@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAAVX///vA\u003d",
+        "filename": "libvideoeditor/vss/src/Android.mk",
+        "patchSetId": 2
+      },
+      "lineNbr": 86,
+      "author": {
+        "id": 2828
+      },
+      "writtenOn": "2012-07-18T22:23:46Z",
+      "side": 1,
+      "message": "Shouldn\u0027t this be\n\n$(TOP)/hardware/qcom/media/mm-core/inc",
+      "revId": "3f9b60b957a2570284a30a0a91b2bb32025c6011",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
