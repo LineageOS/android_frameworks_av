@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAAVn//8f8\u003d",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 370,
+      "author": {
+        "id": 4178
+      },
+      "writtenOn": "2012-08-10T16:18:24Z",
+      "side": 1,
+      "message": "enableMsgType(CAMERA_MSG_ERROR | CAMERA_MSG_ZOOM | CAMERA_MSG_FOCUS |",
+      "revId": "27e18fb0df3e1287f70f8148b1919a90f1081db5",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "AAAAVn//8fU\u003d",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 583,
+      "author": {
+        "id": 4178
+      },
+      "writtenOn": "2012-08-10T16:18:24Z",
+      "side": 1,
+      "message": "Close that after the endif... otherwise you will never close that if statement if QCOM_HARDWARE is not defined.",
+      "revId": "27e18fb0df3e1287f70f8148b1919a90f1081db5",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}

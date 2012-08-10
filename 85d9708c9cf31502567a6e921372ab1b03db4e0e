@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAAVn//8fc\u003d",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 562,
+      "author": {
+        "id": 4178
+      },
+      "writtenOn": "2012-08-10T16:18:24Z",
+      "side": 0,
+      "message": "}",
+      "revId": "85d9708c9cf31502567a6e921372ab1b03db4e0e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "AAAAVn//8fI\u003d",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 942,
+      "author": {
+        "id": 4178
+      },
+      "writtenOn": "2012-08-10T16:18:24Z",
+      "side": 0,
+      "message": "DELETE THAT",
+      "revId": "85d9708c9cf31502567a6e921372ab1b03db4e0e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "AAAAVn//8fM\u003d",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 945,
+      "author": {
+        "id": 4178
+      },
+      "writtenOn": "2012-08-10T16:18:24Z",
+      "side": 0,
+      "message": "}",
+      "revId": "85d9708c9cf31502567a6e921372ab1b03db4e0e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
