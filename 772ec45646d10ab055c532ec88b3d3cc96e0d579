@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAAVn//8dk\u003d",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 370,
+      "author": {
+        "id": 3358
+      },
+      "writtenOn": "2012-08-10T17:26:56Z",
+      "side": 1,
+      "message": "Not sure if it matters, but shouldn\u0027t the added vertical bar go...",
+      "revId": "772ec45646d10ab055c532ec88b3d3cc96e0d579",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "AAAAVn//8dg\u003d",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 372,
+      "author": {
+        "id": 3358
+      },
+      "writtenOn": "2012-08-10T17:26:56Z",
+      "side": 1,
+      "message": "...at the beginning of this line?",
+      "revId": "772ec45646d10ab055c532ec88b3d3cc96e0d579",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
