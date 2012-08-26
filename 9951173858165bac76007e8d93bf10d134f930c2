@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAAW3///+w\u003d",
+        "filename": "media/libmediaplayerservice/StagefrightRecorder.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 1417,
+      "author": {
+        "id": 1022
+      },
+      "writtenOn": "2012-08-26T09:36:27Z",
+      "side": 1,
+      "message": "missing QCOM HARDWARE defines.",
+      "revId": "9951173858165bac76007e8d93bf10d134f930c2",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
