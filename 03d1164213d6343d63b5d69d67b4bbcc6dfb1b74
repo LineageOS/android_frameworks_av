@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAAW3///eQ\u003d",
+        "filename": "media/libmediaplayerservice/StagefrightRecorder.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 1418,
+      "author": {
+        "id": 32
+      },
+      "writtenOn": "2012-08-27T08:34:21Z",
+      "side": 1,
+      "message": "You probably don\u0027t even need to ifdef this stuff.",
+      "revId": "03d1164213d6343d63b5d69d67b4bbcc6dfb1b74",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "AAAAW3///eU\u003d",
+        "filename": "media/libmediaplayerservice/StagefrightRecorder.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 1440,
+      "author": {
+        "id": 32
+      },
+      "writtenOn": "2012-08-27T08:34:21Z",
+      "side": 1,
+      "message": "Don\u0027t indent all of these ifdefs, it\u0027s nasty enough already :(",
+      "revId": "03d1164213d6343d63b5d69d67b4bbcc6dfb1b74",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
