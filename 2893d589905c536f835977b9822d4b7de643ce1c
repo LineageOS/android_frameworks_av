@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAAW3//+/4\u003d",
+        "filename": "media/libmediaplayerservice/StagefrightRecorder.cpp",
+        "patchSetId": 6
+      },
+      "lineNbr": 1417,
+      "author": {
+        "id": 2519
+      },
+      "writtenOn": "2012-08-28T09:23:13Z",
+      "side": 1,
+      "message": "http://www.youtube.com/watch?v\u003dp6l6jPJBZe8",
+      "revId": "2893d589905c536f835977b9822d4b7de643ce1c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "AAAAW3//+/0\u003d",
+        "filename": "media/libmediaplayerservice/StagefrightRecorder.cpp",
+        "patchSetId": 6
+      },
+      "lineNbr": 1439,
+      "author": {
+        "id": 2519
+      },
+      "writtenOn": "2012-08-28T09:23:13Z",
+      "side": 1,
+      "message": "You can\u0027t redefine a variable again. So, this breaks build.",
+      "revId": "2893d589905c536f835977b9822d4b7de643ce1c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "AAAAW3//+/w\u003d",
+        "filename": "media/libmediaplayerservice/StagefrightRecorder.cpp",
+        "patchSetId": 6
+      },
+      "lineNbr": 1451,
+      "author": {
+        "id": 2519
+      },
+      "writtenOn": "2012-08-28T09:23:13Z",
+      "side": 1,
+      "message": "storeMetaDataInVideoBuffers equals useMata\nQCOM_HARDWARE isn\u0027t necessary if you define global in a function the useMeta variable.",
+      "revId": "2893d589905c536f835977b9822d4b7de643ce1c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
