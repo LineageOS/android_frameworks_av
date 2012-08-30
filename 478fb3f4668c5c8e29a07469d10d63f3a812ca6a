@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAAXH///44\u003d",
+        "filename": "media/libmediaplayerservice/StagefrightRecorder.cpp",
+        "patchSetId": 9
+      },
+      "lineNbr": 1439,
+      "author": {
+        "id": 3962
+      },
+      "writtenOn": "2012-08-30T02:33:25Z",
+      "side": 1,
+      "message": "OMG where did this crap come from....",
+      "revId": "478fb3f4668c5c8e29a07469d10d63f3a812ca6a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
