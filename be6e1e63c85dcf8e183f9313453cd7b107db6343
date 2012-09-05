@@ -16,6 +16,24 @@
       "revId": "be6e1e63c85dcf8e183f9313453cd7b107db6343",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "AAAAXH//964\u003d",
+        "filename": "media/libmediaplayerservice/StagefrightRecorder.cpp",
+        "patchSetId": 13
+      },
+      "lineNbr": 1392,
+      "author": {
+        "id": 3962
+      },
+      "writtenOn": "2012-09-05T02:40:28Z",
+      "side": 1,
+      "message": "What do you mean by this?\nAnd I\u0027m gonna add the if defined(QCOM_HARWARE) \u0026\u0026 defined(ARCH_ARM_V6) again",
+      "parentUuid": "AAAAXH//97Q\u003d",
+      "revId": "be6e1e63c85dcf8e183f9313453cd7b107db6343",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
