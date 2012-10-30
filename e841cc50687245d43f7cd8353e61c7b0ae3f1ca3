@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAAaH//8zY\u003d",
+        "filename": "media/libstagefright/OMXCodec.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 431,
+      "author": {
+        "id": 882
+      },
+      "writtenOn": "2012-10-30T07:08:23Z",
+      "side": 1,
+      "message": "I\u0027m not sure we should be setting the screen res here. This would set it for just 860x480, which is great for a phone, but not the A1/Nook Color. RC, thoughts?",
+      "revId": "e841cc50687245d43f7cd8353e61c7b0ae3f1ca3",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
