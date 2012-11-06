@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAAa3///DQ\u003d",
+        "filename": "media/libstagefright/Android.mk",
+        "patchSetId": 1
+      },
+      "lineNbr": 200,
+      "author": {
+        "id": 2195
+      },
+      "writtenOn": "2012-11-06T16:01:27Z",
+      "side": 1,
+      "message": "It is already set at line 173.\n\nAlso, perhaps rename it to something better?",
+      "revId": "65b3e1102a8b76bcae119987468b096dbf6bca41",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "AAAAa3///DY\u003d",
+        "filename": "media/libstagefright/OMXCodec.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 1113,
+      "author": {
+        "id": 2195
+      },
+      "writtenOn": "2012-11-06T16:01:27Z",
+      "side": 1,
+      "message": "whitespace",
+      "revId": "65b3e1102a8b76bcae119987468b096dbf6bca41",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "AAAAa3///DU\u003d",
+        "filename": "media/libstagefright/OMXCodec.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 3585,
+      "author": {
+        "id": 2195
+      },
+      "writtenOn": "2012-11-06T16:01:27Z",
+      "side": 1,
+      "message": "whitespace again",
+      "revId": "65b3e1102a8b76bcae119987468b096dbf6bca41",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
