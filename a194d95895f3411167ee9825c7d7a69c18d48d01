@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAAa3//5kQ\u003d",
+        "filename": "media/libstagefright/ACodec.cpp",
+        "patchSetId": 9
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 2874
+      },
+      "writtenOn": "2012-11-28T15:20:30Z",
+      "side": 1,
+      "message": "The original was better.\nAdjust Android.mk instead to set the correct include path.",
+      "revId": "a194d95895f3411167ee9825c7d7a69c18d48d01",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
