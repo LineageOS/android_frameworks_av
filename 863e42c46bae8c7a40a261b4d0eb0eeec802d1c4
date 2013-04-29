@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAAfH//+qU\u003d",
+        "filename": "services/camera/libcameraservice/CameraHardwareInterface.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 654,
+      "author": {
+        "id": 32
+      },
+      "writtenOn": "2013-04-29T09:27:09Z",
+      "side": 1,
+      "message": "Tabs :(",
+      "revId": "863e42c46bae8c7a40a261b4d0eb0eeec802d1c4",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
