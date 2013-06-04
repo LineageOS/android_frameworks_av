@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "iBxSJxQ",
+        "filename": "media/libstagefright/OMXCodec.cpp",
+        "patchSetId": 6
+      },
+      "lineNbr": 5435,
+      "author": {
+        "id": 883
+      },
+      "writtenOn": "2013-06-04T02:01:24Z",
+      "side": 1,
+      "message": "isn\u0027t that the same thing as \nportFormat.nPortIndex \u003d isEncoder ? 1 : 0;",
+      "revId": "dafacfaefbabf62c245ca43a105f2577c00087f7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
