@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "iL-B3zA",
+        "filename": "camera/CameraParameters.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 246,
+      "author": {
+        "id": 523
+      },
+      "writtenOn": "2013-06-18T01:08:17Z",
+      "side": 1,
+      "message": "STE_SAMSUNG_HARDWARE",
+      "revId": "a8b880f97a062697df0d22035bcd3a11051f6b9e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "iN-Ek0E",
+        "filename": "include/camera/CameraParameters.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 745,
+      "author": {
+        "id": 523
+      },
+      "writtenOn": "2013-06-18T01:08:17Z",
+      "side": 1,
+      "message": "STE_SAMSUNG_HARDWARE",
+      "revId": "a8b880f97a062697df0d22035bcd3a11051f6b9e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
