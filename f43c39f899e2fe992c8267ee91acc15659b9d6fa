@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "iPCq5Bg",
+        "filename": "media/libstagefright/AwesomePlayer.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 2175,
+      "author": {
+        "id": 523
+      },
+      "writtenOn": "2013-06-21T15:01:31Z",
+      "side": 1,
+      "message": "indentation",
+      "revId": "f43c39f899e2fe992c8267ee91acc15659b9d6fa",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
