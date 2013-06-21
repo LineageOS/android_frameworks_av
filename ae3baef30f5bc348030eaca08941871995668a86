@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "iCuw7UI",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 2
+      },
+      "lineNbr": 3,
+      "author": {
+        "id": 2195
+      },
+      "writtenOn": "2013-06-21T20:48:52Z",
+      "side": 1,
+      "message": "y u no retain authorship.",
+      "revId": "ae3baef30f5bc348030eaca08941871995668a86",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
