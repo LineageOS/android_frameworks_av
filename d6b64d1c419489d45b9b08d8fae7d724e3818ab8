@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "dac4157f_3849698c",
+        "filename": "media/libstagefright/AwesomePlayer.cpp",
+        "patchSetId": 4
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2013-07-16T22:26:53Z",
+      "side": 1,
+      "message": "This : breaks compilation.",
+      "revId": "d6b64d1c419489d45b9b08d8fae7d724e3818ab8",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
