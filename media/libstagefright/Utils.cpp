@@ -65,6 +65,7 @@
 #include <media/AudioParameter.h>
 
 #include <stagefright/AVExtensions.h>
+#include <media/stagefright/FFMPEGSoftCodec.h>
 
 namespace android {
 
@@ -1078,7 +1079,15 @@ status_t convertMetaDataToMessage(
     }
 
     AVUtils::get()->convertMetaDataToMessage(meta, &msg);
+
+    FFMPEGSoftCodec::convertMetaDataToMessageFF(meta, &msg);
     *format = msg;
+
+#if 0
+    ALOGI("convertMetaDataToMessage from:");
+    meta->dumpToLog();
+    ALOGI("  to: %s", msg->debugString(0).c_str());
+#endif
 
     return OK;
 }
@@ -1458,8 +1467,10 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
     // XXX TODO add whatever other keys there are
     AVUtils::get()->convertMessageToMetaData(msg, meta);
 
+    FFMPEGSoftCodec::convertMessageToMetaDataFF(msg, meta);
+
 #if 0
-    ALOGI("converted %s to:", msg->debugString(0).c_str());
+    ALOGI("convertMessageToMetaData from %s to:", msg->debugString(0).c_str());
     meta->dumpToLog();
 #endif
 }
@@ -1598,8 +1609,6 @@ bool canOffloadStream(const sp<MetaData>& meta, bool hasVideo,
     if (mapMimeToAudioFormat(info.format, mime) != OK) {
         ALOGE(" Couldn't map mime type \"%s\" to a valid AudioSystem::audio_format !", mime);
         return false;
-    } else {
-        ALOGV("Mime type \"%s\" mapped to audio_format %d", mime, info.format);
     }
 
     info.format  = AVUtils::get()->updateAudioFormat(info.format, meta);
@@ -1612,6 +1621,9 @@ bool canOffloadStream(const sp<MetaData>& meta, bool hasVideo,
     if (AVUtils::get()->canOffloadAPE(meta) != true) {
         return false;
     }
+
+    ALOGV("Mime type \"%s\" mapped to audio_format %d", mime, info.format);
+
     // Redefine aac format according to its profile
     // Offloading depends on audio DSP capabilities.
     int32_t aacaot = -1;
