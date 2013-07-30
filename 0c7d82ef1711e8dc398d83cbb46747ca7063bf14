@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1aca2d91_07e9c61a",
+        "filename": "media/libmediaplayerservice/StagefrightRecorder.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 1448,
+      "author": {
+        "id": 341
+      },
+      "writtenOn": "2013-07-30T23:56:26Z",
+      "side": 1,
+      "message": "atoi has problems with large numbers (http://www.cplusplus.com/reference/cstdlib/atoi/). Could it lead to a potential exploit? strtol (http://www.cplusplus.com/reference/cstdlib/strtol/)is a better alternative",
+      "revId": "0c7d82ef1711e8dc398d83cbb46747ca7063bf14",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
