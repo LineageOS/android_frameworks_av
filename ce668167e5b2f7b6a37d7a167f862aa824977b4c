@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1aca2d91_271722ef",
+        "filename": "media/libnbaio/AudioStreamOutSink.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 70,
+      "author": {
+        "id": 10
+      },
+      "writtenOn": "2013-07-31T01:34:29Z",
+      "side": 1,
+      "message": "getNextWriteTimestamp shouldn\u0027t be invoked at all, it\u0027s ifdeffed out of the thread controller. Where\u0027s the call coming from?",
+      "revId": "ce668167e5b2f7b6a37d7a167f862aa824977b4c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1aca2d91_471a1e19",
+        "filename": "services/audioflinger/AudioFlinger.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 748,
+      "author": {
+        "id": 10
+      },
+      "writtenOn": "2013-07-31T01:34:29Z",
+      "side": 1,
+      "message": "Just move this line to the beginning of the previous block",
+      "revId": "ce668167e5b2f7b6a37d7a167f862aa824977b4c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
