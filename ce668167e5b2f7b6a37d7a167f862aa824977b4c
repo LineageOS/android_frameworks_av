@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "1aca2d91_0788a621",
+        "filename": "media/libnbaio/AudioStreamOutSink.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 70,
+      "author": {
+        "id": 2759
+      },
+      "writtenOn": "2013-07-31T03:22:26Z",
+      "side": 1,
+      "message": "There\u0027s a call in FastMixer.cpp, but ifndef doesn\u0027t help.\n\nframeworks/av/media/libnbaio/AudioStreamOutSink.cpp: In member function \u0027virtual android::status_t android::AudioStreamOutSink::getNextWriteTimestamp(int64_t*)\u0027:\nframeworks/av/media/libnbaio/AudioStreamOutSink.cpp:75:26: error: \u0027struct audio_stream_out\u0027 has no member named \u0027get_next_write_timestamp\u0027\nframeworks/av/media/libnbaio/AudioStreamOutSink.cpp:78:21: error: \u0027struct audio_stream_out\u0027 has no member named \u0027get_next_write_timestamp\u0027\nframeworks/av/media/libnbaio/AudioStreamOutSink.cpp:79:1: error: control reaches end of non-void function [-Werror\u003dreturn-type]\ncc1plus: some warnings being treated as errors",
+      "parentUuid": "1aca2d91_271722ef",
+      "revId": "ce668167e5b2f7b6a37d7a167f862aa824977b4c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "1aca2d91_471a1e19",
         "filename": "services/audioflinger/AudioFlinger.cpp",
         "patchSetId": 1
@@ -30,6 +48,24 @@
       "writtenOn": "2013-07-31T01:34:29Z",
       "side": 1,
       "message": "Just move this line to the beginning of the previous block",
+      "revId": "ce668167e5b2f7b6a37d7a167f862aa824977b4c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1aca2d91_6792ba59",
+        "filename": "services/audioflinger/AudioFlinger.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 748,
+      "author": {
+        "id": 2759
+      },
+      "writtenOn": "2013-07-31T03:22:26Z",
+      "side": 1,
+      "message": "I don\u0027t believe I didn\u0027t see this. Thanks :-)",
+      "parentUuid": "1aca2d91_471a1e19",
       "revId": "ce668167e5b2f7b6a37d7a167f862aa824977b4c",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
