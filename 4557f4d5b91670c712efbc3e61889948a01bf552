@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fae47921_b5822ac7",
+        "filename": "media/libstagefright/omx/Android.mk",
+        "patchSetId": 1
+      },
+      "lineNbr": 48,
+      "author": {
+        "id": 3556
+      },
+      "writtenOn": "2013-08-06T19:56:27Z",
+      "side": 1,
+      "message": "merge error",
+      "revId": "4557f4d5b91670c712efbc3e61889948a01bf552",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
