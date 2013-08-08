@@ -16,6 +16,24 @@
       "revId": "0c7d82ef1711e8dc398d83cbb46747ca7063bf14",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fae47921_a6243eaf",
+        "filename": "media/libmediaplayerservice/StagefrightRecorder.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 1448,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2013-08-08T00:18:23Z",
+      "side": 1,
+      "message": "How large?\n\nfrom cutils/properties.h:\n#define PROPERTY_VALUE_MAX  92\n\nIs 92 large enough to cause problems? This commit is already merged in cm9, cm10 \u0026 cm10.1\n\nThis commit comes from CAF without any tweaks by me",
+      "parentUuid": "1aca2d91_07e9c61a",
+      "revId": "0c7d82ef1711e8dc398d83cbb46747ca7063bf14",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
