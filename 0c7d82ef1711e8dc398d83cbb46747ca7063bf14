@@ -34,6 +34,24 @@
       "revId": "0c7d82ef1711e8dc398d83cbb46747ca7063bf14",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "baee8101_a40d5a39",
+        "filename": "media/libmediaplayerservice/StagefrightRecorder.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 1448,
+      "author": {
+        "id": 341
+      },
+      "writtenOn": "2013-08-19T16:15:56Z",
+      "side": 1,
+      "message": "I am sorry, my mistake. I did not see the implementation of __system_property_read() which just reads from an in-memory copy of the properties that are capped to PROPERTY_VALUE_MAX chars.",
+      "parentUuid": "fae47921_a6243eaf",
+      "revId": "0c7d82ef1711e8dc398d83cbb46747ca7063bf14",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
