@@ -956,6 +956,38 @@ bool PlaylistFetcher::shouldPauseDownload() {
     return false;
 }
 
+void PlaylistFetcher::initSeqNumberForLiveStream(
+        int32_t &firstSeqNumberInPlaylist,
+        int32_t &lastSeqNumberInPlaylist) {
+    // start at least 3 target durations from the end.
+    int64_t timeFromEnd = 0;
+    size_t index = mPlaylist->size();
+    sp<AMessage> itemMeta;
+    int64_t itemDurationUs;
+    int32_t targetDuration;
+    if (mPlaylist->meta()->findInt32("target-duration", &targetDuration)) {
+        do {
+            --index;
+            if (!mPlaylist->itemAt(index, NULL /* uri */, &itemMeta)
+                    || !itemMeta->findInt64("durationUs", &itemDurationUs)) {
+                ALOGW("item or itemDurationUs missing");
+                mSeqNumber = lastSeqNumberInPlaylist - 3;
+                break;
+            }
+
+            timeFromEnd += itemDurationUs;
+            mSeqNumber = firstSeqNumberInPlaylist + index;
+        } while (timeFromEnd < targetDuration * 3E6 && index > 0);
+    } else {
+        ALOGW("target-duration missing");
+        mSeqNumber = lastSeqNumberInPlaylist - 3;
+    }
+
+    if (mSeqNumber < firstSeqNumberInPlaylist) {
+        mSeqNumber = firstSeqNumberInPlaylist;
+    }
+}
+
 bool PlaylistFetcher::initDownloadState(
         AString &uri,
         sp<AMessage> &itemMeta,
@@ -982,11 +1014,8 @@ bool PlaylistFetcher::initDownloadState(
 
         if (mSegmentStartTimeUs < 0) {
             if (!mPlaylist->isComplete() && !mPlaylist->isEvent()) {
-                // If this is a live session, start 3 segments from the end on connect
-                mSeqNumber = lastSeqNumberInPlaylist - 3;
-                if (mSeqNumber < firstSeqNumberInPlaylist) {
-                    mSeqNumber = firstSeqNumberInPlaylist;
-                }
+                // this is a live session
+                initSeqNumberForLiveStream(firstSeqNumberInPlaylist, lastSeqNumberInPlaylist);
             } else {
                 // When seeking mSegmentStartTimeUs is unavailable (< 0), we
                 // use mStartTimeUs (client supplied timestamp) to determine both start segment

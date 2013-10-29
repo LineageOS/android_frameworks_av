@@ -218,6 +218,9 @@ private:
     void onStop(const sp<AMessage> &msg);
     void onMonitorQueue();
     void onDownloadNext();
+    void initSeqNumberForLiveStream(
+            int32_t &firstSeqNumberInPlaylist,
+            int32_t &lastSeqNumberInPlaylist);
     bool initDownloadState(
             AString &uri,
             sp<AMessage> &itemMeta,
