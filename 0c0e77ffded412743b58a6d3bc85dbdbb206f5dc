@@ -16,6 +16,24 @@
       "revId": "0c0e77ffded412743b58a6d3bc85dbdbb206f5dc",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fa1b9901_b0aca5ee",
+        "filename": "media/libstagefright/ACodec.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 982,
+      "author": {
+        "id": 444
+      },
+      "writtenOn": "2013-11-11T07:53:08Z",
+      "side": 1,
+      "message": "It\u0027s an upstream change by CAF, and we should follow that to minimize future merge conflicts. There shouldn\u0027t be anything different for devices though, as they can keep using the TARGET_ENABLE_QC_AV_ENHANCEMENTS.\n\nfrom libstagefright/Android.mk:\nifeq ($(TARGET_ENABLE_QC_AV_ENHANCEMENTS),true)\n       LOCAL_CFLAGS     +\u003d -DENABLE_AV_ENHANCEMENTS\n\nIt\u0027s only the LOCAL_CFLAGS that\u0027s changed as you can see.",
+      "parentUuid": "fa1b9901_b06585e2",
+      "revId": "0c0e77ffded412743b58a6d3bc85dbdbb206f5dc",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
