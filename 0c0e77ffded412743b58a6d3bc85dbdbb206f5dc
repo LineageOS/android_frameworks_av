@@ -34,6 +34,24 @@
       "revId": "0c0e77ffded412743b58a6d3bc85dbdbb206f5dc",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fa1b9901_d0f27906",
+        "filename": "media/libstagefright/ACodec.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 982,
+      "author": {
+        "id": 3556
+      },
+      "writtenOn": "2013-11-11T08:26:10Z",
+      "side": 1,
+      "message": "OK I see that now. I was mobile before",
+      "parentUuid": "fa1b9901_b0aca5ee",
+      "revId": "0c0e77ffded412743b58a6d3bc85dbdbb206f5dc",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
