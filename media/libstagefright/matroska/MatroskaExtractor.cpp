@@ -140,6 +140,7 @@ private:
     enum Type {
         AVC,
         AAC,
+        HEVC,
         OTHER
     };
 
@@ -148,7 +149,7 @@ private:
     Type mType;
     bool mIsAudio;
     BlockIterator mBlockIter;
-    ssize_t mNALSizeLen;  // for type AVC
+    ssize_t mNALSizeLen;  // for type AVC or HEVC
 
     List<MediaBuffer *> mPendingFrames;
 
@@ -241,6 +242,19 @@ MatroskaSource::MatroskaSource(
                 && avccSize >= 5u) {
             mNALSizeLen = 1 + (avcc[4] & 3);
             ALOGV("mNALSizeLen = %zd", mNALSizeLen);
+        } else {
+            ALOGE("No mNALSizeLen");
+        }
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC)) {
+        mType = HEVC;
+
+        uint32_t dummy;
+        const uint8_t *hvcc;
+        size_t hvccSize;
+        if (meta->findData(kKeyHVCC, &dummy, (const void **)&hvcc, &hvccSize)
+                && hvccSize >= 22u) {
+            mNALSizeLen = 1 + (hvcc[14+7] & 3);
+            ALOGV("mNALSizeLen = %zu", mNALSizeLen);
         } else {
             ALOGE("No mNALSizeLen");
         }
@@ -692,7 +706,7 @@ status_t MatroskaSource::read(
     MediaBuffer *frame = *mPendingFrames.begin();
     mPendingFrames.erase(mPendingFrames.begin());
 
-    if (mType != AVC || mNALSizeLen == 0) {
+    if ((mType != AVC && mType != HEVC) || mNALSizeLen == 0) {
         if (targetSampleTimeUs >= 0ll) {
             frame->meta_data()->setInt64(
                     kKeyTargetTime, targetSampleTimeUs);
@@ -1293,6 +1307,14 @@ void MatroskaExtractor::addTracks() {
                 if (!strcmp("V_MPEG4/ISO/AVC", codecID)) {
                     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_AVC);
                     meta->setData(kKeyAVCC, 0, codecPrivate, codecPrivateSize);
+                } else if (!strcmp("V_MPEGH/ISO/HEVC", codecID)) {
+                    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_HEVC);
+                    if (codecPrivateSize > 0) {
+                        meta->setData(kKeyHVCC, kTypeHVCC, codecPrivate, codecPrivateSize);
+                    } else {
+                        ALOGW("HEVC is detected, but does not have configuration.");
+                        continue;
+                    }
                 } else if (!strcmp("V_MPEG4/ISO/ASP", codecID)) {
                     if (codecPrivateSize > 0) {
                         meta->setCString(
