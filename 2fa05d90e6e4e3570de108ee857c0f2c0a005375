@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fa80f949_c7163c55",
+        "filename": "media/libstagefright/MediaBuffer.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 139,
+      "author": {
+        "id": 16
+      },
+      "writtenOn": "2013-12-01T14:42:22Z",
+      "side": 1,
+      "message": "Please remove the \"//added\" comment here. The git history will make it clear anyway.",
+      "revId": "2fa05d90e6e4e3570de108ee857c0f2c0a005375",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
