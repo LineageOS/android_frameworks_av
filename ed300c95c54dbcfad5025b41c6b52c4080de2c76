@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a68dd71_c6ce37b4",
+        "filename": "media/libstagefright/Android.mk",
+        "patchSetId": 3
+      },
+      "lineNbr": 81,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2013-12-28T17:22:54Z",
+      "side": 1,
+      "message": "Is bfam variant check still needed in cm11?",
+      "revId": "ed300c95c54dbcfad5025b41c6b52c4080de2c76",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a68dd71_86c11f83",
+        "filename": "media/libstagefright/Android.mk",
+        "patchSetId": 3
+      },
+      "lineNbr": 98,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2013-12-28T17:22:54Z",
+      "side": 1,
+      "message": "Would be nice to add msm7x30 check here too. Same stuff as 8660.",
+      "revId": "ed300c95c54dbcfad5025b41c6b52c4080de2c76",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
