@@ -19,6 +19,23 @@
     },
     {
       "key": {
+        "uuid": "9a68dd71_060a0fd3",
+        "filename": "media/libstagefright/Android.mk",
+        "patchSetId": 3
+      },
+      "lineNbr": 95,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2013-12-28T18:04:29Z",
+      "side": 1,
+      "message": "is-chipset-in-board-platform-msm8660\n\nshould be\n\nis-chipset-in-board-platform,msm8660",
+      "revId": "ed300c95c54dbcfad5025b41c6b52c4080de2c76",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "9a68dd71_86c11f83",
         "filename": "media/libstagefright/Android.mk",
         "patchSetId": 3
