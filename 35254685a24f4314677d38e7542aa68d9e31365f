@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a68dd71_a4377be2",
+        "filename": "media/libmediaplayerservice/Android.mk",
+        "patchSetId": 4
+      },
+      "lineNbr": 65,
+      "author": {
+        "id": 2544
+      },
+      "writtenOn": "2013-12-29T10:28:12Z",
+      "side": 1,
+      "message": "here",
+      "revId": "35254685a24f4314677d38e7542aa68d9e31365f",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a68dd71_44347fdd",
+        "filename": "services/audioflinger/Android.mk",
+        "patchSetId": 4
+      },
+      "lineNbr": 93,
+      "author": {
+        "id": 2544
+      },
+      "writtenOn": "2013-12-29T10:28:12Z",
+      "side": 1,
+      "message": "here",
+      "revId": "35254685a24f4314677d38e7542aa68d9e31365f",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
