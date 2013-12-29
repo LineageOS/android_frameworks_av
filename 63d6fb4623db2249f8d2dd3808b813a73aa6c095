@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a68dd71_64aae372",
+        "filename": "media/libstagefright/Android.mk",
+        "patchSetId": 9
+      },
+      "lineNbr": 94,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2013-12-29T15:01:05Z",
+      "side": 1,
+      "message": "there is still a typo here that will break 8660\n\n...platform-msm8660 -\u003e ...platform,msm8660",
+      "revId": "63d6fb4623db2249f8d2dd3808b813a73aa6c095",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
