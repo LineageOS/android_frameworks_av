@@ -16,6 +16,23 @@
       "revId": "9ee3f7a33e77355015b8599ae3aba7e3ec0a28bc",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a5de9d1_6ce40f0d",
+        "filename": "services/audioflinger/AudioFlinger.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 1576,
+      "author": {
+        "id": 1935
+      },
+      "writtenOn": "2014-01-01T19:45:07Z",
+      "side": 1,
+      "message": "Also need to remove this #ifdef",
+      "revId": "9ee3f7a33e77355015b8599ae3aba7e3ec0a28bc",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
