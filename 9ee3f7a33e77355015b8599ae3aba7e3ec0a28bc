@@ -33,6 +33,24 @@
       "revId": "9ee3f7a33e77355015b8599ae3aba7e3ec0a28bc",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a5de9d1_2cee17ed",
+        "filename": "services/audioflinger/AudioFlinger.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 1576,
+      "author": {
+        "id": 1935
+      },
+      "writtenOn": "2014-01-01T19:52:30Z",
+      "side": 1,
+      "message": "Or rather change this to:\nelse\n#ifdef QCOM_HARDWARE\n    if (format !\u003d AUDIO_FORMAT_PCM_16_BIT \u0026\u0026\n            !audio_is_compress_voip_format(format) \u0026\u0026\n            !audio_is_compress_capture_format(format)) {\n#else \n    if (format !\u003d AUDIO_FORMAT_PCM_16_BIT) {\n#endif\n        ALOGE(\"openRecord() invalid format %d\", format);\n        lStatus \u003d BAD_VALUE;\n        goto Exit;\n    }\n#endif\n\nOr something.... I really need a machine that can build a bit faster.",
+      "parentUuid": "7a5de9d1_6ce40f0d",
+      "revId": "9ee3f7a33e77355015b8599ae3aba7e3ec0a28bc",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
