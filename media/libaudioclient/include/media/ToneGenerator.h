@@ -177,7 +177,7 @@ private:
 
 
     // Region specific tones.
-    // These supervisory tones are different depending on the region (USA/CANADA, JAPAN, rest of the world).
+    // These supervisory tones are different depending on the region (USA/CANADA, JAPAN, Singapore, rest of the world).
     // When a tone in the range [FIRST_SUP_TONE, LAST_SUP_TONE] is requested, the region is determined
     // from system property gsm.operator.iso-country and the proper tone descriptor is selected with the
     // help of sToneMappingTable[]
@@ -203,6 +203,9 @@ private:
         TONE_AUSTRALIA_BUSY,        // Busy tone: 425 Hz repeated in a 0.375s on, 0.375s off pattern.
         TONE_AUSTRALIA_CALL_WAITING,// Call waiting tone: 425Hz tone repeated in a 0.2s on, 0.2s off, 0.2s on, 4.4s off pattern.
         TONE_AUSTRALIA_CONGESTION,  // Congestion tone: 425Hz tone repeated in a 0.375s on, 0.375s off pattern
+        // SINGAPORE Supervisory tones
+        TONE_SG_BUSY,               // Busy tone: 425 Hz, 750ms ON, 750ms OFF...
+        TONE_SG_RINGTONE,           // Ring Tone: 425 Hz tone modulated with 24 Hz, 400ms ON, 200ms OFF, 400ms ON, 2s OFF...
         NUM_ALTERNATE_TONES
     };
 
@@ -211,6 +214,7 @@ private:
         JAPAN,
         GB,
         AUSTRALIA,
+        SINGAPORE,
         CEPT,
         NUM_REGIONS
     };
