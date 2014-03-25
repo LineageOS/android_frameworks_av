@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "bae84128_23ee8d22",
+        "filename": "media/libstagefright/ACodec.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 3794,
+      "author": {
+        "id": 9180
+      },
+      "writtenOn": "2014-03-25T12:10:20Z",
+      "side": 1,
+      "message": "This (if statement) needs to be enclosed by:\n#ifdef QCOM_HARDWARE\nelse, it\u0027ll break the build for non QCOM_HARDWARE devices.",
+      "revId": "bcc9223df76d564aa1a35be462381acc9eb6e912",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
