@@ -70,6 +70,24 @@
       "revId": "aa96006eff6e8eea8fba09d8796e3781dc4ac3d4",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1af94dfe_de5b612d",
+        "filename": "media/libstagefright/OMXCodec.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 697,
+      "author": {
+        "id": 8640
+      },
+      "writtenOn": "2014-05-07T12:07:07Z",
+      "side": 1,
+      "message": "Is there a need to even have the else outside the ifdef? Seems like having an empty else makes no sense?",
+      "parentUuid": "1af94dfe_be4c9577",
+      "revId": "aa96006eff6e8eea8fba09d8796e3781dc4ac3d4",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
