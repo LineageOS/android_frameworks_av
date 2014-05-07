@@ -16,6 +16,24 @@
       "revId": "aa96006eff6e8eea8fba09d8796e3781dc4ac3d4",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1af94dfe_fb3aafe6",
+        "filename": "media/libstagefright/OMXCodec.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 697,
+      "author": {
+        "id": 5678
+      },
+      "writtenOn": "2014-05-07T09:25:40Z",
+      "side": 1,
+      "message": "I thought about it. But I expect meta-\u003efindData to return data\u003dNULL and size\u003d0 if it evaluates to false. Then if the land in the else branch size will be always 0 so no need to include it.\n\nThe findData assumption might be wrong but it just makes sense to me when looking at the code.",
+      "parentUuid": "1af94dfe_bb302709",
+      "revId": "aa96006eff6e8eea8fba09d8796e3781dc4ac3d4",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
