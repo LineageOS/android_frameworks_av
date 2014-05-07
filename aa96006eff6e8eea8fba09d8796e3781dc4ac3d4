@@ -34,6 +34,24 @@
       "revId": "aa96006eff6e8eea8fba09d8796e3781dc4ac3d4",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1af94dfe_1b22fbb9",
+        "filename": "media/libstagefright/OMXCodec.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 697,
+      "author": {
+        "id": 9180
+      },
+      "writtenOn": "2014-05-07T09:41:59Z",
+      "side": 1,
+      "message": "I think, it could return false, if say, the specified key is not found; irrespective of size/data.\nHowever, If that\u0027s not the case, we should move the ifdef around the else. No point having an empty else block.",
+      "parentUuid": "1af94dfe_fb3aafe6",
+      "revId": "aa96006eff6e8eea8fba09d8796e3781dc4ac3d4",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
