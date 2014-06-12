@@ -946,6 +946,11 @@ status_t SampleTable::getSampleSize_l(
             sampleIndex, sampleSize);
 }
 
+uint32_t SampleTable::getLastSampleIndexInChunk() {
+    Mutex::Autolock autoLock(mLock);
+    return mSampleIterator->getLastSampleIndexInChunk();
+}
+
 status_t SampleTable::getMetaDataForSample(
         uint32_t sampleIndex,
         off64_t *offset,
