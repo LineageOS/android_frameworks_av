@@ -418,6 +418,10 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
             devices2 = availableOutputDevices.getDevicesFromType(
                     AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET);
         }
+        if ((devices2.isEmpty()) && (strategy != STRATEGY_SONIFICATION)) {
+            // no sonification on WFD sink
+            devices2 = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_PROXY);
+        }
         if (devices2.isEmpty()) {
             devices2 = availableOutputDevices.getFirstDevicesFromTypes({
                         AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET, AUDIO_DEVICE_OUT_SPEAKER});
