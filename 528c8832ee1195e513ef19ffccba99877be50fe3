@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a061dce_69d887f0",
+        "filename": "media/libstagefright/FLACExtractor.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 577,
+      "author": {
+        "id": 1935
+      },
+      "writtenOn": "2014-07-22T13:32:30Z",
+      "side": 1,
+      "message": "Where is kKeySampleBits defined? Breaking the build for d2lte currently.",
+      "revId": "528c8832ee1195e513ef19ffccba99877be50fe3",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
