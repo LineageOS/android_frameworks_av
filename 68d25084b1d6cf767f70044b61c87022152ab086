@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5a18252c_8a76b73c",
+        "filename": "services/camera/libcameraservice/Android.mk",
+        "patchSetId": 1
+      },
+      "lineNbr": 63,
+      "author": {
+        "id": 6351
+      },
+      "writtenOn": "2014-10-22T12:20:55Z",
+      "side": 1,
+      "message": "You lost a \"endif\" here.  You have another commit that fixes it.  You really need to combine them into a single commit using \"git rebase\" (fixup, squash or edit) or in the future you can also use \"git commit --amend\" to update a commit...",
+      "revId": "68d25084b1d6cf767f70044b61c87022152ab086",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
