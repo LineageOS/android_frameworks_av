@@ -1,0 +1,89 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5a18252c_46ddb241",
+        "filename": "media/libmedia/AudioRecord.cpp",
+        "patchSetId": 6
+      },
+      "lineNbr": 206,
+      "author": {
+        "id": 444
+      },
+      "writtenOn": "2014-11-01T07:40:48Z",
+      "side": 1,
+      "message": "The code from here down to the last #endif doesn\u0027t exist in kk_2.7.",
+      "revId": "293a966cfd1f860f77aa89d4dffe1c6e05c99964",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5a18252c_26b996ea",
+        "filename": "media/libmedia/AudioTrack.cpp",
+        "patchSetId": 6
+      },
+      "lineNbr": 413,
+      "author": {
+        "id": 444
+      },
+      "writtenOn": "2014-11-01T07:40:48Z",
+      "side": 1,
+      "message": "This code doesn\u0027t exist in kk_2.7 and overrides what\u0027s being set above for DIRECTTRACK. There\u0027s a check there whether or not setting frame sizes as uint8 or uint16.",
+      "revId": "293a966cfd1f860f77aa89d4dffe1c6e05c99964",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5a18252c_86ceaa81",
+        "filename": "services/audioflinger/AudioFlinger.cpp",
+        "patchSetId": 6
+      },
+      "lineNbr": 1593,
+      "author": {
+        "id": 444
+      },
+      "writtenOn": "2014-11-01T07:40:48Z",
+      "side": 1,
+      "message": "Just formatting correction.",
+      "revId": "293a966cfd1f860f77aa89d4dffe1c6e05c99964",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5a18252c_46abf289",
+        "filename": "services/audioflinger/Threads.cpp",
+        "patchSetId": 6
+      },
+      "lineNbr": 3856,
+      "author": {
+        "id": 444
+      },
+      "writtenOn": "2014-11-01T07:40:48Z",
+      "side": 1,
+      "message": "According to kk_2.7, this should be enabled for DIRECTTRACK as well.",
+      "revId": "293a966cfd1f860f77aa89d4dffe1c6e05c99964",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5a18252c_4699326e",
+        "filename": "services/audioflinger/Threads.cpp",
+        "patchSetId": 6
+      },
+      "lineNbr": 5683,
+      "author": {
+        "id": 444
+      },
+      "writtenOn": "2014-11-01T07:40:48Z",
+      "side": 1,
+      "message": "The code here doesn\u0027t exist in kk_2.7. It was removed in voip bringup on kk_2.7 and is handled in a specific DIRECTTRACK part further up. kk_3.5\u0027s voip bringup is a bit differently, and doesn\u0027t take into account DIRECTTRACK related code.",
+      "revId": "293a966cfd1f860f77aa89d4dffe1c6e05c99964",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
