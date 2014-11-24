@@ -117,6 +117,10 @@ LOCAL_SHARED_LIBRARIES := \
         libz \
         libpowermanager \
 
+ifeq ($(BOARD_CANT_REALLOCATE_OMX_BUFFERS),true)
+LOCAL_CFLAGS += -DBOARD_CANT_REALLOCATE_OMX_BUFFERS
+endif
+
 LOCAL_STATIC_LIBRARIES := \
         libstagefright_color_conversion \
         libyuv_static \
