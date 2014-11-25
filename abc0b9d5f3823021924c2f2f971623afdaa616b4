@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "bab6814e_ea392b43",
+        "filename": "media/libstagefright/ACodec.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 768,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2014-11-25T11:42:34Z",
+      "side": 1,
+      "message": "Best not to modify the indentation of this section.",
+      "revId": "abc0b9d5f3823021924c2f2f971623afdaa616b4",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
