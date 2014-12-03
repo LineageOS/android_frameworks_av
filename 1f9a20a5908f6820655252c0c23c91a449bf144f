@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "bab6814e_bf8d8e7d",
+        "filename": "media/libmedia/AudioTrack.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 19,
+      "author": {
+        "id": 68
+      },
+      "writtenOn": "2014-12-03T08:40:45Z",
+      "side": 1,
+      "message": "such debug!",
+      "revId": "1f9a20a5908f6820655252c0c23c91a449bf144f",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "bab6814e_5ff3c20a",
+        "filename": "media/libstagefright/ACodec.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 1622,
+      "author": {
+        "id": 68
+      },
+      "writtenOn": "2014-12-03T08:40:45Z",
+      "side": 1,
+      "message": "Are we supporting 24-bit only for audio/raw?\n\nThe different codecs would eventually need to do this as well.",
+      "revId": "1f9a20a5908f6820655252c0c23c91a449bf144f",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "bab6814e_7fda067a",
+        "filename": "services/audiopolicy/AudioPolicyManager.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 2669,
+      "author": {
+        "id": 68
+      },
+      "writtenOn": "2014-12-03T08:40:45Z",
+      "side": 1,
+      "message": "This is skipping the check only for 24-bit offloads, is it intentional? shouldn\u0027t 16-bit offload be skipped as well?",
+      "revId": "1f9a20a5908f6820655252c0c23c91a449bf144f",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
