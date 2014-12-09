@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9abb7d3a_83be8efd",
+        "filename": "media/libstagefright/Utils.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 43,
+      "author": {
+        "id": 5531
+      },
+      "writtenOn": "2014-12-09T15:39:31Z",
+      "side": 1,
+      "message": "Could just make this\n#ifdef FLAC_OFFLOAD_ENABLED\nsince only one now.",
+      "revId": "de480e1430d2d353fbf5a29b9d23747d0f3079d3",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
