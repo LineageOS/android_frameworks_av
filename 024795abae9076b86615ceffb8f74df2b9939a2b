@@ -16,6 +16,24 @@
       "revId": "024795abae9076b86615ceffb8f74df2b9939a2b",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fad55976_d404c1c7",
+        "filename": "media/libstagefright/Android.mk",
+        "patchSetId": 1
+      },
+      "lineNbr": 182,
+      "author": {
+        "id": 7155
+      },
+      "writtenOn": "2015-01-24T11:14:33Z",
+      "side": 1,
+      "message": "Yes, at least my local builds against lt03wifi went flawless.",
+      "parentUuid": "fad55976_d44cc178",
+      "revId": "024795abae9076b86615ceffb8f74df2b9939a2b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
