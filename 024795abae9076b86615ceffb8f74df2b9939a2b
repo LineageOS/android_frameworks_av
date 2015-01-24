@@ -34,6 +34,41 @@
       "revId": "024795abae9076b86615ceffb8f74df2b9939a2b",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fad55976_f413c50b",
+        "filename": "media/libstagefright/Android.mk",
+        "patchSetId": 1
+      },
+      "lineNbr": 182,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-01-24T11:16:46Z",
+      "side": 1,
+      "message": "I think I may be forgetting that exynos boardconfigs tend to define this.",
+      "parentUuid": "fad55976_d404c1c7",
+      "revId": "024795abae9076b86615ceffb8f74df2b9939a2b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fad55976_54f9f1c7",
+        "filename": "media/libstagefright/OMXCodec.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 2993,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-01-24T11:16:46Z",
+      "side": 1,
+      "message": "Whitespace",
+      "revId": "024795abae9076b86615ceffb8f74df2b9939a2b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
