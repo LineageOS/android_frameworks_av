@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5ac665da_d3b5f7d0",
+        "filename": "services/audiopolicy/AudioPolicyManager.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 3250,
+      "author": {
+        "id": 8640
+      },
+      "writtenOn": "2015-03-23T10:03:12Z",
+      "side": 1,
+      "message": "I think the correct solution is to move the #endif here and leave the #ifdef where it is at.",
+      "revId": "5071e1813a127b802760e486e96d44f4da31bdd7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
