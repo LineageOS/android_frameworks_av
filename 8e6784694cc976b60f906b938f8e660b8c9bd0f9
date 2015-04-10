@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "3ac371cc_9fbee4fd",
+        "filename": "services/audioflinger/Threads.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 5141,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-04-10T17:37:40Z",
+      "side": 1,
+      "message": "It looks like the logic changed  here. In CM11 this standbyIfNotAlreadyInStandby() would occur before the exitPending on line 5135. In CM12 it would appear standby occurs afterwards at line 5562.",
+      "revId": "8e6784694cc976b60f906b938f8e660b8c9bd0f9",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3ac371cc_3fc1b081",
+        "filename": "services/audioflinger/Threads.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 5561,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-04-10T17:37:40Z",
+      "side": 1,
+      "message": "Line 5562 here.",
+      "revId": "8e6784694cc976b60f906b938f8e660b8c9bd0f9",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
