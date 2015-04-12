@@ -212,6 +212,7 @@ bool DescribeDefaultColorFormat(DescribeColorFormat2Params &params) {
         fmt != OMX_COLOR_FormatYUV420PackedPlanar &&
         fmt != OMX_COLOR_FormatYUV420SemiPlanar &&
         fmt != OMX_COLOR_FormatYUV420PackedSemiPlanar &&
+        fmt != OMX_TI_COLOR_FormatYUV420PackedSemiPlanar &&
         fmt != (OMX_COLOR_FORMATTYPE)HAL_PIXEL_FORMAT_YV12) {
         ALOGW("do not know color format 0x%x = %d", fmt, fmt);
         return false;
@@ -271,6 +272,7 @@ bool DescribeDefaultColorFormat(DescribeColorFormat2Params &params) {
 
         case OMX_COLOR_FormatYUV420Planar:
         case OMX_COLOR_FormatYUV420PackedPlanar:
+        case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar:
             image.mPlane[image.U].mOffset = params.nStride * params.nSliceHeight;
             image.mPlane[image.U].mColInc = 1;
             image.mPlane[image.U].mRowInc = params.nStride / 2;
