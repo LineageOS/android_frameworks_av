@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fa7ab95a_33bb7774",
+        "filename": "media/mtp/MtpServer.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 122,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-04-21T10:33:56Z",
+      "side": 1,
+      "message": "if (getStorage(...))",
+      "revId": "865be178b41e3c6ed24e2f064f2c0b6d0a15447f",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
