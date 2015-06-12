@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5a3905b3_10ce8a83",
+        "filename": "services/audiopolicy/Android.mk",
+        "patchSetId": 1
+      },
+      "lineNbr": 23,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-06-12T11:05:17Z",
+      "side": 1,
+      "message": "extra space, I guess.",
+      "revId": "ca6d5f49966581495b2172c4f33d38102e805233",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
