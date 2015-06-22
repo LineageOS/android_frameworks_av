@@ -67,7 +67,7 @@ enum player_type {
 #define AUDIO_SINK_MIN_DEEP_BUFFER_DURATION_US 5000000
 
 // callback mechanism for passing messages to MediaPlayer object
-typedef void (*notify_callback_f)(void* cookie,
+typedef void (*notify_callback_f)(const wp<IMediaPlayer> &listener,
         int msg, int ext1, int ext2, const Parcel *obj);
 
 // abstract base class - use MediaPlayerInterface
@@ -147,7 +147,7 @@ public:
         virtual String8     getParameters(const String8& /* keys */) { return String8::empty(); }
     };
 
-                        MediaPlayerBase() : mCookie(0), mNotify(0) {}
+                        MediaPlayerBase() : mClient(0), mNotify(0) {}
     virtual             ~MediaPlayerBase() {}
     virtual status_t    initCheck() = 0;
     virtual bool        hardwareOutput() = 0;
@@ -248,22 +248,22 @@ public:
     };
 
     void        setNotifyCallback(
-            void* cookie, notify_callback_f notifyFunc) {
+            const wp<IMediaPlayer> &client, notify_callback_f notifyFunc) {
         Mutex::Autolock autoLock(mNotifyLock);
-        mCookie = cookie; mNotify = notifyFunc;
+        mClient = client; mNotify = notifyFunc;
     }
 
     void        sendEvent(int msg, int ext1=0, int ext2=0,
                           const Parcel *obj=NULL) {
         notify_callback_f notifyCB;
-        void* cookie;
+        wp<IMediaPlayer> client;
         {
             Mutex::Autolock autoLock(mNotifyLock);
             notifyCB = mNotify;
-            cookie = mCookie;
+            client = mClient;
         }
 
-        if (notifyCB) notifyCB(cookie, msg, ext1, ext2, obj);
+        if (notifyCB) notifyCB(client, msg, ext1, ext2, obj);
     }
 
     virtual status_t dump(int /* fd */, const Vector<String16>& /* args */) const {
@@ -274,7 +274,7 @@ private:
     friend class MediaPlayerService;
 
     Mutex               mNotifyLock;
-    void*               mCookie;
+    wp<IMediaPlayer>    mClient;
     notify_callback_f   mNotify;
 };
 
