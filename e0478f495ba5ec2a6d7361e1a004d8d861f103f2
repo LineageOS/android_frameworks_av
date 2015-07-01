@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9ff52f3f_9489f227",
+        "filename": "media/libstagefright/AwesomePlayer.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 2430,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-07-01T02:57:36Z",
+      "side": 1,
+      "message": "Usually it\u0027s better to ifdef QCOM_DIRECTTRACK the A-family stuff instead of ifndef the non A-family stuff, no?",
+      "revId": "e0478f495ba5ec2a6d7361e1a004d8d861f103f2",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
