@@ -16,6 +16,24 @@
       "revId": "e0478f495ba5ec2a6d7361e1a004d8d861f103f2",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9ff52f3f_147de21b",
+        "filename": "media/libstagefright/AwesomePlayer.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 2430,
+      "author": {
+        "id": 444
+      },
+      "writtenOn": "2015-07-01T03:00:48Z",
+      "side": 1,
+      "message": "Yeah I\u0027ll fix that.",
+      "parentUuid": "9ff52f3f_9489f227",
+      "revId": "e0478f495ba5ec2a6d7361e1a004d8d861f103f2",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
