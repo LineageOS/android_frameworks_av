@@ -18,6 +18,7 @@
 #define LOG_TAG "OMXMaster"
 #include <utils/Log.h>
 
+#include <cutils/properties.h>
 #include <media/stagefright/omx/OMXMaster.h>
 #include <media/stagefright/omx/SoftOMXPlugin.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -27,8 +28,7 @@
 
 namespace android {
 
-OMXMaster::OMXMaster()
-    : mVendorLibHandle(NULL) {
+OMXMaster::OMXMaster() {
 
     pid_t pid = getpid();
     char filename[20];
@@ -51,45 +51,56 @@ OMXMaster::OMXMaster()
 
     addVendorPlugin();
     addPlugin(new SoftOMXPlugin);
+    addUserPlugin();
 }
 
 OMXMaster::~OMXMaster() {
     clearPlugins();
-
-    if (mVendorLibHandle != NULL) {
-        dlclose(mVendorLibHandle);
-        mVendorLibHandle = NULL;
-    }
 }
 
 void OMXMaster::addVendorPlugin() {
     addPlugin("libstagefrighthw.so");
 }
 
-void OMXMaster::addPlugin(const char *libname) {
-    mVendorLibHandle = dlopen(libname, RTLD_NOW);
+void OMXMaster::addUserPlugin() {
+    char plugin[PROPERTY_VALUE_MAX];
+    char *each_plugin;
+    if (property_get("media.sf.omx-plugin", plugin, NULL)) {
+        each_plugin = strtok(plugin, ",");
+        while (each_plugin != NULL) {
+            addPlugin(each_plugin);
+            each_plugin = strtok(NULL, ",");
+        }
+    }
+}
 
-    if (mVendorLibHandle == NULL) {
+void OMXMaster::addPlugin(const char *libname) {
+    void* handle = dlopen(libname, RTLD_NOW);
+
+    if (handle == NULL) {
         return;
     }
 
     typedef OMXPluginBase *(*CreateOMXPluginFunc)();
     CreateOMXPluginFunc createOMXPlugin =
         (CreateOMXPluginFunc)dlsym(
-                mVendorLibHandle, "createOMXPlugin");
+                handle, "createOMXPlugin");
     if (!createOMXPlugin)
         createOMXPlugin = (CreateOMXPluginFunc)dlsym(
-                mVendorLibHandle, "_ZN7android15createOMXPluginEv");
+                handle, "_ZN7android15createOMXPluginEv");
 
     if (createOMXPlugin) {
-        addPlugin((*createOMXPlugin)());
+        addPlugin((*createOMXPlugin)(), handle);
     }
 }
 
-void OMXMaster::addPlugin(OMXPluginBase *plugin) {
+void OMXMaster::addPlugin(OMXPluginBase *plugin, void *handle) {
+    if (plugin == 0) {
+       return;
+    }
     Mutex::Autolock autoLock(mLock);
 
-    mPlugins.push_back(plugin);
+    mPlugins.add(plugin, handle);
 
     OMX_U32 index = 0;
 
@@ -119,21 +130,32 @@ void OMXMaster::clearPlugins() {
     Mutex::Autolock autoLock(mLock);
 
     typedef void (*DestroyOMXPluginFunc)(OMXPluginBase*);
-    DestroyOMXPluginFunc destroyOMXPlugin =
-        (DestroyOMXPluginFunc)dlsym(
-                mVendorLibHandle, "destroyOMXPlugin");
 
-    mPluginByComponentName.clear();
+    for (unsigned int i = 0; i < mPlugins.size(); i++) {
+        OMXPluginBase *plugin = mPlugins.keyAt(i);
+        if (plugin != NULL) {
+            void *handle = mPlugins.valueAt(i);
 
-    for (List<OMXPluginBase *>::iterator it = mPlugins.begin();
-            it != mPlugins.end(); ++it) {
-        if (destroyOMXPlugin)
-            destroyOMXPlugin(*it);
-        else
-            delete *it;
-        *it = NULL;
+            if (handle != NULL) {
+                DestroyOMXPluginFunc destroyOMXPlugin =
+                    (DestroyOMXPluginFunc)dlsym(
+                            handle, "destroyOMXPlugin");
+
+                if (destroyOMXPlugin)
+                    destroyOMXPlugin(plugin);
+                else
+                    delete plugin;
+
+                dlclose(handle);
+            } else {
+                delete plugin;
+            }
+
+            plugin = NULL;
+        }
     }
 
+    mPluginByComponentName.clear();
     mPlugins.clear();
 }
 
