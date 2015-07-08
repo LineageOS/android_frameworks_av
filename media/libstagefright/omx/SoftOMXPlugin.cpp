@@ -107,6 +107,8 @@ OMX_ERRORTYPE SoftOMXPlugin::makeComponentInstance(
             return OMX_ErrorComponentNotFound;
         }
 
+        ALOGV("load component %s for %s", libName.c_str(), name);
+
         typedef SoftOMXComponent *(*CreateSoftOMXComponentFunc)(
                 const char *, const OMX_CALLBACKTYPE *,
                 OMX_PTR, OMX_COMPONENTTYPE **);
