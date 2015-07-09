@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5ff73747_7188c070",
+        "filename": "media/libstagefright/Android.mk",
+        "patchSetId": 1
+      },
+      "lineNbr": 235,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-07-09T02:00:03Z",
+      "side": 1,
+      "message": "Not like the rest of the file is consistent with the spacing, but might as well try to make it so from now on.",
+      "revId": "3409b317da737d7f0cea733377568379ffa98d5a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5ff73747_31823851",
+        "filename": "media/libstagefright/DataSource.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 59,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-07-09T02:00:03Z",
+      "side": 1,
+      "message": "Could also swap to if (lib \u003d\u003d NULL) return NULL;",
+      "revId": "3409b317da737d7f0cea733377568379ffa98d5a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
