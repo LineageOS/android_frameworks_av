@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1f013ff3_9bbb6b0d",
+        "filename": "services/audiopolicy/AudioPolicyManager.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 896,
+      "author": {
+        "id": 2195
+      },
+      "writtenOn": "2015-07-10T11:25:59Z",
+      "side": 1,
+      "message": "How about using property_get_bool ?\n\nThat handles this (1/true) as well as when it\u0027s set to y/yes/on.",
+      "revId": "7b61f0aa709728ae953e96146e5c80bb619bd5ad",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
