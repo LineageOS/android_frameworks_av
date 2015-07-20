@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ff0f0b1f_2e3d31bb",
+        "filename": "services/audioflinger/AudioFlinger.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 2593,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2015-07-20T00:35:39Z",
+      "side": 1,
+      "message": "This breaks the build after https://github.com/CyanogenMod/android_frameworks_av/commit/d2304db2\n\nNot sure of the proper way to fix it yet",
+      "revId": "96ac12c2a5a0c97c547909aa0555e25b7deeb6b8",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
