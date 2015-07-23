@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "df140735_4813c767",
+        "filename": "media/libstagefright/AwesomePlayer.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 1507,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-07-23T04:58:20Z",
+      "side": 1,
+      "message": "property_get_int32(\"lpa.min_duration\", LPA_MIN_DURATION_USEC_DEFAULT) ?",
+      "range": {
+        "startLine": 1507,
+        "startChar": 22,
+        "endLine": 1507,
+        "endChar": 34
+      },
+      "revId": "fffb2155ea7bef491005663e1411a0dc4a4141ce",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
