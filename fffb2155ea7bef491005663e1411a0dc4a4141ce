@@ -22,6 +22,30 @@
       "revId": "fffb2155ea7bef491005663e1411a0dc4a4141ce",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "df140735_33748899",
+        "filename": "media/libstagefright/AwesomePlayer.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 1507,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2015-07-23T06:39:01Z",
+      "side": 1,
+      "message": "frameworks/av/media/libstagefright/AwesomePlayer.cpp: In member function \u0027void android::AwesomePlayer::createAudioPlayer_l()\u0027:\nframeworks/av/media/libstagefright/AwesomePlayer.cpp:1430:73: error: \u0027property_get_int32\u0027 was not declared in this scope\nframeworks/av/media/libstagefright/AwesomePlayer.cpp: In member function \u0027android::status_t android::AwesomePlayer::initAudioDecoder()\u0027:\nframeworks/av/media/libstagefright/AwesomePlayer.cpp:2086:77: error: \u0027property_get_int32\u0027 was not declared in this scope",
+      "parentUuid": "df140735_4813c767",
+      "range": {
+        "startLine": 1507,
+        "startChar": 22,
+        "endLine": 1507,
+        "endChar": 34
+      },
+      "revId": "fffb2155ea7bef491005663e1411a0dc4a4141ce",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
