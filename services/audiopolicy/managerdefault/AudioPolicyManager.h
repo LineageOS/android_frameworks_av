@@ -395,7 +395,7 @@ protected:
         // must be called every time a condition that affects the device choice for a given output is
         // changed: connected device, phone state, force use, output start, output stop..
         // see getDeviceForStrategy() for the use of fromCache parameter
-        audio_devices_t getNewOutputDevice(const sp<AudioOutputDescriptor>& outputDesc,
+        virtual audio_devices_t getNewOutputDevice(const sp<AudioOutputDescriptor>& outputDesc,
                                            bool fromCache);
 
         // updates cache of device used by all strategies (mDeviceForStrategy[])
@@ -482,12 +482,12 @@ protected:
 
         // if argument "device" is different from AUDIO_DEVICE_NONE,  startSource() will force
         // the re-evaluation of the output device.
-        status_t startSource(const sp<AudioOutputDescriptor>& outputDesc,
+        virtual status_t startSource(const sp<AudioOutputDescriptor>& outputDesc,
                              audio_stream_type_t stream,
                              audio_devices_t device,
                              const char *address,
                              uint32_t *delayMs);
-        status_t stopSource(const sp<AudioOutputDescriptor>& outputDesc,
+        virtual status_t stopSource(const sp<AudioOutputDescriptor>& outputDesc,
                             audio_stream_type_t stream,
                             bool forceDeviceUpdate);
 
@@ -610,6 +610,7 @@ private:
                                             audio_policy_dev_state_t state,
                                             const String8 &device_address);
 
+protected:
         // updates device caching and output for streams that can influence the
         //    routing of notifications
         void handleNotificationRoutingForStream(audio_stream_type_t stream);
@@ -624,7 +625,7 @@ private:
                 SortedVector<audio_io_handle_t>& outputs /*out*/);
         uint32_t curAudioPortGeneration() const { return mAudioPortGeneration; }
         // internal method to return the output handle for the given device and format
-        audio_io_handle_t getOutputForDevice(
+        virtual audio_io_handle_t getOutputForDevice(
                 audio_devices_t device,
                 audio_session_t session,
                 audio_stream_type_t stream,
@@ -660,7 +661,7 @@ private:
                                                         AudioMix **policyMix = NULL);
 
         // Called by setDeviceConnectionState().
-        status_t setDeviceConnectionStateInt(audio_devices_t device,
+        virtual status_t setDeviceConnectionStateInt(audio_devices_t device,
                                                           audio_policy_dev_state_t state,
                                                           const char *device_address,
                                                           const char *device_name);
