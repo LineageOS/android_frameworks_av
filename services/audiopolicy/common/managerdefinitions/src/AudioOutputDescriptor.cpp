@@ -34,7 +34,7 @@ namespace android {
 
 AudioOutputDescriptor::AudioOutputDescriptor(const sp<AudioPort>& port,
                                              AudioPolicyClientInterface *clientInterface)
-    : mPort(port), mDevice(AUDIO_DEVICE_NONE),
+    : mPort(port), mDevice(AUDIO_DEVICE_NONE), mIoHandle(AUDIO_IO_HANDLE_NONE),
       mClientInterface(clientInterface), mPatchHandle(AUDIO_PATCH_HANDLE_NONE), mId(0)
 {
     // clear usage count for all stream types
@@ -222,7 +222,7 @@ void AudioOutputDescriptor::log(const char* indent)
 SwAudioOutputDescriptor::SwAudioOutputDescriptor(const sp<IOProfile>& profile,
                                                  AudioPolicyClientInterface *clientInterface)
     : AudioOutputDescriptor(profile, clientInterface),
-    mProfile(profile), mIoHandle(AUDIO_IO_HANDLE_NONE), mLatency(0),
+    mProfile(profile), mLatency(0),
     mFlags((audio_output_flags_t)0), mPolicyMix(NULL),
     mOutput1(0), mOutput2(0), mDirectOpenCount(0),
     mDirectClientSession(AUDIO_SESSION_NONE), mGlobalRefCount(0)
