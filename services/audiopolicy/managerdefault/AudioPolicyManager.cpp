@@ -4234,7 +4234,7 @@ uint32_t AudioPolicyManager::nextAudioPortGeneration()
 
 // Treblized audio policy xml config will be located in /odm/etc or /vendor/etc.
 static const char *kConfigLocationList[] =
-        {"/odm/etc", "/vendor/etc", "/system/etc"};
+        {"/odm/etc", "/vendor/etc/audio", "/vendor/etc", "/system/etc"};
 static const int kConfigLocationListSize =
         (sizeof(kConfigLocationList) / sizeof(kConfigLocationList[0]));
 
