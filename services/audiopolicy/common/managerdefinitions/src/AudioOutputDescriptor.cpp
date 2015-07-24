@@ -40,7 +40,7 @@ static const DeviceTypeSet& getAllOutRemoteDevices() {
 
 AudioOutputDescriptor::AudioOutputDescriptor(const sp<PolicyAudioPort>& policyAudioPort,
                                              AudioPolicyClientInterface *clientInterface)
-    : mPolicyAudioPort(policyAudioPort), mClientInterface(clientInterface)
+    : mIoHandle(AUDIO_IO_HANDLE_NONE), mPolicyAudioPort(policyAudioPort), mClientInterface(clientInterface)
 {
     if (mPolicyAudioPort.get() != nullptr) {
         mPolicyAudioPort->pickAudioProfile(mSamplingRate, mChannelMask, mFormat);
@@ -278,7 +278,7 @@ void AudioOutputDescriptor::log(const char* indent)
 SwAudioOutputDescriptor::SwAudioOutputDescriptor(const sp<IOProfile>& profile,
                                                  AudioPolicyClientInterface *clientInterface)
     : AudioOutputDescriptor(profile, clientInterface),
-    mProfile(profile), mIoHandle(AUDIO_IO_HANDLE_NONE), mLatency(0),
+    mProfile(profile), mLatency(0),
     mFlags((audio_output_flags_t)0),
     mOutput1(0), mOutput2(0), mDirectOpenCount(0),
     mDirectClientSession(AUDIO_SESSION_NONE)
