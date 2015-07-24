@@ -506,7 +506,7 @@ protected:
         // when a device is disconnected, checks if an output is not used any more and
         // returns its handle if any.
         // transfers the audio tracks and effects from one output thread to another accordingly.
-        status_t checkOutputsForDevice(const sp<DeviceDescriptor>& device,
+        virtual status_t checkOutputsForDevice(const sp<DeviceDescriptor>& device,
                                        audio_policy_dev_state_t state,
                                        SortedVector<audio_io_handle_t>& outputs);
 
@@ -685,10 +685,10 @@ protected:
                                             uint32_t delayMs);
         bool isDeviceOfModule(const sp<DeviceDescriptor>& devDesc, const char *moduleId) const;
 
-        status_t startSource(const sp<SwAudioOutputDescriptor>& outputDesc,
+        virtual status_t startSource(const sp<SwAudioOutputDescriptor>& outputDesc,
                              const sp<TrackClientDescriptor>& client,
                              uint32_t *delayMs);
-        status_t stopSource(const sp<SwAudioOutputDescriptor>& outputDesc,
+        virtual status_t stopSource(const sp<SwAudioOutputDescriptor>& outputDesc,
                             const sp<TrackClientDescriptor>& client);
 
         void clearAudioPatches(uid_t uid);
@@ -787,7 +787,7 @@ protected:
         std::unordered_set<audio_format_t> mManualSurroundFormats;
 
         std::unordered_map<uid_t, audio_flags_mask_t> mAllowedCapturePolicies;
-private:
+protected:
         void onNewAudioModulesAvailableInt(DeviceVector *newDevices);
 
         // Add or remove AC3 DTS encodings based on user preferences.
@@ -840,7 +840,7 @@ private:
                 std::vector<sp<AudioPolicyMix>> *secondaryMixes,
                 output_type_t *outputType);
         // internal method to return the output handle for the given device and format
-        audio_io_handle_t getOutputForDevices(
+        virtual audio_io_handle_t getOutputForDevices(
                 const DeviceVector &devices,
                 audio_session_t session,
                 audio_stream_type_t stream,
@@ -885,7 +885,7 @@ private:
         bool     isValidAttributes(const audio_attributes_t *paa);
 
         // Called by setDeviceConnectionState().
-        status_t setDeviceConnectionStateInt(audio_devices_t deviceType,
+        virtual status_t setDeviceConnectionStateInt(audio_devices_t deviceType,
                                              audio_policy_dev_state_t state,
                                              const char *device_address,
                                              const char *device_name,
