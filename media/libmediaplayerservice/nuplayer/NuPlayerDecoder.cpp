@@ -773,7 +773,8 @@ void NuPlayer::Decoder::handleOutputFormatChange(const sp<AMessage> &format) {
         sp<AMessage> reply = new AMessage(kWhatAudioOutputFormatChanged, this);
         reply->setInt32("generation", mBufferGeneration);
         mRenderer->changeAudioFormat(
-                format, false /* offloadOnly */, hasVideo, flags, reply);
+                format, false /* offloadOnly */, hasVideo,
+                flags, mSource->isStreaming(), reply);
     }
 }
 
