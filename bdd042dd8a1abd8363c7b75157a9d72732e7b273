@@ -16,6 +16,24 @@
       "revId": "bdd042dd8a1abd8363c7b75157a9d72732e7b273",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7f231b9d_5903a70e",
+        "filename": "include/media/stagefright/MediaBufferGroup.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 42,
+      "author": {
+        "id": 7155
+      },
+      "writtenOn": "2015-08-10T03:47:58Z",
+      "side": 0,
+      "message": "It needs to be changed, otherwise the compiler complains about overloaded functions, because the nonBlocking bool is initialized to a default and thus treated the same like the function without the nonBlocking argument.",
+      "parentUuid": "7f231b9d_b6064820",
+      "revId": "bdd042dd8a1abd8363c7b75157a9d72732e7b273",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
