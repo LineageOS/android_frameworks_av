@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7f231b9d_194acf7f",
+        "filename": "media/libstagefright/OMXCodec.cpp",
+        "patchSetId": 11
+      },
+      "lineNbr": 3291,
+      "author": {
+        "id": 10984
+      },
+      "writtenOn": "2015-08-10T19:41:17Z",
+      "side": 1,
+      "message": "This ifdef isn\u0027t being used since we have the same code anyway. While this could stay here to let us know that the code is needed in the USE_ALP_AUDIO case, even the justification/comment for why we need it is different (I mean, what this comment says is different a different reason from what the justification for our introduction of it is: https://github.com/CyanogenMod/android_frameworks_av/commit/ae3484485210d16e397fd007ac928c97cef5842a ). Thus, I\u0027d recommend we ditch both the commented ifdef and the comment before of the variable attribution, or otherwise rephrase the comment.",
+      "revId": "1b12e39551ca1390f4786f24dcbfaa0efea97850",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7f231b9d_39458b71",
+        "filename": "media/libstagefright/StagefrightMediaScanner.cpp",
+        "patchSetId": 11
+      },
+      "lineNbr": 53,
+      "author": {
+        "id": 10984
+      },
+      "writtenOn": "2015-08-10T19:41:17Z",
+      "side": 1,
+      "message": "Since we\u0027re not ifdef\u0027ing this anymore (since we support mp1 and mp2 either way via ffmpeg), this entire change (to this file) seems not necessary.",
+      "revId": "1b12e39551ca1390f4786f24dcbfaa0efea97850",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
