@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7f231b9d_16ee1c88",
+        "filename": "media/libstagefright/ittiamextractors/flac/component/inc/flacp.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 7,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2015-08-10T00:56:11Z",
+      "side": 1,
+      "message": "Doesn\u0027t sound like this should be public",
+      "range": {
+        "startLine": 7,
+        "startChar": 22,
+        "endLine": 7,
+        "endChar": 33
+      },
+      "revId": "534dd127824d0a231f44c3632ccd5b74f6ed30a3",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
