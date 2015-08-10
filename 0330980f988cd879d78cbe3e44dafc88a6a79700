@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7f231b9d_f60cc043",
+        "filename": "media/libstagefright/Android.mk",
+        "patchSetId": 8
+      },
+      "lineNbr": 245,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-08-10T03:39:10Z",
+      "side": 1,
+      "message": "Actually, the static libs are used here.",
+      "revId": "0330980f988cd879d78cbe3e44dafc88a6a79700",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7f231b9d_d609c431",
+        "filename": "media/libstagefright/MediaExtractor.cpp",
+        "patchSetId": 8
+      },
+      "lineNbr": 123,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-08-10T03:39:10Z",
+      "side": 1,
+      "message": "This appears to be the entry point for the new FLAC extractor.",
+      "revId": "0330980f988cd879d78cbe3e44dafc88a6a79700",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
