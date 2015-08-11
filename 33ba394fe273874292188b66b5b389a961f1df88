@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7f231b9d_5c939550",
+        "filename": "media/mtp/MtpServer.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 221,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-08-11T00:53:02Z",
+      "side": 1,
+      "message": "Maybe you could avoid having this extra variable by re-ordering mResponse.dump() after the if statement?",
+      "revId": "33ba394fe273874292188b66b5b389a961f1df88",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7f231b9d_7c8e5128",
+        "filename": "media/mtp/MtpServer.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 223,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-08-11T00:53:02Z",
+      "side": 1,
+      "message": "Missed an instance of errno here.",
+      "revId": "33ba394fe273874292188b66b5b389a961f1df88",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7f231b9d_5cbcb5ba",
+        "filename": "media/mtp/MtpServer.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 886,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-08-11T00:53:02Z",
+      "side": 1,
+      "message": "How about this?\n\n} else {\nresult \u003d MTP_RESPONSE_OK;\n}",
+      "revId": "33ba394fe273874292188b66b5b389a961f1df88",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
