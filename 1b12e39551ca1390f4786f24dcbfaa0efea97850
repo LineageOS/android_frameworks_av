@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "7f231b9d_dc79e52f",
+        "filename": "media/libstagefright/OMXCodec.cpp",
+        "patchSetId": 11
+      },
+      "lineNbr": 3291,
+      "author": {
+        "id": 7155
+      },
+      "writtenOn": "2015-08-11T00:42:32Z",
+      "side": 1,
+      "message": "I actually beg to differ here.\nI think the way it is right now makes more sense, because the commit that introduced this previously is still available as such and is portable on its own, even without this commit. However, to have the same level of code portability here, we need to put the ifdefs anyways, despite them being used or not, because otherwise this commit wouldn\u0027t be applicable on top of a branch lacking the aforementioned commit that introduced this code first.",
+      "parentUuid": "7f231b9d_194acf7f",
+      "revId": "1b12e39551ca1390f4786f24dcbfaa0efea97850",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "7f231b9d_39458b71",
         "filename": "media/libstagefright/StagefrightMediaScanner.cpp",
         "patchSetId": 11
@@ -30,6 +48,24 @@
       "writtenOn": "2015-08-10T19:41:17Z",
       "side": 1,
       "message": "Since we\u0027re not ifdef\u0027ing this anymore (since we support mp1 and mp2 either way via ffmpeg), this entire change (to this file) seems not necessary.",
+      "revId": "1b12e39551ca1390f4786f24dcbfaa0efea97850",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7f231b9d_bc76293e",
+        "filename": "media/libstagefright/StagefrightMediaScanner.cpp",
+        "patchSetId": 11
+      },
+      "lineNbr": 53,
+      "author": {
+        "id": 7155
+      },
+      "writtenOn": "2015-08-11T00:42:32Z",
+      "side": 1,
+      "message": "It is necessary to keep track of changes by each individual commit. Again, this ifdef is needed to maintain the portability of this commit.",
+      "parentUuid": "7f231b9d_39458b71",
       "revId": "1b12e39551ca1390f4786f24dcbfaa0efea97850",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
