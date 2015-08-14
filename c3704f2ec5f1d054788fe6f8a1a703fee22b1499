@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7f231b9d_733557f7",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 302,
+      "author": {
+        "id": 7155
+      },
+      "writtenOn": "2015-08-14T18:07:21Z",
+      "side": 1,
+      "message": "All of this code should be moved out of this functions, back to where the other #ifdefs for SAMSUNG_COLORFORMAT are.\nBecause tis function calls that code via getColorFormat().\nEditing this function directly is a huge mess.",
+      "revId": "c3704f2ec5f1d054788fe6f8a1a703fee22b1499",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7f231b9d_533a5be7",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 312,
+      "author": {
+        "id": 7155
+      },
+      "writtenOn": "2015-08-14T18:07:21Z",
+      "side": 1,
+      "message": "We should probably find a better way to check for the back camera.\nAlso, are you sure it causes side effects to force this format on both the back and the front cam?\nAfaik, the Exynos4 camera also has different formats for the two cams, but enforces one format only.",
+      "revId": "c3704f2ec5f1d054788fe6f8a1a703fee22b1499",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7f231b9d_333fdfd7",
+        "filename": "media/libstagefright/OMXCodec.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 1128,
+      "author": {
+        "id": 7155
+      },
+      "writtenOn": "2015-08-14T18:07:21Z",
+      "side": 1,
+      "message": "This looks wrong.\nNV21 formats are basically NV12, but with U/V reversed (in the interleaved plane).\nThus, NV21 should rather be treated like OMX_COLOR_FormatYUV420SemiPlanar or something alike, but not NV12 and surely not tiled I think.\n\nThen again, I\u0027m hardly an expert on this, so if I\u0027m mixing things here, please enlighten me.",
+      "revId": "c3704f2ec5f1d054788fe6f8a1a703fee22b1499",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
