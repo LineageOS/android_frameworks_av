@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "7f231b9d_b161a73c",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 302,
+      "author": {
+        "id": 9959
+      },
+      "writtenOn": "2015-08-15T07:24:22Z",
+      "side": 1,
+      "message": "At the patch set 1, I defined USE_SAMSUNG_COLORFORMAT_NV21 within USE_SAMSUNG_COLORFORMAT in getColorFormat().\nBut I changed the patch location from getColorFormat() to isCameraColorFormatSupport(), because getColorFormat() is a static function (not a member function) and it cannot touch the CameraSource object. This patch needs to check for the back camera that may require the information from the CameraSource object.",
+      "parentUuid": "7f231b9d_733557f7",
+      "revId": "c3704f2ec5f1d054788fe6f8a1a703fee22b1499",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "7f231b9d_533a5be7",
         "filename": "media/libstagefright/CameraSource.cpp",
         "patchSetId": 3
@@ -36,6 +54,24 @@
     },
     {
       "key": {
+        "uuid": "7f231b9d_9166ab51",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 312,
+      "author": {
+        "id": 9959
+      },
+      "writtenOn": "2015-08-15T07:24:22Z",
+      "side": 1,
+      "message": "I agree. But there is no reliable way to check for the back camera because the cameraId (if \u003d\u003d 0 then back camera) cannot be got from the camera object by the restriction of the android camera API.\nThe side effect to force this format is that the encoded video by the front cam becomes a reversed color (back cam is ok).",
+      "parentUuid": "7f231b9d_533a5be7",
+      "revId": "c3704f2ec5f1d054788fe6f8a1a703fee22b1499",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "7f231b9d_333fdfd7",
         "filename": "media/libstagefright/OMXCodec.cpp",
         "patchSetId": 3
@@ -47,6 +83,24 @@
       "writtenOn": "2015-08-14T18:07:21Z",
       "side": 1,
       "message": "This looks wrong.\nNV21 formats are basically NV12, but with U/V reversed (in the interleaved plane).\nThus, NV21 should rather be treated like OMX_COLOR_FormatYUV420SemiPlanar or something alike, but not NV12 and surely not tiled I think.\n\nThen again, I\u0027m hardly an expert on this, so if I\u0027m mixing things here, please enlighten me.",
+      "revId": "c3704f2ec5f1d054788fe6f8a1a703fee22b1499",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7f231b9d_715b0f87",
+        "filename": "media/libstagefright/OMXCodec.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 1128,
+      "author": {
+        "id": 9959
+      },
+      "writtenOn": "2015-08-15T07:24:22Z",
+      "side": 1,
+      "message": "I agree. I will fix in the next patch set.",
+      "parentUuid": "7f231b9d_333fdfd7",
       "revId": "c3704f2ec5f1d054788fe6f8a1a703fee22b1499",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
