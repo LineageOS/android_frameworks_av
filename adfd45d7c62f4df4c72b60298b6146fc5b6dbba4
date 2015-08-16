@@ -1,0 +1,72 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7f231b9d_2788b5c4",
+        "filename": "media/libstagefright/OMXCodec.cpp",
+        "patchSetId": 7
+      },
+      "lineNbr": 138,
+      "author": {
+        "id": 2320
+      },
+      "writtenOn": "2015-08-16T16:41:32Z",
+      "side": 1,
+      "message": "#ifdef BOARD_USE_SAMSUNG_COLORFORMAT_NV21 missing",
+      "revId": "adfd45d7c62f4df4c72b60298b6146fc5b6dbba4",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7f231b9d_0785b9ad",
+        "filename": "media/libstagefright/OMXCodec.cpp",
+        "patchSetId": 7
+      },
+      "lineNbr": 1142,
+      "author": {
+        "id": 2320
+      },
+      "writtenOn": "2015-08-16T16:41:32Z",
+      "side": 1,
+      "message": "#ifdef BOARD_USE_SAMSUNG_COLORFORMAT_NV21 missing",
+      "revId": "adfd45d7c62f4df4c72b60298b6146fc5b6dbba4",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7f231b9d_e7919df3",
+        "filename": "media/libstagefright/OMXCodec.cpp",
+        "patchSetId": 7
+      },
+      "lineNbr": 1707,
+      "author": {
+        "id": 2320
+      },
+      "writtenOn": "2015-08-16T16:41:32Z",
+      "side": 1,
+      "message": "#ifdef BOARD_USE_SAMSUNG_COLORFORMAT_NV21 missing",
+      "revId": "adfd45d7c62f4df4c72b60298b6146fc5b6dbba4",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7f231b9d_c78ea1cf",
+        "filename": "media/libstagefright/OMXCodec.cpp",
+        "patchSetId": 7
+      },
+      "lineNbr": 2522,
+      "author": {
+        "id": 2320
+      },
+      "writtenOn": "2015-08-16T16:41:32Z",
+      "side": 1,
+      "message": "#ifdef BOARD_USE_SAMSUNG_COLORFORMAT_NV21 missing",
+      "revId": "adfd45d7c62f4df4c72b60298b6146fc5b6dbba4",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
