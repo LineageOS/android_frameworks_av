@@ -1,0 +1,73 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7f231b9d_070ff92e",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 6
+      },
+      "lineNbr": 101,
+      "author": {
+        "id": 9959
+      },
+      "writtenOn": "2015-08-16T03:33:34Z",
+      "side": 1,
+      "message": "This is not good.\n1) For the future better check method of the back cam, CameraParameters is insufficient data (parameters) for checking. The checking must be done in member function of CameraSource for collecting data from the camera object (member variables and member functions).\n2) isRearCamera() is useless if USE_SAMSUNG_COLORFORMAT_NV21 is not defined.",
+      "range": {
+        "startLine": 101,
+        "startChar": 5,
+        "endLine": 101,
+        "endChar": 49
+      },
+      "revId": "f09ea562d1bf8f02a755326baf5b26f5820f7843",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7f231b9d_e734fde0",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 6
+      },
+      "lineNbr": 115,
+      "author": {
+        "id": 9959
+      },
+      "writtenOn": "2015-08-16T03:33:34Z",
+      "side": 1,
+      "message": "This is an undesirable function signature change.\nCameraParameters is only required when USE_SAMSUNG_COLORFORMAT_NV21 is defined.",
+      "range": {
+        "startLine": 115,
+        "startChar": 15,
+        "endLine": 115,
+        "endChar": 61
+      },
+      "revId": "f09ea562d1bf8f02a755326baf5b26f5820f7843",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7f231b9d_2712f559",
+        "filename": "media/libstagefright/OMXCodec.cpp",
+        "patchSetId": 6
+      },
+      "lineNbr": 2517,
+      "author": {
+        "id": 9959
+      },
+      "writtenOn": "2015-08-16T03:33:34Z",
+      "side": 1,
+      "message": "Multiple definition of setNativeWindowColorFormat() is not good. This becomes compile error if both USE_SAMSUNG_COLORFORMAT and USE_SAMSUNG_COLORFOMAT_NV21 are defined.",
+      "range": {
+        "startLine": 2517,
+        "startChar": 5,
+        "endLine": 2517,
+        "endChar": 41
+      },
+      "revId": "f09ea562d1bf8f02a755326baf5b26f5820f7843",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
