@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7f231b9d_8799c920",
+        "filename": "media/libstagefright/Android.mk",
+        "patchSetId": 4
+      },
+      "lineNbr": 237,
+      "author": {
+        "id": 2320
+      },
+      "writtenOn": "2015-08-16T16:25:28Z",
+      "side": 1,
+      "message": "ifneq ($(filter insignal cm,$(TARGET_SLSI_VARIANT)),)",
+      "revId": "98b9f1c990ac410cd9d8ed3e57e4039ef1a620a2",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7f231b9d_679ead08",
+        "filename": "media/libstagefright/Android.mk",
+        "patchSetId": 4
+      },
+      "lineNbr": 240,
+      "author": {
+        "id": 2320
+      },
+      "writtenOn": "2015-08-16T16:25:28Z",
+      "side": 1,
+      "message": "$(TOP)/hardware/$(SLSI_DIR)/exynos/include",
+      "revId": "98b9f1c990ac410cd9d8ed3e57e4039ef1a620a2",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
