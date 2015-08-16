@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7f231b9d_e2c86b75",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 323,
+      "author": {
+        "id": 7155
+      },
+      "writtenOn": "2015-08-16T23:00:14Z",
+      "side": 1,
+      "message": "Shouldn\u0027t this be moved before the ifdefs, so the value for mColorFormat can be re-assigned later on?\nWith the current patch, I don\u0027t see how the ifdef\u0027d code could have any effect, because mColorFormat is assigned to getColorFormat(frameFormat); later on anyways, regardless of any previous code (meaning it wouldn\u0027t make a difference if we compile with or without the code inside the ifdefs.\nOr am I missing something here?",
+      "revId": "01b461d5a9650213492246155b8d9c754e885ac4",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
