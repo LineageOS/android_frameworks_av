@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5f201791_55500c33",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 124,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-08-17T22:41:13Z",
+      "side": 1,
+      "message": "Don\u0027t you want to remove USE_SAMSUNG_CAMERAFORMAT_NV21 here?",
+      "revId": "4d7e9a5fa05bcb73398f8cfb86c0ab21218c4578",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
