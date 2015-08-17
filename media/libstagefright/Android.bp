@@ -146,6 +146,11 @@ cc_library_shared {
             // enable experiments only in userdebug and eng builds
             cflags: ["-DENABLE_STAGEFRIGHT_EXPERIMENTS"],
         },
+        lineage: {
+            uses_samsung_cameraformat_nv21: {
+                cflags: ["-DUSE_SAMSUNG_CAMERAFORMAT_NV21"],
+            },
+        },
     },
 
     sanitize: {
