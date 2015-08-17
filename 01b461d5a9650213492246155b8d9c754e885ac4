@@ -16,6 +16,24 @@
       "revId": "01b461d5a9650213492246155b8d9c754e885ac4",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7f231b9d_62821bcb",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 323,
+      "author": {
+        "id": 9959
+      },
+      "writtenOn": "2015-08-17T08:50:39Z",
+      "side": 1,
+      "message": "I think you are missing \u0027return OK\u0027.",
+      "parentUuid": "7f231b9d_e2c86b75",
+      "revId": "01b461d5a9650213492246155b8d9c754e885ac4",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
