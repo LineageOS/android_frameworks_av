@@ -1160,14 +1160,15 @@ sp<MediaCodecSource> StagefrightRecorder::createAudioSource() {
 
     sp<MediaCodecSource> audioEncoder =
             MediaCodecSource::Create(mLooper, format, audioSource);
-    sp<AudioSystem::AudioDeviceCallback> callback = mAudioDeviceCallback.promote();
+    if (audioEncoder == NULL) {
+        ALOGE("Failed to create audio encoder");
+    } else {
+        sp<AudioSystem::AudioDeviceCallback> callback = mAudioDeviceCallback.promote();
     if (mDeviceCallbackEnabled && callback != 0) {
         audioSource->addAudioDeviceCallback(callback);
     }
     mAudioSourceNode = audioSource;
 
-    if (audioEncoder == NULL) {
-        ALOGE("Failed to create audio encoder");
     }
 
     return audioEncoder;
@@ -1229,13 +1230,22 @@ status_t StagefrightRecorder::setupRawAudioRecording() {
     }
 
     sp<MediaCodecSource> audioEncoder = createAudioSource();
-    if (audioEncoder == NULL) {
+    if (audioEncoder != NULL) {
+        CHECK(mWriter != 0);
+        mWriter->addSource(audioEncoder);
+        mAudioEncoderSource = audioEncoder;
+    } else if (audioEncoder == NULL && mAudioEncoder == AUDIO_ENCODER_LPCM) {
+        CHECK(mWriter != 0);
+        sp<MediaSource> src = setPCMRecording();
+        if (src == NULL) {
+            ALOGE("Recording source is null");
+            return UNKNOWN_ERROR;
+        }
+        mAudioSourceNode =  reinterpret_cast<AudioSource* > (src.get());
+        mWriter->addSource(src);
+    } else if (audioEncoder == NULL) {
         return UNKNOWN_ERROR;
     }
-
-    CHECK(mWriter != 0);
-    mWriter->addSource(audioEncoder);
-    mAudioEncoderSource = audioEncoder;
 
     if (mMaxFileDurationUs != 0) {
         mWriter->setMaxFileDuration(mMaxFileDurationUs);
