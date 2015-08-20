@@ -23,6 +23,7 @@
 #include <camera/CameraParameters.h>
 #include <utils/String8.h>
 
+#include <include/media/MediaSource.h>
 #include <system/audio.h>
 
 #include <media/hardware/MetadataBufferType.h>
@@ -218,6 +219,7 @@ private:
     void clipNumberOfAudioChannels();
     void setDefaultProfileIfNecessary();
     void setDefaultVideoEncoderIfNecessary();
+    virtual sp<MediaSource> setPCMRecording() {return NULL;}
 
 
     StagefrightRecorder(const StagefrightRecorder &);
