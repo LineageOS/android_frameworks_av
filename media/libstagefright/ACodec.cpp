@@ -6220,6 +6220,8 @@ bool ACodec::BaseState::onOMXFillBufferDone(
 
             reply->setInt32("buffer-id", info->mBufferID);
 
+            (void)mCodec->setDSModeHint(reply, flags, timeUs);
+
             notify->setMessage("reply", reply);
 
             notify->post();
@@ -6285,8 +6287,9 @@ void ACodec::BaseState::onOutputBufferDrained(const sp<AMessage> &msg) {
         ALOGW_IF(err != NO_ERROR, "failed to set dataspace: %d", err);
     }
 
+    bool skip = mCodec->getDSModeHint(msg);
     int32_t render;
-    if (mCodec->mNativeWindow != NULL
+    if (!skip && mCodec->mNativeWindow != NULL
             && msg->findInt32("render", &render) && render != 0
             && info->mData != NULL && info->mData->size() != 0) {
         ATRACE_NAME("render");
