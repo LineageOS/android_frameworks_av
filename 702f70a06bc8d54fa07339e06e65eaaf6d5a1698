@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "3f1d235d_26ab0d1e",
+        "filename": "media/libstagefright/MPEG4Writer.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 978,
+      "author": {
+        "id": 13691
+      },
+      "writtenOn": "2015-09-05T05:37:56Z",
+      "side": 1,
+      "message": "Are you worried about truncation?\n\n    durationUs * (mTimeScale / mHFRRation)\n\nwill be imprecise unless mTimeScale is a multiple of mHFRRation.\n\n    (durationUs * mTimeScale) / mHFRRation\n\nis more precise as long as you\u0027re not worried about durationUs * mtimeScale overflowing.",
+      "range": {
+        "startLine": 978,
+        "startChar": 24,
+        "endLine": 978,
+        "endChar": 34
+      },
+      "revId": "702f70a06bc8d54fa07339e06e65eaaf6d5a1698",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
