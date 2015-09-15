@@ -177,7 +177,7 @@ private:
 
 
     // Region specific tones.
-    // These supervisory tones are different depending on the region (USA/CANADA, JAPAN, Singapore, rest of the world).
+    // These supervisory tones are different depending on the region (USA/CANADA, JAPAN, Singapore, Hong Kong, rest of the world).
     // When a tone in the range [FIRST_SUP_TONE, LAST_SUP_TONE] is requested, the region is determined
     // from system property gsm.operator.iso-country and the proper tone descriptor is selected with the
     // help of sToneMappingTable[]
@@ -206,6 +206,9 @@ private:
         // SINGAPORE Supervisory tones
         TONE_SG_BUSY,               // Busy tone: 425 Hz, 750ms ON, 750ms OFF...
         TONE_SG_RINGTONE,           // Ring Tone: 425 Hz tone modulated with 24 Hz, 400ms ON, 200ms OFF, 400ms ON, 2s OFF...
+        // HONG KONG Supervisory tones
+        TONE_HK_BUSY,               // Busy tone: 480 Hz + 620 Hz, 500ms ON, 500ms OFF...
+        TONE_HK_RINGTONE,           // Ring Tone: 440 Hz + 480 Hz repeated with pattern 0,4s on, 0,2s off, 0,4s on and 3s off.
         NUM_ALTERNATE_TONES
     };
 
@@ -215,6 +218,7 @@ private:
         GB,
         AUSTRALIA,
         SINGAPORE,
+        HONGKONG,
         CEPT,
         NUM_REGIONS
     };
