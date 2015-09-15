@@ -740,6 +740,18 @@ const ToneGenerator::ToneDescriptor ToneGenerator::sToneDescriptors[] = {
                         { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
           .repeatCnt = ToneGenerator::TONEGEN_INF,
           .repeatSegment = 0 },                              // TONE_JAPAN_RADIO_ACK
+        { .segments = { { .duration = 375, .waveFreq = { 400, 0 }, 0, 0 },
+                        { .duration = 375, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 },                              // TONE_GB_BUSY
+        { .segments = { { .duration = 400, .waveFreq = { 400, 0 }, 0, 0 },
+                        { .duration = 350, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 225, .waveFreq = { 400, 0 }, 0, 0 },
+                        { .duration = 525, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 },                              // TONE_GB_CONGESTION
         { .segments = { { .duration = 400, .waveFreq = { 400, 450, 0 }, 0, 0 },
                         { .duration = 200, .waveFreq = { 0 }, 0, 0 },
                         { .duration = 400, .waveFreq = { 400, 450, 0 }, 0, 0 },
@@ -797,9 +809,9 @@ const unsigned char /*tone_type*/ ToneGenerator::sToneMappingTable[NUM_REGIONS-1
             TONE_SUP_RINGTONE            // TONE_SUP_RINGTONE
         },
         {   // GB
-            TONE_SUP_DIAL,               // TONE_SUP_DIAL
-            TONE_SUP_BUSY,               // TONE_SUP_BUSY
-            TONE_SUP_CONGESTION,         // TONE_SUP_CONGESTION
+            TONE_ANSI_DIAL,              // TONE_SUP_DIAL
+            TONE_GB_BUSY,                // TONE_SUP_BUSY
+            TONE_GB_CONGESTION,          // TONE_SUP_CONGESTION
             TONE_SUP_RADIO_ACK,          // TONE_SUP_RADIO_ACK
             TONE_SUP_RADIO_NOTAVAIL,     // TONE_SUP_RADIO_NOTAVAIL
             TONE_SUP_ERROR,              // TONE_SUP_ERROR
