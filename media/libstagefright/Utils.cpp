@@ -637,6 +637,11 @@ status_t convertMetaDataToMessage(
         msg->setInt32("track-id", trackID);
     }
 
+    const char *lang;
+    if (meta->findCString(kKeyMediaLanguage, &lang)) {
+        msg->setString("language", lang);
+    }
+
     if (!strncasecmp("video/", mime, 6)) {
         int32_t width, height;
         if (!meta->findInt32(kKeyWidth, &width)
@@ -1271,6 +1276,11 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
     }
     if (msg->findInt32("max-bitrate", &maxBitrate) && maxBitrate > 0 && maxBitrate >= avgBitrate) {
         meta->setInt32(kKeyMaxBitRate, maxBitrate);
+    }
+
+    AString lang;
+    if (msg->findString("language", &lang)) {
+        meta->setCString(kKeyMediaLanguage, lang.c_str());
     }
 
     if (mime.startsWith("video/")) {

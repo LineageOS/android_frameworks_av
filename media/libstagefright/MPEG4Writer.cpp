@@ -3259,7 +3259,12 @@ void MPEG4Writer::Track::writeMdhdBox(uint32_t now) {
     // Each character is packed as the difference between its ASCII value and 0x60.
     // For "English", these are 00101, 01110, 00111.
     // XXX: Where is the padding bit located: 0x15C7?
-    mOwner->writeInt16(0);             // language code
+    const char *lang = NULL;
+    int16_t langCode = 0;
+    if (mMeta->findCString(kKeyMediaLanguage, &lang) && lang && strnlen(lang, 3) > 2) {
+        langCode = ((lang[0] & 0x1f) << 10) | ((lang[1] & 0x1f) << 5) | (lang[2] & 0x1f);
+    }
+    mOwner->writeInt16(langCode);      // language code
     mOwner->writeInt16(0);             // predefined
     mOwner->endBox();
 }
