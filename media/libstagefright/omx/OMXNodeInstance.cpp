@@ -246,6 +246,15 @@ protected:
     virtual ~CallbackDispatcher();
 
 private:
+    enum {
+        // This is used for frame_rendered message batching, which will eventually end up in a
+        // single AMessage in MediaCodec when it is signaled to the app. AMessage can contain
+        // up-to 64 key-value pairs, and each frame_rendered message uses 2 keys, so the max
+        // value for this would be 32. Nonetheless, limit this to 12 to which gives at least 10
+        // mseconds of batching at 120Hz.
+        kMaxQueueSize = 12,
+    };
+
     Mutex mLock;
 
     sp<OMXNodeInstance> const mOwner;
@@ -290,7 +299,7 @@ void OMXNodeInstance::CallbackDispatcher::post(const omx_message &msg, bool real
     Mutex::Autolock autoLock(mLock);
 
     mQueue.push_back(msg);
-    if (realTime) {
+    if (realTime || mQueue.size() >= kMaxQueueSize) {
         mQueueChanged.signal();
     }
 }
@@ -2164,8 +2173,8 @@ OMX_ERRORTYPE OMXNodeInstance::OnEvent(
             msg.fenceFd = -1;
             msg.u.render_data.timestamp = renderData[i].nMediaTimeUs;
             msg.u.render_data.nanoTime = renderData[i].nSystemTimeNs;
-
-            instance->mDispatcher->post(msg, false /* realTime */);
+            bool realTime = msg.u.render_data.timestamp == INT64_MAX;
+            instance->mDispatcher->post(msg, realTime);
         }
         return OMX_ErrorNone;
     }
