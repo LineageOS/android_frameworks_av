@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "1f2f7f8d_5f35dbf6",
+        "filename": "media/libstagefright/OMXCodec.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 1830,
+      "author": {
+        "id": 7155
+      },
+      "writtenOn": "2015-11-03T16:14:48Z",
+      "side": 1,
+      "message": "Nope.\nhttps://github.com/codewalkerster/android_frameworks_av/commit/dcd507cdb113b939967247afa31cd777ea34c43d#diff-564bb950bb269cb324d9c87390167f89R1775",
+      "parentUuid": "1f2f7f8d_d109c431",
+      "revId": "80596ad2a5d374bbabf451ad94a269b0e47b0dd7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "1f2f7f8d_f10cc043",
         "filename": "media/libstagefright/OMXCodec.cpp",
         "patchSetId": 1
