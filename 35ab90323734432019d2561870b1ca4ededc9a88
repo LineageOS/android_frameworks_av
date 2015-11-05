@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1f2f7f8d_48875ed9",
+        "filename": "media/libstagefright/Android.mk",
+        "patchSetId": 1
+      },
+      "lineNbr": 136,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-11-05T02:44:55Z",
+      "side": 1,
+      "message": "I was trying to get rid of this in cm-12.1, but turns out people were still using it. The variant repos are set to read-only though, so you can\u0027t actually change them anymore though... I\u0027d prefer to get rid of these if possible.",
+      "revId": "35ab90323734432019d2561870b1ca4ededc9a88",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
