@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7f515b1d_86a78a50",
+        "filename": "media/libeffects/factory/EffectsFactory.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 459,
+      "author": {
+        "id": 68
+      },
+      "writtenOn": "2015-11-18T22:48:50Z",
+      "side": 1,
+      "message": "Makefile definitions don\u0027t get automatically defined as macros, you need to adjust the Android.mk for this module to define it in CFLAGS when this is set to true, something like:\n\nifeq ($(TARGET_IGNORE_VENDOR_AUDIO_EFFECTS_CONF),true)\n  LOCAL_CFLAGS +\u003d -DIGNORE_VENDOR_AUDIO_EFFECTS_CONF\nendif\n\nAnd then #ifdef on IGNORE_VENDOR_AUDIO_EFFECTS_CONF.\n\nYou\u0027ll need this in both libeffects and policy.",
+      "range": {
+        "startLine": 459,
+        "startChar": 7,
+        "endLine": 459,
+        "endChar": 46
+      },
+      "revId": "011db2f6d47db469f186dd6d7a0f59786cc19876",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
