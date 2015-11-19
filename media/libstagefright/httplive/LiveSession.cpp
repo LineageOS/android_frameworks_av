@@ -1175,7 +1175,7 @@ static double uniformRand() {
 #endif
 
 bool LiveSession::UriIsSameAsIndex(const AString &uri, int32_t i, bool newUri) {
-    ALOGI("[timed_id3] i %d UriIsSameAsIndex newUri %s, %s", i,
+    ALOGV("[timed_id3] i %d UriIsSameAsIndex newUri %s, %s", i,
             newUri ? "true" : "false",
             newUri ? mStreams[i].mNewUri.c_str() : mStreams[i].mUri.c_str());
     return i >= 0
