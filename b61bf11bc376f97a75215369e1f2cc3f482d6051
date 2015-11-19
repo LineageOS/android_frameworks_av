@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7f515b1d_1ae1adff",
+        "filename": "media/libavextensions/mediaplayerservice/AVNuExtensions.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 90,
+      "author": {
+        "id": 13589
+      },
+      "writtenOn": "2015-11-19T20:16:59Z",
+      "side": 1,
+      "message": "Building on Huashan MSM8960 I\u0027m missing this function so far :\n\nframeworks/av/media/libavextensions/mediaplayerservice/AVNuUtils.cpp:146:44: error: no \u0027void android::AVNuUtils::addFlagsInMeta(const android::sp\u003candroid::ABuffer\u003e\u0026, int32_t, bool)\u0027 member function declared in class \u0027android::AVNuUtils\u0027\n         int32_t /*flags*/, bool /*isAudio*/) {",
+      "revId": "b61bf11bc376f97a75215369e1f2cc3f482d6051",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
