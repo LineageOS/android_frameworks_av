@@ -33,6 +33,24 @@
       "revId": "b61bf11bc376f97a75215369e1f2cc3f482d6051",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5f4e5783_6be8d515",
+        "filename": "media/libavextensions/mediaplayerservice/AVNuExtensions.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 90,
+      "author": {
+        "id": 13589
+      },
+      "writtenOn": "2015-11-21T06:09:13Z",
+      "side": 1,
+      "message": "I put back only this function out of the 8974 target, built past the error.\n\nThe two others have to stay of course, they are overloaded.\nvirtual uint32_t android::AVNuUtils::getFlags() cannot be overloaded\nvirtual bool android::AVNuUtils::canUseSetBuffers(const android::sp\u003candroid::MetaData\u003e\u0026) cannot be overloaded",
+      "parentUuid": "7f515b1d_1ae1adff",
+      "revId": "b61bf11bc376f97a75215369e1f2cc3f482d6051",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
