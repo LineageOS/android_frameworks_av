@@ -51,6 +51,24 @@
       "revId": "b61bf11bc376f97a75215369e1f2cc3f482d6051",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff82abbf_b162ead7",
+        "filename": "media/libavextensions/mediaplayerservice/AVNuExtensions.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 90,
+      "author": {
+        "id": 13589
+      },
+      "writtenOn": "2015-11-24T20:19:24Z",
+      "side": 1,
+      "message": "The same problem happens, the function prototype is simply missing for my 8960, therefore excluded.",
+      "parentUuid": "5f4e5783_6be8d515",
+      "revId": "b61bf11bc376f97a75215369e1f2cc3f482d6051",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
