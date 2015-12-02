@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "bf8cb3f7_949f94b3",
+        "filename": "media/libstagefright/ACodec.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 1256,
+      "author": {
+        "id": 13956
+      },
+      "writtenOn": "2015-12-02T00:42:31Z",
+      "side": 1,
+      "message": "Shall we use similar log ? \n%p/%p \ninfo.mGraphicBuffer.get(), info.mGraphicBuffer \u003d\u003d NULL ? NULL : info.mGraphicBuffer-\u003egetNativeBuffer()",
+      "revId": "89474286c70e204a7ffca3602c027ee5ab5fed7a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
