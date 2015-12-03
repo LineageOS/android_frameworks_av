@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "bf8cb3f7_47e95d7e",
+        "filename": "media/libstagefright/SampleTable.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 249,
+      "author": {
+        "id": 13956
+      },
+      "writtenOn": "2015-12-03T06:30:35Z",
+      "side": 0,
+      "message": "SIZE_MAX is unsigned 8 bytes int on 64 bits system and overflow signed 8 bytes off64_t",
+      "revId": "53f30099f701ef110ad7f16c4bec0c26eff9457a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
