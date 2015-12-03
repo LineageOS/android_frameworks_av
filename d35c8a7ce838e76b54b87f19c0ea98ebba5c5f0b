@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "bf8cb3f7_47ff1d67",
+        "filename": "media/libstagefright/FFMPEGSoftCodec.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 272,
+      "author": {
+        "id": 9813
+      },
+      "writtenOn": "2015-12-03T06:00:00Z",
+      "side": 1,
+      "message": "here",
+      "revId": "d35c8a7ce838e76b54b87f19c0ea98ebba5c5f0b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "bf8cb3f7_a70aa987",
+        "filename": "media/libstagefright/FFMPEGSoftCodec.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 309,
+      "author": {
+        "id": 9813
+      },
+      "writtenOn": "2015-12-03T06:00:00Z",
+      "side": 1,
+      "message": "This is already contained in a QCOM_HARDWARE ifdef afaict",
+      "revId": "d35c8a7ce838e76b54b87f19c0ea98ebba5c5f0b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
