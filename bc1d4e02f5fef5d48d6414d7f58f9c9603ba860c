@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "bf8cb3f7_3647a520",
+        "filename": "include/media/stagefright/OMXCodec.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 300,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-12-05T00:39:55Z",
+      "side": 1,
+      "message": "Not useful, OMXCodec isn\u0027t really used anymore.",
+      "revId": "bc1d4e02f5fef5d48d6414d7f58f9c9603ba860c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "bf8cb3f7_d653d9e1",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 118,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-12-05T00:39:55Z",
+      "side": 1,
+      "message": "Not useful, OMXCodec isn\u0027t really used anymore.",
+      "revId": "bc1d4e02f5fef5d48d6414d7f58f9c9603ba860c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
