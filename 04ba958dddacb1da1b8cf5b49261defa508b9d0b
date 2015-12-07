@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9f91af0f_34aa4685",
+        "filename": "media/libstagefright/colorconversion/SoftwareRenderer.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 309,
+      "author": {
+        "id": 12082
+      },
+      "writtenOn": "2015-12-07T22:38:17Z",
+      "side": 1,
+      "message": "This looks weird, you really want to change the \"else\"?",
+      "range": {
+        "startLine": 309,
+        "startChar": 0,
+        "endLine": 309,
+        "endChar": 40
+      },
+      "revId": "04ba958dddacb1da1b8cf5b49261defa508b9d0b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
