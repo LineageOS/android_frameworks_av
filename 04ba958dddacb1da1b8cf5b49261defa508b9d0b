@@ -22,6 +22,30 @@
       "revId": "04ba958dddacb1da1b8cf5b49261defa508b9d0b",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9f91af0f_480e4ee6",
+        "filename": "media/libstagefright/colorconversion/SoftwareRenderer.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 309,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-12-08T03:52:27Z",
+      "side": 1,
+      "message": "It looks like this statement is supposed to be at line 306.",
+      "parentUuid": "9f91af0f_34aa4685",
+      "range": {
+        "startLine": 309,
+        "startChar": 0,
+        "endLine": 309,
+        "endChar": 40
+      },
+      "revId": "04ba958dddacb1da1b8cf5b49261defa508b9d0b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
