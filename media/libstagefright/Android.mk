@@ -73,6 +73,7 @@ LOCAL_SRC_FILES:=                         \
         VBRISeeker.cpp                    \
         VideoFrameScheduler.cpp           \
         WAVExtractor.cpp                  \
+        WAVEWriter.cpp                    \
         WVMExtractor.cpp                  \
         XINGSeeker.cpp                    \
         avc_utils.cpp                     \
