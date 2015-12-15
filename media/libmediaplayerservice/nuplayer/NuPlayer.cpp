@@ -2376,9 +2376,6 @@ void NuPlayer::performDecoderFlush(FlushCommand audio, FlushCommand video) {
 void NuPlayer::performReset() {
     ALOGV("performReset");
 
-    CHECK(mAudioDecoder == NULL);
-    CHECK(mVideoDecoder == NULL);
-
     updatePlaybackTimer(true /* stopping */, "performReset");
     updateRebufferingTimer(true /* stopping */, true /* exiting */);
 
