@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ff6b8bd7_e0dbb67a",
+        "filename": "media/libstagefright/Android.mk",
+        "patchSetId": 3
+      },
+      "lineNbr": 134,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2015-12-16T01:10:32Z",
+      "side": 1,
+      "message": "Going to make this -$(TARGET_SLSI_VARIANT), if we bring back the older \"insignal\" ones, we should definitely make it less painful for ourselves to support multiple variants.",
+      "revId": "c2e562733b19cc2651c83b569e16e846a3c1ef9d",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
