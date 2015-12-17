@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "df7087c5_8d931150",
+        "filename": "media/libstagefright/MediaExtractor.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 120,
+      "author": {
+        "id": 13956
+      },
+      "writtenOn": "2015-12-17T07:43:08Z",
+      "side": 1,
+      "message": "or should we remove that tag checking completely ??",
+      "revId": "40d1dd469234de14001bb4cc1f0300e6ae14c805",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
