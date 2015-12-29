@@ -129,6 +129,11 @@ bool VideoFrameScheduler::PLL::fit(
         numSamplesToUse = mNumSamples;
     }
 
+    if ((period >> kPrecision) == 0 ) {
+        ALOGW("Period is 0, or after including precision is 0 - would cause div0, returning");
+        return false;
+    }
+
     int64_t sumX = 0;
     int64_t sumXX = 0;
     int64_t sumXY = 0;
