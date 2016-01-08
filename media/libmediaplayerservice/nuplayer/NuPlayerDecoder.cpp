@@ -276,7 +276,10 @@ bool NuPlayer::Decoder::handleAnInputBuffer() {
         ALOGI("[%s] resubmitting CSD", mComponentName.c_str());
         reply->setBuffer("buffer", buffer);
         mCSDsToSubmit.removeAt(0);
-        CHECK(onInputBufferFilled(reply));
+        if (!onInputBufferFilled(reply)) {
+            handleError(UNKNOWN_ERROR);
+            return false;
+        }
         return true;
     }
 
@@ -389,7 +392,10 @@ bool android::NuPlayer::Decoder::onInputBufferFilled(const sp<AMessage> &msg) {
 
         // copy into codec buffer
         if (buffer != codecBuffer) {
-            CHECK_LE(buffer->size(), codecBuffer->capacity());
+            if (buffer->size() > codecBuffer->capacity()) {
+                handleError(ERROR_BUFFER_TOO_SMALL);
+                return false;
+            }
             codecBuffer->setRange(0, buffer->size());
             memcpy(codecBuffer->data(), buffer->data(), buffer->size());
         }
