@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1fcbff3d_9a901198",
+        "filename": "services/audiopolicy/managerdefault/AudioPolicyManager.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 773,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-01-13T01:14:07Z",
+      "side": 1,
+      "message": "Match spacing with the rest of the file.",
+      "revId": "b569d8301235fa58a580eee72c3e5697a42f5f2e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
