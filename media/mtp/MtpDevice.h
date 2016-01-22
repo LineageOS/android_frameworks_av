@@ -100,7 +100,7 @@ public:
     bool                    sendObject(MtpObjectHandle handle, int size, int srcFD);
     bool                    deleteObject(MtpObjectHandle handle);
     MtpObjectHandle         getParent(MtpObjectHandle handle);
-    MtpObjectHandle         getStorageID(MtpObjectHandle handle);
+    MtpStorageID            getStorageID(MtpObjectHandle handle);
 
     MtpObjectPropertyList*  getObjectPropsSupported(MtpObjectFormat format);
 
