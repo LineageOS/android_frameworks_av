@@ -2,7 +2,8 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-        SoftVPXEncoder.cpp
+        SoftVPXEncoder.cpp \
+        SoftVP8Encoder.cpp
 
 LOCAL_C_INCLUDES := \
         $(TOP)/external/libvpx/libvpx \
