@@ -16,6 +16,24 @@
       "revId": "5bc845dedc9c620c420e8c25c70e6955af87475b",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1fcbff3d_cf130266",
+        "filename": "media/libstagefright/Android.mk",
+        "patchSetId": 5
+      },
+      "lineNbr": 244,
+      "author": {
+        "id": 7155
+      },
+      "writtenOn": "2016-02-02T00:47:32Z",
+      "side": 1,
+      "message": "That\u0027s why I put the BOARD_USE_EXYNOS_HEVC_FORMATS barrier there..\nI don\u0027t think it\u0027s a good idea to pass thru these color formats in the frameworks for every device using the slsi-cm repos, thus I didn\u0027t use the standard SLSI_VARIANT flag.\n\nSo, if a device (e.g. manta) doesn\u0027t set the BOARD_USE_EXYNOS_HEVC_FORMATS flag, there shouldn\u0027t be any problems.",
+      "parentUuid": "1fcbff3d_6f2bee93",
+      "revId": "5bc845dedc9c620c420e8c25c70e6955af87475b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
