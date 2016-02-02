@@ -34,6 +34,24 @@
       "revId": "5bc845dedc9c620c420e8c25c70e6955af87475b",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1fcbff3d_2393c2a5",
+        "filename": "media/libstagefright/Android.mk",
+        "patchSetId": 5
+      },
+      "lineNbr": 244,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-02-02T01:06:05Z",
+      "side": 1,
+      "message": "In 12.1 there were 2 variant types, -cm and -insignal.",
+      "parentUuid": "1fcbff3d_cf130266",
+      "revId": "5bc845dedc9c620c420e8c25c70e6955af87475b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
