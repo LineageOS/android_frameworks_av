@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1fcbff3d_6f2bee93",
+        "filename": "media/libstagefright/Android.mk",
+        "patchSetId": 5
+      },
+      "lineNbr": 244,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-02-02T00:44:42Z",
+      "side": 1,
+      "message": "I was thinking samsung-slsi-$(TARGET_SLSI_VARIANT), since the google variant won\u0027t ever use custom formats. I think I might want to rethink the organization of the samsung slsi stuff to make it not ridiculous again.",
+      "revId": "5bc845dedc9c620c420e8c25c70e6955af87475b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
