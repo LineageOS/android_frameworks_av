@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1fcbff3d_4f763209",
+        "filename": "media/libstagefright/Android.mk",
+        "patchSetId": 4
+      },
+      "lineNbr": 238,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-02-02T00:22:11Z",
+      "side": 1,
+      "message": "Should probably use the TARGET_SLSI_VARIANT variable here instead of hardcoding.",
+      "revId": "c500d3530ec4da6a948ae4d98b174e8d6f48261f",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
