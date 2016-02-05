@@ -864,17 +864,6 @@ status_t CameraService::validateConnectLocked(const String8& cameraId, /*inout*/
 
     int callingPid = getCallingPid();
 
-    if (clientUid == USE_CALLING_UID) {
-        clientUid = getCallingUid();
-    } else {
-        // We only trust our own process to forward client UIDs
-        if (callingPid != getpid()) {
-            ALOGE("CameraService::connect X (PID %d) rejected (don't trust clientUid %d)",
-                    callingPid, clientUid);
-            return PERMISSION_DENIED;
-        }
-    }
-
     if (!mModule) {
         ALOGE("CameraService::connect X (PID %d) rejected (camera HAL module not loaded)",
                 callingPid);
@@ -885,6 +874,31 @@ status_t CameraService::validateConnectLocked(const String8& cameraId, /*inout*/
         ALOGE("CameraService::connect X (PID %d) rejected (invalid camera ID %s)", callingPid,
                 cameraId.string());
         return -ENODEV;
+    }
+
+#if !defined(__BRILLO__)
+    status_t allowed = validateClientPermissionsLocked(cameraId, clientUid);
+    if (allowed != OK) {
+        return allowed;
+    }
+#endif  // defined(__BRILLO__)
+
+    return checkIfDeviceIsUsable(cameraId);
+}
+
+status_t CameraService::validateClientPermissionsLocked(const String8& cameraId, int& clientUid)
+        const {
+    int callingPid = getCallingPid();
+
+    if (clientUid == USE_CALLING_UID) {
+        clientUid = getCallingUid();
+    } else {
+        // We only trust our own process to forward client UIDs
+        if (callingPid != getpid()) {
+            ALOGE("CameraService::connect X (PID %d) rejected (don't trust clientUid %d)",
+                    callingPid, clientUid);
+            return PERMISSION_DENIED;
+        }
     }
 
     // Check device policy for this camera
@@ -909,7 +923,7 @@ status_t CameraService::validateConnectLocked(const String8& cameraId, /*inout*/
         return PERMISSION_DENIED;
     }
 
-    return checkIfDeviceIsUsable(cameraId);
+    return OK;
 }
 
 status_t CameraService::checkIfDeviceIsUsable(const String8& cameraId) const {
