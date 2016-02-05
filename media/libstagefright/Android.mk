@@ -51,6 +51,7 @@ LOCAL_SRC_FILES:=                         \
         ProcessInfo.cpp                   \
         SampleIterator.cpp                \
         SampleTable.cpp                   \
+        SimpleDecodingSource.cpp          \
         SkipCutBuffer.cpp                 \
         StagefrightMediaScanner.cpp       \
         StagefrightMetadataRetriever.cpp  \
