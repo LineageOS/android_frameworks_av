@@ -269,26 +269,6 @@ uint32_t OMXCodec::getComponentQuirks(
 }
 
 // static
-bool OMXCodec::findCodecQuirks(const char *componentName, uint32_t *quirks) {
-    const sp<IMediaCodecList> list = MediaCodecList::getInstance();
-    if (list == NULL) {
-        return false;
-    }
-
-    ssize_t index = list->findCodecByName(componentName);
-
-    if (index < 0) {
-        return false;
-    }
-
-    const sp<MediaCodecInfo> info = list->getCodecInfo(index);
-    CHECK(info != NULL);
-    *quirks = getComponentQuirks(info);
-
-    return true;
-}
-
-// static
 sp<MediaSource> OMXCodec::Create(
         const sp<IOMX> &omx,
         const sp<MetaData> &meta, bool createEncoder,
@@ -3222,7 +3202,7 @@ void OMXCodec::setRawAudioFormat(
     pcmParams.nSamplingRate = sampleRate;
     pcmParams.ePCMMode = OMX_AUDIO_PCMModeLinear;
 
-    CHECK_EQ(getOMXChannelMapping(
+    CHECK_EQ(ACodec::getOMXChannelMapping(
                 numChannels, pcmParams.eChannelMapping), (status_t)OK);
 
     err = mOMX->setParameter(
@@ -4389,69 +4369,6 @@ status_t QueryCodecs(
         const char *mimeType, bool queryDecoders,
         Vector<CodecCapabilities> *results) {
     return QueryCodecs(omx, mimeType, queryDecoders, false /*hwCodecOnly*/, results);
-}
-
-// These are supposed be equivalent to the logic in
-// "audio_channel_out_mask_from_count".
-status_t getOMXChannelMapping(size_t numChannels, OMX_AUDIO_CHANNELTYPE map[]) {
-    switch (numChannels) {
-        case 1:
-            map[0] = OMX_AUDIO_ChannelCF;
-            break;
-        case 2:
-            map[0] = OMX_AUDIO_ChannelLF;
-            map[1] = OMX_AUDIO_ChannelRF;
-            break;
-        case 3:
-            map[0] = OMX_AUDIO_ChannelLF;
-            map[1] = OMX_AUDIO_ChannelRF;
-            map[2] = OMX_AUDIO_ChannelCF;
-            break;
-        case 4:
-            map[0] = OMX_AUDIO_ChannelLF;
-            map[1] = OMX_AUDIO_ChannelRF;
-            map[2] = OMX_AUDIO_ChannelLR;
-            map[3] = OMX_AUDIO_ChannelRR;
-            break;
-        case 5:
-            map[0] = OMX_AUDIO_ChannelLF;
-            map[1] = OMX_AUDIO_ChannelRF;
-            map[2] = OMX_AUDIO_ChannelCF;
-            map[3] = OMX_AUDIO_ChannelLR;
-            map[4] = OMX_AUDIO_ChannelRR;
-            break;
-        case 6:
-            map[0] = OMX_AUDIO_ChannelLF;
-            map[1] = OMX_AUDIO_ChannelRF;
-            map[2] = OMX_AUDIO_ChannelCF;
-            map[3] = OMX_AUDIO_ChannelLFE;
-            map[4] = OMX_AUDIO_ChannelLR;
-            map[5] = OMX_AUDIO_ChannelRR;
-            break;
-        case 7:
-            map[0] = OMX_AUDIO_ChannelLF;
-            map[1] = OMX_AUDIO_ChannelRF;
-            map[2] = OMX_AUDIO_ChannelCF;
-            map[3] = OMX_AUDIO_ChannelLFE;
-            map[4] = OMX_AUDIO_ChannelLR;
-            map[5] = OMX_AUDIO_ChannelRR;
-            map[6] = OMX_AUDIO_ChannelCS;
-            break;
-        case 8:
-            map[0] = OMX_AUDIO_ChannelLF;
-            map[1] = OMX_AUDIO_ChannelRF;
-            map[2] = OMX_AUDIO_ChannelCF;
-            map[3] = OMX_AUDIO_ChannelLFE;
-            map[4] = OMX_AUDIO_ChannelLR;
-            map[5] = OMX_AUDIO_ChannelRR;
-            map[6] = OMX_AUDIO_ChannelLS;
-            map[7] = OMX_AUDIO_ChannelRS;
-            break;
-        default:
-            return -EINVAL;
-    }
-
-    return OK;
 }
 
 }  // namespace android

@@ -41,7 +41,6 @@
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/OMXClient.h>
-#include <media/stagefright/OMXCodec.h>
 #include <media/stagefright/PersistentSurface.h>
 #include <media/stagefright/SurfaceUtils.h>
 #include <media/hardware/HardwareAPI.h>
@@ -824,8 +823,8 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
 
                 uint32_t requiresAllocateBufferBit =
                     (portIndex == kPortIndexInput)
-                        ? OMXCodec::kRequiresAllocateBufferOnInputPorts
-                        : OMXCodec::kRequiresAllocateBufferOnOutputPorts;
+                        ? kRequiresAllocateBufferOnInputPorts
+                        : kRequiresAllocateBufferOnOutputPorts;
 
                 if ((portIndex == kPortIndexInput && (mFlags & kFlagIsSecure))
                         || (portIndex == kPortIndexOutput && usingMetadataOnEncoderOutput())) {
@@ -5465,7 +5464,7 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
         mDeathNotifier.clear();
     }
 
-    Vector<OMXCodec::CodecNameAndQuirks> matchingCodecs;
+    Vector<AString> matchingCodecs;
 
     AString mime;
 
@@ -5473,13 +5472,9 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
     uint32_t quirks = 0;
     int32_t encoder = false;
     if (msg->findString("componentName", &componentName)) {
-        ssize_t index = matchingCodecs.add();
-        OMXCodec::CodecNameAndQuirks *entry = &matchingCodecs.editItemAt(index);
-        entry->mName = String8(componentName.c_str());
-
-        if (!OMXCodec::findCodecQuirks(
-                    componentName.c_str(), &entry->mQuirks)) {
-            entry->mQuirks = 0;
+        sp<IMediaCodecList> list = MediaCodecList::getInstance();
+        if (list != NULL && list->findCodecByName(componentName.c_str()) >= 0) {
+            matchingCodecs.add(componentName);
         }
     } else {
         CHECK(msg->findString("mime", &mime));
@@ -5488,11 +5483,10 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
             encoder = false;
         }
 
-        OMXCodec::findMatchingCodecs(
+        MediaCodecList::findMatchingCodecs(
                 mime.c_str(),
                 encoder, // createEncoder
-                NULL,  // matchComponentName
-                0,     // flags
+                0,       // flags
                 &matchingCodecs);
     }
 
@@ -5502,8 +5496,8 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
     status_t err = NAME_NOT_FOUND;
     for (size_t matchIndex = 0; matchIndex < matchingCodecs.size();
             ++matchIndex) {
-        componentName = matchingCodecs.itemAt(matchIndex).mName.string();
-        quirks = matchingCodecs.itemAt(matchIndex).mQuirks;
+        componentName = matchingCodecs[matchIndex];
+        quirks = MediaCodecList::getQuirksFor(componentName.c_str());
 
         pid_t tid = gettid();
         int prevPriority = androidGetThreadPriority(tid);
@@ -6861,6 +6855,70 @@ void ACodec::FlushingState::changeStateIfWeOwnAllBuffers() {
 
         mCodec->changeState(mCodec->mExecutingState);
     }
+}
+
+// These are supposed be equivalent to the logic in
+// "audio_channel_out_mask_from_count".
+//static
+status_t ACodec::getOMXChannelMapping(size_t numChannels, OMX_AUDIO_CHANNELTYPE map[]) {
+    switch (numChannels) {
+        case 1:
+            map[0] = OMX_AUDIO_ChannelCF;
+            break;
+        case 2:
+            map[0] = OMX_AUDIO_ChannelLF;
+            map[1] = OMX_AUDIO_ChannelRF;
+            break;
+        case 3:
+            map[0] = OMX_AUDIO_ChannelLF;
+            map[1] = OMX_AUDIO_ChannelRF;
+            map[2] = OMX_AUDIO_ChannelCF;
+            break;
+        case 4:
+            map[0] = OMX_AUDIO_ChannelLF;
+            map[1] = OMX_AUDIO_ChannelRF;
+            map[2] = OMX_AUDIO_ChannelLR;
+            map[3] = OMX_AUDIO_ChannelRR;
+            break;
+        case 5:
+            map[0] = OMX_AUDIO_ChannelLF;
+            map[1] = OMX_AUDIO_ChannelRF;
+            map[2] = OMX_AUDIO_ChannelCF;
+            map[3] = OMX_AUDIO_ChannelLR;
+            map[4] = OMX_AUDIO_ChannelRR;
+            break;
+        case 6:
+            map[0] = OMX_AUDIO_ChannelLF;
+            map[1] = OMX_AUDIO_ChannelRF;
+            map[2] = OMX_AUDIO_ChannelCF;
+            map[3] = OMX_AUDIO_ChannelLFE;
+            map[4] = OMX_AUDIO_ChannelLR;
+            map[5] = OMX_AUDIO_ChannelRR;
+            break;
+        case 7:
+            map[0] = OMX_AUDIO_ChannelLF;
+            map[1] = OMX_AUDIO_ChannelRF;
+            map[2] = OMX_AUDIO_ChannelCF;
+            map[3] = OMX_AUDIO_ChannelLFE;
+            map[4] = OMX_AUDIO_ChannelLR;
+            map[5] = OMX_AUDIO_ChannelRR;
+            map[6] = OMX_AUDIO_ChannelCS;
+            break;
+        case 8:
+            map[0] = OMX_AUDIO_ChannelLF;
+            map[1] = OMX_AUDIO_ChannelRF;
+            map[2] = OMX_AUDIO_ChannelCF;
+            map[3] = OMX_AUDIO_ChannelLFE;
+            map[4] = OMX_AUDIO_ChannelLR;
+            map[5] = OMX_AUDIO_ChannelRR;
+            map[6] = OMX_AUDIO_ChannelLS;
+            map[7] = OMX_AUDIO_ChannelRS;
+            break;
+        default:
+            return -EINVAL;
+    }
+
+    return OK;
 }
 
 }  // namespace android

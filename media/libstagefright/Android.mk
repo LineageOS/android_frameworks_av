@@ -13,7 +13,6 @@ LOCAL_SRC_FILES:=                         \
         CallbackDataSource.cpp            \
         CameraSource.cpp                  \
         CameraSourceTimeLapse.cpp         \
-        ClockEstimator.cpp                \
         CodecBase.cpp                     \
         DataSource.cpp                    \
         DataURISource.cpp                 \
@@ -52,13 +51,13 @@ LOCAL_SRC_FILES:=                         \
         ProcessInfo.cpp                   \
         SampleIterator.cpp                \
         SampleTable.cpp                   \
+        SimpleDecodingSource.cpp          \
         SkipCutBuffer.cpp                 \
         StagefrightMediaScanner.cpp       \
         StagefrightMetadataRetriever.cpp  \
         SurfaceMediaSource.cpp            \
         SurfaceUtils.cpp                  \
         ThrottledSource.cpp               \
-        TimeSource.cpp                    \
         Utils.cpp                         \
         VBRISeeker.cpp                    \
         VideoFrameScheduler.cpp           \

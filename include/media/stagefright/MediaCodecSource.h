@@ -19,16 +19,18 @@
 
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/foundation/AHandlerReflector.h>
+#include <media/stagefright/foundation/Mutexed.h>
 #include <media/stagefright/MediaSource.h>
+
+#include <gui/IGraphicBufferConsumer.h>
 
 namespace android {
 
 struct ALooper;
-class AMessage;
+struct AMessage;
 struct AReplyToken;
 class IGraphicBufferProducer;
-class IGraphicBufferConsumer;
-class MediaCodec;
+struct MediaCodec;
 class MetaData;
 
 struct MediaCodecSource : public MediaSource,
@@ -36,6 +38,7 @@ struct MediaCodecSource : public MediaSource,
     enum FlagBits {
         FLAG_USE_SURFACE_INPUT      = 1,
         FLAG_USE_METADATA_INPUT     = 2,
+        FLAG_PREFER_SOFTWARE_CODEC  = 4,  // used for testing only
     };
 
     static sp<MediaCodecSource> Create(
@@ -75,6 +78,7 @@ private:
         kWhatStart,
         kWhatStop,
         kWhatPause,
+        kWhatStopStalled,
     };
 
     MediaCodecSource(
@@ -122,12 +126,16 @@ private:
     int64_t mFirstSampleTimeUs;
     List<int64_t> mDriftTimeQueue;
 
-    // following variables are protected by mOutputBufferLock
-    Mutex mOutputBufferLock;
-    Condition mOutputBufferCond;
-    List<MediaBuffer*> mOutputBufferQueue;
-    bool mEncoderReachedEOS;
-    status_t mErrorCode;
+    struct Output {
+        Output();
+        List<MediaBuffer*> mBufferQueue;
+        bool mEncoderReachedEOS;
+        status_t mErrorCode;
+        Condition mCond;
+    };
+    Mutexed<Output> mOutput;
+
+    int32_t mGeneration;
 
     DISALLOW_EVIL_CONSTRUCTORS(MediaCodecSource);
 };
