@@ -55,6 +55,10 @@
 
 namespace android {
 
+enum {
+    kMaxIndicesToCheck = 32, // used when enumerating supported formats and profiles
+};
+
 // OMX errors are directly mapped into status_t range if
 // there is no corresponding MediaError status code.
 // Use the statusFromOMXError(int32_t omxError) function.
@@ -2278,9 +2282,8 @@ status_t ACodec::selectAudioPortFormat(
     InitOMXParams(&format);
 
     format.nPortIndex = portIndex;
-    for (OMX_U32 index = 0;; ++index) {
+    for (OMX_U32 index = 0; index <= kMaxIndicesToCheck; ++index) {
         format.nIndex = index;
-
         status_t err = mOMX->getParameter(
                 mNode, OMX_IndexParamAudioPortFormat,
                 &format, sizeof(format));
@@ -2291,6 +2294,13 @@ status_t ACodec::selectAudioPortFormat(
 
         if (format.eEncoding == desiredFormat) {
             break;
+        }
+
+        if (index == kMaxIndicesToCheck) {
+            ALOGW("[%s] stopping checking formats after %u: %s(%x)",
+                    mComponentName.c_str(), index,
+                    asString(format.eEncoding), format.eEncoding);
+            return ERROR_UNSUPPORTED;
         }
     }
 
@@ -2711,8 +2721,7 @@ status_t ACodec::setVideoPortFormatType(
     format.nIndex = 0;
     bool found = false;
 
-    OMX_U32 index = 0;
-    for (;;) {
+    for (OMX_U32 index = 0; index <= kMaxIndicesToCheck; ++index) {
         format.nIndex = index;
         status_t err = mOMX->getParameter(
                 mNode, OMX_IndexParamVideoPortFormat,
@@ -2757,7 +2766,12 @@ status_t ACodec::setVideoPortFormatType(
             break;
         }
 
-        ++index;
+        if (index == kMaxIndicesToCheck) {
+            ALOGW("[%s] stopping checking formats after %u: %s(%x)/%s(%x)",
+                    mComponentName.c_str(), index,
+                    asString(format.eCompressionFormat), format.eCompressionFormat,
+                    asString(format.eColorFormat), format.eColorFormat);
+        }
     }
 
     if (!found) {
@@ -3630,7 +3644,8 @@ status_t ACodec::verifySupportForProfileAndLevel(
     InitOMXParams(&params);
     params.nPortIndex = kPortIndexOutput;
 
-    for (params.nProfileIndex = 0;; ++params.nProfileIndex) {
+    for (OMX_U32 index = 0; index <= kMaxIndicesToCheck; ++index) {
+        params.nProfileIndex = index;
         status_t err = mOMX->getParameter(
                 mNode,
                 OMX_IndexParamVideoProfileLevelQuerySupported,
@@ -3647,7 +3662,14 @@ status_t ACodec::verifySupportForProfileAndLevel(
         if (profile == supportedProfile && level <= supportedLevel) {
             return OK;
         }
+
+        if (index == kMaxIndicesToCheck) {
+            ALOGW("[%s] stopping checking profiles after %u: %x/%x",
+                    mComponentName.c_str(), index,
+                    params.eProfile, params.eLevel);
+        }
     }
+    return ERROR_UNSUPPORTED;
 }
 
 status_t ACodec::configureBitrate(
@@ -6904,7 +6926,8 @@ status_t ACodec::queryCapabilities(
         InitOMXParams(&param);
         param.nPortIndex = isEncoder ? kPortIndexOutput : kPortIndexInput;
 
-        for (param.nProfileIndex = 0;; ++param.nProfileIndex) {
+        for (OMX_U32 index = 0; index <= kMaxIndicesToCheck; ++index) {
+            param.nProfileIndex = index;
             status_t err = omx->getParameter(
                     node, OMX_IndexParamVideoProfileLevelQuerySupported,
                     &param, sizeof(param));
@@ -6912,6 +6935,12 @@ status_t ACodec::queryCapabilities(
                 break;
             }
             builder->addProfileLevel(param.eProfile, param.eLevel);
+
+            if (index == kMaxIndicesToCheck) {
+                ALOGW("[%s] stopping checking profiles after %u: %x/%x",
+                        name.c_str(), index,
+                        param.eProfile, param.eLevel);
+            }
         }
 
         // Color format query
@@ -6921,7 +6950,8 @@ status_t ACodec::queryCapabilities(
         InitOMXParams(&portFormat);
         portFormat.nPortIndex = isEncoder ? kPortIndexInput : kPortIndexOutput;
         Vector<uint32_t> supportedColors; // shadow copy to check for duplicates
-        for (portFormat.nIndex = 0;; ++portFormat.nIndex)  {
+        for (OMX_U32 index = 0; index <= kMaxIndicesToCheck; ++index) {
+            portFormat.nIndex = index;
             status_t err = omx->getParameter(
                     node, OMX_IndexParamVideoPortFormat,
                     &portFormat, sizeof(portFormat));
@@ -6947,6 +6977,12 @@ status_t ACodec::queryCapabilities(
             }
             supportedColors.push(portFormat.eColorFormat);
             builder->addColorFormat(portFormat.eColorFormat);
+
+            if (index == kMaxIndicesToCheck) {
+                ALOGW("[%s] stopping checking formats after %u: %s(%x)",
+                        name.c_str(), index,
+                        asString(portFormat.eColorFormat), portFormat.eColorFormat);
+            }
         }
     }
 
