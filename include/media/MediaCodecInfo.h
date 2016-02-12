@@ -122,8 +122,8 @@ private:
     void addQuirk(const char *name);
     status_t addMime(const char *mime);
     status_t updateMime(const char *mime);
-    // after this call Capabilities will be owned by MediaCodecInfo
-    status_t setCapabilities(const sp<Capabilities> &caps);
+
+    status_t initializeCapabilities(const sp<Capabilities> &caps);
     void addDetail(const AString &key, const AString &value);
     void addFeature(const AString &key, int32_t value);
     void addFeature(const AString &key, const char *value);
