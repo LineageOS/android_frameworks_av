@@ -2353,7 +2353,7 @@ status_t CameraService::dump(int fd, const Vector<String16>& args) {
                 result.appendFormat("  Resource Cost: %d\n", state.second->getCost());
                 result.appendFormat("  Conflicting Devices:");
                 for (auto& id : conflicting) {
-                    result.appendFormat(" %s", cameraId.string());
+                    result.appendFormat(" %s", id.string());
                 }
                 if (conflicting.size() == 0) {
                     result.appendFormat(" NONE");
