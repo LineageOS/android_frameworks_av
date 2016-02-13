@@ -21,6 +21,7 @@ LOCAL_SRC_FILES:= \
 	CameraBinderTests.cpp
 
 LOCAL_SHARED_LIBRARIES := \
+	liblog \
 	libutils \
 	libcutils \
 	libcamera_metadata \

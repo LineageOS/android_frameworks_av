@@ -34,6 +34,7 @@ LOCAL_SRC_FILES := \
   StripSource.cpp \
 
 LOCAL_SHARED_LIBRARIES := \
+  liblog \
   libexpat \
   libutils \
   libcutils \
