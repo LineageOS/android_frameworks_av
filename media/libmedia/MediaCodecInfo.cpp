@@ -238,8 +238,15 @@ void MediaCodecInfo::removeMime(const char *mime) {
     }
 }
 
-status_t MediaCodecInfo::setCapabilities(const sp<Capabilities> &caps) {
-    mCurrentCaps = caps;
+status_t MediaCodecInfo::initializeCapabilities(const sp<Capabilities> &caps) {
+    // TRICKY: copy data to mCurrentCaps as it is a reference to
+    // an element of the capabilites map.
+    mCurrentCaps->mColorFormats.clear();
+    mCurrentCaps->mColorFormats.appendVector(caps->mColorFormats);
+    mCurrentCaps->mProfileLevels.clear();
+    mCurrentCaps->mProfileLevels.appendVector(caps->mProfileLevels);
+    mCurrentCaps->mFlags = caps->mFlags;
+    mCurrentCaps->mDetails = caps->mDetails;
     return OK;
 }
 
