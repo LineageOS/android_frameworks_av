@@ -39,6 +39,7 @@ LOCAL_STATIC_LIBRARIES := \
     libaudiopolicycomponents
 
 LOCAL_SHARED_LIBRARIES += \
+    liblog \
     libcutils \
     libutils \
     libaudioutils \
