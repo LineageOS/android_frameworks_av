@@ -32,6 +32,13 @@ namespace android {
 #define USE_NEON (false)
 #endif
 
+#if defined(__SSSE3__)  // Should be supported in x86 ABI for both 32 & 64-bit.
+#define USE_SSE (true)
+#include <tmmintrin.h>
+#else
+#define USE_SSE (false)
+#endif
+
 template<typename T, typename U>
 struct is_same
 {

@@ -29,9 +29,10 @@
 #include <utils/Log.h>
 #include <audio_utils/primitives.h>
 
-#include "AudioResamplerFirOps.h" // USE_NEON and USE_INLINE_ASSEMBLY defined here
+#include "AudioResamplerFirOps.h" // USE_NEON, USE_SSE and USE_INLINE_ASSEMBLY defined here
 #include "AudioResamplerFirProcess.h"
 #include "AudioResamplerFirProcessNeon.h"
+#include "AudioResamplerFirProcessSSE.h"
 #include "AudioResamplerFirGen.h" // requires math.h
 #include "AudioResamplerDyn.h"
 
