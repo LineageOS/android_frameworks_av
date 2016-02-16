@@ -31,18 +31,18 @@
 
 namespace android {
 
-// Exposes a vpx encoder as an OMX Component
+// Base class for a VPX Encoder OMX Component
 //
 // Boilerplate for callback bindings are taken care
 // by the base class SimpleSoftOMXComponent and its
 // parent SoftOMXComponent.
 //
-// Only following encoder settings are available
+// Only following encoder settings are available (codec specific settings might
+// be available in the sub-classes):
 //    - target bitrate
 //    - rate control (constant / variable)
 //    - frame rate
 //    - error resilience
-//    - token partitioning
 //    - reconstruction & loop filters (g_profile)
 //
 // Only following color formats are recognized
@@ -54,7 +54,7 @@ namespace android {
 //    - encoding deadline is realtime
 //    - multithreaded encoding utilizes a number of threads equal
 // to online cpu's available
-//    - the algorithm interface for encoder is vp8
+//    - the algorithm interface for encoder is decided by the sub-class in use
 //    - fractional bits of frame rate is discarded
 //    - OMX timestamps are in microseconds, therefore
 // encoder timebase is fixed to 1/1000000
@@ -63,7 +63,13 @@ struct SoftVPXEncoder : public SoftVideoEncoderOMXComponent {
     SoftVPXEncoder(const char *name,
                    const OMX_CALLBACKTYPE *callbacks,
                    OMX_PTR appData,
-                   OMX_COMPONENTTYPE **component);
+                   OMX_COMPONENTTYPE **component,
+                   const char* role,
+                   OMX_VIDEO_CODINGTYPE codingType,
+                   const char* mimeType,
+                   int32_t minCompressionRatio,
+                   const CodecProfileLevel *profileLevels,
+                   size_t numProfileLevels);
 
 protected:
     virtual ~SoftVPXEncoder();
@@ -87,7 +93,33 @@ protected:
     // encoding of the frame
     virtual void onQueueFilled(OMX_U32 portIndex);
 
-private:
+    // Initializes vpx encoder with available settings.
+    status_t initEncoder();
+
+    // Populates mCodecInterface with codec specific settings.
+    virtual void setCodecSpecificInterface() = 0;
+
+    // Sets codec specific encoder controls.
+    virtual vpx_codec_err_t setCodecSpecificControls() = 0;
+
+    // Releases vpx encoder instance, with it's associated
+    // data structures.
+    //
+    // Unless called earlier, this is handled by the
+    // dtor.
+    status_t releaseEncoder();
+
+    // Get current encode flags
+    virtual vpx_enc_frame_flags_t getEncodeFlags();
+
+    // Get bitrate parameters.
+    virtual OMX_ERRORTYPE internalGetBitrateParams(
+        OMX_VIDEO_PARAM_BITRATETYPE* bitrate);
+
+    // Updates bitrate to reflect port settings.
+    virtual OMX_ERRORTYPE internalSetBitrateParams(
+        const OMX_VIDEO_PARAM_BITRATETYPE* bitrate);
+
     enum TemporalReferences {
         // For 1 layer case: reference all (last, golden, and alt ref), but only
         // update last.
@@ -137,9 +169,6 @@ private:
     static const uint32_t kInputBufferAlignment = 1;
     static const uint32_t kOutputBufferAlignment = 2;
 
-    // Max value supported for DCT partitions
-    static const uint32_t kMaxDCTPartitions = 3;
-
     // Number of supported input color formats
     static const uint32_t kNumberOfSupportedColorFormats = 3;
 
@@ -160,11 +189,6 @@ private:
 
     // Bitrate control mode, either constant or variable
     vpx_rc_mode mBitrateControlMode;
-
-    // vp8 specific configuration parameter
-    // that enables token partitioning of
-    // the stream into substreams
-    int32_t mDCTPartitions;
 
     // Parameter that denotes whether error resilience
     // is enabled in encoder
@@ -215,31 +239,6 @@ private:
     uint8_t* mConversionBuffer;
 
     bool mKeyFrameRequested;
-
-    // Initializes vpx encoder with available settings.
-    status_t initEncoder();
-
-    // Releases vpx encoder instance, with it's associated
-    // data structures.
-    //
-    // Unless called earlier, this is handled by the
-    // dtor.
-    status_t releaseEncoder();
-
-    // Get current encode flags
-    vpx_enc_frame_flags_t getEncodeFlags();
-
-    // Updates bitrate to reflect port settings.
-    OMX_ERRORTYPE internalSetBitrateParams(
-        const OMX_VIDEO_PARAM_BITRATETYPE* bitrate);
-
-    // Handles vp8 specific parameters.
-    OMX_ERRORTYPE internalSetVp8Params(
-        const OMX_VIDEO_PARAM_VP8TYPE* vp8Params);
-
-    // Handles Android vp8 specific parameters.
-    OMX_ERRORTYPE internalSetAndroidVp8Params(
-        const OMX_VIDEO_PARAM_ANDROID_VP8ENCODERTYPE* vp8AndroidParams);
 
     DISALLOW_EVIL_CONSTRUCTORS(SoftVPXEncoder);
 };
