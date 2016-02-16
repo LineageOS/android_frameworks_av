@@ -490,6 +490,8 @@ private:
     // Check if we can connect, before we acquire the service lock.
     status_t validateConnectLocked(const String8& cameraId, /*inout*/int& clientUid,
             /*inout*/int& clientPid) const;
+    status_t validateClientPermissionsLocked(const String8& cameraId, /*inout*/int& clientUid,
+            /*inout*/int& clientPid) const;
 
     // Handle active client evictions, and update service state.
     // Only call with with mServiceLock held.

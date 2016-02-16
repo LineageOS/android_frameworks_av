@@ -872,6 +872,32 @@ status_t CameraService::validateConnectLocked(const String8& cameraId, /*inout*/
         /*inout*/int& clientPid) const {
 
     int callingPid = getCallingPid();
+
+#if !defined(__BRILLO__)
+    status_t allowed = validateClientPermissionsLocked(cameraId, clientUid, clientPid);
+    if (allowed != OK) {
+        return allowed;
+    }
+#endif  // defined(__BRILLO__)
+
+    if (!mModule) {
+        ALOGE("CameraService::connect X (PID %d) rejected (camera HAL module not loaded)",
+                callingPid);
+        return -ENODEV;
+    }
+
+    if (getCameraState(cameraId) == nullptr) {
+        ALOGE("CameraService::connect X (PID %d) rejected (invalid camera ID %s)", callingPid,
+                cameraId.string());
+        return -ENODEV;
+    }
+
+    return checkIfDeviceIsUsable(cameraId);
+}
+
+status_t CameraService::validateClientPermissionsLocked(const String8& cameraId, int& clientUid,
+        int& clientPid) const {
+    int callingPid = getCallingPid();
     int callingUid = getCallingUid();
 
     // Check if we can trust clientUid
@@ -903,18 +929,7 @@ status_t CameraService::validateConnectLocked(const String8& cameraId, /*inout*/
     // connected to camera service directly.
     clientPid = callingPid;
 
-    if (!mModule) {
-        ALOGE("CameraService::connect X (PID %d) rejected (camera HAL module not loaded)",
-                callingPid);
-        return -ENODEV;
-    }
-
-    if (getCameraState(cameraId) == nullptr) {
-        ALOGE("CameraService::connect X (PID %d) rejected (invalid camera ID %s)", callingPid,
-                cameraId.string());
-        return -ENODEV;
-    }
-
+    // Check device policy for this camera
     userid_t clientUserId = multiuser_get_user_id(clientUid);
 
     // Only allow clients who are being used by the current foreground device user, unless calling
@@ -926,7 +941,7 @@ status_t CameraService::validateConnectLocked(const String8& cameraId, /*inout*/
         return PERMISSION_DENIED;
     }
 
-    return checkIfDeviceIsUsable(cameraId);
+    return OK;
 }
 
 status_t CameraService::checkIfDeviceIsUsable(const String8& cameraId) const {
