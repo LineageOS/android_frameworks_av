@@ -76,7 +76,6 @@ SoftVPXEncoder::SoftVPXEncoder(const char *name,
       mBitrateUpdated(false),
       mBitrateControlMode(VPX_VBR),
       mErrorResilience(OMX_FALSE),
-      mLevel(OMX_VIDEO_VP8Level_Version0),
       mKeyFrameInterval(0),
       mMinQuantizer(0),
       mMaxQuantizer(0),
@@ -127,27 +126,6 @@ status_t SoftVPXEncoder::initEncoder() {
     mCodecConfiguration->g_h = mHeight;
     mCodecConfiguration->g_threads = GetCPUCoreCount();
     mCodecConfiguration->g_error_resilient = mErrorResilience;
-
-    switch (mLevel) {
-        case OMX_VIDEO_VP8Level_Version0:
-            mCodecConfiguration->g_profile = 0;
-            break;
-
-        case OMX_VIDEO_VP8Level_Version1:
-            mCodecConfiguration->g_profile = 1;
-            break;
-
-        case OMX_VIDEO_VP8Level_Version2:
-            mCodecConfiguration->g_profile = 2;
-            break;
-
-        case OMX_VIDEO_VP8Level_Version3:
-            mCodecConfiguration->g_profile = 3;
-            break;
-
-        default:
-            mCodecConfiguration->g_profile = 0;
-    }
 
     // OMX timebase unit is microsecond
     // g_timebase is in seconds (i.e. 1/1000000 seconds)
@@ -250,7 +228,6 @@ status_t SoftVPXEncoder::initEncoder() {
             goto CLEAN_UP;
         }
     }
-
     // Set bitrate values for each layer
     for (size_t i = 0; i < mCodecConfiguration->ts_number_layers; i++) {
         mCodecConfiguration->ts_target_bitrate[i] =
@@ -267,6 +244,10 @@ status_t SoftVPXEncoder::initEncoder() {
     }
     if (mMaxQuantizer > 0) {
         mCodecConfiguration->rc_max_quantizer = mMaxQuantizer;
+    }
+    if (!setCodecSpecificConfiguration()) {
+        // The codec specific method would have logged the error.
+        goto CLEAN_UP;
     }
 
     mCodecContext = new vpx_codec_ctx_t;
@@ -463,69 +444,71 @@ OMX_ERRORTYPE SoftVPXEncoder::internalSetBitrateParams(
 
 vpx_enc_frame_flags_t SoftVPXEncoder::getEncodeFlags() {
     vpx_enc_frame_flags_t flags = 0;
-    int patternIdx = mTemporalPatternIdx % mTemporalPatternLength;
-    mTemporalPatternIdx++;
-    switch (mTemporalPattern[patternIdx]) {
-        case kTemporalUpdateLast:
-            flags |= VP8_EFLAG_NO_UPD_GF;
-            flags |= VP8_EFLAG_NO_UPD_ARF;
-            flags |= VP8_EFLAG_NO_REF_GF;
-            flags |= VP8_EFLAG_NO_REF_ARF;
-            break;
-        case kTemporalUpdateGoldenWithoutDependency:
-            flags |= VP8_EFLAG_NO_REF_GF;
-            // Deliberately no break here.
-        case kTemporalUpdateGolden:
-            flags |= VP8_EFLAG_NO_REF_ARF;
-            flags |= VP8_EFLAG_NO_UPD_ARF;
-            flags |= VP8_EFLAG_NO_UPD_LAST;
-            break;
-        case kTemporalUpdateAltrefWithoutDependency:
-            flags |= VP8_EFLAG_NO_REF_ARF;
-            flags |= VP8_EFLAG_NO_REF_GF;
-            // Deliberately no break here.
-        case kTemporalUpdateAltref:
-            flags |= VP8_EFLAG_NO_UPD_GF;
-            flags |= VP8_EFLAG_NO_UPD_LAST;
-            break;
-        case kTemporalUpdateNoneNoRefAltref:
-            flags |= VP8_EFLAG_NO_REF_ARF;
-            // Deliberately no break here.
-        case kTemporalUpdateNone:
-            flags |= VP8_EFLAG_NO_UPD_GF;
-            flags |= VP8_EFLAG_NO_UPD_ARF;
-            flags |= VP8_EFLAG_NO_UPD_LAST;
-            flags |= VP8_EFLAG_NO_UPD_ENTROPY;
-            break;
-        case kTemporalUpdateNoneNoRefGoldenRefAltRef:
-            flags |= VP8_EFLAG_NO_REF_GF;
-            flags |= VP8_EFLAG_NO_UPD_GF;
-            flags |= VP8_EFLAG_NO_UPD_ARF;
-            flags |= VP8_EFLAG_NO_UPD_LAST;
-            flags |= VP8_EFLAG_NO_UPD_ENTROPY;
-            break;
-        case kTemporalUpdateGoldenWithoutDependencyRefAltRef:
-            flags |= VP8_EFLAG_NO_REF_GF;
-            flags |= VP8_EFLAG_NO_UPD_ARF;
-            flags |= VP8_EFLAG_NO_UPD_LAST;
-            break;
-        case kTemporalUpdateLastRefAltRef:
-            flags |= VP8_EFLAG_NO_UPD_GF;
-            flags |= VP8_EFLAG_NO_UPD_ARF;
-            flags |= VP8_EFLAG_NO_REF_GF;
-            break;
-        case kTemporalUpdateGoldenRefAltRef:
-            flags |= VP8_EFLAG_NO_UPD_ARF;
-            flags |= VP8_EFLAG_NO_UPD_LAST;
-            break;
-        case kTemporalUpdateLastAndGoldenRefAltRef:
-            flags |= VP8_EFLAG_NO_UPD_ARF;
-            flags |= VP8_EFLAG_NO_REF_GF;
-            break;
-        case kTemporalUpdateLastRefAll:
-            flags |= VP8_EFLAG_NO_UPD_ARF;
-            flags |= VP8_EFLAG_NO_UPD_GF;
-            break;
+    if (mTemporalPatternLength > 0) {
+      int patternIdx = mTemporalPatternIdx % mTemporalPatternLength;
+      mTemporalPatternIdx++;
+      switch (mTemporalPattern[patternIdx]) {
+          case kTemporalUpdateLast:
+              flags |= VP8_EFLAG_NO_UPD_GF;
+              flags |= VP8_EFLAG_NO_UPD_ARF;
+              flags |= VP8_EFLAG_NO_REF_GF;
+              flags |= VP8_EFLAG_NO_REF_ARF;
+              break;
+          case kTemporalUpdateGoldenWithoutDependency:
+              flags |= VP8_EFLAG_NO_REF_GF;
+              // Deliberately no break here.
+          case kTemporalUpdateGolden:
+              flags |= VP8_EFLAG_NO_REF_ARF;
+              flags |= VP8_EFLAG_NO_UPD_ARF;
+              flags |= VP8_EFLAG_NO_UPD_LAST;
+              break;
+          case kTemporalUpdateAltrefWithoutDependency:
+              flags |= VP8_EFLAG_NO_REF_ARF;
+              flags |= VP8_EFLAG_NO_REF_GF;
+              // Deliberately no break here.
+          case kTemporalUpdateAltref:
+              flags |= VP8_EFLAG_NO_UPD_GF;
+              flags |= VP8_EFLAG_NO_UPD_LAST;
+              break;
+          case kTemporalUpdateNoneNoRefAltref:
+              flags |= VP8_EFLAG_NO_REF_ARF;
+              // Deliberately no break here.
+          case kTemporalUpdateNone:
+              flags |= VP8_EFLAG_NO_UPD_GF;
+              flags |= VP8_EFLAG_NO_UPD_ARF;
+              flags |= VP8_EFLAG_NO_UPD_LAST;
+              flags |= VP8_EFLAG_NO_UPD_ENTROPY;
+              break;
+          case kTemporalUpdateNoneNoRefGoldenRefAltRef:
+              flags |= VP8_EFLAG_NO_REF_GF;
+              flags |= VP8_EFLAG_NO_UPD_GF;
+              flags |= VP8_EFLAG_NO_UPD_ARF;
+              flags |= VP8_EFLAG_NO_UPD_LAST;
+              flags |= VP8_EFLAG_NO_UPD_ENTROPY;
+              break;
+          case kTemporalUpdateGoldenWithoutDependencyRefAltRef:
+              flags |= VP8_EFLAG_NO_REF_GF;
+              flags |= VP8_EFLAG_NO_UPD_ARF;
+              flags |= VP8_EFLAG_NO_UPD_LAST;
+              break;
+          case kTemporalUpdateLastRefAltRef:
+              flags |= VP8_EFLAG_NO_UPD_GF;
+              flags |= VP8_EFLAG_NO_UPD_ARF;
+              flags |= VP8_EFLAG_NO_REF_GF;
+              break;
+          case kTemporalUpdateGoldenRefAltRef:
+              flags |= VP8_EFLAG_NO_UPD_ARF;
+              flags |= VP8_EFLAG_NO_UPD_LAST;
+              break;
+          case kTemporalUpdateLastAndGoldenRefAltRef:
+              flags |= VP8_EFLAG_NO_UPD_ARF;
+              flags |= VP8_EFLAG_NO_REF_GF;
+              break;
+          case kTemporalUpdateLastRefAll:
+              flags |= VP8_EFLAG_NO_UPD_ARF;
+              flags |= VP8_EFLAG_NO_UPD_GF;
+              break;
+      }
     }
     return flags;
 }
@@ -592,10 +575,7 @@ void SoftVPXEncoder::onQueueFilled(OMX_U32 /* portIndex */) {
         vpx_img_wrap(&raw_frame, VPX_IMG_FMT_I420, mWidth, mHeight,
                      kInputBufferAlignment, (uint8_t *)source);
 
-        vpx_enc_frame_flags_t flags = 0;
-        if (mTemporalPatternLength > 0) {
-            flags = getEncodeFlags();
-        }
+        vpx_enc_frame_flags_t flags = getEncodeFlags();
         if (mKeyFrameRequested) {
             flags |= VPX_EFLAG_FORCE_KF;
             mKeyFrameRequested = false;

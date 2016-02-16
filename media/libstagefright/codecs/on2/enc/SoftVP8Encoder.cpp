@@ -47,11 +47,36 @@ SoftVP8Encoder::SoftVP8Encoder(const char *name,
             name, callbacks, appData, component, "video_encoder.vp8",
             OMX_VIDEO_CodingVP8, MEDIA_MIMETYPE_VIDEO_VP8, 2,
             kVp8ProfileLevels, NELEM(kVp8ProfileLevels)),
-      mDCTPartitions(0) {
+      mDCTPartitions(0),
+      mLevel(OMX_VIDEO_VP8Level_Version0) {
 }
 
 void SoftVP8Encoder::setCodecSpecificInterface() {
     mCodecInterface = vpx_codec_vp8_cx();
+}
+
+bool SoftVP8Encoder::setCodecSpecificConfiguration() {
+    switch (mLevel) {
+        case OMX_VIDEO_VP8Level_Version0:
+            mCodecConfiguration->g_profile = 0;
+            break;
+
+        case OMX_VIDEO_VP8Level_Version1:
+            mCodecConfiguration->g_profile = 1;
+            break;
+
+        case OMX_VIDEO_VP8Level_Version2:
+            mCodecConfiguration->g_profile = 2;
+            break;
+
+        case OMX_VIDEO_VP8Level_Version3:
+            mCodecConfiguration->g_profile = 3;
+            break;
+
+        default:
+            mCodecConfiguration->g_profile = 0;
+    }
+    return true;
 }
 
 vpx_codec_err_t SoftVP8Encoder::setCodecSpecificControls() {
