@@ -3,7 +3,8 @@ include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
         SoftVPXEncoder.cpp \
-        SoftVP8Encoder.cpp
+        SoftVP8Encoder.cpp \
+        SoftVP9Encoder.cpp
 
 LOCAL_C_INCLUDES := \
         $(TOP)/external/libvpx/libvpx \

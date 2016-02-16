@@ -101,5 +101,12 @@
             <Limit name="bitrate" range="1-40000000" />
             <Feature name="bitrate-modes" value="VBR,CBR" />
         </MediaCodec>
+        <MediaCodec name="OMX.google.vp9.encoder" type="video/x-vnd.on2.vp9">
+            <!-- profiles and levels:  ProfileMain : Level_Version0-3 -->
+            <Limit name="size" min="2x2" max="2048x2048" />
+            <Limit name="alignment" value="2x2" />
+            <Limit name="bitrate" range="1-40000000" />
+            <Feature name="bitrate-modes" value="VBR,CBR" />
+        </MediaCodec>
     </Encoders>
 </Included>

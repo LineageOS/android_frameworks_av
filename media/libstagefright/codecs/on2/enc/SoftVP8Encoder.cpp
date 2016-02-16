@@ -55,7 +55,7 @@ void SoftVP8Encoder::setCodecSpecificInterface() {
     mCodecInterface = vpx_codec_vp8_cx();
 }
 
-bool SoftVP8Encoder::setCodecSpecificConfiguration() {
+void SoftVP8Encoder::setCodecSpecificConfiguration() {
     switch (mLevel) {
         case OMX_VIDEO_VP8Level_Version0:
             mCodecConfiguration->g_profile = 0;
@@ -76,7 +76,6 @@ bool SoftVP8Encoder::setCodecSpecificConfiguration() {
         default:
             mCodecConfiguration->g_profile = 0;
     }
-    return true;
 }
 
 vpx_codec_err_t SoftVP8Encoder::setCodecSpecificControls() {
@@ -99,10 +98,6 @@ OMX_ERRORTYPE SoftVP8Encoder::internalGetParameter(OMX_INDEXTYPE index,
             return internalGetVp8Params(
                 (OMX_VIDEO_PARAM_VP8TYPE *)param);
 
-        case OMX_IndexParamVideoAndroidVp8Encoder:
-            return internalGetAndroidVp8Params(
-                (OMX_VIDEO_PARAM_ANDROID_VP8ENCODERTYPE *)param);
-
         default:
             return SoftVPXEncoder::internalGetParameter(index, param);
     }
@@ -117,10 +112,6 @@ OMX_ERRORTYPE SoftVP8Encoder::internalSetParameter(OMX_INDEXTYPE index,
         case OMX_IndexParamVideoVp8:
             return internalSetVp8Params(
                 (const OMX_VIDEO_PARAM_VP8TYPE *)param);
-
-        case OMX_IndexParamVideoAndroidVp8Encoder:
-            return internalSetAndroidVp8Params(
-                (const OMX_VIDEO_PARAM_ANDROID_VP8ENCODERTYPE *)param);
 
         default:
             return SoftVPXEncoder::internalSetParameter(index, param);
@@ -165,67 +156,6 @@ OMX_ERRORTYPE SoftVP8Encoder::internalSetVp8Params(
     } else {
         return OMX_ErrorBadParameter;
     }
-    return OMX_ErrorNone;
-}
-
-OMX_ERRORTYPE SoftVP8Encoder::internalGetAndroidVp8Params(
-        OMX_VIDEO_PARAM_ANDROID_VP8ENCODERTYPE* vp8AndroidParams) {
-    if (vp8AndroidParams->nPortIndex != kOutputPortIndex) {
-        return OMX_ErrorUnsupportedIndex;
-    }
-
-    vp8AndroidParams->nKeyFrameInterval = mKeyFrameInterval;
-    vp8AndroidParams->eTemporalPattern = mTemporalPatternType;
-    vp8AndroidParams->nTemporalLayerCount = mTemporalLayers;
-    vp8AndroidParams->nMinQuantizer = mMinQuantizer;
-    vp8AndroidParams->nMaxQuantizer = mMaxQuantizer;
-    memcpy(vp8AndroidParams->nTemporalLayerBitrateRatio,
-           mTemporalLayerBitrateRatio, sizeof(mTemporalLayerBitrateRatio));
-    return OMX_ErrorNone;
-}
-
-OMX_ERRORTYPE SoftVP8Encoder::internalSetAndroidVp8Params(
-        const OMX_VIDEO_PARAM_ANDROID_VP8ENCODERTYPE* vp8AndroidParams) {
-    if (vp8AndroidParams->nPortIndex != kOutputPortIndex) {
-        return OMX_ErrorUnsupportedIndex;
-    }
-    if (vp8AndroidParams->eTemporalPattern != OMX_VIDEO_VPXTemporalLayerPatternNone &&
-        vp8AndroidParams->eTemporalPattern != OMX_VIDEO_VPXTemporalLayerPatternWebRTC) {
-        return OMX_ErrorBadParameter;
-    }
-    if (vp8AndroidParams->nTemporalLayerCount > OMX_VIDEO_ANDROID_MAXVP8TEMPORALLAYERS) {
-        return OMX_ErrorBadParameter;
-    }
-    if (vp8AndroidParams->nMinQuantizer > vp8AndroidParams->nMaxQuantizer) {
-        return OMX_ErrorBadParameter;
-    }
-
-    mTemporalPatternType = vp8AndroidParams->eTemporalPattern;
-    if (vp8AndroidParams->eTemporalPattern == OMX_VIDEO_VPXTemporalLayerPatternWebRTC) {
-        mTemporalLayers = vp8AndroidParams->nTemporalLayerCount;
-    } else if (vp8AndroidParams->eTemporalPattern == OMX_VIDEO_VPXTemporalLayerPatternNone) {
-        mTemporalLayers = 0;
-    }
-    // Check the bitrate distribution between layers is in increasing order
-    if (mTemporalLayers > 1) {
-        for (size_t i = 0; i < mTemporalLayers - 1; i++) {
-            if (vp8AndroidParams->nTemporalLayerBitrateRatio[i + 1] <=
-                    vp8AndroidParams->nTemporalLayerBitrateRatio[i]) {
-                ALOGE("Wrong bitrate ratio - should be in increasing order.");
-                return OMX_ErrorBadParameter;
-            }
-        }
-    }
-    mKeyFrameInterval = vp8AndroidParams->nKeyFrameInterval;
-    mMinQuantizer = vp8AndroidParams->nMinQuantizer;
-    mMaxQuantizer = vp8AndroidParams->nMaxQuantizer;
-    memcpy(mTemporalLayerBitrateRatio, vp8AndroidParams->nTemporalLayerBitrateRatio,
-            sizeof(mTemporalLayerBitrateRatio));
-    ALOGD("VPx: internalSetAndroidVp8Params. BRMode: %u. TS: %zu. KF: %u."
-          " QP: %u - %u BR0: %u. BR1: %u. BR2: %u",
-          (uint32_t)mBitrateControlMode, mTemporalLayers, mKeyFrameInterval,
-          mMinQuantizer, mMaxQuantizer, mTemporalLayerBitrateRatio[0],
-          mTemporalLayerBitrateRatio[1], mTemporalLayerBitrateRatio[2]);
     return OMX_ErrorNone;
 }
 
