@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ffb9cba7_d5cbad1b",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 1
+      },
+      "lineNbr": 9,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-02-17T06:25:33Z",
+      "side": 1,
+      "message": "Line length.",
+      "revId": "a120ef9df630c89ebdf10e905e0bfa149cd35522",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ffb9cba7_75d0c1ca",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 1
+      },
+      "lineNbr": 11,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-02-17T06:25:33Z",
+      "side": 1,
+      "message": "Line length.",
+      "revId": "a120ef9df630c89ebdf10e905e0bfa149cd35522",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ffb9cba7_75e9a17e",
+        "filename": "media/libavextensions/stagefright/AVUtils.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 1018,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-02-17T06:25:33Z",
+      "side": 1,
+      "message": "It probably makes more sense to have a separate initializeHSR function instead at this point. This code looks strange to me here.",
+      "revId": "a120ef9df630c89ebdf10e905e0bfa149cd35522",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
