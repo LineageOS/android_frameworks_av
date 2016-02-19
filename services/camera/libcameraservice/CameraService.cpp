@@ -254,12 +254,14 @@ void CameraService::onFirstRef()
 }
 
 sp<ICameraServiceProxy> CameraService::getCameraServiceProxy() {
+    sp<ICameraServiceProxy> proxyBinder = nullptr;
+#ifndef __BRILLO__
     sp<IServiceManager> sm = defaultServiceManager();
     sp<IBinder> binder = sm->getService(String16("media.camera.proxy"));
-    if (binder == nullptr) {
-        return nullptr;
+    if (binder != nullptr) {
+        proxyBinder = interface_cast<ICameraServiceProxy>(binder);
     }
-    sp<ICameraServiceProxy> proxyBinder = interface_cast<ICameraServiceProxy>(binder);
+#endif
     return proxyBinder;
 }
 
