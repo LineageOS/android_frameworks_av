@@ -169,6 +169,7 @@ size_t AudioInputDescriptor::getAudioSessionCount(bool activeOnly) const
 
 status_t AudioInputDescriptor::addAudioSession(audio_session_t session,
                          const sp<AudioSession>& audioSession) {
+    audioSession->setDeviceConfig(mFormat, mSamplingRate, mChannelMask);
     return mSessions.addSession(session, audioSession);
 }
 
