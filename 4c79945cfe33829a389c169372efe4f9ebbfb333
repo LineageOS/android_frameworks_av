@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ffb9cba7_9447624c",
+        "filename": "media/libmediaplayerservice/StagefrightRecorder.cpp",
+        "patchSetId": 4
+      },
+      "lineNbr": 1027,
+      "author": {
+        "id": 14090
+      },
+      "writtenOn": "2016-02-26T06:21:33Z",
+      "side": 1,
+      "message": "This is where we reuse the audio source as encoder.",
+      "revId": "4c79945cfe33829a389c169372efe4f9ebbfb333",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
