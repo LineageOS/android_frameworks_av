@@ -16,6 +16,24 @@
       "revId": "e4f4903fd65bf008bab76b7390766a1c3b08e088",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ffb9cba7_14837255",
+        "filename": "media/libmediaplayerservice/StagefrightRecorder.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 2061,
+      "author": {
+        "id": 14090
+      },
+      "writtenOn": "2016-02-26T06:33:45Z",
+      "side": 1,
+      "message": "The AudioSource impl for pause() is pretty dumb, so it\u0027s fine if you call it multiple times.\n\nI\u0027m fine making it symmetric, but it\u0027s probably not necessary.",
+      "parentUuid": "ffb9cba7_b4ae26e5",
+      "revId": "e4f4903fd65bf008bab76b7390766a1c3b08e088",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
