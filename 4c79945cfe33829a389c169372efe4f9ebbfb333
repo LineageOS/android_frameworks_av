@@ -33,6 +33,24 @@
       "revId": "4c79945cfe33829a389c169372efe4f9ebbfb333",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ffb9cba7_f4a49e0a",
+        "filename": "media/libmediaplayerservice/StagefrightRecorder.cpp",
+        "patchSetId": 4
+      },
+      "lineNbr": 2095,
+      "author": {
+        "id": 14090
+      },
+      "writtenOn": "2016-02-26T06:26:14Z",
+      "side": 1,
+      "message": "I\u0027m not sure that is necessary. \n\nI think the same principle should apply if we have some other audio source that does not need an encoder.",
+      "parentUuid": "ffb9cba7_1475b295",
+      "revId": "4c79945cfe33829a389c169372efe4f9ebbfb333",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
