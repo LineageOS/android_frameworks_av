@@ -39,9 +39,9 @@ AudioSession::AudioSession(audio_session_t session,
                            AudioPolicyClientInterface *clientInterface) :
     mSession(session), mInputSource(inputSource),
     mConfig({ .format = format, .sample_rate = sampleRate, .channel_mask = channelMask}),
-    mDeviceConfig(AUDIO_CONFIG_BASE_INITIALIZER),
     mFlags(flags), mUid(uid), mIsSoundTrigger(isSoundTrigger),
-    mOpenCount(1), mActiveCount(0), mPolicyMix(policyMix), mClientInterface(clientInterface)
+    mOpenCount(1), mActiveCount(0), mPolicyMix(policyMix), mClientInterface(clientInterface),
+    mInfoProvider(NULL)
 {
 }
 
@@ -67,25 +67,31 @@ uint32_t AudioSession::changeActiveCount(int delta)
     }
     mActiveCount += delta;
     ALOGV("%s active count %d", __FUNCTION__, mActiveCount);
+    int event = RECORD_CONFIG_EVENT_NONE;
 
     if ((oldActiveCount == 0) && (mActiveCount > 0)) {
-        // if input maps to a dynamic policy with an activity listener, notify of state change
-        if ((mPolicyMix != NULL) && ((mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0))
-        {
-            mClientInterface->onDynamicPolicyMixStateUpdate(mPolicyMix->mRegistrationId,
-                    MIX_STATE_MIXING);
-        }
-        mClientInterface->onRecordingConfigurationUpdate(RECORD_CONFIG_EVENT_START,
-                mSession, mInputSource, &mConfig, &mDeviceConfig);
+        event = RECORD_CONFIG_EVENT_START;
     } else if ((oldActiveCount > 0) && (mActiveCount == 0)) {
+        event = RECORD_CONFIG_EVENT_STOP;
+    }
+
+    if (event != RECORD_CONFIG_EVENT_NONE) {
+        // Dynamic policy callback:
         // if input maps to a dynamic policy with an activity listener, notify of state change
         if ((mPolicyMix != NULL) && ((mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0))
         {
             mClientInterface->onDynamicPolicyMixStateUpdate(mPolicyMix->mRegistrationId,
-                    MIX_STATE_IDLE);
+                    (event == RECORD_CONFIG_EVENT_START) ? MIX_STATE_MIXING : MIX_STATE_IDLE);
         }
-        mClientInterface->onRecordingConfigurationUpdate(RECORD_CONFIG_EVENT_STOP,
-                mSession, mInputSource, &mConfig, &mDeviceConfig);
+
+        // Recording configuration callback:
+        const AudioSessionInfoProvider* provider = mInfoProvider;
+        const audio_config_base_t deviceConfig = (provider != NULL) ? provider->getConfig() :
+                AUDIO_CONFIG_BASE_INITIALIZER;
+        const audio_patch_handle_t patchHandle = (provider != NULL) ? provider->getPatchHandle() :
+                AUDIO_PATCH_HANDLE_NONE;
+        mClientInterface->onRecordingConfigurationUpdate(event, mSession, mInputSource,
+                &mConfig, &deviceConfig, patchHandle);
     }
 
     return mActiveCount;
@@ -105,11 +111,24 @@ bool AudioSession::matches(const sp<AudioSession> &other) const
     return false;
 }
 
-void AudioSession::setDeviceConfig(audio_format_t format, uint32_t sampleRate,
-            audio_channel_mask_t channelMask) {
-    mDeviceConfig.format = format;
-    mDeviceConfig.sample_rate = sampleRate;
-    mDeviceConfig.channel_mask = channelMask;
+void AudioSession::setInfoProvider(AudioSessionInfoProvider *provider)
+{
+    mInfoProvider = provider;
+}
+
+void AudioSession::onSessionInfoUpdate() const
+{
+    if (mActiveCount > 0) {
+        // resend the callback after requerying the informations from the info provider
+        const AudioSessionInfoProvider* provider = mInfoProvider;
+        const audio_config_base_t deviceConfig = (provider != NULL) ? provider->getConfig() :
+                AUDIO_CONFIG_BASE_INITIALIZER;
+        const audio_patch_handle_t patchHandle = (provider != NULL) ? provider->getPatchHandle() :
+                AUDIO_PATCH_HANDLE_NONE;
+        mClientInterface->onRecordingConfigurationUpdate(RECORD_CONFIG_EVENT_START,
+                mSession, mInputSource,
+                &mConfig, &deviceConfig, patchHandle);
+    }
 }
 
 status_t AudioSession::dump(int fd, int spaces, int index) const
@@ -146,7 +165,8 @@ status_t AudioSession::dump(int fd, int spaces, int index) const
 }
 
 status_t AudioSessionCollection::addSession(audio_session_t session,
-                                         const sp<AudioSession>& audioSession)
+                                         const sp<AudioSession>& audioSession,
+                                         AudioSessionInfoProvider *provider)
 {
     ssize_t index = indexOfKey(session);
 
@@ -154,6 +174,7 @@ status_t AudioSessionCollection::addSession(audio_session_t session,
         ALOGW("addSession() session %d already in", session);
         return ALREADY_EXISTS;
     }
+    audioSession->setInfoProvider(provider);
     add(session, audioSession);
     ALOGV("addSession() session %d  client %d source %d",
             session, audioSession->uid(), audioSession->inputSource());
@@ -169,6 +190,7 @@ status_t AudioSessionCollection::removeSession(audio_session_t session)
         return ALREADY_EXISTS;
     }
     ALOGV("removeSession() session %d", session);
+    valueAt(index)->setInfoProvider(NULL);
     removeItemsAt(index);
     return NO_ERROR;
 }
@@ -243,6 +265,13 @@ audio_source_t AudioSessionCollection::getHighestPrioritySource(bool activeOnly)
         }
     }
     return source;
+}
+
+void AudioSessionCollection::onSessionInfoUpdate() const
+{
+    for (size_t i = 0; i < size(); i++) {
+        valueAt(i)->onSessionInfoUpdate();
+    }
 }
 
 status_t AudioSessionCollection::dump(int fd, int spaces) const
