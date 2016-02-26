@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ffb9cba7_b4ae26e5",
+        "filename": "media/libmediaplayerservice/StagefrightRecorder.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 2061,
+      "author": {
+        "id": 13956
+      },
+      "writtenOn": "2016-02-26T06:28:11Z",
+      "side": 1,
+      "message": "i just wonder do we need to guard here also. and why double pause don\u0027t have a problem, but double start will have problem.",
+      "revId": "e4f4903fd65bf008bab76b7390766a1c3b08e088",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
