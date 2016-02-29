@@ -514,7 +514,7 @@ void ID3::Iterator::getstring(String8 *id, bool otherdata) const {
         if (mOffset == 126 || mOffset == 127) {
             // Special treatment for the track number and genre.
             char tmp[16];
-            sprintf(tmp, "%d", (int)*frameData);
+            snprintf(tmp, sizeof(tmp), "%d", (int)*frameData);
 
             id->setTo(tmp);
             return;
