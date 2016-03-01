@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ffb9cba7_5b3592d9",
+        "filename": "media/libstagefright/MPEG4Extractor.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 3328,
+      "author": {
+        "id": 32
+      },
+      "writtenOn": "2016-03-01T20:10:35Z",
+      "side": 1,
+      "message": "Most HEVC clips in the wild do not have configurationVersion \u003d 1, so this will cause them to fail.",
+      "revId": "15c4ae10c34733c240d385e48bc4d7c7fc861964",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
