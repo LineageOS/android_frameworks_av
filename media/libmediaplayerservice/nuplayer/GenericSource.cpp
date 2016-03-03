@@ -213,6 +213,9 @@ status_t NuPlayer::GenericSource::initFromDataSource() {
         sp<MediaSource> track = extractor->getTrack(i);
 
         sp<MetaData> meta = extractor->getTrackMetaData(i);
+        if (meta == NULL) {
+            continue;
+        }
 
         const char *mime;
         CHECK(meta->findCString(kKeyMIMEType, &mime));
