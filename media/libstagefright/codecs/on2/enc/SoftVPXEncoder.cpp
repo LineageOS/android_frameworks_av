@@ -363,9 +363,29 @@ OMX_ERRORTYPE SoftVPXEncoder::internalGetParameter(OMX_INDEXTYPE index,
     const int32_t indexFull = index;
 
     switch (indexFull) {
-        case OMX_IndexParamVideoBitrate:
-            return internalGetBitrateParams(
-                (OMX_VIDEO_PARAM_BITRATETYPE *)param);
+        case OMX_IndexParamVideoBitrate: {
+            OMX_VIDEO_PARAM_BITRATETYPE *bitrate =
+                (OMX_VIDEO_PARAM_BITRATETYPE *)param;
+
+            if (!isValidOMXParam(bitrate)) {
+                return OMX_ErrorBadParameter;
+            }
+
+            if (bitrate->nPortIndex != kOutputPortIndex) {
+                return OMX_ErrorUnsupportedIndex;
+            }
+
+            bitrate->nTargetBitrate = mBitrate;
+
+            if (mBitrateControlMode == VPX_VBR) {
+                bitrate->eControlRate = OMX_Video_ControlRateVariable;
+            } else if (mBitrateControlMode == VPX_CBR) {
+                bitrate->eControlRate = OMX_Video_ControlRateConstant;
+            } else {
+                return OMX_ErrorUnsupportedSetting;
+            }
+            return OMX_ErrorNone;
+        }
 
         default:
             return SoftVideoEncoderOMXComponent::internalGetParameter(index, param);
@@ -378,9 +398,16 @@ OMX_ERRORTYPE SoftVPXEncoder::internalSetParameter(OMX_INDEXTYPE index,
     const int32_t indexFull = index;
 
     switch (indexFull) {
-        case OMX_IndexParamVideoBitrate:
-            return internalSetBitrateParams(
-                (const OMX_VIDEO_PARAM_BITRATETYPE *)param);
+        case OMX_IndexParamVideoBitrate: {
+            const OMX_VIDEO_PARAM_BITRATETYPE *bitRate =
+                (const OMX_VIDEO_PARAM_BITRATETYPE*) param;
+
+            if (!isValidOMXParam(bitRate)) {
+                return OMX_ErrorBadParameter;
+            }
+
+            return internalSetBitrateParams(bitRate);
+        }
 
         default:
             return SoftVideoEncoderOMXComponent::internalSetParameter(index, param);
@@ -395,6 +422,10 @@ OMX_ERRORTYPE SoftVPXEncoder::setConfig(
             OMX_CONFIG_INTRAREFRESHVOPTYPE *params =
                 (OMX_CONFIG_INTRAREFRESHVOPTYPE *)_params;
 
+            if (!isValidOMXParam(params)) {
+                return OMX_ErrorBadParameter;
+            }
+
             if (params->nPortIndex != kOutputPortIndex) {
                 return OMX_ErrorBadPortIndex;
             }
@@ -407,6 +438,10 @@ OMX_ERRORTYPE SoftVPXEncoder::setConfig(
         {
             OMX_VIDEO_CONFIG_BITRATETYPE *params =
                 (OMX_VIDEO_CONFIG_BITRATETYPE *)_params;
+
+            if (!isValidOMXParam(params)) {
+                return OMX_ErrorBadParameter;
+            }
 
             if (params->nPortIndex != kOutputPortIndex) {
                 return OMX_ErrorBadPortIndex;
