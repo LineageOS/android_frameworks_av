@@ -100,7 +100,7 @@ void ALooperRoster::unregisterStaleHandlers() {
     }
 }
 
-static void makeFourCC(uint32_t fourcc, char *s) {
+static void makeFourCC(uint32_t fourcc, char *s, size_t bufsz) {
     s[0] = (fourcc >> 24) & 0xff;
     if (s[0]) {
         s[1] = (fourcc >> 16) & 0xff;
@@ -108,7 +108,7 @@ static void makeFourCC(uint32_t fourcc, char *s) {
         s[3] = fourcc & 0xff;
         s[4] = 0;
     } else {
-        sprintf(s, "%u", fourcc);
+        snprintf(s, bufsz, "%u", fourcc);
     }
 }
 
@@ -146,7 +146,7 @@ void ALooperRoster::dump(int fd, const Vector<String16>& args) {
                 if (verboseStats) {
                     for (size_t j = 0; j < handler->mMessages.size(); j++) {
                         char fourcc[15];
-                        makeFourCC(handler->mMessages.keyAt(j), fourcc);
+                        makeFourCC(handler->mMessages.keyAt(j), fourcc, sizeof(fourcc));
                         s.appendFormat("\n    %s: %u",
                                 fourcc,
                                 handler->mMessages.valueAt(j));

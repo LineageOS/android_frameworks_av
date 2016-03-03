@@ -70,8 +70,8 @@ void MtpPacket::dump() {
     char* bufptr = buffer;
 
     for (size_t i = 0; i < mPacketSize; i++) {
-        sprintf(bufptr, "%02X ", mBuffer[i]);
-        bufptr += strlen(bufptr);
+        bufptr += snprintf(bufptr, sizeof(buffer) - (bufptr - buffer), "%02X ",
+                           mBuffer[i]);
         if (i % DUMP_BYTES_PER_ROW == (DUMP_BYTES_PER_ROW - 1)) {
             ALOGV("%s", buffer);
             bufptr = buffer;

@@ -49,7 +49,7 @@ void hexdump(const void *_data, size_t size, size_t indent, AString *appendTo) {
         appendIndent(&line, indent);
 
         char tmp[32];
-        sprintf(tmp, "%08lx:  ", (unsigned long)offset);
+        snprintf(tmp, sizeof(tmp), "%08lx:  ", (unsigned long)offset);
 
         line.append(tmp);
 
@@ -60,7 +60,7 @@ void hexdump(const void *_data, size_t size, size_t indent, AString *appendTo) {
             if (offset + i >= size) {
                 line.append("   ");
             } else {
-                sprintf(tmp, "%02x ", data[offset + i]);
+                snprintf(tmp, sizeof(tmp), "%02x ", data[offset + i]);
                 line.append(tmp);
             }
         }
