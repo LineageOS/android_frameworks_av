@@ -35,7 +35,6 @@ LOCAL_SRC_FILES:=                         \
         MediaCodecList.cpp                \
         MediaCodecListOverrides.cpp       \
         MediaCodecSource.cpp              \
-        MediaDefs.cpp                     \
         MediaExtractor.cpp                \
         MediaSync.cpp                     \
         MidiExtractor.cpp                 \

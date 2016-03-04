@@ -64,7 +64,7 @@ LOCAL_STATIC_LIBRARIES := \
         libstagefright_m4vh263enc
 
 LOCAL_SHARED_LIBRARIES := \
-        libstagefright \
+        libmedia \
         libstagefright_omx \
         libutils \
         liblog \

@@ -10,7 +10,7 @@ LOCAL_C_INCLUDES := \
         frameworks/native/include/media/openmax \
 
 LOCAL_SHARED_LIBRARIES := \
-        libopus libstagefright libstagefright_omx \
+        libopus libmedia libstagefright_omx \
         libstagefright_foundation libutils liblog
 
 LOCAL_CLANG := true

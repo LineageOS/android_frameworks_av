@@ -14,7 +14,7 @@ LOCAL_CLANG := true
 LOCAL_SANITIZE := signed-integer-overflow unsigned-integer-overflow
 
 LOCAL_SHARED_LIBRARIES := \
-        libstagefright libstagefright_omx libstagefright_foundation libutils liblog
+        libmedia libstagefright_omx libstagefright_foundation libutils liblog
 
 LOCAL_STATIC_LIBRARIES := \
         libFLAC \
