@@ -20,7 +20,7 @@ LOCAL_STATIC_LIBRARIES := \
         libvpx
 
 LOCAL_SHARED_LIBRARIES := \
-        libstagefright libstagefright_omx libstagefright_foundation libutils liblog \
+        libmedia libstagefright_omx libstagefright_foundation libutils liblog \
         libhardware \
 
 LOCAL_MODULE := libstagefright_soft_vpxenc

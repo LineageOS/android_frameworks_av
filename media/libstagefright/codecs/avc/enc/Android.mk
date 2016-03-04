@@ -60,7 +60,7 @@ LOCAL_STATIC_LIBRARIES := \
         libstagefright_avcenc
 
 LOCAL_SHARED_LIBRARIES := \
-        libstagefright \
+        libmedia \
         libstagefright_avc_common \
         libstagefright_enc_common \
         libstagefright_foundation \
