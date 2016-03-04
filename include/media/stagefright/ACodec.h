@@ -94,10 +94,6 @@ struct ACodec : public AHierarchicalStateMachine, public CodecBase {
         DISALLOW_EVIL_CONSTRUCTORS(PortDescription);
     };
 
-    static bool isFlexibleColorFormat(
-            const sp<IOMX> &omx, IOMX::node_id node,
-            uint32_t colorFormat, bool usingNativeBuffers, OMX_U32 *flexibleEquivalent);
-
     // Returns 0 if configuration is not supported.  NOTE: this is treated by
     // some OMX components as auto level, and by others as invalid level.
     static int /* OMX_VIDEO_AVCLEVELTYPE */ getAVCLevelFor(
@@ -341,9 +337,6 @@ private:
             ssize_t *index = NULL);
 
     status_t setComponentRole(bool isEncoder, const char *mime);
-    static const char *getComponentRole(bool isEncoder, const char *mime);
-    static status_t setComponentRole(
-            const sp<IOMX> &omx, IOMX::node_id node, const char *role);
 
     status_t configureCodec(const char *mime, const sp<AMessage> &msg);
 
@@ -540,11 +533,6 @@ private:
     void signalError(
             OMX_ERRORTYPE error = OMX_ErrorUndefined,
             status_t internalError = UNKNOWN_ERROR);
-
-    static bool describeDefaultColorFormat(DescribeColorFormat2Params &describeParams);
-    static bool describeColorFormat(
-        const sp<IOMX> &omx, IOMX::node_id node,
-        DescribeColorFormat2Params &describeParams);
 
     status_t requestIDRFrame();
     status_t setParameters(const sp<AMessage> &params);

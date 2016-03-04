@@ -1600,108 +1600,16 @@ ACodec::BufferInfo *ACodec::findBufferByID(
 
 status_t ACodec::setComponentRole(
         bool isEncoder, const char *mime) {
-    const char *role = getComponentRole(isEncoder, mime);
+    const char *role = GetComponentRole(isEncoder, mime);
     if (role == NULL) {
         return BAD_VALUE;
     }
-    status_t err = setComponentRole(mOMX, mNode, role);
+    status_t err = SetComponentRole(mOMX, mNode, role);
     if (err != OK) {
         ALOGW("[%s] Failed to set standard component role '%s'.",
              mComponentName.c_str(), role);
     }
     return err;
-}
-
-//static
-const char *ACodec::getComponentRole(
-        bool isEncoder, const char *mime) {
-    struct MimeToRole {
-        const char *mime;
-        const char *decoderRole;
-        const char *encoderRole;
-    };
-
-    static const MimeToRole kMimeToRole[] = {
-        { MEDIA_MIMETYPE_AUDIO_MPEG,
-            "audio_decoder.mp3", "audio_encoder.mp3" },
-        { MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_I,
-            "audio_decoder.mp1", "audio_encoder.mp1" },
-        { MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II,
-            "audio_decoder.mp2", "audio_encoder.mp2" },
-        { MEDIA_MIMETYPE_AUDIO_AMR_NB,
-            "audio_decoder.amrnb", "audio_encoder.amrnb" },
-        { MEDIA_MIMETYPE_AUDIO_AMR_WB,
-            "audio_decoder.amrwb", "audio_encoder.amrwb" },
-        { MEDIA_MIMETYPE_AUDIO_AAC,
-            "audio_decoder.aac", "audio_encoder.aac" },
-        { MEDIA_MIMETYPE_AUDIO_VORBIS,
-            "audio_decoder.vorbis", "audio_encoder.vorbis" },
-        { MEDIA_MIMETYPE_AUDIO_OPUS,
-            "audio_decoder.opus", "audio_encoder.opus" },
-        { MEDIA_MIMETYPE_AUDIO_G711_MLAW,
-            "audio_decoder.g711mlaw", "audio_encoder.g711mlaw" },
-        { MEDIA_MIMETYPE_AUDIO_G711_ALAW,
-            "audio_decoder.g711alaw", "audio_encoder.g711alaw" },
-        { MEDIA_MIMETYPE_VIDEO_AVC,
-            "video_decoder.avc", "video_encoder.avc" },
-        { MEDIA_MIMETYPE_VIDEO_HEVC,
-            "video_decoder.hevc", "video_encoder.hevc" },
-        { MEDIA_MIMETYPE_VIDEO_MPEG4,
-            "video_decoder.mpeg4", "video_encoder.mpeg4" },
-        { MEDIA_MIMETYPE_VIDEO_H263,
-            "video_decoder.h263", "video_encoder.h263" },
-        { MEDIA_MIMETYPE_VIDEO_VP8,
-            "video_decoder.vp8", "video_encoder.vp8" },
-        { MEDIA_MIMETYPE_VIDEO_VP9,
-            "video_decoder.vp9", "video_encoder.vp9" },
-        { MEDIA_MIMETYPE_AUDIO_RAW,
-            "audio_decoder.raw", "audio_encoder.raw" },
-        { MEDIA_MIMETYPE_VIDEO_DOLBY_VISION,
-            "video_decoder.dolby-vision", "video_encoder.dolby-vision" },
-        { MEDIA_MIMETYPE_AUDIO_FLAC,
-            "audio_decoder.flac", "audio_encoder.flac" },
-        { MEDIA_MIMETYPE_AUDIO_MSGSM,
-            "audio_decoder.gsm", "audio_encoder.gsm" },
-        { MEDIA_MIMETYPE_VIDEO_MPEG2,
-            "video_decoder.mpeg2", "video_encoder.mpeg2" },
-        { MEDIA_MIMETYPE_AUDIO_AC3,
-            "audio_decoder.ac3", "audio_encoder.ac3" },
-        { MEDIA_MIMETYPE_AUDIO_EAC3,
-            "audio_decoder.eac3", "audio_encoder.eac3" },
-    };
-
-    static const size_t kNumMimeToRole =
-        sizeof(kMimeToRole) / sizeof(kMimeToRole[0]);
-
-    size_t i;
-    for (i = 0; i < kNumMimeToRole; ++i) {
-        if (!strcasecmp(mime, kMimeToRole[i].mime)) {
-            break;
-        }
-    }
-
-    if (i == kNumMimeToRole) {
-        return NULL;
-    }
-
-    return isEncoder ? kMimeToRole[i].encoderRole
-                  : kMimeToRole[i].decoderRole;
-}
-
-//static
-status_t ACodec::setComponentRole(
-        const sp<IOMX> &omx, IOMX::node_id node, const char *role) {
-    OMX_PARAM_COMPONENTROLETYPE roleParams;
-    InitOMXParams(&roleParams);
-
-    strncpy((char *)roleParams.cRole,
-            role, OMX_MAX_STRINGNAME_SIZE - 1);
-
-    roleParams.cRole[OMX_MAX_STRINGNAME_SIZE - 1] = '\0';
-
-    return omx->setParameter(
-            node, OMX_IndexParamStandardComponentRole,
-            &roleParams, sizeof(roleParams));
 }
 
 status_t ACodec::configureCodec(
@@ -2060,7 +1968,7 @@ status_t ACodec::configureCodec(
                 }
                 ALOGD("[%s] Requested output format %#x and got %#x.",
                         mComponentName.c_str(), requestedColorFormat, colorFormat);
-                if (!isFlexibleColorFormat(
+                if (!IsFlexibleColorFormat(
                                 mOMX, mNode, colorFormat, haveNativeWindow, &flexibleEquivalent)
                         || flexibleEquivalent != (OMX_U32)requestedColorFormat) {
                     // device did not handle flex-YUV request for native window, fall back
@@ -2978,7 +2886,7 @@ status_t ACodec::setVideoPortFormatType(
         // substitute back flexible color format to codec supported format
         OMX_U32 flexibleEquivalent;
         if (compressionFormat == OMX_VIDEO_CodingUnused
-                && isFlexibleColorFormat(
+                && IsFlexibleColorFormat(
                         mOMX, mNode, format.eColorFormat, usingNativeBuffers, &flexibleEquivalent)
                 && colorFormat == flexibleEquivalent) {
             ALOGI("[%s] using color format %#x in place of %#x",
@@ -3082,7 +2990,7 @@ status_t ACodec::setSupportedOutputFormat(bool getLegacyFlexibleFormat) {
         // find best legacy non-standard format
         OMX_U32 flexibleEquivalent;
         if (legacyFormat.eColorFormat == OMX_COLOR_FormatUnused
-                && isFlexibleColorFormat(
+                && IsFlexibleColorFormat(
                         mOMX, mNode, format.eColorFormat, false /* usingNativeBuffers */,
                         &flexibleEquivalent)
                 && flexibleEquivalent == OMX_COLOR_FormatYUV420Flexible) {
@@ -4492,188 +4400,6 @@ void ACodec::processDeferredMessages() {
     }
 }
 
-// static
-bool ACodec::describeDefaultColorFormat(DescribeColorFormat2Params &params) {
-    MediaImage2 &image = params.sMediaImage;
-    memset(&image, 0, sizeof(image));
-
-    image.mType = MediaImage2::MEDIA_IMAGE_TYPE_UNKNOWN;
-    image.mNumPlanes = 0;
-
-    const OMX_COLOR_FORMATTYPE fmt = params.eColorFormat;
-    image.mWidth = params.nFrameWidth;
-    image.mHeight = params.nFrameHeight;
-
-    // only supporting YUV420
-    if (fmt != OMX_COLOR_FormatYUV420Planar &&
-        fmt != OMX_COLOR_FormatYUV420PackedPlanar &&
-        fmt != OMX_COLOR_FormatYUV420SemiPlanar &&
-        fmt != OMX_COLOR_FormatYUV420PackedSemiPlanar &&
-        fmt != (OMX_COLOR_FORMATTYPE)HAL_PIXEL_FORMAT_YV12) {
-        ALOGW("do not know color format 0x%x = %d", fmt, fmt);
-        return false;
-    }
-
-    // TEMPORARY FIX for some vendors that advertise sliceHeight as 0
-    if (params.nStride != 0 && params.nSliceHeight == 0) {
-        ALOGW("using sliceHeight=%u instead of what codec advertised (=0)",
-                params.nFrameHeight);
-        params.nSliceHeight = params.nFrameHeight;
-    }
-
-    // we need stride and slice-height to be non-zero and sensible. These values were chosen to
-    // prevent integer overflows further down the line, and do not indicate support for
-    // 32kx32k video.
-    if (params.nStride == 0 || params.nSliceHeight == 0
-            || params.nStride > 32768 || params.nSliceHeight > 32768) {
-        ALOGW("cannot describe color format 0x%x = %d with stride=%u and sliceHeight=%u",
-                fmt, fmt, params.nStride, params.nSliceHeight);
-        return false;
-    }
-
-    // set-up YUV format
-    image.mType = MediaImage2::MEDIA_IMAGE_TYPE_YUV;
-    image.mNumPlanes = 3;
-    image.mBitDepth = 8;
-    image.mBitDepthAllocated = 8;
-    image.mPlane[image.Y].mOffset = 0;
-    image.mPlane[image.Y].mColInc = 1;
-    image.mPlane[image.Y].mRowInc = params.nStride;
-    image.mPlane[image.Y].mHorizSubsampling = 1;
-    image.mPlane[image.Y].mVertSubsampling = 1;
-
-    switch ((int)fmt) {
-        case HAL_PIXEL_FORMAT_YV12:
-            if (params.bUsingNativeBuffers) {
-                size_t ystride = align(params.nStride, 16);
-                size_t cstride = align(params.nStride / 2, 16);
-                image.mPlane[image.Y].mRowInc = ystride;
-
-                image.mPlane[image.V].mOffset = ystride * params.nSliceHeight;
-                image.mPlane[image.V].mColInc = 1;
-                image.mPlane[image.V].mRowInc = cstride;
-                image.mPlane[image.V].mHorizSubsampling = 2;
-                image.mPlane[image.V].mVertSubsampling = 2;
-
-                image.mPlane[image.U].mOffset = image.mPlane[image.V].mOffset
-                        + (cstride * params.nSliceHeight / 2);
-                image.mPlane[image.U].mColInc = 1;
-                image.mPlane[image.U].mRowInc = cstride;
-                image.mPlane[image.U].mHorizSubsampling = 2;
-                image.mPlane[image.U].mVertSubsampling = 2;
-                break;
-            } else {
-                // fall through as YV12 is used for YUV420Planar by some codecs
-            }
-
-        case OMX_COLOR_FormatYUV420Planar:
-        case OMX_COLOR_FormatYUV420PackedPlanar:
-            image.mPlane[image.U].mOffset = params.nStride * params.nSliceHeight;
-            image.mPlane[image.U].mColInc = 1;
-            image.mPlane[image.U].mRowInc = params.nStride / 2;
-            image.mPlane[image.U].mHorizSubsampling = 2;
-            image.mPlane[image.U].mVertSubsampling = 2;
-
-            image.mPlane[image.V].mOffset = image.mPlane[image.U].mOffset
-                    + (params.nStride * params.nSliceHeight / 4);
-            image.mPlane[image.V].mColInc = 1;
-            image.mPlane[image.V].mRowInc = params.nStride / 2;
-            image.mPlane[image.V].mHorizSubsampling = 2;
-            image.mPlane[image.V].mVertSubsampling = 2;
-            break;
-
-        case OMX_COLOR_FormatYUV420SemiPlanar:
-            // FIXME: NV21 for sw-encoder, NV12 for decoder and hw-encoder
-        case OMX_COLOR_FormatYUV420PackedSemiPlanar:
-            // NV12
-            image.mPlane[image.U].mOffset = params.nStride * params.nSliceHeight;
-            image.mPlane[image.U].mColInc = 2;
-            image.mPlane[image.U].mRowInc = params.nStride;
-            image.mPlane[image.U].mHorizSubsampling = 2;
-            image.mPlane[image.U].mVertSubsampling = 2;
-
-            image.mPlane[image.V].mOffset = image.mPlane[image.U].mOffset + 1;
-            image.mPlane[image.V].mColInc = 2;
-            image.mPlane[image.V].mRowInc = params.nStride;
-            image.mPlane[image.V].mHorizSubsampling = 2;
-            image.mPlane[image.V].mVertSubsampling = 2;
-            break;
-
-        default:
-            TRESPASS();
-    }
-    return true;
-}
-
-// static
-bool ACodec::describeColorFormat(
-        const sp<IOMX> &omx, IOMX::node_id node,
-        DescribeColorFormat2Params &describeParams)
-{
-    OMX_INDEXTYPE describeColorFormatIndex;
-    if (omx->getExtensionIndex(
-            node, "OMX.google.android.index.describeColorFormat",
-            &describeColorFormatIndex) == OK) {
-        DescribeColorFormatParams describeParamsV1(describeParams);
-        if (omx->getParameter(
-                node, describeColorFormatIndex,
-                &describeParamsV1, sizeof(describeParamsV1)) == OK) {
-            describeParams.initFromV1(describeParamsV1);
-            return describeParams.sMediaImage.mType != MediaImage2::MEDIA_IMAGE_TYPE_UNKNOWN;
-        }
-    } else if (omx->getExtensionIndex(
-            node, "OMX.google.android.index.describeColorFormat2", &describeColorFormatIndex) == OK
-               && omx->getParameter(
-            node, describeColorFormatIndex, &describeParams, sizeof(describeParams)) == OK) {
-        return describeParams.sMediaImage.mType != MediaImage2::MEDIA_IMAGE_TYPE_UNKNOWN;
-    }
-
-    return describeDefaultColorFormat(describeParams);
-}
-
-// static
-bool ACodec::isFlexibleColorFormat(
-         const sp<IOMX> &omx, IOMX::node_id node,
-         uint32_t colorFormat, bool usingNativeBuffers, OMX_U32 *flexibleEquivalent) {
-    DescribeColorFormat2Params describeParams;
-    InitOMXParams(&describeParams);
-    describeParams.eColorFormat = (OMX_COLOR_FORMATTYPE)colorFormat;
-    // reasonable dummy values
-    describeParams.nFrameWidth = 128;
-    describeParams.nFrameHeight = 128;
-    describeParams.nStride = 128;
-    describeParams.nSliceHeight = 128;
-    describeParams.bUsingNativeBuffers = (OMX_BOOL)usingNativeBuffers;
-
-    CHECK(flexibleEquivalent != NULL);
-
-    if (!describeColorFormat(omx, node, describeParams)) {
-        return false;
-    }
-
-    const MediaImage2 &img = describeParams.sMediaImage;
-    if (img.mType == MediaImage2::MEDIA_IMAGE_TYPE_YUV) {
-        if (img.mNumPlanes != 3
-                || img.mPlane[img.Y].mHorizSubsampling != 1
-                || img.mPlane[img.Y].mVertSubsampling != 1) {
-            return false;
-        }
-
-        // YUV 420
-        if (img.mPlane[img.U].mHorizSubsampling == 2
-                && img.mPlane[img.U].mVertSubsampling == 2
-                && img.mPlane[img.V].mHorizSubsampling == 2
-                && img.mPlane[img.V].mVertSubsampling == 2) {
-            // possible flexible YUV420 format
-            if (img.mBitDepth <= 8) {
-               *flexibleEquivalent = OMX_COLOR_FormatYUV420Flexible;
-               return true;
-            }
-        }
-    }
-    return false;
-}
-
 status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
     const char *niceIndex = portIndex == kPortIndexInput ? "input" : "output";
     OMX_PARAM_PORTDEFINITIONTYPE def;
@@ -4714,7 +4440,7 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
                         describeParams.nSliceHeight = videoDef->nSliceHeight;
                         describeParams.bUsingNativeBuffers = OMX_FALSE;
 
-                        if (describeColorFormat(mOMX, mNode, describeParams)) {
+                        if (DescribeColorFormat(mOMX, mNode, describeParams)) {
                             notify->setBuffer(
                                     "image-data",
                                     ABuffer::CreateAsCopy(
@@ -7813,7 +7539,7 @@ status_t ACodec::queryCapabilities(
         const AString &name, const AString &mime, bool isEncoder,
         sp<MediaCodecInfo::Capabilities> *caps) {
     (*caps).clear();
-    const char *role = getComponentRole(isEncoder, mime.c_str());
+    const char *role = GetComponentRole(isEncoder, mime.c_str());
     if (role == NULL) {
         return BAD_VALUE;
     }
@@ -7834,7 +7560,7 @@ status_t ACodec::queryCapabilities(
         return err;
     }
 
-    err = setComponentRole(omx, node, role);
+    err = SetComponentRole(omx, node, role);
     if (err != OK) {
         omx->freeNode(node);
         client.disconnect();
@@ -7883,7 +7609,7 @@ status_t ACodec::queryCapabilities(
             }
 
             OMX_U32 flexibleEquivalent;
-            if (isFlexibleColorFormat(
+            if (IsFlexibleColorFormat(
                     omx, node, portFormat.eColorFormat, false /* usingNativeWindow */,
                     &flexibleEquivalent)) {
                 bool marked = false;
