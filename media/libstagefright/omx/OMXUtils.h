@@ -17,6 +17,8 @@
 #ifndef OMX_UTILS_H_
 #define OMX_UTILS_H_
 
+#include <media/IOMX.h>
+
 /***** DO NOT USE THIS INCLUDE!!! INTERAL ONLY!!! UNLESS YOU RESIDE IN media/libstagefright *****/
 
 // OMXUtils contains omx-specific utility functions for stagefright/omx library
@@ -35,6 +37,19 @@ static void InitOMXParams(T *params) {
 }
 
 status_t StatusFromOMXError(OMX_ERRORTYPE err);
+
+const char *GetComponentRole(bool isEncoder, const char *mime);
+status_t SetComponentRole(const sp<IOMX> &omx, IOMX::node_id node, const char *role);
+
+struct DescribeColorFormat2Params;
+
+bool IsFlexibleColorFormat(
+        const sp<IOMX> &omx, IOMX::node_id node,
+        uint32_t colorFormat, bool usingNativeBuffers, OMX_U32 *flexibleEquivalent);
+bool DescribeDefaultColorFormat(DescribeColorFormat2Params &describeParams);
+bool DescribeColorFormat(
+        const sp<IOMX> &omx, IOMX::node_id node,
+        DescribeColorFormat2Params &describeParams);
 
 }  // namespace android
 
