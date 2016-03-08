@@ -1,0 +1,96 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ffb9cba7_213c20c7",
+        "filename": "include/media/AudioSystem.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 338,
+      "author": {
+        "id": 10094
+      },
+      "writtenOn": "2016-03-08T03:09:40Z",
+      "side": 1,
+      "message": "this change was not necessary",
+      "range": {
+        "startLine": 337,
+        "startChar": 0,
+        "endLine": 338,
+        "endChar": 1
+      },
+      "revId": "24556fee51be14aa79f0b417513a0278e30f86be",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ffb9cba7_8125ccad",
+        "filename": "include/media/AudioSystem.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 425,
+      "author": {
+        "id": 10094
+      },
+      "writtenOn": "2016-03-08T03:09:40Z",
+      "side": 1,
+      "message": "goo",
+      "range": {
+        "startLine": 425,
+        "startChar": 0,
+        "endLine": 425,
+        "endChar": 38
+      },
+      "revId": "24556fee51be14aa79f0b417513a0278e30f86be",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ffb9cba7_61577804",
+        "filename": "services/audiopolicy/service/AudioPolicyEffects.cpp",
+        "patchSetId": 4
+      },
+      "lineNbr": 18,
+      "author": {
+        "id": 10094
+      },
+      "writtenOn": "2016-03-08T03:09:40Z",
+      "side": 1,
+      "message": "remove this change",
+      "range": {
+        "startLine": 18,
+        "startChar": 0,
+        "endLine": 18,
+        "endChar": 20
+      },
+      "revId": "24556fee51be14aa79f0b417513a0278e30f86be",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ffb9cba7_018d5c7a",
+        "filename": "services/audiopolicy/service/AudioPolicyService.cpp",
+        "patchSetId": 4
+      },
+      "lineNbr": 263,
+      "author": {
+        "id": 10094
+      },
+      "writtenOn": "2016-03-08T03:09:40Z",
+      "side": 1,
+      "message": "goo, whitespace",
+      "range": {
+        "startLine": 261,
+        "startChar": 0,
+        "endLine": 263,
+        "endChar": 1
+      },
+      "revId": "24556fee51be14aa79f0b417513a0278e30f86be",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
