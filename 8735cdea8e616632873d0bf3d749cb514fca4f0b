@@ -22,6 +22,30 @@
       "revId": "8735cdea8e616632873d0bf3d749cb514fca4f0b",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ffb9cba7_d9d5fc44",
+        "filename": "services/audiopolicy/service/AudioPolicyEffects.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 303,
+      "author": {
+        "id": 32
+      },
+      "writtenOn": "2016-03-08T13:34:27Z",
+      "side": 1,
+      "message": "Wow, mega derp. Yes, will fix.",
+      "parentUuid": "ffb9cba7_b9e9281b",
+      "range": {
+        "startLine": 302,
+        "startChar": 0,
+        "endLine": 303,
+        "endChar": 49
+      },
+      "revId": "8735cdea8e616632873d0bf3d749cb514fca4f0b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
