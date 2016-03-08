@@ -99,8 +99,14 @@ protected:
     // Populates mCodecInterface with codec specific settings.
     virtual void setCodecSpecificInterface() = 0;
 
+    // Sets codec specific configuration.
+    virtual bool setCodecSpecificConfiguration() = 0;
+
     // Sets codec specific encoder controls.
     virtual vpx_codec_err_t setCodecSpecificControls() = 0;
+
+    // Get current encode flags.
+    virtual vpx_enc_frame_flags_t getEncodeFlags();
 
     // Releases vpx encoder instance, with it's associated
     // data structures.
@@ -108,9 +114,6 @@ protected:
     // Unless called earlier, this is handled by the
     // dtor.
     status_t releaseEncoder();
-
-    // Get current encode flags
-    virtual vpx_enc_frame_flags_t getEncodeFlags();
 
     // Get bitrate parameters.
     virtual OMX_ERRORTYPE internalGetBitrateParams(
@@ -193,14 +196,6 @@ protected:
     // Parameter that denotes whether error resilience
     // is enabled in encoder
     OMX_BOOL mErrorResilience;
-
-    // Encoder profile corresponding to OMX level parameter
-    //
-    // The inconsistency in the naming is caused by
-    // OMX spec referring vpx profiles (g_profile)
-    // as "levels" whereas using the name "profile" for
-    // something else.
-    OMX_VIDEO_VP8LEVELTYPE mLevel;
 
     // Key frame interval in frames
     uint32_t mKeyFrameInterval;

@@ -56,6 +56,9 @@ protected:
     // Populates |mCodecInterface| with codec specific settings.
     virtual void setCodecSpecificInterface();
 
+    // Sets codec specific configuration.
+    virtual bool setCodecSpecificConfiguration();
+
     // Initializes codec specific encoder settings.
     virtual vpx_codec_err_t setCodecSpecificControls();
 
@@ -83,6 +86,14 @@ private:
     // that enables token partitioning of
     // the stream into substreams
     int32_t mDCTPartitions;
+
+    // Encoder profile corresponding to OMX level parameter
+    //
+    // The inconsistency in the naming is caused by
+    // OMX spec referring vpx profiles (g_profile)
+    // as "levels" whereas using the name "profile" for
+    // something else.
+    OMX_VIDEO_VP8LEVELTYPE mLevel;
 
     DISALLOW_EVIL_CONSTRUCTORS(SoftVP8Encoder);
 };
