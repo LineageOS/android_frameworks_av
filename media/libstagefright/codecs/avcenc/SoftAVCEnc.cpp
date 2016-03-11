@@ -1064,7 +1064,8 @@ OMX_ERRORTYPE SoftAVC::getConfig(
                 return OMX_ErrorUndefined;
             }
 
-            intraRefreshParams->nRefreshPeriod = mAIRRefreshPeriod;
+            intraRefreshParams->nRefreshPeriod =
+                    (mAIRMode == IVE_AIR_MODE_NONE) ? 0 : mAIRRefreshPeriod;
             return OMX_ErrorNone;
         }
 
