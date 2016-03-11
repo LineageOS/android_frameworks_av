@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ffb9cba7_43fa7175",
+        "filename": "services/audiopolicy/service/AudioPolicyInterfaceImplLegacy.cpp",
+        "patchSetId": 4
+      },
+      "lineNbr": 536,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-03-11T04:54:55Z",
+      "side": 1,
+      "message": "#endif goes on line 548.",
+      "range": {
+        "startLine": 536,
+        "startChar": 1,
+        "endLine": 536,
+        "endChar": 6
+      },
+      "revId": "6d7f179e602b72780344c01f4fdb047f2504827c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
