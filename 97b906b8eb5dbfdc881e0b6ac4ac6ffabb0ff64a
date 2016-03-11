@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ffb9cba7_03db191b",
+        "filename": "services/audiopolicy/service/AudioPolicyInterfaceImplLegacy.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 280,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-03-11T04:44:33Z",
+      "side": 1,
+      "message": "Spacing, match the space count of other tabs.",
+      "revId": "97b906b8eb5dbfdc881e0b6ac4ac6ffabb0ff64a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ffb9cba7_e3092595",
+        "filename": "services/audiopolicy/service/AudioPolicyInterfaceImplLegacy.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 534,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-03-11T04:44:33Z",
+      "side": 1,
+      "message": "You might want to do\n\n#else\n\n...\n\n#endif\n\nto avoid potential compiler warnings about unreachable code.",
+      "revId": "97b906b8eb5dbfdc881e0b6ac4ac6ffabb0ff64a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
