@@ -83,7 +83,7 @@ static inline void ProcessNeonIntrinsic(int32_t* out,
         const int16_t* coefsN1)
 {
     ALOG_ASSERT(count > 0 && (count & 7) == 0); // multiple of 8
-    COMPILE_TIME_ASSERT_FUNCTION_SCOPE(CHANNELS == 1 || CHANNELS == 2);
+    static_assert(CHANNELS == 1 || CHANNELS == 2, "CHANNELS must be 1 or 2");
 
     sP -= CHANNELS*((STRIDE>>1)-1);
     coefsP = (const int16_t*)__builtin_assume_aligned(coefsP, 16);
@@ -191,7 +191,7 @@ static inline void ProcessNeonIntrinsic(int32_t* out,
         const int32_t* coefsN1)
 {
     ALOG_ASSERT(count > 0 && (count & 7) == 0); // multiple of 8
-    COMPILE_TIME_ASSERT_FUNCTION_SCOPE(CHANNELS == 1 || CHANNELS == 2);
+    static_assert(CHANNELS == 1 || CHANNELS == 2, "CHANNELS must be 1 or 2");
 
     sP -= CHANNELS*((STRIDE>>1)-1);
     coefsP = (const int32_t*)__builtin_assume_aligned(coefsP, 16);
@@ -366,7 +366,7 @@ static inline void ProcessNeonIntrinsic(float* out,
         const float* coefsN1)
 {
     ALOG_ASSERT(count > 0 && (count & 7) == 0); // multiple of 8
-    COMPILE_TIME_ASSERT_FUNCTION_SCOPE(CHANNELS == 1 || CHANNELS == 2);
+    static_assert(CHANNELS == 1 || CHANNELS == 2, "CHANNELS must be 1 or 2");
 
     sP -= CHANNELS*((STRIDE>>1)-1);
     coefsP = (const float*)__builtin_assume_aligned(coefsP, 16);

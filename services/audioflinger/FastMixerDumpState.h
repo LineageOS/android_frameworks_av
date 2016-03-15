@@ -35,7 +35,7 @@ enum FastTrackUnderrunStatus {
 // This packed representation is used to keep the information atomic.
 union FastTrackUnderruns {
     FastTrackUnderruns() { mAtomic = 0;
-            COMPILE_TIME_ASSERT_FUNCTION_SCOPE(sizeof(FastTrackUnderruns) == sizeof(uint32_t)); }
+            static_assert(sizeof(FastTrackUnderruns) == sizeof(uint32_t), "FastTrackUnderrun"); }
     FastTrackUnderruns(const FastTrackUnderruns& copyFrom) : mAtomic(copyFrom.mAtomic) { }
     FastTrackUnderruns& operator=(const FastTrackUnderruns& rhs)
             { if (this != &rhs) mAtomic = rhs.mAtomic; return *this; }

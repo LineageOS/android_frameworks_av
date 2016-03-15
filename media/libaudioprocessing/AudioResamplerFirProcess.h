@@ -186,7 +186,7 @@ void ProcessBase(TO* const out,
         TINTERP lerpP,
         const TO* const volumeLR)
 {
-    COMPILE_TIME_ASSERT_FUNCTION_SCOPE(CHANNELS > 0)
+    static_assert(CHANNELS > 0, "CHANNELS must be > 0");
 
     if (CHANNELS > 2) {
         // TO accum[CHANNELS];
