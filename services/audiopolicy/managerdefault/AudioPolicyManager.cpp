@@ -1672,33 +1672,37 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
     // Routing?
     mInputRoutes.incRouteActivity(session);
 
-    if (!inputDesc->isActive() || mInputRoutes.hasRouteChanged(session)) {
-        // if input maps to a dynamic policy with an activity listener, notify of state change
-        if ((inputDesc->mPolicyMix != NULL)
-                && ((inputDesc->mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
-            mpClientInterface->onDynamicPolicyMixStateUpdate(inputDesc->mPolicyMix->mDeviceAddress,
-                    MIX_STATE_MIXING);
-        }
+    if (audioSession->activeCount() == 1 || mInputRoutes.hasRouteChanged(session)) {
 
-        if (mInputs.activeInputsCount() == 0) {
-            SoundTrigger::setCaptureState(true);
-        }
-        setInputDevice(input, getNewInputDevice(input), true /* force */);
+        setInputDevice(input, getNewInputDevice(inputDesc), true /* force */);
 
-        // automatically enable the remote submix output when input is started if not
-        // used by a policy mix of type MIX_TYPE_RECORDERS
-        // For remote submix (a virtual device), we open only one input per capture request.
-        if (audio_is_remote_submix_device(inputDesc->mDevice)) {
-            String8 address = String8("");
-            if (inputDesc->mPolicyMix == NULL) {
-                address = String8("0");
-            } else if (inputDesc->mPolicyMix->mMixType == MIX_TYPE_PLAYERS) {
-                address = inputDesc->mPolicyMix->mDeviceAddress;
+        if (inputDesc->getAudioSessionCount(true/*activeOnly*/) == 1) {
+            // if input maps to a dynamic policy with an activity listener, notify of state change
+            if ((inputDesc->mPolicyMix != NULL)
+                    && ((inputDesc->mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
+                mpClientInterface->onDynamicPolicyMixStateUpdate(inputDesc->mPolicyMix->mDeviceAddress,
+                        MIX_STATE_MIXING);
             }
-            if (address != "") {
-                setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
-                        AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
-                        address, "remote-submix");
+
+            if (mInputs.activeInputsCount() == 0) {
+                SoundTrigger::setCaptureState(true);
+            }
+
+            // automatically enable the remote submix output when input is started if not
+            // used by a policy mix of type MIX_TYPE_RECORDERS
+            // For remote submix (a virtual device), we open only one input per capture request.
+            if (audio_is_remote_submix_device(inputDesc->mDevice)) {
+                String8 address = String8("");
+                if (inputDesc->mPolicyMix == NULL) {
+                    address = String8("0");
+                } else if (inputDesc->mPolicyMix->mMixType == MIX_TYPE_PLAYERS) {
+                    address = inputDesc->mPolicyMix->mDeviceAddress;
+                }
+                if (address != "") {
+                    setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
+                            AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                            address, "remote-submix");
+                }
             }
         }
     }
@@ -1735,27 +1739,32 @@ status_t AudioPolicyManager::stopInput(audio_io_handle_t input,
     // Routing?
     mInputRoutes.decRouteActivity(session);
 
-    if (!inputDesc->isActive()) {
-        // if input maps to a dynamic policy with an activity listener, notify of state change
-        if ((inputDesc->mPolicyMix != NULL)
-                && ((inputDesc->mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
-            mpClientInterface->onDynamicPolicyMixStateUpdate(inputDesc->mPolicyMix->mDeviceAddress,
-                    MIX_STATE_IDLE);
-        }
+    if (audioSession->activeCount() == 0) {
 
-        // automatically disable the remote submix output when input is stopped if not
-        // used by a policy mix of type MIX_TYPE_RECORDERS
-        if (audio_is_remote_submix_device(inputDesc->mDevice)) {
-            String8 address = String8("");
-            if (inputDesc->mPolicyMix == NULL) {
-                address = String8("0");
-            } else if (inputDesc->mPolicyMix->mMixType == MIX_TYPE_PLAYERS) {
-                address = inputDesc->mPolicyMix->mDeviceAddress;
+        if (inputDesc->isActive()) {
+            setInputDevice(input, getNewInputDevice(inputDesc), false /* force */);
+        } else {
+            // if input maps to a dynamic policy with an activity listener, notify of state change
+            if ((inputDesc->mPolicyMix != NULL)
+                    && ((inputDesc->mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
+                mpClientInterface->onDynamicPolicyMixStateUpdate(inputDesc->mPolicyMix->mDeviceAddress,
+                        MIX_STATE_IDLE);
             }
-            if (address != "") {
-                setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
-                                         AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
-                                         address, "remote-submix");
+
+            // automatically disable the remote submix output when input is stopped if not
+            // used by a policy mix of type MIX_TYPE_RECORDERS
+            if (audio_is_remote_submix_device(inputDesc->mDevice)) {
+                String8 address = String8("");
+                if (inputDesc->mPolicyMix == NULL) {
+                    address = String8("0");
+                } else if (inputDesc->mPolicyMix->mMixType == MIX_TYPE_PLAYERS) {
+                    address = inputDesc->mPolicyMix->mDeviceAddress;
+                }
+                if (address != "") {
+                    setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
+                                             AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                                             address, "remote-submix");
+                }
             }
 
             resetInputDevice(input);
