@@ -491,7 +491,7 @@ audio_io_handle_t AudioPolicyService::getOutputForEffect(const effect_descriptor
 status_t AudioPolicyService::registerEffect(const effect_descriptor_t *desc,
                                 audio_io_handle_t io,
                                 uint32_t strategy,
-                                int session,
+                                audio_session_t session,
                                 int id)
 {
     if (mAudioPolicyManager == NULL) {
@@ -552,7 +552,7 @@ bool AudioPolicyService::isSourceActive(audio_source_t source) const
     return mAudioPolicyManager->isSourceActive(source);
 }
 
-status_t AudioPolicyService::queryDefaultPreProcessing(int audioSession,
+status_t AudioPolicyService::queryDefaultPreProcessing(audio_session_t audioSession,
                                                        effect_descriptor_t *descriptors,
                                                        uint32_t *count)
 {
