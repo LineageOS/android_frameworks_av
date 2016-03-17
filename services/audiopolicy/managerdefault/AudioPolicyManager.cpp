@@ -1099,7 +1099,7 @@ status_t AudioPolicyManager::startOutput(audio_io_handle_t output,
             outputDesc->mPolicyMix->mMixType == MIX_TYPE_RECORDERS) {
             setDeviceConnectionStateInt(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
                     AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
-                    outputDesc->mPolicyMix->mRegistrationId,
+                    outputDesc->mPolicyMix->mDeviceAddress,
                     "remote-submix");
     }
 
@@ -1216,7 +1216,7 @@ status_t AudioPolicyManager::stopOutput(audio_io_handle_t output,
                 outputDesc->mPolicyMix->mMixType == MIX_TYPE_RECORDERS) {
             setDeviceConnectionStateInt(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
                     AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
-                    outputDesc->mPolicyMix->mRegistrationId,
+                    outputDesc->mPolicyMix->mDeviceAddress,
                     "remote-submix");
         }
     }
@@ -1392,7 +1392,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
             return BAD_VALUE;
         }
         if (policyMix != NULL) {
-            address = policyMix->mRegistrationId;
+            address = policyMix->mDeviceAddress;
             if (policyMix->mMixType == MIX_TYPE_RECORDERS) {
                 // there is an external policy, but this input is attached to a mix of recorders,
                 // meaning it receives audio injected into the framework, so the recorder doesn't
@@ -1665,37 +1665,33 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
     // Routing?
     mInputRoutes.incRouteActivity(session);
 
-    if (audioSession->activeCount() == 1 || mInputRoutes.hasRouteChanged(session)) {
+    if (!inputDesc->isActive() || mInputRoutes.hasRouteChanged(session)) {
+        // if input maps to a dynamic policy with an activity listener, notify of state change
+        if ((inputDesc->mPolicyMix != NULL)
+                && ((inputDesc->mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
+            mpClientInterface->onDynamicPolicyMixStateUpdate(inputDesc->mPolicyMix->mDeviceAddress,
+                    MIX_STATE_MIXING);
+        }
 
-        setInputDevice(input, getNewInputDevice(inputDesc), true /* force */);
+        if (mInputs.activeInputsCount() == 0) {
+            SoundTrigger::setCaptureState(true);
+        }
+        setInputDevice(input, getNewInputDevice(input), true /* force */);
 
-        if (inputDesc->getAudioSessionCount(true/*activeOnly*/) == 1) {
-            // if input maps to a dynamic policy with an activity listener, notify of state change
-            if ((inputDesc->mPolicyMix != NULL)
-                    && ((inputDesc->mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
-                mpClientInterface->onDynamicPolicyMixStateUpdate(inputDesc->mPolicyMix->mRegistrationId,
-                        MIX_STATE_MIXING);
+        // automatically enable the remote submix output when input is started if not
+        // used by a policy mix of type MIX_TYPE_RECORDERS
+        // For remote submix (a virtual device), we open only one input per capture request.
+        if (audio_is_remote_submix_device(inputDesc->mDevice)) {
+            String8 address = String8("");
+            if (inputDesc->mPolicyMix == NULL) {
+                address = String8("0");
+            } else if (inputDesc->mPolicyMix->mMixType == MIX_TYPE_PLAYERS) {
+                address = inputDesc->mPolicyMix->mDeviceAddress;
             }
-
-            if (mInputs.activeInputsCount() == 0) {
-                SoundTrigger::setCaptureState(true);
-            }
-
-            // automatically enable the remote submix output when input is started if not
-            // used by a policy mix of type MIX_TYPE_RECORDERS
-            // For remote submix (a virtual device), we open only one input per capture request.
-            if (audio_is_remote_submix_device(inputDesc->mDevice)) {
-                String8 address = String8("");
-                if (inputDesc->mPolicyMix == NULL) {
-                    address = String8("0");
-                } else if (inputDesc->mPolicyMix->mMixType == MIX_TYPE_PLAYERS) {
-                    address = inputDesc->mPolicyMix->mRegistrationId;
-                }
-                if (address != "") {
-                    setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
-                            AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
-                            address, "remote-submix");
-                }
+            if (address != "") {
+                setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
+                        AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                        address, "remote-submix");
             }
         }
     }
@@ -1732,32 +1728,27 @@ status_t AudioPolicyManager::stopInput(audio_io_handle_t input,
     // Routing?
     mInputRoutes.decRouteActivity(session);
 
-    if (audioSession->activeCount() == 0) {
+    if (!inputDesc->isActive()) {
+        // if input maps to a dynamic policy with an activity listener, notify of state change
+        if ((inputDesc->mPolicyMix != NULL)
+                && ((inputDesc->mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
+            mpClientInterface->onDynamicPolicyMixStateUpdate(inputDesc->mPolicyMix->mDeviceAddress,
+                    MIX_STATE_IDLE);
+        }
 
-        if (inputDesc->isActive()) {
-            setInputDevice(input, getNewInputDevice(inputDesc), false /* force */);
-        } else {
-            // if input maps to a dynamic policy with an activity listener, notify of state change
-            if ((inputDesc->mPolicyMix != NULL)
-                    && ((inputDesc->mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
-                mpClientInterface->onDynamicPolicyMixStateUpdate(inputDesc->mPolicyMix->mRegistrationId,
-                        MIX_STATE_IDLE);
+        // automatically disable the remote submix output when input is stopped if not
+        // used by a policy mix of type MIX_TYPE_RECORDERS
+        if (audio_is_remote_submix_device(inputDesc->mDevice)) {
+            String8 address = String8("");
+            if (inputDesc->mPolicyMix == NULL) {
+                address = String8("0");
+            } else if (inputDesc->mPolicyMix->mMixType == MIX_TYPE_PLAYERS) {
+                address = inputDesc->mPolicyMix->mDeviceAddress;
             }
-
-            // automatically disable the remote submix output when input is stopped if not
-            // used by a policy mix of type MIX_TYPE_RECORDERS
-            if (audio_is_remote_submix_device(inputDesc->mDevice)) {
-                String8 address = String8("");
-                if (inputDesc->mPolicyMix == NULL) {
-                    address = String8("0");
-                } else if (inputDesc->mPolicyMix->mMixType == MIX_TYPE_PLAYERS) {
-                    address = inputDesc->mPolicyMix->mRegistrationId;
-                }
-                if (address != "") {
-                    setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
-                                             AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
-                                             address, "remote-submix");
-                }
+            if (address != "") {
+                setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
+                                         AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                                         address, "remote-submix");
             }
 
             resetInputDevice(input);
@@ -2065,94 +2056,152 @@ bool AudioPolicyManager::isSourceActive(audio_source_t source) const
 
 status_t AudioPolicyManager::registerPolicyMixes(Vector<AudioMix> mixes)
 {
-    sp<HwModule> module;
-    for (size_t i = 0; i < mHwModules.size(); i++) {
-        if (strcmp(AUDIO_HARDWARE_MODULE_ID_REMOTE_SUBMIX, mHwModules[i]->mName) == 0 &&
-                mHwModules[i]->mHandle != 0) {
-            module = mHwModules[i];
+    ALOGV("registerPolicyMixes() %zu mix(es)", mixes.size());
+    status_t res = NO_ERROR;
+
+    sp<HwModule> rSubmixModule;
+    // examine each mix's route type
+    for (size_t i = 0; i < mixes.size(); i++) {
+        // we only support MIX_ROUTE_FLAG_LOOP_BACK or MIX_ROUTE_FLAG_RENDER, not the combination
+        if ((mixes[i].mRouteFlags & MIX_ROUTE_FLAG_ALL) == MIX_ROUTE_FLAG_ALL) {
+            res = INVALID_OPERATION;
             break;
         }
-    }
+        if ((mixes[i].mRouteFlags & MIX_ROUTE_FLAG_LOOP_BACK) == MIX_ROUTE_FLAG_LOOP_BACK) {
+            // Loop back through "remote submix"
+            if (rSubmixModule == 0) {
+                for (size_t j = 0; i < mHwModules.size(); j++) {
+                    if (strcmp(AUDIO_HARDWARE_MODULE_ID_REMOTE_SUBMIX, mHwModules[j]->mName) == 0
+                            && mHwModules[j]->mHandle != 0) {
+                        rSubmixModule = mHwModules[j];
+                        break;
+                    }
+                }
+            }
 
-    if (module == 0) {
-        return INVALID_OPERATION;
-    }
+            ALOGV("registerPolicyMixes() mix %zu of %zu is LOOP_BACK", i, mixes.size());
 
-    ALOGV("registerPolicyMixes() num mixes %zu", mixes.size());
+            if (rSubmixModule == 0) {
+                ALOGE(" Unable to find audio module for submix, aborting mix %zu registration", i);
+                res = INVALID_OPERATION;
+                break;
+            }
 
-    for (size_t i = 0; i < mixes.size(); i++) {
-        String8 address = mixes[i].mRegistrationId;
+            String8 address = mixes[i].mDeviceAddress;
 
-        if (mPolicyMixes.registerMix(address, mixes[i]) != NO_ERROR) {
-            continue;
+            if (mPolicyMixes.registerMix(address, mixes[i], 0 /*output desc*/) != NO_ERROR) {
+                ALOGE(" Error regisering mix %zu for address %s", i, address.string());
+                res = INVALID_OPERATION;
+                break;
+            }
+            audio_config_t outputConfig = mixes[i].mFormat;
+            audio_config_t inputConfig = mixes[i].mFormat;
+            // NOTE: audio flinger mixer does not support mono output: configure remote submix HAL in
+            // stereo and let audio flinger do the channel conversion if needed.
+            outputConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+            inputConfig.channel_mask = AUDIO_CHANNEL_IN_STEREO;
+            rSubmixModule->addOutputProfile(address, &outputConfig,
+                    AUDIO_DEVICE_OUT_REMOTE_SUBMIX, address);
+            rSubmixModule->addInputProfile(address, &inputConfig,
+                    AUDIO_DEVICE_IN_REMOTE_SUBMIX, address);
+
+            if (mixes[i].mMixType == MIX_TYPE_PLAYERS) {
+                setDeviceConnectionStateInt(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
+                        AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                        address.string(), "remote-submix");
+            } else {
+                setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
+                        AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                        address.string(), "remote-submix");
+            }
+        } else if ((mixes[i].mRouteFlags & MIX_ROUTE_FLAG_RENDER) == MIX_ROUTE_FLAG_RENDER) {
+            ALOGV("registerPolicyMixes() mix %zu of %zu is RENDER", i, mixes.size());
+            String8 address = mixes[i].mDeviceAddress;
+
+            audio_devices_t device = mixes[i].mDeviceType;
+
+            for (size_t j = 0 ; j < mOutputs.size() ; j++) {
+                sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(j);
+                sp<AudioPatch> patch = mAudioPatches.valueFor(desc->getPatchHandle());
+                if ((patch != 0) && (patch->mPatch.num_sinks != 0)
+                        && (patch->mPatch.sinks[0].type == AUDIO_PORT_TYPE_DEVICE)
+                        && (patch->mPatch.sinks[0].ext.device.type == device)
+                        && (patch->mPatch.sinks[0].ext.device.address == address)) {
+
+                    if (mPolicyMixes.registerMix(address, mixes[i], desc) != NO_ERROR) {
+                        res = INVALID_OPERATION;
+                    }
+                    break;
+                }
+            }
+
+            if (res != NO_ERROR) {
+                ALOGE(" Error registering mix %zu for device 0x%X addr %s",
+                        i,device, address.string());
+                res = INVALID_OPERATION;
+                break;
+            }
         }
-        audio_config_t outputConfig = mixes[i].mFormat;
-        audio_config_t inputConfig = mixes[i].mFormat;
-        // NOTE: audio flinger mixer does not support mono output: configure remote submix HAL in
-        // stereo and let audio flinger do the channel conversion if needed.
-        outputConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
-        inputConfig.channel_mask = AUDIO_CHANNEL_IN_STEREO;
-        module->addOutputProfile(address, &outputConfig,
-                                 AUDIO_DEVICE_OUT_REMOTE_SUBMIX, address);
-        module->addInputProfile(address, &inputConfig,
-                                 AUDIO_DEVICE_IN_REMOTE_SUBMIX, address);
-
-        if (mixes[i].mMixType == MIX_TYPE_PLAYERS) {
-            setDeviceConnectionStateInt(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
-                                     AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
-                                     address.string(), "remote-submix");
-        } else {
-            setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
-                                     AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
-                                     address.string(), "remote-submix");
-        }
     }
-    return NO_ERROR;
+    if (res != NO_ERROR) {
+        unregisterPolicyMixes(mixes);
+    }
+    return res;
 }
 
 status_t AudioPolicyManager::unregisterPolicyMixes(Vector<AudioMix> mixes)
 {
-    sp<HwModule> module;
-    for (size_t i = 0; i < mHwModules.size(); i++) {
-        if (strcmp(AUDIO_HARDWARE_MODULE_ID_REMOTE_SUBMIX, mHwModules[i]->mName) == 0 &&
-                mHwModules[i]->mHandle != 0) {
-            module = mHwModules[i];
-            break;
-        }
-    }
-
-    if (module == 0) {
-        return INVALID_OPERATION;
-    }
-
     ALOGV("unregisterPolicyMixes() num mixes %zu", mixes.size());
-
+    status_t res = NO_ERROR;
+    sp<HwModule> rSubmixModule;
+    // examine each mix's route type
     for (size_t i = 0; i < mixes.size(); i++) {
-        String8 address = mixes[i].mRegistrationId;
+        if ((mixes[i].mRouteFlags & MIX_ROUTE_FLAG_LOOP_BACK) == MIX_ROUTE_FLAG_LOOP_BACK) {
 
-        if (mPolicyMixes.unregisterMix(address) != NO_ERROR) {
-            continue;
-        }
+            if (rSubmixModule == 0) {
+                for (size_t j = 0; i < mHwModules.size(); j++) {
+                    if (strcmp(AUDIO_HARDWARE_MODULE_ID_REMOTE_SUBMIX, mHwModules[j]->mName) == 0
+                            && mHwModules[j]->mHandle != 0) {
+                        rSubmixModule = mHwModules[j];
+                        break;
+                    }
+                }
+            }
+            if (rSubmixModule == 0) {
+                res = INVALID_OPERATION;
+                continue;
+            }
 
-        if (getDeviceConnectionState(AUDIO_DEVICE_IN_REMOTE_SUBMIX, address.string()) ==
-                                             AUDIO_POLICY_DEVICE_STATE_AVAILABLE)
-        {
-            setDeviceConnectionStateInt(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
-                                     AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
-                                     address.string(), "remote-submix");
-        }
+            String8 address = mixes[i].mDeviceAddress;
 
-        if (getDeviceConnectionState(AUDIO_DEVICE_OUT_REMOTE_SUBMIX, address.string()) ==
-                                             AUDIO_POLICY_DEVICE_STATE_AVAILABLE)
-        {
-            setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
-                                     AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
-                                     address.string(), "remote-submix");
+            if (mPolicyMixes.unregisterMix(address) != NO_ERROR) {
+                res = INVALID_OPERATION;
+                continue;
+            }
+
+            if (getDeviceConnectionState(AUDIO_DEVICE_IN_REMOTE_SUBMIX, address.string()) ==
+                    AUDIO_POLICY_DEVICE_STATE_AVAILABLE)  {
+                setDeviceConnectionStateInt(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
+                        AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                        address.string(), "remote-submix");
+            }
+            if (getDeviceConnectionState(AUDIO_DEVICE_OUT_REMOTE_SUBMIX, address.string()) ==
+                    AUDIO_POLICY_DEVICE_STATE_AVAILABLE)  {
+                setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
+                        AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                        address.string(), "remote-submix");
+            }
+            rSubmixModule->removeOutputProfile(address);
+            rSubmixModule->removeInputProfile(address);
+
+        } if ((mixes[i].mRouteFlags & MIX_ROUTE_FLAG_RENDER) == MIX_ROUTE_FLAG_RENDER) {
+            if (mPolicyMixes.unregisterMix(mixes[i].mDeviceAddress) != NO_ERROR) {
+                res = INVALID_OPERATION;
+                continue;
+            }
         }
-        module->removeOutputProfile(address);
-        module->removeInputProfile(address);
     }
-    return NO_ERROR;
+    return res;
 }
 
 
