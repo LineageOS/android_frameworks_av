@@ -158,7 +158,7 @@ protected:
     Vector < sp<SyncEvent> >mSyncEvents;
     const IAudioFlinger::track_flags_t mFlags;
     const bool          mIsOut;
-    ServerProxy*        mServerProxy;
+    sp<ServerProxy>     mServerProxy;
     const int           mId;
     sp<NBAIO_Sink>      mTeeSink;
     sp<NBAIO_Source>    mTeeSource;

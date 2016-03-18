@@ -4150,7 +4150,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 // read original volumes with volume control
                 float typeVolume = mStreamTypes[track->streamType()].volume;
                 float v = masterVolume * typeVolume;
-                AudioTrackServerProxy *proxy = track->mAudioTrackServerProxy;
+                sp<AudioTrackServerProxy> proxy = track->mAudioTrackServerProxy;
                 gain_minifloat_packed_t vlr = proxy->getVolumeLR();
                 vlf = float_from_gain(gain_minifloat_unpack_left(vlr));
                 vrf = float_from_gain(gain_minifloat_unpack_right(vlr));
@@ -4670,7 +4670,7 @@ void AudioFlinger::DirectOutputThread::processVolume_l(Track *track, bool lastTr
     } else {
         float typeVolume = mStreamTypes[track->streamType()].volume;
         float v = mMasterVolume * typeVolume;
-        AudioTrackServerProxy *proxy = track->mAudioTrackServerProxy;
+        sp<AudioTrackServerProxy> proxy = track->mAudioTrackServerProxy;
         gain_minifloat_packed_t vlr = proxy->getVolumeLR();
         left = float_from_gain(gain_minifloat_unpack_left(vlr));
         if (left > GAIN_FLOAT_UNITY) {
