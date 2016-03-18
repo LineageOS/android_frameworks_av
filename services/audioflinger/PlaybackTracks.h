@@ -163,7 +163,7 @@ private:
                                         // 'volatile' means accessed without lock or
                                         // barrier, but is read/written atomically
     bool                mIsInvalid; // non-resettable latch, set by invalidate()
-    AudioTrackServerProxy*  mAudioTrackServerProxy;
+    sp<AudioTrackServerProxy>  mAudioTrackServerProxy;
     bool                mResumeToStopping; // track was paused in stopping state.
     bool                mFlushHwPending; // track requests for thread flush
 
@@ -211,8 +211,8 @@ private:
     Vector < Buffer* >          mBufferQueue;
     AudioBufferProvider::Buffer mOutBuffer;
     bool                        mActive;
-    DuplicatingThread* const mSourceThread; // for waitTimeMs() in write()
-    AudioTrackClientProxy*      mClientProxy;
+    DuplicatingThread* const    mSourceThread; // for waitTimeMs() in write()
+    sp<AudioTrackClientProxy>   mClientProxy;
 };  // end of OutputTrack
 
 // playback track, used by PatchPanel

@@ -95,7 +95,6 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
         mSessionId(sessionId),
         mFlags(flags),
         mIsOut(isOut),
-        mServerProxy(NULL),
         mId(android_atomic_inc(&nextTrackId)),
         mTerminated(false),
         mType(type),
@@ -220,7 +219,7 @@ AudioFlinger::ThreadBase::TrackBase::~TrackBase()
     dumpTee(-1, mTeeSource, mId);
 #endif
     // delete the proxy before deleting the shared memory it refers to, to avoid dangling reference
-    delete mServerProxy;
+    mServerProxy.clear();
     if (mCblk != NULL) {
         if (mClient == 0) {
             delete mCblk;
@@ -366,7 +365,6 @@ AudioFlinger::PlaybackThread::Track::Track(
     mFastIndex(-1),
     mCachedVolume(1.0),
     mIsInvalid(false),
-    mAudioTrackServerProxy(NULL),
     mResumeToStopping(false),
     mFlushHwPending(false)
 {
@@ -1130,7 +1128,7 @@ AudioFlinger::PlaybackThread::OutputTrack::OutputTrack(
               sampleRate, format, channelMask, frameCount,
               NULL, 0, AUDIO_SESSION_NONE, uid, IAudioFlinger::TRACK_DEFAULT,
               TYPE_OUTPUT),
-    mActive(false), mSourceThread(sourceThread), mClientProxy(NULL)
+    mActive(false), mSourceThread(sourceThread)
 {
 
     if (mCblk != NULL) {
@@ -1155,7 +1153,6 @@ AudioFlinger::PlaybackThread::OutputTrack::OutputTrack(
 AudioFlinger::PlaybackThread::OutputTrack::~OutputTrack()
 {
     clearBufferQueue();
-    delete mClientProxy;
     // superclass destructor will now delete the server proxy and shared memory both refer to
 }
 
