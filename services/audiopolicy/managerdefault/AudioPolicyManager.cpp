@@ -5272,7 +5272,7 @@ void AudioPolicyManager::filterSurroundFormats(FormatVector &formats) {
     bool supportsIEC61937 = false;
     for (size_t formatIndex = 0; formatIndex < formats.size(); formatIndex++) {
         audio_format_t format = formats[formatIndex];
-        ALOGI("%s: original formats: #%x", __FUNCTION__, format);
+        ALOGI("%s: original formats: %#x", __FUNCTION__, format);
         switch (format) {
             case AUDIO_FORMAT_AC3:
             case AUDIO_FORMAT_E_AC3:
@@ -5303,7 +5303,7 @@ void AudioPolicyManager::filterSurroundFormats(FormatVector &formats) {
                 case AUDIO_FORMAT_DTS:
                 case AUDIO_FORMAT_DTS_HD:
                 case AUDIO_FORMAT_IEC61937:
-                    ALOGI("%s: remove #%x", __FUNCTION__, format);
+                    ALOGI("%s: remove %#x", __FUNCTION__, format);
                     formats.removeAt(formatIndex);
                     break;
                 default:
@@ -5334,7 +5334,7 @@ void AudioPolicyManager::filterSurroundFormats(FormatVector &formats) {
     // Just for debugging.
     for (size_t formatIndex = 0; formatIndex < formats.size(); formatIndex++) {
         audio_format_t format = formats[formatIndex];
-        ALOGI("%s: final formats: #%x", __FUNCTION__, format);
+        ALOGI("%s: final formats: %#x", __FUNCTION__, format);
     }
 }
 
