@@ -2146,6 +2146,12 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             return UNKNOWN_ERROR; // stop parsing after sidx
         }
 
+        case FOURCC('a', 'c', '-', '3'):
+        {
+            *offset += chunk_size;
+            return parseAC3SampleEntry(data_offset);
+        }
+
         default:
         {
             // check if we're parsing 'ilst' for meta keys
@@ -2159,6 +2165,99 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         }
     }
 
+    return OK;
+}
+
+status_t MPEG4Extractor::parseAC3SampleEntry(off64_t offset) {
+    // skip 16 bytes:
+    //  + 6-byte reserved,
+    //  + 2-byte data reference index,
+    //  + 8-byte reserved
+    offset += 16;
+    uint16_t channelCount;
+    if (!mDataSource->getUInt16(offset, &channelCount)) {
+        return ERROR_MALFORMED;
+    }
+    // skip 8 bytes:
+    //  + 2-byte channelCount,
+    //  + 2-byte sample size,
+    //  + 4-byte reserved
+    offset += 8;
+    uint16_t sampleRate;
+    if (!mDataSource->getUInt16(offset, &sampleRate)) {
+        ALOGE("MPEG4Extractor: error while reading ac-3 block: cannot read sample rate");
+        return ERROR_MALFORMED;
+    }
+
+    // skip 4 bytes:
+    //  + 2-byte sampleRate,
+    //  + 2-byte reserved
+    offset += 4;
+    return parseAC3SpecificBox(offset, sampleRate);
+}
+
+status_t MPEG4Extractor::parseAC3SpecificBox(
+        off64_t offset, uint16_t sampleRate) {
+    uint32_t size;
+    // + 4-byte size
+    // + 4-byte type
+    // + 3-byte payload
+    const uint32_t kAC3SpecificBoxSize = 11;
+    if (!mDataSource->getUInt32(offset, &size) || size < kAC3SpecificBoxSize) {
+        ALOGE("MPEG4Extractor: error while reading ac-3 block: cannot read specific box size");
+        return ERROR_MALFORMED;
+    }
+
+    offset += 4;
+    uint32_t type;
+    if (!mDataSource->getUInt32(offset, &type) || type != FOURCC('d', 'a', 'c', '3')) {
+        ALOGE("MPEG4Extractor: error while reading ac-3 specific block: header not dac3");
+        return ERROR_MALFORMED;
+    }
+
+    offset += 4;
+    const uint32_t kAC3SpecificBoxPayloadSize = 3;
+    uint8_t chunk[kAC3SpecificBoxPayloadSize];
+    if (mDataSource->readAt(offset, chunk, sizeof(chunk)) != sizeof(chunk)) {
+        ALOGE("MPEG4Extractor: error while reading ac-3 specific block: bitstream fields");
+        return ERROR_MALFORMED;
+    }
+
+    ABitReader br(chunk, sizeof(chunk));
+    static const unsigned channelCountTable[] = {2, 1, 2, 3, 3, 4, 4, 5};
+    static const unsigned sampleRateTable[] = {48000, 44100, 32000};
+
+    unsigned fscod = br.getBits(2);
+    if (fscod == 3) {
+        ALOGE("Incorrect fscod (3) in AC3 header");
+        return ERROR_MALFORMED;
+    }
+    unsigned boxSampleRate = sampleRateTable[fscod];
+    if (boxSampleRate != sampleRate) {
+        ALOGE("sample rate mismatch: boxSampleRate = %d, sampleRate = %d",
+            boxSampleRate, sampleRate);
+        return ERROR_MALFORMED;
+    }
+
+    unsigned bsid = br.getBits(5);
+    if (bsid > 8) {
+        ALOGW("Incorrect bsid in AC3 header. Possibly E-AC-3?");
+        return ERROR_MALFORMED;
+    }
+
+    // skip
+    unsigned bsmod __unused = br.getBits(3);
+
+    unsigned acmod = br.getBits(3);
+    unsigned lfeon = br.getBits(1);
+    unsigned channelCount = channelCountTable[acmod] + lfeon;
+
+    if (mLastTrack == NULL) {
+        return ERROR_MALFORMED;
+    }
+    mLastTrack->meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AC3);
+    mLastTrack->meta->setInt32(kKeyChannelCount, channelCount);
+    mLastTrack->meta->setInt32(kKeySampleRate, sampleRate);
     return OK;
 }
 
