@@ -914,10 +914,12 @@ static bool isTrustedCallingUid(uid_t uid) {
 }
 
 Status CameraService::validateConnectLocked(const String8& cameraId,
-        const String8& clientName8, /*inout*/int& clientUid, /*inout*/int& clientPid) const {
+        const String8& clientName8, /*inout*/int& clientUid, /*inout*/int& clientPid,
+        /*out*/int& originalClientPid) const {
 
 #if !defined(__BRILLO__)
-    Status allowed = validateClientPermissionsLocked(cameraId, clientName8, clientUid, clientPid);
+    Status allowed = validateClientPermissionsLocked(cameraId, clientName8, clientUid, clientPid,
+            originalClientPid);
     if (!allowed.isOk()) {
         return allowed;
     }
@@ -955,7 +957,8 @@ Status CameraService::validateConnectLocked(const String8& cameraId,
 }
 
 Status CameraService::validateClientPermissionsLocked(const String8& cameraId,
-        const String8& clientName8, int& clientUid, int& clientPid) const {
+        const String8& clientName8, int& clientUid, int& clientPid,
+        /*out*/int& originalClientPid) const {
     int callingPid = getCallingPid();
     int callingUid = getCallingUid();
 
@@ -993,6 +996,8 @@ Status CameraService::validateClientPermissionsLocked(const String8& cameraId,
                 "Caller \"%s\" (PID %d, UID %d) cannot open camera \"%s\" without camera permission",
                 clientName8.string(), clientUid, clientPid, cameraId.string());
     }
+
+    originalClientPid = clientPid;
 
     userid_t clientUserId = multiuser_get_user_id(clientUid);
 
