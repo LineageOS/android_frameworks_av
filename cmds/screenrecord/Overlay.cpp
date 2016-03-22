@@ -203,7 +203,6 @@ void Overlay::processFrame_l() {
     mGlConsumer->getTransformMatrix(texMatrix);
     nsecs_t monotonicNsec = mGlConsumer->getTimestamp();
     nsecs_t frameNumber = mGlConsumer->getFrameNumber();
-    int64_t droppedFrames = 0;
 
     if (mLastFrameNumber > 0) {
         mTotalDroppedFrames += size_t(frameNumber - mLastFrameNumber) - 1;
