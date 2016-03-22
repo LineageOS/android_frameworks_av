@@ -161,6 +161,30 @@
       "revId": "29e4c2c9bc84ff8d5807cf4ebfce1ec8daa5e82b",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7faddb67_fac10330",
+        "filename": "media/libstagefright/colorconversion/SoftwareRenderer.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 291,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-03-22T21:43:35Z",
+      "side": 1,
+      "message": "Argh. This code is a mess. If this (and line below) is the only usage of things defined above, maybe it\u0027s better to move the ifdef down here.",
+      "parentUuid": "7faddb67_faa82378",
+      "range": {
+        "startLine": 291,
+        "startChar": 0,
+        "endLine": 291,
+        "endChar": 34
+      },
+      "revId": "29e4c2c9bc84ff8d5807cf4ebfce1ec8daa5e82b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
