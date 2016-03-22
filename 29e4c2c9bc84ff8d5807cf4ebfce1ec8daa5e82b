@@ -25,6 +25,53 @@
     },
     {
       "key": {
+        "uuid": "7faddb67_97bb08e4",
+        "filename": "media/libstagefright/colorconversion/SoftwareRenderer.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 266,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-03-22T16:16:31Z",
+      "side": 1,
+      "message": "This line is unused.",
+      "parentUuid": "7faddb67_f4503ad7",
+      "range": {
+        "startLine": 266,
+        "startChar": 0,
+        "endLine": 266,
+        "endChar": 46
+      },
+      "revId": "29e4c2c9bc84ff8d5807cf4ebfce1ec8daa5e82b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7faddb67_b7c08452",
+        "filename": "media/libstagefright/colorconversion/SoftwareRenderer.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 267,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-03-22T16:16:31Z",
+      "side": 1,
+      "message": "This line is also unused.",
+      "range": {
+        "startLine": 267,
+        "startChar": 8,
+        "endLine": 267,
+        "endChar": 59
+      },
+      "revId": "29e4c2c9bc84ff8d5807cf4ebfce1ec8daa5e82b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "7faddb67_173ddbba",
         "filename": "media/libstagefright/colorconversion/SoftwareRenderer.cpp",
         "patchSetId": 1
@@ -41,6 +88,52 @@
         "startChar": 8,
         "endLine": 268,
         "endChar": 81
+      },
+      "revId": "29e4c2c9bc84ff8d5807cf4ebfce1ec8daa5e82b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7faddb67_f7ecbcf4",
+        "filename": "media/libstagefright/colorconversion/SoftwareRenderer.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 270,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-03-22T16:16:31Z",
+      "side": 1,
+      "message": "The expansion of line 270 is as follows:\n\ndst_u \u003d (dst_y + dst_y_size) + (ALIGN(buf-\u003estride / 2, 16) * buf-\u003eheight / 2)",
+      "range": {
+        "startLine": 270,
+        "startChar": 17,
+        "endLine": 270,
+        "endChar": 22
+      },
+      "revId": "29e4c2c9bc84ff8d5807cf4ebfce1ec8daa5e82b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7faddb67_37e33408",
+        "filename": "media/libstagefright/colorconversion/SoftwareRenderer.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 275,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-03-22T16:16:31Z",
+      "side": 1,
+      "message": "The expansion of line 275 is as follows:\n\ndst_u \u003d (dst_y + dst_y_size) + (ALIGN(buf-\u003estride / 2, 16) * buf-\u003eheight / 2)",
+      "range": {
+        "startLine": 275,
+        "startChar": 17,
+        "endLine": 275,
+        "endChar": 22
       },
       "revId": "29e4c2c9bc84ff8d5807cf4ebfce1ec8daa5e82b",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
