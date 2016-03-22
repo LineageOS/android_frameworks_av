@@ -37,8 +37,8 @@ enum {
 };
 
 struct NALPosition {
-    size_t nalOffset;
-    size_t nalSize;
+    uint32_t nalOffset;
+    uint32_t nalSize;
 };
 
 // Optionally returns sample aspect ratio as well.
