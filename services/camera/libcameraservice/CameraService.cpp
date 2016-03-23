@@ -997,7 +997,10 @@ Status CameraService::validateClientPermissionsLocked(const String8& cameraId,
                 clientName8.string(), clientUid, clientPid, cameraId.string());
     }
 
+    // Only use passed in clientPid to check permission. Use calling PID as the client PID that's
+    // connected to camera service directly.
     originalClientPid = clientPid;
+    clientPid = callingPid;
 
     userid_t clientUserId = multiuser_get_user_id(clientUid);
 
