@@ -49,7 +49,7 @@ long ADebug::GetLevelFromSettingsString(
             ++current;
         }
         // check for :
-        char *colon = strchr(current, ':');
+        const char *colon = strchr(current, ':');
 
         // get level
         char *end;
