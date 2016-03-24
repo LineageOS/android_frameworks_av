@@ -782,7 +782,7 @@ static void GetAudioModes(const char *s, const char *prefix, uint32_t *modes) {
             return;
         }
 
-        char *commaPos = strchr(s, ',');
+        const char *commaPos = strchr(s, ',');
         if (commaPos != NULL) {
             s = commaPos + 1;
 
