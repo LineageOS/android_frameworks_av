@@ -182,7 +182,7 @@ MediaCodecList::MediaCodecList()
 
 void MediaCodecList::parseTopLevelXMLFile(const char *codecs_xml, bool ignore_errors) {
     // get href_base
-    char *href_base_end = strrchr(codecs_xml, '/');
+    const char *href_base_end = strrchr(codecs_xml, '/');
     if (href_base_end != NULL) {
         mHrefBase = AString(codecs_xml, href_base_end - codecs_xml + 1);
     }
