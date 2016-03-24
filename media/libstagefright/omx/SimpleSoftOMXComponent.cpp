@@ -77,19 +77,34 @@ bool SimpleSoftOMXComponent::isSetParameterAllowed(
     switch (index) {
         case OMX_IndexParamPortDefinition:
         {
-            portIndex = ((OMX_PARAM_PORTDEFINITIONTYPE *)params)->nPortIndex;
+            const OMX_PARAM_PORTDEFINITIONTYPE *portDefs =
+                    (const OMX_PARAM_PORTDEFINITIONTYPE *) params;
+            if (!isValidOMXParam(portDefs)) {
+                return false;
+            }
+            portIndex = portDefs->nPortIndex;
             break;
         }
 
         case OMX_IndexParamAudioPcm:
         {
-            portIndex = ((OMX_AUDIO_PARAM_PCMMODETYPE *)params)->nPortIndex;
+            const OMX_AUDIO_PARAM_PCMMODETYPE *pcmMode =
+                    (const OMX_AUDIO_PARAM_PCMMODETYPE *) params;
+            if (!isValidOMXParam(pcmMode)) {
+                return false;
+            }
+            portIndex = pcmMode->nPortIndex;
             break;
         }
 
         case OMX_IndexParamAudioAac:
         {
-            portIndex = ((OMX_AUDIO_PARAM_AACPROFILETYPE *)params)->nPortIndex;
+            const OMX_AUDIO_PARAM_AACPROFILETYPE *aacMode =
+                    (const OMX_AUDIO_PARAM_AACPROFILETYPE *) params;
+            if (!isValidOMXParam(aacMode)) {
+                return false;
+            }
+            portIndex = aacMode->nPortIndex;
             break;
         }
 
