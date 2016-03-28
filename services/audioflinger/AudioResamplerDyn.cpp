@@ -149,6 +149,15 @@ void AudioResamplerDyn<TC, TI, TO>::InBuffer::readAdvance(TI*& impulse, const in
 }
 
 template<typename TC, typename TI, typename TO>
+void AudioResamplerDyn<TC, TI, TO>::InBuffer::reset()
+{
+    // clear resampler state
+    if (mState != nullptr) {
+        memset(mState, 0, mStateCount * sizeof(TI));
+    }
+}
+
+template<typename TC, typename TI, typename TO>
 void AudioResamplerDyn<TC, TI, TO>::Constants::set(
         int L, int halfNumCoefs, int inSampleRate, int outSampleRate)
 {
@@ -528,6 +537,9 @@ size_t AudioResamplerDyn<TC, TI, TO>::resample(TO* out, size_t outFrameCount,
             mBuffer.frameCount = inFrameCount;
             provider->getNextBuffer(&mBuffer);
             if (mBuffer.raw == NULL) {
+                // We are either at the end of playback or in an underrun situation.
+                // Reset buffer to prevent pop noise at the next buffer.
+                mInBuffer.reset();
                 goto resample_exit;
             }
             inFrameCount -= mBuffer.frameCount;
