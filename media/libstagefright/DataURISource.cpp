@@ -28,7 +28,7 @@ sp<DataURISource> DataURISource::Create(const char *uri) {
         return NULL;
     }
 
-    char *commaPos = strrchr(uri, ',');
+    const char *commaPos = strrchr(uri, ',');
 
     if (commaPos == NULL) {
         return NULL;
