@@ -96,6 +96,8 @@ private:
         inline void readAdvance(TI*& impulse, const int halfNumCoefs,
                 const TI* const in, const size_t inputIndex);
 
+        void reset();
+
     private:
         // tuning parameter guidelines: 2 <= multiple <= 8
         static const int kStateSizeMultipleOfFilterLength = 4;
