@@ -330,8 +330,8 @@ public:
 
     static status_t startAudioSource(const struct audio_port_config *source,
                                       const audio_attributes_t *attributes,
-                                      audio_io_handle_t *handle);
-    static status_t stopAudioSource(audio_io_handle_t handle);
+                                      audio_patch_handle_t *handle);
+    static status_t stopAudioSource(audio_patch_handle_t handle);
 
     static status_t setMasterMono(bool mono);
     static status_t getMasterMono(bool *mono);

@@ -712,7 +712,7 @@ status_t AudioPolicyService::registerPolicyMixes(const Vector<AudioMix>& mixes, 
 
 status_t AudioPolicyService::startAudioSource(const struct audio_port_config *source,
                                   const audio_attributes_t *attributes,
-                                  audio_io_handle_t *handle)
+                                  audio_patch_handle_t *handle)
 {
     Mutex::Autolock _l(mLock);
     if (mAudioPolicyManager == NULL) {
@@ -723,7 +723,7 @@ status_t AudioPolicyService::startAudioSource(const struct audio_port_config *so
                                                  IPCThreadState::self()->getCallingUid());
 }
 
-status_t AudioPolicyService::stopAudioSource(audio_io_handle_t handle)
+status_t AudioPolicyService::stopAudioSource(audio_patch_handle_t handle)
 {
     Mutex::Autolock _l(mLock);
     if (mAudioPolicyManager == NULL) {

@@ -3025,7 +3025,7 @@ status_t AudioPolicyManager::acquireSoundTriggerSession(audio_session_t *session
 
 status_t AudioPolicyManager::startAudioSource(const struct audio_port_config *source,
                                   const audio_attributes_t *attributes,
-                                  audio_io_handle_t *handle,
+                                  audio_patch_handle_t *handle,
                                   uid_t uid)
 {
     ALOGV("%s source %p attributes %p handle %p", __FUNCTION__, source, attributes, handle);
@@ -3033,7 +3033,7 @@ status_t AudioPolicyManager::startAudioSource(const struct audio_port_config *so
         return BAD_VALUE;
     }
 
-    *handle = AUDIO_IO_HANDLE_NONE;
+    *handle = AUDIO_PATCH_HANDLE_NONE;
 
     if (source->role != AUDIO_PORT_ROLE_SOURCE ||
             source->type != AUDIO_PORT_TYPE_DEVICE) {
@@ -3140,7 +3140,7 @@ status_t AudioPolicyManager::connectAudioSource(const sp<AudioSourceDescriptor>&
     return NO_ERROR;
 }
 
-status_t AudioPolicyManager::stopAudioSource(audio_io_handle_t handle __unused)
+status_t AudioPolicyManager::stopAudioSource(audio_patch_handle_t handle __unused)
 {
     sp<AudioSourceDescriptor> sourceDesc = mAudioSources.valueFor(handle);
     ALOGV("%s handle %d", __FUNCTION__, handle);

@@ -1175,14 +1175,14 @@ status_t AudioSystem::registerPolicyMixes(const Vector<AudioMix>& mixes, bool re
 
 status_t AudioSystem::startAudioSource(const struct audio_port_config *source,
                                        const audio_attributes_t *attributes,
-                                       audio_io_handle_t *handle)
+                                       audio_patch_handle_t *handle)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
     return aps->startAudioSource(source, attributes, handle);
 }
 
-status_t AudioSystem::stopAudioSource(audio_io_handle_t handle)
+status_t AudioSystem::stopAudioSource(audio_patch_handle_t handle)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
