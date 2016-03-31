@@ -26,7 +26,7 @@
 
 using namespace android;
 
-int main(int argc, char** argv)
+int main(int, char**)
 {
     sp<ProcessState> proc(ProcessState::self());
     sp<IServiceManager> sm = defaultServiceManager();
