@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7faddb67_b86937bf",
+        "filename": "media/libmediaplayerservice/nuplayer/NuPlayerRenderer.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 1594,
+      "author": {
+        "id": 9045
+      },
+      "writtenOn": "2016-04-04T13:47:27Z",
+      "side": 1,
+      "message": "status?",
+      "range": {
+        "startLine": 1594,
+        "startChar": 33,
+        "endLine": 1594,
+        "endChar": 36
+      },
+      "revId": "25387b07a8335e338d2e124f976f2c01b6e334fc",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
