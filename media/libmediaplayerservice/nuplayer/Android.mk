@@ -34,6 +34,8 @@ endif
 
 LOCAL_CLANG := true
 
+LOCAL_SHARED_LIBRARIES := libmedia
+
 LOCAL_MODULE:= libstagefright_nuplayer
 
 LOCAL_MODULE_TAGS := eng
