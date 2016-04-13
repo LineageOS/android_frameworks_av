@@ -12,6 +12,8 @@ LOCAL_C_INCLUDES:= \
         $(TOP)/frameworks/av/include/media/stagefright/timedtext \
         $(TOP)/frameworks/av/media/libstagefright
 
+LOCAL_SHARED_LIBRARIES := libmedia
+
 LOCAL_MODULE:= libstagefright_timedtext
 
 include $(BUILD_STATIC_LIBRARY)

@@ -8,6 +8,8 @@ LOCAL_CFLAGS += -Werror -Wall
 LOCAL_CLANG := true
 LOCAL_SANITIZE := unsigned-integer-overflow signed-integer-overflow
 
+LOCAL_SHARED_LIBRARIES := libmedia
+
 LOCAL_MODULE := libstagefright_id3
 
 include $(BUILD_STATIC_LIBRARY)
