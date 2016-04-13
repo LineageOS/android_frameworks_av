@@ -31,6 +31,8 @@ LOCAL_SRC_FILES:= \
     DrmInfoEvent.cpp \
     ReadWriteUtils.cpp
 
+LOCAL_STATIC_LIBRARIES := libbinder
+
 LOCAL_C_INCLUDES := \
     $(TOP)/frameworks/av/include \
     $(TOP)/frameworks/av/drm/libdrmframework/include \
