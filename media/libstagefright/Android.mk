@@ -123,6 +123,8 @@ LOCAL_SHARED_LIBRARIES += \
         libdl \
         libRScpp \
 
+LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libmedia
+
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wno-error=deprecated-declarations -Wall
 
 # enable experiments only in userdebug and eng builds

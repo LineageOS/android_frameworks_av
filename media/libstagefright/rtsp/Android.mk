@@ -19,7 +19,7 @@ LOCAL_SRC_FILES:=       \
         ASessionDescription.cpp     \
         SDPLoader.cpp               \
 
-LOCAL_SHARED_LIBRARIES += libcrypto
+LOCAL_SHARED_LIBRARIES += libcrypto libmedia
 
 LOCAL_C_INCLUDES:= \
 	$(TOP)/frameworks/av/media/libstagefright \
