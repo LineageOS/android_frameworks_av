@@ -46,6 +46,8 @@ LOCAL_STATIC_LIBRARIES :=       \
     libstagefright_rtsp         \
     libstagefright_timedtext    \
 
+LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libmedia
+
 LOCAL_C_INCLUDES :=                                                 \
     $(TOP)/frameworks/av/media/libstagefright/include               \
     $(TOP)/frameworks/av/media/libstagefright/rtsp                  \
