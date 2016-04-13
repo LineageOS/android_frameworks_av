@@ -20,8 +20,11 @@ LOCAL_SRC_FILES:= \
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \
+    libmedia \
     libutils \
     liblog \
+
+LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libmedia
 
 LOCAL_C_INCLUDES += \
     $(LOCAL_PATH)/include \
