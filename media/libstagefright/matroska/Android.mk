@@ -11,6 +11,8 @@ LOCAL_C_INCLUDES:= \
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
 LOCAL_CLANG := true
 
+LOCAL_SHARED_LIBRARIES := libmedia
+
 LOCAL_MODULE:= libstagefright_matroska
 
 include $(BUILD_STATIC_LIBRARY)
