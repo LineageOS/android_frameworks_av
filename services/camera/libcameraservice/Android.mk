@@ -70,6 +70,8 @@ LOCAL_SHARED_LIBRARIES:= \
     libcamera_metadata \
     libjpeg
 
+LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder
+
 LOCAL_C_INCLUDES += \
     system/media/camera/include \
     system/media/private/camera/include \
