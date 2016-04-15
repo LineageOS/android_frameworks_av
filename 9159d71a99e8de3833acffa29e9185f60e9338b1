@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5faad753_2b267db9",
+        "filename": "media/libstagefright/MediaCodecSource.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 669,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-04-15T16:09:33Z",
+      "side": 1,
+      "message": "property_get_bool",
+      "range": {
+        "startLine": 669,
+        "startChar": 14,
+        "endLine": 669,
+        "endChar": 26
+      },
+      "revId": "9159d71a99e8de3833acffa29e9185f60e9338b1",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_cb3a49cc",
+        "filename": "media/libstagefright/MediaCodecSource.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 671,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-04-15T16:09:33Z",
+      "side": 1,
+      "message": "property_get_bool",
+      "range": {
+        "startLine": 671,
+        "startChar": 14,
+        "endLine": 671,
+        "endChar": 26
+      },
+      "revId": "9159d71a99e8de3833acffa29e9185f60e9338b1",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
