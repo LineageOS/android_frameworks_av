@@ -45,6 +45,29 @@
       "revId": "9159d71a99e8de3833acffa29e9185f60e9338b1",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_ab310def",
+        "filename": "media/libstagefright/MediaCodecSource.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 671,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-04-15T16:11:04Z",
+      "side": 1,
+      "message": "You could also just change the default if the property is not set.",
+      "range": {
+        "startLine": 671,
+        "startChar": 64,
+        "endLine": 671,
+        "endChar": 65
+      },
+      "revId": "9159d71a99e8de3833acffa29e9185f60e9338b1",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
