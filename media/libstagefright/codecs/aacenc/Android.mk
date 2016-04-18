@@ -64,7 +64,10 @@ LOCAL_ARM_MODE := arm
 
 LOCAL_STATIC_LIBRARIES :=
 
-LOCAL_SHARED_LIBRARIES :=
+# libstagefright links this static library, so it probably isn't appropriate to
+# link libstagefright.  However, this library includes libstagefright headers,
+# and needs libbinder to be able to do so correctly.
+LOCAL_SHARED_LIBRARIES := libbinder
 
 LOCAL_C_INCLUDES := \
 	frameworks/av/include \
