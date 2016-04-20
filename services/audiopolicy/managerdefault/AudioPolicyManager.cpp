@@ -2258,7 +2258,9 @@ status_t AudioPolicyManager::dump(int fd)
     snprintf(buffer, SIZE, " Primary Output: %d\n",
              hasPrimaryOutput() ? mPrimaryOutput->mIoHandle : AUDIO_IO_HANDLE_NONE);
     result.append(buffer);
-    snprintf(buffer, SIZE, " Phone state: %d\n", mEngine->getPhoneState());
+    std::string stateLiteral;
+    AudioModeConverter::toString(mEngine->getPhoneState(), stateLiteral);
+    snprintf(buffer, SIZE, " Phone state: %s\n", stateLiteral.c_str());
     result.append(buffer);
     snprintf(buffer, SIZE, " Force use for communications %d\n",
              mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_COMMUNICATION));

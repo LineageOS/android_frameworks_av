@@ -67,19 +67,24 @@ struct GainModeTraits
 };
 struct StreamTraits
 {
-  typedef audio_stream_type_t Type;
-  typedef Vector<Type> Collection;
+    typedef audio_stream_type_t Type;
+    typedef Vector<Type> Collection;
 };
 struct DeviceCategoryTraits
 {
-  typedef device_category Type;
-  typedef Vector<Type> Collection;
+    typedef device_category Type;
+    typedef Vector<Type> Collection;
+};
+struct AudioModeTraits
+{
+    typedef audio_mode_t Type;
+    typedef Vector<Type> Collection;
 };
 template <typename T>
 struct DefaultTraits
 {
-  typedef T Type;
-  typedef Vector<Type> Collection;
+    typedef T Type;
+    typedef Vector<Type> Collection;
 };
 
 template <class Traits>
@@ -117,7 +122,6 @@ protected:
     };
 
     static const Table mTable[];
-    static const size_t mSize;
 };
 
 typedef TypeConverter<DeviceTraits> DeviceConverter;
@@ -130,6 +134,7 @@ typedef TypeConverter<ChannelIndexTraits> ChannelIndexConverter;
 typedef TypeConverter<GainModeTraits> GainModeConverter;
 typedef TypeConverter<StreamTraits> StreamTypeConverter;
 typedef TypeConverter<DeviceCategoryTraits> DeviceCategoryConverter;
+typedef TypeConverter<AudioModeTraits> AudioModeConverter;
 
 static SampleRateTraits::Collection samplingRatesFromString(const std::string &samplingRates,
                                                             const char *del = "|")
