@@ -78,10 +78,6 @@ const DeviceConverter::Table DeviceConverter::mTable[] = {
         MAKE_STRING_FROM_ENUM(AUDIO_DEVICE_IN_STUB),
 };
 
-template<>
-const size_t DeviceConverter::mSize = sizeof(DeviceConverter::mTable) /
-        sizeof(DeviceConverter::mTable[0]);
-
 
 template <>
 const OutputFlagConverter::Table OutputFlagConverter::mTable[] = {
@@ -96,9 +92,6 @@ const OutputFlagConverter::Table OutputFlagConverter::mTable[] = {
     MAKE_STRING_FROM_ENUM(AUDIO_OUTPUT_FLAG_RAW),
     MAKE_STRING_FROM_ENUM(AUDIO_OUTPUT_FLAG_SYNC),
 };
-template<>
-const size_t OutputFlagConverter::mSize = sizeof(OutputFlagConverter::mTable) /
-        sizeof(OutputFlagConverter::mTable[0]);
 
 
 template <>
@@ -108,9 +101,6 @@ const InputFlagConverter::Table InputFlagConverter::mTable[] = {
     MAKE_STRING_FROM_ENUM(AUDIO_INPUT_FLAG_RAW),
     MAKE_STRING_FROM_ENUM(AUDIO_INPUT_FLAG_SYNC),
 };
-template<>
-const size_t InputFlagConverter::mSize = sizeof(InputFlagConverter::mTable) /
-        sizeof(InputFlagConverter::mTable[0]);
 
 
 template <>
@@ -143,9 +133,6 @@ const FormatConverter::Table FormatConverter::mTable[] = {
     MAKE_STRING_FROM_ENUM(AUDIO_FORMAT_DTS_HD),
     MAKE_STRING_FROM_ENUM(AUDIO_FORMAT_IEC61937),
 };
-template<>
-const size_t FormatConverter::mSize = sizeof(FormatConverter::mTable) /
-        sizeof(FormatConverter::mTable[0]);
 
 
 template <>
@@ -156,9 +143,6 @@ const OutputChannelConverter::Table OutputChannelConverter::mTable[] = {
     MAKE_STRING_FROM_ENUM(AUDIO_CHANNEL_OUT_5POINT1),
     MAKE_STRING_FROM_ENUM(AUDIO_CHANNEL_OUT_7POINT1),
 };
-template<>
-const size_t OutputChannelConverter::mSize = sizeof(OutputChannelConverter::mTable) /
-        sizeof(OutputChannelConverter::mTable[0]);
 
 
 template <>
@@ -167,9 +151,6 @@ const InputChannelConverter::Table InputChannelConverter::mTable[] = {
     MAKE_STRING_FROM_ENUM(AUDIO_CHANNEL_IN_STEREO),
     MAKE_STRING_FROM_ENUM(AUDIO_CHANNEL_IN_FRONT_BACK),
 };
-template<>
-const size_t InputChannelConverter::mSize = sizeof(InputChannelConverter::mTable) /
-        sizeof(InputChannelConverter::mTable[0]);
 
 template <>
 const ChannelIndexConverter::Table ChannelIndexConverter::mTable[] = {
@@ -182,9 +163,6 @@ const ChannelIndexConverter::Table ChannelIndexConverter::mTable[] = {
     {"AUDIO_CHANNEL_INDEX_MASK_7", static_cast<audio_channel_mask_t>(AUDIO_CHANNEL_INDEX_MASK_7)},
     {"AUDIO_CHANNEL_INDEX_MASK_8", static_cast<audio_channel_mask_t>(AUDIO_CHANNEL_INDEX_MASK_8)},
 };
-template<>
-const size_t ChannelIndexConverter::mSize = sizeof(ChannelIndexConverter::mTable) /
-        sizeof(ChannelIndexConverter::mTable[0]);
 
 
 template <>
@@ -194,9 +172,6 @@ const GainModeConverter::Table GainModeConverter::mTable[] = {
     MAKE_STRING_FROM_ENUM(AUDIO_GAIN_MODE_RAMP),
 };
 
-template<>
-const size_t GainModeConverter::mSize = sizeof(GainModeConverter::mTable) /
-        sizeof(GainModeConverter::mTable[0]);
 
 template <>
 const DeviceCategoryConverter::Table DeviceCategoryConverter::mTable[] = {
@@ -206,9 +181,6 @@ const DeviceCategoryConverter::Table DeviceCategoryConverter::mTable[] = {
     MAKE_STRING_FROM_ENUM(DEVICE_CATEGORY_EXT_MEDIA)
 };
 
-template<>
-const size_t DeviceCategoryConverter::mSize = sizeof(DeviceCategoryConverter::mTable) /
-        sizeof(DeviceCategoryConverter::mTable[0]);
 
 template <>
 const StreamTypeConverter::Table StreamTypeConverter::mTable[] = {
@@ -227,26 +199,37 @@ const StreamTypeConverter::Table StreamTypeConverter::mTable[] = {
     MAKE_STRING_FROM_ENUM(AUDIO_STREAM_PATCH),
 };
 
+
 template<>
-const size_t StreamTypeConverter::mSize = sizeof(StreamTypeConverter::mTable) /
-        sizeof(StreamTypeConverter::mTable[0]);
+const AudioModeConverter::Table AudioModeConverter::mTable[] = {
+    MAKE_STRING_FROM_ENUM(AUDIO_MODE_INVALID),
+    MAKE_STRING_FROM_ENUM(AUDIO_MODE_CURRENT),
+    MAKE_STRING_FROM_ENUM(AUDIO_MODE_NORMAL),
+    MAKE_STRING_FROM_ENUM(AUDIO_MODE_RINGTONE),
+    MAKE_STRING_FROM_ENUM(AUDIO_MODE_IN_CALL),
+    MAKE_STRING_FROM_ENUM(AUDIO_MODE_IN_COMMUNICATION),
+};
+
 
 template <class Traits>
 bool TypeConverter<Traits>::toString(const typename Traits::Type &value, std::string &str)
 {
-    for (size_t i = 0; i < mSize; i++) {
+    for (size_t i = 0; i < sizeof(mTable) / sizeof(mTable[0]); i++) {
         if (mTable[i].value == value) {
             str = mTable[i].literal;
             return true;
         }
     }
+    char result[64];
+    snprintf(result, sizeof(result), "Unknown enum value %d", value);
+    str = result;
     return false;
 }
 
 template <class Traits>
 bool TypeConverter<Traits>::fromString(const std::string &str, typename Traits::Type &result)
 {
-    for (size_t i = 0; i < mSize; i++) {
+    for (size_t i = 0; i < sizeof(mTable) / sizeof(mTable[0]); i++) {
         if (strcmp(mTable[i].literal, str.c_str()) == 0) {
             ALOGV("stringToEnum() found %s", mTable[i].literal);
             result = mTable[i].value;
@@ -297,6 +280,7 @@ template class TypeConverter<ChannelIndexTraits>;
 template class TypeConverter<GainModeTraits>;
 template class TypeConverter<StreamTraits>;
 template class TypeConverter<DeviceCategoryTraits>;
+template class TypeConverter<AudioModeTraits>;
 
 }; // namespace android
 
