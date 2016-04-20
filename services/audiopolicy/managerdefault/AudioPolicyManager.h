@@ -595,6 +595,15 @@ private:
         void updateAudioProfiles(audio_devices_t device, audio_io_handle_t ioHandle,
                 AudioProfileVector &profiles);
 
+        // Notify the policy client of any change of device state with AUDIO_IO_HANDLE_NONE,
+        // so that the client interprets it as global to audio hardware interfaces.
+        // It can give a chance to HAL implementer to retrieve dynamic capabilities associated
+        // to this device for example.
+        // TODO avoid opening stream to retrieve capabilities of a profile.
+        void broadcastDeviceConnectionState(audio_devices_t device,
+                                            audio_policy_dev_state_t state,
+                                            const String8 &device_address);
+
         // updates device caching and output for streams that can influence the
         //    routing of notifications
         void handleNotificationRoutingForStream(audio_stream_type_t stream);
