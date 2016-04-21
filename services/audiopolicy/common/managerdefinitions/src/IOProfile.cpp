@@ -108,8 +108,18 @@ void IOProfile::dump(int fd)
 
     AudioPort::dump(fd, 4);
 
-    snprintf(buffer, SIZE, "    - flags: 0x%04x\n", getFlags());
+    snprintf(buffer, SIZE, "    - flags: 0x%04x", getFlags());
     result.append(buffer);
+    std::string flagsLiteral;
+    if (getRole() == AUDIO_PORT_ROLE_SINK) {
+        InputFlagConverter::maskToString(getFlags(), flagsLiteral);
+    } else if (getRole() == AUDIO_PORT_ROLE_SOURCE) {
+        OutputFlagConverter::maskToString(getFlags(), flagsLiteral);
+    }
+    if (!flagsLiteral.empty()) {
+        result.appendFormat(" (%s)", flagsLiteral.c_str());
+    }
+    result.append("\n");
     write(fd, result.string(), result.size());
     mSupportedDevices.dump(fd, String8("Supported"), 4, false);
 }
