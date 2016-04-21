@@ -66,7 +66,8 @@ LOCAL_SHARED_LIBRARIES:= \
     libhardware \
     libsync \
     libcamera_metadata \
-    libjpeg
+    libjpeg \
+    libmemunreachable
 
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder
 
