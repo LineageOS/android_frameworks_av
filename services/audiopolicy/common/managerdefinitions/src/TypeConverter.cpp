@@ -270,6 +270,19 @@ uint32_t TypeConverter<Traits>::maskFromString(const std::string &str, const cha
     return value;
 }
 
+template <class Traits>
+void TypeConverter<Traits>::maskToString(uint32_t mask, std::string &str, const char *del)
+{
+    bool first_flag = true;
+    for (size_t i = 0; i < sizeof(mTable) / sizeof(mTable[0]); i++) {
+        if ((mask & mTable[i].value) == mTable[i].value) {
+            if (!first_flag) str += del;
+            first_flag = false;
+            str += mTable[i].literal;
+        }
+    }
+}
+
 template class TypeConverter<DeviceTraits>;
 template class TypeConverter<OutputFlagTraits>;
 template class TypeConverter<InputFlagTraits>;

@@ -115,6 +115,8 @@ public:
 
     static uint32_t maskFromString(const std::string &str, const char *del = "|");
 
+    static void maskToString(uint32_t mask, std::string &str, const char *del = "|");
+
 protected:
     struct Table {
         const char *literal;
