@@ -222,6 +222,9 @@ public:
                                                        volume_group_t &volumeGroup) = 0;
 
     virtual status_t setRttEnabled(bool enabled) = 0;
+
+    virtual status_t listAudioSessions(audio_stream_type_t streams,
+                                       Vector< sp<AudioSessionInfo>> &sessions) = 0;
 };
 
 
