@@ -235,61 +235,72 @@ status_t AudioPolicyService::getOutputForAttr(audio_attributes_t *attr,
     }
 
     ALOGV("%s()", __func__);
-    Mutex::Autolock _l(mLock);
+    sp<AudioPolicyEffects> audioPolicyEffects;
+    {
+        Mutex::Autolock _l(mLock);
 
-    const uid_t callingUid = IPCThreadState::self()->getCallingUid();
-    if (!isAudioServerOrMediaServerUid(callingUid) || uid == (uid_t)-1) {
-        ALOGW_IF(uid != (uid_t)-1 && uid != callingUid,
-                "%s uid %d tried to pass itself off as %d", __func__, callingUid, uid);
-        uid = callingUid;
-    }
-    if (!mPackageManager.allowPlaybackCapture(uid)) {
-        attr->flags |= AUDIO_FLAG_NO_MEDIA_PROJECTION;
-    }
-    if (((attr->flags & (AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY|AUDIO_FLAG_BYPASS_MUTE)) != 0)
-            && !bypassInterruptionPolicyAllowed(pid, uid)) {
-        attr->flags &= ~(AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY|AUDIO_FLAG_BYPASS_MUTE);
-    }
-    AutoCallerClear acc;
-    AudioPolicyInterface::output_type_t outputType;
-    result = mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid,
-                                                 config,
-                                                 &flags, selectedDeviceId, portId,
-                                                 secondaryOutputs,
-                                                 &outputType);
-
-    // FIXME: Introduce a way to check for the the telephony device before opening the output
-    if (result == NO_ERROR) {
-        // enforce permission (if any) required for each type of input
-        switch (outputType) {
-        case AudioPolicyInterface::API_OUTPUT_LEGACY:
-            break;
-        case AudioPolicyInterface::API_OUTPUT_TELEPHONY_TX:
-            if (!modifyPhoneStateAllowed(pid, uid)) {
-                ALOGE("%s() permission denied: modify phone state not allowed for uid %d",
-                    __func__, uid);
-                result = PERMISSION_DENIED;
-            }
-            break;
-        case AudioPolicyInterface::API_OUT_MIX_PLAYBACK:
-            if (!modifyAudioRoutingAllowed(pid, uid)) {
-                ALOGE("%s() permission denied: modify audio routing not allowed for uid %d",
-                    __func__, uid);
-                result = PERMISSION_DENIED;
-            }
-            break;
-        case AudioPolicyInterface::API_OUTPUT_INVALID:
-        default:
-            LOG_ALWAYS_FATAL("%s() encountered an invalid output type %d",
-                __func__, (int)outputType);
+        const uid_t callingUid = IPCThreadState::self()->getCallingUid();
+        if (!isAudioServerOrMediaServerUid(callingUid) || uid == (uid_t)-1) {
+            ALOGW_IF(uid != (uid_t)-1 && uid != callingUid,
+                    "%s uid %d tried to pass itself off as %d", __func__, callingUid, uid);
+            uid = callingUid;
         }
+        if (!mPackageManager.allowPlaybackCapture(uid)) {
+            attr->flags |= AUDIO_FLAG_NO_MEDIA_PROJECTION;
+        }
+        if (((attr->flags & (AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY|AUDIO_FLAG_BYPASS_MUTE)) != 0)
+                && !bypassInterruptionPolicyAllowed(pid, uid)) {
+            attr->flags &= ~(AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY|AUDIO_FLAG_BYPASS_MUTE);
+        }
+        AutoCallerClear acc;
+        AudioPolicyInterface::output_type_t outputType;
+        result = mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid,
+                                                     config,
+                                                     &flags, selectedDeviceId, portId,
+                                                     secondaryOutputs,
+                                                     &outputType);
+
+        // FIXME: Introduce a way to check for the the telephony device before opening the output
+        if (result == NO_ERROR) {
+            // enforce permission (if any) required for each type of input
+            switch (outputType) {
+            case AudioPolicyInterface::API_OUTPUT_LEGACY:
+                break;
+            case AudioPolicyInterface::API_OUTPUT_TELEPHONY_TX:
+                if (!modifyPhoneStateAllowed(pid, uid)) {
+                    ALOGE("%s() permission denied: modify phone state not allowed for uid %d",
+                        __func__, uid);
+                    result = PERMISSION_DENIED;
+                }
+                break;
+            case AudioPolicyInterface::API_OUT_MIX_PLAYBACK:
+                if (!modifyAudioRoutingAllowed(pid, uid)) {
+                    ALOGE("%s() permission denied: modify audio routing not allowed for uid %d",
+                        __func__, uid);
+                    result = PERMISSION_DENIED;
+                }
+                break;
+            case AudioPolicyInterface::API_OUTPUT_INVALID:
+            default:
+                LOG_ALWAYS_FATAL("%s() encountered an invalid output type %d",
+                    __func__, (int)outputType);
+            }
+        }
+
+        if (result == NO_ERROR) {
+            sp <AudioPlaybackClient> client =
+                new AudioPlaybackClient(*attr, *output, uid, pid, session, *portId, *selectedDeviceId, *stream);
+            mAudioPlaybackClients.add(*portId, client);
+        }
+
+        audioPolicyEffects = mAudioPolicyEffects;
     }
 
-    if (result == NO_ERROR) {
-        sp <AudioPlaybackClient> client =
-            new AudioPlaybackClient(*attr, *output, uid, pid, session, *portId, *selectedDeviceId, *stream);
-        mAudioPlaybackClients.add(*portId, client);
+    if (result == NO_ERROR && audioPolicyEffects != 0) {
+        audioPolicyEffects->updateOutputAudioSessionInfo(*output, *stream,
+                session, flags, config, uid);
     }
+
     return result;
 }
 
@@ -393,11 +404,20 @@ void AudioPolicyService::doReleaseOutput(audio_port_handle_t portId)
         audioPolicyEffects->releaseOutputSessionEffects(
             client->io, client->stream, client->session);
     }
-    Mutex::Autolock _l(mLock);
-    mAudioPlaybackClients.removeItem(portId);
+    {
+        Mutex::Autolock _l(mLock);
+        mAudioPlaybackClients.removeItem(portId);
 
-    // called from internal thread: no need to clear caller identity
-    mAudioPolicyManager->releaseOutput(portId);
+        audioPolicyEffects = mAudioPolicyEffects;
+
+        // called from internal thread: no need to clear caller identity
+        mAudioPolicyManager->releaseOutput(portId);
+    }
+
+    if (audioPolicyEffects != 0) {
+        audioPolicyEffects->releaseOutputAudioSessionInfo(client->io,
+                client->stream, client->session);
+    }
 }
 
 status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
@@ -1531,6 +1551,26 @@ status_t AudioPolicyService::registerSoundTriggerCaptureStateListener(
     bool* result)
 {
     *result = mCaptureStateNotifier.RegisterListener(listener);
+    return NO_ERROR;
+}
+
+status_t AudioPolicyService::listAudioSessions(audio_stream_type_t streams,
+                                               Vector< sp<AudioSessionInfo>> &sessions)
+{
+    sp<AudioPolicyEffects> audioPolicyEffects;
+    {
+        Mutex::Autolock _l(mLock);
+        if (mAudioPolicyManager == NULL) {
+            return NO_INIT;
+        }
+        audioPolicyEffects = mAudioPolicyEffects;
+    }
+
+    if (audioPolicyEffects != 0) {
+        return audioPolicyEffects->listAudioSessions(streams, sessions);
+    }
+
+    // no errors here if effects are not available
     return NO_ERROR;
 }
 

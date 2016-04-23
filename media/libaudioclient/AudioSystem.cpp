@@ -43,6 +43,7 @@ Mutex AudioSystem::gLockAPS;
 sp<IAudioFlinger> AudioSystem::gAudioFlinger;
 sp<AudioSystem::AudioFlingerClient> AudioSystem::gAudioFlingerClient;
 std::set<audio_error_callback> AudioSystem::gAudioErrorCallbacks;
+audio_session_callback AudioSystem::gAudioSessionCallback = NULL;
 dynamic_policy_callback AudioSystem::gDynPolicyCallback = NULL;
 record_config_callback AudioSystem::gRecordConfigCallback = NULL;
 
@@ -751,6 +752,17 @@ status_t AudioSystem::AudioFlingerClient::removeAudioDeviceCallback(
 {
     Mutex::Autolock _l(gLock);
     gRecordConfigCallback = cb;
+}
+
+/*static*/ status_t AudioSystem::setAudioSessionCallback(audio_session_callback cb)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+
+    Mutex::Autolock _l(gLock);
+    gAudioSessionCallback = cb;
+
+    return NO_ERROR;
 }
 
 // client singleton for AudioPolicyService binder interface
@@ -1809,6 +1821,32 @@ void AudioSystem::AudioPolicyServiceClient::onRecordingConfigurationUpdate(
     if (cb != NULL) {
         cb(event, clientInfo, clientConfig, clientEffects,
            deviceConfig, effects, patchHandle, source);
+    }
+}
+
+// ---------------------------------------------------------------------------
+
+status_t AudioSystem::listAudioSessions(audio_stream_type_t stream,
+                                        Vector< sp<AudioSessionInfo>> &sessions)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->listAudioSessions(stream, sessions);
+}
+
+void AudioSystem::AudioPolicyServiceClient::onOutputSessionEffectsUpdate(
+        sp<AudioSessionInfo>& info, bool added)
+{
+    ALOGV("AudioPolicyServiceClient::onOutputSessionEffectsUpdate(%d, %d, %d)",
+            info->mStream, info->mSessionId, added);
+    audio_session_callback cb = NULL;
+    {
+        Mutex::Autolock _l(AudioSystem::gLock);
+        cb = gAudioSessionCallback;
+    }
+
+    if (cb != NULL) {
+        cb(AUDIO_OUTPUT_SESSION_EFFECTS_UPDATE, info, added);
     }
 }
 
