@@ -172,6 +172,9 @@ public:
                                         bool *surroundFormatsEnabled,
                                         bool reported) = 0;
     virtual status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled) = 0;
+
+    virtual status_t listAudioSessions(audio_stream_type_t streams,
+                                       Vector< sp<AudioSessionInfo>> &sessions) = 0;
 };
 
 
