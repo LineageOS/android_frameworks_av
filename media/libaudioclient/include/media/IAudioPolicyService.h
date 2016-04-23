@@ -254,6 +254,9 @@ public:
     virtual status_t registerSoundTriggerCaptureStateListener(
         const sp<media::ICaptureStateListener>& listener,
         bool* result) = 0;
+
+    virtual status_t listAudioSessions(audio_stream_type_t streams,
+                                       Vector< sp<AudioSessionInfo>> &sessions) = 0;
 };
 
 
