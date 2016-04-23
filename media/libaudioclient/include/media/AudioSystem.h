@@ -36,6 +36,8 @@ typedef void (*dynamic_policy_callback)(int event, String8 regId, int val);
 typedef void (*record_config_callback)(int event, const record_client_info_t *clientInfo,
                 const audio_config_base_t *clientConfig, const audio_config_base_t *deviceConfig,
                 audio_patch_handle_t patchHandle);
+typedef void (*audio_session_callback)(int event,
+        sp<AudioSessionInfo>& session, bool added);
 
 class IAudioFlinger;
 class IAudioPolicyService;
@@ -100,6 +102,7 @@ public:
     static void setErrorCallback(audio_error_callback cb);
     static void setDynPolicyCallback(dynamic_policy_callback cb);
     static void setRecordConfigCallback(record_config_callback);
+    static status_t setAudioSessionCallback(audio_session_callback cb);
 
     // helper function to obtain AudioFlinger service handle
     static const sp<IAudioFlinger> get_audio_flinger();
@@ -341,6 +344,9 @@ public:
     static float    getStreamVolumeDB(
             audio_stream_type_t stream, int index, audio_devices_t device);
 
+    static status_t listAudioSessions(audio_stream_type_t streams,
+                                      Vector< sp<AudioSessionInfo>> &sessions);
+
     // ----------------------------------------------------------------------------
 
     class AudioPortCallback : public RefBase
@@ -444,6 +450,7 @@ private:
                         const record_client_info_t *clientInfo,
                         const audio_config_base_t *clientConfig,
                         const audio_config_base_t *deviceConfig, audio_patch_handle_t patchHandle);
+        virtual void onOutputSessionEffectsUpdate(sp<AudioSessionInfo>& info, bool added);
 
     private:
         Mutex                               mLock;
@@ -464,6 +471,7 @@ private:
     static audio_error_callback gAudioErrorCallback;
     static dynamic_policy_callback gDynPolicyCallback;
     static record_config_callback gRecordConfigCallback;
+    static audio_session_callback gAudioSessionCallback;
 
     static size_t gInBuffSize;
     // previous parameters for recording buffer size queries

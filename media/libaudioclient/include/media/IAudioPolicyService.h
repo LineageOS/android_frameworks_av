@@ -171,6 +171,9 @@ public:
     virtual status_t getMasterMono(bool *mono) = 0;
     virtual float    getStreamVolumeDB(
             audio_stream_type_t stream, int index, audio_devices_t device) = 0;
+
+    virtual status_t listAudioSessions(audio_stream_type_t streams,
+                                       Vector< sp<AudioSessionInfo>> &sessions) = 0;
 };
 
 
