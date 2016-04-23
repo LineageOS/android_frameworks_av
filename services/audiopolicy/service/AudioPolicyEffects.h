@@ -28,6 +28,8 @@
 
 namespace android {
 
+class AudioPolicyService;
+
 // ----------------------------------------------------------------------------
 
 // AudioPolicyEffects class
@@ -41,7 +43,7 @@ public:
     // The constructor will parse audio_effects.conf
     // First it will look whether vendor specific file exists,
     // otherwise it will parse the system default file.
-	         AudioPolicyEffects();
+            AudioPolicyEffects(AudioPolicyService *audioPolicyService);
     virtual ~AudioPolicyEffects();
 
     // NOTE: methods on AudioPolicyEffects should never be called with the AudioPolicyService
@@ -102,6 +104,19 @@ public:
 
     // Remove the default stream effect from wherever it's attached.
     status_t removeStreamDefaultEffect(audio_unique_id_t id);
+
+    status_t updateOutputAudioSessionInfo(audio_io_handle_t output,
+                             audio_stream_type_t stream,
+                             audio_session_t audioSession,
+                             audio_output_flags_t flags,
+                             const audio_config_t *config, uid_t uid);
+
+    status_t releaseOutputAudioSessionInfo(audio_io_handle_t output,
+                             audio_stream_type_t stream,
+                             audio_session_t audioSession);
+
+    status_t listAudioSessions(audio_stream_type_t streams,
+                             Vector< sp<AudioSessionInfo>> &sessions);
 
 private:
 
@@ -237,6 +252,10 @@ private:
     KeyedVector< audio_stream_type_t, EffectDescVector* > mOutputStreams;
     // Automatic output effects are unique for audiosession ID
     KeyedVector< audio_session_t, EffectVector* > mOutputSessions;
+    // Stream info for session events
+    KeyedVector< audio_session_t, sp<AudioSessionInfo> > mOutputAudioSessionInfo;
+
+    AudioPolicyService *mAudioPolicyService;
 };
 
 } // namespace android
