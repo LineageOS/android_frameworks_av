@@ -238,6 +238,7 @@ private:
     sp<IdleToLoadedState> mIdleToLoadedState;
     sp<FlushingState> mFlushingState;
     sp<SkipCutBuffer> mSkipCutBuffer;
+    int32_t mSampleRate;
 
     AString mComponentName;
     uint32_t mFlags;
