@@ -494,7 +494,8 @@ void ACodec::BufferInfo::checkReadFence(const char *dbg) {
 ////////////////////////////////////////////////////////////////////////////////
 
 ACodec::ACodec()
-    : mQuirks(0),
+    : mSampleRate(0),
+      mQuirks(0),
       mNode(0),
       mUsingNativeWindow(false),
       mNativeWindowUsageBits(0),
@@ -2650,6 +2651,7 @@ status_t ACodec::setupAACCodec(
     } else {
         ALOGW("did not set AudioAndroidAacPresentation due to error %d when setting AudioAac", res);
     }
+    mSampleRate = sampleRate;
     return res;
 }
 
@@ -5178,8 +5180,14 @@ void ACodec::sendFormatChange() {
     CHECK(mOutputFormat->findString("mime", &mime));
 
     if (mime == MEDIA_MIMETYPE_AUDIO_RAW && (mEncoderDelay || mEncoderPadding)) {
-        int32_t channelCount;
-        CHECK(mOutputFormat->findInt32("channel-count", &channelCount));
+        int32_t channelCount, sampleRate;
+        CHECK(notify->findInt32("channel-count", &channelCount));
+        CHECK(mOutputFormat->findInt32("sample-rate", &sampleRate));
+        if (mSampleRate != 0 && sampleRate != 0) {
+            mEncoderDelay = mEncoderDelay * sampleRate / mSampleRate;
+            mEncoderPadding = mEncoderPadding * sampleRate / mSampleRate;
+            mSampleRate = sampleRate;
+        }
         if (mSkipCutBuffer != NULL) {
             size_t prevbufsize = mSkipCutBuffer->size();
             if (prevbufsize != 0) {
