@@ -1,0 +1,106 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5faad753_1c7df6b0",
+        "filename": "media/libmedia/AudioSystem.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-04-25T20:19:34Z",
+      "side": 1,
+      "message": "You can only have 1 callback?",
+      "revId": "0eb58f99cda0e3b8368100c630b02bfd922603f2",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_7c6c2a08",
+        "filename": "services/audiopolicy/service/AudioPolicyEffects.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 248,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-04-25T20:19:34Z",
+      "side": 1,
+      "message": "tabs",
+      "revId": "0eb58f99cda0e3b8368100c630b02bfd922603f2",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_9c71e6e3",
+        "filename": "services/audiopolicy/service/AudioPolicyEffects.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 264,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-04-25T20:19:34Z",
+      "side": 1,
+      "message": "whitespace",
+      "revId": "0eb58f99cda0e3b8368100c630b02bfd922603f2",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_3c76b2da",
+        "filename": "services/audiopolicy/service/AudioPolicyEffects.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 293,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-04-25T20:19:34Z",
+      "side": 1,
+      "message": "whitespace",
+      "revId": "0eb58f99cda0e3b8368100c630b02bfd922603f2",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_5c736ee8",
+        "filename": "services/audiopolicy/service/AudioPolicyEffects.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 374,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-04-25T20:19:34Z",
+      "side": 1,
+      "message": "tabs",
+      "revId": "0eb58f99cda0e3b8368100c630b02bfd922603f2",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_fc7fbaa8",
+        "filename": "services/audiopolicy/service/AudioPolicyEffects.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 398,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-04-25T20:19:34Z",
+      "side": 1,
+      "message": "function wasn\u0027t renamed, this isn\u0027t necessary",
+      "revId": "0eb58f99cda0e3b8368100c630b02bfd922603f2",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
