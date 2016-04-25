@@ -1,0 +1,95 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5faad753_bf5ff4e3",
+        "filename": "include/media/AudioSession.h",
+        "patchSetId": 9
+      },
+      "lineNbr": 39,
+      "author": {
+        "id": 15007
+      },
+      "writtenOn": "2016-04-25T22:51:13Z",
+      "side": 1,
+      "message": "Seems that there is a TAB here.",
+      "revId": "65c12709a26f9644b612588f56ed2f1bf9f58d2a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_df6430bc",
+        "filename": "services/audiopolicy/service/AudioPolicyEffects.cpp",
+        "patchSetId": 9
+      },
+      "lineNbr": 310,
+      "author": {
+        "id": 15007
+      },
+      "writtenOn": "2016-04-25T22:51:13Z",
+      "side": 1,
+      "message": "Trailing SPACE",
+      "revId": "65c12709a26f9644b612588f56ed2f1bf9f58d2a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_ff01ecb0",
+        "filename": "services/audiopolicy/service/AudioPolicyEffects.h",
+        "patchSetId": 9
+      },
+      "lineNbr": 49,
+      "author": {
+        "id": 15007
+      },
+      "writtenOn": "2016-04-25T22:51:13Z",
+      "side": 1,
+      "message": "const ?",
+      "revId": "65c12709a26f9644b612588f56ed2f1bf9f58d2a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_bf04d4c7",
+        "filename": "services/audiopolicy/service/AudioPolicyInterfaceImpl.cpp",
+        "patchSetId": 9
+      },
+      "lineNbr": 165,
+      "author": {
+        "id": 15007
+      },
+      "writtenOn": "2016-04-25T22:51:13Z",
+      "side": 1,
+      "message": "what about (for being sure it is initialized):\n\nstatus_t status \u003d NO_ERROR;",
+      "range": {
+        "startLine": 165,
+        "startChar": 4,
+        "endLine": 165,
+        "endChar": 20
+      },
+      "revId": "65c12709a26f9644b612588f56ed2f1bf9f58d2a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_9f5eb8e4",
+        "filename": "services/audiopolicy/service/AudioPolicyInterfaceImpl.cpp",
+        "patchSetId": 9
+      },
+      "lineNbr": 182,
+      "author": {
+        "id": 15007
+      },
+      "writtenOn": "2016-04-25T22:51:13Z",
+      "side": 1,
+      "message": "Empty line to remove",
+      "revId": "65c12709a26f9644b612588f56ed2f1bf9f58d2a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
