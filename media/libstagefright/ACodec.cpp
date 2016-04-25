@@ -5181,7 +5181,7 @@ void ACodec::sendFormatChange() {
 
     if (mime == MEDIA_MIMETYPE_AUDIO_RAW && (mEncoderDelay || mEncoderPadding)) {
         int32_t channelCount, sampleRate;
-        CHECK(notify->findInt32("channel-count", &channelCount));
+        CHECK(mOutputFormat->findInt32("channel-count", &channelCount));
         CHECK(mOutputFormat->findInt32("sample-rate", &sampleRate));
         if (mSampleRate != 0 && sampleRate != 0) {
             mEncoderDelay = mEncoderDelay * sampleRate / mSampleRate;
