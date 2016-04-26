@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5faad753_75219d9f",
+        "filename": "services/audiopolicy/service/AudioPolicyEffects.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 49,
+      "author": {
+        "id": 10094
+      },
+      "writtenOn": "2016-04-26T14:16:53Z",
+      "side": 1,
+      "message": "if you\u0027re changing it, you might as well fix the formatting.",
+      "range": {
+        "startLine": 49,
+        "startChar": 0,
+        "endLine": 49,
+        "endChar": 12
+      },
+      "revId": "9d35dee4bccd2cd42f92d52933b7b2dbcd115733",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_353b25d2",
+        "filename": "services/audiopolicy/service/AudioPolicyEffects.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 93,
+      "author": {
+        "id": 10094
+      },
+      "writtenOn": "2016-04-26T14:16:53Z",
+      "side": 1,
+      "message": "IMO, it\u0027s not useful to have default parameters here.  The defaults don\u0027t really seem valid and could only cause issues.",
+      "range": {
+        "startLine": 92,
+        "startChar": 29,
+        "endLine": 93,
+        "endChar": 79
+      },
+      "revId": "9d35dee4bccd2cd42f92d52933b7b2dbcd115733",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
