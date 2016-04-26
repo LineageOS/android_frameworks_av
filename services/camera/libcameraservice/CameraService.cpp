@@ -444,6 +444,12 @@ status_t CameraService::getCameraInfo(int cameraId,
         mModule->getCameraInfo(cameraId, &info));
     cameraInfo->facing = info.facing;
     cameraInfo->orientation = info.orientation;
+    // CameraInfo is for android.hardware.Camera which does not
+    // support external camera facing. The closest approximation would be
+    // front camera.
+    if (cameraInfo->orientation == CAMERA_FACING_EXTERNAL) {
+        cameraInfo->orientation = CAMERA_FACING_FRONT;
+    }
     return rc;
 }
 
