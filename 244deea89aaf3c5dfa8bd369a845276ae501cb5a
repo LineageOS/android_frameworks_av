@@ -16,6 +16,23 @@
       "revId": "244deea89aaf3c5dfa8bd369a845276ae501cb5a",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_61a47b09",
+        "filename": "services/audiopolicy/service/AudioPolicyService.cpp",
+        "patchSetId": 12
+      },
+      "lineNbr": 304,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-04-27T18:11:07Z",
+      "side": 0,
+      "message": "unneeded whitespace change",
+      "revId": "244deea89aaf3c5dfa8bd369a845276ae501cb5a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
