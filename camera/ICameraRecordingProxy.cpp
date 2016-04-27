@@ -35,7 +35,7 @@ enum {
 class BpCameraRecordingProxy: public BpInterface<ICameraRecordingProxy>
 {
 public:
-    BpCameraRecordingProxy(const sp<IBinder>& impl)
+    explicit BpCameraRecordingProxy(const sp<IBinder>& impl)
         : BpInterface<ICameraRecordingProxy>(impl)
     {
     }

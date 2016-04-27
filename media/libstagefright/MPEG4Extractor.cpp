@@ -172,7 +172,7 @@ private:
 // Each MPEG4DataSource caches the sampletable metadata for a single track.
 
 struct MPEG4DataSource : public DataSource {
-    MPEG4DataSource(const sp<DataSource> &source);
+    explicit MPEG4DataSource(const sp<DataSource> &source);
 
     virtual status_t initCheck() const;
     virtual ssize_t readAt(off64_t offset, void *data, size_t size);

@@ -31,7 +31,7 @@ enum {
 class BpResourceManagerClient: public BpInterface<IResourceManagerClient>
 {
 public:
-    BpResourceManagerClient(const sp<IBinder> &impl)
+    explicit BpResourceManagerClient(const sp<IBinder> &impl)
         : BpInterface<IResourceManagerClient>(impl)
     {
     }

@@ -48,7 +48,7 @@ const int32_t ICommonClock::kErrorEstimateUnknown = 0x7FFFFFFF;
 class BpCommonClock : public BpInterface<ICommonClock>
 {
   public:
-    BpCommonClock(const sp<IBinder>& impl)
+    explicit BpCommonClock(const sp<IBinder>& impl)
         : BpInterface<ICommonClock>(impl) {}
 
     virtual status_t isCommonTimeValid(bool* valid, uint32_t* timelineID) {
@@ -401,7 +401,7 @@ enum {
 class BpCommonClockListener : public BpInterface<ICommonClockListener>
 {
   public:
-    BpCommonClockListener(const sp<IBinder>& impl)
+    explicit BpCommonClockListener(const sp<IBinder>& impl)
         : BpInterface<ICommonClockListener>(impl) {}
 
     virtual void onTimelineChanged(uint64_t timelineID) {

@@ -32,7 +32,7 @@ enum {
 class BpSchedulingPolicyService : public BpInterface<ISchedulingPolicyService>
 {
 public:
-    BpSchedulingPolicyService(const sp<IBinder>& impl)
+    explicit BpSchedulingPolicyService(const sp<IBinder>& impl)
         : BpInterface<ISchedulingPolicyService>(impl)
     {
     }

@@ -46,7 +46,7 @@ extern "C" {
 namespace android {
 
 struct OggSource : public MediaSource {
-    OggSource(const sp<OggExtractor> &extractor);
+    explicit OggSource(const sp<OggExtractor> &extractor);
 
     virtual sp<MetaData> getFormat();
 
@@ -164,7 +164,7 @@ protected:
 };
 
 struct MyVorbisExtractor : public MyOggExtractor {
-    MyVorbisExtractor(const sp<DataSource> &source)
+    explicit MyVorbisExtractor(const sp<DataSource> &source)
         : MyOggExtractor(source,
                 MEDIA_MIMETYPE_AUDIO_VORBIS,
                 /* numHeaders */ 3,
@@ -192,7 +192,7 @@ struct MyOpusExtractor : public MyOggExtractor {
     static const int32_t kOpusSampleRate = 48000;
     static const int64_t kOpusSeekPreRollUs = 80000; // 80 ms
 
-    MyOpusExtractor(const sp<DataSource> &source)
+    explicit MyOpusExtractor(const sp<DataSource> &source)
         : MyOggExtractor(source, MEDIA_MIMETYPE_AUDIO_OPUS, /*numHeaders*/ 2, kOpusSeekPreRollUs),
           mChannelCount(0),
           mCodecDelay(0),
