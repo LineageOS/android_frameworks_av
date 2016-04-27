@@ -304,8 +304,9 @@ void NuPlayer::HTTPLiveSource::onSessionNotify(const sp<AMessage> &msg) {
                 notifyVideoSizeChanged();
             }
 
-            uint32_t flags = FLAG_CAN_PAUSE;
+            uint32_t flags = 0;
             if (mLiveSession->isSeekable()) {
+                flags |= FLAG_CAN_PAUSE;
                 flags |= FLAG_CAN_SEEK;
                 flags |= FLAG_CAN_SEEK_BACKWARD;
                 flags |= FLAG_CAN_SEEK_FORWARD;
