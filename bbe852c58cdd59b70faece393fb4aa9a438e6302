@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5faad753_c69f85b2",
+        "filename": "services/audiopolicy/Android.mk",
+        "patchSetId": 11
+      },
+      "lineNbr": 53,
+      "author": {
+        "id": 10094
+      },
+      "writtenOn": "2016-04-27T13:11:25Z",
+      "side": 1,
+      "message": "You sure you want to change this?",
+      "range": {
+        "startLine": 53,
+        "startChar": 35,
+        "endLine": 53,
+        "endChar": 50
+      },
+      "revId": "bbe852c58cdd59b70faece393fb4aa9a438e6302",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_66a49109",
+        "filename": "services/audiopolicy/service/AudioPolicyEffects.cpp",
+        "patchSetId": 11
+      },
+      "lineNbr": 349,
+      "author": {
+        "id": 10094
+      },
+      "writtenOn": "2016-04-27T13:11:25Z",
+      "side": 1,
+      "message": "shouldn\u0027t this require an onOutputSessionEffectsUpdate?  Without it, the app must poll the session info because it can change out from under them with no notification.",
+      "range": {
+        "startLine": 347,
+        "startChar": 0,
+        "endLine": 349,
+        "endChar": 41
+      },
+      "revId": "bbe852c58cdd59b70faece393fb4aa9a438e6302",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
