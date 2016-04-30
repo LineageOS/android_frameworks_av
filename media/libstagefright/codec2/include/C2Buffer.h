@@ -223,7 +223,11 @@ public:
      *
      * \return acquired object potentially invalidated if waiting for the fence failed.
      */
-    T get();
+    T get() {
+        // TODO:
+        // wait();
+        return mT;
+    }
 
 protected:
     C2Acquirable(C2Error error, C2Fence fence, T t) : C2Fence(fence), mInitialError(error), mT(t) { }
@@ -268,7 +272,7 @@ protected:
         : mCapacity(parent == nullptr ? 0 : parent->capacity()) { }
 
 private:
-    const uint32_t mCapacity;
+    uint32_t mCapacity;
 /// @}
 };
 
@@ -429,7 +433,7 @@ public:
     /**
      * \return pointer to the start of the block or nullptr on error.
      */
-    const uint8_t *data();
+    const uint8_t *data() const;
 
     /**
      * Returns a portion of this view.
@@ -446,6 +450,10 @@ public:
      * \return error during the creation/mapping of this view.
      */
     C2Error error();
+
+protected:
+    C2ReadView(const _C2LinearCapacityAspect *parent, const uint8_t *data);
+    explicit C2ReadView(C2Error error);
 
 private:
     class Impl;
@@ -475,6 +483,10 @@ public:
      * \return error during the creation/mapping of this view.
      */
     C2Error error();
+
+protected:
+    C2WriteView(const _C2LinearRangeAspect *parent, uint8_t *base);
+    explicit C2WriteView(C2Error error);
 
 private:
     class Impl;
@@ -516,7 +528,13 @@ public:
      */
     C2Fence fence() const { return mFence; }
 
+protected:
+    C2ConstLinearBlock(std::shared_ptr<C2LinearAllocation> alloc);
+    C2ConstLinearBlock(std::shared_ptr<C2LinearAllocation> alloc, size_t offset, size_t size);
+
 private:
+    class Impl;
+    std::shared_ptr<Impl> mImpl;
     C2Fence mFence;
 };
 
@@ -544,6 +562,14 @@ public:
      *    The block shall be modified only until firing the event for the fence.
      */
     C2ConstLinearBlock share(size_t offset, size_t size, C2Fence fence);
+
+protected:
+    C2LinearBlock(std::shared_ptr<C2LinearAllocation> alloc);
+    C2LinearBlock(std::shared_ptr<C2LinearAllocation> alloc, size_t offset, size_t size);
+
+private:
+    class Impl;
+    std::shared_ptr<Impl> mImpl;
 };
 
 /// @}

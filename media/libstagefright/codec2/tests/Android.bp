@@ -6,6 +6,7 @@ cc_test {
     ],
 
     srcs: [
+        "vndk/C2BufferTest.cpp",
         "vndk/C2UtilTest.cpp",
         "C2_test.cpp",
         "C2Param_test.cpp",
@@ -21,6 +22,16 @@ cc_test {
         "libcutils",
         "liblog",
         "libstagefright_codec2",
+        "libcutils",
+        "libhidlbase",
+        "libion",
+        "liblog",
+        "libstagefright_codec2",
+        "libutils",
+    ],
+
+    static_libs: [
+        "libstagefright_codec2_vndk",
     ],
 
     cflags: [

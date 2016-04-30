@@ -672,11 +672,11 @@ private:
     Primitive mValue;
 };
 
-template<> const int32_t &C2Value::Primitive::ref<int32_t>() const { return i32; }
-template<> const int64_t &C2Value::Primitive::ref<int64_t>() const { return i64; }
-template<> const uint32_t &C2Value::Primitive::ref<uint32_t>() const { return u32; }
-template<> const uint64_t &C2Value::Primitive::ref<uint64_t>() const { return u64; }
-template<> const float &C2Value::Primitive::ref<float>() const { return fp; }
+template<> inline const int32_t &C2Value::Primitive::ref<int32_t>() const { return i32; }
+template<> inline const int64_t &C2Value::Primitive::ref<int64_t>() const { return i64; }
+template<> inline const uint32_t &C2Value::Primitive::ref<uint32_t>() const { return u32; }
+template<> inline const uint64_t &C2Value::Primitive::ref<uint64_t>() const { return u64; }
+template<> inline const float &C2Value::Primitive::ref<float>() const { return fp; }
 
 template<> constexpr C2Value::Type C2Value::typeFor<int32_t>() { return INT32; }
 template<> constexpr C2Value::Type C2Value::typeFor<int64_t>() { return INT64; }
