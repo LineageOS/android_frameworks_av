@@ -48,7 +48,7 @@ static size_t kMaxNodeInstances = (1 << 16);
 // Note that deriving CallbackDispatcher from Thread does not work.
 
 struct OMX::CallbackDispatcherThread : public Thread {
-    CallbackDispatcherThread(CallbackDispatcher *dispatcher)
+    explicit CallbackDispatcherThread(CallbackDispatcher *dispatcher)
         : mDispatcher(dispatcher) {
     }
 
@@ -64,7 +64,7 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 
 struct OMX::CallbackDispatcher : public RefBase {
-    CallbackDispatcher(OMXNodeInstance *owner);
+    explicit CallbackDispatcher(OMXNodeInstance *owner);
 
     // Posts |msg| to the listener's queue. If |realTime| is true, the listener thread is notified
     // that a new message is available on the queue. Otherwise, the message stays on the queue, but

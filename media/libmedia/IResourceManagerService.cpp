@@ -58,7 +58,7 @@ static void readFromParcel(const Parcel &data, Vector<T> *items) {
 class BpResourceManagerService : public BpInterface<IResourceManagerService>
 {
 public:
-    BpResourceManagerService(const sp<IBinder> &impl)
+    explicit BpResourceManagerService(const sp<IBinder> &impl)
         : BpInterface<IResourceManagerService>(impl)
     {
     }

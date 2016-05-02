@@ -37,7 +37,7 @@ enum {
 class BpAudioRecord : public BpInterface<IAudioRecord>
 {
 public:
-    BpAudioRecord(const sp<IBinder>& impl)
+    explicit BpAudioRecord(const sp<IBinder>& impl)
         : BpInterface<IAudioRecord>(impl)
     {
     }

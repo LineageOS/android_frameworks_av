@@ -65,7 +65,7 @@ static const int kMaxRetry = 2;
 static const int kMaxReclaimWaitTimeInUs = 500000;  // 0.5s
 
 struct ResourceManagerClient : public BnResourceManagerClient {
-    ResourceManagerClient(MediaCodec* codec) : mMediaCodec(codec) {}
+    explicit ResourceManagerClient(MediaCodec* codec) : mMediaCodec(codec) {}
 
     virtual bool reclaimResource() {
         sp<MediaCodec> codec = mMediaCodec.promote();

@@ -26,7 +26,8 @@ namespace android {
 
 class BpCameraServiceProxy: public BpInterface<ICameraServiceProxy> {
 public:
-    BpCameraServiceProxy(const sp<IBinder>& impl) : BpInterface<ICameraServiceProxy>(impl) {}
+    explicit BpCameraServiceProxy(const sp<IBinder>& impl)
+        : BpInterface<ICameraServiceProxy>(impl) {}
 
     virtual void pingForUserUpdate() {
         Parcel data;

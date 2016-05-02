@@ -31,7 +31,7 @@
 namespace android {
 
 struct PageCache {
-    PageCache(size_t pageSize);
+    explicit PageCache(size_t pageSize);
     ~PageCache();
 
     struct Page {
