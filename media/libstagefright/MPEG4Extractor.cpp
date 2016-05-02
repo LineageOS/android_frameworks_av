@@ -781,6 +781,10 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         ALOGE("b/23540914");
         return ERROR_MALFORMED;
     }
+    if (depth > 100) {
+        ALOGE("b/27456299");
+        return ERROR_MALFORMED;
+    }
     uint32_t hdr[2];
     if (mDataSource->readAt(*offset, hdr, 8) < 8) {
         return ERROR_IO;
