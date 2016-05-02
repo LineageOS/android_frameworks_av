@@ -37,7 +37,7 @@ enum {
 class BpSoundTrigger: public BpInterface<ISoundTrigger>
 {
 public:
-    BpSoundTrigger(const sp<IBinder>& impl)
+    explicit BpSoundTrigger(const sp<IBinder>& impl)
         : BpInterface<ISoundTrigger>(impl)
     {
     }

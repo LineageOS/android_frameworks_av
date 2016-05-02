@@ -37,7 +37,7 @@ class BpCameraServiceListener: public BpInterface<ICameraServiceListener>
 {
 
 public:
-    BpCameraServiceListener(const sp<IBinder>& impl)
+    explicit BpCameraServiceListener(const sp<IBinder>& impl)
         : BpInterface<ICameraServiceListener>(impl)
     {
     }

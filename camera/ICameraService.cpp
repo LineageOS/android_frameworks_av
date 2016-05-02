@@ -89,7 +89,7 @@ static bool readExceptionCode(Parcel& reply) {
 class BpCameraService: public BpInterface<ICameraService>
 {
 public:
-    BpCameraService(const sp<IBinder>& impl)
+    explicit BpCameraService(const sp<IBinder>& impl)
         : BpInterface<ICameraService>(impl)
     {
     }

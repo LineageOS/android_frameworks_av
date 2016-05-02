@@ -61,7 +61,7 @@ enum {
 
 class BpOMX : public BpInterface<IOMX> {
 public:
-    BpOMX(const sp<IBinder> &impl)
+    explicit BpOMX(const sp<IBinder> &impl)
         : BpInterface<IOMX>(impl) {
     }
 
@@ -1079,7 +1079,7 @@ status_t BnOMX::onTransact(
 
 class BpOMXObserver : public BpInterface<IOMXObserver> {
 public:
-    BpOMXObserver(const sp<IBinder> &impl)
+    explicit BpOMXObserver(const sp<IBinder> &impl)
         : BpInterface<IOMXObserver>(impl) {
     }
 

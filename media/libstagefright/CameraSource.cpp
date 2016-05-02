@@ -44,7 +44,7 @@ namespace android {
 static const int64_t CAMERA_SOURCE_TIMEOUT_NS = 3000000000LL;
 
 struct CameraSourceListener : public CameraListener {
-    CameraSourceListener(const sp<CameraSource> &source);
+    explicit CameraSourceListener(const sp<CameraSource> &source);
 
     virtual void notify(int32_t msgType, int32_t ext1, int32_t ext2);
     virtual void postData(int32_t msgType, const sp<IMemory> &dataPtr,

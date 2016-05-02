@@ -37,7 +37,7 @@ enum {
 };
 
 struct BpHDCPObserver : public BpInterface<IHDCPObserver> {
-    BpHDCPObserver(const sp<IBinder> &impl)
+    explicit BpHDCPObserver(const sp<IBinder> &impl)
         : BpInterface<IHDCPObserver>(impl) {
     }
 
@@ -58,7 +58,7 @@ struct BpHDCPObserver : public BpInterface<IHDCPObserver> {
 IMPLEMENT_META_INTERFACE(HDCPObserver, "android.hardware.IHDCPObserver");
 
 struct BpHDCP : public BpInterface<IHDCP> {
-    BpHDCP(const sp<IBinder> &impl)
+    explicit BpHDCP(const sp<IBinder> &impl)
         : BpInterface<IHDCP>(impl) {
     }
 
