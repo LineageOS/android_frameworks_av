@@ -39,7 +39,7 @@ enum {
 };
 
 struct BpCrypto : public BpInterface<ICrypto> {
-    BpCrypto(const sp<IBinder> &impl)
+    explicit BpCrypto(const sp<IBinder> &impl)
         : BpInterface<ICrypto>(impl) {
     }
 

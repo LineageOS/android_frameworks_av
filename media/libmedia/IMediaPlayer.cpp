@@ -72,7 +72,7 @@ enum {
 class BpMediaPlayer: public BpInterface<IMediaPlayer>
 {
 public:
-    BpMediaPlayer(const sp<IBinder>& impl)
+    explicit BpMediaPlayer(const sp<IBinder>& impl)
         : BpInterface<IMediaPlayer>(impl)
     {
     }

@@ -35,7 +35,7 @@
 namespace android {
 
 struct MPEG2TSWriter::SourceInfo : public AHandler {
-    SourceInfo(const sp<IMediaSource> &source);
+    explicit SourceInfo(const sp<IMediaSource> &source);
 
     void start(const sp<AMessage> &notify);
     void stop();

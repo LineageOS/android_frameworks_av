@@ -45,7 +45,7 @@ using namespace android;
 
 struct MyStreamSource : public BnStreamSource {
     // Object assumes ownership of fd.
-    MyStreamSource(int fd);
+    explicit MyStreamSource(int fd);
 
     virtual void setListener(const sp<IStreamListener> &listener);
     virtual void setBuffers(const Vector<sp<IMemory> > &buffers);
@@ -125,7 +125,7 @@ void MyStreamSource::onBufferAvailable(size_t index) {
 ////////////////////////////////////////////////////////////////////////////////
 
 struct MyConvertingStreamSource : public BnStreamSource {
-    MyConvertingStreamSource(const char *filename);
+    explicit MyConvertingStreamSource(const char *filename);
 
     virtual void setListener(const sp<IStreamListener> &listener);
     virtual void setBuffers(const Vector<sp<IMemory> > &buffers);

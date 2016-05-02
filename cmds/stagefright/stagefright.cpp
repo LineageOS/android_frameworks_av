@@ -401,7 +401,7 @@ static void playSource(sp<IMediaSource> &source) {
 ////////////////////////////////////////////////////////////////////////////////
 
 struct DetectSyncSource : public MediaSource {
-    DetectSyncSource(const sp<IMediaSource> &source);
+    explicit DetectSyncSource(const sp<IMediaSource> &source);
 
     virtual status_t start(MetaData *params = NULL);
     virtual status_t stop();
