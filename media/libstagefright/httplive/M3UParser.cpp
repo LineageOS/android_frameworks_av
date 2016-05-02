@@ -46,7 +46,7 @@ struct M3UParser::MediaGroup : public RefBase {
         FLAG_HAS_URI            = 16,
     };
 
-    MediaGroup(Type type);
+    explicit MediaGroup(Type type);
 
     Type type() const;
 

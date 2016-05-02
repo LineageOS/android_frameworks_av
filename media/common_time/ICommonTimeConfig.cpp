@@ -50,7 +50,7 @@ const String16 ICommonTimeConfig::kServiceName("common_time.config");
 class BpCommonTimeConfig : public BpInterface<ICommonTimeConfig>
 {
   public:
-    BpCommonTimeConfig(const sp<IBinder>& impl)
+    explicit BpCommonTimeConfig(const sp<IBinder>& impl)
         : BpInterface<ICommonTimeConfig>(impl) {}
 
     virtual status_t getMasterElectionPriority(uint8_t *priority) {

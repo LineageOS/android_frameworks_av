@@ -52,7 +52,7 @@ inline void writeAudioConfigBaseToParcel(Parcel& data, const audio_config_base_t
 class BpAudioPolicyServiceClient : public BpInterface<IAudioPolicyServiceClient>
 {
 public:
-    BpAudioPolicyServiceClient(const sp<IBinder>& impl)
+    explicit BpAudioPolicyServiceClient(const sp<IBinder>& impl)
         : BpInterface<IAudioPolicyServiceClient>(impl)
     {
     }

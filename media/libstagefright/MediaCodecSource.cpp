@@ -47,7 +47,7 @@ const int32_t kDefaultVideoEncoderDataSpace = HAL_DATASPACE_V0_BT709;
 const int kStopTimeoutUs = 300000; // allow 1 sec for shutting down encoder
 
 struct MediaCodecSource::Puller : public AHandler {
-    Puller(const sp<MediaSource> &source);
+    explicit Puller(const sp<MediaSource> &source);
 
     void interruptSource();
     status_t start(const sp<MetaData> &meta, const sp<AMessage> &notify);

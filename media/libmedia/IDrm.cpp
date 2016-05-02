@@ -59,7 +59,7 @@ enum {
 };
 
 struct BpDrm : public BpInterface<IDrm> {
-    BpDrm(const sp<IBinder> &impl)
+    explicit BpDrm(const sp<IBinder> &impl)
         : BpInterface<IDrm>(impl) {
     }
 

@@ -38,7 +38,7 @@ enum {
 class BpMediaCodecList: public BpInterface<IMediaCodecList>
 {
 public:
-    BpMediaCodecList(const sp<IBinder>& impl)
+    explicit BpMediaCodecList(const sp<IBinder>& impl)
         : BpInterface<IMediaCodecList>(impl)
     {
     }
