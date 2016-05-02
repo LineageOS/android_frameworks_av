@@ -54,7 +54,7 @@ enum {
 class BpCamera: public BpInterface<ICamera>
 {
 public:
-    BpCamera(const sp<IBinder>& impl)
+    explicit BpCamera(const sp<IBinder>& impl)
         : BpInterface<ICamera>(impl)
     {
     }

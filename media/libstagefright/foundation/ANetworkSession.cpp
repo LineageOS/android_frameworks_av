@@ -53,7 +53,7 @@ static const size_t kMaxUDPSize = 1500;
 static const int32_t kMaxUDPRetries = 200;
 
 struct ANetworkSession::NetworkThread : public Thread {
-    NetworkThread(ANetworkSession *session);
+    explicit NetworkThread(ANetworkSession *session);
 
 protected:
     virtual ~NetworkThread();

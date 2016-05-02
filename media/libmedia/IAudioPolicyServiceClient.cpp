@@ -36,7 +36,7 @@ enum {
 class BpAudioPolicyServiceClient : public BpInterface<IAudioPolicyServiceClient>
 {
 public:
-    BpAudioPolicyServiceClient(const sp<IBinder>& impl)
+    explicit BpAudioPolicyServiceClient(const sp<IBinder>& impl)
         : BpInterface<IAudioPolicyServiceClient>(impl)
     {
     }

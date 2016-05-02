@@ -45,7 +45,7 @@ enum {
 class BpRadioService: public BpInterface<IRadioService>
 {
 public:
-    BpRadioService(const sp<IBinder>& impl)
+    explicit BpRadioService(const sp<IBinder>& impl)
         : BpInterface<IRadioService>(impl)
     {
     }

@@ -35,7 +35,7 @@ class BpSoundTriggerClient: public BpInterface<ISoundTriggerClient>
 {
 
 public:
-    BpSoundTriggerClient(const sp<IBinder>& impl)
+    explicit BpSoundTriggerClient(const sp<IBinder>& impl)
         : BpInterface<ISoundTriggerClient>(impl)
     {
     }

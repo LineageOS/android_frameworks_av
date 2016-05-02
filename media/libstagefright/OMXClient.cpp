@@ -34,7 +34,7 @@
 namespace android {
 
 struct MuxOMX : public IOMX {
-    MuxOMX(const sp<IOMX> &remoteOMX);
+    explicit MuxOMX(const sp<IOMX> &remoteOMX);
     virtual ~MuxOMX();
 
     virtual IBinder *onAsBinder() { return IInterface::asBinder(mRemoteOMX).get(); }

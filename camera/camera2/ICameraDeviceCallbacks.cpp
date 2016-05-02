@@ -43,7 +43,7 @@ enum {
 class BpCameraDeviceCallbacks: public BpInterface<ICameraDeviceCallbacks>
 {
 public:
-    BpCameraDeviceCallbacks(const sp<IBinder>& impl)
+    explicit BpCameraDeviceCallbacks(const sp<IBinder>& impl)
         : BpInterface<ICameraDeviceCallbacks>(impl)
     {
     }

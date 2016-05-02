@@ -33,7 +33,7 @@ class BpRadioClient: public BpInterface<IRadioClient>
 {
 
 public:
-    BpRadioClient(const sp<IBinder>& impl)
+    explicit BpRadioClient(const sp<IBinder>& impl)
         : BpInterface<IRadioClient>(impl)
     {
     }

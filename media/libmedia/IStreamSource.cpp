@@ -51,7 +51,7 @@ enum {
 };
 
 struct BpStreamSource : public BpInterface<IStreamSource> {
-    BpStreamSource(const sp<IBinder> &impl)
+    explicit BpStreamSource(const sp<IBinder> &impl)
         : BpInterface<IStreamSource>(impl) {
     }
 
@@ -141,7 +141,7 @@ status_t BnStreamSource::onTransact(
 ////////////////////////////////////////////////////////////////////////////////
 
 struct BpStreamListener : public BpInterface<IStreamListener> {
-    BpStreamListener(const sp<IBinder> &impl)
+    explicit BpStreamListener(const sp<IBinder> &impl)
         : BpInterface<IStreamListener>(impl) {
     }
 
