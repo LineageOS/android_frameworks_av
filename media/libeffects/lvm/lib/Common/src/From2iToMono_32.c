@@ -46,5 +46,27 @@ void From2iToMono_32( const LVM_INT32 *src,
 
     return;
 }
+#ifdef BUILD_FLOAT
+void From2iToMono_Float( const LVM_FLOAT *src,
+                         LVM_FLOAT *dst,
+                         LVM_INT16 n)
+{
+    LVM_INT16 ii;
+    LVM_FLOAT Temp;
 
+    for (ii = n; ii != 0; ii--)
+    {
+        Temp = (*src);
+        src++;
+
+        Temp += (*src);
+        src++;
+
+        *dst = Temp / 2.0f;
+        dst++;
+    }
+
+    return;
+}
+#endif
 /**********************************************************************************/

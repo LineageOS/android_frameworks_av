@@ -43,6 +43,96 @@
 /*  otherwise           Error due to bad parameters                                 */
 /*                                                                                  */
 /************************************************************************************/
+#ifdef BUILD_FLOAT
+LVPSA_RETURN LVPSA_Process           ( pLVPSA_Handle_t      hInstance,
+                                       LVM_FLOAT           *pLVPSA_InputSamples,
+                                       LVM_UINT16           InputBlockSize,
+                                       LVPSA_Time           AudioTime            )
+
+{
+    LVPSA_InstancePr_t     *pLVPSA_Inst = (LVPSA_InstancePr_t*)hInstance;
+    LVM_FLOAT               *pScratch;
+    LVM_INT16               ii;
+    LVM_INT32               AudioTimeInc;
+    extern LVM_UINT32       LVPSA_SampleRateInvTab[];
+    LVM_UINT8               *pWrite_Save;         /* Position of the write pointer
+                                                     at the beginning of the process  */
+
+    /******************************************************************************
+       CHECK PARAMETERS
+    *******************************************************************************/
+    if(hInstance == LVM_NULL || pLVPSA_InputSamples == LVM_NULL)
+    {
+        return(LVPSA_ERROR_NULLADDRESS);
+    }
+    if(InputBlockSize == 0 || InputBlockSize > pLVPSA_Inst->MaxInputBlockSize)
+    {
+        return(LVPSA_ERROR_INVALIDPARAM);
+    }
+
+    pScratch = (LVM_FLOAT*)pLVPSA_Inst->MemoryTable.Region[LVPSA_MEMREGION_SCRATCH].pBaseAddress;
+    pWrite_Save = pLVPSA_Inst->pSpectralDataBufferWritePointer;
+
+    /******************************************************************************
+       APPLY NEW SETTINGS IF NEEDED
+    *******************************************************************************/
+    if (pLVPSA_Inst->bControlPending == LVM_TRUE)
+    {
+        pLVPSA_Inst->bControlPending = 0;
+        LVPSA_ApplyNewSettings( pLVPSA_Inst);
+    }
+
+    /******************************************************************************
+       PROCESS SAMPLES
+    *******************************************************************************/
+    /* Put samples in range [-0.5;0.5[ for BP filters (see Biquads documentation) */
+    Copy_Float(pLVPSA_InputSamples, pScratch, (LVM_INT16)InputBlockSize);
+    Shift_Sat_Float(-1, pScratch, pScratch, (LVM_INT16)InputBlockSize);
+
+    for (ii = 0; ii < pLVPSA_Inst->nRelevantFilters; ii++)
+    {
+        switch(pLVPSA_Inst->pBPFiltersPrecision[ii])
+        {
+            case LVPSA_SimplePrecisionFilter:
+                BP_1I_D16F16C14_TRC_WRA_01  ( &pLVPSA_Inst->pBP_Instances[ii],
+                                              pScratch,
+                                              pScratch + InputBlockSize,
+                                              (LVM_INT16)InputBlockSize);
+                break;
+
+            case LVPSA_DoublePrecisionFilter:
+                BP_1I_D16F32C30_TRC_WRA_01  ( &pLVPSA_Inst->pBP_Instances[ii],
+                                              pScratch,
+                                              pScratch + InputBlockSize,
+                                              (LVM_INT16)InputBlockSize);
+                break;
+            default:
+                break;
+        }
+
+
+        LVPSA_QPD_Process_Float   ( pLVPSA_Inst,
+                                    pScratch + InputBlockSize,
+                                    (LVM_INT16)InputBlockSize,
+                                    ii);
+    }
+
+    /******************************************************************************
+       UPDATE SpectralDataBufferAudioTime
+    *******************************************************************************/
+
+    if(pLVPSA_Inst->pSpectralDataBufferWritePointer != pWrite_Save)
+    {
+        MUL32x32INTO32((AudioTime + (LVM_INT32)((LVM_INT32)pLVPSA_Inst->LocalSamplesCount*1000)),
+                        (LVM_INT32)LVPSA_SampleRateInvTab[pLVPSA_Inst->CurrentParams.Fs],
+                        AudioTimeInc,
+                        LVPSA_FsInvertShift)
+        pLVPSA_Inst->SpectralDataBufferAudioTime = AudioTime + AudioTimeInc;
+    }
+
+    return(LVPSA_OK);
+}
+#else
 LVPSA_RETURN LVPSA_Process           ( pLVPSA_Handle_t      hInstance,
                                        LVM_INT16           *pLVPSA_InputSamples,
                                        LVM_UINT16           InputBlockSize,
@@ -130,7 +220,7 @@ LVPSA_RETURN LVPSA_Process           ( pLVPSA_Handle_t      hInstance,
 
     return(LVPSA_OK);
 }
-
+#endif
 
 /************************************************************************************/
 /*                                                                                  */

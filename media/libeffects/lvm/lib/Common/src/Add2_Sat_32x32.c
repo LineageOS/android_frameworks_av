@@ -57,4 +57,33 @@ void Add2_Sat_32x32( const LVM_INT32  *src,
     return;
 }
 
+#ifdef BUILD_FLOAT
+void Add2_Sat_Float( const LVM_FLOAT  *src,
+                           LVM_FLOAT  *dst,
+                           LVM_INT16  n )
+{
+    LVM_FLOAT Temp;
+    LVM_INT16 ii;
+    for (ii = n; ii != 0; ii--)
+    {
+        Temp = ((LVM_FLOAT) *src) + ((LVM_FLOAT) *dst);
+        src++;
+
+        if (Temp > 1.000000f)
+        {
+            *dst = 1.000000f;
+        }
+        else if (Temp < -1.000000f)
+        {
+            *dst = -1.000000f;
+        }
+        else
+        {
+            *dst = Temp;
+        }
+        dst++;
+    }
+    return;
+}
+#endif
 /**********************************************************************************/

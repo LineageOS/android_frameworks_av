@@ -34,7 +34,12 @@ extern "C" {
 /*######################################################################################*/
 
 /* Absolute value including the corner case for the extreme negative value */
+
+#ifdef BUILD_FLOAT
+LVM_FLOAT   Abs_Float(LVM_FLOAT     input);
+#else
 LVM_INT32   Abs_32(LVM_INT32     input);
+#endif
 
 /****************************************************************************************
  *  Name        : dB_to_Lin32()
@@ -48,8 +53,11 @@ LVM_INT32   Abs_32(LVM_INT32     input);
  *                  (15->01) = decimal part
  *  Returns     : Lin value format 1.16.15
  ****************************************************************************************/
-
+#ifdef BUILD_FLOAT
+LVM_FLOAT dB_to_LinFloat(LVM_INT16    db_fix);
+#else
 LVM_INT32 dB_to_Lin32(LVM_INT16  db_fix);
+#endif
 
 #ifdef __cplusplus
 }

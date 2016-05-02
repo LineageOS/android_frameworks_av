@@ -47,5 +47,23 @@ void Mult3s_32x16( const LVM_INT32 *src,
 
     return;
 }
+#ifdef BUILD_FLOAT
+void Mult3s_Float( const LVM_FLOAT *src,
+                   const LVM_FLOAT val,
+                   LVM_FLOAT *dst,
+                   LVM_INT16 n)
+{
+    LVM_INT16 ii;
+    LVM_FLOAT temp;
 
+    for (ii = n; ii != 0; ii--)
+    {
+        temp = (*src) * val;
+        src++;
+        *dst = temp;
+        dst++;
+    }
+    return;
+}
+#endif
 /**********************************************************************************/

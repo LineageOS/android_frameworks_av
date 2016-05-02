@@ -216,11 +216,17 @@ LVPSA_RETURN LVPSA_Control           ( pLVPSA_Handle_t             hInstance,
 /*  otherwise           Error due to bad parameters                                                                              */
 /*                                                                                                                               */
 /*********************************************************************************************************************************/
+#ifdef BUILD_FLOAT
+LVPSA_RETURN LVPSA_Process           ( pLVPSA_Handle_t      hInstance,
+                                       LVM_FLOAT           *pLVPSA_InputSamples,
+                                       LVM_UINT16           InputBlockSize,
+                                       LVPSA_Time           AudioTime             );
+#else
 LVPSA_RETURN LVPSA_Process           ( pLVPSA_Handle_t      hInstance,
                                        LVM_INT16           *pLVPSA_InputSamples,
                                        LVM_UINT16           InputBlockSize,
                                        LVPSA_Time           AudioTime             );
-
+#endif
 /*********************************************************************************************************************************/
 /*                                                                                                                               */
 /* FUNCTION:            LVPSA_GetSpectrum                                                                                        */

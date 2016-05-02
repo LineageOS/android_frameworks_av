@@ -106,7 +106,11 @@ LVPSA_RETURN LVPSA_Memory            ( pLVPSA_Handle_t             hInstance,
          */
 
         InstAlloc_AddMember( &Instance, sizeof(LVPSA_InstancePr_t) );
+#ifdef BUILD_FLOAT
+        InstAlloc_AddMember( &Instance, pInitParams->nBands * sizeof(LVM_FLOAT) );
+#else
         InstAlloc_AddMember( &Instance, pInitParams->nBands * sizeof(LVM_UINT16) );
+#endif
         InstAlloc_AddMember( &Instance, pInitParams->nBands * sizeof(LVPSA_FilterParam_t) );
 
         {
@@ -134,7 +138,11 @@ LVPSA_RETURN LVPSA_Memory            ( pLVPSA_Handle_t             hInstance,
         /*
          * Scratch memory
          */
+#ifndef BUILD_FLOAT
         InstAlloc_AddMember( &Scratch, 2 * pInitParams->MaxInputBlockSize * sizeof(LVM_INT16) );
+#else
+        InstAlloc_AddMember( &Scratch, 2 * pInitParams->MaxInputBlockSize * sizeof(LVM_FLOAT) );
+#endif
         pMemoryTable->Region[LVPSA_MEMREGION_SCRATCH].Size         = InstAlloc_GetTotal(&Scratch);
         pMemoryTable->Region[LVPSA_MEMREGION_SCRATCH].Type         = LVPSA_SCRATCH;
         pMemoryTable->Region[LVPSA_MEMREGION_SCRATCH].pBaseAddress = LVM_NULL;
@@ -142,8 +150,13 @@ LVPSA_RETURN LVPSA_Memory            ( pLVPSA_Handle_t             hInstance,
         /*
          * Persistent coefficients memory
          */
+#ifndef BUILD_FLOAT
         InstAlloc_AddMember( &Coef, pInitParams->nBands * sizeof(Biquad_Instance_t) );
         InstAlloc_AddMember( &Coef, pInitParams->nBands * sizeof(QPD_State_t) );
+#else
+        InstAlloc_AddMember( &Coef, pInitParams->nBands * sizeof(Biquad_FLOAT_Instance_t) );
+        InstAlloc_AddMember( &Coef, pInitParams->nBands * sizeof(QPD_FLOAT_State_t) );
+#endif
         pMemoryTable->Region[LVPSA_MEMREGION_PERSISTENT_COEF].Size         = InstAlloc_GetTotal(&Coef);
         pMemoryTable->Region[LVPSA_MEMREGION_PERSISTENT_COEF].Type         = LVPSA_PERSISTENT_COEF;
         pMemoryTable->Region[LVPSA_MEMREGION_PERSISTENT_COEF].pBaseAddress = LVM_NULL;
@@ -151,8 +164,13 @@ LVPSA_RETURN LVPSA_Memory            ( pLVPSA_Handle_t             hInstance,
         /*
          * Persistent data memory
          */
+#ifndef BUILD_FLOAT
         InstAlloc_AddMember( &Data, pInitParams->nBands * sizeof(Biquad_1I_Order2_Taps_t) );
         InstAlloc_AddMember( &Data, pInitParams->nBands * sizeof(QPD_Taps_t) );
+#else
+        InstAlloc_AddMember( &Data, pInitParams->nBands * sizeof(Biquad_1I_Order2_FLOAT_Taps_t) );
+        InstAlloc_AddMember( &Data, pInitParams->nBands * sizeof(QPD_FLOAT_Taps_t) );
+#endif
         pMemoryTable->Region[LVPSA_MEMREGION_PERSISTENT_DATA].Size         = InstAlloc_GetTotal(&Data);
         pMemoryTable->Region[LVPSA_MEMREGION_PERSISTENT_DATA].Type         = LVPSA_PERSISTENT_DATA;
         pMemoryTable->Region[LVPSA_MEMREGION_PERSISTENT_DATA].pBaseAddress = LVM_NULL;

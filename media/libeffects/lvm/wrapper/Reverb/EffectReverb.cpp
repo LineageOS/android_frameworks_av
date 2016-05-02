@@ -14,7 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+#ifndef LVM_FLOAT
+typedef float LVM_FLOAT;
+#endif
 #define LOG_TAG "Reverb"
 #define ARRAY_SIZE(array) (sizeof (array) / sizeof (array)[0])
 //#define LOG_NDEBUG 0
@@ -152,6 +154,8 @@ struct ReverbContext{
     LVM_Fs_en                       SampleRate;
     LVM_INT32                       *InFrames32;
     LVM_INT32                       *OutFrames32;
+    size_t                          bufferSizeIn;
+    size_t                          bufferSizeOut;
     bool                            auxiliary;
     bool                            preset;
     uint16_t                        curPreset;
@@ -172,8 +176,11 @@ enum {
 
 #define REVERB_DEFAULT_PRESET REVERB_PRESET_NONE
 
-
+#ifdef BUILD_FLOAT
+#define REVERB_SEND_LEVEL   0.75f // 0.75 in 4.12 format
+#else
 #define REVERB_SEND_LEVEL   (0x0C00) // 0.75 in 4.12 format
+#endif
 #define REVERB_UNIT_VOLUME  (0x1000) // 1.0 in 4.12 format
 
 //--- local function prototypes
@@ -269,8 +276,15 @@ extern "C" int EffectCreate(const effect_uuid_t *uuid,
 
 
     // Allocate memory for reverb process (*2 is for STEREO)
-    pContext->InFrames32  = (LVM_INT32 *)malloc(LVREV_MAX_FRAME_SIZE * sizeof(LVM_INT32) * 2);
-    pContext->OutFrames32 = (LVM_INT32 *)malloc(LVREV_MAX_FRAME_SIZE * sizeof(LVM_INT32) * 2);
+#ifdef BUILD_FLOAT
+    pContext->bufferSizeIn = LVREV_MAX_FRAME_SIZE * sizeof(float) * 2;
+    pContext->bufferSizeOut = pContext->bufferSizeIn;
+#else
+    pContext->bufferSizeIn = LVREV_MAX_FRAME_SIZE * sizeof(LVM_INT32) * 2;
+    pContext->bufferSizeOut = pContext->bufferSizeIn;
+#endif
+    pContext->InFrames32  = (LVM_INT32 *)malloc(pContext->bufferSizeIn);
+    pContext->OutFrames32 = (LVM_INT32 *)malloc(pContext->bufferSizeOut);
 
     ALOGV("\tEffectCreate %p, size %zu", pContext, sizeof(ReverbContext));
     ALOGV("\tEffectCreate end\n");
@@ -292,6 +306,8 @@ extern "C" int EffectRelease(effect_handle_t handle){
     #endif
     free(pContext->InFrames32);
     free(pContext->OutFrames32);
+    pContext->bufferSizeIn = 0;
+    pContext->bufferSizeOut = 0;
     Reverb_free(pContext);
     delete pContext;
     return 0;
@@ -388,6 +404,48 @@ void From2iToMono_32( const LVM_INT32 *src,
 }
 #endif
 
+#ifdef BUILD_FLOAT
+/**********************************************************************************
+   FUNCTION INT16LTOFLOAT
+***********************************************************************************/
+// Todo: need to write function descriptor
+static void Int16ToFloat(const LVM_INT16 *src, LVM_FLOAT *dst, size_t n) {
+    size_t ii;
+    src += n-1;
+    dst += n-1;
+    for (ii = n; ii != 0; ii--) {
+        *dst = ((LVM_FLOAT)((LVM_INT16)*src)) / 32768.0f;
+        src--;
+        dst--;
+    }
+    return;
+}
+/**********************************************************************************
+   FUNCTION FLOATTOINT16_SAT
+***********************************************************************************/
+// Todo : Need to write function descriptor
+static void FloatToInt16_SAT(const LVM_FLOAT *src, LVM_INT16 *dst, size_t n) {
+    size_t ii;
+    LVM_INT32 temp;
+
+    src += n-1;
+    dst += n-1;
+    for (ii = n; ii != 0; ii--) {
+        temp = (LVM_INT32)((*src) * 32768.0f);
+        if (temp >= 32767) {
+            *dst = 32767;
+        } else if (temp <= -32768) {
+            *dst = -32768;
+        } else {
+            *dst = (LVM_INT16)temp;
+        }
+        src--;
+        dst--;
+    }
+    return;
+}
+#endif
+
 static inline int16_t clamp16(int32_t sample)
 {
     if ((sample>>15) ^ (sample>>31))
@@ -421,8 +479,31 @@ int process( LVM_INT16     *pIn,
     LVM_INT16               samplesPerFrame = 1;
     LVREV_ReturnStatus_en   LvmStatus = LVREV_SUCCESS;              /* Function call status */
     LVM_INT16 *OutFrames16;
+#ifdef BUILD_FLOAT
+    LVM_FLOAT               *pInputBuff;
+    LVM_FLOAT               *pOutputBuff;
+#endif
 
-
+#ifdef BUILD_FLOAT
+    if (pContext->InFrames32 == NULL ||
+            pContext->bufferSizeIn < frameCount * sizeof(float) * 2) {
+        if (pContext->InFrames32 != NULL) {
+            free(pContext->InFrames32);
+        }
+        pContext->bufferSizeIn = frameCount * sizeof(float) * 2;
+        pContext->InFrames32 = (LVM_INT32 *)malloc(pContext->bufferSizeIn);
+    }
+    if (pContext->OutFrames32 == NULL ||
+            pContext->bufferSizeOut < frameCount * sizeof(float) * 2) {
+        if (pContext->OutFrames32 != NULL) {
+            free(pContext->OutFrames32);
+        }
+        pContext->bufferSizeOut = frameCount * sizeof(float) * 2;
+        pContext->OutFrames32 = (LVM_INT32 *)malloc(pContext->bufferSizeOut);
+    }
+    pInputBuff = (float *)pContext->InFrames32;
+    pOutputBuff = (float *)pContext->OutFrames32;
+#endif
     // Check that the input is either mono or stereo
     if (pContext->config.inputCfg.channels == AUDIO_CHANNEL_OUT_STEREO) {
         samplesPerFrame = 2;
@@ -448,49 +529,84 @@ int process( LVM_INT16     *pIn,
         Reverb_LoadPreset(pContext);
     }
 
-
-
     // Convert to Input 32 bits
     if (pContext->auxiliary) {
+#ifdef BUILD_FLOAT
+        Int16ToFloat(pIn, pInputBuff, frameCount * samplesPerFrame);
+#else
         for(int i=0; i<frameCount*samplesPerFrame; i++){
             pContext->InFrames32[i] = (LVM_INT32)pIn[i]<<8;
         }
-    } else {
+#endif
+        } else {
         // insert reverb input is always stereo
         for (int i = 0; i < frameCount; i++) {
+#ifndef BUILD_FLOAT
             pContext->InFrames32[2*i] = (pIn[2*i] * REVERB_SEND_LEVEL) >> 4; // <<8 + >>12
             pContext->InFrames32[2*i+1] = (pIn[2*i+1] * REVERB_SEND_LEVEL) >> 4; // <<8 + >>12
+#else
+            pInputBuff[2 * i] = (LVM_FLOAT)pIn[2 * i] * REVERB_SEND_LEVEL / 32768.0f;
+            pInputBuff[2 * i + 1] = (LVM_FLOAT)pIn[2 * i + 1] * REVERB_SEND_LEVEL / 32768.0f;
+#endif
         }
     }
 
     if (pContext->preset && pContext->curPreset == REVERB_PRESET_NONE) {
+#ifdef BUILD_FLOAT
+        memset(pOutputBuff, 0, frameCount * sizeof(LVM_FLOAT) * 2); //always stereo here
+#else
         memset(pContext->OutFrames32, 0, frameCount * sizeof(LVM_INT32) * 2); //always stereo here
+#endif
     } else {
         if(pContext->bEnabled == LVM_FALSE && pContext->SamplesToExitCount > 0) {
+#ifdef BUILD_FLOAT
+            memset(pInputBuff, 0, frameCount * sizeof(LVM_FLOAT) * samplesPerFrame);
+#else
             memset(pContext->InFrames32,0,frameCount * sizeof(LVM_INT32) * samplesPerFrame);
+#endif
             ALOGV("\tZeroing %d samples per frame at the end of call", samplesPerFrame);
         }
 
         /* Process the samples, producing a stereo output */
+#ifdef BUILD_FLOAT
+        LvmStatus = LVREV_Process(pContext->hInstance,      /* Instance handle */
+                                  pInputBuff,     /* Input buffer */
+                                  pOutputBuff,    /* Output buffer */
+                                  frameCount);              /* Number of samples to read */
+#else
         LvmStatus = LVREV_Process(pContext->hInstance,      /* Instance handle */
                                   pContext->InFrames32,     /* Input buffer */
                                   pContext->OutFrames32,    /* Output buffer */
                                   frameCount);              /* Number of samples to read */
-    }
+#endif
+        }
 
     LVM_ERROR_CHECK(LvmStatus, "LVREV_Process", "process")
     if(LvmStatus != LVREV_SUCCESS) return -EINVAL;
 
     // Convert to 16 bits
     if (pContext->auxiliary) {
+#ifdef BUILD_FLOAT
+        FloatToInt16_SAT(pOutputBuff, OutFrames16, (size_t)frameCount * 2);
+#else
         for (int i=0; i < frameCount*2; i++) { //always stereo here
             OutFrames16[i] = clamp16(pContext->OutFrames32[i]>>8);
         }
-    } else {
-        for (int i=0; i < frameCount*2; i++) { //always stereo here
-            OutFrames16[i] = clamp16((pContext->OutFrames32[i]>>8) + (LVM_INT32)pIn[i]);
-        }
+#endif
+        } else {
+#ifdef BUILD_FLOAT
+            for (int i = 0; i < frameCount * 2; i++) {//always stereo here
+                //pOutputBuff and OutFrames16 point to the same buffer, so better to
+                //accumulate in pInputBuff, which is available
+                pInputBuff[i] = pOutputBuff[i] + (LVM_FLOAT)pIn[i] / 32768.0f;
+            }
 
+            FloatToInt16_SAT(pInputBuff, OutFrames16, (size_t)frameCount * 2);
+#else
+            for (int i=0; i < frameCount*2; i++) { //always stereo here
+                OutFrames16[i] = clamp16((pContext->OutFrames32[i]>>8) + (LVM_INT32)pIn[i]);
+            }
+#endif
         // apply volume with ramp if needed
         if ((pContext->leftVolume != pContext->prevLeftVolume ||
                 pContext->rightVolume != pContext->prevRightVolume) &&
@@ -643,6 +759,14 @@ int Reverb_setConfig(ReverbContext *pContext, effect_config_t *pConfig){
     case 48000:
         SampleRate = LVM_FS_48000;
         break;
+#if defined(BUILD_FLOAT) && defined(HIGHER_FS)
+    case 96000:
+        SampleRate = LVM_FS_96000;
+        break;
+    case 192000:
+        SampleRate = LVM_FS_192000;
+        break;
+#endif
     default:
         ALOGV("\rReverb_setConfig invalid sampling rate %d", pConfig->inputCfg.samplingRate);
         return -EINVAL;
@@ -1010,7 +1134,7 @@ int16_t ReverbGetRoomHfLevel(ReverbContext *pContext){
     //ALOGV("\tReverbGetRoomHfLevel() ActiveParams.LPFL %d, pContext->SavedHfLevel: %d, "
     //     "converted level: %d\n", ActiveParams.LPF, pContext->SavedHfLevel, level);
 
-    if(ActiveParams.LPF != level){
+    if((int16_t)ActiveParams.LPF != level){
         ALOGV("\tLVM_ERROR : (ignore at start up) ReverbGetRoomHfLevel() has wrong level -> %d %d\n",
                ActiveParams.Level, level);
     }

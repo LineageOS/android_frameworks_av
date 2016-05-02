@@ -114,4 +114,54 @@ void NonLinComp_D16(LVM_INT16        Gain,
     }
 
 }
+#ifdef BUILD_FLOAT
+void NonLinComp_Float(LVM_FLOAT        Gain,
+                      LVM_FLOAT        *pDataIn,
+                      LVM_FLOAT        *pDataOut,
+                      LVM_INT32        BlockLength)
+{
 
+    LVM_FLOAT            Sample;                    /* Input samples */
+    LVM_INT32            SampleNo;                /* Sample index */
+    LVM_FLOAT            Temp;
+
+
+    /*
+     * Process a block of samples
+     */
+    for(SampleNo = 0; SampleNo < BlockLength; SampleNo++)
+    {
+        /*
+         * Read the input
+         */
+        Sample = *pDataIn;
+        pDataIn++;
+
+
+        /*
+         * Apply the compander, this compresses the signal at the expense of
+         * harmonic distortion. The amount of compression is control by the
+         * gain factor
+         */
+        if (Sample != -1.0f)
+        {
+            Temp = ((Sample * Sample));
+            if(Sample > 0)
+            {
+                Sample = (Sample + ((Gain * (Sample - Temp)) ));
+            }
+            else
+            {
+                Sample = (Sample + ((Gain * (Sample + Temp)) ));
+            }
+        }
+
+
+        /*
+         * Save the output
+         */
+        *pDataOut = Sample;
+        pDataOut++;
+    }
+}
+#endif

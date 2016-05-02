@@ -37,7 +37,7 @@ extern "C" {
 /*    Types                                                                       */
 /*                                                                                */
 /**********************************************************************************/
-
+#ifndef BUILD_FLOAT
 typedef struct
 {
     LVM_INT32  AGC_Gain;                        /* The current AGC gain */
@@ -52,20 +52,39 @@ typedef struct
     LVM_INT16  VolumeTC;                        /* Volume update time constant */
 
 } AGC_MIX_VOL_2St1Mon_D32_t;
+#else
+typedef struct
+{
+    LVM_FLOAT  AGC_Gain;                        /* The current AGC gain */
+    LVM_FLOAT  AGC_MaxGain;                     /* The maximum AGC gain */
+    LVM_FLOAT  Volume;                          /* The current volume setting */
+    LVM_FLOAT  Target;                          /* The target volume setting */
+    LVM_FLOAT  AGC_Target;                      /* AGC target level */
+    LVM_FLOAT  AGC_Attack;                      /* AGC attack scaler */
+    LVM_FLOAT  AGC_Decay;                       /* AGC decay scaler */
+    LVM_FLOAT  VolumeTC;                        /* Volume update time constant */
 
+} AGC_MIX_VOL_2St1Mon_FLOAT_t;
+#endif
 
 /**********************************************************************************/
 /*                                                                                */
 /*    Function Prototypes                                                              */
 /*                                                                                */
 /**********************************************************************************/
-
+#ifdef BUILD_FLOAT
+void AGC_MIX_VOL_2St1Mon_D32_WRA(AGC_MIX_VOL_2St1Mon_FLOAT_t  *pInstance,     /* Instance pointer */
+                                 const LVM_FLOAT            *pStSrc,        /* Stereo source */
+                                 const LVM_FLOAT            *pMonoSrc,      /* Mono source */
+                                 LVM_FLOAT                  *pDst,          /* Stereo destination */
+                                 LVM_UINT16                 n);             /* Number of samples */
+#else
 void AGC_MIX_VOL_2St1Mon_D32_WRA(AGC_MIX_VOL_2St1Mon_D32_t  *pInstance,     /* Instance pointer */
                                  const LVM_INT32            *pStSrc,        /* Stereo source */
                                  const LVM_INT32            *pMonoSrc,      /* Mono source */
                                  LVM_INT32                  *pDst,          /* Stereo destination */
                                  LVM_UINT16                 n);             /* Number of samples */
-
+#endif
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

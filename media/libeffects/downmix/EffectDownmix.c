@@ -33,6 +33,10 @@
 
 #define MINUS_3_DB_IN_Q19_12 2896 // -3dB = 0.707 * 2^12 = 2896
 
+#ifdef BUILD_FLOAT
+#define MINUS_3_DB_IN_FLOAT 0.70710678f // -3dB = 0.70710678f
+#endif
+
 // subset of possible audio_channel_mask_t values, and AUDIO_CHANNEL_OUT_* renamed to CHANNEL_MASK_*
 typedef enum {
     CHANNEL_MASK_QUAD_BACK = AUDIO_CHANNEL_OUT_QUAD_BACK,
@@ -82,8 +86,19 @@ static const effect_descriptor_t * const gDescriptors[] = {
 
 // number of effects in this library
 const int kNbEffects = sizeof(gDescriptors) / sizeof(const effect_descriptor_t *);
-
-
+#ifdef BUILD_FLOAT
+static LVM_FLOAT clamp_float(LVM_FLOAT a) {
+    if (a > 1.0f) {
+        return 1.0f;
+    }
+    else if (a < -1.0f) {
+        return -1.0f;
+    }
+    else {
+        return a;
+    }
+}
+#endif
 /*----------------------------------------------------------------------------
  * Test code
  *--------------------------------------------------------------------------*/
@@ -286,7 +301,7 @@ int32_t DownmixLib_GetDescriptor(const effect_uuid_t *uuid, effect_descriptor_t 
     return -EINVAL;
 }
 
-
+#ifndef BUILD_FLOAT
 /*--- Effect Control Interface Implementation ---*/
 
 static int Downmix_Process(effect_handle_t self,
@@ -385,7 +400,108 @@ static int Downmix_Process(effect_handle_t self,
 
     return 0;
 }
+#else /*BUILD_FLOAT*/
+/*--- Effect Control Interface Implementation ---*/
 
+static int Downmix_Process(effect_handle_t self,
+        audio_buffer_t *inBuffer, audio_buffer_t *outBuffer) {
+
+    downmix_object_t *pDownmixer;
+    LVM_FLOAT *pSrc, *pDst;
+    downmix_module_t *pDwmModule = (downmix_module_t *)self;
+
+    if (pDwmModule == NULL) {
+        return -EINVAL;
+    }
+
+    if (inBuffer == NULL || inBuffer->raw == NULL ||
+        outBuffer == NULL || outBuffer->raw == NULL ||
+        inBuffer->frameCount != outBuffer->frameCount) {
+        return -EINVAL;
+    }
+
+    pDownmixer = (downmix_object_t*) &pDwmModule->context;
+
+    if (pDownmixer->state == DOWNMIX_STATE_UNINITIALIZED) {
+        ALOGE("Downmix_Process error: trying to use an uninitialized downmixer");
+        return -EINVAL;
+    } else if (pDownmixer->state == DOWNMIX_STATE_INITIALIZED) {
+        ALOGE("Downmix_Process error: trying to use a non-configured downmixer");
+        return -ENODATA;
+    }
+
+    pSrc = (LVM_FLOAT *) inBuffer->s16;
+    pDst = (LVM_FLOAT *) outBuffer->s16;
+    size_t numFrames = outBuffer->frameCount;
+
+    const bool accumulate =
+            (pDwmModule->config.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE);
+    const uint32_t downmixInputChannelMask = pDwmModule->config.inputCfg.channels;
+
+    switch(pDownmixer->type) {
+
+      case DOWNMIX_TYPE_STRIP:
+          if (accumulate) {
+              while (numFrames) {
+                  pDst[0] = clamp_float(pDst[0] + pSrc[0]);
+                  pDst[1] = clamp_float(pDst[1] + pSrc[1]);
+                  pSrc += pDownmixer->input_channel_count;
+                  pDst += 2;
+                  numFrames--;
+              }
+          } else {
+              while (numFrames) {
+                  pDst[0] = pSrc[0];
+                  pDst[1] = pSrc[1];
+                  pSrc += pDownmixer->input_channel_count;
+                  pDst += 2;
+                  numFrames--;
+              }
+          }
+          break;
+
+      case DOWNMIX_TYPE_FOLD:
+#ifdef DOWNMIX_ALWAYS_USE_GENERIC_DOWNMIXER
+          // bypass the optimized downmix routines for the common formats
+          if (!Downmix_foldGeneric(
+                  downmixInputChannelMask, pSrc, pDst, numFrames, accumulate)) {
+              ALOGE("Multichannel configuration 0x%" PRIx32 " is not supported",
+                    downmixInputChannelMask);
+              return -EINVAL;
+          }
+          break;
+#endif
+        // optimize for the common formats
+        switch((downmix_input_channel_mask_t)downmixInputChannelMask) {
+        case CHANNEL_MASK_QUAD_BACK:
+        case CHANNEL_MASK_QUAD_SIDE:
+            Downmix_foldFromQuad(pSrc, pDst, numFrames, accumulate);
+            break;
+        case CHANNEL_MASK_5POINT1_BACK:
+        case CHANNEL_MASK_5POINT1_SIDE:
+            Downmix_foldFrom5Point1(pSrc, pDst, numFrames, accumulate);
+            break;
+        case CHANNEL_MASK_7POINT1:
+            Downmix_foldFrom7Point1(pSrc, pDst, numFrames, accumulate);
+            break;
+        default:
+            if (!Downmix_foldGeneric(
+                    downmixInputChannelMask, pSrc, pDst, numFrames, accumulate)) {
+                ALOGE("Multichannel configuration 0x%" PRIx32 " is not supported",
+                      downmixInputChannelMask);
+                return -EINVAL;
+            }
+            break;
+        }
+        break;
+
+      default:
+        return -EINVAL;
+    }
+
+    return 0;
+}
+#endif
 
 static int Downmix_Command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdSize,
         void *pCmdData, uint32_t *replySize, void *pReplyData) {
@@ -818,6 +934,7 @@ int Downmix_getParameter(downmix_object_t *pDownmixer, int32_t param, uint32_t *
  *
  *----------------------------------------------------------------------------
  */
+#ifndef BUILD_FLOAT
 void Downmix_foldFromQuad(int16_t *pSrc, int16_t*pDst, size_t numFrames, bool accumulate) {
     // sample at index 0 is FL
     // sample at index 1 is FR
@@ -845,7 +962,35 @@ void Downmix_foldFromQuad(int16_t *pSrc, int16_t*pDst, size_t numFrames, bool ac
         }
     }
 }
-
+#else
+void Downmix_foldFromQuad(LVM_FLOAT *pSrc, LVM_FLOAT *pDst, size_t numFrames, bool accumulate) {
+    // sample at index 0 is FL
+    // sample at index 1 is FR
+    // sample at index 2 is RL
+    // sample at index 3 is RR
+    if (accumulate) {
+        while (numFrames) {
+            // FL + RL
+            pDst[0] = clamp_float(pDst[0] + ((pSrc[0] + pSrc[2]) / 2.0f));
+            // FR + RR
+            pDst[1] = clamp_float(pDst[1] + ((pSrc[1] + pSrc[3]) / 2.0f));
+            pSrc += 4;
+            pDst += 2;
+            numFrames--;
+        }
+    } else { // same code as above but without adding and clamping pDst[i] to itself
+        while (numFrames) {
+            // FL + RL
+            pDst[0] = clamp_float((pSrc[0] + pSrc[2]) / 2.0f);
+            // FR + RR
+            pDst[1] = clamp_float((pSrc[1] + pSrc[3]) / 2.0f);
+            pSrc += 4;
+            pDst += 2;
+            numFrames--;
+        }
+    }
+}
+#endif
 
 /*----------------------------------------------------------------------------
  * Downmix_foldFrom5Point1()
@@ -864,6 +1009,7 @@ void Downmix_foldFromQuad(int16_t *pSrc, int16_t*pDst, size_t numFrames, bool ac
  *
  *----------------------------------------------------------------------------
  */
+#ifndef BUILD_FLOAT
 void Downmix_foldFrom5Point1(int16_t *pSrc, int16_t*pDst, size_t numFrames, bool accumulate) {
     int32_t lt, rt, centerPlusLfeContrib; // samples in Q19.12 format
     // sample at index 0 is FL
@@ -908,7 +1054,52 @@ void Downmix_foldFrom5Point1(int16_t *pSrc, int16_t*pDst, size_t numFrames, bool
         }
     }
 }
-
+#else
+void Downmix_foldFrom5Point1(LVM_FLOAT *pSrc, LVM_FLOAT *pDst, size_t numFrames, bool accumulate) {
+    LVM_FLOAT lt, rt, centerPlusLfeContrib; // samples in Q19.12 format
+    // sample at index 0 is FL
+    // sample at index 1 is FR
+    // sample at index 2 is FC
+    // sample at index 3 is LFE
+    // sample at index 4 is RL
+    // sample at index 5 is RR
+    // code is mostly duplicated between the two values of accumulate to avoid repeating the test
+    // for every sample
+    if (accumulate) {
+        while (numFrames) {
+            // centerPlusLfeContrib = FC(-3dB) + LFE(-3dB)
+            centerPlusLfeContrib = (pSrc[2] * MINUS_3_DB_IN_FLOAT)
+                    + (pSrc[3] * MINUS_3_DB_IN_FLOAT);
+            // FL + centerPlusLfeContrib + RL
+            lt = pSrc[0] + centerPlusLfeContrib + pSrc[4];
+            // FR + centerPlusLfeContrib + RR
+            rt = pSrc[1] + centerPlusLfeContrib + pSrc[5];
+            // accumulate in destination
+            pDst[0] = clamp_float(pDst[0] + (lt / 2.0f));
+            pDst[1] = clamp_float(pDst[1] + (rt / 2.0f));
+            pSrc += 6;
+            pDst += 2;
+            numFrames--;
+        }
+    } else { // same code as above but without adding and clamping pDst[i] to itself
+        while (numFrames) {
+            // centerPlusLfeContrib = FC(-3dB) + LFE(-3dB)
+            centerPlusLfeContrib = (pSrc[2] * MINUS_3_DB_IN_FLOAT)
+                    + (pSrc[3] * MINUS_3_DB_IN_FLOAT);
+            // FL + centerPlusLfeContrib + RL
+            lt = pSrc[0] + centerPlusLfeContrib + pSrc[4];
+            // FR + centerPlusLfeContrib + RR
+            rt = pSrc[1] + centerPlusLfeContrib + pSrc[5];
+            // store in destination
+            pDst[0] = clamp_float(lt / 2.0f); // differs from when accumulate is true above
+            pDst[1] = clamp_float(rt / 2.0f); // differs from when accumulate is true above
+            pSrc += 6;
+            pDst += 2;
+            numFrames--;
+        }
+    }
+}
+#endif
 
 /*----------------------------------------------------------------------------
  * Downmix_foldFrom7Point1()
@@ -927,6 +1118,7 @@ void Downmix_foldFrom5Point1(int16_t *pSrc, int16_t*pDst, size_t numFrames, bool
  *
  *----------------------------------------------------------------------------
  */
+#ifndef BUILD_FLOAT
 void Downmix_foldFrom7Point1(int16_t *pSrc, int16_t*pDst, size_t numFrames, bool accumulate) {
     int32_t lt, rt, centerPlusLfeContrib; // samples in Q19.12 format
     // sample at index 0 is FL
@@ -973,8 +1165,54 @@ void Downmix_foldFrom7Point1(int16_t *pSrc, int16_t*pDst, size_t numFrames, bool
         }
     }
 }
-
-
+#else
+void Downmix_foldFrom7Point1(LVM_FLOAT *pSrc, LVM_FLOAT *pDst, size_t numFrames, bool accumulate) {
+    LVM_FLOAT lt, rt, centerPlusLfeContrib; // samples in Q19.12 format
+    // sample at index 0 is FL
+    // sample at index 1 is FR
+    // sample at index 2 is FC
+    // sample at index 3 is LFE
+    // sample at index 4 is RL
+    // sample at index 5 is RR
+    // sample at index 6 is SL
+    // sample at index 7 is SR
+    // code is mostly duplicated between the two values of accumulate to avoid repeating the test
+    // for every sample
+    if (accumulate) {
+        while (numFrames) {
+            // centerPlusLfeContrib = FC(-3dB) + LFE(-3dB)
+            centerPlusLfeContrib = (pSrc[2] * MINUS_3_DB_IN_Q19_12)
+                    + (pSrc[3] * MINUS_3_DB_IN_Q19_12);
+            // FL + centerPlusLfeContrib + SL + RL
+            lt = pSrc[0] + centerPlusLfeContrib + pSrc[6] + pSrc[4];
+            // FR + centerPlusLfeContrib + SR + RR
+            rt = pSrc[1] + centerPlusLfeContrib + pSrc[7] + pSrc[5];
+            //accumulate in destination
+            pDst[0] = clamp_float(pDst[0] + (lt / 2.0f));
+            pDst[1] = clamp_float(pDst[1] + (rt / 2.0f));
+            pSrc += 8;
+            pDst += 2;
+            numFrames--;
+        }
+    } else { // same code as above but without adding and clamping pDst[i] to itself
+        while (numFrames) {
+            // centerPlusLfeContrib = FC(-3dB) + LFE(-3dB)
+            centerPlusLfeContrib = (pSrc[2] * MINUS_3_DB_IN_FLOAT)
+                    + (pSrc[3] * MINUS_3_DB_IN_FLOAT);
+            // FL + centerPlusLfeContrib + SL + RL
+            lt = pSrc[0] + centerPlusLfeContrib + pSrc[6] + pSrc[4];
+            // FR + centerPlusLfeContrib + SR + RR
+            rt = pSrc[1] + centerPlusLfeContrib + pSrc[7] + pSrc[5];
+            // store in destination
+            pDst[0] = clamp_float(lt / 2.0f); // differs from when accumulate is true above
+            pDst[1] = clamp_float(rt / 2.0f); // differs from when accumulate is true above
+            pSrc += 8;
+            pDst += 2;
+            numFrames--;
+        }
+    }
+}
+#endif
 /*----------------------------------------------------------------------------
  * Downmix_foldGeneric()
  *----------------------------------------------------------------------------
@@ -1001,6 +1239,7 @@ void Downmix_foldFrom7Point1(int16_t *pSrc, int16_t*pDst, size_t numFrames, bool
  *
  *----------------------------------------------------------------------------
  */
+#ifndef BUILD_FLOAT
 bool Downmix_foldGeneric(
         uint32_t mask, int16_t *pSrc, int16_t*pDst, size_t numFrames, bool accumulate) {
 
@@ -1092,3 +1331,96 @@ bool Downmix_foldGeneric(
     }
     return true;
 }
+#else
+bool Downmix_foldGeneric(
+        uint32_t mask, LVM_FLOAT *pSrc, LVM_FLOAT *pDst, size_t numFrames, bool accumulate) {
+
+    if (!Downmix_validChannelMask(mask)) {
+        return false;
+    }
+
+    const bool hasSides = (mask & kSides) != 0;
+    const bool hasBacks = (mask & kBacks) != 0;
+
+    const int numChan = audio_channel_count_from_out_mask(mask);
+    const bool hasFC = ((mask & AUDIO_CHANNEL_OUT_FRONT_CENTER) == AUDIO_CHANNEL_OUT_FRONT_CENTER);
+    const bool hasLFE =
+            ((mask & AUDIO_CHANNEL_OUT_LOW_FREQUENCY) == AUDIO_CHANNEL_OUT_LOW_FREQUENCY);
+    const bool hasBC = ((mask & AUDIO_CHANNEL_OUT_BACK_CENTER) == AUDIO_CHANNEL_OUT_BACK_CENTER);
+    // compute at what index each channel is: samples will be in the following order:
+    //   FL FR FC LFE BL BR BC SL SR
+    // when a channel is not present, its index is set to the same as the index of the preceding
+    // channel
+    const int indexFC  = hasFC    ? 2            : 1;        // front center
+    const int indexLFE = hasLFE   ? indexFC + 1  : indexFC;  // low frequency
+    const int indexBL  = hasBacks ? indexLFE + 1 : indexLFE; // back left
+    const int indexBR  = hasBacks ? indexBL + 1  : indexBL;  // back right
+    const int indexBC  = hasBC    ? indexBR + 1  : indexBR;  // back center
+    const int indexSL  = hasSides ? indexBC + 1  : indexBC;  // side left
+    const int indexSR  = hasSides ? indexSL + 1  : indexSL;  // side right
+
+    LVM_FLOAT lt, rt, centersLfeContrib;
+    // code is mostly duplicated between the two values of accumulate to avoid repeating the test
+    // for every sample
+    if (accumulate) {
+        while (numFrames) {
+            // compute contribution of FC, BC and LFE
+            centersLfeContrib = 0;
+            if (hasFC)  { centersLfeContrib += pSrc[indexFC]; }
+            if (hasLFE) { centersLfeContrib += pSrc[indexLFE]; }
+            if (hasBC)  { centersLfeContrib += pSrc[indexBC]; }
+            centersLfeContrib *= MINUS_3_DB_IN_FLOAT;
+            // always has FL/FR
+            lt = pSrc[0];
+            rt = pSrc[1];
+            // mix in sides and backs
+            if (hasSides) {
+                lt += pSrc[indexSL];
+                rt += pSrc[indexSR];
+            }
+            if (hasBacks) {
+                lt += pSrc[indexBL];
+                rt += pSrc[indexBR];
+            }
+            lt += centersLfeContrib;
+            rt += centersLfeContrib;
+            // accumulate in destination
+            pDst[0] = clamp_float(pDst[0] + (lt / 2.0f));
+            pDst[1] = clamp_float(pDst[1] + (rt / 2.0f));
+            pSrc += numChan;
+            pDst += 2;
+            numFrames--;
+        }
+    } else {
+        while (numFrames) {
+            // compute contribution of FC, BC and LFE
+            centersLfeContrib = 0;
+            if (hasFC)  { centersLfeContrib += pSrc[indexFC]; }
+            if (hasLFE) { centersLfeContrib += pSrc[indexLFE]; }
+            if (hasBC)  { centersLfeContrib += pSrc[indexBC]; }
+            centersLfeContrib *= MINUS_3_DB_IN_FLOAT;
+            // always has FL/FR
+            lt = pSrc[0];
+            rt = pSrc[1];
+            // mix in sides and backs
+            if (hasSides) {
+                lt += pSrc[indexSL];
+                rt += pSrc[indexSR];
+            }
+            if (hasBacks) {
+                lt += pSrc[indexBL];
+                rt += pSrc[indexBR];
+            }
+            lt += centersLfeContrib;
+            rt += centersLfeContrib;
+            // store in destination
+            pDst[0] = clamp_float(lt / 2.0f); // differs from when accumulate is true above
+            pDst[1] = clamp_float(rt / 2.0f); // differs from when accumulate is true above
+            pSrc += numChan;
+            pDst += 2;
+            numFrames--;
+        }
+    }
+    return true;
+}
+#endif

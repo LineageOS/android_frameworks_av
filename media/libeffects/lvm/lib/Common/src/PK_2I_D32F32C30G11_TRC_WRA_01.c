@@ -38,6 +38,7 @@
  pBiquadState->pDelays[6] is y(n-2)L in Q0 format
  pBiquadState->pDelays[7] is y(n-2)R in Q0 format
 ***************************************************************************/
+#ifndef BUILD_FLOAT
 void PK_2I_D32F32C30G11_TRC_WRA_01 ( Biquad_Instance_t       *pInstance,
                                      LVM_INT32               *pDataIn,
                                      LVM_INT32               *pDataOut,
@@ -116,4 +117,4 @@ void PK_2I_D32F32C30G11_TRC_WRA_01 ( Biquad_Instance_t       *pInstance,
         }
 
     }
-
+#endif
