@@ -37,7 +37,7 @@ enum {
 class BpMediaDrmService: public BpInterface<IMediaDrmService>
 {
 public:
-    BpMediaDrmService(const sp<IBinder>& impl)
+    explicit BpMediaDrmService(const sp<IBinder>& impl)
         : BpInterface<IMediaDrmService>(impl)
     {
     }

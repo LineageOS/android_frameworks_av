@@ -43,7 +43,7 @@ enum {
 
 class BpMediaExtractor : public BpInterface<IMediaExtractor> {
 public:
-    BpMediaExtractor(const sp<IBinder>& impl)
+    explicit BpMediaExtractor(const sp<IBinder>& impl)
         : BpInterface<IMediaExtractor>(impl)
     {
     }

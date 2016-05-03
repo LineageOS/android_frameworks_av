@@ -106,7 +106,7 @@ RemoteMediaBufferWrapper::~RemoteMediaBufferWrapper() {
 
 class BpMediaSource : public BpInterface<IMediaSource> {
 public:
-    BpMediaSource(const sp<IBinder>& impl)
+    explicit BpMediaSource(const sp<IBinder>& impl)
         : BpInterface<IMediaSource>(impl)
     {
     }
