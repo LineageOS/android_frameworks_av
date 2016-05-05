@@ -119,9 +119,11 @@ bool MediaCodecInfo::isEncoder() const {
 }
 
 bool MediaCodecInfo::hasQuirk(const char *name) const {
-    for (size_t ix = 0; ix < mQuirks.size(); ix++) {
-        if (mQuirks.itemAt(ix).equalsIgnoreCase(name)) {
-            return true;
+    if (name) {
+        for (size_t ix = 0; ix < mQuirks.size(); ix++) {
+            if (mQuirks.itemAt(ix).equalsIgnoreCase(name)) {
+                return true;
+            }
         }
     }
     return false;
@@ -186,9 +188,11 @@ status_t MediaCodecInfo::writeToParcel(Parcel *parcel) const {
 }
 
 ssize_t MediaCodecInfo::getCapabilityIndex(const char *mime) const {
-    for (size_t ix = 0; ix < mCaps.size(); ix++) {
-        if (mCaps.keyAt(ix).equalsIgnoreCase(mime)) {
-            return ix;
+    if (mime) {
+        for (size_t ix = 0; ix < mCaps.size(); ix++) {
+            if (mCaps.keyAt(ix).equalsIgnoreCase(mime)) {
+                return ix;
+            }
         }
     }
     return -1;

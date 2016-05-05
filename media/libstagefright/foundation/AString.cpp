@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "AString"
+#include <utils/Log.h>
+
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -40,14 +43,24 @@ AString::AString(const char *s)
     : mData(NULL),
       mSize(0),
       mAllocSize(1) {
-    setTo(s);
+    if (!s) {
+        ALOGW("ctor got NULL, using empty string instead");
+        clear();
+    } else {
+        setTo(s);
+    }
 }
 
 AString::AString(const char *s, size_t size)
     : mData(NULL),
       mSize(0),
       mAllocSize(1) {
-    setTo(s, size);
+    if (!s) {
+        ALOGW("ctor got NULL, using empty string instead");
+        clear();
+    } else {
+        setTo(s, size);
+    }
 }
 
 AString::AString(const String8 &from)
