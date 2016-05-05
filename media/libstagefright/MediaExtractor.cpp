@@ -93,7 +93,7 @@ private:
     sp<IMemory> mMemory;
     sp<DataSource> mSource;
     String8 mName;
-    RemoteDataSource(const sp<DataSource> &source);
+    explicit RemoteDataSource(const sp<DataSource> &source);
     DISALLOW_EVIL_CONSTRUCTORS(RemoteDataSource);
 };
 
