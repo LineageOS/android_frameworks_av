@@ -401,6 +401,7 @@ status_t StreamingProcessor::recordingStreamNeedsUpdate(
             currentFormat != (uint32_t)mRecordingFormat ||
             currentDataSpace != mRecordingDataSpace) {
         *needsUpdate = true;
+        return res;
     }
     *needsUpdate = false;
     return res;
