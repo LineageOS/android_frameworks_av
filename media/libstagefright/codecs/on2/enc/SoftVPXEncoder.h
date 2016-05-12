@@ -100,7 +100,7 @@ protected:
     virtual void setCodecSpecificInterface() = 0;
 
     // Sets codec specific configuration.
-    virtual bool setCodecSpecificConfiguration() = 0;
+    virtual void setCodecSpecificConfiguration() = 0;
 
     // Sets codec specific encoder controls.
     virtual vpx_codec_err_t setCodecSpecificControls() = 0;
@@ -122,6 +122,14 @@ protected:
     // Updates bitrate to reflect port settings.
     virtual OMX_ERRORTYPE internalSetBitrateParams(
         const OMX_VIDEO_PARAM_BITRATETYPE* bitrate);
+
+    // Gets Android vpx specific parameters.
+    OMX_ERRORTYPE internalGetAndroidVpxParams(
+            OMX_VIDEO_PARAM_ANDROID_VP8ENCODERTYPE *vpxAndroidParams);
+
+    // Handles Android vpx specific parameters.
+    OMX_ERRORTYPE internalSetAndroidVpxParams(
+            const OMX_VIDEO_PARAM_ANDROID_VP8ENCODERTYPE *vpxAndroidParams);
 
     enum TemporalReferences {
         // For 1 layer case: reference all (last, golden, and alt ref), but only

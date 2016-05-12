@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#ifndef SOFT_VP8_ENCODER_H_
+#ifndef SOFT_VP9_ENCODER_H_
 
-#define SOFT_VP8_ENCODER_H_
+#define SOFT_VP9_ENCODER_H_
 
 #include "SoftVPXEncoder.h"
 
@@ -31,13 +31,15 @@
 
 namespace android {
 
-// Exposes a vp8 encoder as an OMX Component
+// Exposes a VP9 encoder as an OMX Component
 //
 // In addition to the base class settings, Only following encoder settings are
 // available:
-//    - token partitioning
-struct SoftVP8Encoder : public SoftVPXEncoder {
-    SoftVP8Encoder(const char *name,
+//    - tile rows
+//    - tile columns
+//    - frame parallel mode
+struct SoftVP9Encoder : public SoftVPXEncoder {
+    SoftVP9Encoder(const char *name,
                    const OMX_CALLBACKTYPE *callbacks,
                    OMX_PTR appData,
                    OMX_COMPONENTTYPE **component);
@@ -62,34 +64,30 @@ protected:
     // Initializes codec specific encoder settings.
     virtual vpx_codec_err_t setCodecSpecificControls();
 
-    // Gets vp8 specific parameters.
-    OMX_ERRORTYPE internalGetVp8Params(
-        OMX_VIDEO_PARAM_VP8TYPE* vp8Params);
+    // Gets vp9 specific parameters.
+    OMX_ERRORTYPE internalGetVp9Params(
+        OMX_VIDEO_PARAM_VP9TYPE* vp9Params);
 
-    // Handles vp8 specific parameters.
-    OMX_ERRORTYPE internalSetVp8Params(
-        const OMX_VIDEO_PARAM_VP8TYPE* vp8Params);
+    // Handles vp9 specific parameters.
+    OMX_ERRORTYPE internalSetVp9Params(
+        const OMX_VIDEO_PARAM_VP9TYPE* vp9Params);
 
 private:
-    // Max value supported for DCT partitions
-    static const uint32_t kMaxDCTPartitions = 3;
-
-    // vp8 specific configuration parameter
-    // that enables token partitioning of
-    // the stream into substreams
-    int32_t mDCTPartitions;
-
     // Encoder profile corresponding to OMX level parameter
     //
     // The inconsistency in the naming is caused by
     // OMX spec referring vpx profiles (g_profile)
     // as "levels" whereas using the name "profile" for
     // something else.
-    OMX_VIDEO_VP8LEVELTYPE mLevel;
+    OMX_VIDEO_VP9LEVELTYPE mLevel;
 
-    DISALLOW_EVIL_CONSTRUCTORS(SoftVP8Encoder);
+    int32_t mTileColumns;
+
+    OMX_BOOL mFrameParallelDecoding;
+
+    DISALLOW_EVIL_CONSTRUCTORS(SoftVP9Encoder);
 };
 
 }  // namespace android
 
-#endif  // SOFT_VP8_ENCODER_H_
+#endif  // SOFT_VP9_ENCODER_H_
