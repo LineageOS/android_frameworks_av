@@ -25,7 +25,7 @@ namespace img_utils {
 const uint8_t ZERO_WORD[] = {0, 0, 0, 0};
 
 #define BAIL_ON_FAIL(x, flag) \
-    if ((flag = (x)) != OK) return flag;
+    if (((flag) = (x)) != OK) return flag;
 
 #define BYTES_TILL_WORD(index) \
     ((TIFF_WORD_SIZE - ((index) % TIFF_WORD_SIZE)) % TIFF_WORD_SIZE)
