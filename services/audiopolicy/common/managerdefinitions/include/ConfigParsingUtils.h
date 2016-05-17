@@ -39,7 +39,7 @@ struct StringToEnum {
 };
 
 // TODO: move to a separate file. Should be in sync with audio.h.
-#define STRING_TO_ENUM(string) { #string, (uint32_t)string } // uint32_t cast removes warning
+#define STRING_TO_ENUM(string) { #string, (uint32_t)(string) } // uint32_t cast removes warning
 #define NAME_TO_ENUM(name, value) { name, value }
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
