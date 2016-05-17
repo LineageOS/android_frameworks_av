@@ -52,7 +52,7 @@ extern "C" {
 #define LVPSA_NBANDSMIN                  1      /* Minimum number of frequency band                                 */
 #define LVPSA_NBANDSMAX                  30     /* Maximum number of frequency band                                 */
 #define LVPSA_MAXCENTERFREQ              20000  /* Maximum possible center frequency                                */
-#define LVPSA_MINPOSTGAIN                -15    /* Minimum possible post gain                                       */
+#define LVPSA_MINPOSTGAIN              (-15)    /* Minimum possible post gain                                       */
 #define LVPSA_MAXPOSTGAIN                15     /* Maximum possible post gain                                       */
 #define LVPSA_MINQFACTOR                 25     /* Minimum possible Q factor                                        */
 #define LVPSA_MAXQFACTOR                 1200   /* Maximum possible Q factor                                        */
