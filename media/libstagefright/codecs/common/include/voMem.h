@@ -53,8 +53,8 @@ typedef struct VO_MEM_OPERATOR
 { \
 	VO_MEM_INFO voMemInfo; \
 	voMemInfo.Size=nSize; \
-	pMemOP->Alloc(ID, &voMemInfo); \
-	pBuff=(VO_PBYTE)voMemInfo.VBuffer; \
+	(pMemOP)->Alloc(ID, &voMemInfo); \
+	(pBuff)=(VO_PBYTE)voMemInfo.VBuffer; \
 }
 
 
