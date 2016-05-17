@@ -2332,7 +2332,7 @@ status_t AudioTrack::getTimestamp(AudioTimestamp& timestamp)
     // This is sometimes caused by erratic reports of the available space in the ALSA drivers.
     if (status == NO_ERROR) {
         if (previousTimestampValid) {
-#define TIME_TO_NANOS(time) ((uint64_t)time.tv_sec * 1000000000 + time.tv_nsec)
+#define TIME_TO_NANOS(time) ((uint64_t)(time).tv_sec * 1000000000 + (time).tv_nsec)
             const uint64_t previousTimeNanos = TIME_TO_NANOS(mPreviousTimestamp.mTime);
             const uint64_t currentTimeNanos = TIME_TO_NANOS(timestamp.mTime);
 #undef TIME_TO_NANOS
