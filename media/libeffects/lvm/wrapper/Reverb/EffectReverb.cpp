@@ -16,7 +16,7 @@
  */
 
 #define LOG_TAG "Reverb"
-#define ARRAY_SIZE(array) (sizeof array / sizeof array[0])
+#define ARRAY_SIZE(array) (sizeof (array) / sizeof (array)[0])
 //#define LOG_NDEBUG 0
 
 #include <assert.h>
@@ -34,15 +34,15 @@
 extern "C" const struct effect_interface_s gReverbInterface;
 
 #define LVM_ERROR_CHECK(LvmStatus, callingFunc, calledFunc){\
-        if (LvmStatus == LVREV_NULLADDRESS){\
+        if ((LvmStatus) == LVREV_NULLADDRESS){\
             ALOGV("\tLVREV_ERROR : Parameter error - "\
                     "null pointer returned by %s in %s\n\n\n\n", callingFunc, calledFunc);\
         }\
-        if (LvmStatus == LVREV_INVALIDNUMSAMPLES){\
+        if ((LvmStatus) == LVREV_INVALIDNUMSAMPLES){\
             ALOGV("\tLVREV_ERROR : Parameter error - "\
                     "bad number of samples returned by %s in %s\n\n\n\n", callingFunc, calledFunc);\
         }\
-        if (LvmStatus == LVREV_OUTOFRANGE){\
+        if ((LvmStatus) == LVREV_OUTOFRANGE){\
             ALOGV("\tLVREV_ERROR : Parameter error - "\
                     "out of range returned by %s in %s\n", callingFunc, calledFunc);\
         }\
