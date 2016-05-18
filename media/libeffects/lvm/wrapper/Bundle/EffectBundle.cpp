@@ -16,7 +16,7 @@
  */
 
 #define LOG_TAG "Bundle"
-#define ARRAY_SIZE(array) (sizeof array / sizeof array[0])
+#define ARRAY_SIZE(array) (sizeof (array) / sizeof (array)[0])
 //#define LOG_NDEBUG 0
 
 #include <assert.h>
@@ -34,19 +34,19 @@
 extern "C" const struct effect_interface_s gLvmEffectInterface;
 
 #define LVM_ERROR_CHECK(LvmStatus, callingFunc, calledFunc){\
-        if (LvmStatus == LVM_NULLADDRESS){\
+        if ((LvmStatus) == LVM_NULLADDRESS){\
             ALOGV("\tLVM_ERROR : Parameter error - "\
                     "null pointer returned by %s in %s\n\n\n\n", callingFunc, calledFunc);\
         }\
-        if (LvmStatus == LVM_ALIGNMENTERROR){\
+        if ((LvmStatus) == LVM_ALIGNMENTERROR){\
             ALOGV("\tLVM_ERROR : Parameter error - "\
                     "bad alignment returned by %s in %s\n\n\n\n", callingFunc, calledFunc);\
         }\
-        if (LvmStatus == LVM_INVALIDNUMSAMPLES){\
+        if ((LvmStatus) == LVM_INVALIDNUMSAMPLES){\
             ALOGV("\tLVM_ERROR : Parameter error - "\
                     "bad number of samples returned by %s in %s\n\n\n\n", callingFunc, calledFunc);\
         }\
-        if (LvmStatus == LVM_OUTOFRANGE){\
+        if ((LvmStatus) == LVM_OUTOFRANGE){\
             ALOGV("\tLVM_ERROR : Parameter error - "\
                     "out of range returned by %s in %s\n", callingFunc, calledFunc);\
         }\
