@@ -73,10 +73,10 @@ extern "C" {
 #define LVM_MEM_EXTERNAL        8                   /* External (slow) access memory */
 
 /* Platform specific */
-#define LVM_PERSISTENT          LVM_MEM_PARTITION0+LVM_MEM_PERSISTENT+LVM_MEM_INTERNAL
-#define LVM_PERSISTENT_DATA     LVM_MEM_PARTITION1+LVM_MEM_PERSISTENT+LVM_MEM_INTERNAL
-#define LVM_PERSISTENT_COEF     LVM_MEM_PARTITION2+LVM_MEM_PERSISTENT+LVM_MEM_INTERNAL
-#define LVM_SCRATCH             LVM_MEM_PARTITION3+LVM_MEM_SCRATCH+LVM_MEM_INTERNAL
+#define LVM_PERSISTENT          (LVM_MEM_PARTITION0+LVM_MEM_PERSISTENT+LVM_MEM_INTERNAL)
+#define LVM_PERSISTENT_DATA     (LVM_MEM_PARTITION1+LVM_MEM_PERSISTENT+LVM_MEM_INTERNAL)
+#define LVM_PERSISTENT_COEF     (LVM_MEM_PARTITION2+LVM_MEM_PERSISTENT+LVM_MEM_INTERNAL)
+#define LVM_SCRATCH             (LVM_MEM_PARTITION3+LVM_MEM_SCRATCH+LVM_MEM_INTERNAL)
 
 /****************************************************************************************/
 /*                                                                                      */

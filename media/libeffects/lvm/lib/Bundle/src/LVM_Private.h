@@ -81,7 +81,7 @@ extern "C" {
 #define LVM_TE_MIN_EFFECTLEVEL          0         /*TE Minimum EffectLevel*/
 #define LVM_TE_MAX_EFFECTLEVEL          15        /*TE Maximum Effect level*/
 
-#define LVM_VC_MIN_EFFECTLEVEL          -96       /*VC Minimum EffectLevel*/
+#define LVM_VC_MIN_EFFECTLEVEL          (-96)     /*VC Minimum EffectLevel*/
 #define LVM_VC_MAX_EFFECTLEVEL          0         /*VC Maximum Effect level*/
 
 #define LVM_BE_MIN_EFFECTLEVEL          0         /*BE Minimum EffectLevel*/
@@ -89,7 +89,7 @@ extern "C" {
 
 #define LVM_EQNB_MIN_BAND_FREQ          20        /*EQNB Minimum Band Frequency*/
 #define LVM_EQNB_MAX_BAND_FREQ          24000     /*EQNB Maximum Band Frequency*/
-#define LVM_EQNB_MIN_BAND_GAIN          -15       /*EQNB Minimum Band Frequency*/
+#define LVM_EQNB_MIN_BAND_GAIN          (-15)     /*EQNB Minimum Band Frequency*/
 #define LVM_EQNB_MAX_BAND_GAIN          15        /*EQNB Maximum Band Frequency*/
 #define LVM_EQNB_MIN_QFACTOR            25        /*EQNB Minimum Q Factor*/
 #define LVM_EQNB_MAX_QFACTOR            1200      /*EQNB Maximum Q Factor*/
@@ -103,7 +103,7 @@ extern "C" {
 
 #define LVM_VC_MIXER_TIME              100       /*VC mixer time*/
 #define LVM_VC_BALANCE_MAX             96        /*VC balance max value*/
-#define LVM_VC_BALANCE_MIN             -96       /*VC balance min value*/
+#define LVM_VC_BALANCE_MIN             (-96)     /*VC balance min value*/
 
 /* Algorithm masks */
 #define LVM_CS_MASK                     1
