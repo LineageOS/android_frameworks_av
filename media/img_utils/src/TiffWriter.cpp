@@ -40,7 +40,7 @@ bool Orderable::operator op (const Orderable& orderable) const { \
 }
 
 #define ARRAY_SIZE(array) \
-    (sizeof(array) / sizeof(array[0]))
+    (sizeof(array) / sizeof((array)[0]))
 
 KeyedVector<uint16_t, const TagDefinition_t*> TiffWriter::sTagMaps[] = {
     buildTagMap(TIFF_EP_TAG_DEFINITIONS, ARRAY_SIZE(TIFF_EP_TAG_DEFINITIONS)),
