@@ -33,7 +33,7 @@
 
 #include "IDrmManagerService.h"
 
-#define INVALID_BUFFER_LENGTH -1
+#define INVALID_BUFFER_LENGTH (-1)
 #define MAX_BINDER_TRANSACTION_SIZE ((1*1024*1024)-(4096*2))
 
 using namespace android;
