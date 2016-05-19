@@ -130,7 +130,7 @@ terms listed above has been obtained from the copyright holder.
 
 #define EHF_MASK (int16)0x0008            /* homing frame pattern                       */
 
-#define BIT_0     (int16)-127
+#define BIT_0     ((int16)-127)
 #define BIT_1     (int16)127
 #define BIT_0_ITU (int16)0x007F
 #define BIT_1_ITU (int16)0x0081

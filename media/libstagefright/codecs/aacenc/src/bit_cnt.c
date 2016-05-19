@@ -23,10 +23,10 @@
 #include "bit_cnt.h"
 #include "aac_rom.h"
 
-#define HI_LTAB(a) (a>>8)
-#define LO_LTAB(a) (a & 0xff)
+#define HI_LTAB(a) ((a)>>8)
+#define LO_LTAB(a) ((a) & 0xff)
 
-#define EXPAND(a)  ((((Word32)(a&0xff00)) << 8)|(Word32)(a&0xff))
+#define EXPAND(a)  ((((Word32)((a)&0xff00)) << 8)|(Word32)((a)&0xff))
 
 
 /*****************************************************************************

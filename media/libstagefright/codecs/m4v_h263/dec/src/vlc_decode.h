@@ -79,10 +79,10 @@
 #include "mp4lib_int.h"
 
 #define VLC_ERROR_DETECTED(x) ((x) < 0)
-#define VLC_IO_ERROR    -1
-#define VLC_CODE_ERROR  -2
-#define VLC_MB_STUFFING -4
-#define VLC_NO_LAST_BIT -5
+#define VLC_IO_ERROR    (-1)
+#define VLC_CODE_ERROR  (-2)
+#define VLC_MB_STUFFING (-4)
+#define VLC_NO_LAST_BIT (-5)
 
 #define VLC_ESCAPE_CODE  7167
 

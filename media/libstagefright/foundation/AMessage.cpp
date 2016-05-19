@@ -225,7 +225,8 @@ void AMessage::set##NAME(const char *name, TYPENAME value) {            \
     item->u.FIELDNAME = value;                                          \
 }                                                                       \
                                                                         \
-bool AMessage::find##NAME(const char *name, TYPENAME *value) const {    \
+/* NOLINT added to avoid incorrect warning/fix from clang.tidy */       \
+bool AMessage::find##NAME(const char *name, TYPENAME *value) const {  /* NOLINT */ \
     const Item *item = findItem(name, kType##NAME);                     \
     if (item) {                                                         \
         *value = item->u.FIELDNAME;                                     \

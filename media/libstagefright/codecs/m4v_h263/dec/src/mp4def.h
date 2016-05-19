@@ -47,7 +47,7 @@ typedef int16 MOT;   /*  : "int" type runs faster on RISC machine */
 /* You don't want to use ((x>UB)?UB:(x<LB)?LB:x) for the clipping */
 /*    because it will use one extra comparison if the compiler is */
 /*    not well-optimized.    04/19/2000.                        */
-#define CLIP_THE_RANGE(x,LB,UB) if (x<LB) x = LB; else if (x>UB) x = UB
+#define CLIP_THE_RANGE(x,LB,UB) if ((x)<(LB)) (x) = (LB); else if ((x)>(UB)) (x) = (UB)
 
 #define MODE_INTRA      0x08 //01000
 #define MODE_INTRA_Q    0x09 //01001
@@ -72,7 +72,7 @@ typedef int16 MOT;   /*  : "int" type runs faster on RISC machine */
 #define START_CODE_LENGTH       32
 
 /* 11/30/98 */
-#define NoMarkerFound -1
+#define NoMarkerFound (-1)
 #define FoundRM     1   /* Resync Marker */
 #define FoundVSC    2   /* VOP_START_CODE. */
 #define FoundGSC    3   /* GROUP_START_CODE */
@@ -153,7 +153,7 @@ typedef int16 MOT;   /*  : "int" type runs faster on RISC machine */
 
 
 /* macro utility */
-#define  ZERO_OUT_64BYTES(x)    { *((uint32*)x) = *(((uint32*)(x))+1) =  \
+#define  ZERO_OUT_64BYTES(x)    { *((uint32*)(x)) = *(((uint32*)(x))+1) =  \
         *(((uint32*)(x))+2) = *(((uint32*)(x))+3) =  \
         *(((uint32*)(x))+4) = *(((uint32*)(x))+5) =  \
         *(((uint32*)(x))+6) = *(((uint32*)(x))+7) =  \
