@@ -103,7 +103,7 @@ terms listed above has been obtained from the copyright holder.
 ; Include all pre-processor statements here. Include conditional
 ; compile variables also.
 ----------------------------------------------------------------------------*/
-#define NC   M/2                  /* M = LPC order, NC = M/2 */
+#define NC   (M/2)                  /* M = LPC order, NC = M/2 */
 
 /*----------------------------------------------------------------------------
 ; LOCAL FUNCTION DEFINITIONS

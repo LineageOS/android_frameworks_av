@@ -79,7 +79,7 @@ Returns
 ; Include all pre-processor statements here. Include conditional
 ; compile variables also.
 ----------------------------------------------------------------------------*/
-#define Qfmt30(a)   (Int32)(a*((Int32)1<<30) + (a>=0?0.5F:-0.5F))
+#define Qfmt30(a)   (Int32)((a)*((Int32)1<<30) + ((a)>=0?0.5F:-0.5F))
 
 #define cos_pi_6     Qfmt30(  0.86602540378444f)
 #define cos_2_pi_6   Qfmt30(  0.5f)

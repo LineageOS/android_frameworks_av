@@ -81,7 +81,7 @@ Returns
 ; compile variables also.
 ----------------------------------------------------------------------------*/
 #define QFORMAT    29
-#define Qfmt29(a)   (int32)(a*((int32)1<<QFORMAT) + (a>=0?0.5F:-0.5F))
+#define Qfmt29(a)   (int32)((a)*((int32)1<<QFORMAT) + ((a)>=0?0.5F:-0.5F))
 
 /*----------------------------------------------------------------------------
 ; LOCAL FUNCTION DEFINITIONS

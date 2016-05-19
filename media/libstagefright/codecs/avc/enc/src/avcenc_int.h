@@ -43,7 +43,7 @@ typedef float OsclFloat;
 #define MAX_QP          51
 #define SHIFT_QP        12
 #define  LAMBDA_ACCURACY_BITS         16
-#define  LAMBDA_FACTOR(lambda)        ((int)((double)(1<<LAMBDA_ACCURACY_BITS)*lambda+0.5))
+#define  LAMBDA_FACTOR(lambda)        ((int)((double)(1<<LAMBDA_ACCURACY_BITS)*(lambda)+0.5))
 
 
 #define DISABLE_THRESHOLDING  0
@@ -55,8 +55,8 @@ typedef float OsclFloat;
 #define MAX_VALUE       999999   //!< used for start value for some variables
 
 #define  WEIGHTED_COST(factor,bits)   (((factor)*(bits))>>LAMBDA_ACCURACY_BITS)
-#define  MV_COST(f,s,cx,cy,px,py)     (WEIGHTED_COST(f,mvbits[((cx)<<(s))-px]+mvbits[((cy)<<(s))-py]))
-#define  MV_COST_S(f,cx,cy,px,py)     (WEIGHTED_COST(f,mvbits[cx-px]+mvbits[cy-py]))
+#define  MV_COST(f,s,cx,cy,px,py)     (WEIGHTED_COST(f,mvbits[((cx)<<(s))-(px)]+mvbits[((cy)<<((s)))-(py)]))
+#define  MV_COST_S(f,cx,cy,px,py)     (WEIGHTED_COST(f,mvbits[(cx)-(px)]+mvbits[(cy)-(py)]))
 
 /* for sub-pel search and interpolation */
 #define SUBPEL_PRED_BLK_SIZE 576 // 24x24

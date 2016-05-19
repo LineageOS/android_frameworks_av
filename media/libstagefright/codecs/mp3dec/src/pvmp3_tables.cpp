@@ -136,7 +136,7 @@ const mp3_scaleFactorBandIndex mp3_sfBandIndex[9] =
 
 };
 
-#define INV_Q31( x)   (int32)(0x7FFFFFFF/(float)x - 1.0f)
+#define INV_Q31( x)   (int32)(0x7FFFFFFF/(float)(x) - 1.0f)
 
 const int32 mp3_shortwindBandWidths[9][13] =
 {
@@ -161,7 +161,7 @@ const int32 mp3_shortwindBandWidths[9][13] =
 };
 
 
-#define Q30_fmt(a)    (int32((0x40000000)*a))
+#define Q30_fmt(a)    (int32((0x40000000)*(a)))
 
 const int32 pqmfSynthWin[(HAN_SIZE/2) + 8] =
 {
