@@ -44,7 +44,7 @@ status_t CameraUtils::getRotationTransform(const CameraMetadata& staticInfo,
     }
 
     camera_metadata_ro_entry_t entryFacing = staticInfo.find(ANDROID_LENS_FACING);
-    if (entry.count == 0) {
+    if (entryFacing.count == 0) {
         ALOGE("%s: Can't find android.lens.facing in static metadata!", __FUNCTION__);
         return INVALID_OPERATION;
     }
