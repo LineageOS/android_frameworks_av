@@ -28,7 +28,7 @@
 
 using namespace android;
 
-#define INVALID_VALUE -1
+#define INVALID_VALUE (-1)
 
 Mutex DrmManagerClientImpl::sMutex;
 sp<IDrmManagerService> DrmManagerClientImpl::sDrmManagerService;

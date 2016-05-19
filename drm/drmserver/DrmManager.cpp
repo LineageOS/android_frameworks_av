@@ -33,7 +33,7 @@
 #include "DrmManager.h"
 #include "ReadWriteUtils.h"
 
-#define DECRYPT_FILE_ERROR -1
+#define DECRYPT_FILE_ERROR (-1)
 
 using namespace android;
 
