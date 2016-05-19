@@ -23,7 +23,7 @@
 #include <utils/String8.h>
 #include <utils/Errors.h>
 
-#define INVALID_VALUE -1
+#define INVALID_VALUE (-1)
 
 namespace android {
 
