@@ -30,7 +30,7 @@
 
 using namespace android;
 
-#define FAILURE -1
+#define FAILURE (-1)
 
 String8 ReadWriteUtils::readBytes(const String8& filePath) {
     FILE* file = NULL;
