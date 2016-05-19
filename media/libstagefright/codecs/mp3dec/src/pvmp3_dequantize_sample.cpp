@@ -108,8 +108,8 @@ Input
 ; Include all pre-processor statements here. Include conditional
 ; compile variables also.
 ----------------------------------------------------------------------------*/
-#define Q30_fmt(a)(int32(double(0x40000000)*a))
-#define Q29_fmt(a)(int32(double(0x20000000)*a))
+#define Q30_fmt(a)(int32(double(0x40000000)*(a)))
+#define Q29_fmt(a)(int32(double(0x20000000)*(a)))
 
 /*----------------------------------------------------------------------------
 ; LOCAL FUNCTION DEFINITIONS

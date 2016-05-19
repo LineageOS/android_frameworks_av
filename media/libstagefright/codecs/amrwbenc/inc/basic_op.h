@@ -25,8 +25,8 @@
 #define MAX_32 (Word32)0x7fffffffL
 #define MIN_32 (Word32)0x80000000L
 
-#define MAX_16 (Word16)+32767   /* 0x7fff */
-#define MIN_16 (Word16)-32768   /* 0x8000 */
+#define MAX_16 ((Word16)+32767)   /* 0x7fff */
+#define MIN_16 ((Word16)-32768)   /* 0x8000 */
 
 
 #define  static_vo  static __inline
@@ -41,23 +41,23 @@
 #define L_negate(L_var1) (((L_var1) == (MIN_32)) ? (MAX_32) : (-(L_var1)))                 /* Long negate,     2*/
 
 
-#define extract_h(a)            ((Word16)(a >> 16))
-#define extract_l(x)                (Word16)((x))
-#define add1(a,b)           (a + b)
-#define vo_L_msu(a,b,c)         ( a - (( b * c ) << 1) )
+#define extract_h(a)            ((Word16)((a) >> 16))
+#define extract_l(x)            (Word16)((x))
+#define add1(a,b)               ((a) + (b))
+#define vo_L_msu(a,b,c)         ((a) - (((b) * (c)) << 1))
 #define vo_mult32(a, b)         ((a) * (b))
-#define vo_mult(a,b)            (( a * b ) >> 15 )
-#define vo_L_mult(a,b)              (((a) * (b)) << 1)
-#define vo_shr_r(var1, var2)        ((var1+((Word16)(1L<<(var2-1))))>>var2)
-#define vo_sub(a,b)         (a - b)
+#define vo_mult(a,b)            (((a) * (b)) >> 15)
+#define vo_L_mult(a,b)          (((a) * (b)) << 1)
+#define vo_shr_r(var1, var2)    (((var1)+((Word16)(1L<<((var2)-1))))>>(var2))
+#define vo_sub(a,b)             ((a) - (b))
 #define vo_L_deposit_h(a)       ((Word32)((a) << 16))
-#define vo_round(a)         ((((a) >> 15) + 1) >> 1)
+#define vo_round(a)             ((((a) >> 15) + 1) >> 1)
 #define vo_extract_l(a)         ((Word16)(a))
-#define vo_L_add(a,b)           (a + b)
-#define vo_L_sub(a,b)           (a - b)
-#define vo_mult_r(a,b)          (((( a * b ) >> 14) + 1 ) >> 1 )
-#define vo_negate(a)                (-a)
-#define vo_L_shr_r(L_var1, var2)        ((L_var1+((Word32)(1L<<(var2-1))))>>var2)
+#define vo_L_add(a,b)           ((a) + (b))
+#define vo_L_sub(a,b)           ((a) - (b))
+#define vo_mult_r(a,b)          (((( (a) * (b) ) >> 14) + 1 ) >> 1 )
+#define vo_negate(a)            (-(a))
+#define vo_L_shr_r(L_var1, var2) (((L_var1)+((Word32)(1L<<((var2)-1))))>>(var2))
 
 
 /*___________________________________________________________________________

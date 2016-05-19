@@ -151,7 +151,7 @@
 }
 
 #define ALIGN(ptr, bytePos) \
-        (ptr + ( ((bytePos - (uintptr_t)ptr) & (bytePos - 1)) / sizeof(*ptr) ))
+        ((ptr) + ( (((bytePos) - (uintptr_t)(ptr)) & ((bytePos) - 1)) / sizeof(*(ptr)) ))
 
 extern const u32 h264bsdQpC[52];
 

@@ -69,8 +69,8 @@ terms listed above has been obtained from the copyright holder.
 #define MEAN_ENER_MR122  783741L  /* 36/(20*log10(2)) (Q17) */
 
 /* minimum quantized energy: -14 dB */
-#define MIN_ENERGY       -14336       /* 14                 Q10 */
-#define MIN_ENERGY_MR122  -2381       /* 14 / (20*log10(2)) Q10 */
+#define MIN_ENERGY       (-14336)       /* 14                 Q10 */
+#define MIN_ENERGY_MR122  (-2381)       /* 14 / (20*log10(2)) Q10 */
 
 /*----------------------------------------------------------------------------
 ; LOCAL FUNCTION DEFINITIONS

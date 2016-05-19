@@ -21,15 +21,15 @@
 #define NUM_OF_SPMODES 9
 
 #define PRML 15
-#define PRMN_7k NBBITS_7k/PRML + 1
-#define PRMN_9k NBBITS_9k/PRML + 1
-#define PRMN_12k NBBITS_12k/PRML + 1
-#define PRMN_14k NBBITS_14k/PRML + 1
-#define PRMN_16k NBBITS_16k/PRML + 1
-#define PRMN_18k NBBITS_18k/PRML + 1
-#define PRMN_20k NBBITS_20k/PRML + 1
-#define PRMN_23k NBBITS_23k/PRML + 1
-#define PRMN_24k NBBITS_24k/PRML + 1
+#define PRMN_7k (NBBITS_7k/PRML + 1)
+#define PRMN_9k (NBBITS_9k/PRML + 1)
+#define PRMN_12k (NBBITS_12k/PRML + 1)
+#define PRMN_14k (NBBITS_14k/PRML + 1)
+#define PRMN_16k (NBBITS_16k/PRML + 1)
+#define PRMN_18k (NBBITS_18k/PRML + 1)
+#define PRMN_20k (NBBITS_20k/PRML + 1)
+#define PRMN_23k (NBBITS_23k/PRML + 1)
+#define PRMN_24k (NBBITS_24k/PRML + 1)
 
 static const Word16 dfh_M7k[PRMN_7k] =
 {

@@ -19,8 +19,8 @@
 #include "avcenc_int.h"
 
 
-#define CLIP_RESULT(x)      if((uint)x > 0xFF){ \
-                 x = 0xFF & (~(x>>31));}
+#define CLIP_RESULT(x)      if((uint)(x) > 0xFF){ \
+                 (x) = 0xFF & (~((x)>>31));}
 
 /* (blkwidth << 2) + (dy << 1) + dx */
 static void (*const eChromaMC_SIMD[8])(uint8 *, int , int , int , uint8 *, int, int , int) =

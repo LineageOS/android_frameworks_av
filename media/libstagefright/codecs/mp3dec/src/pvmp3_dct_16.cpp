@@ -109,7 +109,7 @@ Input
 ; Include all pre-processor statements here. Include conditional
 ; compile variables also.
 ----------------------------------------------------------------------------*/
-#define Qfmt(a)   (int32)(a*((int32)1<<27))
+#define Qfmt(a)   (int32)((a)*((int32)1<<27))
 
 /*----------------------------------------------------------------------------
 ; LOCAL FUNCTION DEFINITIONS
