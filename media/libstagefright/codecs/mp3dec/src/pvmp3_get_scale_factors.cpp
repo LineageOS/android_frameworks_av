@@ -86,7 +86,7 @@
 ; Include all pre-processor statements here. Include conditional
 ; compile variables also.
 ----------------------------------------------------------------------------*/
-#define Qfmt_28(a)(int32(double(0x10000000)*a))
+#define Qfmt_28(a)(int32(double(0x10000000)*(a)))
 
 /*----------------------------------------------------------------------------
 ; LOCAL FUNCTION DEFINITIONS

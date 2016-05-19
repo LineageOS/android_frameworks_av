@@ -59,9 +59,9 @@
 ; DEFINES
 ; Include all pre-processor statements here.
 ----------------------------------------------------------------------------*/
-#define Qfmt(a)    (Int32)(a*((Int32)1<<28) )
-#define Qfmt1(a)   (Int32)(a*((Int32)0x7FFFFFFF))
-#define Qfmt2(a)   (Int32)(a*((Int32)1<<27))
+#define Qfmt(a)    (Int32)((a)*((Int32)1<<28) )
+#define Qfmt1(a)   (Int32)((a)*((Int32)0x7FFFFFFF))
+#define Qfmt2(a)   (Int32)((a)*((Int32)1<<27))
 
 /*----------------------------------------------------------------------------
 ; EXTERNAL VARIABLES REFERENCES

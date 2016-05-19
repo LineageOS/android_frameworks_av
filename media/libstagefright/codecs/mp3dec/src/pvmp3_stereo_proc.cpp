@@ -140,7 +140,7 @@ Input
 ----------------------------------------------------------------------------*/
 #define N31 31
 
-#define Q31_fmt(a)    (int32(double(0x7FFFFFFF)*a))
+#define Q31_fmt(a)    (int32(double(0x7FFFFFFF)*(a)))
 
 /*----------------------------------------------------------------------------
 ; LOCAL FUNCTION DEFINITIONS

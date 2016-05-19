@@ -119,8 +119,8 @@ extern "C"
 #define norm_s( x)    (normalize_amr_wb(  x) - 16)
 
 
-#define extract_h( x)    (int16)(x>>16)
-#define L_deposit_h( x)    (int32)(x<<16)
+#define extract_h( x)    (int16)((x)>>16)
+#define L_deposit_h( x)    (int32)((x)<<16)
 
 
 #ifdef __cplusplus

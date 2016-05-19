@@ -32,9 +32,9 @@
 ; DEFINES
 ; Include all pre-processor statements here.
 ----------------------------------------------------------------------------*/
-#define UPDATE_PV_MAXPV_MIN(p,max,min) if ((p) > max) max=(p); else if ((p) < min) min = (p);
+#define UPDATE_PV_MAXPV_MIN(p,max,min) if ((p) > (max)) (max)=(p); else if ((p) < (min)) (min) = (p);
 
-#define     INDEX(x,thr)    (((x)>=thr)?1:0)
+#define     INDEX(x,thr)    (((x)>=(thr))?1:0)
 #define     BLKSIZE     8
 #define     MBSIZE      16
 #define     DERING_THR  16

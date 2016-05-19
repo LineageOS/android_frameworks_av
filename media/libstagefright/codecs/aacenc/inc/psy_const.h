@@ -73,7 +73,7 @@ enum
 #define TRANSFORM_OFFSET_LONG    0
 #define TRANSFORM_OFFSET_SHORT   448
 
-#define LOG_NORM_PCM          -15
+#define LOG_NORM_PCM          (-15)
 
 #define NUM_SAMPLE_RATES	12
 

@@ -50,7 +50,7 @@ typedef  struct {
 
 /* AAC Param ID */
 #define VO_PID_AAC_Mdoule				0x42211000
-#define VO_PID_AAC_ENCPARAM				VO_PID_AAC_Mdoule | 0x0040  /*!< get/set AAC encoder parameter, the parameter is a pointer to AACENC_PARAM */
+#define VO_PID_AAC_ENCPARAM				(VO_PID_AAC_Mdoule | 0x0040)  /*!< get/set AAC encoder parameter, the parameter is a pointer to AACENC_PARAM */
 
 /* AAC decoder error ID */
 #define VO_ERR_AAC_Mdoule				0x82210000

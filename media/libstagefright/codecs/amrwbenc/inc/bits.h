@@ -42,7 +42,7 @@
 #define NBBITS_SID    35
 #define NB_BITS_MAX   NBBITS_24k
 
-#define BIT_0     (Word16)-127
+#define BIT_0     ((Word16)-127)
 #define BIT_1     (Word16)127
 #define BIT_0_ITU (Word16)0x007F
 #define BIT_1_ITU (Word16)0x0081

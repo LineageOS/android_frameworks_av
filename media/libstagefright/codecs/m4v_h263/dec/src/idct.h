@@ -80,9 +80,9 @@ extern "C"
 #define W7 565                  /* 2048*sqrt(2)*cos(7*pi/16) */
 #define W1mW7 2276
 #define W1pW7 3406
-#define W5mW3 -799
-#define mW3mW5 -4017
-#define mW2mW6 -3784
+#define W5mW3 (-799)
+#define mW3mW5 (-4017)
+#define mW2mW6 (-3784)
 #define W2mW6 1568
 
 /* left shift by 11 is to maintain the accuracy of the decimal point */

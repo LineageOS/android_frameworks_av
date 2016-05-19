@@ -25,8 +25,8 @@
 #define FIXED_I4_MODE   AVC_I4_Diagonal_Down_Left
 #define FIXED_INTRA_CHROMA_MODE AVC_IC_DC
 
-#define CLIP_RESULT(x)      if((uint)x > 0xFF){ \
-                 x = 0xFF & (~(x>>31));}
+#define CLIP_RESULT(x)      if((uint)(x) > 0xFF){ \
+                 (x) = 0xFF & (~((x)>>31));}
 
 
 bool IntraDecisionABE(AVCEncObject *encvid, int min_cost, uint8 *curL, int picPitch)

@@ -54,20 +54,20 @@ extern "C"
 {
 #endif
 
-#define CLIP_RESULT(x)      if(x & -256){x = 0xFF & (~(x>>31));}
+#define CLIP_RESULT(x)      if((x) & -256){(x) = 0xFF & (~((x)>>31));}
 #define ADD_AND_CLIP1(x)    x += (pred_word&0xFF); CLIP_RESULT(x);
 #define ADD_AND_CLIP2(x)    x += ((pred_word>>8)&0xFF); CLIP_RESULT(x);
 #define ADD_AND_CLIP3(x)    x += ((pred_word>>16)&0xFF); CLIP_RESULT(x);
 #define ADD_AND_CLIP4(x)    x += ((pred_word>>24)&0xFF); CLIP_RESULT(x);
 
-#define ADD_AND_CLIP(x,y)    {  x9 = ~(x>>8); \
+#define ADD_AND_CLIP(x,y)    {  x9 = ~((x)>>8); \
                             if(x9!=-1){ \
                                 x9 = ((uint32)x9)>>24; \
-                                y = x9|(y<<8); \
+                                (y) = x9|((y)<<8); \
                             } \
                             else \
                             {    \
-                                y =  x|(y<<8); \
+                                (y) =  (x)|((y)<<8); \
                             } \
                             }
 

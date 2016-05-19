@@ -56,8 +56,8 @@ terms listed above has been obtained from the copyright holder.
 #define MAX_32 (int32)0x7fffffffL
 #define MIN_32 (int32)0x80000000L
 
-#define MAX_16 (int16)+32767    /* 0x7fff */
-#define MIN_16 (int16)-32768    /* 0x8000 */
+#define MAX_16 ((int16)+32767)    /* 0x7fff */
+#define MIN_16 ((int16)-32768)    /* 0x8000 */
 
 
 

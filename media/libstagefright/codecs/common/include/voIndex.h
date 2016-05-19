@@ -31,26 +31,26 @@ extern "C" {
 
 /* Define the module ID */
 #define _MAKE_SOURCE_ID(id, name) \
-VO_INDEX_SRC_##name = _VO_INDEX_SOURCE | id,
+VO_INDEX_SRC_##name = _VO_INDEX_SOURCE | (id),
 
 #define _MAKE_CODEC_ID(id, name) \
-VO_INDEX_DEC_##name = _VO_INDEX_DEC | id, \
-VO_INDEX_ENC_##name = _VO_INDEX_ENC | id,
+VO_INDEX_DEC_##name = _VO_INDEX_DEC | (id), \
+VO_INDEX_ENC_##name = _VO_INDEX_ENC | (id),
 
 #define _MAKE_EFFECT_ID(id, name) \
-VO_INDEX_EFT_##name = _VO_INDEX_EFFECT | id,
+VO_INDEX_EFT_##name = _VO_INDEX_EFFECT | (id),
 
 #define _MAKE_SINK_ID(id, name) \
-VO_INDEX_SNK_##name = _VO_INDEX_SINK | id,
+VO_INDEX_SNK_##name = _VO_INDEX_SINK | (id),
 
 #define _MAKE_FILTER_ID(id, name) \
-VO_INDEX_FLT_##name = _VO_INDEX_FILTER | id,
+VO_INDEX_FLT_##name = _VO_INDEX_FILTER | (id),
 
 #define _MAKE_OMX_ID(id, name) \
-VO_INDEX_OMX_##name = _VO_INDEX_OMX | id,
+VO_INDEX_OMX_##name = _VO_INDEX_OMX | (id),
 
 #define _MAKE_MFW_ID(id, name) \
-VO_INDEX_MFW_##name = _VO_INDEX_MFW | id,
+VO_INDEX_MFW_##name = _VO_INDEX_MFW | (id),
 
 enum
 {
