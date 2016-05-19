@@ -46,8 +46,8 @@ namespace android {
 
 /** Compute difference between start and end */
 #define TIME_DIFF(start, end, diff) \
-    diff = ((end.tv_sec - start.tv_sec) * 1000000) + \
-            (end.tv_usec - start.tv_usec);
+    diff = (((end).tv_sec - (start).tv_sec) * 1000000) + \
+            ((end).tv_usec - (start).tv_usec);
 
 struct SoftHEVC: public SoftVideoDecoderOMXComponent {
     SoftHEVC(const char *name, const OMX_CALLBACKTYPE *callbacks,

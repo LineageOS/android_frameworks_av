@@ -98,7 +98,7 @@
 #define LEVEL_45__dB  0.005524271f
 #define LEVEL_60__dB  0.000976562f
 
-#define Qmf31( x)    (int32)(x*(float)0x7FFFFFFF)
+#define Qmf31( x)    (int32)((x)*(float)0x7FFFFFFF)
 
 
 /*----------------------------------------------------------------------------

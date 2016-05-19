@@ -55,7 +55,7 @@
         }
 
 
-#define CLIP_RESULT(x)      if((UInt)x > 0xFF){x = 0xFF & (~(x>>31));}
+#define CLIP_RESULT(x)      if((UInt)(x) > 0xFF){(x) = 0xFF & (~((x)>>31));}
 #define ADD_AND_CLIP1(x)    x += (pred_word&0xFF); CLIP_RESULT(x);
 #define ADD_AND_CLIP2(x)    x += ((pred_word>>8)&0xFF); CLIP_RESULT(x);
 #define ADD_AND_CLIP3(x)    x += ((pred_word>>16)&0xFF); CLIP_RESULT(x);

@@ -23,13 +23,13 @@
 
 #define PREF_16_VEC 129     /* 1MV bias versus 4MVs*/
 
-#define CLIP_RESULT(x)      if((uint)x > 0xFF){ \
-                 x = 0xFF & (~(x>>31));}
+#define CLIP_RESULT(x)      if((uint)(x) > 0xFF){ \
+                 (x) = 0xFF & (~((x)>>31));}
 
-#define CLIP_UPPER16(x)     if((uint)x >= 0x20000000){ \
-        x = 0xFF0000 & (~(x>>31));} \
+#define CLIP_UPPER16(x)     if((uint)(x) >= 0x20000000){ \
+        (x) = 0xFF0000 & (~((x)>>31));} \
         else { \
-        x = (x>>5)&0xFF0000; \
+        (x) = ((x)>>5)&0xFF0000; \
         }
 
 /*=====================================================================

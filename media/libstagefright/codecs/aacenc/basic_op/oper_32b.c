@@ -234,10 +234,10 @@ Word16 iLog4(Word32 value)
 }
 
 #define step(shift) \
-    if ((0x40000000l >> shift) + root <= value)       \
+    if ((0x40000000l >> (shift)) + root <= value)       \
     {                                                 \
-        value -= (0x40000000l >> shift) + root;       \
-        root = (root >> 1) | (0x40000000l >> shift);  \
+        value -= (0x40000000l >> (shift)) + root;       \
+        root = (root >> 1) | (0x40000000l >> (shift));  \
     } else {                                          \
         root = root >> 1;                             \
     }
