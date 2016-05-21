@@ -302,6 +302,10 @@ status_t BnCrypto::onTransact(
             int32_t offset = data.readInt32();
 
             int32_t numSubSamples = data.readInt32();
+            if (numSubSamples < 0 || numSubSamples > 0xffff) {
+                reply->writeInt32(BAD_VALUE);
+                return OK;
+            }
 
             CryptoPlugin::SubSample *subSamples =
                 new CryptoPlugin::SubSample[numSubSamples];
