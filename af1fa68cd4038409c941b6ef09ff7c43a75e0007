@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5faad753_ffc75511",
+        "filename": "media/libstagefright/colorconversion/SoftwareRenderer.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 288,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-05-23T14:36:37Z",
+      "side": 1,
+      "message": "Would have preferred the ifdef down here so it\u0027s more obvious what\u0027s different, but keeping it at the definition is consistent with the other exynos 4 ifdef in the file.",
+      "revId": "af1fa68cd4038409c941b6ef09ff7c43a75e0007",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
