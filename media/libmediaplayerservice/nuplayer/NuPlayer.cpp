@@ -192,7 +192,6 @@ NuPlayer::NuPlayer(pid_t pid)
       mSourceStarted(false),
       mPaused(false),
       mPausedByClient(true),
-      mPendingBufferingFlag(PENDING_BUFFERING_FLAG_NONE),
       mPausedForBuffering(false) {
     clearFlushComplete();
 }
@@ -723,10 +722,6 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                 onStart();
             }
             mPausedByClient = false;
-            if (mPendingBufferingFlag != PENDING_BUFFERING_FLAG_NONE) {
-                notifyListener(MEDIA_INFO, mPendingBufferingFlag, 0);
-                mPendingBufferingFlag = PENDING_BUFFERING_FLAG_NONE;
-            }
             break;
         }
 
@@ -1217,8 +1212,6 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                 }
                 break;
             }
-
-            mPendingBufferingFlag = PENDING_BUFFERING_FLAG_NONE;
 
             mDeferredActions.push_back(
                     new FlushDecoderAction(FLUSH_CMD_FLUSH /* audio */,
@@ -1963,7 +1956,6 @@ void NuPlayer::performSeek(int64_t seekTimeUs) {
     }
     mPreviousSeekTimeUs = seekTimeUs;
     mSource->seekTo(seekTimeUs);
-    mPendingBufferingFlag = PENDING_BUFFERING_FLAG_NONE;
     ++mTimedTextGeneration;
 
     // everything's flushed, continue playback.
@@ -2209,12 +2201,7 @@ void NuPlayer::onSourceNotify(const sp<AMessage> &msg) {
 
         case Source::kWhatBufferingStart:
         {
-            if (mPausedByClient) {
-                mPendingBufferingFlag = PENDING_BUFFERING_FLAG_START;
-            } else {
-                notifyListener(MEDIA_INFO, MEDIA_INFO_BUFFERING_START, 0);
-                mPendingBufferingFlag = PENDING_BUFFERING_FLAG_NONE;
-            }
+            notifyListener(MEDIA_INFO, MEDIA_INFO_BUFFERING_START, 0);
             break;
         }
 
@@ -2237,7 +2224,6 @@ void NuPlayer::onSourceNotify(const sp<AMessage> &msg) {
         case Source::kWhatBufferingEnd:
         {
             notifyListener(MEDIA_INFO, MEDIA_INFO_BUFFERING_END, 0);
-            mPendingBufferingFlag = PENDING_BUFFERING_FLAG_NONE;
             break;
         }
 
