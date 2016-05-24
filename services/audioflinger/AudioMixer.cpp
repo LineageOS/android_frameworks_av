@@ -1704,8 +1704,8 @@ int64_t AudioMixer::calculateOutputPTS(const track_t& t, int64_t basePTS,
 
 // Needs to derive a compile time constant (constexpr).  Could be targeted to go
 // to a MONOVOL mixtype based on MAX_NUM_VOLUMES, but that's an unnecessary complication.
-#define MIXTYPE_MONOVOL(mixtype) (mixtype == MIXTYPE_MULTI ? MIXTYPE_MULTI_MONOVOL : \
-        mixtype == MIXTYPE_MULTI_SAVEONLY ? MIXTYPE_MULTI_SAVEONLY_MONOVOL : mixtype)
+#define MIXTYPE_MONOVOL(mixtype) ((mixtype) == MIXTYPE_MULTI ? MIXTYPE_MULTI_MONOVOL : \
+        (mixtype) == MIXTYPE_MULTI_SAVEONLY ? MIXTYPE_MULTI_SAVEONLY_MONOVOL : (mixtype))
 
 /* MIXTYPE     (see AudioMixerOps.h MIXTYPE_* enumeration)
  * TO: int32_t (Q4.27) or float
