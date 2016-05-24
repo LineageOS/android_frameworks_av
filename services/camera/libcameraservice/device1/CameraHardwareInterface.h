@@ -606,9 +606,9 @@ private:
                 reinterpret_cast<CameraHardwareInterface *>(user);
         return __this->mPreviewWindow.get();
     }
-#define anw(n) __to_anw(((struct camera_preview_window *)n)->user)
+#define anw(n) __to_anw(((struct camera_preview_window *)(n))->user)
 #define hwi(n) reinterpret_cast<CameraHardwareInterface *>(\
-        ((struct camera_preview_window *)n)->user)
+        ((struct camera_preview_window *)(n))->user)
 
     static int __dequeue_buffer(struct preview_stream_ops* w,
                                 buffer_handle_t** buffer, int *stride)
