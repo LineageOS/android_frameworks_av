@@ -592,7 +592,7 @@ IMPLEMENT_META_INTERFACE(OMX, "android.hardware.IOMX");
 ////////////////////////////////////////////////////////////////////////////////
 
 #define CHECK_OMX_INTERFACE(interface, data, reply) \
-        do { if (!data.enforceInterface(interface::getInterfaceDescriptor())) { \
+        do { if (!(data).enforceInterface(interface::getInterfaceDescriptor())) { \
             ALOGW("Call incorrectly routed to " #interface); \
             return PERMISSION_DENIED; \
         } } while (0)
