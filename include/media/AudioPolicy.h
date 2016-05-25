@@ -36,7 +36,7 @@ namespace android {
                                       (RULE_EXCLUSION_MASK|RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET)
 #define RULE_EXCLUDE_UID              (RULE_EXCLUSION_MASK|RULE_MATCH_UID)
 
-#define MIX_TYPE_INVALID -1
+#define MIX_TYPE_INVALID (-1)
 #define MIX_TYPE_PLAYERS 0
 #define MIX_TYPE_RECORDERS 1
 
@@ -45,7 +45,7 @@ namespace android {
 // keep in sync with AudioSystem.java
 #define DYNAMIC_POLICY_EVENT_MIX_STATE_UPDATE 0
 
-#define MIX_STATE_DISABLED -1
+#define MIX_STATE_DISABLED (-1)
 #define MIX_STATE_IDLE 0
 #define MIX_STATE_MIXING 1
 
