@@ -11,3 +11,15 @@ LOCAL_MODULE := libcpustats
 LOCAL_CFLAGS := -Werror -Wall
 
 include $(BUILD_STATIC_LIBRARY)
+
+include $(CLEAR_VARS)
+
+LOCAL_SRC_FILES :=     \
+        CentralTendencyStatistics.cpp \
+        ThreadCpuUsage.cpp
+
+LOCAL_MODULE := libcpustats
+
+LOCAL_CFLAGS := -std=gnu++11 -Werror -Wall
+
+include $(BUILD_HOST_STATIC_LIBRARY)
