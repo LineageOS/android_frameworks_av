@@ -22,6 +22,30 @@
       "revId": "120a94ab7d101ec7840a20c12b110b227e9325c0",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_431f95b6",
+        "filename": "media/mtp/MtpServer.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 141,
+      "author": {
+        "id": 14090
+      },
+      "writtenOn": "2016-06-06T19:16:05Z",
+      "side": 1,
+      "message": "Nvm. Misread the return type.",
+      "parentUuid": "5faad753_231b79d0",
+      "range": {
+        "startLine": 141,
+        "startChar": 35,
+        "endLine": 141,
+        "endChar": 39
+      },
+      "revId": "120a94ab7d101ec7840a20c12b110b227e9325c0",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
