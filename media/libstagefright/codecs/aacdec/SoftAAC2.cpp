@@ -62,6 +62,7 @@ static const OMX_U32 kSupportedProfiles[] = {
     OMX_AUDIO_AACObjectHE_PS,
     OMX_AUDIO_AACObjectLD,
     OMX_AUDIO_AACObjectELD,
+    OMX_AUDIO_AACObjectER_Scalable,
 };
 
 SoftAAC2::SoftAAC2(
