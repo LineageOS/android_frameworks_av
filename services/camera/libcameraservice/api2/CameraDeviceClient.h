@@ -179,6 +179,9 @@ private:
             android_dataspace dataSpace, const CameraMetadata& info,
             /*out*/int32_t* outWidth, /*out*/int32_t* outHeight);
 
+    //check if format is not custom format
+    static bool isPublicFormat(int32_t format);
+
     // IGraphicsBufferProducer binder -> Stream ID for output streams
     KeyedVector<sp<IBinder>, int> mStreamMap;
 

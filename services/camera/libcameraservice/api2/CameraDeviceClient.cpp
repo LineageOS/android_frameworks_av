@@ -449,7 +449,8 @@ status_t CameraDeviceClient::createStream(const OutputConfiguration &outputConfi
     }
 
     // Round dimensions to the nearest dimensions available for this format
-    if (flexibleConsumer && !CameraDeviceClient::roundBufferDimensionNearest(width, height,
+    if (flexibleConsumer && isPublicFormat(format) &&
+            !CameraDeviceClient::roundBufferDimensionNearest(width, height,
             format, dataSpace, mDevice->info(), /*out*/&width, /*out*/&height)) {
         ALOGE("%s: No stream configurations with the format %#x defined, failed to create stream.",
                 __FUNCTION__, format);
@@ -544,6 +545,37 @@ status_t CameraDeviceClient::getInputBufferProducer(
     if (!mDevice.get()) return DEAD_OBJECT;
 
     return mDevice->getInputBufferProducer(producer);
+}
+
+bool CameraDeviceClient::isPublicFormat(int32_t format)
+{
+    switch(format) {
+        case HAL_PIXEL_FORMAT_RGBA_8888:
+        case HAL_PIXEL_FORMAT_RGBX_8888:
+        case HAL_PIXEL_FORMAT_RGB_888:
+        case HAL_PIXEL_FORMAT_RGB_565:
+        case HAL_PIXEL_FORMAT_BGRA_8888:
+        case HAL_PIXEL_FORMAT_YV12:
+        case HAL_PIXEL_FORMAT_Y8:
+        case HAL_PIXEL_FORMAT_Y16:
+        case HAL_PIXEL_FORMAT_RAW16:
+        case HAL_PIXEL_FORMAT_RAW10:
+        case HAL_PIXEL_FORMAT_RAW12:
+        case HAL_PIXEL_FORMAT_RAW_OPAQUE:
+        case HAL_PIXEL_FORMAT_BLOB:
+        case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
+        case HAL_PIXEL_FORMAT_YCbCr_420_888:
+        case HAL_PIXEL_FORMAT_YCbCr_422_888:
+        case HAL_PIXEL_FORMAT_YCbCr_444_888:
+        case HAL_PIXEL_FORMAT_FLEX_RGB_888:
+        case HAL_PIXEL_FORMAT_FLEX_RGBA_8888:
+        case HAL_PIXEL_FORMAT_YCbCr_422_SP:
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        case HAL_PIXEL_FORMAT_YCbCr_422_I:
+            return true;
+        default:
+            return false;
+    }
 }
 
 bool CameraDeviceClient::roundBufferDimensionNearest(int32_t width, int32_t height,
