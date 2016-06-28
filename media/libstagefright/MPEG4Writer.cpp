@@ -2978,7 +2978,7 @@ void MPEG4Writer::Track::writeColrBox() {
         mOwner->writeInt16(primaries);
         mOwner->writeInt16(transfer);
         mOwner->writeInt16(coeffs);
-        mOwner->writeInt8(fullRange ? 128 : 0);
+        mOwner->writeInt8(int8_t(fullRange ? 0x80 : 0x0));
         mOwner->endBox(); // colr
     }
 }
