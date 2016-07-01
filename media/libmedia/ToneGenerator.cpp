@@ -839,8 +839,7 @@ ToneGenerator::ToneGenerator(audio_stream_type_t streamType, float volume, bool 
         mRegion = ANSI;
     } else if (strstr(value, "jp") != NULL) {
         mRegion = JAPAN;
-    } else if (strcmp(value,"uk") == 0 ||
-               strcmp(value,"uk,uk") == 0) {
+    } else if (strstr(value, "uk") != NULL) {
         mRegion = UK;
     } else {
         mRegion = CEPT;
