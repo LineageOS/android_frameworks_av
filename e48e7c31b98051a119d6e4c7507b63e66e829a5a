@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "3fa7e38b_9c624b16",
+        "filename": "services/audiopolicy/service/AudioPolicyInterfaceImpl.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 319,
+      "author": {
+        "id": 13409
+      },
+      "writtenOn": "2016-07-06T16:14:59Z",
+      "side": 1,
+      "message": "blank line above here",
+      "revId": "e48e7c31b98051a119d6e4c7507b63e66e829a5a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3fa7e38b_bc670726",
+        "filename": "services/audiopolicy/service/AudioPolicyInterfaceImplLegacy.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 277,
+      "author": {
+        "id": 13409
+      },
+      "writtenOn": "2016-07-06T16:14:59Z",
+      "side": 1,
+      "message": "blank line",
+      "revId": "e48e7c31b98051a119d6e4c7507b63e66e829a5a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
