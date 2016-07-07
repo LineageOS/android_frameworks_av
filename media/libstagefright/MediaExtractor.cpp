@@ -117,74 +117,6 @@ uint32_t MediaExtractor::flags() const {
     return CAN_SEEK_BACKWARD | CAN_SEEK_FORWARD | CAN_PAUSE | CAN_SEEK;
 }
 
-
-
-class RemoteDataSource : public BnDataSource {
-public:
-    enum {
-        kBufferSize = 64 * 1024,
-    };
-
-    static sp<IDataSource> wrap(const sp<DataSource> &source);
-    virtual ~RemoteDataSource();
-
-    virtual sp<IMemory> getIMemory();
-    virtual ssize_t readAt(off64_t offset, size_t size);
-    virtual status_t getSize(off64_t* size);
-    virtual void close();
-    virtual uint32_t getFlags();
-    virtual String8 toString();
-    virtual sp<DecryptHandle> DrmInitialization(const char *mime);
-
-private:
-    sp<IMemory> mMemory;
-    sp<DataSource> mSource;
-    String8 mName;
-    explicit RemoteDataSource(const sp<DataSource> &source);
-    DISALLOW_EVIL_CONSTRUCTORS(RemoteDataSource);
-};
-
-
-sp<IDataSource> RemoteDataSource::wrap(const sp<DataSource> &source) {
-    return new RemoteDataSource(source);
-}
-RemoteDataSource::RemoteDataSource(const sp<DataSource> &source) {
-    mSource = source;
-    sp<MemoryDealer> memoryDealer = new MemoryDealer(kBufferSize, "RemoteDataSource");
-    mMemory = memoryDealer->allocate(kBufferSize);
-    if (mMemory == NULL) {
-        ALOGE("Failed to allocate memory!");
-    }
-    mName = String8::format("RemoteDataSource(%s)", mSource->toString().string());
-}
-RemoteDataSource::~RemoteDataSource() {
-    close();
-}
-sp<IMemory> RemoteDataSource::getIMemory() {
-    return mMemory;
-}
-ssize_t RemoteDataSource::readAt(off64_t offset, size_t size) {
-    ALOGV("readAt(%" PRId64 ", %zu)", offset, size);
-    return mSource->readAt(offset, mMemory->pointer(), size);
-}
-status_t RemoteDataSource::getSize(off64_t* size) {
-    return mSource->getSize(size);
-}
-void RemoteDataSource::close() {
-    mSource = NULL;
-}
-uint32_t RemoteDataSource::getFlags() {
-    return mSource->flags();
-}
-
-String8 RemoteDataSource::toString() {
-    return mName;
-}
-
-sp<DecryptHandle> RemoteDataSource::DrmInitialization(const char *mime) {
-    return mSource->DrmInitialization(mime);
-}
-
 // static
 sp<IMediaExtractor> MediaExtractor::Create(
         const sp<DataSource> &source, const char *mime) {
@@ -201,7 +133,7 @@ sp<IMediaExtractor> MediaExtractor::Create(
 
         if (binder != 0) {
             sp<IMediaExtractorService> mediaExService(interface_cast<IMediaExtractorService>(binder));
-            sp<IMediaExtractor> ex = mediaExService->makeExtractor(RemoteDataSource::wrap(source), mime);
+            sp<IMediaExtractor> ex = mediaExService->makeExtractor(source->asIDataSource(), mime);
             return ex;
         } else {
             ALOGE("extractor service not running");
@@ -218,7 +150,7 @@ sp<MediaExtractor> MediaExtractor::CreateFromService(
     RegisterDefaultSniffers();
 
     // initialize source decryption if needed
-    source->DrmInitialization();
+    source->DrmInitialization(nullptr /* mime */);
 
     sp<AMessage> meta;
 

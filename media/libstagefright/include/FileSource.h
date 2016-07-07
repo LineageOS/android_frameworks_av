@@ -51,6 +51,8 @@ public:
         return mName;
     }
 
+    static bool requiresDrm(int fd, int64_t offset, int64_t length, const char *mime);
+
 protected:
     virtual ~FileSource();
 

@@ -20,6 +20,7 @@
 #include "include/HTTPBase.h"
 #include "include/NuCachedSource2.h"
 
+#include <media/IDataSource.h>
 #include <media/IMediaHTTPConnection.h>
 #include <media/IMediaHTTPService.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -29,14 +30,13 @@
 #include <media/stagefright/FileSource.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MediaHTTP.h>
+#include <media/stagefright/RemoteDataSource.h>
 #include <media/stagefright/Utils.h>
 #include <utils/String8.h>
 
 #include <cutils/properties.h>
 
 #include <private/android_filesystem_config.h>
-
-#include <arpa/inet.h>
 
 namespace android {
 
@@ -96,6 +96,10 @@ status_t DataSource::getSize(off64_t *size) {
     *size = 0;
 
     return ERROR_UNSUPPORTED;
+}
+
+sp<IDataSource> DataSource::getIDataSource() const {
+    return nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -167,6 +171,11 @@ sp<DataSource> DataSource::CreateFromURI(
     return source;
 }
 
+sp<DataSource> DataSource::CreateFromFd(int fd, int64_t offset, int64_t length) {
+    sp<FileSource> source = new FileSource(fd, offset, length);
+    return source->initCheck() != OK ? nullptr : source;
+}
+
 sp<DataSource> DataSource::CreateMediaHTTP(const sp<IMediaHTTPService> &httpService) {
     if (httpService == NULL) {
         return NULL;
@@ -186,6 +195,10 @@ sp<DataSource> DataSource::CreateFromIDataSource(const sp<IDataSource> &source) 
 
 String8 DataSource::getMIMEType() const {
     return String8("application/octet-stream");
+}
+
+sp<IDataSource> DataSource::asIDataSource() {
+    return RemoteDataSource::wrap(sp<DataSource>(this));
 }
 
 }  // namespace android
