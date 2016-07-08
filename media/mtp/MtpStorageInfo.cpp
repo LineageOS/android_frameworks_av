@@ -58,8 +58,10 @@ bool MtpStorageInfo::read(MtpDataPacket& packet) {
 
     if (!packet.getString(string)) return false;
     mStorageDescription = strdup((const char *)string);
+    if (!mStorageDescription) return false;
     if (!packet.getString(string)) return false;
     mVolumeIdentifier = strdup((const char *)string);
+    if (!mVolumeIdentifier) return false;
 
     return true;
 }

@@ -77,6 +77,7 @@ bool MtpObjectInfo::read(MtpDataPacket& packet) {
 
     if (!packet.getString(string)) return false;
     mName = strdup((const char *)string);
+    if (!mName) return false;
 
     if (!packet.getString(string)) return false;
     if (parseDateTime((const char*)string, time))
@@ -88,6 +89,7 @@ bool MtpObjectInfo::read(MtpDataPacket& packet) {
 
     if (!packet.getString(string)) return false;
     mKeywords = strdup((const char *)string);
+    if (!mKeywords) return false;
 
     return true;
 }
