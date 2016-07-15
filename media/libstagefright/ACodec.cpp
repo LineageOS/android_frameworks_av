@@ -3879,7 +3879,7 @@ status_t ACodec::setCyclicIntraMacroblockRefresh(const sp<AMessage> &msg, int32_
 }
 
 static OMX_U32 setPFramesSpacing(
-        int32_t iFramesInterval /* seconds */, int32_t frameRate, uint32_t BFramesSpacing = 0) {
+        float iFramesInterval /* seconds */, int32_t frameRate, uint32_t BFramesSpacing = 0) {
     // BFramesSpacing is the number of B frames between I/P frames
     // PFramesSpacing (the value to be returned) is the number of P frames between I frames
     //
@@ -3915,9 +3915,10 @@ static OMX_VIDEO_CONTROLRATETYPE getBitrateMode(const sp<AMessage> &msg) {
 }
 
 status_t ACodec::setupMPEG4EncoderParameters(const sp<AMessage> &msg) {
-    int32_t bitrate, iFrameInterval;
+    int32_t bitrate;
+    float iFrameInterval;
     if (!msg->findInt32("bitrate", &bitrate)
-            || !msg->findInt32("i-frame-interval", &iFrameInterval)) {
+            || !msg->findAsFloat("i-frame-interval", &iFrameInterval)) {
         return INVALID_OPERATION;
     }
 
@@ -3996,9 +3997,10 @@ status_t ACodec::setupMPEG4EncoderParameters(const sp<AMessage> &msg) {
 }
 
 status_t ACodec::setupH263EncoderParameters(const sp<AMessage> &msg) {
-    int32_t bitrate, iFrameInterval;
+    int32_t bitrate;
+    float iFrameInterval;
     if (!msg->findInt32("bitrate", &bitrate)
-            || !msg->findInt32("i-frame-interval", &iFrameInterval)) {
+            || !msg->findAsFloat("i-frame-interval", &iFrameInterval)) {
         return INVALID_OPERATION;
     }
 
@@ -4124,9 +4126,10 @@ int /* OMX_VIDEO_AVCLEVELTYPE */ ACodec::getAVCLevelFor(
 }
 
 status_t ACodec::setupAVCEncoderParameters(const sp<AMessage> &msg) {
-    int32_t bitrate, iFrameInterval;
+    int32_t bitrate;
+    float iFrameInterval;
     if (!msg->findInt32("bitrate", &bitrate)
-            || !msg->findInt32("i-frame-interval", &iFrameInterval)) {
+            || !msg->findAsFloat("i-frame-interval", &iFrameInterval)) {
         return INVALID_OPERATION;
     }
 
@@ -4283,9 +4286,10 @@ status_t ACodec::setupAVCEncoderParameters(const sp<AMessage> &msg) {
 }
 
 status_t ACodec::setupHEVCEncoderParameters(const sp<AMessage> &msg) {
-    int32_t bitrate, iFrameInterval;
+    int32_t bitrate;
+    float iFrameInterval;
     if (!msg->findInt32("bitrate", &bitrate)
-            || !msg->findInt32("i-frame-interval", &iFrameInterval)) {
+            || !msg->findAsFloat("i-frame-interval", &iFrameInterval)) {
         return INVALID_OPERATION;
     }
 
@@ -4340,7 +4344,7 @@ status_t ACodec::setupHEVCEncoderParameters(const sp<AMessage> &msg) {
 
 status_t ACodec::setupVPXEncoderParameters(const sp<AMessage> &msg) {
     int32_t bitrate;
-    int32_t iFrameInterval = 0;
+    float iFrameInterval = 0;
     size_t tsLayers = 0;
     OMX_VIDEO_ANDROID_VPXTEMPORALLAYERPATTERNTYPE pattern =
         OMX_VIDEO_VPXTemporalLayerPatternNone;
@@ -4354,7 +4358,7 @@ status_t ACodec::setupVPXEncoderParameters(const sp<AMessage> &msg) {
     if (!msg->findInt32("bitrate", &bitrate)) {
         return INVALID_OPERATION;
     }
-    msg->findInt32("i-frame-interval", &iFrameInterval);
+    msg->findAsFloat("i-frame-interval", &iFrameInterval);
 
     OMX_VIDEO_CONTROLRATETYPE bitrateMode = getBitrateMode(msg);
 
