@@ -63,6 +63,12 @@ private:
         const MatroskaExtractor *mExtractor;
         Vector<const mkvparser::CuePoint*> mCuePoints;
 
+        // mHeader points to memory managed by mkvparser;
+        // mHeader would be deleted when mSegment is deleted
+        // in ~MatroskaExtractor.
+        unsigned char *mHeader;
+        size_t mHeaderLen;
+
         const mkvparser::Track* getTrack() const;
         const mkvparser::CuePoint::TrackPosition *find(long long timeNs) const;
     };
@@ -79,6 +85,7 @@ private:
     int64_t mSeekPreRollNs;
 
     status_t synthesizeAVCC(TrackInfo *trackInfo, size_t index);
+    status_t initTrackInfo(const mkvparser::Track *track, const sp<MetaData> &meta, TrackInfo *trackInfo);
     void addTracks();
     void findThumbnails();
     void getColorInformation(const mkvparser::VideoTrack *vtrack, sp<MetaData> &meta);

@@ -605,16 +605,27 @@ status_t MatroskaSource::readBlock() {
     int64_t timeUs = mBlockIter.blockTimeUs();
 
     for (int i = 0; i < block->GetFrameCount(); ++i) {
+        MatroskaExtractor::TrackInfo *trackInfo = &mExtractor->mTracks.editItemAt(mTrackIndex);
         const mkvparser::Block::Frame &frame = block->GetFrame(i);
+        size_t len = frame.len;
+        if (SIZE_MAX - len < trackInfo->mHeaderLen) {
+            return ERROR_MALFORMED;
+        }
 
-        MediaBuffer *mbuf = new MediaBuffer(frame.len);
+        len += trackInfo->mHeaderLen;
+        MediaBuffer *mbuf = new MediaBuffer(len);
+        uint8_t *data = static_cast<uint8_t *>(mbuf->data());
+        if (trackInfo->mHeader) {
+            memcpy(data, trackInfo->mHeader, trackInfo->mHeaderLen);
+        }
+
         mbuf->meta_data()->setInt64(kKeyTime, timeUs);
         mbuf->meta_data()->setInt32(kKeyIsSyncFrame, block->IsKey());
 
-        status_t err = frame.Read(mExtractor->mReader, static_cast<uint8_t *>(mbuf->data()));
+        status_t err = frame.Read(mExtractor->mReader, data + trackInfo->mHeaderLen);
         if (err == OK
                 && mExtractor->mIsWebm
-                && mExtractor->mTracks.itemAt(mTrackIndex).mEncrypted) {
+                && trackInfo->mEncrypted) {
             err = setWebmBlockCryptoInfo(mbuf);
         }
 
@@ -1164,6 +1175,42 @@ void MatroskaExtractor::getColorInformation(
     }
 }
 
+status_t MatroskaExtractor::initTrackInfo(
+        const mkvparser::Track *track, const sp<MetaData> &meta, TrackInfo *trackInfo) {
+    trackInfo->mTrackNum = track->GetNumber();
+    trackInfo->mMeta = meta;
+    trackInfo->mExtractor = this;
+    trackInfo->mEncrypted = false;
+    trackInfo->mHeader = NULL;
+    trackInfo->mHeaderLen = 0;
+
+    for(size_t i = 0; i < track->GetContentEncodingCount(); i++) {
+        const mkvparser::ContentEncoding *encoding = track->GetContentEncodingByIndex(i);
+        for(size_t j = 0; j < encoding->GetEncryptionCount(); j++) {
+            const mkvparser::ContentEncoding::ContentEncryption *encryption;
+            encryption = encoding->GetEncryptionByIndex(j);
+            trackInfo->mMeta->setData(kKeyCryptoKey, 0, encryption->key_id, encryption->key_id_len);
+            trackInfo->mEncrypted = true;
+            break;
+        }
+
+        for(size_t j = 0; j < encoding->GetCompressionCount(); j++) {
+            const mkvparser::ContentEncoding::ContentCompression *compression;
+            compression = encoding->GetCompressionByIndex(j);
+            ALOGV("compression algo %llu settings_len %lld",
+                compression->algo, compression->settings_len);
+            if (compression->algo == 3
+                    && compression->settings
+                    && compression->settings_len > 0) {
+                trackInfo->mHeader = compression->settings;
+                trackInfo->mHeaderLen = compression->settings_len;
+            }
+        }
+    }
+
+    return OK;
+}
+
 void MatroskaExtractor::addTracks() {
     const mkvparser::Tracks *tracks = mSegment->GetTracks();
 
@@ -1288,21 +1335,7 @@ void MatroskaExtractor::addTracks() {
         mTracks.push();
         size_t n = mTracks.size() - 1;
         TrackInfo *trackInfo = &mTracks.editItemAt(n);
-        trackInfo->mTrackNum = track->GetNumber();
-        trackInfo->mMeta = meta;
-        trackInfo->mExtractor = this;
-
-        trackInfo->mEncrypted = false;
-        for(size_t i = 0; i < track->GetContentEncodingCount() && !trackInfo->mEncrypted; i++) {
-            const mkvparser::ContentEncoding *encoding = track->GetContentEncodingByIndex(i);
-            for(size_t j = 0; j < encoding->GetEncryptionCount(); j++) {
-                const mkvparser::ContentEncoding::ContentEncryption *encryption;
-                encryption = encoding->GetEncryptionByIndex(j);
-                meta->setData(kKeyCryptoKey, 0, encryption->key_id, encryption->key_id_len);
-                trackInfo->mEncrypted = true;
-                break;
-            }
-        }
+        initTrackInfo(track, meta, trackInfo);
 
         if (!strcmp("V_MPEG4/ISO/AVC", codecID) && codecPrivateSize == 0) {
             // Attempt to recover from AVC track without codec private data
