@@ -55,10 +55,9 @@ ssize_t PipeReader::availableToRead()
     // read() is not multi-thread safe w.r.t. itself, so no mutex or atomic op needed to read mFront
     size_t avail = rear - mFront;
     if (CC_UNLIKELY(avail > mPipe.mMaxFrames)) {
-        // Discard 1/16 of the most recent data in pipe to avoid another overrun immediately
-        int32_t oldFront = mFront;
-        mFront = rear - mPipe.mMaxFrames + (mPipe.mMaxFrames >> 4);
-        mFramesOverrun += (size_t) (mFront - oldFront);
+        // Discard all data in pipe to avoid another overrun immediately
+        mFront = rear;
+        mFramesOverrun += avail;
         ++mOverruns;
         return OVERRUN;
     }

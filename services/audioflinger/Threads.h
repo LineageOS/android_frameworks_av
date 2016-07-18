@@ -1353,9 +1353,10 @@ private:
             Condition                           mStartStopCond;
 
             // resampler converts input at HAL Hz to output at AudioRecord client Hz
-            void                               *mRsmpInBuffer; //
+            void                               *mRsmpInBuffer;  // size = mRsmpInFramesOA
             size_t                              mRsmpInFrames;  // size of resampler input in frames
             size_t                              mRsmpInFramesP2;// size rounded up to a power-of-2
+            size_t                              mRsmpInFramesOA;// mRsmpInFramesP2 + over-allocation
 
             // rolling index that is never cleared
             int32_t                             mRsmpInRear;    // last filled frame + 1
