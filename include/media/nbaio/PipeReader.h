@@ -47,6 +47,8 @@ public:
 
     virtual ssize_t read(void *buffer, size_t count);
 
+    virtual ssize_t flush();
+
     // NBAIO_Source end
 
 #if 0   // until necessary

@@ -6459,6 +6459,16 @@ void AudioFlinger::RecordThread::inputStandBy()
         }
     }
     mInput->stream->common.standby(&mInput->stream->common);
+
+    // If going into standby, flush the pipe source.
+    if (mPipeSource.get() != nullptr) {
+        const ssize_t flushed = mPipeSource->flush();
+        if (flushed > 0) {
+            ALOGV("Input standby flushed PipeSource %zd frames", flushed);
+            mTimestamp.mPosition[ExtendedTimestamp::LOCATION_SERVER] += flushed;
+            mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] = systemTime();
+        }
+    }
 }
 
 // RecordThread::createRecordTrack_l() must be called with AudioFlinger::mLock held

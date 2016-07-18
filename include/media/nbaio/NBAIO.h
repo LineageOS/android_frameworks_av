@@ -266,6 +266,17 @@ public:
     //              One or more frames were lost due to overrun, try again to read more recent data.
     virtual ssize_t read(void *buffer, size_t count) = 0;
 
+    // Flush data from buffer.  There is no notion of overrun as all data is dropped.
+    // Flushed frames also count towards frames read.
+    //
+    // Return value:
+    //  >= 0    Number of frames successfully flushed
+    //  < 0     status_t error occurred
+    // Errors:
+    //  NEGOTIATE         (Re-)negotiation is needed.
+    //  INVALID_OPERATION Not implemented
+    virtual ssize_t flush() { return INVALID_OPERATION; }
+
     // Transfer data from source using a series of callbacks.  More suitable for zero-fill,
     // synthesis, and non-contiguous transfers (e.g. circular buffer or readv).
     // Inputs:
