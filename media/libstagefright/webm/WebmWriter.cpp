@@ -493,7 +493,7 @@ status_t WebmWriter::start(MetaData *params) {
     }
 
     sp<WebmElement> elems[] = { ebml, segment, seekHead, info, tracks, cues };
-    size_t nElems = sizeof(elems) / sizeof(elems[0]);
+    static const size_t nElems = sizeof(elems) / sizeof(elems[0]);
     uint64_t offsets[nElems];
     uint64_t sizes[nElems];
     for (uint32_t i = 0; i < nElems; i++) {
