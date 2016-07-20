@@ -666,7 +666,7 @@ void NuPlayer::GenericSource::onMessageReceived(const sp<AMessage> &msg) {
               timeUs = mVideoLastDequeueTimeUs;
           }
           readBuffer(trackType, timeUs, &actualTimeUs, formatChange);
-          readBuffer(counterpartType, -1, NULL, formatChange);
+          readBuffer(counterpartType, -1, NULL, !formatChange);
           ALOGV("timeUs %lld actualTimeUs %lld", (long long)timeUs, (long long)actualTimeUs);
 
           break;
