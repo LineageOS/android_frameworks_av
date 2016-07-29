@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "3fa7e38b_0c17d4ef",
+        "filename": "media/libmedia/mtkaudio_stubs.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 848
+      },
+      "writtenOn": "2016-07-29T23:29:46Z",
+      "side": 1,
+      "message": "Missing copyrights",
+      "range": {
+        "startLine": 1,
+        "startChar": 0,
+        "endLine": 1,
+        "endChar": 24
+      },
+      "revId": "7b542a7ee3ff010e5ec0a12c28505f7e716da2d0",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
