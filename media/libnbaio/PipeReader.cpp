@@ -45,6 +45,7 @@ PipeReader::~PipeReader()
     ALOG_ASSERT(readers > 0);
 }
 
+__attribute__((no_sanitize("integer")))
 ssize_t PipeReader::availableToRead()
 {
     if (CC_UNLIKELY(!mNegotiated)) {
@@ -64,6 +65,7 @@ ssize_t PipeReader::availableToRead()
     return avail;
 }
 
+__attribute__((no_sanitize("integer")))
 ssize_t PipeReader::read(void *buffer, size_t count)
 {
     ssize_t avail = availableToRead();
@@ -95,6 +97,21 @@ ssize_t PipeReader::read(void *buffer, size_t count)
     mFront += red;
     mFramesRead += red;
     return red;
+}
+
+__attribute__((no_sanitize("integer")))
+ssize_t PipeReader::flush()
+{
+    if (CC_UNLIKELY(!mNegotiated)) {
+        return NEGOTIATE;
+    }
+    const int32_t rear = android_atomic_acquire_load(&mPipe.mRear);
+    const size_t flushed = rear - mFront;
+    // We don't check if flushed > mPipe.mMaxFrames (an overrun occurred) as the
+    // distinction is unimportant; all data is dropped.
+    mFront = rear;
+    mFramesRead += flushed;  // we consider flushed frames as read.
+    return flushed;
 }
 
 }   // namespace android
