@@ -1396,6 +1396,11 @@ struct MyHandler : public AHandler {
         msg->post((mKeepAliveTimeoutUs * 9) / 10);
     }
 
+    void cancelAccessUnitTimeoutCheck() {
+        ALOGV("cancelAccessUnitTimeoutCheck");
+        ++mCheckGeneration;
+    }
+
     void postAccessUnitTimeoutCheck() {
         if (mCheckPending) {
             return;
