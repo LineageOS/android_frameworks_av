@@ -101,7 +101,7 @@ struct MuxOMX : public IOMX {
 
     virtual status_t useBuffer(
             node_id node, OMX_U32 port_index, const sp<IMemory> &params,
-            buffer_id *buffer, OMX_U32 allottedSize);
+            buffer_id *buffer, OMX_U32 allottedSize, OMX_BOOL crossProcess);
 
     virtual status_t useGraphicBuffer(
             node_id node, OMX_U32 port_index,
@@ -135,7 +135,7 @@ struct MuxOMX : public IOMX {
 
     virtual status_t allocateBufferWithBackup(
             node_id node, OMX_U32 port_index, const sp<IMemory> &params,
-            buffer_id *buffer, OMX_U32 allottedSize);
+            buffer_id *buffer, OMX_U32 allottedSize, OMX_BOOL crossProcess);
 
     virtual status_t freeBuffer(
             node_id node, OMX_U32 port_index, buffer_id buffer);
@@ -379,8 +379,9 @@ status_t MuxOMX::getGraphicBufferUsage(
 
 status_t MuxOMX::useBuffer(
         node_id node, OMX_U32 port_index, const sp<IMemory> &params,
-        buffer_id *buffer, OMX_U32 allottedSize) {
-    return getOMX(node)->useBuffer(node, port_index, params, buffer, allottedSize);
+        buffer_id *buffer, OMX_U32 allottedSize, OMX_BOOL /* crossProcess */) {
+    return getOMX(node)->useBuffer(
+            node, port_index, params, buffer, allottedSize, OMX_FALSE /* crossProcess */);
 }
 
 status_t MuxOMX::useGraphicBuffer(
@@ -447,9 +448,9 @@ status_t MuxOMX::allocateSecureBuffer(
 
 status_t MuxOMX::allocateBufferWithBackup(
         node_id node, OMX_U32 port_index, const sp<IMemory> &params,
-        buffer_id *buffer, OMX_U32 allottedSize) {
+        buffer_id *buffer, OMX_U32 allottedSize, OMX_BOOL /* crossProcess */) {
     return getOMX(node)->allocateBufferWithBackup(
-            node, port_index, params, buffer, allottedSize);
+            node, port_index, params, buffer, allottedSize, OMX_FALSE /* crossProcess */);
 }
 
 status_t MuxOMX::freeBuffer(
