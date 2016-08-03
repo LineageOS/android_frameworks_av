@@ -32,7 +32,7 @@ namespace android {
 class Fence;
 class GraphicBuffer;
 
-struct FrameRenderTracker : public RefBase {
+struct FrameRenderTracker {
     // Tracks the render information about a frame. Frames go through several states while
     // the render information is tracked:
     //
