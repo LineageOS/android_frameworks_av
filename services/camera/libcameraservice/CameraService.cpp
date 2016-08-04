@@ -2137,6 +2137,8 @@ binder::Status CameraService::BasicClient::disconnect() {
     }
 
     finishCameraOps();
+    // Notify flashlight that a camera device is closed.
+    mCameraService->mFlashlight->deviceClosed(String8::format("%d", mCameraId));
     ALOGI("%s: Disconnected client for camera %d for PID %d", __FUNCTION__, mCameraId, mClientPid);
 
     // client shouldn't be able to call into us anymore
@@ -2233,10 +2235,6 @@ status_t CameraService::BasicClient::finishCameraOps() {
 
         // Transition device state to CLOSED
         mCameraService->updateProxyDeviceState(ICameraServiceProxy::CAMERA_STATE_CLOSED,
-                String8::format("%d", mCameraId));
-
-        // Notify flashlight that a camera device is closed.
-        mCameraService->mFlashlight->deviceClosed(
                 String8::format("%d", mCameraId));
     }
     // Always stop watching, even if no camera op is active
