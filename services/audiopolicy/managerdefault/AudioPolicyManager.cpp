@@ -4333,33 +4333,36 @@ void AudioPolicyManager::checkA2dpSuspend()
             ((mAvailableInputDevices.types() & AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET &
                     ~AUDIO_DEVICE_BIT_IN) != 0) ||
             ((mAvailableOutputDevices.types() & AUDIO_DEVICE_OUT_ALL_SCO) != 0);
-    // suspend A2DP output if:
-    //      (NOT already suspended) &&
-    //      ((SCO device is connected &&
-    //       (forced usage for communication || for record is SCO))) ||
-    //      (phone state is ringing || in call)
+
+    // if suspended, restore A2DP output if:
+    //      ((SCO device is NOT connected) ||
+    //       ((forced usage communication is NOT SCO) && (forced usage for record is NOT SCO) &&
+    //        (phone state is NOT in call) && (phone state is NOT ringing)))
     //
-    // restore A2DP output if:
-    //      (Already suspended) &&
-    //      ((SCO device is NOT connected ||
-    //       (forced usage NOT for communication && NOT for record is SCO))) &&
-    //      (phone state is NOT ringing && NOT in call)
+    // if not suspended, suspend A2DP output if:
+    //      (SCO device is connected) &&
+    //       ((forced usage for communication is SCO) || (forced usage for record is SCO) ||
+    //       ((phone state is in call) || (phone state is ringing)))
     //
     if (mA2dpSuspended) {
-        if ((!isScoConnected ||
-             ((mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_COMMUNICATION) != AUDIO_POLICY_FORCE_BT_SCO) &&
-              (mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_RECORD) != AUDIO_POLICY_FORCE_BT_SCO))) &&
-             ((mEngine->getPhoneState() != AUDIO_MODE_IN_CALL) &&
+        if (!isScoConnected ||
+             ((mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_COMMUNICATION) !=
+                     AUDIO_POLICY_FORCE_BT_SCO) &&
+              (mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_RECORD) !=
+                      AUDIO_POLICY_FORCE_BT_SCO) &&
+              (mEngine->getPhoneState() != AUDIO_MODE_IN_CALL) &&
               (mEngine->getPhoneState() != AUDIO_MODE_RINGTONE))) {
 
             mpClientInterface->restoreOutput(a2dpOutput);
             mA2dpSuspended = false;
         }
     } else {
-        if ((isScoConnected &&
-             ((mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_COMMUNICATION) == AUDIO_POLICY_FORCE_BT_SCO) ||
-              (mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_RECORD) == AUDIO_POLICY_FORCE_BT_SCO))) ||
-             ((mEngine->getPhoneState() == AUDIO_MODE_IN_CALL) ||
+        if (isScoConnected &&
+             ((mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_COMMUNICATION) ==
+                     AUDIO_POLICY_FORCE_BT_SCO) ||
+              (mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_RECORD) ==
+                      AUDIO_POLICY_FORCE_BT_SCO) ||
+              (mEngine->getPhoneState() == AUDIO_MODE_IN_CALL) ||
               (mEngine->getPhoneState() == AUDIO_MODE_RINGTONE))) {
 
             mpClientInterface->suspendOutput(a2dpOutput);
