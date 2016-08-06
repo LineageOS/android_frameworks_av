@@ -32,17 +32,16 @@
 #include <binder/IServiceManager.h>
 #include <binder/MemoryBase.h>
 #include <binder/MemoryHeapBase.h>
-#include <hardware/sound_trigger.h>
+#include <system/sound_trigger.h>
 #include <ServiceUtilities.h>
 #include "SoundTriggerHwService.h"
-
-namespace android {
 
 #ifdef SOUND_TRIGGER_USE_STUB_MODULE
 #define HW_MODULE_PREFIX "stub"
 #else
 #define HW_MODULE_PREFIX "primary"
 #endif
+namespace android {
 
 SoundTriggerHwService::SoundTriggerHwService()
     : BnSoundTriggerHwService(),
@@ -54,30 +53,17 @@ SoundTriggerHwService::SoundTriggerHwService()
 
 void SoundTriggerHwService::onFirstRef()
 {
-    const hw_module_t *mod;
     int rc;
-    sound_trigger_hw_device *dev;
 
-    rc = hw_get_module_by_class(SOUND_TRIGGER_HARDWARE_MODULE_ID, HW_MODULE_PREFIX, &mod);
-    if (rc != 0) {
-        ALOGE("couldn't load sound trigger module %s.%s (%s)",
-              SOUND_TRIGGER_HARDWARE_MODULE_ID, HW_MODULE_PREFIX, strerror(-rc));
-        return;
-    }
-    rc = sound_trigger_hw_device_open(mod, &dev);
-    if (rc != 0) {
-        ALOGE("couldn't open sound trigger hw device in %s.%s (%s)",
-              SOUND_TRIGGER_HARDWARE_MODULE_ID, HW_MODULE_PREFIX, strerror(-rc));
-        return;
-    }
-    if (dev->common.version < SOUND_TRIGGER_DEVICE_API_VERSION_1_0 ||
-        dev->common.version > SOUND_TRIGGER_DEVICE_API_VERSION_CURRENT) {
-        ALOGE("wrong sound trigger hw device version %04x", dev->common.version);
-        return;
-    }
+    sp<SoundTriggerHalInterface> halInterface =
+            SoundTriggerHalInterface::connectModule(HW_MODULE_PREFIX);
 
+    if (halInterface == 0) {
+        ALOGW("could not connect to HAL");
+        return;
+    }
     sound_trigger_module_descriptor descriptor;
-    rc = dev->get_properties(dev, &descriptor.properties);
+    rc = halInterface->getProperties(&descriptor.properties);
     if (rc != 0) {
         ALOGE("could not read implementation properties");
         return;
@@ -88,7 +74,7 @@ void SoundTriggerHwService::onFirstRef()
                                                  descriptor.handle);
 
     sp<ISoundTriggerClient> client;
-    sp<Module> module = new Module(this, dev, descriptor, client);
+    sp<Module> module = new Module(this, halInterface, descriptor, client);
     mModules.add(descriptor.handle, module);
     mCallbackThread = new CallbackThread(this);
 }
@@ -97,9 +83,6 @@ SoundTriggerHwService::~SoundTriggerHwService()
 {
     if (mCallbackThread != 0) {
         mCallbackThread->exit();
-    }
-    for (size_t i = 0; i < mModules.size(); i++) {
-        sound_trigger_hw_device_close(mModules.valueAt(i)->hwDevice());
     }
 }
 
@@ -489,10 +472,10 @@ SoundTriggerHwService::CallbackEvent::~CallbackEvent()
 #define LOG_TAG "SoundTriggerHwService::Module"
 
 SoundTriggerHwService::Module::Module(const sp<SoundTriggerHwService>& service,
-                                      sound_trigger_hw_device* hwDevice,
+                                      const sp<SoundTriggerHalInterface>& halInterface,
                                       sound_trigger_module_descriptor descriptor,
                                       const sp<ISoundTriggerClient>& client)
- : mService(service), mHwDevice(hwDevice), mDescriptor(descriptor),
+ : mService(service), mHalInterface(halInterface), mDescriptor(descriptor),
    mClient(client), mServiceState(SOUND_TRIGGER_STATE_NO_INIT)
 {
 }
@@ -510,10 +493,12 @@ void SoundTriggerHwService::Module::detach() {
         for (size_t i = 0; i < mModels.size(); i++) {
             sp<Model> model = mModels.valueAt(i);
             ALOGV("detach() unloading model %d", model->mHandle);
-            if (model->mState == Model::STATE_ACTIVE) {
-                mHwDevice->stop_recognition(mHwDevice, model->mHandle);
+            if (mHalInterface != 0) {
+                if (model->mState == Model::STATE_ACTIVE) {
+                    mHalInterface->stopRecognition(model->mHandle);
+                }
+                mHalInterface->unloadSoundModel(model->mHandle);
             }
-            mHwDevice->unload_sound_model(mHwDevice, model->mHandle);
         }
         mModels.clear();
     }
@@ -531,10 +516,12 @@ status_t SoundTriggerHwService::Module::loadSoundModel(const sp<IMemory>& modelM
                                 sound_model_handle_t *handle)
 {
     ALOGV("loadSoundModel() handle");
+    if (mHalInterface == 0) {
+        return NO_INIT;
+    }
     if (!captureHotwordAllowed()) {
         return PERMISSION_DENIED;
     }
-
     if (modelMemory == 0 || modelMemory->pointer() == NULL) {
         ALOGE("loadSoundModel() modelMemory is 0 or has NULL pointer()");
         return BAD_VALUE;
@@ -566,7 +553,7 @@ status_t SoundTriggerHwService::Module::loadSoundModel(const sp<IMemory>& modelM
         return INVALID_OPERATION;
     }
 
-    status_t status = mHwDevice->load_sound_model(mHwDevice, sound_model,
+    status_t status = mHalInterface->loadSoundModel(sound_model,
                                                   SoundTriggerHwService::soundModelCallback,
                                                   this, handle);
 
@@ -601,6 +588,9 @@ status_t SoundTriggerHwService::Module::unloadSoundModel(sound_model_handle_t ha
 
 status_t SoundTriggerHwService::Module::unloadSoundModel_l(sound_model_handle_t handle)
 {
+    if (mHalInterface == 0) {
+        return NO_INIT;
+    }
     ssize_t index = mModels.indexOfKey(handle);
     if (index < 0) {
         return BAD_VALUE;
@@ -608,17 +598,20 @@ status_t SoundTriggerHwService::Module::unloadSoundModel_l(sound_model_handle_t 
     sp<Model> model = mModels.valueAt(index);
     mModels.removeItem(handle);
     if (model->mState == Model::STATE_ACTIVE) {
-        mHwDevice->stop_recognition(mHwDevice, model->mHandle);
+        mHalInterface->stopRecognition(model->mHandle);
         model->mState = Model::STATE_IDLE;
     }
     AudioSystem::releaseSoundTriggerSession(model->mCaptureSession);
-    return mHwDevice->unload_sound_model(mHwDevice, handle);
+    return mHalInterface->unloadSoundModel(handle);
 }
 
 status_t SoundTriggerHwService::Module::startRecognition(sound_model_handle_t handle,
                                  const sp<IMemory>& dataMemory)
 {
     ALOGV("startRecognition() model handle %d", handle);
+    if (mHalInterface == 0) {
+        return NO_INIT;
+    }
     if (!captureHotwordAllowed()) {
         return PERMISSION_DENIED;
     }
@@ -657,7 +650,7 @@ status_t SoundTriggerHwService::Module::startRecognition(sound_model_handle_t ha
     //TODO: get capture handle and device from audio policy service
     config->capture_handle = model->mCaptureIOHandle;
     config->capture_device = model->mCaptureDevice;
-    status_t status = mHwDevice->start_recognition(mHwDevice, handle, config,
+    status_t status = mHalInterface->startRecognition(handle, config,
                                         SoundTriggerHwService::recognitionCallback,
                                         this);
 
@@ -672,6 +665,9 @@ status_t SoundTriggerHwService::Module::startRecognition(sound_model_handle_t ha
 status_t SoundTriggerHwService::Module::stopRecognition(sound_model_handle_t handle)
 {
     ALOGV("stopRecognition() model handle %d", handle);
+    if (mHalInterface == 0) {
+        return NO_INIT;
+    }
     if (!captureHotwordAllowed()) {
         return PERMISSION_DENIED;
     }
@@ -685,7 +681,7 @@ status_t SoundTriggerHwService::Module::stopRecognition(sound_model_handle_t han
     if (model->mState != Model::STATE_ACTIVE) {
         return INVALID_OPERATION;
     }
-    mHwDevice->stop_recognition(mHwDevice, handle);
+    mHalInterface->stopRecognition(handle);
     model->mState = Model::STATE_IDLE;
     return NO_ERROR;
 }
@@ -808,18 +804,13 @@ void SoundTriggerHwService::Module::setCaptureState_l(bool active)
         }
 
         const bool supports_stop_all =
-            (mHwDevice->common.version >= SOUND_TRIGGER_DEVICE_API_VERSION_1_1 &&
-             mHwDevice->stop_all_recognitions);
-
-        if (supports_stop_all) {
-            mHwDevice->stop_all_recognitions(mHwDevice);
-        }
+                (mHalInterface != 0) && (mHalInterface->stopAllRecognitions() == ENOSYS);
 
         for (size_t i = 0; i < mModels.size(); i++) {
             sp<Model> model = mModels.valueAt(i);
             if (model->mState == Model::STATE_ACTIVE) {
-                if (!supports_stop_all) {
-                    mHwDevice->stop_recognition(mHwDevice, model->mHandle);
+                if (mHalInterface != 0 && !supports_stop_all) {
+                    mHalInterface->stopRecognition(model->mHandle);
                 }
                 // keep model in ACTIVE state so that event is processed by onCallbackEvent()
                 if (model->mType == SOUND_MODEL_TYPE_KEYPHRASE) {
