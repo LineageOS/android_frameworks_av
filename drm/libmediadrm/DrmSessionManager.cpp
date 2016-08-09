@@ -65,7 +65,7 @@ DrmSessionManager::DrmSessionManager(sp<ProcessInfoInterface> processInfo)
 DrmSessionManager::~DrmSessionManager() {}
 
 void DrmSessionManager::addSession(
-        int pid, sp<DrmSessionClientInterface> drm, const Vector<uint8_t> &sessionId) {
+        int pid, const sp<DrmSessionClientInterface>& drm, const Vector<uint8_t> &sessionId) {
     ALOGV("addSession(pid %d, drm %p, sessionId %s)", pid, drm.get(),
             GetSessionIdString(sessionId).string());
 
@@ -116,7 +116,7 @@ void DrmSessionManager::removeSession(const Vector<uint8_t> &sessionId) {
     }
 }
 
-void DrmSessionManager::removeDrm(sp<DrmSessionClientInterface> drm) {
+void DrmSessionManager::removeDrm(const sp<DrmSessionClientInterface>& drm) {
     ALOGV("removeDrm(%p)", drm.get());
 
     Mutex::Autolock lock(mLock);

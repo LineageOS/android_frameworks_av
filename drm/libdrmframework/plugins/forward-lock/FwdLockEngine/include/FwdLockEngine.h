@@ -539,7 +539,7 @@ class DecodeSession {
             offset = 0;
         }
 
-        DecodeSession(int fd) {
+        explicit DecodeSession(int fd) {
             fileDesc = fd;
             offset = 0;
         }
