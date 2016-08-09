@@ -125,7 +125,7 @@ public:
 
        sound_trigger_hw_device *hwDevice() const { return mHwDevice; }
        struct sound_trigger_module_descriptor descriptor() { return mDescriptor; }
-       void setClient(sp<ISoundTriggerClient> client) { mClient = client; }
+       void setClient(const sp<ISoundTriggerClient>& client) { mClient = client; }
        void clearClient() { mClient.clear(); }
        sp<ISoundTriggerClient> client() const { return mClient; }
        wp<SoundTriggerHwService> service() const { return mService; }
@@ -156,7 +156,7 @@ public:
     class CallbackThread : public Thread {
     public:
 
-        CallbackThread(const wp<SoundTriggerHwService>& service);
+        explicit CallbackThread(const wp<SoundTriggerHwService>& service);
 
         virtual             ~CallbackThread();
 
@@ -176,7 +176,7 @@ public:
         Vector< sp<CallbackEvent> > mEventQueue;
     };
 
-           void detachModule(sp<Module> module);
+           void detachModule(const sp<Module>& module);
 
     static void recognitionCallback(struct sound_trigger_recognition_event *event, void *cookie);
            sp<IMemory> prepareRecognitionEvent_l(struct sound_trigger_recognition_event *event);
