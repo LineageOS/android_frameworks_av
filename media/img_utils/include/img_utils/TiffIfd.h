@@ -42,7 +42,7 @@ namespace img_utils {
  */
 class ANDROID_API TiffIfd : public TiffWritable {
     public:
-        TiffIfd(uint32_t ifdId);
+        explicit TiffIfd(uint32_t ifdId);
         virtual ~TiffIfd();
 
         /**
