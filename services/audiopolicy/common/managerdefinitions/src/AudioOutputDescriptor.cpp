@@ -75,7 +75,7 @@ audio_devices_t AudioOutputDescriptor::supportedDevices()
 }
 
 bool AudioOutputDescriptor::sharesHwModuleWith(
-        const sp<AudioOutputDescriptor> outputDesc)
+        const sp<AudioOutputDescriptor>& outputDesc)
 {
     if (outputDesc->isDuplicated()) {
         return sharesHwModuleWith(outputDesc->subOutput1()) ||
@@ -264,7 +264,7 @@ audio_devices_t SwAudioOutputDescriptor::device() const
 }
 
 bool SwAudioOutputDescriptor::sharesHwModuleWith(
-        const sp<AudioOutputDescriptor> outputDesc)
+        const sp<AudioOutputDescriptor>& outputDesc)
 {
     if (isDuplicated()) {
         return mOutput1->sharesHwModuleWith(outputDesc) || mOutput2->sharesHwModuleWith(outputDesc);

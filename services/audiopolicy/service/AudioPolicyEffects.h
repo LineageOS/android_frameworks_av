@@ -136,7 +136,7 @@ private:
     // class to store voctor of AudioEffects
     class EffectVector {
     public:
-        EffectVector(audio_session_t session) : mSessionId(session), mRefCount(0) {}
+        explicit EffectVector(audio_session_t session) : mSessionId(session), mRefCount(0) {}
         /*virtual*/ ~EffectVector() {}
 
         // Enable or disable all effects in effect vector

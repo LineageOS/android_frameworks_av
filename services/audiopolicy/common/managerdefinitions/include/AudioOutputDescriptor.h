@@ -45,7 +45,7 @@ public:
 
     audio_port_handle_t getId() const;
     virtual audio_devices_t device() const;
-    virtual bool sharesHwModuleWith(const sp<AudioOutputDescriptor> outputDesc);
+    virtual bool sharesHwModuleWith(const sp<AudioOutputDescriptor>& outputDesc);
     virtual audio_devices_t supportedDevices();
     virtual bool isDuplicated() const { return false; }
     virtual uint32_t latency() { return 0; }
@@ -102,7 +102,7 @@ public:
     void setIoHandle(audio_io_handle_t ioHandle);
 
     virtual audio_devices_t device() const;
-    virtual bool sharesHwModuleWith(const sp<AudioOutputDescriptor> outputDesc);
+    virtual bool sharesHwModuleWith(const sp<AudioOutputDescriptor>& outputDesc);
     virtual audio_devices_t supportedDevices();
     virtual uint32_t latency();
     virtual bool isDuplicated() const { return (mOutput1 != NULL && mOutput2 != NULL); }

@@ -30,7 +30,7 @@ class DeviceDescriptor : public AudioPort, public AudioPortConfig
 {
 public:
      // Note that empty name refers by convention to a generic device.
-    DeviceDescriptor(audio_devices_t type, const String8 &tagName = String8(""));
+    explicit DeviceDescriptor(audio_devices_t type, const String8 &tagName = String8(""));
 
     virtual ~DeviceDescriptor() {}
 
@@ -48,7 +48,7 @@ public:
     // AudioPort
     virtual void attach(const sp<HwModule>& module);
     virtual void toAudioPort(struct audio_port *port) const;
-    virtual void importAudioPort(const sp<AudioPort> port);
+    virtual void importAudioPort(const sp<AudioPort>& port);
 
     audio_port_handle_t getId() const;
     status_t dump(int fd, int spaces, int index, bool verbose = true) const;
@@ -76,11 +76,11 @@ public:
 
     audio_devices_t types() const { return mDeviceTypes; }
 
-    sp<DeviceDescriptor> getDevice(audio_devices_t type, String8 address) const;
+    sp<DeviceDescriptor> getDevice(audio_devices_t type, const String8& address) const;
     DeviceVector getDevicesFromType(audio_devices_t types) const;
     sp<DeviceDescriptor> getDeviceFromId(audio_port_handle_t id) const;
     sp<DeviceDescriptor> getDeviceFromTagName(const String8 &tagName) const;
-    DeviceVector getDevicesFromTypeAddr(audio_devices_t type, String8 address) const;
+    DeviceVector getDevicesFromTypeAddr(audio_devices_t type, const String8& address) const;
 
     audio_devices_t getDevicesFromHwModule(audio_module_handle_t moduleHandle) const;
 

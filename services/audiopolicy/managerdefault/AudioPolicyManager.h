@@ -83,7 +83,7 @@ class AudioPolicyManager : public AudioPolicyInterface, public AudioPolicyManage
 {
 
 public:
-                AudioPolicyManager(AudioPolicyClientInterface *clientInterface);
+        explicit AudioPolicyManager(AudioPolicyClientInterface *clientInterface);
         virtual ~AudioPolicyManager();
 
         // AudioPolicyInterface
@@ -223,7 +223,7 @@ public:
             return mSoundTriggerSessions.releaseSession(session);
         }
 
-        virtual status_t registerPolicyMixes(Vector<AudioMix> mixes);
+        virtual status_t registerPolicyMixes(const Vector<AudioMix>& mixes);
         virtual status_t unregisterPolicyMixes(Vector<AudioMix> mixes);
 
         virtual status_t startAudioSource(const struct audio_port_config *source,
@@ -274,9 +274,9 @@ protected:
             return mDefaultOutputDevice;
         }
 protected:
-        void addOutput(audio_io_handle_t output, sp<SwAudioOutputDescriptor> outputDesc);
+        void addOutput(audio_io_handle_t output, const sp<SwAudioOutputDescriptor>& outputDesc);
         void removeOutput(audio_io_handle_t output);
-        void addInput(audio_io_handle_t input, sp<AudioInputDescriptor> inputDesc);
+        void addInput(audio_io_handle_t input, const sp<AudioInputDescriptor>& inputDesc);
 
         // return appropriate device for streams handled by the specified strategy according to current
         // phone state, connected devices...
@@ -292,7 +292,7 @@ protected:
         virtual audio_devices_t getDeviceForStrategy(routing_strategy strategy,
                                                      bool fromCache);
 
-        bool isStrategyActive(const sp<AudioOutputDescriptor> outputDesc, routing_strategy strategy,
+        bool isStrategyActive(const sp<AudioOutputDescriptor>& outputDesc, routing_strategy strategy,
                               uint32_t inPastMs = 0, nsecs_t sysTime = 0) const;
 
         // change the route of the specified output. Returns the number of ms we have slept to
@@ -363,15 +363,15 @@ protected:
         // when a device is disconnected, checks if an output is not used any more and
         // returns its handle if any.
         // transfers the audio tracks and effects from one output thread to another accordingly.
-        status_t checkOutputsForDevice(const sp<DeviceDescriptor> devDesc,
+        status_t checkOutputsForDevice(const sp<DeviceDescriptor>& devDesc,
                                        audio_policy_dev_state_t state,
                                        SortedVector<audio_io_handle_t>& outputs,
-                                       const String8 address);
+                                       const String8& address);
 
-        status_t checkInputsForDevice(const sp<DeviceDescriptor> devDesc,
+        status_t checkInputsForDevice(const sp<DeviceDescriptor>& devDesc,
                                       audio_policy_dev_state_t state,
                                       SortedVector<audio_io_handle_t>& inputs,
-                                      const String8 address);
+                                      const String8& address);
 
         // close an output and its companion duplicating output.
         void closeOutput(audio_io_handle_t output);
@@ -424,7 +424,7 @@ protected:
 #endif //AUDIO_POLICY_TEST
 
         SortedVector<audio_io_handle_t> getOutputsForDevice(audio_devices_t device,
-                                                            SwAudioOutputCollection openOutputs);
+                                                            const SwAudioOutputCollection& openOutputs);
         bool vectorsEqual(SortedVector<audio_io_handle_t>& outputs1,
                                            SortedVector<audio_io_handle_t>& outputs2);
 
@@ -432,7 +432,7 @@ protected:
         // if muting, wait for the audio in pcm buffer to be drained before proceeding
         // if unmuting, unmute only after the specified delay
         // Returns the number of ms waited
-        virtual uint32_t  checkDeviceMuteStrategies(sp<AudioOutputDescriptor> outputDesc,
+        virtual uint32_t  checkDeviceMuteStrategies(const sp<AudioOutputDescriptor>& outputDesc,
                                             audio_devices_t prevDevice,
                                             uint32_t delayMs);
 
@@ -441,7 +441,7 @@ protected:
                                        audio_format_t format);
         // samplingRate, format, channelMask are in/out and so may be modified
         sp<IOProfile> getInputProfile(audio_devices_t device,
-                                      String8 address,
+                                      const String8& address,
                                       uint32_t& samplingRate,
                                       audio_format_t& format,
                                       audio_channel_mask_t& channelMask,
@@ -482,12 +482,12 @@ protected:
 
         // if argument "device" is different from AUDIO_DEVICE_NONE,  startSource() will force
         // the re-evaluation of the output device.
-        status_t startSource(sp<AudioOutputDescriptor> outputDesc,
+        status_t startSource(const sp<AudioOutputDescriptor>& outputDesc,
                              audio_stream_type_t stream,
                              audio_devices_t device,
                              const char *address,
                              uint32_t *delayMs);
-        status_t stopSource(sp<AudioOutputDescriptor> outputDesc,
+        status_t stopSource(const sp<AudioOutputDescriptor>& outputDesc,
                             audio_stream_type_t stream,
                             bool forceDeviceUpdate);
 
@@ -614,9 +614,9 @@ private:
         //   in mProfile->mSupportedDevices) matches the device whose address is to be matched.
         // see deviceDistinguishesOnAddress(audio_devices_t) for whether the device type is one
         //   where addresses are used to distinguish between one connected device and another.
-        void findIoHandlesByAddress(sp<SwAudioOutputDescriptor> desc /*in*/,
+        void findIoHandlesByAddress(const sp<SwAudioOutputDescriptor>& desc /*in*/,
                 const audio_devices_t device /*in*/,
-                const String8 address /*in*/,
+                const String8& address /*in*/,
                 SortedVector<audio_io_handle_t>& outputs /*out*/);
         uint32_t curAudioPortGeneration() const { return mAudioPortGeneration; }
         // internal method to return the output handle for the given device and format

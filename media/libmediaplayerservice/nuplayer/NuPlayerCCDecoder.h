@@ -33,7 +33,7 @@ struct NuPlayer::CCDecoder : public RefBase {
         kTrackTypeCEA708,
     };
 
-    CCDecoder(const sp<AMessage> &notify);
+    explicit CCDecoder(const sp<AMessage> &notify);
 
     size_t getTrackCount() const;
     sp<AMessage> getTrackInfo(size_t index) const;

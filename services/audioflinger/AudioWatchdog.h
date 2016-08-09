@@ -41,7 +41,7 @@ struct AudioWatchdogDump {
 class AudioWatchdog : public Thread {
 
 public:
-    AudioWatchdog(unsigned periodMs = 50) : Thread(false /*canCallJava*/), mPaused(false),
+    explicit AudioWatchdog(unsigned periodMs = 50) : Thread(false /*canCallJava*/), mPaused(false),
             mPeriodNs(periodMs * 1000000), mMaxCycleNs(mPeriodNs * 2),
             // mOldTs
             // mLogTs initialized below
