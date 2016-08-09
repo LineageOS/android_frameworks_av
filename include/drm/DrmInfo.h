@@ -55,7 +55,7 @@ public:
         friend class DrmInfo;
 
     private:
-        KeyIterator(const DrmInfo* drmInfo)
+        explicit KeyIterator(const DrmInfo* drmInfo)
             : mDrmInfo(const_cast <DrmInfo*> (drmInfo)), mIndex(0) {}
 
     public:
@@ -79,7 +79,7 @@ public:
         friend class DrmInfo;
 
     private:
-        Iterator(const DrmInfo* drmInfo)
+        explicit Iterator(const DrmInfo* drmInfo)
             : mDrmInfo(const_cast <DrmInfo*> (drmInfo)), mIndex(0) {}
 
     public:

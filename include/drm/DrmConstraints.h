@@ -70,7 +70,7 @@ public:
     class KeyIterator {
         friend class DrmConstraints;
     private:
-        KeyIterator(DrmConstraints* drmConstraints)
+        explicit KeyIterator(DrmConstraints* drmConstraints)
             : mDrmConstraints(drmConstraints), mIndex(0) {}
 
     public:
@@ -93,7 +93,7 @@ public:
     class Iterator {
         friend class DrmConstraints;
     private:
-        Iterator(DrmConstraints* drmConstraints)
+        explicit Iterator(DrmConstraints* drmConstraints)
             : mDrmConstraints(drmConstraints), mIndex(0) {}
 
     public:

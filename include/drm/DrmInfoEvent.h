@@ -77,7 +77,7 @@ public:
      * @param[in] infoType Type of information
      * @param[in] message Message description
      */
-    DrmInfoEvent(int uniqueId, int infoType, const String8 message);
+    DrmInfoEvent(int uniqueId, int infoType, const String8& message);
 
     /**
      * Destructor for DrmInfoEvent

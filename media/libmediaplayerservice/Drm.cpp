@@ -62,7 +62,7 @@ static bool operator<(const Vector<uint8_t> &lhs, const Vector<uint8_t> &rhs) {
 }
 
 struct DrmSessionClient : public DrmSessionClientInterface {
-    DrmSessionClient(Drm* drm) : mDrm(drm) {}
+    explicit DrmSessionClient(Drm* drm) : mDrm(drm) {}
 
     virtual bool reclaimSession(const Vector<uint8_t>& sessionId) {
         sp<Drm> drm = mDrm.promote();

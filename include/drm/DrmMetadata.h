@@ -35,7 +35,7 @@ public:
     class KeyIterator {
         friend class DrmMetadata;
     private:
-        KeyIterator(DrmMetadata* drmMetadata) : mDrmMetadata(drmMetadata), mIndex(0) {}
+        explicit KeyIterator(DrmMetadata* drmMetadata) : mDrmMetadata(drmMetadata), mIndex(0) {}
 
     public:
         KeyIterator(const KeyIterator& keyIterator);
@@ -57,7 +57,7 @@ public:
     class Iterator {
         friend class DrmMetadata;
     private:
-        Iterator(DrmMetadata* drmMetadata) : mDrmMetadata(drmMetadata), mIndex(0) {}
+        explicit Iterator(DrmMetadata* drmMetadata) : mDrmMetadata(drmMetadata), mIndex(0) {}
 
     public:
         Iterator(const Iterator& iterator);

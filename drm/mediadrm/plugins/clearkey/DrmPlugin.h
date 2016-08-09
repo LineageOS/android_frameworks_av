@@ -39,7 +39,7 @@ using android::Vector;
 
 class DrmPlugin : public android::DrmPlugin {
 public:
-    DrmPlugin(SessionLibrary* sessionLibrary)
+    explicit DrmPlugin(SessionLibrary* sessionLibrary)
             : mSessionLibrary(sessionLibrary) {}
     virtual ~DrmPlugin() {}
 

@@ -140,7 +140,7 @@ namespace android {
     private:
         String8 vectorToString(Vector<uint8_t> const &vector) const;
         String8 arrayToString(uint8_t const *array, size_t len) const;
-        String8 stringMapToString(KeyedVector<String8, String8> map) const;
+        String8 stringMapToString(const KeyedVector<String8, String8>& map) const;
 
         SortedVector<Vector<uint8_t> > mSessions;
         SortedVector<Vector<uint8_t> > mKeySets;
