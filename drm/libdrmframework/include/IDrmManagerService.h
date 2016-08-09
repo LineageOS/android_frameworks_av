@@ -169,7 +169,7 @@ public:
 class BpDrmManagerService: public BpInterface<IDrmManagerService>
 {
 public:
-    BpDrmManagerService(const sp<IBinder>& impl)
+    explicit BpDrmManagerService(const sp<IBinder>& impl)
             : BpInterface<IDrmManagerService>(impl) {}
 
     virtual int addUniqueId(bool isNative);
