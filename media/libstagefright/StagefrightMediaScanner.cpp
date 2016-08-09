@@ -45,7 +45,7 @@ static bool FileHasAcceptableExtension(const char *extension) {
         ".dm", ".m2ts", ".mp3d", ".wmv", ".asf", ".flv", ".ra",
         ".rm", ".rmvb", ".ac3", ".ape", ".dts", ".mp1", ".mp2",
         ".f4v", "hlv", "nrg", "m2v", ".swf", ".vc1", ".vob",
-        ".divx", ".qcp", ".ec3"
+        ".divx", ".qcp", ".ec3", ".opus"
     };
     static const size_t kNumValidExtensions =
         sizeof(kValidExtensions) / sizeof(kValidExtensions[0]);
