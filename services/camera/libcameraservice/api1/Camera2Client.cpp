@@ -526,7 +526,7 @@ status_t Camera2Client::setPreviewTarget(
 }
 
 status_t Camera2Client::setPreviewWindowL(const sp<IBinder>& binder,
-        sp<Surface> window) {
+        const sp<Surface>& window) {
     ATRACE_CALL();
     status_t res;
 
@@ -1903,12 +1903,12 @@ int Camera2Client::getZslStreamId() const {
 }
 
 status_t Camera2Client::registerFrameListener(int32_t minId, int32_t maxId,
-        wp<camera2::FrameProcessor::FilteredListener> listener, bool sendPartials) {
+        const wp<camera2::FrameProcessor::FilteredListener>& listener, bool sendPartials) {
     return mFrameProcessor->registerListener(minId, maxId, listener, sendPartials);
 }
 
 status_t Camera2Client::removeFrameListener(int32_t minId, int32_t maxId,
-        wp<camera2::FrameProcessor::FilteredListener> listener) {
+        const wp<camera2::FrameProcessor::FilteredListener>& listener) {
     return mFrameProcessor->removeListener(minId, maxId, listener);
 }
 
