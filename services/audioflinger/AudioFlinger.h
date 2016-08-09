@@ -323,7 +323,7 @@ public:
                                         int triggerSession,
                                         int listenerSession,
                                         sync_event_callback_t callBack,
-                                        wp<RefBase> cookie);
+                                        const wp<RefBase>& cookie);
 
 private:
 
@@ -496,7 +496,7 @@ private:
     // server side of the client's IAudioTrack
     class TrackHandle : public android::BnAudioTrack {
     public:
-                            TrackHandle(const sp<PlaybackThread::Track>& track);
+        explicit            TrackHandle(const sp<PlaybackThread::Track>& track);
         virtual             ~TrackHandle();
         virtual sp<IMemory> getCblk() const;
         virtual status_t    start();
@@ -524,7 +524,7 @@ private:
     // server side of the client's IAudioRecord
     class RecordHandle : public android::BnAudioRecord {
     public:
-        RecordHandle(const sp<RecordThread::RecordTrack>& recordTrack);
+        explicit RecordHandle(const sp<RecordThread::RecordTrack>& recordTrack);
         virtual             ~RecordHandle();
         virtual status_t    start(int /*AudioSystem::sync_event_t*/ event, int triggerSession);
         virtual void        stop();
@@ -555,8 +555,8 @@ private:
                                               const String8& address,
                                               audio_output_flags_t flags);
 
-              void closeOutputFinish(sp<PlaybackThread> thread);
-              void closeInputFinish(sp<RecordThread> thread);
+              void closeOutputFinish(const sp<PlaybackThread>& thread);
+              void closeInputFinish(const sp<RecordThread>& thread);
 
               // no range check, AudioFlinger::mLock held
               bool streamMute_l(audio_stream_type_t stream) const
@@ -720,9 +720,9 @@ private:
 
     // for use from destructor
     status_t    closeOutput_nonvirtual(audio_io_handle_t output);
-    void        closeOutputInternal_l(sp<PlaybackThread> thread);
+    void        closeOutputInternal_l(const sp<PlaybackThread>& thread);
     status_t    closeInput_nonvirtual(audio_io_handle_t input);
-    void        closeInputInternal_l(sp<RecordThread> thread);
+    void        closeInputInternal_l(const sp<RecordThread>& thread);
     void        setAudioHwSyncForSession_l(PlaybackThread *thread, audio_session_t sessionId);
 
     status_t    checkStreamType(audio_stream_type_t stream) const;

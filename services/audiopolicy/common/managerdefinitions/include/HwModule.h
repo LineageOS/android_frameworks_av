@@ -31,19 +31,19 @@ class IOProfile;
 class HwModule : public RefBase
 {
 public:
-    HwModule(const char *name);
+    explicit HwModule(const char *name);
     ~HwModule();
 
     status_t loadOutput(cnode *root);
     status_t loadInput(cnode *root);
     status_t loadDevice(cnode *root);
 
-    status_t addOutputProfile(String8 name, const audio_config_t *config,
-            audio_devices_t device, String8 address);
-    status_t removeOutputProfile(String8 name);
-    status_t addInputProfile(String8 name, const audio_config_t *config,
-            audio_devices_t device, String8 address);
-    status_t removeInputProfile(String8 name);
+    status_t addOutputProfile(const String8& name, const audio_config_t *config,
+            audio_devices_t device, const String8& address);
+    status_t removeOutputProfile(const String8& name);
+    status_t addInputProfile(const String8& name, const audio_config_t *config,
+            audio_devices_t device, const String8& address);
+    status_t removeInputProfile(const String8& name);
 
     audio_module_handle_t getHandle() const { return mHandle; }
 

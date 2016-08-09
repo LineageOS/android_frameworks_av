@@ -233,14 +233,14 @@ void AudioPolicyService::doOnAudioPatchListUpdate()
     }
 }
 
-void AudioPolicyService::onDynamicPolicyMixStateUpdate(String8 regId, int32_t state)
+void AudioPolicyService::onDynamicPolicyMixStateUpdate(const String8& regId, int32_t state)
 {
     ALOGV("AudioPolicyService::onDynamicPolicyMixStateUpdate(%s, %d)",
             regId.string(), state);
     mOutputCommandThread->dynamicPolicyMixStateUpdateCommand(regId, state);
 }
 
-void AudioPolicyService::doOnDynamicPolicyMixStateUpdate(String8 regId, int32_t state)
+void AudioPolicyService::doOnDynamicPolicyMixStateUpdate(const String8& regId, int32_t state)
 {
     Mutex::Autolock _l(mNotificationClientsLock);
     for (size_t i = 0; i < mNotificationClients.size(); i++) {
@@ -290,7 +290,7 @@ void AudioPolicyService::NotificationClient::onAudioPatchListUpdate()
 }
 
 void AudioPolicyService::NotificationClient::onDynamicPolicyMixStateUpdate(
-        String8 regId, int32_t state)
+        const String8& regId, int32_t state)
 {
     if (mAudioPolicyServiceClient != 0) {
             mAudioPolicyServiceClient->onDynamicPolicyMixStateUpdate(regId, state);
@@ -809,7 +809,7 @@ status_t AudioPolicyService::AudioCommandThread::setAudioPortConfigCommand(
 }
 
 void AudioPolicyService::AudioCommandThread::dynamicPolicyMixStateUpdateCommand(
-        String8 regId, int32_t state)
+        const String8& regId, int32_t state)
 {
     sp<AudioCommand> command = new AudioCommand();
     command->mCommand = DYN_POLICY_MIX_STATE_UPDATE;

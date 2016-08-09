@@ -24,7 +24,7 @@
 namespace android {
     class SharedLibrary : public RefBase {
     public:
-        SharedLibrary(const String8 &path);
+        explicit SharedLibrary(const String8 &path);
         ~SharedLibrary();
 
         bool operator!() const;

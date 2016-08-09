@@ -312,7 +312,7 @@ public:
 
     static audio_mode_t getPhoneState();
 
-    static status_t registerPolicyMixes(Vector<AudioMix> mixes, bool registration);
+    static status_t registerPolicyMixes(const Vector<AudioMix>& mixes, bool registration);
 
     static status_t startAudioSource(const struct audio_port_config *source,
                                       const audio_attributes_t *attributes,

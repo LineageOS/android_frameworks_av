@@ -32,7 +32,7 @@ class AudioMix;
 class AudioInputDescriptor: public AudioPortConfig
 {
 public:
-    AudioInputDescriptor(const sp<IOProfile>& profile);
+    explicit AudioInputDescriptor(const sp<IOProfile>& profile);
     void setIoHandle(audio_io_handle_t ioHandle);
     audio_port_handle_t getId() const;
     audio_module_handle_t getModuleHandle() const;

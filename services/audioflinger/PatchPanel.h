@@ -24,7 +24,7 @@ public:
 
     class Patch;
 
-    PatchPanel(const sp<AudioFlinger>& audioFlinger);
+    explicit PatchPanel(const sp<AudioFlinger>& audioFlinger);
     virtual ~PatchPanel();
 
     /* List connected audio ports and their attributes */
@@ -54,7 +54,7 @@ public:
 
     class Patch {
     public:
-        Patch(const struct audio_patch *patch) :
+        explicit Patch(const struct audio_patch *patch) :
             mAudioPatch(*patch), mHandle(AUDIO_PATCH_HANDLE_NONE),
             mHalHandle(AUDIO_PATCH_HANDLE_NONE), mRecordPatchHandle(AUDIO_PATCH_HANDLE_NONE),
             mPlaybackPatchHandle(AUDIO_PATCH_HANDLE_NONE) {}

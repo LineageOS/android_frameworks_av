@@ -24,7 +24,7 @@
 namespace android {
 
 struct HDCP : public BnHDCP {
-    HDCP(bool createEncryptionModule);
+    explicit HDCP(bool createEncryptionModule);
     virtual ~HDCP();
 
     virtual status_t setObserver(const sp<IHDCPObserver> &observer);

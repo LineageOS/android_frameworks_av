@@ -105,7 +105,7 @@ void AudioPort::toAudioPort(struct audio_port *port) const
     port->num_gains = i;
 }
 
-void AudioPort::importAudioPort(const sp<AudioPort> port) {
+void AudioPort::importAudioPort(const sp<AudioPort>& port) {
     for (size_t k = 0 ; k < port->mSamplingRates.size() ; k++) {
         const uint32_t rate = port->mSamplingRates.itemAt(k);
         if (rate != 0) { // skip "dynamic" rates

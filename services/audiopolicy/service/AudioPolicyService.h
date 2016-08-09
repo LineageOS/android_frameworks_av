@@ -195,7 +195,7 @@ public:
 
     virtual audio_mode_t getPhoneState();
 
-    virtual status_t registerPolicyMixes(Vector<AudioMix> mixes, bool registration);
+    virtual status_t registerPolicyMixes(const Vector<AudioMix>& mixes, bool registration);
 
     virtual status_t startAudioSource(const struct audio_port_config *source,
                                       const audio_attributes_t *attributes,
@@ -223,8 +223,8 @@ public:
             void onAudioPatchListUpdate();
             void doOnAudioPatchListUpdate();
 
-            void onDynamicPolicyMixStateUpdate(String8 regId, int32_t state);
-            void doOnDynamicPolicyMixStateUpdate(String8 regId, int32_t state);
+            void onDynamicPolicyMixStateUpdate(const String8& regId, int32_t state);
+            void doOnDynamicPolicyMixStateUpdate(const String8& regId, int32_t state);
 
 private:
                         AudioPolicyService() ANDROID_API;
@@ -294,7 +294,7 @@ private:
                     void        updateAudioPatchListCommand();
                     status_t    setAudioPortConfigCommand(const struct audio_port_config *config,
                                                           int delayMs);
-                    void        dynamicPolicyMixStateUpdateCommand(String8 regId, int32_t state);
+                    void        dynamicPolicyMixStateUpdateCommand(const String8& regId, int32_t state);
                     void        insertCommand_l(AudioCommand *command, int delayMs = 0);
 
     private:
@@ -397,7 +397,7 @@ private:
     class AudioPolicyClient : public AudioPolicyClientInterface
     {
      public:
-        AudioPolicyClient(AudioPolicyService *service) : mAudioPolicyService(service) {}
+        explicit AudioPolicyClient(AudioPolicyService *service) : mAudioPolicyService(service) {}
         virtual ~AudioPolicyClient() {}
 
         //
@@ -508,7 +508,7 @@ private:
 
                             void      onAudioPortListUpdate();
                             void      onAudioPatchListUpdate();
-                            void      onDynamicPolicyMixStateUpdate(String8 regId, int32_t state);
+                            void      onDynamicPolicyMixStateUpdate(const String8& regId, int32_t state);
                             void      setAudioPortCallbacksEnabled(bool enabled);
 
                 // IBinder::DeathRecipient

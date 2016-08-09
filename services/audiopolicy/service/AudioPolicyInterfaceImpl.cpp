@@ -665,7 +665,7 @@ status_t AudioPolicyService::releaseSoundTriggerSession(audio_session_t session)
     return mAudioPolicyManager->releaseSoundTriggerSession(session);
 }
 
-status_t AudioPolicyService::registerPolicyMixes(Vector<AudioMix> mixes, bool registration)
+status_t AudioPolicyService::registerPolicyMixes(const Vector<AudioMix>& mixes, bool registration)
 {
     Mutex::Autolock _l(mLock);
     if(!modifyAudioRoutingAllowed()) {

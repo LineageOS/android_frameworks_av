@@ -601,7 +601,7 @@ status_t AudioPolicyService::releaseSoundTriggerSession(audio_session_t session 
     return INVALID_OPERATION;
 }
 
-status_t AudioPolicyService::registerPolicyMixes(Vector<AudioMix> mixes __unused,
+status_t AudioPolicyService::registerPolicyMixes(const Vector<AudioMix>& mixes __unused,
                                                  bool registration __unused)
 {
     return INVALID_OPERATION;
