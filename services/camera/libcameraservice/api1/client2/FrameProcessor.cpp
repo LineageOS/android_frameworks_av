@@ -359,7 +359,7 @@ bool FrameProcessor::get3aResult(const CameraMetadata& result, int32_t tag,
 }
 
 
-void FrameProcessor::callbackFaceDetection(sp<Camera2Client> client,
+void FrameProcessor::callbackFaceDetection(const sp<Camera2Client>& client,
                                      const camera_frame_metadata &metadata) {
 
     camera_frame_metadata *metadata_ptr =

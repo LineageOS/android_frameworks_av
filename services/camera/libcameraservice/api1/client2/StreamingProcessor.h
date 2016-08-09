@@ -40,10 +40,10 @@ class Camera2Heap;
 class StreamingProcessor:
             public Thread, public BufferItemConsumer::FrameAvailableListener {
   public:
-    StreamingProcessor(sp<Camera2Client> client);
+    explicit StreamingProcessor(sp<Camera2Client> client);
     ~StreamingProcessor();
 
-    status_t setPreviewWindow(sp<Surface> window);
+    status_t setPreviewWindow(const sp<Surface>& window);
 
     bool haveValidPreviewWindow() const;
 

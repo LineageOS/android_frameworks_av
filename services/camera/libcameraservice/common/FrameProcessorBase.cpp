@@ -47,7 +47,7 @@ FrameProcessorBase::~FrameProcessorBase() {
 }
 
 status_t FrameProcessorBase::registerListener(int32_t minId,
-        int32_t maxId, wp<FilteredListener> listener, bool sendPartials) {
+        int32_t maxId, const wp<FilteredListener>& listener, bool sendPartials) {
     Mutex::Autolock l(mInputMutex);
     List<RangeListener>::iterator item = mRangeListeners.begin();
     while (item != mRangeListeners.end()) {
@@ -70,7 +70,7 @@ status_t FrameProcessorBase::registerListener(int32_t minId,
 
 status_t FrameProcessorBase::removeListener(int32_t minId,
                                            int32_t maxId,
-                                           wp<FilteredListener> listener) {
+                                           const wp<FilteredListener>& listener) {
     Mutex::Autolock l(mInputMutex);
     List<RangeListener>::iterator item = mRangeListeners.begin();
     while (item != mRangeListeners.end()) {

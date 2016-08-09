@@ -100,7 +100,7 @@ class FrameProcessor : public FrameProcessorBase {
     int32_t mLast3AFrameNumber;
 
     // Emit FaceDetection event to java if faces changed
-    void callbackFaceDetection(sp<Camera2Client> client,
+    void callbackFaceDetection(const sp<Camera2Client>& client,
                                const camera_frame_metadata &metadata);
 };
 

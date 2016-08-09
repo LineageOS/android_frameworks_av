@@ -64,7 +64,7 @@ sp<CameraDeviceBase> CameraDeviceFactory::createDevice(int cameraId) {
     return device;
 }
 
-void CameraDeviceFactory::registerService(wp<CameraService> service) {
+void CameraDeviceFactory::registerService(const wp<CameraService>& service) {
     ALOGV("%s: Registered service %p", __FUNCTION__,
           service.promote().get());
 

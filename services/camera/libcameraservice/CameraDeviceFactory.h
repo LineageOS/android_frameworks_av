@@ -30,12 +30,12 @@ class CameraService;
  */
 class CameraDeviceFactory : public virtual RefBase {
   public:
-    static void registerService(wp<CameraService> service);
+    static void registerService(const wp<CameraService>& service);
 
     // Prerequisite: Call registerService.
     static sp<CameraDeviceBase> createDevice(int cameraId);
   private:
-    CameraDeviceFactory(wp<CameraService> service);
+    explicit CameraDeviceFactory(wp<CameraService> service);
 
     static wp<CameraService> sService;
 };

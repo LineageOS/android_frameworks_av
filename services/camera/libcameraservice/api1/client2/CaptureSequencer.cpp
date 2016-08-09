@@ -59,7 +59,7 @@ CaptureSequencer::~CaptureSequencer() {
     ALOGV("%s: Exit", __FUNCTION__);
 }
 
-void CaptureSequencer::setZslProcessor(wp<ZslProcessorInterface> processor) {
+void CaptureSequencer::setZslProcessor(const wp<ZslProcessorInterface>& processor) {
     Mutex::Autolock l(mInputMutex);
     mZslProcessor = processor;
 }
@@ -131,7 +131,7 @@ void CaptureSequencer::onResultAvailable(const CaptureResult &result) {
 }
 
 void CaptureSequencer::onCaptureAvailable(nsecs_t timestamp,
-        sp<MemoryBase> captureBuffer) {
+        const sp<MemoryBase>& captureBuffer) {
     ATRACE_CALL();
     ALOGV("%s", __FUNCTION__);
     Mutex::Autolock l(mInputMutex);
@@ -770,7 +770,7 @@ status_t CaptureSequencer::updateCaptureRequest(const Parameters &params,
 }
 
 /*static*/ void CaptureSequencer::shutterNotifyLocked(const Parameters &params,
-            sp<Camera2Client> client, int msgType) {
+            const sp<Camera2Client>& client, int msgType) {
     ATRACE_CALL();
 
     if (params.state == Parameters::STILL_CAPTURE

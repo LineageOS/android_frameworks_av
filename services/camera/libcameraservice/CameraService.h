@@ -265,7 +265,7 @@ public:
 
         class OpsCallback : public BnAppOpsCallback {
         public:
-            OpsCallback(wp<BasicClient> client);
+            explicit OpsCallback(wp<BasicClient> client);
             virtual void opChanged(int32_t op, const String16& packageName);
 
         private:
