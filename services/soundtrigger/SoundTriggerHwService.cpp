@@ -163,7 +163,7 @@ status_t SoundTriggerHwService::setCaptureState(bool active)
 }
 
 
-void SoundTriggerHwService::detachModule(sp<Module> module)
+void SoundTriggerHwService::detachModule(const sp<Module>& module)
 {
     ALOGV("detachModule");
     AutoMutex lock(mServiceLock);
