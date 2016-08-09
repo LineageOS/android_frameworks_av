@@ -766,7 +766,7 @@ namespace android {
         return result;
     }
 
-    String8 MockDrmPlugin::stringMapToString(KeyedVector<String8, String8> map) const
+    String8 MockDrmPlugin::stringMapToString(const KeyedVector<String8, String8>& map) const
     {
         String8 result("{ ");
         for (size_t i = 0; i < map.size(); i++) {
