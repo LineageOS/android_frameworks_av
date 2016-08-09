@@ -45,12 +45,12 @@ struct DrmSessionManager : public RefBase {
     static sp<DrmSessionManager> Instance();
 
     DrmSessionManager();
-    DrmSessionManager(sp<ProcessInfoInterface> processInfo);
+    explicit DrmSessionManager(sp<ProcessInfoInterface> processInfo);
 
-    void addSession(int pid, sp<DrmSessionClientInterface> drm, const Vector<uint8_t>& sessionId);
+    void addSession(int pid, const sp<DrmSessionClientInterface>& drm, const Vector<uint8_t>& sessionId);
     void useSession(const Vector<uint8_t>& sessionId);
     void removeSession(const Vector<uint8_t>& sessionId);
-    void removeDrm(sp<DrmSessionClientInterface> drm);
+    void removeDrm(const sp<DrmSessionClientInterface>& drm);
     bool reclaimSession(int callingPid);
 
 protected:
