@@ -30,7 +30,7 @@ namespace android {
 class ServiceLog : public RefBase {
 public:
     ServiceLog();
-    ServiceLog(size_t maxNum);
+    explicit ServiceLog(size_t maxNum);
 
     void add(const String8 &log);
     String8 toString(const char *linePrefix = NULL) const;

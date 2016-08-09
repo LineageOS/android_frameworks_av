@@ -52,7 +52,7 @@ public:
     virtual status_t dump(int fd, const Vector<String16>& args);
 
     ResourceManagerService();
-    ResourceManagerService(sp<ProcessInfoInterface> processInfo);
+    explicit ResourceManagerService(sp<ProcessInfoInterface> processInfo);
 
     // IResourceManagerService interface
     virtual void config(const Vector<MediaResourcePolicy> &policies);
