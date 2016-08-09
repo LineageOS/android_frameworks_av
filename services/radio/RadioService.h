@@ -103,7 +103,7 @@ public:
     class CallbackThread : public Thread {
     public:
 
-        CallbackThread(const wp<ModuleClient>& moduleClient);
+        explicit CallbackThread(const wp<ModuleClient>& moduleClient);
 
         virtual ~CallbackThread();
 
