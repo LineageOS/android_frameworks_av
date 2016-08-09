@@ -53,7 +53,7 @@ class MidiExtractor : public MediaExtractor {
 
 public:
     // Extractor assumes ownership of source
-    MidiExtractor(const sp<DataSource> &source);
+    explicit MidiExtractor(const sp<DataSource> &source);
 
     virtual size_t countTracks();
     virtual sp<IMediaSource> getTrack(size_t index);

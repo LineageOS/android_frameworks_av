@@ -60,7 +60,7 @@ private:
     ALooper::handler_id mID;
     wp<ALooper> mLooper;
 
-    inline void setID(ALooper::handler_id id, wp<ALooper> looper) {
+    inline void setID(ALooper::handler_id id, const wp<ALooper> &looper) {
         mID = id;
         mLooper = looper;
     }

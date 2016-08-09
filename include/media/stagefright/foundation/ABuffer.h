@@ -30,7 +30,7 @@ struct AMessage;
 class MediaBufferBase;
 
 struct ABuffer : public RefBase {
-    ABuffer(size_t capacity);
+    explicit ABuffer(size_t capacity);
     ABuffer(void *data, size_t capacity);
 
     uint8_t *base() { return (uint8_t *)mData; }
