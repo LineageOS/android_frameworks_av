@@ -42,7 +42,7 @@ static String8 getString(const Vector<T> &items) {
     return itemsStr;
 }
 
-static bool hasResourceType(String8 type, Vector<MediaResource> resources) {
+static bool hasResourceType(const String8& type, const Vector<MediaResource>& resources) {
     for (size_t i = 0; i < resources.size(); ++i) {
         if (resources[i].mType == type) {
             return true;
@@ -51,7 +51,7 @@ static bool hasResourceType(String8 type, Vector<MediaResource> resources) {
     return false;
 }
 
-static bool hasResourceType(String8 type, ResourceInfos infos) {
+static bool hasResourceType(const String8& type, const ResourceInfos& infos) {
     for (size_t i = 0; i < infos.size(); ++i) {
         if (hasResourceType(type, infos[i].resources)) {
             return true;
@@ -75,7 +75,7 @@ static ResourceInfos& getResourceInfosForEdit(
 
 static ResourceInfo& getResourceInfoForEdit(
         int64_t clientId,
-        const sp<IResourceManagerClient> client,
+        const sp<IResourceManagerClient>& client,
         ResourceInfos& infos) {
     for (size_t i = 0; i < infos.size(); ++i) {
         if (infos[i].clientId == clientId) {
