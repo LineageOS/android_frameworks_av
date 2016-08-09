@@ -51,7 +51,7 @@ class OsclAOStatus
 {
     public:
         OsclAOStatus();
-        OsclAOStatus(int32 aStatus);
+        explicit OsclAOStatus(int32 aStatus);
         int32 operator=(int32 aStatus);
         int32 operator==(int32 aStatus) const;
         int32 operator!=(int32 aStatus) const;

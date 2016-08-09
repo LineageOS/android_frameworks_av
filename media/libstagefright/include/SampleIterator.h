@@ -25,7 +25,7 @@ namespace android {
 class SampleTable;
 
 struct SampleIterator {
-    SampleIterator(SampleTable *table);
+    explicit SampleIterator(SampleTable *table);
 
     status_t seekTo(uint32_t sampleIndex);
 

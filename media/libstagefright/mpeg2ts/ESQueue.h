@@ -44,7 +44,7 @@ struct ElementaryStreamQueue {
         // Data appended to the queue is always at access unit boundaries.
         kFlag_AlignedData = 1,
     };
-    ElementaryStreamQueue(Mode mode, uint32_t flags = 0);
+    explicit ElementaryStreamQueue(Mode mode, uint32_t flags = 0);
 
     status_t appendData(const void *data, size_t size, int64_t timeUs);
     void signalEOS();

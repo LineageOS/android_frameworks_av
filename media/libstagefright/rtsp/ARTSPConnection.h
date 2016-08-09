@@ -33,7 +33,7 @@ struct ARTSPResponse : public RefBase {
 };
 
 struct ARTSPConnection : public AHandler {
-    ARTSPConnection(bool uidValid = false, uid_t uid = 0);
+    explicit ARTSPConnection(bool uidValid = false, uid_t uid = 0);
 
     void connect(const char *url, const sp<AMessage> &reply);
     void disconnect(const sp<AMessage> &reply);

@@ -29,7 +29,7 @@ class String8;
 
 class AMRExtractor : public MediaExtractor {
 public:
-    AMRExtractor(const sp<DataSource> &source);
+    explicit AMRExtractor(const sp<DataSource> &source);
 
     virtual size_t countTracks();
     virtual sp<MediaSource> getTrack(size_t index);

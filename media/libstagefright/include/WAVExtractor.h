@@ -30,7 +30,7 @@ class String8;
 class WAVExtractor : public MediaExtractor {
 public:
     // Extractor assumes ownership of "source".
-    WAVExtractor(const sp<DataSource> &source);
+    explicit WAVExtractor(const sp<DataSource> &source);
 
     virtual size_t countTracks();
     virtual sp<MediaSource> getTrack(size_t index);

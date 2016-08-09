@@ -50,11 +50,11 @@ public:
     // The underlying data remains the responsibility of the caller!
     MediaBuffer(void *data, size_t size);
 
-    MediaBuffer(size_t size);
+    explicit MediaBuffer(size_t size);
 
-    MediaBuffer(const sp<GraphicBuffer>& graphicBuffer);
+    explicit MediaBuffer(const sp<GraphicBuffer>& graphicBuffer);
 
-    MediaBuffer(const sp<ABuffer> &buffer);
+    explicit MediaBuffer(const sp<ABuffer> &buffer);
 
     // Decrements the reference count and returns the buffer to its
     // associated MediaBufferGroup if the reference count drops to 0.

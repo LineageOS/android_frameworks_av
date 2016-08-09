@@ -49,7 +49,7 @@ AString getProfilingVersionString() {
 static const int kMaxInstances = 32;
 
 // TODO: move MediaCodecInfo to C++. Until then, some temp methods to parse out info.
-static bool getMeasureSize(sp<MediaCodecInfo::Capabilities> caps, int32_t *width, int32_t *height) {
+static bool getMeasureSize(const sp<MediaCodecInfo::Capabilities> &caps, int32_t *width, int32_t *height) {
     AString sizeRange;
     if (!caps->getDetails()->findString("size-range", &sizeRange)) {
         return false;
@@ -72,7 +72,7 @@ static bool getMeasureSize(sp<MediaCodecInfo::Capabilities> caps, int32_t *width
     return (*width > 0) && (*height > 0);
 }
 
-static void getMeasureBitrate(sp<MediaCodecInfo::Capabilities> caps, int32_t *bitrate) {
+static void getMeasureBitrate(const sp<MediaCodecInfo::Capabilities> &caps, int32_t *bitrate) {
     // Until have native MediaCodecInfo, we cannot get bitrates based on profile/levels.
     // We use 200000 as default value for our measurement.
     *bitrate = 200000;
@@ -90,7 +90,7 @@ static void getMeasureBitrate(sp<MediaCodecInfo::Capabilities> caps, int32_t *bi
 }
 
 static sp<AMessage> getMeasureFormat(
-        bool isEncoder, AString mime, sp<MediaCodecInfo::Capabilities> caps) {
+        bool isEncoder, const AString &mime, const sp<MediaCodecInfo::Capabilities> &caps) {
     sp<AMessage> format = new AMessage();
     format->setString("mime", mime);
 
@@ -128,7 +128,7 @@ static sp<AMessage> getMeasureFormat(
 }
 
 static size_t doProfileEncoderInputBuffers(
-        AString name, AString mime, sp<MediaCodecInfo::Capabilities> caps) {
+        const AString &name, const AString &mime, const sp<MediaCodecInfo::Capabilities> &caps) {
     ALOGV("doProfileEncoderInputBuffers: name %s, mime %s", name.c_str(), mime.c_str());
 
     sp<AMessage> format = getMeasureFormat(true /* isEncoder */, mime, caps);
@@ -183,7 +183,7 @@ static size_t doProfileEncoderInputBuffers(
 }
 
 static size_t doProfileCodecs(
-        bool isEncoder, AString name, AString mime, sp<MediaCodecInfo::Capabilities> caps) {
+        bool isEncoder, const AString &name, const AString &mime, const sp<MediaCodecInfo::Capabilities> &caps) {
     sp<AMessage> format = getMeasureFormat(isEncoder, mime, caps);
     if (format == NULL) {
         return 0;
@@ -337,7 +337,7 @@ void profileCodecs(
     global_results->add(kPolicySupportsMultipleSecureCodecs, supportMultipleSecureCodecs);
 }
 
-static AString globalResultsToXml(const CodecSettings& results) {
+static AString globalResultsToXml(const CodecSettings &results) {
     AString ret;
     for (size_t i = 0; i < results.size(); ++i) {
         AString setting = AStringPrintf(
@@ -349,7 +349,7 @@ static AString globalResultsToXml(const CodecSettings& results) {
     return ret;
 }
 
-static AString codecResultsToXml(const KeyedVector<AString, CodecSettings>& results) {
+static AString codecResultsToXml(const KeyedVector<AString, CodecSettings> &results) {
     AString ret;
     for (size_t i = 0; i < results.size(); ++i) {
         AString name;
@@ -362,7 +362,7 @@ static AString codecResultsToXml(const KeyedVector<AString, CodecSettings>& resu
                               name.c_str(),
                               mime.c_str());
         ret.append(codec);
-        CodecSettings settings = results.valueAt(i);
+        const CodecSettings &settings = results.valueAt(i);
         for (size_t i = 0; i < settings.size(); ++i) {
             // WARNING: we assume all the settings are "Limit". Currently we have only one type
             // of setting in this case, which is "max-supported-instances".
@@ -379,9 +379,9 @@ static AString codecResultsToXml(const KeyedVector<AString, CodecSettings>& resu
 
 void exportResultsToXML(
         const char *fileName,
-        const CodecSettings& global_results,
-        const KeyedVector<AString, CodecSettings>& encoder_results,
-        const KeyedVector<AString, CodecSettings>& decoder_results) {
+        const CodecSettings &global_results,
+        const KeyedVector<AString, CodecSettings> &encoder_results,
+        const KeyedVector<AString, CodecSettings> &decoder_results) {
     if (global_results.size() == 0 && encoder_results.size() == 0 && decoder_results.size() == 0) {
         return;
     }

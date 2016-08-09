@@ -41,7 +41,7 @@ class SurfaceMediaSource;
 struct ALooper;
 
 struct StagefrightRecorder : public MediaRecorderBase {
-    StagefrightRecorder(const String16 &opPackageName);
+    explicit StagefrightRecorder(const String16 &opPackageName);
     virtual ~StagefrightRecorder();
 
     virtual status_t init();
@@ -52,13 +52,13 @@ struct StagefrightRecorder : public MediaRecorderBase {
     virtual status_t setVideoEncoder(video_encoder ve);
     virtual status_t setVideoSize(int width, int height);
     virtual status_t setVideoFrameRate(int frames_per_second);
-    virtual status_t setCamera(const sp<ICamera>& camera, const sp<ICameraRecordingProxy>& proxy);
-    virtual status_t setPreviewSurface(const sp<IGraphicBufferProducer>& surface);
-    virtual status_t setInputSurface(const sp<IGraphicBufferConsumer>& surface);
+    virtual status_t setCamera(const sp<ICamera> &camera, const sp<ICameraRecordingProxy> &proxy);
+    virtual status_t setPreviewSurface(const sp<IGraphicBufferProducer> &surface);
+    virtual status_t setInputSurface(const sp<IGraphicBufferConsumer> &surface);
     virtual status_t setOutputFile(int fd, int64_t offset, int64_t length);
-    virtual status_t setParameters(const String8& params);
-    virtual status_t setListener(const sp<IMediaRecorderClient>& listener);
-    virtual status_t setClientName(const String16& clientName);
+    virtual status_t setParameters(const String8 &params);
+    virtual status_t setListener(const sp<IMediaRecorderClient> &listener);
+    virtual status_t setClientName(const String16 &clientName);
     virtual status_t prepare();
     virtual status_t start();
     virtual status_t pause();
@@ -66,7 +66,7 @@ struct StagefrightRecorder : public MediaRecorderBase {
     virtual status_t close();
     virtual status_t reset();
     virtual status_t getMaxAmplitude(int *max);
-    virtual status_t dump(int fd, const Vector<String16>& args) const;
+    virtual status_t dump(int fd, const Vector<String16> &args) const;
     // Querying a SurfaceMediaSourcer
     virtual sp<IGraphicBufferProducer> querySurfaceMediaSource() const;
 
@@ -147,8 +147,8 @@ private:
     // depending on the videosource type
     status_t setupMediaSource(sp<MediaSource> *mediaSource);
     status_t setupCameraSource(sp<CameraSource> *cameraSource);
-    status_t setupAudioEncoder(const sp<MediaWriter>& writer);
-    status_t setupVideoEncoder(sp<MediaSource> cameraSource, sp<MediaSource> *source);
+    status_t setupAudioEncoder(const sp<MediaWriter> &writer);
+    status_t setupVideoEncoder(const sp<MediaSource> &cameraSource, sp<MediaSource> *source);
 
     // Encoding parameter handling utilities
     status_t setParameter(const String8 &key, const String8 &value);

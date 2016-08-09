@@ -32,7 +32,7 @@ struct SampleIterator;
 
 class SampleTable : public RefBase {
 public:
-    SampleTable(const sp<DataSource> &source);
+    explicit SampleTable(const sp<DataSource> &source);
 
     bool isValid() const;
 

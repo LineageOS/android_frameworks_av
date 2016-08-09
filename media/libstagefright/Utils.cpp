@@ -458,7 +458,7 @@ status_t convertMetaDataToMessage(
     return OK;
 }
 
-static size_t reassembleAVCC(const sp<ABuffer> &csd0, const sp<ABuffer> csd1, char *avcc) {
+static size_t reassembleAVCC(const sp<ABuffer> &csd0, const sp<ABuffer> &csd1, char *avcc) {
 
     avcc[0] = 1;        // version
     avcc[1] = 0x64;     // profile
@@ -973,7 +973,7 @@ bool operator <(const HLSTime &t0, const HLSTime &t1) {
             || (t0.mSeq == t1.mSeq && t0.mTimeUs < t1.mTimeUs);
 }
 
-void writeToAMessage(sp<AMessage> msg, const AudioPlaybackRate &rate) {
+void writeToAMessage(const sp<AMessage> &msg, const AudioPlaybackRate &rate) {
     msg->setFloat("speed", rate.mSpeed);
     msg->setFloat("pitch", rate.mPitch);
     msg->setInt32("audio-fallback-mode", rate.mFallbackMode);
@@ -988,7 +988,7 @@ void readFromAMessage(const sp<AMessage> &msg, AudioPlaybackRate *rate /* nonnul
     CHECK(msg->findInt32("audio-stretch-mode", (int32_t *)&rate->mStretchMode));
 }
 
-void writeToAMessage(sp<AMessage> msg, const AVSyncSettings &sync, float videoFpsHint) {
+void writeToAMessage(const sp<AMessage> &msg, const AVSyncSettings &sync, float videoFpsHint) {
     msg->setInt32("sync-source", sync.mSource);
     msg->setInt32("audio-adjust-mode", sync.mAudioAdjustMode);
     msg->setFloat("tolerance", sync.mTolerance);
