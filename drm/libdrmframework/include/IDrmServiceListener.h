@@ -49,7 +49,7 @@ public:
 class BpDrmServiceListener: public BpInterface<IDrmServiceListener>
 {
 public:
-    BpDrmServiceListener(const sp<IBinder>& impl)
+    explicit BpDrmServiceListener(const sp<IBinder>& impl)
             : BpInterface<IDrmServiceListener>(impl) {}
 
     virtual status_t notify(const DrmInfoEvent& event);

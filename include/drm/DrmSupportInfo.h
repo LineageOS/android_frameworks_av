@@ -37,7 +37,7 @@ public:
     class MimeTypeIterator {
         friend class DrmSupportInfo;
     private:
-        MimeTypeIterator(DrmSupportInfo* drmSupportInfo)
+        explicit MimeTypeIterator(DrmSupportInfo* drmSupportInfo)
            : mDrmSupportInfo(drmSupportInfo), mIndex(0) {}
     public:
         MimeTypeIterator(const MimeTypeIterator& iterator);
@@ -60,7 +60,7 @@ public:
        friend class DrmSupportInfo;
 
     private:
-        FileSuffixIterator(DrmSupportInfo* drmSupportInfo)
+        explicit FileSuffixIterator(DrmSupportInfo* drmSupportInfo)
             : mDrmSupportInfo(drmSupportInfo), mIndex(0) {}
     public:
         FileSuffixIterator(const FileSuffixIterator& iterator);

@@ -413,7 +413,7 @@ DecryptHandle* DrmManager::openDecryptSession(
         handle->decryptId = mDecryptSessionId + 1;
 
         for (size_t index = 0; index < plugInIdList.size(); index++) {
-            String8 plugInId = plugInIdList.itemAt(index);
+            const String8& plugInId = plugInIdList.itemAt(index);
             IDrmEngine& rDrmEngine = mPlugInManager.getPlugIn(plugInId);
             result = rDrmEngine.openDecryptSession(uniqueId, handle, fd, offset, length, mime);
 
@@ -441,7 +441,7 @@ DecryptHandle* DrmManager::openDecryptSession(
         handle->decryptId = mDecryptSessionId + 1;
 
         for (size_t index = 0; index < plugInIdList.size(); index++) {
-            String8 plugInId = plugInIdList.itemAt(index);
+            const String8& plugInId = plugInIdList.itemAt(index);
             IDrmEngine& rDrmEngine = mPlugInManager.getPlugIn(plugInId);
             result = rDrmEngine.openDecryptSession(uniqueId, handle, uri, mime);
 
@@ -470,7 +470,7 @@ DecryptHandle* DrmManager::openDecryptSession(
         handle->decryptId = mDecryptSessionId + 1;
 
         for (size_t index = 0; index < plugInIdList.size(); index++) {
-            String8 plugInId = plugInIdList.itemAt(index);
+            const String8& plugInId = plugInIdList.itemAt(index);
             IDrmEngine& rDrmEngine = mPlugInManager.getPlugIn(plugInId);
             result = rDrmEngine.openDecryptSession(uniqueId, handle, buf, mimeType);
 
