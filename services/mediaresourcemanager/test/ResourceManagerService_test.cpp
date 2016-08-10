@@ -29,7 +29,7 @@
 
 namespace android {
 
-static int64_t getId(sp<IResourceManagerClient> client) {
+static int64_t getId(const sp<IResourceManagerClient>& client) {
     return (int64_t) client.get();
 }
 
