@@ -28,7 +28,7 @@ namespace android {
 // Sampling rate, format and channel mask must be specified in order to
 // get a valid a match
 bool IOProfile::isCompatibleProfile(audio_devices_t device,
-                                    String8 address,
+                                    const String8& address,
                                     uint32_t samplingRate,
                                     uint32_t *updatedSamplingRate,
                                     audio_format_t format,

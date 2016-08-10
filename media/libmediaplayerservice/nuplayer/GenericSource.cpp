@@ -741,8 +741,8 @@ void NuPlayer::GenericSource::fetchTextData(
         uint32_t sendWhat,
         media_track_type type,
         int32_t curGen,
-        sp<AnotherPacketSource> packets,
-        sp<AMessage> msg) {
+        const sp<AnotherPacketSource>& packets,
+        const sp<AMessage>& msg) {
     int32_t msgGeneration;
     CHECK(msg->findInt32("generation", &msgGeneration));
     if (msgGeneration != curGen) {
@@ -775,8 +775,8 @@ void NuPlayer::GenericSource::sendTextData(
         uint32_t what,
         media_track_type type,
         int32_t curGen,
-        sp<AnotherPacketSource> packets,
-        sp<AMessage> msg) {
+        const sp<AnotherPacketSource>& packets,
+        const sp<AMessage>& msg) {
     int32_t msgGeneration;
     CHECK(msg->findInt32("generation", &msgGeneration));
     if (msgGeneration != curGen) {
@@ -851,7 +851,7 @@ sp<MetaData> NuPlayer::GenericSource::getFormatMeta(bool audio) {
     }
 }
 
-void NuPlayer::GenericSource::onGetFormatMeta(sp<AMessage> msg) const {
+void NuPlayer::GenericSource::onGetFormatMeta(const sp<AMessage>& msg) const {
     int32_t audio;
     CHECK(msg->findInt32("audio", &audio));
 
@@ -1023,7 +1023,7 @@ ssize_t NuPlayer::GenericSource::getSelectedTrack(media_track_type type) const {
     }
 }
 
-void NuPlayer::GenericSource::onGetSelectedTrack(sp<AMessage> msg) const {
+void NuPlayer::GenericSource::onGetSelectedTrack(const sp<AMessage>& msg) const {
     int32_t tmpType;
     CHECK(msg->findInt32("type", &tmpType));
     media_track_type type = (media_track_type)tmpType;
@@ -1079,7 +1079,7 @@ status_t NuPlayer::GenericSource::selectTrack(size_t trackIndex, bool select, in
     return err;
 }
 
-void NuPlayer::GenericSource::onSelectTrack(sp<AMessage> msg) {
+void NuPlayer::GenericSource::onSelectTrack(const sp<AMessage>& msg) {
     int32_t trackIndex, select;
     int64_t timeUs;
     CHECK(msg->findInt32("trackIndex", &trackIndex));
@@ -1199,7 +1199,7 @@ status_t NuPlayer::GenericSource::seekTo(int64_t seekTimeUs) {
     return err;
 }
 
-void NuPlayer::GenericSource::onSeek(sp<AMessage> msg) {
+void NuPlayer::GenericSource::onSeek(const sp<AMessage>& msg) {
     int64_t seekTimeUs;
     CHECK(msg->findInt64("seekTimeUs", &seekTimeUs));
 
@@ -1358,7 +1358,7 @@ void NuPlayer::GenericSource::postReadBuffer(media_track_type trackType) {
     }
 }
 
-void NuPlayer::GenericSource::onReadBuffer(sp<AMessage> msg) {
+void NuPlayer::GenericSource::onReadBuffer(const sp<AMessage>& msg) {
     int32_t tmpType;
     CHECK(msg->findInt32("trackType", &tmpType));
     media_track_type trackType = (media_track_type)tmpType;

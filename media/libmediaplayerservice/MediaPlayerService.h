@@ -169,7 +169,7 @@ class MediaPlayerService : public BnMediaPlayerService
         class CallbackData {
             friend AudioOutput;
         public:
-            CallbackData(AudioOutput *cookie) {
+            explicit CallbackData(AudioOutput *cookie) {
                 mData = cookie;
                 mSwitching = false;
             }
@@ -212,7 +212,7 @@ public:
 
     // IMediaPlayerService interface
     virtual sp<IMediaRecorder>  createMediaRecorder(const String16 &opPackageName);
-    void    removeMediaRecorderClient(wp<MediaRecorderClient> client);
+    void    removeMediaRecorderClient(const wp<MediaRecorderClient>& client);
     virtual sp<IMediaMetadataRetriever> createMetadataRetriever();
 
     virtual sp<IMediaPlayer>    create(const sp<IMediaPlayerClient>& client,
@@ -226,7 +226,7 @@ public:
             const sp<IRemoteDisplayClient>& client, const String8& iface);
     virtual status_t            dump(int fd, const Vector<String16>& args);
 
-            void                removeClient(wp<Client> client);
+            void                removeClient(const wp<Client>& client);
 
     enum {
         MEDIASERVER_PROCESS_DEATH = 0,
