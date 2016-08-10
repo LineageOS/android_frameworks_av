@@ -86,7 +86,7 @@ public:
         MAPTYPE_OUTPUT = 1
     } session_route_map_type_t;
 
-    SessionRouteMap(session_route_map_type_t mapType) :
+    explicit SessionRouteMap(session_route_map_type_t mapType) :
         mMapType(mapType)
     {}
 
@@ -106,7 +106,7 @@ public:
     void addRoute(audio_session_t session,
                   audio_stream_type_t streamType,
                   audio_source_t source,
-                  sp<DeviceDescriptor> deviceDescriptor,
+                  const sp<DeviceDescriptor>& deviceDescriptor,
                   uid_t uid);
 
 private:

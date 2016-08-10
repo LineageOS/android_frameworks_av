@@ -358,7 +358,7 @@ protected:
     // types or implementations from the suspend/restore mechanism.
     bool isEffectEligibleForSuspend(const effect_descriptor_t& desc);
 
-    void clearInputBuffer_l(sp<ThreadBase> thread);
+    void clearInputBuffer_l(const sp<ThreadBase>& thread);
 
     void setThread(const sp<ThreadBase>& thread);
 

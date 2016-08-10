@@ -59,7 +59,7 @@ struct NuPlayer::Source : public AHandler {
 
     // The provides message is used to notify the player about various
     // events.
-    Source(const sp<AMessage> &notify)
+    explicit Source(const sp<AMessage> &notify)
         : mNotify(notify) {
     }
 

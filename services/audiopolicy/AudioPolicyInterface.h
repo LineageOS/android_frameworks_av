@@ -231,7 +231,7 @@ public:
 
     virtual status_t releaseSoundTriggerSession(audio_session_t session) = 0;
 
-    virtual status_t registerPolicyMixes(Vector<AudioMix> mixes) = 0;
+    virtual status_t registerPolicyMixes(const Vector<AudioMix>& mixes) = 0;
     virtual status_t unregisterPolicyMixes(Vector<AudioMix> mixes) = 0;
 
     virtual status_t startAudioSource(const struct audio_port_config *source,

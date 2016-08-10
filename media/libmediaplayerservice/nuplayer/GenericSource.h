@@ -248,23 +248,23 @@ private:
     void finishPrepareAsync();
     status_t startSources();
 
-    void onGetFormatMeta(sp<AMessage> msg) const;
+    void onGetFormatMeta(const sp<AMessage>& msg) const;
     sp<MetaData> doGetFormatMeta(bool audio) const;
 
-    void onGetSelectedTrack(sp<AMessage> msg) const;
+    void onGetSelectedTrack(const sp<AMessage>& msg) const;
     ssize_t doGetSelectedTrack(media_track_type type) const;
 
-    void onSelectTrack(sp<AMessage> msg);
+    void onSelectTrack(const sp<AMessage>& msg);
     status_t doSelectTrack(size_t trackIndex, bool select, int64_t timeUs);
 
-    void onSeek(sp<AMessage> msg);
+    void onSeek(const sp<AMessage>& msg);
     status_t doSeek(int64_t seekTimeUs);
 
     void onPrepareAsync();
 
     void fetchTextData(
             uint32_t what, media_track_type type,
-            int32_t curGen, sp<AnotherPacketSource> packets, sp<AMessage> msg);
+            int32_t curGen, const sp<AnotherPacketSource>& packets, const sp<AMessage>& msg);
 
     void sendGlobalTextData(
             uint32_t what,
@@ -272,7 +272,7 @@ private:
 
     void sendTextData(
             uint32_t what, media_track_type type,
-            int32_t curGen, sp<AnotherPacketSource> packets, sp<AMessage> msg);
+            int32_t curGen, const sp<AnotherPacketSource>& packets, const sp<AMessage>& msg);
 
     sp<ABuffer> mediaBufferToABuffer(
             MediaBuffer *mbuf,
@@ -281,7 +281,7 @@ private:
             int64_t *actualTimeUs = NULL);
 
     void postReadBuffer(media_track_type trackType);
-    void onReadBuffer(sp<AMessage> msg);
+    void onReadBuffer(const sp<AMessage>& msg);
     void readBuffer(
             media_track_type trackType,
             int64_t seekTimeUs = -1ll, int64_t *actualTimeUs = NULL, bool formatChange = false);

@@ -196,7 +196,7 @@ public:
 
     virtual audio_mode_t getPhoneState();
 
-    virtual status_t registerPolicyMixes(Vector<AudioMix> mixes, bool registration);
+    virtual status_t registerPolicyMixes(const Vector<AudioMix>& mixes, bool registration);
 
     virtual status_t startAudioSource(const struct audio_port_config *source,
                                       const audio_attributes_t *attributes,
@@ -227,8 +227,8 @@ public:
             void onAudioPatchListUpdate();
             void doOnAudioPatchListUpdate();
 
-            void onDynamicPolicyMixStateUpdate(String8 regId, int32_t state);
-            void doOnDynamicPolicyMixStateUpdate(String8 regId, int32_t state);
+            void onDynamicPolicyMixStateUpdate(const String8& regId, int32_t state);
+            void doOnDynamicPolicyMixStateUpdate(const String8& regId, int32_t state);
             void onRecordingConfigurationUpdate(int event, audio_session_t session,
                     audio_source_t source, const audio_config_base_t *clientConfig,
                     const audio_config_base_t *deviceConfig, audio_patch_handle_t patchHandle);
@@ -305,7 +305,7 @@ private:
                     void        updateAudioPatchListCommand();
                     status_t    setAudioPortConfigCommand(const struct audio_port_config *config,
                                                           int delayMs);
-                    void        dynamicPolicyMixStateUpdateCommand(String8 regId, int32_t state);
+                    void        dynamicPolicyMixStateUpdateCommand(const String8& regId, int32_t state);
                     void        recordingConfigurationUpdateCommand(
                                                         int event, audio_session_t session,
                                                         audio_source_t source,
@@ -424,7 +424,7 @@ private:
     class AudioPolicyClient : public AudioPolicyClientInterface
     {
      public:
-        AudioPolicyClient(AudioPolicyService *service) : mAudioPolicyService(service) {}
+        explicit AudioPolicyClient(AudioPolicyService *service) : mAudioPolicyService(service) {}
         virtual ~AudioPolicyClient() {}
 
         //
@@ -539,7 +539,7 @@ private:
 
                             void      onAudioPortListUpdate();
                             void      onAudioPatchListUpdate();
-                            void      onDynamicPolicyMixStateUpdate(String8 regId, int32_t state);
+                            void      onDynamicPolicyMixStateUpdate(const String8& regId, int32_t state);
                             void      onRecordingConfigurationUpdate(
                                         int event, audio_session_t session,
                                         audio_source_t source,
