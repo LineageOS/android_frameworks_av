@@ -33,7 +33,7 @@ class MetaData;
 struct NuPlayerDriver;
 
 struct NuPlayer : public AHandler {
-    NuPlayer(pid_t pid);
+    explicit NuPlayer(pid_t pid);
 
     void setUID(uid_t uid);
 
@@ -280,7 +280,7 @@ private:
     void sendTimedMetaData(const sp<ABuffer> &buffer);
     void sendTimedTextData(const sp<ABuffer> &buffer);
 
-    void writeTrackInfo(Parcel* reply, const sp<AMessage> format) const;
+    void writeTrackInfo(Parcel* reply, const sp<AMessage>& format) const;
 
     DISALLOW_EVIL_CONSTRUCTORS(NuPlayer);
 };

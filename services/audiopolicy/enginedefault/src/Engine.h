@@ -43,7 +43,7 @@ private:
     class ManagerInterfaceImpl : public AudioPolicyManagerInterface
     {
     public:
-        ManagerInterfaceImpl(Engine *policyEngine)
+        explicit ManagerInterfaceImpl(Engine *policyEngine)
             : mPolicyEngine(policyEngine) {}
 
         virtual void setObserver(AudioPolicyManagerObserver *observer)

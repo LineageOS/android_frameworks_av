@@ -97,7 +97,7 @@ public:
         sp<ConfigEventData> mData;     // event specific parameter data
 
     protected:
-        ConfigEvent(int type, bool requiresSystemReady = false) :
+        explicit ConfigEvent(int type, bool requiresSystemReady = false) :
             mType(type), mStatus(NO_ERROR), mWaitStatus(false),
             mRequiresSystemReady(requiresSystemReady), mData(NULL) {}
     };
@@ -149,7 +149,7 @@ public:
 
     class SetParameterConfigEventData : public ConfigEventData {
     public:
-        SetParameterConfigEventData(String8 keyValuePairs) :
+        explicit SetParameterConfigEventData(String8 keyValuePairs) :
             mKeyValuePairs(keyValuePairs) {}
 
         virtual  void dump(char *buffer, size_t size) {
@@ -161,7 +161,7 @@ public:
 
     class SetParameterConfigEvent : public ConfigEvent {
     public:
-        SetParameterConfigEvent(String8 keyValuePairs) :
+        explicit SetParameterConfigEvent(String8 keyValuePairs) :
             ConfigEvent(CFG_EVENT_SET_PARAMETER) {
             mData = new SetParameterConfigEventData(keyValuePairs);
             mWaitStatus = true;
@@ -196,7 +196,7 @@ public:
 
     class ReleaseAudioPatchConfigEventData : public ConfigEventData {
     public:
-        ReleaseAudioPatchConfigEventData(const audio_patch_handle_t handle) :
+        explicit ReleaseAudioPatchConfigEventData(const audio_patch_handle_t handle) :
             mHandle(handle) {}
 
         virtual  void dump(char *buffer, size_t size) {
@@ -208,7 +208,7 @@ public:
 
     class ReleaseAudioPatchConfigEvent : public ConfigEvent {
     public:
-        ReleaseAudioPatchConfigEvent(const audio_patch_handle_t handle) :
+        explicit ReleaseAudioPatchConfigEvent(const audio_patch_handle_t handle) :
             ConfigEvent(CFG_EVENT_RELEASE_AUDIO_PATCH) {
             mData = new ReleaseAudioPatchConfigEventData(handle);
             mWaitStatus = true;
@@ -218,7 +218,7 @@ public:
 
     class PMDeathRecipient : public IBinder::DeathRecipient {
     public:
-                    PMDeathRecipient(const wp<ThreadBase>& thread) : mThread(thread) {}
+        explicit    PMDeathRecipient(const wp<ThreadBase>& thread) : mThread(thread) {}
         virtual     ~PMDeathRecipient() {}
 
         // IBinder::DeathRecipient
@@ -598,9 +598,9 @@ public:
                     return reinterpret_cast<int16_t *>(mSinkBuffer); };
 
     virtual     void detachAuxEffect_l(int effectId);
-                status_t attachAuxEffect(const sp<AudioFlinger::PlaybackThread::Track> track,
+                status_t attachAuxEffect(const sp<AudioFlinger::PlaybackThread::Track>& track,
                         int EffectId);
-                status_t attachAuxEffect_l(const sp<AudioFlinger::PlaybackThread::Track> track,
+                status_t attachAuxEffect_l(const sp<AudioFlinger::PlaybackThread::Track>& track,
                         int EffectId);
 
                 virtual status_t addEffectChain_l(const sp<EffectChain>& chain);
@@ -1013,7 +1013,7 @@ private:
 class AsyncCallbackThread : public Thread {
 public:
 
-    AsyncCallbackThread(const wp<PlaybackThread>& playbackThread);
+    explicit AsyncCallbackThread(const wp<PlaybackThread>& playbackThread);
 
     virtual             ~AsyncCallbackThread();
 
@@ -1096,7 +1096,7 @@ public:
     class ResamplerBufferProvider : public AudioBufferProvider
     {
     public:
-        ResamplerBufferProvider(RecordTrack* recordTrack) :
+        explicit ResamplerBufferProvider(RecordTrack* recordTrack) :
             mRecordTrack(recordTrack),
             mRsmpInUnrel(0), mRsmpInFront(0) { }
         virtual ~ResamplerBufferProvider() { }
