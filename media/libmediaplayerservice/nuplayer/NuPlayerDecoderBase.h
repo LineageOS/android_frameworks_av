@@ -30,7 +30,7 @@ class MediaBuffer;
 class Surface;
 
 struct NuPlayer::DecoderBase : public AHandler {
-    DecoderBase(const sp<AMessage> &notify);
+    explicit DecoderBase(const sp<AMessage> &notify);
 
     void configure(const sp<AMessage> &format);
     void init();

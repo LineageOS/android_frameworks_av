@@ -42,8 +42,8 @@ HwModule::~HwModule()
     }
 }
 
-status_t HwModule::addOutputProfile(String8 name, const audio_config_t *config,
-                                    audio_devices_t device, String8 address)
+status_t HwModule::addOutputProfile(const String8 &name, const audio_config_t *config,
+                                    audio_devices_t device, const String8 &address)
 {
     sp<IOProfile> profile = new OutputProfile(name);
 
@@ -93,7 +93,7 @@ void HwModule::setProfiles(const IOProfileCollection &profiles)
     }
 }
 
-status_t HwModule::removeOutputProfile(String8 name)
+status_t HwModule::removeOutputProfile(const String8& name)
 {
     for (size_t i = 0; i < mOutputProfiles.size(); i++) {
         if (mOutputProfiles[i]->getName() == name) {
@@ -105,8 +105,8 @@ status_t HwModule::removeOutputProfile(String8 name)
     return NO_ERROR;
 }
 
-status_t HwModule::addInputProfile(String8 name, const audio_config_t *config,
-                                   audio_devices_t device, String8 address)
+status_t HwModule::addInputProfile(const String8& name, const audio_config_t *config,
+                                   audio_devices_t device, const String8& address)
 {
     sp<IOProfile> profile = new InputProfile(name);
     profile->addAudioProfile(new AudioProfile(config->format, config->channel_mask,
@@ -122,7 +122,7 @@ status_t HwModule::addInputProfile(String8 name, const audio_config_t *config,
     return addInputProfile(profile);
 }
 
-status_t HwModule::removeInputProfile(String8 name)
+status_t HwModule::removeInputProfile(const String8& name)
 {
     for (size_t i = 0; i < mInputProfiles.size(); i++) {
         if (mInputProfiles[i]->getName() == name) {

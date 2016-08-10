@@ -306,7 +306,7 @@ sp<IMediaRecorder> MediaPlayerService::createMediaRecorder(const String16 &opPac
     return recorder;
 }
 
-void MediaPlayerService::removeMediaRecorderClient(wp<MediaRecorderClient> client)
+void MediaPlayerService::removeMediaRecorderClient(const wp<MediaRecorderClient>& client)
 {
     Mutex::Autolock lock(mLock);
     mMediaRecorderClients.remove(client);
@@ -551,7 +551,7 @@ status_t MediaPlayerService::dump(int fd, const Vector<String16>& args)
     return NO_ERROR;
 }
 
-void MediaPlayerService::removeClient(wp<Client> client)
+void MediaPlayerService::removeClient(const wp<Client>& client)
 {
     Mutex::Autolock lock(mLock);
     mClients.remove(client);

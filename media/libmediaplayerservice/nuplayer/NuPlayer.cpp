@@ -428,7 +428,7 @@ void NuPlayer::seekToAsync(int64_t seekTimeUs, bool needNotify) {
 
 
 void NuPlayer::writeTrackInfo(
-        Parcel* reply, const sp<AMessage> format) const {
+        Parcel* reply, const sp<AMessage>& format) const {
     if (format == NULL) {
         ALOGE("NULL format");
         return;

@@ -1421,7 +1421,7 @@ void AudioFlinger::EffectChain::clearInputBuffer()
 }
 
 // Must be called with EffectChain::mLock locked
-void AudioFlinger::EffectChain::clearInputBuffer_l(sp<ThreadBase> thread)
+void AudioFlinger::EffectChain::clearInputBuffer_l(const sp<ThreadBase>& thread)
 {
     // TODO: This will change in the future, depending on multichannel
     // and sample format changes for effects.

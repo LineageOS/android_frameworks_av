@@ -40,7 +40,7 @@ typedef Vector<sp<IOProfile> > IOProfileCollection;
 class HwModule : public RefBase
 {
 public:
-    HwModule(const char *name, uint32_t halVersion = AUDIO_DEVICE_API_VERSION_MIN);
+    explicit HwModule(const char *name, uint32_t halVersion = AUDIO_DEVICE_API_VERSION_MIN);
     ~HwModule();
 
     const char *getName() const { return mName.string(); }
@@ -66,12 +66,12 @@ public:
     status_t addInputProfile(const sp<IOProfile> &profile);
     status_t addProfile(const sp<IOProfile> &profile);
 
-    status_t addOutputProfile(String8 name, const audio_config_t *config,
-            audio_devices_t device, String8 address);
-    status_t removeOutputProfile(String8 name);
-    status_t addInputProfile(String8 name, const audio_config_t *config,
-            audio_devices_t device, String8 address);
-    status_t removeInputProfile(String8 name);
+    status_t addOutputProfile(const String8& name, const audio_config_t *config,
+            audio_devices_t device, const String8& address);
+    status_t removeOutputProfile(const String8& name);
+    status_t addInputProfile(const String8& name, const audio_config_t *config,
+            audio_devices_t device, const String8& address);
+    status_t removeInputProfile(const String8& name);
 
     audio_module_handle_t getHandle() const { return mHandle; }
 
