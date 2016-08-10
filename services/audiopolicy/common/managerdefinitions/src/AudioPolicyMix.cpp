@@ -51,7 +51,7 @@ android::AudioMix *AudioPolicyMix::getMix()
     return &mMix;
 }
 
-status_t AudioPolicyMixCollection::registerMix(String8 address, AudioMix mix)
+status_t AudioPolicyMixCollection::registerMix(const String8& address, AudioMix mix)
 {
     ssize_t index = indexOfKey(address);
     if (index >= 0) {
@@ -64,7 +64,7 @@ status_t AudioPolicyMixCollection::registerMix(String8 address, AudioMix mix)
     return NO_ERROR;
 }
 
-status_t AudioPolicyMixCollection::unregisterMix(String8 address)
+status_t AudioPolicyMixCollection::unregisterMix(const String8& address)
 {
     ssize_t index = indexOfKey(address);
     if (index < 0) {
@@ -76,7 +76,7 @@ status_t AudioPolicyMixCollection::unregisterMix(String8 address)
     return NO_ERROR;
 }
 
-status_t AudioPolicyMixCollection::getAudioPolicyMix(String8 address,
+status_t AudioPolicyMixCollection::getAudioPolicyMix(const String8& address,
                                                      sp<AudioPolicyMix> &policyMix) const
 {
     ssize_t index = indexOfKey(address);

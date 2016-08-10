@@ -1965,7 +1965,7 @@ status_t AudioFlinger::closeOutput_nonvirtual(audio_io_handle_t output)
     return NO_ERROR;
 }
 
-void AudioFlinger::closeOutputFinish(sp<PlaybackThread> thread)
+void AudioFlinger::closeOutputFinish(const sp<PlaybackThread>& thread)
 {
     AudioStreamOut *out = thread->clearOutput();
     ALOG_ASSERT(out != NULL, "out shouldn't be NULL");
@@ -1974,7 +1974,7 @@ void AudioFlinger::closeOutputFinish(sp<PlaybackThread> thread)
     delete out;
 }
 
-void AudioFlinger::closeOutputInternal_l(sp<PlaybackThread> thread)
+void AudioFlinger::closeOutputInternal_l(const sp<PlaybackThread>& thread)
 {
     mPlaybackThreads.removeItem(thread->mId);
     thread->exit();
@@ -2225,7 +2225,7 @@ status_t AudioFlinger::closeInput_nonvirtual(audio_io_handle_t input)
     return NO_ERROR;
 }
 
-void AudioFlinger::closeInputFinish(sp<RecordThread> thread)
+void AudioFlinger::closeInputFinish(const sp<RecordThread>& thread)
 {
     thread->exit();
     AudioStreamIn *in = thread->clearInput();
@@ -2235,7 +2235,7 @@ void AudioFlinger::closeInputFinish(sp<RecordThread> thread)
     delete in;
 }
 
-void AudioFlinger::closeInputInternal_l(sp<RecordThread> thread)
+void AudioFlinger::closeInputInternal_l(const sp<RecordThread>& thread)
 {
     mRecordThreads.removeItem(thread->mId);
     closeInputFinish(thread);
@@ -2433,7 +2433,7 @@ sp<AudioFlinger::SyncEvent> AudioFlinger::createSyncEvent(AudioSystem::sync_even
                                     int triggerSession,
                                     int listenerSession,
                                     sync_event_callback_t callBack,
-                                    wp<RefBase> cookie)
+                                    const wp<RefBase>& cookie)
 {
     Mutex::Autolock _l(mLock);
 

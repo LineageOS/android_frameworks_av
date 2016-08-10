@@ -1086,7 +1086,7 @@ status_t AudioPolicyManager::startOutput(audio_io_handle_t output,
     return status;
 }
 
-status_t AudioPolicyManager::startSource(sp<AudioOutputDescriptor> outputDesc,
+status_t AudioPolicyManager::startSource(const sp<AudioOutputDescriptor>& outputDesc,
                                              audio_stream_type_t stream,
                                              audio_devices_t device,
                                              uint32_t *delayMs)
@@ -1211,7 +1211,7 @@ status_t AudioPolicyManager::stopOutput(audio_io_handle_t output,
     return stopSource(outputDesc, stream, forceDeviceUpdate);
 }
 
-status_t AudioPolicyManager::stopSource(sp<AudioOutputDescriptor> outputDesc,
+status_t AudioPolicyManager::stopSource(const sp<AudioOutputDescriptor>& outputDesc,
                                             audio_stream_type_t stream,
                                             bool forceDeviceUpdate)
 {
@@ -1927,7 +1927,7 @@ bool AudioPolicyManager::isSourceActive(audio_source_t source) const
 //  - 2 if none found, look for a mix matching the attributes usage
 //  - 3 if none found, default to device and output selection by policy rules.
 
-status_t AudioPolicyManager::registerPolicyMixes(Vector<AudioMix> mixes)
+status_t AudioPolicyManager::registerPolicyMixes(const Vector<AudioMix>& mixes)
 {
     sp<HwModule> module;
     for (size_t i = 0; i < mHwModules.size(); i++) {
@@ -3167,7 +3167,7 @@ int AudioPolicyManager::testOutputIndex(audio_io_handle_t output)
 
 // ---
 
-void AudioPolicyManager::addOutput(audio_io_handle_t output, sp<SwAudioOutputDescriptor> outputDesc)
+void AudioPolicyManager::addOutput(audio_io_handle_t output, const sp<SwAudioOutputDescriptor>& outputDesc)
 {
     outputDesc->setIoHandle(output);
     mOutputs.add(output, outputDesc);
@@ -3179,16 +3179,16 @@ void AudioPolicyManager::removeOutput(audio_io_handle_t output)
     mOutputs.removeItem(output);
 }
 
-void AudioPolicyManager::addInput(audio_io_handle_t input, sp<AudioInputDescriptor> inputDesc)
+void AudioPolicyManager::addInput(audio_io_handle_t input, const sp<AudioInputDescriptor>& inputDesc)
 {
     inputDesc->setIoHandle(input);
     mInputs.add(input, inputDesc);
     nextAudioPortGeneration();
 }
 
-void AudioPolicyManager::findIoHandlesByAddress(sp<SwAudioOutputDescriptor> desc /*in*/,
+void AudioPolicyManager::findIoHandlesByAddress(const sp<SwAudioOutputDescriptor>& desc /*in*/,
         const audio_devices_t device /*in*/,
-        const String8 address /*in*/,
+        const String8& address /*in*/,
         SortedVector<audio_io_handle_t>& outputs /*out*/) {
     sp<DeviceDescriptor> devDesc =
         desc->mProfile->mSupportedDevices.getDevice(device, address);
@@ -3199,10 +3199,10 @@ void AudioPolicyManager::findIoHandlesByAddress(sp<SwAudioOutputDescriptor> desc
     }
 }
 
-status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor> devDesc,
+status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& devDesc,
                                                    audio_policy_dev_state_t state,
                                                    SortedVector<audio_io_handle_t>& outputs,
-                                                   const String8 address)
+                                                   const String8& address)
 {
     audio_devices_t device = devDesc->type();
     sp<SwAudioOutputDescriptor> desc;
@@ -3496,10 +3496,10 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor> de
     return NO_ERROR;
 }
 
-status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor> devDesc,
+status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& devDesc,
                                                   audio_policy_dev_state_t state,
                                                   SortedVector<audio_io_handle_t>& inputs,
-                                                  const String8 address)
+                                                  const String8& address)
 {
     audio_devices_t device = devDesc->type();
     sp<AudioInputDescriptor> desc;
@@ -3786,7 +3786,7 @@ void AudioPolicyManager::closeInput(audio_io_handle_t input)
 
 SortedVector<audio_io_handle_t> AudioPolicyManager::getOutputsForDevice(
                                                                 audio_devices_t device,
-                                                                SwAudioOutputCollection openOutputs)
+                                                                const SwAudioOutputCollection& openOutputs)
 {
     SortedVector<audio_io_handle_t> outputs;
 
@@ -4190,7 +4190,7 @@ void AudioPolicyManager::updateDevicesAndOutputs()
     mPreviousOutputs = mOutputs;
 }
 
-uint32_t AudioPolicyManager::checkDeviceMuteStrategies(sp<AudioOutputDescriptor> outputDesc,
+uint32_t AudioPolicyManager::checkDeviceMuteStrategies(const sp<AudioOutputDescriptor>& outputDesc,
                                                        audio_devices_t prevDevice,
                                                        uint32_t delayMs)
 {
@@ -4505,7 +4505,7 @@ status_t AudioPolicyManager::resetInputDevice(audio_io_handle_t input,
 }
 
 sp<IOProfile> AudioPolicyManager::getInputProfile(audio_devices_t device,
-                                                  String8 address,
+                                                  const String8& address,
                                                   uint32_t& samplingRate,
                                                   audio_format_t& format,
                                                   audio_channel_mask_t& channelMask,
@@ -4911,7 +4911,7 @@ bool AudioPolicyManager::isValidAttributes(const audio_attributes_t *paa)
     return true;
 }
 
-bool AudioPolicyManager::isStrategyActive(const sp<AudioOutputDescriptor> outputDesc,
+bool AudioPolicyManager::isStrategyActive(const sp<AudioOutputDescriptor>& outputDesc,
                                           routing_strategy strategy, uint32_t inPastMs,
                                           nsecs_t sysTime) const
 {

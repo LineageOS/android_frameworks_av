@@ -421,7 +421,7 @@ void NuPlayer::seekToAsync(int64_t seekTimeUs, bool needNotify) {
 
 
 void NuPlayer::writeTrackInfo(
-        Parcel* reply, const sp<AMessage> format) const {
+        Parcel* reply, const sp<AMessage>& format) const {
     int32_t trackType;
     CHECK(format->findInt32("type", &trackType));
 

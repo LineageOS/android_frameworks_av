@@ -700,7 +700,7 @@ public:
         return (audio_mode_t)reply.readInt32();
     }
 
-    virtual status_t registerPolicyMixes(Vector<AudioMix> mixes, bool registration)
+    virtual status_t registerPolicyMixes(const Vector<AudioMix>& mixes, bool registration)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());

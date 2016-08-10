@@ -52,11 +52,11 @@ private:
 class AudioPolicyMixCollection : public DefaultKeyedVector<String8, sp<AudioPolicyMix> >
 {
 public:
-    status_t getAudioPolicyMix(String8 address, sp<AudioPolicyMix> &policyMix) const;
+    status_t getAudioPolicyMix(const String8& address, sp<AudioPolicyMix> &policyMix) const;
 
-    status_t registerMix(String8 address, AudioMix mix);
+    status_t registerMix(const String8& address, AudioMix mix);
 
-    status_t unregisterMix(String8 address);
+    status_t unregisterMix(const String8& address);
 
     void closeOutput(sp<SwAudioOutputDescriptor> &desc);
 

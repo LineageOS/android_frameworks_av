@@ -1025,7 +1025,7 @@ void AudioFlinger::ThreadBase::checkSuspendOnAddEffectChain_l(const sp<EffectCha
             mSuspendedSessions.valueAt(index);
 
     for (size_t i = 0; i < sessionEffects.size(); i++) {
-        sp<SuspendedSessionDesc> desc = sessionEffects.valueAt(i);
+        const sp<SuspendedSessionDesc>& desc = sessionEffects.valueAt(i);
         for (int j = 0; j < desc->mRefCount; j++) {
             if (sessionEffects.keyAt(i) == EffectChain::kKeyForSuspendAll) {
                 chain->setEffectSuspendedAll_l(true);
@@ -2666,14 +2666,14 @@ size_t AudioFlinger::PlaybackThread::removeEffectChain_l(const sp<EffectChain>& 
 }
 
 status_t AudioFlinger::PlaybackThread::attachAuxEffect(
-        const sp<AudioFlinger::PlaybackThread::Track> track, int EffectId)
+        const sp<AudioFlinger::PlaybackThread::Track>& track, int EffectId)
 {
     Mutex::Autolock _l(mLock);
     return attachAuxEffect_l(track, EffectId);
 }
 
 status_t AudioFlinger::PlaybackThread::attachAuxEffect_l(
-        const sp<AudioFlinger::PlaybackThread::Track> track, int EffectId)
+        const sp<AudioFlinger::PlaybackThread::Track>& track, int EffectId)
 {
     status_t status = NO_ERROR;
 
