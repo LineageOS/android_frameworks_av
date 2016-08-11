@@ -4211,7 +4211,7 @@ SortedVector<audio_io_handle_t> AudioPolicyManager::getOutputsForDevice(
 
     ALOGVV("getOutputsForDevice() device %04x", device);
     for (size_t i = 0; i < openOutputs.size(); i++) {
-        ALOGVV("output %d isDuplicated=%d device=%04x",
+        ALOGVV("output %zu isDuplicated=%d device=%04x",
                 i, openOutputs.valueAt(i)->isDuplicated(),
                 openOutputs.valueAt(i)->supportedDevices());
         if ((device & openOutputs.valueAt(i)->supportedDevices()) == device) {
@@ -4657,7 +4657,7 @@ uint32_t AudioPolicyManager::checkDeviceMuteStrategies(const sp<AudioOutputDescr
                         == AUDIO_DEVICE_NONE) {
                     continue;
                 }
-                ALOGVV("checkDeviceMuteStrategies() %s strategy %d (curDevice %04x)",
+                ALOGVV("checkDeviceMuteStrategies() %s strategy %zu (curDevice %04x)",
                       mute ? "muting" : "unmuting", i, curDevice);
                 setStrategyMute((routing_strategy)i, mute, desc, mute ? 0 : delayMs);
                 if (isStrategyActive(desc, (routing_strategy)i)) {
