@@ -32,7 +32,7 @@ namespace android {
  */
 class CameraModule {
 public:
-    CameraModule(camera_module_t *module);
+    explicit CameraModule(camera_module_t *module);
     virtual ~CameraModule();
 
     // Must be called after construction

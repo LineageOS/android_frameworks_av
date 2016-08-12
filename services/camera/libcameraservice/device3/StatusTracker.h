@@ -45,7 +45,7 @@ namespace camera3 {
  */
 class StatusTracker: public Thread {
   public:
-    StatusTracker(wp<Camera3Device> parent);
+    explicit StatusTracker(wp<Camera3Device> parent);
     ~StatusTracker();
 
     // An always-invalid component ID

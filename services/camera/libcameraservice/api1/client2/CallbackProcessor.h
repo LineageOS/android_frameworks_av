@@ -41,13 +41,13 @@ struct Parameters;
 class CallbackProcessor:
             public Thread, public CpuConsumer::FrameAvailableListener {
   public:
-    CallbackProcessor(sp<Camera2Client> client);
+    explicit CallbackProcessor(sp<Camera2Client> client);
     ~CallbackProcessor();
 
     void onFrameAvailable(const BufferItem& item);
 
     // Set to NULL to disable the direct-to-app callback window
-    status_t setCallbackWindow(sp<Surface> callbackWindow);
+    status_t setCallbackWindow(const sp<Surface>& callbackWindow);
     status_t updateStream(const Parameters &params);
     status_t deleteStream();
     int getStreamId() const;

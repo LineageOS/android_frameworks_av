@@ -126,10 +126,10 @@ public:
     int getZslStreamId() const;
 
     status_t registerFrameListener(int32_t minId, int32_t maxId,
-            wp<camera2::FrameProcessor::FilteredListener> listener,
+            const wp<camera2::FrameProcessor::FilteredListener>& listener,
             bool sendPartials = true);
     status_t removeFrameListener(int32_t minId, int32_t maxId,
-            wp<camera2::FrameProcessor::FilteredListener> listener);
+            const wp<camera2::FrameProcessor::FilteredListener>& listener);
 
     status_t stopStream();
 
@@ -160,7 +160,7 @@ private:
     typedef camera2::Parameters Parameters;
 
     status_t setPreviewWindowL(const sp<IBinder>& binder,
-            sp<Surface> window);
+            const sp<Surface>& window);
     status_t startPreviewL(Parameters &params, bool restart);
     void     stopPreviewL();
     status_t startRecordingL(Parameters &params, bool restart);

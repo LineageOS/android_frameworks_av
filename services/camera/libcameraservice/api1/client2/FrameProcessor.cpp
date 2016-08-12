@@ -389,7 +389,7 @@ bool FrameProcessor::updatePendingState(const CameraMetadata& result, int32_t ta
 }
 
 
-void FrameProcessor::callbackFaceDetection(sp<Camera2Client> client,
+void FrameProcessor::callbackFaceDetection(const sp<Camera2Client>& client,
                                      const camera_frame_metadata &metadata) {
 
     camera_frame_metadata *metadata_ptr =
