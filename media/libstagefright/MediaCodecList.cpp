@@ -888,18 +888,18 @@ ssize_t MediaCodecList::findCodecByType(
     return -ENOENT;
 }
 
-static status_t limitFoundMissingAttr(AString name, const char *attr, bool found = true) {
+static status_t limitFoundMissingAttr(const AString &name, const char *attr, bool found = true) {
     ALOGE("limit '%s' with %s'%s' attribute", name.c_str(),
             (found ? "" : "no "), attr);
     return -EINVAL;
 }
 
-static status_t limitError(AString name, const char *msg) {
+static status_t limitError(const AString &name, const char *msg) {
     ALOGE("limit '%s' %s", name.c_str(), msg);
     return -EINVAL;
 }
 
-static status_t limitInvalidAttr(AString name, const char *attr, AString value) {
+static status_t limitInvalidAttr(const AString &name, const char *attr, const AString &value) {
     ALOGE("limit '%s' with invalid '%s' attribute (%s)", name.c_str(),
             attr, value.c_str());
     return -EINVAL;

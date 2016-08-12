@@ -30,7 +30,7 @@ namespace android {
 struct ABuffer;
 
 struct AnotherPacketSource : public MediaSource {
-    AnotherPacketSource(const sp<MetaData> &meta);
+    explicit AnotherPacketSource(const sp<MetaData> &meta);
 
     void setFormat(const sp<MetaData> &meta);
 

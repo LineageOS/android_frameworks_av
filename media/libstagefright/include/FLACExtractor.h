@@ -29,7 +29,7 @@ class FLACExtractor : public MediaExtractor {
 
 public:
     // Extractor assumes ownership of source
-    FLACExtractor(const sp<DataSource> &source);
+    explicit FLACExtractor(const sp<DataSource> &source);
 
     virtual size_t countTracks();
     virtual sp<IMediaSource> getTrack(size_t index);

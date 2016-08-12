@@ -32,7 +32,7 @@ struct ARTPConnection : public AHandler {
         kRegularlyRequestFIR = 2,
     };
 
-    ARTPConnection(uint32_t flags = 0);
+    explicit ARTPConnection(uint32_t flags = 0);
 
     void addStream(
             int rtpSocket, int rtcpSocket,
