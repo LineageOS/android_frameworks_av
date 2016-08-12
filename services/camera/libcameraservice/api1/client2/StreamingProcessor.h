@@ -43,7 +43,7 @@ class StreamingProcessor : public virtual VirtualLightRefBase {
     ~StreamingProcessor();
 
     status_t setPreviewWindow(const sp<Surface>& window);
-    status_t setRecordingWindow(sp<Surface> window);
+    status_t setRecordingWindow(const sp<Surface>& window);
 
     bool haveValidPreviewWindow() const;
     bool haveValidRecordingWindow() const;
