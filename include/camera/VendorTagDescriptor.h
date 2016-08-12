@@ -79,7 +79,7 @@ class VendorTagDescriptor
          *
          * Returns OK on success, or a negative error code.
          */
-        status_t lookupTag(String8 name, String8 section, /*out*/uint32_t* tag) const;
+        status_t lookupTag(const String8& name, const String8& section, /*out*/uint32_t* tag) const;
 
         /**
          * Dump the currently configured vendor tags to a file descriptor.

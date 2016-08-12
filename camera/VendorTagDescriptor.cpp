@@ -116,7 +116,7 @@ status_t VendorTagDescriptor::createDescriptorFromOps(const vendor_tag_ops_t* vO
 
     for (size_t i = 0; i < static_cast<size_t>(tagCount); ++i) {
         uint32_t tag = tagArray[i];
-        String8 sectionString = tagToSectionMap.valueFor(tag);
+        const String8& sectionString = tagToSectionMap.valueFor(tag);
 
         // Set up tag to section index map
         ssize_t index = sections.indexOf(sectionString);
@@ -328,7 +328,7 @@ SortedVector<String8> VendorTagDescriptor::getAllSectionNames() const {
     return mSections;
 }
 
-status_t VendorTagDescriptor::lookupTag(String8 name, String8 section, /*out*/uint32_t* tag) const {
+status_t VendorTagDescriptor::lookupTag(const String8& name, const String8& section, /*out*/uint32_t* tag) const {
     ssize_t index = mReverseMapping.indexOfKey(section);
     if (index < 0) {
         ALOGE("%s: Section '%s' does not exist.", __FUNCTION__, section.string());

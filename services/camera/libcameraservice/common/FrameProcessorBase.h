@@ -36,7 +36,7 @@ namespace camera2 {
  */
 class FrameProcessorBase: public Thread {
   public:
-    FrameProcessorBase(wp<CameraDeviceBase> device);
+    explicit FrameProcessorBase(wp<CameraDeviceBase> device);
     virtual ~FrameProcessorBase();
 
     struct FilteredListener: virtual public RefBase {
@@ -48,10 +48,10 @@ class FrameProcessorBase: public Thread {
     // the same range of IDs has no effect.
     // sendPartials controls whether partial results will be sent.
     status_t registerListener(int32_t minId, int32_t maxId,
-                              wp<FilteredListener> listener,
+                              const wp<FilteredListener>& listener,
                               bool sendPartials = true);
     status_t removeListener(int32_t minId, int32_t maxId,
-                            wp<FilteredListener> listener);
+                            const wp<FilteredListener>& listener);
 
     void dump(int fd, const Vector<String16>& args);
   protected:

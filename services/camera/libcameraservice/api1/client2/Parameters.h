@@ -414,7 +414,7 @@ class SharedParameters {
     template<typename S, typename P>
     class BaseLock {
       public:
-        BaseLock(S &p):
+        explicit BaseLock(S &p):
                 mParameters(p.mParameters),
                 mSharedParameters(p) {
             mSharedParameters.mLock.lock();

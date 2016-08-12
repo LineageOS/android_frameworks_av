@@ -55,7 +55,7 @@ void CallbackProcessor::onFrameAvailable(const BufferItem& /*item*/) {
 }
 
 status_t CallbackProcessor::setCallbackWindow(
-        sp<Surface> callbackWindow) {
+        const sp<Surface>& callbackWindow) {
     ATRACE_CALL();
     status_t res;
 

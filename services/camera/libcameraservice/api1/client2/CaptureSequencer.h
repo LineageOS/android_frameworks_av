@@ -45,11 +45,11 @@ class CaptureSequencer:
             virtual public Thread,
             virtual public FrameProcessor::FilteredListener {
   public:
-    CaptureSequencer(wp<Camera2Client> client);
+    explicit CaptureSequencer(wp<Camera2Client> client);
     ~CaptureSequencer();
 
     // Get reference to the ZslProcessor, which holds the ZSL buffers and frames
-    void setZslProcessor(wp<ZslProcessorInterface> processor);
+    void setZslProcessor(const wp<ZslProcessorInterface>& processor);
 
     // Begin still image capture
     status_t startCapture(int msgType);
@@ -70,7 +70,7 @@ class CaptureSequencer:
     virtual void onResultAvailable(const CaptureResult &result);
 
     // Notifications from the JPEG processor
-    void onCaptureAvailable(nsecs_t timestamp, sp<MemoryBase> captureBuffer);
+    void onCaptureAvailable(nsecs_t timestamp, const sp<MemoryBase>& captureBuffer);
 
     void dump(int fd, const Vector<String16>& args);
 
@@ -177,7 +177,7 @@ class CaptureSequencer:
 
     // Emit Shutter/Raw callback to java, and maybe play a shutter sound
     static void shutterNotifyLocked(const Parameters &params,
-            sp<Camera2Client> client, int msgType);
+            const sp<Camera2Client>& client, int msgType);
 };
 
 }; // namespace camera2

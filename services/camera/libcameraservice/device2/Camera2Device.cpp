@@ -930,7 +930,7 @@ status_t Camera2Device::MetadataQueue::signalConsumerLocked() {
 
 status_t Camera2Device::MetadataQueue::freeBuffers(
         List<camera_metadata_t*>::iterator start,
-        List<camera_metadata_t*>::iterator end)
+        const List<camera_metadata_t*>::iterator& end)
 {
     ATRACE_CALL();
     while (start != end) {
@@ -1045,7 +1045,7 @@ Camera2Device::StreamAdapter::~StreamAdapter() {
 }
 
 status_t Camera2Device::StreamAdapter::connectToDevice(
-        sp<ANativeWindow> consumer,
+        const sp<ANativeWindow>& consumer,
         uint32_t width, uint32_t height, int format, size_t size) {
     ATRACE_CALL();
     status_t res;

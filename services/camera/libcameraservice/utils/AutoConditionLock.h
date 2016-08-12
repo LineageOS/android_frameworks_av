@@ -37,7 +37,7 @@ public:
     /**
      * Construct the ConditionManger with the given Mutex.
      */
-    WaitableMutexWrapper(Mutex* mutex);
+    explicit WaitableMutexWrapper(Mutex* mutex);
 
     virtual ~WaitableMutexWrapper();
 private:
@@ -88,7 +88,7 @@ public:
     static std::unique_ptr<AutoConditionLock> waitAndAcquire(
             const std::shared_ptr<WaitableMutexWrapper>& manager);
 private:
-    AutoConditionLock(const std::shared_ptr<WaitableMutexWrapper>& manager);
+    explicit AutoConditionLock(const std::shared_ptr<WaitableMutexWrapper>& manager);
 
     std::shared_ptr<WaitableMutexWrapper> mManager;
     Mutex::Autolock mAutoLock;

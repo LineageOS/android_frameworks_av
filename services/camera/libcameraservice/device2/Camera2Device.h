@@ -35,7 +35,7 @@ namespace android {
  */
 class Camera2Device: public CameraDeviceBase {
   public:
-    Camera2Device(int id);
+    explicit Camera2Device(int id);
 
     virtual ~Camera2Device();
 
@@ -148,7 +148,7 @@ class Camera2Device: public CameraDeviceBase {
       private:
         status_t signalConsumerLocked();
         status_t freeBuffers(List<camera_metadata_t*>::iterator start,
-                List<camera_metadata_t*>::iterator end);
+                const List<camera_metadata_t*>::iterator& end);
 
         camera2_device_t *mHal2Device;
 
@@ -201,7 +201,7 @@ class Camera2Device: public CameraDeviceBase {
      */
     class StreamAdapter: public camera2_stream_ops, public virtual RefBase {
       public:
-        StreamAdapter(camera2_device_t *d);
+        explicit StreamAdapter(camera2_device_t *d);
 
         ~StreamAdapter();
 
@@ -215,7 +215,7 @@ class Camera2Device: public CameraDeviceBase {
          * be equal to the size in bytes of the buffers to allocate for the
          * stream. For other formats, the size parameter is ignored.
          */
-        status_t connectToDevice(sp<ANativeWindow> consumer,
+        status_t connectToDevice(const sp<ANativeWindow>& consumer,
                 uint32_t width, uint32_t height, int format, size_t size);
 
         status_t release();
@@ -287,7 +287,7 @@ class Camera2Device: public CameraDeviceBase {
      */
     class ReprocessStreamAdapter: public camera2_stream_in_ops, public virtual RefBase {
       public:
-        ReprocessStreamAdapter(camera2_device_t *d);
+        explicit ReprocessStreamAdapter(camera2_device_t *d);
 
         ~ReprocessStreamAdapter();
 
