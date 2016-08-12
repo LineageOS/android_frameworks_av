@@ -192,7 +192,7 @@ status_t VendorTagDescriptor::readFromParcel(const Parcel* parcel) {
     // Set up reverse mapping
     for (size_t i = 0; i < static_cast<size_t>(tagCount); ++i) {
         uint32_t tag = allTags[i];
-        String8 sectionString = mSections[mTagToSectionMap.valueFor(tag)];
+        const String8& sectionString = mSections[mTagToSectionMap.valueFor(tag)];
 
         ssize_t reverseIndex = -1;
         if ((reverseIndex = mReverseMapping.indexOfKey(sectionString)) < 0) {
