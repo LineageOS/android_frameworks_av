@@ -69,7 +69,7 @@ static void usage(const char *me) {
 namespace android {
 
 struct SaturationRSFilter : RenderScriptWrapper::RSFilterCallback {
-    void init(RSC::sp<RSC::RS> context) {
+    void init(const RSC::sp<RSC::RS> &context) {
         mScript = new ScriptC_saturation(context);
         mScript->set_gSaturation(3.f);
     }
@@ -90,7 +90,7 @@ private:
 };
 
 struct NightVisionRSFilter : RenderScriptWrapper::RSFilterCallback {
-    void init(RSC::sp<RSC::RS> context) {
+    void init(const RSC::sp<RSC::RS> &context) {
         mScript = new ScriptC_nightvision(context);
     }
 
@@ -110,7 +110,7 @@ private:
 };
 
 struct ARGBToRGBARSFilter : RenderScriptWrapper::RSFilterCallback {
-    void init(RSC::sp<RSC::RS> context) {
+    void init(const RSC::sp<RSC::RS> &context) {
         mScript = new ScriptC_argbtorgba(context);
     }
 

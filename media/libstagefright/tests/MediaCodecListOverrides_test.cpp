@@ -74,11 +74,11 @@ public:
     void verifyProfileResults(const KeyedVector<AString, CodecSettings> &results) {
         EXPECT_LT(0u, results.size());
         for (size_t i = 0; i < results.size(); ++i) {
-            AString key = results.keyAt(i);
-            CodecSettings settings = results.valueAt(i);
+            const AString &key = results.keyAt(i);
+            const CodecSettings &settings = results.valueAt(i);
             EXPECT_EQ(1u, settings.size());
             EXPECT_TRUE(settings.keyAt(0) == "max-supported-instances");
-            AString valueS = settings.valueAt(0);
+            const AString &valueS = settings.valueAt(0);
             int32_t value = strtol(valueS.c_str(), NULL, 10);
             EXPECT_LT(0, value);
             ALOGV("profileCodecs results %s %s", key.c_str(), valueS.c_str());

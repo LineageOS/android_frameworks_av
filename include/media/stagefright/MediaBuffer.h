@@ -56,11 +56,11 @@ public:
     // The underlying data remains the responsibility of the caller!
     MediaBuffer(void *data, size_t size);
 
-    MediaBuffer(size_t size);
+    explicit MediaBuffer(size_t size);
 
-    MediaBuffer(const sp<GraphicBuffer>& graphicBuffer);
+    explicit MediaBuffer(const sp<GraphicBuffer>& graphicBuffer);
 
-    MediaBuffer(const sp<ABuffer> &buffer);
+    explicit MediaBuffer(const sp<ABuffer> &buffer);
 
     MediaBuffer(const sp<IMemory> &mem) :
         MediaBuffer((uint8_t *)mem->pointer() + sizeof(SharedControl), mem->size()) {

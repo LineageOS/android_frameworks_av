@@ -29,7 +29,7 @@ namespace android {
 struct AMessage;
 
 struct AH263Assembler : public ARTPAssembler {
-    AH263Assembler(const sp<AMessage> &notify);
+    explicit AH263Assembler(const sp<AMessage> &notify);
 
 protected:
     virtual ~AH263Assembler();

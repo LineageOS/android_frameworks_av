@@ -242,7 +242,7 @@ private:
     // Release buffer to the consumer
     void releaseBuffer(
             int &id, uint64_t frameNum,
-            const sp<GraphicBuffer> buffer, const sp<Fence> &fence);
+            const sp<GraphicBuffer> &buffer, const sp<Fence> &fence);
 
     void setLatestBuffer_l(const BufferItem &item, bool dropped);
     bool repeatLatestBuffer_l();

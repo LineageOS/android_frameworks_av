@@ -251,10 +251,10 @@ private:
             OMX::buffer_id buffer, OMX_BUFFERHEADERTYPE *header, bool updateCodecBuffer);
 
     status_t createGraphicBufferSource(
-            OMX_U32 portIndex, sp<IGraphicBufferConsumer> consumer /* nullable */,
+            OMX_U32 portIndex, const sp<IGraphicBufferConsumer> &consumer /* nullable */,
             MetadataBufferType *type);
     sp<GraphicBufferSource> getGraphicBufferSource();
-    void setGraphicBufferSource(const sp<GraphicBufferSource>& bufferSource);
+    void setGraphicBufferSource(const sp<GraphicBufferSource> &bufferSource);
 
     // Handles |msg|, and may modify it. Returns true iff completely handled it and
     // |msg| does not need to be sent to the event listener.

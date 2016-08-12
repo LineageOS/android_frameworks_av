@@ -53,7 +53,7 @@
 
 namespace android {
 
-static int64_t getId(sp<IResourceManagerClient> client) {
+static int64_t getId(const sp<IResourceManagerClient> &client) {
     return (int64_t) client.get();
 }
 
@@ -142,7 +142,7 @@ void MediaCodec::ResourceManagerServiceProxy::binderDied(const wp<IBinder>& /*wh
 
 void MediaCodec::ResourceManagerServiceProxy::addResource(
         int64_t clientId,
-        const sp<IResourceManagerClient> client,
+        const sp<IResourceManagerClient> &client,
         const Vector<MediaResource> &resources) {
     Mutex::Autolock _l(mLock);
     if (mService == NULL) {
@@ -2564,7 +2564,7 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
 
 //static
 size_t MediaCodec::CreateFramesRenderedMessage(
-        std::list<FrameRenderTracker::Info> done, sp<AMessage> &msg) {
+        const std::list<FrameRenderTracker::Info> &done, sp<AMessage> &msg) {
     size_t index = 0;
 
     for (std::list<FrameRenderTracker::Info>::const_iterator it = done.cbegin();
