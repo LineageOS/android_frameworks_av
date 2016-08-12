@@ -34,7 +34,7 @@ struct DataSourceReader;
 struct MatroskaSource;
 
 struct MatroskaExtractor : public MediaExtractor {
-    MatroskaExtractor(const sp<DataSource> &source);
+    explicit MatroskaExtractor(const sp<DataSource> &source);
 
     virtual size_t countTracks();
 

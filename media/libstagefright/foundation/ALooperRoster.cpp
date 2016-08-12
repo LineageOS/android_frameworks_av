@@ -34,7 +34,7 @@ ALooperRoster::ALooperRoster()
 }
 
 ALooper::handler_id ALooperRoster::registerHandler(
-        const sp<ALooper> looper, const sp<AHandler> &handler) {
+        const sp<ALooper> &looper, const sp<AHandler> &handler) {
     Mutex::Autolock autoLock(mLock);
 
     if (handler->id() != 0) {

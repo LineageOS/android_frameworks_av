@@ -1493,7 +1493,7 @@ status_t StagefrightRecorder::setupCameraSource(
 }
 
 status_t StagefrightRecorder::setupVideoEncoder(
-        sp<MediaSource> cameraSource,
+        const sp<MediaSource> &cameraSource,
         sp<MediaCodecSource> *source) {
     source->clear();
 
