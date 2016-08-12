@@ -216,7 +216,7 @@ public:
     static constexpr int32_t DEFAULT_MAX_COST = 100;
 
     ClientManager();
-    ClientManager(int32_t totalCost);
+    explicit ClientManager(int32_t totalCost);
 
     /**
      * Add a given ClientDescriptor to the managed list.  ClientDescriptors for clients that

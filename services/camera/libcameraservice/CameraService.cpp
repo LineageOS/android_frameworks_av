@@ -2367,7 +2367,7 @@ String8 CameraService::CameraState::getId() const {
 void CameraService::ClientEventListener::onClientAdded(
         const resource_policy::ClientDescriptor<String8,
         sp<CameraService::BasicClient>>& descriptor) {
-    auto basicClient = descriptor.getValue();
+    const auto& basicClient = descriptor.getValue();
     if (basicClient.get() != nullptr) {
         BatteryNotifier& notifier(BatteryNotifier::getInstance());
         notifier.noteStartCamera(descriptor.getKey(),
@@ -2378,7 +2378,7 @@ void CameraService::ClientEventListener::onClientAdded(
 void CameraService::ClientEventListener::onClientRemoved(
         const resource_policy::ClientDescriptor<String8,
         sp<CameraService::BasicClient>>& descriptor) {
-    auto basicClient = descriptor.getValue();
+    const auto& basicClient = descriptor.getValue();
     if (basicClient.get() != nullptr) {
         BatteryNotifier& notifier(BatteryNotifier::getInstance());
         notifier.noteStopCamera(descriptor.getKey(),

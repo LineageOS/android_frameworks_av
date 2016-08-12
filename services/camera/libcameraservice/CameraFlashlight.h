@@ -193,7 +193,7 @@ class CameraHardwareInterfaceFlashControl : public FlashControlBase {
         status_t disconnectCameraDevice();
 
         // initialize the preview window
-        status_t initializePreviewWindow(sp<CameraHardwareInterface> device,
+        status_t initializePreviewWindow(const sp<CameraHardwareInterface>& device,
                 int32_t width, int32_t height);
 
         // start preview and enable torch
