@@ -2874,7 +2874,7 @@ status_t Camera3Device::RequestThread::setRepeatingRequests(
     return OK;
 }
 
-bool Camera3Device::RequestThread::isRepeatingRequestLocked(const sp<CaptureRequest> requestIn) {
+bool Camera3Device::RequestThread::isRepeatingRequestLocked(const sp<CaptureRequest>& requestIn) {
     if (mRepeatingRequests.empty()) {
         return false;
     }
@@ -2995,7 +2995,7 @@ void Camera3Device::RequestThread::requestExit() {
  * AE_PRECAPTURE_TRIGGER_CANCEL to AE_PRECAPTURE_TRIGGER_IDLE but doesn't add AE_LOCK_ON to the
  * request.
  */
-void Camera3Device::RequestThread::handleAePrecaptureCancelRequest(sp<CaptureRequest> request) {
+void Camera3Device::RequestThread::handleAePrecaptureCancelRequest(const sp<CaptureRequest>& request) {
     request->mAeTriggerCancelOverride.applyAeLock = false;
     request->mAeTriggerCancelOverride.applyAePrecaptureTrigger = false;
 

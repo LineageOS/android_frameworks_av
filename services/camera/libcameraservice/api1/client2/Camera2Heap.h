@@ -26,7 +26,7 @@ namespace camera2 {
 // Utility class for managing a set of IMemory blocks
 class Camera2Heap : public RefBase {
   public:
-    Camera2Heap(size_t buf_size, uint_t num_buffers = 1,
+    explicit Camera2Heap(size_t buf_size, uint_t num_buffers = 1,
             const char *name = NULL) :
             mBufSize(buf_size),
             mNumBufs(num_buffers) {

@@ -812,7 +812,7 @@ status_t CameraHardwareInterfaceFlashControl::getSmallestSurfaceSize(
 }
 
 status_t CameraHardwareInterfaceFlashControl::initializePreviewWindow(
-        sp<CameraHardwareInterface> device, int32_t width, int32_t height) {
+        const sp<CameraHardwareInterface>& device, int32_t width, int32_t height) {
     status_t res;
     BufferQueue::createBufferQueue(&mProducer, &mConsumer);
 

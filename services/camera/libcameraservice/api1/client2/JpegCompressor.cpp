@@ -36,7 +36,7 @@ JpegCompressor::~JpegCompressor() {
     Mutex::Autolock lock(mMutex);
 }
 
-status_t JpegCompressor::start(Vector<CpuConsumer::LockedBuffer*> buffers,
+status_t JpegCompressor::start(const Vector<CpuConsumer::LockedBuffer*>& buffers,
         nsecs_t captureTime) {
     ALOGV("%s", __FUNCTION__);
     Mutex::Autolock busyLock(mBusyMutex);

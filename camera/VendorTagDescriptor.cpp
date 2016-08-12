@@ -192,7 +192,7 @@ status_t VendorTagDescriptor::readFromParcel(const Parcel* parcel) {
     // Set up reverse mapping
     for (size_t i = 0; i < static_cast<size_t>(tagCount); ++i) {
         uint32_t tag = allTags[i];
-        String8 sectionString = mSections[mTagToSectionMap.valueFor(tag)];
+        const String8& sectionString = mSections[mTagToSectionMap.valueFor(tag)];
 
         ssize_t reverseIndex = -1;
         if ((reverseIndex = mReverseMapping.indexOfKey(sectionString)) < 0) {
@@ -284,7 +284,7 @@ const SortedVector<String8>* VendorTagDescriptor::getAllSectionNames() const {
     return &mSections;
 }
 
-status_t VendorTagDescriptor::lookupTag(String8 name, String8 section, /*out*/uint32_t* tag) const {
+status_t VendorTagDescriptor::lookupTag(const String8& name, const String8& section, /*out*/uint32_t* tag) const {
     ssize_t index = mReverseMapping.indexOfKey(section);
     if (index < 0) {
         ALOGE("%s: Section '%s' does not exist.", __FUNCTION__, section.string());
