@@ -175,7 +175,7 @@ struct MediaCodec : public AHandler {
     // by adding rendered frame information to a base notification message. Returns the number
     // of frames that were rendered.
     static size_t CreateFramesRenderedMessage(
-            std::list<FrameRenderTracker::Info> done, sp<AMessage> &msg);
+            const std::list<FrameRenderTracker::Info> &done, sp<AMessage> &msg);
 
 protected:
     virtual ~MediaCodec();
@@ -274,7 +274,7 @@ private:
 
         void addResource(
                 int64_t clientId,
-                const sp<IResourceManagerClient> client,
+                const sp<IResourceManagerClient> &client,
                 const Vector<MediaResource> &resources);
 
         void removeResource(int64_t clientId);

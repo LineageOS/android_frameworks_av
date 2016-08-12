@@ -43,7 +43,7 @@ public:
 
 class WVMExtractor : public MediaExtractor {
 public:
-    WVMExtractor(const sp<DataSource> &source);
+    explicit WVMExtractor(const sp<DataSource> &source);
 
     virtual size_t countTracks();
     virtual sp<IMediaSource> getTrack(size_t index);

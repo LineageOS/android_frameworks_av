@@ -64,7 +64,7 @@ struct ATSParser : public RefBase {
 
     // Event is used to signal sync point event at feedTSPacket().
     struct SyncEvent {
-        SyncEvent(off64_t offset);
+        explicit SyncEvent(off64_t offset);
 
         void init(off64_t offset, const sp<MediaSource> &source,
                 int64_t timeUs);
@@ -89,7 +89,7 @@ struct ATSParser : public RefBase {
         int64_t mTimeUs;
     };
 
-    ATSParser(uint32_t flags = 0);
+    explicit ATSParser(uint32_t flags = 0);
 
     // Feed a TS packet into the parser. uninitialized event with the start
     // offset of this TS packet goes in, and if the parser detects PES with

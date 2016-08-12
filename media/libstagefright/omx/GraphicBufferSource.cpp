@@ -925,7 +925,7 @@ int GraphicBufferSource::findMatchingCodecBuffer_l(
  */
 void GraphicBufferSource::releaseBuffer(
         int &id, uint64_t frameNum,
-        const sp<GraphicBuffer> buffer, const sp<Fence> &fence) {
+        const sp<GraphicBuffer> &buffer, const sp<Fence> &fence) {
     if (mIsPersistent) {
         mConsumer->detachBuffer(id);
         mBufferSlot[id] = NULL;
