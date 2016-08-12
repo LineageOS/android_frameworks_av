@@ -36,7 +36,7 @@ struct TSPacketizer : public RefBase {
         EMIT_HDCP20_DESCRIPTOR = 1,
         EMIT_HDCP21_DESCRIPTOR = 2,
     };
-    TSPacketizer(uint32_t flags);
+    explicit TSPacketizer(uint32_t flags);
 
     // Returns trackIndex or error.
     ssize_t addTrack(const sp<AMessage> &format);

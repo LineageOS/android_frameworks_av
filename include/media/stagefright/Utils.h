@@ -70,7 +70,7 @@ struct HLSTime {
     int64_t mTimeUs;
     sp<AMessage> mMeta;
 
-    HLSTime(const sp<AMessage> &meta = NULL);
+    explicit HLSTime(const sp<AMessage> &meta = NULL);
     int64_t getSegmentTimeUs() const;
 };
 
@@ -78,10 +78,10 @@ bool operator <(const HLSTime &t0, const HLSTime &t1);
 
 // read and write various object to/from AMessage
 
-void writeToAMessage(sp<AMessage> msg, const AudioPlaybackRate &rate);
+void writeToAMessage(const sp<AMessage> &msg, const AudioPlaybackRate &rate);
 void readFromAMessage(const sp<AMessage> &msg, AudioPlaybackRate *rate /* nonnull */);
 
-void writeToAMessage(sp<AMessage> msg, const AVSyncSettings &sync, float videoFpsHint);
+void writeToAMessage(const sp<AMessage> &msg, const AVSyncSettings &sync, float videoFpsHint);
 void readFromAMessage(
         const sp<AMessage> &msg, AVSyncSettings *sync /* nonnull */, float *videoFps /* nonnull */);
 

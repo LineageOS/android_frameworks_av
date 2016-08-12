@@ -849,7 +849,7 @@ status_t OMXNodeInstance::updateGraphicBufferInMeta(
 }
 
 status_t OMXNodeInstance::createGraphicBufferSource(
-        OMX_U32 portIndex, sp<IGraphicBufferConsumer> bufferConsumer, MetadataBufferType *type) {
+        OMX_U32 portIndex, const sp<IGraphicBufferConsumer> &bufferConsumer, MetadataBufferType *type) {
     status_t err;
 
     const sp<GraphicBufferSource>& surfaceCheck = getGraphicBufferSource();

@@ -50,7 +50,7 @@ struct Trex {
 class MPEG4Extractor : public MediaExtractor {
 public:
     // Extractor assumes ownership of "source".
-    MPEG4Extractor(const sp<DataSource> &source);
+    explicit MPEG4Extractor(const sp<DataSource> &source);
 
     virtual size_t countTracks();
     virtual sp<MediaSource> getTrack(size_t index);

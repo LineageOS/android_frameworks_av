@@ -35,7 +35,7 @@ struct ABuffer;
 class MediaBuffer;
 
 struct ARTPWriter : public MediaWriter {
-    ARTPWriter(int fd);
+    explicit ARTPWriter(int fd);
 
     virtual status_t addSource(const sp<MediaSource> &source);
     virtual bool reachedEOS();

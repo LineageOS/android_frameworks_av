@@ -43,7 +43,7 @@ class DummyRecorder {
     // static function to wrap the actual thread entry point
     static void *threadWrapper(void *pthis);
 
-    DummyRecorder(const sp<MediaSource> &source) : mSource(source)
+    explicit DummyRecorder(const sp<MediaSource> &source) : mSource(source)
                                                     , mStarted(false) {}
     ~DummyRecorder( ) {}
 

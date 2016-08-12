@@ -31,7 +31,7 @@ struct AString;
 class Parcel;
 
 struct AReplyToken : public RefBase {
-    AReplyToken(const sp<ALooper> &looper)
+    explicit AReplyToken(const sp<ALooper> &looper)
         : mLooper(looper),
           mReplied(false) {
     }

@@ -165,7 +165,7 @@ private:
         int64_t mLastSampleDurationUs;
         StreamItem()
             : StreamItem("") {}
-        StreamItem(const char *type)
+        explicit StreamItem(const char *type)
             : mType(type),
               mSeekMode(kSeekModeExactPosition) {
                   reset();

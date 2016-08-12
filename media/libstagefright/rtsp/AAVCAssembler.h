@@ -29,7 +29,7 @@ struct ABuffer;
 struct AMessage;
 
 struct AAVCAssembler : public ARTPAssembler {
-    AAVCAssembler(const sp<AMessage> &notify);
+    explicit AAVCAssembler(const sp<AMessage> &notify);
 
 protected:
     virtual ~AAVCAssembler();

@@ -31,7 +31,7 @@ struct MyOggExtractor;
 struct OggSource;
 
 struct OggExtractor : public MediaExtractor {
-    OggExtractor(const sp<DataSource> &source);
+    explicit OggExtractor(const sp<DataSource> &source);
 
     virtual size_t countTracks();
     virtual sp<MediaSource> getTrack(size_t index);

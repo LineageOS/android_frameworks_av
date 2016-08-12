@@ -110,14 +110,14 @@ struct WebmSimpleBlock : public WebmElement {
 
 struct EbmlVoid : public WebmElement {
     const uint64_t mSizeWidth;
-    EbmlVoid(uint64_t totalSize);
+    explicit EbmlVoid(uint64_t totalSize);
     int serializePayloadSize(uint8_t *buf);
     void serializePayload(uint8_t *buf);
 };
 
 struct WebmMaster : public WebmElement {
     const List<sp<WebmElement> > mChildren;
-    WebmMaster(uint64_t id);
+    explicit WebmMaster(uint64_t id);
     WebmMaster(uint64_t id, const List<sp<WebmElement> > &children);
     int serializePayloadSize(uint8_t *buf);
     void serializePayload(uint8_t *buf);

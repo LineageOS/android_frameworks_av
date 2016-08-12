@@ -43,7 +43,7 @@ private:
 
     class PMDeathRecipient : public IBinder::DeathRecipient {
     public:
-        PMDeathRecipient(AWakeLock *wakeLock) : mWakeLock(wakeLock) {}
+        explicit PMDeathRecipient(AWakeLock *wakeLock) : mWakeLock(wakeLock) {}
         virtual ~PMDeathRecipient() {}
 
         // IBinder::DeathRecipient

@@ -35,7 +35,7 @@ struct MPEG2TSSource;
 class String8;
 
 struct MPEG2TSExtractor : public MediaExtractor {
-    MPEG2TSExtractor(const sp<DataSource> &source);
+    explicit MPEG2TSExtractor(const sp<DataSource> &source);
 
     virtual size_t countTracks();
     virtual sp<MediaSource> getTrack(size_t index);
