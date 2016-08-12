@@ -73,7 +73,7 @@ typedef void (*data_callback_timestamp)(nsecs_t timestamp,
 
 class CameraHardwareInterface : public virtual RefBase {
 public:
-    CameraHardwareInterface(const char *name):
+    explicit CameraHardwareInterface(const char *name):
             mDevice(nullptr),
             mName(name),
             mPreviewScalingMode(NOT_SET),
@@ -543,9 +543,9 @@ private:
             commonInitialization();
         }
 
-        CameraHeapMemory(size_t buf_size, uint_t num_buffers = 1) :
-                         mBufSize(buf_size),
-                         mNumBufs(num_buffers)
+        explicit CameraHeapMemory(size_t buf_size, uint_t num_buffers = 1) :
+                                  mBufSize(buf_size),
+                                  mNumBufs(num_buffers)
         {
             mHeap = new MemoryHeapBase(buf_size * num_buffers);
             commonInitialization();

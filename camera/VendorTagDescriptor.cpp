@@ -284,7 +284,7 @@ const SortedVector<String8>* VendorTagDescriptor::getAllSectionNames() const {
     return &mSections;
 }
 
-status_t VendorTagDescriptor::lookupTag(String8 name, String8 section, /*out*/uint32_t* tag) const {
+status_t VendorTagDescriptor::lookupTag(const String8& name, const String8& section, /*out*/uint32_t* tag) const {
     ssize_t index = mReverseMapping.indexOfKey(section);
     if (index < 0) {
         ALOGE("%s: Section '%s' does not exist.", __FUNCTION__, section.string());

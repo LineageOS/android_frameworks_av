@@ -93,13 +93,13 @@ public:
       public:
         class Lock {
           public:
-            Lock(SharedCameraCallbacks &client);
+            explicit Lock(SharedCameraCallbacks &client);
             ~Lock();
             sp<TCamCallbacks> &mRemoteCallback;
           private:
             SharedCameraCallbacks &mSharedClient;
         };
-        SharedCameraCallbacks(const sp<TCamCallbacks>& client);
+        explicit SharedCameraCallbacks(const sp<TCamCallbacks>& client);
         SharedCameraCallbacks& operator=(const sp<TCamCallbacks>& client);
         void clear();
       private:

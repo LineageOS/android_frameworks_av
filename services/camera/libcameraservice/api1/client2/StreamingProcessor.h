@@ -39,10 +39,10 @@ class Camera2Heap;
  */
 class StreamingProcessor : public virtual VirtualLightRefBase {
   public:
-    StreamingProcessor(sp<Camera2Client> client);
+    explicit StreamingProcessor(sp<Camera2Client> client);
     ~StreamingProcessor();
 
-    status_t setPreviewWindow(sp<Surface> window);
+    status_t setPreviewWindow(const sp<Surface>& window);
     status_t setRecordingWindow(sp<Surface> window);
 
     bool haveValidPreviewWindow() const;
