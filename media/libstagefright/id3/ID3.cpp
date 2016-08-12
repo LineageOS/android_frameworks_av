@@ -545,6 +545,10 @@ void ID3::Iterator::getstring(String8 *id, bool otherdata) const {
         n -= skipped;
     }
 
+    if (n <= 0) {
+       return;
+    }
+
     if (encoding == 0x00) {
         // supposedly ISO 8859-1
         id->setTo((const char*)frameData + 1, n);
@@ -560,12 +564,13 @@ void ID3::Iterator::getstring(String8 *id, bool otherdata) const {
 #if BYTE_ORDER == LITTLE_ENDIAN
         if (len > 0) {
             framedatacopy = new (std::nothrow) char16_t[len];
-            if (framedatacopy != NULL) {
-                for (int i = 0; i < len; i++) {
-                    framedatacopy[i] = bswap_16(framedata[i]);
-                }
-                framedata = framedatacopy;
+            if (framedatacopy == NULL) {
+                return;
             }
+            for (int i = 0; i < len; i++) {
+                framedatacopy[i] = bswap_16(framedata[i]);
+            }
+            framedata = framedatacopy;
         }
 #endif
         id->setTo(framedata, len);
@@ -579,19 +584,26 @@ void ID3::Iterator::getstring(String8 *id, bool otherdata) const {
         const char16_t *framedata = (const char16_t *) (frameData + 1);
         char16_t *framedatacopy = NULL;
         if (*framedata == 0xfffe) {
-            // endianness marker doesn't match host endianness, convert
-            if (len > 0) {
-                framedatacopy = new (std::nothrow) char16_t[len];
-                if (framedatacopy != NULL) {
-                    for (int i = 0; i < len; i++) {
-                        framedatacopy[i] = bswap_16(framedata[i]);
-                    }
-                    framedata = framedatacopy;
-                }
+            // endianness marker != host endianness, convert & skip
+            if (len <= 1) {
+                return;         // nothing after the marker
             }
-        }
-        // If the string starts with an endianness marker, skip it
-        if (*framedata == 0xfeff) {
+            framedatacopy = new (std::nothrow) char16_t[len];
+            if (framedatacopy == NULL) {
+                return;
+            }
+            for (int i = 0; i < len; i++) {
+                framedatacopy[i] = bswap_16(framedata[i]);
+            }
+            framedata = framedatacopy;
+            // and skip over the marker
+            framedata++;
+            len--;
+        } else if (*framedata == 0xfeff) {
+            // endianness marker == host endianness, skip it
+            if (len <= 1) {
+                return;         // nothing after the marker
+            }
             framedata++;
             len--;
         }
@@ -604,7 +616,7 @@ void ID3::Iterator::getstring(String8 *id, bool otherdata) const {
                 break;
             }
         }
-        if (eightBit && len > 0) {
+        if (eightBit) {
             // collapse to 8 bit, then let the media scanner client figure out the real encoding
             char *frame8 = new (std::nothrow) char[len];
             if (frame8 != NULL) {
@@ -613,6 +625,8 @@ void ID3::Iterator::getstring(String8 *id, bool otherdata) const {
                 }
                 id->setTo(frame8, len);
                 delete [] frame8;
+            } else {
+                id->setTo(framedata, len);
             }
         } else {
             id->setTo(framedata, len);
