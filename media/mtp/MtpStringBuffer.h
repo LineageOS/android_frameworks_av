@@ -38,8 +38,8 @@ private:
 
 public:
                     MtpStringBuffer();
-                    MtpStringBuffer(const char* src);
-                    MtpStringBuffer(const uint16_t* src);
+    explicit        MtpStringBuffer(const char* src);
+    explicit        MtpStringBuffer(const uint16_t* src);
                     MtpStringBuffer(const MtpStringBuffer& src);
     virtual         ~MtpStringBuffer();
 
