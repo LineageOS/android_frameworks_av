@@ -36,7 +36,7 @@ class ANDROID_API FileInput : public Input {
         /**
          * Create a file input for the given path.
          */
-        FileInput(String8 path);
+        explicit FileInput(String8 path);
 
         virtual ~FileInput();
 
