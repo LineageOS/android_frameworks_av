@@ -29,7 +29,7 @@ namespace img_utils {
 
 class ANDROID_API FileOutput : public Output {
     public:
-        FileOutput(String8 path);
+        explicit FileOutput(String8 path);
         virtual ~FileOutput();
         virtual status_t open();
         virtual status_t write(const uint8_t* buf, size_t offset, size_t count);
