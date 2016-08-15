@@ -35,7 +35,7 @@ protected:
     size_t              mPacketSize;
 
 public:
-                        MtpPacket(int bufferSize);
+    explicit            MtpPacket(int bufferSize);
     virtual             ~MtpPacket();
 
     // sets packet size to the default container size and sets buffer to zero
