@@ -24,8 +24,12 @@
 #include <media/AudioBufferProvider.h>
 #include <system/audio.h>
 #include <sonic.h>
+#include <utils/StrongPointer.h>
 
 namespace android {
+
+class EffectHalInterface;
+class EffectsFactoryHalInterface;
 
 // ----------------------------------------------------------------------------
 
@@ -97,12 +101,13 @@ public:
     //Overrides
     virtual void copyFrames(void *dst, const void *src, size_t frames);
 
-    bool isValid() const { return mDownmixHandle != NULL; }
+    bool isValid() const { return mDownmixInterface.get() != NULL; }
     static status_t init();
     static bool isMultichannelCapable() { return sIsMultichannelCapable; }
 
 protected:
-    effect_handle_t    mDownmixHandle;
+    sp<EffectsFactoryHalInterface> mEffectsFactory;
+    sp<EffectHalInterface> mDownmixInterface;
     effect_config_t    mDownmixConfig;
 
     // effect descriptor for the downmixer used by the mixer

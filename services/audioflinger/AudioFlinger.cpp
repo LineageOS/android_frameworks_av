@@ -44,11 +44,11 @@
 
 #include "AudioMixer.h"
 #include "AudioFlinger.h"
+#include "EffectsFactoryHalInterface.h"
 #include "ServiceUtilities.h"
 
 #include <media/AudioResamplerPublic.h>
 
-#include <media/EffectsFactoryApi.h>
 #include <audio_effects/effect_visualizer.h>
 #include <audio_effects/effect_ns.h>
 #include <audio_effects/effect_aec.h>
@@ -85,6 +85,7 @@ namespace android {
 static const char kDeadlockedString[] = "AudioFlinger may be deadlocked\n";
 static const char kHardwareLockedString[] = "Hardware lock is taken\n";
 static const char kClientLockedString[] = "Client lock is taken\n";
+static const char kNoEffectsFactory[] = "Effects Factory is absent\n";
 
 
 nsecs_t AudioFlinger::mStandbyTimeInNsecs = kDefaultStandbyTimeInNsecs;
@@ -204,6 +205,8 @@ AudioFlinger::AudioFlinger()
     // if the audio service has crashed, battery stats could be left
     // in bad state, reset the state upon service start.
     BatteryNotifier::getInstance().noteResetAudio();
+
+    mEffectsFactoryHal = EffectsFactoryHalInterface::create();
 
 #ifdef TEE_SINK
     char value[PROPERTY_VALUE_MAX];
@@ -422,7 +425,12 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
             write(fd, result.string(), result.size());
         }
 
-        EffectDumpEffects(fd);
+        if (mEffectsFactoryHal.get() != NULL) {
+            mEffectsFactoryHal->dumpEffects(fd);
+        } else {
+            String8 result(kNoEffectsFactory);
+            write(fd, result.string(), result.size());
+        }
 
         dumpClients(fd, args);
         if (clientLocked) {
@@ -2593,24 +2601,39 @@ sp<AudioFlinger::SyncEvent> AudioFlinger::createSyncEvent(AudioSystem::sync_even
 //  Effect management
 // ----------------------------------------------------------------------------
 
+sp<EffectsFactoryHalInterface> AudioFlinger::getEffectsFactory() {
+    return mEffectsFactoryHal;
+}
 
 status_t AudioFlinger::queryNumberEffects(uint32_t *numEffects) const
 {
     Mutex::Autolock _l(mLock);
-    return EffectQueryNumberEffects(numEffects);
+    if (mEffectsFactoryHal.get()) {
+        return mEffectsFactoryHal->queryNumberEffects(numEffects);
+    } else {
+        return -ENODEV;
+    }
 }
 
 status_t AudioFlinger::queryEffect(uint32_t index, effect_descriptor_t *descriptor) const
 {
     Mutex::Autolock _l(mLock);
-    return EffectQueryEffect(index, descriptor);
+    if (mEffectsFactoryHal.get()) {
+        return mEffectsFactoryHal->getDescriptor(index, descriptor);
+    } else {
+        return -ENODEV;
+    }
 }
 
 status_t AudioFlinger::getEffectDescriptor(const effect_uuid_t *pUuid,
         effect_descriptor_t *descriptor) const
 {
     Mutex::Autolock _l(mLock);
-    return EffectGetDescriptor(pUuid, descriptor);
+    if (mEffectsFactoryHal.get()) {
+        return mEffectsFactoryHal->getDescriptor(pUuid, descriptor);
+    } else {
+        return -ENODEV;
+    }
 }
 
 
@@ -2630,8 +2653,8 @@ sp<IEffect> AudioFlinger::createEffect(
     effect_descriptor_t desc;
 
     pid_t pid = IPCThreadState::self()->getCallingPid();
-    ALOGV("createEffect pid %d, effectClient %p, priority %d, sessionId %d, io %d",
-            pid, effectClient.get(), priority, sessionId, io);
+    ALOGV("createEffect pid %d, effectClient %p, priority %d, sessionId %d, io %d, factory %p",
+            pid, effectClient.get(), priority, sessionId, io, mEffectsFactoryHal.get());
 
     if (pDesc == NULL) {
         lStatus = BAD_VALUE;
@@ -2651,10 +2674,15 @@ sp<IEffect> AudioFlinger::createEffect(
         goto Exit;
     }
 
+    if (mEffectsFactoryHal.get() == NULL) {
+        lStatus = NO_INIT;
+        goto Exit;
+    }
+
     {
-        if (!EffectIsNullUuid(&pDesc->uuid)) {
+        if (!EffectsFactoryHalInterface::isNullUuid(&pDesc->uuid)) {
             // if uuid is specified, request effect descriptor
-            lStatus = EffectGetDescriptor(&pDesc->uuid, &desc);
+            lStatus = mEffectsFactoryHal->getDescriptor(&pDesc->uuid, &desc);
             if (lStatus < 0) {
                 ALOGW("createEffect() error %d from EffectGetDescriptor", lStatus);
                 goto Exit;
@@ -2662,7 +2690,7 @@ sp<IEffect> AudioFlinger::createEffect(
         } else {
             // if uuid is not specified, look for an available implementation
             // of the required type in effect factory
-            if (EffectIsNullUuid(&pDesc->type)) {
+            if (EffectsFactoryHalInterface::isNullUuid(&pDesc->type)) {
                 ALOGW("createEffect() no effect type");
                 lStatus = BAD_VALUE;
                 goto Exit;
@@ -2672,13 +2700,13 @@ sp<IEffect> AudioFlinger::createEffect(
             d.flags = 0; // prevent compiler warning
             bool found = false;
 
-            lStatus = EffectQueryNumberEffects(&numEffects);
+            lStatus = mEffectsFactoryHal->queryNumberEffects(&numEffects);
             if (lStatus < 0) {
                 ALOGW("createEffect() error %d from EffectQueryNumberEffects", lStatus);
                 goto Exit;
             }
             for (uint32_t i = 0; i < numEffects; i++) {
-                lStatus = EffectQueryEffect(i, &desc);
+                lStatus = mEffectsFactoryHal->getDescriptor(i, &desc);
                 if (lStatus < 0) {
                     ALOGW("createEffect() error %d from EffectQueryEffect", lStatus);
                     continue;

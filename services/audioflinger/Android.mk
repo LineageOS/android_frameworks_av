@@ -28,6 +28,8 @@ LOCAL_SRC_FILES:=               \
     AudioHwDevice.cpp           \
     AudioStreamOut.cpp          \
     SpdifStreamOut.cpp          \
+    EffectHalLocal.cpp          \
+    EffectsFactoryHalLocal.cpp	\
     Effects.cpp                 \
     AudioMixer.cpp.arm          \
     BufferProviders.cpp         \

@@ -146,7 +146,7 @@ mutable Mutex               mLock;      // mutex for process, commands and handl
     const audio_session_t mSessionId; // audio session ID
     const effect_descriptor_t mDescriptor;// effect descriptor received from effect engine
     effect_config_t     mConfig;    // input and output audio configuration
-    effect_handle_t  mEffectInterface; // Effect module C API
+    sp<EffectHalInterface> mEffectInterface; // Effect module HAL
     status_t            mStatus;    // initialization status
     effect_state        mState;     // current activation state
     Vector<EffectHandle *> mHandles;    // list of client handles

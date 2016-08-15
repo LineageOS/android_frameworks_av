@@ -72,6 +72,7 @@ struct effect_param_cblk_t;
 class AudioMixer;
 class AudioBuffer;
 class AudioResampler;
+class EffectsFactoryHalInterface;
 class FastMixer;
 class PassthruBufferProvider;
 class ServerProxy;
@@ -272,6 +273,7 @@ public:
 
     sp<NBLog::Writer>   newWriter_l(size_t size, const char *name);
     void                unregisterWriter(const sp<NBLog::Writer>& writer);
+    sp<EffectsFactoryHalInterface> getEffectsFactory();
 private:
     static const size_t kLogMemorySize = 40 * 1024;
     sp<MemoryDealer>    mLogMemoryDealer;   // == 0 when NBLog is disabled
@@ -762,6 +764,7 @@ private:
     nsecs_t mGlobalEffectEnableTime;  // when a global effect was last enabled
 
     sp<PatchPanel> mPatchPanel;
+    sp<EffectsFactoryHalInterface> mEffectsFactoryHal;
 
     bool        mSystemReady;
 };

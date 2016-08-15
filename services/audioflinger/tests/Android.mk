@@ -34,8 +34,10 @@ include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:= \
 	test-mixer.cpp \
-	../AudioMixer.cpp.arm \
-	../BufferProviders.cpp
+	../AudioMixer.cpp.arm  \
+	../BufferProviders.cpp \
+	../EffectHalLocal.cpp  \
+	../EffectsFactoryHalLocal.cpp
 
 LOCAL_C_INCLUDES := \
 	$(call include-path-for, audio-effects) \

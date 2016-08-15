@@ -27,6 +27,10 @@
 #include <media/EffectsFactoryApi.h>
 
 #include "AudioFlinger.h"
+#include "EffectHalInterface.h"
+// FIXME: Remove after converting the main audio HAL
+#include "EffectHalLocal.h"
+#include "EffectsFactoryHalInterface.h"
 #include "ServiceUtilities.h"
 
 // ----------------------------------------------------------------------------
@@ -64,7 +68,6 @@ AudioFlinger::EffectModule::EffectModule(ThreadBase *thread,
       mThread(thread), mChain(chain), mId(id), mSessionId(sessionId),
       mDescriptor(*desc),
       // mConfig is set by configure() and not used before then
-      mEffectInterface(NULL),
       mStatus(NO_INIT), mState(IDLE),
       // mMaxDisableWaitCnt is set by configure() and not used before then
       // mDisableWaitCnt is set by process() and updateState() and not used before then
@@ -75,7 +78,15 @@ AudioFlinger::EffectModule::EffectModule(ThreadBase *thread,
     int lStatus;
 
     // create effect engine from effect factory
-    mStatus = EffectCreate(&desc->uuid, sessionId, thread->id(), &mEffectInterface);
+    mStatus = -ENODEV;
+    sp<AudioFlinger> audioFlinger = mAudioFlinger.promote();
+    if (audioFlinger.get() != NULL) {
+        sp<EffectsFactoryHalInterface> effectsFactory = audioFlinger->getEffectsFactory();
+        if (effectsFactory.get() != NULL) {
+            mStatus = effectsFactory->createEffect(
+                    &desc->uuid, sessionId, thread->id(), &mEffectInterface);
+        }
+    }
 
     if (mStatus != NO_ERROR) {
         return;
@@ -86,21 +97,20 @@ AudioFlinger::EffectModule::EffectModule(ThreadBase *thread,
         goto Error;
     }
 
-    ALOGV("Constructor success name %s, Interface %p", mDescriptor.name, mEffectInterface);
+    ALOGV("Constructor success name %s, Interface %p", mDescriptor.name, mEffectInterface.get());
     return;
 Error:
-    EffectRelease(mEffectInterface);
-    mEffectInterface = NULL;
+    mEffectInterface.clear();
     ALOGV("Constructor Error %d", mStatus);
 }
 
 AudioFlinger::EffectModule::~EffectModule()
 {
     ALOGV("Destructor %p", this);
-    if (mEffectInterface != NULL) {
+    if (mEffectInterface.get() != NULL) {
         remove_effect_from_hal_l();
         // release effect engine
-        EffectRelease(mEffectInterface);
+        mEffectInterface.clear();
     }
 }
 
@@ -266,7 +276,7 @@ void AudioFlinger::EffectModule::process()
 {
     Mutex::Autolock _l(mLock);
 
-    if (mState == DESTROYED || mEffectInterface == NULL ||
+    if (mState == DESTROYED || mEffectInterface.get() == NULL ||
             mConfig.inputCfg.buffer.raw == NULL ||
             mConfig.outputCfg.buffer.raw == NULL) {
         return;
@@ -281,9 +291,8 @@ void AudioFlinger::EffectModule::process()
         }
 
         // do the actual processing in the effect engine
-        int ret = (*mEffectInterface)->process(mEffectInterface,
-                                               &mConfig.inputCfg.buffer,
-                                               &mConfig.outputCfg.buffer);
+        int ret = mEffectInterface->process(&mConfig.inputCfg.buffer,
+                                            &mConfig.outputCfg.buffer);
 
         // force transition to IDLE state when engine is ready
         if (mState == STOPPED && ret == -ENODATA) {
@@ -313,10 +322,10 @@ void AudioFlinger::EffectModule::process()
 
 void AudioFlinger::EffectModule::reset_l()
 {
-    if (mStatus != NO_ERROR || mEffectInterface == NULL) {
+    if (mStatus != NO_ERROR || mEffectInterface.get() == NULL) {
         return;
     }
-    (*mEffectInterface)->command(mEffectInterface, EFFECT_CMD_RESET, 0, NULL, 0, NULL);
+    mEffectInterface->command(EFFECT_CMD_RESET, 0, NULL, 0, NULL);
 }
 
 status_t AudioFlinger::EffectModule::configure()
@@ -326,7 +335,7 @@ status_t AudioFlinger::EffectModule::configure()
     uint32_t size;
     audio_channel_mask_t channelMask;
 
-    if (mEffectInterface == NULL) {
+    if (mEffectInterface.get() == NULL) {
         status = NO_INIT;
         goto exit;
     }
@@ -389,12 +398,11 @@ status_t AudioFlinger::EffectModule::configure()
 
     status_t cmdStatus;
     size = sizeof(int);
-    status = (*mEffectInterface)->command(mEffectInterface,
-                                                   EFFECT_CMD_SET_CONFIG,
-                                                   sizeof(effect_config_t),
-                                                   &mConfig,
-                                                   &size,
-                                                   &cmdStatus);
+    status = mEffectInterface->command(EFFECT_CMD_SET_CONFIG,
+                                       sizeof(effect_config_t),
+                                       &mConfig,
+                                       &size,
+                                       &cmdStatus);
     if (status == 0) {
         status = cmdStatus;
     }
@@ -416,12 +424,11 @@ status_t AudioFlinger::EffectModule::configure()
         }
 
         *((int32_t *)p->data + 1)= latency;
-        (*mEffectInterface)->command(mEffectInterface,
-                                     EFFECT_CMD_SET_PARAM,
-                                     sizeof(effect_param_t) + 8,
-                                     &buf32,
-                                     &size,
-                                     &cmdStatus);
+        mEffectInterface->command(EFFECT_CMD_SET_PARAM,
+                                  sizeof(effect_param_t) + 8,
+                                  &buf32,
+                                  &size,
+                                  &cmdStatus);
     }
 
     mMaxDisableWaitCnt = (MAX_DISABLE_TIME_MS * mConfig.outputCfg.samplingRate) /
@@ -435,17 +442,16 @@ exit:
 status_t AudioFlinger::EffectModule::init()
 {
     Mutex::Autolock _l(mLock);
-    if (mEffectInterface == NULL) {
+    if (mEffectInterface.get() == NULL) {
         return NO_INIT;
     }
     status_t cmdStatus;
     uint32_t size = sizeof(status_t);
-    status_t status = (*mEffectInterface)->command(mEffectInterface,
-                                                   EFFECT_CMD_INIT,
-                                                   0,
-                                                   NULL,
-                                                   &size,
-                                                   &cmdStatus);
+    status_t status = mEffectInterface->command(EFFECT_CMD_INIT,
+                                                0,
+                                                NULL,
+                                                &size,
+                                                &cmdStatus);
     if (status == 0) {
         status = cmdStatus;
     }
@@ -460,7 +466,8 @@ void AudioFlinger::EffectModule::addEffectToHal_l()
         if (thread != 0) {
             audio_stream_t *stream = thread->stream();
             if (stream != NULL) {
-                stream->add_audio_effect(stream, mEffectInterface);
+                stream->add_audio_effect(stream,
+                        reinterpret_cast<EffectHalLocal*>(mEffectInterface.get())->handle());
             }
         }
     }
@@ -486,7 +493,7 @@ status_t AudioFlinger::EffectModule::start()
 
 status_t AudioFlinger::EffectModule::start_l()
 {
-    if (mEffectInterface == NULL) {
+    if (mEffectInterface.get() == NULL) {
         return NO_INIT;
     }
     if (mStatus != NO_ERROR) {
@@ -494,12 +501,11 @@ status_t AudioFlinger::EffectModule::start_l()
     }
     status_t cmdStatus;
     uint32_t size = sizeof(status_t);
-    status_t status = (*mEffectInterface)->command(mEffectInterface,
-                                                   EFFECT_CMD_ENABLE,
-                                                   0,
-                                                   NULL,
-                                                   &size,
-                                                   &cmdStatus);
+    status_t status = mEffectInterface->command(EFFECT_CMD_ENABLE,
+                                                0,
+                                                NULL,
+                                                &size,
+                                                &cmdStatus);
     if (status == 0) {
         status = cmdStatus;
     }
@@ -517,7 +523,7 @@ status_t AudioFlinger::EffectModule::stop()
 
 status_t AudioFlinger::EffectModule::stop_l()
 {
-    if (mEffectInterface == NULL) {
+    if (mEffectInterface.get() == NULL) {
         return NO_INIT;
     }
     if (mStatus != NO_ERROR) {
@@ -525,12 +531,11 @@ status_t AudioFlinger::EffectModule::stop_l()
     }
     status_t cmdStatus = NO_ERROR;
     uint32_t size = sizeof(status_t);
-    status_t status = (*mEffectInterface)->command(mEffectInterface,
-                                                   EFFECT_CMD_DISABLE,
-                                                   0,
-                                                   NULL,
-                                                   &size,
-                                                   &cmdStatus);
+    status_t status = mEffectInterface->command(EFFECT_CMD_DISABLE,
+                                                0,
+                                                NULL,
+                                                &size,
+                                                &cmdStatus);
     if (status == NO_ERROR) {
         status = cmdStatus;
     }
@@ -548,7 +553,8 @@ status_t AudioFlinger::EffectModule::remove_effect_from_hal_l()
         if (thread != 0) {
             audio_stream_t *stream = thread->stream();
             if (stream != NULL) {
-                stream->remove_audio_effect(stream, mEffectInterface);
+                stream->remove_audio_effect(stream,
+                        reinterpret_cast<EffectHalLocal*>(mEffectInterface.get())->handle());
             }
         }
     }
@@ -569,9 +575,9 @@ status_t AudioFlinger::EffectModule::command(uint32_t cmdCode,
                                              void *pReplyData)
 {
     Mutex::Autolock _l(mLock);
-    ALOGVV("command(), cmdCode: %d, mEffectInterface: %p", cmdCode, mEffectInterface);
+    ALOGVV("command(), cmdCode: %d, mEffectInterface: %p", cmdCode, mEffectInterface.get());
 
-    if (mState == DESTROYED || mEffectInterface == NULL) {
+    if (mState == DESTROYED || mEffectInterface.get() == NULL) {
         return NO_INIT;
     }
     if (mStatus != NO_ERROR) {
@@ -599,12 +605,11 @@ status_t AudioFlinger::EffectModule::command(uint32_t cmdCode,
         android_errorWriteLog(0x534e4554, "30204301");
         return -EINVAL;
     }
-    status_t status = (*mEffectInterface)->command(mEffectInterface,
-                                                   cmdCode,
-                                                   cmdSize,
-                                                   pCmdData,
-                                                   replySize,
-                                                   pReplyData);
+    status_t status = mEffectInterface->command(cmdCode,
+                                                cmdSize,
+                                                pCmdData,
+                                                replySize,
+                                                pReplyData);
     if (cmdCode != EFFECT_CMD_GET_PARAM && status == NO_ERROR) {
         uint32_t size = (replySize == NULL) ? 0 : *replySize;
         for (size_t i = 1; i < mHandles.size(); i++) {
@@ -726,12 +731,11 @@ status_t AudioFlinger::EffectModule::setVolume(uint32_t *left, uint32_t *right, 
         if (controller) {
             pVolume = volume;
         }
-        status = (*mEffectInterface)->command(mEffectInterface,
-                                              EFFECT_CMD_SET_VOLUME,
-                                              size,
-                                              volume,
-                                              &size,
-                                              pVolume);
+        status = mEffectInterface->command(EFFECT_CMD_SET_VOLUME,
+                                           size,
+                                           volume,
+                                           &size,
+                                           pVolume);
         if (controller && status == NO_ERROR && size == sizeof(volume)) {
             *left = volume[0];
             *right = volume[1];
@@ -756,12 +760,11 @@ status_t AudioFlinger::EffectModule::setDevice(audio_devices_t device)
         uint32_t size = sizeof(status_t);
         uint32_t cmd = audio_is_output_devices(device) ? EFFECT_CMD_SET_DEVICE :
                             EFFECT_CMD_SET_INPUT_DEVICE;
-        status = (*mEffectInterface)->command(mEffectInterface,
-                                              cmd,
-                                              sizeof(uint32_t),
-                                              &device,
-                                              &size,
-                                              &cmdStatus);
+        status = mEffectInterface->command(cmd,
+                                           sizeof(uint32_t),
+                                           &device,
+                                           &size,
+                                           &cmdStatus);
     }
     return status;
 }
@@ -776,12 +779,11 @@ status_t AudioFlinger::EffectModule::setMode(audio_mode_t mode)
     if ((mDescriptor.flags & EFFECT_FLAG_AUDIO_MODE_MASK) == EFFECT_FLAG_AUDIO_MODE_IND) {
         status_t cmdStatus;
         uint32_t size = sizeof(status_t);
-        status = (*mEffectInterface)->command(mEffectInterface,
-                                              EFFECT_CMD_SET_AUDIO_MODE,
-                                              sizeof(audio_mode_t),
-                                              &mode,
-                                              &size,
-                                              &cmdStatus);
+        status = mEffectInterface->command(EFFECT_CMD_SET_AUDIO_MODE,
+                                           sizeof(audio_mode_t),
+                                           &mode,
+                                           &size,
+                                           &cmdStatus);
         if (status == NO_ERROR) {
             status = cmdStatus;
         }
@@ -798,12 +800,11 @@ status_t AudioFlinger::EffectModule::setAudioSource(audio_source_t source)
     status_t status = NO_ERROR;
     if ((mDescriptor.flags & EFFECT_FLAG_AUDIO_SOURCE_MASK) == EFFECT_FLAG_AUDIO_SOURCE_IND) {
         uint32_t size = 0;
-        status = (*mEffectInterface)->command(mEffectInterface,
-                                              EFFECT_CMD_SET_AUDIO_SOURCE,
-                                              sizeof(audio_source_t),
-                                              &source,
-                                              &size,
-                                              NULL);
+        status = mEffectInterface->command(EFFECT_CMD_SET_AUDIO_SOURCE,
+                                           sizeof(audio_source_t),
+                                           &source,
+                                           &size,
+                                           NULL);
     }
     return status;
 }
@@ -850,12 +851,11 @@ status_t AudioFlinger::EffectModule::setOffloaded(bool offloaded, audio_io_handl
 
         cmd.isOffload = offloaded;
         cmd.ioHandle = io;
-        status = (*mEffectInterface)->command(mEffectInterface,
-                                              EFFECT_CMD_OFFLOAD,
-                                              sizeof(effect_offload_param_t),
-                                              &cmd,
-                                              &size,
-                                              &cmdStatus);
+        status = mEffectInterface->command(EFFECT_CMD_OFFLOAD,
+                                           sizeof(effect_offload_param_t),
+                                           &cmd,
+                                           &size,
+                                           &cmdStatus);
         if (status == NO_ERROR) {
             status = cmdStatus;
         }
@@ -998,7 +998,7 @@ void AudioFlinger::EffectModule::dump(int fd, const Vector<String16>& args __unu
 
     result.append("\t\tSession Status State Engine:\n");
     snprintf(buffer, SIZE, "\t\t%05d   %03d    %03d   %p\n",
-            mSessionId, mStatus, mState, mEffectInterface);
+            mSessionId, mStatus, mState, mEffectInterface.get());
     result.append(buffer);
 
     result.append("\t\tDescriptor:\n");

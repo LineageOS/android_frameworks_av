@@ -21,12 +21,13 @@
 #include <audio_utils/primitives.h>
 #include <audio_utils/format.h>
 #include <media/AudioResamplerPublic.h>
-#include <media/EffectsFactoryApi.h>
 
 #include <utils/Log.h>
 
 #include "Configuration.h"
 #include "BufferProviders.h"
+#include "EffectHalInterface.h"
+#include "EffectsFactoryHalInterface.h"
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof((x)[0]))
@@ -145,13 +146,22 @@ DownmixerBufferProvider::DownmixerBufferProvider(
     ALOGV("DownmixerBufferProvider(%p)(%#x, %#x, %#x %u %d)",
             this, inputChannelMask, outputChannelMask, format,
             sampleRate, sessionId);
-    if (!sIsMultichannelCapable
-            || EffectCreate(&sDwnmFxDesc.uuid,
-                    sessionId,
-                    SESSION_ID_INVALID_AND_IGNORED,
-                    &mDownmixHandle) != 0) {
+    if (!sIsMultichannelCapable) {
+        ALOGE("DownmixerBufferProvider() error: not multichannel capable");
+        return;
+    }
+    mEffectsFactory = EffectsFactoryHalInterface::create();
+    if (mEffectsFactory.get() == NULL) {
+        ALOGE("DownmixerBufferProvider() error: could not obtain the effects factory");
+        return;
+    }
+    if (mEffectsFactory->createEffect(&sDwnmFxDesc.uuid,
+                                      sessionId,
+                                      SESSION_ID_INVALID_AND_IGNORED,
+                                      &mDownmixInterface) != 0) {
          ALOGE("DownmixerBufferProvider() error creating downmixer effect");
-         mDownmixHandle = NULL;
+         mDownmixInterface.clear();
+         mEffectsFactory.clear();
          return;
      }
      // channel input configuration will be overridden per-track
@@ -173,28 +183,28 @@ DownmixerBufferProvider::DownmixerBufferProvider(
      uint32_t replySize = sizeof(int);
 
      // Configure downmixer
-     status_t status = (*mDownmixHandle)->command(mDownmixHandle,
+     status_t status = mDownmixInterface->command(
              EFFECT_CMD_SET_CONFIG /*cmdCode*/, sizeof(effect_config_t) /*cmdSize*/,
              &mDownmixConfig /*pCmdData*/,
              &replySize, &cmdStatus /*pReplyData*/);
      if (status != 0 || cmdStatus != 0) {
          ALOGE("DownmixerBufferProvider() error %d cmdStatus %d while configuring downmixer",
                  status, cmdStatus);
-         EffectRelease(mDownmixHandle);
-         mDownmixHandle = NULL;
+         mDownmixInterface.clear();
+         mEffectsFactory.clear();
          return;
      }
 
      // Enable downmixer
      replySize = sizeof(int);
-     status = (*mDownmixHandle)->command(mDownmixHandle,
+     status = mDownmixInterface->command(
              EFFECT_CMD_ENABLE /*cmdCode*/, 0 /*cmdSize*/, NULL /*pCmdData*/,
              &replySize, &cmdStatus /*pReplyData*/);
      if (status != 0 || cmdStatus != 0) {
          ALOGE("DownmixerBufferProvider() error %d cmdStatus %d while enabling downmixer",
                  status, cmdStatus);
-         EffectRelease(mDownmixHandle);
-         mDownmixHandle = NULL;
+         mDownmixInterface.clear();
+         mEffectsFactory.clear();
          return;
      }
 
@@ -211,15 +221,15 @@ DownmixerBufferProvider::DownmixerBufferProvider(
      param->vsize = sizeof(downmix_type_t);
      memcpy(param->data + psizePadded, &downmixType, param->vsize);
      replySize = sizeof(int);
-     status = (*mDownmixHandle)->command(mDownmixHandle,
+     status = mDownmixInterface->command(
              EFFECT_CMD_SET_PARAM /* cmdCode */, downmixParamSize /* cmdSize */,
              param /*pCmdData*/, &replySize, &cmdStatus /*pReplyData*/);
      free(param);
      if (status != 0 || cmdStatus != 0) {
          ALOGE("DownmixerBufferProvider() error %d cmdStatus %d while setting downmix type",
                  status, cmdStatus);
-         EffectRelease(mDownmixHandle);
-         mDownmixHandle = NULL;
+         mDownmixInterface.clear();
+         mEffectsFactory.clear();
          return;
      }
      ALOGV("DownmixerBufferProvider() downmix type set to %d", (int) downmixType);
@@ -228,8 +238,6 @@ DownmixerBufferProvider::DownmixerBufferProvider(
 DownmixerBufferProvider::~DownmixerBufferProvider()
 {
     ALOGV("~DownmixerBufferProvider (%p)", this);
-    EffectRelease(mDownmixHandle);
-    mDownmixHandle = NULL;
 }
 
 void DownmixerBufferProvider::copyFrames(void *dst, const void *src, size_t frames)
@@ -239,7 +247,7 @@ void DownmixerBufferProvider::copyFrames(void *dst, const void *src, size_t fram
     mDownmixConfig.outputCfg.buffer.frameCount = frames;
     mDownmixConfig.outputCfg.buffer.raw = dst;
     // may be in-place if src == dst.
-    status_t res = (*mDownmixHandle)->process(mDownmixHandle,
+    status_t res = mDownmixInterface->process(
             &mDownmixConfig.inputCfg.buffer, &mDownmixConfig.outputCfg.buffer);
     ALOGE_IF(res != OK, "DownmixBufferProvider error %d", res);
 }
@@ -248,8 +256,13 @@ void DownmixerBufferProvider::copyFrames(void *dst, const void *src, size_t fram
 /*static*/ status_t DownmixerBufferProvider::init()
 {
     // find multichannel downmix effect if we have to play multichannel content
+    sp<EffectsFactoryHalInterface> effectsFactory = EffectsFactoryHalInterface::create();
+    if (effectsFactory.get() == NULL) {
+        ALOGE("AudioMixer() error: could not obtain the effects factory");
+        return NO_INIT;
+    }
     uint32_t numEffects = 0;
-    int ret = EffectQueryNumberEffects(&numEffects);
+    int ret = effectsFactory->queryNumberEffects(&numEffects);
     if (ret != 0) {
         ALOGE("AudioMixer() error %d querying number of effects", ret);
         return NO_INIT;
@@ -257,7 +270,7 @@ void DownmixerBufferProvider::copyFrames(void *dst, const void *src, size_t fram
     ALOGV("EffectQueryNumberEffects() numEffects=%d", numEffects);
 
     for (uint32_t i = 0 ; i < numEffects ; i++) {
-        if (EffectQueryEffect(i, &sDwnmFxDesc) == 0) {
+        if (effectsFactory->getDescriptor(i, &sDwnmFxDesc) == 0) {
             ALOGV("effect %d is called %s", i, sDwnmFxDesc.name);
             if (memcmp(&sDwnmFxDesc.type, EFFECT_UIID_DOWNMIX, sizeof(effect_uuid_t)) == 0) {
                 ALOGI("found effect \"%s\" from %s",
