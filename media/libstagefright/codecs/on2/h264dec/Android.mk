@@ -95,7 +95,6 @@ ifeq ($(ARCH_ARM_HAVE_NEON),true)
                         $(LOCAL_PATH)/./omxdl/arm_neon/vc/m4p10/api
 endif
 
-LOCAL_CLANG := true
 LOCAL_SANITIZE := signed-integer-overflow
 
 LOCAL_SHARED_LIBRARIES := \

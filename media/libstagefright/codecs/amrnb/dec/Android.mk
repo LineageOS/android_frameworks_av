@@ -48,7 +48,6 @@ LOCAL_CFLAGS := \
         -D"OSCL_UNUSED_ARG(x)=(void)(x)" -DOSCL_IMPORT_REF=
 
 LOCAL_CFLAGS += -Werror
-LOCAL_CLANG := true
 #LOCAL_SANITIZE := signed-integer-overflow
 
 LOCAL_MODULE := libstagefright_amrnbdec
@@ -73,7 +72,6 @@ LOCAL_C_INCLUDES := \
 LOCAL_CFLAGS := -DOSCL_IMPORT_REF=
 
 LOCAL_CFLAGS += -Werror
-LOCAL_CLANG := true
 #LOCAL_SANITIZE := signed-integer-overflow
 
 LOCAL_STATIC_LIBRARIES := \
@@ -104,7 +102,6 @@ LOCAL_STATIC_LIBRARIES := \
 LOCAL_SHARED_LIBRARIES := \
         libstagefright_amrnb_common libaudioutils liblog
 
-LOCAL_CLANG := true
 #LOCAL_SANITIZE := signed-integer-overflow
 
 LOCAL_MODULE := libstagefright_amrnbdec_test

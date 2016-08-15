@@ -5,7 +5,6 @@ LOCAL_SRC_FILES:=                 \
         TextDescriptions.cpp      \
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
-LOCAL_CLANG := true
 LOCAL_SANITIZE := signed-integer-overflow
 
 LOCAL_C_INCLUDES:= \

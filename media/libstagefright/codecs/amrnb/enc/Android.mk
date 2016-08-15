@@ -70,7 +70,6 @@ LOCAL_CFLAGS := \
         -D"OSCL_UNUSED_ARG(x)=(void)(x)"
 
 LOCAL_CFLAGS += -Werror
-LOCAL_CLANG := true
 #addressing b/25409744
 #LOCAL_SANITIZE := signed-integer-overflow
 
@@ -94,7 +93,6 @@ LOCAL_C_INCLUDES := \
         $(LOCAL_PATH)/../common
 
 LOCAL_CFLAGS += -Werror
-LOCAL_CLANG := true
 #addressing b/25409744
 #LOCAL_SANITIZE := signed-integer-overflow
 
@@ -127,7 +125,6 @@ LOCAL_STATIC_LIBRARIES := \
 LOCAL_SHARED_LIBRARIES := \
     libstagefright_amrnb_common
 
-LOCAL_CLANG := true
 #addressing b/25409744
 #LOCAL_SANITIZE := signed-integer-overflow
 

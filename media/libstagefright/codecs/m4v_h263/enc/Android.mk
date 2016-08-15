@@ -34,7 +34,6 @@ LOCAL_C_INCLUDES := \
     $(TOP)/frameworks/native/include/media/openmax
 
 LOCAL_CFLAGS += -Werror
-LOCAL_CLANG := true
 LOCAL_SANITIZE := signed-integer-overflow
 
 include $(BUILD_STATIC_LIBRARY)
@@ -77,7 +76,6 @@ LOCAL_MODULE := libstagefright_soft_mpeg4enc
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_CFLAGS += -Werror
-LOCAL_CLANG := true
 LOCAL_SANITIZE := signed-integer-overflow
 
 include $(BUILD_SHARED_LIBRARY)
@@ -93,7 +91,6 @@ LOCAL_C_INCLUDES := \
         $(LOCAL_PATH)/include
 
 LOCAL_CFLAGS := -DOSCL_EXPORT_REF= -DOSCL_IMPORT_REF= -DBX_RC
-LOCAL_CLANG := true
 LOCAL_SANITIZE := signed-integer-overflow
 
 LOCAL_STATIC_LIBRARIES := \
