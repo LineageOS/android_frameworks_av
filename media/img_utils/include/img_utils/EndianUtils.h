@@ -58,7 +58,7 @@ class ANDROID_API EndianOutput : public Output {
          * Wrap the given Output.  Calling write methods will result in
          * writes to this output.
          */
-        EndianOutput(Output* out, Endianness end=LITTLE);
+        explicit EndianOutput(Output* out, Endianness end=LITTLE);
 
         virtual ~EndianOutput();
 
