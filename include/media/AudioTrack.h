@@ -1056,6 +1056,10 @@ protected:
                                                     // after flush.
     int64_t                 mFramesWrittenServerOffset; // An offset to server frames due to
                                                     // restoring AudioTrack, or stop/start.
+                                                    // This offset is also used for static tracks.
+    int64_t                 mFramesWrittenAtRestore; // Frames written at restore point (or frames
+                                                    // delivered for static tracks).
+                                                    // -1 indicates no previous restore point.
 
     audio_output_flags_t    mFlags;                 // same as mOrigFlags, except for bits that may
                                                     // be denied by client or server, such as

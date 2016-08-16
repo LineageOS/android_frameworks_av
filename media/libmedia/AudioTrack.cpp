@@ -539,6 +539,7 @@ status_t AudioTrack::set(
     mUnderrunCountOffset = 0;
     mFramesWritten = 0;
     mFramesWrittenServerOffset = 0;
+    mFramesWrittenAtRestore = -1; // -1 is a unique initializer.
 
     return NO_ERROR;
 }
@@ -2181,10 +2182,12 @@ status_t AudioTrack::restoreTrack_l(const char *from)
     mUnderrunCountOffset = getUnderrunCount_l();
 
     // save the old static buffer position
+    uint32_t staticPosition = 0;
     size_t bufferPosition = 0;
     int loopCount = 0;
     if (mStaticProxy != 0) {
         mStaticProxy->getBufferPositionAndLoopCount(&bufferPosition, &loopCount);
+        staticPosition = mStaticProxy->getPosition().unsignedValue();
     }
 
     mFlags = mOrigFlags;
@@ -2216,8 +2219,11 @@ status_t AudioTrack::restoreTrack_l(const char *from)
         }
         if (mState == STATE_ACTIVE) {
             result = mAudioTrack->start();
-            mFramesWrittenServerOffset = mFramesWritten; // server resets to zero so we offset
         }
+        // server resets to zero so we offset
+        mFramesWrittenServerOffset =
+                mStaticProxy.get() != nullptr ? staticPosition : mFramesWritten;
+        mFramesWrittenAtRestore = mFramesWrittenServerOffset;
     }
     if (result != NO_ERROR) {
         ALOGW("restoreTrack_l() failed status %d", result);
@@ -2400,7 +2406,17 @@ status_t AudioTrack::getTimestamp(AudioTimestamp& timestamp)
             }
         }
         if (status == INVALID_OPERATION) {
-            status = WOULD_BLOCK;
+            // INVALID_OPERATION occurs when no timestamp has been issued by the server;
+            // other failures are signaled by a negative time.
+            // If we come out of FLUSHED or STOPPED where the position is known
+            // to be zero we convert this to WOULD_BLOCK (with the implicit meaning of
+            // "zero" for NuPlayer).  We don't convert for track restoration as position
+            // does not reset.
+            ALOGV("timestamp server offset:%lld restore frames:%lld",
+                    (long long)mFramesWrittenServerOffset, (long long)mFramesWrittenAtRestore);
+            if (mFramesWrittenServerOffset != mFramesWrittenAtRestore) {
+                status = WOULD_BLOCK;
+            }
         }
     }
     if (status != NO_ERROR) {
