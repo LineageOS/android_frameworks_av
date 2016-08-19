@@ -214,7 +214,7 @@ void SoftMPEG4::onQueueFilled(OMX_U32 /* portIndex */) {
             if ((outHeader->nAllocLen < yFrameSize) ||
                     (outHeader->nAllocLen - yFrameSize < yFrameSize / 2)) {
                 ALOGE("Too small output buffer for reference frame: %zu bytes",
-                        outHeader->nAllocLen);
+                        (size_t)outHeader->nAllocLen);
                 android_errorWriteLog(0x534e4554, "30033990");
                 notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
                 mSignalledError = true;
