@@ -825,7 +825,7 @@ public:
 
 #ifdef TEE_SINK
     // tee sink, if enabled by property, allows dumpsys to write most recent audio to .wav file
-    static void dumpTee(int fd, const sp<NBAIO_Source>& source, audio_io_handle_t id = 0);
+    static void dumpTee(int fd, const sp<NBAIO_Source>& source, audio_io_handle_t id, char suffix);
 
     // whether tee sink is enabled by property
     static bool mTeeSinkInputEnabled;

@@ -4751,7 +4751,7 @@ void AudioFlinger::MixerThread::dumpInternals(int fd, const Vector<String16>& ar
 
 #ifdef TEE_SINK
     // Write the tee output to a .wav file
-    dumpTee(fd, mTeeSource, mId);
+    dumpTee(fd, mTeeSource, mId, 'M');
 #endif
 
 }

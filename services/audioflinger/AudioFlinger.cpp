@@ -520,7 +520,7 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
 #ifdef TEE_SINK
         // dump the serially shared record tee sink
         if (mRecordTeeSource != 0) {
-            dumpTee(fd, mRecordTeeSource);
+            dumpTee(fd, mRecordTeeSource, AUDIO_IO_HANDLE_NONE, 'C');
         }
 #endif
 
@@ -3261,7 +3261,7 @@ int comparEntry(const void *p1, const void *p2)
 }
 
 #ifdef TEE_SINK
-void AudioFlinger::dumpTee(int fd, const sp<NBAIO_Source>& source, audio_io_handle_t id)
+void AudioFlinger::dumpTee(int fd, const sp<NBAIO_Source>& source, audio_io_handle_t id, char suffix)
 {
     NBAIO_Source *teeSource = source.get();
     if (teeSource != NULL) {
@@ -3323,7 +3323,8 @@ void AudioFlinger::dumpTee(int fd, const sp<NBAIO_Source>& source, audio_io_hand
         struct tm tm;
         localtime_r(&tv.tv_sec, &tm);
         strftime(teeTime, sizeof(teeTime), "%Y%m%d%H%M%S", &tm);
-        snprintf(&teePath[teePathLen], sizeof(teePath) - teePathLen, "%s_%d.wav", teeTime, id);
+        snprintf(&teePath[teePathLen], sizeof(teePath) - teePathLen, "%s_%d_%c.wav", teeTime, id,
+                suffix);
         // if 2 dumpsys are done within 1 second, and rotation didn't work, then discard 2nd
         int teeFd = open(teePath, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, S_IRUSR | S_IWUSR);
         if (teeFd >= 0) {
