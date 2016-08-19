@@ -73,6 +73,9 @@
 
 #include "AutoPark.h"
 
+// FIXME: Remove after NBAIO is converted
+#include "StreamHalLocal.h"
+
 // ----------------------------------------------------------------------------
 
 // Note: the following macro is used for extremely verbose logging message.  In
@@ -1847,7 +1850,8 @@ void AudioFlinger::PlaybackThread::preExit()
     ALOGV("  preExit()");
     // FIXME this is using hard-coded strings but in the future, this functionality will be
     //       converted to use audio HAL extensions required to support tunneling
-    mOutput->stream->common.set_parameters(&mOutput->stream->common, "exiting=1");
+    status_t result = mOutput->stream->setParameters(String8("exiting=1"));
+    ALOGE_IF(result != OK, "Error when setting parameters on exit: %d", result);
 }
 
 // PlaybackThread::createTrack_l() must be called with AudioFlinger::mLock held
@@ -1969,7 +1973,12 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
             && audio_has_proportional_frames(format) && sharedBuffer == 0) {
         // this must match AudioTrack.cpp calculateMinFrameCount().
         // TODO: Move to a common library
-        uint32_t latencyMs = mOutput->stream->get_latency(mOutput->stream);
+        uint32_t latencyMs = 0;
+        lStatus = mOutput->stream->getLatency(&latencyMs);
+        if (lStatus != OK) {
+            ALOGE("Error when retrieving output stream latency: %d", lStatus);
+            goto Exit;
+        }
         uint32_t minBufCount = latencyMs / ((1000 * mNormalFrameCount) / mSampleRate);
         if (minBufCount < 2) {
             minBufCount = 2;
@@ -2100,11 +2109,11 @@ uint32_t AudioFlinger::PlaybackThread::latency() const
 }
 uint32_t AudioFlinger::PlaybackThread::latency_l() const
 {
-    if (initCheck() == NO_ERROR) {
-        return correctLatency_l(mOutput->stream->get_latency(mOutput->stream));
-    } else {
-        return 0;
+    uint32_t latency;
+    if (initCheck() == NO_ERROR && mOutput->stream->getLatency(&latency) == OK) {
+        return correctLatency_l(latency);
     }
+    return 0;
 }
 
 void AudioFlinger::PlaybackThread::setMasterVolume(float value)
@@ -2269,14 +2278,11 @@ void AudioFlinger::PlaybackThread::broadcast_l()
 String8 AudioFlinger::PlaybackThread::getParameters(const String8& keys)
 {
     Mutex::Autolock _l(mLock);
-    if (initCheck() != NO_ERROR) {
-        return String8();
+    String8 out_s8;
+    if (initCheck() == NO_ERROR && mOutput->stream->getParameters(keys, &out_s8) == OK) {
+        return out_s8;
     }
-
-    char *s = mOutput->stream->common.get_parameters(&mOutput->stream->common, keys.string());
-    const String8 out_s8(s);
-    free(s);
-    return out_s8;
+    return String8();
 }
 
 void AudioFlinger::PlaybackThread::ioConfigChanged(audio_io_config_event event, pid_t pid) {
@@ -2305,21 +2311,18 @@ void AudioFlinger::PlaybackThread::ioConfigChanged(audio_io_config_event event, 
     mAudioFlinger->ioConfigChanged(event, desc, pid);
 }
 
-void AudioFlinger::PlaybackThread::writeCallback()
+void AudioFlinger::PlaybackThread::onWriteReady()
 {
-    ALOG_ASSERT(mCallbackThread != 0);
     mCallbackThread->resetWriteBlocked();
 }
 
-void AudioFlinger::PlaybackThread::drainCallback()
+void AudioFlinger::PlaybackThread::onDrainReady()
 {
-    ALOG_ASSERT(mCallbackThread != 0);
     mCallbackThread->resetDraining();
 }
 
-void AudioFlinger::PlaybackThread::errorCallback()
+void AudioFlinger::PlaybackThread::onError()
 {
-    ALOG_ASSERT(mCallbackThread != 0);
     mCallbackThread->setAsyncError();
 }
 
@@ -2343,30 +2346,6 @@ void AudioFlinger::PlaybackThread::resetDraining(uint32_t sequence)
     }
 }
 
-// static
-int AudioFlinger::PlaybackThread::asyncCallback(stream_callback_event_t event,
-                                                void *param __unused,
-                                                void *cookie)
-{
-    AudioFlinger::PlaybackThread *me = (AudioFlinger::PlaybackThread *)cookie;
-    ALOGV("asyncCallback() event %d", event);
-    switch (event) {
-    case STREAM_CBK_EVENT_WRITE_READY:
-        me->writeCallback();
-        break;
-    case STREAM_CBK_EVENT_DRAIN_READY:
-        me->drainCallback();
-        break;
-    case STREAM_CBK_EVENT_ERROR:
-        me->errorCallback();
-        break;
-    default:
-        ALOGW("asyncCallback() unknown event %d", event);
-        break;
-    }
-    return 0;
-}
-
 void AudioFlinger::PlaybackThread::readOutputParameters_l()
 {
     // unfortunately we have no way of recovering from errors here, hence the LOG_ALWAYS_FATAL
@@ -2383,7 +2362,8 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
     mChannelCount = audio_channel_count_from_out_mask(mChannelMask);
 
     // Get actual HAL format.
-    mHALFormat = mOutput->stream->common.get_format(&mOutput->stream->common);
+    status_t result = mOutput->stream->getFormat(&mHALFormat);
+    LOG_ALWAYS_FATAL_IF(result != OK, "Error when retrieving output stream format: %d", result);
     // Get format from the shim, which will be different than the HAL format
     // if playing compressed audio over HDMI passthrough.
     mFormat = mOutput->getFormat();
@@ -2396,17 +2376,17 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
                 mFormat);
     }
     mFrameSize = mOutput->getFrameSize();
-    mBufferSize = mOutput->stream->common.get_buffer_size(&mOutput->stream->common);
+    result = mOutput->stream->getBufferSize(&mBufferSize);
+    LOG_ALWAYS_FATAL_IF(result != OK,
+            "Error when retrieving output stream buffer size: %d", result);
     mFrameCount = mBufferSize / mFrameSize;
     if (mFrameCount & 15) {
         ALOGW("HAL output buffer size is %zu frames but AudioMixer requires multiples of 16 frames",
                 mFrameCount);
     }
 
-    if ((mOutput->flags & AUDIO_OUTPUT_FLAG_NON_BLOCKING) &&
-            (mOutput->stream->set_callback != NULL)) {
-        if (mOutput->stream->set_callback(mOutput->stream,
-                                      AudioFlinger::PlaybackThread::asyncCallback, this) == 0) {
+    if (mOutput->flags & AUDIO_OUTPUT_FLAG_NON_BLOCKING) {
+        if (mOutput->stream->setCallback(this) == OK) {
             mUseAsyncWrite = true;
             mCallbackThread = new AudioFlinger::AsyncCallbackThread(this);
         }
@@ -2414,14 +2394,15 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
 
     mHwSupportsPause = false;
     if (mOutput->flags & AUDIO_OUTPUT_FLAG_DIRECT) {
-        if (mOutput->stream->pause != NULL) {
-            if (mOutput->stream->resume != NULL) {
+        bool supportsPause = false, supportsResume = false;
+        if (mOutput->stream->supportsPauseAndResume(&supportsPause, &supportsResume) == OK) {
+            if (supportsPause && supportsResume) {
                 mHwSupportsPause = true;
-            } else {
+            } else if (supportsPause) {
                 ALOGW("direct output implements pause but not resume");
+            } else if (supportsResume) {
+                ALOGW("direct output implements resume but not pause");
             }
-        } else if (mOutput->stream->resume != NULL) {
-            ALOGW("direct output implements resume but not pause");
         }
     }
     if (!mHwSupportsPause && mOutput->flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) {
@@ -2611,12 +2592,12 @@ AudioStreamOut* AudioFlinger::PlaybackThread::clearOutput()
 }
 
 // this method must always be called either with ThreadBase mLock held or inside the thread loop
-audio_stream_t* AudioFlinger::PlaybackThread::stream() const
+sp<StreamHalInterface> AudioFlinger::PlaybackThread::stream() const
 {
     if (mOutput == NULL) {
         return NULL;
     }
-    return &mOutput->stream->common;
+    return mOutput->stream;
 }
 
 uint32_t AudioFlinger::PlaybackThread::activeSleepTimeUs() const
@@ -2754,7 +2735,8 @@ ssize_t AudioFlinger::PlaybackThread::threadLoop_write()
 
 void AudioFlinger::PlaybackThread::threadLoop_drain()
 {
-    if (mOutput->stream->drain) {
+    bool supportsDrain = false;
+    if (mOutput->stream->supportsDrain(&supportsDrain) == OK && supportsDrain) {
         ALOGV("draining %s", (mMixerStatus == MIXER_DRAIN_TRACK) ? "early" : "full");
         if (mUseAsyncWrite) {
             ALOGW_IF(mDrainSequence & 1, "threadLoop_drain(): out of sequence drain request");
@@ -2762,9 +2744,10 @@ void AudioFlinger::PlaybackThread::threadLoop_drain()
             ALOG_ASSERT(mCallbackThread != 0);
             mCallbackThread->setDraining(mDrainSequence);
         }
-        mOutput->stream->drain(mOutput->stream,
+        status_t result = mOutput->stream->drain(
             (mMixerStatus == MIXER_DRAIN_TRACK) ? AUDIO_DRAIN_EARLY_NOTIFY
                                                 : AUDIO_DRAIN_ALL);
+        ALOGE_IF(result != OK, "Error when draining stream: %d", result);
     }
 }
 
@@ -3449,11 +3432,9 @@ status_t AudioFlinger::PlaybackThread::getTimestamp_l(AudioTimestamp& timestamp)
         }
         return status;
     }
-    if ((mType == OFFLOAD || mType == DIRECT)
-            && mOutput != NULL && mOutput->stream->get_presentation_position) {
+    if ((mType == OFFLOAD || mType == DIRECT) && mOutput != NULL) {
         uint64_t position64;
-        int ret = mOutput->getPresentationPosition(&position64, &timestamp.mTime);
-        if (ret == 0) {
+        if (mOutput->getPresentationPosition(&position64, &timestamp.mTime) == OK) {
             timestamp.mPosition = (uint32_t)position64;
             return NO_ERROR;
         }
@@ -3540,8 +3521,7 @@ status_t AudioFlinger::PlaybackThread::createAudioPatch_l(const struct audio_pat
         AudioParameter param = AudioParameter(String8(address));
         free(address);
         param.addInt(String8(AUDIO_PARAMETER_STREAM_ROUTING), (int)type);
-        status = mOutput->stream->common.set_parameters(&mOutput->stream->common,
-                param.toString().string());
+        status = mOutput->stream->setParameters(param.toString());
         *handle = AUDIO_PATCH_HANDLE_NONE;
     }
     if (configChanged) {
@@ -3577,8 +3557,7 @@ status_t AudioFlinger::PlaybackThread::releaseAudioPatch_l(const audio_patch_han
     } else {
         AudioParameter param;
         param.addInt(String8(AUDIO_PARAMETER_STREAM_ROUTING), 0);
-        status = mOutput->stream->common.set_parameters(&mOutput->stream->common,
-                param.toString().string());
+        status = mOutput->stream->setParameters(param.toString());
     }
     return status;
 }
@@ -3630,7 +3609,8 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
         return;
     }
     // create an NBAIO sink for the HAL output stream, and negotiate
-    mOutputSink = new AudioStreamOutSink(output->stream);
+    mOutputSink = new AudioStreamOutSink(
+            static_cast<StreamOutHalLocal*>(output->stream.get())->getStream());
     size_t numCounterOffers = 0;
     const NBAIO_Format offers[1] = {Format_from_SR_C(mSampleRate, mChannelCount, mFormat)};
 #if !LOG_NDEBUG
@@ -4144,8 +4124,11 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 // We have consumed all the buffers of this track.
                 // This would be incomplete if we auto-paused on underrun
                 {
-                    size_t audioHALFrames =
-                            (mOutput->stream->get_latency(mOutput->stream)*mSampleRate) / 1000;
+                    uint32_t latency = 0;
+                    status_t result = mOutput->stream->getLatency(&latency);
+                    ALOGE_IF(result != OK,
+                            "Error when retrieving output stream latency: %d", result);
+                    size_t audioHALFrames = (latency * mSampleRate) / 1000;
                     int64_t framesWritten = mBytesWritten / mFrameSize;
                     if (!(mStandby || track->presentationComplete(framesWritten, audioHALFrames))) {
                         // track stays in active list until presentation is complete
@@ -4686,14 +4669,12 @@ bool AudioFlinger::MixerThread::checkForNewParameter_l(const String8& keyValuePa
     }
 
     if (status == NO_ERROR) {
-        status = mOutput->stream->common.set_parameters(&mOutput->stream->common,
-                                                keyValuePair.string());
+        status = mOutput->stream->setParameters(keyValuePair);
         if (!mStandby && status == INVALID_OPERATION) {
             mOutput->standby();
             mStandby = true;
             mBytesWritten = 0;
-            status = mOutput->stream->common.set_parameters(&mOutput->stream->common,
-                                                   keyValuePair.string());
+            status = mOutput->stream->setParameters(keyValuePair);
         }
         if (status == NO_ERROR && reconfig) {
             readOutputParameters_l();
@@ -4834,9 +4815,8 @@ void AudioFlinger::DirectOutputThread::processVolume_l(Track *track, bool lastTr
                 left = (float)vl / (1 << 24);
                 right = (float)vr / (1 << 24);
             }
-            if (mOutput->stream->set_volume) {
-                mOutput->stream->set_volume(mOutput->stream, left, right);
-            }
+            status_t result = mOutput->stream->setVolume(left, right);
+            ALOGE_IF(result != OK, "Error when setting output stream volume: %d", result);
         }
     }
 }
@@ -5046,13 +5026,15 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::DirectOutputThread::prep
     // if resume is received before pause is executed.
     if (mHwSupportsPause && !mStandby &&
             (doHwPause || (mFlushPending && !mHwPaused && (count != 0)))) {
-        mOutput->stream->pause(mOutput->stream);
+        status_t result = mOutput->stream->pause();
+        ALOGE_IF(result != OK, "Error when pausing output stream: %d", result);
     }
     if (mFlushPending) {
         flushHw_l();
     }
     if (mHwSupportsPause && !mStandby && doHwResume) {
-        mOutput->stream->resume(mOutput->stream);
+        status_t result = mOutput->stream->resume();
+        ALOGE_IF(result != OK, "Error when resuming output stream: %d", result);
     }
     // remove all the tracks that need to be...
     removeTracks_l(*tracksToRemove);
@@ -5190,14 +5172,12 @@ bool AudioFlinger::DirectOutputThread::checkForNewParameter_l(const String8& key
         }
     }
     if (status == NO_ERROR) {
-        status = mOutput->stream->common.set_parameters(&mOutput->stream->common,
-                                                keyValuePair.string());
+        status = mOutput->stream->setParameters(keyValuePair);
         if (!mStandby && status == INVALID_OPERATION) {
             mOutput->standby();
             mStandby = true;
             mBytesWritten = 0;
-            status = mOutput->stream->common.set_parameters(&mOutput->stream->common,
-                                                   keyValuePair.string());
+            status = mOutput->stream->setParameters(keyValuePair);
         }
         if (status == NO_ERROR && reconfig) {
             readOutputParameters_l();
@@ -5584,8 +5564,11 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::OffloadThread::prepareTr
                 // Drain has completed or we are in standby, signal presentation complete
                 if (!(mDrainSequence & 1) || !last || mStandby) {
                     track->mState = TrackBase::STOPPED;
-                    size_t audioHALFrames =
-                            (mOutput->stream->get_latency(mOutput->stream)*mSampleRate) / 1000;
+                    uint32_t latency = 0;
+                    status_t result = mOutput->stream->getLatency(&latency);
+                    ALOGE_IF(result != OK,
+                            "Error when retrieving output stream latency: %d", result);
+                    size_t audioHALFrames = (latency * mSampleRate) / 1000;
                     int64_t framesWritten =
                             mBytesWritten / mOutput->getFrameSize();
                     track->presentationComplete(framesWritten, audioHALFrames);
@@ -5597,16 +5580,15 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::OffloadThread::prepareTr
                 // fill a buffer, then remove it from active list.
                 if (--(track->mRetryCount) <= 0) {
                     bool running = false;
-                    if (mOutput->stream->get_presentation_position != nullptr) {
-                        uint64_t position = 0;
-                        struct timespec unused;
-                        // The running check restarts the retry counter at least once.
-                        int ret = mOutput->stream->get_presentation_position(
-                                mOutput->stream, &position, &unused);
-                        if (ret == NO_ERROR && position != mOffloadUnderrunPosition) {
-                            running = true;
-                            mOffloadUnderrunPosition = position;
-                        }
+                    uint64_t position = 0;
+                    struct timespec unused;
+                    // The running check restarts the retry counter at least once.
+                    status_t ret = mOutput->stream->getPresentationPosition(&position, &unused);
+                    if (ret == NO_ERROR && position != mOffloadUnderrunPosition) {
+                        running = true;
+                        mOffloadUnderrunPosition = position;
+                    }
+                    if (ret == NO_ERROR) {
                         ALOGVV("underrun counter, running(%d): %lld vs %lld", running,
                                 (long long)position, (long long)mOffloadUnderrunPosition);
                     }
@@ -5634,13 +5616,15 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::OffloadThread::prepareTr
     // before flush and then resume HW. This can happen in case of pause/flush/resume
     // if resume is received before pause is executed.
     if (!mStandby && (doHwPause || (mFlushPending && !mHwPaused && (count != 0)))) {
-        mOutput->stream->pause(mOutput->stream);
+        status_t result = mOutput->stream->pause();
+        ALOGE_IF(result != OK, "Error when pausing output stream: %d", result);
     }
     if (mFlushPending) {
         flushHw_l();
     }
     if (!mStandby && doHwResume) {
-        mOutput->stream->resume(mOutput->stream);
+        status_t result = mOutput->stream->resume();
+        ALOGE_IF(result != OK, "Error when resuming output stream: %d", result);
     }
 
     // remove all the tracks that need to be...
@@ -5915,7 +5899,8 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
     readInputParameters_l();
 
     // create an NBAIO source for the HAL input stream, and negotiate
-    mInputSource = new AudioStreamInSource(input->stream);
+    mInputSource = new AudioStreamInSource(
+            static_cast<StreamInHalLocal*>(input->stream.get())->getStream());
     size_t numCounterOffers = 0;
     const NBAIO_Format offers[1] = {Format_from_SR_C(mSampleRate, mChannelCount, mFormat)};
 #if !LOG_NDEBUG
@@ -6304,11 +6289,12 @@ reacquire_wakelock:
         // otherwise use the HAL / AudioStreamIn directly
         } else {
             ATRACE_BEGIN("read");
-            ssize_t bytesRead = mInput->stream->read(mInput->stream,
-                    (uint8_t*)mRsmpInBuffer + rear * mFrameSize, mBufferSize);
+            size_t bytesRead;
+            status_t result = mInput->stream->read(
+                    (uint8_t*)mRsmpInBuffer + rear * mFrameSize, mBufferSize, &bytesRead);
             ATRACE_END();
-            if (bytesRead < 0) {
-                framesRead = bytesRead;
+            if (result < 0) {
+                framesRead = result;
             } else {
                 framesRead = bytesRead / mFrameSize;
             }
@@ -6320,10 +6306,9 @@ reacquire_wakelock:
         mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] = systemTime();
 
         // Update server timestamp with kernel stats
-        if (mInput->stream->get_capture_position != nullptr
-                && mPipeSource.get() == nullptr /* don't obtain for FastCapture, could block */) {
+        if (mPipeSource.get() == nullptr /* don't obtain for FastCapture, could block */) {
             int64_t position, time;
-            int ret = mInput->stream->get_capture_position(mInput->stream, &position, &time);
+            int ret = mInput->stream->getCapturePosition(&position, &time);
             if (ret == NO_ERROR) {
                 mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL] = position;
                 mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL] = time;
@@ -6532,7 +6517,8 @@ void AudioFlinger::RecordThread::inputStandBy()
             sq->end(false /*didModify*/);
         }
     }
-    mInput->stream->common.standby(&mInput->stream->common);
+    status_t result = mInput->stream->standby();
+    ALOGE_IF(result != OK, "Error when putting input stream into standby: %d", result);
 
     // If going into standby, flush the pipe source.
     if (mPipeSource.get() != nullptr) {
@@ -7386,22 +7372,22 @@ bool AudioFlinger::RecordThread::checkForNewParameter_l(const String8& keyValueP
     }
 
     if (status == NO_ERROR) {
-        status = mInput->stream->common.set_parameters(&mInput->stream->common,
-                keyValuePair.string());
+        status = mInput->stream->setParameters(keyValuePair);
         if (status == INVALID_OPERATION) {
             inputStandBy();
-            status = mInput->stream->common.set_parameters(&mInput->stream->common,
-                    keyValuePair.string());
+            status = mInput->stream->setParameters(keyValuePair);
         }
         if (reconfig) {
-            if (status == BAD_VALUE &&
-                audio_is_linear_pcm(mInput->stream->common.get_format(&mInput->stream->common)) &&
-                audio_is_linear_pcm(reqFormat) &&
-                (mInput->stream->common.get_sample_rate(&mInput->stream->common)
-                        <= (AUDIO_RESAMPLER_DOWN_RATIO_MAX * samplingRate)) &&
-                audio_channel_count_from_in_mask(
-                        mInput->stream->common.get_channels(&mInput->stream->common)) <= FCC_8) {
-                status = NO_ERROR;
+            if (status == BAD_VALUE) {
+                uint32_t sRate;
+                audio_channel_mask_t channelMask;
+                audio_format_t format;
+                if (mInput->stream->getAudioProperties(&sRate, &channelMask, &format) == OK &&
+                        audio_is_linear_pcm(format) && audio_is_linear_pcm(reqFormat) &&
+                        sRate <= (AUDIO_RESAMPLER_DOWN_RATIO_MAX * samplingRate) &&
+                        audio_channel_count_from_in_mask(channelMask) <= FCC_8) {
+                    status = NO_ERROR;
+                }
             }
             if (status == NO_ERROR) {
                 readInputParameters_l();
@@ -7416,14 +7402,13 @@ bool AudioFlinger::RecordThread::checkForNewParameter_l(const String8& keyValueP
 String8 AudioFlinger::RecordThread::getParameters(const String8& keys)
 {
     Mutex::Autolock _l(mLock);
-    if (initCheck() != NO_ERROR) {
-        return String8();
+    if (initCheck() == NO_ERROR) {
+        String8 out_s8;
+        if (mInput->stream->getParameters(keys, &out_s8) == OK) {
+            return out_s8;
+        }
     }
-
-    char *s = mInput->stream->common.get_parameters(&mInput->stream->common, keys.string());
-    const String8 out_s8(s);
-    free(s);
-    return out_s8;
+    return String8();
 }
 
 void AudioFlinger::RecordThread::ioConfigChanged(audio_io_config_event event, pid_t pid) {
@@ -7452,19 +7437,16 @@ void AudioFlinger::RecordThread::ioConfigChanged(audio_io_config_event event, pi
 
 void AudioFlinger::RecordThread::readInputParameters_l()
 {
-    mSampleRate = mInput->stream->common.get_sample_rate(&mInput->stream->common);
-    mChannelMask = mInput->stream->common.get_channels(&mInput->stream->common);
+    status_t result = mInput->stream->getAudioProperties(&mSampleRate, &mChannelMask, &mHALFormat);
+    LOG_ALWAYS_FATAL_IF(result != OK, "Error retrieving audio properties from HAL: %d", result);
     mChannelCount = audio_channel_count_from_in_mask(mChannelMask);
-    if (mChannelCount > FCC_8) {
-        ALOGE("HAL channel count %d > %d", mChannelCount, FCC_8);
-    }
-    mHALFormat = mInput->stream->common.get_format(&mInput->stream->common);
+    LOG_ALWAYS_FATAL_IF(mChannelCount > FCC_8, "HAL channel count %d > %d", mChannelCount, FCC_8);
     mFormat = mHALFormat;
-    if (!audio_is_linear_pcm(mFormat)) {
-        ALOGE("HAL format %#x is not linear pcm", mFormat);
-    }
-    mFrameSize = audio_stream_in_frame_size(mInput->stream);
-    mBufferSize = mInput->stream->common.get_buffer_size(&mInput->stream->common);
+    LOG_ALWAYS_FATAL_IF(!audio_is_linear_pcm(mFormat), "HAL format %#x is not linear pcm", mFormat);
+    result = mInput->stream->getFrameSize(&mFrameSize);
+    LOG_ALWAYS_FATAL_IF(result != OK, "Error retrieving frame size from HAL: %d", result);
+    result = mInput->stream->getBufferSize(&mBufferSize);
+    LOG_ALWAYS_FATAL_IF(result != OK, "Error retrieving buffer size from HAL: %d", result);
     mFrameCount = mBufferSize / mFrameSize;
     // This is the formula for calculating the temporary buffer size.
     // With 7 HAL buffers, we can guarantee ability to down-sample the input by ratio of 6:1 to
@@ -7498,11 +7480,11 @@ void AudioFlinger::RecordThread::readInputParameters_l()
 uint32_t AudioFlinger::RecordThread::getInputFramesLost()
 {
     Mutex::Autolock _l(mLock);
-    if (initCheck() != NO_ERROR) {
-        return 0;
+    uint32_t result;
+    if (initCheck() == NO_ERROR && mInput->stream->getInputFramesLost(&result) == OK) {
+        return result;
     }
-
-    return mInput->stream->get_input_frames_lost(mInput->stream);
+    return 0;
 }
 
 // hasAudioSession_l() must be called with ThreadBase::mLock held
@@ -7549,12 +7531,12 @@ AudioFlinger::AudioStreamIn* AudioFlinger::RecordThread::clearInput()
 }
 
 // this method must always be called either with ThreadBase mLock held or inside the thread loop
-audio_stream_t* AudioFlinger::RecordThread::stream() const
+sp<StreamHalInterface> AudioFlinger::RecordThread::stream() const
 {
     if (mInput == NULL) {
         return NULL;
     }
-    return &mInput->stream->common;
+    return mInput->stream;
 }
 
 status_t AudioFlinger::RecordThread::addEffectChain_l(const sp<EffectChain>& chain)
@@ -7646,8 +7628,7 @@ status_t AudioFlinger::RecordThread::createAudioPatch_l(const struct audio_patch
                      (int)patch->sources[0].ext.device.type);
         param.addInt(String8(AUDIO_PARAMETER_STREAM_INPUT_SOURCE),
                                          (int)patch->sinks[0].ext.mix.usecase.source);
-        status = mInput->stream->common.set_parameters(&mInput->stream->common,
-                param.toString().string());
+        status = mInput->stream->setParameters(param.toString());
         *handle = AUDIO_PATCH_HANDLE_NONE;
     }
 
@@ -7671,8 +7652,7 @@ status_t AudioFlinger::RecordThread::releaseAudioPatch_l(const audio_patch_handl
     } else {
         AudioParameter param;
         param.addInt(String8(AUDIO_PARAMETER_STREAM_ROUTING), 0);
-        status = mInput->stream->common.set_parameters(&mInput->stream->common,
-                param.toString().string());
+        status = mInput->stream->setParameters(param.toString());
     }
     return status;
 }

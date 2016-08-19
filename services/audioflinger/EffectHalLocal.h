@@ -24,9 +24,6 @@ namespace android {
 class EffectHalLocal : public EffectHalInterface
 {
   public:
-    // The destructor automatically releases the effect.
-    virtual ~EffectHalLocal();
-
     // Effect process function. Takes input samples as specified
     // in input buffer descriptor and output processed samples as specified
     // in output buffer descriptor.
@@ -43,7 +40,6 @@ class EffectHalLocal : public EffectHalInterface
     // Returns the effect descriptor.
     virtual status_t getDescriptor(effect_descriptor_t *pDescriptor);
 
-    // FIXME: Remove after converting the main audio HAL
     effect_handle_t handle() const { return mHandle; }
 
   private:
@@ -53,6 +49,9 @@ class EffectHalLocal : public EffectHalInterface
 
     // Can not be constructed directly by clients.
     explicit EffectHalLocal(effect_handle_t handle);
+
+    // The destructor automatically releases the effect.
+    virtual ~EffectHalLocal();
 };
 
 } // namespace android

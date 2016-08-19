@@ -23,7 +23,6 @@
 #include <audio_utils/spdif/SPDIFEncoder.h>
 
 #include "AudioHwDevice.h"
-#include "AudioStreamOut.h"
 #include "SpdifStreamOut.h"
 
 namespace android {

@@ -27,6 +27,7 @@ namespace android {
 
 class AudioHwDevice;
 class DeviceHalInterface;
+class StreamOutHalInterface;
 
 /**
  * Managed access to a HAL output stream.
@@ -37,7 +38,7 @@ public:
 // For emphasis, we could also make all pointers to them be "const *",
 // but that would clutter the code unnecessarily.
     AudioHwDevice * const audioHwDev;
-    audio_stream_out_t *stream;
+    sp<StreamOutHalInterface> stream;
     const audio_output_flags_t flags;
 
     sp<DeviceHalInterface> hwDev() const;
@@ -50,7 +51,7 @@ public:
             struct audio_config *config,
             const char *address);
 
-    virtual ~AudioStreamOut() { }
+    virtual ~AudioStreamOut();
 
     // Get the bottom 32-bits of the 64-bit render position.
     status_t getRenderPosition(uint32_t *frames);

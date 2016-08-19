@@ -24,12 +24,12 @@
 
 namespace android {
 
+class StreamInHalInterface;
+class StreamOutHalInterface;
+
 class DeviceHalInterface : public RefBase
 {
   public:
-    // The destructor automatically closes the device.
-    virtual ~DeviceHalInterface() {}
-
     // Sets the value of 'devices' to a bitmask of 1 or more values of audio_devices_t.
     virtual status_t getSupportedDevices(uint32_t *devices) = 0;
 
@@ -69,26 +69,24 @@ class DeviceHalInterface : public RefBase
 
     // Creates and opens the audio hardware output stream. The stream is closed
     // by releasing all references to the returned object.
-    // FIXME: Enable when StreamOutHalInterface is introduced.
-    // virtual status_t openOutputStream(
-    //         audio_io_handle_t handle,
-    //         audio_devices_t devices,
-    //         audio_output_flags_t flags,
-    //         struct audio_config *config,
-    //         const char *address,
-    //         sp<StreamOutHalInterface> *outStream) = 0;
+    virtual status_t openOutputStream(
+            audio_io_handle_t handle,
+            audio_devices_t devices,
+            audio_output_flags_t flags,
+            struct audio_config *config,
+            const char *address,
+            sp<StreamOutHalInterface> *outStream) = 0;
 
     // Creates and opens the audio hardware input stream. The stream is closed
     // by releasing all references to the returned object.
-    // FIXME: Enable when StreamInHalInterface is introduced.
-    // virtual status_t openInputStream(
-    //         audio_io_handle_t handle,
-    //         audio_devices_t devices,
-    //         struct audio_config *config,
-    //         audio_input_flags_t flags,
-    //         const char *address,
-    //         audio_source_t source,
-    //         sp<StreamInHalInterface> *inStream) = 0;
+    virtual status_t openInputStream(
+            audio_io_handle_t handle,
+            audio_devices_t devices,
+            struct audio_config *config,
+            audio_input_flags_t flags,
+            const char *address,
+            audio_source_t source,
+            sp<StreamInHalInterface> *inStream) = 0;
 
     // Creates an audio patch between several source and sink ports.
     virtual status_t createAudioPatch(
@@ -112,6 +110,9 @@ class DeviceHalInterface : public RefBase
   protected:
     // Subclasses can not be constructed directly by clients.
     DeviceHalInterface() {}
+
+    // The destructor automatically closes the device.
+    virtual ~DeviceHalInterface() {}
 };
 
 } // namespace android

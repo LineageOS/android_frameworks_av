@@ -24,9 +24,8 @@
 #include "AudioHwDevice.h"
 #include "AudioStreamOut.h"
 #include "DeviceHalInterface.h"
+#include "StreamHalInterface.h"
 
-// FIXME: Remove after streams HAL is componentized
-#include "DeviceHalLocal.h"
 
 namespace android {
 
@@ -44,6 +43,10 @@ AudioStreamOut::AudioStreamOut(AudioHwDevice *dev, audio_output_flags_t flags)
 {
 }
 
+AudioStreamOut::~AudioStreamOut()
+{
+}
+
 sp<DeviceHalInterface> AudioStreamOut::hwDev() const
 {
     return audioHwDev->hwDevice();
@@ -51,12 +54,12 @@ sp<DeviceHalInterface> AudioStreamOut::hwDev() const
 
 status_t AudioStreamOut::getRenderPosition(uint64_t *frames)
 {
-    if (stream == NULL) {
+    if (stream == 0) {
         return NO_INIT;
     }
 
     uint32_t halPosition = 0;
-    status_t status = stream->get_render_position(stream, &halPosition);
+    status_t status = stream->getRenderPosition(&halPosition);
     if (status != NO_ERROR) {
         return status;
     }
@@ -88,12 +91,12 @@ status_t AudioStreamOut::getRenderPosition(uint32_t *frames)
 
 status_t AudioStreamOut::getPresentationPosition(uint64_t *frames, struct timespec *timestamp)
 {
-    if (stream == NULL) {
+    if (stream == 0) {
         return NO_INIT;
     }
 
     uint64_t halPosition = 0;
-    status_t status = stream->get_presentation_position(stream, &halPosition, timestamp);
+    status_t status = stream->getPresentationPosition(&halPosition, timestamp);
     if (status != NO_ERROR) {
         return status;
     }
@@ -119,13 +122,13 @@ status_t AudioStreamOut::open(
         struct audio_config *config,
         const char *address)
 {
-    audio_stream_out_t *outStream;
+    sp<StreamOutHalInterface> outStream;
 
     audio_output_flags_t customFlags = (config->format == AUDIO_FORMAT_IEC61937)
                 ? (audio_output_flags_t)(flags | AUDIO_OUTPUT_FLAG_IEC958_NONAUDIO)
                 : flags;
 
-    int status = static_cast<DeviceHalLocal*>(hwDev().get())->openOutputStream(
+    int status = hwDev()->openOutputStream(
             handle,
             devices,
             customFlags,
@@ -135,7 +138,7 @@ status_t AudioStreamOut::open(
     ALOGV("AudioStreamOut::open(), HAL returned "
             " stream %p, sampleRate %d, Format %#x, "
             "channelMask %#x, status %d",
-            outStream,
+            outStream.get(),
             config->sample_rate,
             config->format,
             config->channel_mask,
@@ -147,7 +150,7 @@ status_t AudioStreamOut::open(
         struct audio_config customConfig = *config;
         customConfig.format = AUDIO_FORMAT_PCM_16_BIT;
 
-        status = static_cast<DeviceHalLocal*>(hwDev().get())->openOutputStream(
+        status = hwDev()->openOutputStream(
                 handle,
                 devices,
                 customFlags,
@@ -160,7 +163,7 @@ status_t AudioStreamOut::open(
     if (status == NO_ERROR) {
         stream = outStream;
         mHalFormatHasProportionalFrames = audio_has_proportional_frames(config->format);
-        mHalFrameSize = audio_stream_out_frame_size(stream);
+        status = stream->getFrameSize(&mHalFrameSize);
     }
 
     return status;
@@ -168,47 +171,46 @@ status_t AudioStreamOut::open(
 
 audio_format_t AudioStreamOut::getFormat() const
 {
-    return stream->common.get_format(&stream->common);
+    audio_format_t result;
+    return stream->getFormat(&result) == OK ? result : AUDIO_FORMAT_INVALID;
 }
 
 uint32_t AudioStreamOut::getSampleRate() const
 {
-    return stream->common.get_sample_rate(&stream->common);
+    uint32_t result;
+    return stream->getSampleRate(&result) == OK ? result : 0;
 }
 
 audio_channel_mask_t AudioStreamOut::getChannelMask() const
 {
-    return stream->common.get_channels(&stream->common);
+    audio_channel_mask_t result;
+    return stream->getChannelMask(&result) == OK ? result : AUDIO_CHANNEL_INVALID;
 }
 
 int AudioStreamOut::flush()
 {
-    ALOG_ASSERT(stream != NULL);
     mRenderPosition = 0;
     mFramesWritten = 0;
     mFramesWrittenAtStandby = 0;
-    if (stream->flush != NULL) {
-        return stream->flush(stream);
-    }
-    return NO_ERROR;
+    status_t result = stream->flush();
+    return result != INVALID_OPERATION ? result : NO_ERROR;
 }
 
 int AudioStreamOut::standby()
 {
-    ALOG_ASSERT(stream != NULL);
     mRenderPosition = 0;
     mFramesWrittenAtStandby = mFramesWritten;
-    return stream->common.standby(&stream->common);
+    return stream->standby();
 }
 
 ssize_t AudioStreamOut::write(const void *buffer, size_t numBytes)
 {
-    ALOG_ASSERT(stream != NULL);
-    ssize_t bytesWritten = stream->write(stream, buffer, numBytes);
-    if (bytesWritten > 0 && mHalFrameSize > 0) {
+    size_t bytesWritten;
+    status_t result = stream->write(buffer, numBytes, &bytesWritten);
+    if (result == OK && bytesWritten > 0 && mHalFrameSize > 0) {
         mFramesWritten += bytesWritten / mHalFrameSize;
     }
-    return bytesWritten;
+    return result == OK ? bytesWritten : result;
 }
 
 } // namespace android

@@ -151,7 +151,7 @@ DownmixerBufferProvider::DownmixerBufferProvider(
         return;
     }
     mEffectsFactory = EffectsFactoryHalInterface::create();
-    if (mEffectsFactory.get() == NULL) {
+    if (mEffectsFactory == 0) {
         ALOGE("DownmixerBufferProvider() error: could not obtain the effects factory");
         return;
     }
@@ -257,7 +257,7 @@ void DownmixerBufferProvider::copyFrames(void *dst, const void *src, size_t fram
 {
     // find multichannel downmix effect if we have to play multichannel content
     sp<EffectsFactoryHalInterface> effectsFactory = EffectsFactoryHalInterface::create();
-    if (effectsFactory.get() == NULL) {
+    if (effectsFactory == 0) {
         ALOGE("AudioMixer() error: could not obtain the effects factory");
         return NO_INIT;
     }
