@@ -21,13 +21,13 @@
 
 #include <audio_utils/primitives.h>
 
-#include <media/stagefright/foundation/ABuffer.h>
+#include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AUtils.h>
 
 namespace android {
 
-status_t DataConverter::convert(const sp<ABuffer> &source, sp<ABuffer> &target) {
+status_t DataConverter::convert(const sp<MediaCodecBuffer> &source, sp<MediaCodecBuffer> &target) {
     CHECK(source->base() != target->base());
     size_t size = targetSize(source->size());
     status_t err = OK;
@@ -43,7 +43,8 @@ status_t DataConverter::convert(const sp<ABuffer> &source, sp<ABuffer> &target) 
     return err;
 }
 
-status_t DataConverter::safeConvert(const sp<ABuffer> &source, sp<ABuffer> &target) {
+status_t DataConverter::safeConvert(
+        const sp<MediaCodecBuffer> &source, sp<MediaCodecBuffer> &target) {
     memcpy(target->base(), source->data(), source->size());
     return OK;
 }
@@ -101,7 +102,7 @@ AudioConverter* AudioConverter::Create(AudioEncoding source, AudioEncoding targe
     return NULL;
 }
 
-status_t AudioConverter::safeConvert(const sp<ABuffer> &src, sp<ABuffer> &tgt) {
+status_t AudioConverter::safeConvert(const sp<MediaCodecBuffer> &src, sp<MediaCodecBuffer> &tgt) {
     if (mTo == kAudioEncodingPcm8bit && mFrom == kAudioEncodingPcm16bit) {
         memcpy_to_u8_from_i16((uint8_t*)tgt->base(), (const int16_t*)src->data(), src->size() / 2);
     } else if (mTo == kAudioEncodingPcm8bit && mFrom == kAudioEncodingPcmFloat) {

@@ -27,6 +27,7 @@ namespace android {
 struct ABuffer;
 struct MediaCodec;
 class MediaBuffer;
+class MediaCodecBuffer;
 class Surface;
 
 struct NuPlayer::DecoderBase : public AHandler {
@@ -42,7 +43,7 @@ struct NuPlayer::DecoderBase : public AHandler {
     void setRenderer(const sp<Renderer> &renderer);
     virtual status_t setVideoSurface(const sp<Surface> &) { return INVALID_OPERATION; }
 
-    status_t getInputBuffers(Vector<sp<ABuffer> > *dstBuffers) const;
+    status_t getInputBuffers(Vector<sp<MediaCodecBuffer> > *dstBuffers) const;
     void signalFlush();
     void signalResume(bool notifyComplete);
     void initiateShutdown();
@@ -70,7 +71,7 @@ protected:
     virtual void onConfigure(const sp<AMessage> &format) = 0;
     virtual void onSetParameters(const sp<AMessage> &params) = 0;
     virtual void onSetRenderer(const sp<Renderer> &renderer) = 0;
-    virtual void onGetInputBuffers(Vector<sp<ABuffer> > *dstBuffers) = 0;
+    virtual void onGetInputBuffers(Vector<sp<MediaCodecBuffer> > *dstBuffers) = 0;
     virtual void onResume(bool notifyComplete) = 0;
     virtual void onFlush() = 0;
     virtual void onShutdown(bool notifyComplete) = 0;

@@ -25,9 +25,9 @@
 
 namespace android {
 
-struct ABuffer;
 class  AWakeLock;
 struct MediaClock;
+class MediaCodecBuffer;
 struct VideoFrameScheduler;
 
 struct NuPlayer::Renderer : public AHandler {
@@ -46,7 +46,7 @@ struct NuPlayer::Renderer : public AHandler {
 
     void queueBuffer(
             bool audio,
-            const sp<ABuffer> &buffer,
+            const sp<MediaCodecBuffer> &buffer,
             const sp<AMessage> &notifyConsumed);
 
     void queueEOS(bool audio, status_t finalResult);
@@ -125,7 +125,7 @@ private:
     };
 
     struct QueueEntry {
-        sp<ABuffer> mBuffer;
+        sp<MediaCodecBuffer> mBuffer;
         sp<AMessage> mNotifyConsumed;
         size_t mOffset;
         status_t mFinalResult;

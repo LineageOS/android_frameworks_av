@@ -17,7 +17,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "ZeroFilter"
 
-#include <media/stagefright/foundation/ABuffer.h>
+#include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 
@@ -38,7 +38,7 @@ status_t ZeroFilter::setParameters(const sp<AMessage> &msg) {
 }
 
 status_t ZeroFilter::processBuffers(
-        const sp<ABuffer> &srcBuffer, const sp<ABuffer> &outBuffer) {
+        const sp<MediaCodecBuffer> &srcBuffer, const sp<MediaCodecBuffer> &outBuffer) {
     // assuming identical input & output buffers, since we're a copy filter
     if (mInvertData) {
         uint32_t* src = (uint32_t*)srcBuffer->data();

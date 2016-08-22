@@ -24,6 +24,7 @@
 #include <gui/IGraphicBufferProducer.h>
 #include <gui/Surface.h>
 #include <media/ICrypto.h>
+#include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
@@ -689,7 +690,7 @@ status_t MediaCodecSource::feedEncoderInputBuffers() {
 #endif // DEBUG_DRIFT_TIME
             }
 
-            sp<ABuffer> inbuf;
+            sp<MediaCodecBuffer> inbuf;
             status_t err = mEncoder->getInputBuffer(bufferIndex, &inbuf);
             if (err != OK || inbuf == NULL) {
                 mbuf->release();
@@ -851,7 +852,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
                 break;
             }
 
-            sp<ABuffer> outbuf;
+            sp<MediaCodecBuffer> outbuf;
             status_t err = mEncoder->getOutputBuffer(index, &outbuf);
             if (err != OK || outbuf == NULL) {
                 signalEOS();

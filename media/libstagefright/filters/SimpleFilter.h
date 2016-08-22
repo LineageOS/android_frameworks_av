@@ -21,10 +21,10 @@
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 
-struct ABuffer;
-struct AMessage;
-
 namespace android {
+
+struct AMessage;
+class MediaCodecBuffer;
 
 struct SimpleFilter : public RefBase {
 public:
@@ -37,7 +37,7 @@ public:
     virtual void reset() = 0;
     virtual status_t setParameters(const sp<AMessage> &msg) = 0;
     virtual status_t processBuffers(
-            const sp<ABuffer> &srcBuffer, const sp<ABuffer> &outBuffer) = 0;
+            const sp<MediaCodecBuffer> &srcBuffer, const sp<MediaCodecBuffer> &outBuffer) = 0;
 
 protected:
     int32_t mWidth, mHeight;

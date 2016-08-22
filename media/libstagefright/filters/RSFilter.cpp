@@ -19,7 +19,7 @@
 
 #include <utils/Log.h>
 
-#include <media/stagefright/foundation/ABuffer.h>
+#include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 
@@ -85,7 +85,7 @@ status_t RSFilter::setParameters(const sp<AMessage> &msg) {
 }
 
 status_t RSFilter::processBuffers(
-        const sp<ABuffer> &srcBuffer, const sp<ABuffer> &outBuffer) {
+        const sp<MediaCodecBuffer> &srcBuffer, const sp<MediaCodecBuffer> &outBuffer) {
     mAllocIn->copy1DRangeFrom(0, mWidth * mHeight, srcBuffer->data());
     mCallback->processBuffers(mAllocIn.get(), mAllocOut.get());
     mAllocOut->copy1DRangeTo(0, mWidth * mHeight, outBuffer->data());

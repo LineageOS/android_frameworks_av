@@ -35,6 +35,7 @@ struct AString;
 struct CodecBase;
 struct IBatteryStats;
 struct ICrypto;
+class MediaCodecBuffer;
 class IMemory;
 struct MemoryDealer;
 class IResourceManagerClient;
@@ -149,14 +150,14 @@ struct MediaCodec : public AHandler {
     status_t getOutputFormat(sp<AMessage> *format) const;
     status_t getInputFormat(sp<AMessage> *format) const;
 
-    status_t getWidevineLegacyBuffers(Vector<sp<ABuffer> > *buffers) const;
+    status_t getWidevineLegacyBuffers(Vector<sp<MediaCodecBuffer> > *buffers) const;
 
-    status_t getInputBuffers(Vector<sp<ABuffer> > *buffers) const;
-    status_t getOutputBuffers(Vector<sp<ABuffer> > *buffers) const;
+    status_t getInputBuffers(Vector<sp<MediaCodecBuffer> > *buffers) const;
+    status_t getOutputBuffers(Vector<sp<MediaCodecBuffer> > *buffers) const;
 
-    status_t getOutputBuffer(size_t index, sp<ABuffer> *buffer);
+    status_t getOutputBuffer(size_t index, sp<MediaCodecBuffer> *buffer);
     status_t getOutputFormat(size_t index, sp<AMessage> *format);
-    status_t getInputBuffer(size_t index, sp<ABuffer> *buffer);
+    status_t getInputBuffer(size_t index, sp<MediaCodecBuffer> *buffer);
 
     status_t setSurface(const sp<Surface> &nativeWindow);
 
@@ -253,10 +254,10 @@ private:
 
     struct BufferInfo {
         uint32_t mBufferID;
-        sp<ABuffer> mData;
+        sp<MediaCodecBuffer> mData;
         sp<NativeHandle> mNativeHandle;
         sp<RefBase> mMemRef;
-        sp<ABuffer> mEncryptedData;
+        sp<MediaCodecBuffer> mEncryptedData;
         sp<IMemory> mSharedEncryptedBuffer;
         sp<AMessage> mNotify;
         sp<AMessage> mFormat;
@@ -367,7 +368,7 @@ private:
 
     status_t getBufferAndFormat(
             size_t portIndex, size_t index,
-            sp<ABuffer> *buffer, sp<AMessage> *format);
+            sp<MediaCodecBuffer> *buffer, sp<AMessage> *format);
 
     bool handleDequeueInputBuffer(const sp<AReplyToken> &replyID, bool newRequest = false);
     bool handleDequeueOutputBuffer(const sp<AReplyToken> &replyID, bool newRequest = false);
@@ -389,7 +390,7 @@ private:
 
     status_t onSetParameters(const sp<AMessage> &params);
 
-    status_t amendOutputFormatWithCodecSpecificData(const sp<ABuffer> &buffer);
+    status_t amendOutputFormatWithCodecSpecificData(const sp<MediaCodecBuffer> &buffer);
     void updateBatteryStat();
     bool isExecuting() const;
 

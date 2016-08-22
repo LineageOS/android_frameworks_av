@@ -23,6 +23,8 @@
 
 namespace android {
 
+class MediaCodecBuffer;
+
 struct NuPlayer::Decoder : public DecoderBase {
     Decoder(const sp<AMessage> &notify,
             const sp<Source> &source,
@@ -44,7 +46,7 @@ protected:
     virtual void onConfigure(const sp<AMessage> &format);
     virtual void onSetParameters(const sp<AMessage> &params);
     virtual void onSetRenderer(const sp<Renderer> &renderer);
-    virtual void onGetInputBuffers(Vector<sp<ABuffer> > *dstBuffers);
+    virtual void onGetInputBuffers(Vector<sp<MediaCodecBuffer> > *dstBuffers);
     virtual void onResume(bool notifyComplete);
     virtual void onFlush();
     virtual void onShutdown(bool notifyComplete);
@@ -74,8 +76,8 @@ private:
 
     List<sp<AMessage> > mPendingInputMessages;
 
-    Vector<sp<ABuffer> > mInputBuffers;
-    Vector<sp<ABuffer> > mOutputBuffers;
+    Vector<sp<MediaCodecBuffer> > mInputBuffers;
+    Vector<sp<MediaCodecBuffer> > mOutputBuffers;
     Vector<sp<ABuffer> > mCSDsForCurrentFormat;
     Vector<sp<ABuffer> > mCSDsToSubmit;
     Vector<bool> mInputBufferIsDequeued;

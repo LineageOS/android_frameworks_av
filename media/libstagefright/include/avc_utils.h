@@ -18,6 +18,7 @@
 
 #define AVC_UTILS_H_
 
+#include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <utils/Errors.h>
 
@@ -84,6 +85,7 @@ class MetaData;
 sp<MetaData> MakeAVCCodecSpecificData(const sp<ABuffer> &accessUnit);
 
 bool IsIDR(const sp<ABuffer> &accessUnit);
+bool IsIDR(const sp<MediaCodecBuffer> &accessUnit);
 bool IsAVCReferenceFrame(const sp<ABuffer> &accessUnit);
 uint32_t FindAVCLayerId(const uint8_t *data, size_t size);
 

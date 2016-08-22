@@ -24,18 +24,18 @@
 
 namespace android {
 
-struct ABuffer;
+class MediaCodecBuffer;
 
 // DataConverter base class, defaults to memcpy
 struct DataConverter : public RefBase {
     virtual size_t sourceSize(size_t targetSize); // will clamp to SIZE_MAX
     virtual size_t targetSize(size_t sourceSize); // will clamp to SIZE_MAX
 
-    status_t convert(const sp<ABuffer> &source, sp<ABuffer> &target);
+    status_t convert(const sp<MediaCodecBuffer> &source, sp<MediaCodecBuffer> &target);
     virtual ~DataConverter();
 
 protected:
-    virtual status_t safeConvert(const sp<ABuffer> &source, sp<ABuffer> &target);
+    virtual status_t safeConvert(const sp<MediaCodecBuffer> &source, sp<MediaCodecBuffer> &target);
 };
 
 // SampleConverterBase uses a ratio to calculate the source and target sizes
@@ -45,7 +45,7 @@ struct SampleConverterBase : public DataConverter {
     virtual size_t targetSize(size_t sourceSize);
 
 protected:
-    virtual status_t safeConvert(const sp<ABuffer> &source, sp<ABuffer> &target) = 0;
+    virtual status_t safeConvert(const sp<MediaCodecBuffer> &source, sp<MediaCodecBuffer> &target) = 0;
 
     // sourceSize = sourceSampleSize / targetSampleSize * targetSize
     SampleConverterBase(uint32_t sourceSampleSize, uint32_t targetSampleSize)
@@ -61,7 +61,7 @@ struct AudioConverter : public SampleConverterBase {
     static AudioConverter *Create(AudioEncoding source, AudioEncoding target);
 
 protected:
-    virtual status_t safeConvert(const sp<ABuffer> &src, sp<ABuffer> &tgt);
+    virtual status_t safeConvert(const sp<MediaCodecBuffer> &source, sp<MediaCodecBuffer> &target);
 
 private:
     AudioConverter(

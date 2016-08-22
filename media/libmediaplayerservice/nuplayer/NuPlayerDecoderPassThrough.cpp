@@ -25,6 +25,7 @@
 #include "NuPlayerSource.h"
 
 #include <media/ICrypto.h>
+#include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -93,7 +94,7 @@ void NuPlayer::DecoderPassThrough::onSetRenderer(
 }
 
 void NuPlayer::DecoderPassThrough::onGetInputBuffers(
-        Vector<sp<ABuffer> > * /* dstBuffers */) {
+        Vector<sp<MediaCodecBuffer> > * /* dstBuffers */) {
     ALOGE("onGetInputBuffers() called unexpectedly");
 }
 
@@ -289,8 +290,12 @@ void NuPlayer::DecoderPassThrough::onInputBufferFetched(
         return;
     }
 
-    sp<ABuffer> buffer;
-    bool hasBuffer = msg->findBuffer("buffer", &buffer);
+    sp<RefBase> obj;
+    bool hasBuffer = msg->findObject("buffer", &obj);
+    sp<MediaCodecBuffer> buffer;
+    if (hasBuffer) {
+        buffer = static_cast<MediaCodecBuffer *>(obj.get());
+    }
     if (buffer == NULL) {
         int32_t streamErr = ERROR_END_OF_STREAM;
         CHECK(msg->findInt32("err", &streamErr) || !hasBuffer);

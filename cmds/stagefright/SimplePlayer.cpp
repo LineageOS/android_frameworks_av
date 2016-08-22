@@ -25,6 +25,7 @@
 #include <media/AudioTrack.h>
 #include <media/ICrypto.h>
 #include <media/IMediaHTTPService.h>
+#include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -355,7 +356,7 @@ status_t SimplePlayer::onPrepare() {
             err = state->mCodec->dequeueInputBuffer(&index, -1ll);
             CHECK_EQ(err, (status_t)OK);
 
-            const sp<ABuffer> &dstBuffer = state->mBuffers[0].itemAt(index);
+            const sp<MediaCodecBuffer> &dstBuffer = state->mBuffers[0].itemAt(index);
 
             CHECK_LE(srcBuffer->size(), dstBuffer->capacity());
             dstBuffer->setRange(0, srcBuffer->size());
@@ -482,11 +483,13 @@ status_t SimplePlayer::onDoMoreStuff() {
             state->mAvailInputBufferIndices.erase(
                     state->mAvailInputBufferIndices.begin());
 
-            const sp<ABuffer> &dstBuffer =
+            const sp<MediaCodecBuffer> &dstBuffer =
                 state->mBuffers[0].itemAt(index);
+            sp<ABuffer> abuffer = new ABuffer(dstBuffer->base(), dstBuffer->capacity());
 
-            err = mExtractor->readSampleData(dstBuffer);
+            err = mExtractor->readSampleData(abuffer);
             CHECK_EQ(err, (status_t)OK);
+            dstBuffer->setRange(abuffer->offset(), abuffer->size());
 
             int64_t timeUs;
             CHECK_EQ(mExtractor->getSampleTime(&timeUs), (status_t)OK);
@@ -530,7 +533,7 @@ status_t SimplePlayer::onDoMoreStuff() {
                     state->mCodec->releaseOutputBuffer(info->mIndex);
                 } else {
                     if (state->mAudioTrack != NULL) {
-                        const sp<ABuffer> &srcBuffer =
+                        const sp<MediaCodecBuffer> &srcBuffer =
                             state->mBuffers[1].itemAt(info->mIndex);
 
                         renderAudio(state, info, srcBuffer);
@@ -597,7 +600,7 @@ status_t SimplePlayer::onOutputFormatChanged(
 }
 
 void SimplePlayer::renderAudio(
-        CodecState *state, BufferInfo *info, const sp<ABuffer> &buffer) {
+        CodecState *state, BufferInfo *info, const sp<MediaCodecBuffer> &buffer) {
     CHECK(state->mAudioTrack != NULL);
 
     if (state->mAudioTrack->stopped()) {

@@ -38,7 +38,7 @@ protected:
     virtual void onConfigure(const sp<AMessage> &format);
     virtual void onSetParameters(const sp<AMessage> &params);
     virtual void onSetRenderer(const sp<Renderer> &renderer);
-    virtual void onGetInputBuffers(Vector<sp<ABuffer> > *dstBuffers);
+    virtual void onGetInputBuffers(Vector<sp<MediaCodecBuffer> > *dstBuffers);
     virtual void onResume(bool notifyComplete);
     virtual void onFlush();
     virtual void onShutdown(bool notifyComplete);

@@ -43,6 +43,7 @@ LOCAL_SRC_FILES += \
     IResourceManagerClient.cpp \
     IResourceManagerService.cpp \
     IStreamSource.cpp \
+    MediaCodecBuffer.cpp \
     MediaCodecInfo.cpp \
     MediaDefs.cpp \
     MediaUtils.cpp \

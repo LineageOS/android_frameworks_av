@@ -35,6 +35,7 @@
 namespace android {
 
 struct ABuffer;
+class MediaCodecBuffer;
 struct MemoryDealer;
 struct DescribeColorFormat2Params;
 struct DataConverter;
@@ -74,7 +75,7 @@ struct ACodec : public AHierarchicalStateMachine, public CodecBase {
     struct PortDescription : public CodecBase::PortDescription {
         size_t countBuffers();
         IOMX::buffer_id bufferIDAt(size_t index) const;
-        sp<ABuffer> bufferAt(size_t index) const;
+        sp<MediaCodecBuffer> bufferAt(size_t index) const;
         sp<NativeHandle> handleAt(size_t index) const;
         sp<RefBase> memRefAt(size_t index) const;
 
@@ -82,13 +83,13 @@ struct ACodec : public AHierarchicalStateMachine, public CodecBase {
         friend struct ACodec;
 
         Vector<IOMX::buffer_id> mBufferIDs;
-        Vector<sp<ABuffer> > mBuffers;
+        Vector<sp<MediaCodecBuffer>> mBuffers;
         Vector<sp<NativeHandle> > mHandles;
         Vector<sp<RefBase> > mMemRefs;
 
         PortDescription();
         void addBuffer(
-                IOMX::buffer_id id, const sp<ABuffer> &buffer,
+                IOMX::buffer_id id, const sp<MediaCodecBuffer> &buffer,
                 const sp<NativeHandle> &handle, const sp<RefBase> &memRef);
 
         DISALLOW_EVIL_CONSTRUCTORS(PortDescription);
@@ -186,11 +187,12 @@ private:
         Status mStatus;
         unsigned mDequeuedAt;
 
-        sp<ABuffer> mData;      // the client's buffer; if not using data conversion, this is the
-                                // codec buffer; otherwise, it is allocated separately
-        sp<RefBase> mMemRef;    // and a reference to the IMemory, so it does not go away
-        sp<ABuffer> mCodecData; // the codec's buffer
-        sp<RefBase> mCodecRef;  // and a reference to the IMemory
+        sp<MediaCodecBuffer> mData;  // the client's buffer; if not using data conversion, this is
+                                     // the codec buffer; otherwise, it is allocated separately
+        sp<RefBase> mMemRef;         // and a reference to the IMemory, so it does not go away
+        sp<MediaCodecBuffer> mCodecData;  // the codec's buffer
+        sp<RefBase> mCodecRef;            // and a reference to the IMemory
+
         sp<GraphicBuffer> mGraphicBuffer;
         sp<NativeHandle> mNativeHandle;
         int mFenceFd;
@@ -204,6 +206,8 @@ private:
         // Log error, if the current fence is not a read/write fence.
         void checkReadFence(const char *dbg);
         void checkWriteFence(const char *dbg);
+
+        sp<MediaCodecBuffer> alloc(const sp<AMessage> &format);
     };
 
     static const char *_asString(BufferInfo::Status s);
