@@ -99,11 +99,12 @@ void DrmListener::notify(DrmPlugin::EventType eventType, int extra, const Parcel
             break;
         default:
             ALOGE("Invalid event DrmPlugin::EventType %d, ignored", (int)eventType);
-            return;
+            goto cleanup;
     }
 
     (*mListener)(mObj, &sessionId, ndkEventType, extra, data, dataSize);
 
+ cleanup:
     delete [] sessionId.ptr;
     delete [] data;
 }
