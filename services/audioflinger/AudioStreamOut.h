@@ -23,8 +23,6 @@
 
 #include <system/audio.h>
 
-#include "AudioStreamOut.h"
-
 namespace android {
 
 class AudioHwDevice;
