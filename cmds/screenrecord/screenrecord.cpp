@@ -68,6 +68,7 @@ static const char* kMimeTypeAvc = "video/avc";
 // Command-line parameters.
 static bool gVerbose = false;           // chatty on stdout
 static bool gRotate = false;            // rotate 90 degrees
+static bool gMonotonicTime = false;     // use system monotonic time for timestamps
 static enum {
     FORMAT_MP4, FORMAT_H264, FORMAT_FRAMES, FORMAT_RAW_FRAMES
 } gOutputFormat = FORMAT_MP4;           // data format for output
@@ -609,7 +610,7 @@ static status_t recordScreen(const char* fileName) {
     sp<Overlay> overlay;
     if (gWantFrameTime) {
         // Send virtual display frames to an external texture.
-        overlay = new Overlay();
+        overlay = new Overlay(gMonotonicTime);
         err = overlay->start(encoderInputSurface, &bufferProducer);
         if (err != NO_ERROR) {
             if (encoder != NULL) encoder->release();
@@ -892,6 +893,7 @@ int main(int argc, char* const argv[]) {
         { "show-frame-time",    no_argument,        NULL, 'f' },
         { "rotate",             no_argument,        NULL, 'r' },
         { "output-format",      required_argument,  NULL, 'o' },
+        { "monotonic-time",     no_argument,        NULL, 'm' },
         { NULL,                 0,                  NULL, 0 }
     };
 
@@ -970,6 +972,9 @@ int main(int argc, char* const argv[]) {
                 fprintf(stderr, "Unknown format '%s'\n", optarg);
                 return 2;
             }
+            break;
+        case 'm':
+            gMonotonicTime = true;
             break;
         default:
             if (ic != '?') {

@@ -259,6 +259,11 @@ void Overlay::getTimeString_l(nsecs_t monotonicNsec, char* buf, size_t bufLen) {
     const char* format = "%T";
     struct tm tm;
 
+    if (mUseMonotonicTimestamps) {
+        snprintf(buf, bufLen, "%" PRId64, monotonicNsec);
+        return;
+    }
+
     // localtime/strftime is not the fastest way to do this, but a trivial
     // benchmark suggests that the cost is negligible.
     int64_t realTime = mStartRealtimeNsecs +

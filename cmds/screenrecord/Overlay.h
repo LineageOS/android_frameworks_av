@@ -37,7 +37,7 @@ namespace android {
  */
 class Overlay : public GLConsumer::FrameAvailableListener, Thread {
 public:
-    Overlay() : Thread(false),
+    Overlay(bool monotonicTimestamps) : Thread(false),
         mThreadResult(UNKNOWN_ERROR),
         mState(UNINITIALIZED),
         mFrameAvailable(false),
@@ -45,7 +45,8 @@ public:
         mStartMonotonicNsecs(0),
         mStartRealtimeNsecs(0),
         mLastFrameNumber(-1),
-        mTotalDroppedFrames(0)
+        mTotalDroppedFrames(0),
+        mUseMonotonicTimestamps(monotonicTimestamps)
         {}
 
     // Creates a thread that performs the overlay.  Pass in the surface that
@@ -150,6 +151,8 @@ private:
     // Used for tracking dropped frames.
     nsecs_t mLastFrameNumber;
     size_t mTotalDroppedFrames;
+
+    bool mUseMonotonicTimestamps;
 
     static const char* kPropertyNames[];
 };
