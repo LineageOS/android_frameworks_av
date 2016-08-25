@@ -925,9 +925,9 @@ Status CameraService::validateConnectLocked(const String8& cameraId,
         const String8& clientName8, /*inout*/int& clientUid, /*inout*/int& clientPid,
         /*out*/int& originalClientPid) const {
 
-#if !defined(__BRILLO__)
     Status allowed = validateClientPermissionsLocked(cameraId, clientName8, clientUid, clientPid,
             originalClientPid);
+#if !defined(__BRILLO__)
     if (!allowed.isOk()) {
         return allowed;
     }
