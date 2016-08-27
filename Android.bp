@@ -1,0 +1,4 @@
+subdirs = [
+    "media/libmedia",
+    "media/libstagefright/foundation",
+]
