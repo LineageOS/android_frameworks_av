@@ -12,6 +12,25 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * This file was modified by Dolby Laboratories, Inc. The portions of the
+ * code that are surrounded by "DOLBY..." are copyrighted and
+ * licensed separately, as follows:
+ *
+ *  (C) 2011-2016 Dolby Laboratories, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
  */
 
 #ifndef ES_QUEUE_H_
@@ -37,6 +56,9 @@ struct ElementaryStreamQueue {
         H265,
         AAC,
         AC3,
+#ifdef DOLBY_ENABLE
+        EAC3,
+#endif // DOLBY_END
         MPEG_AUDIO,
         MPEG_VIDEO,
         MPEG4_VIDEO,
@@ -85,6 +107,11 @@ protected:
     virtual sp<ABuffer> dequeueAccessUnitH265() {
         return NULL;
     };
+#ifdef DOLBY_ENABLE
+    sp<ABuffer> dequeueAccessUnitEAC3();
+    unsigned independent_streams_processed;
+    unsigned independent_stream_num_channels;
+#endif // DOLBY_END
 
     // consume a logical (compressed) access unit of size "size",
     // returns its timestamp in us (or -1 if no time information).
