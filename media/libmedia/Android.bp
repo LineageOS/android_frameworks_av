@@ -1,0 +1,10 @@
+cc_library_static {
+    name: "libmedia_helper",
+    srcs: ["AudioParameter.cpp"],
+    cflags: [
+        "-Werror",
+        "-Wno-error=deprecated-declarations",
+        "-Wall",
+    ],
+    clang: true,
+}
