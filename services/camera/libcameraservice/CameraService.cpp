@@ -31,6 +31,7 @@
 #include <android/hardware/ICamera.h>
 #include <android/hardware/ICameraClient.h>
 
+#include <android-base/macros.h>
 #include <binder/AppOpsManager.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
@@ -926,13 +927,18 @@ Status CameraService::validateConnectLocked(const String8& cameraId,
         const String8& clientName8, /*inout*/int& clientUid, /*inout*/int& clientPid,
         /*out*/int& originalClientPid) const {
 
+#ifdef __BRILLO__
+    UNUSED(clientName8);
+    UNUSED(clientUid);
+    UNUSED(clientPid);
+    UNUSED(originalClientPid);
+#else
     Status allowed = validateClientPermissionsLocked(cameraId, clientName8, clientUid, clientPid,
             originalClientPid);
-#if !defined(__BRILLO__)
     if (!allowed.isOk()) {
         return allowed;
     }
-#endif  // defined(__BRILLO__)
+#endif  // __BRILLO__
 
     int callingPid = getCallingPid();
 
