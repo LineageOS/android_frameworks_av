@@ -1,0 +1,51 @@
+cc_library_shared {
+    name: "libstagefright_foundation",
+
+    srcs: [
+        "AAtomizer.cpp",
+        "ABitReader.cpp",
+        "ABuffer.cpp",
+        "ADebug.cpp",
+        "AHandler.cpp",
+        "AHierarchicalStateMachine.cpp",
+        "ALooper.cpp",
+        "ALooperRoster.cpp",
+        "AMessage.cpp",
+        "ANetworkSession.cpp",
+        "AString.cpp",
+        "AStringUtils.cpp",
+        "AWakeLock.cpp",
+        "ColorUtils.cpp",
+        "MediaBuffer.cpp",
+        "MediaBufferGroup.cpp",
+        "MetaData.cpp",
+        "ParsedMessage.cpp",
+        "base64.cpp",
+        "hexdump.cpp",
+    ],
+
+    include_dirs: ["frameworks/av/include/media/stagefright/foundation"],
+
+    shared_libs: [
+        "libbinder",
+        "libutils",
+        "libcutils",
+        "liblog",
+        "libpowermanager",
+    ],
+
+    export_shared_lib_headers: ["libbinder"],
+
+    cflags: [
+        "-Wno-multichar",
+        "-Werror",
+        "-Wall",
+    ],
+    clang: true,
+    sanitize: {
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+    },
+}
