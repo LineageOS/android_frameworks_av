@@ -26,6 +26,7 @@
 namespace android {
 
 class AudioHwDevice;
+class DeviceHalInterface;
 
 /**
  * Managed access to a HAL output stream.
@@ -39,7 +40,7 @@ public:
     audio_stream_out_t *stream;
     const audio_output_flags_t flags;
 
-    audio_hw_device_t *hwDev() const;
+    sp<DeviceHalInterface> hwDev() const;
 
     AudioStreamOut(AudioHwDevice *dev, audio_output_flags_t flags);
 

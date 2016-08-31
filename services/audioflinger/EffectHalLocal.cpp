@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "AudioFlinger::EffectHalLocal"
+//#define LOG_NDEBUG 0
+
 #include <media/EffectsFactoryApi.h>
 #include <utils/Log.h>
 
@@ -27,9 +30,8 @@ EffectHalLocal::EffectHalLocal(effect_handle_t handle)
 
 EffectHalLocal::~EffectHalLocal() {
     int status = EffectRelease(mHandle);
-    if (status != 0) {
-        ALOGW("Error releasing effect %p: %s", mHandle, strerror(-status));
-    }
+    ALOGW_IF(status, "Error releasing effect %p: %s", mHandle, strerror(-status));
+    mHandle = 0;
 }
 
 status_t EffectHalLocal::process(audio_buffer_t *inBuffer, audio_buffer_t *outBuffer) {

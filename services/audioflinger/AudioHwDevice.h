@@ -26,6 +26,7 @@
 #include <utils/Errors.h>
 #include <system/audio.h>
 
+#include "DeviceHalInterface.h"
 
 namespace android {
 
@@ -40,7 +41,7 @@ public:
 
     AudioHwDevice(audio_module_handle_t handle,
                   const char *moduleName,
-                  audio_hw_device_t *hwDevice,
+                  sp<DeviceHalInterface> hwDevice,
                   Flags flags)
         : mHandle(handle)
         , mModuleName(strdup(moduleName))
@@ -58,8 +59,8 @@ public:
 
     audio_module_handle_t handle() const { return mHandle; }
     const char *moduleName() const { return mModuleName; }
-    audio_hw_device_t *hwDevice() const { return mHwDevice; }
-    uint32_t version() const { return mHwDevice->common.version; }
+    sp<DeviceHalInterface> hwDevice() const { return mHwDevice; }
+    uint32_t version() const;
 
     /** This method creates and opens the audio hardware output stream.
      * The "address" parameter qualifies the "devices" audio device type if needed.
@@ -79,7 +80,7 @@ public:
 private:
     const audio_module_handle_t mHandle;
     const char * const          mModuleName;
-    audio_hw_device_t * const   mHwDevice;
+    sp<DeviceHalInterface>      mHwDevice;
     const Flags                 mFlags;
 };
 

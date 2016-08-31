@@ -467,7 +467,7 @@ void AudioFlinger::EffectModule::addEffectToHal_l()
             audio_stream_t *stream = thread->stream();
             if (stream != NULL) {
                 stream->add_audio_effect(stream,
-                        reinterpret_cast<EffectHalLocal*>(mEffectInterface.get())->handle());
+                        static_cast<EffectHalLocal*>(mEffectInterface.get())->handle());
             }
         }
     }
@@ -554,7 +554,7 @@ status_t AudioFlinger::EffectModule::remove_effect_from_hal_l()
             audio_stream_t *stream = thread->stream();
             if (stream != NULL) {
                 stream->remove_audio_effect(stream,
-                        reinterpret_cast<EffectHalLocal*>(mEffectInterface.get())->handle());
+                        static_cast<EffectHalLocal*>(mEffectInterface.get())->handle());
             }
         }
     }

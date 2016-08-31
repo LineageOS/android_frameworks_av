@@ -23,6 +23,10 @@
 
 #include "AudioHwDevice.h"
 #include "AudioStreamOut.h"
+#include "DeviceHalInterface.h"
+
+// FIXME: Remove after streams HAL is componentized
+#include "DeviceHalLocal.h"
 
 namespace android {
 
@@ -40,7 +44,7 @@ AudioStreamOut::AudioStreamOut(AudioHwDevice *dev, audio_output_flags_t flags)
 {
 }
 
-audio_hw_device_t *AudioStreamOut::hwDev() const
+sp<DeviceHalInterface> AudioStreamOut::hwDev() const
 {
     return audioHwDev->hwDevice();
 }
@@ -121,14 +125,13 @@ status_t AudioStreamOut::open(
                 ? (audio_output_flags_t)(flags | AUDIO_OUTPUT_FLAG_IEC958_NONAUDIO)
                 : flags;
 
-    int status = hwDev()->open_output_stream(
-            hwDev(),
+    int status = static_cast<DeviceHalLocal*>(hwDev().get())->openOutputStream(
             handle,
             devices,
             customFlags,
             config,
-            &outStream,
-            address);
+            address,
+            &outStream);
     ALOGV("AudioStreamOut::open(), HAL returned "
             " stream %p, sampleRate %d, Format %#x, "
             "channelMask %#x, status %d",
@@ -144,14 +147,13 @@ status_t AudioStreamOut::open(
         struct audio_config customConfig = *config;
         customConfig.format = AUDIO_FORMAT_PCM_16_BIT;
 
-        status = hwDev()->open_output_stream(
-                hwDev(),
+        status = static_cast<DeviceHalLocal*>(hwDev().get())->openOutputStream(
                 handle,
                 devices,
                 customFlags,
                 &customConfig,
-                &outStream,
-                address);
+                address,
+                &outStream);
         ALOGV("AudioStreamOut::open(), treat IEC61937 as PCM, status = %d", status);
     }
 
