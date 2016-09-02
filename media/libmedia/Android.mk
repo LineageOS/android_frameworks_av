@@ -43,6 +43,7 @@ LOCAL_SRC_FILES:= \
     mediarecorder.cpp \
     IMediaMetadataRetriever.cpp \
     mediametadataretriever.cpp \
+    MidiDeviceInfo.cpp \
     MidiIoWrapper.cpp \
     ToneGenerator.cpp \
     JetPlayer.cpp \
