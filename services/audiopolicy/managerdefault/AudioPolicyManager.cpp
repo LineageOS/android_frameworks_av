@@ -1335,9 +1335,11 @@ status_t AudioPolicyManager::stopSource(const sp<AudioOutputDescriptor>& outputD
                         desc->isActive() &&
                         outputDesc->sharesHwModuleWith(desc) &&
                         (newDevice != desc->device())) {
+                    audio_devices_t newDevice2 = getNewOutputDevice(desc, false /*fromCache*/);
+                    bool force = desc->device() != newDevice2;
                     setOutputDevice(desc,
-                                    getNewOutputDevice(desc, false /*fromCache*/),
-                                    true,
+                                    newDevice2,
+                                    force,
                                     outputDesc->latency()*2);
                 }
             }
