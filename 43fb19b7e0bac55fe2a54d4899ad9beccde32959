@@ -16,6 +16,24 @@
       "revId": "43fb19b7e0bac55fe2a54d4899ad9beccde32959",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1fa4df85_e091209b",
+        "filename": "media/libavextensions/stagefright/AVUtils.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 76,
+      "author": {
+        "id": 32
+      },
+      "writtenOn": "2016-09-07T05:25:31Z",
+      "side": 1,
+      "message": "Actually think we should strip out all the QC stuff from this patch and have it separate.\n\nIt looks like this time around there should be less carnage caused by libavextensions, so the possibility for it to coexist is there. Mostly due to the fact that AOSP supports pcm-encoding now.",
+      "parentUuid": "1fa4df85_b44fee90",
+      "revId": "43fb19b7e0bac55fe2a54d4899ad9beccde32959",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
