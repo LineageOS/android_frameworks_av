@@ -2,6 +2,108 @@
   "comments": [
     {
       "key": {
+        "uuid": "1fa4df85_60f3f00b",
+        "filename": "include/media/stagefright/DataSource.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 59,
+      "author": {
+        "id": 32
+      },
+      "writtenOn": "2016-09-07T05:35:21Z",
+      "side": 1,
+      "message": "Not sure if we still need to do this or not, need to look if they improved the codec matching abilities on N",
+      "revId": "43fb19b7e0bac55fe2a54d4899ad9beccde32959",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1fa4df85_80f62cf9",
+        "filename": "include/media/stagefright/FileSource.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 50,
+      "author": {
+        "id": 32
+      },
+      "writtenOn": "2016-09-07T05:35:21Z",
+      "side": 1,
+      "message": "Kill this after switching plugin to AVIO",
+      "revId": "43fb19b7e0bac55fe2a54d4899ad9beccde32959",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1fa4df85_20ddf86f",
+        "filename": "include/media/stagefright/MediaDefs.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 106,
+      "author": {
+        "id": 32
+      },
+      "writtenOn": "2016-09-07T05:35:21Z",
+      "side": 1,
+      "message": "Move elsewhere",
+      "revId": "43fb19b7e0bac55fe2a54d4899ad9beccde32959",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1fa4df85_c0ec242b",
+        "filename": "include/media/stagefright/MediaExtractor.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 23,
+      "author": {
+        "id": 32
+      },
+      "writtenOn": "2016-09-07T05:35:21Z",
+      "side": 1,
+      "message": "kill kill",
+      "revId": "43fb19b7e0bac55fe2a54d4899ad9beccde32959",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1fa4df85_40d8347e",
+        "filename": "include/media/stagefright/MetaData.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 262,
+      "author": {
+        "id": 32
+      },
+      "writtenOn": "2016-09-07T05:35:21Z",
+      "side": 1,
+      "message": "Move all these tags elsewhere",
+      "revId": "43fb19b7e0bac55fe2a54d4899ad9beccde32959",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1fa4df85_e0e60045",
+        "filename": "media/libavextensions/mediaplayerservice/AVNuUtils.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 88,
+      "author": {
+        "id": 32
+      },
+      "writtenOn": "2016-09-07T05:35:21Z",
+      "side": 1,
+      "message": "Move out of this patch",
+      "revId": "43fb19b7e0bac55fe2a54d4899ad9beccde32959",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "1fa4df85_b44fee90",
         "filename": "media/libavextensions/stagefright/AVUtils.cpp",
         "patchSetId": 1
@@ -31,6 +133,91 @@
       "side": 1,
       "message": "Actually think we should strip out all the QC stuff from this patch and have it separate.\n\nIt looks like this time around there should be less carnage caused by libavextensions, so the possibility for it to coexist is there. Mostly due to the fact that AOSP supports pcm-encoding now.",
       "parentUuid": "1fa4df85_b44fee90",
+      "revId": "43fb19b7e0bac55fe2a54d4899ad9beccde32959",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1fa4df85_00e23c30",
+        "filename": "media/libmediaplayerservice/nuplayer/Android.mk",
+        "patchSetId": 1
+      },
+      "lineNbr": 27,
+      "author": {
+        "id": 32
+      },
+      "writtenOn": "2016-09-07T05:35:21Z",
+      "side": 1,
+      "message": "Dont think this is needed",
+      "revId": "43fb19b7e0bac55fe2a54d4899ad9beccde32959",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1fa4df85_a0d2485b",
+        "filename": "media/libstagefright/ACodec.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 556,
+      "author": {
+        "id": 32
+      },
+      "writtenOn": "2016-09-07T05:35:21Z",
+      "side": 1,
+      "message": "This will clash with libavextensions, need to break it out.",
+      "revId": "43fb19b7e0bac55fe2a54d4899ad9beccde32959",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1fa4df85_c0d50445",
+        "filename": "media/libstagefright/ACodec.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 6686,
+      "author": {
+        "id": 32
+      },
+      "writtenOn": "2016-09-07T05:35:21Z",
+      "side": 1,
+      "message": "Move this into a function in FFMPEGSoftCodec",
+      "revId": "43fb19b7e0bac55fe2a54d4899ad9beccde32959",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1fa4df85_a0e9e81a",
+        "filename": "media/libstagefright/MediaDefs.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 95,
+      "author": {
+        "id": 32
+      },
+      "writtenOn": "2016-09-07T05:35:21Z",
+      "side": 1,
+      "message": "Should go in a different file",
+      "revId": "43fb19b7e0bac55fe2a54d4899ad9beccde32959",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1fa4df85_80cf0caf",
+        "filename": "media/libstagefright/Utils.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 1586,
+      "author": {
+        "id": 32
+      },
+      "writtenOn": "2016-09-07T05:35:21Z",
+      "side": 1,
+      "message": "derp",
       "revId": "43fb19b7e0bac55fe2a54d4899ad9beccde32959",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
