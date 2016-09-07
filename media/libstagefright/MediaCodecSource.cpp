@@ -1017,7 +1017,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
         CHECK(msg->findInt64("time-offset-us", &mInputBufferTimeOffsetUs));
 
         // Propagate the timestamp offset to GraphicBufferSource.
-        if (mIsVideo) {
+        if (mFlags & FLAG_USE_SURFACE_INPUT) {
             sp<AMessage> params = new AMessage;
             params->setInt64("time-offset-us", mInputBufferTimeOffsetUs);
             err = mEncoder->setParameters(params);

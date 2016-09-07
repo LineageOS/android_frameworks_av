@@ -55,7 +55,11 @@
 #include "include/DataConverter.h"
 #include "omx/OMXUtils.h"
 
+#include <android/IGraphicBufferSource.h>
+
 namespace android {
+
+using binder::Status;
 
 enum {
     kMaxIndicesToCheck = 32, // used when enumerating supported formats and profiles
@@ -88,6 +92,21 @@ static inline status_t statusFromOMXError(int32_t omxError) {
     default:
         return isOMXError(omxError) ? omxError : 0; // no translation required
     }
+}
+
+static inline status_t statusFromBinderStatus(const Status &status) {
+    if (status.isOk()) {
+        return OK;
+    }
+    status_t err;
+    if ((err = status.serviceSpecificErrorCode()) != OK) {
+        return err;
+    }
+    if ((err = status.transactionError()) != OK) {
+        return err;
+    }
+    // Other exception
+    return UNKNOWN_ERROR;
 }
 
 // checks and converts status_t to a non-side-effect status_t
@@ -5372,6 +5391,7 @@ bool ACodec::BaseState::onMessageReceived(const sp<AMessage> &msg) {
         {
             // This will result in kFlagSawMediaServerDie handling in MediaCodec.
             ALOGE("OMX/mediaserver died, signalling error!");
+            mCodec->mGraphicBufferSource.clear();
             mCodec->signalError(OMX_ErrorResourcesLost, DEAD_OBJECT);
             break;
         }
@@ -6445,6 +6465,7 @@ void ACodec::LoadedState::stateEntered() {
     mCodec->mInputFormat.clear();
     mCodec->mOutputFormat.clear();
     mCodec->mBaseOutputFormat.clear();
+    mCodec->mGraphicBufferSource.clear();
 
     if (mCodec->mShutdownInProgress) {
         bool keepComponentAllocated = mCodec->mKeepComponentAllocated;
@@ -6572,87 +6593,61 @@ status_t ACodec::LoadedState::setupInputSurface() {
     status_t err = OK;
 
     if (mCodec->mRepeatFrameDelayUs > 0ll) {
-        err = mCodec->mOMX->setInternalOption(
-                mCodec->mNode,
-                kPortIndexInput,
-                IOMX::INTERNAL_OPTION_REPEAT_PREVIOUS_FRAME_DELAY,
-                &mCodec->mRepeatFrameDelayUs,
-                sizeof(mCodec->mRepeatFrameDelayUs));
+        err = statusFromBinderStatus(
+                mCodec->mGraphicBufferSource->setRepeatPreviousFrameDelayUs(
+                        mCodec->mRepeatFrameDelayUs));
 
         if (err != OK) {
             ALOGE("[%s] Unable to configure option to repeat previous "
                   "frames (err %d)",
-                  mCodec->mComponentName.c_str(),
-                  err);
+                  mCodec->mComponentName.c_str(), err);
             return err;
         }
     }
 
     if (mCodec->mMaxPtsGapUs > 0ll) {
-        err = mCodec->mOMX->setInternalOption(
-                mCodec->mNode,
-                kPortIndexInput,
-                IOMX::INTERNAL_OPTION_MAX_TIMESTAMP_GAP,
-                &mCodec->mMaxPtsGapUs,
-                sizeof(mCodec->mMaxPtsGapUs));
+        err = statusFromBinderStatus(
+                mCodec->mGraphicBufferSource->setMaxTimestampGapUs(
+                        mCodec->mMaxPtsGapUs));
 
         if (err != OK) {
             ALOGE("[%s] Unable to configure max timestamp gap (err %d)",
-                    mCodec->mComponentName.c_str(),
-                    err);
+                    mCodec->mComponentName.c_str(), err);
             return err;
         }
     }
 
     if (mCodec->mMaxFps > 0) {
-        err = mCodec->mOMX->setInternalOption(
-                mCodec->mNode,
-                kPortIndexInput,
-                IOMX::INTERNAL_OPTION_MAX_FPS,
-                &mCodec->mMaxFps,
-                sizeof(mCodec->mMaxFps));
+        err = statusFromBinderStatus(
+                mCodec->mGraphicBufferSource->setMaxFps(mCodec->mMaxFps));
 
         if (err != OK) {
             ALOGE("[%s] Unable to configure max fps (err %d)",
-                    mCodec->mComponentName.c_str(),
-                    err);
+                    mCodec->mComponentName.c_str(), err);
             return err;
         }
     }
 
     if (mCodec->mTimePerCaptureUs > 0ll
             && mCodec->mTimePerFrameUs > 0ll) {
-        int64_t timeLapse[2];
-        timeLapse[0] = mCodec->mTimePerFrameUs;
-        timeLapse[1] = mCodec->mTimePerCaptureUs;
-        err = mCodec->mOMX->setInternalOption(
-                mCodec->mNode,
-                kPortIndexInput,
-                IOMX::INTERNAL_OPTION_TIME_LAPSE,
-                &timeLapse[0],
-                sizeof(timeLapse));
+        err = statusFromBinderStatus(
+                mCodec->mGraphicBufferSource->setTimeLapseConfig(
+                        mCodec->mTimePerFrameUs, mCodec->mTimePerCaptureUs));
 
         if (err != OK) {
             ALOGE("[%s] Unable to configure time lapse (err %d)",
-                    mCodec->mComponentName.c_str(),
-                    err);
+                    mCodec->mComponentName.c_str(), err);
             return err;
         }
     }
 
     if (mCodec->mCreateInputBuffersSuspended) {
-        bool suspend = true;
-        err = mCodec->mOMX->setInternalOption(
-                mCodec->mNode,
-                kPortIndexInput,
-                IOMX::INTERNAL_OPTION_SUSPEND,
-                &suspend,
-                sizeof(suspend));
+        err = statusFromBinderStatus(
+                mCodec->mGraphicBufferSource->setSuspend(true));
 
         if (err != OK) {
             ALOGE("[%s] Unable to configure option to suspend (err %d)",
-                  mCodec->mComponentName.c_str(),
-                  err);
+                  mCodec->mComponentName.c_str(), err);
             return err;
         }
     }
@@ -6667,9 +6662,14 @@ status_t ACodec::LoadedState::setupInputSurface() {
 
     sp<ABuffer> colorAspectsBuffer;
     if (mCodec->mInputFormat->findBuffer("android._color-aspects", &colorAspectsBuffer)) {
-        err = mCodec->mOMX->setInternalOption(
-                mCodec->mNode, kPortIndexInput, IOMX::INTERNAL_OPTION_COLOR_ASPECTS,
-                colorAspectsBuffer->base(), colorAspectsBuffer->capacity());
+        if (colorAspectsBuffer->size() != sizeof(ColorAspects)) {
+            return INVALID_OPERATION;
+        }
+
+        err = statusFromBinderStatus(
+                mCodec->mGraphicBufferSource->setColorAspects(ColorUtils::packToU32(
+                        *(ColorAspects *)colorAspectsBuffer->base())));
+
         if (err != OK) {
             ALOGE("[%s] Unable to configure color aspects (err %d)",
                   mCodec->mComponentName.c_str(), err);
@@ -6696,7 +6696,8 @@ void ACodec::LoadedState::onCreateInputSurface(
     if (err == OK) {
         mCodec->mInputMetadataType = kMetadataBufferTypeANWBuffer;
         err = mCodec->mOMX->createInputSurface(
-                mCodec->mNode, kPortIndexInput, dataSpace, &bufferProducer,
+                mCodec->mNode, kPortIndexInput, dataSpace,
+                &bufferProducer, &mCodec->mGraphicBufferSource,
                 &mCodec->mInputMetadataType);
         // framework uses ANW buffers internally instead of gralloc handles
         if (mCodec->mInputMetadataType == kMetadataBufferTypeGrallocSource) {
@@ -6742,7 +6743,9 @@ void ACodec::LoadedState::onSetInputSurface(
     if (err == OK) {
         mCodec->mInputMetadataType = kMetadataBufferTypeANWBuffer;
         err = mCodec->mOMX->setInputSurface(
-                mCodec->mNode, kPortIndexInput, surface->getBufferConsumer(),
+                mCodec->mNode, kPortIndexInput,
+                surface->getBufferConsumer(),
+                &mCodec->mGraphicBufferSource,
                 &mCodec->mInputMetadataType);
         // framework uses ANW buffers internally instead of gralloc handles
         if (mCodec->mInputMetadataType == kMetadataBufferTypeGrallocSource) {
@@ -7205,12 +7208,14 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
 
     int64_t timeOffsetUs;
     if (params->findInt64("time-offset-us", &timeOffsetUs)) {
-        status_t err = mOMX->setInternalOption(
-            mNode,
-            kPortIndexInput,
-            IOMX::INTERNAL_OPTION_TIME_OFFSET,
-            &timeOffsetUs,
-            sizeof(timeOffsetUs));
+        if (mGraphicBufferSource == NULL) {
+            ALOGE("[%s] Invalid to set input buffer time offset without surface",
+                    mComponentName.c_str());
+            return INVALID_OPERATION;
+        }
+
+        status_t err = statusFromBinderStatus(
+                mGraphicBufferSource->setTimeOffsetUs(timeOffsetUs));
 
         if (err != OK) {
             ALOGE("[%s] Unable to set input buffer time offset (err %d)",
@@ -7222,13 +7227,14 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
 
     int64_t skipFramesBeforeUs;
     if (params->findInt64("skip-frames-before", &skipFramesBeforeUs)) {
-        status_t err =
-            mOMX->setInternalOption(
-                     mNode,
-                     kPortIndexInput,
-                     IOMX::INTERNAL_OPTION_START_TIME,
-                     &skipFramesBeforeUs,
-                     sizeof(skipFramesBeforeUs));
+        if (mGraphicBufferSource == NULL) {
+            ALOGE("[%s] Invalid to set start time without surface",
+                    mComponentName.c_str());
+            return INVALID_OPERATION;
+        }
+
+        status_t err = statusFromBinderStatus(
+                mGraphicBufferSource->setStartTimeUs(skipFramesBeforeUs));
 
         if (err != OK) {
             ALOGE("Failed to set parameter 'skip-frames-before' (err %d)", err);
@@ -7238,15 +7244,14 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
 
     int32_t dropInputFrames;
     if (params->findInt32("drop-input-frames", &dropInputFrames)) {
-        bool suspend = dropInputFrames != 0;
+        if (mGraphicBufferSource == NULL) {
+            ALOGE("[%s] Invalid to set suspend without surface",
+                    mComponentName.c_str());
+            return INVALID_OPERATION;
+        }
 
-        status_t err =
-            mOMX->setInternalOption(
-                     mNode,
-                     kPortIndexInput,
-                     IOMX::INTERNAL_OPTION_SUSPEND,
-                     &suspend,
-                     sizeof(suspend));
+        status_t err = statusFromBinderStatus(
+                mGraphicBufferSource->setSuspend(dropInputFrames != 0));
 
         if (err != OK) {
             ALOGE("Failed to set parameter 'drop-input-frames' (err %d)", err);
@@ -7296,7 +7301,10 @@ void ACodec::onSignalEndOfInputStream() {
     sp<AMessage> notify = mNotify->dup();
     notify->setInt32("what", CodecBase::kWhatSignaledInputEOS);
 
-    status_t err = mOMX->signalEndOfInputStream(mNode);
+    status_t err = INVALID_OPERATION;
+    if (mGraphicBufferSource != NULL) {
+        err = statusFromBinderStatus(mGraphicBufferSource->signalEndOfInputStream());
+    }
     if (err != OK) {
         notify->setInt32("err", err);
     }

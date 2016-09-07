@@ -100,6 +100,7 @@ public:
     virtual status_t createInputSurface(
             node_id node, OMX_U32 port_index, android_dataspace dataSpace,
             sp<IGraphicBufferProducer> *bufferProducer,
+            sp<IGraphicBufferSource> *bufferSource,
             MetadataBufferType *type);
 
     virtual status_t createPersistentInputSurface(
@@ -109,9 +110,8 @@ public:
     virtual status_t setInputSurface(
             node_id node, OMX_U32 port_index,
             const sp<IGraphicBufferConsumer> &bufferConsumer,
+            sp<IGraphicBufferSource> *bufferSource,
             MetadataBufferType *type);
-
-    virtual status_t signalEndOfInputStream(node_id node);
 
     virtual status_t allocateSecureBuffer(
             node_id node, OMX_U32 port_index, size_t size,
@@ -135,20 +135,13 @@ public:
     virtual status_t emptyGraphicBuffer(
             node_id node,
             buffer_id buffer,
-            const sp<GraphicBuffer> &graphicBuffer,
-            OMX_U32 flags, OMX_TICKS timestamp, int fenceFd);
+            const sp<GraphicBuffer> &graphicBuffer, OMX_U32 flags,
+            OMX_TICKS timestamp, OMX_TICKS origTimestamp, int fenceFd);
 
     virtual status_t getExtensionIndex(
             node_id node,
             const char *parameter_name,
             OMX_INDEXTYPE *index);
-
-    virtual status_t setInternalOption(
-            node_id node,
-            OMX_U32 port_index,
-            InternalOptionType type,
-            const void *data,
-            size_t size);
 
     virtual status_t dispatchMessage(const omx_message &msg);
 

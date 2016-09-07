@@ -2,7 +2,14 @@ LOCAL_PATH:= $(call my-dir)
 
 include $(CLEAR_VARS)
 
+LOCAL_AIDL_INCLUDES := \
+    frameworks/av/media/libmedia/aidl
+
 LOCAL_SRC_FILES:= \
+    aidl/android/IGraphicBufferSource.aidl \
+    aidl/android/IOMXBufferSource.aidl
+
+LOCAL_SRC_FILES += \
     AudioTrack.cpp \
     AudioTrackShared.cpp \
     IAudioFlinger.cpp \

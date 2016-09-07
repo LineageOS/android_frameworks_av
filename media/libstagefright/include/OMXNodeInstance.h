@@ -25,10 +25,10 @@
 #include <utils/threads.h>
 
 namespace android {
-
+class IGraphicBufferSource;
+class IOMXBufferSource;
 class IOMXObserver;
 struct OMXMaster;
-class GraphicBufferSource;
 
 struct OMXNodeInstance {
     OMXNodeInstance(
@@ -87,6 +87,7 @@ struct OMXNodeInstance {
     status_t createInputSurface(
             OMX_U32 portIndex, android_dataspace dataSpace,
             sp<IGraphicBufferProducer> *bufferProducer,
+            sp<IGraphicBufferSource> *bufferSource,
             MetadataBufferType *type);
 
     static status_t createPersistentInputSurface(
@@ -94,10 +95,10 @@ struct OMXNodeInstance {
             sp<IGraphicBufferConsumer> *bufferConsumer);
 
     status_t setInputSurface(
-            OMX_U32 portIndex, const sp<IGraphicBufferConsumer> &bufferConsumer,
+            OMX_U32 portIndex,
+            const sp<IGraphicBufferConsumer> &bufferConsumer,
+            sp<IGraphicBufferSource> *bufferSource,
             MetadataBufferType *type);
-
-    status_t signalEndOfInputStream();
 
     status_t allocateSecureBuffer(
             OMX_U32 portIndex, size_t size, OMX::buffer_id *buffer,
@@ -117,17 +118,12 @@ struct OMXNodeInstance {
             OMX_U32 flags, OMX_TICKS timestamp, int fenceFd);
 
     status_t emptyGraphicBuffer(
-            OMX::buffer_id buffer, const sp<GraphicBuffer> &graphicBuffer,
-            OMX_U32 flags, OMX_TICKS timestamp, int fenceFd);
+            OMX::buffer_id buffer,
+            const sp<GraphicBuffer> &graphicBuffer, OMX_U32 flags,
+            OMX_TICKS timestamp, OMX_TICKS origTimestamp, int fenceFd);
 
     status_t getExtensionIndex(
             const char *parameterName, OMX_INDEXTYPE *index);
-
-    status_t setInternalOption(
-            OMX_U32 portIndex,
-            IOMX::InternalOptionType type,
-            const void *data,
-            size_t size);
 
     bool isSecure() const {
         return mIsSecure;
@@ -154,11 +150,11 @@ private:
     SortedVector<OMX_INDEXTYPE> mProhibitedExtensions;
     bool mIsSecure;
 
-    // Lock only covers mGraphicBufferSource.  We can't always use mLock
-    // because of rare instances where we'd end up locking it recursively.
-    Mutex mGraphicBufferSourceLock;
-    // Access this through getGraphicBufferSource().
-    sp<GraphicBufferSource> mGraphicBufferSource;
+    // Lock only covers mOMXBufferSource and mOMXOutputListener.  We can't always
+    // use mLock because of rare instances where we'd end up locking it recursively.
+    Mutex mOMXBufferSourceLock;
+    // Access these through getBufferSource().
+    sp<IOMXBufferSource> mOMXBufferSource;
 
     struct ActiveBuffer {
         OMX_U32 mPortIndex;
@@ -179,6 +175,10 @@ private:
         kSecureBufferTypeNativeHandle,
     };
     SecureBufferType mSecureBufferType[2];
+
+    KeyedVector<int64_t, int64_t> mOriginalTimeUs;
+    bool mShouldRestorePts;
+    bool mRestorePtsFailed;
 
     // For debug support
     char *mName;
@@ -253,10 +253,16 @@ private:
             OMX::buffer_id buffer, OMX_BUFFERHEADERTYPE *header, bool updateCodecBuffer);
 
     status_t createGraphicBufferSource(
-            OMX_U32 portIndex, const sp<IGraphicBufferConsumer> &consumer /* nullable */,
+            OMX_U32 portIndex, android_dataspace dataSpace,
+            const sp<IGraphicBufferConsumer> &bufferConsumer,
+            sp<IGraphicBufferProducer> *bufferProducer,
+            sp<IGraphicBufferSource> *bufferSource,
             MetadataBufferType *type);
-    sp<GraphicBufferSource> getGraphicBufferSource();
-    void setGraphicBufferSource(const sp<GraphicBufferSource> &bufferSource);
+    sp<IOMXBufferSource> getBufferSource();
+    void setBufferSource(const sp<IOMXBufferSource> &bufferSource);
+    // Called when omx_message::FILL_BUFFER_DONE is received. (Currently the
+    // buffer source will fix timestamp in the header if needed.)
+    void codecBufferFilled(omx_message &msg);
 
     // Handles |msg|, and may modify it. Returns true iff completely handled it and
     // |msg| does not need to be sent to the event listener.

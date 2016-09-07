@@ -24,6 +24,8 @@
 #include "OMXMaster.h"
 #include "OMXUtils.h"
 #include "GraphicBufferSource.h"
+#include <android/IGraphicBufferSource.h>
+#include <android/IOMXBufferSource.h>
 
 #include <OMX_Component.h>
 #include <OMX_IndexExt.h>
@@ -213,7 +215,9 @@ OMXNodeInstance::OMXNodeInstance(
       mDying(false),
       mSailed(false),
       mQueriedProhibitedExtensions(false),
-      mBufferIDCount(0)
+      mBufferIDCount(0),
+      mShouldRestorePts(false),
+      mRestorePtsFailed(false)
 {
     mName = ADebug::GetDebugName(name);
     DEBUG = ADebug::GetDebugLevelFromProperty(name, "debug.stagefright.omx-debug");
@@ -242,16 +246,15 @@ void OMXNodeInstance::setHandle(OMX::node_id node_id, OMX_HANDLETYPE handle) {
     mHandle = handle;
 }
 
-sp<GraphicBufferSource> OMXNodeInstance::getGraphicBufferSource() {
-    Mutex::Autolock autoLock(mGraphicBufferSourceLock);
-    return mGraphicBufferSource;
+sp<IOMXBufferSource> OMXNodeInstance::getBufferSource() {
+    Mutex::Autolock autoLock(mOMXBufferSourceLock);
+    return mOMXBufferSource;
 }
 
-void OMXNodeInstance::setGraphicBufferSource(
-        const sp<GraphicBufferSource>& bufferSource) {
-    Mutex::Autolock autoLock(mGraphicBufferSourceLock);
-    CLOG_INTERNAL(setGraphicBufferSource, "%p", bufferSource.get());
-    mGraphicBufferSource = bufferSource;
+void OMXNodeInstance::setBufferSource(const sp<IOMXBufferSource>& bufferSource) {
+    Mutex::Autolock autoLock(mOMXBufferSourceLock);
+    CLOG_INTERNAL(setBufferSource, "%p", bufferSource.get());
+    mOMXBufferSource = bufferSource;
 }
 
 OMX *OMXNodeInstance::owner() {
@@ -372,28 +375,29 @@ status_t OMXNodeInstance::freeNode(OMXMaster *master) {
 
 status_t OMXNodeInstance::sendCommand(
         OMX_COMMANDTYPE cmd, OMX_S32 param) {
-    if (cmd == OMX_CommandStateSet) {
-        // There are no configurations past first StateSet command.
-        mSailed = true;
-    }
-    const sp<GraphicBufferSource> bufferSource(getGraphicBufferSource());
+    const sp<IOMXBufferSource> bufferSource(getBufferSource());
     if (bufferSource != NULL && cmd == OMX_CommandStateSet) {
         if (param == OMX_StateIdle) {
             // Initiating transition from Executing -> Idle
             // ACodec is waiting for all buffers to be returned, do NOT
             // submit any more buffers to the codec.
-            bufferSource->omxIdle();
+            bufferSource->onOmxIdle();
         } else if (param == OMX_StateLoaded) {
             // Initiating transition from Idle/Executing -> Loaded
             // Buffers are about to be freed.
-            bufferSource->omxLoaded();
-            setGraphicBufferSource(NULL);
+            bufferSource->onOmxLoaded();
+            setBufferSource(NULL);
         }
 
         // fall through
     }
 
     Mutex::Autolock autoLock(mLock);
+
+    if (cmd == OMX_CommandStateSet) {
+        // There are no configurations past first StateSet command.
+        mSailed = true;
+    }
 
     // bump internal-state debug level for 2 input and output frames past a command
     {
@@ -844,9 +848,9 @@ status_t OMXNodeInstance::useBuffer(
 
     addActiveBuffer(portIndex, *buffer);
 
-    sp<GraphicBufferSource> bufferSource(getGraphicBufferSource());
+    sp<IOMXBufferSource> bufferSource(getBufferSource());
     if (bufferSource != NULL && portIndex == kPortIndexInput) {
-        bufferSource->addCodecBuffer(*buffer);
+        bufferSource->onInputBufferAdded(*buffer);
     }
 
     CLOG_BUFFER(useBuffer, NEW_BUFFER_FMT(
@@ -1068,7 +1072,11 @@ status_t OMXNodeInstance::updateNativeHandleInMeta(
 }
 
 status_t OMXNodeInstance::createGraphicBufferSource(
-        OMX_U32 portIndex, const sp<IGraphicBufferConsumer> &bufferConsumer, MetadataBufferType *type) {
+        OMX_U32 portIndex, android_dataspace dataSpace,
+        const sp<IGraphicBufferConsumer> &bufferConsumer,
+        sp<IGraphicBufferProducer> *bufferProducer,
+        sp<IGraphicBufferSource> *bufferSource,
+        MetadataBufferType *type) {
     status_t err;
 
     // only allow graphic source on input port, when there are no allocated buffers yet
@@ -1080,8 +1088,7 @@ status_t OMXNodeInstance::createGraphicBufferSource(
         return INVALID_OPERATION;
     }
 
-    const sp<GraphicBufferSource> surfaceCheck = getGraphicBufferSource();
-    if (surfaceCheck != NULL) {
+    if (getBufferSource() != NULL) {
         if (portIndex < NELEM(mMetadataType) && type != NULL) {
             *type = mMetadataType[portIndex];
         }
@@ -1125,7 +1132,7 @@ status_t OMXNodeInstance::createGraphicBufferSource(
         usageBits = 0;
     }
 
-    sp<GraphicBufferSource> bufferSource = new GraphicBufferSource(
+    sp<GraphicBufferSource> graphicBufferSource = new GraphicBufferSource(
             mOwner,
             mNodeID,
             def.format.video.nFrameWidth,
@@ -1134,33 +1141,38 @@ status_t OMXNodeInstance::createGraphicBufferSource(
             usageBits,
             bufferConsumer);
 
-    if ((err = bufferSource->initCheck()) != OK) {
+    if ((err = graphicBufferSource->initCheck()) != OK) {
         return err;
     }
-    setGraphicBufferSource(bufferSource);
+    setBufferSource(graphicBufferSource);
+
+    if (bufferConsumer == NULL) {
+        graphicBufferSource->setDefaultDataSpace(dataSpace);
+    }
+
+    if (bufferProducer != NULL) {
+        *bufferProducer = graphicBufferSource->getIGraphicBufferProducer();
+    }
+
+    *bufferSource = graphicBufferSource;
 
     return OK;
 }
 
 status_t OMXNodeInstance::createInputSurface(
         OMX_U32 portIndex, android_dataspace dataSpace,
-        sp<IGraphicBufferProducer> *bufferProducer, MetadataBufferType *type) {
+        sp<IGraphicBufferProducer> *bufferProducer,
+        sp<IGraphicBufferSource> *bufferSource,
+        MetadataBufferType *type) {
     if (bufferProducer == NULL) {
         ALOGE("b/25884056");
         return BAD_VALUE;
     }
 
     Mutex::Autolock autolock(mLock);
-    status_t err = createGraphicBufferSource(portIndex, NULL /* bufferConsumer */, type);
-
-    if (err != OK) {
-        return err;
-    }
-
-    mGraphicBufferSource->setDefaultDataSpace(dataSpace);
-
-    *bufferProducer = mGraphicBufferSource->getIGraphicBufferProducer();
-    return OK;
+    return createGraphicBufferSource(
+            portIndex, dataSpace, NULL /* bufferConsumer */,
+            bufferProducer, bufferSource, type);
 }
 
 //static
@@ -1195,22 +1207,14 @@ status_t OMXNodeInstance::createPersistentInputSurface(
 }
 
 status_t OMXNodeInstance::setInputSurface(
-        OMX_U32 portIndex, const sp<IGraphicBufferConsumer> &bufferConsumer,
+        OMX_U32 portIndex,
+        const sp<IGraphicBufferConsumer> &bufferConsumer,
+        sp<IGraphicBufferSource> *bufferSource,
         MetadataBufferType *type) {
     Mutex::Autolock autolock(mLock);
-    return createGraphicBufferSource(portIndex, bufferConsumer, type);
-}
-
-status_t OMXNodeInstance::signalEndOfInputStream() {
-    // For non-Surface input, the MediaCodec should convert the call to a
-    // pair of requests (dequeue input buffer, queue input buffer with EOS
-    // flag set).  Seems easier than doing the equivalent from here.
-    sp<GraphicBufferSource> bufferSource(getGraphicBufferSource());
-    if (bufferSource == NULL) {
-        CLOGW("signalEndOfInputStream can only be used with Surface input");
-        return INVALID_OPERATION;
-    }
-    return bufferSource->signalEndOfInputStream();
+    return createGraphicBufferSource(
+            portIndex, android_dataspace::HAL_DATASPACE_UNKNOWN,
+            bufferConsumer, NULL, bufferSource, type);
 }
 
 status_t OMXNodeInstance::allocateSecureBuffer(
@@ -1260,9 +1264,9 @@ status_t OMXNodeInstance::allocateSecureBuffer(
 
     addActiveBuffer(portIndex, *buffer);
 
-    sp<GraphicBufferSource> bufferSource(getGraphicBufferSource());
+    sp<IOMXBufferSource> bufferSource(getBufferSource());
     if (bufferSource != NULL && portIndex == kPortIndexInput) {
-        bufferSource->addCodecBuffer(*buffer);
+        bufferSource->onInputBufferAdded(*buffer);
     }
     CLOG_BUFFER(allocateSecureBuffer, NEW_BUFFER_FMT(
             *buffer, portIndex, "%zu@%p:%p", size, *buffer_data,
@@ -1314,9 +1318,9 @@ status_t OMXNodeInstance::allocateBufferWithBackup(
 
     addActiveBuffer(portIndex, *buffer);
 
-    sp<GraphicBufferSource> bufferSource(getGraphicBufferSource());
+    sp<IOMXBufferSource> bufferSource(getBufferSource());
     if (bufferSource != NULL && portIndex == kPortIndexInput) {
-        bufferSource->addCodecBuffer(*buffer);
+        bufferSource->onInputBufferAdded(*buffer);
     }
 
     CLOG_BUFFER(allocateBufferWithBackup, NEW_BUFFER_FMT(*buffer, portIndex, "%zu@%p :> %u@%p",
@@ -1390,7 +1394,7 @@ status_t OMXNodeInstance::emptyBuffer(
     Mutex::Autolock autoLock(mLock);
 
     // no emptybuffer if using input surface
-    if (getGraphicBufferSource() != NULL) {
+    if (getBufferSource() != NULL) {
         android_errorWriteLog(0x534e4554, "29422020");
         return INVALID_OPERATION;
     }
@@ -1538,7 +1542,7 @@ status_t OMXNodeInstance::emptyBuffer_l(
 // like emptyBuffer, but the data is already in header->pBuffer
 status_t OMXNodeInstance::emptyGraphicBuffer(
         OMX::buffer_id buffer, const sp<GraphicBuffer> &graphicBuffer,
-        OMX_U32 flags, OMX_TICKS timestamp, int fenceFd) {
+        OMX_U32 flags, OMX_TICKS timestamp, OMX_TICKS origTimestamp, int fenceFd) {
     Mutex::Autolock autoLock(mLock);
 
     OMX_BUFFERHEADERTYPE *header = findBufferHeader(buffer, kPortIndexInput);
@@ -1556,6 +1560,14 @@ status_t OMXNodeInstance::emptyGraphicBuffer(
         return err;
     }
 
+    // If we're required to restore original timestamp, origTimestamp will
+    // be set to non-negative number for all frames. If it's not required
+    // client will set it to -1ll for all frames.
+    if (origTimestamp >= 0ll && !mRestorePtsFailed) {
+        mShouldRestorePts = true;
+        mOriginalTimeUs.add(timestamp, origTimestamp);
+    }
+
     header->nOffset = 0;
     if (graphicBuffer == NULL) {
         header->nFilledLen = 0;
@@ -1565,6 +1577,38 @@ status_t OMXNodeInstance::emptyGraphicBuffer(
         header->nFilledLen = sizeof(VideoNativeMetadata);
     }
     return emptyBuffer_l(header, flags, timestamp, (intptr_t)header->pBuffer, fenceFd);
+}
+
+void OMXNodeInstance::codecBufferFilled(omx_message &msg) {
+    Mutex::Autolock autoLock(mBufferIDLock);
+
+    if (!mShouldRestorePts || mRestorePtsFailed) {
+        return;
+    }
+
+    OMX_U32 &flags = msg.u.extended_buffer_data.flags;
+    OMX_TICKS &timestamp = msg.u.extended_buffer_data.timestamp;
+
+    if (!(flags & OMX_BUFFERFLAG_CODECCONFIG)) {
+        ssize_t index = mOriginalTimeUs.indexOfKey(timestamp);
+        if (index >= 0) {
+            ALOGV("OUT timestamp: %lld -> %lld",
+                    static_cast<long long>(timestamp),
+                    static_cast<long long>(mOriginalTimeUs[index]));
+            timestamp = mOriginalTimeUs[index];
+            mOriginalTimeUs.removeItemsAt(index);
+        } else {
+            // giving up the effort as encoder doesn't appear to preserve pts
+            ALOGW("giving up limiting timestamp gap (pts = %lld)", timestamp);
+            mRestorePtsFailed = true;
+        }
+        if (mOriginalTimeUs.size() > BufferQueue::NUM_BUFFER_SLOTS) {
+            // something terribly wrong must have happened, giving up...
+            ALOGE("mOriginalTimeUs has too many entries (%zu)",
+                    mOriginalTimeUs.size());
+            mRestorePtsFailed = true;
+        }
+    }
 }
 
 status_t OMXNodeInstance::getExtensionIndex(
@@ -1577,133 +1621,7 @@ status_t OMXNodeInstance::getExtensionIndex(
     return StatusFromOMXError(err);
 }
 
-inline static const char *asString(IOMX::InternalOptionType i, const char *def = "??") {
-    switch (i) {
-        case IOMX::INTERNAL_OPTION_SUSPEND:           return "SUSPEND";
-        case IOMX::INTERNAL_OPTION_REPEAT_PREVIOUS_FRAME_DELAY:
-            return "REPEAT_PREVIOUS_FRAME_DELAY";
-        case IOMX::INTERNAL_OPTION_MAX_TIMESTAMP_GAP: return "MAX_TIMESTAMP_GAP";
-        case IOMX::INTERNAL_OPTION_MAX_FPS:           return "MAX_FPS";
-        case IOMX::INTERNAL_OPTION_START_TIME:        return "START_TIME";
-        case IOMX::INTERNAL_OPTION_TIME_LAPSE:        return "TIME_LAPSE";
-        case IOMX::INTERNAL_OPTION_TIME_OFFSET:       return "TIME_OFFSET";
-        default:                                      return def;
-    }
-}
-
-template<typename T>
-static bool getInternalOption(
-        const void *data, size_t size, T *out) {
-    if (size != sizeof(T)) {
-        return false;
-    }
-    *out = *(T*)data;
-    return true;
-}
-
-status_t OMXNodeInstance::setInternalOption(
-        OMX_U32 portIndex,
-        IOMX::InternalOptionType type,
-        const void *data,
-        size_t size) {
-    CLOG_CONFIG(setInternalOption, "%s(%d): %s:%u %zu@%p",
-            asString(type), type, portString(portIndex), portIndex, size, data);
-    switch (type) {
-        case IOMX::INTERNAL_OPTION_SUSPEND:
-        case IOMX::INTERNAL_OPTION_REPEAT_PREVIOUS_FRAME_DELAY:
-        case IOMX::INTERNAL_OPTION_MAX_TIMESTAMP_GAP:
-        case IOMX::INTERNAL_OPTION_MAX_FPS:
-        case IOMX::INTERNAL_OPTION_START_TIME:
-        case IOMX::INTERNAL_OPTION_TIME_LAPSE:
-        case IOMX::INTERNAL_OPTION_TIME_OFFSET:
-        case IOMX::INTERNAL_OPTION_COLOR_ASPECTS:
-        {
-            const sp<GraphicBufferSource> &bufferSource =
-                getGraphicBufferSource();
-
-            if (bufferSource == NULL || portIndex != kPortIndexInput) {
-                CLOGW("setInternalOption is only for Surface input");
-                return ERROR_UNSUPPORTED;
-            }
-
-            if (type == IOMX::INTERNAL_OPTION_SUSPEND) {
-                bool suspend;
-                if (!getInternalOption(data, size, &suspend)) {
-                    return INVALID_OPERATION;
-                }
-
-                CLOG_CONFIG(setInternalOption, "suspend=%d", suspend);
-                bufferSource->suspend(suspend);
-            } else if (type == IOMX::INTERNAL_OPTION_REPEAT_PREVIOUS_FRAME_DELAY) {
-                int64_t delayUs;
-                if (!getInternalOption(data, size, &delayUs)) {
-                    return INVALID_OPERATION;
-                }
-
-                CLOG_CONFIG(setInternalOption, "delayUs=%lld", (long long)delayUs);
-                return bufferSource->setRepeatPreviousFrameDelayUs(delayUs);
-            } else if (type == IOMX::INTERNAL_OPTION_TIME_OFFSET) {
-                int64_t timeOffsetUs;
-                if (!getInternalOption(data, size, &timeOffsetUs)) {
-                    return INVALID_OPERATION;
-                }
-                CLOG_CONFIG(setInternalOption, "bufferOffsetUs=%lld", (long long)timeOffsetUs);
-                return bufferSource->setInputBufferTimeOffset(timeOffsetUs);
-            } else if (type == IOMX::INTERNAL_OPTION_MAX_TIMESTAMP_GAP) {
-                int64_t maxGapUs;
-                if (!getInternalOption(data, size, &maxGapUs)) {
-                    return INVALID_OPERATION;
-                }
-
-                CLOG_CONFIG(setInternalOption, "gapUs=%lld", (long long)maxGapUs);
-                return bufferSource->setMaxTimestampGapUs(maxGapUs);
-            } else if (type == IOMX::INTERNAL_OPTION_MAX_FPS) {
-                float maxFps;
-                if (!getInternalOption(data, size, &maxFps)) {
-                    return INVALID_OPERATION;
-                }
-
-                CLOG_CONFIG(setInternalOption, "maxFps=%f", maxFps);
-                return bufferSource->setMaxFps(maxFps);
-            } else if (type == IOMX::INTERNAL_OPTION_START_TIME) {
-                int64_t skipFramesBeforeUs;
-                if (!getInternalOption(data, size, &skipFramesBeforeUs)) {
-                    return INVALID_OPERATION;
-                }
-
-                CLOG_CONFIG(setInternalOption, "beforeUs=%lld", (long long)skipFramesBeforeUs);
-                bufferSource->setSkipFramesBeforeUs(skipFramesBeforeUs);
-            } else if (type == IOMX::INTERNAL_OPTION_TIME_LAPSE) {
-                GraphicBufferSource::TimeLapseConfig config;
-                if (!getInternalOption(data, size, &config)) {
-                    return INVALID_OPERATION;
-                }
-
-                CLOG_CONFIG(setInternalOption, "perFrameUs=%lld perCaptureUs=%lld",
-                        (long long)config.mTimePerFrameUs, (long long)config.mTimePerCaptureUs);
-
-                return bufferSource->setTimeLapseConfig(config);
-            } else if (type == IOMX::INTERNAL_OPTION_COLOR_ASPECTS) {
-                ColorAspects aspects;
-                if (!getInternalOption(data, size, &aspects)) {
-                    return INVALID_OPERATION;
-                }
-
-                CLOG_CONFIG(setInternalOption, "setting color aspects");
-                bufferSource->setColorAspects(aspects);
-            }
-
-            return OK;
-        }
-
-        default:
-            return ERROR_UNSUPPORTED;
-    }
-}
-
 bool OMXNodeInstance::handleMessage(omx_message &msg) {
-    const sp<GraphicBufferSource>& bufferSource(getGraphicBufferSource());
-
     if (msg.type == omx_message::FILL_BUFFER_DONE) {
         OMX_BUFFERHEADERTYPE *buffer =
             findBufferHeader(msg.u.extended_buffer_data.buffer, kPortIndexOutput);
@@ -1733,10 +1651,8 @@ bool OMXNodeInstance::handleMessage(omx_message &msg) {
         }
         buffer_meta->CopyFromOMX(buffer);
 
-        if (bufferSource != NULL) {
-            // fix up the buffer info (especially timestamp) if needed
-            bufferSource->codecBufferFilled(msg);
-        }
+        // fix up the buffer info (especially timestamp) if needed
+        codecBufferFilled(msg);
     } else if (msg.type == omx_message::EMPTY_BUFFER_DONE) {
         OMX_BUFFERHEADERTYPE *buffer =
             findBufferHeader(msg.u.buffer_data.buffer, kPortIndexInput);
@@ -1752,13 +1668,15 @@ bool OMXNodeInstance::handleMessage(omx_message &msg) {
                     EBD, WITH_STATS(EMPTY_BUFFER(msg.u.buffer_data.buffer, buffer, msg.fenceFd)));
         }
 
+        const sp<IOMXBufferSource> bufferSource(getBufferSource());
+
         if (bufferSource != NULL) {
-            // This is one of the buffers used exclusively by
-            // GraphicBufferSource.
+            // This is one of the buffers used exclusively by IOMXBufferSource.
             // Don't dispatch a message back to ACodec, since it doesn't
             // know that anyone asked to have the buffer emptied and will
             // be very confused.
-            bufferSource->codecBufferEmptied(msg);
+            bufferSource->onInputBufferEmptied(
+                    msg.u.buffer_data.buffer, OMXFenceParcelable(msg.fenceFd));
             return true;
         }
     } else if (msg.type == omx_message::EVENT &&
@@ -1910,13 +1828,13 @@ void OMXNodeInstance::onEvent(
 
     CLOGI_(level, onEvent, "%s(%x), %s(%x), %s(%x)",
             asString(event), event, arg1String, arg1, arg2String, arg2);
-    const sp<GraphicBufferSource>& bufferSource(getGraphicBufferSource());
+    const sp<IOMXBufferSource> bufferSource(getBufferSource());
 
     if (bufferSource != NULL
             && event == OMX_EventCmdComplete
             && arg1 == OMX_CommandStateSet
             && arg2 == OMX_StateExecuting) {
-        bufferSource->omxExecuting();
+        bufferSource->onOmxExecuting();
     }
 
     // allow configuration if we return to the loaded state

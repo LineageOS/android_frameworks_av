@@ -22,14 +22,19 @@
 #include <gui/BufferQueue.h>
 #include <utils/RefBase.h>
 
-#include <OMX_Core.h>
 #include <VideoAPI.h>
-#include "../include/OMXNodeInstance.h"
+#include <media/IOMX.h>
+#include <media/OMXFenceParcelable.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/foundation/AHandlerReflector.h>
 #include <media/stagefright/foundation/ALooper.h>
 
+#include <android/BnGraphicBufferSource.h>
+#include <android/BnOMXBufferSource.h>
+
 namespace android {
+
+using ::android::binder::Status;
 
 struct FrameDropper;
 
@@ -49,7 +54,9 @@ struct FrameDropper;
  * before the codec is in the "executing" state, so we need to queue
  * things up until we're ready to go.
  */
-class GraphicBufferSource : public BufferQueue::ConsumerListener {
+class GraphicBufferSource : public BnGraphicBufferSource,
+                            public BnOMXBufferSource,
+                            public BufferQueue::ConsumerListener {
 public:
     GraphicBufferSource(
             const sp<IOMX> &omx,
@@ -81,38 +88,35 @@ public:
     // This is called when OMX transitions to OMX_StateExecuting, which means
     // we can start handing it buffers.  If we already have buffers of data
     // sitting in the BufferQueue, this will send them to the codec.
-    void omxExecuting();
+    Status onOmxExecuting() override;
 
     // This is called when OMX transitions to OMX_StateIdle, indicating that
     // the codec is meant to return all buffers back to the client for them
     // to be freed. Do NOT submit any more buffers to the component.
-    void omxIdle();
+    Status onOmxIdle() override;
 
     // This is called when OMX transitions to OMX_StateLoaded, indicating that
     // we are shutting down.
-    void omxLoaded();
+    Status onOmxLoaded() override;
 
     // A "codec buffer", i.e. a buffer that can be used to pass data into
     // the encoder, has been allocated.  (This call does not call back into
     // OMXNodeInstance.)
-    void addCodecBuffer(IOMX::buffer_id bufferID);
+    Status onInputBufferAdded(int32_t bufferID) override;
 
     // Called from OnEmptyBufferDone.  If we have a BQ buffer available,
     // fill it with a new frame of data; otherwise, just mark it as available.
-    void codecBufferEmptied(const omx_message &msg);
-
-    // Called when omx_message::FILL_BUFFER_DONE is received. (Currently the
-    // buffer source will fix timestamp in the header if needed.)
-    void codecBufferFilled(omx_message &msg);
+    Status onInputBufferEmptied(
+            int32_t bufferID, const OMXFenceParcelable& fenceParcel) override;
 
     // This is called after the last input frame has been submitted.  We
     // need to submit an empty buffer with the EOS flag set.  If we don't
     // have a codec buffer ready, we just set the mEndOfStream flag.
-    status_t signalEndOfInputStream();
+    Status signalEndOfInputStream() override;
 
     // If suspend is true, all incoming buffers (including those currently
     // in the BufferQueue) will be discarded until the suspension is lifted.
-    void suspend(bool suspend);
+    Status setSuspend(bool suspend) override;
 
     // Specifies the interval after which we requeue the buffer previously
     // queued to the encoder. This is useful in the case of surface flinger
@@ -121,7 +125,7 @@ public:
     // the decoder on the remote end would be unable to decode the latest frame.
     // This API must be called before transitioning the encoder to "executing"
     // state and once this behaviour is specified it cannot be reset.
-    status_t setRepeatPreviousFrameDelayUs(int64_t repeatAfterUs);
+    Status setRepeatPreviousFrameDelayUs(int64_t repeatAfterUs) override;
 
     // When set, the timestamp fed to the encoder will be modified such that
     // the gap between two adjacent frames is capped at maxGapUs. Timestamp
@@ -130,31 +134,26 @@ public:
     // This is to solve a problem in certain real-time streaming case, where
     // encoder's rate control logic produces huge frames after a long period
     // of suspension on input.
-    status_t setMaxTimestampGapUs(int64_t maxGapUs);
+    Status setMaxTimestampGapUs(int64_t maxGapUs) override;
 
     // Sets the input buffer timestamp offset.
     // When set, the sample's timestamp will be adjusted with the timeOffsetUs.
-    status_t setInputBufferTimeOffset(int64_t timeOffsetUs);
+    Status setTimeOffsetUs(int64_t timeOffsetUs) override;
 
     // When set, the max frame rate fed to the encoder will be capped at maxFps.
-    status_t setMaxFps(float maxFps);
-
-    struct TimeLapseConfig {
-        int64_t mTimePerFrameUs;   // the time (us) between two frames for playback
-        int64_t mTimePerCaptureUs; // the time (us) between two frames for capture
-    };
+    Status setMaxFps(float maxFps) override;
 
     // Sets the time lapse (or slow motion) parameters.
     // When set, the sample's timestamp will be modified to playback framerate,
     // and capture timestamp will be modified to capture rate.
-    status_t setTimeLapseConfig(const TimeLapseConfig &config);
+    Status setTimeLapseConfig(int64_t timePerFrameUs, int64_t timePerCaptureUs) override;
 
     // Sets the start time us (in system time), samples before which should
     // be dropped and not submitted to encoder
-    void setSkipFramesBeforeUs(int64_t startTimeUs);
+    Status setStartTimeUs(int64_t startTimeUs) override;
 
     // Sets the desired color aspects, e.g. to be used when producer does not specify a dataspace.
-    void setColorAspects(const ColorAspects &aspects);
+    Status setColorAspects(int32_t aspectsPacked) override;
 
 protected:
     // BufferQueue::ConsumerListener interface, called when a new frame of
@@ -163,17 +162,17 @@ protected:
     // into the codec buffer, and call Empty[This]Buffer.  If we're not yet
     // executing or there's no codec buffer available, we just increment
     // mNumFramesAvailable and return.
-    virtual void onFrameAvailable(const BufferItem& item);
+    void onFrameAvailable(const BufferItem& item) override;
 
     // BufferQueue::ConsumerListener interface, called when the client has
     // released one or more GraphicBuffers.  We clear out the appropriate
     // set of mBufferSlot entries.
-    virtual void onBuffersReleased();
+    void onBuffersReleased() override;
 
     // BufferQueue::ConsumerListener interface, called when the client has
     // changed the sideband stream. GraphicBufferSource doesn't handle sideband
     // streams so this is a no-op (and should never be called).
-    virtual void onSidebandStreamChanged();
+    void onSidebandStreamChanged() override;
 
 private:
     // PersistentProxyListener is similar to BufferQueue::ProxyConsumerListener
@@ -251,7 +250,7 @@ private:
 
     void setLatestBuffer_l(const BufferItem &item, bool dropped);
     bool repeatLatestBuffer_l();
-    int64_t getTimestamp(const BufferItem &item);
+    bool getTimestamp(const BufferItem &item, int64_t *timeUs, int64_t *codecTimeUs);
 
     // called when the data space of the input buffer changes
     void onDataSpaceChanged_l(android_dataspace dataSpace, android_pixel_format pixelFormat);
@@ -312,7 +311,6 @@ private:
         kRepeatLastFrameCount = 10,
     };
 
-    KeyedVector<int64_t, int64_t> mOriginalTimeUs;
     int64_t mMaxTimestampGapUs;
     int64_t mPrevOriginalTimeUs;
     int64_t mPrevModifiedTimeUs;
