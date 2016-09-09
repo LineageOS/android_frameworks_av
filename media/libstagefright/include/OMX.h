@@ -132,6 +132,12 @@ public:
             OMX_U32 range_offset, OMX_U32 range_length,
             OMX_U32 flags, OMX_TICKS timestamp, int fenceFd);
 
+    virtual status_t emptyGraphicBuffer(
+            node_id node,
+            buffer_id buffer,
+            const sp<GraphicBuffer> &graphicBuffer,
+            OMX_U32 flags, OMX_TICKS timestamp, int fenceFd);
+
     virtual status_t getExtensionIndex(
             node_id node,
             const char *parameter_name,
@@ -143,6 +149,8 @@ public:
             InternalOptionType type,
             const void *data,
             size_t size);
+
+    virtual status_t dispatchMessage(const omx_message &msg);
 
     virtual void binderDied(const wp<IBinder> &the_late_who);
 

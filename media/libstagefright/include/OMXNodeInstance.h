@@ -98,8 +98,6 @@ struct OMXNodeInstance {
 
     status_t signalEndOfInputStream();
 
-    void signalEvent(OMX_EVENTTYPE event, OMX_U32 arg1, OMX_U32 arg2);
-
     status_t allocateSecureBuffer(
             OMX_U32 portIndex, size_t size, OMX::buffer_id *buffer,
             void **buffer_data, sp<NativeHandle> *native_handle);
@@ -118,7 +116,7 @@ struct OMXNodeInstance {
             OMX_U32 flags, OMX_TICKS timestamp, int fenceFd);
 
     status_t emptyGraphicBuffer(
-            OMX_BUFFERHEADERTYPE *header, const sp<GraphicBuffer> &buffer,
+            OMX::buffer_id buffer, const sp<GraphicBuffer> &graphicBuffer,
             OMX_U32 flags, OMX_TICKS timestamp, int fenceFd);
 
     status_t getExtensionIndex(
@@ -136,7 +134,6 @@ struct OMXNodeInstance {
 
     // handles messages and removes them from the list
     void onMessages(std::list<omx_message> &messages);
-    void onMessage(const omx_message &msg);
     void onObserverDied(OMXMaster *master);
     void onGetHandleFailed();
     void onEvent(OMX_EVENTTYPE event, OMX_U32 arg1, OMX_U32 arg2);
@@ -158,7 +155,6 @@ private:
     Mutex mGraphicBufferSourceLock;
     // Access this through getGraphicBufferSource().
     sp<GraphicBufferSource> mGraphicBufferSource;
-
 
     struct ActiveBuffer {
         OMX_U32 mPortIndex;
@@ -259,6 +255,8 @@ private:
     // Handles |msg|, and may modify it. Returns true iff completely handled it and
     // |msg| does not need to be sent to the event listener.
     bool handleMessage(omx_message &msg);
+
+    bool handleDataSpaceChanged(omx_message &msg);
 
     OMXNodeInstance(const OMXNodeInstance &);
     OMXNodeInstance &operator=(const OMXNodeInstance &);

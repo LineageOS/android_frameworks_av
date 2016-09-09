@@ -148,6 +148,12 @@ struct MuxOMX : public IOMX {
             OMX_U32 range_offset, OMX_U32 range_length,
             OMX_U32 flags, OMX_TICKS timestamp, int fenceFd);
 
+    virtual status_t emptyGraphicBuffer(
+            node_id node,
+            buffer_id buffer,
+            const sp<GraphicBuffer> &graphicBuffer,
+            OMX_U32 flags, OMX_TICKS timestamp, int fenceFd);
+
     virtual status_t getExtensionIndex(
             node_id node,
             const char *parameter_name,
@@ -159,6 +165,8 @@ struct MuxOMX : public IOMX {
             InternalOptionType type,
             const void *data,
             size_t size);
+
+    virtual status_t dispatchMessage(const omx_message &msg);
 
 private:
     mutable Mutex mLock;
@@ -470,6 +478,15 @@ status_t MuxOMX::emptyBuffer(
             node, buffer, range_offset, range_length, flags, timestamp, fenceFd);
 }
 
+status_t MuxOMX::emptyGraphicBuffer(
+        node_id node,
+        buffer_id buffer,
+        const sp<GraphicBuffer> &graphicBuffer,
+        OMX_U32 flags, OMX_TICKS timestamp, int fenceFd) {
+    return getOMX(node)->emptyGraphicBuffer(
+            node, buffer, graphicBuffer, flags, timestamp, fenceFd);
+}
+
 status_t MuxOMX::getExtensionIndex(
         node_id node,
         const char *parameter_name,
@@ -484,6 +501,10 @@ status_t MuxOMX::setInternalOption(
         const void *data,
         size_t size) {
     return getOMX(node)->setInternalOption(node, port_index, type, data, size);
+}
+
+status_t MuxOMX::dispatchMessage(const omx_message &msg) {
+    return getOMX(msg.node)->dispatchMessage(msg);
 }
 
 OMXClient::OMXClient() {

@@ -24,9 +24,6 @@
 
 #include "GraphicBufferSource.h"
 #include "OMXUtils.h"
-
-#include <OMX_Core.h>
-#include <OMX_IndexExt.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/ColorUtils.h>
@@ -40,10 +37,6 @@
 #include "FrameDropper.h"
 
 namespace android {
-
-static const bool EXTRA_CHECK = true;
-
-static const OMX_U32 kPortIndexInput = 0;
 
 GraphicBufferSource::PersistentProxyListener::PersistentProxyListener(
         const wp<IGraphicBufferConsumer> &consumer,
@@ -113,14 +106,16 @@ void GraphicBufferSource::PersistentProxyListener::onSidebandStreamChanged() {
 }
 
 GraphicBufferSource::GraphicBufferSource(
-        OMXNodeInstance* nodeInstance,
+        const sp<IOMX> &omx,
+        IOMX::node_id nodeID,
         uint32_t bufferWidth,
         uint32_t bufferHeight,
         uint32_t bufferCount,
         uint32_t consumerUsage,
         const sp<IGraphicBufferConsumer> &consumer) :
     mInitCheck(UNKNOWN_ERROR),
-    mNodeInstance(nodeInstance),
+    mOMX(omx),
+    mNodeID(nodeID),
     mExecuting(false),
     mSuspended(false),
     mLastDataSpace(HAL_DATASPACE_UNKNOWN),
@@ -307,7 +302,7 @@ void GraphicBufferSource::omxLoaded(){
     mExecuting = false;
 }
 
-void GraphicBufferSource::addCodecBuffer(OMX_BUFFERHEADERTYPE* header) {
+void GraphicBufferSource::addCodecBuffer(IOMX::buffer_id bufferID) {
     Mutex::Autolock autoLock(mMutex);
 
     if (mExecuting) {
@@ -317,32 +312,33 @@ void GraphicBufferSource::addCodecBuffer(OMX_BUFFERHEADERTYPE* header) {
         return;
     }
 
-    ALOGV("addCodecBuffer h=%p size=%" PRIu32 " p=%p",
-            header, header->nAllocLen, header->pBuffer);
+    ALOGV("addCodecBuffer id=%u", bufferID);
+
     CodecBuffer codecBuffer;
-    codecBuffer.mHeader = header;
+    codecBuffer.mBufferID = bufferID;
     mCodecBuffers.add(codecBuffer);
 }
 
-void GraphicBufferSource::codecBufferEmptied(OMX_BUFFERHEADERTYPE* header, int fenceFd) {
+void GraphicBufferSource::codecBufferEmptied(const omx_message &msg) {
+    IOMX::buffer_id bufferID = msg.u.buffer_data.buffer;
+    int fenceFd = msg.fenceFd;
+
     Mutex::Autolock autoLock(mMutex);
     if (!mExecuting) {
         return;
     }
 
-    int cbi = findMatchingCodecBuffer_l(header);
+    int cbi = findMatchingCodecBuffer_l(bufferID);
     if (cbi < 0) {
         // This should never happen.
-        ALOGE("codecBufferEmptied: buffer not recognized (h=%p)", header);
+        ALOGE("codecBufferEmptied: buffer not recognized (id=%u)", bufferID);
         if (fenceFd >= 0) {
             ::close(fenceFd);
         }
         return;
     }
 
-    ALOGV("codecBufferEmptied h=%p size=%" PRIu32 " filled=%" PRIu32 " p=%p",
-            header, header->nAllocLen, header->nFilledLen,
-            header->pBuffer);
+    ALOGV("codecBufferEmptied id=%u", bufferID);
     CodecBuffer& codecBuffer(mCodecBuffers.editItemAt(cbi));
 
     // header->nFilledLen may not be the original value, so we can't compare
@@ -362,32 +358,6 @@ void GraphicBufferSource::codecBufferEmptied(OMX_BUFFERHEADERTYPE* header, int f
             ::close(fenceFd);
         }
         return;
-    }
-
-    if (EXTRA_CHECK && header->nAllocLen >= sizeof(MetadataBufferType)) {
-        // Pull the graphic buffer handle back out of the buffer, and confirm
-        // that it matches expectations.
-        OMX_U8* data = header->pBuffer;
-        MetadataBufferType type = *(MetadataBufferType *)data;
-        if (type == kMetadataBufferTypeGrallocSource
-                && header->nAllocLen >= sizeof(VideoGrallocMetadata)) {
-            VideoGrallocMetadata &grallocMeta = *(VideoGrallocMetadata *)data;
-            if (grallocMeta.pHandle != codecBuffer.mGraphicBuffer->handle) {
-                // should never happen
-                ALOGE("codecBufferEmptied: buffer's handle is %p, expected %p",
-                        grallocMeta.pHandle, codecBuffer.mGraphicBuffer->handle);
-                CHECK(!"codecBufferEmptied: mismatched buffer");
-            }
-        } else if (type == kMetadataBufferTypeANWBuffer
-                && header->nAllocLen >= sizeof(VideoNativeMetadata)) {
-            VideoNativeMetadata &nativeMeta = *(VideoNativeMetadata *)data;
-            if (nativeMeta.pBuffer != codecBuffer.mGraphicBuffer->getNativeBuffer()) {
-                // should never happen
-                ALOGE("codecBufferEmptied: buffer is %p, expected %p",
-                        nativeMeta.pBuffer, codecBuffer.mGraphicBuffer->getNativeBuffer());
-                CHECK(!"codecBufferEmptied: mismatched buffer");
-            }
-        }
     }
 
     // Find matching entry in our cached copy of the BufferQueue slots.
@@ -438,22 +408,24 @@ void GraphicBufferSource::codecBufferEmptied(OMX_BUFFERHEADERTYPE* header, int f
     return;
 }
 
-void GraphicBufferSource::codecBufferFilled(OMX_BUFFERHEADERTYPE* header) {
+void GraphicBufferSource::codecBufferFilled(omx_message &msg) {
     Mutex::Autolock autoLock(mMutex);
 
+    OMX_U32 &flags = msg.u.extended_buffer_data.flags;
+    OMX_TICKS &timestamp = msg.u.extended_buffer_data.timestamp;
+
     if (mMaxTimestampGapUs > 0ll
-            && !(header->nFlags & OMX_BUFFERFLAG_CODECCONFIG)) {
-        ssize_t index = mOriginalTimeUs.indexOfKey(header->nTimeStamp);
+            && !(flags & OMX_BUFFERFLAG_CODECCONFIG)) {
+        ssize_t index = mOriginalTimeUs.indexOfKey(timestamp);
         if (index >= 0) {
             ALOGV("OUT timestamp: %lld -> %lld",
-                    static_cast<long long>(header->nTimeStamp),
+                    static_cast<long long>(timestamp),
                     static_cast<long long>(mOriginalTimeUs[index]));
-            header->nTimeStamp = mOriginalTimeUs[index];
+            timestamp = mOriginalTimeUs[index];
             mOriginalTimeUs.removeItemsAt(index);
         } else {
             // giving up the effort as encoder doesn't appear to preserve pts
-            ALOGW("giving up limiting timestamp gap (pts = %lld)",
-                    header->nTimeStamp);
+            ALOGW("giving up limiting timestamp gap (pts = %lld)", timestamp);
             mMaxTimestampGapUs = -1ll;
         }
         if (mOriginalTimeUs.size() > BufferQueue::NUM_BUFFER_SLOTS) {
@@ -512,67 +484,16 @@ void GraphicBufferSource::onDataSpaceChanged_l(
     mLastDataSpace = dataSpace;
 
     if (ColorUtils::convertDataSpaceToV0(dataSpace)) {
-        ColorAspects aspects = mColorAspects; // initially requested aspects
+        omx_message msg;
+        msg.type = omx_message::EVENT;
+        msg.node = mNodeID;
+        msg.fenceFd = -1;
+        msg.u.event_data.event = OMX_EventDataSpaceChanged;
+        msg.u.event_data.data1 = mLastDataSpace;
+        msg.u.event_data.data2 = ColorUtils::packToU32(mColorAspects);
+        msg.u.event_data.data3 = pixelFormat;
 
-        // request color aspects to encode
-        OMX_INDEXTYPE index;
-        status_t err = mNodeInstance->getExtensionIndex(
-                "OMX.google.android.index.describeColorAspects", &index);
-        if (err == OK) {
-            // V0 dataspace
-            DescribeColorAspectsParams params;
-            InitOMXParams(&params);
-            params.nPortIndex = kPortIndexInput;
-            params.nDataSpace = mLastDataSpace;
-            params.nPixelFormat = pixelFormat;
-            params.bDataSpaceChanged = OMX_TRUE;
-            params.sAspects = mColorAspects;
-
-            err = mNodeInstance->getConfig(index, &params, sizeof(params));
-            if (err == OK) {
-                aspects = params.sAspects;
-                ALOGD("Codec resolved it to (R:%d(%s), P:%d(%s), M:%d(%s), T:%d(%s)) err=%d(%s)",
-                        params.sAspects.mRange, asString(params.sAspects.mRange),
-                        params.sAspects.mPrimaries, asString(params.sAspects.mPrimaries),
-                        params.sAspects.mMatrixCoeffs, asString(params.sAspects.mMatrixCoeffs),
-                        params.sAspects.mTransfer, asString(params.sAspects.mTransfer),
-                        err, asString(err));
-            } else {
-                params.sAspects = aspects;
-                err = OK;
-            }
-            params.bDataSpaceChanged = OMX_FALSE;
-            for (int triesLeft = 2; --triesLeft >= 0; ) {
-                status_t err = mNodeInstance->setConfig(index, &params, sizeof(params));
-                if (err == OK) {
-                    err = mNodeInstance->getConfig(index, &params, sizeof(params));
-                }
-                if (err != OK || !ColorUtils::checkIfAspectsChangedAndUnspecifyThem(
-                        params.sAspects, aspects)) {
-                    // if we can't set or get color aspects, still communicate dataspace to client
-                    break;
-                }
-
-                ALOGW_IF(triesLeft == 0, "Codec repeatedly changed requested ColorAspects.");
-            }
-        }
-
-        ALOGV("Set color aspects to (R:%d(%s), P:%d(%s), M:%d(%s), T:%d(%s)) err=%d(%s)",
-                aspects.mRange, asString(aspects.mRange),
-                aspects.mPrimaries, asString(aspects.mPrimaries),
-                aspects.mMatrixCoeffs, asString(aspects.mMatrixCoeffs),
-                aspects.mTransfer, asString(aspects.mTransfer),
-                err, asString(err));
-
-        // signal client that the dataspace has changed; this will update the output format
-        // TODO: we should tie this to an output buffer somehow, and signal the change
-        // just before the output buffer is returned to the client, but there are many
-        // ways this could fail (e.g. flushing), and we are not yet supporting this scenario.
-
-        mNodeInstance->signalEvent(
-                OMX_EventDataSpaceChanged, dataSpace,
-                (aspects.mRange << 24) | (aspects.mPrimaries << 16)
-                        | (aspects.mMatrixCoeffs << 8) | aspects.mTransfer);
+        mOMX->dispatchMessage(msg);
     }
 }
 
@@ -849,19 +770,21 @@ status_t GraphicBufferSource::submitBuffer_l(const BufferItem &item, int cbi) {
     codecBuffer.mSlot = item.mSlot;
     codecBuffer.mFrameNumber = item.mFrameNumber;
 
-    OMX_BUFFERHEADERTYPE* header = codecBuffer.mHeader;
-    sp<GraphicBuffer> buffer = codecBuffer.mGraphicBuffer;
-    status_t err = mNodeInstance->emptyGraphicBuffer(
-            header, buffer, OMX_BUFFERFLAG_ENDOFFRAME, timeUs,
-            item.mFence->isValid() ? item.mFence->dup() : -1);
+    IOMX::buffer_id bufferID = codecBuffer.mBufferID;
+    const sp<GraphicBuffer> &buffer = codecBuffer.mGraphicBuffer;
+    int fenceID = item.mFence->isValid() ? item.mFence->dup() : -1;
+
+    status_t err = mOMX->emptyGraphicBuffer(
+            mNodeID, bufferID, buffer, OMX_BUFFERFLAG_ENDOFFRAME, timeUs, fenceID);
+
     if (err != OK) {
-        ALOGW("WARNING: emptyNativeWindowBuffer failed: 0x%x", err);
+        ALOGW("WARNING: emptyGraphicBuffer failed: 0x%x", err);
         codecBuffer.mGraphicBuffer = NULL;
         return err;
     }
 
-    ALOGV("emptyNativeWindowBuffer succeeded, h=%p p=%p buf=%p bufhandle=%p",
-            header, header->pBuffer, buffer->getNativeBuffer(), buffer->handle);
+    ALOGV("emptyGraphicBuffer succeeded, id=%u buf=%p bufhandle=%p",
+            bufferID, buffer->getNativeBuffer(), buffer->handle);
     return OK;
 }
 
@@ -882,16 +805,17 @@ void GraphicBufferSource::submitEndOfInputStream_l() {
     // to stick a placeholder into codecBuffer.mGraphicBuffer to mark it as
     // in-use.
     CodecBuffer& codecBuffer(mCodecBuffers.editItemAt(cbi));
+    IOMX::buffer_id bufferID = codecBuffer.mBufferID;
 
-    OMX_BUFFERHEADERTYPE* header = codecBuffer.mHeader;
-    status_t err = mNodeInstance->emptyGraphicBuffer(
-            header, NULL /* buffer */, OMX_BUFFERFLAG_ENDOFFRAME | OMX_BUFFERFLAG_EOS,
+    status_t err = mOMX->emptyGraphicBuffer(
+            mNodeID, bufferID, NULL /* buffer */,
+            OMX_BUFFERFLAG_ENDOFFRAME | OMX_BUFFERFLAG_EOS,
             0 /* timestamp */, -1 /* fenceFd */);
     if (err != OK) {
         ALOGW("emptyDirectBuffer EOS failed: 0x%x", err);
     } else {
-        ALOGV("submitEndOfInputStream_l: buffer submitted, header=%p cbi=%d",
-                header, cbi);
+        ALOGV("submitEndOfInputStream_l: buffer submitted, id=%u cbi=%d",
+                bufferID, cbi);
         mEndOfStreamSent = true;
     }
 }
@@ -907,10 +831,9 @@ int GraphicBufferSource::findAvailableCodecBuffer_l() {
     return -1;
 }
 
-int GraphicBufferSource::findMatchingCodecBuffer_l(
-        const OMX_BUFFERHEADERTYPE* header) {
+int GraphicBufferSource::findMatchingCodecBuffer_l(IOMX::buffer_id bufferID) {
     for (int i = (int)mCodecBuffers.size() - 1; i>= 0; --i) {
-        if (mCodecBuffers[i].mHeader == header) {
+        if (mCodecBuffers[i].mBufferID == bufferID) {
             return i;
         }
     }

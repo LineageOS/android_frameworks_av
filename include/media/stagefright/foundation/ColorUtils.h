@@ -138,6 +138,12 @@ struct ColorUtils {
             int32_t primaries, int32_t transfer, int32_t coeffs, bool fullRange,
             ColorAspects &aspects);
 
+    // unpack a uint32_t to a full ColorAspects struct
+    static ColorAspects unpackToColorAspects(uint32_t packed);
+
+    // pack a full ColorAspects struct into a uint32_t
+    static uint32_t packToU32(const ColorAspects &aspects);
+
     // updates Unspecified color aspects to their defaults based on the video size
     static void setDefaultCodecColorAspectsIfNeeded(
             ColorAspects &aspects, int32_t width, int32_t height);

@@ -55,6 +55,7 @@ enum {
     FREE_BUFFER,
     FILL_BUFFER,
     EMPTY_BUFFER,
+    EMPTY_GRAPHIC_BUFFER,
     GET_EXTENSION_INDEX,
     OBSERVER_ON_MSG,
     GET_GRAPHIC_BUFFER_USAGE,
@@ -62,6 +63,7 @@ enum {
     UPDATE_GRAPHIC_BUFFER_IN_META,
     CONFIGURE_VIDEO_TUNNEL_MODE,
     UPDATE_NATIVE_HANDLE_IN_META,
+    DISPATCH_MESSAGE,
 };
 
 class BpOMX : public BpInterface<IOMX> {
@@ -585,6 +587,27 @@ public:
         return reply.readInt32();
     }
 
+    virtual status_t emptyGraphicBuffer(
+            node_id node,
+            buffer_id buffer,
+            const sp<GraphicBuffer> &graphicBuffer,
+            OMX_U32 flags, OMX_TICKS timestamp, int fenceFd) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
+        data.writeInt32((int32_t)node);
+        data.writeInt32((int32_t)buffer);
+        data.write(*graphicBuffer);
+        data.writeInt32(flags);
+        data.writeInt64(timestamp);
+        data.writeInt32(fenceFd >= 0);
+        if (fenceFd >= 0) {
+            data.writeFileDescriptor(fenceFd, true /* takeOwnership */);
+        }
+        remote()->transact(EMPTY_GRAPHIC_BUFFER, data, &reply);
+
+        return reply.readInt32();
+    }
+
     virtual status_t getExtensionIndex(
             node_id node,
             const char *parameter_name,
@@ -620,6 +643,22 @@ public:
         data.write(optionData, size);
         data.writeInt32(type);
         remote()->transact(SET_INTERNAL_OPTION, data, &reply);
+
+        return reply.readInt32();
+    }
+
+    virtual status_t dispatchMessage(const omx_message &msg) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
+        data.writeInt32((int32_t)msg.node);
+        data.writeInt32(msg.fenceFd >= 0);
+        if (msg.fenceFd >= 0) {
+            data.writeFileDescriptor(msg.fenceFd, true /* takeOwnership */);
+        }
+        data.writeInt32(msg.type);
+        data.write(&msg.u, sizeof(msg.u));
+
+        remote()->transact(DISPATCH_MESSAGE, data, &reply);
 
         return reply.readInt32();
     }
@@ -1193,6 +1232,24 @@ status_t BnOMX::onTransact(
             return NO_ERROR;
         }
 
+        case EMPTY_GRAPHIC_BUFFER:
+        {
+            CHECK_OMX_INTERFACE(IOMX, data, reply);
+
+            node_id node = (node_id)data.readInt32();
+            buffer_id buffer = (buffer_id)data.readInt32();
+            sp<GraphicBuffer> graphicBuffer = new GraphicBuffer();
+            data.read(*graphicBuffer);
+            OMX_U32 flags = data.readInt32();
+            OMX_TICKS timestamp = data.readInt64();
+            bool haveFence = data.readInt32();
+            int fenceFd = haveFence ? ::dup(data.readFileDescriptor()) : -1;
+            reply->writeInt32(emptyGraphicBuffer(
+                    node, buffer, graphicBuffer, flags, timestamp, fenceFd));
+
+            return NO_ERROR;
+        }
+
         case GET_EXTENSION_INDEX:
         {
             CHECK_OMX_INTERFACE(IOMX, data, reply);
@@ -1216,6 +1273,24 @@ status_t BnOMX::onTransact(
             }
 
             return OK;
+        }
+
+        case DISPATCH_MESSAGE:
+        {
+            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            omx_message msg;
+            msg.node = data.readInt32();
+            int haveFence = data.readInt32();
+            msg.fenceFd = haveFence ? ::dup(data.readFileDescriptor()) : -1;
+            msg.type = (typeof(msg.type))data.readInt32();
+            status_t err = data.read(&msg.u, sizeof(msg.u));
+
+            if (err == OK) {
+                err = dispatchMessage(msg);
+            }
+            reply->writeInt32(err);
+
+            return NO_ERROR;
         }
 
         default:

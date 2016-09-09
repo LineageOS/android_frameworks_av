@@ -5526,11 +5526,7 @@ bool ACodec::BaseState::onOMXFrameRendered(
 bool ACodec::BaseState::onOMXEvent(
         OMX_EVENTTYPE event, OMX_U32 data1, OMX_U32 data2) {
     if (event == OMX_EventDataSpaceChanged) {
-        ColorAspects aspects;
-        aspects.mRange = (ColorAspects::Range)((data2 >> 24) & 0xFF);
-        aspects.mPrimaries = (ColorAspects::Primaries)((data2 >> 16) & 0xFF);
-        aspects.mMatrixCoeffs = (ColorAspects::MatrixCoeffs)((data2 >> 8) & 0xFF);
-        aspects.mTransfer = (ColorAspects::Transfer)(data2 & 0xFF);
+        ColorAspects aspects = ColorUtils::unpackToColorAspects(data2);
 
         mCodec->onDataSpaceChanged((android_dataspace)data1, aspects);
         return true;
