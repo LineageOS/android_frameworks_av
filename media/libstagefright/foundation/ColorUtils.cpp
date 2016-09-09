@@ -342,6 +342,23 @@ void ColorUtils::convertIsoColorAspectsToCodecAspects(
 }
 
 // static
+ColorAspects ColorUtils::unpackToColorAspects(uint32_t packed) {
+    ColorAspects aspects;
+    aspects.mRange        = (ColorAspects::Range)((packed >> 24) & 0xFF);
+    aspects.mPrimaries    = (ColorAspects::Primaries)((packed >> 16) & 0xFF);
+    aspects.mMatrixCoeffs = (ColorAspects::MatrixCoeffs)((packed >> 8) & 0xFF);
+    aspects.mTransfer     = (ColorAspects::Transfer)(packed & 0xFF);
+
+    return aspects;
+}
+
+// static
+uint32_t ColorUtils::packToU32(const ColorAspects &aspects) {
+    return (aspects.mRange << 24) | (aspects.mPrimaries << 16)
+            | (aspects.mMatrixCoeffs << 8) | aspects.mTransfer;
+}
+
+// static
 void ColorUtils::setDefaultCodecColorAspectsIfNeeded(
         ColorAspects &aspects, int32_t width, int32_t height) {
     ColorAspects::MatrixCoeffs coeffs;

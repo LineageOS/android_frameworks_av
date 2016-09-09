@@ -52,7 +52,8 @@ struct FrameDropper;
 class GraphicBufferSource : public BufferQueue::ConsumerListener {
 public:
     GraphicBufferSource(
-            OMXNodeInstance* nodeInstance,
+            const sp<IOMX> &omx,
+            IOMX::node_id nodeID,
             uint32_t bufferWidth,
             uint32_t bufferHeight,
             uint32_t bufferCount,
@@ -94,15 +95,15 @@ public:
     // A "codec buffer", i.e. a buffer that can be used to pass data into
     // the encoder, has been allocated.  (This call does not call back into
     // OMXNodeInstance.)
-    void addCodecBuffer(OMX_BUFFERHEADERTYPE* header);
+    void addCodecBuffer(IOMX::buffer_id bufferID);
 
     // Called from OnEmptyBufferDone.  If we have a BQ buffer available,
     // fill it with a new frame of data; otherwise, just mark it as available.
-    void codecBufferEmptied(OMX_BUFFERHEADERTYPE* header, int fenceFd);
+    void codecBufferEmptied(const omx_message &msg);
 
     // Called when omx_message::FILL_BUFFER_DONE is received. (Currently the
     // buffer source will fix timestamp in the header if needed.)
-    void codecBufferFilled(OMX_BUFFERHEADERTYPE* header);
+    void codecBufferFilled(omx_message &msg);
 
     // This is called after the last input frame has been submitted.  We
     // need to submit an empty buffer with the EOS flag set.  If we don't
@@ -203,7 +204,7 @@ private:
     // Keep track of codec input buffers.  They may either be available
     // (mGraphicBuffer == NULL) or in use by the codec.
     struct CodecBuffer {
-        OMX_BUFFERHEADERTYPE* mHeader;
+        IOMX::buffer_id mBufferID;
 
         // buffer producer's frame-number for buffer
         uint64_t mFrameNumber;
@@ -224,7 +225,7 @@ private:
     }
 
     // Finds the mCodecBuffers entry that matches.  Returns -1 if not found.
-    int findMatchingCodecBuffer_l(const OMX_BUFFERHEADERTYPE* header);
+    int findMatchingCodecBuffer_l(IOMX::buffer_id bufferID);
 
     // Fills a codec buffer with a frame from the BufferQueue.  This must
     // only be called when we know that a frame of data is ready (i.e. we're
@@ -261,8 +262,9 @@ private:
     // Used to report constructor failure.
     status_t mInitCheck;
 
-    // Pointer back to the object that contains us.  We send buffers here.
-    OMXNodeInstance* mNodeInstance;
+    // Pointer back to the IOMX that created us.  We send buffers here.
+    sp<IOMX> mOMX;
+    IOMX::node_id mNodeID;
 
     // Set by omxExecuting() / omxIdling().
     bool mExecuting;

@@ -606,6 +606,21 @@ status_t OMX::emptyBuffer(
             buffer, range_offset, range_length, flags, timestamp, fenceFd);
 }
 
+status_t OMX::emptyGraphicBuffer(
+        node_id node,
+        buffer_id buffer,
+        const sp<GraphicBuffer> &graphicBuffer,
+        OMX_U32 flags, OMX_TICKS timestamp, int fenceFd) {
+    OMXNodeInstance *instance = findInstance(node);
+
+    if (instance == NULL) {
+        return NAME_NOT_FOUND;
+    }
+
+    return instance->emptyGraphicBuffer(
+            buffer, graphicBuffer, flags, timestamp, fenceFd);
+}
+
 status_t OMX::getExtensionIndex(
         node_id node,
         const char *parameter_name,
@@ -633,6 +648,18 @@ status_t OMX::setInternalOption(
     }
 
     return instance->setInternalOption(port_index, type, data, size);
+}
+
+status_t OMX::dispatchMessage(const omx_message &msg) {
+    sp<OMX::CallbackDispatcher> dispatcher = findDispatcher(msg.node);
+
+    if (dispatcher == NULL) {
+        return OMX_ErrorComponentNotFound;
+    }
+
+    dispatcher->post(msg, true /*realTime*/);
+
+    return OMX_ErrorNone;
 }
 
 OMX_ERRORTYPE OMX::OnEvent(

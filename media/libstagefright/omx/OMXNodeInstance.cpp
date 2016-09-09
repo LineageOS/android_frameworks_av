@@ -35,6 +35,7 @@
 #include <HardwareAPI.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ABuffer.h>
+#include <media/stagefright/foundation/ColorUtils.h>
 #include <media/stagefright/MediaErrors.h>
 #include <utils/misc.h>
 #include <utils/NativeHandle.h>
@@ -840,7 +841,7 @@ status_t OMXNodeInstance::useBuffer(
 
     sp<GraphicBufferSource> bufferSource(getGraphicBufferSource());
     if (bufferSource != NULL && portIndex == kPortIndexInput) {
-        bufferSource->addCodecBuffer(header);
+        bufferSource->addCodecBuffer(*buffer);
     }
 
     CLOG_BUFFER(useBuffer, NEW_BUFFER_FMT(
@@ -1119,7 +1120,9 @@ status_t OMXNodeInstance::createGraphicBufferSource(
         usageBits = 0;
     }
 
-    sp<GraphicBufferSource> bufferSource = new GraphicBufferSource(this,
+    sp<GraphicBufferSource> bufferSource = new GraphicBufferSource(
+            mOwner,
+            mNodeID,
             def.format.video.nFrameWidth,
             def.format.video.nFrameHeight,
             def.nBufferCountActual,
@@ -1193,10 +1196,6 @@ status_t OMXNodeInstance::setInputSurface(
     return createGraphicBufferSource(portIndex, bufferConsumer, type);
 }
 
-void OMXNodeInstance::signalEvent(OMX_EVENTTYPE event, OMX_U32 arg1, OMX_U32 arg2) {
-    mOwner->OnEvent(mNodeID, event, arg1, arg2, NULL);
-}
-
 status_t OMXNodeInstance::signalEndOfInputStream() {
     // For non-Surface input, the MediaCodec should convert the call to a
     // pair of requests (dequeue input buffer, queue input buffer with EOS
@@ -1252,7 +1251,7 @@ status_t OMXNodeInstance::allocateSecureBuffer(
 
     sp<GraphicBufferSource> bufferSource(getGraphicBufferSource());
     if (bufferSource != NULL && portIndex == kPortIndexInput) {
-        bufferSource->addCodecBuffer(header);
+        bufferSource->addCodecBuffer(*buffer);
     }
     CLOG_BUFFER(allocateSecureBuffer, NEW_BUFFER_FMT(
             *buffer, portIndex, "%zu@%p:%p", size, *buffer_data,
@@ -1307,7 +1306,7 @@ status_t OMXNodeInstance::allocateBufferWithBackup(
 
     sp<GraphicBufferSource> bufferSource(getGraphicBufferSource());
     if (bufferSource != NULL && portIndex == kPortIndexInput) {
-        bufferSource->addCodecBuffer(header);
+        bufferSource->addCodecBuffer(*buffer);
     }
 
     CLOG_BUFFER(allocateBufferWithBackup, NEW_BUFFER_FMT(*buffer, portIndex, "%zu@%p :> %u@%p",
@@ -1540,15 +1539,16 @@ status_t OMXNodeInstance::emptyBuffer_l(
 
 // like emptyBuffer, but the data is already in header->pBuffer
 status_t OMXNodeInstance::emptyGraphicBuffer(
-        OMX_BUFFERHEADERTYPE *header, const sp<GraphicBuffer> &graphicBuffer,
+        OMX::buffer_id buffer, const sp<GraphicBuffer> &graphicBuffer,
         OMX_U32 flags, OMX_TICKS timestamp, int fenceFd) {
+    Mutex::Autolock autoLock(mLock);
+
+    OMX_BUFFERHEADERTYPE *header = findBufferHeader(buffer, kPortIndexInput);
     if (header == NULL) {
         ALOGE("b/25884056");
         return BAD_VALUE;
     }
 
-    Mutex::Autolock autoLock(mLock);
-    OMX::buffer_id buffer = findBufferID(header);
     status_t err = updateGraphicBufferInMeta_l(
             kPortIndexInput, graphicBuffer, buffer, header,
             true /* updateCodecBuffer */);
@@ -1737,9 +1737,7 @@ bool OMXNodeInstance::handleMessage(omx_message &msg) {
 
         if (bufferSource != NULL) {
             // fix up the buffer info (especially timestamp) if needed
-            bufferSource->codecBufferFilled(buffer);
-
-            msg.u.extended_buffer_data.timestamp = buffer->nTimeStamp;
+            bufferSource->codecBufferFilled(msg);
         }
     } else if (msg.type == omx_message::EMPTY_BUFFER_DONE) {
         OMX_BUFFERHEADERTYPE *buffer =
@@ -1762,10 +1760,88 @@ bool OMXNodeInstance::handleMessage(omx_message &msg) {
             // Don't dispatch a message back to ACodec, since it doesn't
             // know that anyone asked to have the buffer emptied and will
             // be very confused.
-            bufferSource->codecBufferEmptied(buffer, msg.fenceFd);
+            bufferSource->codecBufferEmptied(msg);
             return true;
         }
+    } else if (msg.type == omx_message::EVENT &&
+            msg.u.event_data.event == OMX_EventDataSpaceChanged) {
+        handleDataSpaceChanged(msg);
     }
+
+    return false;
+}
+
+bool OMXNodeInstance::handleDataSpaceChanged(omx_message &msg) {
+    android_dataspace dataSpace = (android_dataspace) msg.u.event_data.data1;
+    android_dataspace origDataSpace = dataSpace;
+
+    if (!ColorUtils::convertDataSpaceToV0(dataSpace)) {
+        // Do not process the data space change, don't notify client either
+        return true;
+    }
+
+    android_pixel_format pixelFormat = (android_pixel_format)msg.u.event_data.data3;
+
+    ColorAspects requestedAspects = ColorUtils::unpackToColorAspects(msg.u.event_data.data2);
+    ColorAspects aspects = requestedAspects; // initially requested aspects
+
+    // request color aspects to encode
+    OMX_INDEXTYPE index;
+    status_t err = getExtensionIndex(
+            "OMX.google.android.index.describeColorAspects", &index);
+    if (err == OK) {
+        // V0 dataspace
+        DescribeColorAspectsParams params;
+        InitOMXParams(&params);
+        params.nPortIndex = kPortIndexInput;
+        params.nDataSpace = origDataSpace;
+        params.nPixelFormat = pixelFormat;
+        params.bDataSpaceChanged = OMX_TRUE;
+        params.sAspects = requestedAspects;
+
+        err = getConfig(index, &params, sizeof(params));
+        if (err == OK) {
+            aspects = params.sAspects;
+            ALOGD("Codec resolved it to (R:%d(%s), P:%d(%s), M:%d(%s), T:%d(%s)) err=%d(%s)",
+                    params.sAspects.mRange, asString(params.sAspects.mRange),
+                    params.sAspects.mPrimaries, asString(params.sAspects.mPrimaries),
+                    params.sAspects.mMatrixCoeffs, asString(params.sAspects.mMatrixCoeffs),
+                    params.sAspects.mTransfer, asString(params.sAspects.mTransfer),
+                    err, asString(err));
+        } else {
+            params.sAspects = aspects;
+            err = OK;
+        }
+        params.bDataSpaceChanged = OMX_FALSE;
+        for (int triesLeft = 2; --triesLeft >= 0; ) {
+            status_t err = setConfig(index, &params, sizeof(params));
+            if (err == OK) {
+                err = getConfig(index, &params, sizeof(params));
+            }
+            if (err != OK || !ColorUtils::checkIfAspectsChangedAndUnspecifyThem(
+                    params.sAspects, aspects)) {
+                // if we can't set or get color aspects, still communicate dataspace to client
+                break;
+            }
+
+            ALOGW_IF(triesLeft == 0, "Codec repeatedly changed requested ColorAspects.");
+        }
+    }
+
+    ALOGV("Set color aspects to (R:%d(%s), P:%d(%s), M:%d(%s), T:%d(%s)) err=%d(%s)",
+            aspects.mRange, asString(aspects.mRange),
+            aspects.mPrimaries, asString(aspects.mPrimaries),
+            aspects.mMatrixCoeffs, asString(aspects.mMatrixCoeffs),
+            aspects.mTransfer, asString(aspects.mTransfer),
+            err, asString(err));
+
+    // signal client that the dataspace has changed; this will update the output format
+    // TODO: we should tie this to an output buffer somehow, and signal the change
+    // just before the output buffer is returned to the client, but there are many
+    // ways this could fail (e.g. flushing), and we are not yet supporting this scenario.
+
+    msg.u.event_data.data1 = (OMX_U32) dataSpace;
+    msg.u.event_data.data2 = (OMX_U32) ColorUtils::packToU32(aspects);
 
     return false;
 }

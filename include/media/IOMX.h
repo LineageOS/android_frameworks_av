@@ -39,6 +39,7 @@ class IOMXObserver;
 class IOMXRenderer;
 class NativeHandle;
 class Surface;
+struct omx_message;
 
 class IOMX : public IInterface {
 public:
@@ -179,6 +180,12 @@ public:
             OMX_U32 range_offset, OMX_U32 range_length,
             OMX_U32 flags, OMX_TICKS timestamp, int fenceFd = -1) = 0;
 
+    virtual status_t emptyGraphicBuffer(
+            node_id node,
+            buffer_id buffer,
+            const sp<GraphicBuffer> &graphicBuffer,
+            OMX_U32 flags, OMX_TICKS timestamp, int fenceFd) = 0;
+
     virtual status_t getExtensionIndex(
             node_id node,
             const char *parameter_name,
@@ -200,6 +207,8 @@ public:
             InternalOptionType type,
             const void *data,
             size_t size) = 0;
+
+    virtual status_t dispatchMessage(const omx_message &msg) = 0;
 };
 
 struct omx_message {
@@ -219,6 +228,8 @@ struct omx_message {
             OMX_EVENTTYPE event;
             OMX_U32 data1;
             OMX_U32 data2;
+            OMX_U32 data3;
+            OMX_U32 data4;
         } event_data;
 
         // if type == EMPTY_BUFFER_DONE
