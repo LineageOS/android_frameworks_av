@@ -117,7 +117,7 @@ private:
     // When necessary, it will send out buffering events to the player.
     struct BufferingMonitor : public AHandler {
     public:
-        BufferingMonitor(const sp<AMessage> &notify);
+        explicit BufferingMonitor(const sp<AMessage> &notify);
 
         // Set up state.
         void prepare(const sp<NuCachedSource2> &cachedSource,
