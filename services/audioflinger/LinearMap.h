@@ -134,7 +134,7 @@ public:
         FIND_METHOD_START_VALUE,             // No samples in history, using start value
     };
 
-    LinearMap(size_t size)
+    explicit LinearMap(size_t size)
             : mSize(size),
               mPos(0), // a circular buffer, so could start anywhere. the first sample is at 1.
               mSamples(0),
