@@ -36,7 +36,7 @@ typedef enum {
 class AudioRoute  : public virtual RefBase
 {
 public:
-    AudioRoute(audio_route_type_t type) : mType(type) {}
+    explicit AudioRoute(audio_route_type_t type) : mType(type) {}
 
     void setSources(const AudioPortVector &sources) { mSources = sources; }
     const AudioPortVector &getSources() const { return mSources; }
