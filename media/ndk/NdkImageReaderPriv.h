@@ -112,7 +112,7 @@ struct AImageReader : public RefBase {
 
     struct FrameListener : public ConsumerBase::FrameAvailableListener {
       public:
-        FrameListener(AImageReader* parent) : mReader(parent) {}
+        explicit FrameListener(AImageReader* parent) : mReader(parent) {}
 
         void onFrameAvailable(const BufferItem& item) override;
 
