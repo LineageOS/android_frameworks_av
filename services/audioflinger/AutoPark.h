@@ -21,7 +21,7 @@ template<typename T> class AutoPark {
 public:
 
     // Park the specific FastThread, which can be nullptr, in hot idle if not currently idling
-    AutoPark(const sp<T>& fastThread) : mFastThread(fastThread)
+    explicit AutoPark(const sp<T>& fastThread) : mFastThread(fastThread)
     {
         mPreviousCommand = FastThreadState::HOT_IDLE;
         if (fastThread != nullptr) {
