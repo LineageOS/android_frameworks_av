@@ -60,7 +60,7 @@ class CameraManagerGlobal final : public RefBase {
 
     class DeathNotifier : public IBinder::DeathRecipient {
       public:
-        DeathNotifier(CameraManagerGlobal* cm) : mCameraManager(cm) {}
+        explicit DeathNotifier(CameraManagerGlobal* cm) : mCameraManager(cm) {}
       protected:
         // IBinder::DeathRecipient implementation
         virtual void binderDied(const wp<IBinder>& who);
@@ -71,7 +71,7 @@ class CameraManagerGlobal final : public RefBase {
 
     class CameraServiceListener final : public hardware::BnCameraServiceListener {
       public:
-        CameraServiceListener(CameraManagerGlobal* cm) : mCameraManager(cm) {}
+        explicit CameraServiceListener(CameraManagerGlobal* cm) : mCameraManager(cm) {}
         virtual binder::Status onStatusChanged(int32_t status, int32_t cameraId);
 
         // Torch API not implemented yet
@@ -86,7 +86,7 @@ class CameraManagerGlobal final : public RefBase {
 
     // Wrapper of ACameraManager_AvailabilityCallbacks so we can store it in std::set
     struct Callback {
-        Callback(const ACameraManager_AvailabilityCallbacks *callback) :
+        explicit Callback(const ACameraManager_AvailabilityCallbacks *callback) :
             mAvailable(callback->onCameraAvailable),
             mUnavailable(callback->onCameraUnavailable),
             mContext(callback->context) {}

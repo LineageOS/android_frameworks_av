@@ -170,7 +170,7 @@ public:
     class RecordingProxy : public BnCameraRecordingProxy
     {
     public:
-        RecordingProxy(const sp<Camera>& camera);
+        explicit RecordingProxy(const sp<Camera>& camera);
 
         // ICameraRecordingProxy interface
         virtual status_t startRecording(const sp<ICameraRecordingProxyListener>& listener);
@@ -183,7 +183,7 @@ public:
     };
 
 protected:
-                        Camera(int cameraId);
+    explicit            Camera(int cameraId);
                         Camera(const Camera&);
                         Camera& operator=(const Camera);
 
