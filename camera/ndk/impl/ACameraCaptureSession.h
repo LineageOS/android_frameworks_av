@@ -24,7 +24,7 @@
 using namespace android;
 
 struct ACaptureSessionOutput {
-    ACaptureSessionOutput(ANativeWindow* window) : mWindow(window) {};
+    explicit ACaptureSessionOutput(ANativeWindow* window) : mWindow(window) {};
 
     bool operator == (const ACaptureSessionOutput& other) const {
         return mWindow == other.mWindow;
