@@ -44,7 +44,7 @@ class Camera3OutputStream;
  */
 class Camera3BufferManager: public virtual RefBase {
 public:
-    Camera3BufferManager(const sp<IGraphicBufferAlloc>& allocator = NULL);
+    explicit Camera3BufferManager(const sp<IGraphicBufferAlloc>& allocator = NULL);
 
     virtual ~Camera3BufferManager();
 
@@ -195,7 +195,7 @@ private:
     struct GraphicBufferEntry {
         sp<GraphicBuffer> graphicBuffer;
         int fenceFd;
-        GraphicBufferEntry(const sp<GraphicBuffer>& gb = 0, int fd = -1) :
+        explicit GraphicBufferEntry(const sp<GraphicBuffer>& gb = 0, int fd = -1) :
             graphicBuffer(gb),
             fenceFd(fd) {}
     };
