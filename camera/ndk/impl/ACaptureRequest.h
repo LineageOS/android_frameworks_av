@@ -22,7 +22,7 @@
 using namespace android;
 
 struct ACameraOutputTarget {
-    ACameraOutputTarget(ANativeWindow* window) : mWindow(window) {};
+    explicit ACameraOutputTarget(ANativeWindow* window) : mWindow(window) {};
 
     bool operator == (const ACameraOutputTarget& other) const {
         return mWindow == other.mWindow;

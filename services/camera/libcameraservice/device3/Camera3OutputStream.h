@@ -46,7 +46,7 @@ struct StreamInfo {
     uint32_t combinedUsage;
     size_t totalBufferCount;
     bool isConfigured;
-    StreamInfo(int id = CAMERA3_STREAM_ID_INVALID,
+    explicit StreamInfo(int id = CAMERA3_STREAM_ID_INVALID,
             int setId = CAMERA3_STREAM_SET_ID_INVALID,
             uint32_t w = 0,
             uint32_t h = 0,
