@@ -16,8 +16,6 @@ LOCAL_C_INCLUDES += \
     external/webrtc/webrtc/modules/audio_processing/include \
     $(call include-path-for, audio-effects)
 
-LOCAL_C_INCLUDES += $(call include-path-for, speex)
-
 LOCAL_SHARED_LIBRARIES := \
     libwebrtc_audio_preprocessing \
     libspeexresampler \
