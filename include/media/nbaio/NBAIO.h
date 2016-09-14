@@ -35,13 +35,16 @@ namespace android {
 
 // In addition to the usual status_t
 enum {
-    NEGOTIATE    = 0x80000010,  // Must (re-)negotiate format.  For negotiate() only, the offeree
-                                // doesn't accept offers, and proposes counter-offers
-    OVERRUN      = 0x80000011,  // availableToRead(), read(), or readVia() detected lost input due
-                                // to overrun; an event is counted and the caller should re-try
-    UNDERRUN     = 0x80000012,  // availableToWrite(), write(), or writeVia() detected a gap in
-                                // output due to underrun (not being called often enough, or with
-                                // enough data); an event is counted and the caller should re-try
+    NEGOTIATE    = (UNKNOWN_ERROR + 0x100),  // Must (re-)negotiate format.  For negotiate() only,
+                                             // the offeree doesn't accept offers, and proposes
+                                             // counter-offers
+    OVERRUN      = (UNKNOWN_ERROR + 0x101),  // availableToRead(), read(), or readVia() detected
+                                             // lost input due to overrun; an event is counted and
+                                             // the caller should re-try
+    UNDERRUN     = (UNKNOWN_ERROR + 0x102),  // availableToWrite(), write(), or writeVia() detected
+                                             // a gap in output due to underrun (not being called
+                                             // often enough, or with enough data); an event is
+                                             // counted and the caller should re-try
 };
 
 // Negotiation of format is based on the data provider and data sink, or the data consumer and

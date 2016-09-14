@@ -143,6 +143,12 @@ static const nsecs_t kOffloadStandbyDelayNs = seconds(1);
 // Direct output thread minimum sleep time in idle or active(underrun) state
 static const nsecs_t kDirectMinSleepTimeUs = 10000;
 
+// The universal constant for ubiquitous 20ms value. The value of 20ms seems to provide a good
+// balance between power consumption and latency, and allows threads to be scheduled reliably
+// by the CFS scheduler.
+// FIXME Express other hardcoded references to 20ms with references to this constant and move
+// it appropriately.
+#define FMS_20 20
 
 // Whether to use fast mixer
 static const enum {
@@ -5875,7 +5881,7 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
                                          ) :
     ThreadBase(audioFlinger, id, outDevice, inDevice, RECORD, systemReady),
     mInput(input), mActiveTracksGen(0), mRsmpInBuffer(NULL),
-    // mRsmpInFrames and mRsmpInFramesP2 are set by readInputParameters_l()
+    // mRsmpInFrames, mRsmpInFramesP2, and mRsmpInFramesOA are set by readInputParameters_l()
     mRsmpInRear(0)
 #ifdef TEE_SINK
     , mTeeSink(teeSink)
@@ -5927,7 +5933,8 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
     if (initFastCapture) {
         // create a Pipe for FastCapture to write to, and for us and fast tracks to read from
         NBAIO_Format format = mInputSource->format();
-        size_t pipeFramesP2 = roundup(mSampleRate / 25);    // double-buffering of 20 ms each
+        // quadruple-buffering of 20 ms each; this ensures we can sleep for 20ms in RecordThread
+        size_t pipeFramesP2 = roundup(4 * FMS_20 * mSampleRate / 1000);
         size_t pipeSize = pipeFramesP2 * Format_frameSize(format);
         void *pipeBuffer;
         const sp<MemoryDealer> roHeap(readOnlyHeap());
@@ -6257,11 +6264,31 @@ reacquire_wakelock:
         // If an NBAIO source is present, use it to read the normal capture's data
         if (mPipeSource != 0) {
             size_t framesToRead = mBufferSize / mFrameSize;
+            framesToRead = min(mRsmpInFramesOA - rear, mRsmpInFramesP2 / 2);
             framesRead = mPipeSource->read((uint8_t*)mRsmpInBuffer + rear * mFrameSize,
                     framesToRead);
-            if (framesRead == 0) {
-                // since pipe is non-blocking, simulate blocking input
-                sleepUs = (framesToRead * 1000000LL) / mSampleRate;
+            // since pipe is non-blocking, simulate blocking input by waiting for 1/2 of
+            // buffer size or at least for 20ms.
+            size_t sleepFrames = max(
+                    min(mPipeFramesP2, mRsmpInFramesP2) / 2, FMS_20 * mSampleRate / 1000);
+            if (framesRead <= (ssize_t) sleepFrames) {
+                sleepUs = (sleepFrames * 1000000LL) / mSampleRate;
+            }
+            if (framesRead < 0) {
+                status_t status = (status_t) framesRead;
+                switch (status) {
+                case OVERRUN:
+                    ALOGW("overrun on read from pipe");
+                    framesRead = 0;
+                    break;
+                case NEGOTIATE:
+                    ALOGE("re-negotiation is needed");
+                    framesRead = -1;  // Will cause an attempt to recover.
+                    break;
+                default:
+                    ALOGE("unknown error %d on read from pipe", status);
+                    break;
+                }
             }
         // otherwise use the HAL / AudioStreamIn directly
         } else {
@@ -7449,9 +7476,9 @@ void AudioFlinger::RecordThread::readInputParameters_l()
     // The current value is higher than necessary.  However it should not add to latency.
 
     // Over-allocate beyond mRsmpInFramesP2 to permit a HAL read past end of buffer
-    size_t bufferSize = (mRsmpInFramesP2 + mFrameCount - 1) * mFrameSize;
-    (void)posix_memalign(&mRsmpInBuffer, 32, bufferSize);
-    memset(mRsmpInBuffer, 0, bufferSize); // if posix_memalign fails, will segv here.
+    mRsmpInFramesOA = mRsmpInFramesP2 + mFrameCount - 1;
+    (void)posix_memalign(&mRsmpInBuffer, 32, mRsmpInFramesOA * mFrameSize);
+    memset(mRsmpInBuffer, 0, mRsmpInFramesOA * mFrameSize); // if posix_memalign fails, will segv here.
 
     // AudioRecord mSampleRate and mChannelCount are constant due to AudioRecord API constraints.
     // But if thread's mSampleRate or mChannelCount changes, how will that affect active tracks?
