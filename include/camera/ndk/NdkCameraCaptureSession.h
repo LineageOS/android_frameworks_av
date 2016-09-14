@@ -32,6 +32,8 @@
  * Do not reference types that are not part of the NDK.
  * Do not #include files that aren't part of the NDK.
  */
+#include <sys/cdefs.h>
+
 #include <android/native_window.h>
 #include "NdkCameraError.h"
 #include "NdkCameraMetadata.h"
@@ -39,9 +41,9 @@
 #ifndef _NDK_CAMERA_CAPTURE_SESSION_H
 #define _NDK_CAMERA_CAPTURE_SESSION_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__BEGIN_DECLS
+
+#if __ANDROID_API__ >= 24
 
 /**
  * ACameraCaptureSession is an opaque type that manages frame captures of a camera device.
@@ -587,11 +589,10 @@ camera_status_t ACameraCaptureSession_stopRepeating(ACameraCaptureSession* sessi
  */
 camera_status_t ACameraCaptureSession_abortCaptures(ACameraCaptureSession* session);
 
+#endif /* __ANDROID_API__ >= 24 */
 
-#ifdef __cplusplus
-} // extern "C"
-#endif
+__END_DECLS
 
-#endif // _NDK_CAMERA_CAPTURE_SESSION_H
+#endif /* _NDK_CAMERA_CAPTURE_SESSION_H */
 
 /** @} */

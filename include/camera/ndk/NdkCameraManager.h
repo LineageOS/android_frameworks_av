@@ -36,13 +36,15 @@
 #ifndef _NDK_CAMERA_MANAGER_H
 #define _NDK_CAMERA_MANAGER_H
 
+#include <sys/cdefs.h>
+
 #include "NdkCameraError.h"
 #include "NdkCameraMetadata.h"
 #include "NdkCameraDevice.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__BEGIN_DECLS
+
+#if __ANDROID_API__ >= 24
 
 /**
  * ACameraManager is opaque type that provides access to camera service.
@@ -271,10 +273,10 @@ camera_status_t ACameraManager_openCamera(
         ACameraDevice_StateCallbacks* callback,
         /*out*/ACameraDevice** device);
 
-#ifdef __cplusplus
-} // extern "C"
-#endif
+#endif /* __ANDROID_API__ >= 24 */
 
-#endif //_NDK_CAMERA_MANAGER_H
+__END_DECLS
+
+#endif /* _NDK_CAMERA_MANAGER_H */
 
 /** @} */

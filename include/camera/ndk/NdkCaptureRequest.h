@@ -32,6 +32,9 @@
  * Do not reference types that are not part of the NDK.
  * Do not #include files that aren't part of the NDK.
  */
+
+#include <sys/cdefs.h>
+
 #include <android/native_window.h>
 #include "NdkCameraError.h"
 #include "NdkCameraMetadata.h"
@@ -39,9 +42,9 @@
 #ifndef _NDK_CAPTURE_REQUEST_H
 #define _NDK_CAPTURE_REQUEST_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__BEGIN_DECLS
+
+#if __ANDROID_API__ >= 24
 
 // Container for output targets
 typedef struct ACameraOutputTargets ACameraOutputTargets;
@@ -300,10 +303,10 @@ camera_status_t ACaptureRequest_setEntry_rational(
  */
 void ACaptureRequest_free(ACaptureRequest* request);
 
-#ifdef __cplusplus
-} // extern "C"
-#endif
+#endif /* __ANDROID_API__ >= 24 */
 
-#endif // _NDK_CAPTURE_REQUEST_H
+__END_DECLS
+
+#endif /* _NDK_CAPTURE_REQUEST_H */
 
 /** @} */

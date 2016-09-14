@@ -32,6 +32,7 @@
  * Do not reference types that are not part of the NDK.
  * Do not #include files that aren't part of the NDK.
  */
+#include <sys/cdefs.h>
 
 #include <android/native_window.h>
 #include "NdkCameraError.h"
@@ -41,9 +42,9 @@
 #ifndef _NDK_CAMERA_DEVICE_H
 #define _NDK_CAMERA_DEVICE_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__BEGIN_DECLS
+
+#if __ANDROID_API__ >= 24
 
 /**
  * ACameraDevice is opaque type that provides access to a camera device.
@@ -658,11 +659,11 @@ camera_status_t ACameraDevice_createCaptureSession(
         const ACameraCaptureSession_stateCallbacks* callbacks,
         /*out*/ACameraCaptureSession** session);
 
-#ifdef __cplusplus
-} // extern "C"
-#endif
+#endif /* __ANDROID_API__ >= 24 */
 
-#endif // _NDK_CAMERA_DEVICE_H
+__END_DECLS
+
+#endif /* _NDK_CAMERA_DEVICE_H */
 
 /** @} */
 
