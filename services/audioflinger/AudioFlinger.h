@@ -71,6 +71,8 @@ struct effect_param_cblk_t;
 class AudioMixer;
 class AudioBuffer;
 class AudioResampler;
+class DeviceHalInterface;
+class DevicesFactoryHalInterface;
 class EffectsFactoryHalInterface;
 class FastMixer;
 class PassthruBufferProvider;
@@ -616,7 +618,7 @@ private:
         audio_stream_in_t* const stream;
         audio_input_flags_t flags;
 
-        audio_hw_device_t* hwDev() const { return audioHwDev->hwDevice(); }
+        sp<DeviceHalInterface> hwDev() const { return audioHwDev->hwDevice(); }
 
         AudioStreamIn(AudioHwDevice *dev, audio_stream_in_t *in, audio_input_flags_t flags) :
             audioHwDev(dev), stream(in), flags(flags) {}
@@ -646,6 +648,8 @@ private:
                 // These two fields are immutable after onFirstRef(), so no lock needed to access
                 AudioHwDevice*                      mPrimaryHardwareDev; // mAudioHwDevs[0] or NULL
                 DefaultKeyedVector<audio_module_handle_t, AudioHwDevice*>  mAudioHwDevs;
+
+                sp<DevicesFactoryHalInterface> mDevicesFactoryHal;
 
     // for dump, indicates which hardware operation is currently in progress (but not stream ops)
     enum hardware_call_state {

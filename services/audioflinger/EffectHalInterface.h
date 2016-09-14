@@ -23,7 +23,7 @@
 
 namespace android {
 
-class EffectHalInterface : public virtual RefBase
+class EffectHalInterface : public RefBase
 {
   public:
     // The destructor automatically releases the effect.

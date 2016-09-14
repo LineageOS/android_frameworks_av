@@ -93,5 +93,10 @@ status_t AudioHwDevice::openOutputStream(
     return status;
 }
 
+uint32_t AudioHwDevice::version() const
+{
+    uint32_t result;
+    return mHwDevice->getVersion(&result) == OK ? result : 0;
+}
 
 }; // namespace android

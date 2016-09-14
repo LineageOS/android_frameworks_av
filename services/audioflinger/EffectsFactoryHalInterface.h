@@ -25,7 +25,7 @@
 
 namespace android {
 
-class EffectsFactoryHalInterface : public virtual RefBase
+class EffectsFactoryHalInterface : public RefBase
 {
   public:
     virtual ~EffectsFactoryHalInterface() {}

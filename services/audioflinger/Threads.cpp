@@ -3504,13 +3504,12 @@ status_t AudioFlinger::PlaybackThread::createAudioPatch_l(const struct audio_pat
     mPatch = *patch;
 
     if (mOutput->audioHwDev->version() >= AUDIO_DEVICE_API_VERSION_3_0) {
-        audio_hw_device_t *hwDevice = mOutput->audioHwDev->hwDevice();
-        status = hwDevice->create_audio_patch(hwDevice,
-                                               patch->num_sources,
-                                               patch->sources,
-                                               patch->num_sinks,
-                                               patch->sinks,
-                                               handle);
+        sp<DeviceHalInterface> hwDevice = mOutput->audioHwDev->hwDevice();
+        status = hwDevice->createAudioPatch(patch->num_sources,
+                                            patch->sources,
+                                            patch->num_sinks,
+                                            patch->sinks,
+                                            handle);
     } else {
         char *address;
         if (strcmp(patch->sinks[0].ext.device.address, "") != 0) {
@@ -3556,8 +3555,8 @@ status_t AudioFlinger::PlaybackThread::releaseAudioPatch_l(const audio_patch_han
     mOutDevice = AUDIO_DEVICE_NONE;
 
     if (mOutput->audioHwDev->version() >= AUDIO_DEVICE_API_VERSION_3_0) {
-        audio_hw_device_t *hwDevice = mOutput->audioHwDev->hwDevice();
-        status = hwDevice->release_audio_patch(hwDevice, handle);
+        sp<DeviceHalInterface> hwDevice = mOutput->audioHwDev->hwDevice();
+        status = hwDevice->releaseAudioPatch(handle);
     } else {
         AudioParameter param;
         param.addInt(String8(AUDIO_PARAMETER_STREAM_ROUTING), 0);
@@ -7588,13 +7587,12 @@ status_t AudioFlinger::RecordThread::createAudioPatch_l(const struct audio_patch
     }
 
     if (mInput->audioHwDev->version() >= AUDIO_DEVICE_API_VERSION_3_0) {
-        audio_hw_device_t *hwDevice = mInput->audioHwDev->hwDevice();
-        status = hwDevice->create_audio_patch(hwDevice,
-                                               patch->num_sources,
-                                               patch->sources,
-                                               patch->num_sinks,
-                                               patch->sinks,
-                                               handle);
+        sp<DeviceHalInterface> hwDevice = mInput->audioHwDev->hwDevice();
+        status = hwDevice->createAudioPatch(patch->num_sources,
+                                            patch->sources,
+                                            patch->num_sinks,
+                                            patch->sinks,
+                                            handle);
     } else {
         char *address;
         if (strcmp(patch->sources[0].ext.device.address, "") != 0) {
@@ -7630,8 +7628,8 @@ status_t AudioFlinger::RecordThread::releaseAudioPatch_l(const audio_patch_handl
     mInDevice = AUDIO_DEVICE_NONE;
 
     if (mInput->audioHwDev->version() >= AUDIO_DEVICE_API_VERSION_3_0) {
-        audio_hw_device_t *hwDevice = mInput->audioHwDev->hwDevice();
-        status = hwDevice->release_audio_patch(hwDevice, handle);
+        sp<DeviceHalInterface> hwDevice = mInput->audioHwDev->hwDevice();
+        status = hwDevice->releaseAudioPatch(handle);
     } else {
         AudioParameter param;
         param.addInt(String8(AUDIO_PARAMETER_STREAM_ROUTING), 0);

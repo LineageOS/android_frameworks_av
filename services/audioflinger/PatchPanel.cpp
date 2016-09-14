@@ -202,9 +202,9 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                     if (hwModule != AUDIO_MODULE_HANDLE_NONE) {
                         ssize_t index = audioflinger->mAudioHwDevs.indexOfKey(hwModule);
                         if (index >= 0) {
-                            audio_hw_device_t *hwDevice =
+                            sp<DeviceHalInterface> hwDevice =
                                     audioflinger->mAudioHwDevs.valueAt(index)->hwDevice();
-                            hwDevice->release_audio_patch(hwDevice, halHandle);
+                            hwDevice->releaseAudioPatch(halHandle);
                         }
                     }
                 }
@@ -344,13 +344,12 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                         goto exit;
                     }
 
-                    audio_hw_device_t *hwDevice = audioHwDevice->hwDevice();
-                    status = hwDevice->create_audio_patch(hwDevice,
-                                                           patch->num_sources,
-                                                           patch->sources,
-                                                           patch->num_sinks,
-                                                           patch->sinks,
-                                                           &halHandle);
+                    sp<DeviceHalInterface> hwDevice = audioHwDevice->hwDevice();
+                    status = hwDevice->createAudioPatch(patch->num_sources,
+                                                        patch->sources,
+                                                        patch->num_sinks,
+                                                        patch->sinks,
+                                                        &halHandle);
                 }
             }
         } break;
@@ -623,8 +622,8 @@ status_t AudioFlinger::PatchPanel::releaseAudioPatch(audio_patch_handle_t handle
                     status = INVALID_OPERATION;
                     break;
                 }
-                audio_hw_device_t *hwDevice = audioHwDevice->hwDevice();
-                status = hwDevice->release_audio_patch(hwDevice, removedPatch->mHalHandle);
+                sp<DeviceHalInterface> hwDevice = audioHwDevice->hwDevice();
+                status = hwDevice->releaseAudioPatch(removedPatch->mHalHandle);
             }
         } break;
         case AUDIO_PORT_TYPE_MIX: {
@@ -688,8 +687,8 @@ status_t AudioFlinger::PatchPanel::setAudioPortConfig(const struct audio_port_co
 
     AudioHwDevice *audioHwDevice = audioflinger->mAudioHwDevs.valueAt(index);
     if (audioHwDevice->version() >= AUDIO_DEVICE_API_VERSION_3_0) {
-        audio_hw_device_t *hwDevice = audioHwDevice->hwDevice();
-        return hwDevice->set_audio_port_config(hwDevice, config);
+        sp<DeviceHalInterface> hwDevice = audioHwDevice->hwDevice();
+        return hwDevice->setAudioPortConfig(config);
     } else {
         return INVALID_OPERATION;
     }

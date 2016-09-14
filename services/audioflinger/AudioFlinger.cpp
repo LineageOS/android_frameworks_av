@@ -44,8 +44,12 @@
 
 #include "AudioMixer.h"
 #include "AudioFlinger.h"
+#include "DeviceHalInterface.h"
+#include "DevicesFactoryHalInterface.h"
 #include "EffectsFactoryHalInterface.h"
 #include "ServiceUtilities.h"
+// FIXME: Remove after streams HAL is componentized
+#include "DeviceHalLocal.h"
 
 #include <media/AudioResamplerPublic.h>
 
@@ -142,35 +146,6 @@ const char *formatToString(audio_format_t format) {
     return "unknown";
 }
 
-static int load_audio_interface(const char *if_name, audio_hw_device_t **dev)
-{
-    const hw_module_t *mod;
-    int rc;
-
-    rc = hw_get_module_by_class(AUDIO_HARDWARE_MODULE_ID, if_name, &mod);
-    ALOGE_IF(rc, "%s couldn't load audio hw module %s.%s (%s)", __func__,
-                 AUDIO_HARDWARE_MODULE_ID, if_name, strerror(-rc));
-    if (rc) {
-        goto out;
-    }
-    rc = audio_hw_device_open(mod, dev);
-    ALOGE_IF(rc, "%s couldn't open audio hw device in %s.%s (%s)", __func__,
-                 AUDIO_HARDWARE_MODULE_ID, if_name, strerror(-rc));
-    if (rc) {
-        goto out;
-    }
-    if ((*dev)->common.version < AUDIO_DEVICE_API_VERSION_MIN) {
-        ALOGE("%s wrong audio hw device version %04x", __func__, (*dev)->common.version);
-        rc = BAD_VALUE;
-        goto out;
-    }
-    return 0;
-
-out:
-    *dev = NULL;
-    return rc;
-}
-
 // ----------------------------------------------------------------------------
 
 AudioFlinger::AudioFlinger()
@@ -206,6 +181,7 @@ AudioFlinger::AudioFlinger()
     // in bad state, reset the state upon service start.
     BatteryNotifier::getInstance().noteResetAudio();
 
+    mDevicesFactoryHal = DevicesFactoryHalInterface::create();
     mEffectsFactoryHal = EffectsFactoryHalInterface::create();
 
 #ifdef TEE_SINK
@@ -266,7 +242,6 @@ AudioFlinger::~AudioFlinger()
 
     for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
         // no mHardwareLock needed, as there are no other references to this
-        audio_hw_device_close(mAudioHwDevs.valueAt(i)->hwDevice());
         delete mAudioHwDevs.valueAt(i);
     }
 
@@ -305,10 +280,12 @@ AudioHwDevice* AudioFlinger::findSuitableHwDev_l(
         // then try to find a module supporting the requested device.
         for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
             AudioHwDevice *audioHwDevice = mAudioHwDevs.valueAt(i);
-            audio_hw_device_t *dev = audioHwDevice->hwDevice();
-            if ((dev->get_supported_devices != NULL) &&
-                    (dev->get_supported_devices(dev) & devices) == devices)
+            sp<DeviceHalInterface> dev = audioHwDevice->hwDevice();
+            uint32_t supportedDevices;
+            if (dev->getSupportedDevices(&supportedDevices) == OK &&
+                    (supportedDevices & devices) == devices) {
                 return audioHwDevice;
+            }
         }
     } else {
         // check a match for the requested module handle
@@ -455,8 +432,8 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
         }
         // dump all hardware devs
         for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
-            audio_hw_device_t *dev = mAudioHwDevs.valueAt(i)->hwDevice();
-            dev->dump(dev, fd);
+            sp<DeviceHalInterface> dev = mAudioHwDevs.valueAt(i)->hwDevice();
+            dev->dump(fd);
         }
 
 #ifdef TEE_SINK
@@ -818,7 +795,7 @@ status_t AudioFlinger::setMasterVolume(float value)
 
         mHardwareStatus = AUDIO_HW_SET_MASTER_VOLUME;
         if (dev->canSetMasterVolume()) {
-            dev->hwDevice()->set_master_volume(dev->hwDevice(), value);
+            dev->hwDevice()->setMasterVolume(value);
         }
         mHardwareStatus = AUDIO_HW_IDLE;
     }
@@ -855,9 +832,9 @@ status_t AudioFlinger::setMode(audio_mode_t mode)
 
     { // scope for the lock
         AutoMutex lock(mHardwareLock);
-        audio_hw_device_t *dev = mPrimaryHardwareDev->hwDevice();
+        sp<DeviceHalInterface> dev = mPrimaryHardwareDev->hwDevice();
         mHardwareStatus = AUDIO_HW_SET_MODE;
-        ret = dev->set_mode(dev, mode);
+        ret = dev->setMode(mode);
         mHardwareStatus = AUDIO_HW_IDLE;
     }
 
@@ -886,8 +863,8 @@ status_t AudioFlinger::setMicMute(bool state)
     AutoMutex lock(mHardwareLock);
     mHardwareStatus = AUDIO_HW_SET_MIC_MUTE;
     for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
-        audio_hw_device_t *dev = mAudioHwDevs.valueAt(i)->hwDevice();
-        status_t result = dev->set_mic_mute(dev, state);
+        sp<DeviceHalInterface> dev = mAudioHwDevs.valueAt(i)->hwDevice();
+        status_t result = dev->setMicMute(state);
         if (result != NO_ERROR) {
             ret = result;
         }
@@ -907,8 +884,8 @@ bool AudioFlinger::getMicMute() const
     AutoMutex lock(mHardwareLock);
     mHardwareStatus = AUDIO_HW_GET_MIC_MUTE;
     for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
-        audio_hw_device_t *dev = mAudioHwDevs.valueAt(i)->hwDevice();
-        status_t result = dev->get_mic_mute(dev, &state);
+        sp<DeviceHalInterface> dev = mAudioHwDevs.valueAt(i)->hwDevice();
+        status_t result = dev->getMicMute(&state);
         if (result == NO_ERROR) {
             mute = mute && state;
         }
@@ -940,7 +917,7 @@ status_t AudioFlinger::setMasterMute(bool muted)
 
         mHardwareStatus = AUDIO_HW_SET_MASTER_MUTE;
         if (dev->canSetMasterMute()) {
-            dev->hwDevice()->set_master_mute(dev->hwDevice(), muted);
+            dev->hwDevice()->setMasterMute(muted);
         }
         mHardwareStatus = AUDIO_HW_IDLE;
     }
@@ -1118,8 +1095,8 @@ status_t AudioFlinger::setParameters(audio_io_handle_t ioHandle, const String8& 
             AutoMutex lock(mHardwareLock);
             mHardwareStatus = AUDIO_HW_SET_PARAMETER;
             for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
-                audio_hw_device_t *dev = mAudioHwDevs.valueAt(i)->hwDevice();
-                status_t result = dev->set_parameters(dev, keyValuePairs.string());
+                sp<DeviceHalInterface> dev = mAudioHwDevs.valueAt(i)->hwDevice();
+                status_t result = dev->setParameters(keyValuePairs);
                 // return success if at least one audio device accepts the parameters as not all
                 // HALs are requested to support all parameters. If no audio device supports the
                 // requested parameters, the last error is reported.
@@ -1200,16 +1177,16 @@ String8 AudioFlinger::getParameters(audio_io_handle_t ioHandle, const String8& k
         String8 out_s8;
 
         for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
-            char *s;
+            String8 s;
+            status_t result;
             {
             AutoMutex lock(mHardwareLock);
             mHardwareStatus = AUDIO_HW_GET_PARAMETER;
-            audio_hw_device_t *dev = mAudioHwDevs.valueAt(i)->hwDevice();
-            s = dev->get_parameters(dev, keys.string());
+            sp<DeviceHalInterface> dev = mAudioHwDevs.valueAt(i)->hwDevice();
+            result = dev->getParameters(keys, &s);
             mHardwareStatus = AUDIO_HW_IDLE;
             }
-            out_s8 += String8(s ? s : "");
-            free(s);
+            if (result == OK) out_s8 += s;
         }
         return out_s8;
     }
@@ -1246,14 +1223,14 @@ size_t AudioFlinger::getInputBufferSize(uint32_t sampleRate, audio_format_t form
     proposed.channel_mask = channelMask;
     proposed.format = format;
 
-    audio_hw_device_t *dev = mPrimaryHardwareDev->hwDevice();
+    sp<DeviceHalInterface> dev = mPrimaryHardwareDev->hwDevice();
     size_t frames;
     for (;;) {
         // Note: config is currently a const parameter for get_input_buffer_size()
         // but we use a copy from proposed in case config changes from the call.
         config = proposed;
-        frames = dev->get_input_buffer_size(dev, &config);
-        if (frames != 0) {
+        status_t result = dev->getInputBufferSize(&config, &frames);
+        if (result == OK && frames != 0) {
             break; // hal success, config is the result
         }
         // change one parameter of the configuration each iteration to a more "common" value
@@ -1300,9 +1277,9 @@ status_t AudioFlinger::setVoiceVolume(float value)
     }
 
     AutoMutex lock(mHardwareLock);
-    audio_hw_device_t *dev = mPrimaryHardwareDev->hwDevice();
+    sp<DeviceHalInterface> dev = mPrimaryHardwareDev->hwDevice();
     mHardwareStatus = AUDIO_HW_SET_VOICE_VOLUME;
-    ret = dev->set_voice_volume(dev, value);
+    ret = dev->setVoiceVolume(value);
     mHardwareStatus = AUDIO_HW_IDLE;
 
     return ret;
@@ -1640,16 +1617,16 @@ audio_module_handle_t AudioFlinger::loadHwModule_l(const char *name)
         }
     }
 
-    audio_hw_device_t *dev;
+    sp<DeviceHalInterface> dev;
 
-    int rc = load_audio_interface(name, &dev);
+    int rc = mDevicesFactoryHal->openDevice(name, &dev);
     if (rc) {
         ALOGE("loadHwModule() error %d loading module %s", rc, name);
         return AUDIO_MODULE_HANDLE_NONE;
     }
 
     mHardwareStatus = AUDIO_HW_INIT;
-    rc = dev->init_check(dev);
+    rc = dev->initCheck();
     mHardwareStatus = AUDIO_HW_IDLE;
     if (rc) {
         ALOGE("loadHwModule() init check error %d for module %s", rc, name);
@@ -1667,32 +1644,26 @@ audio_module_handle_t AudioFlinger::loadHwModule_l(const char *name)
 
         if (0 == mAudioHwDevs.size()) {
             mHardwareStatus = AUDIO_HW_GET_MASTER_VOLUME;
-            if (NULL != dev->get_master_volume) {
-                float mv;
-                if (OK == dev->get_master_volume(dev, &mv)) {
-                    mMasterVolume = mv;
-                }
+            float mv;
+            if (OK == dev->getMasterVolume(&mv)) {
+                mMasterVolume = mv;
             }
 
             mHardwareStatus = AUDIO_HW_GET_MASTER_MUTE;
-            if (NULL != dev->get_master_mute) {
-                bool mm;
-                if (OK == dev->get_master_mute(dev, &mm)) {
-                    mMasterMute = mm;
-                }
+            bool mm;
+            if (OK == dev->getMasterMute(&mm)) {
+                mMasterMute = mm;
             }
         }
 
         mHardwareStatus = AUDIO_HW_SET_MASTER_VOLUME;
-        if ((NULL != dev->set_master_volume) &&
-            (OK == dev->set_master_volume(dev, mMasterVolume))) {
+        if (OK == dev->setMasterVolume(mMasterVolume)) {
             flags = static_cast<AudioHwDevice::Flags>(flags |
                     AudioHwDevice::AHWD_CAN_SET_MASTER_VOLUME);
         }
 
         mHardwareStatus = AUDIO_HW_SET_MASTER_MUTE;
-        if ((NULL != dev->set_master_mute) &&
-            (OK == dev->set_master_mute(dev, mMasterMute))) {
+        if (OK == dev->setMasterMute(mMasterMute)) {
             flags = static_cast<AudioHwDevice::Flags>(flags |
                     AudioHwDevice::AHWD_CAN_SET_MASTER_MUTE);
         }
@@ -1703,8 +1674,7 @@ audio_module_handle_t AudioFlinger::loadHwModule_l(const char *name)
     audio_module_handle_t handle = (audio_module_handle_t) nextUniqueId(AUDIO_UNIQUE_ID_USE_MODULE);
     mAudioHwDevs.add(handle, new AudioHwDevice(handle, name, dev, flags));
 
-    ALOGI("loadHwModule() Loaded %s audio interface from %s (%s) handle %d",
-          name, dev->common.module->name, dev->common.module->id, handle);
+    ALOGI("loadHwModule() Loaded %s audio interface, handle %d", name, handle);
 
     return handle;
 
@@ -1754,13 +1724,15 @@ audio_hw_sync_t AudioFlinger::getAudioHwSyncForSession(audio_session_t sessionId
         return mHwAvSyncIds.valueAt(index);
     }
 
-    audio_hw_device_t *dev = mPrimaryHardwareDev->hwDevice();
+    sp<DeviceHalInterface> dev = mPrimaryHardwareDev->hwDevice();
     if (dev == NULL) {
         return AUDIO_HW_SYNC_INVALID;
     }
-    char *reply = dev->get_parameters(dev, AUDIO_PARAMETER_HW_AV_SYNC);
-    AudioParameter param = AudioParameter(String8(reply));
-    free(reply);
+    String8 reply;
+    AudioParameter param;
+    if (dev->getParameters(String8(AUDIO_PARAMETER_HW_AV_SYNC), &reply) == OK) {
+        param = AudioParameter(reply);
+    }
 
     int value;
     if (param.getInt(String8(AUDIO_PARAMETER_HW_AV_SYNC), value) != NO_ERROR) {
@@ -1945,7 +1917,7 @@ status_t AudioFlinger::openOutput(audio_module_handle_t module,
 
             AutoMutex lock(mHardwareLock);
             mHardwareStatus = AUDIO_HW_SET_MODE;
-            mPrimaryHardwareDev->hwDevice()->set_mode(mPrimaryHardwareDev->hwDevice(), mMode);
+            mPrimaryHardwareDev->hwDevice()->setMode(mMode);
             mHardwareStatus = AUDIO_HW_IDLE;
         }
         return NO_ERROR;
@@ -2041,7 +2013,7 @@ void AudioFlinger::closeOutputFinish(const sp<PlaybackThread>& thread)
     AudioStreamOut *out = thread->clearOutput();
     ALOG_ASSERT(out != NULL, "out shouldn't be NULL");
     // from now on thread->mOutput is NULL
-    out->hwDev()->close_output_stream(out->hwDev(), out->stream);
+    static_cast<DeviceHalLocal*>(out->hwDev().get())->closeOutputStream(out->stream);
     delete out;
 }
 
@@ -2136,10 +2108,10 @@ sp<AudioFlinger::RecordThread> AudioFlinger::openInput_l(audio_module_handle_t m
     }
 
     audio_config_t halconfig = *config;
-    audio_hw_device_t *inHwHal = inHwDev->hwDevice();
+    sp<DeviceHalInterface> inHwHal = inHwDev->hwDevice();
     audio_stream_in_t *inStream = NULL;
-    status_t status = inHwHal->open_input_stream(inHwHal, *input, devices, &halconfig,
-                                        &inStream, flags, address.string(), source);
+    status_t status = static_cast<DeviceHalLocal*>(inHwHal.get())->openInputStream(
+            *input, devices, &halconfig, flags, address.string(), source, &inStream);
     ALOGV("openInput_l() openInputStream returned input %p, SamplingRate %d"
            ", Format %#x, Channels %x, flags %#x, status %d addr %s",
             inStream,
@@ -2160,8 +2132,8 @@ sp<AudioFlinger::RecordThread> AudioFlinger::openInput_l(audio_module_handle_t m
         // FIXME describe the change proposed by HAL (save old values so we can log them here)
         ALOGV("openInput_l() reopening with proposed sampling rate and channel mask");
         inStream = NULL;
-        status = inHwHal->open_input_stream(inHwHal, *input, devices, &halconfig,
-                                            &inStream, flags, address.string(), source);
+        status = static_cast<DeviceHalLocal*>(inHwHal.get())->openInputStream(
+                *input, devices, &halconfig, flags, address.string(), source, &inStream);
         // FIXME log this new status; HAL should not propose any further changes
     }
 
@@ -2312,7 +2284,7 @@ void AudioFlinger::closeInputFinish(const sp<RecordThread>& thread)
     AudioStreamIn *in = thread->clearInput();
     ALOG_ASSERT(in != NULL, "in shouldn't be NULL");
     // from now on thread->mInput is NULL
-    in->hwDev()->close_input_stream(in->hwDev(), in->stream);
+    static_cast<DeviceHalLocal*>(in->hwDev().get())->closeInputStream(in->stream);
     delete in;
 }
 
