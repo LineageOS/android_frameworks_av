@@ -921,11 +921,12 @@ int GraphicBufferSource::findMatchingCodecBuffer_l(
  * frameNum: frame number of the frame being released
  * buffer: GraphicBuffer pointer to release (note this must not be & as we
  *         will clear the original mBufferSlot in persistent case)
+ *         Use NOLINT to supress warning on the copy of 'buffer'.
  * fence: fence of the frame being released
  */
 void GraphicBufferSource::releaseBuffer(
         int &id, uint64_t frameNum,
-        const sp<GraphicBuffer> &buffer, const sp<Fence> &fence) {
+        const sp<GraphicBuffer> buffer, const sp<Fence> &fence) {  // NOLINT
     if (mIsPersistent) {
         mConsumer->detachBuffer(id);
         mBufferSlot[id] = NULL;
