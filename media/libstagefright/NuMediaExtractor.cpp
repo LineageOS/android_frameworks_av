@@ -66,7 +66,7 @@ status_t NuMediaExtractor::setDataSource(
         const KeyedVector<String8, String8> *headers) {
     Mutex::Autolock autoLock(mLock);
 
-    if (mImpl != NULL) {
+    if (mImpl != NULL || path == NULL) {
         return -EINVAL;
     }
 
