@@ -20,6 +20,7 @@
 #include <utils/Log.h>
 #include <utils/threads.h>
 #include <utils/Mutex.h>
+#include <cutils/properties.h>
 
 #include <android/hardware/ICameraService.h>
 
@@ -90,6 +91,12 @@ const sp<::android::hardware::ICameraService>& CameraBase<TCam, TCamTraits>::get
 {
     Mutex::Autolock _l(gLock);
     if (gCameraService.get() == 0) {
+        char value[PROPERTY_VALUE_MAX];
+        property_get("config.disable_cameraservice", value, "0");
+        if (strncmp(value, "0", 2) != 0 && strncasecmp(value, "false", 6) != 0) {
+            return gCameraService;
+        }
+
         sp<IServiceManager> sm = defaultServiceManager();
         sp<IBinder> binder;
         do {
