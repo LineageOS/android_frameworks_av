@@ -34,7 +34,6 @@ LOCAL_SRC_FILES:=               \
 LOCAL_C_INCLUDES := \
     $(TOPDIR)frameworks/av/services/audiopolicy \
     $(TOPDIR)external/sonic \
-    libcore/include \
     $(call include-path-for, audio-effects) \
     $(call include-path-for, audio-utils)
 
