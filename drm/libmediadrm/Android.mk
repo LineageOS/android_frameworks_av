@@ -23,9 +23,6 @@ LOCAL_SHARED_LIBRARIES := \
 	libstagefright_foundation \
 	libutils
 
-LOCAL_C_INCLUDES := \
-    libcore/include
-
 LOCAL_CFLAGS += -Werror -Wno-error=deprecated-declarations -Wall
 LOCAL_CLANG := true
 
