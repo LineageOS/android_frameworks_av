@@ -55,7 +55,6 @@ LOCAL_C_INCLUDES :=                                                 \
     $(TOP)/frameworks/native/include/media/openmax                  \
     $(TOP)/frameworks/native/include/media/hardware                 \
     $(TOP)/external/tremolo/Tremolo                                 \
-    libcore/include                                                 \
 
 LOCAL_CFLAGS += -Werror -Wno-error=deprecated-declarations -Wall
 LOCAL_CLANG := true
