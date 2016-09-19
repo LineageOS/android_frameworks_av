@@ -17,11 +17,11 @@
 #ifndef ANDROID_HARDWARE_DEVICES_FACTORY_HAL_LOCAL_H
 #define ANDROID_HARDWARE_DEVICES_FACTORY_HAL_LOCAL_H
 
+#include <media/audiohal/DevicesFactoryHalInterface.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 
 #include "DeviceHalLocal.h"
-#include "DevicesFactoryHalInterface.h"
 
 namespace android {
 

@@ -23,6 +23,7 @@ LOCAL_SRC_FILES += NBLog.cpp
 LOCAL_MODULE := libnbaio
 
 LOCAL_SHARED_LIBRARIES := \
+    libaudiohal \
     libaudioutils \
     libbinder \
     libcutils \

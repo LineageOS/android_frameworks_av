@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AudioFlinger::DeviceHalLocal"
+#define LOG_TAG "DeviceHalLocal"
 //#define LOG_NDEBUG 0
 
 #include <utils/Log.h>

@@ -17,7 +17,7 @@
 #ifndef ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_LOCAL_H
 #define ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_LOCAL_H
 
-#include "EffectsFactoryHalInterface.h"
+#include <media/audiohal/EffectsFactoryHalInterface.h>
 
 namespace android {
 

@@ -18,31 +18,36 @@
 //#define LOG_NDEBUG 0
 
 #include <utils/Log.h>
+#include <media/audiohal/StreamHalInterface.h>
 #include <media/nbaio/AudioStreamOutSink.h>
 
 namespace android {
 
-AudioStreamOutSink::AudioStreamOutSink(audio_stream_out *stream) :
+AudioStreamOutSink::AudioStreamOutSink(sp<StreamOutHalInterface> stream) :
         NBAIO_Sink(),
         mStream(stream),
         mStreamBufferSizeBytes(0)
 {
-    ALOG_ASSERT(stream != NULL);
+    ALOG_ASSERT(stream != 0);
 }
 
 AudioStreamOutSink::~AudioStreamOutSink()
 {
+    mStream.clear();
 }
 
 ssize_t AudioStreamOutSink::negotiate(const NBAIO_Format offers[], size_t numOffers,
                                       NBAIO_Format counterOffers[], size_t& numCounterOffers)
 {
     if (!Format_isValid(mFormat)) {
-        mStreamBufferSizeBytes = mStream->common.get_buffer_size(&mStream->common);
-        audio_format_t streamFormat = mStream->common.get_format(&mStream->common);
-        uint32_t sampleRate = mStream->common.get_sample_rate(&mStream->common);
-        audio_channel_mask_t channelMask =
-                (audio_channel_mask_t) mStream->common.get_channels(&mStream->common);
+        status_t result;
+        result = mStream->getBufferSize(&mStreamBufferSizeBytes);
+        if (result != OK) return result;
+        audio_format_t streamFormat;
+        uint32_t sampleRate;
+        audio_channel_mask_t channelMask;
+        result = mStream->getAudioProperties(&sampleRate, &channelMask, &streamFormat);
+        if (result != OK) return result;
         mFormat = Format_from_SR_C(sampleRate,
                 audio_channel_count_from_out_mask(channelMask), streamFormat);
         mFrameSize = Format_frameSize(mFormat);
@@ -56,25 +61,24 @@ ssize_t AudioStreamOutSink::write(const void *buffer, size_t count)
         return NEGOTIATE;
     }
     ALOG_ASSERT(Format_isValid(mFormat));
-    ssize_t ret = mStream->write(mStream, buffer, count * mFrameSize);
-    if (ret > 0) {
-        ret /= mFrameSize;
-        mFramesWritten += ret;
+    size_t written;
+    status_t ret = mStream->write(buffer, count * mFrameSize, &written);
+    if (ret == OK && written > 0) {
+        written /= mFrameSize;
+        mFramesWritten += written;
+        return written;
     } else {
         // FIXME verify HAL implementations are returning the correct error codes e.g. WOULD_BLOCK
+        ALOGE_IF(ret != OK, "Error while writing data to HAL: %d", ret);
+        return ret;
     }
-    return ret;
 }
 
 status_t AudioStreamOutSink::getTimestamp(ExtendedTimestamp &timestamp)
 {
-    if (mStream->get_presentation_position == NULL) {
-        return INVALID_OPERATION;
-    }
-
     uint64_t position64;
     struct timespec time;
-    if (mStream->get_presentation_position(mStream, &position64, &time) != OK) {
+    if (mStream->getPresentationPosition(&position64, &time) != OK) {
         return INVALID_OPERATION;
     }
     timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL] = position64;

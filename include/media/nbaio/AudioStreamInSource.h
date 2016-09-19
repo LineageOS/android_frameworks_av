@@ -22,11 +22,13 @@
 
 namespace android {
 
+class StreamInHalInterface;
+
 // not multi-thread safe
 class AudioStreamInSource : public NBAIO_Source {
 
 public:
-    AudioStreamInSource(audio_stream_in *stream);
+    AudioStreamInSource(sp<StreamInHalInterface> stream);
     virtual ~AudioStreamInSource();
 
     // NBAIO_Port interface
@@ -50,11 +52,11 @@ public:
     // NBAIO_Sink end
 
 #if 0   // until necessary
-    audio_stream_in *stream() const { return mStream; }
+    sp<StreamInHalInterface> stream() const { return mStream; }
 #endif
 
 private:
-    audio_stream_in * const mStream;
+    sp<StreamInHalInterface> mStream;
     size_t              mStreamBufferSizeBytes; // as reported by get_buffer_size()
     int64_t             mFramesOverrun;
     int64_t             mOverruns;

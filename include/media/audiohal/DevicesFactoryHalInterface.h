@@ -17,10 +17,9 @@
 #ifndef ANDROID_HARDWARE_DEVICES_FACTORY_HAL_INTERFACE_H
 #define ANDROID_HARDWARE_DEVICES_FACTORY_HAL_INTERFACE_H
 
+#include <media/audiohal/DeviceHalInterface.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
-
-#include "DeviceHalInterface.h"
 
 namespace android {
 

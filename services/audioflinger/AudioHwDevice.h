@@ -23,10 +23,9 @@
 #include <sys/types.h>
 
 #include <hardware/audio.h>
+#include <media/audiohal/DeviceHalInterface.h>
 #include <utils/Errors.h>
 #include <system/audio.h>
-
-#include "DeviceHalInterface.h"
 
 namespace android {
 

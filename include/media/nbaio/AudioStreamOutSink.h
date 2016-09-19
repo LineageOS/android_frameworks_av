@@ -22,11 +22,13 @@
 
 namespace android {
 
+class StreamOutHalInterface;
+
 // not multi-thread safe
 class AudioStreamOutSink : public NBAIO_Sink {
 
 public:
-    AudioStreamOutSink(audio_stream_out *stream);
+    AudioStreamOutSink(sp<StreamOutHalInterface> stream);
     virtual ~AudioStreamOutSink();
 
     // NBAIO_Port interface
@@ -52,11 +54,11 @@ public:
     // NBAIO_Sink end
 
 #if 0   // until necessary
-    audio_stream_out *stream() const { return mStream; }
+    sp<StreamOutHalInterface> stream() const { return mStream; }
 #endif
 
 private:
-    audio_stream_out * const mStream;
+    sp<StreamOutHalInterface> mStream;
     size_t              mStreamBufferSizeBytes; // as reported by get_buffer_size()
 };
 

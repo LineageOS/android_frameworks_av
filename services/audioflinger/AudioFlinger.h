@@ -46,6 +46,7 @@
 #include <hardware/audio.h>
 #include <hardware/audio_policy.h>
 
+#include <media/audiohal/StreamHalInterface.h>
 #include <media/AudioBufferProvider.h>
 #include <media/ExtendedAudioBufferProvider.h>
 
@@ -58,7 +59,6 @@
 #include "SpdifStreamOut.h"
 #include "AudioHwDevice.h"
 #include "LinearMap.h"
-#include "StreamHalInterface.h"
 
 #include <powermanager/IPowerManager.h>
 

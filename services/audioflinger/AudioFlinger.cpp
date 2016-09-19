@@ -31,6 +31,9 @@
 #include <utils/Log.h>
 #include <utils/Trace.h>
 #include <binder/Parcel.h>
+#include <media/audiohal/DeviceHalInterface.h>
+#include <media/audiohal/DevicesFactoryHalInterface.h>
+#include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <memunreachable/memunreachable.h>
 #include <utils/String16.h>
 #include <utils/threads.h>
@@ -44,9 +47,6 @@
 
 #include "AudioMixer.h"
 #include "AudioFlinger.h"
-#include "DeviceHalInterface.h"
-#include "DevicesFactoryHalInterface.h"
-#include "EffectsFactoryHalInterface.h"
 #include "ServiceUtilities.h"
 
 #include <media/AudioResamplerPublic.h>

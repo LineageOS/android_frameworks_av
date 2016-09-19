@@ -17,7 +17,7 @@
 #ifndef ANDROID_HARDWARE_DEVICE_HAL_LOCAL_H
 #define ANDROID_HARDWARE_DEVICE_HAL_LOCAL_H
 
-#include "DeviceHalInterface.h"
+#include <media/audiohal/DeviceHalInterface.h>
 
 namespace android {
 
