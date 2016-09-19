@@ -520,7 +520,7 @@ size_t AudioResamplerDyn<TC, TI, TO>::resample(TO* out, size_t outFrameCount,
         //        inFrameCount, outputIndex, outFrameCount, phaseFraction, phaseWrapLimit);
 
         // check inputIndex overflow
-        ALOG_ASSERT(inputIndex <= mBuffer.frameCount, "inputIndex%d > frameCount%d",
+        ALOG_ASSERT(inputIndex <= mBuffer.frameCount, "inputIndex%zu > frameCount%zu",
                 inputIndex, mBuffer.frameCount);
         // Buffer is empty, fetch a new one if necessary (inFrameCount > 0).
         // We may not fetch a new buffer if the existing data is sufficient.
@@ -591,7 +591,7 @@ done:
         // We arrive here when we're finished or when the input buffer runs out.
         // Regardless we need to release the input buffer if we've acquired it.
         if (inputIndex > 0) {  // we've acquired a buffer (alternatively could check frameCount)
-            ALOG_ASSERT(inputIndex == frameCount, "inputIndex(%d) != frameCount(%d)",
+            ALOG_ASSERT(inputIndex == frameCount, "inputIndex(%zu) != frameCount(%zu)",
                     inputIndex, frameCount);  // must have been fully read.
             inputIndex = 0;
             provider->releaseBuffer(&mBuffer);
@@ -603,7 +603,7 @@ resample_exit:
     // inputIndex must be zero in all three cases:
     // (1) the buffer never was been acquired; (2) the buffer was
     // released at "done:"; or (3) getNextBuffer() failed.
-    ALOG_ASSERT(inputIndex == 0, "Releasing: inputindex:%d frameCount:%d  phaseFraction:%u",
+    ALOG_ASSERT(inputIndex == 0, "Releasing: inputindex:%zu frameCount:%zu  phaseFraction:%u",
             inputIndex, mBuffer.frameCount, phaseFraction);
     ALOG_ASSERT(mBuffer.frameCount == 0); // there must be no frames in the buffer
     mInBuffer.setImpulse(impulse);
