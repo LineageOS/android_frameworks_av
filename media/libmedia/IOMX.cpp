@@ -1044,10 +1044,7 @@ status_t BnOMX::onTransact(
             OMX_BOOL enable = (OMX_BOOL)data.readInt32();
 
             MetadataBufferType type = (MetadataBufferType)data.readInt32();
-            status_t err =
-                // only control output metadata via Binder
-                port_index != 1 /* kOutputPortIndex */ ? BAD_VALUE :
-                storeMetaDataInBuffers(node, port_index, enable, &type);
+            status_t err = storeMetaDataInBuffers(node, port_index, enable, &type);
 
             reply->writeInt32(type);
             reply->writeInt32(err);

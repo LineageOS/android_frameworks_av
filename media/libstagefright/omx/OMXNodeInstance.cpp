@@ -429,9 +429,9 @@ bool OMXNodeInstance::isProhibitedIndex_l(OMX_INDEXTYPE index) {
             || (index > OMX_IndexCommonStartUnused
                     && index <= OMX_IndexConfigCommonTransitionEffect)
             || (index > (OMX_INDEXTYPE)OMX_IndexExtAudioStartUnused
-                    && index <= (OMX_INDEXTYPE)OMX_IndexParamAudioAndroidEac3)
+                    && index <= (OMX_INDEXTYPE)OMX_IndexParamAudioProfileQuerySupported)
             || (index > (OMX_INDEXTYPE)OMX_IndexExtVideoStartUnused
-                    && index <= (OMX_INDEXTYPE)OMX_IndexParamSliceSegments)
+                    && index <= (OMX_INDEXTYPE)OMX_IndexConfigAndroidIntraRefresh)
             || (index > (OMX_INDEXTYPE)OMX_IndexExtOtherStartUnused
                     && index <= (OMX_INDEXTYPE)OMX_IndexParamConsumerUsageBits)) {
         return false;
@@ -781,7 +781,7 @@ status_t OMXNodeInstance::configureVideoTunnelMode(
 
 status_t OMXNodeInstance::useBuffer(
         OMX_U32 portIndex, const sp<IMemory> &params,
-        OMX::buffer_id *buffer, OMX_U32 allottedSize, OMX_BOOL crossProcess) {
+        OMX::buffer_id *buffer, OMX_U32 allottedSize) {
     if (params == NULL || buffer == NULL) {
         ALOGE("b/25884056");
         return BAD_VALUE;
@@ -793,9 +793,9 @@ status_t OMXNodeInstance::useBuffer(
     }
 
     // metadata buffers are not connected cross process
+    // use a backup buffer instead of the actual buffer
     BufferMeta *buffer_meta;
-    bool isMeta = mMetadataType[portIndex] != kMetadataBufferTypeInvalid;
-    bool useBackup = crossProcess && isMeta; // use a backup buffer instead of the actual buffer
+    bool useBackup = mMetadataType[portIndex] != kMetadataBufferTypeInvalid;
     OMX_U8 *data = static_cast<OMX_U8 *>(params->pointer());
     // allocate backup buffer
     if (useBackup) {
@@ -1026,7 +1026,7 @@ status_t OMXNodeInstance::updateGraphicBufferInMeta(
     // update backup buffer for input, codec buffer for output
     return updateGraphicBufferInMeta_l(
             portIndex, graphicBuffer, buffer, header,
-            portIndex == kPortIndexOutput /* updateCodecBuffer */);
+            true /* updateCodecBuffer */);
 }
 
 status_t OMXNodeInstance::updateNativeHandleInMeta(
@@ -1046,7 +1046,7 @@ status_t OMXNodeInstance::updateNativeHandleInMeta(
     BufferMeta *bufferMeta = (BufferMeta *)(header->pAppPrivate);
     // update backup buffer
     sp<ABuffer> data = bufferMeta->getBuffer(
-            header, portIndex == kPortIndexInput /* backup */, false /* limit */);
+            header, false /* backup */, false /* limit */);
     bufferMeta->setNativeHandle(nativeHandle);
     if (mMetadataType[portIndex] == kMetadataBufferTypeNativeHandleSource
             && data->capacity() >= sizeof(VideoNativeHandleMetadata)) {
@@ -1274,7 +1274,7 @@ status_t OMXNodeInstance::allocateSecureBuffer(
 
 status_t OMXNodeInstance::allocateBufferWithBackup(
         OMX_U32 portIndex, const sp<IMemory> &params,
-        OMX::buffer_id *buffer, OMX_U32 allottedSize, OMX_BOOL crossProcess) {
+        OMX::buffer_id *buffer, OMX_U32 allottedSize) {
     if (params == NULL || buffer == NULL) {
         ALOGE("b/25884056");
         return BAD_VALUE;
@@ -1285,9 +1285,8 @@ status_t OMXNodeInstance::allocateBufferWithBackup(
         return BAD_VALUE;
     }
 
-    // metadata buffers are not connected cross process
-    bool isMeta = mMetadataType[portIndex] != kMetadataBufferTypeInvalid;
-    bool copy = !(crossProcess && isMeta);
+    // metadata buffers are not connected cross process; only copy if not meta
+    bool copy = mMetadataType[portIndex] == kMetadataBufferTypeInvalid;
 
     BufferMeta *buffer_meta = new BufferMeta(
             params, portIndex,

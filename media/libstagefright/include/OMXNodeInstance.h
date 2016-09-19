@@ -70,7 +70,7 @@ struct OMXNodeInstance {
 
     status_t useBuffer(
             OMX_U32 portIndex, const sp<IMemory> &params,
-            OMX::buffer_id *buffer, OMX_U32 allottedSize, OMX_BOOL crossProcess);
+            OMX::buffer_id *buffer, OMX_U32 allottedSize);
 
     status_t useGraphicBuffer(
             OMX_U32 portIndex, const sp<GraphicBuffer> &graphicBuffer,
@@ -107,7 +107,7 @@ struct OMXNodeInstance {
 
     status_t allocateBufferWithBackup(
             OMX_U32 portIndex, const sp<IMemory> &params,
-            OMX::buffer_id *buffer, OMX_U32 allottedSize, OMX_BOOL crossProcess);
+            OMX::buffer_id *buffer, OMX_U32 allottedSize);
 
     status_t freeBuffer(OMX_U32 portIndex, OMX::buffer_id buffer);
 
