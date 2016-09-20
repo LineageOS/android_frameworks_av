@@ -1,4 +1,12 @@
+ndk_headers {
+    name: "libcamera2ndk_headers",
+    from: "include/camera/ndk/",
+    to: "camera",
+    srcs: ["include/camera/ndk/**/*.h"],
+}
+
 subdirs = [
+    "camera/ndk",
     "media/libmedia",
     "media/libstagefright/foundation",
 ]

@@ -36,12 +36,14 @@
 #ifndef _NDK_CAMERA_METADATA_H
 #define _NDK_CAMERA_METADATA_H
 
+#include <sys/cdefs.h>
+
 #include "NdkCameraError.h"
 #include "NdkCameraMetadataTags.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__BEGIN_DECLS
+
+#if __ANDROID_API__ >= 24
 
 /**
  * ACameraMetadata is opaque type that provides access to read-only camera metadata like camera
@@ -226,10 +228,10 @@ ACameraMetadata* ACameraMetadata_copy(const ACameraMetadata* src);
  */
 void ACameraMetadata_free(ACameraMetadata* metadata);
 
-#ifdef __cplusplus
-} // extern "C"
-#endif
+#endif /* __ANDROID_API__ >= 24 */
 
-#endif //_NDK_CAMERA_METADATA_H
+__END_DECLS
+
+#endif /* _NDK_CAMERA_METADATA_H */
 
 /** @} */
