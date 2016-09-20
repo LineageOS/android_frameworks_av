@@ -36,6 +36,12 @@
 #ifndef _NDK_CAMERA_METADATA_TAGS_H
 #define _NDK_CAMERA_METADATA_TAGS_H
 
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
+
+#if __ANDROID_API__ >= 24
+
 typedef enum acamera_metadata_section {
     ACAMERA_COLOR_CORRECTION,
     ACAMERA_CONTROL,
@@ -6901,8 +6907,10 @@ typedef enum acamera_metadata_enum_acamera_depth_depth_is_exclusive {
 
 } acamera_metadata_enum_android_depth_depth_is_exclusive_t;
 
+#endif /* __ANDROID_API__ >= 24 */
 
+__END_DECLS
 
-#endif //_NDK_CAMERA_METADATA_TAGS_H
+#endif /* _NDK_CAMERA_METADATA_TAGS_H */
 
 /** @} */

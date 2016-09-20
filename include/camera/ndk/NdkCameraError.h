@@ -36,9 +36,11 @@
 #ifndef _NDK_CAMERA_ERROR_H
 #define _NDK_CAMERA_ERROR_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
+
+#if __ANDROID_API__ >= 24
 
 typedef enum {
     ACAMERA_OK = 0,
@@ -130,11 +132,10 @@ typedef enum {
     ACAMERA_ERROR_PERMISSION_DENIED     = ACAMERA_ERROR_BASE - 13,
 } camera_status_t;
 
+#endif /* __ANDROID_API__ >= 24 */
 
-#ifdef __cplusplus
-} // extern "C"
-#endif
+__END_DECLS
 
-#endif // _NDK_CAMERA_ERROR_H
+#endif /* _NDK_CAMERA_ERROR_H */
 
 /** @} */
