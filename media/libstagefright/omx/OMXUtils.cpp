@@ -178,7 +178,7 @@ const char *GetComponentRole(bool isEncoder, const char *mime) {
                   : kMimeToRole[i].decoderRole;
 }
 
-status_t SetComponentRole(const sp<IOMX> &omx, IOMX::node_id node, const char *role) {
+status_t SetComponentRole(const sp<IOMXNode> &omxNode, const char *role) {
     OMX_PARAM_COMPONENTROLETYPE roleParams;
     InitOMXParams(&roleParams);
 
@@ -187,8 +187,8 @@ status_t SetComponentRole(const sp<IOMX> &omx, IOMX::node_id node, const char *r
 
     roleParams.cRole[OMX_MAX_STRINGNAME_SIZE - 1] = '\0';
 
-    return omx->setParameter(
-            node, OMX_IndexParamStandardComponentRole,
+    return omxNode->setParameter(
+            OMX_IndexParamStandardComponentRole,
             &roleParams, sizeof(roleParams));
 }
 
@@ -305,24 +305,24 @@ bool DescribeDefaultColorFormat(DescribeColorFormat2Params &params) {
 }
 
 bool DescribeColorFormat(
-        const sp<IOMX> &omx, IOMX::node_id node,
+        const sp<IOMXNode> &omxNode,
         DescribeColorFormat2Params &describeParams)
 {
     OMX_INDEXTYPE describeColorFormatIndex;
-    if (omx->getExtensionIndex(
-            node, "OMX.google.android.index.describeColorFormat",
+    if (omxNode->getExtensionIndex(
+            "OMX.google.android.index.describeColorFormat",
             &describeColorFormatIndex) == OK) {
         DescribeColorFormatParams describeParamsV1(describeParams);
-        if (omx->getParameter(
-                node, describeColorFormatIndex,
+        if (omxNode->getParameter(
+                describeColorFormatIndex,
                 &describeParamsV1, sizeof(describeParamsV1)) == OK) {
             describeParams.initFromV1(describeParamsV1);
             return describeParams.sMediaImage.mType != MediaImage2::MEDIA_IMAGE_TYPE_UNKNOWN;
         }
-    } else if (omx->getExtensionIndex(
-            node, "OMX.google.android.index.describeColorFormat2", &describeColorFormatIndex) == OK
-               && omx->getParameter(
-            node, describeColorFormatIndex, &describeParams, sizeof(describeParams)) == OK) {
+    } else if (omxNode->getExtensionIndex(
+            "OMX.google.android.index.describeColorFormat2", &describeColorFormatIndex) == OK
+               && omxNode->getParameter(
+                       describeColorFormatIndex, &describeParams, sizeof(describeParams)) == OK) {
         return describeParams.sMediaImage.mType != MediaImage2::MEDIA_IMAGE_TYPE_UNKNOWN;
     }
 
@@ -331,7 +331,7 @@ bool DescribeColorFormat(
 
 // static
 bool IsFlexibleColorFormat(
-         const sp<IOMX> &omx, IOMX::node_id node,
+         const sp<IOMXNode> &omxNode,
          uint32_t colorFormat, bool usingNativeBuffers, OMX_U32 *flexibleEquivalent) {
     DescribeColorFormat2Params describeParams;
     InitOMXParams(&describeParams);
@@ -345,7 +345,7 @@ bool IsFlexibleColorFormat(
 
     CHECK(flexibleEquivalent != NULL);
 
-    if (!DescribeColorFormat(omx, node, describeParams)) {
+    if (!DescribeColorFormat(omxNode, describeParams)) {
         return false;
     }
 

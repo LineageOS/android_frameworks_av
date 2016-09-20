@@ -244,8 +244,9 @@ private:
     uint32_t mFlags;
     uint32_t mQuirks;
     sp<IOMX> mOMX;
+    sp<IOMXNode> mOMXNode;
     sp<IBinder> mNodeBinder;
-    IOMX::node_id mNode;
+    int32_t mNodeGeneration;
     sp<MemoryDealer> mDealer[2];
 
     bool mUsingNativeWindow;

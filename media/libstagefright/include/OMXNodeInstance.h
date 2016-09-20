@@ -30,17 +30,16 @@ class IOMXBufferSource;
 class IOMXObserver;
 struct OMXMaster;
 
-struct OMXNodeInstance {
+struct OMXNodeInstance : public BnOMXNode {
     OMXNodeInstance(
             OMX *owner, const sp<IOMXObserver> &observer, const char *name);
 
-    void setHandle(OMX::node_id node_id, OMX_HANDLETYPE handle);
+    void setHandle(OMX_HANDLETYPE handle);
 
-    OMX *owner();
+    OMX_HANDLETYPE handle();
     sp<IOMXObserver> observer();
-    OMX::node_id nodeID();
 
-    status_t freeNode(OMXMaster *master);
+    status_t freeNode() override;
 
     status_t sendCommand(OMX_COMMANDTYPE cmd, OMX_S32 param);
     status_t getParameter(OMX_INDEXTYPE index, void *params, size_t size);
@@ -129,21 +128,25 @@ struct OMXNodeInstance {
         return mIsSecure;
     }
 
+    status_t dispatchMessage(const omx_message &msg) override;
+
     // handles messages and removes them from the list
     void onMessages(std::list<omx_message> &messages);
-    void onObserverDied(OMXMaster *master);
-    void onGetHandleFailed();
+    void onObserverDied();
     void onEvent(OMX_EVENTTYPE event, OMX_U32 arg1, OMX_U32 arg2);
 
     static OMX_CALLBACKTYPE kCallbacks;
 
 private:
+    struct CallbackDispatcherThread;
+    struct CallbackDispatcher;
+
     Mutex mLock;
 
     OMX *mOwner;
-    OMX::node_id mNodeID;
     OMX_HANDLETYPE mHandle;
     sp<IOMXObserver> mObserver;
+    sp<CallbackDispatcher> mDispatcher;
     bool mDying;
     bool mSailed;  // configuration is set (no more meta-mode changes)
     bool mQueriedProhibitedExtensions;

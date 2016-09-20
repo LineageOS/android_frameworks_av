@@ -29,6 +29,7 @@
 
 #include <OMX_Component.h>
 #include <OMX_IndexExt.h>
+#include <OMX_VideoExt.h>
 #include <OMX_AsString.h>
 
 #include <binder/IMemory.h>
@@ -45,19 +46,19 @@
 static const OMX_U32 kPortIndexInput = 0;
 static const OMX_U32 kPortIndexOutput = 1;
 
-#define CLOGW(fmt, ...) ALOGW("[%x:%s] " fmt, mNodeID, mName, ##__VA_ARGS__)
+#define CLOGW(fmt, ...) ALOGW("[%p:%s] " fmt, mHandle, mName, ##__VA_ARGS__)
 
 #define CLOG_ERROR_IF(cond, fn, err, fmt, ...) \
-    ALOGE_IF(cond, #fn "(%x:%s, " fmt ") ERROR: %s(%#x)", \
-    mNodeID, mName, ##__VA_ARGS__, asString(err), err)
+    ALOGE_IF(cond, #fn "(%p:%s, " fmt ") ERROR: %s(%#x)", \
+    mHandle, mName, ##__VA_ARGS__, asString(err), err)
 #define CLOG_ERROR(fn, err, fmt, ...) CLOG_ERROR_IF(true, fn, err, fmt, ##__VA_ARGS__)
 #define CLOG_IF_ERROR(fn, err, fmt, ...) \
     CLOG_ERROR_IF((err) != OMX_ErrorNone, fn, err, fmt, ##__VA_ARGS__)
 
 #define CLOGI_(level, fn, fmt, ...) \
-    ALOGI_IF(DEBUG >= (level), #fn "(%x:%s, " fmt ")", mNodeID, mName, ##__VA_ARGS__)
+    ALOGI_IF(DEBUG >= (level), #fn "(%p:%s, " fmt ")", mHandle, mName, ##__VA_ARGS__)
 #define CLOGD_(level, fn, fmt, ...) \
-    ALOGD_IF(DEBUG >= (level), #fn "(%x:%s, " fmt ")", mNodeID, mName, ##__VA_ARGS__)
+    ALOGD_IF(DEBUG >= (level), #fn "(%p:%s, " fmt ")", mHandle, mName, ##__VA_ARGS__)
 
 #define CLOG_LIFE(fn, fmt, ...)     CLOGI_(ADebug::kDebugLifeCycle,     fn, fmt, ##__VA_ARGS__)
 #define CLOG_STATE(fn, fmt, ...)    CLOGI_(ADebug::kDebugState,         fn, fmt, ##__VA_ARGS__)
@@ -65,7 +66,7 @@ static const OMX_U32 kPortIndexOutput = 1;
 #define CLOG_INTERNAL(fn, fmt, ...) CLOGD_(ADebug::kDebugInternalState, fn, fmt, ##__VA_ARGS__)
 
 #define CLOG_DEBUG_IF(cond, fn, fmt, ...) \
-    ALOGD_IF(cond, #fn "(%x, " fmt ")", mNodeID, ##__VA_ARGS__)
+    ALOGD_IF(cond, #fn "(%p, " fmt ")", mHandle, ##__VA_ARGS__)
 
 #define CLOG_BUFFER(fn, fmt, ...) \
     CLOG_DEBUG_IF(DEBUG >= ADebug::kDebugAll, fn, fmt, ##__VA_ARGS__)
@@ -206,10 +207,133 @@ static inline const char *portString(OMX_U32 portIndex) {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
+// This provides the underlying Thread used by CallbackDispatcher.
+// Note that deriving CallbackDispatcher from Thread does not work.
+
+struct OMXNodeInstance::CallbackDispatcherThread : public Thread {
+    explicit CallbackDispatcherThread(CallbackDispatcher *dispatcher)
+        : mDispatcher(dispatcher) {
+    }
+
+private:
+    CallbackDispatcher *mDispatcher;
+
+    bool threadLoop();
+
+    CallbackDispatcherThread(const CallbackDispatcherThread &);
+    CallbackDispatcherThread &operator=(const CallbackDispatcherThread &);
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
+struct OMXNodeInstance::CallbackDispatcher : public RefBase {
+    explicit CallbackDispatcher(const sp<OMXNodeInstance> &owner);
+
+    // Posts |msg| to the listener's queue. If |realTime| is true, the listener thread is notified
+    // that a new message is available on the queue. Otherwise, the message stays on the queue, but
+    // the listener is not notified of it. It will process this message when a subsequent message
+    // is posted with |realTime| set to true.
+    void post(const omx_message &msg, bool realTime = true);
+
+    bool loop();
+
+protected:
+    virtual ~CallbackDispatcher();
+
+private:
+    Mutex mLock;
+
+    sp<OMXNodeInstance> const mOwner;
+    bool mDone;
+    Condition mQueueChanged;
+    std::list<omx_message> mQueue;
+
+    sp<CallbackDispatcherThread> mThread;
+
+    void dispatch(std::list<omx_message> &messages);
+
+    CallbackDispatcher(const CallbackDispatcher &);
+    CallbackDispatcher &operator=(const CallbackDispatcher &);
+};
+
+OMXNodeInstance::CallbackDispatcher::CallbackDispatcher(const sp<OMXNodeInstance> &owner)
+    : mOwner(owner),
+      mDone(false) {
+    mThread = new CallbackDispatcherThread(this);
+    mThread->run("OMXCallbackDisp", ANDROID_PRIORITY_FOREGROUND);
+}
+
+OMXNodeInstance::CallbackDispatcher::~CallbackDispatcher() {
+    {
+        Mutex::Autolock autoLock(mLock);
+
+        mDone = true;
+        mQueueChanged.signal();
+    }
+
+    // A join on self can happen if the last ref to CallbackDispatcher
+    // is released within the CallbackDispatcherThread loop
+    status_t status = mThread->join();
+    if (status != WOULD_BLOCK) {
+        // Other than join to self, the only other error return codes are
+        // whatever readyToRun() returns, and we don't override that
+        CHECK_EQ(status, (status_t)NO_ERROR);
+    }
+}
+
+void OMXNodeInstance::CallbackDispatcher::post(const omx_message &msg, bool realTime) {
+    Mutex::Autolock autoLock(mLock);
+
+    mQueue.push_back(msg);
+    if (realTime) {
+        mQueueChanged.signal();
+    }
+}
+
+void OMXNodeInstance::CallbackDispatcher::dispatch(std::list<omx_message> &messages) {
+    if (mOwner == NULL) {
+        ALOGV("Would have dispatched a message to a node that's already gone.");
+        return;
+    }
+    mOwner->onMessages(messages);
+}
+
+bool OMXNodeInstance::CallbackDispatcher::loop() {
+    for (;;) {
+        std::list<omx_message> messages;
+
+        {
+            Mutex::Autolock autoLock(mLock);
+            while (!mDone && mQueue.empty()) {
+                mQueueChanged.wait(mLock);
+            }
+
+            if (mDone) {
+                break;
+            }
+
+            messages.swap(mQueue);
+        }
+
+        dispatch(messages);
+    }
+
+    return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+bool OMXNodeInstance::CallbackDispatcherThread::threadLoop() {
+    return mDispatcher->loop();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 OMXNodeInstance::OMXNodeInstance(
         OMX *owner, const sp<IOMXObserver> &observer, const char *name)
     : mOwner(owner),
-      mNodeID(0),
       mHandle(NULL),
       mObserver(observer),
       mDying(false),
@@ -239,11 +363,13 @@ OMXNodeInstance::~OMXNodeInstance() {
     CHECK(mHandle == NULL);
 }
 
-void OMXNodeInstance::setHandle(OMX::node_id node_id, OMX_HANDLETYPE handle) {
-    mNodeID = node_id;
+void OMXNodeInstance::setHandle(OMX_HANDLETYPE handle) {
     CLOG_LIFE(allocateNode, "handle=%p", handle);
     CHECK(mHandle == NULL);
     mHandle = handle;
+    if (handle != NULL) {
+        mDispatcher = new CallbackDispatcher(this);
+    }
 }
 
 sp<IOMXBufferSource> OMXNodeInstance::getBufferSource() {
@@ -257,25 +383,22 @@ void OMXNodeInstance::setBufferSource(const sp<IOMXBufferSource>& bufferSource) 
     mOMXBufferSource = bufferSource;
 }
 
-OMX *OMXNodeInstance::owner() {
-    return mOwner;
+OMX_HANDLETYPE OMXNodeInstance::handle() {
+    return mHandle;
 }
 
 sp<IOMXObserver> OMXNodeInstance::observer() {
     return mObserver;
 }
 
-OMX::node_id OMXNodeInstance::nodeID() {
-    return mNodeID;
-}
+status_t OMXNodeInstance::freeNode() {
 
-status_t OMXNodeInstance::freeNode(OMXMaster *master) {
     CLOG_LIFE(freeNode, "handle=%p", mHandle);
     static int32_t kMaxNumIterations = 10;
 
     // exit if we have already freed the node
     if (mHandle == NULL) {
-        return OK;
+        return mOwner->freeNode(this);
     }
 
     // Transition the node from its current state all the way down
@@ -354,23 +477,18 @@ status_t OMXNodeInstance::freeNode(OMXMaster *master) {
             LOG_ALWAYS_FATAL("unknown state %s(%#x).", asString(state), state);
             break;
     }
+    status_t err = mOwner->freeNode(this);
 
-    ALOGV("[%x:%s] calling destroyComponentInstance", mNodeID, mName);
-    OMX_ERRORTYPE err = master->destroyComponentInstance(
-            static_cast<OMX_COMPONENTTYPE *>(mHandle));
+    mDispatcher.clear();
 
     mHandle = NULL;
     CLOG_IF_ERROR(freeNode, err, "");
     free(mName);
     mName = NULL;
 
-    mOwner->invalidateNodeID(mNodeID);
-    mNodeID = 0;
-
     ALOGV("OMXNodeInstance going away.");
-    delete this;
 
-    return StatusFromOMXError(err);
+    return err;
 }
 
 status_t OMXNodeInstance::sendCommand(
@@ -1133,8 +1251,7 @@ status_t OMXNodeInstance::createGraphicBufferSource(
     }
 
     sp<GraphicBufferSource> graphicBufferSource = new GraphicBufferSource(
-            mOwner,
-            mNodeID,
+            this,
             def.format.video.nFrameWidth,
             def.format.video.nFrameHeight,
             def.nBufferCountActual,
@@ -1621,6 +1738,11 @@ status_t OMXNodeInstance::getExtensionIndex(
     return StatusFromOMXError(err);
 }
 
+status_t OMXNodeInstance::dispatchMessage(const omx_message &msg) {
+    mDispatcher->post(msg, true /*realTime*/);
+    return OMX_ErrorNone;
+}
+
 bool OMXNodeInstance::handleMessage(omx_message &msg) {
     if (msg.type == omx_message::FILL_BUFFER_DONE) {
         OMX_BUFFERHEADERTYPE *buffer =
@@ -1776,15 +1898,11 @@ void OMXNodeInstance::onMessages(std::list<omx_message> &messages) {
     }
 }
 
-void OMXNodeInstance::onObserverDied(OMXMaster *master) {
+void OMXNodeInstance::onObserverDied() {
     ALOGE("!!! Observer died. Quickly, do something, ... anything...");
 
     // Try to force shutdown of the node and hope for the best.
-    freeNode(master);
-}
-
-void OMXNodeInstance::onGetHandleFailed() {
-    delete this;
+    freeNode();
 }
 
 // OMXNodeInstance::OnEvent calls OMX::OnEvent, which then calls here.
@@ -1861,8 +1979,39 @@ OMX_ERRORTYPE OMXNodeInstance::OnEvent(
     if (instance->mDying) {
         return OMX_ErrorNone;
     }
-    return instance->owner()->OnEvent(
-            instance->nodeID(), eEvent, nData1, nData2, pEventData);
+
+    instance->onEvent(eEvent, nData1, nData2);
+
+    // output rendered events are not processed as regular events until they hit the observer
+    if (eEvent == OMX_EventOutputRendered) {
+        if (pEventData == NULL) {
+            return OMX_ErrorBadParameter;
+        }
+
+        // process data from array
+        OMX_VIDEO_RENDEREVENTTYPE *renderData = (OMX_VIDEO_RENDEREVENTTYPE *)pEventData;
+        for (size_t i = 0; i < nData1; ++i) {
+            omx_message msg;
+            msg.type = omx_message::FRAME_RENDERED;
+            msg.fenceFd = -1;
+            msg.u.render_data.timestamp = renderData[i].nMediaTimeUs;
+            msg.u.render_data.nanoTime = renderData[i].nSystemTimeNs;
+
+            instance->mDispatcher->post(msg, false /* realTime */);
+        }
+        return OMX_ErrorNone;
+    }
+
+    omx_message msg;
+    msg.type = omx_message::EVENT;
+    msg.fenceFd = -1;
+    msg.u.event_data.event = eEvent;
+    msg.u.event_data.data1 = nData1;
+    msg.u.event_data.data2 = nData2;
+
+    instance->mDispatcher->post(msg, true /* realTime */);
+
+    return OMX_ErrorNone;
 }
 
 // static
@@ -1879,8 +2028,14 @@ OMX_ERRORTYPE OMXNodeInstance::OnEmptyBufferDone(
         return OMX_ErrorNone;
     }
     int fenceFd = instance->retrieveFenceFromMeta_l(pBuffer, kPortIndexOutput);
-    return instance->owner()->OnEmptyBufferDone(instance->nodeID(),
-            instance->findBufferID(pBuffer), pBuffer, fenceFd);
+
+    omx_message msg;
+    msg.type = omx_message::EMPTY_BUFFER_DONE;
+    msg.fenceFd = fenceFd;
+    msg.u.buffer_data.buffer = instance->findBufferID(pBuffer);
+    instance->mDispatcher->post(msg);
+
+    return OMX_ErrorNone;
 }
 
 // static
@@ -1897,8 +2052,18 @@ OMX_ERRORTYPE OMXNodeInstance::OnFillBufferDone(
         return OMX_ErrorNone;
     }
     int fenceFd = instance->retrieveFenceFromMeta_l(pBuffer, kPortIndexOutput);
-    return instance->owner()->OnFillBufferDone(instance->nodeID(),
-            instance->findBufferID(pBuffer), pBuffer, fenceFd);
+
+    omx_message msg;
+    msg.type = omx_message::FILL_BUFFER_DONE;
+    msg.fenceFd = fenceFd;
+    msg.u.extended_buffer_data.buffer = instance->findBufferID(pBuffer);
+    msg.u.extended_buffer_data.range_offset = pBuffer->nOffset;
+    msg.u.extended_buffer_data.range_length = pBuffer->nFilledLen;
+    msg.u.extended_buffer_data.flags = pBuffer->nFlags;
+    msg.u.extended_buffer_data.timestamp = pBuffer->nTimeStamp;
+    instance->mDispatcher->post(msg);
+
+    return OMX_ErrorNone;
 }
 
 void OMXNodeInstance::addActiveBuffer(OMX_U32 portIndex, OMX::buffer_id id) {

@@ -39,16 +39,16 @@ static void InitOMXParams(T *params) {
 status_t StatusFromOMXError(OMX_ERRORTYPE err);
 
 const char *GetComponentRole(bool isEncoder, const char *mime);
-status_t SetComponentRole(const sp<IOMX> &omx, IOMX::node_id node, const char *role);
+status_t SetComponentRole(const sp<IOMXNode> &omxNode, const char *role);
 
 struct DescribeColorFormat2Params;
 
 bool IsFlexibleColorFormat(
-        const sp<IOMX> &omx, IOMX::node_id node,
-        uint32_t colorFormat, bool usingNativeBuffers, OMX_U32 *flexibleEquivalent);
+        const sp<IOMXNode> &omxNode, uint32_t colorFormat,
+        bool usingNativeBuffers, OMX_U32 *flexibleEquivalent);
 bool DescribeDefaultColorFormat(DescribeColorFormat2Params &describeParams);
 bool DescribeColorFormat(
-        const sp<IOMX> &omx, IOMX::node_id node,
+        const sp<IOMXNode> &omxNode,
         DescribeColorFormat2Params &describeParams);
 
 }  // namespace android
