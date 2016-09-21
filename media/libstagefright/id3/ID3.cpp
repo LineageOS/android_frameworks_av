@@ -531,6 +531,9 @@ void ID3::Iterator::getstring(String8 *id, bool otherdata) const {
     }
     size_t n = mFrameSize - getHeaderLength() - 1;
     if (otherdata) {
+        if (n < 5) {
+            return;
+        }
         // skip past the encoding, language, and the 0 separator
         frameData += 4;
         int32_t i = n - 4;
