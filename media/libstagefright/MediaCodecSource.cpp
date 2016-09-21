@@ -905,6 +905,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
                 }
                 mbuf->meta_data()->setInt64(kKeyTime, timeUs);
             } else {
+                mbuf->meta_data()->setInt64(kKeyTime, 0ll);
                 mbuf->meta_data()->setInt32(kKeyIsCodecConfig, true);
             }
             if (flags & MediaCodec::BUFFER_FLAG_SYNCFRAME) {

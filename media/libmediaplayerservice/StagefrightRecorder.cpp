@@ -884,7 +884,10 @@ status_t StagefrightRecorder::start() {
         case OUTPUT_FORMAT_RTP_AVP:
         case OUTPUT_FORMAT_MPEG2TS:
         {
-            status = mWriter->start();
+            sp<MetaData> meta = new MetaData;
+            int64_t startTimeUs = systemTime() / 1000;
+            meta->setInt64(kKeyTime, startTimeUs);
+            status = mWriter->start(meta.get());
             break;
         }
 
