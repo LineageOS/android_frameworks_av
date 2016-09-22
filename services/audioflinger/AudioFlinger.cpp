@@ -48,8 +48,6 @@
 #include "DevicesFactoryHalInterface.h"
 #include "EffectsFactoryHalInterface.h"
 #include "ServiceUtilities.h"
-// FIXME: Remove after streams HAL is componentized
-#include "DeviceHalLocal.h"
 
 #include <media/AudioResamplerPublic.h>
 
@@ -399,7 +397,7 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
             write(fd, result.string(), result.size());
         }
 
-        if (mEffectsFactoryHal.get() != NULL) {
+        if (mEffectsFactoryHal != 0) {
             mEffectsFactoryHal->dumpEffects(fd);
         } else {
             String8 result(kNoEffectsFactory);
@@ -2013,7 +2011,6 @@ void AudioFlinger::closeOutputFinish(const sp<PlaybackThread>& thread)
     AudioStreamOut *out = thread->clearOutput();
     ALOG_ASSERT(out != NULL, "out shouldn't be NULL");
     // from now on thread->mOutput is NULL
-    static_cast<DeviceHalLocal*>(out->hwDev().get())->closeOutputStream(out->stream);
     delete out;
 }
 
@@ -2109,12 +2106,12 @@ sp<AudioFlinger::RecordThread> AudioFlinger::openInput_l(audio_module_handle_t m
 
     audio_config_t halconfig = *config;
     sp<DeviceHalInterface> inHwHal = inHwDev->hwDevice();
-    audio_stream_in_t *inStream = NULL;
-    status_t status = static_cast<DeviceHalLocal*>(inHwHal.get())->openInputStream(
+    sp<StreamInHalInterface> inStream;
+    status_t status = inHwHal->openInputStream(
             *input, devices, &halconfig, flags, address.string(), source, &inStream);
     ALOGV("openInput_l() openInputStream returned input %p, SamplingRate %d"
            ", Format %#x, Channels %x, flags %#x, status %d addr %s",
-            inStream,
+            inStream.get(),
             halconfig.sample_rate,
             halconfig.format,
             halconfig.channel_mask,
@@ -2131,13 +2128,13 @@ sp<AudioFlinger::RecordThread> AudioFlinger::openInput_l(audio_module_handle_t m
         (audio_channel_count_from_in_mask(config->channel_mask) <= FCC_8)) {
         // FIXME describe the change proposed by HAL (save old values so we can log them here)
         ALOGV("openInput_l() reopening with proposed sampling rate and channel mask");
-        inStream = NULL;
-        status = static_cast<DeviceHalLocal*>(inHwHal.get())->openInputStream(
+        inStream.clear();
+        status = inHwHal->openInputStream(
                 *input, devices, &halconfig, flags, address.string(), source, &inStream);
         // FIXME log this new status; HAL should not propose any further changes
     }
 
-    if (status == NO_ERROR && inStream != NULL) {
+    if (status == NO_ERROR && inStream != 0) {
 
 #ifdef TEE_SINK
         // Try to re-use most recently used Pipe to archive a copy of input for dumpsys,
@@ -2284,7 +2281,6 @@ void AudioFlinger::closeInputFinish(const sp<RecordThread>& thread)
     AudioStreamIn *in = thread->clearInput();
     ALOG_ASSERT(in != NULL, "in shouldn't be NULL");
     // from now on thread->mInput is NULL
-    static_cast<DeviceHalLocal*>(in->hwDev().get())->closeInputStream(in->stream);
     delete in;
 }
 
@@ -2649,7 +2645,7 @@ sp<IEffect> AudioFlinger::createEffect(
         goto Exit;
     }
 
-    if (mEffectsFactoryHal.get() == NULL) {
+    if (mEffectsFactoryHal == 0) {
         lStatus = NO_INIT;
         goto Exit;
     }

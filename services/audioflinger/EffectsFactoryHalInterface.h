@@ -28,8 +28,6 @@ namespace android {
 class EffectsFactoryHalInterface : public RefBase
 {
   public:
-    virtual ~EffectsFactoryHalInterface() {}
-
     // Returns the number of different effects in all loaded libraries.
     virtual status_t queryNumberEffects(uint32_t *pNumEffects) = 0;
 
@@ -57,6 +55,8 @@ class EffectsFactoryHalInterface : public RefBase
   protected:
     // Subclasses can not be constructed directly by clients.
     EffectsFactoryHalInterface() {}
+
+    virtual ~EffectsFactoryHalInterface() {}
 };
 
 } // namespace android

@@ -27,6 +27,7 @@ LOCAL_SRC_FILES:=               \
     AudioHwDevice.cpp           \
     AudioStreamOut.cpp          \
     SpdifStreamOut.cpp          \
+    StreamHalLocal.cpp          \
     DeviceHalLocal.cpp          \
     DevicesFactoryHalLocal.cpp	\
     EffectHalLocal.cpp          \

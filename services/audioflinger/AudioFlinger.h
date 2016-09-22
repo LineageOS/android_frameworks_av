@@ -58,6 +58,7 @@
 #include "SpdifStreamOut.h"
 #include "AudioHwDevice.h"
 #include "LinearMap.h"
+#include "StreamHalInterface.h"
 
 #include <powermanager/IPowerManager.h>
 
@@ -615,12 +616,12 @@ private:
 
     struct AudioStreamIn {
         AudioHwDevice* const audioHwDev;
-        audio_stream_in_t* const stream;
+        sp<StreamInHalInterface> stream;
         audio_input_flags_t flags;
 
         sp<DeviceHalInterface> hwDev() const { return audioHwDev->hwDevice(); }
 
-        AudioStreamIn(AudioHwDevice *dev, audio_stream_in_t *in, audio_input_flags_t flags) :
+        AudioStreamIn(AudioHwDevice *dev, sp<StreamInHalInterface> in, audio_input_flags_t flags) :
             audioHwDev(dev), stream(in), flags(flags) {}
     };
 

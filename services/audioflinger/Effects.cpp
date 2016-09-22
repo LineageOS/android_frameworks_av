@@ -28,8 +28,6 @@
 
 #include "AudioFlinger.h"
 #include "EffectHalInterface.h"
-// FIXME: Remove after converting the main audio HAL
-#include "EffectHalLocal.h"
 #include "EffectsFactoryHalInterface.h"
 #include "ServiceUtilities.h"
 
@@ -80,9 +78,9 @@ AudioFlinger::EffectModule::EffectModule(ThreadBase *thread,
     // create effect engine from effect factory
     mStatus = -ENODEV;
     sp<AudioFlinger> audioFlinger = mAudioFlinger.promote();
-    if (audioFlinger.get() != NULL) {
+    if (audioFlinger != 0) {
         sp<EffectsFactoryHalInterface> effectsFactory = audioFlinger->getEffectsFactory();
-        if (effectsFactory.get() != NULL) {
+        if (effectsFactory != 0) {
             mStatus = effectsFactory->createEffect(
                     &desc->uuid, sessionId, thread->id(), &mEffectInterface);
         }
@@ -107,7 +105,7 @@ Error:
 AudioFlinger::EffectModule::~EffectModule()
 {
     ALOGV("Destructor %p", this);
-    if (mEffectInterface.get() != NULL) {
+    if (mEffectInterface != 0) {
         remove_effect_from_hal_l();
         // release effect engine
         mEffectInterface.clear();
@@ -276,7 +274,7 @@ void AudioFlinger::EffectModule::process()
 {
     Mutex::Autolock _l(mLock);
 
-    if (mState == DESTROYED || mEffectInterface.get() == NULL ||
+    if (mState == DESTROYED || mEffectInterface == 0 ||
             mConfig.inputCfg.buffer.raw == NULL ||
             mConfig.outputCfg.buffer.raw == NULL) {
         return;
@@ -338,7 +336,7 @@ void AudioFlinger::EffectModule::process()
 
 void AudioFlinger::EffectModule::reset_l()
 {
-    if (mStatus != NO_ERROR || mEffectInterface.get() == NULL) {
+    if (mStatus != NO_ERROR || mEffectInterface == 0) {
         return;
     }
     mEffectInterface->command(EFFECT_CMD_RESET, 0, NULL, 0, NULL);
@@ -351,7 +349,7 @@ status_t AudioFlinger::EffectModule::configure()
     uint32_t size;
     audio_channel_mask_t channelMask;
 
-    if (mEffectInterface.get() == NULL) {
+    if (mEffectInterface == 0) {
         status = NO_INIT;
         goto exit;
     }
@@ -458,7 +456,7 @@ exit:
 status_t AudioFlinger::EffectModule::init()
 {
     Mutex::Autolock _l(mLock);
-    if (mEffectInterface.get() == NULL) {
+    if (mEffectInterface == 0) {
         return NO_INIT;
     }
     status_t cmdStatus;
@@ -480,10 +478,10 @@ void AudioFlinger::EffectModule::addEffectToHal_l()
          (mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_POST_PROC) {
         sp<ThreadBase> thread = mThread.promote();
         if (thread != 0) {
-            audio_stream_t *stream = thread->stream();
-            if (stream != NULL) {
-                stream->add_audio_effect(stream,
-                        static_cast<EffectHalLocal*>(mEffectInterface.get())->handle());
+            sp<StreamHalInterface> stream = thread->stream();
+            if (stream != 0) {
+                status_t result = stream->addEffect(mEffectInterface);
+                ALOGE_IF(result != OK, "Error when adding effect: %d", result);
             }
         }
     }
@@ -509,7 +507,7 @@ status_t AudioFlinger::EffectModule::start()
 
 status_t AudioFlinger::EffectModule::start_l()
 {
-    if (mEffectInterface.get() == NULL) {
+    if (mEffectInterface == 0) {
         return NO_INIT;
     }
     if (mStatus != NO_ERROR) {
@@ -539,7 +537,7 @@ status_t AudioFlinger::EffectModule::stop()
 
 status_t AudioFlinger::EffectModule::stop_l()
 {
-    if (mEffectInterface.get() == NULL) {
+    if (mEffectInterface == 0) {
         return NO_INIT;
     }
     if (mStatus != NO_ERROR) {
@@ -567,10 +565,10 @@ status_t AudioFlinger::EffectModule::remove_effect_from_hal_l()
              (mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_POST_PROC) {
         sp<ThreadBase> thread = mThread.promote();
         if (thread != 0) {
-            audio_stream_t *stream = thread->stream();
-            if (stream != NULL) {
-                stream->remove_audio_effect(stream,
-                        static_cast<EffectHalLocal*>(mEffectInterface.get())->handle());
+            sp<StreamHalInterface> stream = thread->stream();
+            if (stream != 0) {
+                status_t result = stream->removeEffect(mEffectInterface);
+                ALOGE_IF(result != OK, "Error when removing effect: %d", result);
             }
         }
     }
@@ -593,7 +591,7 @@ status_t AudioFlinger::EffectModule::command(uint32_t cmdCode,
     Mutex::Autolock _l(mLock);
     ALOGVV("command(), cmdCode: %d, mEffectInterface: %p", cmdCode, mEffectInterface.get());
 
-    if (mState == DESTROYED || mEffectInterface.get() == NULL) {
+    if (mState == DESTROYED || mEffectInterface == 0) {
         return NO_INIT;
     }
     if (mStatus != NO_ERROR) {

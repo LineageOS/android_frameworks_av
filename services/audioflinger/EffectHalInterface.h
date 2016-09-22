@@ -26,9 +26,6 @@ namespace android {
 class EffectHalInterface : public RefBase
 {
   public:
-    // The destructor automatically releases the effect.
-    virtual ~EffectHalInterface() {}
-
     // Effect process function. Takes input samples as specified
     // in input buffer descriptor and output processed samples as specified
     // in output buffer descriptor.
@@ -48,6 +45,9 @@ class EffectHalInterface : public RefBase
   protected:
     // Subclasses can not be constructed directly by clients.
     EffectHalInterface() {}
+
+    // The destructor automatically releases the effect.
+    virtual ~EffectHalInterface() {}
 };
 
 } // namespace android

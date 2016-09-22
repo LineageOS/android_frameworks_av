@@ -286,7 +286,7 @@ public:
                 audio_devices_t outDevice() const { return mOutDevice; }
                 audio_devices_t inDevice() const { return mInDevice; }
 
-    virtual     audio_stream_t* stream() const = 0;
+    virtual     sp<StreamHalInterface> stream() const = 0;
 
                 sp<EffectHandle> createEffect_l(
                                     const sp<AudioFlinger::Client>& client,
@@ -484,7 +484,7 @@ protected:
 };
 
 // --- PlaybackThread ---
-class PlaybackThread : public ThreadBase {
+class PlaybackThread : public ThreadBase, public StreamOutHalInterfaceCallback {
 public:
 
 #include "PlaybackTracks.h"
@@ -539,13 +539,13 @@ protected:
     virtual     mixer_state prepareTracks_l(Vector< sp<Track> > *tracksToRemove) = 0;
                 void        removeTracks_l(const Vector< sp<Track> >& tracksToRemove);
 
-                void        writeCallback();
-                void        resetWriteBlocked(uint32_t sequence);
-                void        drainCallback();
-                void        resetDraining(uint32_t sequence);
-                void        errorCallback();
+    // StreamOutHalInterfaceCallback implementation
+    virtual     void        onWriteReady();
+    virtual     void        onDrainReady();
+    virtual     void        onError();
 
-    static      int         asyncCallback(stream_callback_event_t event, void *param, void *cookie);
+                void        resetWriteBlocked(uint32_t sequence);
+                void        resetDraining(uint32_t sequence);
 
     virtual     bool        waitingAsyncCallback();
     virtual     bool        waitingAsyncCallback_l();
@@ -591,7 +591,7 @@ public:
 
                 AudioStreamOut* getOutput() const;
                 AudioStreamOut* clearOutput();
-                virtual audio_stream_t* stream() const;
+                virtual sp<StreamHalInterface> stream() const;
 
                 // a very large number of suspend() will eventually wraparound, but unlikely
                 void        suspend() { (void) android_atomic_inc(&mSuspended); }
@@ -1297,7 +1297,7 @@ public:
 
             void        dump(int fd, const Vector<String16>& args);
             AudioStreamIn* clearInput();
-            virtual audio_stream_t* stream() const;
+            virtual sp<StreamHalInterface> stream() const;
 
 
     virtual bool        checkForNewParameter_l(const String8& keyValuePair,

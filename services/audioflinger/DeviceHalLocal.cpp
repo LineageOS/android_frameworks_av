@@ -20,6 +20,7 @@
 #include <utils/Log.h>
 
 #include "DeviceHalLocal.h"
+#include "StreamHalLocal.h"
 
 namespace android {
 
@@ -89,10 +90,10 @@ status_t DeviceHalLocal::setParameters(const String8& kvPairs) {
 }
 
 status_t DeviceHalLocal::getParameters(const String8& keys, String8 *values) {
-    char *c_values = mDev->get_parameters(mDev, keys.string());
-    if (c_values != NULL) {
-        values->setTo(c_values);
-        free(c_values);
+    char *halValues = mDev->get_parameters(mDev, keys.string());
+    if (halValues != NULL) {
+        values->setTo(halValues);
+        free(halValues);
     } else {
         values->clear();
     }
@@ -103,6 +104,39 @@ status_t DeviceHalLocal::getInputBufferSize(
         const struct audio_config *config, size_t *size) {
     *size = mDev->get_input_buffer_size(mDev, config);
     return OK;
+}
+
+status_t DeviceHalLocal::openOutputStream(
+        audio_io_handle_t handle,
+        audio_devices_t devices,
+        audio_output_flags_t flags,
+        struct audio_config *config,
+        const char *address,
+        sp<StreamOutHalInterface> *outStream) {
+    audio_stream_out_t *halStream;
+    int openResut = mDev->open_output_stream(
+            mDev, handle, devices, flags, config, &halStream, address);
+    if (openResut == OK) {
+        *outStream = new StreamOutHalLocal(halStream, this);
+    }
+    return openResut;
+}
+
+status_t DeviceHalLocal::openInputStream(
+        audio_io_handle_t handle,
+        audio_devices_t devices,
+        struct audio_config *config,
+        audio_input_flags_t flags,
+        const char *address,
+        audio_source_t source,
+        sp<StreamInHalInterface> *inStream) {
+    audio_stream_in_t *halStream;
+    int openResult = mDev->open_input_stream(
+            mDev, handle, devices, config, &halStream, flags, address, source);
+    if (openResult == OK) {
+        *inStream = new StreamInHalLocal(halStream, this);
+    }
+    return openResult;
 }
 
 status_t DeviceHalLocal::createAudioPatch(
@@ -130,36 +164,12 @@ status_t DeviceHalLocal::dump(int fd) {
     return mDev->dump(mDev, fd);
 }
 
-status_t DeviceHalLocal::openOutputStream(
-        audio_io_handle_t handle,
-        audio_devices_t devices,
-        audio_output_flags_t flags,
-        struct audio_config *config,
-        const char *address,
-        struct audio_stream_out **stream_out) {
-    return mDev->open_output_stream(mDev, handle, devices, flags, config, stream_out, address);
-}
-
-status_t DeviceHalLocal::closeOutputStream(struct audio_stream_out *stream_out) {
+void DeviceHalLocal::closeOutputStream(struct audio_stream_out *stream_out) {
     mDev->close_output_stream(mDev, stream_out);
-    return OK;
 }
 
-status_t DeviceHalLocal::openInputStream(
-        audio_io_handle_t handle,
-        audio_devices_t devices,
-        struct audio_config *config,
-        audio_input_flags_t flags,
-        const char *address,
-        audio_source_t source,
-        struct audio_stream_in **stream_in) {
-    return mDev->open_input_stream(
-            mDev, handle, devices, config, stream_in, flags, address, source);
-}
-
-status_t DeviceHalLocal::closeInputStream(struct audio_stream_in *stream_in) {
+void DeviceHalLocal::closeInputStream(struct audio_stream_in *stream_in) {
     mDev->close_input_stream(mDev, stream_in);
-    return OK;
 }
 
 } // namespace android
