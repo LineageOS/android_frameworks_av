@@ -28,6 +28,7 @@
 #ifndef _NDK_MEDIA_EXTRACTOR_H
 #define _NDK_MEDIA_EXTRACTOR_H
 
+#include <sys/cdefs.h>
 #include <sys/types.h>
 
 #include "NdkMediaCodec.h"
@@ -37,6 +38,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#if __ANDROID_API__ >= 21
 
 struct AMediaExtractor;
 typedef struct AMediaExtractor AMediaExtractor;
@@ -157,6 +160,8 @@ enum {
     AMEDIAEXTRACTOR_SAMPLE_FLAG_SYNC = 1,
     AMEDIAEXTRACTOR_SAMPLE_FLAG_ENCRYPTED = 2,
 };
+
+#endif /* __ANDROID_API__ >= 21 */
 
 #ifdef __cplusplus
 } // extern "C"
