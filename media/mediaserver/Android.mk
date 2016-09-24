@@ -19,6 +19,7 @@ LOCAL_SHARED_LIBRARIES := \
 	libcamera_client \
 	libcameraservice \
 	libresourcemanagerservice \
+	liblog \
 	libcutils \
 	libmedia \
 	libmediaplayerservice \
