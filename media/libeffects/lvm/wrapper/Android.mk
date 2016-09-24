@@ -18,6 +18,7 @@ LOCAL_MODULE_RELATIVE_PATH := soundfx
 LOCAL_STATIC_LIBRARIES += libmusicbundle
 
 LOCAL_SHARED_LIBRARIES := \
+     liblog \
      libcutils \
      libdl
 
@@ -47,6 +48,7 @@ LOCAL_MODULE_RELATIVE_PATH := soundfx
 LOCAL_STATIC_LIBRARIES += libreverb
 
 LOCAL_SHARED_LIBRARIES := \
+     liblog \
      libcutils \
      libdl
 
