@@ -2123,7 +2123,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             sp<AReplyToken> replyID;
             CHECK(msg->senderAwaitsResponse(&replyID));
 
-            if (!isExecuting()) {
+            if (!isExecuting() || !mHaveInputSurface) {
                 PostReplyWithError(replyID, INVALID_OPERATION);
                 break;
             } else if (mFlags & kFlagStickyError) {

@@ -27,6 +27,8 @@
 #include <media/openmax/OMX_IndexExt.h>
 #include <utils/NativeHandle.h>
 
+#include <android/IGraphicBufferSource.h>
+
 namespace android {
 
 enum {
@@ -47,7 +49,6 @@ enum {
     CREATE_INPUT_SURFACE,
     CREATE_PERSISTENT_INPUT_SURFACE,
     SET_INPUT_SURFACE,
-    SIGNAL_END_OF_INPUT_STREAM,
     STORE_META_DATA_IN_BUFFERS,
     PREPARE_FOR_ADAPTIVE_PLAYBACK,
     ALLOC_SECURE_BUFFER,
@@ -59,7 +60,6 @@ enum {
     GET_EXTENSION_INDEX,
     OBSERVER_ON_MSG,
     GET_GRAPHIC_BUFFER_USAGE,
-    SET_INTERNAL_OPTION,
     UPDATE_GRAPHIC_BUFFER_IN_META,
     CONFIGURE_VIDEO_TUNNEL_MODE,
     UPDATE_NATIVE_HANDLE_IN_META,
@@ -337,7 +337,9 @@ public:
 
     virtual status_t createInputSurface(
             node_id node, OMX_U32 port_index, android_dataspace dataSpace,
-            sp<IGraphicBufferProducer> *bufferProducer, MetadataBufferType *type) {
+            sp<IGraphicBufferProducer> *bufferProducer,
+            sp<IGraphicBufferSource> *bufferSource,
+            MetadataBufferType *type) {
         Parcel data, reply;
         status_t err;
         data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
@@ -362,6 +364,8 @@ public:
         }
 
         *bufferProducer = IGraphicBufferProducer::asInterface(
+                reply.readStrongBinder());
+        *bufferSource = IGraphicBufferSource::asInterface(
                 reply.readStrongBinder());
 
         return err;
@@ -394,7 +398,9 @@ public:
 
     virtual status_t setInputSurface(
             node_id node, OMX_U32 port_index,
-            const sp<IGraphicBufferConsumer> &bufferConsumer, MetadataBufferType *type) {
+            const sp<IGraphicBufferConsumer> &bufferConsumer,
+            sp<IGraphicBufferSource> *bufferSource,
+            MetadataBufferType *type) {
         Parcel data, reply;
         data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
         status_t err;
@@ -415,21 +421,15 @@ public:
             *type = (MetadataBufferType)negotiatedType;
         }
 
-        return reply.readInt32();
-    }
-
-    virtual status_t signalEndOfInputStream(node_id node) {
-        Parcel data, reply;
-        status_t err;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
-        err = remote()->transact(SIGNAL_END_OF_INPUT_STREAM, data, &reply);
+        err = reply.readInt32();
         if (err != OK) {
-            ALOGW("binder transaction failed: %d", err);
             return err;
         }
 
-        return reply.readInt32();
+        *bufferSource = IGraphicBufferSource::asInterface(
+                reply.readStrongBinder());
+
+        return err;
     }
 
     virtual status_t storeMetaDataInBuffers(
@@ -590,8 +590,8 @@ public:
     virtual status_t emptyGraphicBuffer(
             node_id node,
             buffer_id buffer,
-            const sp<GraphicBuffer> &graphicBuffer,
-            OMX_U32 flags, OMX_TICKS timestamp, int fenceFd) {
+            const sp<GraphicBuffer> &graphicBuffer, OMX_U32 flags,
+            OMX_TICKS timestamp, OMX_TICKS origTimestamp, int fenceFd) {
         Parcel data, reply;
         data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
         data.writeInt32((int32_t)node);
@@ -599,6 +599,7 @@ public:
         data.write(*graphicBuffer);
         data.writeInt32(flags);
         data.writeInt64(timestamp);
+        data.writeInt64(origTimestamp);
         data.writeInt32(fenceFd >= 0);
         if (fenceFd >= 0) {
             data.writeFileDescriptor(fenceFd, true /* takeOwnership */);
@@ -627,24 +628,6 @@ public:
         }
 
         return err;
-    }
-
-    virtual status_t setInternalOption(
-            node_id node,
-            OMX_U32 port_index,
-            InternalOptionType type,
-            const void *optionData,
-            size_t size) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
-        data.writeInt32(port_index);
-        data.writeInt64(size);
-        data.write(optionData, size);
-        data.writeInt32(type);
-        remote()->transact(SET_INTERNAL_OPTION, data, &reply);
-
-        return reply.readInt32();
     }
 
     virtual status_t dispatchMessage(const omx_message &msg) {
@@ -767,7 +750,6 @@ status_t BnOMX::onTransact(
         case SET_PARAMETER:
         case GET_CONFIG:
         case SET_CONFIG:
-        case SET_INTERNAL_OPTION:
         {
             CHECK_OMX_INTERFACE(IOMX, data, reply);
 
@@ -781,8 +763,7 @@ status_t BnOMX::onTransact(
             size_t pageSize = 0;
             size_t allocSize = 0;
             bool isUsageBits = (index == (OMX_INDEXTYPE) OMX_IndexParamConsumerUsageBits);
-            if ((isUsageBits && size < 4) ||
-                    (!isUsageBits && code != SET_INTERNAL_OPTION && size < 8)) {
+            if ((isUsageBits && size < 4) || (!isUsageBits && size < 8)) {
                 // we expect the structure to contain at least the size and
                 // version, 8 bytes total
                 ALOGE("b/27207275 (%zu) (%d/%d)", size, int(index), int(code));
@@ -804,8 +785,7 @@ status_t BnOMX::onTransact(
                     } else {
                         err = NOT_ENOUGH_DATA;
                         OMX_U32 declaredSize = *(OMX_U32*)params;
-                        if (code != SET_INTERNAL_OPTION &&
-                                index != (OMX_INDEXTYPE) OMX_IndexParamConsumerUsageBits &&
+                        if (index != (OMX_INDEXTYPE) OMX_IndexParamConsumerUsageBits &&
                                 declaredSize > size) {
                             // the buffer says it's bigger than it actually is
                             ALOGE("b/27207275 (%u/%zu)", declaredSize, size);
@@ -831,15 +811,6 @@ status_t BnOMX::onTransact(
                                     case SET_CONFIG:
                                         err = setConfig(node, index, params, size);
                                         break;
-                                    case SET_INTERNAL_OPTION:
-                                    {
-                                        InternalOptionType type =
-                                            (InternalOptionType)data.readInt32();
-
-                                        err = setInternalOption(node, index, type, params, size);
-                                        break;
-                                    }
-
                                     default:
                                         TRESPASS();
                                 }
@@ -1002,8 +973,10 @@ status_t BnOMX::onTransact(
             android_dataspace dataSpace = (android_dataspace)data.readInt32();
 
             sp<IGraphicBufferProducer> bufferProducer;
+            sp<IGraphicBufferSource> bufferSource;
             MetadataBufferType type = kMetadataBufferTypeInvalid;
-            status_t err = createInputSurface(node, port_index, dataSpace, &bufferProducer, &type);
+            status_t err = createInputSurface(
+                    node, port_index, dataSpace, &bufferProducer, &bufferSource, &type);
 
             if ((err != OK) && (type == kMetadataBufferTypeInvalid)) {
                 android_errorWriteLog(0x534e4554, "26324358");
@@ -1014,6 +987,7 @@ status_t BnOMX::onTransact(
 
             if (err == OK) {
                 reply->writeStrongBinder(IInterface::asBinder(bufferProducer));
+                reply->writeStrongBinder(IInterface::asBinder(bufferSource));
             }
 
             return NO_ERROR;
@@ -1048,13 +1022,14 @@ status_t BnOMX::onTransact(
             sp<IGraphicBufferConsumer> bufferConsumer =
                     interface_cast<IGraphicBufferConsumer>(data.readStrongBinder());
 
+            sp<IGraphicBufferSource> bufferSource;
             MetadataBufferType type = kMetadataBufferTypeInvalid;
 
             status_t err = INVALID_OPERATION;
             if (bufferConsumer == NULL) {
                 ALOGE("b/26392700");
             } else {
-                err = setInputSurface(node, port_index, bufferConsumer, &type);
+                err = setInputSurface(node, port_index, bufferConsumer, &bufferSource, &type);
 
                 if ((err != OK) && (type == kMetadataBufferTypeInvalid)) {
                    android_errorWriteLog(0x534e4554, "26324358");
@@ -1063,18 +1038,9 @@ status_t BnOMX::onTransact(
 
             reply->writeInt32(type);
             reply->writeInt32(err);
-            return NO_ERROR;
-        }
-
-        case SIGNAL_END_OF_INPUT_STREAM:
-        {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
-
-            node_id node = (node_id)data.readInt32();
-
-            status_t err = signalEndOfInputStream(node);
-            reply->writeInt32(err);
-
+            if (err == OK) {
+                reply->writeStrongBinder(IInterface::asBinder(bufferSource));
+            }
             return NO_ERROR;
         }
 
@@ -1246,10 +1212,12 @@ status_t BnOMX::onTransact(
             data.read(*graphicBuffer);
             OMX_U32 flags = data.readInt32();
             OMX_TICKS timestamp = data.readInt64();
+            OMX_TICKS origTimestamp = data.readInt64();
             bool haveFence = data.readInt32();
             int fenceFd = haveFence ? ::dup(data.readFileDescriptor()) : -1;
             reply->writeInt32(emptyGraphicBuffer(
-                    node, buffer, graphicBuffer, flags, timestamp, fenceFd));
+                    node, buffer, graphicBuffer, flags,
+                    timestamp, origTimestamp, fenceFd));
 
             return NO_ERROR;
         }

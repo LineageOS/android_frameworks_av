@@ -290,13 +290,12 @@ private:
     size_t mNumUndequeuedBuffers;
     sp<DataConverter> mConverter[2];
 
+    sp<IGraphicBufferSource> mGraphicBufferSource;
     int64_t mRepeatFrameDelayUs;
     int64_t mMaxPtsGapUs;
     float mMaxFps;
-
     int64_t mTimePerFrameUs;
     int64_t mTimePerCaptureUs;
-
     bool mCreateInputBuffersSuspended;
 
     bool mTunneled;

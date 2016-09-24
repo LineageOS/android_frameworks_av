@@ -503,7 +503,9 @@ status_t OMX::updateNativeHandleInMeta(
 
 status_t OMX::createInputSurface(
         node_id node, OMX_U32 port_index, android_dataspace dataSpace,
-        sp<IGraphicBufferProducer> *bufferProducer, MetadataBufferType *type) {
+        sp<IGraphicBufferProducer> *bufferProducer,
+        sp<IGraphicBufferSource> *bufferSource,
+        MetadataBufferType *type) {
     OMXNodeInstance *instance = findInstance(node);
 
     if (instance == NULL) {
@@ -511,7 +513,7 @@ status_t OMX::createInputSurface(
     }
 
     return instance->createInputSurface(
-            port_index, dataSpace, bufferProducer, type);
+            port_index, dataSpace, bufferProducer, bufferSource, type);
 }
 
 status_t OMX::createPersistentInputSurface(
@@ -523,25 +525,16 @@ status_t OMX::createPersistentInputSurface(
 
 status_t OMX::setInputSurface(
         node_id node, OMX_U32 port_index,
-        const sp<IGraphicBufferConsumer> &bufferConsumer, MetadataBufferType *type) {
+        const sp<IGraphicBufferConsumer> &bufferConsumer,
+        sp<IGraphicBufferSource> *bufferSource,
+        MetadataBufferType *type) {
     OMXNodeInstance *instance = findInstance(node);
 
     if (instance == NULL) {
         return NAME_NOT_FOUND;
     }
 
-    return instance->setInputSurface(port_index, bufferConsumer, type);
-}
-
-
-status_t OMX::signalEndOfInputStream(node_id node) {
-    OMXNodeInstance *instance = findInstance(node);
-
-    if (instance == NULL) {
-        return NAME_NOT_FOUND;
-    }
-
-    return instance->signalEndOfInputStream();
+    return instance->setInputSurface(port_index, bufferConsumer, bufferSource, type);
 }
 
 status_t OMX::allocateSecureBuffer(
@@ -609,8 +602,8 @@ status_t OMX::emptyBuffer(
 status_t OMX::emptyGraphicBuffer(
         node_id node,
         buffer_id buffer,
-        const sp<GraphicBuffer> &graphicBuffer,
-        OMX_U32 flags, OMX_TICKS timestamp, int fenceFd) {
+        const sp<GraphicBuffer> &graphicBuffer, OMX_U32 flags,
+        OMX_TICKS timestamp, OMX_TICKS origTimestamp, int fenceFd) {
     OMXNodeInstance *instance = findInstance(node);
 
     if (instance == NULL) {
@@ -618,7 +611,7 @@ status_t OMX::emptyGraphicBuffer(
     }
 
     return instance->emptyGraphicBuffer(
-            buffer, graphicBuffer, flags, timestamp, fenceFd);
+            buffer, graphicBuffer, flags, timestamp, origTimestamp, fenceFd);
 }
 
 status_t OMX::getExtensionIndex(
@@ -633,21 +626,6 @@ status_t OMX::getExtensionIndex(
 
     return instance->getExtensionIndex(
             parameter_name, index);
-}
-
-status_t OMX::setInternalOption(
-        node_id node,
-        OMX_U32 port_index,
-        InternalOptionType type,
-        const void *data,
-        size_t size) {
-    OMXNodeInstance *instance = findInstance(node);
-
-    if (instance == NULL) {
-        return NAME_NOT_FOUND;
-    }
-
-    return instance->setInternalOption(port_index, type, data, size);
 }
 
 status_t OMX::dispatchMessage(const omx_message &msg) {

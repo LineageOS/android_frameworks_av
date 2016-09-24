@@ -23,7 +23,6 @@
 #define STRINGIFY_ENUMS // for asString in HardwareAPI.h/VideoAPI.h
 
 #include "GraphicBufferSource.h"
-#include "OMXUtils.h"
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/ColorUtils.h>
@@ -213,7 +212,7 @@ GraphicBufferSource::~GraphicBufferSource() {
     }
 }
 
-void GraphicBufferSource::omxExecuting() {
+Status GraphicBufferSource::onOmxExecuting() {
     Mutex::Autolock autoLock(mMutex);
     ALOGV("--> executing; avail=%zu, codec vec size=%zd",
             mNumFramesAvailable, mCodecBuffers.size());
@@ -262,9 +261,11 @@ void GraphicBufferSource::omxExecuting() {
             msg->post(mRepeatAfterUs);
         }
     }
+
+    return Status::ok();
 }
 
-void GraphicBufferSource::omxIdle() {
+Status GraphicBufferSource::onOmxIdle() {
     ALOGV("omxIdle");
 
     Mutex::Autolock autoLock(mMutex);
@@ -274,9 +275,10 @@ void GraphicBufferSource::omxIdle() {
         // not loaded->idle.
         mExecuting = false;
     }
+    return Status::ok();
 }
 
-void GraphicBufferSource::omxLoaded(){
+Status GraphicBufferSource::onOmxLoaded(){
     Mutex::Autolock autoLock(mMutex);
     if (!mExecuting) {
         // This can happen if something failed very early.
@@ -300,16 +302,17 @@ void GraphicBufferSource::omxLoaded(){
     //       are null; complain if not
 
     mExecuting = false;
+    return Status::ok();
 }
 
-void GraphicBufferSource::addCodecBuffer(IOMX::buffer_id bufferID) {
+Status GraphicBufferSource::onInputBufferAdded(int32_t bufferID) {
     Mutex::Autolock autoLock(mMutex);
 
     if (mExecuting) {
         // This should never happen -- buffers can only be allocated when
         // transitioning from "loaded" to "idle".
         ALOGE("addCodecBuffer: buffer added while executing");
-        return;
+        return Status::fromServiceSpecificError(INVALID_OPERATION);
     }
 
     ALOGV("addCodecBuffer id=%u", bufferID);
@@ -317,15 +320,19 @@ void GraphicBufferSource::addCodecBuffer(IOMX::buffer_id bufferID) {
     CodecBuffer codecBuffer;
     codecBuffer.mBufferID = bufferID;
     mCodecBuffers.add(codecBuffer);
+    return Status::ok();
 }
 
-void GraphicBufferSource::codecBufferEmptied(const omx_message &msg) {
-    IOMX::buffer_id bufferID = msg.u.buffer_data.buffer;
-    int fenceFd = msg.fenceFd;
+Status GraphicBufferSource::onInputBufferEmptied(
+        int32_t bufferID, const OMXFenceParcelable &fenceParcel) {
+    int fenceFd = fenceParcel.get();
 
     Mutex::Autolock autoLock(mMutex);
     if (!mExecuting) {
-        return;
+        if (fenceFd >= 0) {
+            ::close(fenceFd);
+        }
+        return Status::fromServiceSpecificError(INVALID_OPERATION);
     }
 
     int cbi = findMatchingCodecBuffer_l(bufferID);
@@ -335,7 +342,7 @@ void GraphicBufferSource::codecBufferEmptied(const omx_message &msg) {
         if (fenceFd >= 0) {
             ::close(fenceFd);
         }
-        return;
+        return Status::fromServiceSpecificError(BAD_VALUE);
     }
 
     ALOGV("codecBufferEmptied id=%u", bufferID);
@@ -357,7 +364,7 @@ void GraphicBufferSource::codecBufferEmptied(const omx_message &msg) {
         if (fenceFd >= 0) {
             ::close(fenceFd);
         }
-        return;
+        return Status::fromServiceSpecificError(BAD_VALUE);
     }
 
     // Find matching entry in our cached copy of the BufferQueue slots.
@@ -409,77 +416,7 @@ void GraphicBufferSource::codecBufferEmptied(const omx_message &msg) {
         mRepeatBufferDeferred = false;
     }
 
-    return;
-}
-
-void GraphicBufferSource::codecBufferFilled(omx_message &msg) {
-    Mutex::Autolock autoLock(mMutex);
-
-    OMX_U32 &flags = msg.u.extended_buffer_data.flags;
-    OMX_TICKS &timestamp = msg.u.extended_buffer_data.timestamp;
-
-    if (mMaxTimestampGapUs > 0ll
-            && !(flags & OMX_BUFFERFLAG_CODECCONFIG)) {
-        ssize_t index = mOriginalTimeUs.indexOfKey(timestamp);
-        if (index >= 0) {
-            ALOGV("OUT timestamp: %lld -> %lld",
-                    static_cast<long long>(timestamp),
-                    static_cast<long long>(mOriginalTimeUs[index]));
-            timestamp = mOriginalTimeUs[index];
-            mOriginalTimeUs.removeItemsAt(index);
-        } else {
-            // giving up the effort as encoder doesn't appear to preserve pts
-            ALOGW("giving up limiting timestamp gap (pts = %lld)", timestamp);
-            mMaxTimestampGapUs = -1ll;
-        }
-        if (mOriginalTimeUs.size() > BufferQueue::NUM_BUFFER_SLOTS) {
-            // something terribly wrong must have happened, giving up...
-            ALOGE("mOriginalTimeUs has too many entries (%zu)",
-                    mOriginalTimeUs.size());
-            mMaxTimestampGapUs = -1ll;
-        }
-    }
-}
-
-void GraphicBufferSource::suspend(bool suspend) {
-    Mutex::Autolock autoLock(mMutex);
-
-    if (suspend) {
-        mSuspended = true;
-
-        while (mNumFramesAvailable > 0) {
-            BufferItem item;
-            status_t err = mConsumer->acquireBuffer(&item, 0);
-
-            if (err == BufferQueue::NO_BUFFER_AVAILABLE) {
-                // shouldn't happen.
-                ALOGW("suspend: frame was not available");
-                break;
-            } else if (err != OK) {
-                ALOGW("suspend: acquireBuffer returned err=%d", err);
-                break;
-            }
-
-            ++mNumBufferAcquired;
-            --mNumFramesAvailable;
-
-            releaseBuffer(item.mSlot, item.mFrameNumber,
-                    item.mGraphicBuffer, item.mFence);
-        }
-        return;
-    }
-
-    mSuspended = false;
-
-    if (mExecuting && mNumFramesAvailable == 0 && mRepeatBufferDeferred) {
-        if (repeatLatestBuffer_l()) {
-            ALOGV("suspend/deferred repeatLatestBuffer_l SUCCESS");
-
-            mRepeatBufferDeferred = false;
-        } else {
-            ALOGV("suspend/deferred repeatLatestBuffer_l FAILURE");
-        }
-    }
+    return Status::ok();
 }
 
 void GraphicBufferSource::onDataSpaceChanged_l(
@@ -675,34 +612,10 @@ void GraphicBufferSource::setLatestBuffer_l(
     }
 }
 
-status_t GraphicBufferSource::signalEndOfInputStream() {
-    Mutex::Autolock autoLock(mMutex);
-    ALOGV("signalEndOfInputStream: exec=%d avail=%zu eos=%d",
-            mExecuting, mNumFramesAvailable, mEndOfStream);
+bool GraphicBufferSource::getTimestamp(
+        const BufferItem &item, int64_t *origTimeUs, int64_t *codecTimeUs) {
+    *origTimeUs = -1ll;
 
-    if (mEndOfStream) {
-        ALOGE("EOS was already signaled");
-        return INVALID_OPERATION;
-    }
-
-    // Set the end-of-stream flag.  If no frames are pending from the
-    // BufferQueue, and a codec buffer is available, and we're executing,
-    // we initiate the EOS from here.  Otherwise, we'll let
-    // codecBufferEmptied() (or omxExecuting) do it.
-    //
-    // Note: if there are no pending frames and all codec buffers are
-    // available, we *must* submit the EOS from here or we'll just
-    // stall since no future events are expected.
-    mEndOfStream = true;
-
-    if (mExecuting && mNumFramesAvailable == 0) {
-        submitEndOfInputStream_l();
-    }
-
-    return OK;
-}
-
-int64_t GraphicBufferSource::getTimestamp(const BufferItem &item) {
     int64_t timeUs = item.mTimestamp / 1000;
     timeUs += mInputBufferTimeOffsetUs;
 
@@ -721,7 +634,7 @@ int64_t GraphicBufferSource::getTimestamp(const BufferItem &item) {
             if (nFrames <= 0) {
                 // skip this frame as it's too close to previous capture
                 ALOGV("skipping frame, timeUs %lld", static_cast<long long>(timeUs));
-                return -1;
+                return false;
             }
             mPrevCaptureUs = mPrevCaptureUs + nFrames * mTimePerCaptureUs;
             mPrevFrameUs += mTimePerFrameUs * nFrames;
@@ -732,14 +645,15 @@ int64_t GraphicBufferSource::getTimestamp(const BufferItem &item) {
                 static_cast<long long>(mPrevCaptureUs),
                 static_cast<long long>(mPrevFrameUs));
 
-        return mPrevFrameUs;
+        *codecTimeUs = mPrevFrameUs;
+        return true;
     } else {
         int64_t originalTimeUs = timeUs;
         if (originalTimeUs <= mPrevOriginalTimeUs) {
                 // Drop the frame if it's going backward in time. Bad timestamp
                 // could disrupt encoder's rate control completely.
             ALOGW("Dropping frame that's going backward in time");
-            return -1;
+            return false;
         }
 
         if (mMaxTimestampGapUs > 0ll) {
@@ -757,7 +671,7 @@ int64_t GraphicBufferSource::getTimestamp(const BufferItem &item) {
                 timeUs = (timestampGapUs < mMaxTimestampGapUs ?
                     timestampGapUs : mMaxTimestampGapUs) + mPrevModifiedTimeUs;
             }
-            mOriginalTimeUs.add(timeUs, originalTimeUs);
+            *origTimeUs = originalTimeUs;
             ALOGV("IN  timestamp: %lld -> %lld",
                 static_cast<long long>(originalTimeUs),
                 static_cast<long long>(timeUs));
@@ -767,14 +681,15 @@ int64_t GraphicBufferSource::getTimestamp(const BufferItem &item) {
         mPrevModifiedTimeUs = timeUs;
     }
 
-    return timeUs;
+    *codecTimeUs = timeUs;
+    return true;
 }
 
 status_t GraphicBufferSource::submitBuffer_l(const BufferItem &item, int cbi) {
     ALOGV("submitBuffer_l: slot=%d, cbi=%d", item.mSlot, cbi);
 
-    int64_t timeUs = getTimestamp(item);
-    if (timeUs < 0ll) {
+    int64_t origTimeUs, codecTimeUs;
+    if (!getTimestamp(item, &origTimeUs, &codecTimeUs)) {
         return UNKNOWN_ERROR;
     }
 
@@ -788,7 +703,8 @@ status_t GraphicBufferSource::submitBuffer_l(const BufferItem &item, int cbi) {
     int fenceID = item.mFence->isValid() ? item.mFence->dup() : -1;
 
     status_t err = mOMX->emptyGraphicBuffer(
-            mNodeID, bufferID, buffer, OMX_BUFFERFLAG_ENDOFFRAME, timeUs, fenceID);
+            mNodeID, bufferID, buffer, OMX_BUFFERFLAG_ENDOFFRAME,
+            codecTimeUs, origTimeUs, fenceID);
 
     if (err != OK) {
         ALOGW("WARNING: emptyGraphicBuffer failed: 0x%x", err);
@@ -823,7 +739,7 @@ void GraphicBufferSource::submitEndOfInputStream_l() {
     status_t err = mOMX->emptyGraphicBuffer(
             mNodeID, bufferID, NULL /* buffer */,
             OMX_BUFFERFLAG_ENDOFFRAME | OMX_BUFFERFLAG_EOS,
-            0 /* timestamp */, -1 /* fenceFd */);
+            0 /* timestamp */, -1ll /* origTimestamp */, -1 /* fenceFd */);
     if (err != OK) {
         ALOGW("emptyDirectBuffer EOS failed: 0x%x", err);
     } else {
@@ -963,88 +879,172 @@ void GraphicBufferSource::setDefaultDataSpace(android_dataspace dataSpace) {
     mLastDataSpace = dataSpace;
 }
 
-status_t GraphicBufferSource::setRepeatPreviousFrameDelayUs(
-        int64_t repeatAfterUs) {
+Status GraphicBufferSource::setSuspend(bool suspend) {
+    ALOGV("setSuspend=%d", suspend);
+
+    Mutex::Autolock autoLock(mMutex);
+
+    if (suspend) {
+        mSuspended = true;
+
+        while (mNumFramesAvailable > 0) {
+            BufferItem item;
+            status_t err = mConsumer->acquireBuffer(&item, 0);
+
+            if (err == BufferQueue::NO_BUFFER_AVAILABLE) {
+                // shouldn't happen.
+                ALOGW("suspend: frame was not available");
+                break;
+            } else if (err != OK) {
+                ALOGW("suspend: acquireBuffer returned err=%d", err);
+                break;
+            }
+
+            ++mNumBufferAcquired;
+            --mNumFramesAvailable;
+
+            releaseBuffer(item.mSlot, item.mFrameNumber,
+                    item.mGraphicBuffer, item.mFence);
+        }
+        return Status::ok();
+    }
+
+    mSuspended = false;
+
+    if (mExecuting && mNumFramesAvailable == 0 && mRepeatBufferDeferred) {
+        if (repeatLatestBuffer_l()) {
+            ALOGV("suspend/deferred repeatLatestBuffer_l SUCCESS");
+
+            mRepeatBufferDeferred = false;
+        } else {
+            ALOGV("suspend/deferred repeatLatestBuffer_l FAILURE");
+        }
+    }
+    return Status::ok();
+}
+
+Status GraphicBufferSource::setRepeatPreviousFrameDelayUs(int64_t repeatAfterUs) {
+    ALOGV("setRepeatPreviousFrameDelayUs: delayUs=%lld", (long long)repeatAfterUs);
+
     Mutex::Autolock autoLock(mMutex);
 
     if (mExecuting || repeatAfterUs <= 0ll) {
-        return INVALID_OPERATION;
+        return Status::fromServiceSpecificError(INVALID_OPERATION);
     }
 
     mRepeatAfterUs = repeatAfterUs;
-
-    return OK;
+    return Status::ok();
 }
 
-status_t GraphicBufferSource::setMaxTimestampGapUs(int64_t maxGapUs) {
+Status GraphicBufferSource::setMaxTimestampGapUs(int64_t maxGapUs) {
+    ALOGV("setMaxTimestampGapUs: maxGapUs=%lld", (long long)maxGapUs);
+
     Mutex::Autolock autoLock(mMutex);
 
     if (mExecuting || maxGapUs <= 0ll) {
-        return INVALID_OPERATION;
+        return Status::fromServiceSpecificError(INVALID_OPERATION);
     }
 
     mMaxTimestampGapUs = maxGapUs;
 
-    return OK;
+    return Status::ok();
 }
 
-status_t GraphicBufferSource::setInputBufferTimeOffset(int64_t timeOffsetUs) {
+Status GraphicBufferSource::setTimeOffsetUs(int64_t timeOffsetUs) {
     Mutex::Autolock autoLock(mMutex);
 
     // timeOffsetUs must be negative for adjustment.
     if (timeOffsetUs >= 0ll) {
-        return INVALID_OPERATION;
+        return Status::fromServiceSpecificError(INVALID_OPERATION);
     }
 
     mInputBufferTimeOffsetUs = timeOffsetUs;
-    return OK;
+    return Status::ok();
 }
 
-status_t GraphicBufferSource::setMaxFps(float maxFps) {
+Status GraphicBufferSource::setMaxFps(float maxFps) {
+    ALOGV("setMaxFps: maxFps=%lld", (long long)maxFps);
+
     Mutex::Autolock autoLock(mMutex);
 
     if (mExecuting) {
-        return INVALID_OPERATION;
+        return Status::fromServiceSpecificError(INVALID_OPERATION);
     }
 
     mFrameDropper = new FrameDropper();
     status_t err = mFrameDropper->setMaxFrameRate(maxFps);
     if (err != OK) {
         mFrameDropper.clear();
-        return err;
+        return Status::fromServiceSpecificError(err);
     }
 
-    return OK;
+    return Status::ok();
 }
 
-void GraphicBufferSource::setSkipFramesBeforeUs(int64_t skipFramesBeforeUs) {
+Status GraphicBufferSource::setStartTimeUs(int64_t skipFramesBeforeUs) {
+    ALOGV("setStartTimeUs: skipFramesBeforeUs=%lld", (long long)skipFramesBeforeUs);
+
     Mutex::Autolock autoLock(mMutex);
 
     mSkipFramesBeforeNs =
             (skipFramesBeforeUs > 0) ? (skipFramesBeforeUs * 1000) : -1ll;
+
+    return Status::ok();
 }
 
-status_t GraphicBufferSource::setTimeLapseConfig(const TimeLapseConfig &config) {
+Status GraphicBufferSource::setTimeLapseConfig(int64_t timePerFrameUs, int64_t timePerCaptureUs) {
+    ALOGV("setTimeLapseConfig: timePerFrameUs=%lld, timePerCaptureUs=%lld",
+            (long long)timePerFrameUs, (long long)timePerCaptureUs);
+
     Mutex::Autolock autoLock(mMutex);
 
-    if (mExecuting || config.mTimePerFrameUs <= 0ll || config.mTimePerCaptureUs <= 0ll) {
-        return INVALID_OPERATION;
+    if (mExecuting || timePerFrameUs <= 0ll || timePerCaptureUs <= 0ll) {
+        return Status::fromServiceSpecificError(INVALID_OPERATION);
     }
 
-    mTimePerFrameUs = config.mTimePerFrameUs;
-    mTimePerCaptureUs = config.mTimePerCaptureUs;
+    mTimePerFrameUs = timePerFrameUs;
+    mTimePerCaptureUs = timePerCaptureUs;
 
-    return OK;
+    return Status::ok();
 }
 
-void GraphicBufferSource::setColorAspects(const ColorAspects &aspects) {
+Status GraphicBufferSource::setColorAspects(int32_t aspectsPacked) {
     Mutex::Autolock autoLock(mMutex);
-    mColorAspects = aspects;
+    mColorAspects = ColorUtils::unpackToColorAspects(aspectsPacked);
     ALOGD("requesting color aspects (R:%d(%s), P:%d(%s), M:%d(%s), T:%d(%s))",
-            aspects.mRange, asString(aspects.mRange),
-            aspects.mPrimaries, asString(aspects.mPrimaries),
-            aspects.mMatrixCoeffs, asString(aspects.mMatrixCoeffs),
-            aspects.mTransfer, asString(aspects.mTransfer));
+            mColorAspects.mRange, asString(mColorAspects.mRange),
+            mColorAspects.mPrimaries, asString(mColorAspects.mPrimaries),
+            mColorAspects.mMatrixCoeffs, asString(mColorAspects.mMatrixCoeffs),
+            mColorAspects.mTransfer, asString(mColorAspects.mTransfer));
+
+    return Status::ok();
+}
+
+Status GraphicBufferSource::signalEndOfInputStream() {
+    Mutex::Autolock autoLock(mMutex);
+    ALOGV("signalEndOfInputStream: exec=%d avail=%zu eos=%d",
+            mExecuting, mNumFramesAvailable, mEndOfStream);
+
+    if (mEndOfStream) {
+        ALOGE("EOS was already signaled");
+        return Status::fromStatusT(INVALID_OPERATION);
+    }
+
+    // Set the end-of-stream flag.  If no frames are pending from the
+    // BufferQueue, and a codec buffer is available, and we're executing,
+    // we initiate the EOS from here.  Otherwise, we'll let
+    // codecBufferEmptied() (or omxExecuting) do it.
+    //
+    // Note: if there are no pending frames and all codec buffers are
+    // available, we *must* submit the EOS from here or we'll just
+    // stall since no future events are expected.
+    mEndOfStream = true;
+
+    if (mExecuting && mNumFramesAvailable == 0) {
+        submitEndOfInputStream_l();
+    }
+
+    return Status::ok();
 }
 
 void GraphicBufferSource::onMessageReceived(const sp<AMessage> &msg) {

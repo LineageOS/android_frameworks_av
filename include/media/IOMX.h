@@ -34,11 +34,10 @@
 
 namespace android {
 
+class IGraphicBufferSource;
 class IMemory;
 class IOMXObserver;
-class IOMXRenderer;
 class NativeHandle;
-class Surface;
 struct omx_message;
 
 class IOMX : public IInterface {
@@ -129,6 +128,7 @@ public:
     virtual status_t createInputSurface(
             node_id node, OMX_U32 port_index, android_dataspace dataSpace,
             sp<IGraphicBufferProducer> *bufferProducer,
+            sp<IGraphicBufferSource> *bufferSource,
             MetadataBufferType *type = NULL) = 0;
 
     virtual status_t createPersistentInputSurface(
@@ -140,9 +140,8 @@ public:
     virtual status_t setInputSurface(
             node_id node, OMX_U32 port_index,
             const sp<IGraphicBufferConsumer> &bufferConsumer,
+            sp<IGraphicBufferSource> *bufferSource,
             MetadataBufferType *type) = 0;
-
-    virtual status_t signalEndOfInputStream(node_id node) = 0;
 
     // Allocate an opaque buffer as a native handle. If component supports returning native
     // handles, those are returned in *native_handle. Otherwise, the allocated buffer is
@@ -180,33 +179,22 @@ public:
             OMX_U32 range_offset, OMX_U32 range_length,
             OMX_U32 flags, OMX_TICKS timestamp, int fenceFd = -1) = 0;
 
+    // Calls OMX_EmptyBuffer on buffer (after updating buffer header with metadata of
+    // |graphicBuffer|, |flags| and |timestamp|). Passes |fenceFd| to component if it
+    // supports fences. Otherwise, it waits on |fenceFd| before calling OMX_EmptyBuffer.
+    // Takes ownership of |fenceFd| even if this call fails. If |origTimestamp| >= 0,
+    // timestamp on the filled buffer corresponding to this frame will be modified to
+    // |origTimestamp| after it's filled.
     virtual status_t emptyGraphicBuffer(
             node_id node,
             buffer_id buffer,
-            const sp<GraphicBuffer> &graphicBuffer,
-            OMX_U32 flags, OMX_TICKS timestamp, int fenceFd) = 0;
+            const sp<GraphicBuffer> &graphicBuffer, OMX_U32 flags,
+            OMX_TICKS timestamp, OMX_TICKS origTimestamp, int fenceFd) = 0;
 
     virtual status_t getExtensionIndex(
             node_id node,
             const char *parameter_name,
             OMX_INDEXTYPE *index) = 0;
-
-    enum InternalOptionType {
-        INTERNAL_OPTION_SUSPEND,  // data is a bool
-        INTERNAL_OPTION_REPEAT_PREVIOUS_FRAME_DELAY,  // data is an int64_t
-        INTERNAL_OPTION_MAX_TIMESTAMP_GAP, // data is int64_t
-        INTERNAL_OPTION_MAX_FPS, // data is float
-        INTERNAL_OPTION_START_TIME, // data is an int64_t
-        INTERNAL_OPTION_TIME_LAPSE, // data is an int64_t[2]
-        INTERNAL_OPTION_COLOR_ASPECTS, // data is ColorAspects
-        INTERNAL_OPTION_TIME_OFFSET, // data is an int64_t
-    };
-    virtual status_t setInternalOption(
-            node_id node,
-            OMX_U32 port_index,
-            InternalOptionType type,
-            const void *data,
-            size_t size) = 0;
 
     virtual status_t dispatchMessage(const omx_message &msg) = 0;
 };
