@@ -270,7 +270,7 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t         *phInstance,
     pBypassMixer_Instance->MixerStream[0].CallbackSet=0;
     LVC_Mixer_Init(&pBypassMixer_Instance->MixerStream[0],0,0);
     LVC_Mixer_SetTimeConstant(&pBypassMixer_Instance->MixerStream[0],
-        LVDBE_BYPASS_MIXER_TC,pInstance->Params.SampleRate,2);
+        LVDBE_BYPASS_MIXER_TC,(LVM_Fs_en)pInstance->Params.SampleRate,2);
     /*
      * Setup the mixer gain for the unprocessed path
      */
@@ -280,8 +280,7 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t         *phInstance,
     pBypassMixer_Instance->MixerStream[1].CallbackSet=0;
     LVC_Mixer_Init(&pBypassMixer_Instance->MixerStream[1],0x00007FFF,0x00007FFF);
     LVC_Mixer_SetTimeConstant(&pBypassMixer_Instance->MixerStream[1],
-        LVDBE_BYPASS_MIXER_TC,pInstance->Params.SampleRate,2);
+        LVDBE_BYPASS_MIXER_TC,(LVM_Fs_en)pInstance->Params.SampleRate,2);
 
     return(LVDBE_SUCCESS);
 }
-
