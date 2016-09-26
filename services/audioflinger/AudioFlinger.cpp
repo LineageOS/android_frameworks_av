@@ -67,6 +67,9 @@
 #include <mediautils/BatteryNotifier.h>
 #include <private/android_filesystem_config.h>
 
+//#define BUFLOG_NDEBUG 0
+#include <BufLog.h>
+
 // ----------------------------------------------------------------------------
 
 // Note: the following macro is used for extremely verbose logging message.  In
@@ -440,6 +443,8 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
             dumpTee(fd, mRecordTeeSource);
         }
 #endif
+
+        BUFLOG_RESET;
 
         if (locked) {
             mLock.unlock();
