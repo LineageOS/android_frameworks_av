@@ -334,10 +334,10 @@ LVDBE_ReturnStatus_en LVDBE_Control(LVDBE_Handle_t         hInstance,
                      pParams);                          /* New parameters */
 
         LVC_Mixer_SetTimeConstant(&pBypassMixer_Instance->MixerStream[0],
-            LVDBE_BYPASS_MIXER_TC,pParams->SampleRate,2);
+            LVDBE_BYPASS_MIXER_TC,(LVM_Fs_en)pParams->SampleRate,2);
 
         LVC_Mixer_SetTimeConstant(&pBypassMixer_Instance->MixerStream[1],
-            LVDBE_BYPASS_MIXER_TC,pParams->SampleRate,2);
+            LVDBE_BYPASS_MIXER_TC,(LVM_Fs_en)pParams->SampleRate,2);
 
 
     }
