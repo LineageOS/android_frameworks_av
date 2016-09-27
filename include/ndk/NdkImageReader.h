@@ -36,6 +36,8 @@
 #ifndef _NDK_IMAGE_READER_H
 #define _NDK_IMAGE_READER_H
 
+#include <sys/cdefs.h>
+
 #include <android/native_window.h>
 #include "NdkMediaError.h"
 #include "NdkImage.h"
@@ -43,6 +45,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#if __ANDROID_API__ >= 24
 
 /**
  * AImage is an opaque type that allows direct application access to image data rendered into a
@@ -293,6 +297,8 @@ typedef struct AImageReader_ImageListener {
  */
 media_status_t AImageReader_setImageListener(
         AImageReader* reader, AImageReader_ImageListener* listener);
+
+#endif /* __ANDROID_API__ >= 24 */
 
 #ifdef __cplusplus
 } // extern "C"

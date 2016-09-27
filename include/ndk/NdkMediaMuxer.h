@@ -28,6 +28,7 @@
 #ifndef _NDK_MEDIA_MUXER_H
 #define _NDK_MEDIA_MUXER_H
 
+#include <sys/cdefs.h>
 #include <sys/types.h>
 
 #include "NdkMediaCodec.h"
@@ -37,6 +38,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#if __ANDROID_API__ >= 21
 
 struct AMediaMuxer;
 typedef struct AMediaMuxer AMediaMuxer;
@@ -111,6 +114,8 @@ media_status_t AMediaMuxer_stop(AMediaMuxer*);
  */
 media_status_t AMediaMuxer_writeSampleData(AMediaMuxer *muxer,
         size_t trackIdx, const uint8_t *data, const AMediaCodecBufferInfo *info);
+
+#endif /* __ANDROID_API__ >= 21 */
 
 #ifdef __cplusplus
 } // extern "C"

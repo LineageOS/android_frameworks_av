@@ -5,6 +5,13 @@ ndk_headers {
     srcs: ["include/camera/ndk/**/*.h"],
 }
 
+ndk_headers {
+    name: "libmediandk_headers",
+    from: "include/ndk/",
+    to: "media",
+    srcs: ["include/ndk/**/*.h"],
+}
+
 subdirs = [
     "camera/ndk",
     "media/libmedia",

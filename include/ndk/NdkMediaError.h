@@ -28,9 +28,13 @@
 #ifndef _NDK_MEDIA_ERROR_H
 #define _NDK_MEDIA_ERROR_H
 
+#include <sys/cdefs.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#if __ANDROID_API__ >= 21
 
 typedef enum {
     AMEDIA_OK = 0,
@@ -59,6 +63,7 @@ typedef enum {
 
 } media_status_t;
 
+#endif /* __ANDROID_API__ >= 21 */
 
 #ifdef __cplusplus
 } // extern "C"
