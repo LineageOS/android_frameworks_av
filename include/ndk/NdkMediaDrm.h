@@ -27,14 +27,17 @@
 #ifndef _NDK_MEDIA_DRM_H
 #define _NDK_MEDIA_DRM_H
 
+#include <stdbool.h>
+#include <stdint.h>
+#include <sys/cdefs.h>
+
 #include "NdkMediaError.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <stdint.h>
-#include <stdbool.h>
+#if __ANDROID_API__ >= 21
 
 struct AMediaDrm;
 typedef struct AMediaDrm AMediaDrm;
@@ -447,6 +450,8 @@ media_status_t AMediaDrm_sign(AMediaDrm *, const AMediaDrmSessionId *sessionId,
 media_status_t AMediaDrm_verify(AMediaDrm *, const AMediaDrmSessionId *sessionId,
         const char *macAlgorithm, uint8_t *keyId, const uint8_t *message, size_t messageSize,
         const uint8_t *signature, size_t signatureSize);
+
+#endif /* __ANDROID_API__ >= 21 */
 
 #ifdef __cplusplus
 } // extern "C"

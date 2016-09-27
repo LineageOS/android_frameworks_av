@@ -27,6 +27,8 @@
 #ifndef _NDK_MEDIA_CODEC_H
 #define _NDK_MEDIA_CODEC_H
 
+#include <sys/cdefs.h>
+
 #include <android/native_window.h>
 
 #include "NdkMediaCrypto.h"
@@ -37,6 +39,7 @@
 extern "C" {
 #endif
 
+#if __ANDROID_API__ >= 21
 
 struct AMediaCodec;
 typedef struct AMediaCodec AMediaCodec;
@@ -253,6 +256,8 @@ media_status_t AMediaCodecCryptoInfo_getClearBytes(AMediaCodecCryptoInfo*, size_
  * The number of trailing encrypted bytes in each subsample.
  */
 media_status_t AMediaCodecCryptoInfo_getEncryptedBytes(AMediaCodecCryptoInfo*, size_t *dst);
+
+#endif /* __ANDROID_API__ >= 21 */
 
 #ifdef __cplusplus
 } // extern "C"
