@@ -28,12 +28,15 @@
 #ifndef _NDK_MEDIA_CRYPTO_H
 #define _NDK_MEDIA_CRYPTO_H
 
+#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#if __ANDROID_API__ >= 21
 
 struct AMediaCrypto;
 typedef struct AMediaCrypto AMediaCrypto;
@@ -48,6 +51,7 @@ AMediaCrypto* AMediaCrypto_new(const AMediaUUID uuid, const void *initData, size
 
 void AMediaCrypto_delete(AMediaCrypto* crypto);
 
+#endif /* __ANDROID_API__ >= 21 */
 
 #ifdef __cplusplus
 } // extern "C"

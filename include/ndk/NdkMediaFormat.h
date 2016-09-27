@@ -27,6 +27,7 @@
 #ifndef _NDK_MEDIA_FORMAT_H
 #define _NDK_MEDIA_FORMAT_H
 
+#include <sys/cdefs.h>
 #include <sys/types.h>
 
 #include "NdkMediaError.h"
@@ -34,6 +35,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#if __ANDROID_API__ >= 21
 
 struct AMediaFormat;
 typedef struct AMediaFormat AMediaFormat;
@@ -103,6 +106,8 @@ extern const char* AMEDIAFORMAT_KEY_REPEAT_PREVIOUS_FRAME_AFTER;
 extern const char* AMEDIAFORMAT_KEY_SAMPLE_RATE;
 extern const char* AMEDIAFORMAT_KEY_WIDTH;
 extern const char* AMEDIAFORMAT_KEY_STRIDE;
+
+#endif /* __ANDROID_API__ >= 21 */
 
 #ifdef __cplusplus
 } // extern "C"
