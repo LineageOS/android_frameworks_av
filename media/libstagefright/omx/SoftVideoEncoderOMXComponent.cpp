@@ -480,18 +480,25 @@ void SoftVideoEncoderOMXComponent::ConvertRGB32ToPlanar(
             unsigned green = src[greenOffset];
             unsigned blue  = src[blueOffset];
 
-            // using ITU-R BT.601 conversion matrix
+            // Using ITU-R BT.601-7 (03/2011)
+            //   2.5.1: Ey'  = ( 0.299*R + 0.587*G + 0.114*B)
+            //   2.5.2: ECr' = ( 0.701*R - 0.587*G - 0.114*B) / 1.402
+            //          ECb' = (-0.299*R - 0.587*G + 0.886*B) / 1.772
+            //   2.5.3: Y  = 219 * Ey'  +  16
+            //          Cr = 224 * ECr' + 128
+            //          Cb = 224 * ECb' + 128
+
             unsigned luma =
-                ((red * 66 + green * 129 + blue * 25) >> 8) + 16;
+                ((red * 65 + green * 129 + blue * 25 + 128) >> 8) + 16;
 
             dstY[x] = luma;
 
             if ((x & 1) == 0 && (y & 1) == 0) {
                 unsigned U =
-                    ((-red * 38 - green * 74 + blue * 112) >> 8) + 128;
+                    ((-red * 38 - green * 74 + blue * 112 + 128) >> 8) + 128;
 
                 unsigned V =
-                    ((red * 112 - green * 94 - blue * 18) >> 8) + 128;
+                    ((red * 112 - green * 94 - blue * 18 + 128) >> 8) + 128;
 
                 dstU[x >> 1] = U;
                 dstV[x >> 1] = V;
