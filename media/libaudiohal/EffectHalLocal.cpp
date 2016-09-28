@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AudioFlinger::EffectHalLocal"
+#define LOG_TAG "EffectHalLocal"
 //#define LOG_NDEBUG 0
 
 #include <media/EffectsFactoryApi.h>

@@ -20,14 +20,14 @@
 #include <audio_effects/effect_downmix.h>
 #include <audio_utils/primitives.h>
 #include <audio_utils/format.h>
+#include <media/audiohal/EffectHalInterface.h>
+#include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <media/AudioResamplerPublic.h>
 
 #include <utils/Log.h>
 
 #include "Configuration.h"
 #include "BufferProviders.h"
-#include "EffectHalInterface.h"
-#include "EffectsFactoryHalInterface.h"
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof((x)[0]))

@@ -73,9 +73,6 @@
 
 #include "AutoPark.h"
 
-// FIXME: Remove after NBAIO is converted
-#include "StreamHalLocal.h"
-
 // ----------------------------------------------------------------------------
 
 // Note: the following macro is used for extremely verbose logging message.  In
@@ -3618,8 +3615,7 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
         return;
     }
     // create an NBAIO sink for the HAL output stream, and negotiate
-    mOutputSink = new AudioStreamOutSink(
-            static_cast<StreamOutHalLocal*>(output->stream.get())->getStream());
+    mOutputSink = new AudioStreamOutSink(output->stream);
     size_t numCounterOffers = 0;
     const NBAIO_Format offers[1] = {Format_from_SR_C(mSampleRate, mChannelCount, mFormat)};
 #if !LOG_NDEBUG
@@ -5926,8 +5922,7 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
     readInputParameters_l();
 
     // create an NBAIO source for the HAL input stream, and negotiate
-    mInputSource = new AudioStreamInSource(
-            static_cast<StreamInHalLocal*>(input->stream.get())->getStream());
+    mInputSource = new AudioStreamInSource(input->stream);
     size_t numCounterOffers = 0;
     const NBAIO_Format offers[1] = {Format_from_SR_C(mSampleRate, mChannelCount, mFormat)};
 #if !LOG_NDEBUG

@@ -19,13 +19,12 @@
 //#define LOG_NDEBUG 0
 
 #include <hardware/audio.h>
+#include <media/audiohal/DeviceHalInterface.h>
+#include <media/audiohal/StreamHalInterface.h>
 #include <utils/Log.h>
 
 #include "AudioHwDevice.h"
 #include "AudioStreamOut.h"
-#include "DeviceHalInterface.h"
-#include "StreamHalInterface.h"
-
 
 namespace android {
 

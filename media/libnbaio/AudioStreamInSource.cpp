@@ -19,33 +19,38 @@
 
 #include <cutils/compiler.h>
 #include <utils/Log.h>
+#include <media/audiohal/StreamHalInterface.h>
 #include <media/nbaio/AudioStreamInSource.h>
 
 namespace android {
 
-AudioStreamInSource::AudioStreamInSource(audio_stream_in *stream) :
+AudioStreamInSource::AudioStreamInSource(sp<StreamInHalInterface> stream) :
         NBAIO_Source(),
         mStream(stream),
         mStreamBufferSizeBytes(0),
         mFramesOverrun(0),
         mOverruns(0)
 {
-    ALOG_ASSERT(stream != NULL);
+    ALOG_ASSERT(stream != 0);
 }
 
 AudioStreamInSource::~AudioStreamInSource()
 {
+    mStream.clear();
 }
 
 ssize_t AudioStreamInSource::negotiate(const NBAIO_Format offers[], size_t numOffers,
                                       NBAIO_Format counterOffers[], size_t& numCounterOffers)
 {
     if (!Format_isValid(mFormat)) {
-        mStreamBufferSizeBytes = mStream->common.get_buffer_size(&mStream->common);
-        audio_format_t streamFormat = mStream->common.get_format(&mStream->common);
-        uint32_t sampleRate = mStream->common.get_sample_rate(&mStream->common);
-        audio_channel_mask_t channelMask =
-                (audio_channel_mask_t) mStream->common.get_channels(&mStream->common);
+        status_t result;
+        result = mStream->getBufferSize(&mStreamBufferSizeBytes);
+        if (result != OK) return result;
+        audio_format_t streamFormat;
+        uint32_t sampleRate;
+        audio_channel_mask_t channelMask;
+        result = mStream->getAudioProperties(&sampleRate, &channelMask, &streamFormat);
+        if (result != OK) return result;
         mFormat = Format_from_SR_C(sampleRate,
                 audio_channel_count_from_in_mask(channelMask), streamFormat);
         mFrameSize = Format_frameSize(mFormat);
@@ -55,11 +60,14 @@ ssize_t AudioStreamInSource::negotiate(const NBAIO_Format offers[], size_t numOf
 
 int64_t AudioStreamInSource::framesOverrun()
 {
-    uint32_t framesOverrun = mStream->get_input_frames_lost(mStream);
-    if (framesOverrun > 0) {
+    uint32_t framesOverrun;
+    status_t result = mStream->getInputFramesLost(&framesOverrun);
+    if (result == OK && framesOverrun > 0) {
         mFramesOverrun += framesOverrun;
         // FIXME only increment for contiguous ranges
         ++mOverruns;
+    } else if (result != OK) {
+        ALOGE("Error when retrieving lost frames count from HAL: %d", result);
     }
     return mFramesOverrun;
 }
@@ -69,12 +77,14 @@ ssize_t AudioStreamInSource::read(void *buffer, size_t count)
     if (CC_UNLIKELY(!Format_isValid(mFormat))) {
         return NEGOTIATE;
     }
-    ssize_t bytesRead = mStream->read(mStream, buffer, count * mFrameSize);
-    if (bytesRead > 0) {
+    size_t bytesRead;
+    status_t result = mStream->read(buffer, count * mFrameSize, &bytesRead);
+    if (result == OK && bytesRead > 0) {
         size_t framesRead = bytesRead / mFrameSize;
         mFramesRead += framesRead;
         return framesRead;
     } else {
+        ALOGE_IF(result != OK, "Error while reading data from HAL: %d", result);
         return bytesRead;
     }
 }

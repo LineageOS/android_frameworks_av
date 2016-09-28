@@ -18,10 +18,9 @@
 #define ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_INTERFACE_H
 
 #include <hardware/audio_effect.h>
+#include <media/audiohal/EffectHalInterface.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
-
-#include "EffectHalInterface.h"
 
 namespace android {
 

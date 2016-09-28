@@ -35,9 +35,7 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES:= \
 	test-mixer.cpp \
 	../AudioMixer.cpp.arm  \
-	../BufferProviders.cpp \
-	../EffectHalLocal.cpp  \
-	../EffectsFactoryHalLocal.cpp
+	../BufferProviders.cpp
 
 LOCAL_C_INCLUDES := \
 	$(call include-path-for, audio-effects) \
@@ -49,6 +47,7 @@ LOCAL_STATIC_LIBRARIES := \
 	libsndfile
 
 LOCAL_SHARED_LIBRARIES := \
+	libaudiohal \
 	libeffects \
 	libnbaio \
 	libaudioresampler \

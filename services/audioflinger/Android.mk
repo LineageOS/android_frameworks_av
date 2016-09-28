@@ -27,11 +27,6 @@ LOCAL_SRC_FILES:=               \
     AudioHwDevice.cpp           \
     AudioStreamOut.cpp          \
     SpdifStreamOut.cpp          \
-    StreamHalLocal.cpp          \
-    DeviceHalLocal.cpp          \
-    DevicesFactoryHalLocal.cpp	\
-    EffectHalLocal.cpp          \
-    EffectsFactoryHalLocal.cpp	\
     Effects.cpp                 \
     AudioMixer.cpp.arm          \
     BufferProviders.cpp         \
@@ -45,6 +40,7 @@ LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils)
 
 LOCAL_SHARED_LIBRARIES := \
+    libaudiohal \
     libaudioresampler \
     libaudiospdif \
     libaudioutils \
@@ -55,9 +51,6 @@ LOCAL_SHARED_LIBRARIES := \
     libmedia \
     libmediautils \
     libnbaio \
-    libhardware \
-    libhardware_legacy \
-    libeffects \
     libpowermanager \
     libserviceutility \
     libsonic \

@@ -24,11 +24,10 @@
 #include <audio_effects/effect_visualizer.h>
 #include <audio_utils/primitives.h>
 #include <private/media/AudioEffectShared.h>
-#include <media/EffectsFactoryApi.h>
+#include <media/audiohal/EffectHalInterface.h>
+#include <media/audiohal/EffectsFactoryHalInterface.h>
 
 #include "AudioFlinger.h"
-#include "EffectHalInterface.h"
-#include "EffectsFactoryHalInterface.h"
 #include "ServiceUtilities.h"
 
 // ----------------------------------------------------------------------------

@@ -17,12 +17,11 @@
 #ifndef ANDROID_HARDWARE_STREAM_HAL_INTERFACE_H
 #define ANDROID_HARDWARE_STREAM_HAL_INTERFACE_H
 
-#include <hardware/audio_effect.h>
+#include <hardware/audio.h>
+#include <media/audiohal/EffectHalInterface.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 #include <utils/String8.h>
-
-#include "EffectHalInterface.h"
 
 namespace android {
 

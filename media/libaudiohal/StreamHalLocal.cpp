@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AudioFlinger::StreamHalLocal"
+#define LOG_TAG "StreamHalLocal"
 //#define LOG_NDEBUG 0
 
 #include <utils/Log.h>

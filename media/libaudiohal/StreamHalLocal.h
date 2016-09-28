@@ -17,7 +17,7 @@
 #ifndef ANDROID_HARDWARE_STREAM_HAL_LOCAL_H
 #define ANDROID_HARDWARE_STREAM_HAL_LOCAL_H
 
-#include "StreamHalInterface.h"
+#include <media/audiohal/StreamHalInterface.h>
 
 namespace android {
 
@@ -115,9 +115,6 @@ class StreamOutHalLocal : public StreamOutHalInterface, public StreamHalLocal {
     // Return a recent count of the number of audio frames presented to an external observer.
     virtual status_t getPresentationPosition(uint64_t *frames, struct timespec *timestamp);
 
-    // FIXME: Remove after NBAIO is converted.
-    audio_stream_out_t *getStream() const { return mStream; }
-
   private:
     audio_stream_out_t *mStream;
     wp<StreamOutHalInterfaceCallback> mCallback;
@@ -149,9 +146,6 @@ class StreamInHalLocal : public StreamInHalInterface, public StreamHalLocal {
     // Return a recent count of the number of audio frames received and
     // the clock time associated with that frame count.
     virtual status_t getCapturePosition(int64_t *frames, int64_t *time);
-
-    // FIXME: Remove after NBAIO is converted.
-    audio_stream_in_t *getStream() const { return mStream; }
 
   private:
     audio_stream_in_t *mStream;
