@@ -19,29 +19,46 @@
 #define PERSISTENT_SURFACE_H_
 
 #include <gui/IGraphicBufferProducer.h>
-#include <gui/IGraphicBufferConsumer.h>
+#include <android/IGraphicBufferSource.h>
 #include <media/stagefright/foundation/ABase.h>
+#include <binder/Parcel.h>
 
 namespace android {
 
 struct PersistentSurface : public RefBase {
+    PersistentSurface() {}
+
     PersistentSurface(
             const sp<IGraphicBufferProducer>& bufferProducer,
-            const sp<IGraphicBufferConsumer>& bufferConsumer) :
+            const sp<IGraphicBufferSource>& bufferSource) :
         mBufferProducer(bufferProducer),
-        mBufferConsumer(bufferConsumer) { }
+        mBufferSource(bufferSource) { }
 
     sp<IGraphicBufferProducer> getBufferProducer() const {
         return mBufferProducer;
     }
 
-    sp<IGraphicBufferConsumer> getBufferConsumer() const {
-        return mBufferConsumer;
+    sp<IGraphicBufferSource> getBufferSource() const {
+        return mBufferSource;
+    }
+
+    status_t writeToParcel(Parcel *parcel) const {
+        parcel->writeStrongBinder(IInterface::asBinder(mBufferProducer));
+        parcel->writeStrongBinder(IInterface::asBinder(mBufferSource));
+        return NO_ERROR;
+    }
+
+    status_t readFromParcel(const Parcel *parcel) {
+        mBufferProducer = interface_cast<IGraphicBufferProducer>(
+                parcel->readStrongBinder());
+        mBufferSource = interface_cast<IGraphicBufferSource>(
+                parcel->readStrongBinder());
+        return NO_ERROR;
     }
 
 private:
-    const sp<IGraphicBufferProducer> mBufferProducer;
-    const sp<IGraphicBufferConsumer> mBufferConsumer;
+    sp<IGraphicBufferProducer> mBufferProducer;
+    sp<IGraphicBufferSource> mBufferSource;
 
     DISALLOW_EVIL_CONSTRUCTORS(PersistentSurface);
 };

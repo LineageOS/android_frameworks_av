@@ -37,9 +37,9 @@ public:
             const char *name, const sp<IOMXObserver> &observer,
             sp<IOMXNode> *omxNode);
 
-    virtual status_t createPersistentInputSurface(
+    virtual status_t createInputSurface(
             sp<IGraphicBufferProducer> *bufferProducer,
-            sp<IGraphicBufferConsumer> *bufferConsumer);
+            sp<IGraphicBufferSource> *bufferSource);
 
     virtual void binderDied(const wp<IBinder> &the_late_who);
 

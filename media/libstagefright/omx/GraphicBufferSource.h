@@ -58,14 +58,7 @@ class GraphicBufferSource : public BnGraphicBufferSource,
                             public BnOMXBufferSource,
                             public BufferQueue::ConsumerListener {
 public:
-    GraphicBufferSource(
-            const sp<IOMXNode> &omxNode,
-            uint32_t bufferWidth,
-            uint32_t bufferHeight,
-            uint32_t bufferCount,
-            uint32_t consumerUsage,
-            const sp<IGraphicBufferConsumer> &consumer = NULL
-    );
+    GraphicBufferSource();
 
     virtual ~GraphicBufferSource();
 
@@ -80,9 +73,6 @@ public:
     sp<IGraphicBufferProducer> getIGraphicBufferProducer() const {
         return mProducer;
     }
-
-    // Sets the default buffer data space
-    void setDefaultDataSpace(android_dataspace dataSpace);
 
     // This is called when OMX transitions to OMX_StateExecuting, which means
     // we can start handing it buffers.  If we already have buffers of data
@@ -107,6 +97,10 @@ public:
     // fill it with a new frame of data; otherwise, just mark it as available.
     Status onInputBufferEmptied(
             int32_t bufferID, const OMXFenceParcelable& fenceParcel) override;
+
+    // Configure the buffer source to be used with an OMX node with the default
+    // data space.
+    Status configure(const sp<IOMXNode>& omxNode, int32_t dataSpace) override;
 
     // This is called after the last input frame has been submitted.  We
     // need to submit an empty buffer with the EOS flag set.  If we don't
@@ -174,30 +168,6 @@ protected:
     void onSidebandStreamChanged() override;
 
 private:
-    // PersistentProxyListener is similar to BufferQueue::ProxyConsumerListener
-    // except that it returns (acquire/detach/re-attache/release) buffers
-    // in onFrameAvailable() if the actual consumer object is no longer valid.
-    //
-    // This class is used in persistent input surface case to prevent buffer
-    // loss when onFrameAvailable() is received while we don't have a valid
-    // consumer around.
-    class PersistentProxyListener : public BnConsumerListener {
-        public:
-            PersistentProxyListener(
-                    const wp<IGraphicBufferConsumer> &consumer,
-                    const wp<ConsumerListener>& consumerListener);
-            virtual ~PersistentProxyListener();
-            virtual void onFrameAvailable(const BufferItem& item) override;
-            virtual void onFrameReplaced(const BufferItem& item) override;
-            virtual void onBuffersReleased() override;
-            virtual void onSidebandStreamChanged() override;
-         private:
-            // mConsumerListener is a weak reference to the IConsumerListener.
-            wp<ConsumerListener> mConsumerListener;
-            // mConsumer is a weak reference to the IGraphicBufferConsumer, use
-            // a weak ref to avoid circular ref between mConsumer and this class
-            wp<IGraphicBufferConsumer> mConsumer;
-    };
 
     // Keep track of codec input buffers.  They may either be available
     // (mGraphicBuffer == NULL) or in use by the codec.
@@ -242,12 +212,13 @@ private:
     // doing anything if we don't have a codec buffer available.
     void submitEndOfInputStream_l();
 
-    // Release buffer to the consumer
-    void releaseBuffer(
-            int &id, uint64_t frameNum,
-            const sp<GraphicBuffer> buffer, const sp<Fence> &fence);
+    // Acquire buffer from the consumer
+    status_t acquireBuffer(BufferItem *bi);
 
-    void setLatestBuffer_l(const BufferItem &item, bool dropped);
+    // Release buffer to the consumer
+    void releaseBuffer(int id, uint64_t frameNum, const sp<Fence> &fence);
+
+    void setLatestBuffer_l(const BufferItem &item);
     bool repeatLatestBuffer_l();
     bool getTimestamp(const BufferItem &item, int64_t *timeUs, int64_t *codecTimeUs);
 
@@ -274,7 +245,6 @@ private:
     // Our BufferQueue interfaces. mProducer is passed to the producer through
     // getIGraphicBufferProducer, and mConsumer is used internally to retrieve
     // the buffers queued by the producer.
-    bool mIsPersistent;
     sp<IGraphicBufferProducer> mProducer;
     sp<IGraphicBufferConsumer> mConsumer;
 
@@ -340,7 +310,6 @@ private:
 
     int64_t mInputBufferTimeOffsetUs;
 
-    MetadataBufferType mMetadataBufferType;
     ColorAspects mColorAspects;
 
     void onMessageReceived(const sp<AMessage> &msg);

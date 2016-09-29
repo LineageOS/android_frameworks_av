@@ -21,8 +21,7 @@
 #include <media/stagefright/foundation/AHandlerReflector.h>
 #include <media/stagefright/foundation/Mutexed.h>
 #include <media/stagefright/MediaSource.h>
-
-#include <gui/IGraphicBufferConsumer.h>
+#include <media/stagefright/PersistentSurface.h>
 
 namespace android {
 
@@ -44,7 +43,7 @@ struct MediaCodecSource : public MediaSource,
             const sp<ALooper> &looper,
             const sp<AMessage> &format,
             const sp<MediaSource> &source,
-            const sp<IGraphicBufferConsumer> &consumer = NULL,
+            const sp<PersistentSurface> &persistentSurface = NULL,
             uint32_t flags = 0);
 
     bool isVideo() const { return mIsVideo; }
@@ -88,7 +87,7 @@ private:
             const sp<ALooper> &looper,
             const sp<AMessage> &outputFormat,
             const sp<MediaSource> &source,
-            const sp<IGraphicBufferConsumer> &consumer,
+            const sp<PersistentSurface> &persistentSurface,
             uint32_t flags = 0);
 
     status_t onStart(MetaData *params);
@@ -121,7 +120,7 @@ private:
     int32_t mEncoderDataSpace;
     sp<AMessage> mEncoderActivityNotify;
     sp<IGraphicBufferProducer> mGraphicBufferProducer;
-    sp<IGraphicBufferConsumer> mGraphicBufferConsumer;
+    sp<PersistentSurface> mPersistentSurface;
     List<MediaBuffer *> mInputBufferQueue;
     List<size_t> mAvailEncoderInputIndices;
     List<int64_t> mDecodingTimeQueue; // decoding time (us) for video

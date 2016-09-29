@@ -56,8 +56,6 @@
 #include "include/SharedMemoryBuffer.h"
 #include "omx/OMXUtils.h"
 
-#include <android/IGraphicBufferSource.h>
-
 namespace android {
 
 using binder::Status;
@@ -6559,7 +6557,25 @@ bool ACodec::LoadedState::onConfigureComponent(
 }
 
 status_t ACodec::LoadedState::setupInputSurface() {
-    status_t err = OK;
+    if (mCodec->mGraphicBufferSource == NULL) {
+        return BAD_VALUE;
+    }
+
+    android_dataspace dataSpace;
+    status_t err =
+        mCodec->setInitialColorAspectsForVideoEncoderSurfaceAndGetDataSpace(&dataSpace);
+    if (err != OK) {
+        ALOGE("Failed to get default data space");
+        return err;
+    }
+
+    err = statusFromBinderStatus(
+            mCodec->mGraphicBufferSource->configure(mCodec->mOMXNode, dataSpace));
+    if (err != OK) {
+        ALOGE("[%s] Unable to configure for node (err %d)",
+              mCodec->mComponentName.c_str(), err);
+        return err;
+    }
 
     if (mCodec->mRepeatFrameDelayUs > 0ll) {
         err = statusFromBinderStatus(
@@ -6655,30 +6671,20 @@ void ACodec::LoadedState::onCreateInputSurface(
     sp<AMessage> notify = mCodec->mNotify->dup();
     notify->setInt32("what", CodecBase::kWhatInputSurfaceCreated);
 
-    android_dataspace dataSpace;
-    status_t err =
-        mCodec->setInitialColorAspectsForVideoEncoderSurfaceAndGetDataSpace(&dataSpace);
-    notify->setMessage("input-format", mCodec->mInputFormat);
-    notify->setMessage("output-format", mCodec->mOutputFormat);
-
     sp<IGraphicBufferProducer> bufferProducer;
-    if (err == OK) {
-        mCodec->mInputMetadataType = kMetadataBufferTypeANWBuffer;
-        err = mCodec->mOMXNode->createInputSurface(
-                mCodec->kPortIndexInput, dataSpace,
-                &bufferProducer, &mCodec->mGraphicBufferSource,
-                &mCodec->mInputMetadataType);
-        // framework uses ANW buffers internally instead of gralloc handles
-        if (mCodec->mInputMetadataType == kMetadataBufferTypeGrallocSource) {
-            mCodec->mInputMetadataType = kMetadataBufferTypeANWBuffer;
-        }
-    }
+    status_t err = mCodec->mOMX->createInputSurface(
+            &bufferProducer, &mCodec->mGraphicBufferSource);
 
     if (err == OK) {
         err = setupInputSurface();
     }
 
     if (err == OK) {
+        mCodec->mInputMetadataType = kMetadataBufferTypeANWBuffer;
+
+        notify->setMessage("input-format", mCodec->mInputFormat);
+        notify->setMessage("output-format", mCodec->mOutputFormat);
+
         notify->setObject("input-surface",
                 new BufferProducerWrapper(bufferProducer));
     } else {
@@ -6702,32 +6708,16 @@ void ACodec::LoadedState::onSetInputSurface(
     sp<RefBase> obj;
     CHECK(msg->findObject("input-surface", &obj));
     sp<PersistentSurface> surface = static_cast<PersistentSurface *>(obj.get());
+    mCodec->mGraphicBufferSource = surface->getBufferSource();
 
-    android_dataspace dataSpace;
-    status_t err =
-        mCodec->setInitialColorAspectsForVideoEncoderSurfaceAndGetDataSpace(&dataSpace);
-    notify->setMessage("input-format", mCodec->mInputFormat);
-    notify->setMessage("output-format", mCodec->mOutputFormat);
+    status_t err = setupInputSurface();
 
     if (err == OK) {
         mCodec->mInputMetadataType = kMetadataBufferTypeANWBuffer;
-        err = mCodec->mOMXNode->setInputSurface(
-                mCodec->kPortIndexInput,
-                surface->getBufferConsumer(),
-                &mCodec->mGraphicBufferSource,
-                &mCodec->mInputMetadataType);
-        // framework uses ANW buffers internally instead of gralloc handles
-        if (mCodec->mInputMetadataType == kMetadataBufferTypeGrallocSource) {
-            mCodec->mInputMetadataType = kMetadataBufferTypeANWBuffer;
-        }
-    }
 
-    if (err == OK) {
-        surface->getBufferConsumer()->setDefaultBufferDataSpace(dataSpace);
-        err = setupInputSurface();
-    }
-
-    if (err != OK) {
+        notify->setMessage("input-format", mCodec->mInputFormat);
+        notify->setMessage("output-format", mCodec->mOutputFormat);
+    } else {
         // Can't use mCodec->signalError() here -- MediaCodec won't forward
         // the error through because it's in the "configured" state.  We
         // send a kWhatInputSurfaceAccepted with an error value instead.

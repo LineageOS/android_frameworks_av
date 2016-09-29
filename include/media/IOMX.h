@@ -19,8 +19,6 @@
 #define ANDROID_IOMX_H_
 
 #include <binder/IInterface.h>
-#include <gui/IGraphicBufferProducer.h>
-#include <gui/IGraphicBufferConsumer.h>
 #include <ui/GraphicBuffer.h>
 #include <utils/List.h>
 #include <utils/String8.h>
@@ -34,8 +32,10 @@
 
 namespace android {
 
+class IGraphicBufferProducer;
 class IGraphicBufferSource;
 class IMemory;
+class IOMXBufferSource;
 class IOMXNode;
 class IOMXObserver;
 class NativeHandle;
@@ -61,9 +61,9 @@ public:
             const char *name, const sp<IOMXObserver> &observer,
             sp<IOMXNode> *omxNode) = 0;
 
-    virtual status_t createPersistentInputSurface(
+    virtual status_t createInputSurface(
             sp<IGraphicBufferProducer> *bufferProducer,
-            sp<IGraphicBufferConsumer> *bufferConsumer) = 0;
+            sp<IGraphicBufferSource> *bufferSource) = 0;
 };
 
 class IOMXNode : public IInterface {
@@ -125,21 +125,8 @@ public:
             OMX_U32 port_index,
             const sp<NativeHandle> &nativeHandle, buffer_id buffer) = 0;
 
-    // This will set *type to resulting metadata buffer type on OMX error (not on binder error) as
-    // well as on success.
-    virtual status_t createInputSurface(
-            OMX_U32 port_index, android_dataspace dataSpace,
-            sp<IGraphicBufferProducer> *bufferProducer,
-            sp<IGraphicBufferSource> *bufferSource,
-            MetadataBufferType *type = NULL) = 0;
-
-    // This will set *type to resulting metadata buffer type on OMX error (not on binder error) as
-    // well as on success.
     virtual status_t setInputSurface(
-            OMX_U32 port_index,
-            const sp<IGraphicBufferConsumer> &bufferConsumer,
-            sp<IGraphicBufferSource> *bufferSource,
-            MetadataBufferType *type) = 0;
+            const sp<IOMXBufferSource> &bufferSource) = 0;
 
     // Allocate an opaque buffer as a native handle. If component supports returning native
     // handles, those are returned in *native_handle. Otherwise, the allocated buffer is

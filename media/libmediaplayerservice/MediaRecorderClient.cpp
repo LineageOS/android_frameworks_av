@@ -52,7 +52,7 @@ static bool checkPermission(const char* permissionString) {
     return ok;
 }
 
-status_t MediaRecorderClient::setInputSurface(const sp<IGraphicBufferConsumer>& surface)
+status_t MediaRecorderClient::setInputSurface(const sp<PersistentSurface>& surface)
 {
     ALOGV("setInputSurface");
     Mutex::Autolock lock(mLock);

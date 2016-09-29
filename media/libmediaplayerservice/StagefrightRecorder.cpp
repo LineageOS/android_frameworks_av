@@ -45,6 +45,7 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MediaCodecSource.h>
+#include <media/stagefright/PersistentSurface.h>
 #include <media/MediaProfiles.h>
 #include <camera/CameraParameters.h>
 
@@ -248,7 +249,7 @@ status_t StagefrightRecorder::setPreviewSurface(const sp<IGraphicBufferProducer>
 }
 
 status_t StagefrightRecorder::setInputSurface(
-        const sp<IGraphicBufferConsumer>& surface) {
+        const sp<PersistentSurface>& surface) {
     mPersistentSurface = surface;
 
     return OK;

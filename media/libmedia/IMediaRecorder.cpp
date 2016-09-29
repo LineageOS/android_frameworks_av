@@ -29,6 +29,7 @@
 #include <media/IMediaRecorder.h>
 #include <gui/Surface.h>
 #include <gui/IGraphicBufferProducer.h>
+#include <media/stagefright/PersistentSurface.h>
 
 namespace android {
 
@@ -79,12 +80,12 @@ public:
         return reply.readInt32();
     }
 
-    status_t setInputSurface(const sp<IGraphicBufferConsumer>& surface)
+    status_t setInputSurface(const sp<PersistentSurface>& surface)
     {
         ALOGV("setInputSurface(%p)", surface.get());
         Parcel data, reply;
         data.writeInterfaceToken(IMediaRecorder::getInterfaceDescriptor());
-        data.writeStrongBinder(IInterface::asBinder(surface));
+        surface->writeToParcel(&data);
         remote()->transact(SET_INPUT_SURFACE, data, &reply);
         return reply.readInt32();
     }
@@ -490,8 +491,8 @@ status_t BnMediaRecorder::onTransact(
         case SET_INPUT_SURFACE: {
             ALOGV("SET_INPUT_SURFACE");
             CHECK_INTERFACE(IMediaRecorder, data, reply);
-            sp<IGraphicBufferConsumer> surface = interface_cast<IGraphicBufferConsumer>(
-                    data.readStrongBinder());
+            sp<PersistentSurface> surface = new PersistentSurface();
+            surface->readFromParcel(&data);
             reply->writeInt32(setInputSurface(surface));
             return NO_ERROR;
         } break;

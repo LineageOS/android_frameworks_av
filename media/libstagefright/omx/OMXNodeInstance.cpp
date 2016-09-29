@@ -23,8 +23,6 @@
 #include "../include/OMXNodeInstance.h"
 #include "OMXMaster.h"
 #include "OMXUtils.h"
-#include "GraphicBufferSource.h"
-#include <android/IGraphicBufferSource.h>
 #include <android/IOMXBufferSource.h>
 
 #include <OMX_Component.h>
@@ -482,6 +480,7 @@ status_t OMXNodeInstance::freeNode() {
     status_t err = mOwner->freeNode(this);
 
     mDispatcher.clear();
+    mOMXBufferSource.clear();
 
     mHandle = NULL;
     CLOG_IF_ERROR(freeNode, err, "");
@@ -1196,35 +1195,23 @@ status_t OMXNodeInstance::updateNativeHandleInMeta(
     return OK;
 }
 
-status_t OMXNodeInstance::createGraphicBufferSource(
-        OMX_U32 portIndex, android_dataspace dataSpace,
-        const sp<IGraphicBufferConsumer> &bufferConsumer,
-        sp<IGraphicBufferProducer> *bufferProducer,
-        sp<IGraphicBufferSource> *bufferSource,
-        MetadataBufferType *type) {
+status_t OMXNodeInstance::setInputSurface(
+        const sp<IOMXBufferSource> &bufferSource) {
+    Mutex::Autolock autolock(mLock);
+
     status_t err;
 
     // only allow graphic source on input port, when there are no allocated buffers yet
-    if (portIndex != kPortIndexInput) {
-        android_errorWriteLog(0x534e4554, "29422020");
-        return BAD_VALUE;
-    } else if (mNumPortBuffers[portIndex] > 0) {
+    if (mNumPortBuffers[kPortIndexInput] > 0) {
         android_errorWriteLog(0x534e4554, "29422020");
         return INVALID_OPERATION;
     }
 
     if (getBufferSource() != NULL) {
-        if (portIndex < NELEM(mMetadataType) && type != NULL) {
-            *type = mMetadataType[portIndex];
-        }
         return ALREADY_EXISTS;
     }
 
-    // Input buffers will hold meta-data (ANativeWindowBuffer references).
-    if (type != NULL) {
-        *type = kMetadataBufferTypeANWBuffer;
-    }
-    err = storeMetaDataInBuffers_l(portIndex, OMX_TRUE, type);
+    err = storeMetaDataInBuffers_l(kPortIndexInput, OMX_TRUE, NULL);
     if (err != OK) {
         return err;
     }
@@ -1233,13 +1220,13 @@ status_t OMXNodeInstance::createGraphicBufferSource(
     // codec was configured.
     OMX_PARAM_PORTDEFINITIONTYPE def;
     InitOMXParams(&def);
-    def.nPortIndex = portIndex;
+    def.nPortIndex = kPortIndexInput;
     OMX_ERRORTYPE oerr = OMX_GetParameter(
             mHandle, OMX_IndexParamPortDefinition, &def);
     if (oerr != OMX_ErrorNone) {
         OMX_INDEXTYPE index = OMX_IndexParamPortDefinition;
-        CLOG_ERROR(getParameter, oerr, "%s(%#x): %s:%u",
-                asString(index), index, portString(portIndex), portIndex);
+        CLOG_ERROR(getParameter, oerr, "%s(%#x): %s:%u", asString(index),
+                index, portString(kPortIndexInput), kPortIndexInput);
         return UNKNOWN_ERROR;
     }
 
@@ -1250,95 +1237,16 @@ status_t OMXNodeInstance::createGraphicBufferSource(
         return INVALID_OPERATION;
     }
 
-    uint32_t usageBits;
-    oerr = OMX_GetParameter(
-            mHandle, (OMX_INDEXTYPE)OMX_IndexParamConsumerUsageBits, &usageBits);
-    if (oerr != OMX_ErrorNone) {
-        usageBits = 0;
-    }
-
-    sp<GraphicBufferSource> graphicBufferSource = new GraphicBufferSource(
-            this,
-            def.format.video.nFrameWidth,
-            def.format.video.nFrameHeight,
-            def.nBufferCountActual,
-            usageBits,
-            bufferConsumer);
-
-    if ((err = graphicBufferSource->initCheck()) != OK) {
-        return err;
-    }
-    setBufferSource(graphicBufferSource);
-
-    if (bufferConsumer == NULL) {
-        graphicBufferSource->setDefaultDataSpace(dataSpace);
-    }
-
-    if (bufferProducer != NULL) {
-        *bufferProducer = graphicBufferSource->getIGraphicBufferProducer();
-    }
-
-    *bufferSource = graphicBufferSource;
-
-    return OK;
-}
-
-status_t OMXNodeInstance::createInputSurface(
-        OMX_U32 portIndex, android_dataspace dataSpace,
-        sp<IGraphicBufferProducer> *bufferProducer,
-        sp<IGraphicBufferSource> *bufferSource,
-        MetadataBufferType *type) {
-    if (bufferProducer == NULL) {
-        ALOGE("b/25884056");
+    if (def.format.video.nFrameWidth == 0
+            || def.format.video.nFrameHeight == 0) {
+        ALOGE("Invalid video dimension %ux%u",
+                def.format.video.nFrameWidth,
+                def.format.video.nFrameHeight);
         return BAD_VALUE;
     }
 
-    Mutex::Autolock autolock(mLock);
-    return createGraphicBufferSource(
-            portIndex, dataSpace, NULL /* bufferConsumer */,
-            bufferProducer, bufferSource, type);
-}
-
-//static
-status_t OMXNodeInstance::createPersistentInputSurface(
-        sp<IGraphicBufferProducer> *bufferProducer,
-        sp<IGraphicBufferConsumer> *bufferConsumer) {
-    if (bufferProducer == NULL || bufferConsumer == NULL) {
-        ALOGE("b/25884056");
-        return BAD_VALUE;
-    }
-    String8 name("GraphicBufferSource");
-
-    sp<IGraphicBufferProducer> producer;
-    sp<IGraphicBufferConsumer> consumer;
-    BufferQueue::createBufferQueue(&producer, &consumer);
-    consumer->setConsumerName(name);
-    consumer->setConsumerUsageBits(GRALLOC_USAGE_HW_VIDEO_ENCODER);
-
-    sp<BufferQueue::ProxyConsumerListener> proxy =
-        new BufferQueue::ProxyConsumerListener(NULL);
-    status_t err = consumer->consumerConnect(proxy, false);
-    if (err != NO_ERROR) {
-        ALOGE("Error connecting to BufferQueue: %s (%d)",
-                strerror(-err), err);
-        return err;
-    }
-
-    *bufferProducer = producer;
-    *bufferConsumer = consumer;
-
+    setBufferSource(bufferSource);
     return OK;
-}
-
-status_t OMXNodeInstance::setInputSurface(
-        OMX_U32 portIndex,
-        const sp<IGraphicBufferConsumer> &bufferConsumer,
-        sp<IGraphicBufferSource> *bufferSource,
-        MetadataBufferType *type) {
-    Mutex::Autolock autolock(mLock);
-    return createGraphicBufferSource(
-            portIndex, android_dataspace::HAL_DATASPACE_UNKNOWN,
-            bufferConsumer, NULL, bufferSource, type);
 }
 
 status_t OMXNodeInstance::allocateSecureBuffer(
