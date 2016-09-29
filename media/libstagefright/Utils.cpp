@@ -652,6 +652,13 @@ status_t convertMetaDataToMessage(
         msg->setInt32("width", width);
         msg->setInt32("height", height);
 
+        int32_t displayWidth, displayHeight;
+        if (meta->findInt32(kKeyDisplayWidth, &displayWidth)
+                && meta->findInt32(kKeyDisplayHeight, &displayHeight)) {
+            msg->setInt32("display-width", displayWidth);
+            msg->setInt32("display-height", displayHeight);
+        }
+
         int32_t sarWidth, sarHeight;
         if (meta->findInt32(kKeySARWidth, &sarWidth)
                 && meta->findInt32(kKeySARHeight, &sarHeight)) {
@@ -1298,6 +1305,13 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
                 && msg->findInt32("sar-height", &sarHeight)) {
             meta->setInt32(kKeySARWidth, sarWidth);
             meta->setInt32(kKeySARHeight, sarHeight);
+        }
+
+        int32_t displayWidth, displayHeight;
+        if (msg->findInt32("display-width", &displayWidth)
+                && msg->findInt32("display-height", &displayHeight)) {
+            meta->setInt32(kKeyDisplayWidth, displayWidth);
+            meta->setInt32(kKeyDisplayHeight, displayHeight);
         }
 
         int32_t colorFormat;

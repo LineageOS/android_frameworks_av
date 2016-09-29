@@ -1756,6 +1756,20 @@ void NuPlayer::updateVideoSize(
         displayWidth = (displayWidth * sarWidth) / sarHeight;
 
         ALOGV("display dimensions %d x %d", displayWidth, displayHeight);
+    } else {
+        int32_t width, height;
+        if (inputFormat->findInt32("display-width", &width)
+                && inputFormat->findInt32("display-height", &height)
+                && width > 0 && height > 0
+                && displayWidth > 0 && displayHeight > 0) {
+            if (displayHeight * (int64_t)width / height > (int64_t)displayWidth) {
+                displayHeight = (int32_t)(displayWidth * (int64_t)height / width);
+            } else {
+                displayWidth = (int32_t)(displayHeight * (int64_t)width / height);
+            }
+            ALOGV("Video display width and height are overridden to %d x %d",
+                 displayWidth, displayHeight);
+        }
     }
 
     int32_t rotationDegrees;
