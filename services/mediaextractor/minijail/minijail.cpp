@@ -15,7 +15,11 @@
 ** limitations under the License.
 */
 
-#include <cutils/log.h>
+#define LOG_TAG "minijail"
+
+#include <unistd.h>
+
+#include <android/log.h>
 #include <libminijail.h>
 
 #include "minijail.h"

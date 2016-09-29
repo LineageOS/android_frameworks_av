@@ -15,8 +15,10 @@
  */
 #define LOG_TAG "EFFECTSMATH"
 //#define LOG_NDEBUG 0
-#include <cutils/log.h>
+
 #include <assert.h>
+
+#include <android/log.h>
 
 #include "EffectsMath.h"
 
