@@ -33,7 +33,7 @@ public:
     virtual void reset();
     virtual status_t setParameters(const sp<AMessage> &msg);
     virtual status_t processBuffers(
-            const sp<ABuffer> &srcBuffer, const sp<ABuffer> &outBuffer);
+            const sp<MediaCodecBuffer> &srcBuffer, const sp<MediaCodecBuffer> &outBuffer);
 
 protected:
     virtual ~SaturationFilter() {};

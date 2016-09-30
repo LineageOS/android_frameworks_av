@@ -18,6 +18,7 @@
 
 #define SKIP_CUT_BUFFER_H_
 
+#include <media/MediaCodecBuffer.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/foundation/ABuffer.h>
 
@@ -39,6 +40,7 @@ class SkipCutBuffer: public RefBase {
     // After this, the caller should continue processing the buffer as usual.
     void submit(MediaBuffer *buffer);
     void submit(const sp<ABuffer>& buffer);    // same as above, but with an ABuffer
+    void submit(const sp<MediaCodecBuffer>& buffer);    // same as above, but with an ABuffer
     void clear();
     size_t size(); // how many bytes are currently stored in the buffer
 
@@ -48,6 +50,8 @@ class SkipCutBuffer: public RefBase {
  private:
     void write(const char *src, size_t num);
     size_t read(char *dst, size_t num);
+    template <typename T>
+    void submitInternal(const sp<T>& buffer);
     int32_t mSkip;
     int32_t mFrontPadding;
     int32_t mBackPadding;

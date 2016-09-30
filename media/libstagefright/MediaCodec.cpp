@@ -19,6 +19,7 @@
 #include <inttypes.h>
 
 #include "include/avc_utils.h"
+#include "include/SharedMemoryBuffer.h"
 #include "include/SoftwareRenderer.h"
 
 #include <binder/IMemory.h>
@@ -30,6 +31,7 @@
 #include <media/ICrypto.h>
 #include <media/IOMX.h>
 #include <media/IResourceManagerService.h>
+#include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -860,7 +862,7 @@ status_t MediaCodec::getName(AString *name) const {
     return OK;
 }
 
-status_t MediaCodec::getWidevineLegacyBuffers(Vector<sp<ABuffer> > *buffers) const {
+status_t MediaCodec::getWidevineLegacyBuffers(Vector<sp<MediaCodecBuffer> > *buffers) const {
     sp<AMessage> msg = new AMessage(kWhatGetBuffers, this);
     msg->setInt32("portIndex", kPortIndexInput);
     msg->setPointer("buffers", buffers);
@@ -870,7 +872,7 @@ status_t MediaCodec::getWidevineLegacyBuffers(Vector<sp<ABuffer> > *buffers) con
     return PostAndAwaitResponse(msg, &response);
 }
 
-status_t MediaCodec::getInputBuffers(Vector<sp<ABuffer> > *buffers) const {
+status_t MediaCodec::getInputBuffers(Vector<sp<MediaCodecBuffer> > *buffers) const {
     sp<AMessage> msg = new AMessage(kWhatGetBuffers, this);
     msg->setInt32("portIndex", kPortIndexInput);
     msg->setPointer("buffers", buffers);
@@ -879,7 +881,7 @@ status_t MediaCodec::getInputBuffers(Vector<sp<ABuffer> > *buffers) const {
     return PostAndAwaitResponse(msg, &response);
 }
 
-status_t MediaCodec::getOutputBuffers(Vector<sp<ABuffer> > *buffers) const {
+status_t MediaCodec::getOutputBuffers(Vector<sp<MediaCodecBuffer> > *buffers) const {
     sp<AMessage> msg = new AMessage(kWhatGetBuffers, this);
     msg->setInt32("portIndex", kPortIndexOutput);
     msg->setPointer("buffers", buffers);
@@ -888,17 +890,17 @@ status_t MediaCodec::getOutputBuffers(Vector<sp<ABuffer> > *buffers) const {
     return PostAndAwaitResponse(msg, &response);
 }
 
-status_t MediaCodec::getOutputBuffer(size_t index, sp<ABuffer> *buffer) {
+status_t MediaCodec::getOutputBuffer(size_t index, sp<MediaCodecBuffer> *buffer) {
     sp<AMessage> format;
     return getBufferAndFormat(kPortIndexOutput, index, buffer, &format);
 }
 
 status_t MediaCodec::getOutputFormat(size_t index, sp<AMessage> *format) {
-    sp<ABuffer> buffer;
+    sp<MediaCodecBuffer> buffer;
     return getBufferAndFormat(kPortIndexOutput, index, &buffer, format);
 }
 
-status_t MediaCodec::getInputBuffer(size_t index, sp<ABuffer> *buffer) {
+status_t MediaCodec::getInputBuffer(size_t index, sp<MediaCodecBuffer> *buffer) {
     sp<AMessage> format;
     return getBufferAndFormat(kPortIndexInput, index, buffer, &format);
 }
@@ -909,7 +911,7 @@ bool MediaCodec::isExecuting() const {
 
 status_t MediaCodec::getBufferAndFormat(
         size_t portIndex, size_t index,
-        sp<ABuffer> *buffer, sp<AMessage> *format) {
+        sp<MediaCodecBuffer> *buffer, sp<AMessage> *format) {
     // use mutex instead of a context switch
     if (mReleasedByResourceManager) {
         ALOGE("getBufferAndFormat - resource already released");
@@ -917,7 +919,7 @@ status_t MediaCodec::getBufferAndFormat(
     }
 
     if (buffer == NULL) {
-        ALOGE("getBufferAndFormat - null ABuffer");
+        ALOGE("getBufferAndFormat - null MediaCodecBuffer");
         return INVALID_OPERATION;
     }
 
@@ -956,7 +958,6 @@ status_t MediaCodec::getBufferAndFormat(
     *buffer = (portIndex == kPortIndexInput && mCrypto != NULL) ?
                   info.mEncryptedData :
                   info.mData;
-
     *format = info.mFormat;
 
     return OK;
@@ -1046,7 +1047,7 @@ bool MediaCodec::handleDequeueOutputBuffer(const sp<AReplyToken> &replyID, bool 
             return false;
         }
 
-        const sp<ABuffer> &buffer =
+        const sp<MediaCodecBuffer> &buffer =
             mPortBuffers[kPortIndexOutput].itemAt(index).mData;
 
         response->setSize("index", index);
@@ -1377,7 +1378,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         if (portIndex == kPortIndexInput && mCrypto != NULL) {
                             sp<IMemory> mem = mDealer->allocate(info.mData->capacity());
                             info.mEncryptedData =
-                                new ABuffer(mem->pointer(), info.mData->capacity());
+                                new SharedMemoryBuffer(mInputFormat, mem);
                             info.mSharedEncryptedBuffer = mem;
                         }
 
@@ -1484,6 +1485,9 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         break;
                     }
 
+                    // TODO: hold reference of buffer from downstream when
+                    // mPortBuffers is removed.
+
                     if (!mCSD.empty()) {
                         ssize_t index = dequeuePortBuffer(kPortIndexInput);
                         CHECK_GE(index, 0);
@@ -1539,8 +1543,10 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         break;
                     }
 
-                    sp<ABuffer> buffer;
-                    CHECK(msg->findBuffer("buffer", &buffer));
+                    sp<RefBase> obj;
+                    CHECK(msg->findObject("buffer", &obj));
+                    sp<MediaCodecBuffer> buffer = static_cast<MediaCodecBuffer *>(obj.get());
+                    // TODO: hold buffer's reference when we remove mPortBuffers
 
                     int32_t omxFlags;
                     CHECK(msg->findInt32("flags", &omxFlags));
@@ -2156,7 +2162,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             int32_t portIndex;
             CHECK(msg->findInt32("portIndex", &portIndex));
 
-            Vector<sp<ABuffer> > *dstBuffers;
+            Vector<sp<MediaCodecBuffer> > *dstBuffers;
             CHECK(msg->findPointer("buffers", (void **)&dstBuffers));
 
             dstBuffers->clear();
@@ -2306,7 +2312,7 @@ status_t MediaCodec::queueCSDInputBuffer(size_t bufferIndex) {
     sp<ABuffer> csd = *mCSD.begin();
     mCSD.erase(mCSD.begin());
 
-    const sp<ABuffer> &codecInputData =
+    const sp<MediaCodecBuffer> &codecInputData =
         (mCrypto != NULL) ? info->mEncryptedData : info->mData;
 
     if (csd->size() > codecInputData->capacity()) {
@@ -2553,13 +2559,14 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
 
         info->mData->setRange(0, result);
     }
+    // TODO: release buffer reference.
 
     // synchronization boundary for getBufferAndFormat
     {
         Mutex::Autolock al(mBufferLock);
         info->mOwnedByClient = false;
     }
-    reply->setBuffer("buffer", info->mData);
+    reply->setObject("buffer", info->mData);
     reply->post();
 
     info->mNotify = NULL;
@@ -2644,8 +2651,10 @@ status_t MediaCodec::onReleaseOutputBuffer(const sp<AMessage> &msg) {
         }
     }
 
+    info->mNotify->setObject("buffer", info->mData);
+    // TODO: release buffer reference.
     info->mNotify->post();
-    info->mNotify = NULL;
+    info->mNotify.clear();
 
     return OK;
 }
@@ -2765,7 +2774,7 @@ void MediaCodec::onInputBufferAvailable() {
 void MediaCodec::onOutputBufferAvailable() {
     int32_t index;
     while ((index = dequeuePortBuffer(kPortIndexOutput)) >= 0) {
-        const sp<ABuffer> &buffer =
+        const sp<MediaCodecBuffer> &buffer =
             mPortBuffers[kPortIndexOutput].itemAt(index).mData;
         sp<AMessage> msg = mCallback->dup();
         msg->setInt32("callbackID", CB_OUTPUT_AVAILABLE);
@@ -2866,7 +2875,7 @@ status_t MediaCodec::onSetParameters(const sp<AMessage> &params) {
 }
 
 status_t MediaCodec::amendOutputFormatWithCodecSpecificData(
-        const sp<ABuffer> &buffer) {
+        const sp<MediaCodecBuffer> &buffer) {
     AString mime;
     CHECK(mOutputFormat->findString("mime", &mime));
 
@@ -2900,7 +2909,10 @@ status_t MediaCodec::amendOutputFormatWithCodecSpecificData(
     } else {
         // For everything else we just stash the codec specific data into
         // the output format as a single piece of csd under "csd-0".
-        mOutputFormat->setBuffer("csd-0", buffer);
+        sp<ABuffer> csd = new ABuffer(buffer->size());
+        memcpy(csd->data(), buffer->data(), buffer->size());
+        csd->setRange(0, buffer->size());
+        mOutputFormat->setBuffer("csd-0", csd);
     }
 
     return OK;

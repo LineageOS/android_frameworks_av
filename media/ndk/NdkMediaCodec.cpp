@@ -30,10 +30,10 @@
 
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/foundation/ABuffer.h>
 
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaErrors.h>
+#include <media/MediaCodecBuffer.h>
 
 using namespace android;
 
@@ -268,11 +268,15 @@ ssize_t AMediaCodec_dequeueInputBuffer(AMediaCodec *mData, int64_t timeoutUs) {
 
 EXPORT
 uint8_t* AMediaCodec_getInputBuffer(AMediaCodec *mData, size_t idx, size_t *out_size) {
-    android::Vector<android::sp<android::ABuffer> > abufs;
+    android::Vector<android::sp<android::MediaCodecBuffer> > abufs;
     if (mData->mCodec->getInputBuffers(&abufs) == 0) {
         size_t n = abufs.size();
         if (idx >= n) {
             ALOGE("buffer index %zu out of range", idx);
+            return NULL;
+        }
+        if (abufs[idx] == NULL) {
+            ALOGE("buffer index %zu is NULL", idx);
             return NULL;
         }
         if (out_size != NULL) {
@@ -286,7 +290,7 @@ uint8_t* AMediaCodec_getInputBuffer(AMediaCodec *mData, size_t idx, size_t *out_
 
 EXPORT
 uint8_t* AMediaCodec_getOutputBuffer(AMediaCodec *mData, size_t idx, size_t *out_size) {
-    android::Vector<android::sp<android::ABuffer> > abufs;
+    android::Vector<android::sp<android::MediaCodecBuffer> > abufs;
     if (mData->mCodec->getOutputBuffers(&abufs) == 0) {
         size_t n = abufs.size();
         if (idx >= n) {

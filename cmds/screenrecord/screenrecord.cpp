@@ -51,6 +51,7 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MediaMuxer.h>
 #include <media/ICrypto.h>
+#include <media/MediaCodecBuffer.h>
 
 #include "screenrecord.h"
 #include "Overlay.h"
@@ -328,7 +329,7 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
 
     assert((rawFp == NULL && muxer != NULL) || (rawFp != NULL && muxer == NULL));
 
-    Vector<sp<ABuffer> > buffers;
+    Vector<sp<MediaCodecBuffer> > buffers;
     err = encoder->getOutputBuffers(&buffers);
     if (err != NO_ERROR) {
         fprintf(stderr, "Unable to get output buffers (err=%d)\n", err);
@@ -411,7 +412,10 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                     // want to queue these up and do them on a different thread.
                     ATRACE_NAME("write sample");
                     assert(trackIdx != -1);
-                    err = muxer->writeSampleData(buffers[bufIndex], trackIdx,
+                    // TODO
+                    sp<ABuffer> buffer = new ABuffer(
+                            buffers[bufIndex]->data(), buffers[bufIndex]->size());
+                    err = muxer->writeSampleData(buffer, trackIdx,
                             ptsUsec, flags);
                     if (err != NO_ERROR) {
                         fprintf(stderr,

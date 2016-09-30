@@ -21,7 +21,6 @@
 #include "NuPlayerRenderer.h"
 #include <algorithm>
 #include <cutils/properties.h>
-#include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
@@ -31,6 +30,7 @@
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
 #include <media/stagefright/VideoFrameScheduler.h>
+#include <media/MediaCodecBuffer.h>
 
 #include <inttypes.h>
 
@@ -156,12 +156,12 @@ NuPlayer::Renderer::~Renderer() {
 
 void NuPlayer::Renderer::queueBuffer(
         bool audio,
-        const sp<ABuffer> &buffer,
+        const sp<MediaCodecBuffer> &buffer,
         const sp<AMessage> &notifyConsumed) {
     sp<AMessage> msg = new AMessage(kWhatQueueBuffer, this);
     msg->setInt32("queueGeneration", getQueueGeneration(audio));
     msg->setInt32("audio", static_cast<int32_t>(audio));
-    msg->setBuffer("buffer", buffer);
+    msg->setObject("buffer", buffer);
     msg->setMessage("notifyConsumed", notifyConsumed);
     msg->post();
 }
@@ -1368,8 +1368,9 @@ void NuPlayer::Renderer::onQueueBuffer(const sp<AMessage> &msg) {
         }
     }
 
-    sp<ABuffer> buffer;
-    CHECK(msg->findBuffer("buffer", &buffer));
+    sp<RefBase> obj;
+    CHECK(msg->findObject("buffer", &obj));
+    sp<MediaCodecBuffer> buffer = static_cast<MediaCodecBuffer *>(obj.get());
 
     sp<AMessage> notifyConsumed;
     CHECK(msg->findMessage("notifyConsumed", &notifyConsumed));
@@ -1395,8 +1396,8 @@ void NuPlayer::Renderer::onQueueBuffer(const sp<AMessage> &msg) {
         return;
     }
 
-    sp<ABuffer> firstAudioBuffer = (*mAudioQueue.begin()).mBuffer;
-    sp<ABuffer> firstVideoBuffer = (*mVideoQueue.begin()).mBuffer;
+    sp<MediaCodecBuffer> firstAudioBuffer = (*mAudioQueue.begin()).mBuffer;
+    sp<MediaCodecBuffer> firstVideoBuffer = (*mVideoQueue.begin()).mBuffer;
 
     if (firstAudioBuffer == NULL || firstVideoBuffer == NULL) {
         // EOS signalled on either queue.

@@ -39,6 +39,7 @@
 
 #include <media/AudioResamplerPublic.h>
 #include <media/AVSyncSettings.h>
+#include <media/MediaCodecBuffer.h>
 
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -1657,12 +1658,12 @@ status_t NuPlayer::instantiateDecoder(
 
     // allocate buffers to decrypt widevine source buffers
     if (!audio && (mSourceFlags & Source::FLAG_SECURE)) {
-        Vector<sp<ABuffer> > inputBufs;
+        Vector<sp<MediaCodecBuffer> > inputBufs;
         CHECK_EQ((*decoder)->getInputBuffers(&inputBufs), (status_t)OK);
 
         Vector<MediaBuffer *> mediaBufs;
         for (size_t i = 0; i < inputBufs.size(); i++) {
-            const sp<ABuffer> &buffer = inputBufs[i];
+            const sp<MediaCodecBuffer> &buffer = inputBufs[i];
             MediaBuffer *mbuf = new MediaBuffer(buffer->data(), buffer->size());
             mediaBufs.push(mbuf);
         }

@@ -28,6 +28,7 @@
 
 #include <cutils/properties.h>
 #include <media/ICrypto.h>
+#include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -417,7 +418,7 @@ void NuPlayer::Decoder::onSetRenderer(const sp<Renderer> &renderer) {
 }
 
 void NuPlayer::Decoder::onGetInputBuffers(
-        Vector<sp<ABuffer> > *dstBuffers) {
+        Vector<sp<MediaCodecBuffer> > *dstBuffers) {
     CHECK_EQ((status_t)OK, mCodec->getWidevineLegacyBuffers(dstBuffers));
 }
 
@@ -561,7 +562,7 @@ bool NuPlayer::Decoder::handleAnInputBuffer(size_t index) {
         return false;
     }
 
-    sp<ABuffer> buffer;
+    sp<MediaCodecBuffer> buffer;
     mCodec->getInputBuffer(index, &buffer);
 
     if (buffer == NULL) {
@@ -628,7 +629,7 @@ bool NuPlayer::Decoder::handleAnOutputBuffer(
         int64_t timeUs,
         int32_t flags) {
 //    CHECK_LT(bufferIx, mOutputBuffers.size());
-    sp<ABuffer> buffer;
+    sp<MediaCodecBuffer> buffer;
     mCodec->getOutputBuffer(index, &buffer);
 
     if (index >= mOutputBuffers.size()) {
@@ -865,10 +866,11 @@ bool NuPlayer::Decoder::onInputBufferFetched(const sp<AMessage> &msg) {
     size_t bufferIx;
     CHECK(msg->findSize("buffer-ix", &bufferIx));
     CHECK_LT(bufferIx, mInputBuffers.size());
-    sp<ABuffer> codecBuffer = mInputBuffers[bufferIx];
+    sp<MediaCodecBuffer> codecBuffer = mInputBuffers[bufferIx];
 
     sp<ABuffer> buffer;
     bool hasBuffer = msg->findBuffer("buffer", &buffer);
+    bool needsCopy = true;
 
     // handle widevine classic source - that fills an arbitrary input buffer
     MediaBuffer *mediaBuffer = NULL;
@@ -878,7 +880,7 @@ bool NuPlayer::Decoder::onInputBufferFetched(const sp<AMessage> &msg) {
             // likely filled another buffer than we requested: adjust buffer index
             size_t ix;
             for (ix = 0; ix < mInputBuffers.size(); ix++) {
-                const sp<ABuffer> &buf = mInputBuffers[ix];
+                const sp<MediaCodecBuffer> &buf = mInputBuffers[ix];
                 if (buf->data() == mediaBuffer->data()) {
                     // all input buffers are dequeued on start, hence the check
                     if (!mInputBufferIsDequeued[ix]) {
@@ -891,11 +893,12 @@ bool NuPlayer::Decoder::onInputBufferFetched(const sp<AMessage> &msg) {
                     // TRICKY: need buffer for the metadata, so instead, set
                     // codecBuffer to the same (though incorrect) buffer to
                     // avoid a memcpy into the codecBuffer
-                    codecBuffer = buffer;
+                    codecBuffer = new MediaCodecBuffer(codecBuffer->format(), buffer);
                     codecBuffer->setRange(
                             mediaBuffer->range_offset(),
                             mediaBuffer->range_length());
                     bufferIx = ix;
+                    needsCopy = false;
                     break;
                 }
             }
@@ -955,7 +958,7 @@ bool NuPlayer::Decoder::onInputBufferFetched(const sp<AMessage> &msg) {
         }
 
         // copy into codec buffer
-        if (buffer != codecBuffer) {
+        if (needsCopy) {
             if (buffer->size() > codecBuffer->capacity()) {
                 handleError(ERROR_BUFFER_TOO_SMALL);
                 mDequeuedInputBuffers.push_back(bufferIx);
@@ -998,7 +1001,7 @@ void NuPlayer::Decoder::onRenderBuffer(const sp<AMessage> &msg) {
 
     if (!mIsAudio) {
         int64_t timeUs;
-        sp<ABuffer> buffer = mOutputBuffers[bufferIx];
+        sp<MediaCodecBuffer> buffer = mOutputBuffers[bufferIx];
         buffer->meta()->findInt64("timeUs", &timeUs);
 
         if (mCCDecoder != NULL && mCCDecoder->isSelected()) {

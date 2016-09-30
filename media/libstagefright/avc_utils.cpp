@@ -447,7 +447,8 @@ sp<MetaData> MakeAVCCodecSpecificData(const sp<ABuffer> &accessUnit) {
     return meta;
 }
 
-bool IsIDR(const sp<ABuffer> &buffer) {
+template <typename T>
+bool IsIDRInternal(const sp<T> &buffer) {
     const uint8_t *data = buffer->data();
     size_t size = buffer->size();
 
@@ -467,6 +468,14 @@ bool IsIDR(const sp<ABuffer> &buffer) {
     }
 
     return foundIDR;
+}
+
+bool IsIDR(const sp<ABuffer> &buffer) {
+    return IsIDRInternal(buffer);
+}
+
+bool IsIDR(const sp<MediaCodecBuffer> &buffer) {
+    return IsIDRInternal(buffer);
 }
 
 bool IsAVCReferenceFrame(const sp<ABuffer> &accessUnit) {

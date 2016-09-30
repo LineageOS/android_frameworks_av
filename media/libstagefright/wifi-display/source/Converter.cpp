@@ -26,6 +26,7 @@
 #include <cutils/properties.h>
 #include <gui/Surface.h>
 #include <media/ICrypto.h>
+#include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -720,7 +721,7 @@ status_t Converter::doMoreWork() {
 #endif
 
             sp<ABuffer> buffer;
-            sp<ABuffer> outbuf = mEncoderOutputBuffers.itemAt(bufferIndex);
+            sp<MediaCodecBuffer> outbuf = mEncoderOutputBuffers.itemAt(bufferIndex);
 
             if (outbuf->meta()->findPointer("handle", (void**)&handle) &&
                     handle != NULL) {

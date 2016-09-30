@@ -27,8 +27,8 @@
 
 #include <media/ICrypto.h>
 #include <media/IMediaHTTPService.h>
+#include <media/MediaCodecBuffer.h>
 
-#include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/ColorConverter.h>
@@ -223,7 +223,7 @@ static VideoFrame *extractVideoFrame(
         return NULL;
     }
 
-    Vector<sp<ABuffer> > inputBuffers;
+    Vector<sp<MediaCodecBuffer> > inputBuffers;
     err = decoder->getInputBuffers(&inputBuffers);
     if (err != OK) {
         ALOGW("failed to get input buffers: %d (%s)", err, asString(err));
@@ -232,7 +232,7 @@ static VideoFrame *extractVideoFrame(
         return NULL;
     }
 
-    Vector<sp<ABuffer> > outputBuffers;
+    Vector<sp<MediaCodecBuffer> > outputBuffers;
     err = decoder->getOutputBuffers(&outputBuffers);
     if (err != OK) {
         ALOGW("failed to get output buffers: %d (%s)", err, asString(err));
@@ -264,7 +264,7 @@ static VideoFrame *extractVideoFrame(
         size_t inputIndex = -1;
         int64_t ptsUs = 0ll;
         uint32_t flags = 0;
-        sp<ABuffer> codecBuffer = NULL;
+        sp<MediaCodecBuffer> codecBuffer = NULL;
 
         while (haveMoreInputs) {
             err = decoder->dequeueInputBuffer(&inputIndex, kBufferTimeOutUs);
@@ -376,7 +376,7 @@ static VideoFrame *extractVideoFrame(
     }
 
     ALOGV("successfully decoded video frame.");
-    sp<ABuffer> videoFrameBuffer = outputBuffers.itemAt(index);
+    sp<MediaCodecBuffer> videoFrameBuffer = outputBuffers.itemAt(index);
 
     if (thumbNailTime >= 0) {
         if (timeUs != thumbNailTime) {

@@ -31,6 +31,8 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MediaFilter.h>
 
+#include <media/MediaCodecBuffer.h>
+
 #include <gui/BufferItem.h>
 
 #include "ColorConvert.h"
@@ -39,6 +41,8 @@
 #include "RSFilter.h"
 #include "SaturationFilter.h"
 #include "ZeroFilter.h"
+
+#include "../include/SharedMemoryBuffer.h"
 
 namespace android {
 
@@ -195,7 +199,7 @@ MediaFilter::PortDescription::PortDescription() {
 }
 
 void MediaFilter::PortDescription::addBuffer(
-        IOMX::buffer_id id, const sp<ABuffer> &buffer) {
+        IOMX::buffer_id id, const sp<MediaCodecBuffer> &buffer) {
     mBufferIDs.push_back(id);
     mBuffers.push_back(buffer);
 }
@@ -208,7 +212,7 @@ IOMX::buffer_id MediaFilter::PortDescription::bufferIDAt(size_t index) const {
     return mBufferIDs.itemAt(index);
 }
 
-sp<ABuffer> MediaFilter::PortDescription::bufferAt(size_t index) const {
+sp<MediaCodecBuffer> MediaFilter::PortDescription::bufferAt(size_t index) const {
     return mBuffers.itemAt(index);
 }
 
@@ -250,7 +254,8 @@ status_t MediaFilter::allocateBuffersOnPort(OMX_U32 portIndex) {
         info.mBufferID = i;
         info.mGeneration = mGeneration;
         info.mOutputFlags = 0;
-        info.mData = new ABuffer(mem->pointer(), bufferSize);
+        info.mData = new SharedMemoryBuffer(
+                isInput ? mInputFormat : mOutputFormat, mem);
         info.mData->meta()->setInt64("timeUs", 0);
 
         mBuffers[portIndex].push_back(info);
@@ -314,7 +319,7 @@ void MediaFilter::postFillThisBuffer(BufferInfo *info) {
     notify->setInt32("buffer-id", info->mBufferID);
 
     info->mData->meta()->clear();
-    notify->setBuffer("buffer", info->mData);
+    notify->setObject("buffer", info->mData);
 
     sp<AMessage> reply = new AMessage(kWhatInputBufferFilled, this);
     reply->setInt32("buffer-id", info->mBufferID);
@@ -334,7 +339,7 @@ void MediaFilter::postDrainThisBuffer(BufferInfo *info) {
     notify->setInt32("what", CodecBase::kWhatDrainThisBuffer);
     notify->setInt32("buffer-id", info->mBufferID);
     notify->setInt32("flags", info->mOutputFlags);
-    notify->setBuffer("buffer", info->mData);
+    notify->setObject("buffer", info->mData);
 
     sp<AMessage> reply = new AMessage(kWhatOutputBufferDrained, this);
     reply->setInt32("buffer-id", info->mBufferID);
@@ -597,11 +602,12 @@ void MediaFilter::onInputBufferFilled(const sp<AMessage> &msg) {
     CHECK_EQ(info->mStatus, BufferInfo::OWNED_BY_UPSTREAM);
     info->mStatus = BufferInfo::OWNED_BY_US;
 
-    sp<ABuffer> buffer;
+    sp<MediaCodecBuffer> buffer;
     int32_t err = OK;
     bool eos = false;
 
-    if (!msg->findBuffer("buffer", &buffer)) {
+    sp<RefBase> obj;
+    if (!msg->findObject("buffer", &obj)) {
         // these are unfilled buffers returned by client
         CHECK(msg->findInt32("err", &err));
 
@@ -616,6 +622,8 @@ void MediaFilter::onInputBufferFilled(const sp<AMessage> &msg) {
         }
 
         buffer.clear();
+    } else {
+        buffer = static_cast<MediaCodecBuffer *>(obj.get());
     }
 
     int32_t isCSD;
@@ -768,7 +776,8 @@ void MediaFilter::onInputFrameAvailable() {
     // TODO: check input format and convert only if necessary
     // copy RGBA graphic buffer into temporary ARGB input buffer
     BufferInfo *inputInfo = new BufferInfo;
-    inputInfo->mData = new ABuffer(buf->getWidth() * buf->getHeight() * 4);
+    inputInfo->mData = new MediaCodecBuffer(
+            mInputFormat, new ABuffer(buf->getWidth() * buf->getHeight() * 4));
     ALOGV("Copying surface data into temp buffer.");
     convertRGBAToARGB(
             (uint8_t*)bufPtr, buf->getWidth(), buf->getHeight(),

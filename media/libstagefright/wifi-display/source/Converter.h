@@ -25,6 +25,7 @@ namespace android {
 struct ABuffer;
 class IGraphicBufferProducer;
 struct MediaCodec;
+class MediaCodecBuffer;
 
 #define ENABLE_SILENCE_DETECTION        0
 
@@ -106,8 +107,8 @@ private:
 
     sp<IGraphicBufferProducer> mGraphicBufferProducer;
 
-    Vector<sp<ABuffer> > mEncoderInputBuffers;
-    Vector<sp<ABuffer> > mEncoderOutputBuffers;
+    Vector<sp<MediaCodecBuffer> > mEncoderInputBuffers;
+    Vector<sp<MediaCodecBuffer> > mEncoderOutputBuffers;
 
     List<size_t> mAvailEncoderInputIndices;
 

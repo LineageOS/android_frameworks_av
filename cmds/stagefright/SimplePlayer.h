@@ -25,6 +25,7 @@ struct ALooper;
 struct AudioTrack;
 class IGraphicBufferProducer;
 struct MediaCodec;
+class MediaCodecBuffer;
 struct NuMediaExtractor;
 class Surface;
 
@@ -73,7 +74,7 @@ private:
     {
         sp<MediaCodec> mCodec;
         Vector<sp<ABuffer> > mCSD;
-        Vector<sp<ABuffer> > mBuffers[2];
+        Vector<sp<MediaCodecBuffer> > mBuffers[2];
 
         List<size_t> mAvailInputBufferIndices;
         List<BufferInfo> mAvailOutputBufferInfos;
@@ -101,7 +102,7 @@ private:
     status_t onOutputFormatChanged(size_t trackIndex, CodecState *state);
 
     void renderAudio(
-            CodecState *state, BufferInfo *info, const sp<ABuffer> &buffer);
+            CodecState *state, BufferInfo *info, const sp<MediaCodecBuffer> &buffer);
 
     DISALLOW_EVIL_CONSTRUCTORS(SimplePlayer);
 };

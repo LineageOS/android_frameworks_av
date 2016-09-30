@@ -53,6 +53,7 @@
 
 #include "include/avc_utils.h"
 #include "include/DataConverter.h"
+#include "include/SharedMemoryBuffer.h"
 #include "omx/OMXUtils.h"
 
 #include <android/IGraphicBufferSource.h>
@@ -872,6 +873,7 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
             size_t totalSize = def.nBufferCountActual * (alignedSize + alignedConvSize);
             mDealer[portIndex] = new MemoryDealer(totalSize, "ACodec");
 
+            const sp<AMessage> &format = portIndex == kPortIndexInput ? mInputFormat : mOutputFormat;
             for (OMX_U32 i = 0; i < def.nBufferCountActual && err == OK; ++i) {
                 sp<IMemory> mem = mDealer[portIndex]->allocate(bufSize);
                 if (mem == NULL || mem->pointer() == NULL) {
@@ -908,8 +910,8 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
                     // because Widevine source only receives these base addresses.
                     const native_handle_t *native_handle_ptr =
                         native_handle == NULL ? NULL : native_handle->handle();
-                    info.mData = new ABuffer(
-                            ptr != NULL ? ptr : (void *)native_handle_ptr, bufSize);
+                    info.mData = new MediaCodecBuffer(format,
+                            new ABuffer(ptr != NULL ? ptr : (void *)native_handle_ptr, bufSize));
                     info.mNativeHandle = native_handle;
                     info.mCodecData = info.mData;
                 } else if (mQuirks & requiresAllocateBufferBit) {
@@ -920,7 +922,7 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
                 }
 
                 if (mem != NULL) {
-                    info.mCodecData = new ABuffer(mem->pointer(), bufSize);
+                    info.mCodecData = new SharedMemoryBuffer(format, mem);
                     info.mCodecRef = mem;
 
                     if (type == kMetadataBufferTypeANWBuffer) {
@@ -935,7 +937,7 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
                         if (mem == NULL|| mem->pointer() == NULL) {
                             return NO_MEMORY;
                         }
-                        info.mData = new ABuffer(mem->pointer(), conversionBufferSize);
+                        info.mData = new SharedMemoryBuffer(format, mem);
                         info.mMemRef = mem;
                     } else {
                         info.mData = info.mCodecData;
@@ -1139,8 +1141,6 @@ status_t ACodec::allocateOutputBuffersFromNativeWindow() {
         info.mFenceFd = fenceFd;
         info.mIsReadFence = false;
         info.mRenderInfo = NULL;
-        info.mData = new ABuffer(NULL /* data */, bufferSize /* capacity */);
-        info.mCodecData = info.mData;
         info.mGraphicBuffer = graphicBuffer;
         mBuffers[kPortIndexOutput].push(info);
 
@@ -1225,7 +1225,7 @@ status_t ACodec::allocateOutputMetadataBuffers() {
         if (mOutputMetadataType == kMetadataBufferTypeANWBuffer) {
             ((VideoNativeMetadata *)mem->pointer())->nFenceFd = -1;
         }
-        info.mData = new ABuffer(mem->pointer(), mem->size());
+        info.mData = new SharedMemoryBuffer(mOutputFormat, mem);
         info.mMemRef = mem;
         info.mCodecData = info.mData;
         info.mCodecRef = mem;
@@ -1505,20 +1505,20 @@ ACodec::BufferInfo *ACodec::dequeueBufferFromNativeWindow() {
 
     if (mOutputMetadataType == kMetadataBufferTypeGrallocSource) {
         VideoGrallocMetadata *grallocMeta =
-            reinterpret_cast<VideoGrallocMetadata *>(oldest->mData->base());
+            reinterpret_cast<VideoGrallocMetadata *>(oldest->mData->data());
         ALOGV("replaced oldest buffer #%u with age %u (%p/%p stored in %p)",
                 (unsigned)(oldest - &mBuffers[kPortIndexOutput][0]),
                 mDequeueCounter - oldest->mDequeuedAt,
                 (void *)(uintptr_t)grallocMeta->pHandle,
-                oldest->mGraphicBuffer->handle, oldest->mData->base());
+                oldest->mGraphicBuffer->handle, oldest->mData->data());
     } else if (mOutputMetadataType == kMetadataBufferTypeANWBuffer) {
         VideoNativeMetadata *nativeMeta =
-            reinterpret_cast<VideoNativeMetadata *>(oldest->mData->base());
+            reinterpret_cast<VideoNativeMetadata *>(oldest->mData->data());
         ALOGV("replaced oldest buffer #%u with age %u (%p/%p stored in %p)",
                 (unsigned)(oldest - &mBuffers[kPortIndexOutput][0]),
                 mDequeueCounter - oldest->mDequeuedAt,
                 (void *)(uintptr_t)nativeMeta->pBuffer,
-                oldest->mGraphicBuffer->getNativeBuffer(), oldest->mData->base());
+                oldest->mGraphicBuffer->getNativeBuffer(), oldest->mData->data());
     }
 
     updateRenderInfoForDequeuedBuffer(buf, fenceFd, oldest);
@@ -5267,11 +5267,6 @@ void ACodec::signalError(OMX_ERRORTYPE error, status_t internalError) {
     notify->post();
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
-ACodec::PortDescription::PortDescription() {
-}
-
 status_t ACodec::requestIDRFrame() {
     if (!mIsEncoder) {
         return ERROR_UNSUPPORTED;
@@ -5290,8 +5285,13 @@ status_t ACodec::requestIDRFrame() {
             sizeof(params));
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
+ACodec::PortDescription::PortDescription() {
+}
+
 void ACodec::PortDescription::addBuffer(
-        IOMX::buffer_id id, const sp<ABuffer> &buffer,
+        IOMX::buffer_id id, const sp<MediaCodecBuffer> &buffer,
         const sp<NativeHandle> &handle, const sp<RefBase> &memRef) {
     mBufferIDs.push_back(id);
     mBuffers.push_back(buffer);
@@ -5307,7 +5307,7 @@ IOMX::buffer_id ACodec::PortDescription::bufferIDAt(size_t index) const {
     return mBufferIDs.itemAt(index);
 }
 
-sp<ABuffer> ACodec::PortDescription::bufferAt(size_t index) const {
+sp<MediaCodecBuffer> ACodec::PortDescription::bufferAt(size_t index) const {
     return mBuffers.itemAt(index);
 }
 
@@ -5633,7 +5633,7 @@ void ACodec::BaseState::postFillThisBuffer(BufferInfo *info) {
     notify->setInt32("buffer-id", info->mBufferID);
 
     info->mData->meta()->clear();
-    notify->setBuffer("buffer", info->mData);
+    notify->setObject("buffer", info->mData);
 
     sp<AMessage> reply = new AMessage(kWhatInputBufferFilled, mCodec);
     reply->setInt32("buffer-id", info->mBufferID);
@@ -5648,12 +5648,13 @@ void ACodec::BaseState::postFillThisBuffer(BufferInfo *info) {
 void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
     IOMX::buffer_id bufferID;
     CHECK(msg->findInt32("buffer-id", (int32_t*)&bufferID));
-    sp<ABuffer> buffer;
+    sp<MediaCodecBuffer> buffer;
     int32_t err = OK;
     bool eos = false;
     PortMode mode = getPortMode(kPortIndexInput);
 
-    if (!msg->findBuffer("buffer", &buffer)) {
+    sp<RefBase> obj;
+    if (!msg->findObject("buffer", &obj)) {
         /* these are unfilled buffers returned by client */
         CHECK(msg->findInt32("err", &err));
 
@@ -5667,6 +5668,8 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
         }
 
         buffer.clear();
+    } else {
+        buffer = static_cast<MediaCodecBuffer *>(obj.get());
     }
 
     int32_t tmp;
@@ -5999,6 +6002,7 @@ bool ACodec::BaseState::onOMXFillBufferDone(
 
             sp<AMessage> reply =
                 new AMessage(kWhatOutputBufferDrained, mCodec);
+            sp<MediaCodecBuffer> buffer = info->mData;
 
             if (mCodec->mOutputFormat != mCodec->mLastOutputFormat && rangeLength > 0) {
                 // pretend that output format has changed on the first frame (we used to do this)
@@ -6016,8 +6020,8 @@ bool ACodec::BaseState::onOMXFillBufferDone(
             if (mCodec->usingMetadataOnEncoderOutput()) {
                 native_handle_t *handle = NULL;
                 VideoNativeHandleMetadata &nativeMeta =
-                    *(VideoNativeHandleMetadata *)info->mData->data();
-                if (info->mData->size() >= sizeof(nativeMeta)
+                    *(VideoNativeHandleMetadata *)buffer->data();
+                if (buffer->size() >= sizeof(nativeMeta)
                         && nativeMeta.eType == kMetadataBufferTypeNativeHandleSource) {
 #ifdef OMX_ANDROID_COMPILE_AS_32BIT_ON_64BIT_PLATFORMS
                     // handle is only valid on 32-bit/mediaserver process
@@ -6026,16 +6030,16 @@ bool ACodec::BaseState::onOMXFillBufferDone(
                     handle = (native_handle_t *)nativeMeta.pHandle;
 #endif
                 }
-                info->mData->meta()->setPointer("handle", handle);
-                info->mData->meta()->setInt32("rangeOffset", rangeOffset);
-                info->mData->meta()->setInt32("rangeLength", rangeLength);
-            } else if (info->mData == info->mCodecData) {
-                info->mData->setRange(rangeOffset, rangeLength);
+                buffer->meta()->setPointer("handle", handle);
+                buffer->meta()->setInt32("rangeOffset", rangeOffset);
+                buffer->meta()->setInt32("rangeLength", rangeLength);
+            } else if (buffer == info->mCodecData) {
+                buffer->setRange(rangeOffset, rangeLength);
             } else {
                 info->mCodecData->setRange(rangeOffset, rangeLength);
                 // in this case we know that mConverter is not null
                 status_t err = mCodec->mConverter[kPortIndexOutput]->convert(
-                        info->mCodecData, info->mData);
+                        info->mCodecData, buffer);
                 if (err != OK) {
                     mCodec->signalError(OMX_ErrorUndefined, makeNoSideEffectStatus(err));
                     return true;
@@ -6050,14 +6054,14 @@ bool ACodec::BaseState::onOMXFillBufferDone(
 #endif
 
             if (mCodec->mSkipCutBuffer != NULL) {
-                mCodec->mSkipCutBuffer->submit(info->mData);
+                mCodec->mSkipCutBuffer->submit(buffer);
             }
-            info->mData->meta()->setInt64("timeUs", timeUs);
+            buffer->meta()->setInt64("timeUs", timeUs);
 
             sp<AMessage> notify = mCodec->mNotify->dup();
             notify->setInt32("what", CodecBase::kWhatDrainThisBuffer);
             notify->setInt32("buffer-id", info->mBufferID);
-            notify->setBuffer("buffer", info->mData);
+            notify->setObject("buffer", buffer);
             notify->setInt32("flags", flags);
 
             reply->setInt32("buffer-id", info->mBufferID);
@@ -6100,6 +6104,11 @@ bool ACodec::BaseState::onOMXFillBufferDone(
 void ACodec::BaseState::onOutputBufferDrained(const sp<AMessage> &msg) {
     IOMX::buffer_id bufferID;
     CHECK(msg->findInt32("buffer-id", (int32_t*)&bufferID));
+    sp<RefBase> obj;
+    sp<MediaCodecBuffer> buffer = nullptr;
+    if (msg->findObject("buffer", &obj)) {
+        buffer = static_cast<MediaCodecBuffer *>(obj.get());
+    }
     ssize_t index;
     BufferInfo *info = mCodec->findBufferByID(kPortIndexOutput, bufferID, &index);
     BufferInfo::Status status = BufferInfo::getSafeStatus(info);
@@ -6130,13 +6139,13 @@ void ACodec::BaseState::onOutputBufferDrained(const sp<AMessage> &msg) {
     int32_t render;
     if (mCodec->mNativeWindow != NULL
             && msg->findInt32("render", &render) && render != 0
-            && info->mData != NULL && info->mData->size() != 0) {
+            && buffer != NULL && buffer->size() != 0) {
         ATRACE_NAME("render");
         // The client wants this buffer to be rendered.
 
         // save buffers sent to the surface so we can get render time when they return
         int64_t mediaTimeUs = -1;
-        info->mData->meta()->findInt64("timeUs", &mediaTimeUs);
+        buffer->meta()->findInt64("timeUs", &mediaTimeUs);
         if (mediaTimeUs >= 0) {
             mCodec->mRenderTracker.onFrameQueued(
                     mediaTimeUs, info->mGraphicBuffer, new Fence(::dup(info->mFenceFd)));
@@ -6145,7 +6154,7 @@ void ACodec::BaseState::onOutputBufferDrained(const sp<AMessage> &msg) {
         int64_t timestampNs = 0;
         if (!msg->findInt64("timestampNs", &timestampNs)) {
             // use media timestamp if client did not request a specific render timestamp
-            if (info->mData->meta()->findInt64("timeUs", &timestampNs)) {
+            if (buffer->meta()->findInt64("timeUs", &timestampNs)) {
                 ALOGV("using buffer PTS of %lld", (long long)timestampNs);
                 timestampNs *= 1000;
             }
@@ -6170,7 +6179,7 @@ void ACodec::BaseState::onOutputBufferDrained(const sp<AMessage> &msg) {
         }
     } else {
         if (mCodec->mNativeWindow != NULL &&
-            (info->mData == NULL || info->mData->size() != 0)) {
+            (buffer == NULL || buffer->size() != 0)) {
             // move read fence into write fence to avoid clobbering
             info->mIsReadFence = false;
             ATRACE_NAME("frame-drop");

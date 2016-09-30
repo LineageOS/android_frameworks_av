@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 The Android Open Source Project
+ * Copyright 2016, The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,30 +14,32 @@
  * limitations under the License.
  */
 
-#ifndef ZERO_FILTER_H_
-#define ZERO_FILTER_H_
+#ifndef SHARED_MEMORY_BUFFER_H_
 
-#include "SimpleFilter.h"
+#define SHARED_MEMORY_BUFFER_H_
+
+#include <media/MediaCodecBuffer.h>
 
 namespace android {
 
-struct ZeroFilter : public SimpleFilter {
+struct AMessage;
+class IMemory;
+
+/**
+ * MediaCodecBuffer implementation based on IMemory.
+ */
+class SharedMemoryBuffer : public MediaCodecBuffer {
 public:
-    ZeroFilter() : mInvertData(false) {};
+    SharedMemoryBuffer(const sp<AMessage> &format, const sp<IMemory> &mem);
 
-    virtual status_t start() { return OK; };
-    virtual void reset() {};
-    virtual status_t setParameters(const sp<AMessage> &msg);
-    virtual status_t processBuffers(
-            const sp<MediaCodecBuffer> &srcBuffer, const sp<MediaCodecBuffer> &outBuffer);
-
-protected:
-    virtual ~ZeroFilter() {};
+    virtual ~SharedMemoryBuffer() = default;
 
 private:
-    bool mInvertData;
+    SharedMemoryBuffer() = delete;
+
+    const sp<IMemory> mMemory;
 };
 
-}   // namespace android
+}  // namespace android
 
-#endif  // ZERO_FILTER_H_
+#endif  // SHARED_MEMORY_BUFFER_H_

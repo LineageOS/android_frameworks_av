@@ -23,6 +23,7 @@
 
 #include "NuPlayerRenderer.h"
 
+#include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 
@@ -91,7 +92,7 @@ void NuPlayer::DecoderBase::pause() {
     PostAndAwaitResponse(msg, &response);
 }
 
-status_t NuPlayer::DecoderBase::getInputBuffers(Vector<sp<ABuffer> > *buffers) const {
+status_t NuPlayer::DecoderBase::getInputBuffers(Vector<sp<MediaCodecBuffer> > *buffers) const {
     sp<AMessage> msg = new AMessage(kWhatGetInputBuffers, this);
     msg->setPointer("buffers", buffers);
 
@@ -170,7 +171,7 @@ void NuPlayer::DecoderBase::onMessageReceived(const sp<AMessage> &msg) {
             sp<AReplyToken> replyID;
             CHECK(msg->senderAwaitsResponse(&replyID));
 
-            Vector<sp<ABuffer> > *dstBuffers;
+            Vector<sp<MediaCodecBuffer> > *dstBuffers;
             CHECK(msg->findPointer("buffers", (void **)&dstBuffers));
 
             onGetInputBuffers(dstBuffers);

@@ -34,7 +34,7 @@
 
 namespace android {
 
-struct ABuffer;
+class MediaCodecBuffer;
 struct PersistentSurface;
 
 struct CodecBase : public AHandler, /* static */ ColorUtils {
@@ -88,7 +88,7 @@ struct CodecBase : public AHandler, /* static */ ColorUtils {
     struct PortDescription : public RefBase {
         virtual size_t countBuffers() = 0;
         virtual IOMX::buffer_id bufferIDAt(size_t index) const = 0;
-        virtual sp<ABuffer> bufferAt(size_t index) const = 0;
+        virtual sp<MediaCodecBuffer> bufferAt(size_t index) const = 0;
         virtual sp<NativeHandle> handleAt(size_t index) const { return NULL; };
         virtual sp<RefBase> memRefAt(size_t index) const { return NULL; }
 

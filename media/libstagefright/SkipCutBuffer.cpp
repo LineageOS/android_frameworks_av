@@ -88,7 +88,8 @@ void SkipCutBuffer::submit(MediaBuffer *buffer) {
     buffer->set_range(0, copied);
 }
 
-void SkipCutBuffer::submit(const sp<ABuffer>& buffer) {
+template <typename T>
+void SkipCutBuffer::submitInternal(const sp<T>& buffer) {
     if (mCutBuffer == NULL) {
         // passthrough mode
         return;
@@ -118,6 +119,14 @@ void SkipCutBuffer::submit(const sp<ABuffer>& buffer) {
     char *dst = (char*) buffer->base();
     size_t copied = read(dst, buffer->capacity());
     buffer->setRange(0, copied);
+}
+
+void SkipCutBuffer::submit(const sp<ABuffer>& buffer) {
+    submitInternal(buffer);
+}
+
+void SkipCutBuffer::submit(const sp<MediaCodecBuffer>& buffer) {
+    submitInternal(buffer);
 }
 
 void SkipCutBuffer::clear() {

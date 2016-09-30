@@ -26,6 +26,7 @@
 #include <media/ICrypto.h>
 #include <media/IMediaHTTPService.h>
 #include <media/IMediaPlayerService.h>
+#include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
@@ -56,8 +57,8 @@ namespace android {
 
 struct CodecState {
     sp<MediaCodec> mCodec;
-    Vector<sp<ABuffer> > mInBuffers;
-    Vector<sp<ABuffer> > mOutBuffers;
+    Vector<sp<MediaCodecBuffer> > mInBuffers;
+    Vector<sp<MediaCodecBuffer> > mOutBuffers;
     bool mSignalledInputEOS;
     bool mSawOutputEOS;
     int64_t mNumBuffersDecoded;
@@ -174,10 +175,12 @@ static int decode(
                 if (err == OK) {
                     ALOGV("filling input buffer %zu", index);
 
-                    const sp<ABuffer> &buffer = state->mInBuffers.itemAt(index);
+                    const sp<MediaCodecBuffer> &buffer = state->mInBuffers.itemAt(index);
+                    sp<ABuffer> abuffer = new ABuffer(buffer->base(), buffer->capacity());
 
-                    err = extractor->readSampleData(buffer);
+                    err = extractor->readSampleData(abuffer);
                     CHECK_EQ(err, (status_t)OK);
+                    buffer->setRange(abuffer->offset(), abuffer->size());
 
                     int64_t timeUs;
                     err = extractor->getSampleTime(&timeUs);

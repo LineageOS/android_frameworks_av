@@ -21,7 +21,6 @@
 
 namespace android {
 
-struct ABuffer;
 struct GraphicBufferListener;
 struct MemoryDealer;
 struct SimpleFilter;
@@ -51,7 +50,7 @@ struct MediaFilter : public CodecBase {
     struct PortDescription : public CodecBase::PortDescription {
         virtual size_t countBuffers();
         virtual IOMX::buffer_id bufferIDAt(size_t index) const;
-        virtual sp<ABuffer> bufferAt(size_t index) const;
+        virtual sp<MediaCodecBuffer> bufferAt(size_t index) const;
 
     protected:
         PortDescription();
@@ -60,9 +59,9 @@ struct MediaFilter : public CodecBase {
         friend struct MediaFilter;
 
         Vector<IOMX::buffer_id> mBufferIDs;
-        Vector<sp<ABuffer> > mBuffers;
+        Vector<sp<MediaCodecBuffer> > mBuffers;
 
-        void addBuffer(IOMX::buffer_id id, const sp<ABuffer> &buffer);
+        void addBuffer(IOMX::buffer_id id, const sp<MediaCodecBuffer> &buffer);
 
         DISALLOW_EVIL_CONSTRUCTORS(PortDescription);
     };
@@ -82,7 +81,7 @@ private:
         int32_t mOutputFlags;
         Status mStatus;
 
-        sp<ABuffer> mData;
+        sp<MediaCodecBuffer> mData;
     };
 
     enum State {
