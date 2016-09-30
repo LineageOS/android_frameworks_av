@@ -140,7 +140,7 @@ status_t StreamOutHalLocal::getNextWriteTimestamp(int64_t *timestamp) {
     return mStream->get_next_write_timestamp(mStream, timestamp);
 }
 
-status_t StreamOutHalLocal::setCallback(sp<StreamOutHalInterfaceCallback> callback) {
+status_t StreamOutHalLocal::setCallback(wp<StreamOutHalInterfaceCallback> callback) {
     if (mStream->set_callback == NULL) return INVALID_OPERATION;
     status_t result = mStream->set_callback(mStream, StreamOutHalLocal::asyncCallback, this);
     if (result == OK) {
