@@ -33,7 +33,7 @@ struct AMessage;
 struct AReplyToken;
 struct AString;
 struct CodecBase;
-struct IBatteryStats;
+class IBatteryStats;
 struct ICrypto;
 class MediaCodecBuffer;
 class IMemory;
@@ -42,7 +42,7 @@ class IResourceManagerClient;
 class IResourceManagerService;
 struct PersistentSurface;
 struct SoftwareRenderer;
-struct Surface;
+class Surface;
 
 struct MediaCodec : public AHandler {
     enum ConfigureFlags {
