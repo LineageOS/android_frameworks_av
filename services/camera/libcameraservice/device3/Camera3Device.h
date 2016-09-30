@@ -297,6 +297,8 @@ class Camera3Device :
         // requests will be submitted to HAL at a time. The batch size for
         // the following 7 requests will be ignored by the request thread.
         int                                 mBatchSize;
+        //  Whether this request is from a repeating or repeating burst.
+        bool                                mRepeating;
     };
     typedef List<sp<CaptureRequest> > RequestList;
 
@@ -304,6 +306,7 @@ class Camera3Device :
 
     status_t convertMetadataListToRequestListLocked(
             const List<const CameraMetadata> &metadataList,
+            bool repeating,
             /*out*/
             RequestList *requestList);
 

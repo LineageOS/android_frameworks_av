@@ -151,6 +151,7 @@ public:
         SENT_RESULT,
         UNINITIALIZED,
         REPEATING_REQUEST_ERROR,
+        REQUEST_QUEUE_EMPTY,
     };
 
 protected:
@@ -220,6 +221,14 @@ public:
         (void) lastFrameNumber;
         Mutex::Autolock l(mLock);
         mLastStatus = REPEATING_REQUEST_ERROR;
+        mStatusesHit.push_back(mLastStatus);
+        mStatusCondition.broadcast();
+        return binder::Status::ok();
+    }
+
+    virtual binder::Status onRequestQueueEmpty() {
+        Mutex::Autolock l(mLock);
+        mLastStatus = REQUEST_QUEUE_EMPTY;
         mStatusesHit.push_back(mLastStatus);
         mStatusCondition.broadcast();
         return binder::Status::ok();

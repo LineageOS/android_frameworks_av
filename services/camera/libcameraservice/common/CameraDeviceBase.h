@@ -204,6 +204,7 @@ class CameraDeviceBase : public virtual RefBase {
         virtual void notifyShutter(const CaptureResultExtras &resultExtras,
                 nsecs_t timestamp) = 0;
         virtual void notifyPrepared(int streamId) = 0;
+        virtual void notifyRequestQueueEmpty() = 0;
 
         // Required only for API1
         virtual void notifyAutoFocus(uint8_t newState, int triggerId) = 0;

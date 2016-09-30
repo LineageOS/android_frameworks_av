@@ -44,4 +44,5 @@ interface ICameraDeviceCallbacks
      * @param lastFrameNumber Frame number of the last frame of the streaming request.
      */
     oneway void onRepeatingRequestError(in long lastFrameNumber);
+    oneway void onRequestQueueEmpty();
 }

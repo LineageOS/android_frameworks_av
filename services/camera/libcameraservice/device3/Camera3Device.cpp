@@ -686,7 +686,8 @@ status_t Camera3Device::checkStatusOkToCaptureLocked() {
 }
 
 status_t Camera3Device::convertMetadataListToRequestListLocked(
-        const List<const CameraMetadata> &metadataList, RequestList *requestList) {
+        const List<const CameraMetadata> &metadataList, bool repeating,
+        RequestList *requestList) {
     if (requestList == NULL) {
         CLOGE("requestList cannot be NULL.");
         return BAD_VALUE;
@@ -700,6 +701,8 @@ status_t Camera3Device::convertMetadataListToRequestListLocked(
             CLOGE("Can't create capture request");
             return BAD_VALUE;
         }
+
+        newRequest->mRepeating = repeating;
 
         // Setup burst Id and request Id
         newRequest->mResultExtras.burstId = burstId++;
@@ -757,7 +760,8 @@ status_t Camera3Device::submitRequestsHelper(
 
     RequestList requestList;
 
-    res = convertMetadataListToRequestListLocked(requests, /*out*/&requestList);
+    res = convertMetadataListToRequestListLocked(requests, repeating,
+            /*out*/&requestList);
     if (res != OK) {
         // error logged by previous call
         return res;
@@ -3535,6 +3539,12 @@ sp<Camera3Device::CaptureRequest>
                 mRequestQueue.begin();
         nextRequest = *firstRequest;
         mRequestQueue.erase(firstRequest);
+        if (mRequestQueue.empty() && !nextRequest->mRepeating) {
+            sp<NotificationListener> listener = mListener.promote();
+            if (listener != NULL) {
+                listener->notifyRequestQueueEmpty();
+            }
+        }
     }
 
     // In case we've been unpaused by setPaused clearing mDoPause, need to

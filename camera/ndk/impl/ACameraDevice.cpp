@@ -1347,6 +1347,12 @@ CameraDevice::ServiceCallback::onPrepared(int) {
 }
 
 binder::Status
+CameraDevice::ServiceCallback::onRequestQueueEmpty() {
+    // onRequestQueueEmpty not yet implemented in NDK
+    return binder::Status::ok();
+}
+
+binder::Status
 CameraDevice::ServiceCallback::onRepeatingRequestError(int64_t lastFrameNumber) {
     binder::Status ret = binder::Status::ok();
 
