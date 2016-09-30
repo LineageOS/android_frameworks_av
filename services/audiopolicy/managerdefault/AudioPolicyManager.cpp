@@ -1727,7 +1727,7 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
     if (isInCall()) {
         *concurrency |= API_INPUT_CONCURRENCY_CALL;
     }
-    if (mInputs.activeInputsCount() != 0) {
+    if (mInputs.activeInputsCountOnDevices() != 0) {
         *concurrency |= API_INPUT_CONCURRENCY_CAPTURE;
     }
 
@@ -1739,8 +1739,10 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
     mInputRoutes.incRouteActivity(session);
 
     if (audioSession->activeCount() == 1 || mInputRoutes.hasRouteChanged(session)) {
-
-        setInputDevice(input, getNewInputDevice(inputDesc), true /* force */);
+        // indicate active capture to sound trigger service if starting capture from a mic on
+        // primary HW module
+        audio_devices_t device = getNewInputDevice(inputDesc);
+        setInputDevice(input, device, true /* force */);
 
         if (inputDesc->getAudioSessionCount(true/*activeOnly*/) == 1) {
             // if input maps to a dynamic policy with an activity listener, notify of state change
@@ -1750,7 +1752,9 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
                         MIX_STATE_MIXING);
             }
 
-            if (mInputs.activeInputsCount() == 0) {
+            audio_devices_t primaryInputDevices = availablePrimaryInputDevices();
+            if (((device & primaryInputDevices & ~AUDIO_DEVICE_BIT_IN) != 0) &&
+                    mInputs.activeInputsCountOnDevices(primaryInputDevices) == 0) {
                 SoundTrigger::setCaptureState(true);
             }
 
@@ -1833,9 +1837,14 @@ status_t AudioPolicyManager::stopInput(audio_io_handle_t input,
                 }
             }
 
+            audio_devices_t device = inputDesc->mDevice;
             resetInputDevice(input);
 
-            if (mInputs.activeInputsCount() == 0) {
+            // indicate inactive capture to sound trigger service if stopping capture from a mic on
+            // primary HW module
+            audio_devices_t primaryInputDevices = availablePrimaryInputDevices();
+            if (((device & primaryInputDevices & ~AUDIO_DEVICE_BIT_IN) != 0) &&
+                    mInputs.activeInputsCountOnDevices(primaryInputDevices) == 0) {
                 SoundTrigger::setCaptureState(false);
             }
             inputDesc->clearPreemptedSessions();
