@@ -92,7 +92,7 @@ class StreamOutHalLocal : public StreamOutHalInterface, public StreamHalLocal {
     virtual status_t getNextWriteTimestamp(int64_t *timestamp);
 
     // Set the callback for notifying completion of non-blocking write and drain.
-    virtual status_t setCallback(sp<StreamOutHalInterfaceCallback> callback);
+    virtual status_t setCallback(wp<StreamOutHalInterfaceCallback> callback);
 
     // Returns whether pause and resume operations are supported.
     virtual status_t supportsPauseAndResume(bool *supportsPause, bool *supportsResume);

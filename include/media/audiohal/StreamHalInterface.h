@@ -102,7 +102,7 @@ class StreamOutHalInterface : public virtual StreamHalInterface {
     // Set the callback for notifying completion of non-blocking write and drain.
     // The callback must be owned by someone else. The output stream does not own it
     // to avoid strong pointer loops.
-    virtual status_t setCallback(sp<StreamOutHalInterfaceCallback> callback) = 0;
+    virtual status_t setCallback(wp<StreamOutHalInterfaceCallback> callback) = 0;
 
     // Returns whether pause and resume operations are supported.
     virtual status_t supportsPauseAndResume(bool *supportsPause, bool *supportsResume) = 0;
