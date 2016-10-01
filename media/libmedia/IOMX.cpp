@@ -33,7 +33,6 @@ namespace android {
 
 enum {
     CONNECT = IBinder::FIRST_CALL_TRANSACTION,
-    LIVES_LOCALLY,
     LIST_NODES,
     ALLOCATE_NODE,
     FREE_NODE,
@@ -72,14 +71,8 @@ public:
         : BpInterface<IOMX>(impl) {
     }
 
-    virtual bool livesLocally(node_id node, pid_t pid) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
-        data.writeInt32(pid);
-        remote()->transact(LIVES_LOCALLY, data, &reply);
-
-        return reply.readInt32() != 0;
+    virtual bool livesLocally() {
+        return false;
     }
 
     virtual status_t listNodes(List<ComponentInfo> *list) {
@@ -106,8 +99,7 @@ public:
 
     virtual status_t allocateNode(
             const char *name, const sp<IOMXObserver> &observer,
-            sp<IBinder> *nodeBinder,
-            node_id *node) {
+            sp<IBinder> *nodeBinder, sp<IOMXNode> *omxNode) {
         Parcel data, reply;
         data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
         data.writeCString(name);
@@ -116,257 +108,13 @@ public:
 
         status_t err = reply.readInt32();
         if (err == OK) {
-            *node = (node_id)reply.readInt32();
+            *omxNode = IOMXNode::asInterface(reply.readStrongBinder());
             if (nodeBinder != NULL) {
                 *nodeBinder = remote();
             }
         } else {
-            *node = 0;
+            omxNode->clear();
         }
-
-        return err;
-    }
-
-    virtual status_t freeNode(node_id node) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
-        remote()->transact(FREE_NODE, data, &reply);
-
-        return reply.readInt32();
-    }
-
-    virtual status_t sendCommand(
-            node_id node, OMX_COMMANDTYPE cmd, OMX_S32 param) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
-        data.writeInt32(cmd);
-        data.writeInt32(param);
-        remote()->transact(SEND_COMMAND, data, &reply);
-
-        return reply.readInt32();
-    }
-
-    virtual status_t getParameter(
-            node_id node, OMX_INDEXTYPE index,
-            void *params, size_t size) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
-        data.writeInt32(index);
-        data.writeInt64(size);
-        data.write(params, size);
-        remote()->transact(GET_PARAMETER, data, &reply);
-
-        status_t err = reply.readInt32();
-        if (err != OK) {
-            return err;
-        }
-
-        reply.read(params, size);
-
-        return OK;
-    }
-
-    virtual status_t setParameter(
-            node_id node, OMX_INDEXTYPE index,
-            const void *params, size_t size) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
-        data.writeInt32(index);
-        data.writeInt64(size);
-        data.write(params, size);
-        remote()->transact(SET_PARAMETER, data, &reply);
-
-        return reply.readInt32();
-    }
-
-    virtual status_t getConfig(
-            node_id node, OMX_INDEXTYPE index,
-            void *params, size_t size) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
-        data.writeInt32(index);
-        data.writeInt64(size);
-        data.write(params, size);
-        remote()->transact(GET_CONFIG, data, &reply);
-
-        status_t err = reply.readInt32();
-        if (err != OK) {
-            return err;
-        }
-
-        reply.read(params, size);
-
-        return OK;
-    }
-
-    virtual status_t setConfig(
-            node_id node, OMX_INDEXTYPE index,
-            const void *params, size_t size) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
-        data.writeInt32(index);
-        data.writeInt64(size);
-        data.write(params, size);
-        remote()->transact(SET_CONFIG, data, &reply);
-
-        return reply.readInt32();
-    }
-
-    virtual status_t getState(
-            node_id node, OMX_STATETYPE* state) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
-        remote()->transact(GET_STATE, data, &reply);
-
-        *state = static_cast<OMX_STATETYPE>(reply.readInt32());
-        return reply.readInt32();
-    }
-
-    virtual status_t enableNativeBuffers(
-            node_id node, OMX_U32 port_index, OMX_BOOL graphic, OMX_BOOL enable) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
-        data.writeInt32(port_index);
-        data.writeInt32((uint32_t)graphic);
-        data.writeInt32((uint32_t)enable);
-        remote()->transact(ENABLE_NATIVE_BUFFERS, data, &reply);
-
-        status_t err = reply.readInt32();
-        return err;
-    }
-
-    virtual status_t getGraphicBufferUsage(
-            node_id node, OMX_U32 port_index, OMX_U32* usage) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
-        data.writeInt32(port_index);
-        remote()->transact(GET_GRAPHIC_BUFFER_USAGE, data, &reply);
-
-        status_t err = reply.readInt32();
-        *usage = reply.readInt32();
-        return err;
-    }
-
-    virtual status_t useBuffer(
-            node_id node, OMX_U32 port_index, const sp<IMemory> &params,
-            buffer_id *buffer, OMX_U32 allottedSize) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
-        data.writeInt32(port_index);
-        data.writeStrongBinder(IInterface::asBinder(params));
-        data.writeInt32(allottedSize);
-        remote()->transact(USE_BUFFER, data, &reply);
-
-        status_t err = reply.readInt32();
-        if (err != OK) {
-            *buffer = 0;
-
-            return err;
-        }
-
-        *buffer = (buffer_id)reply.readInt32();
-
-        return err;
-    }
-
-
-    virtual status_t useGraphicBuffer(
-            node_id node, OMX_U32 port_index,
-            const sp<GraphicBuffer> &graphicBuffer, buffer_id *buffer) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
-        data.writeInt32(port_index);
-        data.write(*graphicBuffer);
-        remote()->transact(USE_GRAPHIC_BUFFER, data, &reply);
-
-        status_t err = reply.readInt32();
-        if (err != OK) {
-            *buffer = 0;
-
-            return err;
-        }
-
-        *buffer = (buffer_id)reply.readInt32();
-
-        return err;
-    }
-
-    virtual status_t updateGraphicBufferInMeta(
-            node_id node, OMX_U32 port_index,
-            const sp<GraphicBuffer> &graphicBuffer, buffer_id buffer) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
-        data.writeInt32(port_index);
-        data.write(*graphicBuffer);
-        data.writeInt32((int32_t)buffer);
-        remote()->transact(UPDATE_GRAPHIC_BUFFER_IN_META, data, &reply);
-
-        status_t err = reply.readInt32();
-        return err;
-    }
-
-    virtual status_t updateNativeHandleInMeta(
-            node_id node, OMX_U32 port_index,
-            const sp<NativeHandle> &nativeHandle, buffer_id buffer) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
-        data.writeInt32(port_index);
-        data.writeInt32(nativeHandle != NULL);
-        if (nativeHandle != NULL) {
-            data.writeNativeHandle(nativeHandle->handle());
-        }
-        data.writeInt32((int32_t)buffer);
-        remote()->transact(UPDATE_NATIVE_HANDLE_IN_META, data, &reply);
-
-        status_t err = reply.readInt32();
-        return err;
-    }
-
-    virtual status_t createInputSurface(
-            node_id node, OMX_U32 port_index, android_dataspace dataSpace,
-            sp<IGraphicBufferProducer> *bufferProducer,
-            sp<IGraphicBufferSource> *bufferSource,
-            MetadataBufferType *type) {
-        Parcel data, reply;
-        status_t err;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
-        data.writeInt32(port_index);
-        data.writeInt32(dataSpace);
-        err = remote()->transact(CREATE_INPUT_SURFACE, data, &reply);
-        if (err != OK) {
-            ALOGW("binder transaction failed: %d", err);
-            return err;
-        }
-
-        // read type even if createInputSurface failed
-        int negotiatedType = reply.readInt32();
-        if (type != NULL) {
-            *type = (MetadataBufferType)negotiatedType;
-        }
-
-        err = reply.readInt32();
-        if (err != OK) {
-            return err;
-        }
-
-        *bufferProducer = IGraphicBufferProducer::asInterface(
-                reply.readStrongBinder());
-        *bufferSource = IGraphicBufferSource::asInterface(
-                reply.readStrongBinder());
 
         return err;
     }
@@ -395,16 +143,252 @@ public:
 
         return err;
     }
+};
+
+class BpOMXNode : public BpInterface<IOMXNode> {
+public:
+    explicit BpOMXNode(const sp<IBinder> &impl)
+        : BpInterface<IOMXNode>(impl) {
+    }
+
+    virtual status_t freeNode() {
+        Parcel data, reply;
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
+        remote()->transact(FREE_NODE, data, &reply);
+
+        return reply.readInt32();
+    }
+
+    virtual status_t sendCommand(
+            OMX_COMMANDTYPE cmd, OMX_S32 param) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
+        data.writeInt32(cmd);
+        data.writeInt32(param);
+        remote()->transact(SEND_COMMAND, data, &reply);
+
+        return reply.readInt32();
+    }
+
+    virtual status_t getParameter(
+            OMX_INDEXTYPE index,
+            void *params, size_t size) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
+        data.writeInt32(index);
+        data.writeInt64(size);
+        data.write(params, size);
+        remote()->transact(GET_PARAMETER, data, &reply);
+
+        status_t err = reply.readInt32();
+        if (err != OK) {
+            return err;
+        }
+
+        reply.read(params, size);
+
+        return OK;
+    }
+
+    virtual status_t setParameter(
+            OMX_INDEXTYPE index,
+            const void *params, size_t size) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
+        data.writeInt32(index);
+        data.writeInt64(size);
+        data.write(params, size);
+        remote()->transact(SET_PARAMETER, data, &reply);
+
+        return reply.readInt32();
+    }
+
+    virtual status_t getConfig(
+            OMX_INDEXTYPE index,
+            void *params, size_t size) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
+        data.writeInt32(index);
+        data.writeInt64(size);
+        data.write(params, size);
+        remote()->transact(GET_CONFIG, data, &reply);
+
+        status_t err = reply.readInt32();
+        if (err != OK) {
+            return err;
+        }
+
+        reply.read(params, size);
+
+        return OK;
+    }
+
+    virtual status_t setConfig(
+            OMX_INDEXTYPE index,
+            const void *params, size_t size) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
+        data.writeInt32(index);
+        data.writeInt64(size);
+        data.write(params, size);
+        remote()->transact(SET_CONFIG, data, &reply);
+
+        return reply.readInt32();
+    }
+
+    virtual status_t getState(
+            OMX_STATETYPE* state) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
+        remote()->transact(GET_STATE, data, &reply);
+
+        *state = static_cast<OMX_STATETYPE>(reply.readInt32());
+        return reply.readInt32();
+    }
+
+    virtual status_t enableNativeBuffers(
+            OMX_U32 port_index, OMX_BOOL graphic, OMX_BOOL enable) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
+        data.writeInt32(port_index);
+        data.writeInt32((uint32_t)graphic);
+        data.writeInt32((uint32_t)enable);
+        remote()->transact(ENABLE_NATIVE_BUFFERS, data, &reply);
+
+        status_t err = reply.readInt32();
+        return err;
+    }
+
+    virtual status_t getGraphicBufferUsage(
+            OMX_U32 port_index, OMX_U32* usage) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
+        data.writeInt32(port_index);
+        remote()->transact(GET_GRAPHIC_BUFFER_USAGE, data, &reply);
+
+        status_t err = reply.readInt32();
+        *usage = reply.readInt32();
+        return err;
+    }
+
+    virtual status_t useBuffer(
+            OMX_U32 port_index, const sp<IMemory> &params,
+            buffer_id *buffer, OMX_U32 allottedSize) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
+        data.writeInt32(port_index);
+        data.writeStrongBinder(IInterface::asBinder(params));
+        data.writeInt32(allottedSize);
+        remote()->transact(USE_BUFFER, data, &reply);
+
+        status_t err = reply.readInt32();
+        if (err != OK) {
+            *buffer = 0;
+
+            return err;
+        }
+
+        *buffer = (buffer_id)reply.readInt32();
+
+        return err;
+    }
+
+
+    virtual status_t useGraphicBuffer(
+            OMX_U32 port_index,
+            const sp<GraphicBuffer> &graphicBuffer, buffer_id *buffer) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
+        data.writeInt32(port_index);
+        data.write(*graphicBuffer);
+        remote()->transact(USE_GRAPHIC_BUFFER, data, &reply);
+
+        status_t err = reply.readInt32();
+        if (err != OK) {
+            *buffer = 0;
+
+            return err;
+        }
+
+        *buffer = (buffer_id)reply.readInt32();
+
+        return err;
+    }
+
+    virtual status_t updateGraphicBufferInMeta(
+            OMX_U32 port_index,
+            const sp<GraphicBuffer> &graphicBuffer, buffer_id buffer) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
+        data.writeInt32(port_index);
+        data.write(*graphicBuffer);
+        data.writeInt32((int32_t)buffer);
+        remote()->transact(UPDATE_GRAPHIC_BUFFER_IN_META, data, &reply);
+
+        status_t err = reply.readInt32();
+        return err;
+    }
+
+    virtual status_t updateNativeHandleInMeta(
+            OMX_U32 port_index,
+            const sp<NativeHandle> &nativeHandle, buffer_id buffer) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
+        data.writeInt32(port_index);
+        data.writeInt32(nativeHandle != NULL);
+        if (nativeHandle != NULL) {
+            data.writeNativeHandle(nativeHandle->handle());
+        }
+        data.writeInt32((int32_t)buffer);
+        remote()->transact(UPDATE_NATIVE_HANDLE_IN_META, data, &reply);
+
+        status_t err = reply.readInt32();
+        return err;
+    }
+
+    virtual status_t createInputSurface(
+            OMX_U32 port_index, android_dataspace dataSpace,
+            sp<IGraphicBufferProducer> *bufferProducer,
+            sp<IGraphicBufferSource> *bufferSource,
+            MetadataBufferType *type) {
+        Parcel data, reply;
+        status_t err;
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
+        data.writeInt32(port_index);
+        data.writeInt32(dataSpace);
+        err = remote()->transact(CREATE_INPUT_SURFACE, data, &reply);
+        if (err != OK) {
+            ALOGW("binder transaction failed: %d", err);
+            return err;
+        }
+
+        // read type even if createInputSurface failed
+        int negotiatedType = reply.readInt32();
+        if (type != NULL) {
+            *type = (MetadataBufferType)negotiatedType;
+        }
+
+        err = reply.readInt32();
+        if (err != OK) {
+            return err;
+        }
+
+        *bufferProducer = IGraphicBufferProducer::asInterface(
+                reply.readStrongBinder());
+        *bufferSource = IGraphicBufferSource::asInterface(
+                reply.readStrongBinder());
+
+        return err;
+    }
 
     virtual status_t setInputSurface(
-            node_id node, OMX_U32 port_index,
+            OMX_U32 port_index,
             const sp<IGraphicBufferConsumer> &bufferConsumer,
             sp<IGraphicBufferSource> *bufferSource,
             MetadataBufferType *type) {
         Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
         status_t err;
-        data.writeInt32((int32_t)node);
         data.writeInt32(port_index);
         data.writeStrongBinder(IInterface::asBinder(bufferConsumer));
 
@@ -433,10 +417,9 @@ public:
     }
 
     virtual status_t storeMetaDataInBuffers(
-            node_id node, OMX_U32 port_index, OMX_BOOL enable, MetadataBufferType *type) {
+            OMX_U32 port_index, OMX_BOOL enable, MetadataBufferType *type) {
         Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
         data.writeInt32(port_index);
         data.writeInt32((int32_t)enable);
         data.writeInt32(type == NULL ? kMetadataBufferTypeANWBuffer : *type);
@@ -453,11 +436,10 @@ public:
     }
 
     virtual status_t prepareForAdaptivePlayback(
-            node_id node, OMX_U32 port_index, OMX_BOOL enable,
+            OMX_U32 port_index, OMX_BOOL enable,
             OMX_U32 max_width, OMX_U32 max_height) {
         Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
         data.writeInt32(port_index);
         data.writeInt32((int32_t)enable);
         data.writeInt32(max_width);
@@ -469,11 +451,10 @@ public:
     }
 
     virtual status_t configureVideoTunnelMode(
-            node_id node, OMX_U32 portIndex, OMX_BOOL tunneled,
+            OMX_U32 portIndex, OMX_BOOL tunneled,
             OMX_U32 audioHwSync, native_handle_t **sidebandHandle ) {
         Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
         data.writeInt32(portIndex);
         data.writeInt32((int32_t)tunneled);
         data.writeInt32(audioHwSync);
@@ -488,11 +469,10 @@ public:
 
 
     virtual status_t allocateSecureBuffer(
-            node_id node, OMX_U32 port_index, size_t size,
+            OMX_U32 port_index, size_t size,
             buffer_id *buffer, void **buffer_data, sp<NativeHandle> *native_handle) {
         Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
         data.writeInt32(port_index);
         data.writeInt64(size);
         remote()->transact(ALLOC_SECURE_BUFFER, data, &reply);
@@ -517,11 +497,10 @@ public:
     }
 
     virtual status_t allocateBufferWithBackup(
-            node_id node, OMX_U32 port_index, const sp<IMemory> &params,
+            OMX_U32 port_index, const sp<IMemory> &params,
             buffer_id *buffer, OMX_U32 allottedSize) {
         Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
         data.writeInt32(port_index);
         data.writeStrongBinder(IInterface::asBinder(params));
         data.writeInt32(allottedSize);
@@ -540,10 +519,9 @@ public:
     }
 
     virtual status_t freeBuffer(
-            node_id node, OMX_U32 port_index, buffer_id buffer) {
+            OMX_U32 port_index, buffer_id buffer) {
         Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
         data.writeInt32(port_index);
         data.writeInt32((int32_t)buffer);
         remote()->transact(FREE_BUFFER, data, &reply);
@@ -551,10 +529,9 @@ public:
         return reply.readInt32();
     }
 
-    virtual status_t fillBuffer(node_id node, buffer_id buffer, int fenceFd) {
+    virtual status_t fillBuffer(buffer_id buffer, int fenceFd) {
         Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
         data.writeInt32((int32_t)buffer);
         data.writeInt32(fenceFd >= 0);
         if (fenceFd >= 0) {
@@ -566,13 +543,11 @@ public:
     }
 
     virtual status_t emptyBuffer(
-            node_id node,
             buffer_id buffer,
             OMX_U32 range_offset, OMX_U32 range_length,
             OMX_U32 flags, OMX_TICKS timestamp, int fenceFd) {
         Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
         data.writeInt32((int32_t)buffer);
         data.writeInt32(range_offset);
         data.writeInt32(range_length);
@@ -588,13 +563,11 @@ public:
     }
 
     virtual status_t emptyGraphicBuffer(
-            node_id node,
             buffer_id buffer,
             const sp<GraphicBuffer> &graphicBuffer, OMX_U32 flags,
             OMX_TICKS timestamp, OMX_TICKS origTimestamp, int fenceFd) {
         Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
         data.writeInt32((int32_t)buffer);
         data.write(*graphicBuffer);
         data.writeInt32(flags);
@@ -610,12 +583,10 @@ public:
     }
 
     virtual status_t getExtensionIndex(
-            node_id node,
             const char *parameter_name,
             OMX_INDEXTYPE *index) {
         Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)node);
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
         data.writeCString(parameter_name);
 
         remote()->transact(GET_EXTENSION_INDEX, data, &reply);
@@ -632,8 +603,7 @@ public:
 
     virtual status_t dispatchMessage(const omx_message &msg) {
         Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeInt32((int32_t)msg.node);
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
         data.writeInt32(msg.fenceFd >= 0);
         if (msg.fenceFd >= 0) {
             data.writeFileDescriptor(msg.fenceFd, true /* takeOwnership */);
@@ -648,6 +618,7 @@ public:
 };
 
 IMPLEMENT_META_INTERFACE(OMX, "android.hardware.IOMX");
+IMPLEMENT_META_INTERFACE(OMXNode, "android.hardware.IOMXNode");
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -660,16 +631,6 @@ IMPLEMENT_META_INTERFACE(OMX, "android.hardware.IOMX");
 status_t BnOMX::onTransact(
     uint32_t code, const Parcel &data, Parcel *reply, uint32_t flags) {
     switch (code) {
-        case LIVES_LOCALLY:
-        {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
-            node_id node = (node_id)data.readInt32();
-            pid_t pid = (pid_t)data.readInt32();
-            reply->writeInt32(livesLocally(node, pid));
-
-            return OK;
-        }
-
         case LIST_NODES:
         {
             CHECK_OMX_INTERFACE(IOMX, data, reply);
@@ -708,40 +669,64 @@ status_t BnOMX::onTransact(
                 return NO_ERROR;
             }
 
-            node_id node;
+            sp<IOMXNode> omxNode;
 
-            status_t err = allocateNode(name, observer,
-                    NULL /* nodeBinder */, &node);
+            status_t err = allocateNode(
+                    name, observer, NULL /* nodeBinder */, &omxNode);
+
             reply->writeInt32(err);
             if (err == OK) {
-                reply->writeInt32((int32_t)node);
+                reply->writeStrongBinder(IInterface::asBinder(omxNode));
             }
 
             return NO_ERROR;
         }
 
-        case FREE_NODE:
+        case CREATE_PERSISTENT_INPUT_SURFACE:
         {
             CHECK_OMX_INTERFACE(IOMX, data, reply);
 
-            node_id node = (node_id)data.readInt32();
+            sp<IGraphicBufferProducer> bufferProducer;
+            sp<IGraphicBufferConsumer> bufferConsumer;
+            status_t err = createPersistentInputSurface(
+                    &bufferProducer, &bufferConsumer);
 
-            reply->writeInt32(freeNode(node));
+            reply->writeInt32(err);
+
+            if (err == OK) {
+                reply->writeStrongBinder(IInterface::asBinder(bufferProducer));
+                reply->writeStrongBinder(IInterface::asBinder(bufferConsumer));
+            }
+
+            return NO_ERROR;
+        }
+
+        default:
+            return BBinder::onTransact(code, data, reply, flags);
+    }
+}
+
+status_t BnOMXNode::onTransact(
+    uint32_t code, const Parcel &data, Parcel *reply, uint32_t flags) {
+    switch (code) {
+        case FREE_NODE:
+        {
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
+
+            reply->writeInt32(freeNode());
 
             return NO_ERROR;
         }
 
         case SEND_COMMAND:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
-
-            node_id node = (node_id)data.readInt32();
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
             OMX_COMMANDTYPE cmd =
                 static_cast<OMX_COMMANDTYPE>(data.readInt32());
 
             OMX_S32 param = data.readInt32();
-            reply->writeInt32(sendCommand(node, cmd, param));
+            reply->writeInt32(sendCommand(cmd, param));
 
             return NO_ERROR;
         }
@@ -751,9 +736,8 @@ status_t BnOMX::onTransact(
         case GET_CONFIG:
         case SET_CONFIG:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             OMX_INDEXTYPE index = static_cast<OMX_INDEXTYPE>(data.readInt32());
 
             size_t size = data.readInt64();
@@ -800,16 +784,16 @@ status_t BnOMX::onTransact(
                             } else {
                                 switch (code) {
                                     case GET_PARAMETER:
-                                        err = getParameter(node, index, params, size);
+                                        err = getParameter(index, params, size);
                                         break;
                                     case SET_PARAMETER:
-                                        err = setParameter(node, index, params, size);
+                                        err = setParameter(index, params, size);
                                         break;
                                     case GET_CONFIG:
-                                        err = getConfig(node, index, params, size);
+                                        err = getConfig(index, params, size);
                                         break;
                                     case SET_CONFIG:
-                                        err = setConfig(node, index, params, size);
+                                        err = setConfig(index, params, size);
                                         break;
                                     default:
                                         TRESPASS();
@@ -838,12 +822,11 @@ status_t BnOMX::onTransact(
 
         case GET_STATE:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             OMX_STATETYPE state = OMX_StateInvalid;
 
-            status_t err = getState(node, &state);
+            status_t err = getState(&state);
             reply->writeInt32(state);
             reply->writeInt32(err);
 
@@ -852,14 +835,13 @@ status_t BnOMX::onTransact(
 
         case ENABLE_NATIVE_BUFFERS:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             OMX_U32 port_index = data.readInt32();
             OMX_BOOL graphic = (OMX_BOOL)data.readInt32();
             OMX_BOOL enable = (OMX_BOOL)data.readInt32();
 
-            status_t err = enableNativeBuffers(node, port_index, graphic, enable);
+            status_t err = enableNativeBuffers(port_index, graphic, enable);
             reply->writeInt32(err);
 
             return NO_ERROR;
@@ -867,13 +849,12 @@ status_t BnOMX::onTransact(
 
         case GET_GRAPHIC_BUFFER_USAGE:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             OMX_U32 port_index = data.readInt32();
 
             OMX_U32 usage = 0;
-            status_t err = getGraphicBufferUsage(node, port_index, &usage);
+            status_t err = getGraphicBufferUsage(port_index, &usage);
             reply->writeInt32(err);
             reply->writeInt32(usage);
 
@@ -882,9 +863,8 @@ status_t BnOMX::onTransact(
 
         case USE_BUFFER:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             OMX_U32 port_index = data.readInt32();
             sp<IMemory> params =
                 interface_cast<IMemory>(data.readStrongBinder());
@@ -897,7 +877,7 @@ status_t BnOMX::onTransact(
             }
 
             buffer_id buffer;
-            status_t err = useBuffer(node, port_index, params, &buffer, allottedSize);
+            status_t err = useBuffer(port_index, params, &buffer, allottedSize);
             reply->writeInt32(err);
 
             if (err == OK) {
@@ -909,16 +889,15 @@ status_t BnOMX::onTransact(
 
         case USE_GRAPHIC_BUFFER:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             OMX_U32 port_index = data.readInt32();
             sp<GraphicBuffer> graphicBuffer = new GraphicBuffer();
             data.read(*graphicBuffer);
 
             buffer_id buffer;
             status_t err = useGraphicBuffer(
-                    node, port_index, graphicBuffer, &buffer);
+                    port_index, graphicBuffer, &buffer);
             reply->writeInt32(err);
 
             if (err == OK) {
@@ -930,16 +909,15 @@ status_t BnOMX::onTransact(
 
         case UPDATE_GRAPHIC_BUFFER_IN_META:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             OMX_U32 port_index = data.readInt32();
             sp<GraphicBuffer> graphicBuffer = new GraphicBuffer();
             data.read(*graphicBuffer);
             buffer_id buffer = (buffer_id)data.readInt32();
 
             status_t err = updateGraphicBufferInMeta(
-                    node, port_index, graphicBuffer, buffer);
+                    port_index, graphicBuffer, buffer);
             reply->writeInt32(err);
 
             return NO_ERROR;
@@ -947,9 +925,8 @@ status_t BnOMX::onTransact(
 
         case UPDATE_NATIVE_HANDLE_IN_META:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             OMX_U32 port_index = data.readInt32();
             native_handle *handle = NULL;
             if (data.readInt32()) {
@@ -958,7 +935,7 @@ status_t BnOMX::onTransact(
             buffer_id buffer = (buffer_id)data.readInt32();
 
             status_t err = updateNativeHandleInMeta(
-                    node, port_index, NativeHandle::create(handle, true /* ownshandle */), buffer);
+                    port_index, NativeHandle::create(handle, true /* ownshandle */), buffer);
             reply->writeInt32(err);
 
             return NO_ERROR;
@@ -966,9 +943,8 @@ status_t BnOMX::onTransact(
 
         case CREATE_INPUT_SURFACE:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             OMX_U32 port_index = data.readInt32();
             android_dataspace dataSpace = (android_dataspace)data.readInt32();
 
@@ -976,7 +952,7 @@ status_t BnOMX::onTransact(
             sp<IGraphicBufferSource> bufferSource;
             MetadataBufferType type = kMetadataBufferTypeInvalid;
             status_t err = createInputSurface(
-                    node, port_index, dataSpace, &bufferProducer, &bufferSource, &type);
+                    port_index, dataSpace, &bufferProducer, &bufferSource, &type);
 
             if ((err != OK) && (type == kMetadataBufferTypeInvalid)) {
                 android_errorWriteLog(0x534e4554, "26324358");
@@ -993,30 +969,10 @@ status_t BnOMX::onTransact(
             return NO_ERROR;
         }
 
-        case CREATE_PERSISTENT_INPUT_SURFACE:
-        {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
-
-            sp<IGraphicBufferProducer> bufferProducer;
-            sp<IGraphicBufferConsumer> bufferConsumer;
-            status_t err = createPersistentInputSurface(
-                    &bufferProducer, &bufferConsumer);
-
-            reply->writeInt32(err);
-
-            if (err == OK) {
-                reply->writeStrongBinder(IInterface::asBinder(bufferProducer));
-                reply->writeStrongBinder(IInterface::asBinder(bufferConsumer));
-            }
-
-            return NO_ERROR;
-        }
-
         case SET_INPUT_SURFACE:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             OMX_U32 port_index = data.readInt32();
 
             sp<IGraphicBufferConsumer> bufferConsumer =
@@ -1029,7 +985,7 @@ status_t BnOMX::onTransact(
             if (bufferConsumer == NULL) {
                 ALOGE("b/26392700");
             } else {
-                err = setInputSurface(node, port_index, bufferConsumer, &bufferSource, &type);
+                err = setInputSurface(port_index, bufferConsumer, &bufferSource, &type);
 
                 if ((err != OK) && (type == kMetadataBufferTypeInvalid)) {
                    android_errorWriteLog(0x534e4554, "26324358");
@@ -1046,14 +1002,13 @@ status_t BnOMX::onTransact(
 
         case STORE_META_DATA_IN_BUFFERS:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             OMX_U32 port_index = data.readInt32();
             OMX_BOOL enable = (OMX_BOOL)data.readInt32();
 
             MetadataBufferType type = (MetadataBufferType)data.readInt32();
-            status_t err = storeMetaDataInBuffers(node, port_index, enable, &type);
+            status_t err = storeMetaDataInBuffers(port_index, enable, &type);
 
             reply->writeInt32(type);
             reply->writeInt32(err);
@@ -1063,16 +1018,15 @@ status_t BnOMX::onTransact(
 
         case PREPARE_FOR_ADAPTIVE_PLAYBACK:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             OMX_U32 port_index = data.readInt32();
             OMX_BOOL enable = (OMX_BOOL)data.readInt32();
             OMX_U32 max_width = data.readInt32();
             OMX_U32 max_height = data.readInt32();
 
             status_t err = prepareForAdaptivePlayback(
-                    node, port_index, enable, max_width, max_height);
+                    port_index, enable, max_width, max_height);
             reply->writeInt32(err);
 
             return NO_ERROR;
@@ -1080,16 +1034,15 @@ status_t BnOMX::onTransact(
 
         case CONFIGURE_VIDEO_TUNNEL_MODE:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             OMX_U32 port_index = data.readInt32();
             OMX_BOOL tunneled = (OMX_BOOL)data.readInt32();
             OMX_U32 audio_hw_sync = data.readInt32();
 
             native_handle_t *sideband_handle = NULL;
             status_t err = configureVideoTunnelMode(
-                    node, port_index, tunneled, audio_hw_sync, &sideband_handle);
+                    port_index, tunneled, audio_hw_sync, &sideband_handle);
             reply->writeInt32(err);
             if(err == OK){
                 reply->writeNativeHandle(sideband_handle);
@@ -1100,11 +1053,10 @@ status_t BnOMX::onTransact(
 
         case ALLOC_SECURE_BUFFER:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             OMX_U32 port_index = data.readInt32();
-            if (!isSecure(node) || port_index != 0 /* kPortIndexInput */) {
+            if (!isSecure() || port_index != 0 /* kPortIndexInput */) {
                 ALOGE("b/24310423");
                 reply->writeInt32(INVALID_OPERATION);
                 return NO_ERROR;
@@ -1116,7 +1068,7 @@ status_t BnOMX::onTransact(
             void *buffer_data = NULL;
             sp<NativeHandle> native_handle;
             status_t err = allocateSecureBuffer(
-                    node, port_index, size, &buffer, &buffer_data, &native_handle);
+                    port_index, size, &buffer, &buffer_data, &native_handle);
             reply->writeInt32(err);
 
             if (err == OK) {
@@ -1132,9 +1084,8 @@ status_t BnOMX::onTransact(
 
         case ALLOC_BUFFER_WITH_BACKUP:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             OMX_U32 port_index = data.readInt32();
             sp<IMemory> params =
                 interface_cast<IMemory>(data.readStrongBinder());
@@ -1148,7 +1099,7 @@ status_t BnOMX::onTransact(
 
             buffer_id buffer;
             status_t err = allocateBufferWithBackup(
-                    node, port_index, params, &buffer, allottedSize);
+                    port_index, params, &buffer, allottedSize);
 
             reply->writeInt32(err);
 
@@ -1161,34 +1112,31 @@ status_t BnOMX::onTransact(
 
         case FREE_BUFFER:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             OMX_U32 port_index = data.readInt32();
             buffer_id buffer = (buffer_id)data.readInt32();
-            reply->writeInt32(freeBuffer(node, port_index, buffer));
+            reply->writeInt32(freeBuffer(port_index, buffer));
 
             return NO_ERROR;
         }
 
         case FILL_BUFFER:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             buffer_id buffer = (buffer_id)data.readInt32();
             bool haveFence = data.readInt32();
             int fenceFd = haveFence ? ::dup(data.readFileDescriptor()) : -1;
-            reply->writeInt32(fillBuffer(node, buffer, fenceFd));
+            reply->writeInt32(fillBuffer(buffer, fenceFd));
 
             return NO_ERROR;
         }
 
         case EMPTY_BUFFER:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             buffer_id buffer = (buffer_id)data.readInt32();
             OMX_U32 range_offset = data.readInt32();
             OMX_U32 range_length = data.readInt32();
@@ -1197,16 +1145,15 @@ status_t BnOMX::onTransact(
             bool haveFence = data.readInt32();
             int fenceFd = haveFence ? ::dup(data.readFileDescriptor()) : -1;
             reply->writeInt32(emptyBuffer(
-                    node, buffer, range_offset, range_length, flags, timestamp, fenceFd));
+                    buffer, range_offset, range_length, flags, timestamp, fenceFd));
 
             return NO_ERROR;
         }
 
         case EMPTY_GRAPHIC_BUFFER:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             buffer_id buffer = (buffer_id)data.readInt32();
             sp<GraphicBuffer> graphicBuffer = new GraphicBuffer();
             data.read(*graphicBuffer);
@@ -1216,7 +1163,7 @@ status_t BnOMX::onTransact(
             bool haveFence = data.readInt32();
             int fenceFd = haveFence ? ::dup(data.readFileDescriptor()) : -1;
             reply->writeInt32(emptyGraphicBuffer(
-                    node, buffer, graphicBuffer, flags,
+                    buffer, graphicBuffer, flags,
                     timestamp, origTimestamp, fenceFd));
 
             return NO_ERROR;
@@ -1224,9 +1171,8 @@ status_t BnOMX::onTransact(
 
         case GET_EXTENSION_INDEX:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            node_id node = (node_id)data.readInt32();
             const char *parameter_name = data.readCString();
 
             if (parameter_name == NULL) {
@@ -1236,7 +1182,7 @@ status_t BnOMX::onTransact(
             }
 
             OMX_INDEXTYPE index;
-            status_t err = getExtensionIndex(node, parameter_name, &index);
+            status_t err = getExtensionIndex(parameter_name, &index);
 
             reply->writeInt32(err);
 
@@ -1249,9 +1195,8 @@ status_t BnOMX::onTransact(
 
         case DISPATCH_MESSAGE:
         {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
             omx_message msg;
-            msg.node = data.readInt32();
             int haveFence = data.readInt32();
             msg.fenceFd = haveFence ? ::dup(data.readFileDescriptor()) : -1;
             msg.type = (typeof(msg.type))data.readInt32();
@@ -1281,14 +1226,12 @@ public:
     virtual void onMessages(const std::list<omx_message> &messages) {
         Parcel data, reply;
         std::list<omx_message>::const_iterator it = messages.cbegin();
-        bool first = true;
+        if (messages.empty()) {
+            return;
+        }
+        data.writeInterfaceToken(IOMXObserver::getInterfaceDescriptor());
         while (it != messages.cend()) {
             const omx_message &msg = *it++;
-            if (first) {
-                data.writeInterfaceToken(IOMXObserver::getInterfaceDescriptor());
-                data.writeInt32(msg.node);
-                first = false;
-            }
             data.writeInt32(msg.fenceFd >= 0);
             if (msg.fenceFd >= 0) {
                 data.writeFileDescriptor(msg.fenceFd, true /* takeOwnership */);
@@ -1297,10 +1240,8 @@ public:
             data.write(&msg.u, sizeof(msg.u));
             ALOGV("onMessage writing message %d, size %zu", msg.type, sizeof(msg));
         }
-        if (!first) {
-            data.writeInt32(-1); // mark end
-            remote()->transact(OBSERVER_ON_MSG, data, &reply, IBinder::FLAG_ONEWAY);
-        }
+        data.writeInt32(-1); // mark end
+        remote()->transact(OBSERVER_ON_MSG, data, &reply, IBinder::FLAG_ONEWAY);
     }
 };
 
@@ -1312,7 +1253,6 @@ status_t BnOMXObserver::onTransact(
         case OBSERVER_ON_MSG:
         {
             CHECK_OMX_INTERFACE(IOMXObserver, data, reply);
-            IOMX::node_id node = data.readInt32();
             std::list<omx_message> messages;
             status_t err = FAILED_TRANSACTION; // must receive at least one message
             do {
@@ -1321,7 +1261,6 @@ status_t BnOMXObserver::onTransact(
                     break;
                 }
                 omx_message msg;
-                msg.node = node;
                 msg.fenceFd = haveFence ? ::dup(data.readFileDescriptor()) : -1;
                 msg.type = (typeof(msg.type))data.readInt32();
                 err = data.read(&msg.u, sizeof(msg.u));

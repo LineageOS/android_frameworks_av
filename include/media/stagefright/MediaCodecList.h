@@ -115,7 +115,6 @@ private:
 
     Vector<sp<MediaCodecInfo> > mCodecInfos;
     sp<MediaCodecInfo> mCurrentInfo;
-    sp<IOMX> mOMX;
 
     MediaCodecList();
     ~MediaCodecList();

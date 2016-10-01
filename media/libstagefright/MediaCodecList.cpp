@@ -196,9 +196,7 @@ void MediaCodecList::parseTopLevelXMLFile(const char *codecs_xml, bool ignore_er
     if (mInitCheck != OK) {
         return;  // this may fail if IMediaPlayerService is not available.
     }
-    mOMX = client.interface();
     parseXMLFile(codecs_xml);
-    mOMX.clear();
 
     if (mInitCheck != OK) {
         if (ignore_errors) {

@@ -59,8 +59,7 @@ class GraphicBufferSource : public BnGraphicBufferSource,
                             public BufferQueue::ConsumerListener {
 public:
     GraphicBufferSource(
-            const sp<IOMX> &omx,
-            IOMX::node_id nodeID,
+            const sp<IOMXNode> &omxNode,
             uint32_t bufferWidth,
             uint32_t bufferHeight,
             uint32_t bufferCount,
@@ -261,9 +260,8 @@ private:
     // Used to report constructor failure.
     status_t mInitCheck;
 
-    // Pointer back to the IOMX that created us.  We send buffers here.
-    sp<IOMX> mOMX;
-    IOMX::node_id mNodeID;
+    // Pointer back to the IOMXNode that created us.  We send buffers here.
+    sp<IOMXNode> mOMXNode;
 
     // Set by omxExecuting() / omxIdling().
     bool mExecuting;

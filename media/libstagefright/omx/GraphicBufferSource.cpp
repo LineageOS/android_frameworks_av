@@ -105,16 +105,14 @@ void GraphicBufferSource::PersistentProxyListener::onSidebandStreamChanged() {
 }
 
 GraphicBufferSource::GraphicBufferSource(
-        const sp<IOMX> &omx,
-        IOMX::node_id nodeID,
+        const sp<IOMXNode> &omxNode,
         uint32_t bufferWidth,
         uint32_t bufferHeight,
         uint32_t bufferCount,
         uint32_t consumerUsage,
         const sp<IGraphicBufferConsumer> &consumer) :
     mInitCheck(UNKNOWN_ERROR),
-    mOMX(omx),
-    mNodeID(nodeID),
+    mOMXNode(omxNode),
     mExecuting(false),
     mSuspended(false),
     mLastDataSpace(HAL_DATASPACE_UNKNOWN),
@@ -427,14 +425,13 @@ void GraphicBufferSource::onDataSpaceChanged_l(
     if (ColorUtils::convertDataSpaceToV0(dataSpace)) {
         omx_message msg;
         msg.type = omx_message::EVENT;
-        msg.node = mNodeID;
         msg.fenceFd = -1;
         msg.u.event_data.event = OMX_EventDataSpaceChanged;
         msg.u.event_data.data1 = mLastDataSpace;
         msg.u.event_data.data2 = ColorUtils::packToU32(mColorAspects);
         msg.u.event_data.data3 = pixelFormat;
 
-        mOMX->dispatchMessage(msg);
+        mOMXNode->dispatchMessage(msg);
     }
 }
 
@@ -702,8 +699,8 @@ status_t GraphicBufferSource::submitBuffer_l(const BufferItem &item, int cbi) {
     const sp<GraphicBuffer> &buffer = codecBuffer.mGraphicBuffer;
     int fenceID = item.mFence->isValid() ? item.mFence->dup() : -1;
 
-    status_t err = mOMX->emptyGraphicBuffer(
-            mNodeID, bufferID, buffer, OMX_BUFFERFLAG_ENDOFFRAME,
+    status_t err = mOMXNode->emptyGraphicBuffer(
+            bufferID, buffer, OMX_BUFFERFLAG_ENDOFFRAME,
             codecTimeUs, origTimeUs, fenceID);
 
     if (err != OK) {
@@ -736,8 +733,8 @@ void GraphicBufferSource::submitEndOfInputStream_l() {
     CodecBuffer& codecBuffer(mCodecBuffers.editItemAt(cbi));
     IOMX::buffer_id bufferID = codecBuffer.mBufferID;
 
-    status_t err = mOMX->emptyGraphicBuffer(
-            mNodeID, bufferID, NULL /* buffer */,
+    status_t err = mOMXNode->emptyGraphicBuffer(
+            bufferID, NULL /* buffer */,
             OMX_BUFFERFLAG_ENDOFFRAME | OMX_BUFFERFLAG_EOS,
             0 /* timestamp */, -1ll /* origTimestamp */, -1 /* fenceFd */);
     if (err != OK) {
