@@ -31,6 +31,11 @@ void limitProcessMemory(
     size_t numberOfBytes,
     size_t percentageOfTotalMem) {
 
+    if (running_with_asan()) {
+        ALOGW("Running with ASan, skip enforcing memory limitations.");
+        return;
+    }
+
     long pageSize = sysconf(_SC_PAGESIZE);
     long numPages = sysconf(_SC_PHYS_PAGES);
     size_t maxMem = SIZE_MAX;
