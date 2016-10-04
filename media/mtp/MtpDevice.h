@@ -71,6 +71,9 @@ private:
     Mutex                   mEventMutex;
     Mutex                   mEventMutexForInterrupt;
 
+    // Remember the device's packet division mode.
+    UrbPacketDivisionMode   mPacketDivisionMode;
+
 public:
     typedef bool (*ReadObjectCallback)
             (void* data, uint32_t offset, uint32_t length, void* clientData);
