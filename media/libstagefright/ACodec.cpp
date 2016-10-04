@@ -510,7 +510,6 @@ void ACodec::BufferInfo::checkReadFence(const char *dbg) {
 
 ACodec::ACodec()
     : mSampleRate(0),
-      mQuirks(0),
       mNodeGeneration(0),
       mUsingNativeWindow(false),
       mNativeWindowUsageBits(0),
@@ -881,11 +880,6 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
                 info.mRenderInfo = NULL;
                 info.mNativeHandle = NULL;
 
-                uint32_t requiresAllocateBufferBit =
-                    (portIndex == kPortIndexInput)
-                        ? kRequiresAllocateBufferOnInputPorts
-                        : kRequiresAllocateBufferOnOutputPorts;
-
                 if (portIndex == kPortIndexInput && (mFlags & kFlagIsSecure)) {
                     mem.clear();
 
@@ -909,11 +903,9 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
                             new ABuffer(ptr != NULL ? ptr : (void *)native_handle_ptr, bufSize));
                     info.mNativeHandle = native_handle;
                     info.mCodecData = info.mData;
-                } else if (mQuirks & requiresAllocateBufferBit) {
-                    err = mOMXNode->allocateBufferWithBackup(
-                            portIndex, mem, &info.mBufferID, allottedSize);
                 } else {
-                    err = mOMXNode->useBuffer(portIndex, mem, &info.mBufferID, allottedSize);
+                    err = mOMXNode->useBuffer(
+                            portIndex, mem, &info.mBufferID, allottedSize);
                 }
 
                 if (mem != NULL) {
@@ -6233,7 +6225,6 @@ void ACodec::UninitializedState::stateEntered() {
     mCodec->mNativeWindowUsageBits = 0;
     mCodec->mOMX.clear();
     mCodec->mOMXNode.clear();
-    mCodec->mQuirks = 0;
     mCodec->mFlags = 0;
     mCodec->mInputMetadataType = kMetadataBufferTypeInvalid;
     mCodec->mOutputMetadataType = kMetadataBufferTypeInvalid;
@@ -6407,7 +6398,7 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
         mCodec->mFlags |= kFlagPushBlankBuffersToNativeWindowOnShutdown;
     }
 
-    mCodec->mQuirks = quirks;
+    omxNode->setQuirks(quirks);
     mCodec->mOMX = omx;
     mCodec->mOMXNode = omxNode;
 

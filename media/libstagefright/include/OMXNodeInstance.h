@@ -101,10 +101,6 @@ struct OMXNodeInstance : public BnOMXNode {
             OMX_U32 portIndex, size_t size, OMX::buffer_id *buffer,
             void **buffer_data, sp<NativeHandle> *native_handle);
 
-    status_t allocateBufferWithBackup(
-            OMX_U32 portIndex, const sp<IMemory> &params,
-            OMX::buffer_id *buffer, OMX_U32 allottedSize);
-
     status_t freeBuffer(OMX_U32 portIndex, OMX::buffer_id buffer);
 
     status_t fillBuffer(OMX::buffer_id buffer, int fenceFd);
@@ -121,6 +117,8 @@ struct OMXNodeInstance : public BnOMXNode {
 
     status_t getExtensionIndex(
             const char *parameterName, OMX_INDEXTYPE *index);
+
+    status_t setQuirks(OMX_U32 quirks);
 
     bool isSecure() const {
         return mIsSecure;
@@ -150,6 +148,7 @@ private:
     bool mQueriedProhibitedExtensions;
     SortedVector<OMX_INDEXTYPE> mProhibitedExtensions;
     bool mIsSecure;
+    uint32_t mQuirks;
 
     // Lock only covers mOMXBufferSource and mOMXOutputListener.  We can't always
     // use mLock because of rare instances where we'd end up locking it recursively.
@@ -251,7 +250,7 @@ private:
     // buffer.)
     status_t updateGraphicBufferInMeta_l(
             OMX_U32 portIndex, const sp<GraphicBuffer> &graphicBuffer,
-            OMX::buffer_id buffer, OMX_BUFFERHEADERTYPE *header, bool updateCodecBuffer);
+            OMX::buffer_id buffer, OMX_BUFFERHEADERTYPE *header);
 
     status_t createGraphicBufferSource(
             OMX_U32 portIndex, android_dataspace dataSpace,

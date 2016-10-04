@@ -242,7 +242,6 @@ private:
 
     AString mComponentName;
     uint32_t mFlags;
-    uint32_t mQuirks;
     sp<IOMX> mOMX;
     sp<IOMXNode> mOMXNode;
     int32_t mNodeGeneration;

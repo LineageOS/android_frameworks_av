@@ -46,6 +46,15 @@
 static const OMX_U32 kPortIndexInput = 0;
 static const OMX_U32 kPortIndexOutput = 1;
 
+// Quirk still supported, even though deprecated
+enum Quirks {
+    kRequiresAllocateBufferOnInputPorts   = 1,
+    kRequiresAllocateBufferOnOutputPorts  = 2,
+
+    kQuirksMask = kRequiresAllocateBufferOnInputPorts
+                | kRequiresAllocateBufferOnOutputPorts,
+};
+
 #define CLOGW(fmt, ...) ALOGW("[%p:%s] " fmt, mHandle, mName, ##__VA_ARGS__)
 
 #define CLOG_ERROR_IF(cond, fn, err, fmt, ...) \
@@ -98,18 +107,16 @@ namespace android {
 
 struct BufferMeta {
     explicit BufferMeta(
-            const sp<IMemory> &mem, OMX_U32 portIndex, bool copyToOmx,
-            bool copyFromOmx, OMX_U8 *backup)
+            const sp<IMemory> &mem, OMX_U32 portIndex, bool copy, OMX_U8 *backup)
         : mMem(mem),
-          mCopyFromOmx(copyFromOmx),
-          mCopyToOmx(copyToOmx),
+          mCopyFromOmx(portIndex == kPortIndexOutput && copy),
+          mCopyToOmx(portIndex == kPortIndexInput && copy),
           mPortIndex(portIndex),
           mBackup(backup) {
     }
 
-    explicit BufferMeta(size_t size, OMX_U32 portIndex)
-        : mSize(size),
-          mCopyFromOmx(false),
+    explicit BufferMeta(OMX_U32 portIndex)
+        : mCopyFromOmx(false),
           mCopyToOmx(false),
           mPortIndex(portIndex),
           mBackup(NULL) {
@@ -129,7 +136,7 @@ struct BufferMeta {
         }
 
         // check component returns proper range
-        sp<ABuffer> codec = getBuffer(header, false /* backup */, true /* limit */);
+        sp<ABuffer> codec = getBuffer(header, true /* limit */);
 
         memcpy((OMX_U8 *)mMem->pointer() + header->nOffset, codec->data(), codec->size());
     }
@@ -144,14 +151,9 @@ struct BufferMeta {
                 header->nFilledLen);
     }
 
-    // return either the codec or the backup buffer
-    sp<ABuffer> getBuffer(const OMX_BUFFERHEADERTYPE *header, bool backup, bool limit) {
-        sp<ABuffer> buf;
-        if (backup && mMem != NULL) {
-            buf = new ABuffer(mMem->pointer(), mMem->size());
-        } else {
-            buf = new ABuffer(header->pBuffer, header->nAllocLen);
-        }
+    // return the codec buffer
+    sp<ABuffer> getBuffer(const OMX_BUFFERHEADERTYPE *header, bool limit) {
+        sp<ABuffer> buf = new ABuffer(header->pBuffer, header->nAllocLen);
         if (limit) {
             if (header->nOffset + header->nFilledLen > header->nOffset
                     && header->nOffset + header->nFilledLen <= header->nAllocLen) {
@@ -183,7 +185,6 @@ private:
     sp<GraphicBuffer> mGraphicBuffer;
     sp<NativeHandle> mNativeHandle;
     sp<IMemory> mMem;
-    size_t mSize;
     bool mCopyFromOmx;
     bool mCopyToOmx;
     OMX_U32 mPortIndex;
@@ -339,6 +340,7 @@ OMXNodeInstance::OMXNodeInstance(
       mDying(false),
       mSailed(false),
       mQueriedProhibitedExtensions(false),
+      mQuirks(0),
       mBufferIDCount(0),
       mShouldRestorePts(false),
       mRestorePtsFailed(false)
@@ -907,43 +909,64 @@ status_t OMXNodeInstance::useBuffer(
         return BAD_VALUE;
     }
 
-    // metadata buffers are not connected cross process
-    // use a backup buffer instead of the actual buffer
     BufferMeta *buffer_meta;
-    bool useBackup = mMetadataType[portIndex] != kMetadataBufferTypeInvalid;
-    OMX_U8 *data = static_cast<OMX_U8 *>(params->pointer());
-    // allocate backup buffer
-    if (useBackup) {
-        data = new (std::nothrow) OMX_U8[allottedSize];
-        if (data == NULL) {
-            return NO_MEMORY;
-        }
-        memset(data, 0, allottedSize);
+    OMX_BUFFERHEADERTYPE *header;
+    OMX_ERRORTYPE err = OMX_ErrorNone;
+    bool isMetadata = mMetadataType[portIndex] != kMetadataBufferTypeInvalid;
 
-        // if we are not connecting the buffers, the sizes must match
-        if (allottedSize != params->size()) {
-            CLOG_ERROR(useBuffer, BAD_VALUE, SIMPLE_BUFFER(portIndex, (size_t)allottedSize, data));
-            delete[] data;
-            return BAD_VALUE;
-        }
+    uint32_t requiresAllocateBufferBit =
+        (portIndex == kPortIndexInput)
+            ? kRequiresAllocateBufferOnInputPorts
+            : kRequiresAllocateBufferOnOutputPorts;
 
+    if (mQuirks & requiresAllocateBufferBit) {
+        // metadata buffers are not connected cross process; only copy if not meta.
         buffer_meta = new BufferMeta(
-                params, portIndex, false /* copyToOmx */, false /* copyFromOmx */, data);
+                    params, portIndex, !isMetadata /* copy */, NULL /* data */);
+
+        err = OMX_AllocateBuffer(
+                mHandle, &header, portIndex, buffer_meta, allottedSize);
+
+        if (err != OMX_ErrorNone) {
+            CLOG_ERROR(allocateBuffer, err,
+                    SIMPLE_BUFFER(portIndex, (size_t)allottedSize, params->pointer()));
+        }
     } else {
-        buffer_meta = new BufferMeta(
-                params, portIndex, false /* copyToOmx */, false /* copyFromOmx */, NULL);
+        OMX_U8 *data = static_cast<OMX_U8 *>(params->pointer());
+
+        // metadata buffers are not connected cross process
+        // use a backup buffer instead of the actual buffer
+        if (isMetadata) {
+            // if we are not connecting the buffers, the sizes must match
+            if (allottedSize != params->size()) {
+                CLOG_ERROR(useBuffer, BAD_VALUE, SIMPLE_BUFFER(portIndex, (size_t)allottedSize, data));
+                return BAD_VALUE;
+            }
+
+            data = new (std::nothrow) OMX_U8[allottedSize];
+            if (data == NULL) {
+                return NO_MEMORY;
+            }
+            memset(data, 0, allottedSize);
+
+            buffer_meta = new BufferMeta(
+                    params, portIndex, false /* copy */, data);
+        } else {
+            buffer_meta = new BufferMeta(
+                    params, portIndex, false /* copy */, NULL);
+        }
+
+        err = OMX_UseBuffer(
+                mHandle, &header, portIndex, buffer_meta,
+                allottedSize, data);
+
+        if (err != OMX_ErrorNone) {
+            CLOG_ERROR(useBuffer, err, SIMPLE_BUFFER(
+                    portIndex, (size_t)allottedSize, data));
+        }
     }
 
-    OMX_BUFFERHEADERTYPE *header;
-
-    OMX_ERRORTYPE err = OMX_UseBuffer(
-            mHandle, &header, portIndex, buffer_meta,
-            allottedSize, data);
-
     if (err != OMX_ErrorNone) {
-        CLOG_ERROR(useBuffer, err, SIMPLE_BUFFER(
-                portIndex, (size_t)allottedSize, data));
-
         delete buffer_meta;
         buffer_meta = NULL;
 
@@ -1090,7 +1113,7 @@ status_t OMXNodeInstance::useGraphicBuffer(
 
 status_t OMXNodeInstance::updateGraphicBufferInMeta_l(
         OMX_U32 portIndex, const sp<GraphicBuffer>& graphicBuffer,
-        OMX::buffer_id buffer, OMX_BUFFERHEADERTYPE *header, bool updateCodecBuffer) {
+        OMX::buffer_id buffer, OMX_BUFFERHEADERTYPE *header) {
     // No need to check |graphicBuffer| since NULL is valid for it as below.
     if (header == NULL) {
         ALOGE("b/25884056");
@@ -1102,14 +1125,9 @@ status_t OMXNodeInstance::updateGraphicBufferInMeta_l(
     }
 
     BufferMeta *bufferMeta = (BufferMeta *)(header->pAppPrivate);
-    sp<ABuffer> data = bufferMeta->getBuffer(
-            header, !updateCodecBuffer /* backup */, false /* limit */);
+    sp<ABuffer> data = bufferMeta->getBuffer(header, false /* limit */);
     bufferMeta->setGraphicBuffer(graphicBuffer);
     MetadataBufferType metaType = mMetadataType[portIndex];
-    // we use gralloc source only in the codec buffers
-    if (metaType == kMetadataBufferTypeGrallocSource && !updateCodecBuffer) {
-        metaType = kMetadataBufferTypeANWBuffer;
-    }
     if (metaType == kMetadataBufferTypeGrallocSource
             && data->capacity() >= sizeof(VideoGrallocMetadata)) {
         VideoGrallocMetadata &metadata = *(VideoGrallocMetadata *)(data->data());
@@ -1138,10 +1156,9 @@ status_t OMXNodeInstance::updateGraphicBufferInMeta(
         OMX::buffer_id buffer) {
     Mutex::Autolock autoLock(mLock);
     OMX_BUFFERHEADERTYPE *header = findBufferHeader(buffer, portIndex);
-    // update backup buffer for input, codec buffer for output
+
     return updateGraphicBufferInMeta_l(
-            portIndex, graphicBuffer, buffer, header,
-            true /* updateCodecBuffer */);
+            portIndex, graphicBuffer, buffer, header);
 }
 
 status_t OMXNodeInstance::updateNativeHandleInMeta(
@@ -1159,9 +1176,7 @@ status_t OMXNodeInstance::updateNativeHandleInMeta(
     }
 
     BufferMeta *bufferMeta = (BufferMeta *)(header->pAppPrivate);
-    // update backup buffer
-    sp<ABuffer> data = bufferMeta->getBuffer(
-            header, false /* backup */, false /* limit */);
+    sp<ABuffer> data = bufferMeta->getBuffer(header, false /* limit */);
     bufferMeta->setNativeHandle(nativeHandle);
     if (mMetadataType[portIndex] == kMetadataBufferTypeNativeHandleSource
             && data->capacity() >= sizeof(VideoNativeHandleMetadata)) {
@@ -1342,7 +1357,7 @@ status_t OMXNodeInstance::allocateSecureBuffer(
 
     Mutex::Autolock autoLock(mLock);
 
-    BufferMeta *buffer_meta = new BufferMeta(size, portIndex);
+    BufferMeta *buffer_meta = new BufferMeta(portIndex);
 
     OMX_BUFFERHEADERTYPE *header;
 
@@ -1380,60 +1395,6 @@ status_t OMXNodeInstance::allocateSecureBuffer(
     CLOG_BUFFER(allocateSecureBuffer, NEW_BUFFER_FMT(
             *buffer, portIndex, "%zu@%p:%p", size, *buffer_data,
             *native_handle == NULL ? NULL : (*native_handle)->handle()));
-
-    return OK;
-}
-
-status_t OMXNodeInstance::allocateBufferWithBackup(
-        OMX_U32 portIndex, const sp<IMemory> &params,
-        OMX::buffer_id *buffer, OMX_U32 allottedSize) {
-    if (params == NULL || buffer == NULL) {
-        ALOGE("b/25884056");
-        return BAD_VALUE;
-    }
-
-    Mutex::Autolock autoLock(mLock);
-    if (allottedSize > params->size() || portIndex >= NELEM(mNumPortBuffers)) {
-        return BAD_VALUE;
-    }
-
-    // metadata buffers are not connected cross process; only copy if not meta
-    bool copy = mMetadataType[portIndex] == kMetadataBufferTypeInvalid;
-
-    BufferMeta *buffer_meta = new BufferMeta(
-            params, portIndex,
-            (portIndex == kPortIndexInput) && copy /* copyToOmx */,
-            (portIndex == kPortIndexOutput) && copy /* copyFromOmx */,
-            NULL /* data */);
-
-    OMX_BUFFERHEADERTYPE *header;
-
-    OMX_ERRORTYPE err = OMX_AllocateBuffer(
-            mHandle, &header, portIndex, buffer_meta, allottedSize);
-    if (err != OMX_ErrorNone) {
-        CLOG_ERROR(allocateBufferWithBackup, err,
-                SIMPLE_BUFFER(portIndex, (size_t)allottedSize, params->pointer()));
-        delete buffer_meta;
-        buffer_meta = NULL;
-
-        *buffer = 0;
-
-        return StatusFromOMXError(err);
-    }
-
-    CHECK_EQ(header->pAppPrivate, buffer_meta);
-
-    *buffer = makeBufferID(header);
-
-    addActiveBuffer(portIndex, *buffer);
-
-    sp<IOMXBufferSource> bufferSource(getBufferSource());
-    if (bufferSource != NULL && portIndex == kPortIndexInput) {
-        bufferSource->onInputBufferAdded(*buffer);
-    }
-
-    CLOG_BUFFER(allocateBufferWithBackup, NEW_BUFFER_FMT(*buffer, portIndex, "%zu@%p :> %u@%p",
-            params->size(), params->pointer(), allottedSize, header->pBuffer));
 
     return OK;
 }
@@ -1661,8 +1622,7 @@ status_t OMXNodeInstance::emptyGraphicBuffer(
     }
 
     status_t err = updateGraphicBufferInMeta_l(
-            kPortIndexInput, graphicBuffer, buffer, header,
-            true /* updateCodecBuffer */);
+            kPortIndexInput, graphicBuffer, buffer, header);
     if (err != OK) {
         CLOG_ERROR(emptyGraphicBuffer, err, FULL_BUFFER(
                 (intptr_t)header->pBuffer, header, fenceFd));
@@ -1732,7 +1692,17 @@ status_t OMXNodeInstance::getExtensionIndex(
 
 status_t OMXNodeInstance::dispatchMessage(const omx_message &msg) {
     mDispatcher->post(msg, true /*realTime*/);
-    return OMX_ErrorNone;
+    return OK;
+}
+
+status_t OMXNodeInstance::setQuirks(OMX_U32 quirks) {
+    if (quirks & ~kQuirksMask) {
+        return BAD_VALUE;
+    }
+
+    mQuirks = quirks;
+
+    return OK;
 }
 
 bool OMXNodeInstance::handleMessage(omx_message &msg) {

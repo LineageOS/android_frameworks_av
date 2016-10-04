@@ -50,7 +50,6 @@ enum {
     STORE_META_DATA_IN_BUFFERS,
     PREPARE_FOR_ADAPTIVE_PLAYBACK,
     ALLOC_SECURE_BUFFER,
-    ALLOC_BUFFER_WITH_BACKUP,
     FREE_BUFFER,
     FILL_BUFFER,
     EMPTY_BUFFER,
@@ -62,6 +61,7 @@ enum {
     CONFIGURE_VIDEO_TUNNEL_MODE,
     UPDATE_NATIVE_HANDLE_IN_META,
     DISPATCH_MESSAGE,
+    SET_QUIRKS,
 };
 
 class BpOMX : public BpInterface<IOMX> {
@@ -478,28 +478,6 @@ public:
         return err;
     }
 
-    virtual status_t allocateBufferWithBackup(
-            OMX_U32 port_index, const sp<IMemory> &params,
-            buffer_id *buffer, OMX_U32 allottedSize) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
-        data.writeInt32(port_index);
-        data.writeStrongBinder(IInterface::asBinder(params));
-        data.writeInt32(allottedSize);
-        remote()->transact(ALLOC_BUFFER_WITH_BACKUP, data, &reply);
-
-        status_t err = reply.readInt32();
-        if (err != OK) {
-            *buffer = 0;
-
-            return err;
-        }
-
-        *buffer = (buffer_id)reply.readInt32();
-
-        return err;
-    }
-
     virtual status_t freeBuffer(
             OMX_U32 port_index, buffer_id buffer) {
         Parcel data, reply;
@@ -594,6 +572,16 @@ public:
         data.write(&msg.u, sizeof(msg.u));
 
         remote()->transact(DISPATCH_MESSAGE, data, &reply);
+
+        return reply.readInt32();
+    }
+
+    virtual status_t setQuirks(OMX_U32 quirks) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
+        data.writeInt32(quirks);
+
+        remote()->transact(SET_QUIRKS, data, &reply);
 
         return reply.readInt32();
     }
@@ -1050,34 +1038,6 @@ status_t BnOMXNode::onTransact(
             return NO_ERROR;
         }
 
-        case ALLOC_BUFFER_WITH_BACKUP:
-        {
-            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
-
-            OMX_U32 port_index = data.readInt32();
-            sp<IMemory> params =
-                interface_cast<IMemory>(data.readStrongBinder());
-            OMX_U32 allottedSize = data.readInt32();
-
-            if (params == NULL) {
-                ALOGE("b/26392700");
-                reply->writeInt32(INVALID_OPERATION);
-                return NO_ERROR;
-            }
-
-            buffer_id buffer;
-            status_t err = allocateBufferWithBackup(
-                    port_index, params, &buffer, allottedSize);
-
-            reply->writeInt32(err);
-
-            if (err == OK) {
-                reply->writeInt32((int32_t)buffer);
-            }
-
-            return NO_ERROR;
-        }
-
         case FREE_BUFFER:
         {
             CHECK_OMX_INTERFACE(IOMXNode, data, reply);
@@ -1174,6 +1134,17 @@ status_t BnOMXNode::onTransact(
                 err = dispatchMessage(msg);
             }
             reply->writeInt32(err);
+
+            return NO_ERROR;
+        }
+
+        case SET_QUIRKS:
+        {
+            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
+
+            OMX_U32 quirks = data.readInt32();
+
+            reply->writeInt32(setQuirks(quirks));
 
             return NO_ERROR;
         }

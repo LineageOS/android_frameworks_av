@@ -150,12 +150,6 @@ public:
             OMX_U32 port_index, size_t size, buffer_id *buffer,
             void **buffer_data, sp<NativeHandle> *native_handle) = 0;
 
-    // Allocate an OMX buffer of size |allotedSize|. Use |params| as the backup buffer, which
-    // may be larger.
-    virtual status_t allocateBufferWithBackup(
-            OMX_U32 port_index, const sp<IMemory> &params,
-            buffer_id *buffer, OMX_U32 allottedSize) = 0;
-
     virtual status_t freeBuffer(
             OMX_U32 port_index, buffer_id buffer) = 0;
 
@@ -189,6 +183,9 @@ public:
             OMX_INDEXTYPE *index) = 0;
 
     virtual status_t dispatchMessage(const omx_message &msg) = 0;
+
+    // TODO: this is temporary, will be removed when quirks move to OMX side
+    virtual status_t setQuirks(OMX_U32 quirks) = 0;
 };
 
 struct omx_message {
