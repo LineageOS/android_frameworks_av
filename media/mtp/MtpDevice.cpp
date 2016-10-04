@@ -220,7 +220,9 @@ MtpDevice::MtpDevice(struct usb_device* device, int interface,
         mTransactionID(0),
         mReceivedResponse(false),
         mProcessingEvent(false),
-        mCurrentEventHandle(0)
+        mCurrentEventHandle(0),
+        mLastSendObjectInfoTransactionID(0),
+        mLastSendObjectInfoObjectHandle(0)
 {
     mRequestIn1 = usb_request_new(device, ep_in);
     mRequestIn2 = usb_request_new(device, ep_in);
@@ -490,6 +492,8 @@ MtpObjectHandle MtpDevice::sendObjectInfo(MtpObjectInfo* info) {
    if (sendRequest(MTP_OPERATION_SEND_OBJECT_INFO) && sendData()) {
         MtpResponseCode ret = readResponse();
         if (ret == MTP_RESPONSE_OK) {
+            mLastSendObjectInfoTransactionID = mRequest.getTransactionID();
+            mLastSendObjectInfoObjectHandle = mResponse.getParameter(3);
             info->mStorageID = mResponse.getParameter(1);
             info->mParent = mResponse.getParameter(2);
             info->mHandle = mResponse.getParameter(3);
@@ -502,9 +506,14 @@ MtpObjectHandle MtpDevice::sendObjectInfo(MtpObjectInfo* info) {
 bool MtpDevice::sendObject(MtpObjectHandle handle, int size, int srcFD) {
     Mutex::Autolock autoLock(mMutex);
 
+    if (mLastSendObjectInfoTransactionID + 1 != mTransactionID ||
+            mLastSendObjectInfoObjectHandle != handle) {
+        ALOGE("A sendObject request must follow the sendObjectInfo request.");
+        return false;
+    }
+
     int remaining = size;
     mRequest.reset();
-    mRequest.setParameter(1, handle);
     bool error = false;
     if (sendRequest(MTP_OPERATION_SEND_OBJECT)) {
         // send data header
