@@ -1,0 +1,65 @@
+From 914ae320cd76d3609334148a23f9eb74a00b5b01 Mon Sep 17 00:00:00 2001
+From: Steve Kondik <steve@cyngn.com>
+Date: Tue, 4 Oct 2016 04:55:30 -0700
+Subject: [PATCH] camera: Workaround for GCC-compiled HAL3 drivers
+
+ * When starting HAL3 using an older camera library (blob),
+   the internal structure is aligned differently when compiled
+   with GCC vs. LLVM. This could cause the "mLocked" field to
+   be overwritten unintentionally, resulting in all update()
+   calls from the HAL failing with "CameraMetadata is locked"
+   even though nothing actually locked it! This would cause
+   the service to kick out the HAL, and nobody gets a camera.
+ * Cheap fix is to add a padding byte between mBuffer and
+   mLocked, and we are back in business.
+
+Change-Id: I3306e14867007a90885aca13e238dee5b49d8da2
+Signed-off-by: Corey Edwards <ensabahnur16@gmail.com>
+---
+ camera/CameraMetadata.cpp       | 8 ++++----
+ include/camera/CameraMetadata.h | 1 +
+ 2 files changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/camera/CameraMetadata.cpp b/camera/CameraMetadata.cpp
+index 373b94e8c..b57cfa8db 100644
+--- a/camera/CameraMetadata.cpp
++++ b/camera/CameraMetadata.cpp
+@@ -33,22 +33,22 @@ typedef Parcel::WritableBlob WritableBlob;
+ typedef Parcel::ReadableBlob ReadableBlob;
+ 
+ CameraMetadata::CameraMetadata() :
+-        mBuffer(NULL), mLocked(false) {
++        mBuffer(NULL), mReserved(false), mLocked(false) {
+ }
+ 
+ CameraMetadata::CameraMetadata(size_t entryCapacity, size_t dataCapacity) :
+-        mLocked(false)
++        mReserved(false), mLocked(false)
+ {
+     mBuffer = allocate_camera_metadata(entryCapacity, dataCapacity);
+ }
+ 
+ CameraMetadata::CameraMetadata(const CameraMetadata &other) :
+-        mLocked(false) {
++        mReserved(false), mLocked(false) {
+     mBuffer = clone_camera_metadata(other.mBuffer);
+ }
+ 
+ CameraMetadata::CameraMetadata(camera_metadata_t *buffer) :
+-        mBuffer(NULL), mLocked(false) {
++        mBuffer(NULL), mReserved(false), mLocked(false) {
+     acquire(buffer);
+ }
+ 
+diff --git a/include/camera/CameraMetadata.h b/include/camera/CameraMetadata.h
+index d28447784..f85f6da20 100644
+--- a/include/camera/CameraMetadata.h
++++ b/include/camera/CameraMetadata.h
+@@ -222,6 +222,7 @@ class CameraMetadata: public Parcelable {
+ 
+   private:
+     camera_metadata_t *mBuffer;
++    volatile bool      mReserved;
+     mutable bool       mLocked;
+ 
+     /**

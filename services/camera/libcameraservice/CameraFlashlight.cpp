@@ -48,7 +48,7 @@ CameraFlashlight::~CameraFlashlight() {
 }
 
 status_t CameraFlashlight::createFlashlightControl(const String8& cameraId) {
-    ALOGV("%s: creating a flash light control for camera %s", __FUNCTION__,
+    ALOGE("%s: creating a flash light control for camera %s", __FUNCTION__,
             cameraId.string());
     if (mFlashControl != NULL) {
         return INVALID_OPERATION;
@@ -56,8 +56,10 @@ status_t CameraFlashlight::createFlashlightControl(const String8& cameraId) {
 
     if (mProviderManager->supportSetTorchMode(cameraId.string())) {
         mFlashControl = new ProviderFlashControl(mProviderManager);
+        ALOGE("CODEWORKX: %s: ProviderFlashControl", __FUNCTION__);
     } else {
         // Only HAL1 devices do not support setTorchMode
+        ALOGE("CODEWORKX: %s: CameraHardwareInterfaceFlashControl", __FUNCTION__);
         mFlashControl =
                 new CameraHardwareInterfaceFlashControl(mProviderManager, *mCallbacks);
     }
@@ -119,12 +121,16 @@ status_t CameraFlashlight::setTorchMode(const String8& cameraId, bool enabled) {
 }
 
 int CameraFlashlight::getNumberOfCameras() {
-    return mProviderManager->getAPI1CompatibleCameraCount();
+    ALOGE("CODEWORKX: %s", __FUNCTION__);
+    return 2;
+    //return mProviderManager->getAPI1CompatibleCameraCount();
 }
 
 status_t CameraFlashlight::findFlashUnits() {
     Mutex::Autolock l(mLock);
     status_t res;
+
+    ALOGE("CODEWORKX: %s", __FUNCTION__);
 
     std::vector<String8> cameraIds;
     int numberOfCameras = getNumberOfCameras();
@@ -297,6 +303,7 @@ status_t ProviderFlashControl::hasFlashUnit(const String8& cameraId, bool *hasFl
         return BAD_VALUE;
     }
     *hasFlash = mProviderManager->hasFlashUnit(cameraId.string());
+    ALOGV("CODEWORKX: %s: hasFlashUnit", __func__);
     return OK;
 }
 
