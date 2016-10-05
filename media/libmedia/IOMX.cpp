@@ -41,7 +41,6 @@ enum {
     SET_PARAMETER,
     GET_CONFIG,
     SET_CONFIG,
-    GET_STATE,
     ENABLE_NATIVE_BUFFERS,
     USE_BUFFER,
     USE_GRAPHIC_BUFFER,
@@ -69,10 +68,6 @@ class BpOMX : public BpInterface<IOMX> {
 public:
     explicit BpOMX(const sp<IBinder> &impl)
         : BpInterface<IOMX>(impl) {
-    }
-
-    virtual bool livesLocally() {
-        return false;
     }
 
     virtual status_t listNodes(List<ComponentInfo> *list) {
@@ -233,16 +228,6 @@ public:
         data.write(params, size);
         remote()->transact(SET_CONFIG, data, &reply);
 
-        return reply.readInt32();
-    }
-
-    virtual status_t getState(
-            OMX_STATETYPE* state) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
-        remote()->transact(GET_STATE, data, &reply);
-
-        *state = static_cast<OMX_STATETYPE>(reply.readInt32());
         return reply.readInt32();
     }
 
@@ -816,19 +801,6 @@ status_t BnOMXNode::onTransact(
                 munmap(params, allocSize);
             }
             params = NULL;
-
-            return NO_ERROR;
-        }
-
-        case GET_STATE:
-        {
-            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
-
-            OMX_STATETYPE state = OMX_StateInvalid;
-
-            status_t err = getState(&state);
-            reply->writeInt32(state);
-            reply->writeInt32(err);
 
             return NO_ERROR;
         }

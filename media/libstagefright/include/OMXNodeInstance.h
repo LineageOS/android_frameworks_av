@@ -50,8 +50,6 @@ struct OMXNodeInstance : public BnOMXNode {
     status_t getConfig(OMX_INDEXTYPE index, void *params, size_t size);
     status_t setConfig(OMX_INDEXTYPE index, const void *params, size_t size);
 
-    status_t getState(OMX_STATETYPE* state);
-
     status_t enableNativeBuffers(OMX_U32 portIndex, OMX_BOOL graphic, OMX_BOOL enable);
 
     status_t getGraphicBufferUsage(OMX_U32 portIndex, OMX_U32* usage);

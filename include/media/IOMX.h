@@ -51,10 +51,6 @@ public:
         kFenceTimeoutMs = 1000
     };
 
-    // Returns true iff the implementation of the OMX interface
-    // lives in the same process.
-    virtual bool livesLocally() = 0;
-
     struct ComponentInfo {
         String8 mName;
         List<String8> mRoles;
@@ -92,8 +88,6 @@ public:
 
     virtual status_t setConfig(
             OMX_INDEXTYPE index, const void *params, size_t size) = 0;
-
-    virtual status_t getState(OMX_STATETYPE* state) = 0;
 
     // This will set *type to previous metadata buffer type on OMX error (not on binder error), and
     // new metadata buffer type on success.
@@ -251,10 +245,6 @@ public:
 
 class BnOMX : public BnInterface<IOMX> {
 public:
-    virtual bool livesLocally() {
-        return true;
-    }
-
     virtual status_t onTransact(
             uint32_t code, const Parcel &data, Parcel *reply,
             uint32_t flags = 0);
