@@ -1,0 +1,24 @@
+cc_library_shared {
+    name: "libaudiohal",
+
+    srcs: [
+        "DeviceHalLocal.cpp",
+        "DevicesFactoryHalLocal.cpp",
+        "EffectHalLocal.cpp",
+        "EffectsFactoryHalLocal.cpp",
+        "StreamHalLocal.cpp",
+    ],
+
+    shared_libs: [
+        "libcutils",
+        "libhardware",
+        "liblog",
+        "libeffects",
+        "libutils",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+}
