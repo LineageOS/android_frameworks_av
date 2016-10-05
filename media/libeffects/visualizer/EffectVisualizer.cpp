@@ -604,7 +604,7 @@ int Visualizer_command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdSize,
                 *replySize < (sizeof(int32_t) * MEASUREMENT_COUNT)) {
             ALOGV("VISUALIZER_CMD_MEASURE() error *replySize %" PRIu32
                     " < (sizeof(int32_t) * MEASUREMENT_COUNT) %" PRIu32, *replySize,
-                    sizeof(int32_t) * MEASUREMENT_COUNT);
+                    uint32_t(sizeof(int32_t)) * MEASUREMENT_COUNT);
             android_errorWriteLog(0x534e4554, "30229821");
             return -EINVAL;
         }
