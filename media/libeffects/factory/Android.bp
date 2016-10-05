@@ -1,0 +1,13 @@
+// Effect factory library
+cc_library_shared {
+    name: "libeffects",
+    srcs: ["EffectsFactory.c"],
+
+    shared_libs: [
+        "libcutils",
+        "liblog",
+        "libdl",
+    ],
+
+    include_dirs: ["system/media/audio_effects/include"],
+}
