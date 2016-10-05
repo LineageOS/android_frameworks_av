@@ -68,7 +68,6 @@ LOCAL_CFLAGS := \
         -D"OSCL_UNUSED_ARG(x)=(void)(x)" -DOSCL_IMPORT_REF= -DOSCL_EXPORT_REF=
 
 LOCAL_CFLAGS += -Werror
-LOCAL_CLANG := true
 #addressing b/25409744
 #LOCAL_SANITIZE := signed-integer-overflow unsigned-integer-overflow
 

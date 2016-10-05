@@ -97,7 +97,6 @@ LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils)
 
 LOCAL_CFLAGS += -Werror -Wno-error=deprecated-declarations -Wall
-LOCAL_CLANG := true
 LOCAL_SANITIZE := unsigned-integer-overflow signed-integer-overflow
 
 include $(BUILD_SHARED_LIBRARY)

@@ -18,7 +18,6 @@ LOCAL_C_INCLUDES:= \
 	external/jpeg \
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
-LOCAL_CLANG := true
 
 LOCAL_MODULE_TAGS := optional
 
@@ -43,7 +42,6 @@ LOCAL_C_INCLUDES:= \
 	$(TOP)/frameworks/native/include/media/hardware
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
-LOCAL_CLANG := true
 
 LOCAL_MODULE_TAGS := optional
 
@@ -68,7 +66,6 @@ LOCAL_C_INCLUDES:= \
 	$(TOP)/frameworks/native/include/media/hardware
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
-LOCAL_CLANG := true
 
 LOCAL_MODULE_TAGS := optional
 
@@ -93,7 +90,6 @@ LOCAL_C_INCLUDES:= \
 	$(TOP)/frameworks/native/include/media/openmax
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
-LOCAL_CLANG := true
 
 LOCAL_MODULE_TAGS := optional
 
@@ -117,7 +113,6 @@ LOCAL_C_INCLUDES:= \
 	$(TOP)/frameworks/native/include/media/openmax
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
-LOCAL_CLANG := true
 
 LOCAL_MODULE_TAGS := optional
 
@@ -141,7 +136,6 @@ LOCAL_C_INCLUDES:= \
 	$(TOP)/frameworks/native/include/media/openmax
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
-LOCAL_CLANG := true
 
 LOCAL_MODULE_TAGS := optional
 
@@ -166,7 +160,6 @@ LOCAL_C_INCLUDES:= \
 	$(TOP)/frameworks/native/include/media/openmax
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
-LOCAL_CLANG := true
 
 LOCAL_MODULE_TAGS := optional
 
@@ -209,7 +202,6 @@ LOCAL_STATIC_LIBRARIES:= \
 	libstagefright_mediafilter
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
-LOCAL_CLANG := true
 
 LOCAL_MODULE_TAGS := optional
 
@@ -233,7 +225,6 @@ LOCAL_C_INCLUDES:= \
 	$(TOP)/frameworks/native/include/media/openmax
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
-LOCAL_CLANG := true
 
 LOCAL_MODULE_TAGS := optional
 
