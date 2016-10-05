@@ -501,8 +501,6 @@ void LvmGlobalBundle_init(){
 //----------------------------------------------------------------------------
 
 int LvmBundle_init(EffectContext *pContext){
-    int status;
-
     ALOGV("\tLvmBundle_init start");
 
     pContext->config.inputCfg.accessMode                    = EFFECT_BUFFER_ACCESS_READ;
@@ -716,7 +714,6 @@ int LvmBundle_process(LVM_INT16        *pIn,
                       int              frameCount,
                       EffectContext    *pContext){
 
-    LVM_ControlParams_t     ActiveParams;                           /* Current control Parameters */
     LVM_ReturnStatus_en     LvmStatus = LVM_SUCCESS;                /* Function call status */
     LVM_INT16               *pOutTmp;
 
@@ -1040,7 +1037,6 @@ int LvmEffect_disable(EffectContext *pContext){
 
 void LvmEffect_free(EffectContext *pContext){
     LVM_ReturnStatus_en     LvmStatus=LVM_SUCCESS;         /* Function call status */
-    LVM_ControlParams_t     params;                        /* Control Parameters */
     LVM_MemTab_t            MemTab;
 
     /* Free the algorithm memory */
@@ -2007,8 +2003,6 @@ int BassBoost_getParameter(EffectContext     *pContext,
     int status = 0;
     int32_t *pParamTemp = (int32_t *)pParam;
     int32_t param = *pParamTemp++;
-    int32_t param2;
-    char *name;
 
     //ALOGV("\tBassBoost_getParameter start");
 
@@ -2125,7 +2119,6 @@ int Virtualizer_getParameter(EffectContext        *pContext,
     int status = 0;
     int32_t *pParamTemp = (int32_t *)pParam;
     int32_t param = *pParamTemp++;
-    char *name;
 
     //ALOGV("\tVirtualizer_getParameter start");
 
@@ -2282,7 +2275,6 @@ int Equalizer_getParameter(EffectContext     *pContext,
                            uint32_t          *pValueSize,
                            void              *pValue){
     int status = 0;
-    int bMute = 0;
     int32_t *pParamTemp = (int32_t *)pParam;
     int32_t param = *pParamTemp++;
     int32_t param2;
@@ -2540,10 +2532,8 @@ int Volume_getParameter(EffectContext     *pContext,
                         uint32_t          *pValueSize,
                         void              *pValue){
     int status = 0;
-    int bMute = 0;
     int32_t *pParamTemp = (int32_t *)pParam;
     int32_t param = *pParamTemp++;;
-    char *name;
 
     //ALOGV("\tVolume_getParameter start");
 
@@ -2873,11 +2863,8 @@ int Effect_process(effect_handle_t     self,
                               audio_buffer_t         *inBuffer,
                               audio_buffer_t         *outBuffer){
     EffectContext * pContext = (EffectContext *) self;
-    LVM_ReturnStatus_en     LvmStatus = LVM_SUCCESS;                /* Function call status */
     int    status = 0;
     int    processStatus = 0;
-    LVM_INT16   *in  = (LVM_INT16 *)inBuffer->raw;
-    LVM_INT16   *out = (LVM_INT16 *)outBuffer->raw;
 
 //ALOGV("\tEffect_process Start : Enabled = %d     Called = %d (%8d %8d %8d)",
 //pContext->pBundledContext->NumberEffectsEnabled,pContext->pBundledContext->NumberEffectsCalled,
@@ -3006,7 +2993,6 @@ int Effect_command(effect_handle_t  self,
                               uint32_t            *replySize,
                               void                *pReplyData){
     EffectContext * pContext = (EffectContext *) self;
-    int retsize;
 
     //ALOGV("\t\nEffect_command start");
 
@@ -3390,7 +3376,6 @@ int Effect_command(effect_handle_t  self,
             int16_t  leftdB, rightdB;
             int16_t  maxdB, pandB;
             int32_t  vol_ret[2] = {1<<24,1<<24}; // Apply no volume
-            int      status = 0;
             LVM_ControlParams_t     ActiveParams;           /* Current control Parameters */
             LVM_ReturnStatus_en     LvmStatus=LVM_SUCCESS;  /* Function call status */
 

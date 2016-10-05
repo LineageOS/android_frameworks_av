@@ -233,7 +233,6 @@ int VisualizerLib_Create(const effect_uuid_t *uuid,
                          int32_t /*ioId*/,
                          effect_handle_t *pHandle) {
     int ret;
-    int i;
 
     if (pHandle == NULL || uuid == NULL) {
         return -EINVAL;
@@ -415,7 +414,6 @@ int Visualizer_command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdSize,
         void *pCmdData, uint32_t *replySize, void *pReplyData) {
 
     VisualizerContext * pContext = (VisualizerContext *)self;
-    int retsize;
 
     if (pContext == NULL || pContext->mState == VISUALIZER_STATE_UNINITIALIZED) {
         return -EINVAL;

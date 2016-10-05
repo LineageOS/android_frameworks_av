@@ -389,7 +389,6 @@ static int Downmix_Command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdS
 
     downmix_module_t *pDwmModule = (downmix_module_t *) self;
     downmix_object_t *pDownmixer;
-    int retsize;
 
     if (pDwmModule == NULL || pDwmModule->context.state == DOWNMIX_STATE_UNINITIALIZED) {
         return -EINVAL;

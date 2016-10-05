@@ -23,6 +23,7 @@ LOCAL_SRC_FILES := \
         EffectProxy.cpp
 
 LOCAL_CFLAGS+= -fvisibility=hidden
+LOCAL_CFLAGS += -Wall -Werror
 
 LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libdl libeffects
 
