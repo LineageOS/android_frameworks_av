@@ -475,6 +475,7 @@ ACameraManager::openCamera(
     sp<hardware::ICameraService> cs = CameraManagerGlobal::getInstance().getCameraService();
     if (cs == nullptr) {
         ALOGE("%s: Cannot reach camera service!", __FUNCTION__);
+        delete device;
         return ACAMERA_ERROR_CAMERA_DISCONNECTED;
     }
 
