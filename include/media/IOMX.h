@@ -63,7 +63,7 @@ public:
 
     virtual status_t allocateNode(
             const char *name, const sp<IOMXObserver> &observer,
-            sp<IBinder> *nodeBinder, sp<IOMXNode> *omxNode) = 0;
+            sp<IOMXNode> *omxNode) = 0;
 
     virtual status_t createPersistentInputSurface(
             sp<IGraphicBufferProducer> *bufferProducer,

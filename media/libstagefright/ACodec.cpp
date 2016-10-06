@@ -6221,7 +6221,10 @@ void ACodec::UninitializedState::stateEntered() {
     ALOGV("Now uninitialized");
 
     if (mDeathNotifier != NULL) {
-        mCodec->mNodeBinder->unlinkToDeath(mDeathNotifier);
+        if (mCodec->mOMXNode != NULL) {
+            sp<IBinder> binder = IInterface::asBinder(mCodec->mOMXNode);
+            binder->unlinkToDeath(mDeathNotifier);
+        }
         mDeathNotifier.clear();
     }
 
@@ -6359,7 +6362,7 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
         pid_t tid = gettid();
         int prevPriority = androidGetThreadPriority(tid);
         androidSetThreadPriority(tid, ANDROID_PRIORITY_FOREGROUND);
-        err = omx->allocateNode(componentName.c_str(), observer, &mCodec->mNodeBinder, &omxNode);
+        err = omx->allocateNode(componentName.c_str(), observer, &omxNode);
         androidSetThreadPriority(tid, prevPriority);
 
         if (err == OK) {
@@ -6384,8 +6387,7 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
     }
 
     mDeathNotifier = new DeathNotifier(notify);
-    if (mCodec->mNodeBinder == NULL ||
-            mCodec->mNodeBinder->linkToDeath(mDeathNotifier) != OK) {
+    if (IInterface::asBinder(omxNode)->linkToDeath(mDeathNotifier) != OK) {
         // This was a local binder, if it dies so do we, we won't care
         // about any notifications in the afterlife.
         mDeathNotifier.clear();
@@ -7798,7 +7800,7 @@ status_t ACodec::queryCapabilities(
     sp<CodecObserver> observer = new CodecObserver;
     sp<IOMXNode> omxNode;
 
-    err = omx->allocateNode(name.c_str(), observer, NULL, &omxNode);
+    err = omx->allocateNode(name.c_str(), observer, &omxNode);
     if (err != OK) {
         client.disconnect();
         return err;

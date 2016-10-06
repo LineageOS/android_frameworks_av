@@ -245,7 +245,6 @@ private:
     uint32_t mQuirks;
     sp<IOMX> mOMX;
     sp<IOMXNode> mOMXNode;
-    sp<IBinder> mNodeBinder;
     int32_t mNodeGeneration;
     sp<MemoryDealer> mDealer[2];
 
