@@ -283,8 +283,7 @@ status_t Harness::testStateTransitions(
 
     sp<CodecObserver> observer = new CodecObserver(this, ++mCurGeneration);
 
-    status_t err =
-        mOMX->allocateNode(componentName, observer, NULL, &mOMXNode);
+    status_t err = mOMX->allocateNode(componentName, observer, &mOMXNode);
     EXPECT_SUCCESS(err, "allocateNode");
 
     NodeReaper reaper(this, mOMXNode);

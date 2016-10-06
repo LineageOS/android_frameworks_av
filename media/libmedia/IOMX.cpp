@@ -94,7 +94,7 @@ public:
 
     virtual status_t allocateNode(
             const char *name, const sp<IOMXObserver> &observer,
-            sp<IBinder> *nodeBinder, sp<IOMXNode> *omxNode) {
+            sp<IOMXNode> *omxNode) {
         Parcel data, reply;
         data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
         data.writeCString(name);
@@ -104,9 +104,6 @@ public:
         status_t err = reply.readInt32();
         if (err == OK) {
             *omxNode = IOMXNode::asInterface(reply.readStrongBinder());
-            if (nodeBinder != NULL) {
-                *nodeBinder = remote();
-            }
         } else {
             omxNode->clear();
         }
@@ -656,8 +653,7 @@ status_t BnOMX::onTransact(
 
             sp<IOMXNode> omxNode;
 
-            status_t err = allocateNode(
-                    name, observer, NULL /* nodeBinder */, &omxNode);
+            status_t err = allocateNode(name, observer, &omxNode);
 
             reply->writeInt32(err);
             if (err == OK) {

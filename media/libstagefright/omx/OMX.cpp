@@ -96,13 +96,10 @@ status_t OMX::listNodes(List<ComponentInfo> *list) {
 
 status_t OMX::allocateNode(
         const char *name, const sp<IOMXObserver> &observer,
-        sp<IBinder> *nodeBinder, sp<IOMXNode> *omxNode) {
+        sp<IOMXNode> *omxNode) {
     Mutex::Autolock autoLock(mLock);
 
     omxNode->clear();
-    if (nodeBinder != NULL) {
-        *nodeBinder = NULL;
-    }
 
     if (mLiveNodes.size() == kMaxNodeInstances) {
         return NO_MEMORY;
