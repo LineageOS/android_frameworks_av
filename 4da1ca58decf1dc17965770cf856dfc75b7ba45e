@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ff2e2bb8_3632e2f2",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 7
+      },
+      "lineNbr": 16,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-10-06T12:31:21Z",
+      "side": 1,
+      "message": "if we don\u0027t need the system/core patch, this can become local",
+      "range": {
+        "startLine": 16,
+        "startChar": 0,
+        "endLine": 16,
+        "endChar": 54
+      },
+      "revId": "4da1ca58decf1dc17965770cf856dfc75b7ba45e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
