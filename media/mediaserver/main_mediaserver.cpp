@@ -26,6 +26,10 @@
 #include "RegisterExtensions.h"
 
 // from LOCAL_C_INCLUDES
+#ifdef NO_CAMERA_SERVER
+#include "CameraService.h"
+#include <hidl/HidlTransportSupport.h>
+#endif
 #include "MediaPlayerService.h"
 #include "ResourceManagerService.h"
 
@@ -35,11 +39,19 @@ int main(int argc __unused, char **argv __unused)
 {
     signal(SIGPIPE, SIG_IGN);
 
+#ifdef NO_CAMERA_SERVER
+    // Set 3 threads for HIDL calls
+    hardware::configureRpcThreadpool(3, /*willjoin*/ false);
+#endif
+
     sp<ProcessState> proc(ProcessState::self());
     sp<IServiceManager> sm(defaultServiceManager());
     ALOGI("ServiceManager: %p", sm.get());
     MediaPlayerService::instantiate();
     ResourceManagerService::instantiate();
+#ifdef NO_CAMERA_SERVER
+    CameraService::instantiate();
+#endif
     registerExtensions();
     ::android::hardware::configureRpcThreadpool(16, false);
     ProcessState::self()->startThreadPool();
