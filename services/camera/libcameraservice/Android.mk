@@ -94,6 +94,10 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := \
 
 LOCAL_CFLAGS += -Wall -Wextra -Werror
 
+ifeq ($(TARGET_HAS_LEGACY_CAMERA_HAL1),true)
+    LOCAL_CFLAGS += -DNO_CAMERA_SERVER
+endif
+
 LOCAL_MODULE:= libcameraservice
 
 include $(BUILD_SHARED_LIBRARY)
