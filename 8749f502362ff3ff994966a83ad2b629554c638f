@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ff2e2bb8_ea8409b4",
+        "filename": "media/mediaserver/Android.mk",
+        "patchSetId": 11
+      },
+      "lineNbr": 39,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2016-10-08T18:23:33Z",
+      "side": 1,
+      "message": "Looks like this is broken too",
+      "range": {
+        "startLine": 39,
+        "startChar": 4,
+        "endLine": 39,
+        "endChar": 16
+      },
+      "revId": "8749f502362ff3ff994966a83ad2b629554c638f",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
