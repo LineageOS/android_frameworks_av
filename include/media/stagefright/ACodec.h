@@ -330,6 +330,8 @@ private:
             uint32_t portIndex, IOMX::buffer_id bufferID,
             ssize_t *index = NULL);
 
+    status_t fillBuffer(BufferInfo *info);
+
     status_t setComponentRole(bool isEncoder, const char *mime);
 
     status_t configureCodec(const char *mime, const sp<AMessage> &msg);

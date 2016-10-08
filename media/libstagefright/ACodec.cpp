@@ -44,6 +44,7 @@
 #include <media/stagefright/PersistentSurface.h>
 #include <media/stagefright/SurfaceUtils.h>
 #include <media/hardware/HardwareAPI.h>
+#include <media/OMXBuffer.h>
 
 #include <OMX_AudioExt.h>
 #include <OMX_VideoExt.h>
@@ -796,7 +797,7 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
 
     status_t err;
     if (mNativeWindow != NULL && portIndex == kPortIndexOutput) {
-        if (storingMetadataInDecodedBuffers()) {
+        if (storingMetadataInDecodedBuffers() && !mLegacyAdaptiveExperiment) {
             err = allocateOutputMetadataBuffers();
         } else {
             err = allocateOutputBuffersFromNativeWindow();
@@ -893,8 +894,8 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
                             : new SecureBuffer(format, native_handle, bufSize);
                     info.mCodecData = info.mData;
                 } else {
-                    err = mOMXNode->useBuffer(
-                            portIndex, mem, &info.mBufferID, allottedSize);
+                    err = mOMXNode->useBuffer(portIndex,
+                            OMXBuffer(mem, allottedSize), &info.mBufferID);
                 }
 
                 if (mem != NULL) {
@@ -1085,6 +1086,11 @@ status_t ACodec::configureOutputBuffersFromNativeWindow(
 }
 
 status_t ACodec::allocateOutputBuffersFromNativeWindow() {
+    // This method only handles the non-metadata mode, or legacy metadata mode
+    // (where the headers for each buffer id will be fixed). Non-legacy metadata
+    // mode shouldn't go through this path.
+    CHECK(!storingMetadataInDecodedBuffers() || mLegacyAdaptiveExperiment);
+
     OMX_U32 bufferCount, bufferSize, minUndequeuedBuffers;
     status_t err = configureOutputBuffersFromNativeWindow(
             &bufferCount, &bufferSize, &minUndequeuedBuffers, true /* preregister */);
@@ -1092,10 +1098,8 @@ status_t ACodec::allocateOutputBuffersFromNativeWindow() {
         return err;
     mNumUndequeuedBuffers = minUndequeuedBuffers;
 
-    if (!storingMetadataInDecodedBuffers()) {
-        static_cast<Surface*>(mNativeWindow.get())
-                ->getIGraphicBufferProducer()->allowAllocation(true);
-    }
+    static_cast<Surface*>(mNativeWindow.get())
+            ->getIGraphicBufferProducer()->allowAllocation(true);
 
     ALOGV("[%s] Allocating %u buffers from a native window of size %u on "
          "output port",
@@ -1118,11 +1122,19 @@ status_t ACodec::allocateOutputBuffersFromNativeWindow() {
         info.mIsReadFence = false;
         info.mRenderInfo = NULL;
         info.mGraphicBuffer = graphicBuffer;
+
+        // TODO: We shouln't need to create MediaCodecBuffer. In metadata mode
+        //       OMX doesn't use the shared memory buffer, but some code still
+        //       access info.mData. Create an ABuffer as a placeholder.
+        if (storingMetadataInDecodedBuffers()) {
+            info.mData = new MediaCodecBuffer(mOutputFormat, new ABuffer(bufferSize));
+            info.mCodecData = info.mData;
+        }
+
         mBuffers[kPortIndexOutput].push(info);
 
         IOMX::buffer_id bufferId;
-        err = mOMXNode->useGraphicBuffer(
-                kPortIndexOutput, graphicBuffer, &bufferId);
+        err = mOMXNode->useBuffer(kPortIndexOutput, graphicBuffer, &bufferId);
         if (err != 0) {
             ALOGE("registering GraphicBuffer %u with OMX IL component failed: "
                  "%d", i, err);
@@ -1139,9 +1151,9 @@ status_t ACodec::allocateOutputBuffersFromNativeWindow() {
     OMX_U32 cancelStart;
     OMX_U32 cancelEnd;
 
-    if (err != 0) {
+    if (err != 0 || storingMetadataInDecodedBuffers()) {
         // If an error occurred while dequeuing we need to cancel any buffers
-        // that were dequeued.
+        // that were dequeued. Also cancel all if we're in legacy metadata mode.
         cancelStart = 0;
         cancelEnd = mBuffers[kPortIndexOutput].size();
     } else {
@@ -1160,19 +1172,23 @@ status_t ACodec::allocateOutputBuffersFromNativeWindow() {
         }
     }
 
-    if (!storingMetadataInDecodedBuffers()) {
-        static_cast<Surface*>(mNativeWindow.get())
-                ->getIGraphicBufferProducer()->allowAllocation(false);
+    static_cast<Surface*>(mNativeWindow.get())
+            ->getIGraphicBufferProducer()->allowAllocation(false);
+
+    if (storingMetadataInDecodedBuffers()) {
+        mMetadataBuffersToSubmit = bufferCount - minUndequeuedBuffers;
     }
 
     return err;
 }
 
 status_t ACodec::allocateOutputMetadataBuffers() {
+    CHECK(storingMetadataInDecodedBuffers() && !mLegacyAdaptiveExperiment);
+
     OMX_U32 bufferCount, bufferSize, minUndequeuedBuffers;
     status_t err = configureOutputBuffersFromNativeWindow(
             &bufferCount, &bufferSize, &minUndequeuedBuffers,
-            mLegacyAdaptiveExperiment /* preregister */);
+            false /* preregister */);
     if (err != 0)
         return err;
     mNumUndequeuedBuffers = minUndequeuedBuffers;
@@ -1185,7 +1201,6 @@ status_t ACodec::allocateOutputMetadataBuffers() {
     size_t totalSize = bufferCount * align(bufSize, MemoryDealer::getAllocationAlignment());
     mDealer[kPortIndexOutput] = new MemoryDealer(totalSize, "ACodec");
 
-    // Dequeue buffers and send them to OMX
     for (OMX_U32 i = 0; i < bufferCount; i++) {
         BufferInfo info;
         info.mStatus = BufferInfo::OWNED_BY_NATIVE_WINDOW;
@@ -1206,55 +1221,11 @@ status_t ACodec::allocateOutputMetadataBuffers() {
         info.mCodecData = info.mData;
         info.mCodecRef = mem;
 
-        err = mOMXNode->useBuffer(
-                kPortIndexOutput, mem, &info.mBufferID, mem->size());
+        err = mOMXNode->useBuffer(kPortIndexOutput, mem, &info.mBufferID);
         mBuffers[kPortIndexOutput].push(info);
 
         ALOGV("[%s] allocated meta buffer with ID %u (pointer = %p)",
              mComponentName.c_str(), info.mBufferID, mem->pointer());
-    }
-
-    if (mLegacyAdaptiveExperiment) {
-        // preallocate and preregister buffers
-        static_cast<Surface *>(mNativeWindow.get())
-                ->getIGraphicBufferProducer()->allowAllocation(true);
-
-        ALOGV("[%s] Allocating %u buffers from a native window of size %u on "
-             "output port",
-             mComponentName.c_str(), bufferCount, bufferSize);
-
-        // Dequeue buffers then cancel them all
-        for (OMX_U32 i = 0; i < bufferCount; i++) {
-            BufferInfo *info = &mBuffers[kPortIndexOutput].editItemAt(i);
-
-            ANativeWindowBuffer *buf;
-            int fenceFd;
-            err = mNativeWindow->dequeueBuffer(mNativeWindow.get(), &buf, &fenceFd);
-            if (err != 0) {
-                ALOGE("dequeueBuffer failed: %s (%d)", strerror(-err), -err);
-                break;
-            }
-
-            sp<GraphicBuffer> graphicBuffer(new GraphicBuffer(buf, false));
-            mOMXNode->updateGraphicBufferInMeta(
-                    kPortIndexOutput, graphicBuffer, info->mBufferID);
-            info->mStatus = BufferInfo::OWNED_BY_US;
-            info->setWriteFence(fenceFd, "allocateOutputMetadataBuffers for legacy");
-            info->mGraphicBuffer = graphicBuffer;
-        }
-
-        for (OMX_U32 i = 0; i < mBuffers[kPortIndexOutput].size(); i++) {
-            BufferInfo *info = &mBuffers[kPortIndexOutput].editItemAt(i);
-            if (info->mStatus == BufferInfo::OWNED_BY_US) {
-                status_t error = cancelBufferToNativeWindow(info);
-                if (err == OK) {
-                    err = error;
-                }
-            }
-        }
-
-        static_cast<Surface*>(mNativeWindow.get())
-                ->getIGraphicBufferProducer()->allowAllocation(false);
     }
 
     mMetadataBuffersToSubmit = bufferCount - minUndequeuedBuffers;
@@ -1276,13 +1247,7 @@ status_t ACodec::submitOutputMetadataBuffer() {
 
     --mMetadataBuffersToSubmit;
     info->checkWriteFence("submitOutputMetadataBuffer");
-    status_t err = mOMXNode->fillBuffer(info->mBufferID, info->mFenceFd);
-    info->mFenceFd = -1;
-    if (err == OK) {
-        info->mStatus = BufferInfo::OWNED_BY_COMPONENT;
-    }
-
-    return err;
+    return fillBuffer(info);
 }
 
 status_t ACodec::waitForFence(int fd, const char *dbg ) {
@@ -1467,15 +1432,18 @@ ACodec::BufferInfo *ACodec::dequeueBufferFromNativeWindow() {
     // while loop above does not complete
     CHECK(storingMetadataInDecodedBuffers());
 
+    if (storingMetadataInDecodedBuffers() && mLegacyAdaptiveExperiment) {
+        // If we're here while running legacy experiment, we dequeued some
+        // unrecognized buffers, and the experiment can't continue.
+        ALOGE("Legacy experiment failed, drop back to metadata mode");
+        mLegacyAdaptiveExperiment = false;
+    }
     // discard buffer in LRU info and replace with new buffer
     oldest->mGraphicBuffer = new GraphicBuffer(buf, false);
     oldest->mStatus = BufferInfo::OWNED_BY_US;
     oldest->setWriteFence(fenceFd, "dequeueBufferFromNativeWindow for oldest");
     mRenderTracker.untrackFrame(oldest->mRenderInfo);
     oldest->mRenderInfo = NULL;
-
-    mOMXNode->updateGraphicBufferInMeta(
-            kPortIndexOutput, oldest->mGraphicBuffer, oldest->mBufferID);
 
     if (mOutputMetadataType == kMetadataBufferTypeGrallocSource) {
         VideoGrallocMetadata *grallocMeta =
@@ -1597,6 +1565,23 @@ ACodec::BufferInfo *ACodec::findBufferByID(
 
     ALOGE("Could not find buffer with ID %u", bufferID);
     return NULL;
+}
+
+status_t ACodec::fillBuffer(BufferInfo *info) {
+    status_t err;
+    if (!storingMetadataInDecodedBuffers() || mLegacyAdaptiveExperiment) {
+        err = mOMXNode->fillBuffer(
+            info->mBufferID, OMXBuffer::sPreset, info->mFenceFd);
+    } else {
+        err = mOMXNode->fillBuffer(
+            info->mBufferID, info->mGraphicBuffer, info->mFenceFd);
+    }
+
+    info->mFenceFd = -1;
+    if (err == OK) {
+        info->mStatus = BufferInfo::OWNED_BY_COMPONENT;
+    }
+    return err;
 }
 
 status_t ACodec::setComponentRole(
@@ -5683,6 +5668,8 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
                         return;
                     }
                     size = info->mCodecData->size();
+                } else {
+                    info->mCodecData->setRange(0, size);
                 }
 
                 if (flags & OMX_BUFFERFLAG_CODECCONFIG) {
@@ -5725,25 +5712,29 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
                 status_t err2 = OK;
                 switch (metaType) {
                 case kMetadataBufferTypeInvalid:
+                    {
+                        err2 = mCodec->mOMXNode->emptyBuffer(
+                            bufferID, info->mCodecData, flags, timeUs, info->mFenceFd);
+                    }
                     break;
 #ifndef OMX_ANDROID_COMPILE_AS_32BIT_ON_64BIT_PLATFORMS
                 case kMetadataBufferTypeNativeHandleSource:
                     if (info->mCodecData->size() >= sizeof(VideoNativeHandleMetadata)) {
                         VideoNativeHandleMetadata *vnhmd =
                             (VideoNativeHandleMetadata*)info->mCodecData->base();
-                        err2 = mCodec->mOMXNode->updateNativeHandleInMeta(
-                                mCodec->kPortIndexInput,
-                                NativeHandle::create(vnhmd->pHandle, false /* ownsHandle */),
-                                bufferID);
+                        sp<NativeHandle> handle = NativeHandle::create(
+                                vnhmd->pHandle, false /* ownsHandle */);
+                        err2 = mCodec->mOMXNode->emptyBuffer(
+                            bufferID, handle, flags, timeUs, info->mFenceFd);
                     }
                     break;
                 case kMetadataBufferTypeANWBuffer:
                     if (info->mCodecData->size() >= sizeof(VideoNativeMetadata)) {
                         VideoNativeMetadata *vnmd = (VideoNativeMetadata*)info->mCodecData->base();
-                        err2 = mCodec->mOMXNode->updateGraphicBufferInMeta(
-                                mCodec->kPortIndexInput,
-                                new GraphicBuffer(vnmd->pBuffer, false /* keepOwnership */),
-                                bufferID);
+                        sp<GraphicBuffer> graphicBuffer = new GraphicBuffer(
+                                vnmd->pBuffer, false /* keepOwnership */);
+                        err2 = mCodec->mOMXNode->emptyBuffer(
+                            bufferID, graphicBuffer, flags, timeUs, info->mFenceFd);
                     }
                     break;
 #endif
@@ -5755,15 +5746,6 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
                     break;
                 }
 
-                if (err2 == OK) {
-                    err2 = mCodec->mOMXNode->emptyBuffer(
-                        bufferID,
-                        0,
-                        size,
-                        flags,
-                        timeUs,
-                        info->mFenceFd);
-                }
                 info->mFenceFd = -1;
                 if (err2 != OK) {
                     mCodec->signalError(OMX_ErrorUndefined, makeNoSideEffectStatus(err2));
@@ -5796,12 +5778,7 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
 
                 info->checkReadFence("onInputBufferFilled");
                 status_t err2 = mCodec->mOMXNode->emptyBuffer(
-                        bufferID,
-                        0,
-                        0,
-                        OMX_BUFFERFLAG_EOS,
-                        0,
-                        info->mFenceFd);
+                        bufferID, OMXBuffer::sPreset, OMX_BUFFERFLAG_EOS, 0, info->mFenceFd);
                 info->mFenceFd = -1;
                 if (err2 != OK) {
                     mCodec->signalError(OMX_ErrorUndefined, makeNoSideEffectStatus(err2));
@@ -5925,14 +5902,11 @@ bool ACodec::BaseState::onOMXFillBufferDone(
                 ALOGV("[%s] calling fillBuffer %u",
                      mCodec->mComponentName.c_str(), info->mBufferID);
 
-                err = mCodec->mOMXNode->fillBuffer(info->mBufferID, info->mFenceFd);
-                info->mFenceFd = -1;
+                err = mCodec->fillBuffer(info);
                 if (err != OK) {
                     mCodec->signalError(OMX_ErrorUndefined, makeNoSideEffectStatus(err));
                     return true;
                 }
-
-                info->mStatus = BufferInfo::OWNED_BY_COMPONENT;
                 break;
             }
 
@@ -6155,12 +6129,8 @@ void ACodec::BaseState::onOutputBufferDrained(const sp<AMessage> &msg) {
                     ALOGV("[%s] calling fillBuffer %u",
                          mCodec->mComponentName.c_str(), info->mBufferID);
                     info->checkWriteFence("onOutputBufferDrained::RESUBMIT_BUFFERS");
-                    status_t err = mCodec->mOMXNode->fillBuffer(
-                            info->mBufferID, info->mFenceFd);
-                    info->mFenceFd = -1;
-                    if (err == OK) {
-                        info->mStatus = BufferInfo::OWNED_BY_COMPONENT;
-                    } else {
+                    status_t err = mCodec->fillBuffer(info);
+                    if (err != OK) {
                         mCodec->signalError(OMX_ErrorUndefined, makeNoSideEffectStatus(err));
                     }
                 }
@@ -6960,14 +6930,11 @@ void ACodec::ExecutingState::submitRegularOutputBuffers() {
         ALOGV("[%s] calling fillBuffer %u", mCodec->mComponentName.c_str(), info->mBufferID);
 
         info->checkWriteFence("submitRegularOutputBuffers");
-        status_t err = mCodec->mOMXNode->fillBuffer(info->mBufferID, info->mFenceFd);
-        info->mFenceFd = -1;
+        status_t err = mCodec->fillBuffer(info);
         if (err != OK) {
             failed = true;
             break;
         }
-
-        info->mStatus = BufferInfo::OWNED_BY_COMPONENT;
     }
 
     if (failed) {
