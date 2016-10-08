@@ -5392,7 +5392,11 @@ void ACodec::sendFormatChange() {
     }
 
     sp<AMessage> notify = mNotify->dup();
-    getVQZIPInfo(mOutputFormat);
+
+    int32_t isVQZIPSession;
+    if (mInputFormat->findInt32("vqzip", &isVQZIPSession) && isVQZIPSession) {
+        getVQZIPInfo(mOutputFormat);
+    }
     notify->setInt32("what", kWhatOutputFormatChanged);
     notify->setMessage("format", mOutputFormat);
 
