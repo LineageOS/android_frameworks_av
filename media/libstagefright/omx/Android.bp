@@ -1,5 +1,6 @@
 cc_library_shared {
     name: "libstagefright_omx",
+    defaults: ["stagefright_qcom_legacy_defaults"],
     vendor_available: true,
     vndk: {
         enabled: true,
