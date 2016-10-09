@@ -1,5 +1,6 @@
 cc_library_shared {
     name: "libstagefright_omx",
+    defaults: ["uses_qcom_bsp_legacy"],
     vendor_available: true,
     vndk: {
         enabled: true,
