@@ -9,6 +9,7 @@ package {
 
 cc_defaults {
     name: "libstagefright_bufferqueue-defaults",
+    defaults: ["stagefright_qcom_legacy_defaults"],
     double_loadable: true,
 
     srcs: [
