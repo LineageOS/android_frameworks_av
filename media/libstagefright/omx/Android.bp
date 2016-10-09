@@ -72,6 +72,14 @@ cc_library_shared {
         "-Wno-documentation",
     ],
 
+    product_variables: {
+        lineage: {
+            uses_qcom_bsp_legacy: {
+                cppflags: ["-DQCOM_BSP_LEGACY"],
+            },
+        },
+    },
+
     sanitize: {
         misc_undefined: [
             "signed-integer-overflow",
