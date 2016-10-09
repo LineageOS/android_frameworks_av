@@ -816,11 +816,13 @@ status_t GraphicBufferSource::submitBuffer_l(const VideoBuffer &item) {
         return UNKNOWN_ERROR;
     }
 
+#ifndef QCOM_BSP_LEGACY
     if ((android_dataspace)item.mDataspace != mLastDataspace) {
         onDataspaceChanged_l(
                 item.mDataspace,
                 (android_pixel_format)item.mBuffer->getGraphicBuffer()->format);
     }
+#endif
 
     std::shared_ptr<AcquiredBuffer> buffer = item.mBuffer;
     // use a GraphicBuffer for now as component is using GraphicBuffers to hold references
