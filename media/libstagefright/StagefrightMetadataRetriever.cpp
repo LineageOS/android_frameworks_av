@@ -754,9 +754,9 @@ void StagefrightMetadataRetriever::parseMetaData() {
 
     if (numTracks == 1) {
         const char *fileMIME;
-        CHECK(meta->findCString(kKeyMIMEType, &fileMIME));
 
-        if (!strcasecmp(fileMIME, "video/x-matroska")) {
+        if (meta->findCString(kKeyMIMEType, &fileMIME) &&
+                !strcasecmp(fileMIME, "video/x-matroska")) {
             sp<MetaData> trackMeta = mExtractor->getTrackMetaData(0);
             const char *trackMIME;
             CHECK(trackMeta->findCString(kKeyMIMEType, &trackMIME));
