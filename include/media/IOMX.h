@@ -163,7 +163,7 @@ public:
     virtual status_t emptyGraphicBuffer(
             buffer_id buffer,
             const sp<GraphicBuffer> &graphicBuffer, OMX_U32 flags,
-            OMX_TICKS timestamp, OMX_TICKS origTimestamp, int fenceFd) = 0;
+            OMX_TICKS timestamp, int fenceFd) = 0;
 
     virtual status_t getExtensionIndex(
             const char *parameter_name,

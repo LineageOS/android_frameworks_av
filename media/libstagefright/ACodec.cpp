@@ -1723,7 +1723,11 @@ status_t ACodec::configureCodec(
             mRepeatFrameDelayUs = -1ll;
         }
 
+        // only allow 32-bit value, since we pass it as U32 to OMX.
         if (!msg->findInt64("max-pts-gap-to-encoder", &mMaxPtsGapUs)) {
+            mMaxPtsGapUs = -1ll;
+        } else if (mMaxPtsGapUs > INT32_MAX || mMaxPtsGapUs < 0) {
+            ALOGW("Unsupported value for max pts gap %lld", (long long) mMaxPtsGapUs);
             mMaxPtsGapUs = -1ll;
         }
 
@@ -6569,9 +6573,14 @@ status_t ACodec::LoadedState::setupInputSurface() {
     }
 
     if (mCodec->mMaxPtsGapUs > 0ll) {
-        err = statusFromBinderStatus(
-                mCodec->mGraphicBufferSource->setMaxTimestampGapUs(
-                        mCodec->mMaxPtsGapUs));
+        OMX_PARAM_U32TYPE maxPtsGapParams;
+        InitOMXParams(&maxPtsGapParams);
+        maxPtsGapParams.nPortIndex = kPortIndexInput;
+        maxPtsGapParams.nU32 = (uint32_t) mCodec->mMaxPtsGapUs;
+
+        err = mCodec->mOMXNode->setParameter(
+                (OMX_INDEXTYPE)OMX_IndexParamMaxFrameDurationForBitrateControl,
+                &maxPtsGapParams, sizeof(maxPtsGapParams));
 
         if (err != OK) {
             ALOGE("[%s] Unable to configure max timestamp gap (err %d)",

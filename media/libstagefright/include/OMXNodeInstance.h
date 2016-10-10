@@ -99,7 +99,7 @@ struct OMXNodeInstance : public BnOMXNode {
     status_t emptyGraphicBuffer(
             OMX::buffer_id buffer,
             const sp<GraphicBuffer> &graphicBuffer, OMX_U32 flags,
-            OMX_TICKS timestamp, OMX_TICKS origTimestamp, int fenceFd);
+            OMX_TICKS timestamp, int fenceFd);
 
     status_t getExtensionIndex(
             const char *parameterName, OMX_INDEXTYPE *index);
@@ -162,9 +162,13 @@ private:
     };
     SecureBufferType mSecureBufferType[2];
 
+    // Following are OMX parameters managed by us (instead of the component)
+    // OMX_IndexParamMaxFrameDurationForBitrateControl
     KeyedVector<int64_t, int64_t> mOriginalTimeUs;
-    bool mShouldRestorePts;
     bool mRestorePtsFailed;
+    int64_t mMaxTimestampGapUs;
+    int64_t mPrevOriginalTimeUs;
+    int64_t mPrevModifiedTimeUs;
 
     // For debug support
     char *mName;
@@ -249,6 +253,9 @@ private:
     bool handleMessage(omx_message &msg);
 
     bool handleDataSpaceChanged(omx_message &msg);
+
+    status_t setMaxPtsGapUs(const void *params, size_t size);
+    int64_t getCodecTimestamp(OMX_TICKS timestamp);
 
     OMXNodeInstance(const OMXNodeInstance &);
     OMXNodeInstance &operator=(const OMXNodeInstance &);

@@ -120,15 +120,6 @@ public:
     // state and once this behaviour is specified it cannot be reset.
     Status setRepeatPreviousFrameDelayUs(int64_t repeatAfterUs) override;
 
-    // When set, the timestamp fed to the encoder will be modified such that
-    // the gap between two adjacent frames is capped at maxGapUs. Timestamp
-    // will be restored to the original when the encoded frame is returned to
-    // the client.
-    // This is to solve a problem in certain real-time streaming case, where
-    // encoder's rate control logic produces huge frames after a long period
-    // of suspension on input.
-    Status setMaxTimestampGapUs(int64_t maxGapUs) override;
-
     // Sets the input buffer timestamp offset.
     // When set, the sample's timestamp will be adjusted with the timeOffsetUs.
     Status setTimeOffsetUs(int64_t timeOffsetUs) override;
@@ -220,7 +211,7 @@ private:
 
     void setLatestBuffer_l(const BufferItem &item);
     bool repeatLatestBuffer_l();
-    bool getTimestamp(const BufferItem &item, int64_t *timeUs, int64_t *codecTimeUs);
+    bool getTimestamp(const BufferItem &item, int64_t *codecTimeUs);
 
     // called when the data space of the input buffer changes
     void onDataSpaceChanged_l(android_dataspace dataSpace, android_pixel_format pixelFormat);
@@ -279,9 +270,7 @@ private:
         kRepeatLastFrameCount = 10,
     };
 
-    int64_t mMaxTimestampGapUs;
     int64_t mPrevOriginalTimeUs;
-    int64_t mPrevModifiedTimeUs;
     int64_t mSkipFramesBeforeNs;
 
     sp<FrameDropper> mFrameDropper;

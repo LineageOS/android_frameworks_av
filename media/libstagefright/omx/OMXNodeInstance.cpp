@@ -340,8 +340,10 @@ OMXNodeInstance::OMXNodeInstance(
       mQueriedProhibitedExtensions(false),
       mQuirks(0),
       mBufferIDCount(0),
-      mShouldRestorePts(false),
-      mRestorePtsFailed(false)
+      mRestorePtsFailed(false),
+      mMaxTimestampGapUs(-1ll),
+      mPrevOriginalTimeUs(-1ll),
+      mPrevModifiedTimeUs(-1ll)
 {
     mName = ADebug::GetDebugName(name);
     DEBUG = ADebug::GetDebugLevelFromProperty(name, "debug.stagefright.omx-debug");
@@ -546,18 +548,17 @@ bool OMXNodeInstance::isProhibitedIndex_l(OMX_INDEXTYPE index) {
         "OMX.google.android.index.getAndroidNativeBufferUsage",
     };
 
-    if ((index > OMX_IndexComponentStartUnused && index <= OMX_IndexParamStandardComponentRole)
-            || (index > OMX_IndexPortStartUnused && index <= OMX_IndexParamCompBufferSupplier)
-            || (index > OMX_IndexAudioStartUnused && index <= OMX_IndexConfigAudioChannelVolume)
-            || (index > OMX_IndexVideoStartUnused && index <= OMX_IndexConfigVideoNalSize)
-            || (index > OMX_IndexCommonStartUnused
-                    && index <= OMX_IndexConfigCommonTransitionEffect)
+    if ((index > OMX_IndexComponentStartUnused && index < OMX_IndexComponentEndUnused)
+            || (index > OMX_IndexPortStartUnused && index < OMX_IndexPortEndUnused)
+            || (index > OMX_IndexAudioStartUnused && index < OMX_IndexAudioEndUnused)
+            || (index > OMX_IndexVideoStartUnused && index < OMX_IndexVideoEndUnused)
+            || (index > OMX_IndexCommonStartUnused && index < OMX_IndexCommonEndUnused)
             || (index > (OMX_INDEXTYPE)OMX_IndexExtAudioStartUnused
-                    && index <= (OMX_INDEXTYPE)OMX_IndexParamAudioProfileQuerySupported)
+                    && index < (OMX_INDEXTYPE)OMX_IndexExtAudioEndUnused)
             || (index > (OMX_INDEXTYPE)OMX_IndexExtVideoStartUnused
-                    && index <= (OMX_INDEXTYPE)OMX_IndexConfigAndroidVideoTemporalLayering)
+                    && index < (OMX_INDEXTYPE)OMX_IndexExtVideoEndUnused)
             || (index > (OMX_INDEXTYPE)OMX_IndexExtOtherStartUnused
-                    && index <= (OMX_INDEXTYPE)OMX_IndexParamConsumerUsageBits)) {
+                    && index < (OMX_INDEXTYPE)OMX_IndexExtOtherEndUnused)) {
         return false;
     }
 
@@ -597,6 +598,10 @@ status_t OMXNodeInstance::setParameter(
     Mutex::Autolock autoLock(mLock);
     OMX_INDEXEXTTYPE extIndex = (OMX_INDEXEXTTYPE)index;
     CLOG_CONFIG(setParameter, "%s(%#x), %zu@%p)", asString(extIndex), index, size, params);
+
+    if (extIndex == OMX_IndexParamMaxFrameDurationForBitrateControl) {
+        return setMaxPtsGapUs(params, size);
+    }
 
     if (isProhibitedIndex_l(index)) {
         android_errorWriteLog(0x534e4554, "29422020");
@@ -1524,7 +1529,7 @@ status_t OMXNodeInstance::emptyBuffer_l(
 // like emptyBuffer, but the data is already in header->pBuffer
 status_t OMXNodeInstance::emptyGraphicBuffer(
         OMX::buffer_id buffer, const sp<GraphicBuffer> &graphicBuffer,
-        OMX_U32 flags, OMX_TICKS timestamp, OMX_TICKS origTimestamp, int fenceFd) {
+        OMX_U32 flags, OMX_TICKS timestamp, int fenceFd) {
     Mutex::Autolock autoLock(mLock);
 
     OMX_BUFFERHEADERTYPE *header = findBufferHeader(buffer, kPortIndexInput);
@@ -1541,13 +1546,7 @@ status_t OMXNodeInstance::emptyGraphicBuffer(
         return err;
     }
 
-    // If we're required to restore original timestamp, origTimestamp will
-    // be set to non-negative number for all frames. If it's not required
-    // client will set it to -1ll for all frames.
-    if (origTimestamp >= 0ll && !mRestorePtsFailed) {
-        mShouldRestorePts = true;
-        mOriginalTimeUs.add(timestamp, origTimestamp);
-    }
+    int64_t codecTimeUs = getCodecTimestamp(timestamp);
 
     header->nOffset = 0;
     if (graphicBuffer == NULL) {
@@ -1557,13 +1556,55 @@ status_t OMXNodeInstance::emptyGraphicBuffer(
     } else {
         header->nFilledLen = sizeof(VideoNativeMetadata);
     }
-    return emptyBuffer_l(header, flags, timestamp, (intptr_t)header->pBuffer, fenceFd);
+    return emptyBuffer_l(header, flags, codecTimeUs, (intptr_t)header->pBuffer, fenceFd);
+}
+
+status_t OMXNodeInstance::setMaxPtsGapUs(const void *params, size_t size) {
+    if (params == NULL || size != sizeof(OMX_PARAM_U32TYPE)) {
+        CLOG_ERROR(setMaxPtsGapUs, BAD_VALUE, "invalid params (%p,%zu)", params, size);
+        return BAD_VALUE;
+    }
+
+    mMaxTimestampGapUs = (int64_t)((OMX_PARAM_U32TYPE*)params)->nU32;
+
+    return OK;
+}
+
+int64_t OMXNodeInstance::getCodecTimestamp(OMX_TICKS timestamp) {
+    int64_t originalTimeUs = timestamp;
+
+    if (mMaxTimestampGapUs > 0ll) {
+        /* Cap timestamp gap between adjacent frames to specified max
+         *
+         * In the scenario of cast mirroring, encoding could be suspended for
+         * prolonged periods. Limiting the pts gap to workaround the problem
+         * where encoder's rate control logic produces huge frames after a
+         * long period of suspension.
+         */
+        if (mPrevOriginalTimeUs >= 0ll) {
+            int64_t timestampGapUs = originalTimeUs - mPrevOriginalTimeUs;
+            timestamp = (timestampGapUs < mMaxTimestampGapUs ?
+                timestampGapUs : mMaxTimestampGapUs) + mPrevModifiedTimeUs;
+        }
+        ALOGV("IN  timestamp: %lld -> %lld",
+            static_cast<long long>(originalTimeUs),
+            static_cast<long long>(timestamp));
+    }
+
+    mPrevOriginalTimeUs = originalTimeUs;
+    mPrevModifiedTimeUs = timestamp;
+
+    if (mMaxTimestampGapUs > 0ll && !mRestorePtsFailed) {
+        mOriginalTimeUs.add(timestamp, originalTimeUs);
+    }
+
+    return timestamp;
 }
 
 void OMXNodeInstance::codecBufferFilled(omx_message &msg) {
     Mutex::Autolock autoLock(mBufferIDLock);
 
-    if (!mShouldRestorePts || mRestorePtsFailed) {
+    if (mMaxTimestampGapUs <= 0ll || mRestorePtsFailed) {
         return;
     }
 
@@ -1581,12 +1622,6 @@ void OMXNodeInstance::codecBufferFilled(omx_message &msg) {
         } else {
             // giving up the effort as encoder doesn't appear to preserve pts
             ALOGW("giving up limiting timestamp gap (pts = %lld)", timestamp);
-            mRestorePtsFailed = true;
-        }
-        if (mOriginalTimeUs.size() > BufferQueue::NUM_BUFFER_SLOTS) {
-            // something terribly wrong must have happened, giving up...
-            ALOGE("mOriginalTimeUs has too many entries (%zu)",
-                    mOriginalTimeUs.size());
             mRestorePtsFailed = true;
         }
     }
