@@ -478,59 +478,43 @@ int64_t MediaSync::getPlayedOutAudioDurationMedia_l(int64_t nowUs) {
     CHECK(mAudioTrack != NULL);
 
     uint32_t numFramesPlayed;
-    int64_t numFramesPlayedAt;
+    int64_t numFramesPlayedAtUs;
     AudioTimestamp ts;
-    static const int64_t kStaleTimestamp100ms = 100000;
 
     status_t res = mAudioTrack->getTimestamp(ts);
     if (res == OK) {
         // case 1: mixing audio tracks.
         numFramesPlayed = ts.mPosition;
-        numFramesPlayedAt =
-            ts.mTime.tv_sec * 1000000LL + ts.mTime.tv_nsec / 1000;
-        const int64_t timestampAge = nowUs - numFramesPlayedAt;
-        if (timestampAge > kStaleTimestamp100ms) {
-            // This is an audio FIXME.
-            // getTimestamp returns a timestamp which may come from audio
-            // mixing threads. After pausing, the MixerThread may go idle,
-            // thus the mTime estimate may become stale. Assuming that the
-            // MixerThread runs 20ms, with FastMixer at 5ms, the max latency
-            // should be about 25ms with an average around 12ms (to be
-            // verified). For safety we use 100ms.
-            ALOGV("getTimestamp: returned stale timestamp nowUs(%lld) "
-                  "numFramesPlayedAt(%lld)",
-                  (long long)nowUs, (long long)numFramesPlayedAt);
-            numFramesPlayedAt = nowUs - kStaleTimestamp100ms;
-        }
+        numFramesPlayedAtUs = ts.mTime.tv_sec * 1000000LL + ts.mTime.tv_nsec / 1000;
         //ALOGD("getTimestamp: OK %d %lld",
-        //      numFramesPlayed, (long long)numFramesPlayedAt);
+        //      numFramesPlayed, (long long)numFramesPlayedAtUs);
     } else if (res == WOULD_BLOCK) {
         // case 2: transitory state on start of a new track
         numFramesPlayed = 0;
-        numFramesPlayedAt = nowUs;
+        numFramesPlayedAtUs = nowUs;
         //ALOGD("getTimestamp: WOULD_BLOCK %d %lld",
-        //      numFramesPlayed, (long long)numFramesPlayedAt);
+        //      numFramesPlayed, (long long)numFramesPlayedAtUs);
     } else {
         // case 3: transitory at new track or audio fast tracks.
         res = mAudioTrack->getPosition(&numFramesPlayed);
         CHECK_EQ(res, (status_t)OK);
-        numFramesPlayedAt = nowUs;
-        numFramesPlayedAt += 1000LL * mAudioTrack->latency() / 2; /* XXX */
-        //ALOGD("getPosition: %d %lld", numFramesPlayed, (long long)numFramesPlayedAt);
+        numFramesPlayedAtUs = nowUs;
+        numFramesPlayedAtUs += 1000LL * mAudioTrack->latency() / 2; /* XXX */
+        //ALOGD("getPosition: %d %lld", numFramesPlayed, (long long)numFramesPlayedAtUs);
     }
 
     //can't be negative until 12.4 hrs, test.
     //CHECK_EQ(numFramesPlayed & (1 << 31), 0);
     int64_t durationUs =
         getDurationIfPlayedAtNativeSampleRate_l(numFramesPlayed)
-            + nowUs - numFramesPlayedAt;
+            + nowUs - numFramesPlayedAtUs;
     if (durationUs < 0) {
         // Occurs when numFramesPlayed position is very small and the following:
         // (1) In case 1, the time nowUs is computed before getTimestamp() is
-        //     called and numFramesPlayedAt is greater than nowUs by time more
+        //     called and numFramesPlayedAtUs is greater than nowUs by time more
         //     than numFramesPlayed.
         // (2) In case 3, using getPosition and adding mAudioTrack->latency()
-        //     to numFramesPlayedAt, by a time amount greater than
+        //     to numFramesPlayedAtUs, by a time amount greater than
         //     numFramesPlayed.
         //
         // Both of these are transitory conditions.
@@ -541,7 +525,7 @@ int64_t MediaSync::getPlayedOutAudioDurationMedia_l(int64_t nowUs) {
     ALOGV("getPlayedOutAudioDurationMedia_l(%lld) nowUs(%lld) frames(%u) "
           "framesAt(%lld)",
           (long long)durationUs, (long long)nowUs, numFramesPlayed,
-          (long long)numFramesPlayedAt);
+          (long long)numFramesPlayedAtUs);
     return durationUs;
 }
 
