@@ -758,6 +758,9 @@ public:
      * The timestamp parameter is undefined on return, if status is not NO_ERROR.
      */
             status_t    getTimestamp(AudioTimestamp& timestamp);
+private:
+            status_t    getTimestamp_l(AudioTimestamp& timestamp);
+public:
 
     /* Return the extended timestamp, with additional timebase info and improved drain behavior.
      *
@@ -839,6 +842,24 @@ public:
      */
             status_t pendingDuration(int32_t *msec,
                     ExtendedTimestamp::Location location = ExtendedTimestamp::LOCATION_SERVER);
+
+    /* hasStarted() is used to determine if audio is now audible at the device after
+     * a start() command. The underlying implementation checks a nonzero timestamp position
+     * or increment for the audible assumption.
+     *
+     * hasStarted() returns true if the track has been started() and audio is audible
+     * and no subsequent pause() or flush() has been called.  Immediately after pause() or
+     * flush() hasStarted() will return false.
+     *
+     * If stop() has been called, hasStarted() will return true if audio is still being
+     * delivered or has finished delivery (even if no audio was written) for both offloaded
+     * and normal tracks. This property removes a race condition in checking hasStarted()
+     * for very short clips, where stop() must be called to finish drain.
+     *
+     * In all cases, hasStarted() may turn false briefly after a subsequent start() is called
+     * until audio becomes audible again.
+     */
+            bool hasStarted(); // not const
 
 protected:
     /* copying audio tracks is not allowed */
@@ -1041,6 +1062,10 @@ protected:
                                                     // and could be easily widened to uint64_t
     int64_t                 mStartUs;               // the start time after flush or stop.
                                                     // only used for offloaded and direct tracks.
+    ExtendedTimestamp       mStartEts;              // Extended timestamp at start for normal
+                                                    // AudioTracks.
+    AudioTimestamp          mStartTs;               // Timestamp at start for offloaded or direct
+                                                    // AudioTracks.
 
     bool                    mPreviousTimestampValid;// true if mPreviousTimestamp is valid
     bool                    mTimestampStartupGlitchReported; // reduce log spam
