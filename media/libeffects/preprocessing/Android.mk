@@ -28,5 +28,6 @@ LOCAL_CFLAGS += \
     -DWEBRTC_POSIX
 
 LOCAL_CFLAGS += -fvisibility=hidden
+LOCAL_CFLAGS += -Wall -Werror
 
 include $(BUILD_SHARED_LIBRARY)

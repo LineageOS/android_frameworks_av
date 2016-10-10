@@ -120,6 +120,7 @@ LOCAL_C_INCLUDES += \
     $(LOCAL_PATH)/StereoWidening/lib
 
 LOCAL_CFLAGS += -fvisibility=hidden
+LOCAL_CFLAGS += -Wall -Werror
 
 include $(BUILD_STATIC_LIBRARY)
 
@@ -177,4 +178,5 @@ LOCAL_C_INCLUDES += \
     $(LOCAL_PATH)/Common/src
 
 LOCAL_CFLAGS += -fvisibility=hidden
+LOCAL_CFLAGS += -Wall -Werror
 include $(BUILD_STATIC_LIBRARY)

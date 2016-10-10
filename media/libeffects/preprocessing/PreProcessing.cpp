@@ -933,7 +933,6 @@ int Session_ReleaseEffect(preproc_session_t *session,
 
 int Session_SetConfig(preproc_session_t *session, effect_config_t *config)
 {
-    uint32_t sr;
     uint32_t inCnl = audio_channel_count_from_in_mask(config->inputCfg.channels);
     uint32_t outCnl = audio_channel_count_from_in_mask(config->outputCfg.channels);
 
@@ -1153,7 +1152,6 @@ static preproc_session_t sSessions[PREPROC_NUM_SESSIONS];
 preproc_session_t *PreProc_GetSession(int32_t procId, int32_t  sessionId, int32_t  ioId)
 {
     size_t i;
-    int free = -1;
     for (i = 0; i < PREPROC_NUM_SESSIONS; i++) {
         if (sSessions[i].io == ioId) {
             if (sSessions[i].createdMsk & (1 << procId)) {
@@ -1210,7 +1208,6 @@ int PreProcessingFx_Process(effect_handle_t     self,
                             audio_buffer_t    *outBuffer)
 {
     preproc_effect_t * effect = (preproc_effect_t *)self;
-    int    status = 0;
 
     if (effect == NULL){
         ALOGV("PreProcessingFx_Process() ERROR effect == NULL");
@@ -1402,8 +1399,6 @@ int PreProcessingFx_Command(effect_handle_t  self,
                             void                *pReplyData)
 {
     preproc_effect_t * effect = (preproc_effect_t *) self;
-    int retsize;
-    int status;
 
     if (effect == NULL){
         return -EINVAL;
@@ -1777,7 +1772,6 @@ int PreProcessingFx_ProcessReverse(effect_handle_t     self,
                                    audio_buffer_t    *outBuffer __unused)
 {
     preproc_effect_t * effect = (preproc_effect_t *)self;
-    int    status = 0;
 
     if (effect == NULL){
         ALOGW("PreProcessingFx_ProcessReverse() ERROR effect == NULL");
@@ -1926,7 +1920,6 @@ int PreProcessingLib_Create(const effect_uuid_t *uuid,
 
 int PreProcessingLib_Release(effect_handle_t interface)
 {
-    int status;
     ALOGV("EffectRelease start %p", interface);
     if (PreProc_Init() != 0) {
         return sInitStatus;

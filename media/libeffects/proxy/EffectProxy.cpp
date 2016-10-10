@@ -44,12 +44,6 @@ const effect_descriptor_t gProxyDescriptor = {
 };
 
 
-static const effect_descriptor_t *const gDescriptors[] =
-{
-    &gProxyDescriptor,
-};
-
-
 int EffectProxyCreate(const effect_uuid_t *uuid,
                             int32_t             sessionId,
                             int32_t             ioId,
