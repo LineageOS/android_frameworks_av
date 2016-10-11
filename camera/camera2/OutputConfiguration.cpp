@@ -21,8 +21,9 @@
 #include <utils/Log.h>
 
 #include <camera/camera2/OutputConfiguration.h>
-#include <gui/Surface.h>
 #include <binder/Parcel.h>
+#include <gui/Surface.h>
+#include <utils/String8.h>
 
 namespace android {
 

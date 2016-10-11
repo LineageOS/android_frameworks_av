@@ -22,6 +22,7 @@
 #include <media/stagefright/MediaErrors.h>
 
 #include <gui/BufferItem.h>
+#include <utils/String8.h>
 
 #include "GraphicBufferListener.h"
 
