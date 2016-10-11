@@ -290,12 +290,8 @@ void NuPlayer::DecoderPassThrough::onInputBufferFetched(
         return;
     }
 
-    sp<RefBase> obj;
-    bool hasBuffer = msg->findObject("buffer", &obj);
-    sp<MediaCodecBuffer> buffer;
-    if (hasBuffer) {
-        buffer = static_cast<MediaCodecBuffer *>(obj.get());
-    }
+    sp<ABuffer> buffer;
+    bool hasBuffer = msg->findBuffer("buffer", &buffer);
     if (buffer == NULL) {
         int32_t streamErr = ERROR_END_OF_STREAM;
         CHECK(msg->findInt32("err", &streamErr) || !hasBuffer);
@@ -324,10 +320,9 @@ void NuPlayer::DecoderPassThrough::onInputBufferFetched(
     int32_t bufferSize = buffer->size();
     mCachedBytes += bufferSize;
 
+    int64_t timeUs = 0;
+    CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
     if (mSkipRenderingUntilMediaTimeUs >= 0) {
-        int64_t timeUs = 0;
-        CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
-
         if (timeUs < mSkipRenderingUntilMediaTimeUs) {
             ALOGV("[%s] dropping buffer at time %lld as requested.",
                      mComponentName.c_str(), (long long)timeUs);
@@ -348,7 +343,10 @@ void NuPlayer::DecoderPassThrough::onInputBufferFetched(
     reply->setInt32("generation", mBufferGeneration);
     reply->setInt32("size", bufferSize);
 
-    mRenderer->queueBuffer(true /* audio */, buffer, reply);
+    sp<MediaCodecBuffer> mcBuffer = new MediaCodecBuffer(nullptr, buffer);
+    mcBuffer->meta()->setInt64("timeUs", timeUs);
+
+    mRenderer->queueBuffer(true /* audio */, mcBuffer, reply);
 
     ++mPendingBuffersToDrain;
     ALOGV("onInputBufferFilled: #ToDrain = %zu, cachedBytes = %zu",
