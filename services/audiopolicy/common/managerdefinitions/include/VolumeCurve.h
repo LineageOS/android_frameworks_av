@@ -18,7 +18,6 @@
 
 #include "IVolumeCurvesCollection.h"
 #include <policy.h>
-#include <hardware/audio.h>
 #include <utils/RefBase.h>
 #include <utils/String8.h>
 #include <utils/SortedVector.h>

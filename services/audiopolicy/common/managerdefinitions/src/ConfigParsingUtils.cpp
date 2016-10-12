@@ -22,7 +22,7 @@
 #include "AudioGain.h"
 #include "IOProfile.h"
 #include "TypeConverter.h"
-#include <hardware/audio.h>
+#include <system/audio.h>
 #include <utils/Log.h>
 #include <cutils/misc.h>
 

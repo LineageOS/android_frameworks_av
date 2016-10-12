@@ -107,7 +107,7 @@ class StreamOutHalLocal : public StreamOutHalInterface, public StreamHalLocal {
     virtual status_t supportsDrain(bool *supportsDrain);
 
     // Requests notification when data buffered by the driver/hardware has been played.
-    virtual status_t drain(audio_drain_type_t type);
+    virtual status_t drain(bool earlyNotify);
 
     // Notifies to the audio driver to flush the queued data.
     virtual status_t flush();

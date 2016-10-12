@@ -19,7 +19,7 @@
 #include <utils/RefBase.h>
 #include <media/AudioPolicy.h>
 #include <utils/KeyedVector.h>
-#include <hardware/audio.h>
+#include <system/audio.h>
 #include <utils/String8.h>
 
 namespace android {

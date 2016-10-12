@@ -20,7 +20,7 @@
 #include <utils/KeyedVector.h>
 #include <utils/StrongPointer.h>
 #include <utils/SortedVector.h>
-#include <hardware/audio.h>
+#include <system/audio.h>
 
 namespace android {
 

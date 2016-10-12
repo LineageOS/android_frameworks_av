@@ -43,7 +43,6 @@
 #include <cutils/properties.h>
 
 #include <system/audio.h>
-#include <hardware/audio.h>
 
 #include "AudioMixer.h"
 #include "AudioFlinger.h"

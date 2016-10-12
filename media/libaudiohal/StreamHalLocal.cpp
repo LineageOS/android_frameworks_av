@@ -17,6 +17,7 @@
 #define LOG_TAG "StreamHalLocal"
 //#define LOG_NDEBUG 0
 
+#include <hardware/audio.h>
 #include <utils/Log.h>
 
 #include "DeviceHalLocal.h"
@@ -199,9 +200,9 @@ status_t StreamOutHalLocal::supportsDrain(bool *supportsDrain) {
     return OK;
 }
 
-status_t StreamOutHalLocal::drain(audio_drain_type_t type) {
+status_t StreamOutHalLocal::drain(bool earlyNotify) {
     if (mStream->drain == NULL) return INVALID_OPERATION;
-    return mStream->drain(mStream, type);
+    return mStream->drain(mStream, earlyNotify ? AUDIO_DRAIN_EARLY_NOTIFY : AUDIO_DRAIN_ALL);
 }
 
 status_t StreamOutHalLocal::flush() {
