@@ -33,11 +33,11 @@
 #include <AudioPolicyEngineInstance.h>
 #include <cutils/properties.h>
 #include <utils/Log.h>
-#include <hardware/audio.h>
 #include <hardware/audio_effect.h>
 #include <media/AudioParameter.h>
 #include <media/AudioPolicyHelper.h>
 #include <soundtrigger/SoundTrigger.h>
+#include <system/audio.h>
 #include "AudioPolicyManager.h"
 #ifndef USE_XML_AUDIO_POLICY_CONF
 #include <ConfigParsingUtils.h>

@@ -20,8 +20,8 @@
 #include "HwModule.h"
 #include "IOProfile.h"
 #include "AudioGain.h"
-#include <hardware/audio.h>
 #include <policy.h>
+#include <system/audio.h>
 
 namespace android {
 

@@ -17,7 +17,6 @@
 #ifndef ANDROID_AUDIO_STREAM_OUT_SINK_H
 #define ANDROID_AUDIO_STREAM_OUT_SINK_H
 
-#include <hardware/audio.h>
 #include "NBAIO.h"
 
 namespace android {

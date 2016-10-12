@@ -17,8 +17,8 @@
 #ifndef ANDROID_HARDWARE_STREAM_HAL_INTERFACE_H
 #define ANDROID_HARDWARE_STREAM_HAL_INTERFACE_H
 
-#include <hardware/audio.h>
 #include <media/audiohal/EffectHalInterface.h>
+#include <system/audio.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 #include <utils/String8.h>
@@ -117,7 +117,7 @@ class StreamOutHalInterface : public virtual StreamHalInterface {
     virtual status_t supportsDrain(bool *supportsDrain) = 0;
 
     // Requests notification when data buffered by the driver/hardware has been played.
-    virtual status_t drain(audio_drain_type_t type) = 0;
+    virtual status_t drain(bool earlyNotify) = 0;
 
     // Notifies to the audio driver to flush the queued data.
     virtual status_t flush() = 0;

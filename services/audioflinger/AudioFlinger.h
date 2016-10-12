@@ -43,7 +43,6 @@
 #include <binder/MemoryDealer.h>
 
 #include <system/audio.h>
-#include <hardware/audio.h>
 #include <hardware/audio_policy.h>
 
 #include <media/audiohal/StreamHalInterface.h>

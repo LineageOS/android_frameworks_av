@@ -33,13 +33,13 @@
 #include <utils/Trace.h>
 
 #include <private/media/AudioTrackShared.h>
-#include <hardware/audio.h>
 #include <audio_effects/effect_ns.h>
 #include <audio_effects/effect_aec.h>
 #include <audio_utils/conversion.h>
 #include <audio_utils/primitives.h>
 #include <audio_utils/format.h>
 #include <audio_utils/minifloat.h>
+#include <system/audio.h>
 
 // NBAIO implementations
 #include <media/nbaio/AudioStreamInSource.h>
@@ -2750,9 +2750,7 @@ void AudioFlinger::PlaybackThread::threadLoop_drain()
             ALOG_ASSERT(mCallbackThread != 0);
             mCallbackThread->setDraining(mDrainSequence);
         }
-        status_t result = mOutput->stream->drain(
-            (mMixerStatus == MIXER_DRAIN_TRACK) ? AUDIO_DRAIN_EARLY_NOTIFY
-                                                : AUDIO_DRAIN_ALL);
+        status_t result = mOutput->stream->drain(mMixerStatus == MIXER_DRAIN_TRACK);
         ALOGE_IF(result != OK, "Error when draining stream: %d", result);
     }
 }

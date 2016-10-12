@@ -17,7 +17,7 @@
 #ifndef ANDROID_HARDWARE_DEVICE_HAL_INTERFACE_H
 #define ANDROID_HARDWARE_DEVICE_HAL_INTERFACE_H
 
-#include <hardware/audio.h>
+#include <system/audio.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 #include <utils/String8.h>
