@@ -88,7 +88,9 @@ public:
         data.writeInt32(handle);
         data.writeStrongBinder(IInterface::asBinder(client));
         ALOGV("attach() config %p withAudio %d region %d type %d",
-              config == NULL ? 0 : config, withAudio, config->region, config->band.type);
+              config == NULL ? 0 : config, withAudio,
+              config == NULL ? 0 : config->region,
+              config == NULL ? 0 : config->band.type);
         if (config == NULL) {
             data.writeInt32(0);
         } else {
