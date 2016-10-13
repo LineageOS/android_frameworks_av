@@ -25,7 +25,6 @@
 #include <utils/threads.h>
 
 namespace android {
-class IGraphicBufferSource;
 class IOMXBufferSource;
 class IOMXObserver;
 struct OMXMaster;
@@ -81,21 +80,8 @@ struct OMXNodeInstance : public BnOMXNode {
             OMX_U32 portIndex, const sp<NativeHandle> &nativeHandle,
             OMX::buffer_id buffer);
 
-    status_t createInputSurface(
-            OMX_U32 portIndex, android_dataspace dataSpace,
-            sp<IGraphicBufferProducer> *bufferProducer,
-            sp<IGraphicBufferSource> *bufferSource,
-            MetadataBufferType *type);
-
-    static status_t createPersistentInputSurface(
-            sp<IGraphicBufferProducer> *bufferProducer,
-            sp<IGraphicBufferConsumer> *bufferConsumer);
-
     status_t setInputSurface(
-            OMX_U32 portIndex,
-            const sp<IGraphicBufferConsumer> &bufferConsumer,
-            sp<IGraphicBufferSource> *bufferSource,
-            MetadataBufferType *type);
+            const sp<IOMXBufferSource> &bufferSource);
 
     status_t allocateSecureBuffer(
             OMX_U32 portIndex, size_t size, OMX::buffer_id *buffer,
@@ -252,12 +238,6 @@ private:
             OMX_U32 portIndex, const sp<GraphicBuffer> &graphicBuffer,
             OMX::buffer_id buffer, OMX_BUFFERHEADERTYPE *header);
 
-    status_t createGraphicBufferSource(
-            OMX_U32 portIndex, android_dataspace dataSpace,
-            const sp<IGraphicBufferConsumer> &bufferConsumer,
-            sp<IGraphicBufferProducer> *bufferProducer,
-            sp<IGraphicBufferSource> *bufferSource,
-            MetadataBufferType *type);
     sp<IOMXBufferSource> getBufferSource();
     void setBufferSource(const sp<IOMXBufferSource> &bufferSource);
     // Called when omx_message::FILL_BUFFER_DONE is received. (Currently the

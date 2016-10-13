@@ -16,22 +16,7 @@
 
 package android;
 
-import android.IOMXNode;
-
-/**
- * Binder interface for controlling a graphic buffer source.
- *
- * @hide
- */
-interface IGraphicBufferSource {
-    void configure(IOMXNode omxNode, int dataSpace);
-    void setSuspend(boolean suspend);
-    void setRepeatPreviousFrameDelayUs(long repeatAfterUs);
-    void setMaxTimestampGapUs(long maxGapUs);
-    void setMaxFps(float maxFps);
-    void setTimeLapseConfig(long timePerFrameUs, long timePerCaptureUs);
-    void setStartTimeUs(long startTimeUs);
-    void setColorAspects(int aspects);
-    void setTimeOffsetUs(long timeOffsetsUs);
-    void signalEndOfInputStream();
+/** @hide */
+interface IOMXNode {
+    // Stub for manual implementation
 }

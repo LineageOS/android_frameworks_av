@@ -27,7 +27,9 @@
 #include <media/openmax/OMX_IndexExt.h>
 #include <utils/NativeHandle.h>
 
+#include <gui/IGraphicBufferProducer.h>
 #include <android/IGraphicBufferSource.h>
+#include <android/IOMXBufferSource.h>
 
 namespace android {
 
@@ -45,7 +47,6 @@ enum {
     USE_BUFFER,
     USE_GRAPHIC_BUFFER,
     CREATE_INPUT_SURFACE,
-    CREATE_PERSISTENT_INPUT_SURFACE,
     SET_INPUT_SURFACE,
     STORE_META_DATA_IN_BUFFERS,
     PREPARE_FOR_ADAPTIVE_PLAYBACK,
@@ -111,13 +112,13 @@ public:
         return err;
     }
 
-    virtual status_t createPersistentInputSurface(
+    virtual status_t createInputSurface(
             sp<IGraphicBufferProducer> *bufferProducer,
-            sp<IGraphicBufferConsumer> *bufferConsumer) {
+            sp<IGraphicBufferSource> *bufferSource) {
         Parcel data, reply;
         status_t err;
         data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        err = remote()->transact(CREATE_PERSISTENT_INPUT_SURFACE, data, &reply);
+        err = remote()->transact(CREATE_INPUT_SURFACE, data, &reply);
         if (err != OK) {
             ALOGW("binder transaction failed: %d", err);
             return err;
@@ -130,7 +131,7 @@ public:
 
         *bufferProducer = IGraphicBufferProducer::asInterface(
                 reply.readStrongBinder());
-        *bufferConsumer = IGraphicBufferConsumer::asInterface(
+        *bufferSource = IGraphicBufferSource::asInterface(
                 reply.readStrongBinder());
 
         return err;
@@ -328,72 +329,21 @@ public:
         return err;
     }
 
-    virtual status_t createInputSurface(
-            OMX_U32 port_index, android_dataspace dataSpace,
-            sp<IGraphicBufferProducer> *bufferProducer,
-            sp<IGraphicBufferSource> *bufferSource,
-            MetadataBufferType *type) {
-        Parcel data, reply;
-        status_t err;
-        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
-        data.writeInt32(port_index);
-        data.writeInt32(dataSpace);
-        err = remote()->transact(CREATE_INPUT_SURFACE, data, &reply);
-        if (err != OK) {
-            ALOGW("binder transaction failed: %d", err);
-            return err;
-        }
-
-        // read type even if createInputSurface failed
-        int negotiatedType = reply.readInt32();
-        if (type != NULL) {
-            *type = (MetadataBufferType)negotiatedType;
-        }
-
-        err = reply.readInt32();
-        if (err != OK) {
-            return err;
-        }
-
-        *bufferProducer = IGraphicBufferProducer::asInterface(
-                reply.readStrongBinder());
-        *bufferSource = IGraphicBufferSource::asInterface(
-                reply.readStrongBinder());
-
-        return err;
-    }
-
     virtual status_t setInputSurface(
-            OMX_U32 port_index,
-            const sp<IGraphicBufferConsumer> &bufferConsumer,
-            sp<IGraphicBufferSource> *bufferSource,
-            MetadataBufferType *type) {
+            const sp<IOMXBufferSource> &bufferSource) {
         Parcel data, reply;
         data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
-        status_t err;
-        data.writeInt32(port_index);
-        data.writeStrongBinder(IInterface::asBinder(bufferConsumer));
 
-        err = remote()->transact(SET_INPUT_SURFACE, data, &reply);
+        data.writeStrongBinder(IInterface::asBinder(bufferSource));
+
+        status_t err = remote()->transact(SET_INPUT_SURFACE, data, &reply);
 
         if (err != OK) {
             ALOGW("binder transaction failed: %d", err);
             return err;
         }
 
-        // read type even if setInputSurface failed
-        int negotiatedType = reply.readInt32();
-        if (type != NULL) {
-            *type = (MetadataBufferType)negotiatedType;
-        }
-
         err = reply.readInt32();
-        if (err != OK) {
-            return err;
-        }
-
-        *bufferSource = IGraphicBufferSource::asInterface(
-                reply.readStrongBinder());
 
         return err;
     }
@@ -651,20 +601,19 @@ status_t BnOMX::onTransact(
             return NO_ERROR;
         }
 
-        case CREATE_PERSISTENT_INPUT_SURFACE:
+        case CREATE_INPUT_SURFACE:
         {
             CHECK_OMX_INTERFACE(IOMX, data, reply);
 
             sp<IGraphicBufferProducer> bufferProducer;
-            sp<IGraphicBufferConsumer> bufferConsumer;
-            status_t err = createPersistentInputSurface(
-                    &bufferProducer, &bufferConsumer);
+            sp<IGraphicBufferSource> bufferSource;
+            status_t err = createInputSurface(&bufferProducer, &bufferSource);
 
             reply->writeInt32(err);
 
             if (err == OK) {
                 reply->writeStrongBinder(IInterface::asBinder(bufferProducer));
-                reply->writeStrongBinder(IInterface::asBinder(bufferConsumer));
+                reply->writeStrongBinder(IInterface::asBinder(bufferSource));
             }
 
             return NO_ERROR;
@@ -897,62 +846,16 @@ status_t BnOMXNode::onTransact(
             return NO_ERROR;
         }
 
-        case CREATE_INPUT_SURFACE:
-        {
-            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
-
-            OMX_U32 port_index = data.readInt32();
-            android_dataspace dataSpace = (android_dataspace)data.readInt32();
-
-            sp<IGraphicBufferProducer> bufferProducer;
-            sp<IGraphicBufferSource> bufferSource;
-            MetadataBufferType type = kMetadataBufferTypeInvalid;
-            status_t err = createInputSurface(
-                    port_index, dataSpace, &bufferProducer, &bufferSource, &type);
-
-            if ((err != OK) && (type == kMetadataBufferTypeInvalid)) {
-                android_errorWriteLog(0x534e4554, "26324358");
-            }
-
-            reply->writeInt32(type);
-            reply->writeInt32(err);
-
-            if (err == OK) {
-                reply->writeStrongBinder(IInterface::asBinder(bufferProducer));
-                reply->writeStrongBinder(IInterface::asBinder(bufferSource));
-            }
-
-            return NO_ERROR;
-        }
-
         case SET_INPUT_SURFACE:
         {
             CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
-            OMX_U32 port_index = data.readInt32();
+            sp<IOMXBufferSource> bufferSource =
+                    interface_cast<IOMXBufferSource>(data.readStrongBinder());
 
-            sp<IGraphicBufferConsumer> bufferConsumer =
-                    interface_cast<IGraphicBufferConsumer>(data.readStrongBinder());
-
-            sp<IGraphicBufferSource> bufferSource;
-            MetadataBufferType type = kMetadataBufferTypeInvalid;
-
-            status_t err = INVALID_OPERATION;
-            if (bufferConsumer == NULL) {
-                ALOGE("b/26392700");
-            } else {
-                err = setInputSurface(port_index, bufferConsumer, &bufferSource, &type);
-
-                if ((err != OK) && (type == kMetadataBufferTypeInvalid)) {
-                   android_errorWriteLog(0x534e4554, "26324358");
-                }
-            }
-
-            reply->writeInt32(type);
+            status_t err = setInputSurface(bufferSource);
             reply->writeInt32(err);
-            if (err == OK) {
-                reply->writeStrongBinder(IInterface::asBinder(bufferSource));
-            }
+
             return NO_ERROR;
         }
 

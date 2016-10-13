@@ -361,7 +361,7 @@ status_t MediaRecorder::setInputSurface(const sp<PersistentSurface>& surface)
         return INVALID_OPERATION;
     }
 
-    return mMediaRecorder->setInputSurface(surface->getBufferConsumer());
+    return mMediaRecorder->setInputSurface(surface);
 }
 
 status_t MediaRecorder::setVideoFrameRate(int frames_per_second)

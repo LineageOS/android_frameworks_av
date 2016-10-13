@@ -213,50 +213,24 @@ status_t MediaCodec::QueryCapabilities(
 // static
 sp<PersistentSurface> MediaCodec::CreatePersistentInputSurface() {
     OMXClient client;
-    CHECK_EQ(client.connect(), (status_t)OK);
+    if (client.connect() != OK) {
+        ALOGE("Failed to connect to OMX to create persistent input surface.");
+        return NULL;
+    }
+
     sp<IOMX> omx = client.interface();
 
-    const sp<IMediaCodecList> mediaCodecList = MediaCodecList::getInstance();
-    if (mediaCodecList == NULL) {
-        ALOGE("Failed to obtain MediaCodecList!");
-        return NULL; // if called from Java should raise IOException
-    }
-
-    AString tmp;
-    sp<AMessage> globalSettings = mediaCodecList->getGlobalSettings();
-    if (globalSettings == NULL || !globalSettings->findString(
-            kMaxEncoderInputBuffers, &tmp)) {
-        ALOGE("Failed to get encoder input buffer count!");
-        return NULL;
-    }
-
-    int32_t bufferCount = strtol(tmp.c_str(), NULL, 10);
-    if (bufferCount <= 0
-            || bufferCount > BufferQueue::MAX_MAX_ACQUIRED_BUFFERS) {
-        ALOGE("Encoder input buffer count is invalid!");
-        return NULL;
-    }
-
     sp<IGraphicBufferProducer> bufferProducer;
-    sp<IGraphicBufferConsumer> bufferConsumer;
+    sp<IGraphicBufferSource> bufferSource;
 
-    status_t err = omx->createPersistentInputSurface(
-            &bufferProducer, &bufferConsumer);
+    status_t err = omx->createInputSurface(&bufferProducer, &bufferSource);
 
     if (err != OK) {
         ALOGE("Failed to create persistent input surface.");
         return NULL;
     }
 
-    err = bufferConsumer->setMaxAcquiredBufferCount(bufferCount);
-
-    if (err != NO_ERROR) {
-        ALOGE("Unable to set BQ max acquired buffer count to %u: %d",
-                bufferCount, err);
-        return NULL;
-    }
-
-    return new PersistentSurface(bufferProducer, bufferConsumer);
+    return new PersistentSurface(bufferProducer, bufferSource);
 }
 
 MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid)
@@ -1311,6 +1285,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     status_t err = NO_ERROR;
                     sp<AMessage> response = new AMessage();
                     if (!msg->findInt32("err", &err)) {
+                        CHECK(msg->findMessage("input-format", &mInputFormat));
+                        CHECK(msg->findMessage("output-format", &mOutputFormat));
                         mHaveInputSurface = true;
                     } else {
                         response->setInt32("err", err);

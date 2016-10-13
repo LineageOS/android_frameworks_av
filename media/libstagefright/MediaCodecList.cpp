@@ -44,8 +44,6 @@
 
 namespace android {
 
-const char *kMaxEncoderInputBuffers = "max-video-encoder-input-buffers";
-
 static Mutex sInitMutex;
 
 static bool parseBoolean(const char *s) {

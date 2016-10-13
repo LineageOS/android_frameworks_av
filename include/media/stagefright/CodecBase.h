@@ -36,6 +36,7 @@ namespace android {
 
 class MediaCodecBuffer;
 struct PersistentSurface;
+class Surface;
 
 struct CodecBase : public AHandler, /* static */ ColorUtils {
     enum {

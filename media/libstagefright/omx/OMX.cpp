@@ -27,6 +27,7 @@
 #include "../include/OMXNodeInstance.h"
 
 #include <media/stagefright/foundation/ADebug.h>
+#include "GraphicBufferSource.h"
 
 #include "OMXMaster.h"
 #include "OMXUtils.h"
@@ -154,11 +155,26 @@ status_t OMX::freeNode(const sp<OMXNodeInstance> &instance) {
     return StatusFromOMXError(err);
 }
 
-status_t OMX::createPersistentInputSurface(
+status_t OMX::createInputSurface(
         sp<IGraphicBufferProducer> *bufferProducer,
-        sp<IGraphicBufferConsumer> *bufferConsumer) {
-    return OMXNodeInstance::createPersistentInputSurface(
-            bufferProducer, bufferConsumer);
+        sp<IGraphicBufferSource> *bufferSource) {
+    if (bufferProducer == NULL || bufferSource == NULL) {
+        ALOGE("b/25884056");
+        return BAD_VALUE;
+    }
+
+    sp<GraphicBufferSource> graphicBufferSource = new GraphicBufferSource();
+    status_t err = graphicBufferSource->initCheck();
+    if (err != OK) {
+        ALOGE("Failed to create persistent input surface: %s (%d)",
+                strerror(-err), err);
+        return err;
+    }
+
+    *bufferProducer = graphicBufferSource->getIGraphicBufferProducer();
+    *bufferSource = graphicBufferSource;
+
+    return OK;
 }
 
 }  // namespace android

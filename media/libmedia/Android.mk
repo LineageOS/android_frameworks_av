@@ -93,8 +93,13 @@ LOCAL_C_INCLUDES := \
     $(TOP)/frameworks/native/include/media/openmax \
     $(TOP)/frameworks/av/include/media/ \
     $(TOP)/frameworks/av/media/libstagefright \
+    $(TOP)/frameworks/av/media/libmedia/aidl \
     $(call include-path-for, audio-effects) \
     $(call include-path-for, audio-utils)
+
+LOCAL_EXPORT_C_INCLUDE_DIRS := \
+    frameworks/av/include/media \
+    frameworks/av/media/libmedia/aidl
 
 LOCAL_CFLAGS += -Werror -Wno-error=deprecated-declarations -Wall
 LOCAL_SANITIZE := unsigned-integer-overflow signed-integer-overflow

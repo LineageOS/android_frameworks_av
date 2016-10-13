@@ -127,61 +127,6 @@ static sp<AMessage> getMeasureFormat(
     return format;
 }
 
-static size_t doProfileEncoderInputBuffers(
-        const AString &name, const AString &mime, const sp<MediaCodecInfo::Capabilities> &caps) {
-    ALOGV("doProfileEncoderInputBuffers: name %s, mime %s", name.c_str(), mime.c_str());
-
-    sp<AMessage> format = getMeasureFormat(true /* isEncoder */, mime, caps);
-    if (format == NULL) {
-        return 0;
-    }
-
-    format->setInt32("color-format", OMX_COLOR_FormatAndroidOpaque);
-    ALOGV("doProfileEncoderInputBuffers: format %s", format->debugString().c_str());
-
-    status_t err = OK;
-    sp<ALooper> looper = new ALooper;
-    looper->setName("MediaCodec_looper");
-    looper->start(
-            false /* runOnCallingThread */, false /* canCallJava */, ANDROID_PRIORITY_AUDIO);
-
-    sp<MediaCodec> codec = MediaCodec::CreateByComponentName(looper, name.c_str(), &err);
-    if (err != OK) {
-        ALOGE("Failed to create codec: %s", name.c_str());
-        return 0;
-    }
-
-    err = codec->configure(format, NULL, NULL, MediaCodec::CONFIGURE_FLAG_ENCODE);
-    if (err != OK) {
-        ALOGE("Failed to configure codec: %s with mime: %s", name.c_str(), mime.c_str());
-        codec->release();
-        return 0;
-    }
-
-    sp<IGraphicBufferProducer> bufferProducer;
-    err = codec->createInputSurface(&bufferProducer);
-    if (err != OK) {
-        ALOGE("Failed to create surface: %s with mime: %s", name.c_str(), mime.c_str());
-        codec->release();
-        return 0;
-    }
-
-    int minUndequeued = 0;
-    err = bufferProducer->query(
-            NATIVE_WINDOW_MIN_UNDEQUEUED_BUFFERS, &minUndequeued);
-    if (err != OK) {
-        ALOGE("Failed to query NATIVE_WINDOW_MIN_UNDEQUEUED_BUFFERS");
-        minUndequeued = 0;
-    }
-
-    err = codec->release();
-    if (err != OK) {
-        ALOGW("Failed to release codec: %s with mime: %s", name.c_str(), mime.c_str());
-    }
-
-    return minUndequeued;
-}
-
 static size_t doProfileCodecs(
         bool isEncoder, const AString &name, const AString &mime, const sp<MediaCodecInfo::Capabilities> &caps) {
     sp<AMessage> format = getMeasureFormat(isEncoder, mime, caps);
@@ -276,7 +221,6 @@ void profileCodecs(
         bool forceToMeasure) {
     KeyedVector<AString, sp<MediaCodecInfo::Capabilities>> codecsNeedMeasure;
     AString supportMultipleSecureCodecs = "true";
-    size_t maxEncoderInputBuffers = 0;
     for (size_t i = 0; i < infos.size(); ++i) {
         const sp<MediaCodecInfo> info = infos[i];
         AString name = info->getCodecName();
@@ -319,20 +263,8 @@ void profileCodecs(
                         supportMultipleSecureCodecs = "false";
                     }
                 }
-                if (info->isEncoder() && mimes[i].startsWith("video/")) {
-                    size_t encoderInputBuffers =
-                        doProfileEncoderInputBuffers(name, mimes[i], caps);
-                    if (encoderInputBuffers > maxEncoderInputBuffers) {
-                        maxEncoderInputBuffers = encoderInputBuffers;
-                    }
-                }
             }
         }
-    }
-    if (maxEncoderInputBuffers > 0) {
-        char tmp[32];
-        sprintf(tmp, "%zu", maxEncoderInputBuffers);
-        global_results->add(kMaxEncoderInputBuffers, tmp);
     }
     global_results->add(kPolicySupportsMultipleSecureCodecs, supportMultipleSecureCodecs);
 }

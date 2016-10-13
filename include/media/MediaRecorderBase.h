@@ -25,9 +25,8 @@
 namespace android {
 
 class ICameraRecordingProxy;
-class Surface;
-class IGraphicBufferConsumer;
 class IGraphicBufferProducer;
+struct PersistentSurface;
 
 struct MediaRecorderBase {
     MediaRecorderBase(const String16 &opPackageName)
@@ -59,7 +58,7 @@ struct MediaRecorderBase {
     virtual status_t reset() = 0;
     virtual status_t getMaxAmplitude(int *max) = 0;
     virtual status_t dump(int fd, const Vector<String16>& args) const = 0;
-    virtual status_t setInputSurface(const sp<IGraphicBufferConsumer>& surface) = 0;
+    virtual status_t setInputSurface(const sp<PersistentSurface>& surface) = 0;
     virtual sp<IGraphicBufferProducer> querySurfaceMediaSource() const = 0;
 
 

@@ -20,7 +20,6 @@
 
 #include <inttypes.h>
 
-#include <gui/IGraphicBufferConsumer.h>
 #include <gui/IGraphicBufferProducer.h>
 #include <gui/Surface.h>
 #include <media/ICrypto.h>
@@ -36,7 +35,6 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
-#include <media/stagefright/PersistentSurface.h>
 #include <media/stagefright/Utils.h>
 
 namespace android {
@@ -326,10 +324,10 @@ sp<MediaCodecSource> MediaCodecSource::Create(
         const sp<ALooper> &looper,
         const sp<AMessage> &format,
         const sp<MediaSource> &source,
-        const sp<IGraphicBufferConsumer> &consumer,
+        const sp<PersistentSurface> &persistentSurface,
         uint32_t flags) {
-    sp<MediaCodecSource> mediaSource =
-            new MediaCodecSource(looper, format, source, consumer, flags);
+    sp<MediaCodecSource> mediaSource = new MediaCodecSource(
+            looper, format, source, persistentSurface, flags);
 
     if (mediaSource->init() == OK) {
         return mediaSource;
@@ -405,7 +403,7 @@ MediaCodecSource::MediaCodecSource(
         const sp<ALooper> &looper,
         const sp<AMessage> &outputFormat,
         const sp<MediaSource> &source,
-        const sp<IGraphicBufferConsumer> &consumer,
+        const sp<PersistentSurface> &persistentSurface,
         uint32_t flags)
     : mLooper(looper),
       mOutputFormat(outputFormat),
@@ -418,7 +416,7 @@ MediaCodecSource::MediaCodecSource(
       mSetEncoderFormat(false),
       mEncoderFormat(0),
       mEncoderDataSpace(0),
-      mGraphicBufferConsumer(consumer),
+      mPersistentSurface(persistentSurface),
       mInputBufferTimeOffsetUs(0),
       mFirstSampleSystemTimeUs(-1ll),
       mPausePending(false),
@@ -515,12 +513,11 @@ status_t MediaCodecSource::initEncoder() {
     if (mFlags & FLAG_USE_SURFACE_INPUT) {
         CHECK(mIsVideo);
 
-        if (mGraphicBufferConsumer != NULL) {
+        if (mPersistentSurface != NULL) {
             // When using persistent surface, we are only interested in the
             // consumer, but have to use PersistentSurface as a wrapper to
             // pass consumer over messages (similar to BufferProducerWrapper)
-            err = mEncoder->setInputSurface(
-                    new PersistentSurface(NULL, mGraphicBufferConsumer));
+            err = mEncoder->setInputSurface(mPersistentSurface);
         } else {
             err = mEncoder->createInputSurface(&mGraphicBufferProducer);
         }
