@@ -26,12 +26,12 @@
 #include <binder/BinderService.h>
 #include <system/audio.h>
 #include <system/audio_policy.h>
-#include <hardware/audio_policy.h>
 #include <media/IAudioPolicyService.h>
 #include <media/ToneGenerator.h>
 #include <media/AudioEffect.h>
 #include <media/AudioPolicy.h>
 #ifdef USE_LEGACY_AUDIO_POLICY
+#include <hardware/audio_policy.h>
 #include <hardware_legacy/AudioPolicyInterface.h>
 #endif
 #include "AudioPolicyEffects.h"

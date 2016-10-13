@@ -36,10 +36,13 @@
 #include <media/AudioEffect.h>
 #include <media/AudioParameter.h>
 
-#include <hardware/hardware.h>
 #include <system/audio.h>
 #include <system/audio_policy.h>
+
+#ifdef USE_LEGACY_AUDIO_POLICY
+#include <hardware/hardware.h>
 #include <hardware/audio_policy.h>
+#endif
 
 namespace android {
 

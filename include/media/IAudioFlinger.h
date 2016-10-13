@@ -30,7 +30,6 @@
 #include <system/audio.h>
 #include <system/audio_effect.h>
 #include <system/audio_policy.h>
-#include <hardware/audio_policy.h>
 #include <media/IEffect.h>
 #include <media/IEffectClient.h>
 #include <utils/String8.h>
