@@ -912,13 +912,17 @@ status_t OMXNodeInstance::useBuffer(
     OMX_BUFFERHEADERTYPE *header;
     OMX_ERRORTYPE err = OMX_ErrorNone;
     bool isMetadata = mMetadataType[portIndex] != kMetadataBufferTypeInvalid;
+    bool isOutputGraphicMetadata = (portIndex == kPortIndexOutput) &&
+            (mMetadataType[portIndex] == kMetadataBufferTypeGrallocSource ||
+                    mMetadataType[portIndex] == kMetadataBufferTypeANWBuffer);
 
     uint32_t requiresAllocateBufferBit =
         (portIndex == kPortIndexInput)
             ? kRequiresAllocateBufferOnInputPorts
             : kRequiresAllocateBufferOnOutputPorts;
 
-    if (mQuirks & requiresAllocateBufferBit) {
+    // we use useBuffer for output metadata regardless of quirks
+    if (!isOutputGraphicMetadata && (mQuirks & requiresAllocateBufferBit)) {
         // metadata buffers are not connected cross process; only copy if not meta.
         buffer_meta = new BufferMeta(
                     params, portIndex, !isMetadata /* copy */, NULL /* data */);
