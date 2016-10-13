@@ -39,6 +39,7 @@ class SoundTriggerHwService :
     friend class BinderService<SoundTriggerHwService>;
 public:
     class Module;
+    class ModuleClient;
 
     static char const* getServiceName() { return "media.sound_trigger_hw"; }
 
@@ -69,7 +70,8 @@ public:
         };
 
         Model(sound_model_handle_t handle, audio_session_t session, audio_io_handle_t ioHandle,
-              audio_devices_t device, sound_trigger_sound_model_type_t type);
+              audio_devices_t device, sound_trigger_sound_model_type_t type,
+              sp<ModuleClient>& moduleClient);
         ~Model() {}
 
         sound_model_handle_t    mHandle;
@@ -79,6 +81,7 @@ public:
         audio_devices_t         mCaptureDevice;
         sound_trigger_sound_model_type_t mType;
         struct sound_trigger_recognition_config mConfig;
+        sp<ModuleClient>        mModuleClient;
     };
 
     class CallbackEvent : public RefBase {
@@ -88,26 +91,75 @@ public:
             TYPE_SOUNDMODEL,
             TYPE_SERVICE_STATE,
         } event_type;
-        CallbackEvent(event_type type, sp<IMemory> memory, wp<Module> module);
+        CallbackEvent(event_type type, sp<IMemory> memory);
 
         virtual             ~CallbackEvent();
+
+        void setModule(wp<Module> module) { mModule = module; }
+        void setModuleClient(wp<ModuleClient> moduleClient) { mModuleClient = moduleClient; }
 
         event_type mType;
         sp<IMemory> mMemory;
         wp<Module> mModule;
+        wp<ModuleClient> mModuleClient;
     };
 
-    class Module : public virtual RefBase,
-                   public BnSoundTrigger,
-                   public IBinder::DeathRecipient     {
+    class Module : public RefBase {
     public:
 
        Module(const sp<SoundTriggerHwService>& service,
               const sp<SoundTriggerHalInterface>& halInterface,
-              sound_trigger_module_descriptor descriptor,
-              const sp<ISoundTriggerClient>& client);
+              sound_trigger_module_descriptor descriptor);
 
        virtual ~Module();
+
+       virtual status_t loadSoundModel(const sp<IMemory>& modelMemory,
+                                       sp<ModuleClient> moduleClient,
+                                       sound_model_handle_t *handle);
+
+       virtual status_t unloadSoundModel(sound_model_handle_t handle);
+
+       virtual status_t startRecognition(sound_model_handle_t handle,
+                                         const sp<IMemory>& dataMemory);
+       virtual status_t stopRecognition(sound_model_handle_t handle);
+
+       sp<SoundTriggerHalInterface> halInterface() const { return mHalInterface; }
+       struct sound_trigger_module_descriptor descriptor() { return mDescriptor; }
+       wp<SoundTriggerHwService> service() const { return mService; }
+       bool isConcurrentCaptureAllowed() const { return mDescriptor.properties.concurrent_capture; }
+
+       sp<Model> getModel(sound_model_handle_t handle);
+
+       void setCaptureState_l(bool active);
+
+       sp<ModuleClient> addClient(const sp<ISoundTriggerClient>& client);
+
+       void detach(const sp<ModuleClient>& moduleClient);
+
+       void onCallbackEvent(const sp<CallbackEvent>& event);
+
+    private:
+
+        status_t unloadSoundModel_l(sound_model_handle_t handle);
+
+        Mutex                                  mLock;
+        wp<SoundTriggerHwService>              mService;
+        sp<SoundTriggerHalInterface>           mHalInterface;
+        struct sound_trigger_module_descriptor mDescriptor;
+        Vector< sp<ModuleClient> >             mModuleClients;
+        DefaultKeyedVector< sound_model_handle_t, sp<Model> >     mModels;
+        sound_trigger_service_state_t          mServiceState;
+    }; // class Module
+
+    class ModuleClient : public virtual RefBase,
+                         public BnSoundTrigger,
+                         public IBinder::DeathRecipient {
+    public:
+
+       ModuleClient(const sp<Module>& module,
+              const sp<ISoundTriggerClient>& client);
+
+       virtual ~ModuleClient();
 
        virtual void detach();
 
@@ -122,35 +174,23 @@ public:
 
        virtual status_t dump(int fd, const Vector<String16>& args);
 
-
-       struct sound_trigger_module_descriptor descriptor() { return mDescriptor; }
-       void setClient(const sp<ISoundTriggerClient>& client) { mClient = client; }
-       void clearClient() { mClient.clear(); }
-       sp<ISoundTriggerClient> client() const { return mClient; }
-       wp<SoundTriggerHwService> service() const { return mService; }
-
-       void onCallbackEvent(const sp<CallbackEvent>& event);
-
-       sp<Model> getModel(sound_model_handle_t handle);
-
-       void setCaptureState_l(bool active);
+       virtual void onFirstRef();
 
        // IBinder::DeathRecipient implementation
        virtual void        binderDied(const wp<IBinder> &who);
 
+       void onCallbackEvent(const sp<CallbackEvent>& event);
+
+       void setCaptureState_l(bool active);
+
+       sp<ISoundTriggerClient> client() const { return mClient; }
+
     private:
 
-       status_t unloadSoundModel_l(sound_model_handle_t handle);
-
-
-        Mutex                                  mLock;
-        wp<SoundTriggerHwService>              mService;
-        sp<SoundTriggerHalInterface>           mHalInterface;
-        struct sound_trigger_module_descriptor mDescriptor;
-        sp<ISoundTriggerClient>                mClient;
-        DefaultKeyedVector< sound_model_handle_t, sp<Model> >     mModels;
-        sound_trigger_service_state_t          mServiceState;
-    }; // class Module
+        mutable Mutex               mLock;
+        wp<Module>                  mModule;
+        sp<ISoundTriggerClient>     mClient;
+    }; // class ModuleClient
 
     class CallbackThread : public Thread {
     public:
@@ -175,8 +215,6 @@ public:
         Vector< sp<CallbackEvent> > mEventQueue;
     };
 
-           void detachModule(const sp<Module>& module);
-
     static void recognitionCallback(struct sound_trigger_recognition_event *event, void *cookie);
            sp<IMemory> prepareRecognitionEvent_l(struct sound_trigger_recognition_event *event);
            void sendRecognitionEvent(struct sound_trigger_recognition_event *event, Module *module);
@@ -187,6 +225,8 @@ public:
 
            sp<IMemory> prepareServiceStateEvent_l(sound_trigger_service_state_t state);
            void sendServiceStateEvent_l(sound_trigger_service_state_t state, Module *module);
+           void sendServiceStateEvent_l(sound_trigger_service_state_t state,
+                                        ModuleClient *moduleClient);
 
            void sendCallbackEvent_l(const sp<CallbackEvent>& event);
            void onCallbackEvent(const sp<CallbackEvent>& event);
