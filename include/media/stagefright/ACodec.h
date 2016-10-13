@@ -76,21 +76,15 @@ struct ACodec : public AHierarchicalStateMachine, public CodecBase {
         size_t countBuffers();
         IOMX::buffer_id bufferIDAt(size_t index) const;
         sp<MediaCodecBuffer> bufferAt(size_t index) const;
-        sp<NativeHandle> handleAt(size_t index) const;
-        sp<RefBase> memRefAt(size_t index) const;
 
     private:
         friend struct ACodec;
 
         Vector<IOMX::buffer_id> mBufferIDs;
         Vector<sp<MediaCodecBuffer>> mBuffers;
-        Vector<sp<NativeHandle> > mHandles;
-        Vector<sp<RefBase> > mMemRefs;
 
         PortDescription();
-        void addBuffer(
-                IOMX::buffer_id id, const sp<MediaCodecBuffer> &buffer,
-                const sp<NativeHandle> &handle, const sp<RefBase> &memRef);
+        void addBuffer(IOMX::buffer_id id, const sp<MediaCodecBuffer> &buffer);
 
         DISALLOW_EVIL_CONSTRUCTORS(PortDescription);
     };
