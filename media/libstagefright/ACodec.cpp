@@ -1215,7 +1215,6 @@ status_t ACodec::allocateOutputMetadataBuffers() {
         info.mCodecData = info.mData;
         info.mCodecRef = mem;
 
-        // we use useBuffer for metadata regardless of quirks
         err = mOMXNode->useBuffer(
                 kPortIndexOutput, mem, &info.mBufferID, mem->size());
         mBuffers[kPortIndexOutput].push(info);
