@@ -53,8 +53,6 @@
 
 #include <powermanager/PowerManager.h>
 
-#include <hardware/audio.h>  // for AUDIO_DEVICE_API_VERSION_...
-
 #include "AudioFlinger.h"
 #include "AudioMixer.h"
 #include "BufferProviders.h"
@@ -3492,7 +3490,7 @@ status_t AudioFlinger::PlaybackThread::createAudioPatch_l(const struct audio_pat
     mOutDevice = type;
     mPatch = *patch;
 
-    if (mOutput->audioHwDev->version() >= AUDIO_DEVICE_API_VERSION_3_0) {
+    if (mOutput->audioHwDev->supportsAudioPatches()) {
         sp<DeviceHalInterface> hwDevice = mOutput->audioHwDev->hwDevice();
         status = hwDevice->createAudioPatch(patch->num_sources,
                                             patch->sources,
@@ -3542,7 +3540,7 @@ status_t AudioFlinger::PlaybackThread::releaseAudioPatch_l(const audio_patch_han
 
     mOutDevice = AUDIO_DEVICE_NONE;
 
-    if (mOutput->audioHwDev->version() >= AUDIO_DEVICE_API_VERSION_3_0) {
+    if (mOutput->audioHwDev->supportsAudioPatches()) {
         sp<DeviceHalInterface> hwDevice = mOutput->audioHwDev->hwDevice();
         status = hwDevice->releaseAudioPatch(handle);
     } else {
@@ -7612,7 +7610,7 @@ status_t AudioFlinger::RecordThread::createAudioPatch_l(const struct audio_patch
         }
     }
 
-    if (mInput->audioHwDev->version() >= AUDIO_DEVICE_API_VERSION_3_0) {
+    if (mInput->audioHwDev->supportsAudioPatches()) {
         sp<DeviceHalInterface> hwDevice = mInput->audioHwDev->hwDevice();
         status = hwDevice->createAudioPatch(patch->num_sources,
                                             patch->sources,
@@ -7652,7 +7650,7 @@ status_t AudioFlinger::RecordThread::releaseAudioPatch_l(const audio_patch_handl
 
     mInDevice = AUDIO_DEVICE_NONE;
 
-    if (mInput->audioHwDev->version() >= AUDIO_DEVICE_API_VERSION_3_0) {
+    if (mInput->audioHwDev->supportsAudioPatches()) {
         sp<DeviceHalInterface> hwDevice = mInput->audioHwDev->hwDevice();
         status = hwDevice->releaseAudioPatch(handle);
     } else {

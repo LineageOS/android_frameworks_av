@@ -50,12 +50,12 @@ audio_module_handle_t AudioPort::getModuleHandle() const
     return mModule->mHandle;
 }
 
-uint32_t AudioPort::getModuleVersion() const
+uint32_t AudioPort::getModuleVersionMajor() const
 {
     if (mModule == 0) {
         return 0;
     }
-    return mModule->getHalVersion();
+    return mModule->getHalVersionMajor();
 }
 
 const char *AudioPort::getModuleName() const

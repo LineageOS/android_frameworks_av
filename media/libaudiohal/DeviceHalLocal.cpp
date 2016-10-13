@@ -40,11 +40,6 @@ status_t DeviceHalLocal::getSupportedDevices(uint32_t *devices) {
     return OK;
 }
 
-status_t DeviceHalLocal::getVersion(uint32_t *version) {
-    *version = mDev->common.version;
-    return OK;
-}
-
 status_t DeviceHalLocal::initCheck() {
     return mDev->init_check(mDev);
 }
@@ -139,17 +134,31 @@ status_t DeviceHalLocal::openInputStream(
     return openResult;
 }
 
+status_t DeviceHalLocal::supportsAudioPatches(bool *supportsPatches) {
+    *supportsPatches = version() >= AUDIO_DEVICE_API_VERSION_3_0;
+    return OK;
+}
+
 status_t DeviceHalLocal::createAudioPatch(
         unsigned int num_sources,
         const struct audio_port_config *sources,
         unsigned int num_sinks,
         const struct audio_port_config *sinks,
         audio_patch_handle_t *patch) {
-    return mDev->create_audio_patch(mDev, num_sources, sources, num_sinks, sinks, patch);
+    if (version() >= AUDIO_DEVICE_API_VERSION_3_0) {
+        return mDev->create_audio_patch(
+                mDev, num_sources, sources, num_sinks, sinks, patch);
+    } else {
+        return INVALID_OPERATION;
+    }
 }
 
 status_t DeviceHalLocal::releaseAudioPatch(audio_patch_handle_t patch) {
-    return mDev->release_audio_patch(mDev, patch);
+    if (version() >= AUDIO_DEVICE_API_VERSION_3_0) {
+        return mDev->release_audio_patch(mDev, patch);
+    } else {
+        return INVALID_OPERATION;
+    }
 }
 
 status_t DeviceHalLocal::getAudioPort(struct audio_port *port) {
@@ -157,7 +166,10 @@ status_t DeviceHalLocal::getAudioPort(struct audio_port *port) {
 }
 
 status_t DeviceHalLocal::setAudioPortConfig(const struct audio_port_config *config) {
-    return mDev->set_audio_port_config(mDev, config);
+    if (version() >= AUDIO_DEVICE_API_VERSION_3_0)
+        return mDev->set_audio_port_config(mDev, config);
+    else
+        return INVALID_OPERATION;
 }
 
 status_t DeviceHalLocal::dump(int fd) {

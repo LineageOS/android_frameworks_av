@@ -18,7 +18,6 @@
 
 #include "DeviceDescriptor.h"
 #include "AudioRoute.h"
-#include <hardware/audio.h>
 #include <utils/RefBase.h>
 #include <utils/String8.h>
 #include <utils/Errors.h>
@@ -40,7 +39,7 @@ typedef Vector<sp<IOProfile> > IOProfileCollection;
 class HwModule : public RefBase
 {
 public:
-    explicit HwModule(const char *name, uint32_t halVersion = AUDIO_DEVICE_API_VERSION_MIN);
+    explicit HwModule(const char *name, uint32_t halVersionMajor = 0, uint32_t halVersionMinor = 0);
     ~HwModule();
 
     const char *getName() const { return mName.string(); }
@@ -55,8 +54,11 @@ public:
 
     void setProfiles(const IOProfileCollection &profiles);
 
-    void setHalVersion(uint32_t halVersion) { mHalVersion = halVersion; }
-    uint32_t getHalVersion() const { return mHalVersion; }
+    void setHalVersion(uint32_t major, uint32_t minor) {
+        mHalVersion = (major << 8) | (minor & 0xff);
+    }
+    uint32_t getHalVersionMajor() const { return mHalVersion >> 8; }
+    uint32_t getHalVersionMinor() const { return mHalVersion & 0xff; }
 
     sp<DeviceDescriptor> getRouteSinkDevice(const sp<AudioRoute> &route) const;
     DeviceVector getRouteSourceDevices(const sp<AudioRoute> &route) const;

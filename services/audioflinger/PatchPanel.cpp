@@ -27,8 +27,6 @@
 #include "ServiceUtilities.h"
 #include <media/AudioParameter.h>
 
-#include <hardware/audio.h>  // for AUDIO_DEVICE_API_VERSION_...
-
 // ----------------------------------------------------------------------------
 
 // Note: the following macro is used for extremely verbose logging message.  In
@@ -249,11 +247,11 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
             // - special patch request with 2 sources (reuse one existing output mix) OR
             // - Device to device AND
             //    - source HW module != destination HW module OR
-            //    - audio HAL version < 3.0
+            //    - audio HAL does not support audio patches creation
             if ((patch->num_sources == 2) ||
                 ((patch->sinks[0].type == AUDIO_PORT_TYPE_DEVICE) &&
                  ((patch->sinks[0].ext.device.hw_module != srcModule) ||
-                  (audioHwDevice->version() < AUDIO_DEVICE_API_VERSION_3_0)))) {
+                  !audioHwDevice->supportsAudioPatches()))) {
                 if (patch->num_sources == 2) {
                     if (patch->sources[1].type != AUDIO_PORT_TYPE_MIX ||
                             (patch->num_sinks != 0 && patch->sinks[0].ext.device.hw_module !=
@@ -341,17 +339,13 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                     }
                     status = thread->sendCreateAudioPatchConfigEvent(patch, &halHandle);
                 } else {
-                    if (audioHwDevice->version() < AUDIO_DEVICE_API_VERSION_3_0) {
-                        status = INVALID_OPERATION;
-                        goto exit;
-                    }
-
                     sp<DeviceHalInterface> hwDevice = audioHwDevice->hwDevice();
                     status = hwDevice->createAudioPatch(patch->num_sources,
                                                         patch->sources,
                                                         patch->num_sinks,
                                                         patch->sinks,
                                                         &halHandle);
+                    if (status == INVALID_OPERATION) goto exit;
                 }
             }
         } break;
@@ -620,10 +614,6 @@ status_t AudioFlinger::PatchPanel::releaseAudioPatch(audio_patch_handle_t handle
                 status = thread->sendReleaseAudioPatchConfigEvent(removedPatch->mHalHandle);
             } else {
                 AudioHwDevice *audioHwDevice = audioflinger->mAudioHwDevs.valueAt(index);
-                if (audioHwDevice->version() < AUDIO_DEVICE_API_VERSION_3_0) {
-                    status = INVALID_OPERATION;
-                    break;
-                }
                 sp<DeviceHalInterface> hwDevice = audioHwDevice->hwDevice();
                 status = hwDevice->releaseAudioPatch(removedPatch->mHalHandle);
             }
@@ -688,13 +678,7 @@ status_t AudioFlinger::PatchPanel::setAudioPortConfig(const struct audio_port_co
     }
 
     AudioHwDevice *audioHwDevice = audioflinger->mAudioHwDevs.valueAt(index);
-    if (audioHwDevice->version() >= AUDIO_DEVICE_API_VERSION_3_0) {
-        sp<DeviceHalInterface> hwDevice = audioHwDevice->hwDevice();
-        return hwDevice->setAudioPortConfig(config);
-    } else {
-        return INVALID_OPERATION;
-    }
-    return NO_ERROR;
+    return audioHwDevice->hwDevice()->setAudioPortConfig(config);
 }
 
 } // namespace android

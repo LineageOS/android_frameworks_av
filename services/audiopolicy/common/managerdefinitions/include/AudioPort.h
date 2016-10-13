@@ -118,7 +118,7 @@ public:
                                         audio_format_t targetFormat);
 
     audio_module_handle_t getModuleHandle() const;
-    uint32_t getModuleVersion() const;
+    uint32_t getModuleVersionMajor() const;
     const char *getModuleName() const;
 
     bool useInputChannelMask() const
