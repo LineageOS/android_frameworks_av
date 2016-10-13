@@ -21,7 +21,6 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-#include <hardware/audio_effect.h>
 #include <media/AudioBufferProvider.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/nbaio/NBLog.h>

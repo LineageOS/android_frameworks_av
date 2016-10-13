@@ -20,9 +20,9 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-#include <hardware/audio_effect.h>
 #include <media/AudioBufferProvider.h>
 #include <system/audio.h>
+#include <system/audio_effect.h>
 #include <sonic.h>
 #include <utils/StrongPointer.h>
 

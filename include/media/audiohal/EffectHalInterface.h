@@ -17,7 +17,7 @@
 #ifndef ANDROID_HARDWARE_EFFECT_HAL_INTERFACE_H
 #define ANDROID_HARDWARE_EFFECT_HAL_INTERFACE_H
 
-#include <hardware/audio_effect.h>
+#include <system/audio_effect.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 

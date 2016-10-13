@@ -23,7 +23,6 @@
 #include <cutils/misc.h>
 #include <media/AudioEffect.h>
 #include <system/audio.h>
-#include <hardware/audio_effect.h>
 #include <utils/Vector.h>
 #include <utils/SortedVector.h>
 

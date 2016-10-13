@@ -34,7 +34,6 @@
 #include "ServiceUtilities.h"
 #include <hardware_legacy/power.h>
 #include <media/AudioEffect.h>
-#include <media/EffectsFactoryApi.h>
 #include <media/AudioParameter.h>
 
 #include <hardware/hardware.h>
