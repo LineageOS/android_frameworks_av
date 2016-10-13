@@ -51,6 +51,30 @@ bool DescribeColorFormat(
         const sp<IOMXNode> &omxNode,
         DescribeColorFormat2Params &describeParams);
 
+inline static const char *asString(MetadataBufferType i, const char *def = "??") {
+    using namespace android;
+    switch (i) {
+        case kMetadataBufferTypeCameraSource:   return "CameraSource";
+        case kMetadataBufferTypeGrallocSource:  return "GrallocSource";
+        case kMetadataBufferTypeANWBuffer:      return "ANWBuffer";
+        case kMetadataBufferTypeNativeHandleSource: return "NativeHandleSource";
+        case kMetadataBufferTypeInvalid:        return "Invalid";
+        default:                                return def;
+    }
+}
+
+inline static const char *asString(IOMX::PortMode mode, const char *def = "??") {
+    using namespace android;
+    switch (mode) {
+        case IOMX::kPortModePresetByteBuffer:   return "PresetByteBuffer";
+        case IOMX::kPortModePresetANWBuffer:    return "PresetANWBuffer";
+        case IOMX::kPortModePresetSecureBuffer: return "PresetSecureBuffer";
+        case IOMX::kPortModeDynamicANWBuffer:   return "DynamicANWBuffer";
+        case IOMX::kPortModeDynamicNativeHandle:return "DynamicNativeHandle";
+        default:                                return def;
+    }
+}
+
 }  // namespace android
 
 #endif

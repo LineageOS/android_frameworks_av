@@ -277,9 +277,7 @@ private:
     bool mChannelMaskPresent;
     int32_t mChannelMask;
     unsigned mDequeueCounter;
-    MetadataBufferType mInputMetadataType;
-    MetadataBufferType mOutputMetadataType;
-    bool mLegacyAdaptiveExperiment;
+    IOMX::PortMode mPortMode[2];
     int32_t mMetadataBuffersToSubmit;
     size_t mNumUndequeuedBuffers;
     sp<DataConverter> mConverter[2];
@@ -303,6 +301,7 @@ private:
     status_t freeBuffer(OMX_U32 portIndex, size_t i);
 
     status_t handleSetSurface(const sp<Surface> &surface);
+    status_t setPortMode(int32_t portIndex, IOMX::PortMode mode);
     status_t setupNativeWindowSizeFormatAndUsage(
             ANativeWindow *nativeWindow /* nonnull */, int *finalUsage /* nonnull */,
             bool reconnect);
@@ -319,11 +318,11 @@ private:
     BufferInfo *dequeueBufferFromNativeWindow();
 
     inline bool storingMetadataInDecodedBuffers() {
-        return mOutputMetadataType >= 0 && !mIsEncoder;
+        return (mPortMode[kPortIndexOutput] == IOMX::kPortModeDynamicANWBuffer) && !mIsEncoder;
     }
 
-    inline bool usingMetadataOnEncoderOutput() {
-        return mOutputMetadataType >= 0 && mIsEncoder;
+    inline bool usingSecureBufferOnEncoderOutput() {
+        return (mPortMode[kPortIndexOutput] == IOMX::kPortModePresetSecureBuffer) && mIsEncoder;
     }
 
     BufferInfo *findBufferByID(
@@ -493,8 +492,6 @@ private:
             int32_t bitrate, OMX_VIDEO_CONTROLRATETYPE bitrateMode);
 
     status_t setupErrorCorrectionParameters();
-
-    status_t initNativeWindow();
 
     // Returns true iff all buffers on the given port have status
     // OWNED_BY_US or OWNED_BY_NATIVE_WINDOW.
