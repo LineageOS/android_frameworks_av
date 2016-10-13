@@ -50,6 +50,8 @@ static inline const T &max(const T &x, const T &y) {
     return x > y ? x : y;
 }
 
+static const int32_t NANOS_PER_SECOND = 1000000000;
+
 static inline nsecs_t framesToNanoseconds(ssize_t frames, uint32_t sampleRate, float speed)
 {
     return ((double)frames * 1000000000) / ((double)sampleRate * speed);
@@ -58,6 +60,11 @@ static inline nsecs_t framesToNanoseconds(ssize_t frames, uint32_t sampleRate, f
 static int64_t convertTimespecToUs(const struct timespec &tv)
 {
     return tv.tv_sec * 1000000ll + tv.tv_nsec / 1000;
+}
+
+static inline nsecs_t convertTimespecToNs(const struct timespec &tv)
+{
+    return tv.tv_sec * (long long)NANOS_PER_SECOND + tv.tv_nsec;
 }
 
 // current monotonic time in microseconds.
@@ -2399,6 +2406,26 @@ status_t AudioTrack::getTimestamp(AudioTimestamp& timestamp)
                     ALOGV_IF(mPreviousLocation == ExtendedTimestamp::LOCATION_SERVER,
                             "getTimestamp() location moved from server to kernel");
                 }
+
+                // We update the timestamp time even when paused.
+                if (mState == STATE_PAUSED /* not needed: STATE_PAUSED_STOPPING */) {
+                    const int64_t now = systemTime();
+                    const int64_t at = convertTimespecToNs(timestamp.mTime);
+                    const int64_t lag =
+                            (ets.mTimeNs[ExtendedTimestamp::LOCATION_SERVER_LASTKERNELOK] < 0 ||
+                                ets.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL_LASTKERNELOK] < 0)
+                            ? int64_t(mAfLatency * 1000000LL)
+                            : (ets.mPosition[ExtendedTimestamp::LOCATION_SERVER_LASTKERNELOK]
+                             - ets.mPosition[ExtendedTimestamp::LOCATION_KERNEL_LASTKERNELOK])
+                             * NANOS_PER_SECOND / mSampleRate;
+                    const int64_t limit = now - lag; // no earlier than this limit
+                    if (at < limit) {
+                        ALOGV("timestamp pause lag:%lld adjusting from %lld to %lld",
+                                (long long)lag, (long long)at, (long long)limit);
+                        timestamp.mTime.tv_sec = limit / NANOS_PER_SECOND;
+                        timestamp.mTime.tv_nsec = limit % NANOS_PER_SECOND; // compiler opt.
+                    }
+                }
                 mPreviousLocation = location;
             } else {
                 // right after AudioTrack is started, one may not find a timestamp
@@ -2428,6 +2455,7 @@ status_t AudioTrack::getTimestamp(AudioTimestamp& timestamp)
             // use cached paused position in case another offloaded track is running.
             timestamp.mPosition = mPausedPosition;
             clock_gettime(CLOCK_MONOTONIC, &timestamp.mTime);
+            // TODO: adjust for delay
             return NO_ERROR;
         }
 
@@ -2514,21 +2542,18 @@ status_t AudioTrack::getTimestamp(AudioTimestamp& timestamp)
     // This is sometimes caused by erratic reports of the available space in the ALSA drivers.
     if (status == NO_ERROR) {
         if (previousTimestampValid) {
-#define TIME_TO_NANOS(time) ((int64_t)(time).tv_sec * 1000000000 + (time).tv_nsec)
-            const int64_t previousTimeNanos = TIME_TO_NANOS(mPreviousTimestamp.mTime);
-            const int64_t currentTimeNanos = TIME_TO_NANOS(timestamp.mTime);
-#undef TIME_TO_NANOS
+            const int64_t previousTimeNanos = convertTimespecToNs(mPreviousTimestamp.mTime);
+            const int64_t currentTimeNanos = convertTimespecToNs(timestamp.mTime);
             if (currentTimeNanos < previousTimeNanos) {
-                ALOGW("retrograde timestamp time");
-                // FIXME Consider blocking this from propagating upwards.
+                ALOGW("retrograde timestamp time corrected, %lld < %lld",
+                        (long long)currentTimeNanos, (long long)previousTimeNanos);
+                timestamp.mTime = mPreviousTimestamp.mTime;
             }
 
             // Looking at signed delta will work even when the timestamps
             // are wrapping around.
             int32_t deltaPosition = (Modulo<uint32_t>(timestamp.mPosition)
                     - mPreviousTimestamp.mPosition).signedValue();
-            // position can bobble slightly as an artifact; this hides the bobble
-            static const int32_t MINIMUM_POSITION_DELTA = 8;
             if (deltaPosition < 0) {
                 // Only report once per position instead of spamming the log.
                 if (!mRetrogradeMotionReported) {
@@ -2541,9 +2566,21 @@ status_t AudioTrack::getTimestamp(AudioTimestamp& timestamp)
             } else {
                 mRetrogradeMotionReported = false;
             }
-            if (deltaPosition < MINIMUM_POSITION_DELTA) {
-                timestamp = mPreviousTimestamp;  // Use last valid timestamp.
+            if (deltaPosition < 0) {
+                timestamp.mPosition = mPreviousTimestamp.mPosition;
+                deltaPosition = 0;
             }
+#if 0
+            // Uncomment this to verify audio timestamp rate.
+            const int64_t deltaTime =
+                    convertTimespecToNs(timestamp.mTime) - previousTimeNanos;
+            if (deltaTime != 0) {
+                const int64_t computedSampleRate =
+                        deltaPosition * (long long)NANOS_PER_SECOND / deltaTime;
+                ALOGD("computedSampleRate:%u  sampleRate:%u",
+                        (unsigned)computedSampleRate, mSampleRate);
+            }
+#endif
         }
         mPreviousTimestamp = timestamp;
         mPreviousTimestampValid = true;
