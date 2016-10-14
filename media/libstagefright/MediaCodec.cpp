@@ -19,6 +19,7 @@
 #include <inttypes.h>
 
 #include "include/avc_utils.h"
+#include "include/SecureBuffer.h"
 #include "include/SharedMemoryBuffer.h"
 #include "include/SoftwareRenderer.h"
 
@@ -929,9 +930,7 @@ status_t MediaCodec::getBufferAndFormat(
     }
 
     // by the time buffers array is initialized, crypto is set
-    *buffer = (portIndex == kPortIndexInput && mCrypto != NULL) ?
-                  info.mEncryptedData :
-                  info.mData;
+    *buffer = info.mData;
     *format = info.mFormat;
 
     return OK;
@@ -1348,13 +1347,11 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         info.mBufferID = portDesc->bufferIDAt(i);
                         info.mOwnedByClient = false;
                         info.mData = portDesc->bufferAt(i);
-                        info.mNativeHandle = portDesc->handleAt(i);
-                        info.mMemRef = portDesc->memRefAt(i);
 
                         if (portIndex == kPortIndexInput && mCrypto != NULL) {
                             sp<IMemory> mem = mDealer->allocate(info.mData->capacity());
-                            info.mEncryptedData =
-                                new SharedMemoryBuffer(mInputFormat, mem);
+                            info.mSecureData = info.mData;
+                            info.mData = new SharedMemoryBuffer(mInputFormat, mem);
                             info.mSharedEncryptedBuffer = mem;
                         }
 
@@ -2151,9 +2148,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 for (size_t i = 0; i < srcBuffers.size(); ++i) {
                     const BufferInfo &info = srcBuffers.itemAt(i);
 
-                    dstBuffers->push_back(
-                            (portIndex == kPortIndexInput && mCrypto != NULL)
-                                    ? info.mEncryptedData : info.mData);
+                    dstBuffers->push_back(info.mData);
                 }
             }
 
@@ -2288,8 +2283,7 @@ status_t MediaCodec::queueCSDInputBuffer(size_t bufferIndex) {
     sp<ABuffer> csd = *mCSD.begin();
     mCSD.erase(mCSD.begin());
 
-    const sp<MediaCodecBuffer> &codecInputData =
-        (mCrypto != NULL) ? info->mEncryptedData : info->mData;
+    const sp<MediaCodecBuffer> &codecInputData = info->mData;
 
     if (csd->size() > codecInputData->capacity()) {
         return -EINVAL;
@@ -2370,7 +2364,7 @@ void MediaCodec::returnBuffersToCodecOnPort(int32_t portIndex, bool isReclaim) {
                 ALOGD("port %d buffer %zu still owned by client when codec is reclaimed",
                         portIndex, i);
             } else {
-                info->mMemRef = NULL;
+                // TODO: clear memory reference.
                 info->mOwnedByClient = false;
             }
 
@@ -2488,32 +2482,22 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
 
     sp<AMessage> reply = info->mNotify;
     info->mData->setRange(offset, size);
-    info->mData->meta()->setInt64("timeUs", timeUs);
 
-    if (flags & BUFFER_FLAG_EOS) {
-        info->mData->meta()->setInt32("eos", true);
-    }
-
-    if (flags & BUFFER_FLAG_CODECCONFIG) {
-        info->mData->meta()->setInt32("csd", true);
-    }
-
+    sp<MediaCodecBuffer> buffer = info->mData;
     if (mCrypto != NULL) {
-        if (size > info->mEncryptedData->capacity()) {
-            return -ERANGE;
-        }
-
         AString *errorDetailMsg;
         CHECK(msg->findPointer("errorDetailMsg", (void **)&errorDetailMsg));
 
-        void *dst_pointer = info->mData->base();
+        void *dst_pointer = nullptr;
         ICrypto::DestinationType dst_type = ICrypto::kDestinationTypeOpaqueHandle;
 
-        if (info->mNativeHandle != NULL) {
-            dst_pointer = (void *)info->mNativeHandle->handle();
-            dst_type = ICrypto::kDestinationTypeNativeHandle;
-        } else if ((mFlags & kFlagIsSecure) == 0) {
+        if ((mFlags & kFlagIsSecure) == 0) {
+            dst_pointer = info->mSecureData->base();
             dst_type = ICrypto::kDestinationTypeVmPointer;
+        } else {
+            sp<SecureBuffer> secureData = static_cast<SecureBuffer *>(info->mSecureData.get());
+            dst_pointer = secureData->getDestinationPointer();
+            dst_type = secureData->getDestinationType();
         }
 
         ssize_t result = mCrypto->decrypt(
@@ -2533,7 +2517,17 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
             return result;
         }
 
-        info->mData->setRange(0, result);
+        info->mSecureData->setRange(0, result);
+        buffer = info->mSecureData;
+    }
+    buffer->meta()->setInt64("timeUs", timeUs);
+
+    if (flags & BUFFER_FLAG_EOS) {
+        buffer->meta()->setInt32("eos", true);
+    }
+
+    if (flags & BUFFER_FLAG_CODECCONFIG) {
+        buffer->meta()->setInt32("csd", true);
     }
     // TODO: release buffer reference.
 
@@ -2542,7 +2536,7 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
         Mutex::Autolock al(mBufferLock);
         info->mOwnedByClient = false;
     }
-    reply->setObject("buffer", info->mData);
+    reply->setObject("buffer", buffer);
     reply->post();
 
     info->mNotify = NULL;

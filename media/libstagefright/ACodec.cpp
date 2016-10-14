@@ -53,6 +53,7 @@
 
 #include "include/avc_utils.h"
 #include "include/DataConverter.h"
+#include "include/SecureBuffer.h"
 #include "include/SharedMemoryBuffer.h"
 #include "omx/OMXUtils.h"
 
@@ -876,7 +877,6 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
                 info.mStatus = BufferInfo::OWNED_BY_US;
                 info.mFenceFd = -1;
                 info.mRenderInfo = NULL;
-                info.mNativeHandle = NULL;
 
                 if (portIndex == kPortIndexInput && (mFlags & kFlagIsSecure)) {
                     mem.clear();
@@ -887,19 +887,9 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
                             portIndex, bufSize, &info.mBufferID,
                             &ptr, &native_handle);
 
-                    // TRICKY: this representation is unorthodox, but ACodec requires
-                    // an ABuffer with a proper size to validate range offsets and lengths.
-                    // Since mData is never referenced for secure input, it is used to store
-                    // either the pointer to the secure buffer, or the opaque handle as on
-                    // some devices ptr is actually an opaque handle, not a pointer.
-
-                    // TRICKY2: use native handle as the base of the ABuffer if received one,
-                    // because Widevine source only receives these base addresses.
-                    const native_handle_t *native_handle_ptr =
-                        native_handle == NULL ? NULL : native_handle->handle();
-                    info.mData = new MediaCodecBuffer(format,
-                            new ABuffer(ptr != NULL ? ptr : (void *)native_handle_ptr, bufSize));
-                    info.mNativeHandle = native_handle;
+                    info.mData = (native_handle == NULL)
+                            ? new SecureBuffer(format, ptr, bufSize)
+                            : new SecureBuffer(format, native_handle, bufSize);
                     info.mCodecData = info.mData;
                 } else {
                     err = mOMXNode->useBuffer(
@@ -948,7 +938,7 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
 
     for (size_t i = 0; i < mBuffers[portIndex].size(); ++i) {
         const BufferInfo &info = mBuffers[portIndex][i];
-        desc->addBuffer(info.mBufferID, info.mData, info.mNativeHandle, info.mMemRef);
+        desc->addBuffer(info.mBufferID, info.mData);
     }
 
     notify->setObject("portDesc", desc);
@@ -5247,12 +5237,9 @@ ACodec::PortDescription::PortDescription() {
 }
 
 void ACodec::PortDescription::addBuffer(
-        IOMX::buffer_id id, const sp<MediaCodecBuffer> &buffer,
-        const sp<NativeHandle> &handle, const sp<RefBase> &memRef) {
+        IOMX::buffer_id id, const sp<MediaCodecBuffer> &buffer) {
     mBufferIDs.push_back(id);
     mBuffers.push_back(buffer);
-    mHandles.push_back(handle);
-    mMemRefs.push_back(memRef);
 }
 
 size_t ACodec::PortDescription::countBuffers() {
@@ -5265,14 +5252,6 @@ IOMX::buffer_id ACodec::PortDescription::bufferIDAt(size_t index) const {
 
 sp<MediaCodecBuffer> ACodec::PortDescription::bufferAt(size_t index) const {
     return mBuffers.itemAt(index);
-}
-
-sp<NativeHandle> ACodec::PortDescription::handleAt(size_t index) const {
-    return mHandles.itemAt(index);
-}
-
-sp<RefBase> ACodec::PortDescription::memRefAt(size_t index) const {
-    return mMemRefs.itemAt(index);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

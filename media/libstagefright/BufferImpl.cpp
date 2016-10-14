@@ -21,7 +21,10 @@
 #include <binder/IMemory.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/ICrypto.h>
+#include <utils/NativeHandle.h>
 
+#include "include/SecureBuffer.h"
 #include "include/SharedMemoryBuffer.h"
 
 namespace android {
@@ -29,6 +32,27 @@ namespace android {
 SharedMemoryBuffer::SharedMemoryBuffer(const sp<AMessage> &format, const sp<IMemory> &mem)
     : MediaCodecBuffer(format, new ABuffer(mem->pointer(), mem->size())),
       mMemory(mem) {
+}
+
+SecureBuffer::SecureBuffer(const sp<AMessage> &format, void *ptr, size_t size)
+    : MediaCodecBuffer(format, new ABuffer(nullptr, size)),
+      mPointer(ptr) {
+}
+
+SecureBuffer::SecureBuffer(
+        const sp<AMessage> &format, const sp<NativeHandle> &handle, size_t size)
+    : MediaCodecBuffer(format, new ABuffer(nullptr, size)),
+      mPointer(nullptr),
+      mHandle(handle) {
+}
+
+void *SecureBuffer::getDestinationPointer() {
+    return (void *)(mHandle == nullptr ? mPointer : mHandle->handle());
+}
+
+ICrypto::DestinationType SecureBuffer::getDestinationType() {
+    return mHandle == nullptr ? ICrypto::kDestinationTypeOpaqueHandle
+                              : ICrypto::kDestinationTypeNativeHandle;
 }
 
 }  // namespace android

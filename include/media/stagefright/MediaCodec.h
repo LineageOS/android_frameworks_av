@@ -255,9 +255,7 @@ private:
     struct BufferInfo {
         uint32_t mBufferID;
         sp<MediaCodecBuffer> mData;
-        sp<NativeHandle> mNativeHandle;
-        sp<RefBase> mMemRef;
-        sp<MediaCodecBuffer> mEncryptedData;
+        sp<MediaCodecBuffer> mSecureData;
         sp<IMemory> mSharedEncryptedBuffer;
         sp<AMessage> mNotify;
         sp<AMessage> mFormat;
