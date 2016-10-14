@@ -27,6 +27,8 @@
 #include "ServiceUtilities.h"
 #include <media/AudioParameter.h>
 
+#include <hardware/audio.h>  // for AUDIO_DEVICE_API_VERSION_...
+
 // ----------------------------------------------------------------------------
 
 // Note: the following macro is used for extremely verbose logging message.  In
@@ -387,7 +389,7 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
             }
             if (thread == audioflinger->primaryPlaybackThread_l()) {
                 AudioParameter param = AudioParameter();
-                param.addInt(String8(AUDIO_PARAMETER_STREAM_ROUTING), (int)type);
+                param.addInt(String8(AudioParameter::keyRouting), (int)type);
 
                 audioflinger->broacastParametersToRecordThreads_l(param.toString());
             }

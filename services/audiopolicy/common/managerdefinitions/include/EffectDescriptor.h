@@ -17,7 +17,7 @@
 #pragma once
 
 #include <RoutingStrategy.h>
-#include <hardware/audio_effect.h>
+#include <system/audio_effect.h>
 #include <utils/KeyedVector.h>
 #include <utils/RefBase.h>
 #include <utils/Errors.h>

@@ -24,8 +24,8 @@
 #include <media/IAudioPolicyService.h>
 #include <media/IEffect.h>
 #include <media/IEffectClient.h>
-#include <hardware/audio_effect.h>
 #include <media/AudioSystem.h>
+#include <system/audio_effect.h>
 
 #include <utils/RefBase.h>
 #include <utils/Errors.h>

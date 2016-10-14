@@ -53,6 +53,8 @@
 
 #include <powermanager/PowerManager.h>
 
+#include <hardware/audio.h>  // for AUDIO_DEVICE_API_VERSION_...
+
 #include "AudioFlinger.h"
 #include "AudioMixer.h"
 #include "BufferProviders.h"
@@ -769,12 +771,12 @@ status_t AudioFlinger::ThreadBase::sendSetParameterConfigEvent_l(const String8& 
     sp<ConfigEvent> configEvent;
     AudioParameter param(keyValuePair);
     int value;
-    if (param.getInt(String8(AUDIO_PARAMETER_MONO_OUTPUT), value) == NO_ERROR) {
+    if (param.getInt(String8(AudioParameter::keyMonoOutput), value) == NO_ERROR) {
         setMasterMono_l(value != 0);
         if (param.size() == 1) {
             return NO_ERROR; // should be a solo parameter - we don't pass down
         }
-        param.remove(String8(AUDIO_PARAMETER_MONO_OUTPUT));
+        param.remove(String8(AudioParameter::keyMonoOutput));
         configEvent = new SetParameterConfigEvent(param.toString());
     } else {
         configEvent = new SetParameterConfigEvent(keyValuePair);
@@ -3509,7 +3511,7 @@ status_t AudioFlinger::PlaybackThread::createAudioPatch_l(const struct audio_pat
         }
         AudioParameter param = AudioParameter(String8(address));
         free(address);
-        param.addInt(String8(AUDIO_PARAMETER_STREAM_ROUTING), (int)type);
+        param.addInt(String8(AudioParameter::keyRouting), (int)type);
         status = mOutput->stream->setParameters(param.toString());
         *handle = AUDIO_PATCH_HANDLE_NONE;
     }
@@ -3545,7 +3547,7 @@ status_t AudioFlinger::PlaybackThread::releaseAudioPatch_l(const audio_patch_han
         status = hwDevice->releaseAudioPatch(handle);
     } else {
         AudioParameter param;
-        param.addInt(String8(AUDIO_PARAMETER_STREAM_ROUTING), 0);
+        param.addInt(String8(AudioParameter::keyRouting), 0);
         status = mOutput->stream->setParameters(param.toString());
     }
     return status;
@@ -7628,9 +7630,9 @@ status_t AudioFlinger::RecordThread::createAudioPatch_l(const struct audio_patch
         }
         AudioParameter param = AudioParameter(String8(address));
         free(address);
-        param.addInt(String8(AUDIO_PARAMETER_STREAM_ROUTING),
+        param.addInt(String8(AudioParameter::keyRouting),
                      (int)patch->sources[0].ext.device.type);
-        param.addInt(String8(AUDIO_PARAMETER_STREAM_INPUT_SOURCE),
+        param.addInt(String8(AudioParameter::keyInputSource),
                                          (int)patch->sinks[0].ext.mix.usecase.source);
         status = mInput->stream->setParameters(param.toString());
         *handle = AUDIO_PATCH_HANDLE_NONE;
@@ -7655,7 +7657,7 @@ status_t AudioFlinger::RecordThread::releaseAudioPatch_l(const audio_patch_handl
         status = hwDevice->releaseAudioPatch(handle);
     } else {
         AudioParameter param;
-        param.addInt(String8(AUDIO_PARAMETER_STREAM_ROUTING), 0);
+        param.addInt(String8(AudioParameter::keyRouting), 0);
         status = mInput->stream->setParameters(param.toString());
     }
     return status;

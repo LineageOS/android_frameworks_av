@@ -34,6 +34,7 @@
 #include <media/audiohal/DeviceHalInterface.h>
 #include <media/audiohal/DevicesFactoryHalInterface.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
+#include <media/AudioParameter.h>
 #include <memunreachable/memunreachable.h>
 #include <utils/String16.h>
 #include <utils/threads.h>
@@ -65,6 +66,8 @@
 #include <media/AudioParameter.h>
 #include <mediautils/BatteryNotifier.h>
 #include <private/android_filesystem_config.h>
+
+#include <hardware/audio.h>  // for AUDIO_HARDWARE_MODULE_...
 
 // ----------------------------------------------------------------------------
 
@@ -1106,8 +1109,8 @@ status_t AudioFlinger::setParameters(audio_io_handle_t ioHandle, const String8& 
         // disable AEC and NS if the device is a BT SCO headset supporting those pre processings
         AudioParameter param = AudioParameter(keyValuePairs);
         String8 value;
-        if (param.get(String8(AUDIO_PARAMETER_KEY_BT_NREC), value) == NO_ERROR) {
-            bool btNrecIsOff = (value == AUDIO_PARAMETER_VALUE_OFF);
+        if (param.get(String8(AudioParameter::keyBtNrec), value) == NO_ERROR) {
+            bool btNrecIsOff = (value == AudioParameter::valueOff);
             if (mBtNrecIsOff != btNrecIsOff) {
                 for (size_t i = 0; i < mRecordThreads.size(); i++) {
                     sp<RecordThread> thread = mRecordThreads.valueAt(i);
@@ -1131,7 +1134,7 @@ status_t AudioFlinger::setParameters(audio_io_handle_t ioHandle, const String8& 
         }
         String8 screenState;
         if (param.get(String8(AudioParameter::keyScreenState), screenState) == NO_ERROR) {
-            bool isOff = screenState == "off";
+            bool isOff = (screenState == AudioParameter::valueOff);
             if (isOff != (AudioFlinger::mScreenState & 1)) {
                 AudioFlinger::mScreenState = ((AudioFlinger::mScreenState & ~1) + 2) | isOff;
             }
@@ -1727,12 +1730,12 @@ audio_hw_sync_t AudioFlinger::getAudioHwSyncForSession(audio_session_t sessionId
     }
     String8 reply;
     AudioParameter param;
-    if (dev->getParameters(String8(AUDIO_PARAMETER_HW_AV_SYNC), &reply) == OK) {
+    if (dev->getParameters(String8(AudioParameter::keyHwAvSync), &reply) == OK) {
         param = AudioParameter(reply);
     }
 
     int value;
-    if (param.getInt(String8(AUDIO_PARAMETER_HW_AV_SYNC), value) != NO_ERROR) {
+    if (param.getInt(String8(AudioParameter::keyHwAvSync), value) != NO_ERROR) {
         ALOGW("getAudioHwSyncForSession error getting sync for session %d", sessionId);
         return AUDIO_HW_SYNC_INVALID;
     }
@@ -1754,7 +1757,7 @@ audio_hw_sync_t AudioFlinger::getAudioHwSyncForSession(audio_session_t sessionId
         uint32_t sessions = thread->hasAudioSession(sessionId);
         if (sessions & ThreadBase::TRACK_SESSION) {
             AudioParameter param = AudioParameter();
-            param.addInt(String8(AUDIO_PARAMETER_STREAM_HW_AV_SYNC), value);
+            param.addInt(String8(AudioParameter::keyStreamHwAvSync), value);
             thread->setParameters(param.toString());
             break;
         }
@@ -1792,7 +1795,7 @@ void AudioFlinger::setAudioHwSyncForSession_l(PlaybackThread *thread, audio_sess
         audio_hw_sync_t syncId = mHwAvSyncIds.valueAt(index);
         ALOGV("setAudioHwSyncForSession_l found ID %d for session %d", syncId, sessionId);
         AudioParameter param = AudioParameter();
-        param.addInt(String8(AUDIO_PARAMETER_STREAM_HW_AV_SYNC), syncId);
+        param.addInt(String8(AudioParameter::keyStreamHwAvSync), syncId);
         thread->setParameters(param.toString());
     }
 }

@@ -33,7 +33,6 @@
 #include <AudioPolicyEngineInstance.h>
 #include <cutils/properties.h>
 #include <utils/Log.h>
-#include <hardware/audio_effect.h>
 #include <media/AudioParameter.h>
 #include <media/AudioPolicyHelper.h>
 #include <soundtrigger/SoundTrigger.h>

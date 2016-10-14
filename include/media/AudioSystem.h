@@ -17,12 +17,12 @@
 #ifndef ANDROID_AUDIOSYSTEM_H_
 #define ANDROID_AUDIOSYSTEM_H_
 
-#include <hardware/audio_effect.h>
 #include <media/AudioPolicy.h>
 #include <media/AudioIoDescriptor.h>
 #include <media/IAudioFlingerClient.h>
 #include <media/IAudioPolicyServiceClient.h>
 #include <system/audio.h>
+#include <system/audio_effect.h>
 #include <system/audio_policy.h>
 #include <utils/Errors.h>
 #include <utils/Mutex.h>

@@ -49,6 +49,18 @@ public:
     static const char * const keyInputSource;
     static const char * const keyScreenState;
 
+    //  keyBtNrec: BT SCO Noise Reduction + Echo Cancellation parameters
+    //  keyHwAvSync: get HW synchronization source identifier from a device
+    //  keyMonoOutput: Enable mono audio playback
+    //  keyStreamHwAvSync: set HW synchronization source identifier on a stream
+    static const char * const keyBtNrec;
+    static const char * const keyHwAvSync;
+    static const char * const keyMonoOutput;
+    static const char * const keyStreamHwAvSync;
+
+    static const char * const valueOn;
+    static const char * const valueOff;
+
     String8 toString();
 
     status_t add(const String8& key, const String8& value);

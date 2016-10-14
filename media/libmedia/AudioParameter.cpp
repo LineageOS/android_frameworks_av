@@ -32,6 +32,12 @@ const char * const AudioParameter::keyChannels = AUDIO_PARAMETER_STREAM_CHANNELS
 const char * const AudioParameter::keyFrameCount = AUDIO_PARAMETER_STREAM_FRAME_COUNT;
 const char * const AudioParameter::keyInputSource = AUDIO_PARAMETER_STREAM_INPUT_SOURCE;
 const char * const AudioParameter::keyScreenState = AUDIO_PARAMETER_KEY_SCREEN_STATE;
+const char * const AudioParameter::keyBtNrec = AUDIO_PARAMETER_KEY_BT_NREC;
+const char * const AudioParameter::keyHwAvSync = AUDIO_PARAMETER_HW_AV_SYNC;
+const char * const AudioParameter::keyMonoOutput = AUDIO_PARAMETER_MONO_OUTPUT;
+const char * const AudioParameter::keyStreamHwAvSync = AUDIO_PARAMETER_STREAM_HW_AV_SYNC;
+const char * const AudioParameter::valueOn = AUDIO_PARAMETER_VALUE_ON;
+const char * const AudioParameter::valueOff = AUDIO_PARAMETER_VALUE_OFF;
 
 AudioParameter::AudioParameter(const String8& keyValuePairs)
 {
