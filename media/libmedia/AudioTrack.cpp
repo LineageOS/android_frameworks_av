@@ -607,7 +607,7 @@ status_t AudioTrack::start()
         mRefreshRemaining = true;
     }
     mNewPosition = mPosition + mUpdatePeriod;
-    int32_t flags = android_atomic_and(~CBLK_DISABLED, &mCblk->mFlags);
+    int32_t flags = android_atomic_and(~(CBLK_STREAM_END_DONE | CBLK_DISABLED), &mCblk->mFlags);
 
     status_t status = NO_ERROR;
     if (!(flags & CBLK_INVALID)) {
