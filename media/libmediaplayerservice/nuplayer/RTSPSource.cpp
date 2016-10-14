@@ -258,7 +258,7 @@ void NuPlayer::RTSPSource::setEOSTimeout(bool audio, int64_t timeout) {
 }
 
 status_t NuPlayer::RTSPSource::getDuration(int64_t *durationUs) {
-    *durationUs = 0ll;
+    *durationUs = -1ll;
 
     int64_t audioDurationUs;
     if (mAudioTrack != NULL
