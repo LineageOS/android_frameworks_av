@@ -33,12 +33,12 @@
 #include <utils/Trace.h>
 
 #include <private/media/AudioTrackShared.h>
-#include <audio_effects/effect_ns.h>
-#include <audio_effects/effect_aec.h>
 #include <audio_utils/conversion.h>
 #include <audio_utils/primitives.h>
 #include <audio_utils/format.h>
 #include <audio_utils/minifloat.h>
+#include <system/audio_effects/effect_ns.h>
+#include <system/audio_effects/effect_aec.h>
 #include <system/audio.h>
 
 // NBAIO implementations

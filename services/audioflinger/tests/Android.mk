@@ -38,7 +38,6 @@ LOCAL_SRC_FILES:= \
 	../BufferProviders.cpp
 
 LOCAL_C_INCLUDES := \
-	$(call include-path-for, audio-effects) \
 	$(call include-path-for, audio-utils) \
 	frameworks/av/services/audioflinger \
 	external/sonic

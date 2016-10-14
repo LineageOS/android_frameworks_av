@@ -94,7 +94,6 @@ LOCAL_C_INCLUDES := \
     $(TOP)/frameworks/av/include/media/ \
     $(TOP)/frameworks/av/media/libstagefright \
     $(TOP)/frameworks/av/media/libmedia/aidl \
-    $(call include-path-for, audio-effects) \
     $(call include-path-for, audio-utils)
 
 LOCAL_EXPORT_C_INCLUDE_DIRS := \

@@ -21,11 +21,11 @@
 
 #include "Configuration.h"
 #include <utils/Log.h>
-#include <audio_effects/effect_visualizer.h>
 #include <audio_utils/primitives.h>
 #include <private/media/AudioEffectShared.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
+#include <system/audio_effects/effect_visualizer.h>
 
 #include "AudioFlinger.h"
 #include "ServiceUtilities.h"

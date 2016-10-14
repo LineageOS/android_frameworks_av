@@ -51,9 +51,9 @@
 
 #include <media/AudioResamplerPublic.h>
 
-#include <audio_effects/effect_visualizer.h>
-#include <audio_effects/effect_ns.h>
-#include <audio_effects/effect_aec.h>
+#include <system/audio_effects/effect_visualizer.h>
+#include <system/audio_effects/effect_ns.h>
+#include <system/audio_effects/effect_aec.h>
 
 #include <audio_utils/primitives.h>
 
