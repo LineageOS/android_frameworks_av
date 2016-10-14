@@ -116,8 +116,8 @@ private:
         virtual  ~SoundTriggerHalHidl();
 
         void convertUuidToHal(Uuid *halUuid,
-                              const struct sound_trigger_uuid_s *uuid);
-        void convertUuidFromHal(struct sound_trigger_uuid_s *uuid,
+                              const sound_trigger_uuid_t *uuid);
+        void convertUuidFromHal(sound_trigger_uuid_t *uuid,
                                 const Uuid *halUuid);
 
         void convertPropertiesFromHal(

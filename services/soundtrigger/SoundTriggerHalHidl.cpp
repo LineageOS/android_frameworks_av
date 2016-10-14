@@ -320,7 +320,7 @@ uint32_t SoundTriggerHalHidl::nextUniqueId()
 }
 
 void SoundTriggerHalHidl::convertUuidToHal(Uuid *halUuid,
-                                           const struct sound_trigger_uuid_s *uuid)
+                                           const sound_trigger_uuid_t *uuid)
 {
     halUuid->timeLow = uuid->timeLow;
     halUuid->timeMid = uuid->timeMid;
@@ -329,7 +329,7 @@ void SoundTriggerHalHidl::convertUuidToHal(Uuid *halUuid,
     memcpy(halUuid->node.data(), &uuid->node[0], sizeof(uuid->node));
 }
 
-void SoundTriggerHalHidl::convertUuidFromHal(struct sound_trigger_uuid_s *uuid,
+void SoundTriggerHalHidl::convertUuidFromHal(sound_trigger_uuid_t *uuid,
                                              const Uuid *halUuid)
 {
     uuid->timeLow = halUuid->timeLow;
