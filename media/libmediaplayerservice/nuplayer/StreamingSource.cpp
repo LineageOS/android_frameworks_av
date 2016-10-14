@@ -228,6 +228,10 @@ sp<AMessage> NuPlayer::StreamingSource::getFormat(bool audio) {
     }
 
     sp<MetaData> meta = source->getFormat();
+    if (meta == NULL) {
+        format->setInt32("err", -EWOULDBLOCK);
+        return format;
+    }
     status_t err = convertMetaDataToMessage(meta, &format);
     if (err != OK) { // format may have been cleared on error
         format = new AMessage;
