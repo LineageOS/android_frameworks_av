@@ -418,6 +418,22 @@ static VideoFrame *extractVideoFrame(
             && trackMeta->findInt32(kKeySARHeight, &sarHeight)
             && sarHeight != 0) {
         frame->mDisplayWidth = (frame->mDisplayWidth * sarWidth) / sarHeight;
+    } else {
+        int32_t width, height;
+        if (trackMeta->findInt32(kKeyDisplayWidth, &width)
+                && trackMeta->findInt32(kKeyDisplayHeight, &height)
+                && frame->mDisplayWidth > 0 && frame->mDisplayHeight > 0
+                && width > 0 && height > 0) {
+            if (frame->mDisplayHeight * (int64_t)width / height > (int64_t)frame->mDisplayWidth) {
+                frame->mDisplayHeight =
+                        (int32_t)(height * (int64_t)frame->mDisplayWidth / width);
+            } else {
+                frame->mDisplayWidth =
+                        (int32_t)(frame->mDisplayHeight * (int64_t)width / height);
+            }
+            ALOGV("thumbNail width and height are overridden to %d x %d",
+                    frame->mDisplayWidth, frame->mDisplayHeight);
+        }
     }
 
     int32_t srcFormat;
