@@ -543,6 +543,7 @@ status_t AudioTrack::set(
     mTimestampStartupGlitchReported = false;
     mRetrogradeMotionReported = false;
     mPreviousLocation = ExtendedTimestamp::LOCATION_INVALID;
+    mStartTs.mPosition = 0;
     mUnderrunCountOffset = 0;
     mFramesWritten = 0;
     mFramesWrittenServerOffset = 0;
@@ -570,6 +571,17 @@ status_t AudioTrack::start()
         mState = STATE_ACTIVE;
     }
     (void) updateAndGetPosition_l();
+
+    // save start timestamp
+    if (isOffloadedOrDirect_l()) {
+        if (getTimestamp_l(mStartTs) != OK) {
+            mStartTs.mPosition = 0;
+        }
+    } else {
+        if (getTimestamp_l(&mStartEts) != OK) {
+            mStartEts.clear();
+        }
+    }
     if (previousState == STATE_STOPPED || previousState == STATE_FLUSHED) {
         // reset current position as seen by client to 0
         mPosition = 0;
@@ -578,19 +590,17 @@ status_t AudioTrack::start()
         mRetrogradeMotionReported = false;
         mPreviousLocation = ExtendedTimestamp::LOCATION_INVALID;
 
-        // read last server side position change via timestamp.
-        ExtendedTimestamp ets;
-        if (mProxy->getTimestamp(&ets) == OK &&
-                ets.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] > 0) {
+        if (!isOffloadedOrDirect_l()
+                && mStartEts.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] > 0) {
             // Server side has consumed something, but is it finished consuming?
             // It is possible since flush and stop are asynchronous that the server
             // is still active at this point.
             ALOGV("start: server read:%lld  cumulative flushed:%lld  client written:%lld",
                     (long long)(mFramesWrittenServerOffset
-                            + ets.mPosition[ExtendedTimestamp::LOCATION_SERVER]),
-                    (long long)ets.mFlushed,
+                            + mStartEts.mPosition[ExtendedTimestamp::LOCATION_SERVER]),
+                    (long long)mStartEts.mFlushed,
                     (long long)mFramesWritten);
-            mFramesWrittenServerOffset = -ets.mPosition[ExtendedTimestamp::LOCATION_SERVER];
+            mFramesWrittenServerOffset = -mStartEts.mPosition[ExtendedTimestamp::LOCATION_SERVER];
         }
         mFramesWritten = 0;
         mProxy->clearTimestamp(); // need new server push for valid timestamp
@@ -2328,7 +2338,11 @@ status_t AudioTrack::getTimestamp_l(ExtendedTimestamp *timestamp)
 status_t AudioTrack::getTimestamp(AudioTimestamp& timestamp)
 {
     AutoMutex lock(mLock);
+    return getTimestamp_l(timestamp);
+}
 
+status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
+{
     bool previousTimestampValid = mPreviousTimestampValid;
     // Set false here to cover all the error return cases.
     mPreviousTimestampValid = false;
@@ -2748,6 +2762,75 @@ status_t AudioTrack::pendingDuration(int32_t *msec, ExtendedTimestamp::Location 
     *msec = (diff <= 0) ? 0
             : (int32_t)((double)diff * 1000 / ((double)mSampleRate * mPlaybackRate.mSpeed));
     return NO_ERROR;
+}
+
+bool AudioTrack::hasStarted()
+{
+    AutoMutex lock(mLock);
+    switch (mState) {
+    case STATE_STOPPED:
+        if (isOffloadedOrDirect_l()) {
+            // check if we have started in the past to return true.
+            return mStartUs > 0;
+        }
+        // A normal audio track may still be draining, so
+        // check if stream has ended.  This covers fasttrack position
+        // instability and start/stop without any data written.
+        if (mProxy->getStreamEndDone()) {
+            return true;
+        }
+        // fall through
+    case STATE_ACTIVE:
+    case STATE_STOPPING:
+        break;
+    case STATE_PAUSED:
+    case STATE_PAUSED_STOPPING:
+    case STATE_FLUSHED:
+        return false;  // we're not active
+    default:
+        LOG_ALWAYS_FATAL("Invalid mState in hasStarted(): %d", mState);
+        break;
+    }
+
+    // wait indicates whether we need to wait for a timestamp.
+    // This is conservatively figured - if we encounter an unexpected error
+    // then we will not wait.
+    bool wait = false;
+    if (isOffloadedOrDirect_l()) {
+        AudioTimestamp ts;
+        status_t status = getTimestamp_l(ts);
+        if (status == WOULD_BLOCK) {
+            wait = true;
+        } else if (status == OK) {
+            wait = (ts.mPosition == 0 || ts.mPosition == mStartTs.mPosition);
+        }
+        ALOGV("hasStarted wait:%d  ts:%u  start position:%lld",
+                (int)wait,
+                ts.mPosition,
+                (long long)mStartTs.mPosition);
+    } else {
+        int location = ExtendedTimestamp::LOCATION_SERVER; // for ALOG
+        ExtendedTimestamp ets;
+        status_t status = getTimestamp_l(&ets);
+        if (status == WOULD_BLOCK) {  // no SERVER or KERNEL frame info in ets
+            wait = true;
+        } else if (status == OK) {
+            for (location = ExtendedTimestamp::LOCATION_KERNEL;
+                    location >= ExtendedTimestamp::LOCATION_SERVER; --location) {
+                if (ets.mTimeNs[location] < 0 || mStartEts.mTimeNs[location] < 0) {
+                    continue;
+                }
+                wait = ets.mPosition[location] == 0
+                        || ets.mPosition[location] == mStartEts.mPosition[location];
+                break;
+            }
+        }
+        ALOGV("hasStarted wait:%d  ets:%lld  start position:%lld",
+                (int)wait,
+                (long long)ets.mPosition[location],
+                (long long)mStartEts.mPosition[location]);
+    }
+    return !wait;
 }
 
 // =========================================================================
