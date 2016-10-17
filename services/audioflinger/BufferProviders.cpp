@@ -17,12 +17,12 @@
 #define LOG_TAG "BufferProvider"
 //#define LOG_NDEBUG 0
 
-#include <audio_effects/effect_downmix.h>
 #include <audio_utils/primitives.h>
 #include <audio_utils/format.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <media/AudioResamplerPublic.h>
+#include <system/audio_effects/effect_downmix.h>
 
 #include <utils/Log.h>
 
