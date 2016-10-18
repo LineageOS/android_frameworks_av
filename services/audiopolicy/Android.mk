@@ -20,7 +20,6 @@ endif
 
 LOCAL_C_INCLUDES := \
     $(TOPDIR)frameworks/av/services/audioflinger \
-    $(call include-path-for, audio-effects) \
     $(call include-path-for, audio-utils) \
     $(TOPDIR)frameworks/av/services/audiopolicy/common/include \
     $(TOPDIR)frameworks/av/services/audiopolicy/engine/interface \
