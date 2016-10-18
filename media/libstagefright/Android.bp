@@ -146,6 +146,10 @@ cc_library_shared {
             // enable experiments only in userdebug and eng builds
             cflags: ["-DENABLE_STAGEFRIGHT_EXPERIMENTS"],
         },
+        has_legacy_camera_hal1: {
+            // enable legacy camera HAL1 product option
+            cflags: ["-DCAMCORDER_GRALLOC_SOURCE"],
+        },
     },
 
     sanitize: {
