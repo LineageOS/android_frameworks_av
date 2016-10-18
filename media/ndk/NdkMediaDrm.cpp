@@ -222,8 +222,7 @@ media_status_t AMediaDrm_setOnEventListener(AMediaDrm *mObj, AMediaDrmEventListe
 
 
 static bool findId(AMediaDrm *mObj, const AMediaDrmByteArray &id, List<idvec_t>::iterator &iter) {
-    iter = mObj->mIds.begin();
-    while (iter != mObj->mIds.end()) {
+    for (iter = mObj->mIds.begin(); iter != mObj->mIds.end(); ++iter) {
         if (iter->array() == id.ptr && iter->size() == id.length) {
             return true;
         }
