@@ -25,7 +25,7 @@
 #include <cutils/misc.h>
 #include <cutils/config_utils.h>
 #include <cutils/properties.h>
-#include <audio_effects/audio_effects_conf.h>
+#include <system/audio_effects/audio_effects_conf.h>
 
 static list_elem_t *gEffectList; // list of effect_entry_t: all currently created effects
 static list_elem_t *gLibraryList; // list of lib_entry_t: all currently loaded libraries
