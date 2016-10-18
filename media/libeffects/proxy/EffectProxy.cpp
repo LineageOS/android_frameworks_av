@@ -91,6 +91,7 @@ int EffectProxyCreate(const effect_uuid_t *uuid,
        delete[] pContext->sube;
        delete[] pContext->desc;
        delete[] pContext->aeli;
+       delete pContext;
        return -EINVAL;
     }
     // Check which is the HW descriptor and copy the descriptors
