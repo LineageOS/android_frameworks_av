@@ -69,7 +69,7 @@ void AudioPolicyManager::broadcastDeviceConnectionState(audio_devices_t device,
 {
     AudioParameter param(device_address);
     const String8 key(state == AUDIO_POLICY_DEVICE_STATE_AVAILABLE ?
-                AUDIO_PARAMETER_DEVICE_CONNECT : AUDIO_PARAMETER_DEVICE_DISCONNECT);
+                AudioParameter::keyStreamConnect : AudioParameter::keyStreamDisconnect);
     param.addInt(key, device);
     mpClientInterface->setParameters(AUDIO_IO_HANDLE_NONE, param.toString());
 }
@@ -3594,7 +3594,7 @@ bool AudioPolicyManager::threadLoop()
                         mTestFormat = format;
                     } else if (mTestOutputs[mCurOutput] != 0) {
                         AudioParameter outputParam = AudioParameter();
-                        outputParam.addInt(String8("format"), format);
+                        outputParam.addInt(String8(AudioParameter::keyStreamSupportedFormats), format);
                         mpClientInterface->setParameters(mTestOutputs[mCurOutput], outputParam.toString());
                     }
                 }
@@ -3613,7 +3613,7 @@ bool AudioPolicyManager::threadLoop()
                         mTestChannels = channels;
                     } else if (mTestOutputs[mCurOutput] != 0) {
                         AudioParameter outputParam = AudioParameter();
-                        outputParam.addInt(String8("channels"), channels);
+                        outputParam.addInt(String8(AudioParameter::keyStreamSupportedChannels), channels);
                         mpClientInterface->setParameters(mTestOutputs[mCurOutput], outputParam.toString());
                     }
                 }
@@ -3626,7 +3626,7 @@ bool AudioPolicyManager::threadLoop()
                         mTestSamplingRate = samplingRate;
                     } else if (mTestOutputs[mCurOutput] != 0) {
                         AudioParameter outputParam = AudioParameter();
-                        outputParam.addInt(String8("sampling_rate"), samplingRate);
+                        outputParam.addInt(String8(AudioParameter::keyStreamSupportedSamplingRates), samplingRate);
                         mpClientInterface->setParameters(mTestOutputs[mCurOutput], outputParam.toString());
                     }
                 }
@@ -5544,12 +5544,12 @@ void AudioPolicyManager::updateAudioProfiles(audio_devices_t device,
 
     // Format MUST be checked first to update the list of AudioProfile
     if (profiles.hasDynamicFormat()) {
-        reply = mpClientInterface->getParameters(ioHandle,
-                                                 String8(AUDIO_PARAMETER_STREAM_SUP_FORMATS));
+        reply = mpClientInterface->getParameters(
+                ioHandle, String8(AudioParameter::keyStreamSupportedFormats));
         ALOGV("%s: supported formats %s", __FUNCTION__, reply.string());
         AudioParameter repliedParameters(reply);
         if (repliedParameters.get(
-                String8(AUDIO_PARAMETER_STREAM_SUP_FORMATS), reply) != NO_ERROR) {
+                String8(AudioParameter::keyStreamSupportedFormats), reply) != NO_ERROR) {
             ALOGE("%s: failed to retrieve format, bailing out", __FUNCTION__);
             return;
         }
@@ -5566,27 +5566,28 @@ void AudioPolicyManager::updateAudioProfiles(audio_devices_t device,
         ChannelsVector channelMasks;
         SampleRateVector samplingRates;
         AudioParameter requestedParameters;
-        requestedParameters.addInt(String8(AUDIO_PARAMETER_STREAM_FORMAT), format);
+        requestedParameters.addInt(String8(AudioParameter::keyFormat), format);
 
         if (profiles.hasDynamicRateFor(format)) {
-            reply = mpClientInterface->getParameters(ioHandle,
-                                                     requestedParameters.toString() + ";" +
-                                                     AUDIO_PARAMETER_STREAM_SUP_SAMPLING_RATES);
+            reply = mpClientInterface->getParameters(
+                    ioHandle,
+                    requestedParameters.toString() + ";" +
+                    AudioParameter::keyStreamSupportedSamplingRates);
             ALOGV("%s: supported sampling rates %s", __FUNCTION__, reply.string());
             AudioParameter repliedParameters(reply);
             if (repliedParameters.get(
-                    String8(AUDIO_PARAMETER_STREAM_SUP_SAMPLING_RATES), reply) == NO_ERROR) {
+                    String8(AudioParameter::keyStreamSupportedSamplingRates), reply) == NO_ERROR) {
                 samplingRates = samplingRatesFromString(reply.string());
             }
         }
         if (profiles.hasDynamicChannelsFor(format)) {
             reply = mpClientInterface->getParameters(ioHandle,
                                                      requestedParameters.toString() + ";" +
-                                                     AUDIO_PARAMETER_STREAM_SUP_CHANNELS);
+                                                     AudioParameter::keyStreamSupportedChannels);
             ALOGV("%s: supported channel masks %s", __FUNCTION__, reply.string());
             AudioParameter repliedParameters(reply);
             if (repliedParameters.get(
-                    String8(AUDIO_PARAMETER_STREAM_SUP_CHANNELS), reply) == NO_ERROR) {
+                    String8(AudioParameter::keyStreamSupportedChannels), reply) == NO_ERROR) {
                 channelMasks = channelMasksFromString(reply.string());
                 if (device == AUDIO_DEVICE_OUT_HDMI) {
                     filterSurroundChannelMasks(&channelMasks);

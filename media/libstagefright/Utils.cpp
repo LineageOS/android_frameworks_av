@@ -41,9 +41,9 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/AudioSystem.h>
 #include <media/MediaPlayerInterface.h>
-#include <hardware/audio.h>
 #include <media/stagefright/Utils.h>
 #include <media/AudioParameter.h>
+#include <system/audio.h>
 
 namespace android {
 

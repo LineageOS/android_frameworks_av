@@ -19,8 +19,8 @@
 
 #include <utils/Log.h>
 
-#include <hardware/audio.h>
 #include <media/AudioParameter.h>
+#include <system/audio.h>
 
 namespace android {
 
@@ -36,8 +36,15 @@ const char * const AudioParameter::keyBtNrec = AUDIO_PARAMETER_KEY_BT_NREC;
 const char * const AudioParameter::keyHwAvSync = AUDIO_PARAMETER_HW_AV_SYNC;
 const char * const AudioParameter::keyMonoOutput = AUDIO_PARAMETER_MONO_OUTPUT;
 const char * const AudioParameter::keyStreamHwAvSync = AUDIO_PARAMETER_STREAM_HW_AV_SYNC;
+const char * const AudioParameter::keyStreamConnect = AUDIO_PARAMETER_DEVICE_CONNECT;
+const char * const AudioParameter::keyStreamDisconnect = AUDIO_PARAMETER_DEVICE_DISCONNECT;
+const char * const AudioParameter::keyStreamSupportedFormats = AUDIO_PARAMETER_STREAM_SUP_FORMATS;
+const char * const AudioParameter::keyStreamSupportedChannels = AUDIO_PARAMETER_STREAM_SUP_CHANNELS;
+const char * const AudioParameter::keyStreamSupportedSamplingRates =
+        AUDIO_PARAMETER_STREAM_SUP_SAMPLING_RATES;
 const char * const AudioParameter::valueOn = AUDIO_PARAMETER_VALUE_ON;
 const char * const AudioParameter::valueOff = AUDIO_PARAMETER_VALUE_OFF;
+const char * const AudioParameter::valueListSeparator = AUDIO_PARAMETER_VALUE_LIST_SEPARATOR;
 
 AudioParameter::AudioParameter(const String8& keyValuePairs)
 {

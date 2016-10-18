@@ -58,8 +58,22 @@ public:
     static const char * const keyMonoOutput;
     static const char * const keyStreamHwAvSync;
 
+    //  keyStreamConnect / Disconnect: value is an int in audio_devices_t
+    static const char * const keyStreamConnect;
+    static const char * const keyStreamDisconnect;
+
+    // For querying stream capabilities. All the returned values are lists.
+    //   keyStreamSupportedFormats: audio_format_t
+    //   keyStreamSupportedChannels: audio_channel_mask_t
+    //   keyStreamSupportedSamplingRates: sampling rate values
+    static const char * const keyStreamSupportedFormats;
+    static const char * const keyStreamSupportedChannels;
+    static const char * const keyStreamSupportedSamplingRates;
+
     static const char * const valueOn;
     static const char * const valueOff;
+
+    static const char * const valueListSeparator;
 
     String8 toString();
 

@@ -23,6 +23,7 @@
 #include "IOProfile.h"
 #include "TypeConverter.h"
 #include <system/audio.h>
+#include <media/AudioParameter.h>
 #include <utils/Log.h>
 #include <cutils/misc.h>
 
@@ -289,7 +290,7 @@ void ConfigParsingUtils::loadDevicesFromTag(const char *tag, DeviceVector &devic
                                             const DeviceVector &declaredDevices)
 {
     char *tagLiteral = strndup(tag, strlen(tag));
-    char *devTag = strtok(tagLiteral, "|");
+    char *devTag = strtok(tagLiteral, AudioParameter::valueListSeparator);
     while (devTag != NULL) {
         if (strlen(devTag) != 0) {
             audio_devices_t type;
@@ -311,7 +312,7 @@ void ConfigParsingUtils::loadDevicesFromTag(const char *tag, DeviceVector &devic
                 }
             }
         }
-        devTag = strtok(NULL, "|");
+        devTag = strtok(NULL, AudioParameter::valueListSeparator);
     }
     free(tagLiteral);
 }
