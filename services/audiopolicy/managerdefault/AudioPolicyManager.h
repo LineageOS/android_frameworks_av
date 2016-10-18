@@ -662,7 +662,7 @@ private:
                                                           const char *device_name);
         void updateMono(audio_io_handle_t output) {
             AudioParameter param;
-            param.addInt(String8(AUDIO_PARAMETER_MONO_OUTPUT), (int)mMasterMono);
+            param.addInt(String8(AudioParameter::keyMonoOutput), (int)mMasterMono);
             mpClientInterface->setParameters(output, param.toString());
         }
 };

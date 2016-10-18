@@ -18,6 +18,7 @@
 
 #include "policy.h"
 #include <Volume.h>
+#include <media/AudioParameter.h>
 #include <system/audio.h>
 #include <convert/convert.h>
 #include <utils/Log.h>
@@ -89,7 +90,7 @@ struct DefaultTraits
 
 template <class Traits>
 static void collectionFromString(const std::string &str, typename Traits::Collection &collection,
-                                 const char *del = "|")
+                                 const char *del = AudioParameter::valueListSeparator)
 {
     char *literal = strdup(str.c_str());
     for (const char *cstr = strtok(literal, del); cstr != NULL; cstr = strtok(NULL, del)) {
@@ -111,11 +112,13 @@ public:
 
     static void collectionFromString(const std::string &str,
                                      typename Traits::Collection &collection,
-                                     const char *del = "|");
+                                     const char *del = AudioParameter::valueListSeparator);
 
-    static uint32_t maskFromString(const std::string &str, const char *del = "|");
+    static uint32_t maskFromString(
+            const std::string &str, const char *del = AudioParameter::valueListSeparator);
 
-    static void maskToString(uint32_t mask, std::string &str, const char *del = "|");
+    static void maskToString(
+            uint32_t mask, std::string &str, const char *del = AudioParameter::valueListSeparator);
 
 protected:
     struct Table {
@@ -139,8 +142,8 @@ typedef TypeConverter<DeviceCategoryTraits> DeviceCategoryConverter;
 typedef TypeConverter<AudioModeTraits> AudioModeConverter;
 
 inline
-static SampleRateTraits::Collection samplingRatesFromString(const std::string &samplingRates,
-                                                            const char *del = "|")
+static SampleRateTraits::Collection samplingRatesFromString(
+        const std::string &samplingRates, const char *del = AudioParameter::valueListSeparator)
 {
     SampleRateTraits::Collection samplingRateCollection;
     collectionFromString<SampleRateTraits>(samplingRates, samplingRateCollection, del);
@@ -148,7 +151,8 @@ static SampleRateTraits::Collection samplingRatesFromString(const std::string &s
 }
 
 inline
-static FormatTraits::Collection formatsFromString(const std::string &formats, const char *del = "|")
+static FormatTraits::Collection formatsFromString(
+        const std::string &formats, const char *del = AudioParameter::valueListSeparator)
 {
     FormatTraits::Collection formatCollection;
     FormatConverter::collectionFromString(formats, formatCollection, del);
@@ -178,8 +182,8 @@ static audio_channel_mask_t channelMaskFromString(const std::string &literalChan
 }
 
 inline
-static ChannelTraits::Collection channelMasksFromString(const std::string &channels,
-                                                        const char *del = "|")
+static ChannelTraits::Collection channelMasksFromString(
+        const std::string &channels, const char *del = AudioParameter::valueListSeparator)
 {
     ChannelTraits::Collection channelMaskCollection;
     OutputChannelConverter::collectionFromString(channels, channelMaskCollection, del);
@@ -189,8 +193,8 @@ static ChannelTraits::Collection channelMasksFromString(const std::string &chann
 }
 
 inline
-static InputChannelTraits::Collection inputChannelMasksFromString(const std::string &inChannels,
-                                                                  const char *del = "|")
+static InputChannelTraits::Collection inputChannelMasksFromString(
+        const std::string &inChannels, const char *del = AudioParameter::valueListSeparator)
 {
     InputChannelTraits::Collection inputChannelMaskCollection;
     InputChannelConverter::collectionFromString(inChannels, inputChannelMaskCollection, del);
@@ -199,8 +203,8 @@ static InputChannelTraits::Collection inputChannelMasksFromString(const std::str
 }
 
 inline
-static OutputChannelTraits::Collection outputChannelMasksFromString(const std::string &outChannels,
-                                                                    const char *del = "|")
+static OutputChannelTraits::Collection outputChannelMasksFromString(
+        const std::string &outChannels, const char *del = AudioParameter::valueListSeparator)
 {
     OutputChannelTraits::Collection outputChannelMaskCollection;
     OutputChannelConverter::collectionFromString(outChannels, outputChannelMaskCollection, del);
