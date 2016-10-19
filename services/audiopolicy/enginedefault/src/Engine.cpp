@@ -320,8 +320,7 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
             if (((availableInputDevices.types() &
                     AUDIO_DEVICE_IN_TELEPHONY_RX & ~AUDIO_DEVICE_BIT_IN) == 0) ||
                     (((txDevice & availPrimaryInputDevices & ~AUDIO_DEVICE_BIT_IN) != 0) &&
-                         (primaryOutput->getAudioPort()->getModuleVersion() <
-                             AUDIO_DEVICE_API_VERSION_3_0))) {
+                         (primaryOutput->getAudioPort()->getModuleVersionMajor() < 3))) {
                 availableOutputDevicesType = availPrimaryOutputDevices;
             }
         }

@@ -33,9 +33,6 @@ class DeviceHalInterface : public RefBase
     // Sets the value of 'devices' to a bitmask of 1 or more values of audio_devices_t.
     virtual status_t getSupportedDevices(uint32_t *devices) = 0;
 
-    // Get the hardware module version.
-    virtual status_t getVersion(uint32_t *version) = 0;
-
     // Check to see if the audio hardware interface has been initialized.
     virtual status_t initCheck() = 0;
 
@@ -87,6 +84,9 @@ class DeviceHalInterface : public RefBase
             const char *address,
             audio_source_t source,
             sp<StreamInHalInterface> *inStream) = 0;
+
+    // Returns whether createAudioPatch and releaseAudioPatch operations are supported.
+    virtual status_t supportsAudioPatches(bool *supportsPatches) = 0;
 
     // Creates an audio patch between several source and sink ports.
     virtual status_t createAudioPatch(

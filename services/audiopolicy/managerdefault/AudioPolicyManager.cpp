@@ -37,6 +37,7 @@
 #include <media/AudioPolicyHelper.h>
 #include <soundtrigger/SoundTrigger.h>
 #include <system/audio.h>
+#include <audio_policy_conf.h>
 #include "AudioPolicyManager.h"
 #ifndef USE_XML_AUDIO_POLICY_CONF
 #include <ConfigParsingUtils.h>
@@ -2721,7 +2722,7 @@ status_t AudioPolicyManager::createAudioPatch(const struct audio_patch *patch,
                 // - source and sink devices are on differnt HW modules OR
                 // - audio HAL version is < 3.0
                 if (!srcDeviceDesc->hasSameHwModuleAs(sinkDeviceDesc) ||
-                        (srcDeviceDesc->mModule->getHalVersion() < AUDIO_DEVICE_API_VERSION_3_0)) {
+                        (srcDeviceDesc->mModule->getHalVersionMajor() < 3)) {
                     // support only one sink device for now to simplify output selection logic
                     if (patch->num_sinks > 1) {
                         return INVALID_OPERATION;
@@ -3083,7 +3084,7 @@ status_t AudioPolicyManager::connectAudioSource(const sp<AudioSourceDescriptor>&
 
     if (srcDeviceDesc->getAudioPort()->mModule->getHandle() ==
             sinkDeviceDesc->getAudioPort()->mModule->getHandle() &&
-            srcDeviceDesc->getAudioPort()->mModule->getHalVersion() >= AUDIO_DEVICE_API_VERSION_3_0 &&
+            srcDeviceDesc->getAudioPort()->mModule->getHalVersionMajor() >= 3 &&
             srcDeviceDesc->getAudioPort()->mGains.size() > 0) {
         ALOGV("%s AUDIO_DEVICE_API_VERSION_3_0", __FUNCTION__);
         //   create patch between src device and output device

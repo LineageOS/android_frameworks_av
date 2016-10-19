@@ -28,9 +28,6 @@ class DeviceHalLocal : public DeviceHalInterface
     // Sets the value of 'devices' to a bitmask of 1 or more values of audio_devices_t.
     virtual status_t getSupportedDevices(uint32_t *devices);
 
-    // Get the hardware module version.
-    virtual status_t getVersion(uint32_t *version);
-
     // Check to see if the audio hardware interface has been initialized.
     virtual status_t initCheck();
 
@@ -83,6 +80,9 @@ class DeviceHalLocal : public DeviceHalInterface
             audio_source_t source,
             sp<StreamInHalInterface> *inStream);
 
+    // Returns whether createAudioPatch and releaseAudioPatch operations are supported.
+    virtual status_t supportsAudioPatches(bool *supportsPatches);
+
     // Creates an audio patch between several source and sink ports.
     virtual status_t createAudioPatch(
             unsigned int num_sources,
@@ -115,6 +115,8 @@ class DeviceHalLocal : public DeviceHalInterface
 
     // The destructor automatically closes the device.
     virtual ~DeviceHalLocal();
+
+    uint32_t version() const { return mDev->common.version; }
 };
 
 } // namespace android

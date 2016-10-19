@@ -67,8 +67,6 @@
 #include <mediautils/BatteryNotifier.h>
 #include <private/android_filesystem_config.h>
 
-#include <hardware/audio.h>  // for AUDIO_HARDWARE_MODULE_...
-
 // ----------------------------------------------------------------------------
 
 // Note: the following macro is used for extremely verbose logging message.  In

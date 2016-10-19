@@ -357,9 +357,8 @@ void ConfigParsingUtils::loadModuleGlobalConfig(cnode *root, const sp<HwModule> 
         } else if (strcmp(AUDIO_HAL_VERSION_TAG, node->name) == 0) {
             uint32_t major, minor;
             sscanf((char *)node->value, "%u.%u", &major, &minor);
-            module->setHalVersion(HARDWARE_DEVICE_API_VERSION(major, minor));
-            ALOGV("loadGlobalConfig() mHalVersion = %04x major %u minor %u",
-                  module->getHalVersion(), major, minor);
+            module->setHalVersion(major, minor);
+            ALOGV("loadGlobalConfig() mHalVersion = major %u minor %u", major, minor);
         }
         node = node->next;
     }

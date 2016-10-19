@@ -418,19 +418,17 @@ status_t ModuleTraits::deserialize(xmlDocPtr doc, const xmlNode *root, PtrElemen
         ALOGE("%s: No %s found", __FUNCTION__, Attributes::name);
         return BAD_VALUE;
     }
-    uint32_t version = AUDIO_DEVICE_API_VERSION_MIN;
+    uint32_t versionMajor = 0, versionMinor = 0;
     string versionLiteral = getXmlAttribute(root, Attributes::version);
     if (!versionLiteral.empty()) {
-        uint32_t major, minor;
-        sscanf(versionLiteral.c_str(), "%u.%u", &major, &minor);
-        version = HARDWARE_DEVICE_API_VERSION(major, minor);
-        ALOGV("%s: mHalVersion = %04x major %u minor %u",  __FUNCTION__,
-              version, major, minor);
+        sscanf(versionLiteral.c_str(), "%u.%u", &versionMajor, &versionMinor);
+        ALOGV("%s: mHalVersion = major %u minor %u",  __FUNCTION__,
+              versionMajor, versionMajor);
     }
 
     ALOGV("%s: %s %s=%s", __FUNCTION__, tag, Attributes::name, name.c_str());
 
-    module = new Element(name.c_str(), version);
+    module = new Element(name.c_str(), versionMajor, versionMinor);
 
     // Deserialize childrens: Audio Mix Port, Audio Device Ports (Source/Sink), Audio Routes
     MixPortTraits::Collection mixPorts;

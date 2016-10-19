@@ -58,7 +58,6 @@ public:
     audio_module_handle_t handle() const { return mHandle; }
     const char *moduleName() const { return mModuleName; }
     sp<DeviceHalInterface> hwDevice() const { return mHwDevice; }
-    uint32_t version() const;
 
     /** This method creates and opens the audio hardware output stream.
      * The "address" parameter qualifies the "devices" audio device type if needed.
@@ -74,6 +73,8 @@ public:
             audio_output_flags_t flags,
             struct audio_config *config,
             const char *address);
+
+    bool supportsAudioPatches() const;
 
 private:
     const audio_module_handle_t mHandle;
