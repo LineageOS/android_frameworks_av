@@ -51,9 +51,7 @@ GraphicBufferSource::GraphicBufferSource() :
     mNumBufferAcquired(0),
     mEndOfStream(false),
     mEndOfStreamSent(false),
-    mMaxTimestampGapUs(-1ll),
     mPrevOriginalTimeUs(-1ll),
-    mPrevModifiedTimeUs(-1ll),
     mSkipFramesBeforeNs(-1ll),
     mRepeatAfterUs(-1ll),
     mRepeatLastFrameGeneration(0),
@@ -515,9 +513,7 @@ void GraphicBufferSource::setLatestBuffer_l(const BufferItem &item) {
 }
 
 bool GraphicBufferSource::getTimestamp(
-        const BufferItem &item, int64_t *origTimeUs, int64_t *codecTimeUs) {
-    *origTimeUs = -1ll;
-
+        const BufferItem &item, int64_t *codecTimeUs) {
     int64_t timeUs = item.mTimestamp / 1000;
     timeUs += mInputBufferTimeOffsetUs;
 
@@ -558,29 +554,7 @@ bool GraphicBufferSource::getTimestamp(
             return false;
         }
 
-        if (mMaxTimestampGapUs > 0ll) {
-            //TODO: Fix the case when mMaxTimestampGapUs and mTimePerCaptureUs are both set.
-
-            /* Cap timestamp gap between adjacent frames to specified max
-             *
-             * In the scenario of cast mirroring, encoding could be suspended for
-             * prolonged periods. Limiting the pts gap to workaround the problem
-             * where encoder's rate control logic produces huge frames after a
-             * long period of suspension.
-             */
-            if (mPrevOriginalTimeUs >= 0ll) {
-                int64_t timestampGapUs = originalTimeUs - mPrevOriginalTimeUs;
-                timeUs = (timestampGapUs < mMaxTimestampGapUs ?
-                    timestampGapUs : mMaxTimestampGapUs) + mPrevModifiedTimeUs;
-            }
-            *origTimeUs = originalTimeUs;
-            ALOGV("IN  timestamp: %lld -> %lld",
-                static_cast<long long>(originalTimeUs),
-                static_cast<long long>(timeUs));
-        }
-
         mPrevOriginalTimeUs = originalTimeUs;
-        mPrevModifiedTimeUs = timeUs;
     }
 
     *codecTimeUs = timeUs;
@@ -590,8 +564,8 @@ bool GraphicBufferSource::getTimestamp(
 status_t GraphicBufferSource::submitBuffer_l(const BufferItem &item, int cbi) {
     ALOGV("submitBuffer_l: slot=%d, cbi=%d", item.mSlot, cbi);
 
-    int64_t origTimeUs, codecTimeUs;
-    if (!getTimestamp(item, &origTimeUs, &codecTimeUs)) {
+    int64_t codecTimeUs;
+    if (!getTimestamp(item, &codecTimeUs)) {
         return UNKNOWN_ERROR;
     }
 
@@ -605,8 +579,7 @@ status_t GraphicBufferSource::submitBuffer_l(const BufferItem &item, int cbi) {
     int fenceID = item.mFence->isValid() ? item.mFence->dup() : -1;
 
     status_t err = mOMXNode->emptyGraphicBuffer(
-            bufferID, buffer, OMX_BUFFERFLAG_ENDOFFRAME,
-            codecTimeUs, origTimeUs, fenceID);
+            bufferID, buffer, OMX_BUFFERFLAG_ENDOFFRAME, codecTimeUs, fenceID);
 
     if (err != OK) {
         ALOGW("WARNING: emptyGraphicBuffer failed: 0x%x", err);
@@ -641,7 +614,7 @@ void GraphicBufferSource::submitEndOfInputStream_l() {
     status_t err = mOMXNode->emptyGraphicBuffer(
             bufferID, NULL /* buffer */,
             OMX_BUFFERFLAG_ENDOFFRAME | OMX_BUFFERFLAG_EOS,
-            0 /* timestamp */, -1ll /* origTimestamp */, -1 /* fenceFd */);
+            0 /* timestamp */, -1 /* fenceFd */);
     if (err != OK) {
         ALOGW("emptyDirectBuffer EOS failed: 0x%x", err);
     } else {
@@ -855,9 +828,7 @@ Status GraphicBufferSource::configure(
         mSuspended = false;
         mEndOfStream = false;
         mEndOfStreamSent = false;
-        mMaxTimestampGapUs = -1ll;
         mPrevOriginalTimeUs = -1ll;
-        mPrevModifiedTimeUs = -1ll;
         mSkipFramesBeforeNs = -1ll;
         mRepeatAfterUs = -1ll;
         mRepeatLastFrameGeneration = 0;
@@ -925,20 +896,6 @@ Status GraphicBufferSource::setRepeatPreviousFrameDelayUs(int64_t repeatAfterUs)
     }
 
     mRepeatAfterUs = repeatAfterUs;
-    return Status::ok();
-}
-
-Status GraphicBufferSource::setMaxTimestampGapUs(int64_t maxGapUs) {
-    ALOGV("setMaxTimestampGapUs: maxGapUs=%lld", (long long)maxGapUs);
-
-    Mutex::Autolock autoLock(mMutex);
-
-    if (mExecuting || maxGapUs <= 0ll) {
-        return Status::fromServiceSpecificError(INVALID_OPERATION);
-    }
-
-    mMaxTimestampGapUs = maxGapUs;
-
     return Status::ok();
 }
 

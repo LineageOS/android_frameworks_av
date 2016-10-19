@@ -475,14 +475,13 @@ public:
     virtual status_t emptyGraphicBuffer(
             buffer_id buffer,
             const sp<GraphicBuffer> &graphicBuffer, OMX_U32 flags,
-            OMX_TICKS timestamp, OMX_TICKS origTimestamp, int fenceFd) {
+            OMX_TICKS timestamp, int fenceFd) {
         Parcel data, reply;
         data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
         data.writeInt32((int32_t)buffer);
         data.write(*graphicBuffer);
         data.writeInt32(flags);
         data.writeInt64(timestamp);
-        data.writeInt64(origTimestamp);
         data.writeInt32(fenceFd >= 0);
         if (fenceFd >= 0) {
             data.writeFileDescriptor(fenceFd, true /* takeOwnership */);
@@ -990,12 +989,10 @@ status_t BnOMXNode::onTransact(
             data.read(*graphicBuffer);
             OMX_U32 flags = data.readInt32();
             OMX_TICKS timestamp = data.readInt64();
-            OMX_TICKS origTimestamp = data.readInt64();
             bool haveFence = data.readInt32();
             int fenceFd = haveFence ? ::dup(data.readFileDescriptor()) : -1;
             reply->writeInt32(emptyGraphicBuffer(
-                    buffer, graphicBuffer, flags,
-                    timestamp, origTimestamp, fenceFd));
+                    buffer, graphicBuffer, flags, timestamp, fenceFd));
 
             return NO_ERROR;
         }

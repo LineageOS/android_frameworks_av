@@ -27,7 +27,6 @@ interface IGraphicBufferSource {
     void configure(IOMXNode omxNode, int dataSpace);
     void setSuspend(boolean suspend);
     void setRepeatPreviousFrameDelayUs(long repeatAfterUs);
-    void setMaxTimestampGapUs(long maxGapUs);
     void setMaxFps(float maxFps);
     void setTimeLapseConfig(long timePerFrameUs, long timePerCaptureUs);
     void setStartTimeUs(long startTimeUs);
