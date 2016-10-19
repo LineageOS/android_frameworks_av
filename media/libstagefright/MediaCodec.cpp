@@ -1097,14 +1097,16 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                             break;
                         }
 
-                        case STOPPING:
                         case RELEASING:
                         {
                             // Ignore the error, assuming we'll still get
-                            // the shutdown complete notification.
-
+                            // the shutdown complete notification. If we
+                            // don't, we'll timeout and force release.
                             sendErrorResponse = false;
-
+                        }
+                        // fall-thru
+                        case STOPPING:
+                        {
                             if (mFlags & kFlagSawMediaServerDie) {
                                 // MediaServer died, there definitely won't
                                 // be a shutdown complete notification after
@@ -1118,6 +1120,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                                     mComponentName.clear();
                                 }
                                 (new AMessage)->postReply(mReplyID);
+                                sendErrorResponse = false;
                             }
                             break;
                         }
@@ -1573,6 +1576,10 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
                 case CodecBase::kWhatShutdownCompleted:
                 {
+                    if (mState == UNINITIALIZED) {
+                        // Ignore shutdown complete if we're already released.
+                        break;
+                    }
                     if (mState == STOPPING) {
                         setState(INITIALIZED);
                     } else {
@@ -1894,7 +1901,9 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 }
             }
 
-            if (!((mFlags & kFlagIsComponentAllocated) && targetState == UNINITIALIZED) // See 1
+            bool isReleasingAllocatedComponent =
+                    (mFlags & kFlagIsComponentAllocated) && targetState == UNINITIALIZED;
+            if (!isReleasingAllocatedComponent // See 1
                     && mState != INITIALIZED
                     && mState != CONFIGURED && !isExecuting()) {
                 // 1) Permit release to shut down the component if allocated.
@@ -1918,6 +1927,14 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 break;
             }
 
+            // If we're flushing, or we're stopping but received a release
+            // request, post the reply for the pending call first, and consider
+            // it done. The reply token will be replaced after this, and we'll
+            // no longer be able to reply.
+            if (mState == FLUSHING || mState == STOPPING) {
+                (new AMessage)->postReply(mReplyID);
+            }
+
             if (mFlags & kFlagSawMediaServerDie) {
                 // It's dead, Jim. Don't expect initiateShutdown to yield
                 // any useful results now...
@@ -1926,6 +1943,15 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     mComponentName.clear();
                 }
                 (new AMessage)->postReply(replyID);
+                break;
+            }
+
+            // If we already have an error, component may not be able to
+            // complete the shutdown properly. If we're stopping, post the
+            // reply now with an error to unblock the client, client can
+            // release after the failure (instead of ANR).
+            if (msg->what() == kWhatStop && (mFlags & kFlagStickyError)) {
+                PostReplyWithError(replyID, getStickyError());
                 break;
             }
 
@@ -1940,6 +1966,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             if (mSoftRenderer != NULL && (mFlags & kFlagPushBlankBuffersOnShutdown)) {
                 pushBlankBuffersToNativeWindow(mSurface.get());
             }
+
             break;
         }
 
