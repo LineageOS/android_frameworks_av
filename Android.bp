@@ -3,6 +3,7 @@ ndk_headers {
     from: "include/camera/ndk/",
     to: "camera",
     srcs: ["include/camera/ndk/**/*.h"],
+    license: "NOTICE",
 }
 
 ndk_headers {
@@ -10,6 +11,7 @@ ndk_headers {
     from: "include/ndk/",
     to: "media",
     srcs: ["include/ndk/**/*.h"],
+    license: "NOTICE",
 }
 
 subdirs = [
