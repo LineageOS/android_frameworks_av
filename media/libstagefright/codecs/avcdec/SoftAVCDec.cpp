@@ -120,7 +120,8 @@ SoftAVC::SoftAVC(
       mIvColorFormat(IV_YUV_420P),
       mChangingResolution(false),
       mSignalledError(false),
-      mStride(mWidth){
+      mStride(mWidth),
+      mInputOffset(0){
     initPorts(
             kNumBuffers, INPUT_BUF_SIZE, kNumBuffers, CODEC_MIME_TYPE);
 
@@ -214,6 +215,7 @@ status_t SoftAVC::setParams(size_t stride) {
 status_t SoftAVC::resetPlugin() {
     mIsInFlush = false;
     mReceivedEOS = false;
+    mInputOffset = 0;
     memset(mTimeStamps, 0, sizeof(mTimeStamps));
     memset(mTimeStampsValid, 0, sizeof(mTimeStampsValid));
 
@@ -400,8 +402,8 @@ bool SoftAVC::setDecodeArgs(
     if (inHeader) {
         ps_dec_ip->u4_ts = timeStampIx;
         ps_dec_ip->pv_stream_buffer =
-            inHeader->pBuffer + inHeader->nOffset;
-        ps_dec_ip->u4_num_Bytes = inHeader->nFilledLen;
+            inHeader->pBuffer + inHeader->nOffset + mInputOffset;
+        ps_dec_ip->u4_num_Bytes = inHeader->nFilledLen - mInputOffset;
     } else {
         ps_dec_ip->u4_ts = 0;
         ps_dec_ip->pv_stream_buffer = NULL;
@@ -472,6 +474,8 @@ void SoftAVC::onPortFlushCompleted(OMX_U32 portIndex) {
 
 void SoftAVC::onQueueFilled(OMX_U32 portIndex) {
     UNUSED(portIndex);
+    OMX_BUFFERHEADERTYPE *inHeader = NULL;
+    BufferInfo *inInfo = NULL;
 
     if (mSignalledError) {
         return;
@@ -498,17 +502,11 @@ void SoftAVC::onQueueFilled(OMX_U32 portIndex) {
     List<BufferInfo *> &outQueue = getPortQueue(kOutputPortIndex);
 
     while (!outQueue.empty()) {
-        BufferInfo *inInfo;
-        OMX_BUFFERHEADERTYPE *inHeader;
-
         BufferInfo *outInfo;
         OMX_BUFFERHEADERTYPE *outHeader;
-        size_t timeStampIx;
+        size_t timeStampIx = 0;
 
-        inInfo = NULL;
-        inHeader = NULL;
-
-        if (!mIsInFlush) {
+        if (!mIsInFlush && (NULL == inHeader)) {
             if (!inQueue.empty()) {
                 inInfo = *inQueue.begin();
                 inHeader = inInfo->mHeader;
@@ -575,7 +573,7 @@ void SoftAVC::onQueueFilled(OMX_U32 portIndex) {
                 return;
             }
             // If input dump is enabled, then write to file
-            DUMP_TO_FILE(mInFile, s_dec_ip.pv_stream_buffer, s_dec_ip.u4_num_Bytes);
+            DUMP_TO_FILE(mInFile, s_dec_ip.pv_stream_buffer, s_dec_ip.u4_num_Bytes, mInputOffset);
 
             GETTIME(&mTimeStart, NULL);
             /* Compute time elapsed between end of previous decode()
@@ -683,24 +681,26 @@ void SoftAVC::onQueueFilled(OMX_U32 portIndex) {
                     resetPlugin();
                 }
             }
+            mInputOffset += s_dec_op.u4_num_bytes_consumed;
         }
-
-        /* If input EOS is seen and decoder is not in flush mode,
-         * set the decoder in flush mode.
-         * There can be a case where EOS is sent along with last picture data
-         * In that case, only after decoding that input data, decoder has to be
-         * put in flush. This case is handled here  */
-
-        if (mReceivedEOS && !mIsInFlush) {
-            setFlushMode();
-        }
-
-        if (inHeader != NULL) {
+        // If more than 4 bytes are remaining in input, then do not release it
+        if (inHeader != NULL && ((inHeader->nFilledLen - mInputOffset) <= 4)) {
             inInfo->mOwnedByUs = false;
             inQueue.erase(inQueue.begin());
             inInfo = NULL;
             notifyEmptyBufferDone(inHeader);
             inHeader = NULL;
+            mInputOffset = 0;
+
+            /* If input EOS is seen and decoder is not in flush mode,
+             * set the decoder in flush mode.
+             * There can be a case where EOS is sent along with last picture data
+             * In that case, only after decoding that input data, decoder has to be
+             * put in flush. This case is handled here  */
+
+            if (mReceivedEOS && !mIsInFlush) {
+                setFlushMode();
+            }
         }
     }
 }
