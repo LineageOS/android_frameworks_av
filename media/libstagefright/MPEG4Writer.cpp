@@ -116,6 +116,7 @@ public:
     int32_t getTrackId() const { return mTrackId; }
     status_t dump(int fd, const Vector<String16>& args) const;
     static const char *getFourCCForMime(const char *mime);
+    const char *getTrackType() const;
 
 private:
     enum {
@@ -271,6 +272,7 @@ private:
     bool mIsAvc;
     bool mIsHevc;
     bool mIsAudio;
+    bool mIsVideo;
     bool mIsMPEG4;
     bool mIsMalformed;
     int32_t mTrackId;
@@ -393,6 +395,7 @@ private:
     void writeMdhdBox(uint32_t now);
     void writeSmhdBox();
     void writeVmhdBox();
+    void writeNmhdBox();
     void writeHdlrBox();
     void writeTkhdBox(uint32_t now);
     void writeColrBox();
@@ -400,6 +403,7 @@ private:
     void writeMp4vEsdsBox();
     void writeAudioFourCCBox();
     void writeVideoFourCCBox();
+    void writeMetadataFourCCBox();
     void writeStblBox(bool use32BitOffset);
 
     Track(const Track &);
@@ -430,6 +434,8 @@ MPEG4Writer::MPEG4Writer(int fd)
       mStartTimestampUs(-1ll),
       mLatitudex10000(0),
       mLongitudex10000(0),
+      mHasAudioTrack(false),
+      mHasVideoTrack(false),
       mAreGeoTagsAvailable(false),
       mStartTimeOffsetMs(-1),
       mMetaKeys(new AMessage()) {
@@ -477,7 +483,7 @@ status_t MPEG4Writer::Track::dump(
     const size_t SIZE = 256;
     char buffer[SIZE];
     String8 result;
-    snprintf(buffer, SIZE, "     %s track\n", mIsAudio? "Audio": "Video");
+    snprintf(buffer, SIZE, "     %s track\n", getTrackType());
     result.append(buffer);
     snprintf(buffer, SIZE, "       reached EOS: %s\n",
             mReachedEOS? "true": "false");
@@ -513,8 +519,10 @@ const char *MPEG4Writer::Track::getFourCCForMime(const char *mime) {
         } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_HEVC, mime)) {
             return "hvc1";
         }
+    } else if (!strncasecmp(mime, "application/", 12)) {
+        return "mett";
     } else {
-        ALOGE("Track (%s) other than video or audio is not supported", mime);
+        ALOGE("Track (%s) other than video/audio/metadata is not supported", mime);
     }
     return NULL;
 }
@@ -526,37 +534,33 @@ status_t MPEG4Writer::addSource(const sp<IMediaSource> &source) {
         return UNKNOWN_ERROR;
     }
 
-    // At most 2 tracks can be supported.
-    if (mTracks.size() >= 2) {
-        ALOGE("Too many tracks (%zu) to add", mTracks.size());
-        return ERROR_UNSUPPORTED;
-    }
-
     CHECK(source.get() != NULL);
 
     const char *mime;
     source->getFormat()->findCString(kKeyMIMEType, &mime);
-    bool isAudio = !strncasecmp(mime, "audio/", 6);
+
+    if (!strncasecmp(mime, "audio/", 6)) {
+        if (mHasAudioTrack) {
+            ALOGE("At most one audio track can be added");
+            return ERROR_UNSUPPORTED;
+        }
+        mHasAudioTrack = true;
+    }
+
+    if (!strncasecmp(mime, "video/", 6)) {
+        if (mHasVideoTrack) {
+            ALOGE("At most one video track can be added");
+            return ERROR_UNSUPPORTED;
+        }
+        mHasVideoTrack = true;
+    }
+
     if (Track::getFourCCForMime(mime) == NULL) {
         ALOGE("Unsupported mime '%s'", mime);
         return ERROR_UNSUPPORTED;
     }
 
-    // At this point, we know the track to be added is either
-    // video or audio. Thus, we only need to check whether it
-    // is an audio track or not (if it is not, then it must be
-    // a video track).
-
-    // No more than one video or one audio track is supported.
-    for (List<Track*>::iterator it = mTracks.begin();
-         it != mTracks.end(); ++it) {
-        if ((*it)->isAudio() == isAudio) {
-            ALOGE("%s track already exists", isAudio? "Audio": "Video");
-            return ERROR_UNSUPPORTED;
-        }
-    }
-
-    // This is the first track of either audio or video.
+    // This is a metadata track or the first track of either audio or video
     // Go ahead to add the track.
     Track *track = new Track(this, source, 1 + mTracks.size());
     mTracks.push_back(track);
@@ -1561,11 +1565,12 @@ MPEG4Writer::Track::Track(
     mIsAvc = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC);
     mIsHevc = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC);
     mIsAudio = !strncasecmp(mime, "audio/", 6);
+    mIsVideo = !strncasecmp(mime, "video/", 6);
     mIsMPEG4 = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_MPEG4) ||
                !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC);
 
     // store temporal layer count
-    if (!mIsAudio) {
+    if (mIsVideo) {
         int32_t count;
         if (mMeta->findInt32(kKeyTemporalLayerCount, &count) && count > 1) {
             mOwner->setTemporalLayerCount(count);
@@ -1621,7 +1626,7 @@ void MPEG4Writer::Track::addOneSttsTableEntry(
 void MPEG4Writer::Track::addOneCttsTableEntry(
         size_t sampleCount, int32_t duration) {
 
-    if (mIsAudio) {
+    if (!mIsVideo) {
         return;
     }
     mCttsTableEntries->add(htonl(sampleCount));
@@ -1753,7 +1758,7 @@ void MPEG4Writer::bufferChunk(const Chunk& chunk) {
 
 void MPEG4Writer::writeChunkToFile(Chunk* chunk) {
     ALOGV("writeChunkToFile: %" PRId64 " from %s track",
-        chunk->mTimeStampUs, chunk->mTrack->isAudio()? "audio": "video");
+        chunk->mTimeStampUs, chunk->mTrack->getTrackType());
 
     int32_t isFirstSample = true;
     while (!chunk->mSamples.empty()) {
@@ -1906,7 +1911,7 @@ status_t MPEG4Writer::Track::start(MetaData *params) {
     mStartTimeRealUs = startTimeUs;
 
     int32_t rotationDegrees;
-    if (!mIsAudio && params && params->findInt32(kKeyRotation, &rotationDegrees)) {
+    if (mIsVideo && params && params->findInt32(kKeyRotation, &rotationDegrees)) {
         mRotation = rotationDegrees;
     }
 
@@ -1964,7 +1969,7 @@ status_t MPEG4Writer::Track::pause() {
 }
 
 status_t MPEG4Writer::Track::stop() {
-    ALOGD("%s track stopping", mIsAudio? "Audio": "Video");
+    ALOGD("%s track stopping", getTrackType());
     if (!mStarted) {
         ALOGE("Stop() called but track is not started");
         return ERROR_END_OF_STREAM;
@@ -1975,15 +1980,15 @@ status_t MPEG4Writer::Track::stop() {
     }
     mDone = true;
 
-    ALOGD("%s track source stopping", mIsAudio? "Audio": "Video");
+    ALOGD("%s track source stopping", getTrackType());
     mSource->stop();
-    ALOGD("%s track source stopped", mIsAudio? "Audio": "Video");
+    ALOGD("%s track source stopped", getTrackType());
 
     void *dummy;
     pthread_join(mThread, &dummy);
     status_t err = static_cast<status_t>(reinterpret_cast<uintptr_t>(dummy));
 
-    ALOGD("%s track stopped", mIsAudio? "Audio": "Video");
+    ALOGD("%s track stopped", getTrackType());
     return err;
 }
 
@@ -2381,8 +2386,10 @@ status_t MPEG4Writer::Track::threadEntry() {
 
     if (mIsAudio) {
         prctl(PR_SET_NAME, (unsigned long)"AudioTrackEncoding", 0, 0, 0);
-    } else {
+    } else if (mIsVideo) {
         prctl(PR_SET_NAME, (unsigned long)"VideoTrackEncoding", 0, 0, 0);
+    } else {
+        prctl(PR_SET_NAME, (unsigned long)"MetadataTrackEncoding", 0, 0, 0);
     }
 
     if (mOwner->isRealTimeRecording()) {
@@ -2393,7 +2400,7 @@ status_t MPEG4Writer::Track::threadEntry() {
 
     status_t err = OK;
     MediaBuffer *buffer;
-    const char *trackName = mIsAudio ? "Audio" : "Video";
+    const char *trackName = getTrackType();
     while (!mDone && (err = mSource->read(&buffer)) == OK) {
         if (buffer->range_length() == 0) {
             buffer->release();
@@ -2536,7 +2543,7 @@ status_t MPEG4Writer::Track::threadEntry() {
             break;
         }
 
-        if (!mIsAudio) {
+        if (mIsVideo) {
             /*
              * Composition time: timestampUs
              * Decoding time: decodingTimeUs
@@ -2661,7 +2668,6 @@ status_t MPEG4Writer::Track::threadEntry() {
                 timestampUs += deltaUs;
             }
         }
-
         mStszTableEntries->add(htonl(sampleSize));
         if (mStszTableEntries->count() > 2) {
 
@@ -2808,7 +2814,7 @@ bool MPEG4Writer::Track::isTrackMalFormed() const {
         return true;
     }
 
-    if (!mIsAudio && mStssTableEntries->count() == 0) {  // no sync frames for video
+    if (mIsVideo && mStssTableEntries->count() == 0) {  // no sync frames for video
         ALOGE("There are no sync frames for video track");
         return true;
     }
@@ -2831,7 +2837,7 @@ void MPEG4Writer::Track::sendTrackSummary(bool hasMultipleTracks) {
 
     mOwner->notify(MEDIA_RECORDER_TRACK_EVENT_INFO,
                     trackNum | MEDIA_RECORDER_TRACK_INFO_TYPE,
-                    mIsAudio? 0: 1);
+                    mIsAudio ? 0: 1);
 
     mOwner->notify(MEDIA_RECORDER_TRACK_EVENT_INFO,
                     trackNum | MEDIA_RECORDER_TRACK_INFO_DURATION_MS,
@@ -2971,11 +2977,11 @@ status_t MPEG4Writer::Track::checkCodecSpecificData() const {
     return OK;
 }
 
+const char *MPEG4Writer::Track::getTrackType() const {
+    return mIsAudio ? "Audio" : (mIsVideo ? "Video" : "Metadata");
+}
+
 void MPEG4Writer::Track::writeTrackHeader(bool use32BitOffset) {
-
-    ALOGV("%s track time scale: %d",
-        mIsAudio? "Audio": "Video", mTimeScale);
-
     uint32_t now = getMpeg4Time();
     mOwner->beginBox("trak");
         writeTkhdBox(now);
@@ -2985,8 +2991,10 @@ void MPEG4Writer::Track::writeTrackHeader(bool use32BitOffset) {
             mOwner->beginBox("minf");
                 if (mIsAudio) {
                     writeSmhdBox();
-                } else {
+                } else if (mIsVideo) {
                     writeVmhdBox();
+                } else {
+                    writeNmhdBox();
                 }
                 writeDinfBox();
                 writeStblBox(use32BitOffset);
@@ -3002,19 +3010,35 @@ void MPEG4Writer::Track::writeStblBox(bool use32BitOffset) {
     mOwner->writeInt32(1);               // entry count
     if (mIsAudio) {
         writeAudioFourCCBox();
-    } else {
+    } else if (mIsVideo) {
         writeVideoFourCCBox();
+    } else {
+        writeMetadataFourCCBox();
     }
     mOwner->endBox();  // stsd
     writeSttsBox();
-    writeCttsBox();
-    if (!mIsAudio) {
+    if (mIsVideo) {
+        writeCttsBox();
         writeStssBox();
     }
     writeStszBox();
     writeStscBox();
     writeStcoBox(use32BitOffset);
     mOwner->endBox();  // stbl
+}
+
+void MPEG4Writer::Track::writeMetadataFourCCBox() {
+    const char *mime;
+    bool success = mMeta->findCString(kKeyMIMEType, &mime);
+    CHECK(success);
+    const char *fourcc = getFourCCForMime(mime);
+    if (fourcc == NULL) {
+        ALOGE("Unknown mime type '%s'.", mime);
+        TRESPASS();
+    }
+    mOwner->beginBox(fourcc);    // TextMetaDataSampleEntry
+    mOwner->writeCString(mime);  // metadata mime_format
+    mOwner->endBox(); // mett
 }
 
 void MPEG4Writer::Track::writeVideoFourCCBox() {
@@ -3024,7 +3048,7 @@ void MPEG4Writer::Track::writeVideoFourCCBox() {
     const char *fourcc = getFourCCForMime(mime);
     if (fourcc == NULL) {
         ALOGE("Unknown mime type '%s'.", mime);
-        CHECK(!"should not be here, unknown mime type.");
+        TRESPASS();
     }
 
     mOwner->beginBox(fourcc);        // video format
@@ -3097,7 +3121,7 @@ void MPEG4Writer::Track::writeAudioFourCCBox() {
     const char *fourcc = getFourCCForMime(mime);
     if (fourcc == NULL) {
         ALOGE("Unknown mime type '%s'.", mime);
-        CHECK(!"should not be here, unknown mime type.");
+        TRESPASS();
     }
 
     mOwner->beginBox(fourcc);        // audio format
@@ -3240,7 +3264,7 @@ void MPEG4Writer::Track::writeTkhdBox(uint32_t now) {
 
     mOwner->writeCompositionMatrix(mRotation);       // matrix
 
-    if (mIsAudio) {
+    if (!mIsVideo) {
         mOwner->writeInt32(0);
         mOwner->writeInt32(0);
     } else {
@@ -3273,16 +3297,22 @@ void MPEG4Writer::Track::writeSmhdBox() {
     mOwner->endBox();
 }
 
+void MPEG4Writer::Track::writeNmhdBox() {
+    mOwner->beginBox("nmhd");
+    mOwner->writeInt32(0);           // version=0, flags=0
+    mOwner->endBox();
+}
+
 void MPEG4Writer::Track::writeHdlrBox() {
     mOwner->beginBox("hdlr");
     mOwner->writeInt32(0);             // version=0, flags=0
     mOwner->writeInt32(0);             // component type: should be mhlr
-    mOwner->writeFourcc(mIsAudio ? "soun" : "vide");  // component subtype
+    mOwner->writeFourcc(mIsAudio ? "soun" : (mIsVideo ? "vide" : "meta"));  // component subtype
     mOwner->writeInt32(0);             // reserved
     mOwner->writeInt32(0);             // reserved
     mOwner->writeInt32(0);             // reserved
     // Removing "r" for the name string just makes the string 4 byte aligned
-    mOwner->writeCString(mIsAudio ? "SoundHandle": "VideoHandle");  // name
+    mOwner->writeCString(mIsAudio ? "SoundHandle": (mIsVideo ? "VideoHandle" : "MetadHandle"));
     mOwner->endBox();
 }
 
@@ -3409,10 +3439,6 @@ void MPEG4Writer::Track::writeSttsBox() {
 }
 
 void MPEG4Writer::Track::writeCttsBox() {
-    if (mIsAudio) {  // ctts is not for audio
-        return;
-    }
-
     // There is no B frame at all
     if (mMinCttsOffsetTimeUs == mMaxCttsOffsetTimeUs) {
         return;
