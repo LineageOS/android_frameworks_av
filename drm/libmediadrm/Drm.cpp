@@ -334,6 +334,7 @@ status_t Drm::destroyPlugin() {
         return -EINVAL;
     }
 
+    setListener(NULL);
     delete mPlugin;
     mPlugin = NULL;
 
