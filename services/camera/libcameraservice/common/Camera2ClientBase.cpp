@@ -307,6 +307,12 @@ void Camera2ClientBase<TClientBase>::notifyPrepared(int streamId) {
 }
 
 template <typename TClientBase>
+void Camera2ClientBase<TClientBase>::notifyRequestQueueEmpty() {
+
+    ALOGV("%s: Request queue now empty", __FUNCTION__);
+}
+
+template <typename TClientBase>
 void Camera2ClientBase<TClientBase>::notifyRepeatingRequestError(long lastFrameNumber) {
     (void)lastFrameNumber;
 

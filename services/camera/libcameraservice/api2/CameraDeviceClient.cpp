@@ -1210,6 +1210,14 @@ void CameraDeviceClient::notifyPrepared(int streamId) {
     }
 }
 
+void CameraDeviceClient::notifyRequestQueueEmpty() {
+    // Thread safe. Don't bother locking.
+    sp<hardware::camera2::ICameraDeviceCallbacks> remoteCb = getRemoteCallback();
+    if (remoteCb != 0) {
+        remoteCb->onRequestQueueEmpty();
+    }
+}
+
 void CameraDeviceClient::detachDevice() {
     if (mDevice == 0) return;
 
