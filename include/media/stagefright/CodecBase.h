@@ -45,7 +45,6 @@ struct CodecBase : public AHandler, /* static */ ColorUtils {
         kWhatEOS                 = 'eos ',
         kWhatShutdownCompleted   = 'scom',
         kWhatFlushCompleted      = 'fcom',
-        kWhatOutputFormatChanged = 'outC',
         kWhatError               = 'erro',
         kWhatComponentAllocated  = 'cAll',
         kWhatComponentConfigured = 'cCon',

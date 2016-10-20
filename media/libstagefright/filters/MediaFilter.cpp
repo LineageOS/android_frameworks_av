@@ -360,25 +360,6 @@ void MediaFilter::postEOS() {
     ALOGV("Sent kWhatEOS.");
 }
 
-void MediaFilter::sendFormatChange() {
-    sp<AMessage> notify = mNotify->dup();
-
-    notify->setInt32("what", kWhatOutputFormatChanged);
-
-    AString mime;
-    CHECK(mOutputFormat->findString("mime", &mime));
-    notify->setString("mime", mime.c_str());
-
-    notify->setInt32("stride", mStride);
-    notify->setInt32("slice-height", mSliceHeight);
-    notify->setInt32("color-format", mColorFormatOut);
-    notify->setRect("crop", 0, 0, mStride - 1, mSliceHeight - 1);
-    notify->setInt32("width", mWidth);
-    notify->setInt32("height", mHeight);
-
-    notify->post();
-}
-
 void MediaFilter::requestFillEmptyInput() {
     if (mPortEOS[kPortIndexInput]) {
         return;
@@ -553,8 +534,6 @@ void MediaFilter::onConfigureComponent(const sp<AMessage> &msg) {
     notify->post();
     mState = CONFIGURED;
     ALOGV("Handled kWhatConfigureComponent.");
-
-    sendFormatChange();
 }
 
 void MediaFilter::onStart() {

@@ -230,7 +230,6 @@ protected:
                     mCodec->signalResume();
 
                     (new AMessage(kWhatSeek, this))->post(5000000ll);
-                } else if (what == CodecBase::kWhatOutputFormatChanged) {
                 } else if (what == CodecBase::kWhatShutdownCompleted) {
                     mDecodeLooper->unregisterHandler(mCodec->id());
 
