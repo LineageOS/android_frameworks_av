@@ -27,6 +27,9 @@
 #include <radio/IRadioClient.h>
 #include <system/radio.h>
 #include <hardware/radio.h>
+#include "RadioInterface.h"
+#include "TunerInterface.h"
+#include "TunerCallbackInterface.h"
 
 namespace android {
 
@@ -66,7 +69,7 @@ public:
     class Module : public virtual RefBase {
     public:
 
-       Module(radio_hw_device* hwDevice,
+       Module(sp<RadioInterface> hwDevice,
               struct radio_properties properties);
 
        virtual ~Module();
@@ -83,7 +86,7 @@ public:
 
        virtual status_t dump(int fd, const Vector<String16>& args);
 
-       const struct radio_hw_device *hwDevice() const { return mHwDevice; }
+       sp<RadioInterface> hwDevice() const { return mHwDevice; }
        const struct radio_properties properties() const { return mProperties; }
        const struct radio_band_config *getDefaultConfig() const ;
 
@@ -92,7 +95,7 @@ public:
        void notifyDeviceConnection(bool connected, const char *address);
 
         Mutex                         mLock;          // protects  mModuleClients
-        const struct radio_hw_device  *mHwDevice;     // HAL hardware device
+        sp<RadioInterface>            mHwDevice;      // HAL hardware device
         const struct radio_properties mProperties;    // cached hardware module properties
         Vector< sp<ModuleClient> >    mModuleClients; // list of attached clients
         bool                          mMute;          // radio audio source state
@@ -128,7 +131,8 @@ public:
     }; // class CallbackThread
 
     class ModuleClient : public BnRadio,
-                   public IBinder::DeathRecipient {
+                   public IBinder::DeathRecipient,
+                   public TunerCallbackInterface {
     public:
 
        ModuleClient(const sp<Module>& module,
@@ -167,8 +171,8 @@ public:
                wp<Module> module() const { return mModule; }
                radio_hal_band_config_t halConfig() const;
                sp<CallbackThread> callbackThread() const { return mCallbackThread; }
-               void setTuner(const struct radio_tuner *tuner);
-               const struct radio_tuner *getTuner() const;
+               void setTuner(sp<TunerInterface>& tuner);
+               sp<TunerInterface>& getTuner();
                bool audio() const { return mAudio; }
 
                void onCallbackEvent(const sp<IMemory>& event);
@@ -179,6 +183,9 @@ public:
        // IBinder::DeathRecipient implementation
        virtual void        binderDied(const wp<IBinder> &who);
 
+       // TunerCallbackInterface
+       virtual void onEvent(radio_hal_event_t *event);
+
     private:
 
         mutable Mutex               mLock;           // protects mClient, mConfig and mTuner
@@ -187,7 +194,7 @@ public:
         radio_band_config_t         mConfig;         // current band configuration
         sp<CallbackThread>          mCallbackThread; // event callback thread
         const bool                  mAudio;
-        const struct radio_tuner    *mTuner;        // HAL tuner interface. NULL indicates that
+        sp<TunerInterface>          mTuner;        // HAL tuner interface. NULL indicates that
                                                     // this client does not have control on any
                                                     // tuner
     }; // class ModuleClient
