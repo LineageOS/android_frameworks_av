@@ -26,7 +26,7 @@
 #include <soundtrigger/ISoundTrigger.h>
 #include <soundtrigger/ISoundTriggerClient.h>
 #include <system/sound_trigger.h>
-#include <hardware/sound_trigger.h>
+#include "SoundTriggerHalInterface.h"
 
 namespace android {
 
@@ -103,7 +103,7 @@ public:
     public:
 
        Module(const sp<SoundTriggerHwService>& service,
-              sound_trigger_hw_device* hwDevice,
+              const sp<SoundTriggerHalInterface>& halInterface,
               sound_trigger_module_descriptor descriptor,
               const sp<ISoundTriggerClient>& client);
 
@@ -123,7 +123,6 @@ public:
        virtual status_t dump(int fd, const Vector<String16>& args);
 
 
-       sound_trigger_hw_device *hwDevice() const { return mHwDevice; }
        struct sound_trigger_module_descriptor descriptor() { return mDescriptor; }
        void setClient(const sp<ISoundTriggerClient>& client) { mClient = client; }
        void clearClient() { mClient.clear(); }
@@ -146,7 +145,7 @@ public:
 
         Mutex                                  mLock;
         wp<SoundTriggerHwService>              mService;
-        struct sound_trigger_hw_device*        mHwDevice;
+        sp<SoundTriggerHalInterface>           mHalInterface;
         struct sound_trigger_module_descriptor mDescriptor;
         sp<ISoundTriggerClient>                mClient;
         DefaultKeyedVector< sound_model_handle_t, sp<Model> >     mModels;
