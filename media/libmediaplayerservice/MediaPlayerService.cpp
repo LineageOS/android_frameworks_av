@@ -685,10 +685,20 @@ sp<MediaPlayerBase> MediaPlayerService::Client::setDataSource_pre(
 
     sp<IServiceManager> sm = defaultServiceManager();
     sp<IBinder> binder = sm->getService(String16("media.extractor"));
+    if (binder == NULL) {
+        ALOGE("Unable to connect to media extractor service");
+        return NULL;
+    }
+
     mExtractorDeathListener = new ServiceDeathNotifier(binder, p, MEDIAEXTRACTOR_PROCESS_DEATH);
     binder->linkToDeath(mExtractorDeathListener);
 
     binder = sm->getService(String16("media.codec"));
+    if (binder == NULL) {
+        ALOGE("Unable to connect to media codec service");
+        return NULL;
+    }
+
     mCodecDeathListener = new ServiceDeathNotifier(binder, p, MEDIACODEC_PROCESS_DEATH);
     binder->linkToDeath(mCodecDeathListener);
 
