@@ -610,12 +610,12 @@ status_t AudioPolicyService::registerPolicyMixes(const Vector<AudioMix>& mixes _
 
 status_t AudioPolicyService::startAudioSource(const struct audio_port_config *source,
                                   const audio_attributes_t *attributes,
-                                  audio_io_handle_t *handle)
+                                  audio_patch_handle_t *handle)
 {
     return INVALID_OPERATION;
 }
 
-status_t AudioPolicyService::stopAudioSource(audio_io_handle_t handle)
+status_t AudioPolicyService::stopAudioSource(audio_patch_handle_t handle)
 {
     return INVALID_OPERATION;
 }

@@ -738,7 +738,7 @@ public:
 
     virtual status_t startAudioSource(const struct audio_port_config *source,
                                       const audio_attributes_t *attributes,
-                                      audio_io_handle_t *handle)
+                                      audio_patch_handle_t *handle)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
@@ -755,11 +755,11 @@ public:
         if (status != NO_ERROR) {
             return status;
         }
-        *handle = (audio_io_handle_t)reply.readInt32();
+        *handle = (audio_patch_handle_t)reply.readInt32();
         return status;
     }
 
-    virtual status_t stopAudioSource(audio_io_handle_t handle)
+    virtual status_t stopAudioSource(audio_patch_handle_t handle)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
@@ -1332,7 +1332,7 @@ status_t BnAudioPolicyService::onTransact(
             data.read(&source, sizeof(struct audio_port_config));
             audio_attributes_t attributes;
             data.read(&attributes, sizeof(audio_attributes_t));
-            audio_io_handle_t handle = {};
+            audio_patch_handle_t handle = AUDIO_PATCH_HANDLE_NONE;
             status_t status = startAudioSource(&source, &attributes, &handle);
             reply->writeInt32(status);
             reply->writeInt32(handle);
@@ -1341,7 +1341,7 @@ status_t BnAudioPolicyService::onTransact(
 
         case STOP_AUDIO_SOURCE: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            audio_io_handle_t handle = (audio_io_handle_t)data.readInt32();
+            audio_patch_handle_t handle = (audio_patch_handle_t) data.readInt32();
             status_t status = stopAudioSource(handle);
             reply->writeInt32(status);
             return NO_ERROR;
