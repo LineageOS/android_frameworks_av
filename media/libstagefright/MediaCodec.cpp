@@ -843,16 +843,6 @@ status_t MediaCodec::getName(AString *name) const {
     return OK;
 }
 
-status_t MediaCodec::getWidevineLegacyBuffers(Vector<sp<MediaCodecBuffer> > *buffers) const {
-    sp<AMessage> msg = new AMessage(kWhatGetBuffers, this);
-    msg->setInt32("portIndex", kPortIndexInput);
-    msg->setPointer("buffers", buffers);
-    msg->setInt32("widevine", true);
-
-    sp<AMessage> response;
-    return PostAndAwaitResponse(msg, &response);
-}
-
 status_t MediaCodec::getInputBuffers(Vector<sp<MediaCodecBuffer> > *buffers) const {
     sp<AMessage> msg = new AMessage(kWhatGetBuffers, this);
     msg->setInt32("portIndex", kPortIndexInput);
@@ -2132,12 +2122,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
         {
             sp<AReplyToken> replyID;
             CHECK(msg->senderAwaitsResponse(&replyID));
-            // Unfortunately widevine legacy source requires knowing all of the
-            // codec input buffers, so we have to provide them even in async mode.
-            int32_t widevine = 0;
-            msg->findInt32("widevine", &widevine);
-
-            if (!isExecuting() || ((mFlags & kFlagIsAsync) && !widevine)) {
+            if (!isExecuting() || (mFlags & kFlagIsAsync)) {
                 PostReplyWithError(replyID, INVALID_OPERATION);
                 break;
             } else if (mFlags & kFlagStickyError) {

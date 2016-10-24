@@ -92,14 +92,6 @@ void NuPlayer::DecoderBase::pause() {
     PostAndAwaitResponse(msg, &response);
 }
 
-status_t NuPlayer::DecoderBase::getInputBuffers(Vector<sp<MediaCodecBuffer> > *buffers) const {
-    sp<AMessage> msg = new AMessage(kWhatGetInputBuffers, this);
-    msg->setPointer("buffers", buffers);
-
-    sp<AMessage> response;
-    return PostAndAwaitResponse(msg, &response);
-}
-
 void NuPlayer::DecoderBase::signalFlush() {
     (new AMessage(kWhatFlush, this))->post();
 }
@@ -161,20 +153,6 @@ void NuPlayer::DecoderBase::onMessageReceived(const sp<AMessage> &msg) {
             CHECK(msg->senderAwaitsResponse(&replyID));
 
             mPaused = true;
-
-            (new AMessage)->postReply(replyID);
-            break;
-        }
-
-        case kWhatGetInputBuffers:
-        {
-            sp<AReplyToken> replyID;
-            CHECK(msg->senderAwaitsResponse(&replyID));
-
-            Vector<sp<MediaCodecBuffer> > *dstBuffers;
-            CHECK(msg->findPointer("buffers", (void **)&dstBuffers));
-
-            onGetInputBuffers(dstBuffers);
 
             (new AMessage)->postReply(replyID);
             break;

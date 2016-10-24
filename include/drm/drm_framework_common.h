@@ -234,10 +234,6 @@ public:
      * POSIX based Decrypt API set for container based DRM
      */
     static const int CONTAINER_BASED = 0x02;
-    /**
-     * Decrypt API for Widevine streams
-     */
-    static const int WV_BASED = 0x3;
 };
 
 /**

@@ -26,7 +26,6 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <utils/Errors.h>
 #include <utils/misc.h>
-#include <../libstagefright/include/WVMExtractor.h>
 
 #include "MediaPlayerFactory.h"
 
