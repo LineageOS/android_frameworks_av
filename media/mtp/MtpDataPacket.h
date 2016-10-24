@@ -20,6 +20,7 @@
 #include "MtpPacket.h"
 #include "mtp.h"
 
+class IMtpHandle;
 struct usb_device;
 struct usb_request;
 
@@ -95,12 +96,12 @@ public:
 
 
 #ifdef MTP_DEVICE
-    // fill our buffer with data from the given file descriptor
-    int                 read(int fd);
+    // fill our buffer with data from the given usb handle
+    int                 read(IMtpHandle *h);
 
-    // write our data to the given file descriptor
-    int                 write(int fd);
-    int                 writeData(int fd, void* data, uint32_t length);
+    // write our data to the given usb handle
+    int                 write(IMtpHandle *h);
+    int                 writeData(IMtpHandle *h, void* data, uint32_t length);
 #endif
 
 #ifdef MTP_HOST

@@ -19,26 +19,31 @@ LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:=                                       \
+                  AsyncIO.cpp                           \
                   MtpDataPacket.cpp                     \
                   MtpDebug.cpp                          \
+                  MtpDevHandle.cpp                      \
                   MtpDevice.cpp                         \
-                  MtpEventPacket.cpp                    \
                   MtpDeviceInfo.cpp                     \
+                  MtpEventPacket.cpp                    \
+                  MtpFfsHandle.cpp                      \
                   MtpObjectInfo.cpp                     \
                   MtpPacket.cpp                         \
                   MtpProperty.cpp                       \
                   MtpRequestPacket.cpp                  \
                   MtpResponsePacket.cpp                 \
                   MtpServer.cpp                         \
+                  MtpStorage.cpp                        \
                   MtpStorageInfo.cpp                    \
                   MtpStringBuffer.cpp                   \
-                  MtpStorage.cpp                        \
                   MtpUtils.cpp                          \
 
 LOCAL_MODULE:= libmtp
 
 LOCAL_CFLAGS := -DMTP_DEVICE -DMTP_HOST -Wall -Wextra -Werror
 
-LOCAL_SHARED_LIBRARIES := libutils libcutils liblog libusbhost libbinder
+LOCAL_SHARED_LIBRARIES := libbase libutils libcutils liblog libusbhost libbinder
 
 include $(BUILD_SHARED_LIBRARY)
+
+include $(call all-makefiles-under,$(LOCAL_PATH))
