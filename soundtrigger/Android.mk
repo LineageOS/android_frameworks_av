@@ -27,7 +27,6 @@ LOCAL_SHARED_LIBRARIES := \
 	libutils \
 	liblog \
 	libbinder \
-	libhardware
 
 #LOCAL_C_INCLUDES += \
 	system/media/camera/include \

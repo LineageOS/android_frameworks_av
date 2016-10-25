@@ -14,13 +14,11 @@ LOCAL_SRC_FILES:= \
 
 LOCAL_SHARED_LIBRARIES := \
 	libbinder \
-	libcrypto \
 	libcutils \
 	libdl \
 	liblog \
 	libmedia \
 	libstagefright \
-	libstagefright_foundation \
 	libutils
 
 LOCAL_CFLAGS += -Werror -Wno-error=deprecated-declarations -Wall
