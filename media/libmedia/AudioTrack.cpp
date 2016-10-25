@@ -2206,7 +2206,7 @@ status_t AudioTrack::restoreTrack_l(const char *from)
     // output parameters and new IAudioFlinger in createTrack_l()
     AudioSystem::clearAudioConfigCache();
 
-    if (isOffloadedOrDirect_l() || mDoNotReconnect) {
+    if ((isOffloadedOrDirect_l() || mDoNotReconnect) && !mPlaybackRateSet) {
         // FIXME re-creation of offloaded and direct tracks is not yet implemented;
         // reconsider enabling for linear PCM encodings when position can be preserved.
         return DEAD_OBJECT;
