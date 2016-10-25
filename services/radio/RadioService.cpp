@@ -305,32 +305,40 @@ sp<IMemory> RadioService::CallbackThread::prepareEvent(radio_hal_event_t *halEve
 {
     sp<IMemory> eventMemory;
 
-    size_t headerSize =
-            (sizeof(struct radio_event) + sizeof(unsigned int) - 1) /sizeof(unsigned int);
-    size_t metadataSize = 0;
+    // The event layout in shared memory is:
+    // sizeof(struct radio_event) bytes : the event itself
+    // 4 bytes                          : metadata size or 0
+    // N bytes                          : metadata if present
+    uint32_t metadataOffset = sizeof(struct radio_event) + sizeof(uint32_t);
+    uint32_t metadataSize = 0;
+
     switch (halEvent->type) {
     case RADIO_EVENT_TUNED:
     case RADIO_EVENT_AF_SWITCH:
         if (radio_metadata_check(halEvent->info.metadata) == 0) {
-            metadataSize = radio_metadata_get_size(halEvent->info.metadata);
+            metadataSize = (uint32_t)radio_metadata_get_size(halEvent->info.metadata);
         }
         break;
     case RADIO_EVENT_METADATA:
         if (radio_metadata_check(halEvent->metadata) != 0) {
             return eventMemory;
         }
-        metadataSize = radio_metadata_get_size(halEvent->metadata);
+        metadataSize = (uint32_t)radio_metadata_get_size(halEvent->metadata);
         break;
     default:
         break;
     }
-    size_t size = headerSize + metadataSize;
-    eventMemory = mMemoryDealer->allocate(size);
+
+    eventMemory = mMemoryDealer->allocate(metadataOffset + metadataSize);
     if (eventMemory == 0 || eventMemory->pointer() == NULL) {
         eventMemory.clear();
         return eventMemory;
     }
+
     struct radio_event *event = (struct radio_event *)eventMemory->pointer();
+
+    *(uint32_t *)((uint8_t *)event + metadataOffset - sizeof(uint32_t)) = metadataSize;
+
     event->type = halEvent->type;
     event->status = halEvent->status;
 
@@ -342,10 +350,7 @@ sp<IMemory> RadioService::CallbackThread::prepareEvent(radio_hal_event_t *halEve
     case RADIO_EVENT_AF_SWITCH:
         event->info = halEvent->info;
         if (metadataSize != 0) {
-            memcpy((char *)event + headerSize, halEvent->info.metadata, metadataSize);
-            // replace meta data pointer by offset while in shared memory so that receiving side
-            // can restore the pointer in destination process.
-            event->info.metadata = (radio_metadata_t *)headerSize;
+            memcpy((uint8_t *)event + metadataOffset, halEvent->info.metadata, metadataSize);
         }
         break;
     case RADIO_EVENT_TA:
@@ -355,10 +360,9 @@ sp<IMemory> RadioService::CallbackThread::prepareEvent(radio_hal_event_t *halEve
         event->on = halEvent->on;
         break;
     case RADIO_EVENT_METADATA:
-        memcpy((char *)event + headerSize, halEvent->metadata, metadataSize);
-        // replace meta data pointer by offset while in shared memory so that receiving side
-        // can restore the pointer in destination process.
-        event->metadata = (radio_metadata_t *)headerSize;
+        if (metadataSize != 0) {
+            memcpy((uint8_t *)event + metadataOffset, halEvent->metadata, metadataSize);
+        }
         break;
     case RADIO_EVENT_HW_FAILURE:
     default:
@@ -853,6 +857,7 @@ status_t RadioService::ModuleClient::getProgramInformation(struct radio_program_
     } else {
         status = INVALID_OPERATION;
     }
+
     return status;
 }
 

@@ -16,8 +16,7 @@
 */
 
 #define LOG_TAG "BpRadioService"
-//
-#define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 
 #include <utils/Log.h>
 #include <utils/Errors.h>
@@ -58,12 +57,12 @@ public:
         }
         Parcel data, reply;
         data.writeInterfaceToken(IRadioService::getInterfaceDescriptor());
-        unsigned int numModulesReq = (properties == NULL) ? 0 : *numModules;
+        uint32_t numModulesReq = (properties == NULL) ? 0 : *numModules;
         data.writeInt32(numModulesReq);
         status_t status = remote()->transact(LIST_MODULES, data, &reply);
         if (status == NO_ERROR) {
             status = (status_t)reply.readInt32();
-            *numModules = (unsigned int)reply.readInt32();
+            *numModules = (uint32_t)reply.readInt32();
         }
         ALOGV("listModules() status %d got *numModules %d", status, *numModules);
         if (status == NO_ERROR) {
@@ -120,11 +119,11 @@ status_t BnRadioService::onTransact(
     switch(code) {
         case LIST_MODULES: {
             CHECK_INTERFACE(IRadioService, data, reply);
-            unsigned int numModulesReq = data.readInt32();
+            uint32_t numModulesReq = data.readInt32();
             if (numModulesReq > MAX_ITEMS_PER_LIST) {
                 numModulesReq = MAX_ITEMS_PER_LIST;
             }
-            unsigned int numModules = numModulesReq;
+            uint32_t numModules = numModulesReq;
             struct radio_properties *properties =
                     (struct radio_properties *)calloc(numModulesReq,
                                                       sizeof(struct radio_properties));
