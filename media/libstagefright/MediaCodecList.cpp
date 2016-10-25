@@ -1173,7 +1173,7 @@ void MediaCodecList::findMatchingCodecs(
         }
     }
 
-    if (flags & kPreferSoftwareCodecs) {
+    if (flags & kPreferSoftwareCodecs || property_get_bool("debug.stagefright.swcodec", false)) {
         matches->sort(compareSoftwareCodecsFirst);
     }
 }
