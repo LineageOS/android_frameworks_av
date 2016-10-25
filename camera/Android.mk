@@ -58,8 +58,6 @@ LOCAL_SHARED_LIBRARIES := \
 	libutils \
 	liblog \
 	libbinder \
-	libhardware \
-	libui \
 	libgui \
 	libcamera_metadata \
 

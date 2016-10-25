@@ -27,13 +27,7 @@ LOCAL_SHARED_LIBRARIES:= \
     liblog \
     libmedia \
     libmediadrm \
-    libmediaplayerservice \
-    libstagefright \
-    libui \
     libutils \
-
-LOCAL_C_INCLUDES := \
-    frameworks/av/media/libmediaplayerservice \
 
 LOCAL_CFLAGS += -Wall -Wextra -Werror
 

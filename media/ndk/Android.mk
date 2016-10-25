@@ -45,7 +45,6 @@ LOCAL_CFLAGS += -Werror
 LOCAL_SHARED_LIBRARIES := \
     libbinder \
     libmedia \
-    libmediadrm \
     libstagefright \
     libstagefright_foundation \
     liblog \
