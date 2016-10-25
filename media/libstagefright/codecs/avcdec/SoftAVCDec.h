@@ -99,6 +99,7 @@ private:
     bool mFlushNeeded;
     bool mSignalledError;
     size_t mStride;
+    size_t mInputOffset;
 
     status_t initDecoder();
     status_t deInitDecoder();
@@ -143,10 +144,10 @@ private:
         ALOGD("Could not open file %s", m_filename);    \
     }                                                   \
 }
-#define DUMP_TO_FILE(m_filename, m_buf, m_size)         \
+#define DUMP_TO_FILE(m_filename, m_buf, m_size, m_offset)\
 {                                                       \
     FILE *fp = fopen(m_filename, "ab");                 \
-    if (fp != NULL && m_buf != NULL) {                  \
+    if (fp != NULL && m_buf != NULL && m_offset == 0) { \
         int i;                                          \
         i = fwrite(m_buf, 1, m_size, fp);               \
         ALOGD("fwrite ret %d to write %d", i, m_size);  \
@@ -154,9 +155,11 @@ private:
             ALOGD("Error in fwrite, returned %d", i);   \
             perror("Error in write to file");           \
         }                                               \
-        fclose(fp);                                     \
-    } else {                                            \
+    } else if (fp == NULL) {                            \
         ALOGD("Could not write to file %s", m_filename);\
+    }                                                   \
+    if (fp) {                                           \
+        fclose(fp);                                     \
     }                                                   \
 }
 #else /* FILE_DUMP_ENABLE */
@@ -166,7 +169,7 @@ private:
 #define OUTPUT_DUMP_EXT
 #define GENERATE_FILE_NAMES()
 #define CREATE_DUMP_FILE(m_filename)
-#define DUMP_TO_FILE(m_filename, m_buf, m_size)
+#define DUMP_TO_FILE(m_filename, m_buf, m_size, m_offset)
 #endif /* FILE_DUMP_ENABLE */
 
 } // namespace android
