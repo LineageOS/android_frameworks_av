@@ -1,0 +1,310 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ff2e2bb8_f664d3bb",
+        "filename": "cmds/stagefright/Android.mk",
+        "patchSetId": 5
+      },
+      "lineNbr": 44,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-10-25T21:50:05Z",
+      "side": 1,
+      "message": "this shouldn\u0027t matter",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_f693334e",
+        "filename": "include/media/IOMX.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 286,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-10-25T21:50:05Z",
+      "side": 1,
+      "message": "unnecessary",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_168fb723",
+        "filename": "include/media/stagefright/CameraSource.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 31,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-10-25T21:50:05Z",
+      "side": 1,
+      "message": "unnecessary",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_56993f6c",
+        "filename": "include/media/stagefright/SurfaceMediaSource.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 28,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-10-25T21:50:05Z",
+      "side": 1,
+      "message": "unnecessary",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_369e3b56",
+        "filename": "media/libmedia/IOMX.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 445,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-10-25T21:50:05Z",
+      "side": 1,
+      "message": "this looks wrong... why is there a cast to uint32_t when the parcel expects int32_t? the ifdef could just be on line 443.",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_565adff2",
+        "filename": "media/libmediaplayerservice/Android.mk",
+        "patchSetId": 5
+      },
+      "lineNbr": 63,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-10-25T21:50:05Z",
+      "side": 1,
+      "message": "this shouldn\u0027t matter",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_16b857c6",
+        "filename": "media/libmediaplayerservice/StagefrightRecorder.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 27,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-10-25T21:50:05Z",
+      "side": 1,
+      "message": "unnecessary",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_96a2a799",
+        "filename": "media/libstagefright/ACodec.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 827,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-10-25T21:50:05Z",
+      "side": 1,
+      "message": "this shouldn\u0027t be needed",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_d6ac2f8e",
+        "filename": "media/libstagefright/ACodec.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 7089,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-10-25T21:50:05Z",
+      "side": 1,
+      "message": "we could just ifdef line 7092 and 7097-7099 here.",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_b6a9ab7c",
+        "filename": "media/libstagefright/ACodec.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 7144,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-10-25T21:50:05Z",
+      "side": 1,
+      "message": "we could just ifdef 7146 and 7151-7153 here",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_b6740b37",
+        "filename": "media/libstagefright/SurfaceMediaSource.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 262,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-10-25T21:50:05Z",
+      "side": 1,
+      "message": "there\u0027s probably a cleaner way to do this...",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_36891b23",
+        "filename": "media/libstagefright/omx/OMXNodeInstance.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 544,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-10-25T21:50:05Z",
+      "side": 1,
+      "message": "this looks ok to me(?), shouldn\u0027t need to be ifdef\u0027d",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_56b2dfe7",
+        "filename": "media/libstagefright/omx/OMXNodeInstance.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 558,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-10-25T21:50:05Z",
+      "side": 1,
+      "message": "don\u0027t need this i think",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_967d871e",
+        "filename": "media/libstagefright/omx/OMXNodeInstance.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 583,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-10-25T21:50:05Z",
+      "side": 1,
+      "message": "don\u0027t need this either, I think. Should be the same as long as the ifdef on 558-560 is removed as well",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_f6bcd3bc",
+        "filename": "media/libstagefright/omx/OMXNodeInstance.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 623,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-10-25T21:50:05Z",
+      "side": 1,
+      "message": "don\u0027t need this",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_767a8324",
+        "filename": "media/libstagefright/omx/OMXNodeInstance.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 984,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-10-25T21:50:05Z",
+      "side": 1,
+      "message": "this should be ok, don\u0027t need to ifdef",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_56849f0c",
+        "filename": "media/libstagefright/tests/Android.mk",
+        "patchSetId": 5
+      },
+      "lineNbr": 36,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-10-25T21:50:05Z",
+      "side": 1,
+      "message": "shouldn\u0027t need to touch this",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_168a171a",
+        "filename": "media/libstagefright/wifi-display/Android.mk",
+        "patchSetId": 5
+      },
+      "lineNbr": 24,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-10-25T21:50:05Z",
+      "side": 1,
+      "message": "don\u0027t need to change this",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
