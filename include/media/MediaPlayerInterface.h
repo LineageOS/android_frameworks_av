@@ -30,6 +30,7 @@
 #include <media/AudioSystem.h>
 #include <media/AudioTimestamp.h>
 #include <media/AVSyncSettings.h>
+#include <media/BufferingSettings.h>
 #include <media/Metadata.h>
 
 // Fwd decl to make sure everyone agrees that the scope of struct sockaddr_in is
@@ -173,6 +174,15 @@ public:
     // pass the buffered IGraphicBufferProducer to the media player service
     virtual status_t    setVideoSurfaceTexture(
                                 const sp<IGraphicBufferProducer>& bufferProducer) = 0;
+
+    virtual status_t    getDefaultBufferingSettings(
+                                BufferingSettings* buffering /* nonnull */) {
+        *buffering = BufferingSettings();
+        return OK;
+    }
+    virtual status_t    setBufferingSettings(const BufferingSettings& /* buffering */) {
+        return OK;
+    }
 
     virtual status_t    prepare() = 0;
     virtual status_t    prepareAsync() = 0;

@@ -972,6 +972,42 @@ status_t MediaPlayerService::Client::getMetadata(
     return OK;
 }
 
+status_t MediaPlayerService::Client::setBufferingSettings(
+        const BufferingSettings& buffering)
+{
+    ALOGV("[%d] setBufferingSettings(%d, %d, %d, %d, %d, %d, %d, %d)",
+            mConnId, buffering.mInitialBufferingMode, buffering.mRebufferingMode,
+            buffering.mInitialWatermarkMs, buffering.mInitialWatermarkKB,
+            buffering.mRebufferingWatermarkLowMs,
+            buffering.mRebufferingWatermarkHighMs,
+            buffering.mRebufferingWatermarkLowKB,
+            buffering.mRebufferingWatermarkHighKB);
+    sp<MediaPlayerBase> p = getPlayer();
+    if (p == 0) return UNKNOWN_ERROR;
+    return p->setBufferingSettings(buffering);
+}
+
+status_t MediaPlayerService::Client::getDefaultBufferingSettings(
+        BufferingSettings* buffering /* nonnull */)
+{
+    sp<MediaPlayerBase> p = getPlayer();
+    // TODO: create mPlayer on demand.
+    if (p == 0) return UNKNOWN_ERROR;
+    status_t ret = p->getDefaultBufferingSettings(buffering);
+    if (ret == NO_ERROR) {
+        ALOGV("[%d] getDefaultBufferingSettings(%d, %d, %d, %d, %d, %d, %d, %d)",
+                mConnId, buffering->mInitialBufferingMode, buffering->mRebufferingMode,
+                buffering->mInitialWatermarkMs, buffering->mInitialWatermarkKB,
+                buffering->mRebufferingWatermarkLowMs,
+                buffering->mRebufferingWatermarkHighMs,
+                buffering->mRebufferingWatermarkLowKB,
+                buffering->mRebufferingWatermarkHighKB);
+    } else {
+        ALOGV("[%d] getDefaultBufferingSettings returned %d", mConnId, ret);
+    }
+    return ret;
+}
+
 status_t MediaPlayerService::Client::prepareAsync()
 {
     ALOGV("[%d] prepareAsync", mConnId);

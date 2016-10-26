@@ -12,6 +12,7 @@ LOCAL_SRC_FILES:= \
 LOCAL_SRC_FILES += \
     IDataSource.cpp \
     IHDCP.cpp \
+    BufferingSettings.cpp \
     mediaplayer.cpp \
     IMediaCodecList.cpp \
     IMediaCodecService.cpp \

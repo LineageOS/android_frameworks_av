@@ -39,6 +39,7 @@ class IGraphicBufferProducer;
 struct IMediaHTTPService;
 struct AudioPlaybackRate;
 struct AVSyncSettings;
+struct BufferingSettings;
 
 typedef IMediaSource::ReadOptions::SeekMode MediaPlayerSeekMode;
 
@@ -59,6 +60,9 @@ public:
     virtual status_t        setDataSource(const sp<IDataSource>& source) = 0;
     virtual status_t        setVideoSurfaceTexture(
                                     const sp<IGraphicBufferProducer>& bufferProducer) = 0;
+    virtual status_t        getDefaultBufferingSettings(
+                                    BufferingSettings* buffering /* nonnull */) = 0;
+    virtual status_t        setBufferingSettings(const BufferingSettings& buffering) = 0;
     virtual status_t        prepareAsync() = 0;
     virtual status_t        start() = 0;
     virtual status_t        stop() = 0;
