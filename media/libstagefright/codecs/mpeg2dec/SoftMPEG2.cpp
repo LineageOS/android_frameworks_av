@@ -47,14 +47,8 @@ namespace android {
         (IVD_CONTROL_API_COMMAND_TYPE_T)IMPEG2D_CMD_CTL_SET_NUM_CORES
 
 static const CodecProfileLevel kProfileLevels[] = {
-    { OMX_VIDEO_MPEG2ProfileSimple, OMX_VIDEO_MPEG2LevelLL  },
-    { OMX_VIDEO_MPEG2ProfileSimple, OMX_VIDEO_MPEG2LevelML  },
-    { OMX_VIDEO_MPEG2ProfileSimple, OMX_VIDEO_MPEG2LevelH14 },
     { OMX_VIDEO_MPEG2ProfileSimple, OMX_VIDEO_MPEG2LevelHL  },
 
-    { OMX_VIDEO_MPEG2ProfileMain  , OMX_VIDEO_MPEG2LevelLL  },
-    { OMX_VIDEO_MPEG2ProfileMain  , OMX_VIDEO_MPEG2LevelML  },
-    { OMX_VIDEO_MPEG2ProfileMain  , OMX_VIDEO_MPEG2LevelH14 },
     { OMX_VIDEO_MPEG2ProfileMain  , OMX_VIDEO_MPEG2LevelHL  },
 };
 
