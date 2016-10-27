@@ -58,6 +58,8 @@ public:
     sp<AMessage> meta();
     sp<AMessage> format();
 
+    virtual sp<MediaCodecBuffer> clone(const sp<AMessage> &format);
+
 private:
     MediaCodecBuffer() = delete;
 

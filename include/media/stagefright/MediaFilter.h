@@ -144,7 +144,6 @@ private:
     void postFillThisBuffer(BufferInfo *info);
     void postDrainThisBuffer(BufferInfo *info);
     void postEOS();
-    void sendFormatChange();
     void requestFillEmptyInput();
     void processBuffers();
 

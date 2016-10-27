@@ -246,7 +246,7 @@ private:
         kFlagIsSecure                   = 64,
         kFlagSawMediaServerDie          = 128,
         kFlagIsEncoder                  = 256,
-        kFlagGatherCodecSpecificData    = 512,
+        // 512 skipped
         kFlagIsAsync                    = 1024,
         kFlagIsComponentAllocated       = 2048,
         kFlagPushBlankBuffersOnShutdown = 4096,
@@ -258,7 +258,6 @@ private:
         sp<MediaCodecBuffer> mSecureData;
         sp<IMemory> mSharedEncryptedBuffer;
         sp<AMessage> mNotify;
-        sp<AMessage> mFormat;
         bool mOwnedByClient;
     };
 
@@ -329,6 +328,7 @@ private:
 
     List<size_t> mAvailPortBuffers[2];
     Vector<BufferInfo> mPortBuffers[2];
+    Vector<sp<MediaCodecBuffer>> mPortBufferArrays[2];
 
     int32_t mDequeueInputTimeoutGeneration;
     sp<AReplyToken> mDequeueInputReplyID;

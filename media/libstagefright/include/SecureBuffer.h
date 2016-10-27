@@ -34,13 +34,15 @@ class NativeHandle;
  */
 class SecureBuffer : public MediaCodecBuffer {
 public:
-    SecureBuffer(const sp<AMessage> &format, void *ptr, size_t size);
+    SecureBuffer(const sp<AMessage> &format, const void *ptr, size_t size);
     SecureBuffer(const sp<AMessage> &format, const sp<NativeHandle> &handle, size_t size);
 
     virtual ~SecureBuffer() = default;
 
     void *getDestinationPointer();
     ICrypto::DestinationType getDestinationType();
+
+    virtual sp<MediaCodecBuffer> clone(const sp<AMessage> &format) override;
 
 private:
     SecureBuffer() = delete;
