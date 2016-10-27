@@ -519,7 +519,7 @@ int MtpDataPacket::readDataAsync(struct usb_request *req) {
 
 // Wait for result of readDataAsync
 int MtpDataPacket::readDataWait(struct usb_device *device) {
-    struct usb_request *req = usb_request_wait(device);
+    struct usb_request *req = usb_request_wait(device, -1);
     return (req ? req->actual_length : -1);
 }
 

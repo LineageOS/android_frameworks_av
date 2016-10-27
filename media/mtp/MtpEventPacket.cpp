@@ -66,7 +66,7 @@ int MtpEventPacket::sendRequest(struct usb_request *request) {
 }
 
 int MtpEventPacket::readResponse(struct usb_device *device) {
-    struct usb_request* const req = usb_request_wait(device);
+    struct usb_request* const req = usb_request_wait(device, -1);
     if (req) {
         mPacketSize = req->actual_length;
         return req->actual_length;
