@@ -524,7 +524,8 @@ bool GraphicBufferSource::getTimestamp(
         if (mPrevCaptureUs < 0ll) {
             // first capture
             mPrevCaptureUs = timeUs;
-            mPrevFrameUs = timeUs;
+            // adjust the first sample timestamp.
+            mPrevFrameUs = (timeUs * mTimePerFrameUs) / mTimePerCaptureUs;
         } else {
             // snap to nearest capture point
             int64_t nFrames = (timeUs + mTimePerCaptureUs / 2 - mPrevCaptureUs)
