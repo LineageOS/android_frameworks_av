@@ -18,7 +18,8 @@ include $(CLEAR_VARS)
 
 
 LOCAL_SRC_FILES:=               \
-    RadioService.cpp
+    RadioService.cpp \
+    RadioHalLegacy.cpp
 
 LOCAL_SHARED_LIBRARIES:= \
     libui \
