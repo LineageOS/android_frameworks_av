@@ -31,7 +31,8 @@ LOCAL_SRC_FILES:=               \
     AudioMixer.cpp.arm          \
     BufferProviders.cpp         \
     PatchPanel.cpp              \
-    StateQueue.cpp
+    StateQueue.cpp              \
+    BufLog.cpp
 
 LOCAL_C_INCLUDES := \
     $(TOPDIR)frameworks/av/services/audiopolicy \
