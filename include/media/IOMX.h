@@ -19,7 +19,7 @@
 #define ANDROID_IOMX_H_
 
 #include <binder/IInterface.h>
-#include <ui/GraphicBuffer.h>
+#include <gui/IGraphicBufferProducer.h>
 #include <utils/List.h>
 #include <utils/String8.h>
 
@@ -39,6 +39,7 @@ class IOMXBufferSource;
 class IOMXNode;
 class IOMXObserver;
 class NativeHandle;
+class OMXBuffer;
 struct omx_message;
 
 class IOMX : public IInterface {
@@ -108,23 +109,6 @@ public:
     virtual status_t getGraphicBufferUsage(
             OMX_U32 port_index, OMX_U32* usage) = 0;
 
-    // Use |params| as an OMX buffer, but limit the size of the OMX buffer to |allottedSize|.
-    virtual status_t useBuffer(
-            OMX_U32 port_index, const sp<IMemory> &params,
-            buffer_id *buffer, OMX_U32 allottedSize) = 0;
-
-    virtual status_t useGraphicBuffer(
-            OMX_U32 port_index,
-            const sp<GraphicBuffer> &graphicBuffer, buffer_id *buffer) = 0;
-
-    virtual status_t updateGraphicBufferInMeta(
-            OMX_U32 port_index,
-            const sp<GraphicBuffer> &graphicBuffer, buffer_id buffer) = 0;
-
-    virtual status_t updateNativeHandleInMeta(
-            OMX_U32 port_index,
-            const sp<NativeHandle> &nativeHandle, buffer_id buffer) = 0;
-
     virtual status_t setInputSurface(
             const sp<IOMXBufferSource> &bufferSource) = 0;
 
@@ -137,33 +121,36 @@ public:
             OMX_U32 port_index, size_t size, buffer_id *buffer,
             void **buffer_data, sp<NativeHandle> *native_handle) = 0;
 
+    // Instructs the component to use the buffer passed in via |omxBuf| on the
+    // specified port. Returns in |*buffer| the buffer id that the component
+    // assigns to this buffer. |omxBuf| must be one of:
+    // 1) OMXBuffer::sPreset for meta-mode,
+    // 2) type kBufferTypeANWBuffer for non-meta-graphic buffer mode,
+    // 3) type kBufferTypeSharedMem for bytebuffer mode.
+    virtual status_t useBuffer(
+            OMX_U32 port_index, const OMXBuffer &omxBuf, buffer_id *buffer) = 0;
+
+    // Frees the buffer on the specified port with buffer id |buffer|.
     virtual status_t freeBuffer(
             OMX_U32 port_index, buffer_id buffer) = 0;
 
-    // Calls OMX_FillBuffer on buffer, and passes |fenceFd| to component if it supports
-    // fences. Otherwise, it waits on |fenceFd| before calling OMX_FillBuffer.
-    // Takes ownership of |fenceFd| even if this call fails.
-    virtual status_t fillBuffer(buffer_id buffer, int fenceFd = -1) = 0;
+    // Calls OMX_FillBuffer on buffer. Passes |fenceFd| to component if it
+    // supports fences. Otherwise, it waits on |fenceFd| before calling
+    // OMX_FillBuffer. Takes ownership of |fenceFd| even if this call fails.
+    // If the port is in metadata mode, the buffer will be updated to point
+    // to the new buffer passed in via |omxBuf| before OMX_FillBuffer is called.
+    // Otherwise info in the |omxBuf| is not used.
+    virtual status_t fillBuffer(
+            buffer_id buffer, const OMXBuffer &omxBuf, int fenceFd = -1) = 0;
 
-    // Calls OMX_EmptyBuffer on buffer (after updating buffer header with |range_offset|,
-    // |range_length|, |flags| and |timestamp|). Passes |fenceFd| to component if it
-    // supports fences. Otherwise, it waits on |fenceFd| before calling OMX_EmptyBuffer.
-    // Takes ownership of |fenceFd| even if this call fails.
+    // Calls OMX_EmptyBuffer on buffer. Passes |fenceFd| to component if it
+    // supports fences. Otherwise, it waits on |fenceFd| before calling
+    // OMX_EmptyBuffer. Takes ownership of |fenceFd| even if this call fails.
+    // If the port is in metadata mode, the buffer will be updated to point
+    // to the new buffer passed in via |omxBuf| before OMX_EmptyBuffer is called.
     virtual status_t emptyBuffer(
-            buffer_id buffer,
-            OMX_U32 range_offset, OMX_U32 range_length,
+            buffer_id buffer, const OMXBuffer &omxBuf,
             OMX_U32 flags, OMX_TICKS timestamp, int fenceFd = -1) = 0;
-
-    // Calls OMX_EmptyBuffer on buffer (after updating buffer header with metadata of
-    // |graphicBuffer|, |flags| and |timestamp|). Passes |fenceFd| to component if it
-    // supports fences. Otherwise, it waits on |fenceFd| before calling OMX_EmptyBuffer.
-    // Takes ownership of |fenceFd| even if this call fails. If |origTimestamp| >= 0,
-    // timestamp on the filled buffer corresponding to this frame will be modified to
-    // |origTimestamp| after it's filled.
-    virtual status_t emptyGraphicBuffer(
-            buffer_id buffer,
-            const sp<GraphicBuffer> &graphicBuffer, OMX_U32 flags,
-            OMX_TICKS timestamp, int fenceFd) = 0;
 
     virtual status_t getExtensionIndex(
             const char *parameter_name,

@@ -65,6 +65,7 @@ LOCAL_SRC_FILES += \
     MediaProfiles.cpp \
     MediaResource.cpp \
     MediaResourcePolicy.cpp \
+    OMXBuffer.cpp \
     IEffect.cpp \
     IEffectClient.cpp \
     AudioEffect.cpp \

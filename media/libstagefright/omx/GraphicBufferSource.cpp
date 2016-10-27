@@ -34,6 +34,7 @@
 #include "omx/OMXUtils.h"
 #include <OMX_Component.h>
 #include <OMX_IndexExt.h>
+#include "OMXBuffer.h"
 
 #include <inttypes.h>
 #include "FrameDropper.h"
@@ -579,7 +580,7 @@ status_t GraphicBufferSource::submitBuffer_l(const BufferItem &item, int cbi) {
     const sp<GraphicBuffer> &buffer = codecBuffer.mGraphicBuffer;
     int fenceID = item.mFence->isValid() ? item.mFence->dup() : -1;
 
-    status_t err = mOMXNode->emptyGraphicBuffer(
+    status_t err = mOMXNode->emptyBuffer(
             bufferID, buffer, OMX_BUFFERFLAG_ENDOFFRAME, codecTimeUs, fenceID);
 
     if (err != OK) {
@@ -612,8 +613,8 @@ void GraphicBufferSource::submitEndOfInputStream_l() {
     CodecBuffer& codecBuffer(mCodecBuffers.editItemAt(cbi));
     IOMX::buffer_id bufferID = codecBuffer.mBufferID;
 
-    status_t err = mOMXNode->emptyGraphicBuffer(
-            bufferID, NULL /* buffer */,
+    status_t err = mOMXNode->emptyBuffer(
+            bufferID, (sp<GraphicBuffer>)NULL,
             OMX_BUFFERFLAG_ENDOFFRAME | OMX_BUFFERFLAG_EOS,
             0 /* timestamp */, -1 /* fenceFd */);
     if (err != OK) {

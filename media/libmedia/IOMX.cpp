@@ -26,8 +26,8 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/openmax/OMX_IndexExt.h>
 #include <utils/NativeHandle.h>
+#include <media/OMXBuffer.h>
 
-#include <gui/IGraphicBufferProducer.h>
 #include <android/IGraphicBufferSource.h>
 #include <android/IOMXBufferSource.h>
 
@@ -45,7 +45,6 @@ enum {
     SET_CONFIG,
     ENABLE_NATIVE_BUFFERS,
     USE_BUFFER,
-    USE_GRAPHIC_BUFFER,
     CREATE_INPUT_SURFACE,
     SET_INPUT_SURFACE,
     STORE_META_DATA_IN_BUFFERS,
@@ -54,13 +53,10 @@ enum {
     FREE_BUFFER,
     FILL_BUFFER,
     EMPTY_BUFFER,
-    EMPTY_GRAPHIC_BUFFER,
     GET_EXTENSION_INDEX,
     OBSERVER_ON_MSG,
     GET_GRAPHIC_BUFFER_USAGE,
-    UPDATE_GRAPHIC_BUFFER_IN_META,
     CONFIGURE_VIDEO_TUNNEL_MODE,
-    UPDATE_NATIVE_HANDLE_IN_META,
     DISPATCH_MESSAGE,
     SET_QUIRKS,
 };
@@ -255,16 +251,19 @@ public:
     }
 
     virtual status_t useBuffer(
-            OMX_U32 port_index, const sp<IMemory> &params,
-            buffer_id *buffer, OMX_U32 allottedSize) {
+            OMX_U32 port_index, const OMXBuffer &omxBuf, buffer_id *buffer) {
         Parcel data, reply;
         data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
         data.writeInt32(port_index);
-        data.writeStrongBinder(IInterface::asBinder(params));
-        data.writeInt32(allottedSize);
+
+        status_t err = omxBuf.writeToParcel(&data);
+        if (err != OK) {
+            return err;
+        }
+
         remote()->transact(USE_BUFFER, data, &reply);
 
-        status_t err = reply.readInt32();
+        err = reply.readInt32();
         if (err != OK) {
             *buffer = 0;
 
@@ -273,59 +272,6 @@ public:
 
         *buffer = (buffer_id)reply.readInt32();
 
-        return err;
-    }
-
-
-    virtual status_t useGraphicBuffer(
-            OMX_U32 port_index,
-            const sp<GraphicBuffer> &graphicBuffer, buffer_id *buffer) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
-        data.writeInt32(port_index);
-        data.write(*graphicBuffer);
-        remote()->transact(USE_GRAPHIC_BUFFER, data, &reply);
-
-        status_t err = reply.readInt32();
-        if (err != OK) {
-            *buffer = 0;
-
-            return err;
-        }
-
-        *buffer = (buffer_id)reply.readInt32();
-
-        return err;
-    }
-
-    virtual status_t updateGraphicBufferInMeta(
-            OMX_U32 port_index,
-            const sp<GraphicBuffer> &graphicBuffer, buffer_id buffer) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
-        data.writeInt32(port_index);
-        data.write(*graphicBuffer);
-        data.writeInt32((int32_t)buffer);
-        remote()->transact(UPDATE_GRAPHIC_BUFFER_IN_META, data, &reply);
-
-        status_t err = reply.readInt32();
-        return err;
-    }
-
-    virtual status_t updateNativeHandleInMeta(
-            OMX_U32 port_index,
-            const sp<NativeHandle> &nativeHandle, buffer_id buffer) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
-        data.writeInt32(port_index);
-        data.writeInt32(nativeHandle != NULL);
-        if (nativeHandle != NULL) {
-            data.writeNativeHandle(nativeHandle->handle());
-        }
-        data.writeInt32((int32_t)buffer);
-        remote()->transact(UPDATE_NATIVE_HANDLE_IN_META, data, &reply);
-
-        status_t err = reply.readInt32();
         return err;
     }
 
@@ -439,10 +385,15 @@ public:
         return reply.readInt32();
     }
 
-    virtual status_t fillBuffer(buffer_id buffer, int fenceFd) {
+    virtual status_t fillBuffer(
+            buffer_id buffer, const OMXBuffer &omxBuf, int fenceFd) {
         Parcel data, reply;
         data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
         data.writeInt32((int32_t)buffer);
+        status_t err = omxBuf.writeToParcel(&data);
+        if (err != OK) {
+            return err;
+        }
         data.writeInt32(fenceFd >= 0);
         if (fenceFd >= 0) {
             data.writeFileDescriptor(fenceFd, true /* takeOwnership */);
@@ -453,14 +404,15 @@ public:
     }
 
     virtual status_t emptyBuffer(
-            buffer_id buffer,
-            OMX_U32 range_offset, OMX_U32 range_length,
+            buffer_id buffer, const OMXBuffer &omxBuf,
             OMX_U32 flags, OMX_TICKS timestamp, int fenceFd) {
         Parcel data, reply;
         data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
         data.writeInt32((int32_t)buffer);
-        data.writeInt32(range_offset);
-        data.writeInt32(range_length);
+        status_t err = omxBuf.writeToParcel(&data);
+        if (err != OK) {
+            return err;
+        }
         data.writeInt32(flags);
         data.writeInt64(timestamp);
         data.writeInt32(fenceFd >= 0);
@@ -468,25 +420,6 @@ public:
             data.writeFileDescriptor(fenceFd, true /* takeOwnership */);
         }
         remote()->transact(EMPTY_BUFFER, data, &reply);
-
-        return reply.readInt32();
-    }
-
-    virtual status_t emptyGraphicBuffer(
-            buffer_id buffer,
-            const sp<GraphicBuffer> &graphicBuffer, OMX_U32 flags,
-            OMX_TICKS timestamp, int fenceFd) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
-        data.writeInt32((int32_t)buffer);
-        data.write(*graphicBuffer);
-        data.writeInt32(flags);
-        data.writeInt64(timestamp);
-        data.writeInt32(fenceFd >= 0);
-        if (fenceFd >= 0) {
-            data.writeFileDescriptor(fenceFd, true /* takeOwnership */);
-        }
-        remote()->transact(EMPTY_GRAPHIC_BUFFER, data, &reply);
 
         return reply.readInt32();
     }
@@ -770,77 +703,20 @@ status_t BnOMXNode::onTransact(
             CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
             OMX_U32 port_index = data.readInt32();
-            sp<IMemory> params =
-                interface_cast<IMemory>(data.readStrongBinder());
-            OMX_U32 allottedSize = data.readInt32();
 
-            if (params == NULL) {
-                ALOGE("b/26392700");
-                reply->writeInt32(INVALID_OPERATION);
-                return NO_ERROR;
+            OMXBuffer omxBuf;
+            status_t err = omxBuf.readFromParcel(&data);
+            if (err != OK) {
+                return err;
             }
 
             buffer_id buffer;
-            status_t err = useBuffer(port_index, params, &buffer, allottedSize);
+            err = useBuffer(port_index, omxBuf, &buffer);
             reply->writeInt32(err);
 
             if (err == OK) {
                 reply->writeInt32((int32_t)buffer);
             }
-
-            return NO_ERROR;
-        }
-
-        case USE_GRAPHIC_BUFFER:
-        {
-            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
-
-            OMX_U32 port_index = data.readInt32();
-            sp<GraphicBuffer> graphicBuffer = new GraphicBuffer();
-            data.read(*graphicBuffer);
-
-            buffer_id buffer;
-            status_t err = useGraphicBuffer(
-                    port_index, graphicBuffer, &buffer);
-            reply->writeInt32(err);
-
-            if (err == OK) {
-                reply->writeInt32((int32_t)buffer);
-            }
-
-            return NO_ERROR;
-        }
-
-        case UPDATE_GRAPHIC_BUFFER_IN_META:
-        {
-            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
-
-            OMX_U32 port_index = data.readInt32();
-            sp<GraphicBuffer> graphicBuffer = new GraphicBuffer();
-            data.read(*graphicBuffer);
-            buffer_id buffer = (buffer_id)data.readInt32();
-
-            status_t err = updateGraphicBufferInMeta(
-                    port_index, graphicBuffer, buffer);
-            reply->writeInt32(err);
-
-            return NO_ERROR;
-        }
-
-        case UPDATE_NATIVE_HANDLE_IN_META:
-        {
-            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
-
-            OMX_U32 port_index = data.readInt32();
-            native_handle *handle = NULL;
-            if (data.readInt32()) {
-                handle = data.readNativeHandle();
-            }
-            buffer_id buffer = (buffer_id)data.readInt32();
-
-            status_t err = updateNativeHandleInMeta(
-                    port_index, NativeHandle::create(handle, true /* ownshandle */), buffer);
-            reply->writeInt32(err);
 
             return NO_ERROR;
         }
@@ -956,9 +832,17 @@ status_t BnOMXNode::onTransact(
             CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
             buffer_id buffer = (buffer_id)data.readInt32();
+
+            OMXBuffer omxBuf;
+            status_t err = omxBuf.readFromParcel(&data);
+            if (err != OK) {
+                return err;
+            }
+
             bool haveFence = data.readInt32();
             int fenceFd = haveFence ? ::dup(data.readFileDescriptor()) : -1;
-            reply->writeInt32(fillBuffer(buffer, fenceFd));
+
+            reply->writeInt32(fillBuffer(buffer, omxBuf, fenceFd));
 
             return NO_ERROR;
         }
@@ -968,31 +852,17 @@ status_t BnOMXNode::onTransact(
             CHECK_OMX_INTERFACE(IOMXNode, data, reply);
 
             buffer_id buffer = (buffer_id)data.readInt32();
-            OMX_U32 range_offset = data.readInt32();
-            OMX_U32 range_length = data.readInt32();
+            OMXBuffer omxBuf;
+            status_t err = omxBuf.readFromParcel(&data);
+            if (err != OK) {
+                return err;
+            }
             OMX_U32 flags = data.readInt32();
             OMX_TICKS timestamp = data.readInt64();
             bool haveFence = data.readInt32();
             int fenceFd = haveFence ? ::dup(data.readFileDescriptor()) : -1;
             reply->writeInt32(emptyBuffer(
-                    buffer, range_offset, range_length, flags, timestamp, fenceFd));
-
-            return NO_ERROR;
-        }
-
-        case EMPTY_GRAPHIC_BUFFER:
-        {
-            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
-
-            buffer_id buffer = (buffer_id)data.readInt32();
-            sp<GraphicBuffer> graphicBuffer = new GraphicBuffer();
-            data.read(*graphicBuffer);
-            OMX_U32 flags = data.readInt32();
-            OMX_TICKS timestamp = data.readInt64();
-            bool haveFence = data.readInt32();
-            int fenceFd = haveFence ? ::dup(data.readFileDescriptor()) : -1;
-            reply->writeInt32(emptyGraphicBuffer(
-                    buffer, graphicBuffer, flags, timestamp, fenceFd));
+                    buffer, omxBuf, flags, timestamp, fenceFd));
 
             return NO_ERROR;
         }

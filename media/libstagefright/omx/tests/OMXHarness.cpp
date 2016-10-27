@@ -38,6 +38,7 @@
 #include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/SimpleDecodingSource.h>
+#include <media/OMXBuffer.h>
 
 #define DEFAULT_TIMEOUT         500000
 
@@ -210,8 +211,7 @@ status_t Harness::allocatePortBuffers(
         buffer.mFlags = 0;
         CHECK(buffer.mMemory != NULL);
 
-        err = mOMXNode->useBuffer(
-                portIndex, buffer.mMemory, &buffer.mID, buffer.mMemory->size());
+        err = mOMXNode->useBuffer(portIndex, buffer.mMemory, &buffer.mID);
         EXPECT_SUCCESS(err, "useBuffer");
 
         buffers->push(buffer);
@@ -338,7 +338,7 @@ status_t Harness::testStateTransitions(
            "executing state.");
 
     for (size_t i = 0; i < outputBuffers.size(); ++i) {
-        err = mOMXNode->fillBuffer(outputBuffers[i].mID);
+        err = mOMXNode->fillBuffer(outputBuffers[i].mID, OMXBuffer::sPreset);
         EXPECT_SUCCESS(err, "fillBuffer");
 
         outputBuffers.editItemAt(i).mFlags |= kBufferBusy;
@@ -363,7 +363,7 @@ status_t Harness::testStateTransitions(
     }
 
     for (size_t i = 0; i < outputBuffers.size(); ++i) {
-        err = mOMXNode->fillBuffer(outputBuffers[i].mID);
+        err = mOMXNode->fillBuffer(outputBuffers[i].mID, OMXBuffer::sPreset);
         EXPECT_SUCCESS(err, "fillBuffer");
 
         outputBuffers.editItemAt(i).mFlags |= kBufferBusy;
