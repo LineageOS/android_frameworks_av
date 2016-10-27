@@ -189,6 +189,24 @@
     },
     {
       "key": {
+        "uuid": "ff2e2bb8_a7e33333",
+        "filename": "media/libstagefright/MediaCodecSource.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 457,
+      "author": {
+        "id": 5404
+      },
+      "writtenOn": "2016-10-27T04:56:27Z",
+      "side": 1,
+      "message": "Actually, it is there. See https://github.com/CyanogenMod/android_frameworks_av/blob/cm-14.0/include/media/stagefright/MediaCodecSource.h#L40 and https://github.com/CyanogenMod/android_frameworks_av/commit/799c90fb07383f4fe4e07448bfdefccbc024bb25",
+      "parentUuid": "ff2e2bb8_e77a5b86",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "ff2e2bb8_b6740b37",
         "filename": "media/libstagefright/SurfaceMediaSource.cpp",
         "patchSetId": 5
