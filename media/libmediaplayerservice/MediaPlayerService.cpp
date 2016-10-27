@@ -1911,6 +1911,13 @@ status_t MediaPlayerService::AudioOutput::open(
                       mRecycledTrack->frameCount(), t->frameCount());
                 reuse = false;
             }
+            // If recycled and new tracks are not on the same output,
+            // don't reuse the recycled one.
+            if (mRecycledTrack->getOutput() != t->getOutput()) {
+                ALOGV("effect chain if exists has already moved to new output, \
+                        giving up reusing recycled track.");
+                reuse = false;
+            }
         }
 
         if (reuse) {
