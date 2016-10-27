@@ -22,7 +22,6 @@ cc_library_shared {
     // static_libs: ["libsndfile"],
 
     shared_libs: [
-        "libaudiohal",
         "libaudioutils",
         "libbinder",
         "libcutils",

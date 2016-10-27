@@ -24,7 +24,6 @@ LOCAL_SRC_FILES:=               \
     SoundTriggerHwService.cpp
 
 LOCAL_SHARED_LIBRARIES:= \
-    libui \
     liblog \
     libutils \
     libbinder \

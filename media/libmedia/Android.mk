@@ -76,7 +76,7 @@ LOCAL_SRC_FILES += \
 LOCAL_SHARED_LIBRARIES := \
 	libui liblog libcutils libutils libbinder libsonivox libicuuc libicui18n libexpat \
         libcamera_client libstagefright_foundation \
-        libgui libdl libaudioutils libnbaio
+        libgui libdl libaudioutils
 
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder
 

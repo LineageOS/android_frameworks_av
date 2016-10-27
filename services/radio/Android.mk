@@ -22,7 +22,6 @@ LOCAL_SRC_FILES:=               \
     RadioHalLegacy.cpp
 
 LOCAL_SHARED_LIBRARIES:= \
-    libui \
     liblog \
     libutils \
     libbinder \

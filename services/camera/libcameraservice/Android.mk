@@ -65,12 +65,11 @@ LOCAL_SHARED_LIBRARIES:= \
     libcamera_client \
     libgui \
     libhardware \
-    libsync \
     libcamera_metadata \
     libjpeg \
     libmemunreachable
 
-LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder
+LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder libcamera_client
 
 LOCAL_C_INCLUDES += \
     system/media/private/camera/include \

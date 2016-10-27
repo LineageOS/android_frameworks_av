@@ -21,7 +21,6 @@ LOCAL_C_INCLUDES += \
 
 LOCAL_SHARED_LIBRARIES :=               \
         libbinder                       \
-        libhardware                     \
         libmedia                        \
         libutils                        \
         liblog                          \

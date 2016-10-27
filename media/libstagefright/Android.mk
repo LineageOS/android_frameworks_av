@@ -72,6 +72,8 @@ LOCAL_C_INCLUDES:= \
         $(TOP)/external/flac/include \
         $(TOP)/external/tremolo \
         $(TOP)/external/libvpx/libwebm \
+        $(TOP)/external/icu/icu4c/source/common \
+        $(TOP)/external/icu/icu4c/source/i18n \
         $(TOP)/system/netd/include \
         $(call include-path-for, audio-utils)
 
@@ -84,23 +86,15 @@ LOCAL_SHARED_LIBRARIES := \
         libdrmframework \
         libexpat \
         libgui \
-        libicui18n \
-        libicuuc \
         liblog \
         libmedia \
         libmediautils \
         libnetd_client \
-        libopus \
         libsonivox \
-        libssl \
         libstagefright_omx \
-        libstagefright_yuv \
-        libsync \
         libui \
         libutils \
         libvorbisidec \
-        libz \
-        libpowermanager
 
 LOCAL_STATIC_LIBRARIES := \
         libstagefright_color_conversion \
@@ -118,8 +112,6 @@ LOCAL_STATIC_LIBRARIES := \
         libmedia_helper \
 
 LOCAL_SHARED_LIBRARIES += \
-        libstagefright_enc_common \
-        libstagefright_avc_common \
         libstagefright_foundation \
         libdl \
         libRScpp \
