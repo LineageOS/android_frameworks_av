@@ -172,6 +172,23 @@
     },
     {
       "key": {
+        "uuid": "ff2e2bb8_e77a5b86",
+        "filename": "media/libstagefright/MediaCodecSource.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 457,
+      "author": {
+        "id": 7181
+      },
+      "writtenOn": "2016-10-27T04:39:46Z",
+      "side": 1,
+      "message": "this flag was missed\ninclude\\media\\stagefright\\MediaCodecSource.h",
+      "revId": "024befd11f6968730ea3ccc2af156611e6baf045",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "ff2e2bb8_b6740b37",
         "filename": "media/libstagefright/SurfaceMediaSource.cpp",
         "patchSetId": 5
