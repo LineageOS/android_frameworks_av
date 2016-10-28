@@ -37,11 +37,11 @@ class BatteryNotifier : public Singleton<BatteryNotifier> {
 public:
     ~BatteryNotifier();
 
-    void noteStartVideo();
-    void noteStopVideo();
+    void noteStartVideo(int uid);
+    void noteStopVideo(int uid);
     void noteResetVideo();
-    void noteStartAudio();
-    void noteStopAudio();
+    void noteStartAudio(int uid);
+    void noteStopAudio(int uid);
     void noteResetAudio();
     void noteFlashlightOn(const String8& id, int uid);
     void noteFlashlightOff(const String8& id, int uid);
@@ -58,8 +58,8 @@ private:
     };
 
     Mutex mLock;
-    int mVideoRefCount;
-    int mAudioRefCount;
+    std::map<int, int> mVideoRefCounts;
+    std::map<int, int> mAudioRefCounts;
     std::map<std::pair<String8, int>, bool> mFlashlightState;
     std::map<std::pair<String8, int>, bool> mCameraState;
     sp<IBatteryStats> mBatteryStatService;

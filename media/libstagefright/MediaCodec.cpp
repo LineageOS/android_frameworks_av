@@ -173,8 +173,9 @@ bool MediaCodec::ResourceManagerServiceProxy::reclaimResource(
 
 // static
 sp<MediaCodec> MediaCodec::CreateByType(
-        const sp<ALooper> &looper, const AString &mime, bool encoder, status_t *err, pid_t pid) {
-    sp<MediaCodec> codec = new MediaCodec(looper, pid);
+        const sp<ALooper> &looper, const AString &mime, bool encoder, status_t *err, pid_t pid,
+        uid_t uid) {
+    sp<MediaCodec> codec = new MediaCodec(looper, pid, uid);
 
     const status_t ret = codec->init(mime, true /* nameIsType */, encoder);
     if (err != NULL) {
@@ -185,8 +186,8 @@ sp<MediaCodec> MediaCodec::CreateByType(
 
 // static
 sp<MediaCodec> MediaCodec::CreateByComponentName(
-        const sp<ALooper> &looper, const AString &name, status_t *err, pid_t pid) {
-    sp<MediaCodec> codec = new MediaCodec(looper, pid);
+        const sp<ALooper> &looper, const AString &name, status_t *err, pid_t pid, uid_t uid) {
+    sp<MediaCodec> codec = new MediaCodec(looper, pid, uid);
 
     const status_t ret = codec->init(name, false /* nameIsType */, false /* encoder */);
     if (err != NULL) {
@@ -234,7 +235,7 @@ sp<PersistentSurface> MediaCodec::CreatePersistentInputSurface() {
     return new PersistentSurface(bufferProducer, bufferSource);
 }
 
-MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid)
+MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid)
     : mState(UNINITIALIZED),
       mReleasedByResourceManager(false),
       mLooper(looper),
@@ -256,6 +257,11 @@ MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid)
       mDequeueOutputReplyID(0),
       mHaveInputSurface(false),
       mHavePendingInputBuffers(false) {
+    if (uid == kNoUid) {
+        mUid = IPCThreadState::self()->getCallingUid();
+    } else {
+        mUid = uid;
+    }
 }
 
 MediaCodec::~MediaCodec() {
@@ -2904,10 +2910,10 @@ void MediaCodec::updateBatteryStat() {
     }
 
     if (mState == CONFIGURED && !mBatteryStatNotified) {
-        BatteryNotifier::getInstance().noteStartVideo();
+        BatteryNotifier::getInstance().noteStartVideo(mUid);
         mBatteryStatNotified = true;
     } else if (mState == UNINITIALIZED && mBatteryStatNotified) {
-        BatteryNotifier::getInstance().noteStopVideo();
+        BatteryNotifier::getInstance().noteStopVideo(mUid);
         mBatteryStatNotified = false;
     }
 }

@@ -33,6 +33,7 @@
 #include <utils/Trace.h>
 
 #include <private/media/AudioTrackShared.h>
+#include <private/android_filesystem_config.h>
 #include <audio_utils/conversion.h>
 #include <audio_utils/primitives.h>
 #include <audio_utils/format.h>
@@ -1040,7 +1041,8 @@ void AudioFlinger::ThreadBase::acquireWakeLock_l(int uid)
     }
 
     if (!mNotifiedBatteryStart) {
-        BatteryNotifier::getInstance().noteStartAudio();
+        // TODO: call this function for each track when it becomes active.
+        BatteryNotifier::getInstance().noteStartAudio(AID_AUDIOSERVER);
         mNotifiedBatteryStart = true;
     }
     gBoottime.acquire(mWakeLockToken);
@@ -1067,7 +1069,8 @@ void AudioFlinger::ThreadBase::releaseWakeLock_l()
     }
 
     if (mNotifiedBatteryStart) {
-        BatteryNotifier::getInstance().noteStopAudio();
+        // TODO: call this function for each track when it becomes inactive.
+        BatteryNotifier::getInstance().noteStopAudio(AID_AUDIOSERVER);
         mNotifiedBatteryStart = false;
     }
 }

@@ -58,6 +58,7 @@ NuPlayer::Decoder::Decoder(
         const sp<AMessage> &notify,
         const sp<Source> &source,
         pid_t pid,
+        uid_t uid,
         const sp<Renderer> &renderer,
         const sp<Surface> &surface,
         const sp<CCDecoder> &ccDecoder)
@@ -67,6 +68,7 @@ NuPlayer::Decoder::Decoder(
       mRenderer(renderer),
       mCCDecoder(ccDecoder),
       mPid(pid),
+      mUid(uid),
       mSkipRenderingUntilMediaTimeUs(-1ll),
       mNumFramesTotal(0ll),
       mNumInputFramesDropped(0ll),
@@ -266,7 +268,7 @@ void NuPlayer::Decoder::onConfigure(const sp<AMessage> &format) {
     ALOGV("[%s] onConfigure (surface=%p)", mComponentName.c_str(), mSurface.get());
 
     mCodec = MediaCodec::CreateByType(
-            mCodecLooper, mime.c_str(), false /* encoder */, NULL /* err */, mPid);
+            mCodecLooper, mime.c_str(), false /* encoder */, NULL /* err */, mPid, mUid);
     int32_t secure = 0;
     if (format->findInt32("secure", &secure) && secure != 0) {
         if (mCodec != NULL) {
@@ -275,7 +277,7 @@ void NuPlayer::Decoder::onConfigure(const sp<AMessage> &format) {
             mCodec->release();
             ALOGI("[%s] creating", mComponentName.c_str());
             mCodec = MediaCodec::CreateByComponentName(
-                    mCodecLooper, mComponentName.c_str(), NULL /* err */, mPid);
+                    mCodecLooper, mComponentName.c_str(), NULL /* err */, mPid, mUid);
         }
     }
     if (mCodec == NULL) {
