@@ -212,23 +212,22 @@ void MPEG2TSExtractor::init() {
                         - mSeekSyncPoints->keyAt(0);
                 off64_t diffOffset = mSeekSyncPoints->valueAt(prevSyncSize - 1)
                         - mSeekSyncPoints->valueAt(0);
-                durationUs = size * diffUs / diffOffset;
-                durations.push_back(durationUs);
+                int64_t currentDurationUs = size * diffUs / diffOffset;
+                durations.push_back(currentDurationUs);
                 if (durations.size() > 5) {
                     durations.erase(durations.begin());
                     int64_t min = *durations.begin();
                     int64_t max = *durations.begin();
-                    for (List<int64_t>::iterator i = durations.begin();
-                            i != durations.end();
-                            ++i) {
-                        if (min > *i) {
-                            min = *i;
+                    for (auto duration : durations) {
+                        if (min > duration) {
+                            min = duration;
                         }
-                        if (max < *i) {
-                            max = *i;
+                        if (max < duration) {
+                            max = duration;
                         }
                     }
                     if (max - min < 500 * 1000) {
+                        durationUs = currentDurationUs;
                         break;
                     }
                 }
