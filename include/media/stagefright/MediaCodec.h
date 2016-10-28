@@ -64,14 +64,15 @@ struct MediaCodec : public AHandler {
     };
 
     static const pid_t kNoPid = -1;
+    static const uid_t kNoUid = -1;
 
     static sp<MediaCodec> CreateByType(
             const sp<ALooper> &looper, const AString &mime, bool encoder, status_t *err = NULL,
-            pid_t pid = kNoPid);
+            pid_t pid = kNoPid, uid_t uid = kNoUid);
 
     static sp<MediaCodec> CreateByComponentName(
             const sp<ALooper> &looper, const AString &name, status_t *err = NULL,
-            pid_t pid = kNoPid);
+            pid_t pid = kNoPid, uid_t uid = kNoUid);
 
     static sp<PersistentSurface> CreatePersistentInputSurface();
 
@@ -287,6 +288,7 @@ private:
     };
 
     State mState;
+    uid_t mUid;
     bool mReleasedByResourceManager;
     sp<ALooper> mLooper;
     sp<ALooper> mCodecLooper;
@@ -345,7 +347,7 @@ private:
     bool mHaveInputSurface;
     bool mHavePendingInputBuffers;
 
-    MediaCodec(const sp<ALooper> &looper, pid_t pid);
+    MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid);
 
     static sp<CodecBase> GetCodecBase(const AString &name, bool nameIsType = false);
 
