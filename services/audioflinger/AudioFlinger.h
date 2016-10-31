@@ -20,6 +20,7 @@
 
 #include "Configuration.h"
 #include <deque>
+#include <map>
 #include <stdint.h>
 #include <sys/types.h>
 #include <limits.h>
