@@ -69,6 +69,7 @@ static const int64_t kMax32BitFileSize = 0x00ffffffffLL; // 2^32-1 : max FAT32
 static const uint8_t kNalUnitTypeSeqParamSet = 0x07;
 static const uint8_t kNalUnitTypePicParamSet = 0x08;
 static const int64_t kInitialDelayTimeUs     = 700000LL;
+static const int64_t kMaxMetadataSize = 0x4000000LL;   // 64MB max per-frame metadata size
 
 static const char kMetaKey_Version[]    = "com.android.version";
 #ifdef SHOW_MODEL_BUILD
@@ -2455,6 +2456,16 @@ status_t MPEG4Writer::Track::threadEntry() {
 
             mGotAllCodecSpecificData = true;
             continue;
+        }
+
+        // Per-frame metadata sample's size must be smaller than max allowed.
+        if (!mIsVideo && !mIsAudio && buffer->range_length() >= kMaxMetadataSize) {
+            ALOGW("Buffer size is %zu. Maximum metadata buffer size is %lld for %s track",
+                    buffer->range_length(), (long long)kMaxMetadataSize, trackName);
+            buffer->release();
+            mSource->stop();
+            mIsMalformed = true;
+            break;
         }
 
         ++nActualFrames;
