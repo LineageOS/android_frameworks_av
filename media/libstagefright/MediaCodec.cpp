@@ -1339,12 +1339,30 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         static_cast<CodecBase::PortDescription *>(obj.get());
 
                     size_t numBuffers = portDesc->countBuffers();
+
+                    size_t totalSize = 0;
+                    for (size_t i = 0; i < numBuffers; ++i) {
+                        if (portIndex == kPortIndexInput && mCrypto != NULL) {
+                            totalSize += portDesc->bufferAt(i)->capacity();
+                        }
+                    }
+
+                    if (totalSize) {
+                        mDealer = new MemoryDealer(totalSize, "MediaCodec");
+                    }
+
                     for (size_t i = 0; i < numBuffers; ++i) {
                         BufferInfo info;
                         info.mBufferID = portDesc->bufferIDAt(i);
                         info.mOwnedByClient = false;
+                        sp<MediaCodecBuffer> buffer = portDesc->bufferAt(i);
+                        if (portIndex == kPortIndexInput && mCrypto != NULL) {
+                            info.mSharedEncryptedBuffer = mDealer->allocate(buffer->capacity());
+                            buffer = new SharedMemoryBuffer(
+                                    mInputFormat, info.mSharedEncryptedBuffer);
+                        }
                         buffers->push_back(info);
-                        mPortBufferArrays[portIndex].push_back(portDesc->bufferAt(i));
+                        mPortBufferArrays[portIndex].push_back(buffer);
                     }
 
                     if (portIndex == kPortIndexOutput) {
@@ -2386,17 +2404,6 @@ size_t MediaCodec::updateBuffers(
     sp<MediaCodecBuffer> buffer = static_cast<MediaCodecBuffer *>(obj.get());
 
     Vector<BufferInfo> *buffers = &mPortBuffers[portIndex];
-    if (portIndex == kPortIndexInput && mCrypto != NULL && mDealer == NULL) {
-        // Lazy initialization for encrypted buffers.
-        size_t capacity = buffer->capacity();
-        size_t totalSize = capacity * buffers->size();
-
-        mDealer = new MemoryDealer(totalSize, "MediaCodec");
-        for (size_t i = 0; i < buffers->size(); ++i) {
-            BufferInfo *info = &buffers->editItemAt(i);
-            info->mSharedEncryptedBuffer = mDealer->allocate(capacity);
-        }
-    }
 
     for (size_t i = 0; i < buffers->size(); ++i) {
         BufferInfo *info = &buffers->editItemAt(i);
