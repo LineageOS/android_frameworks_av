@@ -30,8 +30,9 @@ namespace android {
 const int OutputConfiguration::INVALID_ROTATION = -1;
 const int OutputConfiguration::INVALID_SET_ID = -1;
 
-sp<IGraphicBufferProducer> OutputConfiguration::getGraphicBufferProducer() const {
-    return mGbp;
+const std::vector<sp<IGraphicBufferProducer>>&
+        OutputConfiguration::getGraphicBufferProducers() const {
+    return mGbps;
 }
 
 int OutputConfiguration::getRotation() const {
@@ -103,37 +104,60 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
-    view::Surface surfaceShim;
-    if ((err = surfaceShim.readFromParcel(parcel)) != OK) {
-        // Read surface failure for deferred surface configuration is expected.
-        if (surfaceType == SURFACE_TYPE_SURFACE_VIEW ||
-                surfaceType == SURFACE_TYPE_SURFACE_TEXTURE) {
-            ALOGV("%s: Get null surface from a deferred surface configuration (%dx%d)",
-                    __FUNCTION__, width, height);
-            err = OK;
-        } else {
-            ALOGE("%s: Failed to read surface from parcel", __FUNCTION__);
-            return err;
-        }
+    // numSurfaces is the total number of surfaces for this OutputConfiguration,
+    // regardless the surface is deferred or not.
+    int numSurfaces = 0;
+    if ((err = parcel->readInt32(&numSurfaces)) != OK) {
+        ALOGE("%s: Failed to read maxSurfaces from parcel", __FUNCTION__);
+        return err;
+    }
+    if (numSurfaces < 1) {
+        ALOGE("%s: there has to be at least 1 surface per"
+              " outputConfiguration", __FUNCTION__);
+        return BAD_VALUE;
     }
 
-    mGbp = surfaceShim.graphicBufferProducer;
+    // Read all surfaces from parcel. If a surface is deferred, readFromPacel
+    // returns error, and a null surface is put into the mGbps. We assume all
+    // deferred surfaces are after non-deferred surfaces in the parcel.
+    // TODO: Need better way to detect deferred surface than using error
+    // return from readFromParcel.
+    std::vector<sp<IGraphicBufferProducer>> gbps;
+    for (int i = 0; i < numSurfaces; i++) {
+        view::Surface surfaceShim;
+        if ((err = surfaceShim.readFromParcel(parcel)) != OK) {
+            // Read surface failure for deferred surface configuration is expected.
+            if ((surfaceType == SURFACE_TYPE_SURFACE_VIEW ||
+                    surfaceType == SURFACE_TYPE_SURFACE_TEXTURE)) {
+                ALOGV("%s: Get null surface from a deferred surface configuration (%dx%d)",
+                        __FUNCTION__, width, height);
+                err = OK;
+            } else {
+                ALOGE("%s: Failed to read surface from parcel", __FUNCTION__);
+                return err;
+            }
+        }
+        gbps.push_back(surfaceShim.graphicBufferProducer);
+        ALOGV("%s: OutputConfiguration: gbps[%d] : %p, name %s", __FUNCTION__,
+                i, gbps[i].get(), String8(surfaceShim.name).string());
+    }
+
     mRotation = rotation;
     mSurfaceSetID = setID;
     mSurfaceType = surfaceType;
     mWidth = width;
     mHeight = height;
+    mGbps = std::move(gbps);
 
-    ALOGV("%s: OutputConfiguration: bp = %p, name = %s, rotation = %d, setId = %d,"
-            "surfaceType = %d", __FUNCTION__, mGbp.get(), String8(surfaceShim.name).string(),
-            mRotation, mSurfaceSetID, mSurfaceType);
+    ALOGV("%s: OutputConfiguration: rotation = %d, setId = %d, surfaceType = %d",
+            __FUNCTION__, mRotation, mSurfaceSetID, mSurfaceType);
 
     return err;
 }
 
 OutputConfiguration::OutputConfiguration(sp<IGraphicBufferProducer>& gbp, int rotation,
         int surfaceSetID) {
-    mGbp = gbp;
+    mGbps.push_back(gbp);
     mRotation = rotation;
     mSurfaceSetID = surfaceSetID;
 }
@@ -158,14 +182,53 @@ status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
     err = parcel->writeInt32(mHeight);
     if (err != OK) return err;
 
-    view::Surface surfaceShim;
-    surfaceShim.name = String16("unknown_name"); // name of surface
-    surfaceShim.graphicBufferProducer = mGbp;
-
-    err = surfaceShim.writeToParcel(parcel);
+    int numSurfaces = mGbps.size();
+    err = parcel->writeInt32(numSurfaces);
     if (err != OK) return err;
+
+    for (int i = 0; i < numSurfaces; i++) {
+        view::Surface surfaceShim;
+        surfaceShim.name = String16("unknown_name"); // name of surface
+        surfaceShim.graphicBufferProducer = mGbps[i];
+
+        err = surfaceShim.writeToParcel(parcel);
+        if (err != OK) return err;
+    }
 
     return OK;
 }
 
+bool OutputConfiguration::gbpsEqual(const OutputConfiguration& other) const {
+    const std::vector<sp<IGraphicBufferProducer> >& otherGbps =
+            other.getGraphicBufferProducers();
+
+    if (mGbps.size() != otherGbps.size()) {
+        return false;
+    }
+
+    for (size_t i = 0; i < mGbps.size(); i++) {
+        if (mGbps[i] != otherGbps[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool OutputConfiguration::gbpsLessThan(const OutputConfiguration& other) const {
+    const std::vector<sp<IGraphicBufferProducer> >& otherGbps =
+            other.getGraphicBufferProducers();
+
+    if (mGbps.size() !=  otherGbps.size()) {
+        return mGbps.size() < otherGbps.size();
+    }
+
+    for (size_t i = 0; i < mGbps.size(); i++) {
+        if (mGbps[i] != otherGbps[i]) {
+            return mGbps[i] < otherGbps[i];
+        }
+    }
+
+    return false;
+}
 }; // namespace android

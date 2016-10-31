@@ -17,6 +17,8 @@
 #ifndef ANDROID_SERVERS_CAMERA_CAMERADEVICEBASE_H
 #define ANDROID_SERVERS_CAMERA_CAMERADEVICEBASE_H
 
+#include <list>
+
 #include <utils/RefBase.h>
 #include <utils/String8.h>
 #include <utils/String16.h>
@@ -36,6 +38,9 @@
 namespace android {
 
 class CameraProviderManager;
+
+// Mapping of output stream index to surface ids
+typedef std::unordered_map<int, std::vector<size_t> > SurfaceMap;
 
 /**
  * Base interface for version >= 2 camera device classes, which interface to
@@ -73,6 +78,7 @@ class CameraDeviceBase : public virtual RefBase {
      * Output lastFrameNumber is the expected last frame number of the list of requests.
      */
     virtual status_t captureList(const List<const CameraMetadata> &requests,
+                                 const std::list<const SurfaceMap> &surfaceMaps,
                                  int64_t *lastFrameNumber = NULL) = 0;
 
     /**
@@ -88,6 +94,7 @@ class CameraDeviceBase : public virtual RefBase {
      * Output lastFrameNumber is the last frame number of the previous streaming request.
      */
     virtual status_t setStreamingRequestList(const List<const CameraMetadata> &requests,
+                                             const std::list<const SurfaceMap> &surfaceMaps,
                                              int64_t *lastFrameNumber = NULL) = 0;
 
     /**
@@ -112,6 +119,19 @@ class CameraDeviceBase : public virtual RefBase {
      */
     virtual status_t createStream(sp<Surface> consumer,
             uint32_t width, uint32_t height, int format,
+            android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
+            int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
+            uint32_t consumerUsage = 0) = 0;
+
+    /**
+     * Create an output stream of the requested size, format, rotation and
+     * dataspace with a number of consumers.
+     *
+     * For HAL_PIXEL_FORMAT_BLOB formats, the width and height should be the
+     * logical dimensions of the buffer, not the number of bytes.
+     */
+    virtual status_t createStream(const std::vector<sp<Surface>>& consumers,
+            bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
             uint32_t consumerUsage = 0) = 0;

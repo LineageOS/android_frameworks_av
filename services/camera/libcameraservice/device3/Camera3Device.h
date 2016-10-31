@@ -95,10 +95,12 @@ class Camera3Device :
     // idle state
     status_t capture(CameraMetadata &request, int64_t *lastFrameNumber = NULL) override;
     status_t captureList(const List<const CameraMetadata> &requests,
+            const std::list<const SurfaceMap> &surfaceMaps,
             int64_t *lastFrameNumber = NULL) override;
     status_t setStreamingRequest(const CameraMetadata &request,
             int64_t *lastFrameNumber = NULL) override;
     status_t setStreamingRequestList(const List<const CameraMetadata> &requests,
+            const std::list<const SurfaceMap> &surfaceMaps,
             int64_t *lastFrameNumber = NULL) override;
     status_t clearStreamingRequest(int64_t *lastFrameNumber = NULL) override;
 
@@ -114,6 +116,12 @@ class Camera3Device :
             android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
             uint32_t consumerUsage = 0) override;
+    status_t createStream(const std::vector<sp<Surface>>& consumers,
+            bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
+            android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
+            int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
+            uint32_t consumerUsage = 0) override;
+
     status_t createInputStream(
             uint32_t width, uint32_t height, int format,
             int *id) override;
@@ -342,6 +350,7 @@ class Camera3Device :
         camera3_stream_buffer_t             mInputBuffer;
         Vector<sp<camera3::Camera3OutputStreamInterface> >
                                             mOutputStreams;
+        SurfaceMap                          mOutputSurfaces;
         CaptureResultExtras                 mResultExtras;
         // Used to cancel AE precapture trigger for devices doesn't support
         // CONTROL_AE_PRECAPTURE_TRIGGER_CANCEL
@@ -360,11 +369,18 @@ class Camera3Device :
 
     status_t convertMetadataListToRequestListLocked(
             const List<const CameraMetadata> &metadataList,
+            const std::list<const SurfaceMap> &surfaceMaps,
             bool repeating,
             /*out*/
             RequestList *requestList);
 
-    status_t submitRequestsHelper(const List<const CameraMetadata> &requests, bool repeating,
+    void convertToRequestList(List<const CameraMetadata>& requests,
+            std::list<const SurfaceMap>& surfaceMaps,
+            const CameraMetadata& request);
+
+    status_t submitRequestsHelper(const List<const CameraMetadata> &requests,
+                                  const std::list<const SurfaceMap> &surfaceMaps,
+                                  bool repeating,
                                   int64_t *lastFrameNumber = NULL);
 
 
@@ -436,13 +452,15 @@ class Camera3Device :
      * Do common work for setting up a streaming or single capture request.
      * On success, will transition to ACTIVE if in IDLE.
      */
-    sp<CaptureRequest> setUpRequestLocked(const CameraMetadata &request);
+    sp<CaptureRequest> setUpRequestLocked(const CameraMetadata &request,
+                                          const SurfaceMap &surfaceMap);
 
     /**
      * Build a CaptureRequest request from the CameraDeviceBase request
      * settings.
      */
-    sp<CaptureRequest> createCaptureRequest(const CameraMetadata &request);
+    sp<CaptureRequest> createCaptureRequest(const CameraMetadata &request,
+                                            const SurfaceMap &surfaceMap);
 
     /**
      * Take the currently-defined set of streams and configure the HAL to use

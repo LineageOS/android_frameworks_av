@@ -38,7 +38,7 @@ public:
         SURFACE_TYPE_SURFACE_VIEW = 0,
         SURFACE_TYPE_SURFACE_TEXTURE = 1
     };
-    sp<IGraphicBufferProducer> getGraphicBufferProducer() const;
+    const std::vector<sp<IGraphicBufferProducer>>& getGraphicBufferProducers() const;
     int                        getRotation() const;
     int                        getSurfaceSetID() const;
     int                        getSurfaceType() const;
@@ -65,19 +65,18 @@ public:
             int surfaceSetID = INVALID_SET_ID);
 
     bool operator == (const OutputConfiguration& other) const {
-        return (mGbp == other.mGbp &&
-                mRotation == other.mRotation &&
+        return ( mRotation == other.mRotation &&
                 mSurfaceSetID == other.mSurfaceSetID &&
                 mSurfaceType == other.mSurfaceType &&
                 mWidth == other.mWidth &&
-                mHeight == other.mHeight);
+                mHeight == other.mHeight &&
+                gbpsEqual(other));
     }
     bool operator != (const OutputConfiguration& other) const {
         return !(*this == other);
     }
     bool operator < (const OutputConfiguration& other) const {
         if (*this == other) return false;
-        if (mGbp != other.mGbp) return mGbp < other.mGbp;
         if (mSurfaceSetID != other.mSurfaceSetID) {
             return mSurfaceSetID < other.mSurfaceSetID;
         }
@@ -90,15 +89,20 @@ public:
         if (mHeight != other.mHeight) {
             return mHeight < other.mHeight;
         }
+        if (mRotation != other.mRotation) {
+            return mRotation < other.mRotation;
+        }
 
-        return mRotation < other.mRotation;
+        return gbpsLessThan(other);
     }
     bool operator > (const OutputConfiguration& other) const {
         return (*this != other && !(*this < other));
     }
 
+    bool gbpsEqual(const OutputConfiguration& other) const;
+    bool gbpsLessThan(const OutputConfiguration& other) const;
 private:
-    sp<IGraphicBufferProducer> mGbp;
+    std::vector<sp<IGraphicBufferProducer>> mGbps;
     int                        mRotation;
     int                        mSurfaceSetID;
     int                        mSurfaceType;
