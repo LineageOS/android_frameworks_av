@@ -805,13 +805,6 @@ status_t OMXNodeInstance::useBuffer(
         }
         memset(data, 0, allottedSize);
 
-        // if we are not connecting the buffers, the sizes must match
-        if (allottedSize != params->size()) {
-            CLOG_ERROR(useBuffer, BAD_VALUE, SIMPLE_BUFFER(portIndex, (size_t)allottedSize, data));
-            delete[] data;
-            return BAD_VALUE;
-        }
-
         buffer_meta = new BufferMeta(
                 params, portIndex, false /* copyToOmx */, false /* copyFromOmx */, data);
     } else {
