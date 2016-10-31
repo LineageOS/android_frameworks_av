@@ -51,7 +51,8 @@ NuMediaExtractor::~NuMediaExtractor() {
     for (size_t i = 0; i < mSelectedTracks.size(); ++i) {
         TrackInfo *info = &mSelectedTracks.editItemAt(i);
 
-        CHECK_EQ((status_t)OK, info->mSource->stop());
+        status_t err = info->mSource->stop();
+        ALOGE_IF(err != OK, "error %d stopping track %zu", err, i);
     }
 
     mSelectedTracks.clear();

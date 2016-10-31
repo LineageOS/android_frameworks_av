@@ -377,6 +377,16 @@ void BlockIterator::seek(
 
     *actualFrameTimeUs = -1ll;
 
+    if (seekTimeUs > INT64_MAX / 1000ll ||
+            seekTimeUs < INT64_MIN / 1000ll ||
+            (mExtractor->mSeekPreRollNs > 0 &&
+                    (seekTimeUs * 1000ll) < INT64_MIN + mExtractor->mSeekPreRollNs) ||
+            (mExtractor->mSeekPreRollNs < 0 &&
+                    (seekTimeUs * 1000ll) > INT64_MAX + mExtractor->mSeekPreRollNs)) {
+        ALOGE("cannot seek to %lld", (long long) seekTimeUs);
+        return;
+    }
+
     const int64_t seekTimeNs = seekTimeUs * 1000ll - mExtractor->mSeekPreRollNs;
 
     mkvparser::Segment* const pSegment = mExtractor->mSegment;
