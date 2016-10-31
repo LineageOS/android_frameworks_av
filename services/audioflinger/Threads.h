@@ -400,11 +400,10 @@ protected:
                     effect_uuid_t mType;    // effect type UUID
                 };
 
-                void        acquireWakeLock(int uid = -1);
-                virtual void acquireWakeLock_l(int uid = -1);
+                void        acquireWakeLock();
+                virtual void acquireWakeLock_l();
                 void        releaseWakeLock();
                 void        releaseWakeLock_l();
-                void        updateWakeLockUids(const SortedVector<int> &uids);
                 void        updateWakeLockUids_l(const SortedVector<int> &uids);
                 void        getPowerManager_l();
                 void setEffectSuspended_l(const effect_uuid_t *type,
@@ -479,8 +478,88 @@ protected:
                 static const size_t     kLogSize = 4 * 1024;
                 sp<NBLog::Writer>       mNBLogWriter;
                 bool                    mSystemReady;
-                bool                    mNotifiedBatteryStart;
                 ExtendedTimestamp       mTimestamp;
+
+                // ActiveTracks is a sorted vector of track type T representing the
+                // active tracks of threadLoop() to be considered by the locked prepare portion.
+                // ActiveTracks should be accessed with the ThreadBase lock held.
+                //
+                // During processing and I/O, the threadLoop does not hold the lock;
+                // hence it does not directly use ActiveTracks.  Care should be taken
+                // to hold local strong references or defer removal of tracks
+                // if the threadLoop may still be accessing those tracks due to mix, etc.
+                //
+                // This class updates power information appropriately.
+                //
+
+                template <typename T>
+                class ActiveTracks {
+                public:
+                    ActiveTracks()
+                        : mActiveTracksGeneration(0)
+                        , mLastActiveTracksGeneration(0)
+                    { }
+
+                    ~ActiveTracks() {
+                        clear();
+                    }
+                    // returns the last track added (even though it may have been
+                    // subsequently removed from ActiveTracks).
+                    //
+                    // Used for DirectOutputThread to ensure a flush is called when transitioning
+                    // to a new track (even though it may be on the same session).
+                    // Used for OffloadThread to ensure that volume and mixer state is
+                    // taken from the latest track added.
+                    //
+                    // The latest track is saved with a weak pointer to prevent keeping an
+                    // otherwise useless track alive. Thus the function will return nullptr
+                    // if the latest track has subsequently been removed and destroyed.
+                    sp<T> getLatest() {
+                        return mLatestActiveTrack.promote();
+                    }
+
+                    // Updates ActiveTracks client uids to the thread wakelock.
+                    void updateWakeLockUids(sp<ThreadBase> thread, bool force = false) {
+                        if (mActiveTracksGeneration != mLastActiveTracksGeneration || force) {
+                            thread->updateWakeLockUids_l(getWakeLockUids());
+                            mLastActiveTracksGeneration = mActiveTracksGeneration;
+                        }
+                    }
+
+                    // SortedVector methods
+                    ssize_t         add(const sp<T> &track);
+                    ssize_t         remove(const sp<T> &track);
+                    size_t          size() const {
+                        return mActiveTracks.size();
+                    }
+                    ssize_t         indexOf(const sp<T>& item) {
+                        return mActiveTracks.indexOf(item);
+                    }
+                    sp<T>           operator[](size_t index) const {
+                        return mActiveTracks[index];
+                    }
+                    typename SortedVector<sp<T>>::iterator begin() {
+                        return mActiveTracks.begin();
+                    }
+                    typename SortedVector<sp<T>>::iterator end() {
+                        return mActiveTracks.end();
+                    }
+                    void            clear();
+
+                private:
+                    SortedVector<int> getWakeLockUids() {
+                        SortedVector<int> wakeLockUids;
+                        for (const sp<T> &track : mActiveTracks) {
+                            wakeLockUids.add(track->uid());
+                        }
+                        return wakeLockUids; // moved by underlying SharedBuffer
+                    }
+
+                    SortedVector<sp<T>> mActiveTracks;
+                    int                 mActiveTracksGeneration;
+                    int                 mLastActiveTracksGeneration;
+                    wp<T>               mLatestActiveTrack; // latest track added to ActiveTracks
+                };
 };
 
 // --- PlaybackThread ---
@@ -559,6 +638,10 @@ protected:
     virtual     void        preExit();
 
     virtual     bool        keepWakeLock() const { return true; }
+    virtual     void        acquireWakeLock_l() {
+                                ThreadBase::acquireWakeLock_l();
+                                mActiveTracks.updateWakeLockUids(this, true /* force */);
+                            }
 
 public:
 
@@ -731,10 +814,7 @@ private:
     bool                            mMasterMute;
                 void        setMasterMute_l(bool muted) { mMasterMute = muted; }
 protected:
-    SortedVector< wp<Track> >       mActiveTracks;  // FIXME check if this could be sp<>
-    SortedVector<int>               mWakeLockUids;
-    int                             mActiveTracksGeneration;
-    wp<Track>                       mLatestActiveTrack; // latest track added to mActiveTracks
+    ActiveTracks<Track>     mActiveTracks;
 
     // Allocate a track name for a given channel mask.
     //   Returns name >= 0 if successful, -1 on failure.
@@ -900,8 +980,8 @@ protected:
     virtual     uint32_t    suspendSleepTimeUs() const;
     virtual     void        cacheParameters_l();
 
-    virtual void acquireWakeLock_l(int uid = -1) {
-        PlaybackThread::acquireWakeLock_l(uid);
+    virtual void acquireWakeLock_l() {
+        PlaybackThread::acquireWakeLock_l();
         if (hasFastMixer()) {
             mFastMixer->setBoottimeOffset(
                     mTimestamp.mTimebaseOffset[ExtendedTimestamp::TIMEBASE_BOOTTIME]);
@@ -1340,6 +1420,11 @@ public:
     virtual status_t    checkEffectCompatibility_l(const effect_descriptor_t *desc,
                                                    audio_session_t sessionId);
 
+    virtual void        acquireWakeLock_l() {
+                            ThreadBase::acquireWakeLock_l();
+                            mActiveTracks.updateWakeLockUids(this, true /* force */);
+                        }
+
 private:
             // Enter standby if not already in standby, and set mStandby flag
             void    standbyIfNotAlreadyInStandby();
@@ -1351,9 +1436,8 @@ private:
             SortedVector < sp<RecordTrack> >    mTracks;
             // mActiveTracks has dual roles:  it indicates the current active track(s), and
             // is used together with mStartStopCond to indicate start()/stop() progress
-            SortedVector< sp<RecordTrack> >     mActiveTracks;
-            // generation counter for mActiveTracks
-            int                                 mActiveTracksGen;
+            ActiveTracks<RecordTrack>           mActiveTracks;
+
             Condition                           mStartStopCond;
 
             // resampler converts input at HAL Hz to output at AudioRecord client Hz
