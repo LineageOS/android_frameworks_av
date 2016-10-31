@@ -89,6 +89,8 @@ private:
     int64_t mPrevSampleTimeUs;
     int64_t mInitialReadTimeUs;
     int64_t mNumFramesReceived;
+    int64_t mNumFramesSkipped;
+    int64_t mNumFramesLost;
     int64_t mNumClientOwnedBuffers;
 
     List<MediaBuffer * > mBuffersReceived;
