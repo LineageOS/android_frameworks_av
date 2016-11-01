@@ -70,7 +70,7 @@ struct NuPlayer : public AHandler {
 
     // Will notify the driver through "notifySeekComplete" once finished
     // and needNotify is true.
-    void seekToAsync(int64_t seekTimeUs, bool needNotify = false);
+    void seekToAsync(int64_t seekTimeUs, bool precise = false, bool needNotify = false);
 
     status_t setVideoScalingMode(int32_t mode);
     status_t getTrackInfo(Parcel* reply) const;

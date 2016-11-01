@@ -87,7 +87,7 @@ class TestPlayerStub : public MediaPlayerInterface {
     virtual status_t stop()  {return mPlayer->stop();}
     virtual status_t pause()  {return mPlayer->pause();}
     virtual bool isPlaying() {return mPlayer->isPlaying();}
-    virtual status_t seekTo(int msec) {return mPlayer->seekTo(msec);}
+    virtual status_t seekTo(int msec, bool precise = false) {return mPlayer->seekTo(msec, precise);}
     virtual status_t getCurrentPosition(int *p)  {
         return mPlayer->getCurrentPosition(p);
     }
