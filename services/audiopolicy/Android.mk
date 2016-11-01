@@ -90,8 +90,9 @@ LOCAL_C_INCLUDES += \
     $(TOPDIR)frameworks/av/services/audiopolicy/utilities
 
 LOCAL_STATIC_LIBRARIES := \
-    libmedia_helper \
     libaudiopolicycomponents
+
+LOCAL_WHOLE_STATIC_LIBRARIES := libmedia_helper
 
 ifeq ($(USE_XML_AUDIO_POLICY_CONF), 1)
 LOCAL_STATIC_LIBRARIES += libxml2

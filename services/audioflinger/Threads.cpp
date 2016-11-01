@@ -29,6 +29,7 @@
 #include <cutils/properties.h>
 #include <media/AudioParameter.h>
 #include <media/AudioResamplerPublic.h>
+#include <media/TypeConverter.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
 
@@ -449,168 +450,28 @@ const char *AudioFlinger::ThreadBase::threadTypeToString(AudioFlinger::ThreadBas
     }
 }
 
-String8 devicesToString(audio_devices_t devices)
+std::string devicesToString(audio_devices_t devices)
 {
-    static const struct mapping {
-        audio_devices_t mDevices;
-        const char *    mString;
-    } mappingsOut[] = {
-        {AUDIO_DEVICE_OUT_EARPIECE,         "EARPIECE"},
-        {AUDIO_DEVICE_OUT_SPEAKER,          "SPEAKER"},
-        {AUDIO_DEVICE_OUT_WIRED_HEADSET,    "WIRED_HEADSET"},
-        {AUDIO_DEVICE_OUT_WIRED_HEADPHONE,  "WIRED_HEADPHONE"},
-        {AUDIO_DEVICE_OUT_BLUETOOTH_SCO,    "BLUETOOTH_SCO"},
-        {AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET,    "BLUETOOTH_SCO_HEADSET"},
-        {AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT,     "BLUETOOTH_SCO_CARKIT"},
-        {AUDIO_DEVICE_OUT_BLUETOOTH_A2DP,           "BLUETOOTH_A2DP"},
-        {AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES,"BLUETOOTH_A2DP_HEADPHONES"},
-        {AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER,   "BLUETOOTH_A2DP_SPEAKER"},
-        {AUDIO_DEVICE_OUT_AUX_DIGITAL,      "AUX_DIGITAL"},
-        {AUDIO_DEVICE_OUT_HDMI,             "HDMI"},
-        {AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET,"ANLG_DOCK_HEADSET"},
-        {AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET,"DGTL_DOCK_HEADSET"},
-        {AUDIO_DEVICE_OUT_USB_ACCESSORY,    "USB_ACCESSORY"},
-        {AUDIO_DEVICE_OUT_USB_DEVICE,       "USB_DEVICE"},
-        {AUDIO_DEVICE_OUT_TELEPHONY_TX,     "TELEPHONY_TX"},
-        {AUDIO_DEVICE_OUT_LINE,             "LINE"},
-        {AUDIO_DEVICE_OUT_HDMI_ARC,         "HDMI_ARC"},
-        {AUDIO_DEVICE_OUT_SPDIF,            "SPDIF"},
-        {AUDIO_DEVICE_OUT_FM,               "FM"},
-        {AUDIO_DEVICE_OUT_AUX_LINE,         "AUX_LINE"},
-        {AUDIO_DEVICE_OUT_SPEAKER_SAFE,     "SPEAKER_SAFE"},
-        {AUDIO_DEVICE_OUT_IP,               "IP"},
-        {AUDIO_DEVICE_OUT_BUS,              "BUS"},
-        {AUDIO_DEVICE_NONE,                 "NONE"},       // must be last
-    }, mappingsIn[] = {
-        {AUDIO_DEVICE_IN_COMMUNICATION,     "COMMUNICATION"},
-        {AUDIO_DEVICE_IN_AMBIENT,           "AMBIENT"},
-        {AUDIO_DEVICE_IN_BUILTIN_MIC,       "BUILTIN_MIC"},
-        {AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET, "BLUETOOTH_SCO_HEADSET"},
-        {AUDIO_DEVICE_IN_WIRED_HEADSET,     "WIRED_HEADSET"},
-        {AUDIO_DEVICE_IN_AUX_DIGITAL,       "AUX_DIGITAL"},
-        {AUDIO_DEVICE_IN_VOICE_CALL,        "VOICE_CALL"},
-        {AUDIO_DEVICE_IN_TELEPHONY_RX,      "TELEPHONY_RX"},
-        {AUDIO_DEVICE_IN_BACK_MIC,          "BACK_MIC"},
-        {AUDIO_DEVICE_IN_REMOTE_SUBMIX,     "REMOTE_SUBMIX"},
-        {AUDIO_DEVICE_IN_ANLG_DOCK_HEADSET, "ANLG_DOCK_HEADSET"},
-        {AUDIO_DEVICE_IN_DGTL_DOCK_HEADSET, "DGTL_DOCK_HEADSET"},
-        {AUDIO_DEVICE_IN_USB_ACCESSORY,     "USB_ACCESSORY"},
-        {AUDIO_DEVICE_IN_USB_DEVICE,        "USB_DEVICE"},
-        {AUDIO_DEVICE_IN_FM_TUNER,          "FM_TUNER"},
-        {AUDIO_DEVICE_IN_TV_TUNER,          "TV_TUNER"},
-        {AUDIO_DEVICE_IN_LINE,              "LINE"},
-        {AUDIO_DEVICE_IN_SPDIF,             "SPDIF"},
-        {AUDIO_DEVICE_IN_BLUETOOTH_A2DP,    "BLUETOOTH_A2DP"},
-        {AUDIO_DEVICE_IN_LOOPBACK,          "LOOPBACK"},
-        {AUDIO_DEVICE_IN_IP,                "IP"},
-        {AUDIO_DEVICE_IN_BUS,               "BUS"},
-        {AUDIO_DEVICE_NONE,                 "NONE"},        // must be last
-    };
-    String8 result;
-    audio_devices_t allDevices = AUDIO_DEVICE_NONE;
-    const mapping *entry;
+    std::string result;
     if (devices & AUDIO_DEVICE_BIT_IN) {
-        devices &= ~AUDIO_DEVICE_BIT_IN;
-        entry = mappingsIn;
+        InputDeviceConverter::maskToString(devices, result);
     } else {
-        entry = mappingsOut;
-    }
-    for ( ; entry->mDevices != AUDIO_DEVICE_NONE; entry++) {
-        allDevices = (audio_devices_t) (allDevices | entry->mDevices);
-        if (devices & entry->mDevices) {
-            if (!result.isEmpty()) {
-                result.append("|");
-            }
-            result.append(entry->mString);
-        }
-    }
-    if (devices & ~allDevices) {
-        if (!result.isEmpty()) {
-            result.append("|");
-        }
-        result.appendFormat("0x%X", devices & ~allDevices);
-    }
-    if (result.isEmpty()) {
-        result.append(entry->mString);
+        OutputDeviceConverter::maskToString(devices, result);
     }
     return result;
 }
 
-String8 inputFlagsToString(audio_input_flags_t flags)
+std::string inputFlagsToString(audio_input_flags_t flags)
 {
-    static const struct mapping {
-        audio_input_flags_t     mFlag;
-        const char *            mString;
-    } mappings[] = {
-        {AUDIO_INPUT_FLAG_FAST,             "FAST"},
-        {AUDIO_INPUT_FLAG_HW_HOTWORD,       "HW_HOTWORD"},
-        {AUDIO_INPUT_FLAG_RAW,              "RAW"},
-        {AUDIO_INPUT_FLAG_SYNC,             "SYNC"},
-        {AUDIO_INPUT_FLAG_NONE,             "NONE"},        // must be last
-    };
-    String8 result;
-    audio_input_flags_t allFlags = AUDIO_INPUT_FLAG_NONE;
-    const mapping *entry;
-    for (entry = mappings; entry->mFlag != AUDIO_INPUT_FLAG_NONE; entry++) {
-        allFlags = (audio_input_flags_t) (allFlags | entry->mFlag);
-        if (flags & entry->mFlag) {
-            if (!result.isEmpty()) {
-                result.append("|");
-            }
-            result.append(entry->mString);
-        }
-    }
-    if (flags & ~allFlags) {
-        if (!result.isEmpty()) {
-            result.append("|");
-        }
-        result.appendFormat("0x%X", flags & ~allFlags);
-    }
-    if (result.isEmpty()) {
-        result.append(entry->mString);
-    }
+    std::string result;
+    InputFlagConverter::maskToString(flags, result);
     return result;
 }
 
-String8 outputFlagsToString(audio_output_flags_t flags)
+std::string outputFlagsToString(audio_output_flags_t flags)
 {
-    static const struct mapping {
-        audio_output_flags_t    mFlag;
-        const char *            mString;
-    } mappings[] = {
-        {AUDIO_OUTPUT_FLAG_DIRECT,          "DIRECT"},
-        {AUDIO_OUTPUT_FLAG_PRIMARY,         "PRIMARY"},
-        {AUDIO_OUTPUT_FLAG_FAST,            "FAST"},
-        {AUDIO_OUTPUT_FLAG_DEEP_BUFFER,     "DEEP_BUFFER"},
-        {AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD,"COMPRESS_OFFLOAD"},
-        {AUDIO_OUTPUT_FLAG_NON_BLOCKING,    "NON_BLOCKING"},
-        {AUDIO_OUTPUT_FLAG_HW_AV_SYNC,      "HW_AV_SYNC"},
-        {AUDIO_OUTPUT_FLAG_RAW,             "RAW"},
-        {AUDIO_OUTPUT_FLAG_SYNC,            "SYNC"},
-        {AUDIO_OUTPUT_FLAG_IEC958_NONAUDIO, "IEC958_NONAUDIO"},
-        {AUDIO_OUTPUT_FLAG_NONE,            "NONE"},        // must be last
-    };
-    String8 result;
-    audio_output_flags_t allFlags = AUDIO_OUTPUT_FLAG_NONE;
-    const mapping *entry;
-    for (entry = mappings; entry->mFlag != AUDIO_OUTPUT_FLAG_NONE; entry++) {
-        allFlags = (audio_output_flags_t) (allFlags | entry->mFlag);
-        if (flags & entry->mFlag) {
-            if (!result.isEmpty()) {
-                result.append("|");
-            }
-            result.append(entry->mString);
-        }
-    }
-    if (flags & ~allFlags) {
-        if (!result.isEmpty()) {
-            result.append("|");
-        }
-        result.appendFormat("0x%X", flags & ~allFlags);
-    }
-    if (result.isEmpty()) {
-        result.append(entry->mString);
-    }
+    std::string result;
+    OutputFlagConverter::maskToString(flags, result);
     return result;
 }
 
@@ -944,12 +805,12 @@ void AudioFlinger::ThreadBase::dumpBase(int fd, const Vector<String16>& args __u
     dprintf(fd, "  Standby: %s\n", mStandby ? "yes" : "no");
     dprintf(fd, "  Sample rate: %u Hz\n", mSampleRate);
     dprintf(fd, "  HAL frame count: %zu\n", mFrameCount);
-    dprintf(fd, "  HAL format: 0x%x (%s)\n", mHALFormat, formatToString(mHALFormat));
+    dprintf(fd, "  HAL format: 0x%x (%s)\n", mHALFormat, formatToString(mHALFormat).c_str());
     dprintf(fd, "  HAL buffer size: %zu bytes\n", mBufferSize);
     dprintf(fd, "  Channel count: %u\n", mChannelCount);
     dprintf(fd, "  Channel mask: 0x%08x (%s)\n", mChannelMask,
             channelMaskToString(mChannelMask, mType != RECORD).string());
-    dprintf(fd, "  Processing format: 0x%x (%s)\n", mFormat, formatToString(mFormat));
+    dprintf(fd, "  Processing format: 0x%x (%s)\n", mFormat, formatToString(mFormat).c_str());
     dprintf(fd, "  Processing frame size: %zu bytes\n", mFrameSize);
     dprintf(fd, "  Pending config events:");
     size_t numConfig = mConfigEvents.size();
@@ -962,8 +823,8 @@ void AudioFlinger::ThreadBase::dumpBase(int fd, const Vector<String16>& args __u
     } else {
         dprintf(fd, " none\n");
     }
-    dprintf(fd, "  Output device: %#x (%s)\n", mOutDevice, devicesToString(mOutDevice).string());
-    dprintf(fd, "  Input device: %#x (%s)\n", mInDevice, devicesToString(mInDevice).string());
+    dprintf(fd, "  Output device: %#x (%s)\n", mOutDevice, devicesToString(mOutDevice).c_str());
+    dprintf(fd, "  Input device: %#x (%s)\n", mInDevice, devicesToString(mInDevice).c_str());
     dprintf(fd, "  Audio source: %d (%s)\n", mAudioSource, sourceToString(mAudioSource));
 
     if (locked) {
@@ -1833,8 +1694,8 @@ void AudioFlinger::PlaybackThread::dumpInternals(int fd, const Vector<String16>&
     dprintf(fd, "  Standby delay ns=%lld\n", (long long)mStandbyDelayNs);
     AudioStreamOut *output = mOutput;
     audio_output_flags_t flags = output != NULL ? output->flags : AUDIO_OUTPUT_FLAG_NONE;
-    String8 flagsAsString = outputFlagsToString(flags);
-    dprintf(fd, "  AudioStreamOut: %p flags %#x (%s)\n", output, flags, flagsAsString.string());
+    dprintf(fd, "  AudioStreamOut: %p flags %#x (%s)\n",
+            output, flags, outputFlagsToString(flags).c_str());
     dprintf(fd, "  Frames written: %lld\n", (long long)mFramesWritten);
     dprintf(fd, "  Suspended frames: %lld\n", (long long)mSuspendedFrames);
     if (mPipeSink.get() != nullptr) {
@@ -6879,6 +6740,10 @@ void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& a
 
     dumpBase(fd, args);
 
+    AudioStreamIn *input = mInput;
+    audio_input_flags_t flags = input != NULL ? input->flags : AUDIO_INPUT_FLAG_NONE;
+    dprintf(fd, "  AudioStreamIn: %p flags %#x (%s)\n",
+            input, flags, inputFlagsToString(flags).c_str());
     if (mActiveTracks.size() == 0) {
         dprintf(fd, "  No active record clients\n");
     }

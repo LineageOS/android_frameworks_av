@@ -54,7 +54,7 @@ status_t AudioPatch::dump(int fd, int spaces, int index) const
     for (size_t i = 0; i < mPatch.num_sources; i++) {
         if (mPatch.sources[i].type == AUDIO_PORT_TYPE_DEVICE) {
             std::string device;
-            DeviceConverter::toString(mPatch.sources[i].ext.device.type, device);
+            deviceToString(mPatch.sources[i].ext.device.type, device);
             snprintf(buffer, SIZE, "%*s- Device ID %d %s\n", spaces + 2, "",
                      mPatch.sources[i].id,
                      device.c_str());
@@ -69,7 +69,7 @@ status_t AudioPatch::dump(int fd, int spaces, int index) const
     for (size_t i = 0; i < mPatch.num_sinks; i++) {
         if (mPatch.sinks[i].type == AUDIO_PORT_TYPE_DEVICE) {
             std::string device;
-            DeviceConverter::toString(mPatch.sinks[i].ext.device.type, device);
+            deviceToString(mPatch.sinks[i].ext.device.type, device);
             snprintf(buffer, SIZE, "%*s- Device ID %d %s\n", spaces + 2, "",
                      mPatch.sinks[i].id,
                      device.c_str());

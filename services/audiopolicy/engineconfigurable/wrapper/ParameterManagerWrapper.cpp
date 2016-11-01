@@ -22,7 +22,7 @@
 #include <ParameterMgrPlatformConnector.h>
 #include <SelectionCriterionTypeInterface.h>
 #include <SelectionCriterionInterface.h>
-#include <convert.h>
+#include <media/convert.h>
 #include <algorithm>
 #include <cutils/config_utils.h>
 #include <cutils/misc.h>

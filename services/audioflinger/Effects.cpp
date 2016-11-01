@@ -1047,7 +1047,7 @@ void AudioFlinger::EffectModule::dump(int fd, const Vector<String16>& args __unu
             mConfig.inputCfg.samplingRate,
             mConfig.inputCfg.channels,
             mConfig.inputCfg.format,
-            formatToString((audio_format_t)mConfig.inputCfg.format),
+            formatToString((audio_format_t)mConfig.inputCfg.format).c_str(),
             mConfig.inputCfg.buffer.raw);
     result.append(buffer);
 
@@ -1059,7 +1059,7 @@ void AudioFlinger::EffectModule::dump(int fd, const Vector<String16>& args __unu
             mConfig.outputCfg.samplingRate,
             mConfig.outputCfg.channels,
             mConfig.outputCfg.format,
-            formatToString((audio_format_t)mConfig.outputCfg.format));
+            formatToString((audio_format_t)mConfig.outputCfg.format).c_str());
     result.append(buffer);
 
     snprintf(buffer, SIZE, "\t\t%zu Clients:\n", mHandles.size());

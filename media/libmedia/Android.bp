@@ -1,6 +1,6 @@
 cc_library_static {
     name: "libmedia_helper",
-    srcs: ["AudioParameter.cpp"],
+    srcs: ["AudioParameter.cpp", "TypeConverter.cpp"],
     cflags: [
         "-Werror",
         "-Wno-error=deprecated-declarations",

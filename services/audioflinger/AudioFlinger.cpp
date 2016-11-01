@@ -35,6 +35,7 @@
 #include <media/audiohal/DevicesFactoryHalInterface.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <media/AudioParameter.h>
+#include <media/TypeConverter.h>
 #include <memunreachable/memunreachable.h>
 #include <utils/String16.h>
 #include <utils/threads.h>
@@ -113,38 +114,10 @@ static const nsecs_t kMinGlobalEffectEnabletimeNs = seconds(7200);
 
 // ----------------------------------------------------------------------------
 
-const char *formatToString(audio_format_t format) {
-    switch (audio_get_main_format(format)) {
-    case AUDIO_FORMAT_PCM:
-        switch (format) {
-        case AUDIO_FORMAT_PCM_16_BIT: return "pcm16";
-        case AUDIO_FORMAT_PCM_8_BIT: return "pcm8";
-        case AUDIO_FORMAT_PCM_32_BIT: return "pcm32";
-        case AUDIO_FORMAT_PCM_8_24_BIT: return "pcm8.24";
-        case AUDIO_FORMAT_PCM_FLOAT: return "pcmfloat";
-        case AUDIO_FORMAT_PCM_24_BIT_PACKED: return "pcm24";
-        default:
-            break;
-        }
-        break;
-    case AUDIO_FORMAT_MP3: return "mp3";
-    case AUDIO_FORMAT_AMR_NB: return "amr-nb";
-    case AUDIO_FORMAT_AMR_WB: return "amr-wb";
-    case AUDIO_FORMAT_AAC: return "aac";
-    case AUDIO_FORMAT_HE_AAC_V1: return "he-aac-v1";
-    case AUDIO_FORMAT_HE_AAC_V2: return "he-aac-v2";
-    case AUDIO_FORMAT_VORBIS: return "vorbis";
-    case AUDIO_FORMAT_OPUS: return "opus";
-    case AUDIO_FORMAT_AC3: return "ac-3";
-    case AUDIO_FORMAT_E_AC3: return "e-ac-3";
-    case AUDIO_FORMAT_IEC61937: return "iec61937";
-    case AUDIO_FORMAT_DTS: return "dts";
-    case AUDIO_FORMAT_DTS_HD: return "dts-hd";
-    case AUDIO_FORMAT_DOLBY_TRUEHD: return "dolby-truehd";
-    default:
-        break;
-    }
-    return "unknown";
+std::string formatToString(audio_format_t format) {
+    std::string result;
+    FormatConverter::toString(format, result);
+    return result;
 }
 
 // ----------------------------------------------------------------------------
