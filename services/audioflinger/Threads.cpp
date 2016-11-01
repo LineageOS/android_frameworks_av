@@ -4764,7 +4764,7 @@ AudioFlinger::DirectOutputThread::~DirectOutputThread()
 {
 }
 
-void AudioFlinger::DirectOutputThread::processVolume_l(Track *track, bool lastTrack)
+void AudioFlinger::DirectOutputThread::processVolume_l(sp<Track> track, bool lastTrack)
 {
     float left, right;
 
@@ -4839,14 +4839,13 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::DirectOutputThread::prep
     bool doHwResume = false;
 
     // find out which tracks need to be processed
-    for (const sp<Track> &t : mActiveTracks) {
-        if (t->isInvalid()) {
+    for (const sp<Track> &track : mActiveTracks) {
+        if (track->isInvalid()) {
             ALOGW("An invalidated track shouldn't be in active list");
-            tracksToRemove->add(t);
+            tracksToRemove->add(track);
             continue;
         }
 
-        Track* const track = t.get();
 #ifdef VERY_VERY_VERBOSE_LOGGING
         audio_track_cblk_t* cblk = track->cblk();
 #endif
@@ -4854,8 +4853,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::DirectOutputThread::prep
         // In theory an older track could underrun and restart after the new one starts
         // but as we only care about the transition phase between two tracks on a
         // direct output, it is not a problem to ignore the underrun case.
-        sp<Track> l = mActiveTracks.getLatest();
-        bool last = l.get() == track;
+        bool last = mActiveTracks.getLatest() == track;
 
         if (track->isPausing()) {
             track->setPaused();
@@ -4927,7 +4925,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::DirectOutputThread::prep
 
                 // reset retry count
                 track->mRetryCount = kMaxTrackRetriesDirect;
-                mActiveTrack = t;
+                mActiveTrack = track; // save track as mActiveTracks may change without lock.
                 mixerStatus = MIXER_TRACKS_READY;
                 if (mHwPaused) {
                     doHwResume = true;
@@ -5388,8 +5386,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::OffloadThread::prepareTr
     ALOGV("OffloadThread::prepareTracks_l active tracks %zu", count);
 
     // find out which tracks need to be processed
-    for (const sp<Track> &t : mActiveTracks) {
-        Track* const track = t.get();
+    for (const sp<Track> &track : mActiveTracks) {
 #ifdef VERY_VERY_VERBOSE_LOGGING
         audio_track_cblk_t* cblk = track->cblk();
 #endif
@@ -5397,8 +5394,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::OffloadThread::prepareTr
         // In theory an older track could underrun and restart after the new one starts
         // but as we only care about the transition phase between two tracks on a
         // direct output, it is not a problem to ignore the underrun case.
-        sp<Track> l = mActiveTracks.getLatest();
-        bool last = l.get() == track;
+        bool last = mActiveTracks.getLatest() == track;
 
         if (track->isInvalid()) {
             ALOGW("An invalidated track shouldn't be in active list");
@@ -5504,7 +5500,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::OffloadThread::prepareTr
                 } else {
                     track->mRetryCount = kMaxTrackRetriesOffload;
                 }
-                mActiveTrack = t;
+                mActiveTrack = track; // save track as mActiveTracks may change without lock.
                 mixerStatus = MIXER_TRACKS_READY;
             }
         } else {
