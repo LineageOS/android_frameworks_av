@@ -131,7 +131,7 @@ sp<TCam> CameraBase<TCam, TCamTraits>::connect(int cameraId,
         c->mStatus = NO_ERROR;
     } else {
         ALOGW("An error occurred while connecting to camera %d: %s", cameraId,
-                (cs != nullptr) ? "Service not available" : ret.toString8().string());
+                (cs == nullptr) ? "Service not available" : ret.toString8().string());
         c.clear();
     }
     return c;
