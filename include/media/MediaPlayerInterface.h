@@ -205,7 +205,7 @@ public:
         *videoFps = -1.f;
         return OK;
     }
-    virtual status_t    seekTo(int msec) = 0;
+    virtual status_t    seekTo(int msec, bool precise = false) = 0;
     virtual status_t    getCurrentPosition(int *msec) = 0;
     virtual status_t    getDuration(int *msec) = 0;
     virtual status_t    reset() = 0;

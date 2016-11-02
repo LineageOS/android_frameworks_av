@@ -208,7 +208,7 @@ status_t NuPlayerDriver::prepare_l() {
             mAtEOS = false;
             mState = STATE_STOPPED_AND_PREPARING;
             mIsAsyncPrepare = false;
-            mPlayer->seekToAsync(0, true /* needNotify */);
+            mPlayer->seekToAsync(0, false /* precise */, true /* needNotify */);
             while (mState == STATE_STOPPED_AND_PREPARING) {
                 mCondition.wait(mLock);
             }
@@ -233,7 +233,7 @@ status_t NuPlayerDriver::prepareAsync() {
             mAtEOS = false;
             mState = STATE_STOPPED_AND_PREPARING;
             mIsAsyncPrepare = true;
-            mPlayer->seekToAsync(0, true /* needNotify */);
+            mPlayer->seekToAsync(0, false /* precise */, true /* needNotify */);
             return OK;
         default:
             return INVALID_OPERATION;
@@ -382,8 +382,8 @@ status_t NuPlayerDriver::getSyncSettings(AVSyncSettings *sync, float *videoFps) 
     return mPlayer->getSyncSettings(sync, videoFps);
 }
 
-status_t NuPlayerDriver::seekTo(int msec) {
-    ALOGD("seekTo(%p) %d ms at state %d", this, msec, mState);
+status_t NuPlayerDriver::seekTo(int msec, bool precise) {
+    ALOGD("seekTo(%p) (%d ms, %d) at state %d", this, msec, precise, mState);
     Mutex::Autolock autoLock(mLock);
 
     int64_t seekTimeUs = msec * 1000ll;
@@ -398,7 +398,7 @@ status_t NuPlayerDriver::seekTo(int msec) {
             mSeekInProgress = true;
             // seeks can take a while, so we essentially paused
             notifyListener_l(MEDIA_PAUSED);
-            mPlayer->seekToAsync(seekTimeUs, true /* needNotify */);
+            mPlayer->seekToAsync(seekTimeUs, precise, true /* needNotify */);
             break;
         }
 

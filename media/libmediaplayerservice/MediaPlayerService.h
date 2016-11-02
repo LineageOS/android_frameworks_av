@@ -298,7 +298,7 @@ private:
         virtual status_t        setSyncSettings(const AVSyncSettings& rate, float videoFpsHint);
         virtual status_t        getSyncSettings(AVSyncSettings* rate /* nonnull */,
                                                 float* videoFps /* nonnull */);
-        virtual status_t        seekTo(int msec);
+        virtual status_t        seekTo(int msec, bool precise = false);
         virtual status_t        getCurrentPosition(int* msec);
         virtual status_t        getDuration(int* msec);
         virtual status_t        reset();

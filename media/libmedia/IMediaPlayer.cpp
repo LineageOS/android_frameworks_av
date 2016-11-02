@@ -246,11 +246,12 @@ public:
         return reply.readInt32();
     }
 
-    status_t seekTo(int msec)
+    status_t seekTo(int msec, bool precise)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
         data.writeInt32(msec);
+        data.writeBool(precise);
         remote()->transact(SEEK_TO, data, &reply);
         return reply.readInt32();
     }
@@ -573,7 +574,9 @@ status_t BnMediaPlayer::onTransact(
         } break;
         case SEEK_TO: {
             CHECK_INTERFACE(IMediaPlayer, data, reply);
-            reply->writeInt32(seekTo(data.readInt32()));
+            int msec = data.readInt32();
+            bool precise = data.readBool();
+            reply->writeInt32(seekTo(msec, precise));
             return NO_ERROR;
         } break;
         case GET_CURRENT_POSITION: {

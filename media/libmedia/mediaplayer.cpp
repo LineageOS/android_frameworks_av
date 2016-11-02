@@ -55,7 +55,9 @@ MediaPlayer::MediaPlayer()
     mStreamType = AUDIO_STREAM_MUSIC;
     mAudioAttributesParcel = NULL;
     mCurrentPosition = -1;
+    mCurrentSeekPrecise = false;
     mSeekPosition = -1;
+    mSeekPrecise = false;
     mCurrentState = MEDIA_PLAYER_IDLE;
     mPrepareSync = false;
     mPrepareStatus = NO_ERROR;
@@ -100,7 +102,9 @@ void MediaPlayer::disconnect()
 void MediaPlayer::clear_l()
 {
     mCurrentPosition = -1;
+    mCurrentSeekPrecise = false;
     mSeekPosition = -1;
+    mSeekPrecise = false;
     mVideoWidth = mVideoHeight = 0;
     mRetransmitEndpointValid = false;
 }
@@ -508,9 +512,9 @@ status_t MediaPlayer::getDuration(int *msec)
     return getDuration_l(msec);
 }
 
-status_t MediaPlayer::seekTo_l(int msec)
+status_t MediaPlayer::seekTo_l(int msec, bool precise)
 {
-    ALOGV("seekTo %d", msec);
+    ALOGV("seekTo (%d, %d)", msec, precise);
     if ((mPlayer != 0) && ( mCurrentState & ( MEDIA_PLAYER_STARTED | MEDIA_PLAYER_PREPARED |
             MEDIA_PLAYER_PAUSED |  MEDIA_PLAYER_PLAYBACK_COMPLETE) ) ) {
         if ( msec < 0 ) {
@@ -537,12 +541,14 @@ status_t MediaPlayer::seekTo_l(int msec)
 
         // cache duration
         mCurrentPosition = msec;
+        mCurrentSeekPrecise = precise;
         if (mSeekPosition < 0) {
             mSeekPosition = msec;
-            return mPlayer->seekTo(msec);
+            mSeekPrecise = precise;
+            return mPlayer->seekTo(msec, precise);
         }
         else {
-            ALOGV("Seek in progress - queue up seekTo[%d]", msec);
+            ALOGV("Seek in progress - queue up seekTo[%d, %d]", msec, precise);
             return NO_ERROR;
         }
     }
@@ -551,11 +557,11 @@ status_t MediaPlayer::seekTo_l(int msec)
     return INVALID_OPERATION;
 }
 
-status_t MediaPlayer::seekTo(int msec)
+status_t MediaPlayer::seekTo(int msec, bool precise)
 {
     mLockThreadId = getThreadId();
     Mutex::Autolock _l(mLock);
-    status_t result = seekTo_l(msec);
+    status_t result = seekTo_l(msec, precise);
     mLockThreadId = 0;
 
     return result;
@@ -869,14 +875,16 @@ void MediaPlayer::notify(int msg, int ext1, int ext2, const Parcel *obj)
         break;
     case MEDIA_SEEK_COMPLETE:
         ALOGV("Received seek complete");
-        if (mSeekPosition != mCurrentPosition) {
-            ALOGV("Executing queued seekTo(%d)", mSeekPosition);
+        if (mSeekPosition != mCurrentPosition || (!mSeekPrecise && mCurrentSeekPrecise)) {
+            ALOGV("Executing queued seekTo(%d, %d)", mCurrentPosition, mCurrentSeekPrecise);
             mSeekPosition = -1;
-            seekTo_l(mCurrentPosition);
+            mSeekPrecise = false;
+            seekTo_l(mCurrentPosition, mCurrentSeekPrecise);
         }
         else {
             ALOGV("All seeks complete - return to regularly scheduled program");
             mCurrentPosition = mSeekPosition = -1;
+            mCurrentSeekPrecise = mSeekPrecise = false;
         }
         break;
     case MEDIA_BUFFERING_UPDATE:

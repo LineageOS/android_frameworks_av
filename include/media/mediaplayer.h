@@ -233,7 +233,7 @@ public:
                                     float* videoFps /* nonnull */);
             status_t        getVideoWidth(int *w);
             status_t        getVideoHeight(int *h);
-            status_t        seekTo(int msec);
+            status_t        seekTo(int msec, bool precise = false);
             status_t        getCurrentPosition(int *msec);
             status_t        getDuration(int *msec);
             status_t        reset();
@@ -257,7 +257,7 @@ public:
 
 private:
             void            clear_l();
-            status_t        seekTo_l(int msec);
+            status_t        seekTo_l(int msec, bool precise);
             status_t        prepareAsync_l();
             status_t        getDuration_l(int *msec);
             status_t        attachNewPlayer(const sp<IMediaPlayer>& player);
@@ -274,7 +274,9 @@ private:
     void*                       mCookie;
     media_player_states         mCurrentState;
     int                         mCurrentPosition;
+    bool                        mCurrentSeekPrecise;
     int                         mSeekPosition;
+    int                         mSeekPrecise;
     bool                        mPrepareSync;
     status_t                    mPrepareStatus;
     audio_stream_type_t         mStreamType;

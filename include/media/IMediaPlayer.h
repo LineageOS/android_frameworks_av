@@ -65,7 +65,7 @@ public:
     virtual status_t        setSyncSettings(const AVSyncSettings& sync, float videoFpsHint) = 0;
     virtual status_t        getSyncSettings(AVSyncSettings* sync /* nonnull */,
                                             float* videoFps /* nonnull */) = 0;
-    virtual status_t        seekTo(int msec) = 0;
+    virtual status_t        seekTo(int msec, bool precise = false) = 0;
     virtual status_t        getCurrentPosition(int* msec) = 0;
     virtual status_t        getDuration(int* msec) = 0;
     virtual status_t        reset() = 0;
