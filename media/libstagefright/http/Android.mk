@@ -13,9 +13,9 @@ LOCAL_C_INCLUDES:= \
 	$(TOP)/frameworks/base/core/jni \
 
 LOCAL_SHARED_LIBRARIES := \
-	libstagefright liblog libutils libbinder libstagefright_foundation \
-        libandroid_runtime \
-        libmedia
+    liblog libutils libbinder \
+    libandroid_runtime \
+    libmedia
 
 LOCAL_MODULE:= libstagefright_http_support
 
