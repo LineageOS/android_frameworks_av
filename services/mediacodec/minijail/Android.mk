@@ -15,8 +15,9 @@ else
 endif
 
 # allow device specific additions to the syscall whitelist
-LOCAL_SRC_FILES += $(foreach dir, $(BOARD_SECCOMP_POLICY), \
-                     $(dir)/mediacodec-seccomp.policy)
+ifneq (,$(wildcard $(BOARD_SECCOMP_POLICY)/mediacodec-seccomp.policy))
+    LOCAL_SRC_FILES += $(BOARD_SECCOMP_POLICY)/mediacodec-seccomp.policy
+endif
 
 include $(BUILD_SYSTEM)/base_rules.mk
 
