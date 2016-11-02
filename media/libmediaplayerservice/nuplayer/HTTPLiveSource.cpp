@@ -214,8 +214,8 @@ status_t NuPlayer::HTTPLiveSource::selectTrack(size_t trackIndex, bool select, i
     return (err == OK || err == BAD_VALUE) ? (status_t)OK : err;
 }
 
-status_t NuPlayer::HTTPLiveSource::seekTo(int64_t seekTimeUs) {
-    return mLiveSession->seekTo(seekTimeUs);
+status_t NuPlayer::HTTPLiveSource::seekTo(int64_t seekTimeUs, bool precise) {
+    return mLiveSession->seekTo(seekTimeUs, precise);
 }
 
 void NuPlayer::HTTPLiveSource::pollForRawData(

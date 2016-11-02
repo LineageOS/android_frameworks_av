@@ -71,7 +71,7 @@ struct NuPlayer::GenericSource : public NuPlayer::Source {
     virtual sp<AMessage> getTrackInfo(size_t trackIndex) const;
     virtual ssize_t getSelectedTrack(media_track_type type) const;
     virtual status_t selectTrack(size_t trackIndex, bool select, int64_t timeUs);
-    virtual status_t seekTo(int64_t seekTimeUs);
+    virtual status_t seekTo(int64_t seekTimeUs, bool precise = false);
 
     virtual status_t setBuffers(bool audio, Vector<MediaBuffer *> &buffers);
 
@@ -258,7 +258,7 @@ private:
     status_t doSelectTrack(size_t trackIndex, bool select, int64_t timeUs);
 
     void onSeek(const sp<AMessage>& msg);
-    status_t doSeek(int64_t seekTimeUs);
+    status_t doSeek(int64_t seekTimeUs, bool precise);
 
     void onPrepareAsync();
 
@@ -278,13 +278,15 @@ private:
             MediaBuffer *mbuf,
             media_track_type trackType,
             int64_t seekTimeUs,
+            bool precise,
             int64_t *actualTimeUs = NULL);
 
     void postReadBuffer(media_track_type trackType);
     void onReadBuffer(const sp<AMessage>& msg);
     void readBuffer(
             media_track_type trackType,
-            int64_t seekTimeUs = -1ll, int64_t *actualTimeUs = NULL, bool formatChange = false);
+            int64_t seekTimeUs = -1ll, bool precise = false,
+            int64_t *actualTimeUs = NULL, bool formatChange = false);
 
     void queueDiscontinuityIfNeeded(
             bool seeking, bool formatChange, media_track_type trackType, Track *track);

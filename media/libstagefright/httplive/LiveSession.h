@@ -86,7 +86,7 @@ struct LiveSession : public AHandler {
     status_t disconnect();
 
     // Blocks until seek is complete.
-    status_t seekTo(int64_t timeUs);
+    status_t seekTo(int64_t timeUs, bool precise);
 
     status_t getDuration(int64_t *durationUs) const;
     size_t getTrackCount() const;

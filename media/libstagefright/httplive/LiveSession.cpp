@@ -518,9 +518,10 @@ status_t LiveSession::disconnect() {
     return err;
 }
 
-status_t LiveSession::seekTo(int64_t timeUs) {
+status_t LiveSession::seekTo(int64_t timeUs, bool precise) {
     sp<AMessage> msg = new AMessage(kWhatSeek, this);
     msg->setInt64("timeUs", timeUs);
+    msg->setInt32("precise", precise);
 
     sp<AMessage> response;
     status_t err = msg->postAndAwaitResponse(&response);
@@ -1441,7 +1442,10 @@ HLSTime LiveSession::latestMediaSegmentStartTime() const {
 
 void LiveSession::onSeek(const sp<AMessage> &msg) {
     int64_t timeUs;
+    int32_t precise;
     CHECK(msg->findInt64("timeUs", &timeUs));
+    CHECK(msg->findInt32("precise", &precise));
+    // TODO: add "precise" to changeConfiguration.
     changeConfiguration(timeUs);
 }
 

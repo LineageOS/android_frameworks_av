@@ -279,10 +279,11 @@ status_t NuPlayer::RTSPSource::getDuration(int64_t *durationUs) {
     return OK;
 }
 
-status_t NuPlayer::RTSPSource::seekTo(int64_t seekTimeUs) {
+status_t NuPlayer::RTSPSource::seekTo(int64_t seekTimeUs, bool precise) {
     sp<AMessage> msg = new AMessage(kWhatPerformSeek, this);
     msg->setInt32("generation", ++mSeekGeneration);
     msg->setInt64("timeUs", seekTimeUs);
+    msg->setInt32("precise", precise);
 
     sp<AMessage> response;
     status_t err = msg->postAndAwaitResponse(&response);
@@ -465,8 +466,11 @@ void NuPlayer::RTSPSource::onMessageReceived(const sp<AMessage> &msg) {
         }
 
         int64_t seekTimeUs;
+        int32_t precise;
         CHECK(msg->findInt64("timeUs", &seekTimeUs));
+        CHECK(msg->findInt32("precise", &precise));
 
+        // TODO: add "precise" to performSeek.
         performSeek(seekTimeUs);
         return;
     } else if (msg->what() == kWhatPollBuffering) {
