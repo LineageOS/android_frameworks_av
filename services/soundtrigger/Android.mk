@@ -30,7 +30,7 @@ LOCAL_SHARED_LIBRARIES:= \
     libcutils \
     libhardware \
     libsoundtrigger \
-    libmedia \
+    libaudioclient \
     libserviceutility
 
 

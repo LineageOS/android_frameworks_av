@@ -88,6 +88,7 @@ LOCAL_SHARED_LIBRARIES := \
         libgui \
         liblog \
         libmedia \
+        libaudioclient \
         libmediautils \
         libnetd_client \
         libsonivox \

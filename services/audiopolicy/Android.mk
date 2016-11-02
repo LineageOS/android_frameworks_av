@@ -30,7 +30,7 @@ LOCAL_SHARED_LIBRARIES := \
     libutils \
     liblog \
     libbinder \
-    libmedia \
+    libaudioclient \
     libhardware_legacy \
     libserviceutility
 
