@@ -36,6 +36,7 @@ LOCAL_SRC_FILES:=               \
 
 LOCAL_C_INCLUDES := \
     $(TOPDIR)frameworks/av/services/audiopolicy \
+    $(TOPDIR)frameworks/av/services/medialog \
     $(TOPDIR)external/sonic \
     $(call include-path-for, audio-utils)
 
@@ -49,6 +50,7 @@ LOCAL_SHARED_LIBRARIES := \
     liblog \
     libbinder \
     libmedia \
+    libmedialogservice \
     libmediautils \
     libnbaio \
     libpowermanager \

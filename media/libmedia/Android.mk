@@ -29,7 +29,6 @@ LOCAL_SRC_FILES += \
     IMediaDrmService.cpp \
     IMediaHTTPConnection.cpp \
     IMediaHTTPService.cpp \
-    IMediaLogService.cpp \
     IMediaExtractor.cpp           \
     IMediaExtractorService.cpp \
     IMediaPlayerService.cpp \
