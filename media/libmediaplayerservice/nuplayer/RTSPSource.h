@@ -49,7 +49,7 @@ struct NuPlayer::RTSPSource : public NuPlayer::Source {
     virtual status_t dequeueAccessUnit(bool audio, sp<ABuffer> *accessUnit);
 
     virtual status_t getDuration(int64_t *durationUs);
-    virtual status_t seekTo(int64_t seekTimeUs, bool precise = false);
+    virtual status_t seekTo(int64_t seekTimeUs, bool precise = false) override;
 
     void onMessageReceived(const sp<AMessage> &msg);
 

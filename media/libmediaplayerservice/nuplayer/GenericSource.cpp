@@ -1254,10 +1254,7 @@ status_t NuPlayer::GenericSource::doSeek(int64_t seekTimeUs, bool precise) {
 
 sp<ABuffer> NuPlayer::GenericSource::mediaBufferToABuffer(
         MediaBuffer* mb,
-        media_track_type trackType,
-        int64_t seekTimeUs,
-        bool precise,
-        int64_t *actualTimeUs) {
+        media_track_type trackType) {
     bool audio = trackType == MEDIA_TRACK_TYPE_AUDIO;
     size_t outLength = mb->range_length();
 
@@ -1293,12 +1290,6 @@ sp<ABuffer> NuPlayer::GenericSource::mediaBufferToABuffer(
     int64_t timeUs;
     CHECK(mb->meta_data()->findInt64(kKeyTime, &timeUs));
     meta->setInt64("timeUs", timeUs);
-
-    if (precise && seekTimeUs > timeUs) {
-        sp<AMessage> extra = new AMessage;
-        extra->setInt64("resume-at-mediaTimeUs", seekTimeUs);
-        meta->setMessage("extra", extra);
-    }
 
     if (trackType == MEDIA_TRACK_TYPE_VIDEO) {
         int32_t layerId;
@@ -1337,10 +1328,6 @@ sp<ABuffer> NuPlayer::GenericSource::mediaBufferToABuffer(
             kKeyMpegUserData, &dataType, &mpegUserDataPointer, &mpegUserDataLength)) {
         sp<ABuffer> mpegUserData = ABuffer::CreateAsCopy(mpegUserDataPointer, mpegUserDataLength);
         meta->setBuffer("mpegUserData", mpegUserData);
-    }
-
-    if (actualTimeUs) {
-        *actualTimeUs = timeUs;
     }
 
     mb->release();
@@ -1468,9 +1455,19 @@ void NuPlayer::GenericSource::readBuffer(
 
             queueDiscontinuityIfNeeded(seeking, formatChange, trackType, track);
 
-            sp<ABuffer> buffer = mediaBufferToABuffer(
-                    mbuf, trackType, seekTimeUs, precise,
-                    numBuffers == 0 ? actualTimeUs : NULL);
+            sp<ABuffer> buffer = mediaBufferToABuffer(mbuf, trackType);
+            if (numBuffers == 0 && actualTimeUs != nullptr) {
+                *actualTimeUs = timeUs;
+            }
+            if (seeking && buffer != nullptr) {
+                sp<AMessage> meta = buffer->meta();
+                if (meta != nullptr && precise && seekTimeUs > timeUs) {
+                    sp<AMessage> extra = new AMessage;
+                    extra->setInt64("resume-at-mediaTimeUs", seekTimeUs);
+                    meta->setMessage("extra", extra);
+                }
+            }
+
             track->mPackets->queueAccessUnit(buffer);
             formatChange = false;
             seeking = false;

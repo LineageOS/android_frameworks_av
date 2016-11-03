@@ -245,7 +245,7 @@ private:
     void handleFlushComplete(bool audio, bool isDecoder);
     void finishFlushIfPossible();
 
-    void onStart(int64_t startPositionUs = -1);
+    void onStart(int64_t startPositionUs = -1, bool precise = false);
     void onResume();
     void onPause();
 
@@ -263,7 +263,7 @@ private:
 
     void processDeferredActions();
 
-    void performSeek(int64_t seekTimeUs);
+    void performSeek(int64_t seekTimeUs, bool precise);
     void performDecoderFlush(FlushCommand audio, FlushCommand video);
     void performReset();
     void performScanSources();

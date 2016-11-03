@@ -65,6 +65,13 @@ public:
     virtual status_t        setSyncSettings(const AVSyncSettings& sync, float videoFpsHint) = 0;
     virtual status_t        getSyncSettings(AVSyncSettings* sync /* nonnull */,
                                             float* videoFps /* nonnull */) = 0;
+    // When |precise| is true, it's required that the first rendered media position after seekTo
+    // is precisely at |msec|, up to rounding error of granuality, e.g., video frame interval or
+    // audio length of decoding buffer. In this case, it might take a little long time to finish
+    // seekTo.
+    // When |precise| is false, |msec| is a hint to the mediaplayer which will try its best to
+    // fulfill the request, but it's not guaranteed. This option could result in fast finish of
+    // seekTo.
     virtual status_t        seekTo(int msec, bool precise = false) = 0;
     virtual status_t        getCurrentPosition(int* msec) = 0;
     virtual status_t        getDuration(int* msec) = 0;
