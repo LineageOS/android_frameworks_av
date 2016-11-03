@@ -12,6 +12,25 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * This file was modified by Dolby Laboratories, Inc. The portions of the
+ * code that are surrounded by "DOLBY..." are copyrighted and
+ * licensed separately, as follows:
+ *
+ *  (C) 2011-2016 Dolby Laboratories, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
  */
 
 //#define LOG_NDEBUG 0
@@ -54,6 +73,9 @@
 #include "include/avc_utils.h"
 #include "include/DataConverter.h"
 #include "omx/OMXUtils.h"
+#ifdef DOLBY_ENABLE
+#include "DolbyACodecExtImpl.h"
+#endif // DOLBY_END
 
 #include <stagefright/AVExtensions.h>
 
@@ -1699,6 +1721,10 @@ const char *ACodec::getComponentRole(
             "audio_decoder.ac3", "audio_encoder.ac3" },
         { MEDIA_MIMETYPE_AUDIO_EAC3,
             "audio_decoder.eac3", "audio_encoder.eac3" },
+#ifdef DOLBY_ENABLE
+        { MEDIA_MIMETYPE_AUDIO_EAC3_JOC,
+            "audio_decoder.eac3_joc", NULL },
+#endif // DOLBY_END
     };
 
     static const size_t kNumMimeToRole =
@@ -6717,6 +6743,15 @@ bool ACodec::LoadedState::onMessageReceived(const sp<AMessage> &msg) {
             handled = true;
             break;
         }
+#ifdef DOLBY_ENABLE
+        case ACodec::kWhatSetParameters:
+        {
+            mCodec->setDolbyParameter(msg);
+
+            handled = true;
+            break;
+        }
+#endif // DOLBY_END
 
         default:
             return BaseState::onMessageReceived(msg);
@@ -6963,6 +6998,9 @@ void ACodec::LoadedState::onStart() {
     if (err != OK) {
         mCodec->signalError(OMX_ErrorUndefined, makeNoSideEffectStatus(err));
     } else {
+#ifdef DOLBY_ENABLE
+        mCodec->setDolbyParameterOnEndpChange();
+#endif // DOLBY_END
         mCodec->changeState(mCodec->mLoadedToIdleState);
     }
 }
@@ -7456,6 +7494,9 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
             err = OK;
         }
     }
+#ifdef DOLBY_ENABLE
+    return setDolbyParameterOnProcessedAudio(params);
+#endif // DOLBY_END
 
     int32_t numLayers = 0,
             numBLayers = 0;
