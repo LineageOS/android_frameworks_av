@@ -19,7 +19,6 @@
 
 #include <utils/Log.h>
 #include "SoundTriggerHalHidl.h"
-#include <hidl/ServiceManagement.h>
 #include <hwbinder/IPCThreadState.h>
 #include <hwbinder/ProcessState.h>
 
