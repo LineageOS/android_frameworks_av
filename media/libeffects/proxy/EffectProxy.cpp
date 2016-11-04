@@ -236,6 +236,11 @@ int Effect_command(effect_handle_t  self,
     // pCmdData points to a memory holding effect_offload_param_t structure
     if (cmdCode == EFFECT_CMD_OFFLOAD) {
         ALOGV("Effect_command() cmdCode = EFFECT_CMD_OFFLOAD");
+        if (replySize == NULL || *replySize < sizeof(int)) {
+            ALOGV("effectsOffload: Effect_command: CMD_OFFLOAD has no reply");
+            android_errorWriteLog(0x534e4554, "32448121");
+            return FAILED_TRANSACTION;
+        }
         if (cmdSize == 0 || pCmdData == NULL) {
             ALOGV("effectsOffload: Effect_command: CMD_OFFLOAD has no data");
              *(int*)pReplyData = FAILED_TRANSACTION;
