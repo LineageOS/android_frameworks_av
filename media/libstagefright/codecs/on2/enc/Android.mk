@@ -19,7 +19,6 @@ LOCAL_STATIC_LIBRARIES := \
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright libstagefright_omx libstagefright_foundation libutils liblog \
-        libhardware \
 
 LOCAL_MODULE := libstagefright_soft_vpxenc
 LOCAL_MODULE_TAGS := optional

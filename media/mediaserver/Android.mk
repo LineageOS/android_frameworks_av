@@ -15,13 +15,9 @@ LOCAL_SRC_FILES:= \
 	main_mediaserver.cpp
 
 LOCAL_SHARED_LIBRARIES := \
-	libcamera_metadata \
-	libcamera_client \
-	libcameraservice \
 	libresourcemanagerservice \
 	liblog \
 	libcutils \
-	libmedia \
 	libmediaplayerservice \
 	libutils \
 	libbinder \
@@ -33,7 +29,6 @@ LOCAL_STATIC_LIBRARIES := \
 
 LOCAL_C_INCLUDES := \
     frameworks/av/media/libmediaplayerservice \
-    frameworks/av/services/camera/libcameraservice \
     frameworks/av/services/mediaresourcemanager \
 
 LOCAL_MODULE:= mediaserver

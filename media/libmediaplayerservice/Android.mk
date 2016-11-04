@@ -19,7 +19,6 @@ LOCAL_SRC_FILES:=               \
 
 LOCAL_SHARED_LIBRARIES :=       \
     libbinder                   \
-    libcamera_client            \
     libcrypto                   \
     libcutils                   \
     libdrmframework             \
@@ -29,14 +28,12 @@ LOCAL_SHARED_LIBRARIES :=       \
     libmedia                    \
     libmediautils               \
     libmemunreachable           \
-    libsonivox                  \
     libstagefright              \
     libstagefright_foundation   \
     libstagefright_httplive     \
     libstagefright_omx          \
     libstagefright_wfd          \
     libutils                    \
-    libvorbisidec               \
 
 LOCAL_STATIC_LIBRARIES :=       \
     libstagefright_nuplayer     \
