@@ -10,19 +10,11 @@ LOCAL_SRC_FILES:= \
     aidl/android/IOMXBufferSource.aidl
 
 LOCAL_SRC_FILES += \
-    AudioTrack.cpp \
-    AudioTrackShared.cpp \
-    IAudioFlinger.cpp \
-    IAudioFlingerClient.cpp \
-    IAudioTrack.cpp \
-    IAudioRecord.cpp \
     ICrypto.cpp \
     IDataSource.cpp \
     IDrm.cpp \
     IDrmClient.cpp \
     IHDCP.cpp \
-    AudioRecord.cpp \
-    AudioSystem.cpp \
     mediaplayer.cpp \
     IMediaCodecList.cpp \
     IMediaCodecService.cpp \
@@ -52,11 +44,8 @@ LOCAL_SRC_FILES += \
     mediametadataretriever.cpp \
     MidiDeviceInfo.cpp \
     MidiIoWrapper.cpp \
-    ToneGenerator.cpp \
     JetPlayer.cpp \
     IOMX.cpp \
-    IAudioPolicyService.cpp \
-    IAudioPolicyServiceClient.cpp \
     MediaScanner.cpp \
     MediaScannerClient.cpp \
     CharacterEncodingDetector.cpp \
@@ -65,18 +54,13 @@ LOCAL_SRC_FILES += \
     MediaResource.cpp \
     MediaResourcePolicy.cpp \
     OMXBuffer.cpp \
-    IEffect.cpp \
-    IEffectClient.cpp \
-    AudioEffect.cpp \
     Visualizer.cpp \
-    MemoryLeakTrackUtil.cpp \
     StringArray.cpp \
-    AudioPolicy.cpp
 
 LOCAL_SHARED_LIBRARIES := \
 	libui liblog libcutils libutils libbinder libsonivox libicuuc libicui18n libexpat \
         libcamera_client libstagefright_foundation \
-        libgui libdl libaudioutils
+        libgui libdl libaudioutils libaudioclient
 
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder
 

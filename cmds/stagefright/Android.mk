@@ -129,7 +129,7 @@ LOCAL_SRC_FILES:=         \
 
 LOCAL_SHARED_LIBRARIES := \
 	libstagefright liblog libutils libbinder libstagefright_foundation \
-	libmedia libgui libcutils libui
+	libmedia libgui libcutils
 
 LOCAL_C_INCLUDES:= \
 	frameworks/av/media/libstagefright \
@@ -153,7 +153,7 @@ LOCAL_SRC_FILES:=               \
 
 LOCAL_SHARED_LIBRARIES := \
 	libstagefright liblog libutils libbinder libstagefright_foundation \
-	libmedia libgui libcutils libui
+	libmedia libaudioclient libgui libcutils
 
 LOCAL_C_INCLUDES:= \
 	frameworks/av/media/libstagefright \
@@ -186,7 +186,6 @@ LOCAL_SHARED_LIBRARIES := \
 	libmedia \
 	libgui \
 	libcutils \
-	libui \
 	libRScpp \
 
 LOCAL_C_INCLUDES:= \
@@ -218,7 +217,7 @@ LOCAL_SRC_FILES:=               \
 
 LOCAL_SHARED_LIBRARIES := \
 	libstagefright liblog libutils libbinder libstagefright_foundation \
-	libmedia libgui libcutils libui libc
+	libcutils libc
 
 LOCAL_C_INCLUDES:= \
 	frameworks/av/media/libstagefright \
