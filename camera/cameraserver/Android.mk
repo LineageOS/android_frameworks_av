@@ -25,7 +25,6 @@ LOCAL_SHARED_LIBRARIES := \
 	libcutils \
 	libutils \
 	libbinder \
-	libcamera_client
 
 LOCAL_MODULE:= cameraserver
 LOCAL_32_BIT_ONLY := true

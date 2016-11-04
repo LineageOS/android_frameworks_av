@@ -32,7 +32,6 @@ LOCAL_SHARED_LIBRARIES := \
     liblog \
     libbinder \
     libmedia \
-    libhardware \
     libhardware_legacy \
     libserviceutility
 

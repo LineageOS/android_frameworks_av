@@ -43,6 +43,5 @@ LOCAL_SHARED_LIBRARIES += \
     liblog \
     libcutils \
     libutils \
-    libaudioutils \
 
 include $(BUILD_SHARED_LIBRARY)

@@ -27,7 +27,6 @@ LOCAL_SHARED_LIBRARIES := \
 	libutils \
 	liblog \
 	libbinder \
-	libhardware \
 	libradio_metadata
 
 #LOCAL_C_INCLUDES += \
