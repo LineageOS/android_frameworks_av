@@ -28,14 +28,6 @@ using android::hardware::Return;
 using android::hardware::ProcessState;
 using android::hardware::audio::common::V2_0::AudioDevice;
 
-pthread_once_t SoundTriggerHalHidl::sOnceControl = PTHREAD_ONCE_INIT;
-
-void SoundTriggerHalHidl::sOnceInit()
-{
-    ProcessState::self()->setThreadPoolMaxThreadCount(1);
-    ProcessState::self()->startThreadPool();
-}
-
 /* static */
 sp<SoundTriggerHalInterface> SoundTriggerHalInterface::connectModule(const char *moduleName)
 {
@@ -267,11 +259,6 @@ int SoundTriggerHalHidl::stopAllRecognitions()
 SoundTriggerHalHidl::SoundTriggerHalHidl(const char *moduleName)
     : mModuleName(moduleName), mNextUniqueId(1)
 {
-}
-
-void SoundTriggerHalHidl::onFirstRef()
-{
-    pthread_once(&sOnceControl, &sOnceInit);
 }
 
 SoundTriggerHalHidl::~SoundTriggerHalHidl()

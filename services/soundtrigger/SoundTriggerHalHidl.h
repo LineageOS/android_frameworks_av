@@ -82,9 +82,6 @@ public:
          */
         virtual int stopAllRecognitions();
 
-        // RefBase
-        virtual     void        onFirstRef();
-
         // ISoundTriggerHwCallback
         virtual ::android::hardware::Return<void> recognitionCallback(
                 const ISoundTriggerHwCallback::RecognitionEvent& event, CallbackCookie cookie);
