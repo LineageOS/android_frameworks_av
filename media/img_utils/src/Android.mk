@@ -35,11 +35,8 @@ LOCAL_SRC_FILES := \
 
 LOCAL_SHARED_LIBRARIES := \
   liblog \
-  libexpat \
   libutils \
   libcutils \
-  libcamera_metadata \
-  libcamera_client
 
 LOCAL_C_INCLUDES += \
   $(LOCAL_PATH)/../include \

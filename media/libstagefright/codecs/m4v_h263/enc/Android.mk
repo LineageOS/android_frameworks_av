@@ -65,13 +65,9 @@ LOCAL_STATIC_LIBRARIES := \
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright \
-        libstagefright_enc_common \
-        libstagefright_foundation \
         libstagefright_omx \
         libutils \
         liblog \
-        libui
-
 
 LOCAL_MODULE := libstagefright_soft_mpeg4enc
 LOCAL_MODULE_TAGS := optional

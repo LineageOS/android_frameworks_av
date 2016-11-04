@@ -19,7 +19,6 @@ LOCAL_C_INCLUDES += $(TOP)/frameworks/native/include/media/openmax
 
 LOCAL_SHARED_LIBRARIES  := libstagefright
 LOCAL_SHARED_LIBRARIES  += libstagefright_omx
-LOCAL_SHARED_LIBRARIES  += libstagefright_foundation
 LOCAL_SHARED_LIBRARIES  += libutils
 LOCAL_SHARED_LIBRARIES  += liblog
 
