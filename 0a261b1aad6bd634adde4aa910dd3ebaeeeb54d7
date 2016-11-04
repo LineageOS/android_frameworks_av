@@ -1,0 +1,72 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ff2e2bb8_d7ba5008",
+        "filename": "media/libstagefright/ACodec.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 835,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-11-04T02:52:13Z",
+      "side": 1,
+      "message": "Probably better to check for CAMCORDER_GRALLOC_SOURCE explicitly here.",
+      "revId": "0a261b1aad6bd634adde4aa910dd3ebaeeeb54d7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_7741c40b",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 1280,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-11-04T02:52:13Z",
+      "side": 1,
+      "message": "Do you need to put the other stuff into an #else block to avoid compiler warnings?",
+      "revId": "0a261b1aad6bd634adde4aa910dd3ebaeeeb54d7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_5744801b",
+        "filename": "media/libstagefright/SurfaceMediaSource.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 132,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-11-04T02:52:13Z",
+      "side": 1,
+      "message": "Better to explicitly check for CAMCORDER_GRALLOC_SOURCE here.",
+      "revId": "0a261b1aad6bd634adde4aa910dd3ebaeeeb54d7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_b74a2c24",
+        "filename": "media/libstagefright/SurfaceMediaSource.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 388,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-11-04T02:52:13Z",
+      "side": 1,
+      "message": "Same here.",
+      "revId": "0a261b1aad6bd634adde4aa910dd3ebaeeeb54d7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
