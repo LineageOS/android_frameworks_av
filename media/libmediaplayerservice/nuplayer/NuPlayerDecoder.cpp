@@ -711,6 +711,10 @@ void NuPlayer::Decoder::handleOutputFormatChange(const sp<AMessage> &format) {
             flags = AUDIO_OUTPUT_FLAG_NONE;
         }
 
+        // TODO: This is a temporary fix to flush audio buffers in renderer. The real
+        // fix should be to wait for all buffers rendered normally, then open a new
+        // AudioSink.
+        mRenderer->flush(true /* audio */, false /* notifyComplete */);
         status_t err = mRenderer->openAudioSink(
                 format, false /* offloadOnly */, hasVideo, flags, NULL /* isOffloaed */);
         if (err != OK) {
