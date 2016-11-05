@@ -11,7 +11,6 @@ LOCAL_SHARED_LIBRARIES := \
 	libbinder \
 	libcutils \
 	liblog \
-	libmedia \
 	libmedialogservice \
 	libradioservice \
 	libsoundtriggerservice \
