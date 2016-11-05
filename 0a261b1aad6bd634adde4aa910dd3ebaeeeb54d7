@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "ff2e2bb8_28c0767b",
+        "filename": "media/libstagefright/ACodec.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 835,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2016-11-05T22:27:17Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "ff2e2bb8_d7ba5008",
+      "revId": "0a261b1aad6bd634adde4aa910dd3ebaeeeb54d7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "ff2e2bb8_7741c40b",
         "filename": "media/libstagefright/CameraSource.cpp",
         "patchSetId": 2
@@ -30,6 +48,24 @@
       "writtenOn": "2016-11-04T02:52:13Z",
       "side": 1,
       "message": "Do you need to put the other stuff into an #else block to avoid compiler warnings?",
+      "revId": "0a261b1aad6bd634adde4aa910dd3ebaeeeb54d7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_483a1a98",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 1280,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2016-11-05T22:27:17Z",
+      "side": 1,
+      "message": "There aren\u0027t any compiler warnings here",
+      "parentUuid": "ff2e2bb8_7741c40b",
       "revId": "0a261b1aad6bd634adde4aa910dd3ebaeeeb54d7",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
@@ -53,6 +89,24 @@
     },
     {
       "key": {
+        "uuid": "ff2e2bb8_08bbf20d",
+        "filename": "media/libstagefright/SurfaceMediaSource.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 132,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2016-11-05T22:27:17Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "ff2e2bb8_5744801b",
+      "revId": "0a261b1aad6bd634adde4aa910dd3ebaeeeb54d7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "ff2e2bb8_b74a2c24",
         "filename": "media/libstagefright/SurfaceMediaSource.cpp",
         "patchSetId": 2
@@ -64,6 +118,24 @@
       "writtenOn": "2016-11-04T02:52:13Z",
       "side": 1,
       "message": "Same here.",
+      "revId": "0a261b1aad6bd634adde4aa910dd3ebaeeeb54d7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_68371eb2",
+        "filename": "media/libstagefright/SurfaceMediaSource.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 388,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2016-11-05T22:27:17Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "ff2e2bb8_b74a2c24",
       "revId": "0a261b1aad6bd634adde4aa910dd3ebaeeeb54d7",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
