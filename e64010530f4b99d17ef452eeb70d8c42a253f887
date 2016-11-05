@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ff2e2bb8_286eb694",
+        "filename": "media/libstagefright/SurfaceMediaSource.cpp",
+        "patchSetId": 6
+      },
+      "lineNbr": 132,
+      "author": {
+        "id": 10067
+      },
+      "writtenOn": "2016-11-05T22:42:24Z",
+      "side": 1,
+      "message": "It should be #ifdef here.",
+      "range": {
+        "startLine": 132,
+        "startChar": 0,
+        "endLine": 132,
+        "endChar": 7
+      },
+      "revId": "e64010530f4b99d17ef452eeb70d8c42a253f887",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
