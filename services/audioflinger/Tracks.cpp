@@ -13,6 +13,25 @@
 ** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
+ *
+ * This file was modified by Dolby Laboratories, Inc. The portions of the
+ * code that are surrounded by "DOLBY..." are copyrighted and
+ * licensed separately, as follows:
+ *
+ *  (C) 2014-2016 Dolby Laboratories, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
 */
 
 
@@ -34,6 +53,10 @@
 #include <media/nbaio/Pipe.h>
 #include <media/nbaio/PipeReader.h>
 #include <audio_utils/minifloat.h>
+#ifdef DOLBY_ENABLE // DOLBY_UDC_VIRTUALIZE_AUDIO
+#include <media/AudioParameter.h>
+#include "ds_config.h"
+#endif // DOLBY_END
 
 // ----------------------------------------------------------------------------
 
@@ -423,6 +446,9 @@ AudioFlinger::PlaybackThread::Track::~Track()
     if (mSharedBuffer != 0) {
         mSharedBuffer.clear();
     }
+#ifdef DOLBY_ENABLE // DOLBY_UDC_VIRTUALIZE_AUDIO
+    EffectDapController::instance()->trackDestroyed(mId);
+#endif // DOLBY_END
 }
 
 status_t AudioFlinger::PlaybackThread::Track::initCheck() const
@@ -687,6 +713,14 @@ status_t AudioFlinger::PlaybackThread::Track::start(AudioSystem::sync_event_t ev
                 mState = state;
             }
         }
+#ifdef DOLBY_ENABLE // DOLBY_UDC_VIRTUALIZE_AUDIO
+        if (mState != state) {
+            // This call will disable content processing in global DAP if this track
+            // is carrying processed audio. The content processing will be re-enabled
+            // when this track has been exhausted by MixerThread::prepareTracks_l()
+            EffectDapController::instance()->trackStateChanged(mId, mState);
+        }
+#endif // DOLBY_END
         // track was already in the active list, not a problem
         if (status == ALREADY_EXISTS) {
             status = NO_ERROR;
@@ -850,6 +884,22 @@ void AudioFlinger::PlaybackThread::Track::reset()
 
 status_t AudioFlinger::PlaybackThread::Track::setParameters(const String8& keyValuePairs)
 {
+#ifdef DOLBY_ENABLE // DOLBY_UDC_VIRTUALIZE_AUDIO
+    AudioParameter ap(keyValuePairs);
+    int value = 0;
+    if (ap.getInt(String8(DOLBY_PARAM_PROCESSED_AUDIO), value) == NO_ERROR) {
+        if (value) {
+            // Bypass content processing if processed audio is flowing through this track.
+            ALOGI("%s(): Marking track %d as containing processed audio", __FUNCTION__, mId);
+            EffectDapController::instance()->trackContainsProcessedAudio(mId, mState);
+        } else {
+            // Remove the track if it is no longer carrying processed audio.
+            ALOGI("%s(): Clearing track %d processed audio mark", __FUNCTION__, mId);
+            EffectDapController::instance()->trackDestroyed(mId);
+        }
+        return NO_ERROR;
+    }
+#endif // DOLBY_END
     sp<ThreadBase> thread = mThread.promote();
     if (thread == 0) {
         ALOGE("thread is dead");
@@ -879,6 +929,14 @@ status_t AudioFlinger::PlaybackThread::Track::getTimestamp(AudioTimestamp& times
 
 status_t AudioFlinger::PlaybackThread::Track::attachAuxEffect(int EffectId)
 {
+#ifdef DOLBY_ENABLE // DOLBY_UDC_VIRTUALIZE_AUDIO
+    // The track contains processed audio if EffectId is DOLBY_PROCESSED_AUDIO_EFFECT_ID
+    if (EffectId == DOLBY_PROCESSED_AUDIO_EFFECT_ID) {
+        ALOGI("%s(): Marking track %d as containing processed audio", __FUNCTION__, mId);
+        EffectDapController::instance()->trackContainsProcessedAudio(mId, mState);
+        return NO_ERROR;
+    }
+#endif // DOLBY_END
     status_t status = DEAD_OBJECT;
     sp<ThreadBase> thread = mThread.promote();
     if (thread != 0) {
