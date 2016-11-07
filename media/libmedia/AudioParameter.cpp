@@ -83,7 +83,7 @@ AudioParameter::~AudioParameter()
     mParameters.clear();
 }
 
-String8 AudioParameter::toString()
+String8 AudioParameter::toString() const
 {
     String8 str = String8("");
 
@@ -140,7 +140,7 @@ status_t AudioParameter::remove(const String8& key)
     }
 }
 
-status_t AudioParameter::get(const String8& key, String8& value)
+status_t AudioParameter::get(const String8& key, String8& value) const
 {
     if (mParameters.indexOfKey(key) >= 0) {
         value = mParameters.valueFor(key);
@@ -150,7 +150,7 @@ status_t AudioParameter::get(const String8& key, String8& value)
     }
 }
 
-status_t AudioParameter::getInt(const String8& key, int& value)
+status_t AudioParameter::getInt(const String8& key, int& value) const
 {
     String8 str8;
     status_t result = get(key, str8);
@@ -166,7 +166,7 @@ status_t AudioParameter::getInt(const String8& key, int& value)
     return result;
 }
 
-status_t AudioParameter::getFloat(const String8& key, float& value)
+status_t AudioParameter::getFloat(const String8& key, float& value) const
 {
     String8 str8;
     status_t result = get(key, str8);
@@ -182,7 +182,7 @@ status_t AudioParameter::getFloat(const String8& key, float& value)
     return result;
 }
 
-status_t AudioParameter::getAt(size_t index, String8& key, String8& value)
+status_t AudioParameter::getAt(size_t index, String8& key, String8& value) const
 {
     if (mParameters.size() > index) {
         key = mParameters.keyAt(index);

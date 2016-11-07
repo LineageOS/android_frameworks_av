@@ -75,7 +75,7 @@ public:
 
     static const char * const valueListSeparator;
 
-    String8 toString();
+    String8 toString() const;
 
     status_t add(const String8& key, const String8& value);
     status_t addInt(const String8& key, const int value);
@@ -83,12 +83,12 @@ public:
 
     status_t remove(const String8& key);
 
-    status_t get(const String8& key, String8& value);
-    status_t getInt(const String8& key, int& value);
-    status_t getFloat(const String8& key, float& value);
-    status_t getAt(size_t index, String8& key, String8& value);
+    status_t get(const String8& key, String8& value) const;
+    status_t getInt(const String8& key, int& value) const;
+    status_t getFloat(const String8& key, float& value) const;
+    status_t getAt(size_t index, String8& key, String8& value) const;
 
-    size_t size() { return mParameters.size(); }
+    size_t size() const { return mParameters.size(); }
 
 private:
     String8 mKeyValuePairs;

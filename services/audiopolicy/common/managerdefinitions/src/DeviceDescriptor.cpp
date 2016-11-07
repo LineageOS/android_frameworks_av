@@ -285,7 +285,7 @@ status_t DeviceDescriptor::dump(int fd, int spaces, int index, bool verbose) con
         result.append(buffer);
     }
     std::string deviceLiteral;
-    if (DeviceConverter::toString(mDeviceType, deviceLiteral)) {
+    if (deviceToString(mDeviceType, deviceLiteral)) {
         snprintf(buffer, SIZE, "%*s- type: %-48s\n", spaces, "", deviceLiteral.c_str());
         result.append(buffer);
     }
@@ -302,7 +302,7 @@ status_t DeviceDescriptor::dump(int fd, int spaces, int index, bool verbose) con
 void DeviceDescriptor::log() const
 {
     std::string device;
-    DeviceConverter::toString(mDeviceType, device);
+    deviceToString(mDeviceType, device);
     ALOGI("Device id:%d type:0x%X:%s, addr:%s", mId,  mDeviceType, device.c_str(),
           mAddress.string());
 
