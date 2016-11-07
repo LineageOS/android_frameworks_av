@@ -59,7 +59,7 @@ LOCAL_SHARED_LIBRARIES := \
         libcamera_client libstagefright_foundation \
         libgui libdl libaudioutils libaudioclient
 
-LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder
+LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder libsonivox
 
 LOCAL_WHOLE_STATIC_LIBRARIES := libmedia_helper
 
