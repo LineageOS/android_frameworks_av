@@ -2226,6 +2226,14 @@ void Camera3Device::returnOutputBuffers(
     }
 }
 
+void Camera3Device::removeInFlightMapEntryLocked(int idx) {
+    mInFlightMap.removeItemsAt(idx, 1);
+
+    // Indicate idle inFlightMap to the status tracker
+    if (mInFlightMap.size() == 0) {
+        mStatusTracker->markComponentIdle(mInFlightStatusId, Fence::NO_FENCE);
+    }
+}
 
 void Camera3Device::removeInFlightRequestIfReadyLocked(int idx) {
 
@@ -2261,13 +2269,7 @@ void Camera3Device::removeInFlightRequestIfReadyLocked(int idx) {
         returnOutputBuffers(request.pendingOutputBuffers.array(),
             request.pendingOutputBuffers.size(), 0);
 
-        mInFlightMap.removeItemsAt(idx, 1);
-
-        // Indicate idle inFlightMap to the status tracker
-        if (mInFlightMap.size() == 0) {
-            mStatusTracker->markComponentIdle(mInFlightStatusId, Fence::NO_FENCE);
-        }
-
+        removeInFlightMapEntryLocked(idx);
         ALOGVV("%s: removed frame %d from InFlightMap", __FUNCTION__, frameNumber);
      }
 
@@ -3441,6 +3443,20 @@ void Camera3Device::RequestThread::cleanUpFailedRequests(bool sendRequestError) 
                         hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_REQUEST,
                         captureRequest->mResultExtras);
             }
+        }
+
+        // Remove yet-to-be submitted inflight request from inflightMap
+        {
+          sp<Camera3Device> parent = mParent.promote();
+          if (parent != NULL) {
+              Mutex::Autolock l(parent->mInFlightLock);
+              ssize_t idx = parent->mInFlightMap.indexOfKey(captureRequest->mResultExtras.frameNumber);
+              if (idx >= 0) {
+                  ALOGV("%s: Remove inflight request from queue: frameNumber %" PRId64,
+                        __FUNCTION__, captureRequest->mResultExtras.frameNumber);
+                  parent->removeInFlightMapEntryLocked(idx);
+              }
+          }
         }
     }
 

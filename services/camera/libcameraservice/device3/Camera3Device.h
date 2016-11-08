@@ -852,6 +852,9 @@ class Camera3Device :
 
     /**** Scope for mInFlightLock ****/
 
+    // Remove the in-flight map entry of the given index from mInFlightMap.
+    // It must only be called with mInFlightLock held.
+    void removeInFlightMapEntryLocked(int idx);
     // Remove the in-flight request of the given index from mInFlightMap
     // if it's no longer needed. It must only be called with mInFlightLock held.
     void removeInFlightRequestIfReadyLocked(int idx);
