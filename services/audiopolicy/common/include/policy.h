@@ -47,16 +47,6 @@ static const audio_format_t gDynamicFormat = AUDIO_FORMAT_DEFAULT;
 #define APM_AUDIO_DEVICE_IN_MATCH_ADDRESS_ALL (AUDIO_DEVICE_IN_REMOTE_SUBMIX|AUDIO_DEVICE_IN_BUS)
 
 /**
- * Stub audio output device. Used in policy configuration file on platforms without audio outputs.
- * This alias value to AUDIO_DEVICE_OUT_DEFAULT is only used in the audio policy context.
- */
-#define AUDIO_DEVICE_OUT_STUB AUDIO_DEVICE_OUT_DEFAULT
-/**
- * Stub audio input device. Used in policy configuration file on platforms without audio inputs.
- * This alias value to AUDIO_DEVICE_IN_DEFAULT is only used in the audio policy context.
- */
-#define AUDIO_DEVICE_IN_STUB AUDIO_DEVICE_IN_DEFAULT
-/**
  * Alias to AUDIO_DEVICE_OUT_DEFAULT defined for clarification when this value is used by volume
  * control APIs (e.g setStreamVolumeIndex().
  */
