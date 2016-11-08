@@ -203,6 +203,18 @@ void NuPlayer::Decoder::onMessageReceived(const sp<AMessage> &msg) {
             break;
         }
 
+        case kWhatAudioOutputFormatChanged:
+        {
+            if (!isStaleReply(msg)) {
+                status_t err;
+                if (msg->findInt32("err", &err) && err != OK) {
+                    ALOGE("Renderer reported 0x%x when changing audio output format", err);
+                    handleError(err);
+                }
+            }
+            break;
+        }
+
         case kWhatSetVideoSurface:
         {
             sp<AReplyToken> replyID;
@@ -711,15 +723,10 @@ void NuPlayer::Decoder::handleOutputFormatChange(const sp<AMessage> &format) {
             flags = AUDIO_OUTPUT_FLAG_NONE;
         }
 
-        // TODO: This is a temporary fix to flush audio buffers in renderer. The real
-        // fix should be to wait for all buffers rendered normally, then open a new
-        // AudioSink.
-        mRenderer->flush(true /* audio */, false /* notifyComplete */);
-        status_t err = mRenderer->openAudioSink(
-                format, false /* offloadOnly */, hasVideo, flags, NULL /* isOffloaed */);
-        if (err != OK) {
-            handleError(err);
-        }
+        sp<AMessage> reply = new AMessage(kWhatAudioOutputFormatChanged, this);
+        reply->setInt32("generation", mBufferGeneration);
+        mRenderer->changeAudioFormat(
+                format, false /* offloadOnly */, hasVideo, flags, reply);
     }
 }
 
