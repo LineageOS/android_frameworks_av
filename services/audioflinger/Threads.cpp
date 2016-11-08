@@ -929,12 +929,12 @@ void AudioFlinger::ThreadBase::getPowerManager_l() {
     }
 }
 
-void AudioFlinger::ThreadBase::updateWakeLockUids_l(const SortedVector<int> &uids) {
+void AudioFlinger::ThreadBase::updateWakeLockUids_l(const SortedVector<uid_t> &uids) {
     getPowerManager_l();
 
 #if !LOG_NDEBUG
     std::stringstream s;
-    for (int uid : uids) {
+    for (uid_t uid : uids) {
         s << uid << " ";
     }
     ALOGD("updateWakeLockUids_l %s uids:%s", mThreadName, s.str().c_str());
