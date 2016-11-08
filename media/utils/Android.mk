@@ -20,6 +20,7 @@ LOCAL_SRC_FILES := \
   BatteryNotifier.cpp \
   ISchedulingPolicyService.cpp \
   MemoryLeakTrackUtil.cpp \
+  ProcessInfo.cpp \
   SchedulingPolicyService.cpp
 
 LOCAL_SHARED_LIBRARIES := \
