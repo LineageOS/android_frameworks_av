@@ -72,7 +72,7 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
             size_t frameCount,
             void *buffer,
             audio_session_t sessionId,
-            int clientUid,
+            uid_t clientUid,
             bool isOut,
             alloc_type alloc,
             track_type type)
@@ -99,10 +99,10 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
         mThreadIoHandle(thread->id())
 {
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
-    if (!isTrustedCallingUid(callingUid) || clientUid == -1) {
-        ALOGW_IF(clientUid != -1 && clientUid != (int)callingUid,
+    if (!isTrustedCallingUid(callingUid) || clientUid == AUDIO_UID_INVALID) {
+        ALOGW_IF(clientUid != AUDIO_UID_INVALID && clientUid != callingUid,
                 "%s uid %d tried to pass itself off as %d", __FUNCTION__, callingUid, clientUid);
-        clientUid = (int)callingUid;
+        clientUid = callingUid;
     }
     // clientUid contains the uid of the app that is responsible for this track, so we can blame
     // battery usage on it.
@@ -341,7 +341,7 @@ AudioFlinger::PlaybackThread::Track::Track(
             void *buffer,
             const sp<IMemory>& sharedBuffer,
             audio_session_t sessionId,
-            int uid,
+            uid_t uid,
             audio_output_flags_t flags,
             track_type type)
     :   TrackBase(thread, client, sampleRate, format, channelMask, frameCount,
@@ -1138,7 +1138,7 @@ AudioFlinger::PlaybackThread::OutputTrack::OutputTrack(
             audio_format_t format,
             audio_channel_mask_t channelMask,
             size_t frameCount,
-            int uid)
+            uid_t uid)
     :   Track(playbackThread, NULL, AUDIO_STREAM_PATCH,
               sampleRate, format, channelMask, frameCount,
               NULL, 0, AUDIO_SESSION_NONE, uid, AUDIO_OUTPUT_FLAG_NONE,
@@ -1474,7 +1474,7 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
             size_t frameCount,
             void *buffer,
             audio_session_t sessionId,
-            int uid,
+            uid_t uid,
             audio_input_flags_t flags,
             track_type type)
     :   TrackBase(thread, client, sampleRate, format,

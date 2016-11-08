@@ -204,7 +204,7 @@ AudioTrack::AudioTrack(
         audio_session_t sessionId,
         transfer_type transferType,
         const audio_offload_info_t *offloadInfo,
-        int uid,
+        uid_t uid,
         pid_t pid,
         const audio_attributes_t* pAttributes,
         bool doNotReconnect,
@@ -235,7 +235,7 @@ AudioTrack::AudioTrack(
         audio_session_t sessionId,
         transfer_type transferType,
         const audio_offload_info_t *offloadInfo,
-        int uid,
+        uid_t uid,
         pid_t pid,
         const audio_attributes_t* pAttributes,
         bool doNotReconnect,
@@ -296,7 +296,7 @@ status_t AudioTrack::set(
         audio_session_t sessionId,
         transfer_type transferType,
         const audio_offload_info_t *offloadInfo,
-        int uid,
+        uid_t uid,
         pid_t pid,
         const audio_attributes_t* pAttributes,
         bool doNotReconnect,
@@ -490,7 +490,7 @@ status_t AudioTrack::set(
     }
     int callingpid = IPCThreadState::self()->getCallingPid();
     int mypid = getpid();
-    if (uid == -1 || (callingpid != mypid)) {
+    if (uid == AUDIO_UID_INVALID || (callingpid != mypid)) {
         mClientUid = IPCThreadState::self()->getCallingUid();
     } else {
         mClientUid = uid;

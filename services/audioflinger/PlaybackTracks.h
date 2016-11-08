@@ -32,7 +32,7 @@ public:
                                 void *buffer,
                                 const sp<IMemory>& sharedBuffer,
                                 audio_session_t sessionId,
-                                int uid,
+                                uid_t uid,
                                 audio_output_flags_t flags,
                                 track_type type);
     virtual             ~Track();
@@ -188,7 +188,7 @@ public:
                                 audio_format_t format,
                                 audio_channel_mask_t channelMask,
                                 size_t frameCount,
-                                int uid);
+                                uid_t uid);
     virtual             ~OutputTrack();
 
     virtual status_t    start(AudioSystem::sync_event_t event =
