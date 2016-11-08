@@ -54,6 +54,8 @@ const OutputDeviceConverter::Table OutputDeviceConverter::mTable[] = {
     MAKE_STRING_FROM_ENUM(AUDIO_DEVICE_OUT_IP),
     MAKE_STRING_FROM_ENUM(AUDIO_DEVICE_OUT_BUS),
     MAKE_STRING_FROM_ENUM(AUDIO_DEVICE_OUT_DEFAULT),
+    // STUB must be after DEFAULT, so the latter is picked up by toString first.
+    MAKE_STRING_FROM_ENUM(AUDIO_DEVICE_OUT_STUB),
     TERMINATOR
 };
 
@@ -86,6 +88,8 @@ const InputDeviceConverter::Table InputDeviceConverter::mTable[] = {
     MAKE_STRING_FROM_ENUM(AUDIO_DEVICE_IN_IP),
     MAKE_STRING_FROM_ENUM(AUDIO_DEVICE_IN_BUS),
     MAKE_STRING_FROM_ENUM(AUDIO_DEVICE_IN_DEFAULT),
+    // STUB must be after DEFAULT, so the latter is picked up by toString first.
+    MAKE_STRING_FROM_ENUM(AUDIO_DEVICE_IN_STUB),
     TERMINATOR
 };
 
