@@ -4758,6 +4758,11 @@ void AudioFlinger::DirectOutputThread::onAddNewTrack_l()
                 mFlushPending = true;
             }
         }
+    } else if (previousTrack == 0) {
+        // there could be an old track added back during track transition for direct
+        // output, so always issues flush to flush data of the previous track if it
+        // was already destroyed with HAL paused, then flush can resume the playback
+        mFlushPending = true;
     }
     PlaybackThread::onAddNewTrack_l();
 }
