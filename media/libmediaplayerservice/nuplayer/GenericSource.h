@@ -71,7 +71,7 @@ struct NuPlayer::GenericSource : public NuPlayer::Source {
     virtual sp<AMessage> getTrackInfo(size_t trackIndex) const;
     virtual ssize_t getSelectedTrack(media_track_type type) const;
     virtual status_t selectTrack(size_t trackIndex, bool select, int64_t timeUs);
-    virtual status_t seekTo(int64_t seekTimeUs, bool precise = false);
+    virtual status_t seekTo(int64_t seekTimeUs, bool precise = false) override;
 
     virtual status_t setBuffers(bool audio, Vector<MediaBuffer *> &buffers);
 
@@ -276,13 +276,15 @@ private:
 
     sp<ABuffer> mediaBufferToABuffer(
             MediaBuffer *mbuf,
-            media_track_type trackType,
-            int64_t seekTimeUs,
-            bool precise,
-            int64_t *actualTimeUs = NULL);
+            media_track_type trackType);
 
     void postReadBuffer(media_track_type trackType);
     void onReadBuffer(const sp<AMessage>& msg);
+    // |precise| is a modifier of |seekTimeUs|.
+    // When |precise| is true, the buffer read shall include an item indicating skipping
+    // rendering all buffers with timestamp earlier than |seekTimeUs|.
+    // When |precise| is false, the buffer read will not include the item as above in order
+    // to facilitate fast seek operation.
     void readBuffer(
             media_track_type trackType,
             int64_t seekTimeUs = -1ll, bool precise = false,
