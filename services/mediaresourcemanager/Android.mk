@@ -4,7 +4,7 @@ include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := ResourceManagerService.cpp ServiceLog.cpp
 
-LOCAL_SHARED_LIBRARIES := libmedia libstagefright libbinder libutils liblog
+LOCAL_SHARED_LIBRARIES := libmedia libmediautils libbinder libutils liblog
 
 LOCAL_MODULE:= libresourcemanagerservice
 

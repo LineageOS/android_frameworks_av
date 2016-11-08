@@ -10,15 +10,11 @@ LOCAL_SRC_FILES:= \
     aidl/android/IOMXBufferSource.aidl
 
 LOCAL_SRC_FILES += \
-    ICrypto.cpp \
     IDataSource.cpp \
-    IDrm.cpp \
-    IDrmClient.cpp \
     IHDCP.cpp \
     mediaplayer.cpp \
     IMediaCodecList.cpp \
     IMediaCodecService.cpp \
-    IMediaDrmService.cpp \
     IMediaHTTPConnection.cpp \
     IMediaHTTPService.cpp \
     IMediaExtractor.cpp           \

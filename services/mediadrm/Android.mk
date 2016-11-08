@@ -25,7 +25,6 @@ LOCAL_SHARED_LIBRARIES:= \
     libbinder \
     libcutils \
     liblog \
-    libmedia \
     libmediadrm \
     libutils \
 
