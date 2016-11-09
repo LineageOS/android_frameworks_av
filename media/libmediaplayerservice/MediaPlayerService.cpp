@@ -577,7 +577,7 @@ MediaPlayerService::Client::Client(
     mLoop = false;
     mStatus = NO_INIT;
     mAudioSessionId = audioSessionId;
-    mUID = uid;
+    mUid = uid;
     mRetransmitEndpointValid = false;
     mAudioAttributes = NULL;
 
@@ -643,7 +643,7 @@ sp<MediaPlayerBase> MediaPlayerService::Client::createPlayer(player_type playerT
     }
 
     if (p != NULL) {
-        p->setUID(mUID);
+        p->setUID(mUid);
     }
 
     return p;
@@ -1386,7 +1386,7 @@ int Antagonizer::callbackThread(void* user)
 
 #undef LOG_TAG
 #define LOG_TAG "AudioSink"
-MediaPlayerService::AudioOutput::AudioOutput(audio_session_t sessionId, int uid, int pid,
+MediaPlayerService::AudioOutput::AudioOutput(audio_session_t sessionId, uid_t uid, int pid,
         const audio_attributes_t* attr)
     : mCallback(NULL),
       mCallbackCookie(NULL),
@@ -2348,7 +2348,7 @@ void MediaPlayerService::addBatteryData(uint32_t params)
         return;
     }
 
-    int uid = IPCThreadState::self()->getCallingUid();
+    uid_t uid = IPCThreadState::self()->getCallingUid();
     if (uid == AID_MEDIA) {
         return;
     }

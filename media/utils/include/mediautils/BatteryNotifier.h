@@ -37,17 +37,17 @@ class BatteryNotifier : public Singleton<BatteryNotifier> {
 public:
     ~BatteryNotifier();
 
-    void noteStartVideo(int uid);
-    void noteStopVideo(int uid);
+    void noteStartVideo(uid_t uid);
+    void noteStopVideo(uid_t uid);
     void noteResetVideo();
-    void noteStartAudio(int uid);
-    void noteStopAudio(int uid);
+    void noteStartAudio(uid_t uid);
+    void noteStopAudio(uid_t uid);
     void noteResetAudio();
-    void noteFlashlightOn(const String8& id, int uid);
-    void noteFlashlightOff(const String8& id, int uid);
+    void noteFlashlightOn(const String8& id, uid_t uid);
+    void noteFlashlightOff(const String8& id, uid_t uid);
     void noteResetFlashlight();
-    void noteStartCamera(const String8& id, int uid);
-    void noteStopCamera(const String8& id, int uid);
+    void noteStartCamera(const String8& id, uid_t uid);
+    void noteStopCamera(const String8& id, uid_t uid);
     void noteResetCamera();
 
 private:
@@ -58,10 +58,10 @@ private:
     };
 
     Mutex mLock;
-    std::map<int, int> mVideoRefCounts;
-    std::map<int, int> mAudioRefCounts;
-    std::map<std::pair<String8, int>, bool> mFlashlightState;
-    std::map<std::pair<String8, int>, bool> mCameraState;
+    std::map<uid_t, int> mVideoRefCounts;
+    std::map<uid_t, int> mAudioRefCounts;
+    std::map<std::pair<String8, uid_t>, bool> mFlashlightState;
+    std::map<std::pair<String8, uid_t>, bool> mCameraState;
     sp<IBatteryStats> mBatteryStatService;
     sp<DeathNotifier> mDeathNotifier;
 

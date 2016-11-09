@@ -75,7 +75,7 @@ class MediaPlayerService : public BnMediaPlayerService
         class CallbackData;
 
      public:
-                                AudioOutput(audio_session_t sessionId, int uid, int pid,
+                                AudioOutput(audio_session_t sessionId, uid_t uid, int pid,
                                         const audio_attributes_t * attr);
         virtual                 ~AudioOutput();
 
@@ -152,7 +152,7 @@ class MediaPlayerService : public BnMediaPlayerService
         float                   mMsecsPerFrame;
         size_t                  mFrameSize;
         audio_session_t         mSessionId;
-        int                     mUid;
+        uid_t                   mUid;
         int                     mPid;
         float                   mSendLevel;
         int                     mAuxEffectId;
@@ -402,7 +402,7 @@ private:
                     int32_t                     mConnId;
                     audio_session_t             mAudioSessionId;
                     audio_attributes_t *        mAudioAttributes;
-                    uid_t                       mUID;
+                    uid_t                       mUid;
                     sp<ANativeWindow>           mConnectedWindow;
                     sp<IBinder>                 mConnectedWindowBinder;
                     struct sockaddr_in          mRetransmitEndpoint;
