@@ -360,6 +360,8 @@ status_t AudioFlinger::EffectModule::configure()
 
     if ((mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY) {
         mConfig.inputCfg.channels = AUDIO_CHANNEL_OUT_MONO;
+        mConfig.outputCfg.channels = AUDIO_CHANNEL_OUT_STEREO;
+        ALOGV("Overriding auxiliary effect input as MONO and output as STEREO");
     } else {
         mConfig.inputCfg.channels = channelMask;
         // TODO: Update this logic when multichannel effects are implemented.
