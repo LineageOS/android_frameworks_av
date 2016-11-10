@@ -59,6 +59,8 @@ enum visualizer_state_e {
 
 #define DISCARD_MEASUREMENTS_TIME_MS 2000 // discard measurements older than this number of ms
 
+#define MAX_LATENCY_MS 3000 // 3 seconds of latency for audio pipeline
+
 // maximum number of buffers for which we keep track of the measurements
 #define MEASUREMENT_WINDOW_MAX_SIZE_IN_BUFFERS 25 // note: buffer index is stored in uint8_t
 
@@ -519,18 +521,29 @@ int Visualizer_command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdSize,
             break;
         }
         switch (*(uint32_t *)p->data) {
-        case VISUALIZER_PARAM_CAPTURE_SIZE:
-            pContext->mCaptureSize = *((uint32_t *)p->data + 1);
-            ALOGV("set mCaptureSize = %" PRIu32, pContext->mCaptureSize);
-            break;
+        case VISUALIZER_PARAM_CAPTURE_SIZE: {
+            const uint32_t captureSize = *((uint32_t *)p->data + 1);
+            if (captureSize > VISUALIZER_CAPTURE_SIZE_MAX) {
+                android_errorWriteLog(0x534e4554, "31781965");
+                *(int32_t *)pReplyData = -EINVAL;
+                ALOGW("set mCaptureSize = %u > %u", captureSize, VISUALIZER_CAPTURE_SIZE_MAX);
+            } else {
+                pContext->mCaptureSize = captureSize;
+                ALOGV("set mCaptureSize = %u", captureSize);
+            }
+            } break;
         case VISUALIZER_PARAM_SCALING_MODE:
             pContext->mScalingMode = *((uint32_t *)p->data + 1);
             ALOGV("set mScalingMode = %" PRIu32, pContext->mScalingMode);
             break;
-        case VISUALIZER_PARAM_LATENCY:
-            pContext->mLatency = *((uint32_t *)p->data + 1);
-            ALOGV("set mLatency = %" PRIu32, pContext->mLatency);
-            break;
+        case VISUALIZER_PARAM_LATENCY: {
+            uint32_t latency = *((uint32_t *)p->data + 1);
+            if (latency > MAX_LATENCY_MS) {
+                latency = MAX_LATENCY_MS; // clamp latency b/31781965
+            }
+            pContext->mLatency = latency;
+            ALOGV("set mLatency = %u", latency);
+            } break;
         case VISUALIZER_PARAM_MEASUREMENT_MODE:
             pContext->mMeasurementMode = *((uint32_t *)p->data + 1);
             ALOGV("set mMeasurementMode = %" PRIu32, pContext->mMeasurementMode);
@@ -569,10 +582,18 @@ int Visualizer_command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdSize,
                 if (latencyMs < 0) {
                     latencyMs = 0;
                 }
-                const uint32_t deltaSmpl =
-                    pContext->mConfig.inputCfg.samplingRate * latencyMs / 1000;
-                int32_t capturePoint = pContext->mCaptureIdx - captureSize - deltaSmpl;
+                uint32_t deltaSmpl = captureSize
+                        + pContext->mConfig.inputCfg.samplingRate * latencyMs / 1000;
 
+                // large sample rate, latency, or capture size, could cause overflow.
+                // do not offset more than the size of buffer.
+                if (deltaSmpl > CAPTURE_BUF_SIZE) {
+                    android_errorWriteLog(0x534e4554, "31781965");
+                    deltaSmpl = CAPTURE_BUF_SIZE;
+                }
+
+                int32_t capturePoint = pContext->mCaptureIdx - deltaSmpl;
+                // a negative capturePoint means we wrap the buffer.
                 if (capturePoint < 0) {
                     uint32_t size = -capturePoint;
                     if (size > captureSize) {
