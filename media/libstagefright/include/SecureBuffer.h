@@ -42,8 +42,6 @@ public:
     void *getDestinationPointer();
     ICrypto::DestinationType getDestinationType();
 
-    virtual sp<MediaCodecBuffer> clone(const sp<AMessage> &format) override;
-
 private:
     SecureBuffer() = delete;
 

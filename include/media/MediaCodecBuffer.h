@@ -58,13 +58,13 @@ public:
     sp<AMessage> meta();
     sp<AMessage> format();
 
-    virtual sp<MediaCodecBuffer> clone(const sp<AMessage> &format);
+    void setFormat(const sp<AMessage> &format);
 
 private:
     MediaCodecBuffer() = delete;
 
     const sp<AMessage> mMeta;
-    const sp<AMessage> mFormat;
+    sp<AMessage> mFormat;
     const sp<ABuffer> mBuffer;
     MediaBufferBase *mMediaBufferBase;
 };
