@@ -85,7 +85,7 @@ AudioRecord::AudioRecord(
         audio_session_t sessionId,
         transfer_type transferType,
         audio_input_flags_t flags,
-        int uid,
+        uid_t uid,
         pid_t pid,
         const audio_attributes_t* pAttributes)
     : mActive(false),
@@ -143,7 +143,7 @@ status_t AudioRecord::set(
         audio_session_t sessionId,
         transfer_type transferType,
         audio_input_flags_t flags,
-        int uid,
+        uid_t uid,
         pid_t pid,
         const audio_attributes_t* pAttributes)
 {
@@ -236,7 +236,7 @@ status_t AudioRecord::set(
 
     int callingpid = IPCThreadState::self()->getCallingPid();
     int mypid = getpid();
-    if (uid == -1 || (callingpid != mypid)) {
+    if (uid == AUDIO_UID_INVALID || (callingpid != mypid)) {
         mClientUid = IPCThreadState::self()->getCallingUid();
     } else {
         mClientUid = uid;

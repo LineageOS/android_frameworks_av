@@ -929,12 +929,12 @@ void AudioFlinger::ThreadBase::getPowerManager_l() {
     }
 }
 
-void AudioFlinger::ThreadBase::updateWakeLockUids_l(const SortedVector<int> &uids) {
+void AudioFlinger::ThreadBase::updateWakeLockUids_l(const SortedVector<uid_t> &uids) {
     getPowerManager_l();
 
 #if !LOG_NDEBUG
     std::stringstream s;
-    for (int uid : uids) {
+    for (uid_t uid : uids) {
         s << uid << " ";
     }
     ALOGD("updateWakeLockUids_l %s uids:%s", mThreadName, s.str().c_str());
@@ -949,10 +949,10 @@ void AudioFlinger::ThreadBase::updateWakeLockUids_l(const SortedVector<int> &uid
         return;
     }
     if (mPowerManager != 0) {
-        sp<IBinder> binder = new BBinder();
-        status_t status;
-        status = mPowerManager->updateWakeLockUids(mWakeLockToken, uids.size(), uids.array(),
-                    true /* FIXME force oneway contrary to .aidl */);
+        std::vector<int> uidsAsInt(uids.begin(), uids.end()); // powermanager expects uids as ints
+        status_t status = mPowerManager->updateWakeLockUids(
+                mWakeLockToken, uidsAsInt.size(), uidsAsInt.data(),
+                true /* FIXME force oneway contrary to .aidl */);
         ALOGV("updateWakeLockUids_l() %s status %d", mThreadName, status);
     }
 }
@@ -1753,7 +1753,7 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
         audio_session_t sessionId,
         audio_output_flags_t *flags,
         pid_t tid,
-        int uid,
+        uid_t uid,
         status_t *status)
 {
     size_t frameCount = *pFrameCount;
@@ -4416,7 +4416,7 @@ uint32_t AudioFlinger::PlaybackThread::trackCountForUid_l(uid_t uid)
 {
     uint32_t trackCount = 0;
     for (size_t i = 0; i < mTracks.size() ; i++) {
-        if (mTracks[i]->uid() == (int)uid) {
+        if (mTracks[i]->uid() == uid) {
             trackCount++;
         }
     }
@@ -6351,7 +6351,7 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
         size_t *pFrameCount,
         audio_session_t sessionId,
         size_t *notificationFrames,
-        int uid,
+        uid_t uid,
         audio_input_flags_t *flags,
         pid_t tid,
         status_t *status)

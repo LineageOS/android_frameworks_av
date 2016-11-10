@@ -62,7 +62,7 @@ public:
                                 size_t frameCount,
                                 void *buffer,
                                 audio_session_t sessionId,
-                                int uid,
+                                uid_t uid,
                                 bool isOut,
                                 alloc_type alloc = ALLOC_CBLK,
                                 track_type type = TYPE_DEFAULT);
@@ -75,7 +75,7 @@ public:
             sp<IMemory> getCblk() const { return mCblkMemory; }
             audio_track_cblk_t* cblk() const { return mCblk; }
             audio_session_t sessionId() const { return mSessionId; }
-            int         uid() const { return mUid; }
+            uid_t       uid() const { return mUid; }
     virtual status_t    setSyncEvent(const sp<SyncEvent>& event);
 
             sp<IMemory> getBuffers() const { return mBufferMemory; }
@@ -153,7 +153,7 @@ protected:
                                     // openRecord(), and then adjusted as needed
 
     const audio_session_t mSessionId;
-    int                 mUid;
+    uid_t               mUid;
     Vector < sp<SyncEvent> >mSyncEvents;
     const bool          mIsOut;
     sp<ServerProxy>     mServerProxy;

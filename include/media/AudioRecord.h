@@ -180,7 +180,7 @@ public:
                                     audio_session_t sessionId = AUDIO_SESSION_ALLOCATE,
                                     transfer_type transferType = TRANSFER_DEFAULT,
                                     audio_input_flags_t flags = AUDIO_INPUT_FLAG_NONE,
-                                    int uid = -1,
+                                    uid_t uid = AUDIO_UID_INVALID,
                                     pid_t pid = -1,
                                     const audio_attributes_t* pAttributes = NULL);
 
@@ -218,7 +218,7 @@ public:
                             audio_session_t sessionId = AUDIO_SESSION_ALLOCATE,
                             transfer_type transferType = TRANSFER_DEFAULT,
                             audio_input_flags_t flags = AUDIO_INPUT_FLAG_NONE,
-                            int uid = -1,
+                            uid_t uid = AUDIO_UID_INVALID,
                             pid_t pid = -1,
                             const audio_attributes_t* pAttributes = NULL);
 
@@ -642,7 +642,7 @@ private:
 
     sp<DeathNotifier>       mDeathNotifier;
     uint32_t                mSequence;              // incremented for each new IAudioRecord attempt
-    int                     mClientUid;
+    uid_t                   mClientUid;
     pid_t                   mClientPid;
     audio_attributes_t      mAttributes;
 

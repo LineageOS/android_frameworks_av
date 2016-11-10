@@ -30,7 +30,7 @@ public:
                                 size_t frameCount,
                                 void *buffer,
                                 audio_session_t sessionId,
-                                int uid,
+                                uid_t uid,
                                 audio_input_flags_t flags,
                                 track_type type);
     virtual             ~RecordTrack();

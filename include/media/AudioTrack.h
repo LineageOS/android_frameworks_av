@@ -233,7 +233,7 @@ public:
                                     audio_session_t sessionId  = AUDIO_SESSION_ALLOCATE,
                                     transfer_type transferType = TRANSFER_DEFAULT,
                                     const audio_offload_info_t *offloadInfo = NULL,
-                                    int uid = -1,
+                                    uid_t uid = AUDIO_UID_INVALID,
                                     pid_t pid = -1,
                                     const audio_attributes_t* pAttributes = NULL,
                                     bool doNotReconnect = false,
@@ -263,7 +263,7 @@ public:
                                     audio_session_t sessionId   = AUDIO_SESSION_ALLOCATE,
                                     transfer_type transferType = TRANSFER_DEFAULT,
                                     const audio_offload_info_t *offloadInfo = NULL,
-                                    int uid = -1,
+                                    uid_t uid = AUDIO_UID_INVALID,
                                     pid_t pid = -1,
                                     const audio_attributes_t* pAttributes = NULL,
                                     bool doNotReconnect = false,
@@ -309,7 +309,7 @@ public:
                             audio_session_t sessionId  = AUDIO_SESSION_ALLOCATE,
                             transfer_type transferType = TRANSFER_DEFAULT,
                             const audio_offload_info_t *offloadInfo = NULL,
-                            int uid = -1,
+                            uid_t uid = AUDIO_UID_INVALID,
                             pid_t pid = -1,
                             const audio_attributes_t* pAttributes = NULL,
                             bool doNotReconnect = false,
@@ -1130,7 +1130,7 @@ private:
 
     sp<DeathNotifier>       mDeathNotifier;
     uint32_t                mSequence;              // incremented for each new IAudioTrack attempt
-    int                     mClientUid;
+    uid_t                   mClientUid;
     pid_t                   mClientPid;
 
     sp<AudioSystem::AudioDeviceCallback> mDeviceCallback;

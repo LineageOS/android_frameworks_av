@@ -404,7 +404,7 @@ protected:
                 virtual void acquireWakeLock_l();
                 void        releaseWakeLock();
                 void        releaseWakeLock_l();
-                void        updateWakeLockUids_l(const SortedVector<int> &uids);
+                void        updateWakeLockUids_l(const SortedVector<uid_t> &uids);
                 void        getPowerManager_l();
                 void setEffectSuspended_l(const effect_uuid_t *type,
                                           bool suspend,
@@ -547,8 +547,8 @@ protected:
                     void            clear();
 
                 private:
-                    SortedVector<int> getWakeLockUids() {
-                        SortedVector<int> wakeLockUids;
+                    SortedVector<uid_t> getWakeLockUids() {
+                        SortedVector<uid_t> wakeLockUids;
                         for (const sp<T> &track : mActiveTracks) {
                             wakeLockUids.add(track->uid());
                         }
@@ -671,7 +671,7 @@ public:
                                 audio_session_t sessionId,
                                 audio_output_flags_t *flags,
                                 pid_t tid,
-                                int uid,
+                                uid_t uid,
                                 status_t *status /*non-NULL*/);
 
                 AudioStreamOut* getOutput() const;
@@ -1366,7 +1366,7 @@ public:
                     size_t *pFrameCount,
                     audio_session_t sessionId,
                     size_t *notificationFrames,
-                    int uid,
+                    uid_t uid,
                     audio_input_flags_t *flags,
                     pid_t tid,
                     status_t *status /*non-NULL*/);
