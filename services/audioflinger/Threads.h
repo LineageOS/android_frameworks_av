@@ -1077,7 +1077,7 @@ protected:
     DirectOutputThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
                         audio_io_handle_t id, uint32_t device, ThreadBase::type_t type,
                         bool systemReady);
-    void processVolume_l(sp<Track> track, bool lastTrack);
+    void processVolume_l(Track *track, bool lastTrack);
 
     // prepareTracks_l() tells threadLoop_mix() the name of the single active track
     sp<Track>               mActiveTrack;
