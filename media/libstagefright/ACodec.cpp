@@ -5552,7 +5552,8 @@ void ACodec::BaseState::postFillThisBuffer(BufferInfo *info) {
     notify->setInt32("what", CodecBase::kWhatFillThisBuffer);
     notify->setInt32("buffer-id", info->mBufferID);
 
-    notify->setObject("buffer", info->mData->clone(mCodec->mInputFormat));
+    info->mData->setFormat(mCodec->mInputFormat);
+    notify->setObject("buffer", info->mData);
     info->mData.clear();
 
     sp<AMessage> reply = new AMessage(kWhatInputBufferFilled, mCodec);
@@ -5912,7 +5913,7 @@ bool ACodec::BaseState::onOMXFillBufferDone(
 
             sp<AMessage> reply =
                 new AMessage(kWhatOutputBufferDrained, mCodec);
-            sp<MediaCodecBuffer> buffer = info->mData->clone(mCodec->mOutputFormat);
+            sp<MediaCodecBuffer> buffer = info->mData;
 
             if (mCodec->mOutputFormat != mCodec->mLastOutputFormat && rangeLength > 0) {
                 // pretend that output format has changed on the first frame (we used to do this)
@@ -5926,6 +5927,7 @@ bool ACodec::BaseState::onOMXFillBufferDone(
                 // data space) so that we can set it if and once the buffer is rendered.
                 mCodec->addKeyFormatChangesToRenderBufferNotification(reply);
             }
+            buffer->setFormat(mCodec->mOutputFormat);
 
             if (mCodec->usingMetadataOnEncoderOutput()) {
                 native_handle_t *handle = NULL;

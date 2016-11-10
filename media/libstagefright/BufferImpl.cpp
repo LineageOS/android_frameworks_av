@@ -34,10 +34,6 @@ SharedMemoryBuffer::SharedMemoryBuffer(const sp<AMessage> &format, const sp<IMem
       mMemory(mem) {
 }
 
-sp<MediaCodecBuffer> SharedMemoryBuffer::clone(const sp<AMessage> &format) {
-    return new SharedMemoryBuffer(format, mMemory);
-}
-
 SecureBuffer::SecureBuffer(const sp<AMessage> &format, const void *ptr, size_t size)
     : MediaCodecBuffer(format, new ABuffer(nullptr, size)),
       mPointer(ptr) {
@@ -48,12 +44,6 @@ SecureBuffer::SecureBuffer(
     : MediaCodecBuffer(format, new ABuffer(nullptr, size)),
       mPointer(nullptr),
       mHandle(handle) {
-}
-
-sp<MediaCodecBuffer> SecureBuffer::clone(const sp<AMessage> &format) {
-    return (mHandle == nullptr)
-            ? new SecureBuffer(format, mPointer, capacity())
-            : new SecureBuffer(format, mHandle, capacity());
 }
 
 void *SecureBuffer::getDestinationPointer() {

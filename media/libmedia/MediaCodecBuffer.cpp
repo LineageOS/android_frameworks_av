@@ -80,8 +80,9 @@ sp<AMessage> MediaCodecBuffer::format() {
     return mFormat;
 }
 
-sp<MediaCodecBuffer> MediaCodecBuffer::clone(const sp<AMessage> &format) {
-    return new MediaCodecBuffer(format, mBuffer);
+void MediaCodecBuffer::setFormat(const sp<AMessage> &format) {
+    mMeta->clear();
+    mFormat = format;
 }
 
 }  // namespace android
