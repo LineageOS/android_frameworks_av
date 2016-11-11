@@ -60,6 +60,12 @@ ifneq ($(filter msm7x27a msm7x30 msm8660 msm8960,$(TARGET_BOARD_PLATFORM)),)
 LOCAL_CFLAGS += -DQCOM_BSP_LEGACY
 endif
 
+ifneq ($(TARGET_USES_MEDIA_EXTENSIONS),true)
+ifeq ($(TARGET_HAS_LEGACY_CAMERA_HAL1),true)
+LOCAL_CFLAGS += -DCAMCORDER_GRALLOC_SOURCE
+endif
+endif
+
 LOCAL_MODULE:= libstagefright_omx
 LOCAL_CFLAGS += -Werror -Wall -Wno-unused-parameter -Wno-documentation
 LOCAL_SANITIZE := unsigned-integer-overflow signed-integer-overflow cfi
