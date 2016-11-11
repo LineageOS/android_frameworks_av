@@ -2390,7 +2390,6 @@ void MediaCodec::returnBuffersToCodecOnPort(int32_t portIndex, bool isReclaim) {
     }
 
     mAvailPortBuffers[portIndex].clear();
-    mPortBufferArrays[portIndex].clear();
 }
 
 size_t MediaCodec::updateBuffers(
@@ -2414,8 +2413,7 @@ size_t MediaCodec::updateBuffers(
 
             if (portIndex == kPortIndexInput && mCrypto != NULL) {
                 info->mSecureData = buffer;
-                info->mData = new SharedMemoryBuffer(
-                        buffer->format(), info->mSharedEncryptedBuffer);
+                info->mData = mPortBufferArrays[portIndex][i];
             } else {
                 info->mData = buffer;
             }

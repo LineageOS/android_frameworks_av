@@ -34,8 +34,6 @@ public:
 
     virtual ~SharedMemoryBuffer() = default;
 
-    virtual sp<MediaCodecBuffer> clone(const sp<AMessage> &format) override;
-
 private:
     SharedMemoryBuffer() = delete;
 
