@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ff2e2bb8_2a0a1520",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 919,
+      "author": {
+        "id": 13497
+      },
+      "writtenOn": "2016-11-11T23:40:10Z",
+      "side": 1,
+      "message": "I think this should be #ifdef instead.",
+      "range": {
+        "startLine": 919,
+        "startChar": 1,
+        "endLine": 919,
+        "endChar": 7
+      },
+      "revId": "3ee08625ac865f5670ce1173f84c058f18e59e59",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
