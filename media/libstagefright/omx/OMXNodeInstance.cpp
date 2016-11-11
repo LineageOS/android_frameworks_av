@@ -1654,10 +1654,30 @@ status_t OMXNodeInstance::emptyBuffer_l(
     BufferMeta *buffer_meta =
         static_cast<BufferMeta *>(header->pAppPrivate);
 
+#ifndef CAMCORDER_GRALLOC_SOURCE
     // set up proper filled length if component is configured for gralloc metadata mode
     // ignore rangeOffset in this case (as client may be assuming ANW meta buffers).
     if (mMetadataType[kPortIndexInput] == kMetadataBufferTypeGrallocSource) {
         header->nFilledLen = rangeLength ? sizeof(VideoGrallocMetadata) : 0;
+#else
+    sp<ABuffer> backup = buffer_meta->getBuffer(header, false /* limit */);
+    sp<ABuffer> codec = buffer_meta->getBuffer(header, false /* limit */);
+
+    // convert incoming ANW meta buffers if component is configured for gralloc metadata mode
+    // ignore rangeOffset in this case
+    if (mMetadataType[kPortIndexInput] == kMetadataBufferTypeGrallocSource
+            && backup->capacity() >= sizeof(VideoNativeMetadata)
+            && codec->capacity() >= sizeof(VideoGrallocMetadata)
+            && ((VideoNativeMetadata *)backup->base())->eType
+                    == kMetadataBufferTypeANWBuffer) {
+        VideoNativeMetadata &backupMeta = *(VideoNativeMetadata *)backup->base();
+        VideoGrallocMetadata &codecMeta = *(VideoGrallocMetadata *)codec->base();
+        CLOG_BUFFER(emptyBuffer, "converting ANWB %p to handle %p",
+                backupMeta.pBuffer, backupMeta.pBuffer->handle);
+        codecMeta.pHandle = backupMeta.pBuffer != NULL ? backupMeta.pBuffer->handle : NULL;
+        codecMeta.eType = kMetadataBufferTypeGrallocSource;
+        header->nFilledLen = rangeLength ? sizeof(codecMeta) : 0;
+#endif
         header->nOffset = 0;
     } else {
         // rangeLength and rangeOffset must be a subset of the allocated data in the buffer.
