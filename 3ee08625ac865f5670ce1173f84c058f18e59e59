@@ -46,6 +46,30 @@
       "revId": "3ee08625ac865f5670ce1173f84c058f18e59e59",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_ede9671a",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 919,
+      "author": {
+        "id": 13497
+      },
+      "writtenOn": "2016-11-12T13:10:52Z",
+      "side": 1,
+      "message": "Yes I understand, maybe I missed something in my sync but I don\u0027t find where we set AID_MEDIA and AID_CAMERASERVER to have the same value in  https://github.com/CyanogenMod/android_system_core/blob/cm-14.1/include/private/android_filesystem_config.h\n\n\nUnfortunately, this patch doesn\u0027t allow camera on mako (nexus 4 - msm8960) to work , it just crash at opening, and it says in logs that the uid 1047 (AID_CAMERASERVER) is not allowed. \n\n\nI temporarely fixed it with https://github.com/StephanMc/cyanogenmod_android_frameworks_av/commit/72f2bcd562d0dc49cced9faaecf61605ba8afa25 , (the time to make something proper later) but maybe I should have the patch which sets same uid for AID_MEDIA and AID_CAMERASERVER",
+      "parentUuid": "ff2e2bb8_6aaffde2",
+      "range": {
+        "startLine": 919,
+        "startChar": 1,
+        "endLine": 919,
+        "endChar": 7
+      },
+      "revId": "3ee08625ac865f5670ce1173f84c058f18e59e59",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
