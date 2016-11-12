@@ -22,6 +22,30 @@
       "revId": "3ee08625ac865f5670ce1173f84c058f18e59e59",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff2e2bb8_6aaffde2",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 919,
+      "author": {
+        "id": 15776
+      },
+      "writtenOn": "2016-11-12T02:33:56Z",
+      "side": 1,
+      "message": "No - enabling this patch causes AID_MEDIA to have the same value as AID_CAMERASERVER, which will result in an compiler error if this line is added (a switch can\u0027t have two cases with the same value)",
+      "parentUuid": "ff2e2bb8_2a0a1520",
+      "range": {
+        "startLine": 919,
+        "startChar": 1,
+        "endLine": 919,
+        "endChar": 7
+      },
+      "revId": "3ee08625ac865f5670ce1173f84c058f18e59e59",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
