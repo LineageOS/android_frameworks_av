@@ -43,26 +43,27 @@ int SoundTriggerHalHidl::getProperties(struct sound_trigger_properties *properti
 
     ISoundTriggerHw::Properties halProperties;
     Return<void> hidlReturn;
-    int32_t halReturn;
+    int ret;
     {
         AutoMutex lock(mHalLock);
         hidlReturn = soundtrigger->getProperties([&](int rc, auto res) {
-            halReturn = rc;
+            ret = rc;
             halProperties = res;
             ALOGI("getProperties res implementor %s", res.implementor.c_str());
         });
     }
 
-    int ret = 0;
     if (hidlReturn.getStatus().isOk()) {
-        convertPropertiesFromHal(properties, &halProperties);
+        if (ret == 0) {
+            convertPropertiesFromHal(properties, &halProperties);
+        }
     } else {
         ret = (int)hidlReturn.getStatus().transactionError();
         if (ret == -EPIPE) {
             clearService();
         }
     }
-
+    ALOGI("getProperties ret %d", ret);
     return ret;
 }
 
@@ -101,7 +102,7 @@ int SoundTriggerHalHidl::loadSoundModel(struct sound_trigger_sound_model *sound_
     }
 
     Return<void> hidlReturn;
-    int32_t halReturn;
+    int ret;
     SoundModelHandle halHandle;
     {
         AutoMutex lock(mHalLock);
@@ -109,14 +110,14 @@ int SoundTriggerHalHidl::loadSoundModel(struct sound_trigger_sound_model *sound_
             hidlReturn = soundtrigger->loadPhraseSoundModel(
                     *(const ISoundTriggerHw::PhraseSoundModel *)halSoundModel,
                     this, modelId, [&](int32_t retval, auto res) {
-                halReturn = retval;
+                ret = retval;
                 halHandle = res;
             });
 
         } else {
             hidlReturn = soundtrigger->loadSoundModel(*halSoundModel,
                     this, modelId, [&](int32_t retval, auto res) {
-                halReturn = retval;
+                ret = retval;
                 halHandle = res;
             });
         }
@@ -124,12 +125,13 @@ int SoundTriggerHalHidl::loadSoundModel(struct sound_trigger_sound_model *sound_
 
     delete halSoundModel;
 
-    int ret = 0;
     if (hidlReturn.getStatus().isOk()) {
-        AutoMutex lock(mLock);
-        *handle = (sound_model_handle_t)modelId;
-        sp<SoundModel> model = new SoundModel(*handle, callback, cookie, halHandle);
-        mSoundModels.add(*handle, model);
+        if (ret == 0) {
+            AutoMutex lock(mLock);
+            *handle = (sound_model_handle_t)modelId;
+            sp<SoundModel> model = new SoundModel(*handle, callback, cookie, halHandle);
+            mSoundModels.add(*handle, model);
+        }
     } else {
         ret = (int)hidlReturn.getStatus().transactionError();
         ALOGE("loadSoundModel error %d", ret);
@@ -155,18 +157,19 @@ int SoundTriggerHalHidl::unloadSoundModel(sound_model_handle_t handle)
         return -EINVAL;
     }
 
-    Return<int32_t> halReturn(0);
+    Return<int32_t> hidlReturn(0);
     {
         AutoMutex lock(mHalLock);
-        halReturn = soundtrigger->unloadSoundModel(model->mHalHandle);
+        hidlReturn = soundtrigger->unloadSoundModel(model->mHalHandle);
     }
-
-    int ret = (int)halReturn.getStatus().transactionError();
+    int ret = (int)hidlReturn.getStatus().transactionError();
     ALOGE_IF(ret != 0, "unloadSoundModel error %d", ret);
     if (ret == -EPIPE) {
         clearService();
     }
-
+    if (ret == 0) {
+        ret = hidlReturn;
+    }
     return ret;
 }
 
@@ -192,18 +195,21 @@ int SoundTriggerHalHidl::startRecognition(sound_model_handle_t handle,
     ISoundTriggerHw::RecognitionConfig *halConfig =
             convertRecognitionConfigToHal(config);
 
-    Return<int32_t> halReturn(0);
+    Return<int32_t> hidlReturn(0);
     {
         AutoMutex lock(mHalLock);
-        halReturn = soundtrigger->startRecognition(model->mHalHandle, *halConfig, this, handle);
+        hidlReturn = soundtrigger->startRecognition(model->mHalHandle, *halConfig, this, handle);
     }
 
     delete halConfig;
 
-    int ret = (int)halReturn.getStatus().transactionError();
+    int ret = (int)hidlReturn.getStatus().transactionError();
     ALOGE_IF(ret != 0, "startRecognition error %d", ret);
     if (ret == -EPIPE) {
         clearService();
+    }
+    if (ret == 0) {
+        ret = hidlReturn;
     }
     return ret;
 }
@@ -221,16 +227,19 @@ int SoundTriggerHalHidl::stopRecognition(sound_model_handle_t handle)
         return -EINVAL;
     }
 
-    Return<int32_t> halReturn(0);
+    Return<int32_t> hidlReturn(0);
     {
         AutoMutex lock(mHalLock);
-        halReturn = soundtrigger->stopRecognition(model->mHalHandle);
+        hidlReturn = soundtrigger->stopRecognition(model->mHalHandle);
     }
 
-    int ret = (int)halReturn.getStatus().transactionError();
+    int ret = (int)hidlReturn.getStatus().transactionError();
     ALOGE_IF(ret != 0, "stopRecognition error %d", ret);
     if (ret == -EPIPE) {
         clearService();
+    }
+    if (ret == 0) {
+        ret = hidlReturn;
     }
     return ret;
 }
@@ -242,16 +251,19 @@ int SoundTriggerHalHidl::stopAllRecognitions()
         return -ENODEV;
     }
 
-    Return<int32_t> halReturn(0);
+    Return<int32_t> hidlReturn(0);
     {
         AutoMutex lock(mHalLock);
-        Return<int32_t> halReturn = soundtrigger->stopAllRecognitions();
+        hidlReturn = soundtrigger->stopAllRecognitions();
     }
 
-    int ret = (int)halReturn.getStatus().transactionError();
+    int ret = (int)hidlReturn.getStatus().transactionError();
     ALOGE_IF(ret != 0, "stopAllRecognitions error %d", ret);
     if (ret == -EPIPE) {
         clearService();
+    }
+    if (ret == 0) {
+        ret = hidlReturn;
     }
     return ret;
 }
