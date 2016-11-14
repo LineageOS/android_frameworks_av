@@ -75,10 +75,12 @@ public:
 
     static const char * const valueListSeparator;
 
-    String8 toString() const;
+    String8 toString() const { return toStringImpl(true); }
+    String8 keysToString() const { return toStringImpl(false); }
 
     status_t add(const String8& key, const String8& value);
     status_t addInt(const String8& key, const int value);
+    status_t addKey(const String8& key);
     status_t addFloat(const String8& key, const float value);
 
     status_t remove(const String8& key);
@@ -93,6 +95,8 @@ public:
 private:
     String8 mKeyValuePairs;
     KeyedVector <String8, String8> mParameters;
+
+    String8 toStringImpl(bool useValues) const;
 };
 
 };  // namespace android

@@ -83,15 +83,17 @@ AudioParameter::~AudioParameter()
     mParameters.clear();
 }
 
-String8 AudioParameter::toString() const
+String8 AudioParameter::toStringImpl(bool useValues) const
 {
     String8 str = String8("");
 
     size_t size = mParameters.size();
     for (size_t i = 0; i < size; i++) {
         str += mParameters.keyAt(i);
-        str += "=";
-        str += mParameters.valueAt(i);
+        if (useValues) {
+            str += "=";
+            str += mParameters.valueAt(i);
+        }
         if (i < (size - 1)) str += ";";
     }
     return str;
@@ -106,6 +108,11 @@ status_t AudioParameter::add(const String8& key, const String8& value)
         mParameters.replaceValueFor(key, value);
         return ALREADY_EXISTS;
     }
+}
+
+status_t AudioParameter::addKey(const String8& key)
+{
+    return add(key, String8());
 }
 
 status_t AudioParameter::addInt(const String8& key, const int value)
