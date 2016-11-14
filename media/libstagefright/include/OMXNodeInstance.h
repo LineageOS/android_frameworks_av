@@ -50,12 +50,9 @@ struct OMXNodeInstance : public BnOMXNode {
     status_t getConfig(OMX_INDEXTYPE index, void *params, size_t size);
     status_t setConfig(OMX_INDEXTYPE index, const void *params, size_t size);
 
-    status_t enableNativeBuffers(OMX_U32 portIndex, OMX_BOOL graphic, OMX_BOOL enable);
+    status_t setPortMode(OMX_U32 port_index, IOMX::PortMode mode);
 
     status_t getGraphicBufferUsage(OMX_U32 portIndex, OMX_U32* usage);
-
-    status_t storeMetaDataInBuffers(
-            OMX_U32 portIndex, OMX_BOOL enable, MetadataBufferType *type);
 
     status_t prepareForAdaptivePlayback(
             OMX_U32 portIndex, OMX_BOOL enable,
@@ -137,6 +134,8 @@ private:
     KeyedVector<OMX::buffer_id, OMX_BUFFERHEADERTYPE *> mBufferIDToBufferHeader;
     KeyedVector<OMX_BUFFERHEADERTYPE *, OMX::buffer_id> mBufferHeaderToBufferID;
 
+    bool mLegacyAdaptiveExperiment;
+    IOMX::PortMode mPortMode[2];
     // metadata and secure buffer type tracking
     MetadataBufferType mMetadataType[2];
     enum SecureBufferType {
@@ -180,15 +179,11 @@ private:
 
     bool isProhibitedIndex_l(OMX_INDEXTYPE index);
 
-    status_t useBuffer(
-            OMX_U32 portIndex, const sp<IMemory> &params,
-            OMX::buffer_id *buffer, OMX_U32 allottedSize);
-
     status_t useBuffer_l(
             OMX_U32 portIndex, const sp<IMemory> &params,
-            OMX::buffer_id *buffer, OMX_U32 allottedSize);
+            OMX::buffer_id *buffer);
 
-    status_t useGraphicBuffer(
+    status_t useGraphicBuffer_l(
             OMX_U32 portIndex, const sp<GraphicBuffer> &graphicBuffer,
             OMX::buffer_id *buffer);
 
@@ -200,16 +195,16 @@ private:
             OMX_U32 portIndex, const sp<GraphicBuffer> &graphicBuffer,
             OMX::buffer_id *buffer);
 
-    status_t emptyBuffer(
+    status_t emptyBuffer_l(
             OMX::buffer_id buffer,
             OMX_U32 rangeOffset, OMX_U32 rangeLength,
             OMX_U32 flags, OMX_TICKS timestamp, int fenceFd);
 
-    status_t emptyGraphicBuffer(
+    status_t emptyGraphicBuffer_l(
             OMX::buffer_id buffer, const sp<GraphicBuffer> &graphicBuffer,
             OMX_U32 flags, OMX_TICKS timestamp, int fenceFd);
 
-    status_t emptyNativeHandleBuffer(
+    status_t emptyNativeHandleBuffer_l(
             OMX::buffer_id buffer, const sp<NativeHandle> &nativeHandle,
             OMX_U32 flags, OMX_TICKS timestamp, int fenceFd);
 
@@ -234,6 +229,9 @@ private:
             OMX_IN OMX_HANDLETYPE hComponent,
             OMX_IN OMX_PTR pAppData,
             OMX_IN OMX_BUFFERHEADERTYPE *pBuffer);
+
+    status_t enableNativeBuffers_l(
+            OMX_U32 portIndex, OMX_BOOL graphic, OMX_BOOL enable);
 
     status_t storeMetaDataInBuffers_l(
             OMX_U32 portIndex, OMX_BOOL enable, MetadataBufferType *type);

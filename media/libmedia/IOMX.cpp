@@ -37,19 +37,18 @@ enum {
     CONNECT = IBinder::FIRST_CALL_TRANSACTION,
     LIST_NODES,
     ALLOCATE_NODE,
+    CREATE_INPUT_SURFACE,
     FREE_NODE,
     SEND_COMMAND,
     GET_PARAMETER,
     SET_PARAMETER,
     GET_CONFIG,
     SET_CONFIG,
-    ENABLE_NATIVE_BUFFERS,
-    USE_BUFFER,
-    CREATE_INPUT_SURFACE,
+    SET_PORT_MODE,
     SET_INPUT_SURFACE,
-    STORE_META_DATA_IN_BUFFERS,
     PREPARE_FOR_ADAPTIVE_PLAYBACK,
     ALLOC_SECURE_BUFFER,
+    USE_BUFFER,
     FREE_BUFFER,
     FILL_BUFFER,
     EMPTY_BUFFER,
@@ -225,17 +224,15 @@ public:
         return reply.readInt32();
     }
 
-    virtual status_t enableNativeBuffers(
-            OMX_U32 port_index, OMX_BOOL graphic, OMX_BOOL enable) {
+    virtual status_t setPortMode(
+            OMX_U32 port_index, IOMX::PortMode mode) {
         Parcel data, reply;
         data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
         data.writeInt32(port_index);
-        data.writeInt32((uint32_t)graphic);
-        data.writeInt32((uint32_t)enable);
-        remote()->transact(ENABLE_NATIVE_BUFFERS, data, &reply);
+        data.writeInt32(mode);
+        remote()->transact(SET_PORT_MODE, data, &reply);
 
-        status_t err = reply.readInt32();
-        return err;
+        return reply.readInt32();
     }
 
     virtual status_t getGraphicBufferUsage(
@@ -292,25 +289,6 @@ public:
         err = reply.readInt32();
 
         return err;
-    }
-
-    virtual status_t storeMetaDataInBuffers(
-            OMX_U32 port_index, OMX_BOOL enable, MetadataBufferType *type) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMXNode::getInterfaceDescriptor());
-        data.writeInt32(port_index);
-        data.writeInt32((int32_t)enable);
-        data.writeInt32(type == NULL ? kMetadataBufferTypeANWBuffer : *type);
-
-        remote()->transact(STORE_META_DATA_IN_BUFFERS, data, &reply);
-
-        // read type even storeMetaDataInBuffers failed
-        int negotiatedType = reply.readInt32();
-        if (type != NULL) {
-            *type = (MetadataBufferType)negotiatedType;
-        }
-
-        return reply.readInt32();
     }
 
     virtual status_t prepareForAdaptivePlayback(
@@ -670,16 +648,12 @@ status_t BnOMXNode::onTransact(
             return NO_ERROR;
         }
 
-        case ENABLE_NATIVE_BUFFERS:
+        case SET_PORT_MODE:
         {
             CHECK_OMX_INTERFACE(IOMXNode, data, reply);
-
             OMX_U32 port_index = data.readInt32();
-            OMX_BOOL graphic = (OMX_BOOL)data.readInt32();
-            OMX_BOOL enable = (OMX_BOOL)data.readInt32();
-
-            status_t err = enableNativeBuffers(port_index, graphic, enable);
-            reply->writeInt32(err);
+            IOMX::PortMode mode = (IOMX::PortMode) data.readInt32();
+            reply->writeInt32(setPortMode(port_index, mode));
 
             return NO_ERROR;
         }
@@ -729,22 +703,6 @@ status_t BnOMXNode::onTransact(
                     interface_cast<IOMXBufferSource>(data.readStrongBinder());
 
             status_t err = setInputSurface(bufferSource);
-            reply->writeInt32(err);
-
-            return NO_ERROR;
-        }
-
-        case STORE_META_DATA_IN_BUFFERS:
-        {
-            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
-
-            OMX_U32 port_index = data.readInt32();
-            OMX_BOOL enable = (OMX_BOOL)data.readInt32();
-
-            MetadataBufferType type = (MetadataBufferType)data.readInt32();
-            status_t err = storeMetaDataInBuffers(port_index, enable, &type);
-
-            reply->writeInt32(type);
             reply->writeInt32(err);
 
             return NO_ERROR;

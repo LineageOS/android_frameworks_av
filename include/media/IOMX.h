@@ -52,6 +52,20 @@ public:
         kFenceTimeoutMs = 1000
     };
 
+    enum PortMode {
+        kPortModePresetStart = 0,
+        kPortModePresetByteBuffer,
+        kPortModePresetANWBuffer,
+        kPortModePresetSecureBuffer,
+        kPortModePresetEnd,
+
+        kPortModeDynamicStart = 100,
+        kPortModeDynamicANWBuffer,      // uses metadata mode kMetadataBufferTypeANWBuffer
+                                        // or kMetadataBufferTypeGrallocSource
+        kPortModeDynamicNativeHandle,   // uses metadata mode kMetadataBufferTypeNativeHandleSource
+        kPortModeDynamicEnd,
+    };
+
     struct ComponentInfo {
         String8 mName;
         List<String8> mRoles;
@@ -90,10 +104,8 @@ public:
     virtual status_t setConfig(
             OMX_INDEXTYPE index, const void *params, size_t size) = 0;
 
-    // This will set *type to previous metadata buffer type on OMX error (not on binder error), and
-    // new metadata buffer type on success.
-    virtual status_t storeMetaDataInBuffers(
-            OMX_U32 port_index, OMX_BOOL enable, MetadataBufferType *type = NULL) = 0;
+    virtual status_t setPortMode(
+            OMX_U32 port_index, IOMX::PortMode mode) = 0;
 
     virtual status_t prepareForAdaptivePlayback(
             OMX_U32 portIndex, OMX_BOOL enable,
@@ -102,9 +114,6 @@ public:
     virtual status_t configureVideoTunnelMode(
             OMX_U32 portIndex, OMX_BOOL tunneled,
             OMX_U32 audioHwSync, native_handle_t **sidebandHandle) = 0;
-
-    virtual status_t enableNativeBuffers(
-            OMX_U32 port_index, OMX_BOOL graphic, OMX_BOOL enable) = 0;
 
     virtual status_t getGraphicBufferUsage(
             OMX_U32 port_index, OMX_U32* usage) = 0;
@@ -240,23 +249,6 @@ public:
             uint32_t code, const Parcel &data, Parcel *reply,
             uint32_t flags = 0);
 };
-
-struct CodecProfileLevel {
-    OMX_U32 mProfile;
-    OMX_U32 mLevel;
-};
-
-inline static const char *asString(MetadataBufferType i, const char *def = "??") {
-    using namespace android;
-    switch (i) {
-        case kMetadataBufferTypeCameraSource:   return "CameraSource";
-        case kMetadataBufferTypeGrallocSource:  return "GrallocSource";
-        case kMetadataBufferTypeANWBuffer:      return "ANWBuffer";
-        case kMetadataBufferTypeNativeHandleSource: return "NativeHandleSource";
-        case kMetadataBufferTypeInvalid:        return "Invalid";
-        default:                                return def;
-    }
-}
 
 }  // namespace android
 

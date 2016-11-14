@@ -44,7 +44,7 @@ public:
     OMXBuffer(const sp<MediaCodecBuffer> &codecBuffer);
 
     // Constructs a buffer of type kBufferTypeSharedMem.
-    OMXBuffer(const sp<IMemory> &mem, size_t allottedSize = 0);
+    OMXBuffer(const sp<IMemory> &mem);
 
     // Constructs a buffer of type kBufferTypeANWBuffer.
     OMXBuffer(const sp<GraphicBuffer> &gbuf);
@@ -78,7 +78,6 @@ private:
 
     // kBufferTypeSharedMem
     sp<IMemory> mMem;
-    OMX_U32 mAllottedSize;
 
     // kBufferTypeANWBuffer
     sp<GraphicBuffer> mGraphicBuffer;

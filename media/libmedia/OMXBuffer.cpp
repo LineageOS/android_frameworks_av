@@ -38,10 +38,9 @@ OMXBuffer::OMXBuffer(const sp<MediaCodecBuffer>& codecBuffer)
       mRangeLength(codecBuffer != NULL ? codecBuffer->size() : 0) {
 }
 
-OMXBuffer::OMXBuffer(const sp<IMemory> &mem, size_t allottedSize)
+OMXBuffer::OMXBuffer(const sp<IMemory> &mem)
     : mBufferType(kBufferTypeSharedMem),
-      mMem(mem),
-      mAllottedSize(allottedSize ? : mem->size()) {
+      mMem(mem) {
 }
 
 OMXBuffer::OMXBuffer(const sp<GraphicBuffer> &gbuf)
@@ -68,11 +67,7 @@ status_t OMXBuffer::writeToParcel(Parcel *parcel) const {
 
         case kBufferTypeSharedMem:
         {
-            status_t err = parcel->writeStrongBinder(IInterface::asBinder(mMem));
-            if (err != NO_ERROR) {
-                return err;
-            }
-            return parcel->writeUint32(mAllottedSize);
+            return parcel->writeStrongBinder(IInterface::asBinder(mMem));
         }
 
         case kBufferTypeANWBuffer:
@@ -103,10 +98,7 @@ status_t OMXBuffer::readFromParcel(const Parcel *parcel) {
 
         case kBufferTypeSharedMem:
         {
-            sp<IMemory> params = interface_cast<IMemory>(parcel->readStrongBinder());
-
-            mMem = params;
-            mAllottedSize = parcel->readUint32();
+            mMem = interface_cast<IMemory>(parcel->readStrongBinder());
             break;
         }
 
