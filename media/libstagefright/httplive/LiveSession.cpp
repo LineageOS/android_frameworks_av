@@ -178,7 +178,7 @@ bool LiveSession::BandwidthEstimator::estimateBandwidth(
         *shortTermBps = mShortTermEstimate;
     }
 
-    int32_t minEstimate = -1, maxEstimate = -1;
+    int64_t minEstimate = -1, maxEstimate = -1;
     List<int32_t>::iterator it;
     for (it = mPrevEstimates.begin(); it != mPrevEstimates.end(); it++) {
         int32_t estimate = *it;
