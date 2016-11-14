@@ -35,4 +35,8 @@ CodecBase::PortDescription::PortDescription() {
 CodecBase::PortDescription::~PortDescription() {
 }
 
+void CodecBase::setCallback(std::shared_ptr<Callback> &&callback) {
+    mCallback = callback;
+}
+
 }  // namespace android
