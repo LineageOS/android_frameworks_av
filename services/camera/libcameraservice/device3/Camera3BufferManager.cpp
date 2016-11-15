@@ -221,7 +221,8 @@ status_t Camera3BufferManager::getBufferForStream(int streamId, int streamSetId,
             status_t res = OK;
             buffer.fenceFd = -1;
             buffer.graphicBuffer = mAllocator->createGraphicBuffer(
-                    info.width, info.height, info.format, info.combinedUsage, &res);
+                    info.width, info.height, info.format, 1 /* layerCount */,
+                    info.combinedUsage, &res);
             ALOGV("%s: allocating a new graphic buffer (%dx%d, format 0x%x) %p with handle %p",
                     __FUNCTION__, info.width, info.height, info.format,
                     buffer.graphicBuffer.get(), buffer.graphicBuffer->handle);
