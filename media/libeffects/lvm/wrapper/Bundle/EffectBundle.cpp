@@ -340,8 +340,10 @@ exit:
             }
             delete pContext;
         }
-        *pHandle = (effect_handle_t)NULL;
+        if (pHandle != NULL)
+          *pHandle = (effect_handle_t)NULL;
     } else {
+      if (pHandle != NULL)
         *pHandle = (effect_handle_t)pContext;
     }
     ALOGV("\tEffectCreate end..\n\n");
@@ -2661,8 +2663,8 @@ int Volume_setParameter (EffectContext *pContext, void *pParam, void *pValue){
 
         case VOLUME_PARAM_ENABLESTEREOPOSITION:
             positionEnabled = *(uint32_t *)pValue;
-            status = VolumeEnableStereoPosition(pContext, positionEnabled);
-            status = VolumeSetStereoPosition(pContext, pContext->pBundledContext->positionSaved);
+            (void) VolumeEnableStereoPosition(pContext, positionEnabled);
+            (void) VolumeSetStereoPosition(pContext, pContext->pBundledContext->positionSaved);
             //ALOGV("\tVolume_setParameter() VOLUME_PARAM_ENABLESTEREOPOSITION called");
             break;
 
