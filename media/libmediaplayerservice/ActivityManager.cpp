@@ -24,7 +24,7 @@
 
 namespace android {
 
-const uint32_t OPEN_CONTENT_URI_TRANSACTION = IBinder::FIRST_CALL_TRANSACTION + 4;
+const uint32_t OPEN_CONTENT_URI_TRANSACTION = IBinder::FIRST_CALL_TRANSACTION;
 
 // Perform ContentProvider.openFile() on the given URI, returning
 // the resulting native file descriptor.  Returns < 0 on error.
