@@ -28,8 +28,6 @@ namespace android {
 class DevicesFactoryHalLocal : public DevicesFactoryHalInterface
 {
   public:
-    virtual ~DevicesFactoryHalLocal() {}
-
     // Opens a device with the specified name. To close the device, it is
     // necessary to release references to the returned object.
     virtual status_t openDevice(const char *name, sp<DeviceHalInterface> *device);
@@ -39,6 +37,8 @@ class DevicesFactoryHalLocal : public DevicesFactoryHalInterface
 
     // Can not be constructed directly by clients.
     DevicesFactoryHalLocal() {}
+
+    virtual ~DevicesFactoryHalLocal() {}
 };
 
 } // namespace android

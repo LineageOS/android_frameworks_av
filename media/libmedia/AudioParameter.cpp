@@ -189,6 +189,16 @@ status_t AudioParameter::getFloat(const String8& key, float& value) const
     return result;
 }
 
+status_t AudioParameter::getAt(size_t index, String8& key) const
+{
+    if (mParameters.size() > index) {
+        key = mParameters.keyAt(index);
+        return NO_ERROR;
+    } else {
+        return BAD_VALUE;
+    }
+}
+
 status_t AudioParameter::getAt(size_t index, String8& key, String8& value) const
 {
     if (mParameters.size() > index) {
