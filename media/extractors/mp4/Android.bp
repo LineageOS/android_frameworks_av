@@ -1,0 +1,48 @@
+cc_library_shared {
+
+    srcs: [
+        "ItemTable.cpp",
+        "MPEG4Extractor.cpp",
+        "SampleIterator.cpp",
+        "SampleTable.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/libstagefright/",
+    ],
+
+    shared_libs: [
+        "libstagefright",
+        "libmedia",
+        "libstagefright_foundation",
+        "libutils",
+        "liblog",
+    ],
+
+    static_libs: [
+        "libstagefright_id3",
+    ],
+
+    name: "libmp4extractor",
+    relative_install_path: "extractors",
+
+    compile_multilib: "first",
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+        "-fvisibility=hidden",
+    ],
+
+    sanitize: {
+        cfi: true,
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        diag: {
+            cfi: true,
+        },
+    },
+
+}

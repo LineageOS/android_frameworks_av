@@ -19,7 +19,6 @@ LOCAL_SHARED_LIBRARIES :=       \
     libbinder                   \
     libcrypto                   \
     libcutils                   \
-    libdrmframework             \
     liblog                      \
     libdl                       \
     libgui                      \
@@ -34,8 +33,8 @@ LOCAL_SHARED_LIBRARIES :=       \
     libstagefright_httplive     \
     libstagefright_omx          \
     libutils                    \
-    libnativewindow             \
     libhidlbase                 \
+    libhidlmemory               \
     android.hardware.media.omx@1.0 \
 
 LOCAL_STATIC_LIBRARIES :=       \

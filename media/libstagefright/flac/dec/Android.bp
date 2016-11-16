@@ -30,7 +30,6 @@ cc_library_shared {
     static_libs: ["libFLAC"],
 
     shared_libs: [
-        "libcutils",
         "liblog",
         "libstagefright_foundation",
         "libutils",
