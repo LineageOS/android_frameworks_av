@@ -1836,11 +1836,8 @@ status_t ACodec::configureCodec(
                         inputFormat->setInt32("adaptive-playback", true);
                     }
                 }
-                // Fall back to legacy mode (use fixed ANWBuffer)
-                err = setPortMode(kPortIndexOutput, IOMX::kPortModePresetANWBuffer);
-                if (err != OK) {
-                    return err;
-                }
+                // allow failure
+                err = OK;
             } else {
                 ALOGV("[%s] setPortMode on output to %s succeeded",
                         mComponentName.c_str(), asString(IOMX::kPortModeDynamicANWBuffer));
@@ -1873,6 +1870,12 @@ status_t ACodec::configureCodec(
         if (haveNativeWindow && mComponentName.startsWith("OMX.google.")) {
             usingSwRenderer = true;
             haveNativeWindow = false;
+            (void)setPortMode(kPortIndexOutput, IOMX::kPortModePresetByteBuffer);
+        } else if (haveNativeWindow && !storingMetadataInDecodedBuffers()) {
+            err = setPortMode(kPortIndexOutput, IOMX::kPortModePresetANWBuffer);
+            if (err != OK) {
+                return err;
+            }
         }
 
         if (encoder) {
@@ -1887,10 +1890,8 @@ status_t ACodec::configureCodec(
 
         if (haveNativeWindow) {
             mNativeWindow = static_cast<Surface *>(obj.get());
-        }
 
-        // fallback for devices that do not handle flex-YUV for native buffers
-        if (haveNativeWindow) {
+            // fallback for devices that do not handle flex-YUV for native buffers
             int32_t requestedColorFormat = OMX_COLOR_FormatUnused;
             if (msg->findInt32("color-format", &requestedColorFormat) &&
                     requestedColorFormat == OMX_COLOR_FormatYUV420Flexible) {
