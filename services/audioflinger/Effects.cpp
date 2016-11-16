@@ -1191,36 +1191,54 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
         // particular client process:  no risk to block the whole media server process or mixer
         // threads if we are stuck here
         Mutex::Autolock _l(mCblk->lock);
-        if (mCblk->clientIndex > EFFECT_PARAM_BUFFER_SIZE ||
-            mCblk->serverIndex > EFFECT_PARAM_BUFFER_SIZE) {
+
+        // keep local copy of index in case of client corruption b/32220769
+        const uint32_t clientIndex = mCblk->clientIndex;
+        const uint32_t serverIndex = mCblk->serverIndex;
+        if (clientIndex > EFFECT_PARAM_BUFFER_SIZE ||
+            serverIndex > EFFECT_PARAM_BUFFER_SIZE) {
             mCblk->serverIndex = 0;
             mCblk->clientIndex = 0;
             return BAD_VALUE;
         }
         status_t status = NO_ERROR;
-        while (mCblk->serverIndex < mCblk->clientIndex) {
-            int reply;
-            uint32_t rsize = sizeof(int);
-            int *p = (int *)(mBuffer + mCblk->serverIndex);
-            int size = *p++;
-            if (((uint8_t *)p + size) > mBuffer + mCblk->clientIndex) {
+        effect_param_t *param = NULL;
+        for (uint32_t index = serverIndex; index < clientIndex;) {
+            int *p = (int *)(mBuffer + index);
+            const int size = *p++;
+            if (size < 0
+                    || size > EFFECT_PARAM_BUFFER_SIZE
+                    || ((uint8_t *)p + size) > mBuffer + clientIndex) {
                 ALOGW("command(): invalid parameter block size");
+                status = BAD_VALUE;
                 break;
             }
-            effect_param_t *param = (effect_param_t *)p;
-            if (param->psize == 0 || param->vsize == 0) {
-                ALOGW("command(): null parameter or value size");
-                mCblk->serverIndex += size;
-                continue;
+
+            // copy to local memory in case of client corruption b/32220769
+            param = (effect_param_t *)realloc(param, size);
+            if (param == NULL) {
+                ALOGW("command(): out of memory");
+                status = NO_MEMORY;
+                break;
             }
-            uint32_t psize = sizeof(effect_param_t) +
-                             ((param->psize - 1) / sizeof(int) + 1) * sizeof(int) +
-                             param->vsize;
+            memcpy(param, p, size);
+
+            int reply = 0;
+            uint32_t rsize = sizeof(reply);
             status_t ret = mEffect->command(EFFECT_CMD_SET_PARAM,
-                                            psize,
-                                            p,
+                                            size,
+                                            param,
                                             &rsize,
                                             &reply);
+
+            // verify shared memory: server index shouldn't change; client index can't go back.
+            if (serverIndex != mCblk->serverIndex
+                    || clientIndex > mCblk->clientIndex) {
+                android_errorWriteLog(0x534e4554, "32220769");
+                status = BAD_VALUE;
+                break;
+            }
+
             // stop at first error encountered
             if (ret != NO_ERROR) {
                 status = ret;
@@ -1230,8 +1248,9 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
                 *(int *)pReplyData = reply;
                 break;
             }
-            mCblk->serverIndex += size;
+            index += size;
         }
+        free(param);
         mCblk->serverIndex = 0;
         mCblk->clientIndex = 0;
         return status;
