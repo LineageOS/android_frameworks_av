@@ -85,6 +85,139 @@ struct is_unsigned_integral
             typename underlying_integral_type<T, signed>::type>::value> {
 };
 
+/**
+ * Type support relationship query template.
+ *
+ * If T occurs as one of the types in Us with the same const-volatile qualifications, provides the
+ * member constant |value| equal to true. Otherwise value is false.
+ */
+template<typename T, typename ...Us>
+struct is_one_of;
+
+/// \if 0
+/**
+ * Template specialization when first type matches the searched type.
+ */
+template<typename T, typename ...Us>
+struct is_one_of<T, T, Us...> : std::true_type {};
+
+/**
+ * Template specialization when first type does not match the searched type.
+ */
+template<typename T, typename U, typename ...Us>
+struct is_one_of<T, U, Us...> : is_one_of<T, Us...> {};
+
+/**
+ * Template specialization when there are no types to search.
+ */
+template<typename T>
+struct is_one_of<T> : std::false_type {};
+/// \endif
+
+/**
+ * Type support relationship query template.
+ *
+ * If all types in Us are unique, provides the member constant |value| equal to true.
+ * Otherwise value is false.
+ */
+template<typename ...Us>
+struct are_unique;
+
+/// \if 0
+/**
+ * Template specialization when there are no types.
+ */
+template<>
+struct are_unique<> : std::true_type {};
+
+/**
+ * Template specialization when there is at least one type to check.
+ */
+template<typename T, typename ...Us>
+struct are_unique<T, Us...>
+    : std::integral_constant<bool, are_unique<Us...>::value && !is_one_of<T, Us...>::value> {};
+/// \endif
+
+/// \if 0
+template<size_t Base, typename T, typename ...Us>
+struct _find_first_impl;
+
+/**
+ * Template specialization when there are no types to search.
+ */
+template<size_t Base, typename T>
+struct _find_first_impl<Base, T> : std::integral_constant<size_t, 0> {};
+
+/**
+ * Template specialization when T is the first type in Us.
+ */
+template<size_t Base, typename T, typename ...Us>
+struct _find_first_impl<Base, T, T, Us...> : std::integral_constant<size_t, Base> {};
+
+/**
+ * Template specialization when T is not the first type in Us.
+ */
+template<size_t Base, typename T, typename U, typename ...Us>
+struct _find_first_impl<Base, T, U, Us...>
+    : std::integral_constant<size_t, _find_first_impl<Base + 1, T, Us...>::value> {};
+
+/// \endif
+
+/**
+ * Type support relationship query template.
+ *
+ * If T occurs in Us, index is the 1-based left-most index of T in Us. Otherwise, index is 0.
+ */
+template<typename T, typename ...Us>
+struct find_first {
+    static constexpr size_t index = _find_first_impl<1, T, Us...>::value;
+};
+
+/// \if 0
+/**
+ * Helper class for find_first_convertible_to template.
+ *
+ * Adds a base index.
+ */
+template<size_t Base, typename T, typename ...Us>
+struct _find_first_convertible_to_helper;
+
+/**
+ * Template specialization for when there are more types to consider
+ */
+template<size_t Base, typename T, typename U, typename ...Us>
+struct _find_first_convertible_to_helper<Base, T, U, Us...> {
+    static constexpr size_t index =
+        std::is_convertible<T, U>::value ? Base :
+                _find_first_convertible_to_helper<Base + 1, T, Us...>::index;
+    typedef typename std::conditional<
+        std::is_convertible<T, U>::value, U,
+        typename _find_first_convertible_to_helper<Base + 1, T, Us...>::type>::type type;
+};
+
+/**
+ * Template specialization for when there are no more types to consider
+ */
+template<size_t Base, typename T>
+struct _find_first_convertible_to_helper<Base, T> {
+    static constexpr size_t index = 0;
+    typedef void type;
+};
+
+/// \endif
+
+/**
+ * Type support template that returns the type that T can be implicitly converted into, and its
+ * index, from a list of other types (Us).
+ *
+ * Returns index of 0 and type of void if there are no convertible types.
+ *
+ * \param T type that is converted
+ * \param Us types into which the conversion is considered
+ */
+template<typename T, typename ...Us>
+struct find_first_convertible_to : public _find_first_convertible_to_helper<1, T, Us...> { };
+
 }  // namespace android
 
 #endif  // STAGEFRIGHT_FOUNDATION_TYPE_TRAITS_H_
