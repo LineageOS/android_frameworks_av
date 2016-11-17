@@ -2956,6 +2956,8 @@ status_t Camera3Device::RequestThread::clear(
         }
     }
     mRequestQueue.clear();
+
+    Mutex::Autolock al(mTriggerMutex);
     mTriggerMap.clear();
     if (lastFrameNumber != NULL) {
         *lastFrameNumber = mRepeatingLastFrameNumber;
