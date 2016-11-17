@@ -90,6 +90,10 @@ struct ATSParser::Program : public RefBase {
         return mParser->mFlags;
     }
 
+    uint64_t firstPTS() const {
+        return mFirstPTS;
+    }
+
 private:
     struct StreamInfo {
         unsigned mType;
@@ -135,6 +139,7 @@ struct ATSParser::Stream : public RefBase {
 
     void signalEOS(status_t finalResult);
 
+    SourceType getSourceType();
     sp<MediaSource> getSource(SourceType type);
 
     bool isAudio() const;
@@ -208,11 +213,12 @@ ATSParser::SyncEvent::SyncEvent(off64_t offset)
     : mHasReturnedData(false), mOffset(offset), mTimeUs(0) {}
 
 void ATSParser::SyncEvent::init(off64_t offset, const sp<MediaSource> &source,
-        int64_t timeUs) {
+        int64_t timeUs, SourceType type) {
     mHasReturnedData = true;
     mOffset = offset;
     mMediaSource = source;
     mTimeUs = timeUs;
+    mType = type;
 }
 
 void ATSParser::SyncEvent::reset() {
@@ -1121,11 +1127,22 @@ void ATSParser::Stream::onPayloadData(
                 int64_t timeUs;
                 if (accessUnit->meta()->findInt64("timeUs", &timeUs)) {
                     found = true;
-                    event->init(pesStartOffset, mSource, timeUs);
+                    event->init(pesStartOffset, mSource, timeUs, getSourceType());
                 }
             }
         }
     }
+}
+
+ATSParser::SourceType ATSParser::Stream::getSourceType() {
+    if (isVideo()) {
+        return VIDEO;
+    } else if (isAudio()) {
+        return AUDIO;
+    } else if (isMeta()) {
+        return META;
+    }
+    return NUM_SOURCE_TYPES;
 }
 
 sp<MediaSource> ATSParser::Stream::getSource(SourceType type) {
@@ -1563,6 +1580,16 @@ bool ATSParser::PTSTimeDeltaEstablished() {
     }
 
     return mPrograms.editItemAt(0)->PTSTimeDeltaEstablished();
+}
+
+int64_t ATSParser::getFirstPTSTimeUs() {
+    for (size_t i = 0; i < mPrograms.size(); ++i) {
+        sp<ATSParser::Program> program = mPrograms.itemAt(i);
+        if (program->PTSTimeDeltaEstablished()) {
+            return (program->firstPTS() * 100) / 9;
+        }
+    }
+    return -1;
 }
 
 __attribute__((no_sanitize("integer")))

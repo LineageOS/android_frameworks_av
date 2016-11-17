@@ -89,6 +89,8 @@ private:
     // Add a SynPoint derived from |event|.
     void addSyncPoint_l(const ATSParser::SyncEvent &event);
 
+    status_t  estimateDurationsFromTimesUsAtEnd();
+
     DISALLOW_EVIL_CONSTRUCTORS(MPEG2TSExtractor);
 };
 
