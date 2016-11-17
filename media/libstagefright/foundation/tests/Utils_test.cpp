@@ -18,15 +18,11 @@
 #define LOG_TAG "Utils_test"
 
 #include <gtest/gtest.h>
-#include <utils/String8.h>
-#include <utils/Errors.h>
-#include <fcntl.h>
-#include <unistd.h>
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AStringUtils.h>
 #include <media/stagefright/foundation/AUtils.h>
-#include <media/stagefright/Utils.h>
+#include <media/stagefright/Utils.h> // for FOURCC
 
 namespace android {
 
