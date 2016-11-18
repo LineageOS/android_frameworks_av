@@ -104,8 +104,9 @@ struct NuPlayer::Source : public AHandler {
         return INVALID_OPERATION;
     }
 
-    // Refer to comment of seekTo in IMediaPlayer.h for meaning of |precise|.
-    virtual status_t seekTo(int64_t /* seekTimeUs */, bool /* precise */ = false) {
+    virtual status_t seekTo(
+            int64_t /* seekTimeUs */,
+            MediaPlayerSeekMode /* mode */ = MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC) {
         return INVALID_OPERATION;
     }
 

@@ -70,7 +70,10 @@ struct NuPlayer : public AHandler {
 
     // Will notify the driver through "notifySeekComplete" once finished
     // and needNotify is true.
-    void seekToAsync(int64_t seekTimeUs, bool precise = false, bool needNotify = false);
+    void seekToAsync(
+            int64_t seekTimeUs,
+            MediaPlayerSeekMode mode = MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC,
+            bool needNotify = false);
 
     status_t setVideoScalingMode(int32_t mode);
     status_t getTrackInfo(Parcel* reply) const;
@@ -245,7 +248,9 @@ private:
     void handleFlushComplete(bool audio, bool isDecoder);
     void finishFlushIfPossible();
 
-    void onStart(int64_t startPositionUs = -1, bool precise = false);
+    void onStart(
+            int64_t startPositionUs = -1,
+            MediaPlayerSeekMode mode = MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC);
     void onResume();
     void onPause();
 
@@ -263,7 +268,7 @@ private:
 
     void processDeferredActions();
 
-    void performSeek(int64_t seekTimeUs, bool precise);
+    void performSeek(int64_t seekTimeUs, MediaPlayerSeekMode mode);
     void performDecoderFlush(FlushCommand audio, FlushCommand video);
     void performReset();
     void performScanSources();

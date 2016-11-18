@@ -23,6 +23,8 @@
 #include <utils/KeyedVector.h>
 #include <system/audio.h>
 
+#include <media/IMediaSource.h>
+
 // Fwd decl to make sure everyone agrees that the scope of struct sockaddr_in is
 // global, and not in android::
 struct sockaddr_in;
@@ -37,6 +39,8 @@ class IGraphicBufferProducer;
 struct IMediaHTTPService;
 struct AudioPlaybackRate;
 struct AVSyncSettings;
+
+typedef IMediaSource::ReadOptions::SeekMode MediaPlayerSeekMode;
 
 class IMediaPlayer: public IInterface
 {
@@ -65,14 +69,9 @@ public:
     virtual status_t        setSyncSettings(const AVSyncSettings& sync, float videoFpsHint) = 0;
     virtual status_t        getSyncSettings(AVSyncSettings* sync /* nonnull */,
                                             float* videoFps /* nonnull */) = 0;
-    // When |precise| is true, it's required that the first rendered media position after seekTo
-    // is precisely at |msec|, up to rounding error of granuality, e.g., video frame interval or
-    // audio length of decoding buffer. In this case, it might take a little long time to finish
-    // seekTo.
-    // When |precise| is false, |msec| is a hint to the mediaplayer which will try its best to
-    // fulfill the request, but it's not guaranteed. This option could result in fast finish of
-    // seekTo.
-    virtual status_t        seekTo(int msec, bool precise = false) = 0;
+    virtual status_t        seekTo(
+            int msec,
+            MediaPlayerSeekMode mode = MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC) = 0;
     virtual status_t        getCurrentPosition(int* msec) = 0;
     virtual status_t        getDuration(int* msec) = 0;
     virtual status_t        reset() = 0;

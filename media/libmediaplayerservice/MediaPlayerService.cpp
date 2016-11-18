@@ -1121,12 +1121,12 @@ status_t MediaPlayerService::Client::setNextPlayer(const sp<IMediaPlayer>& playe
     return OK;
 }
 
-status_t MediaPlayerService::Client::seekTo(int msec, bool precise)
+status_t MediaPlayerService::Client::seekTo(int msec, MediaPlayerSeekMode mode)
 {
-    ALOGV("[%d] seekTo(%d)", mConnId, msec);
+    ALOGV("[%d] seekTo(%d, %d)", mConnId, msec, mode);
     sp<MediaPlayerBase> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
-    return p->seekTo(msec, precise);
+    return p->seekTo(msec, mode);
 }
 
 status_t MediaPlayerService::Client::reset()
