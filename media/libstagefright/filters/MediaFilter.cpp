@@ -676,7 +676,8 @@ void MediaFilter::onShutdown(const sp<AMessage> &msg) {
     }
 
     sp<AMessage> notify = mNotify->dup();
-    notify->setInt32("what", CodecBase::kWhatShutdownCompleted);
+    notify->setInt32("what", keepComponentAllocated ?
+            CodecBase::kWhatStopCompleted : CodecBase::kWhatReleaseCompleted);
     notify->post();
 }
 
