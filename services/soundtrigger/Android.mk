@@ -42,7 +42,8 @@ LOCAL_SRC_FILES +=               \
 
 LOCAL_SHARED_LIBRARIES += \
 		libhwbinder \
-		libhidl \
+		libhidlbase \
+		libhidltransport \
 		libbase \
 		android.hardware.soundtrigger@2.0 \
 		android.hardware.audio.common@2.0
