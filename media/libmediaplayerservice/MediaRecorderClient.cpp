@@ -369,9 +369,13 @@ status_t MediaRecorderClient::setListener(const sp<IMediaRecorderClient>& listen
 
     sp<IServiceManager> sm = defaultServiceManager();
     sp<IBinder> binder = sm->getService(String16("media.camera"));
-    mCameraDeathListener = new ServiceDeathNotifier(binder, listener,
-            MediaPlayerService::CAMERA_PROCESS_DEATH);
-    binder->linkToDeath(mCameraDeathListener);
+
+    // If the device does not have a camera, do not create a death listener for it.
+    if (binder != NULL) {
+        mCameraDeathListener = new ServiceDeathNotifier(binder, listener,
+                MediaPlayerService::CAMERA_PROCESS_DEATH);
+        binder->linkToDeath(mCameraDeathListener);
+    }
 
     binder = sm->getService(String16("media.codec"));
     mCodecDeathListener = new ServiceDeathNotifier(binder, listener,
