@@ -70,18 +70,18 @@ private:
 };
 
 struct NuPlayer::SeekAction : public Action {
-    explicit SeekAction(int64_t seekTimeUs, bool precise)
+    explicit SeekAction(int64_t seekTimeUs, MediaPlayerSeekMode mode)
         : mSeekTimeUs(seekTimeUs),
-          mPrecise(precise) {
+          mMode(mode) {
     }
 
     virtual void execute(NuPlayer *player) {
-        player->performSeek(mSeekTimeUs, mPrecise);
+        player->performSeek(mSeekTimeUs, mMode);
     }
 
 private:
     int64_t mSeekTimeUs;
-    bool mPrecise;
+    MediaPlayerSeekMode mMode;
 
     DISALLOW_EVIL_CONSTRUCTORS(SeekAction);
 };
@@ -422,10 +422,10 @@ void NuPlayer::resetAsync() {
     (new AMessage(kWhatReset, this))->post();
 }
 
-void NuPlayer::seekToAsync(int64_t seekTimeUs, bool precise, bool needNotify) {
+void NuPlayer::seekToAsync(int64_t seekTimeUs, MediaPlayerSeekMode mode, bool needNotify) {
     sp<AMessage> msg = new AMessage(kWhatSeek, this);
     msg->setInt64("seekTimeUs", seekTimeUs);
-    msg->setInt32("precise", precise);
+    msg->setInt32("mode", mode);
     msg->setInt32("needNotify", needNotify);
     msg->post();
 }
@@ -684,7 +684,8 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                     int64_t currentPositionUs = 0;
                     if (getCurrentPosition(&currentPositionUs) == OK) {
                         mDeferredActions.push_back(
-                                new SeekAction(currentPositionUs, false /* precise */));
+                                new SeekAction(currentPositionUs,
+                                        MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC /* mode */));
                     }
                 }
 
@@ -1200,14 +1201,14 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
         case kWhatSeek:
         {
             int64_t seekTimeUs;
-            int32_t precise;
+            int32_t mode;
             int32_t needNotify;
             CHECK(msg->findInt64("seekTimeUs", &seekTimeUs));
-            CHECK(msg->findInt32("precise", &precise));
+            CHECK(msg->findInt32("mode", &mode));
             CHECK(msg->findInt32("needNotify", &needNotify));
 
-            ALOGV("kWhatSeek seekTimeUs=%lld us, precise=%d, needNotify=%d",
-                    (long long)seekTimeUs, precise, needNotify);
+            ALOGV("kWhatSeek seekTimeUs=%lld us, mode=%d, needNotify=%d",
+                    (long long)seekTimeUs, mode, needNotify);
 
             if (!mStarted) {
                 // Seek before the player is started. In order to preview video,
@@ -1215,7 +1216,7 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                 // only once if needed. After the player is started, any seek
                 // operation will go through normal path.
                 // Audio-only cases are handled separately.
-                onStart(seekTimeUs, precise);
+                onStart(seekTimeUs, (MediaPlayerSeekMode)mode);
                 if (mStarted) {
                     onPause();
                     mPausedByClient = true;
@@ -1231,7 +1232,7 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                                            FLUSH_CMD_FLUSH /* video */));
 
             mDeferredActions.push_back(
-                    new SeekAction(seekTimeUs, precise));
+                    new SeekAction(seekTimeUs, (MediaPlayerSeekMode)mode));
 
             // After a flush without shutdown, decoder is paused.
             // Don't resume it until source seek is done, otherwise it could
@@ -1320,13 +1321,13 @@ status_t NuPlayer::onInstantiateSecureDecoders() {
     return OK;
 }
 
-void NuPlayer::onStart(int64_t startPositionUs, bool precise) {
+void NuPlayer::onStart(int64_t startPositionUs, MediaPlayerSeekMode mode) {
     if (!mSourceStarted) {
         mSourceStarted = true;
         mSource->start();
     }
     if (startPositionUs > 0) {
-        performSeek(startPositionUs, precise);
+        performSeek(startPositionUs, mode);
         if (mSource->getFormat(false /* audio */) == NULL) {
             return;
         }
@@ -1542,7 +1543,7 @@ void NuPlayer::restartAudio(
         mRenderer->flush(false /* audio */, false /* notifyComplete */);
     }
 
-    performSeek(currentPositionUs, false /* precise */);
+    performSeek(currentPositionUs, MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC /* mode */);
 
     if (forceNonOffload) {
         mRenderer->signalDisableOffloadAudio();
@@ -1999,9 +2000,9 @@ void NuPlayer::processDeferredActions() {
     }
 }
 
-void NuPlayer::performSeek(int64_t seekTimeUs, bool precise) {
-    ALOGV("performSeek seekTimeUs=%lld us (%.2f secs), precise=%d",
-          (long long)seekTimeUs, seekTimeUs / 1E6, precise);
+void NuPlayer::performSeek(int64_t seekTimeUs, MediaPlayerSeekMode mode) {
+    ALOGV("performSeek seekTimeUs=%lld us (%.2f secs), mode=%d",
+          (long long)seekTimeUs, seekTimeUs / 1E6, mode);
 
     if (mSource == NULL) {
         // This happens when reset occurs right before the loop mode
@@ -2012,7 +2013,7 @@ void NuPlayer::performSeek(int64_t seekTimeUs, bool precise) {
         return;
     }
     mPreviousSeekTimeUs = seekTimeUs;
-    mSource->seekTo(seekTimeUs, precise);
+    mSource->seekTo(seekTimeUs, mode);
     ++mTimedTextGeneration;
 
     // everything's flushed, continue playback.

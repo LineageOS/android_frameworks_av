@@ -71,7 +71,9 @@ struct NuPlayer::GenericSource : public NuPlayer::Source {
     virtual sp<AMessage> getTrackInfo(size_t trackIndex) const;
     virtual ssize_t getSelectedTrack(media_track_type type) const;
     virtual status_t selectTrack(size_t trackIndex, bool select, int64_t timeUs);
-    virtual status_t seekTo(int64_t seekTimeUs, bool precise = false) override;
+    virtual status_t seekTo(
+        int64_t seekTimeUs,
+        MediaPlayerSeekMode mode = MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC) override;
 
     virtual status_t setBuffers(bool audio, Vector<MediaBuffer *> &buffers);
 
@@ -258,7 +260,7 @@ private:
     status_t doSelectTrack(size_t trackIndex, bool select, int64_t timeUs);
 
     void onSeek(const sp<AMessage>& msg);
-    status_t doSeek(int64_t seekTimeUs, bool precise);
+    status_t doSeek(int64_t seekTimeUs, MediaPlayerSeekMode mode);
 
     void onPrepareAsync();
 
@@ -280,14 +282,15 @@ private:
 
     void postReadBuffer(media_track_type trackType);
     void onReadBuffer(const sp<AMessage>& msg);
-    // |precise| is a modifier of |seekTimeUs|.
-    // When |precise| is true, the buffer read shall include an item indicating skipping
-    // rendering all buffers with timestamp earlier than |seekTimeUs|.
-    // When |precise| is false, the buffer read will not include the item as above in order
+    // When |mode| is MediaPlayerSeekMode::SEEK_CLOSEST, the buffer read shall
+    // include an item indicating skipping rendering all buffers with timestamp
+    // earlier than |seekTimeUs|.
+    // For other modes, the buffer read will not include the item as above in order
     // to facilitate fast seek operation.
     void readBuffer(
             media_track_type trackType,
-            int64_t seekTimeUs = -1ll, bool precise = false,
+            int64_t seekTimeUs = -1ll,
+            MediaPlayerSeekMode mode = MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC,
             int64_t *actualTimeUs = NULL, bool formatChange = false);
 
     void queueDiscontinuityIfNeeded(

@@ -665,8 +665,10 @@ void NuPlayer::GenericSource::onMessageReceived(const sp<AMessage> &msg) {
           } else {
               timeUs = mVideoLastDequeueTimeUs;
           }
-          readBuffer(trackType, timeUs, false /* precise */, &actualTimeUs, formatChange);
-          readBuffer(counterpartType, -1, false /* precise */, NULL, !formatChange);
+          readBuffer(trackType, timeUs, MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC /* mode */,
+                  &actualTimeUs, formatChange);
+          readBuffer(counterpartType, -1, MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC /* mode */,
+                  NULL, !formatChange);
           ALOGV("timeUs %lld actualTimeUs %lld", (long long)timeUs, (long long)actualTimeUs);
 
           break;
@@ -759,7 +761,7 @@ void NuPlayer::GenericSource::fetchTextData(
     CHECK(msg->findInt64("timeUs", &timeUs));
 
     int64_t subTimeUs;
-    readBuffer(type, timeUs, false /* precise */, &subTimeUs);
+    readBuffer(type, timeUs, MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC /* mode */, &subTimeUs);
 
     int64_t delayUs = subTimeUs - timeUs;
     if (msg->what() == kWhatFetchSubtitleData) {
@@ -790,7 +792,7 @@ void NuPlayer::GenericSource::sendTextData(
     }
 
     int64_t nextSubTimeUs;
-    readBuffer(type, -1, false /* precise */, &nextSubTimeUs);
+    readBuffer(type, -1, MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC /* mode */, &nextSubTimeUs);
 
     sp<ABuffer> buffer;
     status_t dequeueStatus = packets->dequeueAccessUnit(&buffer);
@@ -1186,10 +1188,10 @@ status_t NuPlayer::GenericSource::doSelectTrack(size_t trackIndex, bool select, 
     return INVALID_OPERATION;
 }
 
-status_t NuPlayer::GenericSource::seekTo(int64_t seekTimeUs, bool precise) {
+status_t NuPlayer::GenericSource::seekTo(int64_t seekTimeUs, MediaPlayerSeekMode mode) {
     sp<AMessage> msg = new AMessage(kWhatSeek, this);
     msg->setInt64("seekTimeUs", seekTimeUs);
-    msg->setInt32("precise", precise);
+    msg->setInt32("mode", mode);
 
     sp<AMessage> response;
     status_t err = msg->postAndAwaitResponse(&response);
@@ -1202,12 +1204,12 @@ status_t NuPlayer::GenericSource::seekTo(int64_t seekTimeUs, bool precise) {
 
 void NuPlayer::GenericSource::onSeek(const sp<AMessage>& msg) {
     int64_t seekTimeUs;
-    int32_t precise;
+    int32_t mode;
     CHECK(msg->findInt64("seekTimeUs", &seekTimeUs));
-    CHECK(msg->findInt32("precise", &precise));
+    CHECK(msg->findInt32("mode", &mode));
 
     sp<AMessage> response = new AMessage;
-    status_t err = doSeek(seekTimeUs, precise);
+    status_t err = doSeek(seekTimeUs, (MediaPlayerSeekMode)mode);
     response->setInt32("err", err);
 
     sp<AReplyToken> replyID;
@@ -1215,7 +1217,7 @@ void NuPlayer::GenericSource::onSeek(const sp<AMessage>& msg) {
     response->postReply(replyID);
 }
 
-status_t NuPlayer::GenericSource::doSeek(int64_t seekTimeUs, bool precise) {
+status_t NuPlayer::GenericSource::doSeek(int64_t seekTimeUs, MediaPlayerSeekMode mode) {
     mBufferingMonitor->updateDequeuedBufferTime(-1ll);
 
     // If the Widevine source is stopped, do not attempt to read any
@@ -1225,9 +1227,9 @@ status_t NuPlayer::GenericSource::doSeek(int64_t seekTimeUs, bool precise) {
     }
     if (mVideoTrack.mSource != NULL) {
         int64_t actualTimeUs;
-        readBuffer(MEDIA_TRACK_TYPE_VIDEO, seekTimeUs, precise, &actualTimeUs);
+        readBuffer(MEDIA_TRACK_TYPE_VIDEO, seekTimeUs, mode, &actualTimeUs);
 
-        if (!precise) {
+        if (mode != MediaPlayerSeekMode::SEEK_CLOSEST) {
             seekTimeUs = actualTimeUs;
         }
         mVideoLastDequeueTimeUs = actualTimeUs;
@@ -1361,7 +1363,7 @@ void NuPlayer::GenericSource::onReadBuffer(const sp<AMessage>& msg) {
 }
 
 void NuPlayer::GenericSource::readBuffer(
-        media_track_type trackType, int64_t seekTimeUs, bool precise,
+        media_track_type trackType, int64_t seekTimeUs, MediaPlayerSeekMode mode,
         int64_t *actualTimeUs, bool formatChange) {
     // Do not read data if Widevine source is stopped
     if (mStopRead) {
@@ -1408,7 +1410,7 @@ void NuPlayer::GenericSource::readBuffer(
 
     bool seeking = false;
     if (seekTimeUs >= 0) {
-        options.setSeekTo(seekTimeUs, MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC);
+        options.setSeekTo(seekTimeUs, mode);
         seeking = true;
     }
 
@@ -1461,7 +1463,8 @@ void NuPlayer::GenericSource::readBuffer(
             }
             if (seeking && buffer != nullptr) {
                 sp<AMessage> meta = buffer->meta();
-                if (meta != nullptr && precise && seekTimeUs > timeUs) {
+                if (meta != nullptr && mode == MediaPlayerSeekMode::SEEK_CLOSEST
+                        && seekTimeUs > timeUs) {
                     sp<AMessage> extra = new AMessage;
                     extra->setInt64("resume-at-mediaTimeUs", seekTimeUs);
                     meta->setMessage("extra", extra);
