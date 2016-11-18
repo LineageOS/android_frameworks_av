@@ -1460,6 +1460,9 @@ AudioFlinger::Client::Client(const sp<AudioFlinger>& audioFlinger, pid_t pid)
     size_t heapSize = kClientSharedHeapSizeBytes;
     // Increase heap size on non low ram devices to limit risk of reconnection failure for
     // invalidated tracks
+    kClientSharedHeapSizeMultiplier =
+        property_get_int32("audio.heap.size.multiplier",
+            kClientSharedHeapSizeMultiplier);
     if (!audioFlinger->isLowRamDevice()) {
         heapSize *= kClientSharedHeapSizeMultiplier;
     }

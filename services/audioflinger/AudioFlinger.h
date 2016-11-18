@@ -105,7 +105,7 @@ static const nsecs_t kDefaultStandbyTimeInNsecs = seconds(3);
 // Max shared memory size for audio tracks and audio records per client process
 static const size_t kClientSharedHeapSizeBytes = 1024*1024;
 // Shared memory size multiplier for non low ram devices
-static const size_t kClientSharedHeapSizeMultiplier = 4;
+static size_t kClientSharedHeapSizeMultiplier = 4;
 
 #define INCLUDING_FROM_AUDIOFLINGER_H
 
