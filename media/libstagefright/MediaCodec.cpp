@@ -1560,19 +1560,26 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     break;
                 }
 
-                case CodecBase::kWhatShutdownCompleted:
+                case CodecBase::kWhatStopCompleted:
                 {
-                    if (mState == UNINITIALIZED) {
-                        // Ignore shutdown complete if we're already released.
+                    if (mState != STOPPING) {
+                        ALOGW("Received kWhatStopCompleted in state %d", mState);
                         break;
                     }
-                    if (mState == STOPPING) {
-                        setState(INITIALIZED);
-                    } else {
-                        CHECK_EQ(mState, RELEASING);
-                        setState(UNINITIALIZED);
-                        mComponentName.clear();
+                    setState(INITIALIZED);
+                    (new AMessage)->postReply(mReplyID);
+                    break;
+                }
+
+                case CodecBase::kWhatReleaseCompleted:
+                {
+                    if (mState != RELEASING) {
+                        ALOGW("Received kWhatReleaseCompleted in state %d", mState);
+                        break;
                     }
+                    setState(UNINITIALIZED);
+                    mComponentName.clear();
+
                     mFlags &= ~kFlagIsComponentAllocated;
 
                     mResourceManagerService->removeResource(getId(mResourceManagerClient));

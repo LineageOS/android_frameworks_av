@@ -1201,6 +1201,10 @@ status_t ACodec::allocateOutputMetadataBuffers() {
         info.mDequeuedAt = mDequeueCounter;
 
         info.mData = new MediaCodecBuffer(mOutputFormat, new ABuffer(bufferSize));
+
+        // Initialize fence fd to -1 to avoid warning in freeBuffer().
+        ((VideoNativeMetadata *)info.mData->base())->nFenceFd = -1;
+
         info.mCodecData = info.mData;
 
         err = mOMXNode->useBuffer(kPortIndexOutput, OMXBuffer::sPreset, &info.mBufferID);
@@ -5258,7 +5262,7 @@ bool ACodec::BaseState::onMessageReceived(const sp<AMessage> &msg) {
             ALOGE_IF("[%s] failed to release codec instance: err=%d",
                        mCodec->mComponentName.c_str(), err);
             sp<AMessage> notify = mCodec->mNotify->dup();
-            notify->setInt32("what", CodecBase::kWhatShutdownCompleted);
+            notify->setInt32("what", CodecBase::kWhatReleaseCompleted);
             notify->post();
             break;
         }
@@ -6147,7 +6151,8 @@ bool ACodec::UninitializedState::onMessageReceived(const sp<AMessage> &msg) {
                      "cannot keep component allocated on shutdown in Uninitialized state");
 
             sp<AMessage> notify = mCodec->mNotify->dup();
-            notify->setInt32("what", CodecBase::kWhatShutdownCompleted);
+            notify->setInt32("what", keepComponentAllocated ?
+                    CodecBase::kWhatStopCompleted : CodecBase::kWhatReleaseCompleted);
             notify->post();
 
             handled = true;
@@ -6344,7 +6349,8 @@ void ACodec::LoadedState::onShutdown(bool keepComponentAllocated) {
 
     if (mCodec->mExplicitShutdown) {
         sp<AMessage> notify = mCodec->mNotify->dup();
-        notify->setInt32("what", CodecBase::kWhatShutdownCompleted);
+        notify->setInt32("what", keepComponentAllocated ?
+                CodecBase::kWhatStopCompleted : CodecBase::kWhatReleaseCompleted);
         notify->post();
         mCodec->mExplicitShutdown = false;
     }
@@ -7346,8 +7352,7 @@ bool ACodec::ExecutingToIdleState::onMessageReceived(const sp<AMessage> &msg) {
 
         case kWhatShutdown:
         {
-            // We're already doing that...
-
+            mCodec->deferMessage(msg);
             handled = true;
             break;
         }
@@ -7456,8 +7461,7 @@ bool ACodec::IdleToLoadedState::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
         case kWhatShutdown:
         {
-            // We're already doing that...
-
+            mCodec->deferMessage(msg);
             handled = true;
             break;
         }
