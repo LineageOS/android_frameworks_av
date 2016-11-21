@@ -12,6 +12,25 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * This file was modified by Dolby Laboratories, Inc. The portions of the
+ * code that are surrounded by "DOLBY..." are copyrighted and
+ * licensed separately, as follows:
+ *
+ *  (C) 2014-2016 Dolby Laboratories, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
  */
 
 //#define LOG_NDEBUG 0
@@ -40,6 +59,9 @@
 
 #include "avc_utils.h"
 #include "ATSParser.h"
+#ifdef DOLBY_ENABLE
+#include "DolbyNuPlayerDecoderExtImpl.h"
+#endif // DOLBY_END
 
 namespace android {
 
@@ -320,6 +342,9 @@ void NuPlayer::Decoder::onConfigure(const sp<AMessage> &format) {
     sp<AMessage> reply = new AMessage(kWhatCodecNotify, this);
     mCodec->setCallback(reply);
 
+#ifdef DOLBY_ENABLE
+    setDolbyMessage();
+#endif // DOLBY_END
     err = mCodec->start();
     if (err != OK) {
         ALOGE("Failed to start %s decoder (err=%d)", mComponentName.c_str(), err);
