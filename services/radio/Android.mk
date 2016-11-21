@@ -39,7 +39,8 @@ LOCAL_SRC_FILES += \
 
 LOCAL_SHARED_LIBRARIES += \
     libhwbinder \
-    libhidl \
+    libhidlbase \
+    libhidltransport \
     libbase \
     android.hardware.broadcastradio@1.0
 else
