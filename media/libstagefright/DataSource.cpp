@@ -31,7 +31,6 @@
 #include "include/NuCachedSource2.h"
 #include "include/OggExtractor.h"
 #include "include/WAVExtractor.h"
-#include "include/WVMExtractor.h"
 
 #include "matroska/MatroskaExtractor.h"
 
@@ -175,10 +174,6 @@ void DataSource::RegisterDefaultSniffers() {
     RegisterSniffer_l(SniffMP3);
     RegisterSniffer_l(SniffAAC);
     RegisterSniffer_l(SniffMPEG2PS);
-    if (getuid() == AID_MEDIA) {
-        // WVM only in the media server process
-        RegisterSniffer_l(SniffWVM);
-    }
     RegisterSniffer_l(SniffMidi);
 
     char value[PROPERTY_VALUE_MAX];
@@ -200,14 +195,10 @@ sp<DataSource> DataSource::CreateFromURI(
         *contentType = "";
     }
 
-    bool isWidevine = !strncasecmp("widevine://", uri, 11);
-
     sp<DataSource> source;
     if (!strncasecmp("file://", uri, 7)) {
         source = new FileSource(uri + 7);
-    } else if (!strncasecmp("http://", uri, 7)
-            || !strncasecmp("https://", uri, 8)
-            || isWidevine) {
+    } else if (!strncasecmp("http://", uri, 7) || !strncasecmp("https://", uri, 8)) {
         if (httpService == NULL) {
             ALOGE("Invalid http service!");
             return NULL;
@@ -220,14 +211,6 @@ sp<DataSource> DataSource::CreateFromURI(
                 return NULL;
             }
             httpSource = new MediaHTTP(conn);
-        }
-
-        String8 tmp;
-        if (isWidevine) {
-            tmp = String8("http://");
-            tmp.append(uri + 11);
-
-            uri = tmp.string();
         }
 
         String8 cacheConfig;
@@ -246,20 +229,14 @@ sp<DataSource> DataSource::CreateFromURI(
             return NULL;
         }
 
-        if (!isWidevine) {
-            if (contentType != NULL) {
-                *contentType = httpSource->getMIMEType();
-            }
-
-            source = NuCachedSource2::Create(
-                    httpSource,
-                    cacheConfig.isEmpty() ? NULL : cacheConfig.string(),
-                    disconnectAtHighwatermark);
-        } else {
-            // We do not want that prefetching, caching, datasource wrapper
-            // in the widevine:// case.
-            source = httpSource;
+        if (contentType != NULL) {
+            *contentType = httpSource->getMIMEType();
         }
+
+        source = NuCachedSource2::Create(
+                httpSource,
+                cacheConfig.isEmpty() ? NULL : cacheConfig.string(),
+                disconnectAtHighwatermark);
     } else if (!strncasecmp("data:", uri, 5)) {
         source = DataURISource::Create(uri);
     } else {

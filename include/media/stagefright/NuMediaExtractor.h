@@ -108,7 +108,6 @@ private:
     sp<DataSource> mDataSource;
 
     sp<IMediaExtractor> mImpl;
-    bool mIsWidevineExtractor;
 
     Vector<TrackInfo> mSelectedTracks;
     int64_t mTotalBitrate;  // in bits/sec

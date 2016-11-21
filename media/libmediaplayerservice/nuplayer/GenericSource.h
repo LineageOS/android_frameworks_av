@@ -37,7 +37,6 @@ struct IMediaHTTPService;
 struct MediaSource;
 class MediaBuffer;
 struct NuCachedSource2;
-class WVMExtractor;
 
 struct NuPlayer::GenericSource : public NuPlayer::Source {
     GenericSource(const sp<AMessage> &notify, bool uidValid, uid_t uid);
@@ -103,7 +102,6 @@ private:
         kWhatSelectTrack,
         kWhatSeek,
         kWhatReadBuffer,
-        kWhatStopWidevine,
         kWhatStart,
         kWhatResume,
         kWhatSecureDecodersInstantiated,
@@ -123,7 +121,6 @@ private:
 
         // Set up state.
         void prepare(const sp<NuCachedSource2> &cachedSource,
-                const sp<WVMExtractor> &wvmExtractor,
                 int64_t durationUs,
                 int64_t bitrate,
                 bool isStreaming);
@@ -157,7 +154,6 @@ private:
         sp<AMessage> mNotify;
 
         sp<NuCachedSource2> mCachedSource;
-        sp<WVMExtractor> mWVMExtractor;
         int64_t mDurationUs;
         int64_t mBitrate;
         bool mIsStreaming;
@@ -177,7 +173,6 @@ private:
         int64_t mlastDequeuedBufferMediaUs;
 
         void prepare_l(const sp<NuCachedSource2> &cachedSource,
-                const sp<WVMExtractor> &wvmExtractor,
                 int64_t durationUs,
                 int64_t bitrate,
                 bool isStreaming);
@@ -206,7 +201,6 @@ private:
     int32_t mFetchTimedTextDataGeneration;
     int64_t mDurationUs;
     bool mAudioIsVorbis;
-    bool mIsWidevine;
     bool mIsSecure;
     bool mIsStreaming;
     bool mUIDValid;
@@ -221,7 +215,6 @@ private:
     sp<DataSource> mDataSource;
     sp<NuCachedSource2> mCachedSource;
     sp<DataSource> mHttpSource;
-    sp<WVMExtractor> mWVMExtractor;
     sp<MetaData> mFileMeta;
     DrmManagerClient *mDrmManagerClient;
     sp<DecryptHandle> mDecryptHandle;

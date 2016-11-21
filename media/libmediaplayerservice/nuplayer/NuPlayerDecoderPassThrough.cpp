@@ -93,11 +93,6 @@ void NuPlayer::DecoderPassThrough::onSetRenderer(
             "ignoring request to change renderer");
 }
 
-void NuPlayer::DecoderPassThrough::onGetInputBuffers(
-        Vector<sp<MediaCodecBuffer> > * /* dstBuffers */) {
-    ALOGE("onGetInputBuffers() called unexpectedly");
-}
-
 bool NuPlayer::DecoderPassThrough::isStaleReply(const sp<AMessage> &msg) {
     int32_t generation;
     CHECK(msg->findInt32("generation", &generation));

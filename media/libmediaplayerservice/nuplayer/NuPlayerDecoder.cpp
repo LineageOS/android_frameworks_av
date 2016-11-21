@@ -411,17 +411,7 @@ void NuPlayer::Decoder::onSetParameters(const sp<AMessage> &params) {
 }
 
 void NuPlayer::Decoder::onSetRenderer(const sp<Renderer> &renderer) {
-    bool hadNoRenderer = (mRenderer == NULL);
     mRenderer = renderer;
-    if (hadNoRenderer && mRenderer != NULL) {
-        // this means that the widevine legacy source is ready
-        onRequestInputBuffers();
-    }
-}
-
-void NuPlayer::Decoder::onGetInputBuffers(
-        Vector<sp<MediaCodecBuffer> > *dstBuffers) {
-    CHECK_EQ((status_t)OK, mCodec->getWidevineLegacyBuffers(dstBuffers));
 }
 
 void NuPlayer::Decoder::onResume(bool notifyComplete) {
@@ -518,9 +508,7 @@ void NuPlayer::Decoder::onShutdown(bool notifyComplete) {
  * returns true if we should request more data
  */
 bool NuPlayer::Decoder::doRequestBuffers() {
-    // mRenderer is only NULL if we have a legacy widevine source that
-    // is not yet ready. In this case we must not fetch input.
-    if (isDiscontinuityPending() || mRenderer == NULL) {
+    if (isDiscontinuityPending()) {
         return false;
     }
     status_t err = OK;
@@ -878,40 +866,6 @@ bool NuPlayer::Decoder::onInputBufferFetched(const sp<AMessage> &msg) {
     bool hasBuffer = msg->findBuffer("buffer", &buffer);
     bool needsCopy = true;
 
-    // handle widevine classic source - that fills an arbitrary input buffer
-    MediaBuffer *mediaBuffer = NULL;
-    if (hasBuffer) {
-        mediaBuffer = (MediaBuffer *)(buffer->getMediaBufferBase());
-        if (mediaBuffer != NULL) {
-            // likely filled another buffer than we requested: adjust buffer index
-            size_t ix;
-            for (ix = 0; ix < mInputBuffers.size(); ix++) {
-                const sp<MediaCodecBuffer> &buf = mInputBuffers[ix];
-                if (buf->data() == mediaBuffer->data()) {
-                    // all input buffers are dequeued on start, hence the check
-                    if (!mInputBufferIsDequeued[ix]) {
-                        ALOGV("[%s] received MediaBuffer for #%zu instead of #%zu",
-                                mComponentName.c_str(), ix, bufferIx);
-                        mediaBuffer->release();
-                        return false;
-                    }
-
-                    // TRICKY: need buffer for the metadata, so instead, set
-                    // codecBuffer to the same (though incorrect) buffer to
-                    // avoid a memcpy into the codecBuffer
-                    codecBuffer = new MediaCodecBuffer(codecBuffer->format(), buffer);
-                    codecBuffer->setRange(
-                            mediaBuffer->range_offset(),
-                            mediaBuffer->range_length());
-                    bufferIx = ix;
-                    needsCopy = false;
-                    break;
-                }
-            }
-            CHECK(ix < mInputBuffers.size());
-        }
-    }
-
     if (buffer == NULL /* includes !hasBuffer */) {
         int32_t streamErr = ERROR_END_OF_STREAM;
         CHECK(msg->findInt32("err", &streamErr) || !hasBuffer);
@@ -981,18 +935,11 @@ bool NuPlayer::Decoder::onInputBufferFetched(const sp<AMessage> &msg) {
                         timeUs,
                         flags);
         if (err != OK) {
-            if (mediaBuffer != NULL) {
-                mediaBuffer->release();
-            }
             ALOGE("Failed to queue input buffer for %s (err=%d)",
                     mComponentName.c_str(), err);
             handleError(err);
         } else {
             mInputBufferIsDequeued.editItemAt(bufferIx) = false;
-            if (mediaBuffer != NULL) {
-                CHECK(mMediaBuffers[bufferIx] == NULL);
-                mMediaBuffers.editItemAt(bufferIx) = mediaBuffer;
-            }
         }
     }
     return true;

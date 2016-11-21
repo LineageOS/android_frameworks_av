@@ -263,9 +263,6 @@ void NuPlayer::setDataSourceAsync(
     } else {
         sp<GenericSource> genericSource =
                 new GenericSource(notify, mUIDValid, mUID);
-        // Don't set FLAG_SECURE on mSourceFlags here for widevine.
-        // The correct flags will be updated in Source::kWhatFlagsChanged
-        // handler when  GenericSource is prepared.
 
         status_t err = genericSource->setDataSource(httpService, url, headers);
 
@@ -1670,29 +1667,6 @@ status_t NuPlayer::instantiateDecoder(
     }
     (*decoder)->init();
     (*decoder)->configure(format);
-
-    // allocate buffers to decrypt widevine source buffers
-    if (!audio && (mSourceFlags & Source::FLAG_SECURE)) {
-        Vector<sp<MediaCodecBuffer> > inputBufs;
-        CHECK_EQ((*decoder)->getInputBuffers(&inputBufs), (status_t)OK);
-
-        Vector<MediaBuffer *> mediaBufs;
-        for (size_t i = 0; i < inputBufs.size(); i++) {
-            const sp<MediaCodecBuffer> &buffer = inputBufs[i];
-            MediaBuffer *mbuf = new MediaBuffer(buffer->data(), buffer->size());
-            mediaBufs.push(mbuf);
-        }
-
-        status_t err = mSource->setBuffers(audio, mediaBufs);
-        if (err != OK) {
-            for (size_t i = 0; i < mediaBufs.size(); ++i) {
-                mediaBufs[i]->release();
-            }
-            mediaBufs.clear();
-            ALOGE("Secure source didn't support secure mediaBufs.");
-            return err;
-        }
-    }
 
     if (!audio) {
         sp<AMessage> params = new AMessage();

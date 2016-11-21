@@ -28,7 +28,6 @@
 #include "include/MPEG2PSExtractor.h"
 #include "include/MPEG2TSExtractor.h"
 #include "include/DRMExtractor.h"
-#include "include/WVMExtractor.h"
 #include "include/FLACExtractor.h"
 #include "include/AACExtractor.h"
 #include "include/MidiExtractor.h"
@@ -151,15 +150,9 @@ sp<IMediaExtractor> MediaExtractor::Create(
         ALOGW("creating media extractor in calling process");
         return CreateFromService(source, mime);
     } else {
-        // Check if it's WVM, since WVMExtractor needs to be created in the media server process,
-        // not the extractor process.
         String8 mime8;
         float confidence;
         sp<AMessage> meta;
-        if (SniffWVM(source, &mime8, &confidence, &meta) &&
-                !strcasecmp(mime8, MEDIA_MIMETYPE_CONTAINER_WVM)) {
-            return new WVMExtractor(source);
-        }
 
         // Check if it's es-based DRM, since DRMExtractor needs to be created in the media server
         // process, not the extractor process.
@@ -251,9 +244,6 @@ sp<MediaExtractor> MediaExtractor::CreateFromService(
         ret = new MatroskaExtractor(source);
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MPEG2TS)) {
         ret = new MPEG2TSExtractor(source);
-    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_WVM) && getuid() == AID_MEDIA) {
-        // Return now.  WVExtractor should not have the DrmFlag set in the block below.
-        return new WVMExtractor(source);
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC_ADTS)) {
         ret = new AACExtractor(source, meta);
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MPEG2PS)) {
