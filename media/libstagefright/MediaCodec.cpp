@@ -2377,8 +2377,6 @@ void MediaCodec::returnBuffersToCodecOnPort(int32_t portIndex, bool isReclaim) {
         if (info->mNotify != NULL) {
             sp<AMessage> msg = info->mNotify;
             info->mNotify = NULL;
-            msg->setObject("buffer", (portIndex == kPortIndexInput && mCrypto != NULL)
-                    ? info->mSecureData : info->mData);
             if (isReclaim && info->mOwnedByClient) {
                 ALOGD("port %d buffer %zu still owned by client when codec is reclaimed",
                         portIndex, i);
