@@ -1611,8 +1611,13 @@ void AudioMixer::process__OneTrack16BitsStereoNoResampling(state_t* state)
         // in == NULL can happen if the track was flushed just after having
         // been enabled for mixing.
         if (in == NULL || (((uintptr_t)in) & 3)) {
-            memset(out, 0, numFrames
-                    * t.mMixerChannelCount * audio_bytes_per_sample(t.mMixerFormat));
+            if ( AUDIO_FORMAT_PCM_FLOAT == t.mMixerFormat ) {
+                 memset((char*)fout, 0, numFrames
+                         * t.mMixerChannelCount * audio_bytes_per_sample(t.mMixerFormat));
+            } else {
+                 memset((char*)out, 0, numFrames
+                         * t.mMixerChannelCount * audio_bytes_per_sample(t.mMixerFormat));
+            }
             ALOGE_IF((((uintptr_t)in) & 3),
                     "process__OneTrack16BitsStereoNoResampling: misaligned buffer"
                     " %p track %d, channels %d, needs %08x, volume %08x vfl %f vfr %f",
