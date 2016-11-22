@@ -965,8 +965,6 @@ int main(int argc, char **argv) {
         }
     }
 
-    DataSource::RegisterDefaultSniffers();
-
     status_t err = OK;
 
     for (int k = 0; k < argc && err == OK; ++k) {

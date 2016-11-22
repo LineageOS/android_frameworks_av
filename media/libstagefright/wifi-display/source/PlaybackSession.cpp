@@ -36,7 +36,6 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/AudioSource.h>
-#include <media/stagefright/DataSource.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MediaSource.h>
@@ -748,8 +747,6 @@ void WifiDisplaySource::PlaybackSession::onSinkFeedback(const sp<AMessage> &msg)
 
 status_t WifiDisplaySource::PlaybackSession::setupMediaPacketizer(
         bool enableAudio, bool enableVideo) {
-    DataSource::RegisterDefaultSniffers();
-
     mExtractor = new NuMediaExtractor;
 
     status_t err = mExtractor->setDataSource(

@@ -55,8 +55,6 @@ StagefrightMetadataRetriever::StagefrightMetadataRetriever()
     : mParsedMetaData(false),
       mAlbumArt(NULL) {
     ALOGV("StagefrightMetadataRetriever()");
-
-    DataSource::RegisterDefaultSniffers();
 }
 
 StagefrightMetadataRetriever::~StagefrightMetadataRetriever() {

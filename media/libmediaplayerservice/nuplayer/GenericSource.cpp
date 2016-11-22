@@ -68,7 +68,6 @@ NuPlayer::GenericSource::GenericSource(
       mPendingReadBufferTypes(0) {
     mBufferingMonitor = new BufferingMonitor(notify);
     resetDataSource();
-    DataSource::RegisterDefaultSniffers();
 }
 
 void NuPlayer::GenericSource::resetDataSource() {

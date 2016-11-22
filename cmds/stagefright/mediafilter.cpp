@@ -30,7 +30,6 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/DataSource.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/NuMediaExtractor.h>
 #include <media/stagefright/RenderScriptWrapper.h>
@@ -737,8 +736,6 @@ int main(int argc, char **argv) {
     }
 
     ProcessState::self()->startThreadPool();
-
-    DataSource::RegisterDefaultSniffers();
 
     android::sp<ALooper> looper = new ALooper;
     looper->start();

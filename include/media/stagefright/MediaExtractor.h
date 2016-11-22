@@ -80,6 +80,24 @@ protected:
 private:
     bool mIsDrm;
 
+    typedef bool (*SnifferFunc)(
+            const sp<DataSource> &source, String8 *mimeType,
+            float *confidence, sp<AMessage> *meta);
+
+    static Mutex gSnifferMutex;
+    static List<SnifferFunc> gSniffers;
+    static bool gSniffersRegistered;
+
+    // The sniffer can optionally fill in "meta" with an AMessage containing
+    // a dictionary of values that helps the corresponding extractor initialize
+    // its state without duplicating effort already exerted by the sniffer.
+    static void RegisterSniffer_l(SnifferFunc func);
+
+    static bool sniff(const sp<DataSource> &source,
+            String8 *mimeType, float *confidence, sp<AMessage> *meta);
+
+    static void RegisterDefaultSniffers();
+
     MediaExtractor(const MediaExtractor &);
     MediaExtractor &operator=(const MediaExtractor &);
 };

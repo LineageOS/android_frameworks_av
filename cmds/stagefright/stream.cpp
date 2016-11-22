@@ -301,8 +301,6 @@ private:
 int main(int argc, char **argv) {
     android::ProcessState::self()->startThreadPool();
 
-    DataSource::RegisterDefaultSniffers();
-
     if (argc != 2) {
         fprintf(stderr, "Usage: %s filename\n", argv[0]);
         return 1;
