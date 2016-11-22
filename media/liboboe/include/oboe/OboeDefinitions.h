@@ -53,7 +53,7 @@ enum oboe_direction_t {
     OBOE_DIRECTION_COUNT // This should always be last.
 };
 
-enum {
+enum oboe_datatype_t {
     OBOE_AUDIO_DATATYPE_INT16,
     OBOE_AUDIO_DATATYPE_INT32,
     OBOE_AUDIO_DATATYPE_INT824,
@@ -62,7 +62,7 @@ enum {
     OBOE_AUDIO_DATATYPE_COUNT // This should always be last.
 };
 
-enum {
+enum oboe_content_t {
     OBOE_AUDIO_CONTENT_PCM,
     OBOE_AUDIO_CONTENT_MP3,
     OBOE_AUDIO_CONTENT_AAC,
@@ -73,7 +73,7 @@ enum {
     OBOE_AUDIO_CONTENT_COUNT // This should always be last.
 };
 
-enum {
+enum oboe_wrapper_t {
     OBOE_AUDIO_WRAPPER_NONE,
     OBOE_AUDIO_WRAPPER_IEC61937, // Add new values below.
     OBOE_AUDIO_WRAPPER_COUNT // This should always be last.
@@ -133,19 +133,19 @@ typedef enum {
 
 typedef enum
 {
-    OBOE_STATE_UNINITIALIZED = 0,
-    OBOE_STATE_OPEN,
-    OBOE_STATE_STARTING,
-    OBOE_STATE_STARTED,
-    OBOE_STATE_PAUSING,
-    OBOE_STATE_PAUSED,
-    OBOE_STATE_FLUSHING,
-    OBOE_STATE_FLUSHED,
-    OBOE_STATE_STOPPING,
-    OBOE_STATE_STOPPED,
-    OBOE_STATE_CLOSING,
-    OBOE_STATE_CLOSED,
-} oboe_state_t;
+    OBOE_STREAM_STATE_UNINITIALIZED = 0,
+    OBOE_STREAM_STATE_OPEN,
+    OBOE_STREAM_STATE_STARTING,
+    OBOE_STREAM_STATE_STARTED,
+    OBOE_STREAM_STATE_PAUSING,
+    OBOE_STREAM_STATE_PAUSED,
+    OBOE_STREAM_STATE_FLUSHING,
+    OBOE_STREAM_STATE_FLUSHED,
+    OBOE_STREAM_STATE_STOPPING,
+    OBOE_STREAM_STATE_STOPPED,
+    OBOE_STREAM_STATE_CLOSING,
+    OBOE_STREAM_STATE_CLOSED,
+} oboe_stream_state_t;
 
 // TODO review API
 typedef enum {
