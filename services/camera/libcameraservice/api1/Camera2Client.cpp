@@ -993,7 +993,7 @@ status_t Camera2Client::startRecording() {
 }
 
 status_t Camera2Client::startRecordingL(Parameters &params, bool restart) {
-    status_t res;
+    status_t res = OK;
 
     ALOGV("%s: state == %d, restart = %d", __FUNCTION__, params.state, restart);
 
