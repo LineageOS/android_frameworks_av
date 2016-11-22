@@ -5513,9 +5513,8 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
     int32_t err = OK;
     bool eos = false;
     PortMode mode = getPortMode(kPortIndexInput);
-
-    sp<RefBase> obj;
-    if (!msg->findObject("buffer", &obj)) {
+    int32_t discarded = 0;
+    if (msg->findInt32("discarded", &discarded) && discarded) {
         /* these are unfilled buffers returned by client */
         CHECK(msg->findInt32("err", &err));
 
@@ -5527,9 +5526,10 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
                  mCodec->mComponentName.c_str(), err);
             eos = true;
         }
-    } else {
-        buffer = static_cast<MediaCodecBuffer *>(obj.get());
     }
+    sp<RefBase> obj;
+    CHECK(msg->findObject("buffer", &obj));
+    buffer = static_cast<MediaCodecBuffer *>(obj.get());
 
     int32_t tmp;
     if (buffer != NULL && buffer->meta()->findInt32("eos", &tmp) && tmp) {
@@ -5957,10 +5957,11 @@ void ACodec::BaseState::onOutputBufferDrained(const sp<AMessage> &msg) {
     IOMX::buffer_id bufferID;
     CHECK(msg->findInt32("buffer-id", (int32_t*)&bufferID));
     sp<RefBase> obj;
-    sp<MediaCodecBuffer> buffer = nullptr;
-    if (msg->findObject("buffer", &obj)) {
-        buffer = static_cast<MediaCodecBuffer *>(obj.get());
-    }
+    CHECK(msg->findObject("buffer", &obj));
+    sp<MediaCodecBuffer> buffer = static_cast<MediaCodecBuffer *>(obj.get());
+    int32_t discarded = 0;
+    msg->findInt32("discarded", &discarded);
+
     ssize_t index;
     BufferInfo *info = mCodec->findBufferByID(kPortIndexOutput, bufferID, &index);
     BufferInfo::Status status = BufferInfo::getSafeStatus(info);
@@ -5992,7 +5993,7 @@ void ACodec::BaseState::onOutputBufferDrained(const sp<AMessage> &msg) {
     int32_t render;
     if (mCodec->mNativeWindow != NULL
             && msg->findInt32("render", &render) && render != 0
-            && buffer != NULL && buffer->size() != 0) {
+            && !discarded && buffer->size() != 0) {
         ATRACE_NAME("render");
         // The client wants this buffer to be rendered.
 
@@ -6031,8 +6032,7 @@ void ACodec::BaseState::onOutputBufferDrained(const sp<AMessage> &msg) {
             info->mIsReadFence = false;
         }
     } else {
-        if (mCodec->mNativeWindow != NULL &&
-            (buffer == NULL || buffer->size() != 0)) {
+        if (mCodec->mNativeWindow != NULL && (discarded || buffer->size() != 0)) {
             // move read fence into write fence to avoid clobbering
             info->mIsReadFence = false;
             ATRACE_NAME("frame-drop");
