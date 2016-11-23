@@ -14,17 +14,13 @@
  * limitations under the License.
  */
 
-#include <unistd.h>
+#include <binder/IActivityManager.h>
 #include <binder/IBinder.h>
 #include <binder/IServiceManager.h>
-#include <binder/Parcel.h>
-#include <utils/String8.h>
 
 #include "ActivityManager.h"
 
 namespace android {
-
-const uint32_t OPEN_CONTENT_URI_TRANSACTION = IBinder::FIRST_CALL_TRANSACTION;
 
 // Perform ContentProvider.openFile() on the given URI, returning
 // the resulting native file descriptor.  Returns < 0 on error.
@@ -33,26 +29,10 @@ int openContentProviderFile(const String16& uri)
     int fd = -1;
 
     sp<IServiceManager> sm = defaultServiceManager();
-    sp<IBinder> am = sm->getService(String16("activity"));
+    sp<IBinder> binder = sm->getService(String16("activity"));
+    sp<IActivityManager> am = interface_cast<IActivityManager>(binder);
     if (am != NULL) {
-        Parcel data, reply;
-        data.writeInterfaceToken(String16("android.app.IActivityManager"));
-        data.writeString16(uri);
-        status_t ret = am->transact(OPEN_CONTENT_URI_TRANSACTION, data, &reply);
-        if (ret == NO_ERROR) {
-            int32_t exceptionCode = reply.readExceptionCode();
-            if (!exceptionCode) {
-                // Success is indicated here by a nonzero int followed by the fd;
-                // failure by a zero int with no data following.
-                if (reply.readInt32() != 0) {
-                    fd = dup(reply.readFileDescriptor());
-                }
-            } else {
-                // An exception was thrown back; fall through to return failure
-                ALOGD("openContentUri(%s) caught exception %d\n",
-                        String8(uri).string(), exceptionCode);
-            }
-        }
+        fd = am->openContentUri(uri);
     }
 
     return fd;
