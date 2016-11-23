@@ -607,6 +607,22 @@ status_t AudioFlinger::EffectModule::command(uint32_t cmdCode,
         android_errorWriteLog(0x534e4554, "32438594");
         return -EINVAL;
     }
+    if (cmdCode == EFFECT_CMD_GET_PARAM &&
+        (sizeof(effect_param_t) > *replySize
+          || ((effect_param_t *)pCmdData)->psize > *replySize
+                                                   - sizeof(effect_param_t)
+          || ((effect_param_t *)pCmdData)->vsize > *replySize
+                                                   - sizeof(effect_param_t)
+                                                   - ((effect_param_t *)pCmdData)->psize
+          || roundUpDelta(((effect_param_t *)pCmdData)->psize, (uint32_t)sizeof(int)) >
+                                                   *replySize
+                                                   - sizeof(effect_param_t)
+                                                   - ((effect_param_t *)pCmdData)->psize
+                                                   - ((effect_param_t *)pCmdData)->vsize)) {
+        ALOGV("\tLVM_ERROR : EFFECT_CMD_GET_PARAM: reply size inconsistent");
+                     android_errorWriteLog(0x534e4554, "32705438");
+        return -EINVAL;
+    }
     if ((cmdCode == EFFECT_CMD_SET_PARAM
             || cmdCode == EFFECT_CMD_SET_PARAM_DEFERRED) &&  // DEFERRED not generally used
         (sizeof(effect_param_t) > cmdSize
