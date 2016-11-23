@@ -1908,7 +1908,7 @@ status_t AudioFlinger::openOutput(audio_module_handle_t module,
               config->channel_mask,
               flags);
 
-    if (*devices == AUDIO_DEVICE_NONE) {
+    if (devices == NULL || *devices == AUDIO_DEVICE_NONE) {
         return BAD_VALUE;
     }
 
