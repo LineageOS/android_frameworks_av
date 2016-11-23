@@ -590,7 +590,7 @@ status_t BnOMXNode::onTransact(
                     params = mmap(NULL, allocSize, PROT_READ | PROT_WRITE,
                             MAP_PRIVATE | MAP_ANONYMOUS, -1 /* fd */, 0 /* offset */);
                 }
-                if (params != MAP_FAILED) {
+                if (params != MAP_FAILED && params != NULL) {
                     err = data.read(params, size);
                     if (err != OK) {
                         android_errorWriteLog(0x534e4554, "26914474");
