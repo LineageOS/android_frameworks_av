@@ -4477,9 +4477,7 @@ audio_devices_t AudioPolicyManager::getNewInputDevice(const sp<AudioInputDescrip
 
 bool AudioPolicyManager::streamsMatchForvolume(audio_stream_type_t stream1,
                                                audio_stream_type_t stream2) {
-    return ((stream1 == stream2) ||
-            ((stream1 == AUDIO_STREAM_ACCESSIBILITY) && (stream2 == AUDIO_STREAM_MUSIC)) ||
-            ((stream1 == AUDIO_STREAM_MUSIC) && (stream2 == AUDIO_STREAM_ACCESSIBILITY)));
+    return (stream1 == stream2);
 }
 
 uint32_t AudioPolicyManager::getStrategyForStream(audio_stream_type_t stream) {
