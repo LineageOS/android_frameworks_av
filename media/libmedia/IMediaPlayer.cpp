@@ -23,6 +23,7 @@
 
 #include <media/AudioResamplerPublic.h>
 #include <media/AVSyncSettings.h>
+#include <media/BufferingSettings.h>
 
 #include <media/IDataSource.h>
 #include <media/IMediaHTTPService.h>
@@ -40,6 +41,8 @@ enum {
     SET_DATA_SOURCE_FD,
     SET_DATA_SOURCE_STREAM,
     SET_DATA_SOURCE_CALLBACK,
+    SET_BUFFERING_SETTINGS,
+    GET_DEFAULT_BUFFERING_SETTINGS,
     PREPARE_ASYNC,
     START,
     STOP,
@@ -146,6 +149,30 @@ public:
         data.writeStrongBinder(b);
         remote()->transact(SET_VIDEO_SURFACETEXTURE, data, &reply);
         return reply.readInt32();
+    }
+
+    status_t setBufferingSettings(const BufferingSettings& buffering)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
+        buffering.writeToParcel(&data);
+        remote()->transact(SET_BUFFERING_SETTINGS, data, &reply);
+        return reply.readInt32();
+    }
+
+    status_t getDefaultBufferingSettings(BufferingSettings* buffering /* nonnull */)
+    {
+        if (buffering == nullptr) {
+            return BAD_VALUE;
+        }
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
+        remote()->transact(GET_DEFAULT_BUFFERING_SETTINGS, data, &reply);
+        status_t err = reply.readInt32();
+        if (err == OK) {
+            err = buffering->readFromParcel(&reply);
+        }
+        return err;
     }
 
     status_t prepareAsync()
@@ -495,6 +522,23 @@ status_t BnMediaPlayer::onTransact(
             sp<IGraphicBufferProducer> bufferProducer =
                     interface_cast<IGraphicBufferProducer>(data.readStrongBinder());
             reply->writeInt32(setVideoSurfaceTexture(bufferProducer));
+            return NO_ERROR;
+        } break;
+        case SET_BUFFERING_SETTINGS: {
+            CHECK_INTERFACE(IMediaPlayer, data, reply);
+            BufferingSettings buffering;
+            buffering.readFromParcel(&data);
+            reply->writeInt32(setBufferingSettings(buffering));
+            return NO_ERROR;
+        } break;
+        case GET_DEFAULT_BUFFERING_SETTINGS: {
+            CHECK_INTERFACE(IMediaPlayer, data, reply);
+            BufferingSettings buffering;
+            status_t err = getDefaultBufferingSettings(&buffering);
+            reply->writeInt32(err);
+            if (err == OK) {
+                buffering.writeToParcel(reply);
+            }
             return NO_ERROR;
         } break;
         case PREPARE_ASYNC: {
