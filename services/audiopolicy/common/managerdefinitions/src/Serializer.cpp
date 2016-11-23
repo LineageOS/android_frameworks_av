@@ -383,6 +383,7 @@ status_t RouteTraits::deserialize(_xmlDoc */*doc*/, const _xmlNode *root, PtrEle
             sp<AudioPort> source = ctx->findPortByTagName(String8(devTag));
             if (source == NULL) {
                 ALOGE("%s: no source found with name=%s", __FUNCTION__, devTag);
+                free(sourcesLiteral);
                 return BAD_VALUE;
             }
             sources.add(source);
