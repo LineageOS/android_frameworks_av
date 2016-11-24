@@ -1064,6 +1064,10 @@ status_t StagefrightRecorder::setupRawAudioRecording() {
     } else if (audioEncoder == NULL && mAudioEncoder == AUDIO_ENCODER_LPCM) {
         sp<MediaSource> src;
         src = setPCMRecording();
+        if (src == NULL) {
+            ALOGE("Recording source is null");
+            return BAD_VALUE;
+        }
         CHECK(mWriter != 0);
         mWriter->addSource(src);
     }
