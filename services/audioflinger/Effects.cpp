@@ -599,16 +599,17 @@ status_t AudioFlinger::EffectModule::command(uint32_t cmdCode,
         return mStatus;
     }
     if (cmdCode == EFFECT_CMD_GET_PARAM &&
-            (*replySize < sizeof(effect_param_t) ||
-                    ((effect_param_t *)pCmdData)->psize > *replySize - sizeof(effect_param_t))) {
-        android_errorWriteLog(0x534e4554, "29251553");
-        return -EINVAL;
-    }
-    if (cmdCode == EFFECT_CMD_GET_PARAM &&
             (sizeof(effect_param_t) > cmdSize ||
                     ((effect_param_t *)pCmdData)->psize > cmdSize
                                                           - sizeof(effect_param_t))) {
         android_errorWriteLog(0x534e4554, "32438594");
+        android_errorWriteLog(0x534e4554, "33003822");
+        return -EINVAL;
+    }
+    if (cmdCode == EFFECT_CMD_GET_PARAM &&
+            (*replySize < sizeof(effect_param_t) ||
+                    ((effect_param_t *)pCmdData)->psize > *replySize - sizeof(effect_param_t))) {
+        android_errorWriteLog(0x534e4554, "29251553");
         return -EINVAL;
     }
     if ((cmdCode == EFFECT_CMD_SET_PARAM
