@@ -170,8 +170,6 @@ static int translateColorToOmxEnumValue(int color) {
 int main(int argc, char **argv) {
     android::ProcessState::self()->startThreadPool();
 
-    DataSource::RegisterDefaultSniffers();
-
 #if 1
     if (argc != 3) {
         fprintf(stderr, "usage: %s <filename> <input_color_format>\n", argv[0]);

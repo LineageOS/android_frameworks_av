@@ -185,14 +185,14 @@ sp<MediaExtractor> MediaExtractor::CreateFromService(
         const sp<DataSource> &source, const char *mime) {
 
     ALOGV("MediaExtractor::CreateFromService %s", mime);
-    DataSource::RegisterDefaultSniffers();
+    RegisterDefaultSniffers();
 
     sp<AMessage> meta;
 
     String8 tmp;
     if (mime == NULL) {
         float confidence;
-        if (!source->sniff(&tmp, &confidence, &meta)) {
+        if (!sniff(source, &tmp, &confidence, &meta)) {
             ALOGV("FAILED to autodetect media content.");
 
             return NULL;
@@ -262,5 +262,80 @@ sp<MediaExtractor> MediaExtractor::CreateFromService(
 
     return ret;
 }
+
+Mutex MediaExtractor::gSnifferMutex;
+List<MediaExtractor::SnifferFunc> MediaExtractor::gSniffers;
+bool MediaExtractor::gSniffersRegistered = false;
+
+// static
+bool MediaExtractor::sniff(
+        const sp<DataSource> &source, String8 *mimeType, float *confidence, sp<AMessage> *meta) {
+    *mimeType = "";
+    *confidence = 0.0f;
+    meta->clear();
+
+    {
+        Mutex::Autolock autoLock(gSnifferMutex);
+        if (!gSniffersRegistered) {
+            return false;
+        }
+    }
+
+    for (List<SnifferFunc>::iterator it = gSniffers.begin();
+         it != gSniffers.end(); ++it) {
+        String8 newMimeType;
+        float newConfidence;
+        sp<AMessage> newMeta;
+        if ((*it)(source, &newMimeType, &newConfidence, &newMeta)) {
+            if (newConfidence > *confidence) {
+                *mimeType = newMimeType;
+                *confidence = newConfidence;
+                *meta = newMeta;
+            }
+        }
+    }
+
+    return *confidence > 0.0;
+}
+
+// static
+void MediaExtractor::RegisterSniffer_l(SnifferFunc func) {
+    for (List<SnifferFunc>::iterator it = gSniffers.begin();
+         it != gSniffers.end(); ++it) {
+        if (*it == func) {
+            return;
+        }
+    }
+
+    gSniffers.push_back(func);
+}
+
+// static
+void MediaExtractor::RegisterDefaultSniffers() {
+    Mutex::Autolock autoLock(gSnifferMutex);
+    if (gSniffersRegistered) {
+        return;
+    }
+
+    RegisterSniffer_l(SniffMPEG4);
+    RegisterSniffer_l(SniffMatroska);
+    RegisterSniffer_l(SniffOgg);
+    RegisterSniffer_l(SniffWAV);
+    RegisterSniffer_l(SniffFLAC);
+    RegisterSniffer_l(SniffAMR);
+    RegisterSniffer_l(SniffMPEG2TS);
+    RegisterSniffer_l(SniffMP3);
+    RegisterSniffer_l(SniffAAC);
+    RegisterSniffer_l(SniffMPEG2PS);
+    RegisterSniffer_l(SniffMidi);
+
+    char value[PROPERTY_VALUE_MAX];
+    if (property_get("drm.service.enabled", value, NULL)
+            && (!strcmp(value, "1") || !strcasecmp(value, "true"))) {
+        RegisterSniffer_l(SniffDRM);
+    }
+    gSniffersRegistered = true;
+}
+
 
 }  // namespace android

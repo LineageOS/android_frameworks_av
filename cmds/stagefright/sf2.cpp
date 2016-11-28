@@ -620,8 +620,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    DataSource::RegisterDefaultSniffers();
-
     sp<ALooper> looper = new ALooper;
     looper->setName("sf2");
 

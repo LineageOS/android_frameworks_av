@@ -800,7 +800,6 @@ int main(int argc, char **argv) {
     using namespace android;
 
     android::ProcessState::self()->startThreadPool();
-    DataSource::RegisterDefaultSniffers();
 
     const char *me = argv[0];
 

@@ -29,7 +29,6 @@
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AString.h>
-#include <media/stagefright/DataSource.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaMuxer.h>
@@ -318,9 +317,6 @@ int main(int argc, char **argv) {
         return 1;
     }
     ProcessState::self()->startThreadPool();
-
-    // Make sure setDataSource() works.
-    DataSource::RegisterDefaultSniffers();
 
     sp<ALooper> looper = new ALooper;
     looper->start();
