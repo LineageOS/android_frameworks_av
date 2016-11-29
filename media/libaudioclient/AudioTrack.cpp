@@ -671,6 +671,8 @@ void AudioTrack::stop()
         mState = STATE_STOPPING;
     } else {
         mState = STATE_STOPPED;
+        ALOGD_IF(mSharedBuffer == nullptr,
+                "stop() called with %u frames delivered", mReleased.value());
         mReleased = 0;
     }
 
