@@ -59,6 +59,114 @@ static void mysighandler(int signum) {
     oldhandler(signum);
 }
 
+namespace {
+
+enum {
+    kWhatFillThisBuffer      = 'fill',
+    kWhatDrainThisBuffer     = 'drai',
+    kWhatEOS                 = 'eos ',
+    kWhatStopCompleted       = 'scom',
+    kWhatReleaseCompleted    = 'rcom',
+    kWhatFlushCompleted      = 'fcom',
+    kWhatError               = 'erro',
+};
+
+class Sf2Callback : public CodecBase::Callback {
+public:
+    explicit Sf2Callback(const sp<AMessage> &notify);
+    ~Sf2Callback();
+
+    virtual void fillThisBuffer(IOMX::buffer_id bufferId, const sp<MediaCodecBuffer> &buffer,
+            const sp<AMessage> &reply) override;
+    virtual void drainThisBuffer(IOMX::buffer_id bufferId, const sp<MediaCodecBuffer> &buffer,
+            int32_t flags, const sp<AMessage> &reply) override;
+    virtual void onEos(status_t err) override;
+    virtual void onStopCompleted() override;
+    virtual void onReleaseCompleted() override;
+    virtual void onFlushCompleted() override;
+    virtual void onError(status_t err, enum ActionCode actionCode) override;
+    // Events below are not handled; thus ignore.
+    virtual void onComponentAllocated(const char *) override {}
+    virtual void onComponentConfigured(const sp<AMessage> &, const sp<AMessage> &) override {}
+    virtual void onInputSurfaceCreated(
+            const sp<AMessage> &,
+            const sp<AMessage> &,
+            const sp<BufferProducerWrapper> &) override {}
+    virtual void onInputSurfaceCreationFailed(status_t) override {}
+    virtual void onInputSurfaceAccepted(const sp<AMessage> &, const sp<AMessage> &) override {}
+    virtual void onInputSurfaceDeclined(status_t) override {}
+    virtual void onSignaledInputEOS(status_t) override {}
+    virtual void onBuffersAllocated(int32_t, const sp<CodecBase::PortDescription> &) override {}
+    virtual void onOutputFramesRendered(const std::list<FrameRenderTracker::Info> &) override {}
+private:
+    const sp<AMessage> mNotify;
+};
+
+Sf2Callback::Sf2Callback(const sp<AMessage> &notify) : mNotify(notify) {}
+
+Sf2Callback::~Sf2Callback() {}
+
+void Sf2Callback::fillThisBuffer(
+        IOMX::buffer_id bufferId,
+        const sp<MediaCodecBuffer> &buffer,
+        const sp<AMessage> &reply) {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatFillThisBuffer);
+    notify->setInt32("buffer-id", bufferId);
+    notify->setObject("buffer", buffer);
+    notify->setMessage("reply", reply);
+    notify->post();
+}
+
+void Sf2Callback::drainThisBuffer(
+        IOMX::buffer_id bufferId,
+        const sp<MediaCodecBuffer> &buffer,
+        int32_t flags,
+        const sp<AMessage> &reply) {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatDrainThisBuffer);
+    notify->setInt32("buffer-id", bufferId);
+    notify->setObject("buffer", buffer);
+    notify->setInt32("flags", flags);
+    notify->setMessage("reply", reply);
+    notify->post();
+}
+
+void Sf2Callback::onEos(status_t err) {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatEOS);
+    notify->setInt32("err", err);
+    notify->post();
+}
+
+void Sf2Callback::onStopCompleted() {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatStopCompleted);
+    notify->post();
+}
+
+void Sf2Callback::onReleaseCompleted() {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatReleaseCompleted);
+    notify->post();
+}
+
+void Sf2Callback::onFlushCompleted() {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatFlushCompleted);
+    notify->post();
+}
+
+void Sf2Callback::onError(status_t err, enum ActionCode actionCode) {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatError);
+    notify->setInt32("err", err);
+    notify->setInt32("actionCode", actionCode);
+    notify->post();
+}
+
+}  // namespace
+
 struct Controller : public AHandler {
     Controller(const char *uri, bool decodeAudio,
                const sp<Surface> &surface, bool renderToSurface)
@@ -148,8 +256,8 @@ protected:
 
                 mDecodeLooper->registerHandler(mCodec);
 
-                mCodec->setNotificationMessage(
-                        new AMessage(kWhatCodecNotify, this));
+                mCodec->setCallback(
+                        std::make_shared<Sf2Callback>(new AMessage(kWhatCodecNotify, this)));
 
                 sp<AMessage> format = makeFormat(mSource->getFormat());
 
@@ -210,28 +318,28 @@ protected:
                 int32_t what;
                 CHECK(msg->findInt32("what", &what));
 
-                if (what == CodecBase::kWhatFillThisBuffer) {
+                if (what == kWhatFillThisBuffer) {
                     onFillThisBuffer(msg);
-                } else if (what == CodecBase::kWhatDrainThisBuffer) {
+                } else if (what == kWhatDrainThisBuffer) {
                     if ((mNumOutputBuffersReceived++ % 16) == 0) {
                         printf(".");
                         fflush(stdout);
                     }
 
                     onDrainThisBuffer(msg);
-                } else if (what == CodecBase::kWhatEOS
-                        || what == CodecBase::kWhatError) {
-                    printf((what == CodecBase::kWhatEOS) ? "$\n" : "E\n");
+                } else if (what == kWhatEOS
+                        || what == kWhatError) {
+                    printf((what == kWhatEOS) ? "$\n" : "E\n");
 
                     printStatistics();
                     (new AMessage(kWhatStop, this))->post();
-                } else if (what == CodecBase::kWhatFlushCompleted) {
+                } else if (what == kWhatFlushCompleted) {
                     mSeekState = SEEK_FLUSH_COMPLETED;
                     mCodec->signalResume();
 
                     (new AMessage(kWhatSeek, this))->post(5000000ll);
-                } else if (what == CodecBase::kWhatStopCompleted ||
-                        what == CodecBase::kWhatReleaseCompleted) {
+                } else if (what == kWhatStopCompleted ||
+                        what == kWhatReleaseCompleted) {
                     mDecodeLooper->unregisterHandler(mCodec->id());
 
                     if (mDecodeLooper != looper()) {

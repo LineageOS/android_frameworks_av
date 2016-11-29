@@ -28,8 +28,6 @@ struct SimpleFilter;
 struct MediaFilter : public CodecBase {
     MediaFilter();
 
-    virtual void setNotificationMessage(const sp<AMessage> &msg);
-
     virtual void initiateAllocateComponent(const sp<AMessage> &msg);
     virtual void initiateConfigureComponent(const sp<AMessage> &msg);
     virtual void initiateCreateInputSurface();
@@ -120,7 +118,6 @@ private:
     int32_t mColorFormatIn, mColorFormatOut;
     size_t mMaxInputSize, mMaxOutputSize;
     int32_t mGeneration;
-    sp<AMessage> mNotify;
     sp<AMessage> mInputFormat;
     sp<AMessage> mOutputFormat;
 

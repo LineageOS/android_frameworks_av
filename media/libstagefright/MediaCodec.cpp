@@ -67,6 +67,8 @@ static bool isResourceError(status_t err) {
 static const int kMaxRetry = 2;
 static const int kMaxReclaimWaitTimeInUs = 500000;  // 0.5s
 
+////////////////////////////////////////////////////////////////////////////////
+
 struct ResourceManagerClient : public BnResourceManagerClient {
     explicit ResourceManagerClient(MediaCodec* codec) : mMediaCodec(codec) {}
 
@@ -170,6 +172,206 @@ bool MediaCodec::ResourceManagerServiceProxy::reclaimResource(
     }
     return mService->reclaimResource(mPid, resources);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
+namespace {
+
+enum {
+    kWhatFillThisBuffer      = 'fill',
+    kWhatDrainThisBuffer     = 'drai',
+    kWhatEOS                 = 'eos ',
+    kWhatStopCompleted       = 'scom',
+    kWhatReleaseCompleted    = 'rcom',
+    kWhatFlushCompleted      = 'fcom',
+    kWhatError               = 'erro',
+    kWhatComponentAllocated  = 'cAll',
+    kWhatComponentConfigured = 'cCon',
+    kWhatInputSurfaceCreated = 'isfc',
+    kWhatInputSurfaceAccepted = 'isfa',
+    kWhatSignaledInputEOS    = 'seos',
+    kWhatBuffersAllocated    = 'allc',
+    kWhatOutputFramesRendered = 'outR',
+};
+
+class MediaCodecCallback : public CodecBase::Callback {
+public:
+    explicit MediaCodecCallback(const sp<AMessage> &notify);
+    virtual ~MediaCodecCallback();
+
+    virtual void fillThisBuffer(IOMX::buffer_id bufferId, const sp<MediaCodecBuffer> &buffer,
+            const sp<AMessage> &reply) override;
+    virtual void drainThisBuffer(IOMX::buffer_id bufferId, const sp<MediaCodecBuffer> &buffer,
+            int32_t flags, const sp<AMessage> &reply) override;
+    virtual void onEos(status_t err) override;
+    virtual void onStopCompleted() override;
+    virtual void onReleaseCompleted() override;
+    virtual void onFlushCompleted() override;
+    virtual void onError(status_t err, enum ActionCode actionCode) override;
+    virtual void onComponentAllocated(const char *componentName) override;
+    virtual void onComponentConfigured(
+            const sp<AMessage> &inputFormat, const sp<AMessage> &outputFormat) override;
+    virtual void onInputSurfaceCreated(
+            const sp<AMessage> &inputFormat,
+            const sp<AMessage> &outputFormat,
+            const sp<BufferProducerWrapper> &inputSurface) override;
+    virtual void onInputSurfaceCreationFailed(status_t err) override;
+    virtual void onInputSurfaceAccepted(
+            const sp<AMessage> &inputFormat,
+            const sp<AMessage> &outputFormat) override;
+    virtual void onInputSurfaceDeclined(status_t err) override;
+    virtual void onSignaledInputEOS(status_t err) override;
+    virtual void onBuffersAllocated(
+            int32_t portIndex, const sp<CodecBase::PortDescription> &portDesc) override;
+    virtual void onOutputFramesRendered(const std::list<FrameRenderTracker::Info> &done) override;
+private:
+    const sp<AMessage> mNotify;
+};
+
+MediaCodecCallback::MediaCodecCallback(const sp<AMessage> &notify) : mNotify(notify) {}
+
+MediaCodecCallback::~MediaCodecCallback() {}
+
+void MediaCodecCallback::fillThisBuffer(
+        IOMX::buffer_id bufferId,
+        const sp<MediaCodecBuffer> &buffer,
+        const sp<AMessage> &reply) {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatFillThisBuffer);
+    notify->setInt32("buffer-id", bufferId);
+    notify->setObject("buffer", buffer);
+    notify->setMessage("reply", reply);
+    notify->post();
+}
+
+void MediaCodecCallback::drainThisBuffer(
+        IOMX::buffer_id bufferId,
+        const sp<MediaCodecBuffer> &buffer,
+        int32_t flags,
+        const sp<AMessage> &reply) {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatDrainThisBuffer);
+    notify->setInt32("buffer-id", bufferId);
+    notify->setObject("buffer", buffer);
+    notify->setInt32("flags", flags);
+    notify->setMessage("reply", reply);
+    notify->post();
+}
+
+void MediaCodecCallback::onEos(status_t err) {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatEOS);
+    notify->setInt32("err", err);
+    notify->post();
+}
+
+void MediaCodecCallback::onStopCompleted() {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatStopCompleted);
+    notify->post();
+}
+
+void MediaCodecCallback::onReleaseCompleted() {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatReleaseCompleted);
+    notify->post();
+}
+
+void MediaCodecCallback::onFlushCompleted() {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatFlushCompleted);
+    notify->post();
+}
+
+void MediaCodecCallback::onError(status_t err, enum ActionCode actionCode) {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatError);
+    notify->setInt32("err", err);
+    notify->setInt32("actionCode", actionCode);
+    notify->post();
+}
+
+void MediaCodecCallback::onComponentAllocated(const char *componentName) {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatComponentAllocated);
+    notify->setString("componentName", componentName);
+    notify->post();
+}
+
+void MediaCodecCallback::onComponentConfigured(
+        const sp<AMessage> &inputFormat, const sp<AMessage> &outputFormat) {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatComponentConfigured);
+    notify->setMessage("input-format", inputFormat);
+    notify->setMessage("output-format", outputFormat);
+    notify->post();
+}
+
+void MediaCodecCallback::onInputSurfaceCreated(
+        const sp<AMessage> &inputFormat,
+        const sp<AMessage> &outputFormat,
+        const sp<BufferProducerWrapper> &inputSurface) {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatInputSurfaceCreated);
+    notify->setMessage("input-format", inputFormat);
+    notify->setMessage("output-format", outputFormat);
+    notify->setObject("input-surface", inputSurface);
+    notify->post();
+}
+
+void MediaCodecCallback::onInputSurfaceCreationFailed(status_t err) {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatInputSurfaceCreated);
+    notify->setInt32("err", err);
+    notify->post();
+}
+
+void MediaCodecCallback::onInputSurfaceAccepted(
+        const sp<AMessage> &inputFormat,
+        const sp<AMessage> &outputFormat) {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatInputSurfaceAccepted);
+    notify->setMessage("input-format", inputFormat);
+    notify->setMessage("output-format", outputFormat);
+    notify->post();
+}
+
+void MediaCodecCallback::onInputSurfaceDeclined(status_t err) {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatInputSurfaceAccepted);
+    notify->setInt32("err", err);
+    notify->post();
+}
+
+void MediaCodecCallback::onSignaledInputEOS(status_t err) {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatSignaledInputEOS);
+    if (err != OK) {
+        notify->setInt32("err", err);
+    }
+    notify->post();
+}
+
+void MediaCodecCallback::onBuffersAllocated(
+        int32_t portIndex, const sp<CodecBase::PortDescription> &portDesc) {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatBuffersAllocated);
+    notify->setInt32("portIndex", portIndex);
+    notify->setObject("portDesc", portDesc);
+    notify->post();
+}
+
+void MediaCodecCallback::onOutputFramesRendered(const std::list<FrameRenderTracker::Info> &done) {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatOutputFramesRendered);
+    if (MediaCodec::CreateFramesRenderedMessage(done, notify)) {
+        notify->post();
+    }
+}
+
+}  // namespace
+
+////////////////////////////////////////////////////////////////////////////////
 
 // static
 sp<MediaCodec> MediaCodec::CreateByType(
@@ -370,7 +572,8 @@ status_t MediaCodec::init(const AString &name, bool nameIsType, bool encoder) {
 
     mLooper->registerHandler(this);
 
-    mCodec->setNotificationMessage(new AMessage(kWhatCodecNotify, this));
+    mCodec->setCallback(
+            std::make_shared<MediaCodecCallback>(new AMessage(kWhatCodecNotify, this)));
 
     sp<AMessage> msg = new AMessage(kWhatInit, this);
     msg->setString("name", name);
@@ -1056,7 +1259,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             CHECK(msg->findInt32("what", &what));
 
             switch (what) {
-                case CodecBase::kWhatError:
+                case kWhatError:
                 {
                     int32_t err, actionCode;
                     CHECK(msg->findInt32("err", &err));
@@ -1191,7 +1394,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     break;
                 }
 
-                case CodecBase::kWhatComponentAllocated:
+                case kWhatComponentAllocated:
                 {
                     CHECK_EQ(mState, INITIALIZING);
                     setState(INITIALIZED);
@@ -1223,7 +1426,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     break;
                 }
 
-                case CodecBase::kWhatComponentConfigured:
+                case kWhatComponentConfigured:
                 {
                     if (mState == UNINITIALIZED || mState == INITIALIZED) {
                         // In case a kWhatError message came in and replied with error,
@@ -1252,7 +1455,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     break;
                 }
 
-                case CodecBase::kWhatInputSurfaceCreated:
+                case kWhatInputSurfaceCreated:
                 {
                     // response to initiateCreateInputSurface()
                     status_t err = NO_ERROR;
@@ -1276,7 +1479,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     break;
                 }
 
-                case CodecBase::kWhatInputSurfaceAccepted:
+                case kWhatInputSurfaceAccepted:
                 {
                     // response to initiateSetInputSurface()
                     status_t err = NO_ERROR;
@@ -1292,7 +1495,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     break;
                 }
 
-                case CodecBase::kWhatSignaledInputEOS:
+                case kWhatSignaledInputEOS:
                 {
                     // response to signalEndOfInputStream()
                     sp<AMessage> response = new AMessage;
@@ -1305,7 +1508,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 }
 
 
-                case CodecBase::kWhatBuffersAllocated:
+                case kWhatBuffersAllocated:
                 {
                     Mutex::Autolock al(mBufferLock);
                     int32_t portIndex;
@@ -1376,7 +1579,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     break;
                 }
 
-                case CodecBase::kWhatOutputFramesRendered:
+                case kWhatOutputFramesRendered:
                 {
                     // ignore these in all states except running, and check that we have a
                     // notification set
@@ -1388,7 +1591,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     break;
                 }
 
-                case CodecBase::kWhatFillThisBuffer:
+                case kWhatFillThisBuffer:
                 {
                     /* size_t index = */updateBuffers(kPortIndexInput, msg);
 
@@ -1446,7 +1649,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     break;
                 }
 
-                case CodecBase::kWhatDrainThisBuffer:
+                case kWhatDrainThisBuffer:
                 {
                     /* size_t index = */updateBuffers(kPortIndexOutput, msg);
 
@@ -1543,14 +1746,14 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     break;
                 }
 
-                case CodecBase::kWhatEOS:
+                case kWhatEOS:
                 {
                     // We already notify the client of this by using the
                     // corresponding flag in "onOutputBufferReady".
                     break;
                 }
 
-                case CodecBase::kWhatStopCompleted:
+                case kWhatStopCompleted:
                 {
                     if (mState != STOPPING) {
                         ALOGW("Received kWhatStopCompleted in state %d", mState);
@@ -1561,7 +1764,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     break;
                 }
 
-                case CodecBase::kWhatReleaseCompleted:
+                case kWhatReleaseCompleted:
                 {
                     if (mState != RELEASING) {
                         ALOGW("Received kWhatReleaseCompleted in state %d", mState);
@@ -1578,7 +1781,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     break;
                 }
 
-                case CodecBase::kWhatFlushCompleted:
+                case kWhatFlushCompleted:
                 {
                     if (mState != FLUSHING) {
                         ALOGW("received FlushCompleted message in state %d",
