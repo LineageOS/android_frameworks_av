@@ -385,7 +385,6 @@ void AudioPolicyService::releaseInput(audio_io_handle_t input,
     sp<AudioPolicyEffects>audioPolicyEffects;
     {
         Mutex::Autolock _l(mLock);
-        mAudioPolicyManager->releaseInput(input, session);
         audioPolicyEffects = mAudioPolicyEffects;
     }
     if (audioPolicyEffects != 0) {
@@ -394,6 +393,10 @@ void AudioPolicyService::releaseInput(audio_io_handle_t input,
         if(status != NO_ERROR) {
             ALOGW("Failed to release effects on input %d", input);
         }
+    }
+    {
+        Mutex::Autolock _l(mLock);
+        mAudioPolicyManager->releaseInput(input, session);
     }
 }
 
