@@ -124,29 +124,6 @@ include $(BUILD_EXECUTABLE)
 
 include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES:=         \
-	sf2.cpp    \
-
-LOCAL_SHARED_LIBRARIES := \
-	libstagefright liblog libutils libbinder libstagefright_foundation \
-	libmedia libgui libcutils
-
-LOCAL_C_INCLUDES:= \
-	frameworks/av/media/libstagefright \
-	$(TOP)/frameworks/native/include/media/openmax
-
-LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
-
-LOCAL_MODULE_TAGS := optional
-
-LOCAL_MODULE:= sf2
-
-include $(BUILD_EXECUTABLE)
-
-################################################################################
-
-include $(CLEAR_VARS)
-
 LOCAL_SRC_FILES:=               \
 	codec.cpp               \
 	SimplePlayer.cpp        \
