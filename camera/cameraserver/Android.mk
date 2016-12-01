@@ -22,7 +22,6 @@ LOCAL_SRC_FILES:= \
 LOCAL_SHARED_LIBRARIES := \
 	libcameraservice \
 	liblog \
-	libcutils \
 	libutils \
 	libbinder \
 

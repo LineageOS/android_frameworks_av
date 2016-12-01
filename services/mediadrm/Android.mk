@@ -23,7 +23,6 @@ LOCAL_SRC_FILES:= \
 
 LOCAL_SHARED_LIBRARIES:= \
     libbinder \
-    libcutils \
     liblog \
     libmediadrm \
     libutils \

@@ -17,7 +17,6 @@ LOCAL_SRC_FILES:= \
 LOCAL_SHARED_LIBRARIES := \
 	libresourcemanagerservice \
 	liblog \
-	libcutils \
 	libmediaplayerservice \
 	libutils \
 	libbinder \
