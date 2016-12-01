@@ -309,7 +309,8 @@ public:
                                     int sessionId,
                                     effect_descriptor_t *desc,
                                     int *enabled,
-                                    status_t *status /*non-NULL*/);
+                                    status_t *status /*non-NULL*/,
+                                    bool pinned);
 
                 // return values for hasAudioSession (bit field)
                 enum effect_state {
@@ -346,7 +347,9 @@ public:
                 status_t addEffect_l(const sp< EffectModule>& effect);
                 // remove and effect module. Also removes the effect chain is this was the last
                 // effect
-                void removeEffect_l(const sp< EffectModule>& effect);
+                void removeEffect_l(const sp< EffectModule>& effect, bool release = false);
+                // disconnect an effect handle from module and destroy module if last handle
+                void disconnectEffectHandle(EffectHandle *handle, bool unpinIfLast);
                 // detach all tracks connected to an auxiliary effect
     virtual     void detachAuxEffect_l(int effectId __unused) {}
                 // returns either EFFECT_SESSION if effects on this audio session exist in one
