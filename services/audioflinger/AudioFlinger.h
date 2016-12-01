@@ -470,6 +470,7 @@ private:
 
                 bool isNonOffloadableGlobalEffectEnabled_l();
                 void onNonOffloadableGlobalEffectEnable();
+                bool isSessionAcquired_l(int audioSession);
 
     class AudioHwDevice {
     public:
