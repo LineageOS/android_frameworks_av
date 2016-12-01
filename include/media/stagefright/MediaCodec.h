@@ -18,6 +18,9 @@
 
 #define MEDIA_CODEC_H_
 
+#include <memory>
+#include <vector>
+
 #include <gui/IGraphicBufferProducer.h>
 #include <media/hardware/CryptoAPI.h>
 #include <media/MediaCodecInfo.h>
@@ -32,12 +35,12 @@ struct ABuffer;
 struct AMessage;
 struct AReplyToken;
 struct AString;
+class BufferChannelBase;
 struct CodecBase;
 class IBatteryStats;
 struct ICrypto;
 class MediaCodecBuffer;
 class IMemory;
-struct MemoryDealer;
 class IResourceManagerClient;
 class IResourceManagerService;
 struct PersistentSurface;
@@ -252,11 +255,9 @@ private:
     };
 
     struct BufferInfo {
-        uint32_t mBufferID;
+        BufferInfo();
+
         sp<MediaCodecBuffer> mData;
-        sp<MediaCodecBuffer> mSecureData;
-        sp<IMemory> mSharedEncryptedBuffer;
-        sp<AMessage> mNotify;
         bool mOwnedByClient;
     };
 
@@ -301,7 +302,6 @@ private:
     sp<AMessage> mInputFormat;
     sp<AMessage> mCallback;
     sp<AMessage> mOnFrameRenderedNotification;
-    sp<MemoryDealer> mDealer;
 
     sp<IResourceManagerClient> mResourceManagerClient;
     sp<ResourceManagerServiceProxy> mResourceManagerService;
@@ -327,8 +327,7 @@ private:
     Mutex mBufferLock;
 
     List<size_t> mAvailPortBuffers[2];
-    Vector<BufferInfo> mPortBuffers[2];
-    Vector<sp<MediaCodecBuffer>> mPortBufferArrays[2];
+    std::vector<BufferInfo> mPortBuffers[2];
 
     int32_t mDequeueInputTimeoutGeneration;
     sp<AReplyToken> mDequeueInputReplyID;
@@ -344,6 +343,8 @@ private:
 
     bool mHaveInputSurface;
     bool mHavePendingInputBuffers;
+
+    std::shared_ptr<BufferChannelBase> mBufferChannel;
 
     MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid);
 
