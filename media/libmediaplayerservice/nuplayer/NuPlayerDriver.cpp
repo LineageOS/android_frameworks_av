@@ -478,9 +478,7 @@ status_t NuPlayerDriver::reset() {
         notifyListener_l(MEDIA_STOPPED);
     }
 
-    char value[PROPERTY_VALUE_MAX];
-    if (property_get("persist.debug.sf.stats", value, NULL) &&
-            (!strcmp("1", value) || !strcasecmp("true", value))) {
+    if (property_get_bool("persist.debug.sf.stats", false)) {
         Vector<String16> args;
         dump(-1, args);
     }

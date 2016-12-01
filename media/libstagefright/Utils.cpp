@@ -1659,9 +1659,7 @@ AString uriDebugString(const AString &uri, bool incognito) {
         return AString("<URI suppressed>");
     }
 
-    char prop[PROPERTY_VALUE_MAX];
-    if (property_get("media.stagefright.log-uri", prop, "false") &&
-        (!strcmp(prop, "1") || !strcmp(prop, "true"))) {
+    if (property_get_bool("media.stagefright.log-uri", false)) {
         return uri;
     }
 

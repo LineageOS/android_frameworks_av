@@ -911,9 +911,7 @@ status_t Parameters::initialize(const CameraMetadata *info, int deviceVersion) {
             CameraParameters::FALSE);
     }
 
-    char value[PROPERTY_VALUE_MAX];
-    property_get("camera.disable_zsl_mode", value, "0");
-    if (!strcmp(value,"1") || slowJpegMode) {
+    if (slowJpegMode || property_get_bool("camera.disable_zsl_mode", false)) {
         ALOGI("Camera %d: Disabling ZSL mode", cameraId);
         allowZslMode = false;
     } else {

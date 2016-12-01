@@ -1128,9 +1128,7 @@ static bool isTestModeEnabled() {
 
     // Test mode is enabled only if rw.media.record.test system
     // property is enabled.
-    char value[PROPERTY_VALUE_MAX];
-    if (property_get("rw.media.record.test", value, NULL) &&
-        (!strcasecmp(value, "true") || !strcasecmp(value, "1"))) {
+    if (property_get_bool("rw.media.record.test", false)) {
         return true;
     }
     return false;

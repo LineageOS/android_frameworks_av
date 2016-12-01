@@ -770,9 +770,7 @@ status_t CameraSource::start(MetaData *meta) {
         return mInitCheck;
     }
 
-    char value[PROPERTY_VALUE_MAX];
-    if (property_get("media.stagefright.record-stats", value, NULL)
-        && (!strcmp(value, "1") || !strcasecmp(value, "true"))) {
+    if (property_get_bool("media.stagefright.record-stats", false)) {
         mCollectStats = true;
     }
 

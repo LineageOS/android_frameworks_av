@@ -143,9 +143,7 @@ sp<IMediaExtractor> MediaExtractor::Create(
         const sp<DataSource> &source, const char *mime) {
     ALOGV("MediaExtractor::Create %s", mime);
 
-    char value[PROPERTY_VALUE_MAX];
-    if (property_get("media.stagefright.extractremote", value, NULL)
-            && (!strcmp("0", value) || !strcasecmp("false", value))) {
+    if (!property_get_bool("media.stagefright.extractremote", true)) {
         // local extractor
         ALOGW("creating media extractor in calling process");
         return CreateFromService(source, mime);
@@ -329,9 +327,7 @@ void MediaExtractor::RegisterDefaultSniffers() {
     RegisterSniffer_l(SniffMPEG2PS);
     RegisterSniffer_l(SniffMidi);
 
-    char value[PROPERTY_VALUE_MAX];
-    if (property_get("drm.service.enabled", value, NULL)
-            && (!strcmp(value, "1") || !strcasecmp(value, "true"))) {
+    if (property_get_bool("drm.service.enabled", false)) {
         RegisterSniffer_l(SniffDRM);
     }
     gSniffersRegistered = true;

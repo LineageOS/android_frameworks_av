@@ -799,9 +799,7 @@ status_t OMXNodeInstance::enableNativeBuffers_l(
         if (!graphic) {
             // Extension not supported, check for manual override with system property
             // This is a temporary workaround until partners support the OMX extension
-            char value[PROPERTY_VALUE_MAX];
-            if (property_get("media.mediadrmservice.enable", value, NULL)
-                && (!strcmp("1", value) || !strcasecmp("true", value))) {
+            if (property_get_bool("media.mediadrmservice.enable", false)) {
                 CLOG_CONFIG(enableNativeBuffers, "system property override: using native-handles");
                 mSecureBufferType[portIndex] = kSecureBufferTypeNativeHandle;
             } else if (mSecureBufferType[portIndex] == kSecureBufferTypeUnknown) {

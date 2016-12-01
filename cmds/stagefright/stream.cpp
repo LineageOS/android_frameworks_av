@@ -347,9 +347,7 @@ int main(int argc, char **argv) {
 
     sp<IStreamSource> source;
 
-    char prop[PROPERTY_VALUE_MAX];
-    bool usemp4 = property_get("media.stagefright.use-mp4source", prop, NULL) &&
-            (!strcmp(prop, "1") || !strcasecmp(prop, "true"));
+    bool usemp4 = property_get_bool("media.stagefright.use-mp4source", false);
 
     size_t len = strlen(argv[1]);
     if ((!usemp4 && len >= 3 && !strcasecmp(".ts", &argv[1][len - 3])) ||
