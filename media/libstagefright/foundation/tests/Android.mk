@@ -8,12 +8,14 @@ LOCAL_MODULE := sf_foundation_test
 LOCAL_MODULE_TAGS := tests
 
 LOCAL_SRC_FILES := \
+	AData_test.cpp \
 	Flagged_test.cpp \
 	TypeTraits_test.cpp \
 	Utils_test.cpp \
 
 LOCAL_SHARED_LIBRARIES := \
 	libstagefright_foundation \
+	libutils \
 
 LOCAL_C_INCLUDES := \
 	frameworks/av/include \
