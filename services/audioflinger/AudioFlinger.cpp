@@ -2087,9 +2087,10 @@ sp<AudioFlinger::RecordThread> AudioFlinger::openInput_l(audio_module_handle_t m
     sp<StreamInHalInterface> inStream;
     status_t status = inHwHal->openInputStream(
             *input, devices, &halconfig, flags, address.string(), source, &inStream);
-    ALOGV("openInput_l() openInputStream returned input %p, SamplingRate %d"
+    ALOGV("openInput_l() openInputStream returned input %p, devices %x, SamplingRate %d"
            ", Format %#x, Channels %x, flags %#x, status %d addr %s",
             inStream.get(),
+            devices,
             halconfig.sample_rate,
             halconfig.format,
             halconfig.channel_mask,

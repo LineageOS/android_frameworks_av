@@ -14,31 +14,40 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_DEVICES_FACTORY_HAL_INTERFACE_H
-#define ANDROID_HARDWARE_DEVICES_FACTORY_HAL_INTERFACE_H
+#ifndef ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HIDL_H
+#define ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HIDL_H
 
-#include <media/audiohal/DeviceHalInterface.h>
+#include <android/hardware/audio/2.0/IDevicesFactory.h>
+#include <media/audiohal/DevicesFactoryHalInterface.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 
+#include "DeviceHalHidl.h"
+
+using ::android::hardware::audio::V2_0::IDevicesFactory;
+
 namespace android {
 
-class DevicesFactoryHalInterface : public RefBase
+class DevicesFactoryHalHidl : public DevicesFactoryHalInterface
 {
   public:
     // Opens a device with the specified name. To close the device, it is
     // necessary to release references to the returned object.
-    virtual status_t openDevice(const char *name, sp<DeviceHalInterface> *device) = 0;
+    virtual status_t openDevice(const char *name, sp<DeviceHalInterface> *device);
 
-    static sp<DevicesFactoryHalInterface> create();
+  private:
+    friend class DevicesFactoryHalInterface;
 
-  protected:
-    // Subclasses can not be constructed directly by clients.
-    DevicesFactoryHalInterface() {}
+    sp<IDevicesFactory> mDevicesFactory;
 
-    virtual ~DevicesFactoryHalInterface() {}
+    static status_t nameFromHal(const char *name, IDevicesFactory::Device *device);
+
+    // Can not be constructed directly by clients.
+    DevicesFactoryHalHidl();
+
+    virtual ~DevicesFactoryHalHidl();
 };
 
 } // namespace android
 
-#endif // ANDROID_HARDWARE_DEVICES_FACTORY_HAL_INTERFACE_H
+#endif // ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HIDL_H

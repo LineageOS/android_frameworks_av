@@ -88,6 +88,7 @@ public:
     status_t get(const String8& key, String8& value) const;
     status_t getInt(const String8& key, int& value) const;
     status_t getFloat(const String8& key, float& value) const;
+    status_t getAt(size_t index, String8& key) const;
     status_t getAt(size_t index, String8& key, String8& value) const;
 
     size_t size() const { return mParameters.size(); }

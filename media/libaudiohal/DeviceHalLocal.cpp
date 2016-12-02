@@ -109,11 +109,17 @@ status_t DeviceHalLocal::openOutputStream(
         const char *address,
         sp<StreamOutHalInterface> *outStream) {
     audio_stream_out_t *halStream;
+    ALOGV("open_output_stream handle: %d devices: %x flags: %#x"
+            "srate: %d format %#x channels %x address %s",
+            handle, devices, flags,
+            config->sample_rate, config->format, config->channel_mask,
+            address);
     int openResut = mDev->open_output_stream(
             mDev, handle, devices, flags, config, &halStream, address);
     if (openResut == OK) {
         *outStream = new StreamOutHalLocal(halStream, this);
     }
+    ALOGV("open_output_stream status %d stream %p", openResut, halStream);
     return openResut;
 }
 
@@ -126,11 +132,17 @@ status_t DeviceHalLocal::openInputStream(
         audio_source_t source,
         sp<StreamInHalInterface> *inStream) {
     audio_stream_in_t *halStream;
+    ALOGV("open_input_stream handle: %d devices: %x flags: %#x "
+            "srate: %d format %#x channels %x address %s source %d",
+            handle, devices, flags,
+            config->sample_rate, config->format, config->channel_mask,
+            address, source);
     int openResult = mDev->open_input_stream(
             mDev, handle, devices, config, &halStream, flags, address, source);
     if (openResult == OK) {
         *inStream = new StreamInHalLocal(halStream, this);
     }
+    ALOGV("open_input_stream status %d stream %p", openResult, inStream);
     return openResult;
 }
 
