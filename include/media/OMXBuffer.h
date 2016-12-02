@@ -24,12 +24,27 @@
 
 namespace android {
 
+class OMXBuffer;
+
+// This is needed temporarily for the OMX HIDL transition.
+namespace hardware { namespace media { namespace omx {
+namespace V1_0 {
+    struct CodecBuffer;
+namespace implementation {
+    inline bool wrapAs(::android::hardware::media::omx::V1_0::CodecBuffer* t,
+            ::android::OMXBuffer const& l);
+    inline bool convertTo(::android::OMXBuffer* l,
+            ::android::hardware::media::omx::V1_0::CodecBuffer const& t);
+}}}}}
+
 class GraphicBuffer;
 class IMemory;
 class MediaCodecBuffer;
 class NativeHandle;
-class OMXNodeInstance;
+struct OMXNodeInstance;
 
+// TODO: After complete HIDL transition, this class would be replaced by
+// CodecBuffer.
 class OMXBuffer {
 public:
     // sPreset is used in places where we are referring to a pre-registered
@@ -42,6 +57,10 @@ public:
     // Constructs a buffer of type kBufferTypePreset with mRangeLength set to
     // |codecBuffer|'s size (or 0 if |codecBuffer| is NULL).
     OMXBuffer(const sp<MediaCodecBuffer> &codecBuffer);
+
+    // Constructs a buffer of type kBufferTypePreset with a specified
+    // mRangeLength.
+    explicit OMXBuffer(OMX_U32 rangeLength);
 
     // Constructs a buffer of type kBufferTypeSharedMem.
     OMXBuffer(const sp<IMemory> &mem);
@@ -59,7 +78,15 @@ public:
     ~OMXBuffer();
 
 private:
-    friend class OMXNodeInstance;
+    friend struct OMXNodeInstance;
+
+    // This is needed temporarily for OMX HIDL transition.
+    friend inline bool (::android::hardware::media::omx::V1_0::implementation::
+            wrapAs)(::android::hardware::media::omx::V1_0::CodecBuffer* t,
+            OMXBuffer const& l);
+    friend inline bool (::android::hardware::media::omx::V1_0::implementation::
+            convertTo)(OMXBuffer* l,
+            ::android::hardware::media::omx::V1_0::CodecBuffer const& t);
 
     enum BufferType {
         kBufferTypeInvalid = 0,
@@ -85,8 +112,12 @@ private:
     // kBufferTypeNativeHandle
     sp<NativeHandle> mNativeHandle;
 
-    OMXBuffer(const OMXBuffer &);
-    OMXBuffer &operator=(const OMXBuffer &);
+    // Move assignment
+    OMXBuffer &operator=(OMXBuffer&&);
+
+    // Deleted copy constructor and assignment.
+    OMXBuffer(const OMXBuffer&) = delete;
+    OMXBuffer& operator=(const OMXBuffer&) = delete;
 };
 
 }  // namespace android

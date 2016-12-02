@@ -19,11 +19,13 @@ Return<void> Omx::allocateNode(const hidl_string& name, const sp<IOmxObserver>& 
 }
 
 
+// Methods from ::android::hidl::base::V1_0::IBase follow.
+
 IOmx* HIDL_FETCH_IOmx(const char* /* name */) {
     return new Omx();
 }
 
-} // namespace implementation
+}  // namespace implementation
 }  // namespace V1_0
 }  // namespace omx
 }  // namespace media

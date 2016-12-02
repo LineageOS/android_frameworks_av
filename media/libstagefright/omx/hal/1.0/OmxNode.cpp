@@ -1,4 +1,9 @@
+#include <IOMX.h>
+#include <OMXNodeInstance.h>
 #include "OmxNode.h"
+#include "WOmxNode.h"
+#include "WOmxObserver.h"
+#include "Conversion.h"
 
 namespace android {
 namespace hardware {
@@ -13,7 +18,7 @@ Return<Status> OmxNode::freeNode() {
     return ::android::hardware::media::omx::V1_0::Status {};
 }
 
-Return<Status> OmxNode::sendCommand(uint32_t cmd, const hidl_vec<uint8_t>& info) {
+Return<Status> OmxNode::sendCommand(uint32_t cmd, int32_t param) {
     // TODO implement
     return ::android::hardware::media::omx::V1_0::Status {};
 }
@@ -98,12 +103,11 @@ Return<Status> OmxNode::dispatchMessage(const Message& msg) {
     return ::android::hardware::media::omx::V1_0::Status {};
 }
 
-
-IOmxNode* HIDL_FETCH_IOmxNode(const char* /* name */) {
-    return new OmxNode();
+OmxNode::OmxNode(OmxNodeOwner* owner, sp<IOmxObserver> const& observer, char const* name) {
+    mLNode = new OMXNodeInstance(owner, new LWOmxObserver(observer), name);
 }
 
-} // namespace implementation
+}  // namespace implementation
 }  // namespace V1_0
 }  // namespace omx
 }  // namespace media
