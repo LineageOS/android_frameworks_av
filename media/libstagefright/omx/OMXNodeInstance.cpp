@@ -332,7 +332,7 @@ bool OMXNodeInstance::CallbackDispatcherThread::threadLoop() {
 ////////////////////////////////////////////////////////////////////////////////
 
 OMXNodeInstance::OMXNodeInstance(
-        OMX *owner, const sp<IOMXObserver> &observer, const char *name)
+        OmxNodeOwner *owner, const sp<IOMXObserver> &observer, const char *name)
     : mOwner(owner),
       mHandle(NULL),
       mObserver(observer),
@@ -1010,7 +1010,7 @@ status_t OMXNodeInstance::configureVideoTunnelMode(
 }
 
 status_t OMXNodeInstance::useBuffer(
-        OMX_U32 portIndex, const OMXBuffer &omxBuffer, OMX::buffer_id *buffer) {
+        OMX_U32 portIndex, const OMXBuffer &omxBuffer, IOMX::buffer_id *buffer) {
     if (buffer == NULL) {
         ALOGE("b/25884056");
         return BAD_VALUE;
@@ -1040,7 +1040,7 @@ status_t OMXNodeInstance::useBuffer(
 }
 
 status_t OMXNodeInstance::useBuffer_l(
-        OMX_U32 portIndex, const sp<IMemory> &params, OMX::buffer_id *buffer) {
+        OMX_U32 portIndex, const sp<IMemory> &params, IOMX::buffer_id *buffer) {
     BufferMeta *buffer_meta;
     OMX_BUFFERHEADERTYPE *header;
     OMX_ERRORTYPE err = OMX_ErrorNone;
@@ -1147,7 +1147,7 @@ status_t OMXNodeInstance::useBuffer_l(
 
 status_t OMXNodeInstance::useGraphicBuffer2_l(
         OMX_U32 portIndex, const sp<GraphicBuffer>& graphicBuffer,
-        OMX::buffer_id *buffer) {
+        IOMX::buffer_id *buffer) {
     if (graphicBuffer == NULL || buffer == NULL) {
         ALOGE("b/25884056");
         return BAD_VALUE;
@@ -1203,7 +1203,7 @@ status_t OMXNodeInstance::useGraphicBuffer2_l(
 // can be renamed to useGraphicBuffer.
 status_t OMXNodeInstance::useGraphicBuffer_l(
         OMX_U32 portIndex, const sp<GraphicBuffer>& graphicBuffer,
-        OMX::buffer_id *buffer) {
+        IOMX::buffer_id *buffer) {
     if (graphicBuffer == NULL || buffer == NULL) {
         ALOGE("b/25884056");
         return BAD_VALUE;
@@ -1273,7 +1273,7 @@ status_t OMXNodeInstance::useGraphicBuffer_l(
 
 status_t OMXNodeInstance::useGraphicBufferWithMetadata_l(
         OMX_U32 portIndex, const sp<GraphicBuffer> &graphicBuffer,
-        OMX::buffer_id *buffer) {
+        IOMX::buffer_id *buffer) {
     if (portIndex != kPortIndexOutput) {
         return BAD_VALUE;
     }
@@ -1296,7 +1296,7 @@ status_t OMXNodeInstance::useGraphicBufferWithMetadata_l(
 
 status_t OMXNodeInstance::updateGraphicBufferInMeta_l(
         OMX_U32 portIndex, const sp<GraphicBuffer>& graphicBuffer,
-        OMX::buffer_id buffer, OMX_BUFFERHEADERTYPE *header) {
+        IOMX::buffer_id buffer, OMX_BUFFERHEADERTYPE *header) {
     // No need to check |graphicBuffer| since NULL is valid for it as below.
     if (header == NULL) {
         ALOGE("b/25884056");
@@ -1336,7 +1336,7 @@ status_t OMXNodeInstance::updateGraphicBufferInMeta_l(
 
 status_t OMXNodeInstance::updateNativeHandleInMeta_l(
         OMX_U32 portIndex, const sp<NativeHandle>& nativeHandle,
-        OMX::buffer_id buffer, OMX_BUFFERHEADERTYPE *header) {
+        IOMX::buffer_id buffer, OMX_BUFFERHEADERTYPE *header) {
     // No need to check |nativeHandle| since NULL is valid for it as below.
     if (header == NULL) {
         ALOGE("b/25884056");
@@ -1423,7 +1423,7 @@ status_t OMXNodeInstance::setInputSurface(
 }
 
 status_t OMXNodeInstance::allocateSecureBuffer(
-        OMX_U32 portIndex, size_t size, OMX::buffer_id *buffer,
+        OMX_U32 portIndex, size_t size, IOMX::buffer_id *buffer,
         void **buffer_data, sp<NativeHandle> *native_handle) {
     if (buffer == NULL || buffer_data == NULL || native_handle == NULL) {
         ALOGE("b/25884056");
@@ -1481,7 +1481,7 @@ status_t OMXNodeInstance::allocateSecureBuffer(
 }
 
 status_t OMXNodeInstance::freeBuffer(
-        OMX_U32 portIndex, OMX::buffer_id buffer) {
+        OMX_U32 portIndex, IOMX::buffer_id buffer) {
     Mutex::Autolock autoLock(mLock);
     CLOG_BUFFER(freeBuffer, "%s:%u %#x", portString(portIndex), portIndex, buffer);
 
@@ -1505,7 +1505,7 @@ status_t OMXNodeInstance::freeBuffer(
 }
 
 status_t OMXNodeInstance::fillBuffer(
-        OMX::buffer_id buffer, const OMXBuffer &omxBuffer, int fenceFd) {
+        IOMX::buffer_id buffer, const OMXBuffer &omxBuffer, int fenceFd) {
     Mutex::Autolock autoLock(mLock);
 
     OMX_BUFFERHEADERTYPE *header = findBufferHeader(buffer, kPortIndexOutput);
@@ -1579,7 +1579,7 @@ status_t OMXNodeInstance::emptyBuffer(
 }
 
 status_t OMXNodeInstance::emptyBuffer_l(
-        OMX::buffer_id buffer,
+        IOMX::buffer_id buffer,
         OMX_U32 rangeOffset, OMX_U32 rangeLength,
         OMX_U32 flags, OMX_TICKS timestamp, int fenceFd) {
 
@@ -1731,7 +1731,7 @@ status_t OMXNodeInstance::emptyBuffer_l(
 
 // like emptyBuffer, but the data is already in header->pBuffer
 status_t OMXNodeInstance::emptyGraphicBuffer_l(
-        OMX::buffer_id buffer, const sp<GraphicBuffer> &graphicBuffer,
+        IOMX::buffer_id buffer, const sp<GraphicBuffer> &graphicBuffer,
         OMX_U32 flags, OMX_TICKS timestamp, int fenceFd) {
     OMX_BUFFERHEADERTYPE *header = findBufferHeader(buffer, kPortIndexInput);
     if (header == NULL) {
@@ -1803,7 +1803,7 @@ int64_t OMXNodeInstance::getCodecTimestamp(OMX_TICKS timestamp) {
 }
 
 status_t OMXNodeInstance::emptyNativeHandleBuffer_l(
-        OMX::buffer_id buffer, const sp<NativeHandle> &nativeHandle,
+        IOMX::buffer_id buffer, const sp<NativeHandle> &nativeHandle,
         OMX_U32 flags, OMX_TICKS timestamp, int fenceFd) {
     OMX_BUFFERHEADERTYPE *header = findBufferHeader(buffer, kPortIndexInput);
     if (header == NULL) {
@@ -2199,7 +2199,7 @@ OMX_ERRORTYPE OMXNodeInstance::OnFillBufferDone(
     return OMX_ErrorNone;
 }
 
-void OMXNodeInstance::addActiveBuffer(OMX_U32 portIndex, OMX::buffer_id id) {
+void OMXNodeInstance::addActiveBuffer(OMX_U32 portIndex, IOMX::buffer_id id) {
     ActiveBuffer active;
     active.mPortIndex = portIndex;
     active.mID = id;
@@ -2211,7 +2211,7 @@ void OMXNodeInstance::addActiveBuffer(OMX_U32 portIndex, OMX::buffer_id id) {
 }
 
 void OMXNodeInstance::removeActiveBuffer(
-        OMX_U32 portIndex, OMX::buffer_id id) {
+        OMX_U32 portIndex, IOMX::buffer_id id) {
     for (size_t i = 0; i < mActiveBuffers.size(); ++i) {
         if (mActiveBuffers[i].mPortIndex == portIndex
                 && mActiveBuffers[i].mID == id) {
@@ -2236,17 +2236,17 @@ void OMXNodeInstance::freeActiveBuffers() {
     }
 }
 
-OMX::buffer_id OMXNodeInstance::makeBufferID(OMX_BUFFERHEADERTYPE *bufferHeader) {
+IOMX::buffer_id OMXNodeInstance::makeBufferID(OMX_BUFFERHEADERTYPE *bufferHeader) {
     if (bufferHeader == NULL) {
         return 0;
     }
     Mutex::Autolock autoLock(mBufferIDLock);
-    OMX::buffer_id buffer;
+    IOMX::buffer_id buffer;
     do { // handle the very unlikely case of ID overflow
         if (++mBufferIDCount == 0) {
             ++mBufferIDCount;
         }
-        buffer = (OMX::buffer_id)mBufferIDCount;
+        buffer = (IOMX::buffer_id)mBufferIDCount;
     } while (mBufferIDToBufferHeader.indexOfKey(buffer) >= 0);
     mBufferIDToBufferHeader.add(buffer, bufferHeader);
     mBufferHeaderToBufferID.add(bufferHeader, buffer);
@@ -2254,7 +2254,7 @@ OMX::buffer_id OMXNodeInstance::makeBufferID(OMX_BUFFERHEADERTYPE *bufferHeader)
 }
 
 OMX_BUFFERHEADERTYPE *OMXNodeInstance::findBufferHeader(
-        OMX::buffer_id buffer, OMX_U32 portIndex) {
+        IOMX::buffer_id buffer, OMX_U32 portIndex) {
     if (buffer == 0) {
         return NULL;
     }
@@ -2275,7 +2275,7 @@ OMX_BUFFERHEADERTYPE *OMXNodeInstance::findBufferHeader(
     return header;
 }
 
-OMX::buffer_id OMXNodeInstance::findBufferID(OMX_BUFFERHEADERTYPE *bufferHeader) {
+IOMX::buffer_id OMXNodeInstance::findBufferID(OMX_BUFFERHEADERTYPE *bufferHeader) {
     if (bufferHeader == NULL) {
         return 0;
     }
@@ -2288,7 +2288,7 @@ OMX::buffer_id OMXNodeInstance::findBufferID(OMX_BUFFERHEADERTYPE *bufferHeader)
     return mBufferHeaderToBufferID.valueAt(index);
 }
 
-void OMXNodeInstance::invalidateBufferID(OMX::buffer_id buffer) {
+void OMXNodeInstance::invalidateBufferID(IOMX::buffer_id buffer) {
     if (buffer == 0) {
         return;
     }

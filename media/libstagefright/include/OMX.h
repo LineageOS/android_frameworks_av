@@ -21,12 +21,15 @@
 #include <utils/threads.h>
 #include <utils/KeyedVector.h>
 
+#include "OmxNodeOwner.h"
+
 namespace android {
 
 struct OMXMaster;
 struct OMXNodeInstance;
 
 class OMX : public BnOMX,
+            public OmxNodeOwner,
             public IBinder::DeathRecipient {
 public:
     OMX();
@@ -43,7 +46,7 @@ public:
 
     virtual void binderDied(const wp<IBinder> &the_late_who);
 
-    status_t freeNode(const sp<OMXNodeInstance>& instance);
+    virtual status_t freeNode(const sp<OMXNodeInstance>& instance);
 
 protected:
     virtual ~OMX();
