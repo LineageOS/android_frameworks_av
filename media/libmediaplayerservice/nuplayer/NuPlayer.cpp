@@ -1658,9 +1658,7 @@ status_t NuPlayer::instantiateDecoder(
         // directly queuing to display, as this will even improve textureview
         // playback.
         {
-            char value[PROPERTY_VALUE_MAX];
-            if (property_get("persist.sys.media.avsync", value, NULL) &&
-                    (!strcmp("1", value) || !strcasecmp("true", value))) {
+            if (property_get_bool("persist.sys.media.avsync", false)) {
                 format->setInt32("auto-frc", 1);
             }
         }

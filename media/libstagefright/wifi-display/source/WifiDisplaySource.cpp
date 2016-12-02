@@ -911,10 +911,8 @@ status_t WifiDisplaySource::onReceiveM3Response(
 
         bool supportsPCM = (modes & 2) != 0;  // LPCM 2ch 48kHz
 
-        char val[PROPERTY_VALUE_MAX];
         if (supportsPCM
-                && property_get("media.wfd.use-pcm-audio", val, NULL)
-                && (!strcasecmp("true", val) || !strcmp("1", val))) {
+                && property_get_bool("media.wfd.use-pcm-audio", false)) {
             ALOGI("Using PCM audio.");
             mUsingPCMAudio = true;
         } else if (supportsAAC) {
