@@ -1,0 +1,44 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5f681702_fb796c2f",
+        "filename": "media/libstagefright/Android.mk",
+        "patchSetId": 6
+      },
+      "lineNbr": 170,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-12-02T05:32:07Z",
+      "side": 1,
+      "message": "Can we have a more descriptive flag? This doesn\u0027t seem to have anything to relate to the commit this is reverting.",
+      "range": {
+        "startLine": 170,
+        "startChar": 9,
+        "endLine": 170,
+        "endChar": 32
+      },
+      "revId": "e453a5a83a07e3a844a96b51b08be1448c5ca0fa",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5f681702_bb88941f",
+        "filename": "services/camera/libcameraservice/Android.mk",
+        "patchSetId": 6
+      },
+      "lineNbr": 97,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-12-02T05:32:07Z",
+      "side": 1,
+      "message": "Would prefer you moved this up a few lines, like the other flags.",
+      "revId": "e453a5a83a07e3a844a96b51b08be1448c5ca0fa",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
