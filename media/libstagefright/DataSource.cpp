@@ -16,23 +16,9 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "DataSource"
 
-#include "include/AMRExtractor.h"
-
-#include "include/AACExtractor.h"
 #include "include/CallbackDataSource.h"
-#include "include/DRMExtractor.h"
-#include "include/FLACExtractor.h"
 #include "include/HTTPBase.h"
-#include "include/MidiExtractor.h"
-#include "include/MP3Extractor.h"
-#include "include/MPEG2PSExtractor.h"
-#include "include/MPEG2TSExtractor.h"
-#include "include/MPEG4Extractor.h"
 #include "include/NuCachedSource2.h"
-#include "include/OggExtractor.h"
-#include "include/WAVExtractor.h"
-
-#include "matroska/MatroskaExtractor.h"
 
 #include <media/IMediaHTTPConnection.h>
 #include <media/IMediaHTTPService.h>
@@ -43,11 +29,14 @@
 #include <media/stagefright/FileSource.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MediaHTTP.h>
+#include <media/stagefright/Utils.h>
 #include <utils/String8.h>
 
 #include <cutils/properties.h>
 
 #include <private/android_filesystem_config.h>
+
+#include <arpa/inet.h>
 
 namespace android {
 
