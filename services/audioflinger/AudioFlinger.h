@@ -19,6 +19,7 @@
 #define ANDROID_AUDIO_FLINGER_H
 
 #include "Configuration.h"
+#include <deque>
 #include <stdint.h>
 #include <sys/types.h>
 #include <limits.h>

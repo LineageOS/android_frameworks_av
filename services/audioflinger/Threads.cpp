@@ -1623,6 +1623,7 @@ void AudioFlinger::PlaybackThread::dump(int fd, const Vector<String16>& args)
     dumpInternals(fd, args);
     dumpTracks(fd, args);
     dumpEffectChains(fd, args);
+    mLocalLog.dump(fd, args, "  " /* prefix */);
 }
 
 void AudioFlinger::PlaybackThread::dumpTracks(int fd, const Vector<String16>& args __unused)
@@ -2093,6 +2094,10 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
             chain->incActiveTrackCnt();
         }
 
+        char buffer[256];
+        track->dump(buffer, ARRAY_SIZE(buffer), false /* active */);
+        mLocalLog.log("addTrack_l    (%p) %s", track.get(), buffer + 4); // log for analysis
+
         status = NO_ERROR;
     }
 
@@ -2118,6 +2123,11 @@ bool AudioFlinger::PlaybackThread::destroyTrack_l(const sp<Track>& track)
 void AudioFlinger::PlaybackThread::removeTrack_l(const sp<Track>& track)
 {
     track->triggerEvents(AudioSystem::SYNC_EVENT_PRESENTATION_COMPLETE);
+
+    char buffer[256];
+    track->dump(buffer, ARRAY_SIZE(buffer), false /* active */);
+    mLocalLog.log("removeTrack_l (%p) %s", track.get(), buffer + 4); // log for analysis
+
     mTracks.remove(track);
     deleteTrackName_l(track->name());
     // redundant as track is about to be destroyed, for dumpsys only
@@ -3285,6 +3295,10 @@ void AudioFlinger::PlaybackThread::removeTracks_l(const Vector< sp<Track> >& tra
             }
             if (track->isTerminated()) {
                 removeTrack_l(track);
+            } else { // inactive but not terminated
+                char buffer[256];
+                track->dump(buffer, ARRAY_SIZE(buffer), false /* active */);
+                mLocalLog.log("removeTracks_l(%p) %s", track.get(), buffer + 4);
             }
         }
     }
@@ -3731,6 +3745,15 @@ void AudioFlinger::MixerThread::threadLoop_standby()
         FastMixerStateQueue *sq = mFastMixer->sq();
         FastMixerState *state = sq->begin();
         if (!(state->mCommand & FastMixerState::IDLE)) {
+            // Report any frames trapped in the Monopipe
+            MonoPipe *monoPipe = (MonoPipe *)mPipeSink.get();
+            const long long pipeFrames = monoPipe->maxFrames() - monoPipe->availableToWrite();
+            mLocalLog.log("threadLoop_standby: framesWritten:%lld  suspendedFrames:%lld  "
+                    "monoPipeWritten:%lld  monoPipeLeft:%lld",
+                    (long long)mFramesWritten, (long long)mSuspendedFrames,
+                    (long long)mPipeSink->framesWritten(), pipeFrames);
+            mLocalLog.log("threadLoop_standby: %s", mTimestamp.toString().c_str());
+
             state->mCommand = FastMixerState::COLD_IDLE;
             state->mColdFutexAddr = &mFastMixerFutex;
             state->mColdGen++;
