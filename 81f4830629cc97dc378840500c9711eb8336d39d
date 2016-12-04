@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5f681702_ae9207f5",
+        "filename": "media/libstagefright/Utils.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 722,
+      "author": {
+        "id": 13589
+      },
+      "writtenOn": "2016-12-04T00:11:58Z",
+      "side": 0,
+      "message": "Removed by the merge, needs confirmation.",
+      "revId": "81f4830629cc97dc378840500c9711eb8336d39d",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
