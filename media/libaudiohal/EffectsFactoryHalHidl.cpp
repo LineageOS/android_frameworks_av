@@ -20,6 +20,7 @@
 #include <cutils/native_handle.h>
 #include <media/EffectsFactoryApi.h>
 
+#include "ConversionHelperHidl.h"
 #include "EffectHalHidl.h"
 #include "EffectsFactoryHalHidl.h"
 #include "HidlUtils.h"
@@ -63,6 +64,7 @@ status_t EffectsFactoryHalHidl::queryAllDescriptors() {
         return retval == Result::OK ? OK : NO_INIT;
     }
     mLastDescriptors.resize(0);
+    ConversionHelperHidl::crashIfHalIsDead(ret.getStatus());
     return ret.getStatus().transactionError();
 }
 
@@ -107,6 +109,7 @@ status_t EffectsFactoryHalHidl::getDescriptor(
         else if (retval == Result::INVALID_ARGUMENTS) return NAME_NOT_FOUND;
         else return NO_INIT;
     }
+    ConversionHelperHidl::crashIfHalIsDead(ret.getStatus());
     return ret.getStatus().transactionError();
 }
 
@@ -130,6 +133,7 @@ status_t EffectsFactoryHalHidl::createEffect(
         else if (retval == Result::INVALID_ARGUMENTS) return NAME_NOT_FOUND;
         else return NO_INIT;
     }
+    ConversionHelperHidl::crashIfHalIsDead(ret.getStatus());
     return ret.getStatus().transactionError();
 }
 
@@ -139,6 +143,7 @@ status_t EffectsFactoryHalHidl::dumpEffects(int fd) {
     hidlHandle->data[0] = fd;
     Return<void> ret = mEffectsFactory->debugDump(hidlHandle);
     native_handle_delete(hidlHandle);
+    ConversionHelperHidl::crashIfHalIsDead(ret.getStatus());
     return ret.getStatus().transactionError();
 }
 

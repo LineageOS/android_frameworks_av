@@ -30,6 +30,9 @@ using ::android::hardware::hidl_vec;
 namespace android {
 
 class ConversionHelperHidl {
+  public:
+    static void crashIfHalIsDead(const Status& status);
+
   protected:
     static status_t keysFromHal(const String8& keys, hidl_vec<hidl_string> *hidlKeys);
     static status_t parametersFromHal(const String8& kvPairs, hidl_vec<ParameterValue> *hidlParams);

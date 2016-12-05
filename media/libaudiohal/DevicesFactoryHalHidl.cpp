@@ -22,6 +22,7 @@
 #include <android/hardware/audio/2.0/IDevice.h>
 #include <utils/Log.h>
 
+#include "ConversionHelperHidl.h"
 #include "DeviceHalHidl.h"
 #include "DevicesFactoryHalHidl.h"
 
@@ -82,6 +83,7 @@ status_t DevicesFactoryHalHidl::openDevice(const char *name, sp<DeviceHalInterfa
         else if (retval == Result::INVALID_ARGUMENTS) return BAD_VALUE;
         else return NO_INIT;
     }
+    ConversionHelperHidl::crashIfHalIsDead(ret.getStatus());
     return ret.getStatus().transactionError();
 }
 
