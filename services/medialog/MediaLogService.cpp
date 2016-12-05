@@ -35,7 +35,7 @@ void MediaLogService::registerWriter(const sp<IMemory>& shared, size_t size, con
             shared->size() < NBLog::Timeline::sharedSize(size)) {
         return;
     }
-    sp<NBLog::Reader> reader(new NBLog::Reader(size, shared));
+    sp<NBLog::Reader> reader(new NBLog::Reader(shared, size));
     NamedReader namedReader(reader, name);
     Mutex::Autolock _l(mLock);
     mNamedReaders.add(namedReader);

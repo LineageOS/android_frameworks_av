@@ -21,7 +21,7 @@
 
 #include <binder/IMemory.h>
 #include <utils/Mutex.h>
-#include <audio_utils/roundup.h>
+#include <audio_utils/fifo.h>
 
 namespace android {
 
@@ -55,8 +55,11 @@ struct Entry {
 private:
     friend class Writer;
     Event       mEvent;     // event type
-    size_t      mLength;    // length of additional data, 0 <= mLength <= 255
+    uint8_t     mLength;    // length of additional data, 0 <= mLength <= kMaxLength
     const void *mData;      // event type-specific data
+    static const size_t kMaxLength = 255;
+public:
+    static const size_t kOverhead = 3;  // mEvent, mLength, mData[...], duplicate mLength
 };
 
 // representation of a single log entry in shared memory
@@ -70,13 +73,17 @@ private:
 //  byte[2+mLength]     duplicate copy of mLength to permit reverse scan
 //  byte[3+mLength]     start of next log entry
 
-// located in shared memory
+public:
+
+// Located in shared memory, must be POD.
+// Exactly one process must explicitly call the constructor or use placement new.
+// Since this is a POD, the destructor is empty and unnecessary to call it explicitly.
 struct Shared {
-    Shared() : mRear(0) { }
+    Shared() /* mRear initialized via default constructor */ { }
     /*virtual*/ ~Shared() { }
 
-    volatile int32_t mRear;     // index one byte past the end of most recent Entry
-    char    mBuffer[0];         // circular buffer for entries
+    audio_utils_fifo_index  mRear;  // index one byte past the end of most recent Entry
+    char    mBuffer[0];             // circular buffer for entries
 };
 
 public:
@@ -117,10 +124,10 @@ public:
 
     // Input parameter 'size' is the desired size of the timeline in byte units.
     // The size of the shared memory must be at least Timeline::sharedSize(size).
-    Writer(size_t size, void *shared);
-    Writer(size_t size, const sp<IMemory>& iMemory);
+    Writer(void *shared, size_t size);
+    Writer(const sp<IMemory>& iMemory, size_t size);
 
-    virtual ~Writer() { }
+    virtual ~Writer();
 
     virtual void    log(const char *string);
     virtual void    logf(const char *fmt, ...) __attribute__ ((format (printf, 2, 3)));
@@ -138,13 +145,16 @@ public:
     sp<IMemory>     getIMemory() const  { return mIMemory; }
 
 private:
+    // 0 <= length <= kMaxLength
     void    log(Event event, const void *data, size_t length);
     void    log(const Entry *entry, bool trusted = false);
 
-    const size_t    mSize;      // circular buffer size in bytes, must be a power of 2
     Shared* const   mShared;    // raw pointer to shared memory
-    const sp<IMemory> mIMemory; // ref-counted version
-    int32_t         mRear;      // my private copy of mShared->mRear
+    sp<IMemory>     mIMemory;   // ref-counted version, initialized in constructor and then const
+    audio_utils_fifo * const mFifo;                 // FIFO itself,
+                                                    // non-NULL unless constructor fails
+    audio_utils_fifo_writer * const mFifoWriter;    // used to write to FIFO,
+                                                    // non-NULL unless dummy constructor used
     bool            mEnabled;   // whether to actually log
 };
 
@@ -154,7 +164,7 @@ private:
 class LockedWriter : public Writer {
 public:
     LockedWriter();
-    LockedWriter(size_t size, void *shared);
+    LockedWriter(void *shared, size_t size);
 
     virtual void    log(const char *string);
     virtual void    logf(const char *fmt, ...) __attribute__ ((format (printf, 2, 3)));
@@ -176,21 +186,24 @@ public:
 
     // Input parameter 'size' is the desired size of the timeline in byte units.
     // The size of the shared memory must be at least Timeline::sharedSize(size).
-    Reader(size_t size, const void *shared);
-    Reader(size_t size, const sp<IMemory>& iMemory);
+    Reader(const void *shared, size_t size);
+    Reader(const sp<IMemory>& iMemory, size_t size);
 
-    virtual ~Reader() { }
+    virtual ~Reader();
 
     void    dump(int fd, size_t indent = 0);
     bool    isIMemory(const sp<IMemory>& iMemory) const;
 
 private:
-    const size_t    mSize;      // circular buffer size in bytes, must be a power of 2
-    const Shared* const mShared; // raw pointer to shared memory
-    const sp<IMemory> mIMemory; // ref-counted version
-    int32_t     mFront;         // index of oldest acknowledged Entry
+    /*const*/ Shared* const mShared;    // raw pointer to shared memory, actually const but not
+                                        // declared as const because audio_utils_fifo() constructor
+    sp<IMemory> mIMemory;       // ref-counted version, assigned only in constructor
     int     mFd;                // file descriptor
     int     mIndent;            // indentation level
+    audio_utils_fifo * const mFifo;                 // FIFO itself,
+                                                    // non-NULL unless constructor fails
+    audio_utils_fifo_reader * const mFifoReader;    // used to read from FIFO,
+                                                    // non-NULL unless constructor fails
 
     void    dumpLine(const String8& timestamp, String8& body);
 
