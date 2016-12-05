@@ -22,9 +22,10 @@ LOCAL_SRC_FILES := \
     StreamHalHidl.cpp
 
 LOCAL_SHARED_LIBRARIES += \
-    libhwbinder \
-    libhidlbase \
-    libbase     \
+    libhwbinder      \
+    libhidlbase      \
+    libhidltransport \
+    libbase          \
     android.hardware.audio@2.0             \
     android.hardware.audio.common@2.0      \
     android.hardware.audio.common@2.0-util \
