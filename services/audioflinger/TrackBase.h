@@ -65,7 +65,8 @@ public:
                                 uid_t uid,
                                 bool isOut,
                                 alloc_type alloc = ALLOC_CBLK,
-                                track_type type = TYPE_DEFAULT);
+                                track_type type = TYPE_DEFAULT,
+                                audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE);
     virtual             ~TrackBase();
     virtual status_t    initCheck() const;
 
@@ -163,6 +164,7 @@ protected:
     bool                mTerminated;
     track_type          mType;      // must be one of TYPE_DEFAULT, TYPE_OUTPUT, TYPE_PATCH ...
     audio_io_handle_t   mThreadIoHandle; // I/O handle of the thread the track is attached to
+    audio_port_handle_t mPortId; // unique ID for this track used by audio policy
 };
 
 // PatchProxyBufferProvider interface is implemented by PatchTrack and PatchRecord.

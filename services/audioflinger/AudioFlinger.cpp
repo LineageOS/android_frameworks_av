@@ -547,7 +547,8 @@ sp<IAudioTrack> AudioFlinger::createTrack(
         pid_t tid,
         audio_session_t *sessionId,
         int clientUid,
-        status_t *status)
+        status_t *status,
+        audio_port_handle_t portId)
 {
     sp<PlaybackThread::Track> track;
     sp<TrackHandle> trackHandle;
@@ -640,7 +641,8 @@ sp<IAudioTrack> AudioFlinger::createTrack(
         ALOGV("createTrack() lSessionId: %d", lSessionId);
 
         track = thread->createTrack_l(client, streamType, sampleRate, format,
-                channelMask, frameCount, sharedBuffer, lSessionId, flags, tid, clientUid, &lStatus);
+                channelMask, frameCount, sharedBuffer, lSessionId, flags, tid,
+                clientUid, &lStatus, portId);
         LOG_ALWAYS_FATAL_IF((lStatus == NO_ERROR) && (track == 0));
         // we don't abort yet if lStatus != NO_ERROR; there is still work to be done regardless
 
@@ -1445,7 +1447,8 @@ sp<IAudioRecord> AudioFlinger::openRecord(
         size_t *notificationFrames,
         sp<IMemory>& cblk,
         sp<IMemory>& buffers,
-        status_t *status)
+        status_t *status,
+        audio_port_handle_t portId)
 {
     sp<RecordThread::RecordTrack> recordTrack;
     sp<RecordHandle> recordHandle;
@@ -1529,7 +1532,7 @@ sp<IAudioRecord> AudioFlinger::openRecord(
 
         recordTrack = thread->createRecordTrack_l(client, sampleRate, format, channelMask,
                                                   frameCount, lSessionId, notificationFrames,
-                                                  clientUid, flags, tid, &lStatus);
+                                                  clientUid, flags, tid, &lStatus, portId);
         LOG_ALWAYS_FATAL_IF((lStatus == NO_ERROR) && (recordTrack == 0));
 
         if (lStatus == NO_ERROR) {

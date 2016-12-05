@@ -591,7 +591,8 @@ public:
                                 audio_output_flags_t *flags,
                                 pid_t tid,
                                 uid_t uid,
-                                status_t *status /*non-NULL*/);
+                                status_t *status /*non-NULL*/,
+                                audio_port_handle_t portId);
 
                 AudioStreamOut* getOutput() const;
                 AudioStreamOut* clearOutput();
@@ -1363,7 +1364,8 @@ public:
                     uid_t uid,
                     audio_input_flags_t *flags,
                     pid_t tid,
-                    status_t *status /*non-NULL*/);
+                    status_t *status /*non-NULL*/,
+                    audio_port_handle_t portId);
 
             status_t    start(RecordTrack* recordTrack,
                               AudioSystem::sync_event_t event,

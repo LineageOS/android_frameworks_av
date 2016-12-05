@@ -650,6 +650,8 @@ private:
     //  a value of AUDIO_PORT_HANDLE_NONE indicated default (AudioPolicyManager) routing.
     audio_port_handle_t    mSelectedDeviceId;
     sp<AudioSystem::AudioDeviceCallback> mDeviceCallback;
+    audio_port_handle_t    mPortId;  // unique ID allocated by audio policy
+
 };
 
 }; // namespace android

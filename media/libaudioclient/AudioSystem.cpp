@@ -792,18 +792,16 @@ status_t AudioSystem::getOutputForAttr(const audio_attributes_t *attr,
                                         audio_session_t session,
                                         audio_stream_type_t *stream,
                                         uid_t uid,
-                                        uint32_t samplingRate,
-                                        audio_format_t format,
-                                        audio_channel_mask_t channelMask,
+                                        const audio_config_t *config,
                                         audio_output_flags_t flags,
                                         audio_port_handle_t selectedDeviceId,
-                                        const audio_offload_info_t *offloadInfo)
+                                        audio_port_handle_t *portId)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return NO_INIT;
     return aps->getOutputForAttr(attr, output, session, stream, uid,
-                                 samplingRate, format, channelMask,
-                                 flags, selectedDeviceId, offloadInfo);
+                                 config,
+                                 flags, selectedDeviceId, portId);
 }
 
 status_t AudioSystem::startOutput(audio_io_handle_t output,
@@ -838,17 +836,16 @@ status_t AudioSystem::getInputForAttr(const audio_attributes_t *attr,
                                 audio_session_t session,
                                 pid_t pid,
                                 uid_t uid,
-                                uint32_t samplingRate,
-                                audio_format_t format,
-                                audio_channel_mask_t channelMask,
+                                const audio_config_base_t *config,
                                 audio_input_flags_t flags,
-                                audio_port_handle_t selectedDeviceId)
+                                audio_port_handle_t selectedDeviceId,
+                                audio_port_handle_t *portId)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return NO_INIT;
     return aps->getInputForAttr(
             attr, input, session, pid, uid,
-            samplingRate, format, channelMask, flags, selectedDeviceId);
+            config, flags, selectedDeviceId, portId);
 }
 
 status_t AudioSystem::startInput(audio_io_handle_t input,

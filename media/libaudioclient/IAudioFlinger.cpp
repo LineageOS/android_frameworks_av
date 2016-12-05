@@ -108,7 +108,8 @@ public:
                                 pid_t tid,
                                 audio_session_t *sessionId,
                                 int clientUid,
-                                status_t *status)
+                                status_t *status,
+                                audio_port_handle_t portId)
     {
         Parcel data, reply;
         sp<IAudioTrack> track;
@@ -137,6 +138,7 @@ public:
         }
         data.writeInt32(lSessionId);
         data.writeInt32(clientUid);
+        data.writeInt32(portId);
         status_t lStatus = remote()->transact(CREATE_TRACK, data, &reply);
         if (lStatus != NO_ERROR) {
             ALOGE("createTrack error: %s", strerror(-lStatus));
@@ -188,7 +190,8 @@ public:
                                 size_t *notificationFrames,
                                 sp<IMemory>& cblk,
                                 sp<IMemory>& buffers,
-                                status_t *status)
+                                status_t *status,
+                                audio_port_handle_t portId)
     {
         Parcel data, reply;
         sp<IAudioRecord> record;
@@ -211,6 +214,7 @@ public:
         }
         data.writeInt32(lSessionId);
         data.writeInt64(notificationFrames != NULL ? *notificationFrames : 0);
+        data.writeInt32(portId);
         cblk.clear();
         buffers.clear();
         status_t lStatus = remote()->transact(OPEN_RECORD, data, &reply);
@@ -958,6 +962,7 @@ status_t BnAudioFlinger::onTransact(
             pid_t tid = (pid_t) data.readInt32();
             audio_session_t sessionId = (audio_session_t) data.readInt32();
             int clientUid = data.readInt32();
+            audio_port_handle_t portId = (audio_port_handle_t) data.readInt32();
             status_t status = NO_ERROR;
             sp<IAudioTrack> track;
             if ((haveSharedBuffer && (buffer == 0)) ||
@@ -968,7 +973,7 @@ status_t BnAudioFlinger::onTransact(
                 track = createTrack(
                         (audio_stream_type_t) streamType, sampleRate, format,
                         channelMask, &frameCount, &flags, buffer, output, pid, tid,
-                        &sessionId, clientUid, &status);
+                        &sessionId, clientUid, &status, portId);
                 LOG_ALWAYS_FATAL_IF((track != 0) != (status == NO_ERROR));
             }
             reply->writeInt64(frameCount);
@@ -992,13 +997,14 @@ status_t BnAudioFlinger::onTransact(
             int clientUid = data.readInt32();
             audio_session_t sessionId = (audio_session_t) data.readInt32();
             size_t notificationFrames = data.readInt64();
+            audio_port_handle_t portId = (audio_port_handle_t) data.readInt32();
             sp<IMemory> cblk;
             sp<IMemory> buffers;
             status_t status = NO_ERROR;
             sp<IAudioRecord> record = openRecord(input,
                     sampleRate, format, channelMask, opPackageName, &frameCount, &flags,
                     pid, tid, clientUid, &sessionId, &notificationFrames, cblk, buffers,
-                    &status);
+                    &status, portId);
             LOG_ALWAYS_FATAL_IF((record != 0) != (status == NO_ERROR));
             reply->writeInt64(frameCount);
             reply->writeInt32(flags);

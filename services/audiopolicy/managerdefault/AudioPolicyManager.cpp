@@ -718,12 +718,10 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
                                               audio_session_t session,
                                               audio_stream_type_t *stream,
                                               uid_t uid,
-                                              uint32_t samplingRate,
-                                              audio_format_t format,
-                                              audio_channel_mask_t channelMask,
+                                              const audio_config_t *config,
                                               audio_output_flags_t flags,
                                               audio_port_handle_t selectedDeviceId,
-                                              const audio_offload_info_t *offloadInfo)
+                                              audio_port_handle_t *portId)
 {
     audio_attributes_t attributes;
     if (attr != NULL) {
@@ -741,10 +739,16 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
         }
         stream_type_to_audio_attributes(*stream, &attributes);
     }
+
+    // TODO: check for existing client for this port ID
+    if (*portId == AUDIO_PORT_HANDLE_NONE) {
+        *portId = AudioPort::getNextUniqueId();
+    }
+
     sp<SwAudioOutputDescriptor> desc;
     if (mPolicyMixes.getOutputForAttr(attributes, uid, desc) == NO_ERROR) {
         ALOG_ASSERT(desc != 0, "Invalid desc returned by getOutputForAttr");
-        if (!audio_has_proportional_frames(format)) {
+        if (!audio_has_proportional_frames(config->format)) {
             return BAD_VALUE;
         }
         *stream = streamTypefromAttributesInt(&attributes);
@@ -782,11 +786,11 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
     }
 
     ALOGV("getOutputForAttr() device 0x%x, samplingRate %d, format %x, channelMask %x, flags %x",
-          device, samplingRate, format, channelMask, flags);
+          device, config->sample_rate, config->format, config->channel_mask, flags);
 
     *output = getOutputForDevice(device, session, *stream,
-                                 samplingRate, format, channelMask,
-                                 flags, offloadInfo);
+                                 config->sample_rate, config->format, config->channel_mask,
+                                 flags, &config->offload_info);
     if (*output == AUDIO_IO_HANDLE_NONE) {
         mOutputRoutes.removeRoute(session);
         return INVALID_OPERATION;
@@ -1411,16 +1415,15 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
                                              audio_io_handle_t *input,
                                              audio_session_t session,
                                              uid_t uid,
-                                             uint32_t samplingRate,
-                                             audio_format_t format,
-                                             audio_channel_mask_t channelMask,
+                                             const audio_config_base_t *config,
                                              audio_input_flags_t flags,
                                              audio_port_handle_t selectedDeviceId,
-                                             input_type_t *inputType)
+                                             input_type_t *inputType,
+                                             audio_port_handle_t *portId)
 {
     ALOGV("getInputForAttr() source %d, samplingRate %d, format %d, channelMask %x,"
             "session %d, flags %#x",
-          attr->source, samplingRate, format, channelMask, session, flags);
+          attr->source, config->sample_rate, config->format, config->channel_mask, session, flags);
 
     *input = AUDIO_IO_HANDLE_NONE;
     *inputType = API_INPUT_INVALID;
@@ -1436,6 +1439,11 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
         inputSource = AUDIO_SOURCE_MIC;
     }
     halInputSource = inputSource;
+
+    // TODO: check for existing client for this port ID
+    if (*portId == AUDIO_PORT_HANDLE_NONE) {
+        *portId = AudioPort::getNextUniqueId();
+    }
 
     // Explicit routing?
     sp<DeviceDescriptor> deviceDesc;
@@ -1486,12 +1494,13 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
     }
 
     *input = getInputForDevice(device, address, session, uid, inputSource,
-                               samplingRate, format, channelMask, flags,
+                               config->sample_rate, config->format, config->channel_mask, flags,
                                policyMix);
     if (*input == AUDIO_IO_HANDLE_NONE) {
         mInputRoutes.removeRoute(session);
         return INVALID_OPERATION;
     }
+
     ALOGV("getInputForAttr() returns input type = %d", *inputType);
     return NO_ERROR;
 }

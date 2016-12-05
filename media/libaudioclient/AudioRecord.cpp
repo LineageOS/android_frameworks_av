@@ -68,7 +68,7 @@ status_t AudioRecord::getMinFrameCount(
 AudioRecord::AudioRecord(const String16 &opPackageName)
     : mActive(false), mStatus(NO_INIT), mOpPackageName(opPackageName), mSessionId(AUDIO_SESSION_ALLOCATE),
       mPreviousPriority(ANDROID_PRIORITY_NORMAL), mPreviousSchedulingGroup(SP_DEFAULT),
-      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE)
+      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE), mPortId(AUDIO_PORT_HANDLE_NONE)
 {
 }
 
@@ -95,7 +95,8 @@ AudioRecord::AudioRecord(
       mPreviousPriority(ANDROID_PRIORITY_NORMAL),
       mPreviousSchedulingGroup(SP_DEFAULT),
       mProxy(NULL),
-      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE)
+      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
+      mPortId(AUDIO_PORT_HANDLE_NONE)
 {
     mStatus = set(inputSource, sampleRate, format, channelMask, frameCount, cbf, user,
             notificationFrames, false /*threadCanCallJava*/, sessionId, transferType, flags,
@@ -529,14 +530,18 @@ status_t AudioRecord::openRecord_l(const Modulo<uint32_t> &epoch, const String16
     // The sp<> references will be dropped when re-entering scope.
     // The lack of indentation is deliberate, to reduce code churn and ease merges.
     for (;;) {
-
+    audio_config_base_t config  = {
+            .sample_rate = mSampleRate,
+            .channel_mask = mChannelMask,
+            .format = mFormat
+        };
     status = AudioSystem::getInputForAttr(&mAttributes, &input,
                                         mSessionId,
                                         // FIXME compare to AudioTrack
                                         mClientPid,
                                         mClientUid,
-                                        mSampleRate, mFormat, mChannelMask,
-                                        mFlags, mSelectedDeviceId);
+                                        &config,
+                                        mFlags, mSelectedDeviceId, &mPortId);
 
     if (status != NO_ERROR || input == AUDIO_IO_HANDLE_NONE) {
         ALOGE("Could not get audio input for session %d, record source %d, sample rate %u, "
@@ -622,7 +627,8 @@ status_t AudioRecord::openRecord_l(const Modulo<uint32_t> &epoch, const String16
                                                        &notificationFrames,
                                                        iMem,
                                                        bufferMem,
-                                                       &status);
+                                                       &status,
+                                                       mPortId);
     ALOGE_IF(originalSessionId != AUDIO_SESSION_ALLOCATE && mSessionId != originalSessionId,
             "session ID changed from %d to %d", originalSessionId, mSessionId);
 

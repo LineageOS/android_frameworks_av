@@ -66,7 +66,8 @@ public:
                                 pid_t tid,  // -1 means unused, otherwise must be valid non-0
                                 audio_session_t *sessionId,
                                 int clientUid,
-                                status_t *status) = 0;
+                                status_t *status,
+                                audio_port_handle_t portId) = 0;
 
     virtual sp<IAudioRecord> openRecord(
                                 // On successful return, AudioFlinger takes over the handle
@@ -86,7 +87,8 @@ public:
                                 size_t *notificationFrames,
                                 sp<IMemory>& cblk,
                                 sp<IMemory>& buffers,   // return value 0 means it follows cblk
-                                status_t *status) = 0;
+                                status_t *status,
+                                audio_port_handle_t portId) = 0;
 
     // FIXME Surprisingly, format/latency don't work for input handles
 

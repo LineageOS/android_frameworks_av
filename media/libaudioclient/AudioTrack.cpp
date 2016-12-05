@@ -183,7 +183,8 @@ AudioTrack::AudioTrack()
       mPreviousPriority(ANDROID_PRIORITY_NORMAL),
       mPreviousSchedulingGroup(SP_DEFAULT),
       mPausedPosition(0),
-      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE)
+      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
+      mPortId(AUDIO_PORT_HANDLE_NONE)
 {
     mAttributes.content_type = AUDIO_CONTENT_TYPE_UNKNOWN;
     mAttributes.usage = AUDIO_USAGE_UNKNOWN;
@@ -214,7 +215,8 @@ AudioTrack::AudioTrack(
       mPreviousPriority(ANDROID_PRIORITY_NORMAL),
       mPreviousSchedulingGroup(SP_DEFAULT),
       mPausedPosition(0),
-      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE)
+      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
+      mPortId(AUDIO_PORT_HANDLE_NONE)
 {
     mStatus = set(streamType, sampleRate, format, channelMask,
             frameCount, flags, cbf, user, notificationFrames,
@@ -245,7 +247,8 @@ AudioTrack::AudioTrack(
       mPreviousPriority(ANDROID_PRIORITY_NORMAL),
       mPreviousSchedulingGroup(SP_DEFAULT),
       mPausedPosition(0),
-      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE)
+      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
+      mPortId(AUDIO_PORT_HANDLE_NONE)
 {
     mStatus = set(streamType, sampleRate, format, channelMask,
             0 /*frameCount*/, flags, cbf, user, notificationFrames,
@@ -452,6 +455,7 @@ status_t AudioTrack::set(
         mOffloadInfo = &mOffloadInfoCopy;
     } else {
         mOffloadInfo = NULL;
+        memset(&mOffloadInfoCopy, 0, sizeof(audio_offload_info_t));
     }
 
     mVolume[AUDIO_INTERLEAVE_LEFT] = 1.0f;
@@ -1255,10 +1259,15 @@ status_t AudioTrack::createTrack_l()
     // After fast request is denied, we will request again if IAudioTrack is re-created.
 
     status_t status;
+    audio_config_t config = AUDIO_CONFIG_INITIALIZER;
+    config.sample_rate = mSampleRate;
+    config.channel_mask = mChannelMask;
+    config.format = mFormat;
+    config.offload_info = mOffloadInfoCopy;
     status = AudioSystem::getOutputForAttr(attr, &output,
                                            mSessionId, &streamType, mClientUid,
-                                           mSampleRate, mFormat, mChannelMask,
-                                           mFlags, mSelectedDeviceId, mOffloadInfo);
+                                           &config,
+                                           mFlags, mSelectedDeviceId, &mPortId);
 
     if (status != NO_ERROR || output == AUDIO_IO_HANDLE_NONE) {
         ALOGE("Could not get audio output for session %d, stream type %d, usage %d, sample rate %u, format %#x,"
@@ -1416,7 +1425,8 @@ status_t AudioTrack::createTrack_l()
                                                       tid,
                                                       &mSessionId,
                                                       mClientUid,
-                                                      &status);
+                                                      &status,
+                                                      mPortId);
     ALOGE_IF(originalSessionId != AUDIO_SESSION_ALLOCATE && mSessionId != originalSessionId,
             "session ID changed from %d to %d", originalSessionId, mSessionId);
 

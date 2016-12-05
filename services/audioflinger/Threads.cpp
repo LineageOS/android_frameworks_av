@@ -1754,7 +1754,8 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
         audio_output_flags_t *flags,
         pid_t tid,
         uid_t uid,
-        status_t *status)
+        status_t *status,
+        audio_port_handle_t portId)
 {
     size_t frameCount = *pFrameCount;
     sp<Track> track;
@@ -1936,7 +1937,7 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
 
         track = new Track(this, client, streamType, sampleRate, format,
                           channelMask, frameCount, NULL, sharedBuffer,
-                          sessionId, uid, *flags, TrackBase::TYPE_DEFAULT);
+                          sessionId, uid, *flags, TrackBase::TYPE_DEFAULT, portId);
 
         lStatus = track != 0 ? track->initCheck() : (status_t) NO_MEMORY;
         if (lStatus != NO_ERROR) {
@@ -6451,7 +6452,8 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
         uid_t uid,
         audio_input_flags_t *flags,
         pid_t tid,
-        status_t *status)
+        status_t *status,
+        audio_port_handle_t portId)
 {
     size_t frameCount = *pFrameCount;
     sp<RecordTrack> track;
@@ -6559,7 +6561,7 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
 
         track = new RecordTrack(this, client, sampleRate,
                       format, channelMask, frameCount, NULL, sessionId, uid,
-                      *flags, TrackBase::TYPE_DEFAULT);
+                      *flags, TrackBase::TYPE_DEFAULT, portId);
 
         lStatus = track->initCheck();
         if (lStatus != NO_ERROR) {
