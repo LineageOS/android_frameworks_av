@@ -783,11 +783,6 @@ void StagefrightMetadataRetriever::parseMetaData() {
             }
         }
     }
-
-    // To check whether the media file is drm-protected
-    if (mExtractor->getDrmFlag()) {
-        mMetaData.add(METADATA_KEY_IS_DRM, String8("1"));
-    }
 }
 
 void StagefrightMetadataRetriever::clearMetadata() {

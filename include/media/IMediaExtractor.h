@@ -54,8 +54,6 @@ public:
     virtual uint32_t flags() const = 0;
 
     // for DRM
-    virtual void setDrmFlag(bool flag) = 0;
-    virtual bool getDrmFlag() = 0;
     virtual char* getDrmTrackInfo(size_t trackID, int *len)  = 0;
     virtual void setUID(uid_t uid)  = 0;
 

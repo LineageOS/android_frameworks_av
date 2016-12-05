@@ -244,7 +244,6 @@ DRMExtractor::DRMExtractor(const sp<DataSource> &source, const char* mime)
       mDecryptHandle(NULL),
       mDrmManagerClient(NULL) {
     mOriginalExtractor = MediaExtractor::Create(source, mime);
-    mOriginalExtractor->setDrmFlag(true);
     mOriginalExtractor->getMetaData()->setInt32(kKeyIsDRM, 1);
 
     source->getDrmInfo(mDecryptHandle, &mDrmManagerClient);

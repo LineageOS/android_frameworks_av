@@ -34,8 +34,6 @@ enum {
     GETTRACKMETADATA,
     GETMETADATA,
     FLAGS,
-    SETDRMFLAG,
-    GETDRMFLAG,
     GETDRMTRACKINFO,
     SETUID,
     NAME
@@ -101,13 +99,6 @@ public:
         return 0;
     }
 
-    virtual void setDrmFlag(bool flag __unused) {
-        ALOGV("setDrmFlag NOT IMPLEMENTED");
-    }
-    virtual bool getDrmFlag() {
-        ALOGV("getDrmFlag NOT IMPLEMENTED");
-       return false;
-    }
     virtual char* getDrmTrackInfo(size_t trackID __unused, int *len __unused) {
         ALOGV("getDrmTrackInfo NOT IMPLEMENTED");
         return NULL;
