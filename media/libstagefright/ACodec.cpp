@@ -882,6 +882,8 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
                 info.mStatus = BufferInfo::OWNED_BY_US;
                 info.mFenceFd = -1;
                 info.mRenderInfo = NULL;
+                info.mGraphicBuffer = NULL;
+                info.mNewGraphicBuffer = false;
 
                 if (mode == IOMX::kPortModePresetSecureBuffer) {
                     void *ptr = NULL;
@@ -1116,6 +1118,7 @@ status_t ACodec::allocateOutputBuffersFromNativeWindow() {
         info.mIsReadFence = false;
         info.mRenderInfo = NULL;
         info.mGraphicBuffer = graphicBuffer;
+        info.mNewGraphicBuffer = false;
 
         // TODO: We shouln't need to create MediaCodecBuffer. In metadata mode
         //       OMX doesn't use the shared memory buffer, but some code still
@@ -1190,6 +1193,7 @@ status_t ACodec::allocateOutputMetadataBuffers() {
         info.mFenceFd = -1;
         info.mRenderInfo = NULL;
         info.mGraphicBuffer = NULL;
+        info.mNewGraphicBuffer = false;
         info.mDequeuedAt = mDequeueCounter;
 
         info.mData = new MediaCodecBuffer(mOutputFormat, new ABuffer(bufferSize));
@@ -1221,7 +1225,7 @@ status_t ACodec::submitOutputMetadataBuffer() {
     }
 
     ALOGV("[%s] submitting output meta buffer ID %u for graphic buffer %p",
-          mComponentName.c_str(), info->mBufferID, info->mGraphicBuffer.get());
+          mComponentName.c_str(), info->mBufferID, info->mGraphicBuffer->handle);
 
     --mMetadataBuffersToSubmit;
     info->checkWriteFence("submitOutputMetadataBuffer");
@@ -1362,7 +1366,11 @@ ACodec::BufferInfo *ACodec::dequeueBufferFromNativeWindow() {
                     break;
                 }
 
-                ALOGV("dequeued buffer %p", info->mGraphicBuffer->getNativeBuffer());
+                ALOGV("dequeued buffer #%u with age %u, graphicBuffer %p",
+                        (unsigned)(info - &mBuffers[kPortIndexOutput][0]),
+                        mDequeueCounter - info->mDequeuedAt,
+                        info->mGraphicBuffer->handle);
+
                 info->mStatus = BufferInfo::OWNED_BY_US;
                 info->setWriteFence(fenceFd, "dequeueBufferFromNativeWindow");
                 updateRenderInfoForDequeuedBuffer(buf, fenceFd, info);
@@ -1408,6 +1416,7 @@ ACodec::BufferInfo *ACodec::dequeueBufferFromNativeWindow() {
 
     // discard buffer in LRU info and replace with new buffer
     oldest->mGraphicBuffer = new GraphicBuffer(buf, false);
+    oldest->mNewGraphicBuffer = true;
     oldest->mStatus = BufferInfo::OWNED_BY_US;
     oldest->setWriteFence(fenceFd, "dequeueBufferFromNativeWindow for oldest");
     mRenderTracker.untrackFrame(oldest->mRenderInfo);
@@ -1416,7 +1425,7 @@ ACodec::BufferInfo *ACodec::dequeueBufferFromNativeWindow() {
     ALOGV("replaced oldest buffer #%u with age %u, graphicBuffer %p",
             (unsigned)(oldest - &mBuffers[kPortIndexOutput][0]),
             mDequeueCounter - oldest->mDequeuedAt,
-            oldest->mGraphicBuffer->getNativeBuffer());
+            oldest->mGraphicBuffer->handle);
 
     updateRenderInfoForDequeuedBuffer(buf, fenceFd, oldest);
     return oldest;
@@ -1522,7 +1531,13 @@ ACodec::BufferInfo *ACodec::findBufferByID(
 
 status_t ACodec::fillBuffer(BufferInfo *info) {
     status_t err;
-    if (!storingMetadataInDecodedBuffers()) {
+    // Even in dynamic ANW buffer mode, if the graphic buffer is not changing,
+    // send sPreset instead of the same graphic buffer, so that OMX server
+    // side doesn't update the meta. In theory it should make no difference,
+    // however when the same buffer is parcelled again, a new handle could be
+    // created on server side, and some decoder doesn't recognize the handle
+    // even if it's the same buffer.
+    if (!storingMetadataInDecodedBuffers() || !info->mNewGraphicBuffer) {
         err = mOMXNode->fillBuffer(
             info->mBufferID, OMXBuffer::sPreset, info->mFenceFd);
     } else {
@@ -1530,6 +1545,7 @@ status_t ACodec::fillBuffer(BufferInfo *info) {
             info->mBufferID, info->mGraphicBuffer, info->mFenceFd);
     }
 
+    info->mNewGraphicBuffer = false;
     info->mFenceFd = -1;
     if (err == OK) {
         info->mStatus = BufferInfo::OWNED_BY_COMPONENT;
