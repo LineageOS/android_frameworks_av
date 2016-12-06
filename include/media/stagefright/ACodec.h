@@ -188,6 +188,7 @@ private:
         sp<RefBase> mCodecRef;            // and a reference to the IMemory
 
         sp<GraphicBuffer> mGraphicBuffer;
+        bool mNewGraphicBuffer;
         int mFenceFd;
         FrameRenderTracker::Info *mRenderInfo;
 
