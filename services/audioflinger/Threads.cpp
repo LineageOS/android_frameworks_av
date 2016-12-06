@@ -5599,7 +5599,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::OffloadThread::prepareTr
                         ALOGV("OffloadThread: BUFFER TIMEOUT: remove(%d) from active list",
                                 track->name());
                         tracksToRemove->add(track);
-                        // indicate to client process that the track was disabled because of underrun;
+                        // tell client process that the track was disabled because of underrun;
                         // it will then automatically call start() when data is available
                         track->disable();
                     }
@@ -7215,7 +7215,8 @@ void AudioFlinger::RecordThread::readInputParameters_l()
     // Over-allocate beyond mRsmpInFramesP2 to permit a HAL read past end of buffer
     mRsmpInFramesOA = mRsmpInFramesP2 + mFrameCount - 1;
     (void)posix_memalign(&mRsmpInBuffer, 32, mRsmpInFramesOA * mFrameSize);
-    memset(mRsmpInBuffer, 0, mRsmpInFramesOA * mFrameSize); // if posix_memalign fails, will segv here.
+    // if posix_memalign fails, will segv here.
+    memset(mRsmpInBuffer, 0, mRsmpInFramesOA * mFrameSize);
 
     // AudioRecord mSampleRate and mChannelCount are constant due to AudioRecord API constraints.
     // But if thread's mSampleRate or mChannelCount changes, how will that affect active tracks?
@@ -7459,7 +7460,8 @@ status_t AudioFlinger::MmapThreadHandle::getMmapPosition(struct audio_mmap_posit
     return mThread->getMmapPosition(position);
 }
 
-status_t AudioFlinger::MmapThreadHandle::start(const MmapStreamInterface::Client& client, audio_port_handle_t *handle)
+status_t AudioFlinger::MmapThreadHandle::start(const MmapStreamInterface::Client& client,
+        audio_port_handle_t *handle)
 
 {
     if (mThread == 0) {
@@ -8051,8 +8053,8 @@ status_t AudioFlinger::MmapThread::checkEffectCompatibility_l(
         return BAD_VALUE;
     }
     if (isOutput() && ((desc->flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_PRE_PROC)) {
-        ALOGW("checkEffectCompatibility_l(): pre processing effect %s created on playback mmap thread",
-              desc->name);
+        ALOGW("checkEffectCompatibility_l(): pre processing effect %s created on playback mmap "
+              "thread", desc->name);
         return BAD_VALUE;
     }
 
@@ -8284,7 +8286,8 @@ void AudioFlinger::MmapPlaybackThread::dumpInternals(int fd, const Vector<String
 {
     MmapThread::dumpInternals(fd, args);
 
-    dprintf(fd, "  Stream type: %d Stream volume: %f HAL volume: %f Stream mute %d\n", mStreamType, mStreamVolume, mHalVolFloat, mStreamMute);
+    dprintf(fd, "  Stream type: %d Stream volume: %f HAL volume: %f Stream mute %d\n",
+            mStreamType, mStreamVolume, mHalVolFloat, mStreamMute);
     dprintf(fd, "  Master volume: %f Master mute %d\n", mMasterVolume, mMasterMute);
 }
 
