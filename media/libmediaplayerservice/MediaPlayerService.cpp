@@ -1974,7 +1974,7 @@ status_t MediaPlayerService::AudioOutput::updateTrack() {
         }
     }
 #ifdef DOLBY_ENABLE
-    updateTrackOnAudioProcessed(t, false);
+    updateTrackOnAudioProcessed(mTrack, false);
 #endif // DOLBY_END
     ALOGV("updateTrack() DONE status %d", res);
     return res;
