@@ -26,6 +26,7 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
+#include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/DataSource.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
@@ -40,6 +41,8 @@
 namespace android {
 
 static const size_t kTSPacketSize = 188;
+static const int kMaxDurationReadSize = 250000LL;
+static const int kMaxDurationRetry = 6;
 
 struct MPEG2TSSource : public MediaSource {
     MPEG2TSSource(
@@ -243,6 +246,8 @@ void MPEG2TSExtractor::init() {
             const sp<MetaData> meta = impl->getFormat();
             meta->setInt64(kKeyDuration, durationUs);
             impl->setFormat(meta);
+        } else {
+            estimateDurationsFromTimesUsAtEnd();
         }
     }
 
@@ -299,6 +304,106 @@ void MPEG2TSExtractor::addSyncPoint_l(const ATSParser::SyncEvent &event) {
             break;
         }
     }
+}
+
+status_t MPEG2TSExtractor::estimateDurationsFromTimesUsAtEnd()  {
+    if (!(mDataSource->flags() & DataSource::kIsLocalFileSource)) {
+        return ERROR_UNSUPPORTED;
+    }
+
+    off64_t size = 0;
+    status_t err = mDataSource->getSize(&size);
+    if (err != OK) {
+        return err;
+    }
+
+    uint8_t packet[kTSPacketSize];
+    const off64_t zero = 0;
+    off64_t offset = max(zero, size - kMaxDurationReadSize);
+    if (mDataSource->readAt(offset, &packet, 0) < 0) {
+        return ERROR_IO;
+    }
+
+    int retry = 0;
+    bool allDurationsFound = false;
+    int64_t timeAnchorUs = mParser->getFirstPTSTimeUs();
+    do {
+        int bytesRead = 0;
+        sp<ATSParser> parser = new ATSParser(ATSParser::TS_TIMESTAMPS_ARE_ABSOLUTE);
+        ATSParser::SyncEvent ev(0);
+        offset = max(zero, size - (kMaxDurationReadSize << retry));
+        offset = (offset / kTSPacketSize) * kTSPacketSize;
+        for (;;) {
+            if (bytesRead >= kMaxDurationReadSize << max(0, retry - 1)) {
+                break;
+            }
+
+            ssize_t n = mDataSource->readAt(offset, packet, kTSPacketSize);
+            if (n < 0) {
+                return n;
+            } else if (n < (ssize_t)kTSPacketSize) {
+                break;
+            }
+
+            offset += kTSPacketSize;
+            bytesRead += kTSPacketSize;
+            err = parser->feedTSPacket(packet, kTSPacketSize, &ev);
+            if (err != OK) {
+                return err;
+            }
+
+            if (ev.hasReturnedData()) {
+                int64_t durationUs = ev.getTimeUs();
+                ATSParser::SourceType type = ev.getType();
+                ev.reset();
+
+                int64_t firstTimeUs;
+                sp<AnotherPacketSource> src =
+                    (AnotherPacketSource *)mParser->getSource(type).get();
+                if (src == NULL || src->nextBufferTime(&firstTimeUs) != OK) {
+                    continue;
+                }
+                durationUs += src->getEstimatedBufferDurationUs();
+                durationUs -= timeAnchorUs;
+                durationUs -= firstTimeUs;
+                if (durationUs > 0) {
+                    int64_t origDurationUs, lastDurationUs;
+                    const sp<MetaData> meta = src->getFormat();
+                    const uint32_t kKeyLastDuration = 'ldur';
+                    // Require two consecutive duration calculations to be within 1 sec before
+                    // updating; use MetaData to store previous duration estimate in per-stream
+                    // context.
+                    if (!meta->findInt64(kKeyDuration, &origDurationUs)
+                            || !meta->findInt64(kKeyLastDuration, &lastDurationUs)
+                            || (origDurationUs < durationUs
+                             && abs(durationUs - lastDurationUs) < 60000000)) {
+                        meta->setInt64(kKeyDuration, durationUs);
+                    }
+                    meta->setInt64(kKeyLastDuration, durationUs);
+                }
+            }
+        }
+
+        if (!allDurationsFound) {
+            allDurationsFound = true;
+            for (auto t: {ATSParser::VIDEO, ATSParser::AUDIO}) {
+                sp<AnotherPacketSource> src = (AnotherPacketSource *)mParser->getSource(t).get();
+                if (src == NULL) {
+                    continue;
+                }
+                int64_t durationUs;
+                const sp<MetaData> meta = src->getFormat();
+                if (!meta->findInt64(kKeyDuration, &durationUs)) {
+                    allDurationsFound = false;
+                    break;
+                }
+            }
+        }
+
+        ++retry;
+    } while(!allDurationsFound && offset > 0 && retry <= kMaxDurationRetry);
+
+    return allDurationsFound? OK : ERROR_UNSUPPORTED;
 }
 
 uint32_t MPEG2TSExtractor::flags() const {

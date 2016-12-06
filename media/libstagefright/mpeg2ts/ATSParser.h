@@ -62,18 +62,26 @@ struct ATSParser : public RefBase {
         ALIGNED_VIDEO_DATA         = 2,
     };
 
+    enum SourceType {
+        VIDEO = 0,
+        AUDIO = 1,
+        META  = 2,
+        NUM_SOURCE_TYPES = 3
+    };
+
     // Event is used to signal sync point event at feedTSPacket().
     struct SyncEvent {
         explicit SyncEvent(off64_t offset);
 
         void init(off64_t offset, const sp<MediaSource> &source,
-                int64_t timeUs);
+                int64_t timeUs, SourceType type);
 
         bool hasReturnedData() const { return mHasReturnedData; }
         void reset();
         off64_t getOffset() const { return mOffset; }
         const sp<MediaSource> &getMediaSource() const { return mMediaSource; }
         int64_t getTimeUs() const { return mTimeUs; }
+        SourceType getType() const { return mType; }
 
     private:
         bool mHasReturnedData;
@@ -87,6 +95,7 @@ struct ATSParser : public RefBase {
         sp<MediaSource> mMediaSource;
         /* The timestamp of the sync frame. */
         int64_t mTimeUs;
+        SourceType mType;
     };
 
     explicit ATSParser(uint32_t flags = 0);
@@ -107,16 +116,12 @@ struct ATSParser : public RefBase {
 
     void signalEOS(status_t finalResult);
 
-    enum SourceType {
-        VIDEO = 0,
-        AUDIO = 1,
-        META  = 2,
-        NUM_SOURCE_TYPES = 3
-    };
     sp<MediaSource> getSource(SourceType type);
     bool hasSource(SourceType type) const;
 
     bool PTSTimeDeltaEstablished();
+
+    int64_t getFirstPTSTimeUs();
 
     enum {
         // From ISO/IEC 13818-1: 2000 (E), Table 2-29

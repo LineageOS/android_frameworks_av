@@ -57,6 +57,9 @@ struct AnotherPacketSource : public MediaSource {
     // presentation timestamps since the last discontinuity (if any).
     int64_t getBufferedDurationUs(status_t *finalResult);
 
+    // Returns the difference between the two largest timestamps queued
+    int64_t getEstimatedBufferDurationUs();
+
     status_t nextBufferTime(int64_t *timeUs);
 
     void queueAccessUnit(const sp<ABuffer> &buffer);
@@ -113,6 +116,7 @@ private:
     bool mEnabled;
     sp<MetaData> mFormat;
     int64_t mLastQueuedTimeUs;
+    int64_t mEstimatedBufferDurationUs;
     List<sp<ABuffer> > mBuffers;
     status_t mEOSResult;
     sp<AMessage> mLatestEnqueuedMeta;

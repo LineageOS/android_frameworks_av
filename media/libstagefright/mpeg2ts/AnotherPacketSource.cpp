@@ -44,6 +44,7 @@ AnotherPacketSource::AnotherPacketSource(const sp<MetaData> &meta)
       mEnabled(true),
       mFormat(NULL),
       mLastQueuedTimeUs(0),
+      mEstimatedBufferDurationUs(-1),
       mEOSResult(OK),
       mLatestEnqueuedMeta(NULL),
       mLatestDequeuedMeta(NULL) {
@@ -309,6 +310,8 @@ void AnotherPacketSource::clear() {
 
     mFormat = NULL;
     mLatestEnqueuedMeta = NULL;
+
+    mEstimatedBufferDurationUs = -1;
 }
 
 void AnotherPacketSource::queueDiscontinuity(
@@ -429,6 +432,31 @@ int64_t AnotherPacketSource::getBufferedDurationUs(status_t *finalResult) {
     }
 
     return durationUs;
+}
+
+int64_t AnotherPacketSource::getEstimatedBufferDurationUs() {
+    Mutex::Autolock autoLock(mLock);
+    if (mEstimatedBufferDurationUs >= 0) {
+        return mEstimatedBufferDurationUs;
+    }
+
+    SortedVector<int64_t> maxTimesUs;
+    List<sp<ABuffer> >::iterator it;
+    int64_t t1 = 0, t2 = 0;
+    for (it = mBuffers.begin(); it != mBuffers.end(); ++it) {
+        int64_t timeUs = 0;
+        const sp<ABuffer> &buffer = *it;
+        if (!buffer->meta()->findInt64("timeUs", &timeUs)) {
+            continue;
+        }
+        maxTimesUs.add(timeUs);
+        while (maxTimesUs.size() > 2) {
+            maxTimesUs.removeAt(0);
+            t1 = maxTimesUs.itemAt(0);
+            t2 = maxTimesUs.itemAt(1);
+        }
+    }
+    return mEstimatedBufferDurationUs = t2 - t1;
 }
 
 status_t AnotherPacketSource::nextBufferTime(int64_t *timeUs) {
