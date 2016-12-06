@@ -3208,6 +3208,29 @@ static status_t GetMimeTypeForVideoCoding(
     return ERROR_UNSUPPORTED;
 }
 
+status_t ACodec::setPortBufferNum(OMX_U32 portIndex, int bufferNum) {
+    OMX_PARAM_PORTDEFINITIONTYPE def;
+    InitOMXParams(&def);
+    def.nPortIndex = portIndex;
+    status_t err;
+    ALOGD("Setting [%s] %s port buffer number: %d", mComponentName.c_str(),
+            portIndex == kPortIndexInput ? "input" : "output", bufferNum);
+    err = mOMX->getParameter(
+        mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
+    if (err != OK) {
+        return err;
+    }
+    def.nBufferCountActual = bufferNum;
+    err = mOMX->setParameter(
+        mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
+    if (err != OK) {
+        // Component could reject this request.
+        ALOGW("Fail to set [%s] %s port buffer number: %d", mComponentName.c_str(),
+            portIndex == kPortIndexInput ? "input" : "output", bufferNum);
+    }
+    return OK;
+}
+
 status_t ACodec::setupVideoDecoder(
         const char *mime, const sp<AMessage> &msg, bool haveNativeWindow,
         bool usingSwRenderer, sp<AMessage> &outputFormat) {
@@ -3262,6 +3285,24 @@ status_t ACodec::setupVideoDecoder(
 
     if (err != OK) {
         return err;
+    }
+
+    // Set the component input buffer number to be |tmp|. If succeed,
+    // component will set input port buffer number to be |tmp|. If fail,
+    // component will keep the same buffer number as before.
+    if (msg->findInt32("android._num-input-buffers", &tmp)) {
+        err = setPortBufferNum(kPortIndexInput, tmp);
+        if (err != OK)
+            return err;
+    }
+
+    // Set the component output buffer number to be |tmp|. If succeed,
+    // component will set output port buffer number to be |tmp|. If fail,
+    // component will keep the same buffer number as before.
+    if (msg->findInt32("android._num-output-buffers", &tmp)) {
+        err = setPortBufferNum(kPortIndexOutput, tmp);
+        if (err != OK)
+            return err;
     }
 
     int32_t frameRateInt;
@@ -3791,11 +3832,15 @@ status_t ACodec::setupVideoEncoder(
 
         case OMX_VIDEO_CodingVP8:
         case OMX_VIDEO_CodingVP9:
-            err = setupVPXEncoderParameters(msg);
+            err = setupVPXEncoderParameters(msg, outputFormat);
             break;
 
         default:
             break;
+    }
+
+    if (err != OK) {
+        return err;
     }
 
     // Set up color aspects on input, but propagate them to the output format, as they will
@@ -3860,14 +3905,31 @@ status_t ACodec::setCyclicIntraMacroblockRefresh(const sp<AMessage> &msg, int32_
     return err;
 }
 
-static OMX_U32 setPFramesSpacing(int32_t iFramesInterval, int32_t frameRate) {
-    if (iFramesInterval < 0) {
-        return 0xFFFFFFFF;
-    } else if (iFramesInterval == 0) {
+static OMX_U32 setPFramesSpacing(
+        float iFramesInterval /* seconds */, int32_t frameRate, uint32_t BFramesSpacing = 0) {
+    // BFramesSpacing is the number of B frames between I/P frames
+    // PFramesSpacing (the value to be returned) is the number of P frames between I frames
+    //
+    // keyFrameInterval = ((PFramesSpacing + 1) * BFramesSpacing) + PFramesSpacing + 1
+    //                                     ^^^                            ^^^        ^^^
+    //                              number of B frames                number of P    I frame
+    //
+    //                  = (PFramesSpacing + 1) * (BFramesSpacing + 1)
+    //
+    // E.g.
+    //      I   P   I  : I-interval: 8, nPFrames 1, nBFrames 3
+    //       BBB BBB
+
+    if (iFramesInterval < 0) { // just 1 key frame
+        return 0xFFFFFFFE; // don't use maxint as key-frame-interval calculation will add 1
+    } else if (iFramesInterval == 0) { // just key frames
         return 0;
     }
-    OMX_U32 ret = frameRate * iFramesInterval;
-    return ret;
+
+    // round down as key-frame-interval is an upper limit
+    uint32_t keyFrameInterval = uint32_t(frameRate * iFramesInterval);
+    OMX_U32 ret = keyFrameInterval / (BFramesSpacing + 1);
+    return ret > 0 ? ret - 1 : 0;
 }
 
 static OMX_VIDEO_CONTROLRATETYPE getBitrateMode(const sp<AMessage> &msg) {
@@ -3880,9 +3942,10 @@ static OMX_VIDEO_CONTROLRATETYPE getBitrateMode(const sp<AMessage> &msg) {
 }
 
 status_t ACodec::setupMPEG4EncoderParameters(const sp<AMessage> &msg) {
-    int32_t bitrate, iFrameInterval;
+    int32_t bitrate;
+    float iFrameInterval;
     if (!msg->findInt32("bitrate", &bitrate)
-            || !msg->findInt32("i-frame-interval", &iFrameInterval)) {
+            || !msg->findAsFloat("i-frame-interval", &iFrameInterval)) {
         return INVALID_OPERATION;
     }
 
@@ -3915,11 +3978,11 @@ status_t ACodec::setupMPEG4EncoderParameters(const sp<AMessage> &msg) {
     mpeg4type.nAllowedPictureTypes =
         OMX_VIDEO_PictureTypeI | OMX_VIDEO_PictureTypeP;
 
-    mpeg4type.nPFrames = setPFramesSpacing(iFrameInterval, frameRate);
+    mpeg4type.nBFrames = 0;
+    mpeg4type.nPFrames = setPFramesSpacing(iFrameInterval, frameRate, mpeg4type.nBFrames);
     if (mpeg4type.nPFrames == 0) {
         mpeg4type.nAllowedPictureTypes = OMX_VIDEO_PictureTypeI;
     }
-    mpeg4type.nBFrames = 0;
     mpeg4type.nIDCVLCThreshold = 0;
     mpeg4type.bACPred = OMX_TRUE;
     mpeg4type.nMaxPacketSize = 256;
@@ -3962,9 +4025,10 @@ status_t ACodec::setupMPEG4EncoderParameters(const sp<AMessage> &msg) {
 }
 
 status_t ACodec::setupH263EncoderParameters(const sp<AMessage> &msg) {
-    int32_t bitrate, iFrameInterval;
+    int32_t bitrate;
+    float iFrameInterval;
     if (!msg->findInt32("bitrate", &bitrate)
-            || !msg->findInt32("i-frame-interval", &iFrameInterval)) {
+            || !msg->findAsFloat("i-frame-interval", &iFrameInterval)) {
         return INVALID_OPERATION;
     }
 
@@ -3993,11 +4057,11 @@ status_t ACodec::setupH263EncoderParameters(const sp<AMessage> &msg) {
     h263type.nAllowedPictureTypes =
         OMX_VIDEO_PictureTypeI | OMX_VIDEO_PictureTypeP;
 
-    h263type.nPFrames = setPFramesSpacing(iFrameInterval, frameRate);
+    h263type.nBFrames = 0;
+    h263type.nPFrames = setPFramesSpacing(iFrameInterval, frameRate, h263type.nBFrames);
     if (h263type.nPFrames == 0) {
         h263type.nAllowedPictureTypes = OMX_VIDEO_PictureTypeI;
     }
-    h263type.nBFrames = 0;
 
     int32_t profile;
     if (msg->findInt32("profile", &profile)) {
@@ -4090,9 +4154,10 @@ int /* OMX_VIDEO_AVCLEVELTYPE */ ACodec::getAVCLevelFor(
 }
 
 status_t ACodec::setupAVCEncoderParameters(const sp<AMessage> &msg) {
-    int32_t bitrate, iFrameInterval;
+    int32_t bitrate;
+    float iFrameInterval;
     if (!msg->findInt32("bitrate", &bitrate)
-            || !msg->findInt32("i-frame-interval", &iFrameInterval)) {
+            || !msg->findAsFloat("i-frame-interval", &iFrameInterval)) {
         return INVALID_OPERATION;
     }
 
@@ -4149,13 +4214,19 @@ status_t ACodec::setupAVCEncoderParameters(const sp<AMessage> &msg) {
 
         h264type.eProfile = static_cast<OMX_VIDEO_AVCPROFILETYPE>(profile);
         h264type.eLevel = static_cast<OMX_VIDEO_AVCLEVELTYPE>(level);
-    } 
-#if 0
-      else {
-        // Use baseline profile for AVC recording if profile is not specified.
+    } else {
         h264type.eProfile = OMX_VIDEO_AVCProfileBaseline;
-    }
+#if 0   /* DON'T YET DEFAULT TO HIGHEST PROFILE */
+        // Use largest supported profile for AVC recording if profile is not specified.
+        for (OMX_VIDEO_AVCPROFILETYPE profile : {
+                OMX_VIDEO_AVCProfileHigh, OMX_VIDEO_AVCProfileMain }) {
+            if (verifySupportForProfileAndLevel(profile, 0) == OK) {
+                h264type.eProfile = profile;
+                break;
+            }
+        }
 #endif
+    }
 
     ALOGI("setupAVCEncoderParameters with [profile: %s] [level: %s]",
             asString(h264type.eProfile), asString(h264type.eLevel));
@@ -4165,7 +4236,7 @@ status_t ACodec::setupAVCEncoderParameters(const sp<AMessage> &msg) {
         h264type.bUseHadamard = OMX_TRUE;
         h264type.nRefFrames = 1;
         h264type.nBFrames = 0;
-        h264type.nPFrames = setPFramesSpacing(iFrameInterval, frameRate);
+        h264type.nPFrames = setPFramesSpacing(iFrameInterval, frameRate, h264type.nBFrames);
         if (h264type.nPFrames == 0) {
             h264type.nAllowedPictureTypes = OMX_VIDEO_PictureTypeI;
         }
@@ -4183,7 +4254,7 @@ status_t ACodec::setupAVCEncoderParameters(const sp<AMessage> &msg) {
         h264type.bUseHadamard = OMX_TRUE;
         h264type.nRefFrames = 2;
         h264type.nBFrames = 1;
-        h264type.nPFrames = setPFramesSpacing(iFrameInterval, frameRate);
+        h264type.nPFrames = setPFramesSpacing(iFrameInterval, frameRate, h264type.nBFrames);
         h264type.nAllowedPictureTypes =
             OMX_VIDEO_PictureTypeI | OMX_VIDEO_PictureTypeP | OMX_VIDEO_PictureTypeB;
         h264type.nRefIdx10ActiveMinus1 = 0;
@@ -4216,13 +4287,42 @@ status_t ACodec::setupAVCEncoderParameters(const sp<AMessage> &msg) {
         return err;
     }
 
+    // TRICKY: if we are enabling temporal layering as well, some codecs may not support layering
+    // when B-frames are enabled. Detect this now so we can disable B frames if temporal layering
+    // is preferred.
+    AString tsSchema;
+    int32_t preferBFrames = (int32_t)false;
+    if (msg->findString("ts-schema", &tsSchema)
+            && (!msg->findInt32("android._prefer-b-frames", &preferBFrames) || !preferBFrames)) {
+        OMX_VIDEO_PARAM_ANDROID_TEMPORALLAYERINGTYPE layering;
+        InitOMXParams(&layering);
+        layering.nPortIndex = kPortIndexOutput;
+        if (mOMX->getParameter(
+                        mNode, (OMX_INDEXTYPE)OMX_IndexParamAndroidVideoTemporalLayering,
+                        &layering, sizeof(layering)) == OK
+                && layering.eSupportedPatterns
+                && layering.nBLayerCountMax == 0) {
+            h264type.nBFrames = 0;
+            h264type.nPFrames = setPFramesSpacing(iFrameInterval, frameRate, h264type.nBFrames);
+            h264type.nAllowedPictureTypes &= ~OMX_VIDEO_PictureTypeB;
+            ALOGI("disabling B-frames");
+            err = mOMX->setParameter(
+                    mNode, OMX_IndexParamVideoAvc, &h264type, sizeof(h264type));
+
+            if (err != OK) {
+                return err;
+            }
+        }
+    }
+
     return configureBitrate(bitrate, bitrateMode);
 }
 
 status_t ACodec::setupHEVCEncoderParameters(const sp<AMessage> &msg) {
-    int32_t bitrate, iFrameInterval;
+    int32_t bitrate;
+    float iFrameInterval;
     if (!msg->findInt32("bitrate", &bitrate)
-            || !msg->findInt32("i-frame-interval", &iFrameInterval)) {
+            || !msg->findAsFloat("i-frame-interval", &iFrameInterval)) {
         return INVALID_OPERATION;
     }
 
@@ -4266,7 +4366,7 @@ status_t ACodec::setupHEVCEncoderParameters(const sp<AMessage> &msg) {
         hevcType.eLevel = static_cast<OMX_VIDEO_HEVCLEVELTYPE>(level);
     }
     // TODO: finer control?
-    hevcType.nKeyFrameInterval = setPFramesSpacing(iFrameInterval, frameRate);
+    hevcType.nKeyFrameInterval = setPFramesSpacing(iFrameInterval, frameRate) + 1;
 
     err = mOMX->setParameter(
             mNode, (OMX_INDEXTYPE)OMX_IndexParamVideoHevc, &hevcType, sizeof(hevcType));
@@ -4277,9 +4377,9 @@ status_t ACodec::setupHEVCEncoderParameters(const sp<AMessage> &msg) {
     return configureBitrate(bitrate, bitrateMode);
 }
 
-status_t ACodec::setupVPXEncoderParameters(const sp<AMessage> &msg) {
+status_t ACodec::setupVPXEncoderParameters(const sp<AMessage> &msg, sp<AMessage> &outputFormat) {
     int32_t bitrate;
-    int32_t iFrameInterval = 0;
+    float iFrameInterval = 0;
     size_t tsLayers = 0;
     OMX_VIDEO_ANDROID_VPXTEMPORALLAYERPATTERNTYPE pattern =
         OMX_VIDEO_VPXTemporalLayerPatternNone;
@@ -4293,7 +4393,7 @@ status_t ACodec::setupVPXEncoderParameters(const sp<AMessage> &msg) {
     if (!msg->findInt32("bitrate", &bitrate)) {
         return INVALID_OPERATION;
     }
-    msg->findInt32("i-frame-interval", &iFrameInterval);
+    msg->findAsFloat("i-frame-interval", &iFrameInterval);
 
     OMX_VIDEO_CONTROLRATETYPE bitrateMode = getBitrateMode(msg);
 
@@ -4307,19 +4407,31 @@ status_t ACodec::setupVPXEncoderParameters(const sp<AMessage> &msg) {
     }
 
     AString tsSchema;
+    OMX_VIDEO_ANDROID_TEMPORALLAYERINGPATTERNTYPE tsType =
+        OMX_VIDEO_AndroidTemporalLayeringPatternNone;
+
     if (msg->findString("ts-schema", &tsSchema)) {
-        if (tsSchema == "webrtc.vp8.1-layer") {
+        unsigned int numLayers = 0;
+        unsigned int numBLayers = 0;
+        int tags;
+        char dummy;
+        if (sscanf(tsSchema.c_str(), "webrtc.vp8.%u-layer%c", &numLayers, &dummy) == 1
+                && numLayers > 0) {
             pattern = OMX_VIDEO_VPXTemporalLayerPatternWebRTC;
-            tsLayers = 1;
-        } else if (tsSchema == "webrtc.vp8.2-layer") {
+            tsType = OMX_VIDEO_AndroidTemporalLayeringPatternWebRTC;
+            tsLayers = numLayers;
+        } else if ((tags = sscanf(tsSchema.c_str(), "android.generic.%u%c%u%c",
+                        &numLayers, &dummy, &numBLayers, &dummy))
+                && (tags == 1 || (tags == 3 && dummy == '+'))
+                && numLayers > 0 && numLayers < UINT32_MAX - numBLayers) {
             pattern = OMX_VIDEO_VPXTemporalLayerPatternWebRTC;
-            tsLayers = 2;
-        } else if (tsSchema == "webrtc.vp8.3-layer") {
-            pattern = OMX_VIDEO_VPXTemporalLayerPatternWebRTC;
-            tsLayers = 3;
+            // VPX does not have a concept of B-frames, so just count all layers
+            tsType = OMX_VIDEO_AndroidTemporalLayeringPatternAndroid;
+            tsLayers = numLayers + numBLayers;
         } else {
-            ALOGW("Unsupported ts-schema [%s]", tsSchema.c_str());
+            ALOGW("Ignoring unsupported ts-schema [%s]", tsSchema.c_str());
         }
+        tsLayers = min(tsLayers, (size_t)OMX_VIDEO_ANDROID_MAXVP8TEMPORALLAYERS);
     }
 
     OMX_VIDEO_PARAM_ANDROID_VP8ENCODERTYPE vp8type;
@@ -4331,7 +4443,7 @@ status_t ACodec::setupVPXEncoderParameters(const sp<AMessage> &msg) {
 
     if (err == OK) {
         if (iFrameInterval > 0) {
-            vp8type.nKeyFrameInterval = setPFramesSpacing(iFrameInterval, frameRate);
+            vp8type.nKeyFrameInterval = setPFramesSpacing(iFrameInterval, frameRate) + 1;
         }
         vp8type.eTemporalPattern = pattern;
         vp8type.nTemporalLayerCount = tsLayers;
@@ -4351,6 +4463,12 @@ status_t ACodec::setupVPXEncoderParameters(const sp<AMessage> &msg) {
                 &vp8type, sizeof(vp8type));
         if (err != OK) {
             ALOGW("Extended VP8 parameters set failed: %d", err);
+        } else if (tsType == OMX_VIDEO_AndroidTemporalLayeringPatternWebRTC) {
+            // advertise even single layer WebRTC layering, as it is defined
+            outputFormat->setString("ts-schema", AStringPrintf("webrtc.vp8.%u-layer", tsLayers));
+        } else if (tsLayers > 0) {
+            // tsType == OMX_VIDEO_AndroidTemporalLayeringPatternAndroid
+            outputFormat->setString("ts-schema", AStringPrintf("android.generic.%u", tsLayers));
         }
     }
 
@@ -4881,32 +4999,21 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
                             sizeof(vp8type));
 
                     if (err == OK) {
-                        AString tsSchema = "none";
-                        if (vp8type.eTemporalPattern
-                                == OMX_VIDEO_VPXTemporalLayerPatternWebRTC) {
-                            switch (vp8type.nTemporalLayerCount) {
-                                case 1:
-                                {
-                                    tsSchema = "webrtc.vp8.1-layer";
-                                    break;
-                                }
-                                case 2:
-                                {
-                                    tsSchema = "webrtc.vp8.2-layer";
-                                    break;
-                                }
-                                case 3:
-                                {
-                                    tsSchema = "webrtc.vp8.3-layer";
-                                    break;
-                                }
-                                default:
-                                {
-                                    break;
-                                }
+                        if (vp8type.eTemporalPattern == OMX_VIDEO_VPXTemporalLayerPatternWebRTC
+                                && vp8type.nTemporalLayerCount > 0
+                                && vp8type.nTemporalLayerCount
+                                        <= OMX_VIDEO_ANDROID_MAXVP8TEMPORALLAYERS) {
+                            // advertise as android.generic if we configured for android.generic
+                            AString origSchema;
+                            if (notify->findString("ts-schema", &origSchema)
+                                    && origSchema.startsWith("android.generic")) {
+                                notify->setString("ts-schema", AStringPrintf(
+                                        "android.generic.%u", vp8type.nTemporalLayerCount));
+                            } else {
+                                notify->setString("ts-schema", AStringPrintf(
+                                        "webrtc.vp8.%u-layer", vp8type.nTemporalLayerCount));
                             }
                         }
-                        notify->setString("ts-schema", tsSchema);
                     }
                     // Fall through to set up mime.
                 }
@@ -7340,6 +7447,23 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
             ALOGE("setConfig(OMX_IndexConfigVideoBitrate, %d) failed w/ err %d",
                    videoBitrate, err);
 
+            return err;
+        }
+    }
+
+    int64_t timeOffsetUs;
+    if (params->findInt64("time-offset-us", &timeOffsetUs)) {
+        status_t err = mOMX->setInternalOption(
+            mNode,
+            kPortIndexInput,
+            IOMX::INTERNAL_OPTION_TIME_OFFSET,
+            &timeOffsetUs,
+            sizeof(timeOffsetUs));
+
+        if (err != OK) {
+            ALOGE("[%s] Unable to set input buffer time offset (err %d)",
+                mComponentName.c_str(),
+                err);
             return err;
         }
     }

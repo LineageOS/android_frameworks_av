@@ -131,6 +131,10 @@ public:
     // of suspension on input.
     status_t setMaxTimestampGapUs(int64_t maxGapUs);
 
+    // Sets the input buffer timestamp offset.
+    // When set, the sample's timestamp will be adjusted with the timeOffsetUs.
+    status_t setInputBufferTimeOffset(int64_t timeOffsetUs);
+
     // When set, the max frame rate fed to the encoder will be capped at maxFps.
     status_t setMaxFps(float maxFps);
 
@@ -291,6 +295,7 @@ private:
     // is done processing a GraphicBuffer, we can use this to map back
     // to a slot number.
     sp<GraphicBuffer> mBufferSlot[BufferQueue::NUM_BUFFER_SLOTS];
+    int32_t mBufferUseCount[BufferQueue::NUM_BUFFER_SLOTS];
 
     // Tracks codec buffers.
     Vector<CodecBuffer> mCodecBuffers;
@@ -323,7 +328,6 @@ private:
 
     int mLatestBufferId;
     uint64_t mLatestBufferFrameNum;
-    int32_t mLatestBufferUseCount;
     sp<Fence> mLatestBufferFence;
 
     // The previous buffer should've been repeated but
@@ -335,6 +339,8 @@ private:
     int64_t mTimePerFrameUs;
     int64_t mPrevCaptureUs;
     int64_t mPrevFrameUs;
+
+    int64_t mInputBufferTimeOffsetUs;
 
     MetadataBufferType mMetadataBufferType;
     ColorAspects mColorAspects;

@@ -161,9 +161,9 @@ struct Parameters {
     bool previewCallbackOneShot;
     bool previewCallbackSurface;
 
-    bool zslMode;
+    bool allowZslMode;
     // Whether the jpeg stream is slower than 30FPS and can slow down preview.
-    // When slowJpegMode is true, zslMode must be false to avoid slowing down preview.
+    // When slowJpegMode is true, allowZslMode must be false to avoid slowing down preview.
     bool slowJpegMode;
 
     // Overall camera state
@@ -219,6 +219,7 @@ struct Parameters {
         DefaultKeyedVector<uint8_t, OverrideModes> sceneModeOverrides;
         float minFocalLength;
         bool useFlexibleYuv;
+        Size maxJpegSize;
     } fastInfo;
 
     // Quirks information; these are short-lived flags to enable workarounds for
@@ -271,6 +272,8 @@ struct Parameters {
     status_t recoverOverriddenJpegSize();
     // if video snapshot size is currently overridden
     bool isJpegSizeOverridden();
+    // whether zero shutter lag should be used for non-recording operation
+    bool useZeroShutterLag() const;
 
     // Calculate the crop region rectangle, either tightly about the preview
     // resolution, or a region just based on the active array; both take
@@ -386,6 +389,15 @@ private:
     // Helper function to get minimum frame duration for a jpeg size
     // return -1 if input jpeg size cannot be found in supported size list
     int64_t getJpegStreamMinFrameDurationNs(Parameters::Size size);
+
+    // Helper function to get minimum frame duration for a size/format combination
+    // return -1 if input size/format combination cannot be found.
+    int64_t getMinFrameDurationNs(Parameters::Size size, int format);
+
+    // Helper function to check if a given fps is supported by all the sizes with
+    // the same format.
+    // return true if the device doesn't support min frame duration metadata tag.
+    bool isFpsSupported(const Vector<Size> &size, int format, int32_t fps);
 
     // Helper function to get non-duplicated available output formats
     SortedVector<int32_t> getAvailableOutputFormats();

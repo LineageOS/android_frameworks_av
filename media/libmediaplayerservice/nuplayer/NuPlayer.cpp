@@ -807,12 +807,9 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
             }
 
             if (mVideoDecoder != NULL) {
-                float rate = getFrameRate();
-                if (rate > 0) {
-                    sp<AMessage> params = new AMessage();
-                    params->setFloat("operating-rate", rate * mPlaybackSettings.mSpeed);
-                    mVideoDecoder->setParameters(params);
-                }
+                sp<AMessage> params = new AMessage();
+                params->setFloat("playback-speed", mPlaybackSettings.mSpeed);
+                mVideoDecoder->setParameters(params);
             }
 
             sp<AMessage> response = new AMessage;
@@ -1028,6 +1025,7 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                 sp<AMessage> inputFormat =
                         mSource->getFormat(false /* audio */);
 
+                setVideoScalingMode(mVideoScalingMode);
                 updateVideoSize(inputFormat, format);
             } else if (what == DecoderBase::kWhatShutdownCompleted) {
                 ALOGV("%s shutdown completed", audio ? "audio" : "video");
@@ -1381,6 +1379,14 @@ void NuPlayer::onStart(int64_t startPositionUs) {
     }
 
     sp<MetaData> audioMeta = mSource->getFormatMeta(true /* audio */);
+    sp<MetaData> videoMeta = mSource->getFormatMeta(false /* audio */);
+    if (audioMeta == NULL && videoMeta == NULL) {
+        ALOGE("no metadata for either audio or video source");
+        mSource->stop();
+        mSourceStarted = false;
+        notifyListener(MEDIA_ERROR, MEDIA_ERROR_UNKNOWN, ERROR_MALFORMED);
+        return;
+    }
     ALOGV_IF(audioMeta == NULL, "no metadata for audio source");  // video only stream
 
     audio_stream_type_t streamType = AUDIO_STREAM_MUSIC;
@@ -1720,6 +1726,27 @@ status_t NuPlayer::instantiateDecoder(
             mediaBufs.clear();
             ALOGE("Secure source didn't support secure mediaBufs.");
             return err;
+        }
+    }
+
+    if (!audio) {
+        sp<AMessage> params = new AMessage();
+        float rate = getFrameRate();
+        if (rate > 0) {
+            params->setFloat("frame-rate-total", rate);
+        }
+
+        sp<MetaData> fileMeta = getFileMeta();
+        if (fileMeta != NULL) {
+            int32_t videoTemporalLayerCount;
+            if (fileMeta->findInt32(kKeyTemporalLayerCount, &videoTemporalLayerCount)
+                    && videoTemporalLayerCount > 0) {
+                params->setInt32("temporal-layer-count", videoTemporalLayerCount);
+            }
+        }
+
+        if (params->countEntries() > 0) {
+            (*decoder)->setParameters(params);
         }
     }
     return OK;
