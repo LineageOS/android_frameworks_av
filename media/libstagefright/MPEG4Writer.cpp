@@ -435,8 +435,6 @@ MPEG4Writer::MPEG4Writer(int fd)
       mStartTimestampUs(-1ll),
       mLatitudex10000(0),
       mLongitudex10000(0),
-      mHasAudioTrack(false),
-      mHasVideoTrack(false),
       mAreGeoTagsAvailable(false),
       mStartTimeOffsetMs(-1),
       mMetaKeys(new AMessage()) {
@@ -539,22 +537,6 @@ status_t MPEG4Writer::addSource(const sp<IMediaSource> &source) {
 
     const char *mime;
     source->getFormat()->findCString(kKeyMIMEType, &mime);
-
-    if (!strncasecmp(mime, "audio/", 6)) {
-        if (mHasAudioTrack) {
-            ALOGE("At most one audio track can be added");
-            return ERROR_UNSUPPORTED;
-        }
-        mHasAudioTrack = true;
-    }
-
-    if (!strncasecmp(mime, "video/", 6)) {
-        if (mHasVideoTrack) {
-            ALOGE("At most one video track can be added");
-            return ERROR_UNSUPPORTED;
-        }
-        mHasVideoTrack = true;
-    }
 
     if (Track::getFourCCForMime(mime) == NULL) {
         ALOGE("Unsupported mime '%s'", mime);

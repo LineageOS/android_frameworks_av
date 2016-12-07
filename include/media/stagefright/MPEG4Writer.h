@@ -97,8 +97,6 @@ private:
     int64_t mStartTimestampUs;
     int mLatitudex10000;
     int mLongitudex10000;
-    bool mHasAudioTrack;
-    bool mHasVideoTrack;
     bool mAreGeoTagsAvailable;
     int32_t mStartTimeOffsetMs;
 
