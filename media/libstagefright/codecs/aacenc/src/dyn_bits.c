@@ -20,10 +20,14 @@
 
 *******************************************************************************/
 
+#include "android/log.h"
+
 #include "aac_rom.h"
 #include "dyn_bits.h"
 #include "bit_cnt.h"
 #include "psy_const.h"
+
+#define LOG_TAG "NoiselessCoder"
 
 /*****************************************************************************
 *
@@ -296,6 +300,9 @@ noiselessCounter(SECTION_DATA *sectionData,
     case SHORT_WINDOW:
       sideInfoTab = sideInfoTabShort;
       break;
+    default:
+      ALOGE("invalid blockType: %d", blockType);
+      return;
   }
 
 
