@@ -60,8 +60,6 @@ struct NuPlayer::Renderer : public AHandler {
 
     void signalTimeDiscontinuity();
 
-    void signalAudioSinkChanged();
-
     void signalDisableOffloadAudio();
     void signalEnableOffloadAudio();
 
@@ -80,6 +78,14 @@ struct NuPlayer::Renderer : public AHandler {
             uint32_t flags,
             bool *isOffloaded);
     void closeAudioSink();
+
+    // re-open audio sink after all pending audio buffers played.
+    void changeAudioFormat(
+            const sp<AMessage> &format,
+            bool offloadOnly,
+            bool hasVideo,
+            uint32_t flags,
+            const sp<AMessage> &notify);
 
     enum {
         kWhatEOS                      = 'eos ',
@@ -118,14 +124,19 @@ private:
         kWhatResume              = 'resm',
         kWhatOpenAudioSink       = 'opnA',
         kWhatCloseAudioSink      = 'clsA',
+        kWhatChangeAudioFormat   = 'chgA',
         kWhatStopAudioSink       = 'stpA',
         kWhatDisableOffloadAudio = 'noOA',
         kWhatEnableOffloadAudio  = 'enOA',
         kWhatSetVideoFrameRate   = 'sVFR',
     };
 
+    // if mBuffer != nullptr, it's a buffer containing real data.
+    // else if mNotifyConsumed == nullptr, it's EOS.
+    // else it's a tag for re-opening audio sink in different format.
     struct QueueEntry {
         sp<MediaCodecBuffer> mBuffer;
+        sp<AMessage> mMeta;
         sp<AMessage> mNotifyConsumed;
         size_t mOffset;
         status_t mFinalResult;
@@ -220,7 +231,7 @@ private:
     int64_t getPendingAudioPlayoutDurationUs(int64_t nowUs);
     void postDrainAudioQueue_l(int64_t delayUs = 0);
 
-    void clearAnchorTime_l();
+    void clearAnchorTime();
     void clearAudioFirstAnchorTime_l();
     void setAudioFirstAnchorTimeIfNeeded_l(int64_t mediaUs);
     void setVideoLateByUs(int64_t lateUs);
@@ -258,6 +269,7 @@ private:
             bool hasVideo,
             uint32_t flags);
     void onCloseAudioSink();
+    void onChangeAudioFormat(const sp<AMessage> &meta, const sp<AMessage> &notify);
 
     void notifyEOS(bool audio, status_t finalResult, int64_t delayUs = 0);
     void notifyFlushComplete(bool audio);

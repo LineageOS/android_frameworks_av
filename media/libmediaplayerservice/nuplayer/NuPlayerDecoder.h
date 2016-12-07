@@ -56,7 +56,8 @@ private:
     enum {
         kWhatCodecNotify         = 'cdcN',
         kWhatRenderBuffer        = 'rndr',
-        kWhatSetVideoSurface     = 'sSur'
+        kWhatSetVideoSurface     = 'sSur',
+        kWhatAudioOutputFormatChanged = 'aofc'
     };
 
     enum {
