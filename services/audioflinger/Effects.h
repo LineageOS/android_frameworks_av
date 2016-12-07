@@ -95,6 +95,7 @@ public:
     const wp<ThreadBase>& thread() { return mThread; }
 
     status_t addHandle(EffectHandle *handle);
+    ssize_t  disconnectHandle(EffectHandle *handle, bool unpinIfLast);
     ssize_t removeHandle(EffectHandle *handle);
     ssize_t removeHandle_l(EffectHandle *handle);
 

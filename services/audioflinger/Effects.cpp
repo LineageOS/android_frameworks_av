@@ -207,6 +207,24 @@ AudioFlinger::EffectHandle *AudioFlinger::EffectModule::controlHandle_l()
     return NULL;
 }
 
+// unsafe method called when the effect parent thread has been destroyed
+ssize_t AudioFlinger::EffectModule::disconnectHandle(EffectHandle *handle, bool unpinIfLast)
+{
+    ALOGV("disconnect() %p handle %p", this, handle);
+    Mutex::Autolock _l(mLock);
+    ssize_t numHandles = removeHandle_l(handle);
+    if ((numHandles == 0) && (!mPinned || unpinIfLast)) {
+        AudioSystem::unregisterEffect(mId);
+        sp<AudioFlinger> af = mAudioFlinger.promote();
+        if (af != 0) {
+            mLock.unlock();
+            af->updateOrphanEffectChains(this);
+            mLock.lock();
+        }
+    }
+    return numHandles;
+}
+
 bool AudioFlinger::EffectModule::updateState() {
     Mutex::Autolock _l(mLock);
 
@@ -1260,6 +1278,13 @@ void AudioFlinger::EffectHandle::disconnect(bool unpinIfLast)
     }
     if (thread != 0) {
         thread->disconnectEffectHandle(this, unpinIfLast);
+    } else {
+        ALOGW("%s Effect handle %p disconnected after thread destruction", __FUNCTION__, this);
+        // try to cleanup as much as we can
+        sp<EffectModule> effect = mEffect.promote();
+        if (effect != 0) {
+            effect->disconnectHandle(this, unpinIfLast);
+        }
     }
 
     if (mClient != 0) {
