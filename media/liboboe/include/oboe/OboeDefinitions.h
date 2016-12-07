@@ -19,7 +19,11 @@
 
 #include <stdint.h>
 
-typedef int32_t  oboe_handle_t;
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef int32_t  oboe_handle_t; // negative handles are error codes
 typedef int32_t  oboe_result_t;
 typedef int32_t  oboe_sample_rate_t;
 /** This is used for small quantities such as the number of frames in a buffer. */
@@ -173,5 +177,9 @@ typedef enum {
     OBOE_SHARING_MODE_PUBLIC_MIX,
     OBOE_SHARING_MODE_COUNT // This should always be last.
 } oboe_sharing_mode_t;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // OBOE_OBOEDEFINITIONS_H
