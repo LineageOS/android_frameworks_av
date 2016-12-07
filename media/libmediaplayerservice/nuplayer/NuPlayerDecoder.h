@@ -76,6 +76,10 @@ protected:
         kWhatSetVideoSurface     = 'sSur'
     };
 
+    enum {
+        kMaxNumVideoTemporalLayers = 32,
+    };
+
     sp<Surface> mSurface;
 
     sp<Source> mSource;
@@ -109,6 +113,12 @@ protected:
     bool mIsSecure;
     bool mFormatChangePending;
     bool mTimeChangePending;
+    float mFrameRateTotal;
+    float mPlaybackSpeed;
+    int32_t mNumVideoTemporalLayerTotal;
+    int32_t mNumVideoTemporalLayerAllowed;
+    int32_t mCurrentMaxVideoTemporalLayerId;
+    float mVideoTemporalLayerAggregateFps[kMaxNumVideoTemporalLayers];
 
     bool mResumePending;
     AString mComponentName;

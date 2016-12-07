@@ -70,6 +70,9 @@
 
 namespace android {
 
+//FIXME: workaround for truncated touch sounds
+// to be removed when the problem is handled by system UI
+#define TOUCH_SOUND_FIXED_DELAY_MS 100
 // ----------------------------------------------------------------------------
 // AudioPolicyInterface implementation
 // ----------------------------------------------------------------------------
@@ -296,6 +299,9 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t device,
         }
 
         closeAllInputs();
+        // As the input device list can impact the output device selection, update
+        // getDeviceForStrategy() cache
+        updateDevicesAndOutputs();
 
         if (mEngine->getPhoneState() == AUDIO_MODE_IN_CALL && hasPrimaryOutput()) {
             audio_devices_t newDevice = getNewOutputDevice(mPrimaryOutput, false /*fromCache*/);
@@ -342,15 +348,16 @@ audio_policy_dev_state_t AudioPolicyManager::getDeviceConnectionState(audio_devi
             AUDIO_POLICY_DEVICE_STATE_AVAILABLE : AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE;
 }
 
-void AudioPolicyManager::updateCallRouting(audio_devices_t rxDevice, int delayMs)
+uint32_t AudioPolicyManager::updateCallRouting(audio_devices_t rxDevice, uint32_t delayMs)
 {
     bool createTxPatch = false;
     status_t status;
     audio_patch_handle_t afPatchHandle;
     DeviceVector deviceList;
+    uint32_t muteWaitMs = 0;
 
     if(!hasPrimaryOutput()) {
-        return;
+        return muteWaitMs;
     }
     audio_devices_t txDevice = getDeviceAndMixForInputSource(AUDIO_SOURCE_VOICE_COMMUNICATION);
     ALOGV("updateCallRouting device rxDevice %08x txDevice %08x", rxDevice, txDevice);
@@ -370,7 +377,7 @@ void AudioPolicyManager::updateCallRouting(audio_devices_t rxDevice, int delayMs
     // via setOutputDevice() on primary output.
     // Otherwise, create two audio patches for TX and RX path.
     if (availablePrimaryOutputDevices() & rxDevice) {
-        setOutputDevice(mPrimaryOutput, rxDevice, true, delayMs);
+        muteWaitMs = setOutputDevice(mPrimaryOutput, rxDevice, true, delayMs);
         // If the TX device is also on the primary HW module, setOutputDevice() will take care
         // of it due to legacy implementation. If not, create a patch.
         if ((availablePrimaryInputDevices() & txDevice & ~AUDIO_DEVICE_BIT_IN)
@@ -410,7 +417,7 @@ void AudioPolicyManager::updateCallRouting(audio_devices_t rxDevice, int delayMs
         }
 
         afPatchHandle = AUDIO_PATCH_HANDLE_NONE;
-        status = mpClientInterface->createAudioPatch(&patch, &afPatchHandle, 0);
+        status = mpClientInterface->createAudioPatch(&patch, &afPatchHandle, delayMs);
         ALOGW_IF(status != NO_ERROR, "updateCallRouting() error %d creating RX audio patch",
                                                status);
         if (status == NO_ERROR) {
@@ -469,7 +476,7 @@ void AudioPolicyManager::updateCallRouting(audio_devices_t rxDevice, int delayMs
         }
 
         afPatchHandle = AUDIO_PATCH_HANDLE_NONE;
-        status = mpClientInterface->createAudioPatch(&patch, &afPatchHandle, 0);
+        status = mpClientInterface->createAudioPatch(&patch, &afPatchHandle, delayMs);
         ALOGW_IF(status != NO_ERROR, "setPhoneState() error %d creating TX audio patch",
                                                status);
         if (status == NO_ERROR) {
@@ -478,6 +485,8 @@ void AudioPolicyManager::updateCallRouting(audio_devices_t rxDevice, int delayMs
             mCallTxPatch->mUid = mUidCached;
         }
     }
+
+    return muteWaitMs;
 }
 
 void AudioPolicyManager::setPhoneState(audio_mode_t state)
@@ -610,18 +619,26 @@ void AudioPolicyManager::setForceUse(audio_policy_force_use_t usage,
     checkOutputForAllStrategies();
     updateDevicesAndOutputs();
 
+    //FIXME: workaround for truncated touch sounds
+    // to be removed when the problem is handled by system UI
+    uint32_t delayMs = 0;
+    uint32_t waitMs = 0;
+    if (usage == AUDIO_POLICY_FORCE_FOR_COMMUNICATION) {
+        delayMs = TOUCH_SOUND_FIXED_DELAY_MS;
+    }
     if (mEngine->getPhoneState() == AUDIO_MODE_IN_CALL && hasPrimaryOutput()) {
         audio_devices_t newDevice = getNewOutputDevice(mPrimaryOutput, true /*fromCache*/);
-        updateCallRouting(newDevice);
+        waitMs = updateCallRouting(newDevice, delayMs);
     }
     for (size_t i = 0; i < mOutputs.size(); i++) {
         sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueAt(i);
         audio_devices_t newDevice = getNewOutputDevice(outputDesc, true /*fromCache*/);
         if ((mEngine->getPhoneState() != AUDIO_MODE_IN_CALL) || (outputDesc != mPrimaryOutput)) {
-            setOutputDevice(outputDesc, newDevice, (newDevice != AUDIO_DEVICE_NONE));
+            waitMs = setOutputDevice(outputDesc, newDevice, (newDevice != AUDIO_DEVICE_NONE),
+                                     delayMs);
         }
         if (forceVolumeReeval && (newDevice != AUDIO_DEVICE_NONE)) {
-            applyStreamVolumes(outputDesc, newDevice, 0, true);
+            applyStreamVolumes(outputDesc, newDevice, waitMs, true);
         }
     }
 
@@ -802,7 +819,6 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
         const audio_offload_info_t *offloadInfo)
 {
     audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-    uint32_t latency = 0;
     status_t status;
 
 #ifdef AUDIO_POLICY_TEST
@@ -1213,8 +1229,10 @@ status_t AudioPolicyManager::startSource(sp<AudioOutputDescriptor> outputDesc,
         beaconMuteLatency = handleEventForBeacon(STARTING_OUTPUT);
     }
 
+    // force device change if the output is inactive and no audio patch is already present.
     // check active before incrementing usage count
-    bool force = !outputDesc->isActive();
+    bool force = !outputDesc->isActive() &&
+            (outputDesc->getPatchHandle() == AUDIO_PATCH_HANDLE_NONE);
 
     // increment usage count for this stream on the requested output:
     // NOTE that the usage count is the same for duplicated output and hardware output which is
@@ -1234,12 +1252,17 @@ status_t AudioPolicyManager::startSource(sp<AudioOutputDescriptor> outputDesc,
         for (size_t i = 0; i < mOutputs.size(); i++) {
             sp<AudioOutputDescriptor> desc = mOutputs.valueAt(i);
             if (desc != outputDesc) {
-                // force a device change if any other output is managed by the same hw
-                // module and has a current device selection that differs from selected device.
+                // force a device change if any other output is:
+                // - managed by the same hw module
+                // - has a current device selection that differs from selected device.
+                // - supports currently selected device
+                // - has an active audio patch
                 // In this case, the audio HAL must receive the new device selection so that it can
                 // change the device currently selected by the other active output.
                 if (outputDesc->sharesHwModuleWith(desc) &&
-                    desc->device() != device) {
+                        desc->device() != device &&
+                        desc->supportedDevices() & device &&
+                        desc->getPatchHandle() != AUDIO_PATCH_HANDLE_NONE) {
                     force = true;
                 }
                 // wait for audio on other active outputs to be presented when starting
@@ -1272,7 +1295,12 @@ status_t AudioPolicyManager::startSource(sp<AudioOutputDescriptor> outputDesc,
         if (strategy == STRATEGY_SONIFICATION) {
             mpClientInterface->invalidateStream(AUDIO_STREAM_ACCESSIBILITY);
         }
+
+        if (waitMs > muteWaitMs) {
+            *delayMs = waitMs - muteWaitMs;
+        }
     }
+
     return NO_ERROR;
 }
 
@@ -1346,8 +1374,8 @@ status_t AudioPolicyManager::stopSource(sp<AudioOutputDescriptor> outputDesc,
 
             // force restoring the device selection on other active outputs if it differs from the
             // one being selected for this output
+            uint32_t delayMs = outputDesc->latency()*2;
             for (size_t i = 0; i < mOutputs.size(); i++) {
-                audio_io_handle_t curOutput = mOutputs.keyAt(i);
                 sp<AudioOutputDescriptor> desc = mOutputs.valueAt(i);
                 if (desc != outputDesc &&
                         desc->isActive() &&
@@ -1358,7 +1386,11 @@ status_t AudioPolicyManager::stopSource(sp<AudioOutputDescriptor> outputDesc,
                     setOutputDevice(desc,
                                     newDevice2,
                                     force,
-                                    outputDesc->latency()*2);
+                                    delayMs);
+                    // re-apply device specific volume if not done by setOutputDevice()
+                    if (!force) {
+                        applyStreamVolumes(desc, newDevice2, delayMs);
+                    }
                 }
             }
             // update the outputs if stopping one with a stream that can affect notification routing
@@ -1566,6 +1598,8 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
                                   profileFlags);
         if (profile != 0) {
             break; // success
+        } else if (profileFlags & AUDIO_INPUT_FLAG_RAW) {
+            profileFlags = (audio_input_flags_t) (profileFlags & ~AUDIO_INPUT_FLAG_RAW); // retry
         } else if (profileFlags != AUDIO_INPUT_FLAG_NONE) {
             profileFlags = AUDIO_INPUT_FLAG_NONE; // retry
         } else { // fail
@@ -1730,10 +1764,15 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
                     MIX_STATE_MIXING);
         }
 
-        if (mInputs.activeInputsCount() == 0) {
+        // indicate active capture to sound trigger service if starting capture from a mic on
+        // primary HW module
+        audio_devices_t device = getNewInputDevice(input);
+        audio_devices_t primaryInputDevices = availablePrimaryInputDevices();
+        if (((device & primaryInputDevices & ~AUDIO_DEVICE_BIT_IN) != 0) &&
+                mInputs.activeInputsCountOnDevices(primaryInputDevices) == 0) {
             SoundTrigger::setCaptureState(true);
         }
-        setInputDevice(input, getNewInputDevice(input), true /* force */);
+        setInputDevice(input, device, true /* force */);
 
         // automatically enable the remote submix output when input is started if not
         // used by a policy mix of type MIX_TYPE_RECORDERS
@@ -1810,9 +1849,14 @@ status_t AudioPolicyManager::stopInput(audio_io_handle_t input,
             }
         }
 
+        audio_devices_t device = inputDesc->mDevice;
         resetInputDevice(input);
 
-        if (mInputs.activeInputsCount() == 0) {
+        // indicate inactive capture to sound trigger service if stopping capture from a mic on
+        // primary HW module
+        audio_devices_t primaryInputDevices = availablePrimaryInputDevices();
+        if (((device & primaryInputDevices & ~AUDIO_DEVICE_BIT_IN) != 0) &&
+                mInputs.activeInputsCountOnDevices(primaryInputDevices) == 0) {
             SoundTrigger::setCaptureState(false);
         }
         inputDesc->clearPreemptedSessions();
@@ -1871,7 +1915,7 @@ void AudioPolicyManager::closeAllInputs() {
         ssize_t patch_index = mAudioPatches.indexOfKey(inputDesc->getPatchHandle());
         if (patch_index >= 0) {
             sp<AudioPatch> patchDesc = mAudioPatches.valueAt(patch_index);
-            status_t status = mpClientInterface->releaseAudioPatch(patchDesc->mAfPatchHandle, 0);
+            (void) /*status_t status*/ mpClientInterface->releaseAudioPatch(patchDesc->mAfPatchHandle, 0);
             mAudioPatches.removeItemsAt(patch_index);
             patchRemoved = true;
         }
@@ -1950,21 +1994,27 @@ status_t AudioPolicyManager::setStreamVolumeIndex(audio_stream_type_t stream,
                 continue;
             }
             routing_strategy curStrategy = getStrategy((audio_stream_type_t)curStream);
-            audio_devices_t curStreamDevice = getDeviceForStrategy(curStrategy, true /*fromCache*/);
-            if ((curStreamDevice & device) == 0) {
+            audio_devices_t curStreamDevice = getDeviceForStrategy(curStrategy, false /*fromCache*/);
+            if ((device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) &&
+                    ((curStreamDevice & device) == 0)) {
                 continue;
             }
-            bool applyDefault = false;
+            bool applyVolume;
             if (device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) {
                 curStreamDevice |= device;
-            } else if (!mVolumeCurves->hasVolumeIndexForDevice(
-                    stream, Volume::getDeviceForVolume(curStreamDevice))) {
-                applyDefault = true;
+                applyVolume = (curDevice & curStreamDevice) != 0;
+            } else {
+                applyVolume = !mVolumeCurves->hasVolumeIndexForDevice(
+                        stream, Volume::getDeviceForVolume(curStreamDevice));
             }
 
-            if (applyDefault || ((curDevice & curStreamDevice) != 0)) {
+            if (applyVolume) {
+                //FIXME: workaround for truncated touch sounds
+                // delayed volume change for system stream to be removed when the problem is
+                // handled by system UI
                 status_t volStatus =
-                        checkAndSetVolume((audio_stream_type_t)curStream, index, desc, curDevice);
+                        checkAndSetVolume((audio_stream_type_t)curStream, index, desc, curDevice,
+                            (stream == AUDIO_STREAM_SYSTEM) ? TOUCH_SOUND_FIXED_DELAY_MS : 0);
                 if (volStatus != NO_ERROR) {
                     status = volStatus;
                 }
@@ -2795,7 +2845,6 @@ status_t AudioPolicyManager::releaseAudioPatch(audio_patch_handle_t handle,
                            true,
                            NULL);
         } else if (patch->sinks[0].type == AUDIO_PORT_TYPE_DEVICE) {
-            audio_patch_handle_t afPatchHandle = patchDesc->mAfPatchHandle;
             status_t status = mpClientInterface->releaseAudioPatch(patchDesc->mAfPatchHandle, 0);
             ALOGV("releaseAudioPatch() patch panel returned %d patchHandle %d",
                                                               status, patchDesc->mAfPatchHandle);
@@ -3274,6 +3323,7 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
     }
     mEngine->setObserver(this);
     status_t status = mEngine->initCheck();
+    (void) status;
     ALOG_ASSERT(status == NO_ERROR, "Policy engine not initialized(err=%d)", status);
 
     // mAvailableOutputDevices and mAvailableInputDevices now contain all attached devices
@@ -4153,7 +4203,7 @@ void AudioPolicyManager::closeOutput(audio_io_handle_t output)
     ssize_t index = mAudioPatches.indexOfKey(outputDesc->getPatchHandle());
     if (index >= 0) {
         sp<AudioPatch> patchDesc = mAudioPatches.valueAt(index);
-        status_t status = mpClientInterface->releaseAudioPatch(patchDesc->mAfPatchHandle, 0);
+        (void) /*status_t status*/ mpClientInterface->releaseAudioPatch(patchDesc->mAfPatchHandle, 0);
         mAudioPatches.removeItemsAt(index);
         mpClientInterface->onAudioPatchListUpdate();
     }
@@ -4182,7 +4232,7 @@ void AudioPolicyManager::closeInput(audio_io_handle_t input)
     ssize_t index = mAudioPatches.indexOfKey(inputDesc->getPatchHandle());
     if (index >= 0) {
         sp<AudioPatch> patchDesc = mAudioPatches.valueAt(index);
-        status_t status = mpClientInterface->releaseAudioPatch(patchDesc->mAfPatchHandle, 0);
+        (void) /*status_t status*/ mpClientInterface->releaseAudioPatch(patchDesc->mAfPatchHandle, 0);
         mAudioPatches.removeItemsAt(index);
         mpClientInterface->onAudioPatchListUpdate();
     }
@@ -4471,7 +4521,7 @@ audio_devices_t AudioPolicyManager::getDevicesForStream(audio_stream_type_t stre
         }
         routing_strategy curStrategy = getStrategy((audio_stream_type_t)curStream);
         audio_devices_t curDevices =
-                getDeviceForStrategy((routing_strategy)curStrategy, true /*fromCache*/);
+                getDeviceForStrategy((routing_strategy)curStrategy, false /*fromCache*/);
         SortedVector<audio_io_handle_t> outputs = getOutputsForDevice(curDevices, mOutputs);
         for (size_t i = 0; i < outputs.size(); i++) {
             sp<AudioOutputDescriptor> outputDesc = mOutputs.valueFor(outputs[i]);
@@ -4671,15 +4721,20 @@ uint32_t AudioPolicyManager::checkDeviceMuteStrategies(sp<AudioOutputDescriptor>
     // temporary mute output if device selection changes to avoid volume bursts due to
     // different per device volumes
     if (outputDesc->isActive() && (device != prevDevice)) {
-        if (muteWaitMs < outputDesc->latency() * 2) {
-            muteWaitMs = outputDesc->latency() * 2;
+        uint32_t tempMuteWaitMs = outputDesc->latency() * 2;
+        // temporary mute duration is conservatively set to 4 times the reported latency
+        uint32_t tempMuteDurationMs = outputDesc->latency() * 4;
+        if (muteWaitMs < tempMuteWaitMs) {
+            muteWaitMs = tempMuteWaitMs;
         }
+
         for (size_t i = 0; i < NUM_STRATEGIES; i++) {
             if (isStrategyActive(outputDesc, (routing_strategy)i)) {
-                setStrategyMute((routing_strategy)i, true, outputDesc);
-                // do tempMute unmute after twice the mute wait time
+                // make sure that we do not start the temporary mute period too early in case of
+                // delayed device change
+                setStrategyMute((routing_strategy)i, true, outputDesc, delayMs);
                 setStrategyMute((routing_strategy)i, false, outputDesc,
-                                muteWaitMs *2, device);
+                                delayMs + tempMuteDurationMs, device);
             }
         }
     }
@@ -5015,6 +5070,18 @@ float AudioPolicyManager::computeVolume(audio_stream_type_t stream,
                                         audio_devices_t device)
 {
     float volumeDB = mVolumeCurves->volIndexToDb(stream, Volume::getDeviceCategory(device), index);
+
+    // handle the case of accessibility active while a ringtone is playing: if the ringtone is much
+    // louder than the accessibility prompt, the prompt cannot be heard, thus masking the touch
+    // exploration of the dialer UI. In this situation, bring the accessibility volume closer to
+    // the ringtone volume
+    if ((stream == AUDIO_STREAM_ACCESSIBILITY)
+            && (AUDIO_MODE_RINGTONE == mEngine->getPhoneState())
+            && isStreamActive(AUDIO_STREAM_RING, 0)) {
+        const float ringVolumeDB = computeVolume(AUDIO_STREAM_RING, index, device);
+        return ringVolumeDB - 4 > volumeDB ? ringVolumeDB - 4 : volumeDB;
+    }
+
     // if a headset is connected, apply the following rules to ring tones and notifications
     // to avoid sound level bursts in user's ears:
     // - always attenuate notifications volume by 6dB
@@ -5514,7 +5581,6 @@ void AudioPolicyManager::updateAudioProfiles(audio_devices_t device,
                                              AudioProfileVector &profiles)
 {
     String8 reply;
-    char *value;
 
     // Format MUST be checked first to update the list of AudioProfile
     if (profiles.hasDynamicFormat()) {

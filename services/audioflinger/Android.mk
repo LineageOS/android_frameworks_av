@@ -27,6 +27,8 @@ LOCAL_SHARED_LIBRARIES := \
     liblog \
     libbinder
 
+LOCAL_CFLAGS := -Wall -Werror
+
 include $(BUILD_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
