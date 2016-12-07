@@ -35,6 +35,7 @@
 namespace android {
 
 struct ABuffer;
+class ACodecBufferChannel;
 class MediaCodecBuffer;
 struct MemoryDealer;
 struct DescribeColorFormat2Params;
@@ -43,10 +44,9 @@ struct DataConverter;
 struct ACodec : public AHierarchicalStateMachine, public CodecBase {
     ACodec();
 
-    virtual void setNotificationMessage(const sp<AMessage> &msg);
-
     void initiateSetup(const sp<AMessage> &msg);
 
+    virtual std::shared_ptr<BufferChannelBase> getBufferChannel() override;
     virtual void initiateAllocateComponent(const sp<AMessage> &msg);
     virtual void initiateConfigureComponent(const sp<AMessage> &msg);
     virtual void initiateCreateInputSurface();
@@ -71,23 +71,6 @@ struct ACodec : public AHierarchicalStateMachine, public CodecBase {
     virtual void onMessageReceived(const sp<AMessage> &msg) {
         handleMessage(msg);
     }
-
-    struct PortDescription : public CodecBase::PortDescription {
-        size_t countBuffers();
-        IOMX::buffer_id bufferIDAt(size_t index) const;
-        sp<MediaCodecBuffer> bufferAt(size_t index) const;
-
-    private:
-        friend struct ACodec;
-
-        Vector<IOMX::buffer_id> mBufferIDs;
-        Vector<sp<MediaCodecBuffer> > mBuffers;
-
-        PortDescription();
-        void addBuffer(IOMX::buffer_id id, const sp<MediaCodecBuffer> &buffer);
-
-        DISALLOW_EVIL_CONSTRUCTORS(PortDescription);
-    };
 
     // Returns 0 if configuration is not supported.  NOTE: this is treated by
     // some OMX components as auto level, and by others as invalid level.
@@ -218,8 +201,6 @@ private:
     KeyedVector<int64_t, BufferStats> mBufferStats;
 #endif
 
-    sp<AMessage> mNotify;
-
     sp<UninitializedState> mUninitializedState;
     sp<LoadedState> mLoadedState;
     sp<LoadedToIdleState> mLoadedToIdleState;
@@ -295,6 +276,8 @@ private:
 
     OMX_INDEXTYPE mDescribeColorAspectsIndex;
     OMX_INDEXTYPE mDescribeHDRStaticInfoIndex;
+
+    std::shared_ptr<ACodecBufferChannel> mBufferChannel;
 
     status_t setCyclicIntraMacroblockRefresh(const sp<AMessage> &msg, int32_t mode);
     status_t allocateBuffersOnPort(OMX_U32 portIndex);
