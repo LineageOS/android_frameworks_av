@@ -23,10 +23,10 @@ LOCAL_SHARED_LIBRARIES := \
     libaudioclient \
     libhardware_legacy \
     libserviceutility \
-    libaudiopolicymanager
+    libaudiopolicymanager \
+    libmedia_helper
 
 LOCAL_STATIC_LIBRARIES := \
-    libmedia_helper \
     libaudiopolicycomponents
 
 LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
@@ -76,7 +76,7 @@ LOCAL_C_INCLUDES += \
 LOCAL_STATIC_LIBRARIES := \
     libaudiopolicycomponents
 
-LOCAL_WHOLE_STATIC_LIBRARIES := libmedia_helper
+LOCAL_SHARED_LIBRARIES += libmedia_helper
 
 ifeq ($(USE_XML_AUDIO_POLICY_CONF), 1)
 LOCAL_STATIC_LIBRARIES += libxml2

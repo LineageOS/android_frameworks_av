@@ -14,10 +14,9 @@ LOCAL_C_INCLUDES := \
 
 LOCAL_SRC_FILES:= ParameterManagerWrapper.cpp
 
-LOCAL_WHOLE_STATIC_LIBRARIES := libmedia_helper
-
 LOCAL_SHARED_LIBRARIES := \
     libparameter \
+    libmedia_helper
 
 LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
 
