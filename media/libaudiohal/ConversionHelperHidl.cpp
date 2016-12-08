@@ -91,8 +91,8 @@ status_t ConversionHelperHidl::processReturn(const char* funcName, const Status&
 status_t ConversionHelperHidl::processReturn(
         const char* funcName, const Status& status, hardware::audio::V2_0::Result retval) {
     const status_t st = status.isOk() ? analyzeResult(retval) : status.transactionError();
-    ALOGE_IF(st, "%s %p %s: %s (from %s)",
-            mClassName, this, funcName, strerror(-st), status.isOk() ? "hal" : "rpc");
+    ALOGE_IF(!status.isOk() && st, "%s %p %s: %s (from rpc)",
+            mClassName, this, funcName, strerror(-st));
     return st;
 }
 
