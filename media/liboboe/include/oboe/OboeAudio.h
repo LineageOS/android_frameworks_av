@@ -22,6 +22,10 @@
 
 #include "OboeDefinitions.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef int32_t OboeDeviceId;
 typedef oboe_handle_t OboeStream;
 typedef oboe_handle_t OboeStreamBuilder;
@@ -532,5 +536,9 @@ oboe_result_t OboeStream_getTimestamp(OboeStream stream,
                                       oboe_clockid_t clockid,
                                       oboe_position_frames_t *framePosition,
                                       oboe_nanoseconds_t *timeNanoseconds);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //NATIVEOBOE_OBOEAUDIO_H
