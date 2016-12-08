@@ -196,6 +196,7 @@ public:
                                     audio_io_handle_t output,
                                     audio_session_t sessionId,
                                     const String16& callingPackage,
+                                    pid_t pid,
                                     status_t *status,
                                     int *id,
                                     int *enabled) = 0;
