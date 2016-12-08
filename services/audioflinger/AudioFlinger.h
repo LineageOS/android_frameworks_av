@@ -224,6 +224,7 @@ public:
                         audio_io_handle_t io,
                         audio_session_t sessionId,
                         const String16& opPackageName,
+                        pid_t pid,
                         status_t *status /*non-NULL*/,
                         int *id,
                         int *enabled);

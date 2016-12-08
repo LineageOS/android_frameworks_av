@@ -27,6 +27,7 @@
 #include <utils/Vector.h>
 #include <utils/SortedVector.h>
 #include <cutils/config_utils.h>
+#include <binder/IPCThreadState.h>
 #include "AudioPolicyEffects.h"
 #include "ServiceUtilities.h"
 
@@ -105,6 +106,7 @@ status_t AudioPolicyEffects::addInputEffects(audio_io_handle_t input,
 
     ALOGV("addInputEffects(): input: %d, refCount: %d", input, sessionDesc->mRefCount);
     if (sessionDesc->mRefCount == 1) {
+        int64_t token = IPCThreadState::self()->clearCallingIdentity();
         Vector <EffectDesc *> effects = mInputSources.valueAt(index)->mEffects;
         for (size_t i = 0; i < effects.size(); i++) {
             EffectDesc *effect = effects[i];
@@ -125,6 +127,7 @@ status_t AudioPolicyEffects::addInputEffects(audio_io_handle_t input,
             sessionDesc->mEffects.add(fx);
         }
         sessionDesc->setProcessorEnabled(true);
+        IPCThreadState::self()->restoreCallingIdentity(token);
     }
     return status;
 }
@@ -251,6 +254,8 @@ status_t AudioPolicyEffects::addOutputSessionEffects(audio_io_handle_t output,
     ALOGV("addOutputSessionEffects(): session: %d, refCount: %d",
           audioSession, procDesc->mRefCount);
     if (procDesc->mRefCount == 1) {
+        // make sure effects are associated to audio server even if we are executing a binder call
+        int64_t token = IPCThreadState::self()->clearCallingIdentity();
         Vector <EffectDesc *> effects = mOutputStreams.valueAt(index)->mEffects;
         for (size_t i = 0; i < effects.size(); i++) {
             EffectDesc *effect = effects[i];
@@ -269,6 +274,7 @@ status_t AudioPolicyEffects::addOutputSessionEffects(audio_io_handle_t output,
         }
 
         procDesc->setProcessorEnabled(true);
+        IPCThreadState::self()->restoreCallingIdentity(token);
     }
     return status;
 }

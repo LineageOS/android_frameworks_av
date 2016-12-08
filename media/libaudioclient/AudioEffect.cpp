@@ -128,9 +128,11 @@ status_t AudioEffect::set(const effect_uuid_t *type,
     mDescriptor.uuid = *(uuid != NULL ? uuid : EFFECT_UUID_NULL);
 
     mIEffectClient = new EffectClient(this);
+    mClientPid = IPCThreadState::self()->getCallingPid();
 
     iEffect = audioFlinger->createEffect((effect_descriptor_t *)&mDescriptor,
-            mIEffectClient, priority, io, mSessionId, mOpPackageName, &mStatus, &mId, &enabled);
+            mIEffectClient, priority, io, mSessionId, mOpPackageName, mClientPid,
+            &mStatus, &mId, &enabled);
 
     if (iEffect == 0 || (mStatus != NO_ERROR && mStatus != ALREADY_EXISTS)) {
         ALOGE("set(): AudioFlinger could not create effect, status: %d", mStatus);
@@ -156,7 +158,6 @@ status_t AudioEffect::set(const effect_uuid_t *type,
     mCblk->buffer = (uint8_t *)mCblk + bufOffset;
 
     IInterface::asBinder(iEffect)->linkToDeath(mIEffectClient);
-    mClientPid = IPCThreadState::self()->getCallingPid();
     ALOGV("set() %p OK effect: %s id: %d status %d enabled %d pid %d", this, mDescriptor.name, mId,
             mStatus, mEnabled, mClientPid);
 

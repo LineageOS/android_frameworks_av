@@ -716,6 +716,7 @@ public:
                                     audio_io_handle_t output,
                                     audio_session_t sessionId,
                                     const String16& opPackageName,
+                                    pid_t pid,
                                     status_t *status,
                                     int *id,
                                     int *enabled)
@@ -737,6 +738,7 @@ public:
         data.writeInt32((int32_t) output);
         data.writeInt32(sessionId);
         data.writeString16(opPackageName);
+        data.writeInt32((int32_t) pid);
 
         status_t lStatus = remote()->transact(CREATE_EFFECT, data, &reply);
         if (lStatus != NO_ERROR) {
@@ -1294,12 +1296,14 @@ status_t BnAudioFlinger::onTransact(
             audio_io_handle_t output = (audio_io_handle_t) data.readInt32();
             audio_session_t sessionId = (audio_session_t) data.readInt32();
             const String16 opPackageName = data.readString16();
+            pid_t pid = (pid_t)data.readInt32();
+
             status_t status = NO_ERROR;
             int id = 0;
             int enabled = 0;
 
             sp<IEffect> effect = createEffect(&desc, client, priority, output, sessionId,
-                    opPackageName, &status, &id, &enabled);
+                    opPackageName, pid, &status, &id, &enabled);
             reply->writeInt32(status);
             reply->writeInt32(id);
             reply->writeInt32(enabled);
