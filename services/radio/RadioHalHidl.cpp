@@ -39,11 +39,6 @@ sp<RadioInterface> RadioInterface::connectModule(radio_class_t classId)
     return new RadioHalHidl(classId);
 }
 
-void RadioHalHidl::crashIfHalIsDead(const Status& status) {
-    LOG_ALWAYS_FATAL_IF(
-            status.transactionError() == DEAD_OBJECT, "HAL server crashed, need to restart");
-}
-
 int RadioHalHidl::getProperties(radio_hal_properties_t *properties)
 {
     ALOGV("%s IN", __FUNCTION__);
@@ -61,7 +56,10 @@ int RadioHalHidl::getProperties(radio_hal_properties_t *properties)
                     }
                 });
 
-    crashIfHalIsDead(hidlReturn.getStatus());
+    if (hidlReturn.getStatus().transactionError() == DEAD_OBJECT) {
+        clearService();
+        return -EPIPE;
+    }
     if (halResult == Result::OK) {
         HidlUtils::convertPropertiesFromHal(properties, &halProperties);
     }
@@ -93,7 +91,10 @@ int RadioHalHidl::openTuner(const radio_hal_band_config_t *config,
                     }
                 });
 
-    crashIfHalIsDead(hidlReturn.getStatus());
+    if (hidlReturn.getStatus().transactionError() == DEAD_OBJECT) {
+        clearService();
+        return -EPIPE;
+    }
     if (halResult == Result::OK) {
         tunerImpl->setHalTuner(halTuner);
         tuner = tunerImpl;
@@ -374,7 +375,6 @@ status_t RadioHalHidl::Tuner::checkHidlStatus(Status hidlStatus)
     if (status == DEAD_OBJECT) {
         handleHwFailure();
     }
-    RadioHalHidl::crashIfHalIsDead(status);
     return status;
 }
 

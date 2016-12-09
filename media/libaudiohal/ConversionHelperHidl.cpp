@@ -82,16 +82,9 @@ status_t ConversionHelperHidl::analyzeResult(const Result& result) {
     }
 }
 
-// static
-void ConversionHelperHidl::crashIfHalIsDead(const Status& status) {
-    LOG_ALWAYS_FATAL_IF(
-            status.transactionError() == DEAD_OBJECT, "HAL server crashed, need to restart");
-}
-
 status_t ConversionHelperHidl::processReturn(const char* funcName, const Status& status) {
     const status_t st = status.transactionError();
     ALOGE_IF(st, "%s %p %s: %s (from rpc)", mClassName, this, funcName, strerror(-st));
-    crashIfHalIsDead(status);
     return st;
 }
 
@@ -100,7 +93,6 @@ status_t ConversionHelperHidl::processReturn(
     const status_t st = status.isOk() ? analyzeResult(retval) : status.transactionError();
     ALOGE_IF(!status.isOk() && st, "%s %p %s: %s (from rpc)",
             mClassName, this, funcName, strerror(-st));
-    crashIfHalIsDead(status);
     return st;
 }
 
