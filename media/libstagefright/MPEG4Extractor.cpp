@@ -3458,6 +3458,18 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
         return ERROR_UNSUPPORTED;
     }
 
+    if (mLastTrack != NULL) {
+        uint32_t maxBitrate = 0;
+        uint32_t avgBitrate = 0;
+        esds.getBitRate(&maxBitrate, &avgBitrate);
+        if (maxBitrate > 0 && maxBitrate < INT32_MAX) {
+            mLastTrack->meta->setInt32(kKeyMaxBitRate, (int32_t)maxBitrate);
+        }
+        if (avgBitrate > 0 && avgBitrate < INT32_MAX) {
+            mLastTrack->meta->setInt32(kKeyBitRate, (int32_t)avgBitrate);
+        }
+    }
+
     const uint8_t *csd;
     size_t csd_size;
     if (esds.getCodecSpecificInfo(
