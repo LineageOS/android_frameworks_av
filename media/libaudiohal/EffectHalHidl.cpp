@@ -20,7 +20,6 @@
 #include <media/EffectsFactoryApi.h>
 #include <utils/Log.h>
 
-#include "ConversionHelperHidl.h"
 #include "EffectHalHidl.h"
 #include "HidlUtils.h"
 
@@ -103,7 +102,6 @@ status_t EffectHalHidl::getDescriptor(effect_descriptor_t *pDescriptor) {
                     effectDescriptorToHal(result, pDescriptor);
                 }
             });
-    ConversionHelperHidl::crashIfHalIsDead(ret.getStatus());
     return ret.getStatus().isOk() ? analyzeResult(retval) : ret.getStatus().transactionError();
 }
 

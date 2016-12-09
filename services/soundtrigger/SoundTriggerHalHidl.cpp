@@ -59,7 +59,9 @@ int SoundTriggerHalHidl::getProperties(struct sound_trigger_properties *properti
         }
     } else {
         ret = (int)hidlReturn.getStatus().transactionError();
-        crashIfHalIsDead(ret);
+        if (ret == -EPIPE) {
+            clearService();
+        }
     }
     ALOGI("getProperties ret %d", ret);
     return ret;
@@ -133,7 +135,9 @@ int SoundTriggerHalHidl::loadSoundModel(struct sound_trigger_sound_model *sound_
     } else {
         ret = (int)hidlReturn.getStatus().transactionError();
         ALOGE("loadSoundModel error %d", ret);
-        crashIfHalIsDead(ret);
+        if (ret == -EPIPE) {
+            clearService();
+        }
     }
 
 
@@ -160,7 +164,9 @@ int SoundTriggerHalHidl::unloadSoundModel(sound_model_handle_t handle)
     }
     int ret = (int)hidlReturn.getStatus().transactionError();
     ALOGE_IF(ret != 0, "unloadSoundModel error %d", ret);
-    crashIfHalIsDead(ret);
+    if (ret == -EPIPE) {
+        clearService();
+    }
     if (ret == 0) {
         ret = hidlReturn;
     }
@@ -199,7 +205,9 @@ int SoundTriggerHalHidl::startRecognition(sound_model_handle_t handle,
 
     int ret = (int)hidlReturn.getStatus().transactionError();
     ALOGE_IF(ret != 0, "startRecognition error %d", ret);
-    crashIfHalIsDead(ret);
+    if (ret == -EPIPE) {
+        clearService();
+    }
     if (ret == 0) {
         ret = hidlReturn;
     }
@@ -227,7 +235,9 @@ int SoundTriggerHalHidl::stopRecognition(sound_model_handle_t handle)
 
     int ret = (int)hidlReturn.getStatus().transactionError();
     ALOGE_IF(ret != 0, "stopRecognition error %d", ret);
-    crashIfHalIsDead(ret);
+    if (ret == -EPIPE) {
+        clearService();
+    }
     if (ret == 0) {
         ret = hidlReturn;
     }
@@ -249,7 +259,9 @@ int SoundTriggerHalHidl::stopAllRecognitions()
 
     int ret = (int)hidlReturn.getStatus().transactionError();
     ALOGE_IF(ret != 0, "stopAllRecognitions error %d", ret);
-    crashIfHalIsDead(ret);
+    if (ret == -EPIPE) {
+        clearService();
+    }
     if (ret == 0) {
         ret = hidlReturn;
     }
@@ -279,9 +291,10 @@ sp<ISoundTriggerHw> SoundTriggerHalHidl::getService()
     return mISoundTrigger;
 }
 
-void SoundTriggerHalHidl::crashIfHalIsDead(int ret)
+void SoundTriggerHalHidl::clearService()
 {
-    LOG_ALWAYS_FATAL_IF(ret == -EPIPE, "HAL server crashed, need to restart");
+    AutoMutex lock(mLock);
+    mISoundTrigger = 0;
 }
 
 sp<SoundTriggerHalHidl::SoundModel> SoundTriggerHalHidl::getModel(sound_model_handle_t handle)
