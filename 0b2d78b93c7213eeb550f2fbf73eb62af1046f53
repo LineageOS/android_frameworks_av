@@ -22,6 +22,30 @@
       "revId": "0b2d78b93c7213eeb550f2fbf73eb62af1046f53",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5f681702_5d3153a2",
+        "filename": "services/soundtrigger/SoundTriggerHwService.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 310,
+      "author": {
+        "id": 3075
+      },
+      "writtenOn": "2016-12-09T21:48:42Z",
+      "side": 1,
+      "message": "The size of the memory allocated for the original event is !\u003d sizeof(struct sound_trigger_phrase_recognition_event) so we can\u0027t (or shouldn\u0027t) copy into it.\n\nI\u0027m sure this could be done differently but it\u0027s not clear it\u0027s worth it.",
+      "parentUuid": "5f681702_9d12cb08",
+      "range": {
+        "startLine": 310,
+        "startChar": 0,
+        "endLine": 310,
+        "endChar": 33
+      },
+      "revId": "0b2d78b93c7213eeb550f2fbf73eb62af1046f53",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
