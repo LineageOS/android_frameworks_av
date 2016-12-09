@@ -40,8 +40,6 @@ LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
 LOCAL_MODULE := libaudiopolicyengineconfigurable
 LOCAL_MODULE_TAGS := optional
 
-LOCAL_WHOLE_STATIC_LIBRARIES := libmedia_helper
-
 LOCAL_STATIC_LIBRARIES := \
     libaudiopolicypfwwrapper \
     libaudiopolicycomponents \
@@ -53,7 +51,8 @@ LOCAL_SHARED_LIBRARIES := \
     libutils \
     liblog \
     libaudioutils \
-    libparameter
+    libparameter \
+    libmedia_helper
 
 include $(BUILD_SHARED_LIBRARY)
 

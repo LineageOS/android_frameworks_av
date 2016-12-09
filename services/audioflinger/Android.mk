@@ -57,11 +57,11 @@ LOCAL_SHARED_LIBRARIES := \
     libserviceutility \
     libsonic \
     libmediautils \
-    libmemunreachable
+    libmemunreachable \
+    libmedia_helper
 
 LOCAL_STATIC_LIBRARIES := \
     libcpustats \
-    libmedia_helper
 
 LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
 

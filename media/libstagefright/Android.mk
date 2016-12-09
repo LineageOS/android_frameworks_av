@@ -108,9 +108,9 @@ LOCAL_STATIC_LIBRARIES := \
         libstagefright_mpeg2ts \
         libstagefright_id3 \
         libFLAC \
-        libmedia_helper \
 
 LOCAL_SHARED_LIBRARIES += \
+        libmedia_helper \
         libstagefright_foundation \
         libdl \
         libRScpp \

@@ -1,4 +1,4 @@
-cc_library_static {
+cc_library {
     name: "libmedia_helper",
     srcs: ["AudioParameter.cpp", "TypeConverter.cpp"],
     cflags: [
@@ -6,5 +6,8 @@ cc_library_static {
         "-Wno-error=deprecated-declarations",
         "-Wall",
     ],
+    shared: {
+      shared_libs: ["libutils", "liblog"],
+    },
     clang: true,
 }

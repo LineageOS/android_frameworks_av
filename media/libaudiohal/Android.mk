@@ -29,9 +29,8 @@ LOCAL_SHARED_LIBRARIES += \
     android.hardware.audio@2.0             \
     android.hardware.audio.common@2.0      \
     android.hardware.audio.common@2.0-util \
-    android.hardware.audio.effect@2.0
-
-LOCAL_WHOLE_STATIC_LIBRARIES := libmedia_helper
+    android.hardware.audio.effect@2.0 \
+    libmedia_helper
 
 else  # if !ENABLE_TREBLE
 
