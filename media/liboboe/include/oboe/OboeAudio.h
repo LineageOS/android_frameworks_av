@@ -29,11 +29,14 @@ extern "C" {
 typedef int32_t OboeDeviceId;
 typedef oboe_handle_t OboeStream;
 typedef oboe_handle_t OboeStreamBuilder;
-typedef oboe_handle_t OboeThread;
 
 #define OBOE_STREAM_NONE         ((OboeStream)OBOE_HANDLE_INVALID)
 #define OBOE_STREAM_BUILDER_NONE ((OboeStreamBuilder)OBOE_HANDLE_INVALID)
 
+/* OBOE_API will probably get defined in a Makefile for a specific platform. */
+#ifndef OBOE_API
+#define OBOE_API /* for exporting symbols */
+#endif
 
 // ============================================================
 // Audio System
@@ -42,7 +45,7 @@ typedef oboe_handle_t OboeThread;
 /**
  * @return time in the same clock domain as the timestamps
  */
-oboe_nanoseconds_t Oboe_getNanoseconds(oboe_clockid_t clockid);
+OBOE_API oboe_nanoseconds_t Oboe_getNanoseconds(oboe_clockid_t clockid);
 
 /**
  * The text is the ASCII symbol corresponding to the returnCode,
@@ -52,7 +55,7 @@ oboe_nanoseconds_t Oboe_getNanoseconds(oboe_clockid_t clockid);
  *
  * @return pointer to a text representation of an Oboe result code.
  */
-const char * Oboe_convertResultToText(oboe_result_t returnCode);
+OBOE_API const char * Oboe_convertResultToText(oboe_result_t returnCode);
 
 /**
  * The text is the ASCII symbol corresponding to the stream state,
@@ -62,7 +65,7 @@ const char * Oboe_convertResultToText(oboe_result_t returnCode);
  *
  * @return pointer to a text representation of an Oboe state.
  */
-const char * Oboe_convertStreamStateToText(oboe_stream_state_t state);
+OBOE_API const char * Oboe_convertStreamStateToText(oboe_stream_state_t state);
 
 // ============================================================
 // StreamBuilder
@@ -80,7 +83,7 @@ const char * Oboe_convertStreamStateToText(oboe_stream_state_t state);
  *
  * OboeStreamBuilder_delete() must be called when you are done using the builder.
  */
-oboe_result_t Oboe_createStreamBuilder(OboeStreamBuilder *builder);
+OBOE_API oboe_result_t Oboe_createStreamBuilder(OboeStreamBuilder *builder);
 
 /**
  * Request an audio device identified device using an ID.
@@ -91,7 +94,8 @@ oboe_result_t Oboe_createStreamBuilder(OboeStreamBuilder *builder);
  *
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStreamBuilder_setDeviceId(OboeStreamBuilder builder, OboeDeviceId deviceId);
+OBOE_API oboe_result_t OboeStreamBuilder_setDeviceId(OboeStreamBuilder builder,
+                                                     OboeDeviceId deviceId);
 
 /**
  * Request a sample rate in Hz.
@@ -106,14 +110,14 @@ oboe_result_t OboeStreamBuilder_setDeviceId(OboeStreamBuilder builder, OboeDevic
  *
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStreamBuilder_setSampleRate(OboeStreamBuilder builder,
+OBOE_API oboe_result_t OboeStreamBuilder_setSampleRate(OboeStreamBuilder builder,
                                               oboe_sample_rate_t sampleRate);
 
 /**
  * Returns sample rate in Hertz (samples per second).
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStreamBuilder_getSampleRate(OboeStreamBuilder builder,
+OBOE_API oboe_result_t OboeStreamBuilder_getSampleRate(OboeStreamBuilder builder,
                                               oboe_sample_rate_t *sampleRate);
 
 
@@ -128,7 +132,7 @@ oboe_result_t OboeStreamBuilder_getSampleRate(OboeStreamBuilder builder,
  *
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStreamBuilder_setSamplesPerFrame(OboeStreamBuilder builder,
+OBOE_API oboe_result_t OboeStreamBuilder_setSamplesPerFrame(OboeStreamBuilder builder,
                                                    int32_t samplesPerFrame);
 
 /**
@@ -138,7 +142,7 @@ oboe_result_t OboeStreamBuilder_setSamplesPerFrame(OboeStreamBuilder builder,
  * @param samplesPerFrame pointer to a variable to be set to samplesPerFrame.
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStreamBuilder_getSamplesPerFrame(OboeStreamBuilder builder,
+OBOE_API oboe_result_t OboeStreamBuilder_getSamplesPerFrame(OboeStreamBuilder builder,
                                                    int32_t *samplesPerFrame);
 
 
@@ -148,12 +152,14 @@ oboe_result_t OboeStreamBuilder_getSamplesPerFrame(OboeStreamBuilder builder,
  *
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStreamBuilder_setFormat(OboeStreamBuilder builder, oboe_audio_format_t format);
+OBOE_API oboe_result_t OboeStreamBuilder_setFormat(OboeStreamBuilder builder,
+                                                   oboe_audio_format_t format);
 
 /**
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStreamBuilder_getFormat(OboeStreamBuilder builder, oboe_audio_format_t *format);
+OBOE_API oboe_result_t OboeStreamBuilder_getFormat(OboeStreamBuilder builder,
+                                                   oboe_audio_format_t *format);
 
 /**
  * Request a mode for sharing the device.
@@ -164,15 +170,15 @@ oboe_result_t OboeStreamBuilder_getFormat(OboeStreamBuilder builder, oboe_audio_
  * @param sharingMode OBOE_SHARING_MODE_LEGACY or OBOE_SHARING_MODE_EXCLUSIVE
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStreamBuilder_setSharingMode(OboeStreamBuilder builder,
-                                               oboe_sharing_mode_t sharingMode);
+OBOE_API oboe_result_t OboeStreamBuilder_setSharingMode(OboeStreamBuilder builder,
+                                                        oboe_sharing_mode_t sharingMode);
 
 /**
  * Return requested sharing mode.
  * @return OBOE_OK or a negative error
  */
-oboe_result_t OboeStreamBuilder_getSharingMode(OboeStreamBuilder builder,
-                                               oboe_sharing_mode_t *sharingMode);
+OBOE_API oboe_result_t OboeStreamBuilder_getSharingMode(OboeStreamBuilder builder,
+                                                        oboe_sharing_mode_t *sharingMode);
 
 /**
  * Request the direction for a stream. The default is OBOE_DIRECTION_OUTPUT.
@@ -181,16 +187,16 @@ oboe_result_t OboeStreamBuilder_getSharingMode(OboeStreamBuilder builder,
  * @param direction OBOE_DIRECTION_OUTPUT or OBOE_DIRECTION_INPUT
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStreamBuilder_setDirection(OboeStreamBuilder builder,
-                                             oboe_direction_t direction);
+OBOE_API oboe_result_t OboeStreamBuilder_setDirection(OboeStreamBuilder builder,
+                                                      oboe_direction_t direction);
 
 /**
  * @param builder handle provided by Oboe_createStreamBuilder()
  * @param direction pointer to a variable to be set to the currently requested direction.
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStreamBuilder_getDirection(OboeStreamBuilder builder,
-                                             oboe_direction_t *direction);
+OBOE_API oboe_result_t OboeStreamBuilder_getDirection(OboeStreamBuilder builder,
+                                                      oboe_direction_t *direction);
 
 /**
  * Open a stream based on the options in the StreamBuilder.
@@ -202,7 +208,8 @@ oboe_result_t OboeStreamBuilder_getDirection(OboeStreamBuilder builder,
  * @param stream pointer to a variable to receive the new stream handle
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t  OboeStreamBuilder_openStream(OboeStreamBuilder builder, OboeStream *stream);
+OBOE_API oboe_result_t  OboeStreamBuilder_openStream(OboeStreamBuilder builder,
+                                                     OboeStream *stream);
 
 /**
  * Delete the resources associated with the StreamBuilder.
@@ -210,7 +217,7 @@ oboe_result_t  OboeStreamBuilder_openStream(OboeStreamBuilder builder, OboeStrea
  * @param builder handle provided by Oboe_createStreamBuilder()
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t  OboeStreamBuilder_delete(OboeStreamBuilder builder);
+OBOE_API oboe_result_t  OboeStreamBuilder_delete(OboeStreamBuilder builder);
 
 // ============================================================
 // Stream Control
@@ -222,7 +229,7 @@ oboe_result_t  OboeStreamBuilder_delete(OboeStreamBuilder builder);
  * @param stream handle provided by OboeStreamBuilder_openStream()
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t  OboeStream_close(OboeStream stream);
+OBOE_API oboe_result_t  OboeStream_close(OboeStream stream);
 
 /**
  * Asynchronously request to start playing the stream. For output streams, one should
@@ -233,7 +240,7 @@ oboe_result_t  OboeStream_close(OboeStream stream);
  * @param stream handle provided by OboeStreamBuilder_openStream()
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t  OboeStream_requestStart(OboeStream stream);
+OBOE_API oboe_result_t  OboeStream_requestStart(OboeStream stream);
 
 /**
  * Asynchronous request for the stream to pause.
@@ -244,7 +251,7 @@ oboe_result_t  OboeStream_requestStart(OboeStream stream);
  * @param stream handle provided by OboeStreamBuilder_openStream()
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t  OboeStream_requestPause(OboeStream stream);
+OBOE_API oboe_result_t  OboeStream_requestPause(OboeStream stream);
 
 /**
  * Asynchronous request for the stream to flush.
@@ -256,7 +263,7 @@ oboe_result_t  OboeStream_requestPause(OboeStream stream);
  * @param stream handle provided by OboeStreamBuilder_openStream()
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t  OboeStream_requestFlush(OboeStream stream);
+OBOE_API oboe_result_t  OboeStream_requestFlush(OboeStream stream);
 
 /**
  * Asynchronous request for the stream to stop.
@@ -266,7 +273,7 @@ oboe_result_t  OboeStream_requestFlush(OboeStream stream);
  * @param stream handle provided by OboeStreamBuilder_openStream()
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t  OboeStream_requestStop(OboeStream stream);
+OBOE_API oboe_result_t  OboeStream_requestStop(OboeStream stream);
 
 /**
  * Query the current state, eg. OBOE_STREAM_STATE_PAUSING
@@ -275,7 +282,7 @@ oboe_result_t  OboeStream_requestStop(OboeStream stream);
  * @param state pointer to a variable that will be set to the current state
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStream_getState(OboeStream stream, oboe_stream_state_t *state);
+OBOE_API oboe_result_t OboeStream_getState(OboeStream stream, oboe_stream_state_t *state);
 
 /**
  * Wait until the current state no longer matches the input state.
@@ -295,7 +302,7 @@ oboe_result_t OboeStream_getState(OboeStream stream, oboe_stream_state_t *state)
  * @param timeoutNanoseconds Maximum number of nanoseconds to wait for completion.
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStream_waitForStateChange(OboeStream stream,
+OBOE_API oboe_result_t OboeStream_waitForStateChange(OboeStream stream,
                                             oboe_stream_state_t inputState,
                                             oboe_stream_state_t *nextState,
                                             oboe_nanoseconds_t timeoutNanoseconds);
@@ -322,9 +329,9 @@ oboe_result_t OboeStream_waitForStateChange(OboeStream stream,
  * @param timeoutNanoseconds Maximum number of nanoseconds to wait for completion.
  * @return The number of frames actually written or a negative error.
  */
-oboe_result_t OboeStream_read(OboeStream stream,
+OBOE_API oboe_result_t OboeStream_read(OboeStream stream,
                                void *buffer,
-                               int32_t numFrames,
+                               oboe_size_frames_t numFrames,
                                oboe_nanoseconds_t timeoutNanoseconds);
 
 /**
@@ -345,9 +352,9 @@ oboe_result_t OboeStream_read(OboeStream stream,
  * @param timeoutNanoseconds Maximum number of nanoseconds to wait for completion.
  * @return The number of frames actually written or a negative error.
  */
-oboe_result_t OboeStream_write(OboeStream stream,
+OBOE_API oboe_result_t OboeStream_write(OboeStream stream,
                                const void *buffer,
-                               int32_t numFrames,
+                               oboe_size_frames_t numFrames,
                                oboe_nanoseconds_t timeoutNanoseconds);
 
 
@@ -356,31 +363,33 @@ oboe_result_t OboeStream_write(OboeStream stream,
 // ============================================================
 
 /**
- * Create a thread with special properties for low latency audio performance.
- * This thread can be used to implement a callback API.
+ * Create a thread associated with a stream. The thread has special properties for
+ * low latency audio performance. This thread can be used to implement a callback API.
+ *
+ * Only one thread may be associated with a stream.
  *
  * Note that this API is in flux.
  *
- * @param threadHandlePtr a pointer to receive a thread handle
+ * @param stream A stream created using OboeStreamBuilder_openStream().
  * @param periodNanoseconds the estimated period at which the audio thread will need to wake up
  * @param start_routine your thread entry point
  * @param arg an argument that will be passed to your thread entry point
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t Oboe_createAudioThread(OboeThread *threadHandlePtr,
+OBOE_API oboe_result_t OboeStream_createThread(OboeStream stream,
                                      oboe_nanoseconds_t periodNanoseconds,
-                                     void *(*start_routine)(void *), void *arg);
+                                     void *(*startRoutine)(void *), void *arg);
 
 /**
  * Wait until the thread exits or an error occurs.
  * The thread handle will be deleted.
  *
- * @param thread the thread handle passed back from Oboe_createAudioThread()
+ * @param stream A stream created using OboeStreamBuilder_openStream().
  * @param returnArg a pointer to a variable to receive the return value
  * @param timeoutNanoseconds Maximum number of nanoseconds to wait for completion.
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t Oboe_joinAudioThread(OboeThread thread,
+OBOE_API oboe_result_t OboeStream_joinThread(OboeStream stream,
                                    void **returnArg,
                                    oboe_nanoseconds_t timeoutNanoseconds);
 
@@ -398,10 +407,13 @@ oboe_result_t Oboe_joinAudioThread(OboeThread thread,
  * This cannot be set higher than OboeStream_getBufferCapacity().
  *
  * @param stream handle provided by OboeStreamBuilder_openStream()
- * @param frames requested number of frames that can be filled without blocking
- * @return actual number of frames or a negative error
+ * @param requestedFrames requested number of frames that can be filled without blocking
+ * @return actualFrames receives final number of frames
+ * @return OBOE_OK or a negative error
  */
-oboe_result_t OboeStream_setBufferSize(OboeStream stream, oboe_size_frames_t frames);
+OBOE_API oboe_result_t OboeStream_setBufferSize(OboeStream stream,
+                                                oboe_size_frames_t requestedFrames,
+                                                oboe_size_frames_t *actualFrames);
 
 /**
  * Query the maximum number of frames that can be filled without blocking.
@@ -410,7 +422,7 @@ oboe_result_t OboeStream_setBufferSize(OboeStream stream, oboe_size_frames_t fra
  * @param frames pointer to variable to receive the buffer size
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStream_getBufferSize(OboeStream stream, oboe_size_frames_t *frames);
+OBOE_API oboe_result_t OboeStream_getBufferSize(OboeStream stream, oboe_size_frames_t *frames);
 
 /**
  * Query the number of frames that are read or written by the endpoint at one time.
@@ -419,7 +431,7 @@ oboe_result_t OboeStream_getBufferSize(OboeStream stream, oboe_size_frames_t *fr
  * @param frames pointer to variable to receive the burst size
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStream_getFramesPerBurst(OboeStream stream, oboe_size_frames_t *frames);
+OBOE_API oboe_result_t OboeStream_getFramesPerBurst(OboeStream stream, oboe_size_frames_t *frames);
 
 /**
  * Query maximum buffer capacity in frames.
@@ -428,7 +440,7 @@ oboe_result_t OboeStream_getFramesPerBurst(OboeStream stream, oboe_size_frames_t
  * @param frames pointer to variable to receive the buffer capacity
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStream_getBufferCapacity(OboeStream stream, oboe_size_frames_t *frames);
+OBOE_API oboe_result_t OboeStream_getBufferCapacity(OboeStream stream, oboe_size_frames_t *frames);
 
 /**
  * An XRun is an Underrun or an Overrun.
@@ -443,14 +455,14 @@ oboe_result_t OboeStream_getBufferCapacity(OboeStream stream, oboe_size_frames_t
  * @param xRunCount pointer to variable to receive the underrun or overrun count
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStream_getXRunCount(OboeStream stream, int32_t *xRunCount);
+OBOE_API oboe_result_t OboeStream_getXRunCount(OboeStream stream, int32_t *xRunCount);
 
 /**
  * @param stream handle provided by OboeStreamBuilder_openStream()
  * @param sampleRate pointer to variable to receive the actual sample rate
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStream_getSampleRate(OboeStream stream, int32_t *sampleRate);
+OBOE_API oboe_result_t OboeStream_getSampleRate(OboeStream stream, oboe_sample_rate_t *sampleRate);
 
 /**
  * The samplesPerFrame is also known as channelCount.
@@ -459,14 +471,14 @@ oboe_result_t OboeStream_getSampleRate(OboeStream stream, int32_t *sampleRate);
  * @param samplesPerFrame pointer to variable to receive the actual samples per frame
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStream_getSamplesPerFrame(OboeStream stream, int32_t *samplesPerFrame);
+OBOE_API oboe_result_t OboeStream_getSamplesPerFrame(OboeStream stream, int32_t *samplesPerFrame);
 
 /**
  * @param stream handle provided by OboeStreamBuilder_openStream()
  * @param format pointer to variable to receive the actual data format
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStream_getFormat(OboeStream stream, oboe_audio_format_t *format);
+OBOE_API oboe_result_t OboeStream_getFormat(OboeStream stream, oboe_audio_format_t *format);
 
 /**
  * Provide actual sharing mode.
@@ -474,7 +486,7 @@ oboe_result_t OboeStream_getFormat(OboeStream stream, oboe_audio_format_t *forma
  * @param sharingMode pointer to variable to receive the actual sharing mode
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStream_getSharingMode(OboeStream stream,
+OBOE_API oboe_result_t OboeStream_getSharingMode(OboeStream stream,
                                         oboe_sharing_mode_t *sharingMode);
 
 /**
@@ -482,7 +494,7 @@ oboe_result_t OboeStream_getSharingMode(OboeStream stream,
  * @param direction pointer to a variable to be set to the current direction.
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStream_getDirection(OboeStream stream, uint32_t *direction);
+OBOE_API oboe_result_t OboeStream_getDirection(OboeStream stream, oboe_direction_t *direction);
 
 /**
  * Passes back the number of frames that have been written since the stream was created.
@@ -495,7 +507,8 @@ oboe_result_t OboeStream_getDirection(OboeStream stream, uint32_t *direction);
  * @param frames pointer to variable to receive the frames written
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStream_getFramesWritten(OboeStream stream, oboe_position_frames_t *frames);
+OBOE_API oboe_result_t OboeStream_getFramesWritten(OboeStream stream,
+                                                   oboe_position_frames_t *frames);
 
 /**
  * Passes back the number of frames that have been read since the stream was created.
@@ -508,7 +521,7 @@ oboe_result_t OboeStream_getFramesWritten(OboeStream stream, oboe_position_frame
  * @param frames pointer to variable to receive the frames written
  * @return OBOE_OK or a negative error.
  */
-oboe_result_t OboeStream_getFramesRead(OboeStream stream, oboe_position_frames_t *frames);
+OBOE_API oboe_result_t OboeStream_getFramesRead(OboeStream stream, oboe_position_frames_t *frames);
 
 /**
  * Passes back the time at which a particular frame was presented.
@@ -527,12 +540,12 @@ oboe_result_t OboeStream_getFramesRead(OboeStream stream, oboe_position_frames_t
  * The position and time passed back are monotonically increasing.
  *
  * @param stream A handle provided by OboeStreamBuilder_openStream()
- * @param clockId OBOE_CLOCK_MONOTONIC or OBOE_CLOCK_BOOTTIME
+ * @param clockid OBOE_CLOCK_MONOTONIC or OBOE_CLOCK_BOOTTIME
  * @param framePosition pointer to a variable to receive the position
  * @param timeNanoseconds pointer to a variable to receive the time
  * @return OBOE_OK or a negative error
  */
-oboe_result_t OboeStream_getTimestamp(OboeStream stream,
+OBOE_API oboe_result_t OboeStream_getTimestamp(OboeStream stream,
                                       oboe_clockid_t clockid,
                                       oboe_position_frames_t *framePosition,
                                       oboe_nanoseconds_t *timeNanoseconds);
