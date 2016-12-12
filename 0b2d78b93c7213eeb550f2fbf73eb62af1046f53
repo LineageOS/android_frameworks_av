@@ -73,6 +73,30 @@
     },
     {
       "key": {
+        "uuid": "5f681702_c95abc28",
+        "filename": "services/soundtrigger/SoundTriggerHwService.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 310,
+      "author": {
+        "id": 3075
+      },
+      "writtenOn": "2016-12-12T02:44:13Z",
+      "side": 1,
+      "message": "It is in indeed intended to be just a whitespace change.  See Luca comment in PS2.",
+      "parentUuid": "5f681702_e92218a4",
+      "range": {
+        "startLine": 310,
+        "startChar": 0,
+        "endLine": 310,
+        "endChar": 33
+      },
+      "revId": "0b2d78b93c7213eeb550f2fbf73eb62af1046f53",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "5f681702_293c10c7",
         "filename": "services/soundtrigger/SoundTriggerHwService.cpp",
         "patchSetId": 3
@@ -84,6 +108,30 @@
       "writtenOn": "2016-12-12T02:29:57Z",
       "side": 1,
       "message": "Oh, I see, newEvent needs to be valid until after this call.",
+      "range": {
+        "startLine": 312,
+        "startChar": 57,
+        "endLine": 312,
+        "endChar": 62
+      },
+      "revId": "0b2d78b93c7213eeb550f2fbf73eb62af1046f53",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5f681702_2941b03a",
+        "filename": "services/soundtrigger/SoundTriggerHwService.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 312,
+      "author": {
+        "id": 3075
+      },
+      "writtenOn": "2016-12-12T02:44:13Z",
+      "side": 1,
+      "message": "Right, otherwise it can get (and does) overwritten before prepareRecognitionEvent_l() makes a copy.\n\nI was seeing junk in the parts of the eventMemory object that gets passed into the frameworks/base sound trigger helper.  I tracked it down to this function as being the cause.",
+      "parentUuid": "5f681702_293c10c7",
       "range": {
         "startLine": 312,
         "startChar": 57,
