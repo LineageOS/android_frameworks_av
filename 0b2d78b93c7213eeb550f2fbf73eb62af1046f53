@@ -97,6 +97,30 @@
     },
     {
       "key": {
+        "uuid": "5f681702_694ba858",
+        "filename": "services/soundtrigger/SoundTriggerHwService.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 310,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2016-12-12T02:45:41Z",
+      "side": 1,
+      "message": "Honestly, I\u0027d prefer unrelated whitespace changes to not be part of the patch. We should keep formatting cleanup separate from functional patches if possible.",
+      "parentUuid": "5f681702_c95abc28",
+      "range": {
+        "startLine": 310,
+        "startChar": 0,
+        "endLine": 310,
+        "endChar": 33
+      },
+      "revId": "0b2d78b93c7213eeb550f2fbf73eb62af1046f53",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "5f681702_293c10c7",
         "filename": "services/soundtrigger/SoundTriggerHwService.cpp",
         "patchSetId": 3
