@@ -160,6 +160,8 @@ sp<IMediaExtractor> MediaExtractor::Create(
             if (!strncmp(drmMime, "drm+es_based+", 13)) {
                 // DRMExtractor sets container metadata kKeyIsDRM to 1
                 return new DRMExtractor(source, drmMime + 14);
+            } else {
+                mime = drmMime + 20; // get real mimetype after "drm+container_based+" prefix
             }
         }
 
@@ -201,28 +203,6 @@ sp<MediaExtractor> MediaExtractor::CreateFromService(
              mime, confidence);
     }
 
-    bool isDrm = false;
-    // DRM MIME type syntax is "drm+type+original" where
-    // type is "es_based" or "container_based" and
-    // original is the content's cleartext MIME type
-    if (!strncmp(mime, "drm+", 4)) {
-        const char *originalMime = strchr(mime+4, '+');
-        if (originalMime == NULL) {
-            // second + not found
-            return NULL;
-        }
-        ++originalMime;
-        if (!strncmp(mime, "drm+es_based+", 13)) {
-            // DRMExtractor sets container metadata kKeyIsDRM to 1
-            return new DRMExtractor(source, originalMime);
-        } else if (!strncmp(mime, "drm+container_based+", 20)) {
-            mime = originalMime;
-            isDrm = true;
-        } else {
-            return NULL;
-        }
-    }
-
     MediaExtractor *ret = NULL;
     if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MPEG4)
             || !strcasecmp(mime, "audio/mp4")) {
@@ -248,14 +228,6 @@ sp<MediaExtractor> MediaExtractor::CreateFromService(
         ret = new MPEG2PSExtractor(source);
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_MIDI)) {
         ret = new MidiExtractor(source);
-    }
-
-    if (ret != NULL) {
-       if (isDrm) {
-           ret->setDrmFlag(true);
-       } else {
-           ret->setDrmFlag(false);
-       }
     }
 
     return ret;

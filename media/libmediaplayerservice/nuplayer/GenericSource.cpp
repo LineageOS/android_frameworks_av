@@ -145,10 +145,6 @@ status_t NuPlayer::GenericSource::initFromDataSource() {
         return UNKNOWN_ERROR;
     }
 
-    if (extractor->getDrmFlag()) {
-        checkDrmStatus(mDataSource);
-    }
-
     mFileMeta = extractor->getMetaData();
     if (mFileMeta != NULL) {
         int64_t duration;
@@ -260,18 +256,6 @@ status_t NuPlayer::GenericSource::startSources() {
     }
 
     return OK;
-}
-
-void NuPlayer::GenericSource::checkDrmStatus(const sp<DataSource>& dataSource) {
-    dataSource->getDrmInfo(mDecryptHandle, &mDrmManagerClient);
-    if (mDecryptHandle != NULL) {
-        CHECK(mDrmManagerClient);
-        if (RightsStatus::RIGHTS_VALID != mDecryptHandle->status) {
-            sp<AMessage> msg = dupNotify();
-            msg->setInt32("what", kWhatDrmNoLicense);
-            msg->post();
-        }
-    }
 }
 
 int64_t NuPlayer::GenericSource::getLastReadPosition() {

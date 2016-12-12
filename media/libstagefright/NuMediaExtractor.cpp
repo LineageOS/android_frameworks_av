@@ -82,14 +82,6 @@ status_t NuMediaExtractor::setDataSource(
         return ERROR_UNSUPPORTED;
     }
 
-    sp<MetaData> fileMeta = mImpl->getMetaData();
-    if (mImpl->getDrmFlag()) {
-        // Don't expose decrypted content to Java application
-        mImpl.clear();
-        mImpl = NULL;
-        return ERROR_UNSUPPORTED;
-    }
-
     status_t err = updateDurationAndBitrate();
     if (err == OK) {
         mDataSource = dataSource;
