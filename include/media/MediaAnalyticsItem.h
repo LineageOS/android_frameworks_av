@@ -36,12 +36,21 @@ class IMediaAnalyticsService;
 // the class interface
 //
 
-class MediaAnalyticsItem : public RefBase {
+class MediaAnalyticsItem {
 
     friend class MediaAnalyticsService;
     friend class IMediaAnalyticsService;
 
     public:
+
+            enum Type {
+                kTypeNone = 0,
+                kTypeInt32 = 1,
+                kTypeInt64 = 2,
+                kTypeDouble = 3,
+                kTypeCString = 4,
+                kTypeRate = 5,
+            };
 
         // sessionid
         // unique within device, within boot,
@@ -61,7 +70,7 @@ class MediaAnalyticsItem : public RefBase {
         // Attr: names for attributes within a record
         // format "prop1" or "prop/subprop"
         // XXX: need to better define the format
-        typedef AString Attr;
+        typedef const char *Attr;
 
 
     public:
@@ -87,6 +96,7 @@ class MediaAnalyticsItem : public RefBase {
 
         // reset all contents, discarding any extra data
         void clear();
+        MediaAnalyticsItem *dup();
 
         // set the key discriminator for the record.
         // most often initialized as part of the constructor
@@ -97,28 +107,32 @@ class MediaAnalyticsItem : public RefBase {
         int32_t count() const;
 
         // set values appropriately
-        // return values tell us whether we overwrote an existing value
-        bool setInt32(Attr, int32_t value);
-        bool setInt64(Attr, int64_t value);
-        bool setDouble(Attr, double value);
-        bool setCString(Attr, const char *value);
+        void setInt32(Attr, int32_t value);
+        void setInt64(Attr, int64_t value);
+        void setDouble(Attr, double value);
+        void setRate(Attr, int64_t count, int64_t duration);
+        void setCString(Attr, const char *value);
 
         // fused get/add/set; if attr wasn't there, it's a simple set.
         // type-mismatch counts as "wasn't there".
-        // return value tells us whether we overwrote an existing value
-        bool addInt32(Attr, int32_t value);
-        bool addInt64(Attr, int64_t value);
-        bool addDouble(Attr, double value);
+        void addInt32(Attr, int32_t value);
+        void addInt64(Attr, int64_t value);
+        void addDouble(Attr, double value);
+        void addRate(Attr, int64_t count, int64_t duration);
 
         // find & extract values
         // return indicates whether attr exists (and thus value filled in)
+        // NULL parameter value suppresses storage of value.
         bool getInt32(Attr, int32_t *value);
         bool getInt64(Attr, int64_t *value);
         bool getDouble(Attr, double *value);
+        bool getRate(Attr, int64_t *count, int64_t *duration, double *rate);
+        // Caller owns the returned string
         bool getCString(Attr, char **value);
 
         // parameter indicates whether to close any existing open
         // record with same key before establishing a new record
+        // caller retains ownership of 'this'.
         bool selfrecord(bool);
         bool selfrecord();
 
@@ -135,7 +149,7 @@ class MediaAnalyticsItem : public RefBase {
         // clients need not worry about these.
 
         // timestamp, pid, and uid only used on server side
-	// timestamp is in 'nanoseconds, unix time'
+        // timestamp is in 'nanoseconds, unix time'
         MediaAnalyticsItem &setTimestamp(nsecs_t);
         nsecs_t getTimestamp() const;
 
@@ -159,7 +173,8 @@ class MediaAnalyticsItem : public RefBase {
         // merge fields from arg into this
         // with rules for first/last/add, etc
         // XXX: document semantics and how they are indicated
-        bool merge(sp<MediaAnalyticsItem> );
+        // caller continues to own 'incoming'
+        bool merge(MediaAnalyticsItem *incoming);
 
         // enabled 1, disabled 0
         static const char * const EnabledProperty;
@@ -185,31 +200,36 @@ class MediaAnalyticsItem : public RefBase {
 
         Key mKey;
 
-        class Item : public RefBase {
-
-         public:
-
-            enum Type {
-                kTypeNone = 0,
-                kTypeInt32 = 1,
-                kTypeInt64 = 2,
-                kTypeDouble = 3,
-                kTypeCString = 4,
-            };
-
-            Item();
-            ~Item();
-            void clear();
+        struct Prop {
 
             Type mType;
+            const char *mName;
+            size_t mNameLen;    // the strlen(), doesn't include the null
             union {
                     int32_t int32Value;
                     int64_t int64Value;
                     double doubleValue;
                     char *CStringValue;
+                    struct { int64_t count, duration; } rate;
             } u;
+            void setName(const char *name, size_t len);
         };
-        KeyedVector<Attr, sp<Item>> mItems;
+
+        void initProp(Prop *item);
+        void clearProp(Prop *item);
+        void clearPropValue(Prop *item);
+        void copyProp(Prop *dst, const Prop *src);
+        enum {
+            kGrowProps = 10
+        };
+        void growProps(int increment = kGrowProps);
+        size_t findPropIndex(const char *name, size_t len);
+        Prop *findProp(const char *name);
+        Prop *allocateProp(const char *name);
+
+        size_t mPropCount;
+        size_t mPropSize;
+        Prop *mProps;
 
 };
 

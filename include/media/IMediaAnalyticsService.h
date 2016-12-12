@@ -49,14 +49,16 @@ public:
     // 'forcenew' marks any matching incomplete record as complete before
     // inserting this new record.
     // returns the sessionID associated with that item.
-    virtual MediaAnalyticsItem::SessionID_t submit(sp<MediaAnalyticsItem> item, bool forcenew) = 0;
+    // caller continues to own the passed item
+    virtual MediaAnalyticsItem::SessionID_t submit(MediaAnalyticsItem *item, bool forcenew) = 0;
 
 
     // return lists of records that match the supplied parameters.
     // finished [or not] records since time 'ts' with key 'key'
     // timestamp 'ts' is nanoseconds, unix time.
-    virtual List<sp<MediaAnalyticsItem>> *getMediaAnalyticsItemList(bool finished, int64_t ts) = 0;
-    virtual List<sp<MediaAnalyticsItem>> *getMediaAnalyticsItemList(bool finished, int64_t ts, MediaAnalyticsItem::Key key) = 0;
+    // caller responsible for deallocating returned data structures
+    virtual List<MediaAnalyticsItem *> *getMediaAnalyticsItemList(bool finished, int64_t ts) = 0;
+    virtual List<MediaAnalyticsItem *> *getMediaAnalyticsItemList(bool finished, int64_t ts, MediaAnalyticsItem::Key key) = 0;
 
 };
 

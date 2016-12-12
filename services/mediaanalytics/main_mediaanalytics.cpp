@@ -33,6 +33,11 @@ int main(int argc __unused, char **argv __unused)
 {
     signal(SIGPIPE, SIG_IGN);
 
+    // to match the service name
+    // we're replacing "/system/bin/mediaanalytics" with "media.analytics"
+    // we add a ".", but discard the path components: we finish with a shorter string
+    strcpy(argv[0], "media.analytics");
+
     sp<ProcessState> proc(ProcessState::self());
     sp<IServiceManager> sm(defaultServiceManager());
     ALOGI("ServiceManager: %p", sm.get());
