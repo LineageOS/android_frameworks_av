@@ -67,6 +67,7 @@ NBLog::Timeline::~Timeline()
 /*static*/
 size_t NBLog::Timeline::sharedSize(size_t size)
 {
+    // TODO fifo now supports non-power-of-2 buffer sizes, so could remove the roundup
     return sizeof(Shared) + roundup(size);
 }
 

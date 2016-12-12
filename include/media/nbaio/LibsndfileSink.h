@@ -41,7 +41,7 @@ public:
     //virtual size_t framesWritten() const;
     //virtual size_t framesUnderrun() const;
     //virtual size_t underruns() const;
-    //virtual ssize_t availableToWrite() const;
+    //virtual ssize_t availableToWrite();
     virtual ssize_t write(const void *buffer, size_t count);
     //virtual ssize_t writeVia(writeVia_t via, size_t total, void *user, size_t block);
 

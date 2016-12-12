@@ -17,6 +17,7 @@
 #ifndef ANDROID_AUDIO_PIPE_H
 #define ANDROID_AUDIO_PIPE_H
 
+#include <audio_utils/fifo.h>
 #include "NBAIO.h"
 
 namespace android {
@@ -51,7 +52,7 @@ public:
 
     // The write side of a pipe permits overruns; flow control is the caller's responsibility.
     // It doesn't return +infinity because that would guarantee an overrun.
-    virtual ssize_t availableToWrite() const { return mMaxFrames; }
+    virtual ssize_t availableToWrite() { return mMaxFrames; }
 
     virtual ssize_t write(const void *buffer, size_t count);
     //virtual ssize_t writeVia(writeVia_t via, size_t total, void *user, size_t block);
@@ -59,7 +60,8 @@ public:
 private:
     const size_t    mMaxFrames;     // always a power of 2
     void * const    mBuffer;
-    volatile int32_t mRear;         // written by android_atomic_release_store
+    audio_utils_fifo        mFifo;
+    audio_utils_fifo_writer mFifoWriter;
     volatile int32_t mReaders;      // number of PipeReader clients currently attached to this Pipe
     const bool      mFreeBufferInDestructor;
 };

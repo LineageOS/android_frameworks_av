@@ -164,7 +164,12 @@ public:
     //  UNDERRUN    write() has not been called frequently enough, or with enough frames to keep up.
     //              An underrun event is counted, and the caller should re-try this operation.
     //  WOULD_BLOCK Determining how many frames can be written without blocking would itself block.
-    virtual ssize_t availableToWrite() const { return SSIZE_MAX; }
+    virtual ssize_t availableToWrite() {
+        if (!mNegotiated) {
+            return NEGOTIATE;
+        }
+        return SSIZE_MAX;
+    }
 
     // Transfer data to sink from single input buffer.  Implies a copy.
     // Inputs:

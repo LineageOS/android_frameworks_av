@@ -44,7 +44,7 @@ public:
 
     // This is an over-estimate, and could dupe the caller into making a blocking write()
     // FIXME Use an audio HAL API to query the buffer emptying status when it's available.
-    virtual ssize_t availableToWrite() const { return mStreamBufferSizeBytes / mFrameSize; }
+    virtual ssize_t availableToWrite() { return mStreamBufferSizeBytes / mFrameSize; }
 
     virtual ssize_t write(const void *buffer, size_t count);
 
