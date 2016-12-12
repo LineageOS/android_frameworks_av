@@ -143,7 +143,7 @@ private:
 
         uint32_t nextUniqueId();
         sp<ISoundTriggerHw> getService();
-        void clearService();
+        void crashIfHalIsDead(int ret);
         sp<SoundModel> getModel(sound_model_handle_t handle);
         sp<SoundModel> removeModel(sound_model_handle_t handle);
 
