@@ -36,10 +36,18 @@ namespace android {
 // CameraFlashlight implementation begins
 // used by camera service to control flashflight.
 /////////////////////////////////////////////////////////////////////
-CameraFlashlight::CameraFlashlight(CameraModule& cameraModule,
-        const camera_module_callbacks_t& callbacks) :
-        mCameraModule(&cameraModule),
-        mCallbacks(&callbacks),
+CameraFlashlight::CameraFlashlight(CameraModule* cameraModule,
+        camera_module_callbacks_t* callbacks) :
+        mCameraModule(cameraModule),
+        mCallbacks(callbacks),
+        mFlashlightMapInitialized(false) {
+}
+
+CameraFlashlight::CameraFlashlight(sp<CameraProviderManager> providerManager,
+        camera_module_callbacks_t* callbacks) :
+        mCameraModule(nullptr),
+        mProviderManager(providerManager),
+        mCallbacks(callbacks),
         mFlashlightMapInitialized(false) {
 }
 
@@ -55,8 +63,10 @@ status_t CameraFlashlight::createFlashlightControl(const String8& cameraId) {
 
     status_t res = OK;
 
-    if (mCameraModule->getModuleApiVersion() >= CAMERA_MODULE_API_VERSION_2_4) {
-        mFlashControl = new ModuleFlashControl(*mCameraModule, *mCallbacks);
+    if (mCameraModule == nullptr) {
+        mFlashControl = new ProviderFlashControl(mProviderManager);
+    } else if (mCameraModule->getModuleApiVersion() >= CAMERA_MODULE_API_VERSION_2_4) {
+        mFlashControl = new ModuleFlashControl(*mCameraModule);
         if (mFlashControl == NULL) {
             ALOGV("%s: cannot create flash control for module api v2.4+",
                      __FUNCTION__);
@@ -69,7 +79,7 @@ status_t CameraFlashlight::createFlashlightControl(const String8& cameraId) {
                     CAMERA_MODULE_API_VERSION_2_0) {
             camera_info info;
             res = mCameraModule->getCameraInfo(
-                    atoi(String8(cameraId).string()), &info);
+                    atoi(cameraId.string()), &info);
             if (res) {
                 ALOGE("%s: failed to get camera info for camera %s",
                         __FUNCTION__, cameraId.string());
@@ -157,15 +167,27 @@ status_t CameraFlashlight::setTorchMode(const String8& cameraId, bool enabled) {
 status_t CameraFlashlight::findFlashUnits() {
     Mutex::Autolock l(mLock);
     status_t res;
-    int32_t numCameras = mCameraModule->getNumberOfCameras();
+
+    std::vector<String8> cameraIds;
+    if (mCameraModule) {
+        cameraIds.resize(mCameraModule->getNumberOfCameras());
+        for (size_t i = 0; i < cameraIds.size(); i++) {
+            cameraIds[i] = String8::format("%zu", i);
+        }
+    } else {
+        // No module, must be provider
+        std::vector<std::string> ids = mProviderManager->getCameraDeviceIds();
+        cameraIds.resize(ids.size());
+        for (size_t i = 0; i < cameraIds.size(); i++) {
+            cameraIds[i] = String8(ids[i].c_str());
+        }
+    }
 
     mHasFlashlightMap.clear();
     mFlashlightMapInitialized = false;
 
-    for (int32_t i = 0; i < numCameras; i++) {
+    for (auto &id : cameraIds) {
         bool hasFlash = false;
-        String8 id = String8::format("%d", i);
-
         res = createFlashlightControl(id);
         if (res) {
             ALOGE("%s: failed to create flash control for %s", __FUNCTION__,
@@ -224,7 +246,7 @@ status_t CameraFlashlight::prepareDeviceOpen(const String8& cameraId) {
         return NO_INIT;
     }
 
-    if (mCameraModule->getModuleApiVersion() < CAMERA_MODULE_API_VERSION_2_4) {
+    if (mCameraModule && mCameraModule->getModuleApiVersion() < CAMERA_MODULE_API_VERSION_2_4) {
         // framework is going to open a camera device, all flash light control
         // should be closed for backward compatible support.
         mFlashControl.clear();
@@ -274,7 +296,7 @@ status_t CameraFlashlight::deviceClosed(const String8& cameraId) {
     if (mOpenedCameraIds.size() != 0)
         return OK;
 
-    if (mCameraModule->getModuleApiVersion() < CAMERA_MODULE_API_VERSION_2_4) {
+    if (mCameraModule && mCameraModule->getModuleApiVersion() < CAMERA_MODULE_API_VERSION_2_4) {
         // notify torch available for all cameras with a flash
         int numCameras = mCameraModule->getNumberOfCameras();
         for (int i = 0; i < numCameras; i++) {
@@ -298,10 +320,35 @@ FlashControlBase::~FlashControlBase() {
 // ModuleFlashControl implementation begins
 // Flash control for camera module v2.4 and above.
 /////////////////////////////////////////////////////////////////////
-ModuleFlashControl::ModuleFlashControl(CameraModule& cameraModule,
-        const camera_module_callbacks_t& callbacks) :
+ProviderFlashControl::ProviderFlashControl(sp<CameraProviderManager> providerManager) :
+        mProviderManager(providerManager) {
+}
+
+ProviderFlashControl::~ProviderFlashControl() {
+}
+
+status_t ProviderFlashControl::hasFlashUnit(const String8& cameraId, bool *hasFlash) {
+    if (!hasFlash) {
+        return BAD_VALUE;
+    }
+    *hasFlash = mProviderManager->hasFlashUnit(cameraId.string());
+    return OK;
+}
+
+status_t ProviderFlashControl::setTorchMode(const String8& cameraId, bool enabled) {
+    ALOGV("%s: set camera %s torch mode to %d", __FUNCTION__,
+            cameraId.string(), enabled);
+
+    return mProviderManager->setTorchMode(cameraId.string(), enabled);
+}
+// ProviderFlashControl implementation ends
+
+/////////////////////////////////////////////////////////////////////
+// ModuleFlashControl implementation begins
+// Flash control for camera module v2.4 and above.
+/////////////////////////////////////////////////////////////////////
+ModuleFlashControl::ModuleFlashControl(CameraModule& cameraModule) :
         mCameraModule(&cameraModule) {
-    (void) callbacks;
 }
 
 ModuleFlashControl::~ModuleFlashControl() {
@@ -477,7 +524,7 @@ status_t CameraDeviceClientFlashControl::connectCameraDevice(
     }
 
     sp<CameraDeviceBase> device =
-            new Camera3Device(atoi(cameraId.string()));
+            new Camera3Device(cameraId);
     if (device == NULL) {
         return NO_MEMORY;
     }

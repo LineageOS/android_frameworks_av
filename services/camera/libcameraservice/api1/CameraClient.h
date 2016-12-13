@@ -70,13 +70,17 @@ public:
             bool legacyMode = false);
     ~CameraClient();
 
-    status_t initialize(CameraModule *module);
+    virtual status_t initialize(CameraModule *module) override;
+    virtual status_t initialize(sp<CameraProviderManager> manager) override;
 
     virtual status_t dump(int fd, const Vector<String16>& args);
 
     virtual status_t dumpClient(int fd, const Vector<String16>& args);
 
 private:
+
+    template<typename TProviderPtr>
+    status_t initializeImpl(TProviderPtr providerPtr);
 
     // check whether the calling process matches mClientPid.
     status_t                checkPid() const;
@@ -97,6 +101,8 @@ private:
 
     // internal function used by sendCommand to enable/disable shutter sound.
     status_t                enableShutterSound(bool enable);
+
+    static sp<CameraClient>        getClientFromCookie(void* user);
 
     // these are static callback functions
     static void             notifyCallback(int32_t msgType, int32_t ext1, int32_t ext2, void* user);

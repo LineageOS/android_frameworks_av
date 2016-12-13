@@ -35,6 +35,8 @@
 
 namespace android {
 
+class CameraProviderManager;
+
 /**
  * Base interface for version >= 2 camera device classes, which interface to
  * camera HAL device versions >= 2.
@@ -49,6 +51,7 @@ class CameraDeviceBase : public virtual RefBase {
     virtual int      getId() const = 0;
 
     virtual status_t initialize(CameraModule *module) = 0;
+    virtual status_t initialize(sp<CameraProviderManager> manager) = 0;
     virtual status_t disconnect() = 0;
 
     virtual status_t dump(int fd, const Vector<String16> &args) = 0;

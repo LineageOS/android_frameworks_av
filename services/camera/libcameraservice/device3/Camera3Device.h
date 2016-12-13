@@ -65,7 +65,7 @@ class Camera3Device :
             private camera3_callback_ops {
   public:
 
-    explicit Camera3Device(int id);
+    explicit Camera3Device(const String8& id);
 
     virtual ~Camera3Device();
 
@@ -77,6 +77,7 @@ class Camera3Device :
 
     // Transitions to idle state on success.
     virtual status_t initialize(CameraModule *module);
+    virtual status_t initialize(sp<CameraProviderManager> manager);
     virtual status_t disconnect();
     virtual status_t dump(int fd, const Vector<String16> &args);
     virtual const CameraMetadata& info() const;

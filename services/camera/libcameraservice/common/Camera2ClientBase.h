@@ -49,7 +49,7 @@ public:
     Camera2ClientBase(const sp<CameraService>& cameraService,
                       const sp<TCamCallbacks>& remoteCallback,
                       const String16& clientPackageName,
-                      int cameraId,
+                      const String8& cameraId,
                       int cameraFacing,
                       int clientPid,
                       uid_t clientUid,
@@ -57,6 +57,7 @@ public:
     virtual ~Camera2ClientBase();
 
     virtual status_t      initialize(CameraModule *module);
+    virtual status_t      initialize(sp<CameraProviderManager> manager);
     virtual status_t      dumpClient(int fd, const Vector<String16>& args);
 
     /**
@@ -140,6 +141,10 @@ protected:
     virtual void          detachDevice();
 
     bool                  mDeviceActive;
+
+private:
+    template<typename TProviderPtr>
+    status_t              initializeImpl(TProviderPtr providerPtr);
 };
 
 }; // namespace android

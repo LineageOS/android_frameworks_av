@@ -59,8 +59,8 @@ using namespace android::camera3;
 
 namespace android {
 
-Camera3Device::Camera3Device(int id):
-        mId(id),
+Camera3Device::Camera3Device(const String8 &id):
+        mId(atoi(id.string())),
         mIsConstrainedHighSpeedConfiguration(false),
         mHal3Device(NULL),
         mStatus(STATUS_UNINITIALIZED),
@@ -77,7 +77,7 @@ Camera3Device::Camera3Device(int id):
     ATRACE_CALL();
     camera3_callback_ops::notify = &sNotify;
     camera3_callback_ops::process_capture_result = &sProcessCaptureResult;
-    ALOGV("%s: Created device for camera %d", __FUNCTION__, id);
+    ALOGV("%s: Created device for camera %d", __FUNCTION__, mId);
 }
 
 Camera3Device::~Camera3Device()
@@ -254,6 +254,12 @@ status_t Camera3Device::initialize(CameraModule *module)
     }
 
     return OK;
+}
+
+status_t Camera3Device::initialize(sp<CameraProviderManager> manager) {
+    (void) manager;
+    ALOGE("%s: Not supported yet", __FUNCTION__);
+    return INVALID_OPERATION;
 }
 
 status_t Camera3Device::disconnect() {

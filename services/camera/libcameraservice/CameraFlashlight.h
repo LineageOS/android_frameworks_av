@@ -17,13 +17,16 @@
 #ifndef ANDROID_SERVERS_CAMERA_CAMERAFLASHLIGHT_H
 #define ANDROID_SERVERS_CAMERA_CAMERAFLASHLIGHT_H
 
-#include "hardware/camera_common.h"
-#include "utils/KeyedVector.h"
-#include "utils/SortedVector.h"
-#include "gui/GLConsumer.h"
-#include "gui/Surface.h"
+#include <gui/GLConsumer.h>
+#include <gui/Surface.h>
+#include <hardware/camera_common.h>
+#include <utils/KeyedVector.h>
+#include <utils/SortedVector.h>
+#include "common/CameraProviderManager.h"
+#include "common/CameraModule.h"
 #include "common/CameraDeviceBase.h"
 #include "device1/CameraHardwareInterface.h"
+
 
 namespace android {
 
@@ -52,8 +55,10 @@ class FlashControlBase : public virtual VirtualLightRefBase {
  */
 class CameraFlashlight : public virtual VirtualLightRefBase {
     public:
-        CameraFlashlight(CameraModule& cameraModule,
-                const camera_module_callbacks_t& callbacks);
+        CameraFlashlight(CameraModule* cameraModule,
+                camera_module_callbacks_t* callbacks);
+        CameraFlashlight(sp<CameraProviderManager> providerManager,
+                camera_module_callbacks_t* callbacks);
         virtual ~CameraFlashlight();
 
         // Find all flash units. This must be called before other methods. All
@@ -88,7 +93,10 @@ class CameraFlashlight : public virtual VirtualLightRefBase {
         bool hasFlashUnitLocked(const String8& cameraId);
 
         sp<FlashControlBase> mFlashControl;
+
         CameraModule *mCameraModule;
+        sp<CameraProviderManager> mProviderManager;
+
         const camera_module_callbacks_t *mCallbacks;
         SortedVector<String8> mOpenedCameraIds;
 
@@ -100,12 +108,29 @@ class CameraFlashlight : public virtual VirtualLightRefBase {
 };
 
 /**
+ * Flash control for camera provider v2.4 and above.
+ */
+class ProviderFlashControl : public FlashControlBase {
+    public:
+        ProviderFlashControl(sp<CameraProviderManager> providerManager);
+        virtual ~ProviderFlashControl();
+
+        // FlashControlBase
+        status_t hasFlashUnit(const String8& cameraId, bool *hasFlash);
+        status_t setTorchMode(const String8& cameraId, bool enabled);
+
+    private:
+        sp<CameraProviderManager> mProviderManager;
+
+        Mutex mLock;
+};
+
+/**
  * Flash control for camera module v2.4 and above.
  */
 class ModuleFlashControl : public FlashControlBase {
     public:
-        ModuleFlashControl(CameraModule& cameraModule,
-                const camera_module_callbacks_t& callbacks);
+        ModuleFlashControl(CameraModule& cameraModule);
         virtual ~ModuleFlashControl();
 
         // FlashControlBase

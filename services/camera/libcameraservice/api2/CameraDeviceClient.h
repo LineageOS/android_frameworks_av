@@ -42,7 +42,7 @@ protected:
     CameraDeviceClientBase(const sp<CameraService>& cameraService,
             const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
             const String16& clientPackageName,
-            int cameraId,
+            const String8& cameraId,
             int cameraFacing,
             int clientPid,
             uid_t clientUid,
@@ -142,14 +142,15 @@ public:
     CameraDeviceClient(const sp<CameraService>& cameraService,
             const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
             const String16& clientPackageName,
-            int cameraId,
+            const String8& cameraId,
             int cameraFacing,
             int clientPid,
             uid_t clientUid,
             int servicePid);
     virtual ~CameraDeviceClient();
 
-    virtual status_t      initialize(CameraModule *module);
+    virtual status_t      initialize(CameraModule *module) override;
+    virtual status_t      initialize(sp<CameraProviderManager> manager) override;
 
     virtual status_t      dump(int fd, const Vector<String16>& args);
 
@@ -185,6 +186,9 @@ private:
     sp<camera2::FrameProcessorBase> mFrameProcessor;
     static const int32_t FRAME_PROCESSOR_LISTENER_MIN_ID = 0;
     static const int32_t FRAME_PROCESSOR_LISTENER_MAX_ID = 0x7fffffffL;
+
+    template<typename TProviderPtr>
+    status_t      initializeImpl(TProviderPtr providerPtr);
 
     /** Utility members */
     binder::Status checkPidStatus(const char* checkLocation);
