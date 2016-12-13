@@ -285,3 +285,57 @@ TEST(test_oboe_api, oboe_stream) {
 
     EXPECT_EQ(OBOE_OK, OboeStream_close(oboeStream));
 }
+
+#define OBOE_THREAD_ANSWER          1826375
+#define OBOE_THREAD_DURATION_MSEC       500
+
+static void *TestOboeStreamThreadProc(void *arg) {
+    OboeStream oboeStream = (OboeStream) reinterpret_cast<size_t>(arg);
+    oboe_stream_state_t state;
+
+    // Use this to sleep by waiting for something that won't happen.
+    EXPECT_EQ(OBOE_OK, OboeStream_getState(oboeStream, &state));
+    OboeStream_waitForStateChange(oboeStream, OBOE_STREAM_STATE_PAUSED, &state,
+            OBOE_THREAD_DURATION_MSEC * OBOE_NANOS_PER_MILLISECOND);
+    return reinterpret_cast<void *>(OBOE_THREAD_ANSWER);
+}
+
+// Test creating a stream related thread.
+TEST(test_oboe_api, oboe_stream_thread_basic) {
+    OboeStreamBuilder oboeBuilder;
+    OboeStream oboeStream;
+    oboe_result_t result = OBOE_OK;
+    void *threadResult;
+
+    // Use an OboeStreamBuilder to define the stream.
+    result = Oboe_createStreamBuilder(&oboeBuilder);
+    ASSERT_EQ(OBOE_OK, result);
+
+    // Create an OboeStream using the Builder.
+    ASSERT_EQ(OBOE_OK, OboeStreamBuilder_openStream(oboeBuilder, &oboeStream));
+
+    // Start a thread.
+    ASSERT_EQ(OBOE_OK, OboeStream_createThread(oboeStream,
+            10 * OBOE_NANOS_PER_MILLISECOND,
+            TestOboeStreamThreadProc,
+            reinterpret_cast<void *>(oboeStream)));
+    // Thread already started.
+    ASSERT_NE(OBOE_OK, OboeStream_createThread(oboeStream,   // should fail!
+            10 * OBOE_NANOS_PER_MILLISECOND,
+            TestOboeStreamThreadProc,
+            reinterpret_cast<void *>(oboeStream)));
+
+    // Wait for the thread to finish.
+    ASSERT_EQ(OBOE_OK, OboeStream_joinThread(oboeStream,
+            &threadResult, 2 * OBOE_THREAD_DURATION_MSEC * OBOE_NANOS_PER_MILLISECOND));
+    // The thread returns a special answer.
+    ASSERT_EQ(OBOE_THREAD_ANSWER, (int)reinterpret_cast<size_t>(threadResult));
+
+    // Thread should already be joined.
+    ASSERT_NE(OBOE_OK, OboeStream_joinThread(oboeStream,  // should fail!
+            &threadResult, 2 * OBOE_THREAD_DURATION_MSEC * OBOE_NANOS_PER_MILLISECOND));
+
+    // Cleanup
+    EXPECT_EQ(OBOE_OK, OboeStreamBuilder_delete(oboeBuilder));
+    EXPECT_EQ(OBOE_OK, OboeStream_close(oboeStream));
+}
