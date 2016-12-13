@@ -17,6 +17,8 @@
 #ifndef _MTP_PACKET_H
 #define _MTP_PACKET_H
 
+#include <android-base/macros.h>
+
 #include "MtpTypes.h"
 
 struct usb_device;
@@ -66,6 +68,8 @@ protected:
     uint32_t            getUInt32(int offset) const;
     void                putUInt16(int offset, uint16_t value);
     void                putUInt32(int offset, uint32_t value);
+
+    DISALLOW_COPY_AND_ASSIGN(MtpPacket);
 };
 
 }; // namespace android
