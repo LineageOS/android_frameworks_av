@@ -28,7 +28,25 @@ struct DeviceCategoryTraits
     typedef device_category Type;
     typedef Vector<Type> Collection;
 };
+struct MixTypeTraits
+{
+    typedef int32_t Type;
+    typedef Vector<Type> Collection;
+};
+struct RouteFlagTraits
+{
+    typedef uint32_t Type;
+    typedef Vector<Type> Collection;
+};
+struct RuleTraits
+{
+    typedef uint32_t Type;
+    typedef Vector<Type> Collection;
+};
 
 typedef TypeConverter<DeviceCategoryTraits> DeviceCategoryConverter;
+typedef TypeConverter<MixTypeTraits> MixTypeConverter;
+typedef TypeConverter<RouteFlagTraits> RouteFlagTypeConverter;
+typedef TypeConverter<RuleTraits> RuleTypeConverter;
 
 }; // namespace android

@@ -80,6 +80,16 @@ struct AudioModeTraits
     typedef audio_mode_t Type;
     typedef Vector<Type> Collection;
 };
+struct UsageTraits
+{
+    typedef audio_usage_t Type;
+    typedef Vector<Type> Collection;
+};
+struct SourceTraits
+{
+    typedef audio_source_t Type;
+    typedef Vector<Type> Collection;
+};
 template <typename T>
 struct DefaultTraits
 {
@@ -215,6 +225,8 @@ typedef TypeConverter<ChannelIndexTraits> ChannelIndexConverter;
 typedef TypeConverter<GainModeTraits> GainModeConverter;
 typedef TypeConverter<StreamTraits> StreamTypeConverter;
 typedef TypeConverter<AudioModeTraits> AudioModeConverter;
+typedef TypeConverter<UsageTraits> UsageTypeConverter;
+typedef TypeConverter<SourceTraits> SourceTypeConverter;
 
 bool deviceFromString(const std::string& literalDevice, audio_devices_t& device);
 

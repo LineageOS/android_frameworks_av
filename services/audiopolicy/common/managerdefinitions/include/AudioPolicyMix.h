@@ -43,6 +43,8 @@ public:
 
     void setMix(AudioMix &mix);
 
+    status_t dump(int fd, int spaces, int index) const;
+
 private:
     AudioMix    mMix;                   // Audio policy mix descriptor
     sp<SwAudioOutputDescriptor> mOutput;  // Corresponding output stream
@@ -77,6 +79,8 @@ public:
                                                   AudioMix **policyMix);
 
     status_t getInputMixForAttr(audio_attributes_t attr, AudioMix **policyMix);
+
+    status_t dump(int fd) const;
 };
 
 }; // namespace android
