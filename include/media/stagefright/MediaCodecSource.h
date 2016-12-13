@@ -54,7 +54,7 @@ struct MediaCodecSource : public MediaSource,
     // MediaSource
     virtual status_t start(MetaData *params = NULL);
     virtual status_t stop();
-    virtual status_t pause();
+    virtual status_t pause(MetaData *params = NULL);
     virtual sp<MetaData> getFormat();
     virtual status_t read(
             MediaBuffer **buffer,
@@ -65,6 +65,12 @@ struct MediaCodecSource : public MediaSource,
 
     // for AHandlerReflector
     void onMessageReceived(const sp<AMessage> &msg);
+
+    // Set GraphicBufferSource stop time. GraphicBufferSource will stop
+    // after receiving a buffer with timestamp larger or equal than stopTimeUs.
+    // All the buffers with timestamp larger or equal to stopTimeUs will be
+    // discarded. stopTimeUs uses SYSTEM_TIME_MONOTONIC time base.
+    status_t setStopStimeUs(int64_t stopTimeUs);
 
 protected:
     virtual ~MediaCodecSource();
@@ -79,6 +85,7 @@ private:
         kWhatStop,
         kWhatPause,
         kWhatSetInputBufferTimeOffset,
+        kWhatSetStopTimeOffset,
         kWhatGetFirstSampleSystemTimeUs,
         kWhatStopStalled,
     };
@@ -91,13 +98,23 @@ private:
             uint32_t flags = 0);
 
     status_t onStart(MetaData *params);
-    void onPause();
+
+    // Pause the source at pauseStartTimeUs. For non-surface input,
+    // buffers will be dropped immediately. For surface input, buffers
+    // with timestamp smaller than pauseStartTimeUs will still be encoded.
+    // Buffers with timestamp larger or queal to pauseStartTimeUs will be
+    // dropped. pauseStartTimeUs uses SYSTEM_TIME_MONOTONIC time base.
+    void onPause(int64_t pauseStartTimeUs);
+
     status_t init();
     status_t initEncoder();
     void releaseEncoder();
     status_t feedEncoderInputBuffers();
-    void suspend();
-    void resume(int64_t skipFramesBeforeUs = -1ll);
+    // Resume GraphicBufferSource at resumeStartTimeUs. Buffers
+    // from GraphicBufferSource with timestamp larger or equal to
+    // resumeStartTimeUs will be encoded. resumeStartTimeUs uses
+    // SYSTEM_TIME_MONOTONIC time base.
+    void resume(int64_t resumeStartTimeUs = -1ll);
     void signalEOS(status_t err = ERROR_END_OF_STREAM);
     bool reachedEOS();
     status_t postSynchronouslyAndReturnError(const sp<AMessage> &msg);

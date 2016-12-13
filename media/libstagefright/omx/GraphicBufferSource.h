@@ -101,14 +101,18 @@ public:
     // data space.
     Status configure(const sp<IOMXNode>& omxNode, int32_t dataSpace) override;
 
-    // This is called after the last input frame has been submitted.  We
-    // need to submit an empty buffer with the EOS flag set.  If we don't
-    // have a codec buffer ready, we just set the mEndOfStream flag.
+    // This is called after the last input frame has been submitted or buffer
+    // timestamp is greater or equal than stopTimeUs. We need to submit an empty
+    // buffer with the EOS flag set.  If we don't have a codec buffer ready,
+    // we just set the mEndOfStream flag.
     Status signalEndOfInputStream() override;
 
     // If suspend is true, all incoming buffers (including those currently
-    // in the BufferQueue) will be discarded until the suspension is lifted.
-    Status setSuspend(bool suspend) override;
+    // in the BufferQueue) with timestamp larger than timeUs will be discarded
+    // until the suspension is lifted. If suspend is false, all incoming buffers
+    // including those currently in the BufferQueue) with timestamp larger than
+    // timeUs will be processed. timeUs uses SYSTEM_TIME_MONOTONIC time base.
+    Status setSuspend(bool suspend, int64_t timeUs) override;
 
     // Specifies the interval after which we requeue the buffer previously
     // queued to the encoder. This is useful in the case of surface flinger
@@ -134,6 +138,10 @@ public:
     // Sets the start time us (in system time), samples before which should
     // be dropped and not submitted to encoder
     Status setStartTimeUs(int64_t startTimeUs) override;
+
+    // Sets the stop time us (in system time), samples after which should be dropped
+    // and not submitted to encoder. timeUs uses SYSTEM_TIME_MONOTONIC time base.
+    Status setStopTimeUs(int64_t stopTimeUs) override;
 
     // Sets the desired color aspects, e.g. to be used when producer does not specify a dataspace.
     Status setColorAspects(int32_t aspectsPacked) override;
@@ -229,6 +237,9 @@ private:
 
     bool mSuspended;
 
+    // The time to stop sending buffers.
+    int64_t mStopTimeUs;
+
     // Last dataspace seen
     android_dataspace mLastDataSpace;
 
@@ -258,6 +269,25 @@ private:
 
     // Tracks codec buffers.
     Vector<CodecBuffer> mCodecBuffers;
+
+    struct ActionItem {
+        typedef enum {
+            PAUSE,
+            RESUME,
+            STOP
+        } ActionType;
+        ActionType mAction;
+        int64_t mActionTimeUs;
+    };
+
+    // Maintain last action timestamp to ensure all the action timestamps are
+    // monotonically increasing.
+    int64_t mLastActionTimeUs;
+
+    // An action queue that queue up all the actions sent to GraphicBufferSource.
+    // STOP action should only show up at the end of the list as all the actions
+    // after a STOP action will be discarded. mActionQueue is protected by mMutex.
+    List<ActionItem> mActionQueue;
 
     ////
     friend struct AHandlerReflector<GraphicBufferSource>;

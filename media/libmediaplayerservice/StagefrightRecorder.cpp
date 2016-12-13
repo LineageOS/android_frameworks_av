@@ -1812,14 +1812,16 @@ status_t StagefrightRecorder::pause() {
         return OK;
     }
 
+    mPauseStartTimeUs = systemTime() / 1000;
+    sp<MetaData> meta = new MetaData;
+    meta->setInt64(kKeyTime, mPauseStartTimeUs);
+
     if (mAudioEncoderSource != NULL) {
         mAudioEncoderSource->pause();
     }
     if (mVideoEncoderSource != NULL) {
-        mVideoEncoderSource->pause();
+        mVideoEncoderSource->pause(meta.get());
     }
-
-    mPauseStartTimeUs = systemTime() / 1000;
 
     return OK;
 }
@@ -1834,6 +1836,8 @@ status_t StagefrightRecorder::resume() {
     if (mPauseStartTimeUs == 0) {
         return OK;
     }
+
+    int64_t resumeStartTimeUs = systemTime() / 1000;
 
     int64_t bufferStartTimeUs = 0;
     bool allSourcesStarted = true;
@@ -1855,18 +1859,20 @@ status_t StagefrightRecorder::resume() {
             mPauseStartTimeUs = bufferStartTimeUs;
         }
         // 30 ms buffer to avoid timestamp overlap
-        mTotalPausedDurationUs += (systemTime() / 1000) - mPauseStartTimeUs - 30000;
+        mTotalPausedDurationUs += resumeStartTimeUs - mPauseStartTimeUs - 30000;
     }
     double timeOffset = -mTotalPausedDurationUs;
     if (mCaptureFpsEnable) {
         timeOffset *= mCaptureFps / mFrameRate;
     }
+    sp<MetaData> meta = new MetaData;
+    meta->setInt64(kKeyTime, resumeStartTimeUs);
     for (const auto &source : { mAudioEncoderSource, mVideoEncoderSource }) {
         if (source == nullptr) {
             continue;
         }
         source->setInputBufferTimeOffset((int64_t)timeOffset);
-        source->start();
+        source->start(meta.get());
     }
     mPauseStartTimeUs = 0;
 
@@ -1881,6 +1887,12 @@ status_t StagefrightRecorder::stop() {
     if (mCaptureFpsEnable && mCameraSourceTimeLapse != NULL) {
         mCameraSourceTimeLapse->startQuickReadReturns();
         mCameraSourceTimeLapse = NULL;
+    }
+
+    if (mVideoEncoderSource != NULL) {
+        int64_t stopTimeUs = systemTime() / 1000;
+        sp<MetaData> meta = new MetaData;
+        err = mVideoEncoderSource->setStopStimeUs(stopTimeUs);
     }
 
     if (mWriter != NULL) {
