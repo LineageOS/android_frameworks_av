@@ -405,7 +405,7 @@ OBOE_API oboe_result_t OboeStream_createThread(OboeStream stream,
     return audioStream->createThread(periodNanoseconds, startRoutine, arg);
 }
 
-OBOE_API oboe_result_t Oboe_joinThread(OboeStream stream,
+OBOE_API oboe_result_t OboeStream_joinThread(OboeStream stream,
                                    void **returnArg,
                                    oboe_nanoseconds_t timeoutNanoseconds)
 {
