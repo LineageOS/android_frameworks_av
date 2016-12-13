@@ -28,6 +28,8 @@ rt_sigreturn: 1
 getrlimit: 1
 
 # for attaching to debuggerd on process crash
+tgkill: 1
+rt_sigprocmask: 1
 rt_sigaction: 1
 # socket: arg0 == AF_LOCAL
 socket: arg0 == 1
