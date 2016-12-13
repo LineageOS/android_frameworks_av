@@ -20,6 +20,7 @@
 #include <sys/types.h>
 #include <fcntl.h>
 
+#include "IMtpHandle.h"
 #include "MtpResponsePacket.h"
 
 #include <usbhost/usbhost.h>
@@ -35,10 +36,10 @@ MtpResponsePacket::~MtpResponsePacket() {
 }
 
 #ifdef MTP_DEVICE
-int MtpResponsePacket::write(int fd) {
+int MtpResponsePacket::write(IMtpHandle *h) {
     putUInt32(MTP_CONTAINER_LENGTH_OFFSET, mPacketSize);
     putUInt16(MTP_CONTAINER_TYPE_OFFSET, MTP_CONTAINER_TYPE_RESPONSE);
-    int ret = ::write(fd, mBuffer, mPacketSize);
+    int ret = h->write(mBuffer, mPacketSize);
     return (ret < 0 ? ret : 0);
 }
 #endif
