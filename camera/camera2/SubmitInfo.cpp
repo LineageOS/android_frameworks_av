@@ -22,7 +22,7 @@ namespace hardware {
 namespace camera2 {
 namespace utils {
 
-status_t SubmitInfo::writeToParcel(Parcel *parcel) const {
+status_t SubmitInfo::writeToParcel(android::Parcel *parcel) const {
     status_t res;
     if (parcel == nullptr) return BAD_VALUE;
 
@@ -33,7 +33,7 @@ status_t SubmitInfo::writeToParcel(Parcel *parcel) const {
     return res;
 }
 
-status_t SubmitInfo::readFromParcel(const Parcel *parcel) {
+status_t SubmitInfo::readFromParcel(const android::Parcel *parcel) {
     status_t res;
     if (parcel == nullptr) return BAD_VALUE;
 

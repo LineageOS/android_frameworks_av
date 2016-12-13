@@ -33,7 +33,7 @@ namespace hardware {
 
 class ICameraClient;
 
-class ICamera: public IInterface
+class ICamera: public android::IInterface
 {
     /**
      * Keep up-to-date with ICamera.aidl in frameworks/base
@@ -139,7 +139,7 @@ public:
 
 // ----------------------------------------------------------------------------
 
-class BnCamera: public BnInterface<ICamera>
+class BnCamera: public android::BnInterface<ICamera>
 {
 public:
     virtual status_t    onTransact( uint32_t code,

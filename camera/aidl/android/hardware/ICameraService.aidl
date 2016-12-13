@@ -24,6 +24,7 @@ import android.hardware.camera2.params.VendorTagDescriptor;
 import android.hardware.camera2.impl.CameraMetadataNative;
 import android.hardware.ICameraServiceListener;
 import android.hardware.CameraInfo;
+import android.hardware.CameraStatus;
 
 /**
  * Binder interface for the native camera service running in mediaserver.
@@ -83,7 +84,7 @@ interface ICameraService
      * Only supported for device HAL versions >= 3.2
      */
     ICameraDeviceUser connectDevice(ICameraDeviceCallbacks callbacks,
-            int cameraId,
+            String cameraId,
             String opPackageName,
             int clientUid);
 
@@ -102,16 +103,24 @@ interface ICameraService
             int clientUid);
 
     /**
-     * Add/remove listeners for changes to camera device and flashlight state
+     * Add listener for changes to camera device and flashlight state.
+     *
+     * Also returns the set of currently-known camera IDs and state of each device.
+     * Adding a listener will trigger the torch status listener to fire for all
+     * devices that have a flash unit
      */
-    void addListener(ICameraServiceListener listener);
+    CameraStatus[] addListener(ICameraServiceListener listener);
+
+    /**
+     * Remove listener for changes to camera device and flashlight state.
+     */
     void removeListener(ICameraServiceListener listener);
 
     /**
      * Read the static camera metadata for a camera device.
      * Only supported for device HAL versions >= 3.2
      */
-    CameraMetadataNative getCameraCharacteristics(int cameraId);
+    CameraMetadataNative getCameraCharacteristics(String cameraId);
 
     /**
      * Read in the vendor tag descriptors from the camera module HAL.
@@ -132,9 +141,9 @@ interface ICameraService
     const int API_VERSION_2 = 2;
 
     // Determines if a particular API version is supported directly
-    boolean supportsCameraApi(int cameraId, int apiVersion);
+    boolean supportsCameraApi(String cameraId, int apiVersion);
 
-    void setTorchMode(String CameraId, boolean enabled, IBinder clientBinder);
+    void setTorchMode(String cameraId, boolean enabled, IBinder clientBinder);
 
     /**
      * Notify the camera service of a system event.  Should only be called from system_server.

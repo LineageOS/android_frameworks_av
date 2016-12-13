@@ -67,7 +67,8 @@ LOCAL_SHARED_LIBRARIES:= \
     libhardware \
     libcamera_metadata \
     libjpeg \
-    libmemunreachable
+    libmemunreachable \
+    android.hardware.camera.common@1.0
 
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder libcamera_client
 

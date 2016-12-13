@@ -40,7 +40,7 @@ namespace android {
  * instances. Created when first ACameraManager is created and destroyed when
  * all ACameraManager instances are deleted.
  *
- * TODO: maybe CameraManagerGlobal is better sutied in libcameraclient?
+ * TODO: maybe CameraManagerGlobal is better suited in libcameraclient?
  */
 class CameraManagerGlobal final : public RefBase {
   public:
@@ -51,6 +51,11 @@ class CameraManagerGlobal final : public RefBase {
             const ACameraManager_AvailabilityCallbacks *callback);
     void unregisterAvailabilityCallback(
             const ACameraManager_AvailabilityCallbacks *callback);
+
+    /**
+     * Return camera IDs that support camera2
+     */
+    void getCameraIdList(std::vector<String8> *cameraIds);
 
   private:
     sp<hardware::ICameraService> mCameraService;
@@ -72,7 +77,7 @@ class CameraManagerGlobal final : public RefBase {
     class CameraServiceListener final : public hardware::BnCameraServiceListener {
       public:
         explicit CameraServiceListener(CameraManagerGlobal* cm) : mCameraManager(cm) {}
-        virtual binder::Status onStatusChanged(int32_t status, int32_t cameraId);
+        virtual binder::Status onStatusChanged(int32_t status, const String16& cameraId);
 
         // Torch API not implemented yet
         virtual binder::Status onTorchStatusChanged(int32_t, const String16&) {
@@ -125,22 +130,18 @@ class CameraManagerGlobal final : public RefBase {
       public:
         CallbackHandler() {}
         void onMessageReceived(const sp<AMessage> &msg) override;
-      private:
-        inline void sendSingleCallback(
-                int32_t cameraId, void* context,
-                ACameraManager_AvailabilityCallback cb) const;
     };
     sp<CallbackHandler> mHandler;
     sp<ALooper>         mCbLooper; // Looper thread where callbacks actually happen on
 
-    void onStatusChanged(int32_t status, int32_t cameraId);
-    void onStatusChangedLocked(int32_t status, int32_t cameraId);
+    void onStatusChanged(int32_t status, const String8& cameraId);
+    void onStatusChangedLocked(int32_t status, const String8& cameraId);
     // Utils for status
     static bool validStatus(int32_t status);
     static bool isStatusAvailable(int32_t status);
 
     // Map camera_id -> status
-    std::map<int32_t, int32_t> mDeviceStatusMap;
+    std::map<String8, int32_t> mDeviceStatusMap;
 
     // For the singleton instance
     static Mutex sLock;
@@ -157,7 +158,6 @@ class CameraManagerGlobal final : public RefBase {
  */
 struct ACameraManager {
     ACameraManager() :
-            mCachedCameraIdList({kCameraIdListNotInit, nullptr}),
             mGlobalManager(&(android::CameraManagerGlobal::getInstance())) {}
     ~ACameraManager();
     camera_status_t getCameraIdList(ACameraIdList** cameraIdList);
@@ -170,14 +170,10 @@ struct ACameraManager {
                                /*out*/ACameraDevice** device);
 
   private:
-    camera_status_t getOrCreateCameraIdListLocked(ACameraIdList** cameraIdList);
-
     enum {
         kCameraIdListNotInit = -1
     };
     android::Mutex         mLock;
-    std::set<int> mCameraIds;          // Init by getOrCreateCameraIdListLocked
-    ACameraIdList mCachedCameraIdList; // Init by getOrCreateCameraIdListLocked
     android::sp<android::CameraManagerGlobal> mGlobalManager;
 };
 

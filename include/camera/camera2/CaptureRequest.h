@@ -37,8 +37,8 @@ struct CaptureRequest : public Parcelable {
     /**
      * Keep impl up-to-date with CaptureRequest.java in frameworks/base
      */
-    status_t                readFromParcel(const Parcel* parcel) override;
-    status_t                writeToParcel(Parcel* parcel) const override;
+    status_t                readFromParcel(const android::Parcel* parcel) override;
+    status_t                writeToParcel(android::Parcel* parcel) const override;
 };
 
 } // namespace camera2

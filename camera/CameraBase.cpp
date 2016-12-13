@@ -39,7 +39,7 @@ namespace android {
 
 namespace hardware {
 
-status_t CameraInfo::writeToParcel(Parcel* parcel) const {
+status_t CameraInfo::writeToParcel(android::Parcel* parcel) const {
     status_t res;
     res = parcel->writeInt32(facing);
     if (res != OK) return res;
@@ -47,7 +47,7 @@ status_t CameraInfo::writeToParcel(Parcel* parcel) const {
     return res;
 }
 
-status_t CameraInfo::readFromParcel(const Parcel* parcel) {
+status_t CameraInfo::readFromParcel(const android::Parcel* parcel) {
     status_t res;
     res = parcel->readInt32(&facing);
     if (res != OK) return res;
@@ -55,7 +55,23 @@ status_t CameraInfo::readFromParcel(const Parcel* parcel) {
     return res;
 }
 
+status_t CameraStatus::writeToParcel(android::Parcel* parcel) const {
+    status_t res;
+    res = parcel->writeString8(cameraId);
+    if (res != OK) return res;
+    res = parcel->writeInt32(status);
+    return res;
 }
+
+status_t CameraStatus::readFromParcel(const android::Parcel* parcel) {
+    status_t res;
+    res = parcel->readString8(&cameraId);
+    if (res != OK) return res;
+    res = parcel->readInt32(&status);
+    return res;
+}
+
+} // namespace hardware
 
 namespace {
     sp<::android::hardware::ICameraService> gCameraService;
@@ -236,24 +252,6 @@ status_t CameraBase<TCam, TCamTraits>::getCameraInfo(int cameraId,
     const sp<::android::hardware::ICameraService>& cs = getCameraService();
     if (cs == 0) return UNKNOWN_ERROR;
     binder::Status res = cs->getCameraInfo(cameraId, cameraInfo);
-    return res.isOk() ? OK : res.serviceSpecificErrorCode();
-}
-
-template <typename TCam, typename TCamTraits>
-status_t CameraBase<TCam, TCamTraits>::addServiceListener(
-        const sp<::android::hardware::ICameraServiceListener>& listener) {
-    const sp<::android::hardware::ICameraService>& cs = getCameraService();
-    if (cs == 0) return UNKNOWN_ERROR;
-    binder::Status res = cs->addListener(listener);
-    return res.isOk() ? OK : res.serviceSpecificErrorCode();
-}
-
-template <typename TCam, typename TCamTraits>
-status_t CameraBase<TCam, TCamTraits>::removeServiceListener(
-        const sp<::android::hardware::ICameraServiceListener>& listener) {
-    const sp<::android::hardware::ICameraService>& cs = getCameraService();
-    if (cs == 0) return UNKNOWN_ERROR;
-    binder::Status res = cs->removeListener(listener);
     return res.isOk() ? OK : res.serviceSpecificErrorCode();
 }
 

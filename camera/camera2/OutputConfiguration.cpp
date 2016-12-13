@@ -62,13 +62,13 @@ OutputConfiguration::OutputConfiguration() :
         mHeight(0) {
 }
 
-OutputConfiguration::OutputConfiguration(const Parcel& parcel) :
+OutputConfiguration::OutputConfiguration(const android::Parcel& parcel) :
         mRotation(INVALID_ROTATION),
         mSurfaceSetID(INVALID_SET_ID) {
     readFromParcel(&parcel);
 }
 
-status_t OutputConfiguration::readFromParcel(const Parcel* parcel) {
+status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
     status_t err = OK;
     int rotation = 0;
 
@@ -138,7 +138,7 @@ OutputConfiguration::OutputConfiguration(sp<IGraphicBufferProducer>& gbp, int ro
     mSurfaceSetID = surfaceSetID;
 }
 
-status_t OutputConfiguration::writeToParcel(Parcel* parcel) const {
+status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
 
     if (parcel == nullptr) return BAD_VALUE;
     status_t err = OK;

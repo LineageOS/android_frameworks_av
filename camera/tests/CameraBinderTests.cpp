@@ -65,14 +65,14 @@ using namespace android;
 // Stub listener implementation
 class TestCameraServiceListener : public hardware::BnCameraServiceListener {
     std::map<String16, int32_t> mCameraTorchStatuses;
-    std::map<int32_t, int32_t> mCameraStatuses;
+    std::map<String16, int32_t> mCameraStatuses;
     mutable Mutex mLock;
     mutable Condition mCondition;
     mutable Condition mTorchCondition;
 public:
     virtual ~TestCameraServiceListener() {};
 
-    virtual binder::Status onStatusChanged(int32_t status, int32_t cameraId) {
+    virtual binder::Status onStatusChanged(int32_t status, const String16& cameraId) {
         Mutex::Autolock l(mLock);
         mCameraStatuses[cameraId] = status;
         mCondition.broadcast();
@@ -130,7 +130,7 @@ public:
         return iter->second;
     };
 
-    int32_t getStatus(int32_t cameraId) const {
+    int32_t getStatus(const String16& cameraId) const {
         Mutex::Autolock l(mLock);
         const auto& iter = mCameraStatuses.find(cameraId);
         if (iter == mCameraStatuses.end()) {
@@ -310,14 +310,16 @@ TEST(CameraServiceBinderTest, CheckBinderCameraService) {
 
     // Check listener binder calls
     sp<TestCameraServiceListener> listener(new TestCameraServiceListener());
-    res = service->addListener(listener);
+    std::vector<hardware::CameraStatus> statuses;
+    res = service->addListener(listener, &statuses);
     EXPECT_TRUE(res.isOk()) << res;
 
-    EXPECT_TRUE(listener->waitForNumCameras(numCameras));
+    EXPECT_EQ(numCameras, static_cast<const int>(statuses.size()));
 
     for (int32_t i = 0; i < numCameras; i++) {
+        String16 cameraId = String16(String8::format("%d", i));
         bool isSupported = false;
-        res = service->supportsCameraApi(i,
+        res = service->supportsCameraApi(cameraId,
                 hardware::ICameraService::API_VERSION_2, &isSupported);
         EXPECT_TRUE(res.isOk()) << res;
 
@@ -328,12 +330,12 @@ TEST(CameraServiceBinderTest, CheckBinderCameraService) {
 
         // Check metadata binder call
         CameraMetadata metadata;
-        res = service->getCameraCharacteristics(i, &metadata);
+        res = service->getCameraCharacteristics(cameraId, &metadata);
         EXPECT_TRUE(res.isOk()) << res;
         EXPECT_FALSE(metadata.isEmpty());
 
         // Make sure we're available, or skip device tests otherwise
-        int32_t s = listener->getStatus(i);
+        int32_t s = listener->getStatus(cameraId);
         EXPECT_EQ(::android::hardware::ICameraServiceListener::STATUS_PRESENT, s);
         if (s != ::android::hardware::ICameraServiceListener::STATUS_PRESENT) {
             continue;
@@ -342,7 +344,7 @@ TEST(CameraServiceBinderTest, CheckBinderCameraService) {
         // Check connect binder calls
         sp<TestCameraDeviceCallbacks> callbacks(new TestCameraDeviceCallbacks());
         sp<hardware::camera2::ICameraDeviceUser> device;
-        res = service->connectDevice(callbacks, i, String16("meeeeeeeee!"),
+        res = service->connectDevice(callbacks, cameraId, String16("meeeeeeeee!"),
                 hardware::ICameraService::USE_CALLING_UID, /*out*/&device);
         EXPECT_TRUE(res.isOk()) << res;
         ASSERT_NE(nullptr, device.get());
@@ -352,12 +354,12 @@ TEST(CameraServiceBinderTest, CheckBinderCameraService) {
         int32_t torchStatus = listener->getTorchStatus(i);
         if (torchStatus == hardware::ICameraServiceListener::TORCH_STATUS_AVAILABLE_OFF) {
             // Check torch calls
-            res = service->setTorchMode(String16(String8::format("%d", i)),
+            res = service->setTorchMode(cameraId,
                     /*enabled*/true, callbacks);
             EXPECT_TRUE(res.isOk()) << res;
             EXPECT_TRUE(listener->waitForTorchState(
                     hardware::ICameraServiceListener::TORCH_STATUS_AVAILABLE_ON, i));
-            res = service->setTorchMode(String16(String8::format("%d", i)),
+            res = service->setTorchMode(cameraId,
                     /*enabled*/false, callbacks);
             EXPECT_TRUE(res.isOk()) << res;
             EXPECT_TRUE(listener->waitForTorchState(
@@ -379,7 +381,7 @@ protected:
     sp<TestCameraServiceListener> serviceListener;
 
     std::pair<sp<TestCameraDeviceCallbacks>, sp<hardware::camera2::ICameraDeviceUser>>
-            openNewDevice(int deviceId) {
+            openNewDevice(const String16& deviceId) {
         sp<TestCameraDeviceCallbacks> callbacks(new TestCameraDeviceCallbacks());
         sp<hardware::camera2::ICameraDeviceUser> device;
         {
@@ -415,7 +417,8 @@ protected:
         sp<IBinder> binder = sm->getService(String16("media.camera"));
         service = interface_cast<hardware::ICameraService>(binder);
         serviceListener = new TestCameraServiceListener();
-        service->addListener(serviceListener);
+        std::vector<hardware::CameraStatus> statuses;
+        service->addListener(serviceListener, &statuses);
         service->getNumberOfCameras(hardware::ICameraService::CAMERA_TYPE_BACKWARD_COMPATIBLE,
                 &numCameras);
     }
@@ -435,14 +438,14 @@ TEST_F(CameraClientBinderTest, CheckBinderCameraDeviceUser) {
     EXPECT_TRUE(serviceListener->waitForNumCameras(numCameras));
     for (int32_t i = 0; i < numCameras; i++) {
         // Make sure we're available, or skip device tests otherwise
-        int32_t s = serviceListener->getStatus(i);
+        String16 cameraId(String8::format("%d",i));
+        int32_t s = serviceListener->getStatus(cameraId);
         EXPECT_EQ(hardware::ICameraServiceListener::STATUS_PRESENT, s);
         if (s != hardware::ICameraServiceListener::STATUS_PRESENT) {
             continue;
         }
         binder::Status res;
-
-        auto p = openNewDevice(i);
+        auto p = openNewDevice(cameraId);
         sp<TestCameraDeviceCallbacks> callbacks = p.first;
         sp<hardware::camera2::ICameraDeviceUser> device = p.second;
 
