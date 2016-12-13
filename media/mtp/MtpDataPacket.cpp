@@ -24,6 +24,7 @@
 
 #include "MtpDataPacket.h"
 #include "MtpStringBuffer.h"
+#include "IMtpHandle.h"
 
 namespace android {
 
@@ -417,9 +418,9 @@ void MtpDataPacket::putString(const uint16_t* string) {
         putUInt16(0);
 }
 
-#ifdef MTP_DEVICE 
-int MtpDataPacket::read(int fd) {
-    int ret = ::read(fd, mBuffer, MTP_BUFFER_SIZE);
+#ifdef MTP_DEVICE
+int MtpDataPacket::read(IMtpHandle *h) {
+    int ret = h->read(mBuffer, MTP_BUFFER_SIZE);
     if (ret < MTP_CONTAINER_HEADER_SIZE)
         return -1;
     mPacketSize = ret;
@@ -427,20 +428,20 @@ int MtpDataPacket::read(int fd) {
     return ret;
 }
 
-int MtpDataPacket::write(int fd) {
+int MtpDataPacket::write(IMtpHandle *h) {
     MtpPacket::putUInt32(MTP_CONTAINER_LENGTH_OFFSET, mPacketSize);
     MtpPacket::putUInt16(MTP_CONTAINER_TYPE_OFFSET, MTP_CONTAINER_TYPE_DATA);
-    int ret = ::write(fd, mBuffer, mPacketSize);
+    int ret = h->write(mBuffer, mPacketSize);
     return (ret < 0 ? ret : 0);
 }
 
-int MtpDataPacket::writeData(int fd, void* data, uint32_t length) {
+int MtpDataPacket::writeData(IMtpHandle *h, void* data, uint32_t length) {
     allocate(length + MTP_CONTAINER_HEADER_SIZE);
     memcpy(mBuffer + MTP_CONTAINER_HEADER_SIZE, data, length);
     length += MTP_CONTAINER_HEADER_SIZE;
     MtpPacket::putUInt32(MTP_CONTAINER_LENGTH_OFFSET, length);
     MtpPacket::putUInt16(MTP_CONTAINER_TYPE_OFFSET, MTP_CONTAINER_TYPE_DATA);
-    int ret = ::write(fd, mBuffer, length);
+    int ret = h->write(mBuffer, length);
     return (ret < 0 ? ret : 0);
 }
 

@@ -20,6 +20,7 @@
 #include <sys/types.h>
 #include <fcntl.h>
 
+#include "IMtpHandle.h"
 #include "MtpRequestPacket.h"
 
 #include <usbhost/usbhost.h>
@@ -36,8 +37,8 @@ MtpRequestPacket::~MtpRequestPacket() {
 }
 
 #ifdef MTP_DEVICE
-int MtpRequestPacket::read(int fd) {
-    int ret = ::read(fd, mBuffer, mBufferSize);
+int MtpRequestPacket::read(IMtpHandle *h) {
+    int ret = h->read(mBuffer, mBufferSize);
     if (ret < 0) {
         // file read error
         return ret;
