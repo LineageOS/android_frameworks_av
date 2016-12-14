@@ -34,7 +34,7 @@ struct AMessage;
 class DataSource;
 struct IMediaHTTPService;
 class MediaBuffer;
-struct MediaExtractor;
+class MediaExtractor;
 struct MediaSource;
 class MetaData;
 
