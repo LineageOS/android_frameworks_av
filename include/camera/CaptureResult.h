@@ -88,8 +88,8 @@ struct CaptureResultExtras : public android::Parcelable {
      */
     bool isValid();
 
-    virtual status_t                readFromParcel(const Parcel* parcel) override;
-    virtual status_t                writeToParcel(Parcel* parcel) const override;
+    virtual status_t                readFromParcel(const android::Parcel* parcel) override;
+    virtual status_t                writeToParcel(android::Parcel* parcel) const override;
 };
 } // namespace impl
 } // namespace camera2
@@ -105,8 +105,8 @@ struct CaptureResult : public virtual LightRefBase<CaptureResult> {
 
     CaptureResult(const CaptureResult& otherResult);
 
-    status_t                readFromParcel(Parcel* parcel);
-    status_t                writeToParcel(Parcel* parcel) const;
+    status_t                readFromParcel(android::Parcel* parcel);
+    status_t                writeToParcel(android::Parcel* parcel) const;
 };
 
 }

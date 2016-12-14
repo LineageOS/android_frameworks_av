@@ -76,7 +76,7 @@ class VendorTagDescriptor : public Parcelable {
          */
         virtual status_t writeToParcel(
                 /*out*/
-                Parcel* parcel) const override;
+                android::Parcel* parcel) const override;
 
         /**
          * Convenience method to get a vector containing all vendor tag
@@ -103,7 +103,7 @@ class VendorTagDescriptor : public Parcelable {
          *
          * Returns OK on success, or a negative error code.
          */
-        virtual status_t readFromParcel(const Parcel* parcel) override;
+        virtual status_t readFromParcel(const android::Parcel* parcel) override;
 
     protected:
         KeyedVector<String8, KeyedVector<String8, uint32_t>*> mReverseMapping;

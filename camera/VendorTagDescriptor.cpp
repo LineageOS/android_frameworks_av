@@ -96,7 +96,7 @@ void VendorTagDescriptor::copyFrom(const VendorTagDescriptor& src) {
     mVendorOps = src.mVendorOps;
 }
 
-status_t VendorTagDescriptor::readFromParcel(const Parcel* parcel) {
+status_t VendorTagDescriptor::readFromParcel(const android::Parcel* parcel) {
     status_t res = OK;
     if (parcel == NULL) {
         ALOGE("%s: parcel argument was NULL.", __FUNCTION__);
@@ -244,7 +244,7 @@ int VendorTagDescriptor::getTagType(uint32_t tag) const {
     return mTagToTypeMap.valueFor(tag);
 }
 
-status_t VendorTagDescriptor::writeToParcel(Parcel* parcel) const {
+status_t VendorTagDescriptor::writeToParcel(android::Parcel* parcel) const {
     status_t res = OK;
     if (parcel == NULL) {
         ALOGE("%s: parcel argument was NULL.", __FUNCTION__);

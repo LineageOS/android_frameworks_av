@@ -27,7 +27,7 @@
 namespace android {
 namespace hardware {
 
-class ICameraClient: public IInterface
+class ICameraClient: public android::IInterface
 {
 public:
     DECLARE_META_INTERFACE(CameraClient);
@@ -45,7 +45,7 @@ public:
 
 // ----------------------------------------------------------------------------
 
-class BnCameraClient: public BnInterface<ICameraClient>
+class BnCameraClient: public android::BnInterface<ICameraClient>
 {
 public:
     virtual status_t    onTransact( uint32_t code,

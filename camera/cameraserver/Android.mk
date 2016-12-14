@@ -24,6 +24,7 @@ LOCAL_SHARED_LIBRARIES := \
 	liblog \
 	libutils \
 	libbinder \
+	android.hardware.camera.common@1.0
 
 LOCAL_MODULE:= cameraserver
 LOCAL_32_BIT_ONLY := true

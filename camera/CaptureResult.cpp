@@ -26,7 +26,7 @@ bool CaptureResultExtras::isValid() {
     return requestId >= 0;
 }
 
-status_t CaptureResultExtras::readFromParcel(const Parcel *parcel) {
+status_t CaptureResultExtras::readFromParcel(const android::Parcel *parcel) {
     if (parcel == NULL) {
         ALOGE("%s: Null parcel", __FUNCTION__);
         return BAD_VALUE;
@@ -43,7 +43,7 @@ status_t CaptureResultExtras::readFromParcel(const Parcel *parcel) {
     return OK;
 }
 
-status_t CaptureResultExtras::writeToParcel(Parcel *parcel) const {
+status_t CaptureResultExtras::writeToParcel(android::Parcel *parcel) const {
     if (parcel == NULL) {
         ALOGE("%s: Null parcel", __FUNCTION__);
         return BAD_VALUE;
@@ -69,7 +69,7 @@ CaptureResult::CaptureResult(const CaptureResult &otherResult) {
     mMetadata = otherResult.mMetadata;
 }
 
-status_t CaptureResult::readFromParcel(Parcel *parcel) {
+status_t CaptureResult::readFromParcel(android::Parcel *parcel) {
 
     ALOGV("%s: parcel = %p", __FUNCTION__, parcel);
 
@@ -100,7 +100,7 @@ status_t CaptureResult::readFromParcel(Parcel *parcel) {
     return OK;
 }
 
-status_t CaptureResult::writeToParcel(Parcel *parcel) const {
+status_t CaptureResult::writeToParcel(android::Parcel *parcel) const {
 
     ALOGV("%s: parcel = %p", __FUNCTION__, parcel);
 

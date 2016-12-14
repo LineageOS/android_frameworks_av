@@ -31,8 +31,8 @@ public:
     int32_t mRequestId;
     int64_t mLastFrameNumber;
 
-    virtual status_t writeToParcel(Parcel *parcel) const override;
-    virtual status_t readFromParcel(const Parcel* parcel) override;
+    virtual status_t writeToParcel(android::Parcel *parcel) const override;
+    virtual status_t readFromParcel(const android::Parcel* parcel) override;
 
 };
 

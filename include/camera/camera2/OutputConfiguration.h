@@ -47,9 +47,9 @@ public:
     /**
      * Keep impl up-to-date with OutputConfiguration.java in frameworks/base
      */
-    virtual status_t           writeToParcel(Parcel* parcel) const override;
+    virtual status_t           writeToParcel(android::Parcel* parcel) const override;
 
-    virtual status_t           readFromParcel(const Parcel* parcel) override;
+    virtual status_t           readFromParcel(const android::Parcel* parcel) override;
 
     // getGraphicBufferProducer will be NULL
     // getRotation will be INVALID_ROTATION
@@ -59,7 +59,7 @@ public:
     // getGraphicBufferProducer will be NULL if error occurred
     // getRotation will be INVALID_ROTATION if error occurred
     // getSurfaceSetID will be INVALID_SET_ID if error occurred
-    OutputConfiguration(const Parcel& parcel);
+    OutputConfiguration(const android::Parcel& parcel);
 
     OutputConfiguration(sp<IGraphicBufferProducer>& gbp, int rotation,
             int surfaceSetID = INVALID_SET_ID);
@@ -105,7 +105,7 @@ private:
     int                        mWidth;
     int                        mHeight;
     // helper function
-    static String16 readMaybeEmptyString16(const Parcel* parcel);
+    static String16 readMaybeEmptyString16(const android::Parcel* parcel);
 };
 } // namespace params
 } // namespace camera2

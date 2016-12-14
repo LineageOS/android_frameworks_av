@@ -40,7 +40,7 @@ interface ICameraServiceListener
      */
     // Device physically unplugged
     const int STATUS_NOT_PRESENT      = 0;
-    // Device physically has been plugged in and the camera can be used exlusively
+    // Device physically has been plugged in and the camera can be used exclusively
     const int STATUS_PRESENT          = 1;
     // Device physically has been plugged in but it will not be connect-able until enumeration is
     // complete
@@ -51,7 +51,7 @@ interface ICameraServiceListener
     // Use to initialize variables only
     const int STATUS_UNKNOWN          = -1;
 
-    oneway void onStatusChanged(int status, int cameraId);
+    oneway void onStatusChanged(int status, String cameraId);
 
     /**
      * The torch mode status of a camera.

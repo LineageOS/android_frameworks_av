@@ -28,7 +28,7 @@ namespace android {
 namespace hardware {
 namespace camera2 {
 
-status_t CaptureRequest::readFromParcel(const Parcel* parcel) {
+status_t CaptureRequest::readFromParcel(const android::Parcel* parcel) {
     if (parcel == NULL) {
         ALOGE("%s: Null parcel", __FUNCTION__);
         return BAD_VALUE;
@@ -90,7 +90,7 @@ status_t CaptureRequest::readFromParcel(const Parcel* parcel) {
     return OK;
 }
 
-status_t CaptureRequest::writeToParcel(Parcel* parcel) const {
+status_t CaptureRequest::writeToParcel(android::Parcel* parcel) const {
     if (parcel == NULL) {
         ALOGE("%s: Null parcel", __FUNCTION__);
         return BAD_VALUE;
