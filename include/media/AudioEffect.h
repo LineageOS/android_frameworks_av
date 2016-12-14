@@ -462,7 +462,7 @@ private:
         }
 
         // IBinder::DeathRecipient
-        virtual void binderDied(const wp<IBinder>& who) {
+        virtual void binderDied(const wp<IBinder>& /*who*/) {
             sp<AudioEffect> effect = mEffect.promote();
             if (effect != 0) {
                 effect->binderDied();

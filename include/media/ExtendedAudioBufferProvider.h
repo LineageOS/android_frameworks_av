@@ -31,7 +31,7 @@ public:
 
     // Invoked by buffer consumer when a new timestamp is available.
     // Default implementation ignores the timestamp.
-    virtual void    onTimestamp(const ExtendedTimestamp& timestamp) { }
+    virtual void    onTimestamp(const ExtendedTimestamp& /*timestamp*/) { }
 };
 
 }   // namespace android
