@@ -23,7 +23,7 @@ namespace android {
 
 class ACodecBufferChannel;
 struct GraphicBufferListener;
-struct MemoryDealer;
+class MemoryDealer;
 struct SimpleFilter;
 
 struct MediaFilter : public CodecBase {

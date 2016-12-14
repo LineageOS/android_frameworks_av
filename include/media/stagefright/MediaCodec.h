@@ -44,7 +44,7 @@ class IMemory;
 class IResourceManagerClient;
 class IResourceManagerService;
 struct PersistentSurface;
-struct SoftwareRenderer;
+class SoftwareRenderer;
 class Surface;
 
 struct MediaCodec : public AHandler {
