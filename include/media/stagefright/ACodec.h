@@ -37,7 +37,7 @@ namespace android {
 struct ABuffer;
 class ACodecBufferChannel;
 class MediaCodecBuffer;
-struct MemoryDealer;
+class MemoryDealer;
 struct DescribeColorFormat2Params;
 struct DataConverter;
 

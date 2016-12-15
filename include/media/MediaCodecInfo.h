@@ -74,7 +74,7 @@ struct MediaCodecInfo : public RefBase {
 
         DISALLOW_EVIL_CONSTRUCTORS(Capabilities);
 
-        friend class MediaCodecInfo;
+        friend struct MediaCodecInfo;
     };
 
     // Use a subclass to allow setting fields on construction without allowing
@@ -136,7 +136,7 @@ private:
 
     DISALLOW_EVIL_CONSTRUCTORS(MediaCodecInfo);
 
-    friend class MediaCodecList;
+    friend struct MediaCodecList;
     friend class MediaCodecListOverridesTest;
 };
 
