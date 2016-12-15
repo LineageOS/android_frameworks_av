@@ -261,7 +261,7 @@ public:
 
 protected:
     // check if the codec is secure.
-    virtual bool isSecure(IOMX::node_id node) {
+    virtual bool isSecure(IOMX::node_id /*node*/) {
         return false;
     }
 };
