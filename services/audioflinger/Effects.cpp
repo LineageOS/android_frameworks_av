@@ -1233,6 +1233,13 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
 
     // handle commands that are not forwarded transparently to effect engine
     if (cmdCode == EFFECT_CMD_SET_PARAM_COMMIT) {
+        if (*replySize < sizeof(int)) {
+             android_errorWriteLog(0x534e4554, "32095713");
+             return BAD_VALUE;
+         }
+         *(int *)pReplyData = NO_ERROR;
+         *replySize = sizeof(int);
+
         // No need to trylock() here as this function is executed in the binder thread serving a
         // particular client process:  no risk to block the whole media server process or mixer
         // threads if we are stuck here
@@ -1300,12 +1307,6 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
         mCblk->serverIndex = 0;
         mCblk->clientIndex = 0;
         return status;
-    } else if (cmdCode == EFFECT_CMD_ENABLE) {
-        *(int *)pReplyData = NO_ERROR;
-        return enable();
-    } else if (cmdCode == EFFECT_CMD_DISABLE) {
-        *(int *)pReplyData = NO_ERROR;
-        return disable();
     }
 
 #ifdef QCOM_DIRECTTRACK
