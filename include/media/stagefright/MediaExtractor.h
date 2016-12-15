@@ -59,10 +59,10 @@ public:
     virtual uint32_t flags() const;
 
     // for DRM
-    virtual char* getDrmTrackInfo(size_t trackID, int *len) {
+    virtual char* getDrmTrackInfo(size_t /*trackID*/, int * /*len*/) {
         return NULL;
     }
-    virtual void setUID(uid_t uid) {
+    virtual void setUID(uid_t /*uid*/) {
     }
 
     virtual const char * name() { return "<unspecified>"; }

@@ -216,10 +216,10 @@ protected:
 
     // Returns true if need to skip the current frame.
     // Called from dataCallbackTimestamp.
-    virtual bool skipCurrentFrame(int64_t timestampUs) {return false;}
+    virtual bool skipCurrentFrame(int64_t /*timestampUs*/) {return false;}
 
     // Callback called when still camera raw data is available.
-    virtual void dataCallback(int32_t msgType, const sp<IMemory> &data) {}
+    virtual void dataCallback(int32_t /*msgType*/, const sp<IMemory>& /*data*/) {}
 
     virtual void dataCallbackTimestamp(int64_t timestampUs, int32_t msgType,
             const sp<IMemory> &data);
