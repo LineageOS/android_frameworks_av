@@ -159,6 +159,7 @@ class MediaPlayerService : public BnMediaPlayerService
                void             updateTrackOnAudioProcessed(sp<AudioTrack> t, bool trackReused);
                bool             mProcessedAudio;
 #endif // DOLBY_END
+           status_t             updateTrack();
 
         sp<AudioTrack>          mTrack;
         sp<AudioTrack>          mRecycledTrack;

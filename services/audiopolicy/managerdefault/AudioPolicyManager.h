@@ -404,7 +404,7 @@ protected:
         // must be called every time a condition that affects the output choice for a given strategy
         // changes: connected device, phone state, force use...
         // Must be called before updateDevicesAndOutputs()
-        void checkOutputForStrategy(routing_strategy strategy);
+        virtual void checkOutputForStrategy(routing_strategy strategy);
 
         // Same as checkOutputForStrategy() but for a all strategies in order of priority
         void checkOutputForAllStrategies();
@@ -499,7 +499,7 @@ protected:
             return mAvailableInputDevices.getDevicesFromHwModule(mPrimaryOutput->getModuleHandle());
         }
 
-        void updateCallRouting(audio_devices_t rxDevice, int delayMs = 0);
+        uint32_t updateCallRouting(audio_devices_t rxDevice, uint32_t delayMs = 0);
 
         // if argument "device" is different from AUDIO_DEVICE_NONE,  startSource() will force
         // the re-evaluation of the output device.

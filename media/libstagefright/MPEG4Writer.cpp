@@ -17,6 +17,8 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MPEG4Writer"
 
+#include <algorithm>
+
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -28,8 +30,11 @@
 
 #include <utils/Log.h>
 
+#include <functional>
+
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/ColorUtils.h>
 #include <media/stagefright/MPEG4Writer.h>
 #include <media/stagefright/MediaBuffer.h>
@@ -121,18 +126,18 @@ private:
     };
 
     // A helper class to handle faster write box with table entries
-    template<class TYPE>
+    template<class TYPE, unsigned ENTRY_SIZE>
+    // ENTRY_SIZE: # of values in each entry
     struct ListTableEntries {
-        ListTableEntries(uint32_t elementCapacity, uint32_t entryCapacity)
+        static_assert(ENTRY_SIZE > 0, "ENTRY_SIZE must be positive");
+        ListTableEntries(uint32_t elementCapacity)
             : mElementCapacity(elementCapacity),
-            mEntryCapacity(entryCapacity),
             mTotalNumTableEntries(0),
             mNumValuesInCurrEntry(0),
             mCurrTableEntriesElement(NULL) {
             CHECK_GT(mElementCapacity, 0);
-            CHECK_GT(mEntryCapacity, 0);
             // Ensure no integer overflow on allocation in add().
-            CHECK_LT(mEntryCapacity, UINT32_MAX / mElementCapacity);
+            CHECK_LT(ENTRY_SIZE, UINT32_MAX / mElementCapacity);
         }
 
         // Free the allocated memory.
@@ -149,10 +154,10 @@ private:
         // @arg value must be in network byte order
         // @arg pos location the value must be in.
         void set(const TYPE& value, uint32_t pos) {
-            CHECK_LT(pos, mTotalNumTableEntries * mEntryCapacity);
+            CHECK_LT(pos, mTotalNumTableEntries * ENTRY_SIZE);
 
             typename List<TYPE *>::iterator it = mTableEntryList.begin();
-            uint32_t iterations = (pos / (mElementCapacity * mEntryCapacity));
+            uint32_t iterations = (pos / (mElementCapacity * ENTRY_SIZE));
             while (it != mTableEntryList.end() && iterations > 0) {
                 ++it;
                 --iterations;
@@ -160,7 +165,7 @@ private:
             CHECK(it != mTableEntryList.end());
             CHECK_EQ(iterations, 0);
 
-            (*it)[(pos % (mElementCapacity * mEntryCapacity))] = value;
+            (*it)[(pos % (mElementCapacity * ENTRY_SIZE))] = value;
         }
 
         // Get the value at the given position by the given value.
@@ -168,12 +173,12 @@ private:
         // @arg pos location the value must be in.
         // @return true if a value is found.
         bool get(TYPE& value, uint32_t pos) const {
-            if (pos >= mTotalNumTableEntries * mEntryCapacity) {
+            if (pos >= mTotalNumTableEntries * ENTRY_SIZE) {
                 return false;
             }
 
             typename List<TYPE *>::iterator it = mTableEntryList.begin();
-            uint32_t iterations = (pos / (mElementCapacity * mEntryCapacity));
+            uint32_t iterations = (pos / (mElementCapacity * ENTRY_SIZE));
             while (it != mTableEntryList.end() && iterations > 0) {
                 ++it;
                 --iterations;
@@ -181,8 +186,23 @@ private:
             CHECK(it != mTableEntryList.end());
             CHECK_EQ(iterations, 0);
 
-            value = (*it)[(pos % (mElementCapacity * mEntryCapacity))];
+            value = (*it)[(pos % (mElementCapacity * ENTRY_SIZE))];
             return true;
+        }
+
+        // adjusts all values by |adjust(value)|
+        void adjustEntries(
+                std::function<void(size_t /* ix */, TYPE(& /* entry */)[ENTRY_SIZE])> update) {
+            size_t nEntries = mTotalNumTableEntries + mNumValuesInCurrEntry / ENTRY_SIZE;
+            size_t ix = 0;
+            for (TYPE *entryArray : mTableEntryList) {
+                size_t num = std::min(nEntries, (size_t)mElementCapacity);
+                for (size_t i = 0; i < num; ++i) {
+                    update(ix++, (TYPE(&)[ENTRY_SIZE])(*entryArray));
+                    entryArray += ENTRY_SIZE;
+                }
+                nEntries -= num;
+            }
         }
 
         // Store a single value.
@@ -190,18 +210,18 @@ private:
         void add(const TYPE& value) {
             CHECK_LT(mNumValuesInCurrEntry, mElementCapacity);
             uint32_t nEntries = mTotalNumTableEntries % mElementCapacity;
-            uint32_t nValues  = mNumValuesInCurrEntry % mEntryCapacity;
+            uint32_t nValues  = mNumValuesInCurrEntry % ENTRY_SIZE;
             if (nEntries == 0 && nValues == 0) {
-                mCurrTableEntriesElement = new TYPE[mEntryCapacity * mElementCapacity];
+                mCurrTableEntriesElement = new TYPE[ENTRY_SIZE * mElementCapacity];
                 CHECK(mCurrTableEntriesElement != NULL);
                 mTableEntryList.push_back(mCurrTableEntriesElement);
             }
 
-            uint32_t pos = nEntries * mEntryCapacity + nValues;
+            uint32_t pos = nEntries * ENTRY_SIZE + nValues;
             mCurrTableEntriesElement[pos] = value;
 
             ++mNumValuesInCurrEntry;
-            if ((mNumValuesInCurrEntry % mEntryCapacity) == 0) {
+            if ((mNumValuesInCurrEntry % ENTRY_SIZE) == 0) {
                 ++mTotalNumTableEntries;
                 mNumValuesInCurrEntry = 0;
             }
@@ -212,17 +232,17 @@ private:
         // 2. followed by the values in the table enties in order
         // @arg writer the writer to actual write to the storage
         void write(MPEG4Writer *writer) const {
-            CHECK_EQ(mNumValuesInCurrEntry % mEntryCapacity, 0);
+            CHECK_EQ(mNumValuesInCurrEntry % ENTRY_SIZE, 0);
             uint32_t nEntries = mTotalNumTableEntries;
             writer->writeInt32(nEntries);
             for (typename List<TYPE *>::iterator it = mTableEntryList.begin();
                 it != mTableEntryList.end(); ++it) {
                 CHECK_GT(nEntries, 0);
                 if (nEntries >= mElementCapacity) {
-                    writer->write(*it, sizeof(TYPE) * mEntryCapacity, mElementCapacity);
+                    writer->write(*it, sizeof(TYPE) * ENTRY_SIZE, mElementCapacity);
                     nEntries -= mElementCapacity;
                 } else {
-                    writer->write(*it, sizeof(TYPE) * mEntryCapacity, nEntries);
+                    writer->write(*it, sizeof(TYPE) * ENTRY_SIZE, nEntries);
                     break;
                 }
             }
@@ -233,9 +253,8 @@ private:
 
     private:
         uint32_t         mElementCapacity;  // # entries in an element
-        uint32_t         mEntryCapacity;    // # of values in each entry
         uint32_t         mTotalNumTableEntries;
-        uint32_t         mNumValuesInCurrEntry;  // up to mEntryCapacity
+        uint32_t         mNumValuesInCurrEntry;  // up to ENTRY_SIZE
         TYPE             *mCurrTableEntriesElement;
         mutable List<TYPE *>     mTableEntryList;
 
@@ -255,9 +274,11 @@ private:
     bool mIsHevc;
     bool mIsAudio;
     bool mIsMPEG4;
+    bool mIsMalformed;
     int32_t mTrackId;
     int64_t mTrackDurationUs;
     int64_t mMaxChunkDurationUs;
+    int64_t mLastDecodingTimeUs;
 
     int64_t mEstimatedTrackSizeBytes;
     int64_t mMdatSizeBytes;
@@ -269,14 +290,14 @@ private:
     List<MediaBuffer *> mChunkSamples;
 
     bool                mSamplesHaveSameSize;
-    ListTableEntries<uint32_t> *mStszTableEntries;
+    ListTableEntries<uint32_t, 1> *mStszTableEntries;
 
-    ListTableEntries<uint32_t> *mStcoTableEntries;
-    ListTableEntries<off64_t> *mCo64TableEntries;
-    ListTableEntries<uint32_t> *mStscTableEntries;
-    ListTableEntries<uint32_t> *mStssTableEntries;
-    ListTableEntries<uint32_t> *mSttsTableEntries;
-    ListTableEntries<uint32_t> *mCttsTableEntries;
+    ListTableEntries<uint32_t, 1> *mStcoTableEntries;
+    ListTableEntries<off64_t, 1> *mCo64TableEntries;
+    ListTableEntries<uint32_t, 3> *mStscTableEntries;
+    ListTableEntries<uint32_t, 1> *mStssTableEntries;
+    ListTableEntries<uint32_t, 2> *mSttsTableEntries;
+    ListTableEntries<uint32_t, 2> *mCttsTableEntries;
 
     int64_t mMinCttsOffsetTimeUs;
     int64_t mMaxCttsOffsetTimeUs;
@@ -1528,17 +1549,18 @@ MPEG4Writer::Track::Track(
       mPaused(false),
       mResumed(false),
       mStarted(false),
+      mIsMalformed(false),
       mTrackId(trackId),
       mTrackDurationUs(0),
       mEstimatedTrackSizeBytes(0),
       mSamplesHaveSameSize(true),
-      mStszTableEntries(new ListTableEntries<uint32_t>(1000, 1)),
-      mStcoTableEntries(new ListTableEntries<uint32_t>(1000, 1)),
-      mCo64TableEntries(new ListTableEntries<off64_t>(1000, 1)),
-      mStscTableEntries(new ListTableEntries<uint32_t>(1000, 3)),
-      mStssTableEntries(new ListTableEntries<uint32_t>(1000, 1)),
-      mSttsTableEntries(new ListTableEntries<uint32_t>(1000, 2)),
-      mCttsTableEntries(new ListTableEntries<uint32_t>(1000, 2)),
+      mStszTableEntries(new ListTableEntries<uint32_t, 1>(1000)),
+      mStcoTableEntries(new ListTableEntries<uint32_t, 1>(1000)),
+      mCo64TableEntries(new ListTableEntries<off64_t, 1>(1000)),
+      mStscTableEntries(new ListTableEntries<uint32_t, 3>(1000)),
+      mStssTableEntries(new ListTableEntries<uint32_t, 1>(1000)),
+      mSttsTableEntries(new ListTableEntries<uint32_t, 2>(1000)),
+      mCttsTableEntries(new ListTableEntries<uint32_t, 2>(1000)),
       mCttsOffsetTimeUs(0),
       mCodecSpecificData(NULL),
       mCodecSpecificDataSize(0),
@@ -1555,10 +1577,11 @@ MPEG4Writer::Track::Track(
     mIsMPEG4 = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_MPEG4) ||
                !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC);
 
+    // store temporal layer count
     if (!mIsAudio) {
-        int32_t numLayers = 0;
-        if (mMeta->findInt32(kKeyTemporalLayerCount, &numLayers) && numLayers > 1) {
-            mOwner->setTemporalLayerCount(numLayers);
+        int32_t count;
+        if (mMeta->findInt32(kKeyTemporalLayerCount, &count) && count > 1) {
+            mOwner->setTemporalLayerCount(count);
         }
     }
 
@@ -1940,6 +1963,7 @@ status_t MPEG4Writer::Track::start(MetaData *params) {
     mEstimatedTrackSizeBytes = 0;
     mMdatSizeBytes = 0;
     mMaxChunkDurationUs = 0;
+    mLastDecodingTimeUs = -1;
 
     pthread_create(&mThread, &attr, ThreadWrapper, this);
     pthread_attr_destroy(&attr);
@@ -2484,12 +2508,16 @@ status_t MPEG4Writer::Track::threadEntry() {
             ALOGW("Recorded file size exceeds limit %" PRId64 "bytes",
                     mOwner->mMaxFileSizeLimitBytes);
             mOwner->notify(MEDIA_RECORDER_EVENT_INFO, MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED, 0);
+            copy->release();
+            mSource->stop();
             break;
         }
         if (mOwner->exceedsFileDurationLimit()) {
             ALOGW("Recorded file duration exceeds limit %" PRId64 "microseconds",
                     mOwner->mMaxFileDurationLimitUs);
             mOwner->notify(MEDIA_RECORDER_EVENT_INFO, MEDIA_RECORDER_INFO_MAX_DURATION_REACHED, 0);
+            copy->release();
+            mSource->stop();
             break;
         }
 
@@ -2510,13 +2538,17 @@ status_t MPEG4Writer::Track::threadEntry() {
             int64_t durExcludingEarlierPausesUs = timestampUs - previousPausedDurationUs;
             if (WARN_UNLESS(durExcludingEarlierPausesUs >= 0ll, "for %s track", trackName)) {
                 copy->release();
-                return ERROR_MALFORMED;
+                mSource->stop();
+                mIsMalformed = true;
+                break;
             }
 
             int64_t pausedDurationUs = durExcludingEarlierPausesUs - mTrackDurationUs;
             if (WARN_UNLESS(pausedDurationUs >= lastDurationUs, "for %s track", trackName)) {
                 copy->release();
-                return ERROR_MALFORMED;
+                mSource->stop();
+                mIsMalformed = true;
+                break;
             }
 
             previousPausedDurationUs += pausedDurationUs - lastDurationUs;
@@ -2526,7 +2558,9 @@ status_t MPEG4Writer::Track::threadEntry() {
         timestampUs -= previousPausedDurationUs;
         if (WARN_UNLESS(timestampUs >= 0ll, "for %s track", trackName)) {
             copy->release();
-            return ERROR_MALFORMED;
+            mSource->stop();
+            mIsMalformed = true;
+            break;
         }
 
         if (!mIsAudio) {
@@ -2538,6 +2572,17 @@ status_t MPEG4Writer::Track::threadEntry() {
             int64_t decodingTimeUs;
             CHECK(meta_data->findInt64(kKeyDecodingTime, &decodingTimeUs));
             decodingTimeUs -= previousPausedDurationUs;
+
+            // ensure non-negative, monotonic decoding time
+            if (mLastDecodingTimeUs < 0) {
+                decodingTimeUs = std::max((int64_t)0, decodingTimeUs);
+            } else {
+                // increase decoding time by at least 1 tick
+                decodingTimeUs = std::max(
+                        mLastDecodingTimeUs + divUp(1000000, mTimeScale), decodingTimeUs);
+            }
+
+            mLastDecodingTimeUs = decodingTimeUs;
             cttsOffsetTimeUs =
                     timestampUs + mCttsOffsetTimeUs - decodingTimeUs;
             if (cttsOffsetTimeUs < 0) {
@@ -2545,7 +2590,9 @@ status_t MPEG4Writer::Track::threadEntry() {
             }
             if (WARN_UNLESS(cttsOffsetTimeUs >= 0ll, "for %s track", trackName)) {
                 copy->release();
-                return ERROR_MALFORMED;
+                mSource->stop();
+                mIsMalformed = true;
+                break;
             }
 
             timestampUs = decodingTimeUs;
@@ -2557,7 +2604,9 @@ status_t MPEG4Writer::Track::threadEntry() {
                     (cttsOffsetTimeUs * mTimeScale + 500000LL) / 1000000LL;
             if (WARN_UNLESS(currCttsOffsetTimeTicks <= 0x0FFFFFFFFLL, "for %s track", trackName)) {
                 copy->release();
-                return ERROR_MALFORMED;
+                mSource->stop();
+                mIsMalformed = true;
+                break;
             }
 
             if (mStszTableEntries->count() == 0) {
@@ -2597,7 +2646,9 @@ status_t MPEG4Writer::Track::threadEntry() {
 
         if (WARN_UNLESS(timestampUs >= 0ll, "for %s track", trackName)) {
             copy->release();
-            return ERROR_MALFORMED;
+            mSource->stop();
+            mIsMalformed = true;
+            break;
         }
 
         ALOGV("%s media time stamp: %" PRId64 " and previous paused duration %" PRId64,
@@ -2619,7 +2670,8 @@ status_t MPEG4Writer::Track::threadEntry() {
                     (long long)timestampUs, (long long)lastTimestampUs, trackName);
             copy->release();
             mSource->stop();
-            return UNKNOWN_ERROR;
+            mIsMalformed = true;
+            break;
         }
 
         // if the duration is different for this sample, see if it is close enough to the previous
@@ -2777,6 +2829,10 @@ status_t MPEG4Writer::Track::threadEntry() {
 }
 
 bool MPEG4Writer::Track::isTrackMalFormed() const {
+    if (mIsMalformed) {
+        return true;
+    }
+
     if (mStszTableEntries->count() == 0) {                      // no samples written
         ALOGE("The number of recorded samples is 0");
         return true;
@@ -3146,6 +3202,10 @@ void MPEG4Writer::Track::writeMp4aEsdsBox() {
 void MPEG4Writer::Track::writeMp4vEsdsBox() {
     CHECK(mCodecSpecificData);
     CHECK_GT(mCodecSpecificDataSize, 0);
+
+    // Make sure all sizes encode to a single byte.
+    CHECK_LT(23 + mCodecSpecificDataSize, 128);
+
     mOwner->beginBox("esds");
 
     // Make sure all sizes encode to a single byte.
@@ -3396,13 +3456,12 @@ void MPEG4Writer::Track::writeCttsBox() {
 
     mOwner->beginBox("ctts");
     mOwner->writeInt32(0);  // version=0, flags=0
-    uint32_t duration;
-    CHECK(mCttsTableEntries->get(duration, 1));
-    duration = htonl(duration);  // Back host byte order
-
-    // Adjust the initial track start time offset
-    // for the first ctts table entry.
-    mCttsTableEntries->set(htonl(duration + getStartTimeOffsetScaledTime() - mMinCttsOffsetTimeUs), 1);
+    uint32_t delta = mMinCttsOffsetTimeUs - getStartTimeOffsetScaledTime();
+    mCttsTableEntries->adjustEntries([delta](size_t /* ix */, uint32_t (&value)[2]) {
+        // entries are <count, ctts> pairs; adjust only ctts
+        uint32_t duration = htonl(value[1]); // back to host byte order
+        value[1] = htonl(duration - delta);
+    });
     mCttsTableEntries->write(mOwner);
     mOwner->endBox();  // ctts
 }

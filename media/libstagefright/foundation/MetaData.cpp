@@ -397,8 +397,12 @@ void MetaData::dumpToLog() const {
 
 status_t MetaData::writeToParcel(Parcel &parcel) {
     status_t status = OK;
+    status_t ret;
     size_t numItems = mItems.size();
-    parcel.writeUint32(uint32_t(numItems));
+    ret = parcel.writeUint32(uint32_t(numItems));
+    if (ret) {
+        return ret;
+    }
     for (size_t i = 0; i < numItems; i++) {
         int32_t key = mItems.keyAt(i);
         const typed_data &item = mItems.valueAt(i);
@@ -406,29 +410,31 @@ status_t MetaData::writeToParcel(Parcel &parcel) {
         const void *data;
         size_t size;
         item.getData(&type, &data, &size);
-        parcel.writeInt32(key);
-        parcel.writeUint32(type);
-        if (size < SIZE_MAX && size >= kSharedMemThreshold) {
-            sp<MemoryHeapBase> heap =
-                    new MemoryHeapBase(size, 0, "Metadata::writeToParcel");
-            if (heap == NULL) {
-                ALOGE("cannot create HeapBase for shared allocation");
-                status = UNKNOWN_ERROR;
-                break;
+        ret = parcel.writeInt32(key);
+        if (ret) {
+            return ret;
+        }
+        ret = parcel.writeUint32(type);
+        if (ret) {
+            return ret;
+        }
+        if (type == TYPE_NONE) {
+            android::Parcel::WritableBlob blob;
+            ret = parcel.writeUint32(static_cast<uint32_t>(size));
+            if (ret) {
+                return ret;
             }
-            sp<IMemory>  mem = new MemoryBase(heap, 0, size);
-            if (mem == NULL || mem->pointer() == NULL) {
-                ALOGE("cannot create MemoryBase for shared allocation");
-                status = UNKNOWN_ERROR;
-                break;
+            ret = parcel.writeBlob(size, false, &blob);
+            if (ret) {
+                return ret;
             }
-            parcel.writeInt32(SHARED_ALLOCATION);
-            parcel.writeUint32(size);
-            memcpy(mem->pointer(), data, size);
-            parcel.writeStrongBinder(IInterface::asBinder(mem));
+            memcpy(blob.data(), data, size);
+            blob.release();
         } else {
-            parcel.writeInt32(INLINE_ALLOCATION);
-            parcel.writeByteArray(size, (uint8_t*)data);
+            ret = parcel.writeByteArray(size, (uint8_t*)data);
+            if (ret) {
+                return ret;
+            }
         }
     }
     return status;
@@ -443,30 +449,25 @@ status_t MetaData::updateFromParcel(const Parcel &parcel) {
             int32_t key;
             uint32_t type;
             uint32_t size;
-            int32_t allocationType;
             status_t ret = parcel.readInt32(&key);
             ret |= parcel.readUint32(&type);
-            ret |= parcel.readInt32(&allocationType);
             ret |= parcel.readUint32(&size);
             if (ret != OK) {
                 break;
             }
-            if (allocationType == SHARED_ALLOCATION) {
-                sp<IBinder> binder = parcel.readStrongBinder();
-                sp<IMemory> mem = interface_cast<IMemory>(binder);
-                if (mem == NULL || mem->pointer() == NULL) {
-                    ALOGE("received NULL IMemory for shared allocation");
-                    status = UNKNOWN_ERROR;
+            // copy data from Blob, which may be inline in Parcel storage,
+            // then advance position
+            if (type == TYPE_NONE) {
+                android::Parcel::ReadableBlob blob;
+                ret = parcel.readBlob(size, &blob);
+                if (ret != OK) {
                     break;
                 }
-                setData(key, type, mem->pointer(), size);
-            } else if (allocationType == INLINE_ALLOCATION) {
+                setData(key, type, blob.data(), size);
+                blob.release();
+            } else {
                 // copy data directly from Parcel storage, then advance position
                 setData(key, type, parcel.readInplace(size), size);
-            } else {
-                ALOGE("unknown allocation");
-                status = UNKNOWN_ERROR;
-                break;
             }
          }
 

@@ -80,6 +80,7 @@ void NuPlayer::GenericSource::resetDataSource() {
     mHttpSource.clear();
     mUri.clear();
     mUriHeaders.clear();
+    mSources.clear();
     if (mFd >= 0) {
         close(mFd);
         mFd = -1;
@@ -251,7 +252,6 @@ status_t NuPlayer::GenericSource::initFromDataSource() {
                 if (AVNuUtils::get()->isByteStreamModeEnabled(meta)) {
                     mIsByteMode = true;
                 }
-                mAudioTrack.mReadMultiple = track->canReadMultiple();
             }
         } else if (!strncasecmp(mime, "video/", 6)) {
             if (mVideoTrack.mSource == NULL) {
@@ -669,7 +669,6 @@ void NuPlayer::GenericSource::onMessageReceived(const sp<AMessage> &msg) {
           const bool formatChange = true;
           if (trackType == MEDIA_TRACK_TYPE_AUDIO) {
               timeUs = mAudioLastDequeueTimeUs;
-              track->mReadMultiple = source->canReadMultiple();
           } else {
               timeUs = mVideoLastDequeueTimeUs;
           }
@@ -1393,7 +1392,7 @@ void NuPlayer::GenericSource::readBuffer(
             if (mIsWidevine) {
                 maxBuffers = 2;
             } else {
-                maxBuffers = 4;
+                maxBuffers = 8;  // too large of a number may influence seeks
             }
             break;
         case MEDIA_TRACK_TYPE_AUDIO:
@@ -1430,25 +1429,23 @@ void NuPlayer::GenericSource::readBuffer(
     MediaSource::ReadOptions options;
 
     bool seeking = false;
-
     if (seekTimeUs >= 0) {
         options.setSeekTo(seekTimeUs, MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC);
         seeking = true;
     }
 
-    if (mIsWidevine) {
+    const bool couldReadMultiple = (!mIsWidevine && track->mSource->supportReadMultiple());
+
+    if (mIsWidevine || couldReadMultiple) {
         options.setNonBlocking();
     }
-
-    bool couldReadMultiple =
-        (!mIsWidevine && trackType == MEDIA_TRACK_TYPE_AUDIO
-                && track->mReadMultiple);
     for (size_t numBuffers = 0; numBuffers < maxBuffers; ) {
         Vector<MediaBuffer *> mediaBuffers;
         status_t err = NO_ERROR;
 
-        if (!seeking && couldReadMultiple) {
-            err = track->mSource->readMultiple(&mediaBuffers, (maxBuffers - numBuffers));
+        if (couldReadMultiple) {
+            err = track->mSource->readMultiple(
+                    &mediaBuffers, maxBuffers - numBuffers, &options);
         } else {
             MediaBuffer *mbuf = NULL;
             err = track->mSource->read(&mbuf, &options);
@@ -1457,7 +1454,7 @@ void NuPlayer::GenericSource::readBuffer(
             }
         }
 
-        options.clearSeekTo();
+        options.clearNonPersistent();
 
         size_t id = 0;
         size_t count = mediaBuffers.size();

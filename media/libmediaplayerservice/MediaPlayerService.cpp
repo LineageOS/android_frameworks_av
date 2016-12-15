@@ -707,10 +707,20 @@ sp<MediaPlayerBase> MediaPlayerService::Client::setDataSource_pre(
 
     sp<IServiceManager> sm = defaultServiceManager();
     sp<IBinder> binder = sm->getService(String16("media.extractor"));
+    if (binder == NULL) {
+        ALOGE("Unable to connect to media extractor service");
+        return NULL;
+    }
+
     mExtractorDeathListener = new ServiceDeathNotifier(binder, p, MEDIAEXTRACTOR_PROCESS_DEATH);
     binder->linkToDeath(mExtractorDeathListener);
 
     binder = sm->getService(String16("media.codec"));
+    if (binder == NULL) {
+        ALOGE("Unable to connect to media codec service");
+        return NULL;
+    }
+
     mCodecDeathListener = new ServiceDeathNotifier(binder, p, MEDIACODEC_PROCESS_DEATH);
     binder->linkToDeath(mCodecDeathListener);
 
@@ -1901,6 +1911,13 @@ status_t MediaPlayerService::AudioOutput::open(
                       mRecycledTrack->frameCount(), t->frameCount());
                 reuse = false;
             }
+            // If recycled and new tracks are not on the same output,
+            // don't reuse the recycled one.
+            if (mRecycledTrack->getOutput() != t->getOutput()) {
+                ALOGV("effect chain if exists has already moved to new output, \
+                        giving up reusing recycled track.");
+                reuse = false;
+            }
         }
 
         if (reuse) {
@@ -1915,7 +1932,7 @@ status_t MediaPlayerService::AudioOutput::open(
 #ifdef DOLBY_ENABLE
             updateTrackOnAudioProcessed(mTrack, reuse);
 #endif // DOLBY_END
-            return OK;
+            return updateTrack();
         }
     }
 
@@ -1937,20 +1954,29 @@ status_t MediaPlayerService::AudioOutput::open(
     mFrameSize = t->frameSize();
     mTrack = t;
 
+    return updateTrack();
+}
+
+status_t MediaPlayerService::AudioOutput::updateTrack() {
+    if (mTrack == NULL) {
+        return NO_ERROR;
+    }
+
     status_t res = NO_ERROR;
     // Note some output devices may give us a direct track even though we don't specify it.
     // Example: Line application b/17459982.
-    if ((t->getFlags() & (AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD | AUDIO_OUTPUT_FLAG_DIRECT)) == 0) {
-        res = t->setPlaybackRate(mPlaybackRate);
+    if ((mTrack->getFlags()
+            & (AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD | AUDIO_OUTPUT_FLAG_DIRECT)) == 0) {
+        res = mTrack->setPlaybackRate(mPlaybackRate);
         if (res == NO_ERROR) {
-            t->setAuxEffectSendLevel(mSendLevel);
-            res = t->attachAuxEffect(mAuxEffectId);
+            mTrack->setAuxEffectSendLevel(mSendLevel);
+            res = mTrack->attachAuxEffect(mAuxEffectId);
         }
     }
 #ifdef DOLBY_ENABLE
-    updateTrackOnAudioProcessed(t, false);
+    updateTrackOnAudioProcessed(mTrack, false);
 #endif // DOLBY_END
-    ALOGV("open() DONE status %d", res);
+    ALOGV("updateTrack() DONE status %d", res);
     return res;
 }
 
@@ -2002,6 +2028,7 @@ void MediaPlayerService::AudioOutput::switchToNextOutput() {
                     continue;
                 }
                 callbackData->mSwitching = true; // begin track switch
+                callbackData->setOutput(NULL);
 #else
                 // tryBeginTrackSwitch() returns false if the callback has the lock.
                 if (!mCallbackData->tryBeginTrackSwitch()) {

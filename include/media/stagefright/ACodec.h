@@ -392,6 +392,10 @@ protected:
             int32_t width, int32_t height,
             OMX_VIDEO_CODINGTYPE compressionFormat, float frameRate = -1.0);
 
+    // sets |portIndex| port buffer numbers to be |bufferNum|. NOTE: Component could reject
+    // this setting if the |bufferNum| is less than the minimum buffer num of the port.
+    status_t setPortBufferNum(OMX_U32 portIndex, int bufferNum);
+
     // gets index or sets it to 0 on error. Returns error from codec.
     status_t initDescribeColorAspectsIndex();
 
@@ -500,9 +504,12 @@ protected:
     status_t setOperatingRate(float rateFloat, bool isVideo);
     status_t getIntraRefreshPeriod(uint32_t *intraRefreshPeriod);
     status_t setIntraRefreshPeriod(uint32_t intraRefreshPeriod, bool inConfigure);
+
+    // Configures temporal layering based on |msg|. |inConfigure| shall be true iff this is called
+    // during configure() call. on success the configured layering is set in |outputFormat|. If
+    // |outputFormat| is mOutputFormat, it is copied to trigger an output format changed event.
     status_t configureTemporalLayers(
-            uint32_t numLayers, uint32_t numBLayers, bool inConfigure,
-            sp<AMessage> &outputFormat);
+            const sp<AMessage> &msg, bool inConfigure, sp<AMessage> &outputFormat);
 
     status_t setMinBufferSize(OMX_U32 portIndex, size_t size);
 
@@ -510,7 +517,7 @@ protected:
     status_t setupH263EncoderParameters(const sp<AMessage> &msg);
     status_t setupAVCEncoderParameters(const sp<AMessage> &msg);
     status_t setupHEVCEncoderParameters(const sp<AMessage> &msg);
-    status_t setupVPXEncoderParameters(const sp<AMessage> &msg);
+    status_t setupVPXEncoderParameters(const sp<AMessage> &msg, sp<AMessage> &outputFormat);
 
     status_t verifySupportForProfileAndLevel(int32_t profile, int32_t level);
 
@@ -587,6 +594,15 @@ protected:
 
     virtual status_t getVQZIPInfo(const sp<AMessage> &msg) {
         return OK;
+    }
+
+    virtual status_t setDSModeHint(sp<AMessage>& msg,
+        OMX_U32 flags, int64_t timeUs) {
+        return UNKNOWN_ERROR;
+    }
+
+    virtual bool getDSModeHint(const sp<AMessage>& msg) {
+        return false;
     }
 
     sp<IOMXObserver> createObserver();
