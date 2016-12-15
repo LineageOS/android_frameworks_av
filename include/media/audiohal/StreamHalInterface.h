@@ -62,6 +62,19 @@ class StreamHalInterface : public virtual RefBase
 
     virtual status_t dump(int fd) = 0;
 
+    // Start a stream operating in mmap mode.
+    virtual status_t start() = 0;
+
+    // Stop a stream operating in mmap mode.
+    virtual status_t stop() = 0;
+
+    // Retrieve information on the data buffer in mmap mode.
+    virtual status_t createMmapBuffer(int32_t minSizeFrames,
+                                      struct audio_mmap_buffer_info *info) = 0;
+
+    // Get current read/write position in the mmap buffer
+    virtual status_t getMmapPosition(struct audio_mmap_position *position) = 0;
+
   protected:
     // Subclasses can not be constructed directly by clients.
     StreamHalInterface() {}

@@ -31,6 +31,8 @@ using ::android::hardware::audio::V2_0::IStreamOutCallback;
 using ::android::hardware::audio::V2_0::ParameterValue;
 using ::android::hardware::audio::V2_0::Result;
 using ::android::hardware::audio::V2_0::TimeSpec;
+using ::android::hardware::audio::V2_0::MmapBufferInfo;
+using ::android::hardware::audio::V2_0::MmapPosition;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 
@@ -128,6 +130,51 @@ status_t StreamHalHidl::dump(int fd) {
     return processReturn("dump", ret);
 }
 
+status_t StreamHalHidl::start() {
+    if (!mStream) return NO_INIT;
+    return processReturn("start", mStream->start());
+}
+
+status_t StreamHalHidl::stop() {
+    if (!mStream) return NO_INIT;
+    return processReturn("stop", mStream->stop());
+}
+
+status_t StreamHalHidl::createMmapBuffer(int32_t minSizeFrames,
+                                  struct audio_mmap_buffer_info *info) {
+    Result retval;
+    Return<void> ret = mStream->createMmapBuffer(
+            minSizeFrames,
+            [&](Result r, const MmapBufferInfo& hidlInfo) {
+                retval = r;
+                if (retval == Result::OK) {
+                    native_handle *handle = hidlInfo.sharedMemory->handle();
+                    if (handle->numFds > 0) {
+                        info->shared_memory_fd = dup(handle->data[0]);
+                        info->buffer_size_frames = hidlInfo.bufferSizeFrames;
+                        info->burst_size_frames = hidlInfo.burstSizeFrames;
+                        // info->shared_memory_address is not needed in HIDL context
+                        info->shared_memory_address = NULL;
+                    } else {
+                        retval = Result::NOT_INITIALIZED;
+                    }
+                }
+            });
+    return processReturn("createMmapBuffer", ret, retval);
+}
+
+status_t StreamHalHidl::getMmapPosition(struct audio_mmap_position *position) {
+    Result retval;
+    Return<void> ret = mStream->getMmapPosition(
+            [&](Result r, const MmapPosition& hidlPosition) {
+                retval = r;
+                if (retval == Result::OK) {
+                    position->time_nanoseconds = hidlPosition.timeNanoseconds;
+                    position->position_frames = hidlPosition.positionFrames;
+                }
+            });
+    return processReturn("getMmapPosition", ret, retval);
+}
 
 namespace {
 
