@@ -96,7 +96,7 @@ public:
         return String8("<unspecified>");
     }
 
-    virtual status_t reconnectAtOffset(off64_t offset) {
+    virtual status_t reconnectAtOffset(off64_t /*offset*/) {
         return ERROR_UNSUPPORTED;
     }
 
@@ -114,10 +114,10 @@ public:
     static void RegisterDefaultSniffers();
 
     // for DRM
-    virtual sp<DecryptHandle> DrmInitialization(const char *mime = NULL) {
+    virtual sp<DecryptHandle> DrmInitialization(const char * /*mime*/ = NULL) {
         return NULL;
     }
-    virtual void getDrmInfo(sp<DecryptHandle> &handle, DrmManagerClient **client) {};
+    virtual void getDrmInfo(sp<DecryptHandle> &/*handle*/, DrmManagerClient ** /*client*/) {};
 
     virtual String8 getUri() {
         return String8();

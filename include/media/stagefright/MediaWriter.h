@@ -44,11 +44,11 @@ struct MediaWriter : public RefBase {
         mListener = listener;
     }
 
-    virtual status_t dump(int fd, const Vector<String16>& args) {
+    virtual status_t dump(int /*fd*/, const Vector<String16>& /*args*/) {
         return OK;
     }
 
-    virtual void setStartTimeOffsetMs(int ms) {}
+    virtual void setStartTimeOffsetMs(int /*ms*/) {}
     virtual int32_t getStartTimeOffsetMs() const { return 0; }
 
 protected:

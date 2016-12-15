@@ -73,10 +73,10 @@ struct CodecBase : public AHandler, /* static */ ColorUtils {
     virtual void onMessageReceived(const sp<AMessage> &msg) = 0;
 
     virtual status_t queryCapabilities(
-            const AString &name, const AString &mime, bool isEncoder,
-            sp<MediaCodecInfo::Capabilities> *caps /* nonnull */) { return INVALID_OPERATION; }
+            const AString& /*name*/, const AString& /*mime*/, bool /*isEncoder*/,
+            sp<MediaCodecInfo::Capabilities>* /*caps*/ /* nonnull */) { return INVALID_OPERATION; }
 
-    virtual status_t setSurface(const sp<Surface> &surface) { return INVALID_OPERATION; }
+    virtual status_t setSurface(const sp<Surface>& /*surface*/) { return INVALID_OPERATION; }
 
     virtual void signalFlush() = 0;
     virtual void signalResume() = 0;
@@ -89,8 +89,8 @@ struct CodecBase : public AHandler, /* static */ ColorUtils {
         virtual size_t countBuffers() = 0;
         virtual IOMX::buffer_id bufferIDAt(size_t index) const = 0;
         virtual sp<ABuffer> bufferAt(size_t index) const = 0;
-        virtual sp<NativeHandle> handleAt(size_t index) const { return NULL; };
-        virtual sp<RefBase> memRefAt(size_t index) const { return NULL; }
+        virtual sp<NativeHandle> handleAt(size_t /*index*/) const { return NULL; };
+        virtual sp<RefBase> memRefAt(size_t /*index*/) const { return NULL; }
 
     protected:
         PortDescription();

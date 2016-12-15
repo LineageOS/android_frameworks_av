@@ -212,7 +212,7 @@ public:
     // Returns NO_ERROR if a timestamp is available.  The timestamp includes the total number
     // of frames presented to an external observer, together with the value of CLOCK_MONOTONIC
     // as of this presentation count.  The timestamp parameter is undefined if error is returned.
-    virtual status_t getTimestamp(ExtendedTimestamp &timestamp) { return INVALID_OPERATION; }
+    virtual status_t getTimestamp(ExtendedTimestamp& /*timestamp*/) { return INVALID_OPERATION; }
 
 protected:
     NBAIO_Sink(const NBAIO_Format& format = Format_Invalid) : NBAIO_Port(format), mFramesWritten(0)
@@ -299,7 +299,7 @@ public:
 
     // Invoked asynchronously by corresponding sink when a new timestamp is available.
     // Default implementation ignores the timestamp.
-    virtual void    onTimestamp(const ExtendedTimestamp& timestamp) { }
+    virtual void    onTimestamp(const ExtendedTimestamp& /*timestamp*/) { }
 
 protected:
     NBAIO_Source(const NBAIO_Format& format = Format_Invalid) : NBAIO_Port(format), mFramesRead(0)
