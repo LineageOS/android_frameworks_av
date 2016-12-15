@@ -54,9 +54,9 @@ public:
     MediaMetadataRetrieverInterface() {}
 
     virtual             ~MediaMetadataRetrieverInterface() {}
-    virtual VideoFrame* getFrameAtTime(int64_t timeUs, int option) { return NULL; }
+    virtual VideoFrame* getFrameAtTime(int64_t /*timeUs*/, int /*option*/) { return NULL; }
     virtual MediaAlbumArt* extractAlbumArt() { return NULL; }
-    virtual const char* extractMetadata(int keyCode) { return NULL; }
+    virtual const char* extractMetadata(int /*keyCode*/) { return NULL; }
 };
 
 }; // namespace android
