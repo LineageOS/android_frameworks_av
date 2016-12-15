@@ -24,7 +24,7 @@
 namespace android {
 
 class DataSource;
-class MediaSource;
+struct MediaSource;
 class MetaData;
 
 class MediaExtractor : public BnMediaExtractor {

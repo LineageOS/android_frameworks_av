@@ -22,7 +22,7 @@ namespace android {
 
 struct ABuffer;
 struct ALooper;
-struct AudioTrack;
+class AudioTrack;
 class IGraphicBufferProducer;
 struct MediaCodec;
 struct NuMediaExtractor;

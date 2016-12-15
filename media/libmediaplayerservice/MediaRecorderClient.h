@@ -22,7 +22,7 @@
 
 namespace android {
 
-class MediaRecorderBase;
+struct MediaRecorderBase;
 class MediaPlayerService;
 class ICameraRecordingProxy;
 class IGraphicBufferProducer;
