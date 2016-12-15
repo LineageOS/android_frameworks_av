@@ -82,7 +82,7 @@ struct FrameRenderTracker {
         sp<GraphicBuffer> mGraphicBuffer;
         sp<Fence> mFence;
 
-        friend class FrameRenderTracker;
+        friend struct FrameRenderTracker;
     };
 
     FrameRenderTracker();
