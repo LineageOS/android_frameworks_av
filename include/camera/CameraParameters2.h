@@ -151,7 +151,7 @@ private:
         }
 
         ssize_t removeItem(const KeyT& key) {
-            size_t vectorIdx = (size_t) indexOfKey(key);
+            ssize_t vectorIdx = indexOfKey(key);
 
             if (vectorIdx < 0) {
                 return vectorIdx;
