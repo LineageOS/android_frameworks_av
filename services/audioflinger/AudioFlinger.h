@@ -71,12 +71,11 @@
 #include <powermanager/IPowerManager.h>
 
 #include <media/nbaio/NBLog.h>
+#include <private/media/AudioEffectShared.h>
 #include <private/media/AudioTrackShared.h>
 
 namespace android {
 
-struct audio_track_cblk_t;
-struct effect_param_cblk_t;
 class AudioMixer;
 class AudioBuffer;
 class AudioResampler;
