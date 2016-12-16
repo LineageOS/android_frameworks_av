@@ -42,8 +42,7 @@ LOCAL_MODULE_TAGS := optional
 
 LOCAL_STATIC_LIBRARIES := \
     libaudiopolicypfwwrapper \
-    libaudiopolicycomponents \
-    libxml2
+    libaudiopolicycomponents
 
 LOCAL_SHARED_LIBRARIES := \
     liblog \
@@ -52,7 +51,8 @@ LOCAL_SHARED_LIBRARIES := \
     liblog \
     libaudioutils \
     libparameter \
-    libmedia_helper
+    libmedia_helper \
+    libxml2
 
 include $(BUILD_SHARED_LIBRARY)
 
