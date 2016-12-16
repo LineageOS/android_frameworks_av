@@ -115,7 +115,8 @@ public:
                                 pid_t tid,
                                 audio_session_t *sessionId,
                                 int clientUid,
-                                status_t *status /*non-NULL*/);
+                                status_t *status /*non-NULL*/,
+                                audio_port_handle_t portId);
 
     virtual sp<IAudioRecord> openRecord(
                                 audio_io_handle_t input,
@@ -132,7 +133,8 @@ public:
                                 size_t *notificationFrames,
                                 sp<IMemory>& cblk,
                                 sp<IMemory>& buffers,
-                                status_t *status /*non-NULL*/);
+                                status_t *status /*non-NULL*/,
+                                audio_port_handle_t portId);
 
     virtual     uint32_t    sampleRate(audio_io_handle_t ioHandle) const;
     virtual     audio_format_t format(audio_io_handle_t output) const;

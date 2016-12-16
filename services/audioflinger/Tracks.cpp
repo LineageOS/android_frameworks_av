@@ -75,7 +75,8 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
             uid_t clientUid,
             bool isOut,
             alloc_type alloc,
-            track_type type)
+            track_type type,
+            audio_port_handle_t portId)
     :   RefBase(),
         mThread(thread),
         mClient(client),
@@ -96,7 +97,8 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
         mId(android_atomic_inc(&nextTrackId)),
         mTerminated(false),
         mType(type),
-        mThreadIoHandle(thread->id())
+        mThreadIoHandle(thread->id()),
+        mPortId(portId)
 {
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
     if (!isTrustedCallingUid(callingUid) || clientUid == AUDIO_UID_INVALID) {
@@ -343,12 +345,13 @@ AudioFlinger::PlaybackThread::Track::Track(
             audio_session_t sessionId,
             uid_t uid,
             audio_output_flags_t flags,
-            track_type type)
+            track_type type,
+            audio_port_handle_t portId)
     :   TrackBase(thread, client, sampleRate, format, channelMask, frameCount,
                   (sharedBuffer != 0) ? sharedBuffer->pointer() : buffer,
                   sessionId, uid, true /*isOut*/,
                   (type == TYPE_PATCH) ? ( buffer == NULL ? ALLOC_LOCAL : ALLOC_NONE) : ALLOC_CBLK,
-                  type),
+                  type, portId),
     mFillingUpStatus(FS_INVALID),
     // mRetryCount initialized later when needed
     mSharedBuffer(sharedBuffer),
@@ -1477,13 +1480,14 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
             audio_session_t sessionId,
             uid_t uid,
             audio_input_flags_t flags,
-            track_type type)
+            track_type type,
+            audio_port_handle_t portId)
     :   TrackBase(thread, client, sampleRate, format,
                   channelMask, frameCount, buffer, sessionId, uid, false /*isOut*/,
                   (type == TYPE_DEFAULT) ?
                           ((flags & AUDIO_INPUT_FLAG_FAST) ? ALLOC_PIPE : ALLOC_CBLK) :
                           ((buffer == NULL) ? ALLOC_LOCAL : ALLOC_NONE),
-                  type),
+                  type, portId),
         mOverflow(false),
         mFramesToDrop(0),
         mResamplerBufferProvider(NULL), // initialize in case of early constructor exit

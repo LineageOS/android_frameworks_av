@@ -1134,6 +1134,7 @@ private:
     pid_t                   mClientPid;
 
     sp<AudioSystem::AudioDeviceCallback> mDeviceCallback;
+    audio_port_handle_t     mPortId;  // unique ID allocated by audio policy
 };
 
 }; // namespace android

@@ -151,12 +151,10 @@ status_t AudioPolicyService::getOutputForAttr(const audio_attributes_t *attr,
                                               audio_session_t session,
                                               audio_stream_type_t *stream,
                                               uid_t uid,
-                                              uint32_t samplingRate,
-                                              audio_format_t format,
-                                              audio_channel_mask_t channelMask,
+                                              const audio_config_t *config,
                                               audio_output_flags_t flags,
                                               audio_port_handle_t selectedDeviceId,
-                                              const audio_offload_info_t *offloadInfo)
+                                              audio_port_handle_t *portId)
 {
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
@@ -170,8 +168,9 @@ status_t AudioPolicyService::getOutputForAttr(const audio_attributes_t *attr,
                 "%s uid %d tried to pass itself off as %d", __FUNCTION__, callingUid, uid);
         uid = callingUid;
     }
-    return mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid, samplingRate,
-                                    format, channelMask, flags, selectedDeviceId, offloadInfo);
+    return mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid,
+                                                 config,
+                                                 flags, selectedDeviceId, portId);
 }
 
 status_t AudioPolicyService::startOutput(audio_io_handle_t output,
@@ -262,11 +261,10 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
                                              audio_session_t session,
                                              pid_t pid,
                                              uid_t uid,
-                                             uint32_t samplingRate,
-                                             audio_format_t format,
-                                             audio_channel_mask_t channelMask,
+                                             const audio_config_base_t *config,
                                              audio_input_flags_t flags,
-                                             audio_port_handle_t selectedDeviceId)
+                                             audio_port_handle_t selectedDeviceId,
+                                             audio_port_handle_t *portId)
 {
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
@@ -305,9 +303,9 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
         Mutex::Autolock _l(mLock);
         // the audio_in_acoustics_t parameter is ignored by get_input()
         status = mAudioPolicyManager->getInputForAttr(attr, input, session, uid,
-                                                     samplingRate, format, channelMask,
+                                                     config,
                                                      flags, selectedDeviceId,
-                                                     &inputType);
+                                                     &inputType, portId);
         audioPolicyEffects = mAudioPolicyEffects;
 
         if (status == NO_ERROR) {

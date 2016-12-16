@@ -34,7 +34,8 @@ public:
                                 audio_session_t sessionId,
                                 uid_t uid,
                                 audio_output_flags_t flags,
-                                track_type type);
+                                track_type type,
+                                audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE);
     virtual             ~Track();
     virtual status_t    initCheck() const;
 
