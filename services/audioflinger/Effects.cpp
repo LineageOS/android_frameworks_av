@@ -1309,6 +1309,24 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
     ALOGVV("command(), cmdCode: %d, mHasControl: %d, mEffect: %p",
             cmdCode, mHasControl, mEffect.unsafe_get());
 
+    if (cmdCode == EFFECT_CMD_ENABLE) {
+        if (*replySize < sizeof(int)) {
+            android_errorWriteLog(0x534e4554, "32095713");
+            return BAD_VALUE;
+        }
+        *(int *)pReplyData = NO_ERROR;
+        *replySize = sizeof(int);
+        return enable();
+    } else if (cmdCode == EFFECT_CMD_DISABLE) {
+        if (*replySize < sizeof(int)) {
+            android_errorWriteLog(0x534e4554, "32095713");
+            return BAD_VALUE;
+        }
+        *(int *)pReplyData = NO_ERROR;
+        *replySize = sizeof(int);
+        return disable();
+    }
+
     AutoMutex _l(mLock);
     sp<EffectModule> effect = mEffect.promote();
     if (effect == 0 || mDisconnected) {
@@ -1324,11 +1342,17 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
 
     // handle commands that are not forwarded transparently to effect engine
     if (cmdCode == EFFECT_CMD_SET_PARAM_COMMIT) {
+        if (*replySize < sizeof(int)) {
+            android_errorWriteLog(0x534e4554, "32095713");
+            return BAD_VALUE;
+        }
+        *(int *)pReplyData = NO_ERROR;
+        *replySize = sizeof(int);
+
         // No need to trylock() here as this function is executed in the binder thread serving a
         // particular client process:  no risk to block the whole media server process or mixer
         // threads if we are stuck here
         Mutex::Autolock _l(mCblk->lock);
-
         // keep local copy of index in case of client corruption b/32220769
         const uint32_t clientIndex = mCblk->clientIndex;
         const uint32_t serverIndex = mCblk->serverIndex;
@@ -1391,12 +1415,6 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
         mCblk->serverIndex = 0;
         mCblk->clientIndex = 0;
         return status;
-    } else if (cmdCode == EFFECT_CMD_ENABLE) {
-        *(int *)pReplyData = NO_ERROR;
-        return enable();
-    } else if (cmdCode == EFFECT_CMD_DISABLE) {
-        *(int *)pReplyData = NO_ERROR;
-        return disable();
     }
 
     return effect->command(cmdCode, cmdSize, pCmdData, replySize, pReplyData);
