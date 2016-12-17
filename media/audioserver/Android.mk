@@ -14,7 +14,8 @@ LOCAL_SHARED_LIBRARIES := \
 	libmedialogservice \
 	libradioservice \
 	libsoundtriggerservice \
-	libutils
+	libutils \
+	libhwbinder
 
 LOCAL_C_INCLUDES := \
 	frameworks/av/services/audioflinger \
