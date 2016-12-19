@@ -36,7 +36,6 @@ LOCAL_MODULE_TAGS := optional
 
 LOCAL_STATIC_LIBRARIES := \
     libaudiopolicycomponents \
-    libxml2
 
 LOCAL_SHARED_LIBRARIES += \
     liblog \
