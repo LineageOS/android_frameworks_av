@@ -1,17 +1,38 @@
+/*
+ * Copyright 2016, The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifndef ANDROID_HARDWARE_MEDIA_OMX_V1_0__CONVERSION_H
 #define ANDROID_HARDWARE_MEDIA_OMX_V1_0__CONVERSION_H
 
 #include <hidl/MQDescriptor.h>
+#include <hidl/Status.h>
+#include <hidlmemory/mapping.h>
+#include <android/hidl/memory/1.0/IMemory.h>
 
 #include <unistd.h>
 #include <vector>
 #include <list>
 
-#include <frameworks/native/include/binder/Binder.h>
-#include <frameworks/native/include/binder/Status.h>
+#include <binder/Binder.h>
+#include <binder/Status.h>
+#include <ui/FenceTime.h>
 
 #include <OMXFenceParcelable.h>
 #include <cutils/native_handle.h>
+#include <gui/IGraphicBufferProducer.h>
 
 #include <IOMX.h>
 #include <VideoAPI.h>
@@ -22,8 +43,10 @@
 #include <android/hardware/media/omx/1.0/types.h>
 #include <android/hardware/media/omx/1.0/IOmx.h>
 #include <android/hardware/media/omx/1.0/IOmxNode.h>
+#include <android/hardware/media/omx/1.0/IOmxBufferProducer.h>
 #include <android/hardware/media/omx/1.0/IOmxBufferSource.h>
 #include <android/hardware/media/omx/1.0/IOmxObserver.h>
+#include <android/hardware/media/omx/1.0/IOmxProducerListener.h>
 #include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
 
 namespace android {
@@ -36,11 +59,11 @@ namespace implementation {
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
+using ::android::hardware::hidl_handle;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::sp;
 
-using ::android::hardware::hidl_handle;
 using ::android::String8;
 using ::android::OMXFenceParcelable;
 
@@ -48,12 +71,17 @@ using ::android::hardware::media::omx::V1_0::Message;
 using ::android::omx_message;
 
 using ::android::hardware::media::omx::V1_0::ColorAspects;
+using ::android::hardware::media::V1_0::Rect;
+using ::android::hardware::media::V1_0::Region;
 
 using ::android::hardware::graphics::common::V1_0::Dataspace;
 
 using ::android::hardware::graphics::common::V1_0::PixelFormat;
 
 using ::android::OMXBuffer;
+
+using ::android::hardware::media::V1_0::AnwBuffer;
+using ::android::GraphicBuffer;
 
 using ::android::hardware::media::omx::V1_0::IOmx;
 using ::android::IOMX;
@@ -66,6 +94,9 @@ using ::android::IOMXObserver;
 
 using ::android::hardware::media::omx::V1_0::IOmxBufferSource;
 using ::android::IOMXBufferSource;
+
+using ::android::hardware::media::omx::V1_0::IOmxBufferProducer;
+using ::android::IGraphicBufferProducer;
 
 // native_handle_t helper functions.
 
@@ -279,10 +310,13 @@ inline bool wrapAs(Message* t, native_handle_t** nh, omx_message const& l) {
         case omx_message::FILL_BUFFER_DONE:
             t->type = Message::Type::FILL_BUFFER_DONE;
             t->data.extendedBufferData.buffer = l.u.extended_buffer_data.buffer;
-            t->data.extendedBufferData.rangeOffset = l.u.extended_buffer_data.range_offset;
-            t->data.extendedBufferData.rangeLength = l.u.extended_buffer_data.range_length;
+            t->data.extendedBufferData.rangeOffset =
+                    l.u.extended_buffer_data.range_offset;
+            t->data.extendedBufferData.rangeLength =
+                    l.u.extended_buffer_data.range_length;
             t->data.extendedBufferData.flags = l.u.extended_buffer_data.flags;
-            t->data.extendedBufferData.timestampUs = l.u.extended_buffer_data.timestamp;
+            t->data.extendedBufferData.timestampUs =
+                    l.u.extended_buffer_data.timestamp;
             break;
         case omx_message::FRAME_RENDERED:
             t->type = Message::Type::FRAME_RENDERED;
@@ -321,10 +355,13 @@ inline bool wrapAs(omx_message* l, Message const& t) {
         case Message::Type::FILL_BUFFER_DONE:
             l->type = omx_message::FILL_BUFFER_DONE;
             l->u.extended_buffer_data.buffer = t.data.extendedBufferData.buffer;
-            l->u.extended_buffer_data.range_offset = t.data.extendedBufferData.rangeOffset;
-            l->u.extended_buffer_data.range_length = t.data.extendedBufferData.rangeLength;
+            l->u.extended_buffer_data.range_offset =
+                    t.data.extendedBufferData.rangeOffset;
+            l->u.extended_buffer_data.range_length =
+                    t.data.extendedBufferData.rangeLength;
             l->u.extended_buffer_data.flags = t.data.extendedBufferData.flags;
-            l->u.extended_buffer_data.timestamp = t.data.extendedBufferData.timestampUs;
+            l->u.extended_buffer_data.timestamp =
+                    t.data.extendedBufferData.timestampUs;
             break;
         case Message::Type::FRAME_RENDERED:
             l->type = omx_message::FRAME_RENDERED;
@@ -345,9 +382,9 @@ inline bool wrapAs(omx_message* l, Message const& t) {
  * \param[in] t The source `Message`.
  * \return `true` if the conversion is successful; `false` otherwise.
  *
- * This function calls `wrapto()`, then attempts to clone the file descriptor
- * for the fence if it is not `-1`. If the clone cannot be made, `false` will be
- * returned.
+ * This function calls `wrapto()`, then attempts to duplicate the file
+ * descriptor for the fence if it is not `-1`. If duplication fails, `false`
+ * will be returned.
  */
 // convert: Message -> omx_message
 inline bool convertTo(omx_message* l, Message const& t) {
@@ -526,11 +563,11 @@ inline hidl_vec<uint8_t> toHidlBytes(void const* l, size_t size) {
  * \param[out] t The wrapper of type `CodecBuffer`.
  * \param[in] l The source `OMXBuffer`.
  * \return `true` if the wrapping is successful; `false` otherwise.
- *
- * TODO: Use HIDL's shared memory.
  */
 // wrap: OMXBuffer -> CodecBuffer
 inline bool wrapAs(CodecBuffer* t, OMXBuffer const& l) {
+    t->nativeHandle = hidl_handle();
+    t->sharedMemory = hidl_memory();
     switch (l.mBufferType) {
         case OMXBuffer::kBufferTypeInvalid: {
             t->type = CodecBuffer::Type::INVALID;
@@ -539,23 +576,16 @@ inline bool wrapAs(CodecBuffer* t, OMXBuffer const& l) {
         case OMXBuffer::kBufferTypePreset: {
             t->type = CodecBuffer::Type::PRESET;
             t->attr.preset.rangeLength = static_cast<uint32_t>(l.mRangeLength);
+            t->attr.preset.rangeOffset = static_cast<uint32_t>(l.mRangeOffset);
+            return true;
+        }
+        case OMXBuffer::kBufferTypeHidlMemory: {
+            t->type = CodecBuffer::Type::SHARED_MEM;
+            t->sharedMemory = l.mHidlMemory;
             return true;
         }
         case OMXBuffer::kBufferTypeSharedMem: {
-            t->type = CodecBuffer::Type::SHARED_MEM;
-/* TODO: Use HIDL's shared memory.
-            ssize_t offset;
-            size_t size;
-            native_handle_t* handle;
-            sp<IMemoryHeap> memoryHeap = l.mMem->getMemory(&offset, &size);
-            t->attr.sharedMem.size = static_cast<uint32_t>(size);
-            t->attr.sharedMem.flags = static_cast<uint32_t>(memoryHeap->getFlags());
-            t->attr.sharedMem.offset = static_cast<uint32_t>(offset);
-            if (!convertFd2Handle(memoryHeap->getHeapID(), nh)) {
-                return false;
-            }
-            t->nativeHandle = hidl_handle(*nh);
-            return true;*/
+            // This is not supported.
             return false;
         }
         case OMXBuffer::kBufferTypeANWBuffer: {
@@ -563,7 +593,8 @@ inline bool wrapAs(CodecBuffer* t, OMXBuffer const& l) {
             t->attr.anwBuffer.width = l.mGraphicBuffer->getWidth();
             t->attr.anwBuffer.height = l.mGraphicBuffer->getHeight();
             t->attr.anwBuffer.stride = l.mGraphicBuffer->getStride();
-            t->attr.anwBuffer.format = static_cast<PixelFormat>(l.mGraphicBuffer->getPixelFormat());
+            t->attr.anwBuffer.format = static_cast<PixelFormat>(
+                    l.mGraphicBuffer->getPixelFormat());
             t->attr.anwBuffer.layerCount = l.mGraphicBuffer->getLayerCount();
             t->attr.anwBuffer.usage = l.mGraphicBuffer->getUsage();
             t->nativeHandle = hidl_handle(l.mGraphicBuffer->handle);
@@ -584,8 +615,6 @@ inline bool wrapAs(CodecBuffer* t, OMXBuffer const& l) {
  * \param[out] l The destination `OMXBuffer`.
  * \param[in] t The source `CodecBuffer`.
  * \return `true` if successful; `false` otherwise.
- *
- * TODO: Use HIDL's shared memory.
  */
 // convert: CodecBuffer -> OMXBuffer
 inline bool convertTo(OMXBuffer* l, CodecBuffer const& t) {
@@ -595,14 +624,14 @@ inline bool convertTo(OMXBuffer* l, CodecBuffer const& t) {
             return true;
         }
         case CodecBuffer::Type::PRESET: {
-            *l = OMXBuffer(t.attr.preset.rangeLength);
+            *l = OMXBuffer(
+                    t.attr.preset.rangeOffset,
+                    t.attr.preset.rangeLength);
             return true;
         }
         case CodecBuffer::Type::SHARED_MEM: {
-/* TODO: Use HIDL's memory.
-            *l = OMXBuffer();
-            return true;*/
-            return false;
+            *l = OMXBuffer(t.sharedMemory);
+            return true;
         }
         case CodecBuffer::Type::ANW_BUFFER: {
             *l = OMXBuffer(sp<GraphicBuffer>(new GraphicBuffer(
@@ -772,7 +801,7 @@ inline uint64_t toRawTicks(OMX_TICKS l) {
 }
 
 /**
- * \brief Convert 'uint64_t` to `OMX_TICKS`.
+ * \brief Convert `uint64_t` to `OMX_TICKS`.
  *
  * \param[in] l The source `uint64_t`.
  * \return The destination `OMX_TICKS`.
@@ -788,6 +817,1332 @@ inline OMX_TICKS toOMXTicks(uint64_t t) {
 #endif
 }
 
+/**
+ * \brief Wrap `GraphicBuffer` in `AnwBuffer`.
+ *
+ * \param[out] t The wrapper of type `AnwBuffer`.
+ * \param[in] l The source `GraphicBuffer`.
+ */
+// wrap: GraphicBuffer -> AnwBuffer
+inline void wrapAs(AnwBuffer* t, GraphicBuffer const& l) {
+    t->attr.width = l.getWidth();
+    t->attr.height = l.getHeight();
+    t->attr.stride = l.getStride();
+    t->attr.format = static_cast<PixelFormat>(l.getPixelFormat());
+    t->attr.layerCount = l.getLayerCount();
+    t->attr.usage = l.getUsage();
+    t->attr.id = l.getId();
+    t->attr.generationNumber = l.getGenerationNumber();
+    t->nativeHandle = hidl_handle(l.handle);
+}
+
+/**
+ * \brief Convert `AnwBuffer` to `GraphicBuffer`.
+ *
+ * \param[out] l The destination `GraphicBuffer`.
+ * \param[in] t The source `AnwBuffer`.
+ *
+ * This function will duplicate all file descriptors in \p t.
+ */
+// convert: AnwBuffer -> GraphicBuffer
+// Ref: frameworks/native/libs/ui/GraphicBuffer.cpp: GraphicBuffer::flatten
+inline bool convertTo(GraphicBuffer* l, AnwBuffer const& t) {
+    native_handle_t* handle = t.nativeHandle == nullptr ?
+            nullptr : native_handle_clone(t.nativeHandle);
+
+    size_t const numInts = 12 + (handle ? handle->numInts : 0);
+    int32_t* ints = new int32_t[numInts];
+
+    size_t numFds = static_cast<size_t>(handle ? handle->numFds : 0);
+    int* fds = new int[numFds];
+
+    ints[0] = 'GBFR';
+    ints[1] = static_cast<int32_t>(t.attr.width);
+    ints[2] = static_cast<int32_t>(t.attr.height);
+    ints[3] = static_cast<int32_t>(t.attr.stride);
+    ints[4] = static_cast<int32_t>(t.attr.format);
+    ints[5] = static_cast<int32_t>(t.attr.layerCount);
+    ints[6] = static_cast<int32_t>(t.attr.usage);
+    ints[7] = static_cast<int32_t>(t.attr.id >> 32);
+    ints[8] = static_cast<int32_t>(t.attr.id & 0xFFFFFFFF);
+    ints[9] = static_cast<int32_t>(t.attr.generationNumber);
+    ints[10] = 0;
+    ints[11] = 0;
+    if (handle) {
+        ints[10] = static_cast<int32_t>(handle->numFds);
+        ints[11] = static_cast<int32_t>(handle->numInts);
+        int* intsStart = handle->data + handle->numFds;
+        std::copy(handle->data, intsStart, fds);
+        std::copy(intsStart, intsStart + handle->numInts, &ints[12]);
+    }
+
+    void const* constBuffer = static_cast<void const*>(ints);
+    size_t size = numInts * sizeof(int32_t);
+    int const* constFds = static_cast<int const*>(fds);
+    status_t status = l->unflatten(constBuffer, size, constFds, numFds);
+
+    delete [] fds;
+    delete [] ints;
+    native_handle_delete(handle);
+    return status == NO_ERROR;
+}
+
+/**
+ * Conversion functions for types outside media
+ * ============================================
+ *
+ * Some objects in libui and libgui that were made to go through binder calls do
+ * not expose ways to read or write their fields to the public. To pass an
+ * object of this kind through the HIDL boundary, translation functions need to
+ * work around the access restriction by using the publicly available
+ * `flatten()` and `unflatten()` functions.
+ *
+ * All `flatten()` and `unflatten()` overloads follow the same convention as
+ * follows:
+ *
+ *     status_t flatten(ObjectType const& object,
+ *                      [OtherType const& other, ...]
+ *                      void*& buffer, size_t& size,
+ *                      int*& fds, size_t& numFds)
+ *
+ *     status_t unflatten(ObjectType* object,
+ *                        [OtherType* other, ...,]
+ *                        void*& buffer, size_t& size,
+ *                        int*& fds, size_t& numFds)
+ *
+ * The number of `other` parameters varies depending on the `ObjectType`. For
+ * example, in the process of unflattening an object that contains
+ * `hidl_handle`, `other` is needed to hold `native_handle_t` objects that will
+ * be created.
+ *
+ * The last four parameters always work the same way in all overloads of
+ * `flatten()` and `unflatten()`:
+ * - For `flatten()`, `buffer` is the pointer to the non-fd buffer to be filled,
+ *   `size` is the size (in bytes) of the non-fd buffer pointed to by `buffer`,
+ *   `fds` is the pointer to the fd buffer to be filled, and `numFds` is the
+ *   size (in ints) of the fd buffer pointed to by `fds`.
+ * - For `unflatten()`, `buffer` is the pointer to the non-fd buffer to be read
+ *   from, `size` is the size (in bytes) of the non-fd buffer pointed to by
+ *   `buffer`, `fds` is the pointer to the fd buffer to be read from, and
+ *   `numFds` is the size (in ints) of the fd buffer pointed to by `fds`.
+ * - After a successful call to `flatten()` or `unflatten()`, `buffer` and `fds`
+ *   will be advanced, while `size` and `numFds` will be decreased to reflect
+ *   how much storage/data of the two buffers (fd and non-fd) have been used.
+ * - After an unsuccessful call, the values of `buffer`, `size`, `fds` and
+ *   `numFds` are invalid.
+ *
+ * The return value of a successful `flatten()` or `unflatten()` call will be
+ * `OK` (also aliased as `NO_ERROR`). Any other values indicate a failure.
+ *
+ * For each object type that supports flattening, there will be two accompanying
+ * functions: `getFlattenedSize()` and `getFdCount()`. `getFlattenedSize()` will
+ * return the size of the non-fd buffer that the object will need for
+ * flattening. `getFdCount()` will return the size of the fd buffer that the
+ * object will need for flattening.
+ *
+ * The set of these four functions, `getFlattenedSize()`, `getFdCount()`,
+ * `flatten()` and `unflatten()`, are similar to functions of the same name in
+ * the abstract class `Flattenable`. The only difference is that functions in
+ * this file are not member functions of the object type. For example, we write
+ *
+ *     flatten(x, buffer, size, fds, numFds)
+ *
+ * instead of
+ *
+ *     x.flatten(buffer, size, fds, numFds)
+ *
+ * because we cannot modify the type of `x`.
+ *
+ * There is one exception to the naming convention: `hidl_handle` that
+ * represents a fence. The four functions for this "Fence" type have the word
+ * "Fence" attched to their names because the object type, which is
+ * `hidl_handle`, does not carry the special meaning that the object itself can
+ * only contain zero or one file descriptor.
+ */
+
+// Ref: frameworks/native/libs/ui/Fence.cpp
+
+/**
+ * \brief Return the size of the non-fd buffer required to flatten a fence.
+ *
+ * \param[in] fence The input fence of type `hidl_handle`.
+ * \return The required size of the flat buffer.
+ *
+ * The current version of this function always returns 4, which is the number of
+ * bytes required to store the number of file descriptors contained in the fd
+ * part of the flat buffer.
+ */
+inline size_t getFenceFlattenedSize(hidl_handle const& /* fence */) {
+    return 4;
+};
+
+/**
+ * \brief Return the number of file descriptors contained in a fence.
+ *
+ * \param[in] fence The input fence of type `hidl_handle`.
+ * \return `0` if \p fence does not contain a valid file descriptor, or `1`
+ * otherwise.
+ */
+inline size_t getFenceFdCount(hidl_handle const& fence) {
+    return native_handle_read_fd(fence) == -1 ? 0 : 1;
+}
+
+/**
+ * \brief Unflatten `Fence` to `hidl_handle`.
+ *
+ * \param[out] fence The destination `hidl_handle`.
+ * \param[out] nh The underlying native handle.
+ * \param[in,out] buffer The pointer to the flat non-fd buffer.
+ * \param[in,out] size The size of the flat non-fd buffer.
+ * \param[in,out] fds The pointer to the flat fd buffer.
+ * \param[in,out] numFds The size of the flat fd buffer.
+ * \return `NO_ERROR` on success; other value on failure.
+ *
+ * If the return value is `NO_ERROR`, \p nh will point to a newly created
+ * native handle, which needs to be deleted with `native_handle_delete()`
+ * afterwards.
+ */
+inline status_t unflattenFence(hidl_handle* fence, native_handle_t** nh,
+        void const*& buffer, size_t& size, int const*& fds, size_t& numFds) {
+    if (size < 4) {
+        return NO_MEMORY;
+    }
+
+    uint32_t numFdsInHandle;
+    FlattenableUtils::read(buffer, size, numFdsInHandle);
+
+    if (numFdsInHandle > 1) {
+        return BAD_VALUE;
+    }
+
+    if (numFds < numFdsInHandle) {
+        return NO_MEMORY;
+    }
+
+    if (numFdsInHandle) {
+        *nh = native_handle_create_from_fd(*fds);
+        if (*nh == nullptr) {
+            return NO_MEMORY;
+        }
+        *fence = hidl_handle(*nh);
+        ++fds;
+        --numFds;
+    } else {
+        *nh = nullptr;
+        *fence = hidl_handle();
+    }
+
+    return NO_ERROR;
+}
+
+/**
+ * \brief Flatten `hidl_handle` as `Fence`.
+ *
+ * \param[in] t The source `hidl_handle`.
+ * \param[in,out] buffer The pointer to the flat non-fd buffer.
+ * \param[in,out] size The size of the flat non-fd buffer.
+ * \param[in,out] fds The pointer to the flat fd buffer.
+ * \param[in,out] numFds The size of the flat fd buffer.
+ * \return `NO_ERROR` on success; other value on failure.
+ */
+inline status_t flattenFence(hidl_handle const& fence,
+        void*& buffer, size_t& size, int*& fds, size_t& numFds) {
+    if (size < getFenceFlattenedSize(fence) ||
+            numFds < getFenceFdCount(fence)) {
+        return NO_MEMORY;
+    }
+    // Cast to uint32_t since the size of a size_t can vary between 32- and
+    // 64-bit processes
+    FlattenableUtils::write(buffer, size,
+            static_cast<uint32_t>(getFenceFdCount(fence)));
+    int fd = native_handle_read_fd(fence);
+    if (fd != -1) {
+        *fds = fd;
+        ++fds;
+        --numFds;
+    }
+    return NO_ERROR;
+}
+
+/**
+ * \brief Wrap `Fence` in `hidl_handle`.
+ *
+ * \param[out] t The wrapper of type `hidl_handle`.
+ * \param[out] nh The native handle pointed to by \p t.
+ * \param[in] l The source `Fence`.
+ *
+ * On success, \p nh will hold a newly created native handle, which must be
+ * deleted manually with `native_handle_delete()` afterwards.
+ */
+// wrap: Fence -> hidl_handle
+inline bool wrapAs(hidl_handle* t, native_handle_t** nh, Fence const& l) {
+    size_t const baseSize = l.getFlattenedSize();
+    std::unique_ptr<uint8_t[]> baseBuffer(
+            new (std::nothrow) uint8_t[baseSize]);
+    if (!baseBuffer) {
+        return false;
+    }
+
+    size_t const baseNumFds = l.getFdCount();
+    std::unique_ptr<int[]> baseFds(
+            new (std::nothrow) int[baseNumFds]);
+    if (!baseFds) {
+        return false;
+    }
+
+    void* buffer = static_cast<void*>(baseBuffer.get());
+    size_t size = baseSize;
+    int* fds = static_cast<int*>(baseFds.get());
+    size_t numFds = baseNumFds;
+    if (l.flatten(buffer, size, fds, numFds) != NO_ERROR) {
+        return false;
+    }
+
+    void const* constBuffer = static_cast<void const*>(baseBuffer.get());
+    size = baseSize;
+    int const* constFds = static_cast<int const*>(baseFds.get());
+    numFds = baseNumFds;
+    if (unflattenFence(t, nh, constBuffer, size, constFds, numFds)
+            != NO_ERROR) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * \brief Convert `hidl_handle` to `Fence`.
+ *
+ * \param[out] l The destination `Fence`. `l` must not have been used
+ * (`l->isValid()` must return `false`) before this function is called.
+ * \param[in] t The source `hidl_handle`.
+ *
+ * If \p t contains a valid file descriptor, it will be duplicated.
+ */
+// convert: hidl_handle -> Fence
+inline bool convertTo(Fence* l, hidl_handle const& t) {
+    int fd = native_handle_read_fd(t);
+    if (fd != -1) {
+        fd = dup(fd);
+        if (fd == -1) {
+            return false;
+        }
+    }
+    native_handle_t* nh = native_handle_create_from_fd(fd);
+    if (nh == nullptr) {
+        if (fd != -1) {
+            close(fd);
+        }
+        return false;
+    }
+
+    size_t const baseSize = getFenceFlattenedSize(t);
+    std::unique_ptr<uint8_t[]> baseBuffer(
+            new (std::nothrow) uint8_t[baseSize]);
+    if (!baseBuffer) {
+        native_handle_delete(nh);
+        return false;
+    }
+
+    size_t const baseNumFds = getFenceFdCount(t);
+    std::unique_ptr<int[]> baseFds(
+            new (std::nothrow) int[baseNumFds]);
+    if (!baseFds) {
+        native_handle_delete(nh);
+        return false;
+    }
+
+    void* buffer = static_cast<void*>(baseBuffer.get());
+    size_t size = baseSize;
+    int* fds = static_cast<int*>(baseFds.get());
+    size_t numFds = baseNumFds;
+    if (flattenFence(hidl_handle(nh), buffer, size, fds, numFds) != NO_ERROR) {
+        native_handle_delete(nh);
+        return false;
+    }
+    native_handle_delete(nh);
+
+    void const* constBuffer = static_cast<void const*>(baseBuffer.get());
+    size = baseSize;
+    int const* constFds = static_cast<int const*>(baseFds.get());
+    numFds = baseNumFds;
+    if (l->unflatten(constBuffer, size, constFds, numFds) != NO_ERROR) {
+        return false;
+    }
+
+    return true;
+}
+
+// Ref: frameworks/native/libs/ui/FenceTime.cpp: FenceTime::Snapshot
+
+/**
+ * \brief Return the size of the non-fd buffer required to flatten
+ * `FenceTimeSnapshot`.
+ *
+ * \param[in] t The input `FenceTimeSnapshot`.
+ * \return The required size of the flat buffer.
+ */
+inline size_t getFlattenedSize(
+        IOmxBufferProducer::FenceTimeSnapshot const& t) {
+    constexpr size_t min = sizeof(t.state);
+    switch (t.state) {
+        case IOmxBufferProducer::FenceTimeSnapshot::State::EMPTY:
+            return min;
+        case IOmxBufferProducer::FenceTimeSnapshot::State::FENCE:
+            return min + getFenceFlattenedSize(t.fence);
+        case IOmxBufferProducer::FenceTimeSnapshot::State::SIGNAL_TIME:
+            return min + sizeof(
+                    ::android::FenceTime::Snapshot::signalTime);
+    }
+    return 0;
+}
+
+/**
+ * \brief Return the number of file descriptors contained in
+ * `FenceTimeSnapshot`.
+ *
+ * \param[in] t The input `FenceTimeSnapshot`.
+ * \return The number of file descriptors contained in \p snapshot.
+ */
+inline size_t getFdCount(
+        IOmxBufferProducer::FenceTimeSnapshot const& t) {
+    return t.state ==
+            IOmxBufferProducer::FenceTimeSnapshot::State::FENCE ?
+            getFenceFdCount(t.fence) : 0;
+}
+
+/**
+ * \brief Flatten `FenceTimeSnapshot`.
+ *
+ * \param[in] t The source `FenceTimeSnapshot`.
+ * \param[in,out] buffer The pointer to the flat non-fd buffer.
+ * \param[in,out] size The size of the flat non-fd buffer.
+ * \param[in,out] fds The pointer to the flat fd buffer.
+ * \param[in,out] numFds The size of the flat fd buffer.
+ * \return `NO_ERROR` on success; other value on failure.
+ *
+ * This function will duplicate the file descriptor in `t.fence` if `t.state ==
+ * FENCE`.
+ */
+inline status_t flatten(IOmxBufferProducer::FenceTimeSnapshot const& t,
+        void*& buffer, size_t& size, int*& fds, size_t& numFds) {
+    if (size < getFlattenedSize(t)) {
+        return NO_MEMORY;
+    }
+
+    switch (t.state) {
+        case IOmxBufferProducer::FenceTimeSnapshot::State::EMPTY:
+            FlattenableUtils::write(buffer, size,
+                    ::android::FenceTime::Snapshot::State::EMPTY);
+            return NO_ERROR;
+        case IOmxBufferProducer::FenceTimeSnapshot::State::FENCE:
+            FlattenableUtils::write(buffer, size,
+                    ::android::FenceTime::Snapshot::State::FENCE);
+            return flattenFence(t.fence, buffer, size, fds, numFds);
+        case IOmxBufferProducer::FenceTimeSnapshot::State::SIGNAL_TIME:
+            FlattenableUtils::write(buffer, size,
+                    ::android::FenceTime::Snapshot::State::SIGNAL_TIME);
+            FlattenableUtils::write(buffer, size, t.signalTimeNs);
+            return NO_ERROR;
+    }
+    return NO_ERROR;
+}
+
+/**
+ * \brief Unflatten `FenceTimeSnapshot`.
+ *
+ * \param[out] t The destination `FenceTimeSnapshot`.
+ * \param[out] nh The underlying native handle.
+ * \param[in,out] buffer The pointer to the flat non-fd buffer.
+ * \param[in,out] size The size of the flat non-fd buffer.
+ * \param[in,out] fds The pointer to the flat fd buffer.
+ * \param[in,out] numFds The size of the flat fd buffer.
+ * \return `NO_ERROR` on success; other value on failure.
+ *
+ * If the return value is `NO_ERROR` and the constructed snapshot contains a
+ * file descriptor, \p nh will be created to hold that file descriptor. In this
+ * case, \p nh needs to be deleted with `native_handle_delete()` afterwards.
+ */
+inline status_t unflatten(
+        IOmxBufferProducer::FenceTimeSnapshot* t, native_handle_t** nh,
+        void const*& buffer, size_t& size, int const*& fds, size_t& numFds) {
+    if (size < sizeof(t->state)) {
+        return NO_MEMORY;
+    }
+
+    ::android::FenceTime::Snapshot::State state;
+    FlattenableUtils::read(buffer, size, state);
+    switch (state) {
+        case ::android::FenceTime::Snapshot::State::EMPTY:
+            t->state = IOmxBufferProducer::FenceTimeSnapshot::State::EMPTY;
+            return NO_ERROR;
+        case ::android::FenceTime::Snapshot::State::FENCE:
+            t->state = IOmxBufferProducer::FenceTimeSnapshot::State::FENCE;
+            return unflattenFence(&t->fence, nh, buffer, size, fds, numFds);
+        case ::android::FenceTime::Snapshot::State::SIGNAL_TIME:
+            t->state = IOmxBufferProducer::FenceTimeSnapshot::State::SIGNAL_TIME;
+            if (size < sizeof(t->signalTimeNs)) {
+                return NO_MEMORY;
+            }
+            FlattenableUtils::read(buffer, size, t->signalTimeNs);
+            return NO_ERROR;
+    }
+    return NO_ERROR;
+}
+
+// Ref: frameworks/native/libs/gui/FrameTimestamps.cpp: FrameEventsDelta
+
+/**
+ * \brief Return a lower bound on the size of the non-fd buffer required to
+ * flatten `FrameEventsDelta`.
+ *
+ * \param[in] t The input `FrameEventsDelta`.
+ * \return A lower bound on the size of the flat buffer.
+ */
+constexpr size_t minFlattenedSize(
+        IOmxBufferProducer::FrameEventsDelta const& /* t */) {
+    return sizeof(uint64_t) + // mFrameNumber
+            sizeof(uint8_t) + // mIndex
+            sizeof(uint8_t) + // mAddPostCompositeCalled
+            sizeof(uint8_t) + // mAddRetireCalled
+            sizeof(uint8_t) + // mAddReleaseCalled
+            sizeof(nsecs_t) + // mPostedTime
+            sizeof(nsecs_t) + // mRequestedPresentTime
+            sizeof(nsecs_t) + // mLatchTime
+            sizeof(nsecs_t) + // mFirstRefreshStartTime
+            sizeof(nsecs_t); // mLastRefreshStartTime
+}
+
+/**
+ * \brief Return the size of the non-fd buffer required to flatten
+ * `FrameEventsDelta`.
+ *
+ * \param[in] t The input `FrameEventsDelta`.
+ * \return The required size of the flat buffer.
+ */
+inline size_t getFlattenedSize(
+        IOmxBufferProducer::FrameEventsDelta const& t) {
+    return minFlattenedSize(t) +
+            getFlattenedSize(t.gpuCompositionDoneFence) +
+            getFlattenedSize(t.displayPresentFence) +
+            getFlattenedSize(t.displayRetireFence) +
+            getFlattenedSize(t.releaseFence);
+};
+
+/**
+ * \brief Return the number of file descriptors contained in
+ * `FrameEventsDelta`.
+ *
+ * \param[in] t The input `FrameEventsDelta`.
+ * \return The number of file descriptors contained in \p t.
+ */
+inline size_t getFdCount(
+        IOmxBufferProducer::FrameEventsDelta const& t) {
+    return getFdCount(t.gpuCompositionDoneFence) +
+            getFdCount(t.displayPresentFence) +
+            getFdCount(t.displayRetireFence) +
+            getFdCount(t.releaseFence);
+};
+
+/**
+ * \brief Unflatten `FrameEventsDelta`.
+ *
+ * \param[out] t The destination `FrameEventsDelta`.
+ * \param[out] nh The underlying array of native handles.
+ * \param[in,out] buffer The pointer to the flat non-fd buffer.
+ * \param[in,out] size The size of the flat non-fd buffer.
+ * \param[in,out] fds The pointer to the flat fd buffer.
+ * \param[in,out] numFds The size of the flat fd buffer.
+ * \return `NO_ERROR` on success; other value on failure.
+ *
+ * If the return value is `NO_ERROR`, \p nh will have length 4, and it will be
+ * populated with `nullptr` or newly created handles. Each non-null slot in \p
+ * nh will need to be deleted manually with `native_handle_delete()`.
+ */
+inline status_t unflatten(IOmxBufferProducer::FrameEventsDelta* t,
+        std::vector<native_handle_t*>* nh,
+        void const*& buffer, size_t& size, int const*& fds, size_t& numFds) {
+    if (size < minFlattenedSize(*t)) {
+        return NO_MEMORY;
+    }
+    FlattenableUtils::read(buffer, size, t->frameNumber);
+
+    // These were written as uint8_t for alignment.
+    uint8_t temp = 0;
+    FlattenableUtils::read(buffer, size, temp);
+    size_t index = static_cast<size_t>(temp);
+    if (index >= ::android::FrameEventHistory::MAX_FRAME_HISTORY) {
+        return BAD_VALUE;
+    }
+    t->index = static_cast<uint32_t>(index);
+
+    FlattenableUtils::read(buffer, size, temp);
+    t->addPostCompositeCalled = static_cast<bool>(temp);
+    FlattenableUtils::read(buffer, size, temp);
+    t->addRetireCalled = static_cast<bool>(temp);
+    FlattenableUtils::read(buffer, size, temp);
+    t->addReleaseCalled = static_cast<bool>(temp);
+
+    FlattenableUtils::read(buffer, size, t->postedTimeNs);
+    FlattenableUtils::read(buffer, size, t->requestedPresentTimeNs);
+    FlattenableUtils::read(buffer, size, t->latchTimeNs);
+    FlattenableUtils::read(buffer, size, t->firstRefreshStartTimeNs);
+    FlattenableUtils::read(buffer, size, t->lastRefreshStartTimeNs);
+    FlattenableUtils::read(buffer, size, t->dequeueReadyTime);
+
+    // Fences
+    IOmxBufferProducer::FenceTimeSnapshot* tSnapshot[4];
+    tSnapshot[0] = &t->gpuCompositionDoneFence;
+    tSnapshot[1] = &t->displayPresentFence;
+    tSnapshot[2] = &t->displayRetireFence;
+    tSnapshot[3] = &t->releaseFence;
+    nh->resize(4);
+    for (size_t snapshotIndex = 0; snapshotIndex < 4; ++snapshotIndex) {
+        status_t status = unflatten(
+                tSnapshot[snapshotIndex], &((*nh)[snapshotIndex]),
+                buffer, size, fds, numFds);
+        if (status != NO_ERROR) {
+            while (snapshotIndex > 0) {
+                --snapshotIndex;
+                if ((*nh)[snapshotIndex] != nullptr) {
+                    native_handle_delete((*nh)[snapshotIndex]);
+                }
+            }
+            return status;
+        }
+    }
+    return NO_ERROR;
+}
+
+/**
+ * \brief Flatten `FrameEventsDelta`.
+ *
+ * \param[in] t The source `FrameEventsDelta`.
+ * \param[in,out] buffer The pointer to the flat non-fd buffer.
+ * \param[in,out] size The size of the flat non-fd buffer.
+ * \param[in,out] fds The pointer to the flat fd buffer.
+ * \param[in,out] numFds The size of the flat fd buffer.
+ * \return `NO_ERROR` on success; other value on failure.
+ *
+ * This function will duplicate file descriptors contained in \p t.
+ */
+// Ref: frameworks/native/libs/gui/FrameTimestamp.cpp:
+//      FrameEventsDelta::flatten
+inline status_t flatten(IOmxBufferProducer::FrameEventsDelta const& t,
+        void*& buffer, size_t& size, int*& fds, size_t numFds) {
+    // Check that t.index is within a valid range.
+    if (t.index >= static_cast<uint32_t>(FrameEventHistory::MAX_FRAME_HISTORY)
+            || t.index > std::numeric_limits<uint8_t>::max()) {
+        return BAD_VALUE;
+    }
+
+    FlattenableUtils::write(buffer, size, t.frameNumber);
+
+    // These are static_cast to uint8_t for alignment.
+    FlattenableUtils::write(buffer, size, static_cast<uint8_t>(t.index));
+    FlattenableUtils::write(
+            buffer, size, static_cast<uint8_t>(t.addPostCompositeCalled));
+    FlattenableUtils::write(
+            buffer, size, static_cast<uint8_t>(t.addRetireCalled));
+    FlattenableUtils::write(
+            buffer, size, static_cast<uint8_t>(t.addReleaseCalled));
+
+    FlattenableUtils::write(buffer, size, t.postedTimeNs);
+    FlattenableUtils::write(buffer, size, t.requestedPresentTimeNs);
+    FlattenableUtils::write(buffer, size, t.latchTimeNs);
+    FlattenableUtils::write(buffer, size, t.firstRefreshStartTimeNs);
+    FlattenableUtils::write(buffer, size, t.lastRefreshStartTimeNs);
+    FlattenableUtils::write(buffer, size, t.dequeueReadyTime);
+
+    // Fences
+    IOmxBufferProducer::FenceTimeSnapshot const* tSnapshot[4];
+    tSnapshot[0] = &t.gpuCompositionDoneFence;
+    tSnapshot[1] = &t.displayPresentFence;
+    tSnapshot[2] = &t.displayRetireFence;
+    tSnapshot[3] = &t.releaseFence;
+    for (size_t snapshotIndex = 0; snapshotIndex < 4; ++snapshotIndex) {
+        status_t status = flatten(
+                *(tSnapshot[snapshotIndex]), buffer, size, fds, numFds);
+        if (status != NO_ERROR) {
+            return status;
+        }
+    }
+    return NO_ERROR;
+}
+
+// Ref: frameworks/native/libs/gui/FrameTimestamps.cpp: FrameEventHistoryDelta
+
+/**
+ * \brief Return the size of the non-fd buffer required to flatten
+ * `IOmxBufferProducer::FrameEventHistoryDelta`.
+ *
+ * \param[in] t The input `IOmxBufferProducer::FrameEventHistoryDelta`.
+ * \return The required size of the flat buffer.
+ */
+inline size_t getFlattenedSize(
+        IOmxBufferProducer::FrameEventHistoryDelta const& t) {
+    size_t size = 4;
+    for (size_t i = 0; i < t.size(); ++i) {
+        size += getFlattenedSize(t[i]);
+    }
+    return size;
+}
+
+/**
+ * \brief Return the number of file descriptors contained in
+ * `IOmxBufferProducer::FrameEventHistoryDelta`.
+ *
+ * \param[in] t The input `IOmxBufferProducer::FrameEventHistoryDelta`.
+ * \return The number of file descriptors contained in \p t.
+ */
+inline size_t getFdCount(
+        IOmxBufferProducer::FrameEventHistoryDelta const& t) {
+    size_t numFds = 0;
+    for (size_t i = 0; i < t.size(); ++i) {
+        numFds += getFdCount(t[i]);
+    }
+    return numFds;
+}
+
+/**
+ * \brief Unflatten `FrameEventHistoryDelta`.
+ *
+ * \param[out] t The destination `FrameEventHistoryDelta`.
+ * \param[out] nh The underlying array of arrays of native handles.
+ * \param[in,out] buffer The pointer to the flat non-fd buffer.
+ * \param[in,out] size The size of the flat non-fd buffer.
+ * \param[in,out] fds The pointer to the flat fd buffer.
+ * \param[in,out] numFds The size of the flat fd buffer.
+ * \return `NO_ERROR` on success; other value on failure.
+ *
+ * If the return value is `NO_ERROR`, \p nh will be populated with `nullptr` or
+ * newly created handles. The second dimension of \p nh will be 4. Each non-null
+ * slot in \p nh will need to be deleted manually with `native_handle_delete()`.
+ */
+inline status_t unflatten(
+        IOmxBufferProducer::FrameEventHistoryDelta* t,
+        std::vector<std::vector<native_handle_t*> >* nh,
+        void const*& buffer, size_t& size, int const*& fds, size_t& numFds) {
+    if (size < 4) {
+        return NO_MEMORY;
+    }
+
+    uint32_t deltaCount = 0;
+    FlattenableUtils::read(buffer, size, deltaCount);
+    if (static_cast<size_t>(deltaCount) >
+            ::android::FrameEventHistory::MAX_FRAME_HISTORY) {
+        return BAD_VALUE;
+    }
+    t->resize(deltaCount);
+    nh->resize(deltaCount);
+    for (size_t deltaIndex = 0; deltaIndex < deltaCount; ++deltaIndex) {
+        status_t status = unflatten(
+                &((*t)[deltaIndex]), &((*nh)[deltaIndex]),
+                buffer, size, fds, numFds);
+        if (status != NO_ERROR) {
+            return status;
+        }
+    }
+    return NO_ERROR;
+}
+
+/**
+ * \brief Flatten `FrameEventHistoryDelta`.
+ *
+ * \param[in] t The source `FrameEventHistoryDelta`.
+ * \param[in,out] buffer The pointer to the flat non-fd buffer.
+ * \param[in,out] size The size of the flat non-fd buffer.
+ * \param[in,out] fds The pointer to the flat fd buffer.
+ * \param[in,out] numFds The size of the flat fd buffer.
+ * \return `NO_ERROR` on success; other value on failure.
+ *
+ * This function will duplicate file descriptors contained in \p t.
+ */
+inline status_t flatten(
+        IOmxBufferProducer::FrameEventHistoryDelta const& t,
+        void*& buffer, size_t& size, int*& fds, size_t& numFds) {
+    if (t.size() > ::android::FrameEventHistory::MAX_FRAME_HISTORY) {
+        return BAD_VALUE;
+    }
+    if (size < getFlattenedSize(t)) {
+        return NO_MEMORY;
+    }
+
+    FlattenableUtils::write(buffer, size, static_cast<uint32_t>(t.size()));
+    for (size_t deltaIndex = 0; deltaIndex < t.size(); ++deltaIndex) {
+        status_t status = flatten(t[deltaIndex], buffer, size, fds, numFds);
+        if (status != NO_ERROR) {
+            return status;
+        }
+    }
+    return NO_ERROR;
+}
+
+/**
+ * \brief Wrap `::android::FrameEventHistoryData` in
+ * `IOmxBufferProducer::FrameEventHistoryDelta`.
+ *
+ * \param[out] t The wrapper of type
+ * `IOmxBufferProducer::FrameEventHistoryDelta`.
+ * \param[out] nh The array of array of native handles that are referred to by
+ * members of \p t.
+ * \param[in] l The source `::android::FrameEventHistoryDelta`.
+ *
+ * On success, each member of \p nh will be either `nullptr` or a newly created
+ * native handle. All the non-`nullptr` elements must be deleted individually
+ * with `native_handle_delete()`.
+ */
+inline bool wrapAs(IOmxBufferProducer::FrameEventHistoryDelta* t,
+        std::vector<std::vector<native_handle_t*> >* nh,
+        ::android::FrameEventHistoryDelta const& l) {
+
+    size_t const baseSize = l.getFlattenedSize();
+    std::unique_ptr<uint8_t[]> baseBuffer(
+            new (std::nothrow) uint8_t[baseSize]);
+    if (!baseBuffer) {
+        return false;
+    }
+
+    size_t const baseNumFds = l.getFdCount();
+    std::unique_ptr<int[]> baseFds(
+            new (std::nothrow) int[baseNumFds]);
+    if (!baseFds) {
+        return false;
+    }
+
+    void* buffer = static_cast<void*>(baseBuffer.get());
+    size_t size = baseSize;
+    int* fds = baseFds.get();
+    size_t numFds = baseNumFds;
+    if (l.flatten(buffer, size, fds, numFds) != NO_ERROR) {
+        return false;
+    }
+
+    void const* constBuffer = static_cast<void const*>(baseBuffer.get());
+    size = baseSize;
+    int const* constFds = static_cast<int const*>(baseFds.get());
+    numFds = baseNumFds;
+    if (unflatten(t, nh, constBuffer, size, constFds, numFds) != NO_ERROR) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * \brief Convert `IOmxBufferProducer::FrameEventHistoryDelta` to
+ * `::android::FrameEventHistoryDelta`.
+ *
+ * \param[out] l The destination `::android::FrameEventHistoryDelta`.
+ * \param[in] t The source `IOmxBufferProducer::FrameEventHistoryDelta`.
+ *
+ * This function will duplicate all file descriptors contained in \p t.
+ */
+inline bool convertTo(
+        ::android::FrameEventHistoryDelta* l,
+        IOmxBufferProducer::FrameEventHistoryDelta const& t) {
+
+    size_t const baseSize = getFlattenedSize(t);
+    std::unique_ptr<uint8_t[]> baseBuffer(
+            new (std::nothrow) uint8_t[baseSize]);
+    if (!baseBuffer) {
+        return false;
+    }
+
+    size_t const baseNumFds = getFdCount(t);
+    std::unique_ptr<int[]> baseFds(
+            new (std::nothrow) int[baseNumFds]);
+    if (!baseFds) {
+        return false;
+    }
+
+    void* buffer = static_cast<void*>(baseBuffer.get());
+    size_t size = baseSize;
+    int* fds = static_cast<int*>(baseFds.get());
+    size_t numFds = baseNumFds;
+    if (flatten(t, buffer, size, fds, numFds) != NO_ERROR) {
+        return false;
+    }
+
+    void const* constBuffer = static_cast<void const*>(baseBuffer.get());
+    size = baseSize;
+    int const* constFds = static_cast<int const*>(baseFds.get());
+    numFds = baseNumFds;
+    if (l->unflatten(constBuffer, size, constFds, numFds) != NO_ERROR) {
+        return false;
+    }
+
+    return true;
+}
+
+// Ref: frameworks/native/libs/ui/Region.cpp
+
+/**
+ * \brief Return the size of the buffer required to flatten `Region`.
+ *
+ * \param[in] t The input `Region`.
+ * \return The required size of the flat buffer.
+ */
+inline size_t getFlattenedSize(Region const& t) {
+    return sizeof(uint32_t) + t.size() * sizeof(::android::Rect);
+}
+
+/**
+ * \brief Unflatten `Region`.
+ *
+ * \param[out] t The destination `Region`.
+ * \param[in,out] buffer The pointer to the flat buffer.
+ * \param[in,out] size The size of the flat buffer.
+ * \return `NO_ERROR` on success; other value on failure.
+ */
+inline status_t unflatten(Region* t, void const*& buffer, size_t& size) {
+    if (size < sizeof(uint32_t)) {
+        return NO_MEMORY;
+    }
+
+    uint32_t numRects = 0;
+    FlattenableUtils::read(buffer, size, numRects);
+    if (size < numRects * sizeof(Rect)) {
+        return NO_MEMORY;
+    }
+    if (numRects > (UINT32_MAX / sizeof(Rect))) {
+        return NO_MEMORY;
+    }
+
+    t->resize(numRects);
+    for (size_t r = 0; r < numRects; ++r) {
+        ::android::Rect rect(::android::Rect::EMPTY_RECT);
+        status_t status = rect.unflatten(buffer, size);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        FlattenableUtils::advance(buffer, size, sizeof(rect));
+        (*t)[r] = Rect{
+                static_cast<int32_t>(rect.left),
+                static_cast<int32_t>(rect.top),
+                static_cast<int32_t>(rect.right),
+                static_cast<int32_t>(rect.bottom)};
+    }
+    return NO_ERROR;
+}
+
+/**
+ * \brief Flatten `Region`.
+ *
+ * \param[in] t The source `Region`.
+ * \param[in,out] buffer The pointer to the flat buffer.
+ * \param[in,out] size The size of the flat buffer.
+ * \return `NO_ERROR` on success; other value on failure.
+ */
+inline status_t flatten(Region const& t, void*& buffer, size_t& size) {
+    if (size < getFlattenedSize(t)) {
+        return NO_MEMORY;
+    }
+
+    FlattenableUtils::write(buffer, size, static_cast<uint32_t>(t.size()));
+    for (size_t r = 0; r < t.size(); ++r) {
+        ::android::Rect rect(
+                static_cast<int32_t>(t[r].left),
+                static_cast<int32_t>(t[r].top),
+                static_cast<int32_t>(t[r].right),
+                static_cast<int32_t>(t[r].bottom));
+        status_t status = rect.flatten(buffer, size);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        FlattenableUtils::advance(buffer, size, sizeof(rect));
+    }
+    return NO_ERROR;
+}
+
+/**
+ * \brief Convert `::android::Region` to `Region`.
+ *
+ * \param[out] t The destination `Region`.
+ * \param[in] l The source `::android::Region`.
+ */
+// convert: ::android::Region -> Region
+inline bool convertTo(Region* t, ::android::Region const& l) {
+    size_t const baseSize = l.getFlattenedSize();
+    std::unique_ptr<uint8_t[]> baseBuffer(
+            new (std::nothrow) uint8_t[baseSize]);
+    if (!baseBuffer) {
+        return false;
+    }
+
+    void* buffer = static_cast<void*>(baseBuffer.get());
+    size_t size = baseSize;
+    if (l.flatten(buffer, size) != NO_ERROR) {
+        return false;
+    }
+
+    void const* constBuffer = static_cast<void const*>(baseBuffer.get());
+    size = baseSize;
+    if (unflatten(t, constBuffer, size) != NO_ERROR) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * \brief Convert `Region` to `::android::Region`.
+ *
+ * \param[out] l The destination `::android::Region`.
+ * \param[in] t The source `Region`.
+ */
+// convert: Region -> ::android::Region
+inline bool convertTo(::android::Region* l, Region const& t) {
+    size_t const baseSize = getFlattenedSize(t);
+    std::unique_ptr<uint8_t[]> baseBuffer(
+            new (std::nothrow) uint8_t[baseSize]);
+    if (!baseBuffer) {
+        return false;
+    }
+
+    void* buffer = static_cast<void*>(baseBuffer.get());
+    size_t size = baseSize;
+    if (flatten(t, buffer, size) != NO_ERROR) {
+        return false;
+    }
+
+    void const* constBuffer = static_cast<void const*>(baseBuffer.get());
+    size = baseSize;
+    if (l->unflatten(constBuffer, size) != NO_ERROR) {
+        return false;
+    }
+
+    return true;
+}
+
+// Ref: frameworks/native/libs/gui/IGraphicBufferProducer.cpp:
+//      IGraphicBufferProducer::QueueBufferInput
+
+/**
+ * \brief Return a lower bound on the size of the buffer required to flatten
+ * `IOmxBufferProducer::QueueBufferInput`.
+ *
+ * \param[in] t The input `IOmxBufferProducer::QueueBufferInput`.
+ * \return A lower bound on the size of the flat buffer.
+ */
+constexpr size_t minFlattenedSize(
+        IOmxBufferProducer::QueueBufferInput const& /* t */) {
+    return sizeof(int64_t) + // timestamp
+            sizeof(int) + // isAutoTimestamp
+            sizeof(android_dataspace) + // dataSpace
+            sizeof(::android::Rect) + // crop
+            sizeof(int) + // scalingMode
+            sizeof(uint32_t) + // transform
+            sizeof(uint32_t) + // stickyTransform
+            sizeof(bool); // getFrameTimestamps
+}
+
+/**
+ * \brief Return the size of the buffer required to flatten
+ * `IOmxBufferProducer::QueueBufferInput`.
+ *
+ * \param[in] t The input `IOmxBufferProducer::QueueBufferInput`.
+ * \return The required size of the flat buffer.
+ */
+inline size_t getFlattenedSize(IOmxBufferProducer::QueueBufferInput const& t) {
+    return minFlattenedSize(t) +
+            getFenceFlattenedSize(t.fence) +
+            getFlattenedSize(t.surfaceDamage);
+}
+
+/**
+ * \brief Return the number of file descriptors contained in
+ * `IOmxBufferProducer::QueueBufferInput`.
+ *
+ * \param[in] t The input `IOmxBufferProducer::QueueBufferInput`.
+ * \return The number of file descriptors contained in \p t.
+ */
+inline size_t getFdCount(
+        IOmxBufferProducer::QueueBufferInput const& t) {
+    return getFenceFdCount(t.fence);
+}
+
+/**
+ * \brief Flatten `IOmxBufferProducer::QueueBufferInput`.
+ *
+ * \param[in] t The source `IOmxBufferProducer::QueueBufferInput`.
+ * \param[in,out] buffer The pointer to the flat non-fd buffer.
+ * \param[in,out] size The size of the flat non-fd buffer.
+ * \param[in,out] fds The pointer to the flat fd buffer.
+ * \param[in,out] numFds The size of the flat fd buffer.
+ * \return `NO_ERROR` on success; other value on failure.
+ *
+ * This function will duplicate the file descriptor in `t.fence`. */
+inline status_t flatten(IOmxBufferProducer::QueueBufferInput const& t,
+        void*& buffer, size_t& size, int*& fds, size_t& numFds) {
+    if (size < getFlattenedSize(t)) {
+        return NO_MEMORY;
+    }
+
+    FlattenableUtils::write(buffer, size, t.timestamp);
+    FlattenableUtils::write(buffer, size, static_cast<int>(t.isAutoTimestamp));
+    FlattenableUtils::write(buffer, size,
+            static_cast<android_dataspace_t>(t.dataSpace));
+    FlattenableUtils::write(buffer, size, ::android::Rect(
+            static_cast<int32_t>(t.crop.left),
+            static_cast<int32_t>(t.crop.top),
+            static_cast<int32_t>(t.crop.right),
+            static_cast<int32_t>(t.crop.bottom)));
+    FlattenableUtils::write(buffer, size, static_cast<int>(t.scalingMode));
+    FlattenableUtils::write(buffer, size, t.transform);
+    FlattenableUtils::write(buffer, size, t.stickyTransform);
+    FlattenableUtils::write(buffer, size, t.getFrameTimestamps);
+
+    status_t status = flattenFence(t.fence, buffer, size, fds, numFds);
+    if (status != NO_ERROR) {
+        return status;
+    }
+    return flatten(t.surfaceDamage, buffer, size);
+}
+
+/**
+ * \brief Unflatten `IOmxBufferProducer::QueueBufferInput`.
+ *
+ * \param[out] t The destination `IOmxBufferProducer::QueueBufferInput`.
+ * \param[out] nh The underlying native handle for `t->fence`.
+ * \param[in,out] buffer The pointer to the flat non-fd buffer.
+ * \param[in,out] size The size of the flat non-fd buffer.
+ * \param[in,out] fds The pointer to the flat fd buffer.
+ * \param[in,out] numFds The size of the flat fd buffer.
+ * \return `NO_ERROR` on success; other value on failure.
+ *
+ * If the return value is `NO_ERROR` and `t->fence` contains a valid file
+ * descriptor, \p nh will be a newly created native handle holding that file
+ * descriptor. \p nh needs to be deleted with `native_handle_delete()`
+ * afterwards.
+ */
+inline status_t unflatten(
+        IOmxBufferProducer::QueueBufferInput* t, native_handle_t** nh,
+        void const*& buffer, size_t& size, int const*& fds, size_t& numFds) {
+    if (size < minFlattenedSize(*t)) {
+        return NO_MEMORY;
+    }
+
+    FlattenableUtils::read(buffer, size, t->timestamp);
+    int lIsAutoTimestamp;
+    FlattenableUtils::read(buffer, size, lIsAutoTimestamp);
+    t->isAutoTimestamp = static_cast<int32_t>(lIsAutoTimestamp);
+    android_dataspace_t lDataSpace;
+    FlattenableUtils::read(buffer, size, lDataSpace);
+    t->dataSpace = static_cast<Dataspace>(lDataSpace);
+    Rect lCrop;
+    FlattenableUtils::read(buffer, size, lCrop);
+    t->crop = Rect{
+            static_cast<int32_t>(lCrop.left),
+            static_cast<int32_t>(lCrop.top),
+            static_cast<int32_t>(lCrop.right),
+            static_cast<int32_t>(lCrop.bottom)};
+    int lScalingMode;
+    FlattenableUtils::read(buffer, size, lScalingMode);
+    t->scalingMode = static_cast<int32_t>(lScalingMode);
+    FlattenableUtils::read(buffer, size, t->transform);
+    FlattenableUtils::read(buffer, size, t->stickyTransform);
+    FlattenableUtils::read(buffer, size, t->getFrameTimestamps);
+
+    status_t status = unflattenFence(&(t->fence), nh,
+            buffer, size, fds, numFds);
+    if (status != NO_ERROR) {
+        return status;
+    }
+    return unflatten(&(t->surfaceDamage), buffer, size);
+}
+
+/**
+ * \brief Wrap `IGraphicBufferProducer::QueueBufferInput` in
+ * `IOmxBufferProducer::QueueBufferInput`.
+ *
+ * \param[out] t The wrapper of type
+ * `IOmxBufferProducer::QueueBufferInput`.
+ * \param[out] nh The underlying native handle for `t->fence`.
+ * \param[in] l The source `IGraphicBufferProducer::QueueBufferInput`.
+ *
+ * If the return value is `true` and `t->fence` contains a valid file
+ * descriptor, \p nh will be a newly created native handle holding that file
+ * descriptor. \p nh needs to be deleted with `native_handle_delete()`
+ * afterwards.
+ */
+inline bool wrapAs(
+        IOmxBufferProducer::QueueBufferInput* t,
+        native_handle_t** nh,
+        IGraphicBufferProducer::QueueBufferInput const& l) {
+
+    size_t const baseSize = l.getFlattenedSize();
+    std::unique_ptr<uint8_t[]> baseBuffer(
+            new (std::nothrow) uint8_t[baseSize]);
+    if (!baseBuffer) {
+        return false;
+    }
+
+    size_t const baseNumFds = l.getFdCount();
+    std::unique_ptr<int[]> baseFds(
+            new (std::nothrow) int[baseNumFds]);
+    if (!baseFds) {
+        return false;
+    }
+
+    void* buffer = static_cast<void*>(baseBuffer.get());
+    size_t size = baseSize;
+    int* fds = baseFds.get();
+    size_t numFds = baseNumFds;
+    if (l.flatten(buffer, size, fds, numFds) != NO_ERROR) {
+        return false;
+    }
+
+    void const* constBuffer = static_cast<void const*>(baseBuffer.get());
+    size = baseSize;
+    int const* constFds = static_cast<int const*>(baseFds.get());
+    numFds = baseNumFds;
+    if (unflatten(t, nh, constBuffer, size, constFds, numFds) != NO_ERROR) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * \brief Convert `IOmxBufferProducer::QueueBufferInput` to
+ * `IGraphicBufferProducer::QueueBufferInput`.
+ *
+ * \param[out] l The destination `IGraphicBufferProducer::QueueBufferInput`.
+ * \param[in] t The source `IOmxBufferProducer::QueueBufferInput`.
+ *
+ * If `t.fence` has a valid file descriptor, it will be duplicated.
+ */
+inline bool convertTo(
+        IGraphicBufferProducer::QueueBufferInput* l,
+        IOmxBufferProducer::QueueBufferInput const& t) {
+
+    size_t const baseSize = getFlattenedSize(t);
+    std::unique_ptr<uint8_t[]> baseBuffer(
+            new (std::nothrow) uint8_t[baseSize]);
+    if (!baseBuffer) {
+        return false;
+    }
+
+    size_t const baseNumFds = getFdCount(t);
+    std::unique_ptr<int[]> baseFds(
+            new (std::nothrow) int[baseNumFds]);
+    if (!baseFds) {
+        return false;
+    }
+
+    void* buffer = static_cast<void*>(baseBuffer.get());
+    size_t size = baseSize;
+    int* fds = baseFds.get();
+    size_t numFds = baseNumFds;
+    if (flatten(t, buffer, size, fds, numFds) != NO_ERROR) {
+        return false;
+    }
+
+    void const* constBuffer = static_cast<void const*>(baseBuffer.get());
+    size = baseSize;
+    int const* constFds = static_cast<int const*>(baseFds.get());
+    numFds = baseNumFds;
+    if (l->unflatten(constBuffer, size, constFds, numFds) != NO_ERROR) {
+        return false;
+    }
+
+    return true;
+}
+
+// Ref: frameworks/native/libs/gui/IGraphicBufferProducer.cpp:
+//      IGraphicBufferProducer::QueueBufferOutput
+
+/**
+ * \brief Wrap `IGraphicBufferProducer::QueueBufferOutput` in
+ * `IOmxBufferProducer::QueueBufferOutput`.
+ *
+ * \param[out] t The wrapper of type
+ * `IOmxBufferProducer::QueueBufferOutput`.
+ * \param[out] nh The array of array of native handles that are referred to by
+ * members of \p t.
+ * \param[in] l The source `IGraphicBufferProducer::QueueBufferOutput`.
+ *
+ * On success, each member of \p nh will be either `nullptr` or a newly created
+ * native handle. All the non-`nullptr` elements must be deleted individually
+ * with `native_handle_delete()`.
+ */
+// wrap: IGraphicBufferProducer::QueueBufferOutput ->
+// IOmxBufferProducer::QueueBufferOutput
+inline bool wrapAs(IOmxBufferProducer::QueueBufferOutput* t,
+        std::vector<std::vector<native_handle_t*> >* nh,
+        IGraphicBufferProducer::QueueBufferOutput const& l) {
+    if (!wrapAs(&(t->frameTimestamps), nh, l.frameTimestamps)) {
+        return false;
+    }
+    t->width = l.width;
+    t->height = l.height;
+    t->transformHint = l.transformHint;
+    t->numPendingBuffers = l.numPendingBuffers;
+    t->nextFrameNumber = l.nextFrameNumber;
+    return true;
+}
+
+/**
+ * \brief Convert `IOmxBufferProducer::QueueBufferOutput` to
+ * `IGraphicBufferProducer::QueueBufferOutput`.
+ *
+ * \param[out] l The destination `IGraphicBufferProducer::QueueBufferOutput`.
+ * \param[in] t The source `IOmxBufferProducer::QueueBufferOutput`.
+ *
+ * This function will duplicate all file descriptors contained in \p t.
+ */
+// convert: IOmxBufferProducer::QueueBufferOutput ->
+// IGraphicBufferProducer::QueueBufferOutput
+inline bool convertTo(
+        IGraphicBufferProducer::QueueBufferOutput* l,
+        IOmxBufferProducer::QueueBufferOutput const& t) {
+    if (!convertTo(&(l->frameTimestamps), t.frameTimestamps)) {
+        return false;
+    }
+    l->width = t.width;
+    l->height = t.height;
+    l->transformHint = t.transformHint;
+    l->numPendingBuffers = t.numPendingBuffers;
+    l->nextFrameNumber = t.nextFrameNumber;
+    return true;
+}
+
+/**
+ * \brief Convert `IGraphicBufferProducer::DisconnectMode` to
+ * `IOmxBufferProducer::DisconnectMode`.
+ *
+ * \param[in] l The source `IGraphicBufferProducer::DisconnectMode`.
+ * \return The corresponding `IOmxBufferProducer::DisconnectMode`.
+ */
+inline IOmxBufferProducer::DisconnectMode toOmxDisconnectMode(
+        IGraphicBufferProducer::DisconnectMode l) {
+    switch (l) {
+        case IGraphicBufferProducer::DisconnectMode::Api:
+            return IOmxBufferProducer::DisconnectMode::API;
+        case IGraphicBufferProducer::DisconnectMode::AllLocal:
+            return IOmxBufferProducer::DisconnectMode::ALL_LOCAL;
+    }
+    return IOmxBufferProducer::DisconnectMode::API;
+}
+
+/**
+ * \brief Convert `IOmxBufferProducer::DisconnectMode` to
+ * `IGraphicBufferProducer::DisconnectMode`.
+ *
+ * \param[in] l The source `IOmxBufferProducer::DisconnectMode`.
+ * \return The corresponding `IGraphicBufferProducer::DisconnectMode`.
+ */
+inline IGraphicBufferProducer::DisconnectMode toGuiDisconnectMode(
+        IOmxBufferProducer::DisconnectMode t) {
+    switch (t) {
+        case IOmxBufferProducer::DisconnectMode::API:
+            return IGraphicBufferProducer::DisconnectMode::Api;
+        case IOmxBufferProducer::DisconnectMode::ALL_LOCAL:
+            return IGraphicBufferProducer::DisconnectMode::AllLocal;
+    }
+    return IGraphicBufferProducer::DisconnectMode::Api;
+}
 
 }  // namespace implementation
 }  // namespace V1_0

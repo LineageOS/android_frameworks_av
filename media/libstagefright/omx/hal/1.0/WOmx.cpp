@@ -1,6 +1,24 @@
+/*
+ * Copyright 2016, The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include "WOmx.h"
 #include "WOmxNode.h"
 #include "WOmxObserver.h"
+#include "WOmxBufferProducer.h"
+#include "WGraphicBufferSource.h"
 #include "Conversion.h"
 
 namespace android {
@@ -46,10 +64,19 @@ status_t LWOmx::allocateNode(
 }
 
 status_t LWOmx::createInputSurface(
-        sp<::android::IGraphicBufferProducer>* /* bufferProducer */,
-        sp<::android::IGraphicBufferSource>* /* bufferSource */) {
-    // TODO: Implement.
-    return INVALID_OPERATION;
+        sp<::android::IGraphicBufferProducer>* bufferProducer,
+        sp<::android::IGraphicBufferSource>* bufferSource) {
+    status_t fnStatus;
+    status_t transStatus = toStatusT(mBase->createInputSurface(
+            [&fnStatus, bufferProducer, bufferSource] (
+                    Status status,
+                    sp<IOmxBufferProducer> const& tProducer,
+                    sp<IGraphicBufferSource> const& tSource) {
+                fnStatus = toStatusT(status);
+                *bufferProducer = new LWOmxBufferProducer(tProducer);
+                *bufferSource = new LWGraphicBufferSource(tSource);
+            }));
+    return transStatus == NO_ERROR ? fnStatus : transStatus;
 }
 
 ::android::IBinder* LWOmx::onAsBinder() {
@@ -85,7 +112,15 @@ Return<void> TWOmx::allocateNode(
     return Void();
 }
 
-// TODO: Add createInputSurface().
+Return<void> TWOmx::createInputSurface(createInputSurface_cb _hidl_cb) {
+    sp<::android::IGraphicBufferProducer> lProducer;
+    sp<::android::IGraphicBufferSource> lSource;
+    status_t status = mBase->createInputSurface(&lProducer, &lSource);
+    _hidl_cb(toStatus(status),
+             new TWOmxBufferProducer(lProducer),
+             new TWGraphicBufferSource(lSource));
+    return Void();
+}
 
 }  // namespace implementation
 }  // namespace V1_0

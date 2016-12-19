@@ -9,7 +9,8 @@ LOCAL_SHARED_LIBRARIES := \
 
 LOCAL_C_INCLUDES := \
 	$(TOP)/frameworks/av/media/libstagefright \
-	$(TOP)/frameworks/native/include/media/openmax
+	$(TOP)/frameworks/native/include/media/openmax \
+	$(TOP)/system/libhidl/base/include \
 
 LOCAL_CFLAGS += -Werror -Wall
 

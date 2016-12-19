@@ -17,7 +17,8 @@ LOCAL_SRC_FILES:=                     \
 LOCAL_C_INCLUDES += \
         $(TOP)/frameworks/av/media/libstagefright \
         $(TOP)/frameworks/native/include/media/hardware \
-        $(TOP)/frameworks/native/include/media/openmax
+        $(TOP)/frameworks/native/include/media/openmax \
+        $(TOP)/system/libhidl/base/include \
 
 LOCAL_SHARED_LIBRARIES :=               \
         libbinder                       \
@@ -28,7 +29,10 @@ LOCAL_SHARED_LIBRARIES :=               \
         libgui                          \
         libcutils                       \
         libstagefright_foundation       \
-        libdl
+        libdl                           \
+        libhidlbase                     \
+        libhidlmemory                   \
+        android.hidl.memory@1.0         \
 
 LOCAL_MODULE:= libstagefright_omx
 LOCAL_CFLAGS += -Werror -Wall
@@ -39,4 +43,5 @@ include $(BUILD_SHARED_LIBRARY)
 
 ################################################################################
 
+include $(call all-makefiles-under,$(LOCAL_PATH)/hal)
 include $(call all-makefiles-under,$(LOCAL_PATH))

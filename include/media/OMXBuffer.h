@@ -21,6 +21,7 @@
 #include <media/IOMX.h>
 #include <system/window.h>
 #include <utils/StrongPointer.h>
+#include <hidl/HidlSupport.h>
 
 namespace android {
 
@@ -42,6 +43,7 @@ class IMemory;
 class MediaCodecBuffer;
 class NativeHandle;
 struct OMXNodeInstance;
+using hardware::hidl_memory;
 
 // TODO: After complete HIDL transition, this class would be replaced by
 // CodecBuffer.
@@ -54,9 +56,14 @@ public:
     // Default constructor, constructs a buffer of type kBufferTypeInvalid.
     OMXBuffer();
 
-    // Constructs a buffer of type kBufferTypePreset with mRangeLength set to
-    // |codecBuffer|'s size (or 0 if |codecBuffer| is NULL).
+    // Constructs a buffer of type kBufferTypePreset with mRangeOffset set to
+    // |codecBuffer|'s offset and mRangeLength set to |codecBuffer|'s size (or 0
+    // if |codecBuffer| is NULL).
     OMXBuffer(const sp<MediaCodecBuffer> &codecBuffer);
+
+    // Constructs a buffer of type kBufferTypePreset with specified mRangeOffset
+    // and mRangeLength.
+    OMXBuffer(OMX_U32 rangeOffset, OMX_U32 rangeLength);
 
     // Constructs a buffer of type kBufferTypeSharedMem.
     OMXBuffer(const sp<IMemory> &mem);
@@ -66,6 +73,9 @@ public:
 
     // Constructs a buffer of type kBufferTypeNativeHandle.
     OMXBuffer(const sp<NativeHandle> &handle);
+
+    // Constructs a buffer of type kBufferTypeHidlMemory.
+    OMXBuffer(const hidl_memory &hidlMemory);
 
     // Parcelling/Un-parcelling.
     status_t writeToParcel(Parcel *parcel) const;
@@ -88,8 +98,9 @@ private:
         kBufferTypeInvalid = 0,
         kBufferTypePreset,
         kBufferTypeSharedMem,
-        kBufferTypeANWBuffer,
+        kBufferTypeANWBuffer, // Use only for non-Treble
         kBufferTypeNativeHandle,
+        kBufferTypeHidlMemory // Mapped to CodecBuffer::Type::SHARED_MEM.
     };
 
     BufferType mBufferType;
@@ -108,6 +119,9 @@ private:
 
     // kBufferTypeNativeHandle
     sp<NativeHandle> mNativeHandle;
+
+    // kBufferTypeHidlMemory
+    hidl_memory mHidlMemory;
 
     // Move assignment
     OMXBuffer &operator=(OMXBuffer&&);
