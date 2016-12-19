@@ -3889,7 +3889,12 @@ status_t MPEG4Source::parseSampleAuxiliaryInformationSizes(
         return OK;
     }
     if (smplcnt > mCurrentSampleInfoAllocSize) {
-        mCurrentSampleInfoSizes = (uint8_t*) realloc(mCurrentSampleInfoSizes, smplcnt);
+        uint8_t * newPtr =  (uint8_t*) realloc(mCurrentSampleInfoSizes, smplcnt);
+        if (newPtr == NULL) {
+            ALOGE("failed to realloc %u -> %u", mCurrentSampleInfoAllocSize, smplcnt);
+            return NO_MEMORY;
+        }
+        mCurrentSampleInfoSizes = newPtr;
         mCurrentSampleInfoAllocSize = smplcnt;
     }
 
@@ -3928,6 +3933,7 @@ status_t MPEG4Source::parseSampleAuxiliaryInformationOffsets(
     if (entrycount > mCurrentSampleInfoOffsetsAllocSize) {
         uint64_t *newPtr = (uint64_t *)realloc(mCurrentSampleInfoOffsets, entrycount * 8);
         if (newPtr == NULL) {
+            ALOGE("failed to realloc %u -> %u", mCurrentSampleInfoOffsetsAllocSize, entrycount * 8);
             return NO_MEMORY;
         }
         mCurrentSampleInfoOffsets = newPtr;
