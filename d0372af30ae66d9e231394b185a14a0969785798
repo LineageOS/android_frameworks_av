@@ -1,0 +1,211 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5f681702_b0134a5c",
+        "filename": "services/audiopolicy/common/managerdefinitions/Android.mk",
+        "patchSetId": 2
+      },
+      "lineNbr": 39,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2016-12-19T17:22:17Z",
+      "side": 1,
+      "message": "Being overriden",
+      "range": {
+        "startLine": 39,
+        "startChar": 0,
+        "endLine": 39,
+        "endChar": 42
+      },
+      "revId": "d0372af30ae66d9e231394b185a14a0969785798",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5f681702_900e0e30",
+        "filename": "services/audiopolicy/common/managerdefinitions/Android.mk",
+        "patchSetId": 2
+      },
+      "lineNbr": 42,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2016-12-19T17:22:17Z",
+      "side": 1,
+      "message": "Being overriden",
+      "range": {
+        "startLine": 42,
+        "startChar": 0,
+        "endLine": 42,
+        "endChar": 50
+      },
+      "revId": "d0372af30ae66d9e231394b185a14a0969785798",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5f681702_f01dc266",
+        "filename": "services/audiopolicy/common/managerdefinitions/Android.mk",
+        "patchSetId": 2
+      },
+      "lineNbr": 45,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2016-12-19T17:22:17Z",
+      "side": 1,
+      "message": "Being overriden",
+      "range": {
+        "startLine": 45,
+        "startChar": 0,
+        "endLine": 45,
+        "endChar": 41
+      },
+      "revId": "d0372af30ae66d9e231394b185a14a0969785798",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5f681702_d0188676",
+        "filename": "services/audiopolicy/common/managerdefinitions/Android.mk",
+        "patchSetId": 2
+      },
+      "lineNbr": 48,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2016-12-19T17:22:17Z",
+      "side": 1,
+      "message": "Being overriden",
+      "range": {
+        "startLine": 48,
+        "startChar": 0,
+        "endLine": 48,
+        "endChar": 42
+      },
+      "revId": "d0372af30ae66d9e231394b185a14a0969785798",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5f681702_3029fa89",
+        "filename": "services/audiopolicy/common/managerdefinitions/Android.mk",
+        "patchSetId": 2
+      },
+      "lineNbr": 51,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2016-12-19T17:22:17Z",
+      "side": 1,
+      "message": "Being overriden",
+      "range": {
+        "startLine": 51,
+        "startChar": 0,
+        "endLine": 51,
+        "endChar": 41
+      },
+      "revId": "d0372af30ae66d9e231394b185a14a0969785798",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5f681702_102cbe97",
+        "filename": "services/audiopolicy/common/managerdefinitions/Android.mk",
+        "patchSetId": 2
+      },
+      "lineNbr": 54,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2016-12-19T17:22:17Z",
+      "side": 1,
+      "message": "Being overriden",
+      "range": {
+        "startLine": 54,
+        "startChar": 0,
+        "endLine": 54,
+        "endChar": 46
+      },
+      "revId": "d0372af30ae66d9e231394b185a14a0969785798",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5f681702_702372a9",
+        "filename": "services/audiopolicy/common/managerdefinitions/Android.mk",
+        "patchSetId": 2
+      },
+      "lineNbr": 57,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2016-12-19T17:22:17Z",
+      "side": 1,
+      "message": "Being overriden",
+      "range": {
+        "startLine": 57,
+        "startChar": 0,
+        "endLine": 57,
+        "endChar": 48
+      },
+      "revId": "d0372af30ae66d9e231394b185a14a0969785798",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5f681702_500d9635",
+        "filename": "services/audiopolicy/common/managerdefinitions/Android.mk",
+        "patchSetId": 2
+      },
+      "lineNbr": 83,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2016-12-19T17:22:17Z",
+      "side": 1,
+      "message": "Being overriden",
+      "range": {
+        "startLine": 83,
+        "startChar": 0,
+        "endLine": 83,
+        "endChar": 46
+      },
+      "revId": "d0372af30ae66d9e231394b185a14a0969785798",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5f681702_502636b9",
+        "filename": "services/soundtrigger/Android.mk",
+        "patchSetId": 2
+      },
+      "lineNbr": 21,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2016-12-19T17:22:17Z",
+      "side": 1,
+      "message": "Being overriden",
+      "range": {
+        "startLine": 21,
+        "startChar": 4,
+        "endLine": 21,
+        "endChar": 51
+      },
+      "revId": "d0372af30ae66d9e231394b185a14a0969785798",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
