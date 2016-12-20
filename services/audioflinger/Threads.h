@@ -994,8 +994,12 @@ private:
 
                 dprintf(fd, "Local Log:\n");
                 auto it = mLog.begin();
-                if (!dumpAll && mLog.size() > kLogPrint) {
-                    it += (mLog.size() - kLogPrint);
+                if (!dumpAll) {
+                    const size_t lines =
+                            (size_t)property_get_int32("audio.locallog.lines", kLogPrint);
+                    if (mLog.size() > lines) {
+                        it += (mLog.size() - lines);
+                    }
                 }
                 for (; it != mLog.end(); ++it) {
                     const int64_t ns = it->first;

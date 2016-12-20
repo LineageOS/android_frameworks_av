@@ -26,6 +26,7 @@
 #include <limits.h>
 
 #include <cutils/compiler.h>
+#include <cutils/properties.h>
 
 #include <media/IAudioFlinger.h>
 #include <media/IAudioFlingerClient.h>
