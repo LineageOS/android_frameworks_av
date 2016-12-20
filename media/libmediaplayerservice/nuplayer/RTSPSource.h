@@ -40,6 +40,10 @@ struct NuPlayer::RTSPSource : public NuPlayer::Source {
             uid_t uid = 0,
             bool isSDP = false);
 
+    virtual status_t getDefaultBufferingSettings(
+            BufferingSettings* buffering /* nonnull */) override;
+    virtual status_t setBufferingSettings(const BufferingSettings& buffering) override;
+
     virtual void prepareAsync();
     virtual void start();
     virtual void stop();
@@ -67,6 +71,7 @@ private:
         kWhatPerformSeek     = 'seek',
         kWhatPollBuffering   = 'poll',
         kWhatSignalEOS       = 'eos ',
+        kWhatSetBufferingSettings = 'sBuS',
     };
 
     enum State {
@@ -80,12 +85,6 @@ private:
         // Don't log any URLs.
         kFlagIncognito = 1,
     };
-
-    // Buffer Prepare/Underflow/Overflow/Resume Marks
-    static const int64_t kPrepareMarkUs;
-    static const int64_t kUnderflowMarkUs;
-    static const int64_t kOverflowMarkUs;
-    static const int64_t kStartServerMarkUs;
 
     struct TrackInfo {
         sp<AnotherPacketSource> mSource;
@@ -110,6 +109,7 @@ private:
     bool mBuffering;
     bool mInPreparationPhase;
     bool mEOSPending;
+    BufferingSettings mBufferingSettings;
 
     sp<ALooper> mLooper;
     sp<MyHandler> mHandler;

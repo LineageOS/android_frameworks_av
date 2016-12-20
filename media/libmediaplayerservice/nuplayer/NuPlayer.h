@@ -50,6 +50,9 @@ struct NuPlayer : public AHandler {
 
     void setDataSourceAsync(const sp<DataSource> &source);
 
+    status_t getDefaultBufferingSettings(BufferingSettings* buffering /* nonnull */);
+    status_t setBufferingSettings(const BufferingSettings& buffering);
+
     void prepareAsync();
 
     void setVideoSurfaceTextureAsync(
@@ -137,6 +140,8 @@ private:
         kWhatGetTrackInfo               = 'gTrI',
         kWhatGetSelectedTrack           = 'gSel',
         kWhatSelectTrack                = 'selT',
+        kWhatGetDefaultBufferingSettings = 'gDBS',
+        kWhatSetBufferingSettings       = 'sBuS',
     };
 
     wp<NuPlayerDriver> mDriver;

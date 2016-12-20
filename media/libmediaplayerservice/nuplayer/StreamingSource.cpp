@@ -51,6 +51,22 @@ NuPlayer::StreamingSource::~StreamingSource() {
     }
 }
 
+status_t NuPlayer::StreamingSource::getDefaultBufferingSettings(
+        BufferingSettings *buffering /* nonnull */) {
+    *buffering = BufferingSettings();
+    return OK;
+}
+
+status_t NuPlayer::StreamingSource::setBufferingSettings(
+        const BufferingSettings &buffering) {
+    if (buffering.mInitialBufferingMode != BUFFERING_MODE_NONE
+            || buffering.mRebufferingMode != BUFFERING_MODE_NONE) {
+        return BAD_VALUE;
+    }
+
+    return OK;
+}
+
 void NuPlayer::StreamingSource::prepareAsync() {
     if (mLooper == NULL) {
         mLooper = new ALooper;

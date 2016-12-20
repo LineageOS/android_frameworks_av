@@ -32,6 +32,11 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/Utils.h>
 
+// default buffer prepare/ready/underflow marks
+static const int kReadyMarkMs     = 5000;  // 5 seconds
+static const int kPrepareMarkMs   = 1500;  // 1.5 seconds
+static const int kUnderflowMarkMs = 1000;  // 1 second
+
 namespace android {
 
 NuPlayer::HTTPLiveSource::HTTPLiveSource(
@@ -49,6 +54,7 @@ NuPlayer::HTTPLiveSource::HTTPLiveSource(
       mFetchMetaDataGeneration(0),
       mHasMetadata(false),
       mMetadataSelected(false) {
+    getDefaultBufferingSettings(&mBufferingSettings);
     if (headers) {
         mExtraHeaders = *headers;
 
@@ -76,6 +82,42 @@ NuPlayer::HTTPLiveSource::~HTTPLiveSource() {
     }
 }
 
+status_t NuPlayer::HTTPLiveSource::getDefaultBufferingSettings(
+            BufferingSettings* buffering /* nonnull */) {
+    buffering->mInitialBufferingMode = BUFFERING_MODE_TIME_ONLY;
+    buffering->mRebufferingMode = BUFFERING_MODE_TIME_ONLY;
+    buffering->mInitialWatermarkMs = kPrepareMarkMs;
+    buffering->mRebufferingWatermarkLowMs = kUnderflowMarkMs;
+    buffering->mRebufferingWatermarkHighMs = kReadyMarkMs;
+
+    return OK;
+}
+
+status_t NuPlayer::HTTPLiveSource::setBufferingSettings(const BufferingSettings& buffering) {
+    if (buffering.IsSizeBasedBufferingMode(buffering.mInitialBufferingMode)
+            || buffering.IsSizeBasedBufferingMode(buffering.mRebufferingMode)
+            || (buffering.IsTimeBasedBufferingMode(buffering.mRebufferingMode)
+                && buffering.mRebufferingWatermarkLowMs > buffering.mRebufferingWatermarkHighMs)) {
+        return BAD_VALUE;
+    }
+
+    mBufferingSettings = buffering;
+
+    if (mBufferingSettings.mInitialBufferingMode == BUFFERING_MODE_NONE) {
+        mBufferingSettings.mInitialWatermarkMs = BufferingSettings::kNoWatermark;
+    }
+    if (mBufferingSettings.mRebufferingMode == BUFFERING_MODE_NONE) {
+        mBufferingSettings.mRebufferingWatermarkLowMs = BufferingSettings::kNoWatermark;
+        mBufferingSettings.mRebufferingWatermarkHighMs = INT32_MAX;
+    }
+
+    if (mLiveSession != NULL) {
+        mLiveSession->setBufferingSettings(mBufferingSettings);
+    }
+
+    return OK;
+}
+
 void NuPlayer::HTTPLiveSource::prepareAsync() {
     if (mLiveLooper == NULL) {
         mLiveLooper = new ALooper;
@@ -94,6 +136,7 @@ void NuPlayer::HTTPLiveSource::prepareAsync() {
 
     mLiveLooper->registerHandler(mLiveSession);
 
+    mLiveSession->setBufferingSettings(mBufferingSettings);
     mLiveSession->connectAsync(
             mURL.c_str(), mExtraHeaders.isEmpty() ? NULL : &mExtraHeaders);
 }

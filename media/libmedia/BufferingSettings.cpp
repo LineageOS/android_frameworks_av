@@ -28,6 +28,16 @@ bool BufferingSettings::IsValidBufferingMode(int mode) {
     return (mode >= BUFFERING_MODE_NONE && mode < BUFFERING_MODE_COUNT);
 }
 
+// static
+bool BufferingSettings::IsTimeBasedBufferingMode(int mode) {
+    return (mode == BUFFERING_MODE_TIME_ONLY || mode == BUFFERING_MODE_TIME_THEN_SIZE);
+}
+
+// static
+bool BufferingSettings::IsSizeBasedBufferingMode(int mode) {
+    return (mode == BUFFERING_MODE_SIZE_ONLY || mode == BUFFERING_MODE_TIME_THEN_SIZE);
+}
+
 BufferingSettings::BufferingSettings()
         : mInitialBufferingMode(BUFFERING_MODE_NONE),
           mRebufferingMode(BUFFERING_MODE_NONE),

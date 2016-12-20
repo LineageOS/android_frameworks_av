@@ -23,6 +23,7 @@
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 #include <system/audio.h>
+#include <media/BufferingSettings.h>
 #include <media/MediaPlayerInterface.h>
 
 namespace android {
@@ -89,6 +90,9 @@ void readFromAMessage(const sp<AMessage> &msg, AudioPlaybackRate *rate /* nonnul
 void writeToAMessage(const sp<AMessage> &msg, const AVSyncSettings &sync, float videoFpsHint);
 void readFromAMessage(
         const sp<AMessage> &msg, AVSyncSettings *sync /* nonnull */, float *videoFps /* nonnull */);
+
+void writeToAMessage(const sp<AMessage> &msg, const BufferingSettings &buffering);
+void readFromAMessage(const sp<AMessage> &msg, BufferingSettings *buffering /* nonnull */);
 
 AString nameForFd(int fd);
 

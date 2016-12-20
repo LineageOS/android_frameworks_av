@@ -49,11 +49,6 @@ const int64_t LiveSession::kDownSwitchMarkUs = 20000000ll;
 const int64_t LiveSession::kUpSwitchMarginUs = 5000000ll;
 const int64_t LiveSession::kResumeThresholdUs = 100000ll;
 
-// Buffer Prepare/Ready/Underflow Marks
-const int64_t LiveSession::kReadyMarkUs = 5000000ll;
-const int64_t LiveSession::kPrepareMarkUs = 1500000ll;
-const int64_t LiveSession::kUnderflowMarkUs = 1000000ll;
-
 struct LiveSession::BandwidthEstimator : public RefBase {
     BandwidthEstimator();
 
@@ -495,6 +490,13 @@ sp<HTTPDownloader> LiveSession::getHTTPDownloader() {
     return new HTTPDownloader(mHTTPService, mExtraHeaders);
 }
 
+void LiveSession::setBufferingSettings(
+        const BufferingSettings &buffering) {
+    sp<AMessage> msg = new AMessage(kWhatSetBufferingSettings, this);
+    writeToAMessage(msg, buffering);
+    msg->post();
+}
+
 void LiveSession::connectAsync(
         const char *url, const KeyedVector<String8, String8> *headers) {
     sp<AMessage> msg = new AMessage(kWhatConnect, this);
@@ -620,6 +622,12 @@ bool LiveSession::checkSwitchProgress(
 
 void LiveSession::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
+        case kWhatSetBufferingSettings:
+        {
+            readFromAMessage(msg, &mBufferingSettings);
+            break;
+        }
+
         case kWhatConnect:
         {
             onConnect(msg);
@@ -830,7 +838,10 @@ void LiveSession::onMessageReceived(const sp<AMessage> &msg) {
                     // If switching up, require a cushion bigger than kUnderflowMark
                     // to avoid buffering immediately after the switch.
                     // (If we don't have that cushion we'd rather cancel and try again.)
-                    int64_t delayUs = switchUp ? (kUnderflowMarkUs + 1000000ll) : 0;
+                    int64_t delayUs =
+                        switchUp ?
+                            (mBufferingSettings.mRebufferingWatermarkLowMs * 1000ll + 1000000ll)
+                            : 0;
                     bool needResumeUntil = false;
                     sp<AMessage> stopParams = msg;
                     if (checkSwitchProgress(stopParams, delayUs, &needResumeUntil)) {
@@ -2189,13 +2200,16 @@ bool LiveSession::checkBuffering(
         }
 
         ++activeCount;
-        int64_t readyMark = mInPreparationPhase ? kPrepareMarkUs : kReadyMarkUs;
-        if (bufferedDurationUs > readyMark
+        int64_t readyMarkUs =
+            (mInPreparationPhase ?
+                mBufferingSettings.mInitialWatermarkMs :
+                mBufferingSettings.mRebufferingWatermarkHighMs) * 1000ll;
+        if (bufferedDurationUs > readyMarkUs
                 || mPacketSources[i]->isFinished(0)) {
             ++readyCount;
         }
         if (!mPacketSources[i]->isFinished(0)) {
-            if (bufferedDurationUs < kUnderflowMarkUs) {
+            if (bufferedDurationUs < mBufferingSettings.mRebufferingWatermarkLowMs * 1000ll) {
                 ++underflowCount;
             }
             if (bufferedDurationUs > mUpSwitchMark) {

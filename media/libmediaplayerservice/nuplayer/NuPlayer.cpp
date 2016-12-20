@@ -311,6 +311,31 @@ void NuPlayer::setDataSourceAsync(const sp<DataSource> &dataSource) {
     msg->post();
 }
 
+status_t NuPlayer::getDefaultBufferingSettings(
+        BufferingSettings *buffering /* nonnull */) {
+    sp<AMessage> msg = new AMessage(kWhatGetDefaultBufferingSettings, this);
+    sp<AMessage> response;
+    status_t err = msg->postAndAwaitResponse(&response);
+    if (err == OK && response != NULL) {
+        CHECK(response->findInt32("err", &err));
+        if (err == OK) {
+            readFromAMessage(response, buffering);
+        }
+    }
+    return err;
+}
+
+status_t NuPlayer::setBufferingSettings(const BufferingSettings& buffering) {
+    sp<AMessage> msg = new AMessage(kWhatSetBufferingSettings, this);
+    writeToAMessage(msg, buffering);
+    sp<AMessage> response;
+    status_t err = msg->postAndAwaitResponse(&response);
+    if (err == OK && response != NULL) {
+        CHECK(response->findInt32("err", &err));
+    }
+    return err;
+}
+
 void NuPlayer::prepareAsync() {
     (new AMessage(kWhatPrepare, this))->post();
 }
@@ -502,6 +527,48 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
             if (driver != NULL) {
                 driver->notifySetDataSourceCompleted(err);
             }
+            break;
+        }
+
+        case kWhatGetDefaultBufferingSettings:
+        {
+            sp<AReplyToken> replyID;
+            CHECK(msg->senderAwaitsResponse(&replyID));
+
+            ALOGV("kWhatGetDefaultBufferingSettings");
+            BufferingSettings buffering;
+            status_t err = OK;
+            if (mSource != NULL) {
+                err = mSource->getDefaultBufferingSettings(&buffering);
+            } else {
+                err = INVALID_OPERATION;
+            }
+            sp<AMessage> response = new AMessage;
+            if (err == OK) {
+                writeToAMessage(response, buffering);
+            }
+            response->setInt32("err", err);
+            response->postReply(replyID);
+            break;
+        }
+
+        case kWhatSetBufferingSettings:
+        {
+            sp<AReplyToken> replyID;
+            CHECK(msg->senderAwaitsResponse(&replyID));
+
+            ALOGV("kWhatSetBufferingSettings");
+            BufferingSettings buffering;
+            readFromAMessage(msg, &buffering);
+            status_t err = OK;
+            if (mSource != NULL) {
+                err = mSource->setBufferingSettings(buffering);
+            } else {
+                err = INVALID_OPERATION;
+            }
+            sp<AMessage> response = new AMessage;
+            response->setInt32("err", err);
+            response->postReply(replyID);
             break;
         }
 
