@@ -256,10 +256,6 @@ sp<M3UParser> HTTPDownloader::fetchPlaylist(
 
         return NULL;
     }
-
-    if (curPlaylistHash != NULL) {
-        memcpy(curPlaylistHash, hash, sizeof(hash));
-    }
 #endif
 
     sp<M3UParser> playlist =
@@ -270,6 +266,13 @@ sp<M3UParser> HTTPDownloader::fetchPlaylist(
 
         return NULL;
     }
+
+#if defined(__ANDROID__)
+    if (curPlaylistHash != NULL) {
+
+        memcpy(curPlaylistHash, hash, sizeof(hash));
+    }
+#endif
 
     return playlist;
 }
