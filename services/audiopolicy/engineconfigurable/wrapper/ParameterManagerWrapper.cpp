@@ -48,7 +48,7 @@ public:
 
     virtual void info(const string &log)
     {
-        ALOGD("policy-parameter-manager: %s", log.c_str());
+        ALOGV("policy-parameter-manager: %s", log.c_str());
     }
     virtual void warning(const string &log)
     {
