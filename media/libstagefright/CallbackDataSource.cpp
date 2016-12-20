@@ -51,7 +51,7 @@ status_t CallbackDataSource::initCheck() const {
 }
 
 ssize_t CallbackDataSource::readAt(off64_t offset, void* data, size_t size) {
-    if (mMemory == NULL) {
+    if (mMemory == NULL || data == NULL) {
         return -1;
     }
 
