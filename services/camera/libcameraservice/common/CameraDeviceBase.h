@@ -48,7 +48,7 @@ class CameraDeviceBase : public virtual RefBase {
     /**
      * The device's camera ID
      */
-    virtual int      getId() const = 0;
+    virtual const String8& getId() const = 0;
 
     virtual status_t initialize(CameraModule *module) = 0;
     virtual status_t initialize(sp<CameraProviderManager> manager) = 0;

@@ -72,6 +72,11 @@ class Camera3StreamInterface : public virtual RefBase {
     virtual android_dataspace getDataSpace() const = 0;
 
     /**
+     * Get a HAL3 handle for the stream, without starting stream configuration.
+     */
+    virtual camera3_stream* asHalStream() = 0;
+
+    /**
      * Start the stream configuration process. Returns a handle to the stream's
      * information to be passed into the HAL device's configure_streams call.
      *
@@ -104,7 +109,7 @@ class Camera3StreamInterface : public virtual RefBase {
      *   NO_MEMORY in case of an error registering buffers
      *   INVALID_OPERATION in case connecting to the consumer failed
      */
-    virtual status_t finishConfiguration(camera3_device *hal3Device) = 0;
+    virtual status_t finishConfiguration() = 0;
 
     /**
      * Cancels the stream configuration process. This returns the stream to the

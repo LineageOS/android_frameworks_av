@@ -151,7 +151,7 @@ status_t CameraProviderManager::getCameraCharacteristics(const std::string &id,
         CameraMetadata* characteristics) const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
 
-    auto deviceInfo = findDeviceInfoLocked(id, /*minVersion*/ hardware::hidl_version{3,0});
+    auto deviceInfo = findDeviceInfoLocked(id, /*minVersion*/ {3,0}, /*maxVersion*/ {4,0});
     if (deviceInfo == nullptr) return NAME_NOT_FOUND;
 
     return deviceInfo->getCameraCharacteristics(characteristics);
@@ -180,7 +180,6 @@ status_t CameraProviderManager::getHighestSupportedVersion(const std::string &id
     return OK;
 }
 
-
 status_t CameraProviderManager::setTorchMode(const std::string &id, bool enabled) {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
 
@@ -189,6 +188,51 @@ status_t CameraProviderManager::setTorchMode(const std::string &id, bool enabled
 
     return deviceInfo->setTorchMode(enabled);
 }
+
+status_t CameraProviderManager::openSession(const std::string &id,
+        const sp<hardware::camera::device::V3_2::ICameraDeviceCallback>& callback,
+        /*out*/
+        sp<hardware::camera::device::V3_2::ICameraDeviceSession> *session) {
+
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+
+    auto deviceInfo = findDeviceInfoLocked(id,
+            /*minVersion*/ {3,0}, /*maxVersion*/ {4,0});
+    if (deviceInfo == nullptr) return NAME_NOT_FOUND;
+
+    auto *deviceInfo3 = static_cast<ProviderInfo::DeviceInfo3*>(deviceInfo);
+
+    Status status;
+    deviceInfo3->mInterface->open(callback, [&status, &session]
+            (Status s, const sp<device::V3_2::ICameraDeviceSession>& cameraSession) {
+                status = s;
+                if (status == Status::OK) {
+                    *session = cameraSession;
+                }
+            });
+    return mapToStatusT(status);
+}
+
+status_t CameraProviderManager::openSession(const std::string &id,
+        const sp<hardware::camera::device::V1_0::ICameraDeviceCallback>& callback,
+        /*out*/
+        sp<hardware::camera::device::V1_0::ICameraDevice> *session) {
+
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+
+    auto deviceInfo = findDeviceInfoLocked(id,
+            /*minVersion*/ {1,0}, /*maxVersion*/ {2,0});
+    if (deviceInfo == nullptr) return NAME_NOT_FOUND;
+
+    auto *deviceInfo1 = static_cast<ProviderInfo::DeviceInfo1*>(deviceInfo);
+
+    Status status = deviceInfo1->mInterface->open(callback);
+    if (status == Status::OK) {
+        *session = deviceInfo1->mInterface;
+    }
+    return mapToStatusT(status);
+}
+
 
 hardware::Return<void> CameraProviderManager::onRegistration(
         const hardware::hidl_string& /*fqName*/,
@@ -211,10 +255,12 @@ status_t CameraProviderManager::dump(int fd, const Vector<String16>& args) {
 }
 
 CameraProviderManager::ProviderInfo::DeviceInfo* CameraProviderManager::findDeviceInfoLocked(
-        const std::string& id, hardware::hidl_version minVersion) const {
+        const std::string& id,
+        hardware::hidl_version minVersion, hardware::hidl_version maxVersion) const {
     for (auto& provider : mProviders) {
         for (auto& deviceInfo : provider->mDevices) {
-            if (deviceInfo->mId == id && minVersion <= deviceInfo->mVersion) {
+            if (deviceInfo->mId == id &&
+                    minVersion <= deviceInfo->mVersion && maxVersion >= deviceInfo->mVersion) {
                 return deviceInfo.get();
             }
         }

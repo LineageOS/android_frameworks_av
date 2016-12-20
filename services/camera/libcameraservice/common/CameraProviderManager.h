@@ -156,6 +156,22 @@ public:
     status_t setTorchMode(const std::string &id, bool enabled);
 
     /**
+     * Open an active session to a camera device.
+     *
+     * This fully powers on the camera device hardware, and returns a handle to a
+     * session to be used for hardware configuration and operation.
+     */
+    status_t openSession(const std::string &id,
+            const sp<hardware::camera::device::V3_2::ICameraDeviceCallback>& callback,
+            /*out*/
+            sp<hardware::camera::device::V3_2::ICameraDeviceSession> *session);
+
+    status_t openSession(const std::string &id,
+            const sp<hardware::camera::device::V1_0::ICameraDeviceCallback>& callback,
+            /*out*/
+            sp<hardware::camera::device::V1_0::ICameraDevice> *session);
+
+    /**
      * IServiceNotification::onRegistration
      * Invoked by the hardware service manager when a new camera provider is registered
      */
@@ -167,6 +183,12 @@ public:
      * Dump out information about available providers and devices
      */
     status_t dump(int fd, const Vector<String16>& args);
+
+    /**
+     * Conversion methods between HAL Status and status_t and strings
+     */
+    static status_t mapToStatusT(const hardware::camera::common::V1_0::Status& s);
+    static const char* statusToString(const hardware::camera::common::V1_0::Status& s);
 
 private:
     // All private members, unless otherwise noted, expect mInterfaceMutex to be locked before use
@@ -238,12 +260,6 @@ private:
         };
         std::vector<std::unique_ptr<DeviceInfo>> mDevices;
 
-    private:
-        std::string mType;
-        uint32_t mId;
-
-        CameraProviderManager *mManager;
-
         // HALv1-specific camera fields, including the actual device interface
         struct DeviceInfo1 : public DeviceInfo {
             typedef hardware::camera::device::V1_0::ICameraDevice InterfaceT;
@@ -280,6 +296,12 @@ private:
             CameraMetadata mCameraCharacteristics;
         };
 
+    private:
+        std::string mType;
+        uint32_t mId;
+
+        CameraProviderManager *mManager;
+
         // Templated method to instantiate the right kind of DeviceInfo and call the
         // right CameraProvider getCameraDeviceInterface_* method.
         template<class DeviceInfoT>
@@ -301,8 +323,12 @@ private:
 
     // Utility to find a DeviceInfo by ID; pointer is only valid while mInterfaceMutex is held
     // and the calling code doesn't mutate the list of providers or their lists of devices.
+    // Finds the first device of the given ID that falls within the requested version range
+    //   minVersion <= deviceVersion < maxVersion
+    // No guarantees on the order of traversal
     ProviderInfo::DeviceInfo* findDeviceInfoLocked(const std::string& id,
-            hardware::hidl_version minVersion = hardware::hidl_version{0,0}) const;
+            hardware::hidl_version minVersion = hardware::hidl_version{0,0},
+            hardware::hidl_version maxVersion = hardware::hidl_version{1000,0}) const;
 
     status_t addProvider(const std::string& newProvider, bool expected = true);
     status_t removeProvider(const std::string& provider);
@@ -311,8 +337,6 @@ private:
 
     std::vector<sp<ProviderInfo>> mProviders;
 
-    static status_t mapToStatusT(const hardware::camera::common::V1_0::Status& s);
-    static const char* statusToString(const hardware::camera::common::V1_0::Status&);
     static const char* deviceStatusToString(
         const hardware::camera::common::V1_0::CameraDeviceStatus&);
     static const char* torchStatusToString(
