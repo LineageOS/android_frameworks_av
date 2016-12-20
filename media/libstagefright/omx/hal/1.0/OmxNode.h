@@ -1,9 +1,12 @@
-#ifndef ANDROID_HARDWARE_MEDIA_OMX_V1_0__OMXNODE_H
-#define ANDROID_HARDWARE_MEDIA_OMX_V1_0__OMXNODE_H
+#ifndef ANDROID_HARDWARE_MEDIA_OMX_V1_0_OMXNODE_H
+#define ANDROID_HARDWARE_MEDIA_OMX_V1_0_OMXNODE_H
 
 #include <android/hardware/media/omx/1.0/IOmxNode.h>
+#include <android/hardware/media/omx/1.0/IOmxObserver.h>
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
+
+#include <OMXNodeInstance.h>
 
 namespace android {
 namespace hardware {
@@ -15,20 +18,34 @@ namespace implementation {
 using ::android::hardware::media::omx::V1_0::CodecBuffer;
 using ::android::hardware::media::omx::V1_0::IOmxBufferSource;
 using ::android::hardware::media::omx::V1_0::IOmxNode;
+using ::android::hardware::media::omx::V1_0::IOmxObserver;
 using ::android::hardware::media::omx::V1_0::Message;
 using ::android::hardware::media::omx::V1_0::PortMode;
 using ::android::hardware::media::omx::V1_0::Status;
+using ::android::hidl::base::V1_0::IBase;
 using ::android::hardware::hidl_array;
+using ::android::hardware::hidl_memory;
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::sp;
 
+using ::android::OMXNodeInstance;
+using ::android::OmxNodeOwner;
+
+/**
+ * Wrapper classes for conversion
+ * ==============================
+ *
+ * Naming convention:
+ * - LW = Legacy Wrapper --- It wraps a Treble object inside a legacy object.
+ * - TW = Treble Wrapper --- It wraps a legacy object inside a Treble object.
+ */
+
 struct OmxNode : public IOmxNode {
-    // Methods from ::android::hardware::media::omx::V1_0::IOmxNode follow.
     Return<Status> freeNode() override;
-    Return<Status> sendCommand(uint32_t cmd, const hidl_vec<uint8_t>& info) override;
+    Return<Status> sendCommand(uint32_t cmd, int32_t param) override;
     Return<void> getParameter(uint32_t index, const hidl_vec<uint8_t>& inParams, getParameter_cb _hidl_cb) override;
     Return<Status> setParameter(uint32_t index, const hidl_vec<uint8_t>& params) override;
     Return<void> getConfig(uint32_t index, const hidl_vec<uint8_t>& inConfig, getConfig_cb _hidl_cb) override;
@@ -46,9 +63,10 @@ struct OmxNode : public IOmxNode {
     Return<void> getExtensionIndex(const hidl_string& parameterName, getExtensionIndex_cb _hidl_cb) override;
     Return<Status> dispatchMessage(const Message& msg) override;
 
+    OmxNode(OmxNodeOwner* owner, sp<IOmxObserver> const& observer, char const* name);
+protected:
+    sp<OMXNodeInstance> mLNode;
 };
-
-extern "C" IOmxNode* HIDL_FETCH_IOmxNode(const char* name);
 
 }  // namespace implementation
 }  // namespace V1_0
@@ -57,4 +75,4 @@ extern "C" IOmxNode* HIDL_FETCH_IOmxNode(const char* name);
 }  // namespace hardware
 }  // namespace android
 
-#endif  // ANDROID_HARDWARE_MEDIA_OMX_V1_0__OMXNODE_H
+#endif  // ANDROID_HARDWARE_MEDIA_OMX_V1_0_OMXNODE_H

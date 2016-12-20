@@ -38,6 +38,11 @@ OMXBuffer::OMXBuffer(const sp<MediaCodecBuffer>& codecBuffer)
       mRangeLength(codecBuffer != NULL ? codecBuffer->size() : 0) {
 }
 
+OMXBuffer::OMXBuffer(OMX_U32 rangeLength)
+    : mBufferType(kBufferTypePreset),
+      mRangeLength(rangeLength) {
+}
+
 OMXBuffer::OMXBuffer(const sp<IMemory> &mem)
     : mBufferType(kBufferTypeSharedMem),
       mMem(mem) {
@@ -131,6 +136,15 @@ status_t OMXBuffer::readFromParcel(const Parcel *parcel) {
 
     mBufferType = bufferType;
     return OK;
+}
+
+OMXBuffer& OMXBuffer::operator=(OMXBuffer&& source) {
+    mBufferType = std::move(source.mBufferType);
+    mRangeLength = std::move(source.mRangeLength);
+    mMem = std::move(source.mMem);
+    mGraphicBuffer = std::move(source.mGraphicBuffer);
+    mNativeHandle = std::move(source.mNativeHandle);
+    return *this;
 }
 
 } // namespace android
