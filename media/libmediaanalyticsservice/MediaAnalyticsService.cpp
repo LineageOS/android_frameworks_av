@@ -74,7 +74,7 @@
 namespace android {
 
 
-static int trackqueue = 0;
+#define DEBUG_QUEUE     0
 
 //using android::status_t;
 //using android::OK;
@@ -94,8 +94,8 @@ MediaAnalyticsService::MediaAnalyticsService()
 
     ALOGD("MediaAnalyticsService created");
     // clear our queues
-    mOpen = new List<sp<MediaAnalyticsItem>>();
-    mFinalized = new List<sp<MediaAnalyticsItem>>();
+    mOpen = new List<MediaAnalyticsItem *>();
+    mFinalized = new List<MediaAnalyticsItem *>();
 
     mItemsSubmitted = 0;
     mItemsFinalized = 0;
@@ -120,7 +120,8 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::generateUniqueSessionID()
     return (++mLastSessionID);
 }
 
-MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(sp<MediaAnalyticsItem> item, bool forcenew) {
+// caller surrenders ownership of 'item'
+MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(MediaAnalyticsItem *item, bool forcenew) {
 
     MediaAnalyticsItem::SessionID_t id = MediaAnalyticsItem::SessionIDInvalid;
 
@@ -136,6 +137,7 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(sp<MediaAnalyticsI
 
     // validate the record; we discard if we don't like it
     if (contentValid(item) == false) {
+        delete item;
         return MediaAnalyticsItem::SessionIDInvalid;
     }
 
@@ -155,13 +157,17 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(sp<MediaAnalyticsI
     bool finalizing = item->getFinalized();
 
     // if finalizing, we'll remove it
-    sp<MediaAnalyticsItem> oitem = findItem(mOpen, item, finalizing | forcenew);
+    MediaAnalyticsItem *oitem = findItem(mOpen, item, finalizing | forcenew);
     if (oitem != NULL) {
         if (forcenew) {
             // old one gets finalized, then we insert the new one
             // so we'll have 2 records at the end of this.
             // but don't finalize an empty record
-            if (oitem->count() != 0) {
+            if (oitem->count() == 0) {
+                // we're responsible for disposing of the dead record
+                delete oitem;
+                oitem = NULL;
+            } else {
                 oitem->setFinalized(true);
                 saveItem(mFinalized, oitem, 0);
             }
@@ -181,50 +187,53 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(sp<MediaAnalyticsI
                 mItemsFinalized++;
             }
             id = oitem->getSessionID();
+
+            // we're responsible for disposing of the dead record
+            delete item;
+            item = NULL;
         }
     } else {
-            // nothing to merge, save the new record
-            if (finalizing) {
-                if (item->count() != 0) {
-                    // drop empty records
-                    saveItem(mFinalized, item, 0);
-                    mItemsFinalized++;
-                }
+        // nothing to merge, save the new record
+        id = item->getSessionID();
+        if (finalizing) {
+            if (item->count() == 0) {
+                // drop empty records
+                delete item;
+                item = NULL;
             } else {
-                saveItem(mOpen, item, 1);
+                saveItem(mFinalized, item, 0);
+                mItemsFinalized++;
             }
-            id = item->getSessionID();
+        } else {
+            saveItem(mOpen, item, 1);
+        }
     }
-
     return id;
 }
 
-List<sp<MediaAnalyticsItem>> *MediaAnalyticsService::getMediaAnalyticsItemList(bool finished, nsecs_t ts) {
+List<MediaAnalyticsItem *> *MediaAnalyticsService::getMediaAnalyticsItemList(bool finished, nsecs_t ts) {
     // this might never get called; the binder interface maps to the full parm list
     // on the client side before making the binder call.
     // but this lets us be sure...
-    List<sp<MediaAnalyticsItem>> *list;
+    List<MediaAnalyticsItem*> *list;
     list = getMediaAnalyticsItemList(finished, ts, MediaAnalyticsItem::kKeyAny);
     return list;
 }
 
-List<sp<MediaAnalyticsItem>> *MediaAnalyticsService::getMediaAnalyticsItemList(bool , nsecs_t , MediaAnalyticsItem::Key ) {
+List<MediaAnalyticsItem *> *MediaAnalyticsService::getMediaAnalyticsItemList(bool , nsecs_t , MediaAnalyticsItem::Key ) {
 
     // XXX: implement the get-item-list semantics
 
-    List<sp<MediaAnalyticsItem>> *list = NULL;
+    List<MediaAnalyticsItem *> *list = NULL;
     // set up our query on the persistent data
     // slurp in all of the pieces
     // return that
     return list;
 }
 
-// ignoring 2nd argument, name removed to keep compiler happy
-// XXX: arguments to parse:
-//     -- a timestamp (either since X or last X seconds) to bound search
-status_t MediaAnalyticsService::dump(int fd, const Vector<String16>&)
+status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
 {
-    const size_t SIZE = 256;
+    const size_t SIZE = 512;
     char buffer[SIZE];
     String8 result;
 
@@ -234,52 +243,100 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>&)
                 IPCThreadState::self()->getCallingPid(),
                 IPCThreadState::self()->getCallingUid());
         result.append(buffer);
-    } else {
-
-        // crack parameters
-
-
-        Mutex::Autolock _l(mLock);
-
-        snprintf(buffer, SIZE, "Dump of the mediaanalytics process:\n");
-        result.append(buffer);
-
-        int enabled = MediaAnalyticsItem::isEnabled();
-        if (enabled) {
-            snprintf(buffer, SIZE, "Analytics gathering: enabled\n");
-        } else {
-            snprintf(buffer, SIZE, "Analytics gathering: DISABLED via property\n");
-        }
-        result.append(buffer);
-
-        snprintf(buffer, SIZE,
-            "Since Boot: Submissions: %" PRId64
-	    " Finalizations: %" PRId64
-            " Discarded: %" PRId64 "\n",
-            mItemsSubmitted, mItemsFinalized, mItemsDiscarded);
-        result.append(buffer);
-
-        // show the recently recorded records
-        snprintf(buffer, sizeof(buffer), "\nFinalized Analytics (oldest first):\n");
-        result.append(buffer);
-        result.append(this->dumpQueue(mFinalized));
-
-        snprintf(buffer, sizeof(buffer), "\nIn-Progress Analytics (newest first):\n");
-        result.append(buffer);
-        result.append(this->dumpQueue(mOpen));
-
-        // show who is connected and injecting records?
-        // talk about # records fed to the 'readers'
-        // talk about # records we discarded, perhaps "discarded w/o reading" too
-
+        write(fd, result.string(), result.size());
+        return NO_ERROR;
     }
+
+    // crack any parameters
+    bool clear = false;
+    nsecs_t ts_since = 0;
+    String16 clearOption("-clear");
+    String16 sinceOption("-since");
+    int n = args.size();
+    for (int i = 0; i < n; i++) {
+        String8 myarg(args[i]);
+        if (args[i] == clearOption) {
+            clear = true;
+        } else if (args[i] == sinceOption) {
+            i++;
+            if (i < n) {
+                String8 value(args[i]);
+                char *endp;
+                const char *p = value.string();
+                ts_since = strtoll(p, &endp, 10);
+                if (endp == p || *endp != '\0') {
+                    ts_since = 0;
+                }
+            } else {
+                ts_since = 0;
+            }
+        }
+    }
+
+    Mutex::Autolock _l(mLock);
+
+    snprintf(buffer, SIZE, "Dump of the mediaanalytics process:\n");
+    result.append(buffer);
+
+    int enabled = MediaAnalyticsItem::isEnabled();
+    if (enabled) {
+        snprintf(buffer, SIZE, "Analytics gathering: enabled\n");
+    } else {
+        snprintf(buffer, SIZE, "Analytics gathering: DISABLED via property\n");
+    }
+    result.append(buffer);
+
+    snprintf(buffer, SIZE,
+        "Since Boot: Submissions: %" PRId64
+            " Finalizations: %" PRId64
+        " Discarded: %" PRId64 "\n",
+        mItemsSubmitted, mItemsFinalized, mItemsDiscarded);
+    result.append(buffer);
+    if (ts_since != 0) {
+        snprintf(buffer, SIZE,
+            "Dumping Queue entries more recent than: %" PRId64 "\n",
+            (int64_t) ts_since);
+        result.append(buffer);
+    }
+
+    // show the recently recorded records
+    snprintf(buffer, sizeof(buffer), "\nFinalized Analytics (oldest first):\n");
+    result.append(buffer);
+    result.append(this->dumpQueue(mFinalized, ts_since));
+
+    snprintf(buffer, sizeof(buffer), "\nIn-Progress Analytics (newest first):\n");
+    result.append(buffer);
+    result.append(this->dumpQueue(mOpen, ts_since));
+
+    // show who is connected and injecting records?
+    // talk about # records fed to the 'readers'
+    // talk about # records we discarded, perhaps "discarded w/o reading" too
+
+    if (clear) {
+        // remove everything from the finalized queue
+        while (mFinalized->size() > 0) {
+            MediaAnalyticsItem * oitem = *(mFinalized->begin());
+            if (DEBUG_QUEUE) {
+                ALOGD("zap old record: key %s sessionID %" PRId64 " ts %" PRId64 "",
+                    oitem->getKey().c_str(), oitem->getSessionID(),
+                    oitem->getTimestamp());
+            }
+            mFinalized->erase(mFinalized->begin());
+            mItemsDiscarded++;
+        }
+    }
+
     write(fd, result.string(), result.size());
     return NO_ERROR;
 }
 
 // caller has locked mLock...
-String8 MediaAnalyticsService::dumpQueue(List<sp<MediaAnalyticsItem>> *theList) {
-    const size_t SIZE = 256;
+String8 MediaAnalyticsService::dumpQueue(List<MediaAnalyticsItem *> *theList) {
+    return dumpQueue(theList, (nsecs_t) 0);
+}
+
+String8 MediaAnalyticsService::dumpQueue(List<MediaAnalyticsItem *> *theList, nsecs_t ts_since) {
+    const size_t SIZE = 512;
     char buffer[SIZE];
     String8 result;
     int slot = 0;
@@ -287,12 +344,20 @@ String8 MediaAnalyticsService::dumpQueue(List<sp<MediaAnalyticsItem>> *theList) 
     if (theList->empty()) {
             result.append("empty\n");
     } else {
-        List<sp<MediaAnalyticsItem>>::iterator it = theList->begin();
-        for (; it != theList->end(); it++, slot++) {
+        List<MediaAnalyticsItem *>::iterator it = theList->begin();
+        for (; it != theList->end(); it++) {
+            nsecs_t when = (*it)->getTimestamp();
+            if (when < ts_since) {
+                continue;
+            }
             AString entry = (*it)->toString();
-            snprintf(buffer, sizeof(buffer), "%4d: %s\n",
+            snprintf(buffer, sizeof(buffer), "%4d: %s",
                         slot, entry.c_str());
             result.append(buffer);
+            buffer[0] = '\n';
+            buffer[1] = '\0';
+            result.append(buffer);
+            slot++;
         }
     }
 
@@ -304,15 +369,13 @@ String8 MediaAnalyticsService::dumpQueue(List<sp<MediaAnalyticsItem>> *theList) 
 // XXX: rewrite this to manage persistence, etc.
 
 // insert appropriately into queue
-void MediaAnalyticsService::saveItem(List<sp<MediaAnalyticsItem>> *l, sp<MediaAnalyticsItem> item, int front) {
+void MediaAnalyticsService::saveItem(List<MediaAnalyticsItem *> *l, MediaAnalyticsItem * item, int front) {
 
     Mutex::Autolock _l(mLock);
 
-    if (false)
+    if (DEBUG_QUEUE) {
         ALOGD("Inject a record: session %" PRId64 " ts %" PRId64 "",
             item->getSessionID(), item->getTimestamp());
-
-    if (trackqueue) {
         String8 before = dumpQueue(l);
         ALOGD("Q before insert: %s", before.string());
     }
@@ -324,7 +387,7 @@ void MediaAnalyticsService::saveItem(List<sp<MediaAnalyticsItem>> *l, sp<MediaAn
         l->push_back(item);
     }
 
-    if (trackqueue) {
+    if (DEBUG_QUEUE) {
         String8 after = dumpQueue(l);
         ALOGD("Q after insert: %s", after.string());
     }
@@ -332,25 +395,28 @@ void MediaAnalyticsService::saveItem(List<sp<MediaAnalyticsItem>> *l, sp<MediaAn
     // keep removing old records the front until we're in-bounds
     if (mMaxRecords > 0) {
         while (l->size() > (size_t) mMaxRecords) {
-            sp<MediaAnalyticsItem> oitem = *(l->begin());
-            if (trackqueue) {
+            MediaAnalyticsItem * oitem = *(l->begin());
+            if (DEBUG_QUEUE) {
                 ALOGD("zap old record: key %s sessionID %" PRId64 " ts %" PRId64 "",
                     oitem->getKey().c_str(), oitem->getSessionID(),
                     oitem->getTimestamp());
             }
             l->erase(l->begin());
-	    mItemsDiscarded++;
+        ALOGD("drop record at %s:%d", __FILE__, __LINE__);
+            delete oitem;
+        ALOGD("[done] drop record at %s:%d", __FILE__, __LINE__);
+            mItemsDiscarded++;
         }
     }
 
-    if (trackqueue) {
+    if (DEBUG_QUEUE) {
         String8 after = dumpQueue(l);
         ALOGD("Q after cleanup: %s", after.string());
     }
 }
 
 // are they alike enough that nitem can be folded into oitem?
-static bool compatibleItems(sp<MediaAnalyticsItem> oitem, sp<MediaAnalyticsItem> nitem) {
+static bool compatibleItems(MediaAnalyticsItem * oitem, MediaAnalyticsItem * nitem) {
 
     if (0) {
         ALOGD("Compare: o %s n %s",
@@ -386,18 +452,18 @@ static bool compatibleItems(sp<MediaAnalyticsItem> oitem, sp<MediaAnalyticsItem>
 }
 
 // find the incomplete record that this will overlay
-sp<MediaAnalyticsItem> MediaAnalyticsService::findItem(List<sp<MediaAnalyticsItem>> *theList, sp<MediaAnalyticsItem> nitem, bool removeit) {
-    sp<MediaAnalyticsItem> item;
-
+MediaAnalyticsItem *MediaAnalyticsService::findItem(List<MediaAnalyticsItem*> *theList, MediaAnalyticsItem *nitem, bool removeit) {
     if (nitem == NULL) {
         return NULL;
     }
 
+    MediaAnalyticsItem *item = NULL;
+
     Mutex::Autolock _l(mLock);
 
-    for (List<sp<MediaAnalyticsItem>>::iterator it = theList->begin();
+    for (List<MediaAnalyticsItem *>::iterator it = theList->begin();
         it != theList->end(); it++) {
-        sp<MediaAnalyticsItem> tmp = (*it);
+        MediaAnalyticsItem *tmp = (*it);
 
         if (!compatibleItems(tmp, nitem)) {
             continue;
@@ -415,33 +481,37 @@ sp<MediaAnalyticsItem> MediaAnalyticsService::findItem(List<sp<MediaAnalyticsIte
 
 
 // delete the indicated record
-void MediaAnalyticsService::deleteItem(List<sp<MediaAnalyticsItem>> *l, sp<MediaAnalyticsItem> item) {
+void MediaAnalyticsService::deleteItem(List<MediaAnalyticsItem *> *l, MediaAnalyticsItem *item) {
 
     Mutex::Autolock _l(mLock);
 
-    if(trackqueue) {
+    if(DEBUG_QUEUE) {
         String8 before = dumpQueue(l);
         ALOGD("Q before delete: %s", before.string());
     }
 
-    for (List<sp<MediaAnalyticsItem>>::iterator it = l->begin();
+    for (List<MediaAnalyticsItem *>::iterator it = l->begin();
         it != l->end(); it++) {
         if ((*it)->getSessionID() != item->getSessionID())
             continue;
 
-        ALOGD(" --- removing record for SessionID %" PRId64 "", item->getSessionID());
+        if (DEBUG_QUEUE) {
+            ALOGD(" --- removing record for SessionID %" PRId64 "", item->getSessionID());
+            ALOGD("drop record at %s:%d", __FILE__, __LINE__);
+        }
+        delete *it;
         l->erase(it);
         break;
     }
 
-    if (trackqueue) {
+    if (DEBUG_QUEUE) {
         String8 after = dumpQueue(l);
         ALOGD("Q after delete: %s", after.string());
     }
 }
 
 // are the contents good
-bool MediaAnalyticsService::contentValid(sp<MediaAnalyticsItem>) {
+bool MediaAnalyticsService::contentValid(MediaAnalyticsItem *) {
 
     // certain keys require certain uids
     // internal consistency
@@ -450,7 +520,7 @@ bool MediaAnalyticsService::contentValid(sp<MediaAnalyticsItem>) {
 }
 
 // are we rate limited, normally false
-bool MediaAnalyticsService::rateLimited(sp<MediaAnalyticsItem>) {
+bool MediaAnalyticsService::rateLimited(MediaAnalyticsItem *) {
 
     return false;
 }

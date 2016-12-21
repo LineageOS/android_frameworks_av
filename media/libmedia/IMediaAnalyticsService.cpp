@@ -80,7 +80,7 @@ public:
         return sessionid;
     }
 
-    virtual MediaAnalyticsItem::SessionID_t submit(sp<MediaAnalyticsItem> item, bool forcenew)
+    virtual MediaAnalyticsItem::SessionID_t submit(MediaAnalyticsItem *item, bool forcenew)
     {
         // have this record submit itself
         // this will be a binder call with appropriate timing
@@ -115,12 +115,12 @@ public:
         return sessionid;
     }
 
-    virtual List<sp<MediaAnalyticsItem>> *getMediaAnalyticsItemList(bool finished, nsecs_t ts)
+    virtual List<MediaAnalyticsItem*> *getMediaAnalyticsItemList(bool finished, nsecs_t ts)
     {
             return getMediaAnalyticsItemList(finished, ts, MediaAnalyticsItem::kKeyAny);
     }
 
-    virtual List<sp<MediaAnalyticsItem>> *getMediaAnalyticsItemList(bool finished, nsecs_t ts, MediaAnalyticsItem::Key key)
+    virtual List<MediaAnalyticsItem*> *getMediaAnalyticsItemList(bool finished, nsecs_t ts, MediaAnalyticsItem::Key key)
     {
         Parcel data, reply;
         status_t err;
@@ -134,18 +134,18 @@ public:
         }
         data.writeCString(str);
         err = remote()->transact(GET_ITEM_LIST, data, &reply);
-	if (err != NO_ERROR) {
-	    return NULL;
-	}
+        if (err != NO_ERROR) {
+            return NULL;
+        }
 
         // read a count
         int32_t count = reply.readInt32();
-        List<sp<MediaAnalyticsItem>> *list = NULL;
+        List<MediaAnalyticsItem*> *list = NULL;
 
         if (count > 0) {
-            list = new List<sp<MediaAnalyticsItem>>();
+            list = new List<MediaAnalyticsItem*>();
             for (int i=0;i<count;i++) {
-                sp<MediaAnalyticsItem> item = new MediaAnalyticsItem;
+                MediaAnalyticsItem *item = new MediaAnalyticsItem();
                 // XXX: watch for failures here
                 item->readFromParcel(reply);
                 list->push_back(item);
@@ -190,14 +190,14 @@ status_t BnMediaAnalyticsService::onTransact(
             CHECK_INTERFACE(IMediaAnalyticsService, data, reply);
 
             bool forcenew;
-            sp<MediaAnalyticsItem> item = new MediaAnalyticsItem;
+            MediaAnalyticsItem *item = new MediaAnalyticsItem;
 
             data.readBool(&forcenew);
             item->readFromParcel(data);
 
             item->setPid(clientPid);
 
-	    // submit() takes ownership of / responsibility for the item
+            // submit() takes over ownership of 'item'
             MediaAnalyticsItem::SessionID_t sessionid = submit(item, forcenew);
             reply->writeInt64(sessionid);
 
@@ -212,11 +212,11 @@ status_t BnMediaAnalyticsService::onTransact(
             MediaAnalyticsItem::Key key = data.readCString();
 
             // find the (0 or more) items
-            List<sp<MediaAnalyticsItem>> *list =  getMediaAnalyticsItemList(finished, ts, key);
+            List<MediaAnalyticsItem*> *list =  getMediaAnalyticsItemList(finished, ts, key);
             // encapsulate/serialize them
             reply->writeInt32(list->size());
             if (list->size() > 0) {
-                    for (List<sp<MediaAnalyticsItem>>::iterator it = list->begin();
+                    for (List<MediaAnalyticsItem*>::iterator it = list->begin();
                          it != list->end(); it++) {
                             (*it)->writeToParcel(reply);
                     }

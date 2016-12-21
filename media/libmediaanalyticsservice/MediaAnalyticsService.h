@@ -36,11 +36,12 @@ class MediaAnalyticsService : public BnMediaAnalyticsService
 
  public:
 
-    virtual int64_t submit(sp<MediaAnalyticsItem> item, bool forcenew);
+    // on this side, caller surrenders ownership
+    virtual int64_t submit(MediaAnalyticsItem *item, bool forcenew);
 
-    virtual List<sp<MediaAnalyticsItem>>
+    virtual List<MediaAnalyticsItem *>
             *getMediaAnalyticsItemList(bool finished, int64_t ts);
-    virtual List<sp<MediaAnalyticsItem>>
+    virtual List<MediaAnalyticsItem *>
             *getMediaAnalyticsItemList(bool finished, int64_t ts, MediaAnalyticsItem::Key key);
 
 
@@ -68,24 +69,25 @@ class MediaAnalyticsService : public BnMediaAnalyticsService
     int32_t mMaxRecords;
 
     // input validation after arrival from client
-    bool contentValid(sp<MediaAnalyticsItem>);
-    bool rateLimited(sp<MediaAnalyticsItem>);
+    bool contentValid(MediaAnalyticsItem *);
+    bool rateLimited(MediaAnalyticsItem *);
 
     // the ones that are still open
     // (newest at front) since we keep looking for them
-    List<sp<MediaAnalyticsItem>> *mOpen;
+    List<MediaAnalyticsItem *> *mOpen;
     // the ones we've finalized
     // (oldest at front) so it prints nicely for dumpsys
-    List<sp<MediaAnalyticsItem>> *mFinalized;
+    List<MediaAnalyticsItem *> *mFinalized;
     // searching within these queues: queue, key
-    sp<MediaAnalyticsItem> findItem(List<sp<MediaAnalyticsItem>> *,
-                                     sp<MediaAnalyticsItem>, bool removeit);
+    MediaAnalyticsItem *findItem(List<MediaAnalyticsItem *> *,
+                                     MediaAnalyticsItem *, bool removeit);
 
-    void saveItem(sp<MediaAnalyticsItem>);
-    void saveItem(List<sp<MediaAnalyticsItem>>*, sp<MediaAnalyticsItem>, int);
-    void deleteItem(List<sp<MediaAnalyticsItem>>*, sp<MediaAnalyticsItem>);
+    void saveItem(MediaAnalyticsItem);
+    void saveItem(List<MediaAnalyticsItem *> *, MediaAnalyticsItem *, int);
+    void deleteItem(List<MediaAnalyticsItem *> *, MediaAnalyticsItem *);
 
-    String8 dumpQueue(List<sp<MediaAnalyticsItem>> *);
+    String8 dumpQueue(List<MediaAnalyticsItem*> *);
+    String8 dumpQueue(List<MediaAnalyticsItem*> *, nsecs_t);
 
 };
 
