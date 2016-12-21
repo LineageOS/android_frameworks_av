@@ -22,7 +22,8 @@ LOCAL_MODULE:= libstagefright_http_support
 LOCAL_CFLAGS += -Wno-multichar
 
 LOCAL_CFLAGS += -Werror -Wall
-LOCAL_SANITIZE := signed-integer-overflow
+LOCAL_SANITIZE := signed-integer-overflow cfi
+LOCAL_SANITIZE_DIAG := cfi
 
 include $(BUILD_SHARED_LIBRARY)
 

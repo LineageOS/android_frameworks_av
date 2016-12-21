@@ -21,7 +21,8 @@ LOCAL_SHARED_LIBRARIES  += libutils
 LOCAL_SHARED_LIBRARIES  += liblog
 
 LOCAL_LDFLAGS := -Wl,-Bsymbolic
-LOCAL_SANITIZE := signed-integer-overflow
+LOCAL_SANITIZE := signed-integer-overflow cfi
+LOCAL_SANITIZE_DIAG := cfi
 
 include $(BUILD_SHARED_LIBRARY)
 

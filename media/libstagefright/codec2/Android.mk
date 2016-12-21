@@ -11,7 +11,8 @@ LOCAL_C_INCLUDES += \
 LOCAL_MODULE:= libstagefright_codec2
 LOCAL_CFLAGS += -Werror -Wall
 LOCAL_CLANG := true
-LOCAL_SANITIZE := unsigned-integer-overflow signed-integer-overflow
+LOCAL_SANITIZE := unsigned-integer-overflow signed-integer-overflow cfi
+LOCAL_SANITIZE_DIAG := cfi
 
 include $(BUILD_SHARED_LIBRARY)
 
