@@ -98,6 +98,7 @@ nsecs_t AudioFlinger::mStandbyTimeInNsecs = kDefaultStandbyTimeInNsecs;
 
 uint32_t AudioFlinger::mScreenState;
 
+
 #ifdef TEE_SINK
 bool AudioFlinger::mTeeSinkInputEnabled = false;
 bool AudioFlinger::mTeeSinkOutputEnabled = false;
@@ -111,6 +112,9 @@ size_t AudioFlinger::mTeeSinkTrackFrames = kTeeSinkTrackFramesDefault;
 // In order to avoid invalidating offloaded tracks each time a Visualizer is turned on and off
 // we define a minimum time during which a global effect is considered enabled.
 static const nsecs_t kMinGlobalEffectEnabletimeNs = seconds(7200);
+
+Mutex gLock;
+wp<AudioFlinger> gAudioFlinger;
 
 // ----------------------------------------------------------------------------
 
@@ -201,6 +205,8 @@ void AudioFlinger::onFirstRef()
     mPatchPanel = new PatchPanel(this);
 
     mMode = AUDIO_MODE_NORMAL;
+
+    gAudioFlinger = this;
 }
 
 AudioFlinger::~AudioFlinger()
@@ -231,6 +237,44 @@ AudioFlinger::~AudioFlinger()
             }
         }
     }
+}
+
+//static
+status_t MmapStreamInterface::openMmapStream(MmapStreamInterface::stream_direction_t direction,
+                                             const audio_attributes_t *attr,
+                                             audio_config_base_t *config,
+                                             const MmapStreamInterface::Client& client,
+                                             audio_port_handle_t *deviceId,
+                                             const sp<MmapStreamCallback>& callback,
+                                             sp<MmapStreamInterface>& interface)
+{
+    sp<AudioFlinger> af;
+    {
+        Mutex::Autolock _l(gLock);
+        af = gAudioFlinger.promote();
+    }
+    status_t ret = NO_INIT;
+    if (af != 0) {
+        ret = af->openMmapStream(
+                direction, attr, config, client, deviceId, callback, interface);
+    }
+    return ret;
+}
+
+status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t direction __unused,
+                                      const audio_attributes_t *attr __unused,
+                                      audio_config_base_t *config __unused,
+                                      const MmapStreamInterface::Client& client __unused,
+                                      audio_port_handle_t *deviceId __unused,
+                                      const sp<MmapStreamCallback>& callback __unused,
+                                      sp<MmapStreamInterface>& interface __unused)
+{
+    status_t ret = initCheck();
+    if (ret != NO_ERROR) {
+        return ret;
+    }
+
+    return ret;
 }
 
 static const char * const audio_interfaces[] = {

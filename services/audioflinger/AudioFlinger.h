@@ -34,6 +34,8 @@
 #include <media/IAudioRecord.h>
 #include <media/AudioSystem.h>
 #include <media/AudioTrack.h>
+#include <media/MmapStreamInterface.h>
+#include <media/MmapStreamCallback.h>
 
 #include <utils/Atomic.h>
 #include <utils/Errors.h>
@@ -98,6 +100,7 @@ class AudioFlinger :
     public BnAudioFlinger
 {
     friend class BinderService<AudioFlinger>;   // for AudioFlinger()
+
 public:
     static const char* getServiceName() ANDROID_API { return "media.audio_flinger"; }
 
@@ -281,6 +284,14 @@ public:
     sp<NBLog::Writer>   newWriter_l(size_t size, const char *name);
     void                unregisterWriter(const sp<NBLog::Writer>& writer);
     sp<EffectsFactoryHalInterface> getEffectsFactory();
+
+    status_t openMmapStream(MmapStreamInterface::stream_direction_t direction,
+                            const audio_attributes_t *attr,
+                            audio_config_base_t *config,
+                            const MmapStreamInterface::Client& client,
+                            audio_port_handle_t *deviceId,
+                            const sp<MmapStreamCallback>& callback,
+                            sp<MmapStreamInterface>& interface);
 private:
     static const size_t kLogMemorySize = 40 * 1024;
     sp<MemoryDealer>    mLogMemoryDealer;   // == 0 when NBLog is disabled
@@ -288,6 +299,7 @@ private:
     // for as long as possible.  The memory is only freed when it is needed for another log writer.
     Vector< sp<NBLog::Writer> > mUnregisteredWriters;
     Mutex               mUnregisteredWritersLock;
+
 public:
 
     class SyncEvent;
