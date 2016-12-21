@@ -41,14 +41,6 @@ namespace android {
 /** Used to remove warnings about unused parameters */
 #define UNUSED(x) ((void)(x))
 
-/** Get time */
-#define GETTIME(a, b) gettimeofday(a, b);
-
-/** Compute difference between start and end */
-#define TIME_DIFF(start, end, diff) \
-    diff = (((end).tv_sec - (start).tv_sec) * 1000000) + \
-            ((end).tv_usec - (start).tv_usec);
-
 struct SoftAVC : public SoftVideoDecoderOMXComponent {
     SoftAVC(const char *name, const OMX_CALLBACKTYPE *callbacks,
             OMX_PTR appData, OMX_COMPONENTTYPE **component);
@@ -70,8 +62,8 @@ private:
 
     size_t mNumCores;            // Number of cores to be uesd by the codec
 
-    struct timeval mTimeStart;   // Time at the start of decode()
-    struct timeval mTimeEnd;     // Time at the end of decode()
+    nsecs_t mTimeStart;   // Time at the start of decode()
+    nsecs_t mTimeEnd;     // Time at the end of decode()
 
     // Internal buffer to be used to flush out the buffers from decoder
     uint8_t *mFlushOutBuffer;
@@ -129,10 +121,9 @@ private:
 #define INPUT_DUMP_EXT      "h264"
 
 #define GENERATE_FILE_NAMES() {                         \
-    GETTIME(&mTimeStart, NULL);                         \
     strcpy(mInFile, "");                                \
-    sprintf(mInFile, "%s_%ld.%ld.%s", INPUT_DUMP_PATH,  \
-            mTimeStart.tv_sec, mTimeStart.tv_usec,      \
+    sprintf(mInFile, "%s_%lld.%s", INPUT_DUMP_PATH,     \
+            (long long) mTimeStart,                     \
             INPUT_DUMP_EXT);                            \
 }
 
