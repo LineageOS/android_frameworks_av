@@ -32,7 +32,7 @@ TEST(test_oboe_api, oboe_stream_builder) {
     const oboe_sample_rate_t requestedSampleRate1 = 48000;
     const oboe_sample_rate_t requestedSampleRate2 = 44100;
     const int32_t requestedSamplesPerFrame = 2;
-    const oboe_audio_format_t requestedDataFormat = OBOE_AUDIO_DATATYPE_INT16;
+    const oboe_audio_format_t requestedDataFormat = OBOE_AUDIO_FORMAT_PCM16;
 
     oboe_sample_rate_t sampleRate = 0;
     int32_t samplesPerFrame = 0;
@@ -94,7 +94,6 @@ TEST(test_oboe_api, oboe_stream_builder) {
     EXPECT_EQ(OBOE_ERROR_INVALID_HANDLE, OboeStreamBuilder_getSampleRate(oboeBuilder2, &sampleRate));
 }
 
-
 // Test creating a default stream with everything unspecified.
 TEST(test_oboe_api, oboe_stream_unspecified) {
     OboeStreamBuilder oboeBuilder;
@@ -114,18 +113,17 @@ TEST(test_oboe_api, oboe_stream_unspecified) {
 }
 
 // Test Writing to an OboeStream
-TEST(test_oboe_api, oboe_stream) {
+void runtest_oboe_stream(oboe_sharing_mode_t requestedSharingMode) {
     const oboe_sample_rate_t requestedSampleRate = 48000;
     const oboe_sample_rate_t requestedSamplesPerFrame = 2;
-    const oboe_audio_format_t requestedDataFormat = OBOE_AUDIO_DATATYPE_INT16;
-    //const oboe_sharing_mode_t requestedSharingMode = OBOE_SHARING_MODE_EXCLUSIVE; // MMAP NOIRQ
-    const oboe_sharing_mode_t requestedSharingMode = OBOE_SHARING_MODE_LEGACY; // AudioTrack
+    const oboe_audio_format_t requestedDataFormat = OBOE_AUDIO_FORMAT_PCM16;
 
     oboe_sample_rate_t actualSampleRate = -1;
     int32_t actualSamplesPerFrame = -1;
-    oboe_audio_format_t actualDataFormat = OBOE_AUDIO_FORMAT_PCM824;
+    oboe_audio_format_t actualDataFormat = OBOE_AUDIO_FORMAT_INVALID;
     oboe_sharing_mode_t actualSharingMode;
     oboe_size_frames_t framesPerBurst = -1;
+    int writeLoops = 0;
 
     oboe_size_frames_t framesWritten = 0;
     oboe_size_frames_t framesPrimed = 0;
@@ -162,22 +160,30 @@ TEST(test_oboe_api, oboe_stream) {
 
     // Check to see what kind of stream we actually got.
     EXPECT_EQ(OBOE_OK, OboeStream_getSampleRate(oboeStream, &actualSampleRate));
-    EXPECT_TRUE(actualSampleRate >= 44100 && actualSampleRate <= 96000);  // TODO what is range?
+    ASSERT_TRUE(actualSampleRate >= 44100 && actualSampleRate <= 96000);  // TODO what is range?
 
     EXPECT_EQ(OBOE_OK, OboeStream_getSamplesPerFrame(oboeStream, &actualSamplesPerFrame));
-    EXPECT_TRUE(actualSamplesPerFrame >= 1 && actualSamplesPerFrame <= 16); // TODO what is max?
+    ASSERT_TRUE(actualSamplesPerFrame >= 1 && actualSamplesPerFrame <= 16); // TODO what is max?
 
     EXPECT_EQ(OBOE_OK, OboeStream_getSharingMode(oboeStream, &actualSharingMode));
-    EXPECT_TRUE(actualSharingMode == OBOE_SHARING_MODE_EXCLUSIVE
-            || actualSharingMode == OBOE_SHARING_MODE_LEGACY);
+    ASSERT_TRUE(actualSharingMode == OBOE_SHARING_MODE_EXCLUSIVE
+                || actualSharingMode == OBOE_SHARING_MODE_LEGACY);
+
+    EXPECT_EQ(OBOE_OK, OboeStream_getFormat(oboeStream, &actualDataFormat));
+    EXPECT_NE(OBOE_AUDIO_FORMAT_INVALID, actualDataFormat);
 
     EXPECT_EQ(OBOE_OK, OboeStream_getFramesPerBurst(oboeStream, &framesPerBurst));
-    EXPECT_TRUE(framesPerBurst >= 16 && framesPerBurst <= 1024); // TODO what is min/max?
+    ASSERT_TRUE(framesPerBurst >= 16 && framesPerBurst <= 1024); // TODO what is min/max?
 
     // Allocate a buffer for the audio data.
-    int16_t *data = new int16_t[framesPerBurst * actualSamplesPerFrame];
-    ASSERT_TRUE(NULL != data);
+    // TODO handle possibility of other data formats
+    ASSERT_TRUE(actualDataFormat == OBOE_AUDIO_FORMAT_PCM16);
+    size_t dataSizeSamples = framesPerBurst * actualSamplesPerFrame;
+    int16_t *data = new int16_t[dataSizeSamples];
+    ASSERT_TRUE(nullptr != data);
+    memset(data, 0, sizeof(int16_t) * dataSizeSamples);
 
+    // Prime the buffer.
     timeoutNanos = 0;
     do {
         framesWritten = OboeStream_write(oboeStream, data, framesPerBurst, timeoutNanos);
@@ -185,66 +191,70 @@ TEST(test_oboe_api, oboe_stream) {
         framesTotal += framesWritten;
         ASSERT_GE(framesWritten, 0);
         ASSERT_LE(framesWritten, framesPerBurst);
-    } while(framesWritten > 0);
+    } while (framesWritten > 0);
     ASSERT_TRUE(framesTotal > 0);
 
-    // Start and wait for server to respond.
-    ASSERT_EQ(OBOE_OK, OboeStream_requestStart(oboeStream));
-    ASSERT_EQ(OBOE_OK, OboeStream_waitForStateChange(oboeStream,
-                                                     OBOE_STREAM_STATE_STARTING,
-                                                     &state,
-                                                     DEFAULT_STATE_TIMEOUT));
-    EXPECT_EQ(OBOE_STREAM_STATE_STARTED, state);
+    // Start/write/pause more than once to see if it fails after the first time.
+    // Write some data and measure the rate to see if the timing is OK.
+    for (int numLoops = 0; numLoops < 2; numLoops++) {
+        // Start and wait for server to respond.
+        ASSERT_EQ(OBOE_OK, OboeStream_requestStart(oboeStream));
+        ASSERT_EQ(OBOE_OK, OboeStream_waitForStateChange(oboeStream,
+                                                         OBOE_STREAM_STATE_STARTING,
+                                                         &state,
+                                                         DEFAULT_STATE_TIMEOUT));
+        EXPECT_EQ(OBOE_STREAM_STATE_STARTED, state);
 
-    // Write some data while we are running. Read counter should be advancing.
-    int loops = 1 * actualSampleRate / framesPerBurst; // 1 second
-    ASSERT_LT(2, loops); // detect absurdly high framesPerBurst
-    timeoutNanos = 10 * OBOE_NANOS_PER_SECOND * framesPerBurst / actualSampleRate; // bursts
-    framesWritten = 1;
-    ASSERT_EQ(OBOE_OK, OboeStream_getFramesRead(oboeStream, &oboeFramesRead));
-    oboeFramesRead1 = oboeFramesRead;
-    oboe_nanoseconds_t beginTime = Oboe_getNanoseconds(OBOE_CLOCK_MONOTONIC);
-    do {
-        framesWritten = OboeStream_write(oboeStream, data, framesPerBurst, timeoutNanos);
-        ASSERT_GE(framesWritten, 0);
-        ASSERT_LE(framesWritten, framesPerBurst);
+        // Write some data while we are running. Read counter should be advancing.
+        writeLoops = 1 * actualSampleRate / framesPerBurst; // 1 second
+        ASSERT_LT(2, writeLoops); // detect absurdly high framesPerBurst
+        timeoutNanos = 10 * OBOE_NANOS_PER_SECOND * framesPerBurst / actualSampleRate; // bursts
+        framesWritten = 1;
+        ASSERT_EQ(OBOE_OK, OboeStream_getFramesRead(oboeStream, &oboeFramesRead));
+        oboeFramesRead1 = oboeFramesRead;
+        oboe_nanoseconds_t beginTime = Oboe_getNanoseconds(OBOE_CLOCK_MONOTONIC);
+        do {
+            framesWritten = OboeStream_write(oboeStream, data, framesPerBurst, timeoutNanos);
+            ASSERT_GE(framesWritten, 0);
+            ASSERT_LE(framesWritten, framesPerBurst);
 
-        framesTotal += framesWritten;
-        EXPECT_EQ(OBOE_OK, OboeStream_getFramesWritten(oboeStream, &oboeFramesWritten));
-        EXPECT_EQ(framesTotal, oboeFramesWritten);
+            framesTotal += framesWritten;
+            EXPECT_EQ(OBOE_OK, OboeStream_getFramesWritten(oboeStream, &oboeFramesWritten));
+            EXPECT_EQ(framesTotal, oboeFramesWritten);
 
-        // Try to get a more accurate measure of the sample rate.
-        if (beginTime == 0) {
-            EXPECT_EQ(OBOE_OK, OboeStream_getFramesRead(oboeStream, &oboeFramesRead));
-            if (oboeFramesRead > oboeFramesRead1) { // is read pointer advancing
-                beginTime = Oboe_getNanoseconds(OBOE_CLOCK_MONOTONIC);
-                oboeFramesRead1 = oboeFramesRead;
+            // Try to get a more accurate measure of the sample rate.
+            if (beginTime == 0) {
+                EXPECT_EQ(OBOE_OK, OboeStream_getFramesRead(oboeStream, &oboeFramesRead));
+                if (oboeFramesRead > oboeFramesRead1) { // is read pointer advancing
+                    beginTime = Oboe_getNanoseconds(OBOE_CLOCK_MONOTONIC);
+                    oboeFramesRead1 = oboeFramesRead;
+                }
             }
+        } while (framesWritten > 0 && writeLoops-- > 0);
+
+        EXPECT_EQ(OBOE_OK, OboeStream_getFramesRead(oboeStream, &oboeFramesRead2));
+        oboe_nanoseconds_t endTime = Oboe_getNanoseconds(OBOE_CLOCK_MONOTONIC);
+        ASSERT_GT(oboeFramesRead2, 0);
+        ASSERT_GT(oboeFramesRead2, oboeFramesRead1);
+        ASSERT_LE(oboeFramesRead2, oboeFramesWritten);
+
+        // TODO why is legacy so inaccurate?
+        const double rateTolerance = 200.0; // arbitrary tolerance for sample rate
+        if (requestedSharingMode != OBOE_SHARING_MODE_LEGACY) {
+            // Calculate approximate sample rate and compare with stream rate.
+            double seconds = (endTime - beginTime) / (double) OBOE_NANOS_PER_SECOND;
+            double measuredRate = (oboeFramesRead2 - oboeFramesRead1) / seconds;
+            ASSERT_NEAR(actualSampleRate, measuredRate, rateTolerance);
         }
-    } while (framesWritten > 0 && loops-- > 0);
 
-    EXPECT_EQ(OBOE_OK, OboeStream_getFramesRead(oboeStream, &oboeFramesRead2));
-    oboe_nanoseconds_t endTime = Oboe_getNanoseconds(OBOE_CLOCK_MONOTONIC);
-    ASSERT_GT(oboeFramesRead2, 0);
-    ASSERT_GT(oboeFramesRead2, oboeFramesRead1);
-    ASSERT_LE(oboeFramesRead2, oboeFramesWritten);
-
-    // TODO why is legacy so inaccurate?
-    const double rateTolerance = 200.0; // arbitrary tolerance for sample rate
-    if (requestedSharingMode != OBOE_SHARING_MODE_LEGACY) {
-        // Calculate approximate sample rate and compare with stream rate.
-        double seconds = (endTime - beginTime) / (double) OBOE_NANOS_PER_SECOND;
-        double measuredRate = (oboeFramesRead2 - oboeFramesRead1) / seconds;
-        ASSERT_NEAR(actualSampleRate, measuredRate, rateTolerance);
+        // Request async pause and wait for server to say that it has completed the pause.
+        ASSERT_EQ(OBOE_OK, OboeStream_requestPause(oboeStream));
+        EXPECT_EQ(OBOE_OK, OboeStream_waitForStateChange(oboeStream,
+                                                OBOE_STREAM_STATE_PAUSING,
+                                                &state,
+                                                DEFAULT_STATE_TIMEOUT));
+        EXPECT_EQ(OBOE_STREAM_STATE_PAUSED, state);
     }
-
-    // Request async pause and wait for server to say that it has completed the pause.
-    ASSERT_EQ(OBOE_OK, OboeStream_requestPause(oboeStream));
-    EXPECT_EQ(OBOE_OK, OboeStream_waitForStateChange(oboeStream,
-                                            OBOE_STREAM_STATE_PAUSING,
-                                            &state,
-                                            DEFAULT_STATE_TIMEOUT));
-    EXPECT_EQ(OBOE_STREAM_STATE_PAUSED, state);
 
     // Make sure the read counter is not advancing when we are paused.
     ASSERT_EQ(OBOE_OK, OboeStream_getFramesRead(oboeStream, &oboeFramesRead));
@@ -255,13 +265,14 @@ TEST(test_oboe_api, oboe_stream) {
     ASSERT_EQ(OBOE_OK, OboeStream_getFramesRead(oboeStream, &oboeFramesRead2));
     EXPECT_EQ(oboeFramesRead, oboeFramesRead2);
 
-    // Fill up the buffer.
+    // ------------------- TEST FLUSH -----------------
+    // Prime the buffer.
     timeoutNanos = 0;
-    loops = 100;
+    writeLoops = 100;
     do {
         framesWritten = OboeStream_write(oboeStream, data, framesPerBurst, timeoutNanos);
         framesTotal += framesWritten;
-    } while (framesWritten > 0 && loops-- > 0);
+    } while (framesWritten > 0 && writeLoops-- > 0);
     EXPECT_EQ(0, framesWritten);
 
     // Flush and wait for server to respond.
@@ -284,6 +295,16 @@ TEST(test_oboe_api, oboe_stream) {
     ASSERT_TRUE(framesWritten > 0 && framesWritten <= framesPerBurst);
 
     EXPECT_EQ(OBOE_OK, OboeStream_close(oboeStream));
+}
+
+// Test Writing to an OboeStream using LEGACY sharing mode.
+TEST(test_oboe_api, oboe_stream_legacy) {
+    runtest_oboe_stream(OBOE_SHARING_MODE_LEGACY);
+}
+
+// Test Writing to an OboeStream using EXCLUSIVE sharing mode.
+TEST(test_oboe_api, oboe_stream_exclusive) {
+    runtest_oboe_stream(OBOE_SHARING_MODE_EXCLUSIVE);
 }
 
 #define OBOE_THREAD_ANSWER          1826375

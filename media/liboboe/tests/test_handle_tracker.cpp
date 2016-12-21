@@ -56,7 +56,7 @@ TEST(test_handle_tracker, oboe_handle_tracker) {
         EXPECT_EQ(&data, found);
         // should fail the second time
         found = tracker.remove(type, dataHandle);
-        EXPECT_EQ(NULL, found);
+        EXPECT_EQ(nullptr, found);
     }
 }
 
