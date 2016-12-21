@@ -57,6 +57,19 @@ class StreamHalLocal : public virtual StreamHalInterface
 
     virtual status_t dump(int fd);
 
+    // Start a stream operating in mmap mode.
+    virtual status_t start() = 0;
+
+    // Stop a stream operating in mmap mode.
+    virtual status_t stop() = 0;
+
+    // Retrieve information on the data buffer in mmap mode.
+    virtual status_t createMmapBuffer(int32_t minSizeFrames,
+                                      struct audio_mmap_buffer_info *info) = 0;
+
+    // Get current read/write position in the mmap buffer
+    virtual status_t getMmapPosition(struct audio_mmap_position *position) = 0;
+
   protected:
     // Subclasses can not be constructed directly by clients.
     StreamHalLocal(audio_stream_t *stream, sp<DeviceHalLocal> device);
@@ -115,6 +128,19 @@ class StreamOutHalLocal : public StreamOutHalInterface, public StreamHalLocal {
     // Return a recent count of the number of audio frames presented to an external observer.
     virtual status_t getPresentationPosition(uint64_t *frames, struct timespec *timestamp);
 
+    // Start a stream operating in mmap mode.
+    virtual status_t start();
+
+    // Stop a stream operating in mmap mode.
+    virtual status_t stop();
+
+    // Retrieve information on the data buffer in mmap mode.
+    virtual status_t createMmapBuffer(int32_t minSizeFrames,
+                                      struct audio_mmap_buffer_info *info);
+
+    // Get current read/write position in the mmap buffer
+    virtual status_t getMmapPosition(struct audio_mmap_position *position);
+
   private:
     audio_stream_out_t *mStream;
     wp<StreamOutHalInterfaceCallback> mCallback;
@@ -146,6 +172,19 @@ class StreamInHalLocal : public StreamInHalInterface, public StreamHalLocal {
     // Return a recent count of the number of audio frames received and
     // the clock time associated with that frame count.
     virtual status_t getCapturePosition(int64_t *frames, int64_t *time);
+
+    // Start a stream operating in mmap mode.
+    virtual status_t start();
+
+    // Stop a stream operating in mmap mode.
+    virtual status_t stop();
+
+    // Retrieve information on the data buffer in mmap mode.
+    virtual status_t createMmapBuffer(int32_t minSizeFrames,
+                                      struct audio_mmap_buffer_info *info);
+
+    // Get current read/write position in the mmap buffer
+    virtual status_t getMmapPosition(struct audio_mmap_position *position);
 
   private:
     audio_stream_in_t *mStream;
