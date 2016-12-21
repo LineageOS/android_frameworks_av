@@ -26,8 +26,8 @@ LIBOBOE {
     OboeStream_waitForStateChange;
     OboeStream_read;
     OboeStream_write;
-    Oboe_createAudioThread;
-    Oboe_joinAudioThread;
+    OboeStream_createThread;
+    OboeStream_joinThread;
     OboeStream_setBufferSize;
     OboeStream_getBufferSize;
     OboeStream_getFramesPerBurst;
