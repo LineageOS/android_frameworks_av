@@ -18,13 +18,17 @@
 //#define LOG_NDEBUG 0
 
 #include "EffectsFactory.h"
-#include <string.h>
-#include <stdlib.h>
-#include <dlfcn.h>
 
-#include <cutils/misc.h>
+#include <dlfcn.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include <android/log.h>
 #include <cutils/config_utils.h>
+#include <cutils/misc.h>
 #include <cutils/properties.h>
+
 #include <audio_effects/audio_effects_conf.h>
 
 static list_elem_t *gEffectList; // list of effect_entry_t: all currently created effects

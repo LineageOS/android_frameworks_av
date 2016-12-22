@@ -59,7 +59,8 @@ terms listed above has been obtained from the copyright holder.
 /*----------------------------------------------------------------------------
 ; INCLUDES
 ----------------------------------------------------------------------------*/
-#include <log/log.h>
+#define LOG_TAG "a_refl"
+#include <android/log.h>
 
 #include "a_refl.h"
 #include "typedef.h"

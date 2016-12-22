@@ -16,14 +16,14 @@
 #ifndef LE_FX_ENGINE_DSP_CORE_DYNAMIC_RANGE_COMPRESSION_H_
 #define LE_FX_ENGINE_DSP_CORE_DYNAMIC_RANGE_COMPRESSION_H_
 
+//#define LOG_NDEBUG 0
+
 #include "common/core/types.h"
 #include "common/core/math.h"
 #include "dsp/core/basic.h"
 #include "dsp/core/interpolation.h"
 
-//#define LOG_NDEBUG 0
-#include <cutils/log.h>
-
+#include <android/log.h>
 
 namespace le_fx {
 

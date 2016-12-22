@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+//#define LOG_NDEBUG 0
 
 #include <cmath>
 
@@ -22,9 +23,7 @@
 #include "dsp/core/interpolation.h"
 #include "dsp/core/dynamic_range_compression.h"
 
-//#define LOG_NDEBUG 0
-#include <cutils/log.h>
-
+#include <android/log.h>
 
 namespace le_fx {
 

@@ -21,7 +21,8 @@
 #include "AudioSession.h"
 #include "AudioGain.h"
 #include "TypeConverter.h"
-#include <cutils/log.h>
+
+#include <android/log.h>
 #include <utils/String8.h>
 
 namespace android {
