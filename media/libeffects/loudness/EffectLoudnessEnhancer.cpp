@@ -16,13 +16,16 @@
 
 #define LOG_TAG "EffectLE"
 //#define LOG_NDEBUG 0
-#include <cutils/log.h>
+
 #include <assert.h>
+#include <math.h>
+#include <new>
 #include <stdlib.h>
 #include <string.h>
-#include <new>
 #include <time.h>
-#include <math.h>
+
+#include <android/log.h>
+
 #include <audio_effects/effect_loudnessenhancer.h>
 #include "dsp/core/dynamic_range_compression.h"
 

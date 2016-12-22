@@ -17,13 +17,16 @@
 #define LOG_TAG "EffectProxy"
 //#define LOG_NDEBUG 0
 
-#include <cutils/log.h>
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <new>
+
 #include <EffectProxy.h>
+
+#include <log/log.h>
 #include <utils/threads.h>
+
 #include <media/EffectsFactoryApi.h>
 
 namespace android {

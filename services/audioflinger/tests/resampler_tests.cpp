@@ -17,22 +17,25 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "audioflinger_resampler_tests"
 
-#include <unistd.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <fcntl.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <errno.h>
 #include <time.h>
-#include <math.h>
-#include <vector>
-#include <utility>
+#include <unistd.h>
+
 #include <iostream>
-#include <cutils/log.h>
+#include <utility>
+#include <vector>
+
+#include <android/log.h>
 #include <gtest/gtest.h>
 #include <media/AudioBufferProvider.h>
+
 #include "AudioResampler.h"
 #include "test_utils.h"
 

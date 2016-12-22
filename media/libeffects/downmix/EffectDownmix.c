@@ -16,11 +16,14 @@
 
 #define LOG_TAG "EffectDownmix"
 //#define LOG_NDEBUG 0
-#include <log/log.h>
+
 #include <inttypes.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
+
+#include <android/log.h>
+
 #include "EffectDownmix.h"
 
 // Do not submit with DOWNMIX_TEST_CHANNEL_INDEX defined, strictly for testing
