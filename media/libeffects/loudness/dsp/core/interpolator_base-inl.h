@@ -16,12 +16,14 @@
 
 #ifndef LE_FX_ENGINE_DSP_CORE_INTERPOLATOR_BASE_INL_H_
 #define LE_FX_ENGINE_DSP_CORE_INTERPOLATOR_BASE_INL_H_
+#ifndef LOG_TAG
+#define LOG_TAG NULL
+#endif
+//#define LOG_NDEBUG 0
+
+#include <android/log.h>
 
 #include "dsp/core/basic.h"
-
-//#define LOG_NDEBUG 0
-#include <cutils/log.h>
-
 
 namespace le_fx {
 
@@ -112,7 +114,7 @@ bool InterpolatorBase<T, Algorithm>::Initialize(
     if (x_data_[n + 1] <= x_data_[n]) {
       ALOGE("InterpolatorBase::Initialize: xData are not ordered or "
               "contain equal values (X[%d] <= X[%d]) (%.5e <= %.5e)",
-              n + 1, n, x_data_[n + 1], x_data_[n]);
+            n + 1, n, x_data_[n + 1], x_data_[n]);
       status_ = false;
       return false;
     }

@@ -18,16 +18,18 @@
 #define ARRAY_SIZE(array) (sizeof array / sizeof array[0])
 //
 #define LOG_NDEBUG 0
-#include <cutils/log.h>
+
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <new>
+
+#include <android/log.h>
+
 #include "AudioEqualizer.h"
 #include "AudioBiquadFilter.h"
 #include "AudioFormatAdapter.h"
 #include <audio_effects/effect_equalizer.h>
-
 
 // effect_handle_t interface implementation for equalizer effect
 extern "C" const struct effect_interface_s gEqualizerInterface;
