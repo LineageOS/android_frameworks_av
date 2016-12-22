@@ -49,6 +49,15 @@ private:
     int                 mFilePermission;
     int                 mDirectoryPermission;
 
+    // Manufacturer to report in DeviceInfo
+    MtpString           mDeviceInfoManufacturer;
+    // Model to report in DeviceInfo
+    MtpString           mDeviceInfoModel;
+    // Device version to report in DeviceInfo
+    MtpString           mDeviceInfoDeviceVersion;
+    // Serial number to report in DeviceInfo
+    MtpString           mDeviceInfoSerialNumber;
+
     // current session ID
     MtpSessionID        mSessionID;
     // true if we have an open session and mSessionID is valid
@@ -95,7 +104,11 @@ private:
 
 public:
                         MtpServer(MtpDatabase* database, bool ptp,
-                                    int fileGroup, int filePerm, int directoryPerm);
+                                    int fileGroup, int filePerm, int directoryPerm,
+                                    const MtpString& deviceInfoManufacturer,
+                                    const MtpString& deviceInfoModel,
+                                    const MtpString& deviceInfoDeviceVersion,
+                                    const MtpString& deviceInfoSerialNumber);
     virtual             ~MtpServer();
 
     MtpStorage*         getStorage(MtpStorageID id);
