@@ -38,9 +38,9 @@ AudioSession::AudioSession(audio_session_t session,
                            bool isSoundTrigger,
                            AudioMix* policyMix,
                            AudioPolicyClientInterface *clientInterface) :
-    mSession(session), mInputSource(inputSource),
+    mRecordClientInfo({ .uid = uid, .session = session, .source = inputSource}),
     mConfig({ .format = format, .sample_rate = sampleRate, .channel_mask = channelMask}),
-    mFlags(flags), mUid(uid), mIsSoundTrigger(isSoundTrigger),
+    mFlags(flags), mIsSoundTrigger(isSoundTrigger),
     mOpenCount(1), mActiveCount(0), mPolicyMix(policyMix), mClientInterface(clientInterface),
     mInfoProvider(NULL)
 {
@@ -92,7 +92,7 @@ uint32_t AudioSession::changeActiveCount(int delta)
         const audio_patch_handle_t patchHandle = (provider != NULL) ? provider->getPatchHandle() :
                 AUDIO_PATCH_HANDLE_NONE;
         if (patchHandle != AUDIO_PATCH_HANDLE_NONE) {
-            mClientInterface->onRecordingConfigurationUpdate(event, mSession, mInputSource,
+            mClientInterface->onRecordingConfigurationUpdate(event, &mRecordClientInfo,
                     &mConfig, &deviceConfig, patchHandle);
         }
     }
@@ -102,13 +102,13 @@ uint32_t AudioSession::changeActiveCount(int delta)
 
 bool AudioSession::matches(const sp<AudioSession> &other) const
 {
-    if (other->session() == mSession &&
-        other->inputSource() == mInputSource &&
+    if (other->session() == mRecordClientInfo.session &&
+        other->inputSource() == mRecordClientInfo.source &&
         other->format() == mConfig.format &&
         other->sampleRate() == mConfig.sample_rate &&
         other->channelMask() == mConfig.channel_mask &&
         other->flags() == mFlags &&
-        other->uid() == mUid) {
+        other->uid() == mRecordClientInfo.uid) {
         return true;
     }
     return false;
@@ -130,8 +130,7 @@ void AudioSession::onSessionInfoUpdate() const
                 AUDIO_PATCH_HANDLE_NONE;
         if (patchHandle != AUDIO_PATCH_HANDLE_NONE) {
             mClientInterface->onRecordingConfigurationUpdate(RECORD_CONFIG_EVENT_START,
-                    mSession, mInputSource,
-                    &mConfig, &deviceConfig, patchHandle);
+                    &mRecordClientInfo, &mConfig, &deviceConfig, patchHandle);
         }
     }
 }
@@ -144,11 +143,11 @@ status_t AudioSession::dump(int fd, int spaces, int index) const
 
     snprintf(buffer, SIZE, "%*sAudio session %d:\n", spaces, "", index+1);
     result.append(buffer);
-    snprintf(buffer, SIZE, "%*s- session: %2d\n", spaces, "", mSession);
+    snprintf(buffer, SIZE, "%*s- session: %2d\n", spaces, "", mRecordClientInfo.session);
     result.append(buffer);
-    snprintf(buffer, SIZE, "%*s- owner uid: %2d\n", spaces, "", mUid);
+    snprintf(buffer, SIZE, "%*s- owner uid: %2d\n", spaces, "", mRecordClientInfo.uid);
     result.append(buffer);
-    snprintf(buffer, SIZE, "%*s- input source: %d\n", spaces, "", mInputSource);
+    snprintf(buffer, SIZE, "%*s- input source: %d\n", spaces, "", mRecordClientInfo.source);
     result.append(buffer);
     snprintf(buffer, SIZE, "%*s- format: %08x\n", spaces, "", mConfig.format);
     result.append(buffer);
