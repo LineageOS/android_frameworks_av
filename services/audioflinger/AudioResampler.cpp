@@ -17,11 +17,14 @@
 #define LOG_TAG "AudioResampler"
 //#define LOG_NDEBUG 0
 
+#include <pthread.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/types.h>
-#include <cutils/log.h>
+
+#include <android/log.h>
 #include <cutils/properties.h>
+
 #include <audio_utils/primitives.h>
 #include "AudioResampler.h"
 #include "AudioResamplerSinc.h"

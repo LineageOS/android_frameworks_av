@@ -16,10 +16,13 @@
 
 #define LOG_TAG "EffectReverb"
 //#define LOG_NDEBUG 0
-#include <cutils/log.h>
+
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
+
+#include <android/log.h>
+
 #include "EffectReverb.h"
 #include "EffectsMath.h"
 

@@ -15,11 +15,15 @@
  * and limitations under the License.
  * -------------------------------------------------------------------
  */
+
+#define LOG_TAG "conceal"
+
+#include "android/log.h"
+
 #include "mp4dec_lib.h" /* video decoder function prototypes */
 #include "vlc_decode.h"
 #include "bitstream.h"
 #include "scaling.h"
-#include "log/log.h"
 
 /* ====================================================================== /
 Function : ConcealTexture_I()

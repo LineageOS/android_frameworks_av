@@ -17,9 +17,10 @@
 #ifndef ANDROID_EFFECTSFACTORY_H_
 #define ANDROID_EFFECTSFACTORY_H_
 
-#include <cutils/log.h>
-#include <pthread.h>
 #include <dirent.h>
+#include <pthread.h>
+
+#include <android/log.h>
 #include <hardware/audio_effect.h>
 
 #if __cplusplus
