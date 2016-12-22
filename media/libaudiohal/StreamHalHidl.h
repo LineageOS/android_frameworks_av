@@ -20,6 +20,8 @@
 #include <android/hardware/audio/2.0/IStream.h>
 #include <android/hardware/audio/2.0/IStreamIn.h>
 #include <android/hardware/audio/2.0/IStreamOut.h>
+#include <fmq/EventFlag.h>
+#include <fmq/MessageQueue.h>
 #include <media/audiohal/StreamHalInterface.h>
 
 #include "ConversionHelperHidl.h"
@@ -27,7 +29,11 @@
 using ::android::hardware::audio::V2_0::IStream;
 using ::android::hardware::audio::V2_0::IStreamIn;
 using ::android::hardware::audio::V2_0::IStreamOut;
+using ::android::hardware::EventFlag;
+using ::android::hardware::MessageQueue;
 using ::android::hardware::Return;
+using ReadStatus = ::android::hardware::audio::V2_0::IStreamIn::ReadStatus;
+using WriteStatus = ::android::hardware::audio::V2_0::IStreamOut::WriteStatus;
 
 namespace android {
 
@@ -80,12 +86,18 @@ class StreamHalHidl : public virtual StreamHalInterface, public ConversionHelper
     // Get current read/write position in the mmap buffer
     virtual status_t getMmapPosition(struct audio_mmap_position *position);
 
+    // Set the priority of the thread that interacts with the HAL
+    // (must match the priority of the audioflinger's thread that calls 'read' / 'write')
+    virtual status_t setHalThreadPriority(int priority);
+
   protected:
     // Subclasses can not be constructed directly by clients.
     explicit StreamHalHidl(IStream *stream);
 
     // The destructor automatically closes the stream.
     virtual ~StreamHalHidl();
+
+    int mHalThreadPriority;
 
   private:
     IStream *mStream;
@@ -143,14 +155,25 @@ class StreamOutHalHidl : public StreamOutHalInterface, public StreamHalHidl {
 
   private:
     friend class DeviceHalHidl;
+    typedef MessageQueue<uint8_t, hardware::kSynchronizedReadWrite> DataMQ;
+    typedef MessageQueue<WriteStatus, hardware::kSynchronizedReadWrite> StatusMQ;
 
     wp<StreamOutHalInterfaceCallback> mCallback;
     sp<IStreamOut> mStream;
+    std::unique_ptr<DataMQ> mDataMQ;
+    std::unique_ptr<StatusMQ> mStatusMQ;
+    EventFlag* mEfGroup;
+    bool mGetPresentationPositionNotSupported;
+    uint64_t mPPosFromWriteObtained;
+    uint64_t mPPosFromWriteFrames;
+    struct timespec mPPosFromWriteTS;
 
     // Can not be constructed directly by clients.
     StreamOutHalHidl(const sp<IStreamOut>& stream);
 
     virtual ~StreamOutHalHidl();
+
+    status_t prepareForWriting(size_t bufferSize);
 };
 
 class StreamInHalHidl : public StreamInHalInterface, public StreamHalHidl {
@@ -173,13 +196,20 @@ class StreamInHalHidl : public StreamInHalInterface, public StreamHalHidl {
 
   private:
     friend class DeviceHalHidl;
+    typedef MessageQueue<uint8_t, hardware::kSynchronizedReadWrite> DataMQ;
+    typedef MessageQueue<ReadStatus, hardware::kSynchronizedReadWrite> StatusMQ;
 
     sp<IStreamIn> mStream;
+    std::unique_ptr<DataMQ> mDataMQ;
+    std::unique_ptr<StatusMQ> mStatusMQ;
+    EventFlag* mEfGroup;
 
     // Can not be constructed directly by clients.
     StreamInHalHidl(const sp<IStreamIn>& stream);
 
     virtual ~StreamInHalHidl();
+
+    status_t prepareForReading(size_t bufferSize);
 };
 
 } // namespace android

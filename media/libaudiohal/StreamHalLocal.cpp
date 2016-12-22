@@ -96,6 +96,12 @@ status_t StreamHalLocal::dump(int fd) {
     return mStream->dump(mStream, fd);
 }
 
+status_t StreamHalLocal::setHalThreadPriority(int) {
+    // Don't need to do anything as local hal is executed by audioflinger directly
+    // on the same thread.
+    return OK;
+}
+
 StreamOutHalLocal::StreamOutHalLocal(audio_stream_out_t *stream, sp<DeviceHalLocal> device)
         : StreamHalLocal(&stream->common, device), mStream(stream) {
 }
