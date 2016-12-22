@@ -25,10 +25,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <cutils/log.h>
+#include <log/log.h>
+
 #include "EffectBundle.h"
 #include "math.h"
-
 
 // effect_handle_t interface implementation for bass boost
 extern "C" const struct effect_interface_s gLvmEffectInterface;

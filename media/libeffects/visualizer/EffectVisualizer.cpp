@@ -16,17 +16,19 @@
 
 #define LOG_TAG "EffectVisualizer"
 //#define LOG_NDEBUG 0
-#include <log/log.h>
+
 #include <assert.h>
 #include <inttypes.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
-#include <new>
 #include <time.h>
-#include <math.h>
-#include <audio_effects/effect_visualizer.h>
-#include <cutils/log.h>
 
+#include <new>
+
+#include <log/log.h>
+
+#include <audio_effects/effect_visualizer.h>
 
 extern "C" {
 

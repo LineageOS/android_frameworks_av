@@ -25,7 +25,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <cutils/log.h>
+#include <log/log.h>
+
 #include "EffectReverb.h"
 // from Reverb/lib
 #include "LVREV.h"

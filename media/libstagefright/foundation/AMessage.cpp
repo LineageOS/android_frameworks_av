@@ -17,11 +17,13 @@
 #define LOG_TAG "AMessage"
 //#define LOG_NDEBUG 0
 //#define DUMP_STATS
-#include <cutils/log.h>
+
+#include <ctype.h>
 
 #include "AMessage.h"
 
-#include <ctype.h>
+#include <android/log.h>
+#include <binder/Parcel.h>
 
 #include "AAtomizer.h"
 #include "ABuffer.h"
@@ -30,7 +32,6 @@
 #include "AHandler.h"
 #include "AString.h"
 
-#include <binder/Parcel.h>
 #include <media/stagefright/foundation/hexdump.h>
 
 namespace android {
