@@ -427,8 +427,7 @@ status_t CameraProviderManager::ProviderInfo::addDevice(const std::string& name,
 }
 
 status_t CameraProviderManager::ProviderInfo::dump(int fd, const Vector<String16>&) const {
-    dprintf(fd, "    %s: v%d.%d, %zu devices:\n", mProviderName.c_str(),
-            mInterface->version.get_major(), mInterface->version.get_minor(), mDevices.size());
+    dprintf(fd, "    %s: %zu devices:\n", mProviderName.c_str(), mDevices.size());
 
     for (auto& device : mDevices) {
         dprintf(fd, "        %s: Resource cost: %d\n", device->mName.c_str(),
@@ -450,7 +449,7 @@ hardware::Return<void> CameraProviderManager::ProviderInfo::cameraDeviceStatusCh
     sp<StatusListener> listener;
     std::string id;
     {
-        std::lock_guard<std::mutex> lock(mManager->mInterfaceMutex);
+        std::lock_guard<std::mutex> lock(mManager->mStatusListenerMutex);
         bool known = false;
         for (auto& deviceInfo : mDevices) {
             if (deviceInfo->mName == cameraDeviceName) {
@@ -487,7 +486,7 @@ hardware::Return<void> CameraProviderManager::ProviderInfo::torchModeStatusChang
     sp<StatusListener> listener;
     std::string id;
     {
-        std::lock_guard<std::mutex> lock(mManager->mInterfaceMutex);
+        std::lock_guard<std::mutex> lock(mManager->mStatusListenerMutex);
         bool known = false;
         for (auto& deviceInfo : mDevices) {
             if (deviceInfo->mName == cameraDeviceName) {

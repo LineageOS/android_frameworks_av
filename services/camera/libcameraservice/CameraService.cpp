@@ -1645,8 +1645,8 @@ Status CameraService::setTorchMode(const String16& cameraId, bool enabled,
 
     StatusInternal cameraStatus = state->getStatus();
     if (cameraStatus != StatusInternal::PRESENT &&
-            cameraStatus != StatusInternal::NOT_PRESENT) {
-        ALOGE("%s: camera id is invalid %s", __FUNCTION__, id.string());
+            cameraStatus != StatusInternal::NOT_AVAILABLE) {
+        ALOGE("%s: camera id is invalid %s, status %d", __FUNCTION__, id.string(), (int)cameraStatus);
         return STATUS_ERROR_FMT(ERROR_ILLEGAL_ARGUMENT,
                 "Camera ID \"%s\" is a not valid camera ID", id.string());
     }
@@ -1668,7 +1668,7 @@ Status CameraService::setTorchMode(const String16& cameraId, bool enabled,
         }
 
         if (status == TorchModeStatus::NOT_AVAILABLE) {
-            if (cameraStatus == StatusInternal::NOT_PRESENT) {
+            if (cameraStatus == StatusInternal::NOT_AVAILABLE) {
                 ALOGE("%s: torch mode of camera %s is not available because "
                         "camera is in use", __FUNCTION__, id.string());
                 return STATUS_ERROR_FMT(ERROR_CAMERA_IN_USE,

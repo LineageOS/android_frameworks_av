@@ -194,6 +194,8 @@ private:
     // All private members, unless otherwise noted, expect mInterfaceMutex to be locked before use
     mutable std::mutex mInterfaceMutex;
 
+    // the status listener update callbacks will lock mStatusMutex
+    mutable std::mutex mStatusListenerMutex;
     wp<StatusListener> mListener;
     ServiceInteractionProxy* mServiceProxy;
 

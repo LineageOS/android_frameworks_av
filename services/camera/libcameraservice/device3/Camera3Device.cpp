@@ -196,8 +196,10 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager) {
         session->close();
         return res;
     }
-    hardware::hidl_version version = session->getInterfaceVersion();
-    mDeviceVersion = HARDWARE_DEVICE_API_VERSION(version.get_major(), version.get_minor());
+
+    // TODO: camera service will absorb 3_2/3_3/3_4 differences in the future
+    //       for now use 3_4 to keep legacy devices working
+    mDeviceVersion = CAMERA_DEVICE_API_VERSION_3_4;
     mInterface = std::make_unique<HalInterface>(session);
 
     return initializeCommonLocked();
@@ -247,8 +249,7 @@ status_t Camera3Device::initializeCommonLocked() {
     // Determine whether we need to derive sensitivity boost values for older devices.
     // If post-RAW sensitivity boost range is listed, so should post-raw sensitivity control
     // be listed (as the default value 100)
-    if (mDeviceVersion < CAMERA_DEVICE_API_VERSION_3_4 &&
-            mDeviceInfo.exists(ANDROID_CONTROL_POST_RAW_SENSITIVITY_BOOST_RANGE)) {
+    if (mDeviceInfo.exists(ANDROID_CONTROL_POST_RAW_SENSITIVITY_BOOST_RANGE)) {
         mDerivePostRawSensKey = true;
     }
 
@@ -899,12 +900,16 @@ hardware::Return<void> Camera3Device::processCaptureResult(
     camera3_capture_result r;
     status_t res;
     r.frame_number = result.frameNumber;
-    r.result = reinterpret_cast<const camera_metadata_t*>(result.result.data());
-    size_t expected_metadata_size = result.result.size();
-    if ((res = validate_camera_metadata_structure(r.result, &expected_metadata_size)) != OK) {
-        ALOGE("%s: Frame %d: Invalid camera metadata received by camera service from HAL: %s (%d)",
-                __FUNCTION__, result.frameNumber, strerror(-res), res);
-        return hardware::Void();
+    if (result.result.size() != 0) {
+        r.result = reinterpret_cast<const camera_metadata_t*>(result.result.data());
+        size_t expected_metadata_size = result.result.size();
+        if ((res = validate_camera_metadata_structure(r.result, &expected_metadata_size)) != OK) {
+            ALOGE("%s: Frame %d: Invalid camera metadata received by camera service from HAL: %s (%d)",
+                    __FUNCTION__, result.frameNumber, strerror(-res), res);
+            return hardware::Void();
+        }
+    } else {
+        r.result = nullptr;
     }
 
     std::vector<camera3_stream_buffer_t> outputBuffers(result.outputBuffers.size());
@@ -946,7 +951,7 @@ hardware::Return<void> Camera3Device::processCaptureResult(
     r.output_buffers = outputBuffers.data();
 
     camera3_stream_buffer_t inputBuffer;
-    if (result.inputBuffer.buffer == nullptr) {
+    if (result.inputBuffer.streamId == -1) {
         r.input_buffer = nullptr;
     } else {
         if (mInputStream->getId() != result.inputBuffer.streamId) {
@@ -3214,7 +3219,6 @@ status_t Camera3Device::HalInterface::configureStreams(camera3_stream_configurat
 status_t Camera3Device::HalInterface::processCaptureRequest(
         camera3_capture_request_t *request) {
     ATRACE_NAME("CameraHal::processCaptureRequest");
-    (void) request;
     if (!valid()) return INVALID_OPERATION;
     status_t res = OK;
 
@@ -3230,51 +3234,53 @@ status_t Camera3Device::HalInterface::processCaptureRequest(
                     reinterpret_cast<uint8_t*>(const_cast<camera_metadata_t*>(request->settings)),
                     get_camera_metadata_size(request->settings));
         }
-        std::lock_guard<std::mutex> lock(mInflightLock);
-        if (request->input_buffer != nullptr) {
-            int32_t streamId = Camera3Stream::cast(request->input_buffer->stream)->getId();
-            captureRequest.inputBuffer.streamId = streamId;
-            captureRequest.inputBuffer.buffer = *(request->input_buffer->buffer);
-            captureRequest.inputBuffer.status = BufferStatus::OK;
-            native_handle_t *acquireFence = nullptr;
-            if (request->input_buffer->acquire_fence != -1) {
-                acquireFence = native_handle_create(1,0);
-                acquireFence->data[0] = request->input_buffer->acquire_fence;
-                handlesCreated.push_back(acquireFence);
+
+        {
+            std::lock_guard<std::mutex> lock(mInflightLock);
+            if (request->input_buffer != nullptr) {
+                int32_t streamId = Camera3Stream::cast(request->input_buffer->stream)->getId();
+                captureRequest.inputBuffer.streamId = streamId;
+                captureRequest.inputBuffer.buffer = *(request->input_buffer->buffer);
+                captureRequest.inputBuffer.status = BufferStatus::OK;
+                native_handle_t *acquireFence = nullptr;
+                if (request->input_buffer->acquire_fence != -1) {
+                    acquireFence = native_handle_create(1,0);
+                    acquireFence->data[0] = request->input_buffer->acquire_fence;
+                    handlesCreated.push_back(acquireFence);
+                }
+                captureRequest.inputBuffer.acquireFence = acquireFence;
+                captureRequest.inputBuffer.releaseFence = nullptr;
+
+                pushInflightBufferLocked(captureRequest.frameNumber, streamId,
+                        request->input_buffer->buffer);
             }
-            captureRequest.inputBuffer.acquireFence = acquireFence;
-            captureRequest.inputBuffer.releaseFence = nullptr;
 
-            pushInflightBufferLocked(captureRequest.frameNumber, streamId,
-                    request->input_buffer->buffer);
-        }
-        captureRequest.outputBuffers.resize(request->num_output_buffers);
-        for (size_t i = 0; i < request->num_output_buffers; i++) {
-            const camera3_stream_buffer_t *src = request->output_buffers + i;
-            StreamBuffer &dst = captureRequest.outputBuffers[i];
-            int32_t streamId = Camera3Stream::cast(src->stream)->getId();
-            dst.streamId = streamId;
-            dst.buffer = *(src->buffer);
-            dst.status = BufferStatus::OK;
-            native_handle_t *acquireFence = nullptr;
-            if (src->acquire_fence != -1) {
-                acquireFence = native_handle_create(1,0);
-                acquireFence->data[0] = src->acquire_fence;
-                handlesCreated.push_back(acquireFence);
+            captureRequest.outputBuffers.resize(request->num_output_buffers);
+            for (size_t i = 0; i < request->num_output_buffers; i++) {
+                const camera3_stream_buffer_t *src = request->output_buffers + i;
+                StreamBuffer &dst = captureRequest.outputBuffers[i];
+                int32_t streamId = Camera3Stream::cast(src->stream)->getId();
+                dst.streamId = streamId;
+                dst.buffer = *(src->buffer);
+                dst.status = BufferStatus::OK;
+                native_handle_t *acquireFence = nullptr;
+                if (src->acquire_fence != -1) {
+                    acquireFence = native_handle_create(1,0);
+                    acquireFence->data[0] = src->acquire_fence;
+                    handlesCreated.push_back(acquireFence);
+                }
+                dst.acquireFence = acquireFence;
+                dst.releaseFence = nullptr;
+
+                pushInflightBufferLocked(captureRequest.frameNumber, streamId,
+                        src->buffer);
             }
-            dst.acquireFence = acquireFence;
-            dst.releaseFence = nullptr;
-
-            pushInflightBufferLocked(captureRequest.frameNumber, streamId,
-                    src->buffer);
         }
-
         common::V1_0::Status status = mHidlSession->processCaptureRequest(captureRequest);
 
         for (auto& handle : handlesCreated) {
             native_handle_delete(handle);
         }
-
         res = CameraProviderManager::mapToStatusT(status);
     }
     return res;
