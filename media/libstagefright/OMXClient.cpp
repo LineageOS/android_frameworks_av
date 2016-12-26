@@ -29,6 +29,8 @@
 
 #include "include/OMX.h"
 
+#include "omx/hal/1.0/utils/WOmx.h"
+
 namespace android {
 
 OMXClient::OMXClient() {
@@ -50,6 +52,21 @@ status_t OMXClient::connect() {
         return NO_INIT;
     }
 
+    return OK;
+}
+
+status_t OMXClient::connectTreble() {
+    using namespace ::android::hardware::media::omx::V1_0;
+    sp<IOmx> tOmx = IOmx::getService("default");
+    if (tOmx.get() == nullptr) {
+        ALOGE("Cannot obtain Treble IOmx.");
+        return NO_INIT;
+    }
+    if (!tOmx->isRemote()) {
+        ALOGE("Treble IOmx is in passthrough mode.");
+        return NO_INIT;
+    }
+    mOMX = new utils::LWOmx(tOmx);
     return OK;
 }
 
