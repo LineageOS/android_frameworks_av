@@ -298,6 +298,7 @@ inline bool wrapAs(Message* t, native_handle_t** nh, omx_message const& l) {
     switch (l.type) {
         case omx_message::EVENT:
             t->type = Message::Type::EVENT;
+            t->data.eventData.event = uint32_t(l.u.event_data.event);
             t->data.eventData.data1 = l.u.event_data.data1;
             t->data.eventData.data2 = l.u.event_data.data2;
             t->data.eventData.data3 = l.u.event_data.data3;
@@ -343,6 +344,7 @@ inline bool wrapAs(omx_message* l, Message const& t) {
     switch (t.type) {
         case Message::Type::EVENT:
             l->type = omx_message::EVENT;
+            l->u.event_data.event = OMX_EVENTTYPE(t.data.eventData.event);
             l->u.event_data.data1 = t.data.eventData.data1;
             l->u.event_data.data2 = t.data.eventData.data2;
             l->u.event_data.data3 = t.data.eventData.data3;

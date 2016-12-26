@@ -1133,7 +1133,7 @@ status_t OMXNodeInstance::useBuffer_l(
             buffer_meta = new BufferMeta(
                     params, hParams, portIndex, false /* copy */, data);
         } else {
-            data = static_cast<OMX_U8 *>(params->pointer());
+            data = static_cast<OMX_U8 *>(paramsPointer);
 
             buffer_meta = new BufferMeta(
                     params, hParams, portIndex, false /* copy */, NULL);

@@ -114,6 +114,8 @@ LOCAL_SHARED_LIBRARIES += \
         libdl \
         libRScpp \
         libhidlbase \
+        libhidlmemory \
+        android.hidl.memory@1.0 \
         android.hardware.media.omx@1.0 \
         android.hardware.media.omx@1.0-utils \
 

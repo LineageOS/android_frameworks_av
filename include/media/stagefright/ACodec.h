@@ -41,6 +41,14 @@ class MemoryDealer;
 struct DescribeColorFormat2Params;
 struct DataConverter;
 
+// Treble shared memory
+namespace hidl { namespace memory { namespace V1_0 {
+struct IAllocator;
+struct IMemory;
+}}};
+typedef hidl::memory::V1_0::IAllocator TAllocator;
+typedef hidl::memory::V1_0::IMemory TMemory;
+
 struct ACodec : public AHierarchicalStateMachine, public CodecBase {
     ACodec();
 
@@ -85,6 +93,12 @@ struct ACodec : public AHierarchicalStateMachine, public CodecBase {
     };
 
     static status_t getOMXChannelMapping(size_t numChannels, OMX_AUDIO_CHANNELTYPE map[]);
+
+    // Read the flag from "media.use_treble_omx", save it locally, and return
+    // it.
+    bool updateTrebleFlag();
+    // Return the saved flag.
+    bool getTrebleFlag() const;
 
 protected:
     virtual ~ACodec();
@@ -218,6 +232,8 @@ private:
     sp<IOMX> mOMX;
     sp<IOMXNode> mOMXNode;
     int32_t mNodeGeneration;
+    bool mTrebleFlag;
+    sp<TAllocator> mAllocator[2];
     sp<MemoryDealer> mDealer[2];
 
     bool mUsingNativeWindow;

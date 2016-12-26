@@ -166,7 +166,7 @@ OMXBuffer& OMXBuffer::operator=(OMXBuffer&& source) {
     mMem = std::move(source.mMem);
     mGraphicBuffer = std::move(source.mGraphicBuffer);
     mNativeHandle = std::move(source.mNativeHandle);
-    mHidlMemory = source.mHidlMemory; // TODO(b/34093434): Use move when available
+    mHidlMemory = std::move(source.mHidlMemory);
     return *this;
 }
 
