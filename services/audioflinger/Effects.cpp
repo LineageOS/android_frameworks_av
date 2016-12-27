@@ -1496,7 +1496,7 @@ AudioFlinger::EffectChain::EffectChain(ThreadBase *thread,
 AudioFlinger::EffectChain::~EffectChain()
 {
     if (mOwnInBuffer) {
-        delete mInBuffer;
+        delete[] mInBuffer;
     }
 }
 
