@@ -333,6 +333,47 @@ audio_policy_dev_state_t AudioPolicyManager::getDeviceConnectionState(audio_devi
             AUDIO_POLICY_DEVICE_STATE_AVAILABLE : AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE;
 }
 
+status_t AudioPolicyManager::handleDeviceConfigChange(audio_devices_t device,
+                                                      const char *device_address,
+                                                      const char *device_name)
+{
+    status_t status;
+
+    ALOGV("handleDeviceConfigChange(() device: 0x%X, address %s name %s",
+          device, device_address, device_name);
+
+    // Check if the device is currently connected
+    sp<DeviceDescriptor> devDesc =
+            mHwModules.getDeviceDescriptor(device, device_address, device_name);
+    ssize_t index = mAvailableOutputDevices.indexOf(devDesc);
+    if (index < 0) {
+        // Nothing to do: device is not connected
+        return NO_ERROR;
+    }
+
+    // Toggle the device state: UNAVAILABLE -> AVAILABLE
+    // This will force reading again the device configuration
+    status = setDeviceConnectionState(device,
+                                      AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                                      device_address, device_name);
+    if (status != NO_ERROR) {
+        ALOGW("handleDeviceConfigChange() error disabling connection state: %d",
+              status);
+        return status;
+    }
+
+    status = setDeviceConnectionState(device,
+                                      AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                                      device_address, device_name);
+    if (status != NO_ERROR) {
+        ALOGW("handleDeviceConfigChange() error enabling connection state: %d",
+              status);
+        return status;
+    }
+
+    return NO_ERROR;
+}
+
 uint32_t AudioPolicyManager::updateCallRouting(audio_devices_t rxDevice, uint32_t delayMs)
 {
     bool createTxPatch = false;
@@ -4173,7 +4214,7 @@ SortedVector<audio_io_handle_t> AudioPolicyManager::getOutputsForDevice(
 
     ALOGVV("getOutputsForDevice() device %04x", device);
     for (size_t i = 0; i < openOutputs.size(); i++) {
-        ALOGVV("output %d isDuplicated=%d device=%04x",
+        ALOGVV("output %zu isDuplicated=%d device=%04x",
                 i, openOutputs.valueAt(i)->isDuplicated(),
                 openOutputs.valueAt(i)->supportedDevices());
         if ((device & openOutputs.valueAt(i)->supportedDevices()) == device) {
@@ -4614,7 +4655,7 @@ uint32_t AudioPolicyManager::checkDeviceMuteStrategies(const sp<AudioOutputDescr
                         == AUDIO_DEVICE_NONE) {
                     continue;
                 }
-                ALOGVV("checkDeviceMuteStrategies() %s strategy %d (curDevice %04x)",
+                ALOGVV("checkDeviceMuteStrategies() %s strategy %zu (curDevice %04x)",
                       mute ? "muting" : "unmuting", i, curDevice);
                 setStrategyMute((routing_strategy)i, mute, desc, mute ? 0 : delayMs);
                 if (isStrategyActive(desc, (routing_strategy)i)) {
