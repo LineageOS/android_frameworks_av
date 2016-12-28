@@ -1342,26 +1342,26 @@ void NuPlayer::onStart(int64_t startPositionUs, MediaPlayerSeekMode mode) {
         flags |= Renderer::FLAG_REAL_TIME;
     }
 
-    sp<MetaData> audioMeta = mSource->getFormatMeta(true /* audio */);
-    sp<MetaData> videoMeta = mSource->getFormatMeta(false /* audio */);
-    if (audioMeta == NULL && videoMeta == NULL) {
+    bool hasAudio = (mSource->getFormat(true /* audio */) != NULL);
+    bool hasVideo = (mSource->getFormat(false /* audio */) != NULL);
+    if (!hasAudio && !hasVideo) {
         ALOGE("no metadata for either audio or video source");
         mSource->stop();
         mSourceStarted = false;
         notifyListener(MEDIA_ERROR, MEDIA_ERROR_UNKNOWN, ERROR_MALFORMED);
         return;
     }
-    ALOGV_IF(audioMeta == NULL, "no metadata for audio source");  // video only stream
+    ALOGV_IF(!hasAudio, "no metadata for audio source");  // video only stream
+
+    sp<MetaData> audioMeta = mSource->getFormatMeta(true /* audio */);
 
     audio_stream_type_t streamType = AUDIO_STREAM_MUSIC;
     if (mAudioSink != NULL) {
         streamType = mAudioSink->getAudioStreamType();
     }
 
-    sp<AMessage> videoFormat = mSource->getFormat(false /* audio */);
-
     mOffloadAudio =
-        canOffloadStream(audioMeta, (videoFormat != NULL), mSource->isStreaming(), streamType)
+        canOffloadStream(audioMeta, hasVideo, mSource->isStreaming(), streamType)
                 && (mPlaybackSettings.mSpeed == 1.f && mPlaybackSettings.mPitch == 1.f);
     if (mOffloadAudio) {
         flags |= Renderer::FLAG_OFFLOAD_AUDIO;
@@ -1695,6 +1695,16 @@ void NuPlayer::updateVideoSize(
     if (inputFormat == NULL) {
         ALOGW("Unknown video size, reporting 0x0!");
         notifyListener(MEDIA_SET_VIDEO_SIZE, 0, 0);
+        return;
+    }
+    int32_t err = OK;
+    inputFormat->findInt32("err", &err);
+    if (err == -EWOULDBLOCK) {
+        ALOGW("Video meta is not available yet!");
+        return;
+    }
+    if (err != OK) {
+        ALOGW("Something is wrong with video meta!");
         return;
     }
 
