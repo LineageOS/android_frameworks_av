@@ -333,6 +333,47 @@ audio_policy_dev_state_t AudioPolicyManager::getDeviceConnectionState(audio_devi
             AUDIO_POLICY_DEVICE_STATE_AVAILABLE : AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE;
 }
 
+status_t AudioPolicyManager::handleDeviceConfigChange(audio_devices_t device,
+                                                      const char *device_address,
+                                                      const char *device_name)
+{
+    status_t status;
+
+    ALOGV("handleDeviceConfigChange(() device: 0x%X, address %s name %s",
+          device, device_address, device_name);
+
+    // Check if the device is currently connected
+    sp<DeviceDescriptor> devDesc =
+            mHwModules.getDeviceDescriptor(device, device_address, device_name);
+    ssize_t index = mAvailableOutputDevices.indexOf(devDesc);
+    if (index < 0) {
+        // Nothing to do: device is not connected
+        return NO_ERROR;
+    }
+
+    // Toggle the device state: UNAVAILABLE -> AVAILABLE
+    // This will force reading again the device configuration
+    status = setDeviceConnectionState(device,
+                                      AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                                      device_address, device_name);
+    if (status != NO_ERROR) {
+        ALOGW("handleDeviceConfigChange() error disabling connection state: %d",
+              status);
+        return status;
+    }
+
+    status = setDeviceConnectionState(device,
+                                      AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                                      device_address, device_name);
+    if (status != NO_ERROR) {
+        ALOGW("handleDeviceConfigChange() error enabling connection state: %d",
+              status);
+        return status;
+    }
+
+    return NO_ERROR;
+}
+
 uint32_t AudioPolicyManager::updateCallRouting(audio_devices_t rxDevice, uint32_t delayMs)
 {
     bool createTxPatch = false;

@@ -751,6 +751,25 @@ audio_policy_dev_state_t AudioSystem::getDeviceConnectionState(audio_devices_t d
     return aps->getDeviceConnectionState(device, device_address);
 }
 
+status_t AudioSystem::handleDeviceConfigChange(audio_devices_t device,
+                                               const char *device_address,
+                                               const char *device_name)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    const char *address = "";
+    const char *name = "";
+
+    if (aps == 0) return PERMISSION_DENIED;
+
+    if (device_address != NULL) {
+        address = device_address;
+    }
+    if (device_name != NULL) {
+        name = device_name;
+    }
+    return aps->handleDeviceConfigChange(device, address, name);
+}
+
 status_t AudioSystem::setPhoneState(audio_mode_t state)
 {
     if (uint32_t(state) >= AUDIO_MODE_CNT) return BAD_VALUE;

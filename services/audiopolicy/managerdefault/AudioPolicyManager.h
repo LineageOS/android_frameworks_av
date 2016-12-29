@@ -93,6 +93,9 @@ public:
                                                           const char *device_name);
         virtual audio_policy_dev_state_t getDeviceConnectionState(audio_devices_t device,
                                                                               const char *device_address);
+        virtual status_t handleDeviceConfigChange(audio_devices_t device,
+                                                  const char *device_address,
+                                                  const char *device_name);
         virtual void setPhoneState(audio_mode_t state);
         virtual void setForceUse(audio_policy_force_use_t usage,
                                  audio_policy_forced_cfg_t config);
