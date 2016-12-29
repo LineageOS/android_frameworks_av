@@ -81,6 +81,10 @@ public:
     // retrieve a device connection status
     virtual audio_policy_dev_state_t getDeviceConnectionState(audio_devices_t device,
                                                                           const char *device_address) = 0;
+    // indicate a change in device configuration
+    virtual status_t handleDeviceConfigChange(audio_devices_t device,
+                                              const char *device_address,
+                                              const char *device_name) = 0;
     // indicate a change in phone state. Valid phones states are defined by audio_mode_t
     virtual void setPhoneState(audio_mode_t state) = 0;
     // force using a specific device category for the specified usage
