@@ -5336,6 +5336,7 @@ audio_stream_type_t AudioPolicyManager::streamTypefromAttributesInt(const audio_
     switch (attr->usage) {
     case AUDIO_USAGE_MEDIA:
     case AUDIO_USAGE_GAME:
+    case AUDIO_USAGE_ASSISTANT:
     case AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE:
         return AUDIO_STREAM_MUSIC;
     case AUDIO_USAGE_ASSISTANCE_ACCESSIBILITY:
@@ -5391,6 +5392,7 @@ bool AudioPolicyManager::isValidAttributes(const audio_attributes_t *paa)
     case AUDIO_USAGE_ASSISTANCE_SONIFICATION:
     case AUDIO_USAGE_GAME:
     case AUDIO_USAGE_VIRTUAL_SOURCE:
+    case AUDIO_USAGE_ASSISTANT:
         break;
     default:
         return false;

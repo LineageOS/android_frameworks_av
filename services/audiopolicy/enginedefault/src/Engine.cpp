@@ -202,6 +202,7 @@ routing_strategy Engine::getStrategyForUsage(audio_usage_t usage)
 
     case AUDIO_USAGE_MEDIA:
     case AUDIO_USAGE_GAME:
+    case AUDIO_USAGE_ASSISTANT:
     case AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE:
     case AUDIO_USAGE_ASSISTANCE_SONIFICATION:
         return STRATEGY_MEDIA;
