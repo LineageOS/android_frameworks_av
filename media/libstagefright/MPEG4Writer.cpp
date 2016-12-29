@@ -3288,13 +3288,22 @@ void MPEG4Writer::Track::writeHdlrBox() {
 
 void MPEG4Writer::Track::writeMdhdBox(uint32_t now) {
     int64_t trakDurationUs = getDurationUs();
+    int64_t mdhdDuration = (trakDurationUs * mTimeScale + 5E5) / 1E6;
     mOwner->beginBox("mdhd");
-    mOwner->writeInt32(0);             // version=0, flags=0
-    mOwner->writeInt32(now);           // creation time
-    mOwner->writeInt32(now);           // modification time
-    mOwner->writeInt32(mTimeScale);    // media timescale
-    int32_t mdhdDuration = (trakDurationUs * mTimeScale + 5E5) / 1E6;
-    mOwner->writeInt32(mdhdDuration);  // use media timescale
+
+    if (mdhdDuration > UINT32_MAX) {
+        mOwner->writeInt32((1 << 24));            // version=1, flags=0
+        mOwner->writeInt64((int64_t)now);         // creation time
+        mOwner->writeInt64((int64_t)now);         // modification time
+        mOwner->writeInt32(mTimeScale);           // media timescale
+        mOwner->writeInt64(mdhdDuration);         // media timescale
+    } else {
+        mOwner->writeInt32(0);                      // version=0, flags=0
+        mOwner->writeInt32(now);                    // creation time
+        mOwner->writeInt32(now);                    // modification time
+        mOwner->writeInt32(mTimeScale);             // media timescale
+        mOwner->writeInt32((int32_t)mdhdDuration);  // use media timescale
+    }
     // Language follows the three letter standard ISO-639-2/T
     // 'e', 'n', 'g' for "English", for instance.
     // Each character is packed as the difference between its ASCII value and 0x60.
