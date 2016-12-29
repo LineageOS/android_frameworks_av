@@ -28,7 +28,7 @@ template <class T>
 class PluginLoader {
 
   public:
-    PluginLoader(const char *dir, const char *entry, const char *type) {
+    PluginLoader(const char *dir, const char *entry) {
         /**
          * scan all plugins in the plugin directory and add them to the
          * factories list.
@@ -44,7 +44,7 @@ class PluginLoader {
                 String8 file(pEntry->d_name);
                 if (file.getPathExtension() == ".so") {
                     String8 path = pluginDir + pEntry->d_name;
-                    T *plugin = loadOne(path, entry, type);
+                    T *plugin = loadOne(path, entry);
                     if (plugin) {
                         factories.push(plugin);
                     }
@@ -64,10 +64,10 @@ class PluginLoader {
     size_t factoryCount() const {return factories.size();}
 
   private:
-    T* loadOne(const char *path, const char *entry, const char *type) {
+    T* loadOne(const char *path, const char *entry) {
         sp<SharedLibrary> library = new SharedLibrary(String8(path));
         if (!library.get()) {
-            ALOGE("Failed to open %s plugin library %s: %s", type, path,
+            ALOGE("Failed to open plugin library %s: %s", path,
                     library->lastError());
         } else {
             typedef T *(*CreateFactoryFunc)();
@@ -77,7 +77,7 @@ class PluginLoader {
                 libraries.push(library);
                 return createFactoryFunc();
             } else {
-                ALOGE("Failed to create %s plugin factory from %s", type, path);
+                ALOGE("Failed to create plugin factory from %s", path);
             }
         }
         return NULL;
