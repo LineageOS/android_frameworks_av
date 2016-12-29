@@ -57,7 +57,7 @@ public:
 
 private:
     Pipe&       mPipe;
-    int32_t     mFront;         // follows behind mPipe.mRear
+    audio_utils_fifo_reader mFifoReader;
     int64_t     mFramesOverrun;
     int64_t     mOverruns;
 };

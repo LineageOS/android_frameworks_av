@@ -27,7 +27,7 @@ class MonoPipeReader : public NBAIO_Source {
 public:
 
     // Construct a MonoPipeReader and associate it with a MonoPipe;
-    // any data already in the pipe is visible to this PipeReader.
+    // any data already in the pipe is visible to this MonoPipeReader.
     // There can be only a single MonoPipeReader per MonoPipe.
     // FIXME make this constructor a factory method of MonoPipe.
     MonoPipeReader(MonoPipe* pipe);
@@ -59,6 +59,7 @@ public:
 
 private:
     MonoPipe * const mPipe;
+    audio_utils_fifo_reader mFifoReader;
 };
 
 }   // namespace android

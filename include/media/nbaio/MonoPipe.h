@@ -18,8 +18,9 @@
 #define ANDROID_AUDIO_MONO_PIPE_H
 
 #include <time.h>
-#include "NBAIO.h"
+#include <audio_utils/fifo.h>
 #include <media/SingleStateQueue.h>
+#include "NBAIO.h"
 
 namespace android {
 
@@ -55,7 +56,10 @@ public:
     //virtual int64_t framesUnderrun() const;
     //virtual int64_t underruns() const;
 
-    virtual ssize_t availableToWrite() const;
+    // returns n where 0 <= n <= mMaxFrames, or a negative status_t
+    // including the private status codes in NBAIO.h
+    virtual ssize_t availableToWrite();
+
     virtual ssize_t write(const void *buffer, size_t count);
     //virtual ssize_t writeVia(writeVia_t via, size_t total, void *user, size_t block);
 
@@ -80,16 +84,10 @@ public:
             status_t getTimestamp(ExtendedTimestamp &timestamp);
 
 private:
-    const size_t    mReqFrames;     // as requested in constructor, unrounded
-    const size_t    mMaxFrames;     // always a power of 2
+    const size_t    mMaxFrames;     // as requested in constructor, rounded up to a power of 2
     void * const    mBuffer;
-    // mFront and mRear will never be separated by more than mMaxFrames.
-    // 32-bit overflow is possible if the pipe is active for a long time, but if that happens it's
-    // safe because we "&" with (mMaxFrames-1) at end of computations to calculate a buffer index.
-    volatile int32_t mFront;        // written by reader with android_atomic_release_store,
-                                    // read by writer with android_atomic_acquire_load
-    volatile int32_t mRear;         // written by writer with android_atomic_release_store,
-                                    // read by reader with android_atomic_acquire_load
+    audio_utils_fifo        mFifo;
+    audio_utils_fifo_writer mFifoWriter;
     bool            mWriteTsValid;  // whether mWriteTs is valid
     struct timespec mWriteTs;       // time that the previous write() completed
     size_t          mSetpoint;      // target value for pipe fill depth

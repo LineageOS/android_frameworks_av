@@ -27,9 +27,11 @@ namespace android {
 
 Pipe::Pipe(size_t maxFrames, const NBAIO_Format& format, void *buffer) :
         NBAIO_Sink(format),
+        // TODO fifo now supports non-power-of-2 buffer sizes, so could remove the roundup
         mMaxFrames(roundup(maxFrames)),
         mBuffer(buffer == NULL ? malloc(mMaxFrames * Format_frameSize(format)) : buffer),
-        mRear(0),
+        mFifo(mMaxFrames, Format_frameSize(format), mBuffer, false /*throttlesWriter*/),
+        mFifoWriter(mFifo),
         mReaders(0),
         mFreeBufferInDestructor(buffer == NULL)
 {
@@ -49,25 +51,13 @@ ssize_t Pipe::write(const void *buffer, size_t count)
     if (CC_UNLIKELY(!mNegotiated)) {
         return NEGOTIATE;
     }
-    // write() is not multi-thread safe w.r.t. itself, so no mutex or atomic op needed to read mRear
-    size_t rear = mRear & (mMaxFrames - 1);
-    size_t written = mMaxFrames - rear;
-    if (CC_LIKELY(written > count)) {
-        written = count;
+    ssize_t actual = mFifoWriter.write(buffer, count);
+    ALOG_ASSERT(actual <= count);
+    if (actual <= 0) {
+        return actual;
     }
-    memcpy((char *) mBuffer + (rear * mFrameSize), buffer, written * mFrameSize);
-    if (CC_UNLIKELY(rear + written == mMaxFrames)) {
-        if (CC_UNLIKELY((count -= written) > rear)) {
-            count = rear;
-        }
-        if (CC_LIKELY(count > 0)) {
-            memcpy(mBuffer, (char *) buffer + (written * mFrameSize), count * mFrameSize);
-            written += count;
-        }
-    }
-    android_atomic_release_store(written + mRear, &mRear);
-    mFramesWritten += written;
-    return written;
+    mFramesWritten += (size_t) actual;
+    return actual;
 }
 
 }   // namespace android

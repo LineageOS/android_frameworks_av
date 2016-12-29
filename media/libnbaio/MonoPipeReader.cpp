@@ -25,7 +25,7 @@ namespace android {
 
 MonoPipeReader::MonoPipeReader(MonoPipe* pipe) :
         NBAIO_Source(pipe->mFormat),
-        mPipe(pipe)
+        mPipe(pipe), mFifoReader(mPipe->mFifo, true /*throttlesWriter*/)
 {
 }
 
@@ -38,38 +38,21 @@ ssize_t MonoPipeReader::availableToRead()
     if (CC_UNLIKELY(!mNegotiated)) {
         return NEGOTIATE;
     }
-    ssize_t ret = android_atomic_acquire_load(&mPipe->mRear) - mPipe->mFront;
-    ALOG_ASSERT((0 <= ret) && ((size_t) ret <= mPipe->mMaxFrames));
+    ssize_t ret = mFifoReader.available();
+    ALOG_ASSERT(ret <= mPipe->mMaxFrames);
     return ret;
 }
 
 ssize_t MonoPipeReader::read(void *buffer, size_t count)
 {
     // count == 0 is unlikely and not worth checking for explicitly; will be handled automatically
-    ssize_t red = availableToRead();
-    if (CC_UNLIKELY(red <= 0)) {
-        return red;
+    ssize_t actual = mFifoReader.read(buffer, count);
+    ALOG_ASSERT(actual <= count);
+    if (CC_UNLIKELY(actual <= 0)) {
+        return actual;
     }
-    if (CC_LIKELY((size_t) red > count)) {
-        red = count;
-    }
-    size_t front = mPipe->mFront & (mPipe->mMaxFrames - 1);
-    size_t part1 = mPipe->mMaxFrames - front;
-    if (part1 > (size_t) red) {
-        part1 = red;
-    }
-    if (CC_LIKELY(part1 > 0)) {
-        memcpy(buffer, (char *) mPipe->mBuffer + (front * mFrameSize), part1 * mFrameSize);
-        if (CC_UNLIKELY(front + part1 == mPipe->mMaxFrames)) {
-            size_t part2 = red - part1;
-            if (CC_LIKELY(part2 > 0)) {
-                memcpy((char *) buffer + (part1 * mFrameSize), mPipe->mBuffer, part2 * mFrameSize);
-            }
-        }
-        android_atomic_release_store(red + mPipe->mFront, &mPipe->mFront);
-        mFramesRead += red;
-    }
-    return red;
+    mFramesRead += (size_t) actual;
+    return actual;
 }
 
 void MonoPipeReader::onTimestamp(const ExtendedTimestamp &timestamp)
