@@ -24,6 +24,10 @@
 namespace android {
 
 class MetaData;
+namespace media {
+class ICas;
+};
+using namespace media;
 
 class IMediaExtractor : public IInterface {
 public:
@@ -57,6 +61,9 @@ public:
 
     // for DRM
     virtual char* getDrmTrackInfo(size_t trackID, int *len)  = 0;
+
+    virtual status_t setMediaCas(const sp<ICas> &cas) = 0;
+
     virtual void setUID(uid_t uid)  = 0;
 
     virtual const char * name() = 0;

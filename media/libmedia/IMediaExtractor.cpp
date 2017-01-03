@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#include <android/media/ICas.h>
 #include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
 #include <media/IMediaExtractor.h>
@@ -35,6 +36,7 @@ enum {
     GETMETADATA,
     FLAGS,
     GETDRMTRACKINFO,
+    SETMEDIACAS,
     SETUID,
     NAME,
     GETMETRICS
@@ -114,6 +116,21 @@ public:
         ALOGV("getDrmTrackInfo NOT IMPLEMENTED");
         return NULL;
     }
+
+    virtual status_t setMediaCas(const sp<ICas> & cas) {
+        ALOGV("setMediaCas");
+
+        Parcel data, reply;
+        data.writeInterfaceToken(BpMediaExtractor::getInterfaceDescriptor());
+        data.writeStrongBinder(IInterface::asBinder(cas));
+
+        status_t err = remote()->transact(SETMEDIACAS, data, &reply);
+        if (err != NO_ERROR) {
+            return err;
+        }
+        return reply.readInt32();
+    }
+
     virtual void setUID(uid_t uid __unused) {
         ALOGV("setUID NOT IMPLEMENTED");
     }
@@ -184,6 +201,21 @@ status_t BnMediaExtractor::onTransact(
             CHECK_INTERFACE(IMediaExtractor, data, reply);
             status_t ret = getMetrics(reply);
             return ret;
+        }
+        case SETMEDIACAS: {
+            ALOGV("setMediaCas");
+            CHECK_INTERFACE(IMediaExtractor, data, reply);
+
+            sp<IBinder> casBinder;
+            status_t err = data.readNullableStrongBinder(&casBinder);
+            if (err != NO_ERROR) {
+                ALOGE("Error reading cas from parcel");
+                return err;
+            }
+            sp<ICas> cas = interface_cast<ICas>(casBinder);
+
+            reply->writeInt32(setMediaCas(cas));
+            return OK;
         }
         default:
             return BBinder::onTransact(code, data, reply, flags);

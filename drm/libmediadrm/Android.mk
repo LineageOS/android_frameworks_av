@@ -6,12 +6,24 @@ LOCAL_PATH:= $(call my-dir)
 
 include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES:= \
+LOCAL_AIDL_INCLUDES := \
+    frameworks/base/media/java
+
+LOCAL_SRC_FILES := \
+    ../../../base/media/java/android/media/ICas.aidl \
+    ../../../base/media/java/android/media/ICasListener.aidl \
+    ../../../base/media/java/android/media/IDescrambler.aidl \
+    ../../../base/media/java/android/media/IMediaCasService.aidl \
+
+LOCAL_SRC_FILES += \
+    CasImpl.cpp \
+    DescramblerImpl.cpp \
     DrmSessionManager.cpp \
     ICrypto.cpp \
     IDrm.cpp \
     IDrmClient.cpp \
     IMediaDrmService.cpp \
+    MediaCasDefs.cpp \
     SharedLibrary.cpp
 ifneq ($(DISABLE_TREBLE_DRM), true)
 LOCAL_SRC_FILES += \

@@ -43,6 +43,9 @@ namespace android {
         if (!mLibHandle) {
             return NULL;
         }
+        // Clear last error before we load the symbol again,
+        // in case the caller didn't retrieve it.
+        (void)dlerror();
         return dlsym(mLibHandle, symbol);
     }
 

@@ -60,10 +60,10 @@ LOCAL_SHARED_LIBRARIES := \
         libui liblog libcutils libutils libbinder libsonivox libicuuc libicui18n libexpat \
         libcamera_client libstagefright_foundation \
         libgui libdl libaudioutils libaudioclient \
-        libmedia_helper \
+        libmedia_helper libmediadrm \
         libhidlbase \
 
-LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder libsonivox
+LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder libsonivox libmediadrm
 
 # for memory heap analysis
 LOCAL_STATIC_LIBRARIES := libc_malloc_debug_backtrace libc_logging
