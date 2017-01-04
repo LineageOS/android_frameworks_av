@@ -98,7 +98,8 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
         mTerminated(false),
         mType(type),
         mThreadIoHandle(thread->id()),
-        mPortId(portId)
+        mPortId(portId),
+        mIsInvalid(false)
 {
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
     if (!isTrustedCallingUid(callingUid) || clientUid == AUDIO_UID_INVALID) {
@@ -365,7 +366,6 @@ AudioFlinger::PlaybackThread::Track::Track(
     // mSinkTimestamp
     mFastIndex(-1),
     mCachedVolume(1.0),
-    mIsInvalid(false),
     mResumeToStopping(false),
     mFlushHwPending(false),
     mFlags(flags)
@@ -1042,8 +1042,8 @@ status_t AudioFlinger::PlaybackThread::Track::setSyncEvent(const sp<SyncEvent>& 
 
 void AudioFlinger::PlaybackThread::Track::invalidate()
 {
+    TrackBase::invalidate();
     signalClientFlag(CBLK_INVALID);
-    mIsInvalid = true;
 }
 
 void AudioFlinger::PlaybackThread::Track::disable()
@@ -1599,6 +1599,7 @@ void AudioFlinger::RecordThread::RecordTrack::destroy()
 
 void AudioFlinger::RecordThread::RecordTrack::invalidate()
 {
+    TrackBase::invalidate();
     // FIXME should use proxy, and needs work
     audio_track_cblk_t* cblk = mCblk;
     android_atomic_or(CBLK_INVALID, &cblk->mFlags);
@@ -1733,6 +1734,78 @@ status_t AudioFlinger::RecordThread::PatchRecord::obtainBuffer(Proxy::Buffer* bu
 void AudioFlinger::RecordThread::PatchRecord::releaseBuffer(Proxy::Buffer* buffer)
 {
     mProxy->releaseBuffer(buffer);
+}
+
+
+
+AudioFlinger::MmapThread::MmapTrack::MmapTrack(ThreadBase *thread,
+        uint32_t sampleRate,
+        audio_format_t format,
+        audio_channel_mask_t channelMask,
+        audio_session_t sessionId,
+        uid_t uid,
+        audio_port_handle_t portId)
+    :   TrackBase(thread, NULL, sampleRate, format,
+                  channelMask, 0, NULL, sessionId, uid, false,
+                  ALLOC_NONE,
+                  TYPE_DEFAULT, portId)
+{
+}
+
+AudioFlinger::MmapThread::MmapTrack::~MmapTrack()
+{
+}
+
+status_t AudioFlinger::MmapThread::MmapTrack::initCheck() const
+{
+    return NO_ERROR;
+}
+
+status_t AudioFlinger::MmapThread::MmapTrack::start(AudioSystem::sync_event_t event __unused,
+                                                        audio_session_t triggerSession __unused)
+{
+    return NO_ERROR;
+}
+
+void AudioFlinger::MmapThread::MmapTrack::stop()
+{
+}
+
+// AudioBufferProvider interface
+status_t AudioFlinger::MmapThread::MmapTrack::getNextBuffer(AudioBufferProvider::Buffer* buffer)
+{
+    buffer->frameCount = 0;
+    buffer->raw = nullptr;
+    return INVALID_OPERATION;
+}
+
+// ExtendedAudioBufferProvider interface
+size_t AudioFlinger::MmapThread::MmapTrack::framesReady() const {
+    return 0;
+}
+
+int64_t AudioFlinger::MmapThread::MmapTrack::framesReleased() const
+{
+    return 0;
+}
+
+void AudioFlinger::MmapThread::MmapTrack::onTimestamp(const ExtendedTimestamp &timestamp __unused)
+{
+}
+
+/*static*/ void AudioFlinger::MmapThread::MmapTrack::appendDumpHeader(String8& result)
+{
+    result.append("    Client Fmt Chn mask  SRate\n");
+}
+
+void AudioFlinger::MmapThread::MmapTrack::dump(char* buffer, size_t size)
+{
+    snprintf(buffer, size, "            %6u %3u    %08X %5u\n",
+            mUid,
+            mFormat,
+            mChannelMask,
+            mSampleRate);
+
 }
 
 } // namespace android

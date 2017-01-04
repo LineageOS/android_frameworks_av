@@ -42,7 +42,7 @@ public:
 
             void        destroy();
 
-            void        invalidate();
+    virtual void        invalidate();
             // clear the buffer overflow flag
             void        clearOverflow() { mOverflow = false; }
             // set the buffer overflow flag and return previous value

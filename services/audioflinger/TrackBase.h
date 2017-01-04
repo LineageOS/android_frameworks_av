@@ -77,6 +77,7 @@ public:
             audio_track_cblk_t* cblk() const { return mCblk; }
             audio_session_t sessionId() const { return mSessionId; }
             uid_t       uid() const { return mUid; }
+            audio_port_handle_t portId() const { return mPortId; }
     virtual status_t    setSyncEvent(const sp<SyncEvent>& event);
 
             sp<IMemory> getBuffers() const { return mBufferMemory; }
@@ -85,6 +86,10 @@ public:
             bool        isOutputTrack() const { return (mType == TYPE_OUTPUT); }
             bool        isPatchTrack() const { return (mType == TYPE_PATCH); }
             bool        isExternalTrack() const { return !isOutputTrack() && !isPatchTrack(); }
+
+    virtual void        invalidate() { mIsInvalid = true; }
+            bool        isInvalid() const { return mIsInvalid; }
+
 
 protected:
                         TrackBase(const TrackBase&);
@@ -165,6 +170,7 @@ protected:
     track_type          mType;      // must be one of TYPE_DEFAULT, TYPE_OUTPUT, TYPE_PATCH ...
     audio_io_handle_t   mThreadIoHandle; // I/O handle of the thread the track is attached to
     audio_port_handle_t mPortId; // unique ID for this track used by audio policy
+    bool                mIsInvalid; // non-resettable latch, set by invalidate()
 };
 
 // PatchProxyBufferProvider interface is implemented by PatchTrack and PatchRecord.

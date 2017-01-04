@@ -1197,10 +1197,9 @@ status_t AudioFlinger::EffectHandle::enable()
         mEnabled = false;
     } else {
         if (thread != 0) {
-            if (thread->type() == ThreadBase::OFFLOAD) {
-                PlaybackThread *t = (PlaybackThread *)thread.get();
-                Mutex::Autolock _l(t->mLock);
-                t->broadcast_l();
+            if (thread->type() == ThreadBase::OFFLOAD || thread->type() == ThreadBase::MMAP) {
+                Mutex::Autolock _l(thread->mLock);
+                thread->broadcast_l();
             }
             if (!effect->isOffloadable()) {
                 if (thread->type() == ThreadBase::OFFLOAD) {
@@ -1242,10 +1241,9 @@ status_t AudioFlinger::EffectHandle::disable()
     sp<ThreadBase> thread = effect->thread().promote();
     if (thread != 0) {
         thread->checkSuspendOnEffectEnabled(effect, false, effect->sessionId());
-        if (thread->type() == ThreadBase::OFFLOAD) {
-            PlaybackThread *t = (PlaybackThread *)thread.get();
-            Mutex::Autolock _l(t->mLock);
-            t->broadcast_l();
+        if (thread->type() == ThreadBase::OFFLOAD || thread->type() == ThreadBase::MMAP) {
+            Mutex::Autolock _l(thread->mLock);
+            thread->broadcast_l();
         }
     }
 
@@ -1556,6 +1554,9 @@ void AudioFlinger::EffectChain::clearInputBuffer()
 // Must be called with EffectChain::mLock locked
 void AudioFlinger::EffectChain::clearInputBuffer_l(const sp<ThreadBase>& thread)
 {
+    if (mInBuffer == NULL) {
+        return;
+    }
     // TODO: This will change in the future, depending on multichannel
     // and sample format changes for effects.
     // Currently effects processing is only available for stereo, AUDIO_FORMAT_PCM_16_BIT
