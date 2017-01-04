@@ -26,7 +26,6 @@
 extern "C" {
 #endif
 
-typedef int32_t OboeDeviceId;
 typedef oboe_handle_t OboeStream;
 typedef oboe_handle_t OboeStreamBuilder;
 
@@ -92,10 +91,18 @@ OBOE_API oboe_result_t Oboe_createStreamBuilder(OboeStreamBuilder *builder);
  *
  * By default, the primary device will be used.
  *
+ * @param builder handle provided by Oboe_createStreamBuilder()
+ * @param deviceId platform specific identifier or OBOE_DEVICE_UNSPECIFIED
  * @return OBOE_OK or a negative error.
  */
 OBOE_API oboe_result_t OboeStreamBuilder_setDeviceId(OboeStreamBuilder builder,
-                                                     OboeDeviceId deviceId);
+                                                     oboe_device_id_t deviceId);
+/**
+ * Passes back requested device ID.
+ * @return OBOE_OK or a negative error.
+ */
+OBOE_API oboe_result_t OboeStreamBuilder_getDeviceId(OboeStreamBuilder builder,
+                                                     oboe_device_id_t *deviceId);
 
 /**
  * Request a sample rate in Hz.
@@ -111,14 +118,14 @@ OBOE_API oboe_result_t OboeStreamBuilder_setDeviceId(OboeStreamBuilder builder,
  * @return OBOE_OK or a negative error.
  */
 OBOE_API oboe_result_t OboeStreamBuilder_setSampleRate(OboeStreamBuilder builder,
-                                              oboe_sample_rate_t sampleRate);
+                                                       oboe_sample_rate_t sampleRate);
 
 /**
  * Returns sample rate in Hertz (samples per second).
  * @return OBOE_OK or a negative error.
  */
 OBOE_API oboe_result_t OboeStreamBuilder_getSampleRate(OboeStreamBuilder builder,
-                                              oboe_sample_rate_t *sampleRate);
+                                                       oboe_sample_rate_t *sampleRate);
 
 
 /**
@@ -362,6 +369,8 @@ OBOE_API oboe_result_t OboeStream_write(OboeStream stream,
 // High priority audio threads
 // ============================================================
 
+typedef void *(oboe_audio_thread_proc_t)(void *);
+
 /**
  * Create a thread associated with a stream. The thread has special properties for
  * low latency audio performance. This thread can be used to implement a callback API.
@@ -378,7 +387,8 @@ OBOE_API oboe_result_t OboeStream_write(OboeStream stream,
  */
 OBOE_API oboe_result_t OboeStream_createThread(OboeStream stream,
                                      oboe_nanoseconds_t periodNanoseconds,
-                                     void *(*startRoutine)(void *), void *arg);
+                                     oboe_audio_thread_proc_t *threadProc,
+                                     void *arg);
 
 /**
  * Wait until the thread exits or an error occurs.
@@ -475,6 +485,13 @@ OBOE_API oboe_result_t OboeStream_getSamplesPerFrame(OboeStream stream, int32_t 
 
 /**
  * @param stream handle provided by OboeStreamBuilder_openStream()
+ * @param deviceId pointer to variable to receive the actual device ID
+ * @return OBOE_OK or a negative error.
+ */
+OBOE_API oboe_result_t OboeStream_getDeviceId(OboeStream stream, oboe_device_id_t *deviceId);
+
+/**
+ * @param stream handle provided by OboeStreamBuilder_openStream()
  * @param format pointer to variable to receive the actual data format
  * @return OBOE_OK or a negative error.
  */
@@ -554,4 +571,4 @@ OBOE_API oboe_result_t OboeStream_getTimestamp(OboeStream stream,
 }
 #endif
 
-#endif //NATIVEOBOE_OBOEAUDIO_H
+#endif //OBOE_OBOEAUDIO_H

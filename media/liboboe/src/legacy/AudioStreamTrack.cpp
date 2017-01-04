@@ -58,10 +58,10 @@ oboe_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     int32_t samplesPerFrame = (getSamplesPerFrame() == OBOE_UNSPECIFIED)
                               ? 2 : getSamplesPerFrame();
     audio_channel_mask_t channelMask = audio_channel_out_mask_from_count(samplesPerFrame);
-    ALOGE("AudioStreamTrack::open(), samplesPerFrame = %d, channelMask = 0x%08x",
+    ALOGD("AudioStreamTrack::open(), samplesPerFrame = %d, channelMask = 0x%08x",
             samplesPerFrame, channelMask);
 
-    AudioTrack::callback_t callback = NULL;
+    AudioTrack::callback_t callback = nullptr;
     // TODO add more performance options
     audio_output_flags_t flags = (audio_output_flags_t) AUDIO_OUTPUT_FLAG_FAST;
     size_t frameCount = 0;
@@ -78,14 +78,15 @@ oboe_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             frameCount,
             flags,
             callback,
-            NULL,    // user callback data
-            0,       // notificationFrames
+            nullptr,    // user callback data
+            0,          // notificationFrames
             AUDIO_SESSION_ALLOCATE,
             AudioTrack::transfer_type::TRANSFER_SYNC // TODO - this does not allow FAST
             );
 
     // Did we get a valid track?
     status_t status = mAudioTrack->initCheck();
+    ALOGD("AudioStreamTrack::open(), initCheck() returned %d", status);
     // FIXME - this should work - if (status != NO_ERROR) {
     //         But initCheck() is returning 1 !
     if (status < 0) {
@@ -116,7 +117,7 @@ oboe_result_t AudioStreamTrack::close()
 
 oboe_result_t AudioStreamTrack::requestStart()
 {
-    if (mAudioTrack.get() == NULL) {
+    if (mAudioTrack.get() == nullptr) {
         return OBOE_ERROR_INVALID_STATE;
     }
     // Get current position so we can detect when the track is playing.
@@ -135,7 +136,7 @@ oboe_result_t AudioStreamTrack::requestStart()
 
 oboe_result_t AudioStreamTrack::requestPause()
 {
-    if (mAudioTrack.get() == NULL) {
+    if (mAudioTrack.get() == nullptr) {
         return OBOE_ERROR_INVALID_STATE;
     } else if (getState() != OBOE_STREAM_STATE_STARTING
             && getState() != OBOE_STREAM_STATE_STARTED) {
@@ -152,7 +153,7 @@ oboe_result_t AudioStreamTrack::requestPause()
 }
 
 oboe_result_t AudioStreamTrack::requestFlush() {
-    if (mAudioTrack.get() == NULL) {
+    if (mAudioTrack.get() == nullptr) {
         return OBOE_ERROR_INVALID_STATE;
     } else if (getState() != OBOE_STREAM_STATE_PAUSED) {
         return OBOE_ERROR_INVALID_STATE;
@@ -165,7 +166,7 @@ oboe_result_t AudioStreamTrack::requestFlush() {
 }
 
 oboe_result_t AudioStreamTrack::requestStop() {
-    if (mAudioTrack.get() == NULL) {
+    if (mAudioTrack.get() == nullptr) {
         return OBOE_ERROR_INVALID_STATE;
     }
     setState(OBOE_STREAM_STATE_STOPPING);

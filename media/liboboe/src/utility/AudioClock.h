@@ -17,10 +17,10 @@
 #ifndef UTILITY_AUDIOCLOCK_H
 #define UTILITY_AUDIOCLOCK_H
 
-#include <sys/types.h>
+#include <stdint.h>
 #include <time.h>
-#include "oboe/OboeDefinitions.h"
-#include "oboe/OboeAudio.h"
+
+#include <oboe/OboeDefinitions.h>
 
 class AudioClock {
 public:

@@ -19,6 +19,7 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include <new>
 #include <stdint.h>
 #include <assert.h>
 
@@ -51,25 +52,28 @@ static_assert(HANDLE_TRACKER_MAX_HANDLES == (1 << (INDEX_SIZE)),
 
 HandleTracker::HandleTracker(uint32_t maxHandles)
         : mMaxHandleCount(maxHandles)
-        , mHandleAddresses(nullptr)
         , mHandleHeaders(nullptr)
 {
     assert(maxHandles <= HANDLE_TRACKER_MAX_HANDLES);
     // Allocate arrays to hold addresses and validation info.
-    mHandleAddresses = (handle_tracker_address_t *) new handle_tracker_address_t[maxHandles];
+    mHandleAddresses = (handle_tracker_address_t *)
+            new(std::nothrow) handle_tracker_address_t[maxHandles];
     if (mHandleAddresses != nullptr) {
-        mHandleHeaders = new handle_tracker_header_t[maxHandles];
+        mHandleHeaders = new(std::nothrow) handle_tracker_header_t[maxHandles];
+
         if (mHandleHeaders != nullptr) {
-            // Initialize linked list of free nodes. NULL terminated.
+            handle_tracker_header_t initialHeader = buildHeader(0, 1);
+            // Initialize linked list of free nodes. nullptr terminated.
             for (uint32_t i = 0; i < (maxHandles - 1); i++) {
                 mHandleAddresses[i] = &mHandleAddresses[i + 1]; // point to next node
-                mHandleHeaders[i] = 0;
+                mHandleHeaders[i] = initialHeader;
             }
             mNextFreeAddress = &mHandleAddresses[0];
             mHandleAddresses[maxHandles - 1] = nullptr;
             mHandleHeaders[maxHandles - 1] = 0;
         } else {
             delete[] mHandleAddresses; // so the class appears uninitialized
+            mHandleAddresses = nullptr;
         }
     }
 }
@@ -131,7 +135,7 @@ oboe_handle_t HandleTracker::put(handle_tracker_type_t type, void *address)
     // Generate a handle.
     oboe_handle_t handle = buildHandle(inputHeader, index);
 
-    //ALOGD("HandleTracker::put(%p) returns 0x%08x", address, handle);
+    ALOGV("HandleTracker::put(%p) returns 0x%08x", address, handle);
     return handle;
 }
 

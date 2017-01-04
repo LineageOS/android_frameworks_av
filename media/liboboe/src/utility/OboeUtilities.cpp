@@ -28,24 +28,19 @@
 using namespace android;
 
 oboe_size_bytes_t OboeConvert_formatToSizeInBytes(oboe_audio_format_t format) {
-    oboe_datatype_t dataType = OBOE_AUDIO_FORMAT_DATA_TYPE(format);
-    oboe_size_bytes_t size;
-    switch (dataType) {
-        case OBOE_AUDIO_DATATYPE_UINT8:
-            size = sizeof(uint8_t);
-            break;
-        case OBOE_AUDIO_DATATYPE_INT16:
+    oboe_size_bytes_t size = OBOE_ERROR_ILLEGAL_ARGUMENT;
+    switch (format) {
+        case OBOE_AUDIO_FORMAT_PCM16:
             size = sizeof(int16_t);
             break;
-        case OBOE_AUDIO_DATATYPE_INT32:
-        case OBOE_AUDIO_DATATYPE_INT824:
+        case OBOE_AUDIO_FORMAT_PCM32:
+        case OBOE_AUDIO_FORMAT_PCM824:
             size = sizeof(int32_t);
             break;
-        case OBOE_AUDIO_DATATYPE_FLOAT32:
+        case OBOE_AUDIO_FORMAT_PCM_FLOAT:
             size = sizeof(float);
             break;
         default:
-            size = OBOE_ERROR_ILLEGAL_ARGUMENT;
             break;
     }
     return size;

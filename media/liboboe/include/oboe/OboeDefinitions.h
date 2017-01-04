@@ -25,6 +25,10 @@ extern "C" {
 
 typedef int32_t  oboe_handle_t; // negative handles are error codes
 typedef int32_t  oboe_result_t;
+/**
+ * A platform specific identifier for a device.
+ */
+typedef int32_t  oboe_device_id_t;
 typedef int32_t  oboe_sample_rate_t;
 /** This is used for small quantities such as the number of frames in a buffer. */
 typedef int32_t  oboe_size_frames_t;
@@ -38,7 +42,6 @@ typedef int32_t  oboe_size_bytes_t;
 typedef int64_t  oboe_position_frames_t;
 
 typedef int64_t  oboe_nanoseconds_t;
-typedef uint32_t oboe_audio_format_t;
 
 /**
  * This is used to represent a value that has not been specified.
@@ -47,6 +50,7 @@ typedef uint32_t oboe_audio_format_t;
  * and would accept whatever it was given.
  */
 #define OBOE_UNSPECIFIED           0
+#define OBOE_DEVICE_UNSPECIFIED    ((oboe_device_id_t) -1)
 #define OBOE_NANOS_PER_MICROSECOND ((int64_t)1000)
 #define OBOE_NANOS_PER_MILLISECOND (OBOE_NANOS_PER_MICROSECOND * 1000)
 #define OBOE_MILLIS_PER_SECOND     1000
@@ -60,59 +64,14 @@ enum oboe_direction_t {
     OBOE_DIRECTION_COUNT // This should always be last.
 };
 
-enum oboe_datatype_t {
-    OBOE_AUDIO_DATATYPE_INT16,
-    OBOE_AUDIO_DATATYPE_INT32,
-    OBOE_AUDIO_DATATYPE_INT824,
-    OBOE_AUDIO_DATATYPE_UINT8,
-    OBOE_AUDIO_DATATYPE_FLOAT32, // Add new values below.
-    OBOE_AUDIO_DATATYPE_COUNT // This should always be last.
+enum oboe_audio_format_t {
+    OBOE_AUDIO_FORMAT_INVALID = -1,
+    OBOE_AUDIO_FORMAT_UNSPECIFIED = 0,
+    OBOE_AUDIO_FORMAT_PCM16, // TODO rename to _PCM_I16
+    OBOE_AUDIO_FORMAT_PCM_FLOAT,
+    OBOE_AUDIO_FORMAT_PCM824, // TODO rename to _PCM_I8_24
+    OBOE_AUDIO_FORMAT_PCM32  // TODO rename to _PCM_I32
 };
-
-enum oboe_content_t {
-    OBOE_AUDIO_CONTENT_PCM,
-    OBOE_AUDIO_CONTENT_MP3,
-    OBOE_AUDIO_CONTENT_AAC,
-    OBOE_AUDIO_CONTENT_AC3,
-    OBOE_AUDIO_CONTENT_EAC3,
-    OBOE_AUDIO_CONTENT_DTS,
-    OBOE_AUDIO_CONTENT_DTSHD, // Add new values below.
-    OBOE_AUDIO_CONTENT_COUNT // This should always be last.
-};
-
-enum oboe_wrapper_t {
-    OBOE_AUDIO_WRAPPER_NONE,
-    OBOE_AUDIO_WRAPPER_IEC61937, // Add new values below.
-    OBOE_AUDIO_WRAPPER_COUNT // This should always be last.
-};
-
-/**
- * Fields packed into oboe_audio_format_t, from most to least significant bits.
- *   Invalid:1
- *   Reserved:7
- *   Wrapper:8
- *   Content:8
- *   Data Type:8
- */
-#define OBOE_AUDIO_FORMAT(dataType, content, wrapper) \
-    ((oboe_audio_format_t)((wrapper << 16) | (content << 8) | dataType))
-
-#define OBOE_AUDIO_FORMAT_RAW(dataType, content) \
-                OBOE_AUDIO_FORMAT(dataType, content, OBOE_AUDIO_WRAPPER_NONE)
-
-#define OBOE_AUDIO_FORMAT_DATA_TYPE(format) \
-    ((oboe_datatype_t)(format & 0x0FF))
-
-// Define some common formats.
-#define OBOE_AUDIO_FORMAT_PCM16  \
-                OBOE_AUDIO_FORMAT_RAW(OBOE_AUDIO_DATATYPE_INT16, OBOE_AUDIO_CONTENT_PCM)
-#define OBOE_AUDIO_FORMAT_PCM_FLOAT \
-                OBOE_AUDIO_FORMAT_RAW(OBOE_AUDIO_DATATYPE_FLOAT32, OBOE_AUDIO_CONTENT_PCM)
-#define OBOE_AUDIO_FORMAT_PCM824 \
-                OBOE_AUDIO_FORMAT_RAW(OBOE_AUDIO_DATATYPE_INT824, OBOE_AUDIO_CONTENT_PCM)
-#define OBOE_AUDIO_FORMAT_PCM32 \
-                OBOE_AUDIO_FORMAT_RAW(OBOE_AUDIO_DATATYPE_INT32, OBOE_AUDIO_CONTENT_PCM)
-#define OBOE_AUDIO_FORMAT_INVALID ((oboe_audio_format_t)-1)
 
 enum {
     OBOE_OK,

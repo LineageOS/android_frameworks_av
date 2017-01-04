@@ -23,20 +23,12 @@
 
 #include <oboe/OboeDefinitions.h>
 #include <oboe/OboeAudio.h>
+
 #include "AudioStreamBuilder.h"
 #include "AudioStream.h"
 #include "AudioClock.h"
+#include "client/AudioStreamInternal.h"
 #include "HandleTracker.h"
-
-// temporary, as I stage in the MMAP/NOIRQ support, do not review
-#ifndef OBOE_SUPPORT_MMAP
-#define OBOE_SUPPORT_MMAP 0
-#endif
-
-#if OBOE_SUPPORT_MMAP
-#include "AudioStreamInternal.h"
-#include "OboeServiceGateway.h"
-#endif
 
 using namespace oboe;
 
@@ -71,6 +63,8 @@ using namespace oboe;
         return OBOE_ERROR_NULL; \
     }
 
+// Static data.
+// TODO static constructors are discouraged, alternatives?
 static HandleTracker sHandleTracker(OBOE_MAX_HANDLES);
 
 typedef enum
@@ -81,9 +75,6 @@ typedef enum
 } oboe_handle_type_t;
 static_assert(OBOE_HANDLE_TYPE_COUNT <= HANDLE_TRACKER_MAX_TYPES, "Too many handle types.");
 
-#if OBOE_SUPPORT_MMAP
-static OboeServiceGateway sOboeServiceGateway;
-#endif
 
 #define OBOE_CASE_ENUM(name) case name: return #name
 
@@ -165,10 +156,18 @@ OBOE_API oboe_result_t Oboe_createStreamBuilder(OboeStreamBuilder *builder)
 }
 
 OBOE_API oboe_result_t OboeStreamBuilder_setDeviceId(OboeStreamBuilder builder,
-                                                     OboeDeviceId deviceId)
+                                                     oboe_device_id_t deviceId)
 {
     AudioStreamBuilder *streamBuilder = CONVERT_BUILDER_HANDLE_OR_RETURN();
     streamBuilder->setDeviceId(deviceId);
+    return OBOE_OK;
+}
+
+OBOE_API oboe_result_t OboeStreamBuilder_getDeviceId(OboeStreamBuilder builder,
+                                              oboe_device_id_t *deviceId)
+{
+    AudioStreamBuilder *streamBuilder = COMMON_GET_FROM_BUILDER_OR_RETURN(deviceId);
+    *deviceId = streamBuilder->getDeviceId();
     return OBOE_OK;
 }
 
@@ -399,10 +398,10 @@ OBOE_API oboe_result_t OboeStream_write(OboeStream stream,
 
 OBOE_API oboe_result_t OboeStream_createThread(OboeStream stream,
                                      oboe_nanoseconds_t periodNanoseconds,
-                                     void *(*startRoutine)(void *), void *arg)
+                                     oboe_audio_thread_proc_t *threadProc, void *arg)
 {
     AudioStream *audioStream = CONVERT_STREAM_HANDLE_OR_RETURN();
-    return audioStream->createThread(periodNanoseconds, startRoutine, arg);
+    return audioStream->createThread(periodNanoseconds, threadProc, arg);
 }
 
 OBOE_API oboe_result_t OboeStream_joinThread(OboeStream stream,
@@ -510,6 +509,14 @@ OBOE_API oboe_result_t OboeStream_getXRunCount(OboeStream stream, int32_t *xRunC
 {
     AudioStream *audioStream = COMMON_GET_FROM_STREAM_OR_RETURN(xRunCount);
     *xRunCount = audioStream->getXRunCount();
+    return OBOE_OK;
+}
+
+OBOE_API oboe_result_t OboeStream_getDeviceId(OboeStream stream,
+                                                 oboe_device_id_t *deviceId)
+{
+    AudioStream *audioStream = COMMON_GET_FROM_STREAM_OR_RETURN(deviceId);
+    *deviceId = audioStream->getDeviceId();
     return OBOE_OK;
 }
 

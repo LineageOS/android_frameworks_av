@@ -18,11 +18,17 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
-#include <sys/types.h>
-#include "AudioStream.h"
-#include "AudioStreamBuilder.h"
-#include "AudioStreamRecord.h"
-#include "AudioStreamTrack.h"
+#include <new>
+#include <stdint.h>
+
+#include <oboe/OboeDefinitions.h>
+#include <oboe/OboeAudio.h>
+
+#include "client/AudioStreamInternal.h"
+#include "core/AudioStream.h"
+#include "core/AudioStreamBuilder.h"
+#include "legacy/AudioStreamRecord.h"
+#include "legacy/AudioStreamTrack.h"
 
 using namespace oboe;
 
@@ -35,15 +41,15 @@ AudioStreamBuilder::AudioStreamBuilder() {
 AudioStreamBuilder::~AudioStreamBuilder() {
 }
 
-oboe_result_t AudioStreamBuilder::build(AudioStream **streamPtr) {
+oboe_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     // TODO Is there a better place to put the code that decides which class to use?
-    AudioStream *audioStream = nullptr;
+    AudioStream* audioStream = nullptr;
     const oboe_sharing_mode_t sharingMode = getSharingMode();
     switch (getDirection()) {
     case OBOE_DIRECTION_INPUT:
         switch (sharingMode) {
             case OBOE_SHARING_MODE_LEGACY:
-                audioStream = new AudioStreamRecord();
+                audioStream = new(std::nothrow) AudioStreamRecord();
                 break;
             default:
                 ALOGE("AudioStreamBuilder(): bad sharing mode = %d", sharingMode);
@@ -54,7 +60,10 @@ oboe_result_t AudioStreamBuilder::build(AudioStream **streamPtr) {
     case OBOE_DIRECTION_OUTPUT:
         switch (sharingMode) {
             case OBOE_SHARING_MODE_LEGACY:
-                audioStream = new AudioStreamTrack();
+                audioStream = new(std::nothrow) AudioStreamTrack();
+                break;
+            case OBOE_SHARING_MODE_EXCLUSIVE:
+                audioStream = new(std::nothrow) AudioStreamInternal();
                 break;
             default:
                 ALOGE("AudioStreamBuilder(): bad sharing mode = %d", sharingMode);

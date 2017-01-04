@@ -57,7 +57,7 @@ oboe_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
                               ? 2 : getSamplesPerFrame();
     audio_channel_mask_t channelMask = audio_channel_in_mask_from_count(samplesPerFrame);
 
-    AudioRecord::callback_t callback = NULL;
+    AudioRecord::callback_t callback = nullptr;
     audio_input_flags_t flags = (audio_input_flags_t) AUDIO_INPUT_FLAG_NONE;
 
     // TODO implement an unspecified Android format then use that.
@@ -75,14 +75,14 @@ oboe_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
 
             0,    //    size_t frameCount = 0,
             callback,
-            NULL, //    void* user = NULL,
+            nullptr, //    void* user = nullptr,
             0,    //    uint32_t notificationFrames = 0,
             AUDIO_SESSION_ALLOCATE,
             AudioRecord::TRANSFER_DEFAULT,
             flags
              //   int uid = -1,
              //   pid_t pid = -1,
-             //   const audio_attributes_t* pAttributes = NULL
+             //   const audio_attributes_t* pAttributes = nullptr
              );
 
     // Did we get a valid track?
@@ -115,7 +115,7 @@ oboe_result_t AudioStreamRecord::close()
 
 oboe_result_t AudioStreamRecord::requestStart()
 {
-    if (mAudioRecord.get() == NULL) {
+    if (mAudioRecord.get() == nullptr) {
         return OBOE_ERROR_INVALID_STATE;
     }
     // Get current position so we can detect when the track is playing.
@@ -142,7 +142,7 @@ oboe_result_t AudioStreamRecord::requestFlush() {
 }
 
 oboe_result_t AudioStreamRecord::requestStop() {
-    if (mAudioRecord.get() == NULL) {
+    if (mAudioRecord.get() == nullptr) {
         return OBOE_ERROR_INVALID_STATE;
     }
     setState(OBOE_STREAM_STATE_STOPPING);

@@ -18,6 +18,7 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include <atomic>
 #include <stdint.h>
 #include <oboe/OboeAudio.h>
 
@@ -27,10 +28,10 @@
 
 using namespace oboe;
 
-/*
- * AudioStream
- */
 AudioStream::AudioStream() {
+    // mThread is a pthread_t of unknown size so we need memset.
+    memset(&mThread, 0, sizeof(mThread));
+    setPeriodNanoseconds(0);
 }
 
 oboe_result_t AudioStream::open(const AudioStreamBuilder& builder)
@@ -91,23 +92,51 @@ oboe_result_t AudioStream::waitForStateChange(oboe_stream_state_t currentState,
 
         state = getState();
     }
-    if (nextState != NULL) {
+    if (nextState != nullptr) {
         *nextState = state;
     }
     return (state == currentState) ? OBOE_ERROR_TIMEOUT : OBOE_OK;
 }
 
+// This registers the app's background audio thread with the server before
+// passing control to the app. This gives the server an opportunity to boost
+// the thread's performance characteristics.
+void* AudioStream::wrapUserThread() {
+    void* procResult = nullptr;
+    mThreadRegistrationResult = registerThread();
+    if (mThreadRegistrationResult == OBOE_OK) {
+        // Call application procedure. This may take a very long time.
+        procResult = mThreadProc(mThreadArg);
+        ALOGD("AudioStream::mThreadProc() returned");
+        mThreadRegistrationResult = unregisterThread();
+    }
+    return procResult;
+}
+
+// This is the entry point for the new thread created by createThread().
+// It converts the 'C' function call to a C++ method call.
+static void* AudioStream_internalThreadProc(void* threadArg) {
+    AudioStream *audioStream = (AudioStream *) threadArg;
+    return audioStream->wrapUserThread();
+}
+
 oboe_result_t AudioStream::createThread(oboe_nanoseconds_t periodNanoseconds,
-                                     void *(*startRoutine)(void *), void *arg)
+                                     oboe_audio_thread_proc_t *threadProc,
+                                     void* threadArg)
 {
     if (mHasThread) {
         return OBOE_ERROR_INVALID_STATE;
     }
-    if (startRoutine == NULL) {
+    if (threadProc == nullptr) {
         return OBOE_ERROR_NULL;
     }
-    int err = pthread_create(&mThread, NULL, startRoutine, arg);
+    // Pass input parameters to the background thread.
+    mThreadProc = threadProc;
+    mThreadArg = threadArg;
+    setPeriodNanoseconds(periodNanoseconds);
+    int err = pthread_create(&mThread, nullptr, AudioStream_internalThreadProc, this);
     if (err != 0) {
+        // TODO convert errno to oboe_result_t
         return OBOE_ERROR_INTERNAL;
     } else {
         mHasThread = true;
@@ -115,7 +144,7 @@ oboe_result_t AudioStream::createThread(oboe_nanoseconds_t periodNanoseconds,
     }
 }
 
-oboe_result_t AudioStream::joinThread(void **returnArg, oboe_nanoseconds_t timeoutNanoseconds)
+oboe_result_t AudioStream::joinThread(void** returnArg, oboe_nanoseconds_t timeoutNanoseconds)
 {
     if (!mHasThread) {
         return OBOE_ERROR_INVALID_STATE;
@@ -128,7 +157,7 @@ oboe_result_t AudioStream::joinThread(void **returnArg, oboe_nanoseconds_t timeo
     int err = pthread_join(mThread, returnArg);
 #endif
     mHasThread = false;
-    // TODO Just leaked a thread?
-    return err ? OBOE_ERROR_INTERNAL : OBOE_OK;
+    // TODO convert errno to oboe_result_t
+    return err ? OBOE_ERROR_INTERNAL : mThreadRegistrationResult;
 }
 

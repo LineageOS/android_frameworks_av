@@ -17,9 +17,11 @@
 #ifndef OBOE_AUDIOSTREAM_H
 #define OBOE_AUDIOSTREAM_H
 
-#include <unistd.h>
-#include <sys/types.h>
+#include <atomic>
+#include <stdint.h>
+#include <oboe/OboeDefinitions.h>
 #include <oboe/OboeAudio.h>
+
 #include "OboeUtilities.h"
 #include "MonotonicCounter.h"
 
@@ -83,9 +85,24 @@ public:
     }
 
     virtual oboe_result_t createThread(oboe_nanoseconds_t periodNanoseconds,
-                                     void *(*start_routine)(void *), void *arg);
+                                       oboe_audio_thread_proc_t *threadProc,
+                                       void *threadArg);
 
     virtual oboe_result_t joinThread(void **returnArg, oboe_nanoseconds_t timeoutNanoseconds);
+
+    virtual oboe_result_t registerThread() {
+        return OBOE_OK;
+    }
+
+    virtual oboe_result_t unregisterThread() {
+        return OBOE_OK;
+    }
+
+    /**
+     * Internal function used to call the audio thread passed by the user.
+     * It is unfortunately public because it needs to be called by a static 'C' function.
+     */
+    void* wrapUserThread();
 
     // ============== Queries ===========================
 
@@ -125,7 +142,7 @@ public:
         return mSamplesPerFrame;
     }
 
-    OboeDeviceId getDeviceId() const {
+    oboe_device_id_t getDeviceId() const {
         return mDeviceId;
     }
 
@@ -220,21 +237,42 @@ protected:
         mState = state;
     }
 
+
+
+protected:
     MonotonicCounter     mFramesWritten;
     MonotonicCounter     mFramesRead;
+
+    void setPeriodNanoseconds(oboe_nanoseconds_t periodNanoseconds) {
+        mPeriodNanoseconds.store(periodNanoseconds, std::memory_order_release);
+    }
+
+    oboe_nanoseconds_t getPeriodNanoseconds() {
+        return mPeriodNanoseconds.load(std::memory_order_acquire);
+    }
 
 private:
     // These do not change after open().
     int32_t              mSamplesPerFrame = OBOE_UNSPECIFIED;
     oboe_sample_rate_t   mSampleRate = OBOE_UNSPECIFIED;
     oboe_stream_state_t  mState = OBOE_STREAM_STATE_UNINITIALIZED;
-    OboeDeviceId         mDeviceId = OBOE_UNSPECIFIED;
+    oboe_device_id_t     mDeviceId = OBOE_UNSPECIFIED;
     oboe_sharing_mode_t  mSharingMode = OBOE_SHARING_MODE_LEGACY;
-    oboe_audio_format_t  mFormat = OBOE_UNSPECIFIED;
+    oboe_audio_format_t  mFormat = OBOE_AUDIO_FORMAT_UNSPECIFIED;
     oboe_direction_t     mDirection = OBOE_DIRECTION_OUTPUT;
 
+    // background thread ----------------------------------
     bool                 mHasThread = false;
-    pthread_t            mThread;
+    pthread_t            mThread; // initialized in constructor
+
+    // These are set by the application thread and then read by the audio pthread.
+    std::atomic<oboe_nanoseconds_t>  mPeriodNanoseconds; // for tuning SCHED_FIFO threads
+    // TODO make atomic?
+    oboe_audio_thread_proc_t* mThreadProc = nullptr;
+    void*                mThreadArg = nullptr;
+    oboe_result_t        mThreadRegistrationResult = OBOE_OK;
+
+
 };
 
 } /* namespace oboe */

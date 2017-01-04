@@ -17,7 +17,11 @@
 #ifndef OBOE_AUDIOSTREAMBUILDER_H
 #define OBOE_AUDIOSTREAMBUILDER_H
 
+#include <stdint.h>
+
+#include <oboe/OboeDefinitions.h>
 #include <oboe/OboeAudio.h>
+
 #include "AudioStream.h"
 
 namespace oboe {
@@ -38,7 +42,7 @@ public:
     /**
      * This is also known as channelCount.
      */
-    AudioStreamBuilder *setSamplesPerFrame(int samplesPerFrame) {
+    AudioStreamBuilder* setSamplesPerFrame(int samplesPerFrame) {
         mSamplesPerFrame = samplesPerFrame;
         return this;
     }
@@ -47,7 +51,7 @@ public:
         return mDirection;
     }
 
-    AudioStreamBuilder *setDirection(oboe_direction_t direction) {
+    AudioStreamBuilder* setDirection(oboe_direction_t direction) {
         mDirection = direction;
         return this;
     }
@@ -56,7 +60,7 @@ public:
         return mSampleRate;
     }
 
-    AudioStreamBuilder *setSampleRate(oboe_sample_rate_t sampleRate) {
+    AudioStreamBuilder* setSampleRate(oboe_sample_rate_t sampleRate) {
         mSampleRate = sampleRate;
         return this;
     }
@@ -74,16 +78,16 @@ public:
         return mSharingMode;
     }
 
-    AudioStreamBuilder *setSharingMode(oboe_sharing_mode_t sharingMode) {
+    AudioStreamBuilder* setSharingMode(oboe_sharing_mode_t sharingMode) {
         mSharingMode = sharingMode;
         return this;
     }
 
-    OboeDeviceId getDeviceId() const {
+    oboe_device_id_t getDeviceId() const {
         return mDeviceId;
     }
 
-    AudioStreamBuilder *setDeviceId(OboeDeviceId deviceId) {
+    AudioStreamBuilder* setDeviceId(oboe_device_id_t deviceId) {
         mDeviceId = deviceId;
         return this;
     }
@@ -93,9 +97,9 @@ public:
 private:
     int32_t              mSamplesPerFrame = OBOE_UNSPECIFIED;
     oboe_sample_rate_t   mSampleRate = OBOE_UNSPECIFIED;
-    OboeDeviceId         mDeviceId = OBOE_UNSPECIFIED; // TODO need better default
+    oboe_device_id_t     mDeviceId = OBOE_DEVICE_UNSPECIFIED;
     oboe_sharing_mode_t  mSharingMode = OBOE_SHARING_MODE_LEGACY;
-    oboe_audio_format_t  mFormat = OBOE_UNSPECIFIED;
+    oboe_audio_format_t  mFormat = OBOE_AUDIO_FORMAT_UNSPECIFIED;
     oboe_direction_t     mDirection = OBOE_DIRECTION_OUTPUT;
 };
 
