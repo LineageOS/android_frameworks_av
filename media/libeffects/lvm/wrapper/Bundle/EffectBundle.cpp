@@ -2357,8 +2357,12 @@ int Equalizer_getParameter(EffectContext     *pContext,
 
     case EQ_PARAM_BAND_LEVEL:
         param2 = *pParamTemp;
-        if (param2 >= FIVEBAND_NUMBANDS) {
+        if (param2 < 0 || param2 >= FIVEBAND_NUMBANDS) {
             status = -EINVAL;
+            if (param2 < 0) {
+                android_errorWriteLog(0x534e4554, "32438598");
+                ALOGW("\tERROR Equalizer_getParameter() EQ_PARAM_BAND_LEVEL band %d", param2);
+            }
             break;
         }
         *(int16_t *)pValue = (int16_t)EqualizerGetBandLevel(pContext, param2);
@@ -2368,8 +2372,12 @@ int Equalizer_getParameter(EffectContext     *pContext,
 
     case EQ_PARAM_CENTER_FREQ:
         param2 = *pParamTemp;
-        if (param2 >= FIVEBAND_NUMBANDS) {
+        if (param2 < 0 || param2 >= FIVEBAND_NUMBANDS) {
             status = -EINVAL;
+            if (param2 < 0) {
+                android_errorWriteLog(0x534e4554, "32436341");
+                ALOGW("\tERROR Equalizer_getParameter() EQ_PARAM_CENTER_FREQ band %d", param2);
+            }
             break;
         }
         *(int32_t *)pValue = EqualizerGetCentreFrequency(pContext, param2);
@@ -2379,8 +2387,12 @@ int Equalizer_getParameter(EffectContext     *pContext,
 
     case EQ_PARAM_BAND_FREQ_RANGE:
         param2 = *pParamTemp;
-        if (param2 >= FIVEBAND_NUMBANDS) {
+        if (param2 < 0 || param2 >= FIVEBAND_NUMBANDS) {
             status = -EINVAL;
+            if (param2 < 0) {
+                android_errorWriteLog(0x534e4554, "32247948");
+                ALOGW("\tERROR Equalizer_getParameter() EQ_PARAM_BAND_FREQ_RANGE band %d", param2);
+            }
             break;
         }
         EqualizerGetBandFreqRange(pContext, param2, (uint32_t *)pValue, ((uint32_t *)pValue + 1));
@@ -2407,9 +2419,13 @@ int Equalizer_getParameter(EffectContext     *pContext,
 
     case EQ_PARAM_GET_PRESET_NAME:
         param2 = *pParamTemp;
-        if (param2 >= EqualizerGetNumPresets()) {
-        //if (param2 >= 20) {     // AGO FIX
+        if ((param2 < 0 && param2 != PRESET_CUSTOM) ||  param2 >= EqualizerGetNumPresets()) {
             status = -EINVAL;
+            if (param2 < 0) {
+                android_errorWriteLog(0x534e4554, "32448258");
+                ALOGE("\tERROR Equalizer_getParameter() EQ_PARAM_GET_PRESET_NAME preset %d",
+                        param2);
+            }
             break;
         }
         name = (char *)pValue;
@@ -2479,8 +2495,12 @@ int Equalizer_setParameter (EffectContext *pContext, void *pParam, void *pValue)
         band =  *pParamTemp;
         level = (int32_t)(*(int16_t *)pValue);
         //ALOGV("\tEqualizer_setParameter() EQ_PARAM_BAND_LEVEL band %d, level %d", band, level);
-        if (band >= FIVEBAND_NUMBANDS) {
+        if (band < 0 || band >= FIVEBAND_NUMBANDS) {
             status = -EINVAL;
+            if (band < 0) {
+                android_errorWriteLog(0x534e4554, "32095626");
+                ALOGE("\tERROR Equalizer_setParameter() EQ_PARAM_BAND_LEVEL band %d", band);
+            }
             break;
         }
         EqualizerSetBandLevel(pContext, band, level);
