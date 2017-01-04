@@ -466,7 +466,7 @@ sp<MediaRecorder> SurfaceMediaSourceGLTest::setUpMediaRecorder(int fd, int video
     mr->setVideoSource(videoSource);
     mr->setOutputFormat(outputFormat);
     mr->setVideoEncoder(videoEncoder);
-    mr->setOutputFile(fd, 0, 0);
+    mr->setOutputFile(fd);
     mr->setVideoSize(width, height);
     mr->setVideoFrameRate(fps);
     mr->prepare();

@@ -256,6 +256,7 @@ status_t MediaRecorder::setAudioEncoder(int ae)
         return INVALID_OPERATION;
     }
 
+
     status_t ret = mMediaRecorder->setAudioEncoder(ae);
     if (OK != ret) {
         ALOGV("setAudioEncoder failed: %d", ret);
@@ -266,9 +267,9 @@ status_t MediaRecorder::setAudioEncoder(int ae)
     return ret;
 }
 
-status_t MediaRecorder::setOutputFile(int fd, int64_t offset, int64_t length)
+status_t MediaRecorder::setOutputFile(int fd)
 {
-    ALOGV("setOutputFile(%d, %" PRId64 ", %" PRId64 ")", fd, offset, length);
+    ALOGV("setOutputFile(%d)", fd);
     if (mMediaRecorder == NULL) {
         ALOGE("media recorder is not initialized yet");
         return INVALID_OPERATION;
@@ -288,18 +289,48 @@ status_t MediaRecorder::setOutputFile(int fd, int64_t offset, int64_t length)
     // the invalid file descritpor never gets invoked. This is to workaround
     // this issue by checking the file descriptor first before passing
     // it through binder call.
-    if (fd < 0) {
-        ALOGE("Invalid file descriptor: %d", fd);
+    int flags = fcntl(fd, F_GETFL);
+    // fd must be in read-write mode.
+    if (flags == -1 || (flags & O_RDWR) == 0) {
+        ALOGE("Invalid file descriptor: %d err: %s", fd, strerror(errno));
         return BAD_VALUE;
     }
 
-    status_t ret = mMediaRecorder->setOutputFile(fd, offset, length);
+    status_t ret = mMediaRecorder->setOutputFile(fd);
     if (OK != ret) {
-        ALOGV("setOutputFile failed: %d", ret);
+        ALOGE("setOutputFile failed: %d", ret);
         mCurrentState = MEDIA_RECORDER_ERROR;
         return ret;
     }
     mIsOutputFileSet = true;
+    return ret;
+}
+
+status_t MediaRecorder::setNextOutputFile(int fd)
+{
+    ALOGV("setNextOutputFile(%d)", fd);
+    if (mMediaRecorder == NULL) {
+        ALOGE("media recorder is not initialized yet");
+        return INVALID_OPERATION;
+    }
+
+    // It appears that if an invalid file descriptor is passed through
+    // binder calls, the server-side of the inter-process function call
+    // is skipped. As a result, the check at the server-side to catch
+    // the invalid file descritpor never gets invoked. This is to workaround
+    // this issue by checking the file descriptor first before passing
+    // it through binder call.
+    int flags = fcntl(fd, F_GETFL);
+    // fd must be in read-write mode.
+    if (flags == -1 || (flags & O_RDWR) == 0) {
+        ALOGE("Invalid file descriptor: %d err: %s", fd, strerror(errno));
+        return BAD_VALUE;
+    }
+
+    status_t ret = mMediaRecorder->setNextOutputFile(fd);
+    if (OK != ret) {
+        ALOGE("setNextOutputFile failed: %d", ret);
+    }
     return ret;
 }
 

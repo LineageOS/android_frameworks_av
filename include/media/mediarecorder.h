@@ -171,6 +171,8 @@ enum media_recorder_info_type {
 
     MEDIA_RECORDER_INFO_MAX_DURATION_REACHED      = 800,
     MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED      = 801,
+    MEDIA_RECORDER_INFO_MAX_FILESIZE_APPROACHING  = 802,
+    MEDIA_RECORDER_INFO_NEXT_OUTPUT_FILE_STARTED  = 803,
 
     // All track related informtional events start here
     MEDIA_RECORDER_TRACK_INFO_LIST_START           = 1000,
@@ -227,7 +229,8 @@ public:
     status_t    setOutputFormat(int of);
     status_t    setVideoEncoder(int ve);
     status_t    setAudioEncoder(int ae);
-    status_t    setOutputFile(int fd, int64_t offset, int64_t length);
+    status_t    setOutputFile(int fd);
+    status_t    setNextOutputFile(int fd);
     status_t    setVideoSize(int width, int height);
     status_t    setVideoFrameRate(int frames_per_second);
     status_t    setParameters(const String8& params);

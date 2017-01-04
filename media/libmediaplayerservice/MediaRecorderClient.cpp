@@ -161,15 +161,26 @@ status_t MediaRecorderClient::setAudioEncoder(int ae)
     return mRecorder->setAudioEncoder((audio_encoder)ae);
 }
 
-status_t MediaRecorderClient::setOutputFile(int fd, int64_t offset, int64_t length)
+status_t MediaRecorderClient::setOutputFile(int fd)
 {
-    ALOGV("setOutputFile(%d, %lld, %lld)", fd, (long long)offset, (long long)length);
+    ALOGV("setOutputFile(%d)", fd);
     Mutex::Autolock lock(mLock);
     if (mRecorder == NULL) {
         ALOGE("recorder is not initialized");
         return NO_INIT;
     }
-    return mRecorder->setOutputFile(fd, offset, length);
+    return mRecorder->setOutputFile(fd);
+}
+
+status_t MediaRecorderClient::setNextOutputFile(int fd)
+{
+    ALOGV("setNextOutputFile(%d)", fd);
+    Mutex::Autolock lock(mLock);
+    if (mRecorder == NULL) {
+        ALOGE("recorder is not initialized");
+        return NO_INIT;
+    }
+    return mRecorder->setNextOutputFile(fd);
 }
 
 status_t MediaRecorderClient::setVideoSize(int width, int height)

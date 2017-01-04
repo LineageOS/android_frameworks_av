@@ -50,6 +50,7 @@ struct MediaWriter : public RefBase {
 
     virtual void setStartTimeOffsetMs(int /*ms*/) {}
     virtual int32_t getStartTimeOffsetMs() const { return 0; }
+    virtual status_t setNextFd(int fd) { return INVALID_OPERATION; }
 
 protected:
     virtual ~MediaWriter() {}
