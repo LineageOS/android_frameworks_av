@@ -46,7 +46,6 @@
 
 #include <system/audio.h>
 
-#include "AudioMixer.h"
 #include "AudioFlinger.h"
 #include "ServiceUtilities.h"
 

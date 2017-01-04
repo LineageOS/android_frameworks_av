@@ -22,14 +22,13 @@
 #include <sys/types.h>
 
 #include <media/AudioBufferProvider.h>
+#include <media/AudioResampler.h>
 #include <media/AudioResamplerPublic.h>
+#include <media/BufferProviders.h>
 #include <media/nbaio/NBLog.h>
 #include <system/audio.h>
 #include <utils/Compat.h>
 #include <utils/threads.h>
-
-#include "AudioResampler.h"
-#include "BufferProviders.h"
 
 // FIXME This is actually unity gain, which might not be max in future, expressed in U.12
 #define MAX_GAIN_INT AudioMixer::UNITY_GAIN_INT

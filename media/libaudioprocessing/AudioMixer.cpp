@@ -18,7 +18,6 @@
 #define LOG_TAG "AudioMixer"
 //#define LOG_NDEBUG 0
 
-#include "Configuration.h"
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
@@ -36,9 +35,9 @@
 
 #include <audio_utils/primitives.h>
 #include <audio_utils/format.h>
+#include <media/AudioMixer.h>
 
 #include "AudioMixerOps.h"
-#include "AudioMixer.h"
 
 // The FCC_2 macro refers to the Fixed Channel Count of 2 for the legacy integer mixer.
 #ifndef FCC_2

@@ -26,7 +26,7 @@
 #include <log/log.h>
 
 #include <audio_utils/primitives.h>
-#include "AudioResampler.h"
+#include <media/AudioResampler.h>
 #include "AudioResamplerSinc.h"
 #include "AudioResamplerCubic.h"
 #include "AudioResamplerDyn.h"

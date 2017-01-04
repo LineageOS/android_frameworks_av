@@ -1,9 +1,9 @@
 For libsonic dependency:
-pushd external/sonic
+pushd $ANDROID_BUILD_TOP/external/sonic
 mm
 popd
 
-To build resampler library:
+To build audio processing library:
 pushd ..
 Optionally uncomment USE_NEON=false in Android.mk
 mm

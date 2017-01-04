@@ -39,7 +39,7 @@
 #endif
 #include <audio_utils/conversion.h>
 #include <audio_utils/format.h>
-#include "AudioMixer.h"
+#include <media/AudioMixer.h>
 #include "FastMixer.h"
 
 namespace android {

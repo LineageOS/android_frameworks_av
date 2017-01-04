@@ -21,7 +21,7 @@
 #include <audio_utils/primitives.h>
 #include <audio_utils/sndfile.h>
 #include <media/AudioBufferProvider.h>
-#include "AudioMixer.h"
+#include <media/AudioMixer.h>
 #include "test_utils.h"
 
 /* Testing is typically through creation of an output WAV file from several
