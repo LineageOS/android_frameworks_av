@@ -41,7 +41,7 @@ public:
     /**
      * @param maxHandles cannot exceed HANDLE_TRACKER_MAX_HANDLES
      */
-    HandleTracker(uint32_t maxHandles);
+    HandleTracker(uint32_t maxHandles = 256);
     virtual ~HandleTracker();
 
     /**
