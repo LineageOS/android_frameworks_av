@@ -233,7 +233,7 @@ private:
     oboe_audio_format_t  mFormat = OBOE_UNSPECIFIED;
     oboe_direction_t     mDirection = OBOE_DIRECTION_OUTPUT;
 
-    bool                 mHasThread;
+    bool                 mHasThread = false;
     pthread_t            mThread;
 };
 
