@@ -407,7 +407,7 @@ protected:
                 virtual void acquireWakeLock_l();
                 void        releaseWakeLock();
                 void        releaseWakeLock_l();
-                void        updateWakeLockUids_l(const SortedVector<int> &uids);
+                void        updateWakeLockUids_l(const SortedVector<uid_t> &uids);
                 void        getPowerManager_l();
                 void setEffectSuspended_l(const effect_uuid_t *type,
                                           bool suspend,
@@ -552,8 +552,8 @@ protected:
                     void            updatePowerState(sp<ThreadBase> thread, bool force = false);
 
                 private:
-                    SortedVector<int> getWakeLockUids() {
-                        SortedVector<int> wakeLockUids;
+                    SortedVector<uid_t> getWakeLockUids() {
+                        SortedVector<uid_t> wakeLockUids;
                         for (const sp<T> &track : mActiveTracks) {
                             wakeLockUids.add(track->uid());
                         }
