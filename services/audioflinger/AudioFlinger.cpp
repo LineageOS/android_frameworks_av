@@ -1105,7 +1105,7 @@ void AudioFlinger::removeNotificationClient(pid_t pid)
     ALOGV("%d died, releasing its sessions", pid);
     size_t num = mAudioSessionRefs.size();
     bool removed = false;
-    for (size_t i = 0; i< num; ) {
+    for (size_t i = 0; i < num; ) {
         AudioSessionRef *ref = mAudioSessionRefs.itemAt(i);
         ALOGV(" pid %d @ %d", ref->mPid, i);
         if (ref->mPid == pid) {
@@ -1885,7 +1885,7 @@ void AudioFlinger::acquireAudioSessionId(int audioSession)
     }
 
     size_t num = mAudioSessionRefs.size();
-    for (size_t i = 0; i< num; i++) {
+    for (size_t i = 0; i < num; i++) {
         AudioSessionRef *ref = mAudioSessionRefs.editItemAt(i);
         if (ref->mSessionid == audioSession && ref->mPid == caller) {
             ref->mCnt++;
@@ -1903,7 +1903,7 @@ void AudioFlinger::releaseAudioSessionId(int audioSession)
     pid_t caller = IPCThreadState::self()->getCallingPid();
     ALOGV("releasing %d from %d", audioSession, caller);
     size_t num = mAudioSessionRefs.size();
-    for (size_t i = 0; i< num; i++) {
+    for (size_t i = 0; i < num; i++) {
         AudioSessionRef *ref = mAudioSessionRefs.itemAt(i);
         if (ref->mSessionid == audioSession && ref->mPid == caller) {
             ref->mCnt--;
@@ -1919,6 +1919,18 @@ void AudioFlinger::releaseAudioSessionId(int audioSession)
     // If the caller is mediaserver it is likely that the session being released was acquired
     // on behalf of a process not in notification clients and we ignore the warning.
     ALOGW_IF(caller != getpid_cached, "session id %d not found for pid %d", audioSession, caller);
+}
+
+bool AudioFlinger::isSessionAcquired_l(int audioSession)
+{
+    size_t num = mAudioSessionRefs.size();
+    for (size_t i = 0; i < num; i++) {
+        AudioSessionRef *ref = mAudioSessionRefs.itemAt(i);
+        if (ref->mSessionid == audioSession) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void AudioFlinger::purgeStaleEffects_l() {
@@ -2253,8 +2265,9 @@ sp<IEffect> AudioFlinger::createEffect(
         sp<Client> client = registerPid_l(pid);
 
         // create effect on selected output thread
+        bool pinned = (sessionId > AUDIO_SESSION_OUTPUT_MIX) && isSessionAcquired_l(sessionId);
         handle = thread->createEffect_l(client, effectClient, priority, sessionId,
-                &desc, enabled, &lStatus);
+                &desc, enabled, &lStatus, pinned);
         if (handle != 0 && id != NULL) {
             *id = handle->id();
         }
