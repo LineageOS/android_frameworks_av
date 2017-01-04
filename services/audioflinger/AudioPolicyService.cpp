@@ -383,16 +383,14 @@ void AudioPolicyService::releaseInput(audio_io_handle_t input)
         return;
     }
     Mutex::Autolock _l(mLock);
-    mpAudioPolicy->release_input(mpAudioPolicy, input);
-
     ssize_t index = mInputs.indexOfKey(input);
-    if (index < 0) {
-        return;
+    if (index >= 0) {
+        InputDesc *inputDesc = mInputs.valueAt(index);
+        setPreProcessorEnabled(inputDesc, false);
+        delete inputDesc;
+        mInputs.removeItemsAt(index);
     }
-    InputDesc *inputDesc = mInputs.valueAt(index);
-    setPreProcessorEnabled(inputDesc, false);
-    delete inputDesc;
-    mInputs.removeItemsAt(index);
+    mpAudioPolicy->release_input(mpAudioPolicy, input);
 }
 
 status_t AudioPolicyService::initStreamVolume(audio_stream_type_t stream,
