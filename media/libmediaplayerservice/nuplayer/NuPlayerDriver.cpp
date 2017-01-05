@@ -33,6 +33,9 @@
 
 #include <media/IMediaAnalyticsService.h>
 
+static const int kDumpLockRetries = 50;
+static const int kDumpLockSleepUs = 20000;
+
 namespace android {
 
 
@@ -51,7 +54,7 @@ NuPlayerDriver::NuPlayerDriver(pid_t pid)
       mAtEOS(false),
       mLooping(false),
       mAutoLoop(false) {
-    ALOGV("NuPlayerDriver(%p)", this);
+    ALOGD("NuPlayerDriver(%p) created, clientPid(%d)", this, pid);
     mLooper->setName("NuPlayerDriver Looper");
 
     // set up an analytics record
@@ -775,6 +778,24 @@ status_t NuPlayerDriver::dump(
 
     AString logString(" NuPlayer\n");
     char buf[256] = {0};
+
+    bool locked = false;
+    for (int i = 0; i < kDumpLockRetries; ++i) {
+        if (mLock.tryLock() == NO_ERROR) {
+            locked = true;
+            break;
+        }
+        usleep(kDumpLockSleepUs);
+    }
+
+    if (locked) {
+        snprintf(buf, sizeof(buf), "  state(%d), atEOS(%d), looping(%d), autoLoop(%d)\n",
+                mState, mAtEOS, mLooping, mAutoLoop);
+        mLock.unlock();
+    } else {
+        snprintf(buf, sizeof(buf), "  NPD(%p) lock is taken\n", this);
+    }
+    logString.append(buf);
 
     for (size_t i = 0; i < trackStats.size(); ++i) {
         const sp<AMessage> &stats = trackStats.itemAt(i);
