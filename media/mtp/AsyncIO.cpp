@@ -37,15 +37,17 @@ void write_func(struct aiocb *aiocbp) {
 }
 
 void splice_read_func(struct aiocb *aiocbp) {
+    loff_t long_offset = aiocbp->aio_offset;
     aiocbp->ret = TEMP_FAILURE_RETRY(splice(aiocbp->aio_fildes,
-                (off64_t*) &aiocbp->aio_offset, aiocbp->aio_sink,
+                &long_offset, aiocbp->aio_sink,
                 NULL, aiocbp->aio_nbytes, 0));
     if (aiocbp->ret == -1) aiocbp->error = errno;
 }
 
 void splice_write_func(struct aiocb *aiocbp) {
+    loff_t long_offset = aiocbp->aio_offset;
     aiocbp->ret = TEMP_FAILURE_RETRY(splice(aiocbp->aio_fildes, NULL,
-                aiocbp->aio_sink, (off64_t*) &aiocbp->aio_offset,
+                aiocbp->aio_sink, &long_offset,
                 aiocbp->aio_nbytes, 0));
     if (aiocbp->ret == -1) aiocbp->error = errno;
 }
