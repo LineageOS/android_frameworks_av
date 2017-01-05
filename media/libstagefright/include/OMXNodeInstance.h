@@ -18,6 +18,8 @@
 
 #define OMX_NODE_INSTANCE_H_
 
+#include <atomic>
+
 #include <media/IOMX.h>
 #include <utils/RefBase.h>
 #include <utils/threads.h>
@@ -111,7 +113,7 @@ private:
     OMX_HANDLETYPE mHandle;
     sp<IOMXObserver> mObserver;
     sp<CallbackDispatcher> mDispatcher;
-    bool mDying;
+    std::atomic_bool mDying;
     bool mSailed;  // configuration is set (no more meta-mode changes)
     bool mQueriedProhibitedExtensions;
     SortedVector<OMX_INDEXTYPE> mProhibitedExtensions;

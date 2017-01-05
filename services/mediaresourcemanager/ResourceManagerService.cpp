@@ -34,6 +34,31 @@
 
 namespace android {
 
+namespace {
+
+class DeathNotifier : public IBinder::DeathRecipient {
+public:
+    DeathNotifier(const wp<ResourceManagerService> &service, int pid, int64_t clientId)
+        : mService(service), mPid(pid), mClientId(clientId) {}
+
+    virtual void binderDied(const wp<IBinder> & /* who */) override {
+        // Don't check for pid validity since we know it's already dead.
+        sp<ResourceManagerService> service = mService.promote();
+        if (service == nullptr) {
+            ALOGW("ResourceManagerService is dead as well.");
+            return;
+        }
+        service->removeResource(mPid, mClientId, false);
+    }
+
+private:
+    wp<ResourceManagerService> mService;
+    int mPid;
+    int64_t mClientId;
+};
+
+}  // namespace
+
 template <typename T>
 static String8 getString(const Vector<T> &items) {
     String8 itemsStr;
@@ -214,17 +239,25 @@ void ResourceManagerService::addResource(
     ResourceInfo& info = getResourceInfoForEdit(clientId, client, infos);
     // TODO: do the merge instead of append.
     info.resources.appendVector(resources);
+    if (info.deathNotifier == nullptr) {
+        info.deathNotifier = new DeathNotifier(this, pid, clientId);
+        IInterface::asBinder(client)->linkToDeath(info.deathNotifier);
+    }
     notifyResourceGranted(pid, resources);
 }
 
 void ResourceManagerService::removeResource(int pid, int64_t clientId) {
+    removeResource(pid, clientId, true);
+}
+
+void ResourceManagerService::removeResource(int pid, int64_t clientId, bool checkValid) {
     String8 log = String8::format(
             "removeResource(pid %d, clientId %lld)",
             pid, (long long) clientId);
     mServiceLog->add(log);
 
     Mutex::Autolock lock(mLock);
-    if (!mProcessInfo->isValidPid(pid)) {
+    if (checkValid && !mProcessInfo->isValidPid(pid)) {
         ALOGE("Rejected removeResource call with invalid pid.");
         return;
     }
@@ -237,6 +270,7 @@ void ResourceManagerService::removeResource(int pid, int64_t clientId) {
     ResourceInfos &infos = mMap.editValueAt(index);
     for (size_t j = 0; j < infos.size(); ++j) {
         if (infos[j].clientId == clientId) {
+            IInterface::asBinder(infos[j].client)->unlinkToDeath(infos[j].deathNotifier);
             j = infos.removeAt(j);
             found = true;
             break;

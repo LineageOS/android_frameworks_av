@@ -36,6 +36,7 @@ struct ProcessInfoInterface;
 struct ResourceInfo {
     int64_t clientId;
     sp<IResourceManagerClient> client;
+    sp<IBinder::DeathRecipient> deathNotifier;
     Vector<MediaResource> resources;
 };
 
@@ -69,6 +70,8 @@ public:
     // according to the requested resources.
     // Returns true if any resource has been reclaimed, otherwise returns false.
     virtual bool reclaimResource(int callingPid, const Vector<MediaResource> &resources);
+
+    void removeResource(int pid, int64_t clientId, bool checkValid);
 
 protected:
     virtual ~ResourceManagerService();

@@ -398,14 +398,8 @@ sp<IOMXObserver> OMXNodeInstance::observer() {
 }
 
 status_t OMXNodeInstance::freeNode() {
-
     CLOG_LIFE(freeNode, "handle=%p", mHandle);
     static int32_t kMaxNumIterations = 10;
-
-    // exit if we have already freed the node
-    if (mHandle == NULL) {
-        return mOwner->freeNode(this);
-    }
 
     // Transition the node from its current state all the way down
     // to "Loaded".
@@ -416,7 +410,13 @@ status_t OMXNodeInstance::freeNode() {
     // The code below may trigger some more events to be dispatched
     // by the OMX component - we want to ignore them as our client
     // does not expect them.
-    mDying = true;
+    bool expected = false;
+    if (!mDying.compare_exchange_strong(expected, true)) {
+        // exit if we have already freed the node or doing so right now.
+        // NOTE: this ensures that the block below executes at most once.
+        ALOGV("Already dying");
+        return OK;
+    }
 
     OMX_STATETYPE state;
     CHECK_EQ(OMX_GetState(mHandle, &state), OMX_ErrorNone);
