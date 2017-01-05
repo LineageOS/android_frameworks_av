@@ -24,7 +24,6 @@
 
 #define STRINGIFY_ENUMS
 
-#include <media/ICrypto.h>
 #include <media/IOMX.h>
 #include <media/MediaCodecInfo.h>
 #include <media/stagefright/MediaErrors.h>
@@ -38,7 +37,6 @@
 
 namespace android {
 
-class BufferChannelBase;
 class BufferProducerWrapper;
 class MediaCodecBuffer;
 struct PersistentSurface;
@@ -46,14 +44,42 @@ struct RenderedFrameInfo;
 class Surface;
 
 struct CodecBase : public AHandler, /* static */ ColorUtils {
+    struct PortDescription;
+
     /**
      * This interface defines events firing from CodecBase back to MediaCodec.
      * All methods must not block.
      */
-    class CodecCallback {
+    class Callback {
     public:
-        virtual ~CodecCallback() = default;
+        virtual ~Callback() = default;
 
+        /**
+         * Request MediaCodec to fill the specified input buffer.
+         *
+         * @param bufferId  ID of the buffer, assigned by underlying component.
+         * @param buffer    a buffer to be filled.
+         * @param reply     a message to post once MediaCodec has filled the
+         *                  buffer.
+         */
+        virtual void fillThisBuffer(
+                IOMX::buffer_id bufferId,
+                const sp<MediaCodecBuffer> &buffer,
+                const sp<AMessage> &reply) = 0;
+        /**
+         * Request MediaCodec to drain the specified output buffer.
+         *
+         * @param bufferId  ID of the buffer, assigned by underlying component.
+         * @param buffer    a buffer to be filled.
+         * @param flags     flags associated with this buffer (e.g. EOS).
+         * @param reply     a message to post once MediaCodec has filled the
+         *                  buffer.
+         */
+        virtual void drainThisBuffer(
+                IOMX::buffer_id bufferId,
+                const sp<MediaCodecBuffer> &buffer,
+                int32_t flags,
+                const sp<AMessage> &reply) = 0;
         /**
          * Notify MediaCodec for seeing an output EOS.
          *
@@ -62,10 +88,6 @@ struct CodecBase : public AHandler, /* static */ ColorUtils {
          *            prematurely for that error.
          */
         virtual void onEos(status_t err) = 0;
-        /**
-         * Notify MediaCodec that start operation is complete.
-         */
-        virtual void onStartCompleted() = 0;
         /**
          * Notify MediaCodec that stop operation is complete.
          */
@@ -147,55 +169,27 @@ struct CodecBase : public AHandler, /* static */ ColorUtils {
          */
         virtual void onSignaledInputEOS(status_t err) = 0;
         /**
+         * Notify MediaCodec with the allocated buffers.
+         *
+         * @param portIndex zero for input port, one for output port.
+         * @param portDesc  a PortDescription object containing allocated
+         *                  buffers.
+         */
+        virtual void onBuffersAllocated(int32_t portIndex, const sp<PortDescription> &portDesc) = 0;
+        /**
          * Notify MediaCodec that output frames are rendered with information on
          * those frames.
          *
          * @param done  a list of rendered frames.
          */
         virtual void onOutputFramesRendered(const std::list<RenderedFrameInfo> &done) = 0;
-        /**
-         * Notify MediaCodec that output buffers are changed.
-         */
-        virtual void onOutputBuffersChanged() = 0;
     };
 
-    /**
-     * This interface defines events firing from BufferChannelBase back to MediaCodec.
-     * All methods must not block.
-     */
-    class BufferCallback {
-    public:
-        virtual ~BufferCallback() = default;
-
-        /**
-         * Notify MediaCodec that an input buffer is available with given index.
-         * When BufferChannelBase::getInputBufferArray() is not called,
-         * BufferChannelBase may report different buffers with the same index if
-         * MediaCodec already queued/discarded the buffer. After calling
-         * BufferChannelBase::getInputBufferArray(), the buffer and index match the
-         * returned array.
-         */
-        virtual void onInputBufferAvailable(
-                size_t index, const sp<MediaCodecBuffer> &buffer) = 0;
-        /**
-         * Notify MediaCodec that an output buffer is available with given index.
-         * When BufferChannelBase::getOutputBufferArray() is not called,
-         * BufferChannelBase may report different buffers with the same index if
-         * MediaCodec already queued/discarded the buffer. After calling
-         * BufferChannelBase::getOutputBufferArray(), the buffer and index match the
-         * returned array.
-         */
-        virtual void onOutputBufferAvailable(
-                size_t index, const sp<MediaCodecBuffer> &buffer) = 0;
-    };
     enum {
         kMaxCodecBufferSize = 8192 * 4096 * 4, // 8K RGBA
     };
 
-    inline void setCallback(std::unique_ptr<CodecCallback> &&callback) {
-        mCallback = std::move(callback);
-    }
-    virtual std::shared_ptr<BufferChannelBase> getBufferChannel() = 0;
+    void setCallback(std::shared_ptr<Callback> &&callback);
 
     virtual void initiateAllocateComponent(const sp<AMessage> &msg) = 0;
     virtual void initiateConfigureComponent(const sp<AMessage> &msg) = 0;
@@ -221,102 +215,31 @@ struct CodecBase : public AHandler, /* static */ ColorUtils {
     virtual void signalSetParameters(const sp<AMessage> &msg) = 0;
     virtual void signalEndOfInputStream() = 0;
 
+    struct PortDescription : public RefBase {
+        virtual size_t countBuffers() = 0;
+        virtual IOMX::buffer_id bufferIDAt(size_t index) const = 0;
+        virtual sp<MediaCodecBuffer> bufferAt(size_t index) const = 0;
+
+    protected:
+        PortDescription();
+        virtual ~PortDescription();
+
+    private:
+        DISALLOW_EVIL_CONSTRUCTORS(PortDescription);
+    };
+
     /*
      * Codec-related defines
      */
 
 protected:
-    CodecBase() = default;
-    virtual ~CodecBase() = default;
+    CodecBase();
+    virtual ~CodecBase();
 
-    std::unique_ptr<CodecCallback> mCallback;
+    std::shared_ptr<Callback> mCallback;
 
 private:
     DISALLOW_EVIL_CONSTRUCTORS(CodecBase);
-};
-
-/**
- * A channel between MediaCodec and CodecBase object which manages buffer
- * passing. Only MediaCodec is expected to call these methods, and
- * underlying CodecBase implementation should define its own interface
- * separately for itself.
- *
- * Concurrency assumptions:
- *
- * 1) Clients may access the object at multiple threads concurrently.
- * 2) All methods do not call underlying CodecBase object while holding a lock.
- * 3) Code inside critical section executes within 1ms.
- */
-class BufferChannelBase {
-public:
-    virtual ~BufferChannelBase() = default;
-
-    inline void setCallback(std::unique_ptr<CodecBase::BufferCallback> &&callback) {
-        mCallback = std::move(callback);
-    }
-
-    inline void setCrypto(const sp<ICrypto> &crypto) {
-        mCrypto = crypto;
-    }
-
-    /**
-     * Queue an input buffer into the buffer channel.
-     *
-     * @return    OK if successful;
-     *            -ENOENT if the buffer is not known (TODO: this should be
-     *            handled gracefully in the future, here and below).
-     */
-    virtual status_t queueInputBuffer(const sp<MediaCodecBuffer> &buffer) = 0;
-    /**
-     * Queue a secure input buffer into the buffer channel.
-     *
-     * @return    OK if successful;
-     *            -ENOENT if the buffer is not known;
-     *            -ENOSYS if mCrypto is not set so that decryption is not
-     *            possible;
-     *            other errors if decryption failed.
-     */
-    virtual status_t queueSecureInputBuffer(
-            const sp<MediaCodecBuffer> &buffer,
-            bool secure,
-            const uint8_t *key,
-            const uint8_t *iv,
-            CryptoPlugin::Mode mode,
-            CryptoPlugin::Pattern pattern,
-            const CryptoPlugin::SubSample *subSamples,
-            size_t numSubSamples,
-            AString *errorDetailMsg) = 0;
-    /**
-     * Request buffer rendering at specified time.
-     *
-     * @param     timestampNs   nanosecond timestamp for rendering time.
-     * @return    OK if successful;
-     *            -ENOENT if the buffer is not known.
-     */
-    virtual status_t renderOutputBuffer(
-            const sp<MediaCodecBuffer> &buffer, int64_t timestampNs) = 0;
-    /**
-     * Discard a buffer to the underlying CodecBase object.
-     *
-     * TODO: remove once this operation can be handled by just clearing the
-     * reference.
-     *
-     * @return    OK if successful;
-     *            -ENOENT if the buffer is not known.
-     */
-    virtual status_t discardBuffer(const sp<MediaCodecBuffer> &buffer) = 0;
-    /**
-     * Clear and fill array with input buffers.
-     */
-    virtual void getInputBufferArray(Vector<sp<MediaCodecBuffer>> *array) = 0;
-    /**
-     * Clear and fill array with output buffers.
-     */
-    virtual void getOutputBufferArray(Vector<sp<MediaCodecBuffer>> *array) = 0;
-
-protected:
-    std::unique_ptr<CodecBase::BufferCallback> mCallback;
-    sp<ICrypto> mCrypto;
 };
 
 }  // namespace android

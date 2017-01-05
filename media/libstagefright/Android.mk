@@ -4,7 +4,6 @@ include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:=                         \
         ACodec.cpp                        \
-        ACodecBufferChannel.cpp           \
         AACExtractor.cpp                  \
         AACWriter.cpp                     \
         AMRExtractor.cpp                  \
@@ -15,6 +14,7 @@ LOCAL_SRC_FILES:=                         \
         CallbackDataSource.cpp            \
         CameraSource.cpp                  \
         CameraSourceTimeLapse.cpp         \
+        CodecBase.cpp                     \
         DataConverter.cpp                 \
         DataSource.cpp                    \
         DataURISource.cpp                 \

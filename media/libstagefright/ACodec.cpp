@@ -53,7 +53,6 @@
 #include <OMX_AsString.h>
 
 #include "include/avc_utils.h"
-#include "include/ACodecBufferChannel.h"
 #include "include/DataConverter.h"
 #include "include/SecureBuffer.h"
 #include "include/SharedMemoryBuffer.h"
@@ -565,19 +564,14 @@ ACodec::ACodec()
 ACodec::~ACodec() {
 }
 
+void ACodec::setNotificationMessage(const sp<AMessage> &msg) {
+    mNotify = msg;
+}
+
 void ACodec::initiateSetup(const sp<AMessage> &msg) {
     msg->setWhat(kWhatSetup);
     msg->setTarget(this);
     msg->post();
-}
-
-std::shared_ptr<BufferChannelBase> ACodec::getBufferChannel() {
-    if (!mBufferChannel) {
-        mBufferChannel = std::make_shared<ACodecBufferChannel>(
-                new AMessage(kWhatInputBufferFilled, this),
-                new AMessage(kWhatOutputBufferDrained, this));
-    }
-    return mBufferChannel;
 }
 
 void ACodec::signalSetParameters(const sp<AMessage> &params) {
@@ -940,17 +934,12 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
         return err;
     }
 
-    std::vector<ACodecBufferChannel::BufferAndId> array(mBuffers[portIndex].size());
+    sp<PortDescription> desc = new PortDescription;
     for (size_t i = 0; i < mBuffers[portIndex].size(); ++i) {
-        array[i] = {mBuffers[portIndex][i].mData, mBuffers[portIndex][i].mBufferID};
+        const BufferInfo &info = mBuffers[portIndex][i];
+        desc->addBuffer(info.mBufferID, info.mData);
     }
-    if (portIndex == kPortIndexInput) {
-        mBufferChannel->setInputBufferArray(array);
-    } else if (portIndex == kPortIndexOutput) {
-        mBufferChannel->setOutputBufferArray(array);
-    } else {
-        TRESPASS();
-    }
+    mCallback->onBuffersAllocated(portIndex, desc);
 
     return OK;
 }
@@ -1434,12 +1423,6 @@ ACodec::BufferInfo *ACodec::dequeueBufferFromNativeWindow() {
 }
 
 status_t ACodec::freeBuffersOnPort(OMX_U32 portIndex) {
-    if (portIndex == kPortIndexInput) {
-        mBufferChannel->setInputBufferArray({});
-    } else {
-        mBufferChannel->setOutputBufferArray({});
-    }
-
     status_t err = OK;
     for (size_t i = mBuffers[portIndex].size(); i > 0;) {
         i--;
@@ -5077,6 +5060,25 @@ void ACodec::onOutputFormatChanged(sp<const AMessage> expectedFormat) {
     }
 }
 
+void ACodec::addKeyFormatChangesToRenderBufferNotification(sp<AMessage> &notify) {
+    AString mime;
+    CHECK(mOutputFormat->findString("mime", &mime));
+
+    if (mime == MEDIA_MIMETYPE_VIDEO_RAW && mNativeWindow != NULL) {
+        // notify renderer of the crop change and dataspace change
+        // NOTE: native window uses extended right-bottom coordinate
+        int32_t left, top, right, bottom;
+        if (mOutputFormat->findRect("crop", &left, &top, &right, &bottom)) {
+            notify->setRect("crop", left, top, right + 1, bottom + 1);
+        }
+
+        int32_t dataSpace;
+        if (mOutputFormat->findInt32("android._dataspace", &dataSpace)) {
+            notify->setInt32("dataspace", dataSpace);
+        }
+    }
+}
+
 void ACodec::sendFormatChange() {
     AString mime;
     CHECK(mOutputFormat->findString("mime", &mime));
@@ -5134,6 +5136,29 @@ status_t ACodec::requestIDRFrame() {
             OMX_IndexConfigVideoIntraVOPRefresh,
             &params,
             sizeof(params));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+ACodec::PortDescription::PortDescription() {
+}
+
+void ACodec::PortDescription::addBuffer(
+        IOMX::buffer_id id, const sp<MediaCodecBuffer> &buffer) {
+    mBufferIDs.push_back(id);
+    mBuffers.push_back(buffer);
+}
+
+size_t ACodec::PortDescription::countBuffers() {
+    return mBufferIDs.size();
+}
+
+IOMX::buffer_id ACodec::PortDescription::bufferIDAt(size_t index) const {
+    return mBufferIDs.itemAt(index);
+}
+
+sp<MediaCodecBuffer> ACodec::PortDescription::bufferAt(size_t index) const {
+    return mBuffers.itemAt(index);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -5445,7 +5470,9 @@ void ACodec::BaseState::postFillThisBuffer(BufferInfo *info) {
     CHECK_EQ((int)info->mStatus, (int)BufferInfo::OWNED_BY_US);
 
     info->mData->setFormat(mCodec->mInputFormat);
-    mCodec->mBufferChannel->fillThisBuffer(info->mBufferID);
+    sp<AMessage> reply = new AMessage(kWhatInputBufferFilled, mCodec);
+    reply->setInt32("buffer-id", info->mBufferID);
+    mCodec->mCallback->fillThisBuffer(info->mBufferID, info->mData, reply);
     info->mData.clear();
     info->mStatus = BufferInfo::OWNED_BY_UPSTREAM;
 }
@@ -5459,9 +5486,17 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
     PortMode mode = getPortMode(kPortIndexInput);
     int32_t discarded = 0;
     if (msg->findInt32("discarded", &discarded) && discarded) {
-        // these are unfilled buffers returned by client
-        // buffers are returned on MediaCodec.flush
-        mode = KEEP_BUFFERS;
+        /* these are unfilled buffers returned by client */
+        CHECK(msg->findInt32("err", &err));
+
+        if (err == OK) {
+            /* buffers with no errors are returned on MediaCodec.flush */
+            mode = KEEP_BUFFERS;
+        } else {
+            ALOGV("[%s] saw error %d instead of an input buffer",
+                 mCodec->mComponentName.c_str(), err);
+            eos = true;
+        }
     }
     sp<RefBase> obj;
     CHECK(msg->findObject("buffer", &obj));
@@ -5788,6 +5823,7 @@ bool ACodec::BaseState::onOMXFillBufferDone(
                 break;
             }
 
+            sp<AMessage> reply = new AMessage(kWhatOutputBufferDrained, mCodec);
             sp<MediaCodecBuffer> buffer = info->mData;
 
             if (mCodec->mOutputFormat != mCodec->mLastOutputFormat && rangeLength > 0) {
@@ -5795,7 +5831,12 @@ bool ACodec::BaseState::onOMXFillBufferDone(
                 if (mCodec->mBaseOutputFormat == mCodec->mOutputFormat) {
                     mCodec->onOutputFormatChanged(mCodec->mOutputFormat);
                 }
+                mCodec->addKeyFormatChangesToRenderBufferNotification(reply);
                 mCodec->sendFormatChange();
+            } else if (rangeLength > 0 && mCodec->mNativeWindow != NULL) {
+                // If potentially rendering onto a surface, always save key format data (crop &
+                // data space) so that we can set it if and once the buffer is rendered.
+                mCodec->addKeyFormatChangesToRenderBufferNotification(reply);
             }
             buffer->setFormat(mCodec->mOutputFormat);
 
@@ -5840,7 +5881,9 @@ bool ACodec::BaseState::onOMXFillBufferDone(
 
             info->mData.clear();
 
-            mCodec->mBufferChannel->drainThisBuffer(info->mBufferID, flags);
+            reply->setInt32("buffer-id", info->mBufferID);
+
+            mCodec->mCallback->drainThisBuffer(info->mBufferID, buffer, flags, reply);
 
             info->mStatus = BufferInfo::OWNED_BY_DOWNSTREAM;
 
@@ -5888,33 +5931,30 @@ void ACodec::BaseState::onOutputBufferDrained(const sp<AMessage> &msg) {
         return;
     }
     info->mData = buffer;
+
+    android_native_rect_t crop;
+    if (msg->findRect("crop", &crop.left, &crop.top, &crop.right, &crop.bottom)
+            && memcmp(&crop, &mCodec->mLastNativeWindowCrop, sizeof(crop)) != 0) {
+        mCodec->mLastNativeWindowCrop = crop;
+        status_t err = native_window_set_crop(mCodec->mNativeWindow.get(), &crop);
+        ALOGW_IF(err != NO_ERROR, "failed to set crop: %d", err);
+    }
+
+    int32_t dataSpace;
+    if (msg->findInt32("dataspace", &dataSpace)
+            && dataSpace != mCodec->mLastNativeWindowDataSpace) {
+        status_t err = native_window_set_buffers_data_space(
+                mCodec->mNativeWindow.get(), (android_dataspace)dataSpace);
+        mCodec->mLastNativeWindowDataSpace = dataSpace;
+        ALOGW_IF(err != NO_ERROR, "failed to set dataspace: %d", err);
+    }
+
     int32_t render;
     if (mCodec->mNativeWindow != NULL
             && msg->findInt32("render", &render) && render != 0
             && !discarded && buffer->size() != 0) {
         ATRACE_NAME("render");
         // The client wants this buffer to be rendered.
-
-        android_native_rect_t crop;
-        if (buffer->format()->findRect("crop", &crop.left, &crop.top, &crop.right, &crop.bottom)) {
-            // NOTE: native window uses extended right-bottom coordinate
-            ++crop.right;
-            ++crop.bottom;
-            if (memcmp(&crop, &mCodec->mLastNativeWindowCrop, sizeof(crop)) != 0) {
-                mCodec->mLastNativeWindowCrop = crop;
-                status_t err = native_window_set_crop(mCodec->mNativeWindow.get(), &crop);
-                ALOGW_IF(err != NO_ERROR, "failed to set crop: %d", err);
-            }
-        }
-
-        int32_t dataSpace;
-        if (buffer->format()->findInt32("android._dataspace", &dataSpace)
-                && dataSpace != mCodec->mLastNativeWindowDataSpace) {
-            status_t err = native_window_set_buffers_data_space(
-                    mCodec->mNativeWindow.get(), (android_dataspace)dataSpace);
-            mCodec->mLastNativeWindowDataSpace = dataSpace;
-            ALOGW_IF(err != NO_ERROR, "failed to set dataspace: %d", err);
-        }
 
         // save buffers sent to the surface so we can get render time when they return
         int64_t mediaTimeUs = -1;
@@ -6557,18 +6597,12 @@ void ACodec::LoadedToIdleState::stateEntered() {
 
 status_t ACodec::LoadedToIdleState::allocateBuffers() {
     status_t err = mCodec->allocateBuffersOnPort(kPortIndexInput);
+
     if (err != OK) {
         return err;
     }
 
-    err = mCodec->allocateBuffersOnPort(kPortIndexOutput);
-    if (err != OK) {
-        return err;
-    }
-
-    mCodec->mCallback->onStartCompleted();
-
-    return OK;
+    return mCodec->allocateBuffersOnPort(kPortIndexOutput);
 }
 
 bool ACodec::LoadedToIdleState::onMessageReceived(const sp<AMessage> &msg) {
@@ -7176,7 +7210,6 @@ bool ACodec::OutputPortSettingsChangedState::onOMXEvent(
                     err = mCodec->allocateBuffersOnPort(kPortIndexOutput);
                     ALOGE_IF(err != OK, "Failed to allocate output port buffers after port "
                             "reconfiguration: (%d)", err);
-                    mCodec->mCallback->onOutputBuffersChanged();
                 }
 
                 if (err != OK) {
