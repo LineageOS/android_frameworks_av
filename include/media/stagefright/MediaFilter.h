@@ -21,7 +21,6 @@
 
 namespace android {
 
-class ACodecBufferChannel;
 struct GraphicBufferListener;
 class MemoryDealer;
 struct SimpleFilter;
@@ -29,7 +28,6 @@ struct SimpleFilter;
 struct MediaFilter : public CodecBase {
     MediaFilter();
 
-    virtual std::shared_ptr<BufferChannelBase> getBufferChannel() override;
     virtual void initiateAllocateComponent(const sp<AMessage> &msg);
     virtual void initiateConfigureComponent(const sp<AMessage> &msg);
     virtual void initiateCreateInputSurface();
@@ -46,6 +44,25 @@ struct MediaFilter : public CodecBase {
     virtual void signalEndOfInputStream();
 
     virtual void onMessageReceived(const sp<AMessage> &msg);
+
+    struct PortDescription : public CodecBase::PortDescription {
+        virtual size_t countBuffers();
+        virtual IOMX::buffer_id bufferIDAt(size_t index) const;
+        virtual sp<MediaCodecBuffer> bufferAt(size_t index) const;
+
+    protected:
+        PortDescription();
+
+    private:
+        friend struct MediaFilter;
+
+        Vector<IOMX::buffer_id> mBufferIDs;
+        Vector<sp<MediaCodecBuffer> > mBuffers;
+
+        void addBuffer(IOMX::buffer_id id, const sp<MediaCodecBuffer> &buffer);
+
+        DISALLOW_EVIL_CONSTRUCTORS(PortDescription);
+    };
 
 protected:
     virtual ~MediaFilter();
@@ -112,8 +129,6 @@ private:
 
     sp<SimpleFilter> mFilter;
     sp<GraphicBufferListener> mGraphicBufferListener;
-
-    std::shared_ptr<ACodecBufferChannel> mBufferChannel;
 
     // helper functions
     void signalProcessBuffers();
