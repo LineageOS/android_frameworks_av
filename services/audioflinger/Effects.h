@@ -86,10 +86,14 @@ public:
     bool isEnabled() const;
     bool isProcessEnabled() const;
 
-    void        setInBuffer(int16_t *buffer) { mConfig.inputCfg.buffer.s16 = buffer; }
-    int16_t     *inBuffer() { return mConfig.inputCfg.buffer.s16; }
-    void        setOutBuffer(int16_t *buffer) { mConfig.outputCfg.buffer.s16 = buffer; }
-    int16_t     *outBuffer() { return mConfig.outputCfg.buffer.s16; }
+    void        setInBuffer(const sp<EffectBufferHalInterface>& buffer);
+    int16_t     *inBuffer() const {
+        return mInBuffer != 0 ? reinterpret_cast<int16_t*>(mInBuffer->ptr()) : NULL;
+    }
+    void        setOutBuffer(const sp<EffectBufferHalInterface>& buffer);
+    int16_t     *outBuffer() const {
+        return mOutBuffer != 0 ? reinterpret_cast<int16_t*>(mOutBuffer->ptr()) : NULL;
+    }
     void        setChain(const wp<EffectChain>& chain) { mChain = chain; }
     void        setThread(const wp<ThreadBase>& thread) { mThread = thread; }
     const wp<ThreadBase>& thread() { return mThread; }
@@ -153,6 +157,8 @@ mutable Mutex               mLock;      // mutex for process, commands and handl
     const effect_descriptor_t mDescriptor;// effect descriptor received from effect engine
     effect_config_t     mConfig;    // input and output audio configuration
     sp<EffectHalInterface> mEffectInterface; // Effect module HAL
+    sp<EffectBufferHalInterface> mInBuffer;  // Buffers for interacting with HAL
+    sp<EffectBufferHalInterface> mOutBuffer;
     status_t            mStatus;    // initialization status
     effect_state        mState;     // current activation state
     Vector<EffectHandle *> mHandles;    // list of client handles
@@ -301,18 +307,17 @@ public:
     void setMode_l(audio_mode_t mode);
     void setAudioSource_l(audio_source_t source);
 
-    void setInBuffer(int16_t *buffer, bool ownsBuffer = false) {
+    void setInBuffer(const sp<EffectBufferHalInterface>& buffer) {
         mInBuffer = buffer;
-        mOwnInBuffer = ownsBuffer;
     }
     int16_t *inBuffer() const {
-        return mInBuffer;
+        return mInBuffer != 0 ? reinterpret_cast<int16_t*>(mInBuffer->ptr()) : NULL;
     }
-    void setOutBuffer(int16_t *buffer) {
+    void setOutBuffer(const sp<EffectBufferHalInterface>& buffer) {
         mOutBuffer = buffer;
     }
     int16_t *outBuffer() const {
-        return mOutBuffer;
+        return mOutBuffer != 0 ? reinterpret_cast<int16_t*>(mOutBuffer->ptr()) : NULL;
     }
 
     void incTrackCnt() { android_atomic_inc(&mTrackCnt); }
@@ -394,8 +399,8 @@ protected:
     mutable  Mutex mLock;        // mutex protecting effect list
              Vector< sp<EffectModule> > mEffects; // list of effect modules
              audio_session_t mSessionId; // audio session ID
-             int16_t *mInBuffer;         // chain input buffer
-             int16_t *mOutBuffer;        // chain output buffer
+             sp<EffectBufferHalInterface> mInBuffer;  // chain input buffer
+             sp<EffectBufferHalInterface> mOutBuffer; // chain output buffer
 
     // 'volatile' here means these are accessed with atomic operations instead of mutex
     volatile int32_t mActiveTrackCnt;    // number of active tracks connected
@@ -403,7 +408,6 @@ protected:
 
              int32_t mTailBufferCount;   // current effect tail buffer count
              int32_t mMaxTailBuffers;    // maximum effect tail buffers
-             bool mOwnInBuffer;          // true if the chain owns its input buffer
              int mVolumeCtrlIdx;         // index of insert effect having control over volume
              uint32_t mLeftVolume;       // previous volume on left channel
              uint32_t mRightVolume;      // previous volume on right channel

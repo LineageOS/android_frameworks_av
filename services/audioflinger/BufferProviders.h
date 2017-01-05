@@ -28,6 +28,7 @@
 
 namespace android {
 
+class EffectBufferHalInterface;
 class EffectHalInterface;
 class EffectsFactoryHalInterface;
 
@@ -108,6 +109,8 @@ public:
 protected:
     sp<EffectsFactoryHalInterface> mEffectsFactory;
     sp<EffectHalInterface> mDownmixInterface;
+    sp<EffectBufferHalInterface> mInBuffer;
+    sp<EffectBufferHalInterface> mOutBuffer;
     effect_config_t    mDownmixConfig;
 
     // effect descriptor for the downmixer used by the mixer

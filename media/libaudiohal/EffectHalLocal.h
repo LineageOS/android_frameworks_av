@@ -25,14 +25,18 @@ namespace android {
 class EffectHalLocal : public EffectHalInterface
 {
   public:
-    // Effect process function. Takes input samples as specified
-    // in input buffer descriptor and output processed samples as specified
-    // in output buffer descriptor.
-    virtual status_t process(audio_buffer_t *inBuffer, audio_buffer_t *outBuffer);
+    // Set the input buffer.
+    virtual status_t setInBuffer(const sp<EffectBufferHalInterface>& buffer);
+
+    // Set the output buffer.
+    virtual status_t setOutBuffer(const sp<EffectBufferHalInterface>& buffer);
+
+    // Effect process function.
+    virtual status_t process();
 
     // Process reverse stream function. This function is used to pass
     // a reference stream to the effect engine.
-    virtual status_t processReverse(audio_buffer_t *inBuffer, audio_buffer_t *outBuffer);
+    virtual status_t processReverse();
 
     // Send a command and receive a response to/from effect engine.
     virtual status_t command(uint32_t cmdCode, uint32_t cmdSize, void *pCmdData,
@@ -41,10 +45,15 @@ class EffectHalLocal : public EffectHalInterface
     // Returns the effect descriptor.
     virtual status_t getDescriptor(effect_descriptor_t *pDescriptor);
 
+    // Free resources on the remote side.
+    virtual status_t close();
+
     effect_handle_t handle() const { return mHandle; }
 
   private:
     effect_handle_t mHandle;
+    sp<EffectBufferHalInterface> mInBuffer;
+    sp<EffectBufferHalInterface> mOutBuffer;
 
     friend class EffectsFactoryHalLocal;
 

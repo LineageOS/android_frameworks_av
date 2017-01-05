@@ -188,6 +188,7 @@ ssize_t AudioFlinger::EffectModule::removeHandle_l(EffectHandle *handle)
     // this object is released which can happen after next process is called.
     if (mHandles.size() == 0 && !mPinned) {
         mState = DESTROYED;
+        mEffectInterface->close();
     }
 
     return mHandles.size();
@@ -275,9 +276,7 @@ void AudioFlinger::EffectModule::process()
 {
     Mutex::Autolock _l(mLock);
 
-    if (mState == DESTROYED || mEffectInterface == 0 ||
-            mConfig.inputCfg.buffer.raw == NULL ||
-            mConfig.outputCfg.buffer.raw == NULL) {
+    if (mState == DESTROYED || mEffectInterface == 0 || mInBuffer == 0 || mOutBuffer == 0) {
         return;
     }
 
@@ -291,7 +290,7 @@ void AudioFlinger::EffectModule::process()
         int ret;
         if (isProcessImplemented()) {
             // do the actual processing in the effect engine
-            ret = mEffectInterface->process(&mConfig.inputCfg.buffer, &mConfig.outputCfg.buffer);
+            ret = mEffectInterface->process();
         } else {
             if (mConfig.inputCfg.buffer.raw != mConfig.outputCfg.buffer.raw) {
                 size_t frameCnt = mConfig.inputCfg.buffer.frameCount * FCC_2;  //always stereo here
@@ -409,6 +408,12 @@ status_t AudioFlinger::EffectModule::configure()
     mConfig.outputCfg.mask = EFFECT_CONFIG_ALL;
     mConfig.inputCfg.buffer.frameCount = thread->frameCount();
     mConfig.outputCfg.buffer.frameCount = mConfig.inputCfg.buffer.frameCount;
+    if (mInBuffer != 0) {
+        mInBuffer->setFrameCount(mConfig.inputCfg.buffer.frameCount);
+    }
+    if (mOutBuffer != 0) {
+        mOutBuffer->setFrameCount(mConfig.outputCfg.buffer.frameCount);
+    }
 
     ALOGV("configure() %p thread %p buffer %p framecount %zu",
             this, thread.get(), mConfig.inputCfg.buffer.raw, mConfig.inputCfg.buffer.frameCount);
@@ -568,6 +573,7 @@ void AudioFlinger::EffectModule::release_l()
     if (mEffectInterface != 0) {
         remove_effect_from_hal_l();
         // release effect engine
+        mEffectInterface->close();
         mEffectInterface.clear();
     }
 }
@@ -760,6 +766,28 @@ bool AudioFlinger::EffectModule::isProcessEnabled() const
     default:
         return false;
     }
+}
+
+void AudioFlinger::EffectModule::setInBuffer(const sp<EffectBufferHalInterface>& buffer) {
+    if (buffer != 0) {
+        mConfig.inputCfg.buffer.raw = buffer->audioBuffer()->raw;
+        buffer->setFrameCount(mConfig.inputCfg.buffer.frameCount);
+    } else {
+        mConfig.inputCfg.buffer.raw = NULL;
+    }
+    mInBuffer = buffer;
+    mEffectInterface->setInBuffer(buffer);
+}
+
+void AudioFlinger::EffectModule::setOutBuffer(const sp<EffectBufferHalInterface>& buffer) {
+    if (buffer != 0) {
+        mConfig.outputCfg.buffer.raw = buffer->audioBuffer()->raw;
+        buffer->setFrameCount(mConfig.outputCfg.buffer.frameCount);
+    } else {
+        mConfig.outputCfg.buffer.raw = NULL;
+    }
+    mOutBuffer = buffer;
+    mEffectInterface->setOutBuffer(buffer);
 }
 
 status_t AudioFlinger::EffectModule::setVolume(uint32_t *left, uint32_t *right, bool controller)
@@ -1482,7 +1510,7 @@ void AudioFlinger::EffectHandle::dumpToBuffer(char* buffer, size_t size)
 AudioFlinger::EffectChain::EffectChain(ThreadBase *thread,
                                         audio_session_t sessionId)
     : mThread(thread), mSessionId(sessionId), mActiveTrackCnt(0), mTrackCnt(0), mTailBufferCount(0),
-      mOwnInBuffer(false), mVolumeCtrlIdx(-1), mLeftVolume(UINT_MAX), mRightVolume(UINT_MAX),
+      mVolumeCtrlIdx(-1), mLeftVolume(UINT_MAX), mRightVolume(UINT_MAX),
       mNewLeftVolume(UINT_MAX), mNewRightVolume(UINT_MAX)
 {
     mStrategy = AudioSystem::getStrategyForStream(AUDIO_STREAM_MUSIC);
@@ -1495,9 +1523,6 @@ AudioFlinger::EffectChain::EffectChain(ThreadBase *thread,
 
 AudioFlinger::EffectChain::~EffectChain()
 {
-    if (mOwnInBuffer) {
-        delete[] mInBuffer;
-    }
 }
 
 // getEffectFromDesc_l() must be called with ThreadBase::mLock held
@@ -1562,7 +1587,8 @@ void AudioFlinger::EffectChain::clearInputBuffer_l(const sp<ThreadBase>& thread)
     // (4 bytes frame size)
     const size_t frameSize =
             audio_bytes_per_sample(AUDIO_FORMAT_PCM_16_BIT) * min(FCC_2, thread->channelCount());
-    memset(mInBuffer, 0, thread->frameCount() * frameSize);
+    memset(mInBuffer->audioBuffer()->raw, 0, thread->frameCount() * frameSize);
+    mInBuffer->commit();
 }
 
 // Must be called with EffectChain::mLock locked
@@ -1600,9 +1626,15 @@ void AudioFlinger::EffectChain::process_l()
 
     size_t size = mEffects.size();
     if (doProcess) {
+        // Only the input and output buffers of the chain can be external,
+        // and 'update' / 'commit' do nothing for allocated buffers, thus
+        // it's not needed to consider any other buffers here.
+        mInBuffer->update();
+        mOutBuffer->update();
         for (size_t i = 0; i < size; i++) {
             mEffects[i]->process();
         }
+        mOutBuffer->commit();
     }
     bool doResetVolume = false;
     for (size_t i = 0; i < size; i++) {
@@ -1662,9 +1694,11 @@ status_t AudioFlinger::EffectChain::addEffect_ll(const sp<EffectModule>& effect)
         // accumulation stage. Saturation is done in EffectModule::process() before
         // calling the process in effect engine
         size_t numSamples = thread->frameCount();
-        int32_t *buffer = new int32_t[numSamples];
-        memset(buffer, 0, numSamples * sizeof(int32_t));
-        effect->setInBuffer((int16_t *)buffer);
+        sp<EffectBufferHalInterface> halBuffer;
+        status_t result = EffectBufferHalInterface::allocate(
+                numSamples * sizeof(int32_t), &halBuffer);
+        if (result != OK) return result;
+        effect->setInBuffer(halBuffer);
         // auxiliary effects output samples to chain input buffer for further processing
         // by insert effects
         effect->setOutBuffer(mInBuffer);
@@ -1775,9 +1809,7 @@ size_t AudioFlinger::EffectChain::removeEffect_l(const sp<EffectModule>& effect,
                 mEffects[i]->release_l();
             }
 
-            if (type == EFFECT_FLAG_TYPE_AUXILIARY) {
-                delete[] effect->inBuffer();
-            } else {
+            if (type != EFFECT_FLAG_TYPE_AUXILIARY) {
                 if (i == size - 1 && i != 0) {
                     mEffects[i - 1]->setOutBuffer(mOutBuffer);
                     mEffects[i - 1]->configure();
@@ -1922,8 +1954,8 @@ void AudioFlinger::EffectChain::dump(int fd, const Vector<String16>& args)
 
         result.append("\tIn buffer   Out buffer   Active tracks:\n");
         snprintf(buffer, SIZE, "\t%p  %p   %d\n",
-                mInBuffer,
-                mOutBuffer,
+                mInBuffer->audioBuffer(),
+                mOutBuffer->audioBuffer(),
                 mActiveTrackCnt);
         result.append(buffer);
         write(fd, result.string(), result.size());

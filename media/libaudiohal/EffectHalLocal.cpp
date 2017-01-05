@@ -34,12 +34,27 @@ EffectHalLocal::~EffectHalLocal() {
     mHandle = 0;
 }
 
-status_t EffectHalLocal::process(audio_buffer_t *inBuffer, audio_buffer_t *outBuffer) {
-    return (*mHandle)->process(mHandle, inBuffer, outBuffer);
+status_t EffectHalLocal::setInBuffer(const sp<EffectBufferHalInterface>& buffer) {
+    mInBuffer = buffer;
+    return OK;
 }
 
-status_t EffectHalLocal::processReverse(audio_buffer_t *inBuffer, audio_buffer_t *outBuffer) {
-    return (*mHandle)->process_reverse(mHandle, inBuffer, outBuffer);
+status_t EffectHalLocal::setOutBuffer(const sp<EffectBufferHalInterface>& buffer) {
+    mOutBuffer = buffer;
+    return OK;
+}
+
+status_t EffectHalLocal::process() {
+    return (*mHandle)->process(mHandle, mInBuffer->audioBuffer(), mOutBuffer->audioBuffer());
+}
+
+status_t EffectHalLocal::processReverse() {
+    if ((*mHandle)->process_reverse != NULL) {
+        return (*mHandle)->process_reverse(
+                mHandle, mInBuffer->audioBuffer(), mOutBuffer->audioBuffer());
+    } else {
+        return INVALID_OPERATION;
+    }
 }
 
 status_t EffectHalLocal::command(uint32_t cmdCode, uint32_t cmdSize, void *pCmdData,
@@ -49,6 +64,10 @@ status_t EffectHalLocal::command(uint32_t cmdCode, uint32_t cmdSize, void *pCmdD
 
 status_t EffectHalLocal::getDescriptor(effect_descriptor_t *pDescriptor) {
     return (*mHandle)->get_descriptor(mHandle, pDescriptor);
+}
+
+status_t EffectHalLocal::close() {
+    return OK;
 }
 
 } // namespace android
