@@ -24,4 +24,5 @@ ndk_library {
     name: "liboboe.ndk",
     symbol_file: "liboboe.map.txt",
     first_version: "26",
+    unversioned_until: "current",
 }
