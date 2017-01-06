@@ -342,7 +342,7 @@ status_t StreamOutHalHidl::prepareForWriting(size_t bufferSize) {
                     }
                 }
             });
-    if (!ret.getStatus().isOk() || retval != Result::OK) {
+    if (!ret.isOk() || retval != Result::OK) {
         return processReturn("prepareForWriting", ret, retval);
     }
     if (!tempDataMQ || !tempDataMQ->isValid() || !tempStatusMQ || !tempStatusMQ->isValid()
@@ -456,7 +456,7 @@ status_t StreamOutHalHidl::getPresentationPosition(uint64_t *frames, struct time
                     timestamp->tv_nsec = hidlTimeStamp.tvNSec;
                 }
             });
-    if (ret.getStatus().isOk() && retval == Result::NOT_SUPPORTED) {
+    if (ret.isOk() && retval == Result::NOT_SUPPORTED) {
         mGetPresentationPositionNotSupported = true;
     }
     return processReturn("getPresentationPosition", ret, retval);
@@ -570,7 +570,7 @@ status_t StreamInHalHidl::prepareForReading(size_t bufferSize) {
                     }
                 }
             });
-    if (!ret.getStatus().isOk() || retval != Result::OK) {
+    if (!ret.isOk() || retval != Result::OK) {
         return processReturn("prepareForReading", ret, retval);
     }
     if (!tempDataMQ || !tempDataMQ->isValid() || !tempStatusMQ || !tempStatusMQ->isValid()

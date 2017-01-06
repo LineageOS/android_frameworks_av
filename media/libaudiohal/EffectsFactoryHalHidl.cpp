@@ -43,7 +43,7 @@ bool EffectsFactoryHalInterface::isNullUuid(const effect_uuid_t *pEffectUuid) {
     return EffectIsNullUuid(pEffectUuid);
 }
 
-EffectsFactoryHalHidl::EffectsFactoryHalHidl() {
+EffectsFactoryHalHidl::EffectsFactoryHalHidl() : ConversionHelperHidl("EffectsFactory"){
     mEffectsFactory = IEffectsFactory::getService("audio_effects_factory");
 }
 
@@ -60,12 +60,11 @@ status_t EffectsFactoryHalHidl::queryAllDescriptors() {
                     mLastDescriptors = result;
                 }
             });
-    if (ret.getStatus().isOk()) {
+    if (ret.isOk()) {
         return retval == Result::OK ? OK : NO_INIT;
     }
     mLastDescriptors.resize(0);
-    ConversionHelperHidl::crashIfHalIsDead(ret.getStatus());
-    return ret.getStatus().transactionError();
+    return processReturn(__FUNCTION__, ret);
 }
 
 status_t EffectsFactoryHalHidl::queryNumberEffects(uint32_t *pNumEffects) {
@@ -104,13 +103,12 @@ status_t EffectsFactoryHalHidl::getDescriptor(
                     EffectHalHidl::effectDescriptorToHal(result, pDescriptor);
                 }
             });
-    if (ret.getStatus().isOk()) {
+    if (ret.isOk()) {
         if (retval == Result::OK) return OK;
         else if (retval == Result::INVALID_ARGUMENTS) return NAME_NOT_FOUND;
         else return NO_INIT;
     }
-    ConversionHelperHidl::crashIfHalIsDead(ret.getStatus());
-    return ret.getStatus().transactionError();
+    return processReturn(__FUNCTION__, ret);
 }
 
 status_t EffectsFactoryHalHidl::createEffect(
@@ -128,13 +126,12 @@ status_t EffectsFactoryHalHidl::createEffect(
                     *effect = new EffectHalHidl(result, effectId);
                 }
             });
-    if (ret.getStatus().isOk()) {
+    if (ret.isOk()) {
         if (retval == Result::OK) return OK;
         else if (retval == Result::INVALID_ARGUMENTS) return NAME_NOT_FOUND;
         else return NO_INIT;
     }
-    ConversionHelperHidl::crashIfHalIsDead(ret.getStatus());
-    return ret.getStatus().transactionError();
+    return processReturn(__FUNCTION__, ret);
 }
 
 status_t EffectsFactoryHalHidl::dumpEffects(int fd) {
@@ -143,8 +140,7 @@ status_t EffectsFactoryHalHidl::dumpEffects(int fd) {
     hidlHandle->data[0] = fd;
     Return<void> ret = mEffectsFactory->debugDump(hidlHandle);
     native_handle_delete(hidlHandle);
-    ConversionHelperHidl::crashIfHalIsDead(ret.getStatus());
-    return ret.getStatus().transactionError();
+    return processReturn(__FUNCTION__, ret);
 }
 
 } // namespace android

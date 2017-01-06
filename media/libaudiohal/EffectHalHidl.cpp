@@ -103,8 +103,7 @@ status_t EffectHalHidl::getDescriptor(effect_descriptor_t *pDescriptor) {
                     effectDescriptorToHal(result, pDescriptor);
                 }
             });
-    ConversionHelperHidl::crashIfHalIsDead(ret.getStatus());
-    return ret.getStatus().isOk() ? analyzeResult(retval) : ret.getStatus().transactionError();
+    return ret.isOk() ? analyzeResult(retval) : UNKNOWN_ERROR;
 }
 
 } // namespace android

@@ -2,7 +2,6 @@
 #define ANDROID_HARDWARE_MEDIA_OMX_V1_0__CONVERSION_H
 
 #include <hidl/MQDescriptor.h>
-#include <hidl/Status.h>
 
 #include <unistd.h>
 #include <vector>
@@ -147,13 +146,13 @@ inline int native_handle_read_fd(native_handle_t const* nh, int index = 0) {
  */
 
 /**
- * \brief Convert `binder::Status` to `hardware::Status`.
+ * \brief Convert `binder::Status` to `Return<void>`.
  *
  * \param[in] l The source `binder::Status`.
- * \return The corresponding `hardware::Status`.
+ * \return The corresponding `Return<void>`.
  */
-// convert: ::android::binder::Status -> ::android::hardware::Status
-inline ::android::hardware::Status toHardwareStatus(
+// convert: ::android::binder::Status -> Return<void>
+inline Return<void> toHardwareStatus(
         ::android::binder::Status const& l) {
     if (l.exceptionCode() == ::android::binder::Status::EX_SERVICE_SPECIFIC) {
         return ::android::hardware::Status::fromServiceSpecificError(
@@ -166,36 +165,17 @@ inline ::android::hardware::Status toHardwareStatus(
 }
 
 /**
- * \brief Convert `hardware::Status` to `binder::Status`.
+ * \brief Convert `Return<void>` to `binder::Status`.
  *
- * \param[in] t The source `hardware::Status`.
+ * \param[in] t The source `Return<void>`.
  * \return The corresponding `binder::Status`.
  */
-// convert: ::android::hardware::Status -> ::android::binder::Status
+// convert: Return<void> -> ::android::binder::Status
 inline ::android::binder::Status toBinderStatus(
-        ::android::hardware::Status const& t) {
-    if (t.exceptionCode() == ::android::hardware::Status::EX_SERVICE_SPECIFIC) {
-        return ::android::binder::Status::fromServiceSpecificError(
-                t.serviceSpecificErrorCode(),
-                t.exceptionMessage());
-    }
+        Return<void> const& t) {
     return ::android::binder::Status::fromExceptionCode(
-            t.exceptionCode(),
-            t.exceptionMessage());
-}
-
-/**
- * \brief Convert `hardware::Return<void>` to `binder::Status`.
- *
- * \param[in] t The source `hardware::Return<void>`.
- * \return The corresponding `binder::Status`.
- *
- * This function simply calls `toBinderStatus(::android::hardware::Status
- * const&)`.
- */
-// convert: ::android::hardware::Return<void> -> ::android::binder::Status
-inline ::android::binder::Status toBinderStatus(Return<void> const& t) {
-    return toBinderStatus(t.getStatus());
+            t.isOk() ? OK : UNKNOWN_ERROR,
+            t.description().c_str());
 }
 
 /**
@@ -215,8 +195,7 @@ inline ::android::binder::Status toBinderStatus(Return<void> const& t) {
  */
 // convert: Status -> status_t
 inline status_t toStatusT(Return<Status> const& t) {
-    return t.isOk() ? static_cast<status_t>(static_cast<Status>(t)) :
-            t.getStatus().transactionError();
+    return t.isOk() ? static_cast<status_t>(static_cast<Status>(t)) : UNKNOWN_ERROR;
 }
 
 /**
@@ -227,7 +206,7 @@ inline status_t toStatusT(Return<Status> const& t) {
  */
 // convert: Return<void> -> status_t
 inline status_t toStatusT(Return<void> const& t) {
-    return t.getStatus().transactionError();
+    return t.isOk() ? OK : UNKNOWN_ERROR;
 }
 
 /**

@@ -30,9 +30,6 @@ using ::android::hardware::hidl_vec;
 namespace android {
 
 class ConversionHelperHidl {
-  public:
-    static void crashIfHalIsDead(const Status& status);
-
   protected:
     static status_t keysFromHal(const String8& keys, hidl_vec<hidl_string> *hidlKeys);
     static status_t parametersFromHal(const String8& kvPairs, hidl_vec<ParameterValue> *hidlParams);
@@ -40,18 +37,22 @@ class ConversionHelperHidl {
 
     ConversionHelperHidl(const char* className);
 
-    status_t processReturn(const char* funcName, const Return<void>& ret) {
-        return processReturn(funcName, ret.getStatus());
-    }
-
     template<typename R, typename T>
     status_t processReturn(const char* funcName, const Return<R>& ret, T *retval) {
-        if (ret.getStatus().isOk()) {
+        if (ret.isOk()) {
             // This way it also works for enum class to unscoped enum conversion.
             *retval = static_cast<T>(static_cast<R>(ret));
             return OK;
         }
-        return processReturn(funcName, ret.getStatus());
+        return processReturn(funcName, ret);
+    }
+
+    template<typename T>
+    status_t processReturn(const char* funcName, const Return<T>& ret) {
+        if (!ret.isOk()) {
+            emitError(funcName, ret.description().c_str());
+        }
+        return ret.isOk() ? OK : UNKNOWN_ERROR;
     }
 
     status_t processReturn(const char* funcName, const Return<hardware::audio::V2_0::Result>& ret) {
@@ -61,16 +62,21 @@ class ConversionHelperHidl {
     template<typename T>
     status_t processReturn(
             const char* funcName, const Return<T>& ret, hardware::audio::V2_0::Result retval) {
-        return processReturn(funcName, ret.getStatus(), retval);
+        const status_t st = ret.isOk() ? analyzeResult(retval) : UNKNOWN_ERROR;
+        if (!ret.isOk()) {
+            emitError(funcName, ret.description().c_str());
+        } else if (st) {
+            emitError(funcName, strerror(st));
+        }
+        return st;
     }
 
   private:
     const char* mClassName;
 
     static status_t analyzeResult(const hardware::audio::V2_0::Result& result);
-    status_t processReturn(const char* funcName, const Status& status);
-    status_t processReturn(
-            const char* funcName, const Status& status, hardware::audio::V2_0::Result retval);
+
+    void emitError(const char* funcName, const char* description);
 };
 
 }  // namespace android

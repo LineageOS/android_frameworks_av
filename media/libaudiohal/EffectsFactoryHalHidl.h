@@ -27,7 +27,7 @@ using ::android::hardware::audio::effect::V2_0::EffectDescriptor;
 using ::android::hardware::audio::effect::V2_0::IEffectsFactory;
 using ::android::hardware::hidl_vec;
 
-class EffectsFactoryHalHidl : public EffectsFactoryHalInterface
+class EffectsFactoryHalHidl : public EffectsFactoryHalInterface, public ConversionHelperHidl
 {
   public:
     // Returns the number of different effects in all loaded libraries.

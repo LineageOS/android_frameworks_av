@@ -45,8 +45,6 @@ class RadioHalHidl : public RadioInterface
 public:
                     RadioHalHidl(radio_class_t classId);
 
-        static void crashIfHalIsDead(const Status& status);
-
                     // RadioInterface
         virtual int getProperties(radio_hal_properties_t *properties);
         virtual int openTuner(const radio_hal_band_config_t *config,
@@ -88,7 +86,6 @@ public:
 
                     void     onCallback(radio_hal_event_t *halEvent);
                     void     handleHwFailure();
-                    status_t checkHidlStatus(Status hidlStatus);
 
             sp<ITuner> mHalTuner;
             sp<TunerCallbackInterface>  mCallback;

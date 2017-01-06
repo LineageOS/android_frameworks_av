@@ -78,13 +78,12 @@ status_t DevicesFactoryHalHidl::openDevice(const char *name, sp<DeviceHalInterfa
                     *device = new DeviceHalHidl(result);
                 }
             });
-    if (ret.getStatus().isOk()) {
+    if (ret.isOk()) {
         if (retval == Result::OK) return OK;
         else if (retval == Result::INVALID_ARGUMENTS) return BAD_VALUE;
         else return NO_INIT;
     }
-    ConversionHelperHidl::crashIfHalIsDead(ret.getStatus());
-    return ret.getStatus().transactionError();
+    return UNKNOWN_ERROR;
 }
 
 } // namespace android

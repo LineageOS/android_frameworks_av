@@ -39,11 +39,6 @@ sp<RadioInterface> RadioInterface::connectModule(radio_class_t classId)
     return new RadioHalHidl(classId);
 }
 
-void RadioHalHidl::crashIfHalIsDead(const Status& status) {
-    LOG_ALWAYS_FATAL_IF(
-            status.transactionError() == DEAD_OBJECT, "HAL server crashed, need to restart");
-}
-
 int RadioHalHidl::getProperties(radio_hal_properties_t *properties)
 {
     ALOGV("%s IN", __FUNCTION__);
@@ -52,7 +47,7 @@ int RadioHalHidl::getProperties(radio_hal_properties_t *properties)
         return -ENODEV;
     }
     Properties halProperties;
-    Result halResult;
+    Result halResult = Result::NOT_INITIALIZED;
     Return<void> hidlReturn =
             module->getProperties([&](Result result, const Properties& properties) {
                     halResult = result;
@@ -61,7 +56,6 @@ int RadioHalHidl::getProperties(radio_hal_properties_t *properties)
                     }
                 });
 
-    crashIfHalIsDead(hidlReturn.getStatus());
     if (halResult == Result::OK) {
         HidlUtils::convertPropertiesFromHal(properties, &halProperties);
     }
@@ -80,7 +74,7 @@ int RadioHalHidl::openTuner(const radio_hal_band_config_t *config,
     sp<Tuner> tunerImpl = new Tuner(callback, this);
 
     BandConfig halConfig;
-    Result halResult;
+    Result halResult = Result::NOT_INITIALIZED;
     sp<ITuner> halTuner;
 
     HidlUtils::convertBandConfigToHal(&halConfig, config);
@@ -93,7 +87,6 @@ int RadioHalHidl::openTuner(const radio_hal_band_config_t *config,
                     }
                 });
 
-    crashIfHalIsDead(hidlReturn.getStatus());
     if (halResult == Result::OK) {
         tunerImpl->setHalTuner(halTuner);
         tuner = tunerImpl;
@@ -154,7 +147,6 @@ int RadioHalHidl::Tuner::setConfiguration(const radio_hal_band_config_t *config)
     HidlUtils::convertBandConfigToHal(&halConfig, config);
 
     Return<Result> hidlResult = mHalTuner->setConfiguration(halConfig);
-    checkHidlStatus(hidlResult.getStatus());
     return HidlUtils::convertHalResult(hidlResult);
 }
 
@@ -173,8 +165,7 @@ int RadioHalHidl::Tuner::getConfiguration(radio_hal_band_config_t *config)
                         halConfig = config;
                     }
                 });
-    status_t status = checkHidlStatus(hidlReturn.getStatus());
-    if (status == NO_ERROR && halResult == Result::OK) {
+    if (hidlReturn.isOk() && halResult == Result::OK) {
         HidlUtils::convertBandConfigFromHal(config, &halConfig);
     }
     return HidlUtils::convertHalResult(halResult);
@@ -188,7 +179,6 @@ int RadioHalHidl::Tuner::scan(radio_direction_t direction, bool skip_sub_channel
     }
     Return<Result> hidlResult =
             mHalTuner->scan(static_cast<Direction>(direction), skip_sub_channel);
-    checkHidlStatus(hidlResult.getStatus());
     return HidlUtils::convertHalResult(hidlResult);
 }
 
@@ -200,7 +190,6 @@ int RadioHalHidl::Tuner::step(radio_direction_t direction, bool skip_sub_channel
     }
     Return<Result> hidlResult =
             mHalTuner->step(static_cast<Direction>(direction), skip_sub_channel);
-    checkHidlStatus(hidlResult.getStatus());
     return HidlUtils::convertHalResult(hidlResult);
 }
 
@@ -212,7 +201,6 @@ int RadioHalHidl::Tuner::tune(unsigned int channel, unsigned int sub_channel)
     }
     Return<Result> hidlResult =
             mHalTuner->tune(channel, sub_channel);
-    checkHidlStatus(hidlResult.getStatus());
     return HidlUtils::convertHalResult(hidlResult);
 }
 
@@ -223,7 +211,6 @@ int RadioHalHidl::Tuner::cancel()
         return -ENODEV;
     }
     Return<Result> hidlResult = mHalTuner->cancel();
-    checkHidlStatus(hidlResult.getStatus());
     return HidlUtils::convertHalResult(hidlResult);
 }
 
@@ -245,8 +232,7 @@ int RadioHalHidl::Tuner::getProgramInformation(radio_program_info_t *info)
                 halInfo = info;
             }
         });
-    status_t status = checkHidlStatus(hidlReturn.getStatus());
-    if (status == NO_ERROR && halResult == Result::OK) {
+    if (hidlReturn.isOk() && halResult == Result::OK) {
         HidlUtils::convertProgramInfoFromHal(info, &halInfo);
     }
     return HidlUtils::convertHalResult(halResult);
@@ -366,16 +352,6 @@ void RadioHalHidl::Tuner::handleHwFailure()
     event.type = RADIO_EVENT_HW_FAILURE;
     onCallback(&event);
     mHalTuner.clear();
-}
-
-status_t RadioHalHidl::Tuner::checkHidlStatus(Status hidlStatus)
-{
-    status_t status = hidlStatus.transactionError();
-    if (status == DEAD_OBJECT) {
-        handleHwFailure();
-    }
-    RadioHalHidl::crashIfHalIsDead(hidlStatus);
-    return status;
 }
 
 void RadioHalHidl::Tuner::onCallback(radio_hal_event_t *halEvent)
