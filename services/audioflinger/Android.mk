@@ -74,6 +74,10 @@ endif
 endif
 #QTI Resampler
 
+ifeq ($(BOARD_USES_LEGACY_AUDIO_BLOB),true)
+LOCAL_CFLAGS += -DLEGACY_AUDIO_BLOB
+endif
+
 LOCAL_MODULE:= libaudioflinger
 
 LOCAL_SRC_FILES += \
