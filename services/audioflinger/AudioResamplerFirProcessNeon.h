@@ -155,8 +155,8 @@ static inline void ProcessNeonIntrinsic(int32_t* out,
             accum2 = vmlal_s16(accum2, vget_low_s16(negSamp.val[1]), vget_low_s16(negCoef));
             accum2 = vmlal_s16(accum2, vget_high_s16(negSamp.val[1]), vget_high_s16(negCoef));
             sP -= 16;
-        }
         } break;
+        }
     } while (count -= 8);
 
     // multiply by volume and save
