@@ -106,7 +106,7 @@ void testBufferIncrement(size_t channels, bool useFloat,
     // set up the reference run
     std::vector<size_t> refIncr;
     refIncr.push_back(outputFrames);
-    void* reference = malloc(outputSize);
+    void* reference = calloc(outputFrames, outputFrameSize);
     resample(channels, reference, outputFrames, refIncr, &provider, resampler);
 
     provider.reset();
@@ -127,7 +127,7 @@ void testBufferIncrement(size_t channels, bool useFloat,
     outIncr.push_back(1);
     outIncr.push_back(2);
     outIncr.push_back(3);
-    void* test = malloc(outputSize);
+    void* test = calloc(outputFrames, outputFrameSize);
     inputIncr.push_back(1);
     inputIncr.push_back(3);
     provider.setIncr(inputIncr);
@@ -194,7 +194,7 @@ void testStopbandDownconversion(size_t channels,
     // set up the reference run
     std::vector<size_t> refIncr;
     refIncr.push_back(outputFrames);
-    void* reference = malloc(outputSize);
+    void* reference = calloc(outputFrames, outputFrameSize);
     resample(channels, reference, outputFrames, refIncr, &provider, resampler);
 
     TO *out = reinterpret_cast<TO *>(reference);
