@@ -2623,14 +2623,7 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
         info->mData->meta()->setInt32("csd", true);
     }
 
-    // synchronization boundary for getBufferAndFormat
-    sp<MediaCodecBuffer> buffer;
-    {
-        Mutex::Autolock al(mBufferLock);
-        info->mOwnedByClient = false;
-        buffer = info->mData;
-        info->mData.clear();
-    }
+    sp<MediaCodecBuffer> buffer = info->mData;
     status_t err = OK;
     if (mCrypto != NULL) {
         AString *errorDetailMsg;
@@ -2648,6 +2641,13 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
                 errorDetailMsg);
     } else {
         err = mBufferChannel->queueInputBuffer(buffer);
+    }
+
+    if (err == OK) {
+        // synchronization boundary for getBufferAndFormat
+        Mutex::Autolock al(mBufferLock);
+        info->mOwnedByClient = false;
+        info->mData.clear();
     }
 
     return err;
