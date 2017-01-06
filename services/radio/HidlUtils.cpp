@@ -122,8 +122,7 @@ void HidlUtils::convertBandConfigFromHal(radio_hal_band_config_t *config,
 
 //static
 void HidlUtils::convertProgramInfoFromHal(radio_program_info_t *info,
-                                          const ProgramInfo *halInfo,
-                                          bool withMetadata)
+                                          const ProgramInfo *halInfo)
 {
     info->channel = halInfo->channel;
     info->sub_channel = halInfo->subChannel;
@@ -131,10 +130,8 @@ void HidlUtils::convertProgramInfoFromHal(radio_program_info_t *info,
     info->stereo = halInfo->stereo;
     info->digital = halInfo->digital;
     info->signal_strength = halInfo->signalStrength;
-    if (withMetadata && halInfo->metadata.size() != 0) {
-        convertMetaDataFromHal(&info->metadata, halInfo->metadata,
-                               halInfo->channel, halInfo->subChannel);
-    }
+    convertMetaDataFromHal(&info->metadata, halInfo->metadata,
+                           halInfo->channel, halInfo->subChannel);
 }
 
 //static

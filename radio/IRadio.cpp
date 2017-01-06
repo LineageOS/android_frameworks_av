@@ -172,16 +172,11 @@ public:
     virtual status_t getProgramInformation(struct radio_program_info *info)
     {
         Parcel data, reply;
-        if (info == NULL) {
+        if (info == nullptr || info->metadata == nullptr) {
             return BAD_VALUE;
         }
         radio_metadata_t *metadata = info->metadata;
         data.writeInterfaceToken(IRadio::getInterfaceDescriptor());
-        if (metadata != NULL) {
-            data.writeUint32(1);
-        } else {
-            data.writeUint32(0);
-        }
         status_t status = remote()->transact(GET_PROGRAM_INFORMATION, data, &reply);
         if (status == NO_ERROR) {
             status = (status_t)reply.readInt32();
@@ -190,13 +185,13 @@ public:
                 // restore local metadata pointer
                 info->metadata = metadata;
 
-                uint32_t metatataSize = reply.readUint32();
-                if ((metadata != NULL) && (metatataSize != 0)) {
-                    radio_metadata_t *newMetadata = (radio_metadata_t *)malloc(metatataSize);
+                uint32_t metadataSize = reply.readUint32();
+                if (metadataSize != 0) {
+                    radio_metadata_t *newMetadata = (radio_metadata_t *)malloc(metadataSize);
                     if (newMetadata == NULL) {
                         return NO_MEMORY;
                     }
-                    reply.read(newMetadata, metatataSize);
+                    reply.read(newMetadata, metadataSize);
                     status = radio_metadata_add_metadata(&info->metadata, newMetadata);
                     free(newMetadata);
                 }
@@ -306,21 +301,17 @@ status_t BnRadio::onTransact(
             CHECK_INTERFACE(IRadio, data, reply);
             struct radio_program_info info;
             status_t status;
-            // query metadata only if requested by remote side
-            if (data.readUint32() == 1) {
-                status = radio_metadata_allocate(&info.metadata, 0, 0);
-                if (status != NO_ERROR) {
-                    return status;
-                }
-            } else {
-                info.metadata = NULL;
+
+            status = radio_metadata_allocate(&info.metadata, 0, 0);
+            if (status != NO_ERROR) {
+                return status;
             }
             status = getProgramInformation(&info);
 
             reply->writeInt32(status);
             if (status == NO_ERROR) {
                 reply->write(&info, sizeof(struct radio_program_info));
-                if ((info.metadata != NULL) && (radio_metadata_get_count(info.metadata) > 0)) {
+                if (radio_metadata_get_count(info.metadata) > 0) {
                     size_t size = radio_metadata_get_size(info.metadata);
                     reply->writeUint32((uint32_t)size);
                     reply->write(info.metadata, size);
