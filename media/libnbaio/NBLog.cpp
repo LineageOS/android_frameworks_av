@@ -23,7 +23,7 @@
 #include <string.h>
 #include <time.h>
 #include <new>
-#include <cutils/atomic.h>
+#include <audio_utils/roundup.h>
 #include <media/nbaio/NBLog.h>
 #include <utils/Log.h>
 #include <utils/String8.h>
@@ -74,19 +74,30 @@ size_t NBLog::Timeline::sharedSize(size_t size)
 // ---------------------------------------------------------------------------
 
 NBLog::Writer::Writer()
-    : mSize(0), mShared(NULL), mRear(0), mEnabled(false)
+    : mShared(NULL), mFifo(NULL), mFifoWriter(NULL), mEnabled(false)
 {
 }
 
-NBLog::Writer::Writer(size_t size, void *shared)
-    : mSize(roundup(size)), mShared((Shared *) shared), mRear(0), mEnabled(mShared != NULL)
+NBLog::Writer::Writer(void *shared, size_t size)
+    : mShared((Shared *) shared),
+      mFifo(mShared != NULL ?
+        new audio_utils_fifo(size, sizeof(uint8_t),
+            mShared->mBuffer, mShared->mRear, NULL /*throttlesFront*/) : NULL),
+      mFifoWriter(mFifo != NULL ? new audio_utils_fifo_writer(*mFifo) : NULL),
+      mEnabled(mFifoWriter != NULL)
 {
 }
 
-NBLog::Writer::Writer(size_t size, const sp<IMemory>& iMemory)
-    : mSize(roundup(size)), mShared(iMemory != 0 ? (Shared *) iMemory->pointer() : NULL),
-      mIMemory(iMemory), mRear(0), mEnabled(mShared != NULL)
+NBLog::Writer::Writer(const sp<IMemory>& iMemory, size_t size)
+    : Writer(iMemory != 0 ? (Shared *) iMemory->pointer() : NULL, size)
 {
+    mIMemory = iMemory;
+}
+
+NBLog::Writer::~Writer()
+{
+    delete mFifoWriter;
+    delete mFifo;
 }
 
 void NBLog::Writer::log(const char *string)
@@ -95,8 +106,8 @@ void NBLog::Writer::log(const char *string)
         return;
     }
     size_t length = strlen(string);
-    if (length > 255) {
-        length = 255;
+    if (length > Entry::kMaxLength) {
+        length = Entry::kMaxLength;
     }
     log(EVENT_STRING, string, length);
 }
@@ -117,7 +128,7 @@ void NBLog::Writer::logvf(const char *fmt, va_list ap)
     if (!mEnabled) {
         return;
     }
-    char buffer[256];
+    char buffer[Entry::kMaxLength + 1 /*NUL*/];
     int length = vsnprintf(buffer, sizeof(buffer), fmt, ap);
     if (length >= (int) sizeof(buffer)) {
         length = sizeof(buffer) - 1;
@@ -153,7 +164,10 @@ void NBLog::Writer::log(Event event, const void *data, size_t length)
     if (!mEnabled) {
         return;
     }
-    if (data == NULL || length > 255) {
+    if (data == NULL || length > Entry::kMaxLength) {
+        // TODO Perhaps it makes sense to display truncated data or at least a
+        //      message that the data is too long?  The current behavior can create
+        //      a confusion for a programmer debugging their code.
         return;
     }
     switch (event) {
@@ -177,26 +191,16 @@ void NBLog::Writer::log(const NBLog::Entry *entry, bool trusted)
         log(entry->mEvent, entry->mData, entry->mLength);
         return;
     }
-    size_t rear = mRear & (mSize - 1);
-    size_t written = mSize - rear;      // written = number of bytes that have been written so far
-    size_t need = entry->mLength + 3;   // mEvent, mLength, data[length], mLength
-                                        // need = number of bytes remaining to write
-    if (written > need) {
-        written = need;
-    }
-    size_t i;
+    size_t need = entry->mLength + Entry::kOverhead;    // mEvent, mLength, data[length], mLength
+                                                        // need = number of bytes remaining to write
+
     // FIXME optimize this using memcpy for the data part of the Entry.
     // The Entry could have a method copyTo(ptr, offset, size) to optimize the copy.
-    for (i = 0; i < written; ++i) {
-        mShared->mBuffer[rear + i] = entry->readAt(i);
+    uint8_t temp[Entry::kMaxLength + Entry::kOverhead];
+    for (size_t i = 0; i < need; i++) {
+        temp[i] = entry->readAt(i);
     }
-    if (rear + written == mSize && (need -= written) > 0)  {
-        for (i = 0; i < need; ++i) {
-            mShared->mBuffer[i] = entry->readAt(written + i);
-        }
-        written += need;
-    }
-    android_atomic_release_store(mRear += written, &mShared->mRear);
+    mFifoWriter->write(temp, need);
 }
 
 bool NBLog::Writer::isEnabled() const
@@ -218,8 +222,8 @@ NBLog::LockedWriter::LockedWriter()
 {
 }
 
-NBLog::LockedWriter::LockedWriter(size_t size, void *shared)
-    : Writer(size, shared)
+NBLog::LockedWriter::LockedWriter(void *shared, size_t size)
+    : Writer(shared, size)
 {
 }
 
@@ -273,60 +277,59 @@ bool NBLog::LockedWriter::setEnabled(bool enabled)
 
 // ---------------------------------------------------------------------------
 
-NBLog::Reader::Reader(size_t size, const void *shared)
-    : mSize(roundup(size)), mShared((const Shared *) shared), mFront(0)
+NBLog::Reader::Reader(const void *shared, size_t size)
+    : mShared((/*const*/ Shared *) shared), /*mIMemory*/
+      mFd(-1), mIndent(0),
+      mFifo(mShared != NULL ?
+        new audio_utils_fifo(size, sizeof(uint8_t),
+            mShared->mBuffer, mShared->mRear, NULL /*throttlesFront*/) : NULL),
+      mFifoReader(mFifo != NULL ? new audio_utils_fifo_reader(*mFifo) : NULL)
 {
 }
 
-NBLog::Reader::Reader(size_t size, const sp<IMemory>& iMemory)
-    : mSize(roundup(size)), mShared(iMemory != 0 ? (const Shared *) iMemory->pointer() : NULL),
-      mIMemory(iMemory), mFront(0)
+NBLog::Reader::Reader(const sp<IMemory>& iMemory, size_t size)
+    : Reader(iMemory != 0 ? (Shared *) iMemory->pointer() : NULL, size)
 {
+    mIMemory = iMemory;
+}
+
+NBLog::Reader::~Reader()
+{
+    delete mFifoReader;
+    delete mFifo;
 }
 
 void NBLog::Reader::dump(int fd, size_t indent)
 {
-    int32_t rear = android_atomic_acquire_load(&mShared->mRear);
-    size_t avail = rear - mFront;
-    if (avail == 0) {
+    if (mFifoReader == NULL) {
         return;
     }
-    size_t lost = 0;
-    if (avail > mSize) {
-        lost = avail - mSize;
-        mFront += lost;
-        avail = mSize;
-    }
-    size_t remaining = avail;       // remaining = number of bytes left to read
-    size_t front = mFront & (mSize - 1);
-    size_t read = mSize - front;    // read = number of bytes that have been read so far
-    if (read > remaining) {
-        read = remaining;
-    }
     // make a copy to avoid race condition with writer
-    uint8_t *copy = new uint8_t[avail];
-    // copy first part of circular buffer up until the wraparound point
-    memcpy(copy, &mShared->mBuffer[front], read);
-    if (front + read == mSize) {
-        if ((remaining -= read) > 0) {
-            // copy second part of circular buffer starting at beginning
-            memcpy(&copy[read], mShared->mBuffer, remaining);
-            read += remaining;
-            // remaining = 0 but not necessary
-        }
-    }
-    mFront += read;
+    size_t capacity = mFifo->capacity();
+
+    // TODO Stack-based allocation of large objects may fail.
+    //      Currently the log buffers are a page or two, which should be safe.
+    //      But if the log buffers ever get a lot larger,
+    //      then change this to allocate from heap when necessary.
+    static size_t kReasonableStackObjectSize = 32768;
+    ALOGW_IF(capacity > kReasonableStackObjectSize, "Stack-based allocation of object may fail");
+    uint8_t copy[capacity];
+
+    size_t lost;
+    ssize_t actual = mFifoReader->read(copy, capacity, NULL /*timeout*/, &lost);
+    ALOG_ASSERT(actual <= capacity);
+    size_t avail = actual > 0 ? (size_t) actual : 0;
     size_t i = avail;
     Event event;
     size_t length;
     struct timespec ts;
     time_t maxSec = -1;
-    while (i >= 3) {
+    while (i >= Entry::kOverhead) {
         length = copy[i - 1];
-        if (length + 3 > i || copy[i - length - 2] != length) {
+        if (length + Entry::kOverhead > i || copy[i - length - 2] != length) {
             break;
         }
-        event = (Event) copy[i - length - 3];
+        event = (Event) copy[i - length - Entry::kOverhead];
         if (event == EVENT_TIMESTAMP) {
             if (length != sizeof(struct timespec)) {
                 // corrupt
@@ -337,7 +340,7 @@ void NBLog::Reader::dump(int fd, size_t indent)
                 maxSec = ts.tv_sec;
             }
         }
-        i -= length + 3;
+        i -= length + Entry::kOverhead;
     }
     mFd = fd;
     mIndent = indent;
@@ -362,7 +365,7 @@ void NBLog::Reader::dump(int fd, size_t indent)
         event = (Event) copy[i];
         length = copy[i + 1];
         const void *data = &copy[i + 2];
-        size_t advance = length + 3;
+        size_t advance = length + Entry::kOverhead;
         switch (event) {
         case EVENT_STRING:
             body.appendFormat("%.*s", (int) length, (const char *) data);
@@ -376,7 +379,7 @@ void NBLog::Reader::dump(int fd, size_t indent)
             long deltaTotal = 0;
             size_t j = i;
             for (;;) {
-                j += sizeof(struct timespec) + 3;
+                j += sizeof(struct timespec) + 3 /*Entry::kOverhead?*/;
                 if (j >= avail || (Event) copy[j] != EVENT_TIMESTAMP) {
                     break;
                 }
@@ -398,7 +401,7 @@ void NBLog::Reader::dump(int fd, size_t indent)
                 deltaTotal += delta;
                 prevNsec = tsNext.tv_nsec;
             }
-            size_t n = (j - i) / (sizeof(struct timespec) + 3);
+            size_t n = (j - i) / (sizeof(struct timespec) + 3 /*Entry::kOverhead?*/);
             if (deferredTimestamp) {
                 dumpLine(timestamp, body);
                 deferredTimestamp = false;
@@ -432,8 +435,6 @@ void NBLog::Reader::dump(int fd, size_t indent)
     if (deferredTimestamp) {
         dumpLine(timestamp, body);
     }
-    // FIXME it would be more efficient to put a char mCopy[256] as a member variable of the dumper
-    delete[] copy;
 }
 
 void NBLog::Reader::dumpLine(const String8& timestamp, String8& body)

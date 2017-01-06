@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <audio_utils/roundup.h>
 #include "FastThreadDumpState.h"
 
 namespace android {
