@@ -3649,6 +3649,7 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
         mFastMixer->run("FastMixer", PRIORITY_URGENT_AUDIO);
         pid_t tid = mFastMixer->getTid();
         sendPrioConfigEvent(getpid_cached, tid, kPriorityFastMixer);
+        stream()->setHalThreadPriority(kPriorityFastMixer);
 
 #ifdef AUDIO_WATCHDOG
         // create and start the watchdog
@@ -5911,6 +5912,7 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
         mFastCapture->run("FastCapture", ANDROID_PRIORITY_URGENT_AUDIO);
         pid_t tid = mFastCapture->getTid();
         sendPrioConfigEvent(getpid_cached, tid, kPriorityFastCapture);
+        stream()->setHalThreadPriority(kPriorityFastCapture);
 #ifdef AUDIO_WATCHDOG
         // FIXME
 #endif

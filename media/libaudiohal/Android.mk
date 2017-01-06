@@ -3,11 +3,13 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_SHARED_LIBRARIES := \
+    libbase \
     libcutils \
+    libeffects \
+    libfmq \
     libhardware \
     liblog \
-    libutils \
-    libeffects
+    libutils
 
 ifeq ($(ENABLE_TREBLE), true)
 

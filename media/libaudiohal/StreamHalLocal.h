@@ -70,6 +70,10 @@ class StreamHalLocal : public virtual StreamHalInterface
     // Get current read/write position in the mmap buffer
     virtual status_t getMmapPosition(struct audio_mmap_position *position) = 0;
 
+    // Set the priority of the thread that interacts with the HAL
+    // (must match the priority of the audioflinger's thread that calls 'read' / 'write')
+    virtual status_t setHalThreadPriority(int priority);
+
   protected:
     // Subclasses can not be constructed directly by clients.
     StreamHalLocal(audio_stream_t *stream, sp<DeviceHalLocal> device);
