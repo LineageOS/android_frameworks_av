@@ -6315,6 +6315,7 @@ reacquire_wakelock:
         mTimestamp.mPosition[ExtendedTimestamp::LOCATION_SERVER] += framesRead;
         mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] = systemTime();
 
+#ifndef LEGACY_AUDIO_BLOB
         // Update server timestamp with kernel stats
         if (mInput->stream->get_capture_position != nullptr
                 && mPipeSource.get() == nullptr /* don't obtain for FastCapture, could block */) {
@@ -6332,6 +6333,7 @@ reacquire_wakelock:
         }
         // Use this to track timestamp information
         // ALOGD("%s", mTimestamp.toString().c_str());
+#endif
 
         if (framesRead < 0 || (framesRead == 0 && mPipeSource == 0)) {
             ALOGE("read failed: framesRead=%zd", framesRead);
