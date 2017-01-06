@@ -46,7 +46,7 @@ CameraDeviceClientBase::CameraDeviceClientBase(
         const sp<CameraService>& cameraService,
         const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
         const String16& clientPackageName,
-        int cameraId,
+        const String8& cameraId,
         int cameraFacing,
         int clientPid,
         uid_t clientUid,
@@ -67,7 +67,7 @@ CameraDeviceClientBase::CameraDeviceClientBase(
 CameraDeviceClient::CameraDeviceClient(const sp<CameraService>& cameraService,
         const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
         const String16& clientPackageName,
-        int cameraId,
+        const String8& cameraId,
         int cameraFacing,
         int clientPid,
         uid_t clientUid,
@@ -79,22 +79,30 @@ CameraDeviceClient::CameraDeviceClient(const sp<CameraService>& cameraService,
     mRequestIdCounter(0) {
 
     ATRACE_CALL();
-    ALOGI("CameraDeviceClient %d: Opened", cameraId);
+    ALOGI("CameraDeviceClient %s: Opened", cameraId.string());
 }
 
-status_t CameraDeviceClient::initialize(CameraModule *module)
-{
+status_t CameraDeviceClient::initialize(CameraModule *module) {
+    return initializeImpl(module);
+}
+
+status_t CameraDeviceClient::initialize(sp<CameraProviderManager> manager) {
+    return initializeImpl(manager);
+}
+
+template<typename TProviderPtr>
+status_t CameraDeviceClient::initializeImpl(TProviderPtr providerPtr) {
     ATRACE_CALL();
     status_t res;
 
-    res = Camera2ClientBase::initialize(module);
+    res = Camera2ClientBase::initialize(providerPtr);
     if (res != OK) {
         return res;
     }
 
     String8 threadName;
     mFrameProcessor = new FrameProcessorBase(mDevice);
-    threadName = String8::format("CDU-%d-FrameProc", mCameraId);
+    threadName = String8::format("CDU-%s-FrameProc", mCameraIdStr.string());
     mFrameProcessor->run(threadName.string());
 
     mFrameProcessor->registerListener(FRAME_PROCESSOR_LISTENER_MIN_ID,
@@ -138,8 +146,8 @@ binder::Status CameraDeviceClient::submitRequestList(
     }
 
     if (requests.empty()) {
-        ALOGE("%s: Camera %d: Sent null request. Rejecting request.",
-              __FUNCTION__, mCameraId);
+        ALOGE("%s: Camera %s: Sent null request. Rejecting request.",
+              __FUNCTION__, mCameraIdStr.string());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, "Empty request list");
     }
 
@@ -150,13 +158,14 @@ binder::Status CameraDeviceClient::submitRequestList(
     for (auto&& request: requests) {
         if (request.mIsReprocess) {
             if (!mInputStream.configured) {
-                ALOGE("%s: Camera %d: no input stream is configured.", __FUNCTION__, mCameraId);
+                ALOGE("%s: Camera %s: no input stream is configured.", __FUNCTION__,
+                        mCameraIdStr.string());
                 return STATUS_ERROR_FMT(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                        "No input configured for camera %d but request is for reprocessing",
-                        mCameraId);
+                        "No input configured for camera %s but request is for reprocessing",
+                        mCameraIdStr.string());
             } else if (streaming) {
-                ALOGE("%s: Camera %d: streaming reprocess requests not supported.", __FUNCTION__,
-                        mCameraId);
+                ALOGE("%s: Camera %s: streaming reprocess requests not supported.", __FUNCTION__,
+                        mCameraIdStr.string());
                 return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                         "Repeating reprocess requests not supported");
             }
@@ -164,13 +173,13 @@ binder::Status CameraDeviceClient::submitRequestList(
 
         CameraMetadata metadata(request.mMetadata);
         if (metadata.isEmpty()) {
-            ALOGE("%s: Camera %d: Sent empty metadata packet. Rejecting request.",
-                   __FUNCTION__, mCameraId);
+            ALOGE("%s: Camera %s: Sent empty metadata packet. Rejecting request.",
+                   __FUNCTION__, mCameraIdStr.string());
             return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                     "Request settings are empty");
         } else if (request.mSurfaceList.isEmpty()) {
-            ALOGE("%s: Camera %d: Requests must have at least one surface target. "
-                    "Rejecting request.", __FUNCTION__, mCameraId);
+            ALOGE("%s: Camera %s: Requests must have at least one surface target. "
+                    "Rejecting request.", __FUNCTION__, mCameraIdStr.string());
             return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                     "Request has no output targets");
         }
@@ -195,17 +204,17 @@ binder::Status CameraDeviceClient::submitRequestList(
 
             // Trying to submit request with surface that wasn't created
             if (idx == NAME_NOT_FOUND) {
-                ALOGE("%s: Camera %d: Tried to submit a request with a surface that"
+                ALOGE("%s: Camera %s: Tried to submit a request with a surface that"
                         " we have not called createStream on",
-                        __FUNCTION__, mCameraId);
+                        __FUNCTION__, mCameraIdStr.string());
                 return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                         "Request targets Surface that is not part of current capture session");
             }
 
             int streamId = mStreamMap.valueAt(idx);
             outputStreamIds.push_back(streamId);
-            ALOGV("%s: Camera %d: Appending output stream %d to request",
-                    __FUNCTION__, mCameraId, streamId);
+            ALOGV("%s: Camera %s: Appending output stream %d to request",
+                    __FUNCTION__, mCameraIdStr.string(), streamId);
         }
 
         metadata.update(ANDROID_REQUEST_OUTPUT_STREAMS, &outputStreamIds[0],
@@ -217,8 +226,9 @@ binder::Status CameraDeviceClient::submitRequestList(
 
         metadata.update(ANDROID_REQUEST_ID, &(submitInfo->mRequestId), /*size*/1);
         loopCounter++; // loopCounter starts from 1
-        ALOGV("%s: Camera %d: Creating request with ID %d (%d of %zu)",
-              __FUNCTION__, mCameraId, submitInfo->mRequestId, loopCounter, requests.size());
+        ALOGV("%s: Camera %s: Creating request with ID %d (%d of %zu)",
+                __FUNCTION__, mCameraIdStr.string(), submitInfo->mRequestId,
+                loopCounter, requests.size());
 
         metadataRequestList.push_back(metadata);
     }
@@ -228,8 +238,8 @@ binder::Status CameraDeviceClient::submitRequestList(
         err = mDevice->setStreamingRequestList(metadataRequestList, &(submitInfo->mLastFrameNumber));
         if (err != OK) {
             String8 msg = String8::format(
-                "Camera %d:  Got error %s (%d) after trying to set streaming request",
-                mCameraId, strerror(-err), err);
+                "Camera %s:  Got error %s (%d) after trying to set streaming request",
+                mCameraIdStr.string(), strerror(-err), err);
             ALOGE("%s: %s", __FUNCTION__, msg.string());
             res = STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION,
                     msg.string());
@@ -241,8 +251,8 @@ binder::Status CameraDeviceClient::submitRequestList(
         err = mDevice->captureList(metadataRequestList, &(submitInfo->mLastFrameNumber));
         if (err != OK) {
             String8 msg = String8::format(
-                "Camera %d: Got error %s (%d) after trying to submit capture request",
-                mCameraId, strerror(-err), err);
+                "Camera %s: Got error %s (%d) after trying to submit capture request",
+                mCameraIdStr.string(), strerror(-err), err);
             ALOGE("%s: %s", __FUNCTION__, msg.string());
             res = STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION,
                     msg.string());
@@ -250,7 +260,7 @@ binder::Status CameraDeviceClient::submitRequestList(
         ALOGV("%s: requestId = %d ", __FUNCTION__, submitInfo->mRequestId);
     }
 
-    ALOGV("%s: Camera %d: End of function", __FUNCTION__, mCameraId);
+    ALOGV("%s: Camera %s: End of function", __FUNCTION__, mCameraIdStr.string());
     return res;
 }
 
@@ -274,8 +284,8 @@ binder::Status CameraDeviceClient::cancelRequest(
 
     Mutex::Autolock idLock(mStreamingRequestIdLock);
     if (mStreamingRequestId != requestId) {
-        String8 msg = String8::format("Camera %d: Canceling request ID %d doesn't match "
-                "current request ID %d", mCameraId, requestId, mStreamingRequestId);
+        String8 msg = String8::format("Camera %s: Canceling request ID %d doesn't match "
+                "current request ID %d", mCameraIdStr.string(), requestId, mStreamingRequestId);
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
@@ -283,13 +293,13 @@ binder::Status CameraDeviceClient::cancelRequest(
     err = mDevice->clearStreamingRequest(lastFrameNumber);
 
     if (err == OK) {
-        ALOGV("%s: Camera %d: Successfully cleared streaming request",
-              __FUNCTION__, mCameraId);
+        ALOGV("%s: Camera %s: Successfully cleared streaming request",
+                __FUNCTION__, mCameraIdStr.string());
         mStreamingRequestId = REQUEST_ID_NONE;
     } else {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
-                "Camera %d: Error clearing streaming request: %s (%d)",
-                mCameraId, strerror(-err), err);
+                "Camera %s: Error clearing streaming request: %s (%d)",
+                mCameraIdStr.string(), strerror(-err), err);
     }
 
     return res;
@@ -328,8 +338,8 @@ binder::Status CameraDeviceClient::endConfigure(bool isConstrainedHighSpeed) {
         }
         if (!isConstrainedHighSpeedSupported) {
             String8 msg = String8::format(
-                "Camera %d: Try to create a constrained high speed configuration on a device"
-                " that doesn't support it.", mCameraId);
+                "Camera %s: Try to create a constrained high speed configuration on a device"
+                " that doesn't support it.", mCameraIdStr.string());
             ALOGE("%s: %s", __FUNCTION__, msg.string());
             return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                     msg.string());
@@ -338,13 +348,13 @@ binder::Status CameraDeviceClient::endConfigure(bool isConstrainedHighSpeed) {
 
     status_t err = mDevice->configureStreams(isConstrainedHighSpeed);
     if (err == BAD_VALUE) {
-        String8 msg = String8::format("Camera %d: Unsupported set of inputs/outputs provided",
-                mCameraId);
+        String8 msg = String8::format("Camera %s: Unsupported set of inputs/outputs provided",
+                mCameraIdStr.string());
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         res = STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     } else if (err != OK) {
-        String8 msg = String8::format("Camera %d: Error configuring streams: %s (%d)",
-                mCameraId, strerror(-err), err);
+        String8 msg = String8::format("Camera %s: Error configuring streams: %s (%d)",
+                mCameraIdStr.string(), strerror(-err), err);
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         res = STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.string());
     }
@@ -389,8 +399,8 @@ binder::Status CameraDeviceClient::deleteStream(int streamId) {
                 }
             }
             if (dIndex == NAME_NOT_FOUND) {
-                String8 msg = String8::format("Camera %d: Invalid stream ID (%d) specified, no such"
-                        " stream created yet", mCameraId, streamId);
+                String8 msg = String8::format("Camera %s: Invalid stream ID (%d) specified, no such"
+                        " stream created yet", mCameraIdStr.string(), streamId);
                 ALOGW("%s: %s", __FUNCTION__, msg.string());
                 return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
             }
@@ -401,8 +411,8 @@ binder::Status CameraDeviceClient::deleteStream(int streamId) {
     status_t err = mDevice->deleteStream(streamId);
 
     if (err != OK) {
-        String8 msg = String8::format("Camera %d: Unexpected error %s (%d) when deleting stream %d",
-                mCameraId, strerror(-err), err, streamId);
+        String8 msg = String8::format("Camera %s: Unexpected error %s (%d) when deleting stream %d",
+                mCameraIdStr.string(), strerror(-err), err, streamId);
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         res = STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.string());
     } else {
@@ -458,8 +468,8 @@ binder::Status CameraDeviceClient::createStream(
     {
         ssize_t index = mStreamMap.indexOfKey(IInterface::asBinder(bufferProducer));
         if (index != NAME_NOT_FOUND) {
-            String8 msg = String8::format("Camera %d: Surface already has a stream created for it "
-                    "(ID %zd)", mCameraId, index);
+            String8 msg = String8::format("Camera %s: Surface already has a stream created for it "
+                    "(ID %zd)", mCameraIdStr.string(), index);
             ALOGW("%s: %s", __FUNCTION__, msg.string());
             return STATUS_ERROR(CameraService::ERROR_ALREADY_EXISTS, msg.string());
         }
@@ -471,14 +481,14 @@ binder::Status CameraDeviceClient::createStream(
     bool useAsync = false;
     if ((err = bufferProducer->query(NATIVE_WINDOW_CONSUMER_USAGE_BITS,
             &consumerUsage)) != OK) {
-        String8 msg = String8::format("Camera %d: Failed to query Surface consumer usage: %s (%d)",
-                mCameraId, strerror(-err), err);
+        String8 msg = String8::format("Camera %s: Failed to query Surface consumer usage: %s (%d)",
+                mCameraIdStr.string(), strerror(-err), err);
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.string());
     }
     if (consumerUsage & GraphicBuffer::USAGE_HW_TEXTURE) {
-        ALOGW("%s: Camera %d with consumer usage flag: 0x%x: Forcing asynchronous mode for stream",
-                __FUNCTION__, mCameraId, consumerUsage);
+        ALOGW("%s: Camera %s with consumer usage flag: 0x%x: Forcing asynchronous mode for stream",
+                __FUNCTION__, mCameraIdStr.string(), consumerUsage);
         useAsync = true;
     }
 
@@ -495,27 +505,27 @@ binder::Status CameraDeviceClient::createStream(
     ANativeWindow *anw = surface.get();
 
     if ((err = anw->query(anw, NATIVE_WINDOW_WIDTH, &width)) != OK) {
-        String8 msg = String8::format("Camera %d: Failed to query Surface width: %s (%d)",
-                mCameraId, strerror(-err), err);
+        String8 msg = String8::format("Camera %s: Failed to query Surface width: %s (%d)",
+                mCameraIdStr.string(), strerror(-err), err);
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.string());
     }
     if ((err = anw->query(anw, NATIVE_WINDOW_HEIGHT, &height)) != OK) {
-        String8 msg = String8::format("Camera %d: Failed to query Surface height: %s (%d)",
-                mCameraId, strerror(-err), err);
+        String8 msg = String8::format("Camera %s: Failed to query Surface height: %s (%d)",
+                mCameraIdStr.string(), strerror(-err), err);
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.string());
     }
     if ((err = anw->query(anw, NATIVE_WINDOW_FORMAT, &format)) != OK) {
-        String8 msg = String8::format("Camera %d: Failed to query Surface format: %s (%d)",
-                mCameraId, strerror(-err), err);
+        String8 msg = String8::format("Camera %s: Failed to query Surface format: %s (%d)",
+                mCameraIdStr.string(), strerror(-err), err);
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.string());
     }
     if ((err = anw->query(anw, NATIVE_WINDOW_DEFAULT_DATASPACE,
                             reinterpret_cast<int*>(&dataSpace))) != OK) {
-        String8 msg = String8::format("Camera %d: Failed to query Surface dataspace: %s (%d)",
-                mCameraId, strerror(-err), err);
+        String8 msg = String8::format("Camera %s: Failed to query Surface dataspace: %s (%d)",
+                mCameraIdStr.string(), strerror(-err), err);
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.string());
     }
@@ -524,8 +534,8 @@ binder::Status CameraDeviceClient::createStream(
     //       IMPLEMENTATION_DEFINED. b/9487482
     if (format >= HAL_PIXEL_FORMAT_RGBA_8888 &&
         format <= HAL_PIXEL_FORMAT_BGRA_8888) {
-        ALOGW("%s: Camera %d: Overriding format %#x to IMPLEMENTATION_DEFINED",
-              __FUNCTION__, mCameraId, format);
+        ALOGW("%s: Camera %s: Overriding format %#x to IMPLEMENTATION_DEFINED",
+              __FUNCTION__, mCameraIdStr.string(), format);
         format = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
     }
 
@@ -533,8 +543,8 @@ binder::Status CameraDeviceClient::createStream(
     if (flexibleConsumer && isPublicFormat(format) &&
             !CameraDeviceClient::roundBufferDimensionNearest(width, height,
             format, dataSpace, mDevice->info(), /*out*/&width, /*out*/&height)) {
-        String8 msg = String8::format("Camera %d: No supported stream configurations with "
-                "format %#x defined, failed to create output stream", mCameraId, format);
+        String8 msg = String8::format("Camera %s: No supported stream configurations with "
+                "format %#x defined, failed to create output stream", mCameraIdStr.string(), format);
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
@@ -546,14 +556,14 @@ binder::Status CameraDeviceClient::createStream(
 
     if (err != OK) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
-                "Camera %d: Error creating output stream (%d x %d, fmt %x, dataSpace %x): %s (%d)",
-                mCameraId, width, height, format, dataSpace, strerror(-err), err);
+                "Camera %s: Error creating output stream (%d x %d, fmt %x, dataSpace %x): %s (%d)",
+                mCameraIdStr.string(), width, height, format, dataSpace, strerror(-err), err);
     } else {
         mStreamMap.add(binder, streamId);
 
-        ALOGV("%s: Camera %d: Successfully created a new stream ID %d for output surface"
+        ALOGV("%s: Camera %s: Successfully created a new stream ID %d for output surface"
                 " (%d x %d) with format 0x%x.",
-              __FUNCTION__, mCameraId, streamId, width, height, format);
+              __FUNCTION__, mCameraIdStr.string(), streamId, width, height, format);
 
         // Set transform flags to ensure preview to be rotated correctly.
         res = setStreamTransformLocked(streamId);
@@ -596,17 +606,17 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
 
     if (err != OK) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
-                "Camera %d: Error creating output stream (%d x %d, fmt %x, dataSpace %x): %s (%d)",
-                mCameraId, width, height, format, dataSpace, strerror(-err), err);
+                "Camera %s: Error creating output stream (%d x %d, fmt %x, dataSpace %x): %s (%d)",
+                mCameraIdStr.string(), width, height, format, dataSpace, strerror(-err), err);
     } else {
         // Can not add streamId to mStreamMap here, as the surface is deferred. Add it to
         // a separate list to track. Once the deferred surface is set, this id will be
         // relocated to mStreamMap.
         mDeferredStreams.push_back(streamId);
 
-        ALOGV("%s: Camera %d: Successfully created a new stream ID %d for a deferred surface"
+        ALOGV("%s: Camera %s: Successfully created a new stream ID %d for a deferred surface"
                 " (%d x %d) stream with format 0x%x.",
-              __FUNCTION__, mCameraId, streamId, width, height, format);
+              __FUNCTION__, mCameraIdStr.string(), streamId, width, height, format);
 
         // Set transform flags to ensure preview to be rotated correctly.
         res = setStreamTransformLocked(streamId);
@@ -661,8 +671,8 @@ binder::Status CameraDeviceClient::createInputStream(
     }
 
     if (mInputStream.configured) {
-        String8 msg = String8::format("Camera %d: Already has an input stream "
-                "configured (ID %zd)", mCameraId, mInputStream.id);
+        String8 msg = String8::format("Camera %s: Already has an input stream "
+                "configured (ID %zd)", mCameraIdStr.string(), mInputStream.id);
         ALOGE("%s: %s", __FUNCTION__, msg.string() );
         return STATUS_ERROR(CameraService::ERROR_ALREADY_EXISTS, msg.string());
     }
@@ -676,13 +686,13 @@ binder::Status CameraDeviceClient::createInputStream(
         mInputStream.format = format;
         mInputStream.id = streamId;
 
-        ALOGV("%s: Camera %d: Successfully created a new input stream ID %d",
-                __FUNCTION__, mCameraId, streamId);
+        ALOGV("%s: Camera %s: Successfully created a new input stream ID %d",
+                __FUNCTION__, mCameraIdStr.string(), streamId);
 
         *newStreamId = streamId;
     } else {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
-                "Camera %d: Error creating new input stream: %s (%d)", mCameraId,
+                "Camera %s: Error creating new input stream: %s (%d)", mCameraIdStr.string(),
                 strerror(-err), err);
     }
 
@@ -706,8 +716,8 @@ binder::Status CameraDeviceClient::getInputSurface(/*out*/ view::Surface *inputS
     status_t err = mDevice->getInputBufferProducer(&producer);
     if (err != OK) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
-                "Camera %d: Error getting input Surface: %s (%d)",
-                mCameraId, strerror(-err), err);
+                "Camera %s: Error getting input Surface: %s (%d)",
+                mCameraIdStr.string(), strerror(-err), err);
     } else {
         inputSurface->name = String16("CameraInput");
         inputSurface->graphicBufferProducer = producer;
@@ -828,13 +838,13 @@ binder::Status CameraDeviceClient::createDefaultRequest(int templateId,
         request->swap(metadata);
     } else if (err == BAD_VALUE) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                "Camera %d: Template ID %d is invalid or not supported: %s (%d)",
-                mCameraId, templateId, strerror(-err), err);
+                "Camera %s: Template ID %d is invalid or not supported: %s (%d)",
+                mCameraIdStr.string(), templateId, strerror(-err), err);
 
     } else {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
-                "Camera %d: Error creating default request for template %d: %s (%d)",
-                mCameraId, templateId, strerror(-err), err);
+                "Camera %s: Error creating default request for template %d: %s (%d)",
+                mCameraIdStr.string(), templateId, strerror(-err), err);
     }
     return res;
 }
@@ -882,16 +892,16 @@ binder::Status CameraDeviceClient::waitUntilIdle()
     Mutex::Autolock idLock(mStreamingRequestIdLock);
     if (mStreamingRequestId != REQUEST_ID_NONE) {
         String8 msg = String8::format(
-            "Camera %d: Try to waitUntilIdle when there are active streaming requests",
-            mCameraId);
+            "Camera %s: Try to waitUntilIdle when there are active streaming requests",
+            mCameraIdStr.string());
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.string());
     }
     status_t err = mDevice->waitUntilDrained();
     if (err != OK) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
-                "Camera %d: Error waiting to drain: %s (%d)",
-                mCameraId, strerror(-err), err);
+                "Camera %s: Error waiting to drain: %s (%d)",
+                mCameraIdStr.string(), strerror(-err), err);
     }
     ALOGV("%s Done", __FUNCTION__);
     return res;
@@ -917,7 +927,7 @@ binder::Status CameraDeviceClient::flush(
     status_t err = mDevice->flush(lastFrameNumber);
     if (err != OK) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
-                "Camera %d: Error flushing device: %s (%d)", mCameraId, strerror(-err), err);
+                "Camera %s: Error flushing device: %s (%d)", mCameraIdStr.string(), strerror(-err), err);
     }
     return res;
 }
@@ -941,8 +951,8 @@ binder::Status CameraDeviceClient::prepare(int streamId) {
     }
 
     if (index == NAME_NOT_FOUND) {
-        String8 msg = String8::format("Camera %d: Invalid stream ID (%d) specified, no stream "
-              "with that ID exists", mCameraId, streamId);
+        String8 msg = String8::format("Camera %s: Invalid stream ID (%d) specified, no stream "
+              "with that ID exists", mCameraIdStr.string(), streamId);
         ALOGW("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
@@ -952,11 +962,11 @@ binder::Status CameraDeviceClient::prepare(int streamId) {
     status_t err = mDevice->prepare(streamId);
     if (err == BAD_VALUE) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                "Camera %d: Stream %d has already been used, and cannot be prepared",
-                mCameraId, streamId);
+                "Camera %s: Stream %d has already been used, and cannot be prepared",
+                mCameraIdStr.string(), streamId);
     } else if (err != OK) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
-                "Camera %d: Error preparing stream %d: %s (%d)", mCameraId, streamId,
+                "Camera %s: Error preparing stream %d: %s (%d)", mCameraIdStr.string(), streamId,
                 strerror(-err), err);
     }
     return res;
@@ -981,15 +991,15 @@ binder::Status CameraDeviceClient::prepare2(int maxCount, int streamId) {
     }
 
     if (index == NAME_NOT_FOUND) {
-        String8 msg = String8::format("Camera %d: Invalid stream ID (%d) specified, no stream "
-              "with that ID exists", mCameraId, streamId);
+        String8 msg = String8::format("Camera %s: Invalid stream ID (%d) specified, no stream "
+              "with that ID exists", mCameraIdStr.string(), streamId);
         ALOGW("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
 
     if (maxCount <= 0) {
-        String8 msg = String8::format("Camera %d: maxCount (%d) must be greater than 0",
-                mCameraId, maxCount);
+        String8 msg = String8::format("Camera %s: maxCount (%d) must be greater than 0",
+                mCameraIdStr.string(), maxCount);
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
@@ -999,11 +1009,11 @@ binder::Status CameraDeviceClient::prepare2(int maxCount, int streamId) {
     status_t err = mDevice->prepare(maxCount, streamId);
     if (err == BAD_VALUE) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                "Camera %d: Stream %d has already been used, and cannot be prepared",
-                mCameraId, streamId);
+                "Camera %s: Stream %d has already been used, and cannot be prepared",
+                mCameraIdStr.string(), streamId);
     } else if (err != OK) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
-                "Camera %d: Error preparing stream %d: %s (%d)", mCameraId, streamId,
+                "Camera %s: Error preparing stream %d: %s (%d)", mCameraIdStr.string(), streamId,
                 strerror(-err), err);
     }
 
@@ -1029,8 +1039,8 @@ binder::Status CameraDeviceClient::tearDown(int streamId) {
     }
 
     if (index == NAME_NOT_FOUND) {
-        String8 msg = String8::format("Camera %d: Invalid stream ID (%d) specified, no stream "
-              "with that ID exists", mCameraId, streamId);
+        String8 msg = String8::format("Camera %s: Invalid stream ID (%d) specified, no stream "
+              "with that ID exists", mCameraIdStr.string(), streamId);
         ALOGW("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
@@ -1040,11 +1050,11 @@ binder::Status CameraDeviceClient::tearDown(int streamId) {
     status_t err = mDevice->tearDown(streamId);
     if (err == BAD_VALUE) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                "Camera %d: Stream %d is still in use, cannot be torn down",
-                mCameraId, streamId);
+                "Camera %s: Stream %d is still in use, cannot be torn down",
+                mCameraIdStr.string(), streamId);
     } else if (err != OK) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
-                "Camera %d: Error tearing down stream %d: %s (%d)", mCameraId, streamId,
+                "Camera %s: Error tearing down stream %d: %s (%d)", mCameraIdStr.string(), streamId,
                 strerror(-err), err);
     }
 
@@ -1076,8 +1086,8 @@ binder::Status CameraDeviceClient::setDeferredConfiguration(int32_t streamId,
         }
     }
     if (index == NAME_NOT_FOUND) {
-        String8 msg = String8::format("Camera %d: deferred surface is set to a unknown stream"
-                "(ID %d)", mCameraId, streamId);
+        String8 msg = String8::format("Camera %s: deferred surface is set to a unknown stream"
+                "(ID %d)", mCameraIdStr.string(), streamId);
         ALOGW("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
@@ -1090,8 +1100,8 @@ binder::Status CameraDeviceClient::setDeferredConfiguration(int32_t streamId,
     {
         ssize_t index = mStreamMap.indexOfKey(IInterface::asBinder(bufferProducer));
         if (index != NAME_NOT_FOUND) {
-            String8 msg = String8::format("Camera %d: Surface already has a stream created "
-                    " for it (ID %zd)", mCameraId, index);
+            String8 msg = String8::format("Camera %s: Surface already has a stream created "
+                    " for it (ID %zd)", mCameraIdStr.string(), index);
             ALOGW("%s: %s", __FUNCTION__, msg.string());
             return STATUS_ERROR(CameraService::ERROR_ALREADY_EXISTS, msg.string());
         }
@@ -1110,12 +1120,12 @@ binder::Status CameraDeviceClient::setDeferredConfiguration(int32_t streamId,
         mDeferredStreams.removeItemsAt(index);
     } else if (err == NO_INIT) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                "Camera %d: Deferred surface is invalid: %s (%d)",
-                mCameraId, strerror(-err), err);
+                "Camera %s: Deferred surface is invalid: %s (%d)",
+                mCameraIdStr.string(), strerror(-err), err);
     } else {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
-                "Camera %d: Error setting output stream deferred surface: %s (%d)",
-                mCameraId, strerror(-err), err);
+                "Camera %s: Error setting output stream deferred surface: %s (%d)",
+                mCameraIdStr.string(), strerror(-err), err);
     }
 
     return res;
@@ -1127,8 +1137,8 @@ status_t CameraDeviceClient::dump(int fd, const Vector<String16>& args) {
 
 status_t CameraDeviceClient::dumpClient(int fd, const Vector<String16>& args) {
     String8 result;
-    result.appendFormat("CameraDeviceClient[%d] (%p) dump:\n",
-            mCameraId,
+    result.appendFormat("CameraDeviceClient[%s] (%p) dump:\n",
+            mCameraIdStr.string(),
             (getRemoteCallback() != NULL ?
                     IInterface::asBinder(getRemoteCallback()).get() : NULL) );
     result.appendFormat("  Current client UID %u\n", mClientUid);
@@ -1221,15 +1231,15 @@ void CameraDeviceClient::notifyRequestQueueEmpty() {
 void CameraDeviceClient::detachDevice() {
     if (mDevice == 0) return;
 
-    ALOGV("Camera %d: Stopping processors", mCameraId);
+    ALOGV("Camera %s: Stopping processors", mCameraIdStr.string());
 
     mFrameProcessor->removeListener(FRAME_PROCESSOR_LISTENER_MIN_ID,
                                     FRAME_PROCESSOR_LISTENER_MAX_ID,
                                     /*listener*/this);
     mFrameProcessor->requestExit();
-    ALOGV("Camera %d: Waiting for threads", mCameraId);
+    ALOGV("Camera %s: Waiting for threads", mCameraIdStr.string());
     mFrameProcessor->join();
-    ALOGV("Camera %d: Disconnecting device", mCameraId);
+    ALOGV("Camera %s: Disconnecting device", mCameraIdStr.string());
 
     // WORKAROUND: HAL refuses to disconnect while there's streams in flight
     {

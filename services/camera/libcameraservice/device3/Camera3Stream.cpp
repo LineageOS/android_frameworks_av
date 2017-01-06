@@ -166,7 +166,7 @@ bool Camera3Stream::isConfiguring() const {
     return (mState == STATE_IN_CONFIG) || (mState == STATE_IN_RECONFIG);
 }
 
-status_t Camera3Stream::finishConfiguration(camera3_device *hal3Device) {
+status_t Camera3Stream::finishConfiguration() {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);
     switch (mState) {
@@ -212,14 +212,6 @@ status_t Camera3Stream::finishConfiguration(camera3_device *hal3Device) {
     if (res != OK) {
         ALOGE("%s: Unable to configure stream %d queue: %s (%d)",
                 __FUNCTION__, mId, strerror(-res), res);
-        mState = STATE_ERROR;
-        return res;
-    }
-
-    res = registerBuffersLocked(hal3Device);
-    if (res != OK) {
-        ALOGE("%s: Unable to register stream buffers with HAL: %s (%d)",
-                __FUNCTION__, strerror(-res), res);
         mState = STATE_ERROR;
         return res;
     }

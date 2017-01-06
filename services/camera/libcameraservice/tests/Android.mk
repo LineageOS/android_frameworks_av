@@ -1,4 +1,4 @@
-# Copyright 2015 The Android Open Source Project
+# Copyright 2013 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,28 +13,26 @@
 # limitations under the License.
 
 LOCAL_PATH:= $(call my-dir)
-
 include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES:= \
-	main_cameraserver.cpp
+LOCAL_SRC_FILES:= $(call all-cpp-files-under, .)
 
 LOCAL_SHARED_LIBRARIES := \
-	libcameraservice \
-	liblog \
-	libutils \
-	libbinder \
-	android.hardware.camera.common@1.0 \
-	android.hardware.camera.provider@2.4 \
-	android.hardware.camera.device@1.0 \
-	android.hardware.camera.device@3.2 \
-	android.hidl.manager@1.0
+    libcutils \
+    libcameraservice \
+    libhidlbase \
+    liblog \
+    libutils \
+    android.hardware.camera.common@1.0 \
+    android.hardware.camera.provider@2.4 \
+    android.hardware.camera.device@1.0 \
+    android.hardware.camera.device@3.2
 
-LOCAL_MODULE:= cameraserver
-LOCAL_32_BIT_ONLY := true
+LOCAL_C_INCLUDES += \
 
-LOCAL_CFLAGS += -Wall -Wextra -Werror -Wno-unused-parameter
+LOCAL_CFLAGS += -Wall -Wextra -Werror
 
-LOCAL_INIT_RC := cameraserver.rc
+LOCAL_MODULE:= cameraservice_test
+LOCAL_MODULE_TAGS := tests
 
-include $(BUILD_EXECUTABLE)
+include $(BUILD_NATIVE_TEST)

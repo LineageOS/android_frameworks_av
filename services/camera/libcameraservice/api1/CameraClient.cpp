@@ -41,7 +41,8 @@ CameraClient::CameraClient(const sp<CameraService>& cameraService,
         int clientPid, int clientUid,
         int servicePid, bool legacyMode):
         Client(cameraService, cameraClient, clientPackageName,
-                cameraId, cameraFacing, clientPid, clientUid, servicePid)
+                String8::format("%d", cameraId), cameraFacing, clientPid,
+                clientUid, servicePid)
 {
     int callingPid = getCallingPid();
     LOG1("CameraClient::CameraClient E (pid %d, id %d)", callingPid, cameraId);
@@ -61,6 +62,15 @@ CameraClient::CameraClient(const sp<CameraService>& cameraService,
 }
 
 status_t CameraClient::initialize(CameraModule *module) {
+    return initializeImpl<CameraModule*>(module);
+}
+
+status_t CameraClient::initialize(sp<CameraProviderManager> manager) {
+    return initializeImpl<sp<CameraProviderManager>>(manager);
+}
+
+template<typename TProviderPtr>
+status_t CameraClient::initializeImpl(TProviderPtr providerPtr) {
     int callingPid = getCallingPid();
     status_t res;
 
@@ -76,7 +86,7 @@ status_t CameraClient::initialize(CameraModule *module) {
     snprintf(camera_device_name, sizeof(camera_device_name), "%d", mCameraId);
 
     mHardware = new CameraHardwareInterface(camera_device_name);
-    res = mHardware->initialize(module);
+    res = mHardware->initialize(providerPtr);
     if (res != OK) {
         ALOGE("%s: Camera %d: unable to initialize device: %s (%d)",
                 __FUNCTION__, mCameraId, strerror(-res), res);
@@ -252,7 +262,7 @@ binder::Status CameraClient::disconnect() {
     // Turn off all messages.
     disableMsgType(CAMERA_MSG_ALL_MSGS);
     mHardware->stopPreview();
-    mCameraService->updateProxyDeviceState(
+    sCameraService->updateProxyDeviceState(
         ICameraServiceProxy::CAMERA_STATE_IDLE,
         String8::format("%d", mCameraId));
     mHardware->cancelPicture();
@@ -414,7 +424,7 @@ status_t CameraClient::startPreviewMode() {
     mHardware->setPreviewWindow(mPreviewWindow);
     result = mHardware->startPreview();
     if (result == NO_ERROR) {
-        mCameraService->updateProxyDeviceState(
+        sCameraService->updateProxyDeviceState(
             ICameraServiceProxy::CAMERA_STATE_ACTIVE,
             String8::format("%d", mCameraId));
     }
@@ -440,7 +450,7 @@ status_t CameraClient::startRecordingMode() {
 
     // start recording mode
     enableMsgType(CAMERA_MSG_VIDEO_FRAME);
-    mCameraService->playSound(CameraService::SOUND_RECORDING_START);
+    sCameraService->playSound(CameraService::SOUND_RECORDING_START);
     result = mHardware->startRecording();
     if (result != NO_ERROR) {
         ALOGE("mHardware->startRecording() failed with status %d", result);
@@ -457,7 +467,7 @@ void CameraClient::stopPreview() {
 
     disableMsgType(CAMERA_MSG_PREVIEW_FRAME);
     mHardware->stopPreview();
-    mCameraService->updateProxyDeviceState(
+    sCameraService->updateProxyDeviceState(
         ICameraServiceProxy::CAMERA_STATE_IDLE,
         String8::format("%d", mCameraId));
     mPreviewBuffer.clear();
@@ -471,7 +481,7 @@ void CameraClient::stopRecording() {
 
     disableMsgType(CAMERA_MSG_VIDEO_FRAME);
     mHardware->stopRecording();
-    mCameraService->playSound(CameraService::SOUND_RECORDING_STOP);
+    sCameraService->playSound(CameraService::SOUND_RECORDING_STOP);
 
     mPreviewBuffer.clear();
 }
@@ -697,7 +707,7 @@ status_t CameraClient::sendCommand(int32_t cmd, int32_t arg1, int32_t arg2) {
         }
         return OK;
     } else if (cmd == CAMERA_CMD_PLAY_RECORDING_SOUND) {
-        mCameraService->playSound(CameraService::SOUND_RECORDING_START);
+        sCameraService->playSound(CameraService::SOUND_RECORDING_START);
     } else if (cmd == CAMERA_CMD_SET_VIDEO_BUFFER_COUNT) {
         // Silently ignore this command
         return INVALID_OPERATION;
@@ -748,6 +758,16 @@ bool CameraClient::lockIfMessageWanted(int32_t msgType) {
     return false;
 }
 
+sp<CameraClient> CameraClient::getClientFromCookie(void* user) {
+    String8 cameraId = String8::format("%d", (int)(intptr_t) user);
+    auto clientDescriptor = sCameraService->mActiveClientManager.get(cameraId);
+    if (clientDescriptor != nullptr) {
+        return sp<CameraClient>{
+                static_cast<CameraClient*>(clientDescriptor->getValue().get())};
+    }
+    return sp<CameraClient>{nullptr};
+}
+
 // Callback messages can be dispatched to internal handlers or pass to our
 // client's callback functions, depending on the message type.
 //
@@ -767,7 +787,7 @@ void CameraClient::notifyCallback(int32_t msgType, int32_t ext1,
         int32_t ext2, void* user) {
     LOG2("notifyCallback(%d)", msgType);
 
-    sp<CameraClient> client = static_cast<CameraClient*>(getClientFromCookie(user).get());
+    sp<CameraClient> client = getClientFromCookie(user);
     if (client.get() == nullptr) return;
 
     if (!client->lockIfMessageWanted(msgType)) return;
@@ -787,7 +807,7 @@ void CameraClient::dataCallback(int32_t msgType,
         const sp<IMemory>& dataPtr, camera_frame_metadata_t *metadata, void* user) {
     LOG2("dataCallback(%d)", msgType);
 
-    sp<CameraClient> client = static_cast<CameraClient*>(getClientFromCookie(user).get());
+    sp<CameraClient> client = getClientFromCookie(user);
     if (client.get() == nullptr) return;
 
     if (!client->lockIfMessageWanted(msgType)) return;
@@ -820,7 +840,7 @@ void CameraClient::dataCallbackTimestamp(nsecs_t timestamp,
         int32_t msgType, const sp<IMemory>& dataPtr, void* user) {
     LOG2("dataCallbackTimestamp(%d)", msgType);
 
-    sp<CameraClient> client = static_cast<CameraClient*>(getClientFromCookie(user).get());
+    sp<CameraClient> client = getClientFromCookie(user);
     if (client.get() == nullptr) return;
 
     if (!client->lockIfMessageWanted(msgType)) return;
@@ -837,7 +857,7 @@ void CameraClient::dataCallbackTimestamp(nsecs_t timestamp,
 // snapshot taken callback
 void CameraClient::handleShutter(void) {
     if (mPlayShutterSound) {
-        mCameraService->playSound(CameraService::SOUND_SHUTTER);
+        sCameraService->playSound(CameraService::SOUND_SHUTTER);
     }
 
     sp<hardware::ICameraClient> c = mRemoteCallback;
@@ -850,7 +870,7 @@ void CameraClient::handleShutter(void) {
 
     // Shutters only happen in response to takePicture, so mark device as
     // idle now, until preview is restarted
-    mCameraService->updateProxyDeviceState(
+    sCameraService->updateProxyDeviceState(
         ICameraServiceProxy::CAMERA_STATE_IDLE,
         String8::format("%d", mCameraId));
 

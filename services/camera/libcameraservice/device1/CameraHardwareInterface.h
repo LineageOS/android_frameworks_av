@@ -27,6 +27,9 @@
 #include <system/window.h>
 #include <hardware/camera.h>
 
+#include <common/CameraModule.h>
+#include <common/CameraProviderManager.h>
+
 namespace android {
 
 typedef void (*notify_callback)(int32_t msgType,
@@ -122,6 +125,12 @@ public:
         }
         initHalPreviewWindow();
         return rc;
+    }
+
+    status_t initialize(sp<CameraProviderManager> manager) {
+        (void) manager;
+        ALOGE("%s: Not supported yet", __FUNCTION__);
+        return INVALID_OPERATION;
     }
 
     /** Set the ANativeWindow to which preview frames are sent */

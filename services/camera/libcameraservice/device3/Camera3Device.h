@@ -17,6 +17,9 @@
 #ifndef ANDROID_SERVERS_CAMERA3DEVICE_H
 #define ANDROID_SERVERS_CAMERA3DEVICE_H
 
+#include <utility>
+#include <unordered_map>
+
 #include <utils/Condition.h>
 #include <utils/Errors.h>
 #include <utils/List.h>
@@ -24,7 +27,12 @@
 #include <utils/Thread.h>
 #include <utils/KeyedVector.h>
 #include <utils/Timers.h>
+
+#include <android/hardware/camera/device/3.2/ICameraDevice.h>
+#include <android/hardware/camera/device/3.2/ICameraDeviceSession.h>
+#include <android/hardware/camera/device/3.2/ICameraDeviceCallback.h>
 #include <hardware/camera3.h>
+
 #include <camera/CaptureResult.h>
 
 #include "common/CameraDeviceBase.h"
@@ -55,17 +63,18 @@ class Camera3ZslStream;
 class Camera3OutputStreamInterface;
 class Camera3StreamInterface;
 
-}
+} // namespace camera3
 
 /**
  * CameraDevice for HAL devices with version CAMERA_DEVICE_API_VERSION_3_0 or higher.
  */
 class Camera3Device :
             public CameraDeviceBase,
+            virtual public hardware::camera::device::V3_2::ICameraDeviceCallback,
             private camera3_callback_ops {
   public:
 
-    explicit Camera3Device(int id);
+    explicit Camera3Device(const String8& id);
 
     virtual ~Camera3Device();
 
@@ -73,91 +82,92 @@ class Camera3Device :
      * CameraDeviceBase interface
      */
 
-    virtual int      getId() const;
+    const String8& getId() const override;
 
     // Transitions to idle state on success.
-    virtual status_t initialize(CameraModule *module);
-    virtual status_t disconnect();
-    virtual status_t dump(int fd, const Vector<String16> &args);
-    virtual const CameraMetadata& info() const;
+    status_t initialize(CameraModule *module) override;
+    status_t initialize(sp<CameraProviderManager> manager) override;
+    status_t disconnect() override;
+    status_t dump(int fd, const Vector<String16> &args) override;
+    const CameraMetadata& info() const override;
 
     // Capture and setStreamingRequest will configure streams if currently in
     // idle state
-    virtual status_t capture(CameraMetadata &request, int64_t *lastFrameNumber = NULL);
-    virtual status_t captureList(const List<const CameraMetadata> &requests,
-                                 int64_t *lastFrameNumber = NULL);
-    virtual status_t setStreamingRequest(const CameraMetadata &request,
-                                         int64_t *lastFrameNumber = NULL);
-    virtual status_t setStreamingRequestList(const List<const CameraMetadata> &requests,
-                                             int64_t *lastFrameNumber = NULL);
-    virtual status_t clearStreamingRequest(int64_t *lastFrameNumber = NULL);
+    status_t capture(CameraMetadata &request, int64_t *lastFrameNumber = NULL) override;
+    status_t captureList(const List<const CameraMetadata> &requests,
+            int64_t *lastFrameNumber = NULL) override;
+    status_t setStreamingRequest(const CameraMetadata &request,
+            int64_t *lastFrameNumber = NULL) override;
+    status_t setStreamingRequestList(const List<const CameraMetadata> &requests,
+            int64_t *lastFrameNumber = NULL) override;
+    status_t clearStreamingRequest(int64_t *lastFrameNumber = NULL) override;
 
-    virtual status_t waitUntilRequestReceived(int32_t requestId, nsecs_t timeout);
+    status_t waitUntilRequestReceived(int32_t requestId, nsecs_t timeout) override;
 
     // Actual stream creation/deletion is delayed until first request is submitted
     // If adding streams while actively capturing, will pause device before adding
     // stream, reconfiguring device, and unpausing. If the client create a stream
     // with nullptr consumer surface, the client must then call setConsumer()
     // and finish the stream configuration before starting output streaming.
-    virtual status_t createStream(sp<Surface> consumer,
+    status_t createStream(sp<Surface> consumer,
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
-            uint32_t consumerUsage = 0);
-    virtual status_t createInputStream(
+            uint32_t consumerUsage = 0) override;
+    status_t createInputStream(
             uint32_t width, uint32_t height, int format,
-            int *id);
-    virtual status_t createZslStream(
+            int *id) override;
+    status_t createZslStream(
             uint32_t width, uint32_t height,
             int depth,
             /*out*/
             int *id,
             sp<camera3::Camera3ZslStream>* zslStream);
-    virtual status_t createReprocessStreamFromStream(int outputId, int *id);
+    status_t createReprocessStreamFromStream(int outputId, int *id) override;
 
-    virtual status_t getStreamInfo(int id,
+    status_t getStreamInfo(int id,
             uint32_t *width, uint32_t *height,
-            uint32_t *format, android_dataspace *dataSpace);
-    virtual status_t setStreamTransform(int id, int transform);
+            uint32_t *format, android_dataspace *dataSpace) override;
+    status_t setStreamTransform(int id, int transform) override;
 
-    virtual status_t deleteStream(int id);
-    virtual status_t deleteReprocessStream(int id);
+    status_t deleteStream(int id) override;
+    status_t deleteReprocessStream(int id) override;
 
-    virtual status_t configureStreams(bool isConstraiedHighSpeed = false);
-    virtual status_t getInputBufferProducer(
-            sp<IGraphicBufferProducer> *producer);
+    status_t configureStreams(bool isConstraiedHighSpeed = false) override;
+    status_t getInputBufferProducer(
+            sp<IGraphicBufferProducer> *producer) override;
 
-    virtual status_t createDefaultRequest(int templateId, CameraMetadata *request);
+    status_t createDefaultRequest(int templateId, CameraMetadata *request) override;
 
     // Transitions to the idle state on success
-    virtual status_t waitUntilDrained();
+    status_t waitUntilDrained() override;
 
-    virtual status_t setNotifyCallback(wp<NotificationListener> listener);
-    virtual bool     willNotify3A();
-    virtual status_t waitForNextFrame(nsecs_t timeout);
-    virtual status_t getNextResult(CaptureResult *frame);
+    status_t setNotifyCallback(wp<NotificationListener> listener) override;
+    bool     willNotify3A() override;
+    status_t waitForNextFrame(nsecs_t timeout) override;
+    status_t getNextResult(CaptureResult *frame) override;
 
-    virtual status_t triggerAutofocus(uint32_t id);
-    virtual status_t triggerCancelAutofocus(uint32_t id);
-    virtual status_t triggerPrecaptureMetering(uint32_t id);
+    status_t triggerAutofocus(uint32_t id) override;
+    status_t triggerCancelAutofocus(uint32_t id) override;
+    status_t triggerPrecaptureMetering(uint32_t id) override;
 
-    virtual status_t pushReprocessBuffer(int reprocessStreamId,
-            buffer_handle_t *buffer, wp<BufferReleasedListener> listener);
+    status_t pushReprocessBuffer(int reprocessStreamId,
+            buffer_handle_t *buffer, wp<BufferReleasedListener> listener) override;
 
-    virtual status_t flush(int64_t *lastFrameNumber = NULL);
+    status_t flush(int64_t *lastFrameNumber = NULL) override;
 
-    virtual status_t prepare(int streamId);
+    status_t prepare(int streamId) override;
 
-    virtual status_t tearDown(int streamId);
+    status_t tearDown(int streamId) override;
 
-    virtual status_t addBufferListenerForStream(int streamId,
-            wp<camera3::Camera3StreamBufferListener> listener);
+    status_t addBufferListenerForStream(int streamId,
+            wp<camera3::Camera3StreamBufferListener> listener) override;
 
-    virtual status_t prepare(int maxCount, int streamId);
+    status_t prepare(int maxCount, int streamId) override;
 
-    virtual uint32_t getDeviceVersion();
+    uint32_t getDeviceVersion() override;
 
-    virtual ssize_t getJpegBufferSize(uint32_t width, uint32_t height) const;
+    ssize_t getJpegBufferSize(uint32_t width, uint32_t height) const override;
     ssize_t getPointCloudBufferSize() const;
     ssize_t getRawOpaqueBufferSize(int32_t width, int32_t height) const;
 
@@ -168,7 +178,7 @@ class Camera3Device :
      * Set the deferred consumer surface to the output stream and finish the deferred
      * consumer configuration.
      */
-    virtual status_t setConsumerSurface(int streamId, sp<Surface> consumer);
+    status_t setConsumerSurface(int streamId, sp<Surface> consumer) override;
 
   private:
     static const size_t        kDumpLockAttempts  = 10;
@@ -198,14 +208,58 @@ class Camera3Device :
     Mutex                      mLock;
 
     // Camera device ID
-    const int                  mId;
+    const String8              mId;
 
     // Flag indicating is the current active stream configuration is constrained high speed.
     bool                       mIsConstrainedHighSpeedConfiguration;
 
     /**** Scope for mLock ****/
 
-    camera3_device_t          *mHal3Device;
+    /**
+     * Adapter for legacy HAL / HIDL HAL interface calls; calls either into legacy HALv3 or the
+     * HIDL HALv3 interfaces.
+     */
+    class HalInterface {
+      public:
+        HalInterface(camera3_device_t *device);
+        HalInterface(sp<hardware::camera::device::V3_2::ICameraDeviceSession> &session);
+        HalInterface(const HalInterface &other);
+        HalInterface();
+
+        // Returns true if constructed with a valid device or session, and not yet cleared
+        bool valid();
+
+        // Reset this HalInterface object (does not call close())
+        void clear();
+
+        // Calls into the HAL interface
+
+        // Caller takes ownership of requestTemplate
+        status_t constructDefaultRequestSettings(camera3_request_template_t templateId,
+                /*out*/ camera_metadata_t **requestTemplate);
+        status_t configureStreams(/*inout*/ camera3_stream_configuration *config);
+        status_t processCaptureRequest(camera3_capture_request_t *request);
+        status_t flush();
+        status_t dump(int fd);
+        status_t close();
+
+        // Find a buffer_handle_t based on frame number and stream ID
+        status_t popInflightBuffer(int32_t frameNumber, int32_t streamId,
+                /*out*/ buffer_handle_t **buffer);
+
+      private:
+        camera3_device_t *mHal3Device;
+        sp<hardware::camera::device::V3_2::ICameraDeviceSession> mHidlSession;
+
+        std::mutex mInflightLock;
+
+        status_t pushInflightBufferLocked(int32_t frameNumber, int32_t streamId,
+                buffer_handle_t *buffer);
+        // Cache of buffer handles keyed off (frameNumber << 32 | streamId)
+        std::unordered_map<uint64_t, buffer_handle_t*> mInflightBufferMap;
+    };
+
+    std::unique_ptr<HalInterface> mInterface;
 
     CameraMetadata             mDeviceInfo;
 
@@ -313,10 +367,27 @@ class Camera3Device :
     status_t submitRequestsHelper(const List<const CameraMetadata> &requests, bool repeating,
                                   int64_t *lastFrameNumber = NULL);
 
+
+    /**
+     * Implementation of android::hardware::camera::device::V3_2::ICameraDeviceCallback
+     */
+
+    hardware::Return<void> processCaptureResult(
+            const hardware::camera::device::V3_2::CaptureResult& result) override;
+    hardware::Return<void> notify(
+            const hardware::camera::device::V3_2::NotifyMsg& msg) override;
+
+    /**
+     * Common initialization code shared by both HAL paths
+     *
+     * Must be called with mLock and mInterfaceLock held.
+     */
+    status_t initializeCommonLocked();
+
     /**
      * Get the last request submitted to the hal by the request thread.
      *
-     * Takes mLock.
+     * Must be called with mLock held.
      */
     virtual CameraMetadata getLatestRequestLocked();
 
@@ -434,6 +505,24 @@ class Camera3Device :
      */
     static android_dataspace mapToLegacyDataspace(android_dataspace dataSpace);
 
+    /**
+     * Helper functions to map between framework and HIDL values
+     */
+    static hardware::graphics::common::V1_0::PixelFormat mapToPixelFormat(int frameworkFormat);
+    static hardware::camera::device::V3_2::DataspaceFlags mapToHidlDataspace(
+            android_dataspace dataSpace);
+    static hardware::camera::device::V3_2::ConsumerUsageFlags mapToConsumerUsage(uint32_t usage);
+    static hardware::camera::device::V3_2::StreamRotation mapToStreamRotation(
+            camera3_stream_rotation_t rotation);
+    static hardware::camera::device::V3_2::StreamConfigurationMode mapToStreamConfigurationMode(
+            camera3_stream_configuration_mode_t operationMode);
+    static camera3_buffer_status_t mapHidlBufferStatus(hardware::camera::device::V3_2::BufferStatus status);
+    static int mapToFrameworkFormat(hardware::graphics::common::V1_0::PixelFormat pixelFormat);
+    static uint32_t mapConsumerToFrameworkUsage(
+            hardware::camera::device::V3_2::ConsumerUsageFlags usage);
+    static uint32_t mapProducerToFrameworkUsage(
+            hardware::camera::device::V3_2::ProducerUsageFlags usage);
+
     struct RequestTrigger {
         // Metadata tag number, e.g. android.control.aePrecaptureTrigger
         uint32_t metadataTag;
@@ -460,8 +549,10 @@ class Camera3Device :
 
         RequestThread(wp<Camera3Device> parent,
                 sp<camera3::StatusTracker> statusTracker,
-                camera3_device_t *hal3Device,
+                HalInterface* interface,
+                uint32_t deviceVersion,
                 bool aeLockAvailable);
+        ~RequestThread();
 
         void     setNotificationListener(wp<NotificationListener> listener);
 
@@ -541,7 +632,7 @@ class Camera3Device :
         virtual bool threadLoop();
 
       private:
-        static int         getId(const wp<Camera3Device> &device);
+        static const String8& getId(const wp<Camera3Device> &device);
 
         status_t           queueTriggerLocked(RequestTrigger trigger);
         // Mix-in queued triggers into this request
@@ -602,11 +693,12 @@ class Camera3Device :
 
         wp<Camera3Device>  mParent;
         wp<camera3::StatusTracker>  mStatusTracker;
-        camera3_device_t  *mHal3Device;
+        HalInterface*      mInterface;
+        uint32_t           mDeviceVersion;
 
         wp<NotificationListener> mListener;
 
-        const int          mId;       // The camera ID
+        const String8&     mId;       // The camera ID
         int                mStatusId; // The RequestThread's component ID for
                                       // status tracking
 

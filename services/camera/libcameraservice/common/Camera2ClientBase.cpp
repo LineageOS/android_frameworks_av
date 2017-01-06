@@ -47,7 +47,7 @@ Camera2ClientBase<TClientBase>::Camera2ClientBase(
         const sp<CameraService>& cameraService,
         const sp<TCamCallbacks>& remoteCallback,
         const String16& clientPackageName,
-        int cameraId,
+        const String8& cameraId,
         int cameraFacing,
         int clientPid,
         uid_t clientUid,
@@ -55,10 +55,10 @@ Camera2ClientBase<TClientBase>::Camera2ClientBase(
         TClientBase(cameraService, remoteCallback, clientPackageName,
                 cameraId, cameraFacing, clientPid, clientUid, servicePid),
         mSharedCameraCallbacks(remoteCallback),
-        mDeviceVersion(cameraService->getDeviceVersion(cameraId)),
+        mDeviceVersion(cameraService->getDeviceVersion(TClientBase::mCameraIdStr)),
         mDeviceActive(false)
 {
-    ALOGI("Camera %d: Opened. Client: %s (PID %d, UID %d)", cameraId,
+    ALOGI("Camera %s: Opened. Client: %s (PID %d, UID %d)", cameraId.string(),
             String8(clientPackageName).string(), clientPid, clientUid);
 
     mInitialClientPid = clientPid;
@@ -80,9 +80,20 @@ status_t Camera2ClientBase<TClientBase>::checkPid(const char* checkLocation)
 
 template <typename TClientBase>
 status_t Camera2ClientBase<TClientBase>::initialize(CameraModule *module) {
+    return initializeImpl(module);
+}
+
+template <typename TClientBase>
+status_t Camera2ClientBase<TClientBase>::initialize(sp<CameraProviderManager> manager) {
+    return initializeImpl(manager);
+}
+
+template <typename TClientBase>
+template <typename TProviderPtr>
+status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr) {
     ATRACE_CALL();
-    ALOGV("%s: Initializing client for camera %d", __FUNCTION__,
-          TClientBase::mCameraId);
+    ALOGV("%s: Initializing client for camera %s", __FUNCTION__,
+          TClientBase::mCameraIdStr.string());
     status_t res;
 
     // Verify ops permissions
@@ -92,15 +103,15 @@ status_t Camera2ClientBase<TClientBase>::initialize(CameraModule *module) {
     }
 
     if (mDevice == NULL) {
-        ALOGE("%s: Camera %d: No device connected",
-                __FUNCTION__, TClientBase::mCameraId);
+        ALOGE("%s: Camera %s: No device connected",
+                __FUNCTION__, TClientBase::mCameraIdStr.string());
         return NO_INIT;
     }
 
-    res = mDevice->initialize(module);
+    res = mDevice->initialize(providerPtr);
     if (res != OK) {
-        ALOGE("%s: Camera %d: unable to initialize device: %s (%d)",
-                __FUNCTION__, TClientBase::mCameraId, strerror(-res), res);
+        ALOGE("%s: Camera %s: unable to initialize device: %s (%d)",
+                __FUNCTION__, TClientBase::mCameraIdStr.string(), strerror(-res), res);
         return res;
     }
 
@@ -118,8 +129,8 @@ Camera2ClientBase<TClientBase>::~Camera2ClientBase() {
 
     disconnect();
 
-    ALOGI("Closed Camera %d. Client was: %s (PID %d, UID %u)",
-            TClientBase::mCameraId,
+    ALOGI("Closed Camera %s. Client was: %s (PID %d, UID %u)",
+            TClientBase::mCameraIdStr.string(),
             String8(TClientBase::mClientPackageName).string(),
             mInitialClientPid, TClientBase::mClientUid);
 }
@@ -128,8 +139,8 @@ template <typename TClientBase>
 status_t Camera2ClientBase<TClientBase>::dumpClient(int fd,
                                               const Vector<String16>& args) {
     String8 result;
-    result.appendFormat("Camera2ClientBase[%d] (%p) PID: %d, dump:\n",
-            TClientBase::mCameraId,
+    result.appendFormat("Camera2ClientBase[%s] (%p) PID: %d, dump:\n",
+            TClientBase::mCameraIdStr.string(),
             (TClientBase::getRemoteCallback() != NULL ?
                     IInterface::asBinder(TClientBase::getRemoteCallback()).get() : NULL),
             TClientBase::mClientPid);
@@ -180,13 +191,13 @@ binder::Status Camera2ClientBase<TClientBase>::disconnect() {
     if (callingPid != TClientBase::mClientPid &&
         callingPid != TClientBase::mServicePid) return res;
 
-    ALOGV("Camera %d: Shutting down", TClientBase::mCameraId);
+    ALOGV("Camera %s: Shutting down", TClientBase::mCameraIdStr.string());
 
     detachDevice();
 
     CameraService::BasicClient::disconnect();
 
-    ALOGV("Camera %d: Shut down complete complete", TClientBase::mCameraId);
+    ALOGV("Camera %s: Shut down complete complete", TClientBase::mCameraIdStr.string());
 
     return res;
 }
@@ -198,7 +209,7 @@ void Camera2ClientBase<TClientBase>::detachDevice() {
 
     mDevice.clear();
 
-    ALOGV("Camera %d: Detach complete", TClientBase::mCameraId);
+    ALOGV("Camera %s: Detach complete", TClientBase::mCameraIdStr.string());
 }
 
 template <typename TClientBase>
@@ -211,10 +222,10 @@ status_t Camera2ClientBase<TClientBase>::connect(
     if (TClientBase::mClientPid != 0 &&
         getCallingPid() != TClientBase::mClientPid) {
 
-        ALOGE("%s: Camera %d: Connection attempt from pid %d; "
+        ALOGE("%s: Camera %s: Connection attempt from pid %d; "
                 "current locked to pid %d",
                 __FUNCTION__,
-                TClientBase::mCameraId,
+                TClientBase::mCameraIdStr.string(),
                 getCallingPid(),
                 TClientBase::mClientPid);
         return BAD_VALUE;
@@ -242,8 +253,7 @@ template <typename TClientBase>
 void Camera2ClientBase<TClientBase>::notifyIdle() {
     if (mDeviceActive) {
         getCameraService()->updateProxyDeviceState(
-            ICameraServiceProxy::CAMERA_STATE_IDLE,
-            String8::format("%d", TClientBase::mCameraId));
+            ICameraServiceProxy::CAMERA_STATE_IDLE, TClientBase::mCameraIdStr);
     }
     mDeviceActive = false;
 
@@ -258,8 +268,7 @@ void Camera2ClientBase<TClientBase>::notifyShutter(const CaptureResultExtras& re
 
     if (!mDeviceActive) {
         getCameraService()->updateProxyDeviceState(
-            ICameraServiceProxy::CAMERA_STATE_ACTIVE,
-            String8::format("%d", TClientBase::mCameraId));
+            ICameraServiceProxy::CAMERA_STATE_ACTIVE, TClientBase::mCameraIdStr);
     }
     mDeviceActive = true;
 
@@ -322,7 +331,7 @@ void Camera2ClientBase<TClientBase>::notifyRepeatingRequestError(long lastFrameN
 
 template <typename TClientBase>
 int Camera2ClientBase<TClientBase>::getCameraId() const {
-    return TClientBase::mCameraId;
+    return std::stoi(TClientBase::mCameraIdStr.string());
 }
 
 template <typename TClientBase>
@@ -337,7 +346,7 @@ const sp<CameraDeviceBase>& Camera2ClientBase<TClientBase>::getCameraDevice() {
 
 template <typename TClientBase>
 const sp<CameraService>& Camera2ClientBase<TClientBase>::getCameraService() {
-    return TClientBase::mCameraService;
+    return TClientBase::sCameraService;
 }
 
 template <typename TClientBase>

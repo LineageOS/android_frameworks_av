@@ -56,7 +56,8 @@ Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
         int servicePid,
         bool legacyMode):
         Camera2ClientBase(cameraService, cameraClient, clientPackageName,
-                cameraId, cameraFacing, clientPid, clientUid, servicePid),
+                String8::format("%d", cameraId), cameraFacing,
+                clientPid, clientUid, servicePid),
         mParameters(cameraId, cameraFacing)
 {
     ATRACE_CALL();
@@ -1034,7 +1035,7 @@ status_t Camera2Client::startRecordingL(Parameters &params, bool restart) {
     }
 
     if (!restart) {
-        mCameraService->playSound(CameraService::SOUND_RECORDING_START);
+        sCameraService->playSound(CameraService::SOUND_RECORDING_START);
         mStreamingProcessor->updateRecordingRequest(params);
         if (res != OK) {
             ALOGE("%s: Camera %d: Unable to update recording request: %s (%d)",
@@ -1191,7 +1192,7 @@ void Camera2Client::stopRecording() {
             return;
     };
 
-    mCameraService->playSound(CameraService::SOUND_RECORDING_STOP);
+    sCameraService->playSound(CameraService::SOUND_RECORDING_STOP);
 
     // Remove recording stream because the video target may be abandoned soon.
     res = stopStream();
@@ -1621,7 +1622,7 @@ status_t Camera2Client::commandEnableShutterSoundL(bool enable) {
 }
 
 status_t Camera2Client::commandPlayRecordingSoundL() {
-    mCameraService->playSound(CameraService::SOUND_RECORDING_START);
+    sCameraService->playSound(CameraService::SOUND_RECORDING_START);
     return OK;
 }
 

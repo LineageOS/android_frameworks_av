@@ -144,6 +144,10 @@ class Camera3Stream :
     int               getFormat() const;
     android_dataspace getDataSpace() const;
 
+    camera3_stream*   asHalStream() override {
+        return this;
+    }
+
     /**
      * Start the stream configuration process. Returns a handle to the stream's
      * information to be passed into the HAL device's configure_streams call.
@@ -165,11 +169,10 @@ class Camera3Stream :
     bool             isConfiguring() const;
 
     /**
-     * Completes the stream configuration process. During this call, the stream
-     * may call the device's register_stream_buffers() method. The stream
-     * information structure returned by startConfiguration() may no longer be
-     * modified after this call, but can still be read until the destruction of
-     * the stream.
+     * Completes the stream configuration process. The stream information
+     * structure returned by startConfiguration() may no longer be modified
+     * after this call, but can still be read until the destruction of the
+     * stream.
      *
      * Returns:
      *   OK on a successful configuration
@@ -178,7 +181,7 @@ class Camera3Stream :
      *   INVALID_OPERATION in case connecting to the consumer failed or consumer
      *       doesn't exist yet.
      */
-    status_t         finishConfiguration(camera3_device *hal3Device);
+    status_t         finishConfiguration();
 
     /**
      * Cancels the stream configuration process. This returns the stream to the

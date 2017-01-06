@@ -38,6 +38,7 @@
 #include "CameraFlashlight.h"
 
 #include "common/CameraModule.h"
+#include "common/CameraProviderManager.h"
 #include "media/RingBuffer.h"
 #include "utils/AutoConditionLock.h"
 #include "utils/ClientManager.h"
@@ -57,11 +58,13 @@ class MediaPlayer;
 
 class CameraService :
     public BinderService<CameraService>,
-    public ::android::hardware::BnCameraService,
-    public IBinder::DeathRecipient,
-    public camera_module_callbacks_t
+    public virtual ::android::hardware::BnCameraService,
+    public virtual IBinder::DeathRecipient,
+    public camera_module_callbacks_t,
+    public virtual CameraProviderManager::StatusListener
 {
     friend class BinderService<CameraService>;
+    friend class CameraClient;
 public:
     class Client;
     class BasicClient;
@@ -96,11 +99,12 @@ public:
     virtual             ~CameraService();
 
     /////////////////////////////////////////////////////////////////////
-    // HAL Callbacks
+    // HAL Callbacks - implements CameraProviderManager::StatusListener
+
     virtual void        onDeviceStatusChanged(const String8 &cameraId,
-            hardware::camera::common::V1_0::CameraDeviceStatus newHalStatus);
+            hardware::camera::common::V1_0::CameraDeviceStatus newHalStatus) override;
     virtual void        onTorchStatusChanged(const String8& cameraId,
-            hardware::camera::common::V1_0::TorchModeStatus newStatus);
+            hardware::camera::common::V1_0::TorchModeStatus newStatus) override;
 
     /////////////////////////////////////////////////////////////////////
     // ICameraService
@@ -108,7 +112,7 @@ public:
 
     virtual binder::Status     getCameraInfo(int cameraId,
             hardware::CameraInfo* cameraInfo);
-    virtual binder::Status     getCameraCharacteristics(const String16& id,
+    virtual binder::Status     getCameraCharacteristics(const String16& cameraId,
             CameraMetadata* cameraInfo);
     virtual binder::Status     getCameraVendorTagDescriptor(
             /*out*/
@@ -185,7 +189,7 @@ public:
 
     /////////////////////////////////////////////////////////////////////
     // CameraDeviceFactory functionality
-    int                 getDeviceVersion(int cameraId, int* facing = NULL);
+    int                 getDeviceVersion(const String8& cameraId, int* facing = NULL);
 
     /////////////////////////////////////////////////////////////////////
     // Shared utilities
@@ -197,6 +201,7 @@ public:
     class BasicClient : public virtual RefBase {
     public:
         virtual status_t       initialize(CameraModule *module) = 0;
+        virtual status_t       initialize(sp<CameraProviderManager> manager) = 0;
         virtual binder::Status disconnect();
 
         // because we can't virtually inherit IInterface, which breaks
@@ -233,7 +238,7 @@ public:
         BasicClient(const sp<CameraService>& cameraService,
                 const sp<IBinder>& remoteCallback,
                 const String16& clientPackageName,
-                int cameraId,
+                const String8& cameraIdStr,
                 int cameraFacing,
                 int clientPid,
                 uid_t clientUid,
@@ -248,13 +253,13 @@ public:
         bool                            mDestructionStarted;
 
         // these are initialized in the constructor.
-        sp<CameraService>               mCameraService;     // immutable after constructor
-        int                             mCameraId;          // immutable after constructor
-        int                             mCameraFacing;      // immutable after constructor
-        String16                        mClientPackageName; // immutable after constructor
+        static sp<CameraService>        sCameraService;
+        const String8                   mCameraIdStr;
+        const int                       mCameraFacing;
+        String16                        mClientPackageName;
         pid_t                           mClientPid;
-        uid_t                           mClientUid;         // immutable after constructor
-        pid_t                           mServicePid;        // immutable after constructor
+        const uid_t                     mClientUid;
+        const pid_t                     mServicePid;
         bool                            mDisconnected;
 
         // - The app-side Binder interface to receive callbacks from us
@@ -320,7 +325,7 @@ public:
         Client(const sp<CameraService>& cameraService,
                 const sp<hardware::ICameraClient>& cameraClient,
                 const String16& clientPackageName,
-                int cameraId,
+                const String8& cameraIdStr,
                 int cameraFacing,
                 int clientPid,
                 uid_t clientUid,
@@ -343,14 +348,12 @@ public:
         // superclass this can be cast to.
         virtual bool canCastToApiClient(apiLevel level) const;
     protected:
-        // Convert client from cookie.
-        static sp<CameraService::Client> getClientFromCookie(void* user);
-
         // Initialized in constructor
 
         // - The app-side Binder interface to receive callbacks from us
         sp<hardware::ICameraClient>               mRemoteCallback;
 
+        int mCameraId;  // All API1 clients use integer camera IDs
     }; // class Client
 
     /**
@@ -438,6 +441,7 @@ private:
      */
     class CameraState {
     public:
+
         /**
          * Make a new CameraState and set the ID, cost, and conflicting devices using the values
          * returned in the HAL's camera_info struct for each device.
@@ -505,6 +509,12 @@ private:
 
     // Delay-load the Camera HAL module
     virtual void onFirstRef();
+
+    // Load the legacy HAL module
+    status_t loadLegacyHalModule();
+
+    // Eumerate all camera providers in the system
+    status_t enumerateProviders();
 
     // Check if we can connect, before we acquire the service lock.
     // The returned originalClientPid is the PID of the original process that wants to connect to
@@ -676,7 +686,11 @@ private:
     sp<MediaPlayer>     mSoundPlayer[NUM_SOUNDS];
     int                 mSoundRef;  // reference count (release all MediaPlayer when 0)
 
-    CameraModule*     mModule;
+    // Basic flag on whether the camera subsystem is in a usable state
+    bool                mInitialized;
+
+    CameraModule*       mModule;
+    sp<CameraProviderManager> mCameraProviderManager;
 
     // Guarded by mStatusListenerMutex
     std::vector<sp<hardware::ICameraServiceListener>> mListenerList;
@@ -767,7 +781,7 @@ private:
     static int getCameraPriorityFromProcState(int procState);
 
     static binder::Status makeClient(const sp<CameraService>& cameraService,
-            const sp<IInterface>& cameraCb, const String16& packageName, int cameraId,
+            const sp<IInterface>& cameraCb, const String16& packageName, const String8& cameraId,
             int facing, int clientPid, uid_t clientUid, int servicePid, bool legacyMode,
             int halVersion, int deviceVersion, apiLevel effectiveApiLevel,
             /*out*/sp<BasicClient>* client);

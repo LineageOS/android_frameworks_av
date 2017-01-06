@@ -28,6 +28,7 @@ LOCAL_SRC_FILES :=  \
     common/Camera2ClientBase.cpp \
     common/CameraDeviceBase.cpp \
     common/CameraModule.cpp \
+    common/CameraProviderManager.cpp \
     common/FrameProcessorBase.cpp \
     api1/CameraClient.cpp \
     api1/Camera2Client.cpp \
@@ -63,24 +64,35 @@ LOCAL_SHARED_LIBRARIES:= \
     libmedia \
     libmediautils \
     libcamera_client \
+    libcamera_metadata \
     libgui \
     libhardware \
-    libcamera_metadata \
+    libhidlbase \
+    libhidltransport \
     libjpeg \
     libmemunreachable \
-    android.hardware.camera.common@1.0
+    android.hardware.camera.common@1.0 \
+    android.hardware.camera.provider@2.4 \
+    android.hardware.camera.device@1.0 \
+    android.hardware.camera.device@3.2 \
+    android.hidl.manager@1.0
 
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder libcamera_client
 
 LOCAL_C_INCLUDES += \
     system/media/private/camera/include \
-    frameworks/native/include/media/openmax \
-    external/jpeg
+    frameworks/native/include/media/openmax
 
 LOCAL_EXPORT_C_INCLUDE_DIRS := \
     frameworks/av/services/camera/libcameraservice
 
 LOCAL_CFLAGS += -Wall -Wextra -Werror
+
+ifeq ($(ENABLE_TREBLE), true)
+
+  LOCAL_CFLAGS += -DENABLE_TREBLE
+
+endif # ENABLE_TREBLE
 
 LOCAL_MODULE:= libcameraservice
 
