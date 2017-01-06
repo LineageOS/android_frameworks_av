@@ -20,4 +20,5 @@ ndk_library {
     name: "libmediandk.ndk",
     symbol_file: "libmediandk.map.txt",
     first_version: "21",
+    unversioned_until: "current",
 }

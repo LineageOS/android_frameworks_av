@@ -20,4 +20,5 @@ ndk_library {
     name: "libcamera2ndk.ndk",
     symbol_file: "libcamera2ndk.map.txt",
     first_version: "24",
+    unversioned_until: "current",
 }
