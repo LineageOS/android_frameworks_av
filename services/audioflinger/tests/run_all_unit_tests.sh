@@ -8,5 +8,5 @@ fi
 echo "waiting for device"
 adb root && adb wait-for-device remount
 
-#adb shell /system/bin/resampler_tests
 adb shell /data/nativetest/resampler_tests/resampler_tests
+adb shell /data/nativetest64/resampler_tests/resampler_tests

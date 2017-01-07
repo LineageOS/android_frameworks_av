@@ -15,7 +15,9 @@ mm
 echo "waiting for device"
 adb root && adb wait-for-device remount
 adb push $OUT/system/lib/libaudioresampler.so /system/lib
-adb push $OUT/data/nativetest/resampler_tests /system/bin
+adb push $OUT/system/lib64/libaudioresampler.so /system/lib64
+adb push $OUT/data/nativetest/resampler_tests/resampler_tests /data/nativetest/resampler_tests/resampler_tests
+adb push $OUT/data/nativetest64/resampler_tests/resampler_tests /data/nativetest64/resampler_tests/resampler_tests
 
 sh $ANDROID_BUILD_TOP/frameworks/av/services/audioflinger/tests/run_all_unit_tests.sh
 
