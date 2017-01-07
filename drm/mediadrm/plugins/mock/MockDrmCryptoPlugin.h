@@ -33,7 +33,8 @@ namespace android {
 
         bool isCryptoSchemeSupported(const uint8_t uuid[16]);
         bool isContentTypeSupported(const String8 &mimeType);
-        status_t createDrmPlugin(const uint8_t uuid[16], DrmPlugin **plugin);
+        status_t createDrmPlugin(const uint8_t uuid[16],
+                                 DrmPlugin **plugin);
     };
 
     class MockCryptoFactory : public CryptoFactory {

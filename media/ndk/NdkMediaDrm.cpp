@@ -172,7 +172,8 @@ static sp<IDrm> CreateDrmFromUUID(const AMediaUUID uuid) {
         return NULL;
     }
 
-    status_t err = drm->createPlugin(uuid);
+    String8 nullPackageName;
+    status_t err = drm->createPlugin(uuid, nullPackageName);
 
     if (err != OK) {
         return NULL;

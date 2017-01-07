@@ -303,7 +303,8 @@ bool Drm::isCryptoSchemeSupported(const uint8_t uuid[16], const String8 &mimeTyp
     return true;
 }
 
-status_t Drm::createPlugin(const uint8_t uuid[16]) {
+status_t Drm::createPlugin(const uint8_t uuid[16],
+                           const String8& /* appPackageName */) {
     Mutex::Autolock autoLock(mLock);
 
     if (mPlugin != NULL) {
@@ -319,7 +320,12 @@ status_t Drm::createPlugin(const uint8_t uuid[16]) {
     }
 
     status_t result = mFactory->createDrmPlugin(uuid, &mPlugin);
-    mPlugin->setListener(this);
+    if (mPlugin) {
+        mPlugin->setListener(this);
+    } else {
+        ALOGE("Failed to create plugin");
+        return UNEXPECTED_NULL;
+    }
     return result;
 }
 

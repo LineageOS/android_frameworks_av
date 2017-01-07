@@ -35,7 +35,8 @@ public:
     virtual bool isContentTypeSupported(const android::String8 &mimeType);
 
     virtual android::status_t createDrmPlugin(
-            const uint8_t uuid[16], android::DrmPlugin** plugin);
+            const uint8_t uuid[16],
+            android::DrmPlugin** plugin);
 
 private:
     DISALLOW_EVIL_CONSTRUCTORS(DrmFactory);

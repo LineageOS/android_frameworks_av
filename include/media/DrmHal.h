@@ -49,7 +49,8 @@ struct DrmHal : public BnDrm,
 
     virtual bool isCryptoSchemeSupported(const uint8_t uuid[16], const String8 &mimeType);
 
-    virtual status_t createPlugin(const uint8_t uuid[16]);
+    virtual status_t createPlugin(const uint8_t uuid[16],
+                                  const String8 &appPackageName);
 
     virtual status_t destroyPlugin();
 
@@ -169,7 +170,8 @@ private:
     status_t mInitCheck;
 
     sp<IDrmFactory> makeDrmFactory();
-    sp<IDrmPlugin> makeDrmPlugin(const uint8_t uuid[16]);
+    sp<IDrmPlugin> makeDrmPlugin(const uint8_t uuid[16],
+                                 const String8 &appPackageName);
 
     void writeByteArray(Parcel &obj, const hidl_vec<uint8_t>& array);
 
