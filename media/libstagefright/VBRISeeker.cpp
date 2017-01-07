@@ -83,8 +83,23 @@ sp<VBRISeeker> VBRISeeker::CreateFromSource(
          scale,
          entrySize);
 
+    if (entrySize > 4) {
+        ALOGE("invalid VBRI entry size: %zu", entrySize);
+        return NULL;
+    }
+
+    sp<VBRISeeker> seeker = new (std::nothrow) VBRISeeker;
+    if (seeker == NULL) {
+        ALOGW("Couldn't allocate VBRISeeker");
+        return NULL;
+    }
+
     size_t totalEntrySize = numEntries * entrySize;
-    uint8_t *buffer = new uint8_t[totalEntrySize];
+    uint8_t *buffer = new (std::nothrow) uint8_t[totalEntrySize];
+    if (!buffer) {
+        ALOGW("Couldn't allocate %zu bytes", totalEntrySize);
+        return NULL;
+    }
 
     n = source->readAt(pos + sizeof(vbriHeader), buffer, totalEntrySize);
     if (n < (ssize_t)totalEntrySize) {
@@ -94,7 +109,6 @@ sp<VBRISeeker> VBRISeeker::CreateFromSource(
         return NULL;
     }
 
-    sp<VBRISeeker> seeker = new VBRISeeker;
     seeker->mBasePos = post_id3_pos + frameSize;
     // only update mDurationUs if the calculated duration is valid (non zero)
     // otherwise, leave duration at -1 so that getDuration() and getOffsetForTime()
