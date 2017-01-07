@@ -119,7 +119,7 @@ int32_t mulAdd(int32_t in, int32_t v, int32_t a)
 static inline
 int32_t mulAddRL(int left, uint32_t inRL, int16_t v, int32_t a)
 {
-#if USE_INLINE_ASSEMBLY
+#if 0 // USE_INLINE_ASSEMBLY Seems to fail with Clang b/34110890
     int32_t out;
     if (left) {
         asm( "smlabb %[out], %[v], %[inRL], %[a] \n"
@@ -142,7 +142,7 @@ int32_t mulAddRL(int left, uint32_t inRL, int16_t v, int32_t a)
 static inline
 int32_t mulAddRL(int left, uint32_t inRL, int32_t v, int32_t a)
 {
-#if USE_INLINE_ASSEMBLY
+#if 0 // USE_INLINE_ASSEMBLY Seems to fail with Clang b/34110890
     int32_t out;
     if (left) {
         asm( "smlawb %[out], %[v], %[inRL], %[a] \n"
