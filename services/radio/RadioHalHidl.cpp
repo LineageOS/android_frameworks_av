@@ -233,19 +233,21 @@ int RadioHalHidl::Tuner::getProgramInformation(radio_program_info_t *info)
     if (mHalTuner == 0) {
         return -ENODEV;
     }
+    if (info == nullptr || info->metadata == nullptr) {
+        return BAD_VALUE;
+    }
     ProgramInfo halInfo;
     Result halResult;
-    bool withMetaData = (info->metadata != NULL);
     Return<void> hidlReturn = mHalTuner->getProgramInformation(
-                    withMetaData, [&](Result result, const ProgramInfo& info) {
-                        halResult = result;
-                        if (result == Result::OK) {
-                            halInfo = info;
-                        }
-    });
+        [&](Result result, const ProgramInfo& info) {
+            halResult = result;
+            if (result == Result::OK) {
+                halInfo = info;
+            }
+        });
     status_t status = checkHidlStatus(hidlReturn.getStatus());
     if (status == NO_ERROR && halResult == Result::OK) {
-        HidlUtils::convertProgramInfoFromHal(info, &halInfo, withMetaData);
+        HidlUtils::convertProgramInfoFromHal(info, &halInfo);
     }
     return HidlUtils::convertHalResult(halResult);
 }
@@ -276,11 +278,9 @@ Return<void> RadioHalHidl::Tuner::tuneComplete(Result result, const ProgramInfo&
     memset(&event, 0, sizeof(radio_hal_event_t));
     event.type = RADIO_EVENT_TUNED;
     event.status = HidlUtils::convertHalResult(result);
-    HidlUtils::convertProgramInfoFromHal(&event.info, &info, true);
+    HidlUtils::convertProgramInfoFromHal(&event.info, &info);
     onCallback(&event);
-    if (event.info.metadata != NULL) {
-        radio_metadata_deallocate(event.info.metadata);
-    }
+    radio_metadata_deallocate(event.info.metadata);
     return Return<void>();
 }
 
@@ -290,7 +290,7 @@ Return<void> RadioHalHidl::Tuner::afSwitch(const ProgramInfo& info)
     radio_hal_event_t event;
     memset(&event, 0, sizeof(radio_hal_event_t));
     event.type = RADIO_EVENT_AF_SWITCH;
-    HidlUtils::convertProgramInfoFromHal(&event.info, &info, true);
+    HidlUtils::convertProgramInfoFromHal(&event.info, &info);
     onCallback(&event);
     if (event.info.metadata != NULL) {
         radio_metadata_deallocate(event.info.metadata);
