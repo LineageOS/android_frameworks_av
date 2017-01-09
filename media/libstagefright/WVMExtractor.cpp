@@ -42,13 +42,9 @@ void *gVendorLibHandle = NULL;
 
 namespace android {
 
-static Mutex gWVMutex;
-
 WVMExtractor::WVMExtractor(const sp<DataSource> &source)
     : mDataSource(source)
 {
-    Mutex::Autolock autoLock(gWVMutex);
-
     if (!getVendorLibHandle()) {
         return;
     }
@@ -168,8 +164,6 @@ void WVMExtractor::setError(status_t err) {
 bool SniffWVM(
     const sp<DataSource> &source, String8 *mimeType, float *confidence,
         sp<AMessage> *) {
-
-    Mutex::Autolock autoLock(gWVMutex);
 
     if (!WVMExtractor::getVendorLibHandle()) {
         return false;
