@@ -16,6 +16,9 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "NuPlayer"
+
+#include <inttypes.h>
+
 #include <utils/Log.h>
 
 #include "NuPlayer.h"
@@ -1287,6 +1290,8 @@ void NuPlayer::onResume() {
     } else {
         ALOGW("resume called when renderer is gone or not set");
     }
+
+    mLastStartedPlayingTimeNs = systemTime();
 }
 
 status_t NuPlayer::onInstantiateSecureDecoders() {
@@ -1396,6 +1401,8 @@ void NuPlayer::onStart(int64_t startPositionUs, MediaPlayerSeekMode mode) {
         mAudioDecoder->setRenderer(mRenderer);
     }
 
+    mLastStartedPlayingTimeNs = systemTime();
+
     postScanSources();
 }
 
@@ -1413,6 +1420,16 @@ void NuPlayer::onPause() {
         mRenderer->pause();
     } else {
         ALOGW("pause called when renderer is gone or not set");
+    }
+
+    sp<NuPlayerDriver> driver = mDriver.promote();
+    if (driver != NULL) {
+        int64_t now = systemTime();
+        int64_t played = now - mLastStartedPlayingTimeNs;
+        ALOGD("played from %" PRId64 " to %" PRId64 " = %" PRId64 ,
+              mLastStartedPlayingTimeNs, now, played);
+
+        driver->notifyMorePlayingTimeUs((played+500)/1000);
     }
 }
 

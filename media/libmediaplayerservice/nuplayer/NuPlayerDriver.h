@@ -16,6 +16,7 @@
 
 #include <media/MediaPlayerInterface.h>
 
+#include <media/MediaAnalyticsItem.h>
 #include <media/stagefright/foundation/ABase.h>
 
 namespace android {
@@ -75,6 +76,7 @@ struct NuPlayerDriver : public MediaPlayerInterface {
     void notifyResetComplete();
     void notifySetSurfaceComplete();
     void notifyDuration(int64_t durationUs);
+    void notifyMorePlayingTimeUs(int64_t timeUs);
     void notifySeekComplete();
     void notifySeekComplete_l();
     void notifyListener(int msg, int ext1 = 0, int ext2 = 0, const Parcel *in = NULL);
@@ -112,6 +114,7 @@ private:
     int64_t mDurationUs;
     int64_t mPositionUs;
     bool mSeekInProgress;
+    int64_t mPlayingTimeUs;
     // <<<
 
     sp<ALooper> mLooper;
@@ -119,9 +122,14 @@ private:
     sp<AudioSink> mAudioSink;
     uint32_t mPlayerFlags;
 
+    MediaAnalyticsItem *mAnalyticsItem;
+
     bool mAtEOS;
     bool mLooping;
     bool mAutoLoop;
+
+    void finalizeMetrics(const char *where);
+    void logMetrics(const char *where);
 
     status_t prepare_l();
     status_t start_l();
