@@ -1495,10 +1495,16 @@ void NuPlayer::GenericSource::BufferingMonitor::getDefaultBufferingSettings(
     buffering->mRebufferingWatermarkHighMs = kHighWaterMarkRebufferMs;
     buffering->mRebufferingWatermarkLowKB = kLowWaterMarkKB;
     buffering->mRebufferingWatermarkHighKB = kHighWaterMarkKB;
+
+    ALOGV("BufferingMonitor::getDefaultBufferingSettings{%s}",
+            buffering->toString().string());
 }
 
 status_t NuPlayer::GenericSource::BufferingMonitor::setBufferingSettings(
         const BufferingSettings &buffering) {
+    ALOGV("BufferingMonitor::setBufferingSettings{%s}",
+            buffering.toString().string());
+
     Mutex::Autolock _l(mLock);
     if (buffering.IsSizeBasedBufferingMode(buffering.mInitialBufferingMode)
             || (buffering.IsTimeBasedBufferingMode(buffering.mRebufferingMode)

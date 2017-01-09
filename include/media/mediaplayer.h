@@ -219,6 +219,8 @@ public:
             status_t        setVideoSurfaceTexture(
                                     const sp<IGraphicBufferProducer>& bufferProducer);
             status_t        setListener(const sp<MediaPlayerListener>& listener);
+            status_t        getDefaultBufferingSettings(BufferingSettings* buffering /* nonnull */);
+            status_t        setBufferingSettings(const BufferingSettings& buffering);
             status_t        prepare();
             status_t        prepareAsync();
             status_t        start();

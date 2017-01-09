@@ -244,6 +244,28 @@ status_t MediaPlayer::setVideoSurfaceTexture(
     return mPlayer->setVideoSurfaceTexture(bufferProducer);
 }
 
+status_t MediaPlayer::getDefaultBufferingSettings(BufferingSettings* buffering /* nonnull */)
+{
+    ALOGV("getDefaultBufferingSettings");
+
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == 0) {
+        return NO_INIT;
+    }
+    return mPlayer->getDefaultBufferingSettings(buffering);
+}
+
+status_t MediaPlayer::setBufferingSettings(const BufferingSettings& buffering)
+{
+    ALOGV("setBufferingSettings");
+
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == 0) {
+        return NO_INIT;
+    }
+    return mPlayer->setBufferingSettings(buffering);
+}
+
 // must call with lock held
 status_t MediaPlayer::prepareAsync_l()
 {
