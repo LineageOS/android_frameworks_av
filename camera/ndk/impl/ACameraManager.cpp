@@ -335,7 +335,7 @@ ACameraManager::getCameraIdList(ACameraIdList** cameraIdList) {
         return ACAMERA_ERROR_NOT_ENOUGH_MEMORY;
     }
     out->numCameras = numCameras;
-    out->cameraIds = new const char*[numCameras] {nullptr};
+    out->cameraIds = new const char*[numCameras];
     if (!out->cameraIds) {
         ALOGE("Allocate memory for ACameraIdList failed!");
         deleteCameraIdList(out);
