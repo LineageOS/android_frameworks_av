@@ -917,6 +917,8 @@ status_t Parameters::initialize(const CameraMetadata *info, int deviceVersion) {
     } else {
         allowZslMode = true;
     }
+    // TODO (b/34131351): turn ZSL back on after fixing the issue
+    allowZslMode = false;
 
     ALOGI("%s: allowZslMode: %d slowJpegMode %d", __FUNCTION__, allowZslMode, slowJpegMode);
 

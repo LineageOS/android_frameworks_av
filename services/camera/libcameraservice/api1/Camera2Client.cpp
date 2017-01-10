@@ -68,13 +68,22 @@ Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
     mLegacyMode = legacyMode;
 }
 
-status_t Camera2Client::initialize(CameraModule *module)
+status_t Camera2Client::initialize(CameraModule *module) {
+    return initializeImpl(module);
+}
+
+status_t Camera2Client::initialize(sp<CameraProviderManager> manager) {
+    return initializeImpl(manager);
+}
+
+template<typename TProviderPtr>
+status_t Camera2Client::initializeImpl(TProviderPtr providerPtr)
 {
     ATRACE_CALL();
     ALOGV("%s: Initializing client for camera %d", __FUNCTION__, mCameraId);
     status_t res;
 
-    res = Camera2ClientBase::initialize(module);
+    res = Camera2ClientBase::initialize(providerPtr);
     if (res != OK) {
         return res;
     }
