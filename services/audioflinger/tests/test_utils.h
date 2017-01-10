@@ -17,6 +17,12 @@
 #ifndef ANDROID_AUDIO_TEST_UTILS_H
 #define ANDROID_AUDIO_TEST_UTILS_H
 
+#ifndef LOG_TAG
+#define LOG_TAG "test_utils"
+#endif
+
+#include <log/log.h>
+
 #include <audio_utils/sndfile.h>
 
 #ifndef ARRAY_SIZE
