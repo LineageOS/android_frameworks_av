@@ -19,6 +19,7 @@
 
 #include <audio_utils/primitives.h>
 #include <audio_utils/format.h>
+#include <media/audiohal/EffectBufferHalInterface.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <media/AudioResamplerPublic.h>
@@ -179,17 +180,42 @@ DownmixerBufferProvider::DownmixerBufferProvider(
              EFFECT_CONFIG_FORMAT | EFFECT_CONFIG_ACC_MODE;
      mDownmixConfig.outputCfg.mask = mDownmixConfig.inputCfg.mask;
 
+     status_t status;
+     status = EffectBufferHalInterface::mirror(
+             nullptr,
+             audio_bytes_per_sample(format) * audio_channel_count_from_out_mask(inputChannelMask),
+             &mInBuffer);
+     if (status != 0) {
+         ALOGE("DownmixerBufferProvider() error %d while creating input buffer", status);
+         mDownmixInterface.clear();
+         mEffectsFactory.clear();
+         return;
+     }
+     status = EffectBufferHalInterface::mirror(
+             nullptr,
+             audio_bytes_per_sample(format) * audio_channel_count_from_out_mask(outputChannelMask),
+             &mOutBuffer);
+     if (status != 0) {
+         ALOGE("DownmixerBufferProvider() error %d while creating output buffer", status);
+         mInBuffer.clear();
+         mDownmixInterface.clear();
+         mEffectsFactory.clear();
+         return;
+     }
+
      int cmdStatus;
      uint32_t replySize = sizeof(int);
 
      // Configure downmixer
-     status_t status = mDownmixInterface->command(
+     status = mDownmixInterface->command(
              EFFECT_CMD_SET_CONFIG /*cmdCode*/, sizeof(effect_config_t) /*cmdSize*/,
              &mDownmixConfig /*pCmdData*/,
              &replySize, &cmdStatus /*pReplyData*/);
      if (status != 0 || cmdStatus != 0) {
          ALOGE("DownmixerBufferProvider() error %d cmdStatus %d while configuring downmixer",
                  status, cmdStatus);
+         mOutBuffer.clear();
+         mInBuffer.clear();
          mDownmixInterface.clear();
          mEffectsFactory.clear();
          return;
@@ -203,6 +229,8 @@ DownmixerBufferProvider::DownmixerBufferProvider(
      if (status != 0 || cmdStatus != 0) {
          ALOGE("DownmixerBufferProvider() error %d cmdStatus %d while enabling downmixer",
                  status, cmdStatus);
+         mOutBuffer.clear();
+         mInBuffer.clear();
          mDownmixInterface.clear();
          mEffectsFactory.clear();
          return;
@@ -228,6 +256,8 @@ DownmixerBufferProvider::DownmixerBufferProvider(
      if (status != 0 || cmdStatus != 0) {
          ALOGE("DownmixerBufferProvider() error %d cmdStatus %d while setting downmix type",
                  status, cmdStatus);
+         mOutBuffer.clear();
+         mInBuffer.clear();
          mDownmixInterface.clear();
          mEffectsFactory.clear();
          return;
@@ -238,18 +268,26 @@ DownmixerBufferProvider::DownmixerBufferProvider(
 DownmixerBufferProvider::~DownmixerBufferProvider()
 {
     ALOGV("~DownmixerBufferProvider (%p)", this);
+    if (mDownmixInterface != 0) {
+        mDownmixInterface->close();
+    }
 }
 
 void DownmixerBufferProvider::copyFrames(void *dst, const void *src, size_t frames)
 {
-    mDownmixConfig.inputCfg.buffer.frameCount = frames;
-    mDownmixConfig.inputCfg.buffer.raw = const_cast<void *>(src);
-    mDownmixConfig.outputCfg.buffer.frameCount = frames;
-    mDownmixConfig.outputCfg.buffer.raw = dst;
+    mInBuffer->setExternalData(const_cast<void*>(src));
+    mInBuffer->setFrameCount(frames);
+    mInBuffer->update();
+    mOutBuffer->setExternalData(dst);
+    mOutBuffer->setFrameCount(frames);
+    mOutBuffer->update();
     // may be in-place if src == dst.
-    status_t res = mDownmixInterface->process(
-            &mDownmixConfig.inputCfg.buffer, &mDownmixConfig.outputCfg.buffer);
-    ALOGE_IF(res != OK, "DownmixBufferProvider error %d", res);
+    status_t res = mDownmixInterface->process();
+    if (res == OK) {
+        mOutBuffer->commit();
+    } else {
+        ALOGE("DownmixBufferProvider error %d", res);
+    }
 }
 
 /* call once in a pthread_once handler. */

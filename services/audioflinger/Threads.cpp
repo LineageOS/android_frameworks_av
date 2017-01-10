@@ -2759,9 +2759,14 @@ void AudioFlinger::PlaybackThread::invalidateTracks(audio_stream_type_t streamTy
 status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& chain)
 {
     audio_session_t session = chain->sessionId();
-    int16_t* buffer = reinterpret_cast<int16_t*>(mEffectBufferEnabled
-            ? mEffectBuffer : mSinkBuffer);
-    bool ownsBuffer = false;
+    sp<EffectBufferHalInterface> halInBuffer, halOutBuffer;
+    status_t result = EffectBufferHalInterface::mirror(
+            mEffectBufferEnabled ? mEffectBuffer : mSinkBuffer,
+            mEffectBufferEnabled ? mEffectBufferSize : mSinkBufferSize,
+            &halInBuffer);
+    if (result != OK) return result;
+    halOutBuffer = halInBuffer;
+    int16_t *buffer = reinterpret_cast<int16_t*>(halInBuffer->externalData());
 
     ALOGV("addEffectChain_l() %p on thread %p for session %d", chain.get(), this, session);
     if (session > AUDIO_SESSION_OUTPUT_MIX) {
@@ -2769,10 +2774,13 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
         // the sink buffer as input
         if (mType != DIRECT) {
             size_t numSamples = mNormalFrameCount * mChannelCount;
-            buffer = new int16_t[numSamples];
-            memset(buffer, 0, numSamples * sizeof(int16_t));
-            ALOGV("addEffectChain_l() creating new input buffer %p session %d", buffer, session);
-            ownsBuffer = true;
+            status_t result = EffectBufferHalInterface::allocate(
+                    numSamples * sizeof(int16_t),
+                    &halInBuffer);
+            if (result != OK) return result;
+            buffer = halInBuffer->audioBuffer()->s16;
+            ALOGV("addEffectChain_l() creating new input buffer %p session %d",
+                    buffer, session);
         }
 
         // Attach all tracks with same session ID to this chain.
@@ -2795,9 +2803,8 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
         }
     }
     chain->setThread(this);
-    chain->setInBuffer(buffer, ownsBuffer);
-    chain->setOutBuffer(reinterpret_cast<int16_t*>(mEffectBufferEnabled
-            ? mEffectBuffer : mSinkBuffer));
+    chain->setInBuffer(halInBuffer);
+    chain->setOutBuffer(halOutBuffer);
     // Effect chain for session AUDIO_SESSION_OUTPUT_STAGE is inserted at end of effect
     // chains list in order to be processed last as it contains output stage effects.
     // Effect chain for session AUDIO_SESSION_OUTPUT_MIX is inserted before

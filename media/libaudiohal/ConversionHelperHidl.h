@@ -65,8 +65,6 @@ class ConversionHelperHidl {
         const status_t st = ret.isOk() ? analyzeResult(retval) : UNKNOWN_ERROR;
         if (!ret.isOk()) {
             emitError(funcName, ret.description().c_str());
-        } else if (st) {
-            emitError(funcName, strerror(st));
         }
         return st;
     }

@@ -48,6 +48,7 @@
 #include <system/audio.h>
 #include <system/audio_policy.h>
 
+#include <media/audiohal/EffectBufferHalInterface.h>
 #include <media/audiohal/StreamHalInterface.h>
 #include <media/AudioBufferProvider.h>
 #include <media/ExtendedAudioBufferProvider.h>

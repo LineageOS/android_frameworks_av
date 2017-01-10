@@ -19,24 +19,32 @@
 
 #include <android/hardware/audio/effect/2.0/IEffect.h>
 #include <media/audiohal/EffectHalInterface.h>
+#include <fmq/EventFlag.h>
+#include <fmq/MessageQueue.h>
 #include <system/audio_effect.h>
 
 using ::android::hardware::audio::effect::V2_0::EffectDescriptor;
 using ::android::hardware::audio::effect::V2_0::IEffect;
+using ::android::hardware::EventFlag;
+using ::android::hardware::MessageQueue;
 
 namespace android {
 
 class EffectHalHidl : public EffectHalInterface
 {
   public:
-    // Effect process function. Takes input samples as specified
-    // in input buffer descriptor and output processed samples as specified
-    // in output buffer descriptor.
-    virtual status_t process(audio_buffer_t *inBuffer, audio_buffer_t *outBuffer);
+    // Set the input buffer.
+    virtual status_t setInBuffer(const sp<EffectBufferHalInterface>& buffer);
+
+    // Set the output buffer.
+    virtual status_t setOutBuffer(const sp<EffectBufferHalInterface>& buffer);
+
+    // Effect process function.
+    virtual status_t process();
 
     // Process reverse stream function. This function is used to pass
     // a reference stream to the effect engine.
-    virtual status_t processReverse(audio_buffer_t *inBuffer, audio_buffer_t *outBuffer);
+    virtual status_t processReverse();
 
     // Send a command and receive a response to/from effect engine.
     virtual status_t command(uint32_t cmdCode, uint32_t cmdSize, void *pCmdData,
@@ -45,6 +53,9 @@ class EffectHalHidl : public EffectHalInterface
     // Returns the effect descriptor.
     virtual status_t getDescriptor(effect_descriptor_t *pDescriptor);
 
+    // Free resources on the remote side.
+    virtual status_t close();
+
     uint64_t effectId() const { return mEffectId; }
 
     static void effectDescriptorToHal(
@@ -52,8 +63,16 @@ class EffectHalHidl : public EffectHalInterface
 
   private:
     friend class EffectsFactoryHalHidl;
+    typedef MessageQueue<
+        hardware::audio::effect::V2_0::Result, hardware::kSynchronizedReadWrite> StatusMQ;
+
     sp<IEffect> mEffect;
     const uint64_t mEffectId;
+    sp<EffectBufferHalInterface> mInBuffer;
+    sp<EffectBufferHalInterface> mOutBuffer;
+    bool mBuffersChanged;
+    std::unique_ptr<StatusMQ> mStatusMQ;
+    EventFlag* mEfGroup;
 
     static status_t analyzeResult(const hardware::audio::effect::V2_0::Result& result);
 
@@ -62,6 +81,10 @@ class EffectHalHidl : public EffectHalInterface
 
     // The destructor automatically releases the effect.
     virtual ~EffectHalHidl();
+
+    status_t prepareForProcessing();
+    status_t processImpl(uint32_t mqFlag);
+    status_t setProcessBuffers();
 };
 
 } // namespace android
