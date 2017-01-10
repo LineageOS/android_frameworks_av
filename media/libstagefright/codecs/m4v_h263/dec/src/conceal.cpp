@@ -18,7 +18,7 @@
 
 #define LOG_TAG "conceal"
 
-#include "android/log.h"
+#include "log/log.h"
 
 #include "mp4dec_lib.h" /* video decoder function prototypes */
 #include "vlc_decode.h"
