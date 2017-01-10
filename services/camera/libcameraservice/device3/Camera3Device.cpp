@@ -3113,7 +3113,7 @@ status_t Camera3Device::HalInterface::configureStreams(camera3_stream_configurat
         res = mHal3Device->ops->configure_streams(mHal3Device, config);
     } else {
         // Convert stream config to HIDL
-
+        std::set<int> activeStreams;
         StreamConfiguration requestedConfiguration;
         requestedConfiguration.streams.resize(config->num_streams);
         for (size_t i = 0; i < config->num_streams; i++) {
@@ -3142,7 +3142,24 @@ status_t Camera3Device::HalInterface::configureStreams(camera3_stream_configurat
             dst.usage = mapToConsumerUsage(src->usage);
             dst.dataSpace = mapToHidlDataspace(src->data_space);
             dst.rotation = mapToStreamRotation((camera3_stream_rotation_t) src->rotation);
+
+            activeStreams.insert(streamId);
+            // Create Buffer ID map if necessary
+            if (mBufferIdMaps.count(streamId) == 0) {
+                mBufferIdMaps.emplace(streamId, BufferIdMap{});
+            }
         }
+        // remove BufferIdMap for deleted streams
+        for(auto it = mBufferIdMaps.begin(); it != mBufferIdMaps.end();) {
+            int streamId = it->first;
+            bool active = activeStreams.count(streamId) > 0;
+            if (!active) {
+                it = mBufferIdMaps.erase(it);
+            } else {
+                ++it;
+            }
+        }
+
         requestedConfiguration.operationMode = mapToStreamConfigurationMode(
                 (camera3_stream_configuration_mode_t) config->operation_mode);
 
@@ -3239,8 +3256,13 @@ status_t Camera3Device::HalInterface::processCaptureRequest(
             std::lock_guard<std::mutex> lock(mInflightLock);
             if (request->input_buffer != nullptr) {
                 int32_t streamId = Camera3Stream::cast(request->input_buffer->stream)->getId();
+                buffer_handle_t buf = *(request->input_buffer->buffer);
+                auto pair = getBufferId(buf, streamId);
+                bool isNewBuffer = pair.first;
+                uint64_t bufferId = pair.second;
                 captureRequest.inputBuffer.streamId = streamId;
-                captureRequest.inputBuffer.buffer = *(request->input_buffer->buffer);
+                captureRequest.inputBuffer.bufferId = bufferId;
+                captureRequest.inputBuffer.buffer = (isNewBuffer) ? buf : nullptr;
                 captureRequest.inputBuffer.status = BufferStatus::OK;
                 native_handle_t *acquireFence = nullptr;
                 if (request->input_buffer->acquire_fence != -1) {
@@ -3253,6 +3275,9 @@ status_t Camera3Device::HalInterface::processCaptureRequest(
 
                 pushInflightBufferLocked(captureRequest.frameNumber, streamId,
                         request->input_buffer->buffer);
+            } else {
+                captureRequest.inputBuffer.streamId = -1;
+                captureRequest.inputBuffer.bufferId = BUFFER_ID_NO_BUFFER;
             }
 
             captureRequest.outputBuffers.resize(request->num_output_buffers);
@@ -3260,8 +3285,12 @@ status_t Camera3Device::HalInterface::processCaptureRequest(
                 const camera3_stream_buffer_t *src = request->output_buffers + i;
                 StreamBuffer &dst = captureRequest.outputBuffers[i];
                 int32_t streamId = Camera3Stream::cast(src->stream)->getId();
+                buffer_handle_t buf = *(src->buffer);
+                auto pair = getBufferId(buf, streamId);
+                bool isNewBuffer = pair.first;
                 dst.streamId = streamId;
-                dst.buffer = *(src->buffer);
+                dst.bufferId = pair.second;
+                dst.buffer = isNewBuffer ? buf : nullptr;
                 dst.status = BufferStatus::OK;
                 native_handle_t *acquireFence = nullptr;
                 if (src->acquire_fence != -1) {
@@ -3342,6 +3371,20 @@ status_t Camera3Device::HalInterface::popInflightBuffer(
     *buffer = it->second;
     mInflightBufferMap.erase(it);
     return OK;
+}
+
+std::pair<bool, uint64_t> Camera3Device::HalInterface::getBufferId(
+        const buffer_handle_t& buf, int streamId) {
+    std::lock_guard<std::mutex> lock(mBufferIdMapLock);
+
+    BufferIdMap& bIdMap = mBufferIdMaps.at(streamId);
+    auto it = bIdMap.find(buf);
+    if (it == bIdMap.end()) {
+        bIdMap[buf] = mNextBufferId++;
+        return std::make_pair(true, mNextBufferId - 1);
+    } else {
+        return std::make_pair(false, it->second);
+    }
 }
 
 /**

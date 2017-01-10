@@ -257,6 +257,53 @@ class Camera3Device :
                 buffer_handle_t *buffer);
         // Cache of buffer handles keyed off (frameNumber << 32 | streamId)
         std::unordered_map<uint64_t, buffer_handle_t*> mInflightBufferMap;
+
+        struct BufferHasher {
+            size_t operator()(const buffer_handle_t& buf) const {
+                if (buf == nullptr)
+                    return 0;
+
+                size_t result = 1;
+                result = 31 * result + buf->numFds;
+                result = 31 * result + buf->numInts;
+                int length = buf->numFds + buf->numInts;
+                for (int i = 0; i < length; i++) {
+                    result = 31 * result + buf->data[i];
+                }
+                return result;
+            }
+        };
+
+        struct BufferComparator {
+            bool operator()(const buffer_handle_t& buf1, const buffer_handle_t& buf2) const {
+                if (buf1->numFds == buf2->numFds && buf1->numInts == buf2->numInts) {
+                    int length = buf1->numFds + buf1->numInts;
+                    for (int i = 0; i < length; i++) {
+                        if (buf1->data[i] != buf2->data[i]) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+                return false;
+            }
+        };
+
+        std::mutex mBufferIdMapLock; // protecting mBufferIdMaps and mNextBufferId
+        typedef std::unordered_map<const buffer_handle_t, uint64_t,
+                BufferHasher, BufferComparator> BufferIdMap;
+        // stream ID -> per stream buffer ID map
+        std::unordered_map<int, BufferIdMap> mBufferIdMaps;
+        uint64_t mNextBufferId = 1; // 0 means no buffer
+        static const uint64_t BUFFER_ID_NO_BUFFER = 0;
+
+        // method to extract buffer's unique ID
+        // TODO: we should switch to use gralloc mapper's getBackingStore API
+        //       once we ran in binderized gralloc mode, but before that is ready,
+        //       we need to rely on the conventional buffer queue behavior where
+        //       buffer_handle_t's FD won't change.
+        // return pair of (newlySeenBuffer?, bufferId)
+        std::pair<bool, uint64_t> getBufferId(const buffer_handle_t& buf, int streamId);
     };
 
     std::unique_ptr<HalInterface> mInterface;
