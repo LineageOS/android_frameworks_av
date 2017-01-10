@@ -19,7 +19,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <sys/types.h>
-#include <android/log.h>
+
+#include <log/log.h>
 
 #include "AudioResampler.h"
 #include "AudioResamplerCubic.h"
