@@ -3260,8 +3260,8 @@ void MPEG4Writer::Track::writeTkhdBox(uint32_t now) {
         mOwner->writeInt32(0);
     } else {
         int32_t width, height;
-        bool success = mMeta->findInt32(kKeyWidth, &width);
-        success = success && mMeta->findInt32(kKeyHeight, &height);
+        bool success = mMeta->findInt32(kKeyDisplayWidth, &width);
+        success = success && mMeta->findInt32(kKeyDisplayHeight, &height);
         CHECK(success);
 
         mOwner->writeInt32(width << 16);   // 32-bit fixed-point value
