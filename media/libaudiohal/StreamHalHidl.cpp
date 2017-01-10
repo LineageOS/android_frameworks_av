@@ -331,8 +331,8 @@ status_t StreamOutHalHidl::prepareForWriting(size_t bufferSize) {
     Return<void> ret = mStream->prepareForWriting(
             1, bufferSize, ThreadPriority(mHalThreadPriority),
             [&](Result r,
-                    const MQDescriptorSync<uint8_t>& dataMQ,
-                    const MQDescriptorSync<WriteStatus>& statusMQ) {
+                    const DataMQ::Descriptor& dataMQ,
+                    const StatusMQ::Descriptor& statusMQ) {
                 retval = r;
                 if (retval == Result::OK) {
                     tempDataMQ.reset(new DataMQ(dataMQ));
@@ -559,8 +559,8 @@ status_t StreamInHalHidl::prepareForReading(size_t bufferSize) {
     Return<void> ret = mStream->prepareForReading(
             1, bufferSize, ThreadPriority(mHalThreadPriority),
             [&](Result r,
-                    const MQDescriptorSync<uint8_t>& dataMQ,
-                    const MQDescriptorSync<ReadStatus>& statusMQ) {
+                    const DataMQ::Descriptor& dataMQ,
+                    const StatusMQ::Descriptor& statusMQ) {
                 retval = r;
                 if (retval == Result::OK) {
                     tempDataMQ.reset(new DataMQ(dataMQ));
