@@ -254,9 +254,10 @@ class Camera3Device :
         std::mutex mInflightLock;
 
         status_t pushInflightBufferLocked(int32_t frameNumber, int32_t streamId,
-                buffer_handle_t *buffer);
+                buffer_handle_t *buffer, int acquireFence);
         // Cache of buffer handles keyed off (frameNumber << 32 | streamId)
-        std::unordered_map<uint64_t, buffer_handle_t*> mInflightBufferMap;
+        // value is a pair of (buffer_handle_t*, acquire_fence FD)
+        std::unordered_map<uint64_t, std::pair<buffer_handle_t*, int>> mInflightBufferMap;
 
         struct BufferHasher {
             size_t operator()(const buffer_handle_t& buf) const {

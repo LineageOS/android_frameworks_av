@@ -927,8 +927,7 @@ hardware::Return<void> Camera3Device::processCaptureResult(
         bDst.stream = mOutputStreams.valueAt(idx)->asHalStream();
 
         buffer_handle_t *buffer;
-        res = mInterface->popInflightBuffer(result.frameNumber, bSrc.streamId,
-                &buffer);
+        res = mInterface->popInflightBuffer(result.frameNumber, bSrc.streamId, &buffer);
         if (res != OK) {
             ALOGE("%s: Frame %d: Buffer %zu: No in-flight buffer for stream %d",
                     __FUNCTION__, result.frameNumber, i, bSrc.streamId);
@@ -3274,7 +3273,8 @@ status_t Camera3Device::HalInterface::processCaptureRequest(
                 captureRequest.inputBuffer.releaseFence = nullptr;
 
                 pushInflightBufferLocked(captureRequest.frameNumber, streamId,
-                        request->input_buffer->buffer);
+                        request->input_buffer->buffer,
+                        request->input_buffer->acquire_fence);
             } else {
                 captureRequest.inputBuffer.streamId = -1;
                 captureRequest.inputBuffer.bufferId = BUFFER_ID_NO_BUFFER;
@@ -3302,7 +3302,7 @@ status_t Camera3Device::HalInterface::processCaptureRequest(
                 dst.releaseFence = nullptr;
 
                 pushInflightBufferLocked(captureRequest.frameNumber, streamId,
-                        src->buffer);
+                        src->buffer, src->acquire_fence);
             }
         }
         common::V1_0::Status status = mHidlSession->processCaptureRequest(captureRequest);
@@ -3355,20 +3355,27 @@ status_t Camera3Device::HalInterface::close() {
 }
 
 status_t Camera3Device::HalInterface::pushInflightBufferLocked(
-        int32_t frameNumber, int32_t streamId, buffer_handle_t *buffer) {
+        int32_t frameNumber, int32_t streamId, buffer_handle_t *buffer, int acquireFence) {
     uint64_t key = static_cast<uint64_t>(frameNumber) << 32 | static_cast<uint64_t>(streamId);
-    mInflightBufferMap[key] = buffer;
+    auto pair = std::make_pair(buffer, acquireFence);
+    mInflightBufferMap[key] = pair;
     return OK;
 }
 
 status_t Camera3Device::HalInterface::popInflightBuffer(
-        int32_t frameNumber, int32_t streamId, /*out*/ buffer_handle_t **buffer) {
+        int32_t frameNumber, int32_t streamId,
+        /*out*/ buffer_handle_t **buffer) {
     std::lock_guard<std::mutex> lock(mInflightLock);
 
     uint64_t key = static_cast<uint64_t>(frameNumber) << 32 | static_cast<uint64_t>(streamId);
     auto it = mInflightBufferMap.find(key);
     if (it == mInflightBufferMap.end()) return NAME_NOT_FOUND;
-    *buffer = it->second;
+    auto pair = it->second;
+    *buffer = pair.first;
+    int acquireFence = pair.second;
+    if (acquireFence > 0) {
+        ::close(acquireFence);
+    }
     mInflightBufferMap.erase(it);
     return OK;
 }
