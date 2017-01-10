@@ -42,6 +42,7 @@
 #include "SaturationFilter.h"
 #include "ZeroFilter.h"
 
+#include "../include/ACodecBufferChannel.h"
 #include "../include/SharedMemoryBuffer.h"
 
 namespace android {
@@ -53,12 +54,19 @@ MediaFilter::MediaFilter()
     : mState(UNINITIALIZED),
       mGeneration(0),
       mGraphicBufferListener(NULL) {
+    mBufferChannel = std::make_shared<ACodecBufferChannel>(
+            new AMessage(kWhatInputBufferFilled, this),
+            new AMessage(kWhatOutputBufferDrained, this));
 }
 
 MediaFilter::~MediaFilter() {
 }
 
 //////////////////// PUBLIC FUNCTIONS //////////////////////////////////////////
+
+std::shared_ptr<BufferChannelBase> MediaFilter::getBufferChannel() {
+    return mBufferChannel;
+}
 
 void MediaFilter::initiateAllocateComponent(const sp<AMessage> &msg) {
     msg->setWhat(kWhatAllocateComponent);
@@ -189,29 +197,6 @@ void MediaFilter::onMessageReceived(const sp<AMessage> &msg) {
     }
 }
 
-//////////////////// PORT DESCRIPTION //////////////////////////////////////////
-
-MediaFilter::PortDescription::PortDescription() {
-}
-
-void MediaFilter::PortDescription::addBuffer(
-        IOMX::buffer_id id, const sp<MediaCodecBuffer> &buffer) {
-    mBufferIDs.push_back(id);
-    mBuffers.push_back(buffer);
-}
-
-size_t MediaFilter::PortDescription::countBuffers() {
-    return mBufferIDs.size();
-}
-
-IOMX::buffer_id MediaFilter::PortDescription::bufferIDAt(size_t index) const {
-    return mBufferIDs.itemAt(index);
-}
-
-sp<MediaCodecBuffer> MediaFilter::PortDescription::bufferAt(size_t index) const {
-    return mBuffers.itemAt(index);
-}
-
 //////////////////// HELPER FUNCTIONS //////////////////////////////////////////
 
 void MediaFilter::signalProcessBuffers() {
@@ -259,14 +244,15 @@ status_t MediaFilter::allocateBuffersOnPort(OMX_U32 portIndex) {
         }
     }
 
-    sp<PortDescription> desc = new PortDescription;
-
+    std::vector<ACodecBufferChannel::BufferAndId> array(mBuffers[portIndex].size());
     for (size_t i = 0; i < mBuffers[portIndex].size(); ++i) {
-        const BufferInfo &info = mBuffers[portIndex][i];
-
-        desc->addBuffer(info.mBufferID, info.mData);
+        array[i] = {mBuffers[portIndex][i].mData, mBuffers[portIndex][i].mBufferID};
     }
-    mCallback->onBuffersAllocated(portIndex, desc);
+    if (portIndex == kPortIndexInput) {
+        mBufferChannel->setInputBufferArray(array);
+    } else {
+        mBufferChannel->setOutputBufferArray(array);
+    }
 
     return OK;
 }
@@ -307,7 +293,7 @@ void MediaFilter::postFillThisBuffer(BufferInfo *info) {
 
     info->mStatus = BufferInfo::OWNED_BY_UPSTREAM;
 
-    mCallback->fillThisBuffer(info->mBufferID, info->mData, reply);
+    mBufferChannel->fillThisBuffer(info->mBufferID);
 }
 
 void MediaFilter::postDrainThisBuffer(BufferInfo *info) {
@@ -318,8 +304,7 @@ void MediaFilter::postDrainThisBuffer(BufferInfo *info) {
     sp<AMessage> reply = new AMessage(kWhatOutputBufferDrained, this);
     reply->setInt32("buffer-id", info->mBufferID);
 
-    mCallback->drainThisBuffer(
-            info->mBufferID, info->mData, info->mOutputFlags, reply);
+    mBufferChannel->drainThisBuffer(info->mBufferID, info->mOutputFlags);
 
     info->mStatus = BufferInfo::OWNED_BY_UPSTREAM;
 }
@@ -504,6 +489,8 @@ void MediaFilter::onStart() {
     allocateBuffersOnPort(kPortIndexInput);
 
     allocateBuffersOnPort(kPortIndexOutput);
+
+    mCallback->onStartCompleted();
 
     status_t err = mFilter->start();
     if (err != (status_t)OK) {
