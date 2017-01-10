@@ -835,10 +835,15 @@ status_t BnAudioPolicyService::onTransact(
                     static_cast <audio_policy_dev_state_t>(data.readInt32());
             const char *device_address = data.readCString();
             const char *device_name = data.readCString();
-            reply->writeInt32(static_cast<uint32_t> (setDeviceConnectionState(device,
-                                                                              state,
-                                                                              device_address,
-                                                                              device_name)));
+            if (device_address == nullptr || device_name == nullptr) {
+                ALOGE("Bad Binder transaction: SET_DEVICE_CONNECTION_STATE for device %u", device);
+                reply->writeInt32(static_cast<int32_t> (BAD_VALUE));
+            } else {
+                reply->writeInt32(static_cast<uint32_t> (setDeviceConnectionState(device,
+                                                                                  state,
+                                                                                  device_address,
+                                                                                  device_name)));
+            }
             return NO_ERROR;
         } break;
 
@@ -847,8 +852,13 @@ status_t BnAudioPolicyService::onTransact(
             audio_devices_t device =
                     static_cast<audio_devices_t> (data.readInt32());
             const char *device_address = data.readCString();
-            reply->writeInt32(static_cast<uint32_t> (getDeviceConnectionState(device,
-                                                                              device_address)));
+            if (device_address == nullptr) {
+                ALOGE("Bad Binder transaction: GET_DEVICE_CONNECTION_STATE for device %u", device);
+                reply->writeInt32(static_cast<int32_t> (AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE));
+            } else {
+                reply->writeInt32(static_cast<uint32_t> (getDeviceConnectionState(device,
+                                                                                  device_address)));
+            }
             return NO_ERROR;
         } break;
 
@@ -858,9 +868,14 @@ status_t BnAudioPolicyService::onTransact(
                     static_cast <audio_devices_t>(data.readInt32());
             const char *device_address = data.readCString();
             const char *device_name = data.readCString();
-            reply->writeInt32(static_cast<uint32_t> (handleDeviceConfigChange(device,
-                                                                              device_address,
-                                                                              device_name)));
+            if (device_address == nullptr || device_name == nullptr) {
+                ALOGE("Bad Binder transaction: HANDLE_DEVICE_CONFIG_CHANGE for device %u", device);
+                reply->writeInt32(static_cast<int32_t> (BAD_VALUE));
+            } else {
+                reply->writeInt32(static_cast<uint32_t> (handleDeviceConfigChange(device,
+                                                                                  device_address,
+                                                                                  device_name)));
+            }
             return NO_ERROR;
         } break;
 

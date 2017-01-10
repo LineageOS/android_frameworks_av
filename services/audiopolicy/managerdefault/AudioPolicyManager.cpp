@@ -342,6 +342,9 @@ status_t AudioPolicyManager::handleDeviceConfigChange(audio_devices_t device,
     ALOGV("handleDeviceConfigChange(() device: 0x%X, address %s name %s",
           device, device_address, device_name);
 
+    // connect/disconnect only 1 device at a time
+    if (!audio_is_output_device(device) && !audio_is_input_device(device)) return BAD_VALUE;
+
     // Check if the device is currently connected
     sp<DeviceDescriptor> devDesc =
             mHwModules.getDeviceDescriptor(device, device_address, device_name);
