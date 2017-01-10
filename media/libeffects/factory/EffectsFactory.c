@@ -24,10 +24,10 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <android/log.h>
 #include <cutils/config_utils.h>
 #include <cutils/misc.h>
 #include <cutils/properties.h>
+#include <log/log.h>
 
 #include <system/audio_effects/audio_effects_conf.h>
 

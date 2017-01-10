@@ -21,7 +21,7 @@
 #endif
 //#define LOG_NDEBUG 0
 
-#include <android/log.h>
+#include <log/log.h>
 
 namespace le_fx {
 
