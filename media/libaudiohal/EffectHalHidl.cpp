@@ -106,8 +106,8 @@ status_t EffectHalHidl::prepareForProcessing() {
                     }
                 }
             });
-    if (!ret.getStatus().isOk() || retval != Result::OK) {
-        return ret.getStatus().isOk() ? analyzeResult(retval) : ret.getStatus().transactionError();
+    if (!ret.isOk() || retval != Result::OK) {
+        return ret.isOk() ? analyzeResult(retval) : FAILED_TRANSACTION;
     }
     if (!tempStatusMQ || !tempStatusMQ->isValid() || !mEfGroup) {
         ALOGE_IF(!tempStatusMQ, "Failed to obtain status message queue for effects");
@@ -156,7 +156,7 @@ status_t EffectHalHidl::setProcessBuffers() {
     Return<Result> ret = mEffect->setProcessBuffers(
             reinterpret_cast<EffectBufferHalHidl*>(mInBuffer.get())->hidlBuffer(),
             reinterpret_cast<EffectBufferHalHidl*>(mOutBuffer.get())->hidlBuffer());
-    if (ret.getStatus().isOk() && ret == Result::OK) {
+    if (ret.isOk() && ret == Result::OK) {
         mBuffersChanged = false;
         return OK;
     }
