@@ -25,7 +25,6 @@
 #include <android/hardware/soundtrigger/2.0/types.h>
 #include <android/hardware/soundtrigger/2.0/ISoundTriggerHw.h>
 #include <android/hardware/soundtrigger/2.0/ISoundTriggerHwCallback.h>
-#include <android/hardware/soundtrigger/2.0/BnSoundTriggerHwCallback.h>
 
 namespace android {
 
