@@ -53,7 +53,7 @@ public:
     /**
      * Store a pointer and return a handle that can be used to retrieve the pointer.
      *
-     * @param type the type of the object to be tracked
+     * @param expectedType the type of the object to be tracked
      * @param address pointer to be converted to a handle
      * @return a valid handle or a negative error
      */

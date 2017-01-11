@@ -372,7 +372,7 @@ OBOE_API oboe_result_t OboeStream_write(OboeStream stream,
  *
  * @param stream A stream created using OboeStreamBuilder_openStream().
  * @param periodNanoseconds the estimated period at which the audio thread will need to wake up
- * @param start_routine your thread entry point
+ * @param startRoutine your thread entry point
  * @param arg an argument that will be passed to your thread entry point
  * @return OBOE_OK or a negative error.
  */
@@ -408,7 +408,7 @@ OBOE_API oboe_result_t OboeStream_joinThread(OboeStream stream,
  *
  * @param stream handle provided by OboeStreamBuilder_openStream()
  * @param requestedFrames requested number of frames that can be filled without blocking
- * @return actualFrames receives final number of frames
+ * @param actualFrames receives final number of frames
  * @return OBOE_OK or a negative error
  */
 OBOE_API oboe_result_t OboeStream_setBufferSize(OboeStream stream,
