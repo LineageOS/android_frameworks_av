@@ -30,9 +30,13 @@ LOCAL_SHARED_LIBRARIES:= \
     libradio \
     libradio_metadata
 
-ifeq ($(ENABLE_TREBLE),true)
+ifeq ($(USE_LEGACY_LOCAL_AUDIO_HAL),true)
+# libhardware configuration
+LOCAL_SRC_FILES +=               \
+    RadioHalLegacy.cpp
+else
 # Treble configuration
-LOCAL_CFLAGS += -DENABLE_TREBLE
+
 LOCAL_SRC_FILES += \
     HidlUtils.cpp \
     RadioHalHidl.cpp
@@ -43,12 +47,7 @@ LOCAL_SHARED_LIBRARIES += \
     libhidltransport \
     libbase \
     android.hardware.broadcastradio@1.0
-else
-# libhardware configuration
-LOCAL_SRC_FILES +=               \
-    RadioHalLegacy.cpp
 endif
-
 
 LOCAL_CFLAGS += -Wall -Wextra -Werror
 
