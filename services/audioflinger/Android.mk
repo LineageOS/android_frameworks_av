@@ -28,8 +28,6 @@ LOCAL_SRC_FILES:=               \
     AudioStreamOut.cpp          \
     SpdifStreamOut.cpp          \
     Effects.cpp                 \
-    AudioMixer.cpp.arm          \
-    BufferProviders.cpp         \
     PatchPanel.cpp              \
     StateQueue.cpp              \
     BufLog.cpp
@@ -37,12 +35,11 @@ LOCAL_SRC_FILES:=               \
 LOCAL_C_INCLUDES := \
     $(TOPDIR)frameworks/av/services/audiopolicy \
     $(TOPDIR)frameworks/av/services/medialog \
-    $(TOPDIR)external/sonic \
     $(call include-path-for, audio-utils)
 
 LOCAL_SHARED_LIBRARIES := \
     libaudiohal \
-    libaudioresampler \
+    libaudioprocessing \
     libaudiospdif \
     libaudioutils \
     libcutils \
@@ -55,7 +52,6 @@ LOCAL_SHARED_LIBRARIES := \
     libnbaio \
     libpowermanager \
     libserviceutility \
-    libsonic \
     libmediautils \
     libmemunreachable \
     libmedia_helper
@@ -84,61 +80,6 @@ LOCAL_CFLAGS += -DSTATE_QUEUE_INSTANTIATIONS='"StateQueueInstantiations.cpp"'
 LOCAL_CFLAGS += -fvisibility=hidden
 
 LOCAL_CFLAGS += -Werror -Wall
-
-include $(BUILD_SHARED_LIBRARY)
-
-#
-# build audio resampler test tool
-#
-include $(CLEAR_VARS)
-
-LOCAL_SRC_FILES:=               \
-    test-resample.cpp           \
-
-LOCAL_C_INCLUDES := \
-    $(call include-path-for, audio-utils)
-
-LOCAL_STATIC_LIBRARIES := \
-    libsndfile
-
-LOCAL_SHARED_LIBRARIES := \
-    libaudioresampler \
-    libaudioutils \
-    libdl \
-    libcutils \
-    libutils \
-    liblog
-
-LOCAL_MODULE:= test-resample
-
-LOCAL_MODULE_TAGS := optional
-
-LOCAL_CFLAGS := -Werror -Wall
-
-include $(BUILD_EXECUTABLE)
-
-include $(CLEAR_VARS)
-
-LOCAL_SRC_FILES:= \
-    AudioResampler.cpp.arm \
-    AudioResamplerCubic.cpp.arm \
-    AudioResamplerSinc.cpp.arm \
-    AudioResamplerDyn.cpp.arm
-
-LOCAL_C_INCLUDES := \
-    $(call include-path-for, audio-utils)
-
-LOCAL_SHARED_LIBRARIES := \
-    libcutils \
-    libdl \
-    liblog
-
-LOCAL_MODULE := libaudioresampler
-
-LOCAL_CFLAGS := -Werror -Wall
-
-# uncomment to disable NEON on architectures that actually do support NEON, for benchmarking
-#LOCAL_CFLAGS += -DUSE_NEON=false
 
 include $(BUILD_SHARED_LIBRARY)
 

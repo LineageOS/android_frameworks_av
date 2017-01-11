@@ -23,8 +23,11 @@
 #include <media/AudioBufferProvider.h>
 #include <system/audio.h>
 #include <system/audio_effect.h>
-#include <sonic.h>
 #include <utils/StrongPointer.h>
+
+// external forward declaration from external/sonic/sonic.h
+struct sonicStreamStruct;
+typedef struct sonicStreamStruct *sonicStream;
 
 namespace android {
 

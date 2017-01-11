@@ -36,7 +36,7 @@
 #include <gtest/gtest.h>
 #include <media/AudioBufferProvider.h>
 
-#include "AudioResampler.h"
+#include <media/AudioResampler.h>
 #include "test_utils.h"
 
 template <typename T>

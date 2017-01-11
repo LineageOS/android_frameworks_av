@@ -22,7 +22,6 @@
 
 #include <log/log.h>
 
-#include "AudioResampler.h"
 #include "AudioResamplerCubic.h"
 
 namespace android {

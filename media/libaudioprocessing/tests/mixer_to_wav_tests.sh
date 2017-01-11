@@ -37,7 +37,7 @@ fi
 # ensure we have mm
 . $ANDROID_BUILD_TOP/build/envsetup.sh
 
-pushd $ANDROID_BUILD_TOP/frameworks/av/services/audioflinger/
+pushd $ANDROID_BUILD_TOP/frameworks/av/media/libaudioprocessing
 
 # build
 pwd
@@ -46,7 +46,8 @@ mm
 # send to device
 echo "waiting for device"
 adb root && adb wait-for-device remount
-adb push $OUT/system/lib/libaudioresampler.so /system/lib
+adb push $OUT/system/lib/libaudioprocessing.so /system/lib
+adb push $OUT/system/lib64/libaudioprocessing.so /system/lib64
 adb push $OUT/system/bin/test-mixer /system/bin
 
 # createwav creates a series of WAV files testing various

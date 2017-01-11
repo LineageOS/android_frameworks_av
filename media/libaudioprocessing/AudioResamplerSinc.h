@@ -21,7 +21,7 @@
 #include <sys/types.h>
 #include <android/log.h>
 
-#include "AudioResampler.h"
+#include <media/AudioResampler.h>
 
 namespace android {
 

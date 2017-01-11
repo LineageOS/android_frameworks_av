@@ -29,7 +29,7 @@
 #include <audio_utils/sndfile.h>
 #include <utils/Vector.h>
 #include <media/AudioBufferProvider.h>
-#include "AudioResampler.h"
+#include <media/AudioResampler.h>
 
 using namespace android;
 
