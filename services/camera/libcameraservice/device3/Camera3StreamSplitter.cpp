@@ -55,14 +55,15 @@ status_t Camera3StreamSplitter::connect(const std::vector<sp<Surface> >& surface
     // Add output surfaces. This has to be before creating internal buffer queue
     // in order to get max consumer side buffers.
     for (size_t i = 0; i < surfaces.size(); i++) {
-        if (surfaces[i] != nullptr) {
-            res = addOutputLocked(surfaces[i], hal_max_buffers,
-                    OutputType::NonDeferred);
-            if (res != OK) {
-                ALOGE("%s: Failed to add output surface: %s(%d)",
-                        __FUNCTION__, strerror(-res), res);
-                return res;
-            }
+        if (surfaces[i] == nullptr) {
+            ALOGE("%s: Fatal: surface is NULL", __FUNCTION__);
+            return BAD_VALUE;
+        }
+        res = addOutputLocked(surfaces[i], hal_max_buffers, OutputType::NonDeferred);
+        if (res != OK) {
+            ALOGE("%s: Failed to add output surface: %s(%d)",
+                    __FUNCTION__, strerror(-res), res);
+            return res;
         }
     }
 
@@ -110,7 +111,7 @@ Camera3StreamSplitter::~Camera3StreamSplitter() {
 }
 
 status_t Camera3StreamSplitter::addOutput(
-        sp<Surface>& outputQueue, size_t hal_max_buffers) {
+        const sp<Surface>& outputQueue, size_t hal_max_buffers) {
     Mutex::Autolock lock(mMutex);
     return addOutputLocked(outputQueue, hal_max_buffers, OutputType::Deferred);
 }

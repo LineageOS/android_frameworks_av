@@ -122,5 +122,5 @@ interface ICameraDeviceUser
 
     void prepare2(int maxCount, int streamId);
 
-    void setDeferredConfiguration(int streamId, in OutputConfiguration outputConfiguration);
+    void finalizeOutputConfigurations(int streamId, in OutputConfiguration outputConfiguration);
 }

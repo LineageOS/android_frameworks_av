@@ -131,8 +131,8 @@ public:
     // Prepare stream by preallocating up to maxCount of its buffers
     virtual binder::Status prepare2(int32_t maxCount, int32_t streamId);
 
-    // Set the deferred surface for a stream.
-    virtual binder::Status setDeferredConfiguration(int32_t streamId,
+    // Finalize the output configurations with surfaces not added before.
+    virtual binder::Status finalizeOutputConfigurations(int32_t streamId,
             const hardware::camera2::params::OutputConfiguration &outputConfiguration);
 
     /**
@@ -207,6 +207,23 @@ private:
 
     }; // class StreamSurfaceId
 
+    // OutputStreamInfo describes the property of a camera stream.
+    class OutputStreamInfo {
+    public:
+        int width;
+        int height;
+        int format;
+        android_dataspace dataSpace;
+        int32_t consumerUsage;
+        OutputStreamInfo() :
+                width(-1), height(-1), format(-1), dataSpace(HAL_DATASPACE_UNKNOWN),
+                consumerUsage(0) {}
+        OutputStreamInfo(int _width, int _height, int _format, android_dataspace _dataSpace,
+                int32_t _consumerUsage) :
+                    width(_width), height(_height), format(_format),
+                    dataSpace(_dataSpace), consumerUsage(_consumerUsage) {}
+    };
+
 private:
     /** ICameraDeviceUser interface-related private members */
 
@@ -228,6 +245,7 @@ private:
     // Create an output stream with surface deferred for future.
     binder::Status createDeferredSurfaceStreamLocked(
             const hardware::camera2::params::OutputConfiguration &outputConfiguration,
+            bool isShared,
             int* newStreamId = NULL);
 
     // Set the stream transform flags to automatically rotate the camera stream for preview use
@@ -243,6 +261,11 @@ private:
 
     //check if format is not custom format
     static bool isPublicFormat(int32_t format);
+
+    // Create a Surface from an IGraphicBufferProducer. Returns error if
+    // IGraphicBufferProducer's property doesn't match with streamInfo
+    binder::Status createSurfaceFromGbp(OutputStreamInfo& streamInfo, bool isStreamInfoValid,
+            sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp);
 
     // IGraphicsBufferProducer binder -> Stream ID + Surface ID for output streams
     KeyedVector<sp<IBinder>, StreamSurfaceId> mStreamMap;
@@ -267,8 +290,10 @@ private:
     // Surface is configured, the stream id will be moved to mStreamMap.
     Vector<int32_t> mDeferredStreams;
 
+    // stream ID -> outputStreamInfo mapping
+    std::unordered_map<int32_t, OutputStreamInfo> mStreamInfoMap;
+
     static const int32_t MAX_SURFACES_PER_STREAM = 2;
-    static const int32_t MAX_DEFERRED_SURFACES = 1;
 };
 
 }; // namespace android

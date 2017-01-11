@@ -44,6 +44,8 @@ public:
     int                        getSurfaceType() const;
     int                        getWidth() const;
     int                        getHeight() const;
+    bool                       isDeferred() const;
+    bool                       isShared() const;
     /**
      * Keep impl up-to-date with OutputConfiguration.java in frameworks/base
      */
@@ -70,6 +72,8 @@ public:
                 mSurfaceType == other.mSurfaceType &&
                 mWidth == other.mWidth &&
                 mHeight == other.mHeight &&
+                mIsDeferred == other.mIsDeferred &&
+                mIsShared == other.mIsShared &&
                 gbpsEqual(other));
     }
     bool operator != (const OutputConfiguration& other) const {
@@ -92,7 +96,12 @@ public:
         if (mRotation != other.mRotation) {
             return mRotation < other.mRotation;
         }
-
+        if (mIsDeferred != other.mIsDeferred) {
+            return mIsDeferred < other.mIsDeferred;
+        }
+        if (mIsShared != other.mIsShared) {
+            return mIsShared < other.mIsShared;
+        }
         return gbpsLessThan(other);
     }
     bool operator > (const OutputConfiguration& other) const {
@@ -108,6 +117,8 @@ private:
     int                        mSurfaceType;
     int                        mWidth;
     int                        mHeight;
+    bool                       mIsDeferred;
+    bool                       mIsShared;
     // helper function
     static String16 readMaybeEmptyString16(const android::Parcel* parcel);
 };

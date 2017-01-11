@@ -22,7 +22,6 @@ namespace camera3 {
 
 Camera3SharedOutputStream::Camera3SharedOutputStream(int id,
         const std::vector<sp<Surface>>& surfaces,
-        bool hasDeferredSurface,
         uint32_t width, uint32_t height, int format,
         uint32_t consumerUsage, android_dataspace dataSpace,
         camera3_stream_rotation_t rotation,
@@ -30,8 +29,7 @@ Camera3SharedOutputStream::Camera3SharedOutputStream(int id,
         Camera3OutputStream(id, CAMERA3_STREAM_OUTPUT, width, height,
                             format, dataSpace, rotation, consumerUsage,
                             timestampOffset, setId),
-        mSurfaces(surfaces),
-        mDeferred(hasDeferredSurface) {
+        mSurfaces(surfaces) {
 }
 
 Camera3SharedOutputStream::~Camera3SharedOutputStream() {
@@ -70,23 +68,35 @@ status_t Camera3SharedOutputStream::notifyRequestedSurfaces(uint32_t /*frame_num
 
 bool Camera3SharedOutputStream::isConsumerConfigurationDeferred(size_t surface_id) const {
     Mutex::Autolock l(mLock);
-    return (mDeferred && surface_id >= mSurfaces.size());
+    return (surface_id >= mSurfaces.size());
 }
 
-status_t Camera3SharedOutputStream::setConsumer(sp<Surface> surface) {
-    if (surface == nullptr) {
-        ALOGE("%s: it's illegal to set a null consumer surface!", __FUNCTION__);
+status_t Camera3SharedOutputStream::setConsumers(const std::vector<sp<Surface>>& surfaces) {
+    if (surfaces.size() == 0) {
+        ALOGE("%s: it's illegal to set zero consumer surfaces!", __FUNCTION__);
         return INVALID_OPERATION;
     }
 
-    if (!mDeferred) {
-        ALOGE("%s: Current stream isn't deferred!", __FUNCTION__);
-        return INVALID_OPERATION;
+    status_t ret = OK;
+    for (auto& surface : surfaces) {
+        if (surface == nullptr) {
+            ALOGE("%s: it's illegal to set a null consumer surface!", __FUNCTION__);
+            return INVALID_OPERATION;
+        }
+
+        mSurfaces.push_back(surface);
+
+        // Only call addOutput if the splitter has been connected.
+        if (mStreamSplitter != nullptr) {
+            ret = mStreamSplitter->addOutput(surface, camera3_stream::max_buffers);
+            if (ret != OK) {
+                ALOGE("%s: addOutput failed with error code %d", __FUNCTION__, ret);
+                return ret;
+
+            }
+        }
     }
-
-    mSurfaces.push_back(surface);
-
-    return mStreamSplitter->addOutput(surface, camera3_stream::max_buffers);
+    return ret;
 }
 
 status_t Camera3SharedOutputStream::configureQueueLocked() {
@@ -124,7 +134,7 @@ status_t Camera3SharedOutputStream::disconnectLocked() {
 
 status_t Camera3SharedOutputStream::getEndpointUsage(uint32_t *usage) const {
 
-    status_t res;
+    status_t res = OK;
     uint32_t u = 0;
 
     if (mConsumer == nullptr) {

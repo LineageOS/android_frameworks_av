@@ -109,18 +109,18 @@ class Camera3Device :
     // Actual stream creation/deletion is delayed until first request is submitted
     // If adding streams while actively capturing, will pause device before adding
     // stream, reconfiguring device, and unpausing. If the client create a stream
-    // with nullptr consumer surface, the client must then call setConsumer()
+    // with nullptr consumer surface, the client must then call setConsumers()
     // and finish the stream configuration before starting output streaming.
     status_t createStream(sp<Surface> consumer,
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
-            uint32_t consumerUsage = 0) override;
+            bool isShared = false, uint32_t consumerUsage = 0) override;
     status_t createStream(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
-            uint32_t consumerUsage = 0) override;
+            bool isShared = false, uint32_t consumerUsage = 0) override;
 
     status_t createInputStream(
             uint32_t width, uint32_t height, int format,
@@ -183,10 +183,10 @@ class Camera3Device :
     void             notifyStatus(bool idle); // updates from StatusTracker
 
     /**
-     * Set the deferred consumer surface to the output stream and finish the deferred
+     * Set the deferred consumer surfaces to the output stream and finish the deferred
      * consumer configuration.
      */
-    status_t setConsumerSurface(int streamId, sp<Surface> consumer) override;
+    status_t setConsumerSurfaces(int streamId, const std::vector<sp<Surface>>& consumers) override;
 
   private:
     static const size_t        kDumpLockAttempts  = 10;

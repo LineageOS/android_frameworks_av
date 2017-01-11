@@ -61,7 +61,7 @@ public:
     // outputQueue has not been added to the splitter. BAD_VALUE is returned if
     // outputQueue is NULL. See IGraphicBufferProducer::connect for explanations
     // of other error codes.
-    status_t addOutput(sp<Surface>& outputQueue, size_t hal_max_buffers);
+    status_t addOutput(const sp<Surface>& outputQueue, size_t hal_max_buffers);
 
     // Request surfaces for a particular frame number. The requested surfaces
     // are stored in a FIFO queue. And when the buffer becomes available from the
