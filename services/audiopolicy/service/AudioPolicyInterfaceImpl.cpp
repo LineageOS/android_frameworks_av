@@ -37,9 +37,6 @@ status_t AudioPolicyService::setDeviceConnectionState(audio_devices_t device,
     if (!settingsAllowed()) {
         return PERMISSION_DENIED;
     }
-    if (!audio_is_output_device(device) && !audio_is_input_device(device)) {
-        return BAD_VALUE;
-    }
     if (state != AUDIO_POLICY_DEVICE_STATE_AVAILABLE &&
             state != AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE) {
         return BAD_VALUE;
@@ -71,9 +68,6 @@ status_t AudioPolicyService::handleDeviceConfigChange(audio_devices_t device,
     }
     if (!settingsAllowed()) {
         return PERMISSION_DENIED;
-    }
-    if (!audio_is_output_device(device) && !audio_is_input_device(device)) {
-        return BAD_VALUE;
     }
 
     ALOGV("handleDeviceConfigChange()");
