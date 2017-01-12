@@ -22,8 +22,8 @@
 
 #include "AMessage.h"
 
-#include <android/log.h>
 #include <binder/Parcel.h>
+#include <log/log.h>
 
 #include "AAtomizer.h"
 #include "ABuffer.h"

@@ -19,7 +19,8 @@
 
 #include <unistd.h>
 
-#include <android/log.h>
+#include <log/log.h>
+
 #include <libminijail.h>
 
 #include "minijail.h"
