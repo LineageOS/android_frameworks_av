@@ -58,10 +58,6 @@ public:
     // |codecBuffer|'s size (or 0 if |codecBuffer| is NULL).
     OMXBuffer(const sp<MediaCodecBuffer> &codecBuffer);
 
-    // Constructs a buffer of type kBufferTypePreset with a specified
-    // mRangeLength.
-    explicit OMXBuffer(OMX_U32 rangeLength);
-
     // Constructs a buffer of type kBufferTypeSharedMem.
     OMXBuffer(const sp<IMemory> &mem);
 
@@ -101,6 +97,7 @@ private:
     // kBufferTypePreset
     // If the port is operating in byte buffer mode, mRangeLength is the valid
     // range length. Otherwise the range info should also be ignored.
+    OMX_U32 mRangeOffset;
     OMX_U32 mRangeLength;
 
     // kBufferTypeSharedMem

@@ -35,12 +35,8 @@ OMXBuffer::OMXBuffer()
 
 OMXBuffer::OMXBuffer(const sp<MediaCodecBuffer>& codecBuffer)
     : mBufferType(kBufferTypePreset),
+      mRangeOffset(codecBuffer != NULL ? codecBuffer->offset() : 0),
       mRangeLength(codecBuffer != NULL ? codecBuffer->size() : 0) {
-}
-
-OMXBuffer::OMXBuffer(OMX_U32 rangeLength)
-    : mBufferType(kBufferTypePreset),
-      mRangeLength(rangeLength) {
 }
 
 OMXBuffer::OMXBuffer(const sp<IMemory> &mem)
@@ -67,6 +63,10 @@ status_t OMXBuffer::writeToParcel(Parcel *parcel) const {
     switch(mBufferType) {
         case kBufferTypePreset:
         {
+            status_t err = parcel->writeUint32(mRangeOffset);
+            if (err != OK) {
+                return err;
+            }
             return parcel->writeUint32(mRangeLength);
         }
 
@@ -97,7 +97,14 @@ status_t OMXBuffer::readFromParcel(const Parcel *parcel) {
     switch(bufferType) {
         case kBufferTypePreset:
         {
-            mRangeLength = parcel->readUint32();
+            status_t err = parcel->readUint32(&mRangeOffset);
+            if (err != OK) {
+                return err;
+            }
+            err = parcel->readUint32(&mRangeLength);
+            if (err != OK) {
+                return err;
+            }
             break;
         }
 
