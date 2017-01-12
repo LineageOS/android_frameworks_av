@@ -22,9 +22,10 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include <new>
 
-#include <android/log.h>
+#include <log/log.h>
 
 #include "AudioEqualizer.h"
 #include "AudioBiquadFilter.h"

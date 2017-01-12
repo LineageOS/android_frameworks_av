@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <android/log.h>
+#include <log/log.h>
 
 #include "EffectReverb.h"
 #include "EffectsMath.h"
