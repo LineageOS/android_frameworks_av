@@ -19,12 +19,13 @@
 
 #include <assert.h>
 #include <math.h>
-#include <new>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
-#include <android/log.h>
+#include <new>
+
+#include <log/log.h>
 
 #include <audio_effects/effect_loudnessenhancer.h>
 #include "dsp/core/dynamic_range_compression.h"

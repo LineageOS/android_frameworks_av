@@ -32,8 +32,8 @@
 #include <utility>
 #include <vector>
 
-#include <android/log.h>
 #include <gtest/gtest.h>
+#include <log/log.h>
 #include <media/AudioBufferProvider.h>
 
 #include <media/AudioResampler.h>
