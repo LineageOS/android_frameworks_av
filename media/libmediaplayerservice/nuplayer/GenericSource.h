@@ -245,6 +245,9 @@ private:
     void onGetFormatMeta(const sp<AMessage>& msg) const;
     sp<MetaData> doGetFormatMeta(bool audio) const;
 
+    void onGetTrackInfo(const sp<AMessage>& msg) const;
+    sp<AMessage> doGetTrackInfo(size_t trackIndex) const;
+
     void onGetSelectedTrack(const sp<AMessage>& msg) const;
     ssize_t doGetSelectedTrack(media_track_type type) const;
 
