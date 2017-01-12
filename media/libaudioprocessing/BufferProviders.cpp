@@ -200,6 +200,8 @@ DownmixerBufferProvider::DownmixerBufferProvider(
          mEffectsFactory.clear();
          return;
      }
+     mDownmixInterface->setInBuffer(mInBuffer);
+     mDownmixInterface->setOutBuffer(mOutBuffer);
 
      int cmdStatus;
      uint32_t replySize = sizeof(int);

@@ -45,11 +45,21 @@ status_t EffectHalLocal::setOutBuffer(const sp<EffectBufferHalInterface>& buffer
 }
 
 status_t EffectHalLocal::process() {
+    if (mInBuffer == nullptr || mOutBuffer == nullptr) {
+        ALOGE_IF(mInBuffer == nullptr, "Input buffer not set");
+        ALOGE_IF(mOutBuffer == nullptr, "Output buffer not set");
+        return NO_INIT;
+    }
     return (*mHandle)->process(mHandle, mInBuffer->audioBuffer(), mOutBuffer->audioBuffer());
 }
 
 status_t EffectHalLocal::processReverse() {
     if ((*mHandle)->process_reverse != NULL) {
+        if (mInBuffer == nullptr || mOutBuffer == nullptr) {
+            ALOGE_IF(mInBuffer == nullptr, "Input buffer not set");
+            ALOGE_IF(mOutBuffer == nullptr, "Output buffer not set");
+            return NO_INIT;
+        }
         return (*mHandle)->process_reverse(
                 mHandle, mInBuffer->audioBuffer(), mOutBuffer->audioBuffer());
     } else {
