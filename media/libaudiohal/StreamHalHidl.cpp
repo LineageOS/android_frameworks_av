@@ -242,7 +242,7 @@ struct StreamOutCallback : public IStreamOutCallback {
 
 StreamOutHalHidl::StreamOutHalHidl(const sp<IStreamOut>& stream)
         : StreamHalHidl(stream.get()), mStream(stream), mEfGroup(nullptr),
-          mGetPresentationPositionNotSupported(false), mPPosFromWriteObtained(0) {
+          mGetPresentationPositionNotSupported(false), mPPosFromWrite{ 0, OK, 0, { 0, 0 } } {
 }
 
 StreamOutHalHidl::~StreamOutHalHidl() {
@@ -301,19 +301,22 @@ retry:
     status_t ret = mEfGroup->wait(
             static_cast<uint32_t>(MessageQueueFlagBits::NOT_FULL), &efState, NS_PER_SEC);
     if (efState & static_cast<uint32_t>(MessageQueueFlagBits::NOT_FULL)) {
-        WriteStatus writeStatus = { Result::NOT_INITIALIZED, 0, 0, { 0, 0 } };
+        WriteStatus writeStatus =
+                { Result::NOT_INITIALIZED, 0, Result::NOT_INITIALIZED, 0, { 0, 0 } };
         mStatusMQ->read(&writeStatus);
-        if (writeStatus.retval == Result::OK) {
+        if (writeStatus.writeRetval == Result::OK) {
             status = OK;
             *written = writeStatus.written;
-            mPPosFromWriteFrames = writeStatus.frames;
-            mPPosFromWriteTS.tv_sec = writeStatus.timeStamp.tvSec;
-            mPPosFromWriteTS.tv_nsec = writeStatus.timeStamp.tvNSec;
-            struct timespec timeNow;
-            clock_gettime(CLOCK_MONOTONIC, &timeNow);
-            mPPosFromWriteObtained = timeNow.tv_sec * 1000000 + timeNow.tv_nsec / 1000;
+            mPPosFromWrite.status = processReturn(
+                    "get_presentation_position", writeStatus.presentationPositionRetval);
+            if (mPPosFromWrite.status == OK) {
+                mPPosFromWrite.frames = writeStatus.frames;
+                mPPosFromWrite.ts.tv_sec = writeStatus.timeStamp.tvSec;
+                mPPosFromWrite.ts.tv_nsec = writeStatus.timeStamp.tvNSec;
+            }
+            mPPosFromWrite.obtained = getCurrentTimeMs();
         } else {
-            status = processReturn("write", writeStatus.retval);
+            status = processReturn("write", writeStatus.writeRetval);
         }
         return status;
     }
@@ -322,6 +325,12 @@ retry:
         goto retry;
     }
     return ret;
+}
+
+uint64_t StreamOutHalHidl::getCurrentTimeMs() {
+    struct timespec timeNow;
+    clock_gettime(CLOCK_MONOTONIC, &timeNow);
+    return timeNow.tv_sec * 1000000 + timeNow.tv_nsec / 1000;
 }
 
 status_t StreamOutHalHidl::prepareForWriting(size_t bufferSize) {
@@ -435,15 +444,14 @@ status_t StreamOutHalHidl::flush() {
 status_t StreamOutHalHidl::getPresentationPosition(uint64_t *frames, struct timespec *timestamp) {
     if (mStream == 0) return NO_INIT;
     if (mGetPresentationPositionNotSupported) return INVALID_OPERATION;
-    struct timespec timeNow;
-    clock_gettime(CLOCK_MONOTONIC, &timeNow);
-    uint64_t timeStampNow = timeNow.tv_sec * 1000000 + timeNow.tv_nsec / 1000;
-    if (timeStampNow - mPPosFromWriteObtained <= 1000) {
+    if (getCurrentTimeMs() - mPPosFromWrite.obtained <= 1000) {
         // No more than 1 ms passed since the last write, use cached result to avoid binder calls.
-        *frames = mPPosFromWriteFrames;
-        timestamp->tv_sec = mPPosFromWriteTS.tv_sec;
-        timestamp->tv_nsec = mPPosFromWriteTS.tv_nsec;
-        return OK;
+        if (mPPosFromWrite.status == OK) {
+            *frames = mPPosFromWrite.frames;
+            timestamp->tv_sec = mPPosFromWrite.ts.tv_sec;
+            timestamp->tv_nsec = mPPosFromWrite.ts.tv_nsec;
+        }
+        return mPPosFromWrite.status;
     }
 
     Result retval;
