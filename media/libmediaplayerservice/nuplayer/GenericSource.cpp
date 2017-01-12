@@ -691,6 +691,12 @@ void NuPlayer::GenericSource::onMessageReceived(const sp<AMessage> &msg) {
           break;
       }
 
+      case kWhatGetTrackInfo:
+      {
+          onGetTrackInfo(msg);
+          break;
+      }
+
       case kWhatSelectTrack:
       {
           onSelectTrack(msg);
@@ -960,6 +966,34 @@ size_t NuPlayer::GenericSource::getTrackCount() const {
 }
 
 sp<AMessage> NuPlayer::GenericSource::getTrackInfo(size_t trackIndex) const {
+    sp<AMessage> msg = new AMessage(kWhatGetTrackInfo, this);
+    msg->setSize("trackIndex", trackIndex);
+
+    sp<AMessage> response;
+    sp<RefBase> format;
+    status_t err = msg->postAndAwaitResponse(&response);
+    if (err == OK && response != NULL) {
+        CHECK(response->findObject("format", &format));
+        return static_cast<AMessage*>(format.get());
+    } else {
+        return NULL;
+    }
+}
+
+void NuPlayer::GenericSource::onGetTrackInfo(const sp<AMessage>& msg) const {
+    size_t trackIndex;
+    CHECK(msg->findSize("trackIndex", &trackIndex));
+
+    sp<AMessage> response = new AMessage;
+    sp<AMessage> format = doGetTrackInfo(trackIndex);
+    response->setObject("format", format);
+
+    sp<AReplyToken> replyID;
+    CHECK(msg->senderAwaitsResponse(&replyID));
+    response->postReply(replyID);
+}
+
+sp<AMessage> NuPlayer::GenericSource::doGetTrackInfo(size_t trackIndex) const {
     size_t trackCount = mSources.size();
     if (trackIndex >= trackCount) {
         return NULL;
