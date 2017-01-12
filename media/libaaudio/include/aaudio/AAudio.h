@@ -405,7 +405,7 @@ typedef void *(aaudio_audio_thread_proc_t)(void *);
  *
  * @param stream A stream created using AAudioStreamBuilder_openStream().
  * @param periodNanoseconds the estimated period at which the audio thread will need to wake up
- * @param startRoutine your thread entry point
+ * @param threadProc your thread entry point
  * @param arg an argument that will be passed to your thread entry point
  * @return AAUDIO_OK or a negative error.
  */
