@@ -43,7 +43,7 @@ class PluginLoader {
             while ((pEntry = readdir(pDir))) {
                 String8 file(pEntry->d_name);
                 if (file.getPathExtension() == ".so") {
-                    String8 path = pluginDir + pEntry->d_name;
+                    String8 path = pluginDir + "/" + pEntry->d_name;
                     T *plugin = loadOne(path, entry);
                     if (plugin) {
                         factories.push(plugin);
@@ -77,7 +77,8 @@ class PluginLoader {
                 libraries.push(library);
                 return createFactoryFunc();
             } else {
-                ALOGE("Failed to create plugin factory from %s", path);
+                ALOGE("Failed to create plugin factory from %s at entry %s: %s",
+                        path, entry, library->lastError());
             }
         }
         return NULL;
