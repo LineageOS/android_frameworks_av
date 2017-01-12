@@ -164,15 +164,19 @@ class StreamOutHalHidl : public StreamOutHalInterface, public StreamHalHidl {
     std::unique_ptr<StatusMQ> mStatusMQ;
     EventFlag* mEfGroup;
     bool mGetPresentationPositionNotSupported;
-    uint64_t mPPosFromWriteObtained;
-    uint64_t mPPosFromWriteFrames;
-    struct timespec mPPosFromWriteTS;
+    struct {
+        uint64_t obtained;
+        status_t status;
+        uint64_t frames;
+        struct timespec ts;
+    } mPPosFromWrite;
 
     // Can not be constructed directly by clients.
     StreamOutHalHidl(const sp<IStreamOut>& stream);
 
     virtual ~StreamOutHalHidl();
 
+    uint64_t getCurrentTimeMs();
     status_t prepareForWriting(size_t bufferSize);
 };
 
