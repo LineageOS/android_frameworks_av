@@ -80,6 +80,7 @@ class DevicesFactoryHalInterface;
 class EffectsFactoryHalInterface;
 class FastMixer;
 class PassthruBufferProvider;
+class RecordBufferConverter;
 class ServerProxy;
 
 // ----------------------------------------------------------------------------

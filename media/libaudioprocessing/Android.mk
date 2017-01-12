@@ -9,6 +9,7 @@ LOCAL_SRC_FILES := \
     AudioResamplerSinc.cpp.arm \
     AudioResamplerDyn.cpp.arm \
     BufferProviders.cpp \
+    RecordBufferConverter.cpp \
 
 LOCAL_C_INCLUDES := \
     $(TOP) \

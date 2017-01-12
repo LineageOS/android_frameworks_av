@@ -32,6 +32,7 @@
 
 #include <media/nbaio/Pipe.h>
 #include <media/nbaio/PipeReader.h>
+#include <media/RecordBufferConverter.h>
 #include <audio_utils/minifloat.h>
 
 // ----------------------------------------------------------------------------
