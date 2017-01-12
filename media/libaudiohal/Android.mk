@@ -9,9 +9,20 @@ LOCAL_SHARED_LIBRARIES := \
     liblog      \
     libutils
 
-ifeq ($(ENABLE_TREBLE), true)
+ifeq ($(USE_LEGACY_LOCAL_AUDIO_HAL), true)
 
-LOCAL_CFLAGS += -DENABLE_TREBLE
+# Use audiohal directly w/o hwbinder middleware.
+# This is for performance comparison and debugging only.
+
+LOCAL_SRC_FILES := \
+    DeviceHalLocal.cpp          \
+    DevicesFactoryHalLocal.cpp  \
+    EffectBufferHalLocal.cpp    \
+    EffectHalLocal.cpp          \
+    EffectsFactoryHalLocal.cpp  \
+    StreamHalLocal.cpp
+
+else  # if !USE_LEGACY_LOCAL_AUDIO_HAL
 
 LOCAL_SRC_FILES := \
     ConversionHelperHidl.cpp   \
@@ -36,16 +47,7 @@ LOCAL_SHARED_LIBRARIES += \
     android.hidl.memory@1.0                \
     libmedia_helper
 
-else  # if !ENABLE_TREBLE
-
-LOCAL_SRC_FILES := \
-    DeviceHalLocal.cpp          \
-    DevicesFactoryHalLocal.cpp  \
-    EffectBufferHalLocal.cpp    \
-    EffectHalLocal.cpp          \
-    EffectsFactoryHalLocal.cpp  \
-    StreamHalLocal.cpp
-endif  # ENABLE_TREBLE
+endif  # USE_LEGACY_LOCAL_AUDIO_HAL
 
 LOCAL_MODULE := libaudiohal
 

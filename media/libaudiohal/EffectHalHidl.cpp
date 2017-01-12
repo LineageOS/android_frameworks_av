@@ -167,14 +167,16 @@ status_t EffectHalHidl::command(uint32_t cmdCode, uint32_t cmdSize, void *pCmdDa
         uint32_t *replySize, void *pReplyData) {
     if (mEffect == 0) return NO_INIT;
     hidl_vec<uint8_t> hidlData;
-    hidlData.setToExternal(reinterpret_cast<uint8_t*>(pCmdData), cmdSize);
+    if (pCmdData != nullptr && cmdSize > 0) {
+        hidlData.setToExternal(reinterpret_cast<uint8_t*>(pCmdData), cmdSize);
+    }
     status_t status;
     Return<void> ret = mEffect->command(cmdCode, hidlData, *replySize,
             [&](int32_t s, const hidl_vec<uint8_t>& result) {
                 status = s;
                 if (status == 0) {
                     if (*replySize > result.size()) *replySize = result.size();
-                    if (pReplyData && *replySize > 0) {
+                    if (pReplyData != nullptr && *replySize > 0) {
                         memcpy(pReplyData, &result[0], *replySize);
                     }
                 }

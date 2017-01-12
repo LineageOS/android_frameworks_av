@@ -34,23 +34,22 @@ LOCAL_SHARED_LIBRARIES:= \
     libserviceutility
 
 
-ifeq ($(ENABLE_TREBLE),true)
+ifeq ($(USE_LEGACY_LOCAL_AUDIO_HAL),true)
+# libhardware configuration
+LOCAL_SRC_FILES +=               \
+    SoundTriggerHalLegacy.cpp
+else
 # Treble configuration
-LOCAL_CFLAGS += -DENABLE_TREBLE
 LOCAL_SRC_FILES +=               \
     SoundTriggerHalHidl.cpp
 
 LOCAL_SHARED_LIBRARIES += \
-		libhwbinder \
-		libhidlbase \
-		libhidltransport \
-		libbase \
-		android.hardware.soundtrigger@2.0 \
-		android.hardware.audio.common@2.0
-else
-# libhardware configuration
-LOCAL_SRC_FILES +=               \
-    SoundTriggerHalLegacy.cpp
+    libhwbinder \
+    libhidlbase \
+    libhidltransport \
+    libbase \
+    android.hardware.soundtrigger@2.0 \
+    android.hardware.audio.common@2.0
 endif
 
 
