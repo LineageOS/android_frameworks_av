@@ -17,6 +17,7 @@
 #define LOG_TAG "SoundTriggerHalHidl"
 //#define LOG_NDEBUG 0
 
+#include <media/audiohal/hidl/HalDeathHandler.h>
 #include <utils/Log.h>
 #include "SoundTriggerHalHidl.h"
 #include <hwbinder/IPCThreadState.h>
@@ -59,7 +60,7 @@ int SoundTriggerHalHidl::getProperties(struct sound_trigger_properties *properti
         }
     } else {
         ALOGE("getProperties error %s", hidlReturn.description().c_str());
-        return UNKNOWN_ERROR;
+        return FAILED_TRANSACTION;
     }
     ALOGI("getProperties ret %d", ret);
     return ret;
@@ -132,7 +133,7 @@ int SoundTriggerHalHidl::loadSoundModel(struct sound_trigger_sound_model *sound_
         }
     } else {
         ALOGE("loadSoundModel error %s", hidlReturn.description().c_str());
-        return UNKNOWN_ERROR;
+        return FAILED_TRANSACTION;
     }
 
     return ret;
@@ -159,7 +160,7 @@ int SoundTriggerHalHidl::unloadSoundModel(sound_model_handle_t handle)
 
     if (!hidlReturn.isOk()) {
         ALOGE("unloadSoundModel error %s", hidlReturn.description().c_str());
-        return UNKNOWN_ERROR;
+        return FAILED_TRANSACTION;
     }
 
     return hidlReturn;
@@ -197,7 +198,7 @@ int SoundTriggerHalHidl::startRecognition(sound_model_handle_t handle,
 
     if (!hidlReturn.isOk()) {
         ALOGE("startRecognition error %s", hidlReturn.description().c_str());
-        return UNKNOWN_ERROR;
+        return FAILED_TRANSACTION;
     }
     return hidlReturn;
 }
@@ -223,7 +224,7 @@ int SoundTriggerHalHidl::stopRecognition(sound_model_handle_t handle)
 
     if (!hidlReturn.isOk()) {
         ALOGE("stopRecognition error %s", hidlReturn.description().c_str());
-        return UNKNOWN_ERROR;
+        return FAILED_TRANSACTION;
     }
     return hidlReturn;
 }
@@ -243,7 +244,7 @@ int SoundTriggerHalHidl::stopAllRecognitions()
 
     if (!hidlReturn.isOk()) {
         ALOGE("stopAllRecognitions error %s", hidlReturn.description().c_str());
-        return UNKNOWN_ERROR;
+        return FAILED_TRANSACTION;
     }
     return hidlReturn;
 }
@@ -267,6 +268,9 @@ sp<ISoundTriggerHw> SoundTriggerHalHidl::getService()
         std::string serviceName = "sound_trigger.";
         serviceName.append(mModuleName);
         mISoundTrigger = ISoundTriggerHw::getService(serviceName);
+        if (mISoundTrigger != 0) {
+            mISoundTrigger->linkToDeath(HalDeathHandler::getInstance(), 0 /*cookie*/);
+        }
     }
     return mISoundTrigger;
 }

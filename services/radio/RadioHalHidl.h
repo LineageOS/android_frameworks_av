@@ -78,17 +78,18 @@ public:
             virtual Return<void> newMetadata(uint32_t channel, uint32_t subChannel,
                                          const ::android::hardware::hidl_vec<MetaData>& metadata);
 
-            void setHalTuner(sp<ITuner>& halTuner) { mHalTuner = halTuner; }
+            void setHalTuner(sp<ITuner>& halTuner);
             sp<ITuner> getHalTuner() { return mHalTuner; }
 
         private:
             virtual          ~Tuner();
 
-                    void     onCallback(radio_hal_event_t *halEvent);
+                    void     onCallback(radio_hal_event_t *halEvent) const;
                     void     handleHwFailure();
+                    void     sendHwFailureEvent() const;
 
             sp<ITuner> mHalTuner;
-            sp<TunerCallbackInterface>  mCallback;
+            const sp<TunerCallbackInterface> mCallback;
             wp<RadioHalHidl> mParentModule;
         };
 

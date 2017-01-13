@@ -17,6 +17,7 @@
 #define LOG_TAG "RadioHalHidl"
 //#define LOG_NDEBUG 0
 
+#include <media/audiohal/hidl/HalDeathHandler.h>
 #include <utils/Log.h>
 #include <utils/misc.h>
 #include <system/radio_metadata.h>
@@ -333,11 +334,27 @@ Return<void> RadioHalHidl::Tuner::newMetadata(uint32_t channel, uint32_t subChan
 RadioHalHidl::Tuner::Tuner(sp<TunerCallbackInterface> callback, sp<RadioHalHidl> module)
     : TunerInterface(), mHalTuner(NULL), mCallback(callback), mParentModule(module)
 {
+    // Make sure the handler we are passing in only deals with const members,
+    // as it can be called on an arbitrary thread.
+    const auto& self = this;
+    HalDeathHandler::getInstance()->registerAtExitHandler(
+            this, [&self]() { self->sendHwFailureEvent(); });
 }
 
 
 RadioHalHidl::Tuner::~Tuner()
 {
+    HalDeathHandler::getInstance()->unregisterAtExitHandler(this);
+}
+
+void RadioHalHidl::Tuner::setHalTuner(sp<ITuner>& halTuner) {
+    if (mHalTuner != 0) {
+        mHalTuner->unlinkToDeath(HalDeathHandler::getInstance());
+    }
+    mHalTuner = halTuner;
+    if (mHalTuner != 0) {
+        mHalTuner->linkToDeath(HalDeathHandler::getInstance(), 0 /*cookie*/);
+    }
 }
 
 void RadioHalHidl::Tuner::handleHwFailure()
@@ -347,14 +364,19 @@ void RadioHalHidl::Tuner::handleHwFailure()
     if (parentModule != 0) {
         parentModule->clearService();
     }
+    sendHwFailureEvent();
+    mHalTuner.clear();
+}
+
+void RadioHalHidl::Tuner::sendHwFailureEvent() const
+{
     radio_hal_event_t event;
     memset(&event, 0, sizeof(radio_hal_event_t));
     event.type = RADIO_EVENT_HW_FAILURE;
     onCallback(&event);
-    mHalTuner.clear();
 }
 
-void RadioHalHidl::Tuner::onCallback(radio_hal_event_t *halEvent)
+void RadioHalHidl::Tuner::onCallback(radio_hal_event_t *halEvent) const
 {
     if (mCallback != 0) {
         mCallback->onEvent(halEvent);
