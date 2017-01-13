@@ -60,7 +60,6 @@ FastMixer::FastMixer(audio_io_handle_t parentIoHandle)
     mSinkChannelCount(FCC_2),
     mMixerBuffer(NULL),
     mMixerBufferSize(0),
-    mMixerBufferFormat(AUDIO_FORMAT_PCM_16_BIT),
     mMixerBufferState(UNDEFINED),
     mFormat(Format_Invalid),
     mSampleRate(0),
@@ -161,6 +160,7 @@ void FastMixer::onStateChange()
         mOutputSink = current->mOutputSink;
         mOutputSinkGen = current->mOutputSinkGen;
         mSinkChannelMask = current->mSinkChannelMask;
+        mBalance.setChannelMask(mSinkChannelMask);
         if (mOutputSink == NULL) {
             mFormat = Format_Invalid;
             mSampleRate = 0;
@@ -191,10 +191,6 @@ void FastMixer::onStateChange()
         free(mSinkBuffer);
         mSinkBuffer = NULL;
         if (frameCount > 0 && mSampleRate > 0) {
-            // The mixer produces either 16 bit PCM or float output, select
-            // float output if the HAL supports higher than 16 bit precision.
-            mMixerBufferFormat = mFormat.mFormat == AUDIO_FORMAT_PCM_16_BIT ?
-                    AUDIO_FORMAT_PCM_16_BIT : AUDIO_FORMAT_PCM_FLOAT;
             // FIXME new may block for unbounded time at internal mutex of the heap
             //       implementation; it would be better to have normal mixer allocate for us
             //       to avoid blocking here and to prevent possible priority inversion
@@ -471,6 +467,12 @@ void FastMixer::onWork()
             mono_blend(mMixerBuffer, mMixerBufferFormat, Format_channelCount(mFormat), frameCount,
                     true /*limit*/);
         }
+
+        // Balance must take effect after mono conversion.
+        // mBalance detects zero balance within the class for speed (not needed here).
+        mBalance.setBalance(mMasterBalance.load());
+        mBalance.process((float *)mMixerBuffer, frameCount);
+
         // prepare the buffer used to write to sink
         void *buffer = mSinkBuffer != NULL ? mSinkBuffer : mMixerBuffer;
         if (mFormat.mFormat != mMixerBufferFormat) { // sink format not the same as mixer format

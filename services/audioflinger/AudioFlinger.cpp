@@ -897,6 +897,40 @@ status_t AudioFlinger::setMasterVolume(float value)
     return NO_ERROR;
 }
 
+status_t AudioFlinger::setMasterBalance(float balance)
+{
+    status_t ret = initCheck();
+    if (ret != NO_ERROR) {
+        return ret;
+    }
+
+    // check calling permissions
+    if (!settingsAllowed()) {
+        return PERMISSION_DENIED;
+    }
+
+    // check range
+    if (isnan(balance) || fabs(balance) > 1.f) {
+        return BAD_VALUE;
+    }
+
+    Mutex::Autolock _l(mLock);
+
+    // short cut.
+    if (mMasterBalance == balance) return NO_ERROR;
+
+    mMasterBalance = balance;
+
+    for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
+        if (mPlaybackThreads.valueAt(i)->isDuplicating()) {
+            continue;
+        }
+        mPlaybackThreads.valueAt(i)->setMasterBalance(balance);
+    }
+
+    return NO_ERROR;
+}
+
 status_t AudioFlinger::setMode(audio_mode_t mode)
 {
     status_t ret = initCheck();
@@ -1036,6 +1070,13 @@ float AudioFlinger::masterVolume() const
     return masterVolume_l();
 }
 
+status_t AudioFlinger::getMasterBalance(float *balance) const
+{
+    Mutex::Autolock _l(mLock);
+    *balance = getMasterBalance_l();
+    return NO_ERROR; // if called through binder, may return a transactional error
+}
+
 bool AudioFlinger::masterMute() const
 {
     Mutex::Autolock _l(mLock);
@@ -1045,6 +1086,11 @@ bool AudioFlinger::masterMute() const
 float AudioFlinger::masterVolume_l() const
 {
     return mMasterVolume;
+}
+
+float AudioFlinger::getMasterBalance_l() const
+{
+    return mMasterBalance;
 }
 
 bool AudioFlinger::masterMute_l() const
