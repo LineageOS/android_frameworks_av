@@ -21,6 +21,7 @@
 #include <sys/types.h>
 
 #include <media/AudioBufferProvider.h>
+#include <media/AudioResamplerPublic.h>
 #include <system/audio.h>
 #include <system/audio_effect.h>
 #include <utils/StrongPointer.h>
