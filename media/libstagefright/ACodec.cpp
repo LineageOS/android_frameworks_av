@@ -5543,6 +5543,7 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
                 }
 
                 size_t size = buffer->size();
+                size_t offset = buffer->offset();
                 if (buffer->base() != info->mCodecData->base()) {
                     ALOGV("[%s] Needs to copy input data for buffer %u. (%p != %p)",
                          mCodec->mComponentName.c_str(),
@@ -5560,7 +5561,7 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
                     }
                     size = info->mCodecData->size();
                 } else {
-                    info->mCodecData->setRange(0, size);
+                    info->mCodecData->setRange(offset, size);
                 }
 
                 if (flags & OMX_BUFFERFLAG_CODECCONFIG) {

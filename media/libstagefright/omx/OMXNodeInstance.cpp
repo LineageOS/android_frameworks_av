@@ -1559,7 +1559,8 @@ status_t OMXNodeInstance::emptyBuffer(
     switch (omxBuffer.mBufferType) {
     case OMXBuffer::kBufferTypePreset:
         return emptyBuffer_l(
-                buffer, 0, omxBuffer.mRangeLength, flags, timestamp, fenceFd);
+                buffer, omxBuffer.mRangeOffset, omxBuffer.mRangeLength,
+                flags, timestamp, fenceFd);
 
     case OMXBuffer::kBufferTypeANWBuffer:
         return emptyGraphicBuffer_l(
