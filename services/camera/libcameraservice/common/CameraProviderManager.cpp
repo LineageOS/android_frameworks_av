@@ -189,6 +189,42 @@ status_t CameraProviderManager::setTorchMode(const std::string &id, bool enabled
     return deviceInfo->setTorchMode(enabled);
 }
 
+status_t CameraProviderManager::setUpVendorTags() {
+    // TODO (b/34275821): support aggregating vendor tags for more than one provider
+    for (auto& provider : mProviders) {
+        hardware::hidl_vec<VendorTagSection> vts;
+        Status status;
+        provider->mInterface->getVendorTags(
+            [&](auto s, const auto& vendorTagSecs) {
+                status = s;
+                if (s == Status::OK) {
+                    vts = vendorTagSecs;
+                }
+        });
+
+        if (status != Status::OK) {
+            return mapToStatusT(status);
+        }
+
+        VendorTagDescriptor::clearGlobalVendorTagDescriptor();
+
+        // Read all vendor tag definitions into a descriptor
+        sp<VendorTagDescriptor> desc;
+        status_t res;
+        if ((res = HidlVendorTagDescriptor::createDescriptorFromHidl(vts, /*out*/desc))
+                != OK) {
+            ALOGE("%s: Could not generate descriptor from vendor tag operations,"
+                  "received error %s (%d). Camera clients will not be able to use"
+                  "vendor tags", __FUNCTION__, strerror(res), res);
+            return res;
+        }
+
+        // Set the global descriptor to use with camera metadata
+        VendorTagDescriptor::setAsGlobalVendorTagDescriptor(desc);
+    }
+    return OK;
+}
+
 status_t CameraProviderManager::openSession(const std::string &id,
         const sp<hardware::camera::device::V3_2::ICameraDeviceCallback>& callback,
         /*out*/
@@ -970,5 +1006,95 @@ const char* CameraProviderManager::torchStatusToString(const TorchModeStatus& s)
     ALOGW("Unexpected HAL torch mode status code %d", s);
     return "UNKNOWN_STATUS";
 }
+
+
+status_t HidlVendorTagDescriptor::createDescriptorFromHidl(
+        const hardware::hidl_vec<hardware::camera::common::V1_0::VendorTagSection>& vts,
+        /*out*/
+        sp<VendorTagDescriptor>& descriptor) {
+
+    int tagCount = 0;
+
+    for (size_t s = 0; s < vts.size(); s++) {
+        tagCount += vts[s].tags.size();
+    }
+
+    if (tagCount < 0 || tagCount > INT32_MAX) {
+        ALOGE("%s: tag count %d from vendor tag sections is invalid.", __FUNCTION__, tagCount);
+        return BAD_VALUE;
+    }
+
+    Vector<uint32_t> tagArray;
+    LOG_ALWAYS_FATAL_IF(tagArray.resize(tagCount) != tagCount,
+            "%s: too many (%u) vendor tags defined.", __FUNCTION__, tagCount);
+
+
+    sp<HidlVendorTagDescriptor> desc = new HidlVendorTagDescriptor();
+    desc->mTagCount = tagCount;
+
+    SortedVector<String8> sections;
+    KeyedVector<uint32_t, String8> tagToSectionMap;
+
+    int idx = 0;
+    for (size_t s = 0; s < vts.size(); s++) {
+        const hardware::camera::common::V1_0::VendorTagSection& section = vts[s];
+        const char *sectionName = section.sectionName.c_str();
+        if (sectionName == NULL) {
+            ALOGE("%s: no section name defined for vendor tag section %zu.", __FUNCTION__, s);
+            return BAD_VALUE;
+        }
+        String8 sectionString(sectionName);
+        sections.add(sectionString);
+
+        for (size_t j = 0; j < section.tags.size(); j++) {
+            uint32_t tag = section.tags[j].tagId;
+            if (tag < CAMERA_METADATA_VENDOR_TAG_BOUNDARY) {
+                ALOGE("%s: vendor tag %d not in vendor tag section.", __FUNCTION__, tag);
+                return BAD_VALUE;
+            }
+
+            tagArray.editItemAt(idx++) = section.tags[j].tagId;
+
+            const char *tagName = section.tags[j].tagName.c_str();
+            if (tagName == NULL) {
+                ALOGE("%s: no tag name defined for vendor tag %d.", __FUNCTION__, tag);
+                return BAD_VALUE;
+            }
+            desc->mTagToNameMap.add(tag, String8(tagName));
+            tagToSectionMap.add(tag, sectionString);
+
+            int tagType = (int) section.tags[j].tagType;
+            if (tagType < 0 || tagType >= NUM_TYPES) {
+                ALOGE("%s: tag type %d from vendor ops does not exist.", __FUNCTION__, tagType);
+                return BAD_VALUE;
+            }
+            desc->mTagToTypeMap.add(tag, tagType);
+        }
+    }
+
+    desc->mSections = sections;
+
+    for (size_t i = 0; i < tagArray.size(); ++i) {
+        uint32_t tag = tagArray[i];
+        String8 sectionString = tagToSectionMap.valueFor(tag);
+
+        // Set up tag to section index map
+        ssize_t index = sections.indexOf(sectionString);
+        LOG_ALWAYS_FATAL_IF(index < 0, "index %zd must be non-negative", index);
+        desc->mTagToSectionMap.add(tag, static_cast<uint32_t>(index));
+
+        // Set up reverse mapping
+        ssize_t reverseIndex = -1;
+        if ((reverseIndex = desc->mReverseMapping.indexOfKey(sectionString)) < 0) {
+            KeyedVector<String8, uint32_t>* nameMapper = new KeyedVector<String8, uint32_t>();
+            reverseIndex = desc->mReverseMapping.add(sectionString, nameMapper);
+        }
+        desc->mReverseMapping[reverseIndex]->add(desc->mTagToNameMap.valueFor(tag), tag);
+    }
+
+    descriptor = desc;
+    return OK;
+}
+
 
 } // namespace android

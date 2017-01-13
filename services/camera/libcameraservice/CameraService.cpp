@@ -324,7 +324,10 @@ status_t CameraService::enumerateProviders() {
     mNumberOfCameras = mCameraProviderManager->getCameraCount();
     mNumberOfNormalCameras = mCameraProviderManager->getStandardCameraCount();
 
-    // TODO: Set up vendor tags
+    // Setup vendor tags before we call get_camera_info the first time
+    // because HAL might need to setup static vendor keys in get_camera_info
+    // TODO: maybe put this into CameraProviderManager::initialize()?
+    mCameraProviderManager->setUpVendorTags();
 
     mFlashlight = new CameraFlashlight(mCameraProviderManager, this);
     res = mFlashlight->findFlashUnits();
