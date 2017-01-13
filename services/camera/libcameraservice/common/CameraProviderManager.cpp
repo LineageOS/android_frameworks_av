@@ -20,6 +20,7 @@
 
 #include "CameraProviderManager.h"
 
+#include <chrono>
 #include <android/hidl/manager/1.0/IServiceManager.h>
 #include <hidl/ServiceManagement.h>
 
@@ -46,26 +47,42 @@ CameraProviderManager::~CameraProviderManager() {
 
 status_t CameraProviderManager::initialize(wp<CameraProviderManager::StatusListener> listener,
         ServiceInteractionProxy* proxy) {
-    std::lock_guard<std::mutex> lock(mInterfaceMutex);
-    if (proxy == nullptr) {
-        ALOGE("%s: No valid service interaction proxy provided", __FUNCTION__);
-        return BAD_VALUE;
-    }
-    mListener = listener;
-    mServiceProxy = proxy;
+    int numProviders = 0;
+    {
+        std::lock_guard<std::mutex> lock(mInterfaceMutex);
+        if (proxy == nullptr) {
+            ALOGE("%s: No valid service interaction proxy provided", __FUNCTION__);
+            return BAD_VALUE;
+        }
+        mListener = listener;
+        mServiceProxy = proxy;
 
-    // Registering will trigger notifications for all already-known providers
-    bool success = mServiceProxy->registerForNotifications(
-        /* instance name, empty means no filter */ "",
-        this);
-    if (!success) {
-        ALOGE("%s: Unable to register with hardware service manager for notifications "
-                "about camera providers", __FUNCTION__);
-        return INVALID_OPERATION;
+        // Registering will trigger notifications for all already-known providers
+        bool success = mServiceProxy->registerForNotifications(
+            /* instance name, empty means no filter */ "",
+            this);
+        if (!success) {
+            ALOGE("%s: Unable to register with hardware service manager for notifications "
+                    "about camera providers", __FUNCTION__);
+            return INVALID_OPERATION;
+        }
+        numProviders = mProviders.size();
     }
 
-    // Also see if there's a passthrough HAL, but let's not complain if there's not
-    addProvider(kLegacyProviderName, /*expected*/ false);
+    if (numProviders == 0) {
+        // Remote provider might have not been initialized
+        // Wait for a bit and see if we get one registered
+        std::mutex mtx;
+        std::unique_lock<std::mutex> lock(mtx);
+        mProviderRegistered.wait_for(lock, std::chrono::seconds(15));
+        if (mProviders.size() == 0) {
+            ALOGI("%s: Unable to get one registered provider within timeout!",
+                    __FUNCTION__);
+            std::lock_guard<std::mutex> lock(mInterfaceMutex);
+            // See if there's a passthrough HAL, but let's not complain if there's not
+            addProvider(kLegacyProviderName, /*expected*/ false);
+        }
+    }
 
     return OK;
 }
@@ -277,6 +294,7 @@ hardware::Return<void> CameraProviderManager::onRegistration(
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
 
     addProvider(name);
+    mProviderRegistered.notify_one();
     return hardware::Return<void>();
 }
 
@@ -370,7 +388,8 @@ status_t CameraProviderManager::ProviderInfo::initialize() {
         ALOGE("%s: Invalid provider name, ignoring", __FUNCTION__);
         return BAD_VALUE;
     }
-    ALOGI("Connecting to new camera provider: %s", mProviderName.c_str());
+    ALOGI("Connecting to new camera provider: %s, isRemote? %d",
+            mProviderName.c_str(), mInterface->isRemote());
     Status status = mInterface->setCallback(this);
     if (status != Status::OK) {
         ALOGE("%s: Unable to register callbacks with camera provider '%s'",
