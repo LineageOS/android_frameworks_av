@@ -72,7 +72,6 @@ protected:
     virtual ~MediaExtractor() {}
 
 private:
-    bool mIsDrm;
 
     typedef bool (*SnifferFunc)(
             const sp<DataSource> &source, String8 *mimeType,

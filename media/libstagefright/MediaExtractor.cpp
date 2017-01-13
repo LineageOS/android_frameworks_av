@@ -27,7 +27,6 @@
 #include "include/OggExtractor.h"
 #include "include/MPEG2PSExtractor.h"
 #include "include/MPEG2TSExtractor.h"
-#include "include/DRMExtractor.h"
 #include "include/FLACExtractor.h"
 #include "include/AACExtractor.h"
 #include "include/MidiExtractor.h"
@@ -51,8 +50,7 @@
 
 namespace android {
 
-MediaExtractor::MediaExtractor():
-    mIsDrm(false) {
+MediaExtractor::MediaExtractor() {
     if (!LOG_NDEBUG) {
         uid_t uid = getuid();
         struct passwd *pw = getpwuid(uid);
@@ -148,23 +146,6 @@ sp<IMediaExtractor> MediaExtractor::Create(
         ALOGW("creating media extractor in calling process");
         return CreateFromService(source, mime);
     } else {
-        String8 mime8;
-        float confidence;
-        sp<AMessage> meta;
-
-        // Check if it's es-based DRM, since DRMExtractor needs to be created in the media server
-        // process, not the extractor process.
-        if (SniffDRM(source, &mime8, &confidence, &meta)) {
-            const char *drmMime = mime8.string();
-            ALOGV("Detected media content as '%s' with confidence %.2f", drmMime, confidence);
-            if (!strncmp(drmMime, "drm+es_based+", 13)) {
-                // DRMExtractor sets container metadata kKeyIsDRM to 1
-                return new DRMExtractor(source, drmMime + 14);
-            } else {
-                mime = drmMime + 20; // get real mimetype after "drm+container_based+" prefix
-            }
-        }
-
         // remote extractor
         ALOGV("get service manager");
         sp<IBinder> binder = defaultServiceManager()->getService(String16("media.extractor"));
@@ -186,6 +167,9 @@ sp<MediaExtractor> MediaExtractor::CreateFromService(
 
     ALOGV("MediaExtractor::CreateFromService %s", mime);
     RegisterDefaultSniffers();
+
+    // initialize source decryption if needed
+    source->DrmInitialization();
 
     sp<AMessage> meta;
 
@@ -299,9 +283,6 @@ void MediaExtractor::RegisterDefaultSniffers() {
     RegisterSniffer_l(SniffMPEG2PS);
     RegisterSniffer_l(SniffMidi);
 
-    if (property_get_bool("drm.service.enabled", false)) {
-        RegisterSniffer_l(SniffDRM);
-    }
     gSniffersRegistered = true;
 }
 

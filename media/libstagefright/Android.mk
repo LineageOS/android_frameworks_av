@@ -18,7 +18,6 @@ LOCAL_SRC_FILES:=                         \
         DataConverter.cpp                 \
         DataSource.cpp                    \
         DataURISource.cpp                 \
-        DRMExtractor.cpp                  \
         ESDS.cpp                          \
         FileSource.cpp                    \
         FLACExtractor.cpp                 \
