@@ -121,14 +121,6 @@ uint32_t RemoteMediaExtractor::flags() const {
     return mExtractor->flags();
 }
 
-char* RemoteMediaExtractor::getDrmTrackInfo(size_t trackID, int * len) {
-    return mExtractor->getDrmTrackInfo(trackID, len);
-}
-
-void RemoteMediaExtractor::setUID(uid_t uid) {
-    return mExtractor->setUID(uid);
-}
-
 status_t RemoteMediaExtractor::setMediaCas(const HInterfaceToken &casToken) {
     return mExtractor->setMediaCas((uint8_t*)casToken.data(), casToken.size());
 }
