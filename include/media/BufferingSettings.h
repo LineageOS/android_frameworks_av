@@ -40,6 +40,8 @@ struct BufferingSettings : public Parcelable {
     static const int kNoWatermark = -1;
 
     static bool IsValidBufferingMode(int mode);
+    static bool IsTimeBasedBufferingMode(int mode);
+    static bool IsSizeBasedBufferingMode(int mode);
 
     BufferingMode mInitialBufferingMode;  // for prepare
     BufferingMode mRebufferingMode;  // for playback

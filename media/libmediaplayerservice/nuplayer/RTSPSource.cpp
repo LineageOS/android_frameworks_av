@@ -32,11 +32,11 @@ namespace android {
 
 const int64_t kNearEOSTimeoutUs = 2000000ll; // 2 secs
 
-// Buffer Underflow/Prepare/StartServer/Overflow Marks
-const int64_t NuPlayer::RTSPSource::kUnderflowMarkUs   =  1000000ll;
-const int64_t NuPlayer::RTSPSource::kPrepareMarkUs     =  3000000ll;
-const int64_t NuPlayer::RTSPSource::kStartServerMarkUs =  5000000ll;
-const int64_t NuPlayer::RTSPSource::kOverflowMarkUs    = 10000000ll;
+// Default Buffer Underflow/Prepare/StartServer/Overflow Marks
+static const int kUnderflowMarkMs   =  1000;  // 1 second
+static const int kPrepareMarkMs     =  3000;  // 3 seconds
+//static const int kStartServerMarkMs =  5000;
+static const int kOverflowMarkMs    = 10000;  // 10 seconds
 
 NuPlayer::RTSPSource::RTSPSource(
         const sp<AMessage> &notify,
@@ -62,6 +62,7 @@ NuPlayer::RTSPSource::RTSPSource(
       mSeekGeneration(0),
       mEOSTimeoutAudio(0),
       mEOSTimeoutVideo(0) {
+    getDefaultBufferingSettings(&mBufferingSettings);
     if (headers) {
         mExtraHeaders = *headers;
 
@@ -81,6 +82,34 @@ NuPlayer::RTSPSource::~RTSPSource() {
         mLooper->unregisterHandler(id());
         mLooper->stop();
     }
+}
+
+status_t NuPlayer::RTSPSource::getDefaultBufferingSettings(
+            BufferingSettings* buffering /* nonnull */) {
+    buffering->mInitialBufferingMode = BUFFERING_MODE_TIME_ONLY;
+    buffering->mRebufferingMode = BUFFERING_MODE_TIME_ONLY;
+    buffering->mInitialWatermarkMs = kPrepareMarkMs;
+    buffering->mRebufferingWatermarkLowMs = kUnderflowMarkMs;
+    buffering->mRebufferingWatermarkHighMs = kOverflowMarkMs;
+
+    return OK;
+}
+
+status_t NuPlayer::RTSPSource::setBufferingSettings(const BufferingSettings& buffering) {
+    if (mLooper == NULL) {
+        mBufferingSettings = buffering;
+        return OK;
+    }
+
+    sp<AMessage> msg = new AMessage(kWhatSetBufferingSettings, this);
+    writeToAMessage(msg, buffering);
+    sp<AMessage> response;
+    status_t err = msg->postAndAwaitResponse(&response);
+    if (err == OK && response != NULL) {
+        CHECK(response->findInt32("err", &err));
+    }
+
+    return err;
 }
 
 void NuPlayer::RTSPSource::prepareAsync() {
@@ -328,7 +357,8 @@ void NuPlayer::RTSPSource::checkBuffering(
         int64_t bufferedDurationUs = src->getBufferedDurationUs(&finalResult);
 
         // isFinished when duration is 0 checks for EOS result only
-        if (bufferedDurationUs > kPrepareMarkUs || src->isFinished(/* duration */ 0)) {
+        if (bufferedDurationUs > mBufferingSettings.mInitialWatermarkMs * 1000
+                || src->isFinished(/* duration */ 0)) {
             ++preparedCount;
         }
 
@@ -336,13 +366,16 @@ void NuPlayer::RTSPSource::checkBuffering(
             ++overflowCount;
             ++finishedCount;
         } else {
-            if (bufferedDurationUs < kUnderflowMarkUs) {
+            if (bufferedDurationUs < mBufferingSettings.mRebufferingWatermarkLowMs * 1000) {
                 ++underflowCount;
             }
-            if (bufferedDurationUs > kOverflowMarkUs) {
+            if (bufferedDurationUs > mBufferingSettings.mRebufferingWatermarkHighMs * 1000) {
                 ++overflowCount;
             }
-            if (bufferedDurationUs < kStartServerMarkUs) {
+            int64_t startServerMarkUs =
+                    (mBufferingSettings.mRebufferingWatermarkLowMs
+                        + mBufferingSettings.mRebufferingWatermarkHighMs) / 2 * 1000ll;
+            if (bufferedDurationUs < startServerMarkUs) {
                 ++startCount;
             }
         }
@@ -478,6 +511,36 @@ void NuPlayer::RTSPSource::onMessageReceived(const sp<AMessage> &msg) {
         return;
     } else if (msg->what() == kWhatSignalEOS) {
         onSignalEOS(msg);
+        return;
+    } else if (msg->what() == kWhatSetBufferingSettings) {
+        sp<AReplyToken> replyID;
+        CHECK(msg->senderAwaitsResponse(&replyID));
+
+        BufferingSettings buffering;
+        readFromAMessage(msg, &buffering);
+
+        status_t err = OK;
+        if (buffering.IsSizeBasedBufferingMode(buffering.mInitialBufferingMode)
+                || buffering.IsSizeBasedBufferingMode(buffering.mRebufferingMode)
+                || (buffering.mRebufferingWatermarkLowMs > buffering.mRebufferingWatermarkHighMs
+                    && buffering.IsTimeBasedBufferingMode(buffering.mRebufferingMode))) {
+            err = BAD_VALUE;
+        } else {
+            if (buffering.mInitialBufferingMode == BUFFERING_MODE_NONE) {
+                buffering.mInitialWatermarkMs = BufferingSettings::kNoWatermark;
+            }
+            if (buffering.mRebufferingMode == BUFFERING_MODE_NONE) {
+                buffering.mRebufferingWatermarkLowMs = BufferingSettings::kNoWatermark;
+                buffering.mRebufferingWatermarkHighMs = INT32_MAX;
+            }
+
+            mBufferingSettings = buffering;
+        }
+
+        sp<AMessage> response = new AMessage;
+        response->setInt32("err", err);
+        response->postReply(replyID);
+
         return;
     }
 

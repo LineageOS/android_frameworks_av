@@ -38,11 +38,12 @@
 
 namespace android {
 
-static int64_t kLowWaterMarkUs = 2000000ll;  // 2secs
-static int64_t kHighWaterMarkUs = 5000000ll;  // 5secs
-static int64_t kHighWaterMarkRebufferUs = 15000000ll;  // 15secs
-static const ssize_t kLowWaterMarkBytes = 40000;
-static const ssize_t kHighWaterMarkBytes = 200000;
+static const int kLowWaterMarkMs          = 2000;  // 2secs
+static const int kHighWaterMarkMs         = 5000;  // 5secs
+static const int kHighWaterMarkRebufferMs = 15000;  // 15secs
+
+static const int kLowWaterMarkKB  = 40;
+static const int kHighWaterMarkKB = 200;
 
 NuPlayer::GenericSource::GenericSource(
         const sp<AMessage> &notify,
@@ -235,6 +236,16 @@ status_t NuPlayer::GenericSource::initFromDataSource() {
     mBitrate = totalBitrate;
 
     return OK;
+}
+
+status_t NuPlayer::GenericSource::getDefaultBufferingSettings(
+        BufferingSettings* buffering /* nonnull */) {
+    mBufferingMonitor->getDefaultBufferingSettings(buffering);
+    return OK;
+}
+
+status_t NuPlayer::GenericSource::setBufferingSettings(const BufferingSettings& buffering) {
+    return mBufferingMonitor->setBufferingSettings(buffering);
 }
 
 status_t NuPlayer::GenericSource::startSources() {
@@ -1469,9 +1480,46 @@ NuPlayer::GenericSource::BufferingMonitor::BufferingMonitor(const sp<AMessage> &
       mFirstDequeuedBufferRealUs(-1ll),
       mFirstDequeuedBufferMediaUs(-1ll),
       mlastDequeuedBufferMediaUs(-1ll) {
+      getDefaultBufferingSettings(&mSettings);
 }
 
 NuPlayer::GenericSource::BufferingMonitor::~BufferingMonitor() {
+}
+
+void NuPlayer::GenericSource::BufferingMonitor::getDefaultBufferingSettings(
+        BufferingSettings *buffering /* nonnull */) {
+    buffering->mInitialBufferingMode = BUFFERING_MODE_TIME_ONLY;
+    buffering->mRebufferingMode = BUFFERING_MODE_TIME_THEN_SIZE;
+    buffering->mInitialWatermarkMs = kHighWaterMarkMs;
+    buffering->mRebufferingWatermarkLowMs = kLowWaterMarkMs;
+    buffering->mRebufferingWatermarkHighMs = kHighWaterMarkRebufferMs;
+    buffering->mRebufferingWatermarkLowKB = kLowWaterMarkKB;
+    buffering->mRebufferingWatermarkHighKB = kHighWaterMarkKB;
+}
+
+status_t NuPlayer::GenericSource::BufferingMonitor::setBufferingSettings(
+        const BufferingSettings &buffering) {
+    Mutex::Autolock _l(mLock);
+    if (buffering.IsSizeBasedBufferingMode(buffering.mInitialBufferingMode)
+            || (buffering.IsTimeBasedBufferingMode(buffering.mRebufferingMode)
+                && buffering.mRebufferingWatermarkLowMs > buffering.mRebufferingWatermarkHighMs)
+            || (buffering.IsSizeBasedBufferingMode(buffering.mRebufferingMode)
+                && buffering.mRebufferingWatermarkLowKB > buffering.mRebufferingWatermarkHighKB)) {
+        return BAD_VALUE;
+    }
+    mSettings = buffering;
+    if (mSettings.mInitialBufferingMode == BUFFERING_MODE_NONE) {
+        mSettings.mInitialWatermarkMs = BufferingSettings::kNoWatermark;
+    }
+    if (!mSettings.IsTimeBasedBufferingMode(mSettings.mRebufferingMode)) {
+        mSettings.mRebufferingWatermarkLowMs = BufferingSettings::kNoWatermark;
+        mSettings.mRebufferingWatermarkHighMs = INT32_MAX;
+    }
+    if (!mSettings.IsSizeBasedBufferingMode(mSettings.mRebufferingMode)) {
+        mSettings.mRebufferingWatermarkLowKB = BufferingSettings::kNoWatermark;
+        mSettings.mRebufferingWatermarkHighKB = INT32_MAX;
+    }
+    return OK;
 }
 
 void NuPlayer::GenericSource::BufferingMonitor::prepare(
@@ -1702,7 +1750,9 @@ void NuPlayer::GenericSource::BufferingMonitor::onPollBuffering_l() {
 
         stopBufferingIfNecessary_l();
         return;
-    } else if (cachedDurationUs >= 0ll) {
+    }
+
+    if (cachedDurationUs >= 0ll) {
         if (mDurationUs > 0ll) {
             int64_t cachedPosUs = getLastReadPosition_l() + cachedDurationUs;
             int percentage = 100.0 * cachedPosUs / mDurationUs;
@@ -1713,36 +1763,40 @@ void NuPlayer::GenericSource::BufferingMonitor::onPollBuffering_l() {
             notifyBufferingUpdate_l(percentage);
         }
 
-        ALOGV("onPollBuffering_l: cachedDurationUs %.1f sec",
-                cachedDurationUs / 1000000.0f);
+        ALOGV("onPollBuffering_l: cachedDurationUs %.1f sec", cachedDurationUs / 1000000.0f);
 
-        if (cachedDurationUs < kLowWaterMarkUs) {
-            // Take into account the data cached in downstream components to try to avoid
-            // unnecessary pause.
-            if (mOffloadAudio && mFirstDequeuedBufferRealUs >= 0) {
-                int64_t downStreamCacheUs = mlastDequeuedBufferMediaUs - mFirstDequeuedBufferMediaUs
-                        - (ALooper::GetNowUs() - mFirstDequeuedBufferRealUs);
-                if (downStreamCacheUs > 0) {
-                    cachedDurationUs += downStreamCacheUs;
+        if (mPrepareBuffering) {
+            if (cachedDurationUs > mSettings.mInitialWatermarkMs * 1000) {
+                stopBufferingIfNecessary_l();
+            }
+        } else if (mSettings.IsTimeBasedBufferingMode(mSettings.mRebufferingMode)) {
+            if (cachedDurationUs < mSettings.mRebufferingWatermarkLowMs * 1000) {
+                // Take into account the data cached in downstream components to try to avoid
+                // unnecessary pause.
+                if (mOffloadAudio && mFirstDequeuedBufferRealUs >= 0) {
+                    int64_t downStreamCacheUs =
+                        mlastDequeuedBufferMediaUs - mFirstDequeuedBufferMediaUs
+                            - (ALooper::GetNowUs() - mFirstDequeuedBufferRealUs);
+                    if (downStreamCacheUs > 0) {
+                        cachedDurationUs += downStreamCacheUs;
+                    }
                 }
-            }
 
-            if (cachedDurationUs < kLowWaterMarkUs) {
-                startBufferingIfNecessary_l();
-            }
-        } else {
-            int64_t highWaterMark = mPrepareBuffering ? kHighWaterMarkUs : kHighWaterMarkRebufferUs;
-            if (cachedDurationUs > highWaterMark) {
+                if (cachedDurationUs < mSettings.mRebufferingWatermarkLowMs * 1000) {
+                    startBufferingIfNecessary_l();
+                }
+            } else if (cachedDurationUs > mSettings.mRebufferingWatermarkHighMs * 1000) {
                 stopBufferingIfNecessary_l();
             }
         }
-    } else if (cachedDataRemaining >= 0) {
+    } else if (cachedDataRemaining >= 0
+            && mSettings.IsSizeBasedBufferingMode(mSettings.mRebufferingMode)) {
         ALOGV("onPollBuffering_l: cachedDataRemaining %zd bytes",
                 cachedDataRemaining);
 
-        if (cachedDataRemaining < kLowWaterMarkBytes) {
+        if (cachedDataRemaining < (mSettings.mRebufferingWatermarkLowKB << 10)) {
             startBufferingIfNecessary_l();
-        } else if (cachedDataRemaining > kHighWaterMarkBytes) {
+        } else if (cachedDataRemaining > (mSettings.mRebufferingWatermarkHighKB << 10)) {
             stopBufferingIfNecessary_l();
         }
     }

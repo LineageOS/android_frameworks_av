@@ -34,6 +34,10 @@ struct NuPlayer::HTTPLiveSource : public NuPlayer::Source {
             const char *url,
             const KeyedVector<String8, String8> *headers);
 
+    virtual status_t getDefaultBufferingSettings(
+            BufferingSettings* buffering /* nonnull */) override;
+    virtual status_t setBufferingSettings(const BufferingSettings& buffering) override;
+
     virtual void prepareAsync();
     virtual void start();
 
@@ -80,6 +84,7 @@ private:
     int32_t mFetchMetaDataGeneration;
     bool mHasMetadata;
     bool mMetadataSelected;
+    BufferingSettings mBufferingSettings;
 
     void onSessionNotify(const sp<AMessage> &msg);
     void pollForRawData(
