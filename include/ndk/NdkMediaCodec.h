@@ -179,6 +179,19 @@ media_status_t AMediaCodec_setOutputSurface(AMediaCodec*, ANativeWindow* surface
 media_status_t AMediaCodec_releaseOutputBufferAtTime(
         AMediaCodec *mData, size_t idx, int64_t timestampNs);
 
+/**
+ * Creates a Surface that can be used as the input to encoder, in place of input buffers
+ *
+ * This can only be called after the codec has been configured via
+ * AMediaCodec_configure(..); and before AMediaCodec_start() has been called.
+ *
+ * The application is responsible for releasing the surface by calling
+ * ANativeWindow_release() when done.
+ *
+ * For more details, see the Java documentation for MediaCodec.createInputSurface.
+ */
+media_status_t AMediaCodec_createInputSurface(AMediaCodec*, ANativeWindow** surface);
+
 typedef enum {
     AMEDIACODECRYPTOINFO_MODE_CLEAR = 0,
     AMEDIACODECRYPTOINFO_MODE_AES_CTR = 1,
