@@ -66,6 +66,7 @@ struct BufferingSettings : public Parcelable {
     status_t writeToParcel(Parcel* parcel) const override;
     status_t readFromParcel(const Parcel* parcel) override;
 
+    String8 toString() const;
 };
 
 } // namespace android

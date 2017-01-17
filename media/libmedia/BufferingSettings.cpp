@@ -80,4 +80,15 @@ status_t BufferingSettings::writeToParcel(Parcel* parcel) const {
     return OK;
 }
 
+String8 BufferingSettings::toString() const {
+    String8 s;
+    s.appendFormat("initialMode(%d), rebufferingMode(%d), "
+            "initialMarks(%d ms, %d KB), rebufferingMarks(%d, %d)ms, (%d, %d)KB",
+            mInitialBufferingMode, mRebufferingMode,
+            mInitialWatermarkMs, mInitialWatermarkKB,
+            mRebufferingWatermarkLowMs, mRebufferingWatermarkHighMs,
+            mRebufferingWatermarkLowKB, mRebufferingWatermarkHighKB);
+    return s;
+}
+
 } // namespace android

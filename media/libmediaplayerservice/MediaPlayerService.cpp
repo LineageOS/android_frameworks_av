@@ -975,13 +975,8 @@ status_t MediaPlayerService::Client::getMetadata(
 status_t MediaPlayerService::Client::setBufferingSettings(
         const BufferingSettings& buffering)
 {
-    ALOGV("[%d] setBufferingSettings(%d, %d, %d, %d, %d, %d, %d, %d)",
-            mConnId, buffering.mInitialBufferingMode, buffering.mRebufferingMode,
-            buffering.mInitialWatermarkMs, buffering.mInitialWatermarkKB,
-            buffering.mRebufferingWatermarkLowMs,
-            buffering.mRebufferingWatermarkHighMs,
-            buffering.mRebufferingWatermarkLowKB,
-            buffering.mRebufferingWatermarkHighKB);
+    ALOGV("[%d] setBufferingSettings{%s}",
+            mConnId, buffering.toString().string());
     sp<MediaPlayerBase> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     return p->setBufferingSettings(buffering);
@@ -995,13 +990,8 @@ status_t MediaPlayerService::Client::getDefaultBufferingSettings(
     if (p == 0) return UNKNOWN_ERROR;
     status_t ret = p->getDefaultBufferingSettings(buffering);
     if (ret == NO_ERROR) {
-        ALOGV("[%d] getDefaultBufferingSettings(%d, %d, %d, %d, %d, %d, %d, %d)",
-                mConnId, buffering->mInitialBufferingMode, buffering->mRebufferingMode,
-                buffering->mInitialWatermarkMs, buffering->mInitialWatermarkKB,
-                buffering->mRebufferingWatermarkLowMs,
-                buffering->mRebufferingWatermarkHighMs,
-                buffering->mRebufferingWatermarkLowKB,
-                buffering->mRebufferingWatermarkHighKB);
+        ALOGV("[%d] getDefaultBufferingSettings{%s}",
+                mConnId, buffering->toString().string());
     } else {
         ALOGV("[%d] getDefaultBufferingSettings returned %d", mConnId, ret);
     }
