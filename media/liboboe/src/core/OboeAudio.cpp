@@ -96,6 +96,7 @@ OBOE_API const char * Oboe_convertResultToText(oboe_result_t returnCode) {
         OBOE_CASE_ENUM(OBOE_ERROR_WOULD_BLOCK);
         OBOE_CASE_ENUM(OBOE_ERROR_INVALID_ORDER);
         OBOE_CASE_ENUM(OBOE_ERROR_OUT_OF_RANGE);
+        OBOE_CASE_ENUM(OBOE_ERROR_NO_SERVICE);
     }
     return "Unrecognized Oboe error.";
 }
@@ -285,7 +286,6 @@ OBOE_API oboe_result_t  OboeStreamBuilder_openStream(OboeStreamBuilder builder,
 
 OBOE_API oboe_result_t  OboeStreamBuilder_delete(OboeStreamBuilder builder)
 {
-    // TODO protect the remove() with a Mutex
     AudioStreamBuilder *streamBuilder = (AudioStreamBuilder *)
             sHandleTracker.remove(OBOE_HANDLE_TYPE_STREAM_BUILDER, builder);
     if (streamBuilder != nullptr) {
@@ -297,9 +297,9 @@ OBOE_API oboe_result_t  OboeStreamBuilder_delete(OboeStreamBuilder builder)
 
 OBOE_API oboe_result_t  OboeStream_close(OboeStream stream)
 {
-    // TODO protect the remove() with a Mutex
     AudioStream *audioStream = (AudioStream *)
             sHandleTracker.remove(OBOE_HANDLE_TYPE_STREAM, (oboe_handle_t)stream);
+    ALOGD("OboeStream_close(0x%08X), audioStream = %p", stream, audioStream);
     if (audioStream != nullptr) {
         audioStream->close();
         delete audioStream;

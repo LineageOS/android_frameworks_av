@@ -29,13 +29,6 @@
 #include "binding/OboeStreamRequest.h"
 #include "binding/OboeStreamConfiguration.h"
 
-//using android::status_t;
-//using android::IInterface;
-//using android::BnInterface;
-
-using oboe::AudioEndpointParcelable;
-using oboe::OboeStreamRequest;
-using oboe::OboeStreamConfiguration;
 
 namespace android {
 
@@ -45,16 +38,16 @@ public:
 
     DECLARE_META_INTERFACE(OboeAudioService);
 
-    virtual oboe_handle_t openStream(OboeStreamRequest &request,
-                                     OboeStreamConfiguration &configuration) = 0;
+    virtual oboe_handle_t openStream(oboe::OboeStreamRequest &request,
+                                     oboe::OboeStreamConfiguration &configuration) = 0;
 
-    virtual oboe_result_t closeStream(int32_t streamHandle) = 0;
+    virtual oboe_result_t closeStream(oboe_handle_t streamHandle) = 0;
 
     /* Get an immutable description of the in-memory queues
     * used to communicate with the underlying HAL or Service.
     */
     virtual oboe_result_t getStreamDescription(oboe_handle_t streamHandle,
-                                               AudioEndpointParcelable &parcelable) = 0;
+                                               oboe::AudioEndpointParcelable &parcelable) = 0;
 
     /**
      * Start the flow of data.
@@ -79,14 +72,6 @@ public:
 
     virtual oboe_result_t unregisterAudioThread(oboe_handle_t streamHandle,
                                                 pid_t clientThreadId) = 0;
-
-    /**
-     * Poke server instead of running a background thread.
-     * Cooperative multi-tasking for early development only.
-     * TODO remove tickle() when service has its own thread.
-     */
-    virtual void tickle() { };
-
 };
 
 class BnOboeAudioService : public BnInterface<IOboeAudioService> {

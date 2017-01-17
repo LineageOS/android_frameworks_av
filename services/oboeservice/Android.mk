@@ -42,7 +42,9 @@ LOCAL_SRC_FILES += \
     OboeAudioService.cpp \
     OboeServiceStreamBase.cpp \
     OboeServiceStreamFakeHal.cpp \
-    OboeServiceMain.cpp
+    TimestampScheduler.cpp \
+    OboeServiceMain.cpp \
+    OboeThread.cpp
 
 LOCAL_CFLAGS += -Wno-unused-parameter
 LOCAL_CFLAGS += -Wall -Werror

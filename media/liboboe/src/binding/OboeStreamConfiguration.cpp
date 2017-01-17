@@ -65,10 +65,10 @@ oboe_result_t OboeStreamConfiguration::validate() {
     }
 
     switch (mAudioFormat) {
-    case OBOE_AUDIO_FORMAT_PCM16:
+    case OBOE_AUDIO_FORMAT_PCM_I16:
     case OBOE_AUDIO_FORMAT_PCM_FLOAT:
-    case OBOE_AUDIO_FORMAT_PCM824:
-    case OBOE_AUDIO_FORMAT_PCM32:
+    case OBOE_AUDIO_FORMAT_PCM_I8_24:
+    case OBOE_AUDIO_FORMAT_PCM_I32:
         break;
     default:
         ALOGE("OboeStreamConfiguration.validate() invalid audioFormat = %d", mAudioFormat);

@@ -20,6 +20,7 @@
 #include "binding/OboeStreamRequest.h"
 #include "binding/OboeStreamConfiguration.h"
 #include "binding/IOboeAudioService.h"
+#include "utility/OboeUtilities.h"
 
 namespace android {
 
@@ -44,7 +45,7 @@ public:
         request.writeToParcel(&data);
         status_t err = remote()->transact(OPEN_STREAM, data, &reply);
         if (err != NO_ERROR) {
-            return OBOE_ERROR_INTERNAL; // TODO consider another error
+            return OboeConvert_androidToOboeResult(err);
         }
         // parse reply
         oboe_handle_t stream;
@@ -53,14 +54,14 @@ public:
         return stream;
     }
 
-    virtual oboe_result_t closeStream(int32_t streamHandle) override {
+    virtual oboe_result_t closeStream(oboe_handle_t streamHandle) override {
         Parcel data, reply;
         // send command
         data.writeInterfaceToken(IOboeAudioService::getInterfaceDescriptor());
         data.writeInt32(streamHandle);
         status_t err = remote()->transact(CLOSE_STREAM, data, &reply);
         if (err != NO_ERROR) {
-            return OBOE_ERROR_INTERNAL; // TODO consider another error
+            return OboeConvert_androidToOboeResult(err);
         }
         // parse reply
         oboe_result_t res;
@@ -69,14 +70,14 @@ public:
     }
 
     virtual oboe_result_t getStreamDescription(oboe_handle_t streamHandle,
-                                               AudioEndpointParcelable &parcelable)   {
+                                               oboe::AudioEndpointParcelable &parcelable)   {
         Parcel data, reply;
         // send command
         data.writeInterfaceToken(IOboeAudioService::getInterfaceDescriptor());
         data.writeInt32(streamHandle);
         status_t err = remote()->transact(GET_STREAM_DESCRIPTION, data, &reply);
         if (err != NO_ERROR) {
-            return OBOE_ERROR_INTERNAL; // TODO consider another error
+            return OboeConvert_androidToOboeResult(err);
         }
         // parse reply
         parcelable.readFromParcel(&reply);
@@ -97,7 +98,7 @@ public:
         data.writeInt32(streamHandle);
         status_t err = remote()->transact(START_STREAM, data, &reply);
         if (err != NO_ERROR) {
-            return OBOE_ERROR_INTERNAL; // TODO consider another error
+            return OboeConvert_androidToOboeResult(err);
         }
         // parse reply
         oboe_result_t res;
@@ -112,7 +113,7 @@ public:
         data.writeInt32(streamHandle);
         status_t err = remote()->transact(PAUSE_STREAM, data, &reply);
         if (err != NO_ERROR) {
-            return OBOE_ERROR_INTERNAL; // TODO consider another error
+            return OboeConvert_androidToOboeResult(err);
         }
         // parse reply
         oboe_result_t res;
@@ -127,19 +128,12 @@ public:
         data.writeInt32(streamHandle);
         status_t err = remote()->transact(FLUSH_STREAM, data, &reply);
         if (err != NO_ERROR) {
-            return OBOE_ERROR_INTERNAL; // TODO consider another error
+            return OboeConvert_androidToOboeResult(err);
         }
         // parse reply
         oboe_result_t res;
         reply.readInt32(&res);
         return res;
-    }
-
-    virtual void tickle() override { // TODO remove after service thread implemented
-        Parcel data;
-        // send command
-        data.writeInterfaceToken(IOboeAudioService::getInterfaceDescriptor());
-        remote()->transact(TICKLE, data, nullptr);
     }
 
     virtual oboe_result_t registerAudioThread(oboe_handle_t streamHandle, pid_t clientThreadId,
@@ -153,7 +147,7 @@ public:
         data.writeInt64(periodNanoseconds);
         status_t err = remote()->transact(REGISTER_AUDIO_THREAD, data, &reply);
         if (err != NO_ERROR) {
-            return OBOE_ERROR_INTERNAL; // TODO consider another error
+            return OboeConvert_androidToOboeResult(err);
         }
         // parse reply
         oboe_result_t res;
@@ -170,7 +164,7 @@ public:
         data.writeInt32((int32_t) clientThreadId);
         status_t err = remote()->transact(UNREGISTER_AUDIO_THREAD, data, &reply);
         if (err != NO_ERROR) {
-            return OBOE_ERROR_INTERNAL; // TODO consider another error
+            return OboeConvert_androidToOboeResult(err);
         }
         // parse reply
         oboe_result_t res;
@@ -189,8 +183,8 @@ IMPLEMENT_META_INTERFACE(OboeAudioService, "IOboeAudioService");
 status_t BnOboeAudioService::onTransact(uint32_t code, const Parcel& data,
                                         Parcel* reply, uint32_t flags) {
     OboeStream stream;
-    OboeStreamRequest request;
-    OboeStreamConfiguration configuration;
+    oboe::OboeStreamRequest request;
+    oboe::OboeStreamConfiguration configuration;
     pid_t pid;
     oboe_nanoseconds_t nanoseconds;
     oboe_result_t result;
@@ -201,7 +195,7 @@ status_t BnOboeAudioService::onTransact(uint32_t code, const Parcel& data,
         case OPEN_STREAM: {
             request.readFromParcel(&data);
             stream = openStream(request, configuration);
-            ALOGD("BnOboeAudioService::onTransact OPEN_STREAM 0x%08X", stream);
+            ALOGD("BnOboeAudioService::onTransact OPEN_STREAM server handle = 0x%08X", stream);
             reply->writeInt32(stream);
             configuration.writeToParcel(reply);
             return NO_ERROR;
@@ -221,12 +215,12 @@ status_t BnOboeAudioService::onTransact(uint32_t code, const Parcel& data,
             oboe::AudioEndpointParcelable parcelable;
             result = getStreamDescription(stream, parcelable);
             if (result != OBOE_OK) {
-                return -1; // FIXME
+                return OboeConvert_oboeToAndroidStatus(result);
             }
             parcelable.dump();
             result = parcelable.validate();
             if (result != OBOE_OK) {
-                return -1; // FIXME
+                return OboeConvert_oboeToAndroidStatus(result);
             }
             parcelable.writeToParcel(reply);
             reply->writeInt32(result);
@@ -278,12 +272,6 @@ status_t BnOboeAudioService::onTransact(uint32_t code, const Parcel& data,
             ALOGD("BnOboeAudioService::onTransact UNREGISTER_AUDIO_THREAD 0x%08X, result = %d",
                     stream, result);
             reply->writeInt32(result);
-            return NO_ERROR;
-        } break;
-
-        case TICKLE: {
-            ALOGV("BnOboeAudioService::onTransact TICKLE");
-            tickle();
             return NO_ERROR;
         } break;
 

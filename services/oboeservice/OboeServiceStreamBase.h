@@ -17,12 +17,14 @@
 #ifndef OBOE_OBOE_SERVICE_STREAM_BASE_H
 #define OBOE_OBOE_SERVICE_STREAM_BASE_H
 
+#include <utils/Mutex.h>
+
 #include "IOboeAudioService.h"
 #include "OboeService.h"
-#include "AudioStream.h"
 #include "fifo/FifoBuffer.h"
 #include "SharedRingBuffer.h"
 #include "AudioEndpointParcelable.h"
+#include "OboeThread.h"
 
 namespace oboe {
 
@@ -30,7 +32,7 @@ namespace oboe {
 // This should be way more than we need.
 #define QUEUE_UP_CAPACITY_COMMANDS (128)
 
-class OboeServiceStreamBase  {
+class OboeServiceStreamBase {
 
 public:
     OboeServiceStreamBase();
@@ -68,7 +70,11 @@ public:
 
     virtual oboe_result_t close() = 0;
 
-    virtual void tickle() = 0;
+    virtual void sendCurrentTimestamp() = 0;
+
+    oboe_size_frames_t getFramesPerBurst() {
+        return mFramesPerBurst;
+    }
 
     virtual void sendServiceEvent(oboe_service_event_t event,
                                   int32_t data1 = 0,
@@ -77,6 +83,7 @@ public:
     virtual void setRegisteredThread(pid_t pid) {
         mRegisteredClientThread = pid;
     }
+
     virtual pid_t getRegisteredThread() {
         return mRegisteredClientThread;
     }
@@ -92,6 +99,8 @@ protected:
     oboe_size_frames_t       mFramesPerBurst = 0;
     oboe_size_frames_t       mCapacityInFrames = 0;
     oboe_size_bytes_t        mCapacityInBytes = 0;
+
+    android::Mutex           mLockUpMessageQueue;
 };
 
 } /* namespace oboe */

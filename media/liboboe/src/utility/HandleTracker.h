@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-#ifndef UTILITY_HANDLETRACKER_H
-#define UTILITY_HANDLETRACKER_H
+#ifndef UTILITY_HANDLE_TRACKER_H
+#define UTILITY_HANDLE_TRACKER_H
 
 #include <stdint.h>
+#include <utils/Mutex.h>
 
 typedef int32_t  handle_tracker_type_t;       // what kind of handle
 typedef int32_t  handle_tracker_slot_t;       // index in allocation table
@@ -53,6 +54,8 @@ public:
     /**
      * Store a pointer and return a handle that can be used to retrieve the pointer.
      *
+     * It is safe to call put() or remove() from multiple threads.
+     *
      * @param expectedType the type of the object to be tracked
      * @param address pointer to be converted to a handle
      * @return a valid handle or a negative error
@@ -75,6 +78,8 @@ public:
      * Free up the storage associated with the handle.
      * Subsequent attempts to use the handle will fail.
      *
+     * Do NOT remove() a handle while get() is being called for the same handle from another thread.
+     *
      * @param expectedType shouldmatch the type we passed to put()
      * @param handle to be removed from tracking
      * @return address associated with handle or nullptr if not found
@@ -83,17 +88,28 @@ public:
 
 private:
     const int32_t               mMaxHandleCount;   // size of array
-    // This is const after initialization.
+    // This address is const after initialization.
     handle_tracker_address_t  * mHandleAddresses;  // address of objects or a free linked list node
-    // This is const after initialization.
+    // This address is const after initialization.
     handle_tracker_header_t   * mHandleHeaders;    // combination of type and generation
-    handle_tracker_address_t  * mNextFreeAddress; // head of the linked list of free nodes in mHandleAddresses
+    // head of the linked list of free nodes in mHandleAddresses
+    handle_tracker_address_t  * mNextFreeAddress;
+
+    // This Mutex protects the linked list of free nodes.
+    // The list is managed using mHandleAddresses and mNextFreeAddress.
+    // The data in mHandleHeaders is only changed by put() and remove().
+    android::Mutex              mLock;
 
     /**
      * Pull slot off of a list of empty slots.
      * @return index or a negative error
      */
-    handle_tracker_slot_t allocateSlot();
+    handle_tracker_slot_t allocateSlot_l();
+
+    /**
+     * Increment the generation for the slot, avoiding zero.
+     */
+    handle_tracker_generation_t nextGeneration_l(handle_tracker_slot_t index);
 
     /**
      * Validate the handle and return the corresponding index.
@@ -107,7 +123,7 @@ private:
      * @param index slot index returned from allocateSlot
      * @return handle or a negative error
      */
-    oboe_handle_t buildHandle(handle_tracker_header_t header, handle_tracker_slot_t index);
+    static oboe_handle_t buildHandle(handle_tracker_header_t header, handle_tracker_slot_t index);
 
     /**
      * Combine a type and a generation field into a header.
@@ -129,11 +145,6 @@ private:
      */
     static handle_tracker_generation_t extractGeneration(oboe_handle_t handle);
 
-    /**
-     * Increment the generation for the slot, avoiding zero.
-     */
-    handle_tracker_generation_t nextGeneration(handle_tracker_slot_t index);
-
 };
 
-#endif //UTILITY_HANDLETRACKER_H
+#endif //UTILITY_HANDLE_TRACKER_H

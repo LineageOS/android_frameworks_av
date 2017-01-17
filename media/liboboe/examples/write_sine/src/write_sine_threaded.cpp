@@ -27,6 +27,7 @@
 #include "SineGenerator.h"
 
 #define NUM_SECONDS   10
+
 #define SHARING_MODE  OBOE_SHARING_MODE_EXCLUSIVE
 //#define SHARING_MODE  OBOE_SHARING_MODE_LEGACY
 
@@ -133,15 +134,18 @@ public:
     }
 
     oboe_result_t close() {
-        stop();
-        OboeStream_close(mStream);
-        mStream = OBOE_HANDLE_INVALID;
-        OboeStreamBuilder_delete(mBuilder);
-        mBuilder = OBOE_HANDLE_INVALID;
-        delete mOutputBuffer;
-        mOutputBuffer = nullptr;
-        delete mConversionBuffer;
-        mConversionBuffer = nullptr;
+        if (mStream != OBOE_HANDLE_INVALID) {
+            stop();
+            printf("call OboeStream_close(0x%08x)\n", mStream);  fflush(stdout);
+            OboeStream_close(mStream);
+            mStream = OBOE_HANDLE_INVALID;
+            OboeStreamBuilder_delete(mBuilder);
+            mBuilder = OBOE_HANDLE_INVALID;
+            delete mOutputBuffer;
+            mOutputBuffer = nullptr;
+            delete mConversionBuffer;
+            mConversionBuffer = nullptr;
+        }
         return OBOE_OK;
     }
 
@@ -274,9 +278,9 @@ int main(int argc, char **argv)
     printf("player.getFramesPerSecond() = %d\n", player.getFramesPerSecond());
     printf("player.getSamplesPerFrame() = %d\n", player.getSamplesPerFrame());
     myData.sineOsc1.setup(440.0, 48000);
-    myData.sineOsc1.setSweep(300.0, 2000.0, 5.0);
+    myData.sineOsc1.setSweep(300.0, 600.0, 5.0);
     myData.sineOsc2.setup(660.0, 48000);
-    myData.sineOsc2.setSweep(400.0, 3000.0, 7.0);
+    myData.sineOsc2.setSweep(350.0, 900.0, 7.0);
     myData.samplesPerFrame = player.getSamplesPerFrame();
 
     result = player.start();

@@ -18,6 +18,8 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include <atomic>
+
 #include "AudioClock.h"
 #include "AudioEndpointParcelable.h"
 
@@ -41,6 +43,7 @@ OboeServiceStreamFakeHal::OboeServiceStreamFakeHal()
         : OboeServiceStreamBase()
         , mStreamId(nullptr)
         , mPreviousFrameCounter(0)
+        , mOboeThread()
 {
 }
 
@@ -86,7 +89,8 @@ oboe_result_t OboeServiceStreamFakeHal::open(oboe::OboeStreamRequest &request,
     // Fill in OboeStreamConfiguration
     configuration.setSampleRate(mSampleRate);
     configuration.setSamplesPerFrame(mmapInfo.channel_count);
-    configuration.setAudioFormat(OBOE_AUDIO_FORMAT_PCM16);
+    configuration.setAudioFormat(OBOE_AUDIO_FORMAT_PCM_I16);
+
     return OBOE_OK;
 }
 
@@ -117,6 +121,10 @@ oboe_result_t OboeServiceStreamFakeHal::start() {
     oboe_result_t result = fake_hal_start(mStreamId);
     sendServiceEvent(OBOE_SERVICE_EVENT_STARTED);
     mState = OBOE_STREAM_STATE_STARTED;
+    if (result == OBOE_OK) {
+        mThreadEnabled.store(true);
+        result = mOboeThread.start(this);
+    }
     return result;
 }
 
@@ -131,6 +139,8 @@ oboe_result_t OboeServiceStreamFakeHal::pause() {
     mState = OBOE_STREAM_STATE_PAUSED;
     mFramesRead.reset32();
     ALOGD("OboeServiceStreamFakeHal::pause() sent OBOE_SERVICE_EVENT_PAUSED");
+    mThreadEnabled.store(false);
+    result = mOboeThread.stop();
     return result;
 }
 
@@ -166,7 +176,7 @@ void OboeServiceStreamFakeHal::sendCurrentTimestamp() {
         command.what = OboeServiceMessage::code::TIMESTAMP;
         mFramesRead.update32(frameCounter);
         command.timestamp.position = mFramesRead.get();
-        ALOGV("OboeServiceStreamFakeHal::sendCurrentTimestamp() HAL frames = %d, pos = %d",
+        ALOGD("OboeServiceStreamFakeHal::sendCurrentTimestamp() HAL frames = %d, pos = %d",
                 frameCounter, (int)mFramesRead.get());
         command.timestamp.timestamp = AudioClock::getNanoseconds();
         mUpMessageQueue->getFifoBuffer()->write(&command, 1);
@@ -174,17 +184,18 @@ void OboeServiceStreamFakeHal::sendCurrentTimestamp() {
     }
 }
 
-void OboeServiceStreamFakeHal::tickle() {
-    if (mStreamId != nullptr) {
-        switch (mState) {
-            case OBOE_STREAM_STATE_STARTING:
-            case OBOE_STREAM_STATE_STARTED:
-            case OBOE_STREAM_STATE_PAUSING:
-            case OBOE_STREAM_STATE_STOPPING:
-                sendCurrentTimestamp();
-                break;
-            default:
-                break;
+// implement Runnable
+void OboeServiceStreamFakeHal::run() {
+    TimestampScheduler timestampScheduler;
+    timestampScheduler.setBurstPeriod(mFramesPerBurst, mSampleRate);
+    timestampScheduler.start(AudioClock::getNanoseconds());
+    while(mThreadEnabled.load()) {
+        oboe_nanoseconds_t nextTime = timestampScheduler.nextAbsoluteTime();
+        if (AudioClock::getNanoseconds() >= nextTime) {
+            sendCurrentTimestamp();
+        } else  {
+            // Sleep until it is time to send the next timestamp.
+            AudioClock::sleepUntilNanoTime(nextTime);
         }
     }
 }

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef LEGACY_AUDIOSTREAMRECORD_H
-#define LEGACY_AUDIOSTREAMRECORD_H
+#ifndef LEGACY_AUDIO_STREAM_RECORD_H
+#define LEGACY_AUDIO_STREAM_RECORD_H
 
 #include <media/AudioRecord.h>
 #include <oboe/OboeAudio.h>
@@ -75,4 +75,4 @@ private:
 
 } /* namespace oboe */
 
-#endif /* LEGACY_AUDIOSTREAMRECORD_H */
+#endif /* LEGACY_AUDIO_STREAM_RECORD_H */

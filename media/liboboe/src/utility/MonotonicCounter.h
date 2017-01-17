@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef UTILITY_MONOTONICCOUNTER_H
-#define UTILITY_MONOTONICCOUNTER_H
+#ifndef UTILITY_MONOTONIC_COUNTER_H
+#define UTILITY_MONOTONIC_COUNTER_H
 
 #include <stdint.h>
 
@@ -88,4 +88,4 @@ private:
 };
 
 
-#endif //UTILITY_MONOTONICCOUNTER_H
+#endif //UTILITY_MONOTONIC_COUNTER_H

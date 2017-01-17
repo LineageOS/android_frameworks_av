@@ -22,6 +22,7 @@
 #include <assert.h>
 
 #include <binder/IServiceManager.h>
+#include <utils/Mutex.h>
 
 #include <oboe/OboeAudio.h>
 
@@ -40,16 +41,40 @@ using android::String16;
 using android::IServiceManager;
 using android::defaultServiceManager;
 using android::interface_cast;
+using android::Mutex;
 
 using namespace oboe;
 
+static android::Mutex gServiceLock;
+static sp<IOboeAudioService>  gOboeService;
+
+#define OBOE_SERVICE_NAME   "OboeAudioService"
+
 // Helper function to get access to the "OboeAudioService" service.
-static sp<IOboeAudioService> getOboeAudioService() {
-    sp<IServiceManager> sm = defaultServiceManager();
-    sp<IBinder> binder = sm->getService(String16("OboeAudioService"));
-    // TODO: If the "OboeHack" service is not running, getService times out and binder == 0.
-    sp<IOboeAudioService> service = interface_cast<IOboeAudioService>(binder);
-    return service;
+// This code was modeled after frameworks/av/media/libaudioclient/AudioSystem.cpp
+static const sp<IOboeAudioService> getOboeAudioService() {
+    sp<IBinder> binder;
+    Mutex::Autolock _l(gServiceLock);
+    if (gOboeService == 0) {
+        sp<IServiceManager> sm = defaultServiceManager();
+        // Try several times to get the service.
+        int retries = 4;
+        do {
+            binder = sm->getService(String16(OBOE_SERVICE_NAME)); // This will wait a while.
+            if (binder != 0) {
+                break;
+            }
+        } while (retries-- > 0);
+
+        if (binder != 0) {
+            // TODO Add linkToDeath() like in frameworks/av/media/libaudioclient/AudioSystem.cpp
+            // TODO Create a DeathRecipient that disconnects all active streams.
+            gOboeService = interface_cast<IOboeAudioService>(binder);
+        } else {
+            ALOGE("AudioStreamInternal could not get %s", OBOE_SERVICE_NAME);
+        }
+    }
+    return gOboeService;
 }
 
 AudioStreamInternal::AudioStreamInternal()
@@ -59,15 +84,15 @@ AudioStreamInternal::AudioStreamInternal()
         , mServiceStreamHandle(OBOE_HANDLE_INVALID)
         , mFramesPerBurst(16)
 {
-    // TODO protect against mService being NULL;
-    // TODO Model access to the service on frameworks/av/media/libaudioclient/AudioSystem.cpp
-    mService = getOboeAudioService();
 }
 
 AudioStreamInternal::~AudioStreamInternal() {
 }
 
 oboe_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
+
+    const sp<IOboeAudioService>& service = getOboeAudioService();
+    if (service == 0) return OBOE_ERROR_NO_SERVICE;
 
     oboe_result_t result = OBOE_OK;
     OboeStreamRequest request;
@@ -78,7 +103,7 @@ oboe_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         return result;
     }
 
-    // Build the request.
+    // Build the request to send to the server.
     request.setUserId(getuid());
     request.setProcessId(getpid());
     request.getConfiguration().setDeviceId(getDeviceId());
@@ -87,7 +112,7 @@ oboe_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     request.getConfiguration().setAudioFormat(getFormat());
     request.dump();
 
-    mServiceStreamHandle = mService->openStream(request, configuration);
+    mServiceStreamHandle = service->openStream(request, configuration);
     ALOGD("AudioStreamInternal.open(): openStream returned mServiceStreamHandle = 0x%08X",
          (unsigned int)mServiceStreamHandle);
     if (mServiceStreamHandle < 0) {
@@ -105,10 +130,10 @@ oboe_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         setFormat(configuration.getAudioFormat());
 
         oboe::AudioEndpointParcelable parcelable;
-        result = mService->getStreamDescription(mServiceStreamHandle, parcelable);
+        result = service->getStreamDescription(mServiceStreamHandle, parcelable);
         if (result != OBOE_OK) {
             ALOGE("AudioStreamInternal.open(): getStreamDescriptor returns %d", result);
-            mService->closeStream(mServiceStreamHandle);
+            service->closeStream(mServiceStreamHandle);
             return result;
         }
         // resolve parcelable into a descriptor
@@ -133,11 +158,14 @@ oboe_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 oboe_result_t AudioStreamInternal::close() {
     ALOGD("AudioStreamInternal.close(): mServiceStreamHandle = 0x%08X", mServiceStreamHandle);
     if (mServiceStreamHandle != OBOE_HANDLE_INVALID) {
-        mService->closeStream(mServiceStreamHandle);
+        oboe_handle_t serviceStreamHandle = mServiceStreamHandle;
         mServiceStreamHandle = OBOE_HANDLE_INVALID;
+        const sp<IOboeAudioService>& oboeService = getOboeAudioService();
+        if (oboeService == 0) return OBOE_ERROR_NO_SERVICE;
+        oboeService->closeStream(serviceStreamHandle);
         return OBOE_OK;
     } else {
-        return OBOE_ERROR_INVALID_STATE;
+        return OBOE_ERROR_INVALID_HANDLE;
     }
 }
 
@@ -148,11 +176,13 @@ oboe_result_t AudioStreamInternal::requestStart()
     if (mServiceStreamHandle == OBOE_HANDLE_INVALID) {
         return OBOE_ERROR_INVALID_STATE;
     }
+    const sp<IOboeAudioService>& oboeService = getOboeAudioService();
+    if (oboeService == 0) return OBOE_ERROR_NO_SERVICE;
     startTime = Oboe_getNanoseconds(OBOE_CLOCK_MONOTONIC);
     mClockModel.start(startTime);
     processTimestamp(0, startTime);
     setState(OBOE_STREAM_STATE_STARTING);
-    return mService->startStream(mServiceStreamHandle);
+    return oboeService->startStream(mServiceStreamHandle);
 }
 
 oboe_result_t AudioStreamInternal::requestPause()
@@ -161,9 +191,11 @@ oboe_result_t AudioStreamInternal::requestPause()
     if (mServiceStreamHandle == OBOE_HANDLE_INVALID) {
         return OBOE_ERROR_INVALID_STATE;
     }
+    const sp<IOboeAudioService>& oboeService = getOboeAudioService();
+    if (oboeService == 0) return OBOE_ERROR_NO_SERVICE;
     mClockModel.stop(Oboe_getNanoseconds(OBOE_CLOCK_MONOTONIC));
     setState(OBOE_STREAM_STATE_PAUSING);
-    return mService->pauseStream(mServiceStreamHandle);
+    return oboeService->pauseStream(mServiceStreamHandle);
 }
 
 oboe_result_t AudioStreamInternal::requestFlush() {
@@ -171,8 +203,10 @@ oboe_result_t AudioStreamInternal::requestFlush() {
     if (mServiceStreamHandle == OBOE_HANDLE_INVALID) {
         return OBOE_ERROR_INVALID_STATE;
     }
-    setState(OBOE_STREAM_STATE_FLUSHING);
-    return mService->flushStream(mServiceStreamHandle);
+    const sp<IOboeAudioService>& oboeService = getOboeAudioService();
+    if (oboeService == 0) return OBOE_ERROR_NO_SERVICE;
+setState(OBOE_STREAM_STATE_FLUSHING);
+    return oboeService->flushStream(mServiceStreamHandle);
 }
 
 void AudioStreamInternal::onFlushFromServer() {
@@ -208,7 +242,9 @@ oboe_result_t AudioStreamInternal::registerThread() {
     if (mServiceStreamHandle == OBOE_HANDLE_INVALID) {
         return OBOE_ERROR_INVALID_STATE;
     }
-    return mService->registerAudioThread(mServiceStreamHandle,
+    const sp<IOboeAudioService>& oboeService = getOboeAudioService();
+    if (oboeService == 0) return OBOE_ERROR_NO_SERVICE;
+    return oboeService->registerAudioThread(mServiceStreamHandle,
                                          gettid(),
                                          getPeriodNanoseconds());
 }
@@ -218,7 +254,9 @@ oboe_result_t AudioStreamInternal::unregisterThread() {
     if (mServiceStreamHandle == OBOE_HANDLE_INVALID) {
         return OBOE_ERROR_INVALID_STATE;
     }
-    return mService->unregisterAudioThread(mServiceStreamHandle, gettid());
+    const sp<IOboeAudioService>& oboeService = getOboeAudioService();
+    if (oboeService == 0) return OBOE_ERROR_NO_SERVICE;
+    return oboeService->unregisterAudioThread(mServiceStreamHandle, gettid());
 }
 
 // TODO use oboe_clockid_t all the way down to AudioClock
@@ -304,9 +342,6 @@ oboe_result_t AudioStreamInternal::onEventFromServer(OboeServiceMessage *message
 // Process all the commands coming from the server.
 oboe_result_t AudioStreamInternal::processCommands() {
     oboe_result_t result = OBOE_OK;
-
-    // Let the service run in case it is a fake service simulator.
-    mService->tickle(); // TODO use real service thread
 
     while (result == OBOE_OK) {
         OboeServiceMessage message;

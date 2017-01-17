@@ -154,7 +154,7 @@ OBOE_API oboe_result_t OboeStreamBuilder_getSamplesPerFrame(OboeStreamBuilder bu
 
 
 /**
- * Request a sample data format, for example OBOE_AUDIO_FORMAT_PCM16.
+ * Request a sample data format, for example OBOE_AUDIO_FORMAT_PCM_I16.
  * The application should query for the actual format after the stream is opened.
  *
  * @return OBOE_OK or a negative error.
