@@ -3004,7 +3004,11 @@ bool OMXCodec::drainInputBuffer(BufferInfo *info) {
             static const uint8_t kNALStartCode[4] =
                     { 0x00, 0x00, 0x00, 0x01 };
 
-            CHECK(info->mSize >= specific->mSize + 4);
+            if (info->mSize < specific->mSize + 4) {
+                ALOGE("info size %zu < specific size %zu", info->mSize, specific->mSize + 4);
+                setState(ERROR);
+                return false;
+            }
 
             size += 4;
 
@@ -3012,7 +3016,11 @@ bool OMXCodec::drainInputBuffer(BufferInfo *info) {
             memcpy((uint8_t *)info->mData + 4,
                    specific->mData, specific->mSize);
         } else {
-            CHECK(info->mSize >= specific->mSize);
+            if (info->mSize < specific->mSize) {
+                ALOGE("info size %zu < specific size %zu", info->mSize, specific->mSize);
+                setState(ERROR);
+                return false;
+            }
             memcpy(info->mData, specific->mData, specific->mSize);
         }
 
