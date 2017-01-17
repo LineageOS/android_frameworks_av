@@ -48,6 +48,7 @@ LOCAL_SHARED_LIBRARIES += \
     libhidlbase \
     libhidltransport \
     libbase \
+    libaudiohal \
     android.hardware.soundtrigger@2.0 \
     android.hardware.audio.common@2.0
 endif

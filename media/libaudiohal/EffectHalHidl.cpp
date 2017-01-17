@@ -160,7 +160,7 @@ status_t EffectHalHidl::setProcessBuffers() {
         mBuffersChanged = false;
         return OK;
     }
-    return ret.isOk() ? analyzeResult(ret) : UNKNOWN_ERROR;
+    return ret.isOk() ? analyzeResult(ret) : FAILED_TRANSACTION;
 }
 
 status_t EffectHalHidl::command(uint32_t cmdCode, uint32_t cmdSize, void *pCmdData,
@@ -183,7 +183,7 @@ status_t EffectHalHidl::command(uint32_t cmdCode, uint32_t cmdSize, void *pCmdDa
                     }
                 }
             });
-    return status;
+    return ret.isOk() ? status : FAILED_TRANSACTION;
 }
 
 status_t EffectHalHidl::getDescriptor(effect_descriptor_t *pDescriptor) {
@@ -196,13 +196,13 @@ status_t EffectHalHidl::getDescriptor(effect_descriptor_t *pDescriptor) {
                     effectDescriptorToHal(result, pDescriptor);
                 }
             });
-    return ret.isOk() ? analyzeResult(retval) : UNKNOWN_ERROR;
+    return ret.isOk() ? analyzeResult(retval) : FAILED_TRANSACTION;
 }
 
 status_t EffectHalHidl::close() {
     if (mEffect == 0) return NO_INIT;
     Return<Result> ret = mEffect->close();
-    return ret.isOk() ? analyzeResult(ret) : UNKNOWN_ERROR;
+    return ret.isOk() ? analyzeResult(ret) : FAILED_TRANSACTION;
 }
 
 } // namespace android

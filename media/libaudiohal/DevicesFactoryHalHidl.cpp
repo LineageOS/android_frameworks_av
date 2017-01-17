@@ -20,6 +20,7 @@
 //#define LOG_NDEBUG 0
 
 #include <android/hardware/audio/2.0/IDevice.h>
+#include <media/audiohal/hidl/HalDeathHandler.h>
 #include <utils/Log.h>
 
 #include "ConversionHelperHidl.h"
@@ -40,6 +41,11 @@ sp<DevicesFactoryHalInterface> DevicesFactoryHalInterface::create() {
 
 DevicesFactoryHalHidl::DevicesFactoryHalHidl() {
     mDevicesFactory = IDevicesFactory::getService("audio_devices_factory");
+    if (mDevicesFactory != 0) {
+        // It is assumet that DevicesFactory is owned by AudioFlinger
+        // and thus have the same lifespan.
+        mDevicesFactory->linkToDeath(HalDeathHandler::getInstance(), 0 /*cookie*/);
+    }
 }
 
 DevicesFactoryHalHidl::~DevicesFactoryHalHidl() {
@@ -83,7 +89,7 @@ status_t DevicesFactoryHalHidl::openDevice(const char *name, sp<DeviceHalInterfa
         else if (retval == Result::INVALID_ARGUMENTS) return BAD_VALUE;
         else return NO_INIT;
     }
-    return UNKNOWN_ERROR;
+    return FAILED_TRANSACTION;
 }
 
 } // namespace android

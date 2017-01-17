@@ -46,6 +46,7 @@ LOCAL_SHARED_LIBRARIES += \
     libhidlbase \
     libhidltransport \
     libbase \
+    libaudiohal \
     android.hardware.broadcastradio@1.0
 endif
 

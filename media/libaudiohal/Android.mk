@@ -26,6 +26,7 @@ else  # if !USE_LEGACY_LOCAL_AUDIO_HAL
 
 LOCAL_SRC_FILES := \
     ConversionHelperHidl.cpp   \
+    HalDeathHandlerHidl.cpp   \
     DeviceHalHidl.cpp          \
     DevicesFactoryHalHidl.cpp  \
     EffectBufferHalHidl.cpp    \
