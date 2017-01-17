@@ -107,6 +107,7 @@ const struct usb_interface_descriptor mtp_interface_desc = {
     .bInterfaceClass = USB_CLASS_STILL_IMAGE,
     .bInterfaceSubClass = 1,
     .bInterfaceProtocol = 1,
+    .iInterface = 1,
 };
 
 const struct usb_interface_descriptor ptp_interface_desc = {
@@ -259,14 +260,23 @@ const struct ss_func_desc ptp_ss_descriptors = {
     .intr_comp = ss_intr_comp,
 };
 
+#define STR_INTERFACE "MTP"
 const struct {
     struct usb_functionfs_strings_head header;
+    struct {
+        __le16 code;
+        const char str1[sizeof(STR_INTERFACE)];
+    } __attribute__((packed)) lang0;
 } __attribute__((packed)) strings = {
     .header = {
         .magic = cpu_to_le32(FUNCTIONFS_STRINGS_MAGIC),
         .length = cpu_to_le32(sizeof(strings)),
-        .str_count = cpu_to_le32(0),
-        .lang_count = cpu_to_le32(0),
+        .str_count = cpu_to_le32(1),
+        .lang_count = cpu_to_le32(1),
+    },
+    .lang0 = {
+        .code = cpu_to_le16(0x0409),
+        .str1 = STR_INTERFACE,
     },
 };
 
