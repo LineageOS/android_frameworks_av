@@ -27,6 +27,22 @@
 using android::NO_ERROR;
 using android::IBinder;
 
+namespace android {
+
+enum oboe_commands_t {
+    OPEN_STREAM = IBinder::FIRST_CALL_TRANSACTION,
+    CLOSE_STREAM,
+    GET_STREAM_DESCRIPTION,
+    START_STREAM,
+    PAUSE_STREAM,
+    FLUSH_STREAM,
+    REGISTER_AUDIO_THREAD,
+    UNREGISTER_AUDIO_THREAD,
+    TICKLE
+};
+
+} // namespace android
+
 namespace oboe {
 
 enum oboe_commands_t {
