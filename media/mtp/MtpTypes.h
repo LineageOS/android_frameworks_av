@@ -73,6 +73,13 @@ typedef UInt32List MtpStorageIDList;
 
 typedef String8    MtpString;
 
+enum UrbPacketDivisionMode {
+    // First packet only contains a header.
+    FIRST_PACKET_ONLY_HEADER,
+    // First packet contains payload much as possible.
+    FIRST_PACKET_HAS_PAYLOAD
+};
+
 }; // namespace android
 
 #endif // _MTP_TYPES_H
