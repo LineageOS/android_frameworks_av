@@ -56,6 +56,9 @@ class Camera3DummyStream :
 
     virtual status_t detachBuffer(sp<GraphicBuffer>* buffer, int* fenceFd);
 
+    virtual status_t notifyRequestedSurfaces(uint32_t frame_number,
+            const std::vector<size_t>& surface_ids);
+
     /**
      * Return if this output stream is for video encoding.
      */
@@ -64,7 +67,7 @@ class Camera3DummyStream :
     /**
      * Return if the consumer configuration of this stream is deferred.
      */
-    virtual bool isConsumerConfigurationDeferred() const;
+    virtual bool isConsumerConfigurationDeferred(size_t surface_id) const;
 
     /**
      * Set the consumer surface to the output stream.

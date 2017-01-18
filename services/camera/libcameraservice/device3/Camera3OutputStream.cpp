@@ -124,6 +124,7 @@ Camera3OutputStream::Camera3OutputStream(int id, camera3_stream_type_t type,
                                          int format,
                                          android_dataspace dataSpace,
                                          camera3_stream_rotation_t rotation,
+                                         uint32_t consumerUsage, nsecs_t timestampOffset,
                                          int setId) :
         Camera3IOStreamBase(id, type, width, height,
                             /*maxSize*/0,
@@ -132,7 +133,8 @@ Camera3OutputStream::Camera3OutputStream(int id, camera3_stream_type_t type,
         mTraceFirstBuffer(true),
         mUseMonoTimestamp(false),
         mUseBufferManager(false),
-        mConsumerUsage(0) {
+        mTimestampOffset(timestampOffset),
+        mConsumerUsage(consumerUsage) {
 
     if (setId > CAMERA3_STREAM_SET_ID_INVALID) {
         mBufferReleasedListener = new BufferReleasedListener(this);
@@ -373,6 +375,24 @@ status_t Camera3OutputStream::configureQueueLocked() {
         return res;
     }
 
+    if ((res = configureConsumerQueueLocked()) != OK) {
+        return res;
+    }
+
+    // Set dequeueBuffer/attachBuffer timeout if the consumer is not hw composer or hw texture.
+    // We need skip these cases as timeout will disable the non-blocking (async) mode.
+    if (!(isConsumedByHWComposer() || isConsumedByHWTexture())) {
+        mConsumer->setDequeueTimeout(kDequeueBufferTimeout);
+    }
+
+    return OK;
+}
+
+status_t Camera3OutputStream::configureConsumerQueueLocked() {
+    status_t res;
+
+    mTraceFirstBuffer = true;
+
     ALOG_ASSERT(mConsumer != 0, "mConsumer should never be NULL");
 
     // Configure consumer-side ANativeWindow interface. The listener may be used
@@ -470,12 +490,7 @@ status_t Camera3OutputStream::configureQueueLocked() {
     if (res != OK) {
         ALOGE("%s: Unable to configure stream transform to %x: %s (%d)",
                 __FUNCTION__, mTransform, strerror(-res), res);
-    }
-
-    // Set dequeueBuffer/attachBuffer timeout if the consumer is not hw composer or hw texture.
-    // We need skip these cases as timeout will disable the non-blocking (async) mode.
-    if (!(isConsumedByHWComposer() || isConsumedByHWTexture())) {
-        mConsumer->setDequeueTimeout(kDequeueBufferTimeout);
+        return res;
     }
 
     /**
@@ -568,14 +583,24 @@ status_t Camera3OutputStream::disconnectLocked() {
 status_t Camera3OutputStream::getEndpointUsage(uint32_t *usage) const {
 
     status_t res;
-    int32_t u = 0;
+
     if (mConsumer == nullptr) {
         // mConsumerUsage was sanitized before the Camera3OutputStream was constructed.
         *usage = mConsumerUsage;
         return OK;
     }
 
-    res = static_cast<ANativeWindow*>(mConsumer.get())->query(mConsumer.get(),
+    res = getEndpointUsageForSurface(usage, mConsumer);
+
+    return res;
+}
+
+status_t Camera3OutputStream::getEndpointUsageForSurface(uint32_t *usage,
+        const sp<Surface>& surface) const {
+    status_t res;
+    int32_t u = 0;
+
+    res = static_cast<ANativeWindow*>(surface.get())->query(surface.get(),
             NATIVE_WINDOW_CONSUMER_USAGE_BITS, &u);
 
     // If an opaque output stream's endpoint is ImageReader, add
@@ -587,8 +612,8 @@ status_t Camera3OutputStream::getEndpointUsage(uint32_t *usage) const {
     //     3. GRALLOC_USAGE_HW_COMPOSER
     //     4. GRALLOC_USAGE_HW_VIDEO_ENCODER
     if (camera3_stream::format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED &&
-            (u & (GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_RENDER | GRALLOC_USAGE_HW_COMPOSER |
-            GRALLOC_USAGE_HW_VIDEO_ENCODER)) == 0) {
+            (u & (GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_RENDER |
+            GRALLOC_USAGE_HW_COMPOSER | GRALLOC_USAGE_HW_VIDEO_ENCODER)) == 0) {
         u |= GRALLOC_USAGE_HW_CAMERA_ZSL;
     }
 
@@ -676,8 +701,17 @@ status_t Camera3OutputStream::detachBuffer(sp<GraphicBuffer>* buffer, int* fence
     return OK;
 }
 
-bool Camera3OutputStream::isConsumerConfigurationDeferred() const {
+status_t Camera3OutputStream::notifyRequestedSurfaces(uint32_t /*frame_number*/,
+        const std::vector<size_t>& /*surface_ids*/) {
+    return OK;
+}
+
+bool Camera3OutputStream::isConsumerConfigurationDeferred(size_t surface_id) const {
     Mutex::Autolock l(mLock);
+
+    if (surface_id != 0) {
+        ALOGE("%s: surface_id for Camera3OutputStream should be 0!", __FUNCTION__);
+    }
     return mConsumer == nullptr;
 }
 

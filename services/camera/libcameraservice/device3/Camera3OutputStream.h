@@ -135,7 +135,7 @@ class Camera3OutputStream :
     /**
      * Return if the consumer configuration of this stream is deferred.
      */
-    virtual bool isConsumerConfigurationDeferred() const;
+    virtual bool isConsumerConfigurationDeferred(size_t surface_id) const;
 
     /**
      * Set the consumer surface to the output stream.
@@ -158,6 +158,9 @@ class Camera3OutputStream :
 
     virtual status_t detachBuffer(sp<GraphicBuffer>* buffer, int* fenceFd);
 
+    virtual status_t notifyRequestedSurfaces(uint32_t frame_number,
+            const std::vector<size_t>& surface_ids);
+
     /**
      * Set the graphic buffer manager to get/return the stream buffers.
      *
@@ -169,6 +172,7 @@ class Camera3OutputStream :
     Camera3OutputStream(int id, camera3_stream_type_t type,
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation,
+            uint32_t consumerUsage = 0, nsecs_t timestampOffset = 0,
             int setId = CAMERA3_STREAM_SET_ID_INVALID);
 
     /**
@@ -183,11 +187,18 @@ class Camera3OutputStream :
 
     virtual status_t disconnectLocked();
 
+    status_t getEndpointUsageForSurface(uint32_t *usage,
+            const sp<Surface>& surface) const;
+    status_t configureConsumerQueueLocked();
+
+    // Consumer as the output of camera HAL
     sp<Surface> mConsumer;
 
-  private:
+    uint32_t getPresetConsumerUsage() const { return mConsumerUsage; }
 
     static const nsecs_t       kDequeueBufferTimeout   = 1000000000; // 1 sec
+
+  private:
 
     int               mTransform;
 

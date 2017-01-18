@@ -180,6 +180,34 @@ protected:
     status_t              getRotationTransformLocked(/*out*/int32_t* transform);
 
 private:
+    // StreamSurfaceId encapsulates streamId + surfaceId for a particular surface.
+    // streamId specifies the index of the stream the surface belongs to, and the
+    // surfaceId specifies the index of the surface within the stream. (one stream
+    // could contain multiple surfaces.)
+    class StreamSurfaceId final {
+    public:
+        StreamSurfaceId() {
+            mStreamId = -1;
+            mSurfaceId = -1;
+        }
+        StreamSurfaceId(int32_t streamId, int32_t surfaceId) {
+            mStreamId = streamId;
+            mSurfaceId = surfaceId;
+        }
+        int32_t streamId() const {
+            return mStreamId;
+        }
+        int32_t surfaceId() const {
+            return mSurfaceId;
+        }
+
+    private:
+        int32_t mStreamId;
+        int32_t mSurfaceId;
+
+    }; // class StreamSurfaceId
+
+private:
     /** ICameraDeviceUser interface-related private members */
 
     /** Preview callback related members */
@@ -216,8 +244,8 @@ private:
     //check if format is not custom format
     static bool isPublicFormat(int32_t format);
 
-    // IGraphicsBufferProducer binder -> Stream ID for output streams
-    KeyedVector<sp<IBinder>, int> mStreamMap;
+    // IGraphicsBufferProducer binder -> Stream ID + Surface ID for output streams
+    KeyedVector<sp<IBinder>, StreamSurfaceId> mStreamMap;
 
     struct InputStreamConfiguration {
         bool configured;
@@ -238,6 +266,9 @@ private:
     // as there are no surfaces available and can not be put into mStreamMap. Once the deferred
     // Surface is configured, the stream id will be moved to mStreamMap.
     Vector<int32_t> mDeferredStreams;
+
+    static const int32_t MAX_SURFACES_PER_STREAM = 2;
+    static const int32_t MAX_DEFERRED_SURFACES = 1;
 };
 
 }; // namespace android

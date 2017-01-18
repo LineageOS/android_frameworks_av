@@ -83,6 +83,14 @@ status_t Camera3DummyStream::detachBuffer(sp<GraphicBuffer>* buffer, int* fenceF
     return OK;
 }
 
+status_t Camera3DummyStream::notifyRequestedSurfaces(uint32_t frame_number,
+        const std::vector<size_t>& surface_ids) {
+    (void) frame_number;
+    (void) surface_ids;
+    // Do nothing
+    return OK;
+}
+
 status_t Camera3DummyStream::configureQueueLocked() {
     // Do nothing
     return OK;
@@ -103,7 +111,7 @@ bool Camera3DummyStream::isVideoStream() const {
     return false;
 }
 
-bool Camera3DummyStream::isConsumerConfigurationDeferred() const {
+bool Camera3DummyStream::isConsumerConfigurationDeferred(size_t /*surface_id*/) const {
     return false;
 }
 
