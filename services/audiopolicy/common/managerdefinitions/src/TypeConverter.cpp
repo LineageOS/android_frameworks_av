@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <media/AudioPolicy.h>
+
 #include "TypeConverter.h"
 
 namespace android {
@@ -30,6 +32,37 @@ const DeviceCategoryConverter::Table DeviceCategoryConverter::mTable[] = {
     TERMINATOR
 };
 
+template <>
+const MixTypeConverter::Table MixTypeConverter::mTable[] = {
+    MAKE_STRING_FROM_ENUM(MIX_TYPE_INVALID),
+    MAKE_STRING_FROM_ENUM(MIX_TYPE_PLAYERS),
+    MAKE_STRING_FROM_ENUM(MIX_TYPE_RECORDERS),
+    TERMINATOR
+};
+
+template <>
+const RouteFlagTypeConverter::Table RouteFlagTypeConverter::mTable[] = {
+    MAKE_STRING_FROM_ENUM(MIX_ROUTE_FLAG_RENDER),
+    MAKE_STRING_FROM_ENUM(MIX_ROUTE_FLAG_LOOP_BACK),
+    MAKE_STRING_FROM_ENUM(MIX_ROUTE_FLAG_ALL),
+    TERMINATOR
+};
+
+template <>
+const RuleTypeConverter::Table RuleTypeConverter::mTable[] = {
+    MAKE_STRING_FROM_ENUM(RULE_EXCLUSION_MASK),
+    MAKE_STRING_FROM_ENUM(RULE_MATCH_ATTRIBUTE_USAGE),
+    MAKE_STRING_FROM_ENUM(RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET),
+    MAKE_STRING_FROM_ENUM(RULE_MATCH_UID),
+    MAKE_STRING_FROM_ENUM(RULE_EXCLUDE_ATTRIBUTE_USAGE),
+    MAKE_STRING_FROM_ENUM(RULE_EXCLUDE_ATTRIBUTE_CAPTURE_PRESET),
+    MAKE_STRING_FROM_ENUM(RULE_EXCLUDE_UID),
+    TERMINATOR
+};
+
 template class TypeConverter<DeviceCategoryTraits>;
+template class TypeConverter<MixTypeTraits>;
+template class TypeConverter<RouteFlagTraits>;
+template class TypeConverter<RuleTraits>;
 
 }; // namespace android
