@@ -20,6 +20,7 @@
 #include <vector>
 #include <string>
 #include <mutex>
+#include <condition_variable>
 
 #include <camera/CameraParameters2.h>
 #include <camera/CameraMetadata.h>
@@ -29,8 +30,28 @@
 #include <android/hardware/camera/provider/2.4/ICameraProvider.h>
 //#include <android/hardware/camera/provider/2.4/ICameraProviderCallbacks.h>
 #include <android/hidl/manager/1.0/IServiceNotification.h>
+#include <camera/VendorTagDescriptor.h>
 
 namespace android {
+
+/**
+ * The vendor tag descriptor class that takes HIDL vendor tag information as
+ * input. Not part of VendorTagDescriptor class because that class is used
+ * in AIDL generated sources which don't have access to HIDL headers.
+ */
+class HidlVendorTagDescriptor : public VendorTagDescriptor {
+public:
+    /**
+     * Create a VendorTagDescriptor object from the HIDL VendorTagSection
+     * vector.
+     *
+     * Returns OK on success, or a negative error code.
+     */
+    static status_t createDescriptorFromHidl(
+            const hardware::hidl_vec<hardware::camera::common::V1_0::VendorTagSection>& vts,
+            /*out*/
+            sp<VendorTagDescriptor>& descriptor);
+};
 
 /**
  * A manager for all camera providers available on an Android device.
@@ -156,6 +177,11 @@ public:
     status_t setTorchMode(const std::string &id, bool enabled);
 
     /**
+     * Setup vendor tags for all registered providers
+     */
+    status_t setUpVendorTags();
+
+    /**
      * Open an active session to a camera device.
      *
      * This fully powers on the camera device hardware, and returns a handle to a
@@ -193,6 +219,8 @@ public:
 private:
     // All private members, unless otherwise noted, expect mInterfaceMutex to be locked before use
     mutable std::mutex mInterfaceMutex;
+
+    std::condition_variable mProviderRegistered;
 
     // the status listener update callbacks will lock mStatusMutex
     mutable std::mutex mStatusListenerMutex;
