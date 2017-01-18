@@ -136,8 +136,10 @@ status_t MediaPlayer::attachNewPlayer(const sp<IMediaPlayer>& player)
         mPlayer = player;
         if (player != 0) {
             mCurrentState = MEDIA_PLAYER_INITIALIZED;
+            player->getDefaultBufferingSettings(&mCurrentBufferingSettings);
             err = NO_ERROR;
         } else {
+            mCurrentBufferingSettings = BufferingSettings();
             ALOGE("Unable to create media player");
         }
     }
@@ -255,6 +257,18 @@ status_t MediaPlayer::getDefaultBufferingSettings(BufferingSettings* buffering /
     return mPlayer->getDefaultBufferingSettings(buffering);
 }
 
+status_t MediaPlayer::getBufferingSettings(BufferingSettings* buffering /* nonnull */)
+{
+    ALOGV("getBufferingSettings");
+
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == 0) {
+        return NO_INIT;
+    }
+    *buffering = mCurrentBufferingSettings;
+    return NO_ERROR;
+}
+
 status_t MediaPlayer::setBufferingSettings(const BufferingSettings& buffering)
 {
     ALOGV("setBufferingSettings");
@@ -263,7 +277,11 @@ status_t MediaPlayer::setBufferingSettings(const BufferingSettings& buffering)
     if (mPlayer == 0) {
         return NO_INIT;
     }
-    return mPlayer->setBufferingSettings(buffering);
+    status_t err =  mPlayer->setBufferingSettings(buffering);
+    if (err == NO_ERROR) {
+        mCurrentBufferingSettings = buffering;
+    }
+    return err;
 }
 
 // must call with lock held
@@ -606,6 +624,7 @@ status_t MediaPlayer::reset_l()
         // setDataSource has to be called again to create a
         // new mediaplayer.
         mPlayer = 0;
+        mCurrentBufferingSettings = BufferingSettings();
         return ret;
     }
     clear_l();
