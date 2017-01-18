@@ -36,7 +36,14 @@ namespace implementation {
             ::android::OMXBuffer const& l);
     inline bool convertTo(::android::OMXBuffer* l,
             ::android::hardware::media::omx::V1_0::CodecBuffer const& t);
-}}}}}
+}
+namespace utils {
+    inline bool wrapAs(::android::hardware::media::omx::V1_0::CodecBuffer* t,
+            ::android::OMXBuffer const& l);
+    inline bool convertTo(::android::OMXBuffer* l,
+            ::android::hardware::media::omx::V1_0::CodecBuffer const& t);
+}
+}}}}
 
 class GraphicBuffer;
 class IMemory;
@@ -91,6 +98,12 @@ private:
             wrapAs)(::android::hardware::media::omx::V1_0::CodecBuffer* t,
             OMXBuffer const& l);
     friend inline bool (::android::hardware::media::omx::V1_0::implementation::
+            convertTo)(OMXBuffer* l,
+            ::android::hardware::media::omx::V1_0::CodecBuffer const& t);
+    friend inline bool (::android::hardware::media::omx::V1_0::utils::
+            wrapAs)(::android::hardware::media::omx::V1_0::CodecBuffer* t,
+            OMXBuffer const& l);
+    friend inline bool (::android::hardware::media::omx::V1_0::utils::
             convertTo)(OMXBuffer* l,
             ::android::hardware::media::omx::V1_0::CodecBuffer const& t);
 

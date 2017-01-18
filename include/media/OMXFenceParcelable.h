@@ -26,12 +26,20 @@ struct OMXFenceParcelable;
 // This is needed temporarily for the OMX HIDL transition.
 namespace hardware {
     struct hidl_handle;
-namespace media { namespace omx { namespace V1_0 { namespace implementation {
+namespace media { namespace omx { namespace V1_0 {
+namespace implementation {
     void wrapAs(::android::OMXFenceParcelable* l,
             ::android::hardware::hidl_handle const& t);
     bool convertTo(::android::OMXFenceParcelable* l,
             ::android::hardware::hidl_handle const& t);
-}}}}}
+}
+namespace utils {
+    void wrapAs(::android::OMXFenceParcelable* l,
+            ::android::hardware::hidl_handle const& t);
+    bool convertTo(::android::OMXFenceParcelable* l,
+            ::android::hardware::hidl_handle const& t);
+}
+}}}}
 
 struct OMXFenceParcelable : public Parcelable {
     OMXFenceParcelable() : mFenceFd(-1) {}
@@ -54,6 +62,12 @@ private:
             wrapAs)(OMXFenceParcelable* l,
             ::android::hardware::hidl_handle const& t);
     friend bool (::android::hardware::media::omx::V1_0::implementation::
+            convertTo)(OMXFenceParcelable* l,
+            ::android::hardware::hidl_handle const& t);
+    friend void (::android::hardware::media::omx::V1_0::utils::
+            wrapAs)(OMXFenceParcelable* l,
+            ::android::hardware::hidl_handle const& t);
+    friend bool (::android::hardware::media::omx::V1_0::utils::
             convertTo)(OMXFenceParcelable* l,
             ::android::hardware::hidl_handle const& t);
 };
