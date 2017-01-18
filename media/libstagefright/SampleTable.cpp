@@ -566,7 +566,7 @@ status_t SampleTable::setSyncSampleParams(off64_t data_offset, size_t data_size)
 
     if (mDataSource->readAt(data_offset + 8, mSyncSamples,
             (size_t)allocSize) != (ssize_t)allocSize) {
-        delete mSyncSamples;
+        delete[] mSyncSamples;
         mSyncSamples = NULL;
         return ERROR_IO;
     }
@@ -992,4 +992,3 @@ int32_t SampleTable::getCompositionTimeOffset(uint32_t sampleIndex) {
 }
 
 }  // namespace android
-
