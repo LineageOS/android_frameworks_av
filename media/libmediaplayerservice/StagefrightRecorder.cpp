@@ -255,11 +255,8 @@ status_t StagefrightRecorder::setInputSurface(
     return OK;
 }
 
-status_t StagefrightRecorder::setOutputFile(int fd, int64_t offset, int64_t length) {
-    ALOGV("setOutputFile: %d, %lld, %lld", fd, (long long)offset, (long long)length);
-    // These don't make any sense, do they?
-    CHECK_EQ(offset, 0ll);
-    CHECK_EQ(length, 0ll);
+status_t StagefrightRecorder::setOutputFile(int fd) {
+    ALOGV("setOutputFile: %d", fd);
 
     if (fd < 0) {
         ALOGE("Invalid file descriptor: %d", fd);
@@ -275,6 +272,25 @@ status_t StagefrightRecorder::setOutputFile(int fd, int64_t offset, int64_t leng
     mOutputFd = dup(fd);
 
     return OK;
+}
+
+status_t StagefrightRecorder::setNextOutputFile(int fd) {
+    // Only support MPEG4
+    if (mOutputFormat != OUTPUT_FORMAT_MPEG_4) {
+        ALOGE("Only MP4 file format supports setting next output file");
+        return INVALID_OPERATION;
+    }
+    ALOGV("setNextOutputFile: %d", fd);
+
+    if (fd < 0) {
+        ALOGE("Invalid file descriptor: %d", fd);
+        return -EBADF;
+    }
+
+    // start with a clean, empty file
+    ftruncate(fd, 0);
+    int nextFd = dup(fd);
+    return mWriter->setNextFd(nextFd);
 }
 
 // Attempt to parse an float literal optionally surrounded by whitespace,

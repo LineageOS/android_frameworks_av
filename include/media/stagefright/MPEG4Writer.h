@@ -24,10 +24,12 @@
 #include <media/stagefright/MediaWriter.h>
 #include <utils/List.h>
 #include <utils/threads.h>
+#include <media/stagefright/foundation/AHandlerReflector.h>
+#include <media/stagefright/foundation/ALooper.h>
 
 namespace android {
 
-struct AMessage;
+class AMessage;
 class MediaBuffer;
 class MetaData;
 
@@ -65,16 +67,25 @@ public:
     status_t setGeoData(int latitudex10000, int longitudex10000);
     status_t setCaptureRate(float captureFps);
     status_t setTemporalLayerCount(uint32_t layerCount);
+    void notifyApproachingLimit();
     virtual void setStartTimeOffsetMs(int ms) { mStartTimeOffsetMs = ms; }
     virtual int32_t getStartTimeOffsetMs() const { return mStartTimeOffsetMs; }
+    virtual status_t setNextFd(int fd);
 
 protected:
     virtual ~MPEG4Writer();
 
 private:
     class Track;
+    friend struct AHandlerReflector<MPEG4Writer>;
+
+    enum {
+        kWhatSwitch                          = 'swch',
+    };
 
     int  mFd;
+    int mNextFd;
+    sp<MetaData> mStartMeta;
     status_t mInitCheck;
     bool mIsRealTimeRecording;
     bool mUse4ByteNalLength;
@@ -83,6 +94,7 @@ private:
     bool mPaused;
     bool mStarted;  // Writer thread + track threads started successfully
     bool mWriterThreadStarted;  // Only writer thread started successfully
+    bool mSendNotify;
     off64_t mOffset;
     off_t mMdatOffset;
     uint8_t *mMoovBoxBuffer;
@@ -99,6 +111,10 @@ private:
     int mLongitudex10000;
     bool mAreGeoTagsAvailable;
     int32_t mStartTimeOffsetMs;
+    bool mSwitchPending;
+
+    sp<ALooper> mLooper;
+    sp<AHandlerReflector<MPEG4Writer> > mReflector;
 
     Mutex mLock;
 
@@ -184,6 +200,8 @@ private:
     void lock();
     void unlock();
 
+    void initInternal(int fd);
+
     // Acquire lock before calling these methods
     off64_t addSample_l(MediaBuffer *buffer);
     off64_t addLengthPrefixedSample_l(MediaBuffer *buffer);
@@ -192,6 +210,7 @@ private:
     bool exceedsFileSizeLimit();
     bool use32BitFileOffset() const;
     bool exceedsFileDurationLimit();
+    bool approachingFileSizeLimit();
     bool isFileStreamable() const;
     void trackProgressStatus(size_t trackId, int64_t timeUs, status_t err = OK);
     void writeCompositionMatrix(int32_t degrees);
@@ -202,6 +221,7 @@ private:
     void writeGeoDataBox();
     void writeLatitude(int degreex10000);
     void writeLongitude(int degreex10000);
+    void finishCurrentSession();
 
     void addDeviceMeta();
     void writeHdlr();
@@ -210,9 +230,12 @@ private:
     void writeMetaBox();
     void sendSessionSummary();
     void release();
-    status_t reset();
+    status_t switchFd();
+    status_t reset(bool stopSource = true);
 
     static uint32_t getMpeg4Time();
+
+    void onMessageReceived(const sp<AMessage> &msg);
 
     MPEG4Writer(const MPEG4Writer &);
     MPEG4Writer &operator=(const MPEG4Writer &);

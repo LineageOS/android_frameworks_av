@@ -50,6 +50,7 @@ enum {
     SET_VIDEO_ENCODER,
     SET_AUDIO_ENCODER,
     SET_OUTPUT_FILE_FD,
+    SET_NEXT_OUTPUT_FILE_FD,
     SET_VIDEO_SIZE,
     SET_VIDEO_FRAMERATE,
     SET_PARAMETERS,
@@ -172,14 +173,21 @@ public:
         return reply.readInt32();
     }
 
-    status_t setOutputFile(int fd, int64_t offset, int64_t length) {
-        ALOGV("setOutputFile(%d, %" PRId64 ", %" PRId64 ")", fd, offset, length);
+    status_t setOutputFile(int fd) {
+        ALOGV("setOutputFile(%d)", fd);
         Parcel data, reply;
         data.writeInterfaceToken(IMediaRecorder::getInterfaceDescriptor());
         data.writeFileDescriptor(fd);
-        data.writeInt64(offset);
-        data.writeInt64(length);
         remote()->transact(SET_OUTPUT_FILE_FD, data, &reply);
+        return reply.readInt32();
+    }
+
+    status_t setNextOutputFile(int fd) {
+        ALOGV("setNextOutputFile(%d)", fd);
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaRecorder::getInterfaceDescriptor());
+        data.writeFileDescriptor(fd);
+        remote()->transact(SET_NEXT_OUTPUT_FILE_FD, data, &reply);
         return reply.readInt32();
     }
 
@@ -429,9 +437,15 @@ status_t BnMediaRecorder::onTransact(
             ALOGV("SET_OUTPUT_FILE_FD");
             CHECK_INTERFACE(IMediaRecorder, data, reply);
             int fd = dup(data.readFileDescriptor());
-            int64_t offset = data.readInt64();
-            int64_t length = data.readInt64();
-            reply->writeInt32(setOutputFile(fd, offset, length));
+            reply->writeInt32(setOutputFile(fd));
+            ::close(fd);
+            return NO_ERROR;
+        } break;
+        case SET_NEXT_OUTPUT_FILE_FD: {
+            ALOGV("SET_NEXT_OUTPUT_FILE_FD");
+            CHECK_INTERFACE(IMediaRecorder, data, reply);
+            int fd = dup(data.readFileDescriptor());
+            reply->writeInt32(setNextOutputFile(fd));
             ::close(fd);
             return NO_ERROR;
         } break;

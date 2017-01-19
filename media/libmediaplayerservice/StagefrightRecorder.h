@@ -55,7 +55,8 @@ struct StagefrightRecorder : public MediaRecorderBase {
     virtual status_t setCamera(const sp<hardware::ICamera>& camera, const sp<ICameraRecordingProxy>& proxy);
     virtual status_t setPreviewSurface(const sp<IGraphicBufferProducer>& surface);
     virtual status_t setInputSurface(const sp<PersistentSurface>& surface);
-    virtual status_t setOutputFile(int fd, int64_t offset, int64_t length);
+    virtual status_t setOutputFile(int fd);
+    virtual status_t setNextOutputFile(int fd);
     virtual status_t setParameters(const String8 &params);
     virtual status_t setListener(const sp<IMediaRecorderClient> &listener);
     virtual status_t setClientName(const String16 &clientName);
