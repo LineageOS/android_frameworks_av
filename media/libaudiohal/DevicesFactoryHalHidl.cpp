@@ -65,6 +65,9 @@ status_t DevicesFactoryHalHidl::nameFromHal(const char *name, IDevicesFactory::D
     } else if(strcmp(name, AUDIO_HARDWARE_MODULE_ID_REMOTE_SUBMIX) == 0) {
         *device = IDevicesFactory::Device::R_SUBMIX;
         return OK;
+    } else if(strcmp(name, AUDIO_HARDWARE_MODULE_ID_STUB) == 0) {
+        *device = IDevicesFactory::Device::STUB;
+        return OK;
     }
     ALOGE("Invalid device name %s", name);
     return BAD_VALUE;
