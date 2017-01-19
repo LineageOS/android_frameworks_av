@@ -26,11 +26,17 @@
 #include <utils/KeyedVector.h>
 #include <utils/Vector.h>
 #include <utils/RefBase.h>
+#include <vector>
 
 namespace android {
-
+namespace media {
+class ICas;
+class IDescrambler;
+};
+using namespace media;
 class ABitReader;
 struct ABuffer;
+struct AnotherPacketSource;
 
 struct ATSParser : public RefBase {
     enum DiscontinuityType {
@@ -100,6 +106,8 @@ struct ATSParser : public RefBase {
 
     explicit ATSParser(uint32_t flags = 0);
 
+    status_t setMediaCas(const sp<ICas> &cas);
+
     // Feed a TS packet into the parser. uninitialized event with the start
     // offset of this TS packet goes in, and if the parser detects PES with
     // a sync frame, the event will be initiailzed with the start offset of the
@@ -150,6 +158,14 @@ private:
     struct Program;
     struct Stream;
     struct PSISection;
+    struct CasManager;
+    struct CADescriptor {
+        int32_t mSystemID;
+        unsigned mPID;
+        std::vector<uint8_t> mPrivateData;
+    };
+
+    sp<CasManager> mCasManager;
 
     uint32_t mFlags;
     Vector<sp<Program> > mPrograms;
@@ -181,9 +197,13 @@ private:
         ABitReader *br, unsigned PID,
         unsigned continuity_counter,
         unsigned payload_unit_start_indicator,
+        unsigned transport_scrambling_control,
+        unsigned random_access_indicator,
         SyncEvent *event);
 
-    status_t parseAdaptationField(ABitReader *br, unsigned PID);
+    status_t parseAdaptationField(
+            ABitReader *br, unsigned PID, unsigned *random_access_indicator);
+
     // see feedTSPacket().
     status_t parseTS(ABitReader *br, SyncEvent *event);
 

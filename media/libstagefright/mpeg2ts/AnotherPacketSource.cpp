@@ -204,24 +204,52 @@ status_t AnotherPacketSource::read(
         }
 
         MediaBuffer *mediaBuffer = new MediaBuffer(buffer);
+        sp<MetaData> bufmeta = mediaBuffer->meta_data();
 
-        mediaBuffer->meta_data()->setInt64(kKeyTime, timeUs);
+        bufmeta->setInt64(kKeyTime, timeUs);
 
         int32_t isSync;
         if (buffer->meta()->findInt32("isSync", &isSync)) {
-            mediaBuffer->meta_data()->setInt32(kKeyIsSyncFrame, isSync);
+            bufmeta->setInt32(kKeyIsSyncFrame, isSync);
         }
 
         sp<ABuffer> sei;
         if (buffer->meta()->findBuffer("sei", &sei) && sei != NULL) {
-            mediaBuffer->meta_data()->setData(kKeySEI, 0, sei->data(), sei->size());
+            bufmeta->setData(kKeySEI, 0, sei->data(), sei->size());
         }
 
         sp<ABuffer> mpegUserData;
         if (buffer->meta()->findBuffer("mpegUserData", &mpegUserData) && mpegUserData != NULL) {
-            mediaBuffer->meta_data()->setData(
+            bufmeta->setData(
                     kKeyMpegUserData, 0, mpegUserData->data(), mpegUserData->size());
         }
+
+        int32_t cryptoMode;
+        if (buffer->meta()->findInt32("cryptoMode", &cryptoMode)) {
+            int32_t cryptoKey;
+            sp<ABuffer> clearBytesBuffer, encBytesBuffer;
+
+            CHECK(buffer->meta()->findInt32("cryptoKey", &cryptoKey));
+            CHECK(buffer->meta()->findBuffer("clearBytes", &clearBytesBuffer)
+                    && clearBytesBuffer != NULL);
+            CHECK(buffer->meta()->findBuffer("encBytes", &encBytesBuffer)
+                    && encBytesBuffer != NULL);
+
+            bufmeta->setInt32(kKeyCryptoMode, cryptoMode);
+
+            uint8_t array[16] = {0};
+            bufmeta->setData(kKeyCryptoIV, 0, array, 16);
+
+            array[0] = (uint8_t) (cryptoKey & 0xff);
+            bufmeta->setData(kKeyCryptoKey, 0, array, 16);
+
+            bufmeta->setData(kKeyPlainSizes, 0,
+                    clearBytesBuffer->data(), clearBytesBuffer->size());
+
+            bufmeta->setData(kKeyEncryptedSizes, 0,
+                    encBytesBuffer->data(), encBytesBuffer->size());
+        }
+
 
         *out = mediaBuffer;
         return OK;

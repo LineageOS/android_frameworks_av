@@ -20,6 +20,7 @@
 
 #include <numeric>
 
+#include <android/media/IDescrambler.h>
 #include <binder/MemoryDealer.h>
 #include <media/openmax/OMX_Core.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -33,7 +34,8 @@
 #include "include/SharedMemoryBuffer.h"
 
 namespace android {
-
+using binder::Status;
+using MediaDescrambler::DescrambleInfo;
 using BufferInfo = ACodecBufferChannel::BufferInfo;
 using BufferInfoIterator = std::vector<const BufferInfo>::const_iterator;
 
@@ -92,7 +94,7 @@ status_t ACodecBufferChannel::queueSecureInputBuffer(
         const uint8_t *iv, CryptoPlugin::Mode mode, CryptoPlugin::Pattern pattern,
         const CryptoPlugin::SubSample *subSamples, size_t numSubSamples,
         AString *errorDetailMsg) {
-    if (mCrypto == nullptr) {
+    if (!hasCryptoOrDescrambler()) {
         return -ENOSYS;
     }
     std::shared_ptr<const std::vector<const BufferInfo>> array(
@@ -116,9 +118,47 @@ status_t ACodecBufferChannel::queueSecureInputBuffer(
         destination.mType = ICrypto::kDestinationTypeSharedMemory;
         destination.mSharedMemory = mDecryptDestination;
     }
-    ssize_t result = mCrypto->decrypt(key, iv, mode, pattern,
-            it->mSharedEncryptedBuffer, it->mClientBuffer->offset(),
-            subSamples, numSubSamples, destination, errorDetailMsg);
+
+    ssize_t result = -1;
+    if (mCrypto != NULL) {
+        result = mCrypto->decrypt(key, iv, mode, pattern,
+                    it->mSharedEncryptedBuffer, it->mClientBuffer->offset(),
+                    subSamples, numSubSamples, destination, errorDetailMsg);
+    } else {
+        DescrambleInfo descrambleInfo;
+        descrambleInfo.dstType = destination.mType ==
+                ICrypto::kDestinationTypeSharedMemory ?
+                DescrambleInfo::kDestinationTypeVmPointer :
+                DescrambleInfo::kDestinationTypeNativeHandle;
+        descrambleInfo.scramblingControl = key != NULL ?
+                (DescramblerPlugin::ScramblingControl)key[0] :
+                DescramblerPlugin::kScrambling_Unscrambled;
+        descrambleInfo.numSubSamples = numSubSamples;
+        descrambleInfo.subSamples = (DescramblerPlugin::SubSample *)subSamples;
+        descrambleInfo.srcMem = it->mSharedEncryptedBuffer;
+        descrambleInfo.srcOffset = 0;
+        descrambleInfo.dstPtr = NULL;
+        descrambleInfo.dstOffset = 0;
+
+        int32_t descrambleResult = -1;
+        Status status = mDescrambler->descramble(descrambleInfo, &descrambleResult);
+
+        if (status.isOk()) {
+            result = descrambleResult;
+        }
+
+        if (result < 0) {
+            ALOGE("descramble failed, exceptionCode=%d, err=%d, result=%zd",
+                    status.exceptionCode(), status.transactionError(), result);
+        } else {
+            ALOGV("descramble succeeded, result=%zd", result);
+        }
+
+        if (result > 0 && destination.mType == ICrypto::kDestinationTypeSharedMemory) {
+            memcpy(destination.mSharedMemory->pointer(),
+                    (uint8_t*)it->mSharedEncryptedBuffer->pointer(), result);
+        }
+    }
 
     if (result < 0) {
         return result;
@@ -212,8 +252,7 @@ void ACodecBufferChannel::getOutputBufferArray(Vector<sp<MediaCodecBuffer>> *arr
 }
 
 void ACodecBufferChannel::setInputBufferArray(const std::vector<BufferAndId> &array) {
-    bool secure = (mCrypto != nullptr);
-    if (secure) {
+    if (hasCryptoOrDescrambler()) {
         size_t totalSize = std::accumulate(
                 array.begin(), array.end(), 0u,
                 [alignment = MemoryDealer::getAllocationAlignment()]
@@ -232,7 +271,7 @@ void ACodecBufferChannel::setInputBufferArray(const std::vector<BufferAndId> &ar
     std::vector<const BufferInfo> inputBuffers;
     for (const BufferAndId &elem : array) {
         sp<IMemory> sharedEncryptedBuffer;
-        if (secure) {
+        if (hasCryptoOrDescrambler()) {
             sharedEncryptedBuffer = mDealer->allocate(elem.mBuffer->capacity());
         }
         inputBuffers.emplace_back(elem.mBuffer, elem.mBufferId, sharedEncryptedBuffer);

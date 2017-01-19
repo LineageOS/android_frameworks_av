@@ -126,6 +126,10 @@ private:
     // the caller has given up the reference, so that access is also safe.
     std::shared_ptr<const std::vector<const BufferInfo>> mInputBuffers;
     std::shared_ptr<const std::vector<const BufferInfo>> mOutputBuffers;
+
+    bool hasCryptoOrDescrambler() {
+        return mCrypto != NULL || mDescrambler != NULL;
+    }
 };
 
 }  // namespace android

@@ -28,6 +28,8 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
+#include <media/cas/DescramblerAPI.h>
+#include <media/hardware/CryptoAPI.h>
 
 #include "include/avc_utils.h"
 
@@ -52,6 +54,11 @@ void ElementaryStreamQueue::clear(bool clearFormat) {
     }
 
     mRangeInfos.clear();
+
+    if (mScrambledBuffer != NULL) {
+        mScrambledBuffer->setRange(0, 0);
+    }
+    mScrambledRangeInfos.clear();
 
     if (clearFormat) {
         mFormat.clear();
@@ -246,7 +253,8 @@ static bool IsSeeminglyValidMPEGAudioHeader(const uint8_t *ptr, size_t size) {
 }
 
 status_t ElementaryStreamQueue::appendData(
-        const void *data, size_t size, int64_t timeUs) {
+        const void *data, size_t size, int64_t timeUs,
+        int32_t payloadOffset, uint32_t pesScramblingControl) {
 
     if (mEOSReached) {
         ALOGE("appending data after EOS");
@@ -276,7 +284,7 @@ status_t ElementaryStreamQueue::appendData(
                     return ERROR_MALFORMED;
                 }
 
-                if (startOffset > 0) {
+                if (mFormat == NULL && startOffset > 0) {
                     ALOGI("found something resembling an H.264/MPEG syncword "
                           "at offset %zd",
                           startOffset);
@@ -451,6 +459,8 @@ status_t ElementaryStreamQueue::appendData(
     RangeInfo info;
     info.mLength = size;
     info.mTimestampUs = timeUs;
+    info.mPesOffset = payloadOffset;
+    info.mPesScramblingControl = pesScramblingControl;
     mRangeInfos.push_back(info);
 
 #if 0
@@ -463,8 +473,129 @@ status_t ElementaryStreamQueue::appendData(
     return OK;
 }
 
+void ElementaryStreamQueue::appendScrambledData(
+        const void *data, size_t size,
+        int32_t keyId, bool isSync,
+        sp<ABuffer> clearSizes, sp<ABuffer> encSizes) {
+    if (!isScrambled()) {
+        return;
+    }
+
+    size_t neededSize = (mScrambledBuffer == NULL ? 0 : mScrambledBuffer->size()) + size;
+    if (mScrambledBuffer == NULL || neededSize > mScrambledBuffer->capacity()) {
+        neededSize = (neededSize + 65535) & ~65535;
+
+        ALOGI("resizing scrambled buffer to size %zu", neededSize);
+
+        sp<ABuffer> buffer = new ABuffer(neededSize);
+        if (mScrambledBuffer != NULL) {
+            memcpy(buffer->data(), mScrambledBuffer->data(), mScrambledBuffer->size());
+            buffer->setRange(0, mScrambledBuffer->size());
+        } else {
+            buffer->setRange(0, 0);
+        }
+
+        mScrambledBuffer = buffer;
+    }
+    memcpy(mScrambledBuffer->data() + mScrambledBuffer->size(), data, size);
+    mScrambledBuffer->setRange(0, mScrambledBuffer->size() + size);
+
+    ScrambledRangeInfo scrambledInfo;
+    scrambledInfo.mLength = size;
+    scrambledInfo.mKeyId = keyId;
+    scrambledInfo.mIsSync = isSync;
+    scrambledInfo.mClearSizes = clearSizes;
+    scrambledInfo.mEncSizes = encSizes;
+
+    ALOGV("[stream %d] appending scrambled range: size=%zu", mMode, size);
+
+    mScrambledRangeInfos.push_back(scrambledInfo);
+}
+
+sp<ABuffer> ElementaryStreamQueue::dequeueScrambledAccessUnit() {
+    size_t nextScan = mBuffer->size();
+    mBuffer->setRange(0, 0);
+    int32_t pesOffset = 0, pesScramblingControl = 0;
+    int64_t timeUs = fetchTimestamp(nextScan, &pesOffset, &pesScramblingControl);
+    if (timeUs < 0ll) {
+        ALOGE("Negative timeUs");
+        return NULL;
+    }
+
+    // return scrambled unit
+    int32_t keyId = pesScramblingControl, isSync = 0, scrambledLength = 0;
+    sp<ABuffer> clearSizes, encSizes;
+    while (mScrambledRangeInfos.size() > mRangeInfos.size()) {
+        auto it = mScrambledRangeInfos.begin();
+        ALOGV("[stream %d] fetching scrambled range: size=%zu", mMode, it->mLength);
+
+        if (scrambledLength > 0) {
+            // This shouldn't happen since we always dequeue the entire PES.
+            ALOGW("Discarding srambled length %d", scrambledLength);
+        }
+        scrambledLength = it->mLength;
+
+        // TODO: handle key id change, use first non-zero keyId for now
+        if (keyId == 0) {
+            keyId = it->mKeyId;
+        }
+        clearSizes = it->mClearSizes;
+        encSizes = it->mEncSizes;
+        isSync = it->mIsSync;
+        mScrambledRangeInfos.erase(it);
+    }
+    if (scrambledLength == 0) {
+        ALOGE("[stream %d] empty scrambled unit!", mMode);
+        return NULL;
+    }
+
+    // skip the PES header, and copy the rest into scrambled access unit
+    sp<ABuffer> scrambledAccessUnit = ABuffer::CreateAsCopy(
+            mScrambledBuffer->data() + pesOffset,
+            scrambledLength - pesOffset);
+
+    // fix up first sample size after skipping the PES header
+    if (pesOffset > 0) {
+        int32_t &firstClearSize = *(int32_t*)clearSizes->data();
+        int32_t &firstEncSize = *(int32_t*)encSizes->data();
+        // Cut away the PES header
+        if (firstClearSize >= pesOffset) {
+            // This is for TS-level scrambling, we descrambled the first
+            // (or it was clear to begin with)
+            firstClearSize -= pesOffset;
+        } else if (firstEncSize >= pesOffset) {
+            // This can only be PES-level scrambling
+            firstEncSize -= pesOffset;
+        }
+    }
+
+    scrambledAccessUnit->meta()->setInt64("timeUs", timeUs);
+    if (isSync) {
+        scrambledAccessUnit->meta()->setInt32("isSync", 1);
+    }
+
+    // fill in CryptoInfo fields for AnotherPacketSource::read()
+    // MediaCas doesn't use cryptoMode, but set to non-zero value here.
+    scrambledAccessUnit->meta()->setInt32(
+            "cryptoMode", CryptoPlugin::kMode_AES_CBC);
+    scrambledAccessUnit->meta()->setInt32("cryptoKey", keyId);
+    scrambledAccessUnit->meta()->setBuffer("clearBytes", clearSizes);
+    scrambledAccessUnit->meta()->setBuffer("encBytes", encSizes);
+
+    memmove(mScrambledBuffer->data(),
+            mScrambledBuffer->data() + scrambledLength,
+            mScrambledBuffer->size() - scrambledLength);
+
+    mScrambledBuffer->setRange(0, mScrambledBuffer->size() - scrambledLength);
+
+    ALOGV("[stream %d] dequeued scrambled AU: timeUs=%lld, size=%zu",
+            mMode, (long long)timeUs, scrambledAccessUnit->size());
+
+    return scrambledAccessUnit;
+}
+
 sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnit() {
-    if ((mFlags & kFlag_AlignedData) && mMode == H264) {
+    if ((mFlags & kFlag_AlignedData) && mMode == H264 && !isScrambled()) {
         if (mRangeInfos.empty()) {
             return NULL;
         }
@@ -751,7 +882,8 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitAAC() {
     return accessUnit;
 }
 
-int64_t ElementaryStreamQueue::fetchTimestamp(size_t size) {
+int64_t ElementaryStreamQueue::fetchTimestamp(
+        size_t size, int32_t *pesOffset, int32_t *pesScramblingControl) {
     int64_t timeUs = -1;
     bool first = true;
 
@@ -764,6 +896,12 @@ int64_t ElementaryStreamQueue::fetchTimestamp(size_t size) {
 
         if (first) {
             timeUs = info->mTimestampUs;
+            if (pesOffset != NULL) {
+                *pesOffset = info->mPesOffset;
+            }
+            if (pesScramblingControl != NULL) {
+                *pesScramblingControl = info->mPesScramblingControl;
+            }
             first = false;
         }
 
@@ -787,6 +925,25 @@ int64_t ElementaryStreamQueue::fetchTimestamp(size_t size) {
 }
 
 sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitH264() {
+    if (isScrambled()) {
+        if (mBuffer == NULL || mBuffer->size() == 0) {
+            return NULL;
+        }
+        if (mFormat == NULL) {
+            mFormat = MakeAVCCodecSpecificData(mBuffer);
+            if (mFormat == NULL) {
+                ALOGI("Creating dummy AVC format for scrambled content");
+                mFormat = new MetaData;
+                mFormat->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_AVC);
+                mFormat->setInt32(kKeyWidth, 1280);
+                mFormat->setInt32(kKeyHeight, 720);
+            }
+            // for DrmInitData
+            mFormat->setData(kKeyCas, 0, mCasSessionId.data(), mCasSessionId.size());
+        }
+        return dequeueScrambledAccessUnit();
+    }
+
     const uint8_t *data = mBuffer->data();
 
     size_t size = mBuffer->size();
@@ -1045,6 +1202,23 @@ static sp<ABuffer> MakeMPEGVideoESDS(const sp<ABuffer> &csd) {
 }
 
 sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitMPEGVideo() {
+    if (isScrambled()) {
+        if (mBuffer == NULL || mBuffer->size() == 0) {
+            return NULL;
+        }
+        if (mFormat == NULL) {
+            ALOGI("Creating dummy MPEG format for scrambled content");
+            mFormat = new MetaData;
+            mFormat->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_MPEG2);
+            mFormat->setInt32(kKeyWidth, 1280);
+            mFormat->setInt32(kKeyHeight, 720);
+
+            // for DrmInitData
+            mFormat->setData(kKeyCas, 0, mCasSessionId.data(), mCasSessionId.size());
+        }
+        return dequeueScrambledAccessUnit();
+    }
+
     const uint8_t *data = mBuffer->data();
     size_t size = mBuffer->size();
 

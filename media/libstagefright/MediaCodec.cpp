@@ -2012,6 +2012,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             }
 
             mDescrambler = static_cast<IDescrambler *>(descrambler);
+            mBufferChannel->setDescrambler(mDescrambler);
 
             uint32_t flags;
             CHECK(msg->findInt32("flags", (int32_t *)&flags));
@@ -2033,7 +2034,6 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             CHECK(msg->senderAwaitsResponse(&replyID));
 
             status_t err = OK;
-            sp<Surface> surface;
 
             switch (mState) {
                 case CONFIGURED:
@@ -2718,7 +2718,7 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
     CryptoPlugin::Pattern pattern;
 
     if (msg->findSize("size", &size)) {
-        if (mCrypto != NULL) {
+        if (hasCryptoOrDescrambler()) {
             ss.mNumBytesOfClearData = size;
             ss.mNumBytesOfEncryptedData = 0;
 
@@ -2730,7 +2730,9 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
             pattern.mSkipBlocks = 0;
         }
     } else {
-        if (mCrypto == NULL) {
+        if (!hasCryptoOrDescrambler()) {
+            ALOGE("[%s] queuing secure buffer without mCrypto or mDescrambler!",
+                    mComponentName.c_str());
             return -EINVAL;
         }
 
@@ -2779,7 +2781,7 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
 
     sp<MediaCodecBuffer> buffer = info->mData;
     status_t err = OK;
-    if (mCrypto != NULL) {
+    if (hasCryptoOrDescrambler()) {
         AString *errorDetailMsg;
         CHECK(msg->findPointer("errorDetailMsg", (void **)&errorDetailMsg));
 

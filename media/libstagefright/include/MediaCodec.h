@@ -401,6 +401,10 @@ private:
     status_t connectToSurface(const sp<Surface> &surface);
     status_t disconnectFromSurface();
 
+    bool hasCryptoOrDescrambler() {
+        return mCrypto != NULL || mDescrambler != NULL;
+    }
+
     void postActivityNotificationIfPossible();
 
     void onInputBufferAvailable();

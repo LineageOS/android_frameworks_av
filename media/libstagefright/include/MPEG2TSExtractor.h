@@ -45,6 +45,8 @@ struct MPEG2TSExtractor : public MediaExtractor {
 
     virtual sp<MetaData> getMetaData();
 
+    virtual status_t setMediaCas(const sp<ICas> &cas) override;
+
     virtual uint32_t flags() const;
     virtual const char * name() { return "MPEG2TSExtractor"; }
 
@@ -70,7 +72,10 @@ private:
 
     off64_t mOffset;
 
+    static bool isScrambledFormat(const sp<MetaData> &format);
+
     void init();
+    void addSource(const sp<AnotherPacketSource> &impl);
     // Try to feed more data from source to parser.
     // |isInit| means this function is called inside init(). This is a signal to
     // save SyncEvent so that init() can add SyncPoint after it updates |mSourceImpls|.

@@ -176,6 +176,7 @@ enum {
     kKeyCryptoDefaultIVSize = 'cryS',  // int32_t
 
     kKeyPssh              = 'pssh',  // raw data
+    kKeyCas               = ' cas',
 
     // Please see MediaFormat.KEY_IS_AUTOSELECT.
     kKeyTrackIsAutoselect = 'auto', // bool (int32_t)
