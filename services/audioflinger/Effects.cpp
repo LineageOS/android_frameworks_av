@@ -1630,11 +1630,16 @@ void AudioFlinger::EffectChain::process_l()
         // and 'update' / 'commit' do nothing for allocated buffers, thus
         // it's not needed to consider any other buffers here.
         mInBuffer->update();
-        mOutBuffer->update();
+        if (mInBuffer->audioBuffer()->raw != mOutBuffer->audioBuffer()->raw) {
+            mOutBuffer->update();
+        }
         for (size_t i = 0; i < size; i++) {
             mEffects[i]->process();
         }
-        mOutBuffer->commit();
+        mInBuffer->commit();
+        if (mInBuffer->audioBuffer()->raw != mOutBuffer->audioBuffer()->raw) {
+            mOutBuffer->commit();
+        }
     }
     bool doResetVolume = false;
     for (size_t i = 0; i < size; i++) {
@@ -1935,6 +1940,17 @@ void AudioFlinger::EffectChain::syncHalEffectsState()
     }
 }
 
+static void dumpInOutBuffer(
+        char *dump, size_t dumpSize, bool isInput, EffectBufferHalInterface *buffer) {
+    if (buffer->externalData() != nullptr) {
+        snprintf(dump, dumpSize, "%p -> %p",
+                isInput ? buffer->externalData() : buffer->audioBuffer()->raw,
+                isInput ? buffer->audioBuffer()->raw : buffer->externalData());
+    } else {
+        snprintf(dump, dumpSize, "%p", buffer->audioBuffer()->raw);
+    }
+}
+
 void AudioFlinger::EffectChain::dump(int fd, const Vector<String16>& args)
 {
     const size_t SIZE = 256;
@@ -1952,11 +1968,14 @@ void AudioFlinger::EffectChain::dump(int fd, const Vector<String16>& args)
             result.append("\tCould not lock mutex:\n");
         }
 
-        result.append("\tIn buffer   Out buffer   Active tracks:\n");
-        snprintf(buffer, SIZE, "\t%p  %p   %d\n",
-                mInBuffer->audioBuffer(),
-                mOutBuffer->audioBuffer(),
-                mActiveTrackCnt);
+        char inBufferStr[64], outBufferStr[64];
+        dumpInOutBuffer(inBufferStr, sizeof(inBufferStr), true, mInBuffer.get());
+        dumpInOutBuffer(outBufferStr, sizeof(outBufferStr), false, mOutBuffer.get());
+        snprintf(buffer, SIZE, "\t%-*s%-*s   Active tracks:\n",
+                (int)strlen(inBufferStr), "In buffer    ",
+                (int)strlen(outBufferStr), "Out buffer      ");
+        result.append(buffer);
+        snprintf(buffer, SIZE, "\t%s   %s   %d\n", inBufferStr, outBufferStr, mActiveTrackCnt);
         result.append(buffer);
         write(fd, result.string(), result.size());
 
