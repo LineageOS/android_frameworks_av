@@ -27,6 +27,7 @@
 #include <string.h>
 #include <sys/endian.h>
 #include <sys/ioctl.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -488,13 +489,15 @@ public:
         mFd(fd),
         mAllocSize(alloc_size) {
         if (ioctl(mFd, FUNCTIONFS_ENDPOINT_ALLOC, static_cast<__u32>(mAllocSize)))
-            PLOG(DEBUG) << "FFS endpoint alloc failed!";
+            PLOG(ERROR) << "FFS endpoint alloc failed!";
     }
 
     ~ScopedEndpointBufferAlloc() {
         if (ioctl(mFd, FUNCTIONFS_ENDPOINT_ALLOC, static_cast<__u32>(0)))
-            PLOG(DEBUG) << "FFS endpoint alloc reset failed!";
+            PLOG(ERROR) << "FFS endpoint alloc reset failed!";
     }
+
+    DISALLOW_COPY_AND_ASSIGN(ScopedEndpointBufferAlloc);
 };
 
 /* Read from USB and write to a local file. */
@@ -524,7 +527,9 @@ int MtpFfsHandle::receiveFile(mtp_file_range mfr) {
     bool write = false;
 
     posix_fadvise(mfr.fd, 0, 0, POSIX_FADV_SEQUENTIAL | POSIX_FADV_NOREUSE);
-    ScopedEndpointBufferAlloc(mBulkOut, mMaxRead);
+    posix_madvise(data, buf1_len, POSIX_MADV_SEQUENTIAL | POSIX_MADV_WILLNEED);
+    posix_madvise(data2, buf2_len, POSIX_MADV_SEQUENTIAL | POSIX_MADV_WILLNEED);
+    ScopedEndpointBufferAlloc scoped_alloc(mBulkOut, mMaxRead);
 
     // Break down the file into pieces that fit in buffers
     while (file_length > 0 || write) {
@@ -602,8 +607,6 @@ int MtpFfsHandle::sendFile(mtp_file_range mfr) {
         packet_size = mBulkIn_desc.wMaxPacketSize;
     }
 
-    posix_fadvise(mfr.fd, 0, 0, POSIX_FADV_SEQUENTIAL | POSIX_FADV_NOREUSE);
-
     int init_read_len = packet_size - sizeof(mtp_data_header);
     int buf1_len = std::max(static_cast<uint64_t>(packet_size), std::min(
                   static_cast<uint64_t>(MAX_FILE_CHUNK_SIZE), file_length - init_read_len));
@@ -615,6 +618,10 @@ int MtpFfsHandle::sendFile(mtp_file_range mfr) {
             file_length - MAX_FILE_CHUNK_SIZE - init_read_len);
     std::vector<char> buf2(std::max(0, buf2_len));
     char *data2 = buf2.data();
+
+    posix_fadvise(mfr.fd, 0, 0, POSIX_FADV_SEQUENTIAL | POSIX_FADV_NOREUSE);
+    posix_madvise(data, buf1_len, POSIX_MADV_SEQUENTIAL | POSIX_MADV_WILLNEED);
+    posix_madvise(data2, buf2_len, POSIX_MADV_SEQUENTIAL | POSIX_MADV_WILLNEED);
 
     struct aiocb aio;
     aio.aio_fildes = mfr.fd;
@@ -640,7 +647,7 @@ int MtpFfsHandle::sendFile(mtp_file_range mfr) {
     if (writeHandle(mBulkIn, data, packet_size) == -1) return -1;
     if (file_length == 0) return 0;
 
-    ScopedEndpointBufferAlloc(mBulkIn, mMaxWrite);
+    ScopedEndpointBufferAlloc scoped_alloc(mBulkIn, mMaxWrite);
 
     // Break down the file into pieces that fit in buffers
     while(file_length > 0) {
