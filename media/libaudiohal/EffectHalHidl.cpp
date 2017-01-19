@@ -172,7 +172,7 @@ status_t EffectHalHidl::command(uint32_t cmdCode, uint32_t cmdSize, void *pCmdDa
     }
     status_t status;
     uint32_t replySizeStub = 0;
-    if (replySize == nullptr) replySize = &replySizeStub;
+    if (replySize == nullptr || pReplyData == nullptr) replySize = &replySizeStub;
     Return<void> ret = mEffect->command(cmdCode, hidlData, *replySize,
             [&](int32_t s, const hidl_vec<uint8_t>& result) {
                 status = s;
