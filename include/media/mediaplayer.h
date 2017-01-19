@@ -22,6 +22,7 @@
 #include <binder/IMemory.h>
 
 #include <media/AudioResamplerPublic.h>
+#include <media/BufferingSettings.h>
 #include <media/IMediaPlayerClient.h>
 #include <media/IMediaPlayer.h>
 #include <media/IMediaDeathNotifier.h>
@@ -220,6 +221,7 @@ public:
                                     const sp<IGraphicBufferProducer>& bufferProducer);
             status_t        setListener(const sp<MediaPlayerListener>& listener);
             status_t        getDefaultBufferingSettings(BufferingSettings* buffering /* nonnull */);
+            status_t        getBufferingSettings(BufferingSettings* buffering /* nonnull */);
             status_t        setBufferingSettings(const BufferingSettings& buffering);
             status_t        prepare();
             status_t        prepareAsync();
@@ -294,6 +296,7 @@ private:
     float                       mSendLevel;
     struct sockaddr_in          mRetransmitEndpoint;
     bool                        mRetransmitEndpointValid;
+    BufferingSettings           mCurrentBufferingSettings;
 };
 
 }; // namespace android
