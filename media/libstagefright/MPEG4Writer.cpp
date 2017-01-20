@@ -2570,19 +2570,17 @@ status_t MPEG4Writer::Track::threadEntry() {
                 ALOGI("ignoring additional CSD for video track after first frame");
             } else {
                 mMeta = mSource->getFormat(); // get output format after format change
-
+                status_t err;
                 if (mIsAvc) {
-                    status_t err = makeAVCCodecSpecificData(
+                    err = makeAVCCodecSpecificData(
                             (const uint8_t *)buffer->data()
                                 + buffer->range_offset(),
                             buffer->range_length());
-                    CHECK_EQ((status_t)OK, err);
                 } else if (mIsHevc) {
-                    status_t err = makeHEVCCodecSpecificData(
+                    err = makeHEVCCodecSpecificData(
                             (const uint8_t *)buffer->data()
                                 + buffer->range_offset(),
                             buffer->range_length());
-                    CHECK_EQ((status_t)OK, err);
                 } else if (mIsMPEG4) {
                     copyCodecSpecificData((const uint8_t *)buffer->data() + buffer->range_offset(),
                             buffer->range_length());
@@ -2591,6 +2589,12 @@ status_t MPEG4Writer::Track::threadEntry() {
 
             buffer->release();
             buffer = NULL;
+            if (OK != err) {
+                mSource->stop();
+                mOwner->notify(MEDIA_RECORDER_TRACK_EVENT_ERROR,
+                       mTrackId | MEDIA_RECORDER_TRACK_ERROR_GENERAL, err);
+                break;
+            }
 
             mGotAllCodecSpecificData = true;
             continue;
