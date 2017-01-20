@@ -10,7 +10,8 @@ LOCAL_C_INCLUDES := \
         external/flac/include
 
 LOCAL_CFLAGS += -Werror
-LOCAL_SANITIZE := signed-integer-overflow unsigned-integer-overflow
+LOCAL_SANITIZE := signed-integer-overflow unsigned-integer-overflow cfi
+LOCAL_SANITIZE_DIAG := cfi
 
 LOCAL_SHARED_LIBRARIES := \
         libmedia libstagefright_omx libstagefright_foundation libutils liblog

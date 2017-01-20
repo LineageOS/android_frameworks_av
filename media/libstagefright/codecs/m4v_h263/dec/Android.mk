@@ -76,6 +76,7 @@ LOCAL_MODULE := libstagefright_soft_mpeg4dec
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_CFLAGS += -Werror
-LOCAL_SANITIZE := signed-integer-overflow
+LOCAL_SANITIZE := signed-integer-overflow cfi
+LOCAL_SANITIZE_DIAG := cfi
 
 include $(BUILD_SHARED_LIBRARY)

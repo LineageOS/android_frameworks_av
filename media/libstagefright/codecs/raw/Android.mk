@@ -9,7 +9,8 @@ LOCAL_C_INCLUDES := \
         frameworks/native/include/media/openmax
 
 LOCAL_CFLAGS += -Werror
-LOCAL_SANITIZE := signed-integer-overflow unsigned-integer-overflow
+LOCAL_SANITIZE := signed-integer-overflow unsigned-integer-overflow cfi
+LOCAL_SANITIZE_DIAG := cfi
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright_omx libstagefright_foundation libutils liblog

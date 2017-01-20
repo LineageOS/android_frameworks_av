@@ -83,7 +83,8 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := \
     frameworks/av/media/libmedia/aidl
 
 LOCAL_CFLAGS += -Werror -Wno-error=deprecated-declarations -Wall
-LOCAL_SANITIZE := unsigned-integer-overflow signed-integer-overflow
+LOCAL_SANITIZE := unsigned-integer-overflow signed-integer-overflow cfi
+LOCAL_SANITIZE_DIAG := cfi
 
 include $(BUILD_SHARED_LIBRARY)
 

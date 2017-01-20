@@ -19,7 +19,8 @@ LOCAL_C_INCLUDES := \
 LOCAL_CFLAGS :=
 
 LOCAL_CFLAGS += -Werror
-LOCAL_SANITIZE := signed-integer-overflow unsigned-integer-overflow
+LOCAL_SANITIZE := signed-integer-overflow unsigned-integer-overflow cfi
+LOCAL_SANITIZE_DIAG := cfi
 
 LOCAL_STATIC_LIBRARIES := libFraunhoferAAC
 

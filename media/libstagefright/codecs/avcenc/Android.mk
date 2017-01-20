@@ -20,7 +20,9 @@ LOCAL_SHARED_LIBRARIES  += libstagefright_omx
 LOCAL_SHARED_LIBRARIES  += libutils
 LOCAL_SHARED_LIBRARIES  += liblog
 
-LOCAL_SANITIZE := signed-integer-overflow
+LOCAL_SANITIZE := signed-integer-overflow cfi
+
+LOCAL_SANITIZE_DIAG := cfi
 
 LOCAL_LDFLAGS := -Wl,-Bsymbolic
 

@@ -13,7 +13,9 @@ LOCAL_SHARED_LIBRARIES := \
         libopus libmedia libstagefright_omx \
         libstagefright_foundation libutils liblog
 
-LOCAL_SANITIZE := signed-integer-overflow unsigned-integer-overflow
+LOCAL_SANITIZE := signed-integer-overflow unsigned-integer-overflow cfi
+
+LOCAL_SANITIZE_DIAG := cfi
 
 LOCAL_MODULE := libstagefright_soft_opusdec
 LOCAL_MODULE_TAGS := optional

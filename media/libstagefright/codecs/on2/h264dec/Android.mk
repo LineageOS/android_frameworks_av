@@ -95,7 +95,9 @@ ifeq ($(ARCH_ARM_HAVE_NEON),true)
                         $(LOCAL_PATH)/./omxdl/arm_neon/vc/m4p10/api
 endif
 
-LOCAL_SANITIZE := signed-integer-overflow
+LOCAL_SANITIZE := signed-integer-overflow cfi
+
+LOCAL_SANITIZE_DIAG := cfi
 
 LOCAL_SHARED_LIBRARIES := \
 	libmedia libstagefright_omx libstagefright_foundation libutils liblog \

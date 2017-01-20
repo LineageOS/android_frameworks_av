@@ -13,7 +13,9 @@ LOCAL_C_INCLUDES := \
         frameworks/av/media/libstagefright/include \
         frameworks/native/include/media/openmax \
 
-LOCAL_SANITIZE := signed-integer-overflow unsigned-integer-overflow
+LOCAL_SANITIZE := signed-integer-overflow unsigned-integer-overflow cfi
+
+LOCAL_SANITIZE_DIAG := cfi
 
 LOCAL_STATIC_LIBRARIES := \
         libvpx

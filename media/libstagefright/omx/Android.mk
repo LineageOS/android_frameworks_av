@@ -32,7 +32,8 @@ LOCAL_SHARED_LIBRARIES :=               \
 
 LOCAL_MODULE:= libstagefright_omx
 LOCAL_CFLAGS += -Werror -Wall
-LOCAL_SANITIZE := unsigned-integer-overflow signed-integer-overflow
+LOCAL_SANITIZE := unsigned-integer-overflow signed-integer-overflow cfi
+LOCAL_SANITIZE_DIAG := cfi
 
 include $(BUILD_SHARED_LIBRARY)
 
