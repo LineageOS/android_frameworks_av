@@ -60,7 +60,10 @@ class PluginLoader {
         }
     }
 
-    T *getFactory(size_t i) const {return factories[i];}
+    T *getFactory(size_t i) const {
+        return factories[i];
+    }
+
     size_t factoryCount() const {return factories.size();}
 
   private:
@@ -74,12 +77,11 @@ class PluginLoader {
             CreateFactoryFunc createFactoryFunc =
                     (CreateFactoryFunc)library->lookup(entry);
             if (createFactoryFunc) {
+                ALOGV("Found plugin factory entry %s in %s", entry, path);
                 libraries.push(library);
-                return createFactoryFunc();
-            } else {
-                ALOGE("Failed to create plugin factory from %s at entry %s: %s",
-                        path, entry, library->lastError());
-            }
+                T* result = createFactoryFunc();
+                return  result;
+           }
         }
         return NULL;
     }

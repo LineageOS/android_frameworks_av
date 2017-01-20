@@ -15,8 +15,9 @@
  */
 
 #include <binder/IInterface.h>
-#include <media/stagefright/foundation/ABase.h>
+#include <cutils/native_handle.h>
 #include <media/hardware/CryptoAPI.h>
+#include <media/stagefright/foundation/ABase.h>
 
 #ifndef ANDROID_ICRYPTO_H_
 
@@ -47,21 +48,21 @@ struct ICrypto : public IInterface {
     virtual status_t setMediaDrmSession(const Vector<uint8_t> &sessionId) = 0;
 
     enum DestinationType {
-        kDestinationTypeVmPointer,    // non-secure
-        kDestinationTypeOpaqueHandle, // secure
+        kDestinationTypeSharedMemory, // non-secure
         kDestinationTypeNativeHandle  // secure
     };
 
-    virtual ssize_t decrypt(
-            DestinationType dstType,
-            const uint8_t key[16],
-            const uint8_t iv[16],
-            CryptoPlugin::Mode mode,
-            const CryptoPlugin::Pattern &pattern,
-            const sp<IMemory> &sharedBuffer, size_t offset,
+    struct DestinationBuffer {
+        DestinationType mType;
+        native_handle_t *mHandle;
+        sp<IMemory> mSharedMemory;
+    };
+
+    virtual ssize_t decrypt(const uint8_t key[16], const uint8_t iv[16],
+            CryptoPlugin::Mode mode, const CryptoPlugin::Pattern &pattern,
+            const sp<IMemory> &source, size_t offset,
             const CryptoPlugin::SubSample *subSamples, size_t numSubSamples,
-            void *dstPtr,
-            AString *errorDetailMsg) = 0;
+            const DestinationBuffer &destination, AString *errorDetailMsg) = 0;
 
 private:
     DISALLOW_EVIL_CONSTRUCTORS(ICrypto);

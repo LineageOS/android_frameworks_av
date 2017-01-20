@@ -88,14 +88,9 @@ status_t ACodecBufferChannel::queueInputBuffer(const sp<MediaCodecBuffer> &buffe
 }
 
 status_t ACodecBufferChannel::queueSecureInputBuffer(
-        const sp<MediaCodecBuffer> &buffer,
-        bool secure,
-        const uint8_t *key,
-        const uint8_t *iv,
-        CryptoPlugin::Mode mode,
-        CryptoPlugin::Pattern pattern,
-        const CryptoPlugin::SubSample *subSamples,
-        size_t numSubSamples,
+        const sp<MediaCodecBuffer> &buffer, bool secure, const uint8_t *key,
+        const uint8_t *iv, CryptoPlugin::Mode mode, CryptoPlugin::Pattern pattern,
+        const CryptoPlugin::SubSample *subSamples, size_t numSubSamples,
         AString *errorDetailMsg) {
     if (mCrypto == nullptr) {
         return -ENOSYS;
@@ -107,33 +102,30 @@ status_t ACodecBufferChannel::queueSecureInputBuffer(
         return -ENOENT;
     }
 
-    void *dst_pointer = nullptr;
-    ICrypto::DestinationType dst_type = ICrypto::kDestinationTypeOpaqueHandle;
-
+    ICrypto::DestinationBuffer destination;
     if (secure) {
-        sp<SecureBuffer> secureData = static_cast<SecureBuffer *>(it->mCodecBuffer.get());
-        dst_pointer = secureData->getDestinationPointer();
-        dst_type = secureData->getDestinationType();
+        sp<SecureBuffer> secureData =
+                static_cast<SecureBuffer *>(it->mCodecBuffer.get());
+        destination.mType = secureData->getDestinationType();
+        if (destination.mType != ICrypto::kDestinationTypeNativeHandle) {
+            return BAD_VALUE;
+        }
+        destination.mHandle =
+                static_cast<native_handle_t *>(secureData->getDestinationPointer());
     } else {
-        dst_pointer = it->mCodecBuffer->base();
-        dst_type = ICrypto::kDestinationTypeVmPointer;
+        destination.mType = ICrypto::kDestinationTypeSharedMemory;
+        destination.mSharedMemory = mDecryptDestination;
     }
-
-    ssize_t result = mCrypto->decrypt(
-            dst_type,
-            key,
-            iv,
-            mode,
-            pattern,
-            it->mSharedEncryptedBuffer,
-            it->mClientBuffer->offset(),
-            subSamples,
-            numSubSamples,
-            dst_pointer,
-            errorDetailMsg);
+    ssize_t result = mCrypto->decrypt(key, iv, mode, pattern,
+            it->mSharedEncryptedBuffer, it->mClientBuffer->offset(),
+            subSamples, numSubSamples, destination, errorDetailMsg);
 
     if (result < 0) {
         return result;
+    }
+
+    if (destination.mType == ICrypto::kDestinationTypeSharedMemory) {
+        memcpy(it->mCodecBuffer->base(), destination.mSharedMemory->pointer(), result);
     }
 
     it->mCodecBuffer->setRange(0, result);
@@ -228,7 +220,14 @@ void ACodecBufferChannel::setInputBufferArray(const std::vector<BufferAndId> &ar
                 (size_t sum, const BufferAndId& elem) {
                     return sum + align(elem.mBuffer->capacity(), alignment);
                 });
-        mDealer = new MemoryDealer(totalSize, "ACodecBufferChannel");
+        size_t maxSize = std::accumulate(
+                array.begin(), array.end(), 0u,
+                [alignment = MemoryDealer::getAllocationAlignment()]
+                (size_t max, const BufferAndId& elem) {
+                    return std::max(max, align(elem.mBuffer->capacity(), alignment));
+                });
+        mDealer = new MemoryDealer(totalSize + maxSize, "ACodecBufferChannel");
+        mDecryptDestination = mDealer->allocate(maxSize);
     }
     std::vector<const BufferInfo> inputBuffers;
     for (const BufferAndId &elem : array) {
