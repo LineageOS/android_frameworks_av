@@ -18,12 +18,6 @@
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 //#define LOG_NDEBUG 0
 
-#ifdef ENABLE_TREBLE
-  #define USE_HIDL true
-#else
-  #define USE_HIDL false
-#endif
-
 #include <algorithm>
 #include <climits>
 #include <stdio.h>
@@ -197,10 +191,13 @@ void CameraService::onFirstRef()
     notifier.noteResetFlashlight();
 
     status_t res = INVALID_OPERATION;
-    if (USE_HIDL) {
-        res = enumerateProviders();
-    } else {
+
+    bool disableTreble = property_get_bool("camera.disable_treble", false);
+    if (disableTreble) {
+        ALOGI("Treble disabled - using legacy path");
         res = loadLegacyHalModule();
+    } else {
+        res = enumerateProviders();
     }
     if (res == OK) {
         mInitialized = true;
