@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "mediaanalytics"
+#define LOG_TAG "mediametrics"
 //#define LOG_NDEBUG 0
 
 #include <binder/IPCThreadState.h>
@@ -24,7 +24,6 @@
 //#include "RegisterExtensions.h"
 
 // from LOCAL_C_INCLUDES
-#include "IcuUtils.h"
 #include "MediaAnalyticsService.h"
 
 using namespace android;
@@ -34,16 +33,16 @@ int main(int argc __unused, char **argv __unused)
     signal(SIGPIPE, SIG_IGN);
 
     // to match the service name
-    // we're replacing "/system/bin/mediaanalytics" with "media.analytics"
+    // we're replacing "/system/bin/mediametrics" with "media.metrics"
     // we add a ".", but discard the path components: we finish with a shorter string
-    strcpy(argv[0], "media.analytics");
+    strcpy(argv[0], "media.metrics");
 
     sp<ProcessState> proc(ProcessState::self());
     sp<IServiceManager> sm(defaultServiceManager());
     ALOGI("ServiceManager: %p", sm.get());
 
-    InitializeIcuOrDie();
     MediaAnalyticsService::instantiate();
+
     ProcessState::self()->startThreadPool();
     IPCThreadState::self()->joinThreadPool();
 }

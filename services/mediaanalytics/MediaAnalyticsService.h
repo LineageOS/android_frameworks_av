@@ -69,7 +69,7 @@ class MediaAnalyticsService : public BnMediaAnalyticsService
     int32_t mMaxRecords;
 
     // input validation after arrival from client
-    bool contentValid(MediaAnalyticsItem *);
+    bool contentValid(MediaAnalyticsItem *item, bool isTrusted);
     bool rateLimited(MediaAnalyticsItem *);
 
     // the ones that are still open

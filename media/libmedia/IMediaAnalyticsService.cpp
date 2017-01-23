@@ -50,7 +50,6 @@ namespace android {
 enum {
     GENERATE_UNIQUE_SESSIONID = IBinder::FIRST_CALL_TRANSACTION,
     SUBMIT_ITEM,
-    GET_ITEM_LIST,
 };
 
 class BpMediaAnalyticsService: public BpInterface<IMediaAnalyticsService>
@@ -115,45 +114,6 @@ public:
         return sessionid;
     }
 
-    virtual List<MediaAnalyticsItem*> *getMediaAnalyticsItemList(bool finished, nsecs_t ts)
-    {
-            return getMediaAnalyticsItemList(finished, ts, MediaAnalyticsItem::kKeyAny);
-    }
-
-    virtual List<MediaAnalyticsItem*> *getMediaAnalyticsItemList(bool finished, nsecs_t ts, MediaAnalyticsItem::Key key)
-    {
-        Parcel data, reply;
-        status_t err;
-
-        data.writeInterfaceToken(IMediaAnalyticsService::getInterfaceDescriptor());
-        data.writeInt32(finished);
-        data.writeInt64(ts);
-        const char *str = key.c_str();
-        if (key.empty()) {
-            str = MediaAnalyticsItem::kKeyNone.c_str();
-        }
-        data.writeCString(str);
-        err = remote()->transact(GET_ITEM_LIST, data, &reply);
-        if (err != NO_ERROR) {
-            return NULL;
-        }
-
-        // read a count
-        int32_t count = reply.readInt32();
-        List<MediaAnalyticsItem*> *list = NULL;
-
-        if (count > 0) {
-            list = new List<MediaAnalyticsItem*>();
-            for (int i=0;i<count;i++) {
-                MediaAnalyticsItem *item = new MediaAnalyticsItem();
-                // XXX: watch for failures here
-                item->readFromParcel(reply);
-                list->push_back(item);
-            }
-        }
-
-        return list;
-    }
 };
 
 IMPLEMENT_META_INTERFACE(MediaAnalyticsService, "android.media.IMediaAnalyticsService");
@@ -200,33 +160,6 @@ status_t BnMediaAnalyticsService::onTransact(
             // submit() takes over ownership of 'item'
             MediaAnalyticsItem::SessionID_t sessionid = submit(item, forcenew);
             reply->writeInt64(sessionid);
-
-            return NO_ERROR;
-        } break;
-
-        case GET_ITEM_LIST: {
-            CHECK_INTERFACE(IMediaPlayerService, data, reply);
-            // get the parameters
-            bool finished = data.readInt32();
-            nsecs_t ts = data.readInt64();
-            MediaAnalyticsItem::Key key = data.readCString();
-
-            // find the (0 or more) items
-            List<MediaAnalyticsItem*> *list =  getMediaAnalyticsItemList(finished, ts, key);
-            // encapsulate/serialize them
-            reply->writeInt32(list->size());
-            if (list->size() > 0) {
-                    for (List<MediaAnalyticsItem*>::iterator it = list->begin();
-                         it != list->end(); it++) {
-                            (*it)->writeToParcel(reply);
-                    }
-
-
-            }
-
-            // avoid leakiness; organized discarding of list and its contents
-            list->clear();
-            delete list;
 
             return NO_ERROR;
         } break;

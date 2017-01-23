@@ -49,15 +49,15 @@ namespace android {
 const MediaAnalyticsItem::Key MediaAnalyticsItem::kKeyAny  = "any";
 const MediaAnalyticsItem::Key MediaAnalyticsItem::kKeyNone  = "none";
 
-const char * const MediaAnalyticsItem::EnabledProperty  = "media.analytics.enabled";
-const char * const MediaAnalyticsItem::EnabledPropertyPersist  = "persist.media.analytics.enabled";
+const char * const MediaAnalyticsItem::EnabledProperty  = "media.metrics.enabled";
+const char * const MediaAnalyticsItem::EnabledPropertyPersist  = "persist.media.metrics.enabled";
 const int MediaAnalyticsItem::EnabledProperty_default  = 0;
 
 
 // access functions for the class
 MediaAnalyticsItem::MediaAnalyticsItem()
-    : mPid(0),
-      mUid(0),
+    : mPid(-1),
+      mUid(-1),
       mSessionID(MediaAnalyticsItem::SessionIDNone),
       mTimestamp(0),
       mFinalized(0),
@@ -67,8 +67,8 @@ MediaAnalyticsItem::MediaAnalyticsItem()
 }
 
 MediaAnalyticsItem::MediaAnalyticsItem(MediaAnalyticsItem::Key key)
-    : mPid(0),
-      mUid(0),
+    : mPid(-1),
+      mUid(-1),
       mSessionID(MediaAnalyticsItem::SessionIDNone),
       mTimestamp(0),
       mFinalized(0),
@@ -91,6 +91,9 @@ void MediaAnalyticsItem::clear() {
 
     // clean allocated storage from key
     mKey.clear();
+
+    // clean various major parameters
+    mSessionID = MediaAnalyticsItem::SessionIDNone;
 
     // clean attributes
     // contents of the attributes
@@ -646,7 +649,6 @@ int32_t MediaAnalyticsItem::writeToParcel(Parcel *data) {
 }
 
 
-
 AString MediaAnalyticsItem::toString() {
 
     AString result = "(";
@@ -763,7 +765,7 @@ bool MediaAnalyticsItem::isEnabled() {
 
 //static
 sp<IMediaAnalyticsService> MediaAnalyticsItem::getInstance() {
-    static const char *servicename = "media.analytics";
+    static const char *servicename = "media.metrics";
     static int tries_remaining = SVC_TRIES;
     int enabled = isEnabled();
 

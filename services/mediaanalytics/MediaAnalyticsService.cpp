@@ -85,7 +85,7 @@ namespace android {
 
 void MediaAnalyticsService::instantiate() {
     defaultServiceManager()->addService(
-            String16("media.analytics"), new MediaAnalyticsService());
+            String16("media.metrics"), new MediaAnalyticsService());
 }
 
 // XXX: add dynamic controls for mMaxRecords
@@ -125,18 +125,46 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(MediaAnalyticsItem
 
     MediaAnalyticsItem::SessionID_t id = MediaAnalyticsItem::SessionIDInvalid;
 
-    // we control these, not using whatever the user might have sent
+    // we control these, generally not trusting user input
     nsecs_t now = systemTime(SYSTEM_TIME_REALTIME);
     item->setTimestamp(now);
     int pid = IPCThreadState::self()->getCallingPid();
-    item->setPid(pid);
     int uid = IPCThreadState::self()->getCallingUid();
-    item->setUid(uid);
+
+    int uid_given = item->getUid();
+    int pid_given = item->getPid();
+
+    // although we do make exceptions for particular client uids
+    // that we know we trust.
+    //
+    bool isTrusted = false;
+
+    switch (uid)  {
+        case AID_MEDIA:
+        case AID_MEDIA_CODEC:
+        case AID_MEDIA_EX:
+        case AID_MEDIA_DRM:
+            // trusted source, only override default values
+            isTrusted = true;
+            if (uid_given == (-1)) {
+                item->setUid(uid);
+            }
+            if (pid_given == (-1)) {
+                item->setPid(pid);
+            }
+            break;
+        default:
+            isTrusted = false;
+            item->setPid(pid);
+            item->setUid(uid);
+            break;
+    }
+
 
     mItemsSubmitted++;
 
     // validate the record; we discard if we don't like it
-    if (contentValid(item) == false) {
+    if (contentValid(item, isTrusted) == false) {
         delete item;
         return MediaAnalyticsItem::SessionIDInvalid;
     }
@@ -275,14 +303,14 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
 
     Mutex::Autolock _l(mLock);
 
-    snprintf(buffer, SIZE, "Dump of the mediaanalytics process:\n");
+    snprintf(buffer, SIZE, "Dump of the mediametrics process:\n");
     result.append(buffer);
 
     int enabled = MediaAnalyticsItem::isEnabled();
     if (enabled) {
-        snprintf(buffer, SIZE, "Analytics gathering: enabled\n");
+        snprintf(buffer, SIZE, "Metrics gathering: enabled\n");
     } else {
-        snprintf(buffer, SIZE, "Analytics gathering: DISABLED via property\n");
+        snprintf(buffer, SIZE, "Metrics gathering: DISABLED via property\n");
     }
     result.append(buffer);
 
@@ -300,11 +328,11 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
     }
 
     // show the recently recorded records
-    snprintf(buffer, sizeof(buffer), "\nFinalized Analytics (oldest first):\n");
+    snprintf(buffer, sizeof(buffer), "\nFinalized Metrics (oldest first):\n");
     result.append(buffer);
     result.append(this->dumpQueue(mFinalized, ts_since));
 
-    snprintf(buffer, sizeof(buffer), "\nIn-Progress Analytics (newest first):\n");
+    snprintf(buffer, sizeof(buffer), "\nIn-Progress Metrics (newest first):\n");
     result.append(buffer);
     result.append(this->dumpQueue(mOpen, ts_since));
 
@@ -402,9 +430,7 @@ void MediaAnalyticsService::saveItem(List<MediaAnalyticsItem *> *l, MediaAnalyti
                     oitem->getTimestamp());
             }
             l->erase(l->begin());
-        ALOGD("drop record at %s:%d", __FILE__, __LINE__);
             delete oitem;
-        ALOGD("[done] drop record at %s:%d", __FILE__, __LINE__);
             mItemsDiscarded++;
         }
     }
@@ -510,10 +536,34 @@ void MediaAnalyticsService::deleteItem(List<MediaAnalyticsItem *> *l, MediaAnaly
     }
 }
 
-// are the contents good
-bool MediaAnalyticsService::contentValid(MediaAnalyticsItem *) {
+static AString allowedKeys[] =
+{
+    "codec",
+    "extractor"
+};
 
-    // certain keys require certain uids
+static const int nAllowedKeys = sizeof(allowedKeys) / sizeof(allowedKeys[0]);
+
+// are the contents good
+bool MediaAnalyticsService::contentValid(MediaAnalyticsItem *item, bool isTrusted) {
+
+    // untrusted uids can only send us a limited set of keys
+    if (isTrusted == false) {
+        // restrict to a specific set of keys
+        AString key = item->getKey();
+
+        size_t i;
+        for(i = 0; i < nAllowedKeys; i++) {
+            if (key == allowedKeys[i]) {
+                break;
+            }
+        }
+        if (i == nAllowedKeys) {
+            ALOGD("Ignoring (key): %s", item->toString().c_str());
+            return false;
+        }
+    }
+
     // internal consistency
 
     return true;
