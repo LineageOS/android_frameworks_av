@@ -24,10 +24,11 @@
 #include <utils/Condition.h>
 #include <gui/BufferItem.h>
 #include <gui/BufferItemConsumer.h>
+#include <gui/RingBufferConsumer.h>
+#include <gui/IProducerListener.h>
 #include <camera/CameraMetadata.h>
 
 #include "api1/client2/FrameProcessor.h"
-#include "device3/Camera3ZslStream.h"
 
 namespace android {
 
@@ -42,7 +43,6 @@ struct Parameters;
  * ZSL queue processing for HALv3.0 or newer
  */
 class ZslProcessor :
-                    public camera3::Camera3StreamBufferListener,
             virtual public Thread,
             virtual public FrameProcessor::FilteredListener {
   public:
@@ -81,19 +81,18 @@ class ZslProcessor :
 
     void dump(int fd, const Vector<String16>& args) const;
 
-  protected:
-    /**
-     **********************************************
-     * Camera3StreamBufferListener implementation *
-     **********************************************
-     */
-    typedef camera3::Camera3StreamBufferListener::BufferInfo BufferInfo;
-    // Buffer was acquired by the HAL
-    virtual void onBufferAcquired(const BufferInfo& bufferInfo);
-    // Buffer was released by the HAL
-    virtual void onBufferReleased(const BufferInfo& bufferInfo);
-
   private:
+
+    class InputProducerListener : public BnProducerListener {
+    public:
+        InputProducerListener(wp<ZslProcessor> parent) : mParent(parent) {}
+        virtual void onBufferReleased();
+        virtual bool needsReleaseNotify() { return true; }
+
+    private:
+        wp<ZslProcessor> mParent;
+    };
+
     static const nsecs_t kWaitDuration = 10000000; // 10 ms
     nsecs_t mLatestClearedBufferTimestamp;
 
@@ -101,6 +100,8 @@ class ZslProcessor :
         RUNNING,
         LOCKED
     } mState;
+
+    enum { NO_BUFFER_AVAILABLE = BufferQueue::NO_BUFFER_AVAILABLE };
 
     wp<Camera2Client> mClient;
     wp<CaptureSequencer> mSequencer;
@@ -114,7 +115,7 @@ class ZslProcessor :
     };
 
     int mZslStreamId;
-    sp<camera3::Camera3ZslStream> mZslStream;
+    int mInputStreamId;
 
     struct ZslPair {
         BufferItem buffer;
@@ -135,6 +136,12 @@ class ZslProcessor :
 
     bool mHasFocuser;
 
+    // Input buffer queued into HAL
+    sp<RingBufferConsumer::PinnedBufferItem> mInputBuffer;
+    sp<RingBufferConsumer>                   mProducer;
+    sp<IGraphicBufferProducer>               mInputProducer;
+    int                                      mInputProducerSlot;
+
     virtual bool threadLoop();
 
     status_t clearZslQueueLocked();
@@ -144,6 +151,11 @@ class ZslProcessor :
     void dumpZslQueue(int id) const;
 
     nsecs_t getCandidateTimestampLocked(size_t* metadataIdx) const;
+
+    status_t enqueueInputBufferByTimestamp( nsecs_t timestamp,
+        nsecs_t* actualTimestamp);
+    status_t clearInputRingBufferLocked(nsecs_t* latestTimestamp);
+    void notifyInputReleased();
 
     bool isFixedFocusMode(uint8_t afMode) const;
 

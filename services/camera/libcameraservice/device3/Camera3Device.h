@@ -125,12 +125,6 @@ class Camera3Device :
     status_t createInputStream(
             uint32_t width, uint32_t height, int format,
             int *id) override;
-    status_t createZslStream(
-            uint32_t width, uint32_t height,
-            int depth,
-            /*out*/
-            int *id,
-            sp<camera3::Camera3ZslStream>* zslStream);
     status_t createReprocessStreamFromStream(int outputId, int *id) override;
 
     status_t getStreamInfo(int id,
