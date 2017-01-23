@@ -290,9 +290,12 @@ status_t MediaRecorder::setOutputFile(int fd)
     // this issue by checking the file descriptor first before passing
     // it through binder call.
     int flags = fcntl(fd, F_GETFL);
-    // fd must be in read-write mode.
-    if (flags == -1 || (flags & O_RDWR) == 0) {
-        ALOGE("Invalid file descriptor: %d err: %s", fd, strerror(errno));
+    if (flags == -1) {
+        ALOGE("Fail to get File Status Flags err: %s", strerror(errno));
+    }
+    // fd must be in read-write mode or write-only mode.
+    if ((flags & (O_RDWR | O_WRONLY)) == 0) {
+        ALOGE("File descriptor is not in read-write mode or write-only mode");
         return BAD_VALUE;
     }
 
@@ -321,9 +324,12 @@ status_t MediaRecorder::setNextOutputFile(int fd)
     // this issue by checking the file descriptor first before passing
     // it through binder call.
     int flags = fcntl(fd, F_GETFL);
-    // fd must be in read-write mode.
-    if (flags == -1 || (flags & O_RDWR) == 0) {
-        ALOGE("Invalid file descriptor: %d err: %s", fd, strerror(errno));
+    if (flags == -1) {
+        ALOGE("Fail to get File Status Flags err: %s", strerror(errno));
+    }
+    // fd must be in read-write mode or write-only mode.
+    if ((flags & (O_RDWR | O_WRONLY)) == 0) {
+        ALOGE("File descriptor is not in read-write mode or write-only mode");
         return BAD_VALUE;
     }
 
