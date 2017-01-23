@@ -874,7 +874,7 @@ void MediaPlayer::notify(int msg, int ext1, int ext2, const Parcel *obj)
     case MEDIA_NOP: // interface test message
         break;
     case MEDIA_PREPARED:
-        ALOGV("prepared");
+        ALOGV("MediaPlayer::notify() prepared");
         mCurrentState = MEDIA_PLAYER_PREPARED;
         if (mPrepareSync) {
             ALOGV("signal application thread");
@@ -882,6 +882,9 @@ void MediaPlayer::notify(int msg, int ext1, int ext2, const Parcel *obj)
             mPrepareStatus = NO_ERROR;
             mSignal.signal();
         }
+        break;
+    case MEDIA_DRM_INFO:
+        ALOGV("MediaPlayer::notify() MEDIA_DRM_INFO(%d, %d, %d, %p)", msg, ext1, ext2, obj);
         break;
     case MEDIA_PLAYBACK_COMPLETE:
         ALOGV("playback complete");
@@ -981,6 +984,125 @@ status_t MediaPlayer::setNextMediaPlayer(const sp<MediaPlayer>& next) {
     }
 
     return mPlayer->setNextPlayer(next == NULL ? NULL : next->mPlayer);
+}
+
+// ModDrm
+status_t MediaPlayer::prepareDrm(const uint8_t uuid[16], const int mode)
+{
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == NULL) {
+        return NO_INIT;
+    }
+
+    // Only allowing it in player's prepared state
+    if (!(mCurrentState & MEDIA_PLAYER_PREPARED)) {
+        ALOGE("prepareDrm must only be called in the prepared state.");
+        return INVALID_OPERATION;
+    }
+
+    status_t ret = mPlayer->prepareDrm(uuid, mode);
+    ALOGV("prepareDrm: ret=%d", ret);
+
+    return ret;
+}
+
+status_t MediaPlayer::releaseDrm()
+{
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == NULL) {
+        return NO_INIT;
+    }
+
+    // Not allowing releaseDrm in an active state
+    if (mCurrentState & (MEDIA_PLAYER_STARTED | MEDIA_PLAYER_PAUSED)) {
+        ALOGE("releaseDrm can not be called in the started/paused state.");
+        return INVALID_OPERATION;
+    }
+
+    status_t ret = mPlayer->releaseDrm();
+    ALOGV("releaseDrm: ret=%d", ret);
+
+    return ret;
+}
+
+status_t MediaPlayer::getKeyRequest(Vector<uint8_t> const& scope, String8 const& mimeType,
+                              DrmPlugin::KeyType keyType,
+                              KeyedVector<String8, String8>& optionalParameters,
+                              Vector<uint8_t>& request, String8& defaultUrl,
+                              DrmPlugin::KeyRequestType& keyRequestType)
+{
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == NULL) {
+        return NO_INIT;
+    }
+
+    // Not enforcing a particular state beyond the checks enforced by the Java layer
+    // Key exchange can happen after the start.
+    status_t ret = mPlayer->getKeyRequest(scope, mimeType, keyType, optionalParameters,
+                                     request, defaultUrl, keyRequestType);
+    ALOGV("getKeyRequest ret=%d  %d %s %d ", ret,
+          (int)request.size(), defaultUrl.string(), (int)keyRequestType);
+
+    return ret;
+}
+
+status_t MediaPlayer::provideKeyResponse(Vector<uint8_t>& releaseKeySetId,
+                              Vector<uint8_t>& response, Vector<uint8_t>& keySetId)
+{
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == NULL) {
+        return NO_INIT;
+    }
+
+    // Not enforcing a particular state beyond the checks enforced by the Java layer
+    // Key exchange can happen after the start.
+    status_t ret = mPlayer->provideKeyResponse(releaseKeySetId, response, keySetId);
+    ALOGV("provideKeyResponse: ret=%d", ret);
+
+    return ret;
+}
+
+status_t MediaPlayer::restoreKeys(Vector<uint8_t> const& keySetId)
+{
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == NULL) {
+        return NO_INIT;
+    }
+
+    // Not enforcing a particular state beyond the checks enforced by the Java layer
+    // Key exchange can happen after the start.
+    status_t ret = mPlayer->restoreKeys(keySetId);
+    ALOGV("restoreKeys: ret=%d", ret);
+
+    return ret;
+}
+
+status_t MediaPlayer::getDrmPropertyString(String8 const& name, String8& value)
+{
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == NULL) {
+        return NO_INIT;
+    }
+
+    // Not enforcing a particular state beyond the checks enforced by the Java layer
+    status_t ret = mPlayer->getDrmPropertyString(name, value);
+    ALOGV("getDrmPropertyString: ret=%d", ret);
+
+    return ret;
+}
+
+status_t MediaPlayer::setDrmPropertyString(String8 const& name, String8 const& value)
+{
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == NULL) {
+        return NO_INIT;
+    }
+
+    // Not enforcing a particular state beyond the checks enforced by the Java layer
+    status_t ret = mPlayer->setDrmPropertyString(name, value);
+    ALOGV("setDrmPropertyString: ret=%d", ret);
+
+    return ret;
 }
 
 } // namespace android

@@ -55,6 +55,7 @@ enum media_event_type {
     MEDIA_INFO              = 200,
     MEDIA_SUBTITLE_DATA     = 201,
     MEDIA_META_DATA         = 202,
+    MEDIA_DRM_INFO          = 210,
 };
 
 // Generic error codes for the media player framework.  Errors are fatal, the
@@ -260,6 +261,19 @@ public:
             status_t        getParameter(int key, Parcel* reply);
             status_t        setRetransmitEndpoint(const char* addrString, uint16_t port);
             status_t        setNextMediaPlayer(const sp<MediaPlayer>& player);
+            // ModDrm
+            status_t        prepareDrm(const uint8_t uuid[16], const int mode);
+            status_t        releaseDrm();
+            status_t        getKeyRequest(Vector<uint8_t> const& scope, String8 const& mimeType,
+                                    DrmPlugin::KeyType keyType,
+                                    KeyedVector<String8, String8>& optionalParameters,
+                                    Vector<uint8_t>& request, String8& defaultUrl,
+                                    DrmPlugin::KeyRequestType& keyRequestType);
+            status_t        provideKeyResponse(Vector<uint8_t>& releaseKeySetId,
+                                    Vector<uint8_t>& response, Vector<uint8_t>& keySetId);
+            status_t        restoreKeys(Vector<uint8_t> const& keySetId);
+            status_t        getDrmPropertyString(String8 const& name, String8& value);
+            status_t        setDrmPropertyString(String8 const& name, String8 const& value);
 
 private:
             void            clear_l();
