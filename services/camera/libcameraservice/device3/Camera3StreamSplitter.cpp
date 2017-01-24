@@ -37,10 +37,10 @@
 namespace android {
 
 status_t Camera3StreamSplitter::connect(const std::vector<sp<Surface> >& surfaces,
-                                           uint32_t consumerUsage, size_t hal_max_buffers,
-                                           sp<Surface>& consumer) {
-    if (consumer != nullptr) {
-        ALOGE("%s: output Surface is not NULL", __FUNCTION__);
+        uint32_t consumerUsage, size_t halMaxBuffers, sp<Surface>* consumer) {
+    ATRACE_CALL();
+    if (consumer == nullptr) {
+        SP_LOGE("%s: consumer pointer is NULL", __FUNCTION__);
         return BAD_VALUE;
     }
 
@@ -48,129 +48,147 @@ status_t Camera3StreamSplitter::connect(const std::vector<sp<Surface> >& surface
     status_t res = OK;
 
     if (mOutputs.size() > 0 || mConsumer != nullptr) {
-        ALOGE("%s: StreamSplitter already connected", __FUNCTION__);
+        SP_LOGE("%s: already connected", __FUNCTION__);
+        return BAD_VALUE;
+    }
+    if (mBuffers.size() > 0) {
+        SP_LOGE("%s: still has %zu pending buffers", __FUNCTION__, mBuffers.size());
         return BAD_VALUE;
     }
 
+    mMaxHalBuffers = halMaxBuffers;
+    mConsumerName = getUniqueConsumerName();
     // Add output surfaces. This has to be before creating internal buffer queue
     // in order to get max consumer side buffers.
     for (size_t i = 0; i < surfaces.size(); i++) {
         if (surfaces[i] == nullptr) {
-            ALOGE("%s: Fatal: surface is NULL", __FUNCTION__);
+            SP_LOGE("%s: Fatal: surface is NULL", __FUNCTION__);
             return BAD_VALUE;
         }
-        res = addOutputLocked(surfaces[i], hal_max_buffers, OutputType::NonDeferred);
+        res = addOutputLocked(surfaces[i]);
         if (res != OK) {
-            ALOGE("%s: Failed to add output surface: %s(%d)",
+            SP_LOGE("%s: Failed to add output surface: %s(%d)",
                     __FUNCTION__, strerror(-res), res);
             return res;
         }
     }
 
-    // Create buffer queue for input
+    // Create BufferQueue for input
     BufferQueue::createBufferQueue(&mProducer, &mConsumer);
 
+    // Allocate 1 extra buffer to handle the case where all buffers are detached
+    // from input, and attached to the outputs. In this case, the input queue's
+    // dequeueBuffer can still allocate 1 extra buffer before being blocked by
+    // the output's attachBuffer().
     mBufferItemConsumer = new BufferItemConsumer(mConsumer, consumerUsage,
-                                                 mMaxConsumerBuffers);
+                                                 mMaxConsumerBuffers+1);
     if (mBufferItemConsumer == nullptr) {
         return NO_MEMORY;
     }
-    mConsumer->setConsumerName(getUniqueConsumerName());
+    mConsumer->setConsumerName(mConsumerName);
 
-    mSurface = new Surface(mProducer);
-    if (mSurface == nullptr) {
+    *consumer = new Surface(mProducer);
+    if (*consumer == nullptr) {
         return NO_MEMORY;
     }
-    consumer = mSurface;
 
     res = mConsumer->consumerConnect(this, /* controlledByApp */ false);
 
+    SP_LOGV("%s: connected", __FUNCTION__);
     return res;
 }
 
+status_t Camera3StreamSplitter::getOnFrameAvailableResult() {
+    ATRACE_CALL();
+    return mOnFrameAvailableRes.load();
+}
+
 void Camera3StreamSplitter::disconnect() {
+    ATRACE_CALL();
     Mutex::Autolock lock(mMutex);
+
+    for (auto& notifier : mNotifiers) {
+        sp<IGraphicBufferProducer> producer = notifier.first;
+        sp<OutputListener> listener = notifier.second;
+        IInterface::asBinder(producer)->unlinkToDeath(listener);
+    }
+    mNotifiers.clear();
 
     for (auto& output : mOutputs) {
         output->disconnect(NATIVE_WINDOW_API_CAMERA);
     }
     mOutputs.clear();
+    mOutputSlots.clear();
 
-    if (mConsumer != nullptr) {
-        mConsumer->consumerDisconnect();
-        mConsumer.clear();
-    }
+    mConsumer->consumerDisconnect();
 
     if (mBuffers.size() > 0) {
-        ALOGI("%zu buffers still being tracked", mBuffers.size());
+        SP_LOGW("%zu buffers still being tracked", mBuffers.size());
+        mBuffers.clear();
     }
+
+    mMaxHalBuffers = 0;
+    mMaxConsumerBuffers = 0;
+    SP_LOGV("%s: Disconnected", __FUNCTION__);
 }
+
 
 Camera3StreamSplitter::~Camera3StreamSplitter() {
     disconnect();
 }
 
-status_t Camera3StreamSplitter::addOutput(
-        const sp<Surface>& outputQueue, size_t hal_max_buffers) {
+status_t Camera3StreamSplitter::addOutput(const sp<Surface>& outputQueue) {
+    ATRACE_CALL();
     Mutex::Autolock lock(mMutex);
-    return addOutputLocked(outputQueue, hal_max_buffers, OutputType::Deferred);
+    status_t res = addOutputLocked(outputQueue);
+
+    if (res != OK) {
+        SP_LOGE("%s: addOutputLocked failed %d", __FUNCTION__, res);
+        return res;
+    }
+
+    res = mConsumer->setMaxAcquiredBufferCount(mMaxConsumerBuffers+1);
+
+    return res;
 }
 
-status_t Camera3StreamSplitter::addOutputLocked(
-        const sp<Surface>& outputQueue, size_t hal_max_buffers,
-        OutputType outputType) {
+status_t Camera3StreamSplitter::addOutputLocked(const sp<Surface>& outputQueue) {
+    ATRACE_CALL();
     if (outputQueue == nullptr) {
-        ALOGE("addOutput: outputQueue must not be NULL");
-        return BAD_VALUE;
-    }
-    if (hal_max_buffers < 1) {
-        ALOGE("%s: Camera HAL requested max_buffer count: %zu, requires at least 1",
-                __FUNCTION__, hal_max_buffers);
+        SP_LOGE("addOutput: outputQueue must not be NULL");
         return BAD_VALUE;
     }
 
     sp<IGraphicBufferProducer> gbp = outputQueue->getIGraphicBufferProducer();
     // Connect to the buffer producer
-    IGraphicBufferProducer::QueueBufferOutput queueBufferOutput;
     sp<OutputListener> listener(new OutputListener(this, gbp));
     IInterface::asBinder(gbp)->linkToDeath(listener);
-    status_t status = gbp->connect(listener, NATIVE_WINDOW_API_CAMERA,
-            /* producerControlledByApp */ true, &queueBufferOutput);
-    if (status != NO_ERROR) {
-        ALOGE("addOutput: failed to connect (%d)", status);
-       return status;
+    status_t res = outputQueue->connect(NATIVE_WINDOW_API_CAMERA, listener);
+    if (res != NO_ERROR) {
+        SP_LOGE("addOutput: failed to connect (%d)", res);
+        return res;
     }
 
     // Query consumer side buffer count, and update overall buffer count
     int maxConsumerBuffers = 0;
-    status = static_cast<ANativeWindow*>(outputQueue.get())->query(
+    res = static_cast<ANativeWindow*>(outputQueue.get())->query(
             outputQueue.get(),
             NATIVE_WINDOW_MIN_UNDEQUEUED_BUFFERS, &maxConsumerBuffers);
-    if (status != OK) {
-        ALOGE("%s: Unable to query consumer undequeued buffer count"
+    if (res != OK) {
+        SP_LOGE("%s: Unable to query consumer undequeued buffer count"
               " for surface", __FUNCTION__);
-        return status;
+        return res;
     }
 
-    if (maxConsumerBuffers > mMaxConsumerBuffers) {
-        if (outputType == OutputType::Deferred) {
-            ALOGE("%s: Fatal: Deferred surface has higher consumer buffer count"
-                  " %d than what's already configured %d", __FUNCTION__,
-                  maxConsumerBuffers, mMaxConsumerBuffers);
-            return BAD_VALUE;
-        }
-        mMaxConsumerBuffers = maxConsumerBuffers;
-    }
-
-    ALOGV("%s: Consumer wants %d buffers, HAL wants %zu", __FUNCTION__,
-            maxConsumerBuffers, hal_max_buffers);
-    size_t totalBufferCount = maxConsumerBuffers + hal_max_buffers;
-    status = native_window_set_buffer_count(outputQueue.get(),
+    SP_LOGV("%s: Consumer wants %d buffers, Producer wants %zu", __FUNCTION__,
+            maxConsumerBuffers, mMaxHalBuffers);
+    size_t totalBufferCount = maxConsumerBuffers + mMaxHalBuffers;
+    res = native_window_set_buffer_count(outputQueue.get(),
             totalBufferCount);
-    if (status != OK) {
-        ALOGE("%s: Unable to set buffer count for surface %p",
+    if (res != OK) {
+        SP_LOGE("%s: Unable to set buffer count for surface %p",
                 __FUNCTION__, outputQueue.get());
-        return status;
+        return res;
     }
 
     // Set dequeueBuffer/attachBuffer timeout if the consumer is not hw composer or hw texture.
@@ -183,15 +201,67 @@ status_t Camera3StreamSplitter::addOutputLocked(
         outputQueue->setDequeueTimeout(kDequeueBufferTimeout);
     }
 
-    status = gbp->allowAllocation(false);
-    if (status != OK) {
-        ALOGE("%s: Failed to turn off allocation for outputQueue", __FUNCTION__);
-        return status;
+    res = gbp->allowAllocation(false);
+    if (res != OK) {
+        SP_LOGE("%s: Failed to turn off allocation for outputQueue", __FUNCTION__);
+        return res;
     }
 
     // Add new entry into mOutputs
     mOutputs.push_back(gbp);
+    mNotifiers[gbp] = listener;
+    mOutputSlots[gbp] = std::make_unique<OutputSlots>(totalBufferCount);
+
+    mMaxConsumerBuffers += maxConsumerBuffers;
     return NO_ERROR;
+}
+
+status_t Camera3StreamSplitter::outputBufferLocked(const sp<IGraphicBufferProducer>& output,
+        const BufferItem& bufferItem) {
+    ATRACE_CALL();
+    status_t res;
+    IGraphicBufferProducer::QueueBufferInput queueInput(
+            bufferItem.mTimestamp, bufferItem.mIsAutoTimestamp,
+            bufferItem.mDataSpace, bufferItem.mCrop,
+            static_cast<int32_t>(bufferItem.mScalingMode),
+            bufferItem.mTransform, bufferItem.mFence);
+
+    IGraphicBufferProducer::QueueBufferOutput queueOutput;
+
+    uint64_t bufferId = bufferItem.mGraphicBuffer->getId();
+    const BufferTracker& tracker = *(mBuffers[bufferId]);
+    int slot = getSlotForOutputLocked(output, tracker.getBuffer());
+
+    // In case the output BufferQueue has its own lock, if we hold splitter lock while calling
+    // queueBuffer (which will try to acquire the output lock), the output could be holding its
+    // own lock calling releaseBuffer (which  will try to acquire the splitter lock), running into
+    // circular lock situation.
+    mMutex.unlock();
+    res = output->queueBuffer(slot, queueInput, &queueOutput);
+    mMutex.lock();
+
+    SP_LOGV("%s: Queuing buffer to buffer queue %p slot %d returns %d",
+            __FUNCTION__, output.get(), slot, res);
+    if (res != OK) {
+        if (res != NO_INIT && res != DEAD_OBJECT) {
+            SP_LOGE("Queuing buffer to output failed (%d)", res);
+        }
+        // If we just discovered that this output has been abandoned, note
+        // that, increment the release count so that we still release this
+        // buffer eventually, and move on to the next output
+        onAbandonedLocked();
+        decrementBufRefCountLocked(bufferItem.mGraphicBuffer->getId(), output);
+        return res;
+    }
+
+    // If the queued buffer replaces a pending buffer in the async
+    // queue, no onBufferReleased is called by the buffer queue.
+    // Proactively trigger the callback to avoid buffer loss.
+    if (queueOutput.bufferReplaced) {
+        onBufferReleasedByOutputLocked(output);
+    }
+
+    return res;
 }
 
 String8 Camera3StreamSplitter::getUniqueConsumerName() {
@@ -199,141 +269,171 @@ String8 Camera3StreamSplitter::getUniqueConsumerName() {
     return String8::format("Camera3StreamSplitter-%d", android_atomic_inc(&counter));
 }
 
-status_t Camera3StreamSplitter::notifyRequestedSurfaces(
-        const std::vector<size_t>& surfaces) {
+status_t Camera3StreamSplitter::notifyBufferReleased(const sp<GraphicBuffer>& buffer) {
     ATRACE_CALL();
+    status_t res = OK;
+
     Mutex::Autolock lock(mMutex);
 
-    mRequestedSurfaces.push_back(surfaces);
-    return OK;
-}
+    uint64_t bufferId = buffer->getId();
+    std::unique_ptr<BufferTracker> tracker_ptr = std::move(mBuffers[bufferId]);
+    mBuffers.erase(bufferId);
 
-
-void Camera3StreamSplitter::onFrameAvailable(const BufferItem& /* item */) {
-    ATRACE_CALL();
-    Mutex::Autolock lock(mMutex);
-
-    // The current policy is that if any one consumer is consuming buffers too
-    // slowly, the splitter will stall the rest of the outputs by not acquiring
-    // any more buffers from the input. This will cause back pressure on the
-    // input queue, slowing down its producer.
-
-    // If there are too many outstanding buffers, we block until a buffer is
-    // released back to the input in onBufferReleased
-    while (mOutstandingBuffers >= mMaxConsumerBuffers) {
-        mReleaseCondition.wait(mMutex);
-
-        // If the splitter is abandoned while we are waiting, the release
-        // condition variable will be broadcast, and we should just return
-        // without attempting to do anything more (since the input queue will
-        // also be abandoned).
-        if (mIsAbandoned) {
-            return;
+    for (const auto surface : tracker_ptr->requestedSurfaces()) {
+        sp<IGraphicBufferProducer>& gbp = mOutputs[surface];
+        OutputSlots& outputSlots = *(mOutputSlots[gbp]);
+        int slot = getSlotForOutputLocked(gbp, buffer);
+        if (slot != BufferItem::INVALID_BUFFER_SLOT) {
+             gbp->detachBuffer(slot);
+             outputSlots[slot].clear();
         }
     }
-    // If the splitter is abandoned without reaching mMaxConsumerBuffers, just
-    // return without attempting to do anything more.
-    if (mIsAbandoned) {
-        return;
+
+    return res;
+}
+
+status_t Camera3StreamSplitter::attachBufferToOutputs(ANativeWindowBuffer* anb,
+        const std::vector<size_t>& surface_ids) {
+    ATRACE_CALL();
+    status_t res = OK;
+
+    Mutex::Autolock lock(mMutex);
+
+    sp<GraphicBuffer> gb(static_cast<GraphicBuffer*>(anb));
+    uint64_t bufferId = gb->getId();
+
+    // Initialize buffer tracker for this input buffer
+    auto tracker = std::make_unique<BufferTracker>(gb, surface_ids);
+
+    for (auto& surface_id : surface_ids) {
+        sp<IGraphicBufferProducer>& gbp = mOutputs[surface_id];
+        int slot = BufferItem::INVALID_BUFFER_SLOT;
+        //Temporarly Unlock the mutex when trying to attachBuffer to the output
+        //queue, because attachBuffer could block in case of a slow consumer. If
+        //we block while holding the lock, onFrameAvailable and onBufferReleased
+        //will block as well because they need to acquire the same lock.
+        mMutex.unlock();
+        res = gbp->attachBuffer(&slot, gb);
+        mMutex.lock();
+        if (res != OK) {
+            SP_LOGE("%s: Cannot acquireBuffer from GraphicBufferProducer %p: %s (%d)",
+                    __FUNCTION__, gbp.get(), strerror(-res), res);
+            return res;
+        }
+        auto& outputSlots = *mOutputSlots[gbp];
+        if (outputSlots[slot] != nullptr) {
+            // If the buffer is attached to a slot which already contains a buffer,
+            // the previous buffer will be removed from the output queue. Decrement
+            // the reference count accordingly.
+            decrementBufRefCountLocked(outputSlots[slot]->getId(), gbp);
+        }
+        SP_LOGV("%s: Attached buffer %p to slot %d on output %p.",__FUNCTION__, gb.get(),
+                slot, gbp.get());
+        outputSlots[slot] = gb;
     }
 
-    ++mOutstandingBuffers;
+    mBuffers[bufferId] = std::move(tracker);
+
+    return res;
+}
+
+void Camera3StreamSplitter::onFrameAvailable(const BufferItem& /*item*/) {
+    ATRACE_CALL();
+    Mutex::Autolock lock(mMutex);
 
     // Acquire and detach the buffer from the input
     BufferItem bufferItem;
-    status_t status = mConsumer->acquireBuffer(&bufferItem, /* presentWhen */ 0);
-    LOG_ALWAYS_FATAL_IF(status != NO_ERROR,
-            "acquiring buffer from input failed (%d)", status);
+    status_t res = mConsumer->acquireBuffer(&bufferItem, /* presentWhen */ 0);
+    if (res != NO_ERROR) {
+        SP_LOGE("%s: Acquiring buffer from input failed (%d)", __FUNCTION__, res);
+        mOnFrameAvailableRes.store(res);
+        return;
+    }
+    if (mBuffers.find(bufferItem.mGraphicBuffer->getId()) == mBuffers.end()) {
+        SP_LOGE("%s: Acquired buffer doesn't exist in attached buffer map",
+                __FUNCTION__);
+        mOnFrameAvailableRes.store(INVALID_OPERATION);
+        return;
+    }
 
-    ALOGV("acquired buffer %#" PRIx64 " from input",
-            bufferItem.mGraphicBuffer->getId());
+    SP_LOGV("acquired buffer %" PRId64 " from input at slot %d",
+            bufferItem.mGraphicBuffer->getId(), bufferItem.mSlot);
 
-    status = mConsumer->detachBuffer(bufferItem.mSlot);
-    LOG_ALWAYS_FATAL_IF(status != NO_ERROR,
-            "detaching buffer from input failed (%d)", status);
-
-    IGraphicBufferProducer::QueueBufferInput queueInput(
-            bufferItem.mTimestamp, bufferItem.mIsAutoTimestamp,
-            bufferItem.mDataSpace, bufferItem.mCrop,
-            static_cast<int32_t>(bufferItem.mScalingMode),
-            bufferItem.mTransform, bufferItem.mFence);
+    res = mConsumer->detachBuffer(bufferItem.mSlot);
+    if (res != NO_ERROR) {
+        SP_LOGE("%s: detaching buffer from input failed (%d)", __FUNCTION__, res);
+        mOnFrameAvailableRes.store(res);
+        return;
+    }
 
     // Attach and queue the buffer to each of the outputs
-    std::vector<std::vector<size_t> >::iterator surfaces = mRequestedSurfaces.begin();
-    if (surfaces != mRequestedSurfaces.end()) {
+    BufferTracker& tracker = *(mBuffers[bufferItem.mGraphicBuffer->getId()]);
 
-        LOG_ALWAYS_FATAL_IF(surfaces->size() == 0,
-                "requested surface ids shouldn't be empty");
+    SP_LOGV("%s: BufferTracker for buffer %" PRId64 ", number of requests %zu",
+           __FUNCTION__, bufferItem.mGraphicBuffer->getId(), tracker.requestedSurfaces().size());
+    for (const auto id : tracker.requestedSurfaces()) {
 
-        // Initialize our reference count for this buffer
-        mBuffers[bufferItem.mGraphicBuffer->getId()] =
-                std::unique_ptr<BufferTracker>(
-                new BufferTracker(bufferItem.mGraphicBuffer, surfaces->size()));
+        LOG_ALWAYS_FATAL_IF(id >= mOutputs.size(),
+                "requested surface id exceeding max registered ids");
 
-        for (auto id : *surfaces) {
-
-            LOG_ALWAYS_FATAL_IF(id >= mOutputs.size(),
-                    "requested surface id exceeding max registered ids");
-
-            int slot = BufferItem::INVALID_BUFFER_SLOT;
-            status = mOutputs[id]->attachBuffer(&slot, bufferItem.mGraphicBuffer);
-            if (status == NO_INIT) {
-                // If we just discovered that this output has been abandoned, note
-                // that, decrement the reference count so that we still release this
-                // buffer eventually, and move on to the next output
-                onAbandonedLocked();
-                mBuffers[bufferItem.mGraphicBuffer->getId()]->
-                        decrementReferenceCountLocked();
-                continue;
-            } else if (status == WOULD_BLOCK) {
-                // If the output is async, attachBuffer may return WOULD_BLOCK
-                // indicating number of dequeued buffers has reached limit. In
-                // this case, simply decrement the reference count, and move on
-                // to the next output.
-                // TODO: Do we need to report BUFFER_ERROR for this result?
-                mBuffers[bufferItem.mGraphicBuffer->getId()]->
-                        decrementReferenceCountLocked();
-                continue;
-            } else if (status == TIMED_OUT) {
-                // If attachBuffer times out due to the value set by
-                // setDequeueTimeout, simply decrement the reference count, and
-                // move on to the next output.
-                // TODO: Do we need to report BUFFER_ERROR for this result?
-                mBuffers[bufferItem.mGraphicBuffer->getId()]->
-                        decrementReferenceCountLocked();
-                continue;
-            } else {
-                LOG_ALWAYS_FATAL_IF(status != NO_ERROR,
-                        "attaching buffer to output failed (%d)", status);
-            }
-
-            IGraphicBufferProducer::QueueBufferOutput queueOutput;
-            status = mOutputs[id]->queueBuffer(slot, queueInput, &queueOutput);
-            if (status == NO_INIT) {
-                // If we just discovered that this output has been abandoned, note
-                // that, increment the release count so that we still release this
-                // buffer eventually, and move on to the next output
-                onAbandonedLocked();
-                mBuffers[bufferItem.mGraphicBuffer->getId()]->
-                        decrementReferenceCountLocked();
-                continue;
-            } else {
-                LOG_ALWAYS_FATAL_IF(status != NO_ERROR,
-                        "queueing buffer to output failed (%d)", status);
-            }
-
-            // If the queued buffer replaces a pending buffer in the async
-            // queue, no onBufferReleased is called by the buffer queue.
-            // Proactively trigger the callback to avoid buffer loss.
-            if (queueOutput.bufferReplaced) {
-                onBufferReleasedByOutputLocked(mOutputs[id]);
-            }
-
-            ALOGV("queued buffer %#" PRIx64 " to output %p",
-                    bufferItem.mGraphicBuffer->getId(), mOutputs[id].get());
+        res = outputBufferLocked(mOutputs[id], bufferItem);
+        if (res != OK) {
+            SP_LOGE("%s: outputBufferLocked failed %d", __FUNCTION__, res);
+            mOnFrameAvailableRes.store(res);
+            // If we fail to send buffer to certain output, keep sending to
+            // other outputs.
+            continue;
         }
+    }
 
-        mRequestedSurfaces.erase(surfaces);
+    mOnFrameAvailableRes.store(res);
+}
+
+void Camera3StreamSplitter::decrementBufRefCountLocked(uint64_t id,
+        const sp<IGraphicBufferProducer>& from) {
+    ATRACE_CALL();
+    size_t referenceCount = mBuffers[id]->decrementReferenceCountLocked();
+
+    removeSlotForOutputLocked(from, mBuffers[id]->getBuffer());
+    if (referenceCount > 0) {
+        return;
+    }
+
+    // We no longer need to track the buffer now that it is being returned to the
+    // input. Note that this should happen before we unlock the mutex and call
+    // releaseBuffer, to avoid the case where the same bufferId is acquired in
+    // attachBufferToOutputs resulting in a new BufferTracker with same bufferId
+    // overwrites the current one.
+    std::unique_ptr<BufferTracker> tracker_ptr = std::move(mBuffers[id]);
+    mBuffers.erase(id);
+
+    // Attach and release the buffer back to the input
+    int consumerSlot = BufferItem::INVALID_BUFFER_SLOT;
+    status_t res = mConsumer->attachBuffer(&consumerSlot, tracker_ptr->getBuffer());
+    if (res != NO_ERROR) {
+        SP_LOGE("%s: attaching buffer to input failed (%d)", __FUNCTION__, res);
+        return;
+    }
+
+    // Temporarily unlock mutex to avoid circular lock:
+    // 1. This function holds splitter lock, calls releaseBuffer which triggers
+    // onBufferReleased in Camera3OutputStream. onBufferReleased waits on the
+    // OutputStream lock
+    // 2. Camera3SharedOutputStream::getBufferLocked calls
+    // attachBufferToOutputs, which holds the stream lock, and waits for the
+    // splitter lock.
+    sp<IGraphicBufferConsumer> consumer(mConsumer);
+    mMutex.unlock();
+    if (consumer != nullptr) {
+        res = consumer->releaseBuffer(consumerSlot, /* frameNumber */ 0,
+                EGL_NO_DISPLAY, EGL_NO_SYNC_KHR, tracker_ptr->getMergedFence());
+    } else {
+        SP_LOGE("%s: consumer has become null!", __FUNCTION__);
+    }
+    mMutex.lock();
+    // If the producer of this queue is disconnected, -22 error will occur
+    if (res != NO_ERROR) {
+        SP_LOGE("%s: releaseBuffer returns %d", __FUNCTION__, res);
     }
 }
 
@@ -347,73 +447,79 @@ void Camera3StreamSplitter::onBufferReleasedByOutput(
 
 void Camera3StreamSplitter::onBufferReleasedByOutputLocked(
         const sp<IGraphicBufferProducer>& from) {
-
+    ATRACE_CALL();
     sp<GraphicBuffer> buffer;
     sp<Fence> fence;
-    status_t status = from->detachNextBuffer(&buffer, &fence);
-    if (status == NO_INIT) {
+    status_t res = from->detachNextBuffer(&buffer, &fence);
+    if (res == NO_INIT) {
         // If we just discovered that this output has been abandoned, note that,
         // but we can't do anything else, since buffer is invalid
         onAbandonedLocked();
         return;
+    } else if (res == NO_MEMORY) {
+        SP_LOGV("%s: No free buffers", __FUNCTION__);
+        return;
     } else {
-        LOG_ALWAYS_FATAL_IF(status != NO_ERROR,
-                "detaching buffer from output failed (%d)", status);
+        LOG_ALWAYS_FATAL_IF(res != NO_ERROR,
+                "detaching buffer from output failed (%d)", res);
     }
-
-    ALOGV("detached buffer %#" PRIx64 " from output %p",
-          buffer->getId(), from.get());
 
     BufferTracker& tracker = *(mBuffers[buffer->getId()]);
-
     // Merge the release fence of the incoming buffer so that the fence we send
     // back to the input includes all of the outputs' fences
-    tracker.mergeFence(fence);
+    if (fence != nullptr && fence->isValid()) {
+        tracker.mergeFence(fence);
+    }
+    SP_LOGV("detached buffer %" PRId64 " %p from output %p",
+            buffer->getId(), buffer.get(), from.get());
 
     // Check to see if this is the last outstanding reference to this buffer
-    size_t referenceCount = tracker.decrementReferenceCountLocked();
-    ALOGV("buffer %#" PRIx64 " reference count %zu", buffer->getId(),
-            referenceCount);
-    if (referenceCount > 0) {
-        return;
-    }
-
-    // If we've been abandoned, we can't return the buffer to the input, so just
-    // stop tracking it and move on
-    if (mIsAbandoned) {
-        mBuffers.erase(buffer->getId());
-        return;
-    }
-
-    // Attach and release the buffer back to the input
-    int consumerSlot = BufferItem::INVALID_BUFFER_SLOT;
-    status = mConsumer->attachBuffer(&consumerSlot, tracker.getBuffer());
-    LOG_ALWAYS_FATAL_IF(status != NO_ERROR,
-            "attaching buffer to input failed (%d)", status);
-
-    status = mConsumer->releaseBuffer(consumerSlot, /* frameNumber */ 0,
-            EGL_NO_DISPLAY, EGL_NO_SYNC_KHR, tracker.getMergedFence());
-    LOG_ALWAYS_FATAL_IF(status != NO_ERROR,
-            "releasing buffer to input failed (%d)", status);
-
-    ALOGV("released buffer %#" PRIx64 " to input", buffer->getId());
-
-    // We no longer need to track the buffer once it has been returned to the
-    // input
-    mBuffers.erase(buffer->getId());
-
-    // Notify any waiting onFrameAvailable calls
-    --mOutstandingBuffers;
-    mReleaseCondition.signal();
+    decrementBufRefCountLocked(buffer->getId(), from);
 }
 
 void Camera3StreamSplitter::onAbandonedLocked() {
-    ALOGE("one of my outputs has abandoned me");
-    if (!mIsAbandoned && mConsumer != nullptr) {
-        mConsumer->consumerDisconnect();
+    // If this is called from binderDied callback, it means the app process
+    // holding the binder has died. CameraService will be notified of the binder
+    // death, and camera device will be closed, which in turn calls
+    // disconnect().
+    //
+    // If this is called from onBufferReleasedByOutput or onFrameAvailable, one
+    // consumer being abanoned shouldn't impact the other consumer. So we won't
+    // stop the buffer flow.
+    //
+    // In both cases, we don't need to do anything here.
+    SP_LOGV("One of my outputs has abandoned me");
+}
+
+int Camera3StreamSplitter::getSlotForOutputLocked(const sp<IGraphicBufferProducer>& gbp,
+        const sp<GraphicBuffer>& gb) {
+    auto& outputSlots = *mOutputSlots[gbp];
+
+    for (size_t i = 0; i < outputSlots.size(); i++) {
+        if (outputSlots[i] == gb) {
+            return (int)i;
+        }
     }
-    mIsAbandoned = true;
-    mReleaseCondition.broadcast();
+
+    SP_LOGE("%s: Cannot find slot for gb %p on output %p", __FUNCTION__, gb.get(),
+            gbp.get());
+    return BufferItem::INVALID_BUFFER_SLOT;
+}
+
+status_t Camera3StreamSplitter::removeSlotForOutputLocked(const sp<IGraphicBufferProducer>& gbp,
+        const sp<GraphicBuffer>& gb) {
+    auto& outputSlots = *mOutputSlots[gbp];
+
+    for (size_t i = 0; i < outputSlots.size(); i++) {
+        if (outputSlots[i] == gb) {
+           outputSlots[i].clear();
+           return NO_ERROR;
+        }
+    }
+
+    SP_LOGE("%s: Cannot find slot for gb %p on output %p", __FUNCTION__, gb.get(),
+            gbp.get());
+    return BAD_VALUE;
 }
 
 Camera3StreamSplitter::OutputListener::OutputListener(
@@ -422,6 +528,7 @@ Camera3StreamSplitter::OutputListener::OutputListener(
       : mSplitter(splitter), mOutput(output) {}
 
 void Camera3StreamSplitter::OutputListener::onBufferReleased() {
+    ATRACE_CALL();
     sp<Camera3StreamSplitter> splitter = mSplitter.promote();
     sp<IGraphicBufferProducer> output = mOutput.promote();
     if (splitter != nullptr && output != nullptr) {
@@ -438,9 +545,9 @@ void Camera3StreamSplitter::OutputListener::binderDied(const wp<IBinder>& /* who
 }
 
 Camera3StreamSplitter::BufferTracker::BufferTracker(
-        const sp<GraphicBuffer>& buffer, size_t referenceCount)
-      : mBuffer(buffer), mMergedFence(Fence::NO_FENCE),
-        mReferenceCount(referenceCount) {}
+        const sp<GraphicBuffer>& buffer, const std::vector<size_t>& requestedSurfaces)
+      : mBuffer(buffer), mMergedFence(Fence::NO_FENCE), mRequestedSurfaces(requestedSurfaces),
+        mReferenceCount(requestedSurfaces.size()) {}
 
 void Camera3StreamSplitter::BufferTracker::mergeFence(const sp<Fence>& with) {
     mMergedFence = Fence::merge(String8("Camera3StreamSplitter"), mMergedFence, with);

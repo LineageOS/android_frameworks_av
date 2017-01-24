@@ -56,9 +56,6 @@ class Camera3DummyStream :
 
     virtual status_t detachBuffer(sp<GraphicBuffer>* buffer, int* fenceFd);
 
-    virtual status_t notifyRequestedSurfaces(uint32_t frame_number,
-            const std::vector<size_t>& surface_ids);
-
     /**
      * Return if this output stream is for video encoding.
      */
@@ -102,7 +99,8 @@ class Camera3DummyStream :
     /**
      * Internal Camera3Stream interface
      */
-    virtual status_t getBufferLocked(camera3_stream_buffer *buffer);
+    virtual status_t getBufferLocked(camera3_stream_buffer *buffer,
+            const std::vector<size_t>& surface_ids = std::vector<size_t>());
     virtual status_t returnBufferLocked(
             const camera3_stream_buffer &buffer,
             nsecs_t timestamp);

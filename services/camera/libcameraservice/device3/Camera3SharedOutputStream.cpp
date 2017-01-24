@@ -44,7 +44,7 @@ status_t Camera3SharedOutputStream::connectStreamSplitterLocked() {
     uint32_t usage;
     getEndpointUsage(&usage);
 
-    res = mStreamSplitter->connect(mSurfaces, usage, camera3_stream::max_buffers, mConsumer);
+    res = mStreamSplitter->connect(mSurfaces, usage, camera3_stream::max_buffers, &mConsumer);
     if (res != OK) {
         ALOGE("%s: Failed to connect to stream splitter: %s(%d)",
                 __FUNCTION__, strerror(-res), res);
@@ -54,13 +54,13 @@ status_t Camera3SharedOutputStream::connectStreamSplitterLocked() {
     return res;
 }
 
-status_t Camera3SharedOutputStream::notifyRequestedSurfaces(uint32_t /*frame_number*/,
-        const std::vector<size_t>& surface_ids) {
+status_t Camera3SharedOutputStream::notifyBufferReleased(ANativeWindowBuffer *anwBuffer) {
     Mutex::Autolock l(mLock);
     status_t res = OK;
+    const sp<GraphicBuffer> buffer(static_cast<GraphicBuffer*>(anwBuffer));
 
     if (mStreamSplitter != nullptr) {
-        res = mStreamSplitter->notifyRequestedSurfaces(surface_ids);
+        res = mStreamSplitter->notifyBufferReleased(buffer);
     }
 
     return res;
@@ -72,6 +72,7 @@ bool Camera3SharedOutputStream::isConsumerConfigurationDeferred(size_t surface_i
 }
 
 status_t Camera3SharedOutputStream::setConsumers(const std::vector<sp<Surface>>& surfaces) {
+    Mutex::Autolock l(mLock);
     if (surfaces.size() == 0) {
         ALOGE("%s: it's illegal to set zero consumer surfaces!", __FUNCTION__);
         return INVALID_OPERATION;
@@ -88,7 +89,7 @@ status_t Camera3SharedOutputStream::setConsumers(const std::vector<sp<Surface>>&
 
         // Only call addOutput if the splitter has been connected.
         if (mStreamSplitter != nullptr) {
-            ret = mStreamSplitter->addOutput(surface, camera3_stream::max_buffers);
+            ret = mStreamSplitter->addOutput(surface);
             if (ret != OK) {
                 ALOGE("%s: addOutput failed with error code %d", __FUNCTION__, ret);
                 return ret;
@@ -97,6 +98,64 @@ status_t Camera3SharedOutputStream::setConsumers(const std::vector<sp<Surface>>&
         }
     }
     return ret;
+}
+
+status_t Camera3SharedOutputStream::getBufferLocked(camera3_stream_buffer *buffer,
+        const std::vector<size_t>& surface_ids) {
+    ANativeWindowBuffer* anb;
+    int fenceFd = -1;
+
+    status_t res;
+    res = getBufferLockedCommon(&anb, &fenceFd);
+    if (res != OK) {
+        return res;
+    }
+
+    // Attach the buffer to the splitter output queues. This could block if
+    // the output queue doesn't have any empty slot. So unlock during the course
+    // of attachBufferToOutputs.
+    sp<Camera3StreamSplitter> splitter = mStreamSplitter;
+    mLock.unlock();
+    res = splitter->attachBufferToOutputs(anb, surface_ids);
+    mLock.lock();
+    if (res != OK) {
+        ALOGE("%s: Stream %d: Cannot attach stream splitter buffer to outputs: %s (%d)",
+                __FUNCTION__, mId, strerror(-res), res);
+        // Only transition to STATE_ABANDONED from STATE_CONFIGURED. (If it is STATE_PREPARING,
+        // let prepareNextBuffer handle the error.)
+        if (res == NO_INIT && mState == STATE_CONFIGURED) {
+            mState = STATE_ABANDONED;
+        }
+
+        return res;
+    }
+
+    /**
+     * FenceFD now owned by HAL except in case of error,
+     * in which case we reassign it to acquire_fence
+     */
+    handoutBufferLocked(*buffer, &(anb->handle), /*acquireFence*/fenceFd,
+                        /*releaseFence*/-1, CAMERA3_BUFFER_STATUS_OK, /*output*/true);
+
+    return OK;
+}
+
+status_t Camera3SharedOutputStream::queueBufferToConsumer(sp<ANativeWindow>& consumer,
+            ANativeWindowBuffer* buffer, int anwReleaseFence) {
+    status_t res = consumer->queueBuffer(consumer.get(), buffer, anwReleaseFence);
+
+    // After queuing buffer to the internal consumer queue, check whether the buffer is
+    // successfully queued to the output queues.
+    if (res == OK) {
+        res = mStreamSplitter->getOnFrameAvailableResult();
+        if (res != OK) {
+            ALOGE("%s: getOnFrameAvailable returns %d", __FUNCTION__, res);
+        }
+    } else {
+        ALOGE("%s: queueBufer failed %d", __FUNCTION__, res);
+    }
+
+    return res;
 }
 
 status_t Camera3SharedOutputStream::configureQueueLocked() {

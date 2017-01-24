@@ -443,7 +443,8 @@ status_t Camera3Stream::tearDown() {
     return OK;
 }
 
-status_t Camera3Stream::getBuffer(camera3_stream_buffer *buffer) {
+status_t Camera3Stream::getBuffer(camera3_stream_buffer *buffer,
+        const std::vector<size_t>& surface_ids) {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);
     status_t res = OK;
@@ -470,7 +471,7 @@ status_t Camera3Stream::getBuffer(camera3_stream_buffer *buffer) {
         }
     }
 
-    res = getBufferLocked(buffer);
+    res = getBufferLocked(buffer, surface_ids);
     if (res == OK) {
         fireBufferListenersLocked(*buffer, /*acquired*/true, /*output*/true);
         if (buffer->buffer) {
@@ -745,7 +746,8 @@ status_t Camera3Stream::registerBuffersLocked(camera3_device *hal3Device) {
     return res;
 }
 
-status_t Camera3Stream::getBufferLocked(camera3_stream_buffer *) {
+status_t Camera3Stream::getBufferLocked(camera3_stream_buffer *,
+        const std::vector<size_t>&) {
     ALOGE("%s: This type of stream does not support output", __FUNCTION__);
     return INVALID_OPERATION;
 }

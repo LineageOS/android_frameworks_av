@@ -26,6 +26,11 @@
 #include <utils/StrongPointer.h>
 #include <utils/Timers.h>
 
+#define SP_LOGV(x, ...) ALOGV("[%s] " x, mConsumerName.string(), ##__VA_ARGS__)
+#define SP_LOGI(x, ...) ALOGI("[%s] " x, mConsumerName.string(), ##__VA_ARGS__)
+#define SP_LOGW(x, ...) ALOGW("[%s] " x, mConsumerName.string(), ##__VA_ARGS__)
+#define SP_LOGE(x, ...) ALOGE("[%s] " x, mConsumerName.string(), ##__VA_ARGS__)
+
 namespace android {
 
 class GraphicBuffer;
@@ -47,8 +52,8 @@ public:
     // Connect to the stream splitter by creating buffer queue and connecting it
     // with output surfaces.
     status_t connect(const std::vector<sp<Surface> >& surfaces,
-            uint32_t consumerUsage, size_t hal_max_buffers,
-            sp<Surface>& consumer);
+            uint32_t consumerUsage, size_t halMaxBuffers,
+            sp<Surface>* consumer);
 
     // addOutput adds an output BufferQueue to the splitter. The splitter
     // connects to outputQueue as a CPU producer, and any buffers queued
@@ -61,13 +66,22 @@ public:
     // outputQueue has not been added to the splitter. BAD_VALUE is returned if
     // outputQueue is NULL. See IGraphicBufferProducer::connect for explanations
     // of other error codes.
-    status_t addOutput(const sp<Surface>& outputQueue, size_t hal_max_buffers);
+    status_t addOutput(const sp<Surface>& outputQueue);
 
-    // Request surfaces for a particular frame number. The requested surfaces
-    // are stored in a FIFO queue. And when the buffer becomes available from the
-    // input queue, the registered surfaces are used to decide which output is
-    // the buffer sent to.
-    status_t notifyRequestedSurfaces(const std::vector<size_t>& surfaces);
+    // Notification that the graphic buffer has been released to the input
+    // BufferQueue. The buffer should be reused by the camera device instead of
+    // queuing to the outputs.
+    status_t notifyBufferReleased(const sp<GraphicBuffer>& buffer);
+
+    // Attach a buffer to the specified outputs. This call reserves a buffer
+    // slot in the output queue.
+    status_t attachBufferToOutputs(ANativeWindowBuffer* anb,
+            const std::vector<size_t>& surface_ids);
+
+    // Get return value of onFrameAvailable to work around problem that
+    // onFrameAvailable is void. This function should be called by the producer
+    // right after calling queueBuffer().
+    status_t getOnFrameAvailableResult();
 
     // Disconnect the buffer queue from output surfaces.
     void disconnect();
@@ -115,6 +129,10 @@ private:
     // acquire. This must be called with mMutex locked.
     void onAbandonedLocked();
 
+    // Decrement the buffer's reference count. Once the reference count becomes
+    // 0, return the buffer back to the input BufferQueue.
+    void decrementBufRefCountLocked(uint64_t id, const sp<IGraphicBufferProducer>& from);
+
     // This is a thin wrapper class that lets us determine which BufferQueue
     // the IProducerListener::onBufferReleased callback is associated with. We
     // create one of these per output BufferQueue, and then pass the producer
@@ -139,7 +157,8 @@ private:
 
     class BufferTracker {
     public:
-        BufferTracker(const sp<GraphicBuffer>& buffer, size_t referenceCount);
+        BufferTracker(const sp<GraphicBuffer>& buffer,
+                const std::vector<size_t>& requestedSurfaces);
         ~BufferTracker() = default;
 
         const sp<GraphicBuffer>& getBuffer() const { return mBuffer; }
@@ -151,6 +170,8 @@ private:
         // Only called while mMutex is held
         size_t decrementReferenceCountLocked();
 
+        const std::vector<size_t> requestedSurfaces() const { return mRequestedSurfaces; }
+
     private:
 
         // Disallow copying
@@ -159,39 +180,43 @@ private:
 
         sp<GraphicBuffer> mBuffer; // One instance that holds this native handle
         sp<Fence> mMergedFence;
+
+        // Request surfaces for a particular buffer. And when the buffer becomes
+        // available from the input queue, the registered surfaces are used to decide
+        // which output is the buffer sent to.
+        std::vector<size_t> mRequestedSurfaces;
         size_t mReferenceCount;
     };
-
-    // A deferred output is an output being added to the splitter after
-    // connect() call, whereas a non deferred output is added within connect()
-    // call.
-    enum class OutputType { NonDeferred, Deferred };
 
     // Must be accessed through RefBase
     virtual ~Camera3StreamSplitter();
 
-    status_t addOutputLocked(const sp<Surface>& outputQueue,
-                             size_t hal_max_buffers, OutputType outputType);
+    status_t addOutputLocked(const sp<Surface>& outputQueue);
+
+    // Send a buffer to particular output, and increment the reference count
+    // of the buffer. If this output is abandoned, the buffer's reference count
+    // won't be incremented.
+    status_t outputBufferLocked(const sp<IGraphicBufferProducer>& output,
+            const BufferItem& bufferItem);
 
     // Get unique name for the buffer queue consumer
-    static String8 getUniqueConsumerName();
+    String8 getUniqueConsumerName();
 
-    // Max consumer side buffers for deferred surface. This will be used as a
-    // lower bound for overall consumer side max buffers.
-    static const int MAX_BUFFERS_DEFERRED_OUTPUT = 2;
-    int mMaxConsumerBuffers = MAX_BUFFERS_DEFERRED_OUTPUT;
+    // Helper function to get the BufferQueue slot where a particular buffer is attached to.
+    int getSlotForOutputLocked(const sp<IGraphicBufferProducer>& gbp,
+            const sp<GraphicBuffer>& gb);
+    // Helper function to remove the buffer from the BufferQueue slot
+    status_t removeSlotForOutputLocked(const sp<IGraphicBufferProducer>& gbp,
+            const sp<GraphicBuffer>& gb);
+
+
+    // Sum of max consumer buffers for all outputs
+    size_t mMaxConsumerBuffers = 0;
+    size_t mMaxHalBuffers = 0;
 
     static const nsecs_t kDequeueBufferTimeout   = s2ns(1); // 1 sec
 
-    // mIsAbandoned is set to true when an output dies. Once the Camera3StreamSplitter
-    // has been abandoned, it will continue to detach buffers from other
-    // outputs, but it will disconnect from the input and not attempt to
-    // communicate with it further.
-    bool mIsAbandoned = false;
-
     Mutex mMutex;
-    Condition mReleaseCondition;
-    int mOutstandingBuffers = 0;
 
     sp<IGraphicBufferProducer> mProducer;
     sp<IGraphicBufferConsumer> mConsumer;
@@ -199,14 +224,28 @@ private:
     sp<Surface> mSurface;
 
     std::vector<sp<IGraphicBufferProducer> > mOutputs;
-    // Tracking which outputs should the buffer be attached and queued
-    // to for each input buffer.
-    std::vector<std::vector<size_t> > mRequestedSurfaces;
-
     // Map of GraphicBuffer IDs (GraphicBuffer::getId()) to buffer tracking
     // objects (which are mostly for counting how many outputs have released the
     // buffer, but also contain merged release fences).
     std::unordered_map<uint64_t, std::unique_ptr<BufferTracker> > mBuffers;
+
+    struct GBPHash {
+        std::size_t operator()(const sp<IGraphicBufferProducer>& producer) const {
+            return std::hash<IGraphicBufferProducer *>{}(producer.get());
+        }
+    };
+
+    std::unordered_map<sp<IGraphicBufferProducer>, sp<OutputListener>,
+            GBPHash> mNotifiers;
+
+    typedef std::vector<sp<GraphicBuffer>> OutputSlots;
+    std::unordered_map<sp<IGraphicBufferProducer>, std::unique_ptr<OutputSlots>,
+            GBPHash> mOutputSlots;
+
+    // Latest onFrameAvailable return value
+    std::atomic<status_t> mOnFrameAvailableRes{0};
+
+    String8 mConsumerName;
 };
 
 } // namespace android
