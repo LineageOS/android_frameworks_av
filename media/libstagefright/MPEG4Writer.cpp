@@ -435,7 +435,7 @@ MPEG4Writer::~MPEG4Writer() {
 
 void MPEG4Writer::initInternal(int fd) {
     ALOGV("initInternal");
-    mFd = fd;
+    mFd = dup(fd);
     mNextFd = -1;
     mInitCheck = mFd < 0? NO_INIT: OK;
     mIsRealTimeRecording = true;
