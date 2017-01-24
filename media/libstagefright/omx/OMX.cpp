@@ -139,18 +139,20 @@ status_t OMX::freeNode(const sp<OMXNodeInstance> &instance) {
         if (index < 0) {
             // This could conceivably happen if the observer dies at roughly the
             // same time that a client attempts to free the node explicitly.
-            return OK;
+
+            // NOTE: it's guaranteed that this method is called at most once per
+            //       instance.
+            ALOGV("freeNode: instance already removed from book-keeping.");
+        } else {
+            mLiveNodes.removeItemsAt(index);
+            IInterface::asBinder(instance->observer())->unlinkToDeath(this);
         }
-        mLiveNodes.removeItemsAt(index);
     }
 
-    IInterface::asBinder(instance->observer())->unlinkToDeath(this);
-
-    OMX_ERRORTYPE err = OMX_ErrorNone;
-    if (instance->handle() != NULL) {
-        err = mMaster->destroyComponentInstance(
-                static_cast<OMX_COMPONENTTYPE *>(instance->handle()));
-    }
+    CHECK(instance->handle() != NULL);
+    OMX_ERRORTYPE err = mMaster->destroyComponentInstance(
+            static_cast<OMX_COMPONENTTYPE *>(instance->handle()));
+    ALOGV("freeNode: handle destroyed: %p", instance->handle());
 
     return StatusFromOMXError(err);
 }
