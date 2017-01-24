@@ -57,7 +57,7 @@ public:
     void clearPreemptedSessions();
     bool isActive() const;
     bool isSourceActive(audio_source_t source) const;
-    audio_source_t inputSource() const;
+    audio_source_t inputSource(bool activeOnly = false) const;
     bool isSoundTrigger() const;
     status_t addAudioSession(audio_session_t session,
                              const sp<AudioSession>& audioSession);

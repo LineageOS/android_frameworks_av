@@ -1651,13 +1651,15 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
             } else if (isSoundTrigger) {
                 break;
             }
+
             // force close input if current source is now the highest priority request on this input
             // and current input properties are not exactly as requested.
-            if ((desc->mSamplingRate != samplingRate ||
+            if (!isConcurrentSource(inputSource) && !isConcurrentSource(desc->inputSource()) &&
+                    ((desc->mSamplingRate != samplingRate ||
                     desc->mChannelMask != channelMask ||
                     !audio_formats_match(desc->mFormat, format)) &&
                     (source_priority(desc->getHighestPrioritySource(false /*activeOnly*/)) <
-                     source_priority(inputSource))) {
+                     source_priority(inputSource)))) {
                 ALOGV("%s: ", __FUNCTION__);
                 AudioSessionCollection sessions = desc->getAudioSessions(false /*activeOnly*/);
                 for (size_t j = 0; j < sessions.size(); j++) {
@@ -1715,6 +1717,14 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
     return input;
 }
 
+//static
+bool AudioPolicyManager::isConcurrentSource(audio_source_t source)
+{
+    return (source == AUDIO_SOURCE_HOTWORD) ||
+            (source == AUDIO_SOURCE_VOICE_RECOGNITION) ||
+            (source == AUDIO_SOURCE_FM_TUNER);
+}
+
 bool AudioPolicyManager::isConcurentCaptureAllowed(const sp<AudioInputDescriptor>& inputDesc,
         const sp<AudioSession>& audioSession)
 {
@@ -1734,16 +1744,14 @@ bool AudioPolicyManager::isConcurentCaptureAllowed(const sp<AudioInputDescriptor
     // 3) All other active captures are either for re-routing or HOTWORD
 
     if (is_virtual_input_device(inputDesc->mDevice) ||
-            audioSession->inputSource() == AUDIO_SOURCE_HOTWORD ||
-            audioSession->inputSource() == AUDIO_SOURCE_FM_TUNER) {
+            isConcurrentSource(audioSession->inputSource())) {
         return true;
     }
 
     Vector< sp<AudioInputDescriptor> > activeInputs = mInputs.getActiveInputs();
     for (size_t i = 0; i <  activeInputs.size(); i++) {
         sp<AudioInputDescriptor> activeInput = activeInputs[i];
-        if ((activeInput->inputSource() != AUDIO_SOURCE_HOTWORD) &&
-                (activeInput->inputSource() != AUDIO_SOURCE_FM_TUNER) &&
+        if (!isConcurrentSource(activeInput->inputSource(true)) &&
                 !is_virtual_input_device(activeInput->mDevice)) {
             return false;
         }
