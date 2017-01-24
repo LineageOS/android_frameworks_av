@@ -80,7 +80,7 @@ status_t EffectBufferHalHidl::init() {
                     retval = OK;
                 }
             });
-    if (retval == OK) {
+    if (result.isOk() && retval == OK) {
         mMemory = hardware::mapMemory(mHidlBuffer.data);
         if (mMemory != 0) {
             mMemory->update();
@@ -91,8 +91,10 @@ status_t EffectBufferHalHidl::init() {
             ALOGE("Failed to map allocated ashmem");
             retval = NO_MEMORY;
         }
+    } else {
+        ALOGE("Failed to allocate %d bytes from ashmem", (int)mBufferSize);
     }
-    return retval;
+    return result.isOk() ? retval : FAILED_TRANSACTION;
 }
 
 audio_buffer_t* EffectBufferHalHidl::audioBuffer() {
