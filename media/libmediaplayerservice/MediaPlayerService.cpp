@@ -1147,6 +1147,42 @@ status_t MediaPlayerService::Client::setNextPlayer(const sp<IMediaPlayer>& playe
     return OK;
 }
 
+VolumeShaper::Status MediaPlayerService::Client::applyVolumeShaper(
+        const sp<VolumeShaper::Configuration>& configuration,
+        const sp<VolumeShaper::Operation>& operation) {
+    // for hardware output, call player instead
+    ALOGV("Client::applyVolumeShaper(%p)", this);
+    sp<MediaPlayerBase> p = getPlayer();
+    {
+        Mutex::Autolock l(mLock);
+        if (p != 0 && p->hardwareOutput()) {
+            // TODO: investigate internal implementation
+            return VolumeShaper::Status(INVALID_OPERATION);
+        }
+        if (mAudioOutput.get() != nullptr) {
+            return mAudioOutput->applyVolumeShaper(configuration, operation);
+        }
+    }
+    return VolumeShaper::Status(INVALID_OPERATION);
+}
+
+sp<VolumeShaper::State> MediaPlayerService::Client::getVolumeShaperState(int id) {
+    // for hardware output, call player instead
+    ALOGV("Client::getVolumeShaperState(%p)", this);
+    sp<MediaPlayerBase> p = getPlayer();
+    {
+        Mutex::Autolock l(mLock);
+        if (p != 0 && p->hardwareOutput()) {
+            // TODO: investigate internal implementation.
+            return nullptr;
+        }
+        if (mAudioOutput.get() != nullptr) {
+            return mAudioOutput->getVolumeShaperState(id);
+        }
+    }
+    return nullptr;
+}
+
 status_t MediaPlayerService::Client::seekTo(int msec, MediaPlayerSeekMode mode)
 {
     ALOGV("[%d] seekTo(%d, %d)", mConnId, msec, mode);
@@ -2144,6 +2180,27 @@ status_t MediaPlayerService::AudioOutput::attachAuxEffect(int effectId)
         return mTrack->attachAuxEffect(effectId);
     }
     return NO_ERROR;
+}
+
+VolumeShaper::Status MediaPlayerService::AudioOutput::applyVolumeShaper(
+                const sp<VolumeShaper::Configuration>& configuration,
+                const sp<VolumeShaper::Operation>& operation)
+{
+    Mutex::Autolock lock(mLock);
+    ALOGV("AudioOutput::applyVolumeShaper");
+    if (mTrack != 0) {
+        return mTrack->applyVolumeShaper(configuration, operation);
+    }
+    return VolumeShaper::Status(INVALID_OPERATION);
+}
+
+sp<VolumeShaper::State> MediaPlayerService::AudioOutput::getVolumeShaperState(int id)
+{
+    Mutex::Autolock lock(mLock);
+    if (mTrack != 0) {
+        return mTrack->getVolumeShaperState(id);
+    }
+    return nullptr;
 }
 
 // static

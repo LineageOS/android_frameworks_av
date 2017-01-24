@@ -312,6 +312,16 @@ status_t AudioFlinger::TrackHandle::setParameters(const String8& keyValuePairs) 
     return mTrack->setParameters(keyValuePairs);
 }
 
+VolumeShaper::Status AudioFlinger::TrackHandle::applyVolumeShaper(
+        const sp<VolumeShaper::Configuration>& configuration,
+        const sp<VolumeShaper::Operation>& operation) {
+    return mTrack->applyVolumeShaper(configuration, operation);
+}
+
+sp<VolumeShaper::State> AudioFlinger::TrackHandle::getVolumeShaperState(int id) {
+    return mTrack->getVolumeShaperState(id);
+}
+
 status_t AudioFlinger::TrackHandle::getTimestamp(AudioTimestamp& timestamp)
 {
     return mTrack->getTimestamp(timestamp);
@@ -362,6 +372,7 @@ AudioFlinger::PlaybackThread::Track::Track(
     mAuxEffectId(0), mHasVolumeController(false),
     mPresentationCompleteFrames(0),
     mFrameMap(16 /* sink-frame-to-track-frame map memory */),
+    mVolumeHandler(new VolumeHandler(sampleRate)),
     // mSinkTimestamp
     mFastIndex(-1),
     mCachedVolume(1.0),
@@ -872,6 +883,24 @@ status_t AudioFlinger::PlaybackThread::Track::setParameters(const String8& keyVa
     } else {
         return PERMISSION_DENIED;
     }
+}
+
+VolumeShaper::Status AudioFlinger::PlaybackThread::Track::applyVolumeShaper(
+        const sp<VolumeShaper::Configuration>& configuration,
+        const sp<VolumeShaper::Operation>& operation)
+{
+    // Note: We don't check if Thread exists.
+
+    // mVolumeHandler is thread-safe.
+    return mVolumeHandler->applyVolumeShaper(configuration, operation);
+}
+
+sp<VolumeShaper::State> AudioFlinger::PlaybackThread::Track::getVolumeShaperState(int id)
+{
+    // Note: We don't check if Thread exists.
+
+    // mVolumeHandler is thread safe.
+    return mVolumeHandler->getVolumeShaperState(id);
 }
 
 status_t AudioFlinger::PlaybackThread::Track::getTimestamp(AudioTimestamp& timestamp)

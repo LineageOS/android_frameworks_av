@@ -26,6 +26,7 @@
 #include <binder/IMemory.h>
 #include <utils/String8.h>
 #include <media/AudioTimestamp.h>
+#include <media/VolumeShaper.h>
 
 namespace android {
 
@@ -74,6 +75,14 @@ public:
 
     /* Signal the playback thread for a change in control block */
     virtual void        signal() = 0;
+
+    /* Sets the volume shaper */
+    virtual VolumeShaper::Status applyVolumeShaper(
+            const sp<VolumeShaper::Configuration>& configuration,
+            const sp<VolumeShaper::Operation>& operation) = 0;
+
+    /* gets the volume shaper state */
+    virtual sp<VolumeShaper::State> getVolumeShaperState(int id) = 0;
 };
 
 // ----------------------------------------------------------------------------

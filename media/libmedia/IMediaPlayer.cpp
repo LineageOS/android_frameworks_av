@@ -70,6 +70,8 @@ enum {
     SET_RETRANSMIT_ENDPOINT,
     GET_RETRANSMIT_ENDPOINT,
     SET_NEXT_PLAYER,
+    APPLY_VOLUME_SHAPER,
+    GET_VOLUME_SHAPER_STATE,
     // ModDrm
     PREPARE_DRM,
     RELEASE_DRM,
@@ -466,6 +468,57 @@ public:
         data.read(endpoint, sizeof(*endpoint));
 
         return err;
+    }
+
+    virtual VolumeShaper::Status applyVolumeShaper(
+            const sp<VolumeShaper::Configuration>& configuration,
+            const sp<VolumeShaper::Operation>& operation) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
+
+        status_t tmp;
+        status_t status = configuration.get() == nullptr
+                ? data.writeInt32(0)
+                : (tmp = data.writeInt32(1)) != NO_ERROR
+                    ? tmp : configuration->writeToParcel(&data);
+        if (status != NO_ERROR) {
+            return VolumeShaper::Status(status);
+        }
+
+        status = operation.get() == nullptr
+                ? status = data.writeInt32(0)
+                : (tmp = data.writeInt32(1)) != NO_ERROR
+                    ? tmp : operation->writeToParcel(&data);
+        if (status != NO_ERROR) {
+            return VolumeShaper::Status(status);
+        }
+
+        int32_t remoteVolumeShaperStatus;
+        status = remote()->transact(APPLY_VOLUME_SHAPER, data, &reply);
+        if (status == NO_ERROR) {
+            status = reply.readInt32(&remoteVolumeShaperStatus);
+        }
+        if (status != NO_ERROR) {
+            return VolumeShaper::Status(status);
+        }
+        return VolumeShaper::Status(remoteVolumeShaperStatus);
+    }
+
+    virtual sp<VolumeShaper::State> getVolumeShaperState(int id) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
+
+        data.writeInt32(id);
+        status_t status = remote()->transact(GET_VOLUME_SHAPER_STATE, data, &reply);
+        if (status != NO_ERROR) {
+            return nullptr;
+        }
+        sp<VolumeShaper::State> state = new VolumeShaper::State();
+        status = state->readFromParcel(reply);
+        if (status != NO_ERROR) {
+            return nullptr;
+        }
+        return state;
     }
 
     // ModDrm
@@ -890,6 +943,43 @@ status_t BnMediaPlayer::onTransact(
             CHECK_INTERFACE(IMediaPlayer, data, reply);
             reply->writeInt32(setNextPlayer(interface_cast<IMediaPlayer>(data.readStrongBinder())));
 
+            return NO_ERROR;
+        } break;
+
+        case APPLY_VOLUME_SHAPER: {
+            CHECK_INTERFACE(IMediaPlayer, data, reply);
+            sp<VolumeShaper::Configuration> configuration;
+            sp<VolumeShaper::Operation> operation;
+
+            int32_t present;
+            status_t status = data.readInt32(&present);
+            if (status == NO_ERROR && present != 0) {
+                configuration = new VolumeShaper::Configuration();
+                status = configuration->readFromParcel(data);
+            }
+            if (status == NO_ERROR) {
+                status = data.readInt32(&present);
+            }
+            if (status == NO_ERROR && present != 0) {
+                operation = new VolumeShaper::Operation();
+                status = operation->readFromParcel(data);
+            }
+            if (status == NO_ERROR) {
+                status = (status_t)applyVolumeShaper(configuration, operation);
+            }
+            reply->writeInt32(status);
+            return NO_ERROR;
+        } break;
+        case GET_VOLUME_SHAPER_STATE: {
+            CHECK_INTERFACE(IMediaPlayer, data, reply);
+            int id;
+            status_t status = data.readInt32(&id);
+            if (status == NO_ERROR) {
+                sp<VolumeShaper::State> state = getVolumeShaperState(id);
+                if (state.get() != nullptr) {
+                     status = state->writeToParcel(reply);
+                }
+            }
             return NO_ERROR;
         } break;
 

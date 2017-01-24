@@ -129,6 +129,11 @@ class MediaPlayerService : public BnMediaPlayerService
         virtual status_t        setParameters(const String8& keyValuePairs);
         virtual String8         getParameters(const String8& keys);
 
+        virtual VolumeShaper::Status applyVolumeShaper(
+                                        const sp<VolumeShaper::Configuration>& configuration,
+                                        const sp<VolumeShaper::Operation>& operation) override;
+        virtual sp<VolumeShaper::State> getVolumeShaperState(int id) override;
+
     private:
         static void             setMinBufferCount();
         static void             CallbackWrapper(
@@ -322,6 +327,11 @@ private:
         virtual status_t        setRetransmitEndpoint(const struct sockaddr_in* endpoint);
         virtual status_t        getRetransmitEndpoint(struct sockaddr_in* endpoint);
         virtual status_t        setNextPlayer(const sp<IMediaPlayer>& player);
+
+        virtual VolumeShaper::Status applyVolumeShaper(
+                                        const sp<VolumeShaper::Configuration>& configuration,
+                                        const sp<VolumeShaper::Operation>& operation) override;
+        virtual sp<VolumeShaper::State> getVolumeShaperState(int id) override;
 
         sp<MediaPlayerBase>     createPlayer(player_type playerType);
 

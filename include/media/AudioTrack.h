@@ -732,6 +732,14 @@ public:
     /* Set parameters - only possible when using direct output */
             status_t    setParameters(const String8& keyValuePairs);
 
+    /* Sets the volume shaper object */
+            VolumeShaper::Status applyVolumeShaper(
+                    const sp<VolumeShaper::Configuration>& configuration,
+                    const sp<VolumeShaper::Operation>& operation);
+
+    /* Gets the volume shaper state */
+            sp<VolumeShaper::State> getVolumeShaperState(int id);
+
     /* Get parameters */
             String8     getParameters(const String8& keys);
 
@@ -1117,6 +1125,10 @@ protected:
     // For Device Selection API
     //  a value of AUDIO_PORT_HANDLE_NONE indicated default (AudioPolicyManager) routing.
     audio_port_handle_t     mSelectedDeviceId;
+
+    sp<VolumeHandler>       mVolumeHandler;
+
+    int32_t                 mVolumeShaperId;
 
 private:
     class DeathNotifier : public IBinder::DeathRecipient {

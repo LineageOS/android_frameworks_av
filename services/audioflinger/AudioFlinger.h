@@ -54,6 +54,7 @@
 #include <media/AudioMixer.h>
 #include <media/ExtendedAudioBufferProvider.h>
 #include <media/LinearMap.h>
+#include <media/VolumeShaper.h>
 
 #include "FastCapture.h"
 #include "FastMixer.h"
@@ -506,6 +507,10 @@ private:
         virtual void        pause();
         virtual status_t    attachAuxEffect(int effectId);
         virtual status_t    setParameters(const String8& keyValuePairs);
+        virtual VolumeShaper::Status applyVolumeShaper(
+                const sp<VolumeShaper::Configuration>& configuration,
+                const sp<VolumeShaper::Operation>& operation) override;
+        virtual sp<VolumeShaper::State> getVolumeShaperState(int id) override;
         virtual status_t    getTimestamp(AudioTimestamp& timestamp);
         virtual void        signal(); // signal playback thread for a change in control block
 

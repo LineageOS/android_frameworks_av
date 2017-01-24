@@ -4114,7 +4114,11 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 }
                 // cache the combined master volume and stream type volume for fast mixer; this
                 // lacks any synchronization or barrier so VolumeProvider may read a stale value
-                track->mCachedVolume = masterVolume * mStreamTypes[track->streamType()].volume;
+                const float vh = track->getVolumeHandler()->getVolume(
+                        track->mAudioTrackServerProxy->framesReleased());
+                track->mCachedVolume = masterVolume
+                        * mStreamTypes[track->streamType()].volume
+                        * vh;
                 ++fastTracks;
             } else {
                 // was it previously active?
@@ -4256,9 +4260,11 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                     ALOGV("Track right volume out of range: %.3g", vrf);
                     vrf = GAIN_FLOAT_UNITY;
                 }
-                // now apply the master volume and stream type volume
-                vlf *= v;
-                vrf *= v;
+                const float vh = track->getVolumeHandler()->getVolume(
+                        track->mAudioTrackServerProxy->framesReleased());
+                // now apply the master volume and stream type volume and shaper volume
+                vlf *= v * vh;
+                vrf *= v * vh;
                 // assuming master volume and stream type volume each go up to 1.0,
                 // then derive vl and vr as U8.24 versions for the effect chain
                 const float scaleto8_24 = MAX_GAIN_INT * MAX_GAIN_INT;
@@ -4743,6 +4749,15 @@ void AudioFlinger::DirectOutputThread::processVolume_l(Track *track, bool lastTr
         float typeVolume = mStreamTypes[track->streamType()].volume;
         float v = mMasterVolume * typeVolume;
         sp<AudioTrackServerProxy> proxy = track->mAudioTrackServerProxy;
+
+        if (audio_is_linear_pcm(mFormat) && !usesHwAvSync()) {
+            const float vh = track->getVolumeHandler()->getVolume(
+                    track->mAudioTrackServerProxy->framesReleased());
+            v *= vh;
+        } else {
+            // TODO: implement volume scaling in HW
+        }
+
         gain_minifloat_packed_t vlr = proxy->getVolumeLR();
         left = float_from_gain(gain_minifloat_unpack_left(vlr));
         if (left > GAIN_FLOAT_UNITY) {

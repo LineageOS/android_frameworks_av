@@ -261,6 +261,11 @@ public:
             status_t        getParameter(int key, Parcel* reply);
             status_t        setRetransmitEndpoint(const char* addrString, uint16_t port);
             status_t        setNextMediaPlayer(const sp<MediaPlayer>& player);
+
+            VolumeShaper::Status applyVolumeShaper(
+                                    const sp<VolumeShaper::Configuration>& configuration,
+                                    const sp<VolumeShaper::Operation>& operation);
+            sp<VolumeShaper::State> getVolumeShaperState(int id);
             // ModDrm
             status_t        prepareDrm(const uint8_t uuid[16], const int mode);
             status_t        releaseDrm();

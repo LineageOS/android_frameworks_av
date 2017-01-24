@@ -25,6 +25,7 @@
 
 #include <media/IMediaSource.h>
 #include <media/drm/DrmAPI.h>   // for DrmPlugin::* enum
+#include <media/VolumeShaper.h>
 
 // Fwd decl to make sure everyone agrees that the scope of struct sockaddr_in is
 // global, and not in android::
@@ -90,6 +91,12 @@ public:
     virtual status_t        setRetransmitEndpoint(const struct sockaddr_in* endpoint) = 0;
     virtual status_t        getRetransmitEndpoint(struct sockaddr_in* endpoint) = 0;
     virtual status_t        setNextPlayer(const sp<IMediaPlayer>& next) = 0;
+
+    virtual VolumeShaper::Status applyVolumeShaper(
+                                    const sp<VolumeShaper::Configuration>& configuration,
+                                    const sp<VolumeShaper::Operation>& operation) = 0;
+    virtual sp<VolumeShaper::State> getVolumeShaperState(int id) = 0;
+
     // ModDrm
     virtual status_t        prepareDrm(const uint8_t uuid[16], const int mode) = 0;
     virtual status_t        releaseDrm() = 0;
