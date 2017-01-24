@@ -39,6 +39,12 @@
 #include <utils/misc.h>
 #include <utils/NativeHandle.h>
 
+#ifdef USE_S3D_SUPPORT
+#include "Exynos_OMX_Def.h"
+#include "ExynosHWCService.h"
+#include <binder/IServiceManager.h>
+#endif
+
 static const OMX_U32 kPortIndexInput = 0;
 static const OMX_U32 kPortIndexOutput = 1;
 
@@ -1856,6 +1862,42 @@ void OMXNodeInstance::onEvent(
         case OMX_EventPortSettingsChanged:
             arg2String = asString((OMX_INDEXEXTTYPE)arg2);
             // fall through
+#ifdef USE_S3D_SUPPORT
+        case (OMX_EVENTTYPE)OMX_EventS3DInformation:
+        {
+// we have no way to check this in here!
+//            if (mFlags & kClientNeedsFramebuffer)
+//                break;
+
+            sp<IServiceManager> sm = defaultServiceManager();
+            sp<android::IExynosHWCService> hwc = interface_cast<android::IExynosHWCService>(
+                    sm->getService(String16("Exynos.HWCService")));
+            if (hwc != NULL) {
+                if (arg1 == OMX_TRUE) {
+                    int eS3DMode;
+                    switch (arg2) {
+                    case OMX_SEC_FPARGMT_SIDE_BY_SIDE:
+                        eS3DMode = S3D_SBS;
+                        break;
+                    case OMX_SEC_FPARGMT_TOP_BOTTOM:
+                        eS3DMode = S3D_TB;
+                        break;
+                    case OMX_SEC_FPARGMT_CHECKERBRD_INTERL: // unsupport format at HDMI
+                    case OMX_SEC_FPARGMT_COLUMN_INTERL:
+                    case OMX_SEC_FPARGMT_ROW_INTERL:
+                    case OMX_SEC_FPARGMT_TEMPORAL_INTERL:
+                    default:
+                        eS3DMode = S3D_NONE;
+                    }
+
+                    hwc->setHdmiResolution(0, eS3DMode);
+                }
+            } else {
+                ALOGE("Exynos.HWCService is unavailable");
+            }
+            break;
+        }
+#endif
         default:
             arg1String = portString(arg1);
     }
