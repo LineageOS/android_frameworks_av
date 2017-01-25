@@ -52,14 +52,6 @@ public:
     // caller continues to own the passed item
     virtual MediaAnalyticsItem::SessionID_t submit(MediaAnalyticsItem *item, bool forcenew) = 0;
 
-
-    // return lists of records that match the supplied parameters.
-    // finished [or not] records since time 'ts' with key 'key'
-    // timestamp 'ts' is nanoseconds, unix time.
-    // caller responsible for deallocating returned data structures
-    virtual List<MediaAnalyticsItem *> *getMediaAnalyticsItemList(bool finished, int64_t ts) = 0;
-    virtual List<MediaAnalyticsItem *> *getMediaAnalyticsItemList(bool finished, int64_t ts, MediaAnalyticsItem::Key key) = 0;
-
 };
 
 // ----------------------------------------------------------------------------

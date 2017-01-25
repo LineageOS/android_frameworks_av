@@ -1,4 +1,4 @@
-service mediaanalytics /system/bin/mediaanalytics
+service mediametrics /system/bin/mediametrics
     class main
     user media
     ioprio rt 4
