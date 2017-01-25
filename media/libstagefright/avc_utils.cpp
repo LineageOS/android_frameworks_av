@@ -454,7 +454,10 @@ bool IsAVCReferenceFrame(const sp<ABuffer> &accessUnit) {
     size_t nalSize;
     bool bIsReferenceFrame = true;
     while (getNextNALUnit(&data, &size, &nalStart, &nalSize, true) == OK) {
-        CHECK_GT(nalSize, 0u);
+        if (nalSize == 0u) {
+            ALOGW("skipping empty nal unit from potentially malformed bitstream");
+            continue;
+        }
 
         unsigned nalType = nalStart[0] & 0x1f;
 
