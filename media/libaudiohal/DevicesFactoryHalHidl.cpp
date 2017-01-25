@@ -40,7 +40,7 @@ sp<DevicesFactoryHalInterface> DevicesFactoryHalInterface::create() {
 }
 
 DevicesFactoryHalHidl::DevicesFactoryHalHidl() {
-    mDevicesFactory = IDevicesFactory::getService("audio_devices_factory");
+    mDevicesFactory = IDevicesFactory::getService();
     if (mDevicesFactory != 0) {
         // It is assumet that DevicesFactory is owned by AudioFlinger
         // and thus have the same lifespan.
