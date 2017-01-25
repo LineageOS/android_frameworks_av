@@ -40,6 +40,8 @@ class EffectBufferHalHidl : public EffectBufferHalInterface
 
     virtual void update();
     virtual void commit();
+    virtual void update(size_t size);
+    virtual void commit(size_t size);
 
     const AudioBuffer& hidlBuffer() const { return mHidlBuffer; }
 

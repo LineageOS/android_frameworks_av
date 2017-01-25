@@ -42,6 +42,8 @@ class EffectBufferHalInterface : public RefBase
 
     virtual void update() = 0;  // copies data from the external buffer, noop for allocated buffers
     virtual void commit() = 0;  // copies data to the external buffer, noop for allocated buffers
+    virtual void update(size_t size) = 0;  // copies partial data from external buffer
+    virtual void commit(size_t size) = 0;  // copies partial data to external buffer
 
     static status_t allocate(size_t size, sp<EffectBufferHalInterface>* buffer);
     static status_t mirror(void* external, size_t size, sp<EffectBufferHalInterface>* buffer);

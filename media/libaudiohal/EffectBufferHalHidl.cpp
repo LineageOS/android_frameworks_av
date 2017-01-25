@@ -113,15 +113,25 @@ void EffectBufferHalHidl::setExternalData(void* external) {
 }
 
 void EffectBufferHalHidl::update() {
-    if (mExternalData == nullptr) return;
-    mMemory->update();
-    memcpy(mAudioBuffer.raw, mExternalData, mBufferSize);
-    mMemory->commit();
+    update(mBufferSize);
 }
 
 void EffectBufferHalHidl::commit() {
+    commit(mBufferSize);
+}
+
+void EffectBufferHalHidl::update(size_t size) {
     if (mExternalData == nullptr) return;
-    memcpy(mExternalData, mAudioBuffer.raw, mBufferSize);
+    mMemory->update();
+    if (size > mBufferSize) size = mBufferSize;
+    memcpy(mAudioBuffer.raw, mExternalData, size);
+    mMemory->commit();
+}
+
+void EffectBufferHalHidl::commit(size_t size) {
+    if (mExternalData == nullptr) return;
+    if (size > mBufferSize) size = mBufferSize;
+    memcpy(mExternalData, mAudioBuffer.raw, size);
 }
 
 } // namespace android

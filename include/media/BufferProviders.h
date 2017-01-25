@@ -113,6 +113,8 @@ public:
 protected:
     sp<EffectsFactoryHalInterface> mEffectsFactory;
     sp<EffectHalInterface> mDownmixInterface;
+    size_t mInFrameSize;
+    size_t mOutFrameSize;
     sp<EffectBufferHalInterface> mInBuffer;
     sp<EffectBufferHalInterface> mOutBuffer;
     effect_config_t    mDownmixConfig;

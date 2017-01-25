@@ -142,9 +142,9 @@ DownmixerBufferProvider::DownmixerBufferProvider(
             audio_bytes_per_sample(format) * audio_channel_count_from_out_mask(outputChannelMask),
             bufferFrameCount)  // set bufferFrameCount to 0 to do in-place
 {
-    ALOGV("DownmixerBufferProvider(%p)(%#x, %#x, %#x %u %d)",
+    ALOGV("DownmixerBufferProvider(%p)(%#x, %#x, %#x %u %d %d)",
             this, inputChannelMask, outputChannelMask, format,
-            sampleRate, sessionId);
+            sampleRate, sessionId, (int)bufferFrameCount);
     if (!sIsMultichannelCapable) {
         ALOGE("DownmixerBufferProvider() error: not multichannel capable");
         return;
@@ -178,11 +178,13 @@ DownmixerBufferProvider::DownmixerBufferProvider(
              EFFECT_CONFIG_FORMAT | EFFECT_CONFIG_ACC_MODE;
      mDownmixConfig.outputCfg.mask = mDownmixConfig.inputCfg.mask;
 
+     mInFrameSize =
+             audio_bytes_per_sample(format) * audio_channel_count_from_out_mask(inputChannelMask);
+     mOutFrameSize =
+             audio_bytes_per_sample(format) * audio_channel_count_from_out_mask(outputChannelMask);
      status_t status;
      status = EffectBufferHalInterface::mirror(
-             nullptr,
-             audio_bytes_per_sample(format) * audio_channel_count_from_out_mask(inputChannelMask),
-             &mInBuffer);
+             nullptr, mInFrameSize * bufferFrameCount, &mInBuffer);
      if (status != 0) {
          ALOGE("DownmixerBufferProvider() error %d while creating input buffer", status);
          mDownmixInterface.clear();
@@ -190,9 +192,7 @@ DownmixerBufferProvider::DownmixerBufferProvider(
          return;
      }
      status = EffectBufferHalInterface::mirror(
-             nullptr,
-             audio_bytes_per_sample(format) * audio_channel_count_from_out_mask(outputChannelMask),
-             &mOutBuffer);
+             nullptr, mOutFrameSize * bufferFrameCount, &mOutBuffer);
      if (status != 0) {
          ALOGE("DownmixerBufferProvider() error %d while creating output buffer", status);
          mInBuffer.clear();
@@ -277,14 +277,18 @@ void DownmixerBufferProvider::copyFrames(void *dst, const void *src, size_t fram
 {
     mInBuffer->setExternalData(const_cast<void*>(src));
     mInBuffer->setFrameCount(frames);
-    mInBuffer->update();
-    mOutBuffer->setExternalData(dst);
+    mInBuffer->update(mInFrameSize * frames);
     mOutBuffer->setFrameCount(frames);
-    mOutBuffer->update();
+    mOutBuffer->setExternalData(dst);
+    if (dst != src) {
+        // Downmix may be accumulating, need to populate the output buffer
+        // with the dst data.
+        mOutBuffer->update(mOutFrameSize * frames);
+    }
     // may be in-place if src == dst.
     status_t res = mDownmixInterface->process();
     if (res == OK) {
-        mOutBuffer->commit();
+        mOutBuffer->commit(mOutFrameSize * frames);
     } else {
         ALOGE("DownmixBufferProvider error %d", res);
     }

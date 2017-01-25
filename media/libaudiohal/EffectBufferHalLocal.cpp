@@ -75,4 +75,10 @@ void EffectBufferHalLocal::update() {
 void EffectBufferHalLocal::commit() {
 }
 
+void EffectBufferHalLocal::update(size_t size) {
+}
+
+void EffectBufferHalLocal::commit(size_t size) {
+}
+
 } // namespace android

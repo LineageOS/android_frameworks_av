@@ -35,6 +35,8 @@ class EffectBufferHalLocal : public EffectBufferHalInterface
 
     virtual void update();
     virtual void commit();
+    virtual void update(size_t size);
+    virtual void commit(size_t size);
 
   private:
     friend class EffectBufferHalInterface;
