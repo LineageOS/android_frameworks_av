@@ -31,14 +31,6 @@ LOCAL_SRC_FILES :=  \
     common/FrameProcessorBase.cpp \
     api1/CameraClient.cpp \
     api1/Camera2Client.cpp \
-    api1/client2/Parameters.cpp \
-    api1/client2/FrameProcessor.cpp \
-    api1/client2/StreamingProcessor.cpp \
-    api1/client2/JpegProcessor.cpp \
-    api1/client2/CallbackProcessor.cpp \
-    api1/client2/JpegCompressor.cpp \
-    api1/client2/CaptureSequencer.cpp \
-    api1/client2/ZslProcessor.cpp \
     api2/CameraDeviceClient.cpp \
     device1/CameraHardwareInterface.cpp \
     device3/Camera3Device.cpp \
@@ -56,6 +48,30 @@ LOCAL_SRC_FILES :=  \
     utils/AutoConditionLock.cpp \
     utils/TagMonitor.cpp \
     utils/LatencyHistogram.cpp
+
+#use QTI Camera2Client layer, if TARGET_USES_QTI_CAMERA2CLIENT is enabled.
+ifeq ($(TARGET_USES_QTI_CAMERA2CLIENT),true)
+LOCAL_SRC_FILES +=  \
+    api1/qticlient2/Parameters.cpp \
+    api1/qticlient2/QTIParameters.cpp \
+    api1/qticlient2/FrameProcessor.cpp \
+    api1/qticlient2/StreamingProcessor.cpp \
+    api1/qticlient2/JpegProcessor.cpp \
+    api1/qticlient2/CallbackProcessor.cpp \
+    api1/qticlient2/JpegCompressor.cpp \
+    api1/qticlient2/CaptureSequencer.cpp \
+    api1/qticlient2/ZslProcessor.cpp
+else
+LOCAL_SRC_FILES +=  \
+    api1/client2/Parameters.cpp \
+    api1/client2/FrameProcessor.cpp \
+    api1/client2/StreamingProcessor.cpp \
+    api1/client2/JpegProcessor.cpp \
+    api1/client2/CallbackProcessor.cpp \
+    api1/client2/JpegCompressor.cpp \
+    api1/client2/CaptureSequencer.cpp \
+    api1/client2/ZslProcessor.cpp
+endif
 
 LOCAL_SHARED_LIBRARIES:= \
     libui \
@@ -102,6 +118,10 @@ LOCAL_CLANG_CFLAGS += -Wno-error=unused-lambda-capture
 
 ifeq ($(TARGET_HAS_LEGACY_CAMERA_HAL1),true)
     LOCAL_CFLAGS += -DNO_CAMERA_SERVER
+endif
+
+ifeq ($(TARGET_USES_QTI_CAMERA2CLIENT),true)
+LOCAL_CFLAGS += -DUSE_QTI_CAMERA2CLIENT
 endif
 
 LOCAL_MODULE:= libcameraservice
