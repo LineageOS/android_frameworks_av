@@ -300,14 +300,12 @@ status_t BnRadio::onTransact(
         case GET_PROGRAM_INFORMATION: {
             CHECK_INTERFACE(IRadio, data, reply);
             struct radio_program_info info;
-            status_t status;
 
-            status = radio_metadata_allocate(&info.metadata, 0, 0);
+            status_t status = radio_metadata_allocate(&info.metadata, 0, 0);
             if (status != NO_ERROR) {
                 return status;
             }
             status = getProgramInformation(&info);
-
             reply->writeInt32(status);
             if (status == NO_ERROR) {
                 reply->write(&info, sizeof(struct radio_program_info));
