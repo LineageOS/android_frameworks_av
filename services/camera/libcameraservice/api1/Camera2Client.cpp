@@ -28,11 +28,19 @@
 
 #include "api1/Camera2Client.h"
 
+#ifndef USE_QTI_CAMERA2CLIENT
 #include "api1/client2/StreamingProcessor.h"
 #include "api1/client2/JpegProcessor.h"
 #include "api1/client2/CaptureSequencer.h"
 #include "api1/client2/CallbackProcessor.h"
 #include "api1/client2/ZslProcessor.h"
+#else
+#include "api1/qticlient2/StreamingProcessor.h"
+#include "api1/qticlient2/JpegProcessor.h"
+#include "api1/qticlient2/CaptureSequencer.h"
+#include "api1/qticlient2/CallbackProcessor.h"
+#include "api1/qticlient2/ZslProcessor.h"
+#endif
 
 #define ALOG1(...) ALOGD_IF(gLogLevel >= 1, __VA_ARGS__);
 #define ALOG2(...) ALOGD_IF(gLogLevel >= 2, __VA_ARGS__);
@@ -101,7 +109,11 @@ status_t Camera2Client::initializeImpl(TProviderPtr providerPtr)
     {
         SharedParameters::Lock l(mParameters);
 
+#ifndef USE_QTI_CAMERA2CLIENT
         res = l.mParameters.initialize(&(mDevice->info()), mDeviceVersion);
+#else
+        res = l.mParameters.initialize(&(mDevice->info()), mDeviceVersion, providerPtr, mDevice);
+#endif
         if (res != OK) {
             ALOGE("%s: Camera %d: unable to build defaults: %s (%d)",
                     __FUNCTION__, mCameraId, strerror(-res), res);

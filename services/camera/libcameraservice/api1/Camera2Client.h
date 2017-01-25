@@ -20,8 +20,13 @@
 #include "CameraService.h"
 #include "common/CameraDeviceBase.h"
 #include "common/Camera2ClientBase.h"
+#ifndef USE_QTI_CAMERA2CLIENT
 #include "api1/client2/Parameters.h"
 #include "api1/client2/FrameProcessor.h"
+#else
+#include "api1/qticlient2/Parameters.h"
+#include "api1/qticlient2/FrameProcessor.h"
+#endif
 //#include "api1/client2/StreamingProcessor.h"
 //#include "api1/client2/JpegProcessor.h"
 //#include "api1/client2/ZslProcessor.h"
