@@ -51,7 +51,7 @@ const MediaAnalyticsItem::Key MediaAnalyticsItem::kKeyNone  = "none";
 
 const char * const MediaAnalyticsItem::EnabledProperty  = "media.metrics.enabled";
 const char * const MediaAnalyticsItem::EnabledPropertyPersist  = "persist.media.metrics.enabled";
-const int MediaAnalyticsItem::EnabledProperty_default  = 0;
+const int MediaAnalyticsItem::EnabledProperty_default  = 1;
 
 
 // access functions for the class
