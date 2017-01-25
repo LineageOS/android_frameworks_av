@@ -1942,7 +1942,9 @@ void AudioFlinger::EffectChain::syncHalEffectsState()
 
 static void dumpInOutBuffer(
         char *dump, size_t dumpSize, bool isInput, EffectBufferHalInterface *buffer) {
-    if (buffer->externalData() != nullptr) {
+    if (buffer == nullptr) {
+        snprintf(dump, dumpSize, "%p", buffer);
+    } else if (buffer->externalData() != nullptr) {
         snprintf(dump, dumpSize, "%p -> %p",
                 isInput ? buffer->externalData() : buffer->audioBuffer()->raw,
                 isInput ? buffer->audioBuffer()->raw : buffer->externalData());
