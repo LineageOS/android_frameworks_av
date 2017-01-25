@@ -46,9 +46,9 @@ class Camera3OutputStreamInterface : public virtual Camera3StreamInterface {
     virtual bool isConsumerConfigurationDeferred(size_t surface_id = 0) const = 0;
 
     /**
-     * Set the consumer surface to the output stream.
+     * Set the consumer surfaces to the output stream.
      */
-    virtual status_t setConsumer(sp<Surface> consumer) = 0;
+    virtual status_t setConsumers(const std::vector<sp<Surface>>& consumers) = 0;
 
     /**
      * Detach an unused buffer from the stream.

@@ -710,14 +710,19 @@ bool Camera3OutputStream::isConsumerConfigurationDeferred(size_t surface_id) con
     Mutex::Autolock l(mLock);
 
     if (surface_id != 0) {
-        ALOGE("%s: surface_id for Camera3OutputStream should be 0!", __FUNCTION__);
+        ALOGE("%s: surface_id %zu for Camera3OutputStream should be 0!", __FUNCTION__, surface_id);
     }
     return mConsumer == nullptr;
 }
 
-status_t Camera3OutputStream::setConsumer(sp<Surface> consumer) {
-    if (consumer == nullptr) {
-        ALOGE("%s: it's illegal to set a null consumer surface!", __FUNCTION__);
+status_t Camera3OutputStream::setConsumers(const std::vector<sp<Surface>>& consumers) {
+    if (consumers.size() != 1) {
+        ALOGE("%s: it's illegal to set %zu consumer surfaces!",
+                  __FUNCTION__, consumers.size());
+        return INVALID_OPERATION;
+    }
+    if (consumers[0] == nullptr) {
+        ALOGE("%s: it's illegal to set null consumer surface!", __FUNCTION__);
         return INVALID_OPERATION;
     }
 
@@ -726,7 +731,7 @@ status_t Camera3OutputStream::setConsumer(sp<Surface> consumer) {
         return INVALID_OPERATION;
     }
 
-    mConsumer = consumer;
+    mConsumer = consumers[0];
     return OK;
 }
 

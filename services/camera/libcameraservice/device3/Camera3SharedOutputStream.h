@@ -33,7 +33,7 @@ public:
      * sharing between multiple streams.
      */
     Camera3SharedOutputStream(int id, const std::vector<sp<Surface>>& surfaces,
-            bool hasDeferredSurface, uint32_t width, uint32_t height, int format,
+            uint32_t width, uint32_t height, int format,
             uint32_t consumerUsage, android_dataspace dataSpace,
             camera3_stream_rotation_t rotation, nsecs_t timestampOffset,
             int setId = CAMERA3_STREAM_SET_ID_INVALID);
@@ -45,7 +45,7 @@ public:
 
     virtual bool isConsumerConfigurationDeferred(size_t surface_id) const;
 
-    virtual status_t setConsumer(sp<Surface> consumer);
+    virtual status_t setConsumers(const std::vector<sp<Surface>>& consumers);
 
 private:
     // Surfaces passed in constructor from app
@@ -67,8 +67,6 @@ private:
     virtual status_t disconnectLocked();
 
     virtual status_t getEndpointUsage(uint32_t *usage) const;
-
-    bool mDeferred;
 
 }; // class Camera3SharedOutputStream
 

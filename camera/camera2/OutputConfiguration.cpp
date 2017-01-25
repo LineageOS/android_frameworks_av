@@ -56,12 +56,22 @@ int OutputConfiguration::getHeight() const {
     return mHeight;
 }
 
+bool OutputConfiguration::isDeferred() const {
+    return mIsDeferred;
+}
+
+bool OutputConfiguration::isShared() const {
+    return mIsShared;
+}
+
 OutputConfiguration::OutputConfiguration() :
         mRotation(INVALID_ROTATION),
         mSurfaceSetID(INVALID_SET_ID),
         mSurfaceType(SURFACE_TYPE_UNKNOWN),
         mWidth(0),
-        mHeight(0) {
+        mHeight(0),
+        mIsDeferred(false),
+        mIsShared(false) {
 }
 
 OutputConfiguration::OutputConfiguration(const android::Parcel& parcel) :
@@ -105,42 +115,28 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
-    // numSurfaces is the total number of surfaces for this OutputConfiguration,
-    // regardless the surface is deferred or not.
-    int numSurfaces = 0;
-    if ((err = parcel->readInt32(&numSurfaces)) != OK) {
-        ALOGE("%s: Failed to read maxSurfaces from parcel", __FUNCTION__);
+    int isDeferred = 0;
+    if ((err = parcel->readInt32(&isDeferred)) != OK) {
+        ALOGE("%s: Failed to read surface isDeferred flag from parcel", __FUNCTION__);
         return err;
     }
-    if (numSurfaces < 1) {
-        ALOGE("%s: there has to be at least 1 surface per"
-              " outputConfiguration", __FUNCTION__);
+
+    int isShared = 0;
+    if ((err = parcel->readInt32(&isShared)) != OK) {
+        ALOGE("%s: Failed to read surface isShared flag from parcel", __FUNCTION__);
+        return err;
+    }
+
+    if (isDeferred && surfaceType != SURFACE_TYPE_SURFACE_VIEW &&
+            surfaceType != SURFACE_TYPE_SURFACE_TEXTURE) {
+        ALOGE("%s: Invalid surface type for deferred configuration", __FUNCTION__);
         return BAD_VALUE;
     }
 
-    // Read all surfaces from parcel. If a surface is deferred, readFromPacel
-    // returns error, and a null surface is put into the mGbps. We assume all
-    // deferred surfaces are after non-deferred surfaces in the parcel.
-    // TODO: Need better way to detect deferred surface than using error
-    // return from readFromParcel.
-    std::vector<sp<IGraphicBufferProducer>> gbps;
-    for (int i = 0; i < numSurfaces; i++) {
-        view::Surface surfaceShim;
-        if ((err = surfaceShim.readFromParcel(parcel)) != OK) {
-            // Read surface failure for deferred surface configuration is expected.
-            if ((surfaceType == SURFACE_TYPE_SURFACE_VIEW ||
-                    surfaceType == SURFACE_TYPE_SURFACE_TEXTURE)) {
-                ALOGV("%s: Get null surface from a deferred surface configuration (%dx%d)",
-                        __FUNCTION__, width, height);
-                err = OK;
-            } else {
-                ALOGE("%s: Failed to read surface from parcel", __FUNCTION__);
-                return err;
-            }
-        }
-        gbps.push_back(surfaceShim.graphicBufferProducer);
-        ALOGV("%s: OutputConfiguration: gbps[%d] : %p, name %s", __FUNCTION__,
-                i, gbps[i].get(), String8(surfaceShim.name).string());
+    std::vector<view::Surface> surfaceShims;
+    if ((err = parcel->readParcelableVector(&surfaceShims)) != OK) {
+        ALOGE("%s: Failed to read surface(s) from parcel", __FUNCTION__);
+        return err;
     }
 
     mRotation = rotation;
@@ -148,7 +144,14 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
     mSurfaceType = surfaceType;
     mWidth = width;
     mHeight = height;
-    mGbps = std::move(gbps);
+    mIsDeferred = isDeferred != 0;
+    mIsShared = isShared != 0;
+    for (auto& surface : surfaceShims) {
+        ALOGV("%s: OutputConfiguration: %p, name %s", __FUNCTION__,
+                surface.graphicBufferProducer.get(),
+                String8(surface.name).string());
+        mGbps.push_back(surface.graphicBufferProducer);
+    }
 
     ALOGV("%s: OutputConfiguration: rotation = %d, setId = %d, surfaceType = %d",
             __FUNCTION__, mRotation, mSurfaceSetID, mSurfaceType);
@@ -161,6 +164,8 @@ OutputConfiguration::OutputConfiguration(sp<IGraphicBufferProducer>& gbp, int ro
     mGbps.push_back(gbp);
     mRotation = rotation;
     mSurfaceSetID = surfaceSetID;
+    mIsDeferred = false;
+    mIsShared = false;
 }
 
 status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
@@ -183,18 +188,21 @@ status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
     err = parcel->writeInt32(mHeight);
     if (err != OK) return err;
 
-    int numSurfaces = mGbps.size();
-    err = parcel->writeInt32(numSurfaces);
+    err = parcel->writeInt32(mIsDeferred ? 1 : 0);
     if (err != OK) return err;
 
-    for (int i = 0; i < numSurfaces; i++) {
+    err = parcel->writeInt32(mIsShared ? 1 : 0);
+    if (err != OK) return err;
+
+    std::vector<view::Surface> surfaceShims;
+    for (auto& gbp : mGbps) {
         view::Surface surfaceShim;
         surfaceShim.name = String16("unknown_name"); // name of surface
-        surfaceShim.graphicBufferProducer = mGbps[i];
-
-        err = surfaceShim.writeToParcel(parcel);
-        if (err != OK) return err;
+        surfaceShim.graphicBufferProducer = gbp;
+        surfaceShims.push_back(surfaceShim);
     }
+    err = parcel->writeParcelableVector(surfaceShims);
+    if (err != OK) return err;
 
     return OK;
 }

@@ -1292,7 +1292,7 @@ status_t Camera3Device::createZslStream(
 status_t Camera3Device::createStream(sp<Surface> consumer,
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
-            int streamSetId, uint32_t consumerUsage) {
+            int streamSetId, bool isShared, uint32_t consumerUsage) {
     ATRACE_CALL();
 
     if (consumer == nullptr) {
@@ -1304,19 +1304,19 @@ status_t Camera3Device::createStream(sp<Surface> consumer,
     consumers.push_back(consumer);
 
     return createStream(consumers, /*hasDeferredConsumer*/ false, width, height,
-            format, dataSpace, rotation, id, streamSetId, consumerUsage);
+            format, dataSpace, rotation, id, streamSetId, isShared, consumerUsage);
 }
 
 status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
         android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
-        int streamSetId, uint32_t consumerUsage) {
+        int streamSetId, bool isShared, uint32_t consumerUsage) {
     ATRACE_CALL();
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
     ALOGV("Camera %s: Creating new stream %d: %d x %d, format %d, dataspace %d rotation %d"
-            " consumer usage 0x%x", mId.string(), mNextStreamId, width, height, format, dataSpace, rotation,
-            consumerUsage);
+            " consumer usage 0x%x, isShared %d", mId.string(), mNextStreamId, width, height, format,
+            dataSpace, rotation, consumerUsage, isShared);
 
     status_t res;
     bool wasActive = false;
@@ -1370,8 +1370,6 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         return BAD_VALUE;
     }
 
-    bool streamSharing  = consumers.size() > 1 || (consumers.size()  > 0 && hasDeferredConsumer);
-
     // Use legacy dataspace values for older HALs
     if (mDeviceVersion <= CAMERA_DEVICE_API_VERSION_3_3) {
         dataSpace = mapToLegacyDataspace(dataSpace);
@@ -1403,14 +1401,14 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0],
                 width, height, rawOpaqueBufferSize, format, dataSpace, rotation,
                 mTimestampOffset, streamSetId);
+    } else if (isShared) {
+        newStream = new Camera3SharedOutputStream(mNextStreamId, consumers,
+                width, height, format, consumerUsage, dataSpace, rotation,
+                mTimestampOffset, streamSetId);
     } else if (consumers.size() == 0 && hasDeferredConsumer) {
         newStream = new Camera3OutputStream(mNextStreamId,
                 width, height, format, consumerUsage, dataSpace, rotation,
                 mTimestampOffset, streamSetId);
-    } else if (streamSharing) {
-        newStream = new Camera3SharedOutputStream(mNextStreamId, consumers,
-                hasDeferredConsumer, width, height, format, consumerUsage,
-                dataSpace, rotation, mTimestampOffset, streamSetId);
     } else {
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0],
                 width, height, format, dataSpace, rotation,
@@ -2067,14 +2065,16 @@ void Camera3Device::notifyStatus(bool idle) {
     }
 }
 
-status_t Camera3Device::setConsumerSurface(int streamId, sp<Surface> consumer) {
+status_t Camera3Device::setConsumerSurfaces(int streamId,
+        const std::vector<sp<Surface>>& consumers) {
     ATRACE_CALL();
-    ALOGV("%s: Camera %s: set consumer surface for stream %d", __FUNCTION__, mId.string(), streamId);
+    ALOGV("%s: Camera %s: set consumer surface for stream %d",
+            __FUNCTION__, mId.string(), streamId);
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
 
-    if (consumer == nullptr) {
-        CLOGE("Null consumer is passed!");
+    if (consumers.size() == 0) {
+        CLOGE("No consumer is passed!");
         return BAD_VALUE;
     }
 
@@ -2084,7 +2084,7 @@ status_t Camera3Device::setConsumerSurface(int streamId, sp<Surface> consumer) {
         return idx;
     }
     sp<Camera3OutputStreamInterface> stream = mOutputStreams[idx];
-    status_t res = stream->setConsumer(consumer);
+    status_t res = stream->setConsumers(consumers);
     if (res != OK) {
         CLOGE("Stream %d set consumer failed (error %d %s) ", streamId, res, strerror(-res));
         return res;
