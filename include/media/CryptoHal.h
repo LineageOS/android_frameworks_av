@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,24 +14,23 @@
  * limitations under the License.
  */
 
-#ifndef CRYPTO_H_
+#ifndef CRYPTO_HAL_H_
 
-#define CRYPTO_H_
+#define CRYPTO_HAL_H_
 
+#include <android/hardware/drm/1.0/ICryptoFactory.h>
+#include <android/hardware/drm/1.0/ICryptoPlugin.h>
 #include <media/ICrypto.h>
-#include <utils/threads.h>
 #include <utils/KeyedVector.h>
+#include <utils/threads.h>
 
 #include "SharedLibrary.h"
 
 namespace android {
 
-struct CryptoFactory;
-struct CryptoPlugin;
-
-struct Crypto : public BnCrypto {
-    Crypto();
-    virtual ~Crypto();
+struct CryptoHal : public BnCrypto {
+    CryptoHal();
+    virtual ~CryptoHal();
 
     virtual status_t initCheck() const;
 
@@ -53,27 +52,37 @@ struct Crypto : public BnCrypto {
             CryptoPlugin::Mode mode, const CryptoPlugin::Pattern &pattern,
             const sp<IMemory> &source, size_t offset,
             const CryptoPlugin::SubSample *subSamples, size_t numSubSamples,
-            const DestinationBuffer &destination, AString *errorDetailMsg);
+            const ICrypto::DestinationBuffer &destination,
+            AString *errorDetailMsg);
 
 private:
     mutable Mutex mLock;
 
-    status_t mInitCheck;
     sp<SharedLibrary> mLibrary;
-    CryptoFactory *mFactory;
-    CryptoPlugin *mPlugin;
+    sp<::android::hardware::drm::V1_0::ICryptoFactory> mFactory;
+    sp<::android::hardware::drm::V1_0::ICryptoPlugin> mPlugin;
 
-    static KeyedVector<Vector<uint8_t>, String8> mUUIDToLibraryPathMap;
-    static KeyedVector<String8, wp<SharedLibrary> > mLibraryPathToOpenLibraryMap;
-    static Mutex mMapLock;
+    /**
+     * mInitCheck is:
+     *   NO_INIT if a plugin hasn't been created yet
+     *   ERROR_UNSUPPORTED if a plugin can't be created for the uuid
+     *   OK after a plugin has been created and mPlugin is valid
+     */
+    status_t mInitCheck;
 
-    void findFactoryForScheme(const uint8_t uuid[16]);
-    bool loadLibraryForScheme(const String8 &path, const uint8_t uuid[16]);
-    void closeFactory();
+    void *mHeapBase;
 
-    DISALLOW_EVIL_CONSTRUCTORS(Crypto);
+    sp<::android::hardware::drm::V1_0::ICryptoFactory>
+            makeCryptoFactory();
+    sp<::android::hardware::drm::V1_0::ICryptoPlugin>
+            makeCryptoPlugin(const uint8_t uuid[16], const void *initData,
+                size_t size);
+
+    status_t setHeapBase(const sp<IMemory> &sharedBuffer);
+
+    DISALLOW_EVIL_CONSTRUCTORS(CryptoHal);
 };
 
 }  // namespace android
 
-#endif  // CRYPTO_H_
+#endif  // CRYPTO_HAL_H_

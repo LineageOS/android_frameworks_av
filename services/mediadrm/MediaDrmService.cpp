@@ -21,11 +21,16 @@
 #define LOG_TAG "MediaDrmService"
 
 #include "MediaDrmService.h"
-
 #include <binder/IServiceManager.h>
+#include <utils/Log.h>
+
+#ifdef ENABLE_TREBLE_DRM
+#include <media/CryptoHal.h>
+#include <media/DrmHal.h>
+#else
 #include <media/Crypto.h>
 #include <media/Drm.h>
-#include <utils/Log.h>
+#endif
 
 namespace android {
 
@@ -35,11 +40,19 @@ void MediaDrmService::instantiate() {
 }
 
 sp<ICrypto> MediaDrmService::makeCrypto() {
+#ifdef ENABLE_TREBLE_DRM
+    return new CryptoHal;
+#else
     return new Crypto;
+#endif
 }
 
 sp<IDrm> MediaDrmService::makeDrm() {
+#ifdef ENABLE_TREBLE_DRM
+    return new DrmHal;
+#else
     return new Drm;
+#endif
 }
 
 } // namespace android

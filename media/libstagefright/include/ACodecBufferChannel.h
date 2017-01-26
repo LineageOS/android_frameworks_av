@@ -115,6 +115,7 @@ private:
     const sp<AMessage> mOutputBufferDrained;
 
     sp<MemoryDealer> mDealer;
+    sp<IMemory> mDecryptDestination;
 
     // These should only be accessed via std::atomic_* functions.
     //

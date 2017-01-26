@@ -51,8 +51,7 @@ void *SecureBuffer::getDestinationPointer() {
 }
 
 ICrypto::DestinationType SecureBuffer::getDestinationType() {
-    return mHandle == nullptr ? ICrypto::kDestinationTypeOpaqueHandle
-                              : ICrypto::kDestinationTypeNativeHandle;
+    return ICrypto::kDestinationTypeNativeHandle;
 }
 
 }  // namespace android
