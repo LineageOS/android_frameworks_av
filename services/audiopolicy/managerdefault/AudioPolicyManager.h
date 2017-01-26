@@ -507,6 +507,8 @@ protected:
 
         void clearAudioSources(uid_t uid);
 
+        static bool isConcurrentSource(audio_source_t source);
+
         bool isConcurentCaptureAllowed(const sp<AudioInputDescriptor>& inputDesc,
                 const sp<AudioSession>& audioSession);
 

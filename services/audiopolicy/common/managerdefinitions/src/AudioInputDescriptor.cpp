@@ -63,11 +63,9 @@ audio_port_handle_t AudioInputDescriptor::getId() const
     return mId;
 }
 
-audio_source_t AudioInputDescriptor::inputSource() const
+audio_source_t AudioInputDescriptor::inputSource(bool activeOnly) const
 {
-    // TODO: return highest priority input source
-    return mSessions.size() > 0 ? mSessions.valueAt(0)->inputSource() :
-                       AUDIO_SOURCE_DEFAULT;
+    return getHighestPrioritySource(activeOnly);
 }
 
 void AudioInputDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig,
