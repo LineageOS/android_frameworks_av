@@ -383,6 +383,10 @@ status_t AudioTrack::set(
         if ((mAttributes.flags & AUDIO_FLAG_LOW_LATENCY) != 0) {
             flags = (audio_output_flags_t) (flags | AUDIO_OUTPUT_FLAG_FAST);
         }
+        // check deep buffer after flags have been modified above
+        if (flags == AUDIO_OUTPUT_FLAG_NONE && (mAttributes.flags & AUDIO_FLAG_DEEP_BUFFER) != 0) {
+            flags = AUDIO_OUTPUT_FLAG_DEEP_BUFFER;
+        }
     }
 
     // these below should probably come from the audioFlinger too...
