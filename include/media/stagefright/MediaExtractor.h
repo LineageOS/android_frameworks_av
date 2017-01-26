@@ -20,6 +20,7 @@
 
 #include <media/IMediaExtractor.h>
 #include <media/IMediaSource.h>
+#include <media/MediaAnalyticsItem.h>
 
 namespace android {
 
@@ -69,7 +70,9 @@ public:
 
 protected:
     MediaExtractor();
-    virtual ~MediaExtractor() {}
+    virtual ~MediaExtractor();
+
+    MediaAnalyticsItem *mAnalyticsItem;
 
 private:
 

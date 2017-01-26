@@ -36,6 +36,7 @@
 #include <binder/IServiceManager.h>
 #include <binder/MemoryDealer.h>
 
+#include <media/MediaAnalyticsItem.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/DataSource.h>
@@ -47,8 +48,15 @@
 #include <utils/String8.h>
 #include <private/android_filesystem_config.h>
 
+// still doing some on/off toggling here.
+#define MEDIA_LOG       1
+
 
 namespace android {
+
+// key for media statistics
+static const char *KeyName_Extractor = "extractor";
+// attrs for media statistics
 
 MediaExtractor::MediaExtractor() {
     if (!LOG_NDEBUG) {
@@ -57,8 +65,29 @@ MediaExtractor::MediaExtractor() {
         ALOGI("extractor created in uid: %d (%s)", getuid(), pw->pw_name);
     }
 
+    mAnalyticsItem = NULL;
+    if (MEDIA_LOG) {
+        mAnalyticsItem = new MediaAnalyticsItem(KeyName_Extractor);
+        (void) mAnalyticsItem->generateSessionID();
+    }
 }
 
+MediaExtractor::~MediaExtractor() {
+
+    // log the current record, provided it has some information worth recording
+    if (MEDIA_LOG) {
+        if (mAnalyticsItem != NULL) {
+            if (mAnalyticsItem->count() > 0) {
+                mAnalyticsItem->setFinalized(true);
+                mAnalyticsItem->selfrecord();
+            }
+        }
+    }
+    if (mAnalyticsItem != NULL) {
+        delete mAnalyticsItem;
+        mAnalyticsItem = NULL;
+    }
+}
 
 sp<MetaData> MediaExtractor::getMetaData() {
     return new MetaData;
@@ -212,6 +241,31 @@ sp<MediaExtractor> MediaExtractor::CreateFromService(
         ret = new MPEG2PSExtractor(source);
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_MIDI)) {
         ret = new MidiExtractor(source);
+    }
+
+    if (ret != NULL) {
+       // track the container format (mpeg, aac, wvm, etc)
+       if (MEDIA_LOG) {
+          if (ret->mAnalyticsItem != NULL) {
+              ret->mAnalyticsItem->setCString("fmt",  ret->name());
+              // tracks (size_t)
+              ret->mAnalyticsItem->setInt32("ntrk",  ret->countTracks());
+              // metadata
+              sp<MetaData> pMetaData = ret->getMetaData();
+              if (pMetaData != NULL) {
+                String8 xx = pMetaData->toString();
+                ALOGD("metadata says: %s", xx.string());
+                // can grab various fields like:
+                // 'titl' -- but this verges into PII
+                // 'mime'
+                const char *mime = NULL;
+                if (pMetaData->findCString(kKeyMIMEType, &mime)) {
+                    ret->mAnalyticsItem->setCString("mime",  mime);
+                }
+                // what else is interesting here?
+              }
+          }
+       }
     }
 
     return ret;

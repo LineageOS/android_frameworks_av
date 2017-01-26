@@ -36,6 +36,7 @@
 #include <media/AudioSystem.h>
 #include <media/AVSyncSettings.h>
 #include <media/IDataSource.h>
+#include <media/MediaAnalyticsItem.h>
 
 #include <binder/MemoryBase.h>
 
@@ -810,7 +811,11 @@ status_t MediaPlayer::getParameter(int key, Parcel *reply)
     ALOGV("MediaPlayer::getParameter(%d)", key);
     Mutex::Autolock _l(mLock);
     if (mPlayer != NULL) {
-        return  mPlayer->getParameter(key, reply);
+        status_t status =  mPlayer->getParameter(key, reply);
+        if (status != OK) {
+            ALOGD("getParameter returns %d", status);
+        }
+        return status;
     }
     ALOGV("getParameter: no active player");
     return INVALID_OPERATION;

@@ -33,6 +33,7 @@
 #include <media/IOMX.h>
 #include <media/IResourceManagerService.h>
 #include <media/MediaCodecBuffer.h>
+#include <media/MediaAnalyticsItem.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -56,6 +57,13 @@
 #include <utils/Singleton.h>
 
 namespace android {
+
+// key for media statistics
+static const char *CodecKeyName = "codec";
+// attrs for media statistics
+static const char *CodecMime = "mime";
+static const char *CodecCodec = "codec";
+
 
 static int64_t getId(const sp<IResourceManagerClient> &client) {
     return (int64_t) client.get();
@@ -476,11 +484,27 @@ MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid)
     } else {
         mUid = uid;
     }
+    // set up our new record, get a sessionID, put it into the in-progress list
+    mAnalyticsItem = new MediaAnalyticsItem(CodecKeyName);
+    if (mAnalyticsItem != NULL) {
+        (void) mAnalyticsItem->generateSessionID();
+        // don't record it yet; only at the end, when we have decided that we have
+        // data worth writing (e.g. .count() > 0)
+    }
 }
 
 MediaCodec::~MediaCodec() {
     CHECK_EQ(mState, UNINITIALIZED);
     mResourceManagerService->removeResource(getId(mResourceManagerClient));
+
+    if (mAnalyticsItem != NULL ) {
+        if (mAnalyticsItem->count() > 0) {
+            mAnalyticsItem->setFinalized(true);
+            mAnalyticsItem->selfrecord();
+        }
+        delete mAnalyticsItem;
+        mAnalyticsItem = NULL;
+    }
 }
 
 // static
@@ -600,6 +624,19 @@ status_t MediaCodec::init(const AString &name, bool nameIsType, bool encoder) {
         msg->setInt32("encoder", encoder);
     }
 
+    if (mAnalyticsItem != NULL) {
+        if (nameIsType) {
+            // name is the mime type
+            mAnalyticsItem->setCString(CodecMime, name.c_str());
+        } else {
+            mAnalyticsItem->setCString(CodecCodec, name.c_str());
+        }
+        mAnalyticsItem->setCString("mode", mIsVideo ? "video" : "audio");
+        //mAnalyticsItem->setInt32("type", nameIsType);
+        if (nameIsType)
+            mAnalyticsItem->setInt32("encoder", encoder);
+    }
+
     status_t err;
     Vector<MediaResource> resources;
     MediaResource::Type type =
@@ -652,6 +689,12 @@ status_t MediaCodec::configure(
             mRotationDegrees = 0;
         }
 
+        if (mAnalyticsItem != NULL) {
+            mAnalyticsItem->setInt32("width", mVideoWidth);
+            mAnalyticsItem->setInt32("height", mVideoHeight);
+            mAnalyticsItem->setInt32("rotation", mRotationDegrees);
+        }
+
         // Prevent possible integer overflow in downstream code.
         if (mInitIsEncoder
                 && (uint64_t)mVideoWidth * mVideoHeight > (uint64_t)INT32_MAX / 4) {
@@ -666,6 +709,10 @@ status_t MediaCodec::configure(
 
     if (crypto != NULL) {
         msg->setPointer("crypto", crypto.get());
+        if (mAnalyticsItem != NULL) {
+            // XXX: save indication that it's crypto in some way...
+            mAnalyticsItem->setInt32("crypto", 1);
+        }
     }
 
     // save msg for reset
@@ -1054,6 +1101,21 @@ status_t MediaCodec::getName(AString *name) const {
     }
 
     CHECK(response->findString("name", name));
+
+    return OK;
+}
+
+status_t MediaCodec::getMetrics(Parcel *reply) {
+
+    // shouldn't happen, but be safe
+    if (mAnalyticsItem == NULL) {
+        return UNKNOWN_ERROR;
+    }
+
+    // XXX: go get current values for whatever in-flight data we want
+
+    // send it back to the caller.
+    mAnalyticsItem->writeToParcel(reply);
 
     return OK;
 }

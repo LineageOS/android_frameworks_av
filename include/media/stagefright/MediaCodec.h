@@ -25,6 +25,7 @@
 #include <media/hardware/CryptoAPI.h>
 #include <media/MediaCodecInfo.h>
 #include <media/MediaResource.h>
+#include <media/MediaAnalyticsItem.h>
 #include <media/stagefright/foundation/AHandler.h>
 #include <media/stagefright/FrameRenderTracker.h>
 #include <utils/Vector.h>
@@ -172,6 +173,8 @@ struct MediaCodec : public AHandler {
 
     status_t getName(AString *componentName) const;
 
+    status_t getMetrics(Parcel *reply);
+
     status_t setParameters(const sp<AMessage> &params);
 
     // Create a MediaCodec notification message from a list of rendered or dropped render infos
@@ -297,6 +300,8 @@ private:
     status_t mStickyError;
     sp<Surface> mSurface;
     SoftwareRenderer *mSoftRenderer;
+
+    MediaAnalyticsItem *mAnalyticsItem;
 
     sp<AMessage> mOutputFormat;
     sp<AMessage> mInputFormat;
