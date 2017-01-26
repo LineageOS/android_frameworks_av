@@ -278,6 +278,7 @@ ACameraMetadata::isCaptureRequestTag(const uint32_t tag) {
         case ACAMERA_CONTROL_SCENE_MODE:
         case ACAMERA_CONTROL_VIDEO_STABILIZATION_MODE:
         case ACAMERA_CONTROL_POST_RAW_SENSITIVITY_BOOST:
+        case ACAMERA_CONTROL_ENABLE_ZSL:
         case ACAMERA_EDGE_MODE:
         case ACAMERA_FLASH_MODE:
         case ACAMERA_HOT_PIXEL_MODE:

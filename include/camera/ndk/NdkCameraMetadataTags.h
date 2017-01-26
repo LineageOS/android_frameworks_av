@@ -1515,6 +1515,40 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_CONTROL_POST_RAW_SENSITIVITY_BOOST =                // int32
             ACAMERA_CONTROL_START + 40,
+    /**
+     * <p>Allow camera device to enable zero-shutter-lag mode for requests with
+     * ACAMERA_CONTROL_CAPTURE_INTENT == STILL_CAPTURE.</p>
+     *
+     * @see ACAMERA_CONTROL_CAPTURE_INTENT
+     *
+     * <p>This tag may appear in:</p>
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     *   <li>ACaptureRequest</li>
+     * </ul>
+     *
+     * <p>If enableZsl is <code>true</code>, the camera device may enable zero-shutter-lag mode for requests with
+     * STILL_CAPTURE capture intent. The camera device may use images captured in the past to
+     * produce output images for a zero-shutter-lag request. The result metadata including the
+     * ACAMERA_SENSOR_TIMESTAMP reflects the source frames used to produce output images.
+     * Therefore, the contents of the output images and the result metadata may be out of order
+     * compared to previous regular requests. enableZsl does not affect requests with other
+     * capture intents.</p>
+     * <p>For example, when requests are submitted in the following order:
+     *   Request A: enableZsl is <code>true</code>, ACAMERA_CONTROL_CAPTURE_INTENT is PREVIEW
+     *   Request B: enableZsl is <code>true</code>, ACAMERA_CONTROL_CAPTURE_INTENT is STILL_CAPTURE</p>
+     * <p>The output images for request B may have contents captured before the output images for
+     * request A, and the result metadata for request B may be older than the result metadata for
+     * request A.</p>
+     * <p>Note that when enableZsl is <code>true</code>, it is not guaranteed to get output images captured in the
+     * past for requests with STILL_CAPTURE capture intent.</p>
+     * <p>The value of enableZsl in capture templates is always <code>false</code> if present.</p>
+     *
+     * @see ACAMERA_CONTROL_CAPTURE_INTENT
+     * @see ACAMERA_SENSOR_TIMESTAMP
+     */
+    ACAMERA_CONTROL_ENABLE_ZSL =                                // byte (enum)
+            ACAMERA_CONTROL_START + 41,
     ACAMERA_CONTROL_END,
 
     /**
@@ -5761,6 +5795,26 @@ typedef enum acamera_metadata_enum_acamera_control_awb_lock_available {
     ACAMERA_CONTROL_AWB_LOCK_AVAILABLE_TRUE                          = 1,
 
 } acamera_metadata_enum_android_control_awb_lock_available_t;
+
+// ACAMERA_CONTROL_ENABLE_ZSL
+typedef enum acamera_metadata_enum_acamera_control_enable_zsl {
+    /**
+     * <p>Requests with ACAMERA_CONTROL_CAPTURE_INTENT == STILL_CAPTURE must be captured
+     * after previous requests.</p>
+     *
+     * @see ACAMERA_CONTROL_CAPTURE_INTENT
+     */
+    ACAMERA_CONTROL_ENABLE_ZSL_FALSE                                 = 0,
+
+    /**
+     * <p>Requests with ACAMERA_CONTROL_CAPTURE_INTENT == STILL_CAPTURE may or may not be
+     * captured before previous requests.</p>
+     *
+     * @see ACAMERA_CONTROL_CAPTURE_INTENT
+     */
+    ACAMERA_CONTROL_ENABLE_ZSL_TRUE                                  = 1,
+
+} acamera_metadata_enum_android_control_enable_zsl_t;
 
 
 
