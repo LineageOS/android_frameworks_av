@@ -79,6 +79,8 @@ static const char kMetaKey_Build[]      = "com.android.build";
 static const char kMetaKey_CaptureFps[] = "com.android.capture.fps";
 static const char kMetaKey_TemporalLayerCount[] = "com.android.video.temporal_layers_count";
 
+static const int kTimestampDebugCount = 10;
+
 static const uint8_t kMandatoryHevcNalUnitTypes[3] = {
     kHevcNalUnitTypeVps,
     kHevcNalUnitTypeSps,
@@ -305,6 +307,9 @@ private:
     int64_t mMinCttsOffsetTimeUs;
     int64_t mMaxCttsOffsetTimeUs;
 
+    // Save the last 10 frames' timestamp for debug.
+    std::list<std::pair<int64_t, int64_t>> mTimestampDebugHelper;
+
     // Sequence parameter set or picture parameter set
     struct AVCParamSet {
         AVCParamSet(uint16_t length, const uint8_t *data)
@@ -333,6 +338,8 @@ private:
 
     // Update the audio track's drift information.
     void updateDriftTime(const sp<MetaData>& meta);
+
+    void dumpTimeStamps();
 
     int32_t getStartTimeOffsetScaledTime() const;
 
@@ -2501,6 +2508,17 @@ void MPEG4Writer::Track::updateDriftTime(const sp<MetaData>& meta) {
     }
 }
 
+void MPEG4Writer::Track::dumpTimeStamps() {
+    ALOGE("Dumping %s track's last 10 frames timestamp ", getTrackType());
+    std::string timeStampString;
+    for (std::list<std::pair<int64_t, int64_t>>::iterator num = mTimestampDebugHelper.begin();
+            num != mTimestampDebugHelper.end(); ++num) {
+        timeStampString += "(" + std::to_string(num->first)+
+                "us, " + std::to_string(num->second) + "us) ";
+    }
+    ALOGE("%s", timeStampString.c_str());
+}
+
 status_t MPEG4Writer::Track::threadEntry() {
     int32_t count = 0;
     const int64_t interleaveDurationUs = mOwner->interleaveDuration();
@@ -2706,8 +2724,9 @@ status_t MPEG4Writer::Track::threadEntry() {
             previousPausedDurationUs += pausedDurationUs - lastDurationUs;
             mResumed = false;
         }
-
+        std::pair<int64_t, int64_t> timestampPair;
         timestampUs -= previousPausedDurationUs;
+        timestampPair.first = timestampUs;
         if (WARN_UNLESS(timestampUs >= 0ll, "for %s track", trackName)) {
             copy->release();
             mSource->stop();
@@ -2864,6 +2883,12 @@ status_t MPEG4Writer::Track::threadEntry() {
         lastDurationUs = timestampUs - lastTimestampUs;
         lastDurationTicks = currDurationTicks;
         lastTimestampUs = timestampUs;
+        timestampPair.second = timestampUs;
+        // Insert the timestamp into the mTimestampDebugHelper
+        if (mTimestampDebugHelper.size() >= kTimestampDebugCount) {
+            mTimestampDebugHelper.pop_front();
+        }
+        mTimestampDebugHelper.push_back(timestampPair);
 
         if (isSync != 0) {
             addOneStssTableEntry(mStszTableEntries->count());
@@ -2919,6 +2944,7 @@ status_t MPEG4Writer::Track::threadEntry() {
     }
 
     if (isTrackMalFormed()) {
+        dumpTimeStamps();
         err = ERROR_MALFORMED;
     }
 
