@@ -16,6 +16,7 @@
 */
 
 #define LOG_TAG "IRadio"
+//#define LOG_NDEBUG 0
 #include <utils/Log.h>
 #include <utils/Errors.h>
 #include <binder/IMemory.h>
@@ -23,7 +24,7 @@
 #include <radio/IRadioService.h>
 #include <radio/IRadioClient.h>
 #include <system/radio.h>
-#include <system/radio_metadata.h>
+#include <system/RadioMetadataWrapper.h>
 
 namespace android {
 
@@ -303,12 +304,9 @@ status_t BnRadio::onTransact(
         case GET_PROGRAM_INFORMATION: {
             CHECK_INTERFACE(IRadio, data, reply);
             struct radio_program_info info;
+            RadioMetadataWrapper metadataWrapper(&info.metadata);
 
-            status_t status = radio_metadata_allocate(&info.metadata, 0, 0);
-            if (status != NO_ERROR) {
-                return status;
-            }
-            status = getProgramInformation(&info);
+            status_t status = getProgramInformation(&info);
             reply->writeInt32(status);
             if (status == NO_ERROR) {
                 reply->write(&info, sizeof(struct radio_program_info));
@@ -321,7 +319,6 @@ status_t BnRadio::onTransact(
                     reply->writeInt32(0);
                 }
             }
-            radio_metadata_deallocate(info.metadata);
             return NO_ERROR;
         }
         case HAS_CONTROL: {
