@@ -706,7 +706,16 @@ status_t NuPlayerDriver::setParameter(
     return INVALID_OPERATION;
 }
 
-status_t NuPlayerDriver::getParameter(int /* key */, Parcel * /* reply */) {
+status_t NuPlayerDriver::getParameter(int key, Parcel *reply) {
+
+    if (key == FOURCC('m','t','r','X')) {
+        // mtrX -- a play on 'metrics' (not matrix)
+        // gather current info all together, parcel it, and send it back
+        finalizeMetrics("api");
+        mAnalyticsItem->writeToParcel(reply);
+        return OK;
+    }
+
     return INVALID_OPERATION;
 }
 
