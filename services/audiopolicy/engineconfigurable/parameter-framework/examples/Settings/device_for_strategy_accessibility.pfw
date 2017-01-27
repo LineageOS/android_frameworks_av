@@ -375,7 +375,7 @@ supDomain: DeviceForStrategy
 						TelephonyMode IsNot InCall
 						TelephonyMode IsNot InCommunication
 						AvailableOutputDevices Excludes UsbAccessory
-						ForceUseForCommunication Is ForceSpeaker
+						ForceUseForMedia IsNot ForceSpeaker
 				AvailableOutputDevices Includes UsbDevice
 
 				component: /Policy/policy/strategies/accessibility/selected_output_devices/mask
