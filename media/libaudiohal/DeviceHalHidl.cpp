@@ -50,6 +50,10 @@ namespace {
 status_t deviceAddressFromHal(
         audio_devices_t device, const char* halAddress, DeviceAddress* address) {
     address->device = AudioDevice(device);
+
+    if (address == nullptr || strnlen(halAddress, AUDIO_DEVICE_MAX_ADDRESS_LEN) == 0) {
+        return OK;
+    }
     const bool isInput = (device & AUDIO_DEVICE_BIT_IN) != 0;
     if (isInput) device &= ~AUDIO_DEVICE_BIT_IN;
     if ((!isInput && (device & AUDIO_DEVICE_OUT_ALL_A2DP) != 0)
