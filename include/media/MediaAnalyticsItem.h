@@ -40,6 +40,7 @@ class MediaAnalyticsItem {
 
     friend class MediaAnalyticsService;
     friend class IMediaAnalyticsService;
+    friend class MediaMetricsJNI;
 
     public:
 
