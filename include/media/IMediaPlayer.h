@@ -24,6 +24,7 @@
 #include <system/audio.h>
 
 #include <media/IMediaSource.h>
+#include <media/drm/DrmAPI.h>   // for DrmPlugin::* enum
 
 // Fwd decl to make sure everyone agrees that the scope of struct sockaddr_in is
 // global, and not in android::
@@ -89,6 +90,22 @@ public:
     virtual status_t        setRetransmitEndpoint(const struct sockaddr_in* endpoint) = 0;
     virtual status_t        getRetransmitEndpoint(struct sockaddr_in* endpoint) = 0;
     virtual status_t        setNextPlayer(const sp<IMediaPlayer>& next) = 0;
+    // ModDrm
+    virtual status_t        prepareDrm(const uint8_t uuid[16], const int mode) = 0;
+    virtual status_t        releaseDrm() = 0;
+    virtual status_t        getKeyRequest(Vector<uint8_t> const& scope,
+                                    String8 const &mimeType,
+                                    DrmPlugin::KeyType keyType,
+                                    KeyedVector<String8, String8>& optionalParameters,
+                                    Vector<uint8_t>& request,
+                                    String8& defaultUrl,
+                                    DrmPlugin::KeyRequestType& keyRequestType) = 0;
+    virtual status_t        provideKeyResponse(Vector<uint8_t>& releaseKeySetId,
+                                    Vector<uint8_t>& response,
+                                    Vector<uint8_t>& keySetId) = 0;
+    virtual status_t        restoreKeys(Vector<uint8_t> const& keySetId) = 0;
+    virtual status_t        getDrmPropertyString(String8 const& name, String8& value) = 0;
+    virtual status_t        setDrmPropertyString(String8 const& name, String8 const& value) = 0;
 
     // Invoke a generic method on the player by using opaque parcels
     // for the request and reply.
