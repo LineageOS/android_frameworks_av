@@ -1822,7 +1822,8 @@ void NuPlayer::updateVideoSize(
     // Take into account sample aspect ratio if necessary:
     int32_t sarWidth, sarHeight;
     if (inputFormat->findInt32("sar-width", &sarWidth)
-            && inputFormat->findInt32("sar-height", &sarHeight)) {
+            && inputFormat->findInt32("sar-height", &sarHeight)
+            && sarWidth > 0 && sarHeight > 0) {
         ALOGV("Sample aspect ratio %d : %d", sarWidth, sarHeight);
 
         displayWidth = (displayWidth * sarWidth) / sarHeight;
