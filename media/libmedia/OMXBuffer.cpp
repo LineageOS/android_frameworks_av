@@ -17,6 +17,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "OMXBuffer"
 
+#include <media/stagefright/foundation/ADebug.h>
 #include <media/MediaCodecBuffer.h>
 #include <media/OMXBuffer.h>
 #include <binder/IMemory.h>
@@ -39,6 +40,12 @@ OMXBuffer::OMXBuffer(const sp<MediaCodecBuffer>& codecBuffer)
       mRangeLength(codecBuffer != NULL ? codecBuffer->size() : 0) {
 }
 
+OMXBuffer::OMXBuffer(OMX_U32 rangeOffset, OMX_U32 rangeLength)
+    : mBufferType(kBufferTypePreset),
+      mRangeOffset(rangeOffset),
+      mRangeLength(rangeLength) {
+}
+
 OMXBuffer::OMXBuffer(const sp<IMemory> &mem)
     : mBufferType(kBufferTypeSharedMem),
       mMem(mem) {
@@ -54,10 +61,16 @@ OMXBuffer::OMXBuffer(const sp<NativeHandle> &handle)
       mNativeHandle(handle) {
 }
 
+OMXBuffer::OMXBuffer(const hidl_memory &hidlMemory)
+    : mBufferType(kBufferTypeHidlMemory),
+      mHidlMemory(hidlMemory) {
+}
+
 OMXBuffer::~OMXBuffer() {
 }
 
 status_t OMXBuffer::writeToParcel(Parcel *parcel) const {
+    CHECK(mBufferType != kBufferTypeHidlMemory);
     parcel->writeInt32(mBufferType);
 
     switch(mBufferType) {
@@ -93,6 +106,7 @@ status_t OMXBuffer::writeToParcel(Parcel *parcel) const {
 
 status_t OMXBuffer::readFromParcel(const Parcel *parcel) {
     BufferType bufferType = (BufferType) parcel->readInt32();
+    CHECK(bufferType != kBufferTypeHidlMemory);
 
     switch(bufferType) {
         case kBufferTypePreset:
@@ -147,10 +161,12 @@ status_t OMXBuffer::readFromParcel(const Parcel *parcel) {
 
 OMXBuffer& OMXBuffer::operator=(OMXBuffer&& source) {
     mBufferType = std::move(source.mBufferType);
+    mRangeOffset = std::move(source.mRangeOffset);
     mRangeLength = std::move(source.mRangeLength);
     mMem = std::move(source.mMem);
     mGraphicBuffer = std::move(source.mGraphicBuffer);
     mNativeHandle = std::move(source.mNativeHandle);
+    mHidlMemory = source.mHidlMemory; // TODO(b/34093434): Use move when available
     return *this;
 }
 

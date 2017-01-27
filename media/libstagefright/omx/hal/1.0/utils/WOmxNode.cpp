@@ -1,3 +1,19 @@
+/*
+ * Copyright 2016, The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include <IOMX.h>
 #include <OMXNodeInstance.h>
 #include "WOmxNode.h"
@@ -11,7 +27,7 @@ namespace hardware {
 namespace media {
 namespace omx {
 namespace V1_0 {
-namespace implementation {
+namespace utils {
 
 using ::android::hardware::Void;
 
@@ -50,7 +66,6 @@ status_t LWOmxNode::getParameter(
 status_t LWOmxNode::setParameter(
         OMX_INDEXTYPE index, const void *params, size_t size) {
     hidl_vec<uint8_t> tParams = inHidlBytes(params, size);
-    tParams = inHidlBytes(params, size);
     return toStatusT(mBase->setParameter(
             toRawIndexType(index), tParams));
 }
@@ -102,7 +117,8 @@ status_t LWOmxNode::configureVideoTunnelMode(
             [&fnStatus, sidebandHandle](
                     Status status, hidl_handle const& outSidebandHandle) {
                 fnStatus = toStatusT(status);
-                *sidebandHandle = native_handle_clone(outSidebandHandle);
+                *sidebandHandle = outSidebandHandle == nullptr ?
+                        nullptr : native_handle_clone(outSidebandHandle);
             }));
     return transStatus == NO_ERROR ? fnStatus : transStatus;
 }
@@ -229,8 +245,8 @@ status_t LWOmxNode::dispatchMessage(const omx_message &lMsg) {
 }
 
 // TODO: this is temporary, will be removed when quirks move to OMX side.
-status_t LWOmxNode::setQuirks(OMX_U32 /* quirks */) {
-    return NO_ERROR;
+status_t LWOmxNode::setQuirks(OMX_U32 quirks) {
+    return toStatusT(mBase->setQuirks(static_cast<uint32_t>(quirks)));;
 }
 
 ::android::IBinder* LWOmxNode::onAsBinder() {
@@ -306,7 +322,7 @@ Return<Status> TWOmxNode::prepareForAdaptivePlayback(
 Return<void> TWOmxNode::configureVideoTunnelMode(
         uint32_t portIndex, bool tunneled, uint32_t audioHwSync,
         configureVideoTunnelMode_cb _hidl_cb) {
-    native_handle_t* sidebandHandle;
+    native_handle_t* sidebandHandle = nullptr;
     Status status = toStatus(mBase->configureVideoTunnelMode(
             portIndex,
             toEnumBool(tunneled),
@@ -412,8 +428,12 @@ Return<Status> TWOmxNode::dispatchMessage(const Message& tMsg) {
     return toStatus(mBase->dispatchMessage(lMsg));
 }
 
+Return<void> TWOmxNode::setQuirks(uint32_t quirks) {
+    mBase->setQuirks(static_cast<OMX_U32>(quirks));
+    return Void();
+}
 
-}  // namespace implementation
+}  // namespace utils
 }  // namespace V1_0
 }  // namespace omx
 }  // namespace media

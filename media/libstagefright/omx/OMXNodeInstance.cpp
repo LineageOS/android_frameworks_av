@@ -42,6 +42,8 @@
 #include <utils/NativeHandle.h>
 #include <media/OMXBuffer.h>
 
+#include <hidlmemory/mapping.h>
+
 static const OMX_U32 kPortIndexInput = 0;
 static const OMX_U32 kPortIndexOutput = 1;
 
@@ -106,8 +108,10 @@ namespace android {
 
 struct BufferMeta {
     explicit BufferMeta(
-            const sp<IMemory> &mem, OMX_U32 portIndex, bool copy, OMX_U8 *backup)
+            const sp<IMemory> &mem, const sp<IHidlMemory> &hidlMemory,
+            OMX_U32 portIndex, bool copy, OMX_U8 *backup)
         : mMem(mem),
+          mHidlMemory(hidlMemory),
           mCopyFromOmx(portIndex == kPortIndexOutput && copy),
           mCopyToOmx(portIndex == kPortIndexInput && copy),
           mPortIndex(portIndex),
@@ -129,6 +133,12 @@ struct BufferMeta {
           mBackup(NULL) {
     }
 
+    OMX_U8 *getPointer() {
+        return mMem.get() ? static_cast<OMX_U8*>(mMem->pointer()) :
+                mHidlMemory.get() ? static_cast<OMX_U8*>(
+                static_cast<void*>(mHidlMemory->getPointer())) : nullptr;
+    }
+
     void CopyFromOMX(const OMX_BUFFERHEADERTYPE *header) {
         if (!mCopyFromOmx) {
             return;
@@ -137,7 +147,7 @@ struct BufferMeta {
         // check component returns proper range
         sp<ABuffer> codec = getBuffer(header, true /* limit */);
 
-        memcpy((OMX_U8 *)mMem->pointer() + header->nOffset, codec->data(), codec->size());
+        memcpy(getPointer() + header->nOffset, codec->data(), codec->size());
     }
 
     void CopyToOMX(const OMX_BUFFERHEADERTYPE *header) {
@@ -146,7 +156,7 @@ struct BufferMeta {
         }
 
         memcpy(header->pBuffer + header->nOffset,
-                (const OMX_U8 *)mMem->pointer() + header->nOffset,
+                getPointer() + header->nOffset,
                 header->nFilledLen);
     }
 
@@ -184,6 +194,7 @@ private:
     sp<GraphicBuffer> mGraphicBuffer;
     sp<NativeHandle> mNativeHandle;
     sp<IMemory> mMem;
+    sp<IHidlMemory> mHidlMemory;
     bool mCopyFromOmx;
     bool mCopyToOmx;
     OMX_U32 mPortIndex;
@@ -1021,28 +1032,48 @@ status_t OMXNodeInstance::useBuffer(
     Mutex::Autolock autoLock(mLock);
 
     switch (omxBuffer.mBufferType) {
-    case OMXBuffer::kBufferTypePreset:
-        return useBuffer_l(portIndex, NULL, buffer);
+        case OMXBuffer::kBufferTypePreset:
+            return useBuffer_l(portIndex, NULL, NULL, buffer);
 
-    case OMXBuffer::kBufferTypeSharedMem:
-        return useBuffer_l(portIndex, omxBuffer.mMem, buffer);
+        case OMXBuffer::kBufferTypeSharedMem:
+            return useBuffer_l(portIndex, omxBuffer.mMem, NULL, buffer);
 
-    case OMXBuffer::kBufferTypeANWBuffer:
-        return useGraphicBuffer_l(portIndex, omxBuffer.mGraphicBuffer, buffer);
+        case OMXBuffer::kBufferTypeANWBuffer:
+            return useGraphicBuffer_l(portIndex, omxBuffer.mGraphicBuffer, buffer);
 
-    default:
-        break;
+        case OMXBuffer::kBufferTypeHidlMemory: {
+                sp<IHidlMemory> hidlMemory = mapMemory(omxBuffer.mHidlMemory);
+                return useBuffer_l(portIndex, NULL, hidlMemory, buffer);
+            }
+        default:
+            break;
     }
 
     return BAD_VALUE;
 }
 
 status_t OMXNodeInstance::useBuffer_l(
-        OMX_U32 portIndex, const sp<IMemory> &params, IOMX::buffer_id *buffer) {
+        OMX_U32 portIndex, const sp<IMemory> &params,
+        const sp<IHidlMemory> &hParams, IOMX::buffer_id *buffer) {
     BufferMeta *buffer_meta;
     OMX_BUFFERHEADERTYPE *header;
     OMX_ERRORTYPE err = OMX_ErrorNone;
     bool isMetadata = mMetadataType[portIndex] != kMetadataBufferTypeInvalid;
+
+    size_t paramsSize;
+    void* paramsPointer;
+    if (params != NULL && hParams != NULL) {
+        return BAD_VALUE;
+    }
+    if (params != NULL) {
+        paramsPointer = params->pointer();
+        paramsSize = params->size();
+    } else if (hParams != NULL) {
+        paramsPointer = hParams->getPointer();
+        paramsSize = hParams->getSize();
+    } else {
+        paramsPointer = nullptr;
+    }
 
     OMX_U32 allottedSize;
     if (isMetadata) {
@@ -1057,11 +1088,11 @@ status_t OMXNodeInstance::useBuffer_l(
         }
     } else {
         // NULL params is allowed only in metadata mode.
-        if (params == NULL) {
+        if (paramsPointer == nullptr) {
             ALOGE("b/25884056");
             return BAD_VALUE;
         }
-        allottedSize = params->size();
+        allottedSize = paramsSize;
     }
 
     bool isOutputGraphicMetadata = (portIndex == kPortIndexOutput) &&
@@ -1077,7 +1108,7 @@ status_t OMXNodeInstance::useBuffer_l(
     if (!isOutputGraphicMetadata && (mQuirks & requiresAllocateBufferBit)) {
         // metadata buffers are not connected cross process; only copy if not meta.
         buffer_meta = new BufferMeta(
-                    params, portIndex, !isMetadata /* copy */, NULL /* data */);
+                    params, hParams, portIndex, !isMetadata /* copy */, NULL /* data */);
 
         err = OMX_AllocateBuffer(
                 mHandle, &header, portIndex, buffer_meta, allottedSize);
@@ -1085,7 +1116,7 @@ status_t OMXNodeInstance::useBuffer_l(
         if (err != OMX_ErrorNone) {
             CLOG_ERROR(allocateBuffer, err,
                     SIMPLE_BUFFER(portIndex, (size_t)allottedSize,
-                            params != NULL ? params->pointer() : NULL));
+                            paramsPointer));
         }
     } else {
         OMX_U8 *data = NULL;
@@ -1100,12 +1131,12 @@ status_t OMXNodeInstance::useBuffer_l(
             memset(data, 0, allottedSize);
 
             buffer_meta = new BufferMeta(
-                    params, portIndex, false /* copy */, data);
+                    params, hParams, portIndex, false /* copy */, data);
         } else {
             data = static_cast<OMX_U8 *>(params->pointer());
 
             buffer_meta = new BufferMeta(
-                    params, portIndex, false /* copy */, NULL);
+                    params, hParams, portIndex, false /* copy */, NULL);
         }
 
         err = OMX_UseBuffer(
@@ -1139,7 +1170,7 @@ status_t OMXNodeInstance::useBuffer_l(
     }
 
     CLOG_BUFFER(useBuffer, NEW_BUFFER_FMT(
-            *buffer, portIndex, "%u(%zu)@%p", allottedSize, params->size(), params->pointer()));
+            *buffer, portIndex, "%u(%zu)@%p", allottedSize, paramsSize, paramsPointer));
     return OK;
 }
 
@@ -1281,7 +1312,7 @@ status_t OMXNodeInstance::useGraphicBufferWithMetadata_l(
         return BAD_VALUE;
     }
 
-    status_t err = useBuffer_l(portIndex, NULL, buffer);
+    status_t err = useBuffer_l(portIndex, NULL, NULL, buffer);
     if (err != OK) {
         return err;
     }

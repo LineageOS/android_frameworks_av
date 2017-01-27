@@ -57,10 +57,11 @@ LOCAL_SRC_FILES += \
     StringArray.cpp \
 
 LOCAL_SHARED_LIBRARIES := \
-	libui liblog libcutils libutils libbinder libsonivox libicuuc libicui18n libexpat \
+        libui liblog libcutils libutils libbinder libsonivox libicuuc libicui18n libexpat \
         libcamera_client libstagefright_foundation \
         libgui libdl libaudioutils libaudioclient \
-        libmedia_helper
+        libmedia_helper \
+        libhidlbase \
 
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder libsonivox
 
@@ -72,6 +73,7 @@ LOCAL_MODULE:= libmedia
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 
 LOCAL_C_INCLUDES := \
+    $(TOP)/system/libhidl/base/include \
     $(TOP)/frameworks/native/include/media/openmax \
     $(TOP)/frameworks/av/include/media/ \
     $(TOP)/frameworks/av/media/libstagefright \

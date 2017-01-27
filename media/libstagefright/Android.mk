@@ -113,6 +113,7 @@ LOCAL_SHARED_LIBRARIES += \
         libstagefright_foundation \
         libdl \
         libRScpp \
+	libhidlbase \
 
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libmedia
 

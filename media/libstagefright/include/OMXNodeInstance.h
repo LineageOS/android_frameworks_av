@@ -27,11 +27,14 @@
 #include <utils/SortedVector.h>
 #include "OmxNodeOwner.h"
 
+#include <android/hidl/memory/1.0/IMemory.h>
+
 namespace android {
 class IOMXBufferSource;
 class IOMXObserver;
 struct OMXMaster;
 class OMXBuffer;
+typedef hidl::memory::V1_0::IMemory IHidlMemory;
 
 struct OMXNodeInstance : public BnOMXNode {
     OMXNodeInstance(
@@ -184,7 +187,7 @@ private:
 
     status_t useBuffer_l(
             OMX_U32 portIndex, const sp<IMemory> &params,
-            IOMX::buffer_id *buffer);
+            const sp<IHidlMemory> &hParams, IOMX::buffer_id *buffer);
 
     status_t useGraphicBuffer_l(
             OMX_U32 portIndex, const sp<GraphicBuffer> &graphicBuffer,
