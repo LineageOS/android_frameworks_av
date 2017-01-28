@@ -936,10 +936,7 @@ status_t BnOMX::onTransact(
             OMX_U32 port_index = data.readInt32();
             OMX_BOOL enable = (OMX_BOOL)data.readInt32();
 
-            status_t err =
-                // only control output metadata via Binder
-                port_index != 1 /* kOutputPortIndex */ ? BAD_VALUE :
-                storeMetaDataInBuffers(node, port_index, enable);
+            status_t err = storeMetaDataInBuffers(node, port_index, enable);
             reply->writeInt32(err);
 
             return NO_ERROR;
