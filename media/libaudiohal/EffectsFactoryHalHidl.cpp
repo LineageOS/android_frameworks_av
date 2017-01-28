@@ -17,7 +17,9 @@
 #define LOG_TAG "EffectsFactoryHalHidl"
 //#define LOG_NDEBUG 0
 
+#include <android/hidl/memory/1.0/IAllocator.h>
 #include <cutils/native_handle.h>
+#include <hidl/ServiceManagement.h>
 #include <media/EffectsFactoryApi.h>
 
 #include "ConversionHelperHidl.h"
@@ -45,6 +47,10 @@ bool EffectsFactoryHalInterface::isNullUuid(const effect_uuid_t *pEffectUuid) {
 
 EffectsFactoryHalHidl::EffectsFactoryHalHidl() : ConversionHelperHidl("EffectsFactory"){
     mEffectsFactory = IEffectsFactory::getService("audio_effects_factory");
+    // TODO: Waiting should not be needed (b/34772726).
+    // Also remove include of IAllocator.h and ServiceManagement.h
+    android::hardware::details::waitForHwService(
+            hidl::memory::V1_0::IAllocator::descriptor, "ashmem");
 }
 
 EffectsFactoryHalHidl::~EffectsFactoryHalHidl() {
