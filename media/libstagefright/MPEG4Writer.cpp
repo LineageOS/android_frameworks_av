@@ -2748,9 +2748,11 @@ status_t MPEG4Writer::Track::threadEntry() {
             if (mLastDecodingTimeUs < 0) {
                 decodingTimeUs = std::max((int64_t)0, decodingTimeUs);
             } else {
-                // increase decoding time by at least 1 tick
-                decodingTimeUs = std::max(
-                        mLastDecodingTimeUs + divUp(1000000, mTimeScale), decodingTimeUs);
+                // increase decoding time by at least the larger vaule of 1 tick and
+                // 0.1 milliseconds. This needs to take into account the possible
+                // delta adjustment in DurationTicks in below.
+                decodingTimeUs = std::max(mLastDecodingTimeUs +
+                        std::max(100, divUp(1000000, mTimeScale)), decodingTimeUs);
             }
 
             mLastDecodingTimeUs = decodingTimeUs;
