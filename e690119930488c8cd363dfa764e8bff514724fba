@@ -22,6 +22,30 @@
       "revId": "e690119930488c8cd363dfa764e8bff514724fba",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a437d4f_0e902742",
+        "filename": "media/libstagefright/WAVExtractor.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 459,
+      "author": {
+        "id": 6351
+      },
+      "writtenOn": "2017-01-29T13:27:11Z",
+      "side": 1,
+      "message": "Submit the fix to aosp..\n\nI left that in intentionally because it is in android-7.1.1_r9.",
+      "parentUuid": "9a437d4f_4e762f40",
+      "range": {
+        "startLine": 459,
+        "startChar": 49,
+        "endLine": 459,
+        "endChar": 50
+      },
+      "revId": "e690119930488c8cd363dfa764e8bff514724fba",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
