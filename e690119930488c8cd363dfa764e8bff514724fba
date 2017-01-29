@@ -70,6 +70,29 @@
       "revId": "e690119930488c8cd363dfa764e8bff514724fba",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a437d4f_f1302458",
+        "filename": "media/libstagefright/WAVExtractor.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 517,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2017-01-29T18:40:58Z",
+      "side": 1,
+      "message": "I wonder if it\u0027s because there was no 32-bit sample support before? It looks like the old code always assumed 24.",
+      "range": {
+        "startLine": 517,
+        "startChar": 8,
+        "endLine": 517,
+        "endChar": 43
+      },
+      "revId": "e690119930488c8cd363dfa764e8bff514724fba",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
