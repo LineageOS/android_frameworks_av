@@ -215,6 +215,14 @@ cc_library_shared {
         },
     },
 
+    product_variables: {
+        lineage: {
+            target_omx_legacy_rescaling: {
+                cppflags: ["-DUSE_LEGACY_RESCALING"],
+            },
+        },
+    },
+
     sanitize: {
         cfi: true,
         misc_undefined: [
