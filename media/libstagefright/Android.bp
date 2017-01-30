@@ -202,6 +202,10 @@ cc_library_shared {
 cc_library {
     name: "libstagefright",
 
+    defaults: [
+      "omx_legacy_rescaling_defaults",
+    ],
+
     srcs: [
         "AACWriter.cpp",
         "ACodec.cpp",
