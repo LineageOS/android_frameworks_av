@@ -30,7 +30,8 @@ LOCAL_SRC_FILES:=               \
     Effects.cpp                 \
     PatchPanel.cpp              \
     StateQueue.cpp              \
-    BufLog.cpp
+    BufLog.cpp                  \
+    TypedLogger.cpp
 
 LOCAL_C_INCLUDES := \
     $(TOPDIR)frameworks/av/services/audiopolicy \

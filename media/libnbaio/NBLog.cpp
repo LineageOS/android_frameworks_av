@@ -105,6 +105,7 @@ void NBLog::Writer::log(const char *string)
     if (!mEnabled) {
         return;
     }
+    LOG_ALWAYS_FATAL_IF(string == NULL, "Attempted to log NULL string");
     size_t length = strlen(string);
     if (length > Entry::kMaxLength) {
         length = Entry::kMaxLength;
@@ -147,16 +148,136 @@ void NBLog::Writer::logTimestamp()
     }
     struct timespec ts;
     if (!clock_gettime(CLOCK_MONOTONIC, &ts)) {
-        log(EVENT_TIMESTAMP, &ts, sizeof(struct timespec));
+        log(EVENT_TIMESTAMP, &ts, sizeof(ts));
     }
 }
 
-void NBLog::Writer::logTimestamp(const struct timespec& ts)
+void NBLog::Writer::logTimestamp(const struct timespec &ts)
 {
     if (!mEnabled) {
         return;
     }
-    log(EVENT_TIMESTAMP, &ts, sizeof(struct timespec));
+    log(EVENT_TIMESTAMP, &ts, sizeof(ts));
+}
+
+void NBLog::Writer::logInteger(const int x)
+{
+    if (!mEnabled) {
+        return;
+    }
+    log(EVENT_INTEGER, &x, sizeof(x));
+}
+
+void NBLog::Writer::logFloat(const float x)
+{
+    if (!mEnabled) {
+        return;
+    }
+    log(EVENT_FLOAT, &x, sizeof(x));
+}
+
+void NBLog::Writer::logPID()
+{
+    if (!mEnabled) {
+        return;
+    }
+    pid_t id = ::getpid();
+    // TODO: append process name to pid
+    // const char* path = sprintf("/proc/%d/status", id);
+    // FILE* f = fopen(path);
+    // size_t length = 30
+    // char buffer[length];
+    // getline(&buffer, &length, f);
+    // char* pidTag = sprintf("")
+    log(EVENT_PID, &id, sizeof(pid_t));
+}
+
+void NBLog::Writer::logStart(const char *fmt)
+{
+    if (!mEnabled) {
+        return;
+    }
+    size_t length = strlen(fmt);
+    if (length > Entry::kMaxLength) {
+        length = Entry::kMaxLength;
+    }
+    log(EVENT_START_FMT, fmt, length);
+}
+
+void NBLog::Writer::logEnd()
+{
+    if (!mEnabled) {
+        return;
+    }
+    Entry entry = Entry(EVENT_END_FMT, NULL, 0);
+    log(&entry, true);
+}
+
+void NBLog::Writer::logFormat(const char *fmt, ...)
+{
+    if (!mEnabled) {
+        return;
+    }
+
+    va_list ap;
+    va_start(ap, fmt);
+    Writer::logVFormat(fmt, ap);
+    va_end(ap);
+}
+
+void NBLog::Writer::logVFormat(const char *fmt, va_list argp)
+{
+    if (!mEnabled) {
+        return;
+    }
+    Writer::logStart(fmt);
+    int i;
+    double f;
+    char* s;
+    struct timespec t;
+    Writer::logTimestamp();
+    for (const char *p = fmt; *p != '\0'; p++) {
+        // TODO: implement more complex formatting such as %.3f
+        if (*p != '%') {
+            continue;
+        }
+        switch(*++p) {
+        case 's': // string
+            s = va_arg(argp, char *);
+            Writer::log(s);
+            break;
+
+        case 't': // timestamp
+            t = va_arg(argp, struct timespec);
+            Writer::logTimestamp(t);
+            break;
+
+        case 'd': // integer
+            i = va_arg(argp, int);
+            Writer::logInteger(i);
+            break;
+
+        case 'f': // float
+            f = va_arg(argp, double); // float arguments are promoted to double in vararg lists
+            Writer::logFloat((float)f);
+            break;
+
+        case 'p': // pid
+            Writer::logPID();
+            break;
+
+        // the "%\0" case finishes parsing
+        case '\0':
+            --p;
+            break;
+
+        default:
+            ALOGW("NBLog Writer parsed invalid format specifier: %c", *p);
+            break;
+        // the '%' case is handled using the formatted string in the reader
+        }
+    }
+    Writer::logEnd();
 }
 
 void NBLog::Writer::log(Event event, const void *data, size_t length)
@@ -173,6 +294,10 @@ void NBLog::Writer::log(Event event, const void *data, size_t length)
     switch (event) {
     case EVENT_STRING:
     case EVENT_TIMESTAMP:
+    case EVENT_INTEGER:
+    case EVENT_FLOAT:
+    case EVENT_PID:
+    case EVENT_START_FMT:
         break;
     case EVENT_RESERVED:
     default:
@@ -257,10 +382,41 @@ void NBLog::LockedWriter::logTimestamp()
     Writer::logTimestamp();
 }
 
-void NBLog::LockedWriter::logTimestamp(const struct timespec& ts)
+void NBLog::LockedWriter::logTimestamp(const struct timespec &ts)
 {
     Mutex::Autolock _l(mLock);
     Writer::logTimestamp(ts);
+}
+
+void NBLog::LockedWriter::logInteger(const int x)
+{
+    Mutex::Autolock _l(mLock);
+    Writer::logInteger(x);
+}
+
+void NBLog::LockedWriter::logFloat(const float x)
+{
+    Mutex::Autolock _l(mLock);
+    Writer::logFloat(x);
+}
+
+void NBLog::LockedWriter::logPID()
+{
+    Mutex::Autolock _l(mLock);
+    Writer::logPID();
+}
+
+void NBLog::LockedWriter::logStart(const char *fmt)
+{
+    Mutex::Autolock _l(mLock);
+    Writer::logStart(fmt);
+}
+
+
+void NBLog::LockedWriter::logEnd()
+{
+    Mutex::Autolock _l(mLock);
+    Writer::logEnd();
 }
 
 bool NBLog::LockedWriter::isEnabled() const
@@ -420,6 +576,22 @@ void NBLog::Reader::dump(int fd, size_t indent)
                     (int) (ts.tv_nsec / 1000000));
             deferredTimestamp = true;
             } break;
+        case EVENT_INTEGER:
+            appendInt(&body, data);
+            break;
+        case EVENT_FLOAT:
+            appendFloat(&body, data);
+            break;
+        case EVENT_PID:
+            appendPID(&body, data);
+            break;
+        case EVENT_START_FMT:
+            advance += handleFormat((const char*) &copy[i + 2], length,
+                                    &copy[i + Entry::kOverhead + length], &timestamp, &body);
+            break;
+        case EVENT_END_FMT:
+            body.appendFormat("warning: got to end format event");
+            break;
         case EVENT_RESERVED:
         default:
             body.appendFormat("warning: unknown event %d", event);
@@ -437,7 +609,7 @@ void NBLog::Reader::dump(int fd, size_t indent)
     }
 }
 
-void NBLog::Reader::dumpLine(const String8& timestamp, String8& body)
+void NBLog::Reader::dumpLine(const String8 &timestamp, String8 &body)
 {
     if (mFd >= 0) {
         dprintf(mFd, "%.*s%s %s\n", mIndent, "", timestamp.string(), body.string());
@@ -450,6 +622,106 @@ void NBLog::Reader::dumpLine(const String8& timestamp, String8& body)
 bool NBLog::Reader::isIMemory(const sp<IMemory>& iMemory) const
 {
     return iMemory != 0 && mIMemory != 0 && iMemory->pointer() == mIMemory->pointer();
+}
+
+void NBLog::appendTimestamp(String8 *body, const void *data) {
+    struct timespec ts;
+    memcpy(&ts, data, sizeof(struct timespec));
+    body->appendFormat("[%d.%03d]", (int) ts.tv_sec,
+                    (int) (ts.tv_nsec / 1000000));
+}
+
+void NBLog::appendInt(String8 *body, const void *data) {
+    int x = *((int*) data);
+    body->appendFormat("<%d>", x);
+}
+
+void NBLog::appendFloat(String8 *body, const void *data) {
+    float f;
+    memcpy(&f, data, sizeof(float));
+    body->appendFormat("<%f>", f);
+}
+
+void NBLog::appendPID(String8 *body, const void* data) {
+    pid_t id = *((pid_t*) data);
+    body->appendFormat("<PID: %d>", id);
+}
+
+int NBLog::handleFormat(const char *fmt, size_t fmt_length, const uint8_t *data,
+                        String8 *timestamp, String8 *body) {
+    if (data[0] != EVENT_TIMESTAMP) {
+        ALOGW("NBLog Reader Expected timestamp event %d, got %d", EVENT_TIMESTAMP, data[0]);
+    }
+    struct timespec ts;
+    memcpy(&ts, &data[2], sizeof(ts));
+    timestamp->clear();
+    timestamp->appendFormat("[%d.%03d]", (int) ts.tv_sec,
+                    (int) (ts.tv_nsec / 1000000));
+    size_t data_offset = Entry::kOverhead + sizeof ts;
+
+    for (size_t fmt_offset = 0; fmt_offset < fmt_length; ++fmt_offset) {
+        if (fmt[fmt_offset] != '%') {
+            body->append(&fmt[fmt_offset], 1); // TODO optimize to write consecutive strings at once
+            continue;
+        }
+        if (fmt[++fmt_offset] == '%') {
+            body->append("%");
+            continue;
+        }
+        if (fmt_offset == fmt_length) {
+            continue;
+        }
+
+        NBLog::Event event = (NBLog::Event) data[data_offset];
+        size_t length = data[data_offset + 1];
+
+        // TODO check length for event type is correct
+        if(length != data[data_offset + length + 2]) {
+            ALOGW("NBLog Reader recieved different lengths %zu and %d for event %d", length,
+                  data[data_offset + length + 2], event);
+            body->append("<invalid entry>");
+            ++fmt_offset;
+            continue;
+        }
+
+        // TODO: implement more complex formatting such as %.3f
+        void * datum = (void*) &data[data_offset + 2]; // pointer to the current event data
+        switch(fmt[fmt_offset])
+        {
+        case 's': // string
+            ALOGW_IF(event != EVENT_STRING, "NBLog Reader incompatible event for string specifier: %d", event);
+            body->append((const char*) datum, length);
+            break;
+
+        case 't': // timestamp
+            ALOGW_IF(event != EVENT_TIMESTAMP, "NBLog Reader incompatible event for timestamp specifier: %d", event);
+            appendTimestamp(body, datum);
+            break;
+
+        case 'd': // integer
+            ALOGW_IF(event != EVENT_INTEGER, "NBLog Reader incompatible event for integer specifier: %d", event);
+            appendInt(body, datum);
+
+            break;
+
+        case 'f': // float
+            ALOGW_IF(event != EVENT_FLOAT, "NBLog Reader incompatible event for float specifier: %d", event);
+            appendFloat(body, datum);
+            break;
+
+        case 'p': // pid
+            ALOGW_IF(event != EVENT_PID, "NBLog Reader incompatible event for pid specifier: %d", event);
+            appendPID(body, datum);
+            break;
+
+        default:
+            ALOGW("NBLog Reader encountered unknown character %c", fmt[fmt_offset]);
+        }
+
+        data_offset += length + Entry::kOverhead;
+
+    }
+    return data_offset + Entry::kOverhead; // data offset + size of END_FMT event
 }
 
 }   // namespace android

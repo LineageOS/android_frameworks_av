@@ -73,6 +73,9 @@
 
 #include "AutoPark.h"
 
+#include <pthread.h>
+#include "TypedLogger.h"
+
 // ----------------------------------------------------------------------------
 
 // Note: the following macro is used for extremely verbose logging message.  In
@@ -2903,6 +2906,8 @@ void AudioFlinger::PlaybackThread::detachAuxEffect_l(int effectId)
 
 bool AudioFlinger::PlaybackThread::threadLoop()
 {
+    logWriterTLS = mNBLogWriter.get();
+
     Vector< sp<Track> > tracksToRemove;
 
     mStandbyTimeNs = systemTime();
@@ -2934,7 +2939,9 @@ bool AudioFlinger::PlaybackThread::threadLoop()
     const char *logString = NULL;
 
     checkSilentMode_l();
-
+#if 0
+    int z = 0; // used in logFormat example
+#endif
     while (!exitPending())
     {
         cpuStats.sample(myName);
@@ -3023,7 +3030,17 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                     }
                 }
             }
-
+#if 0
+            // logFormat example
+            if (!(z % 100)) {
+                timespec ts;
+                clock_gettime(CLOCK_MONOTONIC, &ts);
+                LOGF("This is an integer %d, this is a float %f, this is my "
+                    "pid %p %% %s %t", 42, 3.14, "and this is a timestamp", ts);
+                LOGF("A deceptive null-terminated string %\0");
+            }
+            ++z;
+#endif
             saveOutputTracks();
             if (mSignalPending) {
                 // A signal was raised while we were unlocked
