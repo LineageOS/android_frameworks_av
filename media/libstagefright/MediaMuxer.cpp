@@ -41,7 +41,7 @@ namespace android {
 MediaMuxer::MediaMuxer(int fd, OutputFormat format)
     : mFormat(format),
       mState(UNINITIALIZED) {
-    if (format == OUTPUT_FORMAT_MPEG_4) {
+    if (format == OUTPUT_FORMAT_MPEG_4 || format == OUTPUT_FORMAT_THREE_GPP) {
         mWriter = new MPEG4Writer(fd);
     } else if (format == OUTPUT_FORMAT_WEBM) {
         mWriter = new WebmWriter(fd);
@@ -108,8 +108,8 @@ status_t MediaMuxer::setLocation(int latitude, int longitude) {
         ALOGE("setLocation() must be called before start().");
         return INVALID_OPERATION;
     }
-    if (mFormat != OUTPUT_FORMAT_MPEG_4) {
-        ALOGE("setLocation() is only supported for .mp4 output.");
+    if (mFormat != OUTPUT_FORMAT_MPEG_4 && mFormat != OUTPUT_FORMAT_THREE_GPP) {
+        ALOGE("setLocation() is only supported for .mp4 pr .3gp output.");
         return INVALID_OPERATION;
     }
 

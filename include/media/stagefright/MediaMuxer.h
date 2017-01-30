@@ -45,8 +45,9 @@ public:
     // Please update media/java/android/media/MediaMuxer.java if the
     // OutputFormat is updated.
     enum OutputFormat {
-        OUTPUT_FORMAT_MPEG_4 = 0,
-        OUTPUT_FORMAT_WEBM   = 1,
+        OUTPUT_FORMAT_MPEG_4      = 0,
+        OUTPUT_FORMAT_WEBM        = 1,
+        OUTPUT_FORMAT_THREE_GPP   = 2,
         OUTPUT_FORMAT_LIST_END // must be last - used to validate format type
     };
 
