@@ -37,8 +37,7 @@ enum oboe_commands_t {
     PAUSE_STREAM,
     FLUSH_STREAM,
     REGISTER_AUDIO_THREAD,
-    UNREGISTER_AUDIO_THREAD,
-    TICKLE
+    UNREGISTER_AUDIO_THREAD
 };
 
 } // namespace android
@@ -53,8 +52,7 @@ enum oboe_commands_t {
     PAUSE_STREAM,
     FLUSH_STREAM,
     REGISTER_AUDIO_THREAD,
-    UNREGISTER_AUDIO_THREAD,
-    TICKLE
+    UNREGISTER_AUDIO_THREAD
 };
 
 // TODO Expand this to include all the open parameters.

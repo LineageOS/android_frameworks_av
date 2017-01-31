@@ -114,7 +114,6 @@ private:
     AudioEndpoint            mAudioEndpoint;
     oboe_handle_t            mServiceStreamHandle;
     EndpointDescriptor       mEndpointDescriptor;
-    sp<IOboeAudioService>    mService;
     // Offset from underlying frame position.
     oboe_position_frames_t   mFramesOffsetFromService = 0;
     oboe_position_frames_t   mLastFramesRead = 0;

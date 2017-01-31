@@ -34,10 +34,19 @@ using namespace oboe;
 
 typedef enum
 {
+    OBOE_HANDLE_TYPE_DUMMY1, // TODO remove DUMMYs
+    OBOE_HANDLE_TYPE_DUMMY2, // make server handles different than client
     OBOE_HANDLE_TYPE_STREAM,
     OBOE_HANDLE_TYPE_COUNT
 } oboe_service_handle_type_t;
 static_assert(OBOE_HANDLE_TYPE_COUNT <= HANDLE_TRACKER_MAX_TYPES, "Too many handle types.");
+
+android::OboeAudioService::OboeAudioService()
+    : BnOboeAudioService() {
+}
+
+OboeAudioService::~OboeAudioService() {
+}
 
 oboe_handle_t OboeAudioService::openStream(oboe::OboeStreamRequest &request,
                                                 oboe::OboeStreamConfiguration &configuration) {
@@ -61,7 +70,7 @@ oboe_result_t OboeAudioService::closeStream(oboe_handle_t streamHandle) {
     OboeServiceStreamBase *serviceStream = (OboeServiceStreamBase *)
             mHandleTracker.remove(OBOE_HANDLE_TYPE_STREAM,
                                   streamHandle);
-    ALOGI("OboeAudioService.closeStream(0x%08X)", streamHandle);
+    ALOGD("OboeAudioService.closeStream(0x%08X)", streamHandle);
     if (serviceStream != nullptr) {
         ALOGD("OboeAudioService::closeStream(): deleting serviceStream = %p", serviceStream);
         delete serviceStream;
@@ -79,9 +88,8 @@ OboeServiceStreamBase *OboeAudioService::convertHandleToServiceStream(
 oboe_result_t OboeAudioService::getStreamDescription(
                 oboe_handle_t streamHandle,
                 oboe::AudioEndpointParcelable &parcelable) {
-    ALOGI("OboeAudioService::getStreamDescriptor(), streamHandle = 0x%08x", streamHandle);
     OboeServiceStreamBase *serviceStream = convertHandleToServiceStream(streamHandle);
-    ALOGI("OboeAudioService::getStreamDescriptor(), serviceStream = %p", serviceStream);
+    ALOGD("OboeAudioService::getStreamDescription(), serviceStream = %p", serviceStream);
     if (serviceStream == nullptr) {
         return OBOE_ERROR_INVALID_HANDLE;
     }
@@ -90,45 +98,38 @@ oboe_result_t OboeAudioService::getStreamDescription(
 
 oboe_result_t OboeAudioService::startStream(oboe_handle_t streamHandle) {
     OboeServiceStreamBase *serviceStream = convertHandleToServiceStream(streamHandle);
-    ALOGI("OboeAudioService::startStream(), serviceStream = %p", serviceStream);
+    ALOGD("OboeAudioService::startStream(), serviceStream = %p", serviceStream);
     if (serviceStream == nullptr) {
         return OBOE_ERROR_INVALID_HANDLE;
     }
-    mLatestHandle = streamHandle;
-    return serviceStream->start();
+    oboe_result_t result = serviceStream->start();
+    return result;
 }
 
 oboe_result_t OboeAudioService::pauseStream(oboe_handle_t streamHandle) {
     OboeServiceStreamBase *serviceStream = convertHandleToServiceStream(streamHandle);
-    ALOGI("OboeAudioService::pauseStream(), serviceStream = %p", serviceStream);
+    ALOGD("OboeAudioService::pauseStream(), serviceStream = %p", serviceStream);
     if (serviceStream == nullptr) {
         return OBOE_ERROR_INVALID_HANDLE;
     }
-    return serviceStream->pause();
+    oboe_result_t result = serviceStream->pause();
+    return result;
 }
 
 oboe_result_t OboeAudioService::flushStream(oboe_handle_t streamHandle) {
     OboeServiceStreamBase *serviceStream = convertHandleToServiceStream(streamHandle);
-    ALOGI("OboeAudioService::flushStream(), serviceStream = %p", serviceStream);
+    ALOGD("OboeAudioService::flushStream(), serviceStream = %p", serviceStream);
     if (serviceStream == nullptr) {
         return OBOE_ERROR_INVALID_HANDLE;
     }
     return serviceStream->flush();
 }
 
-void OboeAudioService::tickle() {
-    OboeServiceStreamBase *serviceStream = convertHandleToServiceStream(mLatestHandle);
-    //ALOGI("OboeAudioService::tickle(), serviceStream = %p", serviceStream);
-    if (serviceStream != nullptr) {
-        serviceStream->tickle();
-    }
-}
-
 oboe_result_t OboeAudioService::registerAudioThread(oboe_handle_t streamHandle,
                                                          pid_t clientThreadId,
                                                          oboe_nanoseconds_t periodNanoseconds) {
     OboeServiceStreamBase *serviceStream = convertHandleToServiceStream(streamHandle);
-    ALOGI("OboeAudioService::registerAudioThread(), serviceStream = %p", serviceStream);
+    ALOGD("OboeAudioService::registerAudioThread(), serviceStream = %p", serviceStream);
     if (serviceStream == nullptr) {
         ALOGE("OboeAudioService::registerAudioThread(), serviceStream == nullptr");
         return OBOE_ERROR_INVALID_HANDLE;

@@ -87,12 +87,10 @@ oboe_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     // Did we get a valid track?
     status_t status = mAudioTrack->initCheck();
     ALOGD("AudioStreamTrack::open(), initCheck() returned %d", status);
-    // FIXME - this should work - if (status != NO_ERROR) {
-    //         But initCheck() is returning 1 !
-    if (status < 0) {
+    if (status != NO_ERROR) {
         close();
         ALOGE("AudioStreamTrack::open(), initCheck() returned %d", status);
-        return OboeConvert_androidToOboeError(status);
+        return OboeConvert_androidToOboeResult(status);
     }
 
     // Get the actual values from the AudioTrack.
@@ -123,11 +121,11 @@ oboe_result_t AudioStreamTrack::requestStart()
     // Get current position so we can detect when the track is playing.
     status_t err = mAudioTrack->getPosition(&mPositionWhenStarting);
     if (err != OK) {
-        return OboeConvert_androidToOboeError(err);
+        return OboeConvert_androidToOboeResult(err);
     }
     err = mAudioTrack->start();
     if (err != OK) {
-        return OboeConvert_androidToOboeError(err);
+        return OboeConvert_androidToOboeResult(err);
     } else {
         setState(OBOE_STREAM_STATE_STARTING);
     }
@@ -147,7 +145,7 @@ oboe_result_t AudioStreamTrack::requestPause()
     mAudioTrack->pause();
     status_t err = mAudioTrack->getPosition(&mPositionWhenPausing);
     if (err != OK) {
-        return OboeConvert_androidToOboeError(err);
+        return OboeConvert_androidToOboeResult(err);
     }
     return OBOE_OK;
 }
@@ -191,7 +189,7 @@ oboe_result_t AudioStreamTrack::updateState()
         if (mAudioTrack->stopped()) {
             err = mAudioTrack->getPosition(&position);
             if (err != OK) {
-                return OboeConvert_androidToOboeError(err);
+                return OboeConvert_androidToOboeResult(err);
             } else if (position == mPositionWhenPausing) {
                 // Has stream really stopped advancing?
                 setState(OBOE_STREAM_STATE_PAUSED);
@@ -203,7 +201,7 @@ oboe_result_t AudioStreamTrack::updateState()
         {
             err = mAudioTrack->getPosition(&position);
             if (err != OK) {
-                return OboeConvert_androidToOboeError(err);
+                return OboeConvert_androidToOboeResult(err);
             } else if (position == 0) {
                 // Advance frames read to match written.
                 setState(OBOE_STREAM_STATE_FLUSHED);
@@ -239,7 +237,7 @@ oboe_result_t AudioStreamTrack::write(const void *buffer,
         return 0;
     } else if (bytesWritten < 0) {
         ALOGE("invalid write, returned %d", (int)bytesWritten);
-        return OboeConvert_androidToOboeError(bytesWritten);
+        return OboeConvert_androidToOboeResult(bytesWritten);
     }
     oboe_size_frames_t framesWritten = (oboe_size_frames_t)(bytesWritten / bytesPerFrame);
     incrementFramesWritten(framesWritten);
@@ -251,7 +249,7 @@ oboe_result_t AudioStreamTrack::setBufferSize(oboe_size_frames_t requestedFrames
 {
     ssize_t result = mAudioTrack->setBufferSizeInFrames(requestedFrames);
     if (result != OK) {
-        return OboeConvert_androidToOboeError(result);
+        return OboeConvert_androidToOboeResult(result);
     } else {
         *actualFrames = result;
         return OBOE_OK;

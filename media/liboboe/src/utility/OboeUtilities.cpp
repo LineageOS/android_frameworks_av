@@ -30,11 +30,11 @@ using namespace android;
 oboe_size_bytes_t OboeConvert_formatToSizeInBytes(oboe_audio_format_t format) {
     oboe_size_bytes_t size = OBOE_ERROR_ILLEGAL_ARGUMENT;
     switch (format) {
-        case OBOE_AUDIO_FORMAT_PCM16:
+        case OBOE_AUDIO_FORMAT_PCM_I16:
             size = sizeof(int16_t);
             break;
-        case OBOE_AUDIO_FORMAT_PCM32:
-        case OBOE_AUDIO_FORMAT_PCM824:
+        case OBOE_AUDIO_FORMAT_PCM_I32:
+        case OBOE_AUDIO_FORMAT_PCM_I8_24:
             size = sizeof(int32_t);
             break;
         case OBOE_AUDIO_FORMAT_PCM_FLOAT:
@@ -67,14 +67,47 @@ void OboeConvert_pcm16ToFloat(const float *source, int32_t numSamples, int16_t *
     }
 }
 
-oboe_result_t OboeConvert_androidToOboeError(status_t error) {
-    if (error >= 0) {
-        return error;
+status_t OboeConvert_oboeToAndroidStatus(oboe_result_t result) {
+    // This covers the case for OBOE_OK and for positive results.
+    if (result >= 0) {
+        return result;
+    }
+    status_t status;
+    switch (result) {
+    case OBOE_ERROR_DISCONNECTED:
+    case OBOE_ERROR_INVALID_HANDLE:
+        status = DEAD_OBJECT;
+        break;
+    case OBOE_ERROR_INVALID_STATE:
+        status = INVALID_OPERATION;
+        break;
+    case OBOE_ERROR_UNEXPECTED_VALUE: // TODO redundant?
+    case OBOE_ERROR_ILLEGAL_ARGUMENT:
+        status = BAD_VALUE;
+        break;
+    case OBOE_ERROR_WOULD_BLOCK:
+        status = WOULD_BLOCK;
+        break;
+    // TODO add more result codes
+    default:
+        status = UNKNOWN_ERROR;
+        break;
+    }
+    return status;
+}
+
+oboe_result_t OboeConvert_androidToOboeResult(status_t status) {
+    // This covers the case for OK and for positive result.
+    if (status >= 0) {
+        return status;
     }
     oboe_result_t result;
-    switch (error) {
-    case OK:
-        result = OBOE_OK;
+    switch (status) {
+    case BAD_TYPE:
+        result = OBOE_ERROR_INVALID_HANDLE;
+        break;
+    case DEAD_OBJECT:
+        result = OBOE_ERROR_DISCONNECTED;
         break;
     case INVALID_OPERATION:
         result = OBOE_ERROR_INVALID_STATE;
@@ -85,7 +118,7 @@ oboe_result_t OboeConvert_androidToOboeError(status_t error) {
     case WOULD_BLOCK:
         result = OBOE_ERROR_WOULD_BLOCK;
         break;
-    // TODO add more error codes
+    // TODO add more status codes
     default:
         result = OBOE_ERROR_INTERNAL;
         break;
@@ -96,16 +129,16 @@ oboe_result_t OboeConvert_androidToOboeError(status_t error) {
 audio_format_t OboeConvert_oboeToAndroidDataFormat(oboe_audio_format_t oboeFormat) {
     audio_format_t androidFormat;
     switch (oboeFormat) {
-    case OBOE_AUDIO_FORMAT_PCM16:
+    case OBOE_AUDIO_FORMAT_PCM_I16:
         androidFormat = AUDIO_FORMAT_PCM_16_BIT;
         break;
     case OBOE_AUDIO_FORMAT_PCM_FLOAT:
         androidFormat = AUDIO_FORMAT_PCM_FLOAT;
         break;
-    case OBOE_AUDIO_FORMAT_PCM824:
+    case OBOE_AUDIO_FORMAT_PCM_I8_24:
         androidFormat = AUDIO_FORMAT_PCM_8_24_BIT;
         break;
-    case OBOE_AUDIO_FORMAT_PCM32:
+    case OBOE_AUDIO_FORMAT_PCM_I32:
         androidFormat = AUDIO_FORMAT_PCM_32_BIT;
         break;
     default:
@@ -120,16 +153,16 @@ oboe_audio_format_t OboeConvert_androidToOboeDataFormat(audio_format_t androidFo
     oboe_audio_format_t oboeFormat = OBOE_AUDIO_FORMAT_INVALID;
     switch (androidFormat) {
     case AUDIO_FORMAT_PCM_16_BIT:
-        oboeFormat = OBOE_AUDIO_FORMAT_PCM16;
+        oboeFormat = OBOE_AUDIO_FORMAT_PCM_I16;
         break;
     case AUDIO_FORMAT_PCM_FLOAT:
         oboeFormat = OBOE_AUDIO_FORMAT_PCM_FLOAT;
         break;
     case AUDIO_FORMAT_PCM_32_BIT:
-        oboeFormat = OBOE_AUDIO_FORMAT_PCM32;
+        oboeFormat = OBOE_AUDIO_FORMAT_PCM_I32;
         break;
     case AUDIO_FORMAT_PCM_8_24_BIT:
-        oboeFormat = OBOE_AUDIO_FORMAT_PCM824;
+        oboeFormat = OBOE_AUDIO_FORMAT_PCM_I8_24;
         break;
     default:
         oboeFormat = OBOE_AUDIO_FORMAT_INVALID;

@@ -19,12 +19,15 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include <assert.h>
 #include <new>
 #include <stdint.h>
-#include <assert.h>
+#include <utils/Mutex.h>
 
 #include <oboe/OboeDefinitions.h>
 #include "HandleTracker.h"
+
+using android::Mutex;
 
 // Handle format is: tgggiiii
 // where each letter is 4 bits, t=type, g=generation, i=index
@@ -80,15 +83,17 @@ HandleTracker::HandleTracker(uint32_t maxHandles)
 
 HandleTracker::~HandleTracker()
 {
+    Mutex::Autolock _l(mLock);
     delete[] mHandleAddresses;
     delete[] mHandleHeaders;
+    mHandleAddresses = nullptr;
 }
 
 bool HandleTracker::isInitialized() const {
     return mHandleAddresses != nullptr;
 }
 
-handle_tracker_slot_t HandleTracker::allocateSlot() {
+handle_tracker_slot_t HandleTracker::allocateSlot_l() {
     void **allocated = mNextFreeAddress;
     if (allocated == nullptr) {
         return SLOT_UNAVAILABLE;
@@ -98,7 +103,7 @@ handle_tracker_slot_t HandleTracker::allocateSlot() {
     return (allocated - mHandleAddresses);
 }
 
-handle_tracker_generation_t HandleTracker::nextGeneration(handle_tracker_slot_t index) {
+handle_tracker_generation_t HandleTracker::nextGeneration_l(handle_tracker_slot_t index) {
     handle_tracker_generation_t generation = (mHandleHeaders[index] + 1) & GENERATION_MASK;
     // Avoid generation zero so that 0x0 is not a valid handle.
     if (generation == GENERATION_INVALID) {
@@ -116,15 +121,17 @@ oboe_handle_t HandleTracker::put(handle_tracker_type_t type, void *address)
         return static_cast<oboe_handle_t>(OBOE_ERROR_NO_MEMORY);
     }
 
+    Mutex::Autolock _l(mLock);
+
     // Find an empty slot.
-    handle_tracker_slot_t index = allocateSlot();
+    handle_tracker_slot_t index = allocateSlot_l();
     if (index == SLOT_UNAVAILABLE) {
         ALOGE("HandleTracker::put() no room for more handles");
         return static_cast<oboe_handle_t>(OBOE_ERROR_NO_FREE_HANDLES);
     }
 
     // Cycle the generation counter so stale handles can be detected.
-    handle_tracker_generation_t generation = nextGeneration(index); // reads header table
+    handle_tracker_generation_t generation = nextGeneration_l(index); // reads header table
     handle_tracker_header_t inputHeader = buildHeader(type, generation);
 
     // These two writes may need to be observed by other threads or cores during get().
@@ -150,6 +157,8 @@ handle_tracker_slot_t HandleTracker::handleToIndex(handle_tracker_type_t type,
     }
     handle_tracker_generation_t handleGeneration = extractGeneration(handle);
     handle_tracker_header_t inputHeader = buildHeader(type, handleGeneration);
+    // We do not need to synchronize this access to mHandleHeaders because it is constant for
+    // the lifetime of the handle.
     if (inputHeader != mHandleHeaders[index]) {
         ALOGE("HandleTracker::handleToIndex() inputHeader = 0x%08x != mHandleHeaders[%d] = 0x%08x",
              inputHeader, index, mHandleHeaders[index]);
@@ -165,6 +174,8 @@ handle_tracker_address_t HandleTracker::get(handle_tracker_type_t type, oboe_han
     }
     handle_tracker_slot_t index = handleToIndex(type, handle);
     if (index >= 0) {
+        // We do not need to synchronize this access to mHandleHeaders because this slot
+        // is allocated and, therefore, not part of the linked list of free slots.
         return mHandleAddresses[index];
     } else {
         return nullptr;
@@ -175,6 +186,9 @@ handle_tracker_address_t HandleTracker::remove(handle_tracker_type_t type, oboe_
     if (!isInitialized()) {
         return nullptr;
     }
+
+    Mutex::Autolock _l(mLock);
+
     handle_tracker_slot_t index = handleToIndex(type,handle);
     if (index >= 0) {
         handle_tracker_address_t address = mHandleAddresses[index];

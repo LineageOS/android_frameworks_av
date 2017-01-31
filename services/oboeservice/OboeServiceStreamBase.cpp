@@ -40,12 +40,15 @@ OboeServiceStreamBase::OboeServiceStreamBase()
 }
 
 OboeServiceStreamBase::~OboeServiceStreamBase() {
+    Mutex::Autolock _l(mLockUpMessageQueue);
     delete mUpMessageQueue;
 }
 
 void OboeServiceStreamBase::sendServiceEvent(oboe_service_event_t event,
                               int32_t data1,
                               int64_t data2) {
+
+    Mutex::Autolock _l(mLockUpMessageQueue);
     OboeServiceMessage command;
     command.what = OboeServiceMessage::code::EVENT;
     command.event.event = event;

@@ -24,31 +24,32 @@
 
 #include <oboe/OboeDefinitions.h>
 #include <oboe/OboeAudio.h>
-#include "HandleTracker.h"
+#include "utility/HandleTracker.h"
 #include "IOboeAudioService.h"
-#include "OboeService.h"
 #include "OboeServiceStreamBase.h"
 
-using namespace android;
-namespace oboe {
+namespace android {
 
 class OboeAudioService :
     public BinderService<OboeAudioService>,
     public BnOboeAudioService
 {
-    friend class BinderService<OboeAudioService>;   // for OboeAudioService()
+    friend class BinderService<OboeAudioService>;
+
 public:
-// TODO why does this fail?    static const char* getServiceName() ANDROID_API { return "media.audio_oboe"; }
+    OboeAudioService();
+    virtual ~OboeAudioService();
+
     static const char* getServiceName() { return "media.audio_oboe"; }
 
-    virtual oboe_handle_t openStream(OboeStreamRequest &request,
-                                     OboeStreamConfiguration &configuration);
+    virtual oboe_handle_t openStream(oboe::OboeStreamRequest &request,
+                                     oboe::OboeStreamConfiguration &configuration);
 
     virtual oboe_result_t closeStream(oboe_handle_t streamHandle);
 
     virtual oboe_result_t getStreamDescription(
                 oboe_handle_t streamHandle,
-                AudioEndpointParcelable &parcelable);
+                oboe::AudioEndpointParcelable &parcelable);
 
     virtual oboe_result_t startStream(oboe_handle_t streamHandle);
 
@@ -61,16 +62,14 @@ public:
 
     virtual oboe_result_t unregisterAudioThread(oboe_handle_t streamHandle, pid_t pid);
 
-    virtual void tickle();
-
 private:
 
-    OboeServiceStreamBase *convertHandleToServiceStream(oboe_handle_t streamHandle) const;
+    oboe::OboeServiceStreamBase *convertHandleToServiceStream(oboe_handle_t streamHandle) const;
 
     HandleTracker mHandleTracker;
-    oboe_handle_t mLatestHandle = OBOE_ERROR_INVALID_HANDLE; // TODO until we have service threads
+
 };
 
-} /* namespace oboe */
+} /* namespace android */
 
 #endif //OBOE_OBOE_AUDIO_SERVICE_H

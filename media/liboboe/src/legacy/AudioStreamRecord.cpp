@@ -90,7 +90,7 @@ oboe_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     if (status != OK) {
         close();
         ALOGE("AudioStreamRecord::open(), initCheck() returned %d", status);
-        return OboeConvert_androidToOboeError(status);
+        return OboeConvert_androidToOboeResult(status);
     }
 
     // Get the actual rate.
@@ -121,11 +121,11 @@ oboe_result_t AudioStreamRecord::requestStart()
     // Get current position so we can detect when the track is playing.
     status_t err = mAudioRecord->getPosition(&mPositionWhenStarting);
     if (err != OK) {
-        return OboeConvert_androidToOboeError(err);
+        return OboeConvert_androidToOboeResult(err);
     }
     err = mAudioRecord->start();
     if (err != OK) {
-        return OboeConvert_androidToOboeError(err);
+        return OboeConvert_androidToOboeResult(err);
     } else {
         setState(OBOE_STREAM_STATE_STARTING);
     }
@@ -160,7 +160,7 @@ oboe_result_t AudioStreamRecord::updateState()
     case OBOE_STREAM_STATE_STARTING:
         err = mAudioRecord->getPosition(&position);
         if (err != OK) {
-            result = OboeConvert_androidToOboeError(err);
+            result = OboeConvert_androidToOboeResult(err);
         } else if (position != mPositionWhenStarting) {
             setState(OBOE_STREAM_STATE_STARTED);
         }
@@ -193,7 +193,7 @@ oboe_result_t AudioStreamRecord::read(void *buffer,
     if (bytesRead == WOULD_BLOCK) {
         return 0;
     } else if (bytesRead < 0) {
-        return OboeConvert_androidToOboeError(bytesRead);
+        return OboeConvert_androidToOboeResult(bytesRead);
     }
     oboe_size_frames_t framesRead = (oboe_size_frames_t)(bytesRead / bytesPerFrame);
     return (oboe_result_t) framesRead;

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef UTILITY_OBOEUTILITIES_H
-#define UTILITY_OBOEUTILITIES_H
+#ifndef UTILITY_OBOE_UTILITIES_H
+#define UTILITY_OBOE_UTILITIES_H
 
 #include <stdint.h>
 #include <sys/types.h>
@@ -25,7 +25,15 @@
 
 #include "oboe/OboeDefinitions.h"
 
-oboe_result_t OboeConvert_androidToOboeError(android::status_t error);
+/**
+ * Convert an Oboe result into the closest matching Android status.
+ */
+android::status_t OboeConvert_oboeToAndroidStatus(oboe_result_t result);
+
+/**
+ * Convert an Android status into the closest matching Oboe result.
+ */
+oboe_result_t OboeConvert_androidToOboeResult(android::status_t status);
 
 void OboeConvert_floatToPcm16(const float *source, int32_t numSamples, int16_t *destination);
 
@@ -51,4 +59,4 @@ oboe_audio_format_t OboeConvert_androidToOboeDataFormat(audio_format_t format);
  */
 oboe_size_bytes_t OboeConvert_formatToSizeInBytes(oboe_audio_format_t format);
 
-#endif //UTILITY_OBOEUTILITIES_H
+#endif //UTILITY_OBOE_UTILITIES_H

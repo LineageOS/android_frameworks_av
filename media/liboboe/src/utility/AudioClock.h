@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef UTILITY_AUDIOCLOCK_H
-#define UTILITY_AUDIOCLOCK_H
+#ifndef UTILITY_AUDIO_CLOCK_H
+#define UTILITY_AUDIO_CLOCK_H
 
 #include <stdint.h>
 #include <time.h>
@@ -95,4 +95,4 @@ public:
 };
 
 
-#endif // UTILITY_AUDIOCLOCK_H
+#endif // UTILITY_AUDIO_CLOCK_H

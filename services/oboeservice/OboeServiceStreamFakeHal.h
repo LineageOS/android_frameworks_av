@@ -22,10 +22,13 @@
 #include "FakeAudioHal.h"
 #include "MonotonicCounter.h"
 #include "AudioEndpointParcelable.h"
+#include "TimestampScheduler.h"
 
 namespace oboe {
 
-class OboeServiceStreamFakeHal : public OboeServiceStreamBase {
+class OboeServiceStreamFakeHal
+    : public OboeServiceStreamBase
+    , public Runnable {
 
 public:
     OboeServiceStreamFakeHal();
@@ -53,11 +56,9 @@ public:
 
     virtual oboe_result_t close() override;
 
-    virtual void tickle() override;
-
-protected:
-
     void sendCurrentTimestamp();
+
+    virtual void run() override; // to implement Runnable
 
 private:
     fake_hal_stream_ptr    mStreamId; // Move to HAL
@@ -68,6 +69,9 @@ private:
     int                    mPreviousFrameCounter = 0;   // from HAL
 
     oboe_stream_state_t    mState = OBOE_STREAM_STATE_UNINITIALIZED;
+
+    OboeThread             mOboeThread;
+    std::atomic<bool>      mThreadEnabled;
 };
 
 } // namespace oboe
