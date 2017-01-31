@@ -31,6 +31,7 @@ LOCAL_SHARED_LIBRARIES := \
 
 LOCAL_MODULE:= cameraserver
 LOCAL_32_BIT_ONLY := true
+LOCAL_NO_FPIE := $(TARGET_NEEDS_NONPIE_CAMERASERVER)
 
 LOCAL_CFLAGS += -Wall -Wextra -Werror -Wno-unused-parameter
 
