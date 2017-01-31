@@ -280,6 +280,7 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
     nsecs_t ts_since = 0;
     String16 clearOption("-clear");
     String16 sinceOption("-since");
+    String16 helpOption("-help");
     int n = args.size();
     for (int i = 0; i < n; i++) {
         String8 myarg(args[i]);
@@ -298,6 +299,16 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
             } else {
                 ts_since = 0;
             }
+            // command line is milliseconds; internal units are nano-seconds
+            ts_since *= 1000*1000;
+        } else if (args[i] == helpOption) {
+            result.append("Recognized parameters:\n");
+            result.append("-help        this help message\n");
+            result.append("-clear       clears out saved records\n");
+            result.append("-since XXX   include records since XXX\n");
+            result.append("             (XXX is milliseconds since the UNIX epoch)\n");
+            write(fd, result.string(), result.size());
+            return NO_ERROR;
         }
     }
 
@@ -364,8 +375,6 @@ String8 MediaAnalyticsService::dumpQueue(List<MediaAnalyticsItem *> *theList) {
 }
 
 String8 MediaAnalyticsService::dumpQueue(List<MediaAnalyticsItem *> *theList, nsecs_t ts_since) {
-    const size_t SIZE = 512;
-    char buffer[SIZE];
     String8 result;
     int slot = 0;
 
@@ -379,12 +388,7 @@ String8 MediaAnalyticsService::dumpQueue(List<MediaAnalyticsItem *> *theList, ns
                 continue;
             }
             AString entry = (*it)->toString();
-            snprintf(buffer, sizeof(buffer), "%4d: %s",
-                        slot, entry.c_str());
-            result.append(buffer);
-            buffer[0] = '\n';
-            buffer[1] = '\0';
-            result.append(buffer);
+            result.appendFormat("%5d: %s\n", slot, entry.c_str());
             slot++;
         }
     }
