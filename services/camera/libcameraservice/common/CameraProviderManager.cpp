@@ -47,43 +47,25 @@ CameraProviderManager::~CameraProviderManager() {
 
 status_t CameraProviderManager::initialize(wp<CameraProviderManager::StatusListener> listener,
         ServiceInteractionProxy* proxy) {
-    int numProviders = 0;
-    {
-        std::lock_guard<std::mutex> lock(mInterfaceMutex);
-        if (proxy == nullptr) {
-            ALOGE("%s: No valid service interaction proxy provided", __FUNCTION__);
-            return BAD_VALUE;
-        }
-        mListener = listener;
-        mServiceProxy = proxy;
-
-        // Registering will trigger notifications for all already-known providers
-        bool success = mServiceProxy->registerForNotifications(
-            /* instance name, empty means no filter */ "",
-            this);
-        if (!success) {
-            ALOGE("%s: Unable to register with hardware service manager for notifications "
-                    "about camera providers", __FUNCTION__);
-            return INVALID_OPERATION;
-        }
-        numProviders = mProviders.size();
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+    if (proxy == nullptr) {
+        ALOGE("%s: No valid service interaction proxy provided", __FUNCTION__);
+        return BAD_VALUE;
     }
+    mListener = listener;
+    mServiceProxy = proxy;
 
-    if (numProviders == 0) {
-        // Remote provider might have not been initialized
-        // Wait for a bit and see if we get one registered
-        std::mutex mtx;
-        std::unique_lock<std::mutex> lock(mtx);
-        mProviderRegistered.wait_for(lock, std::chrono::seconds(15));
-        if (mProviders.size() == 0) {
-            ALOGI("%s: Unable to get one registered provider within timeout!",
-                    __FUNCTION__);
-            std::lock_guard<std::mutex> lock(mInterfaceMutex);
-            // See if there's a passthrough HAL, but let's not complain if there's not
-            addProvider(kLegacyProviderName, /*expected*/ false);
-        }
+    // Registering will trigger notifications for all already-known providers
+    bool success = mServiceProxy->registerForNotifications(
+        /* instance name, empty means no filter */ "",
+        this);
+    if (!success) {
+        ALOGE("%s: Unable to register with hardware service manager for notifications "
+                "about camera providers", __FUNCTION__);
+        return INVALID_OPERATION;
     }
-
+    // See if there's a passthrough HAL, but let's not complain if there's not
+    addProvider(kLegacyProviderName, /*expected*/ false);
     return OK;
 }
 
@@ -294,7 +276,6 @@ hardware::Return<void> CameraProviderManager::onRegistration(
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
 
     addProvider(name);
-    mProviderRegistered.notify_one();
     return hardware::Return<void>();
 }
 
@@ -335,12 +316,11 @@ status_t CameraProviderManager::addProvider(const std::string& newProvider, bool
             mServiceProxy->getService(newProvider);
 
     if (interface == nullptr) {
+        ALOGW("%s: Camera provider HAL '%s' is not actually available", __FUNCTION__,
+                newProvider.c_str());
         if (expected) {
-            ALOGW("%s: Camera provider HAL '%s' is not actually available", __FUNCTION__,
-                    newProvider.c_str());
             return BAD_VALUE;
         } else {
-            // Not guaranteed to be found, so not an error if it wasn't
             return OK;
         }
     }
