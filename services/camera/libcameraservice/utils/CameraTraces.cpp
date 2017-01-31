@@ -74,7 +74,7 @@ status_t CameraTraces::dump(int fd, const Vector<String16> &args __attribute__((
         return BAD_VALUE;
     }
 
-    dprintf(fd, "Camera traces (%zu):\n", pcsList.size());
+    dprintf(fd, "== Camera error traces (%zu): ==\n", pcsList.size());
 
     if (pcsList.empty()) {
         dprintf(fd, "  No camera traces collected.\n");

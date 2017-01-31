@@ -1285,37 +1285,34 @@ status_t CameraDeviceClient::dump(int fd, const Vector<String16>& args) {
 }
 
 status_t CameraDeviceClient::dumpClient(int fd, const Vector<String16>& args) {
-    String8 result;
-    result.appendFormat("CameraDeviceClient[%s] (%p) dump:\n",
+    dprintf(fd, "  CameraDeviceClient[%s] (%p) dump:\n",
             mCameraIdStr.string(),
             (getRemoteCallback() != NULL ?
                     IInterface::asBinder(getRemoteCallback()).get() : NULL) );
-    result.appendFormat("  Current client UID %u\n", mClientUid);
+    dprintf(fd, "    Current client UID %u\n", mClientUid);
 
-    result.append("  State:\n");
-    result.appendFormat("    Request ID counter: %d\n", mRequestIdCounter);
+    dprintf(fd, "    State:\n");
+    dprintf(fd, "      Request ID counter: %d\n", mRequestIdCounter);
     if (mInputStream.configured) {
-        result.appendFormat("    Current input stream ID: %d\n",
-                    mInputStream.id);
+        dprintf(fd, "      Current input stream ID: %d\n", mInputStream.id);
     } else {
-        result.append("    No input stream configured.\n");
+        dprintf(fd, "      No input stream configured.\n");
     }
     if (!mStreamMap.isEmpty()) {
-        result.append("    Current output stream/surface IDs:\n");
+        dprintf(fd, "      Current output stream/surface IDs:\n");
         for (size_t i = 0; i < mStreamMap.size(); i++) {
-            result.appendFormat("      Stream %d Surface %d\n",
+            dprintf(fd, "        Stream %d Surface %d\n",
                                 mStreamMap.valueAt(i).streamId(),
                                 mStreamMap.valueAt(i).surfaceId());
         }
     } else if (!mDeferredStreams.isEmpty()) {
-        result.append("    Current deferred surface output stream IDs:\n");
+        dprintf(fd, "      Current deferred surface output stream IDs:\n");
         for (auto& streamId : mDeferredStreams) {
-            result.appendFormat("      Stream %d\n", streamId);
+            dprintf(fd, "        Stream %d\n", streamId);
         }
     } else {
-        result.append("    No output streams configured.\n");
+        dprintf(fd, "      No output streams configured.\n");
     }
-    write(fd, result.string(), result.size());
     // TODO: print dynamic/request section from most recent requests
     mFrameProcessor->dump(fd, args);
 
