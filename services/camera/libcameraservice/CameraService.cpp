@@ -684,7 +684,6 @@ Status CameraService::getCameraVendorTagDescriptor(
 
 int CameraService::getDeviceVersion(const String8& cameraId, int* facing) {
     ATRACE_CALL();
-    struct camera_info info;
 
     int deviceVersion = 0;
 
@@ -692,6 +691,7 @@ int CameraService::getDeviceVersion(const String8& cameraId, int* facing) {
         int id = cameraIdToInt(cameraId);
         if (id < 0) return -1;
 
+        struct camera_info info;
         if (mModule->getCameraInfo(id, &info) != OK) {
             return -1;
         }
@@ -710,8 +710,15 @@ int CameraService::getDeviceVersion(const String8& cameraId, int* facing) {
         hardware::hidl_version maxVersion{0,0};
         res = mCameraProviderManager->getHighestSupportedVersion(String8::std_string(cameraId),
                 &maxVersion);
-        if (res == NAME_NOT_FOUND) return -1;
+        if (res != OK) return -1;
         deviceVersion = HARDWARE_DEVICE_API_VERSION(maxVersion.get_major(), maxVersion.get_minor());
+
+        hardware::CameraInfo info;
+        if (facing) {
+            res = mCameraProviderManager->getCameraInfo(String8::std_string(cameraId), &info);
+            if (res != OK) return -1;
+            *facing = info.facing;
+        }
     }
     return deviceVersion;
 }
@@ -1532,17 +1539,14 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         // give flashlight a chance to close devices if necessary.
         mFlashlight->prepareDeviceOpen(cameraId);
 
-        // TODO: Update getDeviceVersion + HAL interface to use strings for Camera IDs
-        int id = cameraIdToInt(cameraId);
-        if (id == -1) {
-            ALOGE("%s: Invalid camera ID %s, cannot get device version from HAL.", __FUNCTION__,
-                    cameraId.string());
-            return STATUS_ERROR_FMT(ERROR_ILLEGAL_ARGUMENT,
-                    "Bad camera ID \"%s\" passed to camera open", cameraId.string());
-        }
-
         int facing = -1;
         int deviceVersion = getDeviceVersion(cameraId, /*out*/&facing);
+        if (facing == -1) {
+            ALOGE("%s: Unable to get camera device \"%s\"  facing", __FUNCTION__, cameraId.string());
+            return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION,
+                    "Unable to get camera device \"%s\" facing", cameraId.string());
+        }
+
         sp<BasicClient> tmp = nullptr;
         if(!(ret = makeClient(this, cameraCb, clientPackageName, cameraId, facing, clientPid,
                 clientUid, getpid(), legacyMode, halVersion, deviceVersion, effectiveApiLevel,
@@ -1880,9 +1884,13 @@ Status CameraService::supportsCameraApi(const String16& cameraId, int apiVersion
     }
 
     int facing = -1;
-
-    int deviceVersion = getDeviceVersion(id, &facing);
-
+    int deviceVersion = getDeviceVersion(id, /*out*/ &facing);
+    if (facing == -1) {
+        String8 msg = String8::format("Unable to get facing for camera device %s",
+                id.string());
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(ERROR_INVALID_OPERATION, msg.string());
+    }
     switch(deviceVersion) {
         case CAMERA_DEVICE_API_VERSION_1_0:
         case CAMERA_DEVICE_API_VERSION_3_0:
