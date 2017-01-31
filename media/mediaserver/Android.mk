@@ -40,6 +40,8 @@ LOCAL_32_BIT_ONLY := true
 
 LOCAL_INIT_RC := mediaserver.rc
 
+LOCAL_NO_FPIE := $(TARGET_DISABLE_ARM_PIE)
+
 LOCAL_CFLAGS := -Werror -Wall
 
 ifneq ($(BOARD_NUMBER_OF_CAMERAS),)
