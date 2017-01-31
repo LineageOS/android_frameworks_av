@@ -465,6 +465,10 @@ status_t MediaRecorderClient::setListener(const sp<IMediaRecorderClient>& listen
     } else {
         // Legacy IOMX
         binder = sm->getService(String16("media.codec"));
+        if (binder == NULL) {
+           ALOGE("Unable to connect to media codec service");
+           return NO_INIT;
+        }
         mCodecDeathListener = new ServiceDeathNotifier(binder, listener,
                 MediaPlayerService::MEDIACODEC_PROCESS_DEATH);
         binder->linkToDeath(mCodecDeathListener);
