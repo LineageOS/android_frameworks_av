@@ -24,8 +24,7 @@ LOCAL_SHARED_LIBRARIES:= \
     libbinder \
     liblog \
     libmediadrm \
-    libutils \
-    libandroidfw
+    libutils
 ifeq ($(ENABLE_TREBLE), true)
 LOCAL_SHARED_LIBRARIES += \
     libhidlbase \
