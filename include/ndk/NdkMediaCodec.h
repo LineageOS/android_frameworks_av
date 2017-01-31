@@ -190,7 +190,39 @@ media_status_t AMediaCodec_releaseOutputBufferAtTime(
  *
  * For more details, see the Java documentation for MediaCodec.createInputSurface.
  */
-media_status_t AMediaCodec_createInputSurface(AMediaCodec*, ANativeWindow** surface);
+media_status_t AMediaCodec_createInputSurface(
+        AMediaCodec *mData, ANativeWindow **surface);
+
+/**
+ * Creates a persistent Surface that can be used as the input to encoder
+ *
+ * Persistent surface can be reused by MediaCodec instances and can be set
+ * on a new instance via AMediaCodec_setInputSurface().
+ * A persistent surface can be connected to at most one instance of MediaCodec
+ * at any point in time.
+ *
+ * The application is responsible for releasing the surface by calling
+ * ANativeWindow_release() when done.
+ *
+ * For more details, see the Java documentation for MediaCodec.createPersistentInputSurface.
+ */
+media_status_t AMediaCodec_createPersistentInputSurface(
+        ANativeWindow **surface);
+
+/**
+ * Set a persistent-surface that can be used as the input to encoder, in place of input buffers
+ *
+ * The surface provided *must* be a persistent surface created via
+ * AMediaCodec_createPersistentInputSurface()
+ * This can only be called after the codec has been configured by calling
+ * AMediaCodec_configure(..); and before AMediaCodec_start() has been called.
+ *
+ * For more details, see the Java documentation for MediaCodec.setInputSurface.
+ */
+media_status_t AMediaCodec_setInputSurface(
+        AMediaCodec *mData, ANativeWindow *surface);
+
+
 
 typedef enum {
     AMEDIACODECRYPTOINFO_MODE_CLEAR = 0,

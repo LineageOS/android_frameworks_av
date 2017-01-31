@@ -31,6 +31,7 @@
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
 
+#include <media/stagefright/PersistentSurface.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/MediaCodecBuffer.h>
@@ -55,6 +56,18 @@ enum {
     kWhatStopActivityNotifications,
 };
 
+struct AMediaCodecPersistentSurface : public Surface {
+    sp<PersistentSurface> mPersistentSurface;
+    AMediaCodecPersistentSurface(
+            const sp<IGraphicBufferProducer>& igbp,
+            const sp<PersistentSurface>& ps)
+            : Surface(igbp) {
+        mPersistentSurface = ps;
+    }
+    virtual ~AMediaCodecPersistentSurface() {
+        //mPersistentSurface ref will be let go off here
+    }
+};
 
 class CodecHandler: public AHandler {
 private:
@@ -394,6 +407,47 @@ media_status_t AMediaCodec_createInputSurface(AMediaCodec *mData, ANativeWindow 
     *surface = new Surface(igbp);
     ANativeWindow_acquire(*surface);
     return AMEDIA_OK;
+}
+
+EXPORT
+media_status_t AMediaCodec_createPersistentInputSurface(ANativeWindow **surface) {
+    if (surface == NULL) {
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+    *surface = NULL;
+
+    sp<PersistentSurface> ps = MediaCodec::CreatePersistentInputSurface();
+    if (ps == NULL) {
+        return AMEDIA_ERROR_UNKNOWN;
+    }
+
+    sp<IGraphicBufferProducer> igbp = ps->getBufferProducer();
+    if (igbp == NULL) {
+        return AMEDIA_ERROR_UNKNOWN;
+    }
+
+    *surface = new AMediaCodecPersistentSurface(igbp, ps);
+    ANativeWindow_acquire(*surface);
+
+    return AMEDIA_OK;
+}
+
+EXPORT
+media_status_t AMediaCodec_setInputSurface(
+        AMediaCodec *mData, ANativeWindow *surface) {
+
+    if (surface == NULL || mData == NULL) {
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+
+    AMediaCodecPersistentSurface *aMediaPersistentSurface =
+            static_cast<AMediaCodecPersistentSurface *>(surface);
+    if (aMediaPersistentSurface->mPersistentSurface == NULL) {
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+
+    return translate_error(mData->mCodec->setInputSurface(
+            aMediaPersistentSurface->mPersistentSurface));
 }
 
 //EXPORT

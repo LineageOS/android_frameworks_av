@@ -39,6 +39,7 @@ LOCAL_C_INCLUDES := \
     frameworks/base/media/jni \
     frameworks/av/include/ndk \
     frameworks/native/include \
+    frameworks/native/include/media/openmax \
     system/media/camera/include \
     $(call include-path-for, libhardware)/hardware \
 
