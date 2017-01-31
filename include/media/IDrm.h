@@ -34,7 +34,8 @@ struct IDrm : public IInterface {
 
     virtual bool isCryptoSchemeSupported(const uint8_t uuid[16], const String8 &mimeType) = 0;
 
-    virtual status_t createPlugin(const uint8_t uuid[16]) = 0;
+    virtual status_t createPlugin(const uint8_t uuid[16],
+                                  const String8 &appPackageName) = 0;
 
     virtual status_t destroyPlugin() = 0;
 

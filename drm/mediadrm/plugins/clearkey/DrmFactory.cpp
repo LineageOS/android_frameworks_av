@@ -44,7 +44,8 @@ bool DrmFactory::isContentTypeSupported(const android::String8 &type) {
 }
 
 android::status_t DrmFactory::createDrmPlugin(
-        const uint8_t uuid[16], android::DrmPlugin** plugin) {
+        const uint8_t uuid[16],
+        android::DrmPlugin** plugin) {
     if (!isCryptoSchemeSupported(uuid)) {
         *plugin = NULL;
         return android::BAD_VALUE;

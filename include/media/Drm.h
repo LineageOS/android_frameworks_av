@@ -40,7 +40,7 @@ struct Drm : public BnDrm,
 
     virtual bool isCryptoSchemeSupported(const uint8_t uuid[16], const String8 &mimeType);
 
-    virtual status_t createPlugin(const uint8_t uuid[16]);
+    virtual status_t createPlugin(const uint8_t uuid[16], const String8 &appPackageName);
 
     virtual status_t destroyPlugin();
 

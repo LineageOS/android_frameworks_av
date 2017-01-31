@@ -13,7 +13,7 @@ LOCAL_SRC_FILES:= \
     IDrmClient.cpp \
     IMediaDrmService.cpp \
     SharedLibrary.cpp
-ifeq ($(ENABLE_TREBLE_DRM), true)
+ifeq ($(ENABLE_TREBLE), true)
 LOCAL_SRC_FILES += \
     DrmHal.cpp \
     CryptoHal.cpp
@@ -31,7 +31,7 @@ LOCAL_SHARED_LIBRARIES := \
     libmediautils \
     libstagefright_foundation \
     libutils
-ifeq ($(ENABLE_TREBLE_DRM), true)
+ifeq ($(ENABLE_TREBLE), true)
 LOCAL_SHARED_LIBRARIES += \
     android.hidl.base@1.0 \
     android.hardware.drm@1.0 \

@@ -88,13 +88,15 @@ struct BpDrm : public BpInterface<IDrm> {
         return reply.readInt32() != 0;
     }
 
-    virtual status_t createPlugin(const uint8_t uuid[16]) {
+    virtual status_t createPlugin(const uint8_t uuid[16],
+                                  const String8& appPackageName) {
         Parcel data, reply;
         data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
         data.write(uuid, 16);
-
+        data.writeString8(appPackageName);
         status_t status = remote()->transact(CREATE_PLUGIN, data, &reply);
         if (status != OK) {
+            ALOGE("createPlugin: binder call failed: %d", status);
             return status;
         }
 
@@ -585,7 +587,6 @@ status_t BnDrm::onTransact(
             data.read(uuid, sizeof(uuid));
             String8 mimeType = data.readString8();
             reply->writeInt32(isCryptoSchemeSupported(uuid, mimeType));
-
             return OK;
         }
 
@@ -594,7 +595,8 @@ status_t BnDrm::onTransact(
             CHECK_INTERFACE(IDrm, data, reply);
             uint8_t uuid[16];
             data.read(uuid, sizeof(uuid));
-            reply->writeInt32(createPlugin(uuid));
+            String8 appPackageName = data.readString8();
+            reply->writeInt32(createPlugin(uuid, appPackageName));
             return OK;
         }
 

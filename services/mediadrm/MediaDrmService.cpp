@@ -24,7 +24,7 @@
 #include <binder/IServiceManager.h>
 #include <utils/Log.h>
 
-#ifdef ENABLE_TREBLE_DRM
+#ifdef ENABLE_TREBLE
 #include <media/CryptoHal.h>
 #include <media/DrmHal.h>
 #else
@@ -40,7 +40,7 @@ void MediaDrmService::instantiate() {
 }
 
 sp<ICrypto> MediaDrmService::makeCrypto() {
-#ifdef ENABLE_TREBLE_DRM
+#ifdef ENABLE_TREBLE
     return new CryptoHal;
 #else
     return new Crypto;
@@ -48,7 +48,7 @@ sp<ICrypto> MediaDrmService::makeCrypto() {
 }
 
 sp<IDrm> MediaDrmService::makeDrm() {
-#ifdef ENABLE_TREBLE_DRM
+#ifdef ENABLE_TREBLE
     return new DrmHal;
 #else
     return new Drm;

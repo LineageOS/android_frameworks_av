@@ -26,7 +26,7 @@ LOCAL_SHARED_LIBRARIES:= \
     libmediadrm \
     libutils \
     libandroidfw
-ifeq ($(ENABLE_TREBLE_DRM), true)
+ifeq ($(ENABLE_TREBLE), true)
 LOCAL_SHARED_LIBRARIES += \
     libhidlbase \
     libhidlmemory \
@@ -35,8 +35,8 @@ LOCAL_SHARED_LIBRARIES += \
 endif
 
 LOCAL_CFLAGS += -Wall -Wextra -Werror
-ifeq ($(ENABLE_TREBLE_DRM), true)
-LOCAL_CFLAGS += -DENABLE_TREBLE_DRM=1
+ifeq ($(ENABLE_TREBLE), true)
+LOCAL_CFLAGS += -DENABLE_TREBLE=1
 endif
 
 LOCAL_MODULE:= mediadrmserver

@@ -205,21 +205,22 @@ sp<IDrmFactory> DrmHal::makeDrmFactory() {
     return factory;
 }
 
-sp<IDrmPlugin> DrmHal::makeDrmPlugin(const uint8_t uuid[16]) {
+sp<IDrmPlugin> DrmHal::makeDrmPlugin(const uint8_t uuid[16],
+        const String8& appPackageName) {
     if (mFactory == NULL){
         return NULL;
     }
 
     sp<IDrmPlugin> plugin;
-    Return<void> hResult = mFactory->createPlugin(uuid,
+    Return<void> hResult = mFactory->createPlugin(uuid, appPackageName.string(),
             [&](Status status, const sp<IDrmPlugin>& hPlugin) {
-                if (status != Status::OK) {
-                    ALOGD("Failed to make drm plugin");
-                    return;
-                }
-                plugin = hPlugin;
-            }
-        );
+      if (status != Status::OK) {
+        ALOGD("Failed to make drm plugin");
+        return;
+      }
+      plugin = hPlugin;
+    }
+    );
     return plugin;
 }
 
@@ -350,10 +351,11 @@ bool DrmHal::isCryptoSchemeSupported(const uint8_t uuid[16], const String8 &mime
     return result;
 }
 
-status_t DrmHal::createPlugin(const uint8_t uuid[16]) {
+status_t DrmHal::createPlugin(const uint8_t uuid[16],
+        const String8& appPackageName) {
     Mutex::Autolock autoLock(mLock);
 
-    mPlugin = makeDrmPlugin(uuid);
+    mPlugin = makeDrmPlugin(uuid, appPackageName);
 
     if (mPlugin == NULL) {
         mInitCheck = ERROR_UNSUPPORTED;
@@ -597,8 +599,7 @@ status_t DrmHal::getProvisionRequest(String8 const &certType,
 }
 
 status_t DrmHal::provideProvisionResponse(Vector<uint8_t> const &response,
-                                       Vector<uint8_t> &certificate,
-                                       Vector<uint8_t> &wrappedKey) {
+        Vector<uint8_t> &certificate, Vector<uint8_t> &wrappedKey) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
@@ -783,10 +784,8 @@ status_t DrmHal::setMacAlgorithm(Vector<uint8_t> const &sessionId,
 }
 
 status_t DrmHal::encrypt(Vector<uint8_t> const &sessionId,
-                      Vector<uint8_t> const &keyId,
-                      Vector<uint8_t> const &input,
-                      Vector<uint8_t> const &iv,
-                      Vector<uint8_t> &output) {
+        Vector<uint8_t> const &keyId, Vector<uint8_t> const &input,
+        Vector<uint8_t> const &iv, Vector<uint8_t> &output) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
@@ -811,10 +810,8 @@ status_t DrmHal::encrypt(Vector<uint8_t> const &sessionId,
 }
 
 status_t DrmHal::decrypt(Vector<uint8_t> const &sessionId,
-                      Vector<uint8_t> const &keyId,
-                      Vector<uint8_t> const &input,
-                      Vector<uint8_t> const &iv,
-                      Vector<uint8_t> &output) {
+        Vector<uint8_t> const &keyId, Vector<uint8_t> const &input,
+        Vector<uint8_t> const &iv, Vector<uint8_t> &output) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
@@ -839,9 +836,8 @@ status_t DrmHal::decrypt(Vector<uint8_t> const &sessionId,
 }
 
 status_t DrmHal::sign(Vector<uint8_t> const &sessionId,
-                   Vector<uint8_t> const &keyId,
-                   Vector<uint8_t> const &message,
-                   Vector<uint8_t> &signature) {
+        Vector<uint8_t> const &keyId, Vector<uint8_t> const &message,
+        Vector<uint8_t> &signature) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
@@ -866,10 +862,8 @@ status_t DrmHal::sign(Vector<uint8_t> const &sessionId,
 }
 
 status_t DrmHal::verify(Vector<uint8_t> const &sessionId,
-                     Vector<uint8_t> const &keyId,
-                     Vector<uint8_t> const &message,
-                     Vector<uint8_t> const &signature,
-                     bool &match) {
+        Vector<uint8_t> const &keyId, Vector<uint8_t> const &message,
+        Vector<uint8_t> const &signature, bool &match) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
@@ -896,10 +890,8 @@ status_t DrmHal::verify(Vector<uint8_t> const &sessionId,
 }
 
 status_t DrmHal::signRSA(Vector<uint8_t> const &sessionId,
-                      String8 const &algorithm,
-                      Vector<uint8_t> const &message,
-                      Vector<uint8_t> const &wrappedKey,
-                      Vector<uint8_t> &signature) {
+        String8 const &algorithm, Vector<uint8_t> const &message,
+        Vector<uint8_t> const &wrappedKey, Vector<uint8_t> &signature) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
