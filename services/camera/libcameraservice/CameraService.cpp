@@ -2750,174 +2750,175 @@ status_t CameraService::dump(int fd, const Vector<String16>& args) {
                 getCallingPid(),
                 getCallingUid());
         write(fd, result.string(), result.size());
-    } else {
-        bool locked = tryLock(mServiceLock);
-        // failed to lock - CameraService is probably deadlocked
-        if (!locked) {
-            result.append("CameraService may be deadlocked\n");
-            write(fd, result.string(), result.size());
-        }
+        return NO_ERROR;
+    }
 
-        bool hasClient = false;
-        if (!mInitialized) {
-            result = String8::format("No camera HAL available!\n");
-            write(fd, result.string(), result.size());
+    bool locked = tryLock(mServiceLock);
+    // failed to lock - CameraService is probably deadlocked
+    if (!locked) {
+        result.append("CameraService may be deadlocked\n");
+        write(fd, result.string(), result.size());
+    }
 
-            // Dump event log for error information
-            dumpEventLog(fd);
-
-            if (locked) mServiceLock.unlock();
-            return NO_ERROR;
-        }
-        if (mModule == nullptr) {
-            mCameraProviderManager->dump(fd, args);
-            // TODO - need way more dumping here
-
-            if (locked) mServiceLock.unlock();
-            return NO_ERROR;
-        }
-
-        result = String8::format("Camera module HAL API version: 0x%x\n", mModule->getHalApiVersion());
-        result.appendFormat("Camera module API version: 0x%x\n", mModule->getModuleApiVersion());
-        result.appendFormat("Camera module name: %s\n", mModule->getModuleName());
-        result.appendFormat("Camera module author: %s\n", mModule->getModuleAuthor());
-        result.appendFormat("Number of camera devices: %d\n", mNumberOfCameras);
-        result.appendFormat("Number of normal camera devices: %d\n", mNumberOfNormalCameras);
-        String8 activeClientString = mActiveClientManager.toString();
-        result.appendFormat("Active Camera Clients:\n%s", activeClientString.string());
-        result.appendFormat("Allowed users:\n%s\n", toString(mAllowedUsers).string());
-
-        sp<VendorTagDescriptor> desc = VendorTagDescriptor::getGlobalVendorTagDescriptor();
-        if (desc == NULL) {
-            result.appendFormat("Vendor tags left unimplemented.\n");
-        } else {
-            result.appendFormat("Vendor tag definitions:\n");
-        }
-
+    bool hasClient = false;
+    if (!mInitialized) {
+        result = String8::format("No camera HAL available!\n");
         write(fd, result.string(), result.size());
 
-        if (desc != NULL) {
-            desc->dump(fd, /*verbosity*/2, /*indentation*/4);
-        }
-
+        // Dump event log for error information
         dumpEventLog(fd);
 
-        bool stateLocked = tryLock(mCameraStatesLock);
-        if (!stateLocked) {
-            result = String8::format("CameraStates in use, may be deadlocked\n");
-            write(fd, result.string(), result.size());
-        }
-
-        for (auto& state : mCameraStates) {
-            String8 cameraId = state.first;
-            result = String8::format("Camera %s information:\n", cameraId.string());
-            camera_info info;
-
-            status_t rc = mModule->getCameraInfo(cameraIdToInt(cameraId), &info);
-            if (rc != OK) {
-                result.appendFormat("  Error reading static information!\n");
-                write(fd, result.string(), result.size());
-            } else {
-                result.appendFormat("  Facing: %s\n",
-                        info.facing == CAMERA_FACING_BACK ? "BACK" :
-                                info.facing == CAMERA_FACING_FRONT ? "FRONT" : "EXTERNAL");
-                result.appendFormat("  Orientation: %d\n", info.orientation);
-                int deviceVersion;
-                if (mModule->getModuleApiVersion() < CAMERA_MODULE_API_VERSION_2_0) {
-                    deviceVersion = CAMERA_DEVICE_API_VERSION_1_0;
-                } else {
-                    deviceVersion = info.device_version;
-                }
-
-                auto conflicting = state.second->getConflicting();
-                result.appendFormat("  Resource Cost: %d\n", state.second->getCost());
-                result.appendFormat("  Conflicting Devices:");
-                for (auto& id : conflicting) {
-                    result.appendFormat(" %s", id.string());
-                }
-                if (conflicting.size() == 0) {
-                    result.appendFormat(" NONE");
-                }
-                result.appendFormat("\n");
-
-                result.appendFormat("  Device version: %#x\n", deviceVersion);
-                if (deviceVersion >= CAMERA_DEVICE_API_VERSION_3_0) {
-                    result.appendFormat("  Device static metadata:\n");
-                    write(fd, result.string(), result.size());
-                    dump_indented_camera_metadata(info.static_camera_characteristics,
-                            fd, /*verbosity*/2, /*indentation*/4);
-                } else {
-                    write(fd, result.string(), result.size());
-                }
-
-                CameraParameters p = state.second->getShimParams();
-                if (!p.isEmpty()) {
-                    result = String8::format("  Camera1 API shim is using parameters:\n        ");
-                    write(fd, result.string(), result.size());
-                    p.dump(fd, args);
-                }
-            }
-
-            auto clientDescriptor = mActiveClientManager.get(cameraId);
-            if (clientDescriptor == nullptr) {
-                result = String8::format("  Device %s is closed, no client instance\n",
-                        cameraId.string());
-                write(fd, result.string(), result.size());
-                continue;
-            }
-            hasClient = true;
-            result = String8::format("  Device %s is open. Client instance dump:\n\n",
-                    cameraId.string());
-            result.appendFormat("Client priority level: %d\n", clientDescriptor->getPriority());
-            result.appendFormat("Client PID: %d\n", clientDescriptor->getOwnerId());
-
-            auto client = clientDescriptor->getValue();
-            result.appendFormat("Client package: %s\n",
-                    String8(client->getPackageName()).string());
-            write(fd, result.string(), result.size());
-
-            client->dumpClient(fd, args);
-        }
-
-        if (stateLocked) mCameraStatesLock.unlock();
-
-        if (!hasClient) {
-            result = String8::format("\nNo active camera clients yet.\n");
-            write(fd, result.string(), result.size());
-        }
+        if (locked) mServiceLock.unlock();
+        return NO_ERROR;
+    }
+    if (mModule == nullptr) {
+        mCameraProviderManager->dump(fd, args);
+        // TODO - need way more dumping here
 
         if (locked) mServiceLock.unlock();
+        return NO_ERROR;
+    }
 
-        // Dump camera traces if there were any
-        write(fd, "\n", 1);
-        camera3::CameraTraces::dump(fd, args);
+    result = String8::format("Camera module HAL API version: 0x%x\n", mModule->getHalApiVersion());
+    result.appendFormat("Camera module API version: 0x%x\n", mModule->getModuleApiVersion());
+    result.appendFormat("Camera module name: %s\n", mModule->getModuleName());
+    result.appendFormat("Camera module author: %s\n", mModule->getModuleAuthor());
+    result.appendFormat("Number of camera devices: %d\n", mNumberOfCameras);
+    result.appendFormat("Number of normal camera devices: %d\n", mNumberOfNormalCameras);
+    String8 activeClientString = mActiveClientManager.toString();
+    result.appendFormat("Active Camera Clients:\n%s", activeClientString.string());
+    result.appendFormat("Allowed users:\n%s\n", toString(mAllowedUsers).string());
 
-        // Process dump arguments, if any
-        int n = args.size();
-        String16 verboseOption("-v");
-        String16 unreachableOption("--unreachable");
-        for (int i = 0; i < n; i++) {
-            if (args[i] == verboseOption) {
-                // change logging level
-                if (i + 1 >= n) continue;
-                String8 levelStr(args[i+1]);
-                int level = atoi(levelStr.string());
-                result = String8::format("\nSetting log level to %d.\n", level);
-                setLogLevel(level);
+    sp<VendorTagDescriptor> desc = VendorTagDescriptor::getGlobalVendorTagDescriptor();
+    if (desc == NULL) {
+        result.appendFormat("Vendor tags left unimplemented.\n");
+    } else {
+        result.appendFormat("Vendor tag definitions:\n");
+    }
+
+    write(fd, result.string(), result.size());
+
+    if (desc != NULL) {
+        desc->dump(fd, /*verbosity*/2, /*indentation*/4);
+    }
+
+    dumpEventLog(fd);
+
+    bool stateLocked = tryLock(mCameraStatesLock);
+    if (!stateLocked) {
+        result = String8::format("CameraStates in use, may be deadlocked\n");
+        write(fd, result.string(), result.size());
+    }
+
+    for (auto& state : mCameraStates) {
+        String8 cameraId = state.first;
+        result = String8::format("Camera %s information:\n", cameraId.string());
+        camera_info info;
+
+        status_t rc = mModule->getCameraInfo(cameraIdToInt(cameraId), &info);
+        if (rc != OK) {
+            result.appendFormat("  Error reading static information!\n");
+            write(fd, result.string(), result.size());
+        } else {
+            result.appendFormat("  Facing: %s\n",
+                    info.facing == CAMERA_FACING_BACK ? "BACK" :
+                    info.facing == CAMERA_FACING_FRONT ? "FRONT" : "EXTERNAL");
+            result.appendFormat("  Orientation: %d\n", info.orientation);
+            int deviceVersion;
+            if (mModule->getModuleApiVersion() < CAMERA_MODULE_API_VERSION_2_0) {
+                deviceVersion = CAMERA_DEVICE_API_VERSION_1_0;
+            } else {
+                deviceVersion = info.device_version;
+            }
+
+            auto conflicting = state.second->getConflicting();
+            result.appendFormat("  Resource Cost: %d\n", state.second->getCost());
+            result.appendFormat("  Conflicting Devices:");
+            for (auto& id : conflicting) {
+                result.appendFormat(" %s", id.string());
+            }
+            if (conflicting.size() == 0) {
+                result.appendFormat(" NONE");
+            }
+            result.appendFormat("\n");
+
+            result.appendFormat("  Device version: %#x\n", deviceVersion);
+            if (deviceVersion >= CAMERA_DEVICE_API_VERSION_3_0) {
+                result.appendFormat("  Device static metadata:\n");
                 write(fd, result.string(), result.size());
-            } else if (args[i] == unreachableOption) {
-                // Dump memory analysis
-                // TODO - should limit be an argument parameter?
-                UnreachableMemoryInfo info;
-                bool success = GetUnreachableMemory(info, /*limit*/ 10000);
-                if (!success) {
-                    dprintf(fd, "\nUnable to dump unreachable memory. "
-                            "Try disabling SELinux enforcement.\n");
-                } else {
-                    dprintf(fd, "\nDumping unreachable memory:\n");
-                    std::string s = info.ToString(/*log_contents*/ true);
-                    write(fd, s.c_str(), s.size());
+                dump_indented_camera_metadata(info.static_camera_characteristics,
+                        fd, /*verbosity*/2, /*indentation*/4);
+            } else {
+                write(fd, result.string(), result.size());
                 }
+
+            CameraParameters p = state.second->getShimParams();
+            if (!p.isEmpty()) {
+                result = String8::format("  Camera1 API shim is using parameters:\n        ");
+                write(fd, result.string(), result.size());
+                p.dump(fd, args);
+            }
+        }
+
+        auto clientDescriptor = mActiveClientManager.get(cameraId);
+        if (clientDescriptor == nullptr) {
+            result = String8::format("  Device %s is closed, no client instance\n",
+                    cameraId.string());
+            write(fd, result.string(), result.size());
+            continue;
+        }
+        hasClient = true;
+        result = String8::format("  Device %s is open. Client instance dump:\n\n",
+                cameraId.string());
+        result.appendFormat("Client priority level: %d\n", clientDescriptor->getPriority());
+        result.appendFormat("Client PID: %d\n", clientDescriptor->getOwnerId());
+
+        auto client = clientDescriptor->getValue();
+        result.appendFormat("Client package: %s\n",
+                String8(client->getPackageName()).string());
+        write(fd, result.string(), result.size());
+
+        client->dumpClient(fd, args);
+    }
+
+    if (stateLocked) mCameraStatesLock.unlock();
+
+    if (!hasClient) {
+        result = String8::format("\nNo active camera clients yet.\n");
+        write(fd, result.string(), result.size());
+    }
+
+    if (locked) mServiceLock.unlock();
+
+    // Dump camera traces if there were any
+    write(fd, "\n", 1);
+    camera3::CameraTraces::dump(fd, args);
+
+    // Process dump arguments, if any
+    int n = args.size();
+    String16 verboseOption("-v");
+    String16 unreachableOption("--unreachable");
+    for (int i = 0; i < n; i++) {
+        if (args[i] == verboseOption) {
+            // change logging level
+            if (i + 1 >= n) continue;
+            String8 levelStr(args[i+1]);
+            int level = atoi(levelStr.string());
+            result = String8::format("\nSetting log level to %d.\n", level);
+            setLogLevel(level);
+            write(fd, result.string(), result.size());
+        } else if (args[i] == unreachableOption) {
+            // Dump memory analysis
+            // TODO - should limit be an argument parameter?
+            UnreachableMemoryInfo info;
+            bool success = GetUnreachableMemory(info, /*limit*/ 10000);
+            if (!success) {
+                dprintf(fd, "\nUnable to dump unreachable memory. "
+                        "Try disabling SELinux enforcement.\n");
+            } else {
+                dprintf(fd, "\nDumping unreachable memory:\n");
+                std::string s = info.ToString(/*log_contents*/ true);
+                write(fd, s.c_str(), s.size());
             }
         }
     }
