@@ -20,7 +20,6 @@
 #include <vector>
 #include <string>
 #include <mutex>
-#include <condition_variable>
 
 #include <camera/CameraParameters2.h>
 #include <camera/CameraMetadata.h>
@@ -219,8 +218,6 @@ public:
 private:
     // All private members, unless otherwise noted, expect mInterfaceMutex to be locked before use
     mutable std::mutex mInterfaceMutex;
-
-    std::condition_variable mProviderRegistered;
 
     // the status listener update callbacks will lock mStatusMutex
     mutable std::mutex mStatusListenerMutex;
