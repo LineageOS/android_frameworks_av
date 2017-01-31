@@ -1932,7 +1932,7 @@ void AudioPolicyManager::releaseInput(audio_io_handle_t input,
     ALOG_ASSERT(inputDesc != 0);
 
     sp<AudioSession> audioSession = inputDesc->getAudioSession(session);
-    if (index < 0) {
+    if (audioSession == 0) {
         ALOGW("releaseInput() unknown session %d on input %d", session, input);
         return;
     }
