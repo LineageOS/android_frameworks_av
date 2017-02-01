@@ -239,6 +239,7 @@ status_t Camera3OutputStream::returnBufferLocked(
     }
 
     mLastTimestamp = timestamp;
+    mFrameCount++;
 
     return OK;
 }
