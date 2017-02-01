@@ -85,6 +85,9 @@ status_t Camera3InputStream::getInputBufferLocked(
                         /*releaseFence*/-1, CAMERA3_BUFFER_STATUS_OK, /*output*/false);
     mBuffersInFlight.push_back(bufferItem);
 
+    mFrameCount++;
+    mLastTimestamp = bufferItem.mTimestamp;
+
     return OK;
 }
 
@@ -220,6 +223,7 @@ status_t Camera3InputStream::configureQueueLocked() {
 
     mHandoutTotalBufferCount = 0;
     mFrameCount = 0;
+    mLastTimestamp = 0;
 
     if (mConsumer.get() == 0) {
         sp<IGraphicBufferProducer> producer;
