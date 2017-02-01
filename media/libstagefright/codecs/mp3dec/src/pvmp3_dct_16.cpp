@@ -149,6 +149,7 @@ const int32 CosTable_dct32[16] =
 ; FUNCTION CODE
 ----------------------------------------------------------------------------*/
 
+__attribute__((no_sanitize("integer")))
 void pvmp3_dct_16(int32 vec[], int32 flag)
 {
     int32 tmp0;
@@ -308,6 +309,7 @@ void pvmp3_dct_16(int32 vec[], int32 flag)
 /*----------------------------------------------------------------------------
 ; FUNCTION CODE
 ----------------------------------------------------------------------------*/
+__attribute__((no_sanitize("integer")))
 void pvmp3_merge_in_place_N32(int32 vec[])
 {
 
@@ -366,6 +368,7 @@ void pvmp3_merge_in_place_N32(int32 vec[])
 
 
 
+__attribute__((no_sanitize("integer")))
 void pvmp3_split(int32 *vect)
 {
 

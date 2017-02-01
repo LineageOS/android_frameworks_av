@@ -129,6 +129,7 @@ const int32 cosTerms_1_ov_cos_phi[18] =
 
 
 
+__attribute__((no_sanitize("integer")))
 void pvmp3_mdct_18(int32 vec[], int32 *history, const int32 *window)
 {
     int32 i;
