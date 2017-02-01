@@ -27,6 +27,7 @@ public:
     OMXClient();
 
     status_t connect();
+    status_t connectTreble();
     void disconnect();
 
     sp<IOMX> interface() {
