@@ -81,7 +81,7 @@ public:
 
     static void    appendInt(String8 *body, const void *data);
     static void    appendFloat(String8 *body, const void *data);
-    static void    appendPID(String8 *body, const void *data);
+    static void    appendPID(String8 *body, const void *data, size_t length);
     static int     handleFormat(const char *fmt, size_t length, const uint8_t *data,
                                 String8 *timestamp, String8 *body);
     static void    appendTimestamp(String8 *body, const void *data);
@@ -177,6 +177,11 @@ private:
     audio_utils_fifo_writer * const mFifoWriter;    // used to write to FIFO,
                                                     // non-NULL unless dummy constructor used
     bool            mEnabled;   // whether to actually log
+
+    // cached pid and process name to use in %p format specifier
+    // total tag length is mPidTagSize and process name is not zero terminated
+    char   *mPidTag;
+    size_t  mPidTagSize;
 };
 
 // ---------------------------------------------------------------------------

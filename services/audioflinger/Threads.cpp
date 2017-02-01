@@ -3041,7 +3041,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
             }
 #if 0
             // logFormat example
-            if (!(z % 100)) {
+            if (z % 100 == 0) {
                 timespec ts;
                 clock_gettime(CLOCK_MONOTONIC, &ts);
                 LOGF("This is an integer %d, this is a float %f, this is my "

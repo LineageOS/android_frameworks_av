@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/prctl.h>
 #include <time.h>
 #include <new>
 #include <audio_utils/roundup.h>
@@ -74,7 +75,7 @@ size_t NBLog::Timeline::sharedSize(size_t size)
 // ---------------------------------------------------------------------------
 
 NBLog::Writer::Writer()
-    : mShared(NULL), mFifo(NULL), mFifoWriter(NULL), mEnabled(false)
+    : mShared(NULL), mFifo(NULL), mFifoWriter(NULL), mEnabled(false), mPidTag(NULL), mPidTagSize(0)
 {
 }
 
@@ -86,6 +87,18 @@ NBLog::Writer::Writer(void *shared, size_t size)
       mFifoWriter(mFifo != NULL ? new audio_utils_fifo_writer(*mFifo) : NULL),
       mEnabled(mFifoWriter != NULL)
 {
+    // caching pid and process name
+    pid_t id = ::getpid();
+    char procName[16];
+    int status = prctl(PR_GET_NAME, procName);
+    if (status) {  // error getting process name
+        procName[0] = '\0';
+    }
+    size_t length = strlen(procName);
+    mPidTagSize = length + sizeof(pid_t);
+    mPidTag = new char[mPidTagSize];
+    memcpy(mPidTag, &id, sizeof(pid_t));
+    memcpy(mPidTag + sizeof(pid_t), procName, length);
 }
 
 NBLog::Writer::Writer(const sp<IMemory>& iMemory, size_t size)
@@ -98,6 +111,7 @@ NBLog::Writer::~Writer()
 {
     delete mFifoWriter;
     delete mFifo;
+    delete[] mPidTag;
 }
 
 void NBLog::Writer::log(const char *string)
@@ -181,15 +195,7 @@ void NBLog::Writer::logPID()
     if (!mEnabled) {
         return;
     }
-    pid_t id = ::getpid();
-    // TODO: append process name to pid
-    // const char* path = sprintf("/proc/%d/status", id);
-    // FILE* f = fopen(path);
-    // size_t length = 30
-    // char buffer[length];
-    // getline(&buffer, &length, f);
-    // char* pidTag = sprintf("")
-    log(EVENT_PID, &id, sizeof(pid_t));
+    log(EVENT_PID, mPidTag, mPidTagSize);
 }
 
 void NBLog::Writer::logStart(const char *fmt)
@@ -271,10 +277,12 @@ void NBLog::Writer::logVFormat(const char *fmt, va_list argp)
             --p;
             break;
 
+        case '%':
+            break;
+
         default:
             ALOGW("NBLog Writer parsed invalid format specifier: %c", *p);
             break;
-        // the '%' case is handled using the formatted string in the reader
         }
     }
     Writer::logEnd();
@@ -583,7 +591,7 @@ void NBLog::Reader::dump(int fd, size_t indent)
             appendFloat(&body, data);
             break;
         case EVENT_PID:
-            appendPID(&body, data);
+            appendPID(&body, data, length);
             break;
         case EVENT_START_FMT:
             advance += handleFormat((const char*) &copy[i + 2], length,
@@ -642,9 +650,10 @@ void NBLog::appendFloat(String8 *body, const void *data) {
     body->appendFormat("<%f>", f);
 }
 
-void NBLog::appendPID(String8 *body, const void* data) {
+void NBLog::appendPID(String8 *body, const void* data, size_t length) {
     pid_t id = *((pid_t*) data);
-    body->appendFormat("<PID: %d>", id);
+    char * name = &((char*) data)[sizeof(pid_t)];
+    body->appendFormat("<PID: %d, name: %.*s>", id, (int) (length - sizeof(pid_t)), name);
 }
 
 int NBLog::handleFormat(const char *fmt, size_t fmt_length, const uint8_t *data,
@@ -701,7 +710,6 @@ int NBLog::handleFormat(const char *fmt, size_t fmt_length, const uint8_t *data,
         case 'd': // integer
             ALOGW_IF(event != EVENT_INTEGER, "NBLog Reader incompatible event for integer specifier: %d", event);
             appendInt(body, datum);
-
             break;
 
         case 'f': // float
@@ -711,7 +719,7 @@ int NBLog::handleFormat(const char *fmt, size_t fmt_length, const uint8_t *data,
 
         case 'p': // pid
             ALOGW_IF(event != EVENT_PID, "NBLog Reader incompatible event for pid specifier: %d", event);
-            appendPID(body, datum);
+            appendPID(body, datum, length);
             break;
 
         default:
