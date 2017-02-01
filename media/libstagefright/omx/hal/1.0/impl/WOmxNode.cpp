@@ -196,6 +196,7 @@ status_t LWOmxNode::fillBuffer(
     }
     status_t status = toStatusT(mBase->fillBuffer(
             buffer, codecBuffer, fenceNh));
+    native_handle_close(fenceNh);
     native_handle_delete(fenceNh);
     return status;
 }
@@ -217,6 +218,7 @@ status_t LWOmxNode::emptyBuffer(
             flags,
             toRawTicks(timestamp),
             fenceNh));
+    native_handle_close(fenceNh);
     native_handle_delete(fenceNh);
     return status;
 }
@@ -240,6 +242,7 @@ status_t LWOmxNode::dispatchMessage(const omx_message &lMsg) {
         return NO_MEMORY;
     }
     status_t status = toStatusT(mBase->dispatchMessage(tMsg));
+    native_handle_close(nh);
     native_handle_delete(nh);
     return status;
 }
@@ -392,7 +395,7 @@ Return<Status> TWOmxNode::fillBuffer(
     return toStatus(mBase->fillBuffer(
             buffer,
             omxBuffer,
-            native_handle_read_fd(fence)));
+            dup(native_handle_read_fd(fence))));
 }
 
 Return<Status> TWOmxNode::emptyBuffer(
@@ -407,7 +410,7 @@ Return<Status> TWOmxNode::emptyBuffer(
             omxBuffer,
             flags,
             toOMXTicks(timestampUs),
-            native_handle_read_fd(fence)));
+            dup(native_handle_read_fd(fence))));
 }
 
 Return<void> TWOmxNode::getExtensionIndex(
@@ -422,7 +425,7 @@ Return<void> TWOmxNode::getExtensionIndex(
 
 Return<Status> TWOmxNode::dispatchMessage(const Message& tMsg) {
     omx_message lMsg;
-    if (!wrapAs(&lMsg, tMsg)) {
+    if (!convertTo(&lMsg, tMsg)) {
         return Status::BAD_VALUE;
     }
     return toStatus(mBase->dispatchMessage(lMsg));

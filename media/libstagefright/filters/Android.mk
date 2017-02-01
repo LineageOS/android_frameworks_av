@@ -22,7 +22,9 @@ LOCAL_C_INCLUDES += $(intermediates)
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
 
-LOCAL_SHARED_LIBRARIES := libmedia
+LOCAL_SHARED_LIBRARIES := \
+        libmedia \
+        libhidlmemory \
 
 LOCAL_MODULE:= libstagefright_mediafilter
 

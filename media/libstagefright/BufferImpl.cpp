@@ -34,6 +34,11 @@ SharedMemoryBuffer::SharedMemoryBuffer(const sp<AMessage> &format, const sp<IMem
       mMemory(mem) {
 }
 
+SharedMemoryBuffer::SharedMemoryBuffer(const sp<AMessage> &format, const sp<TMemory> &mem)
+    : MediaCodecBuffer(format, new ABuffer(mem->getPointer(), mem->getSize())),
+      mTMemory(mem) {
+}
+
 SecureBuffer::SecureBuffer(const sp<AMessage> &format, const void *ptr, size_t size)
     : MediaCodecBuffer(format, new ABuffer(nullptr, size)),
       mPointer(ptr) {

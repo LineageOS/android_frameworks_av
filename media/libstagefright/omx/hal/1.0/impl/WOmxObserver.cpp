@@ -45,6 +45,7 @@ void LWOmxObserver::onMessages(std::list<omx_message> const& lMessages) {
     }
     mBase->onMessages(tMessages);
     for (auto& handle : handles) {
+        native_handle_close(handle);
         native_handle_delete(handle);
     }
 }
@@ -61,7 +62,7 @@ Return<void> TWOmxObserver::onMessages(const hidl_vec<Message>& tMessages) {
     std::list<omx_message> lMessages;
     for (size_t i = 0; i < tMessages.size(); ++i) {
         lMessages.push_back(omx_message{});
-        wrapAs(&lMessages.back(), tMessages[i]);
+        convertTo(&lMessages.back(), tMessages[i]);
     }
     mBase->onMessages(lMessages);
     return Return<void>();
