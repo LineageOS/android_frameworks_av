@@ -222,6 +222,16 @@ media_status_t AMediaCodec_createPersistentInputSurface(
 media_status_t AMediaCodec_setInputSurface(
         AMediaCodec *mData, ANativeWindow *surface);
 
+/**
+ * Signal additional parameters to the codec instance.
+ *
+ * Parameters can be communicated only when the codec is running, i.e
+ * after AMediaCodec_start() has been called.
+ *
+ * NOTE: Some of these parameter changes may silently fail to apply.
+ */
+media_status_t AMediaCodec_setParameters(
+        AMediaCodec *mData, const AMediaFormat* params);
 
 
 typedef enum {
