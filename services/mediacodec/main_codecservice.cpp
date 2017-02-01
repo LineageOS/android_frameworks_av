@@ -25,10 +25,13 @@
 #include <binder/ProcessState.h>
 #include <binder/IServiceManager.h>
 #include <utils/Log.h>
+#include <cutils/properties.h>
 
 // from LOCAL_C_INCLUDES
 #include "MediaCodecService.h"
 #include "minijail/minijail.h"
+
+#include <android/hardware/media/omx/1.0/IOmx.h>
 
 using namespace android;
 
@@ -42,6 +45,21 @@ int main(int argc __unused, char** argv)
     sp<ProcessState> proc(ProcessState::self());
     sp<IServiceManager> sm = defaultServiceManager();
     MediaCodecService::instantiate();
+
+    // Treble
+    bool useTrebleOmx = bool(property_get_bool("debug.treble_omx", 0));
+    if (useTrebleOmx) {
+        using namespace ::android::hardware::media::omx::V1_0;
+        sp<IOmx> omx = IOmx::getService(true);
+        if (omx == nullptr) {
+            ALOGE("Cannot create a Treble IOmx service.");
+        } else if (omx->registerAsService("default") != OK) {
+            ALOGE("Cannot register a Treble IOmx service.");
+        } else {
+            ALOGV("Treble IOmx service created.");
+        }
+    }
+
     ProcessState::self()->startThreadPool();
     IPCThreadState::self()->joinThreadPool();
 }

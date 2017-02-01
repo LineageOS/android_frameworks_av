@@ -17,7 +17,8 @@ include $(CLEAR_VARS)
 LOCAL_REQUIRED_MODULES_arm := mediacodec-seccomp.policy
 LOCAL_SRC_FILES := main_codecservice.cpp minijail/minijail.cpp
 LOCAL_SHARED_LIBRARIES := libmedia libmediacodecservice libbinder libutils \
-	liblog libminijail
+    liblog libminijail libcutils \
+    android.hardware.media.omx@1.0
 LOCAL_C_INCLUDES := \
     $(TOP)/frameworks/av/media/libstagefright \
     $(TOP)/frameworks/native/include/media/openmax
