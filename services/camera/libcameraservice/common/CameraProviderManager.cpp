@@ -282,7 +282,6 @@ hardware::Return<void> CameraProviderManager::onRegistration(
 status_t CameraProviderManager::dump(int fd, const Vector<String16>& args) {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
 
-    dprintf(fd, "Available camera providers and devices:\n");
     for (auto& provider : mProviders) {
         provider->dump(fd, args);
     }
@@ -462,17 +461,45 @@ status_t CameraProviderManager::ProviderInfo::addDevice(const std::string& name,
 }
 
 status_t CameraProviderManager::ProviderInfo::dump(int fd, const Vector<String16>&) const {
-    dprintf(fd, "    %s: %zu devices:\n", mProviderName.c_str(), mDevices.size());
+    dprintf(fd, "== Camera Provider HAL %s (v2.4) static info: %zu devices: ==\n",
+            mProviderName.c_str(), mDevices.size());
 
     for (auto& device : mDevices) {
-        dprintf(fd, "        %s: Resource cost: %d\n", device->mName.c_str(),
-                device->mResourceCost.resourceCost);
-        if (device->mResourceCost.conflictingDevices.size() > 0) {
-            dprintf(fd, "            Conflicting devices:\n");
+        dprintf(fd, "== Camera HAL device %s (v%d.%d) static information: ==\n", device->mName.c_str(),
+                device->mVersion.get_major(), device->mVersion.get_minor());
+        dprintf(fd, "  Resource cost: %d\n", device->mResourceCost.resourceCost);
+        if (device->mResourceCost.conflictingDevices.size() == 0) {
+            dprintf(fd, "  Conflicting devices: None\n");
+        } else {
+            dprintf(fd, "  Conflicting devices:\n");
             for (size_t i = 0; i < device->mResourceCost.conflictingDevices.size(); i++) {
-                dprintf(fd, "              %s\n",
+                dprintf(fd, "    %s\n",
                         device->mResourceCost.conflictingDevices[i].c_str());
             }
+        }
+        dprintf(fd, "  API1 info:\n");
+        dprintf(fd, "    Has a flash unit: %s\n",
+                device->hasFlashUnit() ? "true" : "false");
+        hardware::CameraInfo info;
+        status_t res = device->getCameraInfo(&info);
+        if (res != OK) {
+            dprintf(fd, "   <Error reading camera info: %s (%d)>\n",
+                    strerror(-res), res);
+        } else {
+            dprintf(fd, "    Facing: %s\n",
+                    info.facing == hardware::CAMERA_FACING_BACK ? "Back" : "Front");
+            dprintf(fd, "    Orientation: %d\n", info.orientation);
+        }
+        CameraMetadata info2;
+        res = device->getCameraCharacteristics(&info2);
+        if (res == INVALID_OPERATION) {
+            dprintf(fd, "  API2 not directly supported\n");
+        } else if (res != OK) {
+            dprintf(fd, "  <Error reading camera characteristics: %s (%d)>\n",
+                    strerror(-res), res);
+        } else {
+            dprintf(fd, "  API2 camera characteristics:\n");
+            info2.dump(fd, /*verbosity*/ 2, /*indentation*/ 4);
         }
     }
     return OK;

@@ -750,7 +750,7 @@ status_t Camera3Device::dump(int fd, const Vector<String16> &args) {
     mTagMonitor.dumpMonitoredMetadata(fd);
 
     if (mInterface->valid()) {
-        lines = String8("    HAL device dump:\n");
+        lines = String8("     HAL device dump:\n");
         write(fd, lines.string(), lines.size());
         mInterface->dump(fd);
     }
