@@ -24,12 +24,12 @@
 #include <binder/IServiceManager.h>
 #include <utils/Log.h>
 
-#ifdef ENABLE_TREBLE
-#include <media/CryptoHal.h>
-#include <media/DrmHal.h>
-#else
+#ifdef DISABLE_TREBLE_DRM
 #include <media/Crypto.h>
 #include <media/Drm.h>
+#else
+#include <media/CryptoHal.h>
+#include <media/DrmHal.h>
 #endif
 
 namespace android {
@@ -40,18 +40,18 @@ void MediaDrmService::instantiate() {
 }
 
 sp<ICrypto> MediaDrmService::makeCrypto() {
-#ifdef ENABLE_TREBLE
-    return new CryptoHal;
-#else
+#ifdef DISABLE_TREBLE_DRM
     return new Crypto;
+#else
+    return new CryptoHal;
 #endif
 }
 
 sp<IDrm> MediaDrmService::makeDrm() {
-#ifdef ENABLE_TREBLE
-    return new DrmHal;
-#else
+#ifdef DISABLE_TREBLE_DRM
     return new Drm;
+#else
+    return new DrmHal;
 #endif
 }
 

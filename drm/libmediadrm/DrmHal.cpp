@@ -202,6 +202,8 @@ sp<IDrmFactory> DrmHal::makeDrmFactory() {
     if (factory == NULL) {
         ALOGE("Failed to make drm factory");
     }
+    ALOGD("makeDrmFactory: service is %s",
+            factory->isRemote() ? "Remote" : "Not Remote");
     return factory;
 }
 
