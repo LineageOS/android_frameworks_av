@@ -18,11 +18,11 @@
 
 #include <binder/Parcelable.h>
 
-#include "binding/OboeServiceDefinitions.h"
+#include "binding/AAudioServiceDefinitions.h"
 #include "binding/SharedRegionParcelable.h"
 #include "binding/RingBufferParcelable.h"
 
-using namespace oboe;
+using namespace aaudio;
 
 RingBufferParcelable::RingBufferParcelable() {}
 RingBufferParcelable::~RingBufferParcelable() {}
@@ -100,23 +100,23 @@ status_t RingBufferParcelable::readFromParcel(const Parcel* parcel) {
     return NO_ERROR; // TODO check for errors above
 }
 
-oboe_result_t RingBufferParcelable::resolve(SharedMemoryParcelable *memoryParcels, RingBufferDescriptor *descriptor) {
-    oboe_result_t result;
+aaudio_result_t RingBufferParcelable::resolve(SharedMemoryParcelable *memoryParcels, RingBufferDescriptor *descriptor) {
+    aaudio_result_t result;
 
     result = mReadCounterParcelable.resolve(memoryParcels,
                                             (void **) &descriptor->readCounterAddress);
-    if (result != OBOE_OK) {
+    if (result != AAUDIO_OK) {
         return result;
     }
 
     result = mWriteCounterParcelable.resolve(memoryParcels,
                                              (void **) &descriptor->writeCounterAddress);
-    if (result != OBOE_OK) {
+    if (result != AAUDIO_OK) {
         return result;
     }
 
     result = mDataParcelable.resolve(memoryParcels, (void **) &descriptor->dataAddress);
-    if (result != OBOE_OK) {
+    if (result != AAUDIO_OK) {
         return result;
     }
 
@@ -124,36 +124,36 @@ oboe_result_t RingBufferParcelable::resolve(SharedMemoryParcelable *memoryParcel
     descriptor->framesPerBurst = mFramesPerBurst;
     descriptor->capacityInFrames = mCapacityInFrames;
     descriptor->flags = mFlags;
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
-oboe_result_t RingBufferParcelable::validate() {
-    oboe_result_t result;
+aaudio_result_t RingBufferParcelable::validate() {
+    aaudio_result_t result;
     if (mCapacityInFrames < 0 || mCapacityInFrames >= 32 * 1024) {
         ALOGE("RingBufferParcelable invalid mCapacityInFrames = %d", mCapacityInFrames);
-        return OBOE_ERROR_INTERNAL;
+        return AAUDIO_ERROR_INTERNAL;
     }
     if (mBytesPerFrame < 0 || mBytesPerFrame >= 256) {
         ALOGE("RingBufferParcelable invalid mBytesPerFrame = %d", mBytesPerFrame);
-        return OBOE_ERROR_INTERNAL;
+        return AAUDIO_ERROR_INTERNAL;
     }
     if (mFramesPerBurst < 0 || mFramesPerBurst >= 1024) {
         ALOGE("RingBufferParcelable invalid mFramesPerBurst = %d", mFramesPerBurst);
-        return OBOE_ERROR_INTERNAL;
+        return AAUDIO_ERROR_INTERNAL;
     }
-    if ((result = mReadCounterParcelable.validate()) != OBOE_OK) {
+    if ((result = mReadCounterParcelable.validate()) != AAUDIO_OK) {
         ALOGE("RingBufferParcelable invalid mReadCounterParcelable = %d", result);
         return result;
     }
-    if ((result = mWriteCounterParcelable.validate()) != OBOE_OK) {
+    if ((result = mWriteCounterParcelable.validate()) != AAUDIO_OK) {
         ALOGE("RingBufferParcelable invalid mWriteCounterParcelable = %d", result);
         return result;
     }
-    if ((result = mDataParcelable.validate()) != OBOE_OK) {
+    if ((result = mDataParcelable.validate()) != AAUDIO_OK) {
         ALOGE("RingBufferParcelable invalid mDataParcelable = %d", result);
         return result;
     }
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
 

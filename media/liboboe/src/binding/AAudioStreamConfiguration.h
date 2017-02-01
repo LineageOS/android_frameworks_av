@@ -14,39 +14,39 @@
  * limitations under the License.
  */
 
-#ifndef BINDING_OBOE_STREAM_CONFIGURATION_H
-#define BINDING_OBOE_STREAM_CONFIGURATION_H
+#ifndef BINDING_AAUDIO_STREAM_CONFIGURATION_H
+#define BINDING_AAUDIO_STREAM_CONFIGURATION_H
 
 #include <stdint.h>
 
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
-#include <oboe/OboeDefinitions.h>
+#include <aaudio/AAudioDefinitions.h>
 
 using android::status_t;
 using android::Parcel;
 using android::Parcelable;
 
-namespace oboe {
+namespace aaudio {
 
-class OboeStreamConfiguration : public Parcelable {
+class AAudioStreamConfiguration : public Parcelable {
 public:
-    OboeStreamConfiguration();
-    virtual ~OboeStreamConfiguration();
+    AAudioStreamConfiguration();
+    virtual ~AAudioStreamConfiguration();
 
-    oboe_device_id_t getDeviceId() const {
+    aaudio_device_id_t getDeviceId() const {
         return mDeviceId;
     }
 
-    void setDeviceId(oboe_device_id_t deviceId) {
+    void setDeviceId(aaudio_device_id_t deviceId) {
         mDeviceId = deviceId;
     }
 
-    oboe_sample_rate_t getSampleRate() const {
+    aaudio_sample_rate_t getSampleRate() const {
         return mSampleRate;
     }
 
-    void setSampleRate(oboe_sample_rate_t sampleRate) {
+    void setSampleRate(aaudio_sample_rate_t sampleRate) {
         mSampleRate = sampleRate;
     }
 
@@ -58,11 +58,11 @@ public:
         mSamplesPerFrame = samplesPerFrame;
     }
 
-    oboe_audio_format_t getAudioFormat() const {
+    aaudio_audio_format_t getAudioFormat() const {
         return mAudioFormat;
     }
 
-    void setAudioFormat(oboe_audio_format_t audioFormat) {
+    void setAudioFormat(aaudio_audio_format_t audioFormat) {
         mAudioFormat = audioFormat;
     }
 
@@ -70,17 +70,17 @@ public:
 
     virtual status_t readFromParcel(const Parcel* parcel) override;
 
-    oboe_result_t validate();
+    aaudio_result_t validate();
 
     void dump();
 
 protected:
-    oboe_device_id_t    mDeviceId        = OBOE_DEVICE_UNSPECIFIED;
-    oboe_sample_rate_t  mSampleRate      = OBOE_UNSPECIFIED;
-    int32_t             mSamplesPerFrame = OBOE_UNSPECIFIED;
-    oboe_audio_format_t mAudioFormat     = OBOE_AUDIO_FORMAT_UNSPECIFIED;
+    aaudio_device_id_t    mDeviceId        = AAUDIO_DEVICE_UNSPECIFIED;
+    aaudio_sample_rate_t  mSampleRate      = AAUDIO_UNSPECIFIED;
+    int32_t             mSamplesPerFrame = AAUDIO_UNSPECIFIED;
+    aaudio_audio_format_t mAudioFormat     = AAUDIO_FORMAT_UNSPECIFIED;
 };
 
-} /* namespace oboe */
+} /* namespace aaudio */
 
-#endif //BINDING_OBOE_STREAM_CONFIGURATION_H
+#endif //BINDING_AAUDIO_STREAM_CONFIGURATION_H

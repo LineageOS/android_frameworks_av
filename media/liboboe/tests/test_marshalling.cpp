@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// Unit tests for Oboe Marshalling of RingBuffer information.
+// Unit tests for AAudio Marshalling of RingBuffer information.
 
 #include <stdlib.h>
 #include <math.h>
@@ -25,14 +25,14 @@
 #include <gtest/gtest.h>
 #include <sys/mman.h>
 
-#include <oboe/OboeDefinitions.h>
+#include <aaudio/AAudioDefinitions.h>
 #include <binding/AudioEndpointParcelable.h>
 
 using namespace android;
-using namespace oboe;
+using namespace aaudio;
 
 // Test adding one value.
-TEST(test_marshalling, oboe_one_read_write) {
+TEST(test_marshalling, aaudio_one_read_write) {
     Parcel parcel;
     size_t pos = parcel.dataPosition();
     const int arbitraryValue = 235;
@@ -44,7 +44,7 @@ TEST(test_marshalling, oboe_one_read_write) {
 }
 
 // Test SharedMemoryParcel.
-TEST(test_marshalling, oboe_shared_memory) {
+TEST(test_marshalling, aaudio_shared_memory) {
     SharedMemoryParcelable sharedMemoryA;
     SharedMemoryParcelable sharedMemoryB;
     const size_t memSizeBytes = 840;
@@ -52,10 +52,10 @@ TEST(test_marshalling, oboe_shared_memory) {
     ASSERT_LE(0, fd);
     sharedMemoryA.setup(fd, memSizeBytes);
     void *region1;
-    EXPECT_EQ(OBOE_OK, sharedMemoryA.resolve(0, 16, &region1)); // fits in region
-    EXPECT_NE(OBOE_OK, sharedMemoryA.resolve(-2, 16, &region1)); // offset is negative
-    EXPECT_NE(OBOE_OK, sharedMemoryA.resolve(0, memSizeBytes + 8, &region1)); // size too big
-    EXPECT_NE(OBOE_OK, sharedMemoryA.resolve(memSizeBytes - 8, 16, &region1)); // goes past the end
+    EXPECT_EQ(AAUDIO_OK, sharedMemoryA.resolve(0, 16, &region1)); // fits in region
+    EXPECT_NE(AAUDIO_OK, sharedMemoryA.resolve(-2, 16, &region1)); // offset is negative
+    EXPECT_NE(AAUDIO_OK, sharedMemoryA.resolve(0, memSizeBytes + 8, &region1)); // size too big
+    EXPECT_NE(AAUDIO_OK, sharedMemoryA.resolve(memSizeBytes - 8, 16, &region1)); // goes past the end
     int32_t *buffer1 = (int32_t *)region1;
     buffer1[0] = 98735; // arbitrary value
 
@@ -69,14 +69,14 @@ TEST(test_marshalling, oboe_shared_memory) {
 
     // should see same value at two different addresses
     void *region2;
-    EXPECT_EQ(OBOE_OK, sharedMemoryB.resolve(0, 16, &region2));
+    EXPECT_EQ(AAUDIO_OK, sharedMemoryB.resolve(0, 16, &region2));
     int32_t *buffer2 = (int32_t *)region2;
     EXPECT_NE(buffer1, buffer2);
     EXPECT_EQ(buffer1[0], buffer2[0]);
 }
 
 // Test SharedRegionParcel.
-TEST(test_marshalling, oboe_shared_region) {
+TEST(test_marshalling, aaudio_shared_region) {
     SharedMemoryParcelable sharedMemories[2];
     SharedRegionParcelable sharedRegionA;
     SharedRegionParcelable sharedRegionB;
@@ -89,7 +89,7 @@ TEST(test_marshalling, oboe_shared_region) {
     sharedRegionA.setup(0, regionOffset1, regionSize1);
 
     void *region1;
-    EXPECT_EQ(OBOE_OK, sharedRegionA.resolve(sharedMemories, &region1));
+    EXPECT_EQ(AAUDIO_OK, sharedRegionA.resolve(sharedMemories, &region1));
     int32_t *buffer1 = (int32_t *)region1;
     buffer1[0] = 336677; // arbitrary value
 
@@ -102,13 +102,13 @@ TEST(test_marshalling, oboe_shared_region) {
 
     // should see same value
     void *region2;
-    EXPECT_EQ(OBOE_OK, sharedRegionB.resolve(sharedMemories, &region2));
+    EXPECT_EQ(AAUDIO_OK, sharedRegionB.resolve(sharedMemories, &region2));
     int32_t *buffer2 = (int32_t *)region2;
     EXPECT_EQ(buffer1[0], buffer2[0]);
 }
 
 // Test RingBufferParcelable.
-TEST(test_marshalling, oboe_ring_buffer_parcelable) {
+TEST(test_marshalling, aaudio_ring_buffer_parcelable) {
     SharedMemoryParcelable sharedMemories[2];
     RingBufferParcelable ringBufferA;
     RingBufferParcelable ringBufferB;
@@ -136,7 +136,7 @@ TEST(test_marshalling, oboe_ring_buffer_parcelable) {
 
     // setup A
     RingBufferDescriptor descriptorA;
-    EXPECT_EQ(OBOE_OK, ringBufferA.resolve(sharedMemories, &descriptorA));
+    EXPECT_EQ(AAUDIO_OK, ringBufferA.resolve(sharedMemories, &descriptorA));
     descriptorA.dataAddress[0] = 95;
     descriptorA.dataAddress[1] = 57;
     descriptorA.readCounterAddress[0] = 17;
@@ -152,7 +152,7 @@ TEST(test_marshalling, oboe_ring_buffer_parcelable) {
     ringBufferB.readFromParcel(&parcel);
 
     RingBufferDescriptor descriptorB;
-    EXPECT_EQ(OBOE_OK, ringBufferB.resolve(sharedMemories, &descriptorB));
+    EXPECT_EQ(AAUDIO_OK, ringBufferB.resolve(sharedMemories, &descriptorB));
 
     // A and B should match
     EXPECT_EQ(descriptorA.dataAddress[0], descriptorB.dataAddress[0]);

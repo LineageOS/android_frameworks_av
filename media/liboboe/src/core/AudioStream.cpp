@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "OboeAudio"
+#define LOG_TAG "AAudio"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
 #include <atomic>
 #include <stdint.h>
-#include <oboe/OboeAudio.h>
+#include <aaudio/AAudio.h>
 
 #include "AudioStreamBuilder.h"
 #include "AudioStream.h"
 #include "AudioClock.h"
 
-using namespace oboe;
+using namespace aaudio;
 
 AudioStream::AudioStream() {
     // mThread is a pthread_t of unknown size so we need memset.
@@ -34,7 +34,7 @@ AudioStream::AudioStream() {
     setPeriodNanoseconds(0);
 }
 
-oboe_result_t AudioStream::open(const AudioStreamBuilder& builder)
+aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
 {
     // TODO validate parameters.
     // Copy parameters from the Builder because the Builder may be deleted after this call.
@@ -43,41 +43,41 @@ oboe_result_t AudioStream::open(const AudioStreamBuilder& builder)
     mDeviceId = builder.getDeviceId();
     mFormat = builder.getFormat();
     mSharingMode = builder.getSharingMode();
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
 AudioStream::~AudioStream() {
     close();
 }
 
-oboe_result_t AudioStream::waitForStateTransition(oboe_stream_state_t startingState,
-                                               oboe_stream_state_t endingState,
-                                               oboe_nanoseconds_t timeoutNanoseconds)
+aaudio_result_t AudioStream::waitForStateTransition(aaudio_stream_state_t startingState,
+                                               aaudio_stream_state_t endingState,
+                                               aaudio_nanoseconds_t timeoutNanoseconds)
 {
-    oboe_stream_state_t state = getState();
-    oboe_stream_state_t nextState = state;
+    aaudio_stream_state_t state = getState();
+    aaudio_stream_state_t nextState = state;
     if (state == startingState && state != endingState) {
-        oboe_result_t result = waitForStateChange(state, &nextState, timeoutNanoseconds);
-        if (result != OBOE_OK) {
+        aaudio_result_t result = waitForStateChange(state, &nextState, timeoutNanoseconds);
+        if (result != AAUDIO_OK) {
             return result;
         }
     }
 // It's OK if the expected transition has already occurred.
 // But if we reach an unexpected state then that is an error.
     if (nextState != endingState) {
-        return OBOE_ERROR_UNEXPECTED_STATE;
+        return AAUDIO_ERROR_UNEXPECTED_STATE;
     } else {
-        return OBOE_OK;
+        return AAUDIO_OK;
     }
 }
 
-oboe_result_t AudioStream::waitForStateChange(oboe_stream_state_t currentState,
-                                                oboe_stream_state_t *nextState,
-                                                oboe_nanoseconds_t timeoutNanoseconds)
+aaudio_result_t AudioStream::waitForStateChange(aaudio_stream_state_t currentState,
+                                                aaudio_stream_state_t *nextState,
+                                                aaudio_nanoseconds_t timeoutNanoseconds)
 {
     // TODO replace this when similar functionality added to AudioTrack.cpp
-    oboe_nanoseconds_t durationNanos = 20 * OBOE_NANOS_PER_MILLISECOND;
-    oboe_stream_state_t state = getState();
+    aaudio_nanoseconds_t durationNanos = 20 * AAUDIO_NANOS_PER_MILLISECOND;
+    aaudio_stream_state_t state = getState();
     while (state == currentState && timeoutNanoseconds > 0) {
         if (durationNanos > timeoutNanoseconds) {
             durationNanos = timeoutNanoseconds;
@@ -85,8 +85,8 @@ oboe_result_t AudioStream::waitForStateChange(oboe_stream_state_t currentState,
         AudioClock::sleepForNanos(durationNanos);
         timeoutNanoseconds -= durationNanos;
 
-        oboe_result_t result = updateState();
-        if (result != OBOE_OK) {
+        aaudio_result_t result = updateState();
+        if (result != AAUDIO_OK) {
             return result;
         }
 
@@ -95,7 +95,7 @@ oboe_result_t AudioStream::waitForStateChange(oboe_stream_state_t currentState,
     if (nextState != nullptr) {
         *nextState = state;
     }
-    return (state == currentState) ? OBOE_ERROR_TIMEOUT : OBOE_OK;
+    return (state == currentState) ? AAUDIO_ERROR_TIMEOUT : AAUDIO_OK;
 }
 
 // This registers the app's background audio thread with the server before
@@ -104,7 +104,7 @@ oboe_result_t AudioStream::waitForStateChange(oboe_stream_state_t currentState,
 void* AudioStream::wrapUserThread() {
     void* procResult = nullptr;
     mThreadRegistrationResult = registerThread();
-    if (mThreadRegistrationResult == OBOE_OK) {
+    if (mThreadRegistrationResult == AAUDIO_OK) {
         // Call application procedure. This may take a very long time.
         procResult = mThreadProc(mThreadArg);
         ALOGD("AudioStream::mThreadProc() returned");
@@ -120,15 +120,15 @@ static void* AudioStream_internalThreadProc(void* threadArg) {
     return audioStream->wrapUserThread();
 }
 
-oboe_result_t AudioStream::createThread(oboe_nanoseconds_t periodNanoseconds,
-                                     oboe_audio_thread_proc_t *threadProc,
+aaudio_result_t AudioStream::createThread(aaudio_nanoseconds_t periodNanoseconds,
+                                     aaudio_audio_thread_proc_t *threadProc,
                                      void* threadArg)
 {
     if (mHasThread) {
-        return OBOE_ERROR_INVALID_STATE;
+        return AAUDIO_ERROR_INVALID_STATE;
     }
     if (threadProc == nullptr) {
-        return OBOE_ERROR_NULL;
+        return AAUDIO_ERROR_NULL;
     }
     // Pass input parameters to the background thread.
     mThreadProc = threadProc;
@@ -136,18 +136,18 @@ oboe_result_t AudioStream::createThread(oboe_nanoseconds_t periodNanoseconds,
     setPeriodNanoseconds(periodNanoseconds);
     int err = pthread_create(&mThread, nullptr, AudioStream_internalThreadProc, this);
     if (err != 0) {
-        // TODO convert errno to oboe_result_t
-        return OBOE_ERROR_INTERNAL;
+        // TODO convert errno to aaudio_result_t
+        return AAUDIO_ERROR_INTERNAL;
     } else {
         mHasThread = true;
-        return OBOE_OK;
+        return AAUDIO_OK;
     }
 }
 
-oboe_result_t AudioStream::joinThread(void** returnArg, oboe_nanoseconds_t timeoutNanoseconds)
+aaudio_result_t AudioStream::joinThread(void** returnArg, aaudio_nanoseconds_t timeoutNanoseconds)
 {
     if (!mHasThread) {
-        return OBOE_ERROR_INVALID_STATE;
+        return AAUDIO_ERROR_INVALID_STATE;
     }
 #if 0
     // TODO implement equivalent of pthread_timedjoin_np()
@@ -157,7 +157,7 @@ oboe_result_t AudioStream::joinThread(void** returnArg, oboe_nanoseconds_t timeo
     int err = pthread_join(mThread, returnArg);
 #endif
     mHasThread = false;
-    // TODO convert errno to oboe_result_t
-    return err ? OBOE_ERROR_INTERNAL : mThreadRegistrationResult;
+    // TODO convert errno to aaudio_result_t
+    return err ? AAUDIO_ERROR_INTERNAL : mThreadRegistrationResult;
 }
 

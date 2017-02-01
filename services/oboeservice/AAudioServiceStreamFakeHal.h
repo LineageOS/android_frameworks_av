@@ -14,47 +14,47 @@
  * limitations under the License.
  */
 
-#ifndef OBOE_OBOE_SERVICE_STREAM_FAKE_HAL_H
-#define OBOE_OBOE_SERVICE_STREAM_FAKE_HAL_H
+#ifndef AAUDIO_AAUDIO_SERVICE_STREAM_FAKE_HAL_H
+#define AAUDIO_AAUDIO_SERVICE_STREAM_FAKE_HAL_H
 
-#include "OboeService.h"
-#include "OboeServiceStreamBase.h"
+#include "AAudioServiceDefinitions.h"
+#include "AAudioServiceStreamBase.h"
 #include "FakeAudioHal.h"
 #include "MonotonicCounter.h"
 #include "AudioEndpointParcelable.h"
 #include "TimestampScheduler.h"
 
-namespace oboe {
+namespace aaudio {
 
-class OboeServiceStreamFakeHal
-    : public OboeServiceStreamBase
+class AAudioServiceStreamFakeHal
+    : public AAudioServiceStreamBase
     , public Runnable {
 
 public:
-    OboeServiceStreamFakeHal();
-    virtual ~OboeServiceStreamFakeHal();
+    AAudioServiceStreamFakeHal();
+    virtual ~AAudioServiceStreamFakeHal();
 
-    virtual oboe_result_t getDescription(AudioEndpointParcelable &parcelable) override;
+    virtual aaudio_result_t getDescription(AudioEndpointParcelable &parcelable) override;
 
-    virtual oboe_result_t open(oboe::OboeStreamRequest &request,
-                               oboe::OboeStreamConfiguration &configuration) override;
+    virtual aaudio_result_t open(aaudio::AAudioStreamRequest &request,
+                               aaudio::AAudioStreamConfiguration &configuration) override;
 
     /**
      * Start the flow of data.
      */
-    virtual oboe_result_t start() override;
+    virtual aaudio_result_t start() override;
 
     /**
      * Stop the flow of data such that start() can resume with loss of data.
      */
-    virtual oboe_result_t pause() override;
+    virtual aaudio_result_t pause() override;
 
     /**
      *  Discard any data held by the underlying HAL or Service.
      */
-    virtual oboe_result_t flush() override;
+    virtual aaudio_result_t flush() override;
 
-    virtual oboe_result_t close() override;
+    virtual aaudio_result_t close() override;
 
     void sendCurrentTimestamp();
 
@@ -68,12 +68,12 @@ private:
     int                    mHalFileDescriptor = -1;
     int                    mPreviousFrameCounter = 0;   // from HAL
 
-    oboe_stream_state_t    mState = OBOE_STREAM_STATE_UNINITIALIZED;
+    aaudio_stream_state_t    mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
 
-    OboeThread             mOboeThread;
+    AAudioThread             mAAudioThread;
     std::atomic<bool>      mThreadEnabled;
 };
 
-} // namespace oboe
+} // namespace aaudio
 
-#endif //OBOE_OBOE_SERVICE_STREAM_FAKE_HAL_H
+#endif //AAUDIO_AAUDIO_SERVICE_STREAM_FAKE_HAL_H

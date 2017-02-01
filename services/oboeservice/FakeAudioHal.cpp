@@ -32,7 +32,7 @@
 
 #include "FakeAudioHal.h"
 
-//using namespace oboe;
+//using namespace aaudio;
 
 using sample_t = int16_t;
 using std::cout;

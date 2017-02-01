@@ -14,29 +14,29 @@
  * limitations under the License.
  */
 
-#ifndef OBOE_OBOE_SERVICE_STREAM_BASE_H
-#define OBOE_OBOE_SERVICE_STREAM_BASE_H
+#ifndef AAUDIO_AAUDIO_SERVICE_STREAM_BASE_H
+#define AAUDIO_AAUDIO_SERVICE_STREAM_BASE_H
 
 #include <utils/Mutex.h>
 
-#include "IOboeAudioService.h"
-#include "OboeService.h"
+#include "IAAudioService.h"
+#include "AAudioServiceDefinitions.h"
 #include "fifo/FifoBuffer.h"
 #include "SharedRingBuffer.h"
 #include "AudioEndpointParcelable.h"
-#include "OboeThread.h"
+#include "AAudioThread.h"
 
-namespace oboe {
+namespace aaudio {
 
 // We expect the queue to only have a few commands.
 // This should be way more than we need.
 #define QUEUE_UP_CAPACITY_COMMANDS (128)
 
-class OboeServiceStreamBase {
+class AAudioServiceStreamBase {
 
 public:
-    OboeServiceStreamBase();
-    virtual ~OboeServiceStreamBase();
+    AAudioServiceStreamBase();
+    virtual ~AAudioServiceStreamBase();
 
     enum {
         ILLEGAL_THREAD_ID = 0
@@ -45,38 +45,38 @@ public:
     /**
      * Fill in a parcelable description of stream.
      */
-    virtual oboe_result_t getDescription(oboe::AudioEndpointParcelable &parcelable) = 0;
+    virtual aaudio_result_t getDescription(aaudio::AudioEndpointParcelable &parcelable) = 0;
 
     /**
      * Open the device.
      */
-    virtual oboe_result_t open(oboe::OboeStreamRequest &request,
-                               oboe::OboeStreamConfiguration &configuration) = 0;
+    virtual aaudio_result_t open(aaudio::AAudioStreamRequest &request,
+                               aaudio::AAudioStreamConfiguration &configuration) = 0;
 
     /**
      * Start the flow of data.
      */
-    virtual oboe_result_t start() = 0;
+    virtual aaudio_result_t start() = 0;
 
     /**
      * Stop the flow of data such that start() can resume with loss of data.
      */
-    virtual oboe_result_t pause() = 0;
+    virtual aaudio_result_t pause() = 0;
 
     /**
      *  Discard any data held by the underlying HAL or Service.
      */
-    virtual oboe_result_t flush() = 0;
+    virtual aaudio_result_t flush() = 0;
 
-    virtual oboe_result_t close() = 0;
+    virtual aaudio_result_t close() = 0;
 
     virtual void sendCurrentTimestamp() = 0;
 
-    oboe_size_frames_t getFramesPerBurst() {
+    aaudio_size_frames_t getFramesPerBurst() {
         return mFramesPerBurst;
     }
 
-    virtual void sendServiceEvent(oboe_service_event_t event,
+    virtual void sendServiceEvent(aaudio_service_event_t event,
                                   int32_t data1 = 0,
                                   int64_t data2 = 0);
 
@@ -94,15 +94,15 @@ protected:
 
     SharedRingBuffer *       mUpMessageQueue;
 
-    oboe_sample_rate_t       mSampleRate = 0;
-    oboe_size_bytes_t        mBytesPerFrame = 0;
-    oboe_size_frames_t       mFramesPerBurst = 0;
-    oboe_size_frames_t       mCapacityInFrames = 0;
-    oboe_size_bytes_t        mCapacityInBytes = 0;
+    aaudio_sample_rate_t       mSampleRate = 0;
+    aaudio_size_bytes_t        mBytesPerFrame = 0;
+    aaudio_size_frames_t       mFramesPerBurst = 0;
+    aaudio_size_frames_t       mCapacityInFrames = 0;
+    aaudio_size_bytes_t        mCapacityInBytes = 0;
 
     android::Mutex           mLockUpMessageQueue;
 };
 
-} /* namespace oboe */
+} /* namespace aaudio */
 
-#endif //OBOE_OBOE_SERVICE_STREAM_BASE_H
+#endif //AAUDIO_AAUDIO_SERVICE_STREAM_BASE_H

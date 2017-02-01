@@ -21,7 +21,7 @@
 #ifndef FAKE_AUDIO_HAL_H
 #define FAKE_AUDIO_HAL_H
 
-//namespace oboe {
+//namespace aaudio {
 
 using sample_t = int16_t;
 struct mmap_buffer_info {
@@ -53,6 +53,6 @@ int fake_hal_close(fake_hal_stream_ptr stream);
 
 //} /* "C" */
 
-//} /* namespace oboe */
+//} /* namespace aaudio */
 
 #endif // FAKE_AUDIO_HAL_H

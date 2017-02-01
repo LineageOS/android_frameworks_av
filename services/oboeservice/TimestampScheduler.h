@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-#ifndef OBOE_TIMESTAMP_SCHEDULER_H
-#define OBOE_TIMESTAMP_SCHEDULER_H
+#ifndef AAUDIO_TIMESTAMP_SCHEDULER_H
+#define AAUDIO_TIMESTAMP_SCHEDULER_H
 
 //#include <stdlib.h> // random()
 
-#include "IOboeAudioService.h"
-#include "OboeService.h"
+#include "IAAudioService.h"
+#include "AAudioServiceDefinitions.h"
 #include "AudioStream.h"
 #include "fifo/FifoBuffer.h"
 #include "SharedRingBuffer.h"
 #include "AudioEndpointParcelable.h"
 
-namespace oboe {
+namespace aaudio {
 
 /**
  * Schedule wakeup time for monitoring the position
@@ -43,34 +43,34 @@ public:
     /**
      * Start the schedule at the given time.
      */
-    void start(oboe_nanoseconds_t startTime);
+    void start(aaudio_nanoseconds_t startTime);
 
     /**
      * Calculate the next time that the read position should be
      * measured.
      */
-    oboe_nanoseconds_t nextAbsoluteTime();
+    aaudio_nanoseconds_t nextAbsoluteTime();
 
-    void setBurstPeriod(oboe_nanoseconds_t burstPeriod) {
+    void setBurstPeriod(aaudio_nanoseconds_t burstPeriod) {
         mBurstPeriod = burstPeriod;
     }
 
-    void setBurstPeriod(oboe_size_frames_t framesPerBurst,
-                        oboe_sample_rate_t sampleRate) {
-        mBurstPeriod = OBOE_NANOS_PER_SECOND * framesPerBurst / sampleRate;
+    void setBurstPeriod(aaudio_size_frames_t framesPerBurst,
+                        aaudio_sample_rate_t sampleRate) {
+        mBurstPeriod = AAUDIO_NANOS_PER_SECOND * framesPerBurst / sampleRate;
     }
 
-    oboe_nanoseconds_t getBurstPeriod() {
+    aaudio_nanoseconds_t getBurstPeriod() {
         return mBurstPeriod;
     }
 
 private:
     // Start with an arbitrary default so we do not divide by zero.
-    oboe_nanoseconds_t mBurstPeriod = OBOE_NANOS_PER_MILLISECOND;
-    oboe_nanoseconds_t mStartTime;
-    oboe_nanoseconds_t mLastTime;
+    aaudio_nanoseconds_t mBurstPeriod = AAUDIO_NANOS_PER_MILLISECOND;
+    aaudio_nanoseconds_t mStartTime;
+    aaudio_nanoseconds_t mLastTime;
 };
 
-} /* namespace oboe */
+} /* namespace aaudio */
 
-#endif /* OBOE_TIMESTAMP_SCHEDULER_H */
+#endif /* AAUDIO_TIMESTAMP_SCHEDULER_H */

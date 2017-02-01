@@ -14,43 +14,43 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "OboeService"
+#define LOG_TAG "AAudioService"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
-#include "IOboeAudioService.h"
-#include "OboeService.h"
-#include "OboeServiceStreamBase.h"
+#include "IAAudioService.h"
+#include "AAudioServiceDefinitions.h"
+#include "AAudioServiceStreamBase.h"
 #include "AudioEndpointParcelable.h"
 
 using namespace android;
-using namespace oboe;
+using namespace aaudio;
 
 /**
  * Construct the AudioCommandQueues and the AudioDataQueue
  * and fill in the endpoint parcelable.
  */
 
-OboeServiceStreamBase::OboeServiceStreamBase()
+AAudioServiceStreamBase::AAudioServiceStreamBase()
         : mUpMessageQueue(nullptr)
 {
     // TODO could fail so move out of constructor
     mUpMessageQueue = new SharedRingBuffer();
-    mUpMessageQueue->allocate(sizeof(OboeServiceMessage), QUEUE_UP_CAPACITY_COMMANDS);
+    mUpMessageQueue->allocate(sizeof(AAudioServiceMessage), QUEUE_UP_CAPACITY_COMMANDS);
 }
 
-OboeServiceStreamBase::~OboeServiceStreamBase() {
+AAudioServiceStreamBase::~AAudioServiceStreamBase() {
     Mutex::Autolock _l(mLockUpMessageQueue);
     delete mUpMessageQueue;
 }
 
-void OboeServiceStreamBase::sendServiceEvent(oboe_service_event_t event,
+void AAudioServiceStreamBase::sendServiceEvent(aaudio_service_event_t event,
                               int32_t data1,
                               int64_t data2) {
 
     Mutex::Autolock _l(mLockUpMessageQueue);
-    OboeServiceMessage command;
-    command.what = OboeServiceMessage::code::EVENT;
+    AAudioServiceMessage command;
+    command.what = AAudioServiceMessage::code::EVENT;
     command.event.event = event;
     command.event.data1 = data1;
     command.event.data2 = data2;

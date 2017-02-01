@@ -21,10 +21,10 @@
 
 #include <binder/Parcelable.h>
 
-#include "binding/OboeServiceDefinitions.h"
+#include "binding/AAudioServiceDefinitions.h"
 #include "binding/SharedRegionParcelable.h"
 
-namespace oboe {
+namespace aaudio {
 
 class RingBufferParcelable : public Parcelable {
 public:
@@ -62,9 +62,9 @@ public:
 
     virtual status_t readFromParcel(const Parcel* parcel) override;
 
-    oboe_result_t resolve(SharedMemoryParcelable *memoryParcels, RingBufferDescriptor *descriptor);
+    aaudio_result_t resolve(SharedMemoryParcelable *memoryParcels, RingBufferDescriptor *descriptor);
 
-    oboe_result_t validate();
+    aaudio_result_t validate();
 
     void dump();
 
@@ -78,6 +78,6 @@ private:
     RingbufferFlags         mFlags = RingbufferFlags::NONE;
 };
 
-} /* namespace oboe */
+} /* namespace aaudio */
 
 #endif //BINDING_RINGBUFFER_PARCELABLE_H

@@ -20,32 +20,32 @@
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
 
-#include <oboe/OboeDefinitions.h>
+#include <aaudio/AAudioDefinitions.h>
 
-#include "binding/OboeStreamConfiguration.h"
-#include "binding/OboeStreamRequest.h"
+#include "binding/AAudioStreamConfiguration.h"
+#include "binding/AAudioStreamRequest.h"
 
 using android::NO_ERROR;
 using android::status_t;
 using android::Parcel;
 using android::Parcelable;
 
-using namespace oboe;
+using namespace aaudio;
 
-OboeStreamRequest::OboeStreamRequest()
+AAudioStreamRequest::AAudioStreamRequest()
     : mConfiguration()
     {}
 
-OboeStreamRequest::~OboeStreamRequest() {}
+AAudioStreamRequest::~AAudioStreamRequest() {}
 
-status_t OboeStreamRequest::writeToParcel(Parcel* parcel) const {
+status_t AAudioStreamRequest::writeToParcel(Parcel* parcel) const {
     parcel->writeInt32((int32_t) mUserId);
     parcel->writeInt32((int32_t) mProcessId);
     mConfiguration.writeToParcel(parcel);
     return NO_ERROR; // TODO check for errors above
 }
 
-status_t OboeStreamRequest::readFromParcel(const Parcel* parcel) {
+status_t AAudioStreamRequest::readFromParcel(const Parcel* parcel) {
     int32_t temp;
     parcel->readInt32(&temp);
     mUserId = (uid_t) temp;
@@ -55,12 +55,12 @@ status_t OboeStreamRequest::readFromParcel(const Parcel* parcel) {
     return NO_ERROR; // TODO check for errors above
 }
 
-oboe_result_t OboeStreamRequest::validate() {
+aaudio_result_t AAudioStreamRequest::validate() {
     return mConfiguration.validate();
 }
 
-void OboeStreamRequest::dump() {
-    ALOGD("OboeStreamRequest mUserId = %d -----", mUserId);
-    ALOGD("OboeStreamRequest mProcessId = %d", mProcessId);
+void AAudioStreamRequest::dump() {
+    ALOGD("AAudioStreamRequest mUserId = %d -----", mUserId);
+    ALOGD("AAudioStreamRequest mProcessId = %d", mProcessId);
     mConfiguration.dump();
 }

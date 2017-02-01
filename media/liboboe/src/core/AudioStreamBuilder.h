@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-#ifndef OBOE_AUDIOSTREAMBUILDER_H
-#define OBOE_AUDIOSTREAMBUILDER_H
+#ifndef AAUDIO_AUDIOSTREAMBUILDER_H
+#define AAUDIO_AUDIOSTREAMBUILDER_H
 
 #include <stdint.h>
 
-#include <oboe/OboeDefinitions.h>
-#include <oboe/OboeAudio.h>
+#include <aaudio/AAudioDefinitions.h>
+#include <aaudio/AAudio.h>
 
 #include "AudioStream.h"
 
-namespace oboe {
+namespace aaudio {
 
 /**
  * Factory class for an AudioStream.
@@ -47,62 +47,62 @@ public:
         return this;
     }
 
-    oboe_direction_t getDirection() const {
+    aaudio_direction_t getDirection() const {
         return mDirection;
     }
 
-    AudioStreamBuilder* setDirection(oboe_direction_t direction) {
+    AudioStreamBuilder* setDirection(aaudio_direction_t direction) {
         mDirection = direction;
         return this;
     }
 
-    oboe_sample_rate_t getSampleRate() const {
+    aaudio_sample_rate_t getSampleRate() const {
         return mSampleRate;
     }
 
-    AudioStreamBuilder* setSampleRate(oboe_sample_rate_t sampleRate) {
+    AudioStreamBuilder* setSampleRate(aaudio_sample_rate_t sampleRate) {
         mSampleRate = sampleRate;
         return this;
     }
 
-    oboe_audio_format_t getFormat() const {
+    aaudio_audio_format_t getFormat() const {
         return mFormat;
     }
 
-    AudioStreamBuilder *setFormat(oboe_audio_format_t format) {
+    AudioStreamBuilder *setFormat(aaudio_audio_format_t format) {
         mFormat = format;
         return this;
     }
 
-    oboe_sharing_mode_t getSharingMode() const {
+    aaudio_sharing_mode_t getSharingMode() const {
         return mSharingMode;
     }
 
-    AudioStreamBuilder* setSharingMode(oboe_sharing_mode_t sharingMode) {
+    AudioStreamBuilder* setSharingMode(aaudio_sharing_mode_t sharingMode) {
         mSharingMode = sharingMode;
         return this;
     }
 
-    oboe_device_id_t getDeviceId() const {
+    aaudio_device_id_t getDeviceId() const {
         return mDeviceId;
     }
 
-    AudioStreamBuilder* setDeviceId(oboe_device_id_t deviceId) {
+    AudioStreamBuilder* setDeviceId(aaudio_device_id_t deviceId) {
         mDeviceId = deviceId;
         return this;
     }
 
-    oboe_result_t build(AudioStream **streamPtr);
+    aaudio_result_t build(AudioStream **streamPtr);
 
 private:
-    int32_t              mSamplesPerFrame = OBOE_UNSPECIFIED;
-    oboe_sample_rate_t   mSampleRate = OBOE_UNSPECIFIED;
-    oboe_device_id_t     mDeviceId = OBOE_DEVICE_UNSPECIFIED;
-    oboe_sharing_mode_t  mSharingMode = OBOE_SHARING_MODE_LEGACY;
-    oboe_audio_format_t  mFormat = OBOE_AUDIO_FORMAT_UNSPECIFIED;
-    oboe_direction_t     mDirection = OBOE_DIRECTION_OUTPUT;
+    int32_t              mSamplesPerFrame = AAUDIO_UNSPECIFIED;
+    aaudio_sample_rate_t   mSampleRate = AAUDIO_UNSPECIFIED;
+    aaudio_device_id_t     mDeviceId = AAUDIO_DEVICE_UNSPECIFIED;
+    aaudio_sharing_mode_t  mSharingMode = AAUDIO_SHARING_MODE_LEGACY;
+    aaudio_audio_format_t  mFormat = AAUDIO_FORMAT_UNSPECIFIED;
+    aaudio_direction_t     mDirection = AAUDIO_DIRECTION_OUTPUT;
 };
 
-} /* namespace oboe */
+} /* namespace aaudio */
 
-#endif /* OBOE_AUDIOSTREAMBUILDER_H */
+#endif /* AAUDIO_AUDIOSTREAMBUILDER_H */

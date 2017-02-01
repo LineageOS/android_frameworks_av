@@ -17,7 +17,7 @@
 #include <stdint.h>
 
 #include <sys/mman.h>
-#include <oboe/OboeDefinitions.h>
+#include <aaudio/AAudioDefinitions.h>
 
 #include <binder/Parcelable.h>
 
@@ -28,7 +28,7 @@ using android::status_t;
 using android::Parcel;
 using android::Parcelable;
 
-using namespace oboe;
+using namespace aaudio;
 
 SharedMemoryParcelable::SharedMemoryParcelable() {}
 SharedMemoryParcelable::~SharedMemoryParcelable() {};
@@ -56,48 +56,48 @@ status_t SharedMemoryParcelable::readFromParcel(const Parcel* parcel) {
 
 // TODO Add code to unmmap()
 
-oboe_result_t SharedMemoryParcelable::resolve(int32_t offsetInBytes, int32_t sizeInBytes,
+aaudio_result_t SharedMemoryParcelable::resolve(int32_t offsetInBytes, int32_t sizeInBytes,
                                               void **regionAddressPtr) {
     if (offsetInBytes < 0) {
         ALOGE("SharedMemoryParcelable illegal offsetInBytes = %d", offsetInBytes);
-        return OBOE_ERROR_OUT_OF_RANGE;
+        return AAUDIO_ERROR_OUT_OF_RANGE;
     } else if ((offsetInBytes + sizeInBytes) > mSizeInBytes) {
         ALOGE("SharedMemoryParcelable out of range, offsetInBytes = %d, "
               "sizeInBytes = %d, mSizeInBytes = %d",
               offsetInBytes, sizeInBytes, mSizeInBytes);
-        return OBOE_ERROR_OUT_OF_RANGE;
+        return AAUDIO_ERROR_OUT_OF_RANGE;
     }
     if (mResolvedAddress == nullptr) {
         mResolvedAddress = (uint8_t *) mmap(0, mSizeInBytes, PROT_READ|PROT_WRITE,
                                           MAP_SHARED, mFd, 0);
         if (mResolvedAddress == nullptr) {
             ALOGE("SharedMemoryParcelable mmap failed for fd = %d", mFd);
-            return OBOE_ERROR_INTERNAL;
+            return AAUDIO_ERROR_INTERNAL;
         }
     }
     *regionAddressPtr = mResolvedAddress + offsetInBytes;
     ALOGD("SharedMemoryParcelable mResolvedAddress = %p", mResolvedAddress);
     ALOGD("SharedMemoryParcelable offset by %d, *regionAddressPtr = %p",
           offsetInBytes, *regionAddressPtr);
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
 int32_t SharedMemoryParcelable::getSizeInBytes() {
     return mSizeInBytes;
 }
 
-oboe_result_t SharedMemoryParcelable::validate() {
+aaudio_result_t SharedMemoryParcelable::validate() {
     if (mSizeInBytes < 0 || mSizeInBytes >= MAX_MMAP_SIZE) {
         ALOGE("SharedMemoryParcelable invalid mSizeInBytes = %d", mSizeInBytes);
-        return OBOE_ERROR_INTERNAL;
+        return AAUDIO_ERROR_INTERNAL;
     }
     if (mSizeInBytes > 0) {
         if (mFd == -1) {
             ALOGE("SharedMemoryParcelable uninitialized mFd = %d", mFd);
-            return OBOE_ERROR_INTERNAL;
+            return AAUDIO_ERROR_INTERNAL;
         }
     }
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
 void SharedMemoryParcelable::dump() {

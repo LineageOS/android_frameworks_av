@@ -27,7 +27,7 @@ using android::status_t;
 using android::Parcel;
 using android::Parcelable;
 
-namespace oboe {
+namespace aaudio {
 
 // Arbitrary limits for sanity checks. TODO remove after debugging.
 #define MAX_SHARED_MEMORIES (32)
@@ -49,11 +49,11 @@ public:
 
     virtual status_t readFromParcel(const Parcel* parcel) override;
 
-    oboe_result_t resolve(int32_t offsetInBytes, int32_t sizeInBytes, void **regionAddressPtr);
+    aaudio_result_t resolve(int32_t offsetInBytes, int32_t sizeInBytes, void **regionAddressPtr);
 
     int32_t getSizeInBytes();
 
-    oboe_result_t validate();
+    aaudio_result_t validate();
 
     void dump();
 
@@ -63,6 +63,6 @@ protected:
     uint8_t *mResolvedAddress = nullptr;
 };
 
-} /* namespace oboe */
+} /* namespace aaudio */
 
 #endif //BINDING_SHAREDMEMORYPARCELABLE_H

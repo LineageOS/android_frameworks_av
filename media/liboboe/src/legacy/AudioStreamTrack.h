@@ -18,13 +18,13 @@
 #define LEGACY_AUDIO_STREAM_TRACK_H
 
 #include <media/AudioTrack.h>
-#include <oboe/OboeAudio.h>
+#include <aaudio/AAudio.h>
 
 #include "AudioStreamBuilder.h"
 #include "AudioStream.h"
-#include "OboeLegacy.h"
+#include "AAudioLegacy.h"
 
-namespace oboe {
+namespace aaudio {
 
 
 /**
@@ -37,42 +37,42 @@ public:
     virtual ~AudioStreamTrack();
 
 
-    virtual oboe_result_t open(const AudioStreamBuilder & builder) override;
-    virtual oboe_result_t close() override;
+    virtual aaudio_result_t open(const AudioStreamBuilder & builder) override;
+    virtual aaudio_result_t close() override;
 
-    virtual oboe_result_t requestStart() override;
-    virtual oboe_result_t requestPause() override;
-    virtual oboe_result_t requestFlush() override;
-    virtual oboe_result_t requestStop() override;
+    virtual aaudio_result_t requestStart() override;
+    virtual aaudio_result_t requestPause() override;
+    virtual aaudio_result_t requestFlush() override;
+    virtual aaudio_result_t requestStop() override;
 
-    virtual oboe_result_t getTimestamp(clockid_t clockId,
-                                       oboe_position_frames_t *framePosition,
-                                       oboe_nanoseconds_t *timeNanoseconds) override {
-        return OBOE_ERROR_UNIMPLEMENTED; // TODO call getTimestamp(ExtendedTimestamp *timestamp);
+    virtual aaudio_result_t getTimestamp(clockid_t clockId,
+                                       aaudio_position_frames_t *framePosition,
+                                       aaudio_nanoseconds_t *timeNanoseconds) override {
+        return AAUDIO_ERROR_UNIMPLEMENTED; // TODO call getTimestamp(ExtendedTimestamp *timestamp);
     }
 
-    virtual oboe_result_t write(const void *buffer,
-                             oboe_size_frames_t numFrames,
-                             oboe_nanoseconds_t timeoutNanoseconds) override;
+    virtual aaudio_result_t write(const void *buffer,
+                             aaudio_size_frames_t numFrames,
+                             aaudio_nanoseconds_t timeoutNanoseconds) override;
 
-    virtual oboe_result_t setBufferSize(oboe_size_frames_t requestedFrames,
-                                             oboe_size_frames_t *actualFrames) override;
-    virtual oboe_size_frames_t getBufferSize() const override;
-    virtual oboe_size_frames_t getBufferCapacity() const override;
-    virtual oboe_size_frames_t getFramesPerBurst()const  override;
+    virtual aaudio_result_t setBufferSize(aaudio_size_frames_t requestedFrames,
+                                             aaudio_size_frames_t *actualFrames) override;
+    virtual aaudio_size_frames_t getBufferSize() const override;
+    virtual aaudio_size_frames_t getBufferCapacity() const override;
+    virtual aaudio_size_frames_t getFramesPerBurst()const  override;
     virtual int32_t getXRunCount() const override;
 
-    virtual oboe_position_frames_t getFramesRead() override;
+    virtual aaudio_position_frames_t getFramesRead() override;
 
-    virtual oboe_result_t updateState() override;
+    virtual aaudio_result_t updateState() override;
 
 private:
     android::sp<android::AudioTrack> mAudioTrack;
     // TODO add 64-bit position reporting to AudioRecord and use it.
-    oboe_wrapping_frames_t           mPositionWhenStarting = 0;
-    oboe_wrapping_frames_t           mPositionWhenPausing = 0;
+    aaudio_wrapping_frames_t           mPositionWhenStarting = 0;
+    aaudio_wrapping_frames_t           mPositionWhenPausing = 0;
 };
 
-} /* namespace oboe */
+} /* namespace aaudio */
 
 #endif /* LEGACY_AUDIO_STREAM_TRACK_H */

@@ -14,22 +14,22 @@
  * limitations under the License.
  */
 
-#ifndef BINDING_OBOESERVICEDEFINITIONS_H
-#define BINDING_OBOESERVICEDEFINITIONS_H
+#ifndef BINDING_AAUDIOSERVICEDEFINITIONS_H
+#define BINDING_AAUDIOSERVICEDEFINITIONS_H
 
 #include <stdint.h>
 #include <utils/RefBase.h>
 #include <binder/TextOutput.h>
 #include <binder/IInterface.h>
 
-#include <oboe/OboeAudio.h>
+#include <aaudio/AAudio.h>
 
 using android::NO_ERROR;
 using android::IBinder;
 
 namespace android {
 
-enum oboe_commands_t {
+enum aaudio_commands_t {
     OPEN_STREAM = IBinder::FIRST_CALL_TRANSACTION,
     CLOSE_STREAM,
     GET_STREAM_DESCRIPTION,
@@ -42,9 +42,9 @@ enum oboe_commands_t {
 
 } // namespace android
 
-namespace oboe {
+namespace aaudio {
 
-enum oboe_commands_t {
+enum aaudio_commands_t {
     OPEN_STREAM = IBinder::FIRST_CALL_TRANSACTION,
     CLOSE_STREAM,
     GET_STREAM_DESCRIPTION,
@@ -56,12 +56,12 @@ enum oboe_commands_t {
 };
 
 // TODO Expand this to include all the open parameters.
-typedef struct OboeServiceStreamInfo_s {
+typedef struct AAudioServiceStreamInfo_s {
     int32_t             deviceId;
     int32_t             samplesPerFrame;  // number of channels
-    oboe_sample_rate_t  sampleRate;
-    oboe_audio_format_t audioFormat;
-} OboeServiceStreamInfo;
+    aaudio_sample_rate_t  sampleRate;
+    aaudio_audio_format_t audioFormat;
+} AAudioServiceStreamInfo;
 
 // This must be a fixed width so it can be in shared memory.
 enum RingbufferFlags : uint32_t {
@@ -95,6 +95,6 @@ typedef struct EndpointDescriptor_s {
     RingBufferDescriptor downDataQueueDescriptor;    // eg. playback
 } EndpointDescriptor;
 
-} // namespace oboe
+} // namespace aaudio
 
-#endif //BINDING_OBOESERVICEDEFINITIONS_H
+#endif //BINDING_AAUDIOSERVICEDEFINITIONS_H

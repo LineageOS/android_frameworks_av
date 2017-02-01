@@ -14,27 +14,27 @@
  * limitations under the License.
  */
 
-#ifndef BINDING_OBOE_STREAM_REQUEST_H
-#define BINDING_OBOE_STREAM_REQUEST_H
+#ifndef BINDING_AAUDIO_STREAM_REQUEST_H
+#define BINDING_AAUDIO_STREAM_REQUEST_H
 
 #include <stdint.h>
 
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
-#include <oboe/OboeDefinitions.h>
+#include <aaudio/AAudioDefinitions.h>
 
-#include "binding/OboeStreamConfiguration.h"
+#include "binding/AAudioStreamConfiguration.h"
 
 using android::status_t;
 using android::Parcel;
 using android::Parcelable;
 
-namespace oboe {
+namespace aaudio {
 
-class OboeStreamRequest : public Parcelable {
+class AAudioStreamRequest : public Parcelable {
 public:
-    OboeStreamRequest();
-    virtual ~OboeStreamRequest();
+    AAudioStreamRequest();
+    virtual ~AAudioStreamRequest();
 
     uid_t getUserId() const {
         return mUserId;
@@ -52,7 +52,7 @@ public:
         mProcessId = processId;
     }
 
-    OboeStreamConfiguration &getConfiguration() {
+    AAudioStreamConfiguration &getConfiguration() {
         return mConfiguration;
     }
 
@@ -60,16 +60,16 @@ public:
 
     virtual status_t readFromParcel(const Parcel* parcel) override;
 
-    oboe_result_t validate();
+    aaudio_result_t validate();
 
     void dump();
 
 protected:
-    OboeStreamConfiguration  mConfiguration;
+    AAudioStreamConfiguration  mConfiguration;
     uid_t    mUserId;
     pid_t    mProcessId;
 };
 
-} /* namespace oboe */
+} /* namespace aaudio */
 
-#endif //BINDING_OBOE_STREAM_REQUEST_H
+#endif //BINDING_AAUDIO_STREAM_REQUEST_H

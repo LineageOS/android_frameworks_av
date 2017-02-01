@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "OboeAudio"
+#define LOG_TAG "AAudio"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
 #include <new>
 #include <stdint.h>
 
-#include <oboe/OboeDefinitions.h>
-#include <oboe/OboeAudio.h>
+#include <aaudio/AAudioDefinitions.h>
+#include <aaudio/AAudio.h>
 
 #include "client/AudioStreamInternal.h"
 #include "core/AudioStream.h"
@@ -30,7 +30,7 @@
 #include "legacy/AudioStreamRecord.h"
 #include "legacy/AudioStreamTrack.h"
 
-using namespace oboe;
+using namespace aaudio;
 
 /*
  * AudioStreamBuilder
@@ -41,50 +41,50 @@ AudioStreamBuilder::AudioStreamBuilder() {
 AudioStreamBuilder::~AudioStreamBuilder() {
 }
 
-oboe_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
+aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     // TODO Is there a better place to put the code that decides which class to use?
     AudioStream* audioStream = nullptr;
-    const oboe_sharing_mode_t sharingMode = getSharingMode();
+    const aaudio_sharing_mode_t sharingMode = getSharingMode();
     switch (getDirection()) {
-    case OBOE_DIRECTION_INPUT:
+    case AAUDIO_DIRECTION_INPUT:
         switch (sharingMode) {
-            case OBOE_SHARING_MODE_LEGACY:
+            case AAUDIO_SHARING_MODE_LEGACY:
                 audioStream = new(std::nothrow) AudioStreamRecord();
                 break;
             default:
                 ALOGE("AudioStreamBuilder(): bad sharing mode = %d", sharingMode);
-                return OBOE_ERROR_ILLEGAL_ARGUMENT;
+                return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
                 break;
         }
         break;
-    case OBOE_DIRECTION_OUTPUT:
+    case AAUDIO_DIRECTION_OUTPUT:
         switch (sharingMode) {
-            case OBOE_SHARING_MODE_LEGACY:
+            case AAUDIO_SHARING_MODE_LEGACY:
                 audioStream = new(std::nothrow) AudioStreamTrack();
                 break;
-            case OBOE_SHARING_MODE_EXCLUSIVE:
+            case AAUDIO_SHARING_MODE_EXCLUSIVE:
                 audioStream = new(std::nothrow) AudioStreamInternal();
                 break;
             default:
                 ALOGE("AudioStreamBuilder(): bad sharing mode = %d", sharingMode);
-                return OBOE_ERROR_ILLEGAL_ARGUMENT;
+                return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
                 break;
         }
         break;
     default:
         ALOGE("AudioStreamBuilder(): bad direction = %d", getDirection());
-        return OBOE_ERROR_ILLEGAL_ARGUMENT;
+        return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
         break;
     }
     if (audioStream == nullptr) {
-        return OBOE_ERROR_NO_MEMORY;
+        return AAUDIO_ERROR_NO_MEMORY;
     }
     ALOGD("AudioStreamBuilder(): created audioStream = %p", audioStream);
 
     // TODO maybe move this out of build and pass the builder to the constructors
     // Open the stream using the parameters from the builder.
-    const oboe_result_t result = audioStream->open(*this);
-    if (result != OBOE_OK) {
+    const aaudio_result_t result = audioStream->open(*this);
+    if (result != AAUDIO_OK) {
         delete audioStream;
     } else {
         *streamPtr = audioStream;

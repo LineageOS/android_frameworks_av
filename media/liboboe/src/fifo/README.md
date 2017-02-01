@@ -5,5 +5,5 @@ One thread modifies the readCounter and the other thread modifies the writeCount
 
 TODO The internal low-level implementation might be merged in some form with audio_utils fifo
 and/or FMQ [after confirming that requirements are met].
-The higher-levels parts related to Oboe use of the FIFO such as API, fds, relative
+The higher-levels parts related to AAudio use of the FIFO such as API, fds, relative
 location of indices and data buffer, mapping, allocation of memmory will probably be kept as-is.

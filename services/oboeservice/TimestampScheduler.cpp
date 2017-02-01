@@ -19,14 +19,14 @@
 
 #include "TimestampScheduler.h"
 
-using namespace oboe;
+using namespace aaudio;
 
-void TimestampScheduler::start(oboe_nanoseconds_t startTime) {
+void TimestampScheduler::start(aaudio_nanoseconds_t startTime) {
     mStartTime = startTime;
     mLastTime = startTime;
 }
 
-oboe_nanoseconds_t TimestampScheduler::nextAbsoluteTime() {
+aaudio_nanoseconds_t TimestampScheduler::nextAbsoluteTime() {
     int64_t periodsElapsed = (mLastTime - mStartTime) / mBurstPeriod;
     // This is an arbitrary schedule that could probably be improved.
     // It starts out sending a timestamp on every period because we want to
@@ -35,10 +35,10 @@ oboe_nanoseconds_t TimestampScheduler::nextAbsoluteTime() {
     int64_t minPeriodsToDelay = (periodsElapsed < 10) ? 1 :
         (periodsElapsed < 100) ? 3 :
         (periodsElapsed < 1000) ? 10 : 50;
-    oboe_nanoseconds_t sleepTime = minPeriodsToDelay * mBurstPeriod;
+    aaudio_nanoseconds_t sleepTime = minPeriodsToDelay * mBurstPeriod;
     // Generate a random rectangular distribution one burst wide so that we get
     // an uncorrelated sampling of the MMAP pointer.
-    sleepTime += (oboe_nanoseconds_t)(random() * mBurstPeriod / RAND_MAX);
+    sleepTime += (aaudio_nanoseconds_t)(random() * mBurstPeriod / RAND_MAX);
     mLastTime += sleepTime;
     return mLastTime;
 }

@@ -20,35 +20,35 @@
 #include <stdint.h>
 #include <time.h>
 
-#include <oboe/OboeDefinitions.h>
+#include <aaudio/AAudioDefinitions.h>
 
 class AudioClock {
 public:
-    static oboe_nanoseconds_t getNanoseconds(clockid_t clockId = CLOCK_MONOTONIC) {
+    static aaudio_nanoseconds_t getNanoseconds(clockid_t clockId = CLOCK_MONOTONIC) {
         struct timespec time;
         int result = clock_gettime(clockId, &time);
         if (result < 0) {
             return -errno;
         }
-        return (time.tv_sec * OBOE_NANOS_PER_SECOND) + time.tv_nsec;
+        return (time.tv_sec * AAUDIO_NANOS_PER_SECOND) + time.tv_nsec;
     }
 
     /**
      * Sleep until the specified absolute time.
-     * Return immediately with OBOE_ERROR_ILLEGAL_ARGUMENT if a negative
+     * Return immediately with AAUDIO_ERROR_ILLEGAL_ARGUMENT if a negative
      * nanoTime is specified.
      *
      * @param nanoTime time to wake up
      * @param clockId CLOCK_MONOTONIC is default
      * @return 0, a negative error, or 1 if the call is interrupted by a signal handler (EINTR)
      */
-    static int sleepUntilNanoTime(oboe_nanoseconds_t nanoTime,
+    static int sleepUntilNanoTime(aaudio_nanoseconds_t nanoTime,
                                   clockid_t clockId = CLOCK_MONOTONIC) {
         if (nanoTime > 0) {
             struct timespec time;
-            time.tv_sec = nanoTime / OBOE_NANOS_PER_SECOND;
+            time.tv_sec = nanoTime / AAUDIO_NANOS_PER_SECOND;
             // Calculate the fractional nanoseconds. Avoids expensive % operation.
-            time.tv_nsec = nanoTime - (time.tv_sec * OBOE_NANOS_PER_SECOND);
+            time.tv_nsec = nanoTime - (time.tv_sec * AAUDIO_NANOS_PER_SECOND);
             int err = clock_nanosleep(clockId, TIMER_ABSTIME, &time, nullptr);
             switch (err) {
             case EINTR:
@@ -60,7 +60,7 @@ public:
                 return 0 - err;
             }
         } else {
-            return OBOE_ERROR_ILLEGAL_ARGUMENT;
+            return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
         }
     }
 
@@ -72,12 +72,12 @@ public:
      * @param clockId CLOCK_MONOTONIC is default
      * @return 0, a negative error, or 1 if the call is interrupted by a signal handler (EINTR)
      */
-    static int sleepForNanos(oboe_nanoseconds_t nanoseconds, clockid_t clockId = CLOCK_MONOTONIC) {
+    static int sleepForNanos(aaudio_nanoseconds_t nanoseconds, clockid_t clockId = CLOCK_MONOTONIC) {
         if (nanoseconds > 0) {
             struct timespec time;
-            time.tv_sec = nanoseconds / OBOE_NANOS_PER_SECOND;
+            time.tv_sec = nanoseconds / AAUDIO_NANOS_PER_SECOND;
             // Calculate the fractional nanoseconds. Avoids expensive % operation.
-            time.tv_nsec = nanoseconds - (time.tv_sec * OBOE_NANOS_PER_SECOND);
+            time.tv_nsec = nanoseconds - (time.tv_sec * AAUDIO_NANOS_PER_SECOND);
             const int flags = 0; // documented as relative sleep
             int err = clock_nanosleep(clockId, flags, &time, nullptr);
             switch (err) {

@@ -1,13 +1,13 @@
 LOCAL_PATH:= $(call my-dir)
 
-# Oboe Service
+# AAudio Service
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := oboeservice
 LOCAL_MODULE_TAGS := optional
 
-LIBOBOE_DIR := ../../media/liboboe
-LIBOBOE_SRC_DIR := $(LIBOBOE_DIR)/src
+LIBAAUDIO_DIR := ../../media/liboboe
+LIBAAUDIO_SRC_DIR := $(LIBAAUDIO_DIR)/src
 
 LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils) \
@@ -26,25 +26,25 @@ LOCAL_C_INCLUDES := \
 
 # TODO These could be in a liboboe_common library
 LOCAL_SRC_FILES += \
-    $(LIBOBOE_SRC_DIR)/utility/HandleTracker.cpp \
-    $(LIBOBOE_SRC_DIR)/utility/OboeUtilities.cpp \
-    $(LIBOBOE_SRC_DIR)/fifo/FifoBuffer.cpp \
-    $(LIBOBOE_SRC_DIR)/fifo/FifoControllerBase.cpp \
-    $(LIBOBOE_SRC_DIR)/binding/SharedMemoryParcelable.cpp \
-    $(LIBOBOE_SRC_DIR)/binding/SharedRegionParcelable.cpp \
-    $(LIBOBOE_SRC_DIR)/binding/RingBufferParcelable.cpp \
-    $(LIBOBOE_SRC_DIR)/binding/AudioEndpointParcelable.cpp \
-    $(LIBOBOE_SRC_DIR)/binding/OboeStreamRequest.cpp \
-    $(LIBOBOE_SRC_DIR)/binding/OboeStreamConfiguration.cpp \
-    $(LIBOBOE_SRC_DIR)/binding/IOboeAudioService.cpp \
+    $(LIBAAUDIO_SRC_DIR)/utility/HandleTracker.cpp \
+    $(LIBAAUDIO_SRC_DIR)/utility/AAudioUtilities.cpp \
+    $(LIBAAUDIO_SRC_DIR)/fifo/FifoBuffer.cpp \
+    $(LIBAAUDIO_SRC_DIR)/fifo/FifoControllerBase.cpp \
+    $(LIBAAUDIO_SRC_DIR)/binding/SharedMemoryParcelable.cpp \
+    $(LIBAAUDIO_SRC_DIR)/binding/SharedRegionParcelable.cpp \
+    $(LIBAAUDIO_SRC_DIR)/binding/RingBufferParcelable.cpp \
+    $(LIBAAUDIO_SRC_DIR)/binding/AudioEndpointParcelable.cpp \
+    $(LIBAAUDIO_SRC_DIR)/binding/AAudioStreamRequest.cpp \
+    $(LIBAAUDIO_SRC_DIR)/binding/AAudioStreamConfiguration.cpp \
+    $(LIBAAUDIO_SRC_DIR)/binding/IAAudioService.cpp \
     SharedRingBuffer.cpp \
     FakeAudioHal.cpp \
-    OboeAudioService.cpp \
-    OboeServiceStreamBase.cpp \
-    OboeServiceStreamFakeHal.cpp \
+    AAudioService.cpp \
+    AAudioServiceStreamBase.cpp \
+    AAudioServiceStreamFakeHal.cpp \
     TimestampScheduler.cpp \
-    OboeServiceMain.cpp \
-    OboeThread.cpp
+    AAudioServiceMain.cpp \
+    AAudioThread.cpp
 
 LOCAL_CFLAGS += -Wno-unused-parameter
 LOCAL_CFLAGS += -Wall -Werror

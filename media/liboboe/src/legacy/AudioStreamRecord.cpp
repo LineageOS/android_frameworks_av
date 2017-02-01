@@ -21,13 +21,13 @@
 #include <stdint.h>
 #include <utils/String16.h>
 #include <media/AudioRecord.h>
-#include <oboe/OboeAudio.h>
+#include <aaudio/AAudio.h>
 
 #include "AudioClock.h"
 #include "AudioStreamRecord.h"
 
 using namespace android;
-using namespace oboe;
+using namespace aaudio;
 
 AudioStreamRecord::AudioStreamRecord()
     : AudioStream()
@@ -36,24 +36,24 @@ AudioStreamRecord::AudioStreamRecord()
 
 AudioStreamRecord::~AudioStreamRecord()
 {
-    const oboe_stream_state_t state = getState();
-    bool bad = !(state == OBOE_STREAM_STATE_UNINITIALIZED || state == OBOE_STREAM_STATE_CLOSED);
+    const aaudio_stream_state_t state = getState();
+    bool bad = !(state == AAUDIO_STREAM_STATE_UNINITIALIZED || state == AAUDIO_STREAM_STATE_CLOSED);
     ALOGE_IF(bad, "stream not closed, in state %d", state);
 }
 
-oboe_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
+aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
 {
-    oboe_result_t result = OBOE_OK;
+    aaudio_result_t result = AAUDIO_OK;
 
     result = AudioStream::open(builder);
-    if (result != OBOE_OK) {
+    if (result != AAUDIO_OK) {
         return result;
     }
 
     // Try to create an AudioRecord
 
     // TODO Support UNSPECIFIED in AudioTrack. For now, use stereo if unspecified.
-    int32_t samplesPerFrame = (getSamplesPerFrame() == OBOE_UNSPECIFIED)
+    int32_t samplesPerFrame = (getSamplesPerFrame() == AAUDIO_UNSPECIFIED)
                               ? 2 : getSamplesPerFrame();
     audio_channel_mask_t channelMask = audio_channel_in_mask_from_count(samplesPerFrame);
 
@@ -61,9 +61,9 @@ oboe_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     audio_input_flags_t flags = (audio_input_flags_t) AUDIO_INPUT_FLAG_NONE;
 
     // TODO implement an unspecified Android format then use that.
-    audio_format_t format = (getFormat() == OBOE_UNSPECIFIED)
+    audio_format_t format = (getFormat() == AAUDIO_UNSPECIFIED)
             ? AUDIO_FORMAT_PCM_FLOAT
-            : OboeConvert_oboeToAndroidDataFormat(getFormat());
+            : AAudioConvert_aaudioToAndroidDataFormat(getFormat());
 
     mAudioRecord = new AudioRecord(
             AUDIO_SOURCE_DEFAULT,
@@ -90,84 +90,84 @@ oboe_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     if (status != OK) {
         close();
         ALOGE("AudioStreamRecord::open(), initCheck() returned %d", status);
-        return OboeConvert_androidToOboeResult(status);
+        return AAudioConvert_androidToAAudioResult(status);
     }
 
     // Get the actual rate.
     setSampleRate(mAudioRecord->getSampleRate());
     setSamplesPerFrame(mAudioRecord->channelCount());
-    setFormat(OboeConvert_androidToOboeDataFormat(mAudioRecord->format()));
+    setFormat(AAudioConvert_androidToAAudioDataFormat(mAudioRecord->format()));
 
-    setState(OBOE_STREAM_STATE_OPEN);
+    setState(AAUDIO_STREAM_STATE_OPEN);
 
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
-oboe_result_t AudioStreamRecord::close()
+aaudio_result_t AudioStreamRecord::close()
 {
     // TODO add close() or release() to AudioRecord API then call it from here
-    if (getState() != OBOE_STREAM_STATE_CLOSED) {
+    if (getState() != AAUDIO_STREAM_STATE_CLOSED) {
         mAudioRecord.clear();
-        setState(OBOE_STREAM_STATE_CLOSED);
+        setState(AAUDIO_STREAM_STATE_CLOSED);
     }
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
-oboe_result_t AudioStreamRecord::requestStart()
+aaudio_result_t AudioStreamRecord::requestStart()
 {
     if (mAudioRecord.get() == nullptr) {
-        return OBOE_ERROR_INVALID_STATE;
+        return AAUDIO_ERROR_INVALID_STATE;
     }
     // Get current position so we can detect when the track is playing.
     status_t err = mAudioRecord->getPosition(&mPositionWhenStarting);
     if (err != OK) {
-        return OboeConvert_androidToOboeResult(err);
+        return AAudioConvert_androidToAAudioResult(err);
     }
     err = mAudioRecord->start();
     if (err != OK) {
-        return OboeConvert_androidToOboeResult(err);
+        return AAudioConvert_androidToAAudioResult(err);
     } else {
-        setState(OBOE_STREAM_STATE_STARTING);
+        setState(AAUDIO_STREAM_STATE_STARTING);
     }
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
-oboe_result_t AudioStreamRecord::requestPause()
+aaudio_result_t AudioStreamRecord::requestPause()
 {
-    return OBOE_ERROR_UNIMPLEMENTED;
+    return AAUDIO_ERROR_UNIMPLEMENTED;
 }
 
-oboe_result_t AudioStreamRecord::requestFlush() {
-    return OBOE_ERROR_UNIMPLEMENTED;
+aaudio_result_t AudioStreamRecord::requestFlush() {
+    return AAUDIO_ERROR_UNIMPLEMENTED;
 }
 
-oboe_result_t AudioStreamRecord::requestStop() {
+aaudio_result_t AudioStreamRecord::requestStop() {
     if (mAudioRecord.get() == nullptr) {
-        return OBOE_ERROR_INVALID_STATE;
+        return AAUDIO_ERROR_INVALID_STATE;
     }
-    setState(OBOE_STREAM_STATE_STOPPING);
+    setState(AAUDIO_STREAM_STATE_STOPPING);
     mAudioRecord->stop();
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
-oboe_result_t AudioStreamRecord::updateState()
+aaudio_result_t AudioStreamRecord::updateState()
 {
-    oboe_result_t result = OBOE_OK;
-    oboe_wrapping_frames_t position;
+    aaudio_result_t result = AAUDIO_OK;
+    aaudio_wrapping_frames_t position;
     status_t err;
     switch (getState()) {
     // TODO add better state visibility to AudioRecord
-    case OBOE_STREAM_STATE_STARTING:
+    case AAUDIO_STREAM_STATE_STARTING:
         err = mAudioRecord->getPosition(&position);
         if (err != OK) {
-            result = OboeConvert_androidToOboeResult(err);
+            result = AAudioConvert_androidToAAudioResult(err);
         } else if (position != mPositionWhenStarting) {
-            setState(OBOE_STREAM_STATE_STARTED);
+            setState(AAUDIO_STREAM_STATE_STARTED);
         }
         break;
-    case OBOE_STREAM_STATE_STOPPING:
+    case AAUDIO_STREAM_STATE_STOPPING:
         if (mAudioRecord->stopped()) {
-            setState(OBOE_STREAM_STATE_STOPPED);
+            setState(AAUDIO_STREAM_STATE_STOPPED);
         }
         break;
     default:
@@ -176,14 +176,14 @@ oboe_result_t AudioStreamRecord::updateState()
     return result;
 }
 
-oboe_result_t AudioStreamRecord::read(void *buffer,
-                                      oboe_size_frames_t numFrames,
-                                      oboe_nanoseconds_t timeoutNanoseconds)
+aaudio_result_t AudioStreamRecord::read(void *buffer,
+                                      aaudio_size_frames_t numFrames,
+                                      aaudio_nanoseconds_t timeoutNanoseconds)
 {
-    oboe_size_frames_t bytesPerFrame = getBytesPerFrame();
-    oboe_size_bytes_t numBytes;
-    oboe_result_t result = OboeConvert_framesToBytes(numFrames, bytesPerFrame, &numBytes);
-    if (result != OBOE_OK) {
+    aaudio_size_frames_t bytesPerFrame = getBytesPerFrame();
+    aaudio_size_bytes_t numBytes;
+    aaudio_result_t result = AAudioConvert_framesToBytes(numFrames, bytesPerFrame, &numBytes);
+    if (result != AAUDIO_OK) {
         return result;
     }
 
@@ -193,35 +193,35 @@ oboe_result_t AudioStreamRecord::read(void *buffer,
     if (bytesRead == WOULD_BLOCK) {
         return 0;
     } else if (bytesRead < 0) {
-        return OboeConvert_androidToOboeResult(bytesRead);
+        return AAudioConvert_androidToAAudioResult(bytesRead);
     }
-    oboe_size_frames_t framesRead = (oboe_size_frames_t)(bytesRead / bytesPerFrame);
-    return (oboe_result_t) framesRead;
+    aaudio_size_frames_t framesRead = (aaudio_size_frames_t)(bytesRead / bytesPerFrame);
+    return (aaudio_result_t) framesRead;
 }
 
-oboe_result_t AudioStreamRecord::setBufferSize(oboe_size_frames_t requestedFrames,
-                                             oboe_size_frames_t *actualFrames)
+aaudio_result_t AudioStreamRecord::setBufferSize(aaudio_size_frames_t requestedFrames,
+                                             aaudio_size_frames_t *actualFrames)
 {
     *actualFrames = getBufferCapacity();
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
-oboe_size_frames_t AudioStreamRecord::getBufferSize() const
+aaudio_size_frames_t AudioStreamRecord::getBufferSize() const
 {
     return getBufferCapacity(); // TODO implement in AudioRecord?
 }
 
-oboe_size_frames_t AudioStreamRecord::getBufferCapacity() const
+aaudio_size_frames_t AudioStreamRecord::getBufferCapacity() const
 {
-    return static_cast<oboe_size_frames_t>(mAudioRecord->frameCount());
+    return static_cast<aaudio_size_frames_t>(mAudioRecord->frameCount());
 }
 
 int32_t AudioStreamRecord::getXRunCount() const
 {
-    return OBOE_ERROR_UNIMPLEMENTED; // TODO implement when AudioRecord supports it
+    return AAUDIO_ERROR_UNIMPLEMENTED; // TODO implement when AudioRecord supports it
 }
 
-oboe_size_frames_t AudioStreamRecord::getFramesPerBurst() const
+aaudio_size_frames_t AudioStreamRecord::getFramesPerBurst() const
 {
     return 192; // TODO add query to AudioRecord.cpp
 }

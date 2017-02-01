@@ -14,24 +14,24 @@
  * limitations under the License.
  */
 
-#ifndef OBOE_AUDIOSTREAMINTERNAL_H
-#define OBOE_AUDIOSTREAMINTERNAL_H
+#ifndef AAUDIO_AUDIOSTREAMINTERNAL_H
+#define AAUDIO_AUDIOSTREAMINTERNAL_H
 
 #include <stdint.h>
-#include <oboe/OboeAudio.h>
+#include <aaudio/AAudio.h>
 
-#include "binding/IOboeAudioService.h"
+#include "binding/IAAudioService.h"
 #include "binding/AudioEndpointParcelable.h"
 #include "client/IsochronousClockModel.h"
 #include "client/AudioEndpoint.h"
 #include "core/AudioStream.h"
 
 using android::sp;
-using android::IOboeAudioService;
+using android::IAAudioService;
 
-namespace oboe {
+namespace aaudio {
 
-// A stream that talks to the OboeService or directly to a HAL.
+// A stream that talks to the AAudioService or directly to a HAL.
 class AudioStreamInternal : public AudioStream {
 
 public:
@@ -39,57 +39,57 @@ public:
     virtual ~AudioStreamInternal();
 
     // =========== Begin ABSTRACT methods ===========================
-    virtual oboe_result_t requestStart() override;
+    virtual aaudio_result_t requestStart() override;
 
-    virtual oboe_result_t requestPause() override;
+    virtual aaudio_result_t requestPause() override;
 
-    virtual oboe_result_t requestFlush() override;
+    virtual aaudio_result_t requestFlush() override;
 
-    virtual oboe_result_t requestStop() override;
+    virtual aaudio_result_t requestStop() override;
 
-    // TODO use oboe_clockid_t all the way down to AudioClock
-    virtual oboe_result_t getTimestamp(clockid_t clockId,
-                                       oboe_position_frames_t *framePosition,
-                                       oboe_nanoseconds_t *timeNanoseconds) override;
+    // TODO use aaudio_clockid_t all the way down to AudioClock
+    virtual aaudio_result_t getTimestamp(clockid_t clockId,
+                                       aaudio_position_frames_t *framePosition,
+                                       aaudio_nanoseconds_t *timeNanoseconds) override;
 
 
-    virtual oboe_result_t updateState() override;
+    virtual aaudio_result_t updateState() override;
     // =========== End ABSTRACT methods ===========================
 
-    virtual oboe_result_t open(const AudioStreamBuilder &builder) override;
+    virtual aaudio_result_t open(const AudioStreamBuilder &builder) override;
 
-    virtual oboe_result_t close() override;
+    virtual aaudio_result_t close() override;
 
-    virtual oboe_result_t write(const void *buffer,
+    virtual aaudio_result_t write(const void *buffer,
                              int32_t numFrames,
-                             oboe_nanoseconds_t timeoutNanoseconds) override;
+                             aaudio_nanoseconds_t timeoutNanoseconds) override;
 
-    virtual oboe_result_t waitForStateChange(oboe_stream_state_t currentState,
-                                          oboe_stream_state_t *nextState,
-                                          oboe_nanoseconds_t timeoutNanoseconds) override;
+    virtual aaudio_result_t waitForStateChange(aaudio_stream_state_t currentState,
+                                          aaudio_stream_state_t *nextState,
+                                          aaudio_nanoseconds_t timeoutNanoseconds) override;
 
-    virtual oboe_result_t setBufferSize(oboe_size_frames_t requestedFrames,
-                                        oboe_size_frames_t *actualFrames) override;
+    virtual aaudio_result_t setBufferSize(aaudio_size_frames_t requestedFrames,
+                                        aaudio_size_frames_t *actualFrames) override;
 
-    virtual oboe_size_frames_t getBufferSize() const override;
+    virtual aaudio_size_frames_t getBufferSize() const override;
 
-    virtual oboe_size_frames_t getBufferCapacity() const override;
+    virtual aaudio_size_frames_t getBufferCapacity() const override;
 
-    virtual oboe_size_frames_t getFramesPerBurst() const override;
+    virtual aaudio_size_frames_t getFramesPerBurst() const override;
 
-    virtual oboe_position_frames_t getFramesRead() override;
+    virtual aaudio_position_frames_t getFramesRead() override;
 
     virtual int32_t getXRunCount() const override {
         return mXRunCount;
     }
 
-    virtual oboe_result_t registerThread() override;
+    virtual aaudio_result_t registerThread() override;
 
-    virtual oboe_result_t unregisterThread() override;
+    virtual aaudio_result_t unregisterThread() override;
 
 protected:
 
-    oboe_result_t processCommands();
+    aaudio_result_t processCommands();
 
 /**
  * Low level write that will not block. It will just write as much as it can.
@@ -98,31 +98,31 @@ protected:
  *
  * @return the number of frames written or a negative error code.
  */
-    virtual oboe_result_t writeNow(const void *buffer,
+    virtual aaudio_result_t writeNow(const void *buffer,
                                 int32_t numFrames,
-                                oboe_nanoseconds_t currentTimeNanos,
-                                oboe_nanoseconds_t *wakeTimePtr);
+                                aaudio_nanoseconds_t currentTimeNanos,
+                                aaudio_nanoseconds_t *wakeTimePtr);
 
     void onFlushFromServer();
 
-    oboe_result_t onEventFromServer(OboeServiceMessage *message);
+    aaudio_result_t onEventFromServer(AAudioServiceMessage *message);
 
-    oboe_result_t onTimestampFromServer(OboeServiceMessage *message);
+    aaudio_result_t onTimestampFromServer(AAudioServiceMessage *message);
 
 private:
     IsochronousClockModel    mClockModel;
     AudioEndpoint            mAudioEndpoint;
-    oboe_handle_t            mServiceStreamHandle;
+    aaudio_handle_t            mServiceStreamHandle;
     EndpointDescriptor       mEndpointDescriptor;
     // Offset from underlying frame position.
-    oboe_position_frames_t   mFramesOffsetFromService = 0;
-    oboe_position_frames_t   mLastFramesRead = 0;
-    oboe_size_frames_t       mFramesPerBurst;
+    aaudio_position_frames_t   mFramesOffsetFromService = 0;
+    aaudio_position_frames_t   mLastFramesRead = 0;
+    aaudio_size_frames_t       mFramesPerBurst;
     int32_t                  mXRunCount = 0;
 
-    void processTimestamp(uint64_t position, oboe_nanoseconds_t time);
+    void processTimestamp(uint64_t position, aaudio_nanoseconds_t time);
 };
 
-} /* namespace oboe */
+} /* namespace aaudio */
 
-#endif //OBOE_AUDIOSTREAMINTERNAL_H
+#endif //AAUDIO_AUDIOSTREAMINTERNAL_H

@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-#ifndef OBOE_LEGACY_H
-#define OBOE_LEGACY_H
+#ifndef AAUDIO_LEGACY_H
+#define AAUDIO_LEGACY_H
 
 #include <stdint.h>
-#include <oboe/OboeAudio.h>
+#include <aaudio/AAudio.h>
 
 /**
  * Common code for legacy classes.
  */
 
 /* AudioTrack uses a 32-bit frame counter that can wrap around in about a day. */
-typedef uint32_t oboe_wrapping_frames_t;
+typedef uint32_t aaudio_wrapping_frames_t;
 
-#endif /* OBOE_LEGACY_H */
+#endif /* AAUDIO_LEGACY_H */

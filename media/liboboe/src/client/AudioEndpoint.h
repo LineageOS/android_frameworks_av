@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-#ifndef OBOE_AUDIO_ENDPOINT_H
-#define OBOE_AUDIO_ENDPOINT_H
+#ifndef AAUDIO_AUDIO_ENDPOINT_H
+#define AAUDIO_AUDIO_ENDPOINT_H
 
-#include <oboe/OboeAudio.h>
+#include <aaudio/AAudio.h>
 
-#include "OboeServiceMessage.h"
+#include "AAudioServiceMessage.h"
 #include "AudioEndpointParcelable.h"
 #include "fifo/FifoBuffer.h"
 
-namespace oboe {
+namespace aaudio {
 
 #define ENDPOINT_DATA_QUEUE_SIZE_MIN   64
 
@@ -40,19 +40,19 @@ public:
     /**
      * Configure based on the EndPointDescriptor_t.
      */
-    oboe_result_t configure(const EndpointDescriptor *pEndpointDescriptor);
+    aaudio_result_t configure(const EndpointDescriptor *pEndpointDescriptor);
 
     /**
      * Read from a command passed up from the Server.
      * @return 1 if command received, 0 for no command, or negative error.
      */
-    oboe_result_t readUpCommand(OboeServiceMessage *commandPtr);
+    aaudio_result_t readUpCommand(AAudioServiceMessage *commandPtr);
 
     /**
      * Non-blocking write.
      * @return framesWritten or a negative error code.
      */
-    oboe_result_t writeDataNow(const void *buffer, int32_t numFrames);
+    aaudio_result_t writeDataNow(const void *buffer, int32_t numFrames);
 
     /**
      * Set the read index in the downData queue.
@@ -71,13 +71,13 @@ public:
      */
     bool isOutputFreeRunning() const { return mOutputFreeRunning; }
 
-    int32_t setBufferSizeInFrames(oboe_size_frames_t requestedFrames,
-                                  oboe_size_frames_t *actualFrames);
-    oboe_size_frames_t getBufferSizeInFrames() const;
+    int32_t setBufferSizeInFrames(aaudio_size_frames_t requestedFrames,
+                                  aaudio_size_frames_t *actualFrames);
+    aaudio_size_frames_t getBufferSizeInFrames() const;
 
-    oboe_size_frames_t getBufferCapacityInFrames() const;
+    aaudio_size_frames_t getBufferCapacityInFrames() const;
 
-    oboe_size_frames_t getFullFramesAvailable();
+    aaudio_size_frames_t getFullFramesAvailable();
 
 private:
     FifoBuffer   * mUpCommandQueue;
@@ -87,6 +87,6 @@ private:
     fifo_counter_t mDataWriteCounter; // only used if free-running
 };
 
-} // namespace oboe
+} // namespace aaudio
 
-#endif //OBOE_AUDIO_ENDPOINT_H
+#endif //AAUDIO_AUDIO_ENDPOINT_H

@@ -20,21 +20,21 @@
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
 
-#include <oboe/OboeDefinitions.h>
+#include <aaudio/AAudioDefinitions.h>
 
-#include "binding/OboeStreamConfiguration.h"
+#include "binding/AAudioStreamConfiguration.h"
 
 using android::NO_ERROR;
 using android::status_t;
 using android::Parcel;
 using android::Parcelable;
 
-using namespace oboe;
+using namespace aaudio;
 
-OboeStreamConfiguration::OboeStreamConfiguration() {}
-OboeStreamConfiguration::~OboeStreamConfiguration() {}
+AAudioStreamConfiguration::AAudioStreamConfiguration() {}
+AAudioStreamConfiguration::~AAudioStreamConfiguration() {}
 
-status_t OboeStreamConfiguration::writeToParcel(Parcel* parcel) const {
+status_t AAudioStreamConfiguration::writeToParcel(Parcel* parcel) const {
     parcel->writeInt32(mDeviceId);
     parcel->writeInt32(mSampleRate);
     parcel->writeInt32(mSamplesPerFrame);
@@ -42,43 +42,43 @@ status_t OboeStreamConfiguration::writeToParcel(Parcel* parcel) const {
     return NO_ERROR; // TODO check for errors above
 }
 
-status_t OboeStreamConfiguration::readFromParcel(const Parcel* parcel) {
+status_t AAudioStreamConfiguration::readFromParcel(const Parcel* parcel) {
     int32_t temp;
     parcel->readInt32(&mDeviceId);
     parcel->readInt32(&mSampleRate);
     parcel->readInt32(&mSamplesPerFrame);
     parcel->readInt32(&temp);
-    mAudioFormat = (oboe_audio_format_t) temp;
+    mAudioFormat = (aaudio_audio_format_t) temp;
     return NO_ERROR; // TODO check for errors above
 }
 
-oboe_result_t OboeStreamConfiguration::validate() {
+aaudio_result_t AAudioStreamConfiguration::validate() {
     // Validate results of the open.
     if (mSampleRate < 0 || mSampleRate >= 8 * 48000) { // TODO review limits
-        ALOGE("OboeStreamConfiguration.validate(): invalid sampleRate = %d", mSampleRate);
-        return OBOE_ERROR_INTERNAL;
+        ALOGE("AAudioStreamConfiguration.validate(): invalid sampleRate = %d", mSampleRate);
+        return AAUDIO_ERROR_INTERNAL;
     }
 
     if (mSamplesPerFrame < 1 || mSamplesPerFrame >= 32) { // TODO review limits
-        ALOGE("OboeStreamConfiguration.validate() invalid samplesPerFrame = %d", mSamplesPerFrame);
-        return OBOE_ERROR_INTERNAL;
+        ALOGE("AAudioStreamConfiguration.validate() invalid samplesPerFrame = %d", mSamplesPerFrame);
+        return AAUDIO_ERROR_INTERNAL;
     }
 
     switch (mAudioFormat) {
-    case OBOE_AUDIO_FORMAT_PCM_I16:
-    case OBOE_AUDIO_FORMAT_PCM_FLOAT:
-    case OBOE_AUDIO_FORMAT_PCM_I8_24:
-    case OBOE_AUDIO_FORMAT_PCM_I32:
+    case AAUDIO_FORMAT_PCM_I16:
+    case AAUDIO_FORMAT_PCM_FLOAT:
+    case AAUDIO_FORMAT_PCM_I8_24:
+    case AAUDIO_FORMAT_PCM_I32:
         break;
     default:
-        ALOGE("OboeStreamConfiguration.validate() invalid audioFormat = %d", mAudioFormat);
-        return OBOE_ERROR_INTERNAL;
+        ALOGE("AAudioStreamConfiguration.validate() invalid audioFormat = %d", mAudioFormat);
+        return AAUDIO_ERROR_INTERNAL;
     }
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
-void OboeStreamConfiguration::dump() {
-    ALOGD("OboeStreamConfiguration mSampleRate = %d -----", mSampleRate);
-    ALOGD("OboeStreamConfiguration mSamplesPerFrame = %d", mSamplesPerFrame);
-    ALOGD("OboeStreamConfiguration mAudioFormat = %d", (int)mAudioFormat);
+void AAudioStreamConfiguration::dump() {
+    ALOGD("AAudioStreamConfiguration mSampleRate = %d -----", mSampleRate);
+    ALOGD("AAudioStreamConfiguration mSamplesPerFrame = %d", mSamplesPerFrame);
+    ALOGD("AAudioStreamConfiguration mAudioFormat = %d", (int)mAudioFormat);
 }
