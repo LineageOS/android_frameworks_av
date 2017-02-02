@@ -59,10 +59,13 @@
 namespace android {
 
 // key for media statistics
-static const char *CodecKeyName = "codec";
+static const char *kCodecKeyName = "codec";
 // attrs for media statistics
-static const char *CodecMime = "mime";
-static const char *CodecCodec = "codec";
+static const char *kCodecCodec = "codec";               /* e.g. OMX.google.aac.decoder */
+static const char *kCodecMime = "mime";                 /* e.g. audio/mime */
+static const char *kCodecMode = "mode";                 /* audio, video */
+static const char *kCodecSecure = "secure";             /* 0, 1 */
+
 
 
 static int64_t getId(const sp<IResourceManagerClient> &client) {
@@ -485,7 +488,7 @@ MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid)
         mUid = uid;
     }
     // set up our new record, get a sessionID, put it into the in-progress list
-    mAnalyticsItem = new MediaAnalyticsItem(CodecKeyName);
+    mAnalyticsItem = new MediaAnalyticsItem(kCodecKeyName);
     if (mAnalyticsItem != NULL) {
         (void) mAnalyticsItem->generateSessionID();
         // don't record it yet; only at the end, when we have decided that we have
@@ -627,11 +630,11 @@ status_t MediaCodec::init(const AString &name, bool nameIsType, bool encoder) {
     if (mAnalyticsItem != NULL) {
         if (nameIsType) {
             // name is the mime type
-            mAnalyticsItem->setCString(CodecMime, name.c_str());
+            mAnalyticsItem->setCString(kCodecMime, name.c_str());
         } else {
-            mAnalyticsItem->setCString(CodecCodec, name.c_str());
+            mAnalyticsItem->setCString(kCodecCodec, name.c_str());
         }
-        mAnalyticsItem->setCString("mode", mIsVideo ? "video" : "audio");
+        mAnalyticsItem->setCString(kCodecMode, mIsVideo ? "video" : "audio");
         //mAnalyticsItem->setInt32("type", nameIsType);
         if (nameIsType)
             mAnalyticsItem->setInt32("encoder", encoder);
@@ -1465,6 +1468,10 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
                     CHECK(msg->findString("componentName", &mComponentName));
 
+                    if (mComponentName.c_str()) {
+                        mAnalyticsItem->setCString(kCodecCodec, mComponentName.c_str());
+                    }
+
                     if (mComponentName.startsWith("OMX.google.")) {
                         mFlags |= kFlagUsesSoftwareRenderer;
                     } else {
@@ -1475,9 +1482,11 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     if (mComponentName.endsWith(".secure")) {
                         mFlags |= kFlagIsSecure;
                         resourceType = MediaResource::kSecureCodec;
+                        mAnalyticsItem->setInt32(kCodecSecure, 1);
                     } else {
                         mFlags &= ~kFlagIsSecure;
                         resourceType = MediaResource::kNonSecureCodec;
+                        mAnalyticsItem->setInt32(kCodecSecure, 0);
                     }
 
                     if (mIsVideo) {
