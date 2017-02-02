@@ -66,7 +66,7 @@ namespace {
 
 // establish binder interface to camera service
 template <typename TCam, typename TCamTraits>
-const sp<ICameraService>& CameraBase<TCam, TCamTraits>::getCameraService()
+const sp<ICameraService> CameraBase<TCam, TCamTraits>::getCameraService()
 {
     Mutex::Autolock _l(gLock);
     if (gCameraService.get() == 0) {
@@ -99,7 +99,7 @@ sp<TCam> CameraBase<TCam, TCamTraits>::connect(int cameraId,
     sp<TCam> c = new TCam(cameraId);
     sp<TCamCallbacks> cl = c;
     status_t status = NO_ERROR;
-    const sp<ICameraService>& cs = getCameraService();
+    const sp<ICameraService> cs = getCameraService();
 
     if (cs != 0) {
         TCamConnectService fnConnectService = TCamTraits::fnConnectService;
@@ -196,7 +196,7 @@ int CameraBase<TCam, TCamTraits>::getNumberOfCameras() {
 template <typename TCam, typename TCamTraits>
 status_t CameraBase<TCam, TCamTraits>::getCameraInfo(int cameraId,
                                struct CameraInfo* cameraInfo) {
-    const sp<ICameraService>& cs = getCameraService();
+    const sp<ICameraService> cs = getCameraService();
     if (cs == 0) return UNKNOWN_ERROR;
     return cs->getCameraInfo(cameraId, cameraInfo);
 }
@@ -204,7 +204,7 @@ status_t CameraBase<TCam, TCamTraits>::getCameraInfo(int cameraId,
 template <typename TCam, typename TCamTraits>
 status_t CameraBase<TCam, TCamTraits>::addServiceListener(
                             const sp<ICameraServiceListener>& listener) {
-    const sp<ICameraService>& cs = getCameraService();
+    const sp<ICameraService> cs = getCameraService();
     if (cs == 0) return UNKNOWN_ERROR;
     return cs->addListener(listener);
 }
@@ -212,7 +212,7 @@ status_t CameraBase<TCam, TCamTraits>::addServiceListener(
 template <typename TCam, typename TCamTraits>
 status_t CameraBase<TCam, TCamTraits>::removeServiceListener(
                             const sp<ICameraServiceListener>& listener) {
-    const sp<ICameraService>& cs = getCameraService();
+    const sp<ICameraService> cs = getCameraService();
     if (cs == 0) return UNKNOWN_ERROR;
     return cs->removeListener(listener);
 }
