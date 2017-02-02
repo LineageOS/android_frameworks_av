@@ -115,7 +115,7 @@ protected:
     virtual void                     binderDied(const wp<IBinder>& who);
 
     // helper function to obtain camera service handle
-    static const sp<::android::hardware::ICameraService>& getCameraService();
+    static const sp<::android::hardware::ICameraService> getCameraService();
 
     sp<TCamUser>                     mCamera;
     status_t                         mStatus;
