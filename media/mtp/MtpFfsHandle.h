@@ -48,6 +48,9 @@ private:
     int mMaxWrite;
     int mMaxRead;
 
+    std::vector<char> mBuffer1;
+    std::vector<char> mBuffer2;
+
 public:
     int read(void *data, int len);
     int write(const void *data, int len);
