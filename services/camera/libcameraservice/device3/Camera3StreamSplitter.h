@@ -103,6 +103,11 @@ private:
     // onFrameAvailable call to proceed.
     void onBufferReleasedByOutput(const sp<IGraphicBufferProducer>& from);
 
+    // This is the implementation of onBufferReleasedByOutput without the mutex locked.
+    // It could either be called from onBufferReleasedByOutput or from
+    // onFrameAvailable when a buffer in the async buffer queue is overwritten.
+    void onBufferReleasedByOutputLocked(const sp<IGraphicBufferProducer>& from);
+
     // When this is called, the splitter disconnects from (i.e., abandons) its
     // input queue and signals any waiting onFrameAvailable calls to wake up.
     // It still processes callbacks from other outputs, but only detaches their

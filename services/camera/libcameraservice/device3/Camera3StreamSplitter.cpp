@@ -322,6 +322,13 @@ void Camera3StreamSplitter::onFrameAvailable(const BufferItem& /* item */) {
                         "queueing buffer to output failed (%d)", status);
             }
 
+            // If the queued buffer replaces a pending buffer in the async
+            // queue, no onBufferReleased is called by the buffer queue.
+            // Proactively trigger the callback to avoid buffer loss.
+            if (queueOutput.bufferReplaced) {
+                onBufferReleasedByOutputLocked(mOutputs[id]);
+            }
+
             ALOGV("queued buffer %#" PRIx64 " to output %p",
                     bufferItem.mGraphicBuffer->getId(), mOutputs[id].get());
         }
@@ -334,6 +341,12 @@ void Camera3StreamSplitter::onBufferReleasedByOutput(
         const sp<IGraphicBufferProducer>& from) {
     ATRACE_CALL();
     Mutex::Autolock lock(mMutex);
+
+    onBufferReleasedByOutputLocked(from);
+}
+
+void Camera3StreamSplitter::onBufferReleasedByOutputLocked(
+        const sp<IGraphicBufferProducer>& from) {
 
     sp<GraphicBuffer> buffer;
     sp<Fence> fence;
