@@ -23,18 +23,18 @@
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
 
-#include "binding/OboeServiceDefinitions.h"
+#include "binding/AAudioServiceDefinitions.h"
 #include "binding/RingBufferParcelable.h"
 
 using android::status_t;
 using android::Parcel;
 using android::Parcelable;
 
-namespace oboe {
+namespace aaudio {
 
 /**
  * Container for information about the message queues plus
- * general stream information needed by Oboe clients.
+ * general stream information needed by AAudio clients.
  * It contains no addresses, just sizes, offsets and file descriptors for
  * shared memory that can be passed through Binder.
  */
@@ -53,9 +53,9 @@ public:
 
     virtual status_t readFromParcel(const Parcel* parcel) override;
 
-    oboe_result_t resolve(EndpointDescriptor *descriptor);
+    aaudio_result_t resolve(EndpointDescriptor *descriptor);
 
-    oboe_result_t validate();
+    aaudio_result_t validate();
 
     void dump();
 
@@ -71,6 +71,6 @@ private:
     SharedMemoryParcelable  mSharedMemories[MAX_SHARED_MEMORIES];
 };
 
-} /* namespace oboe */
+} /* namespace aaudio */
 
 #endif //BINDING_AUDIOENDPOINTPARCELABLE_H

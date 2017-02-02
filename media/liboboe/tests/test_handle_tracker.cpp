@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-// Unit tests for Oboe Handle Tracker
+// Unit tests for AAudio Handle Tracker
 
 #include <stdlib.h>
 #include <math.h>
 
 #include <gtest/gtest.h>
 
-#include <oboe/OboeDefinitions.h>
+#include <aaudio/AAudioDefinitions.h>
 #include "HandleTracker.h"
 
 // Test adding one address.
-TEST(test_handle_tracker, oboe_handle_tracker) {
+TEST(test_handle_tracker, aaudio_handle_tracker) {
     const int MAX_HANDLES = 4;
     HandleTracker tracker(MAX_HANDLES);
     handle_tracker_type_t type = 3; // arbitrary generic type
@@ -40,7 +40,7 @@ TEST(test_handle_tracker, oboe_handle_tracker) {
         EXPECT_EQ(nullptr, found);
 
         // create a valid handle and use it to lookup the object again
-        oboe_handle_t dataHandle = tracker.put(type, &data);
+        aaudio_handle_t dataHandle = tracker.put(type, &data);
         ASSERT_TRUE(dataHandle > 0);
         found = tracker.get(type, dataHandle);
         EXPECT_EQ(&data, found);
@@ -61,12 +61,12 @@ TEST(test_handle_tracker, oboe_handle_tracker) {
 }
 
 // Test filling the tracker.
-TEST(test_handle_tracker, oboe_full_up) {
+TEST(test_handle_tracker, aaudio_full_up) {
     const int MAX_HANDLES = 5;
     HandleTracker tracker(MAX_HANDLES);
     handle_tracker_type_t type = 4; // arbitrary generic type
     int data[MAX_HANDLES];
-    oboe_handle_t handles[MAX_HANDLES];
+    aaudio_handle_t handles[MAX_HANDLES];
     handle_tracker_address_t found;
 
     // repeat the test several times to see if it breaks
@@ -81,7 +81,7 @@ TEST(test_handle_tracker, oboe_full_up) {
         }
 
         // Now that it is full, try to add one more.
-        oboe_handle_t handle = tracker.put(type, &data[0]);
+        aaudio_handle_t handle = tracker.put(type, &data[0]);
         EXPECT_TRUE(handle < 0);
 
         for (int i = 0; i < MAX_HANDLES; i++) {

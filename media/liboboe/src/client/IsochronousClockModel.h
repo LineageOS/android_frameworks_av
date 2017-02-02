@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-#ifndef OBOE_ISOCHRONOUSCLOCKMODEL_H
-#define OBOE_ISOCHRONOUSCLOCKMODEL_H
+#ifndef AAUDIO_ISOCHRONOUSCLOCKMODEL_H
+#define AAUDIO_ISOCHRONOUSCLOCKMODEL_H
 
 #include <stdint.h>
-#include <oboe/OboeAudio.h>
+#include <aaudio/AAudio.h>
 
-namespace oboe {
+namespace aaudio {
 
 /**
  * Model an isochronous data stream using occasional timestamps as input.
@@ -34,17 +34,17 @@ public:
     IsochronousClockModel();
     virtual ~IsochronousClockModel();
 
-    void start(oboe_nanoseconds_t nanoTime);
-    void stop(oboe_nanoseconds_t nanoTime);
+    void start(aaudio_nanoseconds_t nanoTime);
+    void stop(aaudio_nanoseconds_t nanoTime);
 
-    void processTimestamp(oboe_position_frames_t framePosition, oboe_nanoseconds_t nanoTime);
+    void processTimestamp(aaudio_position_frames_t framePosition, aaudio_nanoseconds_t nanoTime);
 
     /**
      * @param sampleRate rate of the stream in frames per second
      */
-    void setSampleRate(oboe_sample_rate_t sampleRate);
+    void setSampleRate(aaudio_sample_rate_t sampleRate);
 
-    oboe_sample_rate_t getSampleRate() const {
+    aaudio_sample_rate_t getSampleRate() const {
         return mSampleRate;
     }
 
@@ -53,9 +53,9 @@ public:
      *
      * @param framesPerBurst number of frames that stream advance at one time.
      */
-    void setFramesPerBurst(oboe_size_frames_t framesPerBurst);
+    void setFramesPerBurst(aaudio_size_frames_t framesPerBurst);
 
-    oboe_size_frames_t getFramesPerBurst() const {
+    aaudio_size_frames_t getFramesPerBurst() const {
         return mFramesPerBurst;
     }
 
@@ -65,7 +65,7 @@ public:
      * @param framePosition position of the stream in frames
      * @return time in nanoseconds
      */
-    oboe_nanoseconds_t convertPositionToTime(oboe_position_frames_t framePosition) const;
+    aaudio_nanoseconds_t convertPositionToTime(aaudio_position_frames_t framePosition) const;
 
     /**
      * Calculate an estimated position where the stream will be at the specified time.
@@ -73,19 +73,19 @@ public:
      * @param nanoTime time of interest
      * @return position in frames
      */
-    oboe_position_frames_t convertTimeToPosition(oboe_nanoseconds_t nanoTime) const;
+    aaudio_position_frames_t convertTimeToPosition(aaudio_nanoseconds_t nanoTime) const;
 
     /**
      * @param framesDelta difference in frames
      * @return duration in nanoseconds
      */
-    oboe_nanoseconds_t convertDeltaPositionToTime(oboe_position_frames_t framesDelta) const;
+    aaudio_nanoseconds_t convertDeltaPositionToTime(aaudio_position_frames_t framesDelta) const;
 
     /**
      * @param nanosDelta duration in nanoseconds
      * @return frames that stream will advance in that time
      */
-    oboe_position_frames_t convertDeltaTimeToPosition(oboe_nanoseconds_t nanosDelta) const;
+    aaudio_position_frames_t convertDeltaTimeToPosition(aaudio_nanoseconds_t nanosDelta) const;
 
 private:
     enum clock_model_state_t {
@@ -95,17 +95,17 @@ private:
         STATE_RUNNING
     };
 
-    oboe_sample_rate_t     mSampleRate;
-    oboe_size_frames_t     mFramesPerBurst;
+    aaudio_sample_rate_t     mSampleRate;
+    aaudio_size_frames_t     mFramesPerBurst;
     int32_t                mMaxLatenessInNanos;
-    oboe_position_frames_t mMarkerFramePosition;
-    oboe_nanoseconds_t     mMarkerNanoTime;
+    aaudio_position_frames_t mMarkerFramePosition;
+    aaudio_nanoseconds_t     mMarkerNanoTime;
     int32_t                mTimestampCount;
     clock_model_state_t     mState;
 
     void update();
 };
 
-} /* namespace oboe */
+} /* namespace aaudio */
 
-#endif //OBOE_ISOCHRONOUSCLOCKMODEL_H
+#endif //AAUDIO_ISOCHRONOUSCLOCKMODEL_H

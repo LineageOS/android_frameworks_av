@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef OBOE_SHARED_RINGBUFFER_H
-#define OBOE_SHARED_RINGBUFFER_H
+#ifndef AAUDIO_SHARED_RINGBUFFER_H
+#define AAUDIO_SHARED_RINGBUFFER_H
 
 #include <stdint.h>
 #include <cutils/ashmem.h>
@@ -25,7 +25,7 @@
 #include "RingBufferParcelable.h"
 #include "AudioEndpointParcelable.h"
 
-namespace oboe {
+namespace aaudio {
 
 // Determine the placement of the counters and data in shared memory.
 #define SHARED_RINGBUFFER_READ_OFFSET   0
@@ -41,7 +41,7 @@ public:
 
     virtual ~SharedRingBuffer();
 
-    oboe_result_t allocate(fifo_frames_t bytesPerFrame, fifo_frames_t capacityInFrames);
+    aaudio_result_t allocate(fifo_frames_t bytesPerFrame, fifo_frames_t capacityInFrames);
 
     void fillParcelable(AudioEndpointParcelable &endpointParcelable,
                         RingBufferParcelable &ringBufferParcelable);
@@ -59,6 +59,6 @@ private:
     fifo_frames_t  mCapacityInFrames = 0;
 };
 
-} /* namespace oboe */
+} /* namespace aaudio */
 
-#endif //OBOE_SHARED_RINGBUFFER_H
+#endif //AAUDIO_SHARED_RINGBUFFER_H

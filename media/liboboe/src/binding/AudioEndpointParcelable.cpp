@@ -20,7 +20,7 @@
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
 
-#include "binding/OboeServiceDefinitions.h"
+#include "binding/AAudioServiceDefinitions.h"
 #include "binding/RingBufferParcelable.h"
 #include "binding/AudioEndpointParcelable.h"
 
@@ -29,11 +29,11 @@ using android::status_t;
 using android::Parcel;
 using android::Parcelable;
 
-using namespace oboe;
+using namespace aaudio;
 
 /**
  * Container for information about the message queues plus
- * general stream information needed by Oboe clients.
+ * general stream information needed by AAudio clients.
  * It contains no addresses, just sizes, offsets and file descriptors for
  * shared memory that can be passed through Binder.
  */
@@ -47,7 +47,7 @@ AudioEndpointParcelable::~AudioEndpointParcelable() {}
  */
 int32_t AudioEndpointParcelable::addFileDescriptor(int fd, int32_t sizeInBytes) {
     if (mNumSharedMemories >= MAX_SHARED_MEMORIES) {
-        return OBOE_ERROR_OUT_OF_RANGE;
+        return AAUDIO_ERROR_OUT_OF_RANGE;
     }
     int32_t index = mNumSharedMemories++;
     mSharedMemories[index].setup(fd, sizeInBytes);
@@ -81,45 +81,45 @@ status_t AudioEndpointParcelable::readFromParcel(const Parcel* parcel) {
     return NO_ERROR; // TODO check for errors above
 }
 
-oboe_result_t AudioEndpointParcelable::resolve(EndpointDescriptor *descriptor) {
+aaudio_result_t AudioEndpointParcelable::resolve(EndpointDescriptor *descriptor) {
     // TODO error check
     mUpMessageQueueParcelable.resolve(mSharedMemories, &descriptor->upMessageQueueDescriptor);
     mDownMessageQueueParcelable.resolve(mSharedMemories,
                                         &descriptor->downMessageQueueDescriptor);
     mUpDataQueueParcelable.resolve(mSharedMemories, &descriptor->upDataQueueDescriptor);
     mDownDataQueueParcelable.resolve(mSharedMemories, &descriptor->downDataQueueDescriptor);
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
-oboe_result_t AudioEndpointParcelable::validate() {
-    oboe_result_t result;
+aaudio_result_t AudioEndpointParcelable::validate() {
+    aaudio_result_t result;
     if (mNumSharedMemories < 0 || mNumSharedMemories >= MAX_SHARED_MEMORIES) {
         ALOGE("AudioEndpointParcelable invalid mNumSharedMemories = %d", mNumSharedMemories);
-        return OBOE_ERROR_INTERNAL;
+        return AAUDIO_ERROR_INTERNAL;
     }
     for (int i = 0; i < mNumSharedMemories; i++) {
         result = mSharedMemories[i].validate();
-        if (result != OBOE_OK) {
+        if (result != AAUDIO_OK) {
             return result;
         }
     }
-    if ((result = mUpMessageQueueParcelable.validate()) != OBOE_OK) {
+    if ((result = mUpMessageQueueParcelable.validate()) != AAUDIO_OK) {
         ALOGE("AudioEndpointParcelable invalid mUpMessageQueueParcelable = %d", result);
         return result;
     }
-    if ((result = mDownMessageQueueParcelable.validate()) != OBOE_OK) {
+    if ((result = mDownMessageQueueParcelable.validate()) != AAUDIO_OK) {
         ALOGE("AudioEndpointParcelable invalid mDownMessageQueueParcelable = %d", result);
         return result;
     }
-    if ((result = mUpDataQueueParcelable.validate()) != OBOE_OK) {
+    if ((result = mUpDataQueueParcelable.validate()) != AAUDIO_OK) {
         ALOGE("AudioEndpointParcelable invalid mUpDataQueueParcelable = %d", result);
         return result;
     }
-    if ((result = mDownDataQueueParcelable.validate()) != OBOE_OK) {
+    if ((result = mDownDataQueueParcelable.validate()) != AAUDIO_OK) {
         ALOGE("AudioEndpointParcelable invalid mDownDataQueueParcelable = %d", result);
         return result;
     }
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
 void AudioEndpointParcelable::dump() {

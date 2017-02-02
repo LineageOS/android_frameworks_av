@@ -14,40 +14,38 @@
  * limitations under the License.
  */
 
-#ifndef OBOE_OBOE_SERVICE_H
-#define OBOE_OBOE_SERVICE_H
+#ifndef AAUDIO_AAUDIO_SERVICE_MESSAGE_H
+#define AAUDIO_AAUDIO_SERVICE_MESSAGE_H
 
 #include <stdint.h>
 
-#include <oboe/OboeAudio.h>
+#include <aaudio/AAudioDefinitions.h>
 
-#include "binding/RingBufferParcelable.h"
-
-namespace oboe {
+namespace aaudio {
 
 // TODO move this an "include" folder for the service.
 
-struct OboeMessageTimestamp {
-    oboe_position_frames_t position;
+struct AAudioMessageTimestamp {
+    aaudio_position_frames_t position;
     int64_t                deviceOffset; // add to client position to get device position
-    oboe_nanoseconds_t     timestamp;
+    aaudio_nanoseconds_t     timestamp;
 };
 
-typedef enum oboe_service_event_e : uint32_t {
-    OBOE_SERVICE_EVENT_STARTED,
-    OBOE_SERVICE_EVENT_PAUSED,
-    OBOE_SERVICE_EVENT_FLUSHED,
-    OBOE_SERVICE_EVENT_CLOSED,
-    OBOE_SERVICE_EVENT_DISCONNECTED
-} oboe_service_event_t;
+typedef enum aaudio_service_event_e : uint32_t {
+    AAUDIO_SERVICE_EVENT_STARTED,
+    AAUDIO_SERVICE_EVENT_PAUSED,
+    AAUDIO_SERVICE_EVENT_FLUSHED,
+    AAUDIO_SERVICE_EVENT_CLOSED,
+    AAUDIO_SERVICE_EVENT_DISCONNECTED
+} aaudio_service_event_t;
 
-struct OboeMessageEvent {
-    oboe_service_event_t event;
+struct AAudioMessageEvent {
+    aaudio_service_event_t event;
     int32_t data1;
     int64_t data2;
 };
 
-typedef struct OboeServiceMessage_s {
+typedef struct AAudioServiceMessage_s {
     enum class code : uint32_t {
         NOTHING,
         TIMESTAMP,
@@ -56,12 +54,12 @@ typedef struct OboeServiceMessage_s {
 
     code what;
     union {
-        OboeMessageTimestamp timestamp;
-        OboeMessageEvent event;
+        AAudioMessageTimestamp timestamp;
+        AAudioMessageEvent event;
     };
-} OboeServiceMessage;
+} AAudioServiceMessage;
 
 
-} /* namespace oboe */
+} /* namespace aaudio */
 
-#endif //OBOE_OBOE_SERVICE_H
+#endif //AAUDIO_AAUDIO_SERVICE_MESSAGE_H

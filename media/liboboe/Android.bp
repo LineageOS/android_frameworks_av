@@ -13,11 +13,11 @@
 // limitations under the License.
 
 ndk_headers {
-    name: "libOboe_headers",
+    name: "libAAudio_headers",
     from: "include",
     to: "",
-    srcs: ["include/oboe/*.h"],
-    license: "include/oboe/NOTICE",
+    srcs: ["include/aaudio/*.h"],
+    license: "include/aaudio/NOTICE",
 }
 
 ndk_library {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "OboeAudio"
+#define LOG_TAG "AAudio"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -24,14 +24,14 @@
 #include <binder/IServiceManager.h>
 #include <utils/Mutex.h>
 
-#include <oboe/OboeAudio.h>
+#include <aaudio/AAudio.h>
 
 #include "AudioClock.h"
 #include "AudioEndpointParcelable.h"
-#include "binding/OboeStreamRequest.h"
-#include "binding/OboeStreamConfiguration.h"
-#include "binding/IOboeAudioService.h"
-#include "binding/OboeServiceMessage.h"
+#include "binding/AAudioStreamRequest.h"
+#include "binding/AAudioStreamConfiguration.h"
+#include "binding/IAAudioService.h"
+#include "binding/AAudioServiceMessage.h"
 
 #include "AudioStreamInternal.h"
 
@@ -43,24 +43,24 @@ using android::defaultServiceManager;
 using android::interface_cast;
 using android::Mutex;
 
-using namespace oboe;
+using namespace aaudio;
 
 static android::Mutex gServiceLock;
-static sp<IOboeAudioService>  gOboeService;
+static sp<IAAudioService>  gAAudioService;
 
-#define OBOE_SERVICE_NAME   "OboeAudioService"
+#define AAUDIO_SERVICE_NAME   "AAudioService"
 
-// Helper function to get access to the "OboeAudioService" service.
+// Helper function to get access to the "AAudioService" service.
 // This code was modeled after frameworks/av/media/libaudioclient/AudioSystem.cpp
-static const sp<IOboeAudioService> getOboeAudioService() {
+static const sp<IAAudioService> getAAudioService() {
     sp<IBinder> binder;
     Mutex::Autolock _l(gServiceLock);
-    if (gOboeService == 0) {
+    if (gAAudioService == 0) {
         sp<IServiceManager> sm = defaultServiceManager();
         // Try several times to get the service.
         int retries = 4;
         do {
-            binder = sm->getService(String16(OBOE_SERVICE_NAME)); // This will wait a while.
+            binder = sm->getService(String16(AAUDIO_SERVICE_NAME)); // This will wait a while.
             if (binder != 0) {
                 break;
             }
@@ -69,19 +69,19 @@ static const sp<IOboeAudioService> getOboeAudioService() {
         if (binder != 0) {
             // TODO Add linkToDeath() like in frameworks/av/media/libaudioclient/AudioSystem.cpp
             // TODO Create a DeathRecipient that disconnects all active streams.
-            gOboeService = interface_cast<IOboeAudioService>(binder);
+            gAAudioService = interface_cast<IAAudioService>(binder);
         } else {
-            ALOGE("AudioStreamInternal could not get %s", OBOE_SERVICE_NAME);
+            ALOGE("AudioStreamInternal could not get %s", AAUDIO_SERVICE_NAME);
         }
     }
-    return gOboeService;
+    return gAAudioService;
 }
 
 AudioStreamInternal::AudioStreamInternal()
         : AudioStream()
         , mClockModel()
         , mAudioEndpoint()
-        , mServiceStreamHandle(OBOE_HANDLE_INVALID)
+        , mServiceStreamHandle(AAUDIO_HANDLE_INVALID)
         , mFramesPerBurst(16)
 {
 }
@@ -89,14 +89,14 @@ AudioStreamInternal::AudioStreamInternal()
 AudioStreamInternal::~AudioStreamInternal() {
 }
 
-oboe_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
+aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 
-    const sp<IOboeAudioService>& service = getOboeAudioService();
-    if (service == 0) return OBOE_ERROR_NO_SERVICE;
+    const sp<IAAudioService>& service = getAAudioService();
+    if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
 
-    oboe_result_t result = OBOE_OK;
-    OboeStreamRequest request;
-    OboeStreamConfiguration configuration;
+    aaudio_result_t result = AAUDIO_OK;
+    AAudioStreamRequest request;
+    AAudioStreamConfiguration configuration;
 
     result = AudioStream::open(builder);
     if (result < 0) {
@@ -117,10 +117,10 @@ oboe_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
          (unsigned int)mServiceStreamHandle);
     if (mServiceStreamHandle < 0) {
         result = mServiceStreamHandle;
-        ALOGE("AudioStreamInternal.open(): acquireRealtimeStream oboe_result_t = 0x%08X", result);
+        ALOGE("AudioStreamInternal.open(): acquireRealtimeStream aaudio_result_t = 0x%08X", result);
     } else {
         result = configuration.validate();
-        if (result != OBOE_OK) {
+        if (result != AAUDIO_OK) {
             close();
             return result;
         }
@@ -129,9 +129,9 @@ oboe_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         setSamplesPerFrame(configuration.getSamplesPerFrame());
         setFormat(configuration.getAudioFormat());
 
-        oboe::AudioEndpointParcelable parcelable;
+        aaudio::AudioEndpointParcelable parcelable;
         result = service->getStreamDescription(mServiceStreamHandle, parcelable);
-        if (result != OBOE_OK) {
+        if (result != AAUDIO_OK) {
             ALOGE("AudioStreamInternal.open(): getStreamDescriptor returns %d", result);
             service->closeStream(mServiceStreamHandle);
             return result;
@@ -150,143 +150,143 @@ oboe_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         mClockModel.setSampleRate(getSampleRate());
         mClockModel.setFramesPerBurst(mFramesPerBurst);
 
-        setState(OBOE_STREAM_STATE_OPEN);
+        setState(AAUDIO_STREAM_STATE_OPEN);
     }
     return result;
 }
 
-oboe_result_t AudioStreamInternal::close() {
+aaudio_result_t AudioStreamInternal::close() {
     ALOGD("AudioStreamInternal.close(): mServiceStreamHandle = 0x%08X", mServiceStreamHandle);
-    if (mServiceStreamHandle != OBOE_HANDLE_INVALID) {
-        oboe_handle_t serviceStreamHandle = mServiceStreamHandle;
-        mServiceStreamHandle = OBOE_HANDLE_INVALID;
-        const sp<IOboeAudioService>& oboeService = getOboeAudioService();
-        if (oboeService == 0) return OBOE_ERROR_NO_SERVICE;
-        oboeService->closeStream(serviceStreamHandle);
-        return OBOE_OK;
+    if (mServiceStreamHandle != AAUDIO_HANDLE_INVALID) {
+        aaudio_handle_t serviceStreamHandle = mServiceStreamHandle;
+        mServiceStreamHandle = AAUDIO_HANDLE_INVALID;
+        const sp<IAAudioService>& aaudioService = getAAudioService();
+        if (aaudioService == 0) return AAUDIO_ERROR_NO_SERVICE;
+        aaudioService->closeStream(serviceStreamHandle);
+        return AAUDIO_OK;
     } else {
-        return OBOE_ERROR_INVALID_HANDLE;
+        return AAUDIO_ERROR_INVALID_HANDLE;
     }
 }
 
-oboe_result_t AudioStreamInternal::requestStart()
+aaudio_result_t AudioStreamInternal::requestStart()
 {
-    oboe_nanoseconds_t startTime;
+    aaudio_nanoseconds_t startTime;
     ALOGD("AudioStreamInternal(): start()");
-    if (mServiceStreamHandle == OBOE_HANDLE_INVALID) {
-        return OBOE_ERROR_INVALID_STATE;
+    if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
+        return AAUDIO_ERROR_INVALID_STATE;
     }
-    const sp<IOboeAudioService>& oboeService = getOboeAudioService();
-    if (oboeService == 0) return OBOE_ERROR_NO_SERVICE;
-    startTime = Oboe_getNanoseconds(OBOE_CLOCK_MONOTONIC);
+    const sp<IAAudioService>& aaudioService = getAAudioService();
+    if (aaudioService == 0) return AAUDIO_ERROR_NO_SERVICE;
+    startTime = AAudio_getNanoseconds(AAUDIO_CLOCK_MONOTONIC);
     mClockModel.start(startTime);
     processTimestamp(0, startTime);
-    setState(OBOE_STREAM_STATE_STARTING);
-    return oboeService->startStream(mServiceStreamHandle);
+    setState(AAUDIO_STREAM_STATE_STARTING);
+    return aaudioService->startStream(mServiceStreamHandle);
 }
 
-oboe_result_t AudioStreamInternal::requestPause()
+aaudio_result_t AudioStreamInternal::requestPause()
 {
     ALOGD("AudioStreamInternal(): pause()");
-    if (mServiceStreamHandle == OBOE_HANDLE_INVALID) {
-        return OBOE_ERROR_INVALID_STATE;
+    if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
+        return AAUDIO_ERROR_INVALID_STATE;
     }
-    const sp<IOboeAudioService>& oboeService = getOboeAudioService();
-    if (oboeService == 0) return OBOE_ERROR_NO_SERVICE;
-    mClockModel.stop(Oboe_getNanoseconds(OBOE_CLOCK_MONOTONIC));
-    setState(OBOE_STREAM_STATE_PAUSING);
-    return oboeService->pauseStream(mServiceStreamHandle);
+    const sp<IAAudioService>& aaudioService = getAAudioService();
+    if (aaudioService == 0) return AAUDIO_ERROR_NO_SERVICE;
+    mClockModel.stop(AAudio_getNanoseconds(AAUDIO_CLOCK_MONOTONIC));
+    setState(AAUDIO_STREAM_STATE_PAUSING);
+    return aaudioService->pauseStream(mServiceStreamHandle);
 }
 
-oboe_result_t AudioStreamInternal::requestFlush() {
+aaudio_result_t AudioStreamInternal::requestFlush() {
     ALOGD("AudioStreamInternal(): flush()");
-    if (mServiceStreamHandle == OBOE_HANDLE_INVALID) {
-        return OBOE_ERROR_INVALID_STATE;
+    if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
+        return AAUDIO_ERROR_INVALID_STATE;
     }
-    const sp<IOboeAudioService>& oboeService = getOboeAudioService();
-    if (oboeService == 0) return OBOE_ERROR_NO_SERVICE;
-setState(OBOE_STREAM_STATE_FLUSHING);
-    return oboeService->flushStream(mServiceStreamHandle);
+    const sp<IAAudioService>& aaudioService = getAAudioService();
+    if (aaudioService == 0) return AAUDIO_ERROR_NO_SERVICE;
+setState(AAUDIO_STREAM_STATE_FLUSHING);
+    return aaudioService->flushStream(mServiceStreamHandle);
 }
 
 void AudioStreamInternal::onFlushFromServer() {
     ALOGD("AudioStreamInternal(): onFlushFromServer()");
-    oboe_position_frames_t readCounter = mAudioEndpoint.getDownDataReadCounter();
-    oboe_position_frames_t writeCounter = mAudioEndpoint.getDownDataWriteCounter();
+    aaudio_position_frames_t readCounter = mAudioEndpoint.getDownDataReadCounter();
+    aaudio_position_frames_t writeCounter = mAudioEndpoint.getDownDataWriteCounter();
     // Bump offset so caller does not see the retrograde motion in getFramesRead().
-    oboe_position_frames_t framesFlushed = writeCounter - readCounter;
+    aaudio_position_frames_t framesFlushed = writeCounter - readCounter;
     mFramesOffsetFromService += framesFlushed;
     // Flush written frames by forcing writeCounter to readCounter.
     // This is because we cannot move the read counter in the hardware.
     mAudioEndpoint.setDownDataWriteCounter(readCounter);
 }
 
-oboe_result_t AudioStreamInternal::requestStop()
+aaudio_result_t AudioStreamInternal::requestStop()
 {
     // TODO better implementation of requestStop()
-    oboe_result_t result = requestPause();
-    if (result == OBOE_OK) {
-        oboe_stream_state_t state;
-        result = waitForStateChange(OBOE_STREAM_STATE_PAUSING,
+    aaudio_result_t result = requestPause();
+    if (result == AAUDIO_OK) {
+        aaudio_stream_state_t state;
+        result = waitForStateChange(AAUDIO_STREAM_STATE_PAUSING,
                                     &state,
-                                    500 * OBOE_NANOS_PER_MILLISECOND);// TODO temporary code
-        if (result == OBOE_OK) {
+                                    500 * AAUDIO_NANOS_PER_MILLISECOND);// TODO temporary code
+        if (result == AAUDIO_OK) {
             result = requestFlush();
         }
     }
     return result;
 }
 
-oboe_result_t AudioStreamInternal::registerThread() {
+aaudio_result_t AudioStreamInternal::registerThread() {
     ALOGD("AudioStreamInternal(): registerThread()");
-    if (mServiceStreamHandle == OBOE_HANDLE_INVALID) {
-        return OBOE_ERROR_INVALID_STATE;
+    if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
+        return AAUDIO_ERROR_INVALID_STATE;
     }
-    const sp<IOboeAudioService>& oboeService = getOboeAudioService();
-    if (oboeService == 0) return OBOE_ERROR_NO_SERVICE;
-    return oboeService->registerAudioThread(mServiceStreamHandle,
+    const sp<IAAudioService>& aaudioService = getAAudioService();
+    if (aaudioService == 0) return AAUDIO_ERROR_NO_SERVICE;
+    return aaudioService->registerAudioThread(mServiceStreamHandle,
                                          gettid(),
                                          getPeriodNanoseconds());
 }
 
-oboe_result_t AudioStreamInternal::unregisterThread() {
+aaudio_result_t AudioStreamInternal::unregisterThread() {
     ALOGD("AudioStreamInternal(): unregisterThread()");
-    if (mServiceStreamHandle == OBOE_HANDLE_INVALID) {
-        return OBOE_ERROR_INVALID_STATE;
+    if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
+        return AAUDIO_ERROR_INVALID_STATE;
     }
-    const sp<IOboeAudioService>& oboeService = getOboeAudioService();
-    if (oboeService == 0) return OBOE_ERROR_NO_SERVICE;
-    return oboeService->unregisterAudioThread(mServiceStreamHandle, gettid());
+    const sp<IAAudioService>& aaudioService = getAAudioService();
+    if (aaudioService == 0) return AAUDIO_ERROR_NO_SERVICE;
+    return aaudioService->unregisterAudioThread(mServiceStreamHandle, gettid());
 }
 
-// TODO use oboe_clockid_t all the way down to AudioClock
-oboe_result_t AudioStreamInternal::getTimestamp(clockid_t clockId,
-                           oboe_position_frames_t *framePosition,
-                           oboe_nanoseconds_t *timeNanoseconds) {
+// TODO use aaudio_clockid_t all the way down to AudioClock
+aaudio_result_t AudioStreamInternal::getTimestamp(clockid_t clockId,
+                           aaudio_position_frames_t *framePosition,
+                           aaudio_nanoseconds_t *timeNanoseconds) {
 // TODO implement using real HAL
-    oboe_nanoseconds_t time = AudioClock::getNanoseconds();
+    aaudio_nanoseconds_t time = AudioClock::getNanoseconds();
     *framePosition = mClockModel.convertTimeToPosition(time);
-    *timeNanoseconds = time + (10 * OBOE_NANOS_PER_MILLISECOND); // Fake hardware delay
-    return OBOE_OK;
+    *timeNanoseconds = time + (10 * AAUDIO_NANOS_PER_MILLISECOND); // Fake hardware delay
+    return AAUDIO_OK;
 }
 
-oboe_result_t AudioStreamInternal::updateState() {
+aaudio_result_t AudioStreamInternal::updateState() {
     return processCommands();
 }
 
 #if LOG_TIMESTAMPS
-static void AudioStreamInternal_LogTimestamp(OboeServiceMessage &command) {
+static void AudioStreamInternal_LogTimestamp(AAudioServiceMessage &command) {
     static int64_t oldPosition = 0;
-    static oboe_nanoseconds_t oldTime = 0;
+    static aaudio_nanoseconds_t oldTime = 0;
     int64_t framePosition = command.timestamp.position;
-    oboe_nanoseconds_t nanoTime = command.timestamp.timestamp;
+    aaudio_nanoseconds_t nanoTime = command.timestamp.timestamp;
     ALOGD("AudioStreamInternal() timestamp says framePosition = %08lld at nanoTime %llu",
          (long long) framePosition,
          (long long) nanoTime);
     int64_t nanosDelta = nanoTime - oldTime;
     if (nanosDelta > 0 && oldTime > 0) {
         int64_t framesDelta = framePosition - oldPosition;
-        int64_t rate = (framesDelta * OBOE_NANOS_PER_SECOND) / nanosDelta;
+        int64_t rate = (framesDelta * AAUDIO_NANOS_PER_SECOND) / nanosDelta;
         ALOGD("AudioStreamInternal() - framesDelta = %08lld", (long long) framesDelta);
         ALOGD("AudioStreamInternal() - nanosDelta = %08lld", (long long) nanosDelta);
         ALOGD("AudioStreamInternal() - measured rate = %llu", (unsigned long long) rate);
@@ -296,40 +296,40 @@ static void AudioStreamInternal_LogTimestamp(OboeServiceMessage &command) {
 }
 #endif
 
-oboe_result_t AudioStreamInternal::onTimestampFromServer(OboeServiceMessage *message) {
-    oboe_position_frames_t framePosition = 0;
+aaudio_result_t AudioStreamInternal::onTimestampFromServer(AAudioServiceMessage *message) {
+    aaudio_position_frames_t framePosition = 0;
 #if LOG_TIMESTAMPS
     AudioStreamInternal_LogTimestamp(command);
 #endif
     framePosition = message->timestamp.position;
     processTimestamp(framePosition, message->timestamp.timestamp);
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
-oboe_result_t AudioStreamInternal::onEventFromServer(OboeServiceMessage *message) {
-    oboe_result_t result = OBOE_OK;
+aaudio_result_t AudioStreamInternal::onEventFromServer(AAudioServiceMessage *message) {
+    aaudio_result_t result = AAUDIO_OK;
     ALOGD("processCommands() got event %d", message->event.event);
     switch (message->event.event) {
-        case OBOE_SERVICE_EVENT_STARTED:
-            ALOGD("processCommands() got OBOE_SERVICE_EVENT_STARTED");
-            setState(OBOE_STREAM_STATE_STARTED);
+        case AAUDIO_SERVICE_EVENT_STARTED:
+            ALOGD("processCommands() got AAUDIO_SERVICE_EVENT_STARTED");
+            setState(AAUDIO_STREAM_STATE_STARTED);
             break;
-        case OBOE_SERVICE_EVENT_PAUSED:
-            ALOGD("processCommands() got OBOE_SERVICE_EVENT_PAUSED");
-            setState(OBOE_STREAM_STATE_PAUSED);
+        case AAUDIO_SERVICE_EVENT_PAUSED:
+            ALOGD("processCommands() got AAUDIO_SERVICE_EVENT_PAUSED");
+            setState(AAUDIO_STREAM_STATE_PAUSED);
             break;
-        case OBOE_SERVICE_EVENT_FLUSHED:
-            ALOGD("processCommands() got OBOE_SERVICE_EVENT_FLUSHED");
-            setState(OBOE_STREAM_STATE_FLUSHED);
+        case AAUDIO_SERVICE_EVENT_FLUSHED:
+            ALOGD("processCommands() got AAUDIO_SERVICE_EVENT_FLUSHED");
+            setState(AAUDIO_STREAM_STATE_FLUSHED);
             onFlushFromServer();
             break;
-        case OBOE_SERVICE_EVENT_CLOSED:
-            ALOGD("processCommands() got OBOE_SERVICE_EVENT_CLOSED");
-            setState(OBOE_STREAM_STATE_CLOSED);
+        case AAUDIO_SERVICE_EVENT_CLOSED:
+            ALOGD("processCommands() got AAUDIO_SERVICE_EVENT_CLOSED");
+            setState(AAUDIO_STREAM_STATE_CLOSED);
             break;
-        case OBOE_SERVICE_EVENT_DISCONNECTED:
-            result = OBOE_ERROR_DISCONNECTED;
-            ALOGW("WARNING - processCommands() OBOE_SERVICE_EVENT_DISCONNECTED");
+        case AAUDIO_SERVICE_EVENT_DISCONNECTED:
+            result = AAUDIO_ERROR_DISCONNECTED;
+            ALOGW("WARNING - processCommands() AAUDIO_SERVICE_EVENT_DISCONNECTED");
             break;
         default:
             ALOGW("WARNING - processCommands() Unrecognized event = %d",
@@ -340,27 +340,27 @@ oboe_result_t AudioStreamInternal::onEventFromServer(OboeServiceMessage *message
 }
 
 // Process all the commands coming from the server.
-oboe_result_t AudioStreamInternal::processCommands() {
-    oboe_result_t result = OBOE_OK;
+aaudio_result_t AudioStreamInternal::processCommands() {
+    aaudio_result_t result = AAUDIO_OK;
 
-    while (result == OBOE_OK) {
-        OboeServiceMessage message;
+    while (result == AAUDIO_OK) {
+        AAudioServiceMessage message;
         if (mAudioEndpoint.readUpCommand(&message) != 1) {
             break; // no command this time, no problem
         }
         switch (message.what) {
-        case OboeServiceMessage::code::TIMESTAMP:
+        case AAudioServiceMessage::code::TIMESTAMP:
             result = onTimestampFromServer(&message);
             break;
 
-        case OboeServiceMessage::code::EVENT:
+        case AAudioServiceMessage::code::EVENT:
             result = onEventFromServer(&message);
             break;
 
         default:
             ALOGW("WARNING - AudioStreamInternal::processCommands() Unrecognized what = %d",
                  (int) message.what);
-            result = OBOE_ERROR_UNEXPECTED_VALUE;
+            result = AAUDIO_ERROR_UNEXPECTED_VALUE;
             break;
         }
     }
@@ -368,13 +368,13 @@ oboe_result_t AudioStreamInternal::processCommands() {
 }
 
 // Write the data, block if needed and timeoutMillis > 0
-oboe_result_t AudioStreamInternal::write(const void *buffer, int32_t numFrames,
-                                         oboe_nanoseconds_t timeoutNanoseconds)
+aaudio_result_t AudioStreamInternal::write(const void *buffer, int32_t numFrames,
+                                         aaudio_nanoseconds_t timeoutNanoseconds)
 {
-    oboe_result_t result = OBOE_OK;
+    aaudio_result_t result = AAUDIO_OK;
     uint8_t* source = (uint8_t*)buffer;
-    oboe_nanoseconds_t currentTimeNanos = AudioClock::getNanoseconds();
-    oboe_nanoseconds_t deadlineNanos = currentTimeNanos + timeoutNanoseconds;
+    aaudio_nanoseconds_t currentTimeNanos = AudioClock::getNanoseconds();
+    aaudio_nanoseconds_t deadlineNanos = currentTimeNanos + timeoutNanoseconds;
     int32_t framesLeft = numFrames;
 //    ALOGD("AudioStreamInternal::write(%p, %d) at time %08llu , mState = %d ------------------",
 //         buffer, numFrames, (unsigned long long) currentTimeNanos, mState);
@@ -382,8 +382,8 @@ oboe_result_t AudioStreamInternal::write(const void *buffer, int32_t numFrames,
     // Write until all the data has been written or until a timeout occurs.
     while (framesLeft > 0) {
         // The call to writeNow() will not block. It will just write as much as it can.
-        oboe_nanoseconds_t wakeTimeNanos = 0;
-        oboe_result_t framesWritten = writeNow(source, framesLeft,
+        aaudio_nanoseconds_t wakeTimeNanos = 0;
+        aaudio_result_t framesWritten = writeNow(source, framesLeft,
                                                currentTimeNanos, &wakeTimeNanos);
 //        ALOGD("AudioStreamInternal::write() writeNow() framesLeft = %d --> framesWritten = %d", framesLeft, framesWritten);
         if (framesWritten < 0) {
@@ -420,11 +420,11 @@ oboe_result_t AudioStreamInternal::write(const void *buffer, int32_t numFrames,
 }
 
 // Write as much data as we can without blocking.
-oboe_result_t AudioStreamInternal::writeNow(const void *buffer, int32_t numFrames,
-                                         oboe_nanoseconds_t currentNanoTime, oboe_nanoseconds_t *wakeTimePtr) {
+aaudio_result_t AudioStreamInternal::writeNow(const void *buffer, int32_t numFrames,
+                                         aaudio_nanoseconds_t currentNanoTime, aaudio_nanoseconds_t *wakeTimePtr) {
     {
-        oboe_result_t result = processCommands();
-        if (result != OBOE_OK) {
+        aaudio_result_t result = processCommands();
+        if (result != AAUDIO_OK) {
             return result;
         }
     }
@@ -451,16 +451,16 @@ oboe_result_t AudioStreamInternal::writeNow(const void *buffer, int32_t numFrame
     // Calculate an ideal time to wake up.
     if (wakeTimePtr != nullptr && framesWritten >= 0) {
         // By default wake up a few milliseconds from now.  // TODO review
-        oboe_nanoseconds_t wakeTime = currentNanoTime + (2 * OBOE_NANOS_PER_MILLISECOND);
+        aaudio_nanoseconds_t wakeTime = currentNanoTime + (2 * AAUDIO_NANOS_PER_MILLISECOND);
         switch (getState()) {
-            case OBOE_STREAM_STATE_OPEN:
-            case OBOE_STREAM_STATE_STARTING:
+            case AAUDIO_STREAM_STATE_OPEN:
+            case AAUDIO_STREAM_STATE_STARTING:
                 if (framesWritten != 0) {
                     // Don't wait to write more data. Just prime the buffer.
                     wakeTime = currentNanoTime;
                 }
                 break;
-            case OBOE_STREAM_STATE_STARTED:   // When do we expect the next read burst to occur?
+            case AAUDIO_STREAM_STATE_STARTED:   // When do we expect the next read burst to occur?
                 {
                     uint32_t burstSize = mFramesPerBurst;
                     if (burstSize < 32) {
@@ -484,19 +484,19 @@ oboe_result_t AudioStreamInternal::writeNow(const void *buffer, int32_t numFrame
     return framesWritten;
 }
 
-oboe_result_t AudioStreamInternal::waitForStateChange(oboe_stream_state_t currentState,
-                                                      oboe_stream_state_t *nextState,
-                                                      oboe_nanoseconds_t timeoutNanoseconds)
+aaudio_result_t AudioStreamInternal::waitForStateChange(aaudio_stream_state_t currentState,
+                                                      aaudio_stream_state_t *nextState,
+                                                      aaudio_nanoseconds_t timeoutNanoseconds)
 
 {
-    oboe_result_t result = processCommands();
+    aaudio_result_t result = processCommands();
 //    ALOGD("AudioStreamInternal::waitForStateChange() - processCommands() returned %d", result);
-    if (result != OBOE_OK) {
+    if (result != AAUDIO_OK) {
         return result;
     }
     // TODO replace this polling with a timed sleep on a futex on the message queue
-    int32_t durationNanos = 5 * OBOE_NANOS_PER_MILLISECOND;
-    oboe_stream_state_t state = getState();
+    int32_t durationNanos = 5 * AAUDIO_NANOS_PER_MILLISECOND;
+    aaudio_stream_state_t state = getState();
 //    ALOGD("AudioStreamInternal::waitForStateChange() - state = %d", state);
     while (state == currentState && timeoutNanoseconds > 0) {
         // TODO use futex from service message queue
@@ -507,7 +507,7 @@ oboe_result_t AudioStreamInternal::waitForStateChange(oboe_stream_state_t curren
         timeoutNanoseconds -= durationNanos;
 
         result = processCommands();
-        if (result != OBOE_OK) {
+        if (result != AAUDIO_OK) {
             return result;
         }
 
@@ -517,37 +517,37 @@ oboe_result_t AudioStreamInternal::waitForStateChange(oboe_stream_state_t curren
     if (nextState != nullptr) {
         *nextState = state;
     }
-    return (state == currentState) ? OBOE_ERROR_TIMEOUT : OBOE_OK;
+    return (state == currentState) ? AAUDIO_ERROR_TIMEOUT : AAUDIO_OK;
 }
 
 
-void AudioStreamInternal::processTimestamp(uint64_t position, oboe_nanoseconds_t time) {
+void AudioStreamInternal::processTimestamp(uint64_t position, aaudio_nanoseconds_t time) {
     mClockModel.processTimestamp( position, time);
 }
 
-oboe_result_t AudioStreamInternal::setBufferSize(oboe_size_frames_t requestedFrames,
-                                        oboe_size_frames_t *actualFrames) {
+aaudio_result_t AudioStreamInternal::setBufferSize(aaudio_size_frames_t requestedFrames,
+                                        aaudio_size_frames_t *actualFrames) {
     return mAudioEndpoint.setBufferSizeInFrames(requestedFrames, actualFrames);
 }
 
-oboe_size_frames_t AudioStreamInternal::getBufferSize() const
+aaudio_size_frames_t AudioStreamInternal::getBufferSize() const
 {
     return mAudioEndpoint.getBufferSizeInFrames();
 }
 
-oboe_size_frames_t AudioStreamInternal::getBufferCapacity() const
+aaudio_size_frames_t AudioStreamInternal::getBufferCapacity() const
 {
     return mAudioEndpoint.getBufferCapacityInFrames();
 }
 
-oboe_size_frames_t AudioStreamInternal::getFramesPerBurst() const
+aaudio_size_frames_t AudioStreamInternal::getFramesPerBurst() const
 {
     return mEndpointDescriptor.downDataQueueDescriptor.framesPerBurst;
 }
 
-oboe_position_frames_t AudioStreamInternal::getFramesRead()
+aaudio_position_frames_t AudioStreamInternal::getFramesRead()
 {
-    oboe_position_frames_t framesRead =
+    aaudio_position_frames_t framesRead =
             mClockModel.convertTimeToPosition(AudioClock::getNanoseconds())
             + mFramesOffsetFromService;
     // Prevent retrograde motion.

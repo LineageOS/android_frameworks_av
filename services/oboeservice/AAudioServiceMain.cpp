@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "OboeService"
+#define LOG_TAG "AAudioService"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -33,26 +33,26 @@
 #include <cutils/ashmem.h>
 #include <sys/mman.h>
 
-#include "OboeService.h"
-#include "IOboeAudioService.h"
-#include "OboeAudioService.h"
+#include "AAudioServiceDefinitions.h"
+#include "IAAudioService.h"
+#include "AAudioService.h"
 
 using namespace android;
-using namespace oboe;
+using namespace aaudio;
 
 /**
- * This is used to test the OboeService as a standalone application.
- * It is not used when the OboeService is integrated with AudioFlinger.
+ * This is used to test the AAudioService as a standalone application.
+ * It is not used when the AAudioService is integrated with AudioFlinger.
  */
 int main(int argc, char **argv) {
-    printf("Test OboeService %s\n", argv[1]);
-    ALOGD("This is the OboeAudioService");
+    printf("Test AAudioService %s\n", argv[1]);
+    ALOGD("This is the AAudioService");
 
-    defaultServiceManager()->addService(String16("OboeAudioService"), new OboeAudioService());
+    defaultServiceManager()->addService(String16("AAudioService"), new AAudioService());
     android::ProcessState::self()->startThreadPool();
-    printf("OboeAudioService service is now ready\n");
+    printf("AAudioService service is now ready\n");
     IPCThreadState::self()->joinThreadPool();
-    printf("OboeAudioService service thread joined\n");
+    printf("AAudioService service thread joined\n");
 
     return 0;
 }

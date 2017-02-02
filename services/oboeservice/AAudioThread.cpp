@@ -14,25 +14,25 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "OboeService"
+#define LOG_TAG "AAudioService"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
 #include <pthread.h>
 
-#include <oboe/OboeDefinitions.h>
+#include <aaudio/AAudioDefinitions.h>
 
-#include "OboeThread.h"
+#include "AAudioThread.h"
 
-using namespace oboe;
+using namespace aaudio;
 
 
-OboeThread::OboeThread() {
+AAudioThread::AAudioThread() {
     // mThread is a pthread_t of unknown size so we need memset.
     memset(&mThread, 0, sizeof(mThread));
 }
 
-void OboeThread::dispatch() {
+void AAudioThread::dispatch() {
     if (mRunnable != nullptr) {
         mRunnable->run();
     } else {
@@ -42,35 +42,35 @@ void OboeThread::dispatch() {
 
 // This is the entry point for the new thread created by createThread().
 // It converts the 'C' function call to a C++ method call.
-static void * OboeThread_internalThreadProc(void *arg) {
-    OboeThread *oboeThread = (OboeThread *) arg;
-    oboeThread->dispatch();
+static void * AAudioThread_internalThreadProc(void *arg) {
+    AAudioThread *aaudioThread = (AAudioThread *) arg;
+    aaudioThread->dispatch();
     return nullptr;
 }
 
-oboe_result_t OboeThread::start(Runnable *runnable) {
+aaudio_result_t AAudioThread::start(Runnable *runnable) {
     if (mHasThread) {
-        return OBOE_ERROR_INVALID_STATE;
+        return AAUDIO_ERROR_INVALID_STATE;
     }
     mRunnable = runnable; // TODO use atomic?
-    int err = pthread_create(&mThread, nullptr, OboeThread_internalThreadProc, this);
+    int err = pthread_create(&mThread, nullptr, AAudioThread_internalThreadProc, this);
     if (err != 0) {
-        ALOGE("OboeThread::pthread_create() returned %d", err);
-        // TODO convert errno to oboe_result_t
-        return OBOE_ERROR_INTERNAL;
+        ALOGE("AAudioThread::pthread_create() returned %d", err);
+        // TODO convert errno to aaudio_result_t
+        return AAUDIO_ERROR_INTERNAL;
     } else {
         mHasThread = true;
-        return OBOE_OK;
+        return AAUDIO_OK;
     }
 }
 
-oboe_result_t OboeThread::stop() {
+aaudio_result_t AAudioThread::stop() {
     if (!mHasThread) {
-        return OBOE_ERROR_INVALID_STATE;
+        return AAUDIO_ERROR_INVALID_STATE;
     }
     int err = pthread_join(mThread, nullptr);
     mHasThread = false;
-    // TODO convert errno to oboe_result_t
-    return err ? OBOE_ERROR_INTERNAL : OBOE_OK;
+    // TODO convert errno to aaudio_result_t
+    return err ? AAUDIO_ERROR_INTERNAL : AAUDIO_OK;
 }
 

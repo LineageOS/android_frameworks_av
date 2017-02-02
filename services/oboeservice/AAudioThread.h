@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#ifndef OBOE_THREAD_H
-#define OBOE_THREAD_H
+#ifndef AAUDIO_THREAD_H
+#define AAUDIO_THREAD_H
 
 #include <atomic>
 #include <pthread.h>
 
-#include <oboe/OboeDefinitions.h>
+#include <aaudio/AAudioDefinitions.h>
 
-namespace oboe {
+namespace aaudio {
 
 class Runnable {
 public:
@@ -35,23 +35,23 @@ public:
 /**
  * Abstraction for a host thread.
  */
-class OboeThread
+class AAudioThread
 {
 public:
-    OboeThread();
-    OboeThread(Runnable *runnable);
-    virtual ~OboeThread() = default;
+    AAudioThread();
+    AAudioThread(Runnable *runnable);
+    virtual ~AAudioThread() = default;
 
     /**
      * Start the thread running.
      */
-    oboe_result_t start(Runnable *runnable = nullptr);
+    aaudio_result_t start(Runnable *runnable = nullptr);
 
     /**
      * Join the thread.
      * The caller must somehow tell the thread to exit before calling join().
      */
-    oboe_result_t stop();
+    aaudio_result_t stop();
 
     /**
      * This will get called in the thread.
@@ -68,6 +68,6 @@ private:
 
 };
 
-} /* namespace oboe */
+} /* namespace aaudio */
 
-#endif ///OBOE_THREAD_H
+#endif ///AAUDIO_THREAD_H

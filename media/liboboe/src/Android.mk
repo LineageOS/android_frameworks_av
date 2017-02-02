@@ -1,15 +1,15 @@
 LOCAL_PATH:= $(call my-dir)
 
 # ======================= STATIC LIBRARY ==========================
-# This is being built because it make Oboe testing very easy with a complete executable.
+# This is being built because it make AAudio testing very easy with a complete executable.
 # TODO Remove this target later, when not needed.
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := liboboe
 LOCAL_MODULE_TAGS := optional
 
-LIBOBOE_DIR := $(TOP)/frameworks/av/media/liboboe
-LIBOBOE_SRC_DIR := $(LIBOBOE_DIR)/src
+LIBAAUDIO_DIR := $(TOP)/frameworks/av/media/liboboe
+LIBAAUDIO_SRC_DIR := $(LIBAAUDIO_DIR)/src
 
 LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils) \
@@ -29,11 +29,11 @@ LOCAL_C_INCLUDES := \
 LOCAL_SRC_FILES = \
     core/AudioStream.cpp \
     core/AudioStreamBuilder.cpp \
-    core/OboeAudio.cpp \
+    core/AAudioAudio.cpp \
     legacy/AudioStreamRecord.cpp \
     legacy/AudioStreamTrack.cpp \
     utility/HandleTracker.cpp \
-    utility/OboeUtilities.cpp \
+    utility/AAudioUtilities.cpp \
     fifo/FifoBuffer.cpp \
     fifo/FifoControllerBase.cpp \
     client/AudioEndpoint.cpp \
@@ -43,16 +43,16 @@ LOCAL_SRC_FILES = \
     binding/SharedRegionParcelable.cpp \
     binding/RingBufferParcelable.cpp \
     binding/AudioEndpointParcelable.cpp \
-    binding/OboeStreamRequest.cpp \
-    binding/OboeStreamConfiguration.cpp \
-    binding/IOboeAudioService.cpp
+    binding/AAudioStreamRequest.cpp \
+    binding/AAudioStreamConfiguration.cpp \
+    binding/IAAudioService.cpp
 
 LOCAL_CFLAGS += -Wno-unused-parameter -Wall -Werror
 
 # By default, all symbols are hidden.
 # LOCAL_CFLAGS += -fvisibility=hidden
-# OBOE_API is used to explicitly export a function or a variable as a visible symbol.
-LOCAL_CFLAGS += -DOBOE_API='__attribute__((visibility("default")))'
+# AAUDIO_API is used to explicitly export a function or a variable as a visible symbol.
+LOCAL_CFLAGS += -DAAUDIO_API='__attribute__((visibility("default")))'
 
 include $(BUILD_STATIC_LIBRARY)
 
@@ -78,11 +78,11 @@ LOCAL_C_INCLUDES := \
 
 LOCAL_SRC_FILES = core/AudioStream.cpp \
     core/AudioStreamBuilder.cpp \
-    core/OboeAudio.cpp \
+    core/AAudioAudio.cpp \
     legacy/AudioStreamRecord.cpp \
     legacy/AudioStreamTrack.cpp \
     utility/HandleTracker.cpp \
-    utility/OboeUtilities.cpp \
+    utility/AAudioUtilities.cpp \
     fifo/FifoBuffer.cpp \
     fifo/FifoControllerBase.cpp \
     client/AudioEndpoint.cpp \
@@ -92,16 +92,16 @@ LOCAL_SRC_FILES = core/AudioStream.cpp \
     binding/SharedRegionParcelable.cpp \
     binding/RingBufferParcelable.cpp \
     binding/AudioEndpointParcelable.cpp \
-    binding/OboeStreamRequest.cpp \
-    binding/OboeStreamConfiguration.cpp \
-    binding/IOboeAudioService.cpp
+    binding/AAudioStreamRequest.cpp \
+    binding/AAudioStreamConfiguration.cpp \
+    binding/IAAudioService.cpp
 
 LOCAL_CFLAGS += -Wno-unused-parameter -Wall -Werror
 
 # By default, all symbols are hidden.
 # LOCAL_CFLAGS += -fvisibility=hidden
-# OBOE_API is used to explicitly export a function or a variable as a visible symbol.
-LOCAL_CFLAGS += -DOBOE_API='__attribute__((visibility("default")))'
+# AAUDIO_API is used to explicitly export a function or a variable as a visible symbol.
+LOCAL_CFLAGS += -DAAUDIO_API='__attribute__((visibility("default")))'
 
 LOCAL_SHARED_LIBRARIES := libaudioclient liblog libcutils libutils libbinder
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "OboeService"
+#define LOG_TAG "AAudioService"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -23,13 +23,13 @@
 #include "AudioClock.h"
 #include "AudioEndpointParcelable.h"
 
-#include "OboeServiceStreamBase.h"
-#include "OboeServiceStreamFakeHal.h"
+#include "AAudioServiceStreamBase.h"
+#include "AAudioServiceStreamFakeHal.h"
 
 #include "FakeAudioHal.h"
 
 using namespace android;
-using namespace oboe;
+using namespace aaudio;
 
 // HACK values for Marlin
 #define CARD_ID              0
@@ -39,24 +39,24 @@ using namespace oboe;
  * Construct the audio message queuues and message queues.
  */
 
-OboeServiceStreamFakeHal::OboeServiceStreamFakeHal()
-        : OboeServiceStreamBase()
+AAudioServiceStreamFakeHal::AAudioServiceStreamFakeHal()
+        : AAudioServiceStreamBase()
         , mStreamId(nullptr)
         , mPreviousFrameCounter(0)
-        , mOboeThread()
+        , mAAudioThread()
 {
 }
 
-OboeServiceStreamFakeHal::~OboeServiceStreamFakeHal() {
-    ALOGD("OboeServiceStreamFakeHal::~OboeServiceStreamFakeHal() call close()");
+AAudioServiceStreamFakeHal::~AAudioServiceStreamFakeHal() {
+    ALOGD("AAudioServiceStreamFakeHal::~AAudioServiceStreamFakeHal() call close()");
     close();
 }
 
-oboe_result_t OboeServiceStreamFakeHal::open(oboe::OboeStreamRequest &request,
-                                             oboe::OboeStreamConfiguration &configuration) {
+aaudio_result_t AAudioServiceStreamFakeHal::open(aaudio::AAudioStreamRequest &request,
+                                             aaudio::AAudioStreamConfiguration &configuration) {
     // Open stream on HAL and pass information about the ring buffer to the client.
     mmap_buffer_info mmapInfo;
-    oboe_result_t error;
+    aaudio_result_t error;
 
     // Open HAL
     error = fake_hal_open(CARD_ID, DEVICE_ID, &mStreamId);
@@ -79,26 +79,26 @@ oboe_result_t OboeServiceStreamFakeHal::open(oboe::OboeStreamRequest &request,
     mCapacityInBytes = mmapInfo.buffer_capacity_in_bytes;
     mSampleRate = mmapInfo.sample_rate;
     mBytesPerFrame = mmapInfo.channel_count * sizeof(int16_t); // FIXME based on data format
-    ALOGD("OboeServiceStreamFakeHal::open() mmapInfo.burst_size_in_frames = %d",
+    ALOGD("AAudioServiceStreamFakeHal::open() mmapInfo.burst_size_in_frames = %d",
          mmapInfo.burst_size_in_frames);
-    ALOGD("OboeServiceStreamFakeHal::open() mmapInfo.buffer_capacity_in_frames = %d",
+    ALOGD("AAudioServiceStreamFakeHal::open() mmapInfo.buffer_capacity_in_frames = %d",
          mmapInfo.buffer_capacity_in_frames);
-    ALOGD("OboeServiceStreamFakeHal::open() mmapInfo.buffer_capacity_in_bytes = %d",
+    ALOGD("AAudioServiceStreamFakeHal::open() mmapInfo.buffer_capacity_in_bytes = %d",
          mmapInfo.buffer_capacity_in_bytes);
 
-    // Fill in OboeStreamConfiguration
+    // Fill in AAudioStreamConfiguration
     configuration.setSampleRate(mSampleRate);
     configuration.setSamplesPerFrame(mmapInfo.channel_count);
-    configuration.setAudioFormat(OBOE_AUDIO_FORMAT_PCM_I16);
+    configuration.setAudioFormat(AAUDIO_FORMAT_PCM_I16);
 
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
 /**
  * Get an immutable description of the in-memory queues
  * used to communicate with the underlying HAL or Service.
  */
-oboe_result_t OboeServiceStreamFakeHal::getDescription(AudioEndpointParcelable &parcelable) {
+aaudio_result_t AAudioServiceStreamFakeHal::getDescription(AudioEndpointParcelable &parcelable) {
     // Gather information on the message queue.
     mUpMessageQueue->fillParcelable(parcelable,
                                     parcelable.mUpMessageQueueParcelable);
@@ -110,20 +110,20 @@ oboe_result_t OboeServiceStreamFakeHal::getDescription(AudioEndpointParcelable &
     parcelable.mDownDataQueueParcelable.setBytesPerFrame(mBytesPerFrame);
     parcelable.mDownDataQueueParcelable.setFramesPerBurst(mFramesPerBurst);
     parcelable.mDownDataQueueParcelable.setCapacityInFrames(mCapacityInFrames);
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
 /**
  * Start the flow of data.
  */
-oboe_result_t OboeServiceStreamFakeHal::start() {
-    if (mStreamId == nullptr) return OBOE_ERROR_NULL;
-    oboe_result_t result = fake_hal_start(mStreamId);
-    sendServiceEvent(OBOE_SERVICE_EVENT_STARTED);
-    mState = OBOE_STREAM_STATE_STARTED;
-    if (result == OBOE_OK) {
+aaudio_result_t AAudioServiceStreamFakeHal::start() {
+    if (mStreamId == nullptr) return AAUDIO_ERROR_NULL;
+    aaudio_result_t result = fake_hal_start(mStreamId);
+    sendServiceEvent(AAUDIO_SERVICE_EVENT_STARTED);
+    mState = AAUDIO_STREAM_STATE_STARTED;
+    if (result == AAUDIO_OK) {
         mThreadEnabled.store(true);
-        result = mOboeThread.start(this);
+        result = mAAudioThread.start(this);
     }
     return result;
 }
@@ -131,33 +131,33 @@ oboe_result_t OboeServiceStreamFakeHal::start() {
 /**
  * Stop the flow of data such that start() can resume with loss of data.
  */
-oboe_result_t OboeServiceStreamFakeHal::pause() {
-    if (mStreamId == nullptr) return OBOE_ERROR_NULL;
+aaudio_result_t AAudioServiceStreamFakeHal::pause() {
+    if (mStreamId == nullptr) return AAUDIO_ERROR_NULL;
     sendCurrentTimestamp();
-    oboe_result_t result = fake_hal_pause(mStreamId);
-    sendServiceEvent(OBOE_SERVICE_EVENT_PAUSED);
-    mState = OBOE_STREAM_STATE_PAUSED;
+    aaudio_result_t result = fake_hal_pause(mStreamId);
+    sendServiceEvent(AAUDIO_SERVICE_EVENT_PAUSED);
+    mState = AAUDIO_STREAM_STATE_PAUSED;
     mFramesRead.reset32();
-    ALOGD("OboeServiceStreamFakeHal::pause() sent OBOE_SERVICE_EVENT_PAUSED");
+    ALOGD("AAudioServiceStreamFakeHal::pause() sent AAUDIO_SERVICE_EVENT_PAUSED");
     mThreadEnabled.store(false);
-    result = mOboeThread.stop();
+    result = mAAudioThread.stop();
     return result;
 }
 
 /**
  *  Discard any data held by the underlying HAL or Service.
  */
-oboe_result_t OboeServiceStreamFakeHal::flush() {
-    if (mStreamId == nullptr) return OBOE_ERROR_NULL;
+aaudio_result_t AAudioServiceStreamFakeHal::flush() {
+    if (mStreamId == nullptr) return AAUDIO_ERROR_NULL;
     // TODO how do we flush an MMAP/NOIRQ buffer? sync pointers?
-    ALOGD("OboeServiceStreamFakeHal::pause() send OBOE_SERVICE_EVENT_FLUSHED");
-    sendServiceEvent(OBOE_SERVICE_EVENT_FLUSHED);
-    mState = OBOE_STREAM_STATE_FLUSHED;
-    return OBOE_OK;
+    ALOGD("AAudioServiceStreamFakeHal::pause() send AAUDIO_SERVICE_EVENT_FLUSHED");
+    sendServiceEvent(AAUDIO_SERVICE_EVENT_FLUSHED);
+    mState = AAUDIO_STREAM_STATE_FLUSHED;
+    return AAUDIO_OK;
 }
 
-oboe_result_t OboeServiceStreamFakeHal::close() {
-    oboe_result_t result = OBOE_OK;
+aaudio_result_t AAudioServiceStreamFakeHal::close() {
+    aaudio_result_t result = AAUDIO_OK;
     if (mStreamId != nullptr) {
         result = fake_hal_close(mStreamId);
         mStreamId = nullptr;
@@ -165,18 +165,18 @@ oboe_result_t OboeServiceStreamFakeHal::close() {
     return result;
 }
 
-void OboeServiceStreamFakeHal::sendCurrentTimestamp() {
+void AAudioServiceStreamFakeHal::sendCurrentTimestamp() {
     int frameCounter = 0;
     int error = fake_hal_get_frame_counter(mStreamId, &frameCounter);
     if (error < 0) {
-        ALOGE("OboeServiceStreamFakeHal::sendCurrentTimestamp() error %d",
+        ALOGE("AAudioServiceStreamFakeHal::sendCurrentTimestamp() error %d",
                 error);
     } else if (frameCounter != mPreviousFrameCounter) {
-        OboeServiceMessage command;
-        command.what = OboeServiceMessage::code::TIMESTAMP;
+        AAudioServiceMessage command;
+        command.what = AAudioServiceMessage::code::TIMESTAMP;
         mFramesRead.update32(frameCounter);
         command.timestamp.position = mFramesRead.get();
-        ALOGD("OboeServiceStreamFakeHal::sendCurrentTimestamp() HAL frames = %d, pos = %d",
+        ALOGD("AAudioServiceStreamFakeHal::sendCurrentTimestamp() HAL frames = %d, pos = %d",
                 frameCounter, (int)mFramesRead.get());
         command.timestamp.timestamp = AudioClock::getNanoseconds();
         mUpMessageQueue->getFifoBuffer()->write(&command, 1);
@@ -185,12 +185,12 @@ void OboeServiceStreamFakeHal::sendCurrentTimestamp() {
 }
 
 // implement Runnable
-void OboeServiceStreamFakeHal::run() {
+void AAudioServiceStreamFakeHal::run() {
     TimestampScheduler timestampScheduler;
     timestampScheduler.setBurstPeriod(mFramesPerBurst, mSampleRate);
     timestampScheduler.start(AudioClock::getNanoseconds());
     while(mThreadEnabled.load()) {
-        oboe_nanoseconds_t nextTime = timestampScheduler.nextAbsoluteTime();
+        aaudio_nanoseconds_t nextTime = timestampScheduler.nextAbsoluteTime();
         if (AudioClock::getNanoseconds() >= nextTime) {
             sendCurrentTimestamp();
         } else  {

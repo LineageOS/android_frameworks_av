@@ -14,20 +14,20 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "OboeService"
+#define LOG_TAG "AAudioService"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
 #include "AudioClock.h"
 #include "AudioEndpointParcelable.h"
 
-//#include "OboeServiceStreamBase.h"
-//#include "OboeServiceStreamFakeHal.h"
+//#include "AAudioServiceStreamBase.h"
+//#include "AAudioServiceStreamFakeHal.h"
 
 #include "SharedRingBuffer.h"
 
 using namespace android;
-using namespace oboe;
+using namespace aaudio;
 
 SharedRingBuffer::~SharedRingBuffer()
 {
@@ -39,23 +39,23 @@ SharedRingBuffer::~SharedRingBuffer()
     }
 }
 
-oboe_result_t SharedRingBuffer::allocate(fifo_frames_t   bytesPerFrame,
+aaudio_result_t SharedRingBuffer::allocate(fifo_frames_t   bytesPerFrame,
                                          fifo_frames_t   capacityInFrames) {
     mCapacityInFrames = capacityInFrames;
 
     // Create shared memory large enough to hold the data and the read and write counters.
     mDataMemorySizeInBytes = bytesPerFrame * capacityInFrames;
     mSharedMemorySizeInBytes = mDataMemorySizeInBytes + (2 * (sizeof(fifo_counter_t)));
-    mFileDescriptor = ashmem_create_region("OboeSharedRingBuffer", mSharedMemorySizeInBytes);
+    mFileDescriptor = ashmem_create_region("AAudioSharedRingBuffer", mSharedMemorySizeInBytes);
     if (mFileDescriptor < 0) {
         ALOGE("SharedRingBuffer::allocate() ashmem_create_region() failed %d", errno);
-        return OBOE_ERROR_INTERNAL;
+        return AAUDIO_ERROR_INTERNAL;
     }
     int err = ashmem_set_prot_region(mFileDescriptor, PROT_READ|PROT_WRITE); // TODO error handling?
     if (err < 0) {
         ALOGE("SharedRingBuffer::allocate() ashmem_set_prot_region() failed %d", errno);
         close(mFileDescriptor);
-        return OBOE_ERROR_INTERNAL; // TODO convert errno to a better OBOE_ERROR;
+        return AAUDIO_ERROR_INTERNAL; // TODO convert errno to a better AAUDIO_ERROR;
     }
 
     // Map the fd to memory addresses.
@@ -66,7 +66,7 @@ oboe_result_t SharedRingBuffer::allocate(fifo_frames_t   bytesPerFrame,
     if (mSharedMemory == MAP_FAILED) {
         ALOGE("SharedRingBuffer::allocate() mmap() failed %d", errno);
         close(mFileDescriptor);
-        return OBOE_ERROR_INTERNAL; // TODO convert errno to a better OBOE_ERROR;
+        return AAUDIO_ERROR_INTERNAL; // TODO convert errno to a better AAUDIO_ERROR;
     }
 
     // Get addresses for our counters and data from the shared memory.
@@ -78,7 +78,7 @@ oboe_result_t SharedRingBuffer::allocate(fifo_frames_t   bytesPerFrame,
 
     mFifoBuffer = new(std::nothrow) FifoBuffer(bytesPerFrame, capacityInFrames,
                                  readCounterAddress, writeCounterAddress, dataAddress);
-    return (mFifoBuffer == nullptr) ? OBOE_ERROR_NO_MEMORY : OBOE_OK;
+    return (mFifoBuffer == nullptr) ? AAUDIO_ERROR_NO_MEMORY : AAUDIO_OK;
 }
 
 void SharedRingBuffer::fillParcelable(AudioEndpointParcelable &endpointParcelable,

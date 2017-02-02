@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "OboeAudio"
+#define LOG_TAG "AAudio"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -22,22 +22,22 @@
 #include <sys/types.h>
 #include <utils/Errors.h>
 
-#include "oboe/OboeDefinitions.h"
-#include "OboeUtilities.h"
+#include "aaudio/AAudioDefinitions.h"
+#include "AAudioUtilities.h"
 
 using namespace android;
 
-oboe_size_bytes_t OboeConvert_formatToSizeInBytes(oboe_audio_format_t format) {
-    oboe_size_bytes_t size = OBOE_ERROR_ILLEGAL_ARGUMENT;
+aaudio_size_bytes_t AAudioConvert_formatToSizeInBytes(aaudio_audio_format_t format) {
+    aaudio_size_bytes_t size = AAUDIO_ERROR_ILLEGAL_ARGUMENT;
     switch (format) {
-        case OBOE_AUDIO_FORMAT_PCM_I16:
+        case AAUDIO_FORMAT_PCM_I16:
             size = sizeof(int16_t);
             break;
-        case OBOE_AUDIO_FORMAT_PCM_I32:
-        case OBOE_AUDIO_FORMAT_PCM_I8_24:
+        case AAUDIO_FORMAT_PCM_I32:
+        case AAUDIO_FORMAT_PCM_I8_24:
             size = sizeof(int32_t);
             break;
-        case OBOE_AUDIO_FORMAT_PCM_FLOAT:
+        case AAUDIO_FORMAT_PCM_FLOAT:
             size = sizeof(float);
             break;
         default:
@@ -47,7 +47,7 @@ oboe_size_bytes_t OboeConvert_formatToSizeInBytes(oboe_audio_format_t format) {
 }
 
 // TODO This similar to a function in audio_utils. Consider using that instead.
-void OboeConvert_floatToPcm16(const float *source, int32_t numSamples, int16_t *destination) {
+void AAudioConvert_floatToPcm16(const float *source, int32_t numSamples, int16_t *destination) {
     for (int i = 0; i < numSamples; i++) {
         float fval = source[i];
         fval += 1.0; // to avoid discontinuity at 0.0 caused by truncation
@@ -61,31 +61,31 @@ void OboeConvert_floatToPcm16(const float *source, int32_t numSamples, int16_t *
     }
 }
 
-void OboeConvert_pcm16ToFloat(const float *source, int32_t numSamples, int16_t *destination) {
+void AAudioConvert_pcm16ToFloat(const float *source, int32_t numSamples, int16_t *destination) {
     for (int i = 0; i < numSamples; i++) {
         destination[i] = source[i] * (1.0f / 32768.0f);
     }
 }
 
-status_t OboeConvert_oboeToAndroidStatus(oboe_result_t result) {
-    // This covers the case for OBOE_OK and for positive results.
+status_t AAudioConvert_aaudioToAndroidStatus(aaudio_result_t result) {
+    // This covers the case for AAUDIO_OK and for positive results.
     if (result >= 0) {
         return result;
     }
     status_t status;
     switch (result) {
-    case OBOE_ERROR_DISCONNECTED:
-    case OBOE_ERROR_INVALID_HANDLE:
+    case AAUDIO_ERROR_DISCONNECTED:
+    case AAUDIO_ERROR_INVALID_HANDLE:
         status = DEAD_OBJECT;
         break;
-    case OBOE_ERROR_INVALID_STATE:
+    case AAUDIO_ERROR_INVALID_STATE:
         status = INVALID_OPERATION;
         break;
-    case OBOE_ERROR_UNEXPECTED_VALUE: // TODO redundant?
-    case OBOE_ERROR_ILLEGAL_ARGUMENT:
+    case AAUDIO_ERROR_UNEXPECTED_VALUE: // TODO redundant?
+    case AAUDIO_ERROR_ILLEGAL_ARGUMENT:
         status = BAD_VALUE;
         break;
-    case OBOE_ERROR_WOULD_BLOCK:
+    case AAUDIO_ERROR_WOULD_BLOCK:
         status = WOULD_BLOCK;
         break;
     // TODO add more result codes
@@ -96,93 +96,93 @@ status_t OboeConvert_oboeToAndroidStatus(oboe_result_t result) {
     return status;
 }
 
-oboe_result_t OboeConvert_androidToOboeResult(status_t status) {
+aaudio_result_t AAudioConvert_androidToAAudioResult(status_t status) {
     // This covers the case for OK and for positive result.
     if (status >= 0) {
         return status;
     }
-    oboe_result_t result;
+    aaudio_result_t result;
     switch (status) {
     case BAD_TYPE:
-        result = OBOE_ERROR_INVALID_HANDLE;
+        result = AAUDIO_ERROR_INVALID_HANDLE;
         break;
     case DEAD_OBJECT:
-        result = OBOE_ERROR_DISCONNECTED;
+        result = AAUDIO_ERROR_DISCONNECTED;
         break;
     case INVALID_OPERATION:
-        result = OBOE_ERROR_INVALID_STATE;
+        result = AAUDIO_ERROR_INVALID_STATE;
         break;
     case BAD_VALUE:
-        result = OBOE_ERROR_UNEXPECTED_VALUE;
+        result = AAUDIO_ERROR_UNEXPECTED_VALUE;
         break;
     case WOULD_BLOCK:
-        result = OBOE_ERROR_WOULD_BLOCK;
+        result = AAUDIO_ERROR_WOULD_BLOCK;
         break;
     // TODO add more status codes
     default:
-        result = OBOE_ERROR_INTERNAL;
+        result = AAUDIO_ERROR_INTERNAL;
         break;
     }
     return result;
 }
 
-audio_format_t OboeConvert_oboeToAndroidDataFormat(oboe_audio_format_t oboeFormat) {
+audio_format_t AAudioConvert_aaudioToAndroidDataFormat(aaudio_audio_format_t aaudioFormat) {
     audio_format_t androidFormat;
-    switch (oboeFormat) {
-    case OBOE_AUDIO_FORMAT_PCM_I16:
+    switch (aaudioFormat) {
+    case AAUDIO_FORMAT_PCM_I16:
         androidFormat = AUDIO_FORMAT_PCM_16_BIT;
         break;
-    case OBOE_AUDIO_FORMAT_PCM_FLOAT:
+    case AAUDIO_FORMAT_PCM_FLOAT:
         androidFormat = AUDIO_FORMAT_PCM_FLOAT;
         break;
-    case OBOE_AUDIO_FORMAT_PCM_I8_24:
+    case AAUDIO_FORMAT_PCM_I8_24:
         androidFormat = AUDIO_FORMAT_PCM_8_24_BIT;
         break;
-    case OBOE_AUDIO_FORMAT_PCM_I32:
+    case AAUDIO_FORMAT_PCM_I32:
         androidFormat = AUDIO_FORMAT_PCM_32_BIT;
         break;
     default:
         androidFormat = AUDIO_FORMAT_DEFAULT;
-        ALOGE("OboeConvert_oboeToAndroidDataFormat 0x%08X unrecognized", oboeFormat);
+        ALOGE("AAudioConvert_aaudioToAndroidDataFormat 0x%08X unrecognized", aaudioFormat);
         break;
     }
     return androidFormat;
 }
 
-oboe_audio_format_t OboeConvert_androidToOboeDataFormat(audio_format_t androidFormat) {
-    oboe_audio_format_t oboeFormat = OBOE_AUDIO_FORMAT_INVALID;
+aaudio_audio_format_t AAudioConvert_androidToAAudioDataFormat(audio_format_t androidFormat) {
+    aaudio_audio_format_t aaudioFormat = AAUDIO_FORMAT_INVALID;
     switch (androidFormat) {
     case AUDIO_FORMAT_PCM_16_BIT:
-        oboeFormat = OBOE_AUDIO_FORMAT_PCM_I16;
+        aaudioFormat = AAUDIO_FORMAT_PCM_I16;
         break;
     case AUDIO_FORMAT_PCM_FLOAT:
-        oboeFormat = OBOE_AUDIO_FORMAT_PCM_FLOAT;
+        aaudioFormat = AAUDIO_FORMAT_PCM_FLOAT;
         break;
     case AUDIO_FORMAT_PCM_32_BIT:
-        oboeFormat = OBOE_AUDIO_FORMAT_PCM_I32;
+        aaudioFormat = AAUDIO_FORMAT_PCM_I32;
         break;
     case AUDIO_FORMAT_PCM_8_24_BIT:
-        oboeFormat = OBOE_AUDIO_FORMAT_PCM_I8_24;
+        aaudioFormat = AAUDIO_FORMAT_PCM_I8_24;
         break;
     default:
-        oboeFormat = OBOE_AUDIO_FORMAT_INVALID;
-        ALOGE("OboeConvert_androidToOboeDataFormat 0x%08X unrecognized", androidFormat);
+        aaudioFormat = AAUDIO_FORMAT_INVALID;
+        ALOGE("AAudioConvert_androidToAAudioDataFormat 0x%08X unrecognized", androidFormat);
         break;
     }
-    return oboeFormat;
+    return aaudioFormat;
 }
 
-oboe_size_bytes_t OboeConvert_framesToBytes(oboe_size_frames_t numFrames,
-                                            oboe_size_bytes_t bytesPerFrame,
-                                            oboe_size_bytes_t *sizeInBytes) {
+aaudio_size_bytes_t AAudioConvert_framesToBytes(aaudio_size_frames_t numFrames,
+                                            aaudio_size_bytes_t bytesPerFrame,
+                                            aaudio_size_bytes_t *sizeInBytes) {
     // TODO implement more elegantly
     const int32_t maxChannels = 256; // ridiculously large
-    const oboe_size_frames_t maxBytesPerFrame = maxChannels * sizeof(float);
+    const aaudio_size_frames_t maxBytesPerFrame = maxChannels * sizeof(float);
     // Prevent overflow by limiting multiplicands.
     if (bytesPerFrame > maxBytesPerFrame || numFrames > (0x3FFFFFFF / maxBytesPerFrame)) {
         ALOGE("size overflow, numFrames = %d, frameSize = %zd", numFrames, bytesPerFrame);
-        return OBOE_ERROR_OUT_OF_RANGE;
+        return AAUDIO_ERROR_OUT_OF_RANGE;
     }
     *sizeInBytes = numFrames * bytesPerFrame;
-    return OBOE_OK;
+    return AAUDIO_OK;
 }

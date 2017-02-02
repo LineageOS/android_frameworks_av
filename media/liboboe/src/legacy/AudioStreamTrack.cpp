@@ -21,13 +21,13 @@
 #include <stdint.h>
 #include <media/AudioTrack.h>
 
-#include <oboe/OboeAudio.h>
+#include <aaudio/AAudio.h>
 #include "AudioClock.h"
 #include "AudioStreamTrack.h"
 
 
 using namespace android;
-using namespace oboe;
+using namespace aaudio;
 
 /*
  * Create a stream that uses the AudioTrack.
@@ -39,14 +39,14 @@ AudioStreamTrack::AudioStreamTrack()
 
 AudioStreamTrack::~AudioStreamTrack()
 {
-    const oboe_stream_state_t state = getState();
-    bool bad = !(state == OBOE_STREAM_STATE_UNINITIALIZED || state == OBOE_STREAM_STATE_CLOSED);
+    const aaudio_stream_state_t state = getState();
+    bool bad = !(state == AAUDIO_STREAM_STATE_UNINITIALIZED || state == AAUDIO_STREAM_STATE_CLOSED);
     ALOGE_IF(bad, "stream not closed, in state %d", state);
 }
 
-oboe_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
+aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 {
-    oboe_result_t result = OBOE_OK;
+    aaudio_result_t result = AAUDIO_OK;
 
     result = AudioStream::open(builder);
     if (result != OK) {
@@ -55,7 +55,7 @@ oboe_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
     // Try to create an AudioTrack
     // TODO Support UNSPECIFIED in AudioTrack. For now, use stereo if unspecified.
-    int32_t samplesPerFrame = (getSamplesPerFrame() == OBOE_UNSPECIFIED)
+    int32_t samplesPerFrame = (getSamplesPerFrame() == AAUDIO_UNSPECIFIED)
                               ? 2 : getSamplesPerFrame();
     audio_channel_mask_t channelMask = audio_channel_out_mask_from_count(samplesPerFrame);
     ALOGD("AudioStreamTrack::open(), samplesPerFrame = %d, channelMask = 0x%08x",
@@ -66,9 +66,9 @@ oboe_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     audio_output_flags_t flags = (audio_output_flags_t) AUDIO_OUTPUT_FLAG_FAST;
     size_t frameCount = 0;
     // TODO implement an unspecified AudioTrack format then use that.
-    audio_format_t format = (getFormat() == OBOE_UNSPECIFIED)
+    audio_format_t format = (getFormat() == AAUDIO_UNSPECIFIED)
             ? AUDIO_FORMAT_PCM_FLOAT
-            : OboeConvert_oboeToAndroidDataFormat(getFormat());
+            : AAudioConvert_aaudioToAndroidDataFormat(getFormat());
 
     mAudioTrack = new AudioTrack(
             (audio_stream_type_t) AUDIO_STREAM_MUSIC,
@@ -90,143 +90,143 @@ oboe_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     if (status != NO_ERROR) {
         close();
         ALOGE("AudioStreamTrack::open(), initCheck() returned %d", status);
-        return OboeConvert_androidToOboeResult(status);
+        return AAudioConvert_androidToAAudioResult(status);
     }
 
     // Get the actual values from the AudioTrack.
     setSamplesPerFrame(mAudioTrack->channelCount());
     setSampleRate(mAudioTrack->getSampleRate());
-    setFormat(OboeConvert_androidToOboeDataFormat(mAudioTrack->format()));
+    setFormat(AAudioConvert_androidToAAudioDataFormat(mAudioTrack->format()));
 
-    setState(OBOE_STREAM_STATE_OPEN);
+    setState(AAUDIO_STREAM_STATE_OPEN);
 
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
-oboe_result_t AudioStreamTrack::close()
+aaudio_result_t AudioStreamTrack::close()
 {
     // TODO maybe add close() or release() to AudioTrack API then call it from here
-    if (getState() != OBOE_STREAM_STATE_CLOSED) {
+    if (getState() != AAUDIO_STREAM_STATE_CLOSED) {
         mAudioTrack.clear(); // TODO is this right?
-        setState(OBOE_STREAM_STATE_CLOSED);
+        setState(AAUDIO_STREAM_STATE_CLOSED);
     }
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
-oboe_result_t AudioStreamTrack::requestStart()
+aaudio_result_t AudioStreamTrack::requestStart()
 {
     if (mAudioTrack.get() == nullptr) {
-        return OBOE_ERROR_INVALID_STATE;
+        return AAUDIO_ERROR_INVALID_STATE;
     }
     // Get current position so we can detect when the track is playing.
     status_t err = mAudioTrack->getPosition(&mPositionWhenStarting);
     if (err != OK) {
-        return OboeConvert_androidToOboeResult(err);
+        return AAudioConvert_androidToAAudioResult(err);
     }
     err = mAudioTrack->start();
     if (err != OK) {
-        return OboeConvert_androidToOboeResult(err);
+        return AAudioConvert_androidToAAudioResult(err);
     } else {
-        setState(OBOE_STREAM_STATE_STARTING);
+        setState(AAUDIO_STREAM_STATE_STARTING);
     }
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
-oboe_result_t AudioStreamTrack::requestPause()
+aaudio_result_t AudioStreamTrack::requestPause()
 {
     if (mAudioTrack.get() == nullptr) {
-        return OBOE_ERROR_INVALID_STATE;
-    } else if (getState() != OBOE_STREAM_STATE_STARTING
-            && getState() != OBOE_STREAM_STATE_STARTED) {
-        ALOGE("requestPause(), called when state is %s", Oboe_convertStreamStateToText(getState()));
-        return OBOE_ERROR_INVALID_STATE;
+        return AAUDIO_ERROR_INVALID_STATE;
+    } else if (getState() != AAUDIO_STREAM_STATE_STARTING
+            && getState() != AAUDIO_STREAM_STATE_STARTED) {
+        ALOGE("requestPause(), called when state is %s", AAudio_convertStreamStateToText(getState()));
+        return AAUDIO_ERROR_INVALID_STATE;
     }
-    setState(OBOE_STREAM_STATE_PAUSING);
+    setState(AAUDIO_STREAM_STATE_PAUSING);
     mAudioTrack->pause();
     status_t err = mAudioTrack->getPosition(&mPositionWhenPausing);
     if (err != OK) {
-        return OboeConvert_androidToOboeResult(err);
+        return AAudioConvert_androidToAAudioResult(err);
     }
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
-oboe_result_t AudioStreamTrack::requestFlush() {
+aaudio_result_t AudioStreamTrack::requestFlush() {
     if (mAudioTrack.get() == nullptr) {
-        return OBOE_ERROR_INVALID_STATE;
-    } else if (getState() != OBOE_STREAM_STATE_PAUSED) {
-        return OBOE_ERROR_INVALID_STATE;
+        return AAUDIO_ERROR_INVALID_STATE;
+    } else if (getState() != AAUDIO_STREAM_STATE_PAUSED) {
+        return AAUDIO_ERROR_INVALID_STATE;
     }
-    setState(OBOE_STREAM_STATE_FLUSHING);
+    setState(AAUDIO_STREAM_STATE_FLUSHING);
     incrementFramesRead(getFramesWritten() - getFramesRead());
     mAudioTrack->flush();
     mFramesWritten.reset32();
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
-oboe_result_t AudioStreamTrack::requestStop() {
+aaudio_result_t AudioStreamTrack::requestStop() {
     if (mAudioTrack.get() == nullptr) {
-        return OBOE_ERROR_INVALID_STATE;
+        return AAUDIO_ERROR_INVALID_STATE;
     }
-    setState(OBOE_STREAM_STATE_STOPPING);
+    setState(AAUDIO_STREAM_STATE_STOPPING);
     incrementFramesRead(getFramesWritten() - getFramesRead()); // TODO review
     mAudioTrack->stop();
     mFramesWritten.reset32();
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
-oboe_result_t AudioStreamTrack::updateState()
+aaudio_result_t AudioStreamTrack::updateState()
 {
     status_t err;
-    oboe_wrapping_frames_t position;
+    aaudio_wrapping_frames_t position;
     switch (getState()) {
     // TODO add better state visibility to AudioTrack
-    case OBOE_STREAM_STATE_STARTING:
+    case AAUDIO_STREAM_STATE_STARTING:
         if (mAudioTrack->hasStarted()) {
-            setState(OBOE_STREAM_STATE_STARTED);
+            setState(AAUDIO_STREAM_STATE_STARTED);
         }
         break;
-    case OBOE_STREAM_STATE_PAUSING:
+    case AAUDIO_STREAM_STATE_PAUSING:
         if (mAudioTrack->stopped()) {
             err = mAudioTrack->getPosition(&position);
             if (err != OK) {
-                return OboeConvert_androidToOboeResult(err);
+                return AAudioConvert_androidToAAudioResult(err);
             } else if (position == mPositionWhenPausing) {
                 // Has stream really stopped advancing?
-                setState(OBOE_STREAM_STATE_PAUSED);
+                setState(AAUDIO_STREAM_STATE_PAUSED);
             }
             mPositionWhenPausing = position;
         }
         break;
-    case OBOE_STREAM_STATE_FLUSHING:
+    case AAUDIO_STREAM_STATE_FLUSHING:
         {
             err = mAudioTrack->getPosition(&position);
             if (err != OK) {
-                return OboeConvert_androidToOboeResult(err);
+                return AAudioConvert_androidToAAudioResult(err);
             } else if (position == 0) {
                 // Advance frames read to match written.
-                setState(OBOE_STREAM_STATE_FLUSHED);
+                setState(AAUDIO_STREAM_STATE_FLUSHED);
             }
         }
         break;
-    case OBOE_STREAM_STATE_STOPPING:
+    case AAUDIO_STREAM_STATE_STOPPING:
         if (mAudioTrack->stopped()) {
-            setState(OBOE_STREAM_STATE_STOPPED);
+            setState(AAUDIO_STREAM_STATE_STOPPED);
         }
         break;
     default:
         break;
     }
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
-oboe_result_t AudioStreamTrack::write(const void *buffer,
-                                      oboe_size_frames_t numFrames,
-                                      oboe_nanoseconds_t timeoutNanoseconds)
+aaudio_result_t AudioStreamTrack::write(const void *buffer,
+                                      aaudio_size_frames_t numFrames,
+                                      aaudio_nanoseconds_t timeoutNanoseconds)
 {
-    oboe_size_frames_t bytesPerFrame = getBytesPerFrame();
-    oboe_size_bytes_t numBytes;
-    oboe_result_t result = OboeConvert_framesToBytes(numFrames, bytesPerFrame, &numBytes);
-    if (result != OBOE_OK) {
+    aaudio_size_frames_t bytesPerFrame = getBytesPerFrame();
+    aaudio_size_bytes_t numBytes;
+    aaudio_result_t result = AAudioConvert_framesToBytes(numFrames, bytesPerFrame, &numBytes);
+    if (result != AAUDIO_OK) {
         return result;
     }
 
@@ -237,33 +237,33 @@ oboe_result_t AudioStreamTrack::write(const void *buffer,
         return 0;
     } else if (bytesWritten < 0) {
         ALOGE("invalid write, returned %d", (int)bytesWritten);
-        return OboeConvert_androidToOboeResult(bytesWritten);
+        return AAudioConvert_androidToAAudioResult(bytesWritten);
     }
-    oboe_size_frames_t framesWritten = (oboe_size_frames_t)(bytesWritten / bytesPerFrame);
+    aaudio_size_frames_t framesWritten = (aaudio_size_frames_t)(bytesWritten / bytesPerFrame);
     incrementFramesWritten(framesWritten);
     return framesWritten;
 }
 
-oboe_result_t AudioStreamTrack::setBufferSize(oboe_size_frames_t requestedFrames,
-                                             oboe_size_frames_t *actualFrames)
+aaudio_result_t AudioStreamTrack::setBufferSize(aaudio_size_frames_t requestedFrames,
+                                             aaudio_size_frames_t *actualFrames)
 {
     ssize_t result = mAudioTrack->setBufferSizeInFrames(requestedFrames);
     if (result != OK) {
-        return OboeConvert_androidToOboeResult(result);
+        return AAudioConvert_androidToAAudioResult(result);
     } else {
         *actualFrames = result;
-        return OBOE_OK;
+        return AAUDIO_OK;
     }
 }
 
-oboe_size_frames_t AudioStreamTrack::getBufferSize() const
+aaudio_size_frames_t AudioStreamTrack::getBufferSize() const
 {
-    return static_cast<oboe_size_frames_t>(mAudioTrack->getBufferSizeInFrames());
+    return static_cast<aaudio_size_frames_t>(mAudioTrack->getBufferSizeInFrames());
 }
 
-oboe_size_frames_t AudioStreamTrack::getBufferCapacity() const
+aaudio_size_frames_t AudioStreamTrack::getBufferCapacity() const
 {
-    return static_cast<oboe_size_frames_t>(mAudioTrack->frameCount());
+    return static_cast<aaudio_size_frames_t>(mAudioTrack->frameCount());
 }
 
 int32_t AudioStreamTrack::getXRunCount() const
@@ -276,13 +276,13 @@ int32_t AudioStreamTrack::getFramesPerBurst() const
     return 192; // TODO add query to AudioTrack.cpp
 }
 
-oboe_position_frames_t AudioStreamTrack::getFramesRead() {
-    oboe_wrapping_frames_t position;
+aaudio_position_frames_t AudioStreamTrack::getFramesRead() {
+    aaudio_wrapping_frames_t position;
     status_t result;
     switch (getState()) {
-    case OBOE_STREAM_STATE_STARTING:
-    case OBOE_STREAM_STATE_STARTED:
-    case OBOE_STREAM_STATE_STOPPING:
+    case AAUDIO_STREAM_STATE_STARTING:
+    case AAUDIO_STREAM_STATE_STARTED:
+    case AAUDIO_STREAM_STATE_STOPPING:
         result = mAudioTrack->getPosition(&position);
         if (result == OK) {
             mFramesRead.update32(position);

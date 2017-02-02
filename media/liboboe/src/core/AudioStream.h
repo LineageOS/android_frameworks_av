@@ -14,23 +14,23 @@
  * limitations under the License.
  */
 
-#ifndef OBOE_AUDIOSTREAM_H
-#define OBOE_AUDIOSTREAM_H
+#ifndef AAUDIO_AUDIOSTREAM_H
+#define AAUDIO_AUDIOSTREAM_H
 
 #include <atomic>
 #include <stdint.h>
-#include <oboe/OboeDefinitions.h>
-#include <oboe/OboeAudio.h>
+#include <aaudio/AAudioDefinitions.h>
+#include <aaudio/AAudio.h>
 
-#include "OboeUtilities.h"
+#include "AAudioUtilities.h"
 #include "MonotonicCounter.h"
 
-namespace oboe {
+namespace aaudio {
 
 class AudioStreamBuilder;
 
 /**
- * Oboe audio stream.
+ * AAudio audio stream.
  */
 class AudioStream {
 public:
@@ -45,57 +45,57 @@ public:
     /* Asynchronous requests.
      * Use waitForStateChange() to wait for completion.
      */
-    virtual oboe_result_t requestStart() = 0;
-    virtual oboe_result_t requestPause() = 0;
-    virtual oboe_result_t requestFlush() = 0;
-    virtual oboe_result_t requestStop() = 0;
+    virtual aaudio_result_t requestStart() = 0;
+    virtual aaudio_result_t requestPause() = 0;
+    virtual aaudio_result_t requestFlush() = 0;
+    virtual aaudio_result_t requestStop() = 0;
 
-    // TODO use oboe_clockid_t all the way down to AudioClock
-    virtual oboe_result_t getTimestamp(clockid_t clockId,
-                                       oboe_position_frames_t *framePosition,
-                                       oboe_nanoseconds_t *timeNanoseconds) = 0;
+    // TODO use aaudio_clockid_t all the way down to AudioClock
+    virtual aaudio_result_t getTimestamp(clockid_t clockId,
+                                       aaudio_position_frames_t *framePosition,
+                                       aaudio_nanoseconds_t *timeNanoseconds) = 0;
 
 
-    virtual oboe_result_t updateState() = 0;
+    virtual aaudio_result_t updateState() = 0;
 
 
     // =========== End ABSTRACT methods ===========================
 
-    virtual oboe_result_t waitForStateChange(oboe_stream_state_t currentState,
-                                          oboe_stream_state_t *nextState,
-                                          oboe_nanoseconds_t timeoutNanoseconds);
+    virtual aaudio_result_t waitForStateChange(aaudio_stream_state_t currentState,
+                                          aaudio_stream_state_t *nextState,
+                                          aaudio_nanoseconds_t timeoutNanoseconds);
 
     /**
      * Open the stream using the parameters in the builder.
      * Allocate the necessary resources.
      */
-    virtual oboe_result_t open(const AudioStreamBuilder& builder);
+    virtual aaudio_result_t open(const AudioStreamBuilder& builder);
 
     /**
      * Close the stream and deallocate any resources from the open() call.
      * It is safe to call close() multiple times.
      */
-    virtual oboe_result_t close() {
-        return OBOE_OK;
+    virtual aaudio_result_t close() {
+        return AAUDIO_OK;
     }
 
-    virtual oboe_result_t setBufferSize(oboe_size_frames_t requestedFrames,
-                                        oboe_size_frames_t *actualFrames) {
-        return OBOE_ERROR_UNIMPLEMENTED;
+    virtual aaudio_result_t setBufferSize(aaudio_size_frames_t requestedFrames,
+                                        aaudio_size_frames_t *actualFrames) {
+        return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
-    virtual oboe_result_t createThread(oboe_nanoseconds_t periodNanoseconds,
-                                       oboe_audio_thread_proc_t *threadProc,
+    virtual aaudio_result_t createThread(aaudio_nanoseconds_t periodNanoseconds,
+                                       aaudio_audio_thread_proc_t *threadProc,
                                        void *threadArg);
 
-    virtual oboe_result_t joinThread(void **returnArg, oboe_nanoseconds_t timeoutNanoseconds);
+    virtual aaudio_result_t joinThread(void **returnArg, aaudio_nanoseconds_t timeoutNanoseconds);
 
-    virtual oboe_result_t registerThread() {
-        return OBOE_OK;
+    virtual aaudio_result_t registerThread() {
+        return AAUDIO_OK;
     }
 
-    virtual oboe_result_t unregisterThread() {
-        return OBOE_OK;
+    virtual aaudio_result_t unregisterThread() {
+        return AAUDIO_OK;
     }
 
     /**
@@ -106,109 +106,109 @@ public:
 
     // ============== Queries ===========================
 
-    virtual oboe_stream_state_t getState() const {
+    virtual aaudio_stream_state_t getState() const {
         return mState;
     }
 
-    virtual oboe_size_frames_t getBufferSize() const {
-        return OBOE_ERROR_UNIMPLEMENTED;
+    virtual aaudio_size_frames_t getBufferSize() const {
+        return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
-    virtual oboe_size_frames_t getBufferCapacity() const {
-        return OBOE_ERROR_UNIMPLEMENTED;
+    virtual aaudio_size_frames_t getBufferCapacity() const {
+        return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
-    virtual oboe_size_frames_t getFramesPerBurst() const {
-        return OBOE_ERROR_UNIMPLEMENTED;
+    virtual aaudio_size_frames_t getFramesPerBurst() const {
+        return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
     virtual int32_t getXRunCount() const {
-        return OBOE_ERROR_UNIMPLEMENTED;
+        return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
     bool isPlaying() const {
-        return mState == OBOE_STREAM_STATE_STARTING || mState == OBOE_STREAM_STATE_STARTED;
+        return mState == AAUDIO_STREAM_STATE_STARTING || mState == AAUDIO_STREAM_STATE_STARTED;
     }
 
-    oboe_result_t getSampleRate() const {
+    aaudio_result_t getSampleRate() const {
         return mSampleRate;
     }
 
-    oboe_audio_format_t getFormat()  const {
+    aaudio_audio_format_t getFormat()  const {
         return mFormat;
     }
 
-    oboe_result_t getSamplesPerFrame() const {
+    aaudio_result_t getSamplesPerFrame() const {
         return mSamplesPerFrame;
     }
 
-    oboe_device_id_t getDeviceId() const {
+    aaudio_device_id_t getDeviceId() const {
         return mDeviceId;
     }
 
-    oboe_sharing_mode_t getSharingMode() const {
+    aaudio_sharing_mode_t getSharingMode() const {
         return mSharingMode;
     }
 
-    oboe_direction_t getDirection() const {
+    aaudio_direction_t getDirection() const {
         return mDirection;
     }
 
-    oboe_size_bytes_t getBytesPerFrame() const {
+    aaudio_size_bytes_t getBytesPerFrame() const {
         return mSamplesPerFrame * getBytesPerSample();
     }
 
-    oboe_size_bytes_t getBytesPerSample() const {
-        return OboeConvert_formatToSizeInBytes(mFormat);
+    aaudio_size_bytes_t getBytesPerSample() const {
+        return AAudioConvert_formatToSizeInBytes(mFormat);
     }
 
-    virtual oboe_position_frames_t getFramesWritten() {
+    virtual aaudio_position_frames_t getFramesWritten() {
         return mFramesWritten.get();
     }
 
-    virtual oboe_position_frames_t getFramesRead() {
+    virtual aaudio_position_frames_t getFramesRead() {
         return mFramesRead.get();
     }
 
 
     // ============== I/O ===========================
     // A Stream will only implement read() or write() depending on its direction.
-    virtual oboe_result_t write(const void *buffer,
-                             oboe_size_frames_t numFrames,
-                             oboe_nanoseconds_t timeoutNanoseconds) {
-        return OBOE_ERROR_UNIMPLEMENTED;
+    virtual aaudio_result_t write(const void *buffer,
+                             aaudio_size_frames_t numFrames,
+                             aaudio_nanoseconds_t timeoutNanoseconds) {
+        return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
-    virtual oboe_result_t read(void *buffer,
-                            oboe_size_frames_t numFrames,
-                            oboe_nanoseconds_t timeoutNanoseconds) {
-        return OBOE_ERROR_UNIMPLEMENTED;
+    virtual aaudio_result_t read(void *buffer,
+                            aaudio_size_frames_t numFrames,
+                            aaudio_nanoseconds_t timeoutNanoseconds) {
+        return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
 protected:
 
-    virtual oboe_position_frames_t incrementFramesWritten(oboe_size_frames_t frames) {
-        return static_cast<oboe_position_frames_t>(mFramesWritten.increment(frames));
+    virtual aaudio_position_frames_t incrementFramesWritten(aaudio_size_frames_t frames) {
+        return static_cast<aaudio_position_frames_t>(mFramesWritten.increment(frames));
     }
 
-    virtual oboe_position_frames_t incrementFramesRead(oboe_size_frames_t frames) {
-        return static_cast<oboe_position_frames_t>(mFramesRead.increment(frames));
+    virtual aaudio_position_frames_t incrementFramesRead(aaudio_size_frames_t frames) {
+        return static_cast<aaudio_position_frames_t>(mFramesRead.increment(frames));
     }
 
     /**
      * Wait for a transition from one state to another.
-     * @return OBOE_OK if the endingState was observed, or OBOE_ERROR_UNEXPECTED_STATE
+     * @return AAUDIO_OK if the endingState was observed, or AAUDIO_ERROR_UNEXPECTED_STATE
      *   if any state that was not the startingState or endingState was observed
-     *   or OBOE_ERROR_TIMEOUT
+     *   or AAUDIO_ERROR_TIMEOUT
      */
-    virtual oboe_result_t waitForStateTransition(oboe_stream_state_t startingState,
-                                              oboe_stream_state_t endingState,
-                                              oboe_nanoseconds_t timeoutNanoseconds);
+    virtual aaudio_result_t waitForStateTransition(aaudio_stream_state_t startingState,
+                                              aaudio_stream_state_t endingState,
+                                              aaudio_nanoseconds_t timeoutNanoseconds);
 
     /**
      * This should not be called after the open() call.
      */
-    void setSampleRate(oboe_sample_rate_t sampleRate) {
+    void setSampleRate(aaudio_sample_rate_t sampleRate) {
         mSampleRate = sampleRate;
     }
 
@@ -222,18 +222,18 @@ protected:
     /**
      * This should not be called after the open() call.
      */
-    void setSharingMode(oboe_sharing_mode_t sharingMode) {
+    void setSharingMode(aaudio_sharing_mode_t sharingMode) {
         mSharingMode = sharingMode;
     }
 
     /**
      * This should not be called after the open() call.
      */
-    void setFormat(oboe_audio_format_t format) {
+    void setFormat(aaudio_audio_format_t format) {
         mFormat = format;
     }
 
-    void setState(oboe_stream_state_t state) {
+    void setState(aaudio_stream_state_t state) {
         mState = state;
     }
 
@@ -243,38 +243,38 @@ protected:
     MonotonicCounter     mFramesWritten;
     MonotonicCounter     mFramesRead;
 
-    void setPeriodNanoseconds(oboe_nanoseconds_t periodNanoseconds) {
+    void setPeriodNanoseconds(aaudio_nanoseconds_t periodNanoseconds) {
         mPeriodNanoseconds.store(periodNanoseconds, std::memory_order_release);
     }
 
-    oboe_nanoseconds_t getPeriodNanoseconds() {
+    aaudio_nanoseconds_t getPeriodNanoseconds() {
         return mPeriodNanoseconds.load(std::memory_order_acquire);
     }
 
 private:
     // These do not change after open().
-    int32_t              mSamplesPerFrame = OBOE_UNSPECIFIED;
-    oboe_sample_rate_t   mSampleRate = OBOE_UNSPECIFIED;
-    oboe_stream_state_t  mState = OBOE_STREAM_STATE_UNINITIALIZED;
-    oboe_device_id_t     mDeviceId = OBOE_UNSPECIFIED;
-    oboe_sharing_mode_t  mSharingMode = OBOE_SHARING_MODE_LEGACY;
-    oboe_audio_format_t  mFormat = OBOE_AUDIO_FORMAT_UNSPECIFIED;
-    oboe_direction_t     mDirection = OBOE_DIRECTION_OUTPUT;
+    int32_t              mSamplesPerFrame = AAUDIO_UNSPECIFIED;
+    aaudio_sample_rate_t   mSampleRate = AAUDIO_UNSPECIFIED;
+    aaudio_stream_state_t  mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
+    aaudio_device_id_t     mDeviceId = AAUDIO_UNSPECIFIED;
+    aaudio_sharing_mode_t  mSharingMode = AAUDIO_SHARING_MODE_LEGACY;
+    aaudio_audio_format_t  mFormat = AAUDIO_FORMAT_UNSPECIFIED;
+    aaudio_direction_t     mDirection = AAUDIO_DIRECTION_OUTPUT;
 
     // background thread ----------------------------------
     bool                 mHasThread = false;
     pthread_t            mThread; // initialized in constructor
 
     // These are set by the application thread and then read by the audio pthread.
-    std::atomic<oboe_nanoseconds_t>  mPeriodNanoseconds; // for tuning SCHED_FIFO threads
+    std::atomic<aaudio_nanoseconds_t>  mPeriodNanoseconds; // for tuning SCHED_FIFO threads
     // TODO make atomic?
-    oboe_audio_thread_proc_t* mThreadProc = nullptr;
+    aaudio_audio_thread_proc_t* mThreadProc = nullptr;
     void*                mThreadArg = nullptr;
-    oboe_result_t        mThreadRegistrationResult = OBOE_OK;
+    aaudio_result_t        mThreadRegistrationResult = AAUDIO_OK;
 
 
 };
 
-} /* namespace oboe */
+} /* namespace aaudio */
 
-#endif /* OBOE_AUDIOSTREAM_H */
+#endif /* AAUDIO_AUDIOSTREAM_H */

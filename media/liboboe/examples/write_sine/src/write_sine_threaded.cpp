@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// Play sine waves using an Oboe background thread.
+// Play sine waves using an AAudio background thread.
 
 #include <assert.h>
 #include <unistd.h>
@@ -22,34 +22,34 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
-#include <oboe/OboeDefinitions.h>
-#include <oboe/OboeAudio.h>
+#include <aaudio/AAudioDefinitions.h>
+#include <aaudio/AAudio.h>
 #include "SineGenerator.h"
 
 #define NUM_SECONDS   10
 
-#define SHARING_MODE  OBOE_SHARING_MODE_EXCLUSIVE
-//#define SHARING_MODE  OBOE_SHARING_MODE_LEGACY
+#define SHARING_MODE  AAUDIO_SHARING_MODE_EXCLUSIVE
+//#define SHARING_MODE  AAUDIO_SHARING_MODE_LEGACY
 
 // Prototype for a callback.
 typedef int audio_callback_proc_t(float *outputBuffer,
-                                     oboe_size_frames_t numFrames,
+                                     aaudio_size_frames_t numFrames,
                                      void *userContext);
 
-static void *SimpleOboePlayerThreadProc(void *arg);
+static void *SimpleAAudioPlayerThreadProc(void *arg);
 
 /**
- * Simple wrapper for Oboe that opens a default stream and then calls
+ * Simple wrapper for AAudio that opens a default stream and then calls
  * a callback function to fill the output buffers.
  */
-class SimpleOboePlayer {
+class SimpleAAudioPlayer {
 public:
-    SimpleOboePlayer() {}
-    virtual ~SimpleOboePlayer() {
+    SimpleAAudioPlayer() {}
+    virtual ~SimpleAAudioPlayer() {
         close();
     };
 
-    void setSharingMode(oboe_sharing_mode_t requestedSharingMode) {
+    void setSharingMode(aaudio_sharing_mode_t requestedSharingMode) {
         mRequestedSharingMode = requestedSharingMode;
     }
 
@@ -66,34 +66,34 @@ public:
     /**
      * Open a stream
      */
-    oboe_result_t open(audio_callback_proc_t *proc, void *userContext) {
+    aaudio_result_t open(audio_callback_proc_t *proc, void *userContext) {
         mCallbackProc = proc;
         mUserContext = userContext;
-        oboe_result_t result = OBOE_OK;
+        aaudio_result_t result = AAUDIO_OK;
 
-        // Use an OboeStreamBuilder to contain requested parameters.
-        result = Oboe_createStreamBuilder(&mBuilder);
-        if (result != OBOE_OK) return result;
+        // Use an AAudioStreamBuilder to contain requested parameters.
+        result = AAudio_createStreamBuilder(&mBuilder);
+        if (result != AAUDIO_OK) return result;
 
-        result = OboeStreamBuilder_setSharingMode(mBuilder, mRequestedSharingMode);
-        if (result != OBOE_OK) goto finish1;
+        result = AAudioStreamBuilder_setSharingMode(mBuilder, mRequestedSharingMode);
+        if (result != AAUDIO_OK) goto finish1;
 
-        // Open an OboeStream using the Builder.
-        result = OboeStreamBuilder_openStream(mBuilder, &mStream);
-        if (result != OBOE_OK) goto finish1;
+        // Open an AAudioStream using the Builder.
+        result = AAudioStreamBuilder_openStream(mBuilder, &mStream);
+        if (result != AAUDIO_OK) goto finish1;
 
         // Check to see what kind of stream we actually got.
-        result = OboeStream_getSampleRate(mStream, &mFramesPerSecond);
+        result = AAudioStream_getSampleRate(mStream, &mFramesPerSecond);
         printf("open() mFramesPerSecond = %d\n", mFramesPerSecond);
-        if (result != OBOE_OK) goto finish2;
-        result = OboeStream_getSamplesPerFrame(mStream, &mSamplesPerFrame);
+        if (result != AAUDIO_OK) goto finish2;
+        result = AAudioStream_getSamplesPerFrame(mStream, &mSamplesPerFrame);
         printf("open() mSamplesPerFrame = %d\n", mSamplesPerFrame);
-        if (result != OBOE_OK) goto finish2;
+        if (result != AAUDIO_OK) goto finish2;
 
         // This is the number of frames that are read in one chunk by a DMA controller
         // or a DSP or a mixer.
-        result = OboeStream_getFramesPerBurst(mStream, &mFramesPerBurst);
-        if (result != OBOE_OK) goto finish2;
+        result = AAudioStream_getFramesPerBurst(mStream, &mFramesPerBurst);
+        if (result != AAUDIO_OK) goto finish2;
         // Some DMA might use very short bursts. We don't need to write such small
         // buffers. But it helps to use a multiple of the burst size for predictable scheduling.
         while (mFramesPerBurst < 48) {
@@ -101,9 +101,9 @@ public:
         }
         printf("DataFormat: final framesPerBurst = %d\n",mFramesPerBurst);
 
-        result = OboeStream_getFormat(mStream, &mDataFormat);
-        if (result != OBOE_OK) {
-            fprintf(stderr, "ERROR - OboeStream_getFormat() returned %d\n", result);
+        result = AAudioStream_getFormat(mStream, &mDataFormat);
+        if (result != AAUDIO_OK) {
+            fprintf(stderr, "ERROR - AAudioStream_getFormat() returned %d\n", result);
             goto finish2;
         }
 
@@ -111,75 +111,75 @@ public:
         mOutputBuffer = new float[mFramesPerBurst * mSamplesPerFrame];
         if (mOutputBuffer == nullptr) {
             fprintf(stderr, "ERROR - could not allocate data buffer\n");
-            result = OBOE_ERROR_NO_MEMORY;
+            result = AAUDIO_ERROR_NO_MEMORY;
         }
 
         // If needed allocate a buffer for converting float to int16_t.
-        if (mDataFormat == OBOE_AUDIO_FORMAT_PCM16) {
+        if (mDataFormat == AAUDIO_FORMAT_PCM16) {
             mConversionBuffer = new int16_t[mFramesPerBurst * mSamplesPerFrame];
             if (mConversionBuffer == nullptr) {
                 fprintf(stderr, "ERROR - could not allocate conversion buffer\n");
-                result = OBOE_ERROR_NO_MEMORY;
+                result = AAUDIO_ERROR_NO_MEMORY;
             }
         }
         return result;
 
      finish2:
-        OboeStream_close(mStream);
-        mStream = OBOE_HANDLE_INVALID;
+        AAudioStream_close(mStream);
+        mStream = AAUDIO_HANDLE_INVALID;
      finish1:
-        OboeStreamBuilder_delete(mBuilder);
-        mBuilder = OBOE_HANDLE_INVALID;
+        AAudioStreamBuilder_delete(mBuilder);
+        mBuilder = AAUDIO_HANDLE_INVALID;
         return result;
     }
 
-    oboe_result_t close() {
-        if (mStream != OBOE_HANDLE_INVALID) {
+    aaudio_result_t close() {
+        if (mStream != AAUDIO_HANDLE_INVALID) {
             stop();
-            printf("call OboeStream_close(0x%08x)\n", mStream);  fflush(stdout);
-            OboeStream_close(mStream);
-            mStream = OBOE_HANDLE_INVALID;
-            OboeStreamBuilder_delete(mBuilder);
-            mBuilder = OBOE_HANDLE_INVALID;
+            printf("call AAudioStream_close(0x%08x)\n", mStream);  fflush(stdout);
+            AAudioStream_close(mStream);
+            mStream = AAUDIO_HANDLE_INVALID;
+            AAudioStreamBuilder_delete(mBuilder);
+            mBuilder = AAUDIO_HANDLE_INVALID;
             delete mOutputBuffer;
             mOutputBuffer = nullptr;
             delete mConversionBuffer;
             mConversionBuffer = nullptr;
         }
-        return OBOE_OK;
+        return AAUDIO_OK;
     }
 
     // Start a thread that will call the callback proc.
-    oboe_result_t start() {
+    aaudio_result_t start() {
         mEnabled = true;
-        oboe_nanoseconds_t nanosPerBurst = mFramesPerBurst * OBOE_NANOS_PER_SECOND
+        aaudio_nanoseconds_t nanosPerBurst = mFramesPerBurst * AAUDIO_NANOS_PER_SECOND
                                            / mFramesPerSecond;
-        return OboeStream_createThread(mStream, nanosPerBurst,
-                                       SimpleOboePlayerThreadProc,
+        return AAudioStream_createThread(mStream, nanosPerBurst,
+                                       SimpleAAudioPlayerThreadProc,
                                        this);
     }
 
     // Tell the thread to stop.
-    oboe_result_t stop() {
+    aaudio_result_t stop() {
         mEnabled = false;
-        return OboeStream_joinThread(mStream, nullptr, 2 * OBOE_NANOS_PER_SECOND);
+        return AAudioStream_joinThread(mStream, nullptr, 2 * AAUDIO_NANOS_PER_SECOND);
     }
 
-    oboe_result_t callbackLoop() {
+    aaudio_result_t callbackLoop() {
         int32_t framesWritten = 0;
         int32_t xRunCount = 0;
-        oboe_result_t result = OBOE_OK;
+        aaudio_result_t result = AAUDIO_OK;
 
-        result = OboeStream_requestStart(mStream);
-        if (result != OBOE_OK) {
-            fprintf(stderr, "ERROR - OboeStream_requestStart() returned %d\n", result);
+        result = AAudioStream_requestStart(mStream);
+        if (result != AAUDIO_OK) {
+            fprintf(stderr, "ERROR - AAudioStream_requestStart() returned %d\n", result);
             return result;
         }
 
         // Give up after several burst periods have passed.
         const int burstsPerTimeout = 8;
-        oboe_nanoseconds_t nanosPerTimeout =
-                        burstsPerTimeout * mFramesPerBurst * OBOE_NANOS_PER_SECOND
+        aaudio_nanoseconds_t nanosPerTimeout =
+                        burstsPerTimeout * mFramesPerBurst * AAUDIO_NANOS_PER_SECOND
                         / mFramesPerSecond;
 
         while (mEnabled && result >= 0) {
@@ -194,23 +194,23 @@ public:
                     mConversionBuffer[i] = (int16_t)(32767.0 * mOutputBuffer[i]);
                 }
                 // Write the application data to stream.
-                result = OboeStream_write(mStream, mConversionBuffer, mFramesPerBurst, nanosPerTimeout);
+                result = AAudioStream_write(mStream, mConversionBuffer, mFramesPerBurst, nanosPerTimeout);
             } else {
                 // Write the application data to stream.
-                result = OboeStream_write(mStream, mOutputBuffer, mFramesPerBurst, nanosPerTimeout);
+                result = AAudioStream_write(mStream, mOutputBuffer, mFramesPerBurst, nanosPerTimeout);
             }
             framesWritten += result;
             if (result < 0) {
-                fprintf(stderr, "ERROR - OboeStream_write() returned %zd\n", result);
+                fprintf(stderr, "ERROR - AAudioStream_write() returned %zd\n", result);
             }
         }
 
-        result = OboeStream_getXRunCount(mStream, &xRunCount);
-        printf("OboeStream_getXRunCount %d\n", xRunCount);
+        result = AAudioStream_getXRunCount(mStream, &xRunCount);
+        printf("AAudioStream_getXRunCount %d\n", xRunCount);
 
-        result = OboeStream_requestStop(mStream);
-        if (result != OBOE_OK) {
-            fprintf(stderr, "ERROR - OboeStream_requestStart() returned %d\n", result);
+        result = AAudioStream_requestStop(mStream);
+        if (result != AAUDIO_OK) {
+            fprintf(stderr, "ERROR - AAudioStream_requestStart() returned %d\n", result);
             return result;
         }
 
@@ -218,24 +218,24 @@ public:
     }
 
 private:
-    OboeStreamBuilder   mBuilder = OBOE_HANDLE_INVALID;
-    OboeStream          mStream = OBOE_HANDLE_INVALID;
+    AAudioStreamBuilder   mBuilder = AAUDIO_HANDLE_INVALID;
+    AAudioStream          mStream = AAUDIO_HANDLE_INVALID;
     float            *  mOutputBuffer = nullptr;
     int16_t          *  mConversionBuffer = nullptr;
 
     audio_callback_proc_t * mCallbackProc = nullptr;
     void             *  mUserContext = nullptr;
-    oboe_sharing_mode_t mRequestedSharingMode = SHARING_MODE;
+    aaudio_sharing_mode_t mRequestedSharingMode = SHARING_MODE;
     int32_t             mSamplesPerFrame = 0;
     int32_t             mFramesPerSecond = 0;
-    oboe_size_frames_t  mFramesPerBurst = 0;
-    oboe_audio_format_t mDataFormat = OBOE_AUDIO_FORMAT_PCM16;
+    aaudio_size_frames_t  mFramesPerBurst = 0;
+    aaudio_audio_format_t mDataFormat = AAUDIO_FORMAT_PCM16;
 
     volatile bool       mEnabled = false; // used to request that callback exit its loop
 };
 
-static void *SimpleOboePlayerThreadProc(void *arg) {
-    SimpleOboePlayer *player = (SimpleOboePlayer *) arg;
+static void *SimpleAAudioPlayerThreadProc(void *arg) {
+    SimpleAAudioPlayer *player = (SimpleAAudioPlayer *) arg;
     player->callbackLoop();
     return nullptr;
 }
@@ -261,17 +261,17 @@ int MyCallbackProc(float *outputBuffer, int32_t numFrames, void *userContext) {
 int main(int argc, char **argv)
 {
     (void)argc; // unused
-    SimpleOboePlayer player;
+    SimpleAAudioPlayer player;
     SineThreadedData_t myData;
-    oboe_result_t result;
+    aaudio_result_t result;
 
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
-    printf("%s - Play a sine wave using an Oboe Thread\n", argv[0]);
+    printf("%s - Play a sine wave using an AAudio Thread\n", argv[0]);
 
     result = player.open(MyCallbackProc, &myData);
-    if (result != OBOE_OK) {
+    if (result != AAUDIO_OK) {
         fprintf(stderr, "ERROR -  player.open() returned %d\n", result);
         goto error;
     }
@@ -284,7 +284,7 @@ int main(int argc, char **argv)
     myData.samplesPerFrame = player.getSamplesPerFrame();
 
     result = player.start();
-    if (result != OBOE_OK) {
+    if (result != AAUDIO_OK) {
         fprintf(stderr, "ERROR -  player.start() returned %d\n", result);
         goto error;
     }
@@ -299,12 +299,12 @@ int main(int argc, char **argv)
     printf("Woke up now.\n");
 
     result = player.stop();
-    if (result != OBOE_OK) {
+    if (result != AAUDIO_OK) {
         fprintf(stderr, "ERROR -  player.stop() returned %d\n", result);
         goto error;
     }
     result = player.close();
-    if (result != OBOE_OK) {
+    if (result != AAUDIO_OK) {
         fprintf(stderr, "ERROR -  player.close() returned %d\n", result);
         goto error;
     }
@@ -313,7 +313,7 @@ int main(int argc, char **argv)
     return EXIT_SUCCESS;
 error:
     player.close();
-    printf("exiting - Oboe result = %d = %s\n", result, Oboe_convertResultToText(result));
+    printf("exiting - AAudio result = %d = %s\n", result, AAudio_convertResultToText(result));
     return EXIT_FAILURE;
 }
 

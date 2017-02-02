@@ -60,7 +60,7 @@ public:
      * @param address pointer to be converted to a handle
      * @return a valid handle or a negative error
      */
-    oboe_handle_t put(handle_tracker_type_t expectedType, handle_tracker_address_t address);
+    aaudio_handle_t put(handle_tracker_type_t expectedType, handle_tracker_address_t address);
 
     /**
      * Get the original pointer associated with the handle.
@@ -72,7 +72,7 @@ public:
      * @param handle to be converted to a pointer
      * @return address associated with handle or nullptr
      */
-    handle_tracker_address_t get(handle_tracker_type_t expectedType, oboe_handle_t handle) const;
+    handle_tracker_address_t get(handle_tracker_type_t expectedType, aaudio_handle_t handle) const;
 
     /**
      * Free up the storage associated with the handle.
@@ -84,7 +84,7 @@ public:
      * @param handle to be removed from tracking
      * @return address associated with handle or nullptr if not found
      */
-    handle_tracker_address_t remove(handle_tracker_type_t expectedType, oboe_handle_t handle);
+    handle_tracker_address_t remove(handle_tracker_type_t expectedType, aaudio_handle_t handle);
 
 private:
     const int32_t               mMaxHandleCount;   // size of array
@@ -115,7 +115,7 @@ private:
      * Validate the handle and return the corresponding index.
      * @return slot index or a negative error
      */
-    handle_tracker_slot_t handleToIndex(oboe_handle_t handle, handle_tracker_type_t type) const;
+    handle_tracker_slot_t handleToIndex(aaudio_handle_t handle, handle_tracker_type_t type) const;
 
     /**
      * Construct a handle from a header and an index.
@@ -123,7 +123,7 @@ private:
      * @param index slot index returned from allocateSlot
      * @return handle or a negative error
      */
-    static oboe_handle_t buildHandle(handle_tracker_header_t header, handle_tracker_slot_t index);
+    static aaudio_handle_t buildHandle(handle_tracker_header_t header, handle_tracker_slot_t index);
 
     /**
      * Combine a type and a generation field into a header.
@@ -136,14 +136,14 @@ private:
      * Does not validate the handle.
      * @return index associated with a handle
      */
-    static handle_tracker_slot_t extractIndex(oboe_handle_t handle);
+    static handle_tracker_slot_t extractIndex(aaudio_handle_t handle);
 
     /**
      * Extract the generation from a handle.
      * Does not validate the handle.
      * @return generation associated with a handle
      */
-    static handle_tracker_generation_t extractGeneration(oboe_handle_t handle);
+    static handle_tracker_generation_t extractGeneration(aaudio_handle_t handle);
 
 };
 

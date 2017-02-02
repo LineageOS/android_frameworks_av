@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "OboeAudio"
+#define LOG_TAG "AAudio"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
 #include <cassert>
-#include <oboe/OboeDefinitions.h>
+#include <aaudio/AAudioDefinitions.h>
 
 #include "AudioEndpointParcelable.h"
 #include "AudioEndpoint.h"
-#include "OboeServiceMessage.h"
+#include "AAudioServiceMessage.h"
 
 using namespace android;
-using namespace oboe;
+using namespace aaudio;
 
 AudioEndpoint::AudioEndpoint()
     : mOutputFreeRunning(false)
@@ -80,13 +80,13 @@ void AudioEndpoint_validateDescriptor(const EndpointDescriptor *pEndpointDescrip
     AudioEndpoint_validateQueueDescriptor("data", &pEndpointDescriptor->downDataQueueDescriptor);
 }
 
-oboe_result_t AudioEndpoint::configure(const EndpointDescriptor *pEndpointDescriptor)
+aaudio_result_t AudioEndpoint::configure(const EndpointDescriptor *pEndpointDescriptor)
 {
-    oboe_result_t result = OBOE_OK;
+    aaudio_result_t result = AAUDIO_OK;
     AudioEndpoint_validateDescriptor(pEndpointDescriptor); // FIXME remove after debugging
 
     const RingBufferDescriptor *descriptor = &pEndpointDescriptor->upMessageQueueDescriptor;
-    assert(descriptor->bytesPerFrame == sizeof(OboeServiceMessage));
+    assert(descriptor->bytesPerFrame == sizeof(AAudioServiceMessage));
     assert(descriptor->readCounterAddress != nullptr);
     assert(descriptor->writeCounterAddress != nullptr);
     mUpCommandQueue = new FifoBuffer(
@@ -137,12 +137,12 @@ oboe_result_t AudioEndpoint::configure(const EndpointDescriptor *pEndpointDescri
     return result;
 }
 
-oboe_result_t AudioEndpoint::readUpCommand(OboeServiceMessage *commandPtr)
+aaudio_result_t AudioEndpoint::readUpCommand(AAudioServiceMessage *commandPtr)
 {
     return mUpCommandQueue->read(commandPtr, 1);
 }
 
-oboe_result_t AudioEndpoint::writeDataNow(const void *buffer, int32_t numFrames)
+aaudio_result_t AudioEndpoint::writeDataNow(const void *buffer, int32_t numFrames)
 {
     return mDownDataQueue->write(buffer, numFrames);
 }
@@ -167,15 +167,15 @@ fifo_counter_t AudioEndpoint::getDownDataWriteCounter()
     return mDownDataQueue->getWriteCounter();
 }
 
-oboe_size_frames_t AudioEndpoint::setBufferSizeInFrames(oboe_size_frames_t requestedFrames,
-                                            oboe_size_frames_t *actualFrames)
+aaudio_size_frames_t AudioEndpoint::setBufferSizeInFrames(aaudio_size_frames_t requestedFrames,
+                                            aaudio_size_frames_t *actualFrames)
 {
     if (requestedFrames < ENDPOINT_DATA_QUEUE_SIZE_MIN) {
         requestedFrames = ENDPOINT_DATA_QUEUE_SIZE_MIN;
     }
     mDownDataQueue->setThreshold(requestedFrames);
     *actualFrames = mDownDataQueue->getThreshold();
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
 int32_t AudioEndpoint::getBufferSizeInFrames() const

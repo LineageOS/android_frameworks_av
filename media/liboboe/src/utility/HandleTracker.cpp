@@ -15,7 +15,7 @@
  *
  */
 
-#define LOG_TAG "OboeAudio"
+#define LOG_TAG "AAudio"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -24,7 +24,7 @@
 #include <stdint.h>
 #include <utils/Mutex.h>
 
-#include <oboe/OboeDefinitions.h>
+#include <aaudio/AAudioDefinitions.h>
 #include "HandleTracker.h"
 
 using android::Mutex;
@@ -112,13 +112,13 @@ handle_tracker_generation_t HandleTracker::nextGeneration_l(handle_tracker_slot_
     return generation;
 }
 
-oboe_handle_t HandleTracker::put(handle_tracker_type_t type, void *address)
+aaudio_handle_t HandleTracker::put(handle_tracker_type_t type, void *address)
 {
     if (type < 0 || type >= HANDLE_TRACKER_MAX_TYPES) {
-        return static_cast<oboe_handle_t>(OBOE_ERROR_OUT_OF_RANGE);
+        return static_cast<aaudio_handle_t>(AAUDIO_ERROR_OUT_OF_RANGE);
     }
     if (!isInitialized()) {
-        return static_cast<oboe_handle_t>(OBOE_ERROR_NO_MEMORY);
+        return static_cast<aaudio_handle_t>(AAUDIO_ERROR_NO_MEMORY);
     }
 
     Mutex::Autolock _l(mLock);
@@ -127,7 +127,7 @@ oboe_handle_t HandleTracker::put(handle_tracker_type_t type, void *address)
     handle_tracker_slot_t index = allocateSlot_l();
     if (index == SLOT_UNAVAILABLE) {
         ALOGE("HandleTracker::put() no room for more handles");
-        return static_cast<oboe_handle_t>(OBOE_ERROR_NO_FREE_HANDLES);
+        return static_cast<aaudio_handle_t>(AAUDIO_ERROR_NO_FREE_HANDLES);
     }
 
     // Cycle the generation counter so stale handles can be detected.
@@ -140,20 +140,20 @@ oboe_handle_t HandleTracker::put(handle_tracker_type_t type, void *address)
     // TODO use store release to enforce memory order with get()
 
     // Generate a handle.
-    oboe_handle_t handle = buildHandle(inputHeader, index);
+    aaudio_handle_t handle = buildHandle(inputHeader, index);
 
     ALOGV("HandleTracker::put(%p) returns 0x%08x", address, handle);
     return handle;
 }
 
 handle_tracker_slot_t HandleTracker::handleToIndex(handle_tracker_type_t type,
-                                                   oboe_handle_t handle) const
+                                                   aaudio_handle_t handle) const
 {
     // Validate the handle.
     handle_tracker_slot_t index = extractIndex(handle);
     if (index >= mMaxHandleCount) {
         ALOGE("HandleTracker::handleToIndex() invalid handle = 0x%08X", handle);
-        return static_cast<oboe_handle_t>(OBOE_ERROR_INVALID_HANDLE);
+        return static_cast<aaudio_handle_t>(AAUDIO_ERROR_INVALID_HANDLE);
     }
     handle_tracker_generation_t handleGeneration = extractGeneration(handle);
     handle_tracker_header_t inputHeader = buildHeader(type, handleGeneration);
@@ -162,12 +162,12 @@ handle_tracker_slot_t HandleTracker::handleToIndex(handle_tracker_type_t type,
     if (inputHeader != mHandleHeaders[index]) {
         ALOGE("HandleTracker::handleToIndex() inputHeader = 0x%08x != mHandleHeaders[%d] = 0x%08x",
              inputHeader, index, mHandleHeaders[index]);
-        return static_cast<oboe_handle_t>(OBOE_ERROR_INVALID_HANDLE);
+        return static_cast<aaudio_handle_t>(AAUDIO_ERROR_INVALID_HANDLE);
     }
     return index;
 }
 
-handle_tracker_address_t HandleTracker::get(handle_tracker_type_t type, oboe_handle_t handle) const
+handle_tracker_address_t HandleTracker::get(handle_tracker_type_t type, aaudio_handle_t handle) const
 {
     if (!isInitialized()) {
         return nullptr;
@@ -182,7 +182,7 @@ handle_tracker_address_t HandleTracker::get(handle_tracker_type_t type, oboe_han
     }
 }
 
-handle_tracker_address_t HandleTracker::remove(handle_tracker_type_t type, oboe_handle_t handle) {
+handle_tracker_address_t HandleTracker::remove(handle_tracker_type_t type, aaudio_handle_t handle) {
     if (!isInitialized()) {
         return nullptr;
     }
@@ -208,9 +208,9 @@ handle_tracker_address_t HandleTracker::remove(handle_tracker_type_t type, oboe_
     }
 }
 
-oboe_handle_t HandleTracker::buildHandle(handle_tracker_header_t typeGeneration,
+aaudio_handle_t HandleTracker::buildHandle(handle_tracker_header_t typeGeneration,
                                          handle_tracker_slot_t index) {
-    return (oboe_handle_t)((typeGeneration << GENERATION_SHIFT) | (index & INDEX_MASK));
+    return (aaudio_handle_t)((typeGeneration << GENERATION_SHIFT) | (index & INDEX_MASK));
 }
 
 handle_tracker_header_t HandleTracker::buildHeader(handle_tracker_type_t type,
@@ -220,12 +220,12 @@ handle_tracker_header_t HandleTracker::buildHeader(handle_tracker_type_t type,
         | (generation & GENERATION_MASK));
 }
 
-handle_tracker_slot_t HandleTracker::extractIndex(oboe_handle_t handle)
+handle_tracker_slot_t HandleTracker::extractIndex(aaudio_handle_t handle)
 {
     return handle & INDEX_MASK;
 }
 
-handle_tracker_generation_t HandleTracker::extractGeneration(oboe_handle_t handle)
+handle_tracker_generation_t HandleTracker::extractGeneration(aaudio_handle_t handle)
 {
     return (handle >> GENERATION_SHIFT) & GENERATION_MASK;
 }

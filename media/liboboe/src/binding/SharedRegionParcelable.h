@@ -22,7 +22,7 @@
 #include <sys/mman.h>
 #include <binder/Parcelable.h>
 
-#include <oboe/OboeDefinitions.h>
+#include <aaudio/AAudioDefinitions.h>
 
 #include "binding/SharedMemoryParcelable.h"
 
@@ -30,7 +30,7 @@ using android::status_t;
 using android::Parcel;
 using android::Parcelable;
 
-namespace oboe {
+namespace aaudio {
 
 class SharedRegionParcelable : public Parcelable {
 public:
@@ -43,9 +43,9 @@ public:
 
     virtual status_t readFromParcel(const Parcel* parcel) override;
 
-    oboe_result_t resolve(SharedMemoryParcelable *memoryParcels, void **regionAddressPtr);
+    aaudio_result_t resolve(SharedMemoryParcelable *memoryParcels, void **regionAddressPtr);
 
-    oboe_result_t validate();
+    aaudio_result_t validate();
 
     void dump();
 
@@ -55,6 +55,6 @@ protected:
     int32_t mSizeInBytes       = 0;
 };
 
-} /* namespace oboe */
+} /* namespace aaudio */
 
 #endif //BINDING_SHAREDREGIONPARCELABLE_H

@@ -19,7 +19,7 @@
 #include <sys/mman.h>
 #include <binder/Parcelable.h>
 
-#include <oboe/OboeDefinitions.h>
+#include <aaudio/AAudioDefinitions.h>
 
 #include "binding/SharedMemoryParcelable.h"
 #include "binding/SharedRegionParcelable.h"
@@ -29,7 +29,7 @@ using android::status_t;
 using android::Parcel;
 using android::Parcelable;
 
-using namespace oboe;
+using namespace aaudio;
 
 SharedRegionParcelable::SharedRegionParcelable() {}
 SharedRegionParcelable::~SharedRegionParcelable() {}
@@ -60,36 +60,36 @@ status_t SharedRegionParcelable::readFromParcel(const Parcel* parcel) {
     return NO_ERROR; // TODO check for errors above
 }
 
-oboe_result_t SharedRegionParcelable::resolve(SharedMemoryParcelable *memoryParcels,
+aaudio_result_t SharedRegionParcelable::resolve(SharedMemoryParcelable *memoryParcels,
                                               void **regionAddressPtr) {
     if (mSizeInBytes == 0) {
         *regionAddressPtr = nullptr;
-        return OBOE_OK;
+        return AAUDIO_OK;
     }
     if (mSharedMemoryIndex < 0) {
         ALOGE("SharedRegionParcelable invalid mSharedMemoryIndex = %d", mSharedMemoryIndex);
-        return OBOE_ERROR_INTERNAL;
+        return AAUDIO_ERROR_INTERNAL;
     }
     SharedMemoryParcelable *memoryParcel = &memoryParcels[mSharedMemoryIndex];
     return memoryParcel->resolve(mOffsetInBytes, mSizeInBytes, regionAddressPtr);
 }
 
-oboe_result_t SharedRegionParcelable::validate() {
+aaudio_result_t SharedRegionParcelable::validate() {
     if (mSizeInBytes < 0 || mSizeInBytes >= MAX_MMAP_SIZE) {
         ALOGE("SharedRegionParcelable invalid mSizeInBytes = %d", mSizeInBytes);
-        return OBOE_ERROR_INTERNAL;
+        return AAUDIO_ERROR_INTERNAL;
     }
     if (mSizeInBytes > 0) {
         if (mOffsetInBytes < 0 || mOffsetInBytes >= MAX_MMAP_OFFSET) {
             ALOGE("SharedRegionParcelable invalid mOffsetInBytes = %d", mOffsetInBytes);
-            return OBOE_ERROR_INTERNAL;
+            return AAUDIO_ERROR_INTERNAL;
         }
         if (mSharedMemoryIndex < 0 || mSharedMemoryIndex >= MAX_SHARED_MEMORIES) {
             ALOGE("SharedRegionParcelable invalid mSharedMemoryIndex = %d", mSharedMemoryIndex);
-            return OBOE_ERROR_INTERNAL;
+            return AAUDIO_ERROR_INTERNAL;
         }
     }
-    return OBOE_OK;
+    return AAUDIO_OK;
 }
 
 void SharedRegionParcelable::dump() {

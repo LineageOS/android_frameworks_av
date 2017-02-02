@@ -14,67 +14,67 @@
  * limitations under the License.
  */
 
-#ifndef BINDING_IOBOEAUDIOSERVICE_H
-#define BINDING_IOBOEAUDIOSERVICE_H
+#ifndef BINDING_IAAUDIOSERVICE_H
+#define BINDING_IAAUDIOSERVICE_H
 
 #include <stdint.h>
 #include <utils/RefBase.h>
 #include <binder/TextOutput.h>
 #include <binder/IInterface.h>
 
-#include <oboe/OboeAudio.h>
+#include <aaudio/AAudio.h>
 
-#include "binding/OboeServiceDefinitions.h"
+#include "binding/AAudioServiceDefinitions.h"
 #include "binding/AudioEndpointParcelable.h"
-#include "binding/OboeStreamRequest.h"
-#include "binding/OboeStreamConfiguration.h"
+#include "binding/AAudioStreamRequest.h"
+#include "binding/AAudioStreamConfiguration.h"
 
 
 namespace android {
 
 // Interface (our AIDL) - Shared by server and client
-class IOboeAudioService : public IInterface {
+class IAAudioService : public IInterface {
 public:
 
-    DECLARE_META_INTERFACE(OboeAudioService);
+    DECLARE_META_INTERFACE(AAudioService);
 
-    virtual oboe_handle_t openStream(oboe::OboeStreamRequest &request,
-                                     oboe::OboeStreamConfiguration &configuration) = 0;
+    virtual aaudio_handle_t openStream(aaudio::AAudioStreamRequest &request,
+                                     aaudio::AAudioStreamConfiguration &configuration) = 0;
 
-    virtual oboe_result_t closeStream(oboe_handle_t streamHandle) = 0;
+    virtual aaudio_result_t closeStream(aaudio_handle_t streamHandle) = 0;
 
     /* Get an immutable description of the in-memory queues
     * used to communicate with the underlying HAL or Service.
     */
-    virtual oboe_result_t getStreamDescription(oboe_handle_t streamHandle,
-                                               oboe::AudioEndpointParcelable &parcelable) = 0;
+    virtual aaudio_result_t getStreamDescription(aaudio_handle_t streamHandle,
+                                               aaudio::AudioEndpointParcelable &parcelable) = 0;
 
     /**
      * Start the flow of data.
      */
-    virtual oboe_result_t startStream(oboe_handle_t streamHandle) = 0;
+    virtual aaudio_result_t startStream(aaudio_handle_t streamHandle) = 0;
 
     /**
      * Stop the flow of data such that start() can resume without loss of data.
      */
-    virtual oboe_result_t pauseStream(oboe_handle_t streamHandle) = 0;
+    virtual aaudio_result_t pauseStream(aaudio_handle_t streamHandle) = 0;
 
     /**
      *  Discard any data held by the underlying HAL or Service.
      */
-    virtual oboe_result_t flushStream(oboe_handle_t streamHandle) = 0;
+    virtual aaudio_result_t flushStream(aaudio_handle_t streamHandle) = 0;
 
     /**
      * Manage the specified thread as a low latency audio thread.
      */
-    virtual oboe_result_t registerAudioThread(oboe_handle_t streamHandle, pid_t clientThreadId,
-                                              oboe_nanoseconds_t periodNanoseconds) = 0;
+    virtual aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle, pid_t clientThreadId,
+                                              aaudio_nanoseconds_t periodNanoseconds) = 0;
 
-    virtual oboe_result_t unregisterAudioThread(oboe_handle_t streamHandle,
+    virtual aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
                                                 pid_t clientThreadId) = 0;
 };
 
-class BnOboeAudioService : public BnInterface<IOboeAudioService> {
+class BnAAudioService : public BnInterface<IAAudioService> {
 public:
     virtual status_t onTransact(uint32_t code, const Parcel& data,
                                 Parcel* reply, uint32_t flags = 0);
@@ -83,4 +83,4 @@ public:
 
 } /* namespace android */
 
-#endif //BINDING_IOBOEAUDIOSERVICE_H
+#endif //BINDING_IAAUDIOSERVICE_H
