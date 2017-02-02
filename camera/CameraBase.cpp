@@ -86,7 +86,7 @@ namespace {
 
 // establish binder interface to camera service
 template <typename TCam, typename TCamTraits>
-const sp<::android::hardware::ICameraService>& CameraBase<TCam, TCamTraits>::getCameraService()
+const sp<::android::hardware::ICameraService> CameraBase<TCam, TCamTraits>::getCameraService()
 {
     Mutex::Autolock _l(gLock);
     if (gCameraService.get() == 0) {
@@ -118,7 +118,7 @@ sp<TCam> CameraBase<TCam, TCamTraits>::connect(int cameraId,
     ALOGV("%s: connect", __FUNCTION__);
     sp<TCam> c = new TCam(cameraId);
     sp<TCamCallbacks> cl = c;
-    const sp<::android::hardware::ICameraService>& cs = getCameraService();
+    const sp<::android::hardware::ICameraService> cs = getCameraService();
 
     binder::Status ret;
     if (cs != nullptr) {
@@ -226,7 +226,7 @@ int CameraBase<TCam, TCamTraits>::getNumberOfCameras() {
 template <typename TCam, typename TCamTraits>
 status_t CameraBase<TCam, TCamTraits>::getCameraInfo(int cameraId,
         struct hardware::CameraInfo* cameraInfo) {
-    const sp<::android::hardware::ICameraService>& cs = getCameraService();
+    const sp<::android::hardware::ICameraService> cs = getCameraService();
     if (cs == 0) return UNKNOWN_ERROR;
     binder::Status res = cs->getCameraInfo(cameraId, cameraInfo);
     return res.isOk() ? OK : res.serviceSpecificErrorCode();
