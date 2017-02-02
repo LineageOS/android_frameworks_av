@@ -10,4 +10,8 @@ cc_library_shared {
     ],
 
     include_dirs: ["system/media/audio_effects/include"],
+
+    local_include_dirs:["include"],
+
+    export_include_dirs: ["include"],
 }
