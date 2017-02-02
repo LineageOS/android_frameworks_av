@@ -179,6 +179,7 @@ void MtpServer::run() {
 
     if (sHandle->start()) {
         ALOGE("Failed to start usb driver!");
+        sHandle->close();
         return;
     }
 
