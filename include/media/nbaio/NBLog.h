@@ -40,6 +40,12 @@ enum Event {
     EVENT_RESERVED,
     EVENT_STRING,               // ASCII string, not NUL-terminated
     EVENT_TIMESTAMP,            // clock_gettime(CLOCK_MONOTONIC)
+    EVENT_INTEGER,
+    EVENT_FLOAT,
+    EVENT_PID,
+    EVENT_START_FMT,            // logFormat start event: entry includes format string, following
+                                // entries contain format arguments
+    EVENT_END_FMT,              // end of logFormat argument list
 };
 
 // ---------------------------------------------------------------------------
@@ -72,6 +78,13 @@ public:
 //  byte[2+mLength-1]   mData[mLength-1]
 //  byte[2+mLength]     duplicate copy of mLength to permit reverse scan
 //  byte[3+mLength]     start of next log entry
+
+    static void    appendInt(String8 *body, const void *data);
+    static void    appendFloat(String8 *body, const void *data);
+    static void    appendPID(String8 *body, const void *data);
+    static int     handleFormat(const char *fmt, size_t length, const uint8_t *data,
+                                String8 *timestamp, String8 *body);
+    static void    appendTimestamp(String8 *body, const void *data);
 
 public:
 
@@ -133,7 +146,15 @@ public:
     virtual void    logf(const char *fmt, ...) __attribute__ ((format (printf, 2, 3)));
     virtual void    logvf(const char *fmt, va_list ap);
     virtual void    logTimestamp();
-    virtual void    logTimestamp(const struct timespec& ts);
+    virtual void    logTimestamp(const struct timespec &ts);
+    virtual void    logInteger(const int x);
+    virtual void    logFloat(const float x);
+    virtual void    logPID();
+    virtual void    logFormat(const char *fmt, ...);
+    virtual void    logVFormat(const char *fmt, va_list ap);
+    virtual void    logStart(const char *fmt);
+    virtual void    logEnd();
+
 
     virtual bool    isEnabled() const;
 
@@ -170,7 +191,12 @@ public:
     virtual void    logf(const char *fmt, ...) __attribute__ ((format (printf, 2, 3)));
     virtual void    logvf(const char *fmt, va_list ap);
     virtual void    logTimestamp();
-    virtual void    logTimestamp(const struct timespec& ts);
+    virtual void    logTimestamp(const struct timespec &ts);
+    virtual void    logInteger(const int x);
+    virtual void    logFloat(const float x);
+    virtual void    logPID();
+    virtual void    logStart(const char *fmt);
+    virtual void    logEnd();
 
     virtual bool    isEnabled() const;
     virtual bool    setEnabled(bool enabled);

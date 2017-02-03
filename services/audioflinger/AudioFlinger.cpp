@@ -70,6 +70,8 @@
 //#define BUFLOG_NDEBUG 0
 #include <BufLog.h>
 
+#include "TypedLogger.h"
+
 // ----------------------------------------------------------------------------
 
 // Note: the following macro is used for extremely verbose logging message.  In
