@@ -198,6 +198,10 @@ void MediaBuffer::setObserver(MediaBufferObserver *observer) {
     mObserver = observer;
 }
 
+int MediaBuffer::refcount() const {
+    return mRefCount;
+}
+
 MediaBuffer *MediaBuffer::clone() {
     CHECK(mGraphicBuffer == NULL);
 
