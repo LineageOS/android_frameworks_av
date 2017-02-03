@@ -26,7 +26,7 @@
 
 namespace android {
 
-static const char kDeadlockedString[] = "MediaLogService may be deadlocked\n";
+// static const char kDeadlockedString[] = "MediaLogService may be deadlocked\n";
 
 void MediaLogService::registerWriter(const sp<IMemory>& shared, size_t size, const char *name)
 {
@@ -36,9 +36,10 @@ void MediaLogService::registerWriter(const sp<IMemory>& shared, size_t size, con
         return;
     }
     sp<NBLog::Reader> reader(new NBLog::Reader(shared, size));
-    NamedReader namedReader(reader, name);
+    NBLog::NamedReader namedReader(reader, name);
     Mutex::Autolock _l(mLock);
     mNamedReaders.add(namedReader);
+    mMerger.addReader(namedReader);
 }
 
 void MediaLogService::unregisterWriter(const sp<IMemory>& shared)
@@ -81,7 +82,8 @@ status_t MediaLogService::dump(int fd, const Vector<String16>& args __unused)
         return NO_ERROR;
     }
 
-    Vector<NamedReader> namedReaders;
+#if 0
+    Vector<NBLog::NamedReader> namedReaders;
     {
         bool locked = dumpTryLock(mLock);
 
@@ -95,19 +97,23 @@ status_t MediaLogService::dump(int fd, const Vector<String16>& args __unused)
             }
             return NO_ERROR;
         }
-        namedReaders = mNamedReaders;
+            // namedReaders = mNamedReaders;
+            // for (size_t i = 0; i < namedReaders.size(); i++) {
+            //     const NBLog::NamedReader& namedReader = namedReaders[i];
+            //     if (fd >= 0) {
+            //         dprintf(fd, "\n%s:\n", namedReader.name());
+            //     } else {
+            //         ALOGI("%s:", namedReader.name());
+            //     }
+            //     namedReader.reader()->dump(fd, 0 /*indent*/);
+            // }
+
         mLock.unlock();
     }
+#endif
 
-    for (size_t i = 0; i < namedReaders.size(); i++) {
-        const NamedReader& namedReader = namedReaders[i];
-        if (fd >= 0) {
-            dprintf(fd, "\n%s:\n", namedReader.name());
-        } else {
-            ALOGI("%s:", namedReader.name());
-        }
-        namedReader.reader()->dump(fd, 0 /*indent*/);
-    }
+    mMerger.merge();
+    mMergeReader.dump(fd);
     return NO_ERROR;
 }
 
