@@ -103,9 +103,7 @@ public:
     MediaBuffer *clone();
 
     // sum of localRefcount() and remoteRefcount()
-    int refcount() const {
-        return localRefcount() + remoteRefcount();
-    }
+    int refcount() const;
 
     int localRefcount() const {
         return mRefCount;
