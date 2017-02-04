@@ -1,0 +1,62 @@
+--- media/libeffects/visualizer/EffectVisualizer.cpp
++++ media/libeffects/visualizer/EffectVisualizer.cpp
+@@ -523,18 +525,29 @@
+             break;
+         }
+         switch (*(uint32_t *)p->data) {
+-        case VISUALIZER_PARAM_CAPTURE_SIZE:
+-            pContext->mCaptureSize = *((uint32_t *)p->data + 1);
+-            ALOGV("set mCaptureSize = %" PRIu32, pContext->mCaptureSize);
+-            break;
++        case VISUALIZER_PARAM_CAPTURE_SIZE: {
++            const uint32_t captureSize = *((uint32_t *)p->data + 1);
++            if (captureSize > VISUALIZER_CAPTURE_SIZE_MAX) {
++                android_errorWriteLog(0x534e4554, "31781965");
++                *(int32_t *)pReplyData = -EINVAL;
++                ALOGW("set mCaptureSize = %u > %u", captureSize, VISUALIZER_CAPTURE_SIZE_MAX);
++            } else {
++                pContext->mCaptureSize = captureSize;
++                ALOGV("set mCaptureSize = %u", captureSize);
++            }
++            } break;
+         case VISUALIZER_PARAM_SCALING_MODE:
+             pContext->mScalingMode = *((uint32_t *)p->data + 1);
+             ALOGV("set mScalingMode = %" PRIu32, pContext->mScalingMode);
+             break;
+-        case VISUALIZER_PARAM_LATENCY:
+-            pContext->mLatency = *((uint32_t *)p->data + 1);
+-            ALOGV("set mLatency = %" PRIu32, pContext->mLatency);
+-            break;
++        case VISUALIZER_PARAM_LATENCY: {
++            uint32_t latency = *((uint32_t *)p->data + 1);
++            if (latency > MAX_LATENCY_MS) {
++                latency = MAX_LATENCY_MS; // clamp latency b/31781965
++            }
++            pContext->mLatency = latency;
++            ALOGV("set mLatency = %u", latency);
++            } break;
+         case VISUALIZER_PARAM_MEASUREMENT_MODE:
+             pContext->mMeasurementMode = *((uint32_t *)p->data + 1);
+             ALOGV("set mMeasurementMode = %" PRIu32, pContext->mMeasurementMode);
+@@ -573,10 +586,18 @@
+                 if (latencyMs < 0) {
+                     latencyMs = 0;
+                 }
+-                const uint32_t deltaSmpl =
+-                    pContext->mConfig.inputCfg.samplingRate * latencyMs / 1000;
+-                int32_t capturePoint = pContext->mCaptureIdx - captureSize - deltaSmpl;
++                uint32_t deltaSmpl = captureSize
++                        + pContext->mConfig.inputCfg.samplingRate * latencyMs / 1000;
+ 
++                // large sample rate, latency, or capture size, could cause overflow.
++                // do not offset more than the size of buffer.
++                if (deltaSmpl > CAPTURE_BUF_SIZE) {
++                    android_errorWriteLog(0x534e4554, "31781965");
++                    deltaSmpl = CAPTURE_BUF_SIZE;
++                }
++
++                int32_t capturePoint = pContext->mCaptureIdx - deltaSmpl;
++                // a negative capturePoint means we wrap the buffer.
+                 if (capturePoint < 0) {
+                     uint32_t size = -capturePoint;
+                     if (size > captureSize) {

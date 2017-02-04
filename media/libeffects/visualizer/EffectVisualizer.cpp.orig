@@ -58,8 +58,6 @@ enum visualizer_state_e {
 
 #define DISCARD_MEASUREMENTS_TIME_MS 2000 // discard measurements older than this number of ms
 
-#define MAX_LATENCY_MS 3000 // 3 seconds of latency for audio pipeline
-
 // maximum number of buffers for which we keep track of the measurements
 #define MEASUREMENT_WINDOW_MAX_SIZE_IN_BUFFERS 25 // note: buffer index is stored in uint8_t
 
