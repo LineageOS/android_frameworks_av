@@ -583,7 +583,7 @@ int MtpFfsHandle::sendFile(mtp_file_range mfr) {
     uint64_t file_length = mfr.length;
     uint32_t given_length = std::min(static_cast<uint64_t>(MAX_MTP_FILE_SIZE),
             file_length + sizeof(mtp_data_header));
-    uint64_t offset = 0;
+    uint64_t offset = mfr.offset;
     struct usb_endpoint_descriptor mBulkIn_desc;
     int packet_size;
 
@@ -594,7 +594,10 @@ int MtpFfsHandle::sendFile(mtp_file_range mfr) {
         packet_size = mBulkIn_desc.wMaxPacketSize;
     }
 
-    int init_read_len = packet_size - sizeof(mtp_data_header);
+    // If file_length is larger than a size_t, truncating would produce the wrong comparison.
+    // Instead, promote the left side to 64 bits, then truncate the small result.
+    int init_read_len = std::min(
+            static_cast<uint64_t>(packet_size - sizeof(mtp_data_header)), file_length);
 
     char *data = mBuffer1.data();
     char *data2 = mBuffer2.data();
@@ -620,10 +623,10 @@ int MtpFfsHandle::sendFile(mtp_file_range mfr) {
     if (TEMP_FAILURE_RETRY(pread(mfr.fd, reinterpret_cast<char*>(data) +
                     sizeof(mtp_data_header), init_read_len, offset))
             != init_read_len) return -1;
+    if (writeHandle(mBulkIn, data, sizeof(mtp_data_header) + init_read_len) == -1) return -1;
+    if (file_length == static_cast<unsigned>(init_read_len)) return 0;
     file_length -= init_read_len;
     offset += init_read_len;
-    if (writeHandle(mBulkIn, data, packet_size) == -1) return -1;
-    if (file_length == 0) return 0;
 
     // Break down the file into pieces that fit in buffers
     while(file_length > 0) {
