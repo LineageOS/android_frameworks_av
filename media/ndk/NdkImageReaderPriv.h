@@ -25,7 +25,8 @@
 #include <utils/Mutex.h>
 #include <utils/StrongPointer.h>
 
-#include <gui/CpuConsumer.h>
+#include <gui/BufferItem.h>
+#include <gui/BufferItemConsumer.h>
 #include <gui/Surface.h>
 
 #include <media/stagefright/foundation/ALooper.h>
@@ -48,11 +49,16 @@ namespace {
 
 struct AImageReader : public RefBase {
   public:
+    static const int32_t kDefaultUsage;
 
     static bool isSupportedFormat(int32_t format);
     static int getNumPlanesForFormat(int32_t format);
 
-    AImageReader(int32_t width, int32_t height, int32_t format, int32_t maxImages);
+    AImageReader(int32_t width,
+                 int32_t height,
+                 int32_t format,
+                 uint64_t usage,
+                 int32_t maxImages);
     ~AImageReader();
 
     // Inintialize AImageReader, uninitialized or failed to initialize AImageReader
@@ -68,22 +74,24 @@ struct AImageReader : public RefBase {
     int32_t        getWidth()     const { return mWidth; };
     int32_t        getHeight()    const { return mHeight; };
     int32_t        getFormat()    const { return mFormat; };
+    uint64_t       getUsage()     const { return mUsage; };
     int32_t        getMaxImages() const { return mMaxImages; };
-
 
   private:
 
     friend struct AImage; // for grabing reader lock
 
-    media_status_t acquireCpuConsumerImageLocked(/*out*/AImage** image);
-    CpuConsumer::LockedBuffer* getLockedBufferLocked();
-    void returnLockedBufferLocked(CpuConsumer::LockedBuffer* buffer);
+    BufferItem* getBufferItemLocked();
+    void returnBufferItemLocked(BufferItem* buffer);
+
+    // Called by AImageReader_acquireXXX to acquire a Buffer and setup AImage.
+    media_status_t acquireImageLocked(/*out*/AImage** image);
 
     // Called by AImage to close image
     void releaseImageLocked(AImage* image);
 
-    static int getBufferWidth(CpuConsumer::LockedBuffer* buffer);
-    static int getBufferHeight(CpuConsumer::LockedBuffer* buffer);
+    static int getBufferWidth(BufferItem* buffer);
+    static int getBufferHeight(BufferItem* buffer);
 
     media_status_t setImageListenerLocked(AImageReader_ImageListener* listener);
 
@@ -102,12 +110,15 @@ struct AImageReader : public RefBase {
     };
     sp<CallbackHandler> mHandler;
     sp<ALooper>         mCbLooper; // Looper thread where callbacks actually happen on
+    List<BufferItem*>   mBuffers;
 
-    List<CpuConsumer::LockedBuffer*> mBuffers;
     const int32_t mWidth;
     const int32_t mHeight;
     const int32_t mFormat;
+    const uint64_t mUsage;
     const int32_t mMaxImages;
+
+    // TODO(jwcai) Seems completely unused in AImageReader class.
     const int32_t mNumPlanes;
 
     struct FrameListener : public ConsumerBase::FrameAvailableListener {
@@ -130,7 +141,7 @@ struct AImageReader : public RefBase {
 
     sp<IGraphicBufferProducer> mProducer;
     sp<Surface>                mSurface;
-    sp<CpuConsumer>            mCpuConsumer;
+    sp<BufferItemConsumer>     mBufferItemConsumer;
     sp<ANativeWindow>          mWindow;
 
     List<AImage*>              mAcquiredImages;
