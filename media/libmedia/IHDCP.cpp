@@ -241,14 +241,11 @@ status_t BnHDCP::onTransact(
         case HDCP_ENCRYPT:
         {
             size_t size = data.readInt32();
-            size_t bufSize = 2 * size;
-
-            // watch out for overflow
             void *inData = NULL;
-            if (bufSize > size) {
-                inData = malloc(bufSize);
+            // watch out for overflow
+            if (size <= SIZE_MAX / 2) {
+                inData = malloc(2 * size);
             }
-
             if (inData == NULL) {
                 reply->writeInt32(ERROR_OUT_OF_RANGE);
                 return OK;
@@ -256,11 +253,16 @@ status_t BnHDCP::onTransact(
 
             void *outData = (uint8_t *)inData + size;
 
-            data.read(inData, size);
+            status_t err = data.read(inData, size);
+            if (err != OK) {
+                free(inData);
+                reply->writeInt32(err);
+                return OK;
+            }
 
             uint32_t streamCTR = data.readInt32();
             uint64_t inputCTR;
-            status_t err = encrypt(inData, size, streamCTR, &inputCTR, outData);
+            err = encrypt(inData, size, streamCTR, &inputCTR, outData);
 
             reply->writeInt32(err);
 
