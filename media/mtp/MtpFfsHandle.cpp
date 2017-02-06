@@ -62,7 +62,12 @@ constexpr int MAX_FILE_CHUNK_SIZE = 3145728;
 constexpr int USB_FFS_MAX_WRITE = MTP_BUFFER_SIZE;
 constexpr int USB_FFS_MAX_READ = MTP_BUFFER_SIZE;
 
+static_assert(USB_FFS_MAX_WRITE > 0, "Max r/w values must be > 0!");
+static_assert(USB_FFS_MAX_READ > 0, "Max r/w values must be > 0!");
+
 constexpr unsigned int MAX_MTP_FILE_SIZE = 0xFFFFFFFF;
+
+constexpr size_t ENDPOINT_ALLOC_RETRIES = 10;
 
 struct func_desc {
     struct usb_interface_descriptor intf;
@@ -459,19 +464,28 @@ int MtpFfsHandle::start() {
     mMaxWrite = android::base::GetIntProperty("sys.usb.ffs.max_write", USB_FFS_MAX_WRITE);
     mMaxRead = android::base::GetIntProperty("sys.usb.ffs.max_read", USB_FFS_MAX_READ);
 
-    while (mMaxWrite > USB_FFS_MAX_WRITE && mMaxRead > USB_FFS_MAX_READ) {
+    size_t attempts = 0;
+    while (mMaxWrite >= USB_FFS_MAX_WRITE && mMaxRead >= USB_FFS_MAX_READ &&
+            attempts < ENDPOINT_ALLOC_RETRIES) {
         // If larger contiguous chunks of memory aren't available, attempt to try
         // smaller allocations.
         if (ioctl(mBulkIn, FUNCTIONFS_ENDPOINT_ALLOC, static_cast<__u32>(mMaxWrite)) ||
             ioctl(mBulkOut, FUNCTIONFS_ENDPOINT_ALLOC, static_cast<__u32>(mMaxRead))) {
+            if (errno == ENODEV) {
+                // Driver hasn't enabled endpoints yet.
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                attempts += 1;
+                continue;
+            }
             mMaxWrite /= 2;
             mMaxRead /=2;
         } else {
             return 0;
         }
     }
+    // Try to start MtpServer anyway, with the smallest max r/w values
     PLOG(ERROR) << "Functionfs could not allocate any memory!";
-    return -1;
+    return 0;
 }
 
 int MtpFfsHandle::configure(bool usePtp) {

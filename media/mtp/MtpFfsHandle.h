@@ -59,6 +59,10 @@ public:
     int sendFile(mtp_file_range mfr);
     int sendEvent(mtp_event me);
 
+    /**
+     * Open ffs endpoints and allocate necessary kernel and user memory.
+     * Will sleep until endpoints are enabled, for up to 1 second.
+     */
     int start();
     void close();
 
