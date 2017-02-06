@@ -17,6 +17,8 @@
 #ifndef ANDROID_HARDWARE_STREAM_HAL_HIDL_H
 #define ANDROID_HARDWARE_STREAM_HAL_HIDL_H
 
+#include <atomic>
+
 #include <android/hardware/audio/2.0/IStream.h>
 #include <android/hardware/audio/2.0/IStreamIn.h>
 #include <android/hardware/audio/2.0/IStreamOut.h>
@@ -32,7 +34,9 @@ using ::android::hardware::audio::V2_0::IStreamOut;
 using ::android::hardware::EventFlag;
 using ::android::hardware::MessageQueue;
 using ::android::hardware::Return;
+using ReadParameters = ::android::hardware::audio::V2_0::IStreamIn::ReadParameters;
 using ReadStatus = ::android::hardware::audio::V2_0::IStreamIn::ReadStatus;
+using WriteCommand = ::android::hardware::audio::V2_0::IStreamOut::WriteCommand;
 using WriteStatus = ::android::hardware::audio::V2_0::IStreamOut::WriteStatus;
 
 namespace android {
@@ -155,28 +159,27 @@ class StreamOutHalHidl : public StreamOutHalInterface, public StreamHalHidl {
 
   private:
     friend class DeviceHalHidl;
+    typedef MessageQueue<WriteCommand, hardware::kSynchronizedReadWrite> CommandMQ;
     typedef MessageQueue<uint8_t, hardware::kSynchronizedReadWrite> DataMQ;
     typedef MessageQueue<WriteStatus, hardware::kSynchronizedReadWrite> StatusMQ;
 
     wp<StreamOutHalInterfaceCallback> mCallback;
     sp<IStreamOut> mStream;
+    std::unique_ptr<CommandMQ> mCommandMQ;
     std::unique_ptr<DataMQ> mDataMQ;
     std::unique_ptr<StatusMQ> mStatusMQ;
+    std::atomic<pid_t> mWriterClient;
     EventFlag* mEfGroup;
-    bool mGetPresentationPositionNotSupported;
-    struct {
-        uint64_t obtained;
-        status_t status;
-        uint64_t frames;
-        struct timespec ts;
-    } mPPosFromWrite;
 
     // Can not be constructed directly by clients.
     StreamOutHalHidl(const sp<IStreamOut>& stream);
 
     virtual ~StreamOutHalHidl();
 
-    uint64_t getCurrentTimeMs();
+    using WriterCallback = std::function<void(const WriteStatus& writeStatus)>;
+    status_t callWriterThread(
+            WriteCommand cmd, const char* cmdName,
+            const uint8_t* data, size_t dataSize, WriterCallback callback);
     status_t prepareForWriting(size_t bufferSize);
 };
 
@@ -200,12 +203,15 @@ class StreamInHalHidl : public StreamInHalInterface, public StreamHalHidl {
 
   private:
     friend class DeviceHalHidl;
+    typedef MessageQueue<ReadParameters, hardware::kSynchronizedReadWrite> CommandMQ;
     typedef MessageQueue<uint8_t, hardware::kSynchronizedReadWrite> DataMQ;
     typedef MessageQueue<ReadStatus, hardware::kSynchronizedReadWrite> StatusMQ;
 
     sp<IStreamIn> mStream;
+    std::unique_ptr<CommandMQ> mCommandMQ;
     std::unique_ptr<DataMQ> mDataMQ;
     std::unique_ptr<StatusMQ> mStatusMQ;
+    std::atomic<pid_t> mReaderClient;
     EventFlag* mEfGroup;
 
     // Can not be constructed directly by clients.
@@ -213,6 +219,9 @@ class StreamInHalHidl : public StreamInHalInterface, public StreamHalHidl {
 
     virtual ~StreamInHalHidl();
 
+    using ReaderCallback = std::function<void(const ReadStatus& readStatus)>;
+    status_t callReaderThread(
+            const ReadParameters& params, const char* cmdName, ReaderCallback callback);
     status_t prepareForReading(size_t bufferSize);
 };
 
