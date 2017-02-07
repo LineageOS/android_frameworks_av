@@ -651,22 +651,6 @@ String8 CameraService::getFormattedCurrentTime() {
     return String8(formattedTime);
 }
 
-int CameraService::getCameraPriorityFromProcState(int procState) {
-    // Find the priority for the camera usage based on the process state.  Higher priority clients
-    // win for evictions.
-    if (procState < 0) {
-        ALOGE("%s: Received invalid process state %d from ActivityManagerService!", __FUNCTION__,
-                procState);
-        return -1;
-    }
-    // Treat sleeping TOP processes the same as regular TOP processes, for
-    // access priority.  This is important for lock-screen camera launch scenarios
-    if (procState == PROCESS_STATE_TOP_SLEEPING) {
-        procState = PROCESS_STATE_TOP;
-    }
-    return INT_MAX - procState;
-}
-
 Status CameraService::getCameraVendorTagDescriptor(
         /*out*/
         hardware::camera2::params::VendorTagDescriptor* desc) {
@@ -1212,20 +1196,24 @@ status_t CameraService::handleEvictionsLocked(const String8& cameraId, int clien
         std::vector<int> ownerPids(mActiveClientManager.getAllOwners());
         ownerPids.push_back(clientPid);
 
-        // Use the value +PROCESS_STATE_NONEXISTENT, to avoid taking
-        // address of PROCESS_STATE_NONEXISTENT as a reference argument
-        // for the vector constructor. PROCESS_STATE_NONEXISTENT does
-        // not have an out-of-class definition.
-        std::vector<int> priorities(ownerPids.size(), +PROCESS_STATE_NONEXISTENT);
+        std::vector<int> priorityScores(ownerPids.size());
+        std::vector<int> states(ownerPids.size());
 
-        // Get priorites of all active PIDs
-        ProcessInfoService::getProcessStatesFromPids(ownerPids.size(), &ownerPids[0],
-                /*out*/&priorities[0]);
+        // Get priority scores of all active PIDs
+        status_t err = ProcessInfoService::getProcessStatesScoresFromPids(
+                ownerPids.size(), &ownerPids[0], /*out*/&states[0],
+                /*out*/&priorityScores[0]);
+        if (err != OK) {
+            ALOGE("%s: Priority score query failed: %d",
+                  __FUNCTION__, err);
+            return err;
+        }
 
         // Update all active clients' priorities
-        std::map<int,int> pidToPriorityMap;
+        std::map<int,resource_policy::ClientPriority> pidToPriorityMap;
         for (size_t i = 0; i < ownerPids.size() - 1; i++) {
-            pidToPriorityMap.emplace(ownerPids[i], getCameraPriorityFromProcState(priorities[i]));
+            pidToPriorityMap.emplace(ownerPids[i],
+                    resource_policy::ClientPriority(priorityScores[i], states[i]));
         }
         mActiveClientManager.updatePriorities(pidToPriorityMap);
 
@@ -1242,7 +1230,9 @@ status_t CameraService::handleEvictionsLocked(const String8& cameraId, int clien
         clientDescriptor = CameraClientManager::makeClientDescriptor(cameraId,
                 sp<BasicClient>{nullptr}, static_cast<int32_t>(state->getCost()),
                 state->getConflicting(),
-                getCameraPriorityFromProcState(priorities[priorities.size() - 1]), clientPid);
+                priorityScores[priorityScores.size() - 1],
+                clientPid,
+                states[states.size() - 1]);
 
         // Find clients that would be evicted
         auto evicted = mActiveClientManager.wouldEvict(clientDescriptor);
@@ -1259,19 +1249,22 @@ status_t CameraService::handleEvictionsLocked(const String8& cameraId, int clien
                     mActiveClientManager.getIncompatibleClients(clientDescriptor);
 
             String8 msg = String8::format("%s : DENIED connect device %s client for package %s "
-                    "(PID %d, priority %d) due to eviction policy", curTime.string(),
+                    "(PID %d, score %d state %d) due to eviction policy", curTime.string(),
                     cameraId.string(), packageName.string(), clientPid,
-                    getCameraPriorityFromProcState(priorities[priorities.size() - 1]));
+                    priorityScores[priorityScores.size() - 1],
+                    states[states.size() - 1]);
 
             for (auto& i : incompatibleClients) {
                 msg.appendFormat("\n   - Blocked by existing device %s client for package %s"
-                        "(PID %" PRId32 ", priority %" PRId32 ")", i->getKey().string(),
-                        String8{i->getValue()->getPackageName()}.string(), i->getOwnerId(),
-                        i->getPriority());
+                        "(PID %" PRId32 ", score %" PRId32 ", state %" PRId32 ")",
+                        i->getKey().string(),
+                        String8{i->getValue()->getPackageName()}.string(),
+                        i->getOwnerId(), i->getPriority().getScore(),
+                        i->getPriority().getState());
                 ALOGE("   Conflicts with: Device %s, client package %s (PID %"
-                        PRId32 ", priority %" PRId32 ")", i->getKey().string(),
+                        PRId32 ", score %" PRId32 ", state %" PRId32 ")", i->getKey().string(),
                         String8{i->getValue()->getPackageName()}.string(), i->getOwnerId(),
-                        i->getPriority());
+                        i->getPriority().getScore(), i->getPriority().getState());
             }
 
             // Log the client's attempt
@@ -1299,12 +1292,14 @@ status_t CameraService::handleEvictionsLocked(const String8& cameraId, int clien
 
             // Log the clients evicted
             logEvent(String8::format("EVICT device %s client held by package %s (PID"
-                    " %" PRId32 ", priority %" PRId32 ")\n   - Evicted by device %s client for"
-                    " package %s (PID %d, priority %" PRId32 ")",
+                    " %" PRId32 ", score %" PRId32 ", state %" PRId32 ")\n - Evicted by device %s client for"
+                    " package %s (PID %d, score %" PRId32 ", state %" PRId32 ")",
                     i->getKey().string(), String8{clientSp->getPackageName()}.string(),
-                    i->getOwnerId(), i->getPriority(), cameraId.string(),
+                    i->getOwnerId(), i->getPriority().getScore(),
+                    i->getPriority().getState(), cameraId.string(),
                     packageName.string(), clientPid,
-                    getCameraPriorityFromProcState(priorities[priorities.size() - 1])));
+                    priorityScores[priorityScores.size() - 1],
+                    states[states.size() - 1]));
 
             // Notify the client of disconnection
             clientSp->notifyError(hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_DISCONNECTED,
@@ -2142,9 +2137,11 @@ void CameraService::doUserSwitch(const std::vector<int32_t>& newUserIds) {
 
         // Log the clients evicted
         logEvent(String8::format("EVICT device %s client held by package %s (PID %"
-                PRId32 ", priority %" PRId32 ")\n   - Evicted due to user switch.",
-                i->getKey().string(), String8{clientSp->getPackageName()}.string(),
-                i->getOwnerId(), i->getPriority()));
+                PRId32 ", score %" PRId32 ", state %" PRId32 ")\n   - Evicted due"
+                " to user switch.", i->getKey().string(),
+                String8{clientSp->getPackageName()}.string(),
+                i->getOwnerId(), i->getPriority().getScore(),
+                i->getPriority().getState()));
 
     }
 
@@ -2680,7 +2677,8 @@ String8 CameraService::CameraClientManager::toString() const {
         String8 key = i->getKey();
         int32_t cost = i->getCost();
         int32_t pid = i->getOwnerId();
-        int32_t priority = i->getPriority();
+        int32_t score = i->getPriority().getScore();
+        int32_t state = i->getPriority().getState();
         auto conflicting = i->getConflicting();
         auto clientSp = i->getValue();
         String8 packageName;
@@ -2690,8 +2688,8 @@ String8 CameraService::CameraClientManager::toString() const {
             uid_t clientUid = clientSp->getClientUid();
             clientUserId = multiuser_get_user_id(clientUid);
         }
-        ret.appendFormat("\n(Camera ID: %s, Cost: %" PRId32 ", PID: %" PRId32 ", Priority: %"
-                PRId32 ", ", key.string(), cost, pid, priority);
+        ret.appendFormat("\n(Camera ID: %s, Cost: %" PRId32 ", PID: %" PRId32 ", Score: %"
+                PRId32 ", State: %" PRId32, key.string(), cost, pid, score, state);
 
         if (clientSp.get() != nullptr) {
             ret.appendFormat("User Id: %d, ", clientUserId);
@@ -2713,16 +2711,18 @@ String8 CameraService::CameraClientManager::toString() const {
 
 CameraService::DescriptorPtr CameraService::CameraClientManager::makeClientDescriptor(
         const String8& key, const sp<BasicClient>& value, int32_t cost,
-        const std::set<String8>& conflictingKeys, int32_t priority, int32_t ownerId) {
+        const std::set<String8>& conflictingKeys, int32_t score, int32_t ownerId,
+        int32_t state) {
 
     return std::make_shared<resource_policy::ClientDescriptor<String8, sp<BasicClient>>>(
-            key, value, cost, conflictingKeys, priority, ownerId);
+            key, value, cost, conflictingKeys, score, ownerId, state);
 }
 
 CameraService::DescriptorPtr CameraService::CameraClientManager::makeClientDescriptor(
         const sp<BasicClient>& value, const CameraService::DescriptorPtr& partial) {
     return makeClientDescriptor(partial->getKey(), value, partial->getCost(),
-            partial->getConflicting(), partial->getPriority(), partial->getOwnerId());
+            partial->getConflicting(), partial->getPriority().getScore(),
+            partial->getOwnerId(), partial->getPriority().getState());
 }
 
 // ----------------------------------------------------------------------------
@@ -2800,7 +2800,9 @@ status_t CameraService::dump(int fd, const Vector<String16>& args) {
         }
         dprintf(fd, "  Device %s is open. Client instance dump:\n",
                 cameraId.string());
-        dprintf(fd, "    Client priority level: %d\n", clientDescriptor->getPriority());
+        dprintf(fd, "    Client priority score: %d state: %d\n",
+                clientDescriptor->getPriority().getScore(),
+                clientDescriptor->getPriority().getState());
         dprintf(fd, "    Client PID: %d\n", clientDescriptor->getOwnerId());
 
         auto client = clientDescriptor->getValue();

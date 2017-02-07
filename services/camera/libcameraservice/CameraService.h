@@ -75,11 +75,6 @@ public:
         API_2 = 2
     };
 
-    // Process state (mirrors frameworks/base/core/java/android/app/ActivityManager.java)
-    static const int PROCESS_STATE_NONEXISTENT = -1;
-    static const int PROCESS_STATE_TOP = 2;
-    static const int PROCESS_STATE_TOP_SLEEPING = 5;
-
     // 3 second busy timeout when other clients are connecting
     static const nsecs_t DEFAULT_CONNECT_TIMEOUT_NS = 3000000000;
 
@@ -402,8 +397,8 @@ public:
          * Make a ClientDescriptor object wrapping the given BasicClient strong pointer.
          */
         static DescriptorPtr makeClientDescriptor(const String8& key, const sp<BasicClient>& value,
-                int32_t cost, const std::set<String8>& conflictingKeys, int32_t priority,
-                int32_t ownerId);
+                int32_t cost, const std::set<String8>& conflictingKeys, int32_t score,
+                int32_t ownerId, int32_t state);
 
         /**
          * Make a ClientDescriptor object wrapping the given BasicClient strong pointer with
@@ -774,11 +769,6 @@ private:
      * Get the current system time as a formatted string.
      */
     static String8 getFormattedCurrentTime();
-
-    /**
-     * Get the camera eviction priority from the current process state given by ActivityManager.
-     */
-    static int getCameraPriorityFromProcState(int procState);
 
     static binder::Status makeClient(const sp<CameraService>& cameraService,
             const sp<IInterface>& cameraCb, const String16& packageName, const String8& cameraId,
