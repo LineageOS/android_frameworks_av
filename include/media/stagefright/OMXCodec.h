@@ -294,6 +294,10 @@ private:
     status_t allocateBuffersOnPort(OMX_U32 portIndex);
     status_t allocateOutputBuffersFromNativeWindow();
 
+#ifdef MTK_HARDWARE
+    void setHalWindowColorFormat(OMX_COLOR_FORMATTYPE &eHalColorFormat);
+#endif
+
     status_t queueBufferToNativeWindow(BufferInfo *info);
     status_t cancelBufferToNativeWindow(BufferInfo *info);
     BufferInfo* dequeueBufferFromNativeWindow();

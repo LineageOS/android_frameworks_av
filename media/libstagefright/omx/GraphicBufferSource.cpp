@@ -57,7 +57,7 @@ void GraphicBufferSource::PersistentProxyListener::onFrameAvailable(
         if (consumer == NULL) {
             return;
         }
-        BufferItem bi;
+        BufferQueue::BufferItem bi;
         status_t err = consumer->acquireBuffer(&bi, 0);
         if (err != OK) {
             ALOGE("PersistentProxyListener: acquireBuffer failed (%d)", err);
@@ -461,7 +461,7 @@ void GraphicBufferSource::suspend(bool suspend) {
         mSuspended = true;
 
         while (mNumFramesAvailable > 0) {
-            BufferItem item;
+            BufferQueue::BufferItem item;
             status_t err = mConsumer->acquireBuffer(&item, 0);
 
             if (err == BufferQueue::NO_BUFFER_AVAILABLE) {
@@ -512,7 +512,7 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
 
     ALOGV("fillCodecBuffer_l: acquiring buffer, avail=%zu",
             mNumFramesAvailable);
-    BufferItem item;
+    BufferQueue::BufferItem item;
     status_t err = mConsumer->acquireBuffer(&item, 0);
     if (err == BufferQueue::NO_BUFFER_AVAILABLE) {
         // shouldn't happen
@@ -599,7 +599,7 @@ bool GraphicBufferSource::repeatLatestBuffer_l() {
         return false;
     }
 
-    BufferItem item;
+    BufferQueue::BufferItem item;
     item.mBuf = mLatestBufferId;
     item.mFrameNumber = mLatestBufferFrameNum;
     item.mTimestamp = mRepeatLastFrameTimestamp;
@@ -631,7 +631,7 @@ bool GraphicBufferSource::repeatLatestBuffer_l() {
 }
 
 void GraphicBufferSource::setLatestBuffer_l(
-        const BufferItem &item, bool dropped) {
+        const BufferQueue::BufferItem &item, bool dropped) {
     ALOGV("setLatestBuffer_l");
 
     if (mLatestBufferId >= 0) {
@@ -685,7 +685,7 @@ status_t GraphicBufferSource::signalEndOfInputStream() {
     return OK;
 }
 
-int64_t GraphicBufferSource::getTimestamp(const BufferItem &item) {
+int64_t GraphicBufferSource::getTimestamp(const BufferQueue::BufferItem &item) {
     int64_t timeUs = item.mTimestamp / 1000;
 
     if (mTimePerCaptureUs > 0ll) {
@@ -745,7 +745,8 @@ int64_t GraphicBufferSource::getTimestamp(const BufferItem &item) {
     return timeUs;
 }
 
-status_t GraphicBufferSource::submitBuffer_l(const BufferItem &item, int cbi) {
+status_t GraphicBufferSource::submitBuffer_l(
+        const BufferQueue::BufferItem &item, int cbi) {
     ALOGV("submitBuffer_l cbi=%d", cbi);
 
     int64_t timeUs = getTimestamp(item);
@@ -872,7 +873,7 @@ void GraphicBufferSource::onFrameAvailable(const BufferItem& /*item*/) {
             ALOGV("onFrameAvailable: suspended, ignoring frame");
         }
 
-        BufferItem item;
+        BufferQueue::BufferItem item;
         status_t err = mConsumer->acquireBuffer(&item, 0);
         if (err == OK) {
             mNumBufferAcquired++;

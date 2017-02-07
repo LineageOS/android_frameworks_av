@@ -346,7 +346,7 @@ void MediaSync::flush() {
         mFrameScheduler->restart();
     }
     while (!mBufferItems.empty()) {
-        BufferItem *bufferItem = &*mBufferItems.begin();
+        BufferQueue::BufferItem *bufferItem = &*mBufferItems.begin();
         returnBufferToInput_l(bufferItem->mGraphicBuffer, bufferItem->mFence);
         mBufferItems.erase(mBufferItems.begin());
     }
@@ -552,7 +552,7 @@ void MediaSync::onDrainVideo_l() {
 
     while (!mBufferItems.empty()) {
         int64_t nowUs = ALooper::GetNowUs();
-        BufferItem *bufferItem = &*mBufferItems.begin();
+        BufferQueue::BufferItem *bufferItem = &*mBufferItems.begin();
         int64_t itemMediaUs = bufferItem->mTimestamp / 1000;
         int64_t itemRealUs = getRealTime(itemMediaUs, nowUs);
 
@@ -625,7 +625,7 @@ void MediaSync::onFrameAvailableFromInput() {
     }
 
     // Acquire and detach the buffer from the input.
-    BufferItem bufferItem;
+    BufferQueue::BufferItem bufferItem;
     status_t status = mInput->acquireBuffer(&bufferItem, 0 /* presentWhen */);
     if (status != NO_ERROR) {
         ALOGE("acquiring buffer from input failed (%d)", status);
@@ -669,7 +669,7 @@ void MediaSync::onFrameAvailableFromInput() {
     }
 }
 
-void MediaSync::renderOneBufferItem_l(const BufferItem &bufferItem) {
+void MediaSync::renderOneBufferItem_l(const BufferQueue::BufferItem &bufferItem) {
     IGraphicBufferProducer::QueueBufferInput queueInput(
             bufferItem.mTimestamp,
             bufferItem.mIsAutoTimestamp,

@@ -19,6 +19,7 @@
 
 #include <gui/IConsumerListener.h>
 #include <gui/IProducerListener.h>
+#include <gui/BufferQueue.h>
 
 #include <media/AudioResamplerPublic.h>
 #include <media/AVSyncSettings.h>
@@ -205,7 +206,7 @@ private:
     bool mHasAudio;
 
     int64_t mNextBufferItemMediaUs;
-    List<BufferItem> mBufferItems;
+    List<BufferQueue::BufferItem> mBufferItems;
     sp<VideoFrameScheduler> mFrameScheduler;
 
     // Keep track of buffers received from |mInput|. This is needed because
@@ -248,7 +249,7 @@ private:
     void onFrameAvailableFromInput();
 
     // Send |bufferItem| to the output for rendering.
-    void renderOneBufferItem_l(const BufferItem &bufferItem);
+    void renderOneBufferItem_l(const BufferQueue::BufferItem &bufferItem);
 
     // This implements the onBufferReleased callback from IProducerListener.
     // It gets called from an OutputListener.

@@ -1613,6 +1613,14 @@ status_t StagefrightRecorder::setupVideoEncoder(
             break;
     }
 
+    // force hw video encoder for camera
+    if (mVideoSource == VIDEO_SOURCE_CAMERA) {
+        AString mime;
+        CHECK(format->findString("mime", &mime));
+        mime.append("_cam");
+        format->setString("mime", mime);
+    }
+
     if (cameraSource != NULL) {
         sp<MetaData> meta = cameraSource->getFormat();
 

@@ -31,8 +31,6 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MediaFilter.h>
 
-#include <gui/BufferItem.h>
-
 #include "ColorConvert.h"
 #include "GraphicBufferListener.h"
 #include "IntrinsicBlurFilter.h"
@@ -756,7 +754,7 @@ void MediaFilter::onCreateInputSurface() {
 }
 
 void MediaFilter::onInputFrameAvailable() {
-    BufferItem item = mGraphicBufferListener->getBufferItem();
+    BufferQueue::BufferItem item = mGraphicBufferListener->getBufferItem();
     sp<GraphicBuffer> buf = mGraphicBufferListener->getBuffer(item);
 
     // get pointer to graphic buffer

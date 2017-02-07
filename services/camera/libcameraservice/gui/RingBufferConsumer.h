@@ -17,7 +17,6 @@
 #ifndef ANDROID_GUI_RINGBUFFERCONSUMER_H
 #define ANDROID_GUI_RINGBUFFERCONSUMER_H
 
-#include <gui/BufferItem.h>
 #include <gui/ConsumerBase.h>
 
 #include <ui/GraphicBuffer.h>
@@ -54,6 +53,8 @@ class RingBufferConsumer : public ConsumerBase,
 {
   public:
     typedef ConsumerBase::FrameAvailableListener FrameAvailableListener;
+
+    typedef BufferQueue::BufferItem BufferItem;
 
     enum { INVALID_BUFFER_SLOT = BufferQueue::INVALID_BUFFER_SLOT };
     enum { NO_BUFFER_AVAILABLE = BufferQueue::NO_BUFFER_AVAILABLE };
@@ -164,7 +165,7 @@ class RingBufferConsumer : public ConsumerBase,
   private:
 
     // Override ConsumerBase::onFrameAvailable
-    virtual void onFrameAvailable(const BufferItem& item);
+    virtual void onFrameAvailable(const android::BufferItem& item);
 
     void pinBufferLocked(const BufferItem& item);
     void unpinBuffer(const BufferItem& item);

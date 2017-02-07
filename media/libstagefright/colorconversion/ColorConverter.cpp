@@ -22,6 +22,14 @@
 #include <media/stagefright/ColorConverter.h>
 #include <media/stagefright/MediaErrors.h>
 
+#ifdef MTK_HARDWARE
+#include <DpBlitStream.h>
+
+const OMX_COLOR_FORMATTYPE OMX_MTK_COLOR_FormatYV12 = (OMX_COLOR_FORMATTYPE)0x7F000200;
+const OMX_COLOR_FORMATTYPE OMX_COLOR_FormatVendorMTKYUV = (OMX_COLOR_FORMATTYPE)0x7F000001;
+const OMX_COLOR_FORMATTYPE OMX_COLOR_FormatVendorMTKYUV_FCM = (OMX_COLOR_FORMATTYPE)0x7F000002;
+#endif
+
 namespace android {
 
 ColorConverter::ColorConverter(
@@ -47,6 +55,11 @@ bool ColorConverter::isValid() const {
         case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
         case OMX_COLOR_FormatYUV420SemiPlanar:
         case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar:
+#ifdef MTK_HARDWARE
+        case OMX_MTK_COLOR_FormatYV12:
+        case OMX_COLOR_FormatVendorMTKYUV:
+        case OMX_COLOR_FormatVendorMTKYUV_FCM:
+#endif
             return true;
 
         default:
@@ -103,7 +116,11 @@ status_t ColorConverter::convert(
 
     switch (mSrcFormat) {
         case OMX_COLOR_FormatYUV420Planar:
+#ifdef MTK_HARDWARE
+            err = convertYUVToRGBHW(src, dst);
+#else
             err = convertYUV420Planar(src, dst);
+#endif
             break;
 
         case OMX_COLOR_FormatCbYCrY:
@@ -121,6 +138,14 @@ status_t ColorConverter::convert(
         case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar:
             err = convertTIYUV420PackedSemiPlanar(src, dst);
             break;
+
+#ifdef MTK_HARDWARE
+        case OMX_MTK_COLOR_FormatYV12:
+        case OMX_COLOR_FormatVendorMTKYUV:
+        case OMX_COLOR_FormatVendorMTKYUV_FCM:
+            err = convertYUVToRGBHW(src, dst);
+            break;
+#endif
 
         default:
         {
@@ -520,5 +545,93 @@ uint8_t *ColorConverter::initClip() {
 
     return &mClip[-kClipMin];
 }
+
+#ifdef MTK_HARDWARE
+status_t ColorConverter::convertYUVToRGBHW(const BitmapParams &src, const BitmapParams &dst) {
+    DpBlitStream blitStream;
+    unsigned int srcWStride = src.mWidth;
+    unsigned int srcHStride = src.mHeight;
+
+    DpRect srcRoi;
+    srcRoi.x = src.mCropLeft;
+    srcRoi.y = src.mCropTop;
+    srcRoi.w = src.mCropRight - src.mCropLeft;
+    srcRoi.h = src.mCropBottom - src.mCropTop;
+
+    unsigned int dstWStride = dst.mWidth ;
+    unsigned int dstHStride = dst.mHeight ;
+    char name_yuv[100];
+    char retriever_yuv_propty[100];
+    char name_rgb[100];
+    char retriever_propty_rgb[100];
+
+    if (mSrcFormat == OMX_COLOR_FormatYUV420Planar) {
+        char* planar[3];
+        unsigned int length[3];
+        planar[0] = (char*)src.mBits;
+        length[0] = srcWStride*srcHStride;
+        planar[1] = planar[0] + length[0];
+	      length[1] = srcWStride*srcHStride/4;
+        planar[2] = planar[1] + length[1];
+        length[2] = length[1];
+
+        blitStream.setSrcBuffer((void**)planar, (unsigned int*)length, 3);
+        blitStream.setSrcConfig(srcWStride, srcHStride, eYUV_420_3P, eInterlace_None, &srcRoi);
+    }
+    else if (mSrcFormat == OMX_MTK_COLOR_FormatYV12) {
+        char* planar[3];
+        unsigned int length[3];
+        planar[0] = (char*)src.mBits;
+        length[0] = srcWStride*srcHStride;
+        planar[1] = planar[0] + length[0];
+        length[1] = srcWStride*srcHStride/4;
+        planar[2] = planar[1] + length[1];
+        length[2] = length[1];
+
+        blitStream.setSrcBuffer((void**)planar, (unsigned int*)length, 3);
+        blitStream.setSrcConfig(srcWStride, srcHStride, eYV12, eInterlace_None, &srcRoi);
+    }
+    else if (mSrcFormat == OMX_COLOR_FormatVendorMTKYUV) {
+        char* planar[2];
+        unsigned int length[2];
+        planar[0] = (char*)src.mBits;
+        length[0] = srcWStride*srcHStride;
+        planar[1] = planar[0] + length[0];
+        length[1] = srcWStride*srcHStride/2;
+
+        blitStream.setSrcBuffer((void**)planar, (unsigned int*)length, 2);
+        blitStream.setSrcConfig(srcWStride, srcHStride, srcWStride * 32, srcWStride * 16, eNV12_BLK, DP_PROFILE_BT601, eInterlace_None, &srcRoi);
+    }
+    else if (mSrcFormat == OMX_COLOR_FormatVendorMTKYUV_FCM) {
+        char* planar[2];
+        unsigned int length[2];
+        planar[0] = (char*)src.mBits;
+        length[0] = srcWStride*srcHStride;
+        planar[1] = planar[0] + length[0];
+        length[1] = srcWStride*srcHStride/2;
+
+        blitStream.setSrcBuffer((void**)planar, (unsigned int*)length, 2);
+        blitStream.setSrcConfig(srcWStride, srcHStride, srcWStride * 32, srcWStride * 16, eNV12_BLK_FCM, DP_PROFILE_BT601, eInterlace_None, &srcRoi);
+    }
+
+    if (mDstFormat == OMX_COLOR_Format16bitRGB565) {
+        blitStream.setDstBuffer(dst.mBits, dst.mWidth * dst.mHeight * 2);
+        blitStream.setDstConfig(dst.mWidth, dst.mHeight, eRGB565);
+    }
+    else if (mDstFormat == OMX_COLOR_Format32bitARGB8888) {
+        blitStream.setDstBuffer(dst.mBits, dst.mWidth * dst.mHeight * 4);
+        blitStream.setDstConfig(dst.mWidth, dst.mHeight, eRGBA8888);
+    }
+
+    // Add Sharpness in Video Thumbnail
+    blitStream.setTdshp(1);
+    bool bRet = blitStream.invalidate();
+
+    if (!bRet)
+        return OK;
+    else
+        return UNKNOWN_ERROR;
+}
+#endif
 
 }  // namespace android

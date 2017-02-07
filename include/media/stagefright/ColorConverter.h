@@ -79,6 +79,10 @@ private:
     status_t convertTIYUV420PackedSemiPlanar(
             const BitmapParams &src, const BitmapParams &dst);
 
+#ifdef MTK_HARDWARE
+    status_t convertYUVToRGBHW(const BitmapParams &src, const BitmapParams &dst);
+#endif
+
     ColorConverter(const ColorConverter &);
     ColorConverter &operator=(const ColorConverter &);
 };
