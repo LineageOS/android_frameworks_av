@@ -758,6 +758,51 @@ status_t MediaCodec::configure(
     return err;
 }
 
+status_t MediaCodec::releaseCrypto()
+{
+    ALOGV("releaseCrypto");
+
+    sp<AMessage> msg = new AMessage(kWhatDrmReleaseCrypto, this);
+
+    sp<AMessage> response;
+    status_t status = msg->postAndAwaitResponse(&response);
+
+    if (status == OK && response != NULL) {
+        CHECK(response->findInt32("status", &status));
+        ALOGV("releaseCrypto ret: %d ", status);
+    }
+    else {
+        ALOGE("releaseCrypto err: %d", status);
+    }
+
+    return status;
+}
+
+void MediaCodec::onReleaseCrypto(const sp<AMessage>& msg)
+{
+    status_t status = INVALID_OPERATION;
+    if (mCrypto != NULL) {
+        ALOGV("onReleaseCrypto: mCrypto: %p (%d)", mCrypto.get(), mCrypto->getStrongCount());
+        mBufferChannel->setCrypto(NULL);
+        // TODO change to ALOGV
+        ALOGD("onReleaseCrypto: [before clear]  mCrypto: %p (%d)",
+                mCrypto.get(), mCrypto->getStrongCount());
+        mCrypto.clear();
+
+        status = OK;
+    }
+    else {
+        ALOGW("onReleaseCrypto: No mCrypto. err: %d", status);
+    }
+
+    sp<AMessage> response = new AMessage;
+    response->setInt32("status", status);
+
+    sp<AReplyToken> replyID;
+    CHECK(msg->senderAwaitsResponse(&replyID));
+    response->postReply(replyID);
+}
+
 status_t MediaCodec::setInputSurface(
         const sp<PersistentSurface> &surface) {
     sp<AMessage> msg = new AMessage(kWhatSetInputSurface, this);
@@ -1938,8 +1983,14 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 crypto = NULL;
             }
 
+            ALOGV("kWhatConfigure: Old mCrypto: %p (%d)",
+                    mCrypto.get(), (mCrypto != NULL ? mCrypto->getStrongCount() : 0));
+
             mCrypto = static_cast<ICrypto *>(crypto);
             mBufferChannel->setCrypto(mCrypto);
+
+            ALOGV("kWhatConfigure: New mCrypto: %p (%d)",
+                    mCrypto.get(), (mCrypto != NULL ? mCrypto->getStrongCount() : 0));
 
             uint32_t flags;
             CHECK(msg->findInt32("flags", (int32_t *)&flags));
@@ -2471,6 +2522,12 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             break;
         }
 
+        case kWhatDrmReleaseCrypto:
+        {
+            onReleaseCrypto(msg);
+            break;
+        }
+
         default:
             TRESPASS();
     }
@@ -2530,6 +2587,10 @@ void MediaCodec::setState(State newState) {
         delete mSoftRenderer;
         mSoftRenderer = NULL;
 
+        if ( mCrypto != NULL ) {
+            ALOGV("setState: ~mCrypto: %p (%d)",
+                    mCrypto.get(), (mCrypto != NULL ? mCrypto->getStrongCount() : 0));
+        }
         mCrypto.clear();
         handleSetSurface(NULL);
 

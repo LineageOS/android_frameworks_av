@@ -25,8 +25,9 @@ LOCAL_SHARED_LIBRARIES :=       \
     liblog                      \
     libdl                       \
     libgui                      \
-    libmedia                    \
     libaudioclient              \
+    libmedia                    \
+    libmediadrm                 \
     libmediautils               \
     libmemunreachable           \
     libstagefright              \

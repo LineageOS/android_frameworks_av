@@ -20,9 +20,10 @@
 
 #include "NuPlayer.h"
 
+#include <media/ICrypto.h>
+#include <media/mediaplayer.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/MetaData.h>
-#include <media/mediaplayer.h>
 #include <utils/Vector.h>
 
 namespace android {
@@ -55,6 +56,8 @@ struct NuPlayer::Source : public AHandler {
         kWhatQueueDecoderShutdown,
         kWhatDrmNoLicense,
         kWhatInstantiateSecureDecoders,
+        // Modular DRM
+        kWhatDrmInfo,
     };
 
     // The provides message is used to notify the player about various
@@ -132,6 +135,17 @@ struct NuPlayer::Source : public AHandler {
 
     virtual void setOffloadAudio(bool /* offload */) {}
 
+    // Modular DRM
+    virtual status_t prepareDrm(
+            const uint8_t /*uuid*/[16], const Vector<uint8_t> &/*drmSessionId*/,
+            sp<ICrypto> */*crypto*/) {
+        return INVALID_OPERATION;
+    }
+
+    virtual status_t releaseDrm() {
+        return INVALID_OPERATION;
+    }
+
 protected:
     virtual ~Source() {}
 
@@ -143,6 +157,8 @@ protected:
     void notifyVideoSizeChanged(const sp<AMessage> &format = NULL);
     void notifyInstantiateSecureDecoders(const sp<AMessage> &reply);
     void notifyPrepared(status_t err = OK);
+    // Modular DRM
+    void notifyDrmInfo(const sp<ABuffer> &buffer);
 
 private:
     sp<AMessage> mNotify;

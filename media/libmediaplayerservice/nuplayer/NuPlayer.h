@@ -19,6 +19,7 @@
 #define NU_PLAYER_H_
 
 #include <media/AudioResamplerPublic.h>
+#include <media/ICrypto.h>
 #include <media/MediaPlayerInterface.h>
 #include <media/stagefright/foundation/AHandler.h>
 
@@ -88,6 +89,10 @@ struct NuPlayer : public AHandler {
     sp<MetaData> getFileMeta();
     float getFrameRate();
 
+    // Modular DRM
+    status_t prepareDrm(const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId);
+    status_t releaseDrm();
+
 protected:
     virtual ~NuPlayer();
 
@@ -142,6 +147,8 @@ private:
         kWhatSelectTrack                = 'selT',
         kWhatGetDefaultBufferingSettings = 'gDBS',
         kWhatSetBufferingSettings       = 'sBuS',
+        kWhatPrepareDrm                 = 'pDrm',
+        kWhatReleaseDrm                 = 'rDrm',
     };
 
     wp<NuPlayerDriver> mDriver;
@@ -223,6 +230,10 @@ private:
     // Pause state as requested by source (internally) due to buffering
     bool mPausedForBuffering;
 
+    // Modular DRM
+    sp<ICrypto> mCrypto;
+    bool mIsDrmProtected;
+
     inline const sp<DecoderBase> &getDecoder(bool audio) {
         return audio ? mAudioDecoder : mVideoDecoder;
     }
@@ -293,6 +304,9 @@ private:
     void sendTimedTextData(const sp<ABuffer> &buffer);
 
     void writeTrackInfo(Parcel* reply, const sp<AMessage>& format) const;
+
+    status_t onPrepareDrm(const sp<AMessage> &msg);
+    status_t onReleaseDrm();
 
     DISALLOW_EVIL_CONSTRUCTORS(NuPlayer);
 };

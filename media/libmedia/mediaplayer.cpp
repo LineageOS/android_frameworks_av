@@ -16,7 +16,7 @@
 */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "MediaPlayer"
+#define LOG_TAG "MediaPlayerNative"
 
 #include <fcntl.h>
 #include <inttypes.h>
@@ -1012,9 +1012,12 @@ sp<VolumeShaper::State> MediaPlayer::getVolumeShaperState(int id)
     return mPlayer->getVolumeShaperState(id);
 }
 
-// ModDrm
-status_t MediaPlayer::prepareDrm(const uint8_t uuid[16], const int mode)
+// Modular DRM
+status_t MediaPlayer::prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>& drmSessionId)
 {
+    // TODO change to ALOGV
+    ALOGD("prepareDrm: uuid: %p  drmSessionId: %p(%zu)", uuid,
+            drmSessionId.array(), drmSessionId.size());
     Mutex::Autolock _l(mLock);
     if (mPlayer == NULL) {
         return NO_INIT;
@@ -1026,10 +1029,19 @@ status_t MediaPlayer::prepareDrm(const uint8_t uuid[16], const int mode)
         return INVALID_OPERATION;
     }
 
-    status_t ret = mPlayer->prepareDrm(uuid, mode);
-    ALOGV("prepareDrm: ret=%d", ret);
+    if (drmSessionId.isEmpty()) {
+        ALOGE("prepareDrm: Unexpected. Can't proceed with crypto. Empty drmSessionId.");
+        return INVALID_OPERATION;
+    }
 
-    return ret;
+    // Passing down to mediaserver mainly for creating the crypto
+    status_t status = mPlayer->prepareDrm(uuid, drmSessionId);
+    ALOGE_IF(status != OK, "prepareDrm: Failed at mediaserver with ret: %d", status);
+
+    // TODO change to ALOGV
+    ALOGD("prepareDrm: mediaserver::prepareDrm ret=%d", status);
+
+    return status;
 }
 
 status_t MediaPlayer::releaseDrm()
@@ -1039,96 +1051,26 @@ status_t MediaPlayer::releaseDrm()
         return NO_INIT;
     }
 
-    // Not allowing releaseDrm in an active state
-    if (mCurrentState & (MEDIA_PLAYER_STARTED | MEDIA_PLAYER_PAUSED)) {
-        ALOGE("releaseDrm can not be called in the started/paused state.");
+    // Not allowing releaseDrm in an active/resumable state
+    if (mCurrentState & (MEDIA_PLAYER_STARTED |
+                         MEDIA_PLAYER_PAUSED |
+                         MEDIA_PLAYER_PLAYBACK_COMPLETE |
+                         MEDIA_PLAYER_STATE_ERROR)) {
+        ALOGE("releaseDrm Unexpected state %d. Can only be called in stopped/idle.", mCurrentState);
         return INVALID_OPERATION;
     }
 
-    status_t ret = mPlayer->releaseDrm();
-    ALOGV("releaseDrm: ret=%d", ret);
-
-    return ret;
-}
-
-status_t MediaPlayer::getKeyRequest(Vector<uint8_t> const& scope, String8 const& mimeType,
-                              DrmPlugin::KeyType keyType,
-                              KeyedVector<String8, String8>& optionalParameters,
-                              Vector<uint8_t>& request, String8& defaultUrl,
-                              DrmPlugin::KeyRequestType& keyRequestType)
-{
-    Mutex::Autolock _l(mLock);
-    if (mPlayer == NULL) {
-        return NO_INIT;
+    status_t status = mPlayer->releaseDrm();
+    // TODO change to ALOGV
+    ALOGD("releaseDrm: mediaserver::releaseDrm ret: %d", status);
+    if (status != OK) {
+        ALOGE("releaseDrm: Failed at mediaserver with ret: %d", status);
+        // Overriding to OK so the client proceed with its own cleanup
+        // Client can't do more cleanup. mediaserver release its crypto at end of session anyway.
+        status = OK;
     }
 
-    // Not enforcing a particular state beyond the checks enforced by the Java layer
-    // Key exchange can happen after the start.
-    status_t ret = mPlayer->getKeyRequest(scope, mimeType, keyType, optionalParameters,
-                                     request, defaultUrl, keyRequestType);
-    ALOGV("getKeyRequest ret=%d  %d %s %d ", ret,
-          (int)request.size(), defaultUrl.string(), (int)keyRequestType);
-
-    return ret;
-}
-
-status_t MediaPlayer::provideKeyResponse(Vector<uint8_t>& releaseKeySetId,
-                              Vector<uint8_t>& response, Vector<uint8_t>& keySetId)
-{
-    Mutex::Autolock _l(mLock);
-    if (mPlayer == NULL) {
-        return NO_INIT;
-    }
-
-    // Not enforcing a particular state beyond the checks enforced by the Java layer
-    // Key exchange can happen after the start.
-    status_t ret = mPlayer->provideKeyResponse(releaseKeySetId, response, keySetId);
-    ALOGV("provideKeyResponse: ret=%d", ret);
-
-    return ret;
-}
-
-status_t MediaPlayer::restoreKeys(Vector<uint8_t> const& keySetId)
-{
-    Mutex::Autolock _l(mLock);
-    if (mPlayer == NULL) {
-        return NO_INIT;
-    }
-
-    // Not enforcing a particular state beyond the checks enforced by the Java layer
-    // Key exchange can happen after the start.
-    status_t ret = mPlayer->restoreKeys(keySetId);
-    ALOGV("restoreKeys: ret=%d", ret);
-
-    return ret;
-}
-
-status_t MediaPlayer::getDrmPropertyString(String8 const& name, String8& value)
-{
-    Mutex::Autolock _l(mLock);
-    if (mPlayer == NULL) {
-        return NO_INIT;
-    }
-
-    // Not enforcing a particular state beyond the checks enforced by the Java layer
-    status_t ret = mPlayer->getDrmPropertyString(name, value);
-    ALOGV("getDrmPropertyString: ret=%d", ret);
-
-    return ret;
-}
-
-status_t MediaPlayer::setDrmPropertyString(String8 const& name, String8 const& value)
-{
-    Mutex::Autolock _l(mLock);
-    if (mPlayer == NULL) {
-        return NO_INIT;
-    }
-
-    // Not enforcing a particular state beyond the checks enforced by the Java layer
-    status_t ret = mPlayer->setDrmPropertyString(name, value);
-    ALOGV("setDrmPropertyString: ret=%d", ret);
-
-    return ret;
+    return status;
 }
 
 } // namespace android

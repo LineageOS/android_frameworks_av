@@ -87,6 +87,10 @@ struct NuPlayerDriver : public MediaPlayerInterface {
     void notifyListener(int msg, int ext1 = 0, int ext2 = 0, const Parcel *in = NULL);
     void notifyFlagsChanged(uint32_t flags);
 
+    // Modular DRM
+    virtual status_t prepareDrm(const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId);
+    virtual status_t releaseDrm();
+
 protected:
     virtual ~NuPlayerDriver();
 

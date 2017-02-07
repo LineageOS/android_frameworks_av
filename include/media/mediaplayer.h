@@ -266,19 +266,9 @@ public:
                                     const sp<VolumeShaper::Configuration>& configuration,
                                     const sp<VolumeShaper::Operation>& operation);
             sp<VolumeShaper::State> getVolumeShaperState(int id);
-            // ModDrm
-            status_t        prepareDrm(const uint8_t uuid[16], const int mode);
+            // Modular DRM
+            status_t        prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>& drmSessionId);
             status_t        releaseDrm();
-            status_t        getKeyRequest(Vector<uint8_t> const& scope, String8 const& mimeType,
-                                    DrmPlugin::KeyType keyType,
-                                    KeyedVector<String8, String8>& optionalParameters,
-                                    Vector<uint8_t>& request, String8& defaultUrl,
-                                    DrmPlugin::KeyRequestType& keyRequestType);
-            status_t        provideKeyResponse(Vector<uint8_t>& releaseKeySetId,
-                                    Vector<uint8_t>& response, Vector<uint8_t>& keySetId);
-            status_t        restoreKeys(Vector<uint8_t> const& keySetId);
-            status_t        getDrmPropertyString(String8 const& name, String8& value);
-            status_t        setDrmPropertyString(String8 const& name, String8 const& value);
 
 private:
             void            clear_l();

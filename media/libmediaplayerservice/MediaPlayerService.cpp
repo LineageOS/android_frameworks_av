@@ -1428,6 +1428,32 @@ void MediaPlayerService::Client::addNewMetadataUpdate(media::Metadata::Type meta
     }
 }
 
+// Modular DRM
+status_t MediaPlayerService::Client::prepareDrm(const uint8_t uuid[16],
+        const Vector<uint8_t>& drmSessionId)
+{
+    ALOGV("[%d] prepareDrm", mConnId);
+    sp<MediaPlayerBase> p = getPlayer();
+    if (p == 0) return UNKNOWN_ERROR;
+
+    status_t ret = p->prepareDrm(uuid, drmSessionId);
+    ALOGV("prepareDrm ret: %d", ret);
+
+    return ret;
+}
+
+status_t MediaPlayerService::Client::releaseDrm()
+{
+    ALOGV("[%d] releaseDrm", mConnId);
+    sp<MediaPlayerBase> p = getPlayer();
+    if (p == 0) return UNKNOWN_ERROR;
+
+    status_t ret = p->releaseDrm();
+    ALOGV("releaseDrm ret: %d", ret);
+
+    return ret;
+}
+
 #if CALLBACK_ANTAGONIZER
 const int Antagonizer::interval = 10000; // 10 msecs
 

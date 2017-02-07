@@ -51,6 +51,10 @@ struct NuPlayer::DecoderBase : public AHandler {
         return mStats;
     }
 
+    virtual status_t releaseCrypto() {
+        return INVALID_OPERATION;
+    }
+
     enum {
         kWhatInputDiscontinuity  = 'inDi',
         kWhatVideoSizeChanged    = 'viSC',
