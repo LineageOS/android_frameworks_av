@@ -28,7 +28,7 @@ static sp<ISchedulingPolicyService> sSchedulingPolicyService;
 static const String16 _scheduling_policy("scheduling_policy");
 static Mutex sMutex;
 
-int requestPriority(pid_t pid, pid_t tid, int32_t prio, bool asynchronous)
+int requestPriority(pid_t pid, pid_t tid, int32_t prio, bool isForApp, bool asynchronous)
 {
     // FIXME merge duplicated code related to service lookup, caching, and error recovery
     int ret;
@@ -47,7 +47,7 @@ int requestPriority(pid_t pid, pid_t tid, int32_t prio, bool asynchronous)
             sSchedulingPolicyService = sps;
             sMutex.unlock();
         }
-        ret = sps->requestPriority(pid, tid, prio, asynchronous);
+        ret = sps->requestPriority(pid, tid, prio, isForApp, asynchronous);
         if (ret != DEAD_OBJECT) {
             break;
         }

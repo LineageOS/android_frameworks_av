@@ -126,23 +126,25 @@ public:
 
     class PrioConfigEventData : public ConfigEventData {
     public:
-        PrioConfigEventData(pid_t pid, pid_t tid, int32_t prio) :
-            mPid(pid), mTid(tid), mPrio(prio) {}
+        PrioConfigEventData(pid_t pid, pid_t tid, int32_t prio, bool forApp) :
+            mPid(pid), mTid(tid), mPrio(prio), mForApp(forApp) {}
 
         virtual  void dump(char *buffer, size_t size) {
-            snprintf(buffer, size, "Prio event: pid %d, tid %d, prio %d\n", mPid, mTid, mPrio);
+            snprintf(buffer, size, "Prio event: pid %d, tid %d, prio %d, for app? %d\n",
+                    mPid, mTid, mPrio, mForApp);
         }
 
         const pid_t mPid;
         const pid_t mTid;
         const int32_t mPrio;
+        const bool mForApp;
     };
 
     class PrioConfigEvent : public ConfigEvent {
     public:
-        PrioConfigEvent(pid_t pid, pid_t tid, int32_t prio) :
+        PrioConfigEvent(pid_t pid, pid_t tid, int32_t prio, bool forApp) :
             ConfigEvent(CFG_EVENT_PRIO, true) {
-            mData = new PrioConfigEventData(pid, tid, prio);
+            mData = new PrioConfigEventData(pid, tid, prio, forApp);
         }
         virtual ~PrioConfigEvent() {}
     };
@@ -267,8 +269,8 @@ public:
                 status_t    sendConfigEvent_l(sp<ConfigEvent>& event);
                 void        sendIoConfigEvent(audio_io_config_event event, pid_t pid = 0);
                 void        sendIoConfigEvent_l(audio_io_config_event event, pid_t pid = 0);
-                void        sendPrioConfigEvent(pid_t pid, pid_t tid, int32_t prio);
-                void        sendPrioConfigEvent_l(pid_t pid, pid_t tid, int32_t prio);
+                void        sendPrioConfigEvent(pid_t pid, pid_t tid, int32_t prio, bool forApp);
+                void        sendPrioConfigEvent_l(pid_t pid, pid_t tid, int32_t prio, bool forApp);
                 status_t    sendSetParameterConfigEvent_l(const String8& keyValuePair);
                 status_t    sendCreateAudioPatchConfigEvent(const struct audio_patch *patch,
                                                             audio_patch_handle_t *handle);

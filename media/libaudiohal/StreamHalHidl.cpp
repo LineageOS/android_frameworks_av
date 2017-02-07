@@ -18,6 +18,7 @@
 //#define LOG_NDEBUG 0
 
 #include <android/hardware/audio/2.0/IStreamOutCallback.h>
+#include <mediautils/SchedulingPolicyService.h>
 #include <utils/Log.h>
 
 #include "DeviceHalHidl.h"
@@ -26,6 +27,7 @@
 
 using ::android::hardware::audio::common::V2_0::AudioChannelMask;
 using ::android::hardware::audio::common::V2_0::AudioFormat;
+using ::android::hardware::audio::common::V2_0::ThreadInfo;
 using ::android::hardware::audio::V2_0::AudioDrain;
 using ::android::hardware::audio::V2_0::IStreamOutCallback;
 using ::android::hardware::audio::V2_0::MessageQueueFlagBits;
@@ -33,7 +35,6 @@ using ::android::hardware::audio::V2_0::MmapBufferInfo;
 using ::android::hardware::audio::V2_0::MmapPosition;
 using ::android::hardware::audio::V2_0::ParameterValue;
 using ::android::hardware::audio::V2_0::Result;
-using ::android::hardware::audio::V2_0::ThreadPriority;
 using ::android::hardware::audio::V2_0::TimeSpec;
 using ::android::hardware::MQDescriptorSync;
 using ::android::hardware::Return;
@@ -44,8 +45,8 @@ namespace android {
 
 StreamHalHidl::StreamHalHidl(IStream *stream)
         : ConversionHelperHidl("Stream"),
-          mHalThreadPriority(static_cast<int>(ThreadPriority::NORMAL)),
-          mStream(stream) {
+          mStream(stream),
+          mHalThreadPriority(HAL_THREAD_PRIORITY_DEFAULT) {
 }
 
 StreamHalHidl::~StreamHalHidl() {
@@ -185,6 +186,19 @@ status_t StreamHalHidl::getMmapPosition(struct audio_mmap_position *position) {
 status_t StreamHalHidl::setHalThreadPriority(int priority) {
     mHalThreadPriority = priority;
     return OK;
+}
+
+bool StreamHalHidl::requestHalThreadPriority(pid_t threadPid, pid_t threadId) {
+    if (mHalThreadPriority == HAL_THREAD_PRIORITY_DEFAULT) {
+        return true;
+    }
+    int err = requestPriority(
+            threadPid, threadId,
+            mHalThreadPriority, false /*isForApp*/, true /*asynchronous*/);
+    ALOGE_IF(err, "failed to set priority %d for pid %d tid %d; error %d",
+            mHalThreadPriority, threadPid, threadId, err);
+    // Audio will still work, but latency will be higher and sometimes unacceptable.
+    return err == 0;
 }
 
 namespace {
@@ -352,12 +366,14 @@ status_t StreamOutHalHidl::prepareForWriting(size_t bufferSize) {
     std::unique_ptr<DataMQ> tempDataMQ;
     std::unique_ptr<StatusMQ> tempStatusMQ;
     Result retval;
+    pid_t halThreadPid, halThreadTid;
     Return<void> ret = mStream->prepareForWriting(
-            1, bufferSize, ThreadPriority(mHalThreadPriority),
+            1, bufferSize,
             [&](Result r,
                     const CommandMQ::Descriptor& commandMQ,
                     const DataMQ::Descriptor& dataMQ,
-                    const StatusMQ::Descriptor& statusMQ) {
+                    const StatusMQ::Descriptor& statusMQ,
+                    const ThreadInfo& halThreadInfo) {
                 retval = r;
                 if (retval == Result::OK) {
                     tempCommandMQ.reset(new CommandMQ(commandMQ));
@@ -366,6 +382,8 @@ status_t StreamOutHalHidl::prepareForWriting(size_t bufferSize) {
                     if (tempDataMQ->isValid() && tempDataMQ->getEventFlagWord()) {
                         EventFlag::createEventFlag(tempDataMQ->getEventFlagWord(), &mEfGroup);
                     }
+                    halThreadPid = halThreadInfo.pid;
+                    halThreadTid = halThreadInfo.tid;
                 }
             });
     if (!ret.isOk() || retval != Result::OK) {
@@ -386,6 +404,8 @@ status_t StreamOutHalHidl::prepareForWriting(size_t bufferSize) {
         ALOGE_IF(!mEfGroup, "Event flag creation for writing failed");
         return NO_INIT;
     }
+    requestHalThreadPriority(halThreadPid, halThreadTid);
+
     mCommandMQ = std::move(tempCommandMQ);
     mDataMQ = std::move(tempDataMQ);
     mStatusMQ = std::move(tempStatusMQ);
@@ -605,12 +625,14 @@ status_t StreamInHalHidl::prepareForReading(size_t bufferSize) {
     std::unique_ptr<DataMQ> tempDataMQ;
     std::unique_ptr<StatusMQ> tempStatusMQ;
     Result retval;
+    pid_t halThreadPid, halThreadTid;
     Return<void> ret = mStream->prepareForReading(
-            1, bufferSize, ThreadPriority(mHalThreadPriority),
+            1, bufferSize,
             [&](Result r,
                     const CommandMQ::Descriptor& commandMQ,
                     const DataMQ::Descriptor& dataMQ,
-                    const StatusMQ::Descriptor& statusMQ) {
+                    const StatusMQ::Descriptor& statusMQ,
+                    const ThreadInfo& halThreadInfo) {
                 retval = r;
                 if (retval == Result::OK) {
                     tempCommandMQ.reset(new CommandMQ(commandMQ));
@@ -619,6 +641,8 @@ status_t StreamInHalHidl::prepareForReading(size_t bufferSize) {
                     if (tempDataMQ->isValid() && tempDataMQ->getEventFlagWord()) {
                         EventFlag::createEventFlag(tempDataMQ->getEventFlagWord(), &mEfGroup);
                     }
+                    halThreadPid = halThreadInfo.pid;
+                    halThreadTid = halThreadInfo.tid;
                 }
             });
     if (!ret.isOk() || retval != Result::OK) {
@@ -639,6 +663,8 @@ status_t StreamInHalHidl::prepareForReading(size_t bufferSize) {
         ALOGE_IF(!mEfGroup, "Event flag creation for reading failed");
         return NO_INIT;
     }
+    requestHalThreadPriority(halThreadPid, halThreadTid);
+
     mCommandMQ = std::move(tempCommandMQ);
     mDataMQ = std::move(tempDataMQ);
     mStatusMQ = std::move(tempStatusMQ);
