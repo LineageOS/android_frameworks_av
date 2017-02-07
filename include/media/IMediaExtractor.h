@@ -42,6 +42,8 @@ public:
     // returns an empty metadata object.
     virtual sp<MetaData> getMetaData() = 0;
 
+    virtual status_t getMetrics(Parcel *reply) = 0;
+
     enum Flags {
         CAN_SEEK_BACKWARD  = 1,  // the "seek 10secs back button"
         CAN_SEEK_FORWARD   = 2,  // the "seek 10secs forward button"

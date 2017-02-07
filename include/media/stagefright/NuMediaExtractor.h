@@ -78,6 +78,7 @@ struct NuMediaExtractor : public RefBase {
     status_t getSampleTrackIndex(size_t *trackIndex);
     status_t getSampleTime(int64_t *sampleTimeUs);
     status_t getSampleMeta(sp<MetaData> *sampleMeta);
+    status_t getMetrics(Parcel *reply);
 
     bool getCachedDuration(int64_t *durationUs, bool *eos) const;
 

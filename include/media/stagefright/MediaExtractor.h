@@ -48,6 +48,8 @@ public:
     // returns an empty metadata object.
     virtual sp<MetaData> getMetaData();
 
+    status_t getMetrics(Parcel *reply);
+
     enum Flags {
         CAN_SEEK_BACKWARD  = 1,  // the "seek 10secs back button"
         CAN_SEEK_FORWARD   = 2,  // the "seek 10secs forward button"
@@ -73,6 +75,8 @@ protected:
     virtual ~MediaExtractor();
 
     MediaAnalyticsItem *mAnalyticsItem;
+
+    virtual void populateMetrics();
 
 private:
 

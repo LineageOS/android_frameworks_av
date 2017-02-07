@@ -569,6 +569,11 @@ status_t NuMediaExtractor::getSampleMeta(sp<MetaData> *sampleMeta) {
     return OK;
 }
 
+status_t NuMediaExtractor::getMetrics(Parcel *reply) {
+    status_t status = mImpl->getMetrics(reply);
+    return status;
+}
+
 bool NuMediaExtractor::getTotalBitrate(int64_t *bitrate) const {
     if (mTotalBitrate >= 0) {
         *bitrate = mTotalBitrate;
