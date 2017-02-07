@@ -22,7 +22,7 @@
 #include <hidl/Status.h>
 
 #include <frameworks/native/include/binder/Binder.h>
-#include <android/IOMXBufferSource.h>
+#include <android/BnOMXBufferSource.h>
 #include <OMXFenceParcelable.h>
 
 namespace android {
@@ -45,6 +45,7 @@ using ::android::sp;
 
 using ::android::OMXFenceParcelable;
 using ::android::IOMXBufferSource;
+using ::android::BnOMXBufferSource;
 
 /**
  * Wrapper classes for conversion
@@ -55,7 +56,7 @@ using ::android::IOMXBufferSource;
  * - TW = Treble Wrapper --- It wraps a legacy object inside a Treble object.
  */
 
-struct LWOmxBufferSource : public IOMXBufferSource {
+struct LWOmxBufferSource : public BnOMXBufferSource {
     sp<IOmxBufferSource> mBase;
     LWOmxBufferSource(sp<IOmxBufferSource> const& base);
     ::android::binder::Status onOmxExecuting() override;
@@ -64,8 +65,6 @@ struct LWOmxBufferSource : public IOMXBufferSource {
     ::android::binder::Status onInputBufferAdded(int32_t bufferID) override;
     ::android::binder::Status onInputBufferEmptied(
             int32_t bufferID, OMXFenceParcelable const& fenceParcel) override;
-protected:
-    ::android::IBinder* onAsBinder() override;
 };
 
 struct TWOmxBufferSource : public IOmxBufferSource {

@@ -61,16 +61,9 @@ LWOmxBufferSource::LWOmxBufferSource(sp<IOmxBufferSource> const& base) :
     ::android::binder::Status status = toBinderStatus(
             mBase->onInputBufferEmptied(
             static_cast<uint32_t>(bufferId), fence));
-    if (native_handle_delete(fenceNh) != 0) {
-        return ::android::binder::Status::fromExceptionCode(
-                ::android::binder::Status::EX_NULL_POINTER,
-                "Cannot delete native handle");
-    }
+    native_handle_close(fenceNh);
+    native_handle_delete(fenceNh);
     return status;
-}
-
-::android::IBinder* LWOmxBufferSource::onAsBinder() {
-    return nullptr;
 }
 
 // TWOmxBufferSource
@@ -79,20 +72,23 @@ TWOmxBufferSource::TWOmxBufferSource(sp<IOMXBufferSource> const& base) :
 }
 
 Return<void> TWOmxBufferSource::onOmxExecuting() {
-    return toHardwareStatus(mBase->onOmxExecuting());
+    mBase->onOmxExecuting();
+    return Void();
 }
 
 Return<void> TWOmxBufferSource::onOmxIdle() {
-    return toHardwareStatus(mBase->onOmxIdle());
+    mBase->onOmxIdle();
+    return Void();
 }
 
 Return<void> TWOmxBufferSource::onOmxLoaded() {
-    return toHardwareStatus(mBase->onOmxLoaded());
+    mBase->onOmxLoaded();
+    return Void();
 }
 
 Return<void> TWOmxBufferSource::onInputBufferAdded(uint32_t buffer) {
-    return toHardwareStatus(mBase->onInputBufferAdded(
-            static_cast<int32_t>(buffer)));
+    mBase->onInputBufferAdded(int32_t(buffer));
+    return Void();
 }
 
 Return<void> TWOmxBufferSource::onInputBufferEmptied(
@@ -102,8 +98,8 @@ Return<void> TWOmxBufferSource::onInputBufferEmptied(
       return ::android::hardware::Status::fromExceptionCode(
               ::android::hardware::Status::EX_BAD_PARCELABLE);
     }
-    return toHardwareStatus(mBase->onInputBufferEmptied(
-            static_cast<int32_t>(buffer), fenceParcelable));
+    mBase->onInputBufferEmptied(int32_t(buffer), fenceParcelable);
+    return Void();
 }
 
 }  // namespace utils

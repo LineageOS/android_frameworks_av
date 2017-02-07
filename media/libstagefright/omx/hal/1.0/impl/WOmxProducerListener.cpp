@@ -52,11 +52,6 @@ bool LWOmxProducerListener::needsReleaseNotify() {
     return static_cast<bool>(mBase->needsReleaseNotify());
 }
 
-::android::IBinder* LWOmxProducerListener::onAsBinder() {
-    return nullptr;
-}
-
-
 }  // namespace implementation
 }  // namespace V1_0
 }  // namespace omx

@@ -78,10 +78,6 @@ LWGraphicBufferSource::LWGraphicBufferSource(
     return toBinderStatus(mBase->signalEndOfInputStream());
 }
 
-::android::IBinder* LWGraphicBufferSource::onAsBinder() {
-    return nullptr;
-}
-
 // TWGraphicBufferSource
 TWGraphicBufferSource::TWGraphicBufferSource(
         sp<LGraphicBufferSource> const& base) : mBase(base) {
@@ -89,47 +85,51 @@ TWGraphicBufferSource::TWGraphicBufferSource(
 
 Return<void> TWGraphicBufferSource::configure(
         const sp<IOmxNode>& omxNode, Dataspace dataspace) {
-    return toHardwareStatus(mBase->configure(
-            new LWOmxNode(omxNode),
-            toRawDataspace(dataspace)));
+    mBase->configure(new LWOmxNode(omxNode), toRawDataspace(dataspace));
+    return Void();
 }
 
 Return<void> TWGraphicBufferSource::setSuspend(bool suspend) {
-    return toHardwareStatus(mBase->setSuspend(suspend));
+    mBase->setSuspend(suspend);
+    return Void();
 }
 
 Return<void> TWGraphicBufferSource::setRepeatPreviousFrameDelayUs(
         int64_t repeatAfterUs) {
-    return toHardwareStatus(mBase->setRepeatPreviousFrameDelayUs(
-            repeatAfterUs));
+    mBase->setRepeatPreviousFrameDelayUs(repeatAfterUs);
+    return Void();
 }
 
 Return<void> TWGraphicBufferSource::setMaxFps(float maxFps) {
-    return toHardwareStatus(mBase->setMaxFps(maxFps));
+    mBase->setMaxFps(maxFps);
+    return Void();
 }
 
 Return<void> TWGraphicBufferSource::setTimeLapseConfig(
         int64_t timePerFrameUs, int64_t timePerCaptureUs) {
-    return toHardwareStatus(mBase->setTimeLapseConfig(
-            timePerFrameUs, timePerCaptureUs));
+    mBase->setTimeLapseConfig(timePerFrameUs, timePerCaptureUs);
+    return Void();
 }
 
 Return<void> TWGraphicBufferSource::setStartTimeUs(int64_t startTimeUs) {
-    return toHardwareStatus(mBase->setStartTimeUs(startTimeUs));
+    mBase->setStartTimeUs(startTimeUs);
+    return Void();
 }
 
 Return<void> TWGraphicBufferSource::setColorAspects(
         const ColorAspects& aspects) {
-    return toHardwareStatus(mBase->setColorAspects(toCompactColorAspects(
-            aspects)));
+    mBase->setColorAspects(toCompactColorAspects(aspects));
+    return Void();
 }
 
 Return<void> TWGraphicBufferSource::setTimeOffsetUs(int64_t timeOffsetUs) {
-    return toHardwareStatus(mBase->setTimeOffsetUs(timeOffsetUs));
+    mBase->setTimeOffsetUs(timeOffsetUs);
+    return Void();
 }
 
 Return<void> TWGraphicBufferSource::signalEndOfInputStream() {
-    return toHardwareStatus(mBase->signalEndOfInputStream());
+    mBase->signalEndOfInputStream();
+    return Void();
 }
 
 }  // namespace implementation

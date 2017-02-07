@@ -294,7 +294,7 @@ inline bool wrapAs(Message* t, native_handle_t** nh, omx_message const& l) {
     if (!*nh) {
         return false;
     }
-    t->fence = inHidlHandle(*nh);
+    t->fence = *nh;
     switch (l.type) {
         case omx_message::EVENT:
             t->type = Message::Type::EVENT;
@@ -592,6 +592,16 @@ inline bool wrapAs(CodecBuffer* t, OMXBuffer const& l) {
         }
         case OMXBuffer::kBufferTypeANWBuffer: {
             t->type = CodecBuffer::Type::ANW_BUFFER;
+            if (l.mGraphicBuffer == nullptr) {
+                t->attr.anwBuffer.width = 0;
+                t->attr.anwBuffer.height = 0;
+                t->attr.anwBuffer.stride = 0;
+                t->attr.anwBuffer.format = static_cast<PixelFormat>(1);
+                t->attr.anwBuffer.layerCount = 0;
+                t->attr.anwBuffer.usage = 0;
+                t->nativeHandle = hidl_handle();
+                return true;
+            }
             t->attr.anwBuffer.width = l.mGraphicBuffer->getWidth();
             t->attr.anwBuffer.height = l.mGraphicBuffer->getHeight();
             t->attr.anwBuffer.stride = l.mGraphicBuffer->getStride();
@@ -636,6 +646,10 @@ inline bool convertTo(OMXBuffer* l, CodecBuffer const& t) {
             return true;
         }
         case CodecBuffer::Type::ANW_BUFFER: {
+            if (t.nativeHandle.getNativeHandle() == nullptr) {
+                *l = OMXBuffer(sp<GraphicBuffer>(nullptr));
+                return true;
+            }
             *l = OMXBuffer(sp<GraphicBuffer>(new GraphicBuffer(
                     t.attr.anwBuffer.width,
                     t.attr.anwBuffer.height,

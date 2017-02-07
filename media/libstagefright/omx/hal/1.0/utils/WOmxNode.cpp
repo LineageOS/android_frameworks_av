@@ -252,10 +252,6 @@ status_t LWOmxNode::setQuirks(OMX_U32 quirks) {
     return toStatusT(mBase->setQuirks(static_cast<uint32_t>(quirks)));;
 }
 
-::android::IBinder* LWOmxNode::onAsBinder() {
-    return nullptr;
-}
-
 // TWOmxNode
 TWOmxNode::TWOmxNode(sp<IOMXNode> const& base) : mBase(base) {
 }
@@ -281,7 +277,8 @@ Return<void> TWOmxNode::getParameter(
 }
 
 Return<Status> TWOmxNode::setParameter(
-        uint32_t index, hidl_vec<uint8_t> const& params) {
+        uint32_t index, hidl_vec<uint8_t> const& inParams) {
+    hidl_vec<uint8_t> params(inParams);
     return toStatus(mBase->setParameter(
             toEnumIndexType(index),
             static_cast<void const*>(params.data()),
@@ -301,7 +298,8 @@ Return<void> TWOmxNode::getConfig(
 }
 
 Return<Status> TWOmxNode::setConfig(
-        uint32_t index, const hidl_vec<uint8_t>& config) {
+        uint32_t index, const hidl_vec<uint8_t>& inConfig) {
+    hidl_vec<uint8_t> config(inConfig);
     return toStatus(mBase->setConfig(
             toEnumIndexType(index),
             static_cast<void const*>(config.data()),

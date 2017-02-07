@@ -50,10 +50,6 @@ void LWOmxObserver::onMessages(std::list<omx_message> const& lMessages) {
     }
 }
 
-::android::IBinder* LWOmxObserver::onAsBinder() {
-    return nullptr;
-}
-
 // TWOmxObserver
 TWOmxObserver::TWOmxObserver(sp<IOMXObserver> const& base) : mBase(base) {
 }
