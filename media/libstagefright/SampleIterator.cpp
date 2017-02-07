@@ -305,8 +305,16 @@ status_t SampleIterator::findSampleTimeAndDuration(
         return ERROR_OUT_OF_RANGE;
     }
 
-    while (sampleIndex >= mTTSSampleIndex + mTTSCount) {
-        if (mTimeToSampleIndex == mTable->mTimeToSampleCount) {
+    while (true) {
+        if (mTTSSampleIndex > UINT32_MAX - mTTSCount) {
+            return ERROR_OUT_OF_RANGE;
+        }
+        if(sampleIndex < mTTSSampleIndex + mTTSCount) {
+            break;
+        }
+        if (mTimeToSampleIndex == mTable->mTimeToSampleCount ||
+            mTTSCount > UINT32_MAX / mTTSDuration ||
+            mTTSSampleTime > UINT32_MAX - (mTTSCount * mTTSDuration)) {
             return ERROR_OUT_OF_RANGE;
         }
 
