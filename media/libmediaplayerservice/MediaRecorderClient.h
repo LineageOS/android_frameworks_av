@@ -20,6 +20,8 @@
 
 #include <media/IMediaRecorder.h>
 
+#include <android/hardware/media/omx/1.0/IOmx.h>
+
 namespace android {
 
 struct MediaRecorderBase;
@@ -28,21 +30,35 @@ class ICameraRecordingProxy;
 
 class MediaRecorderClient : public BnMediaRecorder
 {
-    class ServiceDeathNotifier: public IBinder::DeathRecipient
+    typedef ::android::hardware::media::omx::V1_0::IOmx IOmx;
+
+    class ServiceDeathNotifier :
+            public IBinder::DeathRecipient,
+            public ::android::hardware::hidl_death_recipient
     {
     public:
         ServiceDeathNotifier(
                 const sp<IBinder>& service,
                 const sp<IMediaRecorderClient>& listener,
                 int which);
+        ServiceDeathNotifier(
+                const sp<IOmx>& omx,
+                const sp<IMediaRecorderClient>& listener,
+                int which);
         virtual ~ServiceDeathNotifier();
         virtual void binderDied(const wp<IBinder>& who);
-
+        virtual void serviceDied(
+                uint64_t cookie,
+                const wp<::android::hidl::base::V1_0::IBase>& who);
+        void unlinkToDeath();
     private:
         int mWhich;
         sp<IBinder> mService;
+        sp<IOmx> mOmx;
         wp<IMediaRecorderClient> mListener;
     };
+
+    void clearDeathNotifiers();
 
 public:
     virtual     status_t   setCamera(const sp<hardware::ICamera>& camera,
@@ -84,8 +100,8 @@ private:
                                                                const String16& opPackageName);
     virtual                ~MediaRecorderClient();
 
-    sp<IBinder::DeathRecipient> mCameraDeathListener;
-    sp<IBinder::DeathRecipient> mCodecDeathListener;
+    sp<ServiceDeathNotifier> mCameraDeathListener;
+    sp<ServiceDeathNotifier> mCodecDeathListener;
 
     pid_t                  mPid;
     Mutex                  mLock;

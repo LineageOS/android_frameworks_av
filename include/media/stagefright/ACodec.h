@@ -94,9 +94,8 @@ struct ACodec : public AHierarchicalStateMachine, public CodecBase {
 
     static status_t getOMXChannelMapping(size_t numChannels, OMX_AUDIO_CHANNELTYPE map[]);
 
-    // Read the flag from "media.use_treble_omx", save it locally, and return
-    // it.
-    bool updateTrebleFlag();
+    // Save the flag.
+    void setTrebleFlag(bool trebleFlag);
     // Return the saved flag.
     bool getTrebleFlag() const;
 

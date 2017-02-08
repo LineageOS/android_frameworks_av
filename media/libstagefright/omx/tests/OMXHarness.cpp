@@ -39,6 +39,8 @@
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/SimpleDecodingSource.h>
 #include <media/OMXBuffer.h>
+#include <android/hardware/media/omx/1.0/IOmx.h>
+#include <omx/hal/1.0/utils/WOmx.h>
 
 #define DEFAULT_TIMEOUT         500000
 
@@ -64,7 +66,7 @@ void Harness::CodecObserver::onMessages(const std::list<omx_message> &messages) 
 /////////////////////////////////////////////////////////////////////
 
 Harness::Harness()
-    : mInitCheck(NO_INIT) {
+    : mInitCheck(NO_INIT), mUseTreble(false) {
     mInitCheck = initOMX();
 }
 
@@ -76,10 +78,23 @@ status_t Harness::initCheck() const {
 }
 
 status_t Harness::initOMX() {
-    sp<IServiceManager> sm = defaultServiceManager();
-    sp<IBinder> binder = sm->getService(String16("media.codec"));
-    sp<IMediaCodecService> service = interface_cast<IMediaCodecService>(binder);
-    mOMX = service->getOMX();
+    int32_t trebleOmx = property_get_int32("persist.media.treble_omx", -1);
+    if ((trebleOmx == 1) || ((trebleOmx == -1) &&
+            property_get_bool("persist.hal.binderization", 0))) {
+        using namespace ::android::hardware::media::omx::V1_0;
+        sp<IOmx> tOmx = IOmx::getService();
+        if (tOmx == nullptr) {
+            return NO_INIT;
+        }
+        mOMX = new utils::LWOmx(tOmx);
+        mUseTreble = true;
+    } else {
+        sp<IServiceManager> sm = defaultServiceManager();
+        sp<IBinder> binder = sm->getService(String16("media.codec"));
+        sp<IMediaCodecService> service = interface_cast<IMediaCodecService>(binder);
+        mOMX = service->getOMX();
+        mUseTreble = false;
+    }
 
     return mOMX != 0 ? OK : NO_INIT;
 }
@@ -197,7 +212,6 @@ status_t Harness::getPortDefinition(
     EXPECT((err) == OK, info " failed")
 
 status_t Harness::allocatePortBuffers(
-        const sp<MemoryDealer> &dealer,
         OMX_U32 portIndex, Vector<Buffer> *buffers) {
     buffers->clear();
 
@@ -207,11 +221,27 @@ status_t Harness::allocatePortBuffers(
 
     for (OMX_U32 i = 0; i < def.nBufferCountActual; ++i) {
         Buffer buffer;
-        buffer.mMemory = dealer->allocate(def.nBufferSize);
         buffer.mFlags = 0;
-        CHECK(buffer.mMemory != NULL);
+        if (mUseTreble) {
+            bool success;
+            auto transStatus = mAllocator->allocate(def.nBufferSize,
+                    [&success, &buffer](
+                            bool s,
+                            hidl_memory const& m) {
+                        success = s;
+                        buffer.mHidlMemory = m;
+                    });
+            EXPECT(transStatus.isOk(),
+                    "Cannot call allocator");
+            EXPECT(success,
+                    "Cannot allocate memory");
+            err = mOMXNode->useBuffer(portIndex, buffer.mHidlMemory, &buffer.mID);
+        } else {
+            buffer.mMemory = mDealer->allocate(def.nBufferSize);
+            CHECK(buffer.mMemory != NULL);
+            err = mOMXNode->useBuffer(portIndex, buffer.mMemory, &buffer.mID);
+        }
 
-        err = mOMXNode->useBuffer(portIndex, buffer.mMemory, &buffer.mID);
         EXPECT_SUCCESS(err, "useBuffer");
 
         buffers->push(buffer);
@@ -279,7 +309,13 @@ status_t Harness::testStateTransitions(
         return OK;
     }
 
-    sp<MemoryDealer> dealer = new MemoryDealer(16 * 1024 * 1024, "OMXHarness");
+    if (mUseTreble) {
+        mAllocator = IAllocator::getService("ashmem");
+        EXPECT(mAllocator != nullptr,
+                "Cannot obtain hidl AshmemAllocator");
+    } else {
+        mDealer = new MemoryDealer(16 * 1024 * 1024, "OMXHarness");
+    }
 
     sp<CodecObserver> observer = new CodecObserver(this, ++mCurGeneration);
 
@@ -305,14 +341,14 @@ status_t Harness::testStateTransitions(
 
     // Now allocate buffers.
     Vector<Buffer> inputBuffers;
-    err = allocatePortBuffers(dealer, 0, &inputBuffers);
+    err = allocatePortBuffers(0, &inputBuffers);
     EXPECT_SUCCESS(err, "allocatePortBuffers(input)");
 
     err = dequeueMessageForNode(&msg, DEFAULT_TIMEOUT);
     CHECK_EQ(err, (status_t)TIMED_OUT);
 
     Vector<Buffer> outputBuffers;
-    err = allocatePortBuffers(dealer, 1, &outputBuffers);
+    err = allocatePortBuffers(1, &outputBuffers);
     EXPECT_SUCCESS(err, "allocatePortBuffers(output)");
 
     err = dequeueMessageForNode(&msg, DEFAULT_TIMEOUT);

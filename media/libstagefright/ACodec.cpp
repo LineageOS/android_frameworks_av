@@ -575,7 +575,7 @@ ACodec::ACodec()
 
     changeState(mUninitializedState);
 
-    updateTrebleFlag();
+    mTrebleFlag = false;
 }
 
 ACodec::~ACodec() {
@@ -6229,11 +6229,12 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
     CHECK(mCodec->mOMXNode == NULL);
 
     OMXClient client;
-    if ((mCodec->updateTrebleFlag() ?
-            client.connectTreble() : client.connect()) != OK) {
+    bool trebleFlag;
+    if (client.connect(&trebleFlag) != OK) {
         mCodec->signalError(OMX_ErrorUndefined, NO_INIT);
         return false;
     }
+    mCodec->setTrebleFlag(trebleFlag);
 
     sp<IOMX> omx = client.interface();
 
@@ -7676,8 +7677,7 @@ status_t ACodec::queryCapabilities(
     }
 
     OMXClient client;
-    status_t err = getTrebleFlag() ?
-            client.connectTreble() : client.connect();
+    status_t err = client.connect();
     if (err != OK) {
         return err;
     }
@@ -7893,11 +7893,8 @@ status_t ACodec::getOMXChannelMapping(size_t numChannels, OMX_AUDIO_CHANNELTYPE 
     return OK;
 }
 
-bool ACodec::updateTrebleFlag() {
-    mTrebleFlag = bool(property_get_bool("debug.treble_omx", 0));
-    ALOGV("updateTrebleFlag() returns %s",
-            mTrebleFlag ? "true" : "false");
-    return mTrebleFlag;
+void ACodec::setTrebleFlag(bool trebleFlag) {
+    mTrebleFlag = trebleFlag;
 }
 
 bool ACodec::getTrebleFlag() const {

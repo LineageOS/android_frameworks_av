@@ -23,6 +23,9 @@
 #include <utils/Vector.h>
 #include <utils/threads.h>
 
+#include <binder/MemoryDealer.h>
+#include <android/hidl/memory/1.0/IAllocator.h>
+#include <android/hidl/memory/1.0/IMemory.h>
 #include <OMX_Component.h>
 
 namespace android {
@@ -30,12 +33,15 @@ namespace android {
 class MemoryDealer;
 
 struct Harness : public RefBase {
+    typedef hidl::memory::V1_0::IMemory TMemory;
+    typedef hardware::hidl_memory hidl_memory;
     enum BufferFlags {
         kBufferBusy = 1
     };
     struct Buffer {
         IOMX::buffer_id mID;
         sp<IMemory> mMemory;
+        hidl_memory mHidlMemory;
         uint32_t mFlags;
     };
 
@@ -54,7 +60,6 @@ struct Harness : public RefBase {
             OMX_U32 portIndex, OMX_PARAM_PORTDEFINITIONTYPE *def);
 
     status_t allocatePortBuffers(
-            const sp<MemoryDealer> &dealer,
             OMX_U32 portIndex, Vector<Buffer> *buffers);
 
     status_t setRole(const char *role);
@@ -74,6 +79,8 @@ protected:
     virtual ~Harness();
 
 private:
+    typedef hidl::memory::V1_0::IAllocator IAllocator;
+
     friend struct NodeReaper;
     struct CodecObserver;
 
@@ -86,6 +93,9 @@ private:
     Condition mMessageAddedCondition;
     int32_t mLastMsgGeneration;
     int32_t mCurGeneration;
+    bool mUseTreble;
+    sp<MemoryDealer> mDealer;
+    sp<IAllocator> mAllocator;
 
     status_t initOMX();
 

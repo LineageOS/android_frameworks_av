@@ -36,6 +36,8 @@ LOCAL_SHARED_LIBRARIES :=       \
     libstagefright_omx          \
     libstagefright_wfd          \
     libutils                    \
+    libhidlbase                 \
+    android.hardware.media.omx@1.0 \
 
 LOCAL_STATIC_LIBRARIES :=       \
     libstagefright_nuplayer     \

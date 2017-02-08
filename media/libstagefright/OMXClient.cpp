@@ -22,6 +22,7 @@
 #endif
 
 #include <utils/Log.h>
+#include <cutils/properties.h>
 
 #include <binder/IServiceManager.h>
 #include <media/IMediaCodecService.h>
@@ -36,7 +37,22 @@ namespace android {
 OMXClient::OMXClient() {
 }
 
-status_t OMXClient::connect() {
+status_t OMXClient::connect(bool* trebleFlag) {
+    int32_t trebleOmx = property_get_int32("persist.media.treble_omx", -1);
+    if ((trebleOmx == 1) || ((trebleOmx == -1) &&
+            property_get_bool("persist.hal.binderization", 0))) {
+        if (trebleFlag != nullptr) {
+            *trebleFlag = true;
+        }
+        return connectTreble();
+    }
+    if (trebleFlag != nullptr) {
+        *trebleFlag = false;
+    }
+    return connectLegacy();
+}
+
+status_t OMXClient::connectLegacy() {
     sp<IServiceManager> sm = defaultServiceManager();
     sp<IBinder> codecbinder = sm->getService(String16("media.codec"));
     sp<IMediaCodecService> codecservice = interface_cast<IMediaCodecService>(codecbinder);
@@ -67,6 +83,7 @@ status_t OMXClient::connectTreble() {
         return NO_INIT;
     }
     mOMX = new utils::LWOmx(tOmx);
+    ALOGI("Treble IOmx obtained");
     return OK;
 }
 

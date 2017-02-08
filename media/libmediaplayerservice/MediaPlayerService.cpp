@@ -597,6 +597,7 @@ MediaPlayerService::Client::~Client()
     if (mAudioAttributes != NULL) {
         free(mAudioAttributes);
     }
+    clearDeathNotifiers();
 }
 
 void MediaPlayerService::Client::disconnect()
@@ -654,12 +655,22 @@ MediaPlayerService::Client::ServiceDeathNotifier::ServiceDeathNotifier(
         const sp<MediaPlayerBase>& listener,
         int which) {
     mService = service;
+    mOmx = nullptr;
+    mListener = listener;
+    mWhich = which;
+}
+
+MediaPlayerService::Client::ServiceDeathNotifier::ServiceDeathNotifier(
+        const sp<IOmx>& omx,
+        const sp<MediaPlayerBase>& listener,
+        int which) {
+    mService = nullptr;
+    mOmx = omx;
     mListener = listener;
     mWhich = which;
 }
 
 MediaPlayerService::Client::ServiceDeathNotifier::~ServiceDeathNotifier() {
-    mService->unlinkToDeath(this);
 }
 
 void MediaPlayerService::Client::ServiceDeathNotifier::binderDied(const wp<IBinder>& /*who*/) {
@@ -671,10 +682,43 @@ void MediaPlayerService::Client::ServiceDeathNotifier::binderDied(const wp<IBind
     }
 }
 
+void MediaPlayerService::Client::ServiceDeathNotifier::serviceDied(
+        uint64_t /* cookie */,
+        const wp<::android::hidl::base::V1_0::IBase>& /* who */) {
+    sp<MediaPlayerBase> listener = mListener.promote();
+    if (listener != NULL) {
+        listener->sendEvent(MEDIA_ERROR, MEDIA_ERROR_SERVER_DIED, mWhich);
+    } else {
+        ALOGW("listener for process %d death is gone", mWhich);
+    }
+}
+
+void MediaPlayerService::Client::ServiceDeathNotifier::unlinkToDeath() {
+    if (mService != nullptr) {
+        mService->unlinkToDeath(this);
+        mService = nullptr;
+    } else if (mOmx != nullptr) {
+        mOmx->unlinkToDeath(this);
+        mOmx = nullptr;
+    }
+}
+
+void MediaPlayerService::Client::clearDeathNotifiers() {
+    if (mExtractorDeathListener != nullptr) {
+        mExtractorDeathListener->unlinkToDeath();
+        mExtractorDeathListener = nullptr;
+    }
+    if (mCodecDeathListener != nullptr) {
+        mCodecDeathListener->unlinkToDeath();
+        mCodecDeathListener = nullptr;
+    }
+}
+
 sp<MediaPlayerBase> MediaPlayerService::Client::setDataSource_pre(
         player_type playerType)
 {
     ALOGV("player type = %d", playerType);
+    clearDeathNotifiers();
 
     // create the right type of player
     sp<MediaPlayerBase> p = createPlayer(playerType);
@@ -691,13 +735,27 @@ sp<MediaPlayerBase> MediaPlayerService::Client::setDataSource_pre(
     mExtractorDeathListener = new ServiceDeathNotifier(binder, p, MEDIAEXTRACTOR_PROCESS_DEATH);
     binder->linkToDeath(mExtractorDeathListener);
 
-    binder = sm->getService(String16("media.codec"));
-    if (binder == NULL) {
-        ALOGE("codec service not available");
-        return NULL;
+    int32_t trebleOmx = property_get_int32("persist.media.treble_omx", -1);
+    if ((trebleOmx == 1) || ((trebleOmx == -1) &&
+            property_get_bool("persist.hal.binderization", 0))) {
+        // Treble IOmx
+        sp<IOmx> omx = IOmx::getService();
+        if (omx == nullptr) {
+            ALOGE("Treble IOmx not available");
+            return NULL;
+        }
+        mCodecDeathListener = new ServiceDeathNotifier(omx, p, MEDIACODEC_PROCESS_DEATH);
+        omx->linkToDeath(mCodecDeathListener, 0);
+    } else {
+        // Legacy IOMX
+        binder = sm->getService(String16("media.codec"));
+        if (binder == NULL) {
+            ALOGE("codec service not available");
+            return NULL;
+        }
+        mCodecDeathListener = new ServiceDeathNotifier(binder, p, MEDIACODEC_PROCESS_DEATH);
+        binder->linkToDeath(mCodecDeathListener);
     }
-    mCodecDeathListener = new ServiceDeathNotifier(binder, p, MEDIACODEC_PROCESS_DEATH);
-    binder->linkToDeath(mCodecDeathListener);
 
     if (!p->hardwareOutput()) {
         Mutex::Autolock l(mLock);

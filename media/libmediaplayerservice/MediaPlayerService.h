@@ -30,6 +30,8 @@
 #include <media/Metadata.h>
 #include <media/stagefright/foundation/ABase.h>
 
+#include <android/hardware/media/omx/1.0/IOmx.h>
+
 #include <system/audio.h>
 
 namespace android {
@@ -69,6 +71,7 @@ private:
 class MediaPlayerService : public BnMediaPlayerService
 {
     class Client;
+    typedef ::android::hardware::media::omx::V1_0::IOmx IOmx;
 
     class AudioOutput : public MediaPlayerBase::AudioSink
     {
@@ -362,21 +365,34 @@ private:
         virtual status_t releaseDrm();
 
     private:
-        class ServiceDeathNotifier: public IBinder::DeathRecipient
+        class ServiceDeathNotifier:
+                public IBinder::DeathRecipient,
+                public ::android::hardware::hidl_death_recipient
         {
         public:
             ServiceDeathNotifier(
                     const sp<IBinder>& service,
                     const sp<MediaPlayerBase>& listener,
                     int which);
+            ServiceDeathNotifier(
+                    const sp<IOmx>& omx,
+                    const sp<MediaPlayerBase>& listener,
+                    int which);
             virtual ~ServiceDeathNotifier();
             virtual void binderDied(const wp<IBinder>& who);
+            virtual void serviceDied(
+                    uint64_t cookie,
+                    const wp<::android::hidl::base::V1_0::IBase>& who);
+            void unlinkToDeath();
 
         private:
             int mWhich;
             sp<IBinder> mService;
+            sp<IOmx> mOmx;
             wp<MediaPlayerBase> mListener;
         };
+
+        void clearDeathNotifiers();
 
         friend class MediaPlayerService;
                                 Client( const sp<MediaPlayerService>& service,
@@ -437,8 +453,8 @@ private:
         // getMetadata clears this set.
         media::Metadata::Filter mMetadataUpdated;  // protected by mLock
 
-        sp<IBinder::DeathRecipient> mExtractorDeathListener;
-        sp<IBinder::DeathRecipient> mCodecDeathListener;
+        sp<ServiceDeathNotifier> mExtractorDeathListener;
+        sp<ServiceDeathNotifier> mCodecDeathListener;
 #if CALLBACK_ANTAGONIZER
                     Antagonizer*                mAntagonizer;
 #endif

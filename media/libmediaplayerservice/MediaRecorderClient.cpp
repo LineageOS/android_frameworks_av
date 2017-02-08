@@ -328,6 +328,7 @@ status_t MediaRecorderClient::release()
         wp<MediaRecorderClient> client(this);
         mMediaPlayerService->removeMediaRecorderClient(client);
     }
+    clearDeathNotifiers();
     return NO_ERROR;
 }
 
@@ -351,15 +352,25 @@ MediaRecorderClient::ServiceDeathNotifier::ServiceDeathNotifier(
         const sp<IMediaRecorderClient>& listener,
         int which) {
     mService = service;
+    mOmx = nullptr;
+    mListener = listener;
+    mWhich = which;
+}
+
+MediaRecorderClient::ServiceDeathNotifier::ServiceDeathNotifier(
+        const sp<IOmx>& omx,
+        const sp<IMediaRecorderClient>& listener,
+        int which) {
+    mService = nullptr;
+    mOmx = omx;
     mListener = listener;
     mWhich = which;
 }
 
 MediaRecorderClient::ServiceDeathNotifier::~ServiceDeathNotifier() {
-    mService->unlinkToDeath(this);
 }
 
-void  MediaRecorderClient::ServiceDeathNotifier::binderDied(const wp<IBinder>& /*who*/) {
+void MediaRecorderClient::ServiceDeathNotifier::binderDied(const wp<IBinder>& /*who*/) {
     sp<IMediaRecorderClient> listener = mListener.promote();
     if (listener != NULL) {
         listener->notify(MEDIA_ERROR, MEDIA_ERROR_SERVER_DIED, mWhich);
@@ -368,9 +379,42 @@ void  MediaRecorderClient::ServiceDeathNotifier::binderDied(const wp<IBinder>& /
     }
 }
 
+void MediaRecorderClient::ServiceDeathNotifier::serviceDied(
+        uint64_t /* cookie */,
+        const wp<::android::hidl::base::V1_0::IBase>& /* who */) {
+    sp<IMediaRecorderClient> listener = mListener.promote();
+    if (listener != NULL) {
+        listener->notify(MEDIA_ERROR, MEDIA_ERROR_SERVER_DIED, mWhich);
+    } else {
+        ALOGW("listener for process %d death is gone", mWhich);
+    }
+}
+
+void MediaRecorderClient::ServiceDeathNotifier::unlinkToDeath() {
+    if (mService != nullptr) {
+        mService->unlinkToDeath(this);
+        mService = nullptr;
+    } else if (mOmx != nullptr) {
+        mOmx->unlinkToDeath(this);
+        mOmx = nullptr;
+    }
+}
+
+void MediaRecorderClient::clearDeathNotifiers() {
+    if (mCameraDeathListener != nullptr) {
+        mCameraDeathListener->unlinkToDeath();
+        mCameraDeathListener = nullptr;
+    }
+    if (mCodecDeathListener != nullptr) {
+        mCodecDeathListener->unlinkToDeath();
+        mCodecDeathListener = nullptr;
+    }
+}
+
 status_t MediaRecorderClient::setListener(const sp<IMediaRecorderClient>& listener)
 {
     ALOGV("setListener");
+    clearDeathNotifiers();
     Mutex::Autolock lock(mLock);
     if (mRecorder == NULL) {
         ALOGE("recorder is not initialized");
@@ -395,10 +439,25 @@ status_t MediaRecorderClient::setListener(const sp<IMediaRecorderClient>& listen
     }
     sCameraChecked = true;
 
-    binder = sm->getService(String16("media.codec"));
-    mCodecDeathListener = new ServiceDeathNotifier(binder, listener,
-            MediaPlayerService::MEDIACODEC_PROCESS_DEATH);
-    binder->linkToDeath(mCodecDeathListener);
+    int32_t trebleOmx = property_get_int32("persist.media.treble_omx", -1);
+    if ((trebleOmx == 1) || ((trebleOmx == -1) &&
+            property_get_bool("persist.hal.binderization", 0))) {
+        // Treble IOmx
+        sp<IOmx> omx = IOmx::getService();
+        if (omx == nullptr) {
+            ALOGE("Treble IOmx not available");
+            return NO_INIT;
+        }
+        mCodecDeathListener = new ServiceDeathNotifier(omx, listener,
+                MediaPlayerService::MEDIACODEC_PROCESS_DEATH);
+        omx->linkToDeath(mCodecDeathListener, 0);
+    } else {
+        // Legacy IOMX
+        binder = sm->getService(String16("media.codec"));
+        mCodecDeathListener = new ServiceDeathNotifier(binder, listener,
+                MediaPlayerService::MEDIACODEC_PROCESS_DEATH);
+        binder->linkToDeath(mCodecDeathListener);
+    }
 
     return OK;
 }

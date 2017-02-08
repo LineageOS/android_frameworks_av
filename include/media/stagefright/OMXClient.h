@@ -26,7 +26,8 @@ class OMXClient {
 public:
     OMXClient();
 
-    status_t connect();
+    status_t connect(bool* trebleFlag = nullptr);
+    status_t connectLegacy();
     status_t connectTreble();
     void disconnect();
 

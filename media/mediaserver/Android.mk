@@ -12,23 +12,24 @@ endif
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:= \
-	main_mediaserver.cpp
+        main_mediaserver.cpp
 
 LOCAL_SHARED_LIBRARIES := \
-	libresourcemanagerservice \
-	liblog \
-	libmediaplayerservice \
-	libutils \
-	libbinder \
-	libicuuc \
+        libresourcemanagerservice \
+        liblog \
+        libmediaplayerservice \
+        libutils \
+        libbinder \
+        libicuuc \
+        android.hardware.media.omx@1.0 \
 
 LOCAL_STATIC_LIBRARIES := \
         libicuandroid_utils \
         libregistermsext
 
 LOCAL_C_INCLUDES := \
-    frameworks/av/media/libmediaplayerservice \
-    frameworks/av/services/mediaresourcemanager \
+        frameworks/av/media/libmediaplayerservice \
+        frameworks/av/services/mediaresourcemanager \
 
 LOCAL_MODULE:= mediaserver
 LOCAL_32_BIT_ONLY := true

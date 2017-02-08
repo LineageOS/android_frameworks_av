@@ -64,6 +64,9 @@
 #include <gui/Surface.h>
 #include <gui/SurfaceComposerClient.h>
 
+#include <android/hardware/media/omx/1.0/IOmx.h>
+#include <omx/hal/1.0/utils/WOmx.h>
+
 using namespace android;
 
 static long gNumRepetitions;
@@ -904,13 +907,25 @@ int main(int argc, char **argv) {
     }
 
     if (listComponents) {
-        sp<IServiceManager> sm = defaultServiceManager();
-        sp<IBinder> binder = sm->getService(String16("media.codec"));
-        sp<IMediaCodecService> service = interface_cast<IMediaCodecService>(binder);
+        sp<IOMX> omx;
+        int32_t trebleOmx = property_get_int32("persist.media.treble_omx", -1);
+        if ((trebleOmx == 1) || ((trebleOmx == -1) &&
+                property_get_bool("persist.hal.binderization", 0))) {
+            using namespace ::android::hardware::media::omx::V1_0;
+            sp<IOmx> tOmx = IOmx::getService();
 
-        CHECK(service.get() != NULL);
+            CHECK(tOmx.get() != NULL);
 
-        sp<IOMX> omx = service->getOMX();
+            omx = new utils::LWOmx(tOmx);
+        } else {
+            sp<IServiceManager> sm = defaultServiceManager();
+            sp<IBinder> binder = sm->getService(String16("media.codec"));
+            sp<IMediaCodecService> service = interface_cast<IMediaCodecService>(binder);
+
+            CHECK(service.get() != NULL);
+
+            omx = service->getOMX();
+        }
         CHECK(omx.get() != NULL);
 
         List<IOMX::ComponentInfo> list;

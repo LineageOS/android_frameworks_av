@@ -32,6 +32,7 @@
 #include "minijail.h"
 
 #include <android/hardware/media/omx/1.0/IOmx.h>
+#include <hidl/HidlTransportSupport.h>
 
 using namespace android;
 
@@ -45,13 +46,13 @@ int main(int argc __unused, char** argv)
     SetUpMinijail(kSeccompPolicyPath, std::string());
 
     strcpy(argv[0], "media.codec");
-    sp<ProcessState> proc(ProcessState::self());
-    sp<IServiceManager> sm = defaultServiceManager();
-    MediaCodecService::instantiate();
 
-    // Treble
-    bool useTrebleOmx = bool(property_get_bool("debug.treble_omx", 0));
-    if (useTrebleOmx) {
+    ::android::hardware::configureRpcThreadpool(64, false);
+    sp<ProcessState> proc(ProcessState::self());
+
+    int32_t trebleOmx = property_get_int32("persist.media.treble_omx", -1);
+    if ((trebleOmx == 1) || ((trebleOmx == -1) &&
+            property_get_bool("persist.hal.binderization", 0))) {
         using namespace ::android::hardware::media::omx::V1_0;
         sp<IOmx> omx = IOmx::getService(true);
         if (omx == nullptr) {
@@ -59,8 +60,11 @@ int main(int argc __unused, char** argv)
         } else if (omx->registerAsService("default") != OK) {
             LOG(ERROR) << "Cannot register a Treble IOmx service.";
         } else {
-            LOG(VERBOSE) << "Treble IOmx service created.";
+            LOG(INFO) << "Treble IOmx service created.";
         }
+    } else {
+        MediaCodecService::instantiate();
+        LOG(INFO) << "Non-Treble IOMX service created.";
     }
 
     ProcessState::self()->startThreadPool();
