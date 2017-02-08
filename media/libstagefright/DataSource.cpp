@@ -231,7 +231,7 @@ sp<DataSource> DataSource::CreateFromURI(
         }
 
         String8 cacheConfig;
-        bool disconnectAtHighwatermark;
+        bool disconnectAtHighwatermark = false;
         KeyedVector<String8, String8> nonCacheSpecificHeaders;
         if (headers != NULL) {
             nonCacheSpecificHeaders = *headers;

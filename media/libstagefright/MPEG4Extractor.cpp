@@ -4412,8 +4412,8 @@ status_t MPEG4Source::read(
         // fall through
     }
 
-    off64_t offset;
-    size_t size;
+    off64_t offset = 0;
+    size_t size = 0;
     uint32_t cts, stts;
     bool isSyncSample;
     bool newBuffer = false;
