@@ -275,6 +275,7 @@ status_t StagefrightRecorder::setOutputFile(int fd) {
 }
 
 status_t StagefrightRecorder::setNextOutputFile(int fd) {
+    Mutex::Autolock autolock(mLock);
     // Only support MPEG4
     if (mOutputFormat != OUTPUT_FORMAT_MPEG_4) {
         ALOGE("Only MP4 file format supports setting next output file");
@@ -290,6 +291,10 @@ status_t StagefrightRecorder::setNextOutputFile(int fd) {
     // start with a clean, empty file
     ftruncate(fd, 0);
     int nextFd = dup(fd);
+    if (mWriter == NULL) {
+        ALOGE("setNextOutputFile failed. Writer has been freed");
+        return INVALID_OPERATION;
+    }
     return mWriter->setNextFd(nextFd);
 }
 
@@ -851,6 +856,8 @@ status_t StagefrightRecorder::prepareInternal() {
 }
 
 status_t StagefrightRecorder::prepare() {
+    ALOGV("prepare");
+    Mutex::Autolock autolock(mLock);
     if (mVideoSource == VIDEO_SOURCE_SURFACE) {
         return prepareInternal();
     }
@@ -859,6 +866,7 @@ status_t StagefrightRecorder::prepare() {
 
 status_t StagefrightRecorder::start() {
     ALOGV("start");
+    Mutex::Autolock autolock(mLock);
     if (mOutputFd < 0) {
         ALOGE("Output file descriptor is invalid");
         return INVALID_OPERATION;
@@ -1867,6 +1875,7 @@ status_t StagefrightRecorder::resume() {
 
 status_t StagefrightRecorder::stop() {
     ALOGV("stop");
+    Mutex::Autolock autolock(mLock);
     status_t err = OK;
 
     if (mCaptureFpsEnable && mCameraSourceTimeLapse != NULL) {
@@ -1984,6 +1993,7 @@ status_t StagefrightRecorder::getMaxAmplitude(int *max) {
 status_t StagefrightRecorder::dump(
         int fd, const Vector<String16>& args) const {
     ALOGV("dump");
+    Mutex::Autolock autolock(mLock);
     const size_t SIZE = 256;
     char buffer[SIZE];
     String8 result;
