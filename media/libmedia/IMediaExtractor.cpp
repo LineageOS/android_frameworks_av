@@ -36,7 +36,8 @@ enum {
     FLAGS,
     GETDRMTRACKINFO,
     SETUID,
-    NAME
+    NAME,
+    GETMETRICS
 };
 
 class BpMediaExtractor : public BpInterface<IMediaExtractor> {
@@ -92,6 +93,16 @@ public:
             return MetaData::createFromParcel(reply);
         }
         return NULL;
+    }
+
+    virtual status_t getMetrics(Parcel * reply) {
+        Parcel data;
+        data.writeInterfaceToken(BpMediaExtractor::getInterfaceDescriptor());
+        status_t ret = remote()->transact(GETMETRICS, data, reply);
+        if (ret == NO_ERROR) {
+            return OK;
+        }
+        return UNKNOWN_ERROR;
     }
 
     virtual uint32_t flags() const {
@@ -168,6 +179,11 @@ status_t BnMediaExtractor::onTransact(
                 return NO_ERROR;
             }
             return UNKNOWN_ERROR;
+        }
+        case GETMETRICS: {
+            CHECK_INTERFACE(IMediaExtractor, data, reply);
+            status_t ret = getMetrics(reply);
+            return ret;
         }
         default:
             return BBinder::onTransact(code, data, reply, flags);

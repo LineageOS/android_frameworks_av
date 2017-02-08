@@ -5066,6 +5066,10 @@ MPEG4Extractor::Track *MPEG4Extractor::findTrackByMimePrefix(
     return NULL;
 }
 
+void MPEG4Extractor::populateMetrics() {
+    ALOGV("MPEG4Extractor::populateMetrics");
+}
+
 static bool LegacySniffMPEG4(
         const sp<DataSource> &source, String8 *mimeType, float *confidence) {
     uint8_t header[8];

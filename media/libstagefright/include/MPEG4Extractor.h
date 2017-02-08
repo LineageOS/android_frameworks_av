@@ -66,6 +66,8 @@ public:
 protected:
     virtual ~MPEG4Extractor();
 
+    virtual void populateMetrics();
+
 private:
 
     struct PsshInfo {

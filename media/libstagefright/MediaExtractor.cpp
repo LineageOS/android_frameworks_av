@@ -55,7 +55,7 @@
 namespace android {
 
 // key for media statistics
-static const char *KeyName_Extractor = "extractor";
+static const char *kKeyExtractor = "extractor";
 // attrs for media statistics
 
 MediaExtractor::MediaExtractor() {
@@ -67,7 +67,7 @@ MediaExtractor::MediaExtractor() {
 
     mAnalyticsItem = NULL;
     if (MEDIA_LOG) {
-        mAnalyticsItem = new MediaAnalyticsItem(KeyName_Extractor);
+        mAnalyticsItem = new MediaAnalyticsItem(kKeyExtractor);
         (void) mAnalyticsItem->generateSessionID();
     }
 }
@@ -91,6 +91,23 @@ MediaExtractor::~MediaExtractor() {
 
 sp<MetaData> MediaExtractor::getMetaData() {
     return new MetaData;
+}
+
+status_t MediaExtractor::getMetrics(Parcel *reply) {
+
+    if (mAnalyticsItem == NULL || reply == NULL) {
+        return UNKNOWN_ERROR;
+    }
+
+    populateMetrics();
+    mAnalyticsItem->writeToParcel(reply);
+
+    return OK;
+}
+
+void MediaExtractor::populateMetrics() {
+    ALOGV("MediaExtractor::populateMetrics");
+    // normally overridden in subclasses
 }
 
 uint32_t MediaExtractor::flags() const {
@@ -247,24 +264,23 @@ sp<MediaExtractor> MediaExtractor::CreateFromService(
        // track the container format (mpeg, aac, wvm, etc)
        if (MEDIA_LOG) {
           if (ret->mAnalyticsItem != NULL) {
+              size_t ntracks = ret->countTracks();
               ret->mAnalyticsItem->setCString("fmt",  ret->name());
               // tracks (size_t)
-              ret->mAnalyticsItem->setInt32("ntrk",  ret->countTracks());
+              ret->mAnalyticsItem->setInt32("ntrk",  ntracks);
               // metadata
               sp<MetaData> pMetaData = ret->getMetaData();
               if (pMetaData != NULL) {
                 String8 xx = pMetaData->toString();
-                ALOGD("metadata says: %s", xx.string());
-                // can grab various fields like:
                 // 'titl' -- but this verges into PII
                 // 'mime'
                 const char *mime = NULL;
                 if (pMetaData->findCString(kKeyMIMEType, &mime)) {
                     ret->mAnalyticsItem->setCString("mime",  mime);
                 }
-                // what else is interesting here?
+                // what else is interesting and not already available?
               }
-          }
+	  }
        }
     }
 
