@@ -2082,6 +2082,7 @@ inline bool wrapAs(IOmxBufferProducer::QueueBufferOutput* t,
     t->transformHint = l.transformHint;
     t->numPendingBuffers = l.numPendingBuffers;
     t->nextFrameNumber = l.nextFrameNumber;
+    t->bufferReplaced = l.bufferReplaced;
     return true;
 }
 
@@ -2107,6 +2108,7 @@ inline bool convertTo(
     l->transformHint = t.transformHint;
     l->numPendingBuffers = t.numPendingBuffers;
     l->nextFrameNumber = t.nextFrameNumber;
+    l->bufferReplaced = t.bufferReplaced;
     return true;
 }
 
