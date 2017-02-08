@@ -2793,23 +2793,23 @@ status_t CameraService::dump(int fd, const Vector<String16>& args) {
         }
 
         auto clientDescriptor = mActiveClientManager.get(cameraId);
-        if (clientDescriptor == nullptr) {
+        if (clientDescriptor != nullptr) {
+            dprintf(fd, "  Device %s is open. Client instance dump:\n",
+                    cameraId.string());
+            dprintf(fd, "    Client priority score: %d state: %d\n",
+                    clientDescriptor->getPriority().getScore(),
+                    clientDescriptor->getPriority().getState());
+            dprintf(fd, "    Client PID: %d\n", clientDescriptor->getOwnerId());
+
+            auto client = clientDescriptor->getValue();
+            dprintf(fd, "    Client package: %s\n",
+                    String8(client->getPackageName()).string());
+
+            client->dumpClient(fd, args);
+        } else {
             dprintf(fd, "  Device %s is closed, no client instance\n",
                     cameraId.string());
-            continue;
         }
-        dprintf(fd, "  Device %s is open. Client instance dump:\n",
-                cameraId.string());
-        dprintf(fd, "    Client priority score: %d state: %d\n",
-                clientDescriptor->getPriority().getScore(),
-                clientDescriptor->getPriority().getState());
-        dprintf(fd, "    Client PID: %d\n", clientDescriptor->getOwnerId());
-
-        auto client = clientDescriptor->getValue();
-        dprintf(fd, "    Client package: %s\n",
-                String8(client->getPackageName()).string());
-
-        client->dumpClient(fd, args);
 
         if (mModule != nullptr) {
             dprintf(fd, "== Camera HAL device %s static information: ==\n", cameraId.string());
