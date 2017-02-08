@@ -5976,6 +5976,18 @@ void AudioFlinger::RecordThread::onFirstRef()
     run(mThreadName, PRIORITY_URGENT_AUDIO);
 }
 
+void AudioFlinger::RecordThread::preExit()
+{
+    ALOGV("  preExit()");
+    Mutex::Autolock _l(mLock);
+    for (size_t i = 0; i < mTracks.size(); i++) {
+        sp<RecordTrack> track = mTracks[i];
+        track->invalidate();
+    }
+    mActiveTracks.clear();
+    mStartStopCond.broadcast();
+}
+
 bool AudioFlinger::RecordThread::threadLoop()
 {
     nsecs_t lastWarning = 0;

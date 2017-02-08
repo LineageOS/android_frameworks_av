@@ -1346,6 +1346,7 @@ public:
 
     // Thread virtuals
     virtual bool        threadLoop();
+    virtual void        preExit();
 
     // RefBase
     virtual void        onFirstRef();
