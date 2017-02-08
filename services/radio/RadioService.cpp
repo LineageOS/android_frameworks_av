@@ -84,10 +84,11 @@ void RadioService::onFirstRef()
     radio_properties_t properties;
     properties.handle =
             (radio_handle_t)android_atomic_inc(&mNextUniqueId);
-
-    ALOGI("loaded default module %s, handle %d", properties.product, properties.handle);
-
     convertProperties(&properties, &halProperties);
+
+    ALOGI("loaded default module %s, ver %s, handle %d", properties.product,
+        properties.version, properties.handle);
+
     sp<Module> module = new Module(dev, properties);
     mModules.add(properties.handle, module);
 }
