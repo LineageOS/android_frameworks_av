@@ -24,6 +24,7 @@ LOCAL_SHARED_LIBRARIES:= \
     libbinder \
     liblog \
     libmediadrm \
+    libhidltransport \
     libutils
 ifeq ($(ENABLE_TREBLE), true)
 LOCAL_SHARED_LIBRARIES += \
