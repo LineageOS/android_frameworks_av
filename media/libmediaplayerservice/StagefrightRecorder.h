@@ -43,7 +43,6 @@ struct ALooper;
 struct StagefrightRecorder : public MediaRecorderBase {
     explicit StagefrightRecorder(const String16 &opPackageName);
     virtual ~StagefrightRecorder();
-
     virtual status_t init();
     virtual status_t setAudioSource(audio_source_t as);
     virtual status_t setVideoSource(video_source vs);
@@ -73,6 +72,7 @@ struct StagefrightRecorder : public MediaRecorderBase {
     virtual sp<IGraphicBufferProducer> querySurfaceMediaSource() const;
 
 private:
+    mutable Mutex mLock;
     sp<hardware::ICamera> mCamera;
     sp<ICameraRecordingProxy> mCameraProxy;
     sp<IGraphicBufferProducer> mPreviewSurface;
