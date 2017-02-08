@@ -26,6 +26,8 @@
 
 namespace android {
 
+class IGraphicBufferAlloc;
+
 namespace camera3 {
 
 struct StreamInfo;
