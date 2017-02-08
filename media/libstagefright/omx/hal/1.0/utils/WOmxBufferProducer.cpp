@@ -203,7 +203,8 @@ Return<void> TWOmxBufferProducer::query(int32_t what, query_cb _hidl_cb) {
 Return<void> TWOmxBufferProducer::connect(
         const sp<IOmxProducerListener>& listener,
         int32_t api, bool producerControlledByApp, connect_cb _hidl_cb) {
-    sp<IProducerListener> lListener = new LWOmxProducerListener(listener);
+    sp<IProducerListener> lListener = listener == nullptr ?
+            nullptr : new LWOmxProducerListener(listener);
     IGraphicBufferProducer::QueueBufferOutput lOutput;
     status_t status = mBase->connect(lListener,
             static_cast<int>(api),
@@ -479,7 +480,8 @@ int LWOmxBufferProducer::query(int what, int* value) {
 status_t LWOmxBufferProducer::connect(
         const sp<IProducerListener>& listener, int api,
         bool producerControlledByApp, QueueBufferOutput* output) {
-    sp<IOmxProducerListener> tListener = new TWOmxProducerListener(listener);
+    sp<IOmxProducerListener> tListener = listener == nullptr ?
+            nullptr : new TWOmxProducerListener(listener);
     status_t fnStatus;
     status_t transStatus = toStatusT(mBase->connect(
             tListener, static_cast<int32_t>(api), producerControlledByApp,
@@ -580,10 +582,6 @@ status_t LWOmxBufferProducer::getUniqueId(uint64_t* outId) const {
                 *outId = id;
             }));
     return transStatus == NO_ERROR ? fnStatus : transStatus;
-}
-
-::android::IBinder* LWOmxBufferProducer::onAsBinder() {
-    return nullptr;
 }
 
 }  // namespace utils

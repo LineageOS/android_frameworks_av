@@ -79,10 +79,6 @@ status_t LWOmx::createInputSurface(
     return transStatus == NO_ERROR ? fnStatus : transStatus;
 }
 
-::android::IBinder* LWOmx::onAsBinder() {
-    return nullptr;
-}
-
 // TWOmx
 TWOmx::TWOmx(sp<IOMX> const& base) : mBase(base) {
 }

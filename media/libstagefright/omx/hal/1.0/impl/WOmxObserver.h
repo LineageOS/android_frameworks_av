@@ -43,6 +43,7 @@ using ::android::hardware::Void;
 using ::android::sp;
 
 using ::android::IOMXObserver;
+using ::android::BnOMXObserver;
 using ::android::omx_message;
 
 /**
@@ -54,12 +55,10 @@ using ::android::omx_message;
  * - TW = Treble Wrapper --- It wraps a legacy object inside a Treble object.
  */
 
-struct LWOmxObserver : public IOMXObserver {
+struct LWOmxObserver : public BnOMXObserver {
     sp<IOmxObserver> mBase;
     LWOmxObserver(sp<IOmxObserver> const& base);
     void onMessages(std::list<omx_message> const& lMessages) override;
-protected:
-    ::android::IBinder* onAsBinder() override;
 };
 
 struct TWOmxObserver : public IOmxObserver {

@@ -23,7 +23,7 @@
 
 #include <frameworks/native/include/binder/Binder.h>
 #include <IOMX.h>
-#include <android/IGraphicBufferSource.h>
+#include <android/BnGraphicBufferSource.h>
 #include <android/hardware/media/omx/1.0/IOmxNode.h>
 
 #include <android/hardware/graphics/common/1.0/types.h>
@@ -60,10 +60,11 @@ using ::android::IOMXNode;
  */
 
 typedef ::android::IGraphicBufferSource LGraphicBufferSource;
+typedef ::android::BnGraphicBufferSource BnGraphicBufferSource;
 typedef ::android::hardware::media::omx::V1_0::IGraphicBufferSource
         TGraphicBufferSource;
 
-struct LWGraphicBufferSource : public LGraphicBufferSource {
+struct LWGraphicBufferSource : public BnGraphicBufferSource {
     sp<TGraphicBufferSource> mBase;
     LWGraphicBufferSource(sp<TGraphicBufferSource> const& base);
     ::android::binder::Status configure(
@@ -78,8 +79,6 @@ struct LWGraphicBufferSource : public LGraphicBufferSource {
     ::android::binder::Status setColorAspects(int32_t aspects) override;
     ::android::binder::Status setTimeOffsetUs(int64_t timeOffsetsUs) override;
     ::android::binder::Status signalEndOfInputStream() override;
-protected:
-    ::android::IBinder* onAsBinder() override;
 };
 
 struct TWGraphicBufferSource : public TGraphicBufferSource {

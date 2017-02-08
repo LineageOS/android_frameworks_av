@@ -43,6 +43,35 @@ namespace android {
 
 static const OMX_U32 kPortIndexInput = 0;
 
+class GraphicBufferSource::OmxBufferSource : public BnOMXBufferSource {
+public:
+    GraphicBufferSource* mSource;
+
+    OmxBufferSource(GraphicBufferSource* source): mSource(source) {
+    }
+
+    Status onOmxExecuting() override {
+        return mSource->onOmxExecuting();
+    }
+
+    Status onOmxIdle() override {
+        return mSource->onOmxIdle();
+    }
+
+    Status onOmxLoaded() override {
+        return mSource->onOmxLoaded();
+    }
+
+    Status onInputBufferAdded(int bufferId) override {
+        return mSource->onInputBufferAdded(bufferId);
+    }
+
+    Status onInputBufferEmptied(
+            int bufferId, const OMXFenceParcelable& fenceParcel) override {
+        return mSource->onInputBufferEmptied(bufferId, fenceParcel);
+    }
+};
+
 GraphicBufferSource::GraphicBufferSource() :
     mInitCheck(UNKNOWN_ERROR),
     mExecuting(false),
@@ -66,7 +95,8 @@ GraphicBufferSource::GraphicBufferSource() :
     mTimePerFrameUs(-1ll),
     mPrevCaptureUs(-1ll),
     mPrevFrameUs(-1ll),
-    mInputBufferTimeOffsetUs(0ll) {
+    mInputBufferTimeOffsetUs(0ll),
+    mOmxBufferSource(new OmxBufferSource(this)) {
     ALOGV("GraphicBufferSource");
 
     String8 name("GraphicBufferSource");
@@ -766,7 +796,7 @@ Status GraphicBufferSource::configure(
     // Do setInputSurface() first, the node will try to enable metadata
     // mode on input, and does necessary error checking. If this fails,
     // we can't use this input surface on the node.
-    status_t err = omxNode->setInputSurface(this);
+    status_t err = omxNode->setInputSurface(mOmxBufferSource);
     if (err != NO_ERROR) {
         ALOGE("Unable to set input surface: %d", err);
         return Status::fromServiceSpecificError(err);

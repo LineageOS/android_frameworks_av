@@ -42,6 +42,7 @@ using ::android::hardware::Void;
 using ::android::sp;
 
 using ::android::IProducerListener;
+using ::android::BnProducerListener;
 
 struct TWOmxProducerListener : public IOmxProducerListener {
     sp<IProducerListener> mBase;
@@ -50,14 +51,12 @@ struct TWOmxProducerListener : public IOmxProducerListener {
     Return<bool> needsReleaseNotify() override;
 };
 
-class LWOmxProducerListener : public IProducerListener {
+class LWOmxProducerListener : public BnProducerListener {
 public:
     sp<IOmxProducerListener> mBase;
     LWOmxProducerListener(sp<IOmxProducerListener> const& base);
     void onBufferReleased() override;
     bool needsReleaseNotify() override;
-protected:
-    ::android::IBinder* onAsBinder() override;
 };
 
 }  // namespace utils

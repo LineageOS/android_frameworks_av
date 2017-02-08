@@ -56,7 +56,7 @@ using ::android::sp;
  * - TW = Treble Wrapper --- It wraps a legacy object inside a Treble object.
  */
 
-struct LWOmxNode : public IOMXNode {
+struct LWOmxNode : public BnOMXNode {
     sp<IOmxNode> mBase;
     LWOmxNode(sp<IOmxNode> const& base);
     status_t freeNode() override;
@@ -103,8 +103,6 @@ struct LWOmxNode : public IOMXNode {
 
     // TODO: this is temporary, will be removed when quirks move to OMX side.
     status_t setQuirks(OMX_U32 quirks) override;
-protected:
-    ::android::IBinder* onAsBinder() override;
 };
 
 struct TWOmxNode : public IOmxNode {

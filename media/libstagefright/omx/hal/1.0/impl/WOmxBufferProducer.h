@@ -47,6 +47,7 @@ using ::android::hardware::Void;
 using ::android::sp;
 
 using ::android::IGraphicBufferProducer;
+using ::android::BnGraphicBufferProducer;
 using ::android::IProducerListener;
 
 struct TWOmxBufferProducer : public IOmxBufferProducer {
@@ -91,7 +92,7 @@ struct TWOmxBufferProducer : public IOmxBufferProducer {
     Return<void> getUniqueId(getUniqueId_cb _hidl_cb) override;
 };
 
-struct LWOmxBufferProducer : public IGraphicBufferProducer {
+struct LWOmxBufferProducer : public BnGraphicBufferProducer {
     sp<IOmxBufferProducer> mBase;
     LWOmxBufferProducer(sp<IOmxBufferProducer> const& base);
 
@@ -128,8 +129,6 @@ struct LWOmxBufferProducer : public IGraphicBufferProducer {
           sp<Fence>* outFence, float outTransformMatrix[16]) override;
     void getFrameTimestamps(FrameEventHistoryDelta* outDelta) override;
     status_t getUniqueId(uint64_t* outId) const override;
-protected:
-    ::android::IBinder* onAsBinder() override;
 };
 
 }  // namespace implementation

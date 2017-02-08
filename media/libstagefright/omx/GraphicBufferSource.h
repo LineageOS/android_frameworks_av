@@ -55,7 +55,6 @@ struct FrameDropper;
  * things up until we're ready to go.
  */
 class GraphicBufferSource : public BnGraphicBufferSource,
-                            public BnOMXBufferSource,
                             public BufferQueue::ConsumerListener {
 public:
     GraphicBufferSource();
@@ -77,26 +76,26 @@ public:
     // This is called when OMX transitions to OMX_StateExecuting, which means
     // we can start handing it buffers.  If we already have buffers of data
     // sitting in the BufferQueue, this will send them to the codec.
-    Status onOmxExecuting() override;
+    Status onOmxExecuting();
 
     // This is called when OMX transitions to OMX_StateIdle, indicating that
     // the codec is meant to return all buffers back to the client for them
     // to be freed. Do NOT submit any more buffers to the component.
-    Status onOmxIdle() override;
+    Status onOmxIdle();
 
     // This is called when OMX transitions to OMX_StateLoaded, indicating that
     // we are shutting down.
-    Status onOmxLoaded() override;
+    Status onOmxLoaded();
 
     // A "codec buffer", i.e. a buffer that can be used to pass data into
     // the encoder, has been allocated.  (This call does not call back into
     // OMXNodeInstance.)
-    Status onInputBufferAdded(int32_t bufferID) override;
+    Status onInputBufferAdded(int32_t bufferID);
 
     // Called from OnEmptyBufferDone.  If we have a BQ buffer available,
     // fill it with a new frame of data; otherwise, just mark it as available.
     Status onInputBufferEmptied(
-            int32_t bufferID, const OMXFenceParcelable& fenceParcel) override;
+            int32_t bufferID, const OMXFenceParcelable& fenceParcel);
 
     // Configure the buffer source to be used with an OMX node with the default
     // data space.
@@ -300,6 +299,9 @@ private:
     int64_t mInputBufferTimeOffsetUs;
 
     ColorAspects mColorAspects;
+
+    class OmxBufferSource;
+    sp<OmxBufferSource> mOmxBufferSource;
 
     void onMessageReceived(const sp<AMessage> &msg);
 

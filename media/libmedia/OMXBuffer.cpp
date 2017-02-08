@@ -90,6 +90,13 @@ status_t OMXBuffer::writeToParcel(Parcel *parcel) const {
 
         case kBufferTypeANWBuffer:
         {
+            if (mGraphicBuffer == NULL) {
+                return parcel->writeBool(false);
+            }
+            status_t err = parcel->writeBool(true);
+            if (err != OK) {
+                return err;
+            }
             return parcel->write(*mGraphicBuffer);
         }
 
@@ -130,15 +137,21 @@ status_t OMXBuffer::readFromParcel(const Parcel *parcel) {
 
         case kBufferTypeANWBuffer:
         {
-            sp<GraphicBuffer> buffer = new GraphicBuffer();
-
-            status_t err = parcel->read(*buffer);
-
+            bool notNull;
+            status_t err = parcel->readBool(&notNull);
             if (err != OK) {
                 return err;
             }
-
-            mGraphicBuffer = buffer;
+            if (notNull) {
+                sp<GraphicBuffer> buffer = new GraphicBuffer();
+                status_t err = parcel->read(*buffer);
+                if (err != OK) {
+                    return err;
+                }
+                mGraphicBuffer = buffer;
+            } else {
+                mGraphicBuffer = nullptr;
+            }
             break;
         }
 
