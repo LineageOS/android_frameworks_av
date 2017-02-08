@@ -313,7 +313,7 @@ status_t SampleIterator::findSampleTimeAndDuration(
             break;
         }
         if (mTimeToSampleIndex == mTable->mTimeToSampleCount ||
-            mTTSCount > UINT32_MAX / mTTSDuration ||
+            (mTTSDuration != 0 && mTTSCount > UINT32_MAX / mTTSDuration) ||
             mTTSSampleTime > UINT32_MAX - (mTTSCount * mTTSDuration)) {
             return ERROR_OUT_OF_RANGE;
         }
