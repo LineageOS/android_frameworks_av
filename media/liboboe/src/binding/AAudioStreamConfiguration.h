@@ -66,6 +66,14 @@ public:
         mAudioFormat = audioFormat;
     }
 
+    aaudio_size_frames_t getBufferCapacity() const {
+        return mBufferCapacity;
+    }
+
+    void setBufferCapacity(aaudio_size_frames_t frames) {
+        mBufferCapacity = frames;
+    }
+
     virtual status_t writeToParcel(Parcel* parcel) const override;
 
     virtual status_t readFromParcel(const Parcel* parcel) override;
@@ -77,8 +85,9 @@ public:
 protected:
     aaudio_device_id_t    mDeviceId        = AAUDIO_DEVICE_UNSPECIFIED;
     aaudio_sample_rate_t  mSampleRate      = AAUDIO_UNSPECIFIED;
-    int32_t             mSamplesPerFrame = AAUDIO_UNSPECIFIED;
+    int32_t               mSamplesPerFrame = AAUDIO_UNSPECIFIED;
     aaudio_audio_format_t mAudioFormat     = AAUDIO_FORMAT_UNSPECIFIED;
+    aaudio_size_frames_t  mBufferCapacity  = AAUDIO_UNSPECIFIED;
 };
 
 } /* namespace aaudio */

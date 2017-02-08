@@ -31,8 +31,8 @@ namespace aaudio {
 
 // Arbitrary limits for sanity checks. TODO remove after debugging.
 #define MAX_SHARED_MEMORIES (32)
-#define MAX_MMAP_OFFSET (32 * 1024)
-#define MAX_MMAP_SIZE (32 * 1024)
+#define MAX_MMAP_OFFSET_BYTES (32 * 1024 * 8)
+#define MAX_MMAP_SIZE_BYTES (32 * 1024 * 8)
 
 /**
  * This is a parcelable description of a shared memory referenced by a file descriptor.

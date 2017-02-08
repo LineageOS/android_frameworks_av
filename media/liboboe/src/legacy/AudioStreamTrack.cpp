@@ -64,7 +64,8 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     AudioTrack::callback_t callback = nullptr;
     // TODO add more performance options
     audio_output_flags_t flags = (audio_output_flags_t) AUDIO_OUTPUT_FLAG_FAST;
-    size_t frameCount = 0;
+    size_t frameCount = (builder.getBufferCapacity() == AAUDIO_UNSPECIFIED) ? 0
+                        : builder.getBufferCapacity();
     // TODO implement an unspecified AudioTrack format then use that.
     audio_format_t format = (getFormat() == AAUDIO_UNSPECIFIED)
             ? AUDIO_FORMAT_PCM_FLOAT

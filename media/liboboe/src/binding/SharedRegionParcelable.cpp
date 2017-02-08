@@ -75,14 +75,14 @@ aaudio_result_t SharedRegionParcelable::resolve(SharedMemoryParcelable *memoryPa
 }
 
 aaudio_result_t SharedRegionParcelable::validate() {
-    if (mSizeInBytes < 0 || mSizeInBytes >= MAX_MMAP_SIZE) {
+    if (mSizeInBytes < 0 || mSizeInBytes >= MAX_MMAP_SIZE_BYTES) {
         ALOGE("SharedRegionParcelable invalid mSizeInBytes = %d", mSizeInBytes);
-        return AAUDIO_ERROR_INTERNAL;
+        return AAUDIO_ERROR_OUT_OF_RANGE;
     }
     if (mSizeInBytes > 0) {
-        if (mOffsetInBytes < 0 || mOffsetInBytes >= MAX_MMAP_OFFSET) {
+        if (mOffsetInBytes < 0 || mOffsetInBytes >= MAX_MMAP_OFFSET_BYTES) {
             ALOGE("SharedRegionParcelable invalid mOffsetInBytes = %d", mOffsetInBytes);
-            return AAUDIO_ERROR_INTERNAL;
+            return AAUDIO_ERROR_OUT_OF_RANGE;
         }
         if (mSharedMemoryIndex < 0 || mSharedMemoryIndex >= MAX_SHARED_MEMORIES) {
             ALOGE("SharedRegionParcelable invalid mSharedMemoryIndex = %d", mSharedMemoryIndex);

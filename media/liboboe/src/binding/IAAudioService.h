@@ -38,6 +38,11 @@ public:
 
     DECLARE_META_INTERFACE(AAudioService);
 
+    /**
+     * @param request info needed to create the stream
+     * @param configuration contains information about the created stream
+     * @return handle to the stream or a negative error
+     */
     virtual aaudio_handle_t openStream(aaudio::AAudioStreamRequest &request,
                                      aaudio::AAudioStreamConfiguration &configuration) = 0;
 

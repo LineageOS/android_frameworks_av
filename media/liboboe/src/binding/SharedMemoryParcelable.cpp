@@ -87,9 +87,9 @@ int32_t SharedMemoryParcelable::getSizeInBytes() {
 }
 
 aaudio_result_t SharedMemoryParcelable::validate() {
-    if (mSizeInBytes < 0 || mSizeInBytes >= MAX_MMAP_SIZE) {
+    if (mSizeInBytes < 0 || mSizeInBytes >= MAX_MMAP_SIZE_BYTES) {
         ALOGE("SharedMemoryParcelable invalid mSizeInBytes = %d", mSizeInBytes);
-        return AAUDIO_ERROR_INTERNAL;
+        return AAUDIO_ERROR_OUT_OF_RANGE;
     }
     if (mSizeInBytes > 0) {
         if (mFd == -1) {

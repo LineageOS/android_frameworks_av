@@ -256,6 +256,26 @@ AAUDIO_API aaudio_result_t AAudioStreamBuilder_getSharingMode(AAudioStreamBuilde
     return AAUDIO_OK;
 }
 
+AAUDIO_API aaudio_result_t AAudioStreamBuilder_setBufferCapacity(AAudioStreamBuilder builder,
+                                                        aaudio_size_frames_t frames)
+{
+    AudioStreamBuilder *streamBuilder = CONVERT_BUILDER_HANDLE_OR_RETURN();
+    if (frames < 0) {
+        return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
+    } else {
+        streamBuilder->setBufferCapacity(frames);
+        return AAUDIO_OK;
+    }
+}
+
+AAUDIO_API aaudio_result_t AAudioStreamBuilder_getBufferCapacity(AAudioStreamBuilder builder,
+                                                        aaudio_size_frames_t *frames)
+{
+    AudioStreamBuilder *streamBuilder = COMMON_GET_FROM_BUILDER_OR_RETURN(frames);
+    *frames = streamBuilder->getBufferCapacity();
+    return AAUDIO_OK;
+}
+
 static aaudio_result_t  AAudioInternal_openStream(AudioStreamBuilder *streamBuilder,
                                               AAudioStream *streamPtr)
 {
