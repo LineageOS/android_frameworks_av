@@ -17,15 +17,8 @@
 #ifndef AAUDIO_TIMESTAMP_SCHEDULER_H
 #define AAUDIO_TIMESTAMP_SCHEDULER_H
 
-
-
-#include "IAAudioService.h"
-#include "AAudioServiceDefinitions.h"
-#include "AudioStream.h"
-#include "fifo/FifoBuffer.h"
-#include "SharedRingBuffer.h"
-#include "AudioEndpointParcelable.h"
-#include "utility/AudioClock.h"
+#include <aaudio/AAudioDefinitions.h>
+#include <utility/AudioClock.h>
 
 namespace aaudio {
 
@@ -47,8 +40,7 @@ public:
     void start(int64_t startTime);
 
     /**
-     * Calculate the next time that the read position should be
-     * measured.
+     * Calculate the next time that the read position should be measured.
      */
     int64_t nextAbsoluteTime();
 
@@ -68,8 +60,8 @@ public:
 private:
     // Start with an arbitrary default so we do not divide by zero.
     int64_t mBurstPeriod = AAUDIO_NANOS_PER_MILLISECOND;
-    int64_t mStartTime;
-    int64_t mLastTime;
+    int64_t mStartTime = 0;
+    int64_t mLastTime = 0;
 };
 
 } /* namespace aaudio */

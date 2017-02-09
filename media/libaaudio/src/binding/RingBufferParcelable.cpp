@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "AAudio"
+//#define LOG_NDEBUG 0
+#include <utils/Log.h>
+
 #include <stdint.h>
 
 #include <binder/Parcelable.h>
