@@ -39,7 +39,9 @@ typedef void *fake_hal_stream_ptr;
 //extern "C"
 //{
 
-int fake_hal_open(int card_id, int device_id, fake_hal_stream_ptr *stream_pp);
+int fake_hal_open(int card_id, int device_id,
+                  int frameCapacity,
+                  fake_hal_stream_ptr *stream_pp);
 
 int fake_hal_get_mmap_info(fake_hal_stream_ptr stream, mmap_buffer_info *info);
 

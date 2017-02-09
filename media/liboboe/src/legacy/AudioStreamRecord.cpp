@@ -60,6 +60,8 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     AudioRecord::callback_t callback = nullptr;
     audio_input_flags_t flags = (audio_input_flags_t) AUDIO_INPUT_FLAG_NONE;
 
+    size_t frameCount = (builder.getBufferCapacity() == AAUDIO_UNSPECIFIED) ? 0
+                        : builder.getBufferCapacity();
     // TODO implement an unspecified Android format then use that.
     audio_format_t format = (getFormat() == AAUDIO_UNSPECIFIED)
             ? AUDIO_FORMAT_PCM_FLOAT
@@ -70,20 +72,18 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
             getSampleRate(),
             format,
             channelMask,
-
             mOpPackageName, // const String16& opPackageName TODO does not compile
-
-            0,    //    size_t frameCount = 0,
+            frameCount,
             callback,
             nullptr, //    void* user = nullptr,
             0,    //    uint32_t notificationFrames = 0,
             AUDIO_SESSION_ALLOCATE,
             AudioRecord::TRANSFER_DEFAULT,
             flags
-             //   int uid = -1,
-             //   pid_t pid = -1,
-             //   const audio_attributes_t* pAttributes = nullptr
-             );
+            //   int uid = -1,
+            //   pid_t pid = -1,
+            //   const audio_attributes_t* pAttributes = nullptr
+            );
 
     // Did we get a valid track?
     status_t status = mAudioRecord->initCheck();

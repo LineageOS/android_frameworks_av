@@ -37,7 +37,7 @@ public:
     virtual aaudio_result_t getDescription(AudioEndpointParcelable &parcelable) override;
 
     virtual aaudio_result_t open(aaudio::AAudioStreamRequest &request,
-                               aaudio::AAudioStreamConfiguration &configuration) override;
+                                 aaudio::AAudioStreamConfiguration &configurationOutput) override;
 
     /**
      * Start the flow of data.

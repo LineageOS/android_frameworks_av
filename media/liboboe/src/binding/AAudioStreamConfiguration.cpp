@@ -39,6 +39,7 @@ status_t AAudioStreamConfiguration::writeToParcel(Parcel* parcel) const {
     parcel->writeInt32(mSampleRate);
     parcel->writeInt32(mSamplesPerFrame);
     parcel->writeInt32((int32_t) mAudioFormat);
+    parcel->writeInt32(mBufferCapacity);
     return NO_ERROR; // TODO check for errors above
 }
 
@@ -49,6 +50,7 @@ status_t AAudioStreamConfiguration::readFromParcel(const Parcel* parcel) {
     parcel->readInt32(&mSamplesPerFrame);
     parcel->readInt32(&temp);
     mAudioFormat = (aaudio_audio_format_t) temp;
+    parcel->readInt32(&mBufferCapacity);
     return NO_ERROR; // TODO check for errors above
 }
 
@@ -74,11 +76,17 @@ aaudio_result_t AAudioStreamConfiguration::validate() {
         ALOGE("AAudioStreamConfiguration.validate() invalid audioFormat = %d", mAudioFormat);
         return AAUDIO_ERROR_INTERNAL;
     }
+
+    if (mBufferCapacity < 0) {
+        ALOGE("AAudioStreamConfiguration.validate() invalid mBufferCapacity = %d", mBufferCapacity);
+        return AAUDIO_ERROR_INTERNAL;
+    }
     return AAUDIO_OK;
 }
 
 void AAudioStreamConfiguration::dump() {
-    ALOGD("AAudioStreamConfiguration mSampleRate = %d -----", mSampleRate);
+    ALOGD("AAudioStreamConfiguration mSampleRate      = %d -----", mSampleRate);
     ALOGD("AAudioStreamConfiguration mSamplesPerFrame = %d", mSamplesPerFrame);
-    ALOGD("AAudioStreamConfiguration mAudioFormat = %d", (int)mAudioFormat);
+    ALOGD("AAudioStreamConfiguration mAudioFormat     = %d", (int)mAudioFormat);
+    ALOGD("AAudioStreamConfiguration mBufferCapacity  = %d", mBufferCapacity);
 }

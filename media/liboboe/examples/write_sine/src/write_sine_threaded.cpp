@@ -86,9 +86,17 @@ public:
         result = AAudioStream_getSampleRate(mStream, &mFramesPerSecond);
         printf("open() mFramesPerSecond = %d\n", mFramesPerSecond);
         if (result != AAUDIO_OK) goto finish2;
+
         result = AAudioStream_getSamplesPerFrame(mStream, &mSamplesPerFrame);
         printf("open() mSamplesPerFrame = %d\n", mSamplesPerFrame);
         if (result != AAUDIO_OK) goto finish2;
+
+        {
+            aaudio_size_frames_t bufferCapacity;
+            result = AAudioStream_getBufferCapacity(mStream, &bufferCapacity);
+            if (result != AAUDIO_OK) goto finish2;
+            printf("open() got bufferCapacity = %d\n", bufferCapacity);
+        }
 
         // This is the number of frames that are read in one chunk by a DMA controller
         // or a DSP or a mixer.

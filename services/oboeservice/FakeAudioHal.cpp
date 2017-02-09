@@ -94,13 +94,24 @@ typedef struct stream_tracker {
 #define FRAMES_PER_BURST_QUALCOMM 192
 #define FRAMES_PER_BURST_NVIDIA   128
 
-int fake_hal_open(int card_id, int device_id, fake_hal_stream_ptr *streamPP) {
+int fake_hal_open(int card_id, int device_id,
+                  int frameCapacity,
+                  fake_hal_stream_ptr *streamPP) {
     int framesPerBurst = FRAMES_PER_BURST_QUALCOMM; // TODO update as needed
+    int periodCountRequested = frameCapacity / framesPerBurst;
     int periodCount = 32;
     unsigned int offset1;
     unsigned int frames1;
     void *area = nullptr;
     int mmapAvail = 0;
+
+    // Try to match requested size with a power of 2.
+    while (periodCount < periodCountRequested && periodCount < 1024) {
+        periodCount *= 2;
+    }
+    std::cout << "fake_hal_open() requested frameCapacity = " << frameCapacity << std::endl;
+    std::cout << "fake_hal_open() periodCountRequested = " << periodCountRequested << std::endl;
+    std::cout << "fake_hal_open() periodCount = " << periodCount << std::endl;
 
     // Configuration for an ALSA stream.
     pcm_config cfg;

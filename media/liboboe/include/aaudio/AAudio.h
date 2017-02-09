@@ -195,7 +195,7 @@ AAUDIO_API aaudio_result_t AAudioStreamBuilder_getSharingMode(AAudioStreamBuilde
  * @return AAUDIO_OK or a negative error.
  */
 AAUDIO_API aaudio_result_t AAudioStreamBuilder_setDirection(AAudioStreamBuilder builder,
-                                                      aaudio_direction_t direction);
+                                                            aaudio_direction_t direction);
 
 /**
  * @param builder handle provided by AAudio_createStreamBuilder()
@@ -203,7 +203,31 @@ AAUDIO_API aaudio_result_t AAudioStreamBuilder_setDirection(AAudioStreamBuilder 
  * @return AAUDIO_OK or a negative error.
  */
 AAUDIO_API aaudio_result_t AAudioStreamBuilder_getDirection(AAudioStreamBuilder builder,
-                                                      aaudio_direction_t *direction);
+                                                            aaudio_direction_t *direction);
+
+/**
+ * Set the requested maximum buffer capacity in frames.
+ * The final AAudioStream capacity may differ, but will probably be at least this big.
+ *
+ * Default is AAUDIO_UNSPECIFIED.
+ *
+ * @param builder handle provided by AAudio_createStreamBuilder()
+ * @param frames the desired buffer capacity in frames or AAUDIO_UNSPECIFIED
+ * @return AAUDIO_OK or a negative error.
+ */
+AAUDIO_API aaudio_result_t AAudioStreamBuilder_setBufferCapacity(AAudioStreamBuilder builder,
+                                                                 aaudio_size_frames_t frames);
+
+/**
+ * Query the requested maximum buffer capacity in frames that was passed to
+ * AAudioStreamBuilder_setBufferCapacity().
+ *
+ * @param builder handle provided by AAudio_createStreamBuilder()
+ * @param frames pointer to variable to receive the requested buffer capacity
+ * @return AAUDIO_OK or a negative error.
+ */
+AAUDIO_API aaudio_result_t AAudioStreamBuilder_getBufferCapacity(AAudioStreamBuilder builder,
+                                                                 aaudio_size_frames_t *frames);
 
 /**
  * Open a stream based on the options in the StreamBuilder.
@@ -422,8 +446,8 @@ AAUDIO_API aaudio_result_t AAudioStream_joinThread(AAudioStream stream,
  * @return AAUDIO_OK or a negative error
  */
 AAUDIO_API aaudio_result_t AAudioStream_setBufferSize(AAudioStream stream,
-                                                aaudio_size_frames_t requestedFrames,
-                                                aaudio_size_frames_t *actualFrames);
+                                                      aaudio_size_frames_t requestedFrames,
+                                                      aaudio_size_frames_t *actualFrames);
 
 /**
  * Query the maximum number of frames that can be filled without blocking.
@@ -432,7 +456,8 @@ AAUDIO_API aaudio_result_t AAudioStream_setBufferSize(AAudioStream stream,
  * @param frames pointer to variable to receive the buffer size
  * @return AAUDIO_OK or a negative error.
  */
-AAUDIO_API aaudio_result_t AAudioStream_getBufferSize(AAudioStream stream, aaudio_size_frames_t *frames);
+AAUDIO_API aaudio_result_t AAudioStream_getBufferSize(AAudioStream stream,
+                                                      aaudio_size_frames_t *frames);
 
 /**
  * Query the number of frames that are read or written by the endpoint at one time.
@@ -441,7 +466,8 @@ AAUDIO_API aaudio_result_t AAudioStream_getBufferSize(AAudioStream stream, aaudi
  * @param frames pointer to variable to receive the burst size
  * @return AAUDIO_OK or a negative error.
  */
-AAUDIO_API aaudio_result_t AAudioStream_getFramesPerBurst(AAudioStream stream, aaudio_size_frames_t *frames);
+AAUDIO_API aaudio_result_t AAudioStream_getFramesPerBurst(AAudioStream stream,
+                                                          aaudio_size_frames_t *frames);
 
 /**
  * Query maximum buffer capacity in frames.
@@ -450,7 +476,8 @@ AAUDIO_API aaudio_result_t AAudioStream_getFramesPerBurst(AAudioStream stream, a
  * @param frames pointer to variable to receive the buffer capacity
  * @return AAUDIO_OK or a negative error.
  */
-AAUDIO_API aaudio_result_t AAudioStream_getBufferCapacity(AAudioStream stream, aaudio_size_frames_t *frames);
+AAUDIO_API aaudio_result_t AAudioStream_getBufferCapacity(AAudioStream stream,
+                                                          aaudio_size_frames_t *frames);
 
 /**
  * An XRun is an Underrun or an Overrun.
@@ -472,7 +499,8 @@ AAUDIO_API aaudio_result_t AAudioStream_getXRunCount(AAudioStream stream, int32_
  * @param sampleRate pointer to variable to receive the actual sample rate
  * @return AAUDIO_OK or a negative error.
  */
-AAUDIO_API aaudio_result_t AAudioStream_getSampleRate(AAudioStream stream, aaudio_sample_rate_t *sampleRate);
+AAUDIO_API aaudio_result_t AAudioStream_getSampleRate(AAudioStream stream,
+                                                      aaudio_sample_rate_t *sampleRate);
 
 /**
  * The samplesPerFrame is also known as channelCount.
@@ -481,21 +509,24 @@ AAUDIO_API aaudio_result_t AAudioStream_getSampleRate(AAudioStream stream, aaudi
  * @param samplesPerFrame pointer to variable to receive the actual samples per frame
  * @return AAUDIO_OK or a negative error.
  */
-AAUDIO_API aaudio_result_t AAudioStream_getSamplesPerFrame(AAudioStream stream, int32_t *samplesPerFrame);
+AAUDIO_API aaudio_result_t AAudioStream_getSamplesPerFrame(AAudioStream stream,
+                                                           int32_t *samplesPerFrame);
 
 /**
  * @param stream handle provided by AAudioStreamBuilder_openStream()
  * @param deviceId pointer to variable to receive the actual device ID
  * @return AAUDIO_OK or a negative error.
  */
-AAUDIO_API aaudio_result_t AAudioStream_getDeviceId(AAudioStream stream, aaudio_device_id_t *deviceId);
+AAUDIO_API aaudio_result_t AAudioStream_getDeviceId(AAudioStream stream,
+                                                    aaudio_device_id_t *deviceId);
 
 /**
  * @param stream handle provided by AAudioStreamBuilder_openStream()
  * @param format pointer to variable to receive the actual data format
  * @return AAUDIO_OK or a negative error.
  */
-AAUDIO_API aaudio_result_t AAudioStream_getFormat(AAudioStream stream, aaudio_audio_format_t *format);
+AAUDIO_API aaudio_result_t AAudioStream_getFormat(AAudioStream stream,
+                                                  aaudio_audio_format_t *format);
 
 /**
  * Provide actual sharing mode.
@@ -511,7 +542,8 @@ AAUDIO_API aaudio_result_t AAudioStream_getSharingMode(AAudioStream stream,
  * @param direction pointer to a variable to be set to the current direction.
  * @return AAUDIO_OK or a negative error.
  */
-AAUDIO_API aaudio_result_t AAudioStream_getDirection(AAudioStream stream, aaudio_direction_t *direction);
+AAUDIO_API aaudio_result_t AAudioStream_getDirection(AAudioStream stream,
+                                                     aaudio_direction_t *direction);
 
 /**
  * Passes back the number of frames that have been written since the stream was created.
@@ -538,7 +570,8 @@ AAUDIO_API aaudio_result_t AAudioStream_getFramesWritten(AAudioStream stream,
  * @param frames pointer to variable to receive the frames written
  * @return AAUDIO_OK or a negative error.
  */
-AAUDIO_API aaudio_result_t AAudioStream_getFramesRead(AAudioStream stream, aaudio_position_frames_t *frames);
+AAUDIO_API aaudio_result_t AAudioStream_getFramesRead(AAudioStream stream,
+                                                      aaudio_position_frames_t *frames);
 
 /**
  * Passes back the time at which a particular frame was presented.

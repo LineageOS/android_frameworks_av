@@ -53,13 +53,14 @@ AAudioServiceStreamFakeHal::~AAudioServiceStreamFakeHal() {
 }
 
 aaudio_result_t AAudioServiceStreamFakeHal::open(aaudio::AAudioStreamRequest &request,
-                                             aaudio::AAudioStreamConfiguration &configuration) {
+                                       aaudio::AAudioStreamConfiguration &configurationOutput) {
     // Open stream on HAL and pass information about the ring buffer to the client.
     mmap_buffer_info mmapInfo;
     aaudio_result_t error;
 
     // Open HAL
-    error = fake_hal_open(CARD_ID, DEVICE_ID, &mStreamId);
+    int bufferCapacity = request.getConfiguration().getBufferCapacity();
+    error = fake_hal_open(CARD_ID, DEVICE_ID, bufferCapacity, &mStreamId);
     if(error < 0) {
         ALOGE("Could not open card %d, device %d", CARD_ID, DEVICE_ID);
         return error;
@@ -87,9 +88,9 @@ aaudio_result_t AAudioServiceStreamFakeHal::open(aaudio::AAudioStreamRequest &re
          mmapInfo.buffer_capacity_in_bytes);
 
     // Fill in AAudioStreamConfiguration
-    configuration.setSampleRate(mSampleRate);
-    configuration.setSamplesPerFrame(mmapInfo.channel_count);
-    configuration.setAudioFormat(AAUDIO_FORMAT_PCM_I16);
+    configurationOutput.setSampleRate(mSampleRate);
+    configurationOutput.setSamplesPerFrame(mmapInfo.channel_count);
+    configurationOutput.setAudioFormat(AAUDIO_FORMAT_PCM_I16);
 
     return AAUDIO_OK;
 }

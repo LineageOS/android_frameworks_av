@@ -33,6 +33,7 @@
 #include "binding/IAAudioService.h"
 #include "binding/AAudioServiceMessage.h"
 
+#include "core/AudioStreamBuilder.h"
 #include "AudioStreamInternal.h"
 
 #define LOG_TIMESTAMPS   0
@@ -110,6 +111,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     request.getConfiguration().setSampleRate(getSampleRate());
     request.getConfiguration().setSamplesPerFrame(getSamplesPerFrame());
     request.getConfiguration().setAudioFormat(getFormat());
+    request.getConfiguration().setBufferCapacity(builder.getBufferCapacity());
     request.dump();
 
     mServiceStreamHandle = service->openStream(request, configuration);
@@ -141,7 +143,6 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 
         // Configure endpoint based on descriptor.
         mAudioEndpoint.configure(&mEndpointDescriptor);
-
 
         mFramesPerBurst = mEndpointDescriptor.downDataQueueDescriptor.framesPerBurst;
         assert(mFramesPerBurst >= 16);
