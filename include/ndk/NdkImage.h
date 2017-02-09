@@ -40,6 +40,10 @@
 
 #include "NdkMediaError.h"
 
+#if __ANDROID_API__ >= 26
+#include <android/hardware_buffer.h>
+#endif /* __ANDROID_API__ >= 26 */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -706,6 +710,53 @@ media_status_t AImage_getPlaneData(
         /*out*/uint8_t** data, /*out*/int* dataLength);
 
 #endif /* __ANDROID_API__ >= 24 */
+
+#if __ANDROID_API__ >= 26
+
+/*
+ * Return the image back the the system and delete the AImage object from memory asynchronously.
+ *
+ * <p>Similar to {@link AImage_delete}, do NOT use the image pointer after this method returns.
+ * However, the caller can still hold on to the {@link AHardwareBuffer} returned from this image and
+ * signal the release of the hardware buffer back to the {@link AImageReader}'s queue using
+ * releaseFenceFd.</p>
+ *
+ * @param image The {@link AImage} to be deleted.
+ * @param releaseFenceFd A sync fence fd defined in {@link sync.h}, which signals the release of
+ *         underlying {@link AHardwareBuffer}.
+ *
+ * @see sync.h
+ */
+void AImage_deleteAsync(AImage* image, int releaseFenceFd);
+
+/**
+ * Get the hardware buffer handle of the input image intended for GPU and/or hardware access.
+ *
+ * <p>Note that no reference on the returned {@link AHardwareBuffer} handle is acquired
+ * automatically. Once the {@link AImage} or the parent {@link AImageReader} is deleted, the
+ * {@link AHardwareBuffer} handle from previous {@link AImage_getHardwareBuffer} becomes
+ * invalid.</p>
+ *
+ * <p>If the caller ever needs to hold on a reference to the {@link AHardwareBuffer} handle after
+ * the {@link AImage} or the parent {@link AImageReader} is deleted, it must call {@link
+ * AHardwareBuffer_acquire} to acquire an extra reference, and call {@link AHardwareBuffer_release}
+ * once it has finished using it in order to properly deallocate the underlying memory managed by
+ * {@link AHardwareBuffer}. If the caller has acquired extra reference on an {@link AHardwareBuffer}
+ * returned from this function, it must also listen to {@link onBufferFreed} callback to be
+ * notified when the buffer is no longer used by {@link AImageReader}.</p>
+ *
+ * @param image the {@link AImage} of interest.
+ * @param outBuffer The memory area pointed to by buffer will contain the acquired AHardwareBuffer
+ *         handle.
+ * @return <ul>
+ *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
+ *         <li>{@link AMEDIA_ERROR_INVALID_PARAMETER} if image or buffer is NULL</li></ul>
+ *
+ * @see AImageReader_ImageCallback
+ */
+media_status_t AImage_getHardwareBuffer(const AImage* image, /*out*/AHardwareBuffer** buffer);
+
+#endif /* __ANDROID_API__ >= 26 */
 
 #ifdef __cplusplus
 } // extern "C"
