@@ -45,6 +45,8 @@ public:
 
     aaudio_result_t resolve(SharedMemoryParcelable *memoryParcels, void **regionAddressPtr);
 
+    bool isFileDescriptorSafe(SharedMemoryParcelable *memoryParcels);
+
     aaudio_result_t validate();
 
     void dump();

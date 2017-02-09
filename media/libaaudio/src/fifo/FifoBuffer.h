@@ -21,15 +21,29 @@
 
 #include "FifoControllerBase.h"
 
+namespace android {
+
+/**
+ * Structure that represents a region in a circular buffer that might be at the
+ * end of the array and split in two.
+ */
+struct WrappingBuffer {
+    enum {
+        SIZE = 2
+    };
+    void *data[SIZE];
+    int32_t numFrames[SIZE];
+};
+
 class FifoBuffer {
 public:
     FifoBuffer(int32_t bytesPerFrame, fifo_frames_t capacityInFrames);
 
-    FifoBuffer(int32_t   bytesPerFrame,
-               fifo_frames_t   capacityInFrames,
-               fifo_counter_t * readCounterAddress,
-               fifo_counter_t * writeCounterAddress,
-               void * dataStorageAddress);
+    FifoBuffer(int32_t bytesPerFrame,
+               fifo_frames_t capacityInFrames,
+               fifo_counter_t *readCounterAddress,
+               fifo_counter_t *writeCounterAddress,
+               void *dataStorageAddress);
 
     ~FifoBuffer();
 
@@ -40,10 +54,33 @@ public:
     fifo_frames_t write(const void *source, fifo_frames_t framesToWrite);
 
     fifo_frames_t getThreshold();
+
     void setThreshold(fifo_frames_t threshold);
 
     fifo_frames_t getBufferCapacityInFrames();
 
+    /**
+     * Return pointer to available full frames in data1 and set size in numFrames1.
+     * if the data is split across the end of the FIFO then set data2 and numFrames2.
+     * Other wise set them to null
+     * @param wrappingBuffer
+     */
+    void getFullDataAvailable(WrappingBuffer *wrappingBuffer);
+
+    /**
+     * Return pointer to available empty frames in data1 and set size in numFrames1.
+     * if the room is split across the end of the FIFO then set data2 and numFrames2.
+     * Other wise set them to null
+     * @param wrappingBuffer
+     */
+    void getEmptyRoomAvailable(WrappingBuffer *wrappingBuffer);
+
+    /**
+     * Copy data from the FIFO into the buffer.
+     * @param buffer
+     * @param numFrames
+     * @return
+     */
     fifo_frames_t readNow(void *buffer, fifo_frames_t numFrames);
 
     int64_t getNextReadTime(int32_t frameRate);
@@ -73,15 +110,21 @@ public:
     }
 
 private:
+
+    void fillWrappingBuffer(WrappingBuffer *wrappingBuffer,
+                            int32_t framesAvailable, int32_t startIndex);
+
     const fifo_frames_t mFrameCapacity;
-    const int32_t       mBytesPerFrame;
-    uint8_t *           mStorage;
-    bool                mStorageOwned; // did this object allocate the storage?
+    const int32_t mBytesPerFrame;
+    uint8_t *mStorage;
+    bool mStorageOwned; // did this object allocate the storage?
     FifoControllerBase *mFifo;
-    fifo_counter_t      mFramesReadCount;
-    fifo_counter_t      mFramesUnderrunCount;
-    int32_t             mUnderrunCount; // need? just use frames
-    int32_t             mLastReadSize;
+    fifo_counter_t mFramesReadCount;
+    fifo_counter_t mFramesUnderrunCount;
+    int32_t mUnderrunCount; // need? just use frames
+    int32_t mLastReadSize;
 };
+
+}  // android
 
 #endif //FIFO_FIFO_BUFFER_H

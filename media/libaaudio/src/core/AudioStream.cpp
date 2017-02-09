@@ -45,6 +45,7 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     mDeviceId = builder.getDeviceId();
     mFormat = builder.getFormat();
     mDirection = builder.getDirection();
+    mSharingMode = builder.getSharingMode();
 
     // callbacks
     mFramesPerDataCallback = builder.getFramesPerDataCallback();

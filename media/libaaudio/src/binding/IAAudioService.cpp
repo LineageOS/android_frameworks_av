@@ -40,11 +40,13 @@ public:
     {
     }
 
-    virtual aaudio_handle_t openStream(aaudio::AAudioStreamRequest &request,
-                                     aaudio::AAudioStreamConfiguration &configuration) override {
+    virtual aaudio_handle_t openStream(const aaudio::AAudioStreamRequest &request,
+                                     aaudio::AAudioStreamConfiguration &configurationOutput) override {
         Parcel data, reply;
         // send command
         data.writeInterfaceToken(IAAudioService::getInterfaceDescriptor());
+        ALOGE("BpAAudioService::client openStream request dump --------------------");
+        request.dump();
         request.writeToParcel(&data);
         status_t err = remote()->transact(OPEN_STREAM, data, &reply);
         if (err != NO_ERROR) {
@@ -53,7 +55,12 @@ public:
         // parse reply
         aaudio_handle_t stream;
         reply.readInt32(&stream);
-        configuration.readFromParcel(&reply);
+        err = configurationOutput.readFromParcel(&reply);
+        if (err != NO_ERROR) {
+            ALOGE("BpAAudioService::client openStream readFromParcel failed %d", err);
+            closeStream(stream);
+            return AAudioConvert_androidToAAudioResult(err);
+        }
         return stream;
     }
 
@@ -80,16 +87,30 @@ public:
         data.writeInt32(streamHandle);
         status_t err = remote()->transact(GET_STREAM_DESCRIPTION, data, &reply);
         if (err != NO_ERROR) {
+            ALOGE("BpAAudioService::client transact(GET_STREAM_DESCRIPTION) returns %d", err);
             return AAudioConvert_androidToAAudioResult(err);
         }
         // parse reply
-        parcelable.readFromParcel(&reply);
-        parcelable.dump();
-        aaudio_result_t result = parcelable.validate();
-        if (result != AAUDIO_OK) {
+        aaudio_result_t result;
+        err = reply.readInt32(&result);
+        if (err != NO_ERROR) {
+            ALOGE("BpAAudioService::client transact(GET_STREAM_DESCRIPTION) readInt %d", err);
+            return AAudioConvert_androidToAAudioResult(err);
+        } else if (result != AAUDIO_OK) {
+            ALOGE("BpAAudioService::client GET_STREAM_DESCRIPTION passed result %d", result);
             return result;
         }
-        reply.readInt32(&result);
+        err = parcelable.readFromParcel(&reply);;
+        if (err != NO_ERROR) {
+            ALOGE("BpAAudioService::client transact(GET_STREAM_DESCRIPTION) read endpoint %d", err);
+            return AAudioConvert_androidToAAudioResult(err);
+        }
+        //parcelable.dump();
+        result = parcelable.validate();
+        if (result != AAUDIO_OK) {
+            ALOGE("BpAAudioService::client GET_STREAM_DESCRIPTION validation fails %d", result);
+            return result;
+        }
         return result;
     }
 
@@ -139,13 +160,16 @@ public:
         return res;
     }
 
-    virtual aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle, pid_t clientThreadId,
+    virtual aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle,
+                                              pid_t clientProcessId,
+                                              pid_t clientThreadId,
                                               int64_t periodNanoseconds)
     override {
         Parcel data, reply;
         // send command
         data.writeInterfaceToken(IAAudioService::getInterfaceDescriptor());
         data.writeInt32(streamHandle);
+        data.writeInt32((int32_t) clientProcessId);
         data.writeInt32((int32_t) clientThreadId);
         data.writeInt64(periodNanoseconds);
         status_t err = remote()->transact(REGISTER_AUDIO_THREAD, data, &reply);
@@ -158,12 +182,15 @@ public:
         return res;
     }
 
-    virtual aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle, pid_t clientThreadId)
+    virtual aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
+                                                  pid_t clientProcessId,
+                                                  pid_t clientThreadId)
     override {
         Parcel data, reply;
         // send command
         data.writeInterfaceToken(IAAudioService::getInterfaceDescriptor());
         data.writeInt32(streamHandle);
+        data.writeInt32((int32_t) clientProcessId);
         data.writeInt32((int32_t) clientThreadId);
         status_t err = remote()->transact(UNREGISTER_AUDIO_THREAD, data, &reply);
         if (err != NO_ERROR) {
@@ -178,7 +205,7 @@ public:
 };
 
 // Implement an interface to the service.
-// This is here so that you don't have to link with liboboe static library.
+// This is here so that you don't have to link with libaaudio static library.
 IMPLEMENT_META_INTERFACE(AAudioService, "IAAudioService");
 
 // The order of parameters in the Parcels must match with code in BpAAudioService
@@ -189,6 +216,7 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
     aaudio::AAudioStreamRequest request;
     aaudio::AAudioStreamConfiguration configuration;
     pid_t pid;
+    pid_t tid;
     int64_t nanoseconds;
     aaudio_result_t result;
     ALOGV("BnAAudioService::onTransact(%i) %i", code, flags);
@@ -197,8 +225,12 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
     switch(code) {
         case OPEN_STREAM: {
             request.readFromParcel(&data);
+
+            ALOGD("BnAAudioService::client openStream request dump --------------------");
+            request.dump();
+
             stream = openStream(request, configuration);
-            ALOGD("BnAAudioService::onTransact OPEN_STREAM server handle = 0x%08X", stream);
+            ALOGV("BnAAudioService::onTransact OPEN_STREAM server handle = 0x%08X", stream);
             reply->writeInt32(stream);
             configuration.writeToParcel(reply);
             return NO_ERROR;
@@ -206,7 +238,7 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
 
         case CLOSE_STREAM: {
             data.readInt32(&stream);
-            ALOGD("BnAAudioService::onTransact CLOSE_STREAM 0x%08X", stream);
+            ALOGV("BnAAudioService::onTransact CLOSE_STREAM 0x%08X", stream);
             result = closeStream(stream);
             reply->writeInt32(result);
             return NO_ERROR;
@@ -214,26 +246,28 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
 
         case GET_STREAM_DESCRIPTION: {
             data.readInt32(&stream);
-            ALOGD("BnAAudioService::onTransact GET_STREAM_DESCRIPTION 0x%08X", stream);
+            ALOGI("BnAAudioService::onTransact GET_STREAM_DESCRIPTION 0x%08X", stream);
             aaudio::AudioEndpointParcelable parcelable;
             result = getStreamDescription(stream, parcelable);
+            ALOGI("BnAAudioService::onTransact getStreamDescription() returns %d", result);
             if (result != AAUDIO_OK) {
                 return AAudioConvert_aaudioToAndroidStatus(result);
             }
-            parcelable.dump();
             result = parcelable.validate();
             if (result != AAUDIO_OK) {
+                ALOGE("BnAAudioService::onTransact getStreamDescription() returns %d", result);
+                parcelable.dump();
                 return AAudioConvert_aaudioToAndroidStatus(result);
             }
-            parcelable.writeToParcel(reply);
             reply->writeInt32(result);
+            parcelable.writeToParcel(reply);
             return NO_ERROR;
         } break;
 
         case START_STREAM: {
             data.readInt32(&stream);
             result = startStream(stream);
-            ALOGD("BnAAudioService::onTransact START_STREAM 0x%08X, result = %d",
+            ALOGV("BnAAudioService::onTransact START_STREAM 0x%08X, result = %d",
                     stream, result);
             reply->writeInt32(result);
             return NO_ERROR;
@@ -242,7 +276,7 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
         case PAUSE_STREAM: {
             data.readInt32(&stream);
             result = pauseStream(stream);
-            ALOGD("BnAAudioService::onTransact PAUSE_STREAM 0x%08X, result = %d",
+            ALOGV("BnAAudioService::onTransact PAUSE_STREAM 0x%08X, result = %d",
                     stream, result);
             reply->writeInt32(result);
             return NO_ERROR;
@@ -251,7 +285,7 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
         case FLUSH_STREAM: {
             data.readInt32(&stream);
             result = flushStream(stream);
-            ALOGD("BnAAudioService::onTransact FLUSH_STREAM 0x%08X, result = %d",
+            ALOGV("BnAAudioService::onTransact FLUSH_STREAM 0x%08X, result = %d",
                     stream, result);
             reply->writeInt32(result);
             return NO_ERROR;
@@ -260,9 +294,10 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
         case REGISTER_AUDIO_THREAD: {
             data.readInt32(&stream);
             data.readInt32(&pid);
+            data.readInt32(&tid);
             data.readInt64(&nanoseconds);
-            result = registerAudioThread(stream, pid, nanoseconds);
-            ALOGD("BnAAudioService::onTransact REGISTER_AUDIO_THREAD 0x%08X, result = %d",
+            result = registerAudioThread(stream, pid, tid, nanoseconds);
+            ALOGV("BnAAudioService::onTransact REGISTER_AUDIO_THREAD 0x%08X, result = %d",
                     stream, result);
             reply->writeInt32(result);
             return NO_ERROR;
@@ -271,8 +306,9 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
         case UNREGISTER_AUDIO_THREAD: {
             data.readInt32(&stream);
             data.readInt32(&pid);
-            result = unregisterAudioThread(stream, pid);
-            ALOGD("BnAAudioService::onTransact UNREGISTER_AUDIO_THREAD 0x%08X, result = %d",
+            data.readInt32(&tid);
+            result = unregisterAudioThread(stream, pid, tid);
+            ALOGV("BnAAudioService::onTransact UNREGISTER_AUDIO_THREAD 0x%08X, result = %d",
                     stream, result);
             reply->writeInt32(result);
             return NO_ERROR;

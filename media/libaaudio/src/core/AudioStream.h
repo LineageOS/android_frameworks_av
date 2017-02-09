@@ -22,8 +22,8 @@
 #include <stdint.h>
 #include <aaudio/AAudio.h>
 
-#include "AAudioUtilities.h"
-#include "MonotonicCounter.h"
+#include "utility/AAudioUtilities.h"
+#include "utility/MonotonicCounter.h"
 
 namespace aaudio {
 
@@ -266,10 +266,13 @@ protected:
         mState = state;
     }
 
+    void setDeviceId(int32_t deviceId) {
+        mDeviceId = deviceId;
+    }
+
     std::mutex           mStreamMutex;
 
     std::atomic<bool>    mCallbackEnabled;
-
 
 protected:
     MonotonicCounter     mFramesWritten;

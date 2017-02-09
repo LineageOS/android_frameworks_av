@@ -14,11 +14,15 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "AAudio"
+//#define LOG_NDEBUG 0
+#include <utils/Log.h>
+
 #include <stdint.h>
 
-#include <sys/mman.h>
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
+#include <utility/AAudioUtilities.h>
 
 #include "binding/AAudioServiceDefinitions.h"
 #include "binding/RingBufferParcelable.h"
@@ -82,13 +86,27 @@ status_t AudioEndpointParcelable::readFromParcel(const Parcel* parcel) {
 }
 
 aaudio_result_t AudioEndpointParcelable::resolve(EndpointDescriptor *descriptor) {
-    // TODO error check
-    mUpMessageQueueParcelable.resolve(mSharedMemories, &descriptor->upMessageQueueDescriptor);
-    mDownMessageQueueParcelable.resolve(mSharedMemories,
+    aaudio_result_t result = mUpMessageQueueParcelable.resolve(mSharedMemories,
+                                                           &descriptor->upMessageQueueDescriptor);
+    if (result != AAUDIO_OK) return result;
+    result = mDownMessageQueueParcelable.resolve(mSharedMemories,
                                         &descriptor->downMessageQueueDescriptor);
-    mUpDataQueueParcelable.resolve(mSharedMemories, &descriptor->upDataQueueDescriptor);
-    mDownDataQueueParcelable.resolve(mSharedMemories, &descriptor->downDataQueueDescriptor);
-    return AAUDIO_OK;
+    if (result != AAUDIO_OK) return result;
+
+    result = mUpDataQueueParcelable.resolve(mSharedMemories, &descriptor->upDataQueueDescriptor);
+    if (result != AAUDIO_OK) return result;
+    result = mDownDataQueueParcelable.resolve(mSharedMemories,
+                                              &descriptor->downDataQueueDescriptor);
+    return result;
+}
+
+aaudio_result_t AudioEndpointParcelable::close() {
+    int err = 0;
+    for (int i = 0; i < mNumSharedMemories; i++) {
+        int lastErr = mSharedMemories[i].close();
+        if (lastErr < 0) err = lastErr;
+    }
+    return AAudioConvert_androidToAAudioResult(err);
 }
 
 aaudio_result_t AudioEndpointParcelable::validate() {
@@ -100,6 +118,7 @@ aaudio_result_t AudioEndpointParcelable::validate() {
     for (int i = 0; i < mNumSharedMemories; i++) {
         result = mSharedMemories[i].validate();
         if (result != AAUDIO_OK) {
+            ALOGE("AudioEndpointParcelable invalid mSharedMemories[%d] = %d", i, result);
             return result;
         }
     }

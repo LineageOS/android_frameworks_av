@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "AAudio"
+//#define LOG_NDEBUG 0
+#include <utils/Log.h>
+
 #include <stdint.h>
 
 #include <sys/mman.h>
@@ -39,28 +43,48 @@ AAudioStreamRequest::AAudioStreamRequest()
 AAudioStreamRequest::~AAudioStreamRequest() {}
 
 status_t AAudioStreamRequest::writeToParcel(Parcel* parcel) const {
-    parcel->writeInt32((int32_t) mUserId);
-    parcel->writeInt32((int32_t) mProcessId);
-    mConfiguration.writeToParcel(parcel);
-    return NO_ERROR; // TODO check for errors above
+    status_t status = parcel->writeInt32((int32_t) mUserId);
+    if (status != NO_ERROR) goto error;
+    status = parcel->writeInt32((int32_t) mProcessId);
+    if (status != NO_ERROR) goto error;
+    status = parcel->writeInt32((int32_t) mDirection);
+    if (status != NO_ERROR) goto error;
+    status = mConfiguration.writeToParcel(parcel);
+    if (status != NO_ERROR) goto error;
+    return NO_ERROR;
+
+error:
+    ALOGE("AAudioStreamRequest.writeToParcel(): write failed = %d", status);
+    return status;
 }
 
 status_t AAudioStreamRequest::readFromParcel(const Parcel* parcel) {
     int32_t temp;
-    parcel->readInt32(&temp);
+    status_t status = parcel->readInt32(&temp);
+    if (status != NO_ERROR) goto error;
     mUserId = (uid_t) temp;
-    parcel->readInt32(&temp);
+    status = parcel->readInt32(&temp);
+    if (status != NO_ERROR) goto error;
     mProcessId = (pid_t) temp;
-    mConfiguration.readFromParcel(parcel);
-    return NO_ERROR; // TODO check for errors above
+    status = parcel->readInt32(&temp);
+    if (status != NO_ERROR) goto error;
+    mDirection = (aaudio_direction_t) temp;
+    status = mConfiguration.readFromParcel(parcel);
+    if (status != NO_ERROR) goto error;
+    return NO_ERROR;
+
+error:
+    ALOGE("AAudioStreamRequest.readFromParcel(): read failed = %d", status);
+    return status;
 }
 
-aaudio_result_t AAudioStreamRequest::validate() {
+aaudio_result_t AAudioStreamRequest::validate() const {
     return mConfiguration.validate();
 }
 
-void AAudioStreamRequest::dump() {
-    ALOGD("AAudioStreamRequest mUserId = %d -----", mUserId);
+void AAudioStreamRequest::dump() const {
+    ALOGD("AAudioStreamRequest mUserId    = %d", mUserId);
     ALOGD("AAudioStreamRequest mProcessId = %d", mProcessId);
+    ALOGD("AAudioStreamRequest mDirection = %d", mDirection);
     mConfiguration.dump();
 }

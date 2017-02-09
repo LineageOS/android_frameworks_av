@@ -52,6 +52,18 @@ public:
         mProcessId = processId;
     }
 
+    aaudio_direction_t getDirection() const {
+        return mDirection;
+    }
+
+    void setDirection(aaudio_direction_t direction) {
+        mDirection = direction;
+    }
+
+    const AAudioStreamConfiguration &getConstantConfiguration() const {
+        return mConfiguration;
+    }
+
     AAudioStreamConfiguration &getConfiguration() {
         return mConfiguration;
     }
@@ -60,14 +72,15 @@ public:
 
     virtual status_t readFromParcel(const Parcel* parcel) override;
 
-    aaudio_result_t validate();
+    aaudio_result_t validate() const;
 
-    void dump();
+    void dump() const;
 
 protected:
     AAudioStreamConfiguration  mConfiguration;
-    uid_t    mUserId;
-    pid_t    mProcessId;
+    uid_t                      mUserId;
+    pid_t                      mProcessId;
+    aaudio_direction_t         mDirection;
 };
 
 } /* namespace aaudio */

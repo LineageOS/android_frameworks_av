@@ -7585,7 +7585,11 @@ status_t AudioFlinger::MmapThread::start(const MmapStreamInterface::Client& clie
 
     if (mActiveTracks.size() == 0) {
         // for the first track, reuse portId and session allocated when the stream was opened
-        mHalStream->start();
+        ret = mHalStream->start();
+        if (ret != NO_ERROR) {
+            ALOGE("%s: error mHalStream->start() = %d for first track", __FUNCTION__, ret);
+            return ret;
+        }
         portId = mPortId;
         sessionId = mSessionId;
         mStandby = false;
@@ -7640,6 +7644,7 @@ status_t AudioFlinger::MmapThread::start(const MmapStreamInterface::Client& clie
 
     // abort if start is rejected by audio policy manager
     if (ret != NO_ERROR) {
+        ALOGE("%s: error start rejected by AudioPolicyManager = %d", __FUNCTION__, ret);
         if (mActiveTracks.size() != 0) {
             if (isOutput()) {
                 AudioSystem::releaseOutput(mId, streamType(), sessionId);
@@ -7935,15 +7940,17 @@ status_t AudioFlinger::MmapThread::createAudioPatch_l(const struct audio_patch *
     if (isOutput() && mPrevOutDevice != mOutDevice) {
         mPrevOutDevice = type;
         sendIoConfigEvent_l(AUDIO_OUTPUT_CONFIG_CHANGED);
-        if (mCallback != 0) {
-            mCallback->onRoutingChanged(deviceId);
+        sp<MmapStreamCallback> callback = mCallback.promote();
+        if (callback != 0) {
+            callback->onRoutingChanged(deviceId);
         }
     }
     if (!isOutput() && mPrevInDevice != mInDevice) {
         mPrevInDevice = type;
         sendIoConfigEvent_l(AUDIO_INPUT_CONFIG_CHANGED);
-        if (mCallback != 0) {
-            mCallback->onRoutingChanged(deviceId);
+        sp<MmapStreamCallback> callback = mCallback.promote();
+        if (callback != 0) {
+            callback->onRoutingChanged(deviceId);
         }
     }
     return status;
@@ -8058,8 +8065,9 @@ void AudioFlinger::MmapThread::threadLoop_standby()
 
 void AudioFlinger::MmapThread::threadLoop_exit()
 {
-    if (mCallback != 0) {
-        mCallback->onTearDown();
+    sp<MmapStreamCallback> callback = mCallback.promote();
+    if (callback != 0) {
+        callback->onTearDown();
     }
 }
 
@@ -8107,8 +8115,9 @@ void AudioFlinger::MmapThread::checkInvalidTracks_l()
 {
     for (const sp<MmapTrack> &track : mActiveTracks) {
         if (track->isInvalid()) {
-            if (mCallback != 0) {
-                mCallback->onTearDown();
+            sp<MmapStreamCallback> callback = mCallback.promote();
+            if (callback != 0) {
+                callback->onTearDown();
             }
             break;
         }
@@ -8285,7 +8294,8 @@ void AudioFlinger::MmapPlaybackThread::processVolume_l()
 
         mOutput->stream->setVolume(volume, volume);
 
-        if (mCallback != 0) {
+        sp<MmapStreamCallback> callback = mCallback.promote();
+        if (callback != 0) {
             int channelCount;
             if (isOutput()) {
                 channelCount = audio_channel_count_from_out_mask(mChannelMask);
@@ -8296,7 +8306,7 @@ void AudioFlinger::MmapPlaybackThread::processVolume_l()
             for (int i = 0; i < channelCount; i++) {
                 values.add(volume);
             }
-            mCallback->onVolumeChanged(mChannelMask, values);
+            callback->onVolumeChanged(mChannelMask, values);
         }
     }
 }

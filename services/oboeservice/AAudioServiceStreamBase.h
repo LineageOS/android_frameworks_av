@@ -17,13 +17,15 @@
 #ifndef AAUDIO_AAUDIO_SERVICE_STREAM_BASE_H
 #define AAUDIO_AAUDIO_SERVICE_STREAM_BASE_H
 
-#include <utils/Mutex.h>
+#include <mutex>
 
-#include "IAAudioService.h"
-#include "AAudioServiceDefinitions.h"
 #include "fifo/FifoBuffer.h"
+#include "binding/IAAudioService.h"
+#include "binding/AudioEndpointParcelable.h"
+#include "binding/AAudioServiceMessage.h"
+#include "utility/AAudioUtilities.h"
+
 #include "SharedRingBuffer.h"
-#include "AudioEndpointParcelable.h"
 #include "AAudioThread.h"
 
 namespace aaudio {
@@ -32,7 +34,11 @@ namespace aaudio {
 // This should be way more than we need.
 #define QUEUE_UP_CAPACITY_COMMANDS (128)
 
-class AAudioServiceStreamBase {
+/**
+ * Base class for a stream in the AAudio service.
+ */
+class AAudioServiceStreamBase
+    : public Runnable  {
 
 public:
     AAudioServiceStreamBase();
@@ -42,16 +48,14 @@ public:
         ILLEGAL_THREAD_ID = 0
     };
 
-    /**
-     * Fill in a parcelable description of stream.
-     */
-    virtual aaudio_result_t getDescription(aaudio::AudioEndpointParcelable &parcelable) = 0;
-
+    // -------------------------------------------------------------------
     /**
      * Open the device.
      */
-    virtual aaudio_result_t open(aaudio::AAudioStreamRequest &request,
-                               aaudio::AAudioStreamConfiguration &configuration) = 0;
+    virtual aaudio_result_t open(const aaudio::AAudioStreamRequest &request,
+                                 aaudio::AAudioStreamConfiguration &configurationOutput) = 0;
+
+    virtual aaudio_result_t close();
 
     /**
      * Start the flow of data.
@@ -68,39 +72,69 @@ public:
      */
     virtual aaudio_result_t flush() = 0;
 
-    virtual aaudio_result_t close() = 0;
+    // -------------------------------------------------------------------
 
-    virtual void sendCurrentTimestamp() = 0;
+    /**
+     * Send a message to the client.
+     */
+    aaudio_result_t sendServiceEvent(aaudio_service_event_t event,
+                                     double  dataDouble = 0.0,
+                                     int64_t dataLong = 0);
 
-    int32_t getFramesPerBurst() {
-        return mFramesPerBurst;
-    }
+    /**
+     * Fill in a parcelable description of stream.
+     */
+    aaudio_result_t getDescription(AudioEndpointParcelable &parcelable);
 
-    virtual void sendServiceEvent(aaudio_service_event_t event,
-                                  int32_t data1 = 0,
-                                  int64_t data2 = 0);
 
-    virtual void setRegisteredThread(pid_t pid) {
+    void setRegisteredThread(pid_t pid) {
         mRegisteredClientThread = pid;
     }
 
-    virtual pid_t getRegisteredThread() {
+    pid_t getRegisteredThread() const {
         return mRegisteredClientThread;
     }
 
+    int32_t getFramesPerBurst() const {
+        return mFramesPerBurst;
+    }
+
+    int32_t calculateBytesPerFrame() const {
+        return mSamplesPerFrame * AAudioConvert_formatToSizeInBytes(mAudioFormat);
+    }
+
+    void run() override; // to implement Runnable
+
+    void processError();
+
 protected:
+    aaudio_result_t writeUpMessageQueue(AAudioServiceMessage *command);
+
+    aaudio_result_t sendCurrentTimestamp();
+
+    virtual aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) = 0;
+
+    virtual aaudio_result_t getDownDataDescription(AudioEndpointParcelable &parcelable) = 0;
+
+    aaudio_stream_state_t               mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
 
     pid_t              mRegisteredClientThread = ILLEGAL_THREAD_ID;
 
     SharedRingBuffer*  mUpMessageQueue;
+    std::mutex         mLockUpMessageQueue;
 
-    int32_t            mSampleRate = 0;
-    int32_t            mBytesPerFrame = 0;
+    AAudioThread        mAAudioThread;
+    // This is used by one thread to tell another thread to exit. So it must be atomic.
+    std::atomic<bool>   mThreadEnabled;
+
+
+    int                mAudioDataFileDescriptor = -1;
+
+    aaudio_audio_format_t mAudioFormat = AAUDIO_FORMAT_UNSPECIFIED;
     int32_t            mFramesPerBurst = 0;
-    int32_t            mCapacityInFrames = 0;
-    int32_t            mCapacityInBytes = 0;
-
-    android::Mutex     mLockUpMessageQueue;
+    int32_t            mSamplesPerFrame = AAUDIO_UNSPECIFIED;
+    int32_t            mSampleRate = AAUDIO_UNSPECIFIED;
+    int32_t            mCapacityInFrames = AAUDIO_UNSPECIFIED;
 };
 
 } /* namespace aaudio */

@@ -22,17 +22,19 @@
 
 #include <binder/BinderService.h>
 
-#include <aaudio/AAudioDefinitions.h>
 #include <aaudio/AAudio.h>
 #include "utility/HandleTracker.h"
-#include "IAAudioService.h"
+#include "binding/IAAudioService.h"
+#include "binding/AAudioServiceInterface.h"
+
 #include "AAudioServiceStreamBase.h"
 
 namespace android {
 
 class AAudioService :
     public BinderService<AAudioService>,
-    public BnAAudioService
+    public BnAAudioService,
+    public aaudio::AAudioServiceInterface
 {
     friend class BinderService<AAudioService>;
 
@@ -40,9 +42,9 @@ public:
     AAudioService();
     virtual ~AAudioService();
 
-    static const char* getServiceName() { return "media.audio_aaudio"; }
+    static const char* getServiceName() { return AAUDIO_SERVICE_NAME; }
 
-    virtual aaudio_handle_t openStream(aaudio::AAudioStreamRequest &request,
+    virtual aaudio_handle_t openStream(const aaudio::AAudioStreamRequest &request,
                                      aaudio::AAudioStreamConfiguration &configuration);
 
     virtual aaudio_result_t closeStream(aaudio_handle_t streamHandle);
@@ -58,9 +60,11 @@ public:
     virtual aaudio_result_t flushStream(aaudio_handle_t streamHandle);
 
     virtual aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle,
-                                              pid_t pid, int64_t periodNanoseconds) ;
+                                              pid_t pid, pid_t tid,
+                                              int64_t periodNanoseconds) ;
 
-    virtual aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle, pid_t pid);
+    virtual aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
+                                                  pid_t pid, pid_t tid);
 
 private:
 
@@ -68,6 +72,9 @@ private:
 
     HandleTracker mHandleTracker;
 
+    enum constants {
+        DEFAULT_AUDIO_PRIORITY = 2
+    };
 };
 
 } /* namespace android */

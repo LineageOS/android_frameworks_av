@@ -19,13 +19,13 @@
 
 #include <aaudio/AAudio.h>
 
-#include "AAudioServiceMessage.h"
-#include "AudioEndpointParcelable.h"
+#include "binding/AAudioServiceMessage.h"
+#include "binding/AudioEndpointParcelable.h"
 #include "fifo/FifoBuffer.h"
 
 namespace aaudio {
 
-#define ENDPOINT_DATA_QUEUE_SIZE_MIN   64
+#define ENDPOINT_DATA_QUEUE_SIZE_MIN   48
 
 /**
  * A sink for audio.
@@ -54,15 +54,19 @@ public:
      */
     aaudio_result_t writeDataNow(const void *buffer, int32_t numFrames);
 
+    void getEmptyRoomAvailable(android::WrappingBuffer *wrappingBuffer);
+
+    void advanceWriteIndex(int32_t deltaFrames);
+
     /**
      * Set the read index in the downData queue.
      * This is needed if the reader is not updating the index itself.
      */
-    void setDownDataReadCounter(fifo_counter_t framesRead);
-    fifo_counter_t getDownDataReadCounter();
+    void setDownDataReadCounter(android::fifo_counter_t framesRead);
+    android::fifo_counter_t getDownDataReadCounter();
 
-    void setDownDataWriteCounter(fifo_counter_t framesWritten);
-    fifo_counter_t getDownDataWriteCounter();
+    void setDownDataWriteCounter(android::fifo_counter_t framesWritten);
+    android::fifo_counter_t getDownDataWriteCounter();
 
     /**
      * The result is not valid until after configure() is called.
@@ -80,11 +84,11 @@ public:
     int32_t getFullFramesAvailable();
 
 private:
-    FifoBuffer   * mUpCommandQueue;
-    FifoBuffer   * mDownDataQueue;
-    bool           mOutputFreeRunning;
-    fifo_counter_t mDataReadCounter; // only used if free-running
-    fifo_counter_t mDataWriteCounter; // only used if free-running
+    android::FifoBuffer    *mUpCommandQueue;
+    android::FifoBuffer    *mDownDataQueue;
+    bool                    mOutputFreeRunning;
+    android::fifo_counter_t mDataReadCounter; // only used if free-running
+    android::fifo_counter_t mDataWriteCounter; // only used if free-running
 };
 
 } // namespace aaudio
