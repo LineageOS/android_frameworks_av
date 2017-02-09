@@ -23,10 +23,18 @@
 
 #include <binder/Parcel.h>
 #include <gui/Surface.h>
+#include <gui/view/Surface.h>
 
 namespace android {
 namespace hardware {
 namespace camera2 {
+
+// These must be in the .cpp (to avoid inlining)
+CaptureRequest::CaptureRequest() = default;
+CaptureRequest::~CaptureRequest() = default;
+CaptureRequest::CaptureRequest(const CaptureRequest& rhs) = default;
+CaptureRequest::CaptureRequest(CaptureRequest&& rhs) noexcept = default;
+
 
 status_t CaptureRequest::readFromParcel(const android::Parcel* parcel) {
     if (parcel == NULL) {

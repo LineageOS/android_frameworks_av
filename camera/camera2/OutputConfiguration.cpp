@@ -22,7 +22,7 @@
 
 #include <camera/camera2/OutputConfiguration.h>
 #include <binder/Parcel.h>
-#include <gui/Surface.h>
+#include <gui/view/Surface.h>
 #include <utils/String8.h>
 
 namespace android {
