@@ -1878,14 +1878,7 @@ Status CameraService::supportsCameraApi(const String16& cameraId, int apiVersion
             return STATUS_ERROR(ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
 
-    int facing = -1;
-    int deviceVersion = getDeviceVersion(id, /*out*/ &facing);
-    if (facing == -1) {
-        String8 msg = String8::format("Unable to get facing for camera device %s",
-                id.string());
-        ALOGE("%s: %s", __FUNCTION__, msg.string());
-        return STATUS_ERROR(ERROR_INVALID_OPERATION, msg.string());
-    }
+    int deviceVersion = getDeviceVersion(id);
     switch(deviceVersion) {
         case CAMERA_DEVICE_API_VERSION_1_0:
         case CAMERA_DEVICE_API_VERSION_3_0:
