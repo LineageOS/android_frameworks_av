@@ -5,7 +5,8 @@ LOCAL_SRC_FILES:=                 \
         TextDescriptions.cpp      \
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
-LOCAL_SANITIZE := signed-integer-overflow
+LOCAL_SANITIZE := signed-integer-overflow cfi
+LOCAL_SANITIZE_DIAG := cfi
 
 LOCAL_C_INCLUDES:= \
         $(TOP)/frameworks/av/include/media/stagefright/timedtext \

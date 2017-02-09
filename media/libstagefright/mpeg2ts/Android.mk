@@ -14,7 +14,8 @@ LOCAL_C_INCLUDES:= \
 	$(TOP)/frameworks/native/include/media/openmax
 
 LOCAL_CFLAGS += -Werror -Wall
-LOCAL_SANITIZE := unsigned-integer-overflow signed-integer-overflow
+LOCAL_SANITIZE := unsigned-integer-overflow signed-integer-overflow cfi
+LOCAL_SANITIZE_DIAG := cfi
 
 LOCAL_SHARED_LIBRARIES := libmedia
 

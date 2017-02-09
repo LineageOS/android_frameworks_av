@@ -14,7 +14,8 @@ LOCAL_STATIC_LIBRARIES := \
         libyuv_static \
 
 LOCAL_CFLAGS += -Werror
-LOCAL_SANITIZE := signed-integer-overflow
+LOCAL_SANITIZE := signed-integer-overflow cfi
+LOCAL_SANITIZE_DIAG := cfi
 
 LOCAL_MODULE:= libstagefright_color_conversion
 
