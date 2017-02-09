@@ -923,7 +923,10 @@ SoundTriggerHwService::ModuleClient::ModuleClient(const sp<Module>& module,
 
 void SoundTriggerHwService::ModuleClient::onFirstRef()
 {
-    IInterface::asBinder(mClient)->linkToDeath(this);
+    sp<IBinder> binder = IInterface::asBinder(mClient);
+    if (binder != 0) {
+        binder->linkToDeath(this);
+    }
 }
 
 SoundTriggerHwService::ModuleClient::~ModuleClient()
