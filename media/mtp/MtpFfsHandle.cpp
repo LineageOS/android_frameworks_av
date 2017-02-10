@@ -40,7 +40,7 @@
 #define cpu_to_le16(x)  htole16(x)
 #define cpu_to_le32(x)  htole32(x)
 
-#define FUNCTIONFS_ENDPOINT_ALLOC       _IOR('g', 131, __u32)
+#define FUNCTIONFS_ENDPOINT_ALLOC       _IOR('g', 231, __u32)
 
 namespace {
 
