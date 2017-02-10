@@ -215,6 +215,7 @@ private:
         int format;
         android_dataspace dataSpace;
         int32_t consumerUsage;
+        bool finalized = false;
         OutputStreamInfo() :
                 width(-1), height(-1), format(-1), dataSpace(HAL_DATASPACE_UNKNOWN),
                 consumerUsage(0) {}

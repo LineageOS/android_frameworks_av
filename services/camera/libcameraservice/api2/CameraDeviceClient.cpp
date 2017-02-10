@@ -1217,6 +1217,13 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
 
+    if (mStreamInfoMap[streamId].finalized) {
+        String8 msg = String8::format("Camera %s: finalizeOutputConfigurations has been called"
+                " on stream ID %d", mCameraIdStr.string(), streamId);
+        ALOGW("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+    }
+
     if (!mDevice.get()) {
         return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
     }
@@ -1246,13 +1253,6 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
         surfaceId++;
     }
 
-    if (consumerSurfaces.size() == 0) {
-        String8 msg = String8::format("Camera %s: New OutputConfiguration has the same surfaces"
-                " for stream (ID %d)", mCameraIdStr.string(), streamId);
-        ALOGW("%s: %s", __FUNCTION__, msg.string());
-        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
-    }
-
     // Finish the deferred stream configuration with the surface.
     status_t err;
     err = mDevice->setConsumerSurfaces(streamId, consumerSurfaces);
@@ -1267,6 +1267,7 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
         if (deferredStreamIndex != NAME_NOT_FOUND) {
             mDeferredStreams.removeItemsAt(deferredStreamIndex);
         }
+        mStreamInfoMap[streamId].finalized = true;
     } else if (err == NO_INIT) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_ILLEGAL_ARGUMENT,
                 "Camera %s: Deferred surface is invalid: %s (%d)",
