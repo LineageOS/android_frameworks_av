@@ -26,7 +26,7 @@ LOCAL_SHARED_LIBRARIES:= \
     libmediadrm \
     libhidltransport \
     libutils
-ifeq ($(ENABLE_TREBLE), true)
+ifneq ($(DISABLE_TREBLE_DRM), true)
 LOCAL_SHARED_LIBRARIES += \
     libhidlbase \
     libhidlmemory \
@@ -35,8 +35,8 @@ LOCAL_SHARED_LIBRARIES += \
 endif
 
 LOCAL_CFLAGS += -Wall -Wextra -Werror
-ifeq ($(ENABLE_TREBLE), true)
-LOCAL_CFLAGS += -DENABLE_TREBLE=1
+ifeq ($(DISABLE_TREBLE_DRM), true)
+LOCAL_CFLAGS += -DDISABLE_TREBLE_DRM=1
 endif
 
 LOCAL_MODULE:= mediadrmserver
