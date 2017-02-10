@@ -568,7 +568,7 @@ void GraphicBufferSource::onDataSpaceChanged_l(
                 aspects.mTransfer, asString(aspects.mTransfer),
                 err, asString(err));
 
-#ifndef QCOM_BSP_LEGACY
+#if !defined(QCOM_BSP_LEGACY) && !defined(USES_LEGACY_MEDIA_HAL)
         // signal client that the dataspace has changed; this will update the output format
         // TODO: we should tie this to an output buffer somehow, and signal the change
         // just before the output buffer is returned to the client, but there are many
