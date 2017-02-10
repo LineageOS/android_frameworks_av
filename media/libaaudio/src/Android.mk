@@ -5,18 +5,18 @@ LOCAL_PATH:= $(call my-dir)
 # TODO Remove this target later, when not needed.
 include $(CLEAR_VARS)
 
-LOCAL_MODULE := liboboe
+LOCAL_MODULE := libaaudio
 LOCAL_MODULE_TAGS := optional
 
-LIBAAUDIO_DIR := $(TOP)/frameworks/av/media/liboboe
+LIBAAUDIO_DIR := $(TOP)/frameworks/av/media/libaaudio
 LIBAAUDIO_SRC_DIR := $(LIBAAUDIO_DIR)/src
 
 LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils) \
     frameworks/native/include \
     system/core/base/include \
-    frameworks/native/media/liboboe/include/include \
-    frameworks/av/media/liboboe/include \
+    frameworks/native/media/libaaudio/include/include \
+    frameworks/av/media/libaaudio/include \
     frameworks/native/include \
     $(LOCAL_PATH) \
     $(LOCAL_PATH)/binding \
@@ -59,15 +59,15 @@ include $(BUILD_STATIC_LIBRARY)
 # ======================= SHARED LIBRARY ==========================
 include $(CLEAR_VARS)
 
-LOCAL_MODULE := liboboe
+LOCAL_MODULE := libaaudio
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils) \
     frameworks/native/include \
     system/core/base/include \
-    frameworks/native/media/liboboe/include/include \
-    frameworks/av/media/liboboe/include \
+    frameworks/native/media/libaaudio/include/include \
+    frameworks/av/media/libaaudio/include \
     $(LOCAL_PATH) \
     $(LOCAL_PATH)/binding \
     $(LOCAL_PATH)/client \

@@ -3,28 +3,28 @@ LOCAL_PATH:= $(call my-dir)
 # AAudio Service
 include $(CLEAR_VARS)
 
-LOCAL_MODULE := oboeservice
+LOCAL_MODULE := aaudioservice
 LOCAL_MODULE_TAGS := optional
 
-LIBAAUDIO_DIR := ../../media/liboboe
+LIBAAUDIO_DIR := ../../media/libaaudio
 LIBAAUDIO_SRC_DIR := $(LIBAAUDIO_DIR)/src
 
 LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils) \
     frameworks/native/include \
     system/core/base/include \
-    $(TOP)/frameworks/native/media/liboboe/include/include \
-    $(TOP)/frameworks/av/media/liboboe/include \
+    $(TOP)/frameworks/native/media/libaaudio/include/include \
+    $(TOP)/frameworks/av/media/libaaudio/include \
     frameworks/native/include \
     $(TOP)/external/tinyalsa/include \
-    $(TOP)/frameworks/av/media/liboboe/src \
-    $(TOP)/frameworks/av/media/liboboe/src/binding \
-    $(TOP)/frameworks/av/media/liboboe/src/client \
-    $(TOP)/frameworks/av/media/liboboe/src/core \
-    $(TOP)/frameworks/av/media/liboboe/src/fifo \
-    $(TOP)/frameworks/av/media/liboboe/src/utility
+    $(TOP)/frameworks/av/media/libaaudio/src \
+    $(TOP)/frameworks/av/media/libaaudio/src/binding \
+    $(TOP)/frameworks/av/media/libaaudio/src/client \
+    $(TOP)/frameworks/av/media/libaaudio/src/core \
+    $(TOP)/frameworks/av/media/libaaudio/src/fifo \
+    $(TOP)/frameworks/av/media/libaaudio/src/utility
 
-# TODO These could be in a liboboe_common library
+# TODO These could be in a libaaudio_common library
 LOCAL_SRC_FILES += \
     $(LIBAAUDIO_SRC_DIR)/utility/HandleTracker.cpp \
     $(LIBAAUDIO_SRC_DIR)/utility/AAudioUtilities.cpp \
