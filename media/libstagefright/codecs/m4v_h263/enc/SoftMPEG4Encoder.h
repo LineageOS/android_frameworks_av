@@ -43,6 +43,8 @@ struct SoftMPEG4Encoder : public SoftVideoEncoderOMXComponent {
 
     virtual void onQueueFilled(OMX_U32 portIndex);
 
+    virtual void onReset();
+
 protected:
     virtual ~SoftMPEG4Encoder();
 
