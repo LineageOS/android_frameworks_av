@@ -955,6 +955,10 @@ OMX_ERRORTYPE SoftVPXEncoder::getExtensionIndex(
     return SimpleSoftOMXComponent::getExtensionIndex(name, index);
 }
 
+void SoftVPXEncoder::onReset() {
+    releaseEncoder();
+}
+
 }  // namespace android
 
 

@@ -87,6 +87,8 @@ protected:
     // encoding of the frame
     virtual void onQueueFilled(OMX_U32 portIndex);
 
+    virtual void onReset();
+
     virtual OMX_ERRORTYPE getExtensionIndex(
             const char *name, OMX_INDEXTYPE *index);
 
