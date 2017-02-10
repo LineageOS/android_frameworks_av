@@ -30,6 +30,16 @@ namespace hardware {
 namespace camera2 {
 
 struct CaptureRequest : public Parcelable {
+
+    // those are needed so we can use a forward declaration of Surface, otherwise
+    // the type is incomplete when the ctor/dtors are generated. This has the added
+    // benefit that ctor/dtors are not inlined, which is good because they're not trivial
+    // (because of the vtable and Vector<>)
+    CaptureRequest();
+    CaptureRequest(const CaptureRequest& rhs);
+    CaptureRequest(CaptureRequest&& rhs) noexcept;
+    virtual ~CaptureRequest();
+
     CameraMetadata          mMetadata;
     Vector<sp<Surface> >    mSurfaceList;
     bool                    mIsReprocess;
