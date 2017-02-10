@@ -613,16 +613,17 @@ void AudioFlinger::ThreadBase::sendIoConfigEvent_l(audio_io_config_event event, 
     sendConfigEvent_l(configEvent);
 }
 
-void AudioFlinger::ThreadBase::sendPrioConfigEvent(pid_t pid, pid_t tid, int32_t prio)
+void AudioFlinger::ThreadBase::sendPrioConfigEvent(pid_t pid, pid_t tid, int32_t prio, bool forApp)
 {
     Mutex::Autolock _l(mLock);
-    sendPrioConfigEvent_l(pid, tid, prio);
+    sendPrioConfigEvent_l(pid, tid, prio, forApp);
 }
 
 // sendPrioConfigEvent_l() must be called with ThreadBase::mLock held
-void AudioFlinger::ThreadBase::sendPrioConfigEvent_l(pid_t pid, pid_t tid, int32_t prio)
+void AudioFlinger::ThreadBase::sendPrioConfigEvent_l(
+        pid_t pid, pid_t tid, int32_t prio, bool forApp)
 {
-    sp<ConfigEvent> configEvent = (ConfigEvent *)new PrioConfigEvent(pid, tid, prio);
+    sp<ConfigEvent> configEvent = (ConfigEvent *)new PrioConfigEvent(pid, tid, prio, forApp);
     sendConfigEvent_l(configEvent);
 }
 
@@ -682,7 +683,7 @@ void AudioFlinger::ThreadBase::processConfigEvents_l()
         case CFG_EVENT_PRIO: {
             PrioConfigEventData *data = (PrioConfigEventData *)event->mData.get();
             // FIXME Need to understand why this has to be done asynchronously
-            int err = requestPriority(data->mPid, data->mTid, data->mPrio,
+            int err = requestPriority(data->mPid, data->mTid, data->mPrio, data->mForApp,
                     true /*asynchronous*/);
             if (err != 0) {
                 ALOGW("Policy SCHED_FIFO priority %d is unavailable for pid %d tid %d; error %d",
@@ -2017,7 +2018,7 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
             pid_t callingPid = IPCThreadState::self()->getCallingPid();
             // we don't have CAP_SYS_NICE, nor do we want to have it as it's too powerful,
             // so ask activity manager to do this on our behalf
-            sendPrioConfigEvent_l(callingPid, tid, kPriorityAudioApp);
+            sendPrioConfigEvent_l(callingPid, tid, kPriorityAudioApp, true /*isForApp*/);
         }
     }
 
@@ -3673,7 +3674,7 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
         // start the fast mixer
         mFastMixer->run("FastMixer", PRIORITY_URGENT_AUDIO);
         pid_t tid = mFastMixer->getTid();
-        sendPrioConfigEvent(getpid_cached, tid, kPriorityFastMixer);
+        sendPrioConfigEvent(getpid_cached, tid, kPriorityFastMixer, false);
         stream()->setHalThreadPriority(kPriorityFastMixer);
 
 #ifdef AUDIO_WATCHDOG
@@ -5936,7 +5937,7 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
         // start the fast capture
         mFastCapture->run("FastCapture", ANDROID_PRIORITY_URGENT_AUDIO);
         pid_t tid = mFastCapture->getTid();
-        sendPrioConfigEvent(getpid_cached, tid, kPriorityFastCapture);
+        sendPrioConfigEvent(getpid_cached, tid, kPriorityFastCapture, false);
         stream()->setHalThreadPriority(kPriorityFastCapture);
 #ifdef AUDIO_WATCHDOG
         // FIXME
@@ -6596,7 +6597,7 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
             pid_t callingPid = IPCThreadState::self()->getCallingPid();
             // we don't have CAP_SYS_NICE, nor do we want to have it as it's too powerful,
             // so ask activity manager to do this on our behalf
-            sendPrioConfigEvent_l(callingPid, tid, kPriorityAudioApp);
+            sendPrioConfigEvent_l(callingPid, tid, kPriorityAudioApp, true);
         }
     }
 

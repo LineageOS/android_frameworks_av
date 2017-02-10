@@ -46,7 +46,8 @@ LOCAL_SHARED_LIBRARIES += \
     android.hardware.audio.common@2.0-util \
     android.hardware.audio.effect@2.0      \
     android.hidl.memory@1.0                \
-    libmedia_helper
+    libmedia_helper  \
+    libmediautils
 
 endif  # USE_LEGACY_LOCAL_AUDIO_HAL
 

@@ -2368,7 +2368,7 @@ status_t Camera3Device::configureStreamsLocked() {
         // Boost priority of request thread to SCHED_FIFO.
         pid_t requestThreadTid = mRequestThread->getTid();
         res = requestPriority(getpid(), requestThreadTid,
-                kRequestThreadPriority, /*asynchronous*/ false);
+                kRequestThreadPriority, /*isForApp*/ false, /*asynchronous*/ false);
         if (res != OK) {
             ALOGW("Can't set realtime priority for request processing thread: %s (%d)",
                     strerror(-res), res);

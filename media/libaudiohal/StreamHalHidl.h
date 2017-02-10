@@ -101,10 +101,12 @@ class StreamHalHidl : public virtual StreamHalInterface, public ConversionHelper
     // The destructor automatically closes the stream.
     virtual ~StreamHalHidl();
 
-    int mHalThreadPriority;
+    bool requestHalThreadPriority(pid_t threadPid, pid_t threadId);
 
   private:
+    const int HAL_THREAD_PRIORITY_DEFAULT = -1;
     IStream *mStream;
+    int mHalThreadPriority;
 };
 
 class StreamOutHalHidl : public StreamOutHalInterface, public StreamHalHidl {
