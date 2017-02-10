@@ -569,6 +569,7 @@ void GraphicBufferSource::onDataSpaceChanged_l(
                 err, asString(err));
 
 #ifndef QCOM_BSP_LEGACY
+#ifndef USES_LEGACY_MEDIA_HAL
         // signal client that the dataspace has changed; this will update the output format
         // TODO: we should tie this to an output buffer somehow, and signal the change
         // just before the output buffer is returned to the client, but there are many
@@ -578,6 +579,7 @@ void GraphicBufferSource::onDataSpaceChanged_l(
                 OMX_EventDataSpaceChanged, dataSpace,
                 (aspects.mRange << 24) | (aspects.mPrimaries << 16)
                         | (aspects.mMatrixCoeffs << 8) | aspects.mTransfer);
+#endif
 #endif
     }
 }
