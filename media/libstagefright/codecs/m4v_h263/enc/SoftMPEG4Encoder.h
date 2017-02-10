@@ -42,6 +42,8 @@ struct SoftMPEG4Encoder : public SimpleSoftOMXComponent {
             OMX_INDEXTYPE index, const OMX_PTR params);
 
     virtual void onQueueFilled(OMX_U32 portIndex);
+	
+    virtual void onReset();
 
     // Override SoftOMXComponent methods
 
