@@ -17,6 +17,8 @@
 #ifndef ANDROID_AUDIOSYSTEM_H_
 #define ANDROID_AUDIOSYSTEM_H_
 
+#include <sys/types.h>
+
 #include <media/AudioPolicy.h>
 #include <media/AudioIoDescriptor.h>
 #include <media/IAudioFlingerClient.h>
