@@ -118,10 +118,9 @@ protected:
 
 public:
     void triggerEvents(AudioSystem::sync_event_t type);
-    void invalidate();
+    virtual void invalidate();
     void disable();
 
-    bool isInvalid() const { return mIsInvalid; }
     int fastIndex() const { return mFastIndex; }
 
 protected:
@@ -166,7 +165,6 @@ private:
     volatile float      mCachedVolume;  // combined master volume and stream type volume;
                                         // 'volatile' means accessed without lock or
                                         // barrier, but is read/written atomically
-    bool                mIsInvalid; // non-resettable latch, set by invalidate()
     sp<AudioTrackServerProxy>  mAudioTrackServerProxy;
     bool                mResumeToStopping; // track was paused in stopping state.
     bool                mFlushHwPending; // track requests for thread flush

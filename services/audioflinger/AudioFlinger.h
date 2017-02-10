@@ -34,6 +34,8 @@
 #include <media/IAudioRecord.h>
 #include <media/AudioSystem.h>
 #include <media/AudioTrack.h>
+#include <media/MmapStreamInterface.h>
+#include <media/MmapStreamCallback.h>
 
 #include <utils/Atomic.h>
 #include <utils/Errors.h>
@@ -100,6 +102,7 @@ class AudioFlinger :
     public BnAudioFlinger
 {
     friend class BinderService<AudioFlinger>;   // for AudioFlinger()
+
 public:
     static const char* getServiceName() ANDROID_API { return "media.audio_flinger"; }
 
@@ -283,6 +286,14 @@ public:
     sp<NBLog::Writer>   newWriter_l(size_t size, const char *name);
     void                unregisterWriter(const sp<NBLog::Writer>& writer);
     sp<EffectsFactoryHalInterface> getEffectsFactory();
+
+    status_t openMmapStream(MmapStreamInterface::stream_direction_t direction,
+                            const audio_attributes_t *attr,
+                            audio_config_base_t *config,
+                            const MmapStreamInterface::Client& client,
+                            audio_port_handle_t *deviceId,
+                            const sp<MmapStreamCallback>& callback,
+                            sp<MmapStreamInterface>& interface);
 private:
     static const size_t kLogMemorySize = 40 * 1024;
     sp<MemoryDealer>    mLogMemoryDealer;   // == 0 when NBLog is disabled
@@ -290,6 +301,7 @@ private:
     // for as long as possible.  The memory is only freed when it is needed for another log writer.
     Vector< sp<NBLog::Writer> > mUnregisteredWriters;
     Mutex               mUnregisteredWritersLock;
+
 public:
 
     class SyncEvent;
@@ -533,19 +545,40 @@ private:
         void                stop_nonvirtual();
     };
 
+    // Mmap stream control interface implementation. Each MmapThreadHandle controls one
+    // MmapPlaybackThread or MmapCaptureThread instance.
+    class MmapThreadHandle : public MmapStreamInterface {
+    public:
+        explicit            MmapThreadHandle(const sp<MmapThread>& thread);
+        virtual             ~MmapThreadHandle();
+
+        // MmapStreamInterface virtuals
+        virtual status_t createMmapBuffer(int32_t minSizeFrames,
+                                          struct audio_mmap_buffer_info *info);
+        virtual status_t getMmapPosition(struct audio_mmap_position *position);
+        virtual status_t start(const MmapStreamInterface::Client& client, audio_port_handle_t *handle);
+        virtual status_t stop(audio_port_handle_t handle);
+
+    private:
+        sp<MmapThread> mThread;
+    };
 
               ThreadBase *checkThread_l(audio_io_handle_t ioHandle) const;
               PlaybackThread *checkPlaybackThread_l(audio_io_handle_t output) const;
               MixerThread *checkMixerThread_l(audio_io_handle_t output) const;
               RecordThread *checkRecordThread_l(audio_io_handle_t input) const;
-              sp<RecordThread> openInput_l(audio_module_handle_t module,
+              MmapThread *checkMmapThread_l(audio_io_handle_t io) const;
+              VolumeInterface *getVolumeInterface_l(audio_io_handle_t output) const;
+              Vector <VolumeInterface *> getAllVolumeInterfaces_l() const;
+
+              sp<ThreadBase> openInput_l(audio_module_handle_t module,
                                            audio_io_handle_t *input,
                                            audio_config_t *config,
                                            audio_devices_t device,
                                            const String8& address,
                                            audio_source_t source,
                                            audio_input_flags_t flags);
-              sp<PlaybackThread> openOutput_l(audio_module_handle_t module,
+              sp<ThreadBase> openOutput_l(audio_module_handle_t module,
                                               audio_io_handle_t *output,
                                               audio_config_t *config,
                                               audio_devices_t devices,
@@ -722,6 +755,12 @@ private:
 
                 // list of sessions for which a valid HW A/V sync ID was retrieved from the HAL
                 DefaultKeyedVector< audio_session_t , audio_hw_sync_t >mHwAvSyncIds;
+
+                // list of MMAP stream control threads. Those threads allow for wake lock, routing
+                // and volume control for activity on the associated MMAP stream at the HAL.
+                // Audio data transfer is directly handled by the client creating the MMAP stream
+                DefaultKeyedVector< audio_io_handle_t, sp<MmapThread> >  mMmapThreads;
+
 private:
     sp<Client>  registerPid(pid_t pid);    // always returns non-0
 
