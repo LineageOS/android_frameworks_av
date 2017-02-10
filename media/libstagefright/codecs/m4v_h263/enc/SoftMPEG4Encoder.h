@@ -48,6 +48,8 @@ struct SoftMPEG4Encoder : public SimpleSoftOMXComponent {
     virtual OMX_ERRORTYPE getExtensionIndex(
             const char *name, OMX_INDEXTYPE *index);
 
+    virtual void onReset();
+
 protected:
     virtual ~SoftMPEG4Encoder();
 
