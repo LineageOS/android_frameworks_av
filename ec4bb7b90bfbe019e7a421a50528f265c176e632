@@ -22,6 +22,30 @@
       "revId": "ec4bb7b90bfbe019e7a421a50528f265c176e632",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5a2585a7_9937deb0",
+        "filename": "media/libstagefright/omx/GraphicBufferSource.cpp",
+        "patchSetId": 6
+      },
+      "lineNbr": 571,
+      "author": {
+        "id": 12604
+      },
+      "writtenOn": "2017-02-12T13:09:47Z",
+      "side": 1,
+      "message": "Sorry, this is correct.  I originally thought it was an \"or\" statement.",
+      "parentUuid": "5a2585a7_390eaa35",
+      "range": {
+        "startLine": 571,
+        "startChar": 30,
+        "endLine": 571,
+        "endChar": 32
+      },
+      "revId": "ec4bb7b90bfbe019e7a421a50528f265c176e632",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
