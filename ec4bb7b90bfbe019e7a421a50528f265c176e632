@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5a2585a7_390eaa35",
+        "filename": "media/libstagefright/omx/GraphicBufferSource.cpp",
+        "patchSetId": 6
+      },
+      "lineNbr": 571,
+      "author": {
+        "id": 12604
+      },
+      "writtenOn": "2017-02-12T12:19:08Z",
+      "side": 1,
+      "message": "Only one of these flags needs to be defined to prevent this code block from executing.",
+      "range": {
+        "startLine": 571,
+        "startChar": 30,
+        "endLine": 571,
+        "endChar": 32
+      },
+      "revId": "ec4bb7b90bfbe019e7a421a50528f265c176e632",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
