@@ -24,7 +24,6 @@ LOCAL_SHARED_LIBRARIES:= \
     libbinder \
     liblog \
     libmediadrm \
-    libhidltransport \
     libutils
 ifneq ($(DISABLE_TREBLE_DRM), true)
 LOCAL_SHARED_LIBRARIES += \
