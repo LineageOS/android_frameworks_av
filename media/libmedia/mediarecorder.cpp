@@ -513,6 +513,17 @@ status_t MediaRecorder::getMaxAmplitude(int* max)
     return ret;
 }
 
+status_t MediaRecorder::getMetrics(Parcel *reply) {
+
+    ALOGV("getMetrics");
+
+    status_t ret = mMediaRecorder->getMetrics(reply);
+    if (OK != ret) {
+        ALOGE("getMetrics failed: %d", ret);
+    }
+    return ret;
+}
+
 status_t MediaRecorder::start()
 {
     ALOGV("start");

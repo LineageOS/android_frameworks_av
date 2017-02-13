@@ -18,6 +18,7 @@
 
 #define STAGEFRIGHT_RECORDER_H_
 
+#include <media/MediaAnalyticsItem.h>
 #include <media/MediaRecorderBase.h>
 #include <camera/CameraParameters.h>
 #include <utils/String8.h>
@@ -67,6 +68,7 @@ struct StagefrightRecorder : public MediaRecorderBase {
     virtual status_t close();
     virtual status_t reset();
     virtual status_t getMaxAmplitude(int *max);
+    virtual status_t getMetrics(Parcel *reply);
     virtual status_t dump(int fd, const Vector<String16> &args) const;
     // Querying a SurfaceMediaSourcer
     virtual sp<IGraphicBufferProducer> querySurfaceMediaSource() const;
@@ -84,6 +86,11 @@ private:
     sp<MediaWriter> mWriter;
     int mOutputFd;
     sp<AudioSource> mAudioSourceNode;
+
+    MediaAnalyticsItem *mAnalyticsItem;
+    bool mAnalyticsDirty;
+    void resetMetrics();
+    void updateMetrics();
 
     audio_source_t mAudioSource;
     video_source mVideoSource;

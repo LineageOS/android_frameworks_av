@@ -238,6 +238,17 @@ status_t MediaRecorderClient::getMaxAmplitude(int* max)
     return mRecorder->getMaxAmplitude(max);
 }
 
+status_t MediaRecorderClient::getMetrics(Parcel* reply)
+{
+    ALOGV("MediaRecorderClient::getMetrics");
+    Mutex::Autolock lock(mLock);
+    if (mRecorder == NULL) {
+        ALOGE("recorder is not initialized");
+        return NO_INIT;
+    }
+    return mRecorder->getMetrics(reply);
+}
+
 status_t MediaRecorderClient::start()
 {
     ALOGV("start");
