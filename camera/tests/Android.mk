@@ -18,7 +18,8 @@ LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 
 LOCAL_SRC_FILES:= \
 	VendorTagDescriptorTests.cpp \
-	CameraBinderTests.cpp
+	CameraBinderTests.cpp \
+	CameraZSLTests.cpp
 
 LOCAL_SHARED_LIBRARIES := \
 	liblog \

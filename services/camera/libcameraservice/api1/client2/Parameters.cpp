@@ -911,14 +911,26 @@ status_t Parameters::initialize(const CameraMetadata *info, int deviceVersion) {
             CameraParameters::FALSE);
     }
 
+    bool isZslReprocessPresent = false;
+    camera_metadata_ro_entry_t availableCapabilities =
+        staticInfo(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+    if (0 < availableCapabilities.count) {
+        const uint8_t *caps = availableCapabilities.data.u8;
+        for (size_t i = 0; i < availableCapabilities.count; i++) {
+            if (ANDROID_REQUEST_AVAILABLE_CAPABILITIES_PRIVATE_REPROCESSING ==
+                caps[i]) {
+                isZslReprocessPresent = true;
+                break;
+            }
+        }
+    }
+
     if (slowJpegMode || property_get_bool("camera.disable_zsl_mode", false)) {
         ALOGI("Camera %d: Disabling ZSL mode", cameraId);
         allowZslMode = false;
     } else {
-        allowZslMode = true;
+        allowZslMode = isZslReprocessPresent;
     }
-    // TODO (b/34131351): turn ZSL back on after fixing the issue
-    allowZslMode = false;
 
     ALOGI("%s: allowZslMode: %d slowJpegMode %d", __FUNCTION__, allowZslMode, slowJpegMode);
 

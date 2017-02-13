@@ -46,7 +46,6 @@ LOCAL_SRC_FILES :=  \
     device3/Camera3IOStreamBase.cpp \
     device3/Camera3InputStream.cpp \
     device3/Camera3OutputStream.cpp \
-    device3/Camera3ZslStream.cpp \
     device3/Camera3DummyStream.cpp \
     device3/Camera3SharedOutputStream.cpp \
     device3/StatusTracker.cpp \
