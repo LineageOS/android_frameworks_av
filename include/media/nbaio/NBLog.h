@@ -51,6 +51,97 @@ enum Event {
     EVENT_END_FMT,              // end of logFormat argument list
 };
 
+
+// ---------------------------------------------------------------------------
+// API for handling format entry operations
+
+// a formatted entry has the following structure:
+//    * START_FMT entry, containing the format string
+//    * author entry of the thread that generated it (optional, present in merged log)
+//    * TIMESTAMP entry
+//    * format arg1
+//    * format arg2
+//    * ...
+//    * END_FMT entry
+
+class FormatEntry {
+public:
+    // build a Format Entry starting in the given pointer
+    class iterator;
+    explicit FormatEntry(const uint8_t *entry);
+    explicit FormatEntry(const iterator &it);
+
+    // entry representation in memory
+    struct entry {
+        const uint8_t type;
+        const uint8_t length;
+        const uint8_t data[0];
+    };
+
+    // entry tail representation (after data)
+    struct ending {
+        uint8_t length;
+        uint8_t next[0];
+    };
+
+    // entry iterator
+    class iterator {
+    public:
+        iterator(const uint8_t *entry);
+        iterator(const iterator &other);
+
+        // dereference underlying entry
+        const entry&    operator*() const;
+        const entry*    operator->() const;
+        // advance to next entry
+        iterator&       operator++(); // ++i
+        // back to previous entry
+        iterator&       operator--(); // --i
+        bool            operator!=(const iterator &other) const;
+        int             operator-(const iterator &other) const;
+
+        bool            hasConsistentLength() const;
+        void            copyTo(std::unique_ptr<audio_utils_fifo_writer> &dst) const;
+        void            copyData(uint8_t *dst) const;
+
+        template<typename T>
+        inline const T& payload() {
+            return *reinterpret_cast<const T *>(ptr + 2);
+        }
+
+    private:
+        friend class FormatEntry;
+        const uint8_t  *ptr;
+    };
+
+    // Entry's format string
+    const char* formatString() const;
+
+    // Enrty's format string length
+    size_t      formatStringLength() const;
+
+    // Format arguments (excluding format string, timestamp and author)
+    iterator    args() const;
+
+    // get format entry timestamp
+    timespec    timestamp() const;
+
+    // entry's author index (-1 if none present)
+    // a Merger has a vector of Readers, author simply points to the index of the
+    // Reader that originated the entry
+    int         author() const;
+
+    // copy entry, adding author before timestamp, returns size of original entry
+    size_t      copyTo(std::unique_ptr<audio_utils_fifo_writer> &dst, int author) const;
+
+    iterator    begin() const;
+
+private:
+    // copies ordinary entry from src to dst, and returns length of entry
+    // size_t      copyEntry(audio_utils_fifo_writer *dst, const iterator &it);
+    const uint8_t  *mEntry;
+};
+
 // ---------------------------------------------------------------------------
 
 // representation of a single log entry in private memory
@@ -68,50 +159,11 @@ private:
     const void *mData;      // event type-specific data
     static const size_t kMaxLength = 255;
 public:
-    static const size_t kOverhead = 3;  // mEvent, mLength, mData[...], duplicate mLength
-};
-
-// ---------------------------------------------------------------------------
-// API for handling format entry operations
-
-// a formatted entry has the following structure:
-//    * START_FMT entry, containing the format string
-//    * author entry of the thread that generated it (optional, present in merged log)
-//    * TIMESTAMP entry
-//    * format arg1
-//    * format arg2
-//    * ...
-//    * END_FMT entry
-
-class FormatEntry {
-public:
-    // build a Format Entry starting in the given pointer
-    explicit FormatEntry(const uint8_t *entry);
-
-    // Entry's format string
-    const char*     formatString() const;
-
-    // Enrty's format string length
-    size_t          formatStringLength() const;
-
-    // Format arguments (excluding format string, timestamp and author)
-    const uint8_t  *args() const;
-
-    // get format entry timestamp
-    timespec        timestamp() const;
-
-    // entry's author index (-1 if none present)
-    int             author() const;
-
-    // copy entry, adding author before timestamp, returns size of original entry
-    // (intended for merger)
-    size_t          copyTo(std::unique_ptr<audio_utils_fifo_writer> &dst, int author) const;
-private:
-    // copies ordinary entry from src to dst, and returns length of entry
-    size_t          copyEntry(std::unique_ptr<audio_utils_fifo_writer> &dst, const uint8_t *src)
-                        const;
-
-    const uint8_t  *mEntry;
+    // mEvent, mLength, mData[...], duplicate mLength
+    static const size_t kOverhead = sizeof(FormatEntry::entry) + sizeof(FormatEntry::ending);
+    // endind length of previous entry
+    static const size_t kPreviousLengthOffset = - sizeof(FormatEntry::ending) +
+                                                offsetof(FormatEntry::ending, length);
 };
 
 // representation of a single log entry in shared memory
@@ -312,9 +364,10 @@ private:
                                                     // non-NULL unless constructor fails
 
     void    dumpLine(const String8& timestamp, String8& body);
-    int     handleFormat(const FormatEntry &fmtEntry,
-                                String8 *timestamp,
-                                String8 *body);
+
+    FormatEntry::iterator   handleFormat(const FormatEntry &fmtEntry,
+                                         String8 *timestamp,
+                                         String8 *body);
     // dummy method for handling absent author entry
     virtual size_t handleAuthor(const FormatEntry &fmtEntry, String8 *body) { return 0; }
 

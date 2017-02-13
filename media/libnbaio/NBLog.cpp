@@ -51,70 +51,115 @@ int NBLog::Entry::readAt(size_t offset) const
 // ---------------------------------------------------------------------------
 
 NBLog::FormatEntry::FormatEntry(const uint8_t *entry) : mEntry(entry) {
-    ALOGW_IF(entry[0] != EVENT_START_FMT,
-             "Created format entry with invalid event type %d",
-             entry[0]);
+    ALOGW_IF(entry[offsetof(struct entry, type)] != EVENT_START_FMT,
+        "Created format entry with invalid event type %d", entry[offsetof(struct entry, type)]);
 }
 
+NBLog::FormatEntry::FormatEntry(const NBLog::FormatEntry::iterator &it) : FormatEntry(it.ptr) {}
+
 const char *NBLog::FormatEntry::formatString() const {
-    return (const char*) mEntry + 2;
+    return (const char*) mEntry + offsetof(entry, data);
 }
 
 size_t NBLog::FormatEntry::formatStringLength() const {
-    return mEntry[1];
+    return mEntry[offsetof(entry, length)];
 }
 
-const uint8_t *NBLog::FormatEntry::args() const {
-    const uint8_t *ptr = mEntry + mEntry[1] + NBLog::Entry::kOverhead;
-    if (ptr[0] != EVENT_TIMESTAMP) { // skip author if present
-        ptr += ptr[1] + NBLog::Entry::kOverhead;
+NBLog::FormatEntry::iterator NBLog::FormatEntry::args() const {
+    auto it = begin();
+    // Second entry can be author or timestamp. Skip author if present
+    if ((++it)->type == EVENT_AUTHOR) {
+        ++it;
     }
-    return ptr + ptr[1] + NBLog::Entry::kOverhead;
+    return ++it;
 }
 
 timespec NBLog::FormatEntry::timestamp() const {
-    const uint8_t *ptr = mEntry + mEntry[1] + NBLog::Entry::kOverhead;
-    if (ptr[0] != EVENT_TIMESTAMP) { // skip authors if present
-        ptr += ptr[1] + NBLog::Entry::kOverhead;
+    auto it = begin();
+    if ((++it)->type != EVENT_TIMESTAMP) {
+        ++it;
     }
-    // by this point, we should be standing in the timestamp entry
-    return *((struct timespec*) (&ptr[2]));
+    return it.payload<timespec>();
 }
 
 pid_t NBLog::FormatEntry::author() const {
-    size_t authorOffset = mEntry[1] + NBLog::Entry::kOverhead;
-    // return -1 if the entry has no author
-    if (mEntry[authorOffset] != EVENT_AUTHOR) {
-        return -1;
+    auto it = begin();
+    if ((++it)->type == EVENT_AUTHOR) {
+        return it.payload<int>();
     }
-    return *(pid_t*)(mEntry + authorOffset + 2);
+    return -1;
 }
 
 size_t NBLog::FormatEntry::copyTo(std::unique_ptr<audio_utils_fifo_writer> &dst, int author) const {
+    auto it = this->begin();
     // copy fmt start entry
-    size_t entryOffset = copyEntry(dst, mEntry);
+    it.copyTo(dst);
     // insert author entry
     size_t authorEntrySize = NBLog::Entry::kOverhead + sizeof(author);
     uint8_t authorEntry[authorEntrySize];
-    authorEntry[0] = EVENT_AUTHOR;
-    authorEntry[1] = authorEntry[authorEntrySize - 1] = sizeof(author);
-    *(int*) (&authorEntry[2]) = author;
+    authorEntry[offsetof(entry, type)] = EVENT_AUTHOR;
+    authorEntry[offsetof(entry, length)] =
+        authorEntry[authorEntrySize + NBLog::Entry::kPreviousLengthOffset] =
+        sizeof(author);
+    *(int*) (&authorEntry[offsetof(entry, data)]) = author;
     dst->write(authorEntry, authorEntrySize);
     // copy rest of entries
-    Event lastEvent = EVENT_TIMESTAMP;
-    while (lastEvent != EVENT_END_FMT) {
-        lastEvent = (Event) mEntry[entryOffset];
-        entryOffset += copyEntry(dst, mEntry + entryOffset);
+    while ((++it)->type != EVENT_END_FMT) {
+        it.copyTo(dst);
     }
-    return entryOffset;
+    it.copyTo(dst);
+    ++it;
+    return it - this->begin();
 }
 
+void NBLog::FormatEntry::iterator::copyTo(std::unique_ptr<audio_utils_fifo_writer> &dst) const {
+    size_t length = ptr[offsetof(entry, length)] + NBLog::Entry::kOverhead;
+    dst->write(ptr, length);
+}
 
-size_t NBLog::FormatEntry::copyEntry(std::unique_ptr<audio_utils_fifo_writer> &dst,
-                                     const uint8_t *src) const {
-    size_t length = src[1] + NBLog::Entry::kOverhead;
-    dst->write(src, length);
-    return length;
+void NBLog::FormatEntry::iterator::copyData(uint8_t *dst) const {
+    memcpy((void*) dst, ptr + offsetof(entry, data), ptr[offsetof(entry, length)]);
+}
+
+NBLog::FormatEntry::iterator NBLog::FormatEntry::begin() const {
+    return iterator(mEntry);
+}
+
+NBLog::FormatEntry::iterator::iterator(const uint8_t *entry)
+    : ptr(entry) {}
+
+NBLog::FormatEntry::iterator::iterator(const NBLog::FormatEntry::iterator &other)
+    : ptr(other.ptr) {}
+
+const NBLog::FormatEntry::entry& NBLog::FormatEntry::iterator::operator*() const {
+    return *(entry*) ptr;
+}
+
+const NBLog::FormatEntry::entry* NBLog::FormatEntry::iterator::operator->() const {
+    return (entry*) ptr;
+}
+
+NBLog::FormatEntry::iterator& NBLog::FormatEntry::iterator::operator++() {
+    ptr += ptr[offsetof(entry, length)] + NBLog::Entry::kOverhead;
+    return *this;
+}
+
+NBLog::FormatEntry::iterator& NBLog::FormatEntry::iterator::operator--() {
+    ptr -= ptr[NBLog::Entry::kPreviousLengthOffset] + NBLog::Entry::kOverhead;
+    return *this;
+}
+
+int NBLog::FormatEntry::iterator::operator-(const NBLog::FormatEntry::iterator &other) const {
+    return ptr - other.ptr;
+}
+
+bool NBLog::FormatEntry::iterator::operator!=(const iterator &other) const {
+    return ptr != other.ptr;
+}
+
+bool NBLog::FormatEntry::iterator::hasConsistentLength() const {
+    return ptr[offsetof(entry, length)] == ptr[ptr[offsetof(entry, length)] +
+        NBLog::Entry::kOverhead + NBLog::Entry::kPreviousLengthOffset];
 }
 
 // ---------------------------------------------------------------------------
@@ -553,35 +598,34 @@ std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
 
 void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapshot)
 {
-    size_t i = snapshot.available();
-    const uint8_t *snapData = snapshot.data();
-    Event event;
-    size_t length;
+    NBLog::FormatEntry::iterator entry(snapshot.data() + snapshot.available());
+    NBLog::FormatEntry::iterator prevEntry = entry;
+    --prevEntry;
+    NBLog::FormatEntry::iterator start(snapshot.data());
+
     struct timespec ts;
     time_t maxSec = -1;
-    while (i >= Entry::kOverhead) {
-        length = snapData[i - 1];
-        if (length + Entry::kOverhead > i || snapData[i - length - 2] != length) {
-
+    while (entry - start >= (int) Entry::kOverhead) {
+        if (prevEntry - start < 0 || !prevEntry.hasConsistentLength()) {
             break;
         }
-        event = (Event) snapData[i - length - Entry::kOverhead];
-        if (event == EVENT_TIMESTAMP) {
-            if (length != sizeof(struct timespec)) {
+        if (prevEntry->type == EVENT_TIMESTAMP) {
+            if (prevEntry->length != sizeof(struct timespec)) {
                 // corrupt
                 break;
             }
-            memcpy(&ts, &snapData[i - length - 1], sizeof(struct timespec));
+            prevEntry.copyData((uint8_t*) &ts);
             if (ts.tv_sec > maxSec) {
                 maxSec = ts.tv_sec;
             }
         }
-        i -= length + Entry::kOverhead;
+        --entry;
+        --prevEntry;
     }
     mFd = fd;
     mIndent = indent;
     String8 timestamp, body;
-    size_t lost = snapshot.lost() + i;
+    size_t lost = snapshot.lost() + (entry - start);
     if (lost > 0) {
         body.appendFormat("warning: lost %zu bytes worth of events", lost);
         // TODO timestamp empty here, only other choice to wait for the first timestamp event in the
@@ -597,30 +641,29 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
         timestamp.appendFormat("[%*s]", (int) width + 4, "");
     }
     bool deferredTimestamp = false;
-    while (i < snapshot.available()) {
-        event = (Event) snapData[i];
-        length = snapData[i + 1];
-        const void *data = &snapData[i + 2];
-        size_t advance = length + Entry::kOverhead;
-        switch (event) {
+    NBLog::FormatEntry::iterator end(snapshot.data() + snapshot.available());
+
+    while (entry != end) {
+        switch (entry->type) {
+#if 0
         case EVENT_STRING:
-            body.appendFormat("%.*s", (int) length, (const char *) data);
+            body.appendFormat("%.*s", (int) entry.length(), entry.data());
             break;
         case EVENT_TIMESTAMP: {
             // already checked that length == sizeof(struct timespec);
-            memcpy(&ts, data, sizeof(struct timespec));
+            entry.copyData((const uint8_t*) &ts);
             long prevNsec = ts.tv_nsec;
             long deltaMin = LONG_MAX;
             long deltaMax = -1;
             long deltaTotal = 0;
-            size_t j = i;
+            auto aux(entry);
             for (;;) {
-                j += sizeof(struct timespec) + 3 /*Entry::kOverhead?*/;
-                if (j >= snapshot.available() || (Event) snapData[j] != EVENT_TIMESTAMP) {
+                ++aux;
+                if (end - aux >= 0 || aux.type() != EVENT_TIMESTAMP) {
                     break;
                 }
                 struct timespec tsNext;
-                memcpy(&tsNext, &snapData[j + 2], sizeof(struct timespec));
+                aux.copyData((const uint8_t*) &tsNext);
                 if (tsNext.tv_sec != ts.tv_sec) {
                     break;
                 }
@@ -637,7 +680,7 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
                 deltaTotal += delta;
                 prevNsec = tsNext.tv_nsec;
             }
-            size_t n = (j - i) / (sizeof(struct timespec) + 3 /*Entry::kOverhead?*/);
+            size_t n = (aux - entry) / (sizeof(struct timespec) + 3 /*Entry::kOverhead?*/);
             if (deferredTimestamp) {
                 dumpLine(timestamp, body);
                 deferredTimestamp = false;
@@ -648,35 +691,37 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
                         (int) ts.tv_sec, (int) (ts.tv_nsec / 1000000),
                         (int) ((ts.tv_nsec + deltaTotal) / 1000000),
                         (int) (deltaMin / 1000000), (int) (deltaMax / 1000000));
-                i = j;
-                advance = 0;
+                entry = aux;
+                // advance = 0;
                 break;
             }
             timestamp.appendFormat("[%d.%03d]", (int) ts.tv_sec,
                     (int) (ts.tv_nsec / 1000000));
             deferredTimestamp = true;
-            } break;
+            }
+            break;
         case EVENT_INTEGER:
-            appendInt(&body, data);
+            appendInt(&body, entry.data());
             break;
         case EVENT_FLOAT:
-            appendFloat(&body, data);
+            appendFloat(&body, entry.data());
             break;
         case EVENT_PID:
-            appendPID(&body, data, length);
+            appendPID(&body, entry.data(), entry.length());
             break;
+#endif
         case EVENT_START_FMT:
-            advance += handleFormat(FormatEntry(snapData + i), &timestamp, &body);
+            // right now, this is the only supported case
+            entry = handleFormat(FormatEntry(entry), &timestamp, &body);
             break;
         case EVENT_END_FMT:
             body.appendFormat("warning: got to end format event");
             break;
         case EVENT_RESERVED:
         default:
-            body.appendFormat("warning: unknown event %d", event);
+            body.appendFormat("warning: unknown event %d", entry->type);
             break;
         }
-        i += advance;
 
         if (!body.isEmpty()) {
             dumpLine(timestamp, body);
@@ -734,20 +779,20 @@ void NBLog::appendPID(String8 *body, const void* data, size_t length) {
     body->appendFormat("<PID: %d, name: %.*s>", id, (int) (length - sizeof(pid_t)), name);
 }
 
-int NBLog::Reader::handleFormat(const FormatEntry &fmtEntry, String8 *timestamp, String8 *body) {
+NBLog::FormatEntry::iterator NBLog::Reader::handleFormat(const FormatEntry &fmtEntry,
+                                                         String8 *timestamp,
+                                                         String8 *body) {
     // log timestamp
     struct timespec ts = fmtEntry.timestamp();
     timestamp->clear();
     timestamp->appendFormat("[%d.%03d]", (int) ts.tv_sec,
                     (int) (ts.tv_nsec / 1000000));
-    size_t fullLength = NBLog::Entry::kOverhead + sizeof(ts);
 
     // log author (if present)
-    fullLength += handleAuthor(fmtEntry, body);
+    handleAuthor(fmtEntry, body);
 
     // log string
-    const uint8_t *args = fmtEntry.args();
-    size_t args_offset = 0;
+    NBLog::FormatEntry::iterator arg = fmtEntry.args();
 
     const char* fmt = fmtEntry.formatString();
     size_t fmt_length = fmtEntry.formatStringLength();
@@ -757,28 +802,33 @@ int NBLog::Reader::handleFormat(const FormatEntry &fmtEntry, String8 *timestamp,
             body->append(&fmt[fmt_offset], 1); // TODO optimize to write consecutive strings at once
             continue;
         }
+        // case "%%""
         if (fmt[++fmt_offset] == '%') {
             body->append("%");
             continue;
         }
+        // case "%\0"
         if (fmt_offset == fmt_length) {
             continue;
         }
 
-        NBLog::Event event = (NBLog::Event) args[args_offset];
-        size_t length = args[args_offset + 1];
+        NBLog::Event event = (NBLog::Event) arg->type;
+        size_t length = arg->length;
 
         // TODO check length for event type is correct
-        if(length != args[args_offset + length + 2]) {
-            ALOGW("NBLog Reader received different lengths %zu and %d for event %d", length,
-                  args[args_offset + length + 2], event);
+        if (!arg.hasConsistentLength()) {
+            // TODO: corrupt, resync buffer
             body->append("<invalid entry>");
             ++fmt_offset;
             continue;
         }
 
+        if (event == EVENT_END_FMT) {
+            break;
+        }
+
         // TODO: implement more complex formatting such as %.3f
-        void * datum = (void*) &args[args_offset + 2]; // pointer to the current event args
+        const uint8_t *datum = arg->data; // pointer to the current event args
         switch(fmt[fmt_offset])
         {
         case 's': // string
@@ -814,12 +864,11 @@ int NBLog::Reader::handleFormat(const FormatEntry &fmtEntry, String8 *timestamp,
         default:
             ALOGW("NBLog Reader encountered unknown character %c", fmt[fmt_offset]);
         }
-
-        args_offset += length + Entry::kOverhead;
-
+        ++arg;
     }
-    fullLength += args_offset + Entry::kOverhead;
-    return fullLength;
+    ALOGW_IF(arg->type != EVENT_END_FMT, "Expected end of format, got %d", arg->type);
+    ++arg;
+    return arg;
 }
 
 // ---------------------------------------------------------------------------
