@@ -17,6 +17,7 @@
 #ifndef ANDROID_HARDWARE_CAMERA_HARDWARE_INTERFACE_H
 #define ANDROID_HARDWARE_CAMERA_HARDWARE_INTERFACE_H
 
+#include <unordered_map>
 #include <binder/IMemory.h>
 #include <binder/MemoryBase.h>
 #include <binder/MemoryHeapBase.h>
@@ -74,10 +75,15 @@ typedef void (*data_callback_timestamp)(nsecs_t timestamp,
  * provided in a data callback must be copied if it's needed after returning.
  */
 
-class CameraHardwareInterface : public virtual RefBase {
+class CameraHardwareInterface :
+        public virtual RefBase,
+        public virtual hardware::camera::device::V1_0::ICameraDeviceCallback,
+        public virtual hardware::camera::device::V1_0::ICameraDevicePreviewCallback {
+
 public:
     explicit CameraHardwareInterface(const char *name):
             mDevice(nullptr),
+            mHidlDevice(nullptr),
             mName(name),
             mPreviewScalingMode(NOT_SET),
             mPreviewTransform(NOT_SET),
@@ -90,115 +96,23 @@ public:
     {
     }
 
-    ~CameraHardwareInterface()
-    {
-        ALOGI("Destroying camera %s", mName.string());
-        if(mDevice) {
-            int rc = mDevice->common.close(&mDevice->common);
-            if (rc != OK)
-                ALOGE("Could not close camera %s: %d", mName.string(), rc);
-        }
-    }
+    ~CameraHardwareInterface();
 
-    status_t initialize(CameraModule *module)
-    {
-        ALOGI("Opening camera %s", mName.string());
-        camera_info info;
-        status_t res = module->getCameraInfo(atoi(mName.string()), &info);
-        if (res != OK) {
-            return res;
-        }
-
-        int rc = OK;
-        if (module->getModuleApiVersion() >= CAMERA_MODULE_API_VERSION_2_3 &&
-            info.device_version > CAMERA_DEVICE_API_VERSION_1_0) {
-            // Open higher version camera device as HAL1.0 device.
-            rc = module->openLegacy(mName.string(),
-                                     CAMERA_DEVICE_API_VERSION_1_0,
-                                     (hw_device_t **)&mDevice);
-        } else {
-            rc = module->open(mName.string(), (hw_device_t **)&mDevice);
-        }
-        if (rc != OK) {
-            ALOGE("Could not open camera %s: %d", mName.string(), rc);
-            return rc;
-        }
-        initHalPreviewWindow();
-        return rc;
-    }
-
-    status_t initialize(sp<CameraProviderManager> manager) {
-        (void) manager;
-        ALOGE("%s: Not supported yet", __FUNCTION__);
-        return INVALID_OPERATION;
-    }
+    status_t initialize(CameraModule *module);
+    status_t initialize(sp<CameraProviderManager> manager);
 
     /** Set the ANativeWindow to which preview frames are sent */
-    status_t setPreviewWindow(const sp<ANativeWindow>& buf)
-    {
-        ALOGV("%s(%s) buf %p", __FUNCTION__, mName.string(), buf.get());
-        if (mDevice->ops->set_preview_window) {
-            mPreviewWindow = buf;
-            if (buf != nullptr) {
-                if (mPreviewScalingMode != NOT_SET) {
-                    setPreviewScalingMode(mPreviewScalingMode);
-                }
-                if (mPreviewTransform != NOT_SET) {
-                    setPreviewTransform(mPreviewTransform);
-                }
-            }
-            mHalPreviewWindow.user = this;
-            ALOGV("%s &mHalPreviewWindow %p mHalPreviewWindow.user %p", __FUNCTION__,
-                    &mHalPreviewWindow, mHalPreviewWindow.user);
-            return mDevice->ops->set_preview_window(mDevice,
-                    buf.get() ? &mHalPreviewWindow.nw : 0);
-        }
-        return INVALID_OPERATION;
-    }
+    status_t setPreviewWindow(const sp<ANativeWindow>& buf);
 
-    status_t setPreviewScalingMode(int scalingMode)
-    {
-        int rc = OK;
-        mPreviewScalingMode = scalingMode;
-        if (mPreviewWindow != nullptr) {
-            rc = native_window_set_scaling_mode(mPreviewWindow.get(),
-                    scalingMode);
-        }
-        return rc;
-    }
+    status_t setPreviewScalingMode(int scalingMode);
 
-    status_t setPreviewTransform(int transform) {
-        int rc = OK;
-        mPreviewTransform = transform;
-        if (mPreviewWindow != nullptr) {
-            rc = native_window_set_buffers_transform(mPreviewWindow.get(),
-                    mPreviewTransform);
-        }
-        return rc;
-    }
+    status_t setPreviewTransform(int transform);
 
     /** Set the notification and data callbacks */
     void setCallbacks(notify_callback notify_cb,
                       data_callback data_cb,
                       data_callback_timestamp data_cb_timestamp,
-                      void* user)
-    {
-        mNotifyCb = notify_cb;
-        mDataCb = data_cb;
-        mDataCbTimestamp = data_cb_timestamp;
-        mCbUser = user;
-
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-
-        if (mDevice->ops->set_callbacks) {
-            mDevice->ops->set_callbacks(mDevice,
-                                   __notify_cb,
-                                   __data_cb,
-                                   __data_cb_timestamp,
-                                   __get_memory,
-                                   this);
-        }
-    }
+                      void* user);
 
     /**
      * The following three functions all take a msgtype,
@@ -209,12 +123,7 @@ public:
     /**
      * Enable a message, or set of messages.
      */
-    void enableMsgType(int32_t msgType)
-    {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        if (mDevice->ops->enable_msg_type)
-            mDevice->ops->enable_msg_type(mDevice, msgType);
-    }
+    void enableMsgType(int32_t msgType);
 
     /**
      * Disable a message, or a set of messages.
@@ -226,57 +135,29 @@ public:
      * modify/access any video recording frame after calling
      * disableMsgType(CAMERA_MSG_VIDEO_FRAME).
      */
-    void disableMsgType(int32_t msgType)
-    {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        if (mDevice->ops->disable_msg_type)
-            mDevice->ops->disable_msg_type(mDevice, msgType);
-    }
+    void disableMsgType(int32_t msgType);
 
     /**
      * Query whether a message, or a set of messages, is enabled.
      * Note that this is operates as an AND, if any of the messages
      * queried are off, this will return false.
      */
-    int msgTypeEnabled(int32_t msgType)
-    {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        if (mDevice->ops->msg_type_enabled)
-            return mDevice->ops->msg_type_enabled(mDevice, msgType);
-        return false;
-    }
+    int msgTypeEnabled(int32_t msgType);
 
     /**
      * Start preview mode.
      */
-    status_t startPreview()
-    {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        if (mDevice->ops->start_preview)
-            return mDevice->ops->start_preview(mDevice);
-        return INVALID_OPERATION;
-    }
+    status_t startPreview();
 
     /**
      * Stop a previously started preview.
      */
-    void stopPreview()
-    {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        if (mDevice->ops->stop_preview)
-            mDevice->ops->stop_preview(mDevice);
-    }
+    void stopPreview();
 
     /**
      * Returns true if preview is enabled.
      */
-    int previewEnabled()
-    {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        if (mDevice->ops->preview_enabled)
-            return mDevice->ops->preview_enabled(mDevice);
-        return false;
-    }
+    int previewEnabled();
 
     /**
      * Request the camera hal to store meta data or real YUV data in
@@ -310,13 +191,7 @@ public:
      * @return OK on success.
      */
 
-    status_t storeMetaDataInBuffers(int enable)
-    {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        if (mDevice->ops->store_meta_data_in_buffers)
-            return mDevice->ops->store_meta_data_in_buffers(mDevice, enable);
-        return enable ? INVALID_OPERATION: OK;
-    }
+    status_t storeMetaDataInBuffers(int enable);
 
     /**
      * Start record mode. When a record image is available a CAMERA_MSG_VIDEO_FRAME
@@ -327,34 +202,17 @@ public:
      * to manage the life-cycle of the video recording frames, and the client must
      * not modify/access any video recording frames.
      */
-    status_t startRecording()
-    {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        if (mDevice->ops->start_recording)
-            return mDevice->ops->start_recording(mDevice);
-        return INVALID_OPERATION;
-    }
+    status_t startRecording();
 
     /**
      * Stop a previously started recording.
      */
-    void stopRecording()
-    {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        if (mDevice->ops->stop_recording)
-            mDevice->ops->stop_recording(mDevice);
-    }
+    void stopRecording();
 
     /**
      * Returns true if recording is enabled.
      */
-    int recordingEnabled()
-    {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        if (mDevice->ops->recording_enabled)
-            return mDevice->ops->recording_enabled(mDevice);
-        return false;
-    }
+    int recordingEnabled();
 
     /**
      * Release a record frame previously returned by CAMERA_MSG_VIDEO_FRAME.
@@ -366,30 +224,14 @@ public:
      * responsibility of managing the life-cycle of the video recording
      * frames.
      */
-    void releaseRecordingFrame(const sp<IMemory>& mem)
-    {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        if (mDevice->ops->release_recording_frame) {
-            ssize_t offset;
-            size_t size;
-            sp<IMemoryHeap> heap = mem->getMemory(&offset, &size);
-            void *data = ((uint8_t *)heap->base()) + offset;
-            return mDevice->ops->release_recording_frame(mDevice, data);
-        }
-    }
+    void releaseRecordingFrame(const sp<IMemory>& mem);
 
     /**
      * Start auto focus, the notification callback routine is called
      * with CAMERA_MSG_FOCUS once when focusing is complete. autoFocus()
      * will be called again if another auto focus is needed.
      */
-    status_t autoFocus()
-    {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        if (mDevice->ops->auto_focus)
-            return mDevice->ops->auto_focus(mDevice);
-        return INVALID_OPERATION;
-    }
+    status_t autoFocus();
 
     /**
      * Cancels auto-focus function. If the auto-focus is still in progress,
@@ -397,151 +239,73 @@ public:
      * or not, this function will return the focus position to the default.
      * If the camera does not support auto-focus, this is a no-op.
      */
-    status_t cancelAutoFocus()
-    {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        if (mDevice->ops->cancel_auto_focus)
-            return mDevice->ops->cancel_auto_focus(mDevice);
-        return INVALID_OPERATION;
-    }
+    status_t cancelAutoFocus();
 
     /**
      * Take a picture.
      */
-    status_t takePicture()
-    {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        if (mDevice->ops->take_picture)
-            return mDevice->ops->take_picture(mDevice);
-        return INVALID_OPERATION;
-    }
+    status_t takePicture();
 
     /**
      * Cancel a picture that was started with takePicture.  Calling this
      * method when no picture is being taken is a no-op.
      */
-    status_t cancelPicture()
-    {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        if (mDevice->ops->cancel_picture)
-            return mDevice->ops->cancel_picture(mDevice);
-        return INVALID_OPERATION;
-    }
+    status_t cancelPicture();
 
     /**
      * Set the camera parameters. This returns BAD_VALUE if any parameter is
      * invalid or not supported. */
-    status_t setParameters(const CameraParameters &params)
-    {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        if (mDevice->ops->set_parameters)
-            return mDevice->ops->set_parameters(mDevice,
-                                               params.flatten().string());
-        return INVALID_OPERATION;
-    }
+    status_t setParameters(const CameraParameters &params);
 
     /** Return the camera parameters. */
-    CameraParameters getParameters() const
-    {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        CameraParameters parms;
-        if (mDevice->ops->get_parameters) {
-            char *temp = mDevice->ops->get_parameters(mDevice);
-            String8 str_parms(temp);
-            if (mDevice->ops->put_parameters)
-                mDevice->ops->put_parameters(mDevice, temp);
-            else
-                free(temp);
-            parms.unflatten(str_parms);
-        }
-        return parms;
-    }
+    CameraParameters getParameters() const;
 
     /**
      * Send command to camera driver.
      */
-    status_t sendCommand(int32_t cmd, int32_t arg1, int32_t arg2)
-    {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        if (mDevice->ops->send_command)
-            return mDevice->ops->send_command(mDevice, cmd, arg1, arg2);
-        return INVALID_OPERATION;
-    }
+    status_t sendCommand(int32_t cmd, int32_t arg1, int32_t arg2);
 
     /**
      * Release the hardware resources owned by this object.  Note that this is
      * *not* done in the destructor.
      */
-    void release() {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        if (mDevice->ops->release)
-            mDevice->ops->release(mDevice);
-    }
+    void release();
 
     /**
      * Dump state of the camera hardware
      */
-    status_t dump(int fd, const Vector<String16>& /*args*/) const
-    {
-        ALOGV("%s(%s)", __FUNCTION__, mName.string());
-        if (mDevice->ops->dump)
-            return mDevice->ops->dump(mDevice, fd);
-        return OK; // It's fine if the HAL doesn't implement dump()
-    }
+    status_t dump(int fd, const Vector<String16>& /*args*/) const;
 
 private:
     camera_device_t *mDevice;
+    sp<hardware::camera::device::V1_0::ICameraDevice> mHidlDevice;
     String8 mName;
 
-    static void __notify_cb(int32_t msg_type, int32_t ext1,
-                            int32_t ext2, void *user)
-    {
-        ALOGV("%s", __FUNCTION__);
-        CameraHardwareInterface *__this =
-                static_cast<CameraHardwareInterface *>(user);
-        __this->mNotifyCb(msg_type, ext1, ext2, __this->mCbUser);
-    }
+    static void sNotifyCb(int32_t msg_type, int32_t ext1,
+                            int32_t ext2, void *user);
 
-    static void __data_cb(int32_t msg_type,
+    static void sDataCb(int32_t msg_type,
                           const camera_memory_t *data, unsigned int index,
                           camera_frame_metadata_t *metadata,
-                          void *user)
-    {
-        ALOGV("%s", __FUNCTION__);
-        CameraHardwareInterface *__this =
-                static_cast<CameraHardwareInterface *>(user);
-        sp<CameraHeapMemory> mem(static_cast<CameraHeapMemory *>(data->handle));
-        if (index >= mem->mNumBufs) {
-            ALOGE("%s: invalid buffer index %d, max allowed is %d", __FUNCTION__,
-                 index, mem->mNumBufs);
-            return;
-        }
-        __this->mDataCb(msg_type, mem->mBuffers[index], metadata, __this->mCbUser);
-    }
+                          void *user);
 
-    static void __data_cb_timestamp(nsecs_t timestamp, int32_t msg_type,
+    static void sDataCbTimestamp(nsecs_t timestamp, int32_t msg_type,
                              const camera_memory_t *data, unsigned index,
-                             void *user)
-    {
-        ALOGV("%s", __FUNCTION__);
-        CameraHardwareInterface *__this =
-                static_cast<CameraHardwareInterface *>(user);
-        // Start refcounting the heap object from here on.  When the clients
-        // drop all references, it will be destroyed (as well as the enclosed
-        // MemoryHeapBase.
-        sp<CameraHeapMemory> mem(static_cast<CameraHeapMemory *>(data->handle));
-        if (index >= mem->mNumBufs) {
-            ALOGE("%s: invalid buffer index %d, max allowed is %d", __FUNCTION__,
-                 index, mem->mNumBufs);
-            return;
-        }
-        __this->mDataCbTimestamp(timestamp, msg_type, mem->mBuffers[index], __this->mCbUser);
-    }
+                             void *user);
+
+    // TODO: b/35625849
+    // Meta data buffer layout for passing a native_handle to codec
+    // matching frameworks/native/include/media/hardware/MetadataBufferType.h and
+    //          frameworks/native/include/media/hardware/HardwareAPI.h
+    struct VideoNativeHandleMetadata {
+        static const uint32_t kMetadataBufferTypeNativeHandleSource = 3;
+        uint32_t eType; // must be kMetadataBufferTypeNativeHandleSource
+        native_handle_t* pHandle;
+    };
 
     // This is a utility class that combines a MemoryHeapBase and a MemoryBase
     // in one.  Since we tend to use them in a one-to-one relationship, this is
     // handy.
-
     class CameraHeapMemory : public RefBase {
     public:
         CameraHeapMemory(int fd, size_t buf_size, uint_t num_buffers = 1) :
@@ -572,7 +336,7 @@ private:
                                              i * mBufSize,
                                              mBufSize);
 
-            handle.release = __put_memory;
+            handle.release = sPutMemory;
         }
 
         virtual ~CameraHeapMemory()
@@ -588,199 +352,94 @@ private:
         camera_memory_t handle;
     };
 
-    static camera_memory_t* __get_memory(int fd, size_t buf_size, uint_t num_bufs,
-                                         void *user __attribute__((unused)))
-    {
-        CameraHeapMemory *mem;
-        if (fd < 0)
-            mem = new CameraHeapMemory(buf_size, num_bufs);
-        else
-            mem = new CameraHeapMemory(fd, buf_size, num_bufs);
-        mem->incStrong(mem);
-        return &mem->handle;
-    }
+    static camera_memory_t* sGetMemory(int fd, size_t buf_size, uint_t num_bufs,
+                                         void *user __attribute__((unused)));
 
-    static void __put_memory(camera_memory_t *data)
-    {
-        if (!data)
-            return;
+    static void sPutMemory(camera_memory_t *data);
 
-        CameraHeapMemory *mem = static_cast<CameraHeapMemory *>(data->handle);
-        mem->decStrong(mem);
-    }
+    static ANativeWindow *sToAnw(void *user);
 
-    static ANativeWindow *__to_anw(void *user)
-    {
-        CameraHardwareInterface *__this =
-                reinterpret_cast<CameraHardwareInterface *>(user);
-        return __this->mPreviewWindow.get();
-    }
-#define anw(n) __to_anw(((struct camera_preview_window *)(n))->user)
-#define hwi(n) reinterpret_cast<CameraHardwareInterface *>(\
-        ((struct camera_preview_window *)(n))->user)
+    static int sDequeueBuffer(struct preview_stream_ops* w,
+                                buffer_handle_t** buffer, int *stride);
 
-    static int __dequeue_buffer(struct preview_stream_ops* w,
-                                buffer_handle_t** buffer, int *stride)
-    {
-        int rc;
-        ANativeWindow *a = anw(w);
-        ANativeWindowBuffer* anb;
-        rc = native_window_dequeue_buffer_and_wait(a, &anb);
-        if (!rc) {
-            *buffer = &anb->handle;
-            *stride = anb->stride;
-        }
-        return rc;
-    }
+    static int sLockBuffer(struct preview_stream_ops* w,
+                      buffer_handle_t* /*buffer*/);
 
-#ifndef container_of
-#define container_of(ptr, type, member) ({                      \
-        const __typeof__(((type *) 0)->member) *__mptr = (ptr);     \
-        (type *) ((char *) __mptr - (char *)(&((type *)0)->member)); })
-#endif
+    static int sEnqueueBuffer(struct preview_stream_ops* w,
+                      buffer_handle_t* buffer);
 
-    static int __lock_buffer(struct preview_stream_ops* w,
-                      buffer_handle_t* /*buffer*/)
-    {
-        ANativeWindow *a = anw(w);
-        (void)a;
-        return 0;
-    }
+    static int sCancelBuffer(struct preview_stream_ops* w,
+                      buffer_handle_t* buffer);
 
-    static int __enqueue_buffer(struct preview_stream_ops* w,
-                      buffer_handle_t* buffer)
-    {
-        ANativeWindow *a = anw(w);
-        return a->queueBuffer(a,
-                  container_of(buffer, ANativeWindowBuffer, handle), -1);
-    }
+    static int sSetBufferCount(struct preview_stream_ops* w, int count);
 
-    static int __cancel_buffer(struct preview_stream_ops* w,
-                      buffer_handle_t* buffer)
-    {
-        ANativeWindow *a = anw(w);
-        return a->cancelBuffer(a,
-                  container_of(buffer, ANativeWindowBuffer, handle), -1);
-    }
+    static int sSetBuffersGeometry(struct preview_stream_ops* w,
+                      int width, int height, int format);
 
-    static int __set_buffer_count(struct preview_stream_ops* w, int count)
-    {
-        ANativeWindow *a = anw(w);
+    static int sSetCrop(struct preview_stream_ops *w,
+                      int left, int top, int right, int bottom);
 
-        if (a != nullptr) {
-            // Workaround for b/27039775
-            // Previously, setting the buffer count would reset the buffer
-            // queue's flag that allows for all buffers to be dequeued on the
-            // producer side, instead of just the producer's declared max count,
-            // if no filled buffers have yet been queued by the producer.  This
-            // reset no longer happens, but some HALs depend on this behavior,
-            // so it needs to be maintained for HAL backwards compatibility.
-            // Simulate the prior behavior by disconnecting/reconnecting to the
-            // window and setting the values again.  This has the drawback of
-            // actually causing memory reallocation, which may not have happened
-            // in the past.
-            CameraHardwareInterface *hw = hwi(w);
-            native_window_api_disconnect(a, NATIVE_WINDOW_API_CAMERA);
-            native_window_api_connect(a, NATIVE_WINDOW_API_CAMERA);
-            if (hw->mPreviewScalingMode != NOT_SET) {
-                native_window_set_scaling_mode(a, hw->mPreviewScalingMode);
-            }
-            if (hw->mPreviewTransform != NOT_SET) {
-                native_window_set_buffers_transform(a, hw->mPreviewTransform);
-            }
-            if (hw->mPreviewWidth != NOT_SET) {
-                native_window_set_buffers_dimensions(a,
-                        hw->mPreviewWidth, hw->mPreviewHeight);
-                native_window_set_buffers_format(a, hw->mPreviewFormat);
-            }
-            if (hw->mPreviewUsage != 0) {
-                native_window_set_usage(a, hw->mPreviewUsage);
-            }
-            if (hw->mPreviewSwapInterval != NOT_SET) {
-                a->setSwapInterval(a, hw->mPreviewSwapInterval);
-            }
-            if (hw->mPreviewCrop.left != NOT_SET) {
-                native_window_set_crop(a, &(hw->mPreviewCrop));
-            }
-        }
+    static int sSetTimestamp(struct preview_stream_ops *w,
+                               int64_t timestamp);
 
-        return native_window_set_buffer_count(a, count);
-    }
+    static int sSetUsage(struct preview_stream_ops* w, int usage);
 
-    static int __set_buffers_geometry(struct preview_stream_ops* w,
-                      int width, int height, int format)
-    {
-        int rc;
-        ANativeWindow *a = anw(w);
-        CameraHardwareInterface *hw = hwi(w);
-        hw->mPreviewWidth = width;
-        hw->mPreviewHeight = height;
-        hw->mPreviewFormat = format;
-        rc = native_window_set_buffers_dimensions(a, width, height);
-        if (!rc) {
-            rc = native_window_set_buffers_format(a, format);
-        }
-        return rc;
-    }
+    static int sSetSwapInterval(struct preview_stream_ops *w, int interval);
 
-    static int __set_crop(struct preview_stream_ops *w,
-                      int left, int top, int right, int bottom)
-    {
-        ANativeWindow *a = anw(w);
-        CameraHardwareInterface *hw = hwi(w);
-        hw->mPreviewCrop.left = left;
-        hw->mPreviewCrop.top = top;
-        hw->mPreviewCrop.right = right;
-        hw->mPreviewCrop.bottom = bottom;
-        return native_window_set_crop(a, &(hw->mPreviewCrop));
-    }
-
-    static int __set_timestamp(struct preview_stream_ops *w,
-                               int64_t timestamp) {
-        ANativeWindow *a = anw(w);
-        return native_window_set_buffers_timestamp(a, timestamp);
-    }
-
-    static int __set_usage(struct preview_stream_ops* w, int usage)
-    {
-        ANativeWindow *a = anw(w);
-        CameraHardwareInterface *hw = hwi(w);
-        hw->mPreviewUsage = usage;
-        return native_window_set_usage(a, usage);
-    }
-
-    static int __set_swap_interval(struct preview_stream_ops *w, int interval)
-    {
-        ANativeWindow *a = anw(w);
-        CameraHardwareInterface *hw = hwi(w);
-        hw->mPreviewSwapInterval = interval;
-        return a->setSwapInterval(a, interval);
-    }
-
-    static int __get_min_undequeued_buffer_count(
+    static int sGetMinUndequeuedBufferCount(
                       const struct preview_stream_ops *w,
-                      int *count)
-    {
-        ANativeWindow *a = anw(w);
-        return a->query(a, NATIVE_WINDOW_MIN_UNDEQUEUED_BUFFERS, count);
-    }
+                      int *count);
 
-    void initHalPreviewWindow()
-    {
-        mHalPreviewWindow.nw.cancel_buffer = __cancel_buffer;
-        mHalPreviewWindow.nw.lock_buffer = __lock_buffer;
-        mHalPreviewWindow.nw.dequeue_buffer = __dequeue_buffer;
-        mHalPreviewWindow.nw.enqueue_buffer = __enqueue_buffer;
-        mHalPreviewWindow.nw.set_buffer_count = __set_buffer_count;
-        mHalPreviewWindow.nw.set_buffers_geometry = __set_buffers_geometry;
-        mHalPreviewWindow.nw.set_crop = __set_crop;
-        mHalPreviewWindow.nw.set_timestamp = __set_timestamp;
-        mHalPreviewWindow.nw.set_usage = __set_usage;
-        mHalPreviewWindow.nw.set_swap_interval = __set_swap_interval;
+    void initHalPreviewWindow();
 
-        mHalPreviewWindow.nw.get_min_undequeued_buffer_count =
-                __get_min_undequeued_buffer_count;
-    }
+    std::pair<bool, uint64_t> getBufferId(ANativeWindowBuffer* anb);
+    void cleanupCirculatingBuffers();
+
+    /**
+     * Implementation of android::hardware::camera::device::V1_0::ICameraDeviceCallback
+     */
+    hardware::Return<void> notifyCallback(
+            hardware::camera::device::V1_0::NotifyCallbackMsg msgType,
+            int32_t ext1, int32_t ext2) override;
+    hardware::Return<uint32_t> registerMemory(
+            const hardware::hidl_handle& descriptor,
+            uint32_t bufferSize, uint32_t bufferCount) override;
+    hardware::Return<void> unregisterMemory(uint32_t memId) override;
+    hardware::Return<void> dataCallback(
+            hardware::camera::device::V1_0::DataCallbackMsg msgType,
+            uint32_t data, uint32_t bufferIndex,
+            const hardware::camera::device::V1_0::CameraFrameMetadata& metadata) override;
+    hardware::Return<void> dataCallbackTimestamp(
+            hardware::camera::device::V1_0::DataCallbackMsg msgType,
+            uint32_t data, uint32_t bufferIndex, int64_t timestamp) override;
+    hardware::Return<void> handleCallbackTimestamp(
+            hardware::camera::device::V1_0::DataCallbackMsg msgType,
+            const hardware::hidl_handle& frameData, uint32_t data,
+            uint32_t bufferIndex, int64_t timestamp) override;
+
+    /**
+     * Implementation of android::hardware::camera::device::V1_0::ICameraDevicePreviewCallback
+     */
+    hardware::Return<void> dequeueBuffer(dequeueBuffer_cb _hidl_cb) override;
+    hardware::Return<hardware::camera::common::V1_0::Status>
+            enqueueBuffer(uint64_t bufferId) override;
+    hardware::Return<hardware::camera::common::V1_0::Status>
+            cancelBuffer(uint64_t bufferId) override;
+    hardware::Return<hardware::camera::common::V1_0::Status>
+            setBufferCount(uint32_t count) override;
+    hardware::Return<hardware::camera::common::V1_0::Status>
+            setBuffersGeometry(uint32_t w, uint32_t h,
+                    hardware::graphics::common::V1_0::PixelFormat format) override;
+    hardware::Return<hardware::camera::common::V1_0::Status>
+            setCrop(int32_t left, int32_t top, int32_t right, int32_t bottom) override;
+    hardware::Return<hardware::camera::common::V1_0::Status>
+            setUsage(hardware::graphics::allocator::V2_0::ProducerUsage usage) override;
+    hardware::Return<hardware::camera::common::V1_0::Status>
+            setSwapInterval(int32_t interval) override;
+    hardware::Return<void> getMinUndequeuedBufferCount(
+        getMinUndequeuedBufferCount_cb _hidl_cb) override;
+    hardware::Return<hardware::camera::common::V1_0::Status>
+            setTimestamp(int64_t timestamp) override;
 
     sp<ANativeWindow>        mPreviewWindow;
 
@@ -806,6 +465,48 @@ private:
     int mPreviewUsage;
     int mPreviewSwapInterval;
     android_native_rect_t mPreviewCrop;
+
+    struct BufferHasher {
+        size_t operator()(const buffer_handle_t& buf) const {
+            if (buf == nullptr)
+                return 0;
+
+            size_t result = 1;
+            result = 31 * result + buf->numFds;
+            result = 31 * result + buf->numInts;
+            int length = buf->numFds + buf->numInts;
+            for (int i = 0; i < length; i++) {
+                result = 31 * result + buf->data[i];
+            }
+            return result;
+        }
+    };
+
+    struct BufferComparator {
+        bool operator()(const buffer_handle_t& buf1, const buffer_handle_t& buf2) const {
+            if (buf1->numFds == buf2->numFds && buf1->numInts == buf2->numInts) {
+                int length = buf1->numFds + buf1->numInts;
+                for (int i = 0; i < length; i++) {
+                    if (buf1->data[i] != buf2->data[i]) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            return false;
+        }
+    };
+
+    std::mutex mBufferIdMapLock; // protecting mBufferIdMap and mNextBufferId
+    typedef std::unordered_map<const buffer_handle_t, uint64_t,
+            BufferHasher, BufferComparator> BufferIdMap;
+    // stream ID -> per stream buffer ID map
+    BufferIdMap mBufferIdMap;
+    std::unordered_map<uint64_t, ANativeWindowBuffer*> mReversedBufMap;
+    uint64_t mNextBufferId = 1;
+    static const uint64_t BUFFER_ID_NO_BUFFER = 0;
+
+    std::unordered_map<int, camera_memory_t*> mHidlMemPoolMap;
 };
 
 };  // namespace android
