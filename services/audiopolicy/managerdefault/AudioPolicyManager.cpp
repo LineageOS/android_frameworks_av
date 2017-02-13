@@ -1631,8 +1631,8 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
                                                               isSoundTrigger,
                                                               policyMix, mpClientInterface);
 
-
     // reuse an open input if possible
+    sp<AudioInputDescriptor> reusedInputDesc;
     for (size_t i = 0; i < mInputs.size(); i++) {
         sp<AudioInputDescriptor> desc = mInputs.valueAt(i);
         // reuse input if:
@@ -1656,33 +1656,41 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
                 } else {
                     ALOGW("getInputForDevice() record with different attributes"
                           " exists for session %d", session);
-                    break;
+                    continue;
                 }
             } else if (isSoundTrigger) {
-                break;
+                continue;
             }
 
-            // force close input if current source is now the highest priority request on this input
-            // and current input properties are not exactly as requested.
-            if (!isConcurrentSource(inputSource) && !isConcurrentSource(desc->inputSource()) &&
+            // Reuse the already opened input stream on this profile if:
+            // - the new capture source is background OR
+            // - the path requested configurations match OR
+            // - the new source priority is less than the highest source priority on this input
+            // If the input stream cannot be reused, close it before opening a new stream
+            // on the same profile for the new client so that the requested path configuration
+            // can be selected.
+            if (!isConcurrentSource(inputSource) &&
                     ((desc->mSamplingRate != samplingRate ||
                     desc->mChannelMask != channelMask ||
                     !audio_formats_match(desc->mFormat, format)) &&
                     (source_priority(desc->getHighestPrioritySource(false /*activeOnly*/)) <
                      source_priority(inputSource)))) {
-                ALOGV("%s: ", __FUNCTION__);
-                AudioSessionCollection sessions = desc->getAudioSessions(false /*activeOnly*/);
-                for (size_t j = 0; j < sessions.size(); j++) {
-                    audio_session_t currentSession = sessions.keyAt(j);
-                    stopInput(desc->mIoHandle, currentSession);
-                    releaseInput(desc->mIoHandle, currentSession);
-                }
-                break;
+                reusedInputDesc = desc;
+                continue;
             } else {
                 desc->addAudioSession(session, audioSession);
                 ALOGV("%s: reusing input %d", __FUNCTION__, mInputs.keyAt(i));
                 return mInputs.keyAt(i);
             }
+        }
+    }
+
+    if (reusedInputDesc != 0) {
+        AudioSessionCollection sessions = reusedInputDesc->getAudioSessions(false /*activeOnly*/);
+        for (size_t j = 0; j < sessions.size(); j++) {
+            audio_session_t currentSession = sessions.keyAt(j);
+            stopInput(reusedInputDesc->mIoHandle, currentSession);
+            releaseInput(reusedInputDesc->mIoHandle, currentSession);
         }
     }
 
