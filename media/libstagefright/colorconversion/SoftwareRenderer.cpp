@@ -24,7 +24,8 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <system/window.h>
 #include <ui/GraphicBufferMapper.h>
-#include <gui/IGraphicBufferProducer.h>
+#include <ui/GraphicBuffer.h>
+#include <ui/Rect.h>
 
 namespace android {
 

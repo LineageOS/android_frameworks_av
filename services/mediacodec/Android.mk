@@ -6,6 +6,7 @@ LOCAL_SRC_FILES := MediaCodecService.cpp
 LOCAL_SHARED_LIBRARIES := \
     libmedia \
     libbinder \
+    libgui \
     libutils \
     liblog \
     libstagefright_omx
@@ -26,6 +27,7 @@ LOCAL_SHARED_LIBRARIES := \
     libmediacodecservice \
     libbinder \
     libutils \
+    libgui \
     liblog \
     libbase \
     libavservices_minijail \

@@ -23,6 +23,7 @@ LOCAL_SHARED_LIBRARIES := \
 	libcameraservice \
 	liblog \
 	libutils \
+	libui \
 	libbinder \
 	android.hardware.camera.common@1.0 \
 	android.hardware.camera.provider@2.4 \

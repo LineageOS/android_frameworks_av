@@ -30,7 +30,6 @@
 #include <media/stagefright/Utils.h>
 #include <OMX_IndexExt.h>
 #include <OMX_VideoExt.h>
-#include <ui/Rect.h>
 
 #include "ih264_typedefs.h"
 #include "iv2.h"

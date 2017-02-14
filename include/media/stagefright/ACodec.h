@@ -29,6 +29,7 @@
 #include <media/stagefright/SkipCutBuffer.h>
 #include <utils/NativeHandle.h>
 #include <OMX_Audio.h>
+#include <hardware/gralloc.h>
 
 #define TRACK_BUFFER_TIMING     0
 
