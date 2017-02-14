@@ -362,6 +362,17 @@ public:
         return param;
     }
 
+    /// Returns managed clone of |orig| at heap.
+    inline static std::unique_ptr<C2Param> Copy(const C2Param &orig) {
+        if (orig.size() == 0) {
+            return nullptr;
+        }
+        void *mem = ::operator new (orig.size());
+        C2Param *param = new (mem) C2Param(orig.size(), orig._mIndex);
+        param->updateFrom(orig);
+        return std::unique_ptr<C2Param>(param);
+    }
+
 #if 0
     template<typename P, class=decltype(C2Param(P()))>
     P *As() { return P::From(this); }

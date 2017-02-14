@@ -67,6 +67,7 @@ enum C2ParamIndexKind : uint32_t {
     kParamIndexStructStart = 0x1,
     kParamIndexVideoSize,
     kParamIndexMaxVideoSizeHint,
+    kParamIndexVideoSizeTuning,
 
     kParamIndexParamStart = 0x800,
 };
@@ -230,19 +231,22 @@ struct C2VideoSizeStruct {
     int32_t mWidth;     ///< video width
     int32_t mHeight;    ///< video height
 
-    DEFINE_AND_DESCRIBE_C2STRUCT(VideoSize)
+    DEFINE_C2STRUCT_NO_BASE(VideoSize)
+} C2_PACK;
+
+DESCRIBE_C2STRUCT(VideoSize, {
     C2FIELD(mWidth, "width")
     C2FIELD(mHeight, "height")
-};
+})
 
 // video size for video decoder [OUT]
-typedef C2StreamParam<C2Info, C2VideoSizeStruct> C2VideoSizeStreamInfo;
+typedef C2StreamParam<C2Info, C2VideoSizeStruct, kParamIndexVideoSize> C2VideoSizeStreamInfo;
 
 // max video size for video decoder [IN]
 typedef C2PortParam<C2Setting, C2VideoSizeStruct, kParamIndexMaxVideoSizeHint> C2MaxVideoSizeHintPortSetting;
 
 // video encoder size [IN]
-typedef C2StreamParam<C2Tuning, C2VideoSizeStruct> C2VideoSizeStreamTuning;
+typedef C2StreamParam<C2Tuning, C2VideoSizeStruct, kParamIndexVideoSizeTuning> C2VideoSizeStreamTuning;
 
 /// @}
 
