@@ -124,13 +124,7 @@ typedef enum
     AAUDIO_STREAM_STATE_CLOSED,
 } aaudio_stream_state_t;
 
-// TODO review API
 typedef enum {
-    /**
-     * This will use an AudioTrack object for playing audio
-     * and an AudioRecord for recording data.
-     */
-    AAUDIO_SHARING_MODE_LEGACY,
     /**
      * This will be the only stream using a particular source or sink.
      * This mode will provide the lowest possible latency.
@@ -142,12 +136,7 @@ typedef enum {
      * This will have higher latency than the EXCLUSIVE mode.
      */
     AAUDIO_SHARING_MODE_SHARED,
-    /**
-     * Multiple applications will do their own mixing into a memory mapped buffer.
-     * It may be possible for malicious applications to read the data produced by
-     * other apps. So do not use this for private data such as telephony or messaging.
-     */
-    AAUDIO_SHARING_MODE_PUBLIC_MIX,
+
     AAUDIO_SHARING_MODE_COUNT // This should always be last.
 } aaudio_sharing_mode_t;
 

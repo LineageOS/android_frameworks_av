@@ -257,7 +257,7 @@ private:
     aaudio_sample_rate_t   mSampleRate = AAUDIO_UNSPECIFIED;
     aaudio_stream_state_t  mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
     aaudio_device_id_t     mDeviceId = AAUDIO_UNSPECIFIED;
-    aaudio_sharing_mode_t  mSharingMode = AAUDIO_SHARING_MODE_LEGACY;
+    aaudio_sharing_mode_t  mSharingMode = AAUDIO_SHARING_MODE_SHARED;
     aaudio_audio_format_t  mFormat = AAUDIO_FORMAT_UNSPECIFIED;
     aaudio_direction_t     mDirection = AAUDIO_DIRECTION_OUTPUT;
 
