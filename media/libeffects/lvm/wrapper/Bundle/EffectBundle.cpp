@@ -1424,17 +1424,25 @@ int VirtualizerForceVirtualizationMode(EffectContext *pContext, audio_devices_t 
 //                            horizontal plane, +90 is directly above the user, -90 below
 //
 //----------------------------------------------------------------------------
-void VirtualizerGetSpeakerAngles(audio_channel_mask_t channelMask __unused,
+void VirtualizerGetSpeakerAngles(audio_channel_mask_t channelMask,
         audio_devices_t deviceType __unused, int32_t *pSpeakerAngles) {
     // the channel count is guaranteed to be 1 or 2
     // the device is guaranteed to be of type headphone
-    // this virtualizer is always 2in with speakers at -90 and 90deg of azimuth, 0deg of elevation
-    *pSpeakerAngles++ = (int32_t) AUDIO_CHANNEL_OUT_FRONT_LEFT;
-    *pSpeakerAngles++ = -90; // azimuth
-    *pSpeakerAngles++ = 0;   // elevation
-    *pSpeakerAngles++ = (int32_t) AUDIO_CHANNEL_OUT_FRONT_RIGHT;
-    *pSpeakerAngles++ = 90;  // azimuth
-    *pSpeakerAngles   = 0;   // elevation
+    // this virtualizer is always using 2 virtual speakers at -90 and 90deg of azimuth, 0deg of
+    // elevation but the return information is sized for nbChannels * 3, so we have to consider
+    // the (false here) case of a single channel, and return only 3 fields.
+    if (audio_channel_count_from_out_mask(channelMask) == 1) {
+        *pSpeakerAngles++ = (int32_t) AUDIO_CHANNEL_OUT_MONO; // same as FRONT_LEFT
+        *pSpeakerAngles++ = 0; // azimuth
+        *pSpeakerAngles = 0; // elevation
+    } else {
+        *pSpeakerAngles++ = (int32_t) AUDIO_CHANNEL_OUT_FRONT_LEFT;
+        *pSpeakerAngles++ = -90; // azimuth
+        *pSpeakerAngles++ = 0;   // elevation
+        *pSpeakerAngles++ = (int32_t) AUDIO_CHANNEL_OUT_FRONT_RIGHT;
+        *pSpeakerAngles++ = 90;  // azimuth
+        *pSpeakerAngles   = 0;   // elevation
+    }
 }
 
 //----------------------------------------------------------------------------
