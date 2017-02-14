@@ -1540,6 +1540,7 @@ class MmapThread : public ThreadBase
     status_t getMmapPosition(struct audio_mmap_position *position);
     status_t start(const MmapStreamInterface::Client& client, audio_port_handle_t *handle);
     status_t stop(audio_port_handle_t handle);
+    status_t standby();
 
     // RefBase
     virtual     void        onFirstRef();
@@ -1549,6 +1550,7 @@ class MmapThread : public ThreadBase
 
     virtual     void        threadLoop_exit();
     virtual     void        threadLoop_standby();
+    virtual     bool        shouldStandby_l() { return false; }
 
     virtual     status_t    initCheck() const { return (mHalStream == 0) ? NO_INIT : NO_ERROR; }
     virtual     size_t      frameCount() const { return mFrameCount; }
