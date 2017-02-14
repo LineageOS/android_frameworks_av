@@ -39,6 +39,8 @@ enum {
     SET_PARAMETERS,
     GET_TIMESTAMP,
     SIGNAL,
+    APPLY_VOLUME_SHAPER,
+    GET_VOLUME_SHAPER_STATE,
 };
 
 class BpAudioTrack : public BpInterface<IAudioTrack>
@@ -143,6 +145,52 @@ public:
         data.writeInterfaceToken(IAudioTrack::getInterfaceDescriptor());
         remote()->transact(SIGNAL, data, &reply);
     }
+
+    virtual VolumeShaper::Status applyVolumeShaper(
+            const sp<VolumeShaper::Configuration>& configuration,
+            const sp<VolumeShaper::Operation>& operation) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioTrack::getInterfaceDescriptor());
+
+        status_t status = configuration.get() == nullptr
+                ? data.writeInt32(0)
+                :  data.writeInt32(1)
+                    ?: configuration->writeToParcel(&data);
+        if (status != NO_ERROR) {
+            return VolumeShaper::Status(status);
+        }
+
+        status = operation.get() == nullptr
+                ? status = data.writeInt32(0)
+                : data.writeInt32(1)
+                    ?: operation->writeToParcel(&data);
+        if (status != NO_ERROR) {
+            return VolumeShaper::Status(status);
+        }
+
+        int32_t remoteVolumeShaperStatus;
+        status = remote()->transact(APPLY_VOLUME_SHAPER, data, &reply)
+                 ?: reply.readInt32(&remoteVolumeShaperStatus);
+
+        return VolumeShaper::Status(status ?: remoteVolumeShaperStatus);
+    }
+
+    virtual sp<VolumeShaper::State> getVolumeShaperState(int id) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioTrack::getInterfaceDescriptor());
+
+        data.writeInt32(id);
+        status_t status = remote()->transact(GET_VOLUME_SHAPER_STATE, data, &reply);
+        if (status != NO_ERROR) {
+            return nullptr;
+        }
+        sp<VolumeShaper::State> state = new VolumeShaper::State;
+        status = state->readFromParcel(reply);
+        if (status != NO_ERROR) {
+            return nullptr;
+        }
+        return state;
+    }
 };
 
 IMPLEMENT_META_INTERFACE(AudioTrack, "android.media.IAudioTrack");
@@ -204,6 +252,40 @@ status_t BnAudioTrack::onTransact(
         case SIGNAL: {
             CHECK_INTERFACE(IAudioTrack, data, reply);
             signal();
+            return NO_ERROR;
+        } break;
+        case APPLY_VOLUME_SHAPER: {
+            CHECK_INTERFACE(IAudioTrack, data, reply);
+            sp<VolumeShaper::Configuration> configuration;
+            sp<VolumeShaper::Operation> operation;
+
+            int32_t present;
+            status_t status = data.readInt32(&present);
+            if (status == NO_ERROR && present != 0) {
+                configuration = new VolumeShaper::Configuration();
+                status = configuration->readFromParcel(data);
+            }
+            status = status ?: data.readInt32(&present);
+            if (status == NO_ERROR && present != 0) {
+                operation = new VolumeShaper::Operation();
+                status = operation->readFromParcel(data);
+            }
+            if (status == NO_ERROR) {
+                status = (status_t)applyVolumeShaper(configuration, operation);
+            }
+            reply->writeInt32(status);
+            return NO_ERROR;
+        } break;
+        case GET_VOLUME_SHAPER_STATE: {
+            CHECK_INTERFACE(IAudioTrack, data, reply);
+            int id;
+            status_t status = data.readInt32(&id);
+            if (status == NO_ERROR) {
+                sp<VolumeShaper::State> state = getVolumeShaperState(id);
+                if (state.get() != nullptr) {
+                     status = state->writeToParcel(reply);
+                }
+            }
             return NO_ERROR;
         } break;
         default:

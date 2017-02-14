@@ -76,6 +76,13 @@ public:
 
     virtual bool        isFastTrack() const { return (mFlags & AUDIO_OUTPUT_FLAG_FAST) != 0; }
 
+// implement volume handling.
+   VolumeShaper::Status applyVolumeShaper(
+                                const sp<VolumeShaper::Configuration>& configuration,
+                                const sp<VolumeShaper::Operation>& operation);
+sp<VolumeShaper::State> getVolumeShaperState(int id);
+    sp<VolumeHandler>   getVolumeHandler() { return mVolumeHandler; }
+
 protected:
     // for numerous
     friend class PlaybackThread;
@@ -151,6 +158,8 @@ protected:
     LinearMap<int64_t> mFrameMap;           // track frame to server frame mapping
 
     ExtendedTimestamp  mSinkTimestamp;
+
+    sp<VolumeHandler>  mVolumeHandler; // handles multiple VolumeShaper configs and operations
 
 private:
     // The following fields are only for fast tracks, and should be in a subclass

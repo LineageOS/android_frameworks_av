@@ -184,6 +184,7 @@ AudioTrack::AudioTrack()
       mPreviousSchedulingGroup(SP_DEFAULT),
       mPausedPosition(0),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
+      mVolumeShaperId(VolumeShaper::kSystemIdMax),
       mPortId(AUDIO_PORT_HANDLE_NONE)
 {
     mAttributes.content_type = AUDIO_CONTENT_TYPE_UNKNOWN;
@@ -556,7 +557,7 @@ status_t AudioTrack::set(
     mFramesWritten = 0;
     mFramesWrittenServerOffset = 0;
     mFramesWrittenAtRestore = -1; // -1 is a unique initializer.
-
+    mVolumeHandler = new VolumeHandler(mSampleRate);
     return NO_ERROR;
 }
 
@@ -2308,6 +2309,40 @@ status_t AudioTrack::setParameters(const String8& keyValuePairs)
 {
     AutoMutex lock(mLock);
     return mAudioTrack->setParameters(keyValuePairs);
+}
+
+VolumeShaper::Status AudioTrack::applyVolumeShaper(
+        const sp<VolumeShaper::Configuration>& configuration,
+        const sp<VolumeShaper::Operation>& operation)
+{
+    AutoMutex lock(mLock);
+    if (configuration->getType() == VolumeShaper::Configuration::TYPE_SCALE) {
+        const int id = configuration->getId();
+        LOG_ALWAYS_FATAL_IF(id >= VolumeShaper::kSystemIdMax || id < -1,
+                "id must be -1 or a system id (less than kSystemIdMax)");
+        if (id == -1) {
+            // if not a system id, reassign to a unique id
+            configuration->setId(mVolumeShaperId);
+            ALOGD("setting id to %d", mVolumeShaperId);
+            // increment and avoid signed overflow.
+            if (mVolumeShaperId == INT32_MAX) {
+                mVolumeShaperId = VolumeShaper::kSystemIdMax;
+            } else {
+                ++mVolumeShaperId;
+            }
+        }
+    }
+    VolumeShaper::Status status = mAudioTrack->applyVolumeShaper(configuration, operation);
+    // TODO: For restoration purposes, record successful creation and termination.
+    return status;
+}
+
+sp<VolumeShaper::State> AudioTrack::getVolumeShaperState(int id)
+{
+    // TODO: To properly restore the AudioTrack
+    // we will need to save the last state in AudioTrackShared.
+    AutoMutex lock(mLock);
+    return mAudioTrack->getVolumeShaperState(id);
 }
 
 status_t AudioTrack::getTimestamp(ExtendedTimestamp *timestamp)

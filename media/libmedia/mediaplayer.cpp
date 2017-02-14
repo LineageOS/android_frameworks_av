@@ -991,6 +991,27 @@ status_t MediaPlayer::setNextMediaPlayer(const sp<MediaPlayer>& next) {
     return mPlayer->setNextPlayer(next == NULL ? NULL : next->mPlayer);
 }
 
+VolumeShaper::Status MediaPlayer::applyVolumeShaper(
+        const sp<VolumeShaper::Configuration>& configuration,
+        const sp<VolumeShaper::Operation>& operation)
+{
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == nullptr) {
+        return VolumeShaper::Status(NO_INIT);
+    }
+    VolumeShaper::Status status = mPlayer->applyVolumeShaper(configuration, operation);
+    return status;
+}
+
+sp<VolumeShaper::State> MediaPlayer::getVolumeShaperState(int id)
+{
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == nullptr) {
+        return nullptr;
+    }
+    return mPlayer->getVolumeShaperState(id);
+}
+
 // ModDrm
 status_t MediaPlayer::prepareDrm(const uint8_t uuid[16], const int mode)
 {
