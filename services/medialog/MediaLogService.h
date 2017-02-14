@@ -27,13 +27,8 @@ class MediaLogService : public BinderService<MediaLogService>, public BnMediaLog
 {
     friend class BinderService<MediaLogService>;    // for MediaLogService()
 public:
-    MediaLogService() :
-        BnMediaLogService(),
-        mMergerShared((NBLog::Shared*) malloc(NBLog::Timeline::sharedSize(kMergeBufferSize))),
-        mMerger(mMergerShared, kMergeBufferSize),
-        mMergeReader(mMergerShared, kMergeBufferSize, mMerger)
-    {ALOGI("Nico creating MergeReader");}
-    virtual ~MediaLogService() { free(mMergerShared); }
+    MediaLogService();
+    virtual ~MediaLogService() override;
     virtual void onFirstRef() { }
 
     static const char*  getServiceName() { return "media.log"; }
@@ -47,6 +42,8 @@ public:
     virtual status_t    onTransact(uint32_t code, const Parcel& data, Parcel* reply,
                                 uint32_t flags);
 
+    virtual void        requestMergeWakeup() override;
+
 private:
 
     // Internal dump
@@ -58,10 +55,10 @@ private:
     Mutex               mLock;
 
     Vector<NBLog::NamedReader> mNamedReaders;
-
     NBLog::Shared *mMergerShared;
     NBLog::Merger mMerger;
     NBLog::MergeReader mMergeReader;
+    const sp<NBLog::MergeThread> mMergeThread;
 };
 
 }   // namespace android

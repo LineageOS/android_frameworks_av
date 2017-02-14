@@ -2953,6 +2953,10 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 #endif
     while (!exitPending())
     {
+        // Log merge requests are performed during AudioFlinger binder transactions, but
+        // that does not cover audio playback. It's requested here for that reason.
+        mAudioFlinger->requestLogMerge();
+
         cpuStats.sample(myName);
 
         Vector< sp<EffectChain> > effectChains;

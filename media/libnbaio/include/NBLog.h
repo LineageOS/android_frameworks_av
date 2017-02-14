@@ -20,8 +20,9 @@
 #define ANDROID_MEDIA_NBLOG_H
 
 #include <binder/IMemory.h>
-#include <utils/Mutex.h>
 #include <audio_utils/fifo.h>
+#include <utils/Mutex.h>
+#include <utils/threads.h>
 
 #include <vector>
 
@@ -41,6 +42,7 @@ private:
 enum Event {
     EVENT_RESERVED,
     EVENT_STRING,               // ASCII string, not NUL-terminated
+    // TODO: make timestamp optional
     EVENT_TIMESTAMP,            // clock_gettime(CLOCK_MONOTONIC)
     EVENT_INTEGER,              // integer value entry
     EVENT_FLOAT,                // floating point value entry
@@ -106,7 +108,7 @@ public:
 
         template<typename T>
         inline const T& payload() {
-            return *reinterpret_cast<const T *>(ptr + 2);
+            return *reinterpret_cast<const T *>(ptr + offsetof(entry, data));
         }
 
     private:
@@ -423,6 +425,43 @@ private:
     // handle author entry by looking up the author's name and appending it to the body
     // returns number of bytes read from fmtEntry
     size_t handleAuthor(const FormatEntry &fmtEntry, String8 *body);
+};
+
+// MergeThread is a thread that contains a Merger. It works as a retriggerable one-shot:
+// when triggered, it awakes for a lapse of time, during which it periodically merges; if
+// retriggered, the timeout is reset.
+// The thread is triggered on AudioFlinger binder activity.
+class MergeThread : public Thread {
+public:
+    MergeThread(Merger &merger);
+    virtual ~MergeThread() override;
+
+    // Reset timeout and activate thread to merge periodically if it's idle
+    void wakeup();
+
+    // Set timeout period until the merging thread goes idle again
+    void setTimeoutUs(int time);
+
+private:
+    virtual bool threadLoop() override;
+
+    // the merger who actually does the work of merging the logs
+    Merger&     mMerger;
+
+    // mutex for the condition variable
+    Mutex       mMutex;
+
+    // condition variable to activate merging on timeout >= 0
+    Condition   mCond;
+
+    // time left until the thread blocks again (in microseconds)
+    int         mTimeoutUs;
+
+    // merging period when the thread is awake
+    static const int  kThreadSleepPeriodUs = 1000000 /*1s*/;
+
+    // initial timeout value when triggered
+    static const int  kThreadWakeupPeriodUs = 3000000 /*3s*/;
 };
 
 };  // class NBLog

@@ -29,6 +29,7 @@ namespace android {
 enum {
     REGISTER_WRITER = IBinder::FIRST_CALL_TRANSACTION,
     UNREGISTER_WRITER,
+    REQUEST_MERGE_WAKEUP,
 };
 
 class BpMediaLogService : public BpInterface<IMediaLogService>
@@ -57,6 +58,13 @@ public:
         // FIXME ignores status
     }
 
+    virtual void    requestMergeWakeup() {
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaLogService::getInterfaceDescriptor());
+        status_t status __unused = remote()->transact(REQUEST_MERGE_WAKEUP, data, &reply);
+        // FIXME ignores status
+    }
+
 };
 
 IMPLEMENT_META_INTERFACE(MediaLogService, "android.media.IMediaLogService");
@@ -81,6 +89,12 @@ status_t BnMediaLogService::onTransact(
             CHECK_INTERFACE(IMediaLogService, data, reply);
             sp<IMemory> shared = interface_cast<IMemory>(data.readStrongBinder());
             unregisterWriter(shared);
+            return NO_ERROR;
+        }
+
+        case REQUEST_MERGE_WAKEUP: {
+            CHECK_INTERFACE(IMediaLogService, data, reply);
+            requestMergeWakeup();
             return NO_ERROR;
         }
 
