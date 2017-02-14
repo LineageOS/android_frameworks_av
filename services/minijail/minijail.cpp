@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <android-base/file.h>
 #include <android-base/logging.h>
 #include <android-base/unique_fd.h>
 
@@ -27,30 +28,71 @@
 
 namespace android {
 
-int SetUpMinijail(const std::string& seccomp_policy_path)
+int WritePolicyToPipe(const std::string& base_policy_content,
+                      const std::string& additional_policy_content)
+{
+    int pipefd[2];
+    if (pipe(pipefd) == -1) {
+        PLOG(ERROR) << "pipe() failed";
+        return -1;
+    }
+
+    base::unique_fd write_end(pipefd[1]);
+    std::string content = base_policy_content;
+
+    if (additional_policy_content.length() > 0) {
+        content += "\n";
+        content += additional_policy_content;
+    }
+
+    if (!base::WriteStringToFd(content, write_end.get())) {
+        LOG(ERROR) << "Could not write policy to fd";
+        return -1;
+    }
+
+    return pipefd[0];
+}
+
+int SetUpMinijail(const std::string& base_policy_path, const std::string& additional_policy_path)
 {
     // No seccomp policy defined for this architecture.
-    if (access(seccomp_policy_path.c_str(), R_OK) == -1) {
+    if (access(base_policy_path.c_str(), R_OK) == -1) {
         LOG(WARNING) << "No seccomp policy defined for this architecture.";
         return 0;
     }
 
-    int policy_fd = TEMP_FAILURE_RETRY(open(seccomp_policy_path.c_str(), O_RDONLY | O_CLOEXEC));
-    if (policy_fd == -1) {
-        PLOG(FATAL) << "Failed to open seccomp policy file '" << seccomp_policy_path << "'";
+    std::string base_policy_content;
+    std::string additional_policy_content;
+    if (!base::ReadFileToString(base_policy_path, &base_policy_content,
+                                false /* follow_symlinks */)) {
+        LOG(ERROR) << "Could not read base policy file '" << base_policy_path << "'";
+        return -1;
+    }
+
+    if (additional_policy_path.length() > 0 &&
+        !base::ReadFileToString(additional_policy_path, &additional_policy_content,
+                                false /* follow_symlinks */)) {
+        LOG(WARNING) << "Could not read additional policy file '" << additional_policy_path << "'";
+        additional_policy_content = std::string();
+    }
+
+    base::unique_fd policy_fd(WritePolicyToPipe(base_policy_content, additional_policy_content));
+    if (policy_fd.get() == -1) {
+        LOG(ERROR) << "Could not write seccomp policy to fd";
+        return -1;
     }
 
     ScopedMinijail jail{minijail_new()};
     if (!jail) {
-        LOG(WARNING) << "Failed to create minijail.";
+        LOG(ERROR) << "Failed to create minijail.";
         return -1;
     }
 
     minijail_no_new_privs(jail.get());
     minijail_log_seccomp_filter_failures(jail.get());
     minijail_use_seccomp_filter(jail.get());
-    // This closes |policy_fd|.
-    minijail_parse_seccomp_filters_from_fd(jail.get(), policy_fd);
+    // Transfer ownership of |policy_fd|.
+    minijail_parse_seccomp_filters_from_fd(jail.get(), policy_fd.release());
     minijail_enter(jail.get());
     return 0;
 }

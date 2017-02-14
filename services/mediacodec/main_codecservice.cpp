@@ -23,6 +23,8 @@
 #include <binder/IServiceManager.h>
 #include <cutils/properties.h>
 
+#include <string>
+
 #include <android-base/logging.h>
 
 // from LOCAL_C_INCLUDES
@@ -40,7 +42,7 @@ int main(int argc __unused, char** argv)
 {
     LOG(INFO) << "mediacodecservice starting";
     signal(SIGPIPE, SIG_IGN);
-    SetUpMinijail(kSeccompPolicyPath);
+    SetUpMinijail(kSeccompPolicyPath, std::string());
 
     strcpy(argv[0], "media.codec");
     sp<ProcessState> proc(ProcessState::self());

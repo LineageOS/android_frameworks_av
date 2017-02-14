@@ -22,6 +22,8 @@
 #include <binder/ProcessState.h>
 #include <binder/IServiceManager.h>
 
+#include <string>
+
 // from LOCAL_C_INCLUDES
 #include "IcuUtils.h"
 #include "MediaExtractorService.h"
@@ -41,7 +43,7 @@ int main(int argc __unused, char** argv)
         20 /* upper limit as percentage of physical RAM */);
 
     signal(SIGPIPE, SIG_IGN);
-    SetUpMinijail(kSeccompPolicyPath);
+    SetUpMinijail(kSeccompPolicyPath, std::string());
 
     InitializeIcuOrDie();
 
