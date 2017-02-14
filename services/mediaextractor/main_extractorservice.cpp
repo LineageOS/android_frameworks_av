@@ -15,24 +15,23 @@
 ** limitations under the License.
 */
 
-#define LOG_TAG "mediaextractor"
-//#define LOG_NDEBUG 0
-
 #include <fcntl.h>
 #include <sys/prctl.h>
 #include <sys/wait.h>
 #include <binder/IPCThreadState.h>
 #include <binder/ProcessState.h>
 #include <binder/IServiceManager.h>
-#include <utils/Log.h>
 
 // from LOCAL_C_INCLUDES
 #include "IcuUtils.h"
 #include "MediaExtractorService.h"
 #include "MediaUtils.h"
-#include "minijail/minijail.h"
+#include "minijail.h"
 
 using namespace android;
+
+// Must match location in Android.mk.
+static const char kSeccompPolicyPath[] = "/system/etc/seccomp_policy/mediaextractor-seccomp.policy";
 
 int main(int argc __unused, char** argv)
 {
@@ -42,7 +41,7 @@ int main(int argc __unused, char** argv)
         20 /* upper limit as percentage of physical RAM */);
 
     signal(SIGPIPE, SIG_IGN);
-    MiniJail();
+    SetUpMinijail(kSeccompPolicyPath);
 
     InitializeIcuOrDie();
 
