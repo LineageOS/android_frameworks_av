@@ -167,8 +167,8 @@ fifo_counter_t AudioEndpoint::getDownDataWriteCounter()
     return mDownDataQueue->getWriteCounter();
 }
 
-aaudio_size_frames_t AudioEndpoint::setBufferSizeInFrames(aaudio_size_frames_t requestedFrames,
-                                            aaudio_size_frames_t *actualFrames)
+int32_t AudioEndpoint::setBufferSizeInFrames(int32_t requestedFrames,
+                                            int32_t *actualFrames)
 {
     if (requestedFrames < ENDPOINT_DATA_QUEUE_SIZE_MIN) {
         requestedFrames = ENDPOINT_DATA_QUEUE_SIZE_MIN;

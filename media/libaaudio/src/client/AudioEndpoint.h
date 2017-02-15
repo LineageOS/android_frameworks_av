@@ -71,13 +71,13 @@ public:
      */
     bool isOutputFreeRunning() const { return mOutputFreeRunning; }
 
-    int32_t setBufferSizeInFrames(aaudio_size_frames_t requestedFrames,
-                                  aaudio_size_frames_t *actualFrames);
-    aaudio_size_frames_t getBufferSizeInFrames() const;
+    int32_t setBufferSizeInFrames(int32_t requestedFrames,
+                                  int32_t *actualFrames);
+    int32_t getBufferSizeInFrames() const;
 
-    aaudio_size_frames_t getBufferCapacityInFrames() const;
+    int32_t getBufferCapacityInFrames() const;
 
-    aaudio_size_frames_t getFullFramesAvailable();
+    int32_t getFullFramesAvailable();
 
 private:
     FifoBuffer   * mUpCommandQueue;

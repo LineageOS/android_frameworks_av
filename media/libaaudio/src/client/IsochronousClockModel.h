@@ -34,17 +34,17 @@ public:
     IsochronousClockModel();
     virtual ~IsochronousClockModel();
 
-    void start(aaudio_nanoseconds_t nanoTime);
-    void stop(aaudio_nanoseconds_t nanoTime);
+    void start(int64_t nanoTime);
+    void stop(int64_t nanoTime);
 
-    void processTimestamp(aaudio_position_frames_t framePosition, aaudio_nanoseconds_t nanoTime);
+    void processTimestamp(int64_t framePosition, int64_t nanoTime);
 
     /**
      * @param sampleRate rate of the stream in frames per second
      */
-    void setSampleRate(aaudio_sample_rate_t sampleRate);
+    void setSampleRate(int32_t sampleRate);
 
-    aaudio_sample_rate_t getSampleRate() const {
+    int32_t getSampleRate() const {
         return mSampleRate;
     }
 
@@ -53,9 +53,9 @@ public:
      *
      * @param framesPerBurst number of frames that stream advance at one time.
      */
-    void setFramesPerBurst(aaudio_size_frames_t framesPerBurst);
+    void setFramesPerBurst(int32_t framesPerBurst);
 
-    aaudio_size_frames_t getFramesPerBurst() const {
+    int32_t getFramesPerBurst() const {
         return mFramesPerBurst;
     }
 
@@ -65,7 +65,7 @@ public:
      * @param framePosition position of the stream in frames
      * @return time in nanoseconds
      */
-    aaudio_nanoseconds_t convertPositionToTime(aaudio_position_frames_t framePosition) const;
+    int64_t convertPositionToTime(int64_t framePosition) const;
 
     /**
      * Calculate an estimated position where the stream will be at the specified time.
@@ -73,19 +73,19 @@ public:
      * @param nanoTime time of interest
      * @return position in frames
      */
-    aaudio_position_frames_t convertTimeToPosition(aaudio_nanoseconds_t nanoTime) const;
+    int64_t convertTimeToPosition(int64_t nanoTime) const;
 
     /**
      * @param framesDelta difference in frames
      * @return duration in nanoseconds
      */
-    aaudio_nanoseconds_t convertDeltaPositionToTime(aaudio_position_frames_t framesDelta) const;
+    int64_t convertDeltaPositionToTime(int64_t framesDelta) const;
 
     /**
      * @param nanosDelta duration in nanoseconds
      * @return frames that stream will advance in that time
      */
-    aaudio_position_frames_t convertDeltaTimeToPosition(aaudio_nanoseconds_t nanosDelta) const;
+    int64_t convertDeltaTimeToPosition(int64_t nanosDelta) const;
 
 private:
     enum clock_model_state_t {
@@ -95,13 +95,12 @@ private:
         STATE_RUNNING
     };
 
-    aaudio_sample_rate_t     mSampleRate;
-    aaudio_size_frames_t     mFramesPerBurst;
-    int32_t                mMaxLatenessInNanos;
-    aaudio_position_frames_t mMarkerFramePosition;
-    aaudio_nanoseconds_t     mMarkerNanoTime;
-    int32_t                mTimestampCount;
-    clock_model_state_t     mState;
+    int64_t             mMarkerFramePosition;
+    int64_t             mMarkerNanoTime;
+    int32_t             mSampleRate;
+    int32_t             mFramesPerBurst;
+    int32_t             mMaxLatenessInNanos;
+    clock_model_state_t mState;
 
     void update();
 };

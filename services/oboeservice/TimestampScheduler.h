@@ -17,7 +17,7 @@
 #ifndef AAUDIO_TIMESTAMP_SCHEDULER_H
 #define AAUDIO_TIMESTAMP_SCHEDULER_H
 
-//#include <stdlib.h> // random()
+
 
 #include "IAAudioService.h"
 #include "AAudioServiceDefinitions.h"
@@ -25,6 +25,7 @@
 #include "fifo/FifoBuffer.h"
 #include "SharedRingBuffer.h"
 #include "AudioEndpointParcelable.h"
+#include "utility/AudioClock.h"
 
 namespace aaudio {
 
@@ -43,32 +44,32 @@ public:
     /**
      * Start the schedule at the given time.
      */
-    void start(aaudio_nanoseconds_t startTime);
+    void start(int64_t startTime);
 
     /**
      * Calculate the next time that the read position should be
      * measured.
      */
-    aaudio_nanoseconds_t nextAbsoluteTime();
+    int64_t nextAbsoluteTime();
 
-    void setBurstPeriod(aaudio_nanoseconds_t burstPeriod) {
+    void setBurstPeriod(int64_t burstPeriod) {
         mBurstPeriod = burstPeriod;
     }
 
-    void setBurstPeriod(aaudio_size_frames_t framesPerBurst,
-                        aaudio_sample_rate_t sampleRate) {
+    void setBurstPeriod(int32_t framesPerBurst,
+                        int32_t sampleRate) {
         mBurstPeriod = AAUDIO_NANOS_PER_SECOND * framesPerBurst / sampleRate;
     }
 
-    aaudio_nanoseconds_t getBurstPeriod() {
+    int64_t getBurstPeriod() {
         return mBurstPeriod;
     }
 
 private:
     // Start with an arbitrary default so we do not divide by zero.
-    aaudio_nanoseconds_t mBurstPeriod = AAUDIO_NANOS_PER_MILLISECOND;
-    aaudio_nanoseconds_t mStartTime;
-    aaudio_nanoseconds_t mLastTime;
+    int64_t mBurstPeriod = AAUDIO_NANOS_PER_MILLISECOND;
+    int64_t mStartTime;
+    int64_t mLastTime;
 };
 
 } /* namespace aaudio */

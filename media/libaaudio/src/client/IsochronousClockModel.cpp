@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <aaudio/AAudioDefinitions.h>
 
+#include "utility/AudioClock.h"
 #include "IsochronousClockModel.h"
 
 #define MIN_LATENESS_NANOS (10 * AAUDIO_NANOS_PER_MICROSECOND)
@@ -29,11 +30,11 @@ using namespace android;
 using namespace aaudio;
 
 IsochronousClockModel::IsochronousClockModel()
-        : mSampleRate(48000)
+        : mMarkerFramePosition(0)
+        , mMarkerNanoTime(0)
+        , mSampleRate(48000)
         , mFramesPerBurst(64)
         , mMaxLatenessInNanos(0)
-        , mMarkerFramePosition(0)
-        , mMarkerNanoTime(0)
         , mState(STATE_STOPPED)
 {
 }
@@ -41,21 +42,21 @@ IsochronousClockModel::IsochronousClockModel()
 IsochronousClockModel::~IsochronousClockModel() {
 }
 
-void IsochronousClockModel::start(aaudio_nanoseconds_t nanoTime)
+void IsochronousClockModel::start(int64_t nanoTime)
 {
     mMarkerNanoTime = nanoTime;
     mState = STATE_STARTING;
 }
 
-void IsochronousClockModel::stop(aaudio_nanoseconds_t nanoTime)
+void IsochronousClockModel::stop(int64_t nanoTime)
 {
     mMarkerNanoTime = nanoTime;
     mMarkerFramePosition = convertTimeToPosition(nanoTime); // TODO should we do this?
     mState = STATE_STOPPED;
 }
 
-void IsochronousClockModel::processTimestamp(aaudio_position_frames_t framePosition,
-                                             aaudio_nanoseconds_t nanoTime) {
+void IsochronousClockModel::processTimestamp(int64_t framePosition,
+                                             int64_t nanoTime) {
     int64_t framesDelta = framePosition - mMarkerFramePosition;
     int64_t nanosDelta = nanoTime - mMarkerNanoTime;
     if (nanosDelta < 1000) {
@@ -115,7 +116,6 @@ void IsochronousClockModel::processTimestamp(aaudio_position_frames_t framePosit
     default:
         break;
     }
-    ++mTimestampCount;
 }
 
 void IsochronousClockModel::setSampleRate(int32_t sampleRate) {
@@ -133,41 +133,41 @@ void IsochronousClockModel::update() {
     mMaxLatenessInNanos = (nanosLate > MIN_LATENESS_NANOS) ? nanosLate : MIN_LATENESS_NANOS;
 }
 
-aaudio_nanoseconds_t IsochronousClockModel::convertDeltaPositionToTime(
-        aaudio_position_frames_t framesDelta) const {
+int64_t IsochronousClockModel::convertDeltaPositionToTime(
+        int64_t framesDelta) const {
     return (AAUDIO_NANOS_PER_SECOND * framesDelta) / mSampleRate;
 }
 
-int64_t IsochronousClockModel::convertDeltaTimeToPosition(aaudio_nanoseconds_t nanosDelta) const {
+int64_t IsochronousClockModel::convertDeltaTimeToPosition(int64_t nanosDelta) const {
     return (mSampleRate * nanosDelta) / AAUDIO_NANOS_PER_SECOND;
 }
 
-aaudio_nanoseconds_t IsochronousClockModel::convertPositionToTime(
-        aaudio_position_frames_t framePosition) const {
+int64_t IsochronousClockModel::convertPositionToTime(
+        int64_t framePosition) const {
     if (mState == STATE_STOPPED) {
         return mMarkerNanoTime;
     }
-    aaudio_position_frames_t nextBurstIndex = (framePosition + mFramesPerBurst - 1) / mFramesPerBurst;
-    aaudio_position_frames_t nextBurstPosition = mFramesPerBurst * nextBurstIndex;
-    aaudio_position_frames_t framesDelta = nextBurstPosition - mMarkerFramePosition;
-    aaudio_nanoseconds_t nanosDelta = convertDeltaPositionToTime(framesDelta);
-    aaudio_nanoseconds_t time = (aaudio_nanoseconds_t) (mMarkerNanoTime + nanosDelta);
+    int64_t nextBurstIndex = (framePosition + mFramesPerBurst - 1) / mFramesPerBurst;
+    int64_t nextBurstPosition = mFramesPerBurst * nextBurstIndex;
+    int64_t framesDelta = nextBurstPosition - mMarkerFramePosition;
+    int64_t nanosDelta = convertDeltaPositionToTime(framesDelta);
+    int64_t time = (int64_t) (mMarkerNanoTime + nanosDelta);
 //    ALOGI("IsochronousClockModel::convertPositionToTime: pos = %llu --> time = %llu",
 //         (unsigned long long)framePosition,
 //         (unsigned long long)time);
     return time;
 }
 
-aaudio_position_frames_t IsochronousClockModel::convertTimeToPosition(
-        aaudio_nanoseconds_t nanoTime) const {
+int64_t IsochronousClockModel::convertTimeToPosition(
+        int64_t nanoTime) const {
     if (mState == STATE_STOPPED) {
         return mMarkerFramePosition;
     }
-    aaudio_nanoseconds_t nanosDelta = nanoTime - mMarkerNanoTime;
-    aaudio_position_frames_t framesDelta = convertDeltaTimeToPosition(nanosDelta);
-    aaudio_position_frames_t nextBurstPosition = mMarkerFramePosition + framesDelta;
-    aaudio_position_frames_t nextBurstIndex = nextBurstPosition / mFramesPerBurst;
-    aaudio_position_frames_t position = nextBurstIndex * mFramesPerBurst;
+    int64_t nanosDelta = nanoTime - mMarkerNanoTime;
+    int64_t framesDelta = convertDeltaTimeToPosition(nanosDelta);
+    int64_t nextBurstPosition = mMarkerFramePosition + framesDelta;
+    int64_t nextBurstIndex = nextBurstPosition / mFramesPerBurst;
+    int64_t position = nextBurstIndex * mFramesPerBurst;
 //    ALOGI("IsochronousClockModel::convertTimeToPosition: time = %llu --> pos = %llu",
 //         (unsigned long long)nanoTime,
 //         (unsigned long long)position);

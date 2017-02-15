@@ -22,9 +22,15 @@
 
 #include <aaudio/AAudioDefinitions.h>
 
+// Time conversion constants.
+#define AAUDIO_NANOS_PER_MICROSECOND ((int64_t)1000)
+#define AAUDIO_NANOS_PER_MILLISECOND (AAUDIO_NANOS_PER_MICROSECOND * 1000)
+#define AAUDIO_MILLIS_PER_SECOND     1000
+#define AAUDIO_NANOS_PER_SECOND      (AAUDIO_NANOS_PER_MILLISECOND * AAUDIO_MILLIS_PER_SECOND)
+
 class AudioClock {
 public:
-    static aaudio_nanoseconds_t getNanoseconds(clockid_t clockId = CLOCK_MONOTONIC) {
+    static int64_t getNanoseconds(clockid_t clockId = CLOCK_MONOTONIC) {
         struct timespec time;
         int result = clock_gettime(clockId, &time);
         if (result < 0) {
@@ -42,7 +48,7 @@ public:
      * @param clockId CLOCK_MONOTONIC is default
      * @return 0, a negative error, or 1 if the call is interrupted by a signal handler (EINTR)
      */
-    static int sleepUntilNanoTime(aaudio_nanoseconds_t nanoTime,
+    static int sleepUntilNanoTime(int64_t nanoTime,
                                   clockid_t clockId = CLOCK_MONOTONIC) {
         if (nanoTime > 0) {
             struct timespec time;
@@ -72,7 +78,7 @@ public:
      * @param clockId CLOCK_MONOTONIC is default
      * @return 0, a negative error, or 1 if the call is interrupted by a signal handler (EINTR)
      */
-    static int sleepForNanos(aaudio_nanoseconds_t nanoseconds, clockid_t clockId = CLOCK_MONOTONIC) {
+    static int sleepForNanos(int64_t nanoseconds, clockid_t clockId = CLOCK_MONOTONIC) {
         if (nanoseconds > 0) {
             struct timespec time;
             time.tv_sec = nanoseconds / AAUDIO_NANOS_PER_SECOND;

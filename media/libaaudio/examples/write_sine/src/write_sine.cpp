@@ -25,6 +25,8 @@
 
 #define SAMPLE_RATE   48000
 #define NUM_SECONDS   10
+#define NANOS_PER_MICROSECOND ((int64_t)1000)
+#define NANOS_PER_MILLISECOND (NANOS_PER_MICROSECOND * 1000)
 
 static const char *getSharingModeText(aaudio_sharing_mode_t mode) {
     const char *modeText = "unknown";
@@ -51,18 +53,18 @@ int main(int argc, char **argv)
     int actualSamplesPerFrame = 0;
     const int requestedSampleRate = SAMPLE_RATE;
     int actualSampleRate = 0;
-    const aaudio_audio_format_t requestedDataFormat = AAUDIO_FORMAT_PCM16;
-    aaudio_audio_format_t actualDataFormat = AAUDIO_FORMAT_PCM16;
+    const aaudio_audio_format_t requestedDataFormat = AAUDIO_FORMAT_PCM_I16;
+    aaudio_audio_format_t actualDataFormat = AAUDIO_FORMAT_PCM_I16;
 
     const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_EXCLUSIVE;
     aaudio_sharing_mode_t actualSharingMode = AAUDIO_SHARING_MODE_SHARED;
 
-    AAudioStreamBuilder aaudioBuilder = AAUDIO_STREAM_BUILDER_NONE;
-    AAudioStream aaudioStream = AAUDIO_STREAM_NONE;
+    AAudioStreamBuilder aaudioBuilder = nullptr;
+    AAudioStream aaudioStream = nullptr;
     aaudio_stream_state_t state = AAUDIO_STREAM_STATE_UNINITIALIZED;
-    aaudio_size_frames_t framesPerBurst = 0;
-    aaudio_size_frames_t framesToPlay = 0;
-    aaudio_size_frames_t framesLeft = 0;
+    int32_t framesPerBurst = 0;
+    int32_t framesToPlay = 0;
+    int32_t framesLeft = 0;
     int32_t xRunCount = 0;
     int16_t *data = nullptr;
 
@@ -82,57 +84,42 @@ int main(int argc, char **argv)
     }
 
     // Request stream properties.
-    result = AAudioStreamBuilder_setSampleRate(aaudioBuilder, requestedSampleRate);
-    if (result != AAUDIO_OK) {
-        goto finish;
-    }
-    result = AAudioStreamBuilder_setSamplesPerFrame(aaudioBuilder, requestedSamplesPerFrame);
-    if (result != AAUDIO_OK) {
-        goto finish;
-    }
-    result = AAudioStreamBuilder_setFormat(aaudioBuilder, requestedDataFormat);
-    if (result != AAUDIO_OK) {
-        goto finish;
-    }
-    result = AAudioStreamBuilder_setSharingMode(aaudioBuilder, requestedSharingMode);
-    if (result != AAUDIO_OK) {
-        goto finish;
-    }
+    AAudioStreamBuilder_setSampleRate(aaudioBuilder, requestedSampleRate);
+    AAudioStreamBuilder_setSamplesPerFrame(aaudioBuilder, requestedSamplesPerFrame);
+    AAudioStreamBuilder_setFormat(aaudioBuilder, requestedDataFormat);
+    AAudioStreamBuilder_setSharingMode(aaudioBuilder, requestedSharingMode);
+
 
     // Create an AAudioStream using the Builder.
     result = AAudioStreamBuilder_openStream(aaudioBuilder, &aaudioStream);
-    printf("aaudioStream 0x%08x\n", aaudioStream);
     if (result != AAUDIO_OK) {
         goto finish;
     }
 
-    result = AAudioStream_getState(aaudioStream, &state);
+    state = AAudioStream_getState(aaudioStream);
     printf("after open, state = %s\n", AAudio_convertStreamStateToText(state));
 
     // Check to see what kind of stream we actually got.
-    result = AAudioStream_getSampleRate(aaudioStream, &actualSampleRate);
+    actualSampleRate = AAudioStream_getSampleRate(aaudioStream);
     printf("SampleRate: requested = %d, actual = %d\n", requestedSampleRate, actualSampleRate);
 
     sineOsc1.setup(440.0, actualSampleRate);
     sineOsc2.setup(660.0, actualSampleRate);
 
-    result = AAudioStream_getSamplesPerFrame(aaudioStream, &actualSamplesPerFrame);
+    actualSamplesPerFrame = AAudioStream_getSamplesPerFrame(aaudioStream);
     printf("SamplesPerFrame: requested = %d, actual = %d\n",
             requestedSamplesPerFrame, actualSamplesPerFrame);
 
-    result = AAudioStream_getSharingMode(aaudioStream, &actualSharingMode);
+    actualSharingMode = AAudioStream_getSharingMode(aaudioStream);
     printf("SharingMode: requested = %s, actual = %s\n",
             getSharingModeText(requestedSharingMode),
             getSharingModeText(actualSharingMode));
 
     // This is the number of frames that are read in one chunk by a DMA controller
     // or a DSP or a mixer.
-    result = AAudioStream_getFramesPerBurst(aaudioStream, &framesPerBurst);
+    framesPerBurst = AAudioStream_getFramesPerBurst(aaudioStream);
     printf("DataFormat: original framesPerBurst = %d\n",framesPerBurst);
-    if (result != AAUDIO_OK) {
-        fprintf(stderr, "ERROR - AAudioStream_getFramesPerBurst() returned %d\n", result);
-        goto finish;
-    }
+
     // Some DMA might use very short bursts of 16 frames. We don't need to write such small
     // buffers. But it helps to use a multiple of the burst size for predictable scheduling.
     while (framesPerBurst < 48) {
@@ -140,7 +127,7 @@ int main(int argc, char **argv)
     }
     printf("DataFormat: final framesPerBurst = %d\n",framesPerBurst);
 
-    AAudioStream_getFormat(aaudioStream, &actualDataFormat);
+    actualDataFormat = AAudioStream_getFormat(aaudioStream);
     printf("DataFormat: requested = %d, actual = %d\n", requestedDataFormat, actualDataFormat);
     // TODO handle other data formats
 
@@ -160,7 +147,7 @@ int main(int argc, char **argv)
         goto finish;
     }
 
-    result = AAudioStream_getState(aaudioStream, &state);
+    state = AAudioStream_getState(aaudioStream);
     printf("after start, state = %s\n", AAudio_convertStreamStateToText(state));
 
     // Play for a while.
@@ -174,7 +161,7 @@ int main(int argc, char **argv)
         }
 
         // Write audio data to the stream.
-        aaudio_nanoseconds_t timeoutNanos = 100 * AAUDIO_NANOS_PER_MILLISECOND;
+        int64_t timeoutNanos = 100 * NANOS_PER_MILLISECOND;
         int minFrames = (framesToPlay < framesPerBurst) ? framesToPlay : framesPerBurst;
         int actual = AAudioStream_write(aaudioStream, data, minFrames, timeoutNanos);
         if (actual < 0) {
@@ -187,7 +174,7 @@ int main(int argc, char **argv)
         framesLeft -= actual;
     }
 
-    result = AAudioStream_getXRunCount(aaudioStream, &xRunCount);
+    xRunCount = AAudioStream_getXRunCount(aaudioStream);
     printf("AAudioStream_getXRunCount %d\n", xRunCount);
 
 finish:

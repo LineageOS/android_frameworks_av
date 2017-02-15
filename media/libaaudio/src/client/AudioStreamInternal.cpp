@@ -172,14 +172,14 @@ aaudio_result_t AudioStreamInternal::close() {
 
 aaudio_result_t AudioStreamInternal::requestStart()
 {
-    aaudio_nanoseconds_t startTime;
+    int64_t startTime;
     ALOGD("AudioStreamInternal(): start()");
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
         return AAUDIO_ERROR_INVALID_STATE;
     }
     const sp<IAAudioService>& aaudioService = getAAudioService();
     if (aaudioService == 0) return AAUDIO_ERROR_NO_SERVICE;
-    startTime = AAudio_getNanoseconds(AAUDIO_CLOCK_MONOTONIC);
+    startTime = AudioClock::getNanoseconds();
     mClockModel.start(startTime);
     processTimestamp(0, startTime);
     setState(AAUDIO_STREAM_STATE_STARTING);
@@ -194,7 +194,7 @@ aaudio_result_t AudioStreamInternal::requestPause()
     }
     const sp<IAAudioService>& aaudioService = getAAudioService();
     if (aaudioService == 0) return AAUDIO_ERROR_NO_SERVICE;
-    mClockModel.stop(AAudio_getNanoseconds(AAUDIO_CLOCK_MONOTONIC));
+    mClockModel.stop(AudioClock::getNanoseconds());
     setState(AAUDIO_STREAM_STATE_PAUSING);
     return aaudioService->pauseStream(mServiceStreamHandle);
 }
@@ -212,10 +212,10 @@ setState(AAUDIO_STREAM_STATE_FLUSHING);
 
 void AudioStreamInternal::onFlushFromServer() {
     ALOGD("AudioStreamInternal(): onFlushFromServer()");
-    aaudio_position_frames_t readCounter = mAudioEndpoint.getDownDataReadCounter();
-    aaudio_position_frames_t writeCounter = mAudioEndpoint.getDownDataWriteCounter();
+    int64_t readCounter = mAudioEndpoint.getDownDataReadCounter();
+    int64_t writeCounter = mAudioEndpoint.getDownDataWriteCounter();
     // Bump offset so caller does not see the retrograde motion in getFramesRead().
-    aaudio_position_frames_t framesFlushed = writeCounter - readCounter;
+    int64_t framesFlushed = writeCounter - readCounter;
     mFramesOffsetFromService += framesFlushed;
     // Flush written frames by forcing writeCounter to readCounter.
     // This is because we cannot move the read counter in the hardware.
@@ -262,10 +262,10 @@ aaudio_result_t AudioStreamInternal::unregisterThread() {
 
 // TODO use aaudio_clockid_t all the way down to AudioClock
 aaudio_result_t AudioStreamInternal::getTimestamp(clockid_t clockId,
-                           aaudio_position_frames_t *framePosition,
-                           aaudio_nanoseconds_t *timeNanoseconds) {
+                           int64_t *framePosition,
+                           int64_t *timeNanoseconds) {
 // TODO implement using real HAL
-    aaudio_nanoseconds_t time = AudioClock::getNanoseconds();
+    int64_t time = AudioClock::getNanoseconds();
     *framePosition = mClockModel.convertTimeToPosition(time);
     *timeNanoseconds = time + (10 * AAUDIO_NANOS_PER_MILLISECOND); // Fake hardware delay
     return AAUDIO_OK;
@@ -278,9 +278,9 @@ aaudio_result_t AudioStreamInternal::updateState() {
 #if LOG_TIMESTAMPS
 static void AudioStreamInternal_LogTimestamp(AAudioServiceMessage &command) {
     static int64_t oldPosition = 0;
-    static aaudio_nanoseconds_t oldTime = 0;
+    static int64_t oldTime = 0;
     int64_t framePosition = command.timestamp.position;
-    aaudio_nanoseconds_t nanoTime = command.timestamp.timestamp;
+    int64_t nanoTime = command.timestamp.timestamp;
     ALOGD("AudioStreamInternal() timestamp says framePosition = %08lld at nanoTime %llu",
          (long long) framePosition,
          (long long) nanoTime);
@@ -298,7 +298,7 @@ static void AudioStreamInternal_LogTimestamp(AAudioServiceMessage &command) {
 #endif
 
 aaudio_result_t AudioStreamInternal::onTimestampFromServer(AAudioServiceMessage *message) {
-    aaudio_position_frames_t framePosition = 0;
+    int64_t framePosition = 0;
 #if LOG_TIMESTAMPS
     AudioStreamInternal_LogTimestamp(command);
 #endif
@@ -370,12 +370,12 @@ aaudio_result_t AudioStreamInternal::processCommands() {
 
 // Write the data, block if needed and timeoutMillis > 0
 aaudio_result_t AudioStreamInternal::write(const void *buffer, int32_t numFrames,
-                                         aaudio_nanoseconds_t timeoutNanoseconds)
+                                         int64_t timeoutNanoseconds)
 {
     aaudio_result_t result = AAUDIO_OK;
     uint8_t* source = (uint8_t*)buffer;
-    aaudio_nanoseconds_t currentTimeNanos = AudioClock::getNanoseconds();
-    aaudio_nanoseconds_t deadlineNanos = currentTimeNanos + timeoutNanoseconds;
+    int64_t currentTimeNanos = AudioClock::getNanoseconds();
+    int64_t deadlineNanos = currentTimeNanos + timeoutNanoseconds;
     int32_t framesLeft = numFrames;
 //    ALOGD("AudioStreamInternal::write(%p, %d) at time %08llu , mState = %d ------------------",
 //         buffer, numFrames, (unsigned long long) currentTimeNanos, mState);
@@ -383,7 +383,7 @@ aaudio_result_t AudioStreamInternal::write(const void *buffer, int32_t numFrames
     // Write until all the data has been written or until a timeout occurs.
     while (framesLeft > 0) {
         // The call to writeNow() will not block. It will just write as much as it can.
-        aaudio_nanoseconds_t wakeTimeNanos = 0;
+        int64_t wakeTimeNanos = 0;
         aaudio_result_t framesWritten = writeNow(source, framesLeft,
                                                currentTimeNanos, &wakeTimeNanos);
 //        ALOGD("AudioStreamInternal::write() writeNow() framesLeft = %d --> framesWritten = %d", framesLeft, framesWritten);
@@ -422,7 +422,7 @@ aaudio_result_t AudioStreamInternal::write(const void *buffer, int32_t numFrames
 
 // Write as much data as we can without blocking.
 aaudio_result_t AudioStreamInternal::writeNow(const void *buffer, int32_t numFrames,
-                                         aaudio_nanoseconds_t currentNanoTime, aaudio_nanoseconds_t *wakeTimePtr) {
+                                         int64_t currentNanoTime, int64_t *wakeTimePtr) {
     {
         aaudio_result_t result = processCommands();
         if (result != AAUDIO_OK) {
@@ -452,7 +452,7 @@ aaudio_result_t AudioStreamInternal::writeNow(const void *buffer, int32_t numFra
     // Calculate an ideal time to wake up.
     if (wakeTimePtr != nullptr && framesWritten >= 0) {
         // By default wake up a few milliseconds from now.  // TODO review
-        aaudio_nanoseconds_t wakeTime = currentNanoTime + (2 * AAUDIO_NANOS_PER_MILLISECOND);
+        int64_t wakeTime = currentNanoTime + (2 * AAUDIO_NANOS_PER_MILLISECOND);
         switch (getState()) {
             case AAUDIO_STREAM_STATE_OPEN:
             case AAUDIO_STREAM_STATE_STARTING:
@@ -487,7 +487,7 @@ aaudio_result_t AudioStreamInternal::writeNow(const void *buffer, int32_t numFra
 
 aaudio_result_t AudioStreamInternal::waitForStateChange(aaudio_stream_state_t currentState,
                                                       aaudio_stream_state_t *nextState,
-                                                      aaudio_nanoseconds_t timeoutNanoseconds)
+                                                      int64_t timeoutNanoseconds)
 
 {
     aaudio_result_t result = processCommands();
@@ -522,33 +522,38 @@ aaudio_result_t AudioStreamInternal::waitForStateChange(aaudio_stream_state_t cu
 }
 
 
-void AudioStreamInternal::processTimestamp(uint64_t position, aaudio_nanoseconds_t time) {
+void AudioStreamInternal::processTimestamp(uint64_t position, int64_t time) {
     mClockModel.processTimestamp( position, time);
 }
 
-aaudio_result_t AudioStreamInternal::setBufferSize(aaudio_size_frames_t requestedFrames,
-                                        aaudio_size_frames_t *actualFrames) {
-    return mAudioEndpoint.setBufferSizeInFrames(requestedFrames, actualFrames);
+aaudio_result_t AudioStreamInternal::setBufferSize(int32_t requestedFrames) {
+    int32_t actualFrames = 0;
+    aaudio_result_t result = mAudioEndpoint.setBufferSizeInFrames(requestedFrames, &actualFrames);
+    if (result < 0) {
+        return result;
+    } else {
+        return (aaudio_result_t) actualFrames;
+    }
 }
 
-aaudio_size_frames_t AudioStreamInternal::getBufferSize() const
+int32_t AudioStreamInternal::getBufferSize() const
 {
     return mAudioEndpoint.getBufferSizeInFrames();
 }
 
-aaudio_size_frames_t AudioStreamInternal::getBufferCapacity() const
+int32_t AudioStreamInternal::getBufferCapacity() const
 {
     return mAudioEndpoint.getBufferCapacityInFrames();
 }
 
-aaudio_size_frames_t AudioStreamInternal::getFramesPerBurst() const
+int32_t AudioStreamInternal::getFramesPerBurst() const
 {
     return mEndpointDescriptor.downDataQueueDescriptor.framesPerBurst;
 }
 
-aaudio_position_frames_t AudioStreamInternal::getFramesRead()
+int64_t AudioStreamInternal::getFramesRead()
 {
-    aaudio_position_frames_t framesRead =
+    int64_t framesRead =
             mClockModel.convertTimeToPosition(AudioClock::getNanoseconds())
             + mFramesOffsetFromService;
     // Prevent retrograde motion.

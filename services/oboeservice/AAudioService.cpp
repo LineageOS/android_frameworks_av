@@ -57,7 +57,7 @@ aaudio_handle_t AAudioService::openStream(aaudio::AAudioStreamRequest &request,
         ALOGE("AAudioService::openStream(): open returned %d", result);
         return result;
     } else {
-        AAudioStream handle = mHandleTracker.put(AAUDIO_HANDLE_TYPE_STREAM, serviceStream);
+        aaudio_handle_t handle = mHandleTracker.put(AAUDIO_HANDLE_TYPE_STREAM, serviceStream);
         ALOGD("AAudioService::openStream(): handle = 0x%08X", handle);
         if (handle < 0) {
             delete serviceStream;
@@ -127,7 +127,7 @@ aaudio_result_t AAudioService::flushStream(aaudio_handle_t streamHandle) {
 
 aaudio_result_t AAudioService::registerAudioThread(aaudio_handle_t streamHandle,
                                                          pid_t clientThreadId,
-                                                         aaudio_nanoseconds_t periodNanoseconds) {
+                                                         int64_t periodNanoseconds) {
     AAudioServiceStreamBase *serviceStream = convertHandleToServiceStream(streamHandle);
     ALOGD("AAudioService::registerAudioThread(), serviceStream = %p", serviceStream);
     if (serviceStream == nullptr) {

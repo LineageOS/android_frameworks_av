@@ -34,19 +34,19 @@ public:
     AAudioStreamConfiguration();
     virtual ~AAudioStreamConfiguration();
 
-    aaudio_device_id_t getDeviceId() const {
+    int32_t getDeviceId() const {
         return mDeviceId;
     }
 
-    void setDeviceId(aaudio_device_id_t deviceId) {
+    void setDeviceId(int32_t deviceId) {
         mDeviceId = deviceId;
     }
 
-    aaudio_sample_rate_t getSampleRate() const {
+    int32_t getSampleRate() const {
         return mSampleRate;
     }
 
-    void setSampleRate(aaudio_sample_rate_t sampleRate) {
+    void setSampleRate(int32_t sampleRate) {
         mSampleRate = sampleRate;
     }
 
@@ -66,11 +66,11 @@ public:
         mAudioFormat = audioFormat;
     }
 
-    aaudio_size_frames_t getBufferCapacity() const {
+    int32_t getBufferCapacity() const {
         return mBufferCapacity;
     }
 
-    void setBufferCapacity(aaudio_size_frames_t frames) {
+    void setBufferCapacity(int32_t frames) {
         mBufferCapacity = frames;
     }
 
@@ -83,11 +83,11 @@ public:
     void dump();
 
 protected:
-    aaudio_device_id_t    mDeviceId        = AAUDIO_DEVICE_UNSPECIFIED;
-    aaudio_sample_rate_t  mSampleRate      = AAUDIO_UNSPECIFIED;
+    int32_t               mDeviceId        = AAUDIO_DEVICE_UNSPECIFIED;
+    int32_t               mSampleRate      = AAUDIO_UNSPECIFIED;
     int32_t               mSamplesPerFrame = AAUDIO_UNSPECIFIED;
     aaudio_audio_format_t mAudioFormat     = AAUDIO_FORMAT_UNSPECIFIED;
-    aaudio_size_frames_t  mBufferCapacity  = AAUDIO_UNSPECIFIED;
+    int32_t               mBufferCapacity  = AAUDIO_UNSPECIFIED;
 };
 
 } /* namespace aaudio */

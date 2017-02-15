@@ -46,9 +46,9 @@ void AAudioConvert_pcm16ToFloat(const int16_t *source, int32_t numSamples, float
  * @param sizeInBytes total size in bytes
  * @return AAUDIO_OK or negative error, eg. AAUDIO_ERROR_OUT_OF_RANGE
  */
-aaudio_size_bytes_t AAudioConvert_framesToBytes(aaudio_size_frames_t numFrames,
-                                            aaudio_size_bytes_t bytesPerFrame,
-                                            aaudio_size_bytes_t *sizeInBytes);
+int32_t AAudioConvert_framesToBytes(int32_t numFrames,
+                                            int32_t bytesPerFrame,
+                                            int32_t *sizeInBytes);
 
 audio_format_t AAudioConvert_aaudioToAndroidDataFormat(aaudio_audio_format_t aaudio_format);
 
@@ -57,6 +57,6 @@ aaudio_audio_format_t AAudioConvert_androidToAAudioDataFormat(audio_format_t for
 /**
  * @return the size of a sample of the given format in bytes or AAUDIO_ERROR_ILLEGAL_ARGUMENT
  */
-aaudio_size_bytes_t AAudioConvert_formatToSizeInBytes(aaudio_audio_format_t format);
+int32_t AAudioConvert_formatToSizeInBytes(aaudio_audio_format_t format);
 
 #endif //UTILITY_AAUDIO_UTILITIES_H

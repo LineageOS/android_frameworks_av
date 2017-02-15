@@ -27,8 +27,8 @@
 
 using namespace android;
 
-aaudio_size_bytes_t AAudioConvert_formatToSizeInBytes(aaudio_audio_format_t format) {
-    aaudio_size_bytes_t size = AAUDIO_ERROR_ILLEGAL_ARGUMENT;
+int32_t AAudioConvert_formatToSizeInBytes(aaudio_audio_format_t format) {
+    int32_t size = AAUDIO_ERROR_ILLEGAL_ARGUMENT;
     switch (format) {
         case AAUDIO_FORMAT_PCM_I16:
             size = sizeof(int16_t);
@@ -172,12 +172,12 @@ aaudio_audio_format_t AAudioConvert_androidToAAudioDataFormat(audio_format_t and
     return aaudioFormat;
 }
 
-aaudio_size_bytes_t AAudioConvert_framesToBytes(aaudio_size_frames_t numFrames,
-                                            aaudio_size_bytes_t bytesPerFrame,
-                                            aaudio_size_bytes_t *sizeInBytes) {
+int32_t AAudioConvert_framesToBytes(int32_t numFrames,
+                                            int32_t bytesPerFrame,
+                                            int32_t *sizeInBytes) {
     // TODO implement more elegantly
     const int32_t maxChannels = 256; // ridiculously large
-    const aaudio_size_frames_t maxBytesPerFrame = maxChannels * sizeof(float);
+    const int32_t maxBytesPerFrame = maxChannels * sizeof(float);
     // Prevent overflow by limiting multiplicands.
     if (bytesPerFrame > maxBytesPerFrame || numFrames > (0x3FFFFFFF / maxBytesPerFrame)) {
         ALOGE("size overflow, numFrames = %d, frameSize = %zd", numFrames, bytesPerFrame);

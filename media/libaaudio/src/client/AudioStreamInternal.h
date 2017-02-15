@@ -49,8 +49,8 @@ public:
 
     // TODO use aaudio_clockid_t all the way down to AudioClock
     virtual aaudio_result_t getTimestamp(clockid_t clockId,
-                                       aaudio_position_frames_t *framePosition,
-                                       aaudio_nanoseconds_t *timeNanoseconds) override;
+                                       int64_t *framePosition,
+                                       int64_t *timeNanoseconds) override;
 
 
     virtual aaudio_result_t updateState() override;
@@ -62,22 +62,21 @@ public:
 
     virtual aaudio_result_t write(const void *buffer,
                              int32_t numFrames,
-                             aaudio_nanoseconds_t timeoutNanoseconds) override;
+                             int64_t timeoutNanoseconds) override;
 
     virtual aaudio_result_t waitForStateChange(aaudio_stream_state_t currentState,
                                           aaudio_stream_state_t *nextState,
-                                          aaudio_nanoseconds_t timeoutNanoseconds) override;
+                                          int64_t timeoutNanoseconds) override;
 
-    virtual aaudio_result_t setBufferSize(aaudio_size_frames_t requestedFrames,
-                                        aaudio_size_frames_t *actualFrames) override;
+    virtual aaudio_result_t setBufferSize(int32_t requestedFrames) override;
 
-    virtual aaudio_size_frames_t getBufferSize() const override;
+    virtual int32_t getBufferSize() const override;
 
-    virtual aaudio_size_frames_t getBufferCapacity() const override;
+    virtual int32_t getBufferCapacity() const override;
 
-    virtual aaudio_size_frames_t getFramesPerBurst() const override;
+    virtual int32_t getFramesPerBurst() const override;
 
-    virtual aaudio_position_frames_t getFramesRead() override;
+    virtual int64_t getFramesRead() override;
 
     virtual int32_t getXRunCount() const override {
         return mXRunCount;
@@ -100,8 +99,8 @@ protected:
  */
     virtual aaudio_result_t writeNow(const void *buffer,
                                 int32_t numFrames,
-                                aaudio_nanoseconds_t currentTimeNanos,
-                                aaudio_nanoseconds_t *wakeTimePtr);
+                                int64_t currentTimeNanos,
+                                int64_t *wakeTimePtr);
 
     void onFlushFromServer();
 
@@ -112,15 +111,15 @@ protected:
 private:
     IsochronousClockModel    mClockModel;
     AudioEndpoint            mAudioEndpoint;
-    aaudio_handle_t            mServiceStreamHandle;
+    aaudio_handle_t          mServiceStreamHandle;
     EndpointDescriptor       mEndpointDescriptor;
     // Offset from underlying frame position.
-    aaudio_position_frames_t   mFramesOffsetFromService = 0;
-    aaudio_position_frames_t   mLastFramesRead = 0;
-    aaudio_size_frames_t       mFramesPerBurst;
+    int64_t                  mFramesOffsetFromService = 0;
+    int64_t                  mLastFramesRead = 0;
+    int32_t                  mFramesPerBurst;
     int32_t                  mXRunCount = 0;
 
-    void processTimestamp(uint64_t position, aaudio_nanoseconds_t time);
+    void processTimestamp(uint64_t position, int64_t time);
 };
 
 } /* namespace aaudio */

@@ -72,7 +72,7 @@ public:
 
     virtual void sendCurrentTimestamp() = 0;
 
-    aaudio_size_frames_t getFramesPerBurst() {
+    int32_t getFramesPerBurst() {
         return mFramesPerBurst;
     }
 
@@ -90,17 +90,17 @@ public:
 
 protected:
 
-    pid_t                    mRegisteredClientThread = ILLEGAL_THREAD_ID;
+    pid_t              mRegisteredClientThread = ILLEGAL_THREAD_ID;
 
-    SharedRingBuffer *       mUpMessageQueue;
+    SharedRingBuffer*  mUpMessageQueue;
 
-    aaudio_sample_rate_t       mSampleRate = 0;
-    aaudio_size_bytes_t        mBytesPerFrame = 0;
-    aaudio_size_frames_t       mFramesPerBurst = 0;
-    aaudio_size_frames_t       mCapacityInFrames = 0;
-    aaudio_size_bytes_t        mCapacityInBytes = 0;
+    int32_t            mSampleRate = 0;
+    int32_t            mBytesPerFrame = 0;
+    int32_t            mFramesPerBurst = 0;
+    int32_t            mCapacityInFrames = 0;
+    int32_t            mCapacityInBytes = 0;
 
-    android::Mutex           mLockUpMessageQueue;
+    android::Mutex     mLockUpMessageQueue;
 };
 
 } /* namespace aaudio */
