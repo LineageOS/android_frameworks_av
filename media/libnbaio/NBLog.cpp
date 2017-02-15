@@ -91,8 +91,9 @@ pid_t NBLog::FormatEntry::author() const {
     return -1;
 }
 
-size_t NBLog::FormatEntry::copyTo(std::unique_ptr<audio_utils_fifo_writer> &dst, int author) const {
-    auto it = this->begin();
+NBLog::FormatEntry::iterator NBLog::FormatEntry::copyWithAuthor(
+        std::unique_ptr<audio_utils_fifo_writer> &dst, int author) const {
+    auto it = begin();
     // copy fmt start entry
     it.copyTo(dst);
     // insert author entry
@@ -110,7 +111,7 @@ size_t NBLog::FormatEntry::copyTo(std::unique_ptr<audio_utils_fifo_writer> &dst,
     }
     it.copyTo(dst);
     ++it;
-    return it - this->begin();
+    return it;
 }
 
 void NBLog::FormatEntry::iterator::copyTo(std::unique_ptr<audio_utils_fifo_writer> &dst) const {
@@ -125,6 +126,9 @@ void NBLog::FormatEntry::iterator::copyData(uint8_t *dst) const {
 NBLog::FormatEntry::iterator NBLog::FormatEntry::begin() const {
     return iterator(mEntry);
 }
+
+NBLog::FormatEntry::iterator::iterator()
+    : ptr(nullptr) {}
 
 NBLog::FormatEntry::iterator::iterator(const uint8_t *entry)
     : ptr(entry) {}
@@ -148,6 +152,16 @@ NBLog::FormatEntry::iterator& NBLog::FormatEntry::iterator::operator++() {
 NBLog::FormatEntry::iterator& NBLog::FormatEntry::iterator::operator--() {
     ptr -= ptr[NBLog::Entry::kPreviousLengthOffset] + NBLog::Entry::kOverhead;
     return *this;
+}
+
+NBLog::FormatEntry::iterator NBLog::FormatEntry::iterator::next() const {
+    iterator aux(*this);
+    return ++aux;
+}
+
+NBLog::FormatEntry::iterator NBLog::FormatEntry::iterator::prev() const {
+    iterator aux(*this);
+    return --aux;
 }
 
 int NBLog::FormatEntry::iterator::operator-(const NBLog::FormatEntry::iterator &other) const {
@@ -580,6 +594,23 @@ NBLog::Reader::~Reader()
     delete mFifo;
 }
 
+uint8_t *NBLog::Reader::findLastEntryOfType(uint8_t *front, uint8_t *back, uint8_t type) {
+    while (back + Entry::kPreviousLengthOffset >= front) {
+        uint8_t *prev = back - back[Entry::kPreviousLengthOffset] - Entry::kOverhead;
+        if (prev < front || prev + prev[offsetof(FormatEntry::entry, length)] +
+                            Entry::kOverhead != back) {
+
+            // prev points to an out of limits or inconsistent entry
+            return nullptr;
+        }
+        if (prev[offsetof(FormatEntry::entry, type)] == type) {
+            return prev;
+        }
+        back = prev;
+    }
+    return nullptr; // no entry found
+}
+
 std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
 {
     if (mFifoReader == NULL) {
@@ -588,22 +619,66 @@ std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
     // make a copy to avoid race condition with writer
     size_t capacity = mFifo->capacity();
 
-    std::unique_ptr<Snapshot> snapshot(new Snapshot(capacity));
+    // This emulates the behaviour of audio_utils_fifo_reader::read, but without incrementing the
+    // reader index. The index is incremented after handling corruption, to after the last complete
+    // entry of the buffer
+    size_t lost;
+    audio_utils_iovec iovec[2];
+    ssize_t availToRead = mFifoReader->obtain(iovec, capacity, NULL /*timeout*/, &lost);
+    if (availToRead <= 0) {
+        return std::unique_ptr<NBLog::Reader::Snapshot>(new Snapshot());
+    }
 
-    ssize_t actual = mFifoReader->read((void*) snapshot->mData, capacity, NULL /*timeout*/,
-                                       &(snapshot->mLost));
-    ALOG_ASSERT(actual <= capacity);
-    snapshot->mAvail = actual > 0 ? (size_t) actual : 0;
+    std::unique_ptr<Snapshot> snapshot(new Snapshot(availToRead));
+    memcpy(snapshot->mData, (const char *) mFifo->buffer() + iovec[0].mOffset, iovec[0].mLength);
+    if (iovec[1].mLength > 0) {
+        memcpy(snapshot->mData + (iovec[0].mLength),
+            (const char *) mFifo->buffer() + iovec[1].mOffset, iovec[1].mLength);
+    }
+
+    // Handle corrupted buffer
+    // Potentially, a buffer has corrupted data on both beginning (due to overflow) and end
+    // (due to incomplete format entry). But even if the end format entry is incomplete,
+    // it ends in a complete entry (which is not an END_FMT). So is safe to traverse backwards.
+    // TODO: handle client corruption (in the middle of a buffer)
+
+    uint8_t *back = snapshot->mData + availToRead;
+    uint8_t *front = snapshot->mData;
+
+    // Find last END_FMT. <back> is sitting on an entry which might be the middle of a FormatEntry.
+    // We go backwards until we find an EVENT_END_FMT.
+    uint8_t *lastEnd = findLastEntryOfType(front, back, EVENT_END_FMT);
+    if (lastEnd == nullptr) {
+        snapshot->mEnd = snapshot->mBegin = FormatEntry::iterator(front);
+    } else {
+        // end of snapshot points to after last END_FMT entry
+        snapshot->mEnd = FormatEntry::iterator(lastEnd + Entry::kOverhead);
+        // find first START_FMT
+        uint8_t *firstStart = nullptr;
+        uint8_t *firstStartTmp = lastEnd;
+        while ((firstStartTmp = findLastEntryOfType(front, firstStartTmp, EVENT_START_FMT))
+                != nullptr) {
+            firstStart = firstStartTmp;
+        }
+        // firstStart is null if no START_FMT entry was found before lastEnd
+        if (firstStart == nullptr) {
+            snapshot->mBegin = snapshot->mEnd;
+        } else {
+            snapshot->mBegin = FormatEntry::iterator(firstStart);
+        }
+    }
+
+    // advance fifo reader index to after last entry read.
+    mFifoReader->release(snapshot->mEnd - front);
+
+    snapshot->mLost = lost;
     return snapshot;
+
 }
 
 void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapshot)
 {
-    NBLog::FormatEntry::iterator entry(snapshot.data() + snapshot.available());
-    NBLog::FormatEntry::iterator prevEntry = entry;
-    --prevEntry;
-    NBLog::FormatEntry::iterator start(snapshot.data());
-
+#if 0
     struct timespec ts;
     time_t maxSec = -1;
     while (entry - start >= (int) Entry::kOverhead) {
@@ -623,16 +698,18 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
         --entry;
         --prevEntry;
     }
+#endif
     mFd = fd;
     mIndent = indent;
     String8 timestamp, body;
-    size_t lost = snapshot.lost() + (entry - start);
+    size_t lost = snapshot.lost() + (snapshot.begin() - FormatEntry::iterator(snapshot.data()));
     if (lost > 0) {
         body.appendFormat("warning: lost %zu bytes worth of events", lost);
         // TODO timestamp empty here, only other choice to wait for the first timestamp event in the
         //      log to push it out.  Consider keeping the timestamp/body between calls to readAt().
         dumpLine(timestamp, body);
     }
+#if 0
     size_t width = 1;
     while (maxSec >= 10) {
         ++width;
@@ -642,9 +719,8 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
         timestamp.appendFormat("[%*s]", (int) width + 4, "");
     }
     bool deferredTimestamp = false;
-    NBLog::FormatEntry::iterator end(snapshot.data() + snapshot.available());
-
-    while (entry != end) {
+#endif
+    for (auto entry = snapshot.begin(); entry != snapshot.end();) {
         switch (entry->type) {
 #if 0
         case EVENT_STRING:
@@ -717,21 +793,23 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             break;
         case EVENT_END_FMT:
             body.appendFormat("warning: got to end format event");
+            ++entry;
             break;
         case EVENT_RESERVED:
         default:
-            body.appendFormat("warning: unknown event %d", entry->type);
+            body.appendFormat("warning: unexpected event %d", entry->type);
+            ++entry;
             break;
         }
 
         if (!body.isEmpty()) {
             dumpLine(timestamp, body);
-            deferredTimestamp = false;
+            // deferredTimestamp = false;
         }
     }
-    if (deferredTimestamp) {
-        dumpLine(timestamp, body);
-    }
+    // if (deferredTimestamp) {
+    //     dumpLine(timestamp, body);
+    // }
 }
 
 void NBLog::Reader::dump(int fd, size_t indent)
@@ -817,12 +895,6 @@ NBLog::FormatEntry::iterator NBLog::Reader::handleFormat(const FormatEntry &fmtE
         size_t length = arg->length;
 
         // TODO check length for event type is correct
-        if (!arg.hasConsistentLength()) {
-            // TODO: corrupt, resync buffer
-            body->append("<invalid entry>");
-            ++fmt_offset;
-            continue;
-        }
 
         if (event == EVENT_END_FMT) {
             break;
@@ -910,37 +982,33 @@ bool operator>(const struct MergeItem &i1, const struct MergeItem &i2) {
 void NBLog::Merger::merge() {
     int nLogs = mNamedReaders.size();
     std::vector<std::unique_ptr<NBLog::Reader::Snapshot>> snapshots(nLogs);
+    std::vector<NBLog::FormatEntry::iterator> offsets(nLogs);
     for (int i = 0; i < nLogs; ++i) {
         snapshots[i] = mNamedReaders[i].reader()->getSnapshot();
+        offsets[i] = snapshots[i]->begin();
     }
     // initialize offsets
-    std::vector<size_t> offsets(nLogs, 0);
     // TODO custom heap implementation could allow to update top, improving performance
     // for bursty buffers
     std::priority_queue<MergeItem, std::vector<MergeItem>, std::greater<MergeItem>> timestamps;
     for (int i = 0; i < nLogs; ++i)
     {
-        if (snapshots[i]->available() > 0) {
-            timespec ts = FormatEntry(snapshots[i]->data()).timestamp();
-            MergeItem item(ts, i);
-            timestamps.push(item);
+        if (offsets[i] != snapshots[i]->end()) {
+            timespec ts = FormatEntry(offsets[i]).timestamp();
+            timestamps.emplace(ts, i);
         }
     }
 
     while (!timestamps.empty()) {
         // find minimum timestamp
         int index = timestamps.top().index;
-        // copy it to the log
-        size_t length = FormatEntry(snapshots[index]->data() + offsets[index]).copyTo(
-            mFifoWriter, index);
+        // copy it to the log, increasing offset
+        offsets[index] = FormatEntry(offsets[index]).copyWithAuthor(mFifoWriter, index);
         // update data structures
-        offsets[index] += length;
-        ALOGW_IF(offsets[index] > snapshots[index]->available(), "Overflown snapshot capacity");
         timestamps.pop();
-        if (offsets[index] != snapshots[index]->available()) {
-            timespec ts = FormatEntry(snapshots[index]->data() + offsets[index]).timestamp();
-            MergeItem item(ts, index);
-            timestamps.emplace(item);
+        if (offsets[index] != snapshots[index]->end()) {
+            timespec ts = FormatEntry(offsets[index]).timestamp();
+            timestamps.emplace(ts, index);
         }
     }
 }
