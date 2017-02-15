@@ -1497,9 +1497,10 @@ inline status_t flatten(IOmxBufferProducer::FrameEventsDelta const& t,
  */
 inline size_t getFlattenedSize(
         IOmxBufferProducer::FrameEventHistoryDelta const& t) {
-    size_t size = 4;
-    for (size_t i = 0; i < t.size(); ++i) {
-        size += getFlattenedSize(t[i]);
+    size_t size = 4 + // mDeltas.size()
+            sizeof(t.compositorTiming);
+    for (size_t i = 0; i < t.deltas.size(); ++i) {
+        size += getFlattenedSize(t.deltas[i]);
     }
     return size;
 }
@@ -1514,8 +1515,8 @@ inline size_t getFlattenedSize(
 inline size_t getFdCount(
         IOmxBufferProducer::FrameEventHistoryDelta const& t) {
     size_t numFds = 0;
-    for (size_t i = 0; i < t.size(); ++i) {
-        numFds += getFdCount(t[i]);
+    for (size_t i = 0; i < t.deltas.size(); ++i) {
+        numFds += getFdCount(t.deltas[i]);
     }
     return numFds;
 }
@@ -1543,17 +1544,19 @@ inline status_t unflatten(
         return NO_MEMORY;
     }
 
+    FlattenableUtils::read(buffer, size, t->compositorTiming);
+
     uint32_t deltaCount = 0;
     FlattenableUtils::read(buffer, size, deltaCount);
     if (static_cast<size_t>(deltaCount) >
             ::android::FrameEventHistory::MAX_FRAME_HISTORY) {
         return BAD_VALUE;
     }
-    t->resize(deltaCount);
+    t->deltas.resize(deltaCount);
     nh->resize(deltaCount);
     for (size_t deltaIndex = 0; deltaIndex < deltaCount; ++deltaIndex) {
         status_t status = unflatten(
-                &((*t)[deltaIndex]), &((*nh)[deltaIndex]),
+                &(t->deltas[deltaIndex]), &((*nh)[deltaIndex]),
                 buffer, size, fds, numFds);
         if (status != NO_ERROR) {
             return status;
@@ -1577,16 +1580,18 @@ inline status_t unflatten(
 inline status_t flatten(
         IOmxBufferProducer::FrameEventHistoryDelta const& t,
         void*& buffer, size_t& size, int*& fds, size_t& numFds) {
-    if (t.size() > ::android::FrameEventHistory::MAX_FRAME_HISTORY) {
+    if (t.deltas.size() > ::android::FrameEventHistory::MAX_FRAME_HISTORY) {
         return BAD_VALUE;
     }
     if (size < getFlattenedSize(t)) {
         return NO_MEMORY;
     }
 
-    FlattenableUtils::write(buffer, size, static_cast<uint32_t>(t.size()));
-    for (size_t deltaIndex = 0; deltaIndex < t.size(); ++deltaIndex) {
-        status_t status = flatten(t[deltaIndex], buffer, size, fds, numFds);
+    FlattenableUtils::write(buffer, size, t.compositorTiming);
+
+    FlattenableUtils::write(buffer, size, static_cast<uint32_t>(t.deltas.size()));
+    for (size_t deltaIndex = 0; deltaIndex < t.deltas.size(); ++deltaIndex) {
+        status_t status = flatten(t.deltas[deltaIndex], buffer, size, fds, numFds);
         if (status != NO_ERROR) {
             return status;
         }
