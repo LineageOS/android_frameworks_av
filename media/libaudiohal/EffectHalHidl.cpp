@@ -135,7 +135,7 @@ status_t EffectHalHidl::processImpl(uint32_t mqFlag) {
     uint32_t efState = 0;
 retry:
     status_t ret = mEfGroup->wait(
-            static_cast<uint32_t>(MessageQueueFlagBits::DONE_PROCESSING), &efState, NS_PER_SEC);
+            static_cast<uint32_t>(MessageQueueFlagBits::DONE_PROCESSING), &efState);
     if (efState & static_cast<uint32_t>(MessageQueueFlagBits::DONE_PROCESSING)) {
         Result retval = Result::NOT_INITIALIZED;
         mStatusMQ->read(&retval);
