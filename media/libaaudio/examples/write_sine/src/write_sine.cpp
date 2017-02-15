@@ -32,14 +32,8 @@ static const char *getSharingModeText(aaudio_sharing_mode_t mode) {
     case AAUDIO_SHARING_MODE_EXCLUSIVE:
         modeText = "EXCLUSIVE";
         break;
-    case AAUDIO_SHARING_MODE_LEGACY:
-        modeText = "LEGACY";
-        break;
     case AAUDIO_SHARING_MODE_SHARED:
         modeText = "SHARED";
-        break;
-    case AAUDIO_SHARING_MODE_PUBLIC_MIX:
-        modeText = "PUBLIC_MIX";
         break;
     default:
         break;
@@ -61,8 +55,7 @@ int main(int argc, char **argv)
     aaudio_audio_format_t actualDataFormat = AAUDIO_FORMAT_PCM16;
 
     const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_EXCLUSIVE;
-    //const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_LEGACY;
-    aaudio_sharing_mode_t actualSharingMode = AAUDIO_SHARING_MODE_LEGACY;
+    aaudio_sharing_mode_t actualSharingMode = AAUDIO_SHARING_MODE_SHARED;
 
     AAudioStreamBuilder aaudioBuilder = AAUDIO_STREAM_BUILDER_NONE;
     AAudioStream aaudioStream = AAUDIO_STREAM_NONE;

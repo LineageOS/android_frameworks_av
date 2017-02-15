@@ -29,7 +29,7 @@
 #define NUM_SECONDS   10
 
 #define SHARING_MODE  AAUDIO_SHARING_MODE_EXCLUSIVE
-//#define SHARING_MODE  AAUDIO_SHARING_MODE_LEGACY
+//#define SHARING_MODE  AAUDIO_SHARING_MODE_SHARED
 
 // Prototype for a callback.
 typedef int audio_callback_proc_t(float *outputBuffer,

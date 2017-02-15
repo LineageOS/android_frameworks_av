@@ -107,7 +107,7 @@ private:
     int32_t                mSamplesPerFrame = AAUDIO_UNSPECIFIED;
     aaudio_sample_rate_t   mSampleRate = AAUDIO_UNSPECIFIED;
     aaudio_device_id_t     mDeviceId = AAUDIO_DEVICE_UNSPECIFIED;
-    aaudio_sharing_mode_t  mSharingMode = AAUDIO_SHARING_MODE_LEGACY;
+    aaudio_sharing_mode_t  mSharingMode = AAUDIO_SHARING_MODE_SHARED;
     aaudio_audio_format_t  mFormat = AAUDIO_FORMAT_UNSPECIFIED;
     aaudio_direction_t     mDirection = AAUDIO_DIRECTION_OUTPUT;
     aaudio_size_frames_t   mBufferCapacity = AAUDIO_UNSPECIFIED;

@@ -42,13 +42,12 @@ AudioStreamBuilder::~AudioStreamBuilder() {
 }
 
 aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
-    // TODO Is there a better place to put the code that decides which class to use?
     AudioStream* audioStream = nullptr;
     const aaudio_sharing_mode_t sharingMode = getSharingMode();
     switch (getDirection()) {
     case AAUDIO_DIRECTION_INPUT:
         switch (sharingMode) {
-            case AAUDIO_SHARING_MODE_LEGACY:
+            case AAUDIO_SHARING_MODE_SHARED:
                 audioStream = new(std::nothrow) AudioStreamRecord();
                 break;
             default:
@@ -59,7 +58,7 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
         break;
     case AAUDIO_DIRECTION_OUTPUT:
         switch (sharingMode) {
-            case AAUDIO_SHARING_MODE_LEGACY:
+            case AAUDIO_SHARING_MODE_SHARED:
                 audioStream = new(std::nothrow) AudioStreamTrack();
                 break;
             case AAUDIO_SHARING_MODE_EXCLUSIVE:
