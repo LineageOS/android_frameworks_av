@@ -15,31 +15,34 @@
 ** limitations under the License.
 */
 
-#define LOG_TAG "mediacodec"
-//#define LOG_NDEBUG 0
-
 #include <fcntl.h>
 #include <sys/prctl.h>
 #include <sys/wait.h>
 #include <binder/IPCThreadState.h>
 #include <binder/ProcessState.h>
 #include <binder/IServiceManager.h>
-#include <utils/Log.h>
 #include <cutils/properties.h>
+
+#include <string>
+
+#include <android-base/logging.h>
 
 // from LOCAL_C_INCLUDES
 #include "MediaCodecService.h"
-#include "minijail/minijail.h"
+#include "minijail.h"
 
 #include <android/hardware/media/omx/1.0/IOmx.h>
 
 using namespace android;
 
+// Must match location in Android.mk.
+static const char kSeccompPolicyPath[] = "/system/etc/seccomp_policy/mediacodec-seccomp.policy";
+
 int main(int argc __unused, char** argv)
 {
-    ALOGI("@@@ mediacodecservice starting");
+    LOG(INFO) << "mediacodecservice starting";
     signal(SIGPIPE, SIG_IGN);
-    MiniJail();
+    SetUpMinijail(kSeccompPolicyPath, std::string());
 
     strcpy(argv[0], "media.codec");
     sp<ProcessState> proc(ProcessState::self());
@@ -52,11 +55,11 @@ int main(int argc __unused, char** argv)
         using namespace ::android::hardware::media::omx::V1_0;
         sp<IOmx> omx = IOmx::getService(true);
         if (omx == nullptr) {
-            ALOGE("Cannot create a Treble IOmx service.");
+            LOG(ERROR) << "Cannot create a Treble IOmx service.";
         } else if (omx->registerAsService("default") != OK) {
-            ALOGE("Cannot register a Treble IOmx service.");
+            LOG(ERROR) << "Cannot register a Treble IOmx service.";
         } else {
-            ALOGV("Treble IOmx service created.");
+            LOG(VERBOSE) << "Treble IOmx service created.";
         }
     }
 

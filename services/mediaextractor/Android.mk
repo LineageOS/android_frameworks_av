@@ -15,8 +15,9 @@ LOCAL_REQUIRED_MODULES_arm := mediaextractor-seccomp.policy
 LOCAL_REQUIRED_MODULES_arm64 := mediaextractor-seccomp.policy
 LOCAL_REQUIRED_MODULES_x86 := mediaextractor-seccomp.policy
 # TODO add seccomp filter for x86_64.
-LOCAL_SRC_FILES := main_extractorservice.cpp minijail/minijail.cpp
-LOCAL_SHARED_LIBRARIES := libmedia libmediaextractorservice libbinder libutils liblog libicuuc libminijail
+LOCAL_SRC_FILES := main_extractorservice.cpp
+LOCAL_SHARED_LIBRARIES := libmedia libmediaextractorservice libbinder libutils \
+    liblog libbase libicuuc libavservices_minijail
 LOCAL_STATIC_LIBRARIES := libicuandroid_utils
 LOCAL_MODULE:= mediaextractor
 LOCAL_INIT_RC := mediaextractor.rc
