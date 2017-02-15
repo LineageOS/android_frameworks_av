@@ -3973,9 +3973,11 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
     FastMixerState *state = NULL;
     bool didModify = false;
     FastMixerStateQueue::block_t block = FastMixerStateQueue::BLOCK_UNTIL_PUSHED;
+    bool coldIdle = false;
     if (mFastMixer != 0) {
         sq = mFastMixer->sq();
         state = sq->begin();
+        coldIdle = state->mCommand == FastMixerState::COLD_IDLE;
     }
 
     mMixerBufferValid = false;  // mMixerBuffer has no valid data until appropriate tracks found.
@@ -4471,7 +4473,15 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
     }
     if (sq != NULL) {
         sq->end(didModify);
-        sq->push(block);
+        // No need to block if the FastMixer is in COLD_IDLE as the FastThread
+        // is not active. (We BLOCK_UNTIL_ACKED when entering COLD_IDLE
+        // when bringing the output sink into standby.)
+        //
+        // We will get the latest FastMixer state when we come out of COLD_IDLE.
+        //
+        // This occurs with BT suspend when we idle the FastMixer with
+        // active tracks, which may be added or removed.
+        sq->push(coldIdle ? FastMixerStateQueue::BLOCK_NEVER : block);
     }
 #ifdef AUDIO_WATCHDOG
     if (pauseAudioWatchdog && mAudioWatchdog != 0) {
