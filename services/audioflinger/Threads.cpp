@@ -3578,9 +3578,17 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
         break;
     case FastMixer_Static:
     case FastMixer_Dynamic:
-        initFastMixer = mFrameCount < mNormalFrameCount;
+        // FastMixer was designed to operate with a HAL that pulls at a regular rate,
+        // where the period is less than an experimentally determined threshold that can be
+        // scheduled reliably with CFS. However, the BT A2DP HAL is
+        // bursty (does not pull at a regular rate) and so cannot operate with FastMixer.
+        initFastMixer = mFrameCount < mNormalFrameCount
+                && (mOutDevice & AUDIO_DEVICE_OUT_ALL_A2DP) == 0;
         break;
     }
+    ALOGW_IF(initFastMixer == false && mFrameCount < mNormalFrameCount,
+            "FastMixer is preferred for this sink as frameCount %zu is less than threshold %zu",
+            mFrameCount, mNormalFrameCount);
     if (initFastMixer) {
         audio_format_t fastMixerFormat;
         if (mMixerBufferEnabled && mEffectBufferEnabled) {
