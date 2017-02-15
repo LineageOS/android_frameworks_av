@@ -338,8 +338,7 @@ status_t StreamOutHalHidl::callWriterThread(
     // TODO: Remove manual event flag handling once blocking MQ is implemented. b/33815422
     uint32_t efState = 0;
 retry:
-    status_t ret = mEfGroup->wait(
-            static_cast<uint32_t>(MessageQueueFlagBits::NOT_FULL), &efState, NS_PER_SEC);
+    status_t ret = mEfGroup->wait(static_cast<uint32_t>(MessageQueueFlagBits::NOT_FULL), &efState);
     if (efState & static_cast<uint32_t>(MessageQueueFlagBits::NOT_FULL)) {
         WriteStatus writeStatus;
         writeStatus.retval = Result::NOT_INITIALIZED;
@@ -597,8 +596,7 @@ status_t StreamInHalHidl::callReaderThread(
     // TODO: Remove manual event flag handling once blocking MQ is implemented. b/33815422
     uint32_t efState = 0;
 retry:
-    status_t ret = mEfGroup->wait(
-            static_cast<uint32_t>(MessageQueueFlagBits::NOT_EMPTY), &efState, NS_PER_SEC);
+    status_t ret = mEfGroup->wait(static_cast<uint32_t>(MessageQueueFlagBits::NOT_EMPTY), &efState);
     if (efState & static_cast<uint32_t>(MessageQueueFlagBits::NOT_EMPTY)) {
         ReadStatus readStatus;
         readStatus.retval = Result::NOT_INITIALIZED;
