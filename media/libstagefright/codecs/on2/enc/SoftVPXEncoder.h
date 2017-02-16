@@ -90,6 +90,8 @@ protected:
     virtual OMX_ERRORTYPE getExtensionIndex(
             const char *name, OMX_INDEXTYPE *index);
 
+    virtual void onReset();
+
 private:
     // number of buffers allocated per port
     static const uint32_t kNumBuffers = 4;
