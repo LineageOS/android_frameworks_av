@@ -331,7 +331,7 @@ NuPlayerDrm::CryptoInfo *NuPlayerDrm::getSampleCryptoInfo(sp<MetaData> meta)
     size_t keysize;
     if (meta->findData(kKeyCryptoKey, &type, &key, &keysize)) {
         if (keysize != kBlockSize) {
-            ALOGE("getSampleCryptoInfo Keys must be %zu bytes in length: %zu",
+            ALOGE("getSampleCryptoInfo Keys must be %d bytes in length: %zu",
                     kBlockSize, keysize);
             // Keys must be 16 bytes in length.
             return NULL;
@@ -342,7 +342,7 @@ NuPlayerDrm::CryptoInfo *NuPlayerDrm::getSampleCryptoInfo(sp<MetaData> meta)
     size_t ivsize;
     if (meta->findData(kKeyCryptoIV, &type, &iv, &ivsize)) {
         if (ivsize != kBlockSize) {
-            ALOGE("getSampleCryptoInfo IV must be %zu bytes in length: %zu",
+            ALOGE("getSampleCryptoInfo IV must be %d bytes in length: %zu",
                     kBlockSize, ivsize);
             // IVs must be 16 bytes in length.
             return NULL;
