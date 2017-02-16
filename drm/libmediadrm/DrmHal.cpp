@@ -349,6 +349,7 @@ bool DrmHal::isCryptoSchemeSupported(const uint8_t uuid[16], const String8 &mime
     bool result = false;
 
     if (mFactory != NULL && mFactory->isCryptoSchemeSupported(uuid)) {
+        result = true;
         if (mimeType != "") {
             result = mFactory->isContentTypeSupported(mimeType.string());
         }
