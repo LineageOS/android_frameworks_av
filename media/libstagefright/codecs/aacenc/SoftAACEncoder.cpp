@@ -62,8 +62,7 @@ SoftAACEncoder::SoftAACEncoder(
 }
 
 SoftAACEncoder::~SoftAACEncoder() {
-    delete[] mInputFrame;
-    mInputFrame = NULL;
+    onReset();
 
     if (mEncoderHandle) {
         CHECK_EQ(VO_ERR_NONE, mApiHandle->Uninit(mEncoderHandle));
@@ -577,6 +576,17 @@ void SoftAACEncoder::onQueueFilled(OMX_U32 portIndex) {
 
         mInputSize = 0;
     }
+}
+
+void SoftAACEncoder::onReset() {
+    delete[] mInputFrame;
+    mInputFrame = NULL;
+    mInputSize = 0;
+
+    mSentCodecSpecificData = false;
+    mInputTimeUs = -1ll;
+    mSawInputEOS = false;
+    mSignalledError = false;
 }
 
 }  // namespace android
