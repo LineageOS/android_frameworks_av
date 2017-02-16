@@ -26,6 +26,8 @@
 
 #include "SharedLibrary.h"
 
+class IMemoryHeap;
+
 namespace android {
 
 struct CryptoHal : public BnCrypto {
@@ -70,7 +72,8 @@ private:
      */
     status_t mInitCheck;
 
-    void *mHeapBase;
+    KeyedVector<void *, uint32_t> mHeapBases;
+    uint32_t mNextBufferId;
 
     sp<::android::hardware::drm::V1_0::ICryptoFactory>
             makeCryptoFactory();
@@ -78,7 +81,10 @@ private:
             makeCryptoPlugin(const uint8_t uuid[16], const void *initData,
                 size_t size);
 
-    status_t setHeapBase(const sp<IMemory> &sharedBuffer);
+    void setHeapBase(const sp<IMemoryHeap>& heap);
+
+    status_t toSharedBuffer(const sp<IMemory>& memory,
+            ::android::hardware::drm::V1_0::SharedBuffer* buffer);
 
     DISALLOW_EVIL_CONSTRUCTORS(CryptoHal);
 };
