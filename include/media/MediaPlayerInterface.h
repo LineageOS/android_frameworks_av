@@ -285,31 +285,11 @@ public:
         return INVALID_OPERATION;
     }
 
-    // ModDrm
-    virtual status_t prepareDrm(const uint8_t uuid[16], const int mode) {
+    // Modular DRM
+    virtual status_t prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>& drmSessionId) {
         return INVALID_OPERATION;
     }
     virtual status_t releaseDrm() {
-        return INVALID_OPERATION;
-    }
-    virtual status_t getKeyRequest(Vector<uint8_t> const& scope, String8 const& mimeType,
-                             DrmPlugin::KeyType keyType,
-                             KeyedVector<String8, String8>& optionalParameters,
-                             Vector<uint8_t>& request, String8& defaultUrl,
-                             DrmPlugin::KeyRequestType& keyRequestType) {
-        return INVALID_OPERATION;
-    }
-    virtual status_t provideKeyResponse(Vector<uint8_t>& releaseKeySetId,
-                             Vector<uint8_t>& response, Vector<uint8_t>& keySetId) {
-        return INVALID_OPERATION;
-    }
-    virtual status_t restoreKeys(Vector<uint8_t> const& keySetId) {
-        return INVALID_OPERATION;
-    }
-    virtual status_t getDrmPropertyString(String8 const& name, String8& value) {
-        return INVALID_OPERATION;
-    }
-    virtual status_t setDrmPropertyString(String8 const& name, String8 const& value) {
         return INVALID_OPERATION;
     }
 

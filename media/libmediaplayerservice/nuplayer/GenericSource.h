@@ -28,7 +28,6 @@
 namespace android {
 
 class DecryptHandle;
-class DrmManagerClient;
 struct AnotherPacketSource;
 struct ARTSPController;
 class DataSource;
@@ -38,7 +37,9 @@ struct MediaSource;
 class MediaBuffer;
 struct NuCachedSource2;
 
-struct NuPlayer::GenericSource : public NuPlayer::Source {
+struct NuPlayer::GenericSource : public NuPlayer::Source,
+                                 public MediaBufferObserver // Modular DRM
+{
     GenericSource(const sp<AMessage> &notify, bool uidValid, uid_t uid);
 
     status_t setDataSource(
@@ -84,6 +85,13 @@ struct NuPlayer::GenericSource : public NuPlayer::Source {
 
     virtual void setOffloadAudio(bool offload);
 
+    // Modular DRM
+    virtual void signalBufferReturned(MediaBuffer *buffer);
+
+    virtual status_t prepareDrm(
+            const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId, sp<ICrypto> *crypto);
+
+
 protected:
     virtual ~GenericSource();
 
@@ -109,6 +117,8 @@ private:
         kWhatStart,
         kWhatResume,
         kWhatSecureDecodersInstantiated,
+        // Modular DRM
+        kWhatPrepareDrm,
     };
 
     struct Track {
@@ -224,8 +234,6 @@ private:
     sp<NuCachedSource2> mCachedSource;
     sp<DataSource> mHttpSource;
     sp<MetaData> mFileMeta;
-    DrmManagerClient *mDrmManagerClient;
-    sp<DecryptHandle> mDecryptHandle;
     bool mStarted;
     bool mStopRead;
     int64_t mBitrate;
@@ -243,7 +251,6 @@ private:
 
     status_t initFromDataSource();
     int64_t getLastReadPosition();
-    void setDrmPlaybackStatusIfNeeded(int playbackStatus, int64_t position);
 
     void notifyPreparedAndCleanup(status_t err);
     void onSecureDecodersInstantiated(status_t err);
@@ -298,6 +305,13 @@ private:
 
     void queueDiscontinuityIfNeeded(
             bool seeking, bool formatChange, media_track_type trackType, Track *track);
+
+    // Modular DRM
+    bool mIsDrmProtected;
+    Vector<String8> mMimes;
+
+    status_t checkDrmInfo();
+    status_t onPrepareDrm(const sp<AMessage> &msg);
 
     DISALLOW_EVIL_CONSTRUCTORS(GenericSource);
 };

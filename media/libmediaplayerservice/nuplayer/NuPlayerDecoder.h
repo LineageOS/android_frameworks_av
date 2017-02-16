@@ -39,6 +39,8 @@ struct NuPlayer::Decoder : public DecoderBase {
     // sets the output surface of video decoders.
     virtual status_t setVideoSurface(const sp<Surface> &surface);
 
+    virtual status_t releaseCrypto();
+
 protected:
     virtual ~Decoder();
 
@@ -57,7 +59,8 @@ private:
         kWhatCodecNotify         = 'cdcN',
         kWhatRenderBuffer        = 'rndr',
         kWhatSetVideoSurface     = 'sSur',
-        kWhatAudioOutputFormatChanged = 'aofc'
+        kWhatAudioOutputFormatChanged = 'aofc',
+        kWhatDrmReleaseCrypto    = 'rDrm',
     };
 
     enum {
@@ -134,6 +137,8 @@ private:
     void finishHandleDiscontinuity(bool flushOnTimeChange);
 
     void notifyResumeCompleteIfNecessary();
+
+    void onReleaseCrypto(const sp<AMessage>& msg);
 
     DISALLOW_EVIL_CONSTRUCTORS(Decoder);
 };

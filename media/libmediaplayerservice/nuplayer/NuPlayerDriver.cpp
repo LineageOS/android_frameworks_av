@@ -884,8 +884,8 @@ void NuPlayerDriver::notifyListener(
 
 void NuPlayerDriver::notifyListener_l(
         int msg, int ext1, int ext2, const Parcel *in) {
-    ALOGD("notifyListener_l(%p), (%d, %d, %d), loop setting(%d, %d)",
-            this, msg, ext1, ext2, mAutoLoop, mLooping);
+    ALOGD("notifyListener_l(%p), (%d, %d, %d, %d), loop setting(%d, %d)",
+            this, msg, ext1, ext2, (in == NULL ? -1 : (int)in->dataSize()), mAutoLoop, mLooping);
     switch (msg) {
         case MEDIA_PLAYBACK_COMPLETE:
         {
@@ -943,6 +943,8 @@ void NuPlayerDriver::notifySetDataSourceCompleted(status_t err) {
 }
 
 void NuPlayerDriver::notifyPrepareCompleted(status_t err) {
+    ALOGV("notifyPrepareCompleted %d", err);
+
     Mutex::Autolock autoLock(mLock);
 
     if (mState != STATE_PREPARING) {
@@ -985,6 +987,35 @@ void NuPlayerDriver::notifyFlagsChanged(uint32_t flags) {
     Mutex::Autolock autoLock(mLock);
 
     mPlayerFlags = flags;
+}
+
+// Modular DRM
+status_t NuPlayerDriver::prepareDrm(const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId)
+{
+    ALOGV("prepareDrm(%p) state: %d", this, mState);
+
+    Mutex::Autolock autoLock(mLock);
+
+    // leaving the state verification for mediaplayer.cpp
+    status_t ret = mPlayer->prepareDrm(uuid, drmSessionId);
+
+    ALOGV("prepareDrm ret: %d", ret);
+
+    return ret;
+}
+
+status_t NuPlayerDriver::releaseDrm()
+{
+    ALOGV("releaseDrm(%p) state: %d", this, mState);
+
+    Mutex::Autolock autoLock(mLock);
+
+    // leaving the state verification for mediaplayer.cpp
+    status_t ret = mPlayer->releaseDrm();
+
+    ALOGV("releaseDrm ret: %d", ret);
+
+    return ret;
 }
 
 }  // namespace android

@@ -72,14 +72,9 @@ enum {
     SET_NEXT_PLAYER,
     APPLY_VOLUME_SHAPER,
     GET_VOLUME_SHAPER_STATE,
-    // ModDrm
+    // Modular DRM
     PREPARE_DRM,
     RELEASE_DRM,
-    GET_KEY_REQUEST,
-    PROVIDE_KEY_RESPONSE,
-    RESTORE_KEYS,
-    GET_DRM_PROPERTY_STRING,
-    SET_DRM_PROPERTY_STRING,
 };
 
 // ModDrm helpers
@@ -521,14 +516,14 @@ public:
         return state;
     }
 
-    // ModDrm
-    status_t prepareDrm(const uint8_t uuid[16], const int mode)
+    // Modular DRM
+    status_t prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>& drmSessionId)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
 
         data.write(uuid, 16);
-        data.writeInt32(mode);
+        writeVector(data, drmSessionId);
 
         status_t status = remote()->transact(PREPARE_DRM, data, &reply);
         if (status != OK) {
@@ -547,105 +542,6 @@ public:
         status_t status = remote()->transact(RELEASE_DRM, data, &reply);
         if (status != OK) {
             ALOGE("releaseDrm: binder call failed: %d", status);
-            return status;
-        }
-
-        return reply.readInt32();
-    }
-
-    status_t getKeyRequest(Vector<uint8_t> const& scope, String8 const& mimeType,
-            DrmPlugin::KeyType keyType, KeyedVector<String8, String8>& optionalParameters,
-            Vector<uint8_t>& request, String8& defaultUrl,
-            DrmPlugin::KeyRequestType& keyRequestType)
-    {
-        Parcel data, reply;
-        data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
-
-        writeVector(data, scope);
-        data.writeString8(mimeType);
-        data.writeInt32((int32_t)keyType);
-
-        data.writeUint32(optionalParameters.size());
-        for (size_t i = 0; i < optionalParameters.size(); ++i) {
-            data.writeString8(optionalParameters.keyAt(i));
-            data.writeString8(optionalParameters.valueAt(i));
-        }
-
-        status_t status = remote()->transact(GET_KEY_REQUEST, data, &reply);
-        if (status != OK) {
-            ALOGE("getKeyRequest: binder call failed: %d", status);
-            return status;
-        }
-
-        readVector(reply, request);
-        defaultUrl = reply.readString8();
-        keyRequestType = (DrmPlugin::KeyRequestType)reply.readInt32();
-
-        return reply.readInt32();
-    }
-
-    status_t provideKeyResponse(Vector<uint8_t>& releaseKeySetId, Vector<uint8_t>& response,
-            Vector<uint8_t> &keySetId)
-    {
-        Parcel data, reply;
-        data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
-
-        writeVector(data, releaseKeySetId);
-        writeVector(data, response);
-
-        status_t status = remote()->transact(PROVIDE_KEY_RESPONSE, data, &reply);
-        if (status != OK) {
-            ALOGE("provideKeyResponse: binder call failed: %d", status);
-            return status;
-        }
-
-        readVector(reply, keySetId);
-
-        return reply.readInt32();
-    }
-
-    status_t restoreKeys(Vector<uint8_t> const& keySetId)
-    {
-        Parcel data, reply;
-        data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
-
-        writeVector(data, keySetId);
-
-        status_t status = remote()->transact(RESTORE_KEYS, data, &reply);
-        if (status != OK) {
-            ALOGE("restoreKeys: binder call failed: %d", status);
-            return status;
-        }
-
-        return reply.readInt32();
-    }
-
-    status_t getDrmPropertyString(String8 const& name, String8& value)
-    {
-        Parcel data, reply;
-        data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
-
-        data.writeString8(name);
-        status_t status = remote()->transact(GET_DRM_PROPERTY_STRING, data, &reply);
-        if (status != OK) {
-            ALOGE("getDrmPropertyString: binder call failed: %d", status);
-            return status;
-        }
-
-        value = reply.readString8();
-        return reply.readInt32();
-    }
-
-    status_t setDrmPropertyString(String8 const& name, String8 const& value)
-    {
-        Parcel data, reply;
-        data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
-
-        data.writeString8(name);
-        data.writeString8(value);
-        status_t status = remote()->transact(SET_DRM_PROPERTY_STRING, data, &reply);
-        if (status != OK) {
-            ALOGE("setDrmPropertyString: binder call failed: %d", status);
             return status;
         }
 
@@ -983,15 +879,16 @@ status_t BnMediaPlayer::onTransact(
             return NO_ERROR;
         } break;
 
-        // ModDrm
+        // Modular DRM
         case PREPARE_DRM: {
             CHECK_INTERFACE(IMediaPlayer, data, reply);
+
             uint8_t uuid[16];
             data.read(uuid, sizeof(uuid));
+            Vector<uint8_t> drmSessionId;
+            readVector(data, drmSessionId);
 
-            int mode = data.readInt32();
-
-            uint32_t result = prepareDrm(uuid, mode);
+            uint32_t result = prepareDrm(uuid, drmSessionId);
             reply->writeInt32(result);
             return OK;
         }
@@ -999,73 +896,6 @@ status_t BnMediaPlayer::onTransact(
             CHECK_INTERFACE(IMediaPlayer, data, reply);
 
             uint32_t result = releaseDrm();
-            reply->writeInt32(result);
-            return OK;
-        }
-        case GET_KEY_REQUEST: {
-            CHECK_INTERFACE(IMediaPlayer, data, reply);
-
-            Vector<uint8_t> scope;
-            readVector(data, scope);
-            String8 mimeType = data.readString8();
-            DrmPlugin::KeyType keyType = (DrmPlugin::KeyType)data.readInt32();
-
-            KeyedVector<String8, String8> optionalParameters;
-            uint32_t count = data.readUint32();
-            for (size_t i = 0; i < count; ++i) {
-                String8 key, value;
-                key = data.readString8();
-                value = data.readString8();
-                optionalParameters.add(key, value);
-            }
-
-            Vector<uint8_t> request;
-            String8 defaultUrl;
-            DrmPlugin::KeyRequestType keyRequestType = DrmPlugin::kKeyRequestType_Unknown;
-
-            status_t result = getKeyRequest(scope, mimeType, keyType, optionalParameters,
-                                      request, defaultUrl, keyRequestType);
-
-            writeVector(*reply, request);
-            reply->writeString8(defaultUrl);
-            reply->writeInt32(keyRequestType);
-            reply->writeInt32(result);
-            return OK;
-        }
-        case PROVIDE_KEY_RESPONSE: {
-            CHECK_INTERFACE(IMediaPlayer, data, reply);
-            Vector<uint8_t> releaseKeySetId, response, keySetId;
-            readVector(data, releaseKeySetId);
-            readVector(data, response);
-            uint32_t result = provideKeyResponse(releaseKeySetId, response, keySetId);
-            writeVector(*reply, keySetId);
-            reply->writeInt32(result);
-            return OK;
-        }
-        case RESTORE_KEYS: {
-            CHECK_INTERFACE(IMediaPlayer, data, reply);
-
-            Vector<uint8_t> keySetId;
-            readVector(data, keySetId);
-            uint32_t result = restoreKeys(keySetId);
-            reply->writeInt32(result);
-            return OK;
-        }
-        case GET_DRM_PROPERTY_STRING: {
-            CHECK_INTERFACE(IMediaPlayer, data, reply);
-            String8 name, value;
-            name = data.readString8();
-            uint32_t result = getDrmPropertyString(name, value);
-            reply->writeString8(value);
-            reply->writeInt32(result);
-            return OK;
-        }
-        case SET_DRM_PROPERTY_STRING: {
-            CHECK_INTERFACE(IMediaPlayer, data, reply);
-            String8 name, value;
-            name = data.readString8();
-            value = data.readString8();
-            uint32_t result = setDrmPropertyString(name, value);
             reply->writeInt32(result);
             return OK;
         }

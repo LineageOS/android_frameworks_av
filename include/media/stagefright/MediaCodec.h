@@ -91,6 +91,8 @@ struct MediaCodec : public AHandler {
             const sp<ICrypto> &crypto,
             uint32_t flags);
 
+    status_t releaseCrypto();
+
     status_t setCallback(const sp<AMessage> &callback);
 
     status_t setOnFrameRenderedNotification(const sp<AMessage> &notify);
@@ -239,6 +241,7 @@ private:
         kWhatSetParameters                  = 'setP',
         kWhatSetCallback                    = 'setC',
         kWhatSetNotification                = 'setN',
+        kWhatDrmReleaseCrypto               = 'rDrm',
     };
 
     enum {
@@ -415,6 +418,8 @@ private:
         mFlags |= kFlagStickyError;
         mStickyError = err;
     }
+
+    void onReleaseCrypto(const sp<AMessage>& msg);
 
     DISALLOW_EVIL_CONSTRUCTORS(MediaCodec);
 };
