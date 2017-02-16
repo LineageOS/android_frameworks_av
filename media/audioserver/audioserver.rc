@@ -6,3 +6,8 @@ service audioserver /system/bin/audioserver
     ioprio rt 4
     writepid /dev/cpuset/foreground/tasks /dev/stune/foreground/tasks
     onrestart restart audio-hal-2-0
+
+on property:vts.native_server.on=1
+    stop audioserver
+on property:vts.native_server.on=0
+    start audioserver
