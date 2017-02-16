@@ -20,8 +20,7 @@
 namespace android {
 int WritePolicyToPipe(const std::string& base_policy_content,
                       const std::string& additional_policy_content);
-int SetUpMinijail(const std::string& base_policy_path,
-                  const std::string& additional_policy_path);
+void SetUpMinijail(const std::string& base_policy_path, const std::string& additional_policy_path);
 }
 
 #endif  // AV_SERVICES_MINIJAIL_MINIJAIL
