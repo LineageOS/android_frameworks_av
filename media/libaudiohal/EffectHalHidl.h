@@ -23,6 +23,8 @@
 #include <fmq/MessageQueue.h>
 #include <system/audio_effect.h>
 
+using ::android::hardware::audio::effect::V2_0::EffectBufferConfig;
+using ::android::hardware::audio::effect::V2_0::EffectConfig;
 using ::android::hardware::audio::effect::V2_0::EffectDescriptor;
 using ::android::hardware::audio::effect::V2_0::IEffect;
 using ::android::hardware::EventFlag;
@@ -75,6 +77,9 @@ class EffectHalHidl : public EffectHalInterface
     EventFlag* mEfGroup;
 
     static status_t analyzeResult(const hardware::audio::effect::V2_0::Result& result);
+    static void effectBufferConfigFromHal(
+            const buffer_config_t& halConfig, EffectBufferConfig* config);
+    static void effectConfigFromHal(const effect_config_t& halConfig, EffectConfig* config);
 
     // Can not be constructed directly by clients.
     EffectHalHidl(const sp<IEffect>& effect, uint64_t effectId);
@@ -84,6 +89,9 @@ class EffectHalHidl : public EffectHalInterface
 
     status_t prepareForProcessing();
     status_t processImpl(uint32_t mqFlag);
+    status_t setConfigImpl(
+            uint32_t cmdCode, uint32_t cmdSize, void *pCmdData,
+            uint32_t *replySize, void *pReplyData);
     status_t setProcessBuffers();
 };
 
