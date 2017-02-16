@@ -189,7 +189,7 @@ status_t NuPlayer::GenericSource::initFromDataSource() {
         const char *mime;
         CHECK(meta->findCString(kKeyMIMEType, &mime));
 
-        ALOGV("initFromDataSource track[%d]: %s", i, mime);
+        ALOGV("initFromDataSource track[%zu]: %s", i, mime);
 
         // Do the string compare immediately with "mime",
         // we can't assume "mime" would stay valid after another
@@ -1932,7 +1932,7 @@ status_t NuPlayer::GenericSource::checkDrmInfo()
     Parcel parcel;
     NuPlayerDrm::retrieveDrmInfo(pssh, psshsize, mMimes, &parcel);
     ALOGV("checkDrmInfo: MEDIA_DRM_INFO PSSH size: %d  Parcel size: %d  objects#: %d",
-          psshsize, (int)parcel.dataSize(), (int)parcel.objectsCount());
+          (int)psshsize, (int)parcel.dataSize(), (int)parcel.objectsCount());
 
     if (parcel.dataSize() == 0) {
         ALOGE("checkDrmInfo: Unexpected parcel size: 0");
