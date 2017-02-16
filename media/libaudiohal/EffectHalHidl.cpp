@@ -74,9 +74,30 @@ void EffectHalHidl::effectBufferConfigFromHal(
 }
 
 // static
+void EffectHalHidl::effectBufferConfigToHal(
+        const EffectBufferConfig& config, buffer_config_t* halConfig) {
+    halConfig->buffer.frameCount = 0;
+    halConfig->buffer.raw = NULL;
+    halConfig->samplingRate = config.samplingRateHz;
+    halConfig->channels = static_cast<uint32_t>(config.channels);
+    halConfig->bufferProvider.cookie = NULL;
+    halConfig->bufferProvider.getBuffer = NULL;
+    halConfig->bufferProvider.releaseBuffer = NULL;
+    halConfig->format = static_cast<uint8_t>(config.format);
+    halConfig->accessMode = static_cast<uint8_t>(config.accessMode);
+    halConfig->mask = static_cast<uint8_t>(config.mask);
+}
+
+// static
 void EffectHalHidl::effectConfigFromHal(const effect_config_t& halConfig, EffectConfig* config) {
     effectBufferConfigFromHal(halConfig.inputCfg, &config->inputCfg);
     effectBufferConfigFromHal(halConfig.outputCfg, &config->outputCfg);
+}
+
+// static
+void EffectHalHidl::effectConfigToHal(const EffectConfig& config, effect_config_t* halConfig) {
+    effectBufferConfigToHal(config.inputCfg, &halConfig->inputCfg);
+    effectBufferConfigToHal(config.outputCfg, &halConfig->outputCfg);
 }
 
 // static
@@ -193,6 +214,8 @@ status_t EffectHalHidl::command(uint32_t cmdCode, uint32_t cmdSize, void *pCmdDa
     // Special cases.
     if (cmdCode == EFFECT_CMD_SET_CONFIG || cmdCode == EFFECT_CMD_SET_CONFIG_REVERSE) {
         return setConfigImpl(cmdCode, cmdSize, pCmdData, replySize, pReplyData);
+    } else if (cmdCode == EFFECT_CMD_GET_CONFIG || cmdCode == EFFECT_CMD_GET_CONFIG_REVERSE) {
+        return getConfigImpl(cmdCode, replySize, pReplyData);
     }
 
     // Common case.
@@ -233,6 +256,34 @@ status_t EffectHalHidl::close() {
     if (mEffect == 0) return NO_INIT;
     Return<Result> ret = mEffect->close();
     return ret.isOk() ? analyzeResult(ret) : FAILED_TRANSACTION;
+}
+
+status_t EffectHalHidl::getConfigImpl(
+        uint32_t cmdCode, uint32_t *replySize, void *pReplyData) {
+    if (replySize == NULL || *replySize != sizeof(effect_config_t) || pReplyData == NULL) {
+        return BAD_VALUE;
+    }
+    status_t result = FAILED_TRANSACTION;
+    Return<void> ret;
+    if (cmdCode == EFFECT_CMD_GET_CONFIG) {
+        ret = mEffect->getConfig([&] (Result r, const EffectConfig &hidlConfig) {
+            result = analyzeResult(r);
+            if (r == Result::OK) {
+                effectConfigToHal(hidlConfig, static_cast<effect_config_t*>(pReplyData));
+            }
+        });
+    } else {
+        ret = mEffect->getConfigReverse([&] (Result r, const EffectConfig &hidlConfig) {
+            result = analyzeResult(r);
+            if (r == Result::OK) {
+                effectConfigToHal(hidlConfig, static_cast<effect_config_t*>(pReplyData));
+            }
+        });
+    }
+    if (!ret.isOk()) {
+        result = FAILED_TRANSACTION;
+    }
+    return result;
 }
 
 status_t EffectHalHidl::setConfigImpl(
