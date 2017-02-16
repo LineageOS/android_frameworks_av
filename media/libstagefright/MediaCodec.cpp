@@ -2914,7 +2914,7 @@ status_t MediaCodec::connectToSurface(const sp<Surface> &surface) {
             return ALREADY_EXISTS;
         }
 
-        err = native_window_api_connect(surface.get(), NATIVE_WINDOW_API_MEDIA);
+        err = nativeWindowConnect(surface.get(), "connectToSurface");
         if (err == OK) {
             // Require a fresh set of buffers after each connect by using a unique generation
             // number. Rely on the fact that max supported process id by Linux is 2^22.
@@ -2929,12 +2929,12 @@ status_t MediaCodec::connectToSurface(const sp<Surface> &surface) {
             // This is needed as the consumer may be holding onto stale frames that it can reattach
             // to this surface after disconnect/connect, and those free frames would inherit the new
             // generation number. Disconnecting after setting a unique generation prevents this.
-            native_window_api_disconnect(surface.get(), NATIVE_WINDOW_API_MEDIA);
-            err = native_window_api_connect(surface.get(), NATIVE_WINDOW_API_MEDIA);
+            nativeWindowDisconnect(surface.get(), "connectToSurface(reconnect)");
+            err = nativeWindowConnect(surface.get(), "connectToSurface(reconnect)");
         }
 
         if (err != OK) {
-            ALOGE("native_window_api_connect returned an error: %s (%d)", strerror(-err), err);
+            ALOGE("nativeWindowConnect returned an error: %s (%d)", strerror(-err), err);
         }
     }
     // do not return ALREADY_EXISTS unless surfaces are the same
@@ -2946,9 +2946,9 @@ status_t MediaCodec::disconnectFromSurface() {
     if (mSurface != NULL) {
         // Resetting generation is not technically needed, but there is no need to keep it either
         mSurface->setGenerationNumber(0);
-        err = native_window_api_disconnect(mSurface.get(), NATIVE_WINDOW_API_MEDIA);
+        err = nativeWindowDisconnect(mSurface.get(), "disconnectFromSurface");
         if (err != OK) {
-            ALOGW("native_window_api_disconnect returned an error: %s (%d)", strerror(-err), err);
+            ALOGW("nativeWindowDisconnect returned an error: %s (%d)", strerror(-err), err);
         }
         // assume disconnected even on error
         mSurface.clear();

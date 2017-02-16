@@ -33,6 +33,8 @@ status_t setNativeWindowSizeFormatAndUsage(
         ANativeWindow *nativeWindow /* nonnull */,
         int width, int height, int format, int rotation, int usage, bool reconnect);
 status_t pushBlankBuffersToNativeWindow(ANativeWindow *nativeWindow /* nonnull */);
+status_t nativeWindowConnect(ANativeWindow *surface, const char *reason);
+status_t nativeWindowDisconnect(ANativeWindow *surface, const char *reason);
 
 } // namespace android
 

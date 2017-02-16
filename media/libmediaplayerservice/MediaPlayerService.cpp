@@ -60,6 +60,7 @@
 #include <media/stagefright/Utils.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooperRoster.h>
+#include <media/stagefright/SurfaceUtils.h>
 #include <mediautils/BatteryNotifier.h>
 
 #include <memunreachable/memunreachable.h>
@@ -903,11 +904,11 @@ status_t MediaPlayerService::Client::setDataSource(
 
 void MediaPlayerService::Client::disconnectNativeWindow() {
     if (mConnectedWindow != NULL) {
-        status_t err = native_window_api_disconnect(mConnectedWindow.get(),
-                NATIVE_WINDOW_API_MEDIA);
+        status_t err = nativeWindowDisconnect(
+                mConnectedWindow.get(), "disconnectNativeWindow");
 
         if (err != OK) {
-            ALOGW("native_window_api_disconnect returned an error: %s (%d)",
+            ALOGW("nativeWindowDisconnect returned an error: %s (%d)",
                     strerror(-err), err);
         }
     }
@@ -929,8 +930,7 @@ status_t MediaPlayerService::Client::setVideoSurfaceTexture(
     sp<ANativeWindow> anw;
     if (bufferProducer != NULL) {
         anw = new Surface(bufferProducer, true /* controlledByApp */);
-        status_t err = native_window_api_connect(anw.get(),
-                NATIVE_WINDOW_API_MEDIA);
+        status_t err = nativeWindowConnect(anw.get(), "setVideoSurfaceTexture");
 
         if (err != OK) {
             ALOGE("setVideoSurfaceTexture failed: %d", err);

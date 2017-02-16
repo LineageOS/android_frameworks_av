@@ -31,15 +31,15 @@ status_t setNativeWindowSizeFormatAndUsage(
 
     // In some cases we need to reconnect so that we can dequeue all buffers
     if (reconnect) {
-        err = native_window_api_disconnect(nativeWindow, NATIVE_WINDOW_API_MEDIA);
+        err = nativeWindowDisconnect(nativeWindow, "setNativeWindowSizeFormatAndUsage");
         if (err != NO_ERROR) {
-            ALOGE("native_window_api_disconnect failed: %s (%d)", strerror(-err), -err);
+            ALOGE("nativeWindowDisconnect failed: %s (%d)", strerror(-err), -err);
             return err;
         }
 
-        err = native_window_api_connect(nativeWindow, NATIVE_WINDOW_API_MEDIA);
+        err = nativeWindowConnect(nativeWindow, "setNativeWindowSizeFormatAndUsage");
         if (err != NO_ERROR) {
-            ALOGE("native_window_api_connect failed: %s (%d)", strerror(-err), -err);
+            ALOGE("nativeWindowConnect failed: %s (%d)", strerror(-err), -err);
             return err;
         }
     }
@@ -127,7 +127,7 @@ status_t pushBlankBuffersToNativeWindow(ANativeWindow *nativeWindow /* nonnull *
     // We need to reconnect to the ANativeWindow as a CPU client to ensure that
     // no frames get dropped by SurfaceFlinger assuming that these are video
     // frames.
-    err = native_window_api_disconnect(nativeWindow, NATIVE_WINDOW_API_MEDIA);
+    err = nativeWindowDisconnect(nativeWindow, "pushBlankBuffersToNativeWindow");
     if (err != NO_ERROR) {
         ALOGE("error pushing blank frames: api_disconnect failed: %s (%d)", strerror(-err), -err);
         return err;
@@ -136,7 +136,7 @@ status_t pushBlankBuffersToNativeWindow(ANativeWindow *nativeWindow /* nonnull *
     err = native_window_api_connect(nativeWindow, NATIVE_WINDOW_API_CPU);
     if (err != NO_ERROR) {
         ALOGE("error pushing blank frames: api_connect failed: %s (%d)", strerror(-err), -err);
-        (void)native_window_api_connect(nativeWindow, NATIVE_WINDOW_API_MEDIA);
+        (void)nativeWindowConnect(nativeWindow, "pushBlankBuffersToNativeWindow(err)");
         return err;
     }
 
@@ -219,7 +219,7 @@ error:
         }
     }
 
-    err2 = native_window_api_connect(nativeWindow, NATIVE_WINDOW_API_MEDIA);
+    err2 = nativeWindowConnect(nativeWindow, "pushBlankBuffersToNativeWindow(err2)");
     if (err2 != NO_ERROR) {
         ALOGE("error pushing blank frames: api_connect failed: %s (%d)", strerror(-err), -err);
         if (err == NO_ERROR) {
@@ -230,5 +230,22 @@ error:
     return err;
 }
 
+status_t nativeWindowConnect(ANativeWindow *surface, const char *reason) {
+    ALOGD("connecting to surface %p, reason %s", surface, reason);
+
+    status_t err = native_window_api_connect(surface, NATIVE_WINDOW_API_MEDIA);
+    ALOGE_IF(err != OK, "Failed to connect to surface %p, err %d", surface, err);
+
+    return err;
+}
+
+status_t nativeWindowDisconnect(ANativeWindow *surface, const char *reason) {
+    ALOGD("disconnecting from surface %p, reason %s", surface, reason);
+
+    status_t err = native_window_api_disconnect(surface, NATIVE_WINDOW_API_MEDIA);
+    ALOGE_IF(err != OK, "Failed to disconnect from surface %p, err %d", surface, err);
+
+    return err;
+}
 }  // namespace android
 
