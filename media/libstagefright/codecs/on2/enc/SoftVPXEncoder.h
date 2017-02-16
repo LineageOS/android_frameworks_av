@@ -93,6 +93,8 @@ protected:
     // encoding of the frame
     virtual void onQueueFilled(OMX_U32 portIndex);
 
+    virtual void onReset();
+
     // Initializes vpx encoder with available settings.
     status_t initEncoder();
 
