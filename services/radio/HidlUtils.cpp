@@ -134,14 +134,18 @@ void HidlUtils::convertProgramInfoFromHal(radio_program_info_t *info,
                            halInfo->channel, halInfo->subChannel);
 }
 
+// TODO(twasilczyk): drop unnecessary channel info
 //static
 void HidlUtils::convertMetaDataFromHal(radio_metadata_t **metadata,
                                        const hidl_vec<MetaData>& halMetadata,
-                                       uint32_t channel,
-                                       uint32_t subChannel)
+                                       uint32_t channel __unused,
+                                       uint32_t subChannel __unused)
 {
 
-    radio_metadata_allocate(metadata, channel, subChannel);
+    if (metadata == nullptr || *metadata == nullptr) {
+        ALOGE("destination metadata buffer is a nullptr");
+        return;
+    }
     for (size_t i = 0; i < halMetadata.size(); i++) {
         radio_metadata_key_t key = static_cast<radio_metadata_key_t>(halMetadata[i].key);
         radio_metadata_type_t type = static_cast<radio_metadata_key_t>(halMetadata[i].type);

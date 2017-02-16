@@ -20,7 +20,7 @@
 #include <media/audiohal/hidl/HalDeathHandler.h>
 #include <utils/Log.h>
 #include <utils/misc.h>
-#include <system/radio_metadata.h>
+#include <system/RadioMetadataWrapper.h>
 #include <android/hardware/broadcastradio/1.0/IBroadcastRadioFactory.h>
 
 #include "RadioHalHidl.h"
@@ -261,27 +261,25 @@ Return<void> RadioHalHidl::Tuner::configChange(Result result, const BandConfig& 
 Return<void> RadioHalHidl::Tuner::tuneComplete(Result result, const ProgramInfo& info)
 {
     ALOGV("%s IN", __FUNCTION__);
-    radio_hal_event_t event;
-    memset(&event, 0, sizeof(radio_hal_event_t));
+    radio_hal_event_t event = {};
+    RadioMetadataWrapper metadataWrapper(&event.info.metadata);
+
     event.type = RADIO_EVENT_TUNED;
     event.status = HidlUtils::convertHalResult(result);
     HidlUtils::convertProgramInfoFromHal(&event.info, &info);
     onCallback(&event);
-    radio_metadata_deallocate(event.info.metadata);
     return Return<void>();
 }
 
 Return<void> RadioHalHidl::Tuner::afSwitch(const ProgramInfo& info)
 {
     ALOGV("%s IN", __FUNCTION__);
-    radio_hal_event_t event;
-    memset(&event, 0, sizeof(radio_hal_event_t));
+    radio_hal_event_t event = {};
+    RadioMetadataWrapper metadataWrapper(&event.info.metadata);
+
     event.type = RADIO_EVENT_AF_SWITCH;
     HidlUtils::convertProgramInfoFromHal(&event.info, &info);
     onCallback(&event);
-    if (event.info.metadata != NULL) {
-        radio_metadata_deallocate(event.info.metadata);
-    }
     return Return<void>();
 }
 
@@ -319,14 +317,12 @@ Return<void> RadioHalHidl::Tuner::newMetadata(uint32_t channel, uint32_t subChan
                                           const ::android::hardware::hidl_vec<MetaData>& metadata)
 {
     ALOGV("%s IN", __FUNCTION__);
-    radio_hal_event_t event;
-    memset(&event, 0, sizeof(radio_hal_event_t));
+    radio_hal_event_t event = {};
+    RadioMetadataWrapper metadataWrapper(&event.info.metadata);
+
     event.type = RADIO_EVENT_METADATA;
     HidlUtils::convertMetaDataFromHal(&event.metadata, metadata, channel, subChannel);
     onCallback(&event);
-    if (event.metadata != NULL) {
-        radio_metadata_deallocate(event.info.metadata);
-    }
     return Return<void>();
 }
 
