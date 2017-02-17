@@ -61,7 +61,7 @@
 #include "include/SharedMemoryBuffer.h"
 #include "omx/OMXUtils.h"
 
-#include <android/hidl/memory/1.0/IAllocator.h>
+#include <android/hidl/allocator/1.0/IAllocator.h>
 #include <android/hidl/memory/1.0/IMemory.h>
 #include "omx/hal/1.0/utils/WOmxNode.h"
 

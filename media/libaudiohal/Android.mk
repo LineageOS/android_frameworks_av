@@ -45,6 +45,7 @@ LOCAL_SHARED_LIBRARIES += \
     android.hardware.audio.common@2.0      \
     android.hardware.audio.common@2.0-util \
     android.hardware.audio.effect@2.0      \
+    android.hidl.allocator@1.0             \
     android.hidl.memory@1.0                \
     libmedia_helper  \
     libmediautils
