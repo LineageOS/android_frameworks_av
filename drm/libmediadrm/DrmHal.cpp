@@ -20,12 +20,11 @@
 
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
-#include <dirent.h>
-#include <dlfcn.h>
 
 #include <android/hardware/drm/1.0/IDrmFactory.h>
 #include <android/hardware/drm/1.0/IDrmPlugin.h>
 #include <android/hardware/drm/1.0/types.h>
+#include <android/hidl/manager/1.0/IServiceManager.h>
 
 #include <media/DrmHal.h>
 #include <media/DrmSessionClientInterface.h>
@@ -52,6 +51,7 @@ using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
+using ::android::hidl::manager::V1_0::IServiceManager;
 using ::android::sp;
 
 namespace android {
@@ -110,9 +110,9 @@ static KeyedVector<String8, String8> toKeyedVector(const ::KeyedVector&
     return keyedVector;
 }
 
-static List<Vector<uint8_t> > toSecureStops(const hidl_vec<SecureStop>&
+static List<Vector<uint8_t>> toSecureStops(const hidl_vec<SecureStop>&
         hSecureStops) {
-    List<Vector<uint8_t> > secureStops;
+    List<Vector<uint8_t>> secureStops;
     for (size_t i = 0; i < hSecureStops.size(); i++) {
         secureStops.push_back(toVector(hSecureStops[i].opaqueData));
     }
@@ -189,43 +189,61 @@ private:
 
 DrmHal::DrmHal()
    : mDrmSessionClient(new DrmSessionClient(this)),
-     mFactory(makeDrmFactory()),
-     mInitCheck((mFactory == NULL) ? ERROR_UNSUPPORTED : NO_INIT) {
+     mFactories(makeDrmFactories()),
+     mInitCheck((mFactories.size() == 0) ? ERROR_UNSUPPORTED : NO_INIT) {
 }
 
 DrmHal::~DrmHal() {
     DrmSessionManager::Instance()->removeDrm(mDrmSessionClient);
 }
 
-sp<IDrmFactory> DrmHal::makeDrmFactory() {
-    sp<IDrmFactory> factory = IDrmFactory::getService("drm");
-    if (factory == NULL) {
-        ALOGE("Failed to make drm factory");
-        return NULL;
+Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
+    Vector<sp<IDrmFactory>> factories;
+
+    auto manager = ::IServiceManager::getService("manager");
+
+    if (manager != NULL) {
+        manager->listByInterface(IDrmFactory::descriptor,
+                [&factories](const hidl_vec<hidl_string> &registered) {
+                    for (const auto &instance : registered) {
+                        auto factory = IDrmFactory::getService(instance);
+                        if (factory != NULL) {
+                            factories.push_back(factory);
+                            ALOGI("makeDrmFactories: factory instance %s is %s",
+                                    instance.c_str(),
+                                    factory->isRemote() ? "Remote" : "Not Remote");
+                        }
+                    }
+                }
+            );
     }
 
-    ALOGD("makeDrmFactory: service is %s",
-            factory->isRemote() ? "Remote" : "Not Remote");
-
-    return factory;
+    if (factories.size() == 0) {
+        // must be in passthrough mode, load the default passthrough service
+        auto passthrough = IDrmFactory::getService("drm");
+        if (passthrough != NULL) {
+            ALOGI("makeDrmFactories: using default drm instance");
+            factories.push_back(passthrough);
+        } else {
+            ALOGE("Failed to find any drm factories");
+        }
+    }
+    return factories;
 }
 
-sp<IDrmPlugin> DrmHal::makeDrmPlugin(const uint8_t uuid[16],
-        const String8& appPackageName) {
-    if (mFactory == NULL){
-        return NULL;
-    }
+sp<IDrmPlugin> DrmHal::makeDrmPlugin(const sp<IDrmFactory>& factory,
+        const uint8_t uuid[16], const String8& appPackageName) {
 
     sp<IDrmPlugin> plugin;
-    Return<void> hResult = mFactory->createPlugin(uuid, appPackageName.string(),
+    Return<void> hResult = factory->createPlugin(uuid, appPackageName.string(),
             [&](Status status, const sp<IDrmPlugin>& hPlugin) {
-      if (status != Status::OK) {
-        ALOGD("Failed to make drm plugin");
-        return;
-      }
-      plugin = hPlugin;
-    }
-    );
+                if (status != Status::OK) {
+                    ALOGE("Failed to make drm plugin");
+                    return;
+                }
+                plugin = hPlugin;
+            }
+        );
     return plugin;
 }
 
@@ -346,22 +364,30 @@ Return<void> DrmHal::sendKeysChange(const hidl_vec<uint8_t>& sessionId,
 
 bool DrmHal::isCryptoSchemeSupported(const uint8_t uuid[16], const String8 &mimeType) {
     Mutex::Autolock autoLock(mLock);
-    bool result = false;
 
-    if (mFactory != NULL && mFactory->isCryptoSchemeSupported(uuid)) {
-        result = true;
-        if (mimeType != "") {
-            result = mFactory->isContentTypeSupported(mimeType.string());
+    for (size_t i = 0; i < mFactories.size(); i++) {
+        if (mFactories[i]->isCryptoSchemeSupported(uuid)) {
+            if (mimeType != "") {
+                if (mFactories[i]->isContentTypeSupported(mimeType.string())) {
+                    return true;
+                }
+            } else {
+                return true;
+            }
         }
     }
-    return result;
+    return false;
 }
 
 status_t DrmHal::createPlugin(const uint8_t uuid[16],
         const String8& appPackageName) {
     Mutex::Autolock autoLock(mLock);
 
-    mPlugin = makeDrmPlugin(uuid, appPackageName);
+    for (size_t i = 0; i < mFactories.size(); i++) {
+        if (mFactories[i]->isCryptoSchemeSupported(uuid)) {
+            mPlugin = makeDrmPlugin(mFactories[i], uuid, appPackageName);
+        }
+    }
 
     if (mPlugin == NULL) {
         mInitCheck = ERROR_UNSUPPORTED;
@@ -628,7 +654,7 @@ status_t DrmHal::provideProvisionResponse(Vector<uint8_t> const &response,
     return hResult.isOk() ? err : DEAD_OBJECT;
 }
 
-status_t DrmHal::getSecureStops(List<Vector<uint8_t> > &secureStops) {
+status_t DrmHal::getSecureStops(List<Vector<uint8_t>> &secureStops) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {

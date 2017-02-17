@@ -20,11 +20,14 @@
 
 #include <android/hardware/drm/1.0/ICryptoFactory.h>
 #include <android/hardware/drm/1.0/ICryptoPlugin.h>
+
 #include <media/ICrypto.h>
 #include <utils/KeyedVector.h>
 #include <utils/threads.h>
 
-#include "SharedLibrary.h"
+using ::android::hardware::drm::V1_0::ICryptoFactory;
+using ::android::hardware::drm::V1_0::ICryptoPlugin;
+using ::android::hardware::drm::V1_0::SharedBuffer;
 
 class IMemoryHeap;
 
@@ -60,9 +63,8 @@ struct CryptoHal : public BnCrypto {
 private:
     mutable Mutex mLock;
 
-    sp<SharedLibrary> mLibrary;
-    sp<::android::hardware::drm::V1_0::ICryptoFactory> mFactory;
-    sp<::android::hardware::drm::V1_0::ICryptoPlugin> mPlugin;
+    const Vector<sp<ICryptoFactory>> mFactories;
+    sp<ICryptoPlugin> mPlugin;
 
     /**
      * mInitCheck is:
@@ -75,16 +77,13 @@ private:
     KeyedVector<void *, uint32_t> mHeapBases;
     uint32_t mNextBufferId;
 
-    sp<::android::hardware::drm::V1_0::ICryptoFactory>
-            makeCryptoFactory();
-    sp<::android::hardware::drm::V1_0::ICryptoPlugin>
-            makeCryptoPlugin(const uint8_t uuid[16], const void *initData,
-                size_t size);
+    Vector<sp<ICryptoFactory>> makeCryptoFactories();
+    sp<ICryptoPlugin> makeCryptoPlugin(const sp<ICryptoFactory>& factory,
+            const uint8_t uuid[16], const void *initData, size_t size);
 
     void setHeapBase(const sp<IMemoryHeap>& heap);
 
-    status_t toSharedBuffer(const sp<IMemory>& memory,
-            ::android::hardware::drm::V1_0::SharedBuffer* buffer);
+    status_t toSharedBuffer(const sp<IMemory>& memory, ::SharedBuffer* buffer);
 
     DISALLOW_EVIL_CONSTRUCTORS(CryptoHal);
 };

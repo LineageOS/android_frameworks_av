@@ -17,10 +17,9 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "CryptoHal"
 #include <utils/Log.h>
-#include <dirent.h>
-#include <dlfcn.h>
 
 #include <android/hardware/drm/1.0/types.h>
+#include <android/hidl/manager/1.0/IServiceManager.h>
 
 #include <binder/IMemory.h>
 #include <cutils/native_handle.h>
@@ -47,6 +46,7 @@ using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
+using ::android::hidl::manager::V1_0::IServiceManager;
 using ::android::sp;
 
 
@@ -101,31 +101,52 @@ static String8 toString8(hidl_string hString) {
 
 
 CryptoHal::CryptoHal()
-    : mFactory(makeCryptoFactory()),
-      mInitCheck((mFactory == NULL) ? ERROR_UNSUPPORTED : NO_INIT),
+    : mFactories(makeCryptoFactories()),
+      mInitCheck((mFactories.size() == 0) ? ERROR_UNSUPPORTED : NO_INIT),
       mNextBufferId(0) {
 }
 
 CryptoHal::~CryptoHal() {
 }
 
+Vector<sp<ICryptoFactory>> CryptoHal::makeCryptoFactories() {
+    Vector<sp<ICryptoFactory>> factories;
 
-sp<ICryptoFactory> CryptoHal::makeCryptoFactory() {
-    sp<ICryptoFactory> factory = ICryptoFactory::getService("crypto");
-    if (factory == NULL) {
-        ALOGE("Failed to make crypto factory");
+    auto manager = ::IServiceManager::getService("manager");
+    if (manager != NULL) {
+        manager->listByInterface(ICryptoFactory::descriptor,
+                [&factories](const hidl_vec<hidl_string> &registered) {
+                    for (const auto &instance : registered) {
+                        auto factory = ICryptoFactory::getService(instance);
+                        if (factory != NULL) {
+                            factories.push_back(factory);
+                            ALOGI("makeCryptoFactories: factory instance %s is %s",
+                                    instance.c_str(),
+                                    factory->isRemote() ? "Remote" : "Not Remote");
+                        }
+                    }
+                }
+            );
     }
-    return factory;
+
+    if (factories.size() == 0) {
+        // must be in passthrough mode, load the default passthrough service
+        auto passthrough = ICryptoFactory::getService("crypto");
+        if (passthrough != NULL) {
+            ALOGI("makeCryptoFactories: using default crypto instance");
+            factories.push_back(passthrough);
+        } else {
+            ALOGE("Failed to find any crypto factories");
+        }
+    }
+    return factories;
 }
 
-sp<ICryptoPlugin> CryptoHal::makeCryptoPlugin(const uint8_t uuid[16],
-        const void *initData, size_t initDataSize) {
-    if (mFactory == NULL){
-        return NULL;
-    }
+sp<ICryptoPlugin> CryptoHal::makeCryptoPlugin(const sp<ICryptoFactory>& factory,
+        const uint8_t uuid[16], const void *initData, size_t initDataSize) {
 
     sp<ICryptoPlugin> plugin;
-    Return<void> hResult = mFactory->createPlugin(toHidlArray16(uuid),
+    Return<void> hResult = factory->createPlugin(toHidlArray16(uuid),
             toHidlVec(initData, initDataSize),
             [&](Status status, const sp<ICryptoPlugin>& hPlugin) {
                 if (status != Status::OK) {
@@ -146,17 +167,24 @@ status_t CryptoHal::initCheck() const {
 
 bool CryptoHal::isCryptoSchemeSupported(const uint8_t uuid[16]) {
     Mutex::Autolock autoLock(mLock);
-    if (mFactory != NULL) {
-        return mFactory->isCryptoSchemeSupported(uuid);
+
+    for (size_t i = 0; i < mFactories.size(); i++) {
+        if (mFactories[i]->isCryptoSchemeSupported(uuid)) {
+            return true;
+        }
     }
     return false;
 }
 
-status_t CryptoHal::createPlugin(
-        const uint8_t uuid[16], const void *data, size_t size) {
+status_t CryptoHal::createPlugin(const uint8_t uuid[16], const void *data,
+        size_t size) {
     Mutex::Autolock autoLock(mLock);
 
-    mPlugin = makeCryptoPlugin(uuid, data, size);
+    for (size_t i = 0; i < mFactories.size(); i++) {
+        if (mFactories[i]->isCryptoSchemeSupported(uuid)) {
+            mPlugin = makeCryptoPlugin(mFactories[i], uuid, data, size);
+        }
+    }
 
     if (mPlugin == NULL) {
         mInitCheck = ERROR_UNSUPPORTED;

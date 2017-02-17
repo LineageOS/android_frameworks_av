@@ -48,7 +48,8 @@ LOCAL_SHARED_LIBRARIES += \
     android.hidl.base@1.0 \
     android.hardware.drm@1.0 \
     libhidlbase \
-    libhidlmemory
+    libhidlmemory \
+    libhidltransport
 endif
 
 LOCAL_CFLAGS += -Werror -Wno-error=deprecated-declarations -Wall
