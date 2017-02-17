@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AAUDIO_AAUDIO_SERVICE_H
-#define AAUDIO_AAUDIO_SERVICE_H
+#ifndef AAUDIO_AAUDIO_SERVICE_DEFINITIONS_H
+#define AAUDIO_AAUDIO_SERVICE_DEFINITIONS_H
 
 #include <stdint.h>
 
@@ -28,9 +28,9 @@ namespace aaudio {
 // TODO move this an "include" folder for the service.
 
 struct AAudioMessageTimestamp {
-    aaudio_position_frames_t position;
+    int64_t position;
     int64_t                deviceOffset; // add to client position to get device position
-    aaudio_nanoseconds_t     timestamp;
+    int64_t     timestamp;
 };
 
 typedef enum aaudio_service_event_e : uint32_t {
@@ -61,7 +61,6 @@ typedef struct AAudioServiceMessage_s {
     };
 } AAudioServiceMessage;
 
-
 } /* namespace aaudio */
 
-#endif //AAUDIO_AAUDIO_SERVICE_H
+#endif //AAUDIO_AAUDIO_SERVICE_DEFINITIONS_H

@@ -52,7 +52,7 @@ AudioStream::~AudioStream() {
 
 aaudio_result_t AudioStream::waitForStateTransition(aaudio_stream_state_t startingState,
                                                aaudio_stream_state_t endingState,
-                                               aaudio_nanoseconds_t timeoutNanoseconds)
+                                               int64_t timeoutNanoseconds)
 {
     aaudio_stream_state_t state = getState();
     aaudio_stream_state_t nextState = state;
@@ -73,10 +73,10 @@ aaudio_result_t AudioStream::waitForStateTransition(aaudio_stream_state_t starti
 
 aaudio_result_t AudioStream::waitForStateChange(aaudio_stream_state_t currentState,
                                                 aaudio_stream_state_t *nextState,
-                                                aaudio_nanoseconds_t timeoutNanoseconds)
+                                                int64_t timeoutNanoseconds)
 {
     // TODO replace this when similar functionality added to AudioTrack.cpp
-    aaudio_nanoseconds_t durationNanos = 20 * AAUDIO_NANOS_PER_MILLISECOND;
+    int64_t durationNanos = 20 * AAUDIO_NANOS_PER_MILLISECOND;
     aaudio_stream_state_t state = getState();
     while (state == currentState && timeoutNanoseconds > 0) {
         if (durationNanos > timeoutNanoseconds) {
@@ -120,7 +120,7 @@ static void* AudioStream_internalThreadProc(void* threadArg) {
     return audioStream->wrapUserThread();
 }
 
-aaudio_result_t AudioStream::createThread(aaudio_nanoseconds_t periodNanoseconds,
+aaudio_result_t AudioStream::createThread(int64_t periodNanoseconds,
                                      aaudio_audio_thread_proc_t *threadProc,
                                      void* threadArg)
 {
@@ -144,7 +144,7 @@ aaudio_result_t AudioStream::createThread(aaudio_nanoseconds_t periodNanoseconds
     }
 }
 
-aaudio_result_t AudioStream::joinThread(void** returnArg, aaudio_nanoseconds_t timeoutNanoseconds)
+aaudio_result_t AudioStream::joinThread(void** returnArg, int64_t timeoutNanoseconds)
 {
     if (!mHasThread) {
         return AAUDIO_ERROR_INVALID_STATE;

@@ -62,9 +62,9 @@ public:
     void dispatch(); // called internally from 'C' thread wrapper
 
 private:
-    Runnable*                mRunnable = nullptr; // TODO make atomic with memory barrier?
-    bool                     mHasThread = false;
-    pthread_t                mThread; // initialized in constructor
+    Runnable*          mRunnable = nullptr; // TODO make atomic with memory barrier?
+    bool               mHasThread = false;
+    pthread_t          mThread; // initialized in constructor
 
 };
 

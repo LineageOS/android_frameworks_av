@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <utils/Mutex.h>
 
+typedef int32_t  aaudio_handle_t;
 typedef int32_t  handle_tracker_type_t;       // what kind of handle
 typedef int32_t  handle_tracker_slot_t;       // index in allocation table
 typedef int32_t  handle_tracker_generation_t; // incremented when slot used

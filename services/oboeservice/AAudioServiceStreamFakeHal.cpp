@@ -191,7 +191,7 @@ void AAudioServiceStreamFakeHal::run() {
     timestampScheduler.setBurstPeriod(mFramesPerBurst, mSampleRate);
     timestampScheduler.start(AudioClock::getNanoseconds());
     while(mThreadEnabled.load()) {
-        aaudio_nanoseconds_t nextTime = timestampScheduler.nextAbsoluteTime();
+        int64_t nextTime = timestampScheduler.nextAbsoluteTime();
         if (AudioClock::getNanoseconds() >= nextTime) {
             sendCurrentTimestamp();
         } else  {

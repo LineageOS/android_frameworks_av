@@ -44,6 +44,10 @@ enum aaudio_commands_t {
 
 namespace aaudio {
 
+typedef int32_t  aaudio_handle_t;
+
+#define AAUDIO_HANDLE_INVALID  ((aaudio_handle_t) -1)
+
 enum aaudio_commands_t {
     OPEN_STREAM = IBinder::FIRST_CALL_TRANSACTION,
     CLOSE_STREAM,
@@ -57,9 +61,9 @@ enum aaudio_commands_t {
 
 // TODO Expand this to include all the open parameters.
 typedef struct AAudioServiceStreamInfo_s {
-    int32_t             deviceId;
-    int32_t             samplesPerFrame;  // number of channels
-    aaudio_sample_rate_t  sampleRate;
+    int32_t               deviceId;
+    int32_t               samplesPerFrame;  // number of channels
+    int32_t               sampleRate;
     aaudio_audio_format_t audioFormat;
 } AAudioServiceStreamInfo;
 

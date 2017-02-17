@@ -46,31 +46,30 @@ public:
     virtual aaudio_result_t requestStop() override;
 
     virtual aaudio_result_t getTimestamp(clockid_t clockId,
-                                       aaudio_position_frames_t *framePosition,
-                                       aaudio_nanoseconds_t *timeNanoseconds) override {
+                                       int64_t *framePosition,
+                                       int64_t *timeNanoseconds) override {
         return AAUDIO_ERROR_UNIMPLEMENTED; // TODO call getTimestamp(ExtendedTimestamp *timestamp);
     }
 
     virtual aaudio_result_t write(const void *buffer,
-                             aaudio_size_frames_t numFrames,
-                             aaudio_nanoseconds_t timeoutNanoseconds) override;
+                             int32_t numFrames,
+                             int64_t timeoutNanoseconds) override;
 
-    virtual aaudio_result_t setBufferSize(aaudio_size_frames_t requestedFrames,
-                                             aaudio_size_frames_t *actualFrames) override;
-    virtual aaudio_size_frames_t getBufferSize() const override;
-    virtual aaudio_size_frames_t getBufferCapacity() const override;
-    virtual aaudio_size_frames_t getFramesPerBurst()const  override;
+    virtual aaudio_result_t setBufferSize(int32_t requestedFrames) override;
+    virtual int32_t getBufferSize() const override;
+    virtual int32_t getBufferCapacity() const override;
+    virtual int32_t getFramesPerBurst()const  override;
     virtual int32_t getXRunCount() const override;
 
-    virtual aaudio_position_frames_t getFramesRead() override;
+    virtual int64_t getFramesRead() override;
 
     virtual aaudio_result_t updateState() override;
 
 private:
     android::sp<android::AudioTrack> mAudioTrack;
     // TODO add 64-bit position reporting to AudioRecord and use it.
-    aaudio_wrapping_frames_t           mPositionWhenStarting = 0;
-    aaudio_wrapping_frames_t           mPositionWhenPausing = 0;
+    aaudio_wrapping_frames_t         mPositionWhenStarting = 0;
+    aaudio_wrapping_frames_t         mPositionWhenPausing = 0;
 };
 
 } /* namespace aaudio */

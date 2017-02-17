@@ -221,11 +221,11 @@ aaudio_result_t AudioStreamTrack::updateState()
 }
 
 aaudio_result_t AudioStreamTrack::write(const void *buffer,
-                                      aaudio_size_frames_t numFrames,
-                                      aaudio_nanoseconds_t timeoutNanoseconds)
+                                      int32_t numFrames,
+                                      int64_t timeoutNanoseconds)
 {
-    aaudio_size_frames_t bytesPerFrame = getBytesPerFrame();
-    aaudio_size_bytes_t numBytes;
+    int32_t bytesPerFrame = getBytesPerFrame();
+    int32_t numBytes;
     aaudio_result_t result = AAudioConvert_framesToBytes(numFrames, bytesPerFrame, &numBytes);
     if (result != AAUDIO_OK) {
         return result;
@@ -240,31 +240,29 @@ aaudio_result_t AudioStreamTrack::write(const void *buffer,
         ALOGE("invalid write, returned %d", (int)bytesWritten);
         return AAudioConvert_androidToAAudioResult(bytesWritten);
     }
-    aaudio_size_frames_t framesWritten = (aaudio_size_frames_t)(bytesWritten / bytesPerFrame);
+    int32_t framesWritten = (int32_t)(bytesWritten / bytesPerFrame);
     incrementFramesWritten(framesWritten);
     return framesWritten;
 }
 
-aaudio_result_t AudioStreamTrack::setBufferSize(aaudio_size_frames_t requestedFrames,
-                                             aaudio_size_frames_t *actualFrames)
+aaudio_result_t AudioStreamTrack::setBufferSize(int32_t requestedFrames)
 {
     ssize_t result = mAudioTrack->setBufferSizeInFrames(requestedFrames);
-    if (result != OK) {
+    if (result < 0) {
         return AAudioConvert_androidToAAudioResult(result);
     } else {
-        *actualFrames = result;
-        return AAUDIO_OK;
+        return result;
     }
 }
 
-aaudio_size_frames_t AudioStreamTrack::getBufferSize() const
+int32_t AudioStreamTrack::getBufferSize() const
 {
-    return static_cast<aaudio_size_frames_t>(mAudioTrack->getBufferSizeInFrames());
+    return static_cast<int32_t>(mAudioTrack->getBufferSizeInFrames());
 }
 
-aaudio_size_frames_t AudioStreamTrack::getBufferCapacity() const
+int32_t AudioStreamTrack::getBufferCapacity() const
 {
-    return static_cast<aaudio_size_frames_t>(mAudioTrack->frameCount());
+    return static_cast<int32_t>(mAudioTrack->frameCount());
 }
 
 int32_t AudioStreamTrack::getXRunCount() const
@@ -277,7 +275,7 @@ int32_t AudioStreamTrack::getFramesPerBurst() const
     return 192; // TODO add query to AudioTrack.cpp
 }
 
-aaudio_position_frames_t AudioStreamTrack::getFramesRead() {
+int64_t AudioStreamTrack::getFramesRead() {
     aaudio_wrapping_frames_t position;
     status_t result;
     switch (getState()) {

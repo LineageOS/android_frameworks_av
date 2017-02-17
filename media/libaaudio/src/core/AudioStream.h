@@ -52,8 +52,8 @@ public:
 
     // TODO use aaudio_clockid_t all the way down to AudioClock
     virtual aaudio_result_t getTimestamp(clockid_t clockId,
-                                       aaudio_position_frames_t *framePosition,
-                                       aaudio_nanoseconds_t *timeNanoseconds) = 0;
+                                       int64_t *framePosition,
+                                       int64_t *timeNanoseconds) = 0;
 
 
     virtual aaudio_result_t updateState() = 0;
@@ -63,7 +63,7 @@ public:
 
     virtual aaudio_result_t waitForStateChange(aaudio_stream_state_t currentState,
                                           aaudio_stream_state_t *nextState,
-                                          aaudio_nanoseconds_t timeoutNanoseconds);
+                                          int64_t timeoutNanoseconds);
 
     /**
      * Open the stream using the parameters in the builder.
@@ -79,16 +79,15 @@ public:
         return AAUDIO_OK;
     }
 
-    virtual aaudio_result_t setBufferSize(aaudio_size_frames_t requestedFrames,
-                                        aaudio_size_frames_t *actualFrames) {
+    virtual aaudio_result_t setBufferSize(int32_t requestedFrames) {
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
-    virtual aaudio_result_t createThread(aaudio_nanoseconds_t periodNanoseconds,
+    virtual aaudio_result_t createThread(int64_t periodNanoseconds,
                                        aaudio_audio_thread_proc_t *threadProc,
                                        void *threadArg);
 
-    virtual aaudio_result_t joinThread(void **returnArg, aaudio_nanoseconds_t timeoutNanoseconds);
+    virtual aaudio_result_t joinThread(void **returnArg, int64_t timeoutNanoseconds);
 
     virtual aaudio_result_t registerThread() {
         return AAUDIO_OK;
@@ -106,19 +105,19 @@ public:
 
     // ============== Queries ===========================
 
-    virtual aaudio_stream_state_t getState() const {
+    aaudio_stream_state_t getState() const {
         return mState;
     }
 
-    virtual aaudio_size_frames_t getBufferSize() const {
+    virtual int32_t getBufferSize() const {
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
-    virtual aaudio_size_frames_t getBufferCapacity() const {
+    virtual int32_t getBufferCapacity() const {
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
-    virtual aaudio_size_frames_t getFramesPerBurst() const {
+    virtual int32_t getFramesPerBurst() const {
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
@@ -142,7 +141,7 @@ public:
         return mSamplesPerFrame;
     }
 
-    aaudio_device_id_t getDeviceId() const {
+    int32_t getDeviceId() const {
         return mDeviceId;
     }
 
@@ -154,19 +153,19 @@ public:
         return mDirection;
     }
 
-    aaudio_size_bytes_t getBytesPerFrame() const {
+    int32_t getBytesPerFrame() const {
         return mSamplesPerFrame * getBytesPerSample();
     }
 
-    aaudio_size_bytes_t getBytesPerSample() const {
+    int32_t getBytesPerSample() const {
         return AAudioConvert_formatToSizeInBytes(mFormat);
     }
 
-    virtual aaudio_position_frames_t getFramesWritten() {
+    virtual int64_t getFramesWritten() {
         return mFramesWritten.get();
     }
 
-    virtual aaudio_position_frames_t getFramesRead() {
+    virtual int64_t getFramesRead() {
         return mFramesRead.get();
     }
 
@@ -174,25 +173,25 @@ public:
     // ============== I/O ===========================
     // A Stream will only implement read() or write() depending on its direction.
     virtual aaudio_result_t write(const void *buffer,
-                             aaudio_size_frames_t numFrames,
-                             aaudio_nanoseconds_t timeoutNanoseconds) {
+                             int32_t numFrames,
+                             int64_t timeoutNanoseconds) {
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
     virtual aaudio_result_t read(void *buffer,
-                            aaudio_size_frames_t numFrames,
-                            aaudio_nanoseconds_t timeoutNanoseconds) {
+                            int32_t numFrames,
+                            int64_t timeoutNanoseconds) {
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
 protected:
 
-    virtual aaudio_position_frames_t incrementFramesWritten(aaudio_size_frames_t frames) {
-        return static_cast<aaudio_position_frames_t>(mFramesWritten.increment(frames));
+    virtual int64_t incrementFramesWritten(int32_t frames) {
+        return static_cast<int64_t>(mFramesWritten.increment(frames));
     }
 
-    virtual aaudio_position_frames_t incrementFramesRead(aaudio_size_frames_t frames) {
-        return static_cast<aaudio_position_frames_t>(mFramesRead.increment(frames));
+    virtual int64_t incrementFramesRead(int32_t frames) {
+        return static_cast<int64_t>(mFramesRead.increment(frames));
     }
 
     /**
@@ -202,13 +201,13 @@ protected:
      *   or AAUDIO_ERROR_TIMEOUT
      */
     virtual aaudio_result_t waitForStateTransition(aaudio_stream_state_t startingState,
-                                              aaudio_stream_state_t endingState,
-                                              aaudio_nanoseconds_t timeoutNanoseconds);
+                                                   aaudio_stream_state_t endingState,
+                                                   int64_t timeoutNanoseconds);
 
     /**
      * This should not be called after the open() call.
      */
-    void setSampleRate(aaudio_sample_rate_t sampleRate) {
+    void setSampleRate(int32_t sampleRate) {
         mSampleRate = sampleRate;
     }
 
@@ -243,33 +242,33 @@ protected:
     MonotonicCounter     mFramesWritten;
     MonotonicCounter     mFramesRead;
 
-    void setPeriodNanoseconds(aaudio_nanoseconds_t periodNanoseconds) {
+    void setPeriodNanoseconds(int64_t periodNanoseconds) {
         mPeriodNanoseconds.store(periodNanoseconds, std::memory_order_release);
     }
 
-    aaudio_nanoseconds_t getPeriodNanoseconds() {
+    int64_t getPeriodNanoseconds() {
         return mPeriodNanoseconds.load(std::memory_order_acquire);
     }
 
 private:
     // These do not change after open().
-    int32_t              mSamplesPerFrame = AAUDIO_UNSPECIFIED;
-    aaudio_sample_rate_t   mSampleRate = AAUDIO_UNSPECIFIED;
-    aaudio_stream_state_t  mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
-    aaudio_device_id_t     mDeviceId = AAUDIO_UNSPECIFIED;
+    int32_t                mSamplesPerFrame = AAUDIO_UNSPECIFIED;
+    int32_t                mSampleRate = AAUDIO_UNSPECIFIED;
+    int32_t                mDeviceId = AAUDIO_UNSPECIFIED;
     aaudio_sharing_mode_t  mSharingMode = AAUDIO_SHARING_MODE_SHARED;
     aaudio_audio_format_t  mFormat = AAUDIO_FORMAT_UNSPECIFIED;
     aaudio_direction_t     mDirection = AAUDIO_DIRECTION_OUTPUT;
+    aaudio_stream_state_t  mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
 
     // background thread ----------------------------------
-    bool                 mHasThread = false;
-    pthread_t            mThread; // initialized in constructor
+    bool                   mHasThread = false;
+    pthread_t              mThread; // initialized in constructor
 
     // These are set by the application thread and then read by the audio pthread.
-    std::atomic<aaudio_nanoseconds_t>  mPeriodNanoseconds; // for tuning SCHED_FIFO threads
+    std::atomic<int64_t>   mPeriodNanoseconds; // for tuning SCHED_FIFO threads
     // TODO make atomic?
     aaudio_audio_thread_proc_t* mThreadProc = nullptr;
-    void*                mThreadArg = nullptr;
+    void*                  mThreadArg = nullptr;
     aaudio_result_t        mThreadRegistrationResult = AAUDIO_OK;
 
 

@@ -177,11 +177,11 @@ aaudio_result_t AudioStreamRecord::updateState()
 }
 
 aaudio_result_t AudioStreamRecord::read(void *buffer,
-                                      aaudio_size_frames_t numFrames,
-                                      aaudio_nanoseconds_t timeoutNanoseconds)
+                                      int32_t numFrames,
+                                      int64_t timeoutNanoseconds)
 {
-    aaudio_size_frames_t bytesPerFrame = getBytesPerFrame();
-    aaudio_size_bytes_t numBytes;
+    int32_t bytesPerFrame = getBytesPerFrame();
+    int32_t numBytes;
     aaudio_result_t result = AAudioConvert_framesToBytes(numFrames, bytesPerFrame, &numBytes);
     if (result != AAUDIO_OK) {
         return result;
@@ -195,25 +195,23 @@ aaudio_result_t AudioStreamRecord::read(void *buffer,
     } else if (bytesRead < 0) {
         return AAudioConvert_androidToAAudioResult(bytesRead);
     }
-    aaudio_size_frames_t framesRead = (aaudio_size_frames_t)(bytesRead / bytesPerFrame);
+    int32_t framesRead = (int32_t)(bytesRead / bytesPerFrame);
     return (aaudio_result_t) framesRead;
 }
 
-aaudio_result_t AudioStreamRecord::setBufferSize(aaudio_size_frames_t requestedFrames,
-                                             aaudio_size_frames_t *actualFrames)
+aaudio_result_t AudioStreamRecord::setBufferSize(int32_t requestedFrames)
 {
-    *actualFrames = getBufferCapacity();
-    return AAUDIO_OK;
+    return getBufferSize();
 }
 
-aaudio_size_frames_t AudioStreamRecord::getBufferSize() const
+int32_t AudioStreamRecord::getBufferSize() const
 {
     return getBufferCapacity(); // TODO implement in AudioRecord?
 }
 
-aaudio_size_frames_t AudioStreamRecord::getBufferCapacity() const
+int32_t AudioStreamRecord::getBufferCapacity() const
 {
-    return static_cast<aaudio_size_frames_t>(mAudioRecord->frameCount());
+    return static_cast<int32_t>(mAudioRecord->frameCount());
 }
 
 int32_t AudioStreamRecord::getXRunCount() const
@@ -221,7 +219,7 @@ int32_t AudioStreamRecord::getXRunCount() const
     return AAUDIO_ERROR_UNIMPLEMENTED; // TODO implement when AudioRecord supports it
 }
 
-aaudio_size_frames_t AudioStreamRecord::getFramesPerBurst() const
+int32_t AudioStreamRecord::getFramesPerBurst() const
 {
     return 192; // TODO add query to AudioRecord.cpp
 }

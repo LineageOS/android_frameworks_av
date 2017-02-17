@@ -56,11 +56,11 @@ public:
         return this;
     }
 
-    aaudio_sample_rate_t getSampleRate() const {
+    int32_t getSampleRate() const {
         return mSampleRate;
     }
 
-    AudioStreamBuilder* setSampleRate(aaudio_sample_rate_t sampleRate) {
+    AudioStreamBuilder* setSampleRate(int32_t sampleRate) {
         mSampleRate = sampleRate;
         return this;
     }
@@ -83,20 +83,20 @@ public:
         return this;
     }
 
-    aaudio_size_frames_t getBufferCapacity() const {
+    int32_t getBufferCapacity() const {
         return mBufferCapacity;
     }
 
-    AudioStreamBuilder* setBufferCapacity(aaudio_size_frames_t frames) {
+    AudioStreamBuilder* setBufferCapacity(int32_t frames) {
         mBufferCapacity = frames;
         return this;
     }
 
-    aaudio_device_id_t getDeviceId() const {
+    int32_t getDeviceId() const {
         return mDeviceId;
     }
 
-    AudioStreamBuilder* setDeviceId(aaudio_device_id_t deviceId) {
+    AudioStreamBuilder* setDeviceId(int32_t deviceId) {
         mDeviceId = deviceId;
         return this;
     }
@@ -105,12 +105,12 @@ public:
 
 private:
     int32_t                mSamplesPerFrame = AAUDIO_UNSPECIFIED;
-    aaudio_sample_rate_t   mSampleRate = AAUDIO_UNSPECIFIED;
-    aaudio_device_id_t     mDeviceId = AAUDIO_DEVICE_UNSPECIFIED;
+    int32_t                mSampleRate = AAUDIO_UNSPECIFIED;
+    int32_t                mDeviceId = AAUDIO_DEVICE_UNSPECIFIED;
     aaudio_sharing_mode_t  mSharingMode = AAUDIO_SHARING_MODE_SHARED;
     aaudio_audio_format_t  mFormat = AAUDIO_FORMAT_UNSPECIFIED;
     aaudio_direction_t     mDirection = AAUDIO_DIRECTION_OUTPUT;
-    aaudio_size_frames_t   mBufferCapacity = AAUDIO_UNSPECIFIED;
+    int32_t                mBufferCapacity = AAUDIO_UNSPECIFIED;
 };
 
 } /* namespace aaudio */

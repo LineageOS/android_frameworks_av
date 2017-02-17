@@ -23,12 +23,12 @@
 
 namespace aaudio {
 
-// TODO move this an "include" folder for the service.
+// TODO move this to an "include" folder for the service.
 
 struct AAudioMessageTimestamp {
-    aaudio_position_frames_t position;
-    int64_t                deviceOffset; // add to client position to get device position
-    aaudio_nanoseconds_t     timestamp;
+    int64_t    position;
+    int64_t    deviceOffset; // add to client position to get device position
+    int64_t    timestamp;
 };
 
 typedef enum aaudio_service_event_e : uint32_t {
@@ -41,8 +41,8 @@ typedef enum aaudio_service_event_e : uint32_t {
 
 struct AAudioMessageEvent {
     aaudio_service_event_t event;
-    int32_t data1;
-    int64_t data2;
+    int32_t                data1;
+    int64_t                data2;
 };
 
 typedef struct AAudioServiceMessage_s {

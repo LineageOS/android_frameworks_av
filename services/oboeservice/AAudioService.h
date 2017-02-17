@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AAUDIO_AAUDIO_AUDIO_SERVICE_H
-#define AAUDIO_AAUDIO_AUDIO_SERVICE_H
+#ifndef AAUDIO_AAUDIO_SERVICE_H
+#define AAUDIO_AAUDIO_SERVICE_H
 
 #include <time.h>
 #include <pthread.h>
@@ -58,7 +58,7 @@ public:
     virtual aaudio_result_t flushStream(aaudio_handle_t streamHandle);
 
     virtual aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle,
-                                              pid_t pid, aaudio_nanoseconds_t periodNanoseconds) ;
+                                              pid_t pid, int64_t periodNanoseconds) ;
 
     virtual aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle, pid_t pid);
 
@@ -72,4 +72,4 @@ private:
 
 } /* namespace android */
 
-#endif //AAUDIO_AAUDIO_AUDIO_SERVICE_H
+#endif //AAUDIO_AAUDIO_SERVICE_H

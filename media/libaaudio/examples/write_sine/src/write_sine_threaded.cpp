@@ -26,14 +26,18 @@
 #include <aaudio/AAudio.h>
 #include "SineGenerator.h"
 
-#define NUM_SECONDS   10
+#define NUM_SECONDS           10
+#define NANOS_PER_MICROSECOND ((int64_t)1000)
+#define NANOS_PER_MILLISECOND (NANOS_PER_MICROSECOND * 1000)
+#define MILLIS_PER_SECOND     1000
+#define NANOS_PER_SECOND      (NANOS_PER_MILLISECOND * MILLIS_PER_SECOND)
 
-#define SHARING_MODE  AAUDIO_SHARING_MODE_EXCLUSIVE
-//#define SHARING_MODE  AAUDIO_SHARING_MODE_SHARED
+//#define SHARING_MODE  AAUDIO_SHARING_MODE_EXCLUSIVE
+#define SHARING_MODE  AAUDIO_SHARING_MODE_SHARED
 
 // Prototype for a callback.
 typedef int audio_callback_proc_t(float *outputBuffer,
-                                     aaudio_size_frames_t numFrames,
+                                     int32_t numFrames,
                                      void *userContext);
 
 static void *SimpleAAudioPlayerThreadProc(void *arg);
@@ -75,33 +79,27 @@ public:
         result = AAudio_createStreamBuilder(&mBuilder);
         if (result != AAUDIO_OK) return result;
 
-        result = AAudioStreamBuilder_setSharingMode(mBuilder, mRequestedSharingMode);
-        if (result != AAUDIO_OK) goto finish1;
+        AAudioStreamBuilder_setSharingMode(mBuilder, mRequestedSharingMode);
 
         // Open an AAudioStream using the Builder.
         result = AAudioStreamBuilder_openStream(mBuilder, &mStream);
         if (result != AAUDIO_OK) goto finish1;
 
         // Check to see what kind of stream we actually got.
-        result = AAudioStream_getSampleRate(mStream, &mFramesPerSecond);
+        mFramesPerSecond = AAudioStream_getSampleRate(mStream);
         printf("open() mFramesPerSecond = %d\n", mFramesPerSecond);
-        if (result != AAUDIO_OK) goto finish2;
 
-        result = AAudioStream_getSamplesPerFrame(mStream, &mSamplesPerFrame);
+        mSamplesPerFrame = AAudioStream_getSamplesPerFrame(mStream);
         printf("open() mSamplesPerFrame = %d\n", mSamplesPerFrame);
-        if (result != AAUDIO_OK) goto finish2;
 
         {
-            aaudio_size_frames_t bufferCapacity;
-            result = AAudioStream_getBufferCapacity(mStream, &bufferCapacity);
-            if (result != AAUDIO_OK) goto finish2;
+            int32_t bufferCapacity = AAudioStream_getBufferCapacityInFrames(mStream);
             printf("open() got bufferCapacity = %d\n", bufferCapacity);
         }
 
         // This is the number of frames that are read in one chunk by a DMA controller
         // or a DSP or a mixer.
-        result = AAudioStream_getFramesPerBurst(mStream, &mFramesPerBurst);
-        if (result != AAUDIO_OK) goto finish2;
+        mFramesPerBurst = AAudioStream_getFramesPerBurst(mStream);
         // Some DMA might use very short bursts. We don't need to write such small
         // buffers. But it helps to use a multiple of the burst size for predictable scheduling.
         while (mFramesPerBurst < 48) {
@@ -109,11 +107,7 @@ public:
         }
         printf("DataFormat: final framesPerBurst = %d\n",mFramesPerBurst);
 
-        result = AAudioStream_getFormat(mStream, &mDataFormat);
-        if (result != AAUDIO_OK) {
-            fprintf(stderr, "ERROR - AAudioStream_getFormat() returned %d\n", result);
-            goto finish2;
-        }
+        mDataFormat = AAudioStream_getFormat(mStream);
 
         // Allocate a buffer for the audio data.
         mOutputBuffer = new float[mFramesPerBurst * mSamplesPerFrame];
@@ -123,7 +117,7 @@ public:
         }
 
         // If needed allocate a buffer for converting float to int16_t.
-        if (mDataFormat == AAUDIO_FORMAT_PCM16) {
+        if (mDataFormat == AAUDIO_FORMAT_PCM_I16) {
             mConversionBuffer = new int16_t[mFramesPerBurst * mSamplesPerFrame];
             if (mConversionBuffer == nullptr) {
                 fprintf(stderr, "ERROR - could not allocate conversion buffer\n");
@@ -132,23 +126,20 @@ public:
         }
         return result;
 
-     finish2:
-        AAudioStream_close(mStream);
-        mStream = AAUDIO_HANDLE_INVALID;
      finish1:
         AAudioStreamBuilder_delete(mBuilder);
-        mBuilder = AAUDIO_HANDLE_INVALID;
+        mBuilder = nullptr;
         return result;
     }
 
     aaudio_result_t close() {
-        if (mStream != AAUDIO_HANDLE_INVALID) {
+        if (mStream != nullptr) {
             stop();
-            printf("call AAudioStream_close(0x%08x)\n", mStream);  fflush(stdout);
+            printf("call AAudioStream_close(%p)\n", mStream);  fflush(stdout);
             AAudioStream_close(mStream);
-            mStream = AAUDIO_HANDLE_INVALID;
+            mStream = nullptr;
             AAudioStreamBuilder_delete(mBuilder);
-            mBuilder = AAUDIO_HANDLE_INVALID;
+            mBuilder = nullptr;
             delete mOutputBuffer;
             mOutputBuffer = nullptr;
             delete mConversionBuffer;
@@ -160,7 +151,7 @@ public:
     // Start a thread that will call the callback proc.
     aaudio_result_t start() {
         mEnabled = true;
-        aaudio_nanoseconds_t nanosPerBurst = mFramesPerBurst * AAUDIO_NANOS_PER_SECOND
+        int64_t nanosPerBurst = mFramesPerBurst * NANOS_PER_SECOND
                                            / mFramesPerSecond;
         return AAudioStream_createThread(mStream, nanosPerBurst,
                                        SimpleAAudioPlayerThreadProc,
@@ -170,7 +161,7 @@ public:
     // Tell the thread to stop.
     aaudio_result_t stop() {
         mEnabled = false;
-        return AAudioStream_joinThread(mStream, nullptr, 2 * AAUDIO_NANOS_PER_SECOND);
+        return AAudioStream_joinThread(mStream, nullptr, 2 * NANOS_PER_SECOND);
     }
 
     aaudio_result_t callbackLoop() {
@@ -186,8 +177,8 @@ public:
 
         // Give up after several burst periods have passed.
         const int burstsPerTimeout = 8;
-        aaudio_nanoseconds_t nanosPerTimeout =
-                        burstsPerTimeout * mFramesPerBurst * AAUDIO_NANOS_PER_SECOND
+        int64_t nanosPerTimeout =
+                        burstsPerTimeout * mFramesPerBurst * NANOS_PER_SECOND
                         / mFramesPerSecond;
 
         while (mEnabled && result >= 0) {
@@ -213,7 +204,7 @@ public:
             }
         }
 
-        result = AAudioStream_getXRunCount(mStream, &xRunCount);
+        xRunCount = AAudioStream_getXRunCount(mStream);
         printf("AAudioStream_getXRunCount %d\n", xRunCount);
 
         result = AAudioStream_requestStop(mStream);
@@ -226,20 +217,20 @@ public:
     }
 
 private:
-    AAudioStreamBuilder   mBuilder = AAUDIO_HANDLE_INVALID;
-    AAudioStream          mStream = AAUDIO_HANDLE_INVALID;
-    float            *  mOutputBuffer = nullptr;
-    int16_t          *  mConversionBuffer = nullptr;
+    AAudioStreamBuilder   mBuilder = nullptr;
+    AAudioStream          mStream = nullptr;
+    float                *mOutputBuffer = nullptr;
+    int16_t              *mConversionBuffer = nullptr;
 
-    audio_callback_proc_t * mCallbackProc = nullptr;
-    void             *  mUserContext = nullptr;
+    audio_callback_proc_t *mCallbackProc = nullptr;
+    void                 *mUserContext = nullptr;
     aaudio_sharing_mode_t mRequestedSharingMode = SHARING_MODE;
-    int32_t             mSamplesPerFrame = 0;
-    int32_t             mFramesPerSecond = 0;
-    aaudio_size_frames_t  mFramesPerBurst = 0;
-    aaudio_audio_format_t mDataFormat = AAUDIO_FORMAT_PCM16;
+    int32_t               mSamplesPerFrame = 0;
+    int32_t               mFramesPerSecond = 0;
+    int32_t               mFramesPerBurst = 0;
+    aaudio_audio_format_t mDataFormat = AAUDIO_FORMAT_PCM_I16;
 
-    volatile bool       mEnabled = false; // used to request that callback exit its loop
+    volatile bool         mEnabled = false; // used to request that callback exit its loop
 };
 
 static void *SimpleAAudioPlayerThreadProc(void *arg) {

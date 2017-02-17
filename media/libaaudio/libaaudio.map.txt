@@ -1,20 +1,15 @@
 LIBAAUDIO {
   global:
-    AAudio_getNanoseconds;
     AAudio_convertResultToText;
     AAudio_convertStreamStateToText;
     AAudio_createStreamBuilder;
     AAudioStreamBuilder_setDeviceId;
     AAudioStreamBuilder_setSampleRate;
-    AAudioStreamBuilder_getSampleRate;
     AAudioStreamBuilder_setSamplesPerFrame;
-    AAudioStreamBuilder_getSamplesPerFrame;
     AAudioStreamBuilder_setFormat;
-    AAudioStreamBuilder_getFormat;
     AAudioStreamBuilder_setSharingMode;
-    AAudioStreamBuilder_getSharingMode;
     AAudioStreamBuilder_setDirection;
-    AAudioStreamBuilder_getDirection;
+    AAudioStreamBuilder_setBufferCapacityInFrames;
     AAudioStreamBuilder_openStream;
     AAudioStreamBuilder_delete;
     AAudioStream_close;
@@ -28,13 +23,14 @@ LIBAAUDIO {
     AAudioStream_write;
     AAudioStream_createThread;
     AAudioStream_joinThread;
-    AAudioStream_setBufferSize;
-    AAudioStream_getBufferSize;
+    AAudioStream_setBufferSizeInFrames;
+    AAudioStream_getBufferSizeInFrames;
     AAudioStream_getFramesPerBurst;
-    AAudioStream_getBufferCapacity;
+    AAudioStream_getBufferCapacityInFrames;
     AAudioStream_getXRunCount;
     AAudioStream_getSampleRate;
     AAudioStream_getSamplesPerFrame;
+    AAudioStream_getDeviceId;
     AAudioStream_getFormat;
     AAudioStream_getSharingMode;
     AAudioStream_getDirection;

@@ -18,11 +18,14 @@
 
 #include "binding/AudioEndpointParcelable.h"
 #include "binding/AAudioStreamRequest.h"
+#include "binding/AAudioServiceDefinitions.h"
 #include "binding/AAudioStreamConfiguration.h"
 #include "binding/IAAudioService.h"
 #include "utility/AAudioUtilities.h"
 
 namespace android {
+
+using aaudio::aaudio_handle_t;
 
 /**
  * This is used by the AAudio Client to talk to the AAudio Service.
@@ -137,7 +140,7 @@ public:
     }
 
     virtual aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle, pid_t clientThreadId,
-                                              aaudio_nanoseconds_t periodNanoseconds)
+                                              int64_t periodNanoseconds)
     override {
         Parcel data, reply;
         // send command
@@ -182,11 +185,11 @@ IMPLEMENT_META_INTERFACE(AAudioService, "IAAudioService");
 
 status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
                                         Parcel* reply, uint32_t flags) {
-    AAudioStream stream;
+    aaudio_handle_t stream;
     aaudio::AAudioStreamRequest request;
     aaudio::AAudioStreamConfiguration configuration;
     pid_t pid;
-    aaudio_nanoseconds_t nanoseconds;
+    int64_t nanoseconds;
     aaudio_result_t result;
     ALOGV("BnAAudioService::onTransact(%i) %i", code, flags);
     data.checkInterface(this);
