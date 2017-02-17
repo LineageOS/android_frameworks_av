@@ -43,11 +43,20 @@ struct DescribeColorFormat2Params;
 struct DataConverter;
 
 // Treble shared memory
-namespace hidl { namespace memory { namespace V1_0 {
+namespace hidl {
+namespace allocator {
+namespace V1_0 {
 struct IAllocator;
+} // V1_0
+} // allocator
+namespace memory {
+namespace V1_0 {
 struct IMemory;
-}}};
-typedef hidl::memory::V1_0::IAllocator TAllocator;
+} // V1_0
+} // memory
+} // hidl
+
+typedef hidl::allocator::V1_0::IAllocator TAllocator;
 typedef hidl::memory::V1_0::IMemory TMemory;
 
 struct ACodec : public AHierarchicalStateMachine, public CodecBase {

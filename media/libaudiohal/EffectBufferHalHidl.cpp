@@ -19,7 +19,7 @@
 #define LOG_TAG "EffectBufferHalHidl"
 //#define LOG_NDEBUG 0
 
-#include <android/hidl/memory/1.0/IAllocator.h>
+#include <android/hidl/allocator/1.0/IAllocator.h>
 #include <hidlmemory/mapping.h>
 #include <utils/Log.h>
 
@@ -28,7 +28,7 @@
 
 using ::android::hardware::Return;
 using ::android::hardware::Status;
-using ::android::hidl::memory::V1_0::IAllocator;
+using ::android::hidl::allocator::V1_0::IAllocator;
 
 namespace android {
 

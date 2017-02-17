@@ -24,7 +24,7 @@
 #include <utils/threads.h>
 
 #include <binder/MemoryDealer.h>
-#include <android/hidl/memory/1.0/IAllocator.h>
+#include <android/hidl/allocator/1.0/IAllocator.h>
 #include <android/hidl/memory/1.0/IMemory.h>
 #include <OMX_Component.h>
 
