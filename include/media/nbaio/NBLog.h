@@ -23,6 +23,8 @@
 #include <utils/Mutex.h>
 #include <audio_utils/fifo.h>
 
+#include <vector>
+
 namespace android {
 
 class String8;
@@ -40,9 +42,10 @@ enum Event {
     EVENT_RESERVED,
     EVENT_STRING,               // ASCII string, not NUL-terminated
     EVENT_TIMESTAMP,            // clock_gettime(CLOCK_MONOTONIC)
-    EVENT_INTEGER,
-    EVENT_FLOAT,
-    EVENT_PID,
+    EVENT_INTEGER,              // integer value entry
+    EVENT_FLOAT,                // floating point value entry
+    EVENT_PID,                  // process ID and process name
+    EVENT_AUTHOR,               // author index (present in merged logs) tracks entry's original log
     EVENT_START_FMT,            // logFormat start event: entry includes format string, following
                                 // entries contain format arguments
     EVENT_END_FMT,              // end of logFormat argument list
@@ -68,6 +71,49 @@ public:
     static const size_t kOverhead = 3;  // mEvent, mLength, mData[...], duplicate mLength
 };
 
+// ---------------------------------------------------------------------------
+// API for handling format entry operations
+
+// a formatted entry has the following structure:
+//    * START_FMT entry, containing the format string
+//    * author entry of the thread that generated it (optional, present in merged log)
+//    * TIMESTAMP entry
+//    * format arg1
+//    * format arg2
+//    * ...
+//    * END_FMT entry
+
+class FormatEntry {
+public:
+    // build a Format Entry starting in the given pointer
+    explicit FormatEntry(const uint8_t *entry);
+
+    // Entry's format string
+    const char*     formatString() const;
+
+    // Enrty's format string length
+    size_t          formatStringLength() const;
+
+    // Format arguments (excluding format string, timestamp and author)
+    const uint8_t  *args() const;
+
+    // get format entry timestamp
+    timespec        timestamp() const;
+
+    // entry's author index (-1 if none present)
+    int             author() const;
+
+    // copy entry, adding author before timestamp, returns size of original entry
+    // (intended for merger)
+    size_t          copyTo(std::unique_ptr<audio_utils_fifo_writer> &dst, int author) const;
+private:
+    // copies ordinary entry from src to dst, and returns length of entry
+    size_t          copyEntry(std::unique_ptr<audio_utils_fifo_writer> &dst, const uint8_t *src)
+                        const;
+
+    const uint8_t  *mEntry;
+};
+
 // representation of a single log entry in shared memory
 //  byte[0]             mEvent
 //  byte[1]             mLength
@@ -82,9 +128,8 @@ public:
     static void    appendInt(String8 *body, const void *data);
     static void    appendFloat(String8 *body, const void *data);
     static void    appendPID(String8 *body, const void *data, size_t length);
-    static int     handleFormat(const char *fmt, size_t length, const uint8_t *data,
-                                String8 *timestamp, String8 *body);
     static void    appendTimestamp(String8 *body, const void *data);
+    static size_t  fmtEntryLength(const uint8_t *data);
 
 public:
 
@@ -215,6 +260,31 @@ private:
 class Reader : public RefBase {
 public:
 
+    // A snapshot of a readers buffer
+    class Snapshot {
+    public:
+        Snapshot() : mData(NULL), mAvail(0), mLost(0) {}
+
+        Snapshot(size_t bufferSize) : mData(new uint8_t[bufferSize]) {}
+
+        ~Snapshot() { delete[] mData; }
+
+        // copy of the buffer
+        const uint8_t *data() const { return mData; }
+
+        // amount of data available (given by audio_utils_fifo_reader)
+        size_t   available() const { return mAvail; }
+
+        // amount of data lost (given by audio_utils_fifo_reader)
+        size_t   lost() const { return mLost; }
+
+    private:
+        friend class Reader;
+        const uint8_t *mData;
+        size_t         mAvail;
+        size_t         mLost;
+    };
+
     // Input parameter 'size' is the desired size of the timeline in byte units.
     // The size of the shared memory must be at least Timeline::sharedSize(size).
     Reader(const void *shared, size_t size);
@@ -222,8 +292,13 @@ public:
 
     virtual ~Reader();
 
-    void    dump(int fd, size_t indent = 0);
-    bool    isIMemory(const sp<IMemory>& iMemory) const;
+    // get snapshot of readers fifo buffer, effectively consuming the buffer
+    std::unique_ptr<Snapshot> getSnapshot();
+    // dump a particular snapshot of the reader
+    void     dump(int fd, size_t indent, Snapshot & snap);
+    // dump the current content of the reader's buffer
+    void     dump(int fd, size_t indent = 0);
+    bool     isIMemory(const sp<IMemory>& iMemory) const;
 
 private:
     /*const*/ Shared* const mShared;    // raw pointer to shared memory, actually const but not
@@ -237,8 +312,64 @@ private:
                                                     // non-NULL unless constructor fails
 
     void    dumpLine(const String8& timestamp, String8& body);
+    int     handleFormat(const FormatEntry &fmtEntry,
+                                String8 *timestamp,
+                                String8 *body);
+    // dummy method for handling absent author entry
+    virtual size_t handleAuthor(const FormatEntry &fmtEntry, String8 *body) { return 0; }
 
     static const size_t kSquashTimestamp = 5; // squash this many or more adjacent timestamps
+};
+
+// Wrapper for a reader with a name. Contains a pointer to the reader and a pointer to the name
+class NamedReader {
+public:
+    NamedReader() { mName[0] = '\0'; } // for Vector
+    NamedReader(const sp<NBLog::Reader>& reader, const char *name) :
+        mReader(reader)
+        { strlcpy(mName, name, sizeof(mName)); }
+    ~NamedReader() { }
+    const sp<NBLog::Reader>&  reader() const { return mReader; }
+    const char*               name() const { return mName; }
+
+private:
+    sp<NBLog::Reader>   mReader;
+    static const size_t kMaxName = 32;
+    char                mName[kMaxName];
+};
+
+// ---------------------------------------------------------------------------
+
+class Merger : public RefBase {
+public:
+    Merger(const void *shared, size_t size);
+
+    virtual ~Merger() {}
+
+    void addReader(const NamedReader &reader);
+    // TODO add removeReader
+    void merge();
+    const std::vector<NamedReader> *getNamedReaders() const;
+private:
+    // vector of the readers the merger is supposed to merge from.
+    // every reader reads from a writer's buffer
+    std::vector<NamedReader> mNamedReaders;
+    uint8_t *mBuffer;
+    Shared * const mShared;
+    std::unique_ptr<audio_utils_fifo> mFifo;
+    std::unique_ptr<audio_utils_fifo_writer> mFifoWriter;
+
+    static struct timespec getTimestamp(const uint8_t *data);
+};
+
+class MergeReader : public Reader {
+public:
+    MergeReader(const void *shared, size_t size, Merger &merger);
+private:
+    const std::vector<NamedReader> *mNamedReaders;
+    // handle author entry by looking up the author's name and appending it to the body
+    // returns number of bytes read from fmtEntry
+    size_t handleAuthor(const FormatEntry &fmtEntry, String8 *body);
 };
 
 };  // class NBLog
