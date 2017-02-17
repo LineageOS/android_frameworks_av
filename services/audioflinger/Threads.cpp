@@ -3044,9 +3044,9 @@ bool AudioFlinger::PlaybackThread::threadLoop()
             if (z % 100 == 0) {
                 timespec ts;
                 clock_gettime(CLOCK_MONOTONIC, &ts);
-                LOGF("This is an integer %d, this is a float %f, this is my "
+                LOGT("This is an integer %d, this is a float %f, this is my "
                     "pid %p %% %s %t", 42, 3.14, "and this is a timestamp", ts);
-                LOGF("A deceptive null-terminated string %\0");
+                LOGT("A deceptive null-terminated string %\0");
             }
             ++z;
 #endif

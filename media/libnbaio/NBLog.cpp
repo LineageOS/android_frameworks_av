@@ -686,7 +686,7 @@ int NBLog::handleFormat(const char *fmt, size_t fmt_length, const uint8_t *data,
 
         // TODO check length for event type is correct
         if(length != data[data_offset + length + 2]) {
-            ALOGW("NBLog Reader recieved different lengths %zu and %d for event %d", length,
+            ALOGW("NBLog Reader received different lengths %zu and %d for event %d", length,
                   data[data_offset + length + 2], event);
             body->append("<invalid entry>");
             ++fmt_offset;
@@ -698,27 +698,32 @@ int NBLog::handleFormat(const char *fmt, size_t fmt_length, const uint8_t *data,
         switch(fmt[fmt_offset])
         {
         case 's': // string
-            ALOGW_IF(event != EVENT_STRING, "NBLog Reader incompatible event for string specifier: %d", event);
+            ALOGW_IF(event != EVENT_STRING,
+                "NBLog Reader incompatible event for string specifier: %d", event);
             body->append((const char*) datum, length);
             break;
 
         case 't': // timestamp
-            ALOGW_IF(event != EVENT_TIMESTAMP, "NBLog Reader incompatible event for timestamp specifier: %d", event);
+            ALOGW_IF(event != EVENT_TIMESTAMP,
+                "NBLog Reader incompatible event for timestamp specifier: %d", event);
             appendTimestamp(body, datum);
             break;
 
         case 'd': // integer
-            ALOGW_IF(event != EVENT_INTEGER, "NBLog Reader incompatible event for integer specifier: %d", event);
+            ALOGW_IF(event != EVENT_INTEGER,
+                "NBLog Reader incompatible event for integer specifier: %d", event);
             appendInt(body, datum);
             break;
 
         case 'f': // float
-            ALOGW_IF(event != EVENT_FLOAT, "NBLog Reader incompatible event for float specifier: %d", event);
+            ALOGW_IF(event != EVENT_FLOAT,
+                "NBLog Reader incompatible event for float specifier: %d", event);
             appendFloat(body, datum);
             break;
 
         case 'p': // pid
-            ALOGW_IF(event != EVENT_PID, "NBLog Reader incompatible event for pid specifier: %d", event);
+            ALOGW_IF(event != EVENT_PID,
+                "NBLog Reader incompatible event for pid specifier: %d", event);
             appendPID(body, datum, length);
             break;
 
