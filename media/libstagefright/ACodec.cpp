@@ -6554,7 +6554,7 @@ status_t ACodec::LoadedState::setupInputSurface() {
 
     if (mCodec->mCreateInputBuffersSuspended) {
         err = statusFromBinderStatus(
-                mCodec->mGraphicBufferSource->setSuspend(true));
+                mCodec->mGraphicBufferSource->setSuspend(true, -1));
 
         if (err != OK) {
             ALOGE("[%s] Unable to configure option to suspend (err %d)",
@@ -7118,11 +7118,29 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
             return INVALID_OPERATION;
         }
 
+        int64_t suspendStartTimeUs = -1;
+        (void) params->findInt64("drop-start-time-us", &suspendStartTimeUs);
         status_t err = statusFromBinderStatus(
-                mGraphicBufferSource->setSuspend(dropInputFrames != 0));
+                mGraphicBufferSource->setSuspend(dropInputFrames != 0, suspendStartTimeUs));
 
         if (err != OK) {
             ALOGE("Failed to set parameter 'drop-input-frames' (err %d)", err);
+            return err;
+        }
+    }
+
+    int64_t stopTimeUs;
+    if (params->findInt64("stop-time-us", &stopTimeUs)) {
+        if (mGraphicBufferSource == NULL) {
+            ALOGE("[%s] Invalid to set stop time without surface",
+                    mComponentName.c_str());
+            return INVALID_OPERATION;
+        }
+        status_t err = statusFromBinderStatus(
+                mGraphicBufferSource->setStopTimeUs(stopTimeUs));
+
+        if (err != OK) {
+            ALOGE("Failed to set parameter 'stop-time-us' (err %d)", err);
             return err;
         }
     }

@@ -25,11 +25,12 @@ import android.IOMXNode;
  */
 interface IGraphicBufferSource {
     void configure(IOMXNode omxNode, int dataSpace);
-    void setSuspend(boolean suspend);
+    void setSuspend(boolean suspend, long suspendTimeUs);
     void setRepeatPreviousFrameDelayUs(long repeatAfterUs);
     void setMaxFps(float maxFps);
     void setTimeLapseConfig(long timePerFrameUs, long timePerCaptureUs);
     void setStartTimeUs(long startTimeUs);
+    void setStopTimeUs(long stopTimeUs);
     void setColorAspects(int aspects);
     void setTimeOffsetUs(long timeOffsetsUs);
     void signalEndOfInputStream();

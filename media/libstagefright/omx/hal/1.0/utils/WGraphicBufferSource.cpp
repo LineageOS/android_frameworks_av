@@ -39,8 +39,9 @@ LWGraphicBufferSource::LWGraphicBufferSource(
             new TWOmxNode(omxNode), toHardwareDataspace(dataSpace)));
 }
 
-::android::binder::Status LWGraphicBufferSource::setSuspend(bool suspend) {
-    return toBinderStatus(mBase->setSuspend(suspend));
+::android::binder::Status LWGraphicBufferSource::setSuspend(
+        bool suspend, int64_t timeUs) {
+    return toBinderStatus(mBase->setSuspend(suspend, timeUs));
 }
 
 ::android::binder::Status LWGraphicBufferSource::setRepeatPreviousFrameDelayUs(
@@ -61,6 +62,11 @@ LWGraphicBufferSource::LWGraphicBufferSource(
 ::android::binder::Status LWGraphicBufferSource::setStartTimeUs(
         int64_t startTimeUs) {
     return toBinderStatus(mBase->setStartTimeUs(startTimeUs));
+}
+
+::android::binder::Status LWGraphicBufferSource::setStopTimeUs(
+        int64_t stopTimeUs) {
+    return toBinderStatus(mBase->setStopTimeUs(stopTimeUs));
 }
 
 ::android::binder::Status LWGraphicBufferSource::setColorAspects(
@@ -89,8 +95,8 @@ Return<void> TWGraphicBufferSource::configure(
     return Void();
 }
 
-Return<void> TWGraphicBufferSource::setSuspend(bool suspend) {
-    mBase->setSuspend(suspend);
+Return<void> TWGraphicBufferSource::setSuspend(bool suspend, int64_t timeUs) {
+    mBase->setSuspend(suspend, timeUs);
     return Void();
 }
 
@@ -114,6 +120,10 @@ Return<void> TWGraphicBufferSource::setTimeLapseConfig(
 Return<void> TWGraphicBufferSource::setStartTimeUs(int64_t startTimeUs) {
     mBase->setStartTimeUs(startTimeUs);
     return Void();
+}
+
+Return<void> TWGraphicBufferSource::setStopTimeUs(int64_t stopTimeUs) {
+    return toHardwareStatus(mBase->setStopTimeUs(stopTimeUs));
 }
 
 Return<void> TWGraphicBufferSource::setColorAspects(

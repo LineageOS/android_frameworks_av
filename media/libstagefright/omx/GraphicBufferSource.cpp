@@ -76,11 +76,13 @@ GraphicBufferSource::GraphicBufferSource() :
     mInitCheck(UNKNOWN_ERROR),
     mExecuting(false),
     mSuspended(false),
+    mStopTimeUs(-1),
     mLastDataSpace(HAL_DATASPACE_UNKNOWN),
     mNumFramesAvailable(0),
     mNumBufferAcquired(0),
     mEndOfStream(false),
     mEndOfStreamSent(false),
+    mLastActionTimeUs(-1ll),
     mPrevOriginalTimeUs(-1ll),
     mSkipFramesBeforeNs(-1ll),
     mRepeatAfterUs(-1ll),
@@ -171,7 +173,7 @@ Status GraphicBufferSource::onOmxExecuting() {
 
     // If EOS has already been signaled, and there are no more frames to
     // submit, try to send EOS now as well.
-    if (mEndOfStream && mNumFramesAvailable == 0) {
+    if (mStopTimeUs == -1 && mEndOfStream && mNumFramesAvailable == 0) {
         submitEndOfInputStream_l();
     }
 
@@ -348,8 +350,8 @@ Status GraphicBufferSource::onInputBufferEmptied(
         ALOGV("buffer freed, %zu frames avail (eos=%d)",
                 mNumFramesAvailable, mEndOfStream);
         fillCodecBuffer_l();
-    } else if (mEndOfStream) {
-        // No frames available, but EOS is pending, so use this buffer to
+    } else if (mEndOfStream && mStopTimeUs == -1) {
+        // No frames available, but EOS is pending and no stop time, so use this buffer to
         // send that.
         ALOGV("buffer freed, EOS pending");
         submitEndOfInputStream_l();
@@ -387,7 +389,7 @@ void GraphicBufferSource::onDataSpaceChanged_l(
 bool GraphicBufferSource::fillCodecBuffer_l() {
     CHECK(mExecuting && mNumFramesAvailable > 0);
 
-    if (mSuspended) {
+    if (mSuspended && mActionQueue.empty()) {
         return false;
     }
 
@@ -408,7 +410,84 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
         return false;
     }
 
+    int64_t itemTimeUs = item.mTimestamp / 1000;
+
     mNumFramesAvailable--;
+
+    // Process ActionItem in the Queue if there is any. If a buffer's timestamp
+    // is smaller than the first action's timestamp, no action need to be performed.
+    // If buffer's timestamp is larger or equal than the last action's timestamp,
+    // only the last action needs to be performed as all the acitions before the
+    // the action are overridden by the last action. For the other cases, traverse
+    // the Queue to find the newest action that with timestamp smaller or equal to
+    // the buffer's timestamp. For example, an action queue like
+    // [pause, 1s], [resume 2us], [pause 3us], [resume 4us], [pause 5us].... Upon
+    // receiving a buffer with timestamp 3.5us, only the action [pause, 3us] needs
+    // to be handled and [pause, 1us], [resume 2us] will be discarded.
+    bool dropped = false;
+    bool done = false;
+    if (!mActionQueue.empty()) {
+        // First scan to check if bufferTimestamp is smaller than first action's timestamp.
+        ActionItem nextAction = *(mActionQueue.begin());
+        if (itemTimeUs < nextAction.mActionTimeUs) {
+            ALOGV("No action. buffer timestamp %lld us < action timestamp: %lld us",
+                (long long)itemTimeUs, (long long)nextAction.mActionTimeUs);
+            // All the actions are ahead. No action need to perform now.
+            // Release the buffer if is in suspended state, or process the buffer
+            // if not in suspended state.
+            dropped = mSuspended;
+            done = true;
+        }
+
+        if (!done) {
+            List<ActionItem>::iterator it = mActionQueue.begin();
+            while(it != mActionQueue.end()) {
+                nextAction = *it;
+                mActionQueue.erase(it);
+                if (nextAction.mActionTimeUs > itemTimeUs) {
+                    break;
+                }
+                ++it;
+            }
+
+            CHECK(itemTimeUs >= nextAction.mActionTimeUs);
+            switch (nextAction.mAction) {
+                case ActionItem::PAUSE:
+                {
+                    mSuspended = true;
+                    dropped = true;
+                    ALOGV("RUNNING/PAUSE -> PAUSE at buffer %lld us  PAUSE Time: %lld us",
+                            (long long)itemTimeUs, (long long)nextAction.mActionTimeUs);
+                    break;
+                }
+                case ActionItem::RESUME:
+                {
+                    mSuspended = false;
+                    ALOGV("PAUSE/RUNNING -> RUNNING at buffer %lld us  RESUME Time: %lld us",
+                            (long long)itemTimeUs, (long long)nextAction.mActionTimeUs);
+                    break;
+                }
+                case ActionItem::STOP:
+                {
+                    ALOGV("RUNNING/PAUSE -> STOP at buffer %lld us  STOP Time: %lld us",
+                            (long long)itemTimeUs, (long long)nextAction.mActionTimeUs);
+                    dropped = true;
+                    // Clear the whole ActionQueue as recording is done
+                    mActionQueue.clear();
+                    submitEndOfInputStream_l();
+                    break;
+                }
+                default:
+                    ALOGE("Unknown action type");
+                    return false;
+            }
+        }
+    }
+
+    if (dropped) {
+        releaseBuffer(item.mSlot, item.mFrameNumber, item.mFence);
+        return true;
+    }
 
     if (item.mDataSpace != mLastDataSpace) {
         onDataSpaceChanged_l(
@@ -419,7 +498,6 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
 
     // only submit sample if start time is unspecified, or sample
     // is queued after the specified start time
-    bool dropped = false;
     if (mSkipFramesBeforeNs < 0ll || item.mTimestamp >= mSkipFramesBeforeNs) {
         // if start time is set, offset time stamp by start time
         if (mSkipFramesBeforeNs > 0) {
@@ -719,12 +797,12 @@ void GraphicBufferSource::onFrameAvailable(const BufferItem& /*item*/) {
     ALOGV("onFrameAvailable exec=%d avail=%zu",
             mExecuting, mNumFramesAvailable);
 
-    if (mOMXNode == NULL || mEndOfStream || mSuspended) {
-        if (mEndOfStream) {
+    if (mOMXNode == NULL || mEndOfStreamSent || (mSuspended && mActionQueue.empty())) {
+        if (mEndOfStreamSent) {
             // This should only be possible if a new buffer was queued after
             // EOS was signaled, i.e. the app is misbehaving.
 
-            ALOGW("onFrameAvailable: EOS is set, ignoring frame");
+            ALOGW("onFrameAvailable: EOS is sent, ignoring frame");
         } else {
             ALOGV("onFrameAvailable: suspended, ignoring frame");
         }
@@ -875,44 +953,74 @@ Status GraphicBufferSource::configure(
         mPrevCaptureUs = -1ll;
         mPrevFrameUs = -1ll;
         mInputBufferTimeOffsetUs = 0;
+        mStopTimeUs = -1;
+        mActionQueue.clear();
     }
 
     return Status::ok();
 }
 
-Status GraphicBufferSource::setSuspend(bool suspend) {
-    ALOGV("setSuspend=%d", suspend);
+Status GraphicBufferSource::setSuspend(bool suspend, int64_t suspendStartTimeUs) {
+    ALOGV("setSuspend=%d at time %lld us", suspend, (long long)suspendStartTimeUs);
 
     Mutex::Autolock autoLock(mMutex);
 
-    if (suspend) {
-        mSuspended = true;
-
-        while (mNumFramesAvailable > 0) {
-            BufferItem item;
-            status_t err = acquireBuffer(&item);
-
-            if (err != OK) {
-                ALOGE("setSuspend: acquireBuffer returned err=%d", err);
-                break;
-            }
-
-            --mNumFramesAvailable;
-
-            releaseBuffer(item.mSlot, item.mFrameNumber, item.mFence);
-        }
-        return Status::ok();
+    if (mStopTimeUs != -1) {
+        ALOGE("setSuspend failed as STOP action is pending");
+        return Status::fromServiceSpecificError(INVALID_OPERATION);
     }
 
-    mSuspended = false;
+    // Push the action to the queue.
+    if (suspendStartTimeUs != -1) {
+        // suspendStartTimeUs must be smaller or equal to current systemTime.
+        int64_t currentSystemTimeUs = systemTime() / 1000;
+        if (suspendStartTimeUs > currentSystemTimeUs) {
+            ALOGE("setSuspend failed. %lld is larger than current system time %lld us",
+                    (long long)suspendStartTimeUs, (long long)currentSystemTimeUs);
+            return Status::fromServiceSpecificError(INVALID_OPERATION);
+        }
+        if (mLastActionTimeUs != -1 && suspendStartTimeUs < mLastActionTimeUs) {
+            ALOGE("setSuspend failed. %lld is smaller than last action time %lld us",
+                    (long long)suspendStartTimeUs, (long long)mLastActionTimeUs);
+            return Status::fromServiceSpecificError(INVALID_OPERATION);
+        }
+        mLastActionTimeUs = suspendStartTimeUs;
+        ActionItem action;
+        action.mAction = suspend ? ActionItem::PAUSE : ActionItem::RESUME;
+        action.mActionTimeUs = suspendStartTimeUs;
+        ALOGV("Push %s action into actionQueue", suspend ? "PAUSE" : "RESUME");
+        mActionQueue.push_back(action);
+    } else {
+        if (suspend) {
+            mSuspended = true;
 
-    if (mExecuting && mNumFramesAvailable == 0 && mRepeatBufferDeferred) {
-        if (repeatLatestBuffer_l()) {
-            ALOGV("suspend/deferred repeatLatestBuffer_l SUCCESS");
+            while (mNumFramesAvailable > 0) {
+                BufferItem item;
+                status_t err = acquireBuffer(&item);
 
-            mRepeatBufferDeferred = false;
+                if (err != OK) {
+                    ALOGE("setSuspend: acquireBuffer returned err=%d", err);
+                    break;
+                }
+
+                --mNumFramesAvailable;
+
+                releaseBuffer(item.mSlot, item.mFrameNumber, item.mFence);
+            }
+            return Status::ok();
         } else {
-            ALOGV("suspend/deferred repeatLatestBuffer_l FAILURE");
+
+            mSuspended = false;
+
+            if (mExecuting && mNumFramesAvailable == 0 && mRepeatBufferDeferred) {
+                if (repeatLatestBuffer_l()) {
+                    ALOGV("suspend/deferred repeatLatestBuffer_l SUCCESS");
+
+                    mRepeatBufferDeferred = false;
+                } else {
+                    ALOGV("suspend/deferred repeatLatestBuffer_l FAILURE");
+                }
+            }
         }
     }
     return Status::ok();
@@ -973,6 +1081,36 @@ Status GraphicBufferSource::setStartTimeUs(int64_t skipFramesBeforeUs) {
     return Status::ok();
 }
 
+Status GraphicBufferSource::setStopTimeUs(int64_t stopTimeUs) {
+    ALOGV("setStopTimeUs: %lld us", (long long)stopTimeUs);
+    Mutex::Autolock autoLock(mMutex);
+
+    if (mStopTimeUs != -1) {
+        // Ignore if stop time has already been set
+        return Status::ok();
+    }
+
+    // stopTimeUs must be smaller or equal to current systemTime.
+    int64_t currentSystemTimeUs = systemTime() / 1000;
+    if (stopTimeUs > currentSystemTimeUs) {
+        ALOGE("setStopTimeUs failed. %lld is larger than current system time %lld us",
+            (long long)stopTimeUs, (long long)currentSystemTimeUs);
+        return Status::fromServiceSpecificError(INVALID_OPERATION);
+    }
+    if (mLastActionTimeUs != -1 && stopTimeUs < mLastActionTimeUs) {
+        ALOGE("setSuspend failed. %lld is smaller than last action time %lld us",
+            (long long)stopTimeUs, (long long)mLastActionTimeUs);
+        return Status::fromServiceSpecificError(INVALID_OPERATION);
+    }
+    mLastActionTimeUs = stopTimeUs;
+    ActionItem action;
+    action.mAction = ActionItem::STOP;
+    action.mActionTimeUs = stopTimeUs;
+    mActionQueue.push_back(action);
+    mStopTimeUs = stopTimeUs;
+    return Status::ok();
+}
+
 Status GraphicBufferSource::setTimeLapseConfig(int64_t timePerFrameUs, int64_t timePerCaptureUs) {
     ALOGV("setTimeLapseConfig: timePerFrameUs=%lld, timePerCaptureUs=%lld",
             (long long)timePerFrameUs, (long long)timePerCaptureUs);
@@ -1013,15 +1151,15 @@ Status GraphicBufferSource::signalEndOfInputStream() {
 
     // Set the end-of-stream flag.  If no frames are pending from the
     // BufferQueue, and a codec buffer is available, and we're executing,
-    // we initiate the EOS from here.  Otherwise, we'll let
-    // codecBufferEmptied() (or omxExecuting) do it.
+    // and there is no stop timestamp, we initiate the EOS from here.
+    // Otherwise, we'll let codecBufferEmptied() (or omxExecuting) do it.
     //
     // Note: if there are no pending frames and all codec buffers are
     // available, we *must* submit the EOS from here or we'll just
     // stall since no future events are expected.
     mEndOfStream = true;
 
-    if (mExecuting && mNumFramesAvailable == 0) {
+    if (mStopTimeUs == -1 && mExecuting && mNumFramesAvailable == 0) {
         submitEndOfInputStream_l();
     }
 

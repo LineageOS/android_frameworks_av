@@ -363,8 +363,20 @@ status_t MediaCodecSource::stop() {
     return postSynchronouslyAndReturnError(msg);
 }
 
-status_t MediaCodecSource::pause() {
-    (new AMessage(kWhatPause, mReflector))->post();
+
+status_t MediaCodecSource::setStopStimeUs(int64_t stopTimeUs) {
+    if (!(mFlags & FLAG_USE_SURFACE_INPUT)) {
+        return OK;
+    }
+    sp<AMessage> msg = new AMessage(kWhatSetStopTimeOffset, mReflector);
+    msg->setInt64("stop-time-us", stopTimeUs);
+    return postSynchronouslyAndReturnError(msg);
+}
+
+status_t MediaCodecSource::pause(MetaData* params) {
+    sp<AMessage> msg = new AMessage(kWhatPause, mReflector);
+    msg->setObject("meta", params);
+    msg->post();
     return OK;
 }
 
@@ -624,22 +636,13 @@ void MediaCodecSource::signalEOS(status_t err) {
     }
 }
 
-void MediaCodecSource::suspend() {
-    CHECK(mFlags & FLAG_USE_SURFACE_INPUT);
-    if (mEncoder != NULL) {
-        sp<AMessage> params = new AMessage;
-        params->setInt32("drop-input-frames", true);
-        mEncoder->setParameters(params);
-    }
-}
-
-void MediaCodecSource::resume(int64_t skipFramesBeforeUs) {
+void MediaCodecSource::resume(int64_t resumeStartTimeUs) {
     CHECK(mFlags & FLAG_USE_SURFACE_INPUT);
     if (mEncoder != NULL) {
         sp<AMessage> params = new AMessage;
         params->setInt32("drop-input-frames", false);
-        if (skipFramesBeforeUs > 0) {
-            params->setInt64("skip-frames-before", skipFramesBeforeUs);
+        if (resumeStartTimeUs > 0) {
+            params->setInt64("drop-start-time-us", resumeStartTimeUs);
         }
         mEncoder->setParameters(params);
     }
@@ -661,7 +664,7 @@ status_t MediaCodecSource::feedEncoderInputBuffers() {
                 mFirstSampleSystemTimeUs = systemTime() / 1000;
                 if (mPausePending) {
                     mPausePending = false;
-                    onPause();
+                    onPause(mFirstSampleSystemTimeUs);
                     mbuf->release();
                     mAvailEncoderInputIndices.push_back(bufferIndex);
                     return OK;
@@ -728,6 +731,10 @@ status_t MediaCodecSource::onStart(MetaData *params) {
         ALOGE("Failed to start while we're stopping");
         return INVALID_OPERATION;
     }
+    int64_t startTimeUs;
+    if (params == NULL || !params->findInt64(kKeyTime, &startTimeUs)) {
+        startTimeUs = -1ll;
+    }
 
     if (mStarted) {
         ALOGI("MediaCodecSource (%s) resuming", mIsVideo ? "video" : "audio");
@@ -739,7 +746,7 @@ status_t MediaCodecSource::onStart(MetaData *params) {
             mEncoder->requestIDRFrame();
         }
         if (mFlags & FLAG_USE_SURFACE_INPUT) {
-            resume();
+            resume(startTimeUs);
         } else {
             CHECK(mPuller != NULL);
             mPuller->resume();
@@ -752,11 +759,14 @@ status_t MediaCodecSource::onStart(MetaData *params) {
     status_t err = OK;
 
     if (mFlags & FLAG_USE_SURFACE_INPUT) {
-        int64_t startTimeUs;
-        if (!params || !params->findInt64(kKeyTime, &startTimeUs)) {
-            startTimeUs = -1ll;
+        if (mEncoder != NULL) {
+            sp<AMessage> params = new AMessage;
+            params->setInt32("drop-input-frames", false);
+            if (startTimeUs >= 0) {
+                params->setInt64("skip-frames-before", startTimeUs);
+            }
+            mEncoder->setParameters(params);
         }
-        resume(startTimeUs);
     } else {
         CHECK(mPuller != NULL);
         sp<MetaData> meta = params;
@@ -781,9 +791,12 @@ status_t MediaCodecSource::onStart(MetaData *params) {
     return OK;
 }
 
-void MediaCodecSource::onPause() {
-    if (mFlags & FLAG_USE_SURFACE_INPUT) {
-        suspend();
+void MediaCodecSource::onPause(int64_t pauseStartTimeUs) {
+    if ((mFlags & FLAG_USE_SURFACE_INPUT) && (mEncoder != NULL)) {
+        sp<AMessage> params = new AMessage;
+        params->setInt32("drop-input-frames", true);
+        params->setInt64("drop-start-time-us", pauseStartTimeUs);
+        mEncoder->setParameters(params);
     } else {
         CHECK(mPuller != NULL);
         mPuller->pause();
@@ -871,7 +884,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
                             mFirstSampleSystemTimeUs = systemTime() / 1000;
                             if (mPausePending) {
                                 mPausePending = false;
-                                onPause();
+                                onPause(mFirstSampleSystemTimeUs);
                                 mbuf->release();
                                 break;
                             }
@@ -1000,6 +1013,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
             ALOGV("source (%s) stopped", mIsVideo ? "video" : "audio");
         }
         signalEOS();
+        break;
     }
 
     case kWhatPause:
@@ -1007,7 +1021,14 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
         if (mFirstSampleSystemTimeUs < 0) {
             mPausePending = true;
         } else {
-            onPause();
+            sp<RefBase> obj;
+            CHECK(msg->findObject("meta", &obj));
+            MetaData *params = static_cast<MetaData *>(obj.get());
+            int64_t pauseStartTimeUs = -1;
+            if (params == NULL || !params->findInt64(kKeyTime, &pauseStartTimeUs)) {
+                pauseStartTimeUs = -1ll;
+            }
+            onPause(pauseStartTimeUs);
         }
         break;
     }
@@ -1022,6 +1043,26 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
         if (mFlags & FLAG_USE_SURFACE_INPUT) {
             sp<AMessage> params = new AMessage;
             params->setInt64("time-offset-us", mInputBufferTimeOffsetUs);
+            err = mEncoder->setParameters(params);
+        }
+
+        sp<AMessage> response = new AMessage;
+        response->setInt32("err", err);
+        response->postReply(replyID);
+        break;
+    }
+    case kWhatSetStopTimeOffset:
+    {
+        sp<AReplyToken> replyID;
+        CHECK(msg->senderAwaitsResponse(&replyID));
+        status_t err = OK;
+        int64_t stopTimeUs;
+        CHECK(msg->findInt64("stop-time-us", &stopTimeUs));
+
+        // Propagate the timestamp offset to GraphicBufferSource.
+        if (mFlags & FLAG_USE_SURFACE_INPUT) {
+            sp<AMessage> params = new AMessage;
+            params->setInt64("stop-time-us", stopTimeUs);
             err = mEncoder->setParameters(params);
         }
 
