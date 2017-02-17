@@ -95,17 +95,6 @@ static hidl_array<uint8_t, 16> toHidlArray16(const uint8_t *ptr) {
 }
 
 
-static ::SharedBuffer toSharedBuffer(const sp<IMemory>& sharedBuffer) {
-    ssize_t offset;
-    size_t size;
-    sharedBuffer->getMemory(&offset, &size);
-
-    ::SharedBuffer buffer;
-    buffer.offset = offset >= 0 ? offset : 0;
-    buffer.size = size;
-    return buffer;
-}
-
 static String8 toString8(hidl_string hString) {
     return String8(hString.c_str());
 }
@@ -114,7 +103,7 @@ static String8 toString8(hidl_string hString) {
 CryptoHal::CryptoHal()
     : mFactory(makeCryptoFactory()),
       mInitCheck((mFactory == NULL) ? ERROR_UNSUPPORTED : NO_INIT),
-      mHeapBase(NULL) {
+      mNextBufferId(0) {
 }
 
 CryptoHal::~CryptoHal() {
@@ -206,20 +195,45 @@ bool CryptoHal::requiresSecureDecoderComponent(const char *mime) const {
  * size.  Once the heap base is established, shared memory buffers
  * are sent by providing an offset into the heap and a buffer size.
  */
-status_t CryptoHal::setHeapBase(const sp<IMemory>& sharedBuffer) {
-    sp<IMemoryHeap> heap = sharedBuffer->getMemory(NULL, NULL);
-    if (mHeapBase != heap->getBase()) {
-        int fd = heap->getHeapID();
-        native_handle_t* nativeHandle = native_handle_create(1, 0);
-        nativeHandle->data[0] = fd;
-        auto hidlHandle = hidl_handle(nativeHandle);
-        auto hidlMemory = hidl_memory("ashmem", hidlHandle, heap->getSize());
-        mHeapBase = heap->getBase();
-        Return<void> hResult = mPlugin->setSharedBufferBase(hidlMemory);
-        if (!hResult.isOk()) {
-            return DEAD_OBJECT;
-        }
+void CryptoHal::setHeapBase(const sp<IMemoryHeap>& heap) {
+    native_handle_t* nativeHandle = native_handle_create(1, 0);
+    if (!nativeHandle) {
+        ALOGE("setSharedBufferBase(), failed to create native handle");
+        return;
     }
+    if (heap == NULL) {
+        ALOGE("setSharedBufferBase(): heap is NULL");
+        return;
+    }
+    int fd = heap->getHeapID();
+    nativeHandle->data[0] = fd;
+    auto hidlHandle = hidl_handle(nativeHandle);
+    auto hidlMemory = hidl_memory("ashmem", hidlHandle, heap->getSize());
+    mHeapBases.add(heap->getBase(), mNextBufferId);
+    Return<void> hResult = mPlugin->setSharedBufferBase(hidlMemory, mNextBufferId++);
+    ALOGE_IF(!hResult.isOk(), "setSharedBufferBase(): remote call failed");
+}
+
+status_t CryptoHal::toSharedBuffer(const sp<IMemory>& memory, ::SharedBuffer* buffer) {
+    ssize_t offset;
+    size_t size;
+
+    if (memory == NULL && buffer == NULL) {
+        return UNEXPECTED_NULL;
+    }
+
+    sp<IMemoryHeap> heap = memory->getMemory(&offset, &size);
+    if (heap == NULL) {
+        return UNEXPECTED_NULL;
+    }
+
+    if (mHeapBases.indexOfKey(heap->getBase()) < 0) {
+        setHeapBase(heap);
+    }
+
+    buffer->bufferId = mHeapBases.valueFor(heap->getBase());
+    buffer->offset = offset >= 0 ? offset : 0;
+    buffer->size = size;
     return OK;
 }
 
@@ -233,9 +247,6 @@ ssize_t CryptoHal::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
     if (mInitCheck != OK) {
         return mInitCheck;
     }
-
-    // Establish the base of the shared memory heap
-    setHeapBase(source);
 
     Mode hMode;
     switch(mode) {
@@ -272,7 +283,11 @@ ssize_t CryptoHal::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
     ::DestinationBuffer hDestination;
     if (destination.mType == kDestinationTypeSharedMemory) {
         hDestination.type = BufferType::SHARED_MEMORY;
-        hDestination.nonsecureMemory = toSharedBuffer(destination.mSharedMemory);
+        status_t status = toSharedBuffer(destination.mSharedMemory,
+                &hDestination.nonsecureMemory);
+        if (status != OK) {
+            return status;
+        }
         secure = false;
     } else {
         hDestination.type = BufferType::NATIVE_HANDLE;
@@ -280,12 +295,17 @@ ssize_t CryptoHal::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
         secure = true;
     }
 
+    ::SharedBuffer hSource;
+    status_t status = toSharedBuffer(source, &hSource);
+    if (status != OK) {
+        return status;
+    }
 
     status_t err = UNKNOWN_ERROR;
     uint32_t bytesWritten = 0;
 
     Return<void> hResult = mPlugin->decrypt(secure, toHidlArray16(keyId), toHidlArray16(iv), hMode,
-            hPattern, hSubSamples, toSharedBuffer(source), offset, hDestination,
+            hPattern, hSubSamples, hSource, offset, hDestination,
             [&](Status status, uint32_t hBytesWritten, hidl_string hDetailedError) {
                 if (status == Status::OK) {
                     bytesWritten = hBytesWritten;
