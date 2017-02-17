@@ -249,6 +249,7 @@ public:
     void        notify(int msg, int ext1, int ext2);
     status_t    setInputSurface(const sp<PersistentSurface>& surface);
     sp<IGraphicBufferProducer>     querySurfaceMediaSourceFromMediaServer();
+    status_t    getMetrics(Parcel *reply);
 
 private:
     void                    doCleanUp();

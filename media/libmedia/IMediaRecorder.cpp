@@ -59,7 +59,9 @@ enum {
     SET_LISTENER,
     SET_CLIENT_NAME,
     PAUSE,
-    RESUME
+    RESUME,
+    GET_METRICS,
+
 };
 
 class BpMediaRecorder: public BpInterface<IMediaRecorder>
@@ -261,6 +263,18 @@ public:
         return reply.readInt32();
     }
 
+    status_t getMetrics(Parcel* reply)
+    {
+        ALOGV("getMetrics");
+        Parcel data;
+        data.writeInterfaceToken(IMediaRecorder::getInterfaceDescriptor());
+        status_t ret = remote()->transact(GET_METRICS, data, reply);
+        if (ret == NO_ERROR) {
+            return OK;
+        }
+        return UNKNOWN_ERROR;
+    }
+
     status_t start()
     {
         ALOGV("start");
@@ -396,6 +410,11 @@ status_t BnMediaRecorder::onTransact(
             reply->writeInt32(max);
             reply->writeInt32(ret);
             return NO_ERROR;
+        } break;
+        case GET_METRICS: {
+            ALOGV("GET_METRICS");
+            status_t ret = getMetrics(reply);
+            return ret;
         } break;
         case SET_VIDEO_SOURCE: {
             ALOGV("SET_VIDEO_SOURCE");

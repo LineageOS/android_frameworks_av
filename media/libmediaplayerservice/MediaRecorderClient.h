@@ -79,6 +79,7 @@ public:
     virtual     status_t   setClientName(const String16& clientName);
     virtual     status_t   prepare();
     virtual     status_t   getMaxAmplitude(int* max);
+    virtual     status_t   getMetrics(Parcel* reply);
     virtual     status_t   start();
     virtual     status_t   stop();
     virtual     status_t   reset();
