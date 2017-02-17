@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "WOmxObserver-impl"
 #include "WOmxObserver.h"
 
 #include <vector>
@@ -43,7 +44,10 @@ void LWOmxObserver::onMessages(std::list<omx_message> const& lMessages) {
         wrapAs(&tMessages[i], &handles[i], message);
         ++i;
     }
-    mBase->onMessages(tMessages);
+    auto transResult = mBase->onMessages(tMessages);
+    if (!transResult.isOk()) {
+        ALOGE("LWOmxObserver::onMessages transaction failed");
+    }
     for (auto& handle : handles) {
         native_handle_close(handle);
         native_handle_delete(handle);
