@@ -199,7 +199,8 @@ NuPlayer::NuPlayer(pid_t pid)
       mSourceStarted(false),
       mPaused(false),
       mPausedByClient(true),
-      mPausedForBuffering(false) {
+      mPausedForBuffering(false),
+      mIsDrmProtected(false) {
     clearFlushComplete();
 }
 
@@ -1145,12 +1146,6 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                     case SHUTTING_DOWN_DECODER:
                         break; // Wait for shutdown to complete.
                     case FLUSHED:
-                        // Both secure audio/video now. Legacy Widevine did it for secure video.
-                        // Widevine source reads must stop before releasing the video decoder.
-                        if (mSource != NULL && mIsDrmProtected) {
-                            mSource->stop();
-                            mSourceStarted = false;
-                        }
                         getDecoder(audio)->initiateShutdown(); // In the middle of a seek.
                         *flushing = SHUTTING_DOWN_DECODER;     // Shut down.
                         break;
@@ -1574,12 +1569,6 @@ void NuPlayer::handleFlushComplete(bool audio, bool isDecoder) {
             *state = SHUTTING_DOWN_DECODER;
 
             ALOGV("initiating %s decoder shutdown", audio ? "audio" : "video");
-            // Both secure audio/video now. Legacy Widevine did it for secure video only.
-            // Widevine source reads must stop before releasing the video decoder.
-            if (mSource != NULL && mIsDrmProtected) {
-                mSource->stop();
-                mSourceStarted = false;
-            }
             getDecoder(audio)->initiateShutdown();
             break;
         }
@@ -2724,7 +2713,11 @@ status_t NuPlayer::onReleaseDrm()
     // TODO change to ALOGV
     ALOGD("onReleaseDrm ");
 
-    mIsDrmProtected = true;
+    if (!mIsDrmProtected) {
+        ALOGW("onReleaseDrm: Unexpected. mIsDrmProtected is already false.");
+    }
+
+    mIsDrmProtected = false;
 
     status_t status;
     if (mCrypto != NULL) {
