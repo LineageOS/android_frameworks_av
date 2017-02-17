@@ -10,6 +10,9 @@ LOCAL_C_INCLUDES := \
         $(TOP)/hardware/msm7k \
         $(TOP)/external/libyuv/files/include
 
+LOCAL_SHARED_LIBRARIES := \
+        libui \
+
 LOCAL_STATIC_LIBRARIES := \
         libyuv_static \
 

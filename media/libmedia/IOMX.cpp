@@ -25,8 +25,9 @@
 #include <media/IOMX.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/openmax/OMX_IndexExt.h>
-#include <utils/NativeHandle.h>
 #include <media/OMXBuffer.h>
+#include <utils/NativeHandle.h>
+#include <gui/IGraphicBufferProducer.h>
 
 #include <android/IGraphicBufferSource.h>
 #include <android/IOMXBufferSource.h>

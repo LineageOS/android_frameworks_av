@@ -29,8 +29,6 @@
 
 #include <sys/cdefs.h>
 
-#include <android/native_window.h>
-
 #include "NdkMediaCrypto.h"
 #include "NdkMediaError.h"
 #include "NdkMediaFormat.h"
@@ -38,6 +36,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+struct ANativeWindow;
 
 #if __ANDROID_API__ >= 21
 

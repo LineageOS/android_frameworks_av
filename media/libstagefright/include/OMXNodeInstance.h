@@ -30,6 +30,7 @@
 #include <android/hidl/memory/1.0/IMemory.h>
 
 namespace android {
+class GraphicBuffer;
 class IOMXBufferSource;
 class IOMXObserver;
 struct OMXMaster;

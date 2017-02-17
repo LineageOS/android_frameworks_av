@@ -19,17 +19,15 @@
 
 #include <gui/BufferItem.h>
 #include <gui/ConsumerBase.h>
+#include <gui/BufferQueue.h>
 
-#include <ui/GraphicBuffer.h>
-
-#include <utils/String8.h>
-#include <utils/Vector.h>
-#include <utils/threads.h>
 #include <utils/List.h>
 
 #define ANDROID_GRAPHICS_RINGBUFFERCONSUMER_JNI_ID "mRingBufferConsumer"
 
 namespace android {
+
+class String8;
 
 /**
  * The RingBufferConsumer maintains a ring buffer of BufferItem objects,

@@ -23,6 +23,7 @@ LOCAL_C_INCLUDES += $(intermediates)
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
 
 LOCAL_SHARED_LIBRARIES := \
+        libgui \
         libmedia \
         libhidlmemory \
 
