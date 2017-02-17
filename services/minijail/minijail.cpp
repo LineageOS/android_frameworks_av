@@ -53,20 +53,19 @@ int WritePolicyToPipe(const std::string& base_policy_content,
     return pipefd[0];
 }
 
-int SetUpMinijail(const std::string& base_policy_path, const std::string& additional_policy_path)
+void SetUpMinijail(const std::string& base_policy_path, const std::string& additional_policy_path)
 {
     // No seccomp policy defined for this architecture.
     if (access(base_policy_path.c_str(), R_OK) == -1) {
         LOG(WARNING) << "No seccomp policy defined for this architecture.";
-        return 0;
+        return;
     }
 
     std::string base_policy_content;
     std::string additional_policy_content;
     if (!base::ReadFileToString(base_policy_path, &base_policy_content,
                                 false /* follow_symlinks */)) {
-        LOG(ERROR) << "Could not read base policy file '" << base_policy_path << "'";
-        return -1;
+        LOG(FATAL) << "Could not read base policy file '" << base_policy_path << "'";
     }
 
     if (additional_policy_path.length() > 0 &&
@@ -78,14 +77,12 @@ int SetUpMinijail(const std::string& base_policy_path, const std::string& additi
 
     base::unique_fd policy_fd(WritePolicyToPipe(base_policy_content, additional_policy_content));
     if (policy_fd.get() == -1) {
-        LOG(ERROR) << "Could not write seccomp policy to fd";
-        return -1;
+        LOG(FATAL) << "Could not write seccomp policy to fd";
     }
 
     ScopedMinijail jail{minijail_new()};
     if (!jail) {
-        LOG(ERROR) << "Failed to create minijail.";
-        return -1;
+        LOG(FATAL) << "Failed to create minijail.";
     }
 
     minijail_no_new_privs(jail.get());
@@ -94,6 +91,5 @@ int SetUpMinijail(const std::string& base_policy_path, const std::string& additi
     // Transfer ownership of |policy_fd|.
     minijail_parse_seccomp_filters_from_fd(jail.get(), policy_fd.release());
     minijail_enter(jail.get());
-    return 0;
 }
 }
