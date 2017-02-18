@@ -24,7 +24,8 @@
 #define ALOGVV(a...) do { } while(0)
 #endif
 
-#define AUDIO_POLICY_XML_CONFIG_FILE "/system/etc/audio_policy_configuration.xml"
+#define AUDIO_POLICY_XML_CONFIG_FILE_PATH_MAX_LENGTH 128
+#define AUDIO_POLICY_XML_CONFIG_FILE_NAME "audio_policy_configuration.xml"
 
 #include <inttypes.h>
 #include <math.h>
@@ -3327,6 +3328,33 @@ uint32_t AudioPolicyManager::nextAudioPortGeneration()
     return android_atomic_inc(&mAudioPortGeneration);
 }
 
+#ifdef USE_XML_AUDIO_POLICY_CONF
+// Treblized audio policy xml config will be located in /odm/etc or /vendor/etc.
+static const char *kConfigLocationList[] =
+        {"/odm/etc", "/vendor/etc", "/system/etc"};
+static const int kConfigLocationListSize =
+        (sizeof(kConfigLocationList) / sizeof(kConfigLocationList[0]));
+
+static status_t deserializeAudioPolicyXmlConfig(AudioPolicyConfig &config) {
+    char audioPolicyXmlConfigFile[AUDIO_POLICY_XML_CONFIG_FILE_PATH_MAX_LENGTH];
+    status_t ret;
+
+    for (int i = 0; i < kConfigLocationListSize; i++) {
+        PolicySerializer serializer;
+        snprintf(audioPolicyXmlConfigFile,
+                 sizeof(audioPolicyXmlConfigFile),
+                 "%s/%s",
+                 kConfigLocationList[i],
+                 AUDIO_POLICY_XML_CONFIG_FILE_NAME);
+        ret = serializer.deserialize(audioPolicyXmlConfigFile, config);
+        if (ret == NO_ERROR) {
+            break;
+        }
+    }
+    return ret;
+}
+#endif
+
 AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterface)
     :
 #ifdef AUDIO_POLICY_TEST
@@ -3354,8 +3382,7 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
     AudioPolicyConfig config(mHwModules, mAvailableOutputDevices, mAvailableInputDevices,
                              mDefaultOutputDevice, speakerDrcEnabled,
                              static_cast<VolumeCurvesCollection *>(mVolumeCurves));
-    PolicySerializer serializer;
-    if (serializer.deserialize(AUDIO_POLICY_XML_CONFIG_FILE, config) != NO_ERROR) {
+    if (deserializeAudioPolicyXmlConfig(config) != NO_ERROR) {
 #else
     mVolumeCurves = new StreamDescriptorCollection();
     AudioPolicyConfig config(mHwModules, mAvailableOutputDevices, mAvailableInputDevices,
