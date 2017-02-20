@@ -169,12 +169,41 @@ sp<IMediaCodecList> MediaCodecList::getInstance() {
     return sRemoteList;
 }
 
+// Treblized media codec list will be located in /odm/etc or /vendor/etc.
+static const char *kConfigLocationList[] =
+        {"/odm/etc", "/vendor/etc", "/etc"};
+static const int kConfigLocationListSize =
+        (sizeof(kConfigLocationList) / sizeof(kConfigLocationList[0]));
+
+#define MEDIA_CODECS_CONFIG_FILE_PATH_MAX_LENGTH 128
+
+static bool findMediaCodecListFileFullPath(const char *file_name, char *out_path) {
+    for (int i = 0; i < kConfigLocationListSize; i++) {
+        snprintf(out_path,
+                 MEDIA_CODECS_CONFIG_FILE_PATH_MAX_LENGTH,
+                 "%s/%s",
+                 kConfigLocationList[i],
+                 file_name);
+        struct stat file_stat;
+        if (stat(out_path, &file_stat) == 0 && S_ISREG(file_stat.st_mode)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 MediaCodecList::MediaCodecList()
     : mInitCheck(NO_INIT),
       mUpdate(false),
       mGlobalSettings(new AMessage()) {
-    parseTopLevelXMLFile("/etc/media_codecs.xml");
-    parseTopLevelXMLFile("/etc/media_codecs_performance.xml", true/* ignore_errors */);
+    char config_file_path[MEDIA_CODECS_CONFIG_FILE_PATH_MAX_LENGTH];
+    if (findMediaCodecListFileFullPath("media_codecs.xml", config_file_path)) {
+        parseTopLevelXMLFile(config_file_path);
+    }
+    if (findMediaCodecListFileFullPath("media_codecs_performance.xml",
+                                       config_file_path)) {
+        parseTopLevelXMLFile(config_file_path, true/* ignore_errors */);
+    }
     parseTopLevelXMLFile(kProfilingResults, true/* ignore_errors */);
 }
 
