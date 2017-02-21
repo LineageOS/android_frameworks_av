@@ -77,7 +77,11 @@ struct NuPlayer::Source : public AHandler {
     // an error or ERROR_END_OF_STREAM if not.
     virtual status_t feedMoreTSData() = 0;
 
+    // Returns non-NULL format when the specified track exists.
+    // When the format has "err" set to -EWOULDBLOCK, source needs more time to get valid meta data.
+    // Returns NULL if the specified track doesn't exist or is invalid;
     virtual sp<AMessage> getFormat(bool audio);
+
     virtual sp<MetaData> getFormatMeta(bool /* audio */) { return NULL; }
     virtual sp<MetaData> getFileFormatMeta() const { return NULL; }
 
