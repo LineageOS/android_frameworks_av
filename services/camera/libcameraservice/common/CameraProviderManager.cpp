@@ -21,7 +21,6 @@
 #include "CameraProviderManager.h"
 
 #include <chrono>
-#include <android/hidl/manager/1.0/IServiceManager.h>
 #include <hidl/ServiceManagement.h>
 
 namespace android {
