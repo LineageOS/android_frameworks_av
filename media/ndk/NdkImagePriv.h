@@ -32,12 +32,13 @@ using namespace android;
 
 // TODO: this only supports ImageReader
 struct AImage {
-    AImage(AImageReader* reader, int32_t format, uint64_t usage,
+    AImage(AImageReader* reader, int32_t format, uint64_t usage0, uint64_t usage1,
            BufferItem* buffer, int64_t timestamp,
            int32_t width, int32_t height, int32_t numPlanes);
 
     // free all resources while keeping object alive. Caller must obtain reader lock
-    void close();
+    void close() { close(-1); }
+    void close(int releaseFenceFd);
 
     // Remove from object memory. Must be called after close
     void free();
@@ -61,6 +62,7 @@ struct AImage {
     media_status_t getPlanePixelStride(int planeIdx, /*out*/int32_t* pixelStride) const;
     media_status_t getPlaneRowStride(int planeIdx, /*out*/int32_t* rowStride) const;
     media_status_t getPlaneData(int planeIdx,/*out*/uint8_t** data, /*out*/int* dataLength) const;
+    media_status_t getHardwareBuffer(/*out*/AHardwareBuffer** buffer) const;
 
   private:
     // AImage should be deleted through free() API.
@@ -73,7 +75,8 @@ struct AImage {
     // When reader is close, AImage will only accept close API call
     wp<AImageReader>           mReader;
     const int32_t              mFormat;
-    const uint64_t             mUsage;  // AHARDWAREBUFFER_USAGE0* flags.
+    const uint64_t             mUsage0;  // AHARDWAREBUFFER_USAGE0* flags.
+    const uint64_t             mUsage1;  // AHARDWAREBUFFER_USAGE1* flags.
     BufferItem*                mBuffer;
     std::unique_ptr<CpuConsumer::LockedBuffer> mLockedBuffer;
     const int64_t              mTimestamp;

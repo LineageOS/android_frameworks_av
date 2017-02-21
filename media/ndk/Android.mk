@@ -56,6 +56,7 @@ LOCAL_SHARED_LIBRARIES := \
     liblog \
     libutils \
     libcutils \
+    libandroid \
     libandroid_runtime \
     libbinder \
     libgui \

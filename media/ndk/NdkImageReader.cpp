@@ -38,9 +38,9 @@ namespace {
     }
 }
 
-const int32_t AImageReader::kDefaultUsage = AHARDWAREBUFFER_USAGE0_CPU_READ_OFTEN;
 const char* AImageReader::kCallbackFpKey = "Callback";
 const char* AImageReader::kContextKey    = "Context";
+const char* AImageReader::kGraphicBufferKey = "GraphicBuffer";
 
 bool
 AImageReader::isSupportedFormat(int32_t format) {
@@ -117,6 +117,45 @@ AImageReader::FrameListener::setImageListener(AImageReader_ImageListener* listen
     return AMEDIA_OK;
 }
 
+void
+AImageReader::BufferRemovedListener::onBufferFreed(const wp<GraphicBuffer>& graphicBuffer) {
+    Mutex::Autolock _l(mLock);
+    sp<AImageReader> reader = mReader.promote();
+    if (reader == nullptr) {
+        ALOGW("A frame is available after AImageReader closed!");
+        return; // reader has been closed
+    }
+    if (mListener.onBufferRemoved == nullptr) {
+        return; // No callback registered
+    }
+
+    sp<GraphicBuffer> gBuffer = graphicBuffer.promote();
+    if (gBuffer == nullptr) {
+        ALOGW("A buffer being freed has gone away!");
+        return; // buffer is already destroyed
+    }
+
+    sp<AMessage> msg = new AMessage(AImageReader::kWhatBufferRemoved, reader->mHandler);
+    msg->setPointer(
+        AImageReader::kCallbackFpKey, (void*) mListener.onBufferRemoved);
+    msg->setPointer(AImageReader::kContextKey, mListener.context);
+    msg->setObject(AImageReader::kGraphicBufferKey, gBuffer);
+    msg->post();
+}
+
+media_status_t
+AImageReader::BufferRemovedListener::setBufferRemovedListener(
+    AImageReader_BufferRemovedListener* listener) {
+    Mutex::Autolock _l(mLock);
+    if (listener == nullptr) {
+        mListener.context = nullptr;
+        mListener.onBufferRemoved = nullptr;
+    } else {
+        mListener = *listener;
+    }
+    return AMEDIA_OK;
+}
+
 media_status_t
 AImageReader::setImageListenerLocked(AImageReader_ImageListener* listener) {
     return mFrameListener->setImageListener(listener);
@@ -128,9 +167,50 @@ AImageReader::setImageListener(AImageReader_ImageListener* listener) {
     return setImageListenerLocked(listener);
 }
 
+media_status_t
+AImageReader::setBufferRemovedListenerLocked(AImageReader_BufferRemovedListener* listener) {
+    return mBufferRemovedListener->setBufferRemovedListener(listener);
+}
+
+media_status_t
+AImageReader::setBufferRemovedListener(AImageReader_BufferRemovedListener* listener) {
+    Mutex::Autolock _l(mLock);
+    return setBufferRemovedListenerLocked(listener);
+}
+
 void AImageReader::CallbackHandler::onMessageReceived(
         const sp<AMessage> &msg) {
     switch (msg->what()) {
+        case kWhatBufferRemoved:
+        {
+            AImageReader_BufferRemovedCallback onBufferRemoved;
+            void* context;
+            bool found = msg->findPointer(kCallbackFpKey, (void**) &onBufferRemoved);
+            if (!found || onBufferRemoved == nullptr) {
+                ALOGE("%s: Cannot find onBufferRemoved callback fp!", __FUNCTION__);
+                return;
+            }
+            found = msg->findPointer(kContextKey, &context);
+            if (!found) {
+                ALOGE("%s: Cannot find callback context!", __FUNCTION__);
+                return;
+            }
+            sp<RefBase> bufferToFree;
+            found = msg->findObject(kGraphicBufferKey, &bufferToFree);
+            if (!found || bufferToFree == nullptr) {
+                ALOGE("%s: Cannot find the buffer to free!", __FUNCTION__);
+                return;
+            }
+
+            // TODO(jwcai) Someone from Android graphics team stating this should just be a
+            // static_cast.
+            AHardwareBuffer* outBuffer = reinterpret_cast<AHardwareBuffer*>(bufferToFree.get());
+
+            // At this point, bufferToFree holds the last reference to the GraphicBuffer owned by
+            // this AImageReader, and the reference will be gone once this function returns.
+            (*onBufferRemoved)(context, mReader, outBuffer);
+            break;
+        }
         case kWhatImageAvailable:
         {
             AImageReader_ImageCallback onImageAvailable;
@@ -157,15 +237,18 @@ void AImageReader::CallbackHandler::onMessageReceived(
 AImageReader::AImageReader(int32_t width,
                            int32_t height,
                            int32_t format,
-                           uint64_t usage,
+                           uint64_t usage0,
+                           uint64_t usage1,
                            int32_t maxImages)
     : mWidth(width),
       mHeight(height),
       mFormat(format),
-      mUsage(usage),
+      mUsage0(usage0),
+      mUsage1(usage1),
       mMaxImages(maxImages),
       mNumPlanes(getNumPlanesForFormat(format)),
-      mFrameListener(new FrameListener(this)) {}
+      mFrameListener(new FrameListener(this)),
+      mBufferRemovedListener(new BufferRemovedListener(this)) {}
 
 media_status_t
 AImageReader::init() {
@@ -176,18 +259,19 @@ AImageReader::init() {
     uint64_t producerUsage;
     uint64_t consumerUsage;
     android_hardware_HardwareBuffer_convertToGrallocUsageBits(
-            &producerUsage, &consumerUsage, mUsage, 0);
+            &producerUsage, &consumerUsage, mUsage0, mUsage1);
+    mHalUsage = consumerUsage;
 
     sp<IGraphicBufferProducer> gbProducer;
     sp<IGraphicBufferConsumer> gbConsumer;
     BufferQueue::createBufferQueue(&gbProducer, &gbConsumer);
 
-    String8 consumerName = String8::format(
-            "ImageReader-%dx%df%xu%" PRIu64 "m%d-%d-%d", mWidth, mHeight, mFormat, mUsage,
-            mMaxImages, getpid(), createProcessUniqueId());
+    String8 consumerName = String8::format("ImageReader-%dx%df%xu%" PRIu64 "u%" PRIu64 "m%d-%d-%d",
+            mWidth, mHeight, mFormat, mUsage0, mUsage1, mMaxImages, getpid(),
+            createProcessUniqueId());
 
     mBufferItemConsumer =
-            new BufferItemConsumer(gbConsumer, consumerUsage, mMaxImages, /*controlledByApp*/ true);
+            new BufferItemConsumer(gbConsumer, mHalUsage, mMaxImages, /*controlledByApp*/ true);
     if (mBufferItemConsumer == nullptr) {
         ALOGE("Failed to allocate BufferItemConsumer");
         return AMEDIA_ERROR_UNKNOWN;
@@ -196,6 +280,7 @@ AImageReader::init() {
     mProducer = gbProducer;
     mBufferItemConsumer->setName(consumerName);
     mBufferItemConsumer->setFrameAvailableListener(mFrameListener);
+    mBufferItemConsumer->setBufferFreedListener(mBufferRemovedListener);
 
     status_t res;
     res = mBufferItemConsumer->setDefaultBufferSize(mWidth, mHeight);
@@ -247,6 +332,9 @@ AImageReader::~AImageReader() {
     AImageReader_ImageListener nullListener = {nullptr, nullptr};
     setImageListenerLocked(&nullListener);
 
+    AImageReader_BufferRemovedListener nullBufferRemovedListener = {nullptr, nullptr};
+    setBufferRemovedListenerLocked(&nullBufferRemovedListener);
+
     if (mCbLooper != nullptr) {
         mCbLooper->unregisterHandler(mHandler->id());
         mCbLooper->stop();
@@ -274,7 +362,7 @@ AImageReader::~AImageReader() {
 }
 
 media_status_t
-AImageReader::acquireImageLocked(/*out*/AImage** image) {
+AImageReader::acquireImageLocked(/*out*/AImage** image, /*out*/int* acquireFenceFd) {
     *image = nullptr;
     BufferItem* buffer = getBufferItemLocked();
     if (buffer == nullptr) {
@@ -283,7 +371,10 @@ AImageReader::acquireImageLocked(/*out*/AImage** image) {
         return AMEDIA_IMGREADER_MAX_IMAGES_ACQUIRED;
     }
 
-    status_t res = mBufferItemConsumer->acquireBuffer(buffer, 0);
+    // When the output paramter fence is not NULL, we are acquiring the image asynchronously.
+    bool waitForFence = acquireFenceFd == nullptr;
+    status_t res = mBufferItemConsumer->acquireBuffer(buffer, 0, waitForFence);
+
     if (res != NO_ERROR) {
         returnBufferItemLocked(buffer);
         if (res != BufferQueue::NO_BUFFER_AVAILABLE) {
@@ -301,10 +392,12 @@ AImageReader::acquireImageLocked(/*out*/AImage** image) {
     const int bufferWidth = getBufferWidth(buffer);
     const int bufferHeight = getBufferHeight(buffer);
     const int bufferFmt = buffer->mGraphicBuffer->getPixelFormat();
+    const int bufferUsage = buffer->mGraphicBuffer->getUsage();
 
     const int readerWidth = mWidth;
     const int readerHeight = mHeight;
     const int readerFmt = mHalFormat;
+    const int readerUsage = mHalUsage;
 
     // Check if the producer buffer configurations match what AImageReader configured. Add some
     // extra checks for non-opaque formats.
@@ -323,6 +416,13 @@ AImageReader::acquireImageLocked(/*out*/AImage** image) {
             ALOGW("%s: Buffer size: %dx%d, doesn't match AImageReader configured size: %dx%d",
                     __FUNCTION__, bufferWidth, bufferHeight, readerWidth, readerHeight);
         }
+
+        // Check if the buffer usage is a super set of reader's usage bits, aka all usage bits that
+        // ImageReader requested has been supported from the producer side.
+        ALOGD_IF((readerUsage | bufferUsage) != bufferUsage,
+                "%s: Producer buffer usage: %x, doesn't cover all usage bits AImageReader "
+                "configured: %x",
+                __FUNCTION__, bufferUsage, readerUsage);
 
         if (readerFmt != bufferFmt) {
             if (readerFmt == HAL_PIXEL_FORMAT_YCbCr_420_888 && isPossiblyYUV(bufferFmt)) {
@@ -345,13 +445,19 @@ AImageReader::acquireImageLocked(/*out*/AImage** image) {
     }
 
     if (mHalFormat == HAL_PIXEL_FORMAT_BLOB) {
-        *image = new AImage(this, mFormat, mUsage, buffer, buffer->mTimestamp,
-                            readerWidth, readerHeight, mNumPlanes);
+        *image = new AImage(this, mFormat, mUsage0, mUsage1, buffer, buffer->mTimestamp,
+                readerWidth, readerHeight, mNumPlanes);
     } else {
-        *image = new AImage(this, mFormat, mUsage, buffer, buffer->mTimestamp,
-                            bufferWidth, bufferHeight, mNumPlanes);
+        *image = new AImage(this, mFormat, mUsage0, mUsage1, buffer, buffer->mTimestamp,
+                bufferWidth, bufferHeight, mNumPlanes);
     }
     mAcquiredImages.push_back(*image);
+
+    // When the output paramter fence is not NULL, we are acquiring the image asynchronously.
+    if (acquireFenceFd != nullptr) {
+        *acquireFenceFd = buffer->mFence->dup();
+    }
+
     return AMEDIA_OK;
 }
 
@@ -373,7 +479,7 @@ AImageReader::returnBufferItemLocked(BufferItem* buffer) {
 }
 
 void
-AImageReader::releaseImageLocked(AImage* image) {
+AImageReader::releaseImageLocked(AImage* image, int releaseFenceFd) {
     BufferItem* buffer = image->mBuffer;
     if (buffer == nullptr) {
         // This should not happen, but is not fatal
@@ -381,15 +487,17 @@ AImageReader::releaseImageLocked(AImage* image) {
         return;
     }
 
-    int fenceFd = -1;
-    media_status_t ret = image->unlockImageIfLocked(&fenceFd);
+    int unlockFenceFd = -1;
+    media_status_t ret = image->unlockImageIfLocked(&unlockFenceFd);
     if (ret < 0) {
         ALOGW("%s: AImage %p is cannot be unlocked.", __FUNCTION__, image);
         return;
     }
 
-    sp<Fence> releaseFence = fenceFd > 0 ? new Fence(fenceFd) : Fence::NO_FENCE;
-    mBufferItemConsumer->releaseBuffer(*buffer, releaseFence);
+    sp<Fence> unlockFence = unlockFenceFd > 0 ? new Fence(unlockFenceFd) : Fence::NO_FENCE;
+    sp<Fence> releaseFence = releaseFenceFd > 0 ? new Fence(releaseFenceFd) : Fence::NO_FENCE;
+    sp<Fence> bufferFence = Fence::merge("AImageReader", unlockFence, releaseFence);
+    mBufferItemConsumer->releaseBuffer(*buffer, bufferFence);
     returnBufferItemLocked(buffer);
     image->mBuffer = nullptr;
 
@@ -433,13 +541,13 @@ AImageReader::getBufferHeight(BufferItem* buffer) {
 }
 
 media_status_t
-AImageReader::acquireNextImage(/*out*/AImage** image) {
+AImageReader::acquireNextImage(/*out*/AImage** image, /*out*/int* acquireFenceFd) {
     Mutex::Autolock _l(mLock);
-    return acquireImageLocked(image);
+    return acquireImageLocked(image, acquireFenceFd);
 }
 
 media_status_t
-AImageReader::acquireLatestImage(/*out*/AImage** image) {
+AImageReader::acquireLatestImage(/*out*/AImage** image, /*out*/int* acquireFenceFd) {
     if (image == nullptr) {
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
@@ -447,17 +555,26 @@ AImageReader::acquireLatestImage(/*out*/AImage** image) {
     *image = nullptr;
     AImage* prevImage = nullptr;
     AImage* nextImage = nullptr;
-    media_status_t ret = acquireImageLocked(&prevImage);
+    media_status_t ret = acquireImageLocked(&prevImage, acquireFenceFd);
     if (prevImage == nullptr) {
         return ret;
     }
     for (;;) {
-        ret = acquireImageLocked(&nextImage);
+        ret = acquireImageLocked(&nextImage, acquireFenceFd);
         if (nextImage == nullptr) {
             *image = prevImage;
             return AMEDIA_OK;
         }
-        prevImage->close();
+
+        if (acquireFenceFd == nullptr) {
+            // No need for release fence here since the prevImage is unused and acquireImageLocked
+            // has already waited for acquired fence to be signaled.
+            prevImage->close();
+        } else {
+            // Use the acquire fence as release fence, so that producer can wait before trying to
+            // refill the buffer.
+            prevImage->close(*acquireFenceFd);
+        }
         prevImage->free();
         prevImage = nextImage;
         nextImage = nullptr;
@@ -468,6 +585,15 @@ EXPORT
 media_status_t AImageReader_new(
         int32_t width, int32_t height, int32_t format, int32_t maxImages,
         /*out*/AImageReader** reader) {
+    ALOGV("%s", __FUNCTION__);
+    return AImageReader_newWithUsage(
+            width, height, format, AHARDWAREBUFFER_USAGE0_CPU_READ_OFTEN, 0, maxImages, reader);
+}
+
+EXPORT
+media_status_t AImageReader_newWithUsage(
+        int32_t width, int32_t height, int32_t format, uint64_t usage0, uint64_t usage1,
+        int32_t maxImages, /*out*/ AImageReader** reader) {
     ALOGV("%s", __FUNCTION__);
 
     if (width < 1 || height < 1) {
@@ -499,10 +625,8 @@ media_status_t AImageReader_new(
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
-    // Set consumer usage to AHARDWAREBUFFER_USAGE0_CPU_READ_OFTEN by default so that
-    // AImageReader_new behaves as if it's backed by CpuConsumer.
     AImageReader* tmpReader = new AImageReader(
-        width, height, format, AImageReader::kDefaultUsage, maxImages);
+        width, height, format, usage0, usage1, maxImages);
     if (tmpReader == nullptr) {
         ALOGE("%s: AImageReader allocation failed", __FUNCTION__);
         return AMEDIA_ERROR_UNKNOWN;
@@ -590,23 +714,37 @@ media_status_t AImageReader_getMaxImages(const AImageReader* reader, /*out*/int3
 EXPORT
 media_status_t AImageReader_acquireNextImage(AImageReader* reader, /*out*/AImage** image) {
     ALOGV("%s", __FUNCTION__);
-    if (reader == nullptr || image == nullptr) {
-        ALOGE("%s: invalid argument. reader %p, image %p",
-                __FUNCTION__, reader, image);
-        return AMEDIA_ERROR_INVALID_PARAMETER;
-    }
-    return reader->acquireNextImage(image);
+    return AImageReader_acquireNextImageAsync(reader, image, nullptr);
 }
 
 EXPORT
 media_status_t AImageReader_acquireLatestImage(AImageReader* reader, /*out*/AImage** image) {
+    ALOGV("%s", __FUNCTION__);
+    return AImageReader_acquireLatestImageAsync(reader, image, nullptr);
+}
+
+EXPORT
+media_status_t AImageReader_acquireNextImageAsync(
+    AImageReader* reader, /*out*/AImage** image, /*out*/int* acquireFenceFd) {
     ALOGV("%s", __FUNCTION__);
     if (reader == nullptr || image == nullptr) {
         ALOGE("%s: invalid argument. reader %p, image %p",
                 __FUNCTION__, reader, image);
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
-    return reader->acquireLatestImage(image);
+    return reader->acquireNextImage(image, acquireFenceFd);
+}
+
+EXPORT
+media_status_t AImageReader_acquireLatestImageAsync(
+    AImageReader* reader, /*out*/AImage** image, /*out*/int* acquireFenceFd) {
+    ALOGV("%s", __FUNCTION__);
+    if (reader == nullptr || image == nullptr) {
+        ALOGE("%s: invalid argument. reader %p, image %p",
+                __FUNCTION__, reader, image);
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+    return reader->acquireLatestImage(image, acquireFenceFd);
 }
 
 EXPORT
@@ -619,5 +757,18 @@ media_status_t AImageReader_setImageListener(
     }
 
     reader->setImageListener(listener);
+    return AMEDIA_OK;
+}
+
+EXPORT
+media_status_t AImageReader_setBufferRemovedListener(
+    AImageReader* reader, AImageReader_BufferRemovedListener* listener) {
+    ALOGV("%s", __FUNCTION__);
+    if (reader == nullptr) {
+        ALOGE("%s: invalid argument! reader %p", __FUNCTION__, reader);
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+
+    reader->setBufferRemovedListener(listener);
     return AMEDIA_OK;
 }

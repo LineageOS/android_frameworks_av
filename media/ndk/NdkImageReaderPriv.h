@@ -49,15 +49,14 @@ namespace {
 
 struct AImageReader : public RefBase {
   public:
-    static const int32_t kDefaultUsage;
-
     static bool isSupportedFormat(int32_t format);
     static int getNumPlanesForFormat(int32_t format);
 
     AImageReader(int32_t width,
                  int32_t height,
                  int32_t format,
-                 uint64_t usage,
+                 uint64_t usage0,
+                 uint64_t usage1,
                  int32_t maxImages);
     ~AImageReader();
 
@@ -66,15 +65,15 @@ struct AImageReader : public RefBase {
     media_status_t init();
 
     media_status_t setImageListener(AImageReader_ImageListener* listener);
+    media_status_t setBufferRemovedListener(AImageReader_BufferRemovedListener* listener);
 
-    media_status_t acquireNextImage(/*out*/AImage** image);
-    media_status_t acquireLatestImage(/*out*/AImage** image);
+    media_status_t acquireNextImage(/*out*/AImage** image, /*out*/int* fenceFd);
+    media_status_t acquireLatestImage(/*out*/AImage** image, /*out*/int* fenceFd);
 
     ANativeWindow* getWindow()    const { return mWindow.get(); };
     int32_t        getWidth()     const { return mWidth; };
     int32_t        getHeight()    const { return mHeight; };
     int32_t        getFormat()    const { return mFormat; };
-    uint64_t       getUsage()     const { return mUsage; };
     int32_t        getMaxImages() const { return mMaxImages; };
 
   private:
@@ -85,22 +84,25 @@ struct AImageReader : public RefBase {
     void returnBufferItemLocked(BufferItem* buffer);
 
     // Called by AImageReader_acquireXXX to acquire a Buffer and setup AImage.
-    media_status_t acquireImageLocked(/*out*/AImage** image);
+    media_status_t acquireImageLocked(/*out*/AImage** image, /*out*/int* fenceFd);
 
     // Called by AImage to close image
-    void releaseImageLocked(AImage* image);
+    void releaseImageLocked(AImage* image, int releaseFenceFd);
 
     static int getBufferWidth(BufferItem* buffer);
     static int getBufferHeight(BufferItem* buffer);
 
     media_status_t setImageListenerLocked(AImageReader_ImageListener* listener);
+    media_status_t setBufferRemovedListenerLocked(AImageReader_BufferRemovedListener* listener);
 
     // definition of handler and message
     enum {
-        kWhatImageAvailable
+        kWhatBufferRemoved,
+        kWhatImageAvailable,
     };
     static const char* kCallbackFpKey;
     static const char* kContextKey;
+    static const char* kGraphicBufferKey;
     class CallbackHandler : public AHandler {
       public:
         CallbackHandler(AImageReader* reader) : mReader(reader) {}
@@ -115,7 +117,8 @@ struct AImageReader : public RefBase {
     const int32_t mWidth;
     const int32_t mHeight;
     const int32_t mFormat;
-    const uint64_t mUsage;
+    const uint64_t mUsage0;  // AHARDWAREBUFFER_USAGE0* flags.
+    const uint64_t mUsage1;  // AHARDWAREBUFFER_USAGE1* flags.
     const int32_t mMaxImages;
 
     // TODO(jwcai) Seems completely unused in AImageReader class.
@@ -136,8 +139,24 @@ struct AImageReader : public RefBase {
     };
     sp<FrameListener> mFrameListener;
 
+    struct BufferRemovedListener : public BufferItemConsumer::BufferFreedListener {
+      public:
+        explicit BufferRemovedListener(AImageReader* parent) : mReader(parent) {}
+
+        void onBufferFreed(const wp<GraphicBuffer>& graphicBuffer) override;
+
+        media_status_t setBufferRemovedListener(AImageReader_BufferRemovedListener* listener);
+
+       private:
+        AImageReader_BufferRemovedListener mListener = {nullptr, nullptr};
+        wp<AImageReader>           mReader;
+        Mutex                      mLock;
+    };
+    sp<BufferRemovedListener> mBufferRemovedListener;
+
     int mHalFormat;
     android_dataspace mHalDataSpace;
+    uint64_t mHalUsage;
 
     sp<IGraphicBufferProducer> mProducer;
     sp<Surface>                mSurface;

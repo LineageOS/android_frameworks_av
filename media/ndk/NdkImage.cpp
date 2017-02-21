@@ -31,10 +31,10 @@ using namespace android;
 
 #define ALIGN(x, mask) ( ((x) + (mask) - 1) & ~((mask) - 1) )
 
-AImage::AImage(AImageReader* reader, int32_t format, uint64_t usage,
+AImage::AImage(AImageReader* reader, int32_t format, uint64_t usage0, uint64_t usage1,
         BufferItem* buffer, int64_t timestamp,
         int32_t width, int32_t height, int32_t numPlanes) :
-        mReader(reader), mFormat(format), mUsage(usage),
+        mReader(reader), mFormat(format), mUsage0(usage0), mUsage1(usage1),
         mBuffer(buffer), mLockedBuffer(nullptr), mTimestamp(timestamp),
         mWidth(width), mHeight(height), mNumPlanes(numPlanes) {
 }
@@ -54,7 +54,7 @@ AImage::isClosed() const {
 }
 
 void
-AImage::close() {
+AImage::close(int releaseFenceFd) {
     Mutex::Autolock _l(mLock);
     if (mIsClosed) {
         return;
@@ -64,7 +64,7 @@ AImage::close() {
         LOG_ALWAYS_FATAL("Error: AImage not closed before AImageReader close!");
         return;
     }
-    reader->releaseImageLocked(this);
+    reader->releaseImageLocked(this, releaseFenceFd);
     // Should have been set to nullptr in releaseImageLocked
     // Set to nullptr here for extra safety only
     mBuffer = nullptr;
@@ -178,9 +178,9 @@ media_status_t AImage::lockImage() {
         return AMEDIA_ERROR_INVALID_OBJECT;
     }
 
-    if ((mUsage & AHARDWAREBUFFER_USAGE0_CPU_READ_OFTEN) == 0) {
+    if ((mUsage0 & AHARDWAREBUFFER_USAGE0_CPU_READ_OFTEN) == 0) {
         ALOGE("%s: AImage %p does not have any software read usage bits set, usage=%" PRIu64 "",
-              __FUNCTION__, this, mUsage);
+              __FUNCTION__, this, mUsage0);
         return AMEDIA_IMGREADER_CANNOT_LOCK_IMAGE;
     }
 
@@ -194,7 +194,7 @@ media_status_t AImage::lockImage() {
     uint64_t producerUsage;
     uint64_t consumerUsage;
     android_hardware_HardwareBuffer_convertToGrallocUsageBits(
-            &producerUsage, &consumerUsage, mUsage, 0);
+            &producerUsage, &consumerUsage, mUsage0, mUsage1);
 
     status_t ret =
             lockImageFromBuffer(mBuffer, consumerUsage, mBuffer->mFence->dup(), lockedBuffer.get());
@@ -600,12 +600,31 @@ AImage::getPlaneData(int planeIdx,/*out*/uint8_t** data, /*out*/int* dataLength)
     return AMEDIA_OK;
 }
 
+media_status_t
+AImage::getHardwareBuffer(/*out*/AHardwareBuffer** buffer) const {
+    if (mBuffer == nullptr || mBuffer->mGraphicBuffer == nullptr) {
+        ALOGE("%s: AImage %p has no buffer.", __FUNCTION__, this);
+        return AMEDIA_ERROR_INVALID_OBJECT;
+    }
+
+    // TODO(jwcai) Someone from Android graphics team stating this should just be a static_cast.
+    *buffer = reinterpret_cast<AHardwareBuffer*>(mBuffer->mGraphicBuffer.get());
+    return AMEDIA_OK;
+}
+
 EXPORT
 void AImage_delete(AImage* image) {
     ALOGV("%s", __FUNCTION__);
+    AImage_deleteAsync(image, -1);
+    return;
+}
+
+EXPORT
+void AImage_deleteAsync(AImage* image, int releaseFenceFd) {
+    ALOGV("%s", __FUNCTION__);
     if (image != nullptr) {
         image->lockReader();
-        image->close();
+        image->close(releaseFenceFd);
         image->unlockReader();
         if (!image->isClosed()) {
             LOG_ALWAYS_FATAL("Image close failed!");
@@ -749,4 +768,16 @@ media_status_t AImage_getPlaneData(
         return ret;
     }
     return image->getPlaneData(planeIdx, data, dataLength);
+}
+
+EXPORT
+media_status_t AImage_getHardwareBuffer(
+    const AImage* image, /*out*/AHardwareBuffer** buffer) {
+    ALOGV("%s", __FUNCTION__);
+
+    if (image == nullptr || buffer == nullptr) {
+        ALOGE("%s: bad argument. image %p buffer %p", __FUNCTION__, image, buffer);
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+    return image->getHardwareBuffer(buffer);
 }
