@@ -33,6 +33,7 @@ LOCAL_SHARED_LIBRARIES := \
     libavservices_minijail \
     libcutils \
     libhwbinder \
+    libhidltransport \
     android.hardware.media.omx@1.0
 LOCAL_C_INCLUDES := \
     $(TOP)/frameworks/av/media/libstagefright \
