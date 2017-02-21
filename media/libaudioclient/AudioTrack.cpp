@@ -1479,12 +1479,13 @@ status_t AudioTrack::createTrack_l()
     mAwaitBoost = false;
     if (mFlags & AUDIO_OUTPUT_FLAG_FAST) {
         if (flags & AUDIO_OUTPUT_FLAG_FAST) {
-            ALOGV("AUDIO_OUTPUT_FLAG_FAST successful; frameCount %zu", frameCount);
+            ALOGI("AUDIO_OUTPUT_FLAG_FAST successful; frameCount %zu -> %zu", frameCount, temp);
             if (!mThreadCanCallJava) {
                 mAwaitBoost = true;
             }
         } else {
-            ALOGW("AUDIO_OUTPUT_FLAG_FAST denied by server; frameCount %zu", frameCount);
+            ALOGW("AUDIO_OUTPUT_FLAG_FAST denied by server; frameCount %zu -> %zu", frameCount,
+                    temp);
         }
     }
     mFlags = flags;
