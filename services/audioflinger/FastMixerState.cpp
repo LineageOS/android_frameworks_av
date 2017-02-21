@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "FastMixerState"
+//#define LOG_NDEBUG 0
+
 #include <cutils/properties.h>
 #include "FastMixerState.h"
 
