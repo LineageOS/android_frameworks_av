@@ -1060,6 +1060,9 @@ MtpResponseCode MtpServer::doSendObject() {
                 mfr.length = mSendObjectFileSize - initialData;
             }
 
+            mfr.command = 0;
+            mfr.transaction_id = 0;
+
             // transfer the file
             ret = sHandle->receiveFile(mfr);
             if ((ret < 0) && (errno == ECANCELED)) {
@@ -1257,6 +1260,8 @@ MtpResponseCode MtpServer::doSendPartialObject() {
             mfr.fd = edit->mFD;
             mfr.offset = offset;
             mfr.length = length;
+            mfr.command = 0;
+            mfr.transaction_id = 0;
 
             // transfer the file
             ret = sHandle->receiveFile(mfr);
