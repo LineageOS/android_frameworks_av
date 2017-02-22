@@ -45,8 +45,8 @@ bool EffectsFactoryHalInterface::isNullUuid(const effect_uuid_t *pEffectUuid) {
     return EffectIsNullUuid(pEffectUuid);
 }
 
-EffectsFactoryHalHidl::EffectsFactoryHalHidl() : ConversionHelperHidl("EffectsFactory"){
-    mEffectsFactory = IEffectsFactory::getService("audio_effects_factory");
+EffectsFactoryHalHidl::EffectsFactoryHalHidl() : ConversionHelperHidl("EffectsFactory") {
+    mEffectsFactory = IEffectsFactory::getService();
     // TODO: Waiting should not be needed (b/34772726).
     // Also remove include of IAllocator.h and ServiceManagement.h
     android::hardware::details::waitForHwService(
