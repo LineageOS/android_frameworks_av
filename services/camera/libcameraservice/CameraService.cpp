@@ -58,9 +58,6 @@
 
 #include <system/camera.h>
 
-#include <android/hidl/manager/1.0/IServiceManager.h>
-#include <hidl/ServiceManagement.h>
-
 #include "CameraService.h"
 #include "api1/CameraClient.h"
 #include "api1/Camera2Client.h"
