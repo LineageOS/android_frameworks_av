@@ -641,6 +641,7 @@ int MtpFfsHandle::sendFile(mtp_file_range mfr) {
     if (file_length == static_cast<unsigned>(init_read_len)) return 0;
     file_length -= init_read_len;
     offset += init_read_len;
+    ret = 0;
 
     // Break down the file into pieces that fit in buffers
     while(file_length > 0) {
