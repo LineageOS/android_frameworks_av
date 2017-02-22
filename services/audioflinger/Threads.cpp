@@ -3063,8 +3063,13 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                     releaseWakeLock_l();
                     released = true;
                 }
-                ALOGV("wait async completion");
-                mWaitWorkCV.wait(mLock);
+
+                const int64_t waitNs = computeWaitTimeNs_l();
+                ALOGV("wait async completion (wait time: %lld)", (long long)waitNs);
+                status_t status = mWaitWorkCV.waitRelative(mLock, waitNs);
+                if (status == TIMED_OUT) {
+                    mSignalPending = true; // if timeout recheck everything
+                }
                 ALOGV("async completion/wake");
                 if (released) {
                     acquireWakeLock_l();
@@ -4131,7 +4136,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 // cache the combined master volume and stream type volume for fast mixer; this
                 // lacks any synchronization or barrier so VolumeProvider may read a stale value
                 const float vh = track->getVolumeHandler()->getVolume(
-                        track->mAudioTrackServerProxy->framesReleased());
+                        track->mAudioTrackServerProxy->framesReleased()).first;
                 track->mCachedVolume = masterVolume
                         * mStreamTypes[track->streamType()].volume
                         * vh;
@@ -4277,7 +4282,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                     vrf = GAIN_FLOAT_UNITY;
                 }
                 const float vh = track->getVolumeHandler()->getVolume(
-                        track->mAudioTrackServerProxy->framesReleased());
+                        track->mAudioTrackServerProxy->framesReleased()).first;
                 // now apply the master volume and stream type volume and shaper volume
                 vlf *= v * vh;
                 vrf *= v * vh;
@@ -4756,6 +4761,7 @@ AudioFlinger::DirectOutputThread::DirectOutputThread(const sp<AudioFlinger>& aud
         ThreadBase::type_t type, bool systemReady)
     :   PlaybackThread(audioFlinger, output, id, device, type, systemReady)
         // mLeftVolFloat, mRightVolFloat
+        , mVolumeShaperActive(false)
 {
 }
 
@@ -4774,13 +4780,12 @@ void AudioFlinger::DirectOutputThread::processVolume_l(Track *track, bool lastTr
         float v = mMasterVolume * typeVolume;
         sp<AudioTrackServerProxy> proxy = track->mAudioTrackServerProxy;
 
-        if (audio_is_linear_pcm(mFormat) && !usesHwAvSync()) {
-            const float vh = track->getVolumeHandler()->getVolume(
+        // Get volumeshaper scaling
+        std::pair<float /* volume */, bool /* active */>
+            vh = track->getVolumeHandler()->getVolume(
                     track->mAudioTrackServerProxy->framesReleased());
-            v *= vh;
-        } else {
-            // TODO: implement volume scaling in HW
-        }
+        v *= vh.first;
+        mVolumeShaperActive = vh.second;
 
         gain_minifloat_packed_t vlr = proxy->getVolumeLR();
         left = float_from_gain(gain_minifloat_unpack_left(vlr));
@@ -5236,6 +5241,13 @@ void AudioFlinger::DirectOutputThread::flushHw_l()
     mOutput->flush();
     mHwPaused = false;
     mFlushPending = false;
+}
+
+int64_t AudioFlinger::DirectOutputThread::computeWaitTimeNs_l() const {
+    // If a VolumeShaper is active, we must wake up periodically to update volume.
+    const int64_t NS_PER_MS = 1000000;
+    return mVolumeShaperActive ?
+            kMinNormalSinkBufferSizeMs * NS_PER_MS : PlaybackThread::computeWaitTimeNs_l();
 }
 
 // ----------------------------------------------------------------------------

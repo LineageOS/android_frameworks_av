@@ -59,6 +59,10 @@ public:
             bool        isOffloaded() const
                                 { return (mFlags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) != 0; }
             bool        isDirect() const { return (mFlags & AUDIO_OUTPUT_FLAG_DIRECT) != 0; }
+            bool        isOffloadedOrDirect() const { return (mFlags
+                            & (AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD
+                                    | AUDIO_OUTPUT_FLAG_DIRECT)) != 0; }
+
             status_t    setParameters(const String8& keyValuePairs);
             status_t    attachAuxEffect(int EffectId);
             void        setAuxBuffer(int EffectId, int32_t *buffer);

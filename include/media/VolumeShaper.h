@@ -94,6 +94,14 @@ public:
             , mId(-1) {
         }
 
+        Configuration(const Configuration &configuration)
+            : Interpolator<S, T>(*static_cast<const Interpolator<S, T> *>(&configuration))
+            , mType(configuration.mType)
+            , mOptionFlags(configuration.mOptionFlags)
+            , mDurationMs(configuration.mDurationMs)
+            , mId(configuration.mId) {
+        }
+
         Type getType() const {
             return mType;
         }
@@ -493,13 +501,8 @@ public:
         return new VolumeShaper::State(mLastVolume, mXOffset);
     }
 
-    std::pair<T, bool> getVolume(int64_t trackFrameCount, double trackSampleRate) {
-        if (mConfiguration.get() == nullptr || mConfiguration->empty()) {
-            ALOGE("nonexistent VolumeShaper, removing");
-            mLastVolume = T(1);
-            mXOffset = 0.f;
-            return std::make_pair(T(1), true);
-        }
+    std::pair<T /* volume */, bool /* active */> getVolume(
+            int64_t trackFrameCount, double trackSampleRate) {
         if ((getFlags() & VolumeShaper::Operation::FLAG_DELAY) != 0) {
             VS_LOG("delayed VolumeShaper, ignoring");
             mLastVolume = T(1);
@@ -534,13 +537,13 @@ public:
             if (x > mConfiguration->last().first) {
                 mXOffset = 0.f;
                 mLastVolume = 1.f;
-                return std::make_pair(T(1), false); // too early
+                return std::make_pair(T(1), true); // too early
             }
         } else {
             if (x < mConfiguration->first().first) {
                 mXOffset = 0.f;
                 mLastVolume = 1.f;
-                return std::make_pair(T(1), false); // too early
+                return std::make_pair(T(1), true); // too early
             }
             if (x > mConfiguration->last().first) {
                 mXOffset = 1.f;
@@ -558,7 +561,7 @@ public:
         const T volume = mConfiguration->adjustVolume(volumeChange);
         VS_LOG("volume: %f  unscaled: %f", volume, unscaledVolume);
         mLastVolume = volume;
-        return std::make_pair(volume, false);
+        return std::make_pair(volume, true);
     }
 
     std::string toString() const {
@@ -597,6 +600,8 @@ public:
     VolumeShaper::Status applyVolumeShaper(
             const sp<VolumeShaper::Configuration> &configuration,
             const sp<VolumeShaper::Operation> &operation) {
+        VS_LOG("applyVolumeShaper:configuration: %s", configuration->toString().c_str());
+        VS_LOG("applyVolumeShaper:operation: %s", operation->toString().c_str());
         AutoMutex _l(mLock);
         if (configuration == nullptr) {
             ALOGE("null configuration");
@@ -614,34 +619,6 @@ public:
         VS_LOG("applyVolumeShaper id: %d", id);
 
         switch (configuration->getType()) {
-        case VolumeShaper::Configuration::TYPE_ID: {
-            VS_LOG("trying to find id: %d", id);
-            auto it = findId_l(id);
-            if (it == mVolumeShapers.end()) {
-                VS_LOG("couldn't find id: %d\n%s", id, this->toString().c_str());
-                return VolumeShaper::Status(INVALID_OPERATION);
-            }
-            if ((it->getFlags() & VolumeShaper::Operation::FLAG_TERMINATE) != 0) {
-                VS_LOG("terminate id: %d", id);
-                mVolumeShapers.erase(it);
-                break;
-            }
-            if ((it->getFlags() & VolumeShaper::Operation::FLAG_REVERSE) !=
-                    (operation->getFlags() & VolumeShaper::Operation::FLAG_REVERSE)) {
-                const S x = it->mXTranslate((T)mLastFrame);
-                VS_LOG("translation: %f", x);
-                // reflect position
-                S target = 1.f - x;
-                if (target < it->mConfiguration->first().first) {
-                    VS_LOG("clamp to start - begin immediately");
-                    target = 0.;
-                }
-                VS_LOG("target: %f", target);
-                it->mXTranslate.setOffset(it->mXTranslate.getOffset()
-                        + (x - target) / it->mXTranslate.getScale());
-            }
-            it->mOperation = operation; // replace the operation
-        } break;
         case VolumeShaper::Configuration::TYPE_SCALE: {
             const int replaceId = operation->getReplaceId();
             if (replaceId >= 0) {
@@ -670,6 +647,38 @@ public:
             }
             // create new VolumeShaper
             mVolumeShapers.emplace_back(configuration, operation);
+        }
+        // fall through to handle the operation
+        case VolumeShaper::Configuration::TYPE_ID: {
+            VS_LOG("trying to find id: %d", id);
+            auto it = findId_l(id);
+            if (it == mVolumeShapers.end()) {
+                VS_LOG("couldn't find id: %d", id);
+                return VolumeShaper::Status(INVALID_OPERATION);
+            }
+            if ((it->getFlags() & VolumeShaper::Operation::FLAG_TERMINATE) != 0) {
+                VS_LOG("terminate id: %d", id);
+                mVolumeShapers.erase(it);
+                break;
+            }
+            const bool clockTime = (it->mConfiguration->getOptionFlags()
+                    & VolumeShaper::Configuration::OPTION_FLAG_CLOCK_TIME) != 0;
+            if ((it->getFlags() & VolumeShaper::Operation::FLAG_REVERSE) !=
+                    (operation->getFlags() & VolumeShaper::Operation::FLAG_REVERSE)) {
+                const int64_t frameCount = clockTime ? VolumeShaper::getNowUs() : mLastFrame;
+                const S x = it->mXTranslate((T)frameCount);
+                VS_LOG("reverse translation: %f", x);
+                // reflect position
+                S target = 1.f - x;
+                if (target < it->mConfiguration->first().first) {
+                    VS_LOG("clamp to start - begin immediately");
+                    target = 0.;
+                }
+                VS_LOG("target reverse: %f", target);
+                it->mXTranslate.setOffset(it->mXTranslate.getOffset()
+                        + (x - target) / it->mXTranslate.getScale());
+            }
+            it->mOperation = operation; // replace the operation
         } break;
         }
         return VolumeShaper::Status(id);
@@ -684,21 +693,19 @@ public:
         return it->getState();
     }
 
-    T getVolume(int64_t trackFrameCount) {
+    std::pair<T /* volume */, bool /* active */> getVolume(int64_t trackFrameCount) {
         AutoMutex _l(mLock);
         mLastFrame = trackFrameCount;
         T volume(1);
+        size_t activeCount = 0;
         for (auto it = mVolumeShapers.begin(); it != mVolumeShapers.end();) {
             std::pair<T, bool> shaperVolume =
                     it->getVolume(trackFrameCount, mSampleRate);
             volume *= shaperVolume.first;
-            if (shaperVolume.second) {
-                it = mVolumeShapers.erase(it);
-                continue;
-            }
+            activeCount += shaperVolume.second;
             ++it;
         }
-        return volume;
+        return std::make_pair(volume, activeCount != 0);
     }
 
     std::string toString() const {

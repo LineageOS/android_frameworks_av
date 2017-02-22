@@ -757,6 +757,9 @@ public:
 
     virtual     void        getAudioPortConfig(struct audio_port_config *config);
 
+                // Return the asynchronous signal wait time.
+    virtual     int64_t     computeWaitTimeNs_l() const { return INT64_MAX; }
+
 protected:
     // updated by readOutputParameters_l()
     size_t                          mNormalFrameCount;  // normal mixer and effects
@@ -1174,6 +1177,7 @@ protected:
     // volumes last sent to audio HAL with stream->set_volume()
     float mLeftVolFloat;
     float mRightVolFloat;
+    bool mVolumeShaperActive;
 
     DirectOutputThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
                         audio_io_handle_t id, uint32_t device, ThreadBase::type_t type,
@@ -1187,6 +1191,8 @@ protected:
 
 public:
     virtual     bool        hasFastMixer() const { return false; }
+
+    virtual     int64_t     computeWaitTimeNs_l() const override;
 };
 
 class OffloadThread : public DirectOutputThread {
