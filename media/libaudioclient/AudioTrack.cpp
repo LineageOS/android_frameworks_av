@@ -184,7 +184,6 @@ AudioTrack::AudioTrack()
       mPreviousSchedulingGroup(SP_DEFAULT),
       mPausedPosition(0),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
-      mVolumeShaperId(VolumeShaper::kSystemIdMax),
       mPortId(AUDIO_PORT_HANDLE_NONE)
 {
     mAttributes.content_type = AUDIO_CONTENT_TYPE_UNKNOWN;
@@ -557,7 +556,7 @@ status_t AudioTrack::set(
     mFramesWritten = 0;
     mFramesWrittenServerOffset = 0;
     mFramesWrittenAtRestore = -1; // -1 is a unique initializer.
-    mVolumeHandler = new VolumeHandler(mSampleRate);
+    mVolumeHandler = new VolumeHandler();
     return NO_ERROR;
 }
 
@@ -2251,6 +2250,20 @@ status_t AudioTrack::restoreTrack_l(const char *from)
                 }
             }
         }
+        // restore volume handler
+        mVolumeHandler->forall([this](const sp<VolumeShaper::Configuration> &configuration,
+                const sp<VolumeShaper::Operation> &operation) -> VolumeShaper::Status {
+            sp<VolumeShaper::Operation> operationToEnd = new VolumeShaper::Operation(*operation);
+            // TODO: Ideally we would restore to the exact xOffset position
+            // as returned by getVolumeShaperState(), but we don't have that
+            // information when restoring at the client unless we periodically poll
+            // the server or create shared memory state.
+            //
+            // For now, we simply advance to the end of the VolumeShaper effect.
+            operationToEnd->setXOffset(1.f);
+            return mAudioTrack->applyVolumeShaper(configuration, operationToEnd);
+        });
+
         if (mState == STATE_ACTIVE) {
             result = mAudioTrack->start();
         }
@@ -2316,24 +2329,12 @@ VolumeShaper::Status AudioTrack::applyVolumeShaper(
         const sp<VolumeShaper::Operation>& operation)
 {
     AutoMutex lock(mLock);
-    if (configuration->getType() == VolumeShaper::Configuration::TYPE_SCALE) {
-        const int id = configuration->getId();
-        LOG_ALWAYS_FATAL_IF(id >= VolumeShaper::kSystemIdMax || id < -1,
-                "id must be -1 or a system id (less than kSystemIdMax)");
-        if (id == -1) {
-            // if not a system id, reassign to a unique id
-            configuration->setId(mVolumeShaperId);
-            ALOGD("setting id to %d", mVolumeShaperId);
-            // increment and avoid signed overflow.
-            if (mVolumeShaperId == INT32_MAX) {
-                mVolumeShaperId = VolumeShaper::kSystemIdMax;
-            } else {
-                ++mVolumeShaperId;
-            }
-        }
-    }
+    mVolumeHandler->setIdIfNecessary(configuration);
     VolumeShaper::Status status = mAudioTrack->applyVolumeShaper(configuration, operation);
-    // TODO: For restoration purposes, record successful creation and termination.
+    if (status >= 0) {
+        // save VolumeShaper for restore
+        mVolumeHandler->applyVolumeShaper(configuration, operation);
+    }
     return status;
 }
 

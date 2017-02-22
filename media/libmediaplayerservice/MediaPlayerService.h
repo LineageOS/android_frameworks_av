@@ -165,6 +165,7 @@ class MediaPlayerService : public BnMediaPlayerService
         float                   mSendLevel;
         int                     mAuxEffectId;
         audio_output_flags_t    mFlags;
+        sp<VolumeHandler>       mVolumeHandler;
         mutable Mutex           mLock;
 
         // static variables below not protected by mutex

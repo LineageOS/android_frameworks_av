@@ -1566,7 +1566,8 @@ MediaPlayerService::AudioOutput::AudioOutput(audio_session_t sessionId, uid_t ui
       mPid(pid),
       mSendLevel(0.0),
       mAuxEffectId(0),
-      mFlags(AUDIO_OUTPUT_FLAG_NONE)
+      mFlags(AUDIO_OUTPUT_FLAG_NONE),
+      mVolumeHandler(new VolumeHandler())
 {
     ALOGV("AudioOutput(%d)", sessionId);
     if (attr != NULL) {
@@ -2030,6 +2031,13 @@ status_t MediaPlayerService::AudioOutput::open(
     ALOGV("setVolume");
     t->setVolume(mLeftVolume, mRightVolume);
 
+    // Dispatch any queued VolumeShapers when the track was not open.
+    mVolumeHandler->forall([&t](const sp<VolumeShaper::Configuration> &configuration,
+            const sp<VolumeShaper::Operation> &operation) -> VolumeShaper::Status {
+        return t->applyVolumeShaper(configuration, operation);
+    });
+    mVolumeHandler->reset(); // After dispatching, clear VolumeShaper queue.
+
     mSampleRateHz = sampleRate;
     mFlags = flags;
     mMsecsPerFrame = 1E3f / (mPlaybackRate.mSpeed * sampleRate);
@@ -2272,10 +2280,14 @@ VolumeShaper::Status MediaPlayerService::AudioOutput::applyVolumeShaper(
 {
     Mutex::Autolock lock(mLock);
     ALOGV("AudioOutput::applyVolumeShaper");
+
+    // We take ownership of the VolumeShaper if set before the track is created.
+    mVolumeHandler->setIdIfNecessary(configuration);
     if (mTrack != 0) {
         return mTrack->applyVolumeShaper(configuration, operation);
+    } else {
+        return mVolumeHandler->applyVolumeShaper(configuration, operation);
     }
-    return VolumeShaper::Status(INVALID_OPERATION);
 }
 
 sp<VolumeShaper::State> MediaPlayerService::AudioOutput::getVolumeShaperState(int id)
@@ -2283,8 +2295,9 @@ sp<VolumeShaper::State> MediaPlayerService::AudioOutput::getVolumeShaperState(in
     Mutex::Autolock lock(mLock);
     if (mTrack != 0) {
         return mTrack->getVolumeShaperState(id);
+    } else {
+        return mVolumeHandler->getVolumeShaperState(id);
     }
-    return nullptr;
 }
 
 // static

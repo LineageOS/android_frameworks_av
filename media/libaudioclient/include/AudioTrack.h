@@ -1128,8 +1128,6 @@ protected:
 
     sp<VolumeHandler>       mVolumeHandler;
 
-    int32_t                 mVolumeShaperId;
-
 private:
     class DeathNotifier : public IBinder::DeathRecipient {
     public:
