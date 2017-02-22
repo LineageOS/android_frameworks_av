@@ -79,7 +79,7 @@ protected:
     virtual ~Harness();
 
 private:
-    typedef hidl::memory::V1_0::IAllocator IAllocator;
+    typedef hidl::allocator::V1_0::IAllocator IAllocator;
 
     friend struct NodeReaper;
     struct CodecObserver;

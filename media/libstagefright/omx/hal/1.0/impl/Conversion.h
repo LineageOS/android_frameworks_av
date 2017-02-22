@@ -17,29 +17,26 @@
 #ifndef ANDROID_HARDWARE_MEDIA_OMX_V1_0__CONVERSION_H
 #define ANDROID_HARDWARE_MEDIA_OMX_V1_0__CONVERSION_H
 
+#include <vector>
+#include <list>
+
+#include <unistd.h>
+
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
 #include <hidlmemory/mapping.h>
-#include <android/hidl/memory/1.0/IMemory.h>
-
-#include <unistd.h>
-#include <vector>
-#include <list>
 
 #include <binder/Binder.h>
 #include <binder/Status.h>
 #include <ui/FenceTime.h>
-
-#include <OMXFenceParcelable.h>
+#include <media/OMXFenceParcelable.h>
 #include <cutils/native_handle.h>
 #include <gui/IGraphicBufferProducer.h>
 
-#include <IOMX.h>
+#include <media/OMXBuffer.h>
 #include <VideoAPI.h>
-#include <OMXBuffer.h>
-#include <android/IOMXBufferSource.h>
-#include <android/IGraphicBufferSource.h>
 
+#include <android/hidl/memory/1.0/IMemory.h>
 #include <android/hardware/media/omx/1.0/types.h>
 #include <android/hardware/media/omx/1.0/IOmx.h>
 #include <android/hardware/media/omx/1.0/IOmxNode.h>
@@ -48,6 +45,9 @@
 #include <android/hardware/media/omx/1.0/IOmxObserver.h>
 #include <android/hardware/media/omx/1.0/IOmxProducerListener.h>
 #include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
+
+#include <android/IGraphicBufferSource.h>
+#include <android/IOMXBufferSource.h>
 
 namespace android {
 namespace hardware {

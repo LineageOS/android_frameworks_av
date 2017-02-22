@@ -17,13 +17,14 @@
 #ifndef ANDROID_HARDWARE_MEDIA_OMX_V1_0_WOMXBUFFERPRODUCER_H
 #define ANDROID_HARDWARE_MEDIA_OMX_V1_0_WOMXBUFFERPRODUCER_H
 
-#include <android/hardware/media/omx/1.0/IOmxBufferProducer.h>
-#include <binder/Binder.h>
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
+
+#include <binder/Binder.h>
 #include <gui/IGraphicBufferProducer.h>
 #include <gui/IProducerListener.h>
-#include "Conversion.h"
+
+#include <android/hardware/media/omx/1.0/IOmxBufferProducer.h>
 
 namespace android {
 namespace hardware {

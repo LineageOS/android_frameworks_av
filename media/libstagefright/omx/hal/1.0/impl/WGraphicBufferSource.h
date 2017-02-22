@@ -17,16 +17,17 @@
 #ifndef ANDROID_HARDWARE_MEDIA_OMX_V1_0_WGRAPHICBUFFERSOURCE_H
 #define ANDROID_HARDWARE_MEDIA_OMX_V1_0_WGRAPHICBUFFERSOURCE_H
 
-#include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
 
-#include <frameworks/native/include/binder/Binder.h>
-#include <IOMX.h>
-#include <android/BnGraphicBufferSource.h>
-#include <android/hardware/media/omx/1.0/IOmxNode.h>
+#include <media/IOMX.h>
+#include <binder/Binder.h>
 
 #include <android/hardware/graphics/common/1.0/types.h>
+#include <android/hardware/media/omx/1.0/IOmxNode.h>
+#include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
+
+#include <android/BnGraphicBufferSource.h>
 
 namespace android {
 namespace hardware {

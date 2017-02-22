@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-#include "WGraphicBufferSource.h"
-#include "Conversion.h"
-#include "WOmxNode.h"
 #include <stagefright/foundation/ColorUtils.h>
+
+#include "WGraphicBufferSource.h"
+#include "WOmxNode.h"
+#include "Conversion.h"
 
 namespace android {
 namespace hardware {

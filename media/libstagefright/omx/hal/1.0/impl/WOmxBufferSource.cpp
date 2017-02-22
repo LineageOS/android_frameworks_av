@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
+#include <utils/String8.h>
+
 #include "WOmxBufferSource.h"
 #include "Conversion.h"
-#include <utils/String8.h>
-#include <cutils/native_handle.h>
 
 namespace android {
 namespace hardware {

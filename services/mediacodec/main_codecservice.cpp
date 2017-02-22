@@ -33,6 +33,7 @@
 
 #include <android/hardware/media/omx/1.0/IOmx.h>
 #include <hidl/HidlTransportSupport.h>
+#include <omx/hal/1.0/impl/Omx.h>
 
 using namespace android;
 
@@ -54,10 +55,10 @@ int main(int argc __unused, char** argv)
     if ((trebleOmx == 1) || ((trebleOmx == -1) &&
             property_get_bool("persist.hal.binderization", 0))) {
         using namespace ::android::hardware::media::omx::V1_0;
-        sp<IOmx> omx = IOmx::getService(true);
+        sp<IOmx> omx = new implementation::Omx();
         if (omx == nullptr) {
             LOG(ERROR) << "Cannot create a Treble IOmx service.";
-        } else if (omx->registerAsService("default") != OK) {
+        } else if (omx->registerAsService() != OK) {
             LOG(ERROR) << "Cannot register a Treble IOmx service.";
         } else {
             LOG(INFO) << "Treble IOmx service created.";

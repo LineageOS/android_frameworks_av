@@ -2,7 +2,6 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := android.hardware.media.omx@1.0-impl
-LOCAL_MODULE_RELATIVE_PATH := hw
 LOCAL_SRC_FILES := \
     WGraphicBufferSource.cpp \
     WOmx.cpp \
@@ -34,12 +33,10 @@ LOCAL_SHARED_LIBRARIES := \
     android.hidl.base@1.0 \
 
 LOCAL_C_INCLUDES += \
-        $(TOP) \
-        $(TOP)/frameworks/av/include/media \
-        $(TOP)/frameworks/av/media/libstagefright/include \
-        $(TOP)/frameworks/av/media/libstagefright/omx \
-        $(TOP)/frameworks/native/include/media/hardware \
-        $(TOP)/frameworks/native/include/media/openmax \
+        $(TOP)/frameworks/av/include \
+        $(TOP)/frameworks/av/media/libstagefright \
         $(TOP)/frameworks/native/include \
+        $(TOP)/frameworks/native/include/media/openmax \
+        $(TOP)/frameworks/native/include/media/hardware \
 
 include $(BUILD_SHARED_LIBRARY)

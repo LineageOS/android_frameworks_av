@@ -16,6 +16,7 @@
 
 #include "WOmxBufferProducer.h"
 #include "WOmxProducerListener.h"
+#include "Conversion.h"
 
 namespace android {
 namespace hardware {

@@ -17,13 +17,12 @@
 #ifndef ANDROID_HARDWARE_MEDIA_OMX_V1_0_OMX_H
 #define ANDROID_HARDWARE_MEDIA_OMX_V1_0_OMX_H
 
-#include <android/hardware/media/omx/1.0/IOmx.h>
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
 
-#include <utils/threads.h>
-#include <utils/KeyedVector.h>
-#include <OmxNodeOwner.h>
+#include "../../../../include/OMXNodeInstance.h"
+
+#include <android/hardware/media/omx/1.0/IOmx.h>
 
 namespace android {
 
