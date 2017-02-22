@@ -94,6 +94,7 @@ LOCAL_SHARED_LIBRARIES := \
         libutils \
         libvorbisidec \
         libmediadrm \
+        libnativewindow \
 
 LOCAL_STATIC_LIBRARIES := \
         libstagefright_color_conversion \
