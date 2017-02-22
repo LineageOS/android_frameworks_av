@@ -54,6 +54,9 @@ status_t CameraProviderManager::initialize(wp<CameraProviderManager::StatusListe
     mListener = listener;
     mServiceProxy = proxy;
 
+    // See if there's a passthrough HAL, but let's not complain if there's not
+    addProvider(kLegacyProviderName, /*expected*/ false);
+
     // Registering will trigger notifications for all already-known providers
     bool success = mServiceProxy->registerForNotifications(
         /* instance name, empty means no filter */ "",
@@ -63,8 +66,7 @@ status_t CameraProviderManager::initialize(wp<CameraProviderManager::StatusListe
                 "about camera providers", __FUNCTION__);
         return INVALID_OPERATION;
     }
-    // See if there's a passthrough HAL, but let's not complain if there's not
-    addProvider(kLegacyProviderName, /*expected*/ false);
+
     return OK;
 }
 
