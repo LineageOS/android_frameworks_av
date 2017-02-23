@@ -18,6 +18,7 @@
 //#define LOG_NDEBUG 0
 
 #include <android/hardware/audio/2.0/IStreamOutCallback.h>
+#include <hwbinder/IPCThreadState.h>
 #include <mediautils/SchedulingPolicyService.h>
 #include <utils/Log.h>
 
@@ -263,8 +264,10 @@ StreamOutHalHidl::~StreamOutHalHidl() {
             processReturn("clearCallback", mStream->clearCallback());
         }
         processReturn("close", mStream->close());
+        mStream.clear();
     }
     mCallback.clear();
+    hardware::IPCThreadState::self()->flushCommands();
     if (mEfGroup) {
         EventFlag::deleteEventFlag(&mEfGroup);
     }
@@ -538,6 +541,8 @@ StreamInHalHidl::StreamInHalHidl(const sp<IStreamIn>& stream)
 StreamInHalHidl::~StreamInHalHidl() {
     if (mStream != 0) {
         processReturn("close", mStream->close());
+        mStream.clear();
+        hardware::IPCThreadState::self()->flushCommands();
     }
     if (mEfGroup) {
         EventFlag::deleteEventFlag(&mEfGroup);
