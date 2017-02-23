@@ -21,6 +21,7 @@
 
 #include <android/hardware/audio/2.0/IPrimaryDevice.h>
 #include <cutils/native_handle.h>
+#include <hwbinder/IPCThreadState.h>
 #include <utils/Log.h>
 
 #include "DeviceHalHidl.h"
@@ -101,6 +102,10 @@ DeviceHalHidl::DeviceHalHidl(const sp<IDevice>& device)
 }
 
 DeviceHalHidl::~DeviceHalHidl() {
+    if (mDevice != 0) {
+        mDevice.clear();
+        hardware::IPCThreadState::self()->flushCommands();
+    }
 }
 
 status_t DeviceHalHidl::getSupportedDevices(uint32_t*) {

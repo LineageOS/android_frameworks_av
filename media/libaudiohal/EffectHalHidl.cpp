@@ -17,6 +17,7 @@
 #define LOG_TAG "EffectHalHidl"
 //#define LOG_NDEBUG 0
 
+#include <hwbinder/IPCThreadState.h>
 #include <media/EffectsFactoryApi.h>
 #include <utils/Log.h>
 
@@ -44,7 +45,11 @@ EffectHalHidl::EffectHalHidl(const sp<IEffect>& effect, uint64_t effectId)
 }
 
 EffectHalHidl::~EffectHalHidl() {
-    close();
+    if (mEffect != 0) {
+        close();
+        mEffect.clear();
+        hardware::IPCThreadState::self()->flushCommands();
+    }
 }
 
 // static
