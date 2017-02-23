@@ -116,7 +116,7 @@ RadioHalHidl::~RadioHalHidl()
 sp<IBroadcastRadio> RadioHalHidl::getService()
 {
     if (mHalModule == 0) {
-        sp<IBroadcastRadioFactory> factory = IBroadcastRadioFactory::getService("broadcastradio");
+        sp<IBroadcastRadioFactory> factory = IBroadcastRadioFactory::getService();
         if (factory != 0) {
             factory->connectModule(static_cast<Class>(mClassId),
                                [&](Result retval, const ::android::sp<IBroadcastRadio>& result) {
