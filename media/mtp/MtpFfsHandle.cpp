@@ -205,13 +205,13 @@ const struct usb_endpoint_descriptor_no_audio ss_intr = {
 const struct usb_ss_ep_comp_descriptor ss_sink_comp = {
     .bLength = sizeof(ss_sink_comp),
     .bDescriptorType = USB_DT_SS_ENDPOINT_COMP,
-    .bMaxBurst = 2,
+    .bMaxBurst = 6,
 };
 
 const struct usb_ss_ep_comp_descriptor ss_source_comp = {
     .bLength = sizeof(ss_source_comp),
     .bDescriptorType = USB_DT_SS_ENDPOINT_COMP,
-    .bMaxBurst = 2,
+    .bMaxBurst = 6,
 };
 
 const struct usb_ss_ep_comp_descriptor ss_intr_comp = {
