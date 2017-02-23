@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fa5d592f_15e72542",
+        "filename": "services/audioflinger/Threads.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 6320,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2017-02-23T16:24:10Z",
+      "side": 1,
+      "message": "Wrap your audio blob you are trying to use such that it sets it\u0027s stream get_capture_position function as nullptr.",
+      "range": {
+        "startLine": 6320,
+        "startChar": 28,
+        "endLine": 6320,
+        "endChar": 48
+      },
+      "revId": "7ef7e855d2ae549273f1024b6c0b96ffe4f731a3",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
