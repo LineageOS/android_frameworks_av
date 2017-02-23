@@ -20,7 +20,7 @@ include $(BUILD_SHARED_LIBRARY)
 
 # service executable
 include $(CLEAR_VARS)
-LOCAL_REQUIRED_MODULES_arm := mediacodec-seccomp.policy
+LOCAL_REQUIRED_MODULES_arm := mediacodec.policy
 LOCAL_SRC_FILES := main_codecservice.cpp
 LOCAL_SHARED_LIBRARIES := \
     libmedia \
@@ -45,5 +45,21 @@ LOCAL_MODULE := mediacodec
 LOCAL_32_BIT_ONLY := true
 LOCAL_INIT_RC := mediacodec.rc
 include $(BUILD_EXECUTABLE)
+
+# service seccomp policy
+ifeq ($(TARGET_ARCH), $(filter $(TARGET_ARCH), arm arm64))
+include $(CLEAR_VARS)
+LOCAL_MODULE := mediacodec.policy
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT)/etc/seccomp_policy
+# mediacodec runs in 32-bit combatibility mode. For 64 bit architectures,
+# use the 32 bit policy
+ifdef TARGET_2ND_ARCH
+    LOCAL_SRC_FILES := seccomp_policy/mediacodec-$(TARGET_2ND_ARCH).policy
+else
+    LOCAL_SRC_FILES := seccomp_policy/mediacodec-$(TARGET_ARCH).policy
+endif
+include $(BUILD_PREBUILT)
+endif
 
 include $(call all-makefiles-under, $(LOCAL_PATH))
