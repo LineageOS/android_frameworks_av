@@ -611,6 +611,37 @@ inline bool convertTo(GraphicBuffer* l, AnwBuffer const& t) {
 }
 
 /**
+ * \brief Wrap `GraphicBuffer` in `CodecBuffer`.
+ *
+ * \param[out] t The wrapper of type `CodecBuffer`.
+ * \param[in] l The source `GraphicBuffer`.
+ */
+// wrap: OMXBuffer -> CodecBuffer
+inline CodecBuffer *wrapAs(CodecBuffer *t, sp<GraphicBuffer> const& graphicBuffer) {
+    t->sharedMemory = hidl_memory();
+    t->nativeHandle = hidl_handle();
+    t->type = CodecBuffer::Type::ANW_BUFFER;
+    if (graphicBuffer == nullptr) {
+        t->attr.anwBuffer.width = 0;
+        t->attr.anwBuffer.height = 0;
+        t->attr.anwBuffer.stride = 0;
+        t->attr.anwBuffer.format = static_cast<PixelFormat>(1);
+        t->attr.anwBuffer.layerCount = 0;
+        t->attr.anwBuffer.usage = 0;
+        return t;
+    }
+    t->attr.anwBuffer.width = graphicBuffer->getWidth();
+    t->attr.anwBuffer.height = graphicBuffer->getHeight();
+    t->attr.anwBuffer.stride = graphicBuffer->getStride();
+    t->attr.anwBuffer.format = static_cast<PixelFormat>(
+            graphicBuffer->getPixelFormat());
+    t->attr.anwBuffer.layerCount = graphicBuffer->getLayerCount();
+    t->attr.anwBuffer.usage = graphicBuffer->getUsage();
+    t->nativeHandle = graphicBuffer->handle;
+    return t;
+}
+
+/**
  * \brief Wrap `OMXBuffer` in `CodecBuffer`.
  *
  * \param[out] t The wrapper of type `CodecBuffer`.
@@ -642,24 +673,7 @@ inline bool wrapAs(CodecBuffer* t, OMXBuffer const& l) {
             return false;
         }
         case OMXBuffer::kBufferTypeANWBuffer: {
-            t->type = CodecBuffer::Type::ANW_BUFFER;
-            if (l.mGraphicBuffer == nullptr) {
-                t->attr.anwBuffer.width = 0;
-                t->attr.anwBuffer.height = 0;
-                t->attr.anwBuffer.stride = 0;
-                t->attr.anwBuffer.format = static_cast<PixelFormat>(1);
-                t->attr.anwBuffer.layerCount = 0;
-                t->attr.anwBuffer.usage = 0;
-                return true;
-            }
-            t->attr.anwBuffer.width = l.mGraphicBuffer->getWidth();
-            t->attr.anwBuffer.height = l.mGraphicBuffer->getHeight();
-            t->attr.anwBuffer.stride = l.mGraphicBuffer->getStride();
-            t->attr.anwBuffer.format = static_cast<PixelFormat>(
-                    l.mGraphicBuffer->getPixelFormat());
-            t->attr.anwBuffer.layerCount = l.mGraphicBuffer->getLayerCount();
-            t->attr.anwBuffer.usage = l.mGraphicBuffer->getUsage();
-            t->nativeHandle = l.mGraphicBuffer->handle;
+            wrapAs(t, l.mGraphicBuffer);
             return true;
         }
         case OMXBuffer::kBufferTypeNativeHandle: {

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include <stagefright/foundation/ColorUtils.h>
-
 #include <media/omx/1.0/WGraphicBufferSource.h>
 #include <media/omx/1.0/WOmxNode.h>
 #include <media/omx/1.0/Conversion.h>
@@ -27,14 +25,12 @@ namespace omx {
 namespace V1_0 {
 namespace utils {
 
-using android::ColorUtils;
-
 // LWGraphicBufferSource
 LWGraphicBufferSource::LWGraphicBufferSource(
         sp<TGraphicBufferSource> const& base) : mBase(base) {
 }
 
-::android::binder::Status LWGraphicBufferSource::configure(
+BnStatus LWGraphicBufferSource::configure(
         const sp<IOMXNode>& omxNode, int32_t dataSpace) {
     sp<IOmxNode> hOmxNode = omxNode->getHalInterface();
     return toBinderStatus(mBase->configure(
@@ -42,109 +38,49 @@ LWGraphicBufferSource::LWGraphicBufferSource(
             toHardwareDataspace(dataSpace)));
 }
 
-::android::binder::Status LWGraphicBufferSource::setSuspend(
+BnStatus LWGraphicBufferSource::setSuspend(
         bool suspend, int64_t timeUs) {
     return toBinderStatus(mBase->setSuspend(suspend, timeUs));
 }
 
-::android::binder::Status LWGraphicBufferSource::setRepeatPreviousFrameDelayUs(
+BnStatus LWGraphicBufferSource::setRepeatPreviousFrameDelayUs(
         int64_t repeatAfterUs) {
     return toBinderStatus(mBase->setRepeatPreviousFrameDelayUs(repeatAfterUs));
 }
 
-::android::binder::Status LWGraphicBufferSource::setMaxFps(float maxFps) {
+BnStatus LWGraphicBufferSource::setMaxFps(float maxFps) {
     return toBinderStatus(mBase->setMaxFps(maxFps));
 }
 
-::android::binder::Status LWGraphicBufferSource::setTimeLapseConfig(
+BnStatus LWGraphicBufferSource::setTimeLapseConfig(
         int64_t timePerFrameUs, int64_t timePerCaptureUs) {
     return toBinderStatus(mBase->setTimeLapseConfig(
             timePerFrameUs, timePerCaptureUs));
 }
 
-::android::binder::Status LWGraphicBufferSource::setStartTimeUs(
+BnStatus LWGraphicBufferSource::setStartTimeUs(
         int64_t startTimeUs) {
     return toBinderStatus(mBase->setStartTimeUs(startTimeUs));
 }
 
-::android::binder::Status LWGraphicBufferSource::setStopTimeUs(
+BnStatus LWGraphicBufferSource::setStopTimeUs(
         int64_t stopTimeUs) {
     return toBinderStatus(mBase->setStopTimeUs(stopTimeUs));
 }
 
-::android::binder::Status LWGraphicBufferSource::setColorAspects(
+BnStatus LWGraphicBufferSource::setColorAspects(
         int32_t aspects) {
     return toBinderStatus(mBase->setColorAspects(
             toHardwareColorAspects(aspects)));
 }
 
-::android::binder::Status LWGraphicBufferSource::setTimeOffsetUs(
+BnStatus LWGraphicBufferSource::setTimeOffsetUs(
         int64_t timeOffsetsUs) {
     return toBinderStatus(mBase->setTimeOffsetUs(timeOffsetsUs));
 }
 
-::android::binder::Status LWGraphicBufferSource::signalEndOfInputStream() {
+BnStatus LWGraphicBufferSource::signalEndOfInputStream() {
     return toBinderStatus(mBase->signalEndOfInputStream());
-}
-
-// TWGraphicBufferSource
-TWGraphicBufferSource::TWGraphicBufferSource(
-        sp<LGraphicBufferSource> const& base) : mBase(base) {
-}
-
-Return<void> TWGraphicBufferSource::configure(
-        const sp<IOmxNode>& omxNode, Dataspace dataspace) {
-    mBase->configure(new LWOmxNode(omxNode), toRawDataspace(dataspace));
-    return Void();
-}
-
-Return<void> TWGraphicBufferSource::setSuspend(
-        bool suspend, int64_t timeUs) {
-    mBase->setSuspend(suspend, timeUs);
-    return Void();
-}
-
-Return<void> TWGraphicBufferSource::setRepeatPreviousFrameDelayUs(
-        int64_t repeatAfterUs) {
-    mBase->setRepeatPreviousFrameDelayUs(repeatAfterUs);
-    return Void();
-}
-
-Return<void> TWGraphicBufferSource::setMaxFps(float maxFps) {
-    mBase->setMaxFps(maxFps);
-    return Void();
-}
-
-Return<void> TWGraphicBufferSource::setTimeLapseConfig(
-        int64_t timePerFrameUs, int64_t timePerCaptureUs) {
-    mBase->setTimeLapseConfig(timePerFrameUs, timePerCaptureUs);
-    return Void();
-}
-
-Return<void> TWGraphicBufferSource::setStartTimeUs(int64_t startTimeUs) {
-    mBase->setStartTimeUs(startTimeUs);
-    return Void();
-}
-
-Return<void> TWGraphicBufferSource::setStopTimeUs(int64_t stopTimeUs) {
-    mBase->setStopTimeUs(stopTimeUs);
-    return Void();
-}
-
-Return<void> TWGraphicBufferSource::setColorAspects(
-        const ColorAspects& aspects) {
-    mBase->setColorAspects(toCompactColorAspects(aspects));
-    return Void();
-}
-
-Return<void> TWGraphicBufferSource::setTimeOffsetUs(int64_t timeOffsetUs) {
-    mBase->setTimeOffsetUs(timeOffsetUs);
-    return Void();
-}
-
-Return<void> TWGraphicBufferSource::signalEndOfInputStream() {
-    mBase->signalEndOfInputStream();
-    return Void();
 }
 
 }  // namespace utils
