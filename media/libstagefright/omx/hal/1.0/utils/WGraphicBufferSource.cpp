@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-#include "WGraphicBufferSource.h"
-#include "Conversion.h"
-#include "WOmxNode.h"
 #include <stagefright/foundation/ColorUtils.h>
+
+#include "WGraphicBufferSource.h"
+#include "WOmxNode.h"
+#include "Conversion.h"
 
 namespace android {
 namespace hardware {
@@ -95,7 +96,8 @@ Return<void> TWGraphicBufferSource::configure(
     return Void();
 }
 
-Return<void> TWGraphicBufferSource::setSuspend(bool suspend, int64_t timeUs) {
+Return<void> TWGraphicBufferSource::setSuspend(
+        bool suspend, int64_t timeUs) {
     mBase->setSuspend(suspend, timeUs);
     return Void();
 }

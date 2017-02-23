@@ -17,12 +17,14 @@
 #ifndef ANDROID_HARDWARE_MEDIA_OMX_V1_0_WOMXOBSERVER_H
 #define ANDROID_HARDWARE_MEDIA_OMX_V1_0_WOMXOBSERVER_H
 
-#include <android/hardware/media/omx/1.0/IOmxObserver.h>
+#include <list>
+
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
 
-#include <IOMX.h>
-#include <list>
+#include <media/IOMX.h>
+
+#include <android/hardware/media/omx/1.0/IOmxObserver.h>
 
 namespace android {
 namespace hardware {

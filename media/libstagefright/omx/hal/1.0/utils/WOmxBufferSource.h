@@ -17,13 +17,14 @@
 #ifndef ANDROID_HARDWARE_MEDIA_OMX_V1_0_WOMXBUFFERSOURCE_H
 #define ANDROID_HARDWARE_MEDIA_OMX_V1_0_WOMXBUFFERSOURCE_H
 
-#include <android/hardware/media/omx/1.0/IOmxBufferSource.h>
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
 
-#include <frameworks/native/include/binder/Binder.h>
+#include <binder/Binder.h>
+#include <media/OMXFenceParcelable.h>
+
+#include <android/hardware/media/omx/1.0/IOmxBufferSource.h>
 #include <android/BnOMXBufferSource.h>
-#include <OMXFenceParcelable.h>
 
 namespace android {
 namespace hardware {

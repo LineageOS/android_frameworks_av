@@ -22,7 +22,7 @@
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
 
-#include <OMXNodeInstance.h>
+#include "../../../../include/OMXNodeInstance.h"
 
 namespace android {
 namespace hardware {

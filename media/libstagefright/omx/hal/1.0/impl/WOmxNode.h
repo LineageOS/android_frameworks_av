@@ -17,12 +17,15 @@
 #ifndef ANDROID_HARDWARE_MEDIA_OMX_V1_0_WOMXNODE_H
 #define ANDROID_HARDWARE_MEDIA_OMX_V1_0_WOMXNODE_H
 
-#include <android/hardware/media/omx/1.0/IOmxNode.h>
-#include <android/hardware/media/omx/1.0/IOmxObserver.h>
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
 
 #include <utils/Errors.h>
+
+#include "../../../../include/OMXNodeInstance.h"
+
+#include <android/hardware/media/omx/1.0/IOmxNode.h>
+#include <android/hardware/media/omx/1.0/IOmxObserver.h>
 
 namespace android {
 namespace hardware {

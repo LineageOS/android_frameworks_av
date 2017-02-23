@@ -15,13 +15,13 @@
  */
 
 #define LOG_TAG "WOmxObserver-utils"
-#include "WOmxObserver.h"
 
 #include <vector>
 
 #include <cutils/native_handle.h>
-#include <frameworks/native/include/binder/Binder.h>
+#include <binder/Binder.h>
 
+#include "WOmxObserver.h"
 #include "Conversion.h"
 
 namespace android {

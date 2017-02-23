@@ -14,13 +14,11 @@
  * limitations under the License.
  */
 
-#include <IOMX.h>
-#include <OMXNodeInstance.h>
+#include <algorithm>
+
 #include "WOmxNode.h"
 #include "WOmxBufferSource.h"
 #include "Conversion.h"
-
-#include <algorithm>
 
 namespace android {
 namespace hardware {

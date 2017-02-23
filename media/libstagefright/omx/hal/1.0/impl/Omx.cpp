@@ -16,21 +16,21 @@
 
 #include <list>
 
-#include "Omx.h"
-#include <IOMX.h>
-#include <OMXMaster.h>
-#include <OMXNodeInstance.h>
-#include <GraphicBufferSource.h>
 #include <gui/IGraphicBufferProducer.h>
-
+#include <OMX_Core.h>
 #include <OMX_AsString.h>
-#include <OMXUtils.h>
+
+#include "../../../OMXUtils.h"
+#include "../../../OMXMaster.h"
+#include "../../../GraphicBufferSource.h"
 
 #include "WOmxNode.h"
 #include "WOmxObserver.h"
 #include "WOmxBufferProducer.h"
 #include "WGraphicBufferSource.h"
 #include "Conversion.h"
+
+#include "Omx.h"
 
 namespace android {
 namespace hardware {

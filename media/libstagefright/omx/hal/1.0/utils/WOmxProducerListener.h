@@ -17,12 +17,13 @@
 #ifndef ANDROID_HARDWARE_MEDIA_OMX_V1_0_WOMXPRODUCERLISTENER_H
 #define ANDROID_HARDWARE_MEDIA_OMX_V1_0_WOMXPRODUCERLISTENER_H
 
-#include <android/hardware/media/omx/1.0/IOmxProducerListener.h>
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
 
 #include <binder/IBinder.h>
 #include <gui/IProducerListener.h>
+
+#include <android/hardware/media/omx/1.0/IOmxProducerListener.h>
 
 namespace android {
 namespace hardware {
