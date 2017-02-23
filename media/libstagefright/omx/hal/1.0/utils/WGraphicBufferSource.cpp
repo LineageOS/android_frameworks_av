@@ -125,7 +125,8 @@ Return<void> TWGraphicBufferSource::setStartTimeUs(int64_t startTimeUs) {
 }
 
 Return<void> TWGraphicBufferSource::setStopTimeUs(int64_t stopTimeUs) {
-    return toHardwareStatus(mBase->setStopTimeUs(stopTimeUs));
+    mBase->setStopTimeUs(stopTimeUs);
+    return Void();
 }
 
 Return<void> TWGraphicBufferSource::setColorAspects(

@@ -25,6 +25,7 @@ LOCAL_SHARED_LIBRARIES := \
     libcutils \
     libbinder \
     liblog \
+    libbase \
     android.hardware.media.omx@1.0 \
     android.hardware.graphics.common@1.0 \
     android.hardware.media@1.0 \

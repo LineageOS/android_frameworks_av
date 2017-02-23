@@ -95,8 +95,7 @@ Return<void> TWOmxBufferSource::onInputBufferEmptied(
         uint32_t buffer, hidl_handle const& fence) {
     OMXFenceParcelable fenceParcelable;
     if (!convertTo(&fenceParcelable, fence)) {
-      return ::android::hardware::Status::fromExceptionCode(
-              ::android::hardware::Status::EX_BAD_PARCELABLE);
+        return Void();
     }
     mBase->onInputBufferEmptied(int32_t(buffer), fenceParcelable);
     return Void();

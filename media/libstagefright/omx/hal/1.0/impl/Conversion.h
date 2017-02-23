@@ -177,25 +177,6 @@ inline int native_handle_read_fd(native_handle_t const* nh, int index = 0) {
  */
 
 /**
- * \brief Convert `binder::Status` to `Return<void>`.
- *
- * \param[in] l The source `binder::Status`.
- * \return The corresponding `Return<void>`.
- */
-// convert: ::android::binder::Status -> Return<void>
-inline Return<void> toHardwareStatus(
-        ::android::binder::Status const& l) {
-    if (l.exceptionCode() == ::android::binder::Status::EX_SERVICE_SPECIFIC) {
-        return ::android::hardware::Status::fromServiceSpecificError(
-                l.serviceSpecificErrorCode(),
-                l.exceptionMessage());
-    }
-    return ::android::hardware::Status::fromExceptionCode(
-            l.exceptionCode(),
-            l.exceptionMessage());
-}
-
-/**
  * \brief Convert `Return<void>` to `binder::Status`.
  *
  * \param[in] t The source `Return<void>`.

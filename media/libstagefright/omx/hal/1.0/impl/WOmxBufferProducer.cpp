@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "WOmxBufferProducer-impl"
+
+#include <android-base/logging.h>
+
 #include "WOmxBufferProducer.h"
 #include "WOmxProducerListener.h"
 #include "Conversion.h"
@@ -63,23 +67,29 @@ Return<void> TWOmxBufferProducer::dequeueBuffer(
             width, height,
             static_cast<::android::PixelFormat>(format), usage,
             getFrameTimestamps ? &outTimestamps : nullptr);
-
     hidl_handle tFence;
-    native_handle_t* nh;
-    if (!wrapAs(&tFence, &nh, *fence)) {
-        return ::android::hardware::Status::fromExceptionCode(
-                ::android::hardware::Status::EX_BAD_PARCELABLE,
-                String8("TWOmxBufferProducer::dequeueBuffer(): "
-                "Cannot wrap Fence in hidl_handle"));
-    }
     FrameEventHistoryDelta tOutTimestamps;
+
+    native_handle_t* nh = nullptr;
+    if ((fence == nullptr) || !wrapAs(&tFence, &nh, *fence)) {
+        LOG(ERROR) << "TWOmxBufferProducer::dequeueBuffer - "
+                "Invalid output fence";
+        _hidl_cb(toStatus(status),
+                 static_cast<int32_t>(slot),
+                 tFence,
+                 tOutTimestamps);
+        return Void();
+    }
     std::vector<std::vector<native_handle_t*> > nhAA;
     if (getFrameTimestamps && !wrapAs(&tOutTimestamps, &nhAA, outTimestamps)) {
+        LOG(ERROR) << "TWOmxBufferProducer::dequeueBuffer - "
+                "Invalid output timestamps";
+        _hidl_cb(toStatus(status),
+                 static_cast<int32_t>(slot),
+                 tFence,
+                 tOutTimestamps);
         native_handle_delete(nh);
-        return ::android::hardware::Status::fromExceptionCode(
-                ::android::hardware::Status::EX_BAD_PARCELABLE,
-                String8("TWOmxBufferProducer::dequeueBuffer(): "
-                "Cannot wrap Fence in hidl_handle"));
+        return Void();
     }
 
     _hidl_cb(toStatus(status),
@@ -90,9 +100,7 @@ Return<void> TWOmxBufferProducer::dequeueBuffer(
     if (getFrameTimestamps) {
         for (auto& nhA : nhAA) {
             for (auto& handle : nhA) {
-                if (handle != nullptr) {
-                    native_handle_delete(handle);
-                }
+                native_handle_delete(handle);
             }
         }
     }
@@ -108,16 +116,22 @@ Return<void> TWOmxBufferProducer::detachNextBuffer(
     sp<GraphicBuffer> outBuffer;
     sp<Fence> outFence;
     status_t status = mBase->detachNextBuffer(&outBuffer, &outFence);
-
     AnwBuffer tBuffer;
-    wrapAs(&tBuffer, *outBuffer);
     hidl_handle tFence;
-    native_handle_t* nh;
-    if (!wrapAs(&tFence, &nh, *outFence)) {
-        return ::android::hardware::Status::fromExceptionCode(
-                ::android::hardware::Status::EX_BAD_PARCELABLE,
-                String8("TWOmxBufferProducer::detachNextBuffer(): "
-                "Cannot wrap Fence in hidl_handle"));
+
+    if (outBuffer == nullptr) {
+        LOG(ERROR) << "TWOmxBufferProducer::detachNextBuffer - "
+                "Invalid output buffer";
+        _hidl_cb(toStatus(status), tBuffer, tFence);
+        return Void();
+    }
+    wrapAs(&tBuffer, *outBuffer);
+    native_handle_t* nh = nullptr;
+    if ((outFence != nullptr) && !wrapAs(&tFence, &nh, *outFence)) {
+        LOG(ERROR) << "TWOmxBufferProducer::detachNextBuffer - "
+                "Invalid output fence";
+        _hidl_cb(toStatus(status), tBuffer, tFence);
+        return Void();
     }
 
     _hidl_cb(toStatus(status), tBuffer, tFence);
@@ -131,10 +145,10 @@ Return<void> TWOmxBufferProducer::attachBuffer(
     int outSlot;
     sp<GraphicBuffer> lBuffer = new GraphicBuffer();
     if (!convertTo(lBuffer.get(), buffer)) {
-        return ::android::hardware::Status::fromExceptionCode(
-                ::android::hardware::Status::EX_BAD_PARCELABLE,
-                String8("TWOmxBufferProducer::attachBuffer(): "
-                "Cannot convert AnwBuffer to GraphicBuffer"));
+        LOG(ERROR) << "TWOmxBufferProducer::attachBuffer - "
+                "Invalid input native window buffer";
+        _hidl_cb(toStatus(BAD_VALUE), -1);
+        return Void();
     }
     status_t status = mBase->attachBuffer(&outSlot, lBuffer);
 
@@ -145,38 +159,34 @@ Return<void> TWOmxBufferProducer::attachBuffer(
 Return<void> TWOmxBufferProducer::queueBuffer(
         int32_t slot, const QueueBufferInput& input,
         queueBuffer_cb _hidl_cb) {
+    QueueBufferOutput tOutput;
     IGraphicBufferProducer::QueueBufferInput lInput(
             0, false, HAL_DATASPACE_UNKNOWN,
             ::android::Rect(0, 0, 1, 1),
             NATIVE_WINDOW_SCALING_MODE_FREEZE,
             0, ::android::Fence::NO_FENCE);
     if (!convertTo(&lInput, input)) {
-        return ::android::hardware::Status::fromExceptionCode(
-                ::android::hardware::Status::EX_BAD_PARCELABLE,
-                String8("TWOmxBufferProducer::queueBuffer(): "
-                "Cannot convert IOmxBufferProducer::QueueBufferInput "
-                "to IGraphicBufferProducer::QueueBufferInput"));
+        LOG(ERROR) << "TWOmxBufferProducer::queueBuffer - "
+                "Invalid input";
+        _hidl_cb(toStatus(BAD_VALUE), tOutput);
+        return Void();
     }
     IGraphicBufferProducer::QueueBufferOutput lOutput;
     status_t status = mBase->queueBuffer(
             static_cast<int>(slot), lInput, &lOutput);
 
-    QueueBufferOutput tOutput;
     std::vector<std::vector<native_handle_t*> > nhAA;
     if (!wrapAs(&tOutput, &nhAA, lOutput)) {
-        return ::android::hardware::Status::fromExceptionCode(
-                ::android::hardware::Status::EX_BAD_PARCELABLE,
-                String8("TWOmxBufferProducer::queueBuffer(): "
-                "Cannot wrap IGraphicBufferProducer::QueueBufferOutput "
-                "in IOmxBufferProducer::QueueBufferOutput"));
+        LOG(ERROR) << "TWOmxBufferProducer::queueBuffer - "
+                "Invalid output";
+        _hidl_cb(toStatus(BAD_VALUE), tOutput);
+        return Void();
     }
 
     _hidl_cb(toStatus(status), tOutput);
     for (auto& nhA : nhAA) {
         for (auto& nh : nhA) {
-            if (nh != nullptr) {
-                native_handle_delete(nh);
-            }
+            native_handle_delete(nh);
         }
     }
     return Void();
@@ -186,10 +196,9 @@ Return<Status> TWOmxBufferProducer::cancelBuffer(
         int32_t slot, const hidl_handle& fence) {
     sp<Fence> lFence = new Fence();
     if (!convertTo(lFence.get(), fence)) {
-        return ::android::hardware::Status::fromExceptionCode(
-                ::android::hardware::Status::EX_BAD_PARCELABLE,
-                String8("TWOmxBufferProducer::cancelBuffer(): "
-                "Cannot convert hidl_handle to Fence"));
+        LOG(ERROR) << "TWOmxBufferProducer::cancelBuffer - "
+                "Invalid input fence";
+        return toStatus(BAD_VALUE);
     }
     return toStatus(mBase->cancelBuffer(static_cast<int>(slot), lFence));
 }
@@ -215,19 +224,16 @@ Return<void> TWOmxBufferProducer::connect(
     QueueBufferOutput tOutput;
     std::vector<std::vector<native_handle_t*> > nhAA;
     if (!wrapAs(&tOutput, &nhAA, lOutput)) {
-        return ::android::hardware::Status::fromExceptionCode(
-                ::android::hardware::Status::EX_BAD_PARCELABLE,
-                String8("TWOmxBufferProducer::connect(): "
-                "Cannot wrap IGraphicBufferProducer::QueueBufferOutput "
-                "in IOmxBufferProducer::QueueBufferOutput"));
+        LOG(ERROR) << "TWOmxBufferProducer::connect - "
+                "Invalid output";
+        _hidl_cb(toStatus(status), tOutput);
+        return Void();
     }
 
     _hidl_cb(toStatus(status), tOutput);
     for (auto& nhA : nhAA) {
         for (auto& nh : nhA) {
-            if (nh != nullptr) {
-                native_handle_delete(nh);
-            }
+            native_handle_delete(nh);
         }
     }
     return Void();
@@ -288,14 +294,19 @@ Return<void> TWOmxBufferProducer::getLastQueuedBuffer(
             &lOutBuffer, &lOutFence, lOutTransformMatrix);
 
     AnwBuffer tOutBuffer;
-    wrapAs(&tOutBuffer, *lOutBuffer);
+    if (lOutBuffer != nullptr) {
+        wrapAs(&tOutBuffer, *lOutBuffer);
+    }
     hidl_handle tOutFence;
-    native_handle_t* nh;
-    if (!wrapAs(&tOutFence, &nh, *lOutFence)) {
-        return ::android::hardware::Status::fromExceptionCode(
-                ::android::hardware::Status::EX_BAD_PARCELABLE,
-                String8("TWOmxBufferProducer::getLastQueuedBuffer(): "
-                "Cannot wrap Fence in hidl_handle"));
+    native_handle_t* nh = nullptr;
+    if ((lOutFence == nullptr) || !wrapAs(&tOutFence, &nh, *lOutFence)) {
+        LOG(ERROR) << "TWOmxBufferProducer::getLastQueuedBuffer - "
+                "Invalid output fence";
+        _hidl_cb(toStatus(status),
+                tOutBuffer,
+                tOutFence,
+                hidl_array<float, 16>());
+        return Void();
     }
     hidl_array<float, 16> tOutTransformMatrix(lOutTransformMatrix);
 
@@ -312,19 +323,16 @@ Return<void> TWOmxBufferProducer::getFrameTimestamps(
     FrameEventHistoryDelta tDelta;
     std::vector<std::vector<native_handle_t*> > nhAA;
     if (!wrapAs(&tDelta, &nhAA, lDelta)) {
-        return ::android::hardware::Status::fromExceptionCode(
-                ::android::hardware::Status::EX_BAD_PARCELABLE,
-                String8("TWOmxBufferProducer::getFrameTimestamps(): "
-                "Cannot wrap ::android::FrameEventHistoryDelta "
-                "in FrameEventHistoryDelta"));
+        LOG(ERROR) << "TWOmxBufferProducer::getFrameTimestamps - "
+                "Invalid output frame timestamps";
+        _hidl_cb(tDelta);
+        return Void();
     }
 
     _hidl_cb(tDelta);
     for (auto& nhA : nhAA) {
         for (auto& nh : nhA) {
-            if (nh != nullptr) {
-                native_handle_delete(nh);
-            }
+            native_handle_delete(nh);
         }
     }
     return Void();
@@ -384,9 +392,13 @@ status_t LWOmxBufferProducer::dequeueBuffer(
                 fnStatus = toStatusT(status);
                 *slot = tSlot;
                 if (!convertTo(fence->get(), tFence)) {
+                    LOG(ERROR) << "LWOmxBufferProducer::dequeueBuffer - "
+                            "Invalid output fence";
                     fnStatus = fnStatus == NO_ERROR ? BAD_VALUE : fnStatus;
                 }
                 if (outTimestamps && !convertTo(outTimestamps, tTs)) {
+                    LOG(ERROR) << "LWOmxBufferProducer::dequeueBuffer - "
+                            "Invalid output timestamps";
                     fnStatus = fnStatus == NO_ERROR ? BAD_VALUE : fnStatus;
                 }
             }));
@@ -409,9 +421,13 @@ status_t LWOmxBufferProducer::detachNextBuffer(
                     hidl_handle const& tFence) {
                 fnStatus = toStatusT(status);
                 if (!convertTo(outFence->get(), tFence)) {
+                    LOG(ERROR) << "LWOmxBufferProducer::detachNextBuffer - "
+                            "Invalid output fence";
                     fnStatus = fnStatus == NO_ERROR ? BAD_VALUE : fnStatus;
                 }
                 if (!convertTo(outBuffer->get(), tBuffer)) {
+                    LOG(ERROR) << "LWOmxBufferProducer::detachNextBuffer - "
+                            "Invalid output buffer";
                     fnStatus = fnStatus == NO_ERROR ? BAD_VALUE : fnStatus;
                 }
             }));
@@ -438,6 +454,8 @@ status_t LWOmxBufferProducer::queueBuffer(
     IOmxBufferProducer::QueueBufferInput tInput;
     native_handle_t* nh;
     if (!wrapAs(&tInput, &nh, input)) {
+        LOG(ERROR) << "LWOmxBufferProducer::queueBuffer - "
+                "Invalid input";
         return BAD_VALUE;
     }
     status_t fnStatus;
@@ -447,6 +465,8 @@ status_t LWOmxBufferProducer::queueBuffer(
                     IOmxBufferProducer::QueueBufferOutput const& tOutput) {
                 fnStatus = toStatusT(status);
                 if (!convertTo(output, tOutput)) {
+                    LOG(ERROR) << "LWOmxBufferProducer::queueBuffer - "
+                            "Invalid output";
                     fnStatus = fnStatus == NO_ERROR ? BAD_VALUE : fnStatus;
                 }
             }));
@@ -456,8 +476,10 @@ status_t LWOmxBufferProducer::queueBuffer(
 
 status_t LWOmxBufferProducer::cancelBuffer(int slot, const sp<Fence>& fence) {
     hidl_handle tFence;
-    native_handle_t* nh;
-    if (!wrapAs(&tFence, &nh, *fence)) {
+    native_handle_t* nh = nullptr;
+    if ((fence == nullptr) || !wrapAs(&tFence, &nh, *fence)) {
+        LOG(ERROR) << "LWOmxBufferProducer::cancelBuffer - "
+                "Invalid input fence";
         return BAD_VALUE;
     }
 
@@ -491,6 +513,8 @@ status_t LWOmxBufferProducer::connect(
                     IOmxBufferProducer::QueueBufferOutput const& tOutput) {
                 fnStatus = toStatusT(status);
                 if (!convertTo(output, tOutput)) {
+                    LOG(ERROR) << "LWOmxBufferProducer::connect - "
+                            "Invalid output";
                     fnStatus = fnStatus == NO_ERROR ? BAD_VALUE : fnStatus;
                 }
             }));
@@ -555,10 +579,14 @@ status_t LWOmxBufferProducer::getLastQueuedBuffer(
                 fnStatus = toStatusT(status);
                 *outBuffer = new GraphicBuffer();
                 if (!convertTo(outBuffer->get(), buffer)) {
+                    LOG(ERROR) << "LWOmxBufferProducer::getLastQueuedBuffer - "
+                            "Invalid output buffer";
                     fnStatus = fnStatus == NO_ERROR ? BAD_VALUE : fnStatus;
                 }
                 *outFence = new Fence();
                 if (!convertTo(outFence->get(), fence)) {
+                    LOG(ERROR) << "LWOmxBufferProducer::getLastQueuedBuffer - "
+                            "Invalid output fence";
                     fnStatus = fnStatus == NO_ERROR ? BAD_VALUE : fnStatus;
                 }
                 std::copy(transformMatrix.data(),
