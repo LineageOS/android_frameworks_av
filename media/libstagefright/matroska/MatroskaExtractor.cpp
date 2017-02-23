@@ -1288,8 +1288,51 @@ void MatroskaExtractor::addTracks() {
                     continue;
                 }
 
-                meta->setInt32(kKeyWidth, vtrack->GetWidth());
-                meta->setInt32(kKeyHeight, vtrack->GetHeight());
+                const long long width = vtrack->GetWidth();
+                const long long height = vtrack->GetHeight();
+                if (width <= 0 || width > INT32_MAX) {
+                    ALOGW("track width exceeds int32_t, %lld", width);
+                    continue;
+                }
+                if (height <= 0 || height > INT32_MAX) {
+                    ALOGW("track height exceeds int32_t, %lld", height);
+                    continue;
+                }
+                meta->setInt32(kKeyWidth, (int32_t)width);
+                meta->setInt32(kKeyHeight, (int32_t)height);
+
+                // setting display width/height is optional
+                const long long displayUnit = vtrack->GetDisplayUnit();
+                const long long displayWidth = vtrack->GetDisplayWidth();
+                const long long displayHeight = vtrack->GetDisplayHeight();
+                if (displayWidth > 0 && displayWidth <= INT32_MAX
+                        && displayHeight > 0 && displayHeight <= INT32_MAX) {
+                    switch (displayUnit) {
+                    case 0: // pixels
+                        meta->setInt32(kKeyDisplayWidth, (int32_t)displayWidth);
+                        meta->setInt32(kKeyDisplayHeight, (int32_t)displayHeight);
+                        break;
+                    case 1: // centimeters
+                    case 2: // inches
+                    case 3: // aspect ratio
+                    {
+                        // Physical layout size is treated the same as aspect ratio.
+                        // Note: displayWidth and displayHeight are never zero as they are
+                        // checked in the if above.
+                        const long long computedWidth =
+                                std::max(width, height * displayWidth / displayHeight);
+                        const long long computedHeight =
+                                std::max(height, width * displayHeight / displayWidth);
+                        if (computedWidth <= INT32_MAX && computedHeight <= INT32_MAX) {
+                            meta->setInt32(kKeyDisplayWidth, (int32_t)computedWidth);
+                            meta->setInt32(kKeyDisplayHeight, (int32_t)computedHeight);
+                        }
+                        break;
+                    }
+                    default: // unknown display units, perhaps future version of spec.
+                        break;
+                    }
+                }
 
                 getColorInformation(vtrack, meta);
 
