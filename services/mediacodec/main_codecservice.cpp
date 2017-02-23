@@ -52,7 +52,7 @@ int main(int argc __unused, char** argv)
 
     int32_t trebleOmx = property_get_int32("persist.media.treble_omx", -1);
     if ((trebleOmx == 1) || ((trebleOmx == -1) &&
-            property_get_bool("persist.hal.binderization", 0))) {
+            property_get_bool("omx.binderization", 0))) {
         using namespace ::android::hardware::media::omx::V1_0;
         sp<IOmx> omx = IOmx::getService(true);
         if (omx == nullptr) {
