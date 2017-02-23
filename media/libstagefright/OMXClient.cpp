@@ -40,7 +40,7 @@ OMXClient::OMXClient() {
 status_t OMXClient::connect(bool* trebleFlag) {
     int32_t trebleOmx = property_get_int32("persist.media.treble_omx", -1);
     if ((trebleOmx == 1) || ((trebleOmx == -1) &&
-            property_get_bool("omx.binderization", 0))) {
+            property_get_bool("persist.hal.binderization", 0))) {
         if (trebleFlag != nullptr) {
             *trebleFlag = true;
         }

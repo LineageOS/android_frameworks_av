@@ -738,7 +738,7 @@ sp<MediaPlayerBase> MediaPlayerService::Client::setDataSource_pre(
 
     int32_t trebleOmx = property_get_int32("persist.media.treble_omx", -1);
     if ((trebleOmx == 1) || ((trebleOmx == -1) &&
-            property_get_bool("omx.binderization", 0))) {
+            property_get_bool("persist.hal.binderization", 0))) {
         // Treble IOmx
         sp<IOmx> omx = IOmx::getService();
         if (omx == nullptr) {
