@@ -23,7 +23,10 @@
 #include <media/MediaAnalyticsItem.h>
 
 namespace android {
-
+namespace media {
+class ICas;
+};
+using namespace media;
 class DataSource;
 struct MediaSource;
 class MetaData;
@@ -66,6 +69,9 @@ public:
         return NULL;
     }
     virtual void setUID(uid_t /*uid*/) {
+    }
+    virtual status_t setMediaCas(const sp<ICas> &cas) override {
+        return INVALID_OPERATION;
     }
 
     virtual const char * name() { return "<unspecified>"; }

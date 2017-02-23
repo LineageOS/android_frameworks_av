@@ -23,6 +23,7 @@
 #include "include/SharedMemoryBuffer.h"
 #include "include/SoftwareRenderer.h"
 
+#include <android/media/IDescrambler.h>
 #include <binder/IMemory.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
@@ -680,8 +681,17 @@ status_t MediaCodec::setOnFrameRenderedNotification(const sp<AMessage> &notify) 
 
 status_t MediaCodec::configure(
         const sp<AMessage> &format,
+        const sp<Surface> &nativeWindow,
+        const sp<ICrypto> &crypto,
+        uint32_t flags) {
+    return configure(format, nativeWindow, crypto, NULL, flags);
+}
+
+status_t MediaCodec::configure(
+        const sp<AMessage> &format,
         const sp<Surface> &surface,
         const sp<ICrypto> &crypto,
+        const sp<IDescrambler> &descrambler,
         uint32_t flags) {
     sp<AMessage> msg = new AMessage(kWhatConfigure, this);
 
@@ -710,8 +720,12 @@ status_t MediaCodec::configure(
     msg->setInt32("flags", flags);
     msg->setObject("surface", surface);
 
-    if (crypto != NULL) {
-        msg->setPointer("crypto", crypto.get());
+    if (crypto != NULL || descrambler != NULL) {
+        if (crypto != NULL) {
+            msg->setPointer("crypto", crypto.get());
+        } else {
+            msg->setPointer("descrambler", descrambler.get());
+        }
         if (mAnalyticsItem != NULL) {
             // XXX: save indication that it's crypto in some way...
             mAnalyticsItem->setInt32("crypto", 1);
@@ -1992,6 +2006,13 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             ALOGV("kWhatConfigure: New mCrypto: %p (%d)",
                     mCrypto.get(), (mCrypto != NULL ? mCrypto->getStrongCount() : 0));
 
+            void *descrambler;
+            if (!msg->findPointer("descrambler", &descrambler)) {
+                descrambler = NULL;
+            }
+
+            mDescrambler = static_cast<IDescrambler *>(descrambler);
+
             uint32_t flags;
             CHECK(msg->findInt32("flags", (int32_t *)&flags));
 
@@ -2592,6 +2613,7 @@ void MediaCodec::setState(State newState) {
                     mCrypto.get(), (mCrypto != NULL ? mCrypto->getStrongCount() : 0));
         }
         mCrypto.clear();
+        mDescrambler.clear();
         handleSetSurface(NULL);
 
         mInputFormat.clear();

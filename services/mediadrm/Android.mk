@@ -17,6 +17,7 @@ LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:= \
+    MediaCasService.cpp \
     MediaDrmService.cpp \
     main_mediadrmserver.cpp
 

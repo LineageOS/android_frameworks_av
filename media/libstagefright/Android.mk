@@ -93,6 +93,7 @@ LOCAL_SHARED_LIBRARIES := \
         libui \
         libutils \
         libvorbisidec \
+        libmediadrm \
 
 LOCAL_STATIC_LIBRARIES := \
         libstagefright_color_conversion \

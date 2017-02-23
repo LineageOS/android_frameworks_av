@@ -47,6 +47,10 @@ class IResourceManagerService;
 struct PersistentSurface;
 class SoftwareRenderer;
 class Surface;
+namespace media {
+class IDescrambler;
+};
+using namespace media;
 
 struct MediaCodec : public AHandler {
     enum ConfigureFlags {
@@ -89,6 +93,13 @@ struct MediaCodec : public AHandler {
             const sp<AMessage> &format,
             const sp<Surface> &nativeWindow,
             const sp<ICrypto> &crypto,
+            uint32_t flags);
+
+    status_t configure(
+            const sp<AMessage> &format,
+            const sp<Surface> &nativeWindow,
+            const sp<ICrypto> &crypto,
+            const sp<IDescrambler> &descrambler,
             uint32_t flags);
 
     status_t releaseCrypto();
@@ -344,6 +355,8 @@ private:
     sp<AReplyToken> mDequeueOutputReplyID;
 
     sp<ICrypto> mCrypto;
+
+    sp<IDescrambler> mDescrambler;
 
     List<sp<ABuffer> > mCSD;
 

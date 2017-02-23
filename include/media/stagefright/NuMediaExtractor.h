@@ -28,6 +28,10 @@
 #include <utils/Vector.h>
 
 namespace android {
+namespace media {
+class ICas;
+}
+using namespace media;
 
 struct ABuffer;
 struct AMessage;
@@ -59,6 +63,8 @@ struct NuMediaExtractor : public RefBase {
     status_t setDataSource(int fd, off64_t offset, off64_t size);
 
     status_t setDataSource(const sp<DataSource> &datasource);
+
+    status_t setMediaCas(const sp<ICas> &cas);
 
     size_t countTracks() const;
     status_t getTrackFormat(size_t index, sp<AMessage> *format, uint32_t flags = 0) const;
@@ -109,6 +115,7 @@ private:
     sp<DataSource> mDataSource;
 
     sp<IMediaExtractor> mImpl;
+    sp<ICas> mCas;
 
     Vector<TrackInfo> mSelectedTracks;
     int64_t mTotalBitrate;  // in bits/sec

@@ -35,6 +35,7 @@
 #include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
+#include <android/media/ICas.h>
 
 namespace android {
 
@@ -82,6 +83,10 @@ status_t NuMediaExtractor::setDataSource(
         return ERROR_UNSUPPORTED;
     }
 
+    if (mCas != NULL) {
+        mImpl->setMediaCas(mCas);
+    }
+
     status_t err = updateDurationAndBitrate();
     if (err == OK) {
         mDataSource = dataSource;
@@ -114,6 +119,10 @@ status_t NuMediaExtractor::setDataSource(int fd, off64_t offset, off64_t size) {
         return ERROR_UNSUPPORTED;
     }
 
+    if (mCas != NULL) {
+        mImpl->setMediaCas(mCas);
+    }
+
     err = updateDurationAndBitrate();
     if (err == OK) {
         mDataSource = fileSource;
@@ -140,12 +149,37 @@ status_t NuMediaExtractor::setDataSource(const sp<DataSource> &source) {
         return ERROR_UNSUPPORTED;
     }
 
+    if (mCas != NULL) {
+        mImpl->setMediaCas(mCas);
+    }
+
     err = updateDurationAndBitrate();
     if (err == OK) {
         mDataSource = source;
     }
 
     return err;
+}
+
+status_t NuMediaExtractor::setMediaCas(const sp<ICas> &cas) {
+    ALOGV("setMediaCas: cas=%p", cas.get());
+
+    Mutex::Autolock autoLock(mLock);
+
+    if (cas == NULL) {
+        return BAD_VALUE;
+    }
+
+    if (mImpl != NULL) {
+        mImpl->setMediaCas(cas);
+        status_t err = updateDurationAndBitrate();
+        if (err != OK) {
+            return err;
+        }
+    }
+
+    mCas = cas;
+    return OK;
 }
 
 status_t NuMediaExtractor::updateDurationAndBitrate() {
