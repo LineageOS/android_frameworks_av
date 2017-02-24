@@ -23,9 +23,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#define __force
-#define __bitwise
-#define __user
 #include <sound/asound.h>
 
 #include "tinyalsa/asoundlib.h"
