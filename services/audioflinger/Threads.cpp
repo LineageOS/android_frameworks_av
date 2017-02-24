@@ -36,7 +36,7 @@
 
 #include <private/media/AudioTrackShared.h>
 #include <private/android_filesystem_config.h>
-#include <audio_utils/conversion.h>
+#include <audio_utils/mono_blend.h>
 #include <audio_utils/primitives.h>
 #include <audio_utils/format.h>
 #include <audio_utils/minifloat.h>
