@@ -17,14 +17,17 @@
 #define LOG_TAG "cameraserver"
 //#define LOG_NDEBUG 0
 
-// from LOCAL_C_INCLUDES
 #include "CameraService.h"
+#include <hidl/HidlTransportSupport.h>
 
 using namespace android;
 
 int main(int argc __unused, char** argv __unused)
 {
     signal(SIGPIPE, SIG_IGN);
+
+    // Set 3 threads for HIDL calls
+    hardware::configureRpcThreadpool(3, /*willjoin*/ false);
 
     sp<ProcessState> proc(ProcessState::self());
     sp<IServiceManager> sm = defaultServiceManager();
