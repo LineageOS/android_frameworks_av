@@ -18,6 +18,7 @@
 
 #include <vector>
 
+#include <android-base/logging.h>
 #include <cutils/native_handle.h>
 #include <binder/Binder.h>
 
@@ -46,7 +47,7 @@ void LWOmxObserver::onMessages(std::list<omx_message> const& lMessages) {
     }
     auto transResult = mBase->onMessages(tMessages);
     if (!transResult.isOk()) {
-        ALOGE("LWOmxObserver::onMessages transaction failed");
+        LOG(ERROR) << "LWOmxObserver::onMessages - Transaction failed";
     }
     for (auto& handle : handles) {
         native_handle_close(handle);

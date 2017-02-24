@@ -11,7 +11,6 @@ LOCAL_SRC_FILES := \
     WOmxObserver.cpp \
     WOmxProducerListener.cpp \
     Omx.cpp \
-    OmxNode.cpp \
 
 LOCAL_SHARED_LIBRARIES := \
     libmedia \
@@ -27,6 +26,7 @@ LOCAL_SHARED_LIBRARIES := \
     libcutils \
     libbinder \
     liblog \
+    libbase \
     android.hardware.media.omx@1.0 \
     android.hardware.graphics.common@1.0 \
     android.hardware.media@1.0 \
