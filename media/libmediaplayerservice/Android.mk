@@ -36,6 +36,7 @@ LOCAL_SHARED_LIBRARIES :=       \
     libstagefright_omx          \
     libstagefright_wfd          \
     libutils                    \
+    libnativewindow             \
     libhidlbase                 \
     android.hardware.media.omx@1.0 \
 
