@@ -32,6 +32,10 @@ LOCAL_SHARED_LIBRARIES := \
     android.hardware.media@1.0 \
     android.hidl.base@1.0 \
 
+LOCAL_C_FLAGS += \
+    -Wno-unused-parameter \
+    -Werror
+
 LOCAL_C_INCLUDES += \
         $(TOP)/frameworks/av/include \
         $(TOP)/frameworks/av/media/libstagefright \
