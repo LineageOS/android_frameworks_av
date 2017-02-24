@@ -84,7 +84,7 @@ public:
     }
 
     virtual aaudio_result_t createThread(int64_t periodNanoseconds,
-                                       aaudio_audio_thread_proc_t *threadProc,
+                                       aaudio_audio_thread_proc_t threadProc,
                                        void *threadArg);
 
     virtual aaudio_result_t joinThread(void **returnArg, int64_t timeoutNanoseconds);
@@ -267,7 +267,7 @@ private:
     // These are set by the application thread and then read by the audio pthread.
     std::atomic<int64_t>   mPeriodNanoseconds; // for tuning SCHED_FIFO threads
     // TODO make atomic?
-    aaudio_audio_thread_proc_t* mThreadProc = nullptr;
+    aaudio_audio_thread_proc_t mThreadProc = nullptr;
     void*                  mThreadArg = nullptr;
     aaudio_result_t        mThreadRegistrationResult = AAUDIO_OK;
 

@@ -27,11 +27,8 @@
 extern "C" {
 #endif
 
-typedef struct AAudioStreamStruct * AAudioStream;
-typedef struct AAudioStreamBuilderStruct *  AAudioStreamBuilder;
-
-#define AAUDIO_STREAM_NONE         ((AAudioStream)nullptr)
-#define AAUDIO_STREAM_BUILDER_NONE ((AAudioStreamBuilder)nullptr)
+typedef struct AAudioStreamStruct         AAudioStream;
+typedef struct AAudioStreamBuilderStruct  AAudioStreamBuilder;
 
 #ifndef AAUDIO_API
 #define AAUDIO_API /* export this symbol */
@@ -77,7 +74,7 @@ AAUDIO_API const char * AAudio_convertStreamStateToText(aaudio_stream_state_t st
  *
  * AAudioStreamBuilder_delete() must be called when you are done using the builder.
  */
-AAUDIO_API aaudio_result_t AAudio_createStreamBuilder(AAudioStreamBuilder *builder);
+AAUDIO_API aaudio_result_t AAudio_createStreamBuilder(AAudioStreamBuilder** builder);
 
 /**
  * Request an audio device identified device using an ID.
@@ -88,7 +85,7 @@ AAUDIO_API aaudio_result_t AAudio_createStreamBuilder(AAudioStreamBuilder *build
  * @param builder reference provided by AAudio_createStreamBuilder()
  * @param deviceId device identifier or AAUDIO_DEVICE_UNSPECIFIED
  */
-AAUDIO_API void AAudioStreamBuilder_setDeviceId(AAudioStreamBuilder builder,
+AAUDIO_API void AAudioStreamBuilder_setDeviceId(AAudioStreamBuilder* builder,
                                                      int32_t deviceId);
 
 /**
@@ -103,7 +100,7 @@ AAUDIO_API void AAudioStreamBuilder_setDeviceId(AAudioStreamBuilder builder,
  * Default is AAUDIO_UNSPECIFIED.
 
  */
-AAUDIO_API void AAudioStreamBuilder_setSampleRate(AAudioStreamBuilder builder,
+AAUDIO_API void AAudioStreamBuilder_setSampleRate(AAudioStreamBuilder* builder,
                                                        int32_t sampleRate);
 
 /**
@@ -115,14 +112,14 @@ AAUDIO_API void AAudioStreamBuilder_setSampleRate(AAudioStreamBuilder builder,
  *
  * Note, this quantity is sometimes referred to as "channel count".
  */
-AAUDIO_API void AAudioStreamBuilder_setSamplesPerFrame(AAudioStreamBuilder builder,
+AAUDIO_API void AAudioStreamBuilder_setSamplesPerFrame(AAudioStreamBuilder* builder,
                                                    int32_t samplesPerFrame);
 
 /**
  * Request a sample data format, for example AAUDIO_FORMAT_PCM_I16.
  * The application should query for the actual format after the stream is opened.
  */
-AAUDIO_API void AAudioStreamBuilder_setFormat(AAudioStreamBuilder builder,
+AAUDIO_API void AAudioStreamBuilder_setFormat(AAudioStreamBuilder* builder,
                                                    aaudio_audio_format_t format);
 
 /**
@@ -133,7 +130,7 @@ AAUDIO_API void AAudioStreamBuilder_setFormat(AAudioStreamBuilder builder,
  * @param builder reference provided by AAudio_createStreamBuilder()
  * @param sharingMode AAUDIO_SHARING_MODE_LEGACY or AAUDIO_SHARING_MODE_EXCLUSIVE
  */
-AAUDIO_API void AAudioStreamBuilder_setSharingMode(AAudioStreamBuilder builder,
+AAUDIO_API void AAudioStreamBuilder_setSharingMode(AAudioStreamBuilder* builder,
                                                         aaudio_sharing_mode_t sharingMode);
 
 /**
@@ -142,7 +139,7 @@ AAUDIO_API void AAudioStreamBuilder_setSharingMode(AAudioStreamBuilder builder,
  * @param builder reference provided by AAudio_createStreamBuilder()
  * @param direction AAUDIO_DIRECTION_OUTPUT or AAUDIO_DIRECTION_INPUT
  */
-AAUDIO_API void AAudioStreamBuilder_setDirection(AAudioStreamBuilder builder,
+AAUDIO_API void AAudioStreamBuilder_setDirection(AAudioStreamBuilder* builder,
                                                             aaudio_direction_t direction);
 
 /**
@@ -154,7 +151,7 @@ AAUDIO_API void AAudioStreamBuilder_setDirection(AAudioStreamBuilder builder,
  * @param builder reference provided by AAudio_createStreamBuilder()
  * @param frames the desired buffer capacity in frames or AAUDIO_UNSPECIFIED
  */
-AAUDIO_API void AAudioStreamBuilder_setBufferCapacityInFrames(AAudioStreamBuilder builder,
+AAUDIO_API void AAudioStreamBuilder_setBufferCapacityInFrames(AAudioStreamBuilder* builder,
                                                                  int32_t frames);
 
 /**
@@ -167,8 +164,8 @@ AAUDIO_API void AAudioStreamBuilder_setBufferCapacityInFrames(AAudioStreamBuilde
  * @param stream pointer to a variable to receive the new stream reference
  * @return AAUDIO_OK or a negative error.
  */
-AAUDIO_API aaudio_result_t  AAudioStreamBuilder_openStream(AAudioStreamBuilder builder,
-                                                     AAudioStream *stream);
+AAUDIO_API aaudio_result_t  AAudioStreamBuilder_openStream(AAudioStreamBuilder* builder,
+                                                     AAudioStream** stream);
 
 /**
  * Delete the resources associated with the StreamBuilder.
@@ -176,7 +173,7 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_openStream(AAudioStreamBuilder b
  * @param builder reference provided by AAudio_createStreamBuilder()
  * @return AAUDIO_OK or a negative error.
  */
-AAUDIO_API aaudio_result_t  AAudioStreamBuilder_delete(AAudioStreamBuilder builder);
+AAUDIO_API aaudio_result_t  AAudioStreamBuilder_delete(AAudioStreamBuilder* builder);
 
 // ============================================================
 // Stream Control
@@ -188,7 +185,7 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_delete(AAudioStreamBuilder build
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return AAUDIO_OK or a negative error.
  */
-AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream stream);
+AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream);
 
 /**
  * Asynchronously request to start playing the stream. For output streams, one should
@@ -199,7 +196,7 @@ AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream stream);
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return AAUDIO_OK or a negative error.
  */
-AAUDIO_API aaudio_result_t  AAudioStream_requestStart(AAudioStream stream);
+AAUDIO_API aaudio_result_t  AAudioStream_requestStart(AAudioStream* stream);
 
 /**
  * Asynchronous request for the stream to pause.
@@ -210,7 +207,7 @@ AAUDIO_API aaudio_result_t  AAudioStream_requestStart(AAudioStream stream);
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return AAUDIO_OK or a negative error.
  */
-AAUDIO_API aaudio_result_t  AAudioStream_requestPause(AAudioStream stream);
+AAUDIO_API aaudio_result_t  AAudioStream_requestPause(AAudioStream* stream);
 
 /**
  * Asynchronous request for the stream to flush.
@@ -222,7 +219,7 @@ AAUDIO_API aaudio_result_t  AAudioStream_requestPause(AAudioStream stream);
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return AAUDIO_OK or a negative error.
  */
-AAUDIO_API aaudio_result_t  AAudioStream_requestFlush(AAudioStream stream);
+AAUDIO_API aaudio_result_t  AAudioStream_requestFlush(AAudioStream* stream);
 
 /**
  * Asynchronous request for the stream to stop.
@@ -232,7 +229,7 @@ AAUDIO_API aaudio_result_t  AAudioStream_requestFlush(AAudioStream stream);
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return AAUDIO_OK or a negative error.
  */
-AAUDIO_API aaudio_result_t  AAudioStream_requestStop(AAudioStream stream);
+AAUDIO_API aaudio_result_t  AAudioStream_requestStop(AAudioStream* stream);
 
 /**
  * Query the current state of the client, eg. AAUDIO_STREAM_STATE_PAUSING
@@ -245,7 +242,7 @@ AAUDIO_API aaudio_result_t  AAudioStream_requestStop(AAudioStream stream);
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @param state pointer to a variable that will be set to the current state
  */
-AAUDIO_API aaudio_stream_state_t AAudioStream_getState(AAudioStream stream);
+AAUDIO_API aaudio_stream_state_t AAudioStream_getState(AAudioStream* stream);
 
 /**
  * Wait until the current state no longer matches the input state.
@@ -267,7 +264,7 @@ AAUDIO_API aaudio_stream_state_t AAudioStream_getState(AAudioStream stream);
  * @param timeoutNanoseconds Maximum number of nanoseconds to wait for completion.
  * @return AAUDIO_OK or a negative error.
  */
-AAUDIO_API aaudio_result_t AAudioStream_waitForStateChange(AAudioStream stream,
+AAUDIO_API aaudio_result_t AAudioStream_waitForStateChange(AAudioStream* stream,
                                             aaudio_stream_state_t inputState,
                                             aaudio_stream_state_t *nextState,
                                             int64_t timeoutNanoseconds);
@@ -294,7 +291,7 @@ AAUDIO_API aaudio_result_t AAudioStream_waitForStateChange(AAudioStream stream,
  * @param timeoutNanoseconds Maximum number of nanoseconds to wait for completion.
  * @return The number of frames actually read or a negative error.
  */
-AAUDIO_API aaudio_result_t AAudioStream_read(AAudioStream stream,
+AAUDIO_API aaudio_result_t AAudioStream_read(AAudioStream* stream,
                                void *buffer,
                                int32_t numFrames,
                                int64_t timeoutNanoseconds);
@@ -317,7 +314,7 @@ AAUDIO_API aaudio_result_t AAudioStream_read(AAudioStream stream,
  * @param timeoutNanoseconds Maximum number of nanoseconds to wait for completion.
  * @return The number of frames actually written or a negative error.
  */
-AAUDIO_API aaudio_result_t AAudioStream_write(AAudioStream stream,
+AAUDIO_API aaudio_result_t AAudioStream_write(AAudioStream* stream,
                                const void *buffer,
                                int32_t numFrames,
                                int64_t timeoutNanoseconds);
@@ -327,7 +324,7 @@ AAUDIO_API aaudio_result_t AAudioStream_write(AAudioStream stream,
 // High priority audio threads
 // ============================================================
 
-typedef void *(aaudio_audio_thread_proc_t)(void *);
+typedef void *(*aaudio_audio_thread_proc_t)(void *);
 
 /**
  * Create a thread associated with a stream. The thread has special properties for
@@ -348,9 +345,9 @@ typedef void *(aaudio_audio_thread_proc_t)(void *);
  * @param arg an argument that will be passed to your thread entry point
  * @return AAUDIO_OK or a negative error.
  */
-AAUDIO_API aaudio_result_t AAudioStream_createThread(AAudioStream stream,
+AAUDIO_API aaudio_result_t AAudioStream_createThread(AAudioStream* stream,
                                      int64_t periodNanoseconds,
-                                     aaudio_audio_thread_proc_t *threadProc,
+                                     aaudio_audio_thread_proc_t threadProc,
                                      void *arg);
 
 /**
@@ -361,7 +358,7 @@ AAUDIO_API aaudio_result_t AAudioStream_createThread(AAudioStream stream,
  * @param timeoutNanoseconds Maximum number of nanoseconds to wait for completion.
  * @return AAUDIO_OK or a negative error.
  */
-AAUDIO_API aaudio_result_t AAudioStream_joinThread(AAudioStream stream,
+AAUDIO_API aaudio_result_t AAudioStream_joinThread(AAudioStream* stream,
                                    void **returnArg,
                                    int64_t timeoutNanoseconds);
 
@@ -385,7 +382,7 @@ AAUDIO_API aaudio_result_t AAudioStream_joinThread(AAudioStream stream,
  * @param requestedFrames requested number of frames that can be filled without blocking
  * @return actual buffer size in frames or a negative error
  */
-AAUDIO_API aaudio_result_t AAudioStream_setBufferSizeInFrames(AAudioStream stream,
+AAUDIO_API aaudio_result_t AAudioStream_setBufferSizeInFrames(AAudioStream* stream,
                                                       int32_t requestedFrames);
 
 /**
@@ -394,7 +391,7 @@ AAUDIO_API aaudio_result_t AAudioStream_setBufferSizeInFrames(AAudioStream strea
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return buffer size in frames.
  */
-AAUDIO_API int32_t AAudioStream_getBufferSizeInFrames(AAudioStream stream);
+AAUDIO_API int32_t AAudioStream_getBufferSizeInFrames(AAudioStream* stream);
 
 /**
  * Query the number of frames that the application should read or write at
@@ -409,7 +406,7 @@ AAUDIO_API int32_t AAudioStream_getBufferSizeInFrames(AAudioStream stream);
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return burst size
  */
-AAUDIO_API int32_t AAudioStream_getFramesPerBurst(AAudioStream stream);
+AAUDIO_API int32_t AAudioStream_getFramesPerBurst(AAudioStream* stream);
 
 /**
  * Query maximum buffer capacity in frames.
@@ -417,7 +414,7 @@ AAUDIO_API int32_t AAudioStream_getFramesPerBurst(AAudioStream stream);
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return  the buffer capacity in frames
  */
-AAUDIO_API int32_t AAudioStream_getBufferCapacityInFrames(AAudioStream stream);
+AAUDIO_API int32_t AAudioStream_getBufferCapacityInFrames(AAudioStream* stream);
 
 /**
  * An XRun is an Underrun or an Overrun.
@@ -431,13 +428,13 @@ AAUDIO_API int32_t AAudioStream_getBufferCapacityInFrames(AAudioStream stream);
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return the underrun or overrun count
  */
-AAUDIO_API int32_t AAudioStream_getXRunCount(AAudioStream stream);
+AAUDIO_API int32_t AAudioStream_getXRunCount(AAudioStream* stream);
 
 /**
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return actual sample rate
  */
-AAUDIO_API int32_t AAudioStream_getSampleRate(AAudioStream stream);
+AAUDIO_API int32_t AAudioStream_getSampleRate(AAudioStream* stream);
 
 /**
  * The samplesPerFrame is also known as channelCount.
@@ -445,34 +442,32 @@ AAUDIO_API int32_t AAudioStream_getSampleRate(AAudioStream stream);
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return actual samples per frame
  */
-AAUDIO_API int32_t AAudioStream_getSamplesPerFrame(AAudioStream stream);
+AAUDIO_API int32_t AAudioStream_getSamplesPerFrame(AAudioStream* stream);
 
 /**
  * @param stream reference provided by AAudioStreamBuilder_openStream()
- * @param deviceId pointer to variable to receive the actual device ID
- * @return AAUDIO_OK or a negative error.
+ * @return actual device ID
  */
-AAUDIO_API int32_t AAudioStream_getDeviceId(AAudioStream stream,
-                                                    int32_t *deviceId);
+AAUDIO_API int32_t AAudioStream_getDeviceId(AAudioStream* stream);
 
 /**
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return actual data format
  */
-AAUDIO_API aaudio_audio_format_t AAudioStream_getFormat(AAudioStream stream);
+AAUDIO_API aaudio_audio_format_t AAudioStream_getFormat(AAudioStream* stream);
 
 /**
  * Provide actual sharing mode.
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return  actual sharing mode
  */
-AAUDIO_API aaudio_sharing_mode_t AAudioStream_getSharingMode(AAudioStream stream);
+AAUDIO_API aaudio_sharing_mode_t AAudioStream_getSharingMode(AAudioStream* stream);
 
 /**
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return direction
  */
-AAUDIO_API aaudio_direction_t AAudioStream_getDirection(AAudioStream stream);
+AAUDIO_API aaudio_direction_t AAudioStream_getDirection(AAudioStream* stream);
 
 /**
  * Passes back the number of frames that have been written since the stream was created.
@@ -484,7 +479,7 @@ AAUDIO_API aaudio_direction_t AAudioStream_getDirection(AAudioStream stream);
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return frames written
  */
-AAUDIO_API int64_t AAudioStream_getFramesWritten(AAudioStream stream);
+AAUDIO_API int64_t AAudioStream_getFramesWritten(AAudioStream* stream);
 
 /**
  * Passes back the number of frames that have been read since the stream was created.
@@ -496,7 +491,7 @@ AAUDIO_API int64_t AAudioStream_getFramesWritten(AAudioStream stream);
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return frames read
  */
-AAUDIO_API int64_t AAudioStream_getFramesRead(AAudioStream stream);
+AAUDIO_API int64_t AAudioStream_getFramesRead(AAudioStream* stream);
 
 /**
  * Passes back the time at which a particular frame was presented.
@@ -520,7 +515,7 @@ AAUDIO_API int64_t AAudioStream_getFramesRead(AAudioStream stream);
  * @param timeNanoseconds pointer to a variable to receive the time
  * @return AAUDIO_OK or a negative error
  */
-AAUDIO_API aaudio_result_t AAudioStream_getTimestamp(AAudioStream stream,
+AAUDIO_API aaudio_result_t AAudioStream_getTimestamp(AAudioStream* stream,
                                       clockid_t clockid,
                                       int64_t *framePosition,
                                       int64_t *timeNanoseconds);

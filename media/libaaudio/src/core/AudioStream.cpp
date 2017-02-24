@@ -121,7 +121,7 @@ static void* AudioStream_internalThreadProc(void* threadArg) {
 }
 
 aaudio_result_t AudioStream::createThread(int64_t periodNanoseconds,
-                                     aaudio_audio_thread_proc_t *threadProc,
+                                     aaudio_audio_thread_proc_t threadProc,
                                      void* threadArg)
 {
     if (mHasThread) {

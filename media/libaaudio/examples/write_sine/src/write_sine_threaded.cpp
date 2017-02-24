@@ -217,8 +217,8 @@ public:
     }
 
 private:
-    AAudioStreamBuilder   mBuilder = nullptr;
-    AAudioStream          mStream = nullptr;
+    AAudioStreamBuilder  *mBuilder = nullptr;
+    AAudioStream         *mStream = nullptr;
     float                *mOutputBuffer = nullptr;
     int16_t              *mConversionBuffer = nullptr;
 

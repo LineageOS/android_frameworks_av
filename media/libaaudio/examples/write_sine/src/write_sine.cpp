@@ -59,8 +59,8 @@ int main(int argc, char **argv)
     const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_EXCLUSIVE;
     aaudio_sharing_mode_t actualSharingMode = AAUDIO_SHARING_MODE_SHARED;
 
-    AAudioStreamBuilder aaudioBuilder = nullptr;
-    AAudioStream aaudioStream = nullptr;
+    AAudioStreamBuilder *aaudioBuilder = nullptr;
+    AAudioStream *aaudioStream = nullptr;
     aaudio_stream_state_t state = AAUDIO_STREAM_STATE_UNINITIALIZED;
     int32_t framesPerBurst = 0;
     int32_t framesToPlay = 0;
