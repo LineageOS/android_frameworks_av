@@ -36,3 +36,44 @@ cc_library_shared {
     ldflags: ["-Wl,-Bsymbolic"],
     compile_multilib: "32",
 }
+
+cc_library_shared {
+    name: "libstagefright_soft_c2avcdec",
+
+    static_libs: [
+        "libavcdec",
+        "libstagefright_codec2_vndk",
+    ],
+    srcs: ["C2SoftAvcDec.cpp"],
+
+    include_dirs: [
+        "external/libavc/decoder",
+        "external/libavc/common",
+        "frameworks/av/media/libstagefright/codec2/include",
+        "frameworks/av/media/libstagefright/codec2/vndk/include",
+    ],
+
+    shared_libs: [
+        "android.hardware.graphics.allocator@2.0",
+        "android.hardware.graphics.mapper@2.0",
+        "libhidlbase",
+        "libion",
+        "liblog",
+        "libmedia",
+        "libstagefright_codec2",
+        "libstagefright_foundation",
+        "libutils",
+    ],
+
+    sanitize: {
+        misc_undefined: [
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+        diag: {
+            cfi: true,
+        },
+    },
+
+    ldflags: ["-Wl,-Bsymbolic"],
+}
