@@ -56,17 +56,19 @@ class ConversionHelperHidl {
     }
 
     status_t processReturn(const char* funcName, const Return<hardware::audio::V2_0::Result>& ret) {
-        return processReturn(funcName, ret, ret);
+        if (!ret.isOk()) {
+            emitError(funcName, ret.description().c_str());
+        }
+        return ret.isOk() ? analyzeResult(ret) : FAILED_TRANSACTION;
     }
 
     template<typename T>
     status_t processReturn(
             const char* funcName, const Return<T>& ret, hardware::audio::V2_0::Result retval) {
-        const status_t st = ret.isOk() ? analyzeResult(retval) : FAILED_TRANSACTION;
         if (!ret.isOk()) {
             emitError(funcName, ret.description().c_str());
         }
-        return st;
+        return ret.isOk() ? analyzeResult(retval) : FAILED_TRANSACTION;
     }
 
   private:
