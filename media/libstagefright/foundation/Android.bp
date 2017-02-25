@@ -26,6 +26,8 @@ cc_library_shared {
 
     include_dirs: ["frameworks/av/include/media/stagefright/foundation"],
 
+    export_include_dirs: ["include"],
+
     shared_libs: [
         "libbinder",
         "libutils",

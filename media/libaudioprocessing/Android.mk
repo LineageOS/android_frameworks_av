@@ -14,6 +14,9 @@ LOCAL_SRC_FILES := \
 LOCAL_C_INCLUDES := \
     $(TOP) \
     $(call include-path-for, audio-utils) \
+    $(LOCAL_PATH)/include \
+
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
 
 LOCAL_SHARED_LIBRARIES := \
     libaudiohal \

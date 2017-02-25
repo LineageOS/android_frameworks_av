@@ -65,11 +65,11 @@ LOCAL_C_INCLUDES += \
 	system/media/camera/include \
 	system/media/private/camera/include \
 	frameworks/native/include/media/openmax \
-	frameworks/av/include/camera
+	$(LOCAL_PATH)/include/camera
 
 LOCAL_EXPORT_C_INCLUDE_DIRS := \
 	system/media/camera/include \
-	frameworks/av/include/camera
+	$(LOCAL_PATH)/include/camera
 
 LOCAL_CFLAGS += -Werror -Wall -Wextra
 
