@@ -296,6 +296,7 @@ private:
     int64_t mTimePerFrameUs;
     int64_t mTimePerCaptureUs;
     bool mCreateInputBuffersSuspended;
+    uint32_t mLatency;
 
     bool mTunneled;
 
@@ -477,6 +478,8 @@ private:
             AudioEncoding encoding = kAudioEncodingPcm16bit);
 
     status_t setPriority(int32_t priority);
+    status_t setLatency(uint32_t latency);
+    status_t getLatency(uint32_t *latency);
     status_t setOperatingRate(float rateFloat, bool isVideo);
     status_t getIntraRefreshPeriod(uint32_t *intraRefreshPeriod);
     status_t setIntraRefreshPeriod(uint32_t intraRefreshPeriod, bool inConfigure);
@@ -499,6 +502,7 @@ private:
 
     status_t configureBitrate(
             int32_t bitrate, OMX_VIDEO_CONTROLRATETYPE bitrateMode);
+    void configureEncoderLatency(const sp<AMessage> &msg);
 
     status_t setupErrorCorrectionParameters();
 
