@@ -90,49 +90,49 @@ AAUDIO_API const char * AAudio_convertStreamStateToText(aaudio_stream_state_t st
 
 #undef AAUDIO_CASE_ENUM
 
-static AudioStream *convertAAudioStreamToAudioStream(AAudioStream stream)
+static AudioStream *convertAAudioStreamToAudioStream(AAudioStream* stream)
 {
-    return (AudioStream *) stream;
+    return (AudioStream*) stream;
 }
 
-static AudioStreamBuilder *convertAAudioBuilderToStreamBuilder(AAudioStreamBuilder builder)
+static AudioStreamBuilder *convertAAudioBuilderToStreamBuilder(AAudioStreamBuilder* builder)
 {
-    return (AudioStreamBuilder *) builder;
+    return (AudioStreamBuilder*) builder;
 }
 
-AAUDIO_API aaudio_result_t AAudio_createStreamBuilder(AAudioStreamBuilder *builder)
+AAUDIO_API aaudio_result_t AAudio_createStreamBuilder(AAudioStreamBuilder** builder)
 {
     ALOGD("AAudio_createStreamBuilder(): check sHandleTracker.isInitialized ()");
     AudioStreamBuilder *audioStreamBuilder =  new AudioStreamBuilder();
     if (audioStreamBuilder == nullptr) {
         return AAUDIO_ERROR_NO_MEMORY;
     }
-    *builder = (AAudioStreamBuilder) audioStreamBuilder;
+    *builder = (AAudioStreamBuilder*) audioStreamBuilder;
     return AAUDIO_OK;
 }
 
-AAUDIO_API void AAudioStreamBuilder_setDeviceId(AAudioStreamBuilder builder,
+AAUDIO_API void AAudioStreamBuilder_setDeviceId(AAudioStreamBuilder* builder,
                                                      int32_t deviceId)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);;
     streamBuilder->setDeviceId(deviceId);
 }
 
-AAUDIO_API void AAudioStreamBuilder_setSampleRate(AAudioStreamBuilder builder,
+AAUDIO_API void AAudioStreamBuilder_setSampleRate(AAudioStreamBuilder* builder,
                                               int32_t sampleRate)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);;
     streamBuilder->setSampleRate(sampleRate);
 }
 
-AAUDIO_API void AAudioStreamBuilder_setSamplesPerFrame(AAudioStreamBuilder builder,
+AAUDIO_API void AAudioStreamBuilder_setSamplesPerFrame(AAudioStreamBuilder* builder,
                                                    int32_t samplesPerFrame)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);;
     streamBuilder->setSamplesPerFrame(samplesPerFrame);
 }
 
-AAUDIO_API void AAudioStreamBuilder_setDirection(AAudioStreamBuilder builder,
+AAUDIO_API void AAudioStreamBuilder_setDirection(AAudioStreamBuilder* builder,
                                              aaudio_direction_t direction)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);;
@@ -140,21 +140,21 @@ AAUDIO_API void AAudioStreamBuilder_setDirection(AAudioStreamBuilder builder,
 }
 
 
-AAUDIO_API void AAudioStreamBuilder_setFormat(AAudioStreamBuilder builder,
+AAUDIO_API void AAudioStreamBuilder_setFormat(AAudioStreamBuilder* builder,
                                                    aaudio_audio_format_t format)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);;
     streamBuilder->setFormat(format);
 }
 
-AAUDIO_API void AAudioStreamBuilder_setSharingMode(AAudioStreamBuilder builder,
+AAUDIO_API void AAudioStreamBuilder_setSharingMode(AAudioStreamBuilder* builder,
                                                         aaudio_sharing_mode_t sharingMode)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);;
     streamBuilder->setSharingMode(sharingMode);
 }
 
-AAUDIO_API void AAudioStreamBuilder_setBufferCapacityInFrames(AAudioStreamBuilder builder,
+AAUDIO_API void AAudioStreamBuilder_setBufferCapacityInFrames(AAudioStreamBuilder* builder,
                                                         int32_t frames)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);;
@@ -162,27 +162,27 @@ AAUDIO_API void AAudioStreamBuilder_setBufferCapacityInFrames(AAudioStreamBuilde
 }
 
 static aaudio_result_t  AAudioInternal_openStream(AudioStreamBuilder *streamBuilder,
-                                              AAudioStream *streamPtr)
+                                              AAudioStream** streamPtr)
 {
     AudioStream *audioStream = nullptr;
     aaudio_result_t result = streamBuilder->build(&audioStream);
     if (result != AAUDIO_OK) {
         return result;
     } else {
-        *streamPtr = (AAudioStream) audioStream;
+        *streamPtr = (AAudioStream*) audioStream;
         return AAUDIO_OK;
     }
 }
 
-AAUDIO_API aaudio_result_t  AAudioStreamBuilder_openStream(AAudioStreamBuilder builder,
-                                                     AAudioStream *streamPtr)
+AAUDIO_API aaudio_result_t  AAudioStreamBuilder_openStream(AAudioStreamBuilder* builder,
+                                                     AAudioStream** streamPtr)
 {
     ALOGD("AAudioStreamBuilder_openStream(): builder = %p", builder);
     AudioStreamBuilder *streamBuilder = COMMON_GET_FROM_BUILDER_OR_RETURN(streamPtr);
     return AAudioInternal_openStream(streamBuilder, streamPtr);
 }
 
-AAUDIO_API aaudio_result_t  AAudioStreamBuilder_delete(AAudioStreamBuilder builder)
+AAUDIO_API aaudio_result_t  AAudioStreamBuilder_delete(AAudioStreamBuilder* builder)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
     if (streamBuilder != nullptr) {
@@ -192,7 +192,7 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_delete(AAudioStreamBuilder build
     return AAUDIO_ERROR_INVALID_HANDLE;
 }
 
-AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream stream)
+AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     ALOGD("AAudioStream_close(%p)", stream);
@@ -204,35 +204,35 @@ AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream stream)
     return AAUDIO_ERROR_INVALID_HANDLE;
 }
 
-AAUDIO_API aaudio_result_t  AAudioStream_requestStart(AAudioStream stream)
+AAUDIO_API aaudio_result_t  AAudioStream_requestStart(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     ALOGD("AAudioStream_requestStart(%p)", stream);
     return audioStream->requestStart();
 }
 
-AAUDIO_API aaudio_result_t  AAudioStream_requestPause(AAudioStream stream)
+AAUDIO_API aaudio_result_t  AAudioStream_requestPause(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     ALOGD("AAudioStream_requestPause(%p)", stream);
     return audioStream->requestPause();
 }
 
-AAUDIO_API aaudio_result_t  AAudioStream_requestFlush(AAudioStream stream)
+AAUDIO_API aaudio_result_t  AAudioStream_requestFlush(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     ALOGD("AAudioStream_requestFlush(%p)", stream);
     return audioStream->requestFlush();
 }
 
-AAUDIO_API aaudio_result_t  AAudioStream_requestStop(AAudioStream stream)
+AAUDIO_API aaudio_result_t  AAudioStream_requestStop(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     ALOGD("AAudioStream_requestStop(%p)", stream);
     return audioStream->requestStop();
 }
 
-AAUDIO_API aaudio_result_t AAudioStream_waitForStateChange(AAudioStream stream,
+AAUDIO_API aaudio_result_t AAudioStream_waitForStateChange(AAudioStream* stream,
                                             aaudio_stream_state_t inputState,
                                             aaudio_stream_state_t *nextState,
                                             int64_t timeoutNanoseconds)
@@ -246,7 +246,7 @@ AAUDIO_API aaudio_result_t AAudioStream_waitForStateChange(AAudioStream stream,
 // Stream - non-blocking I/O
 // ============================================================
 
-AAUDIO_API aaudio_result_t AAudioStream_read(AAudioStream stream,
+AAUDIO_API aaudio_result_t AAudioStream_read(AAudioStream* stream,
                                void *buffer,
                                int32_t numFrames,
                                int64_t timeoutNanoseconds)
@@ -267,7 +267,7 @@ AAUDIO_API aaudio_result_t AAudioStream_read(AAudioStream stream,
     return result;
 }
 
-AAUDIO_API aaudio_result_t AAudioStream_write(AAudioStream stream,
+AAUDIO_API aaudio_result_t AAudioStream_write(AAudioStream* stream,
                                const void *buffer,
                                int32_t numFrames,
                                int64_t timeoutNanoseconds)
@@ -292,15 +292,15 @@ AAUDIO_API aaudio_result_t AAudioStream_write(AAudioStream stream,
 // Miscellaneous
 // ============================================================
 
-AAUDIO_API aaudio_result_t AAudioStream_createThread(AAudioStream stream,
+AAUDIO_API aaudio_result_t AAudioStream_createThread(AAudioStream* stream,
                                      int64_t periodNanoseconds,
-                                     aaudio_audio_thread_proc_t *threadProc, void *arg)
+                                     aaudio_audio_thread_proc_t threadProc, void *arg)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->createThread(periodNanoseconds, threadProc, arg);
 }
 
-AAUDIO_API aaudio_result_t AAudioStream_joinThread(AAudioStream stream,
+AAUDIO_API aaudio_result_t AAudioStream_joinThread(AAudioStream* stream,
                                    void **returnArg,
                                    int64_t timeoutNanoseconds)
 {
@@ -312,92 +312,92 @@ AAUDIO_API aaudio_result_t AAudioStream_joinThread(AAudioStream stream,
 // Stream - queries
 // ============================================================
 
-AAUDIO_API int32_t AAudioStream_getSampleRate(AAudioStream stream)
+AAUDIO_API int32_t AAudioStream_getSampleRate(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getSampleRate();
 }
 
-AAUDIO_API int32_t AAudioStream_getSamplesPerFrame(AAudioStream stream)
+AAUDIO_API int32_t AAudioStream_getSamplesPerFrame(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getSamplesPerFrame();
 }
 
-AAUDIO_API aaudio_stream_state_t AAudioStream_getState(AAudioStream stream)
+AAUDIO_API aaudio_stream_state_t AAudioStream_getState(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getState();
 }
 
-AAUDIO_API aaudio_audio_format_t AAudioStream_getFormat(AAudioStream stream)
+AAUDIO_API aaudio_audio_format_t AAudioStream_getFormat(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getFormat();
 }
 
-AAUDIO_API aaudio_result_t AAudioStream_setBufferSizeInFrames(AAudioStream stream,
+AAUDIO_API aaudio_result_t AAudioStream_setBufferSizeInFrames(AAudioStream* stream,
                                                 int32_t requestedFrames)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->setBufferSize(requestedFrames);
 }
 
-AAUDIO_API int32_t AAudioStream_getBufferSizeInFrames(AAudioStream stream)
+AAUDIO_API int32_t AAudioStream_getBufferSizeInFrames(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getBufferSize();
 }
 
-AAUDIO_API aaudio_direction_t AAudioStream_getDirection(AAudioStream stream)
+AAUDIO_API aaudio_direction_t AAudioStream_getDirection(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getDirection();
 }
 
-AAUDIO_API int32_t AAudioStream_getFramesPerBurst(AAudioStream stream)
+AAUDIO_API int32_t AAudioStream_getFramesPerBurst(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getFramesPerBurst();
 }
 
-AAUDIO_API int32_t AAudioStream_getBufferCapacityInFrames(AAudioStream stream)
+AAUDIO_API int32_t AAudioStream_getBufferCapacityInFrames(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getBufferCapacity();
 }
 
-AAUDIO_API int32_t AAudioStream_getXRunCount(AAudioStream stream)
+AAUDIO_API int32_t AAudioStream_getXRunCount(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getXRunCount();
 }
 
-AAUDIO_API int32_t AAudioStream_getDeviceId(AAudioStream stream)
+AAUDIO_API int32_t AAudioStream_getDeviceId(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getDeviceId();
 }
 
-AAUDIO_API aaudio_sharing_mode_t AAudioStream_getSharingMode(AAudioStream stream)
+AAUDIO_API aaudio_sharing_mode_t AAudioStream_getSharingMode(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getSharingMode();
 }
 
-AAUDIO_API int64_t AAudioStream_getFramesWritten(AAudioStream stream)
+AAUDIO_API int64_t AAudioStream_getFramesWritten(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getFramesWritten();
 }
 
-AAUDIO_API int64_t AAudioStream_getFramesRead(AAudioStream stream)
+AAUDIO_API int64_t AAudioStream_getFramesRead(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getFramesRead();
 }
 
-AAUDIO_API aaudio_result_t AAudioStream_getTimestamp(AAudioStream stream,
+AAUDIO_API aaudio_result_t AAudioStream_getTimestamp(AAudioStream* stream,
                                       clockid_t clockid,
                                       int64_t *framePosition,
                                       int64_t *timeNanoseconds)
