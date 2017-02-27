@@ -7,13 +7,13 @@ LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_AIDL_INCLUDES := \
-    frameworks/base/media/java
+    frameworks/av/drm/libmediadrm/aidl
 
 LOCAL_SRC_FILES := \
-    ../../../base/media/java/android/media/ICas.aidl \
-    ../../../base/media/java/android/media/ICasListener.aidl \
-    ../../../base/media/java/android/media/IDescrambler.aidl \
-    ../../../base/media/java/android/media/IMediaCasService.aidl \
+    aidl/android/media/ICas.aidl \
+    aidl/android/media/ICasListener.aidl \
+    aidl/android/media/IDescrambler.aidl \
+    aidl/android/media/IMediaCasService.aidl \
 
 LOCAL_SRC_FILES += \
     CasImpl.cpp \
