@@ -2429,13 +2429,14 @@ void Camera3Device::setErrorStateLockedV(const char *fmt, va_list args) {
 
 status_t Camera3Device::registerInFlight(uint32_t frameNumber,
         int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
-        const AeTriggerCancelOverride_t &aeTriggerCancelOverride) {
+        const AeTriggerCancelOverride_t &aeTriggerCancelOverride,
+        bool hasAppCallback) {
     ATRACE_CALL();
     Mutex::Autolock l(mInFlightLock);
 
     ssize_t res;
     res = mInFlightMap.add(frameNumber, InFlightRequest(numBuffers, resultExtras, hasInput,
-            aeTriggerCancelOverride));
+            aeTriggerCancelOverride, hasAppCallback));
     if (res < 0) return res;
 
     if (mInFlightMap.size() == 1) {
@@ -2679,10 +2680,10 @@ void Camera3Device::processCaptureResult(const camera3_capture_result *result) {
         InFlightRequest &request = mInFlightMap.editValueAt(idx);
         ALOGVV("%s: got InFlightRequest requestId = %" PRId32
                 ", frameNumber = %" PRId64 ", burstId = %" PRId32
-                ", partialResultCount = %d",
+                ", partialResultCount = %d, hasCallback = %d",
                 __FUNCTION__, request.resultExtras.requestId,
                 request.resultExtras.frameNumber, request.resultExtras.burstId,
-                result->partial_result);
+                result->partial_result, request.hasCallback);
         // Always update the partial count to the latest one if it's not 0
         // (buffers only). When framework aggregates adjacent partial results
         // into one, the latest partial count will be used.
@@ -2720,7 +2721,7 @@ void Camera3Device::processCaptureResult(const camera3_capture_result *result) {
                 }
             }
 
-            if (isPartialResult) {
+            if (isPartialResult && request.hasCallback) {
                 // Send partial capture result
                 sendPartialCaptureResult(result->result, request.resultExtras, frameNumber,
                         request.aeTriggerCancelOverride);
@@ -2784,7 +2785,7 @@ void Camera3Device::processCaptureResult(const camera3_capture_result *result) {
             if (shutterTimestamp == 0) {
                 request.pendingMetadata = result->result;
                 request.collectedPartialResult = collectedPartialResult;
-            } else {
+            } else if (request.hasCallback) {
                 CameraMetadata metadata;
                 metadata = result->result;
                 sendCaptureResult(metadata, request.resultExtras,
@@ -2950,20 +2951,20 @@ void Camera3Device::notifyShutter(const camera3_shutter_msg_t &msg,
                 }
             }
 
-            ALOGVV("Camera %s: %s: Shutter fired for frame %d (id %d) at %" PRId64,
+            r.shutterTimestamp = msg.timestamp;
+            if (r.hasCallback) {
+                ALOGVV("Camera %s: %s: Shutter fired for frame %d (id %d) at %" PRId64,
                     mId.string(), __FUNCTION__,
                     msg.frame_number, r.resultExtras.requestId, msg.timestamp);
-            // Call listener, if any
-            if (listener != NULL) {
-                listener->notifyShutter(r.resultExtras, msg.timestamp);
+                // Call listener, if any
+                if (listener != NULL) {
+                    listener->notifyShutter(r.resultExtras, msg.timestamp);
+                }
+                // send pending result and buffers
+                sendCaptureResult(r.pendingMetadata, r.resultExtras,
+                    r.collectedPartialResult, msg.frame_number,
+                    r.hasInputBuffer, r.aeTriggerCancelOverride);
             }
-
-            r.shutterTimestamp = msg.timestamp;
-
-            // send pending result and buffers
-            sendCaptureResult(r.pendingMetadata, r.resultExtras,
-                r.collectedPartialResult, msg.frame_number,
-                r.hasInputBuffer, r.aeTriggerCancelOverride);
             returnOutputBuffers(r.pendingOutputBuffers.array(),
                 r.pendingOutputBuffers.size(), r.shutterTimestamp);
             r.pendingOutputBuffers.clear();
@@ -3860,7 +3861,8 @@ bool Camera3Device::RequestThread::threadLoop() {
 status_t Camera3Device::RequestThread::prepareHalRequests() {
     ATRACE_CALL();
 
-    for (auto& nextRequest : mNextRequests) {
+    for (size_t i = 0; i < mNextRequests.size(); i++) {
+        auto& nextRequest = mNextRequests.editItemAt(i);
         sp<CaptureRequest> captureRequest = nextRequest.captureRequest;
         camera3_capture_request_t* halRequest = &nextRequest.halRequest;
         Vector<camera3_stream_buffer_t>* outputBuffers = &nextRequest.outputBuffers;
@@ -3937,8 +3939,8 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         outputBuffers->insertAt(camera3_stream_buffer_t(), 0,
                 captureRequest->mOutputStreams.size());
         halRequest->output_buffers = outputBuffers->array();
-        for (size_t i = 0; i < captureRequest->mOutputStreams.size(); i++) {
-            sp<Camera3OutputStreamInterface> outputStream = captureRequest->mOutputStreams.editItemAt(i);
+        for (size_t j = 0; j < captureRequest->mOutputStreams.size(); j++) {
+            sp<Camera3OutputStreamInterface> outputStream = captureRequest->mOutputStreams.editItemAt(j);
 
             // Prepare video buffers for high speed recording on the first video request.
             if (mPrepareVideoStream && outputStream->isVideoStream()) {
@@ -3956,8 +3958,8 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 }
             }
 
-            res = outputStream->getBuffer(&outputBuffers->editItemAt(i),
-                    captureRequest->mOutputSurfaces[i]);
+            res = outputStream->getBuffer(&outputBuffers->editItemAt(j),
+                    captureRequest->mOutputSurfaces[j]);
             if (res != OK) {
                 // Can't get output buffer from gralloc queue - this could be due to
                 // abandoned queue or other consumer misbehavior, so not a fatal
@@ -3979,10 +3981,19 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
             CLOGE("RequestThread: Parent is gone");
             return INVALID_OPERATION;
         }
+
+        // If this request list is for constrained high speed recording (not
+        // preview), and the current request is not the last one in the batch,
+        // do not send callback to the app.
+        bool hasCallback = true;
+        if (mNextRequests[0].captureRequest->mBatchSize > 1 && i != mNextRequests.size()-1) {
+            hasCallback = false;
+        }
         res = parent->registerInFlight(halRequest->frame_number,
                 totalNumBuffers, captureRequest->mResultExtras,
                 /*hasInput*/halRequest->input_buffer != NULL,
-                captureRequest->mAeTriggerCancelOverride);
+                captureRequest->mAeTriggerCancelOverride,
+                hasCallback);
         ALOGVV("%s: registered in flight requestId = %" PRId32 ", frameNumber = %" PRId64
                ", burstId = %" PRId32 ".",
                 __FUNCTION__,
