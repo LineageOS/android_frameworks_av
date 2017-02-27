@@ -1018,7 +1018,7 @@ inline status_t unflattenFence(hidl_handle* fence, native_handle_t** nh,
         if (*nh == nullptr) {
             return NO_MEMORY;
         }
-        *fence = hidl_handle(*nh);
+        *fence = *nh;
         ++fds;
         --numFds;
     } else {
@@ -1264,6 +1264,7 @@ inline status_t unflatten(
         return NO_MEMORY;
     }
 
+    *nh = nullptr;
     ::android::FenceTime::Snapshot::State state;
     FlattenableUtils::read(buffer, size, state);
     switch (state) {
@@ -1865,6 +1866,7 @@ inline size_t getFdCount(
  * \brief Flatten `IOmxBufferProducer::QueueBufferInput`.
  *
  * \param[in] t The source `IOmxBufferProducer::QueueBufferInput`.
+ * \param[out] nh The native handle cloned from `t.fence`.
  * \param[in,out] buffer The pointer to the flat non-fd buffer.
  * \param[in,out] size The size of the flat non-fd buffer.
  * \param[in,out] fds The pointer to the flat fd buffer.
@@ -1873,6 +1875,7 @@ inline size_t getFdCount(
  *
  * This function will duplicate the file descriptor in `t.fence`. */
 inline status_t flatten(IOmxBufferProducer::QueueBufferInput const& t,
+        native_handle_t** nh,
         void*& buffer, size_t& size, int*& fds, size_t& numFds) {
     if (size < getFlattenedSize(t)) {
         return NO_MEMORY;
@@ -1892,7 +1895,9 @@ inline status_t flatten(IOmxBufferProducer::QueueBufferInput const& t,
     FlattenableUtils::write(buffer, size, t.stickyTransform);
     FlattenableUtils::write(buffer, size, t.getFrameTimestamps);
 
-    status_t status = flattenFence(t.fence, buffer, size, fds, numFds);
+    *nh = t.fence.getNativeHandle() == nullptr ?
+            nullptr : native_handle_clone(t.fence);
+    status_t status = flattenFence(hidl_handle(*nh), buffer, size, fds, numFds);
     if (status != NO_ERROR) {
         return status;
     }
@@ -2034,7 +2039,8 @@ inline bool convertTo(
     size_t size = baseSize;
     int* fds = baseFds.get();
     size_t numFds = baseNumFds;
-    if (flatten(t, buffer, size, fds, numFds) != NO_ERROR) {
+    native_handle_t* nh;
+    if (flatten(t, &nh, buffer, size, fds, numFds) != NO_ERROR) {
         return false;
     }
 
@@ -2043,9 +2049,12 @@ inline bool convertTo(
     int const* constFds = static_cast<int const*>(baseFds.get());
     numFds = baseNumFds;
     if (l->unflatten(constBuffer, size, constFds, numFds) != NO_ERROR) {
+        native_handle_close(nh);
+        native_handle_delete(nh);
         return false;
     }
 
+    native_handle_delete(nh);
     return true;
 }
 
