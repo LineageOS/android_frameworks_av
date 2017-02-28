@@ -19,7 +19,6 @@
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 
 #include <gui/ISurfaceComposer.h>
-#include <gui/IGraphicBufferAlloc.h>
 #include <private/gui/ComposerService.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
@@ -30,15 +29,7 @@ namespace android {
 
 namespace camera3 {
 
-Camera3BufferManager::Camera3BufferManager(const sp<IGraphicBufferAlloc>& allocator) :
-        mAllocator(allocator) {
-    if (allocator == NULL) {
-        sp<ISurfaceComposer> composer(ComposerService::getComposerService());
-        mAllocator = composer->createGraphicBufferAlloc();
-        if (mAllocator == NULL) {
-            ALOGE("createGraphicBufferAlloc failed");
-        }
-    }
+Camera3BufferManager::Camera3BufferManager() {
 }
 
 Camera3BufferManager::~Camera3BufferManager() {
@@ -79,10 +70,6 @@ status_t Camera3BufferManager::registerStream(wp<Camera3OutputStream>& stream,
     }
 
     Mutex::Autolock l(mLock);
-    if (mAllocator == NULL) {
-        ALOGE("%s: allocator is NULL, buffer manager is bad state.", __FUNCTION__);
-        return INVALID_OPERATION;
-    }
 
     // Check if this stream was registered with different stream set ID, if so, error out.
     for (size_t i = 0; i < mStreamSetMap.size(); i++) {
@@ -132,10 +119,6 @@ status_t Camera3BufferManager::unregisterStream(int streamId, int streamSetId) {
     Mutex::Autolock l(mLock);
     ALOGV("%s: unregister stream %d with stream set %d", __FUNCTION__,
             streamId, streamSetId);
-    if (mAllocator == NULL) {
-        ALOGE("%s: allocator is NULL, buffer manager is bad state.", __FUNCTION__);
-        return INVALID_OPERATION;
-    }
 
     if (!checkIfStreamRegisteredLocked(streamId, streamSetId)){
         ALOGE("%s: stream %d with set id %d wasn't properly registered to this buffer manager!",
@@ -182,10 +165,6 @@ status_t Camera3BufferManager::getBufferForStream(int streamId, int streamSetId,
     Mutex::Autolock l(mLock);
     ALOGV("%s: get buffer for stream %d with stream set %d", __FUNCTION__,
             streamId, streamSetId);
-    if (mAllocator == NULL) {
-        ALOGE("%s: allocator is NULL, buffer manager is bad state.", __FUNCTION__);
-        return INVALID_OPERATION;
-    }
 
     if (!checkIfStreamRegisteredLocked(streamId, streamSetId)) {
         ALOGE("%s: stream %d is not registered with stream set %d yet!!!",
@@ -219,15 +198,18 @@ status_t Camera3BufferManager::getBufferForStream(int streamId, int streamSetId,
         // Allocate one if there is no free buffer available.
         if (buffer.graphicBuffer == nullptr) {
             const StreamInfo& info = streamSet.streamInfoMap.valueFor(streamId);
-            status_t res = OK;
             buffer.fenceFd = -1;
-            buffer.graphicBuffer = mAllocator->createGraphicBuffer(
-                    info.width, info.height, info.format, 1 /* layerCount */,
-                    info.combinedUsage, &res);
+
+            buffer.graphicBuffer = new GraphicBuffer(
+                    info.width, info.height, PixelFormat(info.format), info.combinedUsage,
+                    std::string("Camera3BufferManager pid [") +
+                            std::to_string(getpid()) + "]");
+            status_t res = buffer.graphicBuffer->initCheck();
+
             ALOGV("%s: allocating a new graphic buffer (%dx%d, format 0x%x) %p with handle %p",
                     __FUNCTION__, info.width, info.height, info.format,
                     buffer.graphicBuffer.get(), buffer.graphicBuffer->handle);
-            if (res != OK) {
+            if (res < 0) {
                 ALOGE("%s: graphic buffer allocation failed: (error %d %s) ",
                         __FUNCTION__, res, strerror(-res));
                 return res;
@@ -331,10 +313,6 @@ status_t Camera3BufferManager::onBufferReleased(int streamId, int streamSetId) {
     Mutex::Autolock l(mLock);
 
     ALOGV("Stream %d set %d: Buffer released", streamId, streamSetId);
-    if (mAllocator == NULL) {
-        ALOGE("%s: allocator is NULL, buffer manager is bad state.", __FUNCTION__);
-        return INVALID_OPERATION;
-    }
 
     if (!checkIfStreamRegisteredLocked(streamId, streamSetId)){
         ALOGV("%s: signaling buffer release for an already unregistered stream "
@@ -363,10 +341,6 @@ status_t Camera3BufferManager::returnBufferForStream(int streamId,
     Mutex::Autolock l(mLock);
     ALOGV_IF(buffer != 0, "%s: return buffer (%p) with handle (%p) for stream %d and stream set %d",
             __FUNCTION__, buffer.get(), buffer->handle, streamId, streamSetId);
-    if (mAllocator == NULL) {
-        ALOGE("%s: allocator is NULL, buffer manager is bad state.", __FUNCTION__);
-        return INVALID_OPERATION;
-    }
 
     if (!checkIfStreamRegisteredLocked(streamId, streamSetId)){
         ALOGV("%s: returning buffer for an already unregistered stream (stream %d with set id %d),"

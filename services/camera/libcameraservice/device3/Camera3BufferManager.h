@@ -26,8 +26,6 @@
 
 namespace android {
 
-class IGraphicBufferAlloc;
-
 namespace camera3 {
 
 struct StreamInfo;
@@ -46,7 +44,7 @@ class Camera3OutputStream;
  */
 class Camera3BufferManager: public virtual RefBase {
 public:
-    explicit Camera3BufferManager(const sp<IGraphicBufferAlloc>& allocator = NULL);
+    explicit Camera3BufferManager();
 
     virtual ~Camera3BufferManager();
 
@@ -187,12 +185,6 @@ private:
     mutable Mutex mLock;
 
     static const size_t kMaxBufferCount = BufferQueueDefs::NUM_BUFFER_SLOTS;
-
-    /**
-     * mAllocator is the connection to SurfaceFlinger that is used to allocate new GraphicBuffer
-     * objects.
-     */
-    sp<IGraphicBufferAlloc> mAllocator;
 
     struct GraphicBufferEntry {
         sp<GraphicBuffer> graphicBuffer;

@@ -32,7 +32,6 @@
 namespace android {
 // ----------------------------------------------------------------------------
 
-class IGraphicBufferAlloc;
 class String8;
 class GraphicBuffer;
 

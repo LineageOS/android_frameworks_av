@@ -29,7 +29,6 @@
 #include <ui/GraphicBuffer.h>
 #include <gui/BufferItem.h>
 #include <gui/ISurfaceComposer.h>
-#include <gui/IGraphicBufferAlloc.h>
 #include <OMX_Component.h>
 
 #include <utils/Log.h>
