@@ -315,6 +315,10 @@ status_t StreamOutHalHidl::write(const void *buffer, size_t bytes, size_t *writt
             WriteCommand::WRITE, "write", static_cast<const uint8_t*>(buffer), bytes,
             [&] (const WriteStatus& writeStatus) {
                 *written = writeStatus.reply.written;
+                // Diagnostics of the cause of b/35813113.
+                ALOGE_IF(*written > bytes,
+                        "hal reports more bytes written than asked for: %lld > %lld",
+                        (long long)*written, (long long)bytes);
             });
 }
 
@@ -328,8 +332,8 @@ status_t StreamOutHalHidl::callWriterThread(
     if (data != nullptr) {
         size_t availableToWrite = mDataMQ->availableToWrite();
         if (dataSize > availableToWrite) {
-            ALOGW("truncating write data from %d to %d due to insufficient data queue space",
-                    (int32_t)dataSize, (int32_t)availableToWrite);
+            ALOGW("truncating write data from %lld to %lld due to insufficient data queue space",
+                    (long long)dataSize, (long long)availableToWrite);
             dataSize = availableToWrite;
         }
         if (!mDataMQ->write(data, dataSize)) {
