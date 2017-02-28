@@ -277,12 +277,18 @@ class Camera3Stream :
      * Fill in the camera3_stream_buffer with the next valid buffer for this
      * stream, to hand over to the HAL.
      *
+     * Multiple surfaces could share the same HAL stream, but a request may
+     * be only for a subset of surfaces. In this case, the
+     * Camera3StreamInterface object needs the surface ID information to acquire
+     * buffers for those surfaces.
+     *
      * This method may only be called once finishConfiguration has been called.
      * For bidirectional streams, this method applies to the output-side
      * buffers.
      *
      */
-    status_t         getBuffer(camera3_stream_buffer *buffer);
+    status_t         getBuffer(camera3_stream_buffer *buffer,
+            const std::vector<size_t>& surface_ids = std::vector<size_t>());
 
     /**
      * Return a buffer to the stream after use by the HAL.
@@ -412,7 +418,8 @@ class Camera3Stream :
     // cast to camera3_stream*, implementations must increment the
     // refcount of the stream manually in getBufferLocked, and decrement it in
     // returnBufferLocked.
-    virtual status_t getBufferLocked(camera3_stream_buffer *buffer);
+    virtual status_t getBufferLocked(camera3_stream_buffer *buffer,
+            const std::vector<size_t>& surface_ids = std::vector<size_t>());
     virtual status_t returnBufferLocked(const camera3_stream_buffer &buffer,
             nsecs_t timestamp);
     virtual status_t getInputBufferLocked(camera3_stream_buffer *buffer);

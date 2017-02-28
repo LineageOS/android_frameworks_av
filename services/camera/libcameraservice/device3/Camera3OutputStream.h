@@ -158,8 +158,11 @@ class Camera3OutputStream :
 
     virtual status_t detachBuffer(sp<GraphicBuffer>* buffer, int* fenceFd);
 
-    virtual status_t notifyRequestedSurfaces(uint32_t frame_number,
-            const std::vector<size_t>& surface_ids);
+    /**
+     * Notify that the buffer is being released to the buffer queue instead of
+     * being queued to the consumer.
+     */
+    virtual status_t notifyBufferReleased(ANativeWindowBuffer *anwBuffer);
 
     /**
      * Set the graphic buffer manager to get/return the stream buffers.
@@ -197,6 +200,9 @@ class Camera3OutputStream :
     uint32_t getPresetConsumerUsage() const { return mConsumerUsage; }
 
     static const nsecs_t       kDequeueBufferTimeout   = 1000000000; // 1 sec
+
+    status_t getBufferLockedCommon(ANativeWindowBuffer** anb, int* fenceFd);
+
 
   private:
 
@@ -243,10 +249,15 @@ class Camera3OutputStream :
     /**
      * Internal Camera3Stream interface
      */
-    virtual status_t getBufferLocked(camera3_stream_buffer *buffer);
+    virtual status_t getBufferLocked(camera3_stream_buffer *buffer,
+            const std::vector<size_t>& surface_ids);
+
     virtual status_t returnBufferLocked(
             const camera3_stream_buffer &buffer,
             nsecs_t timestamp);
+
+    virtual status_t queueBufferToConsumer(sp<ANativeWindow>& consumer,
+            ANativeWindowBuffer* buffer, int anwReleaseFence);
 
     virtual status_t configureQueueLocked();
 

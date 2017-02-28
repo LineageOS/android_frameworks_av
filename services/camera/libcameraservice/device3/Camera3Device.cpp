@@ -3956,7 +3956,8 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 }
             }
 
-            res = outputStream->getBuffer(&outputBuffers->editItemAt(i));
+            res = outputStream->getBuffer(&outputBuffers->editItemAt(i),
+                    captureRequest->mOutputSurfaces[i]);
             if (res != OK) {
                 // Can't get output buffer from gralloc queue - this could be due to
                 // abandoned queue or other consumer misbehavior, so not a fatal
@@ -3968,13 +3969,6 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
             }
             halRequest->num_output_buffers++;
 
-            res = outputStream->notifyRequestedSurfaces(halRequest->frame_number,
-                    captureRequest->mOutputSurfaces[i]);
-            if (res != OK) {
-                ALOGE("RequestThread: Cannot register output surfaces: %s (%d)",
-                      strerror(-res), res);
-                return INVALID_OPERATION;
-            }
         }
         totalNumBuffers += halRequest->num_output_buffers;
 

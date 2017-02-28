@@ -59,20 +59,6 @@ class Camera3OutputStreamInterface : public virtual Camera3StreamInterface {
      *
      */
     virtual status_t detachBuffer(sp<GraphicBuffer>* buffer, int* fenceFd) = 0;
-
-    /**
-     * Notify which surfaces are requested for a particular frame number.
-     *
-     * Mulitple surfaces could share the same output stream, but a request may
-     * be only for a subset of surfaces. In this case, the
-     * Camera3OutputStreamInterface object needs to manage the output surfaces on
-     * a per request basis.
-     *
-     * If there is only one surface for this output stream, calling this
-     * function is a no-op.
-     */
-    virtual status_t notifyRequestedSurfaces(uint32_t frame_number,
-            const std::vector<size_t>& surface_ids) = 0;
 };
 
 } // namespace camera3

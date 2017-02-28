@@ -507,6 +507,14 @@ binder::Status CameraDeviceClient::createStream(
             return res;
 
         if (!isStreamInfoValid) {
+            // Streaming sharing is only supported for IMPLEMENTATION_DEFINED
+            // formats.
+            if (isShared && streamInfo.format != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
+                String8 msg = String8::format("Camera %s: Stream sharing is only supported for "
+                        "IMPLEMENTATION_DEFINED format", mCameraIdStr.string());
+                ALOGW("%s: %s", __FUNCTION__, msg.string());
+                return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+            }
             isStreamInfoValid = true;
         }
 

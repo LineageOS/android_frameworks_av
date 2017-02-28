@@ -40,8 +40,7 @@ public:
 
     virtual ~Camera3SharedOutputStream();
 
-    virtual status_t notifyRequestedSurfaces(uint32_t frame_number,
-            const std::vector<size_t>& surface_ids);
+    virtual status_t notifyBufferReleased(ANativeWindowBuffer *buffer);
 
     virtual bool isConsumerConfigurationDeferred(size_t surface_id) const;
 
@@ -61,6 +60,15 @@ private:
      * Initialize stream splitter.
      */
     status_t connectStreamSplitterLocked();
+
+    /**
+     * Internal Camera3Stream interface
+     */
+    virtual status_t getBufferLocked(camera3_stream_buffer *buffer,
+            const std::vector<size_t>& surface_ids);
+
+    virtual status_t queueBufferToConsumer(sp<ANativeWindow>& consumer,
+            ANativeWindowBuffer* buffer, int anwReleaseFence);
 
     virtual status_t configureQueueLocked();
 

@@ -36,7 +36,8 @@ Camera3DummyStream::~Camera3DummyStream() {
 
 }
 
-status_t Camera3DummyStream::getBufferLocked(camera3_stream_buffer *) {
+status_t Camera3DummyStream::getBufferLocked(camera3_stream_buffer *,
+        const std::vector<size_t>&) {
     ATRACE_CALL();
     ALOGE("%s: Stream %d: Dummy stream cannot produce buffers!", __FUNCTION__, mId);
     return INVALID_OPERATION;
@@ -79,14 +80,6 @@ status_t Camera3DummyStream::setTransform(int) {
 status_t Camera3DummyStream::detachBuffer(sp<GraphicBuffer>* buffer, int* fenceFd) {
     (void) buffer;
     (void) fenceFd;
-    // Do nothing
-    return OK;
-}
-
-status_t Camera3DummyStream::notifyRequestedSurfaces(uint32_t frame_number,
-        const std::vector<size_t>& surface_ids) {
-    (void) frame_number;
-    (void) surface_ids;
     // Do nothing
     return OK;
 }
