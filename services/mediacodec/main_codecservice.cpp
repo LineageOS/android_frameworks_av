@@ -38,13 +38,16 @@
 using namespace android;
 
 // Must match location in Android.mk.
-static const char kSeccompPolicyPath[] = "/system/etc/seccomp_policy/mediacodec-seccomp.policy";
+static const char kSystemSeccompPolicyPath[] =
+        "/system/etc/seccomp_policy/mediacodec.policy";
+static const char kVendorSeccompPolicyPath[] =
+        "/vendor/etc/seccomp_policy/mediacodec.policy";
 
 int main(int argc __unused, char** argv)
 {
     LOG(INFO) << "mediacodecservice starting";
     signal(SIGPIPE, SIG_IGN);
-    SetUpMinijail(kSeccompPolicyPath, std::string());
+    SetUpMinijail(kSystemSeccompPolicyPath, kVendorSeccompPolicyPath);
 
     strcpy(argv[0], "media.codec");
 
