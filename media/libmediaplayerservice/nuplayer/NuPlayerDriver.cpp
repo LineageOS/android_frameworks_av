@@ -206,9 +206,11 @@ status_t NuPlayerDriver::setVideoSurfaceTexture(
 
 status_t NuPlayerDriver::getDefaultBufferingSettings(BufferingSettings* buffering) {
     ALOGV("getDefaultBufferingSettings(%p)", this);
-    Mutex::Autolock autoLock(mLock);
-    if (mState == STATE_IDLE) {
-        return INVALID_OPERATION;
+    {
+        Mutex::Autolock autoLock(mLock);
+        if (mState == STATE_IDLE) {
+            return INVALID_OPERATION;
+        }
     }
 
     return mPlayer->getDefaultBufferingSettings(buffering);
@@ -216,9 +218,11 @@ status_t NuPlayerDriver::getDefaultBufferingSettings(BufferingSettings* bufferin
 
 status_t NuPlayerDriver::setBufferingSettings(const BufferingSettings& buffering) {
     ALOGV("setBufferingSettings(%p)", this);
-    Mutex::Autolock autoLock(mLock);
-    if (mState == STATE_IDLE) {
-        return INVALID_OPERATION;
+    {
+        Mutex::Autolock autoLock(mLock);
+        if (mState == STATE_IDLE) {
+            return INVALID_OPERATION;
+        }
     }
 
     return mPlayer->setBufferingSettings(buffering);
