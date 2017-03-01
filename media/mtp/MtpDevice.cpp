@@ -263,19 +263,20 @@ void MtpDevice::close() {
 }
 
 void MtpDevice::print() {
-    if (mDeviceInfo) {
-        mDeviceInfo->print();
+    if (!mDeviceInfo)
+        return;
 
-        if (mDeviceInfo->mDeviceProperties) {
-            ALOGI("***** DEVICE PROPERTIES *****\n");
-            int count = mDeviceInfo->mDeviceProperties->size();
-            for (int i = 0; i < count; i++) {
-                MtpDeviceProperty propCode = (*mDeviceInfo->mDeviceProperties)[i];
-                MtpProperty* property = getDevicePropDesc(propCode);
-                if (property) {
-                    property->print();
-                    delete property;
-                }
+    mDeviceInfo->print();
+
+    if (mDeviceInfo->mDeviceProperties) {
+        ALOGI("***** DEVICE PROPERTIES *****\n");
+        int count = mDeviceInfo->mDeviceProperties->size();
+        for (int i = 0; i < count; i++) {
+            MtpDeviceProperty propCode = (*mDeviceInfo->mDeviceProperties)[i];
+            MtpProperty* property = getDevicePropDesc(propCode);
+            if (property) {
+                property->print();
+                delete property;
             }
         }
     }
