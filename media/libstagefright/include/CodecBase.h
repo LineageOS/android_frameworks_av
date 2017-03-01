@@ -35,9 +35,10 @@
 #include <utils/NativeHandle.h>
 
 #include <system/graphics.h>
+#include <android/media/IDescrambler.h>
 
 namespace android {
-
+using namespace media;
 class BufferChannelBase;
 class BufferProducerWrapper;
 class MediaCodecBuffer;
@@ -259,6 +260,10 @@ public:
         mCrypto = crypto;
     }
 
+    inline void setDescrambler(const sp<IDescrambler> &descrambler) {
+        mDescrambler = descrambler;
+    }
+
     /**
      * Queue an input buffer into the buffer channel.
      *
@@ -317,6 +322,7 @@ public:
 protected:
     std::unique_ptr<CodecBase::BufferCallback> mCallback;
     sp<ICrypto> mCrypto;
+    sp<IDescrambler> mDescrambler;
 };
 
 }  // namespace android

@@ -610,6 +610,22 @@ status_t convertMetaDataToMessage(
     sp<AMessage> msg = new AMessage;
     msg->setString("mime", mime);
 
+    uint32_t type;
+    const void *data;
+    size_t size;
+    if (meta->findData(kKeyCas, &type, &data, &size)) {
+        sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
+        msg->setBuffer("cas", buffer);
+        memcpy(buffer->data(), data, size);
+    }
+
+    if (!strncasecmp("video/scrambled", mime, 15)
+            || !strncasecmp("audio/scrambled", mime, 15)) {
+
+        *format = msg;
+        return OK;
+    }
+
     int64_t durationUs;
     if (meta->findInt64(kKeyDuration, &durationUs)) {
         msg->setInt64("durationUs", durationUs);
@@ -759,9 +775,6 @@ status_t convertMetaDataToMessage(
         msg->setInt32("frame-rate", fps);
     }
 
-    uint32_t type;
-    const void *data;
-    size_t size;
     if (meta->findData(kKeyAVCC, &type, &data, &size)) {
         // Parse the AVCDecoderConfigurationRecord
 

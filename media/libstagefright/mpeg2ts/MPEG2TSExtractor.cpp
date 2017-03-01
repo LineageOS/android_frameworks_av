@@ -148,12 +148,46 @@ sp<MetaData> MPEG2TSExtractor::getMetaData() {
     return meta;
 }
 
+//static
+bool MPEG2TSExtractor::isScrambledFormat(const sp<MetaData> &format) {
+    const char *mime;
+    return format->findCString(kKeyMIMEType, &mime)
+            && (!strcasecmp(MEDIA_MIMETYPE_VIDEO_SCRAMBLED, mime)
+                    || !strcasecmp(MEDIA_MIMETYPE_AUDIO_SCRAMBLED, mime));
+}
+
+status_t MPEG2TSExtractor::setMediaCas(const sp<ICas> &cas) {
+    ALOGD("setMediaCas: %p", cas.get());
+
+    status_t err = mParser->setMediaCas(cas);
+    if (err == OK) {
+        ALOGI("All tracks now have descramblers");
+        init();
+    }
+    return err;
+}
+
+void MPEG2TSExtractor::addSource(const sp<AnotherPacketSource> &impl) {
+    bool found = false;
+    for (size_t i = 0; i < mSourceImpls.size(); i++) {
+        if (mSourceImpls[i] == impl) {
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        mSourceImpls.push(impl);
+    }
+}
+
 void MPEG2TSExtractor::init() {
     bool haveAudio = false;
     bool haveVideo = false;
     int64_t startTime = ALooper::GetNowUs();
 
-    while (feedMore(true /* isInit */) == OK) {
+    status_t err;
+    while ((err = feedMore(true /* isInit */)) == OK
+            || err == ERROR_DRM_DECRYPT_UNIT_NOT_INITIALIZED) {
         if (haveAudio && haveVideo) {
             addSyncPoint_l(mLastSyncEvent);
             mLastSyncEvent.reset();
@@ -165,10 +199,15 @@ void MPEG2TSExtractor::init() {
                         ATSParser::VIDEO).get();
 
             if (impl != NULL) {
-                haveVideo = true;
-                mSourceImpls.push(impl);
-                mSyncPoints.push();
-                mSeekSyncPoints = &mSyncPoints.editTop();
+                sp<MetaData> format = impl->getFormat();
+                if (format != NULL) {
+                    haveVideo = true;
+                    addSource(impl);
+                    if (!isScrambledFormat(format)) {
+                        mSyncPoints.push();
+                        mSeekSyncPoints = &mSyncPoints.editTop();
+                    }
+                }
             }
         }
 
@@ -178,17 +217,32 @@ void MPEG2TSExtractor::init() {
                         ATSParser::AUDIO).get();
 
             if (impl != NULL) {
-                haveAudio = true;
-                mSourceImpls.push(impl);
-                mSyncPoints.push();
-                if (!haveVideo) {
-                    mSeekSyncPoints = &mSyncPoints.editTop();
+                sp<MetaData> format = impl->getFormat();
+                if (format != NULL) {
+                    haveAudio = true;
+                    addSource(impl);
+                    if (!isScrambledFormat(format)) {
+                        mSyncPoints.push();
+                        if (!haveVideo) {
+                            mSeekSyncPoints = &mSyncPoints.editTop();
+                        }
+                    }
                 }
             }
         }
 
         addSyncPoint_l(mLastSyncEvent);
         mLastSyncEvent.reset();
+
+        // ERROR_DRM_DECRYPT_UNIT_NOT_INITIALIZED is returned when the mpeg2ts
+        // is scrambled but we don't have a MediaCas object set. The extraction
+        // will only continue when setMediaCas() is called successfully.
+        if (err == ERROR_DRM_DECRYPT_UNIT_NOT_INITIALIZED) {
+            ALOGI("stopped parsing scrambled content, "
+                  "haveAudio=%d, haveVideo=%d, elaspedTime=%" PRId64,
+                    haveAudio, haveVideo, ALooper::GetNowUs() - startTime);
+            return;
+        }
 
         // Wait only for 2 seconds to detect audio/video streams.
         if (ALooper::GetNowUs() - startTime > 2000000ll) {

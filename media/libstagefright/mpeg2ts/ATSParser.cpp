@@ -17,13 +17,14 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "ATSParser"
 #include <utils/Log.h>
-
 #include "ATSParser.h"
-
 #include "AnotherPacketSource.h"
+#include "CasManager.h"
 #include "ESQueue.h"
 #include "include/avc_utils.h"
 
+#include <android/media/IDescrambler.h>
+#include <binder/MemoryDealer.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -40,6 +41,8 @@
 #include <inttypes.h>
 
 namespace android {
+using binder::Status;
+using MediaDescrambler::DescrambleInfo;
 
 // I want the expression "y" evaluated even if verbose logging is off.
 #define MY_LOGV(x, y) \
@@ -60,6 +63,8 @@ struct ATSParser::Program : public RefBase {
     bool parsePID(
             unsigned pid, unsigned continuity_counter,
             unsigned payload_unit_start_indicator,
+            unsigned transport_scrambling_control,
+            unsigned random_access_indicator,
             ABitReader *br, status_t *err, SyncEvent *event);
 
     void signalDiscontinuity(
@@ -90,14 +95,21 @@ struct ATSParser::Program : public RefBase {
         return mParser->mFlags;
     }
 
+    sp<CasManager> casManager() const {
+        return mParser->mCasManager;
+    }
+
     uint64_t firstPTS() const {
         return mFirstPTS;
     }
+
+    void updateCasSessions();
 
 private:
     struct StreamInfo {
         unsigned mType;
         unsigned mPID;
+        int32_t mCASystemId;
     };
 
     ATSParser *mParser;
@@ -110,6 +122,8 @@ private:
 
     status_t parseProgramMap(ABitReader *br);
     int64_t recoverPTS(uint64_t PTS_33bit);
+    bool findCADescriptor(
+            ABitReader *br, unsigned infoLength, CADescriptor *caDescriptor);
     bool switchPIDs(const Vector<StreamInfo> &infos);
 
     DISALLOW_EVIL_CONSTRUCTORS(Program);
@@ -119,11 +133,16 @@ struct ATSParser::Stream : public RefBase {
     Stream(Program *program,
            unsigned elementaryPID,
            unsigned streamType,
-           unsigned PCR_PID);
+           unsigned PCR_PID,
+           int32_t CA_system_ID);
 
     unsigned type() const { return mStreamType; }
     unsigned pid() const { return mElementaryPID; }
     void setPID(unsigned pid) { mElementaryPID = pid; }
+
+    void setCasSession(
+            const sp<IDescrambler> &descrambler,
+            const std::vector<uint8_t> &sessionId);
 
     // Parse the payload and set event when PES with a sync frame is detected.
     // This method knows when a PES starts; so record mPesStartOffsets in that
@@ -131,6 +150,8 @@ struct ATSParser::Stream : public RefBase {
     status_t parse(
             unsigned continuity_counter,
             unsigned payload_unit_start_indicator,
+            unsigned transport_scrambling_control,
+            unsigned random_access_indicator,
             ABitReader *br,
             SyncEvent *event);
 
@@ -150,6 +171,11 @@ protected:
     virtual ~Stream();
 
 private:
+    struct SubSampleInfo {
+        size_t subSampleSize;
+        unsigned transport_scrambling_mode;
+        unsigned random_access_indicator;
+    };
     Program *mProgram;
     unsigned mElementaryPID;
     unsigned mStreamType;
@@ -166,10 +192,26 @@ private:
 
     ElementaryStreamQueue *mQueue;
 
+    bool mScrambled;
+    sp<IMemory> mMem;
+    sp<MemoryDealer> mDealer;
+    sp<ABuffer> mDescrambledBuffer;
+    List<SubSampleInfo> mSubSamples;
+    sp<IDescrambler> mDescrambler;
+
     // Flush accumulated payload if necessary --- i.e. at EOS or at the start of
     // another payload. event is set if the flushed payload is PES with a sync
     // frame.
     status_t flush(SyncEvent *event);
+
+    // Flush accumulated payload for scrambled streams if necessary --- i.e. at
+    // EOS or at the start of another payload. event is set if the flushed
+    // payload is PES with a sync frame.
+    status_t flushScrambled(SyncEvent *event);
+
+    // Check if a PES packet is scrambled at PES level.
+    uint32_t getPesScramblingControl(ABitReader *br, int32_t *pesOffset);
+
     // Strip and parse PES headers and pass remaining payload into onPayload
     // with parsed metadata. event is set if the PES contains a sync frame.
     status_t parsePES(ABitReader *br, SyncEvent *event);
@@ -179,7 +221,13 @@ private:
     // and timestamp of the packet.
     void onPayloadData(
             unsigned PTS_DTS_flags, uint64_t PTS, uint64_t DTS,
-            const uint8_t *data, size_t size, SyncEvent *event);
+            unsigned PES_scrambling_control,
+            const uint8_t *data, size_t size,
+            int32_t payloadOffset, SyncEvent *event);
+
+    // Ensure internal buffers can hold specified size, and will re-allocate
+    // as needed.
+    void ensureBufferCapacity(size_t size);
 
     DISALLOW_EVIL_CONSTRUCTORS(Stream);
 };
@@ -254,6 +302,8 @@ bool ATSParser::Program::parsePSISection(
 bool ATSParser::Program::parsePID(
         unsigned pid, unsigned continuity_counter,
         unsigned payload_unit_start_indicator,
+        unsigned transport_scrambling_control,
+        unsigned random_access_indicator,
         ABitReader *br, status_t *err, SyncEvent *event) {
     *err = OK;
 
@@ -263,7 +313,11 @@ bool ATSParser::Program::parsePID(
     }
 
     *err = mStreams.editValueAt(index)->parse(
-            continuity_counter, payload_unit_start_indicator, br, event);
+            continuity_counter,
+            payload_unit_start_indicator,
+            transport_scrambling_control,
+            random_access_indicator,
+            br, event);
 
     return true;
 }
@@ -359,6 +413,38 @@ bool ATSParser::Program::switchPIDs(const Vector<StreamInfo> &infos) {
     return success;
 }
 
+bool ATSParser::Program::findCADescriptor(
+        ABitReader *br, unsigned infoLength,
+        ATSParser::CADescriptor *caDescriptor) {
+    bool found = false;
+    while (infoLength > 2) {
+        unsigned descriptor_tag = br->getBits(8);
+        ALOGV("      tag = 0x%02x", descriptor_tag);
+
+        unsigned descriptor_length = br->getBits(8);
+        ALOGV("      len = %u", descriptor_length);
+
+        infoLength -= 2;
+        if (descriptor_length > infoLength) {
+            break;
+        }
+        if (descriptor_tag == 9 && descriptor_length >= 4) {
+            found = true;
+            caDescriptor->mSystemID = br->getBits(16);
+            caDescriptor->mPID = br->getBits(16) & 0x1fff;
+            infoLength -= 4;
+            caDescriptor->mPrivateData.assign(
+                    br->data(), br->data() + descriptor_length - 4);
+            break;
+        } else {
+            infoLength -= descriptor_length;
+            br->skipBits(descriptor_length * 8);
+        }
+    }
+    br->skipBits(infoLength * 8);
+    return found;
+}
+
 status_t ATSParser::Program::parseProgramMap(ABitReader *br) {
     unsigned table_id = br->getBits(8);
     ALOGV("  table_id = %u", table_id);
@@ -395,7 +481,13 @@ status_t ATSParser::Program::parseProgramMap(ABitReader *br) {
     unsigned program_info_length = br->getBits(12);
     ALOGV("  program_info_length = %u", program_info_length);
 
-    br->skipBits(program_info_length * 8);  // skip descriptors
+    // descriptors
+    CADescriptor programCA;
+    bool hasProgramCA = findCADescriptor(br, program_info_length, &programCA);
+    if (hasProgramCA && !mParser->mCasManager->addProgram(
+            mProgramNumber, programCA)) {
+        return ERROR_MALFORMED;
+    }
 
     Vector<StreamInfo> infos;
 
@@ -419,28 +511,17 @@ status_t ATSParser::Program::parseProgramMap(ABitReader *br) {
         unsigned ES_info_length = br->getBits(12);
         ALOGV("    ES_info_length = %u", ES_info_length);
 
-#if 0
-        br->skipBits(ES_info_length * 8);  // skip descriptors
-#else
-        unsigned info_bytes_remaining = ES_info_length;
-        while (info_bytes_remaining >= 2) {
-            MY_LOGV("      tag = 0x%02x", br->getBits(8));
-
-            unsigned descLength = br->getBits(8);
-            ALOGV("      len = %u", descLength);
-
-            if (info_bytes_remaining < descLength) {
-                return ERROR_MALFORMED;
-            }
-            br->skipBits(descLength * 8);
-
-            info_bytes_remaining -= descLength + 2;
+        CADescriptor streamCA;
+        bool hasStreamCA = findCADescriptor(br, ES_info_length, &streamCA);
+        if (hasStreamCA && !mParser->mCasManager->addStream(
+                mProgramNumber, elementaryPID, streamCA)) {
+            return ERROR_MALFORMED;
         }
-#endif
-
         StreamInfo info;
         info.mType = streamType;
         info.mPID = elementaryPID;
+        info.mCASystemId = hasProgramCA ? programCA.mSystemID :
+                           hasStreamCA ? streamCA.mSystemID  : -1;
         infos.push(info);
 
         infoBytesRemaining -= 5 + ES_info_length;
@@ -490,19 +571,29 @@ status_t ATSParser::Program::parseProgramMap(ABitReader *br) {
         }
     }
 
+    bool isAddingScrambledStream = false;
     for (size_t i = 0; i < infos.size(); ++i) {
         StreamInfo &info = infos.editItemAt(i);
 
+        if (mParser->mCasManager->isCAPid(info.mPID)) {
+            // skip CA streams (EMM/ECM)
+            continue;
+        }
         ssize_t index = mStreams.indexOfKey(info.mPID);
 
         if (index < 0) {
             sp<Stream> stream = new Stream(
-                    this, info.mPID, info.mType, PCR_PID);
+                    this, info.mPID, info.mType, PCR_PID, info.mCASystemId);
 
+            isAddingScrambledStream |= info.mCASystemId >= 0;
             mStreams.add(info.mPID, stream);
         }
     }
 
+    if (isAddingScrambledStream) {
+        ALOGI("Receiving scrambled streams without descrambler!");
+        return ERROR_DRM_DECRYPT_UNIT_NOT_INITIALIZED;
+    }
     return OK;
 }
 
@@ -586,13 +677,27 @@ int64_t ATSParser::Program::convertPTSToTimestamp(uint64_t PTS) {
     return timeUs;
 }
 
+void ATSParser::Program::updateCasSessions() {
+    for (size_t i = 0; i < mStreams.size(); ++i) {
+        sp<Stream> &stream = mStreams.editValueAt(i);
+        sp<IDescrambler> descrambler;
+        std::vector<uint8_t> sessionId;
+        if (mParser->mCasManager->getCasSession(
+                mProgramNumber, stream->pid(), &descrambler, &sessionId)) {
+            stream->setCasSession(descrambler, sessionId);
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
+static const size_t kInitialStreamBufferSize = 192 * 1024;
 
 ATSParser::Stream::Stream(
         Program *program,
         unsigned elementaryPID,
         unsigned streamType,
-        unsigned PCR_PID)
+        unsigned PCR_PID,
+        int32_t CA_system_ID)
     : mProgram(program),
       mElementaryPID(elementaryPID),
       mStreamType(streamType),
@@ -601,54 +706,71 @@ ATSParser::Stream::Stream(
       mPayloadStarted(false),
       mEOSReached(false),
       mPrevPTS(0),
-      mQueue(NULL) {
+      mQueue(NULL),
+      mScrambled(CA_system_ID >= 0) {
+    ALOGV("new stream PID 0x%02x, type 0x%02x, scrambled %d",
+            elementaryPID, streamType, mScrambled);
+
+    uint32_t flags = (isVideo() && mScrambled) ?
+            ElementaryStreamQueue::kFlag_ScrambledData : 0;
+
+    ElementaryStreamQueue::Mode mode = ElementaryStreamQueue::INVALID;
+
     switch (mStreamType) {
         case STREAMTYPE_H264:
-            mQueue = new ElementaryStreamQueue(
-                    ElementaryStreamQueue::H264,
-                    (mProgram->parserFlags() & ALIGNED_VIDEO_DATA)
-                        ? ElementaryStreamQueue::kFlag_AlignedData : 0);
+            mode = ElementaryStreamQueue::H264;
+            flags |= (mProgram->parserFlags() & ALIGNED_VIDEO_DATA) ?
+                    ElementaryStreamQueue::kFlag_AlignedData : 0;
             break;
+
         case STREAMTYPE_MPEG2_AUDIO_ADTS:
-            mQueue = new ElementaryStreamQueue(ElementaryStreamQueue::AAC);
+            mode = ElementaryStreamQueue::AAC;
             break;
+
         case STREAMTYPE_MPEG1_AUDIO:
         case STREAMTYPE_MPEG2_AUDIO:
-            mQueue = new ElementaryStreamQueue(
-                    ElementaryStreamQueue::MPEG_AUDIO);
+            mode = ElementaryStreamQueue::MPEG_AUDIO;
             break;
 
         case STREAMTYPE_MPEG1_VIDEO:
         case STREAMTYPE_MPEG2_VIDEO:
-            mQueue = new ElementaryStreamQueue(
-                    ElementaryStreamQueue::MPEG_VIDEO);
+            mode = ElementaryStreamQueue::MPEG_VIDEO;
             break;
 
         case STREAMTYPE_MPEG4_VIDEO:
-            mQueue = new ElementaryStreamQueue(
-                    ElementaryStreamQueue::MPEG4_VIDEO);
+            mode = ElementaryStreamQueue::MPEG4_VIDEO;
             break;
 
         case STREAMTYPE_LPCM_AC3:
         case STREAMTYPE_AC3:
-            mQueue = new ElementaryStreamQueue(
-                    ElementaryStreamQueue::AC3);
+            mode = ElementaryStreamQueue::AC3;
             break;
 
         case STREAMTYPE_METADATA:
-            mQueue = new ElementaryStreamQueue(
-                    ElementaryStreamQueue::METADATA);
+            mode = ElementaryStreamQueue::METADATA;
             break;
 
         default:
-            break;
+            ALOGE("stream PID 0x%02x has invalid stream type 0x%02x",
+                    elementaryPID, streamType);
+            return;
     }
 
-    ALOGV("new stream PID 0x%02x, type 0x%02x", elementaryPID, streamType);
+    mQueue = new ElementaryStreamQueue(mode, flags);
 
     if (mQueue != NULL) {
-        mBuffer = new ABuffer(192 * 1024);
-        mBuffer->setRange(0, 0);
+        ensureBufferCapacity(kInitialStreamBufferSize);
+
+        if (mScrambled && (isAudio() || isVideo())) {
+            // Set initial format to scrambled
+            sp<MetaData> meta = new MetaData();
+            meta->setCString(kKeyMIMEType,
+                    isAudio() ? MEDIA_MIMETYPE_AUDIO_SCRAMBLED
+                              : MEDIA_MIMETYPE_VIDEO_SCRAMBLED);
+            // for DrmInitData
+            meta->setData(kKeyCas, 0, &CA_system_ID, sizeof(CA_system_ID));
+            mSource = new AnotherPacketSource(meta);
+        }
     }
 }
 
@@ -657,10 +779,57 @@ ATSParser::Stream::~Stream() {
     mQueue = NULL;
 }
 
+void ATSParser::Stream::ensureBufferCapacity(size_t neededSize) {
+    if (mBuffer != NULL && mBuffer->capacity() >= neededSize) {
+        return;
+    }
+
+    ALOGV("ensureBufferCapacity: current size %zu, new size %zu, scrambled %d",
+            mBuffer == NULL ? 0 : mBuffer->capacity(), neededSize, mScrambled);
+
+    sp<ABuffer> newBuffer, newScrambledBuffer;
+    sp<IMemory> newMem;
+    sp<MemoryDealer> newDealer;
+    if (mScrambled) {
+        size_t alignment = MemoryDealer::getAllocationAlignment();
+        neededSize = (neededSize + (alignment - 1)) & ~(alignment - 1);
+        // Align to multiples of 64K.
+        neededSize = (neededSize + 65535) & ~65535;
+        newDealer = new MemoryDealer(neededSize, "ATSParser");
+        newMem = newDealer->allocate(neededSize);
+        newScrambledBuffer = new ABuffer(newMem->pointer(), newMem->size());
+
+        if (mDescrambledBuffer != NULL) {
+            memcpy(newScrambledBuffer->data(),
+                    mDescrambledBuffer->data(), mDescrambledBuffer->size());
+            newScrambledBuffer->setRange(0, mDescrambledBuffer->size());
+        } else {
+            newScrambledBuffer->setRange(0, 0);
+        }
+        mMem = newMem;
+        mDealer = newDealer;
+        mDescrambledBuffer = newScrambledBuffer;
+    } else {
+        // Align to multiples of 64K.
+        neededSize = (neededSize + 65535) & ~65535;
+    }
+
+    newBuffer = new ABuffer(neededSize);
+    if (mBuffer != NULL) {
+        memcpy(newBuffer->data(), mBuffer->data(), mBuffer->size());
+        newBuffer->setRange(0, mBuffer->size());
+    } else {
+        newBuffer->setRange(0, 0);
+    }
+    mBuffer = newBuffer;
+}
+
 status_t ATSParser::Stream::parse(
         unsigned continuity_counter,
-        unsigned payload_unit_start_indicator, ABitReader *br,
-        SyncEvent *event) {
+        unsigned payload_unit_start_indicator,
+        unsigned transport_scrambling_control,
+        unsigned random_access_indicator,
+        ABitReader *br, SyncEvent *event) {
     if (mQueue == NULL) {
         return OK;
     }
@@ -672,6 +841,7 @@ status_t ATSParser::Stream::parse(
         mPayloadStarted = false;
         mPesStartOffsets.clear();
         mBuffer->setRange(0, 0);
+        mSubSamples.clear();
         mExpectedContinuityCounter = -1;
 
 #if 0
@@ -725,20 +895,15 @@ status_t ATSParser::Stream::parse(
     }
 
     size_t neededSize = mBuffer->size() + payloadSizeBits / 8;
-    if (mBuffer->capacity() < neededSize) {
-        // Increment in multiples of 64K.
-        neededSize = (neededSize + 65535) & ~65535;
-
-        ALOGI("resizing buffer to %zu bytes", neededSize);
-
-        sp<ABuffer> newBuffer = new ABuffer(neededSize);
-        memcpy(newBuffer->data(), mBuffer->data(), mBuffer->size());
-        newBuffer->setRange(0, mBuffer->size());
-        mBuffer = newBuffer;
-    }
+    ensureBufferCapacity(neededSize);
 
     memcpy(mBuffer->data() + mBuffer->size(), br->data(), payloadSizeBits / 8);
     mBuffer->setRange(0, mBuffer->size() + payloadSizeBits / 8);
+
+    if (mScrambled) {
+        mSubSamples.push_back({payloadSizeBits / 8,
+                 transport_scrambling_control, random_access_indicator});
+    }
 
     return OK;
 }
@@ -789,6 +954,7 @@ void ATSParser::Stream::signalDiscontinuity(
     mPesStartOffsets.clear();
     mEOSReached = false;
     mBuffer->setRange(0, 0);
+    mSubSamples.clear();
 
     bool clearFormat = false;
     if (isAudio()) {
@@ -817,7 +983,15 @@ void ATSParser::Stream::signalDiscontinuity(
     }
 
     if (mSource != NULL) {
-        mSource->queueDiscontinuity(type, extra, true);
+        sp<MetaData> meta = mSource->getFormat();
+        const char* mime;
+        if (clearFormat && meta != NULL && meta->findCString(kKeyMIMEType, &mime)
+                && (!strncasecmp(mime, MEDIA_MIMETYPE_AUDIO_SCRAMBLED, 15)
+                 || !strncasecmp(mime, MEDIA_MIMETYPE_VIDEO_SCRAMBLED, 15))){
+            mSource->clear();
+        } else {
+            mSource->queueDiscontinuity(type, extra, true);
+        }
     }
 }
 
@@ -830,6 +1004,8 @@ void ATSParser::Stream::signalEOS(status_t finalResult) {
 }
 
 status_t ATSParser::Stream::parsePES(ABitReader *br, SyncEvent *event) {
+    const uint8_t *basePtr = br->data();
+
     unsigned packet_startcode_prefix = br->getBits(24);
 
     ALOGV("packet_startcode_prefix = 0x%08x", packet_startcode_prefix);
@@ -859,7 +1035,9 @@ status_t ATSParser::Stream::parsePES(ABitReader *br, SyncEvent *event) {
             return ERROR_MALFORMED;
         }
 
-        MY_LOGV("PES_scrambling_control = %u", br->getBits(2));
+        unsigned PES_scrambling_control = br->getBits(2);
+        ALOGV("PES_scrambling_control = %u", PES_scrambling_control);
+
         MY_LOGV("PES_priority = %u", br->getBits(1));
         MY_LOGV("data_alignment_indicator = %u", br->getBits(1));
         MY_LOGV("copyright = %u", br->getBits(1));
@@ -992,6 +1170,7 @@ status_t ATSParser::Stream::parsePES(ABitReader *br, SyncEvent *event) {
         br->skipBits(optional_bytes_remaining * 8);
 
         // ES data follows.
+        int32_t pesOffset = br->data() - basePtr;
 
         if (PES_packet_length != 0) {
             if (PES_packet_length < PES_header_data_length + 3) {
@@ -1009,21 +1188,26 @@ status_t ATSParser::Stream::parsePES(ABitReader *br, SyncEvent *event) {
                 return ERROR_MALFORMED;
             }
 
+            ALOGV("There's %u bytes of payload, PES_packet_length=%u, offset=%d",
+                    dataLength, PES_packet_length, pesOffset);
+
             onPayloadData(
-                    PTS_DTS_flags, PTS, DTS, br->data(), dataLength, event);
+                    PTS_DTS_flags, PTS, DTS, PES_scrambling_control,
+                    br->data(), dataLength, pesOffset, event);
 
             br->skipBits(dataLength * 8);
         } else {
             onPayloadData(
-                    PTS_DTS_flags, PTS, DTS,
-                    br->data(), br->numBitsLeft() / 8, event);
+                    PTS_DTS_flags, PTS, DTS, PES_scrambling_control,
+                    br->data(), br->numBitsLeft() / 8, pesOffset, event);
 
             size_t payloadSizeBits = br->numBitsLeft();
             if (payloadSizeBits % 8 != 0u) {
                 return ERROR_MALFORMED;
             }
 
-            ALOGV("There's %zu bytes of payload.", payloadSizeBits / 8);
+            ALOGV("There's %zu bytes of payload, offset=%d",
+                    payloadSizeBits / 8, pesOffset);
         }
     } else if (stream_id == 0xbe) {  // padding_stream
         if (PES_packet_length == 0u) {
@@ -1040,6 +1224,200 @@ status_t ATSParser::Stream::parsePES(ABitReader *br, SyncEvent *event) {
     return OK;
 }
 
+uint32_t ATSParser::Stream::getPesScramblingControl(
+        ABitReader *br, int32_t *pesOffset) {
+    unsigned packet_startcode_prefix = br->getBits(24);
+
+    ALOGV("packet_startcode_prefix = 0x%08x", packet_startcode_prefix);
+
+    if (packet_startcode_prefix != 1) {
+        ALOGV("unit does not start with startcode.");
+        return 0;
+    }
+
+    if (br->numBitsLeft() < 48) {
+        return 0;
+    }
+
+    unsigned stream_id = br->getBits(8);
+    ALOGV("stream_id = 0x%02x", stream_id);
+
+    br->skipBits(16); // PES_packet_length
+
+    if (stream_id != 0xbc  // program_stream_map
+            && stream_id != 0xbe  // padding_stream
+            && stream_id != 0xbf  // private_stream_2
+            && stream_id != 0xf0  // ECM
+            && stream_id != 0xf1  // EMM
+            && stream_id != 0xff  // program_stream_directory
+            && stream_id != 0xf2  // DSMCC
+            && stream_id != 0xf8) {  // H.222.1 type E
+        if (br->getBits(2) != 2u) {
+            return 0;
+        }
+
+        unsigned PES_scrambling_control = br->getBits(2);
+        ALOGV("PES_scrambling_control = %u", PES_scrambling_control);
+
+        if (PES_scrambling_control == 0) {
+            return 0;
+        }
+
+        br->skipBits(12); // don't care
+
+        unsigned PES_header_data_length = br->getBits(8);
+        ALOGV("PES_header_data_length = %u", PES_header_data_length);
+
+        if (PES_header_data_length * 8 > br->numBitsLeft()) {
+            return 0;
+        }
+
+        *pesOffset = 9 + PES_header_data_length;
+        ALOGD("found PES_scrambling_control=%d, PES offset=%d",
+                PES_scrambling_control, *pesOffset);
+        return PES_scrambling_control;
+    }
+
+    return 0;
+}
+
+status_t ATSParser::Stream::flushScrambled(SyncEvent *event) {
+    if (mDescrambler == NULL) {
+        ALOGE("received scrambled packets without descrambler!");
+        return UNKNOWN_ERROR;
+    }
+
+    if (mDescrambledBuffer == NULL || mMem == NULL) {
+        ALOGE("received scrambled packets without shared memory!");
+
+        return UNKNOWN_ERROR;
+    }
+
+    int32_t pesOffset = 0;
+    int32_t descrambleSubSamples = 0, descrambleBytes = 0;
+    uint32_t tsScramblingControl = 0, pesScramblingControl = 0;
+
+    // First, go over subsamples to find TS-level scrambling key id, and
+    // calculate how many subsample we need to descramble (assuming we don't
+    // have PES-level scrambling).
+    for (auto it = mSubSamples.begin(); it != mSubSamples.end(); it++) {
+        if (it->transport_scrambling_mode != 0) {
+            // TODO: handle keyId change, use the first non-zero keyId for now.
+            if (tsScramblingControl == 0) {
+                tsScramblingControl = it->transport_scrambling_mode;
+            }
+        }
+        if (tsScramblingControl == 0 || descrambleSubSamples == 0
+                || !mQueue->isScrambled()) {
+            descrambleSubSamples++;
+            descrambleBytes += it->subSampleSize;
+        }
+    }
+    // If not scrambled at TS-level, check PES-level scrambling
+    if (tsScramblingControl == 0) {
+        ABitReader br(mBuffer->data(), mBuffer->size());
+        pesScramblingControl = getPesScramblingControl(&br, &pesOffset);
+        // If not scrambled at PES-level either, or scrambled at PES-level but
+        // requires output to remain scrambled, we don't need to descramble
+        // anything.
+        if (pesScramblingControl == 0 || mQueue->isScrambled()) {
+            descrambleSubSamples = 0;
+            descrambleBytes = 0;
+        }
+    }
+
+    uint32_t sctrl = tsScramblingControl != 0 ?
+            tsScramblingControl : pesScramblingControl;
+
+    // Perform the 1st pass descrambling if needed
+    if (descrambleBytes > 0) {
+        memcpy(mDescrambledBuffer->data(), mBuffer->data(), descrambleBytes);
+        mDescrambledBuffer->setRange(0, descrambleBytes);
+
+        sp<ABuffer> subSamples = new ABuffer(
+                sizeof(DescramblerPlugin::SubSample) * descrambleSubSamples);
+
+        DescrambleInfo info;
+        info.dstType = DescrambleInfo::kDestinationTypeVmPointer;
+        info.scramblingControl = (DescramblerPlugin::ScramblingControl)sctrl;
+        info.numSubSamples = descrambleSubSamples;
+        info.subSamples = (DescramblerPlugin::SubSample *)subSamples->data();
+        info.srcMem = mMem;
+        info.srcOffset = 0;
+        info.dstPtr = NULL; // in-place descrambling into srcMem
+        info.dstOffset = 0;
+
+        int32_t i = 0;
+        for (auto it = mSubSamples.begin();
+                it != mSubSamples.end() && i < descrambleSubSamples; it++, i++) {
+            if (it->transport_scrambling_mode != 0 || pesScramblingControl != 0) {
+                info.subSamples[i].mNumBytesOfClearData = 0;
+                info.subSamples[i].mNumBytesOfEncryptedData = it->subSampleSize;
+            } else {
+                info.subSamples[i].mNumBytesOfClearData = it->subSampleSize;
+                info.subSamples[i].mNumBytesOfEncryptedData = 0;
+            }
+        }
+        // If scrambled at PES-level, PES header should be skipped
+        if (pesScramblingControl != 0) {
+            info.srcOffset = info.dstOffset = pesOffset;
+            info.subSamples[0].mNumBytesOfEncryptedData -= pesOffset;
+        }
+
+        int32_t result;
+        Status status = mDescrambler->descramble(info, &result);
+
+        if (!status.isOk()) {
+            ALOGE("[stream %d] descramble failed, exceptionCode=%d",
+                    mElementaryPID, status.exceptionCode());
+            return UNKNOWN_ERROR;
+        }
+
+        ALOGV("[stream %d] descramble succeeded, %d bytes",
+                mElementaryPID, result);
+        memcpy(mBuffer->data(), mDescrambledBuffer->data(), descrambleBytes);
+    }
+
+    if (mQueue->isScrambled()) {
+        // Queue subSample info for scrambled queue
+        sp<ABuffer> clearSizesBuffer = new ABuffer(mSubSamples.size() * 4);
+        sp<ABuffer> encSizesBuffer = new ABuffer(mSubSamples.size() * 4);
+        int32_t *clearSizePtr = (int32_t*)clearSizesBuffer->data();
+        int32_t *encSizePtr = (int32_t*)encSizesBuffer->data();
+        int32_t isSync = 0;
+        int32_t i = 0;
+        for (auto it = mSubSamples.begin();
+                it != mSubSamples.end(); it++, i++) {
+            if ((it->transport_scrambling_mode == 0
+                    && pesScramblingControl == 0)
+                    || i < descrambleSubSamples) {
+                clearSizePtr[i] = it->subSampleSize;
+                encSizePtr[i] = 0;
+            } else {
+                clearSizePtr[i] = 0;
+                encSizePtr[i] = it->subSampleSize;
+            }
+            isSync |= it->random_access_indicator;
+        }
+        // Pass the original TS subsample size now. The PES header adjust
+        // will be applied when the scrambled AU is dequeued.
+        mQueue->appendScrambledData(
+                mBuffer->data(), mBuffer->size(), sctrl,
+                isSync, clearSizesBuffer, encSizesBuffer);
+    }
+
+    ABitReader br(mBuffer->data(), mBuffer->size());
+    status_t err = parsePES(&br, event);
+
+    if (err != OK) {
+        ALOGE("[stream %d] failed to parse descrambled PES, err=%d",
+                mElementaryPID, err);
+    }
+
+    return err;
+}
+
+
 status_t ATSParser::Stream::flush(SyncEvent *event) {
     if (mBuffer == NULL || mBuffer->size() == 0) {
         return OK;
@@ -1047,9 +1425,14 @@ status_t ATSParser::Stream::flush(SyncEvent *event) {
 
     ALOGV("flushing stream 0x%04x size = %zu", mElementaryPID, mBuffer->size());
 
-    ABitReader br(mBuffer->data(), mBuffer->size());
-
-    status_t err = parsePES(&br, event);
+    status_t err = OK;
+    if (mScrambled) {
+        err = flushScrambled(event);
+        mSubSamples.clear();
+    } else {
+        ABitReader br(mBuffer->data(), mBuffer->size());
+        err = parsePES(&br, event);
+    }
 
     mBuffer->setRange(0, 0);
 
@@ -1058,7 +1441,9 @@ status_t ATSParser::Stream::flush(SyncEvent *event) {
 
 void ATSParser::Stream::onPayloadData(
         unsigned PTS_DTS_flags, uint64_t PTS, uint64_t /* DTS */,
-        const uint8_t *data, size_t size, SyncEvent *event) {
+        unsigned PES_scrambling_control,
+        const uint8_t *data, size_t size,
+        int32_t payloadOffset, SyncEvent *event) {
 #if 0
     ALOGI("payload streamType 0x%02x, PTS = 0x%016llx, dPTS = %lld",
           mStreamType,
@@ -1074,7 +1459,8 @@ void ATSParser::Stream::onPayloadData(
         timeUs = mProgram->convertPTSToTimestamp(PTS);
     }
 
-    status_t err = mQueue->appendData(data, size, timeUs);
+    status_t err = mQueue->appendData(
+            data, size, timeUs, payloadOffset, PES_scrambling_control);
 
     if (mEOSReached) {
         mQueue->signalEOS();
@@ -1096,9 +1482,11 @@ void ATSParser::Stream::onPayloadData(
 
                 const char *mime;
                 if (meta->findCString(kKeyMIMEType, &mime)
-                        && !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)
-                        && !IsIDR(accessUnit)) {
-                    continue;
+                        && !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)) {
+                    int32_t sync = 0;
+                    if (!accessUnit->meta()->findInt32("isSync", &sync) || !sync) {
+                        continue;
+                    }
                 }
                 mSource = new AnotherPacketSource(meta);
                 mSource->queueAccessUnit(accessUnit);
@@ -1178,6 +1566,18 @@ sp<MediaSource> ATSParser::Stream::getSource(SourceType type) {
     return NULL;
 }
 
+void ATSParser::Stream::setCasSession(
+        const sp<IDescrambler> &descrambler,
+        const std::vector<uint8_t> &sessionId) {
+    if (mSource != NULL && mDescrambler == NULL && descrambler != NULL) {
+        signalDiscontinuity(DISCONTINUITY_FORMAT_ONLY, NULL);
+        mDescrambler = descrambler;
+        if (mQueue->isScrambled()) {
+            mQueue->setCasSession(sessionId);
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 ATSParser::ATSParser(uint32_t flags)
@@ -1189,6 +1589,7 @@ ATSParser::ATSParser(uint32_t flags)
       mNumTSPacketsParsed(0),
       mNumPCRs(0) {
     mPSISections.add(0 /* PID */, new PSISection);
+    mCasManager = new CasManager();
 }
 
 ATSParser::~ATSParser() {
@@ -1203,6 +1604,17 @@ status_t ATSParser::feedTSPacket(const void *data, size_t size,
 
     ABitReader br((const uint8_t *)data, kTSPacketSize);
     return parseTS(&br, event);
+}
+
+status_t ATSParser::setMediaCas(const sp<ICas> &cas) {
+    status_t err = mCasManager->setMediaCas(cas);
+    if (err != OK) {
+        return err;
+    }
+    for (size_t i = 0; i < mPrograms.size(); ++i) {
+        mPrograms.editItemAt(i)->updateCasSessions();
+    }
+    return OK;
 }
 
 void ATSParser::signalDiscontinuity(
@@ -1331,6 +1743,8 @@ status_t ATSParser::parsePID(
         ABitReader *br, unsigned PID,
         unsigned continuity_counter,
         unsigned payload_unit_start_indicator,
+        unsigned transport_scrambling_control,
+        unsigned random_access_indicator,
         SyncEvent *event) {
     ssize_t sectionIndex = mPSISections.indexOfKey(PID);
 
@@ -1402,7 +1816,10 @@ status_t ATSParser::parsePID(
     for (size_t i = 0; i < mPrograms.size(); ++i) {
         status_t err;
         if (mPrograms.editItemAt(i)->parsePID(
-                    PID, continuity_counter, payload_unit_start_indicator,
+                    PID, continuity_counter,
+                    payload_unit_start_indicator,
+                    transport_scrambling_control,
+                    random_access_indicator,
                     br, &err, event)) {
             if (err != OK) {
                 return err;
@@ -1414,13 +1831,19 @@ status_t ATSParser::parsePID(
     }
 
     if (!handled) {
+        handled = mCasManager->parsePID(br, PID);
+    }
+
+    if (!handled) {
         ALOGV("PID 0x%04x not handled.", PID);
     }
 
     return OK;
 }
 
-status_t ATSParser::parseAdaptationField(ABitReader *br, unsigned PID) {
+status_t ATSParser::parseAdaptationField(
+        ABitReader *br, unsigned PID, unsigned *random_access_indicator) {
+    *random_access_indicator = 0;
     unsigned adaptation_field_length = br->getBits(8);
 
     if (adaptation_field_length > 0) {
@@ -1435,7 +1858,16 @@ status_t ATSParser::parseAdaptationField(ABitReader *br, unsigned PID) {
             ALOGV("PID 0x%04x: discontinuity_indicator = 1 (!!!)", PID);
         }
 
-        br->skipBits(2);
+        *random_access_indicator = br->getBits(1);
+        if (*random_access_indicator) {
+            ALOGV("PID 0x%04x: random_access_indicator = 1", PID);
+        }
+
+        unsigned elementary_stream_priority_indicator = br->getBits(1);
+        if (elementary_stream_priority_indicator) {
+            ALOGV("PID 0x%04x: elementary_stream_priority_indicator = 1", PID);
+        }
+
         unsigned PCR_flag = br->getBits(1);
 
         size_t numBitsRead = 4;
@@ -1501,7 +1933,8 @@ status_t ATSParser::parseTS(ABitReader *br, SyncEvent *event) {
     unsigned PID = br->getBits(13);
     ALOGV("PID = 0x%04x", PID);
 
-    MY_LOGV("transport_scrambling_control = %u", br->getBits(2));
+    unsigned transport_scrambling_control = br->getBits(2);
+    ALOGV("transport_scrambling_control = %u", transport_scrambling_control);
 
     unsigned adaptation_field_control = br->getBits(2);
     ALOGV("adaptation_field_control = %u", adaptation_field_control);
@@ -1513,13 +1946,17 @@ status_t ATSParser::parseTS(ABitReader *br, SyncEvent *event) {
 
     status_t err = OK;
 
+    unsigned random_access_indicator = 0;
     if (adaptation_field_control == 2 || adaptation_field_control == 3) {
-        err = parseAdaptationField(br, PID);
+        err = parseAdaptationField(br, PID, &random_access_indicator);
     }
     if (err == OK) {
         if (adaptation_field_control == 1 || adaptation_field_control == 3) {
             err = parsePID(br, PID, continuity_counter,
-                    payload_unit_start_indicator, event);
+                    payload_unit_start_indicator,
+                    transport_scrambling_control,
+                    random_access_indicator,
+                    event);
         }
     }
 
