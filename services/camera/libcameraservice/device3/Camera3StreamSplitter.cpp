@@ -32,6 +32,8 @@
 
 #include <utils/Trace.h>
 
+#include <cutils/atomic.h>
+
 #include "Camera3StreamSplitter.h"
 
 namespace android {

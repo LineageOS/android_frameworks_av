@@ -18,6 +18,7 @@
 //#define LOG_NDEBUG 0
 
 #include <cutils/compiler.h>
+#include <cutils/atomic.h>
 #include <utils/Log.h>
 #include <media/nbaio/PipeReader.h>
 

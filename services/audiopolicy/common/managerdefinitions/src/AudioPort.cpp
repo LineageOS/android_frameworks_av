@@ -21,6 +21,7 @@
 #include "HwModule.h"
 #include "AudioGain.h"
 #include <policy.h>
+#include <cutils/atomic.h>
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))

@@ -22,6 +22,7 @@
 #include "Configuration.h"
 #include <linux/futex.h>
 #include <sys/syscall.h>
+#include <cutils/atomic.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
 #include "FastThread.h"

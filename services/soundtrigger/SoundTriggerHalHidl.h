@@ -17,6 +17,7 @@
 #ifndef ANDROID_HARDWARE_SOUNDTRIGGER_HAL_HIDL_H
 #define ANDROID_HARDWARE_SOUNDTRIGGER_HAL_HIDL_H
 
+#include <stdatomic.h>
 #include <utils/RefBase.h>
 #include <utils/KeyedVector.h>
 #include <utils/Vector.h>
