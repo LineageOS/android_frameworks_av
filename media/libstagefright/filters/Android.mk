@@ -29,4 +29,7 @@ LOCAL_SHARED_LIBRARIES := \
 
 LOCAL_MODULE:= libstagefright_mediafilter
 
+LOCAL_SANITIZE := cfi
+LOCAL_SANITIZE_DIAG := cfi
+
 include $(BUILD_STATIC_LIBRARY)
