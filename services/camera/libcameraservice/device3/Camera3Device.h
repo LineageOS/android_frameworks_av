@@ -135,7 +135,9 @@ class Camera3Device :
     status_t deleteStream(int id) override;
     status_t deleteReprocessStream(int id) override;
 
-    status_t configureStreams(bool isConstraiedHighSpeed = false) override;
+    status_t configureStreams(int operatingMode =
+            static_cast<int>(hardware::camera::device::V3_2::StreamConfigurationMode::NORMAL_MODE))
+            override;
     status_t getInputBufferProducer(
             sp<IGraphicBufferProducer> *producer) override;
 
@@ -211,6 +213,11 @@ class Camera3Device :
 
     // Camera device ID
     const String8              mId;
+
+    // Current stream configuration mode;
+    int                        mOperatingMode;
+    // Constant to use for no set operating mode
+    static const int           NO_MODE = -1;
 
     // Flag indicating is the current active stream configuration is constrained high speed.
     bool                       mIsConstrainedHighSpeedConfiguration;
@@ -574,8 +581,9 @@ class Camera3Device :
     static hardware::camera::device::V3_2::ConsumerUsageFlags mapToConsumerUsage(uint32_t usage);
     static hardware::camera::device::V3_2::StreamRotation mapToStreamRotation(
             camera3_stream_rotation_t rotation);
-    static hardware::camera::device::V3_2::StreamConfigurationMode mapToStreamConfigurationMode(
-            camera3_stream_configuration_mode_t operationMode);
+    // Returns a negative error code if the passed-in operation mode is not valid.
+    static status_t mapToStreamConfigurationMode(camera3_stream_configuration_mode_t operationMode,
+            /*out*/ hardware::camera::device::V3_2::StreamConfigurationMode *mode);
     static camera3_buffer_status_t mapHidlBufferStatus(hardware::camera::device::V3_2::BufferStatus status);
     static int mapToFrameworkFormat(hardware::graphics::common::V1_0::PixelFormat pixelFormat);
     static uint32_t mapConsumerToFrameworkUsage(
