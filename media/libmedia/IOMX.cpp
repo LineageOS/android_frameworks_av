@@ -29,6 +29,7 @@
 #include <utils/NativeHandle.h>
 #include <gui/IGraphicBufferProducer.h>
 
+#include <omx/1.0/WOmxNode.h>
 #include <android/IGraphicBufferSource.h>
 #include <android/IOMXBufferSource.h>
 
@@ -448,8 +449,115 @@ public:
     }
 };
 
+using ::android::hardware::media::omx::V1_0::utils::LWOmxNode;
+class HpOMXNode : public HpInterface<BpOMXNode, LWOmxNode> {
+public:
+    HpOMXNode(const sp<IBinder>& base) : PBase(base) {}
+
+    virtual status_t freeNode() {
+        return mBase->freeNode();
+    }
+
+    virtual status_t sendCommand(
+            OMX_COMMANDTYPE cmd, OMX_S32 param) {
+        return mBase->sendCommand(cmd, param);
+    }
+
+    virtual status_t getParameter(
+            OMX_INDEXTYPE index, void *params, size_t size) {
+        return mBase->getParameter(index, params, size);
+    }
+
+    virtual status_t setParameter(
+            OMX_INDEXTYPE index, const void *params, size_t size) {
+        return mBase->setParameter(index, params, size);
+    }
+
+    virtual status_t getConfig(
+            OMX_INDEXTYPE index, void *params, size_t size) {
+        return mBase->getConfig(index, params, size);
+    }
+
+    virtual status_t setConfig(
+            OMX_INDEXTYPE index, const void *params, size_t size) {
+        return mBase->setConfig(index, params, size);
+    }
+
+    virtual status_t setPortMode(
+            OMX_U32 port_index, IOMX::PortMode mode) {
+        return mBase->setPortMode(port_index, mode);
+    }
+
+    virtual status_t prepareForAdaptivePlayback(
+            OMX_U32 portIndex, OMX_BOOL enable,
+            OMX_U32 maxFrameWidth, OMX_U32 maxFrameHeight) {
+        return mBase->prepareForAdaptivePlayback(
+                portIndex, enable, maxFrameWidth, maxFrameHeight);
+    }
+
+    virtual status_t configureVideoTunnelMode(
+            OMX_U32 portIndex, OMX_BOOL tunneled,
+            OMX_U32 audioHwSync, native_handle_t **sidebandHandle) {
+        return mBase->configureVideoTunnelMode(
+                portIndex, tunneled, audioHwSync, sidebandHandle);
+    }
+
+    virtual status_t getGraphicBufferUsage(
+            OMX_U32 port_index, OMX_U32* usage) {
+        return mBase->getGraphicBufferUsage(port_index, usage);
+    }
+
+    virtual status_t setInputSurface(
+            const sp<IOMXBufferSource> &bufferSource) {
+        return mBase->setInputSurface(bufferSource);
+    }
+
+    virtual status_t allocateSecureBuffer(
+            OMX_U32 port_index, size_t size, buffer_id *buffer,
+            void **buffer_data, sp<NativeHandle> *native_handle) {
+        return mBase->allocateSecureBuffer(
+                port_index, size, buffer, buffer_data, native_handle);
+    }
+
+    virtual status_t useBuffer(
+            OMX_U32 port_index, const OMXBuffer &omxBuf, buffer_id *buffer) {
+        return mBase->useBuffer(port_index, omxBuf, buffer);
+    }
+
+    virtual status_t freeBuffer(
+            OMX_U32 port_index, buffer_id buffer) {
+        return mBase->freeBuffer(port_index, buffer);
+    }
+
+    virtual status_t fillBuffer(
+            buffer_id buffer, const OMXBuffer &omxBuf, int fenceFd = -1) {
+        return mBase->fillBuffer(buffer, omxBuf, fenceFd);
+    }
+
+    virtual status_t emptyBuffer(
+            buffer_id buffer, const OMXBuffer &omxBuf,
+            OMX_U32 flags, OMX_TICKS timestamp, int fenceFd = -1) {
+        return mBase->emptyBuffer(buffer, omxBuf, flags, timestamp, fenceFd);
+    }
+
+    virtual status_t getExtensionIndex(
+            const char *parameter_name,
+            OMX_INDEXTYPE *index) {
+        return mBase->getExtensionIndex(parameter_name, index);
+    }
+
+    virtual status_t dispatchMessage(const omx_message &msg) {
+        return mBase->dispatchMessage(msg);
+    }
+
+    // TODO: this is temporary, will be removed when quirks move to OMX side
+    virtual status_t setQuirks(OMX_U32 quirks) {
+        return mBase->setQuirks(quirks);
+    }
+};
+
 IMPLEMENT_META_INTERFACE(OMX, "android.hardware.IOMX");
-IMPLEMENT_META_INTERFACE(OMXNode, "android.hardware.IOMXNode");
+IMPLEMENT_HYBRID_META_INTERFACE(OMXNode, IOmxNode, "android.hardware.IOMXNode");
 
 ////////////////////////////////////////////////////////////////////////////////
 

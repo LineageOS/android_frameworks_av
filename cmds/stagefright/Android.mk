@@ -12,7 +12,6 @@ LOCAL_SHARED_LIBRARIES := \
         libjpeg libgui libcutils liblog \
         libhidlmemory \
         android.hardware.media.omx@1.0 \
-        android.hardware.media.omx@1.0-utils \
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \

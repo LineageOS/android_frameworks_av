@@ -19,6 +19,7 @@
 #define ANDROID_IOMX_H_
 
 #include <binder/IInterface.h>
+#include <binder/HalToken.h>
 #include <utils/List.h>
 #include <utils/String8.h>
 #include <cutils/native_handle.h>
@@ -26,6 +27,7 @@
 #include <list>
 
 #include <media/hardware/MetadataBufferType.h>
+#include <android/hardware/media/omx/1.0/IOmxNode.h>
 
 #include <OMX_Core.h>
 #include <OMX_Video.h>
@@ -41,6 +43,8 @@ class IOMXObserver;
 class NativeHandle;
 class OMXBuffer;
 struct omx_message;
+
+using hardware::media::omx::V1_0::IOmxNode;
 
 class IOMX : public IInterface {
 public:
@@ -83,7 +87,7 @@ public:
 
 class IOMXNode : public IInterface {
 public:
-    DECLARE_META_INTERFACE(OMXNode);
+    DECLARE_HYBRID_META_INTERFACE(OMXNode, IOmxNode);
 
     typedef IOMX::buffer_id buffer_id;
 

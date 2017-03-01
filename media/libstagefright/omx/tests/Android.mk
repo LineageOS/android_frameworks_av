@@ -17,7 +17,6 @@ LOCAL_SHARED_LIBRARIES := \
         android.hidl.allocator@1.0 \
         android.hidl.memory@1.0 \
         android.hardware.media.omx@1.0 \
-        android.hardware.media.omx@1.0-utils
 
 LOCAL_C_INCLUDES := \
         $(TOP)/frameworks/av/media/libstagefright \

@@ -28,9 +28,9 @@
 #include <media/IMediaCodecService.h>
 #include <media/stagefright/OMXClient.h>
 
-#include "include/OMX.h"
+#include <media/IOMX.h>
 
-#include "omx/hal/1.0/utils/WOmx.h"
+#include <media/omx/1.0/WOmx.h>
 
 namespace android {
 

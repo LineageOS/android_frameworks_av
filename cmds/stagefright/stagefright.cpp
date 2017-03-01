@@ -65,7 +65,7 @@
 #include <gui/SurfaceComposerClient.h>
 
 #include <android/hardware/media/omx/1.0/IOmx.h>
-#include <omx/hal/1.0/utils/WOmx.h>
+#include <media/omx/1.0/WOmx.h>
 
 using namespace android;
 

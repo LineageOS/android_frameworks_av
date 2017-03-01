@@ -20,7 +20,7 @@
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
 
-#include "../../../../include/OMXNodeInstance.h"
+#include <media/IOMX.h>
 
 #include <android/hardware/media/omx/1.0/IOmx.h>
 
