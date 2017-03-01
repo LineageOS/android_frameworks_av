@@ -577,7 +577,8 @@ status_t ColorConverter::convertTIYUV420PackedSemiPlanar(
     uint16_t *dst_ptr = (uint16_t *)dst.mBits
         + dst.mCropTop * dst.mWidth + dst.mCropLeft;
 
-    const uint8_t *src_y = (const uint8_t *)src.mBits;
+    const uint8_t *src_y =
+        (const uint8_t *)src.mBits + src.mCropTop * src.mWidth + src.mCropLeft;
 
     const uint8_t *src_u =
         (const uint8_t *)src_y + src.mWidth * (src.mHeight - src.mCropTop / 2);
