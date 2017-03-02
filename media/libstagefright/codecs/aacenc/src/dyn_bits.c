@@ -20,6 +20,10 @@
 
 *******************************************************************************/
 
+#define LOG_TAG "NoiselessCoder"
+
+#include "log/log.h"
+
 #include "aac_rom.h"
 #include "dyn_bits.h"
 #include "bit_cnt.h"
@@ -296,6 +300,9 @@ noiselessCounter(SECTION_DATA *sectionData,
     case SHORT_WINDOW:
       sideInfoTab = sideInfoTabShort;
       break;
+    default:
+      ALOGE("invalid blockType: %d", blockType);
+      return;
   }
 
 
