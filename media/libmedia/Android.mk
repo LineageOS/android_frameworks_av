@@ -55,15 +55,36 @@ LOCAL_SRC_FILES += \
     OMXBuffer.cpp \
     Visualizer.cpp \
     StringArray.cpp \
+    omx/1.0/WGraphicBufferSource.cpp \
+    omx/1.0/WOmx.cpp \
+    omx/1.0/WOmxBufferProducer.cpp \
+    omx/1.0/WOmxBufferSource.cpp \
+    omx/1.0/WOmxNode.cpp \
+    omx/1.0/WOmxObserver.cpp \
+    omx/1.0/WOmxProducerListener.cpp \
 
 LOCAL_SHARED_LIBRARIES := \
         libui liblog libcutils libutils libbinder libsonivox libicuuc libicui18n libexpat \
         libcamera_client libstagefright_foundation \
         libgui libdl libaudioutils libaudioclient \
         libmedia_helper libmediadrm \
+        libbase \
         libhidlbase \
+        libhidltransport \
+        libhwbinder \
+        libhidlmemory \
+        android.hidl.base@1.0 \
+        android.hidl.memory@1.0 \
+        android.hardware.graphics.common@1.0 \
+        android.hardware.media@1.0 \
+        android.hardware.media.omx@1.0 \
 
-LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder libsonivox libmediadrm
+LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := \
+        libbinder \
+        libsonivox \
+        libmediadrm \
+        android.hardware.media.omx@1.0 \
+        android.hidl.memory@1.0 \
 
 # for memory heap analysis
 LOCAL_STATIC_LIBRARIES := libc_malloc_debug_backtrace libc_logging
@@ -76,8 +97,9 @@ LOCAL_C_INCLUDES := \
     $(TOP)/system/libhidl/base/include \
     $(TOP)/frameworks/native/include/media/openmax \
     $(TOP)/frameworks/av/include/media/ \
-    $(TOP)/frameworks/av/media/libstagefright \
     $(TOP)/frameworks/av/media/libmedia/aidl \
+    $(TOP)/frameworks/av/include \
+    $(TOP)/frameworks/native/include \
     $(call include-path-for, audio-utils)
 
 LOCAL_EXPORT_C_INCLUDE_DIRS := \

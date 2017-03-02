@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "WOmxProducerListener.h"
+#include <media/omx/1.0/WOmxProducerListener.h>
 
 namespace android {
 namespace hardware {

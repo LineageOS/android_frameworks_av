@@ -20,9 +20,9 @@
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
 
+#include <binder/HalToken.h>
 #include <utils/Errors.h>
-
-#include "../../../../include/OMXNodeInstance.h"
+#include <media/IOMX.h>
 
 #include <android/hardware/media/omx/1.0/IOmxNode.h>
 #include <android/hardware/media/omx/1.0/IOmxObserver.h>
@@ -59,9 +59,8 @@ using ::android::sp;
  * - TW = Treble Wrapper --- It wraps a legacy object inside a Treble object.
  */
 
-struct LWOmxNode : public BnOMXNode {
-    sp<IOmxNode> mBase;
-    LWOmxNode(sp<IOmxNode> const& base);
+struct LWOmxNode : public H2BConverter<IOmxNode, IOMXNode, BnOMXNode> {
+    LWOmxNode(sp<IOmxNode> const& base) : CBase(base) {}
     status_t freeNode() override;
     status_t sendCommand(
             OMX_COMMANDTYPE cmd, OMX_S32 param) override;

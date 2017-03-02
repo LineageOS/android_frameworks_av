@@ -45,6 +45,7 @@
 #include <media/stagefright/SurfaceUtils.h>
 #include <media/hardware/HardwareAPI.h>
 #include <media/OMXBuffer.h>
+#include <media/omx/1.0/WOmxNode.h>
 
 #include <hidlmemory/mapping.h>
 
@@ -63,7 +64,6 @@
 
 #include <android/hidl/allocator/1.0/IAllocator.h>
 #include <android/hidl/memory/1.0/IMemory.h>
-#include "omx/hal/1.0/utils/WOmxNode.h"
 
 namespace android {
 
@@ -6133,10 +6133,7 @@ void ACodec::UninitializedState::stateEntered() {
     if (mDeathNotifier != NULL) {
         if (mCodec->mOMXNode != NULL) {
             if (mCodec->getTrebleFlag()) {
-                auto tOmxNode =
-                        (static_cast<
-                        ::android::hardware::media::omx::V1_0::utils::
-                        LWOmxNode*>(mCodec->mOMXNode.get()))->mBase;
+                auto tOmxNode = mCodec->mOMXNode->getHalInterface();
                 tOmxNode->unlinkToDeath(mDeathNotifier);
             } else {
                 sp<IBinder> binder = IInterface::asBinder(mCodec->mOMXNode);
@@ -6304,8 +6301,7 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
 
     mDeathNotifier = new DeathNotifier(notify);
     if (mCodec->getTrebleFlag()) {
-        auto tOmxNode = (static_cast<::android::hardware::media::omx::V1_0::
-                utils::LWOmxNode*>(omxNode.get()))->mBase;
+        auto tOmxNode = omxNode->getHalInterface();
         if (!tOmxNode->linkToDeath(mDeathNotifier, 0)) {
             mDeathNotifier.clear();
         }

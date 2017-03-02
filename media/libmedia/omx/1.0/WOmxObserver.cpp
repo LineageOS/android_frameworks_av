@@ -18,12 +18,12 @@
 
 #include <vector>
 
-#include <android-base/logging.h>
+#include <utils/Log.h>
 #include <cutils/native_handle.h>
 #include <binder/Binder.h>
 
-#include "WOmxObserver.h"
-#include "Conversion.h"
+#include <media/omx/1.0/WOmxObserver.h>
+#include <media/omx/1.0/Conversion.h>
 
 namespace android {
 namespace hardware {
@@ -47,7 +47,7 @@ void LWOmxObserver::onMessages(std::list<omx_message> const& lMessages) {
     }
     auto transResult = mBase->onMessages(tMessages);
     if (!transResult.isOk()) {
-        LOG(ERROR) << "LWOmxObserver::onMessages - Transaction failed";
+        ALOGE("LWOmxObserver::onMessages - Transaction failed");
     }
     for (auto& handle : handles) {
         native_handle_close(handle);

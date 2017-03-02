@@ -16,9 +16,9 @@
 
 #include <algorithm>
 
-#include "WOmxNode.h"
-#include "WOmxBufferSource.h"
-#include "Conversion.h"
+#include <media/omx/1.0/WOmxNode.h>
+#include <media/omx/1.0/WOmxBufferSource.h>
+#include <media/omx/1.0/Conversion.h>
 
 namespace android {
 namespace hardware {
@@ -30,9 +30,6 @@ namespace utils {
 using ::android::hardware::Void;
 
 // LWOmxNode
-LWOmxNode::LWOmxNode(sp<IOmxNode> const& base) : mBase(base) {
-}
-
 status_t LWOmxNode::freeNode() {
     return toStatusT(mBase->freeNode());
 }

@@ -20,8 +20,8 @@
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
 
-#include <media/IOMX.h>
 #include <binder/Binder.h>
+#include <media/IOMX.h>
 
 #include <android/hardware/graphics/common/1.0/types.h>
 #include <android/hardware/media/omx/1.0/IOmxNode.h>

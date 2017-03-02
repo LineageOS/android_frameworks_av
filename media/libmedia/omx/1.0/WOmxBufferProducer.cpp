@@ -16,11 +16,11 @@
 
 #define LOG_TAG "WOmxBufferProducer-utils"
 
-#include <android-base/logging.h>
+#include <utils/Log.h>
 
-#include "WOmxBufferProducer.h"
-#include "WOmxProducerListener.h"
-#include "Conversion.h"
+#include <media/omx/1.0/WOmxBufferProducer.h>
+#include <media/omx/1.0/WOmxProducerListener.h>
+#include <media/omx/1.0/Conversion.h>
 
 namespace android {
 namespace hardware {
@@ -72,8 +72,7 @@ Return<void> TWOmxBufferProducer::dequeueBuffer(
 
     native_handle_t* nh = nullptr;
     if ((fence == nullptr) || !wrapAs(&tFence, &nh, *fence)) {
-        LOG(ERROR) << "TWOmxBufferProducer::dequeueBuffer - "
-                "Invalid output fence";
+        ALOGE("TWOmxBufferProducer::dequeueBuffer - Invalid output fence");
         _hidl_cb(toStatus(status),
                  static_cast<int32_t>(slot),
                  tFence,
@@ -82,8 +81,7 @@ Return<void> TWOmxBufferProducer::dequeueBuffer(
     }
     std::vector<std::vector<native_handle_t*> > nhAA;
     if (getFrameTimestamps && !wrapAs(&tOutTimestamps, &nhAA, outTimestamps)) {
-        LOG(ERROR) << "TWOmxBufferProducer::dequeueBuffer - "
-                "Invalid output timestamps";
+        ALOGE("TWOmxBufferProducer::dequeueBuffer - Invalid output timestamps");
         _hidl_cb(toStatus(status),
                  static_cast<int32_t>(slot),
                  tFence,
@@ -120,16 +118,14 @@ Return<void> TWOmxBufferProducer::detachNextBuffer(
     hidl_handle tFence;
 
     if (outBuffer == nullptr) {
-        LOG(ERROR) << "TWOmxBufferProducer::detachNextBuffer - "
-                "Invalid output buffer";
+        ALOGE("TWOmxBufferProducer::detachNextBuffer - Invalid output buffer");
         _hidl_cb(toStatus(status), tBuffer, tFence);
         return Void();
     }
     wrapAs(&tBuffer, *outBuffer);
     native_handle_t* nh = nullptr;
     if ((outFence != nullptr) && !wrapAs(&tFence, &nh, *outFence)) {
-        LOG(ERROR) << "TWOmxBufferProducer::detachNextBuffer - "
-                "Invalid output fence";
+        ALOGE("TWOmxBufferProducer::detachNextBuffer - Invalid output fence");
         _hidl_cb(toStatus(status), tBuffer, tFence);
         return Void();
     }
@@ -145,8 +141,8 @@ Return<void> TWOmxBufferProducer::attachBuffer(
     int outSlot;
     sp<GraphicBuffer> lBuffer = new GraphicBuffer();
     if (!convertTo(lBuffer.get(), buffer)) {
-        LOG(ERROR) << "TWOmxBufferProducer::attachBuffer - "
-                "Invalid input native window buffer";
+        ALOGE("TWOmxBufferProducer::attachBuffer - "
+                "Invalid input native window buffer");
         _hidl_cb(toStatus(BAD_VALUE), -1);
         return Void();
     }
@@ -166,8 +162,7 @@ Return<void> TWOmxBufferProducer::queueBuffer(
             NATIVE_WINDOW_SCALING_MODE_FREEZE,
             0, ::android::Fence::NO_FENCE);
     if (!convertTo(&lInput, input)) {
-        LOG(ERROR) << "TWOmxBufferProducer::queueBuffer - "
-                "Invalid input";
+        ALOGE("TWOmxBufferProducer::queueBuffer - Invalid input");
         _hidl_cb(toStatus(BAD_VALUE), tOutput);
         return Void();
     }
@@ -177,8 +172,7 @@ Return<void> TWOmxBufferProducer::queueBuffer(
 
     std::vector<std::vector<native_handle_t*> > nhAA;
     if (!wrapAs(&tOutput, &nhAA, lOutput)) {
-        LOG(ERROR) << "TWOmxBufferProducer::queueBuffer - "
-                "Invalid output";
+        ALOGE("TWOmxBufferProducer::queueBuffer - Invalid output");
         _hidl_cb(toStatus(BAD_VALUE), tOutput);
         return Void();
     }
@@ -196,8 +190,7 @@ Return<Status> TWOmxBufferProducer::cancelBuffer(
         int32_t slot, const hidl_handle& fence) {
     sp<Fence> lFence = new Fence();
     if (!convertTo(lFence.get(), fence)) {
-        LOG(ERROR) << "TWOmxBufferProducer::cancelBuffer - "
-                "Invalid input fence";
+        ALOGE("TWOmxBufferProducer::cancelBuffer - Invalid input fence");
         return toStatus(BAD_VALUE);
     }
     return toStatus(mBase->cancelBuffer(static_cast<int>(slot), lFence));
@@ -224,8 +217,7 @@ Return<void> TWOmxBufferProducer::connect(
     QueueBufferOutput tOutput;
     std::vector<std::vector<native_handle_t*> > nhAA;
     if (!wrapAs(&tOutput, &nhAA, lOutput)) {
-        LOG(ERROR) << "TWOmxBufferProducer::connect - "
-                "Invalid output";
+        ALOGE("TWOmxBufferProducer::connect - Invalid output");
         _hidl_cb(toStatus(status), tOutput);
         return Void();
     }
@@ -300,8 +292,8 @@ Return<void> TWOmxBufferProducer::getLastQueuedBuffer(
     hidl_handle tOutFence;
     native_handle_t* nh = nullptr;
     if ((lOutFence == nullptr) || !wrapAs(&tOutFence, &nh, *lOutFence)) {
-        LOG(ERROR) << "TWOmxBufferProducer::getLastQueuedBuffer - "
-                "Invalid output fence";
+        ALOGE("TWOmxBufferProducer::getLastQueuedBuffer - "
+                "Invalid output fence");
         _hidl_cb(toStatus(status),
                 tOutBuffer,
                 tOutFence,
@@ -323,8 +315,8 @@ Return<void> TWOmxBufferProducer::getFrameTimestamps(
     FrameEventHistoryDelta tDelta;
     std::vector<std::vector<native_handle_t*> > nhAA;
     if (!wrapAs(&tDelta, &nhAA, lDelta)) {
-        LOG(ERROR) << "TWOmxBufferProducer::getFrameTimestamps - "
-                "Invalid output frame timestamps";
+        ALOGE("TWOmxBufferProducer::getFrameTimestamps - "
+                "Invalid output frame timestamps");
         _hidl_cb(tDelta);
         return Void();
     }
@@ -392,13 +384,13 @@ status_t LWOmxBufferProducer::dequeueBuffer(
                 fnStatus = toStatusT(status);
                 *slot = tSlot;
                 if (!convertTo(fence->get(), tFence)) {
-                    LOG(ERROR) << "LWOmxBufferProducer::dequeueBuffer - "
-                            "Invalid output fence";
+                    ALOGE("LWOmxBufferProducer::dequeueBuffer - "
+                            "Invalid output fence");
                     fnStatus = fnStatus == NO_ERROR ? BAD_VALUE : fnStatus;
                 }
                 if (outTimestamps && !convertTo(outTimestamps, tTs)) {
-                    LOG(ERROR) << "LWOmxBufferProducer::dequeueBuffer - "
-                            "Invalid output timestamps";
+                    ALOGE("LWOmxBufferProducer::dequeueBuffer - "
+                            "Invalid output timestamps");
                     fnStatus = fnStatus == NO_ERROR ? BAD_VALUE : fnStatus;
                 }
             }));
@@ -421,13 +413,13 @@ status_t LWOmxBufferProducer::detachNextBuffer(
                     hidl_handle const& tFence) {
                 fnStatus = toStatusT(status);
                 if (!convertTo(outFence->get(), tFence)) {
-                    LOG(ERROR) << "LWOmxBufferProducer::detachNextBuffer - "
-                            "Invalid output fence";
+                    ALOGE("LWOmxBufferProducer::detachNextBuffer - "
+                            "Invalid output fence");
                     fnStatus = fnStatus == NO_ERROR ? BAD_VALUE : fnStatus;
                 }
                 if (!convertTo(outBuffer->get(), tBuffer)) {
-                    LOG(ERROR) << "LWOmxBufferProducer::detachNextBuffer - "
-                            "Invalid output buffer";
+                    ALOGE("LWOmxBufferProducer::detachNextBuffer - "
+                            "Invalid output buffer");
                     fnStatus = fnStatus == NO_ERROR ? BAD_VALUE : fnStatus;
                 }
             }));
@@ -454,8 +446,7 @@ status_t LWOmxBufferProducer::queueBuffer(
     IOmxBufferProducer::QueueBufferInput tInput;
     native_handle_t* nh;
     if (!wrapAs(&tInput, &nh, input)) {
-        LOG(ERROR) << "LWOmxBufferProducer::queueBuffer - "
-                "Invalid input";
+        ALOGE("LWOmxBufferProducer::queueBuffer - Invalid input");
         return BAD_VALUE;
     }
     status_t fnStatus;
@@ -465,8 +456,8 @@ status_t LWOmxBufferProducer::queueBuffer(
                     IOmxBufferProducer::QueueBufferOutput const& tOutput) {
                 fnStatus = toStatusT(status);
                 if (!convertTo(output, tOutput)) {
-                    LOG(ERROR) << "LWOmxBufferProducer::queueBuffer - "
-                            "Invalid output";
+                    ALOGE("LWOmxBufferProducer::queueBuffer - "
+                            "Invalid output");
                     fnStatus = fnStatus == NO_ERROR ? BAD_VALUE : fnStatus;
                 }
             }));
@@ -478,8 +469,7 @@ status_t LWOmxBufferProducer::cancelBuffer(int slot, const sp<Fence>& fence) {
     hidl_handle tFence;
     native_handle_t* nh = nullptr;
     if ((fence == nullptr) || !wrapAs(&tFence, &nh, *fence)) {
-        LOG(ERROR) << "LWOmxBufferProducer::cancelBuffer - "
-                "Invalid input fence";
+        ALOGE("LWOmxBufferProducer::cancelBuffer - Invalid input fence");
         return BAD_VALUE;
     }
 
@@ -513,8 +503,7 @@ status_t LWOmxBufferProducer::connect(
                     IOmxBufferProducer::QueueBufferOutput const& tOutput) {
                 fnStatus = toStatusT(status);
                 if (!convertTo(output, tOutput)) {
-                    LOG(ERROR) << "LWOmxBufferProducer::connect - "
-                            "Invalid output";
+                    ALOGE("LWOmxBufferProducer::connect - Invalid output");
                     fnStatus = fnStatus == NO_ERROR ? BAD_VALUE : fnStatus;
                 }
             }));
@@ -579,14 +568,14 @@ status_t LWOmxBufferProducer::getLastQueuedBuffer(
                 fnStatus = toStatusT(status);
                 *outBuffer = new GraphicBuffer();
                 if (!convertTo(outBuffer->get(), buffer)) {
-                    LOG(ERROR) << "LWOmxBufferProducer::getLastQueuedBuffer - "
-                            "Invalid output buffer";
+                    ALOGE("LWOmxBufferProducer::getLastQueuedBuffer - "
+                            "Invalid output buffer");
                     fnStatus = fnStatus == NO_ERROR ? BAD_VALUE : fnStatus;
                 }
                 *outFence = new Fence();
                 if (!convertTo(outFence->get(), fence)) {
-                    LOG(ERROR) << "LWOmxBufferProducer::getLastQueuedBuffer - "
-                            "Invalid output fence";
+                    ALOGE("LWOmxBufferProducer::getLastQueuedBuffer - "
+                            "Invalid output fence");
                     fnStatus = fnStatus == NO_ERROR ? BAD_VALUE : fnStatus;
                 }
                 std::copy(transformMatrix.data(),

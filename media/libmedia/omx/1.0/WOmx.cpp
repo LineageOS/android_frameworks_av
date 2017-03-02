@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-#include "WOmx.h"
-#include "WOmxNode.h"
-#include "WOmxObserver.h"
-#include "WOmxBufferProducer.h"
-#include "WGraphicBufferSource.h"
-#include "Conversion.h"
+#include <media/omx/1.0/WOmx.h>
+#include <media/omx/1.0/WOmxNode.h>
+#include <media/omx/1.0/WOmxObserver.h>
+#include <media/omx/1.0/WOmxBufferProducer.h>
+#include <media/omx/1.0/WGraphicBufferSource.h>
+#include <media/omx/1.0/Conversion.h>
 
 namespace android {
 namespace hardware {

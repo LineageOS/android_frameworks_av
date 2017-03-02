@@ -21,7 +21,7 @@
 #include <binder/IMemory.h>
 #include <binder/Parcel.h>
 #include <media/IDataSource.h>
-#include <include/OMX.h>
+#include <media/IOMX.h>
 
 namespace android {
 

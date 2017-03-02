@@ -16,9 +16,9 @@
 
 #include <stagefright/foundation/ColorUtils.h>
 
-#include "WGraphicBufferSource.h"
-#include "WOmxNode.h"
-#include "Conversion.h"
+#include <media/omx/1.0/WGraphicBufferSource.h>
+#include <media/omx/1.0/WOmxNode.h>
+#include <media/omx/1.0/Conversion.h>
 
 namespace android {
 namespace hardware {
@@ -36,8 +36,10 @@ LWGraphicBufferSource::LWGraphicBufferSource(
 
 ::android::binder::Status LWGraphicBufferSource::configure(
         const sp<IOMXNode>& omxNode, int32_t dataSpace) {
+    sp<IOmxNode> hOmxNode = omxNode->getHalInterface();
     return toBinderStatus(mBase->configure(
-            new TWOmxNode(omxNode), toHardwareDataspace(dataSpace)));
+            hOmxNode == nullptr ? new TWOmxNode(omxNode) : hOmxNode,
+            toHardwareDataspace(dataSpace)));
 }
 
 ::android::binder::Status LWGraphicBufferSource::setSuspend(

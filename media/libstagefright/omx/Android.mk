@@ -34,6 +34,9 @@ LOCAL_SHARED_LIBRARIES :=               \
         libhidlmemory                   \
         android.hidl.memory@1.0         \
 
+LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := \
+        android.hidl.memory@1.0
+
 LOCAL_MODULE:= libstagefright_omx
 LOCAL_CFLAGS += -Werror -Wall
 LOCAL_SANITIZE := unsigned-integer-overflow signed-integer-overflow cfi
