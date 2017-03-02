@@ -258,7 +258,11 @@ status_t NuPlayer::HTTPLiveSource::selectTrack(size_t trackIndex, bool select, i
 }
 
 status_t NuPlayer::HTTPLiveSource::seekTo(int64_t seekTimeUs, MediaPlayerSeekMode mode) {
-    return mLiveSession->seekTo(seekTimeUs, mode);
+    if (mLiveSession->isSeekable()) {
+        return mLiveSession->seekTo(seekTimeUs, mode);
+    } else {
+        return INVALID_OPERATION;
+    }
 }
 
 void NuPlayer::HTTPLiveSource::pollForRawData(
