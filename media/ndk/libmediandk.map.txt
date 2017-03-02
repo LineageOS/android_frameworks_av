@@ -1,7 +1,9 @@
 LIBMEDIANDK {
   global:
     AImageReader_acquireLatestImage; # introduced=24
+    AImageReader_acquireLatestImageAsync; # introduced=26
     AImageReader_acquireNextImage; # introduced=24
+    AImageReader_acquireNextImageAsync; # introduced=26
     AImageReader_delete; # introduced=24
     AImageReader_getFormat; # introduced=24
     AImageReader_getHeight; # introduced=24
@@ -9,10 +11,14 @@ LIBMEDIANDK {
     AImageReader_getWidth; # introduced=24
     AImageReader_getWindow; # introduced=24
     AImageReader_new; # introduced=24
+    AImageReader_newWithUsage; # introduced=26
+    AImageReader_setBufferRemovedListener; # introduced=26
     AImageReader_setImageListener; # introduced=24
     AImage_delete; # introduced=24
+    AImage_deleteAsync; # introduced=26
     AImage_getCropRect; # introduced=24
     AImage_getFormat; # introduced=24
+    AImage_getHardwareBuffer; # introduced=26
     AImage_getHeight; # introduced=24
     AImage_getNumberOfPlanes; # introduced=24
     AImage_getPlaneData; # introduced=24
