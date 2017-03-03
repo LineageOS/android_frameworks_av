@@ -36,3 +36,7 @@ socket: arg0 == 1
 connect: 1
 rt_tgsigqueueinfo: 1
 writev: 1
+geteuid: 1
+getgid: 1
+getegid: 1
+getgroups: 1

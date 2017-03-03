@@ -45,3 +45,7 @@ socket: 1
 connect: 1
 fcntl64: 1
 rt_tgsigqueueinfo: 1
+geteuid32: 1
+getgid32: 1
+getegid32: 1
+getgroups32: 1
