@@ -198,6 +198,7 @@ private:
         TONE_GB_CONGESTION,         // Congestion Tone: 400 Hz, 400ms ON, 350ms OFF, 225ms ON, 525ms OFF...
         TONE_GB_RINGTONE,           // Ring Tone: A 400Hz + 450Hz tone repeated in a 0.4s on, 0.2s off, 0.4s on, 2.0s off pattern.
         // AUSTRALIA Supervisory tones
+        TONE_AUSTRALIA_DIAL,        // Dial tone: 425 Hz tone modulated with 25 Hz, continuous
         TONE_AUSTRALIA_RINGTONE,    // Ring tone: A 400Hz + 450Hz tone repeated in a 0.4s on, 0.2s off, 0.4s on, 2.0s off pattern.
         TONE_AUSTRALIA_BUSY,        // Busy tone: 425 Hz repeated in a 0.375s on, 0.375s off pattern.
         TONE_AUSTRALIA_CALL_WAITING,// Call waiting tone: 425Hz tone repeated in a 0.2s on, 0.2s off, 0.2s on, 4.4s off pattern.

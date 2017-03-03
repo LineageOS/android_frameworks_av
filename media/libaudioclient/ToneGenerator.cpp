@@ -759,6 +759,10 @@ const ToneGenerator::ToneDescriptor ToneGenerator::sToneDescriptors[] = {
                         { .duration = 0, .waveFreq = { 0 }, 0, 0}},
           .repeatCnt = ToneGenerator::TONEGEN_INF,
           .repeatSegment = 0 },                              // TONE_GB_RINGTONE
+        { .segments = { { .duration = ToneGenerator::TONEGEN_INF, .waveFreq = { 400, 425, 450, 0 }, 0, 0 },
+                        { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 },                              // TONE_AUSTRALIA_DIAL
         { .segments = { { .duration = 400, .waveFreq = { 400, 450, 0 }, 0, 0 },
                         { .duration = 200, .waveFreq = { 0 }, 0, 0 },
                         { .duration = 400, .waveFreq = { 400, 450, 0 }, 0, 0 },
@@ -819,7 +823,7 @@ const unsigned char /*tone_type*/ ToneGenerator::sToneMappingTable[NUM_REGIONS-1
             TONE_GB_RINGTONE             // TONE_SUP_RINGTONE
         },
         {   // AUSTRALIA
-            TONE_ANSI_DIAL,             // TONE_SUP_DIAL
+            TONE_AUSTRALIA_DIAL,        // TONE_SUP_DIAL
             TONE_AUSTRALIA_BUSY,        // TONE_SUP_BUSY
             TONE_AUSTRALIA_CONGESTION,  // TONE_SUP_CONGESTION
             TONE_SUP_RADIO_ACK,         // TONE_SUP_RADIO_ACK
