@@ -698,7 +698,13 @@ void SampleTable::buildSampleEntriesTable() {
             }
 
             ++sampleIndex;
-            sampleTime += delta;
+            if (sampleTime > UINT32_MAX - delta) {
+                ALOGE("%u + %u would overflow, clamping",
+                    sampleTime, delta);
+                sampleTime = UINT32_MAX;
+            } else {
+                sampleTime += delta;
+            }
         }
     }
 
