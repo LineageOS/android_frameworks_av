@@ -194,8 +194,8 @@ retry:
         }
         return analyzeResult(retval);
     }
-    if (ret == -EAGAIN) {
-        // This normally retries no more than once.
+    if (ret == -EAGAIN || ret == -EINTR) {
+        // Spurious wakeup. This normally retries no more than once.
         goto retry;
     }
     return ret;
