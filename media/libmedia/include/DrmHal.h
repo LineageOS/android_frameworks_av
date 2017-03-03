@@ -87,7 +87,7 @@ struct DrmHal : public BnDrm,
                                               Vector<uint8_t> &certificate,
                                               Vector<uint8_t> &wrappedKey);
 
-    virtual status_t getSecureStops(List<Vector<uint8_t> > &secureStops);
+    virtual status_t getSecureStops(List<Vector<uint8_t>> &secureStops);
     virtual status_t getSecureStop(Vector<uint8_t> const &ssid, Vector<uint8_t> &secureStop);
 
     virtual status_t releaseSecureStops(Vector<uint8_t> const &ssRelease);
@@ -158,7 +158,7 @@ private:
     mutable Mutex mEventLock;
     mutable Mutex mNotifyLock;
 
-    sp<IDrmFactory> mFactory;
+    const Vector<sp<IDrmFactory>> mFactories;
     sp<IDrmPlugin> mPlugin;
 
     /**
@@ -169,9 +169,9 @@ private:
      */
     status_t mInitCheck;
 
-    sp<IDrmFactory> makeDrmFactory();
-    sp<IDrmPlugin> makeDrmPlugin(const uint8_t uuid[16],
-                                 const String8 &appPackageName);
+    Vector<sp<IDrmFactory>> makeDrmFactories();
+    sp<IDrmPlugin> makeDrmPlugin(const sp<IDrmFactory>& factory,
+            const uint8_t uuid[16], const String8& appPackageName);
 
     void writeByteArray(Parcel &obj, const hidl_vec<uint8_t>& array);
 
