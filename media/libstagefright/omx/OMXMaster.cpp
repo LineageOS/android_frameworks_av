@@ -69,8 +69,13 @@ void OMXMaster::addVendorPlugin() {
 
 void OMXMaster::addUserPlugin() {
     char plugin[PROPERTY_VALUE_MAX];
+    char *each_plugin;
     if (property_get("media.sf.omx-plugin", plugin, NULL)) {
-        addPlugin(plugin);
+        each_plugin = strtok(plugin, ",");
+        while (each_plugin != NULL) {
+            addPlugin(each_plugin);
+            each_plugin = strtok(NULL, ",");
+        }
     }
 }
 
