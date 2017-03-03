@@ -15,6 +15,10 @@
  * and limitations under the License.
  * -------------------------------------------------------------------
  */
+
+#define LOG_TAG "m4v_h263"
+#include <log/log.h>
+
 /*
 ------------------------------------------------------------------------------
  INPUT AND OUTPUT DEFINITIONS
@@ -236,6 +240,11 @@ void  MBMotionComp(
 
     /* Pointer to previous luminance frame */
     c_prev  = prev->yChan;
+    if (!c_prev) {
+        ALOGE("b/35269635");
+        android_errorWriteLog(0x534e4554, "35269635");
+        return;
+    }
 
     pred_block = video->mblock->pred_block;
 
@@ -574,7 +583,14 @@ void  SkippedMBMotionComp(
 
     /* zero motion compensation for previous frame */
     /*mby*width + mbx;*/
-    c_prev  = prev->yChan + offset;
+    c_prev  = prev->yChan;
+    if (!c_prev) {
+        ALOGE("b/35269635");
+        android_errorWriteLog(0x534e4554, "35269635");
+        return;
+    }
+    c_prev += offset;
+
     /*by*width_uv + bx;*/
     cu_prev = prev->uChan + (offset >> 2) + (xpos >> 2);
     /*by*width_uv + bx;*/
