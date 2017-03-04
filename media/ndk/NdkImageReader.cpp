@@ -22,6 +22,7 @@
 #include "NdkImagePriv.h"
 #include "NdkImageReaderPriv.h"
 
+#include <cutils/atomic.h>
 #include <utils/Log.h>
 #include <android_runtime/android_view_Surface.h>
 

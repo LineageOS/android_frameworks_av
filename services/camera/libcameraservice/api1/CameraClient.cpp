@@ -17,6 +17,7 @@
 #define LOG_TAG "CameraClient"
 //#define LOG_NDEBUG 0
 
+#include <cutils/atomic.h>
 #include <cutils/properties.h>
 #include <gui/Surface.h>
 #include <media/hardware/HardwareAPI.h>

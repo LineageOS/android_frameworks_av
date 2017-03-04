@@ -32,6 +32,7 @@
 
 #include <AudioPolicyManagerInterface.h>
 #include <AudioPolicyEngineInstance.h>
+#include <cutils/atomic.h>
 #include <cutils/properties.h>
 #include <utils/Log.h>
 #include <media/AudioParameter.h>

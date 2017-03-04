@@ -22,6 +22,7 @@
 #include "TypeConverter.h"
 
 #include <log/log.h>
+#include <cutils/atomic.h>
 #include <utils/String8.h>
 
 namespace android {
