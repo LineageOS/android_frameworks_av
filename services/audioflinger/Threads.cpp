@@ -1422,7 +1422,8 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::ThreadBase::createEffect_l(
         audio_session_t sessionId,
         effect_descriptor_t *desc,
         int *enabled,
-        status_t *status)
+        status_t *status,
+        bool pinned)
 {
     sp<EffectModule> effect;
     sp<EffectHandle> handle;
@@ -1521,20 +1522,13 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::ThreadBase::createEffect_l(
             }
             effectRegistered = true;
             // create a new effect module if none present in the chain
-            effect = new EffectModule(this, chain, desc, id, sessionId);
-            lStatus = effect->status();
-            if (lStatus != NO_ERROR) {
-                goto Exit;
-            }
+            lStatus = chain->createEffect_l(effect, this, desc, id, sessionId, pinned);
 
             bool setVal = false;
             if (mType == OFFLOAD || (mType == DIRECT && mIsDirectPcm)) {
                 setVal = true;
             }
 
-            effect->setOffloaded(setVal, mId);
-
-            lStatus = chain->addEffect_l(effect);
             if (lStatus != NO_ERROR) {
                 goto Exit;
             }
@@ -1576,6 +1570,33 @@ Exit:
 
     *status = lStatus;
     return handle;
+}
+
+void AudioFlinger::ThreadBase::disconnectEffectHandle(EffectHandle *handle,
+                                                      bool unpinIfLast)
+{
+    bool remove = false;
+    sp<EffectModule> effect;
+    {
+        Mutex::Autolock _l(mLock);
+
+        effect = handle->effect().promote();
+        if (effect == 0) {
+            return;
+        }
+        // restore suspended effects if the disconnected handle was enabled and the last one.
+        remove = (effect->removeHandle(handle) == 0) && (!effect->isPinned() || unpinIfLast);
+        if (remove) {
+            removeEffect_l(effect, true);
+        }
+    }
+    if (remove) {
+        mAudioFlinger->updateOrphanEffectChains(effect);
+        AudioSystem::unregisterEffect(effect->id());
+        if (handle->enabled()) {
+            checkSuspendOnEffectEnabled(effect, false, effect->sessionId());
+        }
+    }
 }
 
 sp<AudioFlinger::EffectModule> AudioFlinger::ThreadBase::getEffect(audio_session_t sessionId,
@@ -1647,9 +1668,9 @@ status_t AudioFlinger::ThreadBase::addEffect_l(const sp<EffectModule>& effect)
     return NO_ERROR;
 }
 
-void AudioFlinger::ThreadBase::removeEffect_l(const sp<EffectModule>& effect) {
+void AudioFlinger::ThreadBase::removeEffect_l(const sp<EffectModule>& effect, bool release) {
 
-    ALOGV("removeEffect_l() %p effect %p", this, effect.get());
+    ALOGV("%s %p effect %p", __FUNCTION__, this, effect.get());
     effect_descriptor_t desc = effect->desc();
     if ((desc.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY) {
         detachAuxEffect_l(effect->id());
@@ -1658,7 +1679,7 @@ void AudioFlinger::ThreadBase::removeEffect_l(const sp<EffectModule>& effect) {
     sp<EffectChain> chain = effect->chain().promote();
     if (chain != 0) {
         // remove effect chain if removing last effect
-        if (chain->removeEffect_l(effect) == 0) {
+        if (chain->removeEffect_l(effect, release) == 0) {
             removeEffectChain_l(chain);
         }
     } else {

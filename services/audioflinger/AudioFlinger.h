@@ -607,6 +607,7 @@ private:
                 void        removeNotificationClient(pid_t pid);
                 bool isNonOffloadableGlobalEffectEnabled_l();
                 void onNonOffloadableGlobalEffectEnable();
+                bool isSessionAcquired_l(audio_session_t audioSession);
 
                 // Store an effect chain to mOrphanEffectChains keyed vector.
                 // Called when a thread exits and effects are still attached to it.
