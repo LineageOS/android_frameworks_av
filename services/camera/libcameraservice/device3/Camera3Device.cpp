@@ -933,8 +933,18 @@ status_t Camera3Device::submitRequestsHelper(
     return res;
 }
 
+
 hardware::Return<void> Camera3Device::processCaptureResult(
-        const device::V3_2::CaptureResult& result) {
+        const hardware::hidl_vec<
+                hardware::camera::device::V3_2::CaptureResult>& results) {
+    for (const auto& result : results) {
+        processOneCaptureResult(result);
+    }
+    return hardware::Void();
+}
+
+void Camera3Device::processOneCaptureResult(
+        const hardware::camera::device::V3_2::CaptureResult& result) {
     camera3_capture_result r;
     status_t res;
     r.frame_number = result.frameNumber;
@@ -944,7 +954,7 @@ hardware::Return<void> Camera3Device::processCaptureResult(
         if ((res = validate_camera_metadata_structure(r.result, &expected_metadata_size)) != OK) {
             ALOGE("%s: Frame %d: Invalid camera metadata received by camera service from HAL: %s (%d)",
                     __FUNCTION__, result.frameNumber, strerror(-res), res);
-            return hardware::Void();
+            return;
         }
     } else {
         r.result = nullptr;
@@ -960,7 +970,7 @@ hardware::Return<void> Camera3Device::processCaptureResult(
         if (idx == -1) {
             ALOGE("%s: Frame %d: Buffer %zu: Invalid output stream id %d",
                     __FUNCTION__, result.frameNumber, i, bSrc.streamId);
-            return hardware::Void();
+            return;
         }
         bDst.stream = mOutputStreams.valueAt(idx)->asHalStream();
 
@@ -969,7 +979,7 @@ hardware::Return<void> Camera3Device::processCaptureResult(
         if (res != OK) {
             ALOGE("%s: Frame %d: Buffer %zu: No in-flight buffer for stream %d",
                     __FUNCTION__, result.frameNumber, i, bSrc.streamId);
-            return hardware::Void();
+            return;
         }
         bDst.buffer = buffer;
         bDst.status = mapHidlBufferStatus(bSrc.status);
@@ -981,7 +991,7 @@ hardware::Return<void> Camera3Device::processCaptureResult(
         } else {
             ALOGE("%s: Frame %d: Invalid release fence for buffer %zu, fd count is %d, not 1",
                     __FUNCTION__, result.frameNumber, i, bSrc.releaseFence->numFds);
-            return hardware::Void();
+            return;
         }
     }
     r.num_output_buffers = outputBuffers.size();
@@ -994,7 +1004,7 @@ hardware::Return<void> Camera3Device::processCaptureResult(
         if (mInputStream->getId() != result.inputBuffer.streamId) {
             ALOGE("%s: Frame %d: Invalid input stream id %d", __FUNCTION__,
                     result.frameNumber, result.inputBuffer.streamId);
-            return hardware::Void();
+            return;
         }
         inputBuffer.stream = mInputStream->asHalStream();
         buffer_handle_t *buffer;
@@ -1003,7 +1013,7 @@ hardware::Return<void> Camera3Device::processCaptureResult(
         if (res != OK) {
             ALOGE("%s: Frame %d: Input buffer: No in-flight buffer for stream %d",
                     __FUNCTION__, result.frameNumber, result.inputBuffer.streamId);
-            return hardware::Void();
+            return;
         }
         inputBuffer.buffer = buffer;
         inputBuffer.status = mapHidlBufferStatus(result.inputBuffer.status);
@@ -1015,7 +1025,7 @@ hardware::Return<void> Camera3Device::processCaptureResult(
         } else {
             ALOGE("%s: Frame %d: Invalid release fence for input buffer, fd count is %d, not 1",
                     __FUNCTION__, result.frameNumber, result.inputBuffer.releaseFence->numFds);
-            return hardware::Void();
+            return;
         }
         r.input_buffer = &inputBuffer;
     }
@@ -1023,12 +1033,19 @@ hardware::Return<void> Camera3Device::processCaptureResult(
     r.partial_result = result.partialResult;
 
     processCaptureResult(&r);
-
-    return hardware::Void();
 }
 
 hardware::Return<void> Camera3Device::notify(
-        const NotifyMsg& msg) {
+        const hardware::hidl_vec<hardware::camera::device::V3_2::NotifyMsg>& msgs) {
+    for (const auto& msg : msgs) {
+        notify(msg);
+    }
+    return hardware::Void();
+}
+
+void Camera3Device::notify(
+        const hardware::camera::device::V3_2::NotifyMsg& msg) {
+
     camera3_notify_msg m;
     switch (msg.type) {
         case MsgType::ERROR:
@@ -1039,7 +1056,7 @@ hardware::Return<void> Camera3Device::notify(
                 if (idx == -1) {
                     ALOGE("%s: Frame %d: Invalid error stream id %d",
                             __FUNCTION__, m.message.error.frame_number, msg.msg.error.errorStreamId);
-                    return hardware::Void();
+                    return;
                 }
                 m.message.error.error_stream = mOutputStreams.valueAt(idx)->asHalStream();
             } else {
@@ -1067,8 +1084,6 @@ hardware::Return<void> Camera3Device::notify(
             break;
     }
     notify(&m);
-
-    return hardware::Void();
 }
 
 status_t Camera3Device::captureList(const List<const CameraMetadata> &requests,
@@ -3036,7 +3051,8 @@ Camera3Device::HalInterface::HalInterface() :
         mHal3Device(nullptr) {}
 
 Camera3Device::HalInterface::HalInterface(const HalInterface& other) :
-        mHal3Device(other.mHal3Device), mHidlSession(other.mHidlSession) {}
+        mHal3Device(other.mHal3Device),
+        mHidlSession(other.mHidlSession) {}
 
 bool Camera3Device::HalInterface::valid() {
     return (mHal3Device != nullptr) || (mHidlSession != nullptr);
@@ -3045,6 +3061,10 @@ bool Camera3Device::HalInterface::valid() {
 void Camera3Device::HalInterface::clear() {
     mHal3Device = nullptr;
     mHidlSession.clear();
+}
+
+bool Camera3Device::HalInterface::supportBatchRequest() {
+    return mHidlSession != nullptr;
 }
 
 status_t Camera3Device::HalInterface::constructDefaultRequestSettings(
@@ -3251,6 +3271,114 @@ status_t Camera3Device::HalInterface::configureStreams(camera3_stream_configurat
     return res;
 }
 
+void Camera3Device::HalInterface::wrapAsHidlRequest(camera3_capture_request_t* request,
+        /*out*/device::V3_2::CaptureRequest* captureRequest,
+        /*out*/std::vector<native_handle_t*>* handlesCreated) {
+
+    if (captureRequest == nullptr || handlesCreated == nullptr) {
+        ALOGE("%s: captureRequest (%p) and handlesCreated (%p) must not be null",
+                __FUNCTION__, captureRequest, handlesCreated);
+        return;
+    }
+
+    captureRequest->frameNumber = request->frame_number;
+    // A null request settings maps to a size-0 CameraMetadata
+    if (request->settings != nullptr) {
+        captureRequest->settings.setToExternal(
+                reinterpret_cast<uint8_t*>(const_cast<camera_metadata_t*>(request->settings)),
+                get_camera_metadata_size(request->settings));
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(mInflightLock);
+        if (request->input_buffer != nullptr) {
+            int32_t streamId = Camera3Stream::cast(request->input_buffer->stream)->getId();
+            buffer_handle_t buf = *(request->input_buffer->buffer);
+            auto pair = getBufferId(buf, streamId);
+            bool isNewBuffer = pair.first;
+            uint64_t bufferId = pair.second;
+            captureRequest->inputBuffer.streamId = streamId;
+            captureRequest->inputBuffer.bufferId = bufferId;
+            captureRequest->inputBuffer.buffer = (isNewBuffer) ? buf : nullptr;
+            captureRequest->inputBuffer.status = BufferStatus::OK;
+            native_handle_t *acquireFence = nullptr;
+            if (request->input_buffer->acquire_fence != -1) {
+                acquireFence = native_handle_create(1,0);
+                acquireFence->data[0] = request->input_buffer->acquire_fence;
+                handlesCreated->push_back(acquireFence);
+            }
+            captureRequest->inputBuffer.acquireFence = acquireFence;
+            captureRequest->inputBuffer.releaseFence = nullptr;
+
+            pushInflightBufferLocked(captureRequest->frameNumber, streamId,
+                    request->input_buffer->buffer,
+                    request->input_buffer->acquire_fence);
+        } else {
+            captureRequest->inputBuffer.streamId = -1;
+            captureRequest->inputBuffer.bufferId = BUFFER_ID_NO_BUFFER;
+        }
+
+        captureRequest->outputBuffers.resize(request->num_output_buffers);
+        for (size_t i = 0; i < request->num_output_buffers; i++) {
+            const camera3_stream_buffer_t *src = request->output_buffers + i;
+            StreamBuffer &dst = captureRequest->outputBuffers[i];
+            int32_t streamId = Camera3Stream::cast(src->stream)->getId();
+            buffer_handle_t buf = *(src->buffer);
+            auto pair = getBufferId(buf, streamId);
+            bool isNewBuffer = pair.first;
+            dst.streamId = streamId;
+            dst.bufferId = pair.second;
+            dst.buffer = isNewBuffer ? buf : nullptr;
+            dst.status = BufferStatus::OK;
+            native_handle_t *acquireFence = nullptr;
+            if (src->acquire_fence != -1) {
+                acquireFence = native_handle_create(1,0);
+                acquireFence->data[0] = src->acquire_fence;
+                handlesCreated->push_back(acquireFence);
+            }
+            dst.acquireFence = acquireFence;
+            dst.releaseFence = nullptr;
+
+            pushInflightBufferLocked(captureRequest->frameNumber, streamId,
+                    src->buffer, src->acquire_fence);
+        }
+    }
+}
+
+status_t Camera3Device::HalInterface::processBatchCaptureRequests(
+        std::vector<camera3_capture_request_t*>& requests,/*out*/uint32_t* numRequestProcessed) {
+    ATRACE_NAME("CameraHal::processBatchCaptureRequests");
+    if (!valid()) return INVALID_OPERATION;
+
+    hardware::hidl_vec<device::V3_2::CaptureRequest> captureRequests;
+    size_t batchSize = requests.size();
+    captureRequests.resize(batchSize);
+    std::vector<native_handle_t*> handlesCreated;
+
+    for (size_t i = 0; i < batchSize; i++) {
+        wrapAsHidlRequest(requests[i], /*out*/&captureRequests[i], /*out*/&handlesCreated);
+    }
+
+    common::V1_0::Status status = common::V1_0::Status::INTERNAL_ERROR;
+    *numRequestProcessed = 0;
+    mHidlSession->processCaptureRequest(captureRequests,
+            [&status, &numRequestProcessed] (auto s, uint32_t n) {
+                status = s;
+                *numRequestProcessed = n;
+            });
+
+    if (status == common::V1_0::Status::OK && *numRequestProcessed != batchSize) {
+        ALOGE("%s: processCaptureRequest returns OK but processed %d/%zu requests",
+                __FUNCTION__, *numRequestProcessed, batchSize);
+        status = common::V1_0::Status::INTERNAL_ERROR;
+    }
+
+    for (auto& handle : handlesCreated) {
+        native_handle_delete(handle);
+    }
+    return CameraProviderManager::mapToStatusT(status);
+}
+
 status_t Camera3Device::HalInterface::processCaptureRequest(
         camera3_capture_request_t *request) {
     ATRACE_NAME("CameraHal::processCaptureRequest");
@@ -3260,76 +3388,10 @@ status_t Camera3Device::HalInterface::processCaptureRequest(
     if (mHal3Device != nullptr) {
         res = mHal3Device->ops->process_capture_request(mHal3Device, request);
     } else {
-        device::V3_2::CaptureRequest captureRequest;
-        captureRequest.frameNumber = request->frame_number;
-        std::vector<native_handle_t*> handlesCreated;
-        // A null request settings maps to a size-0 CameraMetadata
-        if (request->settings != nullptr) {
-            captureRequest.settings.setToExternal(
-                    reinterpret_cast<uint8_t*>(const_cast<camera_metadata_t*>(request->settings)),
-                    get_camera_metadata_size(request->settings));
-        }
-
-        {
-            std::lock_guard<std::mutex> lock(mInflightLock);
-            if (request->input_buffer != nullptr) {
-                int32_t streamId = Camera3Stream::cast(request->input_buffer->stream)->getId();
-                buffer_handle_t buf = *(request->input_buffer->buffer);
-                auto pair = getBufferId(buf, streamId);
-                bool isNewBuffer = pair.first;
-                uint64_t bufferId = pair.second;
-                captureRequest.inputBuffer.streamId = streamId;
-                captureRequest.inputBuffer.bufferId = bufferId;
-                captureRequest.inputBuffer.buffer = (isNewBuffer) ? buf : nullptr;
-                captureRequest.inputBuffer.status = BufferStatus::OK;
-                native_handle_t *acquireFence = nullptr;
-                if (request->input_buffer->acquire_fence != -1) {
-                    acquireFence = native_handle_create(1,0);
-                    acquireFence->data[0] = request->input_buffer->acquire_fence;
-                    handlesCreated.push_back(acquireFence);
-                }
-                captureRequest.inputBuffer.acquireFence = acquireFence;
-                captureRequest.inputBuffer.releaseFence = nullptr;
-
-                pushInflightBufferLocked(captureRequest.frameNumber, streamId,
-                        request->input_buffer->buffer,
-                        request->input_buffer->acquire_fence);
-            } else {
-                captureRequest.inputBuffer.streamId = -1;
-                captureRequest.inputBuffer.bufferId = BUFFER_ID_NO_BUFFER;
-            }
-
-            captureRequest.outputBuffers.resize(request->num_output_buffers);
-            for (size_t i = 0; i < request->num_output_buffers; i++) {
-                const camera3_stream_buffer_t *src = request->output_buffers + i;
-                StreamBuffer &dst = captureRequest.outputBuffers[i];
-                int32_t streamId = Camera3Stream::cast(src->stream)->getId();
-                buffer_handle_t buf = *(src->buffer);
-                auto pair = getBufferId(buf, streamId);
-                bool isNewBuffer = pair.first;
-                dst.streamId = streamId;
-                dst.bufferId = pair.second;
-                dst.buffer = isNewBuffer ? buf : nullptr;
-                dst.status = BufferStatus::OK;
-                native_handle_t *acquireFence = nullptr;
-                if (src->acquire_fence != -1) {
-                    acquireFence = native_handle_create(1,0);
-                    acquireFence->data[0] = src->acquire_fence;
-                    handlesCreated.push_back(acquireFence);
-                }
-                dst.acquireFence = acquireFence;
-                dst.releaseFence = nullptr;
-
-                pushInflightBufferLocked(captureRequest.frameNumber, streamId,
-                        src->buffer, src->acquire_fence);
-            }
-        }
-        common::V1_0::Status status = mHidlSession->processCaptureRequest(captureRequest);
-
-        for (auto& handle : handlesCreated) {
-            native_handle_delete(handle);
-        }
-        res = CameraProviderManager::mapToStatusT(status);
+        uint32_t numRequestProcessed = 0;
+        std::vector<camera3_capture_request_t*> requests(1);
+        requests[0] = request;
+        res = processBatchCaptureRequests(requests, &numRequestProcessed);
     }
     return res;
 }
@@ -3757,6 +3819,128 @@ void Camera3Device::RequestThread::checkAndStopRepeatingRequest() {
     }
 }
 
+bool Camera3Device::RequestThread::sendRequestsBatch() {
+    status_t res;
+    size_t batchSize = mNextRequests.size();
+    std::vector<camera3_capture_request_t*> requests(batchSize);
+    uint32_t numRequestProcessed = 0;
+    for (size_t i = 0; i < batchSize; i++) {
+        requests[i] = &mNextRequests.editItemAt(i).halRequest;
+    }
+
+    ATRACE_ASYNC_BEGIN("batch frame capture", mNextRequests[0].halRequest.frame_number);
+    res = mInterface->processBatchCaptureRequests(requests, &numRequestProcessed);
+
+    bool triggerRemoveFailed = false;
+    NextRequest& triggerFailedRequest = mNextRequests.editItemAt(0);
+    for (size_t i = 0; i < numRequestProcessed; i++) {
+        NextRequest& nextRequest = mNextRequests.editItemAt(i);
+        nextRequest.submitted = true;
+
+
+        // Update the latest request sent to HAL
+        if (nextRequest.halRequest.settings != NULL) { // Don't update if they were unchanged
+            Mutex::Autolock al(mLatestRequestMutex);
+
+            camera_metadata_t* cloned = clone_camera_metadata(nextRequest.halRequest.settings);
+            mLatestRequest.acquire(cloned);
+
+            sp<Camera3Device> parent = mParent.promote();
+            if (parent != NULL) {
+                parent->monitorMetadata(TagMonitor::REQUEST,
+                        nextRequest.halRequest.frame_number,
+                        0, mLatestRequest);
+            }
+        }
+
+        if (nextRequest.halRequest.settings != NULL) {
+            nextRequest.captureRequest->mSettings.unlock(nextRequest.halRequest.settings);
+        }
+
+        if (!triggerRemoveFailed) {
+            // Remove any previously queued triggers (after unlock)
+            status_t removeTriggerRes = removeTriggers(mPrevRequest);
+            if (removeTriggerRes != OK) {
+                triggerRemoveFailed = true;
+                triggerFailedRequest = nextRequest;
+            }
+        }
+    }
+
+    if (triggerRemoveFailed) {
+        SET_ERR("RequestThread: Unable to remove triggers "
+              "(capture request %d, HAL device: %s (%d)",
+              triggerFailedRequest.halRequest.frame_number, strerror(-res), res);
+        cleanUpFailedRequests(/*sendRequestError*/ false);
+        return false;
+    }
+
+    if (res != OK) {
+        // Should only get a failure here for malformed requests or device-level
+        // errors, so consider all errors fatal.  Bad metadata failures should
+        // come through notify.
+        SET_ERR("RequestThread: Unable to submit capture request %d to HAL device: %s (%d)",
+                mNextRequests[numRequestProcessed].halRequest.frame_number,
+                strerror(-res), res);
+        cleanUpFailedRequests(/*sendRequestError*/ false);
+        return false;
+    }
+    return true;
+}
+
+bool Camera3Device::RequestThread::sendRequestsOneByOne() {
+    status_t res;
+
+    for (auto& nextRequest : mNextRequests) {
+        // Submit request and block until ready for next one
+        ATRACE_ASYNC_BEGIN("frame capture", nextRequest.halRequest.frame_number);
+        res = mInterface->processCaptureRequest(&nextRequest.halRequest);
+
+        if (res != OK) {
+            // Should only get a failure here for malformed requests or device-level
+            // errors, so consider all errors fatal.  Bad metadata failures should
+            // come through notify.
+            SET_ERR("RequestThread: Unable to submit capture request %d to HAL"
+                    " device: %s (%d)", nextRequest.halRequest.frame_number, strerror(-res),
+                    res);
+            cleanUpFailedRequests(/*sendRequestError*/ false);
+            return false;
+        }
+
+        // Mark that the request has be submitted successfully.
+        nextRequest.submitted = true;
+
+        // Update the latest request sent to HAL
+        if (nextRequest.halRequest.settings != NULL) { // Don't update if they were unchanged
+            Mutex::Autolock al(mLatestRequestMutex);
+
+            camera_metadata_t* cloned = clone_camera_metadata(nextRequest.halRequest.settings);
+            mLatestRequest.acquire(cloned);
+
+            sp<Camera3Device> parent = mParent.promote();
+            if (parent != NULL) {
+                parent->monitorMetadata(TagMonitor::REQUEST, nextRequest.halRequest.frame_number,
+                        0, mLatestRequest);
+            }
+        }
+
+        if (nextRequest.halRequest.settings != NULL) {
+            nextRequest.captureRequest->mSettings.unlock(nextRequest.halRequest.settings);
+        }
+
+        // Remove any previously queued triggers (after unlock)
+        res = removeTriggers(mPrevRequest);
+        if (res != OK) {
+            SET_ERR("RequestThread: Unable to remove triggers "
+                  "(capture request %d, HAL device: %s (%d)",
+                  nextRequest.halRequest.frame_number, strerror(-res), res);
+            cleanUpFailedRequests(/*sendRequestError*/ false);
+            return false;
+        }
+    }
+    return true;
+}
+
 bool Camera3Device::RequestThread::threadLoop() {
     ATRACE_CALL();
     status_t res;
@@ -3819,58 +4003,12 @@ bool Camera3Device::RequestThread::threadLoop() {
 
     ALOGVV("%s: %d: submitting %zu requests in a batch.", __FUNCTION__, __LINE__,
             mNextRequests.size());
-    for (auto& nextRequest : mNextRequests) {
-        // Submit request and block until ready for next one
-        ATRACE_ASYNC_BEGIN("frame capture", nextRequest.halRequest.frame_number);
-        res = mInterface->processCaptureRequest(&nextRequest.halRequest);
 
-        if (res != OK) {
-            // Should only get a failure here for malformed requests or device-level
-            // errors, so consider all errors fatal.  Bad metadata failures should
-            // come through notify.
-            SET_ERR("RequestThread: Unable to submit capture request %d to HAL"
-                    " device: %s (%d)", nextRequest.halRequest.frame_number, strerror(-res),
-                    res);
-            cleanUpFailedRequests(/*sendRequestError*/ false);
-            if (useFlushLock) {
-                mFlushLock.unlock();
-            }
-            return false;
-        }
-
-        // Mark that the request has be submitted successfully.
-        nextRequest.submitted = true;
-
-        // Update the latest request sent to HAL
-        if (nextRequest.halRequest.settings != NULL) { // Don't update if they were unchanged
-            Mutex::Autolock al(mLatestRequestMutex);
-
-            camera_metadata_t* cloned = clone_camera_metadata(nextRequest.halRequest.settings);
-            mLatestRequest.acquire(cloned);
-
-            sp<Camera3Device> parent = mParent.promote();
-            if (parent != NULL) {
-                parent->monitorMetadata(TagMonitor::REQUEST, nextRequest.halRequest.frame_number,
-                        0, mLatestRequest);
-            }
-        }
-
-        if (nextRequest.halRequest.settings != NULL) {
-            nextRequest.captureRequest->mSettings.unlock(nextRequest.halRequest.settings);
-        }
-
-        // Remove any previously queued triggers (after unlock)
-        res = removeTriggers(mPrevRequest);
-        if (res != OK) {
-            SET_ERR("RequestThread: Unable to remove triggers "
-                  "(capture request %d, HAL device: %s (%d)",
-                  nextRequest.halRequest.frame_number, strerror(-res), res);
-            cleanUpFailedRequests(/*sendRequestError*/ false);
-            if (useFlushLock) {
-                mFlushLock.unlock();
-            }
-            return false;
-        }
+    bool submitRequestSuccess = false;
+    if (mInterface->supportBatchRequest()) {
+        submitRequestSuccess = sendRequestsBatch();
+    } else {
+        submitRequestSuccess = sendRequestsOneByOne();
     }
 
     if (useFlushLock) {
@@ -3883,7 +4021,7 @@ bool Camera3Device::RequestThread::threadLoop() {
         mNextRequests.clear();
     }
 
-    return true;
+    return submitRequestSuccess;
 }
 
 status_t Camera3Device::RequestThread::prepareHalRequests() {
