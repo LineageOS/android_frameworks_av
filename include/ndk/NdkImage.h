@@ -54,6 +54,97 @@ typedef struct AImage AImage;
 // Formats not listed here will not be supported by AImageReader
 enum AIMAGE_FORMATS {
     /**
+     * 32 bits RGBA format, 8 bits for each of the four channels.
+     *
+     * <p>
+     * Corresponding formats:
+     * <ul>
+     * <li>AHardwareBuffer: AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM</li>
+     * <li>Vulkan: VK_FORMAT_R8G8B8A8_UNORM</li>
+     * <li>OpenGL ES: GL_RGBA8</li>
+     * </ul>
+     * </p>
+     *
+     * @see AImage
+     * @see AImageReader
+     * @see AHardwareBuffer
+     */
+    AIMAGE_FORMAT_RGBA_8888         = 0x1,
+
+    /**
+     * 32 bits RGBX format, 8 bits for each of the four channels.
+     *
+     * <p>
+     * Corresponding formats:
+     * <ul>
+     * <li>AHardwareBuffer: AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM</li>
+     * <li>Vulkan: VK_FORMAT_R8G8B8A8_UNORM</li>
+     * <li>OpenGL ES: GL_RGBA8</li>
+     * </ul>
+     * </p>
+     *
+     * @see AImage
+     * @see AImageReader
+     * @see AHardwareBuffer
+     */
+    AIMAGE_FORMAT_RGBX_8888         = 0x2,
+
+    /**
+     * 24 bits RGB format, 8 bits for each of the three channels.
+     *
+     * <p>
+     * Corresponding formats:
+     * <ul>
+     * <li>AHardwareBuffer: AHARDWAREBUFFER_FORMAT_R8G8B8_UNORM</li>
+     * <li>Vulkan: VK_FORMAT_R8G8B8_UNORM</li>
+     * <li>OpenGL ES: GL_RGB8</li>
+     * </ul>
+     * </p>
+     *
+     * @see AImage
+     * @see AImageReader
+     * @see AHardwareBuffer
+     */
+    AIMAGE_FORMAT_RGB_888           = 0x3,
+
+    /**
+     * 16 bits RGB format, 5 bits for Red channel, 6 bits for Green channel,
+     * and 5 bits for Blue channel.
+     *
+     * <p>
+     * Corresponding formats:
+     * <ul>
+     * <li>AHardwareBuffer: AHARDWAREBUFFER_FORMAT_R5G6B5_UNORM</li>
+     * <li>Vulkan: VK_FORMAT_R5G6B5_UNORM_PACK16</li>
+     * <li>OpenGL ES: GL_RGB565</li>
+     * </ul>
+     * </p>
+     *
+     * @see AImage
+     * @see AImageReader
+     * @see AHardwareBuffer
+     */
+    AIMAGE_FORMAT_RGB_565           = 0x4,
+
+    /**
+     * 64 bits RGBA format, 16 bits for each of the four channels.
+     *
+     * <p>
+     * Corresponding formats:
+     * <ul>
+     * <li>AHardwareBuffer: AHARDWAREBUFFER_FORMAT_R16G16B16A16_SFLOAT</li>
+     * <li>Vulkan: VK_FORMAT_R16G16B16A16_SFLOAT</li>
+     * <li>OpenGL ES: GL_RGBA16F</li>
+     * </ul>
+     * </p>
+     *
+     * @see AImage
+     * @see AImageReader
+     * @see AHardwareBuffer
+     */
+    AIMAGE_FORMAT_RGBA_FP16         = 0x16,
+
+    /**
      * Multi-plane Android YUV 420 format.
      *
      * <p>This format is a generic YCbCr format, capable of describing any 4:2:0
