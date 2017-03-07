@@ -49,6 +49,7 @@ NuPlayerDriver::NuPlayerDriver(pid_t pid)
       mSeekInProgress(false),
       mPlayingTimeUs(0),
       mLooper(new ALooper),
+      mPlayer(new NuPlayer(pid)),
       mPlayerFlags(0),
       mAnalyticsItem(NULL),
       mAtEOS(false),
@@ -66,7 +67,6 @@ NuPlayerDriver::NuPlayerDriver(pid_t pid)
             true,  /* canCallJava */
             PRIORITY_AUDIO);
 
-    mPlayer = new NuPlayer(pid);
     mLooper->registerHandler(mPlayer);
 
     mPlayer->setDriver(this);
@@ -998,8 +998,6 @@ status_t NuPlayerDriver::prepareDrm(const uint8_t uuid[16], const Vector<uint8_t
 {
     ALOGV("prepareDrm(%p) state: %d", this, mState);
 
-    Mutex::Autolock autoLock(mLock);
-
     // leaving the state verification for mediaplayer.cpp
     status_t ret = mPlayer->prepareDrm(uuid, drmSessionId);
 
@@ -1011,8 +1009,6 @@ status_t NuPlayerDriver::prepareDrm(const uint8_t uuid[16], const Vector<uint8_t
 status_t NuPlayerDriver::releaseDrm()
 {
     ALOGV("releaseDrm(%p) state: %d", this, mState);
-
-    Mutex::Autolock autoLock(mLock);
 
     // leaving the state verification for mediaplayer.cpp
     status_t ret = mPlayer->releaseDrm();

@@ -127,7 +127,7 @@ private:
     // <<<
 
     sp<ALooper> mLooper;
-    sp<NuPlayer> mPlayer;
+    const sp<NuPlayer> mPlayer;
     sp<AudioSink> mAudioSink;
     uint32_t mPlayerFlags;
 
