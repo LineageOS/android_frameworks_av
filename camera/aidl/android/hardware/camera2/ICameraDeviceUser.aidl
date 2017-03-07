@@ -54,6 +54,22 @@ interface ICameraDeviceUser
     void beginConfigure();
 
     /**
+     * The standard operating mode for a camera device; all API guarantees are in force
+     */
+    const int NORMAL_MODE = 0;
+
+    /**
+     * High-speed recording mode; only two outputs targeting preview and video recording may be
+     * used, and requests must be batched.
+     */
+    const int CONSTRAINED_HIGH_SPEED_MODE = 1;
+
+    /**
+     * Start of custom vendor modes
+     */
+    const int VENDOR_MODE_START = 0x8000;
+
+    /**
      * End the device configuration.
      *
      * <p>
@@ -61,8 +77,10 @@ interface ICameraDeviceUser
      * a call to beginConfigure and subsequent createStream/deleteStream calls).  This
      * must be called before any requests can be submitted.
      * <p>
+     * @param operatingMode The kind of session to create; either NORMAL_MODE or
+     *     CONSTRAINED_HIGH_SPEED_MODE. Must be a non-negative value.
      */
-    void endConfigure(boolean isConstrainedHighSpeed);
+    void endConfigure(int operatingMode);
 
     void deleteStream(int streamId);
 

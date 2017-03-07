@@ -70,70 +70,70 @@ public:
             const hardware::camera2::CaptureRequest& request,
             bool streaming = false,
             /*out*/
-            hardware::camera2::utils::SubmitInfo *submitInfo = nullptr);
+            hardware::camera2::utils::SubmitInfo *submitInfo = nullptr) override;
     // List of requests are copied.
     virtual binder::Status submitRequestList(
             const std::vector<hardware::camera2::CaptureRequest>& requests,
             bool streaming = false,
             /*out*/
-            hardware::camera2::utils::SubmitInfo *submitInfo = nullptr);
+            hardware::camera2::utils::SubmitInfo *submitInfo = nullptr) override;
     virtual binder::Status cancelRequest(int requestId,
             /*out*/
-            int64_t* lastFrameNumber = NULL);
+            int64_t* lastFrameNumber = NULL) override;
 
-    virtual binder::Status beginConfigure();
+    virtual binder::Status beginConfigure() override;
 
-    virtual binder::Status endConfigure(bool isConstrainedHighSpeed = false);
+    virtual binder::Status endConfigure(int operatingMode) override;
 
     // Returns -EBUSY if device is not idle
-    virtual binder::Status deleteStream(int streamId);
+    virtual binder::Status deleteStream(int streamId) override;
 
     virtual binder::Status createStream(
             const hardware::camera2::params::OutputConfiguration &outputConfiguration,
             /*out*/
-            int32_t* newStreamId = NULL);
+            int32_t* newStreamId = NULL) override;
 
     // Create an input stream of width, height, and format.
     virtual binder::Status createInputStream(int width, int height, int format,
             /*out*/
-            int32_t* newStreamId = NULL);
+            int32_t* newStreamId = NULL) override;
 
     // Get the buffer producer of the input stream
     virtual binder::Status getInputSurface(
             /*out*/
-            view::Surface *inputSurface);
+            view::Surface *inputSurface) override;
 
     // Create a request object from a template.
     virtual binder::Status createDefaultRequest(int templateId,
             /*out*/
-            hardware::camera2::impl::CameraMetadataNative* request);
+            hardware::camera2::impl::CameraMetadataNative* request) override;
 
     // Get the static metadata for the camera
     // -- Caller owns the newly allocated metadata
     virtual binder::Status getCameraInfo(
             /*out*/
-            hardware::camera2::impl::CameraMetadataNative* cameraCharacteristics);
+            hardware::camera2::impl::CameraMetadataNative* cameraCharacteristics) override;
 
     // Wait until all the submitted requests have finished processing
-    virtual binder::Status waitUntilIdle();
+    virtual binder::Status waitUntilIdle() override;
 
     // Flush all active and pending requests as fast as possible
     virtual binder::Status flush(
             /*out*/
-            int64_t* lastFrameNumber = NULL);
+            int64_t* lastFrameNumber = NULL) override;
 
     // Prepare stream by preallocating its buffers
-    virtual binder::Status prepare(int32_t streamId);
+    virtual binder::Status prepare(int32_t streamId) override;
 
     // Tear down stream resources by freeing its unused buffers
-    virtual binder::Status tearDown(int32_t streamId);
+    virtual binder::Status tearDown(int32_t streamId) override;
 
     // Prepare stream by preallocating up to maxCount of its buffers
-    virtual binder::Status prepare2(int32_t maxCount, int32_t streamId);
+    virtual binder::Status prepare2(int32_t maxCount, int32_t streamId) override;
 
     // Finalize the output configurations with surfaces not added before.
     virtual binder::Status finalizeOutputConfigurations(int32_t streamId,
-            const hardware::camera2::params::OutputConfiguration &outputConfiguration);
+            const hardware::camera2::params::OutputConfiguration &outputConfiguration) override;
 
     /**
      * Interface used by CameraService
