@@ -515,7 +515,7 @@ class Camera3Device :
      * Take the currently-defined set of streams and configure the HAL to use
      * them. This is a long-running operation (may be several hundered ms).
      */
-    status_t           configureStreamsLocked();
+    status_t           configureStreamsLocked(int operatingMode);
 
     /**
      * Cancel stream configuration that did not finish successfully.
