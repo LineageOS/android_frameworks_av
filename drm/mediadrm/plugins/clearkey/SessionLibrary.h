@@ -31,9 +31,9 @@ class SessionLibrary {
 public:
     static SessionLibrary* get();
 
-    const android::sp<Session>& createSession();
+    android::sp<Session> createSession();
 
-    const android::sp<Session>& findSession(
+    android::sp<Session> findSession(
             const android::Vector<uint8_t>& sessionId);
 
     void destroySession(const android::sp<Session>& session);
@@ -48,7 +48,7 @@ private:
 
     android::Mutex mSessionsLock;
     uint32_t mNextSessionId;
-    android::DefaultKeyedVector<android::Vector<uint8_t>, android::sp<Session> >
+    android::KeyedVector<android::Vector<uint8_t>, android::sp<Session> >
             mSessions;
 };
 

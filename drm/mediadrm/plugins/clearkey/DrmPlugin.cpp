@@ -39,8 +39,9 @@ status_t DrmPlugin::closeSession(const Vector<uint8_t>& sessionId) {
     sp<Session> session = mSessionLibrary->findSession(sessionId);
     if (session.get()) {
         mSessionLibrary->destroySession(session);
+        return android::OK;
     }
-    return android::OK;
+    return android::ERROR_DRM_SESSION_NOT_OPENED;
 }
 
 status_t DrmPlugin::getKeyRequest(
