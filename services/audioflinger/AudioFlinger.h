@@ -563,6 +563,7 @@ private:
         virtual status_t getMmapPosition(struct audio_mmap_position *position);
         virtual status_t start(const MmapStreamInterface::Client& client, audio_port_handle_t *handle);
         virtual status_t stop(audio_port_handle_t handle);
+        virtual status_t standby();
 
     private:
         sp<MmapThread> mThread;

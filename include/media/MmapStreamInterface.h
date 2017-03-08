@@ -75,6 +75,7 @@ class MmapStreamInterface : public virtual RefBase
 
     /**
      * Retrieve information on the mmap buffer used for audio samples transfer.
+     * Must be called before any other method after opening the stream or entering standby.
      *
      * \param[in] min_size_frames minimum buffer size requested. The actual buffer
      *        size returned in struct audio_mmap_buffer_info can be larger.
@@ -94,6 +95,7 @@ class MmapStreamInterface : public virtual RefBase
      * \param[out] position address at which the mmap read/write position should be returned.
      *
      * \return OK if the position is successfully returned.
+     *         NO_INIT in case of initialization error
      *         NOT_ENOUGH_DATA if the position cannot be retrieved
      *         INVALID_OPERATION if called before createMmapBuffer()
      */
@@ -106,6 +108,7 @@ class MmapStreamInterface : public virtual RefBase
      * \param[in] client a Client struct describing the client starting on this stream.
      * \param[out] handle unique handle for this instance. Used with stop().
      * \return OK in case of success.
+     *         NO_INIT in case of initialization error
      *         INVALID_OPERATION if called out of sequence
      */
     virtual status_t start(const Client& client, audio_port_handle_t *handle) = 0;
@@ -116,9 +119,22 @@ class MmapStreamInterface : public virtual RefBase
      *
      * \param[in] handle unique handle allocated by start().
      * \return OK in case of success.
+     *         NO_INIT in case of initialization error
      *         INVALID_OPERATION if called out of sequence
      */
     virtual status_t stop(audio_port_handle_t handle) = 0;
+
+    /**
+     * Put a stream operating in mmap mode into standby.
+     * Must be called after createMmapBuffer(). Cannot be called if any client is active.
+     * It is recommended to place a mmap stream into standby as often as possible when no client is
+     * active to save power.
+     *
+     * \return OK in case of success.
+     *         NO_INIT in case of initialization error
+     *         INVALID_OPERATION if called out of sequence
+     */
+    virtual status_t standby() = 0;
 
   protected:
     // Subclasses can not be constructed directly by clients.
