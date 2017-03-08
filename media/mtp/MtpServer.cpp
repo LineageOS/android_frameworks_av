@@ -54,7 +54,7 @@ static const MtpOperationCode kSupportedOperationCodes[] = {
     MTP_OPERATION_SEND_OBJECT,
 //    MTP_OPERATION_INITIATE_CAPTURE,
 //    MTP_OPERATION_FORMAT_STORE,
-//    MTP_OPERATION_RESET_DEVICE,
+    MTP_OPERATION_RESET_DEVICE,
 //    MTP_OPERATION_SELF_TEST,
 //    MTP_OPERATION_SET_OBJECT_PROTECTION,
 //    MTP_OPERATION_POWER_DOWN,
@@ -362,6 +362,7 @@ bool MtpServer::handleRequest() {
         case MTP_OPERATION_OPEN_SESSION:
             response = doOpenSession();
             break;
+        case MTP_OPERATION_RESET_DEVICE:
         case MTP_OPERATION_CLOSE_SESSION:
             response = doCloseSession();
             break;
