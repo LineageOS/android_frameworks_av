@@ -38,6 +38,22 @@ static const int kDumpLockSleepUs = 20000;
 
 namespace android {
 
+// key for media statistics
+static const char *kKeyPlayer = "nuplayer";
+// attrs for media statistics
+static const char *kPlayerVMime = "android.media.mediaplayer.video.mime";
+static const char *kPlayerVCodec = "android.media.mediaplayer.video.codec";
+static const char *kPlayerWidth = "android.media.mediaplayer.width";
+static const char *kPlayerHeight = "android.media.mediaplayer.height";
+static const char *kPlayerFrames = "android.media.mediaplayer.frames";
+static const char *kPlayerFramesDropped = "android.media.mediaplayer.dropped";
+static const char *kPlayerAMime = "android.media.mediaplayer.audio.mime";
+static const char *kPlayerACodec = "android.media.mediaplayer.audio.codec";
+static const char *kPlayerDuration = "android.media.mediaplayer.durationMs";
+static const char *kPlayerPlaying = "android.media.mediaplayer.playingMs";
+static const char *kPlayerError = "android.media.mediaplayer.err";
+static const char *kPlayerErrorCode = "android.media.mediaplayer.errcode";
+
 
 NuPlayerDriver::NuPlayerDriver(pid_t pid)
     : mState(STATE_IDLE),
@@ -59,7 +75,7 @@ NuPlayerDriver::NuPlayerDriver(pid_t pid)
     mLooper->setName("NuPlayerDriver Looper");
 
     // set up an analytics record
-    mAnalyticsItem = new MediaAnalyticsItem("nuplayer");
+    mAnalyticsItem = new MediaAnalyticsItem(kKeyPlayer);
     mAnalyticsItem->generateSessionID();
 
     mLooper->start(
@@ -499,7 +515,7 @@ void NuPlayerDriver::finalizeMetrics(const char *where) {
     if (where == NULL) {
         where = "unknown";
     }
-    ALOGD("finalizeMetrics(%p) from %s at state %d", this, where, mState);
+    ALOGV("finalizeMetrics(%p) from %s at state %d", this, where, mState);
 
     // gather the final stats for this record
     Vector<sp<AMessage>> trackStats;
@@ -517,15 +533,15 @@ void NuPlayerDriver::finalizeMetrics(const char *where) {
 
             if (mime.startsWith("video/")) {
                 int32_t width, height;
-                mAnalyticsItem->setCString("video/mime", mime.c_str());
+                mAnalyticsItem->setCString(kPlayerVMime, mime.c_str());
                 if (!name.empty()) {
-                    mAnalyticsItem->setCString("video/codec", name.c_str());
+                    mAnalyticsItem->setCString(kPlayerVCodec, name.c_str());
                 }
 
                 if (stats->findInt32("width", &width)
                         && stats->findInt32("height", &height)) {
-                    mAnalyticsItem->setInt32("wid", width);
-                    mAnalyticsItem->setInt32("ht", height);
+                    mAnalyticsItem->setInt32(kPlayerWidth, width);
+                    mAnalyticsItem->setInt32(kPlayerHeight, height);
                 }
 
                 int64_t numFramesTotal = 0;
@@ -533,14 +549,14 @@ void NuPlayerDriver::finalizeMetrics(const char *where) {
                 stats->findInt64("frames-total", &numFramesTotal);
                 stats->findInt64("frames-dropped-output", &numFramesDropped);
 
-                mAnalyticsItem->setInt64("frames", numFramesTotal);
-                mAnalyticsItem->setInt64("dropped", numFramesDropped);
+                mAnalyticsItem->setInt64(kPlayerFrames, numFramesTotal);
+                mAnalyticsItem->setInt64(kPlayerFramesDropped, numFramesDropped);
 
 
             } else if (mime.startsWith("audio/")) {
-                mAnalyticsItem->setCString("audio/mime", mime.c_str());
+                mAnalyticsItem->setCString(kPlayerAMime, mime.c_str());
                 if (!name.empty()) {
-                    mAnalyticsItem->setCString("audio/codec", name.c_str());
+                    mAnalyticsItem->setCString(kPlayerACodec, name.c_str());
                 }
             }
         }
@@ -549,11 +565,11 @@ void NuPlayerDriver::finalizeMetrics(const char *where) {
         int duration_ms = -1;
         getDuration(&duration_ms);
         if (duration_ms != -1) {
-            mAnalyticsItem->setInt64("duration", duration_ms);
+            mAnalyticsItem->setInt64(kPlayerDuration, duration_ms);
         }
 
         if (mPlayingTimeUs > 0) {
-            mAnalyticsItem->setInt64("playing", (mPlayingTimeUs+500)/1000 );
+            mAnalyticsItem->setInt64(kPlayerPlaying, (mPlayingTimeUs+500)/1000 );
         }
     }
 }
@@ -563,7 +579,7 @@ void NuPlayerDriver::logMetrics(const char *where) {
     if (where == NULL) {
         where = "unknown";
     }
-    ALOGD("logMetrics(%p) from %s at state %d", this, where, mState);
+    ALOGV("logMetrics(%p) from %s at state %d", this, where, mState);
 
     if (mAnalyticsItem == NULL || mAnalyticsItem->isEnabled() == false) {
         return;
@@ -923,6 +939,15 @@ void NuPlayerDriver::notifyListener_l(
 
         case MEDIA_ERROR:
         {
+            // when we have an error, add it to the analytics for this playback.
+            // ext1 is our primary 'error type' value. Only add ext2 when non-zero.
+            // [test against msg is due to fall through from previous switch value]
+            if (msg == MEDIA_ERROR) {
+                mAnalyticsItem->setInt32(kPlayerError, ext1);
+                if (ext2 != 0) {
+                    mAnalyticsItem->setInt32(kPlayerErrorCode, ext2);
+                }
+            }
             mAtEOS = true;
             break;
         }
