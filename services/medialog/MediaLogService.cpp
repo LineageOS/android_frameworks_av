@@ -27,6 +27,23 @@
 namespace android {
 
 // static const char kDeadlockedString[] = "MediaLogService may be deadlocked\n";
+MediaLogService::MediaLogService() :
+    BnMediaLogService(),
+    mMergerShared((NBLog::Shared*) malloc(NBLog::Timeline::sharedSize(kMergeBufferSize))),
+    mMerger(mMergerShared, kMergeBufferSize),
+    mMergeReader(mMergerShared, kMergeBufferSize, mMerger),
+    mMergeThread(new NBLog::MergeThread(mMerger))
+{
+    mMergeThread->run("MergeThread");
+}
+
+MediaLogService::~MediaLogService()
+{
+    mMergeThread->requestExit();
+    mMergeThread->setTimeoutUs(0);
+    mMergeThread->join();
+    free(mMergerShared);
+}
 
 void MediaLogService::registerWriter(const sp<IMemory>& shared, size_t size, const char *name)
 {
@@ -111,8 +128,7 @@ status_t MediaLogService::dump(int fd, const Vector<String16>& args __unused)
         mLock.unlock();
     }
 #endif
-
-    mMerger.merge();
+    // FIXME request merge to make sure log is up to date
     mMergeReader.dump(fd);
     return NO_ERROR;
 }
@@ -121,6 +137,10 @@ status_t MediaLogService::onTransact(uint32_t code, const Parcel& data, Parcel* 
         uint32_t flags)
 {
     return BnMediaLogService::onTransact(code, data, reply, flags);
+}
+
+void MediaLogService::requestMergeWakeup() {
+    mMergeThread->wakeup();
 }
 
 }   // namespace android

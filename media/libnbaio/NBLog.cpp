@@ -17,6 +17,7 @@
 #define LOG_TAG "NBLog"
 //#define LOG_NDEBUG 0
 
+#include <climits>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -956,6 +957,44 @@ size_t NBLog::MergeReader::handleAuthor(const NBLog::FormatEntry &fmtEntry, Stri
     const char* name = (*mNamedReaders)[author].name();
     body->appendFormat("%s: ", name);
     return NBLog::Entry::kOverhead + sizeof(author);
+}
+
+NBLog::MergeThread::MergeThread(NBLog::Merger &merger)
+    : mMerger(merger),
+      mTimeoutUs(0) {}
+
+NBLog::MergeThread::~MergeThread() {
+    // set exit flag, set timeout to 0 to force threadLoop to exit and wait for the thread to join
+    requestExit();
+    setTimeoutUs(0);
+    join();
+}
+
+bool NBLog::MergeThread::threadLoop() {
+    bool doMerge;
+    {
+        AutoMutex _l(mMutex);
+        // If mTimeoutUs is negative, wait on the condition variable until it's positive.
+        // If it's positive, wait kThreadSleepPeriodUs and then merge
+        nsecs_t waitTime = mTimeoutUs > 0 ? kThreadSleepPeriodUs * 1000 : LLONG_MAX;
+        mCond.waitRelative(mMutex, waitTime);
+        doMerge = mTimeoutUs > 0;
+        mTimeoutUs -= kThreadSleepPeriodUs;
+    }
+    if (doMerge) {
+        mMerger.merge();
+    }
+    return true;
+}
+
+void NBLog::MergeThread::wakeup() {
+    setTimeoutUs(kThreadWakeupPeriodUs);
+}
+
+void NBLog::MergeThread::setTimeoutUs(int time) {
+    AutoMutex _l(mMutex);
+    mTimeoutUs = time;
+    mCond.signal();
 }
 
 }   // namespace android

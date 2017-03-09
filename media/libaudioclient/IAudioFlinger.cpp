@@ -935,7 +935,6 @@ public:
         }
         return reply.readInt64();
     }
-
 };
 
 IMPLEMENT_META_INTERFACE(AudioFlinger, "android.media.IAudioFlinger");
@@ -945,6 +944,29 @@ IMPLEMENT_META_INTERFACE(AudioFlinger, "android.media.IAudioFlinger");
 status_t BnAudioFlinger::onTransact(
     uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
+    // Whitelist of relevant events to trigger log merging.
+    // Log merging should activate during audio activity of any kind. This are considered the
+    // most relevant events.
+    // TODO should select more wisely the items from the list
+    switch (code) {
+        case CREATE_TRACK:
+        case OPEN_RECORD:
+        case SET_MASTER_VOLUME:
+        case SET_MASTER_MUTE:
+        case SET_STREAM_VOLUME:
+        case SET_STREAM_MUTE:
+        case SET_MIC_MUTE:
+        case SET_PARAMETERS:
+        case OPEN_INPUT:
+        case SET_VOICE_VOLUME:
+        case CREATE_EFFECT:
+        case SYSTEM_READY: {
+            requestLogMerge();
+            break;
+        }
+        default:
+            break;
+    }
     switch (code) {
         case CREATE_TRACK: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);

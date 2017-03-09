@@ -129,6 +129,7 @@ std::string formatToString(audio_format_t format) {
 
 AudioFlinger::AudioFlinger()
     : BnAudioFlinger(),
+      mMediaLogNotifier(new AudioFlinger::MediaLogNotifier()),
       mPrimaryHardwareDev(NULL),
       mAudioHwDevs(NULL),
       mHardwareStatus(AUDIO_HW_IDLE),
@@ -162,6 +163,8 @@ AudioFlinger::AudioFlinger()
 
     mDevicesFactoryHal = DevicesFactoryHalInterface::create();
     mEffectsFactoryHal = EffectsFactoryHalInterface::create();
+
+    mMediaLogNotifier->run("MediaLogNotifier");
 
 #ifdef TEE_SINK
     char value[PROPERTY_VALUE_MAX];
@@ -1528,6 +1531,41 @@ void AudioFlinger::NotificationClient::binderDied(const wp<IBinder>& who __unuse
     mAudioFlinger->removeNotificationClient(mPid);
 }
 
+// ----------------------------------------------------------------------------
+AudioFlinger::MediaLogNotifier::MediaLogNotifier()
+    : mPendingRequests(false) {}
+
+
+void AudioFlinger::MediaLogNotifier::requestMerge() {
+    AutoMutex _l(mMutex);
+    mPendingRequests = true;
+    mCond.signal();
+}
+
+bool AudioFlinger::MediaLogNotifier::threadLoop() {
+    // Wait until there are pending requests
+    {
+        AutoMutex _l(mMutex);
+        mPendingRequests = false; // to ignore past requests
+        while (!mPendingRequests) {
+            mCond.wait(mMutex);
+            // TODO may also need an exitPending check
+        }
+        mPendingRequests = false;
+    }
+    // Execute the actual MediaLogService binder call and ignore extra requests for a while
+    sp<IBinder> binder = defaultServiceManager()->getService(String16("media.log"));
+    if (binder != 0) {
+        sp<IMediaLogService> mediaLogService(interface_cast<IMediaLogService>(binder));
+        mediaLogService->requestMergeWakeup();
+    }
+    usleep(kPostTriggerSleepPeriod);
+    return true;
+}
+
+void AudioFlinger::requestLogMerge() {
+    mMediaLogNotifier->requestMerge();
+}
 
 // ----------------------------------------------------------------------------
 
