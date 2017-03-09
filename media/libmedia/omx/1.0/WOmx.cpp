@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
+#include <gui/bufferqueue/1.0/H2BGraphicBufferProducer.h>
 #include <media/omx/1.0/WOmx.h>
 #include <media/omx/1.0/WOmxNode.h>
 #include <media/omx/1.0/WOmxObserver.h>
-#include <media/omx/1.0/WOmxBufferProducer.h>
 #include <media/omx/1.0/WGraphicBufferSource.h>
 #include <media/omx/1.0/Conversion.h>
 
@@ -27,6 +27,11 @@ namespace media {
 namespace omx {
 namespace V1_0 {
 namespace utils {
+
+using ::android::hardware::graphics::bufferqueue::V1_0::utils::
+        H2BGraphicBufferProducer;
+typedef ::android::hardware::graphics::bufferqueue::V1_0::IGraphicBufferProducer
+        HGraphicBufferProducer;
 
 // LWOmx
 LWOmx::LWOmx(sp<IOmx> const& base) : mBase(base) {
@@ -70,10 +75,10 @@ status_t LWOmx::createInputSurface(
     status_t transStatus = toStatusT(mBase->createInputSurface(
             [&fnStatus, bufferProducer, bufferSource] (
                     Status status,
-                    sp<IOmxBufferProducer> const& tProducer,
+                    sp<HGraphicBufferProducer> const& tProducer,
                     sp<IGraphicBufferSource> const& tSource) {
                 fnStatus = toStatusT(status);
-                *bufferProducer = new LWOmxBufferProducer(tProducer);
+                *bufferProducer = new H2BGraphicBufferProducer(tProducer);
                 *bufferSource = new LWGraphicBufferSource(tSource);
             }));
     return transStatus == NO_ERROR ? fnStatus : transStatus;

@@ -22,7 +22,7 @@
 
 #include <utils/Errors.h>
 
-#include "../../../../include/OMXNodeInstance.h"
+#include "../../include/OMXNodeInstance.h"
 
 #include <android/hardware/media/omx/1.0/IOmxNode.h>
 #include <android/hardware/media/omx/1.0/IOmxObserver.h>

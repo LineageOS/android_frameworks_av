@@ -36,6 +36,7 @@ endif
 LOCAL_SHARED_LIBRARIES :=       \
     libbinder                   \
     libui                       \
+    libgui                      \
     libmedia                    \
     libmediadrm                 \
 

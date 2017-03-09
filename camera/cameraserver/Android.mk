@@ -24,6 +24,7 @@ LOCAL_SHARED_LIBRARIES := \
 	liblog \
 	libutils \
 	libui \
+	libgui \
 	libbinder \
 	libhidltransport \
 	android.hardware.camera.common@1.0 \

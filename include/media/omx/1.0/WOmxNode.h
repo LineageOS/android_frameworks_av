@@ -20,9 +20,9 @@
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
 
-#include <binder/HalToken.h>
 #include <utils/Errors.h>
 #include <media/IOMX.h>
+#include <hidl/HybridInterface.h>
 
 #include <android/hardware/media/omx/1.0/IOmxNode.h>
 #include <android/hardware/media/omx/1.0/IOmxObserver.h>
