@@ -108,9 +108,24 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
             sharedBuffer->size());
 
     // ALOGD("Creating track with %d buffers @ %d bytes", bufferCount, bufferSize);
+
+    size_t bufferSize = sharedBuffer == NULL ? roundup(frameCount) : frameCount;
+    // check overflow when computing bufferSize due to multiplication by mFrameSize.
+    if (bufferSize < frameCount  // roundup rounds down for values above UINT_MAX / 2
+            || mFrameSize == 0   // format needs to be correct
+            || bufferSize > SIZE_MAX / mFrameSize) {
+        android_errorWriteLog(0x534e4554, "34749571");
+        return;
+    }
+    bufferSize *= mFrameSize;
+
     size_t size = sizeof(audio_track_cblk_t);
-    size_t bufferSize = (sharedBuffer == 0 ? roundup(frameCount) : frameCount) * mFrameSize;
     if (sharedBuffer == 0) {
+        // check overflow when computing allocation size for streaming tracks.
+        if (size > SIZE_MAX - bufferSize) {
+            android_errorWriteLog(0x534e4554, "34749571");
+            return;
+        }
         size += bufferSize;
     }
 
