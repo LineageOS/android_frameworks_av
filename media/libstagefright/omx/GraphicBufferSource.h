@@ -32,8 +32,6 @@
 #include <android/BnGraphicBufferSource.h>
 #include <android/BnOMXBufferSource.h>
 
-#include "IOmxNodeWrapper.h"
-
 namespace android {
 
 using ::android::binder::Status;
@@ -56,7 +54,8 @@ struct FrameDropper;
  * before the codec is in the "executing" state, so we need to queue
  * things up until we're ready to go.
  */
-class GraphicBufferSource : public BufferQueue::ConsumerListener {
+class GraphicBufferSource : public BnGraphicBufferSource,
+                            public BufferQueue::ConsumerListener {
 public:
     GraphicBufferSource();
 
@@ -96,30 +95,24 @@ public:
     // Called from OnEmptyBufferDone.  If we have a BQ buffer available,
     // fill it with a new frame of data; otherwise, just mark it as available.
     Status onInputBufferEmptied(
-            int32_t bufferID, int fenceFd);
+            int32_t bufferID, const OMXFenceParcelable& fenceParcel);
 
     // Configure the buffer source to be used with an OMX node with the default
     // data space.
-    status_t configure(
-        const sp<IOmxNodeWrapper> &omxNode,
-        int32_t dataSpace,
-        int32_t bufferCount,
-        uint32_t frameWidth,
-        uint32_t frameHeight,
-        uint32_t consumerUsage);
+    Status configure(const sp<IOMXNode>& omxNode, int32_t dataSpace) override;
 
     // This is called after the last input frame has been submitted or buffer
     // timestamp is greater or equal than stopTimeUs. We need to submit an empty
     // buffer with the EOS flag set.  If we don't have a codec buffer ready,
     // we just set the mEndOfStream flag.
-    status_t signalEndOfInputStream();
+    Status signalEndOfInputStream() override;
 
     // If suspend is true, all incoming buffers (including those currently
     // in the BufferQueue) with timestamp larger than timeUs will be discarded
     // until the suspension is lifted. If suspend is false, all incoming buffers
     // including those currently in the BufferQueue) with timestamp larger than
     // timeUs will be processed. timeUs uses SYSTEM_TIME_MONOTONIC time base.
-    status_t setSuspend(bool suspend, int64_t timeUs);
+    Status setSuspend(bool suspend, int64_t timeUs) override;
 
     // Specifies the interval after which we requeue the buffer previously
     // queued to the encoder. This is useful in the case of surface flinger
@@ -128,30 +121,30 @@ public:
     // the decoder on the remote end would be unable to decode the latest frame.
     // This API must be called before transitioning the encoder to "executing"
     // state and once this behaviour is specified it cannot be reset.
-    status_t setRepeatPreviousFrameDelayUs(int64_t repeatAfterUs);
+    Status setRepeatPreviousFrameDelayUs(int64_t repeatAfterUs) override;
 
     // Sets the input buffer timestamp offset.
     // When set, the sample's timestamp will be adjusted with the timeOffsetUs.
-    status_t setTimeOffsetUs(int64_t timeOffsetUs);
+    Status setTimeOffsetUs(int64_t timeOffsetUs) override;
 
     // When set, the max frame rate fed to the encoder will be capped at maxFps.
-    status_t setMaxFps(float maxFps);
+    Status setMaxFps(float maxFps) override;
 
     // Sets the time lapse (or slow motion) parameters.
     // When set, the sample's timestamp will be modified to playback framerate,
     // and capture timestamp will be modified to capture rate.
-    status_t setTimeLapseConfig(int64_t timePerFrameUs, int64_t timePerCaptureUs);
+    Status setTimeLapseConfig(int64_t timePerFrameUs, int64_t timePerCaptureUs) override;
 
     // Sets the start time us (in system time), samples before which should
     // be dropped and not submitted to encoder
-    status_t setStartTimeUs(int64_t startTimeUs);
+    Status setStartTimeUs(int64_t startTimeUs) override;
 
     // Sets the stop time us (in system time), samples after which should be dropped
     // and not submitted to encoder. timeUs uses SYSTEM_TIME_MONOTONIC time base.
-    status_t setStopTimeUs(int64_t stopTimeUs);
+    Status setStopTimeUs(int64_t stopTimeUs) override;
 
     // Sets the desired color aspects, e.g. to be used when producer does not specify a dataspace.
-    status_t setColorAspects(int32_t aspectsPacked);
+    Status setColorAspects(int32_t aspectsPacked) override;
 
 protected:
     // BufferQueue::ConsumerListener interface, called when a new frame of
@@ -236,8 +229,8 @@ private:
     // Used to report constructor failure.
     status_t mInitCheck;
 
-    // Pointer back to the Omx node that created us.  We send buffers here.
-    sp<IOmxNodeWrapper> mOMXNode;
+    // Pointer back to the IOMXNode that created us.  We send buffers here.
+    sp<IOMXNode> mOMXNode;
 
     // Set by omxExecuting() / omxIdling().
     bool mExecuting;
@@ -335,7 +328,10 @@ private:
 
     int64_t mInputBufferTimeOffsetUs;
 
-    int32_t mColorAspectsPacked;
+    ColorAspects mColorAspects;
+
+    class OmxBufferSource;
+    sp<OmxBufferSource> mOmxBufferSource;
 
     void onMessageReceived(const sp<AMessage> &msg);
 

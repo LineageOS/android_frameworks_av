@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-#include <media/omx/1.0/WOmx.h>
-#include <media/omx/1.0/WOmxNode.h>
-#include <media/omx/1.0/WOmxObserver.h>
-#include <media/omx/1.0/WOmxBufferProducer.h>
-#include <media/omx/1.0/WGraphicBufferSource.h>
-#include <media/omx/1.0/Conversion.h>
+#include "WOmx.h"
+#include "WOmxNode.h"
+#include "WOmxObserver.h"
+#include "WOmxBufferProducer.h"
+#include "WGraphicBufferSource.h"
+#include "Conversion.h"
 
 namespace android {
 namespace hardware {
 namespace media {
 namespace omx {
 namespace V1_0 {
-namespace utils {
+namespace implementation {
 
 // LWOmx
 LWOmx::LWOmx(sp<IOmx> const& base) : mBase(base) {
@@ -118,7 +118,7 @@ Return<void> TWOmx::createInputSurface(createInputSurface_cb _hidl_cb) {
     return Void();
 }
 
-}  // namespace utils
+}  // namespace implementation
 }  // namespace V1_0
 }  // namespace omx
 }  // namespace media

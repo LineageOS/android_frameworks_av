@@ -123,6 +123,7 @@ Return<void> Omx::allocateNode(
 
 Return<void> Omx::createInputSurface(createInputSurface_cb _hidl_cb) {
     sp<::android::IGraphicBufferProducer> bufferProducer;
+    sp<::android::IGraphicBufferSource> bufferSource;
 
     sp<GraphicBufferSource> graphicBufferSource = new GraphicBufferSource();
     status_t err = graphicBufferSource->initCheck();
@@ -134,10 +135,11 @@ Return<void> Omx::createInputSurface(createInputSurface_cb _hidl_cb) {
         return Void();
     }
     bufferProducer = graphicBufferSource->getIGraphicBufferProducer();
+    bufferSource = graphicBufferSource;
 
     _hidl_cb(toStatus(OK),
             new TWOmxBufferProducer(bufferProducer),
-            new TWGraphicBufferSource(graphicBufferSource));
+            new TWGraphicBufferSource(bufferSource));
     return Void();
 }
 

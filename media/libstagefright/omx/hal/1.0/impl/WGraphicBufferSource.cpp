@@ -14,15 +14,8 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
-#define LOG_TAG "TWGraphicBufferSource"
+#include <stagefright/foundation/ColorUtils.h>
 
-#include <android/hardware/media/omx/1.0/IOmxBufferSource.h>
-#include <android/hardware/media/omx/1.0/IOmxNode.h>
-#include <OMX_Component.h>
-#include <OMX_IndexExt.h>
-
-#include "omx/OMXUtils.h"
 #include "WGraphicBufferSource.h"
 #include "WOmxNode.h"
 #include "Conversion.h"
@@ -34,183 +27,122 @@ namespace omx {
 namespace V1_0 {
 namespace implementation {
 
-static const OMX_U32 kPortIndexInput = 0;
+using android::ColorUtils;
 
-struct TWGraphicBufferSource::TWOmxNodeWrapper : public IOmxNodeWrapper {
-    sp<IOmxNode> mOmxNode;
+// LWGraphicBufferSource
+LWGraphicBufferSource::LWGraphicBufferSource(
+        sp<TGraphicBufferSource> const& base) : mBase(base) {
+}
 
-    TWOmxNodeWrapper(const sp<IOmxNode> &omxNode): mOmxNode(omxNode) {
-    }
+::android::binder::Status LWGraphicBufferSource::configure(
+        const sp<IOMXNode>& omxNode, int32_t dataSpace) {
+    return toBinderStatus(mBase->configure(
+            new TWOmxNode(omxNode), toHardwareDataspace(dataSpace)));
+}
 
-    virtual status_t emptyBuffer(
-            int32_t bufferId, uint32_t flags,
-            const sp<GraphicBuffer> &buffer,
-            int64_t timestamp, int fenceFd) override {
-        CodecBuffer tBuffer;
-        return toStatusT(mOmxNode->emptyBuffer(
-              bufferId,
-              *wrapAs(&tBuffer, buffer),
-              flags,
-              toRawTicks(timestamp),
-              native_handle_create_from_fd(fenceFd)));
-    }
+::android::binder::Status LWGraphicBufferSource::setSuspend(
+        bool suspend, int64_t timeUs) {
+    return toBinderStatus(mBase->setSuspend(suspend, timeUs));
+}
 
-    virtual void dispatchDataSpaceChanged(
-            int32_t dataSpace, int32_t aspects, int32_t pixelFormat) override {
-        Message tMsg;
-        tMsg.type = Message::Type::EVENT;
-        tMsg.fence = native_handle_create(0, 0);
-        tMsg.data.eventData.event = uint32_t(OMX_EventDataSpaceChanged);
-        tMsg.data.eventData.data1 = dataSpace;
-        tMsg.data.eventData.data2 = aspects;
-        tMsg.data.eventData.data3 = pixelFormat;
-        mOmxNode->dispatchMessage(tMsg);
-    }
-};
+::android::binder::Status LWGraphicBufferSource::setRepeatPreviousFrameDelayUs(
+        int64_t repeatAfterUs) {
+    return toBinderStatus(mBase->setRepeatPreviousFrameDelayUs(repeatAfterUs));
+}
 
-struct TWGraphicBufferSource::TWOmxBufferSource : public IOmxBufferSource {
-    sp<GraphicBufferSource> mSource;
+::android::binder::Status LWGraphicBufferSource::setMaxFps(float maxFps) {
+    return toBinderStatus(mBase->setMaxFps(maxFps));
+}
 
-    TWOmxBufferSource(const sp<GraphicBufferSource> &source): mSource(source) {
-    }
+::android::binder::Status LWGraphicBufferSource::setTimeLapseConfig(
+        int64_t timePerFrameUs, int64_t timePerCaptureUs) {
+    return toBinderStatus(mBase->setTimeLapseConfig(
+            timePerFrameUs, timePerCaptureUs));
+}
 
-    Return<void> onOmxExecuting() override {
-        mSource->onOmxExecuting();
-        return Void();
-    }
+::android::binder::Status LWGraphicBufferSource::setStartTimeUs(
+        int64_t startTimeUs) {
+    return toBinderStatus(mBase->setStartTimeUs(startTimeUs));
+}
 
-    Return<void> onOmxIdle() override {
-        mSource->onOmxIdle();
-        return Void();
-    }
+::android::binder::Status LWGraphicBufferSource::setStopTimeUs(
+        int64_t stopTimeUs) {
+    return toBinderStatus(mBase->setStopTimeUs(stopTimeUs));
+}
 
-    Return<void> onOmxLoaded() override {
-        mSource->onOmxLoaded();
-        return Void();
-    }
+::android::binder::Status LWGraphicBufferSource::setColorAspects(
+        int32_t aspects) {
+    return toBinderStatus(mBase->setColorAspects(
+            toHardwareColorAspects(aspects)));
+}
 
-    Return<void> onInputBufferAdded(uint32_t bufferId) override {
-        mSource->onInputBufferAdded(static_cast<int32_t>(bufferId));
-        return Void();
-    }
+::android::binder::Status LWGraphicBufferSource::setTimeOffsetUs(
+        int64_t timeOffsetsUs) {
+    return toBinderStatus(mBase->setTimeOffsetUs(timeOffsetsUs));
+}
 
-    Return<void> onInputBufferEmptied(
-            uint32_t bufferId, hidl_handle const& tFence) override {
-        mSource->onInputBufferEmptied(
-                static_cast<int32_t>(bufferId),
-                native_handle_read_fd(tFence));
-        return Void();
-    }
-};
+::android::binder::Status LWGraphicBufferSource::signalEndOfInputStream() {
+    return toBinderStatus(mBase->signalEndOfInputStream());
+}
 
 // TWGraphicBufferSource
 TWGraphicBufferSource::TWGraphicBufferSource(
-        sp<GraphicBufferSource> const& base) :
-    mBase(base),
-    mOmxBufferSource(new TWOmxBufferSource(base)) {
+        sp<LGraphicBufferSource> const& base) : mBase(base) {
 }
 
-Return<Status> TWGraphicBufferSource::configure(
+Return<void> TWGraphicBufferSource::configure(
         const sp<IOmxNode>& omxNode, Dataspace dataspace) {
-    if (omxNode == NULL) {
-        return toStatus(BAD_VALUE);
-    }
-
-    // Do setInputSurface() first, the node will try to enable metadata
-    // mode on input, and does necessary error checking. If this fails,
-    // we can't use this input surface on the node.
-    Return<Status> err(omxNode->setInputSurface(mOmxBufferSource));
-    status_t fnStatus = toStatusT(err);
-    if (fnStatus != NO_ERROR) {
-        ALOGE("Unable to set input surface: %d", fnStatus);
-        return err;
-    }
-
-    // use consumer usage bits queried from encoder, but always add
-    // HW_VIDEO_ENCODER for backward compatibility.
-    uint32_t  consumerUsage;
-    void *_params = &consumerUsage;
-    uint8_t *params = static_cast<uint8_t*>(_params);
-    fnStatus = UNKNOWN_ERROR;
-    IOmxNode::getParameter_cb _hidl_cb(
-            [&fnStatus, &params](Status status, hidl_vec<uint8_t> const& outParams) {
-                fnStatus = toStatusT(status);
-                std::copy(
-                        outParams.data(),
-                        outParams.data() + outParams.size(),
-                        params);
-            });
-    omxNode->getParameter(
-            static_cast<uint32_t>(OMX_IndexParamConsumerUsageBits),
-            inHidlBytes(&consumerUsage, sizeof(consumerUsage)),
-            _hidl_cb);
-    if (fnStatus != OK) {
-        consumerUsage = 0;
-    }
-
-    OMX_PARAM_PORTDEFINITIONTYPE def;
-    InitOMXParams(&def);
-    def.nPortIndex = kPortIndexInput;
-
-    _params = &def;
-    params = static_cast<uint8_t*>(_params);
-    omxNode->getParameter(
-            static_cast<uint32_t>(OMX_IndexParamPortDefinition),
-            inHidlBytes(&def, sizeof(def)),
-            _hidl_cb);
-    if (fnStatus != NO_ERROR) {
-        ALOGE("Failed to get port definition: %d", fnStatus);
-        return toStatus(fnStatus);
-    }
-
-
-    return toStatus(mBase->configure(
-            new TWOmxNodeWrapper(omxNode),
-            toRawDataspace(dataspace),
-            def.nBufferCountActual,
-            def.format.video.nFrameWidth,
-            def.format.video.nFrameHeight,
-            consumerUsage));
+    mBase->configure(new LWOmxNode(omxNode), toRawDataspace(dataspace));
+    return Void();
 }
 
-Return<Status> TWGraphicBufferSource::setSuspend(
+Return<void> TWGraphicBufferSource::setSuspend(
         bool suspend, int64_t timeUs) {
-    return toStatus(mBase->setSuspend(suspend, timeUs));
+    mBase->setSuspend(suspend, timeUs);
+    return Void();
 }
 
-Return<Status> TWGraphicBufferSource::setRepeatPreviousFrameDelayUs(
+Return<void> TWGraphicBufferSource::setRepeatPreviousFrameDelayUs(
         int64_t repeatAfterUs) {
-    return toStatus(mBase->setRepeatPreviousFrameDelayUs(repeatAfterUs));
+    mBase->setRepeatPreviousFrameDelayUs(repeatAfterUs);
+    return Void();
 }
 
-Return<Status> TWGraphicBufferSource::setMaxFps(float maxFps) {
-    return toStatus(mBase->setMaxFps(maxFps));
+Return<void> TWGraphicBufferSource::setMaxFps(float maxFps) {
+    mBase->setMaxFps(maxFps);
+    return Void();
 }
 
-Return<Status> TWGraphicBufferSource::setTimeLapseConfig(
+Return<void> TWGraphicBufferSource::setTimeLapseConfig(
         int64_t timePerFrameUs, int64_t timePerCaptureUs) {
-    return toStatus(mBase->setTimeLapseConfig(timePerFrameUs, timePerCaptureUs));
+    mBase->setTimeLapseConfig(timePerFrameUs, timePerCaptureUs);
+    return Void();
 }
 
-Return<Status> TWGraphicBufferSource::setStartTimeUs(int64_t startTimeUs) {
-    return toStatus(mBase->setStartTimeUs(startTimeUs));
+Return<void> TWGraphicBufferSource::setStartTimeUs(int64_t startTimeUs) {
+    mBase->setStartTimeUs(startTimeUs);
+    return Void();
 }
 
-Return<Status> TWGraphicBufferSource::setStopTimeUs(int64_t stopTimeUs) {
-    return toStatus(mBase->setStopTimeUs(stopTimeUs));
+Return<void> TWGraphicBufferSource::setStopTimeUs(int64_t stopTimeUs) {
+    mBase->setStopTimeUs(stopTimeUs);
+    return Void();
 }
 
-Return<Status> TWGraphicBufferSource::setColorAspects(
+Return<void> TWGraphicBufferSource::setColorAspects(
         const ColorAspects& aspects) {
-    return toStatus(mBase->setColorAspects(toCompactColorAspects(aspects)));
+    mBase->setColorAspects(toCompactColorAspects(aspects));
+    return Void();
 }
 
-Return<Status> TWGraphicBufferSource::setTimeOffsetUs(int64_t timeOffsetUs) {
-    return toStatus(mBase->setTimeOffsetUs(timeOffsetUs));
+Return<void> TWGraphicBufferSource::setTimeOffsetUs(int64_t timeOffsetUs) {
+    mBase->setTimeOffsetUs(timeOffsetUs);
+    return Void();
 }
 
-Return<Status> TWGraphicBufferSource::signalEndOfInputStream() {
-    return toStatus(mBase->signalEndOfInputStream());
+Return<void> TWGraphicBufferSource::signalEndOfInputStream() {
+    mBase->signalEndOfInputStream();
+    return Void();
 }
 
 }  // namespace implementation
