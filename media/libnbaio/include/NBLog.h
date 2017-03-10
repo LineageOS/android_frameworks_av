@@ -89,6 +89,7 @@ public:
     // entry iterator
     class iterator {
     public:
+        iterator();
         iterator(const uint8_t *entry);
         iterator(const iterator &other);
 
@@ -99,6 +100,8 @@ public:
         iterator&       operator++(); // ++i
         // back to previous entry
         iterator&       operator--(); // --i
+        iterator        next() const;
+        iterator        prev() const;
         bool            operator!=(const iterator &other) const;
         int             operator-(const iterator &other) const;
 
@@ -134,7 +137,7 @@ public:
     int         author() const;
 
     // copy entry, adding author before timestamp, returns size of original entry
-    size_t      copyTo(std::unique_ptr<audio_utils_fifo_writer> &dst, int author) const;
+    iterator    copyWithAuthor(std::unique_ptr<audio_utils_fifo_writer> &dst, int author) const;
 
     iterator    begin() const;
 
@@ -317,26 +320,32 @@ public:
     // A snapshot of a readers buffer
     class Snapshot {
     public:
-        Snapshot() : mData(NULL), mAvail(0), mLost(0) {}
+        Snapshot() : mData(NULL), mLost(0) {}
 
         Snapshot(size_t bufferSize) : mData(new uint8_t[bufferSize]) {}
 
         ~Snapshot() { delete[] mData; }
 
         // copy of the buffer
-        const uint8_t *data() const { return mData; }
-
-        // amount of data available (given by audio_utils_fifo_reader)
-        size_t   available() const { return mAvail; }
+        uint8_t *data() const { return mData; }
 
         // amount of data lost (given by audio_utils_fifo_reader)
         size_t   lost() const { return mLost; }
 
+        // iterator to beginning of readable segment of snapshot
+        // data between begin and end has valid entries
+        FormatEntry::iterator begin() { return mBegin; }
+
+        // iterator to end of readable segment of snapshot
+        FormatEntry::iterator end() { return mEnd; }
+
+
     private:
         friend class Reader;
-        const uint8_t *mData;
-        size_t         mAvail;
-        size_t         mLost;
+        uint8_t              *mData;
+        size_t                mLost;
+        FormatEntry::iterator mBegin;
+        FormatEntry::iterator mEnd;
     };
 
     // Input parameter 'size' is the desired size of the timeline in byte units.
@@ -372,6 +381,10 @@ private:
                                          String8 *body);
     // dummy method for handling absent author entry
     virtual size_t handleAuthor(const FormatEntry &fmtEntry, String8 *body) { return 0; }
+
+    // Searches for the last entry of type <type> in the range [front, back)
+    // back has to be entry-aligned. Returns nullptr if none enconuntered.
+    static uint8_t *findLastEntryOfType(uint8_t *front, uint8_t *back, uint8_t type);
 
     static const size_t kSquashTimestamp = 5; // squash this many or more adjacent timestamps
 };
