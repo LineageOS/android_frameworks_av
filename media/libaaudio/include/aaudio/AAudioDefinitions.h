@@ -23,8 +23,6 @@
 extern "C" {
 #endif
 
-typedef int32_t  aaudio_result_t;
-
 /**
  * This is used to represent a value that has not been specified.
  * For example, an application could use AAUDIO_UNSPECIFIED to indicate
@@ -34,12 +32,13 @@ typedef int32_t  aaudio_result_t;
 #define AAUDIO_UNSPECIFIED           0
 #define AAUDIO_DEVICE_UNSPECIFIED    ((int32_t) -1)
 
-enum aaudio_direction_t {
+enum {
     AAUDIO_DIRECTION_OUTPUT,
     AAUDIO_DIRECTION_INPUT
 };
+typedef int32_t aaudio_direction_t;
 
-enum aaudio_audio_format_t {
+enum {
     AAUDIO_FORMAT_INVALID = -1,
     AAUDIO_FORMAT_UNSPECIFIED = 0,
     AAUDIO_FORMAT_PCM_I16,
@@ -47,6 +46,7 @@ enum aaudio_audio_format_t {
     AAUDIO_FORMAT_PCM_I8_24,
     AAUDIO_FORMAT_PCM_I32
 };
+typedef int32_t aaudio_audio_format_t;
 
 enum {
     AAUDIO_OK,
@@ -71,8 +71,9 @@ enum {
     AAUDIO_ERROR_OUT_OF_RANGE,
     AAUDIO_ERROR_NO_SERVICE
 };
+typedef int32_t  aaudio_result_t;
 
-typedef enum
+enum
 {
     AAUDIO_STREAM_STATE_UNINITIALIZED = 0,
     AAUDIO_STREAM_STATE_UNKNOWN,
@@ -87,9 +88,10 @@ typedef enum
     AAUDIO_STREAM_STATE_STOPPED,
     AAUDIO_STREAM_STATE_CLOSING,
     AAUDIO_STREAM_STATE_CLOSED,
-} aaudio_stream_state_t;
+};
+typedef int32_t aaudio_stream_state_t;
 
-typedef enum {
+enum {
     /**
      * This will be the only stream using a particular source or sink.
      * This mode will provide the lowest possible latency.
@@ -101,7 +103,8 @@ typedef enum {
      * This will have higher latency than the EXCLUSIVE mode.
      */
     AAUDIO_SHARING_MODE_SHARED
-} aaudio_sharing_mode_t;
+};
+typedef int32_t aaudio_sharing_mode_t;
 
 #ifdef __cplusplus
 }
