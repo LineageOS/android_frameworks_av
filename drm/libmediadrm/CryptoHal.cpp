@@ -112,7 +112,7 @@ CryptoHal::~CryptoHal() {
 Vector<sp<ICryptoFactory>> CryptoHal::makeCryptoFactories() {
     Vector<sp<ICryptoFactory>> factories;
 
-    auto manager = ::IServiceManager::getService("manager");
+    auto manager = ::IServiceManager::getService();
     if (manager != NULL) {
         manager->listByInterface(ICryptoFactory::descriptor,
                 [&factories](const hidl_vec<hidl_string> &registered) {
