@@ -20,15 +20,14 @@
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
 
-#include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
-#include <android/hardware/media/omx/1.0/IOmxNode.h>
+#include <media/IOMX.h>
+#include <binder/Binder.h>
+
 #include <android/hardware/graphics/common/1.0/types.h>
 #include <android/hardware/media/omx/1.0/IOmxNode.h>
 #include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
 
 #include <android/BnGraphicBufferSource.h>
-
-#include "../../../GraphicBufferSource.h"
 
 namespace android {
 namespace hardware {
@@ -37,12 +36,10 @@ namespace omx {
 namespace V1_0 {
 namespace implementation {
 
-using ::android::GraphicBufferSource;
 using ::android::hardware::graphics::common::V1_0::Dataspace;
 using ::android::hardware::media::omx::V1_0::ColorAspects;
 using ::android::hardware::media::omx::V1_0::IGraphicBufferSource;
 using ::android::hardware::media::omx::V1_0::IOmxNode;
-using ::android::hardware::media::omx::V1_0::Status;
 using ::android::hidl::base::V1_0::IBase;
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_memory;
@@ -63,28 +60,44 @@ using ::android::IOMXNode;
  * - TW = Treble Wrapper --- It wraps a legacy object inside a Treble object.
  */
 
+typedef ::android::IGraphicBufferSource LGraphicBufferSource;
+typedef ::android::BnGraphicBufferSource BnGraphicBufferSource;
 typedef ::android::hardware::media::omx::V1_0::IGraphicBufferSource
         TGraphicBufferSource;
 
-struct TWGraphicBufferSource : public TGraphicBufferSource {
-    struct TWOmxNodeWrapper;
-    struct TWOmxBufferSource;
-    sp<GraphicBufferSource> mBase;
-    sp<IOmxBufferSource> mOmxBufferSource;
-
-    TWGraphicBufferSource(sp<GraphicBufferSource> const& base);
-    Return<Status> configure(
-            const sp<IOmxNode>& omxNode, Dataspace dataspace) override;
-    Return<Status> setSuspend(bool suspend, int64_t timeUs) override;
-    Return<Status> setRepeatPreviousFrameDelayUs(int64_t repeatAfterUs) override;
-    Return<Status> setMaxFps(float maxFps) override;
-    Return<Status> setTimeLapseConfig(
+struct LWGraphicBufferSource : public BnGraphicBufferSource {
+    sp<TGraphicBufferSource> mBase;
+    LWGraphicBufferSource(sp<TGraphicBufferSource> const& base);
+    ::android::binder::Status configure(
+            const sp<IOMXNode>& omxNode, int32_t dataSpace) override;
+    ::android::binder::Status setSuspend(bool suspend, int64_t timeUs) override;
+    ::android::binder::Status setRepeatPreviousFrameDelayUs(
+            int64_t repeatAfterUs) override;
+    ::android::binder::Status setMaxFps(float maxFps) override;
+    ::android::binder::Status setTimeLapseConfig(
             int64_t timePerFrameUs, int64_t timePerCaptureUs) override;
-    Return<Status> setStartTimeUs(int64_t startTimeUs) override;
-    Return<Status> setStopTimeUs(int64_t stopTimeUs) override;
-    Return<Status> setColorAspects(const ColorAspects& aspects) override;
-    Return<Status> setTimeOffsetUs(int64_t timeOffsetUs) override;
-    Return<Status> signalEndOfInputStream() override;
+    ::android::binder::Status setStartTimeUs(int64_t startTimeUs) override;
+    ::android::binder::Status setStopTimeUs(int64_t stopTimeUs) override;
+    ::android::binder::Status setColorAspects(int32_t aspects) override;
+    ::android::binder::Status setTimeOffsetUs(int64_t timeOffsetsUs) override;
+    ::android::binder::Status signalEndOfInputStream() override;
+};
+
+struct TWGraphicBufferSource : public TGraphicBufferSource {
+    sp<LGraphicBufferSource> mBase;
+    TWGraphicBufferSource(sp<LGraphicBufferSource> const& base);
+    Return<void> configure(
+            const sp<IOmxNode>& omxNode, Dataspace dataspace) override;
+    Return<void> setSuspend(bool suspend, int64_t timeUs) override;
+    Return<void> setRepeatPreviousFrameDelayUs(int64_t repeatAfterUs) override;
+    Return<void> setMaxFps(float maxFps) override;
+    Return<void> setTimeLapseConfig(
+            int64_t timePerFrameUs, int64_t timePerCaptureUs) override;
+    Return<void> setStartTimeUs(int64_t startTimeUs) override;
+    Return<void> setStopTimeUs(int64_t stopTimeUs) override;
+    Return<void> setColorAspects(const ColorAspects& aspects) override;
+    Return<void> setTimeOffsetUs(int64_t timeOffsetUs) override;
+    Return<void> signalEndOfInputStream() override;
 };
 
 }  // namespace implementation
