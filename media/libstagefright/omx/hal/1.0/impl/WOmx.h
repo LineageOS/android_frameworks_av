@@ -20,7 +20,7 @@
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
 
-#include <media/IOMX.h>
+#include "../../../../include/OMXNodeInstance.h"
 
 #include <android/hardware/media/omx/1.0/IOmx.h>
 
@@ -29,7 +29,7 @@ namespace hardware {
 namespace media {
 namespace omx {
 namespace V1_0 {
-namespace utils {
+namespace implementation {
 
 using ::android::hardware::media::omx::V1_0::IOmx;
 using ::android::hardware::media::omx::V1_0::IOmxNode;
@@ -82,7 +82,7 @@ struct TWOmx : public IOmx {
 
 };
 
-}  // namespace utils
+}  // namespace implementation
 }  // namespace V1_0
 }  // namespace omx
 }  // namespace media

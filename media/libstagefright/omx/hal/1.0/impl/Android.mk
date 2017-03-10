@@ -4,6 +4,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := android.hardware.media.omx@1.0-impl
 LOCAL_SRC_FILES := \
     WGraphicBufferSource.cpp \
+    WOmx.cpp \
     WOmxBufferProducer.cpp \
     WOmxBufferSource.cpp \
     WOmxNode.cpp \

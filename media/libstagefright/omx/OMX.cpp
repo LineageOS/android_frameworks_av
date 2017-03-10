@@ -27,7 +27,7 @@
 #include "../include/OMXNodeInstance.h"
 
 #include <media/stagefright/foundation/ADebug.h>
-#include "BWGraphicBufferSource.h"
+#include "GraphicBufferSource.h"
 
 #include "OMXMaster.h"
 #include "OMXUtils.h"
@@ -174,7 +174,7 @@ status_t OMX::createInputSurface(
     }
 
     *bufferProducer = graphicBufferSource->getIGraphicBufferProducer();
-    *bufferSource = new BWGraphicBufferSource(graphicBufferSource);
+    *bufferSource = graphicBufferSource;
 
     return OK;
 }
