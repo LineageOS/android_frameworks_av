@@ -622,7 +622,7 @@ Status CameraService::getCameraCharacteristics(const String16& cameraId,
         }
     } else {
         status_t res = mCameraProviderManager->getCameraCharacteristics(
-                String16::std_string(cameraId), cameraInfo);
+                String8(cameraId).string(), cameraInfo);
         if (res != OK) {
             return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION, "Unable to retrieve camera "
                     "characteristics for device %s: %s (%d)", String8(cameraId).string(),
@@ -689,14 +689,14 @@ int CameraService::getDeviceVersion(const String8& cameraId, int* facing) {
     } else {
         status_t res;
         hardware::hidl_version maxVersion{0,0};
-        res = mCameraProviderManager->getHighestSupportedVersion(String8::std_string(cameraId),
+        res = mCameraProviderManager->getHighestSupportedVersion(cameraId.string(),
                 &maxVersion);
         if (res != OK) return -1;
         deviceVersion = HARDWARE_DEVICE_API_VERSION(maxVersion.get_major(), maxVersion.get_minor());
 
         hardware::CameraInfo info;
         if (facing) {
-            res = mCameraProviderManager->getCameraInfo(String8::std_string(cameraId), &info);
+            res = mCameraProviderManager->getCameraInfo(cameraId.string(), &info);
             if (res != OK) return -1;
             *facing = info.facing;
         }

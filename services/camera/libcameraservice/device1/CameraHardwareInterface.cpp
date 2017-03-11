@@ -80,7 +80,7 @@ status_t CameraHardwareInterface::initialize(sp<CameraProviderManager> manager) 
 
     ALOGI("Opening camera %s", mName.string());
 
-    status_t ret = manager->openSession(String8::std_string(mName), this, &mHidlDevice);
+    status_t ret = manager->openSession(mName.string(), this, &mHidlDevice);
     if (ret != OK) {
         ALOGE("%s: openSession failed! %s (%d)", __FUNCTION__, strerror(-ret), ret);
     }

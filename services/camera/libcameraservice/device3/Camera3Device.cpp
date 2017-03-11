@@ -183,7 +183,7 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager) {
 
     sp<ICameraDeviceSession> session;
     ATRACE_BEGIN("CameraHal::openSession");
-    status_t res = manager->openSession(String8::std_string(mId), this,
+    status_t res = manager->openSession(mId.string(), this,
             /*out*/ &session);
     ATRACE_END();
     if (res != OK) {
@@ -191,7 +191,7 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager) {
         return res;
     }
 
-    res = manager->getCameraCharacteristics(String8::std_string(mId), &mDeviceInfo);
+    res = manager->getCameraCharacteristics(mId.string(), &mDeviceInfo);
     if (res != OK) {
         SET_ERR_L("Could not retrive camera characteristics: %s (%d)", strerror(-res), res);
         session->close();
