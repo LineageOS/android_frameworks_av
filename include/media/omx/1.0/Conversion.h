@@ -191,6 +191,19 @@ inline ::android::binder::Status toBinderStatus(
 }
 
 /**
+ * \brief Convert `Return<Status>` to `binder::Status`.
+ *
+ * \param[in] t The source `Return<Status>`.
+ * \return The corresponding `binder::Status`.
+ */
+// convert: Return<Status> -> ::android::binder::Status
+inline ::android::binder::Status toBinderStatus(
+        Return<Status> const& t) {
+    return ::android::binder::Status::fromStatusT(
+            t.isOk() ? static_cast<status_t>(static_cast<Status>(t)) : UNKNOWN_ERROR);
+}
+
+/**
  * \brief Convert `Return<Status>` to `status_t`. This is for legacy binder
  * calls.
  *

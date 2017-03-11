@@ -70,18 +70,6 @@ struct LWOmx : public BnOMX {
             sp<::android::IGraphicBufferSource>* bufferSource) override;
 };
 
-struct TWOmx : public IOmx {
-    sp<IOMX> mBase;
-    TWOmx(sp<IOMX> const& base);
-    Return<void> listNodes(listNodes_cb _hidl_cb) override;
-    Return<void> allocateNode(
-            const hidl_string& name,
-            const sp<IOmxObserver>& observer,
-            allocateNode_cb _hidl_cb) override;
-    Return<void> createInputSurface(createInputSurface_cb _hidl_cb) override;
-
-};
-
 }  // namespace utils
 }  // namespace V1_0
 }  // namespace omx

@@ -79,45 +79,6 @@ status_t LWOmx::createInputSurface(
     return transStatus == NO_ERROR ? fnStatus : transStatus;
 }
 
-// TWOmx
-TWOmx::TWOmx(sp<IOMX> const& base) : mBase(base) {
-}
-
-Return<void> TWOmx::listNodes(listNodes_cb _hidl_cb) {
-    List<IOMX::ComponentInfo> lList;
-    Status status = toStatus(mBase->listNodes(&lList));
-
-    hidl_vec<IOmx::ComponentInfo> tList;
-    tList.resize(lList.size());
-    size_t i = 0;
-    for (auto const& lInfo : lList) {
-        convertTo(&(tList[i++]), lInfo);
-    }
-    _hidl_cb(status, tList);
-    return Void();
-}
-
-Return<void> TWOmx::allocateNode(
-        const hidl_string& name,
-        const sp<IOmxObserver>& observer,
-        allocateNode_cb _hidl_cb) {
-    sp<IOMXNode> omxNode;
-    Status status = toStatus(mBase->allocateNode(
-            name, new LWOmxObserver(observer), &omxNode));
-    _hidl_cb(status, new TWOmxNode(omxNode));
-    return Void();
-}
-
-Return<void> TWOmx::createInputSurface(createInputSurface_cb _hidl_cb) {
-    sp<::android::IGraphicBufferProducer> lProducer;
-    sp<::android::IGraphicBufferSource> lSource;
-    status_t status = mBase->createInputSurface(&lProducer, &lSource);
-    _hidl_cb(toStatus(status),
-             new TWOmxBufferProducer(lProducer),
-             new TWGraphicBufferSource(lSource));
-    return Void();
-}
-
 }  // namespace utils
 }  // namespace V1_0
 }  // namespace omx
