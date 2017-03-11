@@ -47,12 +47,16 @@ struct TWGraphicBufferSource::TWOmxNodeWrapper : public IOmxNodeWrapper {
             const sp<GraphicBuffer> &buffer,
             int64_t timestamp, int fenceFd) override {
         CodecBuffer tBuffer;
-        return toStatusT(mOmxNode->emptyBuffer(
+        native_handle_t* fenceNh = native_handle_create_from_fd(fenceFd);
+        status_t err = toStatusT(mOmxNode->emptyBuffer(
               bufferId,
               *wrapAs(&tBuffer, buffer),
               flags,
               toRawTicks(timestamp),
-              native_handle_create_from_fd(fenceFd)));
+              fenceNh));
+        native_handle_close(fenceNh);
+        native_handle_delete(fenceNh);
+        return err;
     }
 
     virtual void dispatchDataSpaceChanged(
