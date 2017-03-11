@@ -62,6 +62,7 @@ private:
     bool mSentCodecSpecificData;
     size_t mInputSize;
     int16_t *mInputFrame;
+    size_t mAllocatedFrameSize;
     int64_t mInputTimeUs;
 
     bool mSawInputEOS;
