@@ -41,37 +41,6 @@
 
 namespace android {
 
-static const OMX_U32 kPortIndexInput = 0;
-
-class GraphicBufferSource::OmxBufferSource : public BnOMXBufferSource {
-public:
-    GraphicBufferSource* mSource;
-
-    OmxBufferSource(GraphicBufferSource* source): mSource(source) {
-    }
-
-    Status onOmxExecuting() override {
-        return mSource->onOmxExecuting();
-    }
-
-    Status onOmxIdle() override {
-        return mSource->onOmxIdle();
-    }
-
-    Status onOmxLoaded() override {
-        return mSource->onOmxLoaded();
-    }
-
-    Status onInputBufferAdded(int bufferId) override {
-        return mSource->onInputBufferAdded(bufferId);
-    }
-
-    Status onInputBufferEmptied(
-            int bufferId, const OMXFenceParcelable& fenceParcel) override {
-        return mSource->onInputBufferEmptied(bufferId, fenceParcel);
-    }
-};
-
 GraphicBufferSource::GraphicBufferSource() :
     mInitCheck(UNKNOWN_ERROR),
     mExecuting(false),
@@ -97,8 +66,7 @@ GraphicBufferSource::GraphicBufferSource() :
     mTimePerFrameUs(-1ll),
     mPrevCaptureUs(-1ll),
     mPrevFrameUs(-1ll),
-    mInputBufferTimeOffsetUs(0ll),
-    mOmxBufferSource(new OmxBufferSource(this)) {
+    mInputBufferTimeOffsetUs(0ll) {
     ALOGV("GraphicBufferSource");
 
     String8 name("GraphicBufferSource");
@@ -122,7 +90,7 @@ GraphicBufferSource::GraphicBufferSource() :
         return;
     }
 
-    memset(&mColorAspects, 0, sizeof(mColorAspects));
+    memset(&mColorAspectsPacked, 0, sizeof(mColorAspectsPacked));
 
     CHECK(mInitCheck == NO_ERROR);
 }
@@ -273,9 +241,7 @@ Status GraphicBufferSource::onInputBufferAdded(int32_t bufferID) {
 }
 
 Status GraphicBufferSource::onInputBufferEmptied(
-        int32_t bufferID, const OMXFenceParcelable &fenceParcel) {
-    int fenceFd = fenceParcel.get();
-
+        int32_t bufferID, int fenceFd) {
     Mutex::Autolock autoLock(mMutex);
     if (!mExecuting) {
         if (fenceFd >= 0) {
@@ -374,15 +340,7 @@ void GraphicBufferSource::onDataSpaceChanged_l(
     mLastDataSpace = dataSpace;
 
     if (ColorUtils::convertDataSpaceToV0(dataSpace)) {
-        omx_message msg;
-        msg.type = omx_message::EVENT;
-        msg.fenceFd = -1;
-        msg.u.event_data.event = OMX_EventDataSpaceChanged;
-        msg.u.event_data.data1 = mLastDataSpace;
-        msg.u.event_data.data2 = ColorUtils::packToU32(mColorAspects);
-        msg.u.event_data.data3 = pixelFormat;
-
-        mOMXNode->dispatchMessage(msg);
+        mOMXNode->dispatchDataSpaceChanged(mLastDataSpace, mColorAspectsPacked, pixelFormat);
     }
 }
 
@@ -689,7 +647,7 @@ status_t GraphicBufferSource::submitBuffer_l(const BufferItem &item, int cbi) {
     int fenceID = item.mFence->isValid() ? item.mFence->dup() : -1;
 
     status_t err = mOMXNode->emptyBuffer(
-            bufferID, buffer, OMX_BUFFERFLAG_ENDOFFRAME, codecTimeUs, fenceID);
+            bufferID, OMX_BUFFERFLAG_ENDOFFRAME, buffer, codecTimeUs, fenceID);
 
     if (err != OK) {
         ALOGW("WARNING: emptyGraphicBuffer failed: 0x%x", err);
@@ -721,10 +679,8 @@ void GraphicBufferSource::submitEndOfInputStream_l() {
     CodecBuffer& codecBuffer(mCodecBuffers.editItemAt(cbi));
     IOMX::buffer_id bufferID = codecBuffer.mBufferID;
 
-    status_t err = mOMXNode->emptyBuffer(
-            bufferID, (sp<GraphicBuffer>)NULL,
-            OMX_BUFFERFLAG_ENDOFFRAME | OMX_BUFFERFLAG_EOS,
-            0 /* timestamp */, -1 /* fenceFd */);
+    status_t err = mOMXNode->emptyBuffer(bufferID,
+            OMX_BUFFERFLAG_ENDOFFRAME | OMX_BUFFERFLAG_EOS);
     if (err != OK) {
         ALOGW("emptyDirectBuffer EOS failed: 0x%x", err);
     } else {
@@ -865,65 +821,38 @@ void GraphicBufferSource::onSidebandStreamChanged() {
     ALOG_ASSERT(false, "GraphicBufferSource can't consume sideband streams");
 }
 
-Status GraphicBufferSource::configure(
-        const sp<IOMXNode>& omxNode, int32_t dataSpace) {
+status_t GraphicBufferSource::configure(
+        const sp<IOmxNodeWrapper>& omxNode,
+        int32_t dataSpace,
+        int32_t bufferCount,
+        uint32_t frameWidth,
+        uint32_t frameHeight,
+        uint32_t consumerUsage) {
     if (omxNode == NULL) {
-        return Status::fromServiceSpecificError(BAD_VALUE);
+        return BAD_VALUE;
     }
 
-    // Do setInputSurface() first, the node will try to enable metadata
-    // mode on input, and does necessary error checking. If this fails,
-    // we can't use this input surface on the node.
-    status_t err = omxNode->setInputSurface(mOmxBufferSource);
-    if (err != NO_ERROR) {
-        ALOGE("Unable to set input surface: %d", err);
-        return Status::fromServiceSpecificError(err);
-    }
-
-    // use consumer usage bits queried from encoder, but always add
-    // HW_VIDEO_ENCODER for backward compatibility.
-    uint32_t consumerUsage;
-    if (omxNode->getParameter(
-            (OMX_INDEXTYPE)OMX_IndexParamConsumerUsageBits,
-            &consumerUsage, sizeof(consumerUsage)) != OK) {
-        consumerUsage = 0;
-    }
-
-    OMX_PARAM_PORTDEFINITIONTYPE def;
-    InitOMXParams(&def);
-    def.nPortIndex = kPortIndexInput;
-
-    err = omxNode->getParameter(
-            OMX_IndexParamPortDefinition, &def, sizeof(def));
-    if (err != NO_ERROR) {
-        ALOGE("Failed to get port definition: %d", err);
-        return Status::fromServiceSpecificError(UNKNOWN_ERROR);
-    }
 
     // Call setMaxAcquiredBufferCount without lock.
     // setMaxAcquiredBufferCount could call back to onBuffersReleased
     // if the buffer count change results in releasing of existing buffers,
     // which would lead to deadlock.
-    err = mConsumer->setMaxAcquiredBufferCount(def.nBufferCountActual);
+    status_t err = mConsumer->setMaxAcquiredBufferCount(bufferCount);
     if (err != NO_ERROR) {
         ALOGE("Unable to set BQ max acquired buffer count to %u: %d",
-                def.nBufferCountActual, err);
-        return Status::fromServiceSpecificError(err);
+                bufferCount, err);
+        return err;
     }
 
     {
         Mutex::Autolock autoLock(mMutex);
         mOMXNode = omxNode;
 
-        err = mConsumer->setDefaultBufferSize(
-                def.format.video.nFrameWidth,
-                def.format.video.nFrameHeight);
+        err = mConsumer->setDefaultBufferSize(frameWidth, frameHeight);
         if (err != NO_ERROR) {
             ALOGE("Unable to set BQ default buffer size to %ux%u: %d",
-                    def.format.video.nFrameWidth,
-                    def.format.video.nFrameHeight,
-                    err);
-            return Status::fromServiceSpecificError(err);
+                    frameWidth, frameHeight, err);
+            return err;
         }
 
         consumerUsage |= GRALLOC_USAGE_HW_VIDEO_ENCODER;
@@ -957,17 +886,17 @@ Status GraphicBufferSource::configure(
         mActionQueue.clear();
     }
 
-    return Status::ok();
+    return OK;
 }
 
-Status GraphicBufferSource::setSuspend(bool suspend, int64_t suspendStartTimeUs) {
+status_t GraphicBufferSource::setSuspend(bool suspend, int64_t suspendStartTimeUs) {
     ALOGV("setSuspend=%d at time %lld us", suspend, (long long)suspendStartTimeUs);
 
     Mutex::Autolock autoLock(mMutex);
 
     if (mStopTimeUs != -1) {
         ALOGE("setSuspend failed as STOP action is pending");
-        return Status::fromServiceSpecificError(INVALID_OPERATION);
+        return INVALID_OPERATION;
     }
 
     // Push the action to the queue.
@@ -977,12 +906,12 @@ Status GraphicBufferSource::setSuspend(bool suspend, int64_t suspendStartTimeUs)
         if (suspendStartTimeUs > currentSystemTimeUs) {
             ALOGE("setSuspend failed. %lld is larger than current system time %lld us",
                     (long long)suspendStartTimeUs, (long long)currentSystemTimeUs);
-            return Status::fromServiceSpecificError(INVALID_OPERATION);
+            return INVALID_OPERATION;
         }
         if (mLastActionTimeUs != -1 && suspendStartTimeUs < mLastActionTimeUs) {
             ALOGE("setSuspend failed. %lld is smaller than last action time %lld us",
                     (long long)suspendStartTimeUs, (long long)mLastActionTimeUs);
-            return Status::fromServiceSpecificError(INVALID_OPERATION);
+            return INVALID_OPERATION;
         }
         mLastActionTimeUs = suspendStartTimeUs;
         ActionItem action;
@@ -1007,7 +936,7 @@ Status GraphicBufferSource::setSuspend(bool suspend, int64_t suspendStartTimeUs)
 
                 releaseBuffer(item.mSlot, item.mFrameNumber, item.mFence);
             }
-            return Status::ok();
+            return OK;
         } else {
 
             mSuspended = false;
@@ -1023,54 +952,54 @@ Status GraphicBufferSource::setSuspend(bool suspend, int64_t suspendStartTimeUs)
             }
         }
     }
-    return Status::ok();
+    return OK;
 }
 
-Status GraphicBufferSource::setRepeatPreviousFrameDelayUs(int64_t repeatAfterUs) {
+status_t GraphicBufferSource::setRepeatPreviousFrameDelayUs(int64_t repeatAfterUs) {
     ALOGV("setRepeatPreviousFrameDelayUs: delayUs=%lld", (long long)repeatAfterUs);
 
     Mutex::Autolock autoLock(mMutex);
 
     if (mExecuting || repeatAfterUs <= 0ll) {
-        return Status::fromServiceSpecificError(INVALID_OPERATION);
+        return INVALID_OPERATION;
     }
 
     mRepeatAfterUs = repeatAfterUs;
-    return Status::ok();
+    return OK;
 }
 
-Status GraphicBufferSource::setTimeOffsetUs(int64_t timeOffsetUs) {
+status_t GraphicBufferSource::setTimeOffsetUs(int64_t timeOffsetUs) {
     Mutex::Autolock autoLock(mMutex);
 
     // timeOffsetUs must be negative for adjustment.
     if (timeOffsetUs >= 0ll) {
-        return Status::fromServiceSpecificError(INVALID_OPERATION);
+        return INVALID_OPERATION;
     }
 
     mInputBufferTimeOffsetUs = timeOffsetUs;
-    return Status::ok();
+    return OK;
 }
 
-Status GraphicBufferSource::setMaxFps(float maxFps) {
+status_t GraphicBufferSource::setMaxFps(float maxFps) {
     ALOGV("setMaxFps: maxFps=%lld", (long long)maxFps);
 
     Mutex::Autolock autoLock(mMutex);
 
     if (mExecuting) {
-        return Status::fromServiceSpecificError(INVALID_OPERATION);
+        return INVALID_OPERATION;
     }
 
     mFrameDropper = new FrameDropper();
     status_t err = mFrameDropper->setMaxFrameRate(maxFps);
     if (err != OK) {
         mFrameDropper.clear();
-        return Status::fromServiceSpecificError(err);
+        return err;
     }
 
-    return Status::ok();
+    return OK;
 }
 
-Status GraphicBufferSource::setStartTimeUs(int64_t skipFramesBeforeUs) {
+status_t GraphicBufferSource::setStartTimeUs(int64_t skipFramesBeforeUs) {
     ALOGV("setStartTimeUs: skipFramesBeforeUs=%lld", (long long)skipFramesBeforeUs);
 
     Mutex::Autolock autoLock(mMutex);
@@ -1078,16 +1007,16 @@ Status GraphicBufferSource::setStartTimeUs(int64_t skipFramesBeforeUs) {
     mSkipFramesBeforeNs =
             (skipFramesBeforeUs > 0) ? (skipFramesBeforeUs * 1000) : -1ll;
 
-    return Status::ok();
+    return OK;
 }
 
-Status GraphicBufferSource::setStopTimeUs(int64_t stopTimeUs) {
+status_t GraphicBufferSource::setStopTimeUs(int64_t stopTimeUs) {
     ALOGV("setStopTimeUs: %lld us", (long long)stopTimeUs);
     Mutex::Autolock autoLock(mMutex);
 
     if (mStopTimeUs != -1) {
         // Ignore if stop time has already been set
-        return Status::ok();
+        return OK;
     }
 
     // stopTimeUs must be smaller or equal to current systemTime.
@@ -1095,12 +1024,12 @@ Status GraphicBufferSource::setStopTimeUs(int64_t stopTimeUs) {
     if (stopTimeUs > currentSystemTimeUs) {
         ALOGE("setStopTimeUs failed. %lld is larger than current system time %lld us",
             (long long)stopTimeUs, (long long)currentSystemTimeUs);
-        return Status::fromServiceSpecificError(INVALID_OPERATION);
+        return INVALID_OPERATION;
     }
     if (mLastActionTimeUs != -1 && stopTimeUs < mLastActionTimeUs) {
         ALOGE("setSuspend failed. %lld is smaller than last action time %lld us",
             (long long)stopTimeUs, (long long)mLastActionTimeUs);
-        return Status::fromServiceSpecificError(INVALID_OPERATION);
+        return INVALID_OPERATION;
     }
     mLastActionTimeUs = stopTimeUs;
     ActionItem action;
@@ -1108,45 +1037,46 @@ Status GraphicBufferSource::setStopTimeUs(int64_t stopTimeUs) {
     action.mActionTimeUs = stopTimeUs;
     mActionQueue.push_back(action);
     mStopTimeUs = stopTimeUs;
-    return Status::ok();
+    return OK;
 }
 
-Status GraphicBufferSource::setTimeLapseConfig(int64_t timePerFrameUs, int64_t timePerCaptureUs) {
+status_t GraphicBufferSource::setTimeLapseConfig(int64_t timePerFrameUs, int64_t timePerCaptureUs) {
     ALOGV("setTimeLapseConfig: timePerFrameUs=%lld, timePerCaptureUs=%lld",
             (long long)timePerFrameUs, (long long)timePerCaptureUs);
 
     Mutex::Autolock autoLock(mMutex);
 
     if (mExecuting || timePerFrameUs <= 0ll || timePerCaptureUs <= 0ll) {
-        return Status::fromServiceSpecificError(INVALID_OPERATION);
+        return INVALID_OPERATION;
     }
 
     mTimePerFrameUs = timePerFrameUs;
     mTimePerCaptureUs = timePerCaptureUs;
 
-    return Status::ok();
+    return OK;
 }
 
-Status GraphicBufferSource::setColorAspects(int32_t aspectsPacked) {
+status_t GraphicBufferSource::setColorAspects(int32_t aspectsPacked) {
     Mutex::Autolock autoLock(mMutex);
-    mColorAspects = ColorUtils::unpackToColorAspects(aspectsPacked);
+    mColorAspectsPacked = aspectsPacked;
+    ColorAspects colorAspects = ColorUtils::unpackToColorAspects(aspectsPacked);
     ALOGD("requesting color aspects (R:%d(%s), P:%d(%s), M:%d(%s), T:%d(%s))",
-            mColorAspects.mRange, asString(mColorAspects.mRange),
-            mColorAspects.mPrimaries, asString(mColorAspects.mPrimaries),
-            mColorAspects.mMatrixCoeffs, asString(mColorAspects.mMatrixCoeffs),
-            mColorAspects.mTransfer, asString(mColorAspects.mTransfer));
+            colorAspects.mRange, asString(colorAspects.mRange),
+            colorAspects.mPrimaries, asString(colorAspects.mPrimaries),
+            colorAspects.mMatrixCoeffs, asString(colorAspects.mMatrixCoeffs),
+            colorAspects.mTransfer, asString(colorAspects.mTransfer));
 
-    return Status::ok();
+    return OK;
 }
 
-Status GraphicBufferSource::signalEndOfInputStream() {
+status_t GraphicBufferSource::signalEndOfInputStream() {
     Mutex::Autolock autoLock(mMutex);
     ALOGV("signalEndOfInputStream: exec=%d avail=%zu eos=%d",
             mExecuting, mNumFramesAvailable, mEndOfStream);
 
     if (mEndOfStream) {
         ALOGE("EOS was already signaled");
-        return Status::fromStatusT(INVALID_OPERATION);
+        return INVALID_OPERATION;
     }
 
     // Set the end-of-stream flag.  If no frames are pending from the
@@ -1163,7 +1093,7 @@ Status GraphicBufferSource::signalEndOfInputStream() {
         submitEndOfInputStream_l();
     }
 
-    return Status::ok();
+    return OK;
 }
 
 void GraphicBufferSource::onMessageReceived(const sp<AMessage> &msg) {

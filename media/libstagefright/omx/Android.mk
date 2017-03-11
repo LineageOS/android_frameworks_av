@@ -4,6 +4,7 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES:=                     \
         FrameDropper.cpp              \
         GraphicBufferSource.cpp       \
+        BWGraphicBufferSource.cpp      \
         OMX.cpp                       \
         OMXMaster.cpp                 \
         OMXNodeInstance.cpp           \
