@@ -200,7 +200,7 @@ DrmHal::~DrmHal() {
 Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
     Vector<sp<IDrmFactory>> factories;
 
-    auto manager = ::IServiceManager::getService("manager");
+    auto manager = ::IServiceManager::getService();
 
     if (manager != NULL) {
         manager->listByInterface(IDrmFactory::descriptor,
