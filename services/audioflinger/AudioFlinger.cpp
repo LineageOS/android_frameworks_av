@@ -292,7 +292,8 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
                                             sessionId,
                                             &streamType, client.clientUid,
                                             &fullConfig,
-                                            (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ | AUDIO_OUTPUT_FLAG_DIRECT),
+                                            (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ |
+                                                    AUDIO_OUTPUT_FLAG_DIRECT),
                                             *deviceId, &portId);
     } else {
         ret = AudioSystem::getInputForAttr(attr, &io,
@@ -2017,7 +2018,8 @@ status_t AudioFlinger::openOutput(audio_module_handle_t module,
                                   uint32_t *latencyMs,
                                   audio_output_flags_t flags)
 {
-    ALOGI("openOutput() this %p, module %d Device %x, SamplingRate %d, Format %#08x, Channels %x, flags %x",
+    ALOGI("openOutput() this %p, module %d Device %x, SamplingRate %d, Format %#08x, Channels %x, "
+              "flags %x",
               this, module,
               (devices != NULL) ? *devices : 0,
               config->sample_rate,
@@ -2115,13 +2117,13 @@ status_t AudioFlinger::closeOutput_nonvirtual(audio_io_handle_t output)
             if (mPlaybackThreads.size()) {
                 PlaybackThread *dstThread = checkPlaybackThread_l(mPlaybackThreads.keyAt(0));
                 if (dstThread != NULL) {
-                    // audioflinger lock is held here so the acquisition order of thread locks does not
-                    // matter
+                    // audioflinger lock is held so order of thread lock acquisition doesn't matter
                     Mutex::Autolock _dl(dstThread->mLock);
                     Mutex::Autolock _sl(playbackThread->mLock);
                     Vector< sp<EffectChain> > effectChains = playbackThread->getEffectChains_l();
                     for (size_t i = 0; i < effectChains.size(); i ++) {
-                        moveEffectChain_l(effectChains[i]->sessionId(), playbackThread.get(), dstThread, true);
+                        moveEffectChain_l(effectChains[i]->sessionId(), playbackThread.get(),
+                                dstThread, true);
                     }
                 }
             }
@@ -2293,7 +2295,8 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
                                           inHwDev, inputStream,
                                           primaryOutputDevice_l(), devices, mSystemReady);
             mMmapThreads.add(*input, thread);
-            ALOGV("openInput_l() created mmap capture thread: ID %d thread %p", *input, thread.get());
+            ALOGV("openInput_l() created mmap capture thread: ID %d thread %p", *input,
+                    thread.get());
             return thread;
         } else {
 #ifdef TEE_SINK
@@ -2399,7 +2402,7 @@ status_t AudioFlinger::closeInput_nonvirtual(audio_io_handle_t input)
                 }
             }
             if (chain != 0) {
-                // first check if a record thread is already opened with a client on the same session.
+                // first check if a record thread is already opened with a client on same session.
                 // This should only happen in case of overlap between one thread tear down and the
                 // creation of its replacement
                 size_t i;
@@ -2416,7 +2419,7 @@ status_t AudioFlinger::closeInput_nonvirtual(audio_io_handle_t input)
                         break;
                     }
                 }
-                // put the chain aside if we could not find a record thread with the same session id.
+                // put the chain aside if we could not find a record thread with the same session id
                 if (i == mRecordThreads.size()) {
                     putOrphanEffectChain_l(chain);
                 }

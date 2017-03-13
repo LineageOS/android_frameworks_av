@@ -917,7 +917,8 @@ status_t AudioTrack::setPlaybackRate(const AudioPlaybackRate &playbackRate)
     }
 
     // Check resampler ratios are within bounds
-    if ((uint64_t)effectiveRate > (uint64_t)mSampleRate * (uint64_t)AUDIO_RESAMPLER_DOWN_RATIO_MAX) {
+    if ((uint64_t)effectiveRate > (uint64_t)mSampleRate *
+            (uint64_t)AUDIO_RESAMPLER_DOWN_RATIO_MAX) {
         ALOGV("setPlaybackRate(%f, %f) failed. Resample rate exceeds max accepted value",
                 playbackRate.mSpeed, playbackRate.mPitch);
         return BAD_VALUE;
@@ -1274,9 +1275,10 @@ status_t AudioTrack::createTrack_l()
                                            mFlags, mSelectedDeviceId, &mPortId);
 
     if (status != NO_ERROR || output == AUDIO_IO_HANDLE_NONE) {
-        ALOGE("Could not get audio output for session %d, stream type %d, usage %d, sample rate %u, format %#x,"
-              " channel mask %#x, flags %#x",
-              mSessionId, streamType, mAttributes.usage, mSampleRate, mFormat, mChannelMask, mFlags);
+        ALOGE("Could not get audio output for session %d, stream type %d, usage %d, sample rate %u,"
+              " format %#x, channel mask %#x, flags %#x",
+              mSessionId, streamType, mAttributes.usage, mSampleRate, mFormat, mChannelMask,
+              mFlags);
         return BAD_VALUE;
     }
     {

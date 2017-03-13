@@ -554,7 +554,8 @@ void AudioSystem::AudioFlingerClient::ioConfigChanged(audio_io_config_event even
                     "channel mask %#x frameCount %zu frameCountHAL %zu deviceId %d",
                     event == AUDIO_OUTPUT_CONFIG_CHANGED ? "output" : "input",
                     ioDesc->mIoHandle, ioDesc->mSamplingRate, ioDesc->mFormat,
-                    ioDesc->mChannelMask, ioDesc->mFrameCount, ioDesc->mFrameCountHAL, ioDesc->getDeviceId());
+                    ioDesc->mChannelMask, ioDesc->mFrameCount, ioDesc->mFrameCountHAL,
+                    ioDesc->getDeviceId());
 
         } break;
         }
