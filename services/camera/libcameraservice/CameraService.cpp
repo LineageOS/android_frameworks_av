@@ -423,20 +423,18 @@ void CameraService::onDeviceStatusChanged(const String8& id,
             // Remove cached shim parameters
             state->setShimParams(CameraParameters());
 
-            // Remove the client from the list of active clients
+            // Remove the client from the list of active clients, if there is one
             clientToDisconnect = removeClientLocked(id);
+        }
 
+        // Disconnect client
+        if (clientToDisconnect.get() != nullptr) {
+            ALOGI("%s: Client for camera ID %s evicted due to device status change from HAL",
+                    __FUNCTION__, id.string());
             // Notify the client of disconnection
             clientToDisconnect->notifyError(
                     hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_DISCONNECTED,
                     CaptureResultExtras{});
-        }
-
-        ALOGI("%s: Client for camera ID %s evicted due to device status change from HAL",
-                __FUNCTION__, id.string());
-
-        // Disconnect client
-        if (clientToDisconnect.get() != nullptr) {
             // Ensure not in binder RPC so client disconnect PID checks work correctly
             LOG_ALWAYS_FATAL_IF(getCallingPid() != getpid(),
                     "onDeviceStatusChanged must be called from the camera service process!");
