@@ -40,7 +40,13 @@ LOCAL_CFLAGS += -DDISABLE_TREBLE_DRM=1
 endif
 
 LOCAL_MODULE:= mediadrmserver
+
+# TODO: Some legacy DRM plugins only support 32-bit. They need to be migrated to
+# 64-bit. (b/18948909) Once all of a device's legacy DRM plugins support 64-bit,
+# that device can turn on ENABLE_MEDIADRM_64 to build this service as 64-bit.
+ifneq ($(ENABLE_MEDIADRM_64), true)
 LOCAL_32_BIT_ONLY := true
+endif
 
 LOCAL_INIT_RC := mediadrmserver.rc
 
