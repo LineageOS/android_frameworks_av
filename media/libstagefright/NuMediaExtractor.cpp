@@ -542,7 +542,7 @@ bool NuMediaExtractor::getTotalBitrate(int64_t *bitrate) const {
     }
 
     off64_t size;
-    if (mDurationUs >= 0 && mDataSource->getSize(&size) == OK) {
+    if (mDurationUs > 0 && mDataSource->getSize(&size) == OK) {
         *bitrate = size * 8000000ll / mDurationUs;  // in bits/sec
         return true;
     }
