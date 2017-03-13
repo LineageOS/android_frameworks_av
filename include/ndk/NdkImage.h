@@ -646,7 +646,9 @@ media_status_t AImage_getNumberOfPlanes(const AImage* image, /*out*/int32_t* num
  *         <li>{@link AMEDIA_ERROR_UNSUPPORTED} if pixel stride is undefined for the format of input
  *                 image.</li>
  *         <li>{@link AMEDIA_ERROR_INVALID_OBJECT} if the {@link AImageReader} generated this
- *                 image has been deleted.</li></ul>
+ *                 image has been deleted.</li>
+ *         <li>{@link AMEDIA_IMGREADER_CANNOT_LOCK_IMAGE} if the {@link AImage} cannot be locked
+ *                 for CPU access.</li></ul>
  */
 media_status_t AImage_getPlanePixelStride(
         const AImage* image, int planeIdx, /*out*/int32_t* pixelStride);
@@ -671,7 +673,9 @@ media_status_t AImage_getPlanePixelStride(
  *         <li>{@link AMEDIA_ERROR_UNSUPPORTED} if row stride is undefined for the format of input
  *                 image.</li>
  *         <li>{@link AMEDIA_ERROR_INVALID_OBJECT} if the {@link AImageReader} generated this
- *                 image has been deleted.</li></ul>
+ *                 image has been deleted.</li>
+ *         <li>{@link AMEDIA_IMGREADER_CANNOT_LOCK_IMAGE} if the {@link AImage} cannot be locked
+ *                 for CPU access.</li></ul>
  */
 media_status_t AImage_getPlaneRowStride(
         const AImage* image, int planeIdx, /*out*/int32_t* rowStride);
@@ -693,7 +697,9 @@ media_status_t AImage_getPlaneRowStride(
  *         <li>{@link AMEDIA_ERROR_INVALID_PARAMETER} if image, data or dataLength is NULL, or
  *                 planeIdx is out of the range of [0, numOfPlanes - 1].</li>
  *         <li>{@link AMEDIA_ERROR_INVALID_OBJECT} if the {@link AImageReader} generated this
- *                 image has been deleted.</li></ul>
+ *                 image has been deleted.</li>
+ *         <li>{@link AMEDIA_IMGREADER_CANNOT_LOCK_IMAGE} if the {@link AImage} cannot be locked
+ *                 for CPU access.</li></ul>
  */
 media_status_t AImage_getPlaneData(
         const AImage* image, int planeIdx,

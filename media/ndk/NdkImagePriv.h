@@ -21,6 +21,7 @@
 #include <utils/Log.h>
 #include <utils/StrongPointer.h>
 
+#include <gui/BufferItem.h>
 #include <gui/CpuConsumer.h>
 
 #include "NdkImageReaderPriv.h"
@@ -31,9 +32,9 @@ using namespace android;
 
 // TODO: this only supports ImageReader
 struct AImage {
-    AImage(AImageReader* reader, int32_t format,
-            CpuConsumer::LockedBuffer* buffer, int64_t timestamp,
-            int32_t width, int32_t height, int32_t numPlanes);
+    AImage(AImageReader* reader, int32_t format, uint64_t usage,
+           BufferItem* buffer, int64_t timestamp,
+           int32_t width, int32_t height, int32_t numPlanes);
 
     // free all resources while keeping object alive. Caller must obtain reader lock
     void close();
@@ -54,6 +55,9 @@ struct AImage {
     media_status_t getNumPlanes(/*out*/int32_t* numPlanes) const;
     media_status_t getTimestamp(/*out*/int64_t* timestamp) const;
 
+    media_status_t lockImage();
+    media_status_t unlockImageIfLocked(/*out*/int* fenceFd);
+
     media_status_t getPlanePixelStride(int planeIdx, /*out*/int32_t* pixelStride) const;
     media_status_t getPlaneRowStride(int planeIdx, /*out*/int32_t* rowStride) const;
     media_status_t getPlaneData(int planeIdx,/*out*/uint8_t** data, /*out*/int* dataLength) const;
@@ -69,7 +73,9 @@ struct AImage {
     // When reader is close, AImage will only accept close API call
     wp<AImageReader>           mReader;
     const int32_t              mFormat;
-    CpuConsumer::LockedBuffer* mBuffer;
+    const uint64_t             mUsage;  // AHARDWAREBUFFER_USAGE0* flags.
+    BufferItem*                mBuffer;
+    std::unique_ptr<CpuConsumer::LockedBuffer> mLockedBuffer;
     const int64_t              mTimestamp;
     const int32_t              mWidth;
     const int32_t              mHeight;

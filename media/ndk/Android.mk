@@ -34,9 +34,12 @@ LOCAL_MODULE:= libmediandk
 
 LOCAL_C_INCLUDES := \
     bionic/libc/private \
+    external/piex \
     frameworks/base/core/jni \
+    frameworks/base/media/jni \
     frameworks/av/include/ndk \
-    system/media/camera/include
+    system/media/camera/include \
+    $(call include-path-for, libhardware)/hardware \
 
 LOCAL_CFLAGS += -fvisibility=hidden -D EXPORT='__attribute__ ((visibility ("default")))'
 
@@ -45,7 +48,9 @@ LOCAL_CFLAGS += -Werror -Wall
 LOCAL_SHARED_LIBRARIES := \
     libbinder \
     libmedia \
+    libmedia_jni \
     libmediadrm \
+    libskia \
     libstagefright \
     libstagefright_foundation \
     liblog \

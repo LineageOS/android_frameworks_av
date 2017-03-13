@@ -22,6 +22,8 @@
 #include "NdkImagePriv.h"
 #include "NdkImageReaderPriv.h"
 
+#include <android_media_Utils.h>
+#include <android_runtime/android_hardware_HardwareBuffer.h>
 #include <utils/Log.h>
 #include "hardware/camera3.h"
 
@@ -29,11 +31,11 @@ using namespace android;
 
 #define ALIGN(x, mask) ( ((x) + (mask) - 1) & ~((mask) - 1) )
 
-AImage::AImage(AImageReader* reader, int32_t format,
-        CpuConsumer::LockedBuffer* buffer, int64_t timestamp,
+AImage::AImage(AImageReader* reader, int32_t format, uint64_t usage,
+        BufferItem* buffer, int64_t timestamp,
         int32_t width, int32_t height, int32_t numPlanes) :
-        mReader(reader), mFormat(format),
-        mBuffer(buffer), mTimestamp(timestamp),
+        mReader(reader), mFormat(format), mUsage(usage),
+        mBuffer(buffer), mLockedBuffer(nullptr), mTimestamp(timestamp),
         mWidth(width), mHeight(height), mNumPlanes(numPlanes) {
 }
 
@@ -66,6 +68,7 @@ AImage::close() {
     // Should have been set to nullptr in releaseImageLocked
     // Set to nullptr here for extra safety only
     mBuffer = nullptr;
+    mLockedBuffer = nullptr;
     mIsClosed = true;
 }
 
@@ -169,8 +172,80 @@ AImage::getTimestamp(int64_t* timestamp) const {
     return AMEDIA_OK;
 }
 
+media_status_t AImage::lockImage() {
+    if (mBuffer == nullptr || mBuffer->mGraphicBuffer == nullptr) {
+        LOG_ALWAYS_FATAL("%s: AImage %p has no buffer.", __FUNCTION__, this);
+        return AMEDIA_ERROR_INVALID_OBJECT;
+    }
+
+    if ((mUsage & AHARDWAREBUFFER_USAGE0_CPU_READ_OFTEN) == 0) {
+        ALOGE("%s: AImage %p does not have any software read usage bits set, usage=%" PRIu64 "",
+              __FUNCTION__, this, mUsage);
+        return AMEDIA_IMGREADER_CANNOT_LOCK_IMAGE;
+    }
+
+    if (mLockedBuffer != nullptr) {
+        // Return immediately if the image has already been locked.
+        return AMEDIA_OK;
+    }
+
+    auto lockedBuffer = std::make_unique<CpuConsumer::LockedBuffer>();
+
+    uint64_t producerUsage;
+    uint64_t consumerUsage;
+    android_hardware_HardwareBuffer_convertToGrallocUsageBits(
+            &producerUsage, &consumerUsage, mUsage, 0);
+
+    status_t ret =
+            lockImageFromBuffer(mBuffer, consumerUsage, mBuffer->mFence->dup(), lockedBuffer.get());
+    if (ret != OK) {
+        ALOGE("%s: AImage %p failed to lock, error=%d", __FUNCTION__, this, ret);
+        return AMEDIA_IMGREADER_CANNOT_LOCK_IMAGE;
+    }
+
+    ALOGV("%s: Successfully locked the image %p.", __FUNCTION__, this);
+    mLockedBuffer = std::move(lockedBuffer);
+
+    return AMEDIA_OK;
+}
+
+media_status_t AImage::unlockImageIfLocked(int* fenceFd) {
+    if (fenceFd == nullptr) {
+        LOG_ALWAYS_FATAL("%s: fenceFd cannot be null.", __FUNCTION__);
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+
+    if (mBuffer == nullptr || mBuffer->mGraphicBuffer == nullptr) {
+        LOG_ALWAYS_FATAL("%s: AImage %p has no buffer.", __FUNCTION__, this);
+        return AMEDIA_ERROR_INVALID_OBJECT;
+    }
+
+    if (mLockedBuffer == nullptr) {
+        // This image hasn't been locked yet, no need to unlock.
+        *fenceFd = -1;
+        return AMEDIA_OK;
+    }
+
+    // No fence by default.
+    int releaseFenceFd = -1;
+    status_t res = mBuffer->mGraphicBuffer->unlockAsync(&releaseFenceFd);
+    if (res != OK) {
+        ALOGE("%s unlock buffer failed on iamge %p.", __FUNCTION__, this);
+        *fenceFd = -1;
+        return AMEDIA_IMGREADER_CANNOT_UNLOCK_IMAGE;
+    }
+
+    *fenceFd = releaseFenceFd;
+    return AMEDIA_OK;
+}
+
 media_status_t
 AImage::getPlanePixelStride(int planeIdx, /*out*/int32_t* pixelStride) const {
+    if (mLockedBuffer == nullptr) {
+        ALOGE("%s: buffer not locked.", __FUNCTION__);
+        return AMEDIA_IMGREADER_IMAGE_NOT_LOCKED;
+    }
+
     if (planeIdx < 0 || planeIdx >= mNumPlanes) {
         ALOGE("Error: planeIdx %d out of bound [0,%d]",
                 planeIdx, mNumPlanes - 1);
@@ -183,10 +258,10 @@ AImage::getPlanePixelStride(int planeIdx, /*out*/int32_t* pixelStride) const {
         ALOGE("%s: image %p has been closed!", __FUNCTION__, this);
         return AMEDIA_ERROR_INVALID_OBJECT;
     }
-    int32_t fmt = mBuffer->flexFormat;
+    int32_t fmt = mLockedBuffer->flexFormat;
     switch (fmt) {
         case HAL_PIXEL_FORMAT_YCbCr_420_888:
-            *pixelStride = (planeIdx == 0) ? 1 : mBuffer->chromaStep;
+            *pixelStride = (planeIdx == 0) ? 1 : mLockedBuffer->chromaStep;
             return AMEDIA_OK;
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
             *pixelStride = (planeIdx == 0) ? 1 : 2;
@@ -226,6 +301,11 @@ AImage::getPlanePixelStride(int planeIdx, /*out*/int32_t* pixelStride) const {
 
 media_status_t
 AImage::getPlaneRowStride(int planeIdx, /*out*/int32_t* rowStride) const {
+    if (mLockedBuffer == nullptr) {
+        ALOGE("%s: buffer not locked.", __FUNCTION__);
+        return AMEDIA_IMGREADER_IMAGE_NOT_LOCKED;
+    }
+
     if (planeIdx < 0 || planeIdx >= mNumPlanes) {
         ALOGE("Error: planeIdx %d out of bound [0,%d]",
                 planeIdx, mNumPlanes - 1);
@@ -238,54 +318,58 @@ AImage::getPlaneRowStride(int planeIdx, /*out*/int32_t* rowStride) const {
         ALOGE("%s: image %p has been closed!", __FUNCTION__, this);
         return AMEDIA_ERROR_INVALID_OBJECT;
     }
-    int32_t fmt = mBuffer->flexFormat;
+    int32_t fmt = mLockedBuffer->flexFormat;
     switch (fmt) {
         case HAL_PIXEL_FORMAT_YCbCr_420_888:
-            *rowStride = (planeIdx == 0) ? mBuffer->stride : mBuffer->chromaStride;
+            *rowStride = (planeIdx == 0) ? mLockedBuffer->stride
+                                         : mLockedBuffer->chromaStride;
             return AMEDIA_OK;
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-            *rowStride = mBuffer->width;
+            *rowStride = mLockedBuffer->width;
             return AMEDIA_OK;
         case HAL_PIXEL_FORMAT_YV12:
-            if (mBuffer->stride % 16) {
-                ALOGE("Stride %d is not 16 pixel aligned!", mBuffer->stride);
+            if (mLockedBuffer->stride % 16) {
+                ALOGE("Stride %d is not 16 pixel aligned!", mLockedBuffer->stride);
                 return AMEDIA_ERROR_UNKNOWN;
             }
-            *rowStride = (planeIdx == 0) ? mBuffer->stride : ALIGN(mBuffer->stride / 2, 16);
+            *rowStride = (planeIdx == 0) ? mLockedBuffer->stride
+                                         : ALIGN(mLockedBuffer->stride / 2, 16);
             return AMEDIA_OK;
         case HAL_PIXEL_FORMAT_RAW10:
         case HAL_PIXEL_FORMAT_RAW12:
             // RAW10 and RAW12 are used for 10-bit and 12-bit raw data, they are single plane
-            *rowStride = mBuffer->stride;
+            *rowStride = mLockedBuffer->stride;
             return AMEDIA_OK;
         case HAL_PIXEL_FORMAT_Y8:
-            if (mBuffer->stride % 16) {
-                ALOGE("Stride %d is not 16 pixel aligned!", mBuffer->stride);
+            if (mLockedBuffer->stride % 16) {
+                ALOGE("Stride %d is not 16 pixel aligned!",
+                      mLockedBuffer->stride);
                 return AMEDIA_ERROR_UNKNOWN;
             }
-            *rowStride = mBuffer->stride;
+            *rowStride = mLockedBuffer->stride;
             return AMEDIA_OK;
         case HAL_PIXEL_FORMAT_Y16:
         case HAL_PIXEL_FORMAT_RAW16:
             // In native side, strides are specified in pixels, not in bytes.
             // Single plane 16bpp bayer data. even width/height,
             // row stride multiple of 16 pixels (32 bytes)
-            if (mBuffer->stride % 16) {
-                ALOGE("Stride %d is not 16 pixel aligned!", mBuffer->stride);
+            if (mLockedBuffer->stride % 16) {
+                ALOGE("Stride %d is not 16 pixel aligned!",
+                      mLockedBuffer->stride);
                 return AMEDIA_ERROR_UNKNOWN;
             }
-            *rowStride = mBuffer->stride * 2;
+            *rowStride = mLockedBuffer->stride * 2;
             return AMEDIA_OK;
         case HAL_PIXEL_FORMAT_RGB_565:
-            *rowStride = mBuffer->stride * 2;
+            *rowStride = mLockedBuffer->stride * 2;
             return AMEDIA_OK;
         case HAL_PIXEL_FORMAT_RGBA_8888:
         case HAL_PIXEL_FORMAT_RGBX_8888:
-            *rowStride = mBuffer->stride * 4;
+            *rowStride = mLockedBuffer->stride * 4;
             return AMEDIA_OK;
         case HAL_PIXEL_FORMAT_RGB_888:
             // Single plane, 24bpp.
-            *rowStride = mBuffer->stride * 3;
+            *rowStride = mLockedBuffer->stride * 3;
             return AMEDIA_OK;
         case HAL_PIXEL_FORMAT_BLOB:
         case HAL_PIXEL_FORMAT_RAW_OPAQUE:
@@ -300,13 +384,13 @@ AImage::getPlaneRowStride(int planeIdx, /*out*/int32_t* rowStride) const {
 
 uint32_t
 AImage::getJpegSize() const {
-    if (mBuffer == nullptr) {
+    if (mLockedBuffer == nullptr) {
         LOG_ALWAYS_FATAL("Error: buffer is null");
     }
 
     uint32_t size = 0;
-    uint32_t width = mBuffer->width;
-    uint8_t* jpegBuffer = mBuffer->data;
+    uint32_t width = mLockedBuffer->width;
+    uint8_t* jpegBuffer = mLockedBuffer->data;
 
     // First check for JPEG transport header at the end of the buffer
     uint8_t* header = jpegBuffer + (width - sizeof(struct camera3_jpeg_blob));
@@ -334,6 +418,11 @@ AImage::getJpegSize() const {
 
 media_status_t
 AImage::getPlaneData(int planeIdx,/*out*/uint8_t** data, /*out*/int* dataLength) const {
+    if (mLockedBuffer == nullptr) {
+        ALOGE("%s: buffer not locked.", __FUNCTION__);
+        return AMEDIA_IMGREADER_IMAGE_NOT_LOCKED;
+    }
+
     if (planeIdx < 0 || planeIdx >= mNumPlanes) {
         ALOGE("Error: planeIdx %d out of bound [0,%d]",
                 planeIdx, mNumPlanes - 1);
@@ -352,140 +441,154 @@ AImage::getPlaneData(int planeIdx,/*out*/uint8_t** data, /*out*/int* dataLength)
     uint8_t* cr = nullptr;
     uint8_t* pData = nullptr;
     int bytesPerPixel = 0;
-    int32_t fmt = mBuffer->flexFormat;
+    int32_t fmt = mLockedBuffer->flexFormat;
 
     switch (fmt) {
         case HAL_PIXEL_FORMAT_YCbCr_420_888:
-            pData = (planeIdx == 0) ? mBuffer->data :
-                    (planeIdx == 1) ? mBuffer->dataCb : mBuffer->dataCr;
+            pData = (planeIdx == 0) ? mLockedBuffer->data
+                                    : (planeIdx == 1) ? mLockedBuffer->dataCb
+                                                      : mLockedBuffer->dataCr;
             // only map until last pixel
             if (planeIdx == 0) {
-                dataSize = mBuffer->stride * (mBuffer->height - 1) + mBuffer->width;
+                dataSize = mLockedBuffer->stride * (mLockedBuffer->height - 1) +
+                           mLockedBuffer->width;
             } else {
-                dataSize = mBuffer->chromaStride * (mBuffer->height / 2 - 1) +
-                        mBuffer->chromaStep * (mBuffer->width / 2 - 1) + 1;
+                dataSize =
+                    mLockedBuffer->chromaStride *
+                        (mLockedBuffer->height / 2 - 1) +
+                    mLockedBuffer->chromaStep * (mLockedBuffer->width / 2 - 1) +
+                    1;
             }
             break;
         // NV21
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-            cr = mBuffer->data + (mBuffer->stride * mBuffer->height);
+            cr = mLockedBuffer->data +
+                 (mLockedBuffer->stride * mLockedBuffer->height);
             cb = cr + 1;
             // only map until last pixel
-            ySize = mBuffer->width * (mBuffer->height - 1) + mBuffer->width;
-            cSize = mBuffer->width * (mBuffer->height / 2 - 1) + mBuffer->width - 1;
-
-            pData = (planeIdx == 0) ? mBuffer->data :
-                    (planeIdx == 1) ? cb : cr;
+            ySize = mLockedBuffer->width * (mLockedBuffer->height - 1) +
+                    mLockedBuffer->width;
+            cSize = mLockedBuffer->width * (mLockedBuffer->height / 2 - 1) +
+                    mLockedBuffer->width - 1;
+            pData = (planeIdx == 0) ? mLockedBuffer->data
+                                    : (planeIdx == 1) ? cb : cr;
             dataSize = (planeIdx == 0) ? ySize : cSize;
             break;
         case HAL_PIXEL_FORMAT_YV12:
             // Y and C stride need to be 16 pixel aligned.
-            if (mBuffer->stride % 16) {
-                ALOGE("Stride %d is not 16 pixel aligned!", mBuffer->stride);
+            if (mLockedBuffer->stride % 16) {
+                ALOGE("Stride %d is not 16 pixel aligned!",
+                      mLockedBuffer->stride);
                 return AMEDIA_ERROR_UNKNOWN;
             }
 
-            ySize = mBuffer->stride * mBuffer->height;
-            cStride = ALIGN(mBuffer->stride / 2, 16);
-            cr = mBuffer->data + ySize;
-            cSize = cStride * mBuffer->height / 2;
+            ySize = mLockedBuffer->stride * mLockedBuffer->height;
+            cStride = ALIGN(mLockedBuffer->stride / 2, 16);
+            cr = mLockedBuffer->data + ySize;
+            cSize = cStride * mLockedBuffer->height / 2;
             cb = cr + cSize;
 
-            pData = (planeIdx == 0) ? mBuffer->data :
-                    (planeIdx == 1) ? cb : cr;
+            pData = (planeIdx == 0) ? mLockedBuffer->data
+                                    : (planeIdx == 1) ? cb : cr;
             dataSize = (planeIdx == 0) ? ySize : cSize;
             break;
         case HAL_PIXEL_FORMAT_Y8:
             // Single plane, 8bpp.
 
-            pData = mBuffer->data;
-            dataSize = mBuffer->stride * mBuffer->height;
+            pData = mLockedBuffer->data;
+            dataSize = mLockedBuffer->stride * mLockedBuffer->height;
             break;
         case HAL_PIXEL_FORMAT_Y16:
             bytesPerPixel = 2;
 
-            pData = mBuffer->data;
-            dataSize = mBuffer->stride * mBuffer->height * bytesPerPixel;
+            pData = mLockedBuffer->data;
+            dataSize =
+                mLockedBuffer->stride * mLockedBuffer->height * bytesPerPixel;
             break;
         case HAL_PIXEL_FORMAT_BLOB:
             // Used for JPEG data, height must be 1, width == size, single plane.
-            if (mBuffer->height != 1) {
-                ALOGE("Jpeg should have height value one but got %d", mBuffer->height);
+            if (mLockedBuffer->height != 1) {
+                ALOGE("Jpeg should have height value one but got %d",
+                      mLockedBuffer->height);
                 return AMEDIA_ERROR_UNKNOWN;
             }
 
-            pData = mBuffer->data;
+            pData = mLockedBuffer->data;
             dataSize = getJpegSize();
             break;
         case HAL_PIXEL_FORMAT_RAW16:
             // Single plane 16bpp bayer data.
             bytesPerPixel = 2;
-            pData = mBuffer->data;
-            dataSize = mBuffer->stride * mBuffer->height * bytesPerPixel;
+            pData = mLockedBuffer->data;
+            dataSize =
+                mLockedBuffer->stride * mLockedBuffer->height * bytesPerPixel;
             break;
         case HAL_PIXEL_FORMAT_RAW_OPAQUE:
             // Used for RAW_OPAQUE data, height must be 1, width == size, single plane.
-            if (mBuffer->height != 1) {
-                ALOGE("RAW_OPAQUE should have height value one but got %d", mBuffer->height);
+            if (mLockedBuffer->height != 1) {
+                ALOGE("RAW_OPAQUE should have height value one but got %d",
+                      mLockedBuffer->height);
                 return AMEDIA_ERROR_UNKNOWN;
             }
-            pData = mBuffer->data;
-            dataSize = mBuffer->width;
+            pData = mLockedBuffer->data;
+            dataSize = mLockedBuffer->width;
             break;
         case HAL_PIXEL_FORMAT_RAW10:
             // Single plane 10bpp bayer data.
-            if (mBuffer->width % 4) {
-                ALOGE("Width is not multiple of 4 %d", mBuffer->width);
+            if (mLockedBuffer->width % 4) {
+                ALOGE("Width is not multiple of 4 %d", mLockedBuffer->width);
                 return AMEDIA_ERROR_UNKNOWN;
             }
-            if (mBuffer->height % 2) {
-                ALOGE("Height is not multiple of 2 %d", mBuffer->height);
+            if (mLockedBuffer->height % 2) {
+                ALOGE("Height is not multiple of 2 %d", mLockedBuffer->height);
                 return AMEDIA_ERROR_UNKNOWN;
             }
-            if (mBuffer->stride < (mBuffer->width * 10 / 8)) {
+            if (mLockedBuffer->stride < (mLockedBuffer->width * 10 / 8)) {
                 ALOGE("stride (%d) should be at least %d",
-                        mBuffer->stride, mBuffer->width * 10 / 8);
+                        mLockedBuffer->stride, mLockedBuffer->width * 10 / 8);
                 return AMEDIA_ERROR_UNKNOWN;
             }
-            pData = mBuffer->data;
-            dataSize = mBuffer->stride * mBuffer->height;
+            pData = mLockedBuffer->data;
+            dataSize = mLockedBuffer->stride * mLockedBuffer->height;
             break;
         case HAL_PIXEL_FORMAT_RAW12:
             // Single plane 10bpp bayer data.
-            if (mBuffer->width % 4) {
-                ALOGE("Width is not multiple of 4 %d", mBuffer->width);
+            if (mLockedBuffer->width % 4) {
+                ALOGE("Width is not multiple of 4 %d", mLockedBuffer->width);
                 return AMEDIA_ERROR_UNKNOWN;
             }
-            if (mBuffer->height % 2) {
-                ALOGE("Height is not multiple of 2 %d", mBuffer->height);
+            if (mLockedBuffer->height % 2) {
+                ALOGE("Height is not multiple of 2 %d", mLockedBuffer->height);
                 return AMEDIA_ERROR_UNKNOWN;
             }
-            if (mBuffer->stride < (mBuffer->width * 12 / 8)) {
+            if (mLockedBuffer->stride < (mLockedBuffer->width * 12 / 8)) {
                 ALOGE("stride (%d) should be at least %d",
-                        mBuffer->stride, mBuffer->width * 12 / 8);
+                        mLockedBuffer->stride, mLockedBuffer->width * 12 / 8);
                 return AMEDIA_ERROR_UNKNOWN;
             }
-            pData = mBuffer->data;
-            dataSize = mBuffer->stride * mBuffer->height;
+            pData = mLockedBuffer->data;
+            dataSize = mLockedBuffer->stride * mLockedBuffer->height;
             break;
         case HAL_PIXEL_FORMAT_RGBA_8888:
         case HAL_PIXEL_FORMAT_RGBX_8888:
             // Single plane, 32bpp.
             bytesPerPixel = 4;
-            pData = mBuffer->data;
-            dataSize = mBuffer->stride * mBuffer->height * bytesPerPixel;
+            pData = mLockedBuffer->data;
+            dataSize =
+                mLockedBuffer->stride * mLockedBuffer->height * bytesPerPixel;
             break;
         case HAL_PIXEL_FORMAT_RGB_565:
             // Single plane, 16bpp.
             bytesPerPixel = 2;
-            pData = mBuffer->data;
-            dataSize = mBuffer->stride * mBuffer->height * bytesPerPixel;
+            pData = mLockedBuffer->data;
+            dataSize =
+                mLockedBuffer->stride * mLockedBuffer->height * bytesPerPixel;
             break;
         case HAL_PIXEL_FORMAT_RGB_888:
             // Single plane, 24bpp.
             bytesPerPixel = 3;
-            pData = mBuffer->data;
-            dataSize = mBuffer->stride * mBuffer->height * bytesPerPixel;
+            pData = mLockedBuffer->data;
+            dataSize = mLockedBuffer->stride * mLockedBuffer->height * bytesPerPixel;
             break;
         default:
             ALOGE("Pixel format: 0x%x is unsupported", fmt);
@@ -602,6 +705,12 @@ media_status_t AImage_getPlanePixelStride(
                 __FUNCTION__, image, pixelStride);
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
+    media_status_t ret = const_cast<AImage*>(image)->lockImage();
+    if (ret != AMEDIA_OK) {
+        ALOGE("%s: failed to lock buffer for CPU access. image %p, error=%d.",
+              __FUNCTION__, image, ret);
+        return ret;
+    }
     return image->getPlanePixelStride(planeIdx, pixelStride);
 }
 
@@ -613,6 +722,12 @@ media_status_t AImage_getPlaneRowStride(
         ALOGE("%s: bad argument. image %p rowStride %p",
                 __FUNCTION__, image, rowStride);
         return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+    media_status_t ret = const_cast<AImage*>(image)->lockImage();
+    if (ret != AMEDIA_OK) {
+        ALOGE("%s: failed to lock buffer for CPU access. image %p, error=%d.",
+              __FUNCTION__, image, ret);
+        return ret;
     }
     return image->getPlaneRowStride(planeIdx, rowStride);
 }
@@ -626,6 +741,12 @@ media_status_t AImage_getPlaneData(
         ALOGE("%s: bad argument. image %p data %p dataLength %p",
                 __FUNCTION__, image, data, dataLength);
         return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+    media_status_t ret = const_cast<AImage*>(image)->lockImage();
+    if (ret != AMEDIA_OK) {
+        ALOGE("%s: failed to lock buffer for CPU access. image %p, error=%d.",
+              __FUNCTION__, image, ret);
+        return ret;
     }
     return image->getPlaneData(planeIdx, data, dataLength);
 }
