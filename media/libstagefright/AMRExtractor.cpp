@@ -259,7 +259,7 @@ status_t AMRSource::read(
 
     int64_t seekTimeUs;
     ReadOptions::SeekMode mode;
-    if (options && options->getSeekTo(&seekTimeUs, &mode)) {
+    if (mOffsetTableLength > 0 && options && options->getSeekTo(&seekTimeUs, &mode)) {
         size_t size;
         int64_t seekFrame = seekTimeUs / 20000ll;  // 20ms per frame.
         mCurrentTimeUs = seekFrame * 20000ll;
