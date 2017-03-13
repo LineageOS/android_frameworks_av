@@ -30,7 +30,6 @@
 using ::android::hardware::audio::V2_0::IDevice;
 using ::android::hardware::audio::V2_0::Result;
 using ::android::hardware::Return;
-using ::android::hardware::Status;
 
 namespace android {
 

@@ -36,7 +36,6 @@ using ::android::hardware::audio::common::V2_0::AudioFormat;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::MQDescriptorSync;
 using ::android::hardware::Return;
-using ::android::hardware::Status;
 
 namespace android {
 
