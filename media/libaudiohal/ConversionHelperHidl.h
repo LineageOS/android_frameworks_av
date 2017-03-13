@@ -23,7 +23,6 @@
 
 using ::android::hardware::audio::V2_0::ParameterValue;
 using ::android::hardware::Return;
-using ::android::hardware::Status;
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 

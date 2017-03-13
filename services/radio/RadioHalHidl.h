@@ -29,7 +29,6 @@
 
 namespace android {
 
-using android::hardware::Status;
 using android::hardware::Return;
 using android::hardware::broadcastradio::V1_0::Result;
 using android::hardware::broadcastradio::V1_0::IBroadcastRadio;

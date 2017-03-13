@@ -27,7 +27,6 @@
 #include "EffectBufferHalHidl.h"
 
 using ::android::hardware::Return;
-using ::android::hardware::Status;
 using ::android::hidl::allocator::V1_0::IAllocator;
 
 namespace android {

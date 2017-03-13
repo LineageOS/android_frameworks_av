@@ -29,7 +29,6 @@ using ::android::hardware::audio::common::V2_0::Uuid;
 using ::android::hardware::audio::effect::V2_0::IEffect;
 using ::android::hardware::audio::effect::V2_0::Result;
 using ::android::hardware::Return;
-using ::android::hardware::Status;
 
 namespace android {
 
