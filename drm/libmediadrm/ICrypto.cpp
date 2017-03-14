@@ -235,17 +235,21 @@ status_t BnCrypto::onTransact(
             size_t opaqueSize = data.readInt32();
             void *opaqueData = NULL;
 
-            if (opaqueSize > 0) {
-                opaqueData = malloc(opaqueSize);
-                data.read(opaqueData, opaqueSize);
+            const size_t kMaxOpaqueSize = 100 * 1024;
+            if (opaqueSize > kMaxOpaqueSize) {
+                return BAD_VALUE;
             }
 
+            opaqueData = malloc(opaqueSize);
+            if (NULL == opaqueData) {
+                return NO_MEMORY;
+            }
+
+            data.read(opaqueData, opaqueSize);
             reply->writeInt32(createPlugin(uuid, opaqueData, opaqueSize));
 
-            if (opaqueData != NULL) {
-                free(opaqueData);
-                opaqueData = NULL;
-            }
+            free(opaqueData);
+            opaqueData = NULL;
 
             return OK;
         }
