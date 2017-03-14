@@ -73,6 +73,10 @@ private:
 class FLACParser : public RefBase {
 
 public:
+    enum {
+        kMaxChannels = 8,
+    };
+
     FLACParser(
         const sp<DataSource> &dataSource,
         // If metadata pointers aren't provided, we don't fill them
@@ -122,7 +126,7 @@ private:
     // media buffers
     size_t mMaxBufferSize;
     MediaBufferGroup *mGroup;
-    void (*mCopy)(short *dst, const int *const *src, unsigned nSamples, unsigned nChannels);
+    void (*mCopy)(short *dst, const int * src[kMaxChannels], unsigned nSamples, unsigned nChannels);
 
     // handle to underlying libFLAC parser
     FLAC__StreamDecoder *mDecoder;
@@ -139,7 +143,7 @@ private:
     bool mWriteRequested;
     bool mWriteCompleted;
     FLAC__FrameHeader mWriteHeader;
-    const FLAC__int32 * const *mWriteBuffer;
+    FLAC__int32 const * mWriteBuffer[kMaxChannels];
 
     // most recent error reported by libFLAC parser
     FLAC__StreamDecoderErrorStatus mErrorStatus;
@@ -323,7 +327,7 @@ FLAC__StreamDecoderWriteStatus FLACParser::writeCallback(
         mWriteRequested = false;
         // FLAC parser doesn't free or realloc buffer until next frame or finish
         mWriteHeader = frame->header;
-        mWriteBuffer = buffer;
+        memmove(mWriteBuffer, buffer, sizeof(const FLAC__int32 * const) * getChannels());
         mWriteCompleted = true;
         return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
     } else {
@@ -380,22 +384,28 @@ void FLACParser::errorCallback(FLAC__StreamDecoderErrorStatus status)
 // Copy samples from FLAC native 32-bit non-interleaved to 16-bit interleaved.
 // These are candidates for optimization if needed.
 
-static void copyMono8(short *dst, const int *const *src, unsigned nSamples, unsigned nChannels)
-{
+static void copyMono8(
+        short *dst,
+        const int * src[FLACParser::kMaxChannels],
+        unsigned nSamples,
+        unsigned /* nChannels */) {
     for (unsigned i = 0; i < nSamples; ++i) {
         *dst++ = src[0][i] << 8;
     }
 }
 
-static void copyStereo8(short *dst, const int *const *src, unsigned nSamples, unsigned nChannels)
-{
+static void copyStereo8(
+        short *dst,
+        const int * src[FLACParser::kMaxChannels],
+        unsigned nSamples,
+        unsigned /* nChannels */) {
     for (unsigned i = 0; i < nSamples; ++i) {
         *dst++ = src[0][i] << 8;
         *dst++ = src[1][i] << 8;
     }
 }
 
-static void copyMultiCh8(short *dst, const int *const *src, unsigned nSamples, unsigned nChannels)
+static void copyMultiCh8(short *dst, const int * src[FLACParser::kMaxChannels], unsigned nSamples, unsigned nChannels)
 {
     for (unsigned i = 0; i < nSamples; ++i) {
         for (unsigned c = 0; c < nChannels; ++c) {
@@ -404,22 +414,28 @@ static void copyMultiCh8(short *dst, const int *const *src, unsigned nSamples, u
     }
 }
 
-static void copyMono16(short *dst, const int *const *src, unsigned nSamples, unsigned nChannels)
-{
+static void copyMono16(
+        short *dst,
+        const int * src[FLACParser::kMaxChannels],
+        unsigned nSamples,
+        unsigned /* nChannels */) {
     for (unsigned i = 0; i < nSamples; ++i) {
         *dst++ = src[0][i];
     }
 }
 
-static void copyStereo16(short *dst, const int *const *src, unsigned nSamples, unsigned nChannels)
-{
+static void copyStereo16(
+        short *dst,
+        const int * src[FLACParser::kMaxChannels],
+        unsigned nSamples,
+        unsigned /* nChannels */) {
     for (unsigned i = 0; i < nSamples; ++i) {
         *dst++ = src[0][i];
         *dst++ = src[1][i];
     }
 }
 
-static void copyMultiCh16(short *dst, const int *const *src, unsigned nSamples, unsigned nChannels)
+static void copyMultiCh16(short *dst, const int * src[FLACParser::kMaxChannels], unsigned nSamples, unsigned nChannels)
 {
     for (unsigned i = 0; i < nSamples; ++i) {
         for (unsigned c = 0; c < nChannels; ++c) {
@@ -430,22 +446,28 @@ static void copyMultiCh16(short *dst, const int *const *src, unsigned nSamples, 
 
 // 24-bit versions should do dithering or noise-shaping, here or in AudioFlinger
 
-static void copyMono24(short *dst, const int *const *src, unsigned nSamples, unsigned nChannels)
-{
+static void copyMono24(
+        short *dst,
+        const int * src[FLACParser::kMaxChannels],
+        unsigned nSamples,
+        unsigned /* nChannels */) {
     for (unsigned i = 0; i < nSamples; ++i) {
         *dst++ = src[0][i] >> 8;
     }
 }
 
-static void copyStereo24(short *dst, const int *const *src, unsigned nSamples, unsigned nChannels)
-{
+static void copyStereo24(
+        short *dst,
+        const int * src[FLACParser::kMaxChannels],
+        unsigned nSamples,
+        unsigned /* nChannels */) {
     for (unsigned i = 0; i < nSamples; ++i) {
         *dst++ = src[0][i] >> 8;
         *dst++ = src[1][i] >> 8;
     }
 }
 
-static void copyMultiCh24(short *dst, const int *const *src, unsigned nSamples, unsigned nChannels)
+static void copyMultiCh24(short *dst, const int * src[FLACParser::kMaxChannels], unsigned nSamples, unsigned nChannels)
 {
     for (unsigned i = 0; i < nSamples; ++i) {
         for (unsigned c = 0; c < nChannels; ++c) {
@@ -454,8 +476,11 @@ static void copyMultiCh24(short *dst, const int *const *src, unsigned nSamples, 
     }
 }
 
-static void copyTrespass(short *dst, const int *const *src, unsigned nSamples, unsigned nChannels)
-{
+static void copyTrespass(
+        short * /* dst */,
+        const int *[FLACParser::kMaxChannels] /* src */,
+        unsigned /* nSamples */,
+        unsigned /* nChannels */) {
     TRESPASS();
 }
 
@@ -478,7 +503,6 @@ FLACParser::FLACParser(
       mStreamInfoValid(false),
       mWriteRequested(false),
       mWriteCompleted(false),
-      mWriteBuffer(NULL),
       mErrorStatus((FLAC__StreamDecoderErrorStatus) -1)
 {
     ALOGV("FLACParser::FLACParser");
@@ -534,7 +558,7 @@ status_t FLACParser::init()
     }
     if (mStreamInfoValid) {
         // check channel count
-        if (getChannels() == 0 || getChannels() > 8) {
+        if (getChannels() == 0 || getChannels() > kMaxChannels) {
             ALOGE("unsupported channel count %u", getChannels());
             return NO_INIT;
         }
@@ -570,7 +594,7 @@ status_t FLACParser::init()
         static const struct {
             unsigned mChannels;
             unsigned mBitsPerSample;
-            void (*mCopy)(short *dst, const int *const *src, unsigned nSamples, unsigned nChannels);
+            void (*mCopy)(short *dst, const int * src[kMaxChannels], unsigned nSamples, unsigned nChannels);
         } table[] = {
             { 1,  8, copyMono8    },
             { 2,  8, copyStereo8  },
