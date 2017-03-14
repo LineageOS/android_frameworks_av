@@ -1916,7 +1916,7 @@ status_t NuPlayer::GenericSource::onPrepareDrm(const sp<AMessage> &msg)
 status_t NuPlayer::GenericSource::checkDrmInfo()
 {
     if (mFileMeta == NULL) {
-        ALOGE("checkDrmInfo: No metadata");
+        ALOGI("checkDrmInfo: No metadata");
         return OK; // letting the caller responds accordingly
     }
 
