@@ -149,7 +149,10 @@ struct BpCrypto : public BpInterface<ICrypto> {
         ssize_t result = reply.readInt32();
 
         if (isCryptoError(result)) {
-            errorDetailMsg->setTo(reply.readCString());
+            AString msg = reply.readCString();
+            if (errorDetailMsg) {
+                *errorDetailMsg = msg;
+            }
         }
 
         return result;
