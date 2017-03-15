@@ -81,7 +81,8 @@ EXPORT
 ssize_t AMediaMuxer_addTrack(AMediaMuxer *muxer, const AMediaFormat *format) {
     sp<AMessage> msg;
     AMediaFormat_getFormat(format, &msg);
-    return translate_error(muxer->mImpl->addTrack(msg));
+    ssize_t ret = muxer->mImpl->addTrack(msg);
+    return (ret >= 0) ? ret : translate_error(ret);
 }
 
 EXPORT
