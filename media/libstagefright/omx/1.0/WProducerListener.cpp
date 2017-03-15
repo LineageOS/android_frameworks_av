@@ -14,45 +14,45 @@
  * limitations under the License.
  */
 
-#include <media/omx/1.0/WOmxProducerListener.h>
+#include "WProducerListener.h"
 
 namespace android {
 namespace hardware {
 namespace media {
 namespace omx {
 namespace V1_0 {
-namespace utils {
+namespace implementation {
 
-// TWOmxProducerListener
-TWOmxProducerListener::TWOmxProducerListener(
-        sp<IProducerListener> const& base):
+// TWProducerListener
+TWProducerListener::TWProducerListener(
+        sp<BProducerListener> const& base):
     mBase(base) {
 }
 
-Return<void> TWOmxProducerListener::onBufferReleased() {
+Return<void> TWProducerListener::onBufferReleased() {
     mBase->onBufferReleased();
     return Void();
 }
 
-Return<bool> TWOmxProducerListener::needsReleaseNotify() {
+Return<bool> TWProducerListener::needsReleaseNotify() {
     return mBase->needsReleaseNotify();
 }
 
-// LWOmxProducerListener
-LWOmxProducerListener::LWOmxProducerListener(
-        sp<IOmxProducerListener> const& base):
+// LWProducerListener
+LWProducerListener::LWProducerListener(
+        sp<HProducerListener> const& base):
     mBase(base) {
 }
 
-void LWOmxProducerListener::onBufferReleased() {
+void LWProducerListener::onBufferReleased() {
     mBase->onBufferReleased();
 }
 
-bool LWOmxProducerListener::needsReleaseNotify() {
+bool LWProducerListener::needsReleaseNotify() {
     return static_cast<bool>(mBase->needsReleaseNotify());
 }
 
-}  // namespace utils
+}  // namespace implementation
 }  // namespace V1_0
 }  // namespace omx
 }  // namespace media

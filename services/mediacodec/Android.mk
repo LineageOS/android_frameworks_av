@@ -34,8 +34,8 @@ LOCAL_SHARED_LIBRARIES := \
     libcutils \
     libhwbinder \
     libhidltransport \
+    libstagefright_omx \
     android.hardware.media.omx@1.0 \
-    android.hardware.media.omx@1.0-impl \
     android.hidl.memory@1.0
 LOCAL_C_INCLUDES := \
     $(TOP)/frameworks/av/media/libstagefright \

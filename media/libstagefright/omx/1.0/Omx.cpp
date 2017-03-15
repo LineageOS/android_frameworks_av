@@ -22,13 +22,13 @@
 #include <OMX_Core.h>
 #include <OMX_AsString.h>
 
-#include "../../../OMXUtils.h"
-#include "../../../OMXMaster.h"
-#include "../../../GraphicBufferSource.h"
+#include "../OMXUtils.h"
+#include "../OMXMaster.h"
+#include "../GraphicBufferSource.h"
 
 #include "WOmxNode.h"
 #include "WOmxObserver.h"
-#include "WOmxBufferProducer.h"
+#include "WGraphicBufferProducer.h"
 #include "WGraphicBufferSource.h"
 #include "Conversion.h"
 
@@ -52,7 +52,6 @@ Omx::~Omx() {
 
 Return<void> Omx::listNodes(listNodes_cb _hidl_cb) {
     std::list<::android::IOMX::ComponentInfo> list;
-    OMX_U32 index = 0;
     char componentName[256];
     for (OMX_U32 index = 0;
             mMaster->enumerateComponents(
@@ -136,7 +135,7 @@ Return<void> Omx::createInputSurface(createInputSurface_cb _hidl_cb) {
     bufferProducer = graphicBufferSource->getIGraphicBufferProducer();
 
     _hidl_cb(toStatus(OK),
-            new TWOmxBufferProducer(bufferProducer),
+            new TWGraphicBufferProducer(bufferProducer),
             new TWGraphicBufferSource(graphicBufferSource));
     return Void();
 }

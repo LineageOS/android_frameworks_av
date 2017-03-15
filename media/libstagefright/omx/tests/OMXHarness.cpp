@@ -40,7 +40,7 @@
 #include <media/stagefright/SimpleDecodingSource.h>
 #include <media/OMXBuffer.h>
 #include <android/hardware/media/omx/1.0/IOmx.h>
-#include <omx/hal/1.0/utils/WOmx.h>
+#include <media/omx/1.0/WOmx.h>
 
 #define DEFAULT_TIMEOUT         500000
 

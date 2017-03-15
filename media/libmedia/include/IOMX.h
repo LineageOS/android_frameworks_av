@@ -19,13 +19,13 @@
 #define ANDROID_IOMX_H_
 
 #include <binder/IInterface.h>
-#include <binder/HalToken.h>
 #include <utils/List.h>
 #include <utils/String8.h>
 #include <cutils/native_handle.h>
 
 #include <list>
 
+#include <hidl/HybridInterface.h>
 #include <media/hardware/MetadataBufferType.h>
 #include <android/hardware/media/omx/1.0/IOmxNode.h>
 

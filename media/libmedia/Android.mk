@@ -57,11 +57,9 @@ LOCAL_SRC_FILES += \
     StringArray.cpp \
     omx/1.0/WGraphicBufferSource.cpp \
     omx/1.0/WOmx.cpp \
-    omx/1.0/WOmxBufferProducer.cpp \
     omx/1.0/WOmxBufferSource.cpp \
     omx/1.0/WOmxNode.cpp \
     omx/1.0/WOmxObserver.cpp \
-    omx/1.0/WOmxProducerListener.cpp \
 
 LOCAL_SHARED_LIBRARIES := \
         libui liblog libcutils libutils libbinder libsonivox libicuuc libicui18n libexpat \
@@ -75,7 +73,9 @@ LOCAL_SHARED_LIBRARIES := \
         libhidlmemory \
         android.hidl.base@1.0 \
         android.hidl.memory@1.0 \
+        android.hidl.token@1.0-utils \
         android.hardware.graphics.common@1.0 \
+        android.hardware.graphics.bufferqueue@1.0 \
         android.hardware.media@1.0 \
         android.hardware.media.omx@1.0 \
 
@@ -83,6 +83,7 @@ LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := \
         libbinder \
         libsonivox \
         libmediadrm \
+        android.hidl.token@1.0-utils \
         android.hardware.media.omx@1.0 \
         android.hidl.memory@1.0 \
 
@@ -104,7 +105,7 @@ LOCAL_C_INCLUDES := \
 
 LOCAL_EXPORT_C_INCLUDE_DIRS := \
     frameworks/av/include/media \
-    frameworks/av/media/libmedia/aidl
+    frameworks/av/media/libmedia/aidl \
 
 LOCAL_CFLAGS += -Werror -Wno-error=deprecated-declarations -Wall
 LOCAL_SANITIZE := unsigned-integer-overflow signed-integer-overflow cfi

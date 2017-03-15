@@ -22,6 +22,7 @@
 
 #include <media/IOMX.h>
 
+#include <hidl/HybridInterface.h>
 #include <android/hardware/media/omx/1.0/IOmx.h>
 
 namespace android {

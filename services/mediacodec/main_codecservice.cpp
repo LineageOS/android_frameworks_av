@@ -33,7 +33,7 @@
 
 #include <android/hardware/media/omx/1.0/IOmx.h>
 #include <hidl/HidlTransportSupport.h>
-#include <omx/hal/1.0/impl/Omx.h>
+#include <omx/1.0/Omx.h>
 
 using namespace android;
 

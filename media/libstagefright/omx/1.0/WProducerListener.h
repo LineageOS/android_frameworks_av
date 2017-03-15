@@ -23,16 +23,15 @@
 #include <binder/IBinder.h>
 #include <gui/IProducerListener.h>
 
-#include <android/hardware/media/omx/1.0/IOmxProducerListener.h>
+#include <android/hardware/graphics/bufferqueue/1.0/IProducerListener.h>
 
 namespace android {
 namespace hardware {
 namespace media {
 namespace omx {
 namespace V1_0 {
-namespace utils {
+namespace implementation {
 
-using ::android::hardware::media::omx::V1_0::IOmxProducerListener;
 using ::android::hidl::base::V1_0::IBase;
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_memory;
@@ -42,25 +41,28 @@ using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::sp;
 
-using ::android::IProducerListener;
+typedef ::android::hardware::graphics::bufferqueue::V1_0::IProducerListener
+        HProducerListener;
+typedef ::android::IProducerListener
+        BProducerListener;
 using ::android::BnProducerListener;
 
-struct TWOmxProducerListener : public IOmxProducerListener {
-    sp<IProducerListener> mBase;
-    TWOmxProducerListener(sp<IProducerListener> const& base);
+struct TWProducerListener : public HProducerListener {
+    sp<BProducerListener> mBase;
+    TWProducerListener(sp<BProducerListener> const& base);
     Return<void> onBufferReleased() override;
     Return<bool> needsReleaseNotify() override;
 };
 
-class LWOmxProducerListener : public BnProducerListener {
+class LWProducerListener : public BnProducerListener {
 public:
-    sp<IOmxProducerListener> mBase;
-    LWOmxProducerListener(sp<IOmxProducerListener> const& base);
+    sp<HProducerListener> mBase;
+    LWProducerListener(sp<HProducerListener> const& base);
     void onBufferReleased() override;
     bool needsReleaseNotify() override;
 };
 
-}  // namespace utils
+}  // namespace implementation
 }  // namespace V1_0
 }  // namespace omx
 }  // namespace media
