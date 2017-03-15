@@ -1420,7 +1420,7 @@ bool ToneGenerator::prepareWave() {
             // Instantiate a wave generator if  ot already done for this frequency
             if (mWaveGens.indexOfKey(frequency) == NAME_NOT_FOUND) {
                 ToneGenerator::WaveGenerator *lpWaveGen =
-                        new ToneGenerator::WaveGenerator((unsigned short)mSamplingRate,
+                        new ToneGenerator::WaveGenerator(mSamplingRate,
                                 frequency,
                                 TONEGEN_GAIN/lNumWaves);
                 mWaveGens.add(frequency, lpWaveGen);
@@ -1544,7 +1544,7 @@ ToneGenerator::tone_type ToneGenerator::getToneForRegion(tone_type toneType) {
 //        none
 //
 ////////////////////////////////////////////////////////////////////////////////
-ToneGenerator::WaveGenerator::WaveGenerator(unsigned short samplingRate,
+ToneGenerator::WaveGenerator::WaveGenerator(uint32_t samplingRate,
         unsigned short frequency, float volume) {
     double d0;
     double F_div_Fs;  // frequency / samplingRate

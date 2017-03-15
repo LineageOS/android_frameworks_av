@@ -299,7 +299,7 @@ private:
             WAVEGEN_STOP  // Stop wave on zero crossing
         };
 
-        WaveGenerator(unsigned short samplingRate, unsigned short frequency,
+        WaveGenerator(uint32_t samplingRate, unsigned short frequency,
                 float volume);
         ~WaveGenerator();
 
