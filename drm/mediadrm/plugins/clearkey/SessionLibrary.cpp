@@ -43,7 +43,7 @@ SessionLibrary* SessionLibrary::get() {
     return sSingleton;
 }
 
-const sp<Session>& SessionLibrary::createSession() {
+sp<Session> SessionLibrary::createSession() {
     Mutex::Autolock lock(mSessionsLock);
 
     String8 sessionIdString = String8::format("%u", mNextSessionId);
@@ -57,9 +57,12 @@ const sp<Session>& SessionLibrary::createSession() {
     return mSessions.valueFor(sessionId);
 }
 
-const sp<Session>& SessionLibrary::findSession(
+sp<Session> SessionLibrary::findSession(
         const Vector<uint8_t>& sessionId) {
     Mutex::Autolock lock(mSessionsLock);
+    if (mSessions.indexOfKey(sessionId) < 0) {
+        return sp<Session>(NULL);
+    }
     return mSessions.valueFor(sessionId);
 }
 
