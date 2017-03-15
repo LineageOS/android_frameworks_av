@@ -34,6 +34,7 @@ LOCAL_C_INCLUDES := \
 	$(TOP)/frameworks/native/include/media/openmax \
 	external/jpeg
 
+LOCAL_CFLAGS := -Werror -Wall
 LOCAL_CFLAGS += -Wno-multichar
 #LOCAL_CFLAGS += -UNDEBUG
 

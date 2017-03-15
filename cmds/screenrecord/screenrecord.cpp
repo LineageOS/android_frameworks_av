@@ -215,7 +215,6 @@ static status_t prepareEncoder(float displayFps, sp<MediaCodec>* pCodec,
  */
 static status_t setDisplayProjection(const sp<IBinder>& dpy,
         const DisplayInfo& mainDpyInfo) {
-    status_t err;
 
     // Set the region of the layer stack we're interested in, which in our
     // case is "all of it".  If the app is rotated (so that the width of the
