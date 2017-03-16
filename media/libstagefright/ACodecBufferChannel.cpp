@@ -39,6 +39,12 @@ using MediaDescrambler::DescrambleInfo;
 using BufferInfo = ACodecBufferChannel::BufferInfo;
 using BufferInfoIterator = std::vector<const BufferInfo>::const_iterator;
 
+ACodecBufferChannel::~ACodecBufferChannel() {
+    if (mCrypto != nullptr && mDealer != nullptr) {
+        mCrypto->unsetHeap(mDealer->getMemoryHeap());
+    }
+}
+
 static BufferInfoIterator findClientBuffer(
         const std::shared_ptr<const std::vector<const BufferInfo>> &array,
         const sp<MediaCodecBuffer> &buffer) {
@@ -251,6 +257,18 @@ void ACodecBufferChannel::getOutputBufferArray(Vector<sp<MediaCodecBuffer>> *arr
     }
 }
 
+sp<MemoryDealer> ACodecBufferChannel::makeMemoryDealer(size_t heapSize) {
+    sp<MemoryDealer> dealer;
+    if (mDealer != nullptr && mCrypto != nullptr) {
+        mCrypto->unsetHeap(mDealer->getMemoryHeap());
+    }
+    dealer = new MemoryDealer(heapSize, "ACodecBufferChannel");
+    if (mCrypto != nullptr) {
+        mCrypto->setHeap(dealer->getMemoryHeap());
+    }
+    return dealer;
+}
+
 void ACodecBufferChannel::setInputBufferArray(const std::vector<BufferAndId> &array) {
     if (hasCryptoOrDescrambler()) {
         size_t totalSize = std::accumulate(
@@ -265,8 +283,10 @@ void ACodecBufferChannel::setInputBufferArray(const std::vector<BufferAndId> &ar
                 (size_t max, const BufferAndId& elem) {
                     return std::max(max, align(elem.mBuffer->capacity(), alignment));
                 });
-        mDealer = new MemoryDealer(totalSize + maxSize, "ACodecBufferChannel");
-        mDecryptDestination = mDealer->allocate(maxSize);
+        size_t destinationBufferSize = maxSize;
+        size_t heapSize = totalSize + destinationBufferSize;
+        mDealer = makeMemoryDealer(heapSize);
+        mDecryptDestination = mDealer->allocate(destinationBufferSize);
     }
     std::vector<const BufferInfo> inputBuffers;
     for (const BufferAndId &elem : array) {
