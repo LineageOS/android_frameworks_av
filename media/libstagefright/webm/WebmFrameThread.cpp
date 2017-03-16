@@ -37,17 +37,23 @@ void *WebmFrameThread::wrap(void *arg) {
 }
 
 status_t WebmFrameThread::start() {
+    status_t err = OK;
     pthread_attr_t attr;
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-    pthread_create(&mThread, &attr, WebmFrameThread::wrap, this);
+    if ((err = pthread_create(&mThread, &attr, WebmFrameThread::wrap, this))) {
+        mThread = 0;
+    }
     pthread_attr_destroy(&attr);
-    return OK;
+    return err;
 }
 
 status_t WebmFrameThread::stop() {
-    void *status;
-    pthread_join(mThread, &status);
+    void *status = nullptr;
+    if (mThread) {
+        pthread_join(mThread, &status);
+        mThread = 0;
+    }
     return (status_t)(intptr_t)status;
 }
 
