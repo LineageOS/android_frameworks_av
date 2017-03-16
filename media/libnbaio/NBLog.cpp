@@ -72,6 +72,8 @@ NBLog::FormatEntry::iterator NBLog::FormatEntry::args() const {
     ++it;
     // skip timestamp
     ++it;
+    // skip hash
+    ++it;
     // Skip author if present
     if (it->type == EVENT_AUTHOR) {
         ++it;
@@ -86,11 +88,25 @@ timespec NBLog::FormatEntry::timestamp() const {
     return it.payload<timespec>();
 }
 
+NBLog::log_hash_t NBLog::FormatEntry::hash() const {
+    auto it = begin();
+    // skip start fmt
+    ++it;
+    // skip timestamp
+    ++it;
+    // unaligned 64-bit read not supported
+    log_hash_t hash;
+    memcpy(&hash, it->data, sizeof(hash));
+    return hash;
+}
+
 pid_t NBLog::FormatEntry::author() const {
     auto it = begin();
     // skip start fmt
     ++it;
     // skip timestamp
+    ++it;
+    // skip hash
     ++it;
     // if there is an author entry, return it, return -1 otherwise
     if (it->type == EVENT_AUTHOR) {
@@ -105,6 +121,8 @@ NBLog::FormatEntry::iterator NBLog::FormatEntry::copyWithAuthor(
     // copy fmt start entry
     it.copyTo(dst);
     // copy timestamp
+    (++it).copyTo(dst);
+    // copy hash
     (++it).copyTo(dst);
     // insert author entry
     size_t authorEntrySize = NBLog::Entry::kOverhead + sizeof(author);
@@ -360,19 +378,27 @@ void NBLog::Writer::logEnd()
     log(&entry, true);
 }
 
-void NBLog::Writer::logFormat(const char *fmt, ...)
+void NBLog::Writer::logHash(log_hash_t hash)
+{
+    if (!mEnabled) {
+        return;
+    }
+    log(EVENT_HASH, &hash, sizeof(hash));
+}
+
+void NBLog::Writer::logFormat(const char *fmt, log_hash_t hash, ...)
 {
     if (!mEnabled) {
         return;
     }
 
     va_list ap;
-    va_start(ap, fmt);
-    Writer::logVFormat(fmt, ap);
+    va_start(ap, hash);
+    Writer::logVFormat(fmt, hash, ap);
     va_end(ap);
 }
 
-void NBLog::Writer::logVFormat(const char *fmt, va_list argp)
+void NBLog::Writer::logVFormat(const char *fmt, log_hash_t hash, va_list argp)
 {
     if (!mEnabled) {
         return;
@@ -383,6 +409,7 @@ void NBLog::Writer::logVFormat(const char *fmt, va_list argp)
     char* s;
     struct timespec t;
     Writer::logTimestamp();
+    Writer::logHash(hash);
     for (const char *p = fmt; *p != '\0'; p++) {
         // TODO: implement more complex formatting such as %.3f
         if (*p != '%') {
@@ -446,6 +473,7 @@ void NBLog::Writer::log(Event event, const void *data, size_t length)
     case EVENT_INTEGER:
     case EVENT_FLOAT:
     case EVENT_PID:
+    case EVENT_HASH:
     case EVENT_START_FMT:
         break;
     case EVENT_RESERVED:
@@ -566,6 +594,12 @@ void NBLog::LockedWriter::logEnd()
 {
     Mutex::Autolock _l(mLock);
     Writer::logEnd();
+}
+
+void NBLog::LockedWriter::logHash(log_hash_t hash)
+{
+    Mutex::Autolock _l(mLock);
+    Writer::logHash(hash);
 }
 
 bool NBLog::LockedWriter::isEnabled() const
@@ -876,6 +910,11 @@ NBLog::FormatEntry::iterator NBLog::Reader::handleFormat(const FormatEntry &fmtE
     timestamp->clear();
     timestamp->appendFormat("[%d.%03d]", (int) ts.tv_sec,
                     (int) (ts.tv_nsec / 1000000));
+
+    // log unique hash
+    log_hash_t hash = fmtEntry.hash();
+    // print only lower 16bit of hash as hex and line as int to reduce spam in the log
+    body->appendFormat("%.4X-%d ", (int)(hash >> 16) & 0xFFFF, (int) hash & 0xFFFF);
 
     // log author (if present)
     handleAuthor(fmtEntry, body);

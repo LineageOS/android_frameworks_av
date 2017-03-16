@@ -34,6 +34,8 @@ class NBLog {
 
 public:
 
+typedef uint64_t log_hash_t;
+
 class Writer;
 class Reader;
 
@@ -50,6 +52,8 @@ enum Event {
     EVENT_AUTHOR,               // author index (present in merged logs) tracks entry's original log
     EVENT_START_FMT,            // logFormat start event: entry includes format string, following
                                 // entries contain format arguments
+    EVENT_HASH,                 // unique HASH of log origin, originates from hash of file name
+                                // and line number
     EVENT_END_FMT,              // end of logFormat argument list
 };
 
@@ -60,6 +64,7 @@ enum Event {
 // a formatted entry has the following structure:
 //    * START_FMT entry, containing the format string
 //    * TIMESTAMP entry
+//    * HASH entry
 //    * author entry of the thread that generated it (optional, present in merged log)
 //    * format arg1
 //    * format arg2
@@ -130,6 +135,9 @@ public:
 
     // get format entry timestamp
     timespec    timestamp() const;
+
+    // get format entry's unique id
+    log_hash_t  hash() const;
 
     // entry's author index (-1 if none present)
     // a Merger has a vector of Readers, author simply points to the index of the
@@ -252,10 +260,11 @@ public:
     virtual void    logInteger(const int x);
     virtual void    logFloat(const float x);
     virtual void    logPID();
-    virtual void    logFormat(const char *fmt, ...);
-    virtual void    logVFormat(const char *fmt, va_list ap);
+    virtual void    logFormat(const char *fmt, log_hash_t hash, ...);
+    virtual void    logVFormat(const char *fmt, log_hash_t hash, va_list ap);
     virtual void    logStart(const char *fmt);
     virtual void    logEnd();
+    virtual void    logHash(log_hash_t hash);
 
 
     virtual bool    isEnabled() const;
@@ -304,6 +313,7 @@ public:
     virtual void    logPID();
     virtual void    logStart(const char *fmt);
     virtual void    logEnd();
+    virtual void    logHash(log_hash_t hash);
 
     virtual bool    isEnabled() const;
     virtual bool    setEnabled(bool enabled);
