@@ -62,10 +62,15 @@ namespace android {
 // key for media statistics
 static const char *kCodecKeyName = "codec";
 // attrs for media statistics
-static const char *kCodecCodec = "codec";               /* e.g. OMX.google.aac.decoder */
-static const char *kCodecMime = "mime";                 /* e.g. audio/mime */
-static const char *kCodecMode = "mode";                 /* audio, video */
-static const char *kCodecSecure = "secure";             /* 0, 1 */
+static const char *kCodecCodec = "android.media.mediacodec.codec";  /* e.g. OMX.google.aac.decoder */
+static const char *kCodecMime = "android.media.mediacodec.mime";    /* e.g. audio/mime */
+static const char *kCodecMode = "android.media.mediacodec.mode";    /* audio, video */
+static const char *kCodecSecure = "android.media.mediacodec.secure";   /* 0, 1 */
+static const char *kCodecHeight = "android.media.mediacodec.height";   /* 0..n */
+static const char *kCodecWidth = "android.media.mediacodec.width";     /* 0..n */
+static const char *kCodecRotation = "android.media.mediacodec.rotation-degrees";  /* 0/90/180/270 */
+static const char *kCodecCrypto = "android.media.mediacodec.crypto";   /* 0,1 */
+static const char *kCodecEncoder = "android.media.mediacodec.encoder"; /* 0,1 */
 
 
 
@@ -636,9 +641,8 @@ status_t MediaCodec::init(const AString &name, bool nameIsType, bool encoder) {
             mAnalyticsItem->setCString(kCodecCodec, name.c_str());
         }
         mAnalyticsItem->setCString(kCodecMode, mIsVideo ? "video" : "audio");
-        //mAnalyticsItem->setInt32("type", nameIsType);
         if (nameIsType)
-            mAnalyticsItem->setInt32("encoder", encoder);
+            mAnalyticsItem->setInt32(kCodecEncoder, encoder);
     }
 
     status_t err;
@@ -698,14 +702,14 @@ status_t MediaCodec::configure(
     if (mIsVideo) {
         format->findInt32("width", &mVideoWidth);
         format->findInt32("height", &mVideoHeight);
-        if (!format->findInt32("rotation-degrees", &mRotationDegrees)) {
+        if (!format->findInt32(kCodecRotation, &mRotationDegrees)) {
             mRotationDegrees = 0;
         }
 
         if (mAnalyticsItem != NULL) {
-            mAnalyticsItem->setInt32("width", mVideoWidth);
-            mAnalyticsItem->setInt32("height", mVideoHeight);
-            mAnalyticsItem->setInt32("rotation", mRotationDegrees);
+            mAnalyticsItem->setInt32(kCodecWidth, mVideoWidth);
+            mAnalyticsItem->setInt32(kCodecHeight, mVideoHeight);
+            mAnalyticsItem->setInt32(kCodecRotation, mRotationDegrees);
         }
 
         // Prevent possible integer overflow in downstream code.
@@ -728,7 +732,7 @@ status_t MediaCodec::configure(
         }
         if (mAnalyticsItem != NULL) {
             // XXX: save indication that it's crypto in some way...
-            mAnalyticsItem->setInt32("crypto", 1);
+            mAnalyticsItem->setInt32(kCodecCrypto, 1);
         }
     }
 
@@ -1167,7 +1171,9 @@ status_t MediaCodec::getName(AString *name) const {
     return OK;
 }
 
-status_t MediaCodec::getMetrics(Parcel *reply) {
+status_t MediaCodec::getMetrics(MediaAnalyticsItem * &reply) {
+
+    reply = NULL;
 
     // shouldn't happen, but be safe
     if (mAnalyticsItem == NULL) {
@@ -1177,7 +1183,7 @@ status_t MediaCodec::getMetrics(Parcel *reply) {
     // XXX: go get current values for whatever in-flight data we want
 
     // send it back to the caller.
-    mAnalyticsItem->writeToParcel(reply);
+    reply = mAnalyticsItem->dup();
 
     return OK;
 }

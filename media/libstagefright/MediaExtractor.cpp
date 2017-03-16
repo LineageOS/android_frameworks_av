@@ -57,6 +57,9 @@ namespace android {
 // key for media statistics
 static const char *kKeyExtractor = "extractor";
 // attrs for media statistics
+static const char *kExtractorMime = "android.media.mediaextractor.mime";
+static const char *kExtractorTracks = "android.media.mediaextractor.ntrk";
+static const char *kExtractorFormat = "android.media.mediaextractor.fmt";
 
 MediaExtractor::MediaExtractor() {
     if (!LOG_NDEBUG) {
@@ -265,9 +268,9 @@ sp<MediaExtractor> MediaExtractor::CreateFromService(
        if (MEDIA_LOG) {
           if (ret->mAnalyticsItem != NULL) {
               size_t ntracks = ret->countTracks();
-              ret->mAnalyticsItem->setCString("fmt",  ret->name());
+              ret->mAnalyticsItem->setCString(kExtractorFormat,  ret->name());
               // tracks (size_t)
-              ret->mAnalyticsItem->setInt32("ntrk",  ntracks);
+              ret->mAnalyticsItem->setInt32(kExtractorTracks,  ntracks);
               // metadata
               sp<MetaData> pMetaData = ret->getMetaData();
               if (pMetaData != NULL) {
@@ -276,7 +279,7 @@ sp<MediaExtractor> MediaExtractor::CreateFromService(
                 // 'mime'
                 const char *mime = NULL;
                 if (pMetaData->findCString(kKeyMIMEType, &mime)) {
-                    ret->mAnalyticsItem->setCString("mime",  mime);
+                    ret->mAnalyticsItem->setCString(kExtractorMime,  mime);
                 }
                 // what else is interesting and not already available?
               }

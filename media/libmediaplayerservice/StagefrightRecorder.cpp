@@ -69,7 +69,23 @@ static const int kMaxNumVideoTemporalLayers = 8;
 // key for media statistics
 static const char *kKeyRecorder = "recorder";
 // attrs for media statistics
-//
+static const char *kRecorderHeight = "android.media.mediarecorder.height";
+static const char *kRecorderWidth = "android.media.mediarecorder.width";
+static const char *kRecorderFrameRate = "android.media.mediarecorder.frame-rate";
+static const char *kRecorderVideoBitrate = "android.media.mediarecorder.video-bitrate";
+static const char *kRecorderAudioSampleRate = "android.media.mediarecorder.audio-samplerate";
+static const char *kRecorderAudioChannels = "android.media.mediarecorder.audio-channels";
+static const char *kRecorderAudioBitrate = "android.media.mediarecorder.audio-bitrate";
+static const char *kRecorderVideoIframeInterval = "android.media.mediarecorder.video-iframe-interval";
+static const char *kRecorderMovieTimescale = "android.media.mediarecorder.movie-timescale";
+static const char *kRecorderAudioTimescale = "android.media.mediarecorder.audio-timescale";
+static const char *kRecorderVideoTimescale = "android.media.mediarecorder.video-timescale";
+static const char *kRecorderVideoProfile = "android.media.mediarecorder.video-encoder-profile";
+static const char *kRecorderVideoLevel = "android.media.mediarecorder.video-encoder-level";
+static const char *kRecorderCaptureFpsEnable = "android.media.mediarecorder.capture-fpsenable";
+static const char *kRecorderCaptureFps = "android.media.mediarecorder.capture-fps";
+static const char *kRecorderRotation = "android.media.mediarecorder.rotation";
+
 // To collect the encoder usage for the battery app
 static void addBatteryData(uint32_t params) {
     sp<IBinder> binder =
@@ -124,34 +140,34 @@ void StagefrightRecorder::updateMetrics() {
     // TBD mOutputFormat  = OUTPUT_FORMAT_THREE_GPP;
     // TBD mAudioEncoder  = AUDIO_ENCODER_AMR_NB;
     // TBD mVideoEncoder  = VIDEO_ENCODER_DEFAULT;
-    mAnalyticsItem->setInt32("ht", mVideoHeight);
-    mAnalyticsItem->setInt32("wid", mVideoWidth);
-    mAnalyticsItem->setInt32("frame-rate", mFrameRate);
-    mAnalyticsItem->setInt32("video-bitrate", mVideoBitRate);
-    mAnalyticsItem->setInt32("audio-samplerate", mSampleRate);
-    mAnalyticsItem->setInt32("audio-channels", mAudioChannels);
-    mAnalyticsItem->setInt32("audio-bitrate", mAudioBitRate);
+    mAnalyticsItem->setInt32(kRecorderHeight, mVideoHeight);
+    mAnalyticsItem->setInt32(kRecorderWidth, mVideoWidth);
+    mAnalyticsItem->setInt32(kRecorderFrameRate, mFrameRate);
+    mAnalyticsItem->setInt32(kRecorderVideoBitrate, mVideoBitRate);
+    mAnalyticsItem->setInt32(kRecorderAudioSampleRate, mSampleRate);
+    mAnalyticsItem->setInt32(kRecorderAudioChannels, mAudioChannels);
+    mAnalyticsItem->setInt32(kRecorderAudioBitrate, mAudioBitRate);
     // TBD mInterleaveDurationUs = 0;
-    mAnalyticsItem->setInt32("video-iframe-interval", mIFramesIntervalSec);
+    mAnalyticsItem->setInt32(kRecorderVideoIframeInterval, mIFramesIntervalSec);
     // TBD mAudioSourceNode = 0;
     // TBD mUse64BitFileOffset = false;
-    mAnalyticsItem->setInt32("movie-timescale", mMovieTimeScale);
-    mAnalyticsItem->setInt32("audio-timescale", mAudioTimeScale);
-    mAnalyticsItem->setInt32("video-timescale", mVideoTimeScale);
+    mAnalyticsItem->setInt32(kRecorderMovieTimescale, mMovieTimeScale);
+    mAnalyticsItem->setInt32(kRecorderAudioTimescale, mAudioTimeScale);
+    mAnalyticsItem->setInt32(kRecorderVideoTimescale, mVideoTimeScale);
     // TBD mCameraId        = 0;
     // TBD mStartTimeOffsetMs = -1;
-    mAnalyticsItem->setInt32("video-encoder-profile", mVideoEncoderProfile);
-    mAnalyticsItem->setInt32("video-encoder-level", mVideoEncoderLevel);
+    mAnalyticsItem->setInt32(kRecorderVideoProfile, mVideoEncoderProfile);
+    mAnalyticsItem->setInt32(kRecorderVideoLevel, mVideoEncoderLevel);
     // TBD mMaxFileDurationUs = 0;
     // TBD mMaxFileSizeBytes = 0;
     // TBD mTrackEveryTimeDurationUs = 0;
-    mAnalyticsItem->setInt32("capture-fpsenable", mCaptureFpsEnable);
-    mAnalyticsItem->setInt32("capture-fps", mCaptureFps);
+    mAnalyticsItem->setInt32(kRecorderCaptureFpsEnable, mCaptureFpsEnable);
+    mAnalyticsItem->setDouble(kRecorderCaptureFps, mCaptureFps);
     // TBD mTimeBetweenCaptureUs = -1;
     // TBD mCameraSourceTimeLapse = NULL;
     // TBD mMetaDataStoredInVideoBuffers = kMetadataBufferTypeInvalid;
     // TBD mEncoderProfiles = MediaProfiles::getInstance();
-    mAnalyticsItem->setInt32("rotation", mRotationDegrees);
+    mAnalyticsItem->setInt32(kRecorderRotation, mRotationDegrees);
     // PII mLatitudex10000 = -3600000;
     // PII mLongitudex10000 = -3600000;
     // TBD mTotalBitRate = 0;

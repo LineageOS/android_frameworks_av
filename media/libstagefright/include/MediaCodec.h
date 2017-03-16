@@ -186,7 +186,7 @@ struct MediaCodec : public AHandler {
 
     status_t getName(AString *componentName) const;
 
-    status_t getMetrics(Parcel *reply);
+    status_t getMetrics(MediaAnalyticsItem * &reply);
 
     status_t setParameters(const sp<AMessage> &params);
 
