@@ -47,7 +47,7 @@ static inline void ProcessSSEIntrinsic(float* out,
         const float* coefsN1)
 {
     ALOG_ASSERT(count > 0 && (count & 7) == 0); // multiple of 8
-    COMPILE_TIME_ASSERT_FUNCTION_SCOPE(CHANNELS == 1 || CHANNELS == 2);
+    static_assert(CHANNELS == 1 || CHANNELS == 2, "CHANNELS must be 1 or 2");
 
     sP -= CHANNELS*(4-1);   // adjust sP for a loop iteration of four
 
