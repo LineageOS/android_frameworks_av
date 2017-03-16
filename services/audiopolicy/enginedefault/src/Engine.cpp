@@ -418,6 +418,25 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
                 (mForceUse[AUDIO_POLICY_FORCE_FOR_SYSTEM] == AUDIO_POLICY_FORCE_SYSTEM_ENFORCED)) {
             device = availableOutputDevicesType & AUDIO_DEVICE_OUT_SPEAKER;
         }
+
+        // if SCO headset is connected and we are told to use it, play ringtone over
+        // speaker and BT SCO
+        if (((availableOutputDevicesType & AUDIO_DEVICE_OUT_ALL_SCO) != 0) &&
+                (mForceUse[AUDIO_POLICY_FORCE_FOR_COMMUNICATION] == AUDIO_POLICY_FORCE_BT_SCO)) {
+            uint32_t device2 = AUDIO_DEVICE_NONE;
+            device2 = availableOutputDevicesType & AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT;
+            if (device2 == AUDIO_DEVICE_NONE) {
+                device2 = availableOutputDevicesType & AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET;
+            }
+            if (device2 == AUDIO_DEVICE_NONE) {
+                device2 = availableOutputDevicesType & AUDIO_DEVICE_OUT_BLUETOOTH_SCO;
+            }
+
+            if (device2 != AUDIO_DEVICE_NONE) {
+                device |= device2;
+                break;
+            }
+        }
         // The second device used for sonification is the same as the device used by media strategy
         // FALL THROUGH
 
