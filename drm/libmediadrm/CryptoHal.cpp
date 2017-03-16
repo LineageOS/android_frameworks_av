@@ -68,6 +68,8 @@ static status_t toStatusT(Status status) {
         return ERROR_DRM_SESSION_NOT_OPENED;
     case Status::ERROR_DRM_CANNOT_HANDLE:
         return ERROR_DRM_CANNOT_HANDLE;
+    case Status::ERROR_DRM_DECRYPT:
+        return ERROR_DRM_DECRYPT;
     default:
         return UNKNOWN_ERROR;
     }
