@@ -292,6 +292,7 @@ private:
             static status_t setTorchMode(InterfaceT& interface, bool enabled);
         };
         std::vector<std::unique_ptr<DeviceInfo>> mDevices;
+        int mUniqueDeviceCount;
 
         // HALv1-specific camera fields, including the actual device interface
         struct DeviceInfo1 : public DeviceInfo {

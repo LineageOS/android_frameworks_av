@@ -22,6 +22,7 @@
 
 #include <chrono>
 #include <inttypes.h>
+#include <set>
 #include <hidl/ServiceManagement.h>
 
 namespace android {
@@ -75,7 +76,7 @@ int CameraProviderManager::getCameraCount() const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
     int count = 0;
     for (auto& provider : mProviders) {
-        count += provider->mDevices.size();
+        count += provider->mUniqueDeviceCount;
     }
     return count;
 }
@@ -85,7 +86,7 @@ int CameraProviderManager::getStandardCameraCount() const {
     int count = 0;
     for (auto& provider : mProviders) {
         if (kStandardProviderTypes.find(provider->getType()) != std::string::npos) {
-            count += provider->mDevices.size();
+            count += provider->mUniqueDeviceCount;
         }
     }
     return count;
@@ -470,6 +471,12 @@ status_t CameraProviderManager::ProviderInfo::initialize() {
             listener->onDeviceStatusChanged(String8(id.c_str()), CameraDeviceStatus::PRESENT);
         }
     }
+
+    std::set<std::string> uniqueCameraIds;
+    for (auto& device : mDevices) {
+        uniqueCameraIds.insert(device->mId);
+    }
+    mUniqueDeviceCount = uniqueCameraIds.size();
 
     ALOGI("Camera provider %s ready with %zu camera devices",
             mProviderName.c_str(), mDevices.size());
