@@ -68,24 +68,32 @@ size_t NBLog::FormatEntry::formatStringLength() const {
 
 NBLog::FormatEntry::iterator NBLog::FormatEntry::args() const {
     auto it = begin();
-    // Second entry can be author or timestamp. Skip author if present
-    if ((++it)->type == EVENT_AUTHOR) {
+    // skip start fmt
+    ++it;
+    // skip timestamp
+    ++it;
+    // Skip author if present
+    if (it->type == EVENT_AUTHOR) {
         ++it;
     }
-    return ++it;
+    return it;
 }
 
 timespec NBLog::FormatEntry::timestamp() const {
     auto it = begin();
-    if ((++it)->type != EVENT_TIMESTAMP) {
-        ++it;
-    }
+    // skip start fmt
+    ++it;
     return it.payload<timespec>();
 }
 
 pid_t NBLog::FormatEntry::author() const {
     auto it = begin();
-    if ((++it)->type == EVENT_AUTHOR) {
+    // skip start fmt
+    ++it;
+    // skip timestamp
+    ++it;
+    // if there is an author entry, return it, return -1 otherwise
+    if (it->type == EVENT_AUTHOR) {
         return it.payload<int>();
     }
     return -1;
@@ -96,6 +104,8 @@ NBLog::FormatEntry::iterator NBLog::FormatEntry::copyWithAuthor(
     auto it = begin();
     // copy fmt start entry
     it.copyTo(dst);
+    // copy timestamp
+    (++it).copyTo(dst);
     // insert author entry
     size_t authorEntrySize = NBLog::Entry::kOverhead + sizeof(author);
     uint8_t authorEntry[authorEntrySize];
