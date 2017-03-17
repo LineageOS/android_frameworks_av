@@ -2513,8 +2513,9 @@ void Camera3Device::removeInFlightRequestIfReadyLocked(int idx) {
             (request.haveResultMetadata && shutterTimestamp != 0))) {
         ATRACE_ASYNC_END("frame capture", frameNumber);
 
-        // Sanity check - if sensor timestamp matches shutter timestamp
-        if (request.requestStatus == OK &&
+        // Sanity check - if sensor timestamp matches shutter timestamp in the
+        // case of request having callback.
+        if (request.hasCallback && request.requestStatus == OK &&
                 sensorTimestamp != shutterTimestamp) {
             SET_ERR("sensor timestamp (%" PRId64
                 ") for frame %d doesn't match shutter timestamp (%" PRId64 ")",
