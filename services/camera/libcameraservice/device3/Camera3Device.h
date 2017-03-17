@@ -859,6 +859,12 @@ class Camera3Device :
         // CONTROL_AE_PRECAPTURE_TRIGGER_CANCEL
         AeTriggerCancelOverride_t aeTriggerCancelOverride;
 
+        // Whether this inflight request's shutter and result callback are to be
+        // called. The policy is that if the request is the last one in the constrained
+        // high speed recording request list, this flag will be true. If the request list
+        // is not for constrained high speed recording, this flag will also be true.
+        bool hasCallback;
+
         // Default constructor needed by KeyedVector
         InFlightRequest() :
                 shutterTimestamp(0),
@@ -867,11 +873,12 @@ class Camera3Device :
                 haveResultMetadata(false),
                 numBuffersLeft(0),
                 hasInputBuffer(false),
-                aeTriggerCancelOverride({false, 0, false, 0}){
+                aeTriggerCancelOverride({false, 0, false, 0}),
+                hasCallback(true) {
         }
 
         InFlightRequest(int numBuffers, CaptureResultExtras extras, bool hasInput,
-                AeTriggerCancelOverride aeTriggerCancelOverride) :
+                AeTriggerCancelOverride aeTriggerCancelOverride, bool hasAppCallback) :
                 shutterTimestamp(0),
                 sensorTimestamp(0),
                 requestStatus(OK),
@@ -879,7 +886,8 @@ class Camera3Device :
                 numBuffersLeft(numBuffers),
                 resultExtras(extras),
                 hasInputBuffer(hasInput),
-                aeTriggerCancelOverride(aeTriggerCancelOverride){
+                aeTriggerCancelOverride(aeTriggerCancelOverride),
+                hasCallback(hasAppCallback) {
         }
     };
 
@@ -892,7 +900,7 @@ class Camera3Device :
 
     status_t registerInFlight(uint32_t frameNumber,
             int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
-            const AeTriggerCancelOverride_t &aeTriggerCancelOverride);
+            const AeTriggerCancelOverride_t &aeTriggerCancelOverride, bool callback);
 
     /**
      * Override result metadata for cancelling AE precapture trigger applied in
