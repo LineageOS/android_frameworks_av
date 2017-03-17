@@ -551,7 +551,8 @@ ACodec::ACodec()
       mCreateInputBuffersSuspended(false),
       mTunneled(false),
       mDescribeColorAspectsIndex((OMX_INDEXTYPE)0),
-      mDescribeHDRStaticInfoIndex((OMX_INDEXTYPE)0) {
+      mDescribeHDRStaticInfoIndex((OMX_INDEXTYPE)0),
+      mVendorExtensionsStatus(kExtensionsUnchecked) {
     mUninitializedState = new UninitializedState(this);
     mLoadedState = new LoadedState(this);
     mLoadedToIdleState = new LoadedToIdleState(this);
@@ -2216,13 +2217,16 @@ status_t ACodec::configureCodec(
     int32_t maxInputSize;
     if (msg->findInt32("max-input-size", &maxInputSize)) {
         err = setMinBufferSize(kPortIndexInput, (size_t)maxInputSize);
+        err = OK; // ignore error
     } else if (!strcmp("OMX.Nvidia.aac.decoder", mComponentName.c_str())) {
         err = setMinBufferSize(kPortIndexInput, 8192);  // XXX
+        err = OK; // ignore error
     }
 
     int32_t priority;
     if (msg->findInt32("priority", &priority)) {
         err = setPriority(priority);
+        err = OK; // ignore error
     }
 
     int32_t rateInt = -1;
@@ -2233,6 +2237,14 @@ status_t ACodec::configureCodec(
     }
     if (rateFloat > 0) {
         err = setOperatingRate(rateFloat, video);
+        err = OK; // ignore errors
+    }
+
+    if (err == OK) {
+        err = setVendorParameters(msg);
+        if (err != OK) {
+            return err;
+        }
     }
 
     // NOTE: both mBaseOutputFormat and mOutputFormat are outputFormat to signal first frame.
@@ -5106,7 +5118,7 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
             return BAD_TYPE;
     }
 
-    return OK;
+    return getVendorParameters(portIndex, notify);
 }
 
 void ACodec::onDataSpaceChanged(android_dataspace dataSpace, const ColorAspects &aspects) {
@@ -7176,7 +7188,362 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
         err = OK; // ignore failure
     }
 
-    return err;
+    return setVendorParameters(params);
+}
+
+// Removes trailing tags matching |tag| from |key| (e.g. a settings name). |minLength| specifies
+// the minimum number of characters to keep in |key| (even if it has trailing tags).
+// (Used to remove trailing 'value' tags in settings names, e.g. to normalize
+// 'vendor.settingsX.value' to 'vendor.settingsX')
+static void removeTrailingTags(char *key, size_t minLength, const char *tag) {
+    size_t length = strlen(key);
+    size_t tagLength = strlen(tag);
+    while (length > minLength + tagLength
+            && !strcmp(key + length - tagLength, tag)
+            && key[length - tagLength - 1] == '.') {
+        length -= tagLength + 1;
+        key[length] = '\0';
+    }
+}
+
+/**
+ * Struct encompassing a vendor extension config structure and a potential error status (in case
+ * the structure is null). Used to iterate through vendor extensions.
+ */
+struct VendorExtension {
+    OMX_CONFIG_ANDROID_VENDOR_EXTENSIONTYPE *config;  // structure does not own config
+    status_t status;
+
+    // create based on an error status
+    VendorExtension(status_t s_ = NO_INIT) : config(nullptr), status(s_) { }
+
+    // create based on a successfully retrieved config structure
+    VendorExtension(OMX_CONFIG_ANDROID_VENDOR_EXTENSIONTYPE *c_) : config(c_), status(OK) { }
+};
+
+// class VendorExtensions;
+/**
+ * Forward iterator to enumerate vendor extensions supported by an OMX component.
+ */
+class VendorExtensionIterator {
+//private:
+    static constexpr size_t kLastIndex = ~(size_t)0; // last index marker
+
+    sp<IOMXNode> mNode;                   // component
+    size_t mIndex;                        // current android extension index
+    std::unique_ptr<uint8_t[]> mBacking;  // current extension's backing
+    VendorExtension mCurrent;             // current extension
+
+    VendorExtensionIterator(const sp<IOMXNode> &node, size_t index)
+        : mNode(node),
+          mIndex(index) {
+        mCurrent = retrieve();
+    }
+
+    friend class VendorExtensions;
+
+public:
+    // copy constructor
+    VendorExtensionIterator(const VendorExtensionIterator &it)
+        : VendorExtensionIterator(it.mNode, it.mIndex) { }
+
+    // retrieves the current extension pointed to by this iterator
+    VendorExtension retrieve() {
+        if (mIndex == kLastIndex) {
+            return NO_INIT;
+        }
+
+        // try with one param first, then retry if extension needs more than 1 param
+        for (size_t paramSizeUsed = 1;; ) {
+            if (paramSizeUsed > OMX_MAX_ANDROID_VENDOR_PARAMCOUNT) {
+                return BAD_VALUE; // this prevents overflow in the following formula
+            }
+
+            size_t size = sizeof(OMX_CONFIG_ANDROID_VENDOR_EXTENSIONTYPE) +
+                (paramSizeUsed - 1) * sizeof(OMX_CONFIG_ANDROID_VENDOR_EXTENSIONTYPE::param);
+            mBacking.reset(new uint8_t[size]);
+            if (!mBacking) {
+                return NO_MEMORY;
+            }
+
+            OMX_CONFIG_ANDROID_VENDOR_EXTENSIONTYPE *config =
+                reinterpret_cast<OMX_CONFIG_ANDROID_VENDOR_EXTENSIONTYPE *>(mBacking.get());
+
+            InitOMXParams(config);
+            config->nSize = size;
+            config->nIndex = mIndex;
+            config->nParamSizeUsed = paramSizeUsed;
+            status_t err = mNode->getConfig(
+                    (OMX_INDEXTYPE)OMX_IndexConfigAndroidVendorExtension, config, size);
+            if (err == OK && config->nParamCount > paramSizeUsed && paramSizeUsed == 1) {
+                // reallocate if we need a bigger config
+                paramSizeUsed = config->nParamCount;
+                continue;
+            } else if (err == NOT_ENOUGH_DATA
+                   || (err != OK && mIndex == 0)) {
+                // stop iterator on no-more signal, or if index is not at all supported
+                mIndex = kLastIndex;
+                return NO_INIT;
+            } else if (err != OK) {
+                return err;
+            } else if (paramSizeUsed != config->nParamSizeUsed) {
+                return BAD_VALUE; // component shall not modify size of nParam
+            }
+
+            return config;
+        }
+    }
+
+    // returns extension pointed to by this iterator
+    VendorExtension operator*() {
+        return mCurrent;
+    }
+
+    // prefix increment: move to next extension
+    VendorExtensionIterator &operator++() { // prefix
+        if (mIndex != kLastIndex) {
+            ++mIndex;
+            mCurrent = retrieve();
+        }
+        return *this;
+    }
+
+    // iterator equality operators
+    bool operator==(const VendorExtensionIterator &o) {
+        return mNode == o.mNode && mIndex == o.mIndex;
+    }
+
+    bool operator!=(const VendorExtensionIterator &o) {
+        return !(*this == o);
+    }
+};
+
+/**
+ * Iterable container for vendor extensions provided by a component
+ */
+class VendorExtensions {
+//private:
+    sp<IOMXNode> mNode;
+
+public:
+    VendorExtensions(const sp<IOMXNode> &node)
+        : mNode(node) {
+    }
+
+    VendorExtensionIterator begin() {
+        return VendorExtensionIterator(mNode, 0);
+    }
+
+    VendorExtensionIterator end() {
+        return VendorExtensionIterator(mNode, VendorExtensionIterator::kLastIndex);
+    }
+};
+
+status_t ACodec::setVendorParameters(const sp<AMessage> &params) {
+    std::map<std::string, std::string> vendorKeys; // maps reduced name to actual name
+    constexpr char prefix[] = "vendor.";
+    constexpr size_t prefixLength = sizeof(prefix) - 1;
+    // longest possible vendor param name
+    char reducedKey[OMX_MAX_STRINGNAME_SIZE + OMX_MAX_STRINGVALUE_SIZE];
+
+    // identify all vendor keys to speed up search later and to detect vendor keys
+    for (size_t i = params->countEntries(); i; --i) {
+        AMessage::Type keyType;
+        const char* key = params->getEntryNameAt(i - 1, &keyType);
+        if (key != nullptr && !strncmp(key, prefix, prefixLength)
+                // it is safe to limit format keys to the max vendor param size as we only
+                // shorten parameter names by removing any trailing 'value' tags, and we
+                // already remove the vendor prefix.
+                && strlen(key + prefixLength) < sizeof(reducedKey)
+                && (keyType == AMessage::kTypeInt32
+                        || keyType == AMessage::kTypeInt64
+                        || keyType == AMessage::kTypeString)) {
+            strcpy(reducedKey, key + prefixLength);
+            removeTrailingTags(reducedKey, 0, "value");
+            auto existingKey = vendorKeys.find(reducedKey);
+            if (existingKey != vendorKeys.end()) {
+                ALOGW("[%s] vendor parameter '%s' aliases parameter '%s'",
+                        mComponentName.c_str(), key, existingKey->second.c_str());
+                // ignore for now
+            }
+            vendorKeys.emplace(reducedKey, key);
+        }
+    }
+
+    // don't bother component if we don't have vendor extensions as they may not have implemented
+    // the android vendor extension support, which will lead to unnecessary OMX failure logs.
+    if (vendorKeys.empty()) {
+        return OK;
+    }
+
+    char key[sizeof(OMX_CONFIG_ANDROID_VENDOR_EXTENSIONTYPE::cName) +
+            sizeof(OMX_CONFIG_ANDROID_VENDOR_PARAMTYPE::cKey)];
+
+    status_t finalError = OK;
+
+    // don't try again if component does not have vendor extensions
+    if (mVendorExtensionsStatus == kExtensionsNone) {
+        return OK;
+    }
+
+    for (VendorExtension ext : VendorExtensions(mOMXNode)) {
+        OMX_CONFIG_ANDROID_VENDOR_EXTENSIONTYPE *config = ext.config;
+        if (config == nullptr) {
+            return ext.status;
+        }
+
+        mVendorExtensionsStatus = kExtensionsExist;
+
+        config->cName[sizeof(config->cName) - 1] = '\0'; // null-terminate name
+        strcpy(key, (const char *)config->cName);
+        size_t nameLength = strlen(key);
+        key[nameLength] = '.';
+
+        // don't set vendor extension if client has not provided any of its parameters
+        // or if client simply unsets parameters that are already unset
+        bool needToSet = false;
+        for (size_t paramIndex = 0; paramIndex < config->nParamCount; ++paramIndex) {
+            // null-terminate param key
+            config->param[paramIndex].cKey[sizeof(config->param[0].cKey) - 1] = '\0';
+            strcpy(key + nameLength + 1, (const char *)config->param[paramIndex].cKey);
+            removeTrailingTags(key, nameLength, "value");
+            auto existingKey = vendorKeys.find(key);
+
+            // don't touch (e.g. change) parameters that are not specified by client
+            if (existingKey == vendorKeys.end()) {
+                continue;
+            }
+
+            bool wasSet = config->param[paramIndex].bSet;
+            switch (config->param[paramIndex].eValueType) {
+            case OMX_AndroidVendorValueInt32:
+            {
+                int32_t value;
+                config->param[paramIndex].bSet =
+                    (OMX_BOOL)params->findInt32(existingKey->second.c_str(), &value);
+                if (config->param[paramIndex].bSet) {
+                    config->param[paramIndex].nInt32 = value;
+                }
+                break;
+            }
+            case OMX_AndroidVendorValueInt64:
+            {
+                int64_t value;
+                config->param[paramIndex].bSet =
+                    (OMX_BOOL)params->findAsInt64(existingKey->second.c_str(), &value);
+                if (config->param[paramIndex].bSet) {
+                    config->param[paramIndex].nInt64 = value;
+                }
+                break;
+            }
+            case OMX_AndroidVendorValueString:
+            {
+                AString value;
+                config->param[paramIndex].bSet =
+                    (OMX_BOOL)params->findString(existingKey->second.c_str(), &value);
+                if (config->param[paramIndex].bSet) {
+                    strncpy((char *)config->param[paramIndex].cString, value.c_str(),
+                            sizeof(OMX_CONFIG_ANDROID_VENDOR_PARAMTYPE::cString));
+                }
+                break;
+            }
+            default:
+                ALOGW("[%s] vendor parameter '%s' is not a supported value",
+                        mComponentName.c_str(), key);
+                continue;
+            }
+            if (config->param[paramIndex].bSet || wasSet) {
+                needToSet = true;
+            }
+        }
+
+        if (needToSet) {
+            status_t err = mOMXNode->setConfig(
+                    (OMX_INDEXTYPE)OMX_IndexConfigAndroidVendorExtension,
+                    config, config->nSize);
+            if (err != OK) {
+                key[nameLength] = '\0';
+                ALOGW("[%s] failed to set vendor extension '%s'", mComponentName.c_str(), key);
+                // try to set each extension, and return first failure
+                if (finalError == OK) {
+                    finalError = err;
+                }
+            }
+        }
+    }
+
+    if (mVendorExtensionsStatus == kExtensionsUnchecked) {
+        mVendorExtensionsStatus = kExtensionsNone;
+    }
+
+    return finalError;
+}
+
+status_t ACodec::getVendorParameters(OMX_U32 portIndex, sp<AMessage> &format) {
+    constexpr char prefix[] = "vendor.";
+    constexpr size_t prefixLength = sizeof(prefix) - 1;
+    char key[sizeof(OMX_CONFIG_ANDROID_VENDOR_EXTENSIONTYPE::cName) +
+            sizeof(OMX_CONFIG_ANDROID_VENDOR_PARAMTYPE::cKey) + prefixLength];
+    strcpy(key, prefix);
+
+    // don't try again if component does not have vendor extensions
+    if (mVendorExtensionsStatus == kExtensionsNone) {
+        return OK;
+    }
+
+    for (VendorExtension ext : VendorExtensions(mOMXNode)) {
+        OMX_CONFIG_ANDROID_VENDOR_EXTENSIONTYPE *config = ext.config;
+        if (config == nullptr) {
+            return ext.status;
+        }
+
+        mVendorExtensionsStatus = kExtensionsExist;
+
+        if (config->eDir != (portIndex == kPortIndexInput ? OMX_DirInput : OMX_DirOutput)) {
+            continue;
+        }
+
+        config->cName[sizeof(config->cName) - 1] = '\0'; // null-terminate name
+        strcpy(key + prefixLength, (const char *)config->cName);
+        size_t nameLength = strlen(key);
+        key[nameLength] = '.';
+
+        for (size_t paramIndex = 0; paramIndex < config->nParamCount; ++paramIndex) {
+            // null-terminate param key
+            config->param[paramIndex].cKey[sizeof(config->param[0].cKey) - 1] = '\0';
+            strcpy(key + nameLength + 1, (const char *)config->param[paramIndex].cKey);
+            removeTrailingTags(key, nameLength, "value");
+            if (config->param[paramIndex].bSet) {
+                switch (config->param[paramIndex].eValueType) {
+                case OMX_AndroidVendorValueInt32:
+                {
+                    format->setInt32(key, config->param[paramIndex].nInt32);
+                    break;
+                }
+                case OMX_AndroidVendorValueInt64:
+                {
+                    format->setInt64(key, config->param[paramIndex].nInt64);
+                    break;
+                }
+                case OMX_AndroidVendorValueString:
+                {
+                    config->param[paramIndex].cString[OMX_MAX_STRINGVALUE_SIZE - 1] = '\0';
+                    format->setString(key, (const char *)config->param[paramIndex].cString);
+                    break;
+                }
+                default:
+                    ALOGW("vendor parameter %s is not a supported value", key);
+                    continue;
+                }
+            }
+        }
+    }
+
+    if (mVendorExtensionsStatus == kExtensionsUnchecked) {
+        mVendorExtensionsStatus = kExtensionsNone;
+    }
+
+    return OK;
 }
 
 void ACodec::onSignalEndOfInputStream() {

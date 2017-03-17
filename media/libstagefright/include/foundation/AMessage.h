@@ -123,6 +123,9 @@ struct AMessage : public RefBase {
     bool findBuffer(const char *name, sp<ABuffer> *buffer) const;
     bool findMessage(const char *name, sp<AMessage> *obj) const;
 
+    // finds signed integer types cast to int64_t
+    bool findAsInt64(const char *name, int64_t *value) const;
+
     // finds any numeric type cast to a float
     bool findAsFloat(const char *name, float *value) const;
 

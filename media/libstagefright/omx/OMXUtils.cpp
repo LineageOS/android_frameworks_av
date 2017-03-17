@@ -32,9 +32,13 @@ status_t StatusFromOMXError(OMX_ERRORTYPE err) {
     switch (err) {
         case OMX_ErrorNone:
             return OK;
+        case OMX_ErrorNoMore:
+            return NOT_ENOUGH_DATA;
         case OMX_ErrorUnsupportedSetting:
         case OMX_ErrorUnsupportedIndex:
             return ERROR_UNSUPPORTED; // this is a media specific error
+        case OMX_ErrorBadParameter:
+            return BAD_VALUE;
         case OMX_ErrorInsufficientResources:
             return NO_MEMORY;
         case OMX_ErrorInvalidComponentName:

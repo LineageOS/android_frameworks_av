@@ -240,6 +240,24 @@ bool AMessage::findAsFloat(const char *name, float *value) const {
     return false;
 }
 
+bool AMessage::findAsInt64(const char *name, int64_t *value) const {
+    size_t i = findItemIndex(name, strlen(name));
+    if (i < mNumItems) {
+        const Item *item = &mItems[i];
+        switch (item->mType) {
+            case kTypeInt64:
+                *value = (float)item->u.int64Value;
+                return true;
+            case kTypeInt32:
+                *value = (float)item->u.int32Value;
+                return true;
+            default:
+                return false;
+        }
+    }
+    return false;
+}
+
 bool AMessage::contains(const char *name) const {
     size_t i = findItemIndex(name, strlen(name));
     return i < mNumItems;

@@ -304,6 +304,12 @@ private:
 
     std::shared_ptr<ACodecBufferChannel> mBufferChannel;
 
+    enum {
+        kExtensionsUnchecked,
+        kExtensionsNone,
+        kExtensionsExist,
+    } mVendorExtensionsStatus;
+
     status_t setCyclicIntraMacroblockRefresh(const sp<AMessage> &msg, int32_t mode);
     status_t allocateBuffersOnPort(OMX_U32 portIndex);
     status_t freeBuffersOnPort(OMX_U32 portIndex);
@@ -548,6 +554,13 @@ private:
 
     status_t requestIDRFrame();
     status_t setParameters(const sp<AMessage> &params);
+
+    // set vendor extension parameters specified in params that are supported by the codec
+    status_t setVendorParameters(const sp<AMessage> &params);
+
+    // get vendor extension parameters supported by the codec for a specific port and add it to
+    // |format|
+    status_t getVendorParameters(OMX_U32 portIndex, sp<AMessage> &format);
 
     // Send EOS on input stream.
     void onSignalEndOfInputStream();
