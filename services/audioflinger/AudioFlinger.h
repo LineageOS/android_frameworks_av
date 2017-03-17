@@ -630,9 +630,9 @@ private:
 #endif
                 void        removeClient_l(pid_t pid);
                 void        removeNotificationClient(pid_t pid);
-
                 bool isNonOffloadableGlobalEffectEnabled_l();
                 void onNonOffloadableGlobalEffectEnable();
+                bool isSessionAcquired_l(int audioSession);
 
     class AudioHwDevice {
     public:
