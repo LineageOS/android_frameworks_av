@@ -137,7 +137,7 @@ private:
     bool mLooping;
     bool mAutoLoop;
 
-    void finalizeMetrics(const char *where);
+    void updateMetrics(const char *where);
     void logMetrics(const char *where);
 
     status_t prepare_l();

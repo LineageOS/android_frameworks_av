@@ -93,7 +93,7 @@ NuPlayerDriver::~NuPlayerDriver() {
     mLooper->stop();
 
     // finalize any pending metrics, usually a no-op.
-    finalizeMetrics("destructor");
+    updateMetrics("destructor");
     logMetrics("destructor");
 
     if (mAnalyticsItem != NULL) {
@@ -511,11 +511,11 @@ status_t NuPlayerDriver::getDuration(int *msec) {
     return OK;
 }
 
-void NuPlayerDriver::finalizeMetrics(const char *where) {
+void NuPlayerDriver::updateMetrics(const char *where) {
     if (where == NULL) {
         where = "unknown";
     }
-    ALOGV("finalizeMetrics(%p) from %s at state %d", this, where, mState);
+    ALOGV("updateMetrics(%p) from %s at state %d", this, where, mState);
 
     // gather the final stats for this record
     Vector<sp<AMessage>> trackStats;
@@ -560,18 +560,16 @@ void NuPlayerDriver::finalizeMetrics(const char *where) {
                 }
             }
         }
-
-        // getDuration() uses mLock for mutex -- careful where we use it.
-        int duration_ms = -1;
-        getDuration(&duration_ms);
-        if (duration_ms != -1) {
-            mAnalyticsItem->setInt64(kPlayerDuration, duration_ms);
-        }
-
-        if (mPlayingTimeUs > 0) {
-            mAnalyticsItem->setInt64(kPlayerPlaying, (mPlayingTimeUs+500)/1000 );
-        }
     }
+
+    // always provide duration and playing time, even if they have 0/unknown values.
+
+    // getDuration() uses mLock for mutex -- careful where we use it.
+    int duration_ms = -1;
+    getDuration(&duration_ms);
+    mAnalyticsItem->setInt64(kPlayerDuration, duration_ms);
+
+    mAnalyticsItem->setInt64(kPlayerPlaying, (mPlayingTimeUs+500)/1000 );
 }
 
 
@@ -605,7 +603,7 @@ void NuPlayerDriver::logMetrics(const char *where) {
 status_t NuPlayerDriver::reset() {
     ALOGD("reset(%p) at state %d", this, mState);
 
-    finalizeMetrics("reset");
+    updateMetrics("reset");
     logMetrics("reset");
 
     Mutex::Autolock autoLock(mLock);
@@ -731,7 +729,7 @@ status_t NuPlayerDriver::getParameter(int key, Parcel *reply) {
     if (key == FOURCC('m','t','r','X')) {
         // mtrX -- a play on 'metrics' (not matrix)
         // gather current info all together, parcel it, and send it back
-        finalizeMetrics("api");
+        updateMetrics("api");
         mAnalyticsItem->writeToParcel(reply);
         return OK;
     }
