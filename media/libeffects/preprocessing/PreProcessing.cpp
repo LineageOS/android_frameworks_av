@@ -531,6 +531,7 @@ int AecSetDevice(preproc_effect_t *effect, uint32_t device)
         break;
     case AUDIO_DEVICE_OUT_WIRED_HEADSET:
     case AUDIO_DEVICE_OUT_WIRED_HEADPHONE:
+    case AUDIO_DEVICE_OUT_USB_HEADSET:
     default:
         break;
     }
