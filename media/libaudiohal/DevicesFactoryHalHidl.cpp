@@ -45,7 +45,8 @@ DevicesFactoryHalHidl::DevicesFactoryHalHidl() {
         // and thus have the same lifespan.
         mDevicesFactory->linkToDeath(HalDeathHandler::getInstance(), 0 /*cookie*/);
     } else {
-        LOG_ALWAYS_FATAL("Failed to obtain IDevicesFactory service");
+        ALOGE("Failed to obtain IDevicesFactory service, terminating process.");
+        exit(1);
     }
 }
 

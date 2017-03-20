@@ -44,7 +44,10 @@ bool EffectsFactoryHalInterface::isNullUuid(const effect_uuid_t *pEffectUuid) {
 
 EffectsFactoryHalHidl::EffectsFactoryHalHidl() : ConversionHelperHidl("EffectsFactory") {
     mEffectsFactory = IEffectsFactory::getService();
-    LOG_ALWAYS_FATAL_IF(mEffectsFactory == 0, "Failed to obtain IEffectsFactory service");
+    if (mEffectsFactory == 0) {
+        ALOGE("Failed to obtain IEffectsFactory service, terminating process.");
+        exit(1);
+    }
 }
 
 EffectsFactoryHalHidl::~EffectsFactoryHalHidl() {
