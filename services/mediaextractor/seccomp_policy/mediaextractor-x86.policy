@@ -51,3 +51,7 @@ getgroups32: 1
 getdents64: 1
 pipe2: 1
 ppoll: 1
+
+# Required by AddressSanitizer
+gettid: 1
+sched_yield: 1
