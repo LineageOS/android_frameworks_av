@@ -51,6 +51,9 @@ protected:
             const sp<IMemory>&) override {};
     void recordingFrameHandleCallbackTimestamp(nsecs_t,
             native_handle_t*) override {};
+    void recordingFrameHandleCallbackTimestampBatch(
+            const std::vector<nsecs_t>&,
+            const std::vector<native_handle_t*>&) override {};
 
     status_t waitForPreviewStart();
     status_t waitForEvent(Mutex &mutex, Condition &condition, bool &flag);

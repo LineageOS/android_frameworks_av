@@ -17,6 +17,7 @@
 #ifndef ANDROID_HARDWARE_ICAMERA_RECORDING_PROXY_LISTENER_H
 #define ANDROID_HARDWARE_ICAMERA_RECORDING_PROXY_LISTENER_H
 
+#include <vector>
 #include <binder/IInterface.h>
 #include <cutils/native_handle.h>
 #include <stdint.h>
@@ -38,6 +39,10 @@ public:
 
     virtual void recordingFrameHandleCallbackTimestamp(nsecs_t timestamp,
                                                        native_handle_t* handle) = 0;
+
+    virtual void recordingFrameHandleCallbackTimestampBatch(
+            const std::vector<nsecs_t>& timestamps,
+            const std::vector<native_handle_t*>& handles) = 0;
 };
 
 // ----------------------------------------------------------------------------

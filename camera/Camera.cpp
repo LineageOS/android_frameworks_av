@@ -240,6 +240,14 @@ void Camera::releaseRecordingFrameHandle(native_handle_t* handle)
     c->releaseRecordingFrameHandle(handle);
 }
 
+void Camera::releaseRecordingFrameHandleBatch(
+        const std::vector<native_handle_t*> handles) {
+    ALOGV("releaseRecordingFrameHandleBatch");
+    sp <::android::hardware::ICamera> c = mCamera;
+    if (c == 0) return;
+    c->releaseRecordingFrameHandleBatch(handles);
+}
+
 // get preview state
 bool Camera::previewEnabled()
 {
@@ -418,6 +426,37 @@ void Camera::recordingFrameHandleCallbackTimestamp(nsecs_t timestamp, native_han
     }
 }
 
+void Camera::recordingFrameHandleCallbackTimestampBatch(
+        const std::vector<nsecs_t>& timestamps,
+        const std::vector<native_handle_t*>& handles)
+{
+    // If recording proxy listener is registered, forward the frame and return.
+    // The other listener (mListener) is ignored because the receiver needs to
+    // call releaseRecordingFrameHandle.
+    sp<ICameraRecordingProxyListener> proxylistener;
+    {
+        Mutex::Autolock _l(mLock);
+        proxylistener = mRecordingProxyListener;
+    }
+    if (proxylistener != NULL) {
+        proxylistener->recordingFrameHandleCallbackTimestampBatch(timestamps, handles);
+        return;
+    }
+
+    sp<CameraListener> listener;
+    {
+        Mutex::Autolock _l(mLock);
+        listener = mListener;
+    }
+
+    if (listener != NULL) {
+        listener->postRecordingFrameHandleTimestampBatch(timestamps, handles);
+    } else {
+        ALOGW("No listener was set. Drop a batch of recording frames.");
+        releaseRecordingFrameHandleBatch(handles);
+    }
+}
+
 sp<ICameraRecordingProxy> Camera::getRecordingProxy() {
     ALOGV("getProxy");
     return new RecordingProxy(this);
@@ -446,6 +485,12 @@ void Camera::RecordingProxy::releaseRecordingFrame(const sp<IMemory>& mem)
 void Camera::RecordingProxy::releaseRecordingFrameHandle(native_handle_t* handle) {
     ALOGV("RecordingProxy::releaseRecordingFrameHandle");
     mCamera->releaseRecordingFrameHandle(handle);
+}
+
+void Camera::RecordingProxy::releaseRecordingFrameHandleBatch(
+        const std::vector<native_handle_t*>& handles) {
+    ALOGV("RecordingProxy::releaseRecordingFrameHandleBatch");
+    mCamera->releaseRecordingFrameHandleBatch(handles);
 }
 
 Camera::RecordingProxy::RecordingProxy(const sp<Camera>& camera)

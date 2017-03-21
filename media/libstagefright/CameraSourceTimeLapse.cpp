@@ -315,6 +315,17 @@ void CameraSourceTimeLapse::recordingFrameHandleCallbackTimestamp(int64_t timest
     CameraSource::recordingFrameHandleCallbackTimestamp(timestampUs, handle);
 }
 
+void CameraSourceTimeLapse::recordingFrameHandleCallbackTimestampBatch(
+        const std::vector<int64_t>& timestampsUs,
+        const std::vector<native_handle_t*>& handles) {
+    ALOGV("recordingFrameHandleCallbackTimestampBatch");
+    int n = timestampsUs.size();
+    for (int i = 0; i < n; i++) {
+        // Don't do batching for CameraSourceTimeLapse for now
+        recordingFrameHandleCallbackTimestamp(timestampsUs[i], handles[i]);
+    }
+}
+
 void CameraSourceTimeLapse::processBufferQueueFrame(BufferItem& buffer) {
     ALOGV("processBufferQueueFrame");
     int64_t timestampUs = buffer.mTimestamp / 1000;
