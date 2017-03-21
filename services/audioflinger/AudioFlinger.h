@@ -58,6 +58,8 @@
 #include <media/LinearMap.h>
 #include <media/VolumeShaper.h>
 
+#include <audio_utils/SimpleLog.h>
+
 #include "FastCapture.h"
 #include "FastMixer.h"
 #include <media/nbaio/NBAIO.h>
