@@ -30,7 +30,9 @@
 #include <utils/Log.h>
 #include <utils/String8.h>
 
+#include <map>
 #include <queue>
+#include <utility>
 
 namespace android {
 
@@ -51,12 +53,25 @@ int NBLog::Entry::readAt(size_t offset) const
 
 // ---------------------------------------------------------------------------
 
-NBLog::FormatEntry::FormatEntry(const uint8_t *entry) : mEntry(entry) {
-    ALOGW_IF(entry[offsetof(struct entry, type)] != EVENT_START_FMT,
-        "Created format entry with invalid event type %d", entry[offsetof(struct entry, type)]);
+/*static*/
+std::unique_ptr<NBLog::AbstractEntry> NBLog::AbstractEntry::buildEntry(const uint8_t *ptr) {
+    uint8_t type = EntryIterator(ptr)->type;
+    switch (type) {
+    case EVENT_START_FMT:
+        return std::make_unique<FormatEntry>(FormatEntry(ptr));
+    case EVENT_HISTOGRAM_FLUSH:
+    case EVENT_HISTOGRAM_ENTRY_TS:
+        return std::make_unique<HistogramEntry>(HistogramEntry(ptr));
+    default:
+        ALOGW("Tried to create AbstractEntry of type %d", type);
+        return nullptr;
+    }
 }
 
-NBLog::FormatEntry::FormatEntry(const NBLog::FormatEntry::iterator &it) : FormatEntry(it.ptr) {}
+NBLog::AbstractEntry::AbstractEntry(const uint8_t *entry) : mEntry(entry) {
+}
+
+// ---------------------------------------------------------------------------
 
 const char *NBLog::FormatEntry::formatString() const {
     return (const char*) mEntry + offsetof(entry, data);
@@ -66,7 +81,7 @@ size_t NBLog::FormatEntry::formatStringLength() const {
     return mEntry[offsetof(entry, length)];
 }
 
-NBLog::FormatEntry::iterator NBLog::FormatEntry::args() const {
+NBLog::EntryIterator NBLog::FormatEntry::args() const {
     auto it = begin();
     // skip start fmt
     ++it;
@@ -100,7 +115,7 @@ NBLog::log_hash_t NBLog::FormatEntry::hash() const {
     return hash;
 }
 
-pid_t NBLog::FormatEntry::author() const {
+int NBLog::FormatEntry::author() const {
     auto it = begin();
     // skip start fmt
     ++it;
@@ -115,7 +130,7 @@ pid_t NBLog::FormatEntry::author() const {
     return -1;
 }
 
-NBLog::FormatEntry::iterator NBLog::FormatEntry::copyWithAuthor(
+NBLog::EntryIterator NBLog::FormatEntry::copyWithAuthor(
         std::unique_ptr<audio_utils_fifo_writer> &dst, int author) const {
     auto it = begin();
     // copy fmt start entry
@@ -142,67 +157,103 @@ NBLog::FormatEntry::iterator NBLog::FormatEntry::copyWithAuthor(
     return it;
 }
 
-void NBLog::FormatEntry::iterator::copyTo(std::unique_ptr<audio_utils_fifo_writer> &dst) const {
+void NBLog::EntryIterator::copyTo(std::unique_ptr<audio_utils_fifo_writer> &dst) const {
     size_t length = ptr[offsetof(entry, length)] + NBLog::Entry::kOverhead;
     dst->write(ptr, length);
 }
 
-void NBLog::FormatEntry::iterator::copyData(uint8_t *dst) const {
+void NBLog::EntryIterator::copyData(uint8_t *dst) const {
     memcpy((void*) dst, ptr + offsetof(entry, data), ptr[offsetof(entry, length)]);
 }
 
-NBLog::FormatEntry::iterator NBLog::FormatEntry::begin() const {
-    return iterator(mEntry);
+NBLog::EntryIterator NBLog::FormatEntry::begin() const {
+    return EntryIterator(mEntry);
 }
 
-NBLog::FormatEntry::iterator::iterator()
+NBLog::EntryIterator::EntryIterator()
     : ptr(nullptr) {}
 
-NBLog::FormatEntry::iterator::iterator(const uint8_t *entry)
+NBLog::EntryIterator::EntryIterator(const uint8_t *entry)
     : ptr(entry) {}
 
-NBLog::FormatEntry::iterator::iterator(const NBLog::FormatEntry::iterator &other)
+NBLog::EntryIterator::EntryIterator(const NBLog::EntryIterator &other)
     : ptr(other.ptr) {}
 
-const NBLog::FormatEntry::entry& NBLog::FormatEntry::iterator::operator*() const {
+const NBLog::entry& NBLog::EntryIterator::operator*() const {
     return *(entry*) ptr;
 }
 
-const NBLog::FormatEntry::entry* NBLog::FormatEntry::iterator::operator->() const {
+const NBLog::entry* NBLog::EntryIterator::operator->() const {
     return (entry*) ptr;
 }
 
-NBLog::FormatEntry::iterator& NBLog::FormatEntry::iterator::operator++() {
+NBLog::EntryIterator& NBLog::EntryIterator::operator++() {
     ptr += ptr[offsetof(entry, length)] + NBLog::Entry::kOverhead;
     return *this;
 }
 
-NBLog::FormatEntry::iterator& NBLog::FormatEntry::iterator::operator--() {
+NBLog::EntryIterator& NBLog::EntryIterator::operator--() {
     ptr -= ptr[NBLog::Entry::kPreviousLengthOffset] + NBLog::Entry::kOverhead;
     return *this;
 }
 
-NBLog::FormatEntry::iterator NBLog::FormatEntry::iterator::next() const {
-    iterator aux(*this);
+NBLog::EntryIterator NBLog::EntryIterator::next() const {
+    EntryIterator aux(*this);
     return ++aux;
 }
 
-NBLog::FormatEntry::iterator NBLog::FormatEntry::iterator::prev() const {
-    iterator aux(*this);
+NBLog::EntryIterator NBLog::EntryIterator::prev() const {
+    EntryIterator aux(*this);
     return --aux;
 }
 
-int NBLog::FormatEntry::iterator::operator-(const NBLog::FormatEntry::iterator &other) const {
+int NBLog::EntryIterator::operator-(const NBLog::EntryIterator &other) const {
     return ptr - other.ptr;
 }
 
-bool NBLog::FormatEntry::iterator::operator!=(const iterator &other) const {
+bool NBLog::EntryIterator::operator!=(const EntryIterator &other) const {
     return ptr != other.ptr;
 }
 
-bool NBLog::FormatEntry::iterator::hasConsistentLength() const {
+bool NBLog::EntryIterator::hasConsistentLength() const {
     return ptr[offsetof(entry, length)] == ptr[ptr[offsetof(entry, length)] +
         NBLog::Entry::kOverhead + NBLog::Entry::kPreviousLengthOffset];
+}
+
+// ---------------------------------------------------------------------------
+
+timespec NBLog::HistogramEntry::timestamp() const {
+    return EntryIterator(mEntry).payload<HistTsEntry>().ts;
+}
+
+NBLog::log_hash_t NBLog::HistogramEntry::hash() const {
+    return EntryIterator(mEntry).payload<HistTsEntry>().hash;
+}
+
+int NBLog::HistogramEntry::author() const {
+    EntryIterator it(mEntry);
+    if (it->length == sizeof(HistTsEntryWithAuthor)) {
+        return it.payload<HistTsEntryWithAuthor>().author;
+    } else {
+        return -1;
+    }
+}
+
+NBLog::EntryIterator NBLog::HistogramEntry::copyWithAuthor(
+        std::unique_ptr<audio_utils_fifo_writer> &dst, int author) const {
+    // Current histogram entry has {type, length, struct HistTsEntry, length}.
+    // We now want {type, length, struct HistTsEntryWithAuthor, length}
+    uint8_t buffer[Entry::kOverhead + sizeof(HistTsEntryWithAuthor)];
+    // Copy content until the point we want to add the author
+    memcpy(buffer, mEntry, sizeof(entry) + sizeof(HistTsEntry));
+    // Copy the author
+    *(int*) (buffer + sizeof(entry) + sizeof(HistTsEntry)) = author;
+    // Update lengths
+    buffer[offsetof(entry, length)] = sizeof(HistTsEntryWithAuthor);
+    buffer[sizeof(buffer) + Entry::kPreviousLengthOffset] = sizeof(HistTsEntryWithAuthor);
+    // Write new buffer into FIFO
+    dst->write(buffer, sizeof(buffer));
+    return EntryIterator(mEntry).next();
 }
 
 // ---------------------------------------------------------------------------
@@ -386,6 +437,36 @@ void NBLog::Writer::logHash(log_hash_t hash)
     log(EVENT_HASH, &hash, sizeof(hash));
 }
 
+void NBLog::Writer::logHistTS(log_hash_t hash)
+{
+    if (!mEnabled) {
+        return;
+    }
+    HistTsEntry data;
+    data.hash = hash;
+    int error = clock_gettime(CLOCK_MONOTONIC, &data.ts);
+    if (error == 0) {
+        log(EVENT_HISTOGRAM_ENTRY_TS, &data, sizeof(data));
+    } else {
+        ALOGE("Failed to get timestamp: error %d", error);
+    }
+}
+
+void NBLog::Writer::logHistFlush(log_hash_t hash)
+{
+    if (!mEnabled) {
+        return;
+    }
+    HistTsEntry data;
+    data.hash = hash;
+    int error = clock_gettime(CLOCK_MONOTONIC, &data.ts);
+    if (error == 0) {
+        log(EVENT_HISTOGRAM_FLUSH, &data, sizeof(data));
+    } else {
+        ALOGE("Failed to get timestamp: error %d", error);
+    }
+}
+
 void NBLog::Writer::logFormat(const char *fmt, log_hash_t hash, ...)
 {
     if (!mEnabled) {
@@ -467,17 +548,8 @@ void NBLog::Writer::log(Event event, const void *data, size_t length)
         //      a confusion for a programmer debugging their code.
         return;
     }
-    switch (event) {
-    case EVENT_STRING:
-    case EVENT_TIMESTAMP:
-    case EVENT_INTEGER:
-    case EVENT_FLOAT:
-    case EVENT_PID:
-    case EVENT_HASH:
-    case EVENT_START_FMT:
-        break;
-    case EVENT_RESERVED:
-    default:
+    // Ignore if invalid event
+    if (event == EVENT_RESERVED || event >= EVENT_UPPER_BOUND) {
         return;
     }
     Entry entry(event, data, length);
@@ -616,6 +688,11 @@ bool NBLog::LockedWriter::setEnabled(bool enabled)
 
 // ---------------------------------------------------------------------------
 
+const std::set<NBLog::Event> NBLog::Reader::startingTypes {NBLog::Event::EVENT_START_FMT,
+                                                           NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS};
+const std::set<NBLog::Event> NBLog::Reader::endingTypes   {NBLog::Event::EVENT_END_FMT,
+                                                           NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS,
+                                                           NBLog::Event::EVENT_HISTOGRAM_FLUSH};
 NBLog::Reader::Reader(const void *shared, size_t size)
     : mShared((/*const*/ Shared *) shared), /*mIMemory*/
       mFd(-1), mIndent(0),
@@ -638,16 +715,17 @@ NBLog::Reader::~Reader()
     delete mFifo;
 }
 
-uint8_t *NBLog::Reader::findLastEntryOfType(uint8_t *front, uint8_t *back, uint8_t type) {
+const uint8_t *NBLog::Reader::findLastEntryOfTypes(const uint8_t *front, const uint8_t *back,
+                                            const std::set<Event> &types) {
     while (back + Entry::kPreviousLengthOffset >= front) {
-        uint8_t *prev = back - back[Entry::kPreviousLengthOffset] - Entry::kOverhead;
-        if (prev < front || prev + prev[offsetof(FormatEntry::entry, length)] +
+        const uint8_t *prev = back - back[Entry::kPreviousLengthOffset] - Entry::kOverhead;
+        if (prev < front || prev + prev[offsetof(entry, length)] +
                             Entry::kOverhead != back) {
 
             // prev points to an out of limits or inconsistent entry
             return nullptr;
         }
-        if (prev[offsetof(FormatEntry::entry, type)] == type) {
+        if (types.find((const Event) prev[offsetof(entry, type)]) != types.end()) {
             return prev;
         }
         back = prev;
@@ -686,21 +764,21 @@ std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
     // it ends in a complete entry (which is not an END_FMT). So is safe to traverse backwards.
     // TODO: handle client corruption (in the middle of a buffer)
 
-    uint8_t *back = snapshot->mData + availToRead;
-    uint8_t *front = snapshot->mData;
+    const uint8_t *back = snapshot->mData + availToRead;
+    const uint8_t *front = snapshot->mData;
 
     // Find last END_FMT. <back> is sitting on an entry which might be the middle of a FormatEntry.
     // We go backwards until we find an EVENT_END_FMT.
-    uint8_t *lastEnd = findLastEntryOfType(front, back, EVENT_END_FMT);
+    const uint8_t *lastEnd = findLastEntryOfTypes(front, back, endingTypes);
     if (lastEnd == nullptr) {
-        snapshot->mEnd = snapshot->mBegin = FormatEntry::iterator(front);
+        snapshot->mEnd = snapshot->mBegin = EntryIterator(front);
     } else {
         // end of snapshot points to after last END_FMT entry
-        snapshot->mEnd = FormatEntry::iterator(lastEnd + Entry::kOverhead);
+        snapshot->mEnd = EntryIterator(lastEnd).next();
         // find first START_FMT
-        uint8_t *firstStart = nullptr;
-        uint8_t *firstStartTmp = lastEnd;
-        while ((firstStartTmp = findLastEntryOfType(front, firstStartTmp, EVENT_START_FMT))
+        const uint8_t *firstStart = nullptr;
+        const uint8_t *firstStartTmp = snapshot->mEnd;
+        while ((firstStartTmp = findLastEntryOfTypes(front, firstStartTmp, startingTypes))
                 != nullptr) {
             firstStart = firstStartTmp;
         }
@@ -708,7 +786,7 @@ std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
         if (firstStart == nullptr) {
             snapshot->mBegin = snapshot->mEnd;
         } else {
-            snapshot->mBegin = FormatEntry::iterator(firstStart);
+            snapshot->mBegin = EntryIterator(firstStart);
         }
     }
 
@@ -718,6 +796,10 @@ std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
     snapshot->mLost = lost;
     return snapshot;
 
+}
+
+int deltaMs(timespec *t1, timespec *t2) {
+    return (t2->tv_sec - t1->tv_sec) * 1000 + t2->tv_nsec / 1000000 - t1->tv_nsec / 1000000;
 }
 
 void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapshot)
@@ -746,7 +828,7 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
     mFd = fd;
     mIndent = indent;
     String8 timestamp, body;
-    size_t lost = snapshot.lost() + (snapshot.begin() - FormatEntry::iterator(snapshot.data()));
+    size_t lost = snapshot.lost() + (snapshot.begin() - EntryIterator(snapshot.data()));
     if (lost > 0) {
         body.appendFormat("warning: lost %zu bytes worth of events", lost);
         // TODO timestamp empty here, only other choice to wait for the first timestamp event in the
@@ -764,6 +846,9 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
     }
     bool deferredTimestamp = false;
 #endif
+    std::map<std::pair<log_hash_t, int>, std::vector<int>> hists;
+    std::map<std::pair<log_hash_t, int>, timespec*> lastTSs;
+
     for (auto entry = snapshot.begin(); entry != snapshot.end();) {
         switch (entry->type) {
 #if 0
@@ -835,6 +920,37 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             // right now, this is the only supported case
             entry = handleFormat(FormatEntry(entry), &timestamp, &body);
             break;
+        case EVENT_HISTOGRAM_ENTRY_TS: {
+            HistTsEntryWithAuthor *data = (HistTsEntryWithAuthor *) (entry->data);
+            // TODO This memcpies are here to avoid unaligned memory access crash.
+            // There's probably a more efficient way to do it
+            log_hash_t hash;
+            memcpy(&hash, &(data->hash), sizeof(hash));
+            const std::pair<log_hash_t, int> key(hash, data->author);
+            if (lastTSs[key] != nullptr) {
+                timespec ts1;
+                memcpy(&ts1, lastTSs[key], sizeof(timespec));
+                timespec ts2;
+                memcpy(&ts2, &data->ts, sizeof(timespec));
+                // TODO might want to filter excessively high outliers, which are usually caused
+                // by the thread being inactive.
+                hists[key].push_back(deltaMs(&ts1, &ts2));
+            }
+            lastTSs[key] = &(data->ts);
+            ++entry;
+            break;
+        }
+        case EVENT_HISTOGRAM_FLUSH:
+            body.appendFormat("Histograms:\n");
+            for (auto const &hist : hists) {
+                body.appendFormat("Histogram %X - ", (int)hist.first.first);
+                handleAuthor(HistogramEntry(entry), &body);
+                drawHistogram(&body, hist.second);
+            }
+            hists.clear();
+            lastTSs.clear();
+            ++entry;
+            break;
         case EVENT_END_FMT:
             body.appendFormat("warning: got to end format event");
             ++entry;
@@ -902,7 +1018,7 @@ void NBLog::appendPID(String8 *body, const void* data, size_t length) {
     body->appendFormat("<PID: %d, name: %.*s>", id, (int) (length - sizeof(pid_t)), name);
 }
 
-NBLog::FormatEntry::iterator NBLog::Reader::handleFormat(const FormatEntry &fmtEntry,
+NBLog::EntryIterator NBLog::Reader::handleFormat(const FormatEntry &fmtEntry,
                                                          String8 *timestamp,
                                                          String8 *body) {
     // log timestamp
@@ -920,7 +1036,7 @@ NBLog::FormatEntry::iterator NBLog::Reader::handleFormat(const FormatEntry &fmtE
     handleAuthor(fmtEntry, body);
 
     // log string
-    NBLog::FormatEntry::iterator arg = fmtEntry.args();
+    NBLog::EntryIterator arg = fmtEntry.args();
 
     const char* fmt = fmtEntry.formatString();
     size_t fmt_length = fmtEntry.formatStringLength();
@@ -993,6 +1109,75 @@ NBLog::FormatEntry::iterator NBLog::Reader::handleFormat(const FormatEntry &fmtE
     return arg;
 }
 
+static int widthOf(int x) {
+    int width = 0;
+    while (x > 0) {
+        ++width;
+        x /= 10;
+    }
+    return width;
+}
+
+static std::map<int, int> buildBuckets(const std::vector<int> &samples) {
+    // TODO allow buckets of variable resolution
+    std::map<int, int> buckets;
+    for (int x : samples) {
+        ++buckets[x];
+    }
+    return buckets;
+}
+
+// TODO put this function in separate file. Make it return a std::string instead of modifying body
+void NBLog::Reader::drawHistogram(String8 *body, const std::vector<int> &samples, int maxHeight) {
+    std::map<int, int> buckets = buildBuckets(samples);
+    // TODO add option for log scale
+    static const char *underscores = "________________";
+    static const char *spaces = "                ";
+
+    auto it = buckets.begin();
+    int maxLabel = it->first;
+    int maxVal = it->second;
+    while (++it != buckets.end()) {
+        if (it->first > maxLabel) {
+            maxLabel = it->first;
+        }
+        if (it->second > maxVal) {
+            maxVal = it->second;
+        }
+    }
+    int height = maxVal;
+    int leftPadding = widthOf(maxVal);
+    int colWidth = std::max(std::max(widthOf(maxLabel) + 1, 3), leftPadding + 2);
+    int scalingFactor = 1;
+    if (height > maxHeight) {
+        scalingFactor = (height + maxHeight) / maxHeight;
+        height /= scalingFactor;
+    }
+    body->appendFormat("\n");
+    body->appendFormat("%*s", leftPadding + 2, " ");
+    for (auto const &x : buckets)
+    {
+        body->appendFormat("[%*d]", colWidth - 2, x.second);
+    }
+    body->appendFormat("\n");
+    for (int row = height * scalingFactor; row > 0; row -= scalingFactor)
+    {
+        body->appendFormat("%*d|", leftPadding, row);
+        for (auto const &x : buckets) {
+            body->appendFormat("%.*s%s", colWidth - 2,
+                   (row == scalingFactor) ? underscores : spaces,
+                   x.second < row ? ((row == scalingFactor) ? "__" : "  ") : "[]");
+        }
+        body->appendFormat("\n");
+    }
+    body->appendFormat("%*s", leftPadding + 1, " ");
+    for (auto const &x : buckets)
+    {
+        body->appendFormat("%*d", colWidth, x.first);
+    }
+    body->appendFormat("\n");
+}
+
 // ---------------------------------------------------------------------------
 
 NBLog::Merger::Merger(const void *shared, size_t size):
@@ -1031,7 +1216,7 @@ bool operator>(const struct MergeItem &i1, const struct MergeItem &i2) {
 void NBLog::Merger::merge() {
     int nLogs = mNamedReaders.size();
     std::vector<std::unique_ptr<NBLog::Reader::Snapshot>> snapshots(nLogs);
-    std::vector<NBLog::FormatEntry::iterator> offsets(nLogs);
+    std::vector<NBLog::EntryIterator> offsets(nLogs);
     for (int i = 0; i < nLogs; ++i) {
         snapshots[i] = mNamedReaders[i].reader()->getSnapshot();
         offsets[i] = snapshots[i]->begin();
@@ -1043,7 +1228,7 @@ void NBLog::Merger::merge() {
     for (int i = 0; i < nLogs; ++i)
     {
         if (offsets[i] != snapshots[i]->end()) {
-            timespec ts = FormatEntry(offsets[i]).timestamp();
+            timespec ts = AbstractEntry::buildEntry(offsets[i])->timestamp();
             timestamps.emplace(ts, i);
         }
     }
@@ -1052,11 +1237,12 @@ void NBLog::Merger::merge() {
         // find minimum timestamp
         int index = timestamps.top().index;
         // copy it to the log, increasing offset
-        offsets[index] = FormatEntry(offsets[index]).copyWithAuthor(mFifoWriter, index);
+        offsets[index] = AbstractEntry::buildEntry(offsets[index])->copyWithAuthor(mFifoWriter,
+                                                                                   index);
         // update data structures
         timestamps.pop();
         if (offsets[index] != snapshots[index]->end()) {
-            timespec ts = FormatEntry(offsets[index]).timestamp();
+            timespec ts = AbstractEntry::buildEntry(offsets[index])->timestamp();
             timestamps.emplace(ts, index);
         }
     }
@@ -1069,11 +1255,10 @@ const std::vector<NBLog::NamedReader> *NBLog::Merger::getNamedReaders() const {
 NBLog::MergeReader::MergeReader(const void *shared, size_t size, Merger &merger)
     : Reader(shared, size), mNamedReaders(merger.getNamedReaders()) {}
 
-size_t NBLog::MergeReader::handleAuthor(const NBLog::FormatEntry &fmtEntry, String8 *body) {
-    int author = fmtEntry.author();
+void NBLog::MergeReader::handleAuthor(const NBLog::AbstractEntry &entry, String8 *body) {
+    int author = entry.author();
     const char* name = (*mNamedReaders)[author].name();
     body->appendFormat("%s: ", name);
-    return NBLog::Entry::kOverhead + sizeof(author);
 }
 
 NBLog::MergeThread::MergeThread(NBLog::Merger &merger)

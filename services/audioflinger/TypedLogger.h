@@ -32,6 +32,7 @@ for each byte to be hashed
 return hash
 
 offset_basis and FNV_prime values depend on the size of the hash output
+Following values are defined by FNV and should not be changed arbitrarily
 */
 
 template<typename T>
@@ -74,9 +75,16 @@ constexpr uint64_t hash(const char (&file)[n], uint32_t line) {
            std::min(line, 0xFFFFu);
 }
 
-#define LOGT(fmt, ...) logWriterTLS->logFormat(fmt, \
-        hash(__FILE__, __LINE__), \
-        ##__VA_ARGS__) // TODO: check null pointer
+// Write formatted entry to log
+#define LOGT(fmt, ...) logWriterTLS->logFormat((fmt), \
+                                               hash(__FILE__, __LINE__), \
+                                               ##__VA_ARGS__) // TODO: check null pointer
+
+// Write histogram timestamp entry
+#define LOG_HIST_TS() logWriterTLS->logHistTS(hash(__FILE__, __LINE__))
+
+// flush all histogram
+#define LOG_HIST_FLUSH() logWriterTLS->logHistFlush(hash(__FILE__, __LINE__))
 
 namespace android {
 extern "C" {

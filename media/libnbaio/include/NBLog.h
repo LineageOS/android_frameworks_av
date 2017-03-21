@@ -24,6 +24,7 @@
 #include <utils/Mutex.h>
 #include <utils/threads.h>
 
+#include <set>
 #include <vector>
 
 namespace android {
@@ -41,7 +42,7 @@ class Reader;
 
 private:
 
-enum Event {
+enum Event : uint8_t {
     EVENT_RESERVED,
     EVENT_STRING,               // ASCII string, not NUL-terminated
     // TODO: make timestamp optional
@@ -54,7 +55,11 @@ enum Event {
                                 // entries contain format arguments
     EVENT_HASH,                 // unique HASH of log origin, originates from hash of file name
                                 // and line number
+    EVENT_HISTOGRAM_ENTRY_TS,   // single datum for timestamp histogram
+    EVENT_HISTOGRAM_FLUSH,      // show histogram on log
     EVENT_END_FMT,              // end of logFormat argument list
+
+    EVENT_UPPER_BOUND,          // to check for invalid events
 };
 
 
@@ -71,88 +76,133 @@ enum Event {
 //    * ...
 //    * END_FMT entry
 
-class FormatEntry {
+// entry representation in memory
+struct entry {
+    const uint8_t type;
+    const uint8_t length;
+    const uint8_t data[0];
+};
+
+// entry tail representation (after data)
+struct ending {
+    uint8_t length;
+    uint8_t next[0];
+};
+
+// entry iterator
+class EntryIterator {
 public:
-    // build a Format Entry starting in the given pointer
-    class iterator;
-    explicit FormatEntry(const uint8_t *entry);
-    explicit FormatEntry(const iterator &it);
+    EntryIterator();
+    explicit EntryIterator(const uint8_t *entry);
+    EntryIterator(const EntryIterator &other);
 
-    // entry representation in memory
-    struct entry {
-        const uint8_t type;
-        const uint8_t length;
-        const uint8_t data[0];
-    };
+    // dereference underlying entry
+    const entry&    operator*() const;
+    const entry*    operator->() const;
+    // advance to next entry
+    EntryIterator&       operator++(); // ++i
+    // back to previous entry
+    EntryIterator&       operator--(); // --i
+    EntryIterator        next() const;
+    EntryIterator        prev() const;
+    bool            operator!=(const EntryIterator &other) const;
+    int             operator-(const EntryIterator &other) const;
 
-    // entry tail representation (after data)
-    struct ending {
-        uint8_t length;
-        uint8_t next[0];
-    };
+    bool            hasConsistentLength() const;
+    void            copyTo(std::unique_ptr<audio_utils_fifo_writer> &dst) const;
+    void            copyData(uint8_t *dst) const;
 
-    // entry iterator
-    class iterator {
-    public:
-        iterator();
-        iterator(const uint8_t *entry);
-        iterator(const iterator &other);
+    template<typename T>
+    inline const T& payload() {
+        return *reinterpret_cast<const T *>(ptr + offsetof(entry, data));
+    }
 
-        // dereference underlying entry
-        const entry&    operator*() const;
-        const entry*    operator->() const;
-        // advance to next entry
-        iterator&       operator++(); // ++i
-        // back to previous entry
-        iterator&       operator--(); // --i
-        iterator        next() const;
-        iterator        prev() const;
-        bool            operator!=(const iterator &other) const;
-        int             operator-(const iterator &other) const;
+    inline operator const uint8_t*() const {
+        return ptr;
+    }
 
-        bool            hasConsistentLength() const;
-        void            copyTo(std::unique_ptr<audio_utils_fifo_writer> &dst) const;
-        void            copyData(uint8_t *dst) const;
+private:
+    const uint8_t  *ptr;
+};
 
-        template<typename T>
-        inline const T& payload() {
-            return *reinterpret_cast<const T *>(ptr + offsetof(entry, data));
-        }
+class AbstractEntry {
+public:
 
-    private:
-        friend class FormatEntry;
-        const uint8_t  *ptr;
-    };
+    // Entry starting in the given pointer
+    explicit AbstractEntry(const uint8_t *entry);
 
-    // Entry's format string
-    const char* formatString() const;
-
-    // Enrty's format string length
-    size_t      formatStringLength() const;
-
-    // Format arguments (excluding format string, timestamp and author)
-    iterator    args() const;
+    // build concrete entry of appropriate class from pointer
+    static std::unique_ptr<AbstractEntry> buildEntry(const uint8_t *ptr);
 
     // get format entry timestamp
-    timespec    timestamp() const;
+    // TODO consider changing to uint64_t
+    virtual timespec     timestamp() const = 0;
 
     // get format entry's unique id
-    log_hash_t  hash() const;
+    virtual log_hash_t   hash() const = 0;
 
     // entry's author index (-1 if none present)
     // a Merger has a vector of Readers, author simply points to the index of the
     // Reader that originated the entry
-    int         author() const;
+    // TODO consider changing to uint32_t
+    virtual int          author() const = 0;
 
-    // copy entry, adding author before timestamp, returns size of original entry
-    iterator    copyWithAuthor(std::unique_ptr<audio_utils_fifo_writer> &dst, int author) const;
+    // copy entry, adding author before timestamp, returns iterator to end of entry
+    virtual EntryIterator    copyWithAuthor(std::unique_ptr<audio_utils_fifo_writer> &dst,
+                                       int author) const = 0;
 
-    iterator    begin() const;
-
-private:
+protected:
     // copies ordinary entry from src to dst, and returns length of entry
     // size_t      copyEntry(audio_utils_fifo_writer *dst, const iterator &it);
     const uint8_t  *mEntry;
+};
+
+class FormatEntry : public AbstractEntry {
+public:
+    // explicit FormatEntry(const EntryIterator &it);
+    explicit FormatEntry(const uint8_t *ptr) : AbstractEntry(ptr) {}
+
+    // Entry's format string
+    const   char* formatString() const;
+
+    // Enrty's format string length
+            size_t      formatStringLength() const;
+
+    // Format arguments (excluding format string, timestamp and author)
+            EntryIterator    args() const;
+
+    // get format entry timestamp
+    virtual timespec    timestamp() const override;
+
+    // get format entry's unique id
+    virtual log_hash_t  hash() const override;
+
+    // entry's author index (-1 if none present)
+    // a Merger has a vector of Readers, author simply points to the index of the
+    // Reader that originated the entry
+    virtual int         author() const override;
+
+    // copy entry, adding author before timestamp, returns size of original entry
+    virtual EntryIterator    copyWithAuthor(std::unique_ptr<audio_utils_fifo_writer> &dst,
+                                       int author) const override;
+
+            EntryIterator    begin() const;
+};
+
+class HistogramEntry : public AbstractEntry {
+public:
+    explicit HistogramEntry(const uint8_t *ptr) : AbstractEntry(ptr) {
+    }
+
+    virtual timespec    timestamp() const override;
+
+    virtual log_hash_t  hash() const override;
+
+    virtual int         author() const override;
+
+    virtual EntryIterator    copyWithAuthor(std::unique_ptr<audio_utils_fifo_writer> &dst,
+                                       int author) const override;
+
 };
 
 // ---------------------------------------------------------------------------
@@ -173,11 +223,27 @@ private:
     static const size_t kMaxLength = 255;
 public:
     // mEvent, mLength, mData[...], duplicate mLength
-    static const size_t kOverhead = sizeof(FormatEntry::entry) + sizeof(FormatEntry::ending);
+    static const size_t kOverhead = sizeof(entry) + sizeof(ending);
     // endind length of previous entry
-    static const size_t kPreviousLengthOffset = - sizeof(FormatEntry::ending) +
-                                                offsetof(FormatEntry::ending, length);
+    static const size_t kPreviousLengthOffset = - sizeof(ending) +
+                                                offsetof(ending, length);
 };
+
+struct HistTsEntry {
+    log_hash_t hash;
+    timespec ts;
+}; //TODO __attribute__((packed));
+
+struct HistTsEntryWithAuthor {
+    log_hash_t hash;
+    timespec ts;
+    int author;
+}; //TODO __attribute__((packed));
+
+struct HistIntEntry {
+    log_hash_t hash;
+    int value;
+}; //TODO __attribute__((packed));
 
 // representation of a single log entry in shared memory
 //  byte[0]             mEvent
@@ -265,7 +331,8 @@ public:
     virtual void    logStart(const char *fmt);
     virtual void    logEnd();
     virtual void    logHash(log_hash_t hash);
-
+    virtual void    logHistTS(log_hash_t hash);
+    virtual void    logHistFlush(log_hash_t hash);
 
     virtual bool    isEnabled() const;
 
@@ -344,18 +411,18 @@ public:
 
         // iterator to beginning of readable segment of snapshot
         // data between begin and end has valid entries
-        FormatEntry::iterator begin() { return mBegin; }
+        EntryIterator begin() { return mBegin; }
 
         // iterator to end of readable segment of snapshot
-        FormatEntry::iterator end() { return mEnd; }
+        EntryIterator end() { return mEnd; }
 
 
     private:
         friend class Reader;
         uint8_t              *mData;
         size_t                mLost;
-        FormatEntry::iterator mBegin;
-        FormatEntry::iterator mEnd;
+        EntryIterator mBegin;
+        EntryIterator mEnd;
     };
 
     // Input parameter 'size' is the desired size of the timeline in byte units.
@@ -374,6 +441,8 @@ public:
     bool     isIMemory(const sp<IMemory>& iMemory) const;
 
 private:
+    static const std::set<Event> startingTypes;
+    static const std::set<Event> endingTypes;
     /*const*/ Shared* const mShared;    // raw pointer to shared memory, actually const but not
                                         // declared as const because audio_utils_fifo() constructor
     sp<IMemory> mIMemory;       // ref-counted version, assigned only in constructor
@@ -386,15 +455,18 @@ private:
 
     void    dumpLine(const String8& timestamp, String8& body);
 
-    FormatEntry::iterator   handleFormat(const FormatEntry &fmtEntry,
+    EntryIterator   handleFormat(const FormatEntry &fmtEntry,
                                          String8 *timestamp,
                                          String8 *body);
     // dummy method for handling absent author entry
-    virtual size_t handleAuthor(const FormatEntry &fmtEntry, String8 *body) { return 0; }
+    virtual void handleAuthor(const AbstractEntry &fmtEntry, String8 *body) {}
+
+    static void drawHistogram(String8 *body, const std::vector<int> &samples, int maxHeight = 10);
 
     // Searches for the last entry of type <type> in the range [front, back)
     // back has to be entry-aligned. Returns nullptr if none enconuntered.
-    static uint8_t *findLastEntryOfType(uint8_t *front, uint8_t *back, uint8_t type);
+    static const uint8_t *findLastEntryOfTypes(const uint8_t *front, const uint8_t *back,
+                                         const std::set<Event> &types);
 
     static const size_t kSquashTimestamp = 5; // squash this many or more adjacent timestamps
 };
@@ -447,7 +519,7 @@ private:
     const std::vector<NamedReader> *mNamedReaders;
     // handle author entry by looking up the author's name and appending it to the body
     // returns number of bytes read from fmtEntry
-    size_t handleAuthor(const FormatEntry &fmtEntry, String8 *body);
+    void handleAuthor(const AbstractEntry &fmtEntry, String8 *body);
 };
 
 // MergeThread is a thread that contains a Merger. It works as a retriggerable one-shot:
