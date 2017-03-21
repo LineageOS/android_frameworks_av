@@ -21,6 +21,7 @@ import android.hardware.ICameraClient;
 import android.hardware.camera2.ICameraDeviceUser;
 import android.hardware.camera2.ICameraDeviceCallbacks;
 import android.hardware.camera2.params.VendorTagDescriptor;
+import android.hardware.camera2.params.VendorTagDescriptorCache;
 import android.hardware.camera2.impl.CameraMetadataNative;
 import android.hardware.ICameraServiceListener;
 import android.hardware.CameraInfo;
@@ -128,6 +129,14 @@ interface ICameraService
      * interpret camera metadata with vendor tags.
      */
     VendorTagDescriptor getCameraVendorTagDescriptor();
+
+    /**
+     * Retrieve the vendor tag descriptor cache which can have multiple vendor
+     * providers.
+     * Intended to be used by the native code of CameraMetadataNative to correctly
+     * interpret camera metadata with vendor tags.
+     */
+    VendorTagDescriptorCache getCameraVendorTagCache();
 
     /**
      * Read the legacy camera1 parameters into a String
