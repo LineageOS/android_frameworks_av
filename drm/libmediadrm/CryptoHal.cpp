@@ -228,11 +228,11 @@ bool CryptoHal::requiresSecureDecoderComponent(const char *mime) const {
 void CryptoHal::setHeapBase(const sp<IMemoryHeap>& heap) {
     native_handle_t* nativeHandle = native_handle_create(1, 0);
     if (!nativeHandle) {
-        ALOGE("setHeapBase(), failed to create native handle");
+        ALOGE("setSharedBufferBase(), failed to create native handle");
         return;
     }
     if (heap == NULL) {
-        ALOGE("setHeapBase(): heap is NULL");
+        ALOGE("setSharedBufferBase(): heap is NULL");
         return;
     }
     int fd = heap->getHeapID();
@@ -242,10 +242,6 @@ void CryptoHal::setHeapBase(const sp<IMemoryHeap>& heap) {
     mHeapBases.add(heap->getBase(), mNextBufferId);
     Return<void> hResult = mPlugin->setSharedBufferBase(hidlMemory, mNextBufferId++);
     ALOGE_IF(!hResult.isOk(), "setSharedBufferBase(): remote call failed");
-}
-
-void CryptoHal::clearHeapBase(const sp<IMemoryHeap>& heap) {
-    mHeapBases.removeItem(heap->getBase());
 }
 
 status_t CryptoHal::toSharedBuffer(const sp<IMemory>& memory, ::SharedBuffer* buffer) {
@@ -261,8 +257,9 @@ status_t CryptoHal::toSharedBuffer(const sp<IMemory>& memory, ::SharedBuffer* bu
         return UNEXPECTED_NULL;
     }
 
-    // memory must be in the declared heap
-    CHECK(mHeapBases.indexOfKey(heap->getBase()) >= 0);
+    if (mHeapBases.indexOfKey(heap->getBase()) < 0) {
+        setHeapBase(heap);
+    }
 
     buffer->bufferId = mHeapBases.valueFor(heap->getBase());
     buffer->offset = offset >= 0 ? offset : 0;
