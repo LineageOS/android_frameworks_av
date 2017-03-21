@@ -60,9 +60,6 @@ struct CryptoHal : public BnCrypto {
             const ICrypto::DestinationBuffer &destination,
             AString *errorDetailMsg);
 
-    virtual void setHeap(const sp<IMemoryHeap>& heap) { setHeapBase(heap); }
-    virtual void unsetHeap(const sp<IMemoryHeap>& heap) { clearHeapBase(heap); }
-
 private:
     mutable Mutex mLock;
 
@@ -85,7 +82,6 @@ private:
             const uint8_t uuid[16], const void *initData, size_t size);
 
     void setHeapBase(const sp<IMemoryHeap>& heap);
-    void clearHeapBase(const sp<IMemoryHeap>& heap);
 
     status_t toSharedBuffer(const sp<IMemory>& memory, ::SharedBuffer* buffer);
 

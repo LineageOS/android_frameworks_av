@@ -36,8 +36,6 @@ enum {
     DECRYPT,
     NOTIFY_RESOLUTION,
     SET_MEDIADRM_SESSION,
-    SET_HEAP,
-    UNSET_HEAP,
 };
 
 struct BpCrypto : public BpInterface<ICrypto> {
@@ -178,23 +176,6 @@ struct BpCrypto : public BpInterface<ICrypto> {
 
         return reply.readInt32();
     }
-
-    virtual void setHeap(const sp<IMemoryHeap> &heap) {
-        Parcel data, reply;
-        data.writeInterfaceToken(ICrypto::getInterfaceDescriptor());
-        data.writeStrongBinder(IInterface::asBinder(heap));
-        remote()->transact(SET_HEAP, data, &reply);
-        return;
-    }
-
-    virtual void unsetHeap(const sp<IMemoryHeap>& heap) {
-        Parcel data, reply;
-        data.writeInterfaceToken(ICrypto::getInterfaceDescriptor());
-        data.writeStrongBinder(IInterface::asBinder(heap));
-        remote()->transact(UNSET_HEAP, data, &reply);
-        return;
-    }
-
 
 private:
     void readVector(Parcel &reply, Vector<uint8_t> &vector) const {
@@ -416,24 +397,6 @@ status_t BnCrypto::onTransact(
             Vector<uint8_t> sessionId;
             readVector(data, sessionId);
             reply->writeInt32(setMediaDrmSession(sessionId));
-            return OK;
-        }
-
-        case SET_HEAP:
-        {
-            CHECK_INTERFACE(ICrypto, data, reply);
-            sp<IMemoryHeap> heap =
-                interface_cast<IMemoryHeap>(data.readStrongBinder());
-            setHeap(heap);
-            return OK;
-        }
-
-        case UNSET_HEAP:
-        {
-            CHECK_INTERFACE(ICrypto, data, reply);
-            sp<IMemoryHeap> heap =
-                interface_cast<IMemoryHeap>(data.readStrongBinder());
-            unsetHeap(heap);
             return OK;
         }
 
