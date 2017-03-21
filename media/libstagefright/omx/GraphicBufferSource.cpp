@@ -379,7 +379,7 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
     // the action are overridden by the last action. For the other cases, traverse
     // the Queue to find the newest action that with timestamp smaller or equal to
     // the buffer's timestamp. For example, an action queue like
-    // [pause, 1s], [resume 2us], [pause 3us], [resume 4us], [pause 5us].... Upon
+    // [pause 1us], [resume 2us], [pause 3us], [resume 4us], [pause 5us].... Upon
     // receiving a buffer with timestamp 3.5us, only the action [pause, 3us] needs
     // to be handled and [pause, 1us], [resume 2us] will be discarded.
     bool dropped = false;
@@ -398,15 +398,14 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
         }
 
         if (!done) {
+            // Find the newest action that with timestamp smaller than itemTimeUs. Then
+            // remove all the actions before and include the newest action.
             List<ActionItem>::iterator it = mActionQueue.begin();
-            while(it != mActionQueue.end()) {
+            while (it != mActionQueue.end() && it->mActionTimeUs <= itemTimeUs) {
                 nextAction = *it;
-                mActionQueue.erase(it);
-                if (nextAction.mActionTimeUs > itemTimeUs) {
-                    break;
-                }
                 ++it;
             }
+            mActionQueue.erase(mActionQueue.begin(), it);
 
             CHECK(itemTimeUs >= nextAction.mActionTimeUs);
             switch (nextAction.mAction) {
