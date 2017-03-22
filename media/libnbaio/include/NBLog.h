@@ -59,8 +59,8 @@ enum Event {
 
 // a formatted entry has the following structure:
 //    * START_FMT entry, containing the format string
-//    * author entry of the thread that generated it (optional, present in merged log)
 //    * TIMESTAMP entry
+//    * author entry of the thread that generated it (optional, present in merged log)
 //    * format arg1
 //    * format arg2
 //    * ...
