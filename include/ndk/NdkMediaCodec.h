@@ -179,6 +179,61 @@ media_status_t AMediaCodec_setOutputSurface(AMediaCodec*, ANativeWindow* surface
 media_status_t AMediaCodec_releaseOutputBufferAtTime(
         AMediaCodec *mData, size_t idx, int64_t timestampNs);
 
+/**
+ * Creates a Surface that can be used as the input to encoder, in place of input buffers
+ *
+ * This can only be called after the codec has been configured via
+ * AMediaCodec_configure(..); and before AMediaCodec_start() has been called.
+ *
+ * The application is responsible for releasing the surface by calling
+ * ANativeWindow_release() when done.
+ *
+ * For more details, see the Java documentation for MediaCodec.createInputSurface.
+ */
+media_status_t AMediaCodec_createInputSurface(
+        AMediaCodec *mData, ANativeWindow **surface);
+
+/**
+ * Creates a persistent Surface that can be used as the input to encoder
+ *
+ * Persistent surface can be reused by MediaCodec instances and can be set
+ * on a new instance via AMediaCodec_setInputSurface().
+ * A persistent surface can be connected to at most one instance of MediaCodec
+ * at any point in time.
+ *
+ * The application is responsible for releasing the surface by calling
+ * ANativeWindow_release() when done.
+ *
+ * For more details, see the Java documentation for MediaCodec.createPersistentInputSurface.
+ */
+media_status_t AMediaCodec_createPersistentInputSurface(
+        ANativeWindow **surface);
+
+/**
+ * Set a persistent-surface that can be used as the input to encoder, in place of input buffers
+ *
+ * The surface provided *must* be a persistent surface created via
+ * AMediaCodec_createPersistentInputSurface()
+ * This can only be called after the codec has been configured by calling
+ * AMediaCodec_configure(..); and before AMediaCodec_start() has been called.
+ *
+ * For more details, see the Java documentation for MediaCodec.setInputSurface.
+ */
+media_status_t AMediaCodec_setInputSurface(
+        AMediaCodec *mData, ANativeWindow *surface);
+
+/**
+ * Signal additional parameters to the codec instance.
+ *
+ * Parameters can be communicated only when the codec is running, i.e
+ * after AMediaCodec_start() has been called.
+ *
+ * NOTE: Some of these parameter changes may silently fail to apply.
+ */
+media_status_t AMediaCodec_setParameters(
+        AMediaCodec *mData, const AMediaFormat* params);
+
+
 typedef enum {
     AMEDIACODECRYPTOINFO_MODE_CLEAR = 0,
     AMEDIACODECRYPTOINFO_MODE_AES_CTR = 1,
