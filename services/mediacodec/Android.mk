@@ -41,9 +41,11 @@ LOCAL_C_INCLUDES := \
     $(TOP)/frameworks/av/media/libstagefright \
     $(TOP)/frameworks/av/media/libstagefright/include \
     $(TOP)/frameworks/native/include/media/openmax
-LOCAL_MODULE := mediacodec
+LOCAL_MODULE := android.hardware.media.omx@1.0-service
+LOCAL_MODULE_RELATIVE_PATH := hw
+LOCAL_PROPRIETARY_MODULE := true
 LOCAL_32_BIT_ONLY := true
-LOCAL_INIT_RC := mediacodec.rc
+LOCAL_INIT_RC := android.hardware.media.omx@1.0-service.rc
 include $(BUILD_EXECUTABLE)
 
 # service seccomp policy
