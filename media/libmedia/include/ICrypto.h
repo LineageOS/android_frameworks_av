@@ -27,7 +27,6 @@ namespace android {
 
 struct AString;
 class IMemory;
-class IMemoryHeap;
 
 struct ICrypto : public IInterface {
     DECLARE_META_INTERFACE(Crypto);
@@ -64,13 +63,6 @@ struct ICrypto : public IInterface {
             const sp<IMemory> &source, size_t offset,
             const CryptoPlugin::SubSample *subSamples, size_t numSubSamples,
             const DestinationBuffer &destination, AString *errorDetailMsg) = 0;
-
-    /**
-     * Declare the heap that the shared memory source buffers passed
-     * to decrypt will be allocated from.
-     */
-    virtual void setHeap(const sp<IMemoryHeap>& heap) = 0;
-    virtual void unsetHeap(const sp<IMemoryHeap>& heap) = 0;
 
 private:
     DISALLOW_EVIL_CONSTRUCTORS(ICrypto);
