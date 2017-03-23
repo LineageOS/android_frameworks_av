@@ -64,7 +64,13 @@ status_t CameraFlashlight::createFlashlightControl(const String8& cameraId) {
     status_t res = OK;
 
     if (mCameraModule == nullptr) {
-        mFlashControl = new ProviderFlashControl(mProviderManager);
+        if (mProviderManager->supportSetTorchMode(cameraId.string())) {
+            mFlashControl = new ProviderFlashControl(mProviderManager);
+        } else {
+            // Only HAL1 devices do not support setTorchMode
+            mFlashControl =
+                    new CameraHardwareInterfaceFlashControl(mProviderManager, *mCallbacks);
+        }
     } else if (mCameraModule->getModuleApiVersion() >= CAMERA_MODULE_API_VERSION_2_4) {
         mFlashControl = new ModuleFlashControl(*mCameraModule);
         if (mFlashControl == NULL) {
@@ -99,8 +105,7 @@ status_t CameraFlashlight::createFlashlightControl(const String8& cameraId) {
             mFlashControl = flashControl;
         } else {
             mFlashControl =
-                    new CameraHardwareInterfaceFlashControl(*mCameraModule,
-                                                            *mCallbacks);
+                    new CameraHardwareInterfaceFlashControl(mCameraModule, *mCallbacks);
         }
     }
 
@@ -164,20 +169,28 @@ status_t CameraFlashlight::setTorchMode(const String8& cameraId, bool enabled) {
     return res;
 }
 
+int CameraFlashlight::getNumberOfCameras() {
+    if (mCameraModule) {
+        return mCameraModule->getNumberOfCameras();
+    } else {
+        return mProviderManager->getStandardCameraCount();
+    }
+}
+
 status_t CameraFlashlight::findFlashUnits() {
     Mutex::Autolock l(mLock);
     status_t res;
 
     std::vector<String8> cameraIds;
+    int numberOfCameras = getNumberOfCameras();
+    cameraIds.resize(numberOfCameras);
     if (mCameraModule) {
-        cameraIds.resize(mCameraModule->getNumberOfCameras());
         for (size_t i = 0; i < cameraIds.size(); i++) {
             cameraIds[i] = String8::format("%zu", i);
         }
     } else {
         // No module, must be provider
-        std::vector<std::string> ids = mProviderManager->getCameraDeviceIds();
-        cameraIds.resize(ids.size());
+        std::vector<std::string> ids = mProviderManager->getStandardCameraDeviceIds();
         for (size_t i = 0; i < cameraIds.size(); i++) {
             cameraIds[i] = String8(ids[i].c_str());
         }
@@ -236,6 +249,17 @@ bool CameraFlashlight::hasFlashUnitLocked(const String8& cameraId) {
     return mHasFlashlightMap.valueAt(index);
 }
 
+bool CameraFlashlight::isBackwardCompatibleMode(const String8& cameraId) {
+    bool backwardCompatibleMode = false;
+    if (mCameraModule && mCameraModule->getModuleApiVersion() < CAMERA_MODULE_API_VERSION_2_4) {
+        backwardCompatibleMode = true;
+    } else if (mProviderManager != nullptr &&
+            !mProviderManager->supportSetTorchMode(cameraId.string())) {
+        backwardCompatibleMode = true;
+    }
+    return backwardCompatibleMode;
+}
+
 status_t CameraFlashlight::prepareDeviceOpen(const String8& cameraId) {
     ALOGV("%s: prepare for device open", __FUNCTION__);
 
@@ -246,14 +270,14 @@ status_t CameraFlashlight::prepareDeviceOpen(const String8& cameraId) {
         return NO_INIT;
     }
 
-    if (mCameraModule && mCameraModule->getModuleApiVersion() < CAMERA_MODULE_API_VERSION_2_4) {
+    if (isBackwardCompatibleMode(cameraId)) {
         // framework is going to open a camera device, all flash light control
         // should be closed for backward compatible support.
         mFlashControl.clear();
 
         if (mOpenedCameraIds.size() == 0) {
             // notify torch unavailable for all cameras with a flash
-            int numCameras = mCameraModule->getNumberOfCameras();
+            int numCameras = getNumberOfCameras();
             for (int i = 0; i < numCameras; i++) {
                 if (hasFlashUnitLocked(String8::format("%d", i))) {
                     mCallbacks->torch_mode_status_change(mCallbacks,
@@ -296,9 +320,9 @@ status_t CameraFlashlight::deviceClosed(const String8& cameraId) {
     if (mOpenedCameraIds.size() != 0)
         return OK;
 
-    if (mCameraModule && mCameraModule->getModuleApiVersion() < CAMERA_MODULE_API_VERSION_2_4) {
+    if (isBackwardCompatibleMode(cameraId)) {
         // notify torch available for all cameras with a flash
-        int numCameras = mCameraModule->getNumberOfCameras();
+        int numCameras = getNumberOfCameras();
         for (int i = 0; i < numCameras; i++) {
             if (hasFlashUnitLocked(String8::format("%d", i))) {
                 mCallbacks->torch_mode_status_change(mCallbacks,
@@ -692,12 +716,21 @@ status_t CameraDeviceClientFlashControl::setTorchMode(
 // Flash control for camera module <= v2.3 and camera HAL v1
 /////////////////////////////////////////////////////////////////////
 CameraHardwareInterfaceFlashControl::CameraHardwareInterfaceFlashControl(
-        CameraModule& cameraModule,
+        CameraModule* cameraModule,
         const camera_module_callbacks_t& callbacks) :
-        mCameraModule(&cameraModule),
+        mCameraModule(cameraModule),
+        mProviderManager(nullptr),
         mCallbacks(&callbacks),
         mTorchEnabled(false) {
+}
 
+CameraHardwareInterfaceFlashControl::CameraHardwareInterfaceFlashControl(
+        sp<CameraProviderManager> manager,
+        const camera_module_callbacks_t& callbacks) :
+        mCameraModule(nullptr),
+        mProviderManager(manager),
+        mCallbacks(&callbacks),
+        mTorchEnabled(false) {
 }
 
 CameraHardwareInterfaceFlashControl::~CameraHardwareInterfaceFlashControl() {
@@ -898,7 +931,12 @@ status_t CameraHardwareInterfaceFlashControl::connectCameraDevice(
     sp<CameraHardwareInterface> device =
             new CameraHardwareInterface(cameraId.string());
 
-    status_t res = device->initialize(mCameraModule);
+    status_t res;
+    if (mCameraModule != nullptr) {
+        res = device->initialize(mCameraModule);
+    } else {
+        res = device->initialize(mProviderManager);
+    }
     if (res) {
         ALOGE("%s: initializing camera %s failed", __FUNCTION__,
                 cameraId.string());

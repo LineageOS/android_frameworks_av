@@ -22,7 +22,6 @@
 
 #include <chrono>
 #include <inttypes.h>
-#include <set>
 #include <hidl/ServiceManagement.h>
 
 namespace android {
@@ -96,8 +95,21 @@ std::vector<std::string> CameraProviderManager::getCameraDeviceIds() const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
     std::vector<std::string> deviceIds;
     for (auto& provider : mProviders) {
-        for (auto& deviceInfo : provider->mDevices) {
-            deviceIds.push_back(deviceInfo->mId);
+        for (auto& id : provider->mUniqueCameraIds) {
+            deviceIds.push_back(id);
+        }
+    }
+    return deviceIds;
+}
+
+std::vector<std::string> CameraProviderManager::getStandardCameraDeviceIds() const {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+    std::vector<std::string> deviceIds;
+    for (auto& provider : mProviders) {
+        if (kStandardProviderTypes.find(provider->getType()) != std::string::npos) {
+            for (auto& id : provider->mUniqueCameraIds) {
+                deviceIds.push_back(id);
+            }
         }
     }
     return deviceIds;
@@ -180,6 +192,23 @@ status_t CameraProviderManager::getHighestSupportedVersion(const std::string &id
     }
     *v = maxVersion;
     return OK;
+}
+
+bool CameraProviderManager::supportSetTorchMode(const std::string &id) {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+    bool support = false;
+    for (auto& provider : mProviders) {
+        auto deviceInfo = findDeviceInfoLocked(id);
+        if (deviceInfo != nullptr) {
+            provider->mInterface->isSetTorchModeSupported(
+                [&support](auto status, bool supported) {
+                    if (status == Status::OK) {
+                        support = supported;
+                    }
+                });
+        }
+    }
+    return support;
 }
 
 status_t CameraProviderManager::setTorchMode(const std::string &id, bool enabled) {
@@ -472,11 +501,10 @@ status_t CameraProviderManager::ProviderInfo::initialize() {
         }
     }
 
-    std::set<std::string> uniqueCameraIds;
     for (auto& device : mDevices) {
-        uniqueCameraIds.insert(device->mId);
+        mUniqueCameraIds.insert(device->mId);
     }
-    mUniqueDeviceCount = uniqueCameraIds.size();
+    mUniqueDeviceCount = mUniqueCameraIds.size();
 
     ALOGI("Camera provider %s ready with %zu camera devices",
             mProviderName.c_str(), mDevices.size());
