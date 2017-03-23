@@ -75,6 +75,11 @@ LIBMEDIANDK {
     AMediaCodec_releaseOutputBuffer;
     AMediaCodec_releaseOutputBufferAtTime;
     AMediaCodec_setOutputSurface; # introduced=24
+    AMediaCodec_setParameters; # introduced=26
+    AMediaCodec_setInputSurface; # introduced=26
+    AMediaCodec_createInputSurface; # introduced=26
+    AMediaCodec_signalEndOfInputStream; # introduced=26
+    AMediaCodec_createPersistentInputSurface; # introduced=26
     AMediaCodec_start;
     AMediaCodec_stop;
     AMediaCrypto_delete;
