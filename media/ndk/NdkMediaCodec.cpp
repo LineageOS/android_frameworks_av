@@ -463,6 +463,22 @@ media_status_t AMediaCodec_setParameters(
     return translate_error(mData->mCodec->setParameters(nativeParams));
 }
 
+EXPORT
+media_status_t AMediaCodec_signalEndOfInputStream(AMediaCodec *mData) {
+
+    if (mData == NULL) {
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+
+    status_t err = mData->mCodec->signalEndOfInputStream();
+    if (err == INVALID_OPERATION) {
+        return AMEDIA_ERROR_INVALID_OPERATION;
+    }
+
+    return translate_error(err);
+
+}
+
 //EXPORT
 media_status_t AMediaCodec_setNotificationCallback(AMediaCodec *mData, OnCodecEvent callback,
         void *userdata) {

@@ -233,6 +233,23 @@ media_status_t AMediaCodec_setInputSurface(
 media_status_t AMediaCodec_setParameters(
         AMediaCodec *mData, const AMediaFormat* params);
 
+/**
+ * Signals end-of-stream on input. Equivalent to submitting an empty buffer with
+ * AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM set.
+ *
+ * Returns AMEDIA_ERROR_INVALID_OPERATION when used with an encoder not in executing state
+ * or not receiving input from a Surface created by AMediaCodec_createInputSurface or
+ * AMediaCodec_createPersistentInputSurface.
+ *
+ * Returns the previous codec error if one exists.
+ *
+ * Returns AMEDIA_OK when completed succesfully.
+ *
+ * For more details, see the Java documentation for MediaCodec.signalEndOfInputStream.
+ */
+media_status_t AMediaCodec_signalEndOfInputStream(AMediaCodec *mData);
+
+
 
 typedef enum {
     AMEDIACODECRYPTOINFO_MODE_CLEAR = 0,
