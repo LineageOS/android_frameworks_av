@@ -1345,6 +1345,7 @@ int VirtualizerIsDeviceSupported(audio_devices_t deviceType) {
     case AUDIO_DEVICE_OUT_WIRED_HEADSET:
     case AUDIO_DEVICE_OUT_WIRED_HEADPHONE:
     case AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES:
+    case AUDIO_DEVICE_OUT_USB_HEADSET:
         return 0;
     default :
         return -EINVAL;
