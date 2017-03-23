@@ -75,6 +75,9 @@ ACodecBufferChannel::ACodecBufferChannel(
 }
 
 status_t ACodecBufferChannel::queueInputBuffer(const sp<MediaCodecBuffer> &buffer) {
+    if (mDealer != nullptr) {
+        return -ENOSYS;
+    }
     std::shared_ptr<const std::vector<const BufferInfo>> array(
             std::atomic_load(&mInputBuffers));
     BufferInfoIterator it = findClientBuffer(array, buffer);
@@ -94,7 +97,7 @@ status_t ACodecBufferChannel::queueSecureInputBuffer(
         const uint8_t *iv, CryptoPlugin::Mode mode, CryptoPlugin::Pattern pattern,
         const CryptoPlugin::SubSample *subSamples, size_t numSubSamples,
         AString *errorDetailMsg) {
-    if (!hasCryptoOrDescrambler()) {
+    if (!hasCryptoOrDescrambler() || mDealer == nullptr) {
         return -ENOSYS;
     }
     std::shared_ptr<const std::vector<const BufferInfo>> array(
