@@ -461,9 +461,9 @@ void Camera3StreamSplitter::onBufferReleasedByOutputLocked(
     } else if (res == NO_MEMORY) {
         SP_LOGV("%s: No free buffers", __FUNCTION__);
         return;
-    } else {
-        LOG_ALWAYS_FATAL_IF(res != NO_ERROR,
-                "detaching buffer from output failed (%d)", res);
+    } else if (res != OK) {
+        SP_LOGE("%s: detaching buffer from output failed (%d)", __FUNCTION__, res);
+        return;
     }
 
     BufferTracker& tracker = *(mBuffers[buffer->getId()]);

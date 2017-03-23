@@ -867,23 +867,22 @@ binder::Status CameraDeviceClient::createSurfaceFromGbp(
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
-    if (dataSpace != streamInfo.dataSpace) {
-        String8 msg = String8::format("Camera %s:Surface dataSpace doesn't match: %d vs %d",
-                 mCameraIdStr.string(), dataSpace, streamInfo.dataSpace);
-        ALOGE("%s: %s", __FUNCTION__, msg.string());
-        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
-    }
-    //At the native side, there isn't a way to check whether 2 surfaces come from the same
-    //surface class type. Use usage flag to approximate the comparison. Treat
-    //different preview surface usage flags as the same.
-    int32_t previewUsageMask =
-            GraphicBuffer::USAGE_HW_TEXTURE | GraphicBuffer::USAGE_HW_COMPOSER;
-    if ((consumerUsage & ~previewUsageMask) != (streamInfo.consumerUsage & ~previewUsageMask)) {
-        String8 msg = String8::format(
-                "Camera %s:Surface usage flag doesn't match 0x%x vs 0x%x",
-                mCameraIdStr.string(), consumerUsage, streamInfo.consumerUsage);
-        ALOGE("%s: %s", __FUNCTION__, msg.string());
-        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+    if (format != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
+        if (dataSpace != streamInfo.dataSpace) {
+            String8 msg = String8::format("Camera %s:Surface dataSpace doesn't match: %d vs %d",
+                    mCameraIdStr.string(), dataSpace, streamInfo.dataSpace);
+            ALOGE("%s: %s", __FUNCTION__, msg.string());
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+        }
+        //At the native side, there isn't a way to check whether 2 surfaces come from the same
+        //surface class type. Use usage flag to approximate the comparison.
+        if (consumerUsage != streamInfo.consumerUsage) {
+            String8 msg = String8::format(
+                    "Camera %s:Surface usage flag doesn't match 0x%x vs 0x%x",
+                    mCameraIdStr.string(), consumerUsage, streamInfo.consumerUsage);
+            ALOGE("%s: %s", __FUNCTION__, msg.string());
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+        }
     }
     return binder::Status::ok();
 }
