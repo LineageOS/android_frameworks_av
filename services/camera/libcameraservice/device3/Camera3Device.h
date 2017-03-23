@@ -598,7 +598,6 @@ class Camera3Device :
     static hardware::graphics::common::V1_0::PixelFormat mapToPixelFormat(int frameworkFormat);
     static hardware::camera::device::V3_2::DataspaceFlags mapToHidlDataspace(
             android_dataspace dataSpace);
-    static hardware::camera::device::V3_2::ConsumerUsageFlags mapToConsumerUsage(uint32_t usage);
     static hardware::camera::device::V3_2::StreamRotation mapToStreamRotation(
             camera3_stream_rotation_t rotation);
     // Returns a negative error code if the passed-in operation mode is not valid.
@@ -606,10 +605,6 @@ class Camera3Device :
             /*out*/ hardware::camera::device::V3_2::StreamConfigurationMode *mode);
     static camera3_buffer_status_t mapHidlBufferStatus(hardware::camera::device::V3_2::BufferStatus status);
     static int mapToFrameworkFormat(hardware::graphics::common::V1_0::PixelFormat pixelFormat);
-    static uint32_t mapConsumerToFrameworkUsage(
-            hardware::camera::device::V3_2::ConsumerUsageFlags usage);
-    static uint32_t mapProducerToFrameworkUsage(
-            hardware::camera::device::V3_2::ProducerUsageFlags usage);
 
     struct RequestTrigger {
         // Metadata tag number, e.g. android.control.aePrecaptureTrigger
