@@ -1790,41 +1790,17 @@ void readFromAMessage(
 }
 
 void writeToAMessage(const sp<AMessage> &msg, const BufferingSettings &buffering) {
-    msg->setInt32("init-mode", buffering.mInitialBufferingMode);
-    msg->setInt32("rebuffer-mode", buffering.mRebufferingMode);
-    msg->setInt32("init-ms", buffering.mInitialWatermarkMs);
-    msg->setInt32("init-kb", buffering.mInitialWatermarkKB);
-    msg->setInt32("rebuffer-low-ms", buffering.mRebufferingWatermarkLowMs);
-    msg->setInt32("rebuffer-high-ms", buffering.mRebufferingWatermarkHighMs);
-    msg->setInt32("rebuffer-low-kb", buffering.mRebufferingWatermarkLowKB);
-    msg->setInt32("rebuffer-high-kb", buffering.mRebufferingWatermarkHighKB);
+    msg->setInt32("init-ms", buffering.mInitialMarkMs);
+    msg->setInt32("resume-playback-ms", buffering.mResumePlaybackMarkMs);
 }
 
 void readFromAMessage(const sp<AMessage> &msg, BufferingSettings *buffering /* nonnull */) {
     int32_t value;
-    if (msg->findInt32("init-mode", &value)) {
-        buffering->mInitialBufferingMode = (BufferingMode)value;
-    }
-    if (msg->findInt32("rebuffer-mode", &value)) {
-        buffering->mRebufferingMode = (BufferingMode)value;
-    }
     if (msg->findInt32("init-ms", &value)) {
-        buffering->mInitialWatermarkMs = value;
+        buffering->mInitialMarkMs = value;
     }
-    if (msg->findInt32("init-kb", &value)) {
-        buffering->mInitialWatermarkKB = value;
-    }
-    if (msg->findInt32("rebuffer-low-ms", &value)) {
-        buffering->mRebufferingWatermarkLowMs = value;
-    }
-    if (msg->findInt32("rebuffer-high-ms", &value)) {
-        buffering->mRebufferingWatermarkHighMs = value;
-    }
-    if (msg->findInt32("rebuffer-low-kb", &value)) {
-        buffering->mRebufferingWatermarkLowKB = value;
-    }
-    if (msg->findInt32("rebuffer-high-kb", &value)) {
-        buffering->mRebufferingWatermarkHighKB = value;
+    if (msg->findInt32("resume-playback-ms", &value)) {
+        buffering->mResumePlaybackMarkMs = value;
     }
 }
 

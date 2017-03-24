@@ -44,7 +44,7 @@ enum {
     SET_DATA_SOURCE_STREAM,
     SET_DATA_SOURCE_CALLBACK,
     SET_BUFFERING_SETTINGS,
-    GET_DEFAULT_BUFFERING_SETTINGS,
+    GET_BUFFERING_SETTINGS,
     PREPARE_ASYNC,
     START,
     STOP,
@@ -184,14 +184,14 @@ public:
         return reply.readInt32();
     }
 
-    status_t getDefaultBufferingSettings(BufferingSettings* buffering /* nonnull */)
+    status_t getBufferingSettings(BufferingSettings* buffering /* nonnull */)
     {
         if (buffering == nullptr) {
             return BAD_VALUE;
         }
         Parcel data, reply;
         data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
-        remote()->transact(GET_DEFAULT_BUFFERING_SETTINGS, data, &reply);
+        remote()->transact(GET_BUFFERING_SETTINGS, data, &reply);
         status_t err = reply.readInt32();
         if (err == OK) {
             err = buffering->readFromParcel(&reply);
@@ -700,10 +700,10 @@ status_t BnMediaPlayer::onTransact(
             reply->writeInt32(setBufferingSettings(buffering));
             return NO_ERROR;
         } break;
-        case GET_DEFAULT_BUFFERING_SETTINGS: {
+        case GET_BUFFERING_SETTINGS: {
             CHECK_INTERFACE(IMediaPlayer, data, reply);
             BufferingSettings buffering;
-            status_t err = getDefaultBufferingSettings(&buffering);
+            status_t err = getBufferingSettings(&buffering);
             reply->writeInt32(err);
             if (err == OK) {
                 buffering.writeToParcel(reply);

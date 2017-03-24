@@ -61,7 +61,7 @@ public:
     virtual status_t        setDataSource(const sp<IDataSource>& source) = 0;
     virtual status_t        setVideoSurfaceTexture(
                                     const sp<IGraphicBufferProducer>& bufferProducer) = 0;
-    virtual status_t        getDefaultBufferingSettings(
+    virtual status_t        getBufferingSettings(
                                     BufferingSettings* buffering /* nonnull */) = 0;
     virtual status_t        setBufferingSettings(const BufferingSettings& buffering) = 0;
     virtual status_t        prepareAsync() = 0;
