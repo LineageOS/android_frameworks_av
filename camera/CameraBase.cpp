@@ -56,17 +56,19 @@ status_t CameraInfo::readFromParcel(const android::Parcel* parcel) {
 }
 
 status_t CameraStatus::writeToParcel(android::Parcel* parcel) const {
-    status_t res;
-    res = parcel->writeString8(cameraId);
+    auto res = parcel->writeString16(String16(cameraId));
     if (res != OK) return res;
+
     res = parcel->writeInt32(status);
     return res;
 }
 
 status_t CameraStatus::readFromParcel(const android::Parcel* parcel) {
-    status_t res;
-    res = parcel->readString8(&cameraId);
+    String16 tempCameraId;
+    auto res = parcel->readString16(&tempCameraId);
     if (res != OK) return res;
+    cameraId = String8(tempCameraId);
+
     res = parcel->readInt32(&status);
     return res;
 }
