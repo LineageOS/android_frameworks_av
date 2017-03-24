@@ -58,9 +58,8 @@ AudioFlinger::EffectModule::EffectModule(ThreadBase *thread,
                                         const wp<AudioFlinger::EffectChain>& chain,
                                         effect_descriptor_t *desc,
                                         int id,
-                                        int sessionId,
-                                        bool pinned)
-    : mPinned(pinned),
+                                        int sessionId)
+    : mPinned(sessionId > AUDIO_SESSION_OUTPUT_MIX),
       mThread(thread), mChain(chain), mId(id), mSessionId(sessionId),
       mDescriptor(*desc),
       // mConfig is set by configure() and not used before then
@@ -74,7 +73,7 @@ AudioFlinger::EffectModule::EffectModule(ThreadBase *thread,
       mSuspended(false)
 #endif
 {
-    ALOGV("Constructor %p pinned %d", this, pinned);
+    ALOGV("Constructor %p", this);
     int lStatus;
 
     // create effect engine from effect factory
@@ -89,8 +88,6 @@ AudioFlinger::EffectModule::EffectModule(ThreadBase *thread,
         goto Error;
     }
 
-    setOffloaded(thread->type() == ThreadBase::OFFLOAD, thread->id());
-
     ALOGV("Constructor success name %s, Interface %p", mDescriptor.name, mEffectInterface);
     return;
 Error:
@@ -103,8 +100,9 @@ AudioFlinger::EffectModule::~EffectModule()
 {
     ALOGV("Destructor %p", this);
     if (mEffectInterface != NULL) {
-        ALOGW("EffectModule %p destructor called with unreleased interface", this);
-        release_l();
+        remove_effect_from_hal_l();
+        // release effect engine
+        EffectRelease(mEffectInterface);
     }
 }
 
@@ -119,7 +117,7 @@ status_t AudioFlinger::EffectModule::addHandle(EffectHandle *handle)
     size_t i;
     for (i = 0; i < size; i++) {
         EffectHandle *h = mHandles[i];
-        if (h == NULL || h->disconnected()) {
+        if (h == NULL || h->destroyed_l()) {
             continue;
         }
         // first non destroyed handle is considered in control
@@ -146,14 +144,9 @@ status_t AudioFlinger::EffectModule::addHandle(EffectHandle *handle)
     return status;
 }
 
-ssize_t AudioFlinger::EffectModule::removeHandle(EffectHandle *handle)
+size_t AudioFlinger::EffectModule::removeHandle(EffectHandle *handle)
 {
     Mutex::Autolock _l(mLock);
-    return removeHandle_l(handle);
-}
-
-ssize_t AudioFlinger::EffectModule::removeHandle_l(EffectHandle *handle)
-{
     size_t size = mHandles.size();
     size_t i;
     for (i = 0; i < size; i++) {
@@ -162,10 +155,9 @@ ssize_t AudioFlinger::EffectModule::removeHandle_l(EffectHandle *handle)
         }
     }
     if (i == size) {
-        ALOGW("%s %p handle not found %p", __FUNCTION__, this, handle);
-        return BAD_VALUE;
+        return size;
     }
-    ALOGV("removeHandle_l() %p removed handle %p in position %d", this, handle, i);
+    ALOGV("removeHandle() %p removed handle %p in position %d", this, handle, i);
 
     mHandles.removeAt(i);
     // if removed from first place, move effect control from this handle to next in line
@@ -192,7 +184,7 @@ AudioFlinger::EffectHandle *AudioFlinger::EffectModule::controlHandle_l()
     // the first valid handle in the list has control over the module
     for (size_t i = 0; i < mHandles.size(); i++) {
         EffectHandle *h = mHandles[i];
-        if (h != NULL && !h->disconnected()) {
+        if (h != NULL && !h->destroyed_l()) {
             return h;
         }
     }
@@ -200,7 +192,7 @@ AudioFlinger::EffectHandle *AudioFlinger::EffectModule::controlHandle_l()
     return NULL;
 }
 
-ssize_t AudioFlinger::EffectModule::disconnectHandle(EffectHandle *handle, bool unpinIfLast)
+size_t AudioFlinger::EffectModule::disconnect(EffectHandle *handle, bool unpinIfLast)
 {
     ALOGV("disconnect() %p handle %p", this, handle);
     // keep a strong reference on this EffectModule to avoid calling the
@@ -552,17 +544,6 @@ status_t AudioFlinger::EffectModule::stop_l()
     return status;
 }
 
-// must be called with EffectChain::mLock held
-void AudioFlinger::EffectModule::release_l()
-{
-    if (mEffectInterface != NULL) {
-        remove_effect_from_hal_l();
-        // release effect engine
-        EffectRelease(mEffectInterface);
-        mEffectInterface = NULL;
-    }
-}
-
 status_t AudioFlinger::EffectModule::remove_effect_from_hal_l()
 {
     if ((mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_PRE_PROC ||
@@ -655,7 +636,7 @@ status_t AudioFlinger::EffectModule::command(uint32_t cmdCode,
         uint32_t size = (replySize == NULL) ? 0 : *replySize;
         for (size_t i = 1; i < mHandles.size(); i++) {
             EffectHandle *h = mHandles[i];
-            if (h != NULL && !h->disconnected()) {
+            if (h != NULL && !h->destroyed_l()) {
                 h->commandExecuted(cmdCode, cmdSize, pCmdData, size, pReplyData);
             }
         }
@@ -713,7 +694,7 @@ status_t AudioFlinger::EffectModule::setEnabled_l(bool enabled)
         }
         for (size_t i = 1; i < mHandles.size(); i++) {
             EffectHandle *h = mHandles[i];
-            if (h != NULL && !h->disconnected()) {
+            if (h != NULL && !h->destroyed_l()) {
                 h->setEnabled(enabled);
             }
         }
@@ -895,7 +876,8 @@ bool AudioFlinger::EffectModule::purgeHandles()
     Mutex::Autolock _l(mLock);
     for (size_t i = 0; i < mHandles.size(); i++) {
         EffectHandle *handle = mHandles[i];
-        if (handle != NULL && !handle->disconnected()) {
+        if (handle != NULL && !handle->destroyed_l()) {
+            handle->effect().clear();
             if (handle->hasControl()) {
                 enabled = handle->enabled();
             }
@@ -1014,7 +996,7 @@ void AudioFlinger::EffectModule::dump(int fd, const Vector<String16>& args)
     result.append("\t\t\tPid   Priority Ctrl Locked client server\n");
     for (size_t i = 0; i < mHandles.size(); ++i) {
         EffectHandle *handle = mHandles[i];
-        if (handle != NULL && !handle->disconnected()) {
+        if (handle != NULL && !handle->destroyed_l()) {
             handle->dump(buffer, SIZE);
             result.append(buffer);
         }
@@ -1042,7 +1024,7 @@ AudioFlinger::EffectHandle::EffectHandle(const sp<EffectModule>& effect,
                                         int32_t priority)
     : BnEffect(),
     mEffect(effect), mEffectClient(effectClient), mClient(client), mCblk(NULL),
-    mPriority(priority), mHasControl(false), mEnabled(false), mDisconnected(false)
+    mPriority(priority), mHasControl(false), mEnabled(false), mDestroyed(false)
 {
     ALOGV("constructor %p", this);
 
@@ -1068,19 +1050,25 @@ AudioFlinger::EffectHandle::EffectHandle(const sp<EffectModule>& effect,
 AudioFlinger::EffectHandle::~EffectHandle()
 {
     ALOGV("Destructor %p", this);
+
+    if (mEffect == 0) {
+        mDestroyed = true;
+        return;
+    }
+    mEffect->lock();
+    mDestroyed = true;
+    mEffect->unlock();
     disconnect(false);
 }
 
 status_t AudioFlinger::EffectHandle::enable()
 {
-    AutoMutex _l(mLock);
     ALOGV("enable %p", this);
-    sp<EffectModule> effect = mEffect.promote();
-    if (effect == 0 || mDisconnected) {
-        return DEAD_OBJECT;
-    }
     if (!mHasControl) {
         return INVALID_OPERATION;
+    }
+    if (mEffect == 0) {
+        return DEAD_OBJECT;
     }
 
     if (mEnabled) {
@@ -1089,20 +1077,20 @@ status_t AudioFlinger::EffectHandle::enable()
 
     mEnabled = true;
 
-    sp<ThreadBase> thread = effect->thread().promote();
+    sp<ThreadBase> thread = mEffect->thread().promote();
     if (thread != 0) {
-        thread->checkSuspendOnEffectEnabled(effect, true, effect->sessionId());
+        thread->checkSuspendOnEffectEnabled(mEffect, true, mEffect->sessionId());
     }
 
     // checkSuspendOnEffectEnabled() can suspend this same effect when enabled
-    if (effect->suspended()) {
+    if (mEffect->suspended()) {
         return NO_ERROR;
     }
 
-    status_t status = effect->setEnabled(true);
+    status_t status = mEffect->setEnabled(true);
     if (status != NO_ERROR) {
         if (thread != 0) {
-            thread->checkSuspendOnEffectEnabled(effect, false, effect->sessionId());
+            thread->checkSuspendOnEffectEnabled(mEffect, false, mEffect->sessionId());
         }
         mEnabled = false;
     } else {
@@ -1112,12 +1100,12 @@ status_t AudioFlinger::EffectHandle::enable()
                 Mutex::Autolock _l(t->mLock);
                 t->broadcast_l();
             }
-            if (!effect->isOffloadable()) {
+            if (!mEffect->isOffloadable()) {
                 if (thread->type() == ThreadBase::OFFLOAD) {
                     PlaybackThread *t = (PlaybackThread *)thread.get();
                     t->invalidateTracks(AUDIO_STREAM_MUSIC);
                 }
-                if (effect->sessionId() == AUDIO_SESSION_OUTPUT_MIX) {
+                if (mEffect->sessionId() == AUDIO_SESSION_OUTPUT_MIX) {
                     thread->mAudioFlinger->onNonOffloadableGlobalEffectEnable();
                 }
             }
@@ -1129,13 +1117,11 @@ status_t AudioFlinger::EffectHandle::enable()
 status_t AudioFlinger::EffectHandle::disable()
 {
     ALOGV("disable %p", this);
-    AutoMutex _l(mLock);
-    sp<EffectModule> effect = mEffect.promote();
-    if (effect == 0 || mDisconnected) {
-        return DEAD_OBJECT;
-    }
     if (!mHasControl) {
         return INVALID_OPERATION;
+    }
+    if (mEffect == 0) {
+        return DEAD_OBJECT;
     }
 
     if (!mEnabled) {
@@ -1143,15 +1129,15 @@ status_t AudioFlinger::EffectHandle::disable()
     }
     mEnabled = false;
 
-    if (effect->suspended()) {
+    if (mEffect->suspended()) {
         return NO_ERROR;
     }
 
-    status_t status = effect->setEnabled(false);
+    status_t status = mEffect->setEnabled(false);
 
-    sp<ThreadBase> thread = effect->thread().promote();
+    sp<ThreadBase> thread = mEffect->thread().promote();
     if (thread != 0) {
-        thread->checkSuspendOnEffectEnabled(effect, false, effect->sessionId());
+        thread->checkSuspendOnEffectEnabled(mEffect, false, mEffect->sessionId());
         if (thread->type() == ThreadBase::OFFLOAD) {
             PlaybackThread *t = (PlaybackThread *)thread.get();
             Mutex::Autolock _l(t->mLock);
@@ -1164,39 +1150,25 @@ status_t AudioFlinger::EffectHandle::disable()
 
 void AudioFlinger::EffectHandle::disconnect()
 {
-    ALOGV("%s %p", __FUNCTION__, this);
     disconnect(true);
 }
 
 void AudioFlinger::EffectHandle::disconnect(bool unpinIfLast)
 {
-    AutoMutex _l(mLock);
-    ALOGV("disconnect(%s) %p", unpinIfLast ? "true" : "false", this);
-    if (mDisconnected) {
-        if (unpinIfLast) {
-            android_errorWriteLog(0x534e4554, "32707507");
-        }
+    ALOGV("disconnect(%s)", unpinIfLast ? "true" : "false");
+    if (mEffect == 0) {
         return;
     }
-    mDisconnected = true;
-    sp<ThreadBase> thread;
-    {
-        sp<EffectModule> effect = mEffect.promote();
-        if (effect != 0) {
-            thread = effect->thread().promote();
-        }
-    }
-    if (thread != 0) {
-        thread->disconnectEffectHandle(this, unpinIfLast);
-    } else {
-        ALOGW("%s Effect handle %p disconnected after thread destruction", __FUNCTION__, this);
-        // try to cleanup as much as we can
-        sp<EffectModule> effect = mEffect.promote();
-        if (effect != 0) {
-            effect->disconnectHandle(this, unpinIfLast);
+    // restore suspended effects if the disconnected handle was enabled and the last one.
+    if ((mEffect->disconnect(this, unpinIfLast) == 0) && mEnabled) {
+        sp<ThreadBase> thread = mEffect->thread().promote();
+        if (thread != 0) {
+            thread->checkSuspendOnEffectEnabled(mEffect, false, mEffect->sessionId());
         }
     }
 
+    // release sp on module => module destructor can be called now
+    mEffect.clear();
     if (mClient != 0) {
         if (mCblk != NULL) {
             // unlike ~TrackBase(), mCblk is never a local new, so don't delete
@@ -1216,16 +1188,14 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
                                              void *pReplyData)
 {
     ALOGVV("command(), cmdCode: %d, mHasControl: %d, mEffect: %p",
-            cmdCode, mHasControl, mEffect.unsafe_get());
+            cmdCode, mHasControl, (mEffect == 0) ? 0 : mEffect.get());
 
-    AutoMutex _l(mLock);
-    sp<EffectModule> effect = mEffect.promote();
-    if (effect == 0 || mDisconnected) {
-        return DEAD_OBJECT;
-    }
     // only get parameter command is permitted for applications not controlling the effect
     if (!mHasControl && cmdCode != EFFECT_CMD_GET_PARAM) {
         return INVALID_OPERATION;
+    }
+    if (mEffect == 0) {
+        return DEAD_OBJECT;
     }
     if (mClient == 0) {
         return INVALID_OPERATION;
@@ -1271,7 +1241,7 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
 
             int reply = 0;
             uint32_t rsize = sizeof(reply);
-            status_t ret = effect->command(EFFECT_CMD_SET_PARAM,
+            status_t ret = mEffect->command(EFFECT_CMD_SET_PARAM,
                                             size,
                                             param,
                                             &rsize,
@@ -1309,7 +1279,7 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
     }
 
 #ifdef QCOM_DIRECTTRACK
-    if(effect->isOnLPA() &&
+    if(mEffect->isOnLPA() &&
        ((cmdCode == EFFECT_CMD_SET_PARAM) || (cmdCode == EFFECT_CMD_SET_PARAM_DEFERRED) ||
         (cmdCode == EFFECT_CMD_SET_PARAM_COMMIT) || (cmdCode == EFFECT_CMD_SET_DEVICE) ||
         (cmdCode == EFFECT_CMD_SET_VOLUME) || (cmdCode == EFFECT_CMD_SET_AUDIO_MODE)) ) {
@@ -1319,7 +1289,7 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
         mClient->audioFlinger()->audioConfigChanged_l(AudioSystem::EFFECT_CONFIG_CHANGED, 0, NULL);
     }
 #endif
-    return effect->command(cmdCode, cmdSize, pCmdData, replySize, pReplyData);
+    return mEffect->command(cmdCode, cmdSize, pCmdData, replySize, pReplyData);
 }
 
 void AudioFlinger::EffectHandle::setControl(bool hasControl, bool signal, bool enabled)
@@ -1405,6 +1375,7 @@ AudioFlinger::EffectChain::~EffectChain()
     if (mOwnInBuffer) {
         delete mInBuffer;
     }
+
 }
 
 // getEffectFromDesc_l() must be called with ThreadBase::mLock held
@@ -1528,38 +1499,13 @@ void AudioFlinger::EffectChain::process_l()
     }
 }
 
-// createEffect_l() must be called with ThreadBase::mLock held
-status_t AudioFlinger::EffectChain::createEffect_l(sp<EffectModule>& effect,
-                                                   ThreadBase *thread,
-                                                   effect_descriptor_t *desc,
-                                                   int id,
-                                                   int sessionId,
-                                                   bool pinned)
-{
-    Mutex::Autolock _l(mLock);
-    effect = new EffectModule(thread, this, desc, id, sessionId, pinned);
-    status_t lStatus = effect->status();
-    if (lStatus == NO_ERROR) {
-        lStatus = addEffect_ll(effect);
-    }
-    if (lStatus != NO_ERROR) {
-        effect.clear();
-    }
-    return lStatus;
-}
-
-// addEffect_l() must be called with ThreadBase::mLock held
+// addEffect_l() must be called with PlaybackThread::mLock held
 status_t AudioFlinger::EffectChain::addEffect_l(const sp<EffectModule>& effect)
-{
-    Mutex::Autolock _l(mLock);
-    return addEffect_ll(effect);
-}
-// addEffect_l() must be called with ThreadBase::mLock and EffectChain::mLock held
-status_t AudioFlinger::EffectChain::addEffect_ll(const sp<EffectModule>& effect)
 {
     effect_descriptor_t desc = effect->desc();
     uint32_t insertPref = desc.flags & EFFECT_FLAG_INSERT_MASK;
 
+    Mutex::Autolock _l(mLock);
     effect->setChain(this);
     sp<ThreadBase> thread = mThread.promote();
     if (thread == 0) {
@@ -1669,9 +1615,8 @@ status_t AudioFlinger::EffectChain::addEffect_ll(const sp<EffectModule>& effect)
     return NO_ERROR;
 }
 
-// removeEffect_l() must be called with ThreadBase::mLock held
-size_t AudioFlinger::EffectChain::removeEffect_l(const sp<EffectModule>& effect,
-                                                 bool release)
+// removeEffect_l() must be called with PlaybackThread::mLock held
+size_t AudioFlinger::EffectChain::removeEffect_l(const sp<EffectModule>& effect)
 {
     Mutex::Autolock _l(mLock);
     size_t size = mEffects.size();
@@ -1686,10 +1631,6 @@ size_t AudioFlinger::EffectChain::removeEffect_l(const sp<EffectModule>& effect,
                     mEffects[i]->state() == EffectModule::STOPPING) {
                 mEffects[i]->stop();
             }
-            if (release) {
-                mEffects[i]->release_l();
-            }
-
             if (type == EFFECT_FLAG_TYPE_AUXILIARY) {
                 delete[] effect->inBuffer();
             } else {
@@ -1701,7 +1642,6 @@ size_t AudioFlinger::EffectChain::removeEffect_l(const sp<EffectModule>& effect,
             mEffects.removeAt(i);
             ALOGV("removeEffect_l() effect %p, removed from chain %p at rank %d", effect.get(),
                     this, i);
-
             break;
         }
     }
@@ -1709,7 +1649,7 @@ size_t AudioFlinger::EffectChain::removeEffect_l(const sp<EffectModule>& effect,
     return mEffects.size();
 }
 
-// setDevice_l() must be called with ThreadBase::mLock held
+// setDevice_l() must be called with PlaybackThread::mLock held
 void AudioFlinger::EffectChain::setDevice_l(audio_devices_t device)
 {
     size_t size = mEffects.size();
@@ -1718,7 +1658,7 @@ void AudioFlinger::EffectChain::setDevice_l(audio_devices_t device)
     }
 }
 
-// setMode_l() must be called with ThreadBase::mLock held
+// setMode_l() must be called with PlaybackThread::mLock held
 void AudioFlinger::EffectChain::setMode_l(audio_mode_t mode)
 {
     size_t size = mEffects.size();
@@ -1727,7 +1667,7 @@ void AudioFlinger::EffectChain::setMode_l(audio_mode_t mode)
     }
 }
 
-// setAudioSource_l() must be called with ThreadBase::mLock held
+// setAudioSource_l() must be called with PlaybackThread::mLock held
 void AudioFlinger::EffectChain::setAudioSource_l(audio_source_t source)
 {
     size_t size = mEffects.size();
@@ -1736,7 +1676,7 @@ void AudioFlinger::EffectChain::setAudioSource_l(audio_source_t source)
     }
 }
 
-// setVolume_l() must be called with ThreadBase::mLock or EffectChain::mLock held
+// setVolume_l() must be called with PlaybackThread::mLock held
 bool AudioFlinger::EffectChain::setVolume_l(uint32_t *left, uint32_t *right)
 {
     uint32_t newLeft = *left;
@@ -1874,7 +1814,7 @@ void AudioFlinger::EffectChain::setEffectSuspended_l(
                     effect->setSuspended(false);
                     effect->lock();
                     EffectHandle *handle = effect->controlHandle_l();
-                    if (handle != NULL && !handle->disconnected()) {
+                    if (handle != NULL && !handle->destroyed_l()) {
                         effect->setEnabled_l(handle->enabled());
                     }
                     effect->unlock();
