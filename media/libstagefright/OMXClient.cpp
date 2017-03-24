@@ -37,6 +37,10 @@ namespace android {
 OMXClient::OMXClient() {
 }
 
+status_t OMXClient::connect() {
+    return connect(nullptr);
+}
+
 status_t OMXClient::connect(bool* trebleFlag) {
     int32_t trebleOmx = property_get_int32("persist.media.treble_omx", -1);
     if ((trebleOmx == 1) || ((trebleOmx == -1) &&
