@@ -577,7 +577,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueScrambledAccessUnit() {
     // fill in CryptoInfo fields for AnotherPacketSource::read()
     // MediaCas doesn't use cryptoMode, but set to non-zero value here.
     scrambledAccessUnit->meta()->setInt32(
-            "cryptoMode", CryptoPlugin::kMode_AES_CBC);
+            "cryptoMode", CryptoPlugin::kMode_AES_CTR);
     scrambledAccessUnit->meta()->setInt32("cryptoKey", keyId);
     scrambledAccessUnit->meta()->setBuffer("clearBytes", clearSizes);
     scrambledAccessUnit->meta()->setBuffer("encBytes", encSizes);
