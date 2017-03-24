@@ -246,10 +246,10 @@ bool AMessage::findAsInt64(const char *name, int64_t *value) const {
         const Item *item = &mItems[i];
         switch (item->mType) {
             case kTypeInt64:
-                *value = (float)item->u.int64Value;
+                *value = item->u.int64Value;
                 return true;
             case kTypeInt32:
-                *value = (float)item->u.int32Value;
+                *value = item->u.int32Value;
                 return true;
             default:
                 return false;
