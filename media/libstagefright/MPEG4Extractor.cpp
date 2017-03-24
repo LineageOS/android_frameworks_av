@@ -3943,7 +3943,8 @@ status_t MPEG4Source::parseChunk(off64_t *offset) {
 
                 while (true) {
                     if (mDataSource->readAt(*offset, hdr, 8) < 8) {
-                        return ERROR_END_OF_STREAM;
+                        // no more box to the end of file.
+                        break;
                     }
                     chunk_size = ntohl(hdr[0]);
                     chunk_type = ntohl(hdr[1]);
