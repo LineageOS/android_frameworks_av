@@ -18,6 +18,7 @@
 #define ANDROID_SERVERS_CAMERA_CAMERAPROVIDER_H
 
 #include <vector>
+#include <set>
 #include <string>
 #include <mutex>
 
@@ -133,6 +134,8 @@ public:
 
     std::vector<std::string> getCameraDeviceIds() const;
 
+    std::vector<std::string> getStandardCameraDeviceIds() const;
+
     /**
      * Return true if a device with a given ID and major version exists
      */
@@ -170,8 +173,14 @@ public:
             hardware::hidl_version *v);
 
     /**
+     * Check if a given camera device support setTorchMode API.
+     */
+    bool supportSetTorchMode(const std::string &id);
+
+    /**
      * Turn on or off the flashlight on a given camera device.
-     * May fail if the device is in active use, or if the device doesn't exist, etc.
+     * May fail if the device does not support this API, is in active use, or if the device
+     * doesn't exist, etc.
      */
     status_t setTorchMode(const std::string &id, bool enabled);
 
@@ -292,6 +301,7 @@ private:
             static status_t setTorchMode(InterfaceT& interface, bool enabled);
         };
         std::vector<std::unique_ptr<DeviceInfo>> mDevices;
+        std::set<std::string> mUniqueCameraIds;
         int mUniqueDeviceCount;
 
         // HALv1-specific camera fields, including the actual device interface

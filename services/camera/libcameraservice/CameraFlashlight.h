@@ -92,6 +92,12 @@ class CameraFlashlight : public virtual VirtualLightRefBase {
         // mLock should be locked.
         bool hasFlashUnitLocked(const String8& cameraId);
 
+        // Check if flash control is in backward compatible mode (simulated torch API by
+        // opening cameras)
+        bool isBackwardCompatibleMode(const String8& cameraId);
+
+        int getNumberOfCameras();
+
         sp<FlashControlBase> mFlashControl;
 
         CameraModule *mCameraModule;
@@ -202,7 +208,11 @@ class CameraDeviceClientFlashControl : public FlashControlBase {
  */
 class CameraHardwareInterfaceFlashControl : public FlashControlBase {
     public:
-        CameraHardwareInterfaceFlashControl(CameraModule& cameraModule,
+        CameraHardwareInterfaceFlashControl(
+                CameraModule* cameraModule,
+                const camera_module_callbacks_t& callbacks);
+        CameraHardwareInterfaceFlashControl(
+                sp<CameraProviderManager> manager,
                 const camera_module_callbacks_t& callbacks);
         virtual ~CameraHardwareInterfaceFlashControl();
 
@@ -235,6 +245,7 @@ class CameraHardwareInterfaceFlashControl : public FlashControlBase {
         status_t hasFlashUnitLocked(const String8& cameraId, bool *hasFlash, bool keepDeviceOpen);
 
         CameraModule *mCameraModule;
+        sp<CameraProviderManager> mProviderManager;
         const camera_module_callbacks_t *mCallbacks;
         sp<CameraHardwareInterface> mDevice;
         String8 mCameraId;
