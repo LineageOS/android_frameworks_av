@@ -699,17 +699,29 @@ void AudioFlinger::ThreadBase::processConfigEvents_l()
             SetParameterConfigEventData *data = (SetParameterConfigEventData *)event->mData.get();
             if (checkForNewParameter_l(data->mKeyValuePairs, event->mStatus)) {
                 configChanged = true;
+                mLocalLog.log("CFG_EVENT_SET_PARAMETER: (%s) configuration changed",
+                        data->mKeyValuePairs.string());
             }
         } break;
         case CFG_EVENT_CREATE_AUDIO_PATCH: {
+            const audio_devices_t oldDevice = getDevice();
             CreateAudioPatchConfigEventData *data =
                                             (CreateAudioPatchConfigEventData *)event->mData.get();
             event->mStatus = createAudioPatch_l(&data->mPatch, &data->mHandle);
+            const audio_devices_t newDevice = getDevice();
+            mLocalLog.log("CFG_EVENT_CREATE_AUDIO_PATCH: old device %#x (%s) new device %#x (%s)",
+                    (unsigned)oldDevice, devicesToString(oldDevice).c_str(),
+                    (unsigned)newDevice, devicesToString(newDevice).c_str());
         } break;
         case CFG_EVENT_RELEASE_AUDIO_PATCH: {
+            const audio_devices_t oldDevice = getDevice();
             ReleaseAudioPatchConfigEventData *data =
                                             (ReleaseAudioPatchConfigEventData *)event->mData.get();
             event->mStatus = releaseAudioPatch_l(data->mHandle);
+            const audio_devices_t newDevice = getDevice();
+            mLocalLog.log("CFG_EVENT_RELEASE_AUDIO_PATCH: old device %#x (%s) new device %#x (%s)",
+                    (unsigned)oldDevice, devicesToString(oldDevice).c_str(),
+                    (unsigned)newDevice, devicesToString(newDevice).c_str());
         } break;
         default:
             ALOG_ASSERT(false, "processConfigEvents_l() unknown event type %d", event->mType);
@@ -826,6 +838,7 @@ void AudioFlinger::ThreadBase::dumpBase(int fd, const Vector<String16>& args __u
     } else {
         dprintf(fd, " none\n");
     }
+    // Note: output device may be used by capture threads for effects such as AEC.
     dprintf(fd, "  Output device: %#x (%s)\n", mOutDevice, devicesToString(mOutDevice).c_str());
     dprintf(fd, "  Input device: %#x (%s)\n", mInDevice, devicesToString(mInDevice).c_str());
     dprintf(fd, "  Audio source: %d (%s)\n", mAudioSource, sourceToString(mAudioSource));
@@ -1694,7 +1707,8 @@ void AudioFlinger::PlaybackThread::dump(int fd, const Vector<String16>& args)
     dumpInternals(fd, args);
     dumpTracks(fd, args);
     dumpEffectChains(fd, args);
-    mLocalLog.dump(fd, args, "  " /* prefix */);
+    dprintf(fd, "  Local log:\n");
+    mLocalLog.dump(fd, "   " /* prefix */, 40 /* lines */);
 }
 
 void AudioFlinger::PlaybackThread::dumpTracks(int fd, const Vector<String16>& args __unused)

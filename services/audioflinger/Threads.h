@@ -288,6 +288,9 @@ public:
                 bool        standby() const { return mStandby; }
                 audio_devices_t outDevice() const { return mOutDevice; }
                 audio_devices_t inDevice() const { return mInDevice; }
+                audio_devices_t getDevice() const { return isOutput() ? mOutDevice : mInDevice; }
+
+    virtual     bool        isOutput() const = 0;
 
     virtual     sp<StreamHalInterface> stream() const = 0;
 
@@ -575,6 +578,8 @@ protected:
                     int                 mLastActiveTracksGeneration;
                     wp<T>               mLatestActiveTrack; // latest track added to ActiveTracks
                 };
+
+                SimpleLog mLocalLog;
 };
 
 class VolumeInterface {
@@ -759,6 +764,8 @@ public:
 
                 // Return the asynchronous signal wait time.
     virtual     int64_t     computeWaitTimeNs_l() const { return INT64_MAX; }
+
+    virtual     bool        isOutput() const override { return true; }
 
 protected:
     // updated by readOutputParameters_l()
@@ -971,80 +978,6 @@ private:
     static const size_t     kFastMixerLogSize = 4 * 1024;
     sp<NBLog::Writer>       mFastMixerNBLogWriter;
 
-    // Do not call from a sched_fifo thread as it uses a system time call
-    // and obtains a local mutex.
-    class LocalLog {
-    public:
-        void log(const char *fmt, ...) {
-            va_list val;
-            va_start(val, fmt);
-
-            // format to buffer
-            char buffer[512];
-            int length = vsnprintf(buffer, sizeof(buffer), fmt, val);
-            if (length >= (signed)sizeof(buffer)) {
-                length = sizeof(buffer) - 1;
-            }
-
-            // strip out trailing newline
-            while (length > 0 && buffer[length - 1] == '\n') {
-                buffer[--length] = 0;
-            }
-
-            // store in circular array
-            AutoMutex _l(mLock);
-            mLog.emplace_back(
-                    std::make_pair(systemTime(SYSTEM_TIME_REALTIME), std::string(buffer)));
-            if (mLog.size() > kLogSize) {
-                mLog.pop_front();
-            }
-
-            va_end(val);
-        }
-
-        void dump(int fd, const Vector<String16>& args, const char *prefix = "") {
-            if (!AudioFlinger::dumpTryLock(mLock)) return; // a local lock, shouldn't happen
-            if (mLog.size() > 0) {
-                bool dumpAll = false;
-                for (const auto &arg : args) {
-                    if (arg == String16("--locallog")) {
-                        dumpAll = true;
-                    }
-                }
-
-                dprintf(fd, "Local Log:\n");
-                auto it = mLog.begin();
-                if (!dumpAll) {
-                    const size_t lines =
-                            (size_t)property_get_int32("audio.locallog.lines", kLogPrint);
-                    if (mLog.size() > lines) {
-                        it += (mLog.size() - lines);
-                    }
-                }
-                for (; it != mLog.end(); ++it) {
-                    const int64_t ns = it->first;
-                    const int ns_per_sec = 1000000000;
-                    const time_t sec = ns / ns_per_sec;
-                    struct tm tm;
-                    localtime_r(&sec, &tm);
-
-                    dprintf(fd, "%s%02d-%02d %02d:%02d:%02d.%03d %s\n",
-                            prefix,
-                            tm.tm_mon + 1, // localtime_r uses months in 0 - 11 range
-                            tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
-                            (int)(ns % ns_per_sec / 1000000),
-                            it->second.c_str());
-                }
-            }
-            mLock.unlock();
-        }
-
-    private:
-        Mutex mLock;
-        static const size_t kLogSize = 256; // full history
-        static const size_t kLogPrint = 32; // default print history
-        std::deque<std::pair<int64_t, std::string>> mLog;
-    } mLocalLog;
 
 public:
     virtual     bool        hasFastMixer() const = 0;
@@ -1446,6 +1379,7 @@ public:
                             ThreadBase::acquireWakeLock_l();
                             mActiveTracks.updatePowerState(this, true /* force */);
                         }
+    virtual bool        isOutput() const override { return false; }
 
 private:
             // Enter standby if not already in standby, and set mStandby flag
@@ -1587,8 +1521,6 @@ class MmapThread : public ThreadBase
     virtual     void        dumpInternals(int fd, const Vector<String16>& args);
                 void        dumpTracks(int fd, const Vector<String16>& args);
 
-    virtual     bool        isOutput() const = 0;
-
  protected:
 
                 audio_attributes_t      mAttr;
@@ -1636,7 +1568,7 @@ public:
 
     virtual     void        dumpInternals(int fd, const Vector<String16>& args);
 
-    virtual     bool        isOutput() const { return true; }
+    virtual     bool        isOutput() const override { return true; }
 
 protected:
 
@@ -1660,7 +1592,7 @@ public:
 
                 AudioStreamIn* clearInput();
 
-    virtual     bool           isOutput() const { return false; }
+    virtual     bool           isOutput() const override { return false; }
 
 protected:
 
