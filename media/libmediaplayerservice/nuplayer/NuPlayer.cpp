@@ -1535,8 +1535,6 @@ void NuPlayer::onPause() {
     if (driver != NULL) {
         int64_t now = systemTime();
         int64_t played = now - mLastStartedPlayingTimeNs;
-        ALOGD("played from %" PRId64 " to %" PRId64 " = %" PRId64 ,
-              mLastStartedPlayingTimeNs, now, played);
 
         driver->notifyMorePlayingTimeUs((played+500)/1000);
     }
