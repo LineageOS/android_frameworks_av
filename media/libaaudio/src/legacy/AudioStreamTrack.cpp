@@ -343,7 +343,7 @@ int32_t AudioStreamTrack::getXRunCount() const
 
 int32_t AudioStreamTrack::getFramesPerBurst() const
 {
-    return 192; // TODO add query to AudioTrack.cpp
+    return static_cast<int32_t>(mAudioTrack->getNotificationPeriodInFrames());
 }
 
 int64_t AudioStreamTrack::getFramesRead() {
