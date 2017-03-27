@@ -243,6 +243,13 @@ public:
             size_t      frameSize() const   { return mFrameSize; }
             audio_source_t inputSource() const  { return mAttributes.source; }
 
+    /*
+     * Return the period of the notification callback in frames.
+     * This value is set when the AudioRecord is constructed.
+     * It can be modified if the AudioRecord is rerouted.
+     */
+            uint32_t    getNotificationPeriodInFrames() const { return mNotificationFramesAct; }
+
     /* After it's created the track is not active. Call start() to
      * make it active. If set, the callback will start being called.
      * If event is not AudioSystem::SYNC_EVENT_NONE, the capture start will be delayed until

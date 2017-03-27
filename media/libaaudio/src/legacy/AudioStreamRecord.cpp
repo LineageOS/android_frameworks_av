@@ -221,7 +221,7 @@ int32_t AudioStreamRecord::getXRunCount() const
 
 int32_t AudioStreamRecord::getFramesPerBurst() const
 {
-    return 192; // TODO add query to AudioRecord.cpp
+    return static_cast<int32_t>(mAudioRecord->getNotificationPeriodInFrames());
 }
 
 // TODO implement getTimestamp
