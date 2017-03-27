@@ -2123,12 +2123,16 @@ status_t MPEG4Writer::Track::stop(bool stopSource) {
     if (mDone) {
         return OK;
     }
-    mDone = true;
+
     if (stopSource) {
         ALOGD("%s track source stopping", getTrackType());
         mSource->stop();
         ALOGD("%s track source stopped", getTrackType());
     }
+
+    // Set mDone to be true after sucessfully stop mSource as mSource may be still outputting
+    // buffers to the writer.
+    mDone = true;
 
     void *dummy;
     pthread_join(mThread, &dummy);
