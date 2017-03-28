@@ -55,13 +55,15 @@ struct CryptoHal : public BnCrypto {
 
     virtual ssize_t decrypt(const uint8_t key[16], const uint8_t iv[16],
             CryptoPlugin::Mode mode, const CryptoPlugin::Pattern &pattern,
-            const sp<IMemory> &source, size_t offset,
+            const ICrypto::SourceBuffer &source, size_t offset,
             const CryptoPlugin::SubSample *subSamples, size_t numSubSamples,
             const ICrypto::DestinationBuffer &destination,
             AString *errorDetailMsg);
 
-    virtual void setHeap(const sp<IMemoryHeap>& heap) { setHeapBase(heap); }
-    virtual void unsetHeap(const sp<IMemoryHeap>& heap) { clearHeapBase(heap); }
+    virtual int32_t setHeap(const sp<IMemoryHeap>& heap) {
+        return setHeapBase(heap);
+    }
+    virtual void unsetHeap(int32_t seqNum) { clearHeapBase(seqNum); }
 
 private:
     mutable Mutex mLock;
@@ -77,17 +79,18 @@ private:
      */
     status_t mInitCheck;
 
-    KeyedVector<void *, uint32_t> mHeapBases;
+    KeyedVector<int32_t, uint32_t> mHeapBases;
     uint32_t mNextBufferId;
+    int32_t mHeapSeqNum;
 
     Vector<sp<ICryptoFactory>> makeCryptoFactories();
     sp<ICryptoPlugin> makeCryptoPlugin(const sp<ICryptoFactory>& factory,
             const uint8_t uuid[16], const void *initData, size_t size);
 
-    void setHeapBase(const sp<IMemoryHeap>& heap);
-    void clearHeapBase(const sp<IMemoryHeap>& heap);
+    int32_t setHeapBase(const sp<IMemoryHeap>& heap);
+    void clearHeapBase(int32_t seqNum);
 
-    status_t toSharedBuffer(const sp<IMemory>& memory, ::SharedBuffer* buffer);
+    status_t toSharedBuffer(const sp<IMemory>& memory, int32_t seqNum, ::SharedBuffer* buffer);
 
     DISALLOW_EVIL_CONSTRUCTORS(CryptoHal);
 };

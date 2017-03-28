@@ -98,7 +98,7 @@ struct BpCrypto : public BpInterface<ICrypto> {
 
     virtual ssize_t decrypt(const uint8_t key[16], const uint8_t iv[16],
             CryptoPlugin::Mode mode, const CryptoPlugin::Pattern &pattern,
-            const sp<IMemory> &source, size_t offset,
+            const SourceBuffer &source, size_t offset,
             const CryptoPlugin::SubSample *subSamples, size_t numSubSamples,
             const DestinationBuffer &destination, AString *errorDetailMsg) {
         Parcel data, reply;
@@ -127,7 +127,8 @@ struct BpCrypto : public BpInterface<ICrypto> {
         }
 
         data.writeInt32(totalSize);
-        data.writeStrongBinder(IInterface::asBinder(source));
+        data.writeStrongBinder(IInterface::asBinder(source.mSharedMemory));
+        data.writeInt32(source.mHeapSeqNum);
         data.writeInt32(offset);
 
         data.writeInt32(numSubSamples);
@@ -179,18 +180,25 @@ struct BpCrypto : public BpInterface<ICrypto> {
         return reply.readInt32();
     }
 
-    virtual void setHeap(const sp<IMemoryHeap> &heap) {
+    virtual int32_t setHeap(const sp<IMemoryHeap> &heap) {
         Parcel data, reply;
         data.writeInterfaceToken(ICrypto::getInterfaceDescriptor());
         data.writeStrongBinder(IInterface::asBinder(heap));
-        remote()->transact(SET_HEAP, data, &reply);
-        return;
+        status_t err = remote()->transact(SET_HEAP, data, &reply);
+        if (err != NO_ERROR) {
+            return -1;
+        }
+        int32_t seqNum;
+        if (reply.readInt32(&seqNum) != NO_ERROR) {
+            return -1;
+        }
+        return seqNum;
     }
 
-    virtual void unsetHeap(const sp<IMemoryHeap>& heap) {
+    virtual void unsetHeap(int32_t seqNum) {
         Parcel data, reply;
         data.writeInterfaceToken(ICrypto::getInterfaceDescriptor());
-        data.writeStrongBinder(IInterface::asBinder(heap));
+        data.writeInt32(seqNum);
         remote()->transact(UNSET_HEAP, data, &reply);
         return;
     }
@@ -314,12 +322,17 @@ status_t BnCrypto::onTransact(
             data.read(iv, sizeof(iv));
 
             size_t totalSize = data.readInt32();
-            sp<IMemory> source =
+
+            SourceBuffer source;
+
+            source.mSharedMemory =
                 interface_cast<IMemory>(data.readStrongBinder());
-            if (source == NULL) {
+            if (source.mSharedMemory == NULL) {
                 reply->writeInt32(BAD_VALUE);
                 return OK;
             }
+            source.mHeapSeqNum = data.readInt32();
+
             int32_t offset = data.readInt32();
 
             int32_t numSubSamples = data.readInt32();
@@ -372,9 +385,9 @@ status_t BnCrypto::onTransact(
 
             if (overflow || sumSubsampleSizes != totalSize) {
                 result = -EINVAL;
-            } else if (totalSize > source->size()) {
+            } else if (totalSize > source.mSharedMemory->size()) {
                 result = -EINVAL;
-            } else if ((size_t)offset > source->size() - totalSize) {
+            } else if ((size_t)offset > source.mSharedMemory->size() - totalSize) {
                 result = -EINVAL;
             } else {
                 result = decrypt(key, iv, mode, pattern, source, offset,
@@ -428,16 +441,15 @@ status_t BnCrypto::onTransact(
             CHECK_INTERFACE(ICrypto, data, reply);
             sp<IMemoryHeap> heap =
                 interface_cast<IMemoryHeap>(data.readStrongBinder());
-            setHeap(heap);
+            reply->writeInt32(setHeap(heap));
             return OK;
         }
 
         case UNSET_HEAP:
         {
             CHECK_INTERFACE(ICrypto, data, reply);
-            sp<IMemoryHeap> heap =
-                interface_cast<IMemoryHeap>(data.readStrongBinder());
-            unsetHeap(heap);
+            int32_t seqNum = data.readInt32();
+            unsetHeap(seqNum);
             return OK;
         }
 

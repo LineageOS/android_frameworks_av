@@ -105,7 +105,8 @@ static String8 toString8(hidl_string hString) {
 CryptoHal::CryptoHal()
     : mFactories(makeCryptoFactories()),
       mInitCheck((mFactories.size() == 0) ? ERROR_UNSUPPORTED : NO_INIT),
-      mNextBufferId(0) {
+      mNextBufferId(0),
+      mHeapSeqNum(0) {
 }
 
 CryptoHal::~CryptoHal() {
@@ -225,30 +226,37 @@ bool CryptoHal::requiresSecureDecoderComponent(const char *mime) const {
  * size.  Once the heap base is established, shared memory buffers
  * are sent by providing an offset into the heap and a buffer size.
  */
-void CryptoHal::setHeapBase(const sp<IMemoryHeap>& heap) {
+int32_t CryptoHal::setHeapBase(const sp<IMemoryHeap>& heap) {
+    if (heap == NULL) {
+        ALOGE("setHeapBase(): heap is NULL");
+        return -1;
+    }
     native_handle_t* nativeHandle = native_handle_create(1, 0);
     if (!nativeHandle) {
         ALOGE("setHeapBase(), failed to create native handle");
-        return;
+        return -1;
     }
-    if (heap == NULL) {
-        ALOGE("setHeapBase(): heap is NULL");
-        return;
-    }
+
+    Mutex::Autolock autoLock(mLock);
+
+    int32_t seqNum = mHeapSeqNum++;
     int fd = heap->getHeapID();
     nativeHandle->data[0] = fd;
     auto hidlHandle = hidl_handle(nativeHandle);
     auto hidlMemory = hidl_memory("ashmem", hidlHandle, heap->getSize());
-    mHeapBases.add(heap->getBase(), mNextBufferId);
+    mHeapBases.add(seqNum, mNextBufferId);
     Return<void> hResult = mPlugin->setSharedBufferBase(hidlMemory, mNextBufferId++);
     ALOGE_IF(!hResult.isOk(), "setSharedBufferBase(): remote call failed");
+    return seqNum;
 }
 
-void CryptoHal::clearHeapBase(const sp<IMemoryHeap>& heap) {
-    mHeapBases.removeItem(heap->getBase());
+void CryptoHal::clearHeapBase(int32_t seqNum) {
+    Mutex::Autolock autoLock(mLock);
+
+    mHeapBases.removeItem(seqNum);
 }
 
-status_t CryptoHal::toSharedBuffer(const sp<IMemory>& memory, ::SharedBuffer* buffer) {
+status_t CryptoHal::toSharedBuffer(const sp<IMemory>& memory, int32_t seqNum, ::SharedBuffer* buffer) {
     ssize_t offset;
     size_t size;
 
@@ -262,9 +270,9 @@ status_t CryptoHal::toSharedBuffer(const sp<IMemory>& memory, ::SharedBuffer* bu
     }
 
     // memory must be in the declared heap
-    CHECK(mHeapBases.indexOfKey(heap->getBase()) >= 0);
+    CHECK(mHeapBases.indexOfKey(seqNum) >= 0);
 
-    buffer->bufferId = mHeapBases.valueFor(heap->getBase());
+    buffer->bufferId = mHeapBases.valueFor(seqNum);
     buffer->offset = offset >= 0 ? offset : 0;
     buffer->size = size;
     return OK;
@@ -272,7 +280,7 @@ status_t CryptoHal::toSharedBuffer(const sp<IMemory>& memory, ::SharedBuffer* bu
 
 ssize_t CryptoHal::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
         CryptoPlugin::Mode mode, const CryptoPlugin::Pattern &pattern,
-        const sp<IMemory> &source, size_t offset,
+        const ICrypto::SourceBuffer &source, size_t offset,
         const CryptoPlugin::SubSample *subSamples, size_t numSubSamples,
         const ICrypto::DestinationBuffer &destination, AString *errorDetailMsg) {
     Mutex::Autolock autoLock(mLock);
@@ -312,11 +320,12 @@ ssize_t CryptoHal::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
     }
     auto hSubSamples = hidl_vec<SubSample>(stdSubSamples);
 
+    int32_t heapSeqNum = source.mHeapSeqNum;
     bool secure;
     ::DestinationBuffer hDestination;
     if (destination.mType == kDestinationTypeSharedMemory) {
         hDestination.type = BufferType::SHARED_MEMORY;
-        status_t status = toSharedBuffer(destination.mSharedMemory,
+        status_t status = toSharedBuffer(destination.mSharedMemory, heapSeqNum,
                 &hDestination.nonsecureMemory);
         if (status != OK) {
             return status;
@@ -329,7 +338,7 @@ ssize_t CryptoHal::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
     }
 
     ::SharedBuffer hSource;
-    status_t status = toSharedBuffer(source, &hSource);
+    status_t status = toSharedBuffer(source.mSharedMemory, heapSeqNum, &hSource);
     if (status != OK) {
         return status;
     }
