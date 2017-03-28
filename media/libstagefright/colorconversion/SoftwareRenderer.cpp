@@ -23,6 +23,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <system/window.h>
+#include <ui/Fence.h>
 #include <ui/GraphicBufferMapper.h>
 #include <ui/GraphicBuffer.h>
 #include <ui/Rect.h>
