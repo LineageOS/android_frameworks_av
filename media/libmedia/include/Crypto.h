@@ -55,6 +55,9 @@ struct Crypto : public BnCrypto {
             const CryptoPlugin::SubSample *subSamples, size_t numSubSamples,
             const DestinationBuffer &destination, AString *errorDetailMsg);
 
+    virtual void setHeap(const sp<IMemoryHeap>&) {}
+    virtual void unsetHeap(const sp<IMemoryHeap>&) {}
+
 private:
     mutable Mutex mLock;
 
