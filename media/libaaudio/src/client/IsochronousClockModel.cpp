@@ -19,7 +19,6 @@
 #include <utils/Log.h>
 
 #include <stdint.h>
-#include <aaudio/AAudioDefinitions.h>
 
 #include "utility/AudioClock.h"
 #include "IsochronousClockModel.h"

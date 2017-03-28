@@ -19,7 +19,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <aaudio/AAudioDefinitions.h>
 #include <aaudio/AAudio.h>
 #include "SineGenerator.h"
 
@@ -44,6 +43,7 @@ static const char *getSharingModeText(aaudio_sharing_mode_t mode) {
     return modeText;
 }
 
+// TODO move to a common utility library
 static int64_t getNanoseconds(clockid_t clockId = CLOCK_MONOTONIC) {
     struct timespec time;
     int result = clock_gettime(clockId, &time);
@@ -74,6 +74,8 @@ int main(int argc, char **argv)
     AAudioStream *aaudioStream = nullptr;
     aaudio_stream_state_t state = AAUDIO_STREAM_STATE_UNINITIALIZED;
     int32_t framesPerBurst = 0;
+    int32_t framesPerWrite = 0;
+    int32_t bufferCapacity = 0;
     int32_t framesToPlay = 0;
     int32_t framesLeft = 0;
     int32_t xRunCount = 0;
@@ -99,7 +101,6 @@ int main(int argc, char **argv)
     AAudioStreamBuilder_setSamplesPerFrame(aaudioBuilder, requestedSamplesPerFrame);
     AAudioStreamBuilder_setFormat(aaudioBuilder, requestedDataFormat);
     AAudioStreamBuilder_setSharingMode(aaudioBuilder, requestedSharingMode);
-
 
     // Create an AAudioStream using the Builder.
     result = AAudioStreamBuilder_openStream(aaudioBuilder, &aaudioStream);
@@ -129,21 +130,25 @@ int main(int argc, char **argv)
     // This is the number of frames that are read in one chunk by a DMA controller
     // or a DSP or a mixer.
     framesPerBurst = AAudioStream_getFramesPerBurst(aaudioStream);
-    printf("DataFormat: original framesPerBurst = %d\n",framesPerBurst);
+    printf("DataFormat: framesPerBurst = %d\n",framesPerBurst);
+    bufferCapacity = AAudioStream_getBufferCapacityInFrames(aaudioStream);
+    printf("DataFormat: bufferCapacity = %d, remainder = %d\n",
+           bufferCapacity, bufferCapacity % framesPerBurst);
 
     // Some DMA might use very short bursts of 16 frames. We don't need to write such small
     // buffers. But it helps to use a multiple of the burst size for predictable scheduling.
-    while (framesPerBurst < 48) {
-        framesPerBurst *= 2;
+    framesPerWrite = framesPerBurst;
+    while (framesPerWrite < 48) {
+        framesPerWrite *= 2;
     }
-    printf("DataFormat: final framesPerBurst = %d\n",framesPerBurst);
+    printf("DataFormat: framesPerWrite = %d\n",framesPerWrite);
 
     actualDataFormat = AAudioStream_getFormat(aaudioStream);
     printf("DataFormat: requested = %d, actual = %d\n", requestedDataFormat, actualDataFormat);
     // TODO handle other data formats
 
     // Allocate a buffer for the audio data.
-    data = new int16_t[framesPerBurst * actualSamplesPerFrame];
+    data = new int16_t[framesPerWrite * actualSamplesPerFrame];
     if (data == nullptr) {
         fprintf(stderr, "ERROR - could not allocate data buffer\n");
         result = AAUDIO_ERROR_NO_MEMORY;
@@ -166,14 +171,14 @@ int main(int argc, char **argv)
     framesLeft = framesToPlay;
     while (framesLeft > 0) {
         // Render sine waves to left and right channels.
-        sineOsc1.render(&data[0], actualSamplesPerFrame, framesPerBurst);
+        sineOsc1.render(&data[0], actualSamplesPerFrame, framesPerWrite);
         if (actualSamplesPerFrame > 1) {
-            sineOsc2.render(&data[1], actualSamplesPerFrame, framesPerBurst);
+            sineOsc2.render(&data[1], actualSamplesPerFrame, framesPerWrite);
         }
 
         // Write audio data to the stream.
         int64_t timeoutNanos = 100 * NANOS_PER_MILLISECOND;
-        int minFrames = (framesToPlay < framesPerBurst) ? framesToPlay : framesPerBurst;
+        int minFrames = (framesToPlay < framesPerWrite) ? framesToPlay : framesPerWrite;
         int actual = AAudioStream_write(aaudioStream, data, minFrames, timeoutNanos);
         if (actual < 0) {
             fprintf(stderr, "ERROR - AAudioStream_write() returned %zd\n", actual);
