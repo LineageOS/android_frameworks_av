@@ -116,6 +116,7 @@ private:
 
     sp<MemoryDealer> mDealer;
     sp<IMemory> mDecryptDestination;
+    int32_t mHeapSeqNum;
 
     // These should only be accessed via std::atomic_* functions.
     //
