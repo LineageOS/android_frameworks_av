@@ -291,6 +291,9 @@ Return<void> DrmHal::sendEvent(EventType hEventType,
         case EventType::VENDOR_DEFINED:
             eventType = DrmPlugin::kDrmPluginEventVendorDefined;
             break;
+        case EventType::SESSION_RECLAIMED:
+            eventType = DrmPlugin::kDrmPluginEventSessionReclaimed;
+            break;
         default:
             return Void();
         }
