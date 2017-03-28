@@ -27,6 +27,7 @@
 #define NUM_SECONDS   10
 #define NANOS_PER_MICROSECOND ((int64_t)1000)
 #define NANOS_PER_MILLISECOND (NANOS_PER_MICROSECOND * 1000)
+#define NANOS_PER_SECOND      (NANOS_PER_MILLISECOND * 1000)
 
 static const char *getSharingModeText(aaudio_sharing_mode_t mode) {
     const char *modeText = "unknown";
@@ -43,6 +44,15 @@ static const char *getSharingModeText(aaudio_sharing_mode_t mode) {
     return modeText;
 }
 
+static int64_t getNanoseconds(clockid_t clockId = CLOCK_MONOTONIC) {
+    struct timespec time;
+    int result = clock_gettime(clockId, &time);
+    if (result < 0) {
+        return -errno;
+    }
+    return (time.tv_sec * NANOS_PER_SECOND) + time.tv_nsec;
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; // unused
@@ -56,7 +66,8 @@ int main(int argc, char **argv)
     const aaudio_audio_format_t requestedDataFormat = AAUDIO_FORMAT_PCM_I16;
     aaudio_audio_format_t actualDataFormat = AAUDIO_FORMAT_PCM_I16;
 
-    const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_EXCLUSIVE;
+    //const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_EXCLUSIVE;
+    const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_SHARED;
     aaudio_sharing_mode_t actualSharingMode = AAUDIO_SHARING_MODE_SHARED;
 
     AAudioStreamBuilder *aaudioBuilder = nullptr;
@@ -172,6 +183,26 @@ int main(int argc, char **argv)
             goto finish;
         }
         framesLeft -= actual;
+
+        // Use timestamp to estimate latency.
+        {
+            int64_t presentationFrame;
+            int64_t presentationTime;
+            result = AAudioStream_getTimestamp(aaudioStream,
+                                               CLOCK_MONOTONIC,
+                                               &presentationFrame,
+                                               &presentationTime
+                                               );
+            if (result == AAUDIO_OK) {
+                int64_t elapsedNanos = getNanoseconds() - presentationTime;
+                int64_t elapsedFrames = actualSampleRate * elapsedNanos / NANOS_PER_SECOND;
+                int64_t currentFrame = presentationFrame + elapsedFrames;
+                int64_t framesWritten = AAudioStream_getFramesWritten(aaudioStream);
+                int64_t estimatedLatencyFrames = framesWritten - currentFrame;
+                int64_t estimatedLatencyMillis = estimatedLatencyFrames * 1000 / actualSampleRate;
+                printf("estimatedLatencyMillis %d\n", (int)estimatedLatencyMillis);
+            }
+        }
     }
 
     xRunCount = AAudioStream_getXRunCount(aaudioStream);

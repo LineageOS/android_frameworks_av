@@ -50,7 +50,6 @@ public:
     virtual aaudio_result_t requestFlush() = 0;
     virtual aaudio_result_t requestStop() = 0;
 
-    // TODO use aaudio_clockid_t all the way down to AudioClock
     virtual aaudio_result_t getTimestamp(clockid_t clockId,
                                        int64_t *framePosition,
                                        int64_t *timeNanoseconds) = 0;
