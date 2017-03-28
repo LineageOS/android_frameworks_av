@@ -18,8 +18,8 @@
 #define AAUDIO_AUDIOSTREAM_H
 
 #include <atomic>
+#include <mutex>
 #include <stdint.h>
-#include <aaudio/AAudioDefinitions.h>
 #include <aaudio/AAudio.h>
 
 #include "AAudioUtilities.h"
@@ -55,14 +55,18 @@ public:
                                        int64_t *timeNanoseconds) = 0;
 
 
-    virtual aaudio_result_t updateState() = 0;
+    /**
+     * Update state while in the middle of waitForStateChange()
+     * @return
+     */
+    virtual aaudio_result_t updateStateWhileWaiting() = 0;
 
 
     // =========== End ABSTRACT methods ===========================
 
     virtual aaudio_result_t waitForStateChange(aaudio_stream_state_t currentState,
-                                          aaudio_stream_state_t *nextState,
-                                          int64_t timeoutNanoseconds);
+                                               aaudio_stream_state_t *nextState,
+                                               int64_t timeoutNanoseconds);
 
     /**
      * Open the stream using the parameters in the builder.
@@ -152,10 +156,16 @@ public:
         return mDirection;
     }
 
+    /**
+     * This is only valid after setSamplesPerFrame() and setFormat() have been called.
+     */
     int32_t getBytesPerFrame() const {
         return mSamplesPerFrame * getBytesPerSample();
     }
 
+    /**
+     * This is only valid after setFormat() has been called.
+     */
     int32_t getBytesPerSample() const {
         return AAudioConvert_formatToSizeInBytes(mFormat);
     }
@@ -168,6 +178,27 @@ public:
         return mFramesRead.get();
     }
 
+    AAudioStream_dataCallback getDataCallbackProc() const {
+        return mDataCallbackProc;
+    }
+    AAudioStream_errorCallback getErrorCallbackProc() const {
+        return mErrorCallbackProc;
+    }
+
+    void *getDataCallbackUserData() const {
+        return mDataCallbackUserData;
+    }
+    void *getErrorCallbackUserData() const {
+        return mErrorCallbackUserData;
+    }
+
+    int32_t getFramesPerDataCallback() const {
+        return mFramesPerDataCallback;
+    }
+
+    bool isDataCallbackActive() {
+        return (mDataCallbackProc != nullptr) && isPlaying();
+    }
 
     // ============== I/O ===========================
     // A Stream will only implement read() or write() depending on its direction.
@@ -235,6 +266,9 @@ protected:
         mState = state;
     }
 
+    std::mutex           mStreamMutex;
+
+    std::atomic<bool>    mCallbackEnabled;
 
 
 protected:
@@ -258,6 +292,15 @@ private:
     aaudio_audio_format_t  mFormat = AAUDIO_FORMAT_UNSPECIFIED;
     aaudio_direction_t     mDirection = AAUDIO_DIRECTION_OUTPUT;
     aaudio_stream_state_t  mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
+
+    // callback ----------------------------------
+
+    AAudioStream_dataCallback   mDataCallbackProc = nullptr;  // external callback functions
+    void                       *mDataCallbackUserData = nullptr;
+    int32_t                     mFramesPerDataCallback = AAUDIO_UNSPECIFIED; // frames
+
+    AAudioStream_errorCallback  mErrorCallbackProc = nullptr;
+    void                       *mErrorCallbackUserData = nullptr;
 
     // background thread ----------------------------------
     bool                   mHasThread = false;

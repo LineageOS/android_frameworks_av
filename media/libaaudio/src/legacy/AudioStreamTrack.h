@@ -17,54 +17,63 @@
 #ifndef LEGACY_AUDIO_STREAM_TRACK_H
 #define LEGACY_AUDIO_STREAM_TRACK_H
 
+#include <math.h>
 #include <media/AudioTrack.h>
 #include <aaudio/AAudio.h>
 
 #include "AudioStreamBuilder.h"
 #include "AudioStream.h"
-#include "AAudioLegacy.h"
+#include "legacy/AAudioLegacy.h"
+#include "legacy/AudioStreamLegacy.h"
+#include "utility/FixedBlockReader.h"
 
 namespace aaudio {
-
 
 /**
  * Internal stream that uses the legacy AudioTrack path.
  */
-class AudioStreamTrack : public AudioStream {
+class AudioStreamTrack : public AudioStreamLegacy {
 public:
     AudioStreamTrack();
 
     virtual ~AudioStreamTrack();
 
 
-    virtual aaudio_result_t open(const AudioStreamBuilder & builder) override;
-    virtual aaudio_result_t close() override;
+    aaudio_result_t open(const AudioStreamBuilder & builder) override;
+    aaudio_result_t close() override;
 
-    virtual aaudio_result_t requestStart() override;
-    virtual aaudio_result_t requestPause() override;
-    virtual aaudio_result_t requestFlush() override;
-    virtual aaudio_result_t requestStop() override;
+    aaudio_result_t requestStart() override;
+    aaudio_result_t requestPause() override;
+    aaudio_result_t requestFlush() override;
+    aaudio_result_t requestStop() override;
 
-    virtual aaudio_result_t getTimestamp(clockid_t clockId,
+    aaudio_result_t getTimestamp(clockid_t clockId,
                                        int64_t *framePosition,
                                        int64_t *timeNanoseconds) override;
 
-    virtual aaudio_result_t write(const void *buffer,
+    aaudio_result_t write(const void *buffer,
                              int32_t numFrames,
                              int64_t timeoutNanoseconds) override;
 
-    virtual aaudio_result_t setBufferSize(int32_t requestedFrames) override;
-    virtual int32_t getBufferSize() const override;
-    virtual int32_t getBufferCapacity() const override;
-    virtual int32_t getFramesPerBurst()const  override;
-    virtual int32_t getXRunCount() const override;
+    aaudio_result_t setBufferSize(int32_t requestedFrames) override;
+    int32_t getBufferSize() const override;
+    int32_t getBufferCapacity() const override;
+    int32_t getFramesPerBurst()const  override;
+    int32_t getXRunCount() const override;
 
-    virtual int64_t getFramesRead() override;
+    int64_t getFramesRead() override;
 
-    virtual aaudio_result_t updateState() override;
+    aaudio_result_t updateStateWhileWaiting() override;
+
+    // This is public so it can be called from the C callback function.
+    void processCallback(int event, void *info) override;
 
 private:
+
     android::sp<android::AudioTrack> mAudioTrack;
+    // adapts between variable sized blocks and fixed size blocks
+    FixedBlockReader                 mFixedBlockReader;
+
     // TODO add 64-bit position reporting to AudioRecord and use it.
     aaudio_wrapping_frames_t         mPositionWhenStarting = 0;
     aaudio_wrapping_frames_t         mPositionWhenPausing = 0;

@@ -22,7 +22,7 @@
 #include <gtest/gtest.h>
 
 #include <aaudio/AAudioDefinitions.h>
-#include "HandleTracker.h"
+#include "utility/HandleTracker.h"
 
 // Test adding one address.
 TEST(test_handle_tracker, aaudio_handle_tracker) {

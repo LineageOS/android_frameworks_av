@@ -30,10 +30,14 @@ LOCAL_SRC_FILES = \
     core/AudioStream.cpp \
     core/AudioStreamBuilder.cpp \
     core/AAudioAudio.cpp \
+    legacy/AudioStreamLegacy.cpp \
     legacy/AudioStreamRecord.cpp \
     legacy/AudioStreamTrack.cpp \
     utility/HandleTracker.cpp \
     utility/AAudioUtilities.cpp \
+    utility/FixedBlockAdapter.cpp \
+    utility/FixedBlockReader.cpp \
+    utility/FixedBlockWriter.cpp \
     fifo/FifoBuffer.cpp \
     fifo/FifoControllerBase.cpp \
     client/AudioEndpoint.cpp \
@@ -79,10 +83,14 @@ LOCAL_C_INCLUDES := \
 LOCAL_SRC_FILES = core/AudioStream.cpp \
     core/AudioStreamBuilder.cpp \
     core/AAudioAudio.cpp \
+    legacy/AudioStreamLegacy.cpp \
     legacy/AudioStreamRecord.cpp \
     legacy/AudioStreamTrack.cpp \
     utility/HandleTracker.cpp \
     utility/AAudioUtilities.cpp \
+    utility/FixedBlockAdapter.cpp \
+    utility/FixedBlockReader.cpp \
+    utility/FixedBlockWriter.cpp \
     fifo/FifoBuffer.cpp \
     fifo/FifoControllerBase.cpp \
     client/AudioEndpoint.cpp \
