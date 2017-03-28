@@ -967,7 +967,7 @@ void Camera3Device::processOneCaptureResult(
         const StreamBuffer &bSrc = result.outputBuffers[i];
 
         ssize_t idx = mOutputStreams.indexOfKey(bSrc.streamId);
-        if (idx == -1) {
+        if (idx == NAME_NOT_FOUND) {
             ALOGE("%s: Frame %d: Buffer %zu: Invalid output stream id %d",
                     __FUNCTION__, result.frameNumber, i, bSrc.streamId);
             return;
@@ -1053,7 +1053,7 @@ void Camera3Device::notify(
             m.message.error.frame_number = msg.msg.error.frameNumber;
             if (msg.msg.error.errorStreamId >= 0) {
                 ssize_t idx = mOutputStreams.indexOfKey(msg.msg.error.errorStreamId);
-                if (idx == -1) {
+                if (idx == NAME_NOT_FOUND) {
                     ALOGE("%s: Frame %d: Invalid error stream id %d",
                             __FUNCTION__, m.message.error.frame_number, msg.msg.error.errorStreamId);
                     return;
