@@ -583,8 +583,12 @@ void NuPlayerDriver::logMetrics(const char *where) {
         return;
     }
 
-    // only bother to log non-empty records
-    if (mAnalyticsItem->count() > 0) {
+    // log only non-empty records
+    // we always updateMetrics() before we get here
+    // and that always injects 2 fields (duration and playing time) into
+    // the record.
+    // So the canonical "empty" record has 2 elements in it.
+    if (mAnalyticsItem->count() > 2) {
 
         mAnalyticsItem->setFinalized(true);
         mAnalyticsItem->selfrecord();
