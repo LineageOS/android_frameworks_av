@@ -261,7 +261,8 @@ struct HistIntEntry {
     static void    appendPID(String8 *body, const void *data, size_t length);
     static void    appendTimestamp(String8 *body, const void *data);
     static size_t  fmtEntryLength(const uint8_t *data);
-
+    static String8 bufferHexDump(const uint8_t *buffer, size_t size);
+    static String8 bufferHexDump(const EntryIterator &it);
 public:
 
 // Located in shared memory, must be POD.

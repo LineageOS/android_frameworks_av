@@ -1018,6 +1018,23 @@ void NBLog::appendPID(String8 *body, const void* data, size_t length) {
     body->appendFormat("<PID: %d, name: %.*s>", id, (int) (length - sizeof(pid_t)), name);
 }
 
+String8 NBLog::bufferHexDump(const uint8_t *buffer, size_t size)
+{
+    String8 str;
+    str.append("[ ");
+    for(size_t i = 0; i < size; i++)
+    {
+        str.appendFormat("%02x ", buffer[i]);
+    }
+    str.append("]");
+    return str;
+}
+
+String8 NBLog::bufferHexDump(const EntryIterator &it)
+{
+    return bufferHexDump(it, it->length + Entry::kOverhead);
+}
+
 NBLog::EntryIterator NBLog::Reader::handleFormat(const FormatEntry &fmtEntry,
                                                          String8 *timestamp,
                                                          String8 *body) {
