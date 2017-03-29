@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,8 @@
 
 #include <media/IMediaAnalyticsService.h>
 
+#include "MetricsSummarizer.h"
+
 
 namespace android {
 
@@ -38,12 +40,6 @@ class MediaAnalyticsService : public BnMediaAnalyticsService
 
     // on this side, caller surrenders ownership
     virtual int64_t submit(MediaAnalyticsItem *item, bool forcenew);
-
-    virtual List<MediaAnalyticsItem *>
-            *getMediaAnalyticsItemList(bool finished, int64_t ts);
-    virtual List<MediaAnalyticsItem *>
-            *getMediaAnalyticsItemList(bool finished, int64_t ts, MediaAnalyticsItem::Key key);
-
 
     static  void            instantiate();
     virtual status_t        dump(int fd, const Vector<String16>& args);
@@ -58,6 +54,7 @@ class MediaAnalyticsService : public BnMediaAnalyticsService
     int64_t mItemsSubmitted;
     int64_t mItemsFinalized;
     int64_t mItemsDiscarded;
+    int64_t mSetsDiscarded;
     MediaAnalyticsItem::SessionID_t mLastSessionID;
 
     // partitioned a bit so we don't over serialize
@@ -67,6 +64,10 @@ class MediaAnalyticsService : public BnMediaAnalyticsService
     // the most we hold in memory
     // up to this many in each queue (open, finalized)
     int32_t mMaxRecords;
+    // # of sets of summaries
+    int32_t mMaxRecordSets;
+    // nsecs until we start a new record set
+    nsecs_t mNewSetInterval;
 
     // input validation after arrival from client
     bool contentValid(MediaAnalyticsItem *item, bool isTrusted);
@@ -82,12 +83,47 @@ class MediaAnalyticsService : public BnMediaAnalyticsService
     MediaAnalyticsItem *findItem(List<MediaAnalyticsItem *> *,
                                      MediaAnalyticsItem *, bool removeit);
 
+    // summarizers
+    void summarize(MediaAnalyticsItem *item);
+    class SummarizerSet {
+        nsecs_t mStarted;
+        List<MetricsSummarizer *> *mSummarizers;
+
+      public:
+        void appendSummarizer(MetricsSummarizer *s) {
+            if (s) {
+                mSummarizers->push_back(s);
+            }
+        };
+        nsecs_t getStarted() { return mStarted;}
+        void setStarted(nsecs_t started) {mStarted = started;}
+        List<MetricsSummarizer *> *getSummarizers() { return mSummarizers;}
+
+        SummarizerSet();
+        ~SummarizerSet();
+    };
+    void newSummarizerSet();
+    List<SummarizerSet *> *mSummarizerSets;
+    SummarizerSet *mCurrentSet;
+    List<MetricsSummarizer *> *getFirstSet() {
+        List<SummarizerSet *>::iterator first = mSummarizerSets->begin();
+        if (first != mSummarizerSets->end()) {
+            return (*first)->getSummarizers();
+        }
+        return NULL;
+    }
+
     void saveItem(MediaAnalyticsItem);
     void saveItem(List<MediaAnalyticsItem *> *, MediaAnalyticsItem *, int);
     void deleteItem(List<MediaAnalyticsItem *> *, MediaAnalyticsItem *);
 
+    // support for generating output
     String8 dumpQueue(List<MediaAnalyticsItem*> *);
-    String8 dumpQueue(List<MediaAnalyticsItem*> *, nsecs_t);
+    String8 dumpQueue(List<MediaAnalyticsItem*> *, nsecs_t, const char *only);
+
+    void dumpHeaders(String8 &result, nsecs_t ts_since);
+    void dumpSummaries(String8 &result, nsecs_t ts_since, const char * only);
+    void dumpRecent(String8 &result, nsecs_t ts_since, const char * only);
 
 };
 
