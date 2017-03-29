@@ -25,6 +25,7 @@
 
 #include "AudioClock.h"
 #include "AudioStreamRecord.h"
+#include "utility/AAudioUtilities.h"
 
 using namespace android;
 using namespace aaudio;
@@ -224,5 +225,28 @@ int32_t AudioStreamRecord::getFramesPerBurst() const
     return static_cast<int32_t>(mAudioRecord->getNotificationPeriodInFrames());
 }
 
-// TODO implement getTimestamp
-
+aaudio_result_t AudioStreamRecord::getTimestamp(clockid_t clockId,
+                                               int64_t *framePosition,
+                                               int64_t *timeNanoseconds) {
+    ExtendedTimestamp extendedTimestamp;
+    status_t status = mAudioRecord->getTimestamp(&extendedTimestamp);
+    if (status != NO_ERROR) {
+        return AAudioConvert_androidToAAudioResult(status);
+    }
+    // TODO Merge common code into AudioStreamLegacy after rebasing.
+    int timebase;
+    switch(clockId) {
+        case CLOCK_BOOTTIME:
+            timebase = ExtendedTimestamp::TIMEBASE_BOOTTIME;
+            break;
+        case CLOCK_MONOTONIC:
+            timebase = ExtendedTimestamp::TIMEBASE_MONOTONIC;
+            break;
+        default:
+            ALOGE("getTimestamp() - Unrecognized clock type %d", (int) clockId);
+            return AAUDIO_ERROR_UNEXPECTED_VALUE;
+            break;
+    }
+    status = extendedTimestamp.getBestTimestamp(framePosition, timeNanoseconds, timebase);
+    return AAudioConvert_androidToAAudioResult(status);
+}
