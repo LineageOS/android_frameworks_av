@@ -27,6 +27,7 @@ namespace android {
 
 struct AString;
 class IMemory;
+class IMemoryHeap;
 
 struct ICrypto : public IInterface {
     DECLARE_META_INTERFACE(Crypto);
@@ -47,6 +48,11 @@ struct ICrypto : public IInterface {
 
     virtual status_t setMediaDrmSession(const Vector<uint8_t> &sessionId) = 0;
 
+    struct SourceBuffer {
+        sp<IMemory> mSharedMemory;
+        int32_t mHeapSeqNum;
+    };
+
     enum DestinationType {
         kDestinationTypeSharedMemory, // non-secure
         kDestinationTypeNativeHandle  // secure
@@ -60,9 +66,18 @@ struct ICrypto : public IInterface {
 
     virtual ssize_t decrypt(const uint8_t key[16], const uint8_t iv[16],
             CryptoPlugin::Mode mode, const CryptoPlugin::Pattern &pattern,
-            const sp<IMemory> &source, size_t offset,
+            const SourceBuffer &source, size_t offset,
             const CryptoPlugin::SubSample *subSamples, size_t numSubSamples,
             const DestinationBuffer &destination, AString *errorDetailMsg) = 0;
+
+    /**
+     * Declare the heap that the shared memory source buffers passed
+     * to decrypt will be allocated from. Returns a sequence number
+     * that subsequent decrypt calls can use to refer to the heap,
+     * with -1 indicating failure.
+     */
+    virtual int32_t setHeap(const sp<IMemoryHeap>& heap) = 0;
+    virtual void unsetHeap(int32_t seqNum) = 0;
 
 private:
     DISALLOW_EVIL_CONSTRUCTORS(ICrypto);
