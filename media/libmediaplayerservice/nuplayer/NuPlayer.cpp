@@ -666,12 +666,13 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
             }
 
             mDeferredActions.push_back(
-                    new FlushDecoderAction(FLUSH_CMD_FLUSH /* audio */,
+                    new FlushDecoderAction(
+                            (obj != NULL ? FLUSH_CMD_FLUSH : FLUSH_CMD_NONE) /* audio */,
                                            FLUSH_CMD_SHUTDOWN /* video */));
 
             mDeferredActions.push_back(new SetSurfaceAction(surface));
 
-            if (obj != NULL || mAudioDecoder != NULL) {
+            if (obj != NULL) {
                 if (mStarted) {
                     // Issue a seek to refresh the video screen only if started otherwise
                     // the extractor may not yet be started and will assert.
@@ -688,13 +689,13 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                 // again if possible.
                 mDeferredActions.push_back(
                         new SimpleAction(&NuPlayer::performScanSources));
-            }
 
-            // After a flush without shutdown, decoder is paused.
-            // Don't resume it until source seek is done, otherwise it could
-            // start pulling stale data too soon.
-            mDeferredActions.push_back(
-                    new ResumeDecoderAction(false /* needNotify */));
+                // After a flush without shutdown, decoder is paused.
+                // Don't resume it until source seek is done, otherwise it could
+                // start pulling stale data too soon.
+                mDeferredActions.push_back(
+                        new ResumeDecoderAction(false /* needNotify */));
+            }
 
             processDeferredActions();
             break;
