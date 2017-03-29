@@ -39,6 +39,12 @@ using MediaDescrambler::DescrambleInfo;
 using BufferInfo = ACodecBufferChannel::BufferInfo;
 using BufferInfoIterator = std::vector<const BufferInfo>::const_iterator;
 
+ACodecBufferChannel::~ACodecBufferChannel() {
+    if (mCrypto != nullptr && mDealer != nullptr && mHeapSeqNum >= 0) {
+        mCrypto->unsetHeap(mHeapSeqNum);
+    }
+}
+
 static BufferInfoIterator findClientBuffer(
         const std::shared_ptr<const std::vector<const BufferInfo>> &array,
         const sp<MediaCodecBuffer> &buffer) {
@@ -71,7 +77,8 @@ ACodecBufferChannel::BufferInfo::BufferInfo(
 ACodecBufferChannel::ACodecBufferChannel(
         const sp<AMessage> &inputBufferFilled, const sp<AMessage> &outputBufferDrained)
     : mInputBufferFilled(inputBufferFilled),
-      mOutputBufferDrained(outputBufferDrained) {
+      mOutputBufferDrained(outputBufferDrained),
+      mHeapSeqNum(-1) {
 }
 
 status_t ACodecBufferChannel::queueInputBuffer(const sp<MediaCodecBuffer> &buffer) {
@@ -122,11 +129,15 @@ status_t ACodecBufferChannel::queueSecureInputBuffer(
         destination.mSharedMemory = mDecryptDestination;
     }
 
+    ICrypto::SourceBuffer source;
+    source.mSharedMemory = it->mSharedEncryptedBuffer;
+    source.mHeapSeqNum = mHeapSeqNum;
+
     ssize_t result = -1;
     if (mCrypto != NULL) {
         result = mCrypto->decrypt(key, iv, mode, pattern,
-                    it->mSharedEncryptedBuffer, it->mClientBuffer->offset(),
-                    subSamples, numSubSamples, destination, errorDetailMsg);
+                source, it->mClientBuffer->offset(),
+                subSamples, numSubSamples, destination, errorDetailMsg);
     } else {
         DescrambleInfo descrambleInfo;
         descrambleInfo.dstType = destination.mType ==
@@ -254,6 +265,25 @@ void ACodecBufferChannel::getOutputBufferArray(Vector<sp<MediaCodecBuffer>> *arr
     }
 }
 
+sp<MemoryDealer> ACodecBufferChannel::makeMemoryDealer(size_t heapSize) {
+    sp<MemoryDealer> dealer;
+    if (mDealer != nullptr && mCrypto != nullptr && mHeapSeqNum >= 0) {
+        mCrypto->unsetHeap(mHeapSeqNum);
+    }
+    dealer = new MemoryDealer(heapSize, "ACodecBufferChannel");
+    if (mCrypto != nullptr) {
+        int32_t seqNum = mCrypto->setHeap(dealer->getMemoryHeap());
+        if (seqNum >= 0) {
+            mHeapSeqNum = seqNum;
+            ALOGD("setHeap returned mHeapSeqNum=%d", mHeapSeqNum);
+        } else {
+            mHeapSeqNum = -1;
+            ALOGD("setHeap failed, setting mHeapSeqNum=-1");
+        }
+    }
+    return dealer;
+}
+
 void ACodecBufferChannel::setInputBufferArray(const std::vector<BufferAndId> &array) {
     if (hasCryptoOrDescrambler()) {
         size_t totalSize = std::accumulate(
@@ -268,8 +298,10 @@ void ACodecBufferChannel::setInputBufferArray(const std::vector<BufferAndId> &ar
                 (size_t max, const BufferAndId& elem) {
                     return std::max(max, align(elem.mBuffer->capacity(), alignment));
                 });
-        mDealer = new MemoryDealer(totalSize + maxSize, "ACodecBufferChannel");
-        mDecryptDestination = mDealer->allocate(maxSize);
+        size_t destinationBufferSize = maxSize;
+        size_t heapSize = totalSize + destinationBufferSize;
+        mDealer = makeMemoryDealer(heapSize);
+        mDecryptDestination = mDealer->allocate(destinationBufferSize);
     }
     std::vector<const BufferInfo> inputBuffers;
     for (const BufferAndId &elem : array) {
