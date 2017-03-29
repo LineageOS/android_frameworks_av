@@ -33,6 +33,8 @@
 #include <ui/GraphicBufferMapper.h>
 #include <ui/Rect.h>
 
+#include <hardware/gralloc.h>
+
 #include <OMX_IndexExt.h>
 
 namespace android {
