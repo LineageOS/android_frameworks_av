@@ -60,7 +60,7 @@ public:
 
     ACodecBufferChannel(
             const sp<AMessage> &inputBufferFilled, const sp<AMessage> &outputBufferDrained);
-    virtual ~ACodecBufferChannel() = default;
+    virtual ~ACodecBufferChannel();
 
     // BufferChannelBase interface
     virtual status_t queueInputBuffer(const sp<MediaCodecBuffer> &buffer) override;
@@ -116,6 +116,7 @@ private:
 
     sp<MemoryDealer> mDealer;
     sp<IMemory> mDecryptDestination;
+    int32_t mHeapSeqNum;
 
     // These should only be accessed via std::atomic_* functions.
     //
@@ -126,6 +127,8 @@ private:
     // the caller has given up the reference, so that access is also safe.
     std::shared_ptr<const std::vector<const BufferInfo>> mInputBuffers;
     std::shared_ptr<const std::vector<const BufferInfo>> mOutputBuffers;
+
+    sp<MemoryDealer> makeMemoryDealer(size_t heapSize);
 
     bool hasCryptoOrDescrambler() {
         return mCrypto != NULL || mDescrambler != NULL;
