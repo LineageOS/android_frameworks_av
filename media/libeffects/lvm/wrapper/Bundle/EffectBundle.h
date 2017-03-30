@@ -140,7 +140,7 @@ static const uint32_t bandFreqRange[FIVEBAND_NUMBANDS][2] = {
                                        {120001, 460000},
                                        {460001, 1800000},
                                        {1800001, 7000000},
-                                       {7000001, 1}};
+                                       {7000001, 20000000}};
 
 //Note: If these frequencies change, please update LimitLevel values accordingly.
 static const LVM_UINT16  EQNB_5BandPresetsFrequencies[] = {
