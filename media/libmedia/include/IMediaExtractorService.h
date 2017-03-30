@@ -32,6 +32,7 @@ public:
 
     virtual sp<IMediaExtractor> makeExtractor(const sp<IDataSource> &source, const char *mime) = 0;
 
+    virtual sp<IDataSource> makeIDataSource(int fd, int64_t offset, int64_t length) = 0;
 };
 
 class BnMediaExtractorService: public BnInterface<IMediaExtractorService>

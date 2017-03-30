@@ -21,7 +21,9 @@
 #include "NuPlayerDrm.h"
 
 #include "AnotherPacketSource.h"
-
+#include <binder/IServiceManager.h>
+#include <cutils/properties.h>
+#include <media/IMediaExtractorService.h>
 #include <media/IMediaHTTPService.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -361,7 +363,32 @@ void NuPlayer::GenericSource::onPrepareAsync() {
                    mHTTPService, uri, &mUriHeaders, &contentType,
                    static_cast<HTTPBase *>(mHttpSource.get()));
         } else {
-            mDataSource = new FileSource(mFd, mOffset, mLength);
+            if (property_get_bool("media.stagefright.extractremote", true) &&
+                    !FileSource::requiresDrm(mFd, mOffset, mLength, nullptr /* mime */)) {
+                sp<IBinder> binder =
+                        defaultServiceManager()->getService(String16("media.extractor"));
+                if (binder != nullptr) {
+                    ALOGD("FileSource remote");
+                    sp<IMediaExtractorService> mediaExService(
+                            interface_cast<IMediaExtractorService>(binder));
+                    sp<IDataSource> source =
+                            mediaExService->makeIDataSource(mFd, mOffset, mLength);
+                    ALOGV("IDataSource(FileSource): %p %d %lld %lld",
+                            source.get(), mFd, (long long)mOffset, (long long)mLength);
+                    if (source.get() != nullptr) {
+                        mDataSource = DataSource::CreateFromIDataSource(source);
+                    } else {
+                        ALOGW("extractor service cannot make data source");
+                    }
+                } else {
+                    ALOGW("extractor service not running");
+                }
+            }
+            if (mDataSource == nullptr) {
+                ALOGD("FileSource local");
+                mDataSource = new FileSource(mFd, mOffset, mLength);
+            }
+
             mFd = -1;
         }
 

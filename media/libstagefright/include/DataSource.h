@@ -56,6 +56,7 @@ public:
 
     static sp<DataSource> CreateMediaHTTP(const sp<IMediaHTTPService> &httpService);
     static sp<DataSource> CreateFromIDataSource(const sp<IDataSource> &source);
+    static sp<DataSource> CreateFromFd(int fd, int64_t offset, int64_t length);
 
     DataSource() {}
 
@@ -116,6 +117,12 @@ public:
     virtual String8 getMIMEType() const;
 
     virtual void close() {};
+
+    // creates an IDataSource wrapper to the DataSource.
+    virtual sp<IDataSource> asIDataSource();
+
+    // returns a pointer to IDataSource if it is wrapped.
+    virtual sp<IDataSource> getIDataSource() const;
 
 protected:
     virtual ~DataSource() {}
