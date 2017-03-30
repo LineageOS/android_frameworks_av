@@ -22,6 +22,7 @@
 
 #include <media/stagefright/DataSource.h>
 #include <media/stagefright/MediaExtractor.h>
+#include <media/stagefright/RemoteDataSource.h>
 #include "MediaExtractorService.h"
 
 namespace android {
@@ -43,6 +44,12 @@ sp<IMediaExtractor> MediaExtractorService::makeExtractor(
     }
 
     return ret;
+}
+
+sp<IDataSource> MediaExtractorService::makeIDataSource(int fd, int64_t offset, int64_t length)
+{
+    sp<DataSource> source = DataSource::CreateFromFd(fd, offset, length);
+    return source.get() != nullptr ? source->asIDataSource() : nullptr;
 }
 
 status_t MediaExtractorService::dump(int fd, const Vector<String16>& args) {

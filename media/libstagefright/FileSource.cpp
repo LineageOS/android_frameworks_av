@@ -21,6 +21,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/FileSource.h>
 #include <media/stagefright/Utils.h>
+#include <private/android_filesystem_config.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -171,6 +172,7 @@ status_t FileSource::getSize(off64_t *size) {
 }
 
 sp<DecryptHandle> FileSource::DrmInitialization(const char *mime) {
+    if (getuid() == AID_MEDIA_EX) return nullptr; // no DRM in media extractor
     if (mDrmManagerClient == NULL) {
         mDrmManagerClient = new DrmManagerClient();
     }
@@ -227,4 +229,18 @@ ssize_t FileSource::readAtDRM(off64_t offset, void *data, size_t size) {
         return mDrmManagerClient->pread(mDecryptHandle, data, size, offset + mOffset);
     }
 }
+
+/* static */
+bool FileSource::requiresDrm(int fd, int64_t offset, int64_t length, const char *mime) {
+    std::unique_ptr<DrmManagerClient> drmClient(new DrmManagerClient());
+    sp<DecryptHandle> decryptHandle =
+            drmClient->openDecryptSession(fd, offset, length, mime);
+    bool requiresDrm = false;
+    if (decryptHandle != nullptr) {
+        requiresDrm = decryptHandle->decryptApiType == DecryptApiType::CONTAINER_BASED;
+        drmClient->closeDecryptSession(decryptHandle);
+    }
+    return requiresDrm;
+}
+
 }  // namespace android
