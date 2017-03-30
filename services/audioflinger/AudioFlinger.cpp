@@ -2044,7 +2044,7 @@ status_t AudioFlinger::openOutput(audio_module_handle_t module,
 
             // the first primary output opened designates the primary hw device
             if ((mPrimaryHardwareDev == NULL) && (flags & AUDIO_OUTPUT_FLAG_PRIMARY)) {
-                ALOGI("Using module %d has the primary audio interface", module);
+                ALOGI("Using module %d as the primary audio interface", module);
                 mPrimaryHardwareDev = playbackThread->getOutput()->audioHwDev;
 
                 AutoMutex lock(mHardwareLock);

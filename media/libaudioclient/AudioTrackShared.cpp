@@ -696,7 +696,8 @@ status_t ServerProxy::obtainBuffer(Buffer* buffer, bool ackFlush)
     ssize_t filled = rear - front;
     // pipe should not already be overfull
     if (!(0 <= filled && (size_t) filled <= mFrameCount)) {
-        ALOGE("Shared memory control block is corrupt (filled=%zd); shutting down", filled);
+        ALOGE("Shared memory control block is corrupt (filled=%zd, mFrameCount=%zu); shutting down",
+                filled, mFrameCount);
         mIsShutdown = true;
     }
     if (mIsShutdown) {
@@ -820,7 +821,8 @@ size_t AudioTrackServerProxy::framesReady()
     ssize_t filled = rear - cblk->u.mStreaming.mFront;
     // pipe should not already be overfull
     if (!(0 <= filled && (size_t) filled <= mFrameCount)) {
-        ALOGE("Shared memory control block is corrupt (filled=%zd); shutting down", filled);
+        ALOGE("Shared memory control block is corrupt (filled=%zd, mFrameCount=%zu); shutting down",
+                filled, mFrameCount);
         mIsShutdown = true;
         return 0;
     }

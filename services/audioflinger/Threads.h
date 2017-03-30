@@ -31,6 +31,7 @@ public:
         RECORD,             // Thread class is RecordThread
         OFFLOAD,            // Thread class is OffloadThread
         MMAP                // control thread for MMAP stream
+        // If you add any values here, also update ThreadBase::threadTypeToString()
     };
 
     static const char *threadTypeToString(type_t type);
