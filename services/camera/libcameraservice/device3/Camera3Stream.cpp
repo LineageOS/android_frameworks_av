@@ -812,6 +812,18 @@ void Camera3Stream::removeBufferListener(
     }
 }
 
+void Camera3Stream::setBufferFreedListener(
+        Camera3StreamBufferFreedListener* listener) {
+    Mutex::Autolock l(mLock);
+    // Only allow set listener during stream configuration because stream is guaranteed to be IDLE
+    // at this state, so setBufferFreedListener won't collide with onBufferFreed callbacks
+    if (mState != STATE_IN_CONFIG && mState != STATE_IN_RECONFIG) {
+        ALOGE("%s: listener must be set during stream configuration!",__FUNCTION__);
+        return;
+    }
+    mBufferFreedListener = listener;
+}
+
 }; // namespace camera3
 
 }; // namespace android

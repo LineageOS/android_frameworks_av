@@ -263,6 +263,8 @@ status_t Camera3InputStream::configureQueueLocked() {
         mConsumer->setName(String8::format("Camera3-InputStream-%d", mId));
 
         mProducer = producer;
+
+        mConsumer->setBufferFreedListener(this);
     }
 
     res = mConsumer->setDefaultBufferSize(camera3_stream::width,
@@ -286,6 +288,17 @@ status_t Camera3InputStream::getEndpointUsage(uint32_t *usage) const {
     // Per HAL3 spec, input streams have 0 for their initial usage field.
     *usage = 0;
     return OK;
+}
+
+void Camera3InputStream::onBufferFreed(const wp<GraphicBuffer>& gb) {
+    const sp<GraphicBuffer> buffer = gb.promote();
+    if (buffer != nullptr) {
+        if (mBufferFreedListener != nullptr) {
+            mBufferFreedListener->onBufferFreed(mId, buffer->handle);
+        }
+    } else {
+        ALOGE("%s: GraphicBuffer is freed before onBufferFreed callback finishes!", __FUNCTION__);
+    }
 }
 
 }; // namespace camera3
