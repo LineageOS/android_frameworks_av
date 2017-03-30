@@ -432,7 +432,6 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
                     dropped = true;
                     // Clear the whole ActionQueue as recording is done
                     mActionQueue.clear();
-                    signalEndOfInputStream();
                     submitEndOfInputStream_l();
                     break;
                 }
