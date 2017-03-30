@@ -54,7 +54,7 @@ struct MediaCodecSource::Puller : public AHandler {
     void stopSource();
     void pause();
     void resume();
-
+    status_t setStopTimeUs(int64_t stopTimeUs);
     bool readBuffer(MediaBuffer **buffer);
 
 protected:
@@ -66,6 +66,7 @@ private:
         kWhatStart = 'msta',
         kWhatStop,
         kWhatPull,
+        kWhatSetStopTimeUs,
     };
 
     sp<MediaSource> mSource;
@@ -161,6 +162,12 @@ status_t MediaCodecSource::Puller::postSynchronouslyAndReturnError(
     return err;
 }
 
+status_t MediaCodecSource::Puller::setStopTimeUs(int64_t stopTimeUs) {
+    sp<AMessage> msg = new AMessage(kWhatSetStopTimeUs, this);
+    msg->setInt64("stop-time-us", stopTimeUs);
+    return postSynchronouslyAndReturnError(msg);
+}
+
 status_t MediaCodecSource::Puller::start(const sp<MetaData> &meta, const sp<AMessage> &notify) {
     ALOGV("puller (%s) start", mIsAudio ? "audio" : "video");
     mLooper->start(
@@ -246,6 +253,20 @@ void MediaCodecSource::Puller::onMessageReceived(const sp<AMessage> &msg) {
 
             sp<AReplyToken> replyID;
             CHECK(msg->senderAwaitsResponse(&replyID));
+            response->postReply(replyID);
+            break;
+        }
+
+        case kWhatSetStopTimeUs:
+        {
+            sp<AReplyToken> replyID;
+            CHECK(msg->senderAwaitsResponse(&replyID));
+            int64_t stopTimeUs;
+            CHECK(msg->findInt64("stop-time-us", &stopTimeUs));
+            status_t err = mSource->setStopTimeUs(stopTimeUs);
+
+            sp<AMessage> response = new AMessage;
+            response->setInt32("err", err);
             response->postReply(replyID);
             break;
         }
@@ -364,11 +385,8 @@ status_t MediaCodecSource::stop() {
 }
 
 
-status_t MediaCodecSource::setStopStimeUs(int64_t stopTimeUs) {
-    if (!(mFlags & FLAG_USE_SURFACE_INPUT)) {
-        return OK;
-    }
-    sp<AMessage> msg = new AMessage(kWhatSetStopTimeOffset, mReflector);
+status_t MediaCodecSource::setStopTimeUs(int64_t stopTimeUs) {
+    sp<AMessage> msg = new AMessage(kWhatSetStopTimeUs, mReflector);
     msg->setInt64("stop-time-us", stopTimeUs);
     return postSynchronouslyAndReturnError(msg);
 }
@@ -1051,7 +1069,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
         response->postReply(replyID);
         break;
     }
-    case kWhatSetStopTimeOffset:
+    case kWhatSetStopTimeUs:
     {
         sp<AReplyToken> replyID;
         CHECK(msg->senderAwaitsResponse(&replyID));
@@ -1059,11 +1077,13 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
         int64_t stopTimeUs;
         CHECK(msg->findInt64("stop-time-us", &stopTimeUs));
 
-        // Propagate the timestamp offset to GraphicBufferSource.
+        // Propagate the stop time to GraphicBufferSource.
         if (mFlags & FLAG_USE_SURFACE_INPUT) {
             sp<AMessage> params = new AMessage;
             params->setInt64("stop-time-us", stopTimeUs);
             err = mEncoder->setParameters(params);
+        } else {
+            err = mPuller->setStopTimeUs(stopTimeUs);
         }
 
         sp<AMessage> response = new AMessage;
