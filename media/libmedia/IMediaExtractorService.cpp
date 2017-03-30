@@ -23,11 +23,13 @@
 #include <sys/types.h>
 #include <binder/Parcel.h>
 #include <media/IMediaExtractorService.h>
+#include <media/stagefright/MediaExtractor.h>
 
 namespace android {
 
 enum {
-    MAKE_EXTRACTOR = IBinder::FIRST_CALL_TRANSACTION
+    MAKE_EXTRACTOR = IBinder::FIRST_CALL_TRANSACTION,
+    MAKE_IDATA_SOURCE_FD,
 };
 
 class BpMediaExtractorService : public BpInterface<IMediaExtractorService>
@@ -52,6 +54,21 @@ public:
         return NULL;
     }
 
+    virtual sp<IDataSource> makeIDataSource(int fd, int64_t offset, int64_t length)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaExtractorService::getInterfaceDescriptor());
+        data.writeFileDescriptor(fd);
+        data.writeInt64(offset);
+        data.writeInt64(length);
+        status_t ret = remote()->transact(MAKE_IDATA_SOURCE_FD, data, &reply);
+        ALOGV("fd:%d offset:%lld length:%lld ret:%d",
+                fd, (long long)offset, (long long)length, ret);
+        if (ret == NO_ERROR) {
+            return interface_cast<IDataSource>(reply.readStrongBinder());
+        }
+        return nullptr;
+    }
 };
 
 IMPLEMENT_META_INTERFACE(MediaExtractorService, "android.media.IMediaExtractorService");
@@ -80,6 +97,23 @@ status_t BnMediaExtractorService::onTransact(
             reply->writeStrongBinder(IInterface::asBinder(ex));
             return NO_ERROR;
         }
+
+        case MAKE_IDATA_SOURCE_FD: {
+            CHECK_INTERFACE(IMediaExtractorService, data, reply);
+            const int fd = dup(data.readFileDescriptor()); // -1 fd checked in makeIDataSource
+            const int64_t offset = data.readInt64();
+            const int64_t length = data.readInt64();
+            ALOGV("fd %d  offset%lld  length:%lld", fd, (long long)offset, (long long)length);
+            sp<IDataSource> source = makeIDataSource(fd, offset, length);
+            reply->writeStrongBinder(IInterface::asBinder(source));
+            // The FileSource closes the descriptor, so if it is not created
+            // we need to close the descriptor explicitly.
+            if (source.get() == nullptr && fd != -1) {
+                close(fd);
+            }
+            return NO_ERROR;
+        }
+
         default:
             return BBinder::onTransact(code, data, reply, flags);
     }

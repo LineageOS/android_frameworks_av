@@ -113,6 +113,10 @@ sp<DecryptHandle> CallbackDataSource::DrmInitialization(const char *mime) {
     return mIDataSource->DrmInitialization(mime);
 }
 
+sp<IDataSource> CallbackDataSource::getIDataSource() const {
+    return mIDataSource;
+}
+
 TinyCacheSource::TinyCacheSource(const sp<DataSource>& source)
     : mSource(source), mCachedOffset(0), mCachedSize(0) {
     mName = String8::format("TinyCacheSource(%s)", mSource->toString().string());
@@ -190,4 +194,9 @@ sp<DecryptHandle> TinyCacheSource::DrmInitialization(const char *mime) {
     mCachedSize = 0;
     return mSource->DrmInitialization(mime);
 }
+
+sp<IDataSource> TinyCacheSource::getIDataSource() const {
+    return mSource->getIDataSource();
+}
+
 } // namespace android
