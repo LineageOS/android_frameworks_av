@@ -46,6 +46,12 @@ enum {
     AAUDIO_FORMAT_PCM_I8_24,
     AAUDIO_FORMAT_PCM_I32
 };
+typedef int32_t aaudio_format_t;
+
+/**
+ * @deprecated use aaudio_format_t instead
+ * TODO remove when tests and examples are updated
+ */
 typedef int32_t aaudio_audio_format_t;
 
 enum {
