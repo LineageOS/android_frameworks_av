@@ -99,9 +99,12 @@ public:
             const Vector<uint8_t>& response,
             Vector<uint8_t>& certificate,
             Vector<uint8_t>& wrappedKey) {
-        UNUSED(response);
         UNUSED(certificate);
         UNUSED(wrappedKey);
+        if (response.size() == 0) {
+            // empty response
+            return android::BAD_VALUE;
+        }
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
 
@@ -111,13 +114,18 @@ public:
     }
 
     virtual status_t getSecureStop(Vector<uint8_t> const &ssid, Vector<uint8_t> &secureStop) {
-        UNUSED(ssid);
+        if (ssid.size() == 0) {
+            return android::BAD_VALUE;
+        }
+
         UNUSED(secureStop);
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
 
     virtual status_t releaseSecureStops(const Vector<uint8_t>& ssRelease) {
-        UNUSED(ssRelease);
+        if (ssRelease.size() == 0) {
+            return android::BAD_VALUE;
+        }
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
 
@@ -151,15 +159,17 @@ public:
 
     virtual status_t setCipherAlgorithm(
             const Vector<uint8_t>& sessionId, const String8& algorithm) {
-        UNUSED(sessionId);
-        UNUSED(algorithm);
+        if (sessionId.size() == 0 || algorithm.size() == 0) {
+            return android::BAD_VALUE;
+        }
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
 
     virtual status_t setMacAlgorithm(
             const Vector<uint8_t>& sessionId, const String8& algorithm) {
-        UNUSED(sessionId);
-        UNUSED(algorithm);
+        if (sessionId.size() == 0 || algorithm.size() == 0) {
+            return android::BAD_VALUE;
+        }
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
 
