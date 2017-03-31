@@ -47,6 +47,9 @@ LOCAL_CFLAGS += -fvisibility=hidden -D EXPORT='__attribute__ ((visibility ("defa
 
 LOCAL_CFLAGS += -Werror -Wall
 
+LOCAL_STATIC_LIBRARIES := \
+    libgrallocusage \
+
 LOCAL_SHARED_LIBRARIES := \
     libbinder \
     libmedia \
