@@ -4,6 +4,7 @@ include $(CLEAR_VARS)
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 
 LOCAL_MODULE := mtp_ffs_handle_test
+LOCAL_COMPATIBILITY_SUITE := device-tests
 
 LOCAL_MODULE_TAGS := tests
 
