@@ -220,6 +220,8 @@ private:
     // Acquire buffer from the consumer
     status_t acquireBuffer(BufferItem *bi);
 
+    bool releaseAllBuffers();
+
     // Release buffer to the consumer
     void releaseBuffer(int id, uint64_t frameNum, const sp<Fence> &fence);
 

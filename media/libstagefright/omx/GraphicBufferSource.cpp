@@ -384,6 +384,7 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
     // to be handled and [pause, 1us], [resume 2us] will be discarded.
     bool dropped = false;
     bool done = false;
+    bool seeStopAction = false;
     if (!mActionQueue.empty()) {
         // First scan to check if bufferTimestamp is smaller than first action's timestamp.
         ActionItem nextAction = *(mActionQueue.begin());
@@ -431,7 +432,7 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
                     dropped = true;
                     // Clear the whole ActionQueue as recording is done
                     mActionQueue.clear();
-                    submitEndOfInputStream_l();
+                    seeStopAction = true;
                     break;
                 }
                 default:
@@ -443,6 +444,14 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
 
     if (dropped) {
         releaseBuffer(item.mSlot, item.mFrameNumber, item.mFence);
+        if (seeStopAction) {
+            // Clear all the buffers before setting mEndOfStream and signal EndOfInputStream.
+            if (!releaseAllBuffers()) {
+                ALOGW("Failed to release all the buffers when handling STOP action");
+            }
+            mEndOfStream = true;
+            submitEndOfInputStream_l();
+        }
         return true;
     }
 
@@ -922,18 +931,8 @@ status_t GraphicBufferSource::setSuspend(bool suspend, int64_t suspendStartTimeU
         if (suspend) {
             mSuspended = true;
 
-            while (mNumFramesAvailable > 0) {
-                BufferItem item;
-                status_t err = acquireBuffer(&item);
-
-                if (err != OK) {
-                    ALOGE("setSuspend: acquireBuffer returned err=%d", err);
-                    break;
-                }
-
-                --mNumFramesAvailable;
-
-                releaseBuffer(item.mSlot, item.mFrameNumber, item.mFence);
+            if (!releaseAllBuffers()) {
+                ALOGW("Failed to release all the buffers during suspend");
             }
             return OK;
         } else {
@@ -952,6 +951,23 @@ status_t GraphicBufferSource::setSuspend(bool suspend, int64_t suspendStartTimeU
         }
     }
     return OK;
+}
+
+bool GraphicBufferSource::releaseAllBuffers() {
+    while (mNumFramesAvailable > 0) {
+        BufferItem item;
+        status_t err = acquireBuffer(&item);
+
+        if (err != OK) {
+            ALOGE("releaseAllBuffers: acquireBuffer fail returned err=%d", err);
+            return false;;
+        }
+
+        --mNumFramesAvailable;
+
+        releaseBuffer(item.mSlot, item.mFrameNumber, item.mFence);
+    }
+    return true;
 }
 
 status_t GraphicBufferSource::setRepeatPreviousFrameDelayUs(int64_t repeatAfterUs) {
