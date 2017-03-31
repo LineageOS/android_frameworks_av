@@ -54,9 +54,7 @@ int main(int argc __unused, char** argv)
     ::android::hardware::configureRpcThreadpool(64, false);
     sp<ProcessState> proc(ProcessState::self());
 
-    int32_t trebleOmx = property_get_int32("persist.media.treble_omx", -1);
-    if ((trebleOmx == 1) || ((trebleOmx == -1) &&
-            property_get_bool("persist.hal.binderization", 0))) {
+    if (property_get_bool("persist.media.treble_omx", true)) {
         using namespace ::android::hardware::media::omx::V1_0;
         sp<IOmx> omx = new implementation::Omx();
         if (omx == nullptr) {
