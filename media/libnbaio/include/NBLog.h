@@ -136,7 +136,7 @@ public:
 
     // get format entry timestamp
     // TODO consider changing to uint64_t
-    virtual timespec     timestamp() const = 0;
+    virtual int64_t      timestamp() const = 0;
 
     // get format entry's unique id
     virtual log_hash_t   hash() const = 0;
@@ -172,7 +172,7 @@ public:
             EntryIterator    args() const;
 
     // get format entry timestamp
-    virtual timespec    timestamp() const override;
+    virtual int64_t     timestamp() const override;
 
     // get format entry's unique id
     virtual log_hash_t  hash() const override;
@@ -194,7 +194,7 @@ public:
     explicit HistogramEntry(const uint8_t *ptr) : AbstractEntry(ptr) {
     }
 
-    virtual timespec    timestamp() const override;
+    virtual int64_t     timestamp() const override;
 
     virtual log_hash_t  hash() const override;
 
@@ -231,12 +231,12 @@ public:
 
 struct HistTsEntry {
     log_hash_t hash;
-    timespec ts;
+    int64_t ts;
 }; //TODO __attribute__((packed));
 
 struct HistTsEntryWithAuthor {
     log_hash_t hash;
-    timespec ts;
+    int64_t ts;
     int author;
 }; //TODO __attribute__((packed));
 
@@ -261,8 +261,8 @@ struct HistIntEntry {
     static void    appendPID(String8 *body, const void *data, size_t length);
     static void    appendTimestamp(String8 *body, const void *data);
     static size_t  fmtEntryLength(const uint8_t *data);
-    static String8 bufferHexDump(const uint8_t *buffer, size_t size);
-    static String8 bufferHexDump(const EntryIterator &it);
+    static String8 bufferDump(const uint8_t *buffer, size_t size);
+    static String8 bufferDump(const EntryIterator &it);
 public:
 
 // Located in shared memory, must be POD.
@@ -323,7 +323,7 @@ public:
     virtual void    logf(const char *fmt, ...) __attribute__ ((format (printf, 2, 3)));
     virtual void    logvf(const char *fmt, va_list ap);
     virtual void    logTimestamp();
-    virtual void    logTimestamp(const struct timespec &ts);
+    virtual void    logTimestamp(const int64_t ts);
     virtual void    logInteger(const int x);
     virtual void    logFloat(const float x);
     virtual void    logPID();
@@ -375,7 +375,7 @@ public:
     virtual void    logf(const char *fmt, ...) __attribute__ ((format (printf, 2, 3)));
     virtual void    logvf(const char *fmt, va_list ap);
     virtual void    logTimestamp();
-    virtual void    logTimestamp(const struct timespec &ts);
+    virtual void    logTimestamp(const int64_t ts);
     virtual void    logInteger(const int x);
     virtual void    logFloat(const float x);
     virtual void    logPID();
@@ -509,8 +509,6 @@ private:
     Shared * const mShared;
     std::unique_ptr<audio_utils_fifo> mFifo;
     std::unique_ptr<audio_utils_fifo_writer> mFifoWriter;
-
-    static struct timespec getTimestamp(const uint8_t *data);
 };
 
 class MergeReader : public Reader {
@@ -561,6 +559,15 @@ private:
 };
 
 };  // class NBLog
+
+// TODO put somewhere else
+static inline int64_t get_monotonic_ns() {
+    timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
+        return (uint64_t) ts.tv_sec * 1000 * 1000 * 1000 + ts.tv_nsec;
+    }
+    return 0; // should not happen.
+}
 
 }   // namespace android
 

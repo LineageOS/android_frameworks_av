@@ -96,11 +96,11 @@ NBLog::EntryIterator NBLog::FormatEntry::args() const {
     return it;
 }
 
-timespec NBLog::FormatEntry::timestamp() const {
+int64_t NBLog::FormatEntry::timestamp() const {
     auto it = begin();
     // skip start fmt
     ++it;
-    return it.payload<timespec>();
+    return it.payload<int64_t>();
 }
 
 NBLog::log_hash_t NBLog::FormatEntry::hash() const {
@@ -222,7 +222,7 @@ bool NBLog::EntryIterator::hasConsistentLength() const {
 
 // ---------------------------------------------------------------------------
 
-timespec NBLog::HistogramEntry::timestamp() const {
+int64_t NBLog::HistogramEntry::timestamp() const {
     return EntryIterator(mEntry).payload<HistTsEntry>().ts;
 }
 
@@ -370,13 +370,15 @@ void NBLog::Writer::logTimestamp()
     if (!mEnabled) {
         return;
     }
-    struct timespec ts;
-    if (!clock_gettime(CLOCK_MONOTONIC, &ts)) {
+    int64_t ts = get_monotonic_ns();
+    if (ts > 0) {
         log(EVENT_TIMESTAMP, &ts, sizeof(ts));
+    } else {
+        ALOGE("Failed to get timestamp");
     }
 }
 
-void NBLog::Writer::logTimestamp(const struct timespec &ts)
+void NBLog::Writer::logTimestamp(const int64_t ts)
 {
     if (!mEnabled) {
         return;
@@ -444,11 +446,11 @@ void NBLog::Writer::logHistTS(log_hash_t hash)
     }
     HistTsEntry data;
     data.hash = hash;
-    int error = clock_gettime(CLOCK_MONOTONIC, &data.ts);
-    if (error == 0) {
+    data.ts = get_monotonic_ns();
+    if (data.ts > 0) {
         log(EVENT_HISTOGRAM_ENTRY_TS, &data, sizeof(data));
     } else {
-        ALOGE("Failed to get timestamp: error %d", error);
+        ALOGE("Failed to get timestamp");
     }
 }
 
@@ -459,11 +461,11 @@ void NBLog::Writer::logHistFlush(log_hash_t hash)
     }
     HistTsEntry data;
     data.hash = hash;
-    int error = clock_gettime(CLOCK_MONOTONIC, &data.ts);
-    if (error == 0) {
+    data.ts = get_monotonic_ns();
+    if (data.ts > 0) {
         log(EVENT_HISTOGRAM_FLUSH, &data, sizeof(data));
     } else {
-        ALOGE("Failed to get timestamp: error %d", error);
+        ALOGE("Failed to get timestamp");
     }
 }
 
@@ -488,7 +490,7 @@ void NBLog::Writer::logVFormat(const char *fmt, log_hash_t hash, va_list argp)
     int i;
     double f;
     char* s;
-    struct timespec t;
+    int64_t t;
     Writer::logTimestamp();
     Writer::logHash(hash);
     for (const char *p = fmt; *p != '\0'; p++) {
@@ -503,7 +505,7 @@ void NBLog::Writer::logVFormat(const char *fmt, log_hash_t hash, va_list argp)
             break;
 
         case 't': // timestamp
-            t = va_arg(argp, struct timespec);
+            t = va_arg(argp, int64_t);
             Writer::logTimestamp(t);
             break;
 
@@ -631,7 +633,7 @@ void NBLog::LockedWriter::logTimestamp()
     Writer::logTimestamp();
 }
 
-void NBLog::LockedWriter::logTimestamp(const struct timespec &ts)
+void NBLog::LockedWriter::logTimestamp(const int64_t ts)
 {
     Mutex::Autolock _l(mLock);
     Writer::logTimestamp(ts);
@@ -798,8 +800,8 @@ std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
 
 }
 
-int deltaMs(timespec *t1, timespec *t2) {
-    return (t2->tv_sec - t1->tv_sec) * 1000 + t2->tv_nsec / 1000000 - t1->tv_nsec / 1000000;
+inline static int deltaMs(int64_t t1, int64_t t2) {
+    return (t2 - t1) / (1000 * 1000);
 }
 
 void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapshot)
@@ -847,7 +849,7 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
     bool deferredTimestamp = false;
 #endif
     std::map<std::pair<log_hash_t, int>, std::vector<int>> hists;
-    std::map<std::pair<log_hash_t, int>, timespec*> lastTSs;
+    std::map<std::pair<log_hash_t, int>, int64_t*> lastTSs;
 
     for (auto entry = snapshot.begin(); entry != snapshot.end();) {
         switch (entry->type) {
@@ -928,13 +930,13 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             memcpy(&hash, &(data->hash), sizeof(hash));
             const std::pair<log_hash_t, int> key(hash, data->author);
             if (lastTSs[key] != nullptr) {
-                timespec ts1;
-                memcpy(&ts1, lastTSs[key], sizeof(timespec));
-                timespec ts2;
-                memcpy(&ts2, &data->ts, sizeof(timespec));
+                int64_t ts1;
+                memcpy(&ts1, lastTSs[key], sizeof(ts1));
+                int64_t ts2;
+                memcpy(&ts2, &data->ts, sizeof(ts2));
                 // TODO might want to filter excessively high outliers, which are usually caused
                 // by the thread being inactive.
-                hists[key].push_back(deltaMs(&ts1, &ts2));
+                hists[key].push_back(deltaMs(ts1, ts2));
             }
             lastTSs[key] = &(data->ts);
             ++entry;
@@ -995,10 +997,10 @@ bool NBLog::Reader::isIMemory(const sp<IMemory>& iMemory) const
 }
 
 void NBLog::appendTimestamp(String8 *body, const void *data) {
-    struct timespec ts;
-    memcpy(&ts, data, sizeof(struct timespec));
-    body->appendFormat("[%d.%03d]", (int) ts.tv_sec,
-                    (int) (ts.tv_nsec / 1000000));
+    int64_t ts;
+    memcpy(&ts, data, sizeof(ts));
+    body->appendFormat("[%d.%03d]", (int) (ts / (1000 * 1000 * 1000)),
+                    (int) ((ts / (1000 * 1000)) % 1000));
 }
 
 void NBLog::appendInt(String8 *body, const void *data) {
@@ -1018,31 +1020,31 @@ void NBLog::appendPID(String8 *body, const void* data, size_t length) {
     body->appendFormat("<PID: %d, name: %.*s>", id, (int) (length - sizeof(pid_t)), name);
 }
 
-String8 NBLog::bufferHexDump(const uint8_t *buffer, size_t size)
+String8 NBLog::bufferDump(const uint8_t *buffer, size_t size)
 {
     String8 str;
     str.append("[ ");
     for(size_t i = 0; i < size; i++)
     {
-        str.appendFormat("%02x ", buffer[i]);
+        str.appendFormat("%d ", buffer[i]);
     }
     str.append("]");
     return str;
 }
 
-String8 NBLog::bufferHexDump(const EntryIterator &it)
+String8 NBLog::bufferDump(const EntryIterator &it)
 {
-    return bufferHexDump(it, it->length + Entry::kOverhead);
+    return bufferDump(it, it->length + Entry::kOverhead);
 }
 
 NBLog::EntryIterator NBLog::Reader::handleFormat(const FormatEntry &fmtEntry,
                                                          String8 *timestamp,
                                                          String8 *body) {
     // log timestamp
-    struct timespec ts = fmtEntry.timestamp();
+    int64_t ts = fmtEntry.timestamp();
     timestamp->clear();
-    timestamp->appendFormat("[%d.%03d]", (int) ts.tv_sec,
-                    (int) (ts.tv_nsec / 1000000));
+    timestamp->appendFormat("[%d.%03d]", (int) (ts / (1000 * 1000 * 1000)),
+                    (int) ((ts / (1000 * 1000)) % 1000));
 
     // log unique hash
     log_hash_t hash = fmtEntry.hash();
@@ -1214,19 +1216,18 @@ void NBLog::Merger::addReader(const NBLog::NamedReader &reader) {
 // composed by a timestamp and the index of the snapshot where the timestamp came from
 struct MergeItem
 {
-    struct timespec ts;
+    int64_t ts;
     int index;
-    MergeItem(struct timespec ts, int index): ts(ts), index(index) {}
+    MergeItem(int64_t ts, int index): ts(ts), index(index) {}
 };
 
 // operators needed for priority queue in merge
-bool operator>(const struct timespec &t1, const struct timespec &t2) {
-    return t1.tv_sec > t2.tv_sec || (t1.tv_sec == t2.tv_sec && t1.tv_nsec > t2.tv_nsec);
-}
+// bool operator>(const int64_t &t1, const int64_t &t2) {
+//     return t1.tv_sec > t2.tv_sec || (t1.tv_sec == t2.tv_sec && t1.tv_nsec > t2.tv_nsec);
+// }
 
 bool operator>(const struct MergeItem &i1, const struct MergeItem &i2) {
-    return i1.ts > i2.ts ||
-        (i1.ts.tv_sec == i2.ts.tv_sec && i1.ts.tv_nsec == i2.ts.tv_nsec && i1.index > i2.index);
+    return i1.ts > i2.ts || (i1.ts == i2.ts && i1.index > i2.index);
 }
 
 // Merge registered readers, sorted by timestamp
@@ -1245,7 +1246,7 @@ void NBLog::Merger::merge() {
     for (int i = 0; i < nLogs; ++i)
     {
         if (offsets[i] != snapshots[i]->end()) {
-            timespec ts = AbstractEntry::buildEntry(offsets[i])->timestamp();
+            int64_t ts = AbstractEntry::buildEntry(offsets[i])->timestamp();
             timestamps.emplace(ts, i);
         }
     }
@@ -1259,7 +1260,7 @@ void NBLog::Merger::merge() {
         // update data structures
         timestamps.pop();
         if (offsets[index] != snapshots[index]->end()) {
-            timespec ts = AbstractEntry::buildEntry(offsets[index])->timestamp();
+            int64_t ts = AbstractEntry::buildEntry(offsets[index])->timestamp();
             timestamps.emplace(ts, index);
         }
     }
