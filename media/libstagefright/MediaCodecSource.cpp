@@ -958,6 +958,10 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
             CHECK(msg->findInt32("err", &err));
             ALOGE("Encoder (%s) reported error : 0x%x",
                     mIsVideo ? "video" : "audio", err);
+            if (!(mFlags & FLAG_USE_SURFACE_INPUT)) {
+                mStopping = true;
+                mPuller->stop();
+            }
             signalEOS();
        }
        break;
