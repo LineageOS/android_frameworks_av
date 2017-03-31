@@ -908,9 +908,7 @@ int main(int argc, char **argv) {
 
     if (listComponents) {
         sp<IOMX> omx;
-        int32_t trebleOmx = property_get_int32("persist.media.treble_omx", -1);
-        if ((trebleOmx == 1) || ((trebleOmx == -1) &&
-                property_get_bool("persist.hal.binderization", 0))) {
+        if (property_get_bool("persist.media.treble_omx", true)) {
             using namespace ::android::hardware::media::omx::V1_0;
             sp<IOmx> tOmx = IOmx::getService();
 
