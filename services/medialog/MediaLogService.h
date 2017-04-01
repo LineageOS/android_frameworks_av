@@ -49,7 +49,8 @@ private:
     // Internal dump
     static const int kDumpLockRetries = 50;
     static const int kDumpLockSleepUs = 20000;
-    static const size_t kMergeBufferSize = 16 * 1024; // TODO determine good value for this
+    // Size of merge buffer, in bytes
+    static const size_t kMergeBufferSize = 64 * 1024; // TODO determine good value for this
     static bool dumpTryLock(Mutex& mutex);
 
     Mutex               mLock;

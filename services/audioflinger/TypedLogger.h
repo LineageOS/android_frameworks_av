@@ -19,7 +19,72 @@
 #define ANDROID_TYPED_LOGGER_H
 
 #include <media/nbaio/NBLog.h>
-#define LOGT(fmt, ...) logWriterTLS->logFormat(fmt, ##__VA_ARGS__) // TODO: check null pointer
+#include <algorithm>
+
+/*
+Fowler-Noll-Vo (FNV-1a) hash function for the file name.
+Hashes at compile time. FNV-1a iterative function:
+
+hash = offset_basis
+for each byte to be hashed
+        hash = hash xor byte
+        hash = hash * FNV_prime
+return hash
+
+offset_basis and FNV_prime values depend on the size of the hash output
+Following values are defined by FNV and should not be changed arbitrarily
+*/
+
+template<typename T>
+constexpr T offset_basis();
+
+template<typename T>
+constexpr T FNV_prime();
+
+template<>
+constexpr uint32_t offset_basis<uint32_t>() {
+    return 2166136261u;
+}
+
+template<>
+constexpr uint32_t FNV_prime<uint32_t>() {
+    return 16777619u;
+}
+
+template<>
+constexpr uint64_t offset_basis<uint64_t>() {
+    return 14695981039346656037ull;
+}
+
+template<>
+constexpr uint64_t FNV_prime<uint64_t>() {
+    return 1099511628211ull;
+}
+
+template <typename T, size_t n>
+constexpr T fnv1a(const char (&file)[n], int i = n - 1) {
+    return i == -1 ? offset_basis<T>() : (fnv1a<T>(file, i - 1) ^ file[i]) * FNV_prime<T>();
+}
+
+template <size_t n>
+constexpr uint64_t hash(const char (&file)[n], uint32_t line) {
+    // Line numbers over or equal to 2^16 are clamped to 2^16 - 1. This way increases collisions
+    // compared to wrapping around, but is easy to identify because it doesn't produce aliasing.
+    // It's a very unlikely case anyways.
+    return ((fnv1a<uint64_t>(file) << 16) ^ ((fnv1a<uint64_t>(file) >> 32) & 0xFFFF0000)) |
+           std::min(line, 0xFFFFu);
+}
+
+// Write formatted entry to log
+#define LOGT(fmt, ...) logWriterTLS->logFormat((fmt), \
+                                               hash(__FILE__, __LINE__), \
+                                               ##__VA_ARGS__) // TODO: check null pointer
+
+// Write histogram timestamp entry
+#define LOG_HIST_TS() logWriterTLS->logHistTS(hash(__FILE__, __LINE__))
+
+// flush all histogram
+#define LOG_HIST_FLUSH() logWriterTLS->logHistFlush(hash(__FILE__, __LINE__))
 
 namespace android {
 extern "C" {
