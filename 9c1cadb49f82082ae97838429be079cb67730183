@@ -1,0 +1,44 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ba57610f_9f3a0035",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 1
+      },
+      "lineNbr": 9,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2017-04-01T20:43:01Z",
+      "side": 1,
+      "message": "line break please",
+      "revId": "9c1cadb49f82082ae97838429be079cb67730183",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba57610f_7f3f4c26",
+        "filename": "media/libstagefright/SurfaceMediaSource.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 430,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2017-04-01T20:43:01Z",
+      "side": 1,
+      "message": "Does this need to be flagged for legacy buffer compat?",
+      "range": {
+        "startLine": 430,
+        "startChar": 49,
+        "endLine": 430,
+        "endChar": 64
+      },
+      "revId": "9c1cadb49f82082ae97838429be079cb67730183",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
