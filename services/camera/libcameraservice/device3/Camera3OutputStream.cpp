@@ -347,7 +347,9 @@ status_t Camera3OutputStream::configureConsumerQueueLocked() {
 
     // Configure consumer-side ANativeWindow interface. The listener may be used
     // to notify buffer manager (if it is used) of the returned buffers.
-    res = mConsumer->connect(NATIVE_WINDOW_API_CAMERA, /*listener*/mBufferReleasedListener);
+    res = mConsumer->connect(NATIVE_WINDOW_API_CAMERA,
+            /*listener*/mBufferReleasedListener,
+            /*reportBufferRemoval*/true);
     if (res != OK) {
         ALOGE("%s: Unable to connect to native window for stream %d",
                 __FUNCTION__, mId);
@@ -543,6 +545,14 @@ status_t Camera3OutputStream::getBufferLockedCommon(ANativeWindowBuffer** anb, i
         }
     }
 
+    if (res == OK) {
+        std::vector<sp<GraphicBuffer>> removedBuffers;
+        res = mConsumer->getAndFlushRemovedBuffers(&removedBuffers);
+        if (res == OK) {
+            onBuffersRemovedLocked(removedBuffers);
+        }
+    }
+
     return res;
 }
 
@@ -686,6 +696,16 @@ void Camera3OutputStream::BufferReleasedListener::onBufferReleased() {
     }
 }
 
+void Camera3OutputStream::onBuffersRemovedLocked(
+        const std::vector<sp<GraphicBuffer>>& removedBuffers) {
+    Camera3StreamBufferFreedListener* callback = mBufferFreedListener;
+    if (callback != nullptr) {
+        for (auto gb : removedBuffers) {
+            callback->onBufferFreed(mId, gb->handle);
+        }
+    }
+}
+
 status_t Camera3OutputStream::detachBuffer(sp<GraphicBuffer>* buffer, int* fenceFd) {
     Mutex::Autolock l(mLock);
 
@@ -718,7 +738,12 @@ status_t Camera3OutputStream::detachBuffer(sp<GraphicBuffer>* buffer, int* fence
         }
     }
 
-    return OK;
+    std::vector<sp<GraphicBuffer>> removedBuffers;
+    res = mConsumer->getAndFlushRemovedBuffers(&removedBuffers);
+    if (res == OK) {
+        onBuffersRemovedLocked(removedBuffers);
+    }
+    return res;
 }
 
 status_t Camera3OutputStream::notifyBufferReleased(ANativeWindowBuffer* /*anwBuffer*/) {
