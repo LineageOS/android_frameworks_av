@@ -22,6 +22,7 @@
 
 #include <binder/IMemory.h>
 #include <media/Crypto.h>
+#include <media/DrmPluginPath.h>
 #include <media/hardware/CryptoAPI.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AString.h>
@@ -102,7 +103,7 @@ void Crypto::findFactoryForScheme(const uint8_t uuid[16]) {
     }
 
     // no luck, have to search
-    String8 dirPath("/vendor/lib/mediadrm");
+    String8 dirPath(getDrmPluginPath());
     String8 pluginPath;
 
     DIR* pDir = opendir(dirPath.string());
