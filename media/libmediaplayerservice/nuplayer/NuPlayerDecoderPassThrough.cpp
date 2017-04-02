@@ -294,6 +294,9 @@ void NuPlayer::DecoderPassThrough::onInputBufferFetched(
             return;
         }
 
+        if (streamErr != ERROR_END_OF_STREAM) {
+            handleError(streamErr);
+        }
         mReachedEOS = true;
         if (mRenderer != NULL) {
             mRenderer->queueEOS(true /* audio */, ERROR_END_OF_STREAM);
