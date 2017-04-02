@@ -397,13 +397,13 @@ status_t StagefrightRecorder::setNextOutputFile(int fd) {
 
 // Attempt to parse an float literal optionally surrounded by whitespace,
 // returns true on success, false otherwise.
-static bool safe_strtof(const char *s, float *val) {
+static bool safe_strtod(const char *s, double *val) {
     char *end;
 
     // It is lame, but according to man page, we have to set errno to 0
-    // before calling strtof().
+    // before calling strtod().
     errno = 0;
-    *val = strtof(s, &end);
+    *val = strtod(s, &end);
 
     if (end == s || errno == ERANGE) {
         return false;
@@ -706,13 +706,23 @@ status_t StagefrightRecorder::setParamCaptureFpsEnable(int32_t captureFpsEnable)
     return OK;
 }
 
-status_t StagefrightRecorder::setParamCaptureFps(float fps) {
+status_t StagefrightRecorder::setParamCaptureFps(double fps) {
     ALOGV("setParamCaptureFps: %.2f", fps);
 
-    int64_t timeUs = (int64_t) (1000000.0 / fps + 0.5f);
+    constexpr int64_t k1E12 = 1000000000000ll;
+    int64_t fpsx1e12 = k1E12 * fps;
+    if (fpsx1e12 == 0) {
+        ALOGE("FPS is zero or too small");
+        return BAD_VALUE;
+    }
 
-    // Not allowing time more than a day
-    if (timeUs <= 0 || timeUs > 86400*1E6) {
+    // This does not overflow since 10^6 * 10^12 < 2^63
+    int64_t timeUs = 1000000ll * k1E12 / fpsx1e12;
+
+    // Not allowing time more than a day and a millisecond for error margin.
+    // Note: 1e12 / 86400 = 11574074.(074) and 1e18 / 11574074 = 86400000553;
+    //       therefore 1 ms of margin should be sufficient.
+    if (timeUs <= 0 || timeUs > 86400001000ll) {
         ALOGE("Time between frame capture (%lld) is out of range [0, 1 Day]", (long long)timeUs);
         return BAD_VALUE;
     }
@@ -846,8 +856,8 @@ status_t StagefrightRecorder::setParameter(
             return setParamCaptureFpsEnable(captureFpsEnable);
         }
     } else if (key == "time-lapse-fps") {
-        float fps;
-        if (safe_strtof(value.string(), &fps)) {
+        double fps;
+        if (safe_strtod(value.string(), &fps)) {
             return setParamCaptureFps(fps);
         }
     } else {
@@ -2073,7 +2083,7 @@ status_t StagefrightRecorder::reset() {
     mMaxFileSizeBytes = 0;
     mTrackEveryTimeDurationUs = 0;
     mCaptureFpsEnable = false;
-    mCaptureFps = 0.0f;
+    mCaptureFps = 0.0;
     mTimeBetweenCaptureUs = -1;
     mCameraSourceTimeLapse = NULL;
     mMetaDataStoredInVideoBuffers = kMetadataBufferTypeInvalid;
