@@ -21,6 +21,7 @@
 #include <dirent.h>
 #include <dlfcn.h>
 
+#include <media/DrmPluginPath.h>
 #include <media/DrmSessionClientInterface.h>
 #include <media/DrmSessionManager.h>
 #include <media/Drm.h>
@@ -220,7 +221,7 @@ void Drm::findFactoryForScheme(const uint8_t uuid[16]) {
     }
 
     // no luck, have to search
-    String8 dirPath("/vendor/lib/mediadrm");
+    String8 dirPath(getDrmPluginPath());
     DIR* pDir = opendir(dirPath.string());
 
     if (pDir == NULL) {

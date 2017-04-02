@@ -18,6 +18,7 @@ LOCAL_SRC_FILES := \
 LOCAL_SRC_FILES += \
     CasImpl.cpp \
     DescramblerImpl.cpp \
+    DrmPluginPath.cpp \
     DrmSessionManager.cpp \
     ICrypto.cpp \
     IDrm.cpp \
