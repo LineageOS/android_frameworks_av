@@ -57,6 +57,9 @@ LOCAL_SRC_FILES :=  \
     utils/AutoConditionLock.cpp \
     utils/TagMonitor.cpp
 
+LOCAL_STATIC_LIBRARIES:= \
+    libgrallocusage
+
 LOCAL_SHARED_LIBRARIES:= \
     libui \
     liblog \

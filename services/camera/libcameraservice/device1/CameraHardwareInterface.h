@@ -461,7 +461,7 @@ private:
     hardware::Return<hardware::camera::common::V1_0::Status>
             setCrop(int32_t left, int32_t top, int32_t right, int32_t bottom) override;
     hardware::Return<hardware::camera::common::V1_0::Status>
-            setUsage(hardware::graphics::allocator::V2_0::ProducerUsage usage) override;
+            setUsage(hardware::camera::device::V1_0::ProducerUsageFlags usage) override;
     hardware::Return<hardware::camera::common::V1_0::Status>
             setSwapInterval(int32_t interval) override;
     hardware::Return<void> getMinUndequeuedBufferCount(
