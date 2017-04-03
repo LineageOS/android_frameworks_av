@@ -490,7 +490,11 @@ int MtpFfsHandle::start() {
 
 int MtpFfsHandle::configure(bool usePtp) {
     // Wait till previous server invocation has closed
-    std::lock_guard<std::mutex> lk(mLock);
+    if (!mLock.try_lock_for(std::chrono::milliseconds(1000))) {
+        LOG(ERROR) << "MtpServer was unable to get configure lock";
+        return -1;
+    }
+    int ret = 0;
 
     // If ptp is changed, the configuration must be rewritten
     if (mPtp != usePtp) {
@@ -500,10 +504,10 @@ int MtpFfsHandle::configure(bool usePtp) {
     mPtp = usePtp;
 
     if (!initFunctionfs()) {
-        return -1;
+        ret = -1;
     }
-
-    return 0;
+    mLock.unlock();
+    return ret;
 }
 
 void MtpFfsHandle::close() {
