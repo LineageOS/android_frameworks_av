@@ -183,6 +183,11 @@ private:
 
     void writeByteArray(Parcel &obj, const hidl_vec<uint8_t>& array);
 
+    void reportMetrics() const;
+    status_t getPropertyStringInternal(String8 const &name, String8 &value) const;
+    status_t getPropertyByteArrayInternal(String8 const &name,
+                                          Vector<uint8_t> &value) const;
+
     DISALLOW_EVIL_CONSTRUCTORS(DrmHal);
 };
 
