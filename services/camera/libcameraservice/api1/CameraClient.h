@@ -50,6 +50,8 @@ public:
     virtual bool            recordingEnabled();
     virtual void            releaseRecordingFrame(const sp<IMemory>& mem);
     virtual void            releaseRecordingFrameHandle(native_handle_t *handle);
+    virtual void            releaseRecordingFrameHandleBatch(
+                                    const std::vector<native_handle_t*>& handles);
     virtual status_t        autoFocus();
     virtual status_t        cancelAutoFocus();
     virtual status_t        takePicture(int msgType);
@@ -109,6 +111,8 @@ private:
     static void             dataCallback(int32_t msgType, const sp<IMemory>& dataPtr,
             camera_frame_metadata_t *metadata, void* user);
     static void             dataCallbackTimestamp(nsecs_t timestamp, int32_t msgType, const sp<IMemory>& dataPtr, void* user);
+    static void             handleCallbackTimestampBatch(
+                                    int32_t msgType, const std::vector<HandleTimestampMessage>&, void* user);
     // handlers for messages
     void                    handleShutter(void);
     void                    handlePreviewData(int32_t msgType, const sp<IMemory>& mem,

@@ -48,6 +48,15 @@ typedef void (*data_callback_timestamp)(nsecs_t timestamp,
                             const sp<IMemory> &dataPtr,
                             void *user);
 
+struct HandleTimestampMessage {
+    nsecs_t timestamp;
+    const sp<IMemory> dataPtr;
+};
+
+typedef void (*data_callback_timestamp_batch)(
+        int32_t msgType,
+        const std::vector<HandleTimestampMessage>&, void* user);
+
 /**
  * CameraHardwareInterface.h defines the interface to the
  * camera hardware abstraction layer, used for setting and getting
@@ -112,6 +121,7 @@ public:
     void setCallbacks(notify_callback notify_cb,
                       data_callback data_cb,
                       data_callback_timestamp data_cb_timestamp,
+                      data_callback_timestamp_batch data_cb_timestamp_batch,
                       void* user);
 
     /**
@@ -225,6 +235,20 @@ public:
      * frames.
      */
     void releaseRecordingFrame(const sp<IMemory>& mem);
+
+    /**
+     * Release a batch of recording frames previously returned by
+     * CAMERA_MSG_VIDEO_FRAME. This method only supports frames that are
+     * stored as VideoNativeHandleMetadata.
+     *
+     * It is camera hal client's responsibility to release video recording
+     * frames sent out by the camera hal before the camera hal receives
+     * a call to disableMsgType(CAMERA_MSG_VIDEO_FRAME). After it receives
+     * the call to disableMsgType(CAMERA_MSG_VIDEO_FRAME), it is camera hal's
+     * responsibility of managing the life-cycle of the video recording
+     * frames.
+     */
+    void releaseRecordingFrameBatch(const std::vector<sp<IMemory>>& frames);
 
     /**
      * Start auto focus, the notification callback routine is called
@@ -416,6 +440,10 @@ private:
             hardware::camera::device::V1_0::DataCallbackMsg msgType,
             const hardware::hidl_handle& frameData, uint32_t data,
             uint32_t bufferIndex, int64_t timestamp) override;
+    hardware::Return<void> handleCallbackTimestampBatch(
+            hardware::camera::device::V1_0::DataCallbackMsg msgType,
+            const hardware::hidl_vec<
+                    hardware::camera::device::V1_0::HandleTimestampMessage>&) override;
 
     /**
      * Implementation of android::hardware::camera::device::V1_0::ICameraDevicePreviewCallback
@@ -450,9 +478,10 @@ private:
 
     struct camera_preview_window mHalPreviewWindow;
 
-    notify_callback         mNotifyCb;
-    data_callback           mDataCb;
-    data_callback_timestamp mDataCbTimestamp;
+    notify_callback               mNotifyCb;
+    data_callback                 mDataCb;
+    data_callback_timestamp       mDataCbTimestamp;
+    data_callback_timestamp_batch mDataCbTimestampBatch;
     void *mCbUser;
 
     // Cached values for preview stream parameters

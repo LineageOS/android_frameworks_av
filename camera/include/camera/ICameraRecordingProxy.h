@@ -17,6 +17,7 @@
 #ifndef ANDROID_HARDWARE_ICAMERA_RECORDING_PROXY_H
 #define ANDROID_HARDWARE_ICAMERA_RECORDING_PROXY_H
 
+#include <vector>
 #include <binder/IInterface.h>
 #include <cutils/native_handle.h>
 #include <utils/RefBase.h>
@@ -85,6 +86,8 @@ public:
     virtual void            stopRecording() = 0;
     virtual void            releaseRecordingFrame(const sp<IMemory>& mem) = 0;
     virtual void            releaseRecordingFrameHandle(native_handle_t *handle) = 0;
+    virtual void            releaseRecordingFrameHandleBatch(
+                                    const std::vector<native_handle_t*>& handles) = 0;
 };
 
 // ----------------------------------------------------------------------------

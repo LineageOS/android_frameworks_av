@@ -1261,6 +1261,13 @@ void Camera2Client::releaseRecordingFrameHandle(native_handle_t *handle) {
     ALOGW("%s: Not supported in buffer queue mode.", __FUNCTION__);
 }
 
+void Camera2Client::releaseRecordingFrameHandleBatch(
+        const std::vector<native_handle_t*>& handles) {
+    (void)handles;
+    ATRACE_CALL();
+    ALOGW("%s: Not supported in buffer queue mode.", __FUNCTION__);
+}
+
 status_t Camera2Client::autoFocus() {
     ATRACE_CALL();
     Mutex::Autolock icl(mBinderSerializationLock);

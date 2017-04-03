@@ -193,6 +193,36 @@ hardware::Return<void> CameraHardwareInterface::handleCallbackTimestamp(
     return hardware::Void();
 }
 
+hardware::Return<void> CameraHardwareInterface::handleCallbackTimestampBatch(
+        DataCallbackMsg msgType,
+        const hardware::hidl_vec<hardware::camera::device::V1_0::HandleTimestampMessage>& messages) {
+    std::vector<android::HandleTimestampMessage> msgs;
+    msgs.reserve(messages.size());
+
+    for (const auto& hidl_msg : messages) {
+        if (mHidlMemPoolMap.count(hidl_msg.data) == 0) {
+            ALOGE("%s: memory pool ID %d not found", __FUNCTION__, hidl_msg.data);
+            return hardware::Void();
+        }
+        sp<CameraHeapMemory> mem(
+                static_cast<CameraHeapMemory *>(mHidlMemPoolMap.at(hidl_msg.data)->handle));
+
+        if (hidl_msg.bufferIndex >= mem->mNumBufs) {
+            ALOGE("%s: invalid buffer index %d, max allowed is %d", __FUNCTION__,
+                 hidl_msg.bufferIndex, mem->mNumBufs);
+            return hardware::Void();
+        }
+        VideoNativeHandleMetadata* md = (VideoNativeHandleMetadata*)
+                mem->mBuffers[hidl_msg.bufferIndex]->pointer();
+        md->pHandle = const_cast<native_handle_t*>(hidl_msg.frameData.getNativeHandle());
+
+        msgs.push_back({hidl_msg.timestamp, mem->mBuffers[hidl_msg.bufferIndex]});
+    }
+
+    mDataCbTimestampBatch((int32_t) msgType, msgs, mCbUser);
+    return hardware::Void();
+}
+
 std::pair<bool, uint64_t> CameraHardwareInterface::getBufferId(
         ANativeWindowBuffer* anb) {
     std::lock_guard<std::mutex> lock(mBufferIdMapLock);
@@ -468,11 +498,13 @@ status_t CameraHardwareInterface::setPreviewWindow(const sp<ANativeWindow>& buf)
 void CameraHardwareInterface::setCallbacks(notify_callback notify_cb,
         data_callback data_cb,
         data_callback_timestamp data_cb_timestamp,
+        data_callback_timestamp_batch data_cb_timestamp_batch,
         void* user)
 {
     mNotifyCb = notify_cb;
     mDataCb = data_cb;
     mDataCbTimestamp = data_cb_timestamp;
+    mDataCbTimestampBatch = data_cb_timestamp_batch;
     mCbUser = user;
 
     ALOGV("%s(%s)", __FUNCTION__, mName.string());
@@ -625,6 +657,44 @@ void CameraHardwareInterface::releaseRecordingFrame(const sp<IMemory>& mem)
     } else if (mDevice && mDevice->ops->release_recording_frame) {
         void *data = ((uint8_t *)heap->base()) + offset;
         return mDevice->ops->release_recording_frame(mDevice, data);
+    }
+}
+
+void CameraHardwareInterface::releaseRecordingFrameBatch(const std::vector<sp<IMemory>>& frames)
+{
+    ALOGV("%s(%s)", __FUNCTION__, mName.string());
+    size_t n = frames.size();
+    std::vector<VideoFrameMessage> msgs;
+    msgs.reserve(n);
+    for (auto& mem : frames) {
+        if (CC_LIKELY(mHidlDevice != nullptr)) {
+            ssize_t offset;
+            size_t size;
+            sp<IMemoryHeap> heap = mem->getMemory(&offset, &size);
+            if (size == sizeof(VideoNativeHandleMetadata)) {
+                uint32_t heapId = heap->getHeapID();
+                uint32_t bufferIndex = offset / size;
+                VideoNativeHandleMetadata* md = (VideoNativeHandleMetadata*) mem->pointer();
+                // Caching the handle here because md->pHandle will be subject to HAL's edit
+                native_handle_t* nh = md->pHandle;
+                VideoFrameMessage msg;
+                msgs.push_back({nh, heapId, bufferIndex});
+            } else {
+                ALOGE("%s only supports VideoNativeHandleMetadata mode", __FUNCTION__);
+                return;
+            }
+        } else {
+            ALOGE("Non HIDL mode do not support %s", __FUNCTION__);
+            return;
+        }
+    }
+
+    mHidlDevice->releaseRecordingFrameHandleBatch(msgs);
+
+    for (auto& msg : msgs) {
+        native_handle_t* nh = const_cast<native_handle_t*>(msg.frameData.getNativeHandle());
+        native_handle_close(nh);
+        native_handle_delete(nh);
     }
 }
 

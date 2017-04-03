@@ -98,6 +98,7 @@ status_t CameraClient::initializeImpl(TProviderPtr providerPtr) {
     mHardware->setCallbacks(notifyCallback,
             dataCallback,
             dataCallbackTimestamp,
+            handleCallbackTimestampBatch,
             (void *)(uintptr_t)mCameraId);
 
     // Enable zoom, error, focus, and metadata messages by default
@@ -533,6 +534,50 @@ void CameraClient::releaseRecordingFrameHandle(native_handle_t *handle) {
     mHardware->releaseRecordingFrame(dataPtr);
 }
 
+void CameraClient::releaseRecordingFrameHandleBatch(const std::vector<native_handle_t*>& handles) {
+    size_t n = handles.size();
+    std::vector<sp<IMemory>> frames;
+    frames.reserve(n);
+    bool error = false;
+    for (auto& handle : handles) {
+        sp<IMemory> dataPtr;
+        {
+            Mutex::Autolock l(mAvailableCallbackBuffersLock);
+            if (!mAvailableCallbackBuffers.empty()) {
+                dataPtr = mAvailableCallbackBuffers.back();
+                mAvailableCallbackBuffers.pop_back();
+            }
+        }
+
+        if (dataPtr == nullptr) {
+            ALOGE("%s: %d: No callback buffer available. Dropping frames.", __FUNCTION__,
+                    __LINE__);
+            error = true;
+            break;
+        } else if (dataPtr->size() != sizeof(VideoNativeHandleMetadata)) {
+            ALOGE("%s: %d: Callback buffer must be VideoNativeHandleMetadata", __FUNCTION__,
+                    __LINE__);
+            error = true;
+            break;
+        }
+
+        VideoNativeHandleMetadata *metadata = (VideoNativeHandleMetadata*)(dataPtr->pointer());
+        metadata->eType = kMetadataBufferTypeNativeHandleSource;
+        metadata->pHandle = handle;
+        frames.push_back(dataPtr);
+    }
+
+    if (error) {
+        for (auto& handle : handles) {
+            native_handle_close(handle);
+            native_handle_delete(handle);
+        }
+    } else {
+        mHardware->releaseRecordingFrameBatch(frames);
+    }
+    return;
+}
+
 status_t CameraClient::setVideoBufferMode(int32_t videoBufferMode) {
     LOG1("setVideoBufferMode: %d", videoBufferMode);
     bool enableMetadataInBuffers = false;
@@ -853,6 +898,49 @@ void CameraClient::dataCallbackTimestamp(nsecs_t timestamp,
     }
 
     client->handleGenericDataTimestamp(timestamp, msgType, dataPtr);
+}
+
+void CameraClient::handleCallbackTimestampBatch(
+        int32_t msgType, const std::vector<HandleTimestampMessage>& msgs, void* user) {
+    LOG2("dataCallbackTimestampBatch");
+    sp<CameraClient> client = getClientFromCookie(user);
+    if (client.get() == nullptr) return;
+    if (!client->lockIfMessageWanted(msgType)) return;
+
+    sp<hardware::ICameraClient> c = client->mRemoteCallback;
+    client->mLock.unlock();
+    if (c != 0 && msgs.size() > 0) {
+        size_t n = msgs.size();
+        std::vector<nsecs_t> timestamps;
+        std::vector<native_handle_t*> handles;
+        timestamps.reserve(n);
+        handles.reserve(n);
+        for (auto& msg : msgs) {
+            native_handle_t* handle = nullptr;
+            if (msg.dataPtr->size() != sizeof(VideoNativeHandleMetadata)) {
+                ALOGE("%s: dataPtr does not contain VideoNativeHandleMetadata!", __FUNCTION__);
+                return;
+            }
+            VideoNativeHandleMetadata *metadata =
+                (VideoNativeHandleMetadata*)(msg.dataPtr->pointer());
+            if (metadata->eType == kMetadataBufferTypeNativeHandleSource) {
+                handle = metadata->pHandle;
+            }
+
+            if (handle == nullptr) {
+                ALOGE("%s: VideoNativeHandleMetadata type mismatch or null handle passed!",
+                        __FUNCTION__);
+                return;
+            }
+            {
+                Mutex::Autolock l(client->mAvailableCallbackBuffersLock);
+                client->mAvailableCallbackBuffers.push_back(msg.dataPtr);
+            }
+            timestamps.push_back(msg.timestamp);
+            handles.push_back(handle);
+        }
+        c->recordingFrameHandleCallbackTimestampBatch(timestamps, handles);
+    }
 }
 
 // snapshot taken callback

@@ -32,6 +32,7 @@ enum {
     DATA_CALLBACK,
     DATA_CALLBACK_TIMESTAMP,
     RECORDING_FRAME_HANDLE_CALLBACK_TIMESTAMP,
+    RECORDING_FRAME_HANDLE_CALLBACK_TIMESTAMP_BATCH,
 };
 
 class BpCameraClient: public BpInterface<ICameraClient>
@@ -89,6 +90,29 @@ public:
         data.writeInt64(timestamp);
         data.writeNativeHandle(handle);
         remote()->transact(RECORDING_FRAME_HANDLE_CALLBACK_TIMESTAMP, data, &reply,
+                IBinder::FLAG_ONEWAY);
+    }
+
+    void recordingFrameHandleCallbackTimestampBatch(
+            const std::vector<nsecs_t>& timestamps,
+            const std::vector<native_handle_t*>& handles) {
+        ALOGV("recordingFrameHandleCallbackTimestampBatch");
+        Parcel data, reply;
+        data.writeInterfaceToken(ICameraClient::getInterfaceDescriptor());
+        uint32_t n = timestamps.size();
+        if (n != handles.size()) {
+            ALOGE("%s: size of timestamps(%zu) and handles(%zu) mismatch!",
+                    __FUNCTION__, timestamps.size(), handles.size());
+            return;
+        }
+        data.writeUint32(n);
+        for (auto ts : timestamps) {
+            data.writeInt64(ts);
+        }
+        for (auto& handle : handles) {
+            data.writeNativeHandle(handle);
+        }
+        remote()->transact(RECORDING_FRAME_HANDLE_CALLBACK_TIMESTAMP_BATCH, data, &reply,
                 IBinder::FLAG_ONEWAY);
     }
 };
@@ -152,6 +176,41 @@ status_t BnCameraClient::onTransact(
 
             // The native handle will be freed in BpCamera::releaseRecordingFrameHandle.
             recordingFrameHandleCallbackTimestamp(timestamp, handle);
+            return NO_ERROR;
+        } break;
+        case RECORDING_FRAME_HANDLE_CALLBACK_TIMESTAMP_BATCH: {
+            ALOGV("RECORDING_FRAME_HANDLE_CALLBACK_TIMESTAMP_BATCH");
+            CHECK_INTERFACE(ICameraClient, data, reply);
+            uint32_t n = 0;
+            status_t res = data.readUint32(&n);
+            if (res != OK) {
+                ALOGE("%s: Failed to read batch size: %s (%d)", __FUNCTION__, strerror(-res), res);
+                return BAD_VALUE;
+            }
+            std::vector<nsecs_t> timestamps;
+            std::vector<native_handle_t*> handles;
+            timestamps.reserve(n);
+            handles.reserve(n);
+            for (uint32_t i = 0; i < n; i++) {
+                res = data.readInt64(&timestamps[i]);
+                if (res != OK) {
+                    ALOGE("%s: Failed to read timestamp[%d]: %s (%d)",
+                            __FUNCTION__, i, strerror(-res), res);
+                    return BAD_VALUE;
+                }
+            }
+            for (uint32_t i = 0; i < n; i++) {
+                native_handle_t* handle = data.readNativeHandle();
+                if (handle == nullptr) {
+                    ALOGE("%s: Received a null native handle at handles[%d]",
+                            __FUNCTION__, i);
+                    return BAD_VALUE;
+                }
+                handles.push_back(handle);
+            }
+
+            // The native handle will be freed in BpCamera::releaseRecordingFrameHandleBatch.
+            recordingFrameHandleCallbackTimestampBatch(timestamps, handles);
             return NO_ERROR;
         } break;
         default:

@@ -18,6 +18,7 @@
 
 #define CAMERA_SOURCE_H_
 
+#include <deque>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaSource.h>
 #include <camera/android/hardware/ICamera.h>
@@ -142,6 +143,9 @@ protected:
                 const sp<IMemory> &data);
         virtual void recordingFrameHandleCallbackTimestamp(int64_t timestampUs,
                 native_handle_t* handle);
+        virtual void recordingFrameHandleCallbackTimestampBatch(
+                const std::vector<int64_t>& timestampsUs,
+                const std::vector<native_handle_t*>& handles);
 
     private:
         sp<CameraSource> mSource;
@@ -214,6 +218,8 @@ protected:
     virtual status_t startCameraRecording();
     virtual void releaseRecordingFrame(const sp<IMemory>& frame);
     virtual void releaseRecordingFrameHandle(native_handle_t* handle);
+    // stagefright recorder not using this for now
+    virtual void releaseRecordingFrameHandleBatch(const std::vector<native_handle_t*>& handles);
 
     // Returns true if need to skip the current frame.
     // Called from dataCallbackTimestamp.
@@ -227,6 +233,10 @@ protected:
 
     virtual void recordingFrameHandleCallbackTimestamp(int64_t timestampUs,
             native_handle_t* handle);
+
+    virtual void recordingFrameHandleCallbackTimestampBatch(
+            const std::vector<int64_t>& timestampsUs,
+            const std::vector<native_handle_t*>& handles);
 
     // Process a buffer item received in BufferQueueListener.
     virtual void processBufferQueueFrame(BufferItem& buffer);
@@ -272,6 +282,13 @@ private:
     // This is protected by mLock.
     KeyedVector<ANativeWindowBuffer*, BufferItem> mReceivedBufferItemMap;
     sp<BufferQueueListener> mBufferQueueListener;
+
+    Mutex mBatchLock; // protecting access to mInflightXXXXX members below
+    // Start of members protected by mBatchLock
+    std::deque<uint32_t> mInflightBatchSizes;
+    std::vector<native_handle_t*> mInflightReturnedHandles;
+    std::vector<const sp<IMemory>> mInflightReturnedMemorys;
+    // End of members protected by mBatchLock
 
     void releaseQueuedFrames();
     void releaseOneRecordingFrame(const sp<IMemory>& frame);
