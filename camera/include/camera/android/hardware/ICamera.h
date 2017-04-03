@@ -101,6 +101,11 @@ public:
     // ICameraClient::recordingFrameHandleCallbackTimestamp.
     virtual void            releaseRecordingFrameHandle(native_handle_t *handle) = 0;
 
+    // Release a batch of recording frame handles that was received via
+    // ICameraClient::recordingFrameHandleCallbackTimestampBatch
+    virtual void            releaseRecordingFrameHandleBatch(
+            const std::vector<native_handle_t*>& handles) = 0;
+
     // auto focus
     virtual status_t        autoFocus() = 0;
 
