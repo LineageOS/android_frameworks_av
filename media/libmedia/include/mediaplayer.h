@@ -133,6 +133,10 @@ enum media_info_type {
     MEDIA_INFO_NOT_SEEKABLE = 801,
     // New media metadata is available.
     MEDIA_INFO_METADATA_UPDATE = 802,
+    // Audio can not be played.
+    MEDIA_INFO_PLAY_AUDIO_ERROR = 804,
+    // Video can not be played.
+    MEDIA_INFO_PLAY_VIDEO_ERROR = 805,
 
     //9xx
     MEDIA_INFO_TIMED_TEXT_ERROR = 900,
