@@ -47,9 +47,7 @@ public:
 
     virtual aaudio_result_t getTimestamp(clockid_t clockId,
                                        int64_t *framePosition,
-                                       int64_t *timeNanoseconds) override {
-        return AAUDIO_ERROR_UNIMPLEMENTED; // TODO call getTimestamp(ExtendedTimestamp *timestamp);
-    }
+                                       int64_t *timeNanoseconds) override;
 
     virtual aaudio_result_t write(const void *buffer,
                              int32_t numFrames,
