@@ -2930,6 +2930,7 @@ void AudioFlinger::PlaybackThread::detachAuxEffect_l(int effectId)
 
 bool AudioFlinger::PlaybackThread::threadLoop()
 {
+    // FIXME Make this an API
     logWriterTLS = mNBLogWriter.get();
 
     Vector< sp<Track> > tracksToRemove;
@@ -2983,6 +2984,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
             processConfigEvents_l();
 
             if (logString != NULL) {
+                // FIXME Remove these internal APIs and replace by LOGT
                 mNBLogWriter->logTimestamp();
                 mNBLogWriter->log(logString);
                 logString = NULL;
