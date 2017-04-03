@@ -298,7 +298,8 @@ public:
                             const sp<MmapStreamCallback>& callback,
                             sp<MmapStreamInterface>& interface);
 private:
-    static const size_t kLogMemorySize = 40 * 1024;
+    // FIXME The 400 is temporarily too high until a leak of writers in media.log is fixed.
+    static const size_t kLogMemorySize = 400 * 1024;
     sp<MemoryDealer>    mLogMemoryDealer;   // == 0 when NBLog is disabled
     // When a log writer is unregistered, it is done lazily so that media.log can continue to see it
     // for as long as possible.  The memory is only freed when it is needed for another log writer.
