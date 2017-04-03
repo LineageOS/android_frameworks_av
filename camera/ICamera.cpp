@@ -55,6 +55,7 @@ enum {
     SET_VIDEO_BUFFER_MODE,
     SET_VIDEO_BUFFER_TARGET,
     RELEASE_RECORDING_FRAME_HANDLE,
+    RELEASE_RECORDING_FRAME_HANDLE_BATCH,
 };
 
 class BpCamera: public BpInterface<ICamera>
@@ -170,6 +171,24 @@ public:
         // Close the native handle because camera received a dup copy.
         native_handle_close(handle);
         native_handle_delete(handle);
+    }
+
+    void releaseRecordingFrameHandleBatch(const std::vector<native_handle_t*>& handles) {
+        ALOGV("releaseRecordingFrameHandleBatch");
+        Parcel data, reply;
+        data.writeInterfaceToken(ICamera::getInterfaceDescriptor());
+        uint32_t n = handles.size();
+        data.writeUint32(n);
+        for (auto& handle : handles) {
+            data.writeNativeHandle(handle);
+        }
+        remote()->transact(RELEASE_RECORDING_FRAME_HANDLE_BATCH, data, &reply);
+
+        // Close the native handle because camera received a dup copy.
+        for (auto& handle : handles) {
+            native_handle_close(handle);
+            native_handle_delete(handle);
+        }
     }
 
     status_t setVideoBufferMode(int32_t videoBufferMode)
@@ -376,6 +395,19 @@ status_t BnCamera::onTransact(
             CHECK_INTERFACE(ICamera, data, reply);
             // releaseRecordingFrameHandle will be responsble to close the native handle.
             releaseRecordingFrameHandle(data.readNativeHandle());
+            return NO_ERROR;
+        } break;
+        case RELEASE_RECORDING_FRAME_HANDLE_BATCH: {
+            ALOGV("RELEASE_RECORDING_FRAME_HANDLE_BATCH");
+            CHECK_INTERFACE(ICamera, data, reply);
+            // releaseRecordingFrameHandle will be responsble to close the native handle.
+            uint32_t n = data.readUint32();
+            std::vector<native_handle_t*> handles;
+            handles.reserve(n);
+            for (uint32_t i = 0; i < n; i++) {
+                handles.push_back(data.readNativeHandle());
+            }
+            releaseRecordingFrameHandleBatch(handles);
             return NO_ERROR;
         } break;
         case SET_VIDEO_BUFFER_MODE: {

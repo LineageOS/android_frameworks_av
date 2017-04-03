@@ -44,6 +44,9 @@ public:
                           camera_frame_metadata_t *metadata) = 0;
     virtual void postDataTimestamp(nsecs_t timestamp, int32_t msgType, const sp<IMemory>& dataPtr) = 0;
     virtual void postRecordingFrameHandleTimestamp(nsecs_t timestamp, native_handle_t* handle) = 0;
+    virtual void postRecordingFrameHandleTimestampBatch(
+            const std::vector<nsecs_t>& timestamps,
+            const std::vector<native_handle_t*>& handles) = 0;
 };
 
 class Camera;
@@ -118,6 +121,10 @@ public:
             // release a recording frame handle
             void        releaseRecordingFrameHandle(native_handle_t *handle);
 
+            // release a batch of recording frame handles
+            void        releaseRecordingFrameHandleBatch(
+                    const std::vector<native_handle_t*> handles);
+
             // autoFocus - status returned from callback
             status_t    autoFocus();
 
@@ -166,6 +173,10 @@ public:
                                      camera_frame_metadata_t *metadata);
     virtual void        dataCallbackTimestamp(nsecs_t timestamp, int32_t msgType, const sp<IMemory>& dataPtr);
     virtual void        recordingFrameHandleCallbackTimestamp(nsecs_t timestamp, native_handle_t* handle);
+    virtual void        recordingFrameHandleCallbackTimestampBatch(
+                                const std::vector<nsecs_t>& timestamps,
+                                const std::vector<native_handle_t*>& handles);
+
 
     class RecordingProxy : public BnCameraRecordingProxy
     {
@@ -177,6 +188,8 @@ public:
         virtual void stopRecording();
         virtual void releaseRecordingFrame(const sp<IMemory>& mem);
         virtual void releaseRecordingFrameHandle(native_handle_t* handle);
+        virtual void releaseRecordingFrameHandleBatch(
+                const std::vector<native_handle_t*>& handles);
 
     private:
         sp<Camera>         mCamera;

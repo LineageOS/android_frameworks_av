@@ -944,7 +944,7 @@ status_t CameraHardwareInterfaceFlashControl::connectCameraDevice(
     }
 
     // need to set __get_memory in set_callbacks().
-    device->setCallbacks(NULL, NULL, NULL, NULL);
+    device->setCallbacks(NULL, NULL, NULL, NULL, NULL);
 
     mParameters = device->getParameters();
 
