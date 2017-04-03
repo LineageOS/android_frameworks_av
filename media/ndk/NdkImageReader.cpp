@@ -27,6 +27,7 @@
 #include <android_media_Utils.h>
 #include <android_runtime/android_view_Surface.h>
 #include <android_runtime/android_hardware_HardwareBuffer.h>
+#include <grallocusage/GrallocUsageConversion.h>
 
 using namespace android;
 
@@ -260,7 +261,8 @@ AImageReader::init() {
     uint64_t consumerUsage;
     android_hardware_HardwareBuffer_convertToGrallocUsageBits(
             &producerUsage, &consumerUsage, mUsage0, mUsage1);
-    mHalUsage = consumerUsage;
+    // Strip out producerUsage here.
+    mHalUsage = android_convertGralloc1To0Usage(0, consumerUsage);
 
     sp<IGraphicBufferProducer> gbProducer;
     sp<IGraphicBufferConsumer> gbConsumer;
@@ -411,11 +413,9 @@ AImageReader::acquireImageLocked(/*out*/AImage** image, /*out*/int* acquireFence
         }
 
         // Check if the producer buffer configurations match what ImageReader configured.
-        if ((bufferFmt != HAL_PIXEL_FORMAT_BLOB) && (readerFmt != HAL_PIXEL_FORMAT_BLOB) &&
-                (readerWidth != bufferWidth || readerHeight != bufferHeight)) {
-            ALOGW("%s: Buffer size: %dx%d, doesn't match AImageReader configured size: %dx%d",
-                    __FUNCTION__, bufferWidth, bufferHeight, readerWidth, readerHeight);
-        }
+        ALOGV_IF(readerWidth != bufferWidth || readerHeight != bufferHeight,
+                "%s: Buffer size: %dx%d, doesn't match AImageReader configured size: %dx%d",
+                __FUNCTION__, bufferWidth, bufferHeight, readerWidth, readerHeight);
 
         // Check if the buffer usage is a super set of reader's usage bits, aka all usage bits that
         // ImageReader requested has been supported from the producer side.
