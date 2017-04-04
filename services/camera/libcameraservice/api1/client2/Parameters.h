@@ -135,6 +135,7 @@ struct Parameters {
     Vector<Area> meteringAreas;
 
     int zoom;
+    bool zoomAvailable;
 
     int videoWidth, videoHeight, videoFormat;
     android_dataspace videoDataSpace;
