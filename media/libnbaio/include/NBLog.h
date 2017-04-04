@@ -466,7 +466,7 @@ private:
     virtual void handleAuthor(const AbstractEntry &fmtEntry, String8 *body) {}
 
     static void drawHistogram(String8 *body, const std::vector<int64_t> &samples,
-                              int indent = 0, int maxHeight = 10);
+                              bool logScale, int indent = 0, int maxHeight = 10);
 
     // Searches for the last entry of type <type> in the range [front, back)
     // back has to be entry-aligned. Returns nullptr if none enconuntered.

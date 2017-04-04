@@ -948,7 +948,7 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             for (auto hist = mHists.begin(); hist != mHists.end();) {
                 if (hist->first.second == histEntry.author()) {
                     body.appendFormat("Histogram %X", (int)hist->first.first);
-                    drawHistogram(&body, hist->second, indent + timestamp.size());
+                    drawHistogram(&body, hist->second, true/*logScale*/, indent + timestamp.size());
                     hist = mHists.erase(hist);
                 } else {
                     ++hist;
@@ -1150,13 +1150,37 @@ static std::map<int, int> buildBuckets(const std::vector<int64_t> &samples) {
     return buckets;
 }
 
+static inline uint32_t log2(uint32_t x) {
+    // This works for x > 0
+    return 31 - __builtin_clz(x);
+}
+
 // TODO put this function in separate file. Make it return a std::string instead of modifying body
+/*
+Example output:
+[54.234] Histogram flush - AudioOut_D:
+Histogram 33640BF1
+            [ 1][ 1][ 1][ 3][54][69][ 1][ 2][ 1]
+        64|                      []
+        32|                  []  []
+        16|                  []  []
+         8|                  []  []
+         4|                  []  []
+         2|______________[]__[]__[]______[]____
+              4   5   6   8   9  10  11  13  15
+Notice that all values that fall in the same row have the same height (65 and 127 are displayed
+identically). That's why exact counts are added at the top.
+*/
 void NBLog::Reader::drawHistogram(String8 *body,
                                   const std::vector<int64_t> &samples,
+                                  bool logScale,
                                   int indent,
                                   int maxHeight) {
+    if (samples.size() <= 1) {
+        return;
+    }
     std::map<int, int> buckets = buildBuckets(samples);
-    // TODO add option for log scale
+    // TODO consider changing all ints to uint32_t or uint64_t
     static const char *underscores = "________________";
     static const char *spaces = "                ";
 
@@ -1172,7 +1196,7 @@ void NBLog::Reader::drawHistogram(String8 *body,
             maxVal = it->second;
         }
     }
-    int height = maxVal;
+    int height = (logScale) ? log2(maxVal) + 1 : maxVal; // maxVal > 0, safe to call log2
     int leftPadding = widthOf(maxVal);
     int colWidth = std::max(std::max(widthOf(maxLabel) + 1, 3), leftPadding + 2);
     int scalingFactor = 1;
@@ -1192,11 +1216,12 @@ void NBLog::Reader::drawHistogram(String8 *body,
     body->appendFormat("\n%*s", indent, " ");
     for (int row = height * scalingFactor; row > 0; row -= scalingFactor)
     {
-        body->appendFormat("%*u|", leftPadding, row);
+        int value = ((logScale) ? (1 << row) : row);
+        body->appendFormat("%*u|", leftPadding, value);
         for (auto const &x : buckets) {
             body->appendFormat("%.*s%s", colWidth - 2,
-                   (row == scalingFactor) ? underscores : spaces,
-                   x.second < row ? ((row == scalingFactor) ? "__" : "  ") : "[]");
+                   (row <= scalingFactor) ? underscores : spaces,
+                   x.second < value ? ((row <= scalingFactor) ? "__" : "  ") : "[]");
         }
         body->appendFormat("\n%*s", indent, " ");
     }
