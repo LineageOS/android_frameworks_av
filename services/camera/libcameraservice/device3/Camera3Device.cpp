@@ -1386,15 +1386,6 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
     return OK;
 }
 
-status_t Camera3Device::createReprocessStreamFromStream(int outputId, int *id) {
-    ATRACE_CALL();
-    (void)outputId; (void)id;
-
-    CLOGE("Unimplemented");
-    return INVALID_OPERATION;
-}
-
-
 status_t Camera3Device::getStreamInfo(int id,
         uint32_t *width, uint32_t *height,
         uint32_t *format, android_dataspace *dataSpace) {
@@ -1508,14 +1499,6 @@ status_t Camera3Device::deleteStream(int id) {
     mNeedConfig = true;
 
     return res;
-}
-
-status_t Camera3Device::deleteReprocessStream(int id) {
-    ATRACE_CALL();
-    (void)id;
-
-    CLOGE("Unimplemented");
-    return INVALID_OPERATION;
 }
 
 status_t Camera3Device::configureStreams(int operatingMode) {
@@ -1841,15 +1824,6 @@ status_t Camera3Device::triggerPrecaptureMetering(uint32_t id) {
 
     return mRequestThread->queueTrigger(trigger,
                                         sizeof(trigger)/sizeof(trigger[0]));
-}
-
-status_t Camera3Device::pushReprocessBuffer(int reprocessStreamId,
-        buffer_handle_t *buffer, wp<BufferReleasedListener> listener) {
-    ATRACE_CALL();
-    (void)reprocessStreamId; (void)buffer; (void)listener;
-
-    CLOGE("Unimplemented");
-    return INVALID_OPERATION;
 }
 
 status_t Camera3Device::flush(int64_t *frameNumber) {
@@ -3141,7 +3115,9 @@ status_t Camera3Device::HalInterface::configureStreams(camera3_stream_configurat
             Stream &dst = requestedConfiguration.streams[i];
             camera3_stream_t *src = config->streams[i];
 
-            int streamId = Camera3Stream::cast(src)->getId();
+            Camera3Stream* cam3stream = Camera3Stream::cast(src);
+            cam3stream->setBufferFreedListener(this);
+            int streamId = cam3stream->getId();
             StreamType streamType;
             switch (src->stream_type) {
                 case CAMERA3_STREAM_OUTPUT:
@@ -3347,9 +3323,21 @@ status_t Camera3Device::HalInterface::processBatchCaptureRequests(
         wrapAsHidlRequest(requests[i], /*out*/&captureRequests[i], /*out*/&handlesCreated);
     }
 
+    std::vector<device::V3_2::BufferCache> cachesToRemove;
+    {
+        std::lock_guard<std::mutex> lock(mBufferIdMapLock);
+        for (auto& pair : mFreedBuffers) {
+            // The stream might have been removed since onBufferFreed
+            if (mBufferIdMaps.find(pair.first) != mBufferIdMaps.end()) {
+                cachesToRemove.push_back({pair.first, pair.second});
+            }
+        }
+        mFreedBuffers.clear();
+    }
+
     common::V1_0::Status status = common::V1_0::Status::INTERNAL_ERROR;
     *numRequestProcessed = 0;
-    mHidlSession->processCaptureRequest(captureRequests,
+    mHidlSession->processCaptureRequest(captureRequests, cachesToRemove,
             [&status, &numRequestProcessed] (auto s, uint32_t n) {
                 status = s;
                 *numRequestProcessed = n;
@@ -3457,10 +3445,38 @@ std::pair<bool, uint64_t> Camera3Device::HalInterface::getBufferId(
     auto it = bIdMap.find(buf);
     if (it == bIdMap.end()) {
         bIdMap[buf] = mNextBufferId++;
+        ALOGV("stream %d now have %zu buffer caches, buf %p",
+                streamId, bIdMap.size(), buf);
         return std::make_pair(true, mNextBufferId - 1);
     } else {
         return std::make_pair(false, it->second);
     }
+}
+
+void Camera3Device::HalInterface::onBufferFreed(
+        int streamId, const native_handle_t* handle) {
+    std::lock_guard<std::mutex> lock(mBufferIdMapLock);
+    uint64_t bufferId = BUFFER_ID_NO_BUFFER;
+    auto mapIt = mBufferIdMaps.find(streamId);
+    if (mapIt == mBufferIdMaps.end()) {
+        // streamId might be from a deleted stream here
+        ALOGI("%s: stream %d has been removed",
+                __FUNCTION__, streamId);
+        return;
+    }
+    BufferIdMap& bIdMap = mapIt->second;
+    auto it = bIdMap.find(handle);
+    if (it == bIdMap.end()) {
+        ALOGW("%s: cannot find buffer %p in stream %d",
+                __FUNCTION__, handle, streamId);
+        return;
+    } else {
+        bufferId =  it->second;
+        bIdMap.erase(it);
+        ALOGV("%s: stream %d now have %zu buffer caches after removing buf %p",
+                __FUNCTION__, streamId, bIdMap.size(), handle);
+    }
+    mFreedBuffers.push_back(std::make_pair(streamId, bufferId));
 }
 
 /**
