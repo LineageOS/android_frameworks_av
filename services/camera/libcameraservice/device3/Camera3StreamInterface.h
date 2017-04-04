@@ -19,6 +19,7 @@
 
 #include <utils/RefBase.h>
 #include "Camera3StreamBufferListener.h"
+#include "Camera3StreamBufferFreedListener.h"
 
 struct camera3_stream_buffer;
 
@@ -287,6 +288,15 @@ class Camera3StreamInterface : public virtual RefBase {
             wp<Camera3StreamBufferListener> listener) = 0;
     virtual void     removeBufferListener(
             const sp<Camera3StreamBufferListener>& listener) = 0;
+
+    /**
+     * Setting listner will remove previous listener (if exists)
+     * Only allow set listener during stream configuration because stream is guaranteed to be IDLE
+     * at this state, so setBufferFreedListener won't collide with onBufferFreed callbacks.
+     * Client is responsible to keep the listener object alive throughout the lifecycle of this
+     * Camera3Stream.
+     */
+    virtual void setBufferFreedListener(Camera3StreamBufferFreedListener* listener) = 0;
 };
 
 } // namespace camera3

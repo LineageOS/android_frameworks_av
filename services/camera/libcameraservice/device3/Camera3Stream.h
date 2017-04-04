@@ -365,6 +365,11 @@ class Camera3Stream :
     void             removeBufferListener(
             const sp<Camera3StreamBufferListener>& listener);
 
+
+    // Setting listener will remove previous listener (if exists)
+    virtual void     setBufferFreedListener(
+            Camera3StreamBufferFreedListener* listener) override;
+
     /**
      * Return if the buffer queue of the stream is abandoned.
      */
@@ -407,6 +412,8 @@ class Camera3Stream :
             uint32_t width, uint32_t height, size_t maxSize, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation,
             int setId);
+
+    Camera3StreamBufferFreedListener* mBufferFreedListener;
 
     /**
      * Interface to be implemented by derived classes
