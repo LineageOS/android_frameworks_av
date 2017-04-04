@@ -34,7 +34,8 @@ namespace camera3 {
  * buffers by feeding them into the HAL, as well as releasing the buffers back
  * the buffers once the HAL is done with them.
  */
-class Camera3InputStream : public Camera3IOStreamBase {
+class Camera3InputStream : public Camera3IOStreamBase,
+                           public BufferItemConsumer::BufferFreedListener {
   public:
     /**
      * Set up a stream for formats that have fixed size, such as RAW and YUV.
@@ -76,6 +77,11 @@ class Camera3InputStream : public Camera3IOStreamBase {
     virtual status_t configureQueueLocked();
 
     virtual status_t getEndpointUsage(uint32_t *usage) const;
+
+    /**
+     * BufferItemConsumer::BufferFreedListener interface
+     */
+    virtual void onBufferFreed(const wp<GraphicBuffer>&) override;
 
 }; // class Camera3InputStream
 

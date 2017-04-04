@@ -125,7 +125,6 @@ class Camera3Device :
     status_t createInputStream(
             uint32_t width, uint32_t height, int format,
             int *id) override;
-    status_t createReprocessStreamFromStream(int outputId, int *id) override;
 
     status_t getStreamInfo(int id,
             uint32_t *width, uint32_t *height,
@@ -133,7 +132,6 @@ class Camera3Device :
     status_t setStreamTransform(int id, int transform) override;
 
     status_t deleteStream(int id) override;
-    status_t deleteReprocessStream(int id) override;
 
     status_t configureStreams(int operatingMode =
             static_cast<int>(hardware::camera::device::V3_2::StreamConfigurationMode::NORMAL_MODE))
@@ -154,9 +152,6 @@ class Camera3Device :
     status_t triggerAutofocus(uint32_t id) override;
     status_t triggerCancelAutofocus(uint32_t id) override;
     status_t triggerPrecaptureMetering(uint32_t id) override;
-
-    status_t pushReprocessBuffer(int reprocessStreamId,
-            buffer_handle_t *buffer, wp<BufferReleasedListener> listener) override;
 
     status_t flush(int64_t *lastFrameNumber = NULL) override;
 
@@ -228,7 +223,7 @@ class Camera3Device :
      * Adapter for legacy HAL / HIDL HAL interface calls; calls either into legacy HALv3 or the
      * HIDL HALv3 interfaces.
      */
-    class HalInterface {
+    class HalInterface : public camera3::Camera3StreamBufferFreedListener {
       public:
         HalInterface(camera3_device_t *device);
         HalInterface(sp<hardware::camera::device::V3_2::ICameraDeviceSession> &session);
@@ -326,6 +321,10 @@ class Camera3Device :
         //       buffer_handle_t's FD won't change.
         // return pair of (newlySeenBuffer?, bufferId)
         std::pair<bool, uint64_t> getBufferId(const buffer_handle_t& buf, int streamId);
+
+        virtual void onBufferFreed(int streamId, const native_handle_t* handle) override;
+
+        std::vector<std::pair<int, uint64_t>> mFreedBuffers;
     };
 
     std::unique_ptr<HalInterface> mInterface;

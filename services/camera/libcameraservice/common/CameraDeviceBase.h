@@ -145,12 +145,6 @@ class CameraDeviceBase : public virtual RefBase {
             int32_t format, /*out*/ int32_t *id) = 0;
 
     /**
-     * Create an input reprocess stream that uses buffers from an existing
-     * output stream.
-     */
-    virtual status_t createReprocessStreamFromStream(int outputId, int *id) = 0;
-
-    /**
      * Get information about a given stream.
      */
     virtual status_t getStreamInfo(int id,
@@ -167,12 +161,6 @@ class CameraDeviceBase : public virtual RefBase {
      * reference that stream.
      */
     virtual status_t deleteStream(int id) = 0;
-
-    /**
-     * Delete reprocess stream. Must not be called if there are requests in
-     * flight which reference that stream.
-     */
-    virtual status_t deleteReprocessStream(int id) = 0;
 
     /**
      * Take the currently-defined set of streams and configure the HAL to use
@@ -287,21 +275,6 @@ class CameraDeviceBase : public virtual RefBase {
      * notifications.
      */
     virtual status_t triggerPrecaptureMetering(uint32_t id) = 0;
-
-    /**
-     * Abstract interface for clients that want to listen to reprocess buffer
-     * release events
-     */
-    struct BufferReleasedListener : public virtual RefBase {
-        virtual void onBufferReleased(buffer_handle_t *handle) = 0;
-    };
-
-    /**
-     * Push a buffer to be reprocessed into a reprocessing stream, and
-     * provide a listener to call once the buffer is returned by the HAL
-     */
-    virtual status_t pushReprocessBuffer(int reprocessStreamId,
-            buffer_handle_t *buffer, wp<BufferReleasedListener> listener) = 0;
 
     /**
      * Flush all pending and in-flight requests. Blocks until flush is
