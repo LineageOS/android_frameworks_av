@@ -304,7 +304,7 @@ status_t ZslProcessor::updateStream(const Parameters &params) {
         sp<IGraphicBufferProducer> producer;
         sp<IGraphicBufferConsumer> consumer;
         BufferQueue::createBufferQueue(&producer, &consumer);
-        mProducer = new RingBufferConsumer(consumer, GRALLOC_USAGE_HW_CAMERA_READ,
+        mProducer = new RingBufferConsumer(consumer, GRALLOC_USAGE_HW_CAMERA_ZSL,
             mBufferQueueDepth);
         mProducer->setName(String8("Camera2-ZslRingBufferConsumer"));
         sp<Surface> outSurface = new Surface(producer);

@@ -17,8 +17,6 @@
 //#define LOG_NDEBUG 0
 
 #include <inttypes.h>
-#include <grallocusage/GrallocUsageConversion.h>
-
 #include "CameraHardwareInterface.h"
 
 namespace android {
@@ -397,14 +395,14 @@ CameraHardwareInterface::setCrop(int32_t left, int32_t top, int32_t right, int32
 }
 
 hardware::Return<Status>
-CameraHardwareInterface::setUsage(hardware::camera::device::V1_0::ProducerUsageFlags usage) {
+CameraHardwareInterface::setUsage(hardware::graphics::allocator::V2_0::ProducerUsage usage) {
     Status s = Status::INTERNAL_ERROR;
     ANativeWindow *a = mPreviewWindow.get();
     if (a == nullptr) {
         ALOGE("%s: preview window is null", __FUNCTION__);
         return s;
     }
-    mPreviewUsage = ::android_convertGralloc1To0Usage(usage, /*consumerUsage*/ 0);
+    mPreviewUsage = (int) usage;
     int rc = native_window_set_usage(a, mPreviewUsage);
     if (rc == OK) {
         cleanupCirculatingBuffers();
