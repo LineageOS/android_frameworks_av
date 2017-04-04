@@ -76,7 +76,8 @@ struct NuPlayer::Renderer : public AHandler {
             bool offloadOnly,
             bool hasVideo,
             uint32_t flags,
-            bool *isOffloaded);
+            bool *isOffloaded,
+            bool isStreaming);
     void closeAudioSink();
 
     // re-open audio sink after all pending audio buffers played.
@@ -85,6 +86,7 @@ struct NuPlayer::Renderer : public AHandler {
             bool offloadOnly,
             bool hasVideo,
             uint32_t flags,
+            bool isStreaming,
             const sp<AMessage> &notify);
 
     enum {
@@ -267,7 +269,8 @@ private:
             const sp<AMessage> &format,
             bool offloadOnly,
             bool hasVideo,
-            uint32_t flags);
+            uint32_t flags,
+            bool isStreaming);
     void onCloseAudioSink();
     void onChangeAudioFormat(const sp<AMessage> &meta, const sp<AMessage> &notify);
 
