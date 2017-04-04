@@ -44,8 +44,6 @@
 #include <utils/Timers.h>
 #include <cutils/properties.h>
 
-#include <grallocusage/GrallocUsageConversion.h>
-
 #include <android/hardware/camera2/ICameraDeviceUser.h>
 
 #include "utils/CameraTraces.h"
@@ -497,6 +495,11 @@ DataspaceFlags Camera3Device::mapToHidlDataspace(
     return dataSpace;
 }
 
+ConsumerUsageFlags Camera3Device::mapToConsumerUsage(
+        uint32_t usage) {
+    return usage;
+}
+
 StreamRotation Camera3Device::mapToStreamRotation(camera3_stream_rotation_t rotation) {
     switch (rotation) {
         case CAMERA3_STREAM_ROTATION_0:
@@ -544,6 +547,16 @@ camera3_buffer_status_t Camera3Device::mapHidlBufferStatus(BufferStatus status) 
 int Camera3Device::mapToFrameworkFormat(
         hardware::graphics::common::V1_0::PixelFormat pixelFormat) {
     return static_cast<uint32_t>(pixelFormat);
+}
+
+uint32_t Camera3Device::mapConsumerToFrameworkUsage(
+        ConsumerUsageFlags usage) {
+    return usage;
+}
+
+uint32_t Camera3Device::mapProducerToFrameworkUsage(
+        ProducerUsageFlags usage) {
+    return usage;
 }
 
 ssize_t Camera3Device::getJpegBufferSize(uint32_t width, uint32_t height) const {
@@ -3136,9 +3149,7 @@ status_t Camera3Device::HalInterface::configureStreams(camera3_stream_configurat
             dst.width = src->width;
             dst.height = src->height;
             dst.format = mapToPixelFormat(src->format);
-            uint64_t consumerUsage, producerUsage;
-            ::android_convertGralloc0To1Usage(src->usage, &producerUsage, &consumerUsage);
-            dst.usage = consumerUsage;
+            dst.usage = mapToConsumerUsage(src->usage);
             dst.dataSpace = mapToHidlDataspace(src->data_space);
             dst.rotation = mapToStreamRotation((camera3_stream_rotation_t) src->rotation);
 
@@ -3220,6 +3231,7 @@ status_t Camera3Device::HalInterface::configureStreams(camera3_stream_configurat
                             __FUNCTION__, streamId);
                     return INVALID_OPERATION;
                 }
+                dst->usage = mapConsumerToFrameworkUsage(src.consumerUsage);
             } else {
                 // OUTPUT
                 if (src.consumerUsage != 0) {
@@ -3227,8 +3239,8 @@ status_t Camera3Device::HalInterface::configureStreams(camera3_stream_configurat
                             __FUNCTION__, streamId);
                     return INVALID_OPERATION;
                 }
+                dst->usage = mapProducerToFrameworkUsage(src.producerUsage);
             }
-            dst->usage = ::android_convertGralloc1To0Usage(src.producerUsage, src.consumerUsage);
             dst->max_buffers = src.maxBuffers;
         }
     }
