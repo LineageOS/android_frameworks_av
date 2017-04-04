@@ -36,7 +36,7 @@ private:
 
     bool mPtp;
 
-    std::mutex mLock;
+    std::timed_mutex mLock;
 
     android::base::unique_fd mControl;
     // "in" from the host's perspective => sink for mtp server
