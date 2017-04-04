@@ -798,16 +798,38 @@ status_t Parameters::initialize(const CameraMetadata *info, int deviceVersion) {
             exposureCompensationStep.data.r[0].denominator);
 
     autoExposureLock = false;
-    params.set(CameraParameters::KEY_AUTO_EXPOSURE_LOCK,
-            CameraParameters::FALSE);
-    params.set(CameraParameters::KEY_AUTO_EXPOSURE_LOCK_SUPPORTED,
-            CameraParameters::TRUE);
+    autoExposureLockAvailable = false;
+    camera_metadata_ro_entry_t exposureLockAvailable =
+        staticInfo(ANDROID_CONTROL_AE_LOCK_AVAILABLE, 1, 1);
+    if ((0 < exposureLockAvailable.count) &&
+            (ANDROID_CONTROL_AE_LOCK_AVAILABLE_TRUE ==
+                    exposureLockAvailable.data.u8[0])) {
+        params.set(CameraParameters::KEY_AUTO_EXPOSURE_LOCK,
+                CameraParameters::FALSE);
+        params.set(CameraParameters::KEY_AUTO_EXPOSURE_LOCK_SUPPORTED,
+                   CameraParameters::TRUE);
+        autoExposureLockAvailable = true;
+    } else {
+        params.set(CameraParameters::KEY_AUTO_EXPOSURE_LOCK_SUPPORTED,
+                   CameraParameters::FALSE);
+    }
 
     autoWhiteBalanceLock = false;
-    params.set(CameraParameters::KEY_AUTO_WHITEBALANCE_LOCK,
-            CameraParameters::FALSE);
-    params.set(CameraParameters::KEY_AUTO_WHITEBALANCE_LOCK_SUPPORTED,
-            CameraParameters::TRUE);
+    autoWhiteBalanceLockAvailable = false;
+    camera_metadata_ro_entry_t whitebalanceLockAvailable =
+        staticInfo(ANDROID_CONTROL_AWB_LOCK_AVAILABLE, 1, 1);
+    if ((0 < whitebalanceLockAvailable.count) &&
+            (ANDROID_CONTROL_AWB_LOCK_AVAILABLE_TRUE ==
+                    whitebalanceLockAvailable.data.u8[0])) {
+        params.set(CameraParameters::KEY_AUTO_WHITEBALANCE_LOCK,
+                CameraParameters::FALSE);
+        params.set(CameraParameters::KEY_AUTO_WHITEBALANCE_LOCK_SUPPORTED,
+                CameraParameters::TRUE);
+        autoWhiteBalanceLockAvailable = true;
+    } else {
+        params.set(CameraParameters::KEY_AUTO_WHITEBALANCE_LOCK_SUPPORTED,
+                CameraParameters::FALSE);
+    }
 
     meteringAreas.add(Parameters::Area(0, 0, 0, 0, 0));
     params.set(CameraParameters::KEY_MAX_NUM_METERING_AREAS,
@@ -1830,13 +1852,25 @@ status_t Parameters::set(const String8& paramString) {
         return BAD_VALUE;
     }
 
-    // AUTO_EXPOSURE_LOCK (always supported)
-    validatedParams.autoExposureLock = boolFromString(
-        newParams.get(CameraParameters::KEY_AUTO_EXPOSURE_LOCK));
+    if (autoExposureLockAvailable) {
+        validatedParams.autoExposureLock = boolFromString(
+            newParams.get(CameraParameters::KEY_AUTO_EXPOSURE_LOCK));
+    } else if (nullptr !=
+            newParams.get(CameraParameters::KEY_AUTO_EXPOSURE_LOCK)){
+        ALOGE("%s: Requested auto exposure lock is not supported",
+              __FUNCTION__);
+        return BAD_VALUE;
+    }
 
-    // AUTO_WHITEBALANCE_LOCK (always supported)
-    validatedParams.autoWhiteBalanceLock = boolFromString(
-        newParams.get(CameraParameters::KEY_AUTO_WHITEBALANCE_LOCK));
+    if (autoWhiteBalanceLockAvailable) {
+        validatedParams.autoWhiteBalanceLock = boolFromString(
+                newParams.get(CameraParameters::KEY_AUTO_WHITEBALANCE_LOCK));
+    } else if (nullptr !=
+           newParams.get(CameraParameters::KEY_AUTO_WHITEBALANCE_LOCK)) {
+        ALOGE("%s: Requested auto whitebalance lock is not supported",
+              __FUNCTION__);
+        return BAD_VALUE;
+    }
 
     // METERING_AREAS
     size_t maxAeRegions = (size_t)staticInfo(ANDROID_CONTROL_MAX_REGIONS,
@@ -1982,10 +2016,12 @@ status_t Parameters::updateRequest(CameraMetadata *request) const {
     }
     if (res != OK) return res;
 
-    uint8_t reqWbLock = autoWhiteBalanceLock ?
-            ANDROID_CONTROL_AWB_LOCK_ON : ANDROID_CONTROL_AWB_LOCK_OFF;
-    res = request->update(ANDROID_CONTROL_AWB_LOCK,
-            &reqWbLock, 1);
+    if (autoWhiteBalanceLockAvailable) {
+        uint8_t reqWbLock = autoWhiteBalanceLock ?
+                ANDROID_CONTROL_AWB_LOCK_ON : ANDROID_CONTROL_AWB_LOCK_OFF;
+        res = request->update(ANDROID_CONTROL_AWB_LOCK,
+                &reqWbLock, 1);
+    }
 
     res = request->update(ANDROID_CONTROL_EFFECT_MODE,
             &effectMode, 1);
@@ -2043,11 +2079,13 @@ status_t Parameters::updateRequest(CameraMetadata *request) const {
             &reqAeMode, 1);
     if (res != OK) return res;
 
-    uint8_t reqAeLock = autoExposureLock ?
-            ANDROID_CONTROL_AE_LOCK_ON : ANDROID_CONTROL_AE_LOCK_OFF;
-    res = request->update(ANDROID_CONTROL_AE_LOCK,
-            &reqAeLock, 1);
-    if (res != OK) return res;
+    if (autoExposureLockAvailable) {
+        uint8_t reqAeLock = autoExposureLock ?
+                ANDROID_CONTROL_AE_LOCK_ON : ANDROID_CONTROL_AE_LOCK_OFF;
+        res = request->update(ANDROID_CONTROL_AE_LOCK,
+                &reqAeLock, 1);
+        if (res != OK) return res;
+    }
 
     res = request->update(ANDROID_CONTROL_AWB_MODE,
             &wbMode, 1);
