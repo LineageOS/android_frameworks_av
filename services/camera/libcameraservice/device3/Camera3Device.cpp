@@ -2895,6 +2895,13 @@ void Camera3Device::notifyError(const camera3_error_msg_t &msg,
                     InFlightRequest &r = mInFlightMap.editValueAt(idx);
                     r.requestStatus = msg.error_code;
                     resultExtras = r.resultExtras;
+                    if (hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_RESULT ==
+                            errorCode) {
+                        // In case of missing result check whether the buffers
+                        // returned. If they returned, then remove inflight
+                        // request.
+                        removeInFlightRequestIfReadyLocked(idx);
+                    }
                 } else {
                     resultExtras.frameNumber = msg.frame_number;
                     ALOGE("Camera %s: %s: cannot find in-flight request on "
