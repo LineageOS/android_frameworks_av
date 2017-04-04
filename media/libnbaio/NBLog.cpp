@@ -30,7 +30,6 @@
 #include <utils/Log.h>
 #include <utils/String8.h>
 
-#include <map>
 #include <queue>
 #include <utility>
 
@@ -848,8 +847,6 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
     }
     bool deferredTimestamp = false;
 #endif
-    std::map<std::pair<log_hash_t, int>, std::vector<int>> hists;
-    std::map<std::pair<log_hash_t, int>, int64_t*> lastTSs;
 
     for (auto entry = snapshot.begin(); entry != snapshot.end();) {
         switch (entry->type) {
@@ -928,31 +925,38 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             // There's probably a more efficient way to do it
             log_hash_t hash;
             memcpy(&hash, &(data->hash), sizeof(hash));
+            int64_t ts;
+            memcpy(&ts, &data->ts, sizeof(ts));
             const std::pair<log_hash_t, int> key(hash, data->author);
-            if (lastTSs[key] != nullptr) {
-                int64_t ts1;
-                memcpy(&ts1, lastTSs[key], sizeof(ts1));
-                int64_t ts2;
-                memcpy(&ts2, &data->ts, sizeof(ts2));
-                // TODO might want to filter excessively high outliers, which are usually caused
-                // by the thread being inactive.
-                hists[key].push_back(deltaMs(ts1, ts2));
-            }
-            lastTSs[key] = &(data->ts);
+            // TODO might want to filter excessively high outliers, which are usually caused
+            // by the thread being inactive.
+            mHists[key].push_back(ts);
             ++entry;
             break;
         }
-        case EVENT_HISTOGRAM_FLUSH:
-            body.appendFormat("Histograms:\n");
-            for (auto const &hist : hists) {
-                body.appendFormat("Histogram %X - ", (int)hist.first.first);
-                handleAuthor(HistogramEntry(entry), &body);
-                drawHistogram(&body, hist.second);
+        case EVENT_HISTOGRAM_FLUSH: {
+            HistogramEntry histEntry(entry);
+            // Log timestamp
+            int64_t ts = histEntry.timestamp();
+            timestamp.clear();
+            timestamp.appendFormat("[%d.%03d]", (int) (ts / (1000 * 1000 * 1000)),
+                            (int) ((ts / (1000 * 1000)) % 1000));
+            // Log histograms
+            body.appendFormat("Histogram flush - ");
+            handleAuthor(histEntry, &body);
+            body.appendFormat("\n");
+            for (auto hist = mHists.begin(); hist != mHists.end();) {
+                if (hist->first.second == histEntry.author()) {
+                    body.appendFormat("Histogram %X", (int)hist->first.first);
+                    drawHistogram(&body, hist->second, indent + timestamp.size());
+                    hist = mHists.erase(hist);
+                } else {
+                    ++hist;
+                }
             }
-            hists.clear();
-            lastTSs.clear();
             ++entry;
             break;
+        }
         case EVENT_END_FMT:
             body.appendFormat("warning: got to end format event");
             ++entry;
@@ -1137,17 +1141,20 @@ static int widthOf(int x) {
     return width;
 }
 
-static std::map<int, int> buildBuckets(const std::vector<int> &samples) {
+static std::map<int, int> buildBuckets(const std::vector<int64_t> &samples) {
     // TODO allow buckets of variable resolution
     std::map<int, int> buckets;
-    for (int x : samples) {
-        ++buckets[x];
+    for (size_t i = 1; i < samples.size(); ++i) {
+        ++buckets[deltaMs(samples[i - 1], samples[i])];
     }
     return buckets;
 }
 
 // TODO put this function in separate file. Make it return a std::string instead of modifying body
-void NBLog::Reader::drawHistogram(String8 *body, const std::vector<int> &samples, int maxHeight) {
+void NBLog::Reader::drawHistogram(String8 *body,
+                                  const std::vector<int64_t> &samples,
+                                  int indent,
+                                  int maxHeight) {
     std::map<int, int> buckets = buildBuckets(samples);
     // TODO add option for log scale
     static const char *underscores = "________________";
@@ -1156,6 +1163,7 @@ void NBLog::Reader::drawHistogram(String8 *body, const std::vector<int> &samples
     auto it = buckets.begin();
     int maxLabel = it->first;
     int maxVal = it->second;
+    // Compute maximum values
     while (++it != buckets.end()) {
         if (it->first > maxLabel) {
             maxLabel = it->first;
@@ -1168,27 +1176,31 @@ void NBLog::Reader::drawHistogram(String8 *body, const std::vector<int> &samples
     int leftPadding = widthOf(maxVal);
     int colWidth = std::max(std::max(widthOf(maxLabel) + 1, 3), leftPadding + 2);
     int scalingFactor = 1;
+    // scale data if it exceeds maximum height
     if (height > maxHeight) {
         scalingFactor = (height + maxHeight) / maxHeight;
         height /= scalingFactor;
     }
-    body->appendFormat("\n");
+    // write header line with bucket values
+    body->appendFormat("\n%*s", indent, " ");
     body->appendFormat("%*s", leftPadding + 2, " ");
     for (auto const &x : buckets)
     {
         body->appendFormat("[%*d]", colWidth - 2, x.second);
     }
-    body->appendFormat("\n");
+    // write histogram ascii art
+    body->appendFormat("\n%*s", indent, " ");
     for (int row = height * scalingFactor; row > 0; row -= scalingFactor)
     {
-        body->appendFormat("%*d|", leftPadding, row);
+        body->appendFormat("%*u|", leftPadding, row);
         for (auto const &x : buckets) {
             body->appendFormat("%.*s%s", colWidth - 2,
                    (row == scalingFactor) ? underscores : spaces,
                    x.second < row ? ((row == scalingFactor) ? "__" : "  ") : "[]");
         }
-        body->appendFormat("\n");
+        body->appendFormat("\n%*s", indent, " ");
     }
+    // write footer with bucket labels
     body->appendFormat("%*s", leftPadding + 1, " ");
     for (auto const &x : buckets)
     {

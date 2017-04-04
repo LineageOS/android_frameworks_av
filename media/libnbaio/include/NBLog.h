@@ -24,6 +24,7 @@
 #include <utils/Mutex.h>
 #include <utils/threads.h>
 
+#include <map>
 #include <set>
 #include <vector>
 
@@ -454,6 +455,8 @@ private:
     audio_utils_fifo_reader * const mFifoReader;    // used to read from FIFO,
                                                     // non-NULL unless constructor fails
 
+    std::map<std::pair<log_hash_t, int>, std::vector<int64_t>> mHists;
+
     void    dumpLine(const String8& timestamp, String8& body);
 
     EntryIterator   handleFormat(const FormatEntry &fmtEntry,
@@ -462,7 +465,8 @@ private:
     // dummy method for handling absent author entry
     virtual void handleAuthor(const AbstractEntry &fmtEntry, String8 *body) {}
 
-    static void drawHistogram(String8 *body, const std::vector<int> &samples, int maxHeight = 10);
+    static void drawHistogram(String8 *body, const std::vector<int64_t> &samples,
+                              int indent = 0, int maxHeight = 10);
 
     // Searches for the last entry of type <type> in the range [front, back)
     // back has to be entry-aligned. Returns nullptr if none enconuntered.
