@@ -1004,12 +1004,21 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
 
         mStopping = true;
 
+        int64_t timeoutUs = kStopTimeoutUs;
         // if using surface, signal source EOS and wait for EOS to come back.
         // otherwise, stop puller (which also clears the input buffer queue)
         // and wait for the EOS message. We cannot call source->stop() because
         // the encoder may still be processing input buffers.
         if (mFlags & FLAG_USE_SURFACE_INPUT) {
             mEncoder->signalEndOfInputStream();
+            // Increase the timeout if there is delay in the GraphicBufferSource
+            sp<AMessage> inputFormat;
+            int64_t stopTimeOffsetUs;
+            if (mEncoder->getInputFormat(&inputFormat) == OK &&
+                    inputFormat->findInt64("android._stop-time-offset-us", &stopTimeOffsetUs) &&
+                    stopTimeOffsetUs > 0) {
+                timeoutUs += stopTimeOffsetUs;
+            }
         } else {
             mPuller->stop();
         }
@@ -1017,7 +1026,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
         // complete stop even if encoder/puller stalled
         sp<AMessage> timeoutMsg = new AMessage(kWhatStopStalled, mReflector);
         timeoutMsg->setInt32("generation", mGeneration);
-        timeoutMsg->post(kStopTimeoutUs);
+        timeoutMsg->post(timeoutUs);
         break;
     }
 

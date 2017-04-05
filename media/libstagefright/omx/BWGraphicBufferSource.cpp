@@ -160,6 +160,11 @@ BWGraphicBufferSource::BWGraphicBufferSource(
     return Status::fromStatusT(mBase->setStopTimeUs(stopTimeUs));
 }
 
+::android::binder::Status BWGraphicBufferSource::getStopTimeOffsetUs(
+        int64_t *stopTimeOffsetUs) {
+    return Status::fromStatusT(mBase->getStopTimeOffsetUs(stopTimeOffsetUs));
+}
+
 ::android::binder::Status BWGraphicBufferSource::setColorAspects(
         int32_t aspects) {
     return Status::fromStatusT(mBase->setColorAspects(aspects));

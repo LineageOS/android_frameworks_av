@@ -31,6 +31,7 @@ interface IGraphicBufferSource {
     void setTimeLapseConfig(double fps, double captureFps);
     void setStartTimeUs(long startTimeUs);
     void setStopTimeUs(long stopTimeUs);
+    long getStopTimeOffsetUs();
     void setColorAspects(int aspects);
     void setTimeOffsetUs(long timeOffsetsUs);
     void signalEndOfInputStream();

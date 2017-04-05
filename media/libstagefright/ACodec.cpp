@@ -7201,6 +7201,16 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
             ALOGE("Failed to set parameter 'stop-time-us' (err %d)", err);
             return err;
         }
+
+        int64_t stopTimeOffsetUs;
+        err = statusFromBinderStatus(
+                mGraphicBufferSource->getStopTimeOffsetUs(&stopTimeOffsetUs));
+
+        if (err != OK) {
+            ALOGE("Failed to get stop time offset (err %d)", err);
+            return err;
+        }
+        mInputFormat->setInt64("android._stop-time-offset-us", stopTimeOffsetUs);
     }
 
     int32_t dummy;
