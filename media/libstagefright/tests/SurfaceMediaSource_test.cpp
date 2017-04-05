@@ -510,7 +510,7 @@ void SurfaceMediaSourceTest::oneBufferPass(int width, int height ) {
 
     // Fill the buffer with the a checkerboard pattern
     uint8_t* img = NULL;
-    sp<GraphicBuffer> buf(new GraphicBuffer(anb, false));
+    sp<GraphicBuffer> buf(GraphicBuffer::from(anb));
     buf->lock(GRALLOC_USAGE_SW_WRITE_OFTEN, (void**)(&img));
     SurfaceMediaSourceTest::fillYV12Buffer(img, width, height, buf->getStride());
     buf->unlock();
@@ -527,7 +527,7 @@ void SurfaceMediaSourceTest::oneBufferPassNoFill(
     ASSERT_TRUE(anb != NULL);
 
     // We do not fill the buffer in. Just queue it back.
-    sp<GraphicBuffer> buf(new GraphicBuffer(anb, false));
+    sp<GraphicBuffer> buf(GraphicBuffer::from(anb));
     ASSERT_EQ(NO_ERROR, mANW->queueBuffer(mANW.get(), buf->getNativeBuffer(),
             -1));
 }
