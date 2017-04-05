@@ -902,6 +902,9 @@ status_t OMXNodeInstance::storeMetaDataInBuffers_l(
                         ? kMetadataBufferTypeGrallocSource : requestedType;
             err = OMX_SetParameter(mHandle, index, &params);
         }
+        if (err == OMX_ErrorBadParameter) {
+            err = OMX_ErrorUnsupportedIndex;
+        }
     }
 
     // don't log loud error if component does not support metadata mode on the output
