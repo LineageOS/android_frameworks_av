@@ -582,6 +582,10 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
             device2 = availableOutputDevicesType & AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET;
         }
         if (device2 == AUDIO_DEVICE_NONE) {
+            // no sonification on WFD sink
+            device2 = availableOutputDevicesType & AUDIO_DEVICE_OUT_PROXY;
+        }
+        if (device2 == AUDIO_DEVICE_NONE) {
             device2 = availableOutputDevicesType & AUDIO_DEVICE_OUT_SPEAKER;
         }
         int device3 = AUDIO_DEVICE_NONE;
