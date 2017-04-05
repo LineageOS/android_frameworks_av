@@ -220,7 +220,7 @@ Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
 
     if (factories.size() == 0) {
         // must be in passthrough mode, load the default passthrough service
-        auto passthrough = IDrmFactory::getService("drm");
+        auto passthrough = IDrmFactory::getService();
         if (passthrough != NULL) {
             ALOGI("makeDrmFactories: using default drm instance");
             factories.push_back(passthrough);
