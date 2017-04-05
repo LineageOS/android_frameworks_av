@@ -48,6 +48,7 @@ static int gInitDone; // true is global initialization has been preformed
 static int gCanQueryEffect; // indicates that call to EffectQueryEffect() is valid, i.e. that the list of effects
                           // was not modified since last call to EffectQueryNumberEffects()
 
+static list_elem_t *gLibraryFailedList;  //list of lib_failed_entry_t: libraries failed to load
 
 /////////////////////////////////////////////////
 //      Local functions prototypes
@@ -584,6 +585,17 @@ error:
     if (hdl != NULL) {
         dlclose(hdl);
     }
+    //add entry for library errors in gLibraryFailedList
+    lib_failed_entry_t *fl = malloc(sizeof(lib_failed_entry_t));
+    fl->name = strndup(name, PATH_MAX);
+    fl->path = strndup(path, PATH_MAX);
+
+    list_elem_t *fe = malloc(sizeof(list_elem_t));
+    fe->object = fl;
+    fe->next = gLibraryFailedList;
+    gLibraryFailedList = fe;
+    ALOGV("getLibrary() linked error in library %p for path %s", fl, path);
+
     return -EINVAL;
 }
 
@@ -986,16 +998,31 @@ int uuidToString(const effect_uuid_t *uuid, char *str, size_t maxLen)
 
 int EffectDumpEffects(int fd) {
     char s[512];
+
+    list_elem_t *fe = gLibraryFailedList;
+    lib_failed_entry_t *fl = NULL;
+
+    dprintf(fd, "Libraries NOT loaded:\n");
+
+    while (fe) {
+        fl = (lib_failed_entry_t *)fe->object;
+        dprintf(fd, " Library %s\n", fl->name);
+        dprintf(fd, "  path: %s\n", fl->path);
+        fe = fe->next;
+    }
+
     list_elem_t *e = gLibraryList;
     lib_entry_t *l = NULL;
     effect_descriptor_t *d = NULL;
     int found = 0;
     int ret = 0;
 
+    dprintf(fd, "Libraries loaded:\n");
     while (e) {
         l = (lib_entry_t *)e->object;
         list_elem_t *efx = l->effects;
-        dprintf(fd, "Library %s\n", l->name);
+        dprintf(fd, " Library %s\n", l->name);
+        dprintf(fd, "  path: %s\n", l->path);
         if (!efx) {
             dprintf(fd, "  (no effects)\n");
         }
