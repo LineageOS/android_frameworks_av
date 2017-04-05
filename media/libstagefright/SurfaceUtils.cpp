@@ -176,7 +176,7 @@ status_t pushBlankBuffersToNativeWindow(ANativeWindow *nativeWindow /* nonnull *
             break;
         }
 
-        sp<GraphicBuffer> buf(new GraphicBuffer(anb, false));
+        sp<GraphicBuffer> buf(GraphicBuffer::from(anb));
 
         // Fill the buffer with the a 1x1 checkerboard pattern ;)
         uint32_t *img = NULL;
