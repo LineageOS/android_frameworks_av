@@ -421,14 +421,22 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                         getLastRemovableMediaDevices(GROUP_WIRED));
             }
         }
-        if ((devices2.isEmpty()) && (strategy != STRATEGY_SONIFICATION)) {
+        if ((devices2.isEmpty()) && (strategy != STRATEGY_SONIFICATION) &&
+                (devices.isEmpty())) {
             // no sonification on aux digital (e.g. HDMI)
             devices2 = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_AUX_DIGITAL);
         }
         if ((devices2.isEmpty()) &&
+                (strategy != STRATEGY_SONIFICATION) &&
                 (getForceUse(AUDIO_POLICY_FORCE_FOR_DOCK) == AUDIO_POLICY_FORCE_ANALOG_DOCK)) {
             devices2 = availableOutputDevices.getDevicesFromType(
                     AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET);
+        }
+        if ((devices2.isEmpty()) && (strategy != STRATEGY_SONIFICATION) &&
+                (devices.isEmpty())) {
+            // no sonification on WFD sink
+            devices2 = availableOutputDevices.getDevicesFromType(
+                    AUDIO_DEVICE_OUT_PROXY);
         }
         if (devices2.isEmpty()) {
             devices2 = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_SPEAKER);
