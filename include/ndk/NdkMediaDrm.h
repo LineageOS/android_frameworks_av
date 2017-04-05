@@ -159,8 +159,7 @@ typedef struct AMediaDrmKeyValuePair {
  * to obtain or release keys used to decrypt encrypted content.
  * AMediaDrm_getKeyRequest is used to obtain an opaque key request byte array that
  * is delivered to the license server.  The opaque key request byte array is
- * returned in KeyRequest.data.  The recommended URL to deliver the key request to
- * is returned in KeyRequest.defaultUrl.
+ * returned in KeyRequest.data.
  *
  * After the app has received the key request response from the server,
  * it should deliver to the response to the DRM engine plugin using the method
