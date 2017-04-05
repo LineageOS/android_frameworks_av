@@ -41,6 +41,7 @@ class MediaAnalyticsItem {
     friend class MediaAnalyticsService;
     friend class IMediaAnalyticsService;
     friend class MediaMetricsJNI;
+    friend class MetricsSummarizer;
 
     public:
 
@@ -231,7 +232,6 @@ class MediaAnalyticsItem {
         size_t mPropCount;
         size_t mPropSize;
         Prop *mProps;
-
 };
 
 } // namespace android
