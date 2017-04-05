@@ -43,7 +43,9 @@ namespace implementation {
 
 constexpr size_t kMaxNodeInstances = (1 << 16);
 
-Omx::Omx() : mMaster(new OMXMaster()) {
+Omx::Omx() :
+    mMaster(new OMXMaster()),
+    mParser() {
 }
 
 Omx::~Omx() {
@@ -111,6 +113,19 @@ Return<void> Omx::allocateNode(
         return Void();
     }
     instance->setHandle(handle);
+    std::vector<AString> quirkVector;
+    if (mParser.getQuirks(name.c_str(), &quirkVector) == OK) {
+        uint32_t quirks = 0;
+        for (const AString quirk : quirkVector) {
+            if (quirk == "requires-allocate-on-input-ports") {
+                quirks |= kRequiresAllocateBufferOnInputPorts;
+            }
+            if (quirk == "requires-allocate-on-output-ports") {
+                quirks |= kRequiresAllocateBufferOnOutputPorts;
+            }
+        }
+        instance->setQuirks(quirks);
+    }
 
     mLiveNodes.add(observer.get(), instance);
     observer->linkToDeath(this, 0);

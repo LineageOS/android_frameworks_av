@@ -41,20 +41,12 @@
 #include <utils/misc.h>
 #include <utils/NativeHandle.h>
 #include <media/OMXBuffer.h>
+#include <media/vndk/xmlparser/1.0/MediaCodecsXmlParser.h>
 
 #include <hidlmemory/mapping.h>
 
 static const OMX_U32 kPortIndexInput = 0;
 static const OMX_U32 kPortIndexOutput = 1;
-
-// Quirk still supported, even though deprecated
-enum Quirks {
-    kRequiresAllocateBufferOnInputPorts   = 1,
-    kRequiresAllocateBufferOnOutputPorts  = 2,
-
-    kQuirksMask = kRequiresAllocateBufferOnInputPorts
-                | kRequiresAllocateBufferOnOutputPorts,
-};
 
 #define CLOGW(fmt, ...) ALOGW("[%p:%s] " fmt, mHandle, mName, ##__VA_ARGS__)
 

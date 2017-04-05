@@ -549,11 +549,6 @@ public:
     virtual status_t dispatchMessage(const omx_message &msg) {
         return mBase->dispatchMessage(msg);
     }
-
-    // TODO: this is temporary, will be removed when quirks move to OMX side
-    virtual status_t setQuirks(OMX_U32 quirks) {
-        return mBase->setQuirks(quirks);
-    }
 };
 
 IMPLEMENT_META_INTERFACE(OMX, "android.hardware.IOMX");
@@ -971,17 +966,6 @@ status_t BnOMXNode::onTransact(
                 err = dispatchMessage(msg);
             }
             reply->writeInt32(err);
-
-            return NO_ERROR;
-        }
-
-        case SET_QUIRKS:
-        {
-            CHECK_OMX_INTERFACE(IOMXNode, data, reply);
-
-            OMX_U32 quirks = data.readInt32();
-
-            reply->writeInt32(setQuirks(quirks));
 
             return NO_ERROR;
         }
