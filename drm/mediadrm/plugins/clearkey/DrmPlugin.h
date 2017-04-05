@@ -63,22 +63,28 @@ public:
             Vector<uint8_t>& keySetId);
 
     virtual status_t removeKeys(const Vector<uint8_t>& sessionId) {
-        UNUSED(sessionId);
+        if (sessionId.size() == 0) {
+            return android::BAD_VALUE;
+        }
+
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
 
     virtual status_t restoreKeys(
             const Vector<uint8_t>& sessionId,
             const Vector<uint8_t>& keySetId) {
-        UNUSED(sessionId);
-        UNUSED(keySetId);
+        if (sessionId.size() == 0 || keySetId.size() == 0) {
+            return android::BAD_VALUE;
+        }
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
 
     virtual status_t queryKeyStatus(
             const Vector<uint8_t>& sessionId,
             KeyedVector<String8, String8>& infoMap) const {
-        UNUSED(sessionId);
+        if (sessionId.size() == 0) {
+            return android::BAD_VALUE;
+        }
         UNUSED(infoMap);
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
@@ -169,10 +175,10 @@ public:
             const Vector<uint8_t>& input,
             const Vector<uint8_t>& iv,
             Vector<uint8_t>& output) {
-        UNUSED(sessionId);
-        UNUSED(keyId);
-        UNUSED(input);
-        UNUSED(iv);
+        if (sessionId.size() == 0 || keyId.size() == 0 ||
+                input.size() == 0 || iv.size() == 0) {
+            return android::BAD_VALUE;
+        }
         UNUSED(output);
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
@@ -183,10 +189,10 @@ public:
             const Vector<uint8_t>& input,
             const Vector<uint8_t>& iv,
             Vector<uint8_t>& output) {
-        UNUSED(sessionId);
-        UNUSED(keyId);
-        UNUSED(input);
-        UNUSED(iv);
+        if (sessionId.size() == 0 || keyId.size() == 0 ||
+                input.size() == 0 || iv.size() == 0) {
+            return android::BAD_VALUE;
+        }
         UNUSED(output);
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
@@ -196,9 +202,10 @@ public:
             const Vector<uint8_t>& keyId,
             const Vector<uint8_t>& message,
             Vector<uint8_t>& signature) {
-        UNUSED(sessionId);
-        UNUSED(keyId);
-        UNUSED(message);
+        if (sessionId.size() == 0 || keyId.size() == 0 ||
+                message.size() == 0) {
+            return android::BAD_VALUE;
+        }
         UNUSED(signature);
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
@@ -208,10 +215,10 @@ public:
             const Vector<uint8_t>& keyId,
             const Vector<uint8_t>& message,
             const Vector<uint8_t>& signature, bool& match) {
-        UNUSED(sessionId);
-        UNUSED(keyId);
-        UNUSED(message);
-        UNUSED(signature);
+        if (sessionId.size() == 0 || keyId.size() == 0 ||
+                message.size() == 0 || signature.size() == 0) {
+            return android::BAD_VALUE;
+        }
         UNUSED(match);
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
@@ -222,10 +229,10 @@ public:
             const Vector<uint8_t>& message,
             const Vector<uint8_t>& wrappedKey,
             Vector<uint8_t>& signature) {
-        UNUSED(sessionId);
-        UNUSED(algorithm);
-        UNUSED(message);
-        UNUSED(wrappedKey);
+        if (sessionId.size() == 0 || algorithm.size() == 0 ||
+                message.size() == 0 || wrappedKey.size() == 0) {
+            return android::BAD_VALUE;
+        }
         UNUSED(signature);
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
