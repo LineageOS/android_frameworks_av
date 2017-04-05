@@ -71,12 +71,13 @@ private:
     // Construct this using a codec, source and looper.
     SimpleDecodingSource(
             const sp<MediaCodec> &codec, const sp<IMediaSource> &source, const sp<ALooper> &looper,
-            bool usingSurface, const sp<AMessage> &format);
+            bool usingSurface, bool isVorbis, const sp<AMessage> &format);
 
     sp<MediaCodec> mCodec;
     sp<IMediaSource> mSource;
     sp<ALooper> mLooper;
     bool mUsingSurface;
+    bool mIsVorbis;
     enum State {
         INIT,
         STARTED,

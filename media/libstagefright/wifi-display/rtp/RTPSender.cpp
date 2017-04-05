@@ -762,10 +762,16 @@ status_t RTPSender::parseTSFB(const uint8_t *data, size_t size) {
     return OK;
 }
 
-status_t RTPSender::parseAPP(const uint8_t *data, size_t size __unused) {
-    if (!memcmp("late", &data[8], 4)) {
-        int64_t avgLatencyUs = (int64_t)U64_AT(&data[12]);
-        int64_t maxLatencyUs = (int64_t)U64_AT(&data[20]);
+status_t RTPSender::parseAPP(const uint8_t *data, size_t size) {
+    static const size_t late_offset = 8;
+    static const char late_string[] = "late";
+    static const size_t avgLatencyUs_offset = late_offset + sizeof(late_string) - 1;
+    static const size_t maxLatencyUs_offset = avgLatencyUs_offset + sizeof(int64_t);
+
+    if ((size >= (maxLatencyUs_offset + sizeof(int64_t)))
+            && !memcmp(late_string, &data[late_offset], sizeof(late_string) - 1)) {
+        int64_t avgLatencyUs = (int64_t)U64_AT(&data[avgLatencyUs_offset]);
+        int64_t maxLatencyUs = (int64_t)U64_AT(&data[maxLatencyUs_offset]);
 
         sp<AMessage> notify = mNotify->dup();
         notify->setInt32("what", kWhatInformSender);

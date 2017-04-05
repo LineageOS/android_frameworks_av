@@ -370,15 +370,26 @@ status_t MediaRecorderClient::setListener(const sp<IMediaRecorderClient>& listen
     mRecorder->setListener(listener);
 
     sp<IServiceManager> sm = defaultServiceManager();
-    sp<IBinder> binder = sm->getService(String16("media.camera"));
+
+    // WORKAROUND: We don't know if camera exists here and getService might block for 5 seconds.
+    // Use checkService for camera if we don't know it exists.
+    static std::atomic<bool> sCameraChecked(false);  // once true never becomes false.
+    static std::atomic<bool> sCameraVerified(false); // once true never becomes false.
+    sp<IBinder> binder = (sCameraVerified || !sCameraChecked)
+        ? sm->getService(String16("media.camera")) : sm->checkService(String16("media.camera"));
     if (binder == NULL) {
         ALOGE("Unable to connect to camera service");
         return NO_INIT;
     }
 
-    mCameraDeathListener = new ServiceDeathNotifier(binder, listener,
-            MediaPlayerService::CAMERA_PROCESS_DEATH);
-    binder->linkToDeath(mCameraDeathListener);
+    // If the device does not have a camera, do not create a death listener for it.
+    if (binder != NULL) {
+        sCameraVerified = true;
+        mCameraDeathListener = new ServiceDeathNotifier(binder, listener,
+                MediaPlayerService::CAMERA_PROCESS_DEATH);
+        binder->linkToDeath(mCameraDeathListener);
+    }
+    sCameraChecked = true;
 
     binder = sm->getService(String16("media.codec"));
     if (binder == NULL) {

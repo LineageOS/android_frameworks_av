@@ -39,6 +39,12 @@ MediaBufferGroup::MediaBufferGroup(size_t growthLimit) :
 MediaBufferGroup::MediaBufferGroup(size_t buffers, size_t buffer_size, size_t growthLimit)
     : mGrowthLimit(growthLimit) {
 
+    if (mGrowthLimit > 0 && buffers > mGrowthLimit) {
+        ALOGW("Preallocated buffers %zu > growthLimit %zu, increasing growthLimit",
+                buffers, mGrowthLimit);
+        mGrowthLimit = buffers;
+    }
+
     if (buffer_size >= kSharedMemoryThreshold) {
         ALOGD("creating MemoryDealer");
         // Using a single MemoryDealer is efficient for a group of shared memory objects.
@@ -102,9 +108,22 @@ MediaBufferGroup::~MediaBufferGroup() {
 void MediaBufferGroup::add_buffer(MediaBuffer *buffer) {
     Mutex::Autolock autoLock(mLock);
 
+    // if we're above our growth limit, release buffers if we can
+    for (auto it = mBuffers.begin();
+            mGrowthLimit > 0
+            && mBuffers.size() >= mGrowthLimit
+            && it != mBuffers.end();) {
+        if ((*it)->refcount() == 0) {
+            (*it)->setObserver(nullptr);
+            (*it)->release();
+            it = mBuffers.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
     buffer->setObserver(this);
     mBuffers.emplace_back(buffer);
-    // optionally: mGrowthLimit = max(mGrowthLimit, mBuffers.size());
 }
 
 bool MediaBufferGroup::has_buffers() {

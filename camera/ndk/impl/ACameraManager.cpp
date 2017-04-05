@@ -22,6 +22,7 @@
 #include "ACameraMetadata.h"
 #include "ACameraDevice.h"
 #include <utils/Vector.h>
+#include <cutils/properties.h>
 #include <stdlib.h>
 #include <camera/VendorTagDescriptor.h>
 
@@ -71,9 +72,19 @@ CameraManagerGlobal::~CameraManagerGlobal() {
     mCameraService.clear();
 }
 
+static bool isCameraServiceDisabled() {
+    char value[PROPERTY_VALUE_MAX];
+    property_get("config.disable_cameraservice", value, "0");
+    return (strncmp(value, "0", 2) != 0 && strncasecmp(value, "false", 6) != 0);
+}
+
 sp<hardware::ICameraService> CameraManagerGlobal::getCameraService() {
     Mutex::Autolock _l(mLock);
     if (mCameraService.get() == nullptr) {
+        if (isCameraServiceDisabled()) {
+            return mCameraService;
+        }
+
         sp<IServiceManager> sm = defaultServiceManager();
         sp<IBinder> binder;
         do {
@@ -302,6 +313,13 @@ void CameraManagerGlobal::onStatusChangedLocked(
 camera_status_t
 ACameraManager::getOrCreateCameraIdListLocked(ACameraIdList** cameraIdList) {
     if (mCachedCameraIdList.numCameras == kCameraIdListNotInit) {
+        if (isCameraServiceDisabled()) {
+            mCachedCameraIdList.numCameras = 0;
+            mCachedCameraIdList.cameraIds = new const char*[0];
+            *cameraIdList = &mCachedCameraIdList;
+            return ACAMERA_OK;
+        }
+
         int numCameras = 0;
         Vector<char *> cameraIds;
         sp<hardware::ICameraService> cs = CameraManagerGlobal::getInstance().getCameraService();

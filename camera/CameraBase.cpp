@@ -20,6 +20,7 @@
 #include <utils/Log.h>
 #include <utils/threads.h>
 #include <utils/Mutex.h>
+#include <cutils/properties.h>
 
 #include <android/hardware/ICameraService.h>
 
@@ -86,10 +87,16 @@ namespace {
 
 // establish binder interface to camera service
 template <typename TCam, typename TCamTraits>
-const sp<::android::hardware::ICameraService>& CameraBase<TCam, TCamTraits>::getCameraService()
+const sp<::android::hardware::ICameraService> CameraBase<TCam, TCamTraits>::getCameraService()
 {
     Mutex::Autolock _l(gLock);
     if (gCameraService.get() == 0) {
+        char value[PROPERTY_VALUE_MAX];
+        property_get("config.disable_cameraservice", value, "0");
+        if (strncmp(value, "0", 2) != 0 && strncasecmp(value, "false", 6) != 0) {
+            return gCameraService;
+        }
+
         sp<IServiceManager> sm = defaultServiceManager();
         sp<IBinder> binder;
         do {
@@ -118,7 +125,7 @@ sp<TCam> CameraBase<TCam, TCamTraits>::connect(int cameraId,
     ALOGV("%s: connect", __FUNCTION__);
     sp<TCam> c = new TCam(cameraId);
     sp<TCamCallbacks> cl = c;
-    const sp<::android::hardware::ICameraService>& cs = getCameraService();
+    const sp<::android::hardware::ICameraService> cs = getCameraService();
 
     binder::Status ret;
     if (cs != nullptr) {
@@ -226,7 +233,7 @@ int CameraBase<TCam, TCamTraits>::getNumberOfCameras() {
 template <typename TCam, typename TCamTraits>
 status_t CameraBase<TCam, TCamTraits>::getCameraInfo(int cameraId,
         struct hardware::CameraInfo* cameraInfo) {
-    const sp<::android::hardware::ICameraService>& cs = getCameraService();
+    const sp<::android::hardware::ICameraService> cs = getCameraService();
     if (cs == 0) return UNKNOWN_ERROR;
     binder::Status res = cs->getCameraInfo(cameraId, cameraInfo);
     return res.isOk() ? OK : res.serviceSpecificErrorCode();

@@ -356,7 +356,7 @@ uint32_t AudioPolicyManager::updateCallRouting(audio_devices_t rxDevice, uint32_
     DeviceVector deviceList;
     uint32_t muteWaitMs = 0;
 
-    if(!hasPrimaryOutput()) {
+    if(!hasPrimaryOutput() || mPrimaryOutput->device() == AUDIO_DEVICE_OUT_STUB) {
         return muteWaitMs;
     }
     audio_devices_t txDevice = getDeviceAndMixForInputSource(AUDIO_SOURCE_VOICE_COMMUNICATION);
