@@ -27,6 +27,7 @@ LOCAL_SHARED_LIBRARIES :=       \
     libgui                      \
     libaudioclient              \
     libmedia                    \
+    libmediametrics             \
     libmediadrm                 \
     libmediautils               \
     libmemunreachable           \
