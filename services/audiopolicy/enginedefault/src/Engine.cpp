@@ -456,13 +456,19 @@ audio_devices_t Engine::getDeviceForStrategyInt(legacy_strategy strategy,
         if (device2 == AUDIO_DEVICE_NONE) {
             device2 = availableOutputDevicesType & AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET;
         }
-        if ((device2 == AUDIO_DEVICE_NONE) && (strategy != STRATEGY_SONIFICATION)) {
+        if ((device2 == AUDIO_DEVICE_NONE) && (strategy != STRATEGY_SONIFICATION) &&
+                (device == AUDIO_DEVICE_NONE)) {
             // no sonification on aux digital (e.g. HDMI)
             device2 = availableOutputDevicesType & AUDIO_DEVICE_OUT_AUX_DIGITAL;
         }
-        if ((device2 == AUDIO_DEVICE_NONE) &&
+        if ((device2 == AUDIO_DEVICE_NONE) && (strategy != STRATEGY_SONIFICATION) &&
                 (getForceUse(AUDIO_POLICY_FORCE_FOR_DOCK) == AUDIO_POLICY_FORCE_ANALOG_DOCK)) {
             device2 = availableOutputDevicesType & AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET;
+        }
+        if ((device2 == AUDIO_DEVICE_NONE) && (strategy != STRATEGY_SONIFICATION) &&
+                (device == AUDIO_DEVICE_NONE)) {
+            // no sonification on WFD sink
+            device2 = availableOutputDevicesType & AUDIO_DEVICE_OUT_PROXY;
         }
         if (device2 == AUDIO_DEVICE_NONE) {
             device2 = availableOutputDevicesType & AUDIO_DEVICE_OUT_SPEAKER;
