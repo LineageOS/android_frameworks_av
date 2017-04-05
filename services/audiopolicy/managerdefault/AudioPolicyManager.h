@@ -539,7 +539,7 @@ protected:
          * Must be called before updateDevicesAndOutputs()
          * @param attr to be considered
          */
-        void checkOutputForAttributes(const audio_attributes_t &attr);
+        virtual void checkOutputForAttributes(const audio_attributes_t &attr);
 
         bool followsSameRouting(const audio_attributes_t &lAttr,
                                 const audio_attributes_t &rAttr) const;
