@@ -411,7 +411,7 @@ Return<void> TWOmxNode::getExtensionIndex(
         getExtensionIndex_cb _hidl_cb) {
     OMX_INDEXTYPE index;
     Status status = toStatus(mBase->getExtensionIndex(
-            parameterName, &index));
+            parameterName.c_str(), &index));
     _hidl_cb(status, toRawIndexType(index));
     return Void();
 }

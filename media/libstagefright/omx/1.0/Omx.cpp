@@ -95,11 +95,11 @@ Return<void> Omx::allocateNode(
     }
 
     sp<OMXNodeInstance> instance = new OMXNodeInstance(
-            this, new LWOmxObserver(observer), name);
+            this, new LWOmxObserver(observer), name.c_str());
 
     OMX_COMPONENTTYPE *handle;
     OMX_ERRORTYPE err = mMaster->makeComponentInstance(
-            name, &OMXNodeInstance::kCallbacks,
+            name.c_str(), &OMXNodeInstance::kCallbacks,
             instance.get(), &handle);
 
     if (err != OMX_ErrorNone) {
