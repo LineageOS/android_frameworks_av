@@ -22,7 +22,7 @@
 #include <utils/String8.h>
 #include <utils/RefBase.h>
 #include <system/camera_vendor_tags.h>
-
+#include <unordered_map>
 #include <stdint.h>
 
 namespace android {
@@ -166,8 +166,84 @@ class VendorTagDescriptor :
 
 };
 
-} /* namespace android */
+namespace hardware {
+namespace camera2 {
+namespace params {
 
+class VendorTagDescriptorCache : public Parcelable {
+  public:
+
+    VendorTagDescriptorCache() {};
+
+    int32_t addVendorDescriptor(metadata_vendor_id_t id,
+            sp<android::VendorTagDescriptor> desc);
+
+    int32_t getVendorTagDescriptor(
+            metadata_vendor_id_t id,
+            sp<android::VendorTagDescriptor> *desc /*out*/);
+
+    // Parcelable interface
+    status_t writeToParcel(Parcel* parcel) const override;
+    status_t readFromParcel(const Parcel* parcel) override;
+
+    // Returns the number of vendor tags defined.
+    int getTagCount(metadata_vendor_id_t id) const;
+
+    // Returns an array containing the id's of vendor tags defined.
+    void getTagArray(uint32_t* tagArray, metadata_vendor_id_t id) const;
+
+    // Returns the section name string for a given vendor tag id.
+    const char* getSectionName(uint32_t tag, metadata_vendor_id_t id) const;
+
+    // Returns the tag name string for a given vendor tag id.
+    const char* getTagName(uint32_t tag, metadata_vendor_id_t id) const;
+
+    // Returns the tag type for a given vendor tag id.
+    int getTagType(uint32_t tag, metadata_vendor_id_t id) const;
+
+    /**
+     * Dump the currently configured vendor tags to a file descriptor.
+     */
+    void dump(int fd, int verbosity, int indentation) const;
+
+  protected:
+    std::unordered_map<metadata_vendor_id_t, sp<android::VendorTagDescriptor>> mVendorMap;
+    struct vendor_tag_cache_ops mVendorCacheOps;
+};
+
+} /* namespace params */
+} /* namespace camera2 */
+} /* namespace hardware */
+
+class VendorTagDescriptorCache :
+        public ::android::hardware::camera2::params::VendorTagDescriptorCache,
+        public LightRefBase<VendorTagDescriptorCache> {
+  public:
+
+    /**
+     * Sets the global vendor tag descriptor cache to use for this process.
+     * Camera metadata operations that access vendor tags will use the
+     * vendor tag definitions set this way.
+     *
+     * Returns OK on success, or a negative error code.
+     */
+    static status_t setAsGlobalVendorTagCache(
+            const sp<VendorTagDescriptorCache>& cache);
+
+    /**
+     * Returns the global vendor tag cache used by this process.
+     * This will contain NULL if no vendor tags are defined.
+     */
+    static sp<VendorTagDescriptorCache> getGlobalVendorTagCache();
+
+    /**
+     * Clears the global vendor tag cache used by this process.
+     */
+    static void clearGlobalVendorTagCache();
+
+};
+
+} /* namespace android */
 
 #define VENDOR_TAG_DESCRIPTOR_H
 #endif /* VENDOR_TAG_DESCRIPTOR_H */

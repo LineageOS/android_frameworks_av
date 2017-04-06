@@ -39,6 +39,7 @@
 #include "device3/StatusTracker.h"
 #include "device3/Camera3BufferManager.h"
 #include "utils/TagMonitor.h"
+#include <camera_metadata_hidden.h>
 
 /**
  * Function pointer types with C calling convention to
@@ -1063,6 +1064,8 @@ class Camera3Device :
 
     void monitorMetadata(TagMonitor::eventSource source, int64_t frameNumber,
             nsecs_t timestamp, const CameraMetadata& metadata);
+
+    metadata_vendor_id_t mVendorTagId;
 
     /**
      * Static callback forwarding methods from HAL to instance

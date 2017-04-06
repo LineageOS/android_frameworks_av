@@ -367,9 +367,12 @@ bool FrameProcessor::updatePendingState(const CameraMetadata& result, int32_t ta
 
     entry = result.find(tag);
     if (entry.count == 0) {
+        const camera_metadata *metaBuffer = result.getAndLock();
         ALOGV("%s: Camera %d: No %s provided by HAL for frame %d in this result!",
                 __FUNCTION__, cameraId,
-                get_camera_metadata_tag_name(tag), frameNumber);
+                get_local_camera_metadata_tag_name(tag, metaBuffer),
+                frameNumber);
+        result.unlock(metaBuffer);
         return false;
     } else {
         switch(sizeof(Src)){

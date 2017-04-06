@@ -23,12 +23,14 @@
 #include <inttypes.h>
 #include <utils/Log.h>
 #include <camera/VendorTagDescriptor.h>
+#include <camera_metadata_hidden.h>
 
 namespace android {
 
 TagMonitor::TagMonitor():
         mMonitoringEnabled(false),
-        mMonitoringEvents(kMaxMonitorEvents)
+        mMonitoringEvents(kMaxMonitorEvents),
+        mVendorTagId(CAMERA_METADATA_INVALID_VENDOR_ID)
 {}
 
 const char* TagMonitor::k3aTags =
@@ -55,6 +57,13 @@ void TagMonitor::parseTagsToMonitor(String8 tagNames) {
 
     sp<VendorTagDescriptor> vTags =
             VendorTagDescriptor::getGlobalVendorTagDescriptor();
+    if ((nullptr == vTags.get()) || (0 >= vTags->getTagCount())) {
+        sp<VendorTagDescriptorCache> cache =
+                VendorTagDescriptorCache::getGlobalVendorTagCache();
+        if (cache.get()) {
+            cache->getVendorTagDescriptor(mVendorTagId, &vTags);
+        }
+    }
 
     bool gotTag = false;
 
@@ -104,6 +113,15 @@ void TagMonitor::monitorMetadata(eventSource source, int64_t frameNumber, nsecs_
         camera_metadata_ro_entry entry = metadata.find(tag);
         CameraMetadata &lastValues = (source == REQUEST) ?
                 mLastMonitoredRequestValues : mLastMonitoredResultValues;
+        if (lastValues.isEmpty()) {
+            lastValues = CameraMetadata(mMonitoredTagList.size());
+            const camera_metadata_t *metaBuffer =
+                    lastValues.getAndLock();
+            set_camera_metadata_vendor_id(
+                    const_cast<camera_metadata_t *> (metaBuffer), mVendorTagId);
+            lastValues.unlock(metaBuffer);
+        }
+
         camera_metadata_entry lastEntry = lastValues.find(tag);
 
         if (entry.count > 0) {
@@ -129,16 +147,21 @@ void TagMonitor::monitorMetadata(eventSource source, int64_t frameNumber, nsecs_
             }
 
             if (isDifferent) {
-                ALOGV("%s: Tag %s changed", __FUNCTION__, get_camera_metadata_tag_name(tag));
+                ALOGV("%s: Tag %s changed", __FUNCTION__,
+                      get_local_camera_metadata_tag_name_vendor_id(
+                              tag, mVendorTagId));
                 lastValues.update(entry);
                 mMonitoringEvents.emplace(source, frameNumber, timestamp, entry);
             }
         } else if (lastEntry.count > 0) {
             // Value has been removed
-            ALOGV("%s: Tag %s removed", __FUNCTION__, get_camera_metadata_tag_name(tag));
+            ALOGV("%s: Tag %s removed", __FUNCTION__,
+                  get_local_camera_metadata_tag_name_vendor_id(
+                          tag, mVendorTagId));
             lastValues.erase(tag);
             entry.tag = tag;
-            entry.type = get_camera_metadata_tag_type(tag);
+            entry.type = get_local_camera_metadata_tag_type_vendor_id(tag,
+                    mVendorTagId);
             entry.count = 0;
             mMonitoringEvents.emplace(source, frameNumber, timestamp, entry);
         }
@@ -152,8 +175,10 @@ void TagMonitor::dumpMonitoredMetadata(int fd) {
         dprintf(fd, "     Tag monitoring enabled for tags:\n");
         for (uint32_t tag : mMonitoredTagList) {
             dprintf(fd, "        %s.%s\n",
-                    get_camera_metadata_section_name(tag),
-                    get_camera_metadata_tag_name(tag));
+                    get_local_camera_metadata_section_name_vendor_id(tag,
+                            mVendorTagId),
+                    get_local_camera_metadata_tag_name_vendor_id(tag,
+                            mVendorTagId));
         }
     } else {
         dprintf(fd, "     Tag monitoring disabled (enable with -m <name1,..,nameN>)\n");
@@ -166,8 +191,10 @@ void TagMonitor::dumpMonitoredMetadata(int fd) {
                     event.frameNumber, event.timestamp,
                     indentation,
                     event.source == REQUEST ? "REQ:" : "RES:",
-                    get_camera_metadata_section_name(event.tag),
-                    get_camera_metadata_tag_name(event.tag));
+                    get_local_camera_metadata_section_name_vendor_id(event.tag,
+                            mVendorTagId),
+                    get_local_camera_metadata_tag_name_vendor_id(event.tag,
+                            mVendorTagId));
             if (event.newData.size() == 0) {
                 dprintf(fd, " (Removed)\n");
             } else {
