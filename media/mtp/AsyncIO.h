@@ -48,6 +48,8 @@ struct aiocb {
     std::thread thread;
     ssize_t ret;
     int error;
+
+    ~aiocb();
 };
 
 // Submit a request for IO to be completed
@@ -58,9 +60,13 @@ int aio_splice_write(struct aiocb *);
 
 // Suspend current thread until given IO is complete, at which point
 // its return value and any errors can be accessed
+// All submitted requests must have a corresponding suspend.
+// aiocb->aio_buf must refer to valid memory until after the suspend call
 int aio_suspend(struct aiocb *[], int, const struct timespec *);
 int aio_error(const struct aiocb *);
 ssize_t aio_return(struct aiocb *);
+
+// (Currently unimplemented)
 int aio_cancel(int, struct aiocb *);
 
 // Initialize a threadpool to perform IO. Only one pool can be
