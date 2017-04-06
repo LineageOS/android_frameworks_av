@@ -23,15 +23,6 @@
 #include <binder/Parcel.h>
 #include <binder/IMemory.h>
 #include <binder/IPCThreadState.h>
-#include <media/IHDCP.h>
-#include <media/IMediaCodecList.h>
-#include <media/IMediaHTTPService.h>
-#include <media/IMediaPlayerService.h>
-#include <media/IMediaRecorder.h>
-#include <media/IOMX.h>
-#include <media/IRemoteDisplay.h>
-#include <media/IRemoteDisplayClient.h>
-#include <media/IStreamSource.h>
 
 #include <utils/Errors.h>  // for status_t
 #include <utils/List.h>
