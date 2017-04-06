@@ -306,19 +306,11 @@ status_t Camera3Device::initializeCommonLocked() {
     }
 
     // Will the HAL be sending in early partial result metadata?
-    if (mDeviceVersion >= CAMERA_DEVICE_API_VERSION_3_2) {
-        camera_metadata_entry partialResultsCount =
-                mDeviceInfo.find(ANDROID_REQUEST_PARTIAL_RESULT_COUNT);
-        if (partialResultsCount.count > 0) {
-            mNumPartialResults = partialResultsCount.data.i32[0];
-            mUsePartialResult = (mNumPartialResults > 1);
-        }
-    } else {
-        camera_metadata_entry partialResultsQuirk =
-                mDeviceInfo.find(ANDROID_QUIRKS_USE_PARTIAL_RESULT);
-        if (partialResultsQuirk.count > 0 && partialResultsQuirk.data.u8[0] == 1) {
-            mUsePartialResult = true;
-        }
+    camera_metadata_entry partialResultsCount =
+            mDeviceInfo.find(ANDROID_REQUEST_PARTIAL_RESULT_COUNT);
+    if (partialResultsCount.count > 0) {
+        mNumPartialResults = partialResultsCount.data.i32[0];
+        mUsePartialResult = (mNumPartialResults > 1);
     }
 
     camera_metadata_entry configs =
@@ -434,48 +426,32 @@ bool Camera3Device::tryLockSpinRightRound(Mutex& lock) {
 
 Camera3Device::Size Camera3Device::getMaxJpegResolution() const {
     int32_t maxJpegWidth = 0, maxJpegHeight = 0;
-    if (mDeviceVersion >= CAMERA_DEVICE_API_VERSION_3_2) {
-        const int STREAM_CONFIGURATION_SIZE = 4;
-        const int STREAM_FORMAT_OFFSET = 0;
-        const int STREAM_WIDTH_OFFSET = 1;
-        const int STREAM_HEIGHT_OFFSET = 2;
-        const int STREAM_IS_INPUT_OFFSET = 3;
-        camera_metadata_ro_entry_t availableStreamConfigs =
-                mDeviceInfo.find(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS);
-        if (availableStreamConfigs.count == 0 ||
-                availableStreamConfigs.count % STREAM_CONFIGURATION_SIZE != 0) {
-            return Size(0, 0);
-        }
+    const int STREAM_CONFIGURATION_SIZE = 4;
+    const int STREAM_FORMAT_OFFSET = 0;
+    const int STREAM_WIDTH_OFFSET = 1;
+    const int STREAM_HEIGHT_OFFSET = 2;
+    const int STREAM_IS_INPUT_OFFSET = 3;
+    camera_metadata_ro_entry_t availableStreamConfigs =
+            mDeviceInfo.find(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS);
+    if (availableStreamConfigs.count == 0 ||
+            availableStreamConfigs.count % STREAM_CONFIGURATION_SIZE != 0) {
+        return Size(0, 0);
+    }
 
-        // Get max jpeg size (area-wise).
-        for (size_t i=0; i < availableStreamConfigs.count; i+= STREAM_CONFIGURATION_SIZE) {
-            int32_t format = availableStreamConfigs.data.i32[i + STREAM_FORMAT_OFFSET];
-            int32_t width = availableStreamConfigs.data.i32[i + STREAM_WIDTH_OFFSET];
-            int32_t height = availableStreamConfigs.data.i32[i + STREAM_HEIGHT_OFFSET];
-            int32_t isInput = availableStreamConfigs.data.i32[i + STREAM_IS_INPUT_OFFSET];
-            if (isInput == ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT
-                    && format == HAL_PIXEL_FORMAT_BLOB &&
-                    (width * height > maxJpegWidth * maxJpegHeight)) {
-                maxJpegWidth = width;
-                maxJpegHeight = height;
-            }
-        }
-    } else {
-        camera_metadata_ro_entry availableJpegSizes =
-                mDeviceInfo.find(ANDROID_SCALER_AVAILABLE_JPEG_SIZES);
-        if (availableJpegSizes.count == 0 || availableJpegSizes.count % 2 != 0) {
-            return Size(0, 0);
-        }
-
-        // Get max jpeg size (area-wise).
-        for (size_t i = 0; i < availableJpegSizes.count; i += 2) {
-            if ((availableJpegSizes.data.i32[i] * availableJpegSizes.data.i32[i + 1])
-                    > (maxJpegWidth * maxJpegHeight)) {
-                maxJpegWidth = availableJpegSizes.data.i32[i];
-                maxJpegHeight = availableJpegSizes.data.i32[i + 1];
-            }
+    // Get max jpeg size (area-wise).
+    for (size_t i=0; i < availableStreamConfigs.count; i+= STREAM_CONFIGURATION_SIZE) {
+        int32_t format = availableStreamConfigs.data.i32[i + STREAM_FORMAT_OFFSET];
+        int32_t width = availableStreamConfigs.data.i32[i + STREAM_WIDTH_OFFSET];
+        int32_t height = availableStreamConfigs.data.i32[i + STREAM_HEIGHT_OFFSET];
+        int32_t isInput = availableStreamConfigs.data.i32[i + STREAM_IS_INPUT_OFFSET];
+        if (isInput == ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT
+                && format == HAL_PIXEL_FORMAT_BLOB &&
+                (width * height > maxJpegWidth * maxJpegHeight)) {
+            maxJpegWidth = width;
+            maxJpegHeight = height;
         }
     }
+
     return Size(maxJpegWidth, maxJpegHeight);
 }
 
@@ -495,31 +471,6 @@ nsecs_t Camera3Device::getMonoToBoottimeOffset() {
         }
     }
     return measured;
-}
-
-/**
- * Map Android N dataspace definitions back to Android M definitions, for
- * use with HALv3.3 or older.
- *
- * Only map where correspondences exist, and otherwise preserve the value.
- */
-android_dataspace Camera3Device::mapToLegacyDataspace(android_dataspace dataSpace) {
-    switch (dataSpace) {
-        case HAL_DATASPACE_V0_SRGB_LINEAR:
-            return HAL_DATASPACE_SRGB_LINEAR;
-        case HAL_DATASPACE_V0_SRGB:
-            return HAL_DATASPACE_SRGB;
-        case HAL_DATASPACE_V0_JFIF:
-            return HAL_DATASPACE_JFIF;
-        case HAL_DATASPACE_V0_BT601_625:
-            return HAL_DATASPACE_BT601_625;
-        case HAL_DATASPACE_V0_BT601_525:
-            return HAL_DATASPACE_BT601_525;
-        case HAL_DATASPACE_V0_BT709:
-            return HAL_DATASPACE_BT709;
-        default:
-            return dataSpace;
-    }
 }
 
 hardware::graphics::common::V1_0::PixelFormat Camera3Device::mapToPixelFormat(
@@ -1365,20 +1316,9 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
     assert(mStatus != STATUS_ACTIVE);
 
     sp<Camera3OutputStream> newStream;
-    // Overwrite stream set id to invalid for HAL3.2 or lower, as buffer manager does support
-    // such devices.
-    if (mDeviceVersion <= CAMERA_DEVICE_API_VERSION_3_2) {
-        streamSetId = CAMERA3_STREAM_SET_ID_INVALID;
-    }
 
     if (consumers.size() == 0 && !hasDeferredConsumer) {
         ALOGE("%s: Number of consumers cannot be smaller than 1", __FUNCTION__);
-        return BAD_VALUE;
-    }
-    // HAL3.1 doesn't support deferred consumer stream creation as it requires buffer registration
-    // which requires a consumer surface to be available.
-    if (hasDeferredConsumer && mDeviceVersion < CAMERA_DEVICE_API_VERSION_3_2) {
-        ALOGE("HAL3.1 doesn't support deferred consumer stream creation");
         return BAD_VALUE;
     }
 
@@ -1387,10 +1327,6 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         return BAD_VALUE;
     }
 
-    // Use legacy dataspace values for older HALs
-    if (mDeviceVersion <= CAMERA_DEVICE_API_VERSION_3_3) {
-        dataSpace = mapToLegacyDataspace(dataSpace);
-    }
     if (format == HAL_PIXEL_FORMAT_BLOB) {
         ssize_t blobBufferSize;
         if (dataSpace != HAL_DATASPACE_DEPTH) {
@@ -1433,15 +1369,7 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
     }
     newStream->setStatusTracker(mStatusTracker);
 
-    /**
-     * Camera3 Buffer manager is only supported by HAL3.3 onwards, as the older HALs ( < HAL3.2)
-     * requires buffers to be statically allocated for internal static buffer registration, while
-     * the buffers provided by buffer manager are really dynamically allocated. For HAL3.2, because
-     * not all HAL implementation supports dynamic buffer registeration, exlude it as well.
-     */
-    if (mDeviceVersion > CAMERA_DEVICE_API_VERSION_3_2) {
-        newStream->setBufferManager(mBufferManager);
-    }
+    newStream->setBufferManager(mBufferManager);
 
     res = mOutputStreams.add(mNextStreamId, newStream);
     if (res < 0) {
@@ -1919,15 +1847,7 @@ status_t Camera3Device::flush(int64_t *frameNumber) {
         mRequestThread->clear(/*out*/frameNumber);
     }
 
-    status_t res;
-    if (mDeviceVersion >= CAMERA_DEVICE_API_VERSION_3_1) {
-        res = mRequestThread->flush();
-    } else {
-        Mutex::Autolock l(mLock);
-        res = waitUntilDrainedLocked();
-    }
-
-    return res;
+    return mRequestThread->flush();
 }
 
 status_t Camera3Device::prepare(int streamId) {
@@ -1968,14 +1888,6 @@ status_t Camera3Device::tearDown(int streamId) {
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
 
-    // Teardown can only be accomplished on devices that don't require register_stream_buffers,
-    // since we cannot call register_stream_buffers except right after configure_streams.
-    if (mDeviceVersion < CAMERA_DEVICE_API_VERSION_3_2) {
-        ALOGE("%s: Unable to tear down streams on device HAL v%x",
-                __FUNCTION__, mDeviceVersion);
-        return NO_INIT;
-    }
-
     sp<Camera3StreamInterface> stream;
     ssize_t outputStreamIdx = mOutputStreams.indexOfKey(streamId);
     if (outputStreamIdx == NAME_NOT_FOUND) {
@@ -2011,12 +1923,6 @@ status_t Camera3Device::addBufferListenerForStream(int streamId,
     stream->addBufferListener(listener);
 
     return OK;
-}
-
-uint32_t Camera3Device::getDeviceVersion() {
-    ATRACE_CALL();
-    Mutex::Autolock il(mInterfaceLock);
-    return mDeviceVersion;
 }
 
 /**
@@ -2732,10 +2638,7 @@ void Camera3Device::processCaptureResult(const camera3_capture_result *result) {
         return;
     }
 
-    // For HAL3.2 or above, If HAL doesn't support partial, it must always set
-    // partial_result to 1 when metadata is included in this result.
     if (!mUsePartialResult &&
-            mDeviceVersion >= CAMERA_DEVICE_API_VERSION_3_2 &&
             result->result != NULL &&
             result->partial_result != 1) {
         SET_ERR("Result is malformed for frame %d: partial_result %u must be 1"
@@ -2780,33 +2683,15 @@ void Camera3Device::processCaptureResult(const camera3_capture_result *result) {
 
         // Check if this result carries only partial metadata
         if (mUsePartialResult && result->result != NULL) {
-            if (mDeviceVersion >= CAMERA_DEVICE_API_VERSION_3_2) {
-                if (result->partial_result > mNumPartialResults || result->partial_result < 1) {
-                    SET_ERR("Result is malformed for frame %d: partial_result %u must be  in"
-                            " the range of [1, %d] when metadata is included in the result",
-                            frameNumber, result->partial_result, mNumPartialResults);
-                    return;
-                }
-                isPartialResult = (result->partial_result < mNumPartialResults);
-                if (isPartialResult) {
-                    request.collectedPartialResult.append(result->result);
-                }
-            } else {
-                camera_metadata_ro_entry_t partialResultEntry;
-                res = find_camera_metadata_ro_entry(result->result,
-                        ANDROID_QUIRKS_PARTIAL_RESULT, &partialResultEntry);
-                if (res != NAME_NOT_FOUND &&
-                        partialResultEntry.count > 0 &&
-                        partialResultEntry.data.u8[0] ==
-                        ANDROID_QUIRKS_PARTIAL_RESULT_PARTIAL) {
-                    // A partial result. Flag this as such, and collect this
-                    // set of metadata into the in-flight entry.
-                    isPartialResult = true;
-                    request.collectedPartialResult.append(
-                        result->result);
-                    request.collectedPartialResult.erase(
-                        ANDROID_QUIRKS_PARTIAL_RESULT);
-                }
+            if (result->partial_result > mNumPartialResults || result->partial_result < 1) {
+                SET_ERR("Result is malformed for frame %d: partial_result %u must be  in"
+                        " the range of [1, %d] when metadata is included in the result",
+                        frameNumber, result->partial_result, mNumPartialResults);
+                return;
+            }
+            isPartialResult = (result->partial_result < mNumPartialResults);
+            if (isPartialResult) {
+                request.collectedPartialResult.append(result->result);
             }
 
             if (isPartialResult && request.hasCallback) {
@@ -3820,11 +3705,7 @@ status_t Camera3Device::RequestThread::flush() {
     ATRACE_CALL();
     Mutex::Autolock l(mFlushLock);
 
-    if (mDeviceVersion >= CAMERA_DEVICE_API_VERSION_3_1) {
-        return mInterface->flush();
-    }
-
-    return -ENOTSUP;
+    return mInterface->flush();
 }
 
 void Camera3Device::RequestThread::setPaused(bool paused) {

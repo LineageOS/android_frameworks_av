@@ -474,9 +474,6 @@ class Camera3Stream :
     Condition mInputBufferReturnedSignal;
     static const nsecs_t kWaitForBufferDuration = 3000000000LL; // 3000 ms
 
-    // Gets all buffers from endpoint and registers them with the HAL.
-    status_t registerBuffersLocked(camera3_device *hal3Device);
-
     void fireBufferListenersLocked(const camera3_stream_buffer& buffer,
                                   bool acquired, bool output);
     List<wp<Camera3StreamBufferListener> > mBufferListenerList;

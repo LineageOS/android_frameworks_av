@@ -166,8 +166,6 @@ class Camera3Device :
 
     status_t prepare(int maxCount, int streamId) override;
 
-    uint32_t getDeviceVersion() override;
-
     ssize_t getJpegBufferSize(uint32_t width, uint32_t height) const override;
     ssize_t getPointCloudBufferSize() const;
     ssize_t getRawOpaqueBufferSize(int32_t width, int32_t height) const;
@@ -597,11 +595,6 @@ class Camera3Device :
      * timestamp.
      */
     static nsecs_t getMonoToBoottimeOffset();
-
-    /**
-     * Helper function to map between legacy and new dataspace enums
-     */
-    static android_dataspace mapToLegacyDataspace(android_dataspace dataSpace);
 
     /**
      * Helper functions to map between framework and HIDL values
