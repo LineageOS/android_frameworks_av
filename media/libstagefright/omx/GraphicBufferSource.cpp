@@ -17,7 +17,7 @@
 #include <inttypes.h>
 
 #define LOG_TAG "GraphicBufferSource"
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
 #define STRINGIFY_ENUMS // for asString in HardwareAPI.h/VideoAPI.h
@@ -26,6 +26,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/ColorUtils.h>
+#include <media/stagefright/foundation/FileDescriptor.h>
 
 #include <media/hardware/MetadataBufferType.h>
 #include <ui/GraphicBuffer.h>
@@ -39,29 +40,236 @@
 #include <inttypes.h>
 #include "FrameDropper.h"
 
+#include <functional>
+#include <memory>
+
 namespace android {
+
+/**
+ * A copiable object managing a buffer in the buffer cache managed by the producer. This object
+ * holds a reference to the buffer, and maintains which buffer slot it belongs to (if any), and
+ * whether it is still in a buffer slot. It also maintains whether there are any outstanging acquire
+ * references to it (by buffers acquired from the slot) mainly so that we can keep a debug
+ * count of how many buffers we need to still release back to the producer.
+ */
+struct GraphicBufferSource::CachedBuffer {
+    /**
+     * Token that is used to track acquire counts (as opposed to all references to this object).
+     */
+    struct Acquirable { };
+
+    /**
+     * Create using a buffer cached in a slot.
+     */
+    CachedBuffer(slot_id slot, const sp<GraphicBuffer> &graphicBuffer)
+        : mIsCached(true),
+          mSlot(slot),
+          mGraphicBuffer(graphicBuffer),
+          mAcquirable(std::make_shared<Acquirable>()) {
+    }
+
+    /**
+     * Returns the cache slot that this buffer is cached in, or -1 if it is no longer cached.
+     *
+     * This assumes that -1 slot id is invalid; though, it is just a benign collision used for
+     * debugging. This object explicitly manages whether it is still cached.
+     */
+    slot_id getSlot() const {
+        return mIsCached ? mSlot : -1;
+    }
+
+    /**
+     * Returns the cached buffer.
+     */
+    sp<GraphicBuffer> getGraphicBuffer() const {
+        return mGraphicBuffer;
+    }
+
+    /**
+     * Checks whether this buffer is still in the buffer cache.
+     */
+    bool isCached() const {
+        return mIsCached;
+    }
+
+    /**
+     * Checks whether this buffer has an acquired reference.
+     */
+    bool isAcquired() const {
+        return mAcquirable.use_count() > 1;
+    }
+
+    /**
+     * Gets and returns a shared acquired reference.
+     */
+    std::shared_ptr<Acquirable> getAcquirable() {
+        return mAcquirable;
+    }
+
+private:
+    friend void GraphicBufferSource::discardBufferAtSlotIndex_l(ssize_t);
+
+    /**
+     * This method to be called when the buffer is no longer in the buffer cache.
+     * Called from discardBufferAtSlotIndex_l.
+     */
+    void onDroppedFromCache() {
+        CHECK_DBG(mIsCached);
+        mIsCached = false;
+    }
+
+    bool mIsCached;
+    slot_id mSlot;
+    sp<GraphicBuffer> mGraphicBuffer;
+    std::shared_ptr<Acquirable> mAcquirable;
+};
+
+/**
+ * A copiable object managing a buffer acquired from the producer. This must always be a cached
+ * buffer. This objects also manages its acquire fence and any release fences that may be returned
+ * by the encoder for this buffer (this buffer may be queued to the encoder multiple times).
+ * If no release fences are added by the encoder, the acquire fence is returned as the release
+ * fence for this - as it is assumed that noone waited for the acquire fence. Otherwise, it is
+ * assumed that the encoder has waited for the acquire fence (or returned it as the release
+ * fence).
+ */
+struct GraphicBufferSource::AcquiredBuffer {
+    AcquiredBuffer(
+            const std::shared_ptr<CachedBuffer> &buffer,
+            std::function<void(AcquiredBuffer *)> onReleased,
+            const sp<Fence> &acquireFence)
+        : mBuffer(buffer),
+          mAcquirable(buffer->getAcquirable()),
+          mAcquireFence(acquireFence),
+          mGotReleaseFences(false),
+          mOnReleased(onReleased) {
+    }
+
+    /**
+     * Adds a release fence returned by the encoder to this object. If this is called with an
+     * valid file descriptor, it is added to the list of release fences. These are returned to the
+     * producer on release() as a merged fence. Regardless of the validity of the file descriptor,
+     * we take note that a release fence was attempted to be added and the acquire fence can now be
+     * assumed as acquired.
+     */
+    void addReleaseFenceFd(int fenceFd) {
+        // save all release fences - these will be propagated to the producer if this buffer is
+        // ever released to it
+        if (fenceFd >= 0) {
+            mReleaseFenceFds.push_back(fenceFd);
+        }
+        mGotReleaseFences = true;
+    }
+
+    /**
+     * Returns the acquire fence file descriptor associated with this object.
+     */
+    int getAcquireFenceFd() {
+        if (mAcquireFence == nullptr || !mAcquireFence->isValid()) {
+            return -1;
+        }
+        return mAcquireFence->dup();
+    }
+
+    /**
+     * Returns whether the buffer is still in the buffer cache.
+     */
+    bool isCached() const {
+        return mBuffer->isCached();
+    }
+
+    /**
+     * Returns the acquired buffer.
+     */
+    sp<GraphicBuffer> getGraphicBuffer() const {
+        return mBuffer->getGraphicBuffer();
+    }
+
+    /**
+     * Returns the slot that this buffer is cached at, or -1 otherwise.
+     *
+     * This assumes that -1 slot id is invalid; though, it is just a benign collision used for
+     * debugging. This object explicitly manages whether it is still cached.
+     */
+    slot_id getSlot() const {
+        return mBuffer->getSlot();
+    }
+
+    /**
+     * Creates and returns a release fence object from the acquire fence and/or any release fences
+     * added. If no release fences were added (even if invalid), returns the acquire fence.
+     * Otherwise, it returns a merged fence from all the valid release fences added.
+     */
+    sp<Fence> getReleaseFence() {
+        // If did not receive release fences, we assume this buffer was not consumed (it was
+        // discarded or dropped). In this case release the acquire fence as the release fence.
+        // We do this here to avoid a dup, close and recreation of the Fence object.
+        if (!mGotReleaseFences) {
+            return mAcquireFence;
+        }
+        sp<Fence> ret = getReleaseFence(0, mReleaseFenceFds.size());
+        // clear fds as fence took ownership of them
+        mReleaseFenceFds.clear();
+        return ret;
+    }
+
+    // this video buffer is no longer referenced by the codec (or kept for later encoding)
+    // it is now safe to release to the producer
+    ~AcquiredBuffer() {
+        //mAcquirable.clear();
+        mOnReleased(this);
+        // mOnRelease method should call getReleaseFence() that releases all fds but just in case
+        ALOGW_IF(!mReleaseFenceFds.empty(), "release fences were not obtained, closing fds");
+        for (int fildes : mReleaseFenceFds) {
+            ::close(fildes);
+            TRESPASS_DBG();
+        }
+    }
+
+private:
+    std::shared_ptr<GraphicBufferSource::CachedBuffer> mBuffer;
+    std::shared_ptr<GraphicBufferSource::CachedBuffer::Acquirable> mAcquirable;
+    sp<Fence> mAcquireFence;
+    Vector<int> mReleaseFenceFds;
+    bool mGotReleaseFences;
+    std::function<void(AcquiredBuffer *)> mOnReleased;
+
+    /**
+     * Creates and returns a release fence from 0 or more release fence file descriptors in from
+     * the specified range in the array.
+     *
+     * @param start start index
+     * @param num   number of release fds to merge
+     */
+    sp<Fence> getReleaseFence(size_t start, size_t num) const {
+        if (num == 0) {
+            return Fence::NO_FENCE;
+        } else if (num == 1) {
+            return new Fence(mReleaseFenceFds[start]);
+        } else {
+            return Fence::merge("GBS::AB",
+                                getReleaseFence(start, num >> 1),
+                                getReleaseFence(start + (num >> 1), num - (num >> 1)));
+        }
+    }
+};
 
 GraphicBufferSource::GraphicBufferSource() :
     mInitCheck(UNKNOWN_ERROR),
+    mNumAvailableUnacquiredBuffers(0),
+    mNumOutstandingAcquires(0),
+    mEndOfStream(false),
+    mEndOfStreamSent(false),
+    mLastDataspace(HAL_DATASPACE_UNKNOWN),
     mExecuting(false),
     mSuspended(false),
     mStopTimeUs(-1),
-    mLastDataSpace(HAL_DATASPACE_UNKNOWN),
-    mNumFramesAvailable(0),
-    mNumBufferAcquired(0),
-    mEndOfStream(false),
-    mEndOfStreamSent(false),
     mLastActionTimeUs(-1ll),
-    mPrevOriginalTimeUs(-1ll),
     mSkipFramesBeforeNs(-1ll),
-    mRepeatAfterUs(-1ll),
+    mFrameRepeatIntervalUs(-1ll),
     mRepeatLastFrameGeneration(0),
-    mRepeatLastFrameTimestamp(-1ll),
-    mRepeatLastFrameCount(0),
-    mLatestBufferId(-1),
-    mLatestBufferFrameNum(0),
-    mLatestBufferFence(Fence::NO_FENCE),
-    mRepeatBufferDeferred(false),
+    mOutstandingFrameRepeatCount(0),
+    mFrameRepeatBlockedOnCodecBuffer(false),
     mTimePerCaptureUs(-1ll),
     mTimePerFrameUs(-1ll),
     mPrevCaptureUs(-1ll),
@@ -90,18 +298,25 @@ GraphicBufferSource::GraphicBufferSource() :
         return;
     }
 
-    memset(&mColorAspectsPacked, 0, sizeof(mColorAspectsPacked));
+    memset(&mDefaultColorAspectsPacked, 0, sizeof(mDefaultColorAspectsPacked));
 
     CHECK(mInitCheck == NO_ERROR);
 }
 
 GraphicBufferSource::~GraphicBufferSource() {
     ALOGV("~GraphicBufferSource");
-    if (mLatestBufferId >= 0) {
-        releaseBuffer(mLatestBufferId, mLatestBufferFrameNum, mLatestBufferFence);
+    {
+        // all acquired buffers must be freed with the mutex locked otherwise our debug assertion
+        // may trigger
+        Mutex::Autolock autoLock(mMutex);
+        mAvailableBuffers.clear();
+        mSubmittedCodecBuffers.clear();
+        mLatestBuffer.mBuffer.reset();
     }
-    if (mNumBufferAcquired != 0) {
-        ALOGW("potential buffer leak (acquired %d)", mNumBufferAcquired);
+
+    if (mNumOutstandingAcquires != 0) {
+        ALOGW("potential buffer leak: acquired=%d", mNumOutstandingAcquires);
+        TRESPASS_DBG();
     }
     if (mConsumer != NULL) {
         status_t err = mConsumer->consumerDisconnect();
@@ -113,11 +328,11 @@ GraphicBufferSource::~GraphicBufferSource() {
 
 Status GraphicBufferSource::onOmxExecuting() {
     Mutex::Autolock autoLock(mMutex);
-    ALOGV("--> executing; avail=%zu, codec vec size=%zd",
-            mNumFramesAvailable, mCodecBuffers.size());
+    ALOGV("--> executing; available=%zu, submittable=%zd",
+            mAvailableBuffers.size(), mFreeCodecBuffers.size());
     CHECK(!mExecuting);
     mExecuting = true;
-    mLastDataSpace = HAL_DATASPACE_UNKNOWN;
+    mLastDataspace = HAL_DATASPACE_UNKNOWN;
     ALOGV("clearing last dataSpace");
 
     // Start by loading up as many buffers as possible.  We want to do this,
@@ -129,35 +344,32 @@ Status GraphicBufferSource::onOmxExecuting() {
     // one codec buffer simultaneously.  (We could instead try to submit
     // all BQ buffers whenever any codec buffer is freed, but if we get the
     // initial conditions right that will never be useful.)
-    while (mNumFramesAvailable) {
+    while (haveAvailableBuffers_l()) {
         if (!fillCodecBuffer_l()) {
-            ALOGV("stop load with frames available (codecAvail=%d)",
-                    isCodecBufferAvailable_l());
+            ALOGV("stop load with available=%zu+%d",
+                    mAvailableBuffers.size(), mNumAvailableUnacquiredBuffers);
             break;
         }
     }
 
-    ALOGV("done loading initial frames, avail=%zu", mNumFramesAvailable);
+    ALOGV("done loading initial frames, available=%zu+%d",
+            mAvailableBuffers.size(), mNumAvailableUnacquiredBuffers);
 
     // If EOS has already been signaled, and there are no more frames to
     // submit, try to send EOS now as well.
-    if (mStopTimeUs == -1 && mEndOfStream && mNumFramesAvailable == 0) {
+    if (mStopTimeUs == -1 && mEndOfStream && !haveAvailableBuffers_l()) {
         submitEndOfInputStream_l();
     }
 
-    if (mRepeatAfterUs > 0ll && mLooper == NULL) {
+    if (mFrameRepeatIntervalUs > 0ll && mLooper == NULL) {
         mReflector = new AHandlerReflector<GraphicBufferSource>(this);
 
         mLooper = new ALooper;
         mLooper->registerHandler(mReflector);
         mLooper->start();
 
-        if (mLatestBufferId >= 0) {
-            sp<AMessage> msg =
-                new AMessage(kWhatRepeatLastFrame, mReflector);
-
-            msg->setInt32("generation", ++mRepeatLastFrameGeneration);
-            msg->post(mRepeatAfterUs);
+        if (mLatestBuffer.mBuffer != nullptr) {
+            queueFrameRepeat_l();
         }
     }
 
@@ -179,11 +391,6 @@ Status GraphicBufferSource::onOmxIdle() {
 
 Status GraphicBufferSource::onOmxLoaded(){
     Mutex::Autolock autoLock(mMutex);
-    if (!mExecuting) {
-        // This can happen if something failed very early.
-        ALOGW("Dropped back down to Loaded without Executing");
-    }
-
     if (mLooper != NULL) {
         mLooper->unregisterHandler(mReflector->id());
         mReflector.clear();
@@ -192,37 +399,21 @@ Status GraphicBufferSource::onOmxLoaded(){
         mLooper.clear();
     }
 
-    ALOGV("--> loaded; avail=%zu eos=%d eosSent=%d acquired=%d",
-            mNumFramesAvailable, mEndOfStream, mEndOfStreamSent, mNumBufferAcquired);
+    ALOGV("--> loaded; available=%zu+%d eos=%d eosSent=%d acquired=%d",
+            mAvailableBuffers.size(), mNumAvailableUnacquiredBuffers,
+            mEndOfStream, mEndOfStreamSent, mNumOutstandingAcquires);
 
     // Codec is no longer executing.  Releasing all buffers to bq.
-    for (int i = (int)mCodecBuffers.size() - 1; i >= 0; --i) {
-        if (mCodecBuffers[i].mGraphicBuffer != NULL) {
-            int id = mCodecBuffers[i].mSlot;
-            if (id != mLatestBufferId) {
-                ALOGV("releasing buffer for codec: slot=%d, useCount=%d, latest=%d",
-                        id, mBufferUseCount[id], mLatestBufferId);
-                sp<Fence> fence = new Fence(-1);
-                releaseBuffer(id, mCodecBuffers[i].mFrameNumber, fence);
-                mBufferUseCount[id] = 0;
-            }
-        }
-    }
-    // Also release the latest buffer
-    if (mLatestBufferId >= 0) {
-        releaseBuffer(mLatestBufferId, mLatestBufferFrameNum, mLatestBufferFence);
-        mBufferUseCount[mLatestBufferId] = 0;
-        mLatestBufferId = -1;
-    }
-
-    mCodecBuffers.clear();
+    mFreeCodecBuffers.clear();
+    mSubmittedCodecBuffers.clear();
+    mLatestBuffer.mBuffer.reset();
     mOMXNode.clear();
     mExecuting = false;
 
     return Status::ok();
 }
 
-Status GraphicBufferSource::onInputBufferAdded(int32_t bufferID) {
+Status GraphicBufferSource::onInputBufferAdded(codec_buffer_id bufferId) {
     Mutex::Autolock autoLock(mMutex);
 
     if (mExecuting) {
@@ -232,145 +423,115 @@ Status GraphicBufferSource::onInputBufferAdded(int32_t bufferID) {
         return Status::fromServiceSpecificError(INVALID_OPERATION);
     }
 
-    ALOGV("addCodecBuffer: bufferID=%u", bufferID);
+    ALOGV("addCodecBuffer: bufferId=%u", bufferId);
 
-    CodecBuffer codecBuffer;
-    codecBuffer.mBufferID = bufferID;
-    mCodecBuffers.add(codecBuffer);
+    mFreeCodecBuffers.push_back(bufferId);
     return Status::ok();
 }
 
-Status GraphicBufferSource::onInputBufferEmptied(
-        int32_t bufferID, int fenceFd) {
+Status GraphicBufferSource::onInputBufferEmptied(codec_buffer_id bufferId, int fenceFd) {
     Mutex::Autolock autoLock(mMutex);
-    if (!mExecuting) {
-        if (fenceFd >= 0) {
-            ::close(fenceFd);
-        }
-        return Status::fromServiceSpecificError(INVALID_OPERATION);
-    }
+    FileDescriptor::Autoclose fence(fenceFd);
 
-    int cbi = findMatchingCodecBuffer_l(bufferID);
+    ssize_t cbi = mSubmittedCodecBuffers.indexOfKey(bufferId);
     if (cbi < 0) {
         // This should never happen.
-        ALOGE("codecBufferEmptied: buffer not recognized (bufferID=%u)", bufferID);
-        if (fenceFd >= 0) {
-            ::close(fenceFd);
-        }
+        ALOGE("onInputBufferEmptied: buffer not recognized (bufferId=%u)", bufferId);
         return Status::fromServiceSpecificError(BAD_VALUE);
     }
 
-    ALOGV("codecBufferEmptied: bufferID=%u, cbi=%d", bufferID, cbi);
-    CodecBuffer& codecBuffer(mCodecBuffers.editItemAt(cbi));
+    std::shared_ptr<AcquiredBuffer> buffer = mSubmittedCodecBuffers.valueAt(cbi);
+
+    // Move buffer to available buffers
+    mSubmittedCodecBuffers.removeItemsAt(cbi);
+    mFreeCodecBuffers.push_back(bufferId);
 
     // header->nFilledLen may not be the original value, so we can't compare
     // that to zero to see of this was the EOS buffer.  Instead we just
-    // see if the GraphicBuffer reference was null, which should only ever
-    // happen for EOS.
-    if (codecBuffer.mGraphicBuffer == NULL) {
+    // see if there is a null AcquiredBuffer, which should only ever happen for EOS.
+    if (buffer == nullptr) {
         if (!(mEndOfStream && mEndOfStreamSent)) {
-            // This can happen when broken code sends us the same buffer
-            // twice in a row.
-            ALOGE("ERROR: codecBufferEmptied on non-EOS null buffer "
-                    "(buffer emptied twice?)");
+            // This can happen when broken code sends us the same buffer twice in a row.
+            ALOGE("onInputBufferEmptied: non-EOS null buffer (bufferId=%u)", bufferId);
+        } else {
+            ALOGV("onInputBufferEmptied: EOS null buffer (bufferId=%u@%zd)", bufferId, cbi);
         }
-        // No GraphicBuffer to deal with, no additional input or output is
-        // expected, so just return.
-        if (fenceFd >= 0) {
-            ::close(fenceFd);
-        }
+        // No GraphicBuffer to deal with, no additional input or output is expected, so just return.
         return Status::fromServiceSpecificError(BAD_VALUE);
     }
 
-    // Find matching entry in our cached copy of the BufferQueue slots.
-    // If we find a match, release that slot.  If we don't, the BufferQueue
-    // has dropped that GraphicBuffer, and there's nothing for us to release.
-    int id = codecBuffer.mSlot;
-    sp<Fence> fence = new Fence(fenceFd);
-    if (mBufferSlot[id] != NULL &&
-        mBufferSlot[id]->handle == codecBuffer.mGraphicBuffer->handle) {
-        mBufferUseCount[id]--;
-
-        if (mBufferUseCount[id] < 0) {
-            ALOGW("mBufferUseCount for bq slot %d < 0 (=%d)", id, mBufferUseCount[id]);
-            mBufferUseCount[id] = 0;
-        }
-        if (id != mLatestBufferId && mBufferUseCount[id] == 0) {
-            releaseBuffer(id, codecBuffer.mFrameNumber, fence);
-        }
-        ALOGV("codecBufferEmptied: slot=%d, cbi=%d, useCount=%d, acquired=%d, handle=%p",
-                id, cbi, mBufferUseCount[id], mNumBufferAcquired, mBufferSlot[id]->handle);
-    } else {
-        ALOGV("codecBufferEmptied: no match for emptied buffer, "
-                "slot=%d, cbi=%d, useCount=%d, acquired=%d",
-                id, cbi, mBufferUseCount[id], mNumBufferAcquired);
-        // we will not reuse codec buffer, so there is no need to wait for fence
+    if (!mExecuting) {
+        // this is fine since this could happen when going from Idle to Loaded
+        ALOGV("onInputBufferEmptied: no longer executing (bufferId=%u@%zd)", bufferId, cbi);
+        return Status::fromServiceSpecificError(OK);
     }
 
-    // Mark the codec buffer as available by clearing the GraphicBuffer ref.
-    codecBuffer.mGraphicBuffer = NULL;
+    ALOGV("onInputBufferEmptied: bufferId=%d@%zd [slot=%d, useCount=%ld, handle=%p] acquired=%d",
+            bufferId, cbi, buffer->getSlot(), buffer.use_count(), buffer->getGraphicBuffer()->handle,
+            mNumOutstandingAcquires);
 
-    if (mNumFramesAvailable) {
+    buffer->addReleaseFenceFd(fence.release());
+    // release codec reference for video buffer just in case remove does not it
+    buffer.reset();
+
+    if (haveAvailableBuffers_l()) {
         // Fill this codec buffer.
         CHECK(!mEndOfStreamSent);
-        ALOGV("buffer freed, %zu frames avail (eos=%d)",
-                mNumFramesAvailable, mEndOfStream);
+        ALOGV("onInputBufferEmptied: buffer freed, feeding codec (available=%zu+%d, eos=%d)",
+                mAvailableBuffers.size(), mNumAvailableUnacquiredBuffers, mEndOfStream);
         fillCodecBuffer_l();
     } else if (mEndOfStream && mStopTimeUs == -1) {
         // No frames available, but EOS is pending and no stop time, so use this buffer to
         // send that.
-        ALOGV("buffer freed, EOS pending");
+        ALOGV("onInputBufferEmptied: buffer freed, submitting EOS");
         submitEndOfInputStream_l();
-    } else if (mRepeatBufferDeferred) {
+    } else if (mFrameRepeatBlockedOnCodecBuffer) {
         bool success = repeatLatestBuffer_l();
-        if (success) {
-            ALOGV("deferred repeatLatestBuffer_l SUCCESS");
-        } else {
-            ALOGV("deferred repeatLatestBuffer_l FAILURE");
-        }
-        mRepeatBufferDeferred = false;
+        ALOGV("onInputBufferEmptied: completing deferred repeatLatestBuffer_l %s",
+                success ? "SUCCESS" : "FAILURE");
+        mFrameRepeatBlockedOnCodecBuffer = false;
     }
 
+    // releaseReleasableBuffers_l();
     return Status::ok();
 }
 
-void GraphicBufferSource::onDataSpaceChanged_l(
-        android_dataspace dataSpace, android_pixel_format pixelFormat) {
-    ALOGD("got buffer with new dataSpace #%x", dataSpace);
-    mLastDataSpace = dataSpace;
+void GraphicBufferSource::onDataspaceChanged_l(
+        android_dataspace dataspace, android_pixel_format pixelFormat) {
+    ALOGD("got buffer with new dataSpace #%x", dataspace);
+    mLastDataspace = dataspace;
 
-    if (ColorUtils::convertDataSpaceToV0(dataSpace)) {
-        mOMXNode->dispatchDataSpaceChanged(mLastDataSpace, mColorAspectsPacked, pixelFormat);
+    if (ColorUtils::convertDataSpaceToV0(dataspace)) {
+        mOMXNode->dispatchDataSpaceChanged(mLastDataspace, mDefaultColorAspectsPacked, pixelFormat);
     }
 }
 
 bool GraphicBufferSource::fillCodecBuffer_l() {
-    CHECK(mExecuting && mNumFramesAvailable > 0);
+    CHECK(mExecuting && haveAvailableBuffers_l());
 
-    if (mSuspended && mActionQueue.empty()) {
-        return false;
-    }
-
-    int cbi = findAvailableCodecBuffer_l();
-    if (cbi < 0) {
+    if (mFreeCodecBuffers.empty()) {
         // No buffers available, bail.
-        ALOGV("fillCodecBuffer_l: no codec buffers, avail now %zu",
-                mNumFramesAvailable);
+        ALOGV("fillCodecBuffer_l: no codec buffers, available=%zu+%d",
+                mAvailableBuffers.size(), mNumAvailableUnacquiredBuffers);
         return false;
     }
 
-    ALOGV("fillCodecBuffer_l: acquiring buffer, avail=%zu",
-            mNumFramesAvailable);
-    BufferItem item;
-    status_t err = acquireBuffer(&item);
-    if (err != OK) {
-        ALOGE("fillCodecBuffer_l: acquireBuffer returned err=%d", err);
-        return false;
+    VideoBuffer item;
+    if (mAvailableBuffers.empty()) {
+        ALOGV("fillCodecBuffer_l: acquiring available buffer, available=%zu+%d",
+                mAvailableBuffers.size(), mNumAvailableUnacquiredBuffers);
+        if (acquireBuffer_l(&item) != OK) {
+            ALOGE("fillCodecBuffer_l: failed to acquire available buffer");
+            return false;
+        }
+    } else {
+        ALOGV("fillCodecBuffer_l: getting available buffer, available=%zu+%d",
+                mAvailableBuffers.size(), mNumAvailableUnacquiredBuffers);
+        item = *mAvailableBuffers.begin();
+        mAvailableBuffers.erase(mAvailableBuffers.begin());
     }
 
-    int64_t itemTimeUs = item.mTimestamp / 1000;
-
-    mNumFramesAvailable--;
+    int64_t itemTimeUs = item.mTimestampNs / 1000;
 
     // Process ActionItem in the Queue if there is any. If a buffer's timestamp
     // is smaller than the first action's timestamp, no action need to be performed.
@@ -382,7 +543,6 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
     // [pause 1us], [resume 2us], [pause 3us], [resume 4us], [pause 5us].... Upon
     // receiving a buffer with timestamp 3.5us, only the action [pause, 3us] needs
     // to be handled and [pause, 1us], [resume 2us] will be discarded.
-    bool dropped = false;
     bool done = false;
     bool seeStopAction = false;
     if (!mActionQueue.empty()) {
@@ -394,7 +554,6 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
             // All the actions are ahead. No action need to perform now.
             // Release the buffer if is in suspended state, or process the buffer
             // if not in suspended state.
-            dropped = mSuspended;
             done = true;
         }
 
@@ -402,7 +561,8 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
             // Find the newest action that with timestamp smaller than itemTimeUs. Then
             // remove all the actions before and include the newest action.
             List<ActionItem>::iterator it = mActionQueue.begin();
-            while (it != mActionQueue.end() && it->mActionTimeUs <= itemTimeUs) {
+            while (it != mActionQueue.end() && it->mActionTimeUs <= itemTimeUs
+                    && nextAction.mAction != ActionItem::STOP) {
                 nextAction = *it;
                 ++it;
             }
@@ -413,7 +573,6 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
                 case ActionItem::PAUSE:
                 {
                     mSuspended = true;
-                    dropped = true;
                     ALOGV("RUNNING/PAUSE -> PAUSE at buffer %lld us  PAUSE Time: %lld us",
                             (long long)itemTimeUs, (long long)nextAction.mActionTimeUs);
                     break;
@@ -429,167 +588,129 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
                 {
                     ALOGV("RUNNING/PAUSE -> STOP at buffer %lld us  STOP Time: %lld us",
                             (long long)itemTimeUs, (long long)nextAction.mActionTimeUs);
-                    dropped = true;
                     // Clear the whole ActionQueue as recording is done
                     mActionQueue.clear();
                     seeStopAction = true;
                     break;
                 }
                 default:
-                    ALOGE("Unknown action type");
+                    TRESPASS_DBG("Unknown action type");
+                    // return true here because we did consume an available buffer, so the
+                    // loop in onOmxExecuting will eventually terminate even if we hit this.
                     return false;
             }
         }
     }
 
-    if (dropped) {
-        releaseBuffer(item.mSlot, item.mFrameNumber, item.mFence);
-        if (seeStopAction) {
-            // Clear all the buffers before setting mEndOfStream and signal EndOfInputStream.
-            if (!releaseAllBuffers()) {
-                ALOGW("Failed to release all the buffers when handling STOP action");
-            }
-            mEndOfStream = true;
-            submitEndOfInputStream_l();
-        }
+    if (seeStopAction) {
+        // Clear all the buffers before setting mEndOfStream and signal EndOfInputStream.
+        releaseAllAvailableBuffers_l();
+        mEndOfStream = true;
+        submitEndOfInputStream_l();
         return true;
     }
 
-    if (item.mDataSpace != mLastDataSpace) {
-        onDataSpaceChanged_l(
-                item.mDataSpace, (android_pixel_format)mBufferSlot[item.mSlot]->getPixelFormat());
+    if (mSuspended) {
+        return true;
     }
 
-    err = UNKNOWN_ERROR;
+    int err = UNKNOWN_ERROR;
 
     // only submit sample if start time is unspecified, or sample
     // is queued after the specified start time
-    if (mSkipFramesBeforeNs < 0ll || item.mTimestamp >= mSkipFramesBeforeNs) {
+    if (mSkipFramesBeforeNs < 0ll || item.mTimestampNs >= mSkipFramesBeforeNs) {
         // if start time is set, offset time stamp by start time
         if (mSkipFramesBeforeNs > 0) {
-            item.mTimestamp -= mSkipFramesBeforeNs;
+            item.mTimestampNs -= mSkipFramesBeforeNs;
         }
 
-        int64_t timeUs = item.mTimestamp / 1000;
+        int64_t timeUs = item.mTimestampNs / 1000;
         if (mFrameDropper != NULL && mFrameDropper->shouldDrop(timeUs)) {
             ALOGV("skipping frame (%lld) to meet max framerate", static_cast<long long>(timeUs));
             // set err to OK so that the skipped frame can still be saved as the lastest frame
             err = OK;
-            dropped = true;
         } else {
-            err = submitBuffer_l(item, cbi);
+            err = submitBuffer_l(item); // this takes shared ownership of the acquired buffer on succeess
         }
     }
 
     if (err != OK) {
-        ALOGV("submitBuffer_l failed, releasing bq slot %d", item.mSlot);
-        releaseBuffer(item.mSlot, item.mFrameNumber, item.mFence);
+        ALOGV("submitBuffer_l failed, will release bq slot %d", item.mBuffer->getSlot());
+        return true;
     } else {
         // Don't set the last buffer id if we're not repeating,
         // we'll be holding on to the last buffer for nothing.
-        if (mRepeatAfterUs > 0ll) {
+        if (mFrameRepeatIntervalUs > 0ll) {
             setLatestBuffer_l(item);
         }
-        if (!dropped) {
-            ++mBufferUseCount[item.mSlot];
-        }
-        ALOGV("buffer submitted: slot=%d, cbi=%d, useCount=%d, acquired=%d",
-                item.mSlot, cbi, mBufferUseCount[item.mSlot], mNumBufferAcquired);
+        ALOGV("buffer submitted [slot=%d, useCount=%ld] acquired=%d",
+                item.mBuffer->getSlot(), item.mBuffer.use_count(), mNumOutstandingAcquires);
     }
 
     return true;
 }
 
 bool GraphicBufferSource::repeatLatestBuffer_l() {
-    CHECK(mExecuting && mNumFramesAvailable == 0);
+    CHECK(mExecuting && !haveAvailableBuffers_l());
 
-    if (mLatestBufferId < 0 || mSuspended) {
-        return false;
-    }
-    if (mBufferSlot[mLatestBufferId] == NULL) {
-        // This can happen if the remote side disconnects, causing
-        // onBuffersReleased() to NULL out our copy of the slots.  The
-        // buffer is gone, so we have nothing to show.
-        //
-        // To be on the safe side we try to release the buffer.
-        ALOGD("repeatLatestBuffer_l: slot was NULL");
-        mConsumer->releaseBuffer(
-                mLatestBufferId,
-                mLatestBufferFrameNum,
-                EGL_NO_DISPLAY,
-                EGL_NO_SYNC_KHR,
-                mLatestBufferFence);
-        mLatestBufferId = -1;
-        mLatestBufferFrameNum = 0;
-        mLatestBufferFence = Fence::NO_FENCE;
+    if (mLatestBuffer.mBuffer == nullptr || mSuspended) {
         return false;
     }
 
-    int cbi = findAvailableCodecBuffer_l();
-    if (cbi < 0) {
+    if (mFreeCodecBuffers.empty()) {
         // No buffers available, bail.
         ALOGV("repeatLatestBuffer_l: no codec buffers.");
         return false;
     }
 
-    BufferItem item;
-    item.mSlot = mLatestBufferId;
-    item.mFrameNumber = mLatestBufferFrameNum;
-    item.mTimestamp = mRepeatLastFrameTimestamp;
-    item.mFence = mLatestBufferFence;
+    if (!mLatestBuffer.mBuffer->isCached()) {
+        ALOGV("repeatLatestBuffer_l: slot was discarded, but repeating our own reference");
+    }
 
-    status_t err = submitBuffer_l(item, cbi);
-
+    // it is ok to update the timestamp of latest buffer as it is only used for submission
+    status_t err = submitBuffer_l(mLatestBuffer);
     if (err != OK) {
         return false;
     }
-
-    ++mBufferUseCount[item.mSlot];
 
     /* repeat last frame up to kRepeatLastFrameCount times.
      * in case of static scene, a single repeat might not get rid of encoder
      * ghosting completely, refresh a couple more times to get better quality
      */
-    if (--mRepeatLastFrameCount > 0) {
-        mRepeatLastFrameTimestamp = item.mTimestamp + mRepeatAfterUs * 1000;
-
-        if (mReflector != NULL) {
-            sp<AMessage> msg = new AMessage(kWhatRepeatLastFrame, mReflector);
-            msg->setInt32("generation", ++mRepeatLastFrameGeneration);
-            msg->post(mRepeatAfterUs);
-        }
+    if (--mOutstandingFrameRepeatCount > 0) {
+        // set up timestamp for repeat frame
+        mLatestBuffer.mTimestampNs += mFrameRepeatIntervalUs * 1000;
+        queueFrameRepeat_l();
     }
 
     return true;
 }
 
-void GraphicBufferSource::setLatestBuffer_l(const BufferItem &item) {
-    if (mLatestBufferId >= 0 && mBufferUseCount[mLatestBufferId] == 0) {
-        releaseBuffer(mLatestBufferId, mLatestBufferFrameNum, mLatestBufferFence);
-        // mLatestBufferFence will be set to new fence just below
-    }
+void GraphicBufferSource::setLatestBuffer_l(const VideoBuffer &item) {
+    mLatestBuffer = item;
 
-    mLatestBufferId = item.mSlot;
-    mLatestBufferFrameNum = item.mFrameNumber;
-    mRepeatLastFrameTimestamp = item.mTimestamp + mRepeatAfterUs * 1000;
+    ALOGV("setLatestBuffer_l: [slot=%d, useCount=%ld]",
+            mLatestBuffer.mBuffer->getSlot(), mLatestBuffer.mBuffer.use_count());
 
-    ALOGV("setLatestBuffer_l: slot=%d, useCount=%d",
-            item.mSlot, mBufferUseCount[item.mSlot]);
+    mOutstandingFrameRepeatCount = kRepeatLastFrameCount;
+    // set up timestamp for repeat frame
+    mLatestBuffer.mTimestampNs += mFrameRepeatIntervalUs * 1000;
+    queueFrameRepeat_l();
+}
 
-    mRepeatBufferDeferred = false;
-    mRepeatLastFrameCount = kRepeatLastFrameCount;
-    mLatestBufferFence = item.mFence;
+void GraphicBufferSource::queueFrameRepeat_l() {
+    mFrameRepeatBlockedOnCodecBuffer = false;
 
     if (mReflector != NULL) {
         sp<AMessage> msg = new AMessage(kWhatRepeatLastFrame, mReflector);
         msg->setInt32("generation", ++mRepeatLastFrameGeneration);
-        msg->post(mRepeatAfterUs);
+        msg->post(mFrameRepeatIntervalUs);
     }
 }
 
-bool GraphicBufferSource::getTimestamp(
-        const BufferItem &item, int64_t *codecTimeUs) {
-    int64_t timeUs = item.mTimestamp / 1000;
+bool GraphicBufferSource::calculateCodecTimestamp_l(
+        nsecs_t bufferTimeNs, int64_t *codecTimeUs) {
+    int64_t timeUs = bufferTimeNs / 1000;
     timeUs += mInputBufferTimeOffsetUs;
 
     if (mTimePerCaptureUs > 0ll
@@ -610,7 +731,7 @@ bool GraphicBufferSource::getTimestamp(
                 ALOGV("skipping frame, timeUs %lld", static_cast<long long>(timeUs));
                 return false;
             }
-            mPrevCaptureUs = mPrevCaptureUs + nFrames * mTimePerCaptureUs;
+            mPrevCaptureUs += mTimePerCaptureUs * nFrames;
             mPrevFrameUs += mTimePerFrameUs * nFrames;
         }
 
@@ -618,53 +739,58 @@ bool GraphicBufferSource::getTimestamp(
                 static_cast<long long>(timeUs),
                 static_cast<long long>(mPrevCaptureUs),
                 static_cast<long long>(mPrevFrameUs));
-
-        *codecTimeUs = mPrevFrameUs;
-        return true;
     } else {
-        int64_t originalTimeUs = timeUs;
-        if (originalTimeUs <= mPrevOriginalTimeUs) {
-                // Drop the frame if it's going backward in time. Bad timestamp
-                // could disrupt encoder's rate control completely.
+        if (timeUs <= mPrevFrameUs) {
+            // Drop the frame if it's going backward in time. Bad timestamp
+            // could disrupt encoder's rate control completely.
             ALOGW("Dropping frame that's going backward in time");
             return false;
         }
 
-        mPrevOriginalTimeUs = originalTimeUs;
+        mPrevFrameUs = timeUs;
     }
 
-    *codecTimeUs = timeUs;
+    *codecTimeUs = mPrevFrameUs;
     return true;
 }
 
-status_t GraphicBufferSource::submitBuffer_l(const BufferItem &item, int cbi) {
-    ALOGV("submitBuffer_l: slot=%d, cbi=%d", item.mSlot, cbi);
+status_t GraphicBufferSource::submitBuffer_l(const VideoBuffer &item) {
+    CHECK(!mFreeCodecBuffers.empty());
+    IOMX::buffer_id codecBufferId = *mFreeCodecBuffers.begin();
+    mFreeCodecBuffers.erase(mFreeCodecBuffers.begin());
+
+    ALOGV("submitBuffer_l [slot=%d, bufferId=%d]", item.mBuffer->getSlot(), codecBufferId);
 
     int64_t codecTimeUs;
-    if (!getTimestamp(item, &codecTimeUs)) {
+    if (!calculateCodecTimestamp_l(item.mTimestampNs, &codecTimeUs)) {
         return UNKNOWN_ERROR;
     }
 
-    CodecBuffer& codecBuffer(mCodecBuffers.editItemAt(cbi));
-    codecBuffer.mGraphicBuffer = mBufferSlot[item.mSlot];
-    codecBuffer.mSlot = item.mSlot;
-    codecBuffer.mFrameNumber = item.mFrameNumber;
+    if ((android_dataspace)item.mDataspace != mLastDataspace) {
+        onDataspaceChanged_l(
+                item.mDataspace,
+                (android_pixel_format)item.mBuffer->getGraphicBuffer()->format);
+    }
 
-    IOMX::buffer_id bufferID = codecBuffer.mBufferID;
-    const sp<GraphicBuffer> &buffer = codecBuffer.mGraphicBuffer;
-    int fenceID = item.mFence->isValid() ? item.mFence->dup() : -1;
-
+    std::shared_ptr<AcquiredBuffer> buffer = item.mBuffer;
+    // use a GraphicBuffer for now as OMXNodeInstance is using GraphicBuffers to hold references
+    // and it requires this graphic buffer to be able to hold its reference
+    // and thus we would need to create a new GraphicBuffer from an ANWBuffer separate from the
+    // acquired GraphicBuffer.
+    // TODO: this can be reworked globally to use ANWBuffer references
+    sp<GraphicBuffer> graphicBuffer = buffer->getGraphicBuffer();
     status_t err = mOMXNode->emptyBuffer(
-            bufferID, OMX_BUFFERFLAG_ENDOFFRAME, buffer, codecTimeUs, fenceID);
+            codecBufferId, OMX_BUFFERFLAG_ENDOFFRAME, graphicBuffer, codecTimeUs,
+            buffer->getAcquireFenceFd());
 
     if (err != OK) {
         ALOGW("WARNING: emptyGraphicBuffer failed: 0x%x", err);
-        codecBuffer.mGraphicBuffer = NULL;
         return err;
     }
 
-    ALOGV("emptyGraphicBuffer succeeded, bufferID=%u buf=%p bufhandle=%p",
-            bufferID, buffer->getNativeBuffer(), buffer->handle);
+    ssize_t cbix = mSubmittedCodecBuffers.add(codecBufferId, buffer);
+    ALOGV("emptyGraphicBuffer succeeded, bufferId=%u@%zd bufhandle=%p",
+            codecBufferId, cbix, graphicBuffer->handle);
     return OK;
 }
 
@@ -675,119 +801,136 @@ void GraphicBufferSource::submitEndOfInputStream_l() {
         return;
     }
 
-    int cbi = findAvailableCodecBuffer_l();
-    if (cbi < 0) {
+    if (mFreeCodecBuffers.empty()) {
         ALOGV("submitEndOfInputStream_l: no codec buffers available");
         return;
     }
+    IOMX::buffer_id codecBufferId = *mFreeCodecBuffers.begin();
+    mFreeCodecBuffers.erase(mFreeCodecBuffers.begin());
 
-    // We reject any additional incoming graphic buffers, so there's no need
-    // to stick a placeholder into codecBuffer.mGraphicBuffer to mark it as
-    // in-use.
-    CodecBuffer& codecBuffer(mCodecBuffers.editItemAt(cbi));
-    IOMX::buffer_id bufferID = codecBuffer.mBufferID;
-
-    status_t err = mOMXNode->emptyBuffer(bufferID,
-            OMX_BUFFERFLAG_ENDOFFRAME | OMX_BUFFERFLAG_EOS);
+    // We reject any additional incoming graphic buffers. There is no acquired buffer used for EOS
+    status_t err = mOMXNode->emptyBuffer(
+            codecBufferId, OMX_BUFFERFLAG_ENDOFFRAME | OMX_BUFFERFLAG_EOS);
     if (err != OK) {
         ALOGW("emptyDirectBuffer EOS failed: 0x%x", err);
     } else {
-        ALOGV("submitEndOfInputStream_l: buffer submitted, bufferID=%u cbi=%d",
-                bufferID, cbi);
+        ssize_t cbix = mSubmittedCodecBuffers.add(codecBufferId, nullptr);
+        ALOGV("submitEndOfInputStream_l: buffer submitted, bufferId=%u@%zd", codecBufferId, cbix);
         mEndOfStreamSent = true;
     }
 }
 
-int GraphicBufferSource::findAvailableCodecBuffer_l() {
-    CHECK(mCodecBuffers.size() > 0);
-
-    for (int i = (int)mCodecBuffers.size() - 1; i>= 0; --i) {
-        if (mCodecBuffers[i].mGraphicBuffer == NULL) {
-            return i;
-        }
-    }
-    return -1;
-}
-
-int GraphicBufferSource::findMatchingCodecBuffer_l(IOMX::buffer_id bufferID) {
-    for (int i = (int)mCodecBuffers.size() - 1; i>= 0; --i) {
-        if (mCodecBuffers[i].mBufferID == bufferID) {
-            return i;
-        }
-    }
-    return -1;
-}
-
-status_t GraphicBufferSource::acquireBuffer(BufferItem *bi) {
-    status_t err = mConsumer->acquireBuffer(bi, 0);
+status_t GraphicBufferSource::acquireBuffer_l(VideoBuffer *ab) {
+    BufferItem bi;
+    status_t err = mConsumer->acquireBuffer(&bi, 0);
     if (err == BufferQueue::NO_BUFFER_AVAILABLE) {
         // shouldn't happen
-        ALOGW("acquireBuffer: frame was not available");
+        ALOGW("acquireBuffer_l: frame was not available");
         return err;
     } else if (err != OK) {
-        ALOGW("acquireBuffer: failed with err=%d", err);
+        ALOGW("acquireBuffer_l: failed with err=%d", err);
         return err;
     }
-    // If this is the first time we're seeing this buffer, add it to our
-    // slot table.
-    if (bi->mGraphicBuffer != NULL) {
-        ALOGV("acquireBuffer: setting mBufferSlot %d", bi->mSlot);
-        mBufferSlot[bi->mSlot] = bi->mGraphicBuffer;
-        mBufferUseCount[bi->mSlot] = 0;
+    --mNumAvailableUnacquiredBuffers;
+
+    // Manage our buffer cache.
+    std::shared_ptr<CachedBuffer> buffer;
+    ssize_t bsi = mBufferSlots.indexOfKey(bi.mSlot);
+    if (bi.mGraphicBuffer != NULL) {
+        // replace/initialize slot with new buffer
+        ALOGV("acquireBuffer_l: %s buffer slot %d", bsi < 0 ? "setting" : "UPDATING", bi.mSlot);
+        if (bsi >= 0) {
+            discardBufferAtSlotIndex_l(bsi);
+        } else {
+            bsi = mBufferSlots.add(bi.mSlot, nullptr);
+        }
+        buffer = std::make_shared<CachedBuffer>(bi.mSlot, bi.mGraphicBuffer);
+        mBufferSlots.replaceValueAt(bsi, buffer);
+    } else {
+        buffer = mBufferSlots.valueAt(bsi);
     }
-    mNumBufferAcquired++;
+    int64_t frameNum = bi.mFrameNumber;
+
+    std::shared_ptr<AcquiredBuffer> acquiredBuffer =
+        std::make_shared<AcquiredBuffer>(
+                buffer,
+                [frameNum, this](AcquiredBuffer *buffer){
+                    // AcquiredBuffer's destructor should always be called when mMutex is locked.
+                    // If we had a reentrant mutex, we could just lock it again to ensure this.
+                    if (mMutex.tryLock() == 0) {
+                        TRESPASS_DBG();
+                        mMutex.unlock();
+                    }
+
+                    // we can release buffers immediately if not using adapters
+                    // alternately, we could add them to mSlotsToRelease, but we would
+                    // somehow need to propagate frame number to that queue
+                    if (buffer->isCached()) {
+                        --mNumOutstandingAcquires;
+                        mConsumer->releaseBuffer(
+                                buffer->getSlot(), frameNum, EGL_NO_DISPLAY, EGL_NO_SYNC_KHR,
+                                buffer->getReleaseFence());
+                    }
+                },
+                bi.mFence);
+    VideoBuffer videoBuffer{acquiredBuffer, bi.mTimestamp, bi.mDataSpace};
+    *ab = videoBuffer;
+    ++mNumOutstandingAcquires;
     return OK;
 }
 
-/*
- * Releases an acquired buffer back to the consumer.
- *
- * id: buffer slot to release
- * frameNum: frame number of the frame being released
- * fence: fence of the frame being released
- */
-void GraphicBufferSource::releaseBuffer(
-        int id, uint64_t frameNum, const sp<Fence> &fence) {
-    ALOGV("releaseBuffer: slot=%d", id);
-    mConsumer->releaseBuffer(
-            id, frameNum, EGL_NO_DISPLAY, EGL_NO_SYNC_KHR, fence);
-    mNumBufferAcquired--;
-}
-
 // BufferQueue::ConsumerListener callback
-void GraphicBufferSource::onFrameAvailable(const BufferItem& /*item*/) {
+void GraphicBufferSource::onFrameAvailable(const BufferItem& item __unused) {
     Mutex::Autolock autoLock(mMutex);
 
-    ALOGV("onFrameAvailable exec=%d avail=%zu",
-            mExecuting, mNumFramesAvailable);
+    ALOGV("onFrameAvailable: executing=%d available=%zu+%d",
+            mExecuting, mAvailableBuffers.size(), mNumAvailableUnacquiredBuffers);
+    ++mNumAvailableUnacquiredBuffers;
 
-    if (mOMXNode == NULL || mEndOfStreamSent || (mSuspended && mActionQueue.empty())) {
-        if (mEndOfStreamSent) {
-            // This should only be possible if a new buffer was queued after
-            // EOS was signaled, i.e. the app is misbehaving.
+    // For BufferQueue we cannot acquire a buffer if we cannot immediately feed it to the codec
+    // OR we are discarding this buffer (acquiring and immediately releasing it), which makes
+    // this an ugly logic.
+    // NOTE: We could also rely on our debug counter but that is meant only as a debug counter.
+    if (!areWeDiscardingAvailableBuffers_l() && mFreeCodecBuffers.empty()) {
+        // we may not be allowed to acquire a possibly encodable buffer, so just note that
+        // it is available
+        ALOGV("onFrameAvailable: cannot acquire buffer right now, do it later");
 
-            ALOGW("onFrameAvailable: EOS is sent, ignoring frame");
-        } else {
-            ALOGV("onFrameAvailable: suspended, ignoring frame");
-        }
-
-        BufferItem item;
-        status_t err = acquireBuffer(&item);
-        if (err == OK) {
-            releaseBuffer(item.mSlot, item.mFrameNumber, item.mFence);
-        } else {
-            ALOGE("onFrameAvailable: acquireBuffer returned err=%d", err);
-        }
-        return;
+        ++mRepeatLastFrameGeneration; // cancel any pending frame repeat
     }
 
-    mNumFramesAvailable++;
+    VideoBuffer buffer;
+    status_t err = acquireBuffer_l(&buffer);
+    if (err != OK) {
+        ALOGE("onFrameAvailable: acquireBuffer returned err=%d", err);
+    } else {
+        onBufferAcquired_l(buffer);
+    }
+}
 
-    mRepeatBufferDeferred = false;
-    ++mRepeatLastFrameGeneration;
+bool GraphicBufferSource::areWeDiscardingAvailableBuffers_l() {
+    return mEndOfStreamSent // already sent EOS to codec
+            || mOMXNode == nullptr // there is no codec connected
+            || (mSuspended && mActionQueue.empty()) // we are suspended and not waiting for
+                                                    // any further action
+            || !mExecuting;
+}
 
-    if (mExecuting) {
-        fillCodecBuffer_l();
+void GraphicBufferSource::onBufferAcquired_l(const VideoBuffer &buffer) {
+    if (mEndOfStreamSent) {
+        // This should only be possible if a new buffer was queued after
+        // EOS was signaled, i.e. the app is misbehaving.
+        ALOGW("onFrameAvailable: EOS is sent, ignoring frame");
+    } else if (mOMXNode == NULL || (mSuspended && mActionQueue.empty())) {
+        // FIXME: if we are suspended but have a resume queued we will stop repeating the last
+        // frame. Is that the desired behavior?
+        ALOGV("onFrameAvailable: suspended, ignoring frame");
+    } else {
+        ++mRepeatLastFrameGeneration; // cancel any pending frame repeat
+        mAvailableBuffers.push_back(buffer);
+        if (mExecuting) {
+            fillCodecBuffer_l();
+        }
     }
 }
 
@@ -805,22 +948,52 @@ void GraphicBufferSource::onBuffersReleased() {
 
     for (int i = 0; i < BufferQueue::NUM_BUFFER_SLOTS; i++) {
         if ((slotMask & 0x01) != 0) {
-            // Last buffer (if set) is always acquired even if its use count
-            // is 0, because we could have skipped that frame but kept it for
-            // repeating. Otherwise a buffer is only acquired if use count>0.
-            if (mBufferSlot[i] != NULL &&
-                    (mBufferUseCount[i] > 0 || mLatestBufferId == i)) {
-                ALOGV("releasing acquired buffer: slot=%d, useCount=%d, latest=%d",
-                        i, mBufferUseCount[i], mLatestBufferId);
-                mNumBufferAcquired--;
-            }
-            if (mLatestBufferId == i) {
-                mLatestBufferId = -1;
-            }
-            mBufferSlot[i] = NULL;
-            mBufferUseCount[i] = 0;
+            discardBufferInSlot_l(i);
         }
         slotMask >>= 1;
+    }
+}
+
+void GraphicBufferSource::discardBufferInSlot_l(GraphicBufferSource::slot_id i) {
+    ssize_t bsi = mBufferSlots.indexOfKey(i);
+    if (bsi < 0) {
+        ALOGW("releasing an unpopulated slot: %d", i);
+    } else {
+        discardBufferAtSlotIndex_l(bsi);
+        mBufferSlots.removeItemsAt(bsi);
+    }
+}
+
+void GraphicBufferSource::discardBufferAtSlotIndex_l(ssize_t bsi) {
+    const std::shared_ptr<CachedBuffer>& buffer = mBufferSlots.valueAt(bsi);
+    // use -2 if there is no latest buffer, and -1 if it is no longer cached
+    slot_id latestBufferSlot =
+        mLatestBuffer.mBuffer == nullptr ? -2 : mLatestBuffer.mBuffer->getSlot();
+    ALOGV("releasing acquired buffer: [slot=%d, useCount=%ld], latest: [slot=%d]",
+            mBufferSlots.keyAt(bsi), buffer.use_count(), latestBufferSlot);
+    mBufferSlots.valueAt(bsi)->onDroppedFromCache();
+
+    // If the slot of an acquired buffer is discarded, that buffer will not have to be
+    // released to the producer, so account it here. However, it is possible that the
+    // acquired buffer has already been discarded so check if it still is.
+    if (buffer->isAcquired()) {
+        --mNumOutstandingAcquires;
+    }
+
+    // clear the buffer reference (not technically needed as caller either replaces or deletes
+    // it; done here for safety).
+    mBufferSlots.editValueAt(bsi).reset();
+    CHECK_DBG(buffer == nullptr);
+}
+
+void GraphicBufferSource::releaseAllAvailableBuffers_l() {
+    mAvailableBuffers.clear();
+    while (mNumAvailableUnacquiredBuffers > 0) {
+        VideoBuffer item;
+        if (acquireBuffer_l(&item) != OK) {
+            ALOGW("releaseAllAvailableBuffers: failed to acquire available unacquired buffer");
+            break;
+        }
     }
 }
 
@@ -867,24 +1040,20 @@ status_t GraphicBufferSource::configure(
         mConsumer->setConsumerUsageBits(consumerUsage);
 
         // Sets the default buffer data space
-        ALOGD("setting dataspace: %#x, acquired=%d", dataSpace, mNumBufferAcquired);
+        ALOGD("setting dataspace: %#x, acquired=%d", dataSpace, mNumOutstandingAcquires);
         mConsumer->setDefaultBufferDataSpace((android_dataspace)dataSpace);
-        mLastDataSpace = (android_dataspace)dataSpace;
+        mLastDataspace = (android_dataspace)dataSpace;
 
         mExecuting = false;
         mSuspended = false;
         mEndOfStream = false;
         mEndOfStreamSent = false;
-        mPrevOriginalTimeUs = -1ll;
         mSkipFramesBeforeNs = -1ll;
-        mRepeatAfterUs = -1ll;
+        mFrameRepeatIntervalUs = -1ll;
         mRepeatLastFrameGeneration = 0;
-        mRepeatLastFrameTimestamp = -1ll;
-        mRepeatLastFrameCount = 0;
-        mLatestBufferId = -1;
-        mLatestBufferFrameNum = 0;
-        mLatestBufferFence = Fence::NO_FENCE;
-        mRepeatBufferDeferred = false;
+        mOutstandingFrameRepeatCount = 0;
+        mLatestBuffer.mBuffer.reset();
+        mFrameRepeatBlockedOnCodecBuffer = false;
         mTimePerCaptureUs = -1ll;
         mTimePerFrameUs = -1ll;
         mPrevCaptureUs = -1ll;
@@ -930,20 +1099,15 @@ status_t GraphicBufferSource::setSuspend(bool suspend, int64_t suspendStartTimeU
     } else {
         if (suspend) {
             mSuspended = true;
-
-            if (!releaseAllBuffers()) {
-                ALOGW("Failed to release all the buffers during suspend");
-            }
+            releaseAllAvailableBuffers_l();
             return OK;
         } else {
-
             mSuspended = false;
-
-            if (mExecuting && mNumFramesAvailable == 0 && mRepeatBufferDeferred) {
+            if (mExecuting && !haveAvailableBuffers_l()
+                    && mFrameRepeatBlockedOnCodecBuffer) {
                 if (repeatLatestBuffer_l()) {
                     ALOGV("suspend/deferred repeatLatestBuffer_l SUCCESS");
-
-                    mRepeatBufferDeferred = false;
+                    mFrameRepeatBlockedOnCodecBuffer = false;
                 } else {
                     ALOGV("suspend/deferred repeatLatestBuffer_l FAILURE");
                 }
@@ -951,23 +1115,6 @@ status_t GraphicBufferSource::setSuspend(bool suspend, int64_t suspendStartTimeU
         }
     }
     return OK;
-}
-
-bool GraphicBufferSource::releaseAllBuffers() {
-    while (mNumFramesAvailable > 0) {
-        BufferItem item;
-        status_t err = acquireBuffer(&item);
-
-        if (err != OK) {
-            ALOGE("releaseAllBuffers: acquireBuffer fail returned err=%d", err);
-            return false;;
-        }
-
-        --mNumFramesAvailable;
-
-        releaseBuffer(item.mSlot, item.mFrameNumber, item.mFence);
-    }
-    return true;
 }
 
 status_t GraphicBufferSource::setRepeatPreviousFrameDelayUs(int64_t repeatAfterUs) {
@@ -979,7 +1126,7 @@ status_t GraphicBufferSource::setRepeatPreviousFrameDelayUs(int64_t repeatAfterU
         return INVALID_OPERATION;
     }
 
-    mRepeatAfterUs = repeatAfterUs;
+    mFrameRepeatIntervalUs = repeatAfterUs;
     return OK;
 }
 
@@ -1073,7 +1220,7 @@ status_t GraphicBufferSource::setTimeLapseConfig(int64_t timePerFrameUs, int64_t
 
 status_t GraphicBufferSource::setColorAspects(int32_t aspectsPacked) {
     Mutex::Autolock autoLock(mMutex);
-    mColorAspectsPacked = aspectsPacked;
+    mDefaultColorAspectsPacked = aspectsPacked;
     ColorAspects colorAspects = ColorUtils::unpackToColorAspects(aspectsPacked);
     ALOGD("requesting color aspects (R:%d(%s), P:%d(%s), M:%d(%s), T:%d(%s))",
             colorAspects.mRange, asString(colorAspects.mRange),
@@ -1086,8 +1233,8 @@ status_t GraphicBufferSource::setColorAspects(int32_t aspectsPacked) {
 
 status_t GraphicBufferSource::signalEndOfInputStream() {
     Mutex::Autolock autoLock(mMutex);
-    ALOGV("signalEndOfInputStream: exec=%d avail=%zu eos=%d",
-            mExecuting, mNumFramesAvailable, mEndOfStream);
+    ALOGV("signalEndOfInputStream: executing=%d available=%zu+%d eos=%d",
+            mExecuting, mAvailableBuffers.size(), mNumAvailableUnacquiredBuffers, mEndOfStream);
 
     if (mEndOfStream) {
         ALOGE("EOS was already signaled");
@@ -1104,7 +1251,7 @@ status_t GraphicBufferSource::signalEndOfInputStream() {
     // stall since no future events are expected.
     mEndOfStream = true;
 
-    if (mStopTimeUs == -1 && mExecuting && mNumFramesAvailable == 0) {
+    if (mStopTimeUs == -1 && mExecuting && !haveAvailableBuffers_l()) {
         submitEndOfInputStream_l();
     }
 
@@ -1125,17 +1272,16 @@ void GraphicBufferSource::onMessageReceived(const sp<AMessage> &msg) {
                 break;
             }
 
-            if (!mExecuting || mNumFramesAvailable > 0) {
+            if (!mExecuting || haveAvailableBuffers_l()) {
                 break;
             }
 
             bool success = repeatLatestBuffer_l();
-
             if (success) {
                 ALOGV("repeatLatestBuffer_l SUCCESS");
             } else {
                 ALOGV("repeatLatestBuffer_l FAILURE");
-                mRepeatBufferDeferred = true;
+                mFrameRepeatBlockedOnCodecBuffer = true;
             }
             break;
         }
