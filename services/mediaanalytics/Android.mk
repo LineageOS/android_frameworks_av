@@ -23,6 +23,7 @@ LOCAL_SHARED_LIBRARIES := \
     libgui                      \
     libmedia                    \
     libmediautils               \
+    libmediametrics             \
     libstagefright_foundation   \
     libutils
 
