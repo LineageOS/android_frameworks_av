@@ -224,6 +224,13 @@ public:
     static status_t mapToStatusT(const hardware::camera::common::V1_0::Status& s);
     static const char* statusToString(const hardware::camera::common::V1_0::Status& s);
 
+    /*
+     * Return provider type for a specific device.
+     */
+    metadata_vendor_id_t getProviderTagIdLocked(const std::string& id,
+            hardware::hidl_version minVersion = hardware::hidl_version{0,0},
+            hardware::hidl_version maxVersion = hardware::hidl_version{1000,0}) const;
+
 private:
     // All private members, unless otherwise noted, expect mInterfaceMutex to be locked before use
     mutable std::mutex mInterfaceMutex;
@@ -241,6 +248,7 @@ private:
     {
         const std::string mProviderName;
         const sp<hardware::camera::provider::V2_4::ICameraProvider> mInterface;
+        const metadata_vendor_id_t mProviderTagid;
 
         ProviderInfo(const std::string &providerName,
                 sp<hardware::camera::provider::V2_4::ICameraProvider>& interface,
@@ -274,6 +282,7 @@ private:
             const std::string mName;  // Full instance name
             const std::string mId;    // ID section of full name
             const hardware::hidl_version mVersion;
+            const metadata_vendor_id_t mProviderTagid;
 
             const hardware::camera::common::V1_0::CameraResourceCost mResourceCost;
 
@@ -287,10 +296,11 @@ private:
                 return INVALID_OPERATION;
             }
 
-            DeviceInfo(const std::string& name, const std::string &id,
-                    const hardware::hidl_version& version,
+            DeviceInfo(const std::string& name, const metadata_vendor_id_t tagId,
+                    const std::string &id, const hardware::hidl_version& version,
                     const hardware::camera::common::V1_0::CameraResourceCost& resourceCost) :
-                    mName(name), mId(id), mVersion(version), mResourceCost(resourceCost),
+                    mName(name), mId(id), mVersion(version), mProviderTagid(tagId),
+                    mResourceCost(resourceCost),
                     mStatus(hardware::camera::common::V1_0::CameraDeviceStatus::PRESENT),
                     mHasFlashUnit(false) {}
             virtual ~DeviceInfo();
@@ -312,8 +322,8 @@ private:
             virtual status_t setTorchMode(bool enabled) override;
             virtual status_t getCameraInfo(hardware::CameraInfo *info) const override;
 
-            DeviceInfo1(const std::string& name, const std::string &id,
-                    uint16_t minorVersion,
+            DeviceInfo1(const std::string& name, const metadata_vendor_id_t tagId,
+                    const std::string &id, uint16_t minorVersion,
                     const hardware::camera::common::V1_0::CameraResourceCost& resourceCost,
                     sp<InterfaceT> interface);
             virtual ~DeviceInfo1();
@@ -331,8 +341,8 @@ private:
             virtual status_t getCameraCharacteristics(
                     CameraMetadata *characteristics) const override;
 
-            DeviceInfo3(const std::string& name, const std::string &id,
-                    uint16_t minorVersion,
+            DeviceInfo3(const std::string& name, const metadata_vendor_id_t tagId,
+                    const std::string &id, uint16_t minorVersion,
                     const hardware::camera::common::V1_0::CameraResourceCost& resourceCost,
                     sp<InterfaceT> interface);
             virtual ~DeviceInfo3();
@@ -352,7 +362,8 @@ private:
         // right CameraProvider getCameraDeviceInterface_* method.
         template<class DeviceInfoT>
         std::unique_ptr<DeviceInfo> initializeDeviceInfo(const std::string &name,
-                const std::string &id, uint16_t minorVersion) const;
+                const metadata_vendor_id_t tagId, const std::string &id,
+                uint16_t minorVersion) const;
 
         // Helper for initializeDeviceInfo to use the right CameraProvider get method.
         template<class InterfaceT>
@@ -365,6 +376,9 @@ private:
         // Parse device instance name for device version, type, and id.
         static status_t parseDeviceName(const std::string& name,
                 uint16_t *major, uint16_t *minor, std::string *type, std::string *id);
+
+        // Generate vendor tag id
+        static metadata_vendor_id_t generateVendorTagId(const std::string &name);
     };
 
     // Utility to find a DeviceInfo by ID; pointer is only valid while mInterfaceMutex is held

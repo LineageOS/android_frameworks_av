@@ -74,7 +74,8 @@ Camera3Device::Camera3Device(const String8 &id):
         mNextReprocessResultFrameNumber(0),
         mNextShutterFrameNumber(0),
         mNextReprocessShutterFrameNumber(0),
-        mListener(NULL)
+        mListener(NULL),
+        mVendorTagId(CAMERA_METADATA_INVALID_VENDOR_ID)
 {
     ATRACE_CALL();
     camera3_callback_ops::notify = &sNotify;
@@ -202,6 +203,8 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager) {
     //       for now use 3_4 to keep legacy devices working
     mDeviceVersion = CAMERA_DEVICE_API_VERSION_3_4;
     mInterface = std::make_unique<HalInterface>(session);
+    std::string providerType;
+    mVendorTagId = manager->getProviderTagIdLocked(mId.string());
 
     return initializeCommonLocked();
 }
@@ -224,6 +227,8 @@ status_t Camera3Device::initializeCommonLocked() {
 
     /** Create buffer manager */
     mBufferManager = new Camera3BufferManager();
+
+    mTagMonitor.initialize(mVendorTagId);
 
     bool aeLockAvailable = false;
     camera_metadata_entry aeLockAvailableEntry = mDeviceInfo.find(
@@ -1587,6 +1592,7 @@ status_t Camera3Device::createDefaultRequest(int templateId,
         return res;
     }
 
+    set_camera_metadata_vendor_id(rawRequest, mVendorTagId);
     mRequestTemplateCache[templateId].acquire(rawRequest);
 
     // Derive some new keys for backward compatibility
@@ -2536,6 +2542,11 @@ void Camera3Device::removeInFlightRequestIfReadyLocked(int idx) {
 void Camera3Device::insertResultLocked(CaptureResult *result, uint32_t frameNumber,
             const AeTriggerCancelOverride_t &aeTriggerCancelOverride) {
     if (result == nullptr) return;
+
+    camera_metadata_t *meta = const_cast<camera_metadata_t *>(
+            result->mMetadata.getAndLock());
+    set_camera_metadata_vendor_id(meta, mVendorTagId);
+    result->mMetadata.unlock(meta);
 
     if (result->mMetadata.update(ANDROID_REQUEST_FRAME_COUNT,
             (int32_t*)&frameNumber, 1) != OK) {
