@@ -23,6 +23,8 @@
 #include <chrono>
 #include <inttypes.h>
 #include <hidl/ServiceManagement.h>
+#include <functional>
+#include <camera_metadata_hidden.h>
 
 namespace android {
 
@@ -221,7 +223,9 @@ status_t CameraProviderManager::setTorchMode(const std::string &id, bool enabled
 }
 
 status_t CameraProviderManager::setUpVendorTags() {
-    // TODO (b/34275821): support aggregating vendor tags for more than one provider
+    sp<VendorTagDescriptorCache> tagCache = new VendorTagDescriptorCache();
+
+    VendorTagDescriptorCache::clearGlobalVendorTagCache();
     for (auto& provider : mProviders) {
         hardware::hidl_vec<VendorTagSection> vts;
         Status status;
@@ -242,8 +246,6 @@ status_t CameraProviderManager::setUpVendorTags() {
             return mapToStatusT(status);
         }
 
-        VendorTagDescriptor::clearGlobalVendorTagDescriptor();
-
         // Read all vendor tag definitions into a descriptor
         sp<VendorTagDescriptor> desc;
         status_t res;
@@ -255,9 +257,11 @@ status_t CameraProviderManager::setUpVendorTags() {
             return res;
         }
 
-        // Set the global descriptor to use with camera metadata
-        VendorTagDescriptor::setAsGlobalVendorTagDescriptor(desc);
+        tagCache->addVendorDescriptor(provider->mProviderTagid, desc);
     }
+
+    VendorTagDescriptorCache::setAsGlobalVendorTagCache(tagCache);
+
     return OK;
 }
 
@@ -350,6 +354,24 @@ CameraProviderManager::ProviderInfo::DeviceInfo* CameraProviderManager::findDevi
     return nullptr;
 }
 
+metadata_vendor_id_t CameraProviderManager::getProviderTagIdLocked(
+        const std::string& id, hardware::hidl_version minVersion,
+        hardware::hidl_version maxVersion) const {
+    metadata_vendor_id_t ret = CAMERA_METADATA_INVALID_VENDOR_ID;
+
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+    for (auto& provider : mProviders) {
+        for (auto& deviceInfo : provider->mDevices) {
+            if (deviceInfo->mId == id &&
+                    minVersion <= deviceInfo->mVersion &&
+                    maxVersion >= deviceInfo->mVersion) {
+                return provider->mProviderTagid;
+            }
+        }
+    }
+
+    return ret;
+}
 
 status_t CameraProviderManager::addProviderLocked(const std::string& newProvider, bool expected) {
     for (const auto& providerInfo : mProviders) {
@@ -430,6 +452,7 @@ CameraProviderManager::ProviderInfo::ProviderInfo(
         CameraProviderManager *manager) :
         mProviderName(providerName),
         mInterface(interface),
+        mProviderTagid(generateVendorTagId(providerName)),
         mManager(manager) {
     (void) mManager;
 }
@@ -542,10 +565,12 @@ status_t CameraProviderManager::ProviderInfo::addDevice(const std::string& name,
     std::unique_ptr<DeviceInfo> deviceInfo;
     switch (major) {
         case 1:
-            deviceInfo = initializeDeviceInfo<DeviceInfo1>(name, id, minor);
+            deviceInfo = initializeDeviceInfo<DeviceInfo1>(name, mProviderTagid,
+                    id, minor);
             break;
         case 3:
-            deviceInfo = initializeDeviceInfo<DeviceInfo3>(name, id, minor);
+            deviceInfo = initializeDeviceInfo<DeviceInfo3>(name, mProviderTagid,
+                    id, minor);
             break;
         default:
             ALOGE("%s: Device %s: Unknown HIDL device HAL major version %d:", __FUNCTION__,
@@ -691,7 +716,7 @@ void CameraProviderManager::ProviderInfo::serviceDied(uint64_t cookie,
 template<class DeviceInfoT>
 std::unique_ptr<CameraProviderManager::ProviderInfo::DeviceInfo>
     CameraProviderManager::ProviderInfo::initializeDeviceInfo(
-        const std::string &name,
+        const std::string &name, const metadata_vendor_id_t tagId,
         const std::string &id, uint16_t minorVersion) const {
     Status status;
 
@@ -711,7 +736,8 @@ std::unique_ptr<CameraProviderManager::ProviderInfo::DeviceInfo>
         return nullptr;
     }
     return std::unique_ptr<DeviceInfo>(
-        new DeviceInfoT(name, id, minorVersion, resourceCost, cameraInterface));
+        new DeviceInfoT(name, tagId, id, minorVersion, resourceCost,
+                cameraInterface));
 }
 
 template<class InterfaceT>
@@ -782,11 +808,12 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo::setTorchMode(Interface
 }
 
 CameraProviderManager::ProviderInfo::DeviceInfo1::DeviceInfo1(const std::string& name,
-        const std::string &id,
+        const metadata_vendor_id_t tagId, const std::string &id,
         uint16_t minorVersion,
         const CameraResourceCost& resourceCost,
         sp<InterfaceT> interface) :
-        DeviceInfo(name, id, hardware::hidl_version{1, minorVersion}, resourceCost),
+        DeviceInfo(name, tagId, id, hardware::hidl_version{1, minorVersion},
+                   resourceCost),
         mInterface(interface) {
     // Get default parameters and initialize flash unit availability
     // Requires powering on the camera device
@@ -869,11 +896,12 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo1::getCameraInfo(
 }
 
 CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string& name,
-        const std::string &id,
+        const metadata_vendor_id_t tagId, const std::string &id,
         uint16_t minorVersion,
         const CameraResourceCost& resourceCost,
         sp<InterfaceT> interface) :
-        DeviceInfo(name, id, hardware::hidl_version{3, minorVersion}, resourceCost),
+        DeviceInfo(name, tagId, id, hardware::hidl_version{3, minorVersion},
+                   resourceCost),
         mInterface(interface) {
     // Get camera characteristics and initialize flash unit availability
     Status status;
@@ -884,6 +912,7 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
                 if (s == Status::OK) {
                     camera_metadata_t *buffer =
                             reinterpret_cast<camera_metadata_t*>(metadata.data());
+                    set_camera_metadata_vendor_id(buffer, mProviderTagid);
                     mCameraCharacteristics = buffer;
                 }
             });
@@ -1002,6 +1031,17 @@ status_t CameraProviderManager::ProviderInfo::parseProviderName(const std::strin
     *id = static_cast<uint32_t>(idVal);
 
     return OK;
+}
+
+metadata_vendor_id_t CameraProviderManager::ProviderInfo::generateVendorTagId(
+        const std::string &name) {
+    metadata_vendor_id_t ret = std::hash<std::string> {} (name);
+    // CAMERA_METADATA_INVALID_VENDOR_ID is not a valid hash value
+    if (CAMERA_METADATA_INVALID_VENDOR_ID == ret) {
+        ret = 0;
+    }
+
+    return ret;
 }
 
 status_t CameraProviderManager::ProviderInfo::parseDeviceName(const std::string& name,

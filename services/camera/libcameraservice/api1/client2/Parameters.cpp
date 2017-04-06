@@ -1198,11 +1198,14 @@ status_t Parameters::buildQuirks() {
 camera_metadata_ro_entry_t Parameters::staticInfo(uint32_t tag,
         size_t minCount, size_t maxCount, bool required) const {
     camera_metadata_ro_entry_t entry = info->find(tag);
+    const camera_metadata_t *metaBuffer = info->getAndLock();
 
     if (CC_UNLIKELY( entry.count == 0 ) && required) {
-        const char* tagSection = get_camera_metadata_section_name(tag);
+        const char* tagSection = get_local_camera_metadata_section_name(tag,
+                metaBuffer);
         if (tagSection == NULL) tagSection = "<unknown>";
-        const char* tagName = get_camera_metadata_tag_name(tag);
+        const char* tagName = get_local_camera_metadata_tag_name(tag,
+                metaBuffer);
         if (tagName == NULL) tagName = "<unknown>";
 
         ALOGE("Error finding static metadata entry '%s.%s' (%x)",
@@ -1210,14 +1213,17 @@ camera_metadata_ro_entry_t Parameters::staticInfo(uint32_t tag,
     } else if (CC_UNLIKELY(
             (minCount != 0 && entry.count < minCount) ||
             (maxCount != 0 && entry.count > maxCount) ) ) {
-        const char* tagSection = get_camera_metadata_section_name(tag);
+        const char* tagSection = get_local_camera_metadata_section_name(tag,
+                metaBuffer);
         if (tagSection == NULL) tagSection = "<unknown>";
-        const char* tagName = get_camera_metadata_tag_name(tag);
+        const char* tagName = get_local_camera_metadata_tag_name(tag,
+                metaBuffer);
         if (tagName == NULL) tagName = "<unknown>";
         ALOGE("Malformed static metadata entry '%s.%s' (%x):"
                 "Expected between %zu and %zu values, but got %zu values",
                 tagSection, tagName, tag, minCount, maxCount, entry.count);
     }
+    info->unlock(metaBuffer);
 
     return entry;
 }

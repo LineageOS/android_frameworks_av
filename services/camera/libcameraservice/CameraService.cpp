@@ -661,6 +661,22 @@ Status CameraService::getCameraVendorTagDescriptor(
     return Status::ok();
 }
 
+Status CameraService::getCameraVendorTagCache(
+        /*out*/ hardware::camera2::params::VendorTagDescriptorCache* cache) {
+    ATRACE_CALL();
+    if (!mInitialized) {
+        ALOGE("%s: Camera HAL couldn't be initialized", __FUNCTION__);
+        return STATUS_ERROR(ERROR_DISCONNECTED,
+                "Camera subsystem not available");
+    }
+    sp<VendorTagDescriptorCache> globalCache =
+            VendorTagDescriptorCache::getGlobalVendorTagCache();
+    if (globalCache != nullptr) {
+        *cache = *(globalCache.get());
+    }
+    return Status::ok();
+}
+
 int CameraService::getDeviceVersion(const String8& cameraId, int* facing) {
     ATRACE_CALL();
 
@@ -2859,7 +2875,13 @@ status_t CameraService::dump(int fd, const Vector<String16>& args) {
 
     sp<VendorTagDescriptor> desc = VendorTagDescriptor::getGlobalVendorTagDescriptor();
     if (desc == NULL) {
-        dprintf(fd, "No vendor tags.\n");
+        sp<VendorTagDescriptorCache> cache =
+                VendorTagDescriptorCache::getGlobalVendorTagCache();
+        if (cache == NULL) {
+            dprintf(fd, "No vendor tags.\n");
+        } else {
+            cache->dump(fd, /*verbosity*/2, /*indentation*/2);
+        }
     } else {
         desc->dump(fd, /*verbosity*/2, /*indentation*/2);
     }

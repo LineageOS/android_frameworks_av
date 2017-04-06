@@ -22,6 +22,9 @@ LOCAL_SHARED_LIBRARIES := \
     libcameraservice \
     libhidlbase \
     liblog \
+    libhidltransport \
+    libcamera_client \
+    libcamera_metadata \
     libutils \
     android.hardware.camera.common@1.0 \
     android.hardware.camera.provider@2.4 \
@@ -29,6 +32,7 @@ LOCAL_SHARED_LIBRARIES := \
     android.hardware.camera.device@3.2
 
 LOCAL_C_INCLUDES += \
+    system/media/private/camera/include \
 
 LOCAL_CFLAGS += -Wall -Wextra -Werror
 

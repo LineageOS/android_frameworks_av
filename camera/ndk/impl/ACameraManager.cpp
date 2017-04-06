@@ -131,10 +131,36 @@ sp<hardware::ICameraService> CameraManagerGlobal::getCameraService() {
         binder::Status ret = mCameraService->getCameraVendorTagDescriptor(/*out*/desc.get());
 
         if (ret.isOk()) {
-            status_t err = VendorTagDescriptor::setAsGlobalVendorTagDescriptor(desc);
-            if (err != OK) {
-                ALOGE("%s: Failed to set vendor tag descriptors, received error %s (%d)",
-                        __FUNCTION__, strerror(-err), err);
+            if (0 < desc->getTagCount()) {
+                status_t err = VendorTagDescriptor::setAsGlobalVendorTagDescriptor(desc);
+                if (err != OK) {
+                    ALOGE("%s: Failed to set vendor tag descriptors, received error %s (%d)",
+                            __FUNCTION__, strerror(-err), err);
+                }
+            } else {
+                sp<VendorTagDescriptorCache> cache =
+                        new VendorTagDescriptorCache();
+                binder::Status res =
+                        mCameraService->getCameraVendorTagCache(
+                                /*out*/cache.get());
+                if (res.serviceSpecificErrorCode() ==
+                        hardware::ICameraService::ERROR_DISCONNECTED) {
+                    // No camera module available, not an error on devices with no cameras
+                    VendorTagDescriptorCache::clearGlobalVendorTagCache();
+                } else if (res.isOk()) {
+                    status_t err =
+                            VendorTagDescriptorCache::setAsGlobalVendorTagCache(
+                                    cache);
+                    if (err != OK) {
+                        ALOGE("%s: Failed to set vendor tag cache,"
+                                "received error %s (%d)", __FUNCTION__,
+                                strerror(-err), err);
+                    }
+                } else {
+                    VendorTagDescriptorCache::clearGlobalVendorTagCache();
+                    ALOGE("%s: Failed to setup vendor tag cache: %s",
+                            __FUNCTION__, res.toString8().string());
+                }
             }
         } else if (ret.serviceSpecificErrorCode() ==
                 hardware::ICameraService::ERROR_DEPRECATED_HAL) {

@@ -112,6 +112,9 @@ public:
     virtual binder::Status     getCameraVendorTagDescriptor(
             /*out*/
             hardware::camera2::params::VendorTagDescriptor* desc);
+    virtual binder::Status     getCameraVendorTagCache(
+            /*out*/
+            hardware::camera2::params::VendorTagDescriptorCache* cache);
 
     virtual binder::Status     connect(const sp<hardware::ICameraClient>& cameraClient,
             int32_t cameraId, const String16& clientPackageName,

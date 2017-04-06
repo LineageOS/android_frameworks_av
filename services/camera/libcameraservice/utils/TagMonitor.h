@@ -27,6 +27,7 @@
 
 #include <media/RingBuffer.h>
 #include <system/camera_metadata.h>
+#include <system/camera_vendor_tags.h>
 #include <camera/CameraMetadata.h>
 
 namespace android {
@@ -43,6 +44,8 @@ class TagMonitor {
     };
 
     TagMonitor();
+
+    void initialize(metadata_vendor_id_t id) { mVendorTagId = id; }
 
     // Parse tag name list (comma-separated) and if valid, enable monitoring
     // If invalid, do nothing.
@@ -100,6 +103,7 @@ class TagMonitor {
 
     // 3A fields to use with the "3a" option
     static const char *k3aTags;
+    metadata_vendor_id_t mVendorTagId;
 };
 
 } // namespace android
