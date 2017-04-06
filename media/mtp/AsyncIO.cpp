@@ -96,6 +96,10 @@ std::thread pool[NUM_THREADS];
 
 } // end anonymous namespace
 
+aiocb::~aiocb() {
+    CHECK(!thread.joinable());
+}
+
 void aio_pool_init(void(f)(int)) {
     CHECK(done == 1);
     done = 0;
