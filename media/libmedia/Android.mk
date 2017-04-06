@@ -26,7 +26,6 @@ LOCAL_SRC_FILES += \
     IMediaPlayer.cpp \
     IMediaRecorder.cpp \
     IMediaSource.cpp \
-    IMediaAnalyticsService.cpp \
     IRemoteDisplay.cpp \
     IRemoteDisplayClient.cpp \
     IResourceManagerClient.cpp \
@@ -35,7 +34,6 @@ LOCAL_SRC_FILES += \
     MediaCodecBuffer.cpp \
     MediaCodecInfo.cpp \
     MediaDefs.cpp \
-    MediaAnalyticsItem.cpp \
     MediaUtils.cpp \
     Metadata.cpp \
     mediarecorder.cpp \
@@ -66,6 +64,7 @@ LOCAL_SHARED_LIBRARIES := \
         libcamera_client libstagefright_foundation \
         libgui libdl libaudioutils libaudioclient \
         libmedia_helper libmediadrm \
+        libmediametrics \
         libbase \
         libhidlbase \
         libhidltransport \
