@@ -199,11 +199,11 @@ aaudio_result_t AudioStreamInternal::close() {
 void *AudioStreamInternal::callbackLoop() {
     aaudio_result_t result = AAUDIO_OK;
     aaudio_data_callback_result_t callbackResult = AAUDIO_CALLBACK_RESULT_CONTINUE;
-    int32_t framesWritten = 0;
     AAudioStream_dataCallback appCallback = getDataCallbackProc();
     if (appCallback == nullptr) return NULL;
 
-    while (mCallbackEnabled.load() && isPlaying() && (result >= 0)) { // result might be a frame count
+    // result might be a frame count
+    while (mCallbackEnabled.load() && isPlaying() && (result >= 0)) {
         // Call application using the AAudio callback interface.
         callbackResult = (*appCallback)(
                 (AAudioStream *) this,
@@ -212,30 +212,32 @@ void *AudioStreamInternal::callbackLoop() {
                 mCallbackFrames);
 
         if (callbackResult == AAUDIO_CALLBACK_RESULT_CONTINUE) {
-            // Write audio data to stream
+            // Write audio data to stream.
             int64_t timeoutNanos = calculateReasonableTimeout(mCallbackFrames);
+
+            // This is a BLOCKING WRITE!
             result = write(mCallbackBuffer, mCallbackFrames, timeoutNanos);
-            if (result == AAUDIO_ERROR_DISCONNECTED) {
+            if ((result != mCallbackFrames)) {
+                ALOGE("AudioStreamInternal(): callbackLoop: write() returned %d", result);
+                if (result >= 0) {
+                    // Only wrote some of the frames requested. Must have timed out.
+                    result = AAUDIO_ERROR_TIMEOUT;
+                }
                 if (getErrorCallbackProc() != nullptr) {
-                    ALOGD("AudioStreamAAudio(): callbackLoop() stream disconnected");
                     (*getErrorCallbackProc())(
                             (AAudioStream *) this,
                             getErrorCallbackUserData(),
-                            AAUDIO_OK);
+                            result);
                 }
-                break;
-            } else if (result != mCallbackFrames) {
-                ALOGE("AudioStreamAAudio(): callbackLoop() wrote %d / %d",
-                      framesWritten, mCallbackFrames);
                 break;
             }
         } else if (callbackResult == AAUDIO_CALLBACK_RESULT_STOP) {
-            ALOGD("AudioStreamAAudio(): callback returned AAUDIO_CALLBACK_RESULT_STOP");
+            ALOGD("AudioStreamInternal(): callback returned AAUDIO_CALLBACK_RESULT_STOP");
             break;
         }
     }
 
-    ALOGD("AudioStreamAAudio(): callbackLoop() exiting, result = %d, isPlaying() = %d",
+    ALOGD("AudioStreamInternal(): callbackLoop() exiting, result = %d, isPlaying() = %d",
           result, (int) isPlaying());
     return NULL; // TODO review
 }
@@ -243,7 +245,7 @@ void *AudioStreamInternal::callbackLoop() {
 static void *aaudio_callback_thread_proc(void *context)
 {
     AudioStreamInternal *stream = (AudioStreamInternal *)context;
-    //LOGD("AudioStreamAAudio(): oboe_callback_thread, stream = %p", stream);
+    //LOGD("AudioStreamInternal(): oboe_callback_thread, stream = %p", stream);
     if (stream != NULL) {
         return stream->callbackLoop();
     } else {
