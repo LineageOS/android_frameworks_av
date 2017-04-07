@@ -84,7 +84,7 @@ status_t ClearKeyDescramblerFactory::createPlugin(
 ///////////////////////////////////////////////////////////////////////////////
 ClearKeyCasPlugin::ClearKeyCasPlugin(
         uint64_t appData, CasPluginCallback callback)
-    : mAppData(appData), mCallback(callback) {
+    : mCallback(callback), mAppData(appData) {
     ALOGV("CTOR");
 }
 
@@ -93,7 +93,7 @@ ClearKeyCasPlugin::~ClearKeyCasPlugin() {
     ClearKeySessionLibrary::get()->destroyPlugin(this);
 }
 
-status_t ClearKeyCasPlugin::setPrivateData(const CasData &data) {
+status_t ClearKeyCasPlugin::setPrivateData(const CasData &/*data*/) {
     ALOGV("setPrivateData");
 
     return OK;
@@ -142,7 +142,7 @@ status_t ClearKeyCasPlugin::closeSession(const CasSessionId &sessionId) {
 }
 
 status_t ClearKeyCasPlugin::setSessionPrivateData(
-        const CasSessionId &sessionId, const CasData &data) {
+        const CasSessionId &sessionId, const CasData & /*data*/) {
     ALOGV("setSessionPrivateData: sessionId=%s",
             sessionIdToString(sessionId).string());
     sp<ClearKeyCasSession> session =
@@ -167,7 +167,7 @@ status_t ClearKeyCasPlugin::processEcm(
     return session->updateECM(mKeyFetcher.get(), (void*)ecm.data(), ecm.size());
 }
 
-status_t ClearKeyCasPlugin::processEmm(const CasEmm& emm) {
+status_t ClearKeyCasPlugin::processEmm(const CasEmm& /*emm*/) {
     ALOGV("processEmm");
     Mutex::Autolock lock(mKeyFetcherLock);
 
@@ -212,8 +212,8 @@ status_t ClearKeyCasPlugin::provision(const String8 &str) {
 }
 
 status_t ClearKeyCasPlugin::refreshEntitlements(
-        int32_t refreshType, const CasData &refreshData) {
-    ALOGV("refreshEntitlements");
+        int32_t refreshType, const CasData &/*refreshData*/) {
+    ALOGV("refreshEntitlements: refreshType=%d", refreshType);
     Mutex::Autolock lock(mKeyFetcherLock);
 
     return OK;
@@ -344,7 +344,7 @@ status_t ClearKeyCasSession::updateECM(
                 AES_BLOCK_SIZE * 8, &mKeyInfo[keyIndex].contentKey);
         mKeyInfo[keyIndex].valid = (result == 0);
         if (!mKeyInfo[keyIndex].valid) {
-            ALOGE("updateECM: failed to set key %d, key_id=%d",
+            ALOGE("updateECM: failed to set key %zu, key_id=%d",
                     keyIndex, keys[keyIndex].key_id);
         }
     }
@@ -356,6 +356,10 @@ ssize_t ClearKeyCasSession::decrypt(
         bool secure, DescramblerPlugin::ScramblingControl scramblingControl,
         size_t numSubSamples, const DescramblerPlugin::SubSample *subSamples,
         const void *srcPtr, void *dstPtr, AString * /* errorDetailMsg */) {
+    if (secure) {
+        return ERROR_DRM_CANNOT_HANDLE;
+    }
+
     AES_KEY contentKey;
 
     if (scramblingControl != DescramblerPlugin::kScrambling_Unscrambled) {
