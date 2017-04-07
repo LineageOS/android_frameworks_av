@@ -49,13 +49,24 @@ static String8 sessionIdToString(const CasSessionId &sessionId) {
     return result;
 }
 
+struct CasImpl::PluginHolder : public RefBase {
+public:
+    explicit PluginHolder(CasPlugin *plugin) : mPlugin(plugin) {}
+    ~PluginHolder() { if (mPlugin != NULL) delete mPlugin; }
+    CasPlugin* get() { return mPlugin; }
+
+private:
+    CasPlugin *mPlugin;
+    DISALLOW_EVIL_CONSTRUCTORS(PluginHolder);
+};
+
 CasImpl::CasImpl(const sp<ICasListener> &listener)
-    : mPlugin(NULL), mListener(listener) {
-    ALOGV("CTOR: mPlugin=%p", mPlugin);
+    : mPluginHolder(NULL), mListener(listener) {
+    ALOGV("CTOR");
 }
 
 CasImpl::~CasImpl() {
-    ALOGV("DTOR: mPlugin=%p", mPlugin);
+    ALOGV("DTOR");
     release();
 }
 
@@ -76,7 +87,7 @@ void CasImpl::OnEvent(
 
 void CasImpl::init(const sp<SharedLibrary>& library, CasPlugin *plugin) {
     mLibrary = library;
-    mPlugin = plugin;
+    mPluginHolder = new PluginHolder(plugin);
 }
 
 void CasImpl::onEvent(
@@ -95,13 +106,20 @@ void CasImpl::onEvent(
 
 Status CasImpl::setPrivateData(const CasData& pvtData) {
     ALOGV("setPrivateData");
-    return getBinderStatus(mPlugin->setPrivateData(pvtData));
+    sp<PluginHolder> holder = mPluginHolder;
+    if (holder == NULL) {
+        return getBinderStatus(INVALID_OPERATION);
+    }
+    return getBinderStatus(holder->get()->setPrivateData(pvtData));
 }
 
 Status CasImpl::openSession(int32_t program_number, CasSessionId* sessionId) {
     ALOGV("openSession: program_number=%d", program_number);
-
-    status_t err = mPlugin->openSession(program_number, sessionId);
+    sp<PluginHolder> holder = mPluginHolder;
+    if (holder == NULL) {
+        return getBinderStatus(INVALID_OPERATION);
+    }
+    status_t err = holder->get()->openSession(program_number, sessionId);
 
     ALOGV("openSession: session opened for program_number=%d, sessionId=%s",
             program_number, sessionIdToString(*sessionId).string());
@@ -115,8 +133,11 @@ Status CasImpl::openSessionForStream(
         CasSessionId* sessionId) {
     ALOGV("openSession: program_number=%d, elementary_PID=%d",
             program_number, elementary_PID);
-
-    status_t err = mPlugin->openSession(
+    sp<PluginHolder> holder = mPluginHolder;
+    if (holder == NULL) {
+        return getBinderStatus(INVALID_OPERATION);
+    }
+    status_t err = holder->get()->openSession(
             program_number, elementary_PID, sessionId);
 
     ALOGV("openSession: session opened for "
@@ -131,69 +152,92 @@ Status CasImpl::setSessionPrivateData(
         const CasSessionId &sessionId, const CasData& pvtData) {
     ALOGV("setSessionPrivateData: sessionId=%s",
             sessionIdToString(sessionId).string());
-
-    return getBinderStatus(mPlugin->setSessionPrivateData(sessionId, pvtData));
+    sp<PluginHolder> holder = mPluginHolder;
+    if (holder == NULL) {
+        return getBinderStatus(INVALID_OPERATION);
+    }
+    return getBinderStatus(holder->get()->setSessionPrivateData(sessionId, pvtData));
 }
 
 Status CasImpl::closeSession(const CasSessionId &sessionId) {
     ALOGV("closeSession: sessionId=%s",
             sessionIdToString(sessionId).string());
-
-    return getBinderStatus(mPlugin->closeSession(sessionId));
+    sp<PluginHolder> holder = mPluginHolder;
+    if (holder == NULL) {
+        return getBinderStatus(INVALID_OPERATION);
+    }
+    return getBinderStatus(holder->get()->closeSession(sessionId));
 }
 
 Status CasImpl::processEcm(const CasSessionId &sessionId, const ParcelableCasData& ecm) {
     ALOGV("processEcm: sessionId=%s",
             sessionIdToString(sessionId).string());
+    sp<PluginHolder> holder = mPluginHolder;
+    if (holder == NULL) {
+        return getBinderStatus(INVALID_OPERATION);
+    }
 
-    return getBinderStatus(mPlugin->processEcm(sessionId, ecm));
+    return getBinderStatus(holder->get()->processEcm(sessionId, ecm));
 }
 
 Status CasImpl::processEmm(const ParcelableCasData& emm) {
     ALOGV("processEmm");
+    sp<PluginHolder> holder = mPluginHolder;
+    if (holder == NULL) {
+        return getBinderStatus(INVALID_OPERATION);
+    }
 
-    return getBinderStatus(mPlugin->processEmm(emm));
+    return getBinderStatus(holder->get()->processEmm(emm));
 }
 
 Status CasImpl::sendEvent(
         int32_t event, int32_t arg, const ::std::unique_ptr<CasData> &eventData) {
     ALOGV("sendEvent");
+    sp<PluginHolder> holder = mPluginHolder;
+    if (holder == NULL) {
+        return getBinderStatus(INVALID_OPERATION);
+    }
 
     status_t err;
     if (eventData == nullptr) {
-        err = mPlugin->sendEvent(event, arg, CasData());
+        err = holder->get()->sendEvent(event, arg, CasData());
     } else {
-        err = mPlugin->sendEvent(event, arg, *eventData);
+        err = holder->get()->sendEvent(event, arg, *eventData);
     }
     return getBinderStatus(err);
 }
 
 Status CasImpl::provision(const String16& provisionString) {
     ALOGV("provision: provisionString=%s", String8(provisionString).string());
+    sp<PluginHolder> holder = mPluginHolder;
+    if (holder == NULL) {
+        return getBinderStatus(INVALID_OPERATION);
+    }
 
-    return getBinderStatus(mPlugin->provision(String8(provisionString)));
+    return getBinderStatus(holder->get()->provision(String8(provisionString)));
 }
 
 Status CasImpl::refreshEntitlements(
         int32_t refreshType, const ::std::unique_ptr<CasData> &refreshData) {
     ALOGV("refreshEntitlements");
+    sp<PluginHolder> holder = mPluginHolder;
+    if (holder == NULL) {
+        return getBinderStatus(INVALID_OPERATION);
+    }
 
     status_t err;
     if (refreshData == nullptr) {
-        err = mPlugin->refreshEntitlements(refreshType, CasData());
+        err = holder->get()->refreshEntitlements(refreshType, CasData());
     } else {
-        err = mPlugin->refreshEntitlements(refreshType, *refreshData);
+        err = holder->get()->refreshEntitlements(refreshType, *refreshData);
     }
     return getBinderStatus(err);
 }
 
 Status CasImpl::release() {
-    ALOGV("release: mPlugin=%p", mPlugin);
-
-    if (mPlugin != NULL) {
-        delete mPlugin;
-        mPlugin = NULL;
-    }
+    ALOGV("release: plugin=%p",
+            mPluginHolder == NULL ? mPluginHolder->get() : NULL);
+    mPluginHolder.clear();
     return Status::ok();
 }
 
