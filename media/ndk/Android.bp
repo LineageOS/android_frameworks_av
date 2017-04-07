@@ -17,7 +17,7 @@
 // frameworks/av/include.
 
 ndk_library {
-    name: "libmediandk.ndk",
+    name: "libmediandk",
     symbol_file: "libmediandk.map.txt",
     first_version: "21",
     unversioned_until: "current",
