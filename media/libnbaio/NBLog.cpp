@@ -996,6 +996,8 @@ bool NBLog::Reader::isIMemory(const sp<IMemory>& iMemory) const
     return iMemory != 0 && mIMemory != 0 && iMemory->pointer() == mIMemory->pointer();
 }
 
+// ---------------------------------------------------------------------------
+
 void NBLog::appendTimestamp(String8 *body, const void *data) {
     int64_t ts;
     memcpy(&ts, data, sizeof(ts));
@@ -1209,6 +1211,8 @@ NBLog::Merger::Merger(const void *shared, size_t size):
       {}
 
 void NBLog::Merger::addReader(const NBLog::NamedReader &reader) {
+    // FIXME This is called by binder thread in MediaLogService::registerWriter
+    //       but the access to shared variable mNamedReaders is not yet protected by a lock.
     mNamedReaders.push_back(reader);
 }
 
@@ -1232,6 +1236,8 @@ bool operator>(const struct MergeItem &i1, const struct MergeItem &i2) {
 
 // Merge registered readers, sorted by timestamp
 void NBLog::Merger::merge() {
+    // FIXME This is called by merge thread
+    //       but the access to shared variable mNamedReaders is not yet protected by a lock.
     int nLogs = mNamedReaders.size();
     std::vector<std::unique_ptr<NBLog::Reader::Snapshot>> snapshots(nLogs);
     std::vector<NBLog::EntryIterator> offsets(nLogs);
@@ -1266,18 +1272,24 @@ void NBLog::Merger::merge() {
     }
 }
 
-const std::vector<NBLog::NamedReader> *NBLog::Merger::getNamedReaders() const {
-    return &mNamedReaders;
+const std::vector<NBLog::NamedReader>& NBLog::Merger::getNamedReaders() const {
+    // FIXME This is returning a reference to a shared variable that needs a lock
+    return mNamedReaders;
 }
+
+// ---------------------------------------------------------------------------
 
 NBLog::MergeReader::MergeReader(const void *shared, size_t size, Merger &merger)
     : Reader(shared, size), mNamedReaders(merger.getNamedReaders()) {}
 
 void NBLog::MergeReader::handleAuthor(const NBLog::AbstractEntry &entry, String8 *body) {
     int author = entry.author();
-    const char* name = (*mNamedReaders)[author].name();
+    // FIXME Needs a lock
+    const char* name = mNamedReaders[author].name();
     body->appendFormat("%s: ", name);
 }
+
+// ---------------------------------------------------------------------------
 
 NBLog::MergeThread::MergeThread(NBLog::Merger &merger)
     : mMerger(merger),
