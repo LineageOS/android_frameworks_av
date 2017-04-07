@@ -199,6 +199,7 @@ status_t MediaBufferGroup::acquire_buffer(
 }
 
 void MediaBufferGroup::signalBufferReturned(MediaBuffer *) {
+    Mutex::Autolock autoLock(mLock);
     mCondition.signal();
 }
 
