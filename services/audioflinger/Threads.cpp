@@ -2930,7 +2930,7 @@ void AudioFlinger::PlaybackThread::detachAuxEffect_l(int effectId)
 
 bool AudioFlinger::PlaybackThread::threadLoop()
 {
-    logWriterTLS = mNBLogWriter.get();
+    tlNBLogWriter = mNBLogWriter.get();
 
     Vector< sp<Track> > tracksToRemove;
 

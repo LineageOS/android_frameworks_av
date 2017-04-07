@@ -23,5 +23,5 @@
 #include "TypedLogger.h"
 
 namespace android {
-thread_local NBLog::Writer *logWriterTLS;
+thread_local NBLog::Writer *tlNBLogWriter;
 }
