@@ -19,7 +19,7 @@
 #include <utils/Log.h>
 
 #include <cassert>
-#include <aaudio/AAudioDefinitions.h>
+#include <aaudio/AAudio.h>
 
 #include "AudioEndpointParcelable.h"
 #include "AudioEndpoint.h"

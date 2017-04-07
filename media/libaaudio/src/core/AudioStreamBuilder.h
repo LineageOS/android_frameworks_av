@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AAUDIO_AUDIOSTREAMBUILDER_H
-#define AAUDIO_AUDIOSTREAMBUILDER_H
+#ifndef AAUDIO_AUDIO_STREAM_BUILDER_H
+#define AAUDIO_AUDIO_STREAM_BUILDER_H
 
 #include <stdint.h>
 
@@ -101,6 +101,52 @@ public:
         return this;
     }
 
+    AAudioStream_dataCallback getDataCallbackProc() const {
+        return mDataCallbackProc;
+    }
+
+    AudioStreamBuilder* setDataCallbackProc(AAudioStream_dataCallback proc) {
+        mDataCallbackProc = proc;
+        return this;
+    }
+
+
+    void *getDataCallbackUserData() const {
+        return mDataCallbackUserData;
+    }
+
+    AudioStreamBuilder* setDataCallbackUserData(void *userData) {
+        mDataCallbackUserData = userData;
+        return this;
+    }
+
+    AAudioStream_errorCallback getErrorCallbackProc() const {
+        return mErrorCallbackProc;
+    }
+
+    AudioStreamBuilder* setErrorCallbackProc(AAudioStream_errorCallback proc) {
+        mErrorCallbackProc = proc;
+        return this;
+    }
+
+    AudioStreamBuilder* setErrorCallbackUserData(void *userData) {
+        mErrorCallbackUserData = userData;
+        return this;
+    }
+
+    void *getErrorCallbackUserData() const {
+        return mErrorCallbackUserData;
+    }
+
+    int32_t getFramesPerDataCallback() const {
+        return mFramesPerDataCallback;
+    }
+
+    AudioStreamBuilder* setFramesPerDataCallback(int32_t sizeInFrames) {
+        mFramesPerDataCallback = sizeInFrames;
+        return this;
+    }
+
     aaudio_result_t build(AudioStream **streamPtr);
 
 private:
@@ -111,8 +157,15 @@ private:
     aaudio_audio_format_t  mFormat = AAUDIO_FORMAT_UNSPECIFIED;
     aaudio_direction_t     mDirection = AAUDIO_DIRECTION_OUTPUT;
     int32_t                mBufferCapacity = AAUDIO_UNSPECIFIED;
+
+    AAudioStream_dataCallback  mDataCallbackProc = nullptr;  // external callback functions
+    void                      *mDataCallbackUserData = nullptr;
+    int32_t                    mFramesPerDataCallback = AAUDIO_UNSPECIFIED; // frames
+
+    AAudioStream_errorCallback mErrorCallbackProc = nullptr;
+    void                      *mErrorCallbackUserData = nullptr;
 };
 
 } /* namespace aaudio */
 
-#endif /* AAUDIO_AUDIOSTREAMBUILDER_H */
+#endif //AAUDIO_AUDIO_STREAM_BUILDER_H

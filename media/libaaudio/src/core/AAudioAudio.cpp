@@ -114,51 +114,77 @@ AAUDIO_API aaudio_result_t AAudio_createStreamBuilder(AAudioStreamBuilder** buil
 AAUDIO_API void AAudioStreamBuilder_setDeviceId(AAudioStreamBuilder* builder,
                                                      int32_t deviceId)
 {
-    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);;
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
     streamBuilder->setDeviceId(deviceId);
 }
 
 AAUDIO_API void AAudioStreamBuilder_setSampleRate(AAudioStreamBuilder* builder,
                                               int32_t sampleRate)
 {
-    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);;
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
     streamBuilder->setSampleRate(sampleRate);
 }
 
 AAUDIO_API void AAudioStreamBuilder_setSamplesPerFrame(AAudioStreamBuilder* builder,
                                                    int32_t samplesPerFrame)
 {
-    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);;
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
     streamBuilder->setSamplesPerFrame(samplesPerFrame);
 }
 
 AAUDIO_API void AAudioStreamBuilder_setDirection(AAudioStreamBuilder* builder,
                                              aaudio_direction_t direction)
 {
-    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);;
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
     streamBuilder->setDirection(direction);
 }
-
 
 AAUDIO_API void AAudioStreamBuilder_setFormat(AAudioStreamBuilder* builder,
                                                    aaudio_audio_format_t format)
 {
-    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);;
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
     streamBuilder->setFormat(format);
 }
 
 AAUDIO_API void AAudioStreamBuilder_setSharingMode(AAudioStreamBuilder* builder,
                                                         aaudio_sharing_mode_t sharingMode)
 {
-    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);;
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
     streamBuilder->setSharingMode(sharingMode);
 }
 
 AAUDIO_API void AAudioStreamBuilder_setBufferCapacityInFrames(AAudioStreamBuilder* builder,
                                                         int32_t frames)
 {
-    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);;
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
     streamBuilder->setBufferCapacity(frames);
+}
+
+AAUDIO_API void AAudioStreamBuilder_setDataCallback(AAudioStreamBuilder* builder,
+                                                    AAudioStream_dataCallback callback,
+                                                    void *userData)
+{
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    ALOGD("AAudioStreamBuilder_setCallback(): userData = %p", userData);
+    streamBuilder->setDataCallbackProc(callback);
+    streamBuilder->setDataCallbackUserData(userData);
+}
+AAUDIO_API void AAudioStreamBuilder_setErrorCallback(AAudioStreamBuilder* builder,
+                                                 AAudioStream_errorCallback callback,
+                                                 void *userData)
+{
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    ALOGD("AAudioStreamBuilder_setCallback(): userData = %p", userData);
+    streamBuilder->setErrorCallbackProc(callback);
+    streamBuilder->setErrorCallbackUserData(userData);
+}
+
+AAUDIO_API void AAudioStreamBuilder_setFramesPerDataCallback(AAudioStreamBuilder* builder,
+                                                int32_t frames)
+{
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    ALOGD("%s: frames = %d", __func__, frames);
+    streamBuilder->setFramesPerDataCallback(frames);
 }
 
 static aaudio_result_t  AAudioInternal_openStream(AudioStreamBuilder *streamBuilder,
@@ -276,6 +302,13 @@ AAUDIO_API aaudio_result_t AAudioStream_write(AAudioStream* stream,
     if (buffer == nullptr) {
         return AAUDIO_ERROR_NULL;
     }
+
+    // Don't allow writes when playing with a callback.
+    if (audioStream->getDataCallbackProc() != nullptr && audioStream->isPlaying()) {
+        ALOGE("Cannot write to a callback stream when running.");
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+
     if (numFrames < 0) {
         return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
     } else if (numFrames == 0) {
@@ -297,6 +330,9 @@ AAUDIO_API aaudio_result_t AAudioStream_createThread(AAudioStream* stream,
                                      aaudio_audio_thread_proc_t threadProc, void *arg)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    if (audioStream->getDataCallbackProc() != nullptr) {
+        return AAUDIO_ERROR_INCOMPATIBLE;
+    }
     return audioStream->createThread(periodNanoseconds, threadProc, arg);
 }
 
