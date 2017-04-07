@@ -340,8 +340,6 @@ class Camera3Device :
 
     CameraMetadata             mRequestTemplateCache[CAMERA3_TEMPLATE_COUNT];
 
-    uint32_t                   mDeviceVersion;
-
     // whether Camera3Device should derive ANDROID_CONTROL_POST_RAW_SENSITIVITY_BOOST for
     // backward compatibility. Should not be changed after initialization.
     bool                       mDerivePostRawSensKey = false;
@@ -403,13 +401,6 @@ class Camera3Device :
     // words, camera device shouldn't be open during CPU suspend.
     nsecs_t                    mTimestampOffset;
 
-    typedef struct AeTriggerCancelOverride {
-        bool applyAeLock;
-        uint8_t aeLock;
-        bool applyAePrecaptureTrigger;
-        uint8_t aePrecaptureTrigger;
-    } AeTriggerCancelOverride_t;
-
     class CaptureRequest : public LightRefBase<CaptureRequest> {
       public:
         CameraMetadata                      mSettings;
@@ -419,9 +410,6 @@ class Camera3Device :
                                             mOutputStreams;
         SurfaceMap                          mOutputSurfaces;
         CaptureResultExtras                 mResultExtras;
-        // Used to cancel AE precapture trigger for devices doesn't support
-        // CONTROL_AE_PRECAPTURE_TRIGGER_CANCEL
-        AeTriggerCancelOverride_t           mAeTriggerCancelOverride;
         // The number of requests that should be submitted to HAL at a time.
         // For example, if batch size is 8, this request and the following 7
         // requests will be submitted to HAL at a time. The batch size for
@@ -641,9 +629,7 @@ class Camera3Device :
 
         RequestThread(wp<Camera3Device> parent,
                 sp<camera3::StatusTracker> statusTracker,
-                HalInterface* interface,
-                uint32_t deviceVersion,
-                bool aeLockAvailable);
+                HalInterface* interface);
         ~RequestThread();
 
         void     setNotificationListener(wp<NotificationListener> listener);
@@ -777,9 +763,6 @@ class Camera3Device :
         // If the input request is in mRepeatingRequests. Must be called with mRequestLock hold
         bool isRepeatingRequestLocked(const sp<CaptureRequest>&);
 
-        // Handle AE precapture trigger cancel for devices <= CAMERA_DEVICE_API_VERSION_3_2.
-        void handleAePrecaptureCancelRequest(const sp<CaptureRequest>& request);
-
         // Clear repeating requests. Must be called with mRequestLock held.
         status_t clearRepeatingRequestsLocked(/*out*/ int64_t *lastFrameNumber = NULL);
 
@@ -792,7 +775,6 @@ class Camera3Device :
         wp<Camera3Device>  mParent;
         wp<camera3::StatusTracker>  mStatusTracker;
         HalInterface*      mInterface;
-        uint32_t           mDeviceVersion;
 
         wp<NotificationListener> mListener;
 
@@ -842,9 +824,6 @@ class Camera3Device :
 
         int64_t            mRepeatingLastFrameNumber;
 
-        // Whether the device supports AE lock
-        bool               mAeLockAvailable;
-
         // Flag indicating if we should prepare video stream for video requests.
         bool               mPrepareVideoStream;
     };
@@ -885,10 +864,6 @@ class Camera3Device :
         // the shutter event.
         Vector<camera3_stream_buffer_t> pendingOutputBuffers;
 
-        // Used to cancel AE precapture trigger for devices doesn't support
-        // CONTROL_AE_PRECAPTURE_TRIGGER_CANCEL
-        AeTriggerCancelOverride_t aeTriggerCancelOverride;
-
         // Whether this inflight request's shutter and result callback are to be
         // called. The policy is that if the request is the last one in the constrained
         // high speed recording request list, this flag will be true. If the request list
@@ -903,12 +878,11 @@ class Camera3Device :
                 haveResultMetadata(false),
                 numBuffersLeft(0),
                 hasInputBuffer(false),
-                aeTriggerCancelOverride({false, 0, false, 0}),
                 hasCallback(true) {
         }
 
         InFlightRequest(int numBuffers, CaptureResultExtras extras, bool hasInput,
-                AeTriggerCancelOverride aeTriggerCancelOverride, bool hasAppCallback) :
+                bool hasAppCallback) :
                 shutterTimestamp(0),
                 sensorTimestamp(0),
                 requestStatus(OK),
@@ -916,7 +890,6 @@ class Camera3Device :
                 numBuffersLeft(numBuffers),
                 resultExtras(extras),
                 hasInputBuffer(hasInput),
-                aeTriggerCancelOverride(aeTriggerCancelOverride),
                 hasCallback(hasAppCallback) {
         }
     };
@@ -930,14 +903,7 @@ class Camera3Device :
 
     status_t registerInFlight(uint32_t frameNumber,
             int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
-            const AeTriggerCancelOverride_t &aeTriggerCancelOverride, bool callback);
-
-    /**
-     * Override result metadata for cancelling AE precapture trigger applied in
-     * handleAePrecaptureCancelRequest().
-     */
-    void overrideResultForPrecaptureCancel(CameraMetadata* result,
-            const AeTriggerCancelOverride_t &aeTriggerCancelOverride);
+            bool callback);
 
     /**
      * Tracking for idle detection
@@ -1032,21 +998,19 @@ class Camera3Device :
 
     // Send a partial capture result.
     void sendPartialCaptureResult(const camera_metadata_t * partialResult,
-            const CaptureResultExtras &resultExtras, uint32_t frameNumber,
-            const AeTriggerCancelOverride_t &aeTriggerCancelOverride);
+            const CaptureResultExtras &resultExtras, uint32_t frameNumber);
 
     // Send a total capture result given the pending metadata and result extras,
     // partial results, and the frame number to the result queue.
     void sendCaptureResult(CameraMetadata &pendingMetadata,
             CaptureResultExtras &resultExtras,
             CameraMetadata &collectedPartialResult, uint32_t frameNumber,
-            bool reprocess, const AeTriggerCancelOverride_t &aeTriggerCancelOverride);
+            bool reprocess);
 
     // Insert the result to the result queue after updating frame number and overriding AE
     // trigger cancel.
     // mOutputLock must be held when calling this function.
-    void insertResultLocked(CaptureResult *result, uint32_t frameNumber,
-            const AeTriggerCancelOverride_t &aeTriggerCancelOverride);
+    void insertResultLocked(CaptureResult *result, uint32_t frameNumber);
 
     /**** Scope for mInFlightLock ****/
 

@@ -163,7 +163,6 @@ status_t Camera3Device::initialize(CameraModule *module)
 
     /** Everything is good to go */
 
-    mDeviceVersion = device->common.version;
     mDeviceInfo = info.static_camera_characteristics;
     mInterface = std::make_unique<HalInterface>(device);
 
@@ -231,9 +230,6 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager) {
         // Don't use the queue onwards.
     }
 
-    // TODO: camera service will absorb 3_2/3_3/3_4 differences in the future
-    //       for now use 3_4 to keep legacy devices working
-    mDeviceVersion = CAMERA_DEVICE_API_VERSION_3_4;
     mInterface = std::make_unique<HalInterface>(session, queue);
     std::string providerType;
     mVendorTagId = manager->getProviderTagIdLocked(mId.string());
@@ -262,17 +258,8 @@ status_t Camera3Device::initializeCommonLocked() {
 
     mTagMonitor.initialize(mVendorTagId);
 
-    bool aeLockAvailable = false;
-    camera_metadata_entry aeLockAvailableEntry = mDeviceInfo.find(
-            ANDROID_CONTROL_AE_LOCK_AVAILABLE);
-    if (aeLockAvailableEntry.count > 0) {
-        aeLockAvailable = (aeLockAvailableEntry.data.u8[0] ==
-                ANDROID_CONTROL_AE_LOCK_AVAILABLE_TRUE);
-    }
-
     /** Start up request queue thread */
-    mRequestThread = new RequestThread(this, mStatusTracker, mInterface.get(), mDeviceVersion,
-            aeLockAvailable);
+    mRequestThread = new RequestThread(this, mStatusTracker, mInterface.get());
     res = mRequestThread->run(String8::format("C3Dev-%s-ReqQueue", mId.string()).string());
     if (res != OK) {
         SET_ERR_L("Unable to start request queue thread: %s (%d)",
@@ -2417,14 +2404,13 @@ void Camera3Device::setErrorStateLockedV(const char *fmt, va_list args) {
 
 status_t Camera3Device::registerInFlight(uint32_t frameNumber,
         int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
-        const AeTriggerCancelOverride_t &aeTriggerCancelOverride,
         bool hasAppCallback) {
     ATRACE_CALL();
     Mutex::Autolock l(mInFlightLock);
 
     ssize_t res;
     res = mInFlightMap.add(frameNumber, InFlightRequest(numBuffers, resultExtras, hasInput,
-            aeTriggerCancelOverride, hasAppCallback));
+            hasAppCallback));
     if (res < 0) return res;
 
     if (mInFlightMap.size() == 1) {
@@ -2509,8 +2495,8 @@ void Camera3Device::removeInFlightRequestIfReadyLocked(int idx) {
     }
 }
 
-void Camera3Device::insertResultLocked(CaptureResult *result, uint32_t frameNumber,
-            const AeTriggerCancelOverride_t &aeTriggerCancelOverride) {
+void Camera3Device::insertResultLocked(CaptureResult *result,
+        uint32_t frameNumber) {
     if (result == nullptr) return;
 
     camera_metadata_t *meta = const_cast<camera_metadata_t *>(
@@ -2529,8 +2515,6 @@ void Camera3Device::insertResultLocked(CaptureResult *result, uint32_t frameNumb
         return;
     }
 
-    overrideResultForPrecaptureCancel(&result->mMetadata, aeTriggerCancelOverride);
-
     // Valid result, insert into queue
     List<CaptureResult>::iterator queuedResult =
             mResultQueue.insert(mResultQueue.end(), CaptureResult(*result));
@@ -2545,15 +2529,14 @@ void Camera3Device::insertResultLocked(CaptureResult *result, uint32_t frameNumb
 
 
 void Camera3Device::sendPartialCaptureResult(const camera_metadata_t * partialResult,
-        const CaptureResultExtras &resultExtras, uint32_t frameNumber,
-        const AeTriggerCancelOverride_t &aeTriggerCancelOverride) {
+        const CaptureResultExtras &resultExtras, uint32_t frameNumber) {
     Mutex::Autolock l(mOutputLock);
 
     CaptureResult captureResult;
     captureResult.mResultExtras = resultExtras;
     captureResult.mMetadata = partialResult;
 
-    insertResultLocked(&captureResult, frameNumber, aeTriggerCancelOverride);
+    insertResultLocked(&captureResult, frameNumber);
 }
 
 
@@ -2561,8 +2544,7 @@ void Camera3Device::sendCaptureResult(CameraMetadata &pendingMetadata,
         CaptureResultExtras &resultExtras,
         CameraMetadata &collectedPartialResult,
         uint32_t frameNumber,
-        bool reprocess,
-        const AeTriggerCancelOverride_t &aeTriggerCancelOverride) {
+        bool reprocess) {
     if (pendingMetadata.isEmpty())
         return;
 
@@ -2618,7 +2600,7 @@ void Camera3Device::sendCaptureResult(CameraMetadata &pendingMetadata,
     mTagMonitor.monitorMetadata(TagMonitor::RESULT,
             frameNumber, timestamp.data.i64[0], captureResult.mMetadata);
 
-    insertResultLocked(&captureResult, frameNumber, aeTriggerCancelOverride);
+    insertResultLocked(&captureResult, frameNumber);
 }
 
 /**
@@ -2696,8 +2678,8 @@ void Camera3Device::processCaptureResult(const camera3_capture_result *result) {
 
             if (isPartialResult && request.hasCallback) {
                 // Send partial capture result
-                sendPartialCaptureResult(result->result, request.resultExtras, frameNumber,
-                        request.aeTriggerCancelOverride);
+                sendPartialCaptureResult(result->result, request.resultExtras,
+                        frameNumber);
             }
         }
 
@@ -2762,8 +2744,8 @@ void Camera3Device::processCaptureResult(const camera3_capture_result *result) {
                 CameraMetadata metadata;
                 metadata = result->result;
                 sendCaptureResult(metadata, request.resultExtras,
-                    collectedPartialResult, frameNumber, hasInputBufferInRequest,
-                    request.aeTriggerCancelOverride);
+                    collectedPartialResult, frameNumber,
+                    hasInputBufferInRequest);
             }
         }
 
@@ -2943,7 +2925,7 @@ void Camera3Device::notifyShutter(const camera3_shutter_msg_t &msg,
                 // send pending result and buffers
                 sendCaptureResult(r.pendingMetadata, r.resultExtras,
                     r.collectedPartialResult, msg.frame_number,
-                    r.hasInputBuffer, r.aeTriggerCancelOverride);
+                    r.hasInputBuffer);
             }
             returnOutputBuffers(r.pendingOutputBuffers.array(),
                 r.pendingOutputBuffers.size(), r.shutterTimestamp);
@@ -3491,14 +3473,11 @@ void Camera3Device::HalInterface::onBufferFreed(
 
 Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         sp<StatusTracker> statusTracker,
-        HalInterface* interface,
-        uint32_t deviceVersion,
-        bool aeLockAvailable) :
+        HalInterface* interface) :
         Thread(/*canCallJava*/false),
         mParent(parent),
         mStatusTracker(statusTracker),
         mInterface(interface),
-        mDeviceVersion(deviceVersion),
         mListener(nullptr),
         mId(getId(parent)),
         mReconfigured(false),
@@ -3510,7 +3489,6 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mCurrentPreCaptureTriggerId(0),
         mRepeatingLastFrameNumber(
             hardware::camera2::ICameraDeviceUser::NO_IN_FLIGHT_REPEATING_FRAMES),
-        mAeLockAvailable(aeLockAvailable),
         mPrepareVideoStream(false) {
     mStatusId = statusTracker->addComponent();
 }
@@ -3736,65 +3714,6 @@ void Camera3Device::RequestThread::requestExit() {
     // The exit from any possible waits
     mDoPauseSignal.signal();
     mRequestSignal.signal();
-}
-
-
-/**
- * For devices <= CAMERA_DEVICE_API_VERSION_3_2, AE_PRECAPTURE_TRIGGER_CANCEL is not supported so
- * we need to override AE_PRECAPTURE_TRIGGER_CANCEL to AE_PRECAPTURE_TRIGGER_IDLE and AE_LOCK_OFF
- * to AE_LOCK_ON to start cancelling AE precapture. If AE lock is not available, it still overrides
- * AE_PRECAPTURE_TRIGGER_CANCEL to AE_PRECAPTURE_TRIGGER_IDLE but doesn't add AE_LOCK_ON to the
- * request.
- */
-void Camera3Device::RequestThread::handleAePrecaptureCancelRequest(const sp<CaptureRequest>& request) {
-    request->mAeTriggerCancelOverride.applyAeLock = false;
-    request->mAeTriggerCancelOverride.applyAePrecaptureTrigger = false;
-
-    if (mDeviceVersion > CAMERA_DEVICE_API_VERSION_3_2) {
-        return;
-    }
-
-    camera_metadata_entry_t aePrecaptureTrigger =
-            request->mSettings.find(ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER);
-    if (aePrecaptureTrigger.count > 0 &&
-            aePrecaptureTrigger.data.u8[0] == ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER_CANCEL) {
-        // Always override CANCEL to IDLE
-        uint8_t aePrecaptureTrigger = ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER_IDLE;
-        request->mSettings.update(ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER, &aePrecaptureTrigger, 1);
-        request->mAeTriggerCancelOverride.applyAePrecaptureTrigger = true;
-        request->mAeTriggerCancelOverride.aePrecaptureTrigger =
-                ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER_CANCEL;
-
-        if (mAeLockAvailable == true) {
-            camera_metadata_entry_t aeLock = request->mSettings.find(ANDROID_CONTROL_AE_LOCK);
-            if (aeLock.count == 0 ||  aeLock.data.u8[0] == ANDROID_CONTROL_AE_LOCK_OFF) {
-                uint8_t aeLock = ANDROID_CONTROL_AE_LOCK_ON;
-                request->mSettings.update(ANDROID_CONTROL_AE_LOCK, &aeLock, 1);
-                request->mAeTriggerCancelOverride.applyAeLock = true;
-                request->mAeTriggerCancelOverride.aeLock = ANDROID_CONTROL_AE_LOCK_OFF;
-            }
-        }
-    }
-}
-
-/**
- * Override result metadata for cancelling AE precapture trigger applied in
- * handleAePrecaptureCancelRequest().
- */
-void Camera3Device::overrideResultForPrecaptureCancel(
-        CameraMetadata *result, const AeTriggerCancelOverride_t &aeTriggerCancelOverride) {
-    if (aeTriggerCancelOverride.applyAeLock) {
-        // Only devices <= v3.2 should have this override
-        assert(mDeviceVersion <= CAMERA_DEVICE_API_VERSION_3_2);
-        result->update(ANDROID_CONTROL_AE_LOCK, &aeTriggerCancelOverride.aeLock, 1);
-    }
-
-    if (aeTriggerCancelOverride.applyAePrecaptureTrigger) {
-        // Only devices <= v3.2 should have this override
-        assert(mDeviceVersion <= CAMERA_DEVICE_API_VERSION_3_2);
-        result->update(ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER,
-                &aeTriggerCancelOverride.aePrecaptureTrigger, 1);
-    }
 }
 
 void Camera3Device::RequestThread::checkAndStopRepeatingRequest() {
@@ -4164,7 +4083,6 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         res = parent->registerInFlight(halRequest->frame_number,
                 totalNumBuffers, captureRequest->mResultExtras,
                 /*hasInput*/halRequest->input_buffer != NULL,
-                captureRequest->mAeTriggerCancelOverride,
                 hasCallback);
         ALOGVV("%s: registered in flight requestId = %" PRId32 ", frameNumber = %" PRId64
                ", burstId = %" PRId32 ".",
@@ -4423,8 +4341,6 @@ sp<Camera3Device::CaptureRequest>
         }
     }
 
-    handleAePrecaptureCancelRequest(nextRequest);
-
     return nextRequest;
 }
 
@@ -4510,9 +4426,7 @@ status_t Camera3Device::RequestThread::insertTriggers(
                 request->mResultExtras.afTriggerId = triggerId;
                 mCurrentAfTriggerId = triggerId;
             }
-            if (parent->mDeviceVersion >= CAMERA_DEVICE_API_VERSION_3_2) {
-                continue; // Trigger ID tag is deprecated since device HAL 3.2
-            }
+            continue;
         }
 
         camera_metadata_entry entry = metadata.find(tag);
