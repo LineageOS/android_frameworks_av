@@ -18,6 +18,7 @@
 #define LOG_TAG "ClearKeyFetcher"
 
 #include <algorithm>
+#include <inttypes.h>
 #include <string>
 
 #include "ClearKeyFetcher.h"
@@ -70,7 +71,7 @@ status_t ClearKeyFetcher::ObtainKey(const sp<ABuffer>& buffer,
         bool same_parity = (((container.descriptor(0).id() & 0x01) ^
                 (container.descriptor(1).id() & 0x01)) == 0);
         if (same_parity) {
-            ALOGW("asset_id=%llu: malformed Ecm, "
+            ALOGW("asset_id=%" PRIu64 ": malformed Ecm, "
                     "content keys have same parity, id0=%d, id1=%d",
                     container.descriptor(0).ecm().asset_id(),
                     container.descriptor(0).id(),
@@ -88,7 +89,7 @@ status_t ClearKeyFetcher::ObtainKey(const sp<ABuffer>& buffer,
     // asset_id change. If it sends an EcmContainer with 2 Ecms with different
     // asset_ids (old and new) then it might be best to prefetch the Emm.
     if ((asset_.id() != 0) && (*asset_id != asset_.id())) {
-        ALOGW("Asset_id change from %llu to %llu", asset_.id(), *asset_id);
+        ALOGW("Asset_id change from %" PRIu64 " to %" PRIu64, asset_.id(), *asset_id);
         asset_.Clear();
     }
 

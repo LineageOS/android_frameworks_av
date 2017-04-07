@@ -84,8 +84,9 @@ public:
     virtual Status release() override;
 
 private:
+    struct PluginHolder;
     sp<SharedLibrary> mLibrary;
-    CasPlugin *mPlugin;
+    sp<PluginHolder> mPluginHolder;
     sp<ICasListener> mListener;
 
     DISALLOW_EVIL_CONSTRUCTORS(CasImpl);

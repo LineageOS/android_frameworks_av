@@ -80,7 +80,7 @@ status_t DecodeECMClearFields(const sp<ABuffer>& ecm, Asset* asset,
     CHECK(default_fields);
 
     if (ecm->size() < kTotalEcmSize) {
-        ALOGE("Short ECM: expected_length=%zu, actual_length=%zu",
+        ALOGE("Short ECM: expected_length=%d, actual_length=%zu",
                 kTotalEcmSize, ecm->size());
         return BAD_VALUE;
     }
