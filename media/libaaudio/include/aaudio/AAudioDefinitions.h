@@ -14,6 +14,15 @@
  * limitations under the License.
  */
 
+/**
+ * @addtogroup Audio
+ * @{
+ */
+
+/**
+ * @file AAudioDefinitions.h
+ */
+
 #ifndef AAUDIO_AAUDIODEFINITIONS_H
 #define AAUDIO_AAUDIODEFINITIONS_H
 
@@ -117,3 +126,5 @@ typedef int32_t aaudio_sharing_mode_t;
 #endif
 
 #endif // AAUDIO_AAUDIODEFINITIONS_H
+
+/** @} */

@@ -15,7 +15,16 @@
  */
 
 /**
- * This is the 'C' ABI for AAudio.
+ * @addtogroup Audio
+ * @{
+ */
+
+/**
+ * @file AAudio.h
+ */
+
+/**
+ * This is the 'C' API for AAudio.
  */
 #ifndef AAUDIO_AAUDIO_H
 #define AAUDIO_AAUDIO_H
@@ -525,3 +534,5 @@ AAUDIO_API aaudio_result_t AAudioStream_getTimestamp(AAudioStream* stream,
 #endif
 
 #endif //AAUDIO_AAUDIO_H
+
+/** @} */
