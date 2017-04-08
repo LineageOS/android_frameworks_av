@@ -549,6 +549,7 @@ ACodec::ACodec()
       mTimePerFrameUs(-1ll),
       mTimePerCaptureUs(-1ll),
       mCreateInputBuffersSuspended(false),
+      mLatency(0),
       mTunneled(false),
       mDescribeColorAspectsIndex((OMX_INDEXTYPE)0),
       mDescribeHDRStaticInfoIndex((OMX_INDEXTYPE)0),
@@ -2281,6 +2282,30 @@ status_t ACodec::configureCodec(
     return err;
 }
 
+status_t ACodec::setLatency(uint32_t latency) {
+    OMX_PARAM_U32TYPE config;
+    InitOMXParams(&config);
+    config.nPortIndex = kPortIndexInput;
+    config.nU32 = (OMX_U32)latency;
+    status_t err = mOMXNode->setConfig(
+            (OMX_INDEXTYPE)OMX_IndexConfigLatency,
+            &config, sizeof(config));
+    return err;
+}
+
+status_t ACodec::getLatency(uint32_t *latency) {
+    OMX_PARAM_U32TYPE config;
+    InitOMXParams(&config);
+    config.nPortIndex = kPortIndexInput;
+    status_t err = mOMXNode->getConfig(
+            (OMX_INDEXTYPE)OMX_IndexConfigLatency,
+            &config, sizeof(config));
+    if (err == OK) {
+        *latency = config.nU32;
+    }
+    return err;
+}
+
 status_t ACodec::setPriority(int32_t priority) {
     if (priority < 0) {
         return BAD_VALUE;
@@ -3798,6 +3823,8 @@ status_t ACodec::setupVideoEncoder(
         }
     }
 
+    configureEncoderLatency(msg);
+
     switch (compressionFormat) {
         case OMX_VIDEO_CodingMPEG4:
             err = setupMPEG4EncoderParameters(msg);
@@ -4257,7 +4284,7 @@ status_t ACodec::setupAVCEncoderParameters(const sp<AMessage> &msg) {
         h264type.nSliceHeaderSpacing = 0;
         h264type.bUseHadamard = OMX_TRUE;
         h264type.nRefFrames = 2;
-        h264type.nBFrames = 1;
+        h264type.nBFrames = mLatency == 0 ? 1 : std::min(1U, mLatency - 1);
         h264type.nPFrames = setPFramesSpacing(iFrameInterval, frameRate, h264type.nBFrames);
         h264type.nAllowedPictureTypes =
             OMX_VIDEO_PictureTypeI | OMX_VIDEO_PictureTypeP | OMX_VIDEO_PictureTypeB;
@@ -4528,6 +4555,29 @@ status_t ACodec::configureBitrate(
             OMX_IndexParamVideoBitrate, &bitrateType, sizeof(bitrateType));
 }
 
+void ACodec::configureEncoderLatency(const sp<AMessage> &msg) {
+    if (!mIsEncoder || !mIsVideo) {
+        return;
+    }
+
+    int32_t latency = 0, bitrateMode;
+    if (msg->findInt32("latency", &latency) && latency > 0) {
+        status_t err = setLatency(latency);
+        if (err != OK) {
+            ALOGW("[%s] failed setLatency. Failure is fine since this key is optional",
+                    mComponentName.c_str());
+            err = OK;
+        } else {
+            mLatency = latency;
+        }
+    } else if ((!msg->findInt32("bitrate-mode", &bitrateMode) &&
+            bitrateMode == OMX_Video_ControlRateConstant)) {
+        // default the latency to be 1 if latency key is not specified or unsupported and bitrateMode
+        // is CBR.
+        mLatency = 1;
+    }
+}
+
 status_t ACodec::setupErrorCorrectionParameters() {
     OMX_VIDEO_PARAM_ERRORCORRECTIONTYPE errorCorrectionType;
     InitOMXParams(&errorCorrectionType);
@@ -4785,6 +4835,10 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
                         (void)getInputColorAspectsForVideoEncoder(notify);
                         if (mConfigFormat->contains("hdr-static-info")) {
                             (void)getHDRStaticInfoForVideoCodec(kPortIndexInput, notify);
+                        }
+                        uint32_t latency = 0;
+                        if (mIsEncoder && getLatency(&latency) == OK && latency > 0) {
+                            notify->setInt32("latency", latency);
                         }
                     }
 
@@ -7177,6 +7231,16 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
         status_t err = setIntraRefreshPeriod(intraRefreshPeriod, false);
         if (err != OK) {
             ALOGI("[%s] failed setIntraRefreshPeriod. Failure is fine since this key is optional",
+                    mComponentName.c_str());
+            err = OK;
+        }
+    }
+
+    int32_t latency = 0;
+    if (params->findInt32("latency", &latency) && latency > 0) {
+        status_t err = setLatency(latency);
+        if (err != OK) {
+            ALOGI("[%s] failed setLatency. Failure is fine since this key is optional",
                     mComponentName.c_str());
             err = OK;
         }
