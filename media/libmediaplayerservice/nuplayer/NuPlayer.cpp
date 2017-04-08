@@ -197,6 +197,8 @@ NuPlayer::NuPlayer(pid_t pid)
       mPrepared(false),
       mResetting(false),
       mSourceStarted(false),
+      mAudioDecoderError(false),
+      mVideoDecoderError(false),
       mPaused(false),
       mPausedByClient(true),
       mPausedForBuffering(false),
@@ -1094,12 +1096,14 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                 ALOGV("%s shutdown completed", audio ? "audio" : "video");
                 if (audio) {
                     mAudioDecoder.clear();
+                    mAudioDecoderError = false;
                     ++mAudioDecoderGeneration;
 
                     CHECK_EQ((int)mFlushingAudio, (int)SHUTTING_DOWN_DECODER);
                     mFlushingAudio = SHUT_DOWN;
                 } else {
                     mVideoDecoder.clear();
+                    mVideoDecoderError = false;
                     ++mVideoDecoderGeneration;
 
                     CHECK_EQ((int)mFlushingVideo, (int)SHUTTING_DOWN_DECODER);
@@ -1154,7 +1158,29 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                         finishFlushIfPossible();  // Should not occur.
                         break;                    // Finish anyways.
                 }
-                notifyListener(MEDIA_ERROR, MEDIA_ERROR_UNKNOWN, err);
+                if (mSource != nullptr) {
+                    if (audio) {
+                        if (mVideoDecoderError || mSource->getFormat(false /* audio */) == NULL) {
+                            // When both audio and video have error, or this stream has only audio
+                            // which has error, notify client of error.
+                            notifyListener(MEDIA_ERROR, MEDIA_ERROR_UNKNOWN, err);
+                        } else {
+                            // Only audio track has error. Video track could be still good to play.
+                            notifyListener(MEDIA_INFO, MEDIA_INFO_PLAY_AUDIO_ERROR, err);
+                        }
+                        mAudioDecoderError = true;
+                    } else {
+                        if (mAudioDecoderError || mSource->getFormat(true /* audio */) == NULL) {
+                            // When both audio and video have error, or this stream has only video
+                            // which has error, notify client of error.
+                            notifyListener(MEDIA_ERROR, MEDIA_ERROR_UNKNOWN, err);
+                        } else {
+                            // Only video track has error. Audio track could be still good to play.
+                            notifyListener(MEDIA_INFO, MEDIA_INFO_PLAY_VIDEO_ERROR, err);
+                        }
+                        mVideoDecoderError = true;
+                    }
+                }
             } else {
                 ALOGV("Unhandled decoder notification %d '%c%c%c%c'.",
                       what,
@@ -1637,6 +1663,7 @@ void NuPlayer::restartAudio(
     if (mAudioDecoder != NULL) {
         mAudioDecoder->pause();
         mAudioDecoder.clear();
+        mAudioDecoderError = false;
         ++mAudioDecoderGeneration;
     }
     if (mFlushingAudio == FLUSHING_DECODER) {
@@ -1774,6 +1801,7 @@ status_t NuPlayer::instantiateDecoder(
             *decoder = new Decoder(notify, mSource, mPID, mUID, mRenderer);
             ALOGV("instantiateDecoder audio Decoder");
         }
+        mAudioDecoderError = false;
     } else {
         sp<AMessage> notify = new AMessage(kWhatVideoNotify, this);
         ++mVideoDecoderGeneration;
@@ -1781,6 +1809,7 @@ status_t NuPlayer::instantiateDecoder(
 
         *decoder = new Decoder(
                 notify, mSource, mPID, mUID, mRenderer, mSurface, mCCDecoder);
+        mVideoDecoderError = false;
 
         // enable FRC if high-quality AV sync is requested, even if not
         // directly queuing to display, as this will even improve textureview
