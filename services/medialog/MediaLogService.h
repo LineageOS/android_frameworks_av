@@ -55,7 +55,7 @@ private:
 
     Mutex               mLock;
 
-    Vector<NBLog::NamedReader> mNamedReaders;
+    Vector<NBLog::NamedReader> mNamedReaders;   // protected by mLock
     NBLog::Shared *mMergerShared;
     NBLog::Merger mMerger;
     NBLog::MergeReader mMergeReader;
