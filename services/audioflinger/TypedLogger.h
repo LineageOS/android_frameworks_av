@@ -75,16 +75,24 @@ constexpr uint64_t hash(const char (&file)[n], uint32_t line) {
            std::min(line, 0xFFFFu);
 }
 
+// TODO Permit disabling of logging at compile-time.
+
+// TODO A non-nullptr dummy implementation that is a nop would be faster than checking for nullptr
+//      in the case when logging is enabled at compile-time and enabled at runtime, but it might be
+//      slower than nullptr check when logging is enabled at compile-time and disabled at runtime.
+
 // Write formatted entry to log
-#define LOGT(fmt, ...) logWriterTLS->logFormat((fmt), \
-                                               hash(__FILE__, __LINE__), \
-                                               ##__VA_ARGS__) // TODO: check null pointer
+#define LOGT(fmt, ...) do { NBLog::Writer *x = logWriterTLS; if (x != nullptr) \
+                                x->logFormat((fmt), hash(__FILE__, __LINE__), ##__VA_ARGS__); } \
+                                while (0)
 
 // Write histogram timestamp entry
-#define LOG_HIST_TS() logWriterTLS->logHistTS(hash(__FILE__, __LINE__))
+#define LOG_HIST_TS() do { NBLog::Writer *x = logWriterTLS; if (x != nullptr) \
+                                x->logHistTS(hash(__FILE__, __LINE__)); } while(0)
 
 // flush all histogram
-#define LOG_HIST_FLUSH() logWriterTLS->logHistFlush(hash(__FILE__, __LINE__))
+#define LOG_HIST_FLUSH() do { NBLog::Writer *x = logWriterTLS; if (x != nullptr) \
+                                x->logHistFlush(hash(__FILE__, __LINE__)); } while(0)
 
 namespace android {
 extern "C" {
