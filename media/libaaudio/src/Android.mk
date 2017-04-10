@@ -26,6 +26,7 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/legacy \
     $(LOCAL_PATH)/utility
 
+# If you add a file here then also add it below in the SHARED target
 LOCAL_SRC_FILES = \
     core/AudioStream.cpp \
     core/AudioStreamBuilder.cpp \
@@ -43,13 +44,14 @@ LOCAL_SRC_FILES = \
     client/AudioEndpoint.cpp \
     client/AudioStreamInternal.cpp \
     client/IsochronousClockModel.cpp \
-    binding/SharedMemoryParcelable.cpp \
-    binding/SharedRegionParcelable.cpp \
-    binding/RingBufferParcelable.cpp \
     binding/AudioEndpointParcelable.cpp \
+    binding/AAudioBinderClient.cpp \
     binding/AAudioStreamRequest.cpp \
     binding/AAudioStreamConfiguration.cpp \
-    binding/IAAudioService.cpp
+    binding/IAAudioService.cpp \
+    binding/RingBufferParcelable.cpp \
+    binding/SharedMemoryParcelable.cpp \
+    binding/SharedRegionParcelable.cpp
 
 LOCAL_CFLAGS += -Wno-unused-parameter -Wall -Werror
 
@@ -96,13 +98,14 @@ LOCAL_SRC_FILES = core/AudioStream.cpp \
     client/AudioEndpoint.cpp \
     client/AudioStreamInternal.cpp \
     client/IsochronousClockModel.cpp \
-    binding/SharedMemoryParcelable.cpp \
-    binding/SharedRegionParcelable.cpp \
-    binding/RingBufferParcelable.cpp \
     binding/AudioEndpointParcelable.cpp \
+    binding/AAudioBinderClient.cpp \
     binding/AAudioStreamRequest.cpp \
     binding/AAudioStreamConfiguration.cpp \
-    binding/IAAudioService.cpp
+    binding/IAAudioService.cpp \
+    binding/RingBufferParcelable.cpp \
+    binding/SharedMemoryParcelable.cpp \
+    binding/SharedRegionParcelable.cpp
 
 LOCAL_CFLAGS += -Wno-unused-parameter -Wall -Werror
 

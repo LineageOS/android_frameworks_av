@@ -39,7 +39,7 @@ extern "C" {
  * and would accept whatever it was given.
  */
 #define AAUDIO_UNSPECIFIED           0
-#define AAUDIO_DEVICE_UNSPECIFIED    ((int32_t) -1)
+#define AAUDIO_DEVICE_UNSPECIFIED    0
 
 enum {
     AAUDIO_DIRECTION_OUTPUT,
@@ -82,9 +82,10 @@ enum {
     AAUDIO_ERROR_NULL,
     AAUDIO_ERROR_TIMEOUT,
     AAUDIO_ERROR_WOULD_BLOCK,
-    AAUDIO_ERROR_INVALID_ORDER,
+    AAUDIO_ERROR_INVALID_FORMAT,
     AAUDIO_ERROR_OUT_OF_RANGE,
-    AAUDIO_ERROR_NO_SERVICE
+    AAUDIO_ERROR_NO_SERVICE,
+    AAUDIO_ERROR_INVALID_RATE
 };
 typedef int32_t  aaudio_result_t;
 
@@ -103,8 +104,10 @@ enum
     AAUDIO_STREAM_STATE_STOPPED,
     AAUDIO_STREAM_STATE_CLOSING,
     AAUDIO_STREAM_STATE_CLOSED,
+    AAUDIO_STREAM_STATE_DISCONNECTED
 };
 typedef int32_t aaudio_stream_state_t;
+
 
 enum {
     /**

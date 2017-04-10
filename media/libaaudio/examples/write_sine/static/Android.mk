@@ -6,7 +6,7 @@ LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils) \
     frameworks/av/media/libaaudio/include
 
-# TODO reorganize folders to avoid using ../
+# NDK recommends using this kind of relative path instead of an absolute path.
 LOCAL_SRC_FILES:= ../src/write_sine.cpp
 
 LOCAL_SHARED_LIBRARIES := libaudioutils libmedia \

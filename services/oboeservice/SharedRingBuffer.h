@@ -22,8 +22,8 @@
 #include <sys/mman.h>
 
 #include "fifo/FifoBuffer.h"
-#include "RingBufferParcelable.h"
-#include "AudioEndpointParcelable.h"
+#include "binding/RingBufferParcelable.h"
+#include "binding/AudioEndpointParcelable.h"
 
 namespace aaudio {
 
@@ -41,22 +41,22 @@ public:
 
     virtual ~SharedRingBuffer();
 
-    aaudio_result_t allocate(fifo_frames_t bytesPerFrame, fifo_frames_t capacityInFrames);
+    aaudio_result_t allocate(android::fifo_frames_t bytesPerFrame, android::fifo_frames_t capacityInFrames);
 
     void fillParcelable(AudioEndpointParcelable &endpointParcelable,
                         RingBufferParcelable &ringBufferParcelable);
 
-    FifoBuffer * getFifoBuffer() {
+    android::FifoBuffer * getFifoBuffer() {
         return mFifoBuffer;
     }
 
 private:
-    int            mFileDescriptor = -1;
-    FifoBuffer   * mFifoBuffer = nullptr;
-    uint8_t      * mSharedMemory = nullptr;
-    int32_t        mSharedMemorySizeInBytes = 0;
-    int32_t        mDataMemorySizeInBytes = 0;
-    fifo_frames_t  mCapacityInFrames = 0;
+    int                    mFileDescriptor = -1;
+    android::FifoBuffer   *mFifoBuffer = nullptr;
+    uint8_t               *mSharedMemory = nullptr;
+    int32_t                mSharedMemorySizeInBytes = 0;
+    int32_t                mDataMemorySizeInBytes = 0;
+    android::fifo_frames_t mCapacityInFrames = 0;
 };
 
 } /* namespace aaudio */

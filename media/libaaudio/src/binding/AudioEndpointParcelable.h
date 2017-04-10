@@ -57,6 +57,8 @@ public:
 
     aaudio_result_t validate();
 
+    aaudio_result_t close();
+
     void dump();
 
 public: // TODO add getters

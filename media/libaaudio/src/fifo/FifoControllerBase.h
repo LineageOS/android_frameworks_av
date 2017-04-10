@@ -19,6 +19,8 @@
 
 #include <stdint.h>
 
+namespace android {
+
 typedef int64_t fifo_counter_t;
 typedef int32_t fifo_frames_t;
 
@@ -117,5 +119,7 @@ private:
     fifo_frames_t mCapacity;
     fifo_frames_t mThreshold;
 };
+
+}  // android
 
 #endif // FIFO_FIFO_CONTROLLER_BASE_H

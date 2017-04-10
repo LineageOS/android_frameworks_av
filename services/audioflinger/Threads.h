@@ -1528,7 +1528,7 @@ class MmapThread : public ThreadBase
                 audio_session_t         mSessionId;
                 audio_port_handle_t     mPortId;
 
-                sp<MmapStreamCallback>  mCallback;
+                wp<MmapStreamCallback>  mCallback;
                 sp<StreamHalInterface>  mHalStream;
                 sp<DeviceHalInterface>  mHalDevice;
                 AudioHwDevice* const    mAudioHwDev;
