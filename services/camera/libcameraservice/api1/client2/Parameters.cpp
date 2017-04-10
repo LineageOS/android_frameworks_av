@@ -838,30 +838,37 @@ status_t Parameters::initialize(const CameraMetadata *info, int deviceVersion) {
             "(0,0,0,0,0)");
 
     zoom = 0;
-    params.set(CameraParameters::KEY_ZOOM, zoom);
-    params.set(CameraParameters::KEY_MAX_ZOOM, NUM_ZOOM_STEPS - 1);
-
+    zoomAvailable = false;
     camera_metadata_ro_entry_t maxDigitalZoom =
         staticInfo(ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM, /*minCount*/1, /*maxCount*/1);
     if (!maxDigitalZoom.count) return NO_INIT;
 
-    {
-        String8 zoomRatios;
-        float zoom = 1.f;
-        float zoomIncrement = (maxDigitalZoom.data.f[0] - zoom) /
-                (NUM_ZOOM_STEPS-1);
-        bool addComma = false;
-        for (size_t i=0; i < NUM_ZOOM_STEPS; i++) {
-            if (addComma) zoomRatios += ",";
-            addComma = true;
-            zoomRatios += String8::format("%d", static_cast<int>(zoom * 100));
-            zoom += zoomIncrement;
-        }
-        params.set(CameraParameters::KEY_ZOOM_RATIOS, zoomRatios);
-    }
+    if (fabs(maxDigitalZoom.data.f[0] - 1.f) > 0.00001f) {
+        params.set(CameraParameters::KEY_ZOOM, zoom);
+        params.set(CameraParameters::KEY_MAX_ZOOM, NUM_ZOOM_STEPS - 1);
 
-    params.set(CameraParameters::KEY_ZOOM_SUPPORTED,
-            CameraParameters::TRUE);
+        {
+            String8 zoomRatios;
+            float zoom = 1.f;
+            float zoomIncrement = (maxDigitalZoom.data.f[0] - zoom) /
+                    (NUM_ZOOM_STEPS-1);
+            bool addComma = false;
+            for (size_t i=0; i < NUM_ZOOM_STEPS; i++) {
+                if (addComma) zoomRatios += ",";
+                addComma = true;
+                zoomRatios += String8::format("%d", static_cast<int>(zoom * 100));
+                zoom += zoomIncrement;
+            }
+            params.set(CameraParameters::KEY_ZOOM_RATIOS, zoomRatios);
+        }
+
+        params.set(CameraParameters::KEY_ZOOM_SUPPORTED,
+                CameraParameters::TRUE);
+        zoomAvailable = true;
+    } else {
+        params.set(CameraParameters::KEY_ZOOM_SUPPORTED,
+                CameraParameters::FALSE);
+    }
     params.set(CameraParameters::KEY_SMOOTH_ZOOM_SUPPORTED,
             CameraParameters::FALSE);
 
@@ -1896,12 +1903,14 @@ status_t Parameters::set(const String8& paramString) {
     }
 
     // ZOOM
-    validatedParams.zoom = newParams.getInt(CameraParameters::KEY_ZOOM);
-    if (validatedParams.zoom < 0
-                || validatedParams.zoom >= (int)NUM_ZOOM_STEPS) {
-        ALOGE("%s: Requested zoom level %d is not supported",
-                __FUNCTION__, validatedParams.zoom);
-        return BAD_VALUE;
+    if (zoomAvailable) {
+        validatedParams.zoom = newParams.getInt(CameraParameters::KEY_ZOOM);
+        if (validatedParams.zoom < 0
+                    || validatedParams.zoom >= (int)NUM_ZOOM_STEPS) {
+            ALOGE("%s: Requested zoom level %d is not supported",
+                    __FUNCTION__, validatedParams.zoom);
+            return BAD_VALUE;
+        }
     }
 
     // VIDEO_SIZE
