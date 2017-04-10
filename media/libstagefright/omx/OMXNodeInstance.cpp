@@ -651,6 +651,12 @@ status_t OMXNodeInstance::useBuffer(
     // We do not support metadata mode changes past buffer allocation
     mSailed = true;
 
+    if (!mSailed) {
+        ALOGE("b/35467458");
+        android_errorWriteLog(0x534e4554, "35467458");
+        return BAD_VALUE;
+    }
+
     // metadata buffers are not connected cross process
     BufferMeta *buffer_meta;
     bool isMeta = mUsingMetadata[portIndex];
@@ -915,6 +921,12 @@ status_t OMXNodeInstance::allocateBuffer(
     // We do not support metadata mode changes past buffer allocation
     mSailed = true;
 
+    if (!mSailed) {
+        ALOGE("b/35467458");
+        android_errorWriteLog(0x534e4554, "35467458");
+        return BAD_VALUE;
+    }
+
     BufferMeta *buffer_meta = new BufferMeta(size, portIndex);
 
     OMX_BUFFERHEADERTYPE *header;
@@ -957,6 +969,12 @@ status_t OMXNodeInstance::allocateBufferWithBackup(
     }
     // We do not support metadata mode changes past buffer allocation
     mSailed = true;
+
+    if (!mSailed) {
+        ALOGE("b/35467458");
+        android_errorWriteLog(0x534e4554, "35467458");
+        return BAD_VALUE;
+    }
 
     // metadata buffers are not connected cross process
     bool isMeta = mUsingMetadata[portIndex];
