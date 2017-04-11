@@ -21,7 +21,7 @@ ndk_headers {
 }
 
 ndk_library {
-    name: "libaaudio.ndk",
+    name: "libaaudio",
     symbol_file: "libaaudio.map.txt",
     first_version: "26",
     unversioned_until: "current",
