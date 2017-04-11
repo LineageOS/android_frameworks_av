@@ -352,12 +352,12 @@ TEST(CameraProviderManagerTest, MultipleVendorTagTest) {
     metadataCopy.update(ANDROID_CONTROL_SCENE_MODE, &sceneMode, 1);
     // However appending from same vendor tag provider should be fine
     ASSERT_EQ(OK, metadata.append(secondMetadata));
-    // Append from a metadata without vendor tag provider should not be supported
+    // Append from a metadata without vendor tag provider should be supported
     CameraMetadata regularMetadata(10, 20);
     uint8_t controlMode = ANDROID_CONTROL_MODE_AUTO;
     regularMetadata.update(ANDROID_CONTROL_MODE, &controlMode, 1);
-    ASSERT_NE(OK, secondMetadata.append(regularMetadata));
-    ASSERT_EQ(1u, secondMetadata.entryCount());
+    ASSERT_EQ(OK, secondMetadata.append(regularMetadata));
+    ASSERT_EQ(2u, secondMetadata.entryCount());
     ASSERT_EQ(2u, metadata.entryCount());
 
     // Dump
