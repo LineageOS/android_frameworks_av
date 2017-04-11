@@ -1033,6 +1033,11 @@ status_t OMXNodeInstance::useBuffer(
     }
 
     Mutex::Autolock autoLock(mLock);
+    if (!mSailed) {
+        ALOGE("b/35467458");
+        android_errorWriteLog(0x534e4554, "35467458");
+        return BAD_VALUE;
+    }
 
     switch (omxBuffer.mBufferType) {
         case OMXBuffer::kBufferTypePreset:
@@ -1470,6 +1475,11 @@ status_t OMXNodeInstance::allocateSecureBuffer(
 
     Mutex::Autolock autoLock(mLock);
 
+    if (!mSailed) {
+        ALOGE("b/35467458");
+        android_errorWriteLog(0x534e4554, "35467458");
+        return BAD_VALUE;
+    }
     BufferMeta *buffer_meta = new BufferMeta(portIndex);
 
     OMX_BUFFERHEADERTYPE *header;
