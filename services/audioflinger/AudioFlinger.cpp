@@ -117,6 +117,22 @@ static const nsecs_t kMinGlobalEffectEnabletimeNs = seconds(7200);
 Mutex gLock;
 wp<AudioFlinger> gAudioFlinger;
 
+// Keep a strong reference to media.log service around forever.
+// The service is within our parent process so it can never die in a way that we could observe.
+// These two variables are const after initialization.
+static sp<IBinder> sMediaLogServiceAsBinder;
+static sp<IMediaLogService> sMediaLogService;
+
+static pthread_once_t sMediaLogOnce = PTHREAD_ONCE_INIT;
+
+static void sMediaLogInit()
+{
+    sMediaLogServiceAsBinder = defaultServiceManager()->getService(String16("media.log"));
+    if (sMediaLogServiceAsBinder != 0) {
+        sMediaLogService = interface_cast<IMediaLogService>(sMediaLogServiceAsBinder);
+    }
+}
+
 // ----------------------------------------------------------------------------
 
 std::string formatToString(audio_format_t format) {
@@ -154,6 +170,7 @@ AudioFlinger::AudioFlinger()
     if (doLog) {
         mLogMemoryDealer = new MemoryDealer(kLogMemorySize, "LogWriters",
                 MemoryHeapBase::READ_ONLY);
+        (void) pthread_once(&sMediaLogOnce, sMediaLogInit);
     }
 
     // reset battery stats.
@@ -230,15 +247,11 @@ AudioFlinger::~AudioFlinger()
     }
 
     // Tell media.log service about any old writers that still need to be unregistered
-    if (mLogMemoryDealer != 0) {
-        sp<IBinder> binder = defaultServiceManager()->getService(String16("media.log"));
-        if (binder != 0) {
-            sp<IMediaLogService> mediaLogService(interface_cast<IMediaLogService>(binder));
-            for (size_t count = mUnregisteredWriters.size(); count > 0; count--) {
-                sp<IMemory> iMemory(mUnregisteredWriters.top()->getIMemory());
-                mUnregisteredWriters.pop();
-                mediaLogService->unregisterWriter(iMemory);
-            }
+    if (sMediaLogService != 0) {
+        for (size_t count = mUnregisteredWriters.size(); count > 0; count--) {
+            sp<IMemory> iMemory(mUnregisteredWriters.top()->getIMemory());
+            mUnregisteredWriters.pop();
+            sMediaLogService->unregisterWriter(iMemory);
         }
     }
 }
@@ -519,13 +532,10 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
 
         // append a copy of media.log here by forwarding fd to it, but don't attempt
         // to lookup the service if it's not running, as it will block for a second
-        if (mLogMemoryDealer != 0) {
-            sp<IBinder> binder = defaultServiceManager()->getService(String16("media.log"));
-            if (binder != 0) {
-                dprintf(fd, "\nmedia.log:\n");
-                Vector<String16> args;
-                binder->dump(fd, args);
-            }
+        if (sMediaLogServiceAsBinder != 0) {
+            dprintf(fd, "\nmedia.log:\n");
+            Vector<String16> args;
+            sMediaLogServiceAsBinder->dump(fd, args);
         }
 
         // check for optional arguments
@@ -570,16 +580,11 @@ sp<AudioFlinger::Client> AudioFlinger::registerPid(pid_t pid)
 
 sp<NBLog::Writer> AudioFlinger::newWriter_l(size_t size, const char *name)
 {
-    // If there is no memory allocated for logs, return a dummy writer that does nothing
-    if (mLogMemoryDealer == 0) {
+    // If there is no memory allocated for logs, return a dummy writer that does nothing.
+    // Similarly if we can't contact the media.log service, also return a dummy writer.
+    if (mLogMemoryDealer == 0 || sMediaLogService == 0) {
         return new NBLog::Writer();
     }
-    sp<IBinder> binder = defaultServiceManager()->getService(String16("media.log"));
-    // Similarly if we can't contact the media.log service, also return a dummy writer
-    if (binder == 0) {
-        return new NBLog::Writer();
-    }
-    sp<IMediaLogService> mediaLogService(interface_cast<IMediaLogService>(binder));
     sp<IMemory> shared = mLogMemoryDealer->allocate(NBLog::Timeline::sharedSize(size));
     // If allocation fails, consult the vector of previously unregistered writers
     // and garbage-collect one or more them until an allocation succeeds
@@ -590,7 +595,7 @@ sp<NBLog::Writer> AudioFlinger::newWriter_l(size_t size, const char *name)
                 // Pick the oldest stale writer to garbage-collect
                 sp<IMemory> iMemory(mUnregisteredWriters[0]->getIMemory());
                 mUnregisteredWriters.removeAt(0);
-                mediaLogService->unregisterWriter(iMemory);
+                sMediaLogService->unregisterWriter(iMemory);
                 // Now the media.log remote reference to IMemory is gone.  When our last local
                 // reference to IMemory also drops to zero at end of this block,
                 // the IMemory destructor will deallocate the region from mLogMemoryDealer.
@@ -609,7 +614,7 @@ success:
     NBLog::Shared *sharedRawPtr = (NBLog::Shared *) shared->pointer();
     new((void *) sharedRawPtr) NBLog::Shared(); // placement new here, but the corresponding
                                                 // explicit destructor not needed since it is POD
-    mediaLogService->registerWriter(shared, size, name);
+    sMediaLogService->registerWriter(shared, size, name);
     return new NBLog::Writer(shared, size);
 }
 
@@ -1544,6 +1549,10 @@ void AudioFlinger::MediaLogNotifier::requestMerge() {
 }
 
 bool AudioFlinger::MediaLogNotifier::threadLoop() {
+    // Should already have been checked, but just in case
+    if (sMediaLogService == 0) {
+        return false;
+    }
     // Wait until there are pending requests
     {
         AutoMutex _l(mMutex);
@@ -1555,11 +1564,7 @@ bool AudioFlinger::MediaLogNotifier::threadLoop() {
         mPendingRequests = false;
     }
     // Execute the actual MediaLogService binder call and ignore extra requests for a while
-    sp<IBinder> binder = defaultServiceManager()->getService(String16("media.log"));
-    if (binder != 0) {
-        sp<IMediaLogService> mediaLogService(interface_cast<IMediaLogService>(binder));
-        mediaLogService->requestMergeWakeup();
-    }
+    sMediaLogService->requestMergeWakeup();
     usleep(kPostTriggerSleepPeriod);
     return true;
 }
