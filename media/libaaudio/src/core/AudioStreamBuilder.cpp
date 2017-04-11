@@ -44,6 +44,7 @@ AudioStreamBuilder::~AudioStreamBuilder() {
 aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     AudioStream* audioStream = nullptr;
     const aaudio_sharing_mode_t sharingMode = getSharingMode();
+    ALOGE("AudioStreamBuilder.build() sharingMode = %d", sharingMode);
     switch (getDirection()) {
     case AAUDIO_DIRECTION_INPUT:
         switch (sharingMode) {

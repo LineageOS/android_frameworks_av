@@ -79,7 +79,7 @@ private:
         }
     }
 
-    double mAmplitude = 0.01;
+    double mAmplitude = 0.05;  // unitless scaler
     double mPhase = 0.0;
     double mPhaseIncrement = 440 * M_PI * 2 / 48000;
     double mFrameRate = 48000;

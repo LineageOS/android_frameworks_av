@@ -22,7 +22,6 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
-#include <aaudio/AAudioDefinitions.h>
 #include <aaudio/AAudio.h>
 #include "SineGenerator.h"
 
@@ -49,7 +48,7 @@ static void *SimpleAAudioPlayerThreadProc(void *arg);
 class SimpleAAudioPlayer {
 public:
     SimpleAAudioPlayer() {}
-    virtual ~SimpleAAudioPlayer() {
+    ~SimpleAAudioPlayer() {
         close();
     };
 
@@ -83,7 +82,7 @@ public:
 
         // Open an AAudioStream using the Builder.
         result = AAudioStreamBuilder_openStream(mBuilder, &mStream);
-        if (result != AAUDIO_OK) goto finish1;
+        if (result != AAUDIO_OK) goto error;
 
         // Check to see what kind of stream we actually got.
         mFramesPerSecond = AAudioStream_getSampleRate(mStream);
@@ -126,7 +125,7 @@ public:
         }
         return result;
 
-     finish1:
+    error:
         AAudioStreamBuilder_delete(mBuilder);
         mBuilder = nullptr;
         return result;

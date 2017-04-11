@@ -4,6 +4,9 @@ LIBAAUDIO {
     AAudio_convertStreamStateToText;
     AAudio_createStreamBuilder;
     AAudioStreamBuilder_setDeviceId;
+    AAudioStreamBuilder_setDataCallback;
+    AAudioStreamBuilder_setErrorCallback;
+    AAudioStreamBuilder_setFramesPerDataCallback;
     AAudioStreamBuilder_setSampleRate;
     AAudioStreamBuilder_setSamplesPerFrame;
     AAudioStreamBuilder_setFormat;
@@ -25,6 +28,7 @@ LIBAAUDIO {
     AAudioStream_joinThread;
     AAudioStream_setBufferSizeInFrames;
     AAudioStream_getBufferSizeInFrames;
+    AAudioStream_getFramesPerDataCallback;
     AAudioStream_getFramesPerBurst;
     AAudioStream_getBufferCapacityInFrames;
     AAudioStream_getXRunCount;

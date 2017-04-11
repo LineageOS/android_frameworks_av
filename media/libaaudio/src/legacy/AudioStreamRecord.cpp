@@ -24,14 +24,16 @@
 #include <aaudio/AAudio.h>
 
 #include "AudioClock.h"
-#include "AudioStreamRecord.h"
-#include "utility/AAudioUtilities.h"
+#include "legacy/AudioStreamLegacy.h"
+#include "legacy/AudioStreamRecord.h"
+#include "utility/FixedBlockWriter.h"
 
 using namespace android;
 using namespace aaudio;
 
 AudioStreamRecord::AudioStreamRecord()
-    : AudioStream()
+    : AudioStreamLegacy()
+    , mFixedBlockWriter(*this)
 {
 }
 
@@ -58,7 +60,6 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
                               ? 2 : getSamplesPerFrame();
     audio_channel_mask_t channelMask = audio_channel_in_mask_from_count(samplesPerFrame);
 
-    AudioRecord::callback_t callback = nullptr;
     audio_input_flags_t flags = (audio_input_flags_t) AUDIO_INPUT_FLAG_NONE;
 
     size_t frameCount = (builder.getBufferCapacity() == AAUDIO_UNSPECIFIED) ? 0
@@ -68,6 +69,17 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
             ? AUDIO_FORMAT_PCM_FLOAT
             : AAudioConvert_aaudioToAndroidDataFormat(getFormat());
 
+    // Setup the callback if there is one.
+    AudioRecord::callback_t callback = nullptr;
+    void *callbackData = nullptr;
+    AudioRecord::transfer_type streamTransferType = AudioRecord::transfer_type::TRANSFER_SYNC;
+    if (builder.getDataCallbackProc() != nullptr) {
+        streamTransferType = AudioRecord::transfer_type::TRANSFER_CALLBACK;
+        callback = getLegacyCallback();
+        callbackData = this;
+    }
+    mCallbackBufferSize = builder.getFramesPerDataCallback();
+
     mAudioRecord = new AudioRecord(
             AUDIO_SOURCE_DEFAULT,
             getSampleRate(),
@@ -76,10 +88,10 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
             mOpPackageName, // const String16& opPackageName TODO does not compile
             frameCount,
             callback,
-            nullptr, //    void* user = nullptr,
+            callbackData,
             0,    //    uint32_t notificationFrames = 0,
             AUDIO_SESSION_ALLOCATE,
-            AudioRecord::TRANSFER_DEFAULT,
+            streamTransferType,
             flags
             //   int uid = -1,
             //   pid_t pid = -1,
@@ -99,6 +111,15 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     setSamplesPerFrame(mAudioRecord->channelCount());
     setFormat(AAudioConvert_androidToAAudioDataFormat(mAudioRecord->format()));
 
+    // We may need to pass the data through a block size adapter to guarantee constant size.
+    if (mCallbackBufferSize != AAUDIO_UNSPECIFIED) {
+        int callbackSizeBytes = getBytesPerFrame() * mCallbackBufferSize;
+        mFixedBlockWriter.open(callbackSizeBytes);
+        mBlockAdapter = &mFixedBlockWriter;
+    } else {
+        mBlockAdapter = nullptr;
+    }
+
     setState(AAUDIO_STREAM_STATE_OPEN);
 
     return AAUDIO_OK;
@@ -111,7 +132,27 @@ aaudio_result_t AudioStreamRecord::close()
         mAudioRecord.clear();
         setState(AAUDIO_STREAM_STATE_CLOSED);
     }
+    mFixedBlockWriter.close();
     return AAUDIO_OK;
+}
+
+void AudioStreamRecord::processCallback(int event, void *info) {
+
+    ALOGD("AudioStreamRecord::processCallback(), event %d", event);
+    switch (event) {
+        case AudioRecord::EVENT_MORE_DATA:
+            processCallbackCommon(AAUDIO_CALLBACK_OPERATION_PROCESS_DATA, info);
+            break;
+
+            // Stream got rerouted so we disconnect.
+        case AudioRecord::EVENT_NEW_IAUDIORECORD:
+            processCallbackCommon(AAUDIO_CALLBACK_OPERATION_DISCONNECTED, info);
+            break;
+
+        default:
+            break;
+    }
+    return;
 }
 
 aaudio_result_t AudioStreamRecord::requestStart()
@@ -124,6 +165,7 @@ aaudio_result_t AudioStreamRecord::requestStart()
     if (err != OK) {
         return AAudioConvert_androidToAAudioResult(err);
     }
+
     err = mAudioRecord->start();
     if (err != OK) {
         return AAudioConvert_androidToAAudioResult(err);
@@ -151,7 +193,7 @@ aaudio_result_t AudioStreamRecord::requestStop() {
     return AAUDIO_OK;
 }
 
-aaudio_result_t AudioStreamRecord::updateState()
+aaudio_result_t AudioStreamRecord::updateStateWhileWaiting()
 {
     aaudio_result_t result = AAUDIO_OK;
     aaudio_wrapping_frames_t position;
