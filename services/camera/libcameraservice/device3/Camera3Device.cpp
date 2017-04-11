@@ -500,7 +500,7 @@ DataspaceFlags Camera3Device::mapToHidlDataspace(
     return dataSpace;
 }
 
-ConsumerUsageFlags Camera3Device::mapToConsumerUsage(
+BufferUsageFlags Camera3Device::mapToConsumerUsage(
         uint32_t usage) {
     return usage;
 }
@@ -555,12 +555,12 @@ int Camera3Device::mapToFrameworkFormat(
 }
 
 uint32_t Camera3Device::mapConsumerToFrameworkUsage(
-        ConsumerUsageFlags usage) {
+        BufferUsageFlags usage) {
     return usage;
 }
 
 uint32_t Camera3Device::mapProducerToFrameworkUsage(
-        ProducerUsageFlags usage) {
+        BufferUsageFlags usage) {
     return usage;
 }
 

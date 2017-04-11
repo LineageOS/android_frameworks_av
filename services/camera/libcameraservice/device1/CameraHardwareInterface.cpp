@@ -395,7 +395,7 @@ CameraHardwareInterface::setCrop(int32_t left, int32_t top, int32_t right, int32
 }
 
 hardware::Return<Status>
-CameraHardwareInterface::setUsage(hardware::graphics::allocator::V2_0::ProducerUsage usage) {
+CameraHardwareInterface::setUsage(hardware::graphics::common::V1_0::BufferUsage usage) {
     Status s = Status::INTERNAL_ERROR;
     ANativeWindow *a = mPreviewWindow.get();
     if (a == nullptr) {
