@@ -28,7 +28,9 @@
 
 using namespace aaudio;
 
-AudioStream::AudioStream() {
+AudioStream::AudioStream()
+        : mCallbackEnabled(false)
+{
     // mThread is a pthread_t of unknown size so we need memset.
     memset(&mThread, 0, sizeof(mThread));
     setPeriodNanoseconds(0);
@@ -36,13 +38,30 @@ AudioStream::AudioStream() {
 
 aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
 {
-    // TODO validate parameters.
+
     // Copy parameters from the Builder because the Builder may be deleted after this call.
     mSamplesPerFrame = builder.getSamplesPerFrame();
     mSampleRate = builder.getSampleRate();
     mDeviceId = builder.getDeviceId();
     mFormat = builder.getFormat();
-    mSharingMode = builder.getSharingMode();
+    mDirection = builder.getDirection();
+
+    // callbacks
+    mFramesPerDataCallback = builder.getFramesPerDataCallback();
+    mDataCallbackProc = builder.getDataCallbackProc();
+    mErrorCallbackProc = builder.getErrorCallbackProc();
+    mDataCallbackUserData = builder.getDataCallbackUserData();
+
+    // TODO validate more parameters.
+    if (mErrorCallbackProc != nullptr && mDataCallbackProc == nullptr) {
+        ALOGE("AudioStream::open(): disconnect callback cannot be used without a data callback.");
+        return AAUDIO_ERROR_UNEXPECTED_VALUE;
+    }
+    if (mDirection != AAUDIO_DIRECTION_INPUT && mDirection != AAUDIO_DIRECTION_OUTPUT) {
+        ALOGE("AudioStream::open(): illegal direction %d", mDirection);
+        return AAUDIO_ERROR_UNEXPECTED_VALUE;
+    }
+
     return AAUDIO_OK;
 }
 
@@ -75,8 +94,13 @@ aaudio_result_t AudioStream::waitForStateChange(aaudio_stream_state_t currentSta
                                                 aaudio_stream_state_t *nextState,
                                                 int64_t timeoutNanoseconds)
 {
+    aaudio_result_t result = updateStateWhileWaiting();
+    if (result != AAUDIO_OK) {
+        return result;
+    }
+
     // TODO replace this when similar functionality added to AudioTrack.cpp
-    int64_t durationNanos = 20 * AAUDIO_NANOS_PER_MILLISECOND;
+    int64_t durationNanos = 20 * AAUDIO_NANOS_PER_MILLISECOND; // arbitrary
     aaudio_stream_state_t state = getState();
     while (state == currentState && timeoutNanoseconds > 0) {
         if (durationNanos > timeoutNanoseconds) {
@@ -85,7 +109,7 @@ aaudio_result_t AudioStream::waitForStateChange(aaudio_stream_state_t currentSta
         AudioClock::sleepForNanos(durationNanos);
         timeoutNanoseconds -= durationNanos;
 
-        aaudio_result_t result = updateState();
+        aaudio_result_t result = updateStateWhileWaiting();
         if (result != AAUDIO_OK) {
             return result;
         }

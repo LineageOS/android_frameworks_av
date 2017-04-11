@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-#ifndef AAUDIO_ISOCHRONOUSCLOCKMODEL_H
-#define AAUDIO_ISOCHRONOUSCLOCKMODEL_H
+#ifndef AAUDIO_ISOCHRONOUS_CLOCK_MODEL_H
+#define AAUDIO_ISOCHRONOUS_CLOCK_MODEL_H
 
 #include <stdint.h>
-#include <aaudio/AAudio.h>
 
 namespace aaudio {
 
@@ -107,4 +106,4 @@ private:
 
 } /* namespace aaudio */
 
-#endif //AAUDIO_ISOCHRONOUSCLOCKMODEL_H
+#endif //AAUDIO_ISOCHRONOUS_CLOCK_MODEL_H

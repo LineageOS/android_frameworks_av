@@ -18,23 +18,19 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
-#include <stdint.h>
 #include <assert.h>
 
 #include <binder/IServiceManager.h>
 #include <utils/Mutex.h>
 
 #include <aaudio/AAudio.h>
+#include <utils/String16.h>
 
-#include "AudioClock.h"
-#include "AudioEndpointParcelable.h"
-#include "binding/AAudioStreamRequest.h"
-#include "binding/AAudioStreamConfiguration.h"
-#include "binding/IAAudioService.h"
+#include "utility/AudioClock.h"
+#include "AudioStreamInternal.h"
 #include "binding/AAudioServiceMessage.h"
 
 #include "core/AudioStreamBuilder.h"
-#include "AudioStreamInternal.h"
 
 #define LOG_TIMESTAMPS   0
 
@@ -50,6 +46,11 @@ static android::Mutex gServiceLock;
 static sp<IAAudioService>  gAAudioService;
 
 #define AAUDIO_SERVICE_NAME   "AAudioService"
+
+#define MIN_TIMEOUT_NANOS        (1000 * AAUDIO_NANOS_PER_MILLISECOND)
+
+// Wait at least this many times longer than the operation should take.
+#define MIN_TIMEOUT_OPERATIONS    4
 
 // Helper function to get access to the "AAudioService" service.
 // This code was modeled after frameworks/av/media/libaudioclient/AudioSystem.cpp
@@ -151,6 +152,29 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         mClockModel.setSampleRate(getSampleRate());
         mClockModel.setFramesPerBurst(mFramesPerBurst);
 
+        if (getDataCallbackProc()) {
+            mCallbackFrames = builder.getFramesPerDataCallback();
+            if (mCallbackFrames > getBufferCapacity() / 2) {
+                ALOGE("AudioStreamInternal.open(): framesPerCallback too large");
+                service->closeStream(mServiceStreamHandle);
+                return AAUDIO_ERROR_OUT_OF_RANGE;
+
+            } else if (mCallbackFrames < 0) {
+                ALOGE("AudioStreamInternal.open(): framesPerCallback negative");
+                service->closeStream(mServiceStreamHandle);
+                return AAUDIO_ERROR_OUT_OF_RANGE;
+
+            }
+            if (mCallbackFrames == AAUDIO_UNSPECIFIED) {
+                mCallbackFrames = mFramesPerBurst;
+            }
+
+            int32_t bytesPerFrame = getSamplesPerFrame()
+                                    * AAudioConvert_formatToSizeInBytes(getFormat());
+            int32_t callbackBufferSize = mCallbackFrames * bytesPerFrame;
+            mCallbackBuffer = new uint8_t[callbackBufferSize];
+        }
+
         setState(AAUDIO_STREAM_STATE_OPEN);
     }
     return result;
@@ -164,9 +188,66 @@ aaudio_result_t AudioStreamInternal::close() {
         const sp<IAAudioService>& aaudioService = getAAudioService();
         if (aaudioService == 0) return AAUDIO_ERROR_NO_SERVICE;
         aaudioService->closeStream(serviceStreamHandle);
+        delete[] mCallbackBuffer;
         return AAUDIO_OK;
     } else {
         return AAUDIO_ERROR_INVALID_HANDLE;
+    }
+}
+
+// Render audio in the application callback and then write the data to the stream.
+void *AudioStreamInternal::callbackLoop() {
+    aaudio_result_t result = AAUDIO_OK;
+    aaudio_data_callback_result_t callbackResult = AAUDIO_CALLBACK_RESULT_CONTINUE;
+    int32_t framesWritten = 0;
+    AAudioStream_dataCallback appCallback = getDataCallbackProc();
+    if (appCallback == nullptr) return NULL;
+
+    while (mCallbackEnabled.load() && isPlaying() && (result >= 0)) { // result might be a frame count
+        // Call application using the AAudio callback interface.
+        callbackResult = (*appCallback)(
+                (AAudioStream *) this,
+                getDataCallbackUserData(),
+                mCallbackBuffer,
+                mCallbackFrames);
+
+        if (callbackResult == AAUDIO_CALLBACK_RESULT_CONTINUE) {
+            // Write audio data to stream
+            int64_t timeoutNanos = calculateReasonableTimeout(mCallbackFrames);
+            result = write(mCallbackBuffer, mCallbackFrames, timeoutNanos);
+            if (result == AAUDIO_ERROR_DISCONNECTED) {
+                if (getErrorCallbackProc() != nullptr) {
+                    ALOGD("AudioStreamAAudio(): callbackLoop() stream disconnected");
+                    (*getErrorCallbackProc())(
+                            (AAudioStream *) this,
+                            getErrorCallbackUserData(),
+                            AAUDIO_OK);
+                }
+                break;
+            } else if (result != mCallbackFrames) {
+                ALOGE("AudioStreamAAudio(): callbackLoop() wrote %d / %d",
+                      framesWritten, mCallbackFrames);
+                break;
+            }
+        } else if (callbackResult == AAUDIO_CALLBACK_RESULT_STOP) {
+            ALOGD("AudioStreamAAudio(): callback returned AAUDIO_CALLBACK_RESULT_STOP");
+            break;
+        }
+    }
+
+    ALOGD("AudioStreamAAudio(): callbackLoop() exiting, result = %d, isPlaying() = %d",
+          result, (int) isPlaying());
+    return NULL; // TODO review
+}
+
+static void *aaudio_callback_thread_proc(void *context)
+{
+    AudioStreamInternal *stream = (AudioStreamInternal *)context;
+    //LOGD("AudioStreamAAudio(): oboe_callback_thread, stream = %p", stream);
+    if (stream != NULL) {
+        return stream->callbackLoop();
+    } else {
+        return NULL;
     }
 }
 
@@ -178,25 +259,69 @@ aaudio_result_t AudioStreamInternal::requestStart()
         return AAUDIO_ERROR_INVALID_STATE;
     }
     const sp<IAAudioService>& aaudioService = getAAudioService();
-    if (aaudioService == 0) return AAUDIO_ERROR_NO_SERVICE;
+    if (aaudioService == 0) {
+        return AAUDIO_ERROR_NO_SERVICE;
+    }
     startTime = AudioClock::getNanoseconds();
     mClockModel.start(startTime);
     processTimestamp(0, startTime);
     setState(AAUDIO_STREAM_STATE_STARTING);
-    return aaudioService->startStream(mServiceStreamHandle);
+    aaudio_result_t result = aaudioService->startStream(mServiceStreamHandle);
+
+    if (result == AAUDIO_OK && getDataCallbackProc() != nullptr) {
+        // Launch the callback loop thread.
+        int64_t periodNanos = mCallbackFrames
+                              * AAUDIO_NANOS_PER_SECOND
+                              / getSampleRate();
+        mCallbackEnabled.store(true);
+        result = createThread(periodNanos, aaudio_callback_thread_proc, this);
+    }
+    return result;
 }
 
-aaudio_result_t AudioStreamInternal::requestPause()
+int64_t AudioStreamInternal::calculateReasonableTimeout(int32_t framesPerOperation) {
+
+    // Wait for at least a second or some number of callbacks to join the thread.
+    int64_t timeoutNanoseconds = (MIN_TIMEOUT_OPERATIONS * framesPerOperation * AAUDIO_NANOS_PER_SECOND)
+                         / getSampleRate();
+    if (timeoutNanoseconds < MIN_TIMEOUT_NANOS) { // arbitrary number of seconds
+        timeoutNanoseconds = MIN_TIMEOUT_NANOS;
+    }
+    return timeoutNanoseconds;
+}
+
+aaudio_result_t AudioStreamInternal::stopCallback()
+{
+    if (isDataCallbackActive()) {
+        mCallbackEnabled.store(false);
+        return joinThread(NULL, calculateReasonableTimeout(mCallbackFrames));
+    } else {
+        return AAUDIO_OK;
+    }
+}
+
+aaudio_result_t AudioStreamInternal::requestPauseInternal()
 {
     ALOGD("AudioStreamInternal(): pause()");
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
         return AAUDIO_ERROR_INVALID_STATE;
     }
     const sp<IAAudioService>& aaudioService = getAAudioService();
-    if (aaudioService == 0) return AAUDIO_ERROR_NO_SERVICE;
+    if (aaudioService == 0) {
+        return AAUDIO_ERROR_NO_SERVICE;
+    }
     mClockModel.stop(AudioClock::getNanoseconds());
     setState(AAUDIO_STREAM_STATE_PAUSING);
     return aaudioService->pauseStream(mServiceStreamHandle);
+}
+
+aaudio_result_t AudioStreamInternal::requestPause()
+{
+    aaudio_result_t result = stopCallback();
+    if (result != AAUDIO_OK) {
+        return result;
+    }
+    return requestPauseInternal();
 }
 
 aaudio_result_t AudioStreamInternal::requestFlush() {
@@ -205,8 +330,10 @@ aaudio_result_t AudioStreamInternal::requestFlush() {
         return AAUDIO_ERROR_INVALID_STATE;
     }
     const sp<IAAudioService>& aaudioService = getAAudioService();
-    if (aaudioService == 0) return AAUDIO_ERROR_NO_SERVICE;
-setState(AAUDIO_STREAM_STATE_FLUSHING);
+    if (aaudioService == 0) {
+        return AAUDIO_ERROR_NO_SERVICE;
+    }
+    setState(AAUDIO_STREAM_STATE_FLUSHING);
     return aaudioService->flushStream(mServiceStreamHandle);
 }
 
@@ -260,18 +387,20 @@ aaudio_result_t AudioStreamInternal::unregisterThread() {
     return aaudioService->unregisterAudioThread(mServiceStreamHandle, gettid());
 }
 
-// TODO use aaudio_clockid_t all the way down to AudioClock
 aaudio_result_t AudioStreamInternal::getTimestamp(clockid_t clockId,
                            int64_t *framePosition,
                            int64_t *timeNanoseconds) {
-// TODO implement using real HAL
+    // TODO implement using real HAL
     int64_t time = AudioClock::getNanoseconds();
     *framePosition = mClockModel.convertTimeToPosition(time);
     *timeNanoseconds = time + (10 * AAUDIO_NANOS_PER_MILLISECOND); // Fake hardware delay
     return AAUDIO_OK;
 }
 
-aaudio_result_t AudioStreamInternal::updateState() {
+aaudio_result_t AudioStreamInternal::updateStateWhileWaiting() {
+    if (isDataCallbackActive()) {
+        return AAUDIO_OK; // state is getting updated by the callback thread read/write call
+    }
     return processCommands();
 }
 
@@ -484,43 +613,6 @@ aaudio_result_t AudioStreamInternal::writeNow(const void *buffer, int32_t numFra
 //         (unsigned long long)mAudioEndpoint.getDownDataWriteCounter());
     return framesWritten;
 }
-
-aaudio_result_t AudioStreamInternal::waitForStateChange(aaudio_stream_state_t currentState,
-                                                      aaudio_stream_state_t *nextState,
-                                                      int64_t timeoutNanoseconds)
-
-{
-    aaudio_result_t result = processCommands();
-//    ALOGD("AudioStreamInternal::waitForStateChange() - processCommands() returned %d", result);
-    if (result != AAUDIO_OK) {
-        return result;
-    }
-    // TODO replace this polling with a timed sleep on a futex on the message queue
-    int32_t durationNanos = 5 * AAUDIO_NANOS_PER_MILLISECOND;
-    aaudio_stream_state_t state = getState();
-//    ALOGD("AudioStreamInternal::waitForStateChange() - state = %d", state);
-    while (state == currentState && timeoutNanoseconds > 0) {
-        // TODO use futex from service message queue
-        if (durationNanos > timeoutNanoseconds) {
-            durationNanos = timeoutNanoseconds;
-        }
-        AudioClock::sleepForNanos(durationNanos);
-        timeoutNanoseconds -= durationNanos;
-
-        result = processCommands();
-        if (result != AAUDIO_OK) {
-            return result;
-        }
-
-        state = getState();
-//        ALOGD("AudioStreamInternal::waitForStateChange() - state = %d", state);
-    }
-    if (nextState != nullptr) {
-        *nextState = state;
-    }
-    return (state == currentState) ? AAUDIO_ERROR_TIMEOUT : AAUDIO_OK;
-}
-
 
 void AudioStreamInternal::processTimestamp(uint64_t position, int64_t time) {
     mClockModel.processTimestamp( position, time);
