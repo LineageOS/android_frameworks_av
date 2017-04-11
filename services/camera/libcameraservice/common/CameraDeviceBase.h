@@ -30,7 +30,6 @@
 #include "hardware/camera3.h"
 #include "camera/CameraMetadata.h"
 #include "camera/CaptureResult.h"
-#include "common/CameraModule.h"
 #include "gui/IGraphicBufferProducer.h"
 #include "device3/Camera3StreamInterface.h"
 #include "binder/Status.h"
@@ -55,7 +54,6 @@ class CameraDeviceBase : public virtual RefBase {
      */
     virtual const String8& getId() const = 0;
 
-    virtual status_t initialize(CameraModule *module) = 0;
     virtual status_t initialize(sp<CameraProviderManager> manager) = 0;
     virtual status_t disconnect() = 0;
 

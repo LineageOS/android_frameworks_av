@@ -82,10 +82,6 @@ CameraDeviceClient::CameraDeviceClient(const sp<CameraService>& cameraService,
     ALOGI("CameraDeviceClient %s: Opened", cameraId.string());
 }
 
-status_t CameraDeviceClient::initialize(CameraModule *module) {
-    return initializeImpl(module);
-}
-
 status_t CameraDeviceClient::initialize(sp<CameraProviderManager> manager) {
     return initializeImpl(manager);
 }
