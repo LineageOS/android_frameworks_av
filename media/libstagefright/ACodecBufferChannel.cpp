@@ -300,8 +300,10 @@ void ACodecBufferChannel::setInputBufferArray(const std::vector<BufferAndId> &ar
                 });
         size_t destinationBufferSize = maxSize;
         size_t heapSize = totalSize + destinationBufferSize;
-        mDealer = makeMemoryDealer(heapSize);
-        mDecryptDestination = mDealer->allocate(destinationBufferSize);
+        if (heapSize > 0) {
+            mDealer = makeMemoryDealer(heapSize);
+            mDecryptDestination = mDealer->allocate(destinationBufferSize);
+        }
     }
     std::vector<const BufferInfo> inputBuffers;
     for (const BufferAndId &elem : array) {
