@@ -397,6 +397,12 @@ AAUDIO_API int32_t AAudioStream_getFramesPerBurst(AAudioStream* stream)
     return audioStream->getFramesPerBurst();
 }
 
+AAUDIO_API int32_t AAudioStream_getFramesPerDataCallback(AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    return audioStream->getFramesPerDataCallback();
+}
+
 AAUDIO_API int32_t AAudioStream_getBufferCapacityInFrames(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
