@@ -17,7 +17,7 @@
 // frameworks/av/include.
 
 ndk_library {
-    name: "libcamera2ndk.ndk",
+    name: "libcamera2ndk",
     symbol_file: "libcamera2ndk.map.txt",
     first_version: "24",
     unversioned_until: "current",
