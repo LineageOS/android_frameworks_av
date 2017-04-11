@@ -67,6 +67,7 @@ LOCAL_SHARED_LIBRARIES:= \
     libmediautils \
     libcamera_client \
     libcamera_metadata \
+    libfmq \
     libgui \
     libhardware \
     libhidlbase \
@@ -79,7 +80,7 @@ LOCAL_SHARED_LIBRARIES:= \
     android.hardware.camera.device@3.2 \
     android.hidl.manager@1.0
 
-LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder libcamera_client
+LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder libcamera_client libfmq
 
 LOCAL_C_INCLUDES += \
     system/media/private/camera/include \
