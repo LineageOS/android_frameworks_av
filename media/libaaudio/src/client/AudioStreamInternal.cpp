@@ -188,6 +188,7 @@ aaudio_result_t AudioStreamInternal::close() {
     }
 }
 
+
 // Render audio in the application callback and then write the data to the stream.
 void *AudioStreamInternal::callbackLoop() {
     aaudio_result_t result = AAUDIO_OK;
