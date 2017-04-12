@@ -91,8 +91,10 @@ uint32_t AudioSession::changeActiveCount(int delta)
                 AUDIO_CONFIG_BASE_INITIALIZER;
         const audio_patch_handle_t patchHandle = (provider != NULL) ? provider->getPatchHandle() :
                 AUDIO_PATCH_HANDLE_NONE;
-        mClientInterface->onRecordingConfigurationUpdate(event, mSession, mInputSource,
-                &mConfig, &deviceConfig, patchHandle);
+        if (patchHandle != AUDIO_PATCH_HANDLE_NONE) {
+            mClientInterface->onRecordingConfigurationUpdate(event, mSession, mInputSource,
+                    &mConfig, &deviceConfig, patchHandle);
+        }
     }
 
     return mActiveCount;
@@ -126,9 +128,11 @@ void AudioSession::onSessionInfoUpdate() const
                 AUDIO_CONFIG_BASE_INITIALIZER;
         const audio_patch_handle_t patchHandle = (provider != NULL) ? provider->getPatchHandle() :
                 AUDIO_PATCH_HANDLE_NONE;
-        mClientInterface->onRecordingConfigurationUpdate(RECORD_CONFIG_EVENT_START,
-                mSession, mInputSource,
-                &mConfig, &deviceConfig, patchHandle);
+        if (patchHandle != AUDIO_PATCH_HANDLE_NONE) {
+            mClientInterface->onRecordingConfigurationUpdate(RECORD_CONFIG_EVENT_START,
+                    mSession, mInputSource,
+                    &mConfig, &deviceConfig, patchHandle);
+        }
     }
 }
 
