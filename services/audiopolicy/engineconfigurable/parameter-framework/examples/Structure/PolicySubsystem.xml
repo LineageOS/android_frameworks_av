@@ -68,7 +68,7 @@
 
         <!--#################### USAGE BEGIN ####################-->
 
-        <ComponentType Name="Usages" Description="associated to audio_stream_type_t definition,
+        <ComponentType Name="Usages" Description="associated to audio_usage_t definition,
                              identifier mapping must match the value of the enum">
             <Component Name="unknown" Type="Usage" Mapping="Amend1:Unknown,Identifier:0"/>
             <Component Name="media" Type="Usage" Mapping="Amend1:Media,Identifier:1"/>
@@ -97,6 +97,7 @@
             <Component Name="game" Type="Usage" Mapping="Amend1:BluetoothSco,Identifier:14"/>
             <Component Name="virtual_source" Type="Usage"
                                              Mapping="Amend1:VirtualSource,Identifier:15"/>
+            <Component Name="assistant" Type="Usage" Mapping="Amend1:Assistant,Identifier:16"/>
         </ComponentType>
 
         <!--#################### USAGE END ####################-->
