@@ -17,6 +17,7 @@
 #include <cstring>
 #include <unistd.h>
 
+
 #define LOG_TAG "FifoBuffer"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
@@ -25,6 +26,8 @@
 #include "FifoController.h"
 #include "FifoControllerIndirect.h"
 #include "FifoBuffer.h"
+
+using namespace android; // TODO just import names needed
 
 FifoBuffer::FifoBuffer(int32_t bytesPerFrame, fifo_frames_t capacityInFrames)
         : mFrameCapacity(capacityInFrames)
@@ -79,80 +82,102 @@ int32_t FifoBuffer::convertFramesToBytes(fifo_frames_t frames) {
     return frames * mBytesPerFrame;
 }
 
-fifo_frames_t FifoBuffer::read(void *buffer, fifo_frames_t numFrames) {
-    size_t numBytes;
-    fifo_frames_t framesAvailable = mFifo->getFullFramesAvailable();
-    fifo_frames_t framesToRead = numFrames;
-    // Is there enough data in the FIFO
-    if (framesToRead > framesAvailable) {
-        framesToRead = framesAvailable;
-    }
-    if (framesToRead == 0) {
-        return 0;
-    }
+void FifoBuffer::fillWrappingBuffer(WrappingBuffer *wrappingBuffer,
+                                    int32_t framesAvailable,
+                                    int32_t startIndex) {
+    wrappingBuffer->data[1] = nullptr;
+    wrappingBuffer->numFrames[1] = 0;
+    if (framesAvailable > 0) {
 
-    fifo_frames_t readIndex = mFifo->getReadIndex();
-    uint8_t *destination = (uint8_t *) buffer;
-    uint8_t *source = &mStorage[convertFramesToBytes(readIndex)];
-    if ((readIndex + framesToRead) > mFrameCapacity) {
-        // read in two parts, first part here
-        fifo_frames_t frames1 = mFrameCapacity - readIndex;
-        int32_t numBytes = convertFramesToBytes(frames1);
-        memcpy(destination, source, numBytes);
-        destination += numBytes;
-        // read second part
-        source = &mStorage[0];
-        fifo_frames_t frames2 = framesToRead - frames1;
-        numBytes = convertFramesToBytes(frames2);
-        memcpy(destination, source, numBytes);
+        uint8_t *source = &mStorage[convertFramesToBytes(startIndex)];
+        // Does the available data cross the end of the FIFO?
+        if ((startIndex + framesAvailable) > mFrameCapacity) {
+            wrappingBuffer->data[0] = source;
+            wrappingBuffer->numFrames[0] = mFrameCapacity - startIndex;
+            wrappingBuffer->data[1] = &mStorage[0];
+            wrappingBuffer->numFrames[1] = mFrameCapacity - startIndex;
+
+        } else {
+            wrappingBuffer->data[0] = source;
+            wrappingBuffer->numFrames[0] = framesAvailable;
+        }
     } else {
-        // just read in one shot
-        numBytes = convertFramesToBytes(framesToRead);
-        memcpy(destination, source, numBytes);
+        wrappingBuffer->data[0] = nullptr;
+        wrappingBuffer->numFrames[0] = 0;
     }
-    mFifo->advanceReadIndex(framesToRead);
 
-    return framesToRead;
 }
 
-fifo_frames_t FifoBuffer::write(const void *buffer, fifo_frames_t framesToWrite) {
+void FifoBuffer::getFullDataAvailable(WrappingBuffer *wrappingBuffer) {
+    fifo_frames_t framesAvailable = mFifo->getFullFramesAvailable();
+    fifo_frames_t startIndex = mFifo->getReadIndex();
+    fillWrappingBuffer(wrappingBuffer, framesAvailable, startIndex);
+}
+
+void FifoBuffer::getEmptyRoomAvailable(WrappingBuffer *wrappingBuffer) {
     fifo_frames_t framesAvailable = mFifo->getEmptyFramesAvailable();
-//    ALOGD("FifoBuffer::write() framesToWrite = %d, framesAvailable = %d",
-//         framesToWrite, framesAvailable);
-    if (framesToWrite > framesAvailable) {
-        framesToWrite = framesAvailable;
-    }
-    if (framesToWrite <= 0) {
-        return 0;
-    }
+    fifo_frames_t startIndex = mFifo->getWriteIndex();
+    fillWrappingBuffer(wrappingBuffer, framesAvailable, startIndex);
+}
 
-    size_t numBytes;
-    fifo_frames_t writeIndex = mFifo->getWriteIndex();
-    int byteIndex = convertFramesToBytes(writeIndex);
-    const uint8_t *source = (const uint8_t *) buffer;
-    uint8_t *destination = &mStorage[byteIndex];
-    if ((writeIndex + framesToWrite) > mFrameCapacity) {
-        // write in two parts, first part here
-        fifo_frames_t frames1 = mFrameCapacity - writeIndex;
-        numBytes = convertFramesToBytes(frames1);
-        memcpy(destination, source, numBytes);
-//        ALOGD("FifoBuffer::write(%p to %p, numBytes = %d", source, destination, numBytes);
-        // read second part
-        source += convertFramesToBytes(frames1);
-        destination = &mStorage[0];
-        fifo_frames_t framesLeft = framesToWrite - frames1;
-        numBytes = convertFramesToBytes(framesLeft);
-//        ALOGD("FifoBuffer::write(%p to %p, numBytes = %d", source, destination, numBytes);
-        memcpy(destination, source, numBytes);
-    } else {
-        // just write in one shot
-        numBytes = convertFramesToBytes(framesToWrite);
-//        ALOGD("FifoBuffer::write(%p to %p, numBytes = %d", source, destination, numBytes);
-        memcpy(destination, source, numBytes);
-    }
-    mFifo->advanceWriteIndex(framesToWrite);
+fifo_frames_t FifoBuffer::read(void *buffer, fifo_frames_t numFrames) {
+    WrappingBuffer wrappingBuffer;
+    uint8_t *destination = (uint8_t *) buffer;
+    fifo_frames_t framesLeft = numFrames;
 
-    return framesToWrite;
+    getFullDataAvailable(&wrappingBuffer);
+
+    // Read data in one or two parts.
+    int partIndex = 0;
+    while (framesLeft > 0 && partIndex < WrappingBuffer::SIZE) {
+        fifo_frames_t framesToRead = framesLeft;
+        fifo_frames_t framesAvailable = wrappingBuffer.numFrames[partIndex];
+        //ALOGD("FifoProcessor::read() framesAvailable = %d, partIndex = %d",
+        //      framesAvailable, partIndex);
+        if (framesAvailable > 0) {
+            if (framesToRead > framesAvailable) {
+                framesToRead = framesAvailable;
+            }
+            int32_t numBytes = convertFramesToBytes(framesToRead);
+            memcpy(destination, wrappingBuffer.data[partIndex], numBytes);
+
+            destination += numBytes;
+            framesLeft -= framesToRead;
+        }
+        partIndex++;
+    }
+    fifo_frames_t framesRead = numFrames - framesLeft;
+    mFifo->advanceReadIndex(framesRead);
+    return framesRead;
+}
+
+fifo_frames_t FifoBuffer::write(const void *buffer, fifo_frames_t numFrames) {
+    WrappingBuffer wrappingBuffer;
+    uint8_t *source = (uint8_t *) buffer;
+    fifo_frames_t framesLeft = numFrames;
+
+    getEmptyRoomAvailable(&wrappingBuffer);
+
+    // Read data in one or two parts.
+    int partIndex = 0;
+    while (framesLeft > 0 && partIndex < WrappingBuffer::SIZE) {
+        fifo_frames_t framesToWrite = framesLeft;
+        fifo_frames_t framesAvailable = wrappingBuffer.numFrames[partIndex];
+        if (framesAvailable > 0) {
+            if (framesToWrite > framesAvailable) {
+                framesToWrite = framesAvailable;
+            }
+            int32_t numBytes = convertFramesToBytes(framesToWrite);
+            memcpy(wrappingBuffer.data[partIndex], source, numBytes);
+
+            source += numBytes;
+            framesLeft -= framesToWrite;
+        }
+        partIndex++;
+    }
+    fifo_frames_t framesWritten = numFrames - framesLeft;
+    mFifo->advanceWriteIndex(framesWritten);
+    return framesWritten;
 }
 
 fifo_frames_t FifoBuffer::readNow(void *buffer, fifo_frames_t numFrames) {

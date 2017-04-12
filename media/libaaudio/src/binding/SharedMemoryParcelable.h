@@ -49,7 +49,13 @@ public:
 
     virtual status_t readFromParcel(const Parcel* parcel) override;
 
+    // mmap() shared memory
     aaudio_result_t resolve(int32_t offsetInBytes, int32_t sizeInBytes, void **regionAddressPtr);
+
+    // munmap() any mapped memory
+    aaudio_result_t close();
+
+    bool isFileDescriptorSafe();
 
     int32_t getSizeInBytes();
 

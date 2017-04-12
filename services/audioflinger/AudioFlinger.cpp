@@ -2138,7 +2138,7 @@ status_t AudioFlinger::closeOutput_nonvirtual(audio_io_handle_t output)
                 return BAD_VALUE;
             }
             mMmapThreads.removeItem(output);
-            ALOGV("closing mmapThread %p", mmapThread.get());
+            ALOGD("closing mmapThread %p", mmapThread.get());
         }
         const sp<AudioIoDescriptor> ioDesc = new AudioIoDescriptor();
         ioDesc->mIoHandle = output;
@@ -2153,7 +2153,7 @@ status_t AudioFlinger::closeOutput_nonvirtual(audio_io_handle_t output)
             closeOutputFinish(playbackThread);
         }
     } else if (mmapThread != 0) {
-        ALOGV("mmapThread exit()");
+        ALOGD("mmapThread exit()");
         mmapThread->exit();
         AudioStreamOut *out = mmapThread->clearOutput();
         ALOG_ASSERT(out != NULL, "out shouldn't be NULL");

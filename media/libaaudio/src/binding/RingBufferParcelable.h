@@ -55,6 +55,8 @@ public:
 
     void setCapacityInFrames(int32_t capacityInFrames);
 
+    bool isFileDescriptorSafe(SharedMemoryParcelable *memoryParcels);
+
     /**
      * The read and write must be symmetric.
      */

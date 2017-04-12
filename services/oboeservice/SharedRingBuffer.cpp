@@ -18,11 +18,8 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
-#include "AudioClock.h"
-#include "AudioEndpointParcelable.h"
-
-//#include "AAudioServiceStreamBase.h"
-//#include "AAudioServiceStreamFakeHal.h"
+#include "binding/RingBufferParcelable.h"
+#include "binding/AudioEndpointParcelable.h"
 
 #include "SharedRingBuffer.h"
 

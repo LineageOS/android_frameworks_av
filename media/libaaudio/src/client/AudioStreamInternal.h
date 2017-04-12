@@ -26,6 +26,8 @@
 #include "client/AudioEndpoint.h"
 #include "core/AudioStream.h"
 
+#include "binding/AAudioServiceInterface.h"
+
 using android::sp;
 using android::IAAudioService;
 
@@ -35,52 +37,54 @@ namespace aaudio {
 class AudioStreamInternal : public AudioStream {
 
 public:
-    AudioStreamInternal();
+    AudioStreamInternal(AAudioServiceInterface  &serviceInterface, bool inService = false);
     virtual ~AudioStreamInternal();
 
     // =========== Begin ABSTRACT methods ===========================
-    virtual aaudio_result_t requestStart() override;
+    aaudio_result_t requestStart() override;
 
-    virtual aaudio_result_t requestPause() override;
+    aaudio_result_t requestPause() override;
 
-    virtual aaudio_result_t requestFlush() override;
+    aaudio_result_t requestFlush() override;
 
-    virtual aaudio_result_t requestStop() override;
+    aaudio_result_t requestStop() override;
 
     // TODO use aaudio_clockid_t all the way down to AudioClock
-    virtual aaudio_result_t getTimestamp(clockid_t clockId,
+    aaudio_result_t getTimestamp(clockid_t clockId,
                                        int64_t *framePosition,
                                        int64_t *timeNanoseconds) override;
 
 
+
     virtual aaudio_result_t updateStateWhileWaiting() override;
+
     // =========== End ABSTRACT methods ===========================
 
-    virtual aaudio_result_t open(const AudioStreamBuilder &builder) override;
+    aaudio_result_t open(const AudioStreamBuilder &builder) override;
 
-    virtual aaudio_result_t close() override;
+    aaudio_result_t close() override;
 
-    virtual aaudio_result_t write(const void *buffer,
+    aaudio_result_t write(const void *buffer,
                              int32_t numFrames,
                              int64_t timeoutNanoseconds) override;
 
-    virtual aaudio_result_t setBufferSize(int32_t requestedFrames) override;
+    aaudio_result_t setBufferSize(int32_t requestedFrames) override;
 
-    virtual int32_t getBufferSize() const override;
+    int32_t getBufferSize() const override;
 
-    virtual int32_t getBufferCapacity() const override;
+    int32_t getBufferCapacity() const override;
 
-    virtual int32_t getFramesPerBurst() const override;
+    int32_t getFramesPerBurst() const override;
 
-    virtual int64_t getFramesRead() override;
+    int64_t getFramesRead() override;
 
-    virtual int32_t getXRunCount() const override {
+    int32_t getXRunCount() const override {
         return mXRunCount;
     }
 
-    virtual aaudio_result_t registerThread() override;
+    aaudio_result_t registerThread() override;
 
-    virtual aaudio_result_t unregisterThread() override;
+    aaudio_result_t unregisterThread() override;
 
     // Called internally from 'C'
     void *callbackLoop();
@@ -100,10 +104,10 @@ protected:
  *
  * @return the number of frames written or a negative error code.
  */
-    virtual aaudio_result_t writeNow(const void *buffer,
-                                int32_t numFrames,
-                                int64_t currentTimeNanos,
-                                int64_t *wakeTimePtr);
+    aaudio_result_t writeNow(const void *buffer,
+                                     int32_t numFrames,
+                                     int64_t currentTimeNanos,
+                                     int64_t *wakeTimePtr);
 
     void onFlushFromServer();
 
@@ -115,19 +119,41 @@ protected:
     int64_t calculateReasonableTimeout(int32_t framesPerOperation);
 
 private:
-    IsochronousClockModel    mClockModel;
-    AudioEndpoint            mAudioEndpoint;
-    aaudio_handle_t          mServiceStreamHandle;
-    EndpointDescriptor       mEndpointDescriptor;
+    /*
+     * Asynchronous write with data conversion.
+     * @param buffer
+     * @param numFrames
+     * @return fdrames written or negative error
+     */
+    aaudio_result_t writeNowWithConversion(const void *buffer,
+                                     int32_t numFrames);
+    void processTimestamp(uint64_t position, int64_t time);
+
+    // Adjust timing model based on timestamp from service.
+
+    IsochronousClockModel    mClockModel;      // timing model for chasing the HAL
+    AudioEndpoint            mAudioEndpoint;   // sink for writes
+    aaudio_handle_t          mServiceStreamHandle; // opaque handle returned from service
+
+    AudioEndpointParcelable  mEndPointParcelable; // description of the buffers filled by service
+    EndpointDescriptor       mEndpointDescriptor; // buffer description with resolved addresses
+
+    aaudio_audio_format_t    mDeviceFormat = AAUDIO_FORMAT_UNSPECIFIED;
+
     uint8_t                 *mCallbackBuffer = nullptr;
     int32_t                  mCallbackFrames = 0;
 
     // Offset from underlying frame position.
-    int64_t                  mFramesOffsetFromService = 0;
-    int64_t                  mLastFramesRead = 0;
-    int32_t                  mFramesPerBurst;
-    int32_t                  mXRunCount = 0;
-    void processTimestamp(uint64_t position, int64_t time);
+    int64_t                  mFramesOffsetFromService = 0; // offset for timestamps
+    int64_t                  mLastFramesRead = 0; // used to prevent retrograde motion
+    int32_t                  mFramesPerBurst;     // frames per HAL transfer
+    int32_t                  mXRunCount = 0;      // how many underrun events?
+    float                    mVolume = 1.0;       // volume that the server told us to use
+
+    AAudioServiceInterface  &mServiceInterface;   // abstract interface to the service
+
+    // The service uses this for SHARED mode.
+    bool                     mInService = false;  // Are running in the client or the service?
 };
 
 } /* namespace aaudio */

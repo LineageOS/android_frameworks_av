@@ -21,14 +21,17 @@
 #include <pthread.h>
 
 #include <aaudio/AAudioDefinitions.h>
+#include <utility/AAudioUtilities.h>
 
 #include "AAudioThread.h"
 
 using namespace aaudio;
 
 
-AAudioThread::AAudioThread() {
-    // mThread is a pthread_t of unknown size so we need memset.
+AAudioThread::AAudioThread()
+    : mRunnable(nullptr)
+    , mHasThread(false) {
+    // mThread is a pthread_t of unknown size so we need memset().
     memset(&mThread, 0, sizeof(mThread));
 }
 
@@ -50,14 +53,16 @@ static void * AAudioThread_internalThreadProc(void *arg) {
 
 aaudio_result_t AAudioThread::start(Runnable *runnable) {
     if (mHasThread) {
+        ALOGE("AAudioThread::start() - mHasThread.load() already true");
         return AAUDIO_ERROR_INVALID_STATE;
     }
-    mRunnable = runnable; // TODO use atomic?
+    // mRunnable will be read by the new thread when it starts.
+    // pthread_create() forces a memory synchronization so mRunnable does not need to be atomic.
+    mRunnable = runnable;
     int err = pthread_create(&mThread, nullptr, AAudioThread_internalThreadProc, this);
     if (err != 0) {
-        ALOGE("AAudioThread::pthread_create() returned %d", err);
-        // TODO convert errno to aaudio_result_t
-        return AAUDIO_ERROR_INTERNAL;
+        ALOGE("AAudioThread::start() - pthread_create() returned %d %s", err, strerror(err));
+        return AAudioConvert_androidToAAudioResult(-err);
     } else {
         mHasThread = true;
         return AAUDIO_OK;
@@ -70,7 +75,11 @@ aaudio_result_t AAudioThread::stop() {
     }
     int err = pthread_join(mThread, nullptr);
     mHasThread = false;
-    // TODO convert errno to aaudio_result_t
-    return err ? AAUDIO_ERROR_INTERNAL : AAUDIO_OK;
+    if (err != 0) {
+        ALOGE("AAudioThread::stop() - pthread_join() returned %d %s", err, strerror(err));
+        return AAudioConvert_androidToAAudioResult(-err);
+    } else {
+        return AAUDIO_OK;
+    }
 }
 

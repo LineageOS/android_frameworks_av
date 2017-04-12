@@ -49,10 +49,13 @@ using namespace aaudio;
 AAUDIO_API const char * AAudio_convertResultToText(aaudio_result_t returnCode) {
     switch (returnCode) {
         AAUDIO_CASE_ENUM(AAUDIO_OK);
+        AAUDIO_CASE_ENUM(AAUDIO_ERROR_DISCONNECTED);
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_ILLEGAL_ARGUMENT);
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_INCOMPATIBLE);
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_INTERNAL);
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_INVALID_STATE);
+        AAUDIO_CASE_ENUM(AAUDIO_ERROR_UNEXPECTED_STATE);
+        AAUDIO_CASE_ENUM(AAUDIO_ERROR_UNEXPECTED_VALUE);
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_INVALID_HANDLE);
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_INVALID_QUERY);
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_UNIMPLEMENTED);
@@ -62,9 +65,10 @@ AAUDIO_API const char * AAudio_convertResultToText(aaudio_result_t returnCode) {
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_NULL);
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_TIMEOUT);
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_WOULD_BLOCK);
-        AAUDIO_CASE_ENUM(AAUDIO_ERROR_INVALID_ORDER);
+        AAUDIO_CASE_ENUM(AAUDIO_ERROR_INVALID_FORMAT);
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_OUT_OF_RANGE);
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_NO_SERVICE);
+        AAUDIO_CASE_ENUM(AAUDIO_ERROR_INVALID_RATE);
     }
     return "Unrecognized AAudio error.";
 }
@@ -82,6 +86,7 @@ AAUDIO_API const char * AAudio_convertStreamStateToText(aaudio_stream_state_t st
         AAUDIO_CASE_ENUM(AAUDIO_STREAM_STATE_FLUSHED);
         AAUDIO_CASE_ENUM(AAUDIO_STREAM_STATE_STOPPING);
         AAUDIO_CASE_ENUM(AAUDIO_STREAM_STATE_STOPPED);
+        AAUDIO_CASE_ENUM(AAUDIO_STREAM_STATE_DISCONNECTED);
         AAUDIO_CASE_ENUM(AAUDIO_STREAM_STATE_CLOSING);
         AAUDIO_CASE_ENUM(AAUDIO_STREAM_STATE_CLOSED);
     }
@@ -102,7 +107,6 @@ static AudioStreamBuilder *convertAAudioBuilderToStreamBuilder(AAudioStreamBuild
 
 AAUDIO_API aaudio_result_t AAudio_createStreamBuilder(AAudioStreamBuilder** builder)
 {
-    ALOGD("AAudio_createStreamBuilder(): check sHandleTracker.isInitialized ()");
     AudioStreamBuilder *audioStreamBuilder =  new AudioStreamBuilder();
     if (audioStreamBuilder == nullptr) {
         return AAUDIO_ERROR_NO_MEMORY;

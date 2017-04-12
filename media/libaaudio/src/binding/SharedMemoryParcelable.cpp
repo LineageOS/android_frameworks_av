@@ -14,12 +14,18 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "AAudio"
+//#define LOG_NDEBUG 0
+#include <utils/Log.h>
+
 #include <stdint.h>
+#include <stdio.h>
 
 #include <sys/mman.h>
 #include <aaudio/AAudioDefinitions.h>
 
 #include <binder/Parcelable.h>
+#include <utility/AAudioUtilities.h>
 
 #include "binding/SharedMemoryParcelable.h"
 
@@ -36,28 +42,55 @@ SharedMemoryParcelable::~SharedMemoryParcelable() {};
 void SharedMemoryParcelable::setup(int fd, int32_t sizeInBytes) {
     mFd = fd;
     mSizeInBytes = sizeInBytes;
+
 }
 
 status_t SharedMemoryParcelable::writeToParcel(Parcel* parcel) const {
-    parcel->writeInt32(mSizeInBytes);
+    status_t status = parcel->writeInt32(mSizeInBytes);
+    if (status != NO_ERROR) return status;
     if (mSizeInBytes > 0) {
-        parcel->writeDupFileDescriptor(mFd);
+        status = parcel->writeDupFileDescriptor(mFd);
+        ALOGE_IF(status != NO_ERROR, "SharedMemoryParcelable writeDupFileDescriptor failed : %d", status);
     }
-    return NO_ERROR; // TODO check for errors above
+    return status;
 }
 
 status_t SharedMemoryParcelable::readFromParcel(const Parcel* parcel) {
-    parcel->readInt32(&mSizeInBytes);
-    if (mSizeInBytes > 0) {
-        mFd = dup(parcel->readFileDescriptor());
+    status_t status = parcel->readInt32(&mSizeInBytes);
+    if (status != NO_ERROR) {
+        return status;
     }
-    return NO_ERROR; // TODO check for errors above
+    if (mSizeInBytes > 0) {
+// FIXME        mFd = dup(parcel->readFileDescriptor());
+        // Why is the ALSA resource not getting freed?!
+        mFd = fcntl(parcel->readFileDescriptor(), F_DUPFD_CLOEXEC, 0);
+        if (mFd == -1) {
+            status = -errno;
+            ALOGE("SharedMemoryParcelable readFileDescriptor fcntl() failed : %d", status);
+        }
+    }
+    return status;
 }
 
-// TODO Add code to unmmap()
+aaudio_result_t SharedMemoryParcelable::close() {
+    if (mResolvedAddress != nullptr) {
+        int err = munmap(mResolvedAddress, mSizeInBytes);
+        if (err < 0) {
+            ALOGE("SharedMemoryParcelable::close() munmap() failed %d", err);
+            return AAudioConvert_androidToAAudioResult(err);
+        }
+        mResolvedAddress = nullptr;
+    }
+    if (mFd != -1) {
+        ::close(mFd);
+        mFd = -1;
+    }
+    return AAUDIO_OK;
+}
 
 aaudio_result_t SharedMemoryParcelable::resolve(int32_t offsetInBytes, int32_t sizeInBytes,
                                               void **regionAddressPtr) {
+
     if (offsetInBytes < 0) {
         ALOGE("SharedMemoryParcelable illegal offsetInBytes = %d", offsetInBytes);
         return AAUDIO_ERROR_OUT_OF_RANGE;
@@ -68,6 +101,11 @@ aaudio_result_t SharedMemoryParcelable::resolve(int32_t offsetInBytes, int32_t s
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
     if (mResolvedAddress == nullptr) {
+        /* TODO remove
+        int fd = fcntl(mFd, F_DUPFD_CLOEXEC, 0);
+        ALOGE_IF(fd==-1, "cannot dup fd=%d, size=%zd, (%s)",
+                    mFd, mSizeInBytes, strerror(errno));
+        */
         mResolvedAddress = (uint8_t *) mmap(0, mSizeInBytes, PROT_READ|PROT_WRITE,
                                           MAP_SHARED, mFd, 0);
         if (mResolvedAddress == nullptr) {
@@ -76,8 +114,8 @@ aaudio_result_t SharedMemoryParcelable::resolve(int32_t offsetInBytes, int32_t s
         }
     }
     *regionAddressPtr = mResolvedAddress + offsetInBytes;
-    ALOGD("SharedMemoryParcelable mResolvedAddress = %p", mResolvedAddress);
-    ALOGD("SharedMemoryParcelable offset by %d, *regionAddressPtr = %p",
+    ALOGV("SharedMemoryParcelable mResolvedAddress = %p", mResolvedAddress);
+    ALOGV("SharedMemoryParcelable offset by %d, *regionAddressPtr = %p",
           offsetInBytes, *regionAddressPtr);
     return AAUDIO_OK;
 }

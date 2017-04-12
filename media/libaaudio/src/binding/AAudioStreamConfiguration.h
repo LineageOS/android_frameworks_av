@@ -66,6 +66,14 @@ public:
         mAudioFormat = audioFormat;
     }
 
+    aaudio_sharing_mode_t getSharingMode() const {
+        return mSharingMode;
+    }
+
+    void setSharingMode(aaudio_sharing_mode_t sharingMode) {
+        mSharingMode = sharingMode;
+    }
+
     int32_t getBufferCapacity() const {
         return mBufferCapacity;
     }
@@ -78,14 +86,15 @@ public:
 
     virtual status_t readFromParcel(const Parcel* parcel) override;
 
-    aaudio_result_t validate();
+    aaudio_result_t validate() const;
 
-    void dump();
+    void dump() const;
 
-protected:
+private:
     int32_t               mDeviceId        = AAUDIO_DEVICE_UNSPECIFIED;
     int32_t               mSampleRate      = AAUDIO_UNSPECIFIED;
     int32_t               mSamplesPerFrame = AAUDIO_UNSPECIFIED;
+    aaudio_sharing_mode_t mSharingMode     = AAUDIO_SHARING_MODE_SHARED;
     aaudio_audio_format_t mAudioFormat     = AAUDIO_FORMAT_UNSPECIFIED;
     int32_t               mBufferCapacity  = AAUDIO_UNSPECIFIED;
 };

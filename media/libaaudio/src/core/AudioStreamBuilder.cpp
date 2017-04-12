@@ -24,11 +24,17 @@
 #include <aaudio/AAudioDefinitions.h>
 #include <aaudio/AAudio.h>
 
+#include "binding/AAudioBinderClient.h"
 #include "client/AudioStreamInternal.h"
 #include "core/AudioStream.h"
 #include "core/AudioStreamBuilder.h"
 #include "legacy/AudioStreamRecord.h"
 #include "legacy/AudioStreamTrack.h"
+
+// Enable a mixer in AAudio service that will mix stream to an ALSA MMAP buffer.
+#define MMAP_SHARED_ENABLED      0
+// Enable AAUDIO_SHARING_MODE_EXCLUSIVE that uses an ALSA MMAP buffer.
+#define MMAP_EXCLUSIVE_ENABLED   1
 
 using namespace aaudio;
 
@@ -43,9 +49,11 @@ AudioStreamBuilder::~AudioStreamBuilder() {
 
 aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     AudioStream* audioStream = nullptr;
+    AAudioBinderClient *aaudioClient = nullptr;
     const aaudio_sharing_mode_t sharingMode = getSharingMode();
-    ALOGE("AudioStreamBuilder.build() sharingMode = %d", sharingMode);
+    ALOGD("AudioStreamBuilder.build() sharingMode = %d", sharingMode);
     switch (getDirection()) {
+
     case AAUDIO_DIRECTION_INPUT:
         switch (sharingMode) {
             case AAUDIO_SHARING_MODE_SHARED:
@@ -57,26 +65,37 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
                 break;
         }
         break;
+
     case AAUDIO_DIRECTION_OUTPUT:
         switch (sharingMode) {
             case AAUDIO_SHARING_MODE_SHARED:
+#if MMAP_SHARED_ENABLED
+                aaudioClient = new AAudioBinderClient();
+                audioStream = new(std::nothrow) AudioStreamInternal(*aaudioClient, false);
+#else
                 audioStream = new(std::nothrow) AudioStreamTrack();
+#endif
                 break;
+#if MMAP_EXCLUSIVE_ENABLED
             case AAUDIO_SHARING_MODE_EXCLUSIVE:
-                audioStream = new(std::nothrow) AudioStreamInternal();
+                aaudioClient = new AAudioBinderClient();
+                audioStream = new(std::nothrow) AudioStreamInternal(*aaudioClient, false);
                 break;
+#endif
             default:
                 ALOGE("AudioStreamBuilder(): bad sharing mode = %d", sharingMode);
                 return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
                 break;
         }
         break;
+
     default:
         ALOGE("AudioStreamBuilder(): bad direction = %d", getDirection());
         return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
         break;
     }
     if (audioStream == nullptr) {
+        delete aaudioClient;
         return AAUDIO_ERROR_NO_MEMORY;
     }
     ALOGD("AudioStreamBuilder(): created audioStream = %p", audioStream);
