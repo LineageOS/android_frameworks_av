@@ -495,7 +495,13 @@ enum AIMAGE_FORMATS {
     /**
      * Android private opaque image format.
      *
-     * <p>This format is not currently supported by {@link AImageReader}.</p>
+     * <p>The choices of the actual format and pixel data layout are entirely up to the
+     * device-specific and framework internal implementations, and may vary depending on use cases
+     * even for the same device. Also note that the contents of these buffers are not directly
+     * accessible to the application.</p>
+     *
+     * <p>When an {@link AImage} of this format is obtained from an {@link AImageReader} or
+     * {@link AImage_getNumberOfPlanes()} method will return zero.</p>
      */
     AIMAGE_FORMAT_PRIVATE           = 0x22
 };
