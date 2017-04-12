@@ -19,7 +19,7 @@
 
 #include <stdint.h>
 
-#include <aaudio/AAudioDefinitions.h>
+#include <aaudio/AAudio.h>
 
 namespace aaudio {
 

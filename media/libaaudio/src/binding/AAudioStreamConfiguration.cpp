@@ -17,10 +17,10 @@
 #include <stdint.h>
 
 #include <sys/mman.h>
+#include <aaudio/AAudio.h>
+
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
-
-#include <aaudio/AAudioDefinitions.h>
 
 #include "binding/AAudioStreamConfiguration.h"
 

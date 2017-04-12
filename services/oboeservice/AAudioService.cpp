@@ -21,7 +21,7 @@
 //#include <time.h>
 //#include <pthread.h>
 
-#include <aaudio/AAudioDefinitions.h>
+#include <aaudio/AAudio.h>
 #include <mediautils/SchedulingPolicyService.h>
 #include <utils/String16.h>
 

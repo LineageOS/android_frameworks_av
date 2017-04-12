@@ -20,7 +20,7 @@
 #include <stdint.h>
 #include <time.h>
 
-#include <aaudio/AAudioDefinitions.h>
+#include <aaudio/AAudio.h>
 
 // Time conversion constants.
 #define AAUDIO_NANOS_PER_MICROSECOND ((int64_t)1000)

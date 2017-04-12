@@ -24,7 +24,7 @@
 #include <stdint.h>
 #include <utils/Mutex.h>
 
-#include <aaudio/AAudioDefinitions.h>
+#include <aaudio/AAudio.h>
 #include "HandleTracker.h"
 
 using android::Mutex;

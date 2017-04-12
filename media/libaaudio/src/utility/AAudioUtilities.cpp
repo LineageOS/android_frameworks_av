@@ -22,7 +22,7 @@
 #include <sys/types.h>
 #include <utils/Errors.h>
 
-#include "aaudio/AAudioDefinitions.h"
+#include "aaudio/AAudio.h"
 #include "AAudioUtilities.h"
 
 using namespace android;
