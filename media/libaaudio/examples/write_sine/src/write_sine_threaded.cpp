@@ -16,7 +16,8 @@
 
 // Play sine waves using an AAudio background thread.
 
-#include <assert.h>
+//#include <assert.h>
+#include <atomic>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -25,14 +26,14 @@
 #include <aaudio/AAudio.h>
 #include "SineGenerator.h"
 
-#define NUM_SECONDS           10
+#define NUM_SECONDS           5
 #define NANOS_PER_MICROSECOND ((int64_t)1000)
 #define NANOS_PER_MILLISECOND (NANOS_PER_MICROSECOND * 1000)
 #define MILLIS_PER_SECOND     1000
 #define NANOS_PER_SECOND      (NANOS_PER_MILLISECOND * MILLIS_PER_SECOND)
 
-//#define SHARING_MODE  AAUDIO_SHARING_MODE_EXCLUSIVE
-#define SHARING_MODE  AAUDIO_SHARING_MODE_SHARED
+#define SHARING_MODE  AAUDIO_SHARING_MODE_EXCLUSIVE
+//#define SHARING_MODE  AAUDIO_SHARING_MODE_SHARED
 
 // Prototype for a callback.
 typedef int audio_callback_proc_t(float *outputBuffer,
@@ -40,6 +41,16 @@ typedef int audio_callback_proc_t(float *outputBuffer,
                                      void *userContext);
 
 static void *SimpleAAudioPlayerThreadProc(void *arg);
+
+// TODO merge into common code
+static int64_t getNanoseconds(clockid_t clockId = CLOCK_MONOTONIC) {
+    struct timespec time;
+    int result = clock_gettime(clockId, &time);
+    if (result < 0) {
+        return -errno; // TODO standardize return value
+    }
+    return (time.tv_sec * NANOS_PER_SECOND) + time.tv_nsec;
+}
 
 /**
  * Simple wrapper for AAudio that opens a default stream and then calls
@@ -79,21 +90,25 @@ public:
         if (result != AAUDIO_OK) return result;
 
         AAudioStreamBuilder_setSharingMode(mBuilder, mRequestedSharingMode);
+        AAudioStreamBuilder_setSampleRate(mBuilder, 48000);
 
         // Open an AAudioStream using the Builder.
         result = AAudioStreamBuilder_openStream(mBuilder, &mStream);
         if (result != AAUDIO_OK) goto error;
 
+        printf("Requested sharing mode = %d\n", mRequestedSharingMode);
+        printf("Actual    sharing mode = %d\n", AAudioStream_getSharingMode(mStream));
+
         // Check to see what kind of stream we actually got.
         mFramesPerSecond = AAudioStream_getSampleRate(mStream);
-        printf("open() mFramesPerSecond = %d\n", mFramesPerSecond);
+        printf("Actual    framesPerSecond = %d\n", mFramesPerSecond);
 
         mSamplesPerFrame = AAudioStream_getSamplesPerFrame(mStream);
-        printf("open() mSamplesPerFrame = %d\n", mSamplesPerFrame);
+        printf("Actual    samplesPerFrame = %d\n", mSamplesPerFrame);
 
         {
             int32_t bufferCapacity = AAudioStream_getBufferCapacityInFrames(mStream);
-            printf("open() got bufferCapacity = %d\n", bufferCapacity);
+            printf("Actual    bufferCapacity = %d\n", bufferCapacity);
         }
 
         // This is the number of frames that are read in one chunk by a DMA controller
@@ -104,9 +119,10 @@ public:
         while (mFramesPerBurst < 48) {
             mFramesPerBurst *= 2;
         }
-        printf("DataFormat: final framesPerBurst = %d\n",mFramesPerBurst);
+        printf("Actual    framesPerBurst = %d\n",mFramesPerBurst);
 
         mDataFormat = AAudioStream_getFormat(mStream);
+        printf("Actual    dataFormat = %d\n", mDataFormat);
 
         // Allocate a buffer for the audio data.
         mOutputBuffer = new float[mFramesPerBurst * mSamplesPerFrame];
@@ -117,6 +133,7 @@ public:
 
         // If needed allocate a buffer for converting float to int16_t.
         if (mDataFormat == AAUDIO_FORMAT_PCM_I16) {
+            printf("Allocate data conversion buffer for float=>pcm16\n");
             mConversionBuffer = new int16_t[mFramesPerBurst * mSamplesPerFrame];
             if (mConversionBuffer == nullptr) {
                 fprintf(stderr, "ERROR - could not allocate conversion buffer\n");
@@ -149,7 +166,7 @@ public:
 
     // Start a thread that will call the callback proc.
     aaudio_result_t start() {
-        mEnabled = true;
+        mEnabled.store(true);
         int64_t nanosPerBurst = mFramesPerBurst * NANOS_PER_SECOND
                                            / mFramesPerSecond;
         return AAudioStream_createThread(mStream, nanosPerBurst,
@@ -159,56 +176,106 @@ public:
 
     // Tell the thread to stop.
     aaudio_result_t stop() {
-        mEnabled = false;
+        mEnabled.store(false);
         return AAudioStream_joinThread(mStream, nullptr, 2 * NANOS_PER_SECOND);
     }
 
-    aaudio_result_t callbackLoop() {
-        int32_t framesWritten = 0;
-        int32_t xRunCount = 0;
-        aaudio_result_t result = AAUDIO_OK;
+    bool isEnabled() const {
+        return mEnabled.load();
+    }
 
-        result = AAudioStream_requestStart(mStream);
-        if (result != AAUDIO_OK) {
-            fprintf(stderr, "ERROR - AAudioStream_requestStart() returned %d\n", result);
-            return result;
-        }
+    aaudio_result_t callbackLoop() {
+        aaudio_result_t result = 0;
+        int64_t framesWritten = 0;
+        int32_t xRunCount = 0;
+        bool    started = false;
+        int64_t framesInBuffer =
+                AAudioStream_getFramesWritten(mStream) -
+                AAudioStream_getFramesRead(mStream);
+        int64_t framesAvailable =
+                AAudioStream_getBufferSizeInFrames(mStream) - framesInBuffer;
+
+        int64_t startTime = 0;
+        int64_t startPosition = 0;
+        int32_t loopCount = 0;
 
         // Give up after several burst periods have passed.
         const int burstsPerTimeout = 8;
-        int64_t nanosPerTimeout =
-                        burstsPerTimeout * mFramesPerBurst * NANOS_PER_SECOND
-                        / mFramesPerSecond;
+        int64_t nanosPerTimeout = 0;
+        int64_t runningNanosPerTimeout = 500 * NANOS_PER_MILLISECOND;
 
-        while (mEnabled && result >= 0) {
+        while (isEnabled() && result >= 0) {
             // Call application's callback function to fill the buffer.
             if (mCallbackProc(mOutputBuffer, mFramesPerBurst, mUserContext)) {
-                mEnabled = false;
+                mEnabled.store(false);
             }
+
             // if needed, convert from float to int16_t PCM
+            //printf("app callbackLoop writing %d frames, state = %s\n", mFramesPerBurst,
+            //       AAudio_convertStreamStateToText(AAudioStream_getState(mStream)));
             if (mConversionBuffer != nullptr) {
                 int32_t numSamples = mFramesPerBurst * mSamplesPerFrame;
                 for (int i = 0; i < numSamples; i++) {
                     mConversionBuffer[i] = (int16_t)(32767.0 * mOutputBuffer[i]);
                 }
                 // Write the application data to stream.
-                result = AAudioStream_write(mStream, mConversionBuffer, mFramesPerBurst, nanosPerTimeout);
+                result = AAudioStream_write(mStream, mConversionBuffer,
+                                            mFramesPerBurst, nanosPerTimeout);
             } else {
                 // Write the application data to stream.
-                result = AAudioStream_write(mStream, mOutputBuffer, mFramesPerBurst, nanosPerTimeout);
+                result = AAudioStream_write(mStream, mOutputBuffer,
+                                            mFramesPerBurst, nanosPerTimeout);
             }
-            framesWritten += result;
+
             if (result < 0) {
-                fprintf(stderr, "ERROR - AAudioStream_write() returned %zd\n", result);
+                fprintf(stderr, "ERROR - AAudioStream_write() returned %d %s\n", result,
+                        AAudio_convertResultToText(result));
+                break;
+            } else if (started && result != mFramesPerBurst) {
+                fprintf(stderr, "ERROR - AAudioStream_write() timed out! %d\n", result);
+                break;
+            } else {
+                framesWritten += result;
+            }
+
+            if (startTime > 0 && ((loopCount & 0x01FF) == 0)) {
+                double elapsedFrames = (double)(framesWritten - startPosition);
+                int64_t elapsedTime = getNanoseconds() - startTime;
+                double measuredRate = elapsedFrames * NANOS_PER_SECOND / elapsedTime;
+                printf("app callbackLoop write() measured rate %f\n", measuredRate);
+            }
+            loopCount++;
+
+            if (!started && framesWritten >= framesAvailable) {
+                // Start buffer if fully primed.{
+                result = AAudioStream_requestStart(mStream);
+                printf("app callbackLoop requestStart returned %d\n", result);
+                if (result != AAUDIO_OK) {
+                    fprintf(stderr, "ERROR - AAudioStream_requestStart() returned %d %s\n", result,
+                            AAudio_convertResultToText(result));
+                    mEnabled.store(false);
+                    return result;
+                }
+                started = true;
+                nanosPerTimeout = runningNanosPerTimeout;
+                startPosition = framesWritten;
+                startTime = getNanoseconds();
+            }
+
+            {
+                int32_t tempXRunCount = AAudioStream_getXRunCount(mStream);
+                if (tempXRunCount != xRunCount) {
+                    xRunCount = tempXRunCount;
+                    printf("AAudioStream_getXRunCount returns %d at frame %d\n",
+                           xRunCount, (int) framesWritten);
+                }
             }
         }
 
-        xRunCount = AAudioStream_getXRunCount(mStream);
-        printf("AAudioStream_getXRunCount %d\n", xRunCount);
-
         result = AAudioStream_requestStop(mStream);
         if (result != AAUDIO_OK) {
-            fprintf(stderr, "ERROR - AAudioStream_requestStart() returned %d\n", result);
+            fprintf(stderr, "ERROR - AAudioStream_requestStop() returned %d %s\n", result,
+                    AAudio_convertResultToText(result));
             return result;
         }
 
@@ -229,7 +296,7 @@ private:
     int32_t               mFramesPerBurst = 0;
     aaudio_audio_format_t mDataFormat = AAUDIO_FORMAT_PCM_I16;
 
-    volatile bool         mEnabled = false; // used to request that callback exit its loop
+    std::atomic<bool>     mEnabled; // used to request that callback exit its loop
 };
 
 static void *SimpleAAudioPlayerThreadProc(void *arg) {
@@ -288,19 +355,21 @@ int main(int argc, char **argv)
     }
 
     printf("Sleep for %d seconds while audio plays in a background thread.\n", NUM_SECONDS);
-    {
+    for (int i = 0; i < NUM_SECONDS && player.isEnabled(); i++) {
         // FIXME sleep is not an NDK API
         // sleep(NUM_SECONDS);
-        const struct timespec request = { .tv_sec = NUM_SECONDS, .tv_nsec = 0 };
+        const struct timespec request = { .tv_sec = 1, .tv_nsec = 0 };
         (void) clock_nanosleep(CLOCK_MONOTONIC, 0 /*flags*/, &request, NULL /*remain*/);
     }
-    printf("Woke up now.\n");
+    printf("Woke up now!\n");
 
     result = player.stop();
     if (result != AAUDIO_OK) {
         fprintf(stderr, "ERROR -  player.stop() returned %d\n", result);
         goto error;
     }
+
+    printf("Player stopped.\n");
     result = player.close();
     if (result != AAUDIO_OK) {
         fprintf(stderr, "ERROR -  player.close() returned %d\n", result);

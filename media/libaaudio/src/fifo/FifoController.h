@@ -22,6 +22,8 @@
 
 #include "FifoControllerBase.h"
 
+namespace android {
+
 /**
  * A FIFO with counters contained in the class.
  */
@@ -55,5 +57,6 @@ private:
     std::atomic<fifo_counter_t> mWriteCounter;
 };
 
+}  // android
 
 #endif //FIFO_FIFO_CONTROLLER_H

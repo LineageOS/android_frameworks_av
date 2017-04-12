@@ -22,7 +22,7 @@
 #include <media/AudioTrack.h>
 
 #include <aaudio/AAudio.h>
-#include "AudioClock.h"
+#include "utility/AudioClock.h"
 #include "legacy/AudioStreamLegacy.h"
 #include "legacy/AudioStreamTrack.h"
 #include "utility/FixedBlockReader.h"
@@ -142,6 +142,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     }
 
     setState(AAUDIO_STREAM_STATE_OPEN);
+    setDeviceId(mAudioTrack->getRoutedDeviceId());
 
     return AAUDIO_OK;
 }

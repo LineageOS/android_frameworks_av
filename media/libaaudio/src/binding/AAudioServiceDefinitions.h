@@ -48,25 +48,6 @@ typedef int32_t  aaudio_handle_t;
 
 #define AAUDIO_HANDLE_INVALID  ((aaudio_handle_t) -1)
 
-enum aaudio_commands_t {
-    OPEN_STREAM = IBinder::FIRST_CALL_TRANSACTION,
-    CLOSE_STREAM,
-    GET_STREAM_DESCRIPTION,
-    START_STREAM,
-    PAUSE_STREAM,
-    FLUSH_STREAM,
-    REGISTER_AUDIO_THREAD,
-    UNREGISTER_AUDIO_THREAD
-};
-
-// TODO Expand this to include all the open parameters.
-typedef struct AAudioServiceStreamInfo_s {
-    int32_t               deviceId;
-    int32_t               samplesPerFrame;  // number of channels
-    int32_t               sampleRate;
-    aaudio_audio_format_t audioFormat;
-} AAudioServiceStreamInfo;
-
 // This must be a fixed width so it can be in shared memory.
 enum RingbufferFlags : uint32_t {
     NONE = 0,

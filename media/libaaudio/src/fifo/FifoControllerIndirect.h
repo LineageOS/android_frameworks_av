@@ -22,6 +22,8 @@
 
 #include "FifoControllerBase.h"
 
+namespace android {
+
 /**
  * A FifoControllerBase with counters external to the class.
  *
@@ -65,5 +67,7 @@ private:
     std::atomic<fifo_counter_t> * mReadCounterAddress;
     std::atomic<fifo_counter_t> * mWriteCounterAddress;
 };
+
+}  // android
 
 #endif //FIFO_FIFO_CONTROLLER_INDIRECT_H

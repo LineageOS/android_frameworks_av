@@ -3,52 +3,54 @@ LOCAL_PATH:= $(call my-dir)
 # AAudio Service
 include $(CLEAR_VARS)
 
-LOCAL_MODULE := aaudioservice
+LOCAL_MODULE := libaaudioservice
 LOCAL_MODULE_TAGS := optional
 
 LIBAAUDIO_DIR := ../../media/libaaudio
 LIBAAUDIO_SRC_DIR := $(LIBAAUDIO_DIR)/src
 
 LOCAL_C_INCLUDES := \
+    $(TOPDIR)frameworks/av/services/audioflinger \
     $(call include-path-for, audio-utils) \
     frameworks/native/include \
     system/core/base/include \
     $(TOP)/frameworks/native/media/libaaudio/include/include \
     $(TOP)/frameworks/av/media/libaaudio/include \
+    $(TOP)/frameworks/av/media/utils/include \
     frameworks/native/include \
     $(TOP)/external/tinyalsa/include \
-    $(TOP)/frameworks/av/media/libaaudio/src \
-    $(TOP)/frameworks/av/media/libaaudio/src/binding \
-    $(TOP)/frameworks/av/media/libaaudio/src/client \
-    $(TOP)/frameworks/av/media/libaaudio/src/core \
-    $(TOP)/frameworks/av/media/libaaudio/src/fifo \
-    $(TOP)/frameworks/av/media/libaaudio/src/utility
+    $(TOP)/frameworks/av/media/libaaudio/src
 
-# TODO These could be in a libaaudio_common library
 LOCAL_SRC_FILES += \
     $(LIBAAUDIO_SRC_DIR)/utility/HandleTracker.cpp \
-    $(LIBAAUDIO_SRC_DIR)/utility/AAudioUtilities.cpp \
-    $(LIBAAUDIO_SRC_DIR)/fifo/FifoBuffer.cpp \
-    $(LIBAAUDIO_SRC_DIR)/fifo/FifoControllerBase.cpp \
-    $(LIBAAUDIO_SRC_DIR)/binding/SharedMemoryParcelable.cpp \
-    $(LIBAAUDIO_SRC_DIR)/binding/SharedRegionParcelable.cpp \
-    $(LIBAAUDIO_SRC_DIR)/binding/RingBufferParcelable.cpp \
-    $(LIBAAUDIO_SRC_DIR)/binding/AudioEndpointParcelable.cpp \
-    $(LIBAAUDIO_SRC_DIR)/binding/AAudioStreamRequest.cpp \
-    $(LIBAAUDIO_SRC_DIR)/binding/AAudioStreamConfiguration.cpp \
-    $(LIBAAUDIO_SRC_DIR)/binding/IAAudioService.cpp \
+    SharedMemoryProxy.cpp \
     SharedRingBuffer.cpp \
-    FakeAudioHal.cpp \
+    AAudioEndpointManager.cpp \
+    AAudioMixer.cpp \
     AAudioService.cpp \
+    AAudioServiceEndpoint.cpp \
     AAudioServiceStreamBase.cpp \
-    AAudioServiceStreamFakeHal.cpp \
+    AAudioServiceStreamMMAP.cpp \
+    AAudioServiceStreamShared.cpp \
     TimestampScheduler.cpp \
-    AAudioServiceMain.cpp \
     AAudioThread.cpp
 
+LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
+
+# LOCAL_CFLAGS += -fvisibility=hidden
 LOCAL_CFLAGS += -Wno-unused-parameter
 LOCAL_CFLAGS += -Wall -Werror
 
-LOCAL_SHARED_LIBRARIES :=  libbinder libcutils libutils liblog libtinyalsa
+LOCAL_SHARED_LIBRARIES :=  \
+    libaaudio \
+    libaudioflinger \
+    libbinder \
+    libcutils \
+    libmediautils \
+    libutils \
+    liblog \
+    libtinyalsa
 
-include $(BUILD_EXECUTABLE)
+include $(BUILD_SHARED_LIBRARY)
+
+

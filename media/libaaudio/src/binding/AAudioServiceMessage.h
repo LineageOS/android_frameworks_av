@@ -25,10 +25,11 @@ namespace aaudio {
 
 // TODO move this to an "include" folder for the service.
 
+// Used to send information about the HAL to the client.
 struct AAudioMessageTimestamp {
-    int64_t    position;
-    int64_t    deviceOffset; // add to client position to get device position
-    int64_t    timestamp;
+    int64_t position;     // number of frames transferred so far
+    int64_t deviceOffset; // add to client position to get device position
+    int64_t timestamp;    // time when that position was reached
 };
 
 typedef enum aaudio_service_event_e : uint32_t {
@@ -36,13 +37,14 @@ typedef enum aaudio_service_event_e : uint32_t {
     AAUDIO_SERVICE_EVENT_PAUSED,
     AAUDIO_SERVICE_EVENT_FLUSHED,
     AAUDIO_SERVICE_EVENT_CLOSED,
-    AAUDIO_SERVICE_EVENT_DISCONNECTED
+    AAUDIO_SERVICE_EVENT_DISCONNECTED,
+    AAUDIO_SERVICE_EVENT_VOLUME
 } aaudio_service_event_t;
 
 struct AAudioMessageEvent {
     aaudio_service_event_t event;
-    int32_t                data1;
-    int64_t                data2;
+    double                 dataDouble;
+    int64_t                dataLong;
 };
 
 typedef struct AAudioServiceMessage_s {
@@ -54,11 +56,10 @@ typedef struct AAudioServiceMessage_s {
 
     code what;
     union {
-        AAudioMessageTimestamp timestamp;
-        AAudioMessageEvent event;
+        AAudioMessageTimestamp timestamp; // what == TIMESTAMP
+        AAudioMessageEvent event;         // what == EVENT
     };
 } AAudioServiceMessage;
-
 
 } /* namespace aaudio */
 

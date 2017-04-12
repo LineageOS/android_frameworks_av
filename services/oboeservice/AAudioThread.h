@@ -24,16 +24,20 @@
 
 namespace aaudio {
 
+/**
+ * Abstract class similar to Java Runnable.
+ */
 class Runnable {
 public:
     Runnable() {};
     virtual ~Runnable() = default;
 
-    virtual void run() {}
+    virtual void run() = 0;
 };
 
 /**
- * Abstraction for a host thread.
+ * Abstraction for a host dependent thread.
+ * TODO Consider using Android "Thread" class or std::thread instead.
  */
 class AAudioThread
 {
@@ -62,9 +66,9 @@ public:
     void dispatch(); // called internally from 'C' thread wrapper
 
 private:
-    Runnable*          mRunnable = nullptr; // TODO make atomic with memory barrier?
-    bool               mHasThread = false;
-    pthread_t          mThread; // initialized in constructor
+    Runnable    *mRunnable;
+    bool         mHasThread;
+    pthread_t    mThread; // initialized in constructor
 
 };
 
