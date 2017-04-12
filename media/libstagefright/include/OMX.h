@@ -20,7 +20,7 @@
 #include <media/IOMX.h>
 #include <utils/threads.h>
 #include <utils/KeyedVector.h>
-
+#include <media/vndk/xmlparser/1.0/MediaCodecsXmlParser.h>
 #include "OmxNodeOwner.h"
 
 namespace android {
@@ -54,6 +54,7 @@ protected:
 private:
     Mutex mLock;
     OMXMaster *mMaster;
+    MediaCodecsXmlParser mParser;
 
     KeyedVector<wp<IBinder>, sp<OMXNodeInstance> > mLiveNodes;
 
