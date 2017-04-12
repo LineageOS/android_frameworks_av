@@ -39,7 +39,7 @@ private:
 
     // callouts
     virtual const FastThreadState *poll();
-    virtual void setLog(NBLog::Writer *logWriter);
+    virtual void setNBLogWriter(NBLog::Writer *logWriter);
     virtual void onIdle();
     virtual void onExit();
     virtual bool isSubClassCommand(FastThreadState::Command command);

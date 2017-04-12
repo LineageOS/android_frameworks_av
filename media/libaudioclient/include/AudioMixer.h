@@ -286,7 +286,7 @@ private:
         process_hook_t  hook;   // one of process__*, never NULL
         int32_t         *outputTemp;
         int32_t         *resampleTemp;
-        NBLog::Writer*  mLog;
+        NBLog::Writer*  mNBLogWriter;   // associated NBLog::Writer or &mDummyLog
         int32_t         reserved[1];
         // FIXME allocate dynamically to save some memory when maxNumTracks < MAX_NUM_TRACKS
         track_t         tracks[MAX_NUM_TRACKS] __attribute__((aligned(32)));
@@ -301,9 +301,11 @@ private:
 
     const uint32_t  mSampleRate;
 
-    NBLog::Writer   mDummyLog;
+    NBLog::Writer   mDummyLogWriter;
 public:
-    void            setLog(NBLog::Writer* log);
+    // Called by FastMixer to inform AudioMixer of it's associated NBLog::Writer.
+    // FIXME It would be safer to use TLS for this, so we don't accidentally use wrong one.
+    void            setNBLogWriter(NBLog::Writer* log);
 private:
     state_t         mState __attribute__((aligned(32)));
 
