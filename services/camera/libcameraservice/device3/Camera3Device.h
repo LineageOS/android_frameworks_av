@@ -185,6 +185,7 @@ class Camera3Device :
 
     // internal typedefs
     using RequestMetadataQueue = hardware::MessageQueue<uint8_t, hardware::kSynchronizedReadWrite>;
+    using ResultMetadataQueue  = hardware::MessageQueue<uint8_t, hardware::kSynchronizedReadWrite>;
 
     static const size_t        kDumpLockAttempts  = 10;
     static const size_t        kDumpSleepDuration = 100000; // 0.10 sec
@@ -222,6 +223,9 @@ class Camera3Device :
 
     // Flag indicating is the current active stream configuration is constrained high speed.
     bool                       mIsConstrainedHighSpeedConfiguration;
+
+    // FMQ to write result on. Must be guarded by mProcessCaptureResultLock.
+    std::unique_ptr<ResultMetadataQueue> mResultMetadataQueue;
 
     /**** Scope for mLock ****/
 
@@ -463,11 +467,14 @@ class Camera3Device :
             const hardware::hidl_vec<
                     hardware::camera::device::V3_2::NotifyMsg>& msgs) override;
 
-    // Handle one capture result
-    void processOneCaptureResult(
+    // Handle one capture result. Assume that mProcessCaptureResultLock is held.
+    void processOneCaptureResultLocked(
             const hardware::camera::device::V3_2::CaptureResult& results);
     // Handle one notify message
     void notify(const hardware::camera::device::V3_2::NotifyMsg& msg);
+
+    // lock to ensure only one processCaptureResult is called at a time.
+    Mutex mProcessCaptureResultLock;
 
     /**
      * Common initialization code shared by both HAL paths
