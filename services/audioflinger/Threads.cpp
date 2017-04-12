@@ -6800,7 +6800,7 @@ void AudioFlinger::RecordThread::syncStartEventCallback(const wp<SyncEvent>& eve
 bool AudioFlinger::RecordThread::stop(RecordThread::RecordTrack* recordTrack) {
     ALOGV("RecordThread::stop");
     AutoMutex _l(mLock);
-    if (mActiveTracks.indexOf(recordTrack) != 0 || recordTrack->mState == TrackBase::PAUSING) {
+    if (mActiveTracks.indexOf(recordTrack) < 0 || recordTrack->mState == TrackBase::PAUSING) {
         return false;
     }
     // note that threadLoop may still be processing the track at this point [without lock]
@@ -6814,7 +6814,7 @@ bool AudioFlinger::RecordThread::stop(RecordThread::RecordTrack* recordTrack) {
     // FIXME incorrect usage of wait: no explicit predicate or loop
     mStartStopCond.wait(mLock);
     // if we have been restarted, recordTrack is in mActiveTracks here
-    if (exitPending() || mActiveTracks.indexOf(recordTrack) != 0) {
+    if (exitPending() || mActiveTracks.indexOf(recordTrack) < 0) {
         ALOGV("Record stopped OK");
         return true;
     }
