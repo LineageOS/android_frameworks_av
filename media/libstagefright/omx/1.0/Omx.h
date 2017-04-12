@@ -23,6 +23,7 @@
 #include "../../include/OMXNodeInstance.h"
 
 #include <android/hardware/media/omx/1.0/IOmx.h>
+#include <media/vndk/xmlparser/1.0/MediaCodecsXmlParser.h>
 
 namespace android {
 
@@ -76,6 +77,7 @@ protected:
     Mutex mLock;
     KeyedVector<wp<IBase>, sp<OMXNodeInstance> > mLiveNodes;
     KeyedVector<OMXNodeInstance*, wp<IBase> > mNode2Observer;
+    MediaCodecsXmlParser mParser;
 };
 
 extern "C" IOmx* HIDL_FETCH_IOmx(const char* name);

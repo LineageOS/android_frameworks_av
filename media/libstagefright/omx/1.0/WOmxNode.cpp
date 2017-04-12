@@ -245,11 +245,6 @@ status_t LWOmxNode::dispatchMessage(const omx_message &lMsg) {
     return status;
 }
 
-// TODO: this is temporary, will be removed when quirks move to OMX side.
-status_t LWOmxNode::setQuirks(OMX_U32 quirks) {
-    return toStatusT(mBase->setQuirks(static_cast<uint32_t>(quirks)));;
-}
-
 // TWOmxNode
 TWOmxNode::TWOmxNode(sp<IOMXNode> const& base) : mBase(base) {
 }
@@ -425,11 +420,6 @@ Return<Status> TWOmxNode::dispatchMessage(const Message& tMsg) {
         return Status::BAD_VALUE;
     }
     return toStatus(mBase->dispatchMessage(lMsg));
-}
-
-Return<void> TWOmxNode::setQuirks(uint32_t quirks) {
-    mBase->setQuirks(static_cast<OMX_U32>(quirks));
-    return Void();
 }
 
 }  // namespace implementation

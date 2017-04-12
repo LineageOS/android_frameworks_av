@@ -170,9 +170,6 @@ public:
             OMX_INDEXTYPE *index) = 0;
 
     virtual status_t dispatchMessage(const omx_message &msg) = 0;
-
-    // TODO: this is temporary, will be removed when quirks move to OMX side
-    virtual status_t setQuirks(OMX_U32 quirks) = 0;
 };
 
 struct omx_message {
