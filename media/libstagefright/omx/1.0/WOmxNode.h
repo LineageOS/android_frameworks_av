@@ -103,9 +103,6 @@ struct LWOmxNode : public BnOMXNode {
             const char *parameter_name,
             OMX_INDEXTYPE *index) override;
     status_t dispatchMessage(const omx_message &msg) override;
-
-    // TODO: this is temporary, will be removed when quirks move to OMX side.
-    status_t setQuirks(OMX_U32 quirks) override;
 };
 
 struct TWOmxNode : public IOmxNode {
@@ -154,7 +151,6 @@ struct TWOmxNode : public IOmxNode {
             hidl_string const& parameterName,
             getExtensionIndex_cb _hidl_cb) override;
     Return<Status> dispatchMessage(Message const& msg) override;
-    Return<void> setQuirks(uint32_t quirks) override;
 };
 
 }  // namespace implementation

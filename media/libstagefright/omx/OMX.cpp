@@ -37,8 +37,7 @@ namespace android {
 // node ids are created by concatenating the pid with a 16-bit counter
 static size_t kMaxNodeInstances = (1 << 16);
 
-OMX::OMX()
-    : mMaster(new OMXMaster) {
+OMX::OMX() : mMaster(new OMXMaster), mParser() {
 }
 
 OMX::~OMX() {
@@ -119,6 +118,19 @@ status_t OMX::allocateNode(
         return StatusFromOMXError(err);
     }
     instance->setHandle(handle);
+    std::vector<AString> quirkVector;
+    if (mParser.getQuirks(name, &quirkVector) == OK) {
+        uint32_t quirks = 0;
+        for (const AString quirk : quirkVector) {
+            if (quirk == "requires-allocate-on-input-ports") {
+                quirks |= kRequiresAllocateBufferOnInputPorts;
+            }
+            if (quirk == "requires-allocate-on-output-ports") {
+                quirks |= kRequiresAllocateBufferOnOutputPorts;
+            }
+        }
+        instance->setQuirks(quirks);
+    }
 
     mLiveNodes.add(IInterface::asBinder(observer), instance);
     IInterface::asBinder(observer)->linkToDeath(this);

@@ -6307,7 +6307,6 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
     AString mime;
 
     AString componentName;
-    uint32_t quirks = 0;
     int32_t encoder = false;
     if (msg->findString("componentName", &componentName)) {
         sp<IMediaCodecList> list = MediaCodecList::getInstance();
@@ -6335,7 +6334,6 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
     for (size_t matchIndex = 0; matchIndex < matchingCodecs.size();
             ++matchIndex) {
         componentName = matchingCodecs[matchIndex];
-        quirks = MediaCodecList::getQuirksFor(componentName.c_str());
 
         pid_t tid = gettid();
         int prevPriority = androidGetThreadPriority(tid);
@@ -6392,7 +6390,6 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
         mCodec->mFlags |= kFlagPushBlankBuffersToNativeWindowOnShutdown;
     }
 
-    omxNode->setQuirks(quirks);
     mCodec->mOMX = omx;
     mCodec->mOMXNode = omxNode;
     mCodec->mCallback->onComponentAllocated(mCodec->mComponentName.c_str());
