@@ -78,7 +78,7 @@ domainGroup: DeviceForStrategy
 				#
 				TelephonyMode IsNot InCall
 				TelephonyMode IsNot InCommunication
-				ForceUseForMedia Is ForceNoBtA2dp
+				ForceUseForMedia IsNot ForceNoBtA2dp
 				AvailableOutputDevices Includes BluetoothA2dp
 
 				component: /Policy/policy/strategies/sonification_respectful/selected_output_devices/mask
@@ -105,7 +105,7 @@ domainGroup: DeviceForStrategy
 				#
 				TelephonyMode IsNot InCall
 				TelephonyMode IsNot InCommunication
-				ForceUseForMedia Is ForceNoBtA2dp
+				ForceUseForMedia IsNot ForceNoBtA2dp
 				AvailableOutputDevices Includes BluetoothA2dpHeadphones
 
 				component: /Policy/policy/strategies/sonification_respectful/selected_output_devices/mask
@@ -132,7 +132,7 @@ domainGroup: DeviceForStrategy
 				#
 				TelephonyMode IsNot InCall
 				TelephonyMode IsNot InCommunication
-				ForceUseForMedia Is ForceNoBtA2dp
+				ForceUseForMedia IsNot ForceNoBtA2dp
 				AvailableOutputDevices Includes BluetoothA2dpSpeaker
 
 				component: /Policy/policy/strategies/sonification_respectful/selected_output_devices/mask
