@@ -1160,7 +1160,8 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                 }
                 if (mSource != nullptr) {
                     if (audio) {
-                        if (mVideoDecoderError || mSource->getFormat(false /* audio */) == NULL) {
+                        if (mVideoDecoderError || mSource->getFormat(false /* audio */) == NULL
+                                || mSurface == NULL) {
                             // When both audio and video have error, or this stream has only audio
                             // which has error, notify client of error.
                             notifyListener(MEDIA_ERROR, MEDIA_ERROR_UNKNOWN, err);
@@ -1170,7 +1171,8 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                         }
                         mAudioDecoderError = true;
                     } else {
-                        if (mAudioDecoderError || mSource->getFormat(true /* audio */) == NULL) {
+                        if (mAudioDecoderError || mSource->getFormat(true /* audio */) == NULL
+                                || mAudioSink == NULL) {
                             // When both audio and video have error, or this stream has only video
                             // which has error, notify client of error.
                             notifyListener(MEDIA_ERROR, MEDIA_ERROR_UNKNOWN, err);
