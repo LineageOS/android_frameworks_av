@@ -253,7 +253,7 @@ typedef aaudio_data_callback_result_t (*AAudioStream_dataCallback)(
  * AAudioStream_requestStop() is called.
  *
  * This callback function will be called on a real-time thread owned by AAudio. See
- * {@link aaudio_data_callback_proc_t} for more information.
+ * {@link AAudioStream_dataCallback} for more information.
  *
  * Note that the AAudio callbacks will never be called simultaneously from multiple threads.
  *
@@ -415,7 +415,6 @@ AAUDIO_API aaudio_result_t  AAudioStream_requestStop(AAudioStream* stream);
  * set to AAUDIO_STREAM_STATE_UNKNOWN and a zero timeout.
  *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
- * @param state pointer to a variable that will be set to the current state
  */
 AAUDIO_API aaudio_stream_state_t AAudioStream_getState(AAudioStream* stream);
 
