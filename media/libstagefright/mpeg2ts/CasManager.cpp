@@ -52,8 +52,9 @@ private:
         sp<IDescrambler> mDescrambler;
     };
     status_t initSession(
-             const sp<ICas>& cas, PidToSessionMap &sessionMap,
-             CasSession *session, unsigned programNumber, unsigned elementaryPID);
+            const sp<ICas>& cas,
+            PidToSessionMap &sessionMap,
+            CasSession *session);
     void closeSession(const sp<ICas>& cas, const CasSession &casSession);
 
     unsigned mProgramNumber;
@@ -88,14 +89,14 @@ bool ATSParser::CasManager::ProgramCasManager::addStream(
 status_t ATSParser::CasManager::ProgramCasManager::setMediaCas(
         const sp<ICas> &cas, PidToSessionMap &sessionMap) {
     if (mHasProgramCas) {
-        return initSession(cas, sessionMap, &mProgramCas, mProgramNumber, 0);
+        return initSession(cas, sessionMap, &mProgramCas);
     }
+    // TODO: share session among streams that has identical CA_descriptors.
+    // For now, we open one session for each stream that has CA_descriptor.
     for (size_t index = 0; index < mStreamPidToCasMap.size(); index++) {
-        unsigned elementaryPID = mStreamPidToCasMap.keyAt(index);
-        status_t err;
-        if ((err = initSession(cas, sessionMap,
-                &mStreamPidToCasMap.editValueAt(index),
-                mProgramNumber, elementaryPID)) != OK) {
+        status_t err = initSession(
+                cas, sessionMap, &mStreamPidToCasMap.editValueAt(index));
+        if (err != OK) {
             return err;
         }
     }
@@ -121,8 +122,9 @@ bool ATSParser::CasManager::ProgramCasManager::getCasSession(
 }
 
 status_t ATSParser::CasManager::ProgramCasManager::initSession(
-         const sp<ICas>& cas, PidToSessionMap &sessionMap,
-         CasSession *session, unsigned programNumber, unsigned elementaryPID) {
+         const sp<ICas>& cas,
+         PidToSessionMap &sessionMap,
+         CasSession *session) {
     sp<IServiceManager> sm = defaultServiceManager();
     sp<IBinder> casServiceBinder = sm->getService(String16("media.cas"));
     sp<IMediaCasService> casService =
@@ -137,13 +139,7 @@ status_t ATSParser::CasManager::ProgramCasManager::initSession(
     std::vector<uint8_t> sessionId;
     const CADescriptor &descriptor = session->mCADescriptor;
 
-    Status status;
-    if (elementaryPID == 0) {
-        status = cas->openSession(programNumber, &sessionId);
-    } else {
-        status = cas->openSessionForStream(
-                programNumber, elementaryPID, &sessionId);
-    }
+    Status status = cas->openSession(&sessionId);
     if (!status.isOk()) {
         ALOGE("Failed to open session: exception=%d, error=%d",
                 status.exceptionCode(), status.serviceSpecificErrorCode());
@@ -298,13 +294,15 @@ bool ATSParser::CasManager::addStream(
     return true;
 }
 
-bool ATSParser::CasManager::getCasSession(
+bool ATSParser::CasManager::getCasInfo(
         unsigned programNumber, unsigned elementaryPID,
-        sp<IDescrambler> *descrambler, std::vector<uint8_t> *sessionId) const {
+        int32_t *systemId, sp<IDescrambler> *descrambler,
+        std::vector<uint8_t> *sessionId) const {
     ssize_t index = mProgramCasMap.indexOfKey(programNumber);
     if (index < 0) {
         return false;
     }
+    *systemId = mSystemId;
     return mProgramCasMap[index]->getCasSession(
             elementaryPID, descrambler, sessionId);
 }

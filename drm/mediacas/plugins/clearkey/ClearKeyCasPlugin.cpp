@@ -110,23 +110,10 @@ static String8 sessionIdToString(const std::vector<uint8_t> &array) {
     return result;
 }
 
-status_t ClearKeyCasPlugin::openSession(
-        uint16_t program_number, CasSessionId* sessionId) {
-    ALOGV("openSession: program_number=%u", program_number);
+status_t ClearKeyCasPlugin::openSession(CasSessionId* sessionId) {
+    ALOGV("openSession");
 
-    return ClearKeySessionLibrary::get()->addSession(
-            this, program_number, 0, sessionId);
-}
-
-status_t ClearKeyCasPlugin::openSession(
-        uint16_t program_number,
-        uint16_t elementary_PID,
-        CasSessionId *sessionId) {
-    ALOGV("openSession: program_number=%u, elementary_PID=%u",
-            program_number, elementary_PID);
-
-    return ClearKeySessionLibrary::get()->addSession(
-            this, program_number, elementary_PID, sessionId);
+    return ClearKeySessionLibrary::get()->addSession(this, sessionId);
 }
 
 status_t ClearKeyCasPlugin::closeSession(const CasSessionId &sessionId) {

@@ -29,27 +29,12 @@ namespace clearkeycas {
 Mutex ClearKeySessionLibrary::sSingletonLock;
 ClearKeySessionLibrary* ClearKeySessionLibrary::sSingleton = NULL;
 
-inline bool operator < (
-        const SessionInfo& lhs, const SessionInfo& rhs) {
-    if (lhs.plugin < rhs.plugin) return true;
-    else if (lhs.plugin > rhs.plugin) return false;
-
-    if (lhs.program_number < rhs.program_number) return true;
-    else if (lhs.program_number > rhs.program_number) return false;
-
-    return lhs.elementary_PID < rhs.elementary_PID;
-}
-
-ClearKeyCasSession::ClearKeyCasSession(const SessionInfo &info)
-    : mSessionInfo(info) {
+ClearKeyCasSession::ClearKeyCasSession(CasPlugin *plugin)
+    : mPlugin(plugin) {
     mKeyInfo[0].valid = mKeyInfo[1].valid = false;
 }
 
 ClearKeyCasSession::~ClearKeyCasSession() {
-}
-
-const SessionInfo& ClearKeyCasSession::getSessionInfo() const {
-    return mSessionInfo;
 }
 
 ClearKeySessionLibrary* ClearKeySessionLibrary::get() {
@@ -66,24 +51,12 @@ ClearKeySessionLibrary* ClearKeySessionLibrary::get() {
 ClearKeySessionLibrary::ClearKeySessionLibrary() : mNextSessionId(1) {}
 
 status_t ClearKeySessionLibrary::addSession(
-        CasPlugin *plugin,
-        uint16_t program_number,
-        uint16_t elementary_PID,
-        CasSessionId *sessionId) {
+        CasPlugin *plugin, CasSessionId *sessionId) {
     CHECK(sessionId);
 
     Mutex::Autolock lock(mSessionsLock);
 
-    SessionInfo info = {plugin, program_number, elementary_PID};
-    ssize_t index = mSessionInfoToIDMap.indexOfKey(info);
-    if (index >= 0) {
-        ALOGW("Session already exists: program_number=%u, elementary_PID=%u",
-                program_number, elementary_PID);
-        *sessionId = mSessionInfoToIDMap[index];
-        return OK;
-    }
-
-    sp<ClearKeyCasSession> session = new ClearKeyCasSession(info);
+    sp<ClearKeyCasSession> session = new ClearKeyCasSession(plugin);
 
     uint8_t *byteArray = (uint8_t *) &mNextSessionId;
     sessionId->push_back(byteArray[3]);
@@ -92,7 +65,6 @@ status_t ClearKeySessionLibrary::addSession(
     sessionId->push_back(byteArray[0]);
     mNextSessionId++;
 
-    mSessionInfoToIDMap.add(info, *sessionId);
     mIDToSessionMap.add(*sessionId, session);
     return OK;
 }
@@ -117,19 +89,16 @@ void ClearKeySessionLibrary::destroySession(const CasSessionId& sessionId) {
     }
 
     sp<ClearKeyCasSession> session = mIDToSessionMap.valueAt(index);
-    mSessionInfoToIDMap.removeItem(session->getSessionInfo());
     mIDToSessionMap.removeItemsAt(index);
 }
 
 void ClearKeySessionLibrary::destroyPlugin(CasPlugin *plugin) {
     Mutex::Autolock lock(mSessionsLock);
 
-    for (ssize_t index = mSessionInfoToIDMap.size() - 1; index >= 0; index--) {
-        const SessionInfo &info = mSessionInfoToIDMap.keyAt(index);
-        if (info.plugin == plugin) {
-            const CasSessionId &id = mSessionInfoToIDMap.valueAt(index);
-            mIDToSessionMap.removeItem(id);
-            mSessionInfoToIDMap.removeItemsAt(index);
+    for (ssize_t index = mIDToSessionMap.size() - 1; index >= 0; index--) {
+        sp<ClearKeyCasSession> session = mIDToSessionMap.valueAt(index);
+        if (session->getPlugin() == plugin) {
+            mIDToSessionMap.removeItemsAt(index);
         }
     }
 }

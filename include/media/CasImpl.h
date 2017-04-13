@@ -54,13 +54,7 @@ public:
     virtual Status setPrivateData(
             const CasData& pvtData) override;
 
-    virtual Status openSession(
-            int32_t program_number, CasSessionId* _aidl_return) override;
-
-    virtual Status openSessionForStream(
-            int32_t program_number,
-            int32_t elementary_PID,
-            CasSessionId* _aidl_return) override;
+    virtual Status openSession(CasSessionId* _aidl_return) override;
 
     virtual Status closeSession(const CasSessionId& sessionId) override;
 
