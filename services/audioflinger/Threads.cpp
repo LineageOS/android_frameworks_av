@@ -2930,7 +2930,6 @@ void AudioFlinger::PlaybackThread::detachAuxEffect_l(int effectId)
 
 bool AudioFlinger::PlaybackThread::threadLoop()
 {
-    // FIXME Make this an API
     logWriterTLS = mNBLogWriter.get();
 
     Vector< sp<Track> > tracksToRemove;
@@ -2958,15 +2957,17 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 
     acquireWakeLock();
 
-    // mNBLogWriter->log can only be called while thread mutex mLock is held.
+    // mNBLogWriter logging APIs can only be called by a single thread, typically the
+    // thread associated with this PlaybackThread.
+    // If you want to share the mNBLogWriter with other threads (for example, binder threads)
+    // then all such threads must agree to hold a common mutex before logging.
     // So if you need to log when mutex is unlocked, set logString to a non-NULL string,
     // and then that string will be logged at the next convenient opportunity.
+    // See reference to logString below.
     const char *logString = NULL;
 
     checkSilentMode_l();
-#if 0
-    int z = 0; // used in logFormat example
-#endif
+
     while (!exitPending())
     {
         // Log merge requests are performed during AudioFlinger binder transactions, but
@@ -2983,8 +2984,8 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 
             processConfigEvents_l();
 
+            // See comment at declaration of logString for why this is done under mLock
             if (logString != NULL) {
-                // FIXME Remove these internal APIs and replace by LOGT
                 mNBLogWriter->logTimestamp();
                 mNBLogWriter->log(logString);
                 logString = NULL;

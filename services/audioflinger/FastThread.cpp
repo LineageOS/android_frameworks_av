@@ -91,6 +91,9 @@ FastThread::~FastThread()
 
 bool FastThread::threadLoop()
 {
+    // LOGT now works even if logWriterTLS is nullptr, but we're considering changing that,
+    // so this initialization permits a future change to remove the check for nullptr.
+    logWriterTLS = &mDummyNBLogWriter;
     for (;;) {
 
         // either nanosleep, sched_yield, or busy wait

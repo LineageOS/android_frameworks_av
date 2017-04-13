@@ -976,7 +976,7 @@ private:
     sp<NBAIO_Source>        mTeeSource;
 #endif
     uint32_t                mScreenState;   // cached copy of gScreenState
-    static const size_t     kFastMixerLogSize = 4 * 1024;
+    static const size_t     kFastMixerLogSize = 8 * 1024;
     sp<NBLog::Writer>       mFastMixerNBLogWriter;
 
 

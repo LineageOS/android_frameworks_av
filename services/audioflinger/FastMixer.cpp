@@ -41,6 +41,7 @@
 #include <audio_utils/format.h>
 #include <media/AudioMixer.h>
 #include "FastMixer.h"
+#include "TypedLogger.h"
 
 namespace android {
 
@@ -137,6 +138,7 @@ bool FastMixer::isSubClassCommand(FastThreadState::Command command)
 
 void FastMixer::onStateChange()
 {
+    LOG_HIST_FLUSH();
     const FastMixerState * const current = (const FastMixerState *) mCurrent;
     const FastMixerState * const previous = (const FastMixerState *) mPrevious;
     FastMixerDumpState * const dumpState = (FastMixerDumpState *) mDumpState;
@@ -333,6 +335,7 @@ void FastMixer::onStateChange()
 
 void FastMixer::onWork()
 {
+    LOG_HIST_TS();
     const FastMixerState * const current = (const FastMixerState *) mCurrent;
     FastMixerDumpState * const dumpState = (FastMixerDumpState *) mDumpState;
     const FastMixerState::Command command = mCommand;
