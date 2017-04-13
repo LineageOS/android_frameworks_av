@@ -134,7 +134,7 @@ Vector<sp<ICryptoFactory>> CryptoHal::makeCryptoFactories() {
 
     if (factories.size() == 0) {
         // must be in passthrough mode, load the default passthrough service
-        auto passthrough = ICryptoFactory::getService("crypto");
+        auto passthrough = ICryptoFactory::getService();
         if (passthrough != NULL) {
             ALOGI("makeCryptoFactories: using default crypto instance");
             factories.push_back(passthrough);
