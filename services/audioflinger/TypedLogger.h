@@ -82,21 +82,21 @@ constexpr uint64_t hash(const char (&file)[n], uint32_t line) {
 //      slower than nullptr check when logging is enabled at compile-time and disabled at runtime.
 
 // Write formatted entry to log
-#define LOGT(fmt, ...) do { NBLog::Writer *x = logWriterTLS; if (x != nullptr) \
+#define LOGT(fmt, ...) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
                                 x->logFormat((fmt), hash(__FILE__, __LINE__), ##__VA_ARGS__); } \
                                 while (0)
 
 // Write histogram timestamp entry
-#define LOG_HIST_TS() do { NBLog::Writer *x = logWriterTLS; if (x != nullptr) \
+#define LOG_HIST_TS() do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
                                 x->logHistTS(hash(__FILE__, __LINE__)); } while(0)
 
 // flush all histogram
-#define LOG_HIST_FLUSH() do { NBLog::Writer *x = logWriterTLS; if (x != nullptr) \
+#define LOG_HIST_FLUSH() do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
                                 x->logHistFlush(hash(__FILE__, __LINE__)); } while(0)
 
 namespace android {
 extern "C" {
-extern thread_local NBLog::Writer *logWriterTLS;
+extern thread_local NBLog::Writer *tlNBLogWriter;
 }
 } // namespace android
 

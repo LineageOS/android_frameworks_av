@@ -91,9 +91,9 @@ FastThread::~FastThread()
 
 bool FastThread::threadLoop()
 {
-    // LOGT now works even if logWriterTLS is nullptr, but we're considering changing that,
+    // LOGT now works even if tlNBLogWriter is nullptr, but we're considering changing that,
     // so this initialization permits a future change to remove the check for nullptr.
-    logWriterTLS = &mDummyNBLogWriter;
+    tlNBLogWriter = &mDummyNBLogWriter;
     for (;;) {
 
         // either nanosleep, sched_yield, or busy wait
@@ -125,7 +125,7 @@ bool FastThread::threadLoop()
             mDumpState = next->mDumpState != NULL ? next->mDumpState : mDummyDumpState;
             mNBLogWriter = next->mNBLogWriter != NULL ? next->mNBLogWriter : &mDummyNBLogWriter;
             setNBLogWriter(mNBLogWriter);   // FastMixer informs its AudioMixer, FastCapture ignores
-            logWriterTLS = mNBLogWriter;
+            tlNBLogWriter = mNBLogWriter;
 
             // We want to always have a valid reference to the previous (non-idle) state.
             // However, the state queue only guarantees access to current and previous states.
