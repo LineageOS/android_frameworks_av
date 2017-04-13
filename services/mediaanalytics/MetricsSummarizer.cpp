@@ -85,16 +85,12 @@ const char *MetricsSummarizer::getKey() {
 // should the record be given to this summarizer
 bool MetricsSummarizer::isMine(MediaAnalyticsItem &item)
 {
-    const char *incoming = item.getKey().c_str();
-    if (incoming == NULL) {
-        incoming = "unspecified";
-    }
     if (mKey == NULL)
         return true;
-    if (strcmp(mKey, incoming) != 0) {
+    AString itemKey = item.getKey();
+    if (strcmp(mKey, itemKey.c_str()) != 0) {
         return false;
     }
-    // since nothing failed....
     return true;
 }
 
