@@ -275,13 +275,18 @@ CaptureSequencer::CaptureState CaptureSequencer::manageDone(sp<Camera2Client> &c
                 res = INVALID_OPERATION;
                 break;
             case Parameters::STILL_CAPTURE:
-                res = client->getCameraDevice()->waitUntilDrained();
-                if (res != OK) {
-                    ALOGE("%s: Camera %d: Can't idle after still capture: "
-                            "%s (%d)", __FUNCTION__, client->getCameraId(),
-                            strerror(-res), res);
+                // No need to move the state to stop for ZSL
+                if (!l.mParameters.allowZslMode) {
+                    res = client->getCameraDevice()->waitUntilDrained();
+                    if (res != OK) {
+                        ALOGE("%s: Camera %d: Can't idle after still capture: "
+                                "%s (%d)", __FUNCTION__, client->getCameraId(),
+                                strerror(-res), res);
+                    }
+                    l.mParameters.state = Parameters::STOPPED;
+                } else {
+                    l.mParameters.state = Parameters::PREVIEW;
                 }
-                l.mParameters.state = Parameters::STOPPED;
                 break;
             case Parameters::VIDEO_SNAPSHOT:
                 l.mParameters.state = Parameters::RECORD;

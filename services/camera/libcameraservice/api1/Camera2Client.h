@@ -35,6 +35,10 @@
 
 namespace android {
 
+#ifdef USE_QTI_CAMERA2CLIENT
+class QTICamera2Client;
+#endif
+
 namespace camera2 {
 
 class StreamingProcessor;
@@ -53,6 +57,10 @@ class IMemory;
 class Camera2Client :
         public Camera2ClientBase<CameraService::Client>
 {
+#ifdef USE_QTI_CAMERA2CLIENT
+friend class QTICamera2Client;
+#endif
+
 public:
     /**
      * ICamera interface (see ICamera for details)
@@ -217,6 +225,9 @@ private:
     sp<camera2::CaptureSequencer> mCaptureSequencer;
     sp<camera2::JpegProcessor> mJpegProcessor;
     sp<camera2::ZslProcessor> mZslProcessor;
+#ifdef USE_QTI_CAMERA2CLIENT
+    sp<QTICamera2Client> mQTICamera2Client;
+#endif
 
     /** Utility members */
     bool mLegacyMode;
