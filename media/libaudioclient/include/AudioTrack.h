@@ -348,7 +348,12 @@ public:
             uint32_t    channelCount() const { return mChannelCount; }
             size_t      frameCount() const  { return mFrameCount; }
 
-    // TODO consider notificationFrames() if needed
+    /*
+     * Return the period of the notification callback in frames.
+     * This value is set when the AudioTrack is constructed.
+     * It can be modified if the AudioTrack is rerouted.
+     */
+            uint32_t    getNotificationPeriodInFrames() const { return mNotificationFramesAct; }
 
     /* Return effective size of audio buffer that an application writes to
      * or a negative error if the track is uninitialized.
