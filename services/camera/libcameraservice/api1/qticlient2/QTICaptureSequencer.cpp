@@ -1,3 +1,5 @@
+/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+ */
 /*
  * Copyright (C) 2012 The Android Open Source Project
  *
@@ -14,7 +16,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "Camera2-CaptureSequencer"
+#define LOG_TAG "Camera2-QTICaptureSequencer"
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 //#define LOG_NDEBUG 0
 
@@ -25,18 +27,16 @@
 #include <utils/Vector.h>
 
 #include "api1/Camera2Client.h"
-#include "api1/qticlient2/CaptureSequencer.h"
+#include "api1/qticlient2/QTICaptureSequencer.h"
 #include "api1/qticlient2/Parameters.h"
 #include "api1/qticlient2/ZslProcessor.h"
-#include "api1/qticlient2/QTICaptureSequencer.h"
 
 namespace android {
 namespace camera2 {
 
 /** Public members */
 
-CaptureSequencer::CaptureSequencer(wp<Camera2Client> client):
-        Thread(false),
+QTICaptureSequencer::QTICaptureSequencer(wp<Camera2Client> client):
         mStartCapture(false),
         mBusy(false),
         mNewAEState(false),
@@ -54,40 +54,50 @@ CaptureSequencer::CaptureSequencer(wp<Camera2Client> client):
         mCaptureId(Camera2Client::kCaptureRequestIdStart),
         mMsgType(0) {
     ALOGV("%s", __FUNCTION__);
-
-    mUseQTICaptureSequencer = false;
-    mQTICaptureSequencer = new QTICaptureSequencer(client);
-    mQTICaptureSequencer->run("QTICaptureSeq");
+    mBurstCount = 1;
 }
 
-CaptureSequencer::~CaptureSequencer() {
+QTICaptureSequencer::~QTICaptureSequencer() {
     ALOGV("%s: Exit", __FUNCTION__);
-    if (mQTICaptureSequencer != NULL) {
-        mQTICaptureSequencer->requestExit();
-        ALOGV("%s: Waiting for thread", __FUNCTION__);
-        mQTICaptureSequencer->join();
+    for (size_t i = 0; i < mBurstCount; i++) {
+        mCaptureHeap[i].clear();
     }
 
 }
 
-void CaptureSequencer::setZslProcessor(const wp<ZslProcessor>& processor) {
+void QTICaptureSequencer::setZslProcessor(wp<ZslProcessor> processor) {
     Mutex::Autolock l(mInputMutex);
     mZslProcessor = processor;
-    mQTICaptureSequencer->setZslProcessor(processor);
 }
 
-status_t CaptureSequencer::startCapture(int msgType) {
+status_t QTICaptureSequencer::startCapture(int msgType, bool& useQTISequencer) {
     ALOGV("%s", __FUNCTION__);
     ATRACE_CALL();
     Mutex::Autolock l(mInputMutex);
+    useQTISequencer = false;
+
+    sp<Camera2Client> client = mClient.promote();
+    if (client == 0) return false;
+
     if (mBusy) {
         ALOGE("%s: Already busy capturing!", __FUNCTION__);
         return INVALID_OPERATION;
     }
 
-    mQTICaptureSequencer->startCapture(msgType, mUseQTICaptureSequencer);
-    if(mUseQTICaptureSequencer) {
-        // Use QTI specific capture sequencer
+    {
+        SharedParameters::Lock lp(client->getParameters());
+        mBurstCount = lp.mParameters.qtiParams->burstCount;
+
+        // Set QTI capture sequencer for ZSL,
+        // For AE bracketing,
+        if ((mBurstCount > 1) ||
+                (lp.mParameters.allowZslMode)) {
+            useQTISequencer = true;
+        }
+    }
+
+    if(!useQTISequencer) {
+        // No need of QTI Capture Sequencer, return from here.
         return OK;
     }
 
@@ -99,12 +109,8 @@ status_t CaptureSequencer::startCapture(int msgType) {
     return OK;
 }
 
-status_t CaptureSequencer::waitUntilIdle(nsecs_t timeout) {
+status_t QTICaptureSequencer::waitUntilIdle(nsecs_t timeout) {
     ATRACE_CALL();
-    if(mUseQTICaptureSequencer) {
-        // Use QTI specific capture sequencer
-        return mQTICaptureSequencer->waitUntilIdle(timeout);
-    }
     ALOGV("%s: Waiting for idle", __FUNCTION__);
     Mutex::Autolock l(mStateMutex);
     status_t res = -1;
@@ -120,8 +126,9 @@ status_t CaptureSequencer::waitUntilIdle(nsecs_t timeout) {
     return OK;
 }
 
-void CaptureSequencer::notifyAutoExposure(uint8_t newState, int triggerId) {
+void QTICaptureSequencer::notifyAutoExposure(uint8_t newState, int triggerId) {
     ATRACE_CALL();
+
     Mutex::Autolock l(mInputMutex);
     mAEState = newState;
     mAETriggerId = triggerId;
@@ -129,17 +136,11 @@ void CaptureSequencer::notifyAutoExposure(uint8_t newState, int triggerId) {
         mNewAEState = true;
         mNewNotifySignal.signal();
     }
-
-    mQTICaptureSequencer->notifyAutoExposure(newState, triggerId);
 }
 
-void CaptureSequencer::notifyShutter(const CaptureResultExtras& resultExtras,
+void QTICaptureSequencer::notifyShutter(const CaptureResultExtras& resultExtras,
                                      nsecs_t timestamp) {
     ATRACE_CALL();
-    if(mUseQTICaptureSequencer) {
-        // Use QTI specific capture sequencer
-        return mQTICaptureSequencer->notifyShutter(resultExtras, timestamp);
-    }
     (void) timestamp;
     Mutex::Autolock l(mInputMutex);
     if (!mHalNotifiedShutter && resultExtras.requestId == mShutterCaptureId) {
@@ -148,34 +149,41 @@ void CaptureSequencer::notifyShutter(const CaptureResultExtras& resultExtras,
     }
 }
 
-void CaptureSequencer::onResultAvailable(const CaptureResult &result) {
+void QTICaptureSequencer::onResultAvailable(const CaptureResult &result) {
     ATRACE_CALL();
-    if(mUseQTICaptureSequencer) {
-        // Use QTI specific capture sequencer
-        return mQTICaptureSequencer->onResultAvailable(result);
-    }
     ALOGV("%s: New result available.", __FUNCTION__);
     Mutex::Autolock l(mInputMutex);
-    mNewFrameId = result.mResultExtras.requestId;
-    mNewFrame = result.mMetadata;
-    if (!mNewFrameReceived) {
+    mNewFrameId[mResultCount] = result.mResultExtras.requestId;
+    mNewFrame[mResultCount] = result.mMetadata;
+    mResultCount++;
+    if (!mNewFrameReceived && mResultCount == mBurstCount) {
         mNewFrameReceived = true;
         mNewFrameSignal.signal();
     }
 }
 
-void CaptureSequencer::onCaptureAvailable(nsecs_t timestamp,
-        const sp<MemoryBase>& captureBuffer, bool captureError) {
+void QTICaptureSequencer::onCaptureAvailable(nsecs_t timestamp,
+        sp<MemoryBase> captureBuffer, bool captureError) {
     ATRACE_CALL();
-    if(mUseQTICaptureSequencer) {
-        // Use QTI specific capture sequencer
-        return mQTICaptureSequencer->onCaptureAvailable(timestamp, captureBuffer, captureError);
-    }
     ALOGV("%s", __FUNCTION__);
     Mutex::Autolock l(mInputMutex);
-    mCaptureTimestamp = timestamp;
-    mCaptureBuffer = captureBuffer;
-    if (!mNewCaptureReceived) {
+    mCaptureTimestamp[mCaptureReceivedCount] = timestamp;
+    mCaptureBuffer[mCaptureReceivedCount] = captureBuffer;
+
+    // Copy the data from jpeg processor to store with QTICaptureSequencer.
+    ssize_t offset;
+    size_t size;
+    sp<IMemoryHeap> captureBufferHeap =
+            captureBuffer->getMemory(&offset, &size);
+
+    uint8_t *srcData = (uint8_t*)captureBufferHeap->getBase() + offset;
+    uint8_t* captureMemory = (uint8_t*)mCaptureHeap[mCaptureReceivedCount]->getBase();
+
+    memcpy(captureMemory, srcData, size);
+    mCaptureBuffer[mCaptureReceivedCount] = new MemoryBase(mCaptureHeap[mCaptureReceivedCount], 0, size);
+
+    mCaptureReceivedCount++;
+    if (!mNewCaptureReceived && mCaptureReceivedCount == mBurstCount) {
         mNewCaptureReceived = true;
         if (captureError) {
             mNewCaptureErrorCnt++;
@@ -187,30 +195,30 @@ void CaptureSequencer::onCaptureAvailable(nsecs_t timestamp,
 }
 
 
-void CaptureSequencer::dump(int fd, const Vector<String16>& /*args*/) {
+void QTICaptureSequencer::dump(int fd) {
     String8 result;
-    if(mUseQTICaptureSequencer) {
-        // Use QTI specific capture sequencer
-        return mQTICaptureSequencer->dump(fd);
-    }
-    if (mCaptureRequest.entryCount() != 0) {
-        result = "    Capture request:\n";
-        write(fd, result.string(), result.size());
-        mCaptureRequest.dump(fd, 2, 6);
-    } else {
-        result = "    Capture request: undefined\n";
-        write(fd, result.string(), result.size());
+    for (size_t i = 0; i < mCaptureRequests.size(); i++) {
+        if (mCaptureRequests[i].entryCount() != 0) {
+            result = "    Capture request:\n";
+            write(fd, result.string(), result.size());
+            mCaptureRequests[i].dump(fd, 2, 6);
+        } else {
+            result = "    Capture request: undefined\n";
+            write(fd, result.string(), result.size());
+        }
     }
     result = String8::format("    Current capture state: %s\n",
             kStateNames[mCaptureState]);
     result.append("    Latest captured frame:\n");
     write(fd, result.string(), result.size());
-    mNewFrame.dump(fd, 2, 6);
+    for (size_t i = 0; i < mResultCount; i++) {
+        mNewFrame[i].dump(fd, 2, 6);
+    }
 }
 
 /** Private members */
 
-const char* CaptureSequencer::kStateNames[CaptureSequencer::NUM_CAPTURE_STATES+1] =
+const char* QTICaptureSequencer::kStateNames[QTICaptureSequencer::NUM_CAPTURE_STATES+1] =
 {
     "IDLE",
     "START",
@@ -226,21 +234,21 @@ const char* CaptureSequencer::kStateNames[CaptureSequencer::NUM_CAPTURE_STATES+1
     "UNKNOWN"
 };
 
-const CaptureSequencer::StateManager
-        CaptureSequencer::kStateManagers[CaptureSequencer::NUM_CAPTURE_STATES-1] = {
-    &CaptureSequencer::manageIdle,
-    &CaptureSequencer::manageStart,
-    &CaptureSequencer::manageZslStart,
-    &CaptureSequencer::manageZslWaiting,
-    &CaptureSequencer::manageZslReprocessing,
-    &CaptureSequencer::manageStandardStart,
-    &CaptureSequencer::manageStandardPrecaptureWait,
-    &CaptureSequencer::manageStandardCapture,
-    &CaptureSequencer::manageStandardCaptureWait,
-    &CaptureSequencer::manageDone,
+const QTICaptureSequencer::StateManager
+        QTICaptureSequencer::kStateManagers[QTICaptureSequencer::NUM_CAPTURE_STATES-1] = {
+    &QTICaptureSequencer::manageIdle,
+    &QTICaptureSequencer::manageStart,
+    &QTICaptureSequencer::manageZslStart,
+    &QTICaptureSequencer::manageZslWaiting,
+    &QTICaptureSequencer::manageZslReprocessing,
+    &QTICaptureSequencer::manageStandardStart,
+    &QTICaptureSequencer::manageStandardPrecaptureWait,
+    &QTICaptureSequencer::manageStandardCapture,
+    &QTICaptureSequencer::manageStandardCaptureWait,
+    &QTICaptureSequencer::manageDone,
 };
 
-bool CaptureSequencer::threadLoop() {
+bool QTICaptureSequencer::threadLoop() {
 
     sp<Camera2Client> client = mClient.promote();
     if (client == 0) return false;
@@ -277,7 +285,7 @@ bool CaptureSequencer::threadLoop() {
     return true;
 }
 
-CaptureSequencer::CaptureState CaptureSequencer::manageIdle(
+QTICaptureSequencer::CaptureState QTICaptureSequencer::manageIdle(
         sp<Camera2Client> &/*client*/) {
     status_t res;
     Mutex::Autolock l(mInputMutex);
@@ -294,7 +302,7 @@ CaptureSequencer::CaptureState CaptureSequencer::manageIdle(
     return IDLE;
 }
 
-CaptureSequencer::CaptureState CaptureSequencer::manageDone(sp<Camera2Client> &client) {
+QTICaptureSequencer::CaptureState QTICaptureSequencer::manageDone(sp<Camera2Client> &client) {
     status_t res = OK;
     ATRACE_CALL();
     mCaptureId++;
@@ -316,13 +324,18 @@ CaptureSequencer::CaptureState CaptureSequencer::manageDone(sp<Camera2Client> &c
                 res = INVALID_OPERATION;
                 break;
             case Parameters::STILL_CAPTURE:
-                res = client->getCameraDevice()->waitUntilDrained();
-                if (res != OK) {
-                    ALOGE("%s: Camera %d: Can't idle after still capture: "
-                            "%s (%d)", __FUNCTION__, client->getCameraId(),
-                            strerror(-res), res);
+                // For ZSL, No need to move the state to STOPPED
+                if (!l.mParameters.allowZslMode) {
+                    res = client->getCameraDevice()->waitUntilDrained();
+                    if (res != OK) {
+                        ALOGE("%s: Camera %d: Can't idle after still capture: "
+                                "%s (%d)", __FUNCTION__, client->getCameraId(),
+                                strerror(-res), res);
+                    }
+                    l.mParameters.state = Parameters::STOPPED;
+                } else {
+                    l.mParameters.state = Parameters::PREVIEW;
                 }
-                l.mParameters.state = Parameters::STOPPED;
                 break;
             case Parameters::VIDEO_SNAPSHOT:
                 l.mParameters.state = Parameters::RECORD;
@@ -346,7 +359,8 @@ CaptureSequencer::CaptureState CaptureSequencer::manageDone(sp<Camera2Client> &c
     /**
      * Fire the jpegCallback in Camera#takePicture(..., jpegCallback)
      */
-    if (mCaptureBuffer != 0 && res == OK) {
+    for (int i = 0; i < mBurstCount; i++) {
+        if (mCaptureBuffer[i] != 0 && res == OK) {
         ATRACE_ASYNC_END(Camera2Client::kTakepictureLabel, takePictureCounter);
 
         Camera2Client::SharedCameraCallbacks::Lock
@@ -354,17 +368,17 @@ CaptureSequencer::CaptureState CaptureSequencer::manageDone(sp<Camera2Client> &c
         ALOGV("%s: Sending still image to client", __FUNCTION__);
         if (l.mRemoteCallback != 0) {
             l.mRemoteCallback->dataCallback(CAMERA_MSG_COMPRESSED_IMAGE,
-                    mCaptureBuffer, NULL);
+                        mCaptureBuffer[i], NULL);
         } else {
             ALOGV("%s: No client!", __FUNCTION__);
         }
+        }
+        mCaptureBuffer[i].clear();
     }
-    mCaptureBuffer.clear();
-
     return IDLE;
 }
 
-CaptureSequencer::CaptureState CaptureSequencer::manageStart(
+QTICaptureSequencer::CaptureState QTICaptureSequencer::manageStart(
         sp<Camera2Client> &client) {
     ALOGV("%s", __FUNCTION__);
     status_t res;
@@ -381,11 +395,38 @@ CaptureSequencer::CaptureState CaptureSequencer::manageStart(
 
     else if (l.mParameters.useZeroShutterLag() &&
             l.mParameters.state == Parameters::STILL_CAPTURE &&
-            l.mParameters.flashMode != Parameters::FLASH_MODE_ON) {
+            l.mParameters.flashMode != Parameters::FLASH_MODE_ON &&
+            !l.mParameters.qtiParams->aeBracketEnable) {
         nextState = ZSL_START;
     } else {
         nextState = STANDARD_START;
     }
+
+    ssize_t maxJpegSize = client->getCameraDevice()->getJpegBufferSize(
+            l.mParameters.pictureWidth, l.mParameters.pictureHeight);
+    if (maxJpegSize <= 0) {
+        ALOGE("%s: Jpeg buffer size (%zu) is invalid ",
+                __FUNCTION__, maxJpegSize);
+        return DONE;
+    }
+
+    for (size_t i = 0; i < mBurstCount; i++) {
+        if (mCaptureHeap[i] == 0 ||
+                (mCaptureHeap[i]->getSize() != static_cast<size_t>(maxJpegSize))) {
+            // Create memory for API consumption
+            mCaptureHeap[i].clear();
+            mCaptureHeap[i] =
+                    new MemoryHeapBase(maxJpegSize, 0 , "QTICaptureSequencerHeap");
+            if (mCaptureHeap[i]->getSize() == 0) {
+                ALOGE("%s: Unable to allocate memory for capture",
+                        __FUNCTION__);
+                return DONE;
+            }
+        }
+    }
+    mCaptureReceivedCount = 0;
+    mResultCount = 0;
+
     {
         Mutex::Autolock l(mInputMutex);
         mShutterCaptureId = mCaptureId;
@@ -396,7 +437,7 @@ CaptureSequencer::CaptureState CaptureSequencer::manageStart(
     return nextState;
 }
 
-CaptureSequencer::CaptureState CaptureSequencer::manageZslStart(
+QTICaptureSequencer::CaptureState QTICaptureSequencer::manageZslStart(
         sp<Camera2Client> &client) {
     ALOGV("%s", __FUNCTION__);
     status_t res;
@@ -407,22 +448,24 @@ CaptureSequencer::CaptureState CaptureSequencer::manageZslStart(
     }
 
     // We don't want to get partial results for ZSL capture.
-    client->registerFrameListener(mCaptureId, mCaptureId + 1,
+    client->registerFrameListener(mCaptureId, mCaptureId + 1 + mBurstCount,
             this,
             /*sendPartials*/false);
 
     // TODO: Actually select the right thing here.
-    res = processor->pushToReprocess(mCaptureId);
-    if (res != OK) {
-        if (res == NOT_ENOUGH_DATA) {
-            ALOGV("%s: Camera %d: ZSL queue doesn't have good frame, "
-                    "falling back to normal capture", __FUNCTION__,
-                    client->getCameraId());
-        } else {
-            ALOGE("%s: Camera %d: Error in ZSL queue: %s (%d)",
-                    __FUNCTION__, client->getCameraId(), strerror(-res), res);
+    for (int i = 0; i < mBurstCount; i++) {
+        res = processor->pushToReprocess(mCaptureId);
+        if (res != OK) {
+            if (res == NOT_ENOUGH_DATA) {
+                ALOGV("%s: Camera %d: ZSL queue doesn't have good frame, "
+                        "falling back to normal capture", __FUNCTION__,
+                        client->getCameraId());
+            } else {
+                ALOGE("%s: Camera %d: Error in ZSL queue: %s (%d)",
+                        __FUNCTION__, client->getCameraId(), strerror(-res), res);
+            }
+            return STANDARD_START;
         }
-        return STANDARD_START;
     }
 
     SharedParameters::Lock l(client->getParameters());
@@ -433,19 +476,19 @@ CaptureSequencer::CaptureState CaptureSequencer::manageZslStart(
     return STANDARD_CAPTURE_WAIT;
 }
 
-CaptureSequencer::CaptureState CaptureSequencer::manageZslWaiting(
+QTICaptureSequencer::CaptureState QTICaptureSequencer::manageZslWaiting(
         sp<Camera2Client> &/*client*/) {
     ALOGV("%s", __FUNCTION__);
     return DONE;
 }
 
-CaptureSequencer::CaptureState CaptureSequencer::manageZslReprocessing(
+QTICaptureSequencer::CaptureState QTICaptureSequencer::manageZslReprocessing(
         sp<Camera2Client> &/*client*/) {
     ALOGV("%s", __FUNCTION__);
     return START;
 }
 
-CaptureSequencer::CaptureState CaptureSequencer::manageStandardStart(
+QTICaptureSequencer::CaptureState QTICaptureSequencer::manageStandardStart(
         sp<Camera2Client> &client) {
     ATRACE_CALL();
 
@@ -456,7 +499,7 @@ CaptureSequencer::CaptureState CaptureSequencer::manageStandardStart(
     // result doesn't have to have this metadata available.
     // TODO: Update to use the HALv3 shutter notification for remove the
     // need for this listener and make it faster. see bug 12530628.
-    client->registerFrameListener(mCaptureId, mCaptureId + 1,
+    client->registerFrameListener(mCaptureId, mCaptureId + 1 + mBurstCount,
             this,
             /*sendPartials*/false);
 
@@ -481,7 +524,7 @@ CaptureSequencer::CaptureState CaptureSequencer::manageStandardStart(
     return STANDARD_PRECAPTURE_WAIT;
 }
 
-CaptureSequencer::CaptureState CaptureSequencer::manageStandardPrecaptureWait(
+QTICaptureSequencer::CaptureState QTICaptureSequencer::manageStandardPrecaptureWait(
         sp<Camera2Client> &/*client*/) {
     status_t res;
     ATRACE_CALL();
@@ -527,7 +570,7 @@ CaptureSequencer::CaptureState CaptureSequencer::manageStandardPrecaptureWait(
     return STANDARD_PRECAPTURE_WAIT;
 }
 
-CaptureSequencer::CaptureState CaptureSequencer::manageStandardCapture(
+QTICaptureSequencer::CaptureState QTICaptureSequencer::manageStandardCapture(
         sp<Camera2Client> &client) {
     status_t res;
     ATRACE_CALL();
@@ -566,32 +609,28 @@ CaptureSequencer::CaptureState CaptureSequencer::manageStandardCapture(
         captureIntent = static_cast<uint8_t>(ANDROID_CONTROL_CAPTURE_INTENT_VIDEO_SNAPSHOT);
     }
 
-    res = mCaptureRequest.update(ANDROID_REQUEST_OUTPUT_STREAMS,
-            outputStreams);
-    if (res == OK) {
-        res = mCaptureRequest.update(ANDROID_REQUEST_ID,
-                &mCaptureId, 1);
-    }
-    if (res == OK) {
-        res = mCaptureRequest.update(ANDROID_CONTROL_CAPTURE_INTENT,
-                &captureIntent, 1);
-    }
-    if (res == OK) {
-        res = mCaptureRequest.sort();
-    }
+    for (size_t i = 0; i < mCaptureRequests.size(); i++) {
+        CameraMetadata &temp = mCaptureRequests.editItemAt(i);
+        res = temp.update(ANDROID_REQUEST_OUTPUT_STREAMS,
+                outputStreams);
+        if (res == OK) {
+            int32_t captureId = mCaptureId + i;
+            res = temp.update(ANDROID_REQUEST_ID,
+                    &captureId, 1);
+        }
+        if (res == OK) {
+            res = temp.update(ANDROID_CONTROL_CAPTURE_INTENT,
+                    &captureIntent, 1);
+        }
+        if (res == OK) {
+            res = temp.sort();
+        }
 
-    if (res != OK) {
-        ALOGE("%s: Camera %d: Unable to set up still capture request: %s (%d)",
-                __FUNCTION__, client->getCameraId(), strerror(-res), res);
-        return DONE;
-    }
-
-    // Create a capture copy since CameraDeviceBase#capture takes ownership
-    CameraMetadata captureCopy = mCaptureRequest;
-    if (captureCopy.entryCount() == 0) {
-        ALOGE("%s: Camera %d: Unable to copy capture request for HAL device",
-                __FUNCTION__, client->getCameraId());
-        return DONE;
+        if (res != OK) {
+            ALOGE("%s: Camera %d: Unable to set up still capture request: %s (%d)",
+                    __FUNCTION__, client->getCameraId(), strerror(-res), res);
+            return DONE;
+        }
     }
 
     /**
@@ -609,20 +648,24 @@ CaptureSequencer::CaptureState CaptureSequencer::manageStandardCapture(
         }
     }
 
-    // TODO: Capture should be atomic with setStreamingRequest here
-    res = client->getCameraDevice()->capture(captureCopy);
-    if (res != OK) {
-        ALOGE("%s: Camera %d: Unable to submit still image capture request: "
-                "%s (%d)",
-                __FUNCTION__, client->getCameraId(), strerror(-res), res);
-        return DONE;
+
+    List<const CameraMetadata> captureRequests;
+    for (int i = 0; i < mBurstCount; i++) {
+        // Create a capture copy since CameraDeviceBase#capture takes ownership
+        CameraMetadata captureCopy = mCaptureRequests[i];
+        if (captureCopy.entryCount() == 0) {
+            ALOGE("%s: Camera %d: Unable to copy capture request for HAL device",
+                    __FUNCTION__, client->getCameraId());
+            return DONE;
+        }
+        res = client->getCameraDevice()->capture(captureCopy);
     }
 
     mTimeoutCount = kMaxTimeoutsForCaptureEnd;
     return STANDARD_CAPTURE_WAIT;
 }
 
-CaptureSequencer::CaptureState CaptureSequencer::manageStandardCaptureWait(
+QTICaptureSequencer::CaptureState QTICaptureSequencer::manageStandardCaptureWait(
         sp<Camera2Client> &client) {
     status_t res;
     ATRACE_CALL();
@@ -686,26 +729,27 @@ CaptureSequencer::CaptureState CaptureSequencer::manageStandardCaptureWait(
         return DONE;
     }
     if (mNewFrameReceived && mNewCaptureReceived) {
-
-        if (mNewFrameId != mCaptureId) {
-            ALOGW("Mismatched capture frame IDs: Expected %d, got %d",
-                    mCaptureId, mNewFrameId);
-        }
-        camera_metadata_entry_t entry;
-        entry = mNewFrame.find(ANDROID_SENSOR_TIMESTAMP);
-        if (entry.count == 0) {
-            ALOGE("No timestamp field in capture frame!");
-        } else if (entry.count == 1) {
-            if (entry.data.i64[0] != mCaptureTimestamp) {
-                ALOGW("Mismatched capture timestamps: Metadata frame %" PRId64 ","
-                        " captured buffer %" PRId64,
-                        entry.data.i64[0],
-                        mCaptureTimestamp);
+        for (int i = 0; i < mBurstCount; i++) {
+            if (mNewFrameId[i] != (mCaptureId + i)) {
+                ALOGW("Mismatched capture frame IDs: Expected %d, got %d",
+                        mCaptureId, mNewFrameId[0]);
             }
-        } else {
-            ALOGE("Timestamp metadata is malformed!");
+            camera_metadata_entry_t entry;
+            entry = mNewFrame[i].find(ANDROID_SENSOR_TIMESTAMP);
+            if (entry.count == 0) {
+                ALOGE("No timestamp field in capture frame!");
+            } else if (entry.count == 1) {
+                if (entry.data.i64[i] != mCaptureTimestamp[i]) {
+                    ALOGW("Mismatched capture timestamps: Metadata frame %" PRId64 ","
+                            " captured buffer %" PRId64,
+                            entry.data.i64[i],
+                            mCaptureTimestamp[i]);
+                }
+            } else {
+                ALOGE("Timestamp metadata is malformed!");
+            }
         }
-        client->removeFrameListener(mCaptureId, mCaptureId + 1, this);
+        client->removeFrameListener(mCaptureId, mCaptureId + 1 + mBurstCount, this);
 
         mNewFrameReceived = false;
         mNewCaptureReceived = false;
@@ -714,31 +758,43 @@ CaptureSequencer::CaptureState CaptureSequencer::manageStandardCaptureWait(
     return STANDARD_CAPTURE_WAIT;
 }
 
-status_t CaptureSequencer::updateCaptureRequest(const Parameters &params,
+status_t QTICaptureSequencer::updateCaptureRequest(const Parameters &params,
         sp<Camera2Client> &client) {
     ATRACE_CALL();
     status_t res;
-    if (mCaptureRequest.entryCount() == 0) {
-        res = client->getCameraDevice()->createDefaultRequest(
-                CAMERA2_TEMPLATE_STILL_CAPTURE,
-                &mCaptureRequest);
+    mCaptureRequests.clear();
+    for (size_t i = 0; i < mBurstCount; i++) {
+        CameraMetadata localCaptureRequest;
+        if (localCaptureRequest.entryCount() == 0) {
+            res = client->getCameraDevice()->createDefaultRequest(
+                    CAMERA2_TEMPLATE_STILL_CAPTURE,
+                    &localCaptureRequest);
+            if (res != OK) {
+                ALOGE("%s: Camera %d: Unable to create default still image request:"
+                        " %s (%d)", __FUNCTION__, client->getCameraId(),
+                        strerror(-res), res);
+                return res;
+            }
+        }
+
+        res = params.updateRequest(&localCaptureRequest);
         if (res != OK) {
-            ALOGE("%s: Camera %d: Unable to create default still image request:"
-                    " %s (%d)", __FUNCTION__, client->getCameraId(),
+            ALOGE("%s: Camera %d: Unable to update common entries of capture "
+                    "request: %s (%d)", __FUNCTION__, client->getCameraId(),
                     strerror(-res), res);
             return res;
         }
-    }
 
-    res = params.updateRequest(&mCaptureRequest);
-    if (res != OK) {
-        ALOGE("%s: Camera %d: Unable to update common entries of capture "
-                "request: %s (%d)", __FUNCTION__, client->getCameraId(),
-                strerror(-res), res);
-        return res;
+        res = params.updateRequestJpeg(&localCaptureRequest);
+        if (res != OK) {
+            ALOGE("%s: Camera %d: Unable to update JPEG entries of capture "
+                    "request: %s (%d)", __FUNCTION__, client->getCameraId(),
+                    strerror(-res), res);
+            return res;
+        }
+        mCaptureRequests.push_back(localCaptureRequest);
     }
-
-    res = params.updateRequestJpeg(&mCaptureRequest);
+    res = params.qtiParams->updateRequestForQTICapture(&mCaptureRequests);
     if (res != OK) {
         ALOGE("%s: Camera %d: Unable to update JPEG entries of capture "
                 "request: %s (%d)", __FUNCTION__, client->getCameraId(),
@@ -749,8 +805,8 @@ status_t CaptureSequencer::updateCaptureRequest(const Parameters &params,
     return OK;
 }
 
-/*static*/ void CaptureSequencer::shutterNotifyLocked(const Parameters &params,
-            const sp<Camera2Client>& client, int msgType) {
+/*static*/ void QTICaptureSequencer::shutterNotifyLocked(const Parameters &params,
+            sp<Camera2Client> client, int msgType) {
     ATRACE_CALL();
 
     if (params.state == Parameters::STILL_CAPTURE
