@@ -138,7 +138,8 @@ ZslProcessor::ZslProcessor(
         mInputBuffer(nullptr),
         mProducer(nullptr),
         mInputProducer(nullptr),
-        mInputProducerSlot(-1) {
+        mInputProducerSlot(-1),
+        mBuffersToDetach(0) {
     // Initialize buffer queue and frame list based on pipeline max depth.
     size_t pipelineMaxDepth = kDefaultMaxPipelineDepth;
     if (client != 0) {
@@ -430,6 +431,11 @@ status_t ZslProcessor::updateRequestWithDefaultStillRequest(CameraMetadata &requ
 void ZslProcessor::notifyInputReleased() {
     Mutex::Autolock l(mInputMutex);
 
+    mBuffersToDetach++;
+    mBuffersToDetachSignal.signal();
+}
+
+void ZslProcessor::doNotifyInputReleasedLocked() {
     assert(nullptr != mInputBuffer.get());
     assert(nullptr != mInputProducer.get());
 
@@ -736,9 +742,18 @@ void ZslProcessor::dump(int fd, const Vector<String16>& /*args*/) const {
 }
 
 bool ZslProcessor::threadLoop() {
-    // TODO: remove dependency on thread. For now, shut thread down right
-    // away.
-    return false;
+    Mutex::Autolock l(mInputMutex);
+
+    if (mBuffersToDetach == 0) {
+        status_t res = mBuffersToDetachSignal.waitRelative(mInputMutex, kWaitDuration);
+        if (res == TIMED_OUT) return true;
+    }
+    while (mBuffersToDetach > 0) {
+        doNotifyInputReleasedLocked();
+        mBuffersToDetach--;
+    }
+
+    return true;
 }
 
 void ZslProcessor::dumpZslQueue(int fd) const {
