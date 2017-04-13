@@ -63,13 +63,7 @@ public:
     virtual status_t setPrivateData(
             const CasData &data) override;
 
-    virtual status_t openSession(
-            uint16_t program_number, CasSessionId *sessionId) override;
-
-    virtual status_t openSession(
-            uint16_t program_number,
-            uint16_t elementary_PID,
-            CasSessionId *sessionId) override;
+    virtual status_t openSession(CasSessionId *sessionId) override;
 
     virtual status_t closeSession(
             const CasSessionId &sessionId) override;

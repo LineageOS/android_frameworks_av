@@ -113,36 +113,15 @@ Status CasImpl::setPrivateData(const CasData& pvtData) {
     return getBinderStatus(holder->get()->setPrivateData(pvtData));
 }
 
-Status CasImpl::openSession(int32_t program_number, CasSessionId* sessionId) {
-    ALOGV("openSession: program_number=%d", program_number);
+Status CasImpl::openSession(CasSessionId* sessionId) {
+    ALOGV("openSession");
     sp<PluginHolder> holder = mPluginHolder;
     if (holder == NULL) {
         return getBinderStatus(INVALID_OPERATION);
     }
-    status_t err = holder->get()->openSession(program_number, sessionId);
+    status_t err = holder->get()->openSession(sessionId);
 
-    ALOGV("openSession: session opened for program_number=%d, sessionId=%s",
-            program_number, sessionIdToString(*sessionId).string());
-
-    return getBinderStatus(err);
-}
-
-Status CasImpl::openSessionForStream(
-        int32_t program_number,
-        int32_t elementary_PID,
-        CasSessionId* sessionId) {
-    ALOGV("openSession: program_number=%d, elementary_PID=%d",
-            program_number, elementary_PID);
-    sp<PluginHolder> holder = mPluginHolder;
-    if (holder == NULL) {
-        return getBinderStatus(INVALID_OPERATION);
-    }
-    status_t err = holder->get()->openSession(
-            program_number, elementary_PID, sessionId);
-
-    ALOGV("openSession: session opened for "
-            "program_number=%d, elementary_PID=%d, sessionId=%s",
-            program_number, elementary_PID,
+    ALOGV("openSession: session opened, sessionId=%s",
             sessionIdToString(*sessionId).string());
 
     return getBinderStatus(err);

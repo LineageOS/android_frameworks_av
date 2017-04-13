@@ -26,26 +26,6 @@ namespace android {
 Mutex MockSessionLibrary::sSingletonLock;
 MockSessionLibrary* MockSessionLibrary::sSingleton = NULL;
 
-inline bool operator < (
-        const SessionInfo& lhs,
-        const SessionInfo& rhs) {
-    if (lhs.plugin < rhs.plugin) return true;
-    else if (lhs.plugin > rhs.plugin) return false;
-
-    if (lhs.program_number < rhs.program_number) return true;
-    else if (lhs.program_number > rhs.program_number) return false;
-
-    return lhs.elementary_PID < rhs.elementary_PID;
-}
-
-void MockCasSession::setSessionInfo(const SessionInfo &info) {
-    mSessionInfo = info;
-}
-
-const SessionInfo& MockCasSession::getSessionInfo() const {
-    return mSessionInfo;
-}
-
 MockSessionLibrary* MockSessionLibrary::get() {
     Mutex::Autolock lock(sSingletonLock);
 
@@ -60,23 +40,10 @@ MockSessionLibrary* MockSessionLibrary::get() {
 MockSessionLibrary::MockSessionLibrary() : mNextSessionId(1) {}
 
 status_t MockSessionLibrary::addSession(
-        CasPlugin *plugin,
-        uint16_t program_number,
-        uint16_t elementary_PID,
-        CasSessionId *sessionId) {
+        CasPlugin *plugin, CasSessionId *sessionId) {
     Mutex::Autolock lock(mSessionsLock);
 
-    SessionInfo info = {plugin, program_number, elementary_PID};
-    ssize_t index = mSessionInfoToIDMap.indexOfKey(info);
-    if (index >= 0) {
-        ALOGW("Session already exists: program_number=%u, elementary_PID=%u",
-                program_number, elementary_PID);
-        *sessionId = mSessionInfoToIDMap[index];
-        return OK;
-    }
-
-    sp<MockCasSession> session = new MockCasSession();
-    session->setSessionInfo(info);
+    sp<MockCasSession> session = new MockCasSession(plugin);
 
     uint8_t *byteArray = (uint8_t *) &mNextSessionId;
     sessionId->push_back(byteArray[3]);
@@ -85,7 +52,6 @@ status_t MockSessionLibrary::addSession(
     sessionId->push_back(byteArray[0]);
     mNextSessionId++;
 
-    mSessionInfoToIDMap.add(info, *sessionId);
     mIDToSessionMap.add(*sessionId, session);
     return OK;
 }
@@ -110,19 +76,16 @@ void MockSessionLibrary::destroySession(const CasSessionId& sessionId) {
     }
 
     sp<MockCasSession> session = mIDToSessionMap.valueAt(index);
-    mSessionInfoToIDMap.removeItem(session->getSessionInfo());
     mIDToSessionMap.removeItemsAt(index);
 }
 
 void MockSessionLibrary::destroyPlugin(CasPlugin *plugin) {
     Mutex::Autolock lock(mSessionsLock);
 
-    for (ssize_t index = mSessionInfoToIDMap.size() - 1; index >= 0; index--) {
-        const SessionInfo &info = mSessionInfoToIDMap.keyAt(index);
-        if (info.plugin == plugin) {
-            const CasSessionId &id = mSessionInfoToIDMap.valueAt(index);
-            mIDToSessionMap.removeItem(id);
-            mSessionInfoToIDMap.removeItemsAt(index);
+    for (ssize_t index = mIDToSessionMap.size() - 1; index >= 0; index--) {
+        sp<MockCasSession> session = mIDToSessionMap.valueAt(index);
+        if (session->getPlugin() == plugin) {
+            mIDToSessionMap.removeItemsAt(index);
         }
     }
 }

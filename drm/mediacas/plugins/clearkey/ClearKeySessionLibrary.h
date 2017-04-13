@@ -30,12 +30,6 @@ struct ABuffer;
 namespace clearkeycas {
 class KeyFetcher;
 
-struct SessionInfo {
-    CasPlugin *plugin;
-    uint16_t program_number;
-    uint16_t elementary_PID;
-};
-
 class ClearKeyCasSession : public RefBase {
 public:
     ssize_t decrypt(
@@ -59,14 +53,14 @@ private:
     };
     sp<ABuffer> mEcmBuffer;
     Mutex mKeyLock;
-    SessionInfo mSessionInfo;
+    CasPlugin* mPlugin;
     KeyInfo mKeyInfo[kNumKeys];
 
     friend class ClearKeySessionLibrary;
 
-    explicit ClearKeyCasSession(const SessionInfo &info);
+    explicit ClearKeyCasSession(CasPlugin *plugin);
     virtual ~ClearKeyCasSession();
-    const SessionInfo& getSessionInfo() const;
+    CasPlugin* getPlugin() const { return mPlugin; }
     status_t decryptPayload(
             const AES_KEY& key, size_t length, size_t offset, char* buffer) const;
 
@@ -77,11 +71,7 @@ class ClearKeySessionLibrary {
 public:
     static ClearKeySessionLibrary* get();
 
-    status_t addSession(
-            CasPlugin *plugin,
-            uint16_t program_number,
-            uint16_t elementary_PID,
-            CasSessionId *sessionId);
+    status_t addSession(CasPlugin *plugin, CasSessionId *sessionId);
 
     sp<ClearKeyCasSession> findSession(const CasSessionId& sessionId);
 
@@ -96,7 +86,6 @@ private:
     Mutex mSessionsLock;
     uint32_t mNextSessionId;
     KeyedVector<CasSessionId, sp<ClearKeyCasSession>> mIDToSessionMap;
-    KeyedVector<SessionInfo, CasSessionId> mSessionInfoToIDMap;
 
     ClearKeySessionLibrary();
     DISALLOW_EVIL_CONSTRUCTORS(ClearKeySessionLibrary);
