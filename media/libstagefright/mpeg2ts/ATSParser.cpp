@@ -140,7 +140,8 @@ struct ATSParser::Stream : public RefBase {
     unsigned pid() const { return mElementaryPID; }
     void setPID(unsigned pid) { mElementaryPID = pid; }
 
-    void setCasSession(
+    void setCasInfo(
+            int32_t systemId,
             const sp<IDescrambler> &descrambler,
             const std::vector<uint8_t> &sessionId);
 
@@ -682,9 +683,10 @@ void ATSParser::Program::updateCasSessions() {
         sp<Stream> &stream = mStreams.editValueAt(i);
         sp<IDescrambler> descrambler;
         std::vector<uint8_t> sessionId;
-        if (mParser->mCasManager->getCasSession(
-                mProgramNumber, stream->pid(), &descrambler, &sessionId)) {
-            stream->setCasSession(descrambler, sessionId);
+        int32_t systemId;
+        if (mParser->mCasManager->getCasInfo(mProgramNumber, stream->pid(),
+                &systemId, &descrambler, &sessionId)) {
+            stream->setCasInfo(systemId, descrambler, sessionId);
         }
     }
 }
@@ -767,8 +769,8 @@ ATSParser::Stream::Stream(
             meta->setCString(kKeyMIMEType,
                     isAudio() ? MEDIA_MIMETYPE_AUDIO_SCRAMBLED
                               : MEDIA_MIMETYPE_VIDEO_SCRAMBLED);
-            // for DrmInitData
-            meta->setData(kKeyCas, 0, &CA_system_ID, sizeof(CA_system_ID));
+            // for MediaExtractor.CasInfo
+            meta->setInt32(kKeyCASystemID, CA_system_ID);
             mSource = new AnotherPacketSource(meta);
         }
     }
@@ -1566,14 +1568,14 @@ sp<MediaSource> ATSParser::Stream::getSource(SourceType type) {
     return NULL;
 }
 
-void ATSParser::Stream::setCasSession(
-        const sp<IDescrambler> &descrambler,
+void ATSParser::Stream::setCasInfo(
+        int32_t systemId, const sp<IDescrambler> &descrambler,
         const std::vector<uint8_t> &sessionId) {
     if (mSource != NULL && mDescrambler == NULL && descrambler != NULL) {
         signalDiscontinuity(DISCONTINUITY_FORMAT_ONLY, NULL);
         mDescrambler = descrambler;
         if (mQueue->isScrambled()) {
-            mQueue->setCasSession(sessionId);
+            mQueue->setCasInfo(systemId, sessionId);
         }
     }
 }
