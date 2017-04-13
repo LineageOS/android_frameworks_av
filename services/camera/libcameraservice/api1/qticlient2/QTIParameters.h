@@ -96,10 +96,11 @@ private:
     metadata_vendor_id_t mVendorTagId;
 
 public:
+    bool mNeedRestart;
     // Sets up default QTI parameters
     status_t initialize(void *parametersParent, sp<CameraDeviceBase> device, sp<CameraProviderManager> manager);
     // Validate and update camera parameters based on new settings
-    status_t set(CameraParameters2& newParams);
+    status_t set(CameraParameters2& newParams, void *parametersParent);
     // Update passed-in request for common parameters
     status_t updateRequest(CameraMetadata *request) const;
     static const char* wbModeEnumToString(uint8_t wbMode);

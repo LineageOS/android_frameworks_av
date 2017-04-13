@@ -146,6 +146,8 @@ double maxExposureTime;
 const char minWbGain[] = "1.0";
 const char maxWbGain[] = "4.0";
 
+const char KEY_QTI_ZSL[] = "zsl";
+const char KEY_QTI_SUPPORTED_ZSL_MODES[] = "zsl-values";
 
 status_t QTIParameters::initialize(void *parametersParent,
         sp<CameraDeviceBase> device, sp<CameraProviderManager> manager) {
@@ -174,6 +176,9 @@ status_t QTIParameters::initialize(void *parametersParent,
 
     ParentParams->params.set(KEY_QTI_REDEYE_REDUCTION,
             "disable");
+
+    ParentParams->params.set(KEY_QTI_SUPPORTED_ZSL_MODES,
+            "on,off");
 
     ParentParams->params.set("num-snaps-per-shutter", 1);
 
@@ -373,9 +378,10 @@ status_t QTIParameters::initialize(void *parametersParent,
     return res;
 }
 
-status_t QTIParameters::set(CameraParameters2& newParams) {
+status_t QTIParameters::set(CameraParameters2& newParams, void *parametersParent) {
     status_t res = OK;
     char prop[PROPERTY_VALUE_MAX];
+    Parameters* ParentParams = (Parameters*)parametersParent;
 
     // ISO
     const char *isoMode = newParams.get(KEY_QTI_ISO_MODE);
@@ -486,6 +492,31 @@ status_t QTIParameters::set(CameraParameters2& newParams) {
     else {
         flashMode = (flashMode_t)Parameters::FLASH_MODE_INVALID;
     }
+
+    // ZSL
+    bool prevAllowZslMode = ParentParams->allowZslMode;
+    // Reset to FALSE, and check below only for true condition.
+    ParentParams->allowZslMode = false;
+    const char *qtiZslMode = newParams.get(KEY_QTI_ZSL);
+    if (qtiZslMode != NULL) {
+        if (!strcmp(qtiZslMode, VALUE_ON)) {
+            ParentParams->allowZslMode = true;
+        }
+    } else {
+        String8 defaultZslMode = String8::format("%d", prevAllowZslMode);
+        memset(prop, 0, sizeof(prop));
+        property_get("persist.camera.zsl.mode", prop, defaultZslMode.string());
+        ParentParams->allowZslMode = (bool)atoi(prop);
+    }
+    if (ParentParams->allowZslMode) {
+        newParams.set(KEY_QTI_ZSL, VALUE_ON);
+        ParentParams->slowJpegMode = false;
+    } else {
+        newParams.set(KEY_QTI_ZSL, VALUE_OFF);
+    }
+    mNeedRestart = (prevAllowZslMode != ParentParams->allowZslMode);
+    ALOGV("%s mNeedRestart = %d, prevAllowZslMode = %d, allowZslMode = %d",
+            __FUNCTION__, mNeedRestart, prevAllowZslMode, ParentParams->allowZslMode);
 
     return res;
 }

@@ -142,6 +142,9 @@ class ZslProcessor :
     sp<IGraphicBufferProducer>               mInputProducer;
     int                                      mInputProducerSlot;
 
+    Condition                                mBuffersToDetachSignal;
+    int                                      mBuffersToDetach;
+
     virtual bool threadLoop();
 
     status_t clearZslQueueLocked();
@@ -156,6 +159,7 @@ class ZslProcessor :
         nsecs_t* actualTimestamp);
     status_t clearInputRingBufferLocked(nsecs_t* latestTimestamp);
     void notifyInputReleased();
+    void doNotifyInputReleasedLocked();
 
     bool isFixedFocusMode(uint8_t afMode) const;
 
