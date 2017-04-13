@@ -61,9 +61,8 @@ status_t SharedMemoryParcelable::readFromParcel(const Parcel* parcel) {
         return status;
     }
     if (mSizeInBytes > 0) {
-// FIXME        mFd = dup(parcel->readFileDescriptor());
-        // Why is the ALSA resource not getting freed?!
-        mFd = fcntl(parcel->readFileDescriptor(), F_DUPFD_CLOEXEC, 0);
+        int originalFD = parcel->readFileDescriptor();
+        mFd = fcntl(originalFD, F_DUPFD_CLOEXEC, 0);
         if (mFd == -1) {
             status = -errno;
             ALOGE("SharedMemoryParcelable readFileDescriptor fcntl() failed : %d", status);
@@ -101,11 +100,6 @@ aaudio_result_t SharedMemoryParcelable::resolve(int32_t offsetInBytes, int32_t s
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
     if (mResolvedAddress == nullptr) {
-        /* TODO remove
-        int fd = fcntl(mFd, F_DUPFD_CLOEXEC, 0);
-        ALOGE_IF(fd==-1, "cannot dup fd=%d, size=%zd, (%s)",
-                    mFd, mSizeInBytes, strerror(errno));
-        */
         mResolvedAddress = (uint8_t *) mmap(0, mSizeInBytes, PROT_READ|PROT_WRITE,
                                           MAP_SHARED, mFd, 0);
         if (mResolvedAddress == nullptr) {

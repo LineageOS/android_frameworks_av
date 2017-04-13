@@ -38,7 +38,6 @@ AudioStream::AudioStream()
 
 aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
 {
-
     // Copy parameters from the Builder because the Builder may be deleted after this call.
     mSamplesPerFrame = builder.getSamplesPerFrame();
     mSampleRate = builder.getSampleRate();
@@ -46,6 +45,7 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     mFormat = builder.getFormat();
     mDirection = builder.getDirection();
     mSharingMode = builder.getSharingMode();
+    mSharingModeMatchRequired = builder.isSharingModeMatchRequired();
 
     // callbacks
     mFramesPerDataCallback = builder.getFramesPerDataCallback();
@@ -53,10 +53,19 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     mErrorCallbackProc = builder.getErrorCallbackProc();
     mDataCallbackUserData = builder.getDataCallbackUserData();
 
-    // TODO validate more parameters.
-    if (mErrorCallbackProc != nullptr && mDataCallbackProc == nullptr) {
-        ALOGE("AudioStream::open(): disconnect callback cannot be used without a data callback.");
-        return AAUDIO_ERROR_UNEXPECTED_VALUE;
+    // This is very helpful for debugging in the future.
+    ALOGI("AudioStream.open(): rate = %d, channels = %d, format = %d, sharing = %d",
+          mSampleRate, mSamplesPerFrame, mFormat, mSharingMode);
+
+    // Check for values that are ridiculously out of range to prevent math overflow exploits.
+    // The service will do a better check.
+    if (mSamplesPerFrame < 0 || mSamplesPerFrame > 128) {
+        ALOGE("AudioStream::open(): samplesPerFrame out of range = %d", mSamplesPerFrame);
+        return AAUDIO_ERROR_OUT_OF_RANGE;
+    }
+    if (mSampleRate < 0 || mSampleRate > 1000000) {
+        ALOGE("AudioStream::open(): mSampleRate out of range = %d", mSampleRate);
+        return AAUDIO_ERROR_INVALID_RATE;
     }
     if (mDirection != AAUDIO_DIRECTION_INPUT && mDirection != AAUDIO_DIRECTION_OUTPUT) {
         ALOGE("AudioStream::open(): illegal direction %d", mDirection);
@@ -68,27 +77,6 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
 
 AudioStream::~AudioStream() {
     close();
-}
-
-aaudio_result_t AudioStream::waitForStateTransition(aaudio_stream_state_t startingState,
-                                               aaudio_stream_state_t endingState,
-                                               int64_t timeoutNanoseconds)
-{
-    aaudio_stream_state_t state = getState();
-    aaudio_stream_state_t nextState = state;
-    if (state == startingState && state != endingState) {
-        aaudio_result_t result = waitForStateChange(state, &nextState, timeoutNanoseconds);
-        if (result != AAUDIO_OK) {
-            return result;
-        }
-    }
-// It's OK if the expected transition has already occurred.
-// But if we reach an unexpected state then that is an error.
-    if (nextState != endingState) {
-        return AAUDIO_ERROR_UNEXPECTED_STATE;
-    } else {
-        return AAUDIO_OK;
-    }
 }
 
 aaudio_result_t AudioStream::waitForStateChange(aaudio_stream_state_t currentState,
@@ -123,16 +111,15 @@ aaudio_result_t AudioStream::waitForStateChange(aaudio_stream_state_t currentSta
     return (state == currentState) ? AAUDIO_ERROR_TIMEOUT : AAUDIO_OK;
 }
 
-// This registers the app's background audio thread with the server before
+// This registers the callback thread with the server before
 // passing control to the app. This gives the server an opportunity to boost
 // the thread's performance characteristics.
 void* AudioStream::wrapUserThread() {
     void* procResult = nullptr;
     mThreadRegistrationResult = registerThread();
     if (mThreadRegistrationResult == AAUDIO_OK) {
-        // Call application procedure. This may take a very long time.
+        // Run callback loop. This may take a very long time.
         procResult = mThreadProc(mThreadArg);
-        ALOGD("AudioStream::mThreadProc() returned");
         mThreadRegistrationResult = unregisterThread();
     }
     return procResult;

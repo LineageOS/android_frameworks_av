@@ -39,11 +39,11 @@ public:
      * @param direction
      * @return endpoint or nullptr
      */
-    AAudioServiceEndpoint *findEndpoint(android::AAudioService &audioService,
+    AAudioServiceEndpoint *openEndpoint(android::AAudioService &audioService,
                                         int32_t deviceId,
                                         aaudio_direction_t direction);
 
-    void removeEndpoint(AAudioServiceEndpoint *serviceEndpoint);
+    void closeEndpoint(AAudioServiceEndpoint *serviceEndpoint);
 
 private:
 

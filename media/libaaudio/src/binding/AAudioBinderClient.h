@@ -66,6 +66,8 @@ public:
      */
     aaudio_result_t pauseStream(aaudio_handle_t streamHandle) override;
 
+    aaudio_result_t stopStream(aaudio_handle_t streamHandle) override;
+
     /**
      *  Discard any data held by the underlying HAL or Service.
      * This is asynchronous. When complete, the service will send a FLUSHED event.

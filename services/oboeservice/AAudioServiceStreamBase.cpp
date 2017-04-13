@@ -63,6 +63,7 @@ aaudio_result_t AAudioServiceStreamBase::close() {
 }
 
 aaudio_result_t AAudioServiceStreamBase::start() {
+    ALOGD("AAudioServiceStreamBase::start() send AAUDIO_SERVICE_EVENT_STARTED");
     sendServiceEvent(AAUDIO_SERVICE_EVENT_STARTED);
     mState = AAUDIO_STREAM_STATE_STARTED;
     mThreadEnabled.store(true);
@@ -78,14 +79,37 @@ aaudio_result_t AAudioServiceStreamBase::pause() {
         processError();
         return result;
     }
+    ALOGD("AAudioServiceStreamBase::pause() send AAUDIO_SERVICE_EVENT_PAUSED");
     sendServiceEvent(AAUDIO_SERVICE_EVENT_PAUSED);
     mState = AAUDIO_STREAM_STATE_PAUSED;
     return result;
 }
 
+aaudio_result_t AAudioServiceStreamBase::stop() {
+    // TODO wait for data to be played out
+    sendCurrentTimestamp();
+    mThreadEnabled.store(false);
+    aaudio_result_t result = mAAudioThread.stop();
+    if (result != AAUDIO_OK) {
+        processError();
+        return result;
+    }
+    ALOGD("AAudioServiceStreamBase::stop() send AAUDIO_SERVICE_EVENT_STOPPED");
+    sendServiceEvent(AAUDIO_SERVICE_EVENT_STOPPED);
+    mState = AAUDIO_STREAM_STATE_STOPPED;
+    return result;
+}
+
+aaudio_result_t AAudioServiceStreamBase::flush() {
+    ALOGD("AAudioServiceStreamBase::flush() send AAUDIO_SERVICE_EVENT_FLUSHED");
+    sendServiceEvent(AAUDIO_SERVICE_EVENT_FLUSHED);
+    mState = AAUDIO_STREAM_STATE_FLUSHED;
+    return AAUDIO_OK;
+}
+
 // implement Runnable
 void AAudioServiceStreamBase::run() {
-    ALOGD("AAudioServiceStreamMMAP::run() entering ----------------");
+    ALOGD("AAudioServiceStreamBase::run() entering ----------------");
     TimestampScheduler timestampScheduler;
     timestampScheduler.setBurstPeriod(mFramesPerBurst, mSampleRate);
     timestampScheduler.start(AudioClock::getNanoseconds());
@@ -102,7 +126,7 @@ void AAudioServiceStreamBase::run() {
             AudioClock::sleepUntilNanoTime(nextTime);
         }
     }
-    ALOGD("AAudioServiceStreamMMAP::run() exiting ----------------");
+    ALOGD("AAudioServiceStreamBase::run() exiting ----------------");
 }
 
 void AAudioServiceStreamBase::processError() {
@@ -122,6 +146,10 @@ aaudio_result_t AAudioServiceStreamBase::sendServiceEvent(aaudio_service_event_t
 
 aaudio_result_t AAudioServiceStreamBase::writeUpMessageQueue(AAudioServiceMessage *command) {
     std::lock_guard<std::mutex> lock(mLockUpMessageQueue);
+    if (mUpMessageQueue == nullptr) {
+        ALOGE("writeUpMessageQueue(): mUpMessageQueue null! - stream not open");
+        return AAUDIO_ERROR_NULL;
+    }
     int32_t count = mUpMessageQueue->getFifoBuffer()->write(command, 1);
     if (count != 1) {
         ALOGE("writeUpMessageQueue(): Queue full. Did client die?");
@@ -133,9 +161,11 @@ aaudio_result_t AAudioServiceStreamBase::writeUpMessageQueue(AAudioServiceMessag
 
 aaudio_result_t AAudioServiceStreamBase::sendCurrentTimestamp() {
     AAudioServiceMessage command;
+    //ALOGD("sendCurrentTimestamp() called");
     aaudio_result_t result = getFreeRunningPosition(&command.timestamp.position,
                                                     &command.timestamp.timestamp);
     if (result == AAUDIO_OK) {
+        //ALOGD("sendCurrentTimestamp(): position %d", (int) command.timestamp.position);
         command.what = AAudioServiceMessage::code::TIMESTAMP;
         result = writeUpMessageQueue(&command);
     }

@@ -41,7 +41,7 @@ void AAudioMixer::clear() {
     memset(mOutputBuffer, 0, mBufferSizeInBytes);
 }
 
-void AAudioMixer::mix(FifoBuffer *fifo, float volume) {
+bool AAudioMixer::mix(FifoBuffer *fifo, float volume) {
     WrappingBuffer wrappingBuffer;
     float *destination = mOutputBuffer;
     fifo_frames_t framesLeft = mFramesPerBurst;
@@ -67,9 +67,10 @@ void AAudioMixer::mix(FifoBuffer *fifo, float volume) {
     }
     fifo->getFifoControllerBase()->advanceReadIndex(mFramesPerBurst - framesLeft);
     if (framesLeft > 0) {
-        ALOGW("AAudioMixer::mix() UNDERFLOW by %d / %d frames ----- UNDERFLOW !!!!!!!!!!",
-              framesLeft, mFramesPerBurst);
+        //ALOGW("AAudioMixer::mix() UNDERFLOW by %d / %d frames ----- UNDERFLOW !!!!!!!!!!",
+        //      framesLeft, mFramesPerBurst);
     }
+    return (framesLeft > 0); // did not get all the frames we needed, ie. "underflow"
 }
 
 void AAudioMixer::mixPart(float *destination, float *source, int32_t numFrames, float volume) {
