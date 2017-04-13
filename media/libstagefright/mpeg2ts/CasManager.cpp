@@ -298,13 +298,15 @@ bool ATSParser::CasManager::addStream(
     return true;
 }
 
-bool ATSParser::CasManager::getCasSession(
+bool ATSParser::CasManager::getCasInfo(
         unsigned programNumber, unsigned elementaryPID,
-        sp<IDescrambler> *descrambler, std::vector<uint8_t> *sessionId) const {
+        int32_t *systemId, sp<IDescrambler> *descrambler,
+        std::vector<uint8_t> *sessionId) const {
     ssize_t index = mProgramCasMap.indexOfKey(programNumber);
     if (index < 0) {
         return false;
     }
+    *systemId = mSystemId;
     return mProgramCasMap[index]->getCasSession(
             elementaryPID, descrambler, sessionId);
 }

@@ -41,7 +41,8 @@ namespace android {
 ElementaryStreamQueue::ElementaryStreamQueue(Mode mode, uint32_t flags)
     : mMode(mode),
       mFlags(flags),
-      mEOSReached(false) {
+      mEOSReached(false),
+      mCASystemId(0) {
 }
 
 sp<MetaData> ElementaryStreamQueue::getFormat() {
@@ -65,6 +66,16 @@ void ElementaryStreamQueue::clear(bool clearFormat) {
     }
 
     mEOSReached = false;
+}
+
+bool ElementaryStreamQueue::isScrambled() const {
+    return (mFlags & kFlag_ScrambledData) != 0;
+}
+
+void ElementaryStreamQueue::setCasInfo(
+        int32_t systemId, const std::vector<uint8_t> &sessionId) {
+    mCASystemId = systemId;
+    mCasSessionId = sessionId;
 }
 
 // Parse AC3 header assuming the current ptr is start position of syncframe,
@@ -938,8 +949,10 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitH264() {
                 mFormat->setInt32(kKeyWidth, 1280);
                 mFormat->setInt32(kKeyHeight, 720);
             }
-            // for DrmInitData
-            mFormat->setData(kKeyCas, 0, mCasSessionId.data(), mCasSessionId.size());
+            // for MediaExtractor.CasInfo
+            mFormat->setInt32(kKeyCASystemID, mCASystemId);
+            mFormat->setData(kKeyCASessionID, 0,
+                    mCasSessionId.data(), mCasSessionId.size());
         }
         return dequeueScrambledAccessUnit();
     }
@@ -1213,8 +1226,10 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitMPEGVideo() {
             mFormat->setInt32(kKeyWidth, 1280);
             mFormat->setInt32(kKeyHeight, 720);
 
-            // for DrmInitData
-            mFormat->setData(kKeyCas, 0, mCasSessionId.data(), mCasSessionId.size());
+            // for MediaExtractor.CasInfo
+            mFormat->setInt32(kKeyCASystemID, mCASystemId);
+            mFormat->setData(kKeyCASessionID, 0,
+                    mCasSessionId.data(), mCasSessionId.size());
         }
         return dequeueScrambledAccessUnit();
     }

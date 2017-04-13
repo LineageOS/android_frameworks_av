@@ -39,9 +39,9 @@ struct ATSParser::CasManager : public RefBase {
             unsigned programNumber, unsigned elementaryPID,
             const CADescriptor &descriptor);
 
-    bool getCasSession(
+    bool getCasInfo(
             unsigned programNumber, unsigned elementaryPID,
-            sp<IDescrambler> *descrambler,
+            int32_t *systemId, sp<IDescrambler> *descrambler,
             std::vector<uint8_t> *sessionId) const;
 
     bool isCAPid(unsigned pid);

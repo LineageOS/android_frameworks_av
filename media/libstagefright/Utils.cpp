@@ -613,10 +613,19 @@ status_t convertMetaDataToMessage(
     uint32_t type;
     const void *data;
     size_t size;
-    if (meta->findData(kKeyCas, &type, &data, &size)) {
+    if (meta->findData(kKeyCASessionID, &type, &data, &size)) {
         sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
-        msg->setBuffer("cas", buffer);
+        if (buffer.get() == NULL || buffer->base() == NULL) {
+            return NO_MEMORY;
+        }
+
+        msg->setBuffer("ca-session-id", buffer);
         memcpy(buffer->data(), data, size);
+    }
+
+    int32_t systemId;
+    if (meta->findInt32(kKeyCASystemID, &systemId)) {
+        msg->setInt32("ca-system-id", systemId);
     }
 
     if (!strncasecmp("video/scrambled", mime, 15)
