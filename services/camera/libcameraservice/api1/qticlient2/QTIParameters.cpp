@@ -149,6 +149,15 @@ const char maxWbGain[] = "4.0";
 const char KEY_QTI_ZSL[] = "zsl";
 const char KEY_QTI_SUPPORTED_ZSL_MODES[] = "zsl-values";
 
+// AE bracketing
+const char KEY_QTI_SUPPORTED_AE_BRACKET_MODES[] = "ae-bracket-hdr-values";
+const char KEY_QTI_CAPTURE_BURST_EXPOSURE[] = "capture-burst-exposures";
+const char KEY_QTI_AE_BRACKET_HDR[] = "ae-bracket-hdr";
+
+const char AE_BRACKET_OFF[] = "Off";
+const char AE_BRACKET[] = "AE-Bracket";
+
+
 status_t QTIParameters::initialize(void *parametersParent,
         sp<CameraDeviceBase> device, sp<CameraProviderManager> manager) {
     status_t res = OK;
@@ -375,6 +384,31 @@ status_t QTIParameters::initialize(void *parametersParent,
     faceDetectionModes += VALUE_ON;
     ParentParams->params.set(KEY_QTI_FACE_DETECTION_MODES,faceDetectionModes.string());
 
+    char burstValue[PROPERTY_VALUE_MAX];
+    property_get("persist.camera.burstcount", burstValue, "1");
+
+    ParentParams->params.set("num-snaps-per-shutter", burstValue);
+    burstCount = atoi(burstValue);
+    ALOGV("burstcount = %d", burstCount);
+
+    // Get AEbracketing values
+    String8 supportedBracketingValues(AE_BRACKET_OFF);
+    supportedBracketingValues += ",";
+    supportedBracketingValues += AE_BRACKET;
+    ParentParams->params.set(KEY_QTI_SUPPORTED_AE_BRACKET_MODES, supportedBracketingValues);
+    // Default
+    ParentParams->params.set(KEY_QTI_AE_BRACKET_HDR, AE_BRACKET_OFF);
+    aeBracketEnable = false;
+
+    char prop[PROPERTY_VALUE_MAX];
+    memset(prop, 0, sizeof(prop));
+    property_get("persist.capture.burst.exposures", prop, "");
+    if (strlen(prop) > 0) {
+        ParentParams->params.set(KEY_QTI_CAPTURE_BURST_EXPOSURE, prop);
+    } else {
+        ParentParams->params.remove(KEY_QTI_CAPTURE_BURST_EXPOSURE);
+    }
+
     return res;
 }
 
@@ -492,6 +526,43 @@ status_t QTIParameters::set(CameraParameters2& newParams, void *parametersParent
     else {
         flashMode = (flashMode_t)Parameters::FLASH_MODE_INVALID;
     }
+
+    // AE bracketing
+    // Get if Ae bracketing is enabled first
+    const char *aeBracketMode = newParams.get(KEY_QTI_AE_BRACKET_HDR);
+    if (aeBracketMode != NULL) {
+        if (!strcmp(aeBracketMode, AE_BRACKET)) {
+            aeBracketEnable = true;
+        } else {
+            aeBracketEnable = false;
+        }
+    }
+    ALOGV("aeBracketEnable = %d, aeBracketMode = %s", aeBracketEnable, aeBracketMode);
+
+    // If Ae bracketing enabled. read bracketing values
+    if (aeBracketEnable) {
+        const char *aeBracketStr = newParams.get(KEY_QTI_CAPTURE_BURST_EXPOSURE);
+        int32_t expNum = 0;
+        if((aeBracketStr != NULL) && (strlen(aeBracketStr) > 0)) {
+            char prop[32];
+            memset(prop, 0, sizeof(prop));
+            strlcpy(prop, aeBracketStr, 32);
+            char *saveptr = NULL;
+            char *token = strtok_r(prop, ",", &saveptr);
+            while ((token != NULL) &&
+                    (expNum != MAX_BURST_COUNT_AE_BRACKETING)) {
+                aeBracketValues[expNum++] = atoi(token);
+                token = strtok_r(NULL, ",", &saveptr);
+            }
+            newParams.set("num-snaps-per-shutter", String8::format("%d", expNum));
+            ALOGV("aeBracketvalues = %s", aeBracketStr);
+        }
+    }
+
+    // Read the burstcount
+    const char* burstValue = newParams.get("num-snaps-per-shutter");
+    burstCount = atoi(burstValue);
+    ALOGV("burstcount = %d", burstCount);
 
     // ZSL
     bool prevAllowZslMode = ParentParams->allowZslMode;
@@ -659,6 +730,33 @@ status_t QTIParameters::updateRequest(CameraMetadata *request) const {
         if (res != OK) return res;
         res = request->update(ANDROID_CONTROL_AE_MODE, &reqAeMode, 1);
         if (res != OK) return res;
+    }
+
+    return res;
+}
+
+status_t QTIParameters::updateRequestForQTICapture(Vector<CameraMetadata> *requests) const {
+    status_t res = OK;
+    sp<VendorTagDescriptor> vTags =
+        VendorTagDescriptor::getGlobalVendorTagDescriptor();
+
+    if (!requests) {
+       return BAD_VALUE;
+    }
+
+    // Check if any Capture request settings need to be changed for QTI features
+
+    // For AE bracketing
+    if (aeBracketEnable) {
+        // If AE bracketing is enabled, then burstCount is the number of bracket values.
+        for (size_t i = 0; i < burstCount; i++) {
+            CameraMetadata &request = requests->editItemAt(i);
+            res = request.update(ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION,
+                    &aeBracketValues[i], 1);
+            if (res != OK) {
+                return res;
+            }
+        }
     }
 
     return res;
