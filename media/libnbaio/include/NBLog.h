@@ -38,6 +38,8 @@ public:
 
 typedef uint64_t log_hash_t;
 
+// FIXME Everything needed for client (writer API and registration) should be isolated
+//       from the rest of the implementation.
 class Writer;
 class Reader;
 
@@ -320,6 +322,7 @@ public:
 
     virtual ~Writer();
 
+    // FIXME needs comments, and some should be private
     virtual void    log(const char *string);
     virtual void    logf(const char *fmt, ...) __attribute__ ((format (printf, 2, 3)));
     virtual void    logvf(const char *fmt, va_list ap);
@@ -504,11 +507,15 @@ public:
     void addReader(const NamedReader &reader);
     // TODO add removeReader
     void merge();
-    const std::vector<NamedReader> *getNamedReaders() const;
+    // FIXME This is returning a reference to a shared variable that needs a lock
+    const std::vector<NamedReader>& getNamedReaders() const;
 private:
     // vector of the readers the merger is supposed to merge from.
     // every reader reads from a writer's buffer
+    // FIXME Needs to be protected by a lock
     std::vector<NamedReader> mNamedReaders;
+
+    // TODO Need comments on all of these
     uint8_t *mBuffer;
     Shared * const mShared;
     std::unique_ptr<audio_utils_fifo> mFifo;
@@ -519,7 +526,9 @@ class MergeReader : public Reader {
 public:
     MergeReader(const void *shared, size_t size, Merger &merger);
 private:
-    const std::vector<NamedReader> *mNamedReaders;
+    // FIXME Needs to be protected by a lock,
+    //       because even though our use of it is read-only there may be asynchronous updates
+    const std::vector<NamedReader>& mNamedReaders;
     // handle author entry by looking up the author's name and appending it to the body
     // returns number of bytes read from fmtEntry
     void handleAuthor(const AbstractEntry &fmtEntry, String8 *body);
