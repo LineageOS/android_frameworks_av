@@ -25,23 +25,17 @@
 
 namespace android {
 
-struct SessionInfo {
-    CasPlugin *plugin;
-    uint16_t program_number;
-    uint16_t elementary_PID;
-};
-
 class MockCasSession : public RefBase {
 public:
-    explicit MockCasSession() {}
+    explicit MockCasSession(CasPlugin *plugin) : mPlugin(plugin) {}
     virtual ~MockCasSession() {}
 
 private:
     friend class MockSessionLibrary;
-    SessionInfo mSessionInfo;
 
-    void setSessionInfo(const SessionInfo &info);
-    const SessionInfo& getSessionInfo() const;
+    CasPlugin* mPlugin;
+
+    CasPlugin* getPlugin() const { return mPlugin; }
 
     DISALLOW_EVIL_CONSTRUCTORS(MockCasSession);
 };
@@ -50,11 +44,7 @@ class MockSessionLibrary {
 public:
     static MockSessionLibrary* get();
 
-    status_t addSession(
-            CasPlugin *plugin,
-            uint16_t program_number,
-            uint16_t elementary_PID,
-            CasSessionId *sessionId);
+    status_t addSession(CasPlugin *plugin, CasSessionId *sessionId);
 
     sp<MockCasSession> findSession(const CasSessionId& sessionId);
 
@@ -69,7 +59,6 @@ private:
     Mutex mSessionsLock;
     uint32_t mNextSessionId;
     KeyedVector<CasSessionId, sp<MockCasSession> > mIDToSessionMap;
-    KeyedVector<SessionInfo, CasSessionId> mSessionInfoToIDMap;
 
     MockSessionLibrary();
     DISALLOW_EVIL_CONSTRUCTORS(MockSessionLibrary);

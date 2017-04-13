@@ -21,8 +21,7 @@ import android.media.MediaCas;
 /** @hide */
 interface ICas {
     void setPrivateData(in byte[] pvtData);
-    byte[] openSession(int program_number);
-    byte[] openSessionForStream(int program_number, int elementary_PID);
+    byte[] openSession();
     void closeSession(in byte[] sessionId);
     void setSessionPrivateData(in byte[] sessionId, in byte[] pvtData);
     void processEcm(in byte[] sessionId, in MediaCas.ParcelableCasData ecm);
