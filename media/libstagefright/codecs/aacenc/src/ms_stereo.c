@@ -94,8 +94,6 @@ void MsStereoProcessing(Word32       *sfbEnergyLeft,
 
       pnms = fixmul(nrgL, nrgR);
 
-      temp = (pnlr + 1) / ((pnms >> 8) + 1);
-
       temp = pnms - pnlr;
       if( temp > 0 ){
 
