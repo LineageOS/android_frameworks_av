@@ -88,7 +88,6 @@ groupShortData(Word32        *mdctSpectrum,
     offset += groupLen[grp] * FRAME_LEN_SHORT;
   }
   groupedSfbOffset[i] = FRAME_LEN_LONG;
-  i += 1;
 
   /* calculate minSnr */
   i = 0;
