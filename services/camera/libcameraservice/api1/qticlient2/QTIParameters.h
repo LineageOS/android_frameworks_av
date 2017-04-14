@@ -105,6 +105,8 @@ public:
     bool hfrMode;
     int32_t hfrPreviewFpsRange[2];
     int32_t nonHfrPreviewFpsRange[2];
+    bool Hdr1xEnable;
+    bool HdrSceneEnable;
     // Sets up default QTI parameters
     status_t initialize(void *parametersParent, sp<CameraDeviceBase> device, sp<CameraProviderManager> manager);
     // Validate and update camera parameters based on new settings
