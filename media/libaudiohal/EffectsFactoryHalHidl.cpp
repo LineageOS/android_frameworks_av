@@ -18,7 +18,6 @@
 //#define LOG_NDEBUG 0
 
 #include <cutils/native_handle.h>
-#include <media/EffectsFactoryApi.h>
 
 #include "ConversionHelperHidl.h"
 #include "EffectHalHidl.h"
@@ -39,7 +38,7 @@ sp<EffectsFactoryHalInterface> EffectsFactoryHalInterface::create() {
 
 // static
 bool EffectsFactoryHalInterface::isNullUuid(const effect_uuid_t *pEffectUuid) {
-    return EffectIsNullUuid(pEffectUuid);
+    return memcmp(pEffectUuid, EFFECT_UUID_NULL, sizeof(effect_uuid_t)) == 0;
 }
 
 EffectsFactoryHalHidl::EffectsFactoryHalHidl() : ConversionHelperHidl("EffectsFactory") {

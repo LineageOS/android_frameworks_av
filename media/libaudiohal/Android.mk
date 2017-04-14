@@ -4,8 +4,6 @@ include $(CLEAR_VARS)
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils   \
-    libeffects  \
-    libhardware \
     liblog      \
     libutils
 
@@ -21,6 +19,10 @@ LOCAL_SRC_FILES := \
     EffectHalLocal.cpp          \
     EffectsFactoryHalLocal.cpp  \
     StreamHalLocal.cpp
+
+LOCAL_SHARED_LIBRARIES += \
+    libeffects  \
+    libhardware
 
 else  # if !USE_LEGACY_LOCAL_AUDIO_HAL
 
