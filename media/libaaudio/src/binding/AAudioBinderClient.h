@@ -17,7 +17,7 @@
 #ifndef AAUDIO_AAUDIO_BINDER_CLIENT_H
 #define AAUDIO_AAUDIO_BINDER_CLIENT_H
 
-#include <aaudio/AAudioDefinitions.h>
+#include <aaudio/AAudio.h>
 #include "AAudioServiceDefinitions.h"
 #include "AAudioServiceInterface.h"
 #include "binding/AAudioStreamRequest.h"

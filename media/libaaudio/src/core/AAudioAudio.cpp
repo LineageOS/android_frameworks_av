@@ -21,7 +21,6 @@
 #include <time.h>
 #include <pthread.h>
 
-#include <aaudio/AAudioDefinitions.h>
 #include <aaudio/AAudio.h>
 
 #include "AudioStreamBuilder.h"

@@ -25,7 +25,7 @@
 #include <gtest/gtest.h>
 #include <sys/mman.h>
 
-#include <aaudio/AAudioDefinitions.h>
+#include <aaudio/AAudio.h>
 #include <binding/AudioEndpointParcelable.h>
 
 using namespace android;

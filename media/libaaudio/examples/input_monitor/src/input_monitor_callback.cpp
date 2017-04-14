@@ -22,7 +22,6 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
-#include <aaudio/AAudioDefinitions.h>
 #include <aaudio/AAudio.h>
 
 #define NUM_SECONDS           10

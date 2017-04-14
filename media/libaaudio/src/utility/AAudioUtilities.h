@@ -23,7 +23,7 @@
 #include <utils/Errors.h>
 #include <hardware/audio.h>
 
-#include "aaudio/AAudioDefinitions.h"
+#include "aaudio/AAudio.h"
 
 /**
  * Convert an AAudio result into the closest matching Android status.

@@ -21,7 +21,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <aaudio/AAudioDefinitions.h>
 #include <aaudio/AAudio.h>
 
 #define SAMPLE_RATE        48000

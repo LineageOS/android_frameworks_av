@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <aaudio/AAudioDefinitions.h>
+#include <aaudio/AAudio.h>
 
 #include "binding/AudioEndpointParcelable.h"
 #include "binding/AAudioStreamRequest.h"

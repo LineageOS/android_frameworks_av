@@ -21,7 +21,7 @@
 
 #include <gtest/gtest.h>
 
-#include <aaudio/AAudioDefinitions.h>
+#include <aaudio/AAudio.h>
 #include "utility/HandleTracker.h"
 
 // Test adding one address.

@@ -20,7 +20,7 @@
 
 #include <pthread.h>
 
-#include <aaudio/AAudioDefinitions.h>
+#include <aaudio/AAudio.h>
 #include <utility/AAudioUtilities.h>
 
 #include "AAudioThread.h"
