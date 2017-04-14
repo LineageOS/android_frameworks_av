@@ -46,6 +46,11 @@ static const char kVendorSeccompPolicyPath[] =
 int main(int argc __unused, char** argv)
 {
     LOG(INFO) << "mediacodecservice starting";
+    bool treble = property_get_bool("persist.media.treble_omx", true);
+    if (treble) {
+      android::ProcessState::initWithDriver("/dev/vndbinder");
+    }
+
     signal(SIGPIPE, SIG_IGN);
     SetUpMinijail(kSystemSeccompPolicyPath, kVendorSeccompPolicyPath);
 
@@ -54,7 +59,7 @@ int main(int argc __unused, char** argv)
     ::android::hardware::configureRpcThreadpool(64, false);
     sp<ProcessState> proc(ProcessState::self());
 
-    if (property_get_bool("persist.media.treble_omx", true)) {
+    if (treble) {
         using namespace ::android::hardware::media::omx::V1_0;
         sp<IOmx> omx = new implementation::Omx();
         if (omx == nullptr) {
