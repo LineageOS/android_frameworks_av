@@ -163,8 +163,12 @@ const char KEY_QTI_VIDEO_HIGH_SPEED_RECORDING[] = "video-hsr";
 const char KEY_QTI_SUPPORTED_VIDEO_HIGH_FRAME_RATE_MODES[] = "video-hfr-values";
 const char KEY_QTI_SUPPORTED_HFR_SIZES[] = "hfr-size-values";
 
+// HDR need 1x frame(one non-HDR extra frame).
+const char KEY_QTI_SUPPORTED_HDR_NEED_1X[] = "hdr-need-1x-values";
+const char KEY_QTI_HDR_NEED_1X[] = "hdr-need-1x";
+
 status_t QTIParameters::initialize(void *parametersParent,
-        sp<CameraDeviceBase> device, sp<CameraProviderManager> manager) {
+            sp<CameraDeviceBase> device, sp<CameraProviderManager> manager) {
     status_t res = OK;
 
     Parameters* ParentParams = (Parameters*)parametersParent;
@@ -198,6 +202,11 @@ status_t QTIParameters::initialize(void *parametersParent,
 
     ParentParams->params.set("ae-bracket-hdr-values","Off,AE-Bracket");
     ParentParams->params.set("ae-bracket-hdr","Off");
+
+    ParentParams->params.set(KEY_QTI_SUPPORTED_HDR_NEED_1X,"true,false");
+    ParentParams->params.set(KEY_QTI_HDR_NEED_1X,"false");
+    Hdr1xEnable = false;
+    HdrSceneEnable = false;
 
     // ISO
     // Get the supported sensitivity range from device3 static info
@@ -647,6 +656,24 @@ status_t QTIParameters::set(CameraParameters2& newParams, void *parametersParent
         ParentParams->qtiParams->hfrMode = false;
     }
 
+    //hdr_need_1x
+    const char *Hdr1x = newParams.get(KEY_QTI_HDR_NEED_1X);
+    const char *HdrSceneMode = newParams.get(CameraParameters::KEY_SCENE_MODE);
+    if(HdrSceneMode != NULL && !strcmp(HdrSceneMode, CameraParameters::SCENE_MODE_HDR)) {
+        HdrSceneEnable = true;
+    } else {
+        HdrSceneEnable = false;
+    }
+    if(Hdr1x != NULL && !strcmp(Hdr1x,"true")) {
+        Hdr1xEnable = true;
+    } else {
+        Hdr1xEnable = false;
+    }
+    if(HdrSceneEnable && Hdr1xEnable ) {
+        burstCount = 2;
+        newParams.set("num-snaps-per-shutter", String8::format("%d", burstCount));
+    }
+
     return res;
 }
 
@@ -803,6 +830,34 @@ status_t QTIParameters::updateRequestForQTICapture(Vector<CameraMetadata> *reque
     }
 
     // Check if any Capture request settings need to be changed for QTI features
+
+    // For HDR need one extra frame.
+    if(Hdr1xEnable && HdrSceneEnable){
+        for (size_t i = 0; i < burstCount; i++) {
+            CameraMetadata &request = requests->editItemAt(i);
+            uint8_t reqSceneMode;
+            uint8_t reqControlMode;
+            if(i==0) {
+                reqSceneMode = ANDROID_CONTROL_SCENE_MODE_DISABLED;
+                reqControlMode = ANDROID_CONTROL_MODE_AUTO;
+            }
+            else {
+                reqSceneMode = ANDROID_CONTROL_SCENE_MODE_HDR;
+                reqControlMode = ANDROID_CONTROL_MODE_USE_SCENE_MODE;
+            }
+            res = request.update(ANDROID_CONTROL_MODE,
+                    &reqControlMode, 1);
+            if (res != OK) {
+                return res;
+            }
+
+            res = request.update(ANDROID_CONTROL_SCENE_MODE,
+                    &reqSceneMode, 1);
+            if (res != OK) {
+                return res;
+            }
+        }
+    }
 
     // For AE bracketing
     if (aeBracketEnable) {
