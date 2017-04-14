@@ -252,6 +252,8 @@ int SoundTriggerHalHidl::stopAllRecognitions()
 SoundTriggerHalHidl::SoundTriggerHalHidl(const char *moduleName)
     : mModuleName(moduleName), mNextUniqueId(1)
 {
+    LOG_ALWAYS_FATAL_IF(strcmp(mModuleName, "primary") != 0,
+            "Treble soundtrigger only supports primary module");
 }
 
 SoundTriggerHalHidl::~SoundTriggerHalHidl()
@@ -265,9 +267,7 @@ sp<ISoundTriggerHw> SoundTriggerHalHidl::getService()
         if (mModuleName == NULL) {
             mModuleName = "primary";
         }
-        std::string serviceName = "sound_trigger.";
-        serviceName.append(mModuleName);
-        mISoundTrigger = ISoundTriggerHw::getService(serviceName);
+        mISoundTrigger = ISoundTriggerHw::getService();
         if (mISoundTrigger != 0) {
             mISoundTrigger->linkToDeath(HalDeathHandler::getInstance(), 0 /*cookie*/);
         }
