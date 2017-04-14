@@ -17,6 +17,9 @@ LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
 ifeq ($(SOUND_TRIGGER_USE_STUB_MODULE), 1)
+    ifneq ($(USE_LEGACY_LOCAL_AUDIO_HAL), true)
+        $(error Requires building with USE_LEGACY_LOCAL_AUDIO_HAL=true)
+    endif
     LOCAL_CFLAGS += -DSOUND_TRIGGER_USE_STUB_MODULE
 endif
 
