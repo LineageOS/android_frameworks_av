@@ -33,4 +33,7 @@ LOCAL_MODULE_TAGS := optional
 
 LOCAL_MODULE := testid3
 
+LOCAL_SANITIZE := cfi
+LOCAL_SANITIZE_DIAG := cfi
+
 include $(BUILD_EXECUTABLE)
