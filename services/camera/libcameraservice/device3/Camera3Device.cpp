@@ -199,10 +199,26 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager) {
         return res;
     }
 
+    std::shared_ptr<RequestMetadataQueue> queue;
+    auto getQueueRet = session->getCaptureRequestMetadataQueue([&queue](const auto& descriptor) {
+        queue = std::make_shared<RequestMetadataQueue>(descriptor);
+        if (!queue->isValid() || queue->availableToWrite() <= 0) {
+            ALOGW("HAL returns empty request metadata fmq, not use it");
+            queue = nullptr;
+            // don't use the queue onwards.
+        }
+    });
+    if (!getQueueRet.isOk()) {
+        ALOGW("Transaction error when getting request metadata fmq: %s, not use it",
+                getQueueRet.description().c_str());
+        queue = nullptr;
+        // Don't use the queue onwards.
+    }
+
     // TODO: camera service will absorb 3_2/3_3/3_4 differences in the future
     //       for now use 3_4 to keep legacy devices working
     mDeviceVersion = CAMERA_DEVICE_API_VERSION_3_4;
-    mInterface = std::make_unique<HalInterface>(session);
+    mInterface = std::make_unique<HalInterface>(session, queue);
     std::string providerType;
     mVendorTagId = manager->getProviderTagIdLocked(mId.string());
 
@@ -3035,16 +3051,20 @@ void Camera3Device::monitorMetadata(TagMonitor::eventSource source,
 Camera3Device::HalInterface::HalInterface(camera3_device_t *device) :
         mHal3Device(device) {}
 
-Camera3Device::HalInterface::HalInterface(sp<ICameraDeviceSession> &session) :
+Camera3Device::HalInterface::HalInterface(
+            sp<ICameraDeviceSession> &session,
+            std::shared_ptr<RequestMetadataQueue> queue) :
         mHal3Device(nullptr),
-        mHidlSession(session) {}
+        mHidlSession(session),
+        mRequestMetadataQueue(queue) {}
 
 Camera3Device::HalInterface::HalInterface() :
         mHal3Device(nullptr) {}
 
 Camera3Device::HalInterface::HalInterface(const HalInterface& other) :
         mHal3Device(other.mHal3Device),
-        mHidlSession(other.mHidlSession) {}
+        mHidlSession(other.mHidlSession),
+        mRequestMetadataQueue(other.mRequestMetadataQueue) {}
 
 bool Camera3Device::HalInterface::valid() {
     return (mHal3Device != nullptr) || (mHidlSession != nullptr);
@@ -3276,12 +3296,8 @@ void Camera3Device::HalInterface::wrapAsHidlRequest(camera3_capture_request_t* r
     }
 
     captureRequest->frameNumber = request->frame_number;
-    // A null request settings maps to a size-0 CameraMetadata
-    if (request->settings != nullptr) {
-        captureRequest->settings.setToExternal(
-                reinterpret_cast<uint8_t*>(const_cast<camera_metadata_t*>(request->settings)),
-                get_camera_metadata_size(request->settings));
-    }
+
+    captureRequest->fmqSettingsSize = 0;
 
     {
         std::lock_guard<std::mutex> lock(mInflightLock);
@@ -3367,6 +3383,33 @@ status_t Camera3Device::HalInterface::processBatchCaptureRequests(
 
     common::V1_0::Status status = common::V1_0::Status::INTERNAL_ERROR;
     *numRequestProcessed = 0;
+
+    // Write metadata to FMQ.
+    for (size_t i = 0; i < batchSize; i++) {
+        camera3_capture_request_t* request = requests[i];
+        device::V3_2::CaptureRequest* captureRequest = &captureRequests[i];
+
+        if (request->settings != nullptr) {
+            size_t settingsSize = get_camera_metadata_size(request->settings);
+            if (mRequestMetadataQueue != nullptr && mRequestMetadataQueue->write(
+                    reinterpret_cast<const uint8_t*>(request->settings), settingsSize)) {
+                captureRequest->settings.resize(0);
+                captureRequest->fmqSettingsSize = settingsSize;
+            } else {
+                if (mRequestMetadataQueue != nullptr) {
+                    ALOGW("%s: couldn't utilize fmq, fallback to hwbinder", __FUNCTION__);
+                }
+                captureRequest->settings.setToExternal(
+                        reinterpret_cast<uint8_t*>(const_cast<camera_metadata_t*>(request->settings)),
+                        get_camera_metadata_size(request->settings));
+                captureRequest->fmqSettingsSize = 0u;
+            }
+        } else {
+            // A null request settings maps to a size-0 CameraMetadata
+            captureRequest->settings.resize(0);
+            captureRequest->fmqSettingsSize = 0u;
+        }
+    }
     mHidlSession->processCaptureRequest(captureRequests, cachesToRemove,
             [&status, &numRequestProcessed] (auto s, uint32_t n) {
                 status = s;

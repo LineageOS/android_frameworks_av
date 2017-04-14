@@ -31,6 +31,7 @@
 #include <android/hardware/camera/device/3.2/ICameraDevice.h>
 #include <android/hardware/camera/device/3.2/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.2/ICameraDeviceCallback.h>
+#include <fmq/MessageQueue.h>
 #include <hardware/camera3.h>
 
 #include <camera/CaptureResult.h>
@@ -181,6 +182,10 @@ class Camera3Device :
     status_t setConsumerSurfaces(int streamId, const std::vector<sp<Surface>>& consumers) override;
 
   private:
+
+    // internal typedefs
+    using RequestMetadataQueue = hardware::MessageQueue<uint8_t, hardware::kSynchronizedReadWrite>;
+
     static const size_t        kDumpLockAttempts  = 10;
     static const size_t        kDumpSleepDuration = 100000; // 0.10 sec
     static const nsecs_t       kShutdownTimeout   = 5000000000; // 5 sec
@@ -227,7 +232,8 @@ class Camera3Device :
     class HalInterface : public camera3::Camera3StreamBufferFreedListener {
       public:
         HalInterface(camera3_device_t *device);
-        HalInterface(sp<hardware::camera::device::V3_2::ICameraDeviceSession> &session);
+        HalInterface(sp<hardware::camera::device::V3_2::ICameraDeviceSession> &session,
+                     std::shared_ptr<RequestMetadataQueue> queue);
         HalInterface(const HalInterface &other);
         HalInterface();
 
@@ -261,6 +267,7 @@ class Camera3Device :
       private:
         camera3_device_t *mHal3Device;
         sp<hardware::camera::device::V3_2::ICameraDeviceSession> mHidlSession;
+        std::shared_ptr<RequestMetadataQueue> mRequestMetadataQueue;
 
         std::mutex mInflightLock;
 
