@@ -102,6 +102,9 @@ public:
     bool mNeedRestart;
     uint8_t burstCount;
     bool aeBracketEnable;
+    bool hfrMode;
+    int32_t hfrPreviewFpsRange[2];
+    int32_t nonHfrPreviewFpsRange[2];
     // Sets up default QTI parameters
     status_t initialize(void *parametersParent, sp<CameraDeviceBase> device, sp<CameraProviderManager> manager);
     // Validate and update camera parameters based on new settings

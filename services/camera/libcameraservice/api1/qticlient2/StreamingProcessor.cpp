@@ -481,6 +481,69 @@ status_t StreamingProcessor::startStream(StreamType type,
     return OK;
 }
 
+status_t StreamingProcessor::startHfrStream(
+        const Vector <Vector <int32_t>> &outputStreams) {
+
+    ATRACE_CALL();
+    status_t res;
+
+    sp<CameraDeviceBase> device = mDevice.promote();
+    if (device == 0) {
+        ALOGE("%s: Camera %d: Device does not exist", __FUNCTION__, mId);
+        return INVALID_OPERATION;
+    }
+
+    ALOGV("%s: Camera %d:", __FUNCTION__, mId);
+
+    Mutex::Autolock m(mMutex);
+
+    CameraMetadata &request = mRecordingRequest;
+
+    // Configure streams for Constrained High Speed mode
+    device->configureStreams(true);
+
+    List<const CameraMetadata> requestList;
+    std::list<const SurfaceMap> surfaceMapsList;
+    for (size_t i = 0; i < outputStreams.size(); i++) {
+        SurfaceMap surfaceMap;
+        CameraMetadata tempRequest = request;
+        res = tempRequest.update(
+            ANDROID_REQUEST_OUTPUT_STREAMS,
+            outputStreams[i]);
+        if (res != OK) {
+            ALOGE("%s: Camera %d: Unable to set up preview request: %s (%d)",
+                    __FUNCTION__, mId, strerror(-res), res);
+            return res;
+        }
+
+        res = tempRequest.sort();
+        if (res != OK) {
+            ALOGE("%s: Camera %d: Error sorting preview request: %s (%d)",
+                    __FUNCTION__, mId, strerror(-res), res);
+            return res;
+        }
+        requestList.push_back(tempRequest);
+
+        camera_metadata_entry streams = tempRequest.find(ANDROID_REQUEST_OUTPUT_STREAMS);
+         for (size_t i = 0; i < streams.count; i++) {
+            surfaceMap[streams.data.i32[i]].push_back(0);
+        }
+        surfaceMapsList.push_back(surfaceMap);
+    }
+    res = device->setStreamingRequestList(requestList, surfaceMapsList);
+    if (res != OK) {
+        ALOGE("%s: Camera %d: Unable to set preview request to start preview: "
+                "%s (%d)",
+                __FUNCTION__, mId, strerror(-res), res);
+        return res;
+    }
+    mActiveRequest = RECORD;
+    mPaused = false;
+    mActiveStreamIds = outputStreams[0];
+    return OK;
+
+}
+
 status_t StreamingProcessor::togglePauseStream(bool pause) {
     ATRACE_CALL();
     status_t res;

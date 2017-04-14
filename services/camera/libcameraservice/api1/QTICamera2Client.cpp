@@ -107,4 +107,188 @@ status_t QTICamera2Client::stopPreviewExtn() {
     }
     return res;
 }
+
+status_t QTICamera2Client::startHFRRecording(Parameters &params) {
+    status_t res = OK;
+    sp<Camera2Client> client = mParentClient.promote();
+    bool needRestart = (params.qtiParams->hfrMode &&
+            (params.state >= Parameters::PREVIEW));
+
+
+    if (needRestart) {
+        stopPreviewForRestart(params);
+        // Store previous Fps range values,
+        // will be useful to restart preview, when recording stops.
+        params.qtiParams->nonHfrPreviewFpsRange[0] = params.previewFpsRange[0];
+        params.qtiParams->nonHfrPreviewFpsRange[1] = params.previewFpsRange[1];
+
+        params.previewFpsRange[0] = params.qtiParams->hfrPreviewFpsRange[0];
+        params.previewFpsRange[1] = params.qtiParams->hfrPreviewFpsRange[1];
+    }
+
+    if (params.videoBufferMode != hardware::ICamera::VIDEO_BUFFER_MODE_BUFFER_QUEUE) {
+        ALOGE("%s: Camera %d: Recording only supported buffer queue mode, but "
+                "mode %d is requested!", __FUNCTION__, client->mCameraId, params.videoBufferMode);
+        return INVALID_OPERATION;
+    }
+
+    if (!client->mStreamingProcessor->haveValidRecordingWindow()) {
+        ALOGE("%s: No valid recording window", __FUNCTION__);
+        return INVALID_OPERATION;
+    }
+
+
+    client->sCameraService->playSound(CameraService::SOUND_RECORDING_START);
+    client->mStreamingProcessor->updateRecordingRequest(params);
+    if (res != OK) {
+        ALOGE("%s: Camera %d: Unable to update recording request: %s (%d)",
+                __FUNCTION__, client->mCameraId, strerror(-res), res);
+        return res;
+    }
+
+    // Disable callbacks if they're enabled; can't record and use callbacks,
+    // and we can't fail record start without stagefright asserting.
+    params.previewCallbackFlags = 0;
+
+    res = client->mStreamingProcessor->updatePreviewStream(params);
+    if (res != OK) {
+        ALOGE("%s: Camera %d: Unable to update preview stream: "
+                "%s (%d)", __FUNCTION__, client->mCameraId,
+                strerror(-res), res);
+        return res;
+    }
+
+    res = client->updateProcessorStream<
+        StreamingProcessor,
+        &StreamingProcessor::updateRecordingStream>(
+                                                    client->mStreamingProcessor,
+                                                    params);
+    if (res != OK) {
+        ALOGE("%s: Camera %d: Unable to update recording stream: "
+                "%s (%d)", __FUNCTION__, client->mCameraId,
+                strerror(-res), res);
+        return res;
+    }
+
+    size_t requestListSize = params.qtiParams->hfrPreviewFpsRange[1]/30;
+    Vector<Vector<int32_t>> outputStreams;
+    for (size_t i = 0; i < requestListSize; i++) {
+        Vector<int32_t> request;
+        // For first request, add preview + video stream requests
+        if (i == 0) {
+            request.push(client->getPreviewStreamId());
+            request.push(client->getRecordingStreamId());
+        } else {
+            // For any other request, only add recording stream.
+            request.push(client->getRecordingStreamId());
+        }
+        outputStreams.push(request);
+    }
+
+    res = client->mStreamingProcessor->startHfrStream(outputStreams);
+
+    if (res != OK) {
+        ALOGE("%s: Camera %d: Unable to start recording stream: %s (%d)",
+                __FUNCTION__, client->mCameraId, strerror(-res), res);
+        return res;
+    }
+
+    if (params.state < Parameters::RECORD) {
+        params.state = Parameters::RECORD;
+    }
+
+    return res;
+
+}
+
+void QTICamera2Client::stopHFRRecording(Parameters &params) {
+    status_t res = OK;
+    sp<Camera2Client> client = mParentClient.promote();
+    client->sCameraService->playSound(CameraService::SOUND_RECORDING_STOP);
+
+    // We need to reconfigure for the preview.to start in non-hfr mode.
+    stopPreviewForRestart(params);
+
+    params.previewFpsRange[0] = params.qtiParams->nonHfrPreviewFpsRange[0];
+    params.previewFpsRange[1] = params.qtiParams->nonHfrPreviewFpsRange[1];
+
+    //.Reset the constrained high speed to false.
+    client->mDevice->configureStreams(false);
+
+    res = client->startPreviewL(params, false);
+    if (res != OK) {
+        ALOGE("%s: Camera %d: Unable to re-start preview after recording : %s (%d)",
+                __FUNCTION__, client->mCameraId, strerror(-res), res);
+        return;
+    }
+
+}
+
+void QTICamera2Client::stopPreviewForRestart(Parameters &params) {
+    status_t res;
+    sp<Camera2Client> client = mParentClient.promote();
+    const nsecs_t kStopCaptureTimeout = 3000000000LL; // 3 seconds
+    Parameters::State state = params.state;
+
+    switch (state) {
+        case Parameters::DISCONNECTED:
+            // Nothing to do.
+            break;
+        case Parameters::STOPPED:
+        case Parameters::VIDEO_SNAPSHOT:
+        case Parameters::STILL_CAPTURE:
+            client->mCaptureSequencer->waitUntilIdle(kStopCaptureTimeout);
+            // no break
+        case Parameters::RECORD:
+        case Parameters::PREVIEW:
+            client->syncWithDevice();
+            res = client->stopStream();
+            if (res != OK) {
+                ALOGE("%s: Camera %d: Can't stop streaming: %s (%d)",
+                        __FUNCTION__, client->mCameraId, strerror(-res), res);
+            }
+
+            // Flush all in-process captures and buffer in order to stop
+            // preview faster.
+            res = client->mDevice->flush();
+            if (res != OK) {
+                ALOGE("%s: Camera %d: Unable to flush pending requests: %s (%d)",
+                        __FUNCTION__, client->mCameraId, strerror(-res), res);
+            }
+
+            res = client->mDevice->waitUntilDrained();
+            if (res != OK) {
+                ALOGE("%s: Camera %d: Waiting to stop streaming failed: %s (%d)",
+                        __FUNCTION__, client->mCameraId, strerror(-res), res);
+            }
+            // Clean up recording stream
+            res = client->mStreamingProcessor->deleteRecordingStream();
+            if (res != OK) {
+                ALOGE("%s: Camera %d: Unable to delete recording stream before "
+                        "stop preview: %s (%d)",
+                        __FUNCTION__, client->mCameraId, strerror(-res), res);
+            }
+            // no break
+        case Parameters::WAITING_FOR_PREVIEW_WINDOW: {
+            params.state = Parameters::STOPPED;
+            client->commandStopFaceDetectionL(params);
+            break;
+        }
+        default:
+            ALOGE("%s: Camera %d: Unknown state %d", __FUNCTION__, client->mCameraId,
+                    state);
+    }
+
+    {
+        params.state = Parameters::STOPPED;
+    }
+
+    client->mStreamingProcessor->deletePreviewStream();
+    client->mStreamingProcessor->deleteRecordingStream();
+    client->mJpegProcessor->deleteStream();
+    client->mCallbackProcessor->deleteStream();
+    client->mZslProcessor->deleteStream();
+
+}
 } // namespace android
+
