@@ -17,7 +17,7 @@
 #ifndef AAUDIO_TIMESTAMP_SCHEDULER_H
 #define AAUDIO_TIMESTAMP_SCHEDULER_H
 
-#include <aaudio/AAudioDefinitions.h>
+#include <aaudio/AAudio.h>
 #include <utility/AudioClock.h>
 
 namespace aaudio {

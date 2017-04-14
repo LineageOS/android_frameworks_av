@@ -21,7 +21,7 @@
 #include <cutils/ashmem.h>
 #include <sys/mman.h>
 
-#include <aaudio/AAudioDefinitions.h>
+#include <aaudio/AAudio.h>
 
 namespace aaudio {
 

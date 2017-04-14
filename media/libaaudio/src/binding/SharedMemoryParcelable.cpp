@@ -22,7 +22,7 @@
 #include <stdio.h>
 
 #include <sys/mman.h>
-#include <aaudio/AAudioDefinitions.h>
+#include <aaudio/AAudio.h>
 
 #include <binder/Parcelable.h>
 #include <utility/AAudioUtilities.h>

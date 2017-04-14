@@ -18,7 +18,7 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
-#include <aaudio/AAudioDefinitions.h>
+#include <aaudio/AAudio.h>
 #include "SharedMemoryProxy.h"
 
 using namespace android;

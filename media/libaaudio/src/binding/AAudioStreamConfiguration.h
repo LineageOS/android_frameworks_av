@@ -19,9 +19,9 @@
 
 #include <stdint.h>
 
+#include <aaudio/AAudio.h>
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
-#include <aaudio/AAudioDefinitions.h>
 
 using android::status_t;
 using android::Parcel;

@@ -23,7 +23,7 @@
 #include <sys/mman.h>
 #include <binder/Parcelable.h>
 
-#include <aaudio/AAudioDefinitions.h>
+#include <aaudio/AAudio.h>
 
 #include "binding/SharedMemoryParcelable.h"
 #include "binding/SharedRegionParcelable.h"
