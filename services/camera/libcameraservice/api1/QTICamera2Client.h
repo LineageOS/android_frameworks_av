@@ -44,6 +44,11 @@ public:
     QTICamera2Client(sp<Camera2Client> client);
     ~QTICamera2Client();
     status_t setParametersExtn(Parameters &params);
+    status_t startHFRRecording(Parameters &params);
+    void stopHFRRecording(Parameters &params);
+
+private:
+    void stopPreviewForRestart(Parameters &params);
 
 };
 

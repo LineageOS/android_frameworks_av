@@ -69,6 +69,9 @@ class StreamingProcessor : public virtual VirtualLightRefBase {
     status_t startStream(StreamType type,
             const Vector<int32_t> &outputStreams);
 
+    status_t startHfrStream(
+            const Vector<Vector <int32_t>> &outputStreams);
+
     // Toggle between paused and unpaused. Stream must be started first.
     status_t togglePauseStream(bool pause);
 
