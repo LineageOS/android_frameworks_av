@@ -157,6 +157,11 @@ const char KEY_QTI_AE_BRACKET_HDR[] = "ae-bracket-hdr";
 const char AE_BRACKET_OFF[] = "Off";
 const char AE_BRACKET[] = "AE-Bracket";
 
+// HFR
+const char KEY_QTI_VIDEO_HIGH_FRAME_RATE[] = "video-hfr";
+const char KEY_QTI_VIDEO_HIGH_SPEED_RECORDING[] = "video-hsr";
+const char KEY_QTI_SUPPORTED_VIDEO_HIGH_FRAME_RATE_MODES[] = "video-hfr-values";
+const char KEY_QTI_SUPPORTED_HFR_SIZES[] = "hfr-size-values";
 
 status_t QTIParameters::initialize(void *parametersParent,
         sp<CameraDeviceBase> device, sp<CameraProviderManager> manager) {
@@ -409,6 +414,49 @@ status_t QTIParameters::initialize(void *parametersParent,
         ParentParams->params.remove(KEY_QTI_CAPTURE_BURST_EXPOSURE);
     }
 
+    // HFR
+    camera_metadata_ro_entry_t availableHfrConfigs =
+            ParentParams->staticInfo(ANDROID_CONTROL_AVAILABLE_HIGH_SPEED_VIDEO_CONFIGURATIONS);
+    if (availableHfrConfigs.count >= 10) {
+        // Retrieve Hfr Configurations.
+        // The elements of config are (width, height, fps_min, fps_max, batch_size_max)
+        // Two sets of such config are available
+        // One for preview and the second one for video.
+
+        String8 hfrValues;
+        String8 hfrSizeValues;
+        int32_t width = 0;
+        int32_t height = 0;
+        int32_t fps_max = 0;
+
+        for (size_t i = 0; i < availableHfrConfigs.count &&
+                availableHfrConfigs.count >= (i+10); i += 10) {
+            width = availableHfrConfigs.data.i32[i+0];
+            height = availableHfrConfigs.data.i32[i+1];
+            // Check if previous fps is same as current fps.
+            // Advertize the max resolution for each high FPS mode.
+            // Each FPS mode, like 120 FPS, will be advertised for max resolution.
+            if (fps_max != availableHfrConfigs.data.i32[i+3]) {
+                fps_max = availableHfrConfigs.data.i32[i+3];
+
+                if (i != 0 ) {
+                    hfrValues += ",";
+                    hfrSizeValues += ",";
+                }
+                hfrValues += String8::format("%d",fps_max);
+                hfrSizeValues += String8::format("%dx%d",width,height);
+
+            }
+        }
+
+        ParentParams->params.set(KEY_QTI_SUPPORTED_VIDEO_HIGH_FRAME_RATE_MODES, hfrValues.string());
+        ParentParams->params.set(KEY_QTI_SUPPORTED_HFR_SIZES, hfrSizeValues.string());
+
+        // Default
+        ParentParams->params.set(KEY_QTI_VIDEO_HIGH_SPEED_RECORDING, "off");
+        ParentParams->params.set(KEY_QTI_VIDEO_HIGH_FRAME_RATE, "off");
+
+    }
     return res;
 }
 
@@ -588,6 +636,16 @@ status_t QTIParameters::set(CameraParameters2& newParams, void *parametersParent
     mNeedRestart = (prevAllowZslMode != ParentParams->allowZslMode);
     ALOGV("%s mNeedRestart = %d, prevAllowZslMode = %d, allowZslMode = %d",
             __FUNCTION__, mNeedRestart, prevAllowZslMode, ParentParams->allowZslMode);
+
+    const char *qtiHfrMode = newParams.get(KEY_QTI_VIDEO_HIGH_FRAME_RATE);
+    ALOGV("HFR mode = %s", qtiHfrMode);
+    if (qtiHfrMode != NULL && strcmp(qtiHfrMode, "off")) {
+        ParentParams->qtiParams->hfrMode = true;
+        ParentParams->qtiParams->hfrPreviewFpsRange[0] = atoi(qtiHfrMode);
+        ParentParams->qtiParams->hfrPreviewFpsRange[1] = atoi(qtiHfrMode);
+    } else {
+        ParentParams->qtiParams->hfrMode = false;
+    }
 
     return res;
 }
