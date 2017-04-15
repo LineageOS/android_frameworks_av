@@ -200,18 +200,34 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager) {
     }
 
     std::shared_ptr<RequestMetadataQueue> queue;
-    auto getQueueRet = session->getCaptureRequestMetadataQueue([&queue](const auto& descriptor) {
-        queue = std::make_shared<RequestMetadataQueue>(descriptor);
-        if (!queue->isValid() || queue->availableToWrite() <= 0) {
-            ALOGW("HAL returns empty request metadata fmq, not use it");
-            queue = nullptr;
-            // don't use the queue onwards.
-        }
-    });
-    if (!getQueueRet.isOk()) {
-        ALOGW("Transaction error when getting request metadata fmq: %s, not use it",
-                getQueueRet.description().c_str());
+    auto requestQueueRet = session->getCaptureRequestMetadataQueue(
+        [&queue](const auto& descriptor) {
+            queue = std::make_shared<RequestMetadataQueue>(descriptor);
+            if (!queue->isValid() || queue->availableToWrite() <= 0) {
+                ALOGE("HAL returns empty request metadata fmq, not use it");
+                queue = nullptr;
+                // don't use the queue onwards.
+            }
+        });
+    if (!requestQueueRet.isOk()) {
+        ALOGE("Transaction error when getting request metadata fmq: %s, not use it",
+                requestQueueRet.description().c_str());
         queue = nullptr;
+        // Don't use the queue onwards.
+    }
+    auto resultQueueRet = session->getCaptureResultMetadataQueue(
+        [&queue = mResultMetadataQueue](const auto& descriptor) {
+            queue = std::make_unique<ResultMetadataQueue>(descriptor);
+            if (!queue->isValid() ||  queue->availableToWrite() <= 0) {
+                ALOGE("HAL returns empty result metadata fmq, not use it");
+                queue = nullptr;
+                // Don't use the queue onwards.
+            }
+        });
+    if (!resultQueueRet.isOk()) {
+        ALOGE("Transaction error when getting result metadata queue from camera session: %s",
+                resultQueueRet.description().c_str());
+        mResultMetadataQueue = nullptr;
         // Don't use the queue onwards.
     }
 
@@ -954,24 +970,56 @@ status_t Camera3Device::submitRequestsHelper(
     return res;
 }
 
-
+// Only one processCaptureResult should be called at a time, so
+// the locks won't block. The locks are present here simply to enforce this.
 hardware::Return<void> Camera3Device::processCaptureResult(
         const hardware::hidl_vec<
                 hardware::camera::device::V3_2::CaptureResult>& results) {
-    for (const auto& result : results) {
-        processOneCaptureResult(result);
+
+    if (mProcessCaptureResultLock.tryLock() != OK) {
+        // This should never happen; it indicates a wrong client implementation
+        // that doesn't follow the contract. But, we can be tolerant here.
+        ALOGE("%s: callback overlapped! waiting 1s...",
+                __FUNCTION__);
+        if (mProcessCaptureResultLock.timedLock(1000000000 /* 1s */) != OK) {
+            ALOGE("%s: cannot acquire lock in 1s, dropping results",
+                    __FUNCTION__);
+            // really don't know what to do, so bail out.
+            return hardware::Void();
+        }
     }
+    for (const auto& result : results) {
+        processOneCaptureResultLocked(result);
+    }
+    mProcessCaptureResultLock.unlock();
     return hardware::Void();
 }
 
-void Camera3Device::processOneCaptureResult(
+void Camera3Device::processOneCaptureResultLocked(
         const hardware::camera::device::V3_2::CaptureResult& result) {
     camera3_capture_result r;
     status_t res;
     r.frame_number = result.frameNumber;
-    if (result.result.size() != 0) {
-        r.result = reinterpret_cast<const camera_metadata_t*>(result.result.data());
-        size_t expected_metadata_size = result.result.size();
+
+    hardware::camera::device::V3_2::CameraMetadata resultMetadata;
+    if (result.fmqResultSize > 0) {
+        resultMetadata.resize(result.fmqResultSize);
+        if (mResultMetadataQueue == nullptr) {
+            return; // logged in initialize()
+        }
+        if (!mResultMetadataQueue->read(resultMetadata.data(), result.fmqResultSize)) {
+            ALOGE("%s: Frame %d: Cannot read camera metadata from fmq, size = %" PRIu64,
+                    __FUNCTION__, result.frameNumber, result.fmqResultSize);
+            return;
+        }
+    } else {
+        resultMetadata.setToExternal(const_cast<uint8_t *>(result.result.data()),
+                result.result.size());
+    }
+
+    if (resultMetadata.size() != 0) {
+        r.result = reinterpret_cast<const camera_metadata_t*>(resultMetadata.data());
+        size_t expected_metadata_size = resultMetadata.size();
         if ((res = validate_camera_metadata_structure(r.result, &expected_metadata_size)) != OK) {
             ALOGE("%s: Frame %d: Invalid camera metadata received by camera service from HAL: %s (%d)",
                     __FUNCTION__, result.frameNumber, strerror(-res), res);
