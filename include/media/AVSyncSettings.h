@@ -1,1 +1,1 @@
-../../media/libmedia/include/AVSyncSettings.h
+../../media/libmedia/include/media/AVSyncSettings.h

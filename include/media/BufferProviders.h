@@ -1,1 +1,1 @@
-../../media/libmedia/include/BufferProviders.h
+../../media/libmedia/include/media/BufferProviders.h

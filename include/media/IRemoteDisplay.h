@@ -1,1 +1,1 @@
-../../media/libmedia/include/IRemoteDisplay.h
+../../media/libmedia/include/media/IRemoteDisplay.h

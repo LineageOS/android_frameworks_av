@@ -1,1 +1,1 @@
-../../media/libmedia/include/RingBuffer.h
+../../media/libmedia/include/media/RingBuffer.h

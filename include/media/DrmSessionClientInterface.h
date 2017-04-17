@@ -1,1 +1,1 @@
-../../media/libmedia/include/DrmSessionClientInterface.h
+../../media/libmedia/include/media/DrmSessionClientInterface.h

@@ -1,1 +1,1 @@
-../../media/libmedia/include/IDrmClient.h
+../../media/libmedia/include/media/IDrmClient.h

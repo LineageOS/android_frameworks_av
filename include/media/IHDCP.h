@@ -1,1 +1,1 @@
-../../media/libmedia/include/IHDCP.h
+../../media/libmedia/include/media/IHDCP.h

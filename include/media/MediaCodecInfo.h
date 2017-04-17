@@ -1,1 +1,1 @@
-../../media/libmedia/include/MediaCodecInfo.h
+../../media/libmedia/include/media/MediaCodecInfo.h

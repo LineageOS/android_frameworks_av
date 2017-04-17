@@ -1,1 +1,1 @@
-../../media/libmedia/include/MidiDeviceInfo.h
+../../media/libmedia/include/media/MidiDeviceInfo.h
