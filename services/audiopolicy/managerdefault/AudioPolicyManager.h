@@ -452,7 +452,7 @@ protected:
                                                        audio_channel_mask_t channelMask,
                                                        audio_output_flags_t flags);
 
-        audio_io_handle_t selectOutputForEffects(const SortedVector<audio_io_handle_t>& outputs);
+        audio_io_handle_t selectOutputForMusicEffects();
 
         virtual status_t addAudioPatch(audio_patch_handle_t handle, const sp<AudioPatch>& patch)
         {
@@ -570,6 +570,8 @@ protected:
 
         bool mMasterMono;               // true if we wish to force all outputs to mono
         AudioPolicyMixCollection mPolicyMixes; // list of registered mixes
+        audio_io_handle_t mMusicEffectOutput;     // output selected for music effects
+
 
 #ifdef AUDIO_POLICY_TEST
         Mutex   mLock;
