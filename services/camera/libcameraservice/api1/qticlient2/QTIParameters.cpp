@@ -167,6 +167,10 @@ const char KEY_QTI_SUPPORTED_HFR_SIZES[] = "hfr-size-values";
 const char KEY_QTI_SUPPORTED_HDR_NEED_1X[] = "hdr-need-1x-values";
 const char KEY_QTI_HDR_NEED_1X[] = "hdr-need-1x";
 
+// DIS
+const char KEY_QTI_SUPPORTED_DIS_MODES[] = "dis-values";
+const char KEY_QTI_DIS[] = "dis";
+
 status_t QTIParameters::initialize(void *parametersParent,
             sp<CameraDeviceBase> device, sp<CameraProviderManager> manager) {
     status_t res = OK;
@@ -466,6 +470,20 @@ status_t QTIParameters::initialize(void *parametersParent,
         ParentParams->params.set(KEY_QTI_VIDEO_HIGH_FRAME_RATE, "off");
 
     }
+
+    // Video stabilization, DIS
+    camera_metadata_ro_entry_t availableVideoStabilizationModes =
+        ParentParams->staticInfo(ANDROID_CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES, 0, 0,
+                false);
+
+    if (availableVideoStabilizationModes.count > 1) {
+        ParentParams->params.set(KEY_QTI_SUPPORTED_DIS_MODES,"disable,enable");
+    } else {
+        ParentParams->params.set(KEY_QTI_SUPPORTED_DIS_MODES,"disable");
+    }
+    // Default
+    ParentParams->params.set(KEY_QTI_DIS, "disable");
+
     return res;
 }
 
@@ -672,6 +690,23 @@ status_t QTIParameters::set(CameraParameters2& newParams, void *parametersParent
     if(HdrSceneEnable && Hdr1xEnable ) {
         burstCount = 2;
         newParams.set("num-snaps-per-shutter", String8::format("%d", burstCount));
+    }
+
+    // VIDEO_STABILIZATION, DIS
+    const char *disValue = newParams.get(KEY_QTI_DIS);
+    if (disValue != NULL && !strcmp(disValue, "enable")) {
+        ParentParams->videoStabilization = true;
+    } else {
+        ParentParams->videoStabilization = false;
+    }
+
+    camera_metadata_ro_entry_t availableVideoStabilizationModes =
+        ParentParams->staticInfo(ANDROID_CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES, 0, 0,
+                false);
+    if (ParentParams->videoStabilization &&
+            availableVideoStabilizationModes.count == 1) {
+        ALOGE("%s: Video stabilization not supported", __FUNCTION__);
+        ParentParams->videoStabilization = false;
     }
 
     return res;
