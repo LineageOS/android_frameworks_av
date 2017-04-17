@@ -940,7 +940,7 @@ status_t Parameters::initialize(const CameraMetadata *info, int deviceVersion) {
             CameraParameters::FALSE);
     }
 
-    bool isZslReprocessPresent = false;
+    isZslReprocessPresent = false;
     camera_metadata_ro_entry_t availableCapabilities =
         staticInfo(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
     if (0 < availableCapabilities.count) {
@@ -999,7 +999,7 @@ status_t Parameters::buildFastInfo() {
         return NO_INIT;
     }
 
-    // Get supported preview fps ranges.
+    // Get supported preview fps ranges, up to default maximum.
     Vector<Size> supportedPreviewSizes;
     Vector<FpsRange> supportedPreviewFpsRanges;
     const Size PREVIEW_SIZE_BOUND = { MAX_PREVIEW_WIDTH, MAX_PREVIEW_HEIGHT };
@@ -1007,7 +1007,8 @@ status_t Parameters::buildFastInfo() {
     if (res != OK) return res;
     for (size_t i=0; i < availableFpsRanges.count; i += 2) {
         if (!isFpsSupported(supportedPreviewSizes,
-                HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED, availableFpsRanges.data.i32[i+1])) {
+                HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED, availableFpsRanges.data.i32[i+1]) ||
+                availableFpsRanges.data.i32[i+1] > MAX_DEFAULT_FPS) {
             continue;
         }
         FpsRange fpsRange = {availableFpsRanges.data.i32[i], availableFpsRanges.data.i32[i+1]};
@@ -1436,30 +1437,43 @@ status_t Parameters::set(const String8& paramString) {
               *
               * Either way, in case of multiple ranges, break the tie by
               * selecting the smaller range.
+              *
+              * Always select range within 30fps if one exists.
               */
 
             // all ranges which have previewFps
             Vector<Range> candidateRanges;
+            Vector<Range> candidateFastRanges;
             for (i = 0; i < availableFrameRates.count; i+=2) {
                 Range r = {
                             availableFrameRates.data.i32[i],
                             availableFrameRates.data.i32[i+1]
                 };
+                if (!isFpsSupported(availablePreviewSizes,
+                        HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED, r.max)) {
+                    continue;
+                }
 
                 if (r.min <= previewFps && previewFps <= r.max) {
-                    candidateRanges.push(r);
+                    if (r.max <= MAX_DEFAULT_FPS) {
+                        candidateRanges.push(r);
+                    } else {
+                        candidateFastRanges.push(r);
+                    }
                 }
             }
-            if (candidateRanges.isEmpty()) {
+            if (candidateRanges.isEmpty() && candidateFastRanges.isEmpty()) {
                 ALOGE("%s: Requested preview frame rate %d is not supported",
                         __FUNCTION__, previewFps);
                 return BAD_VALUE;
             }
-            // most applicable range with targetFps
-            Range bestRange = candidateRanges[0];
-            for (i = 1; i < candidateRanges.size(); ++i) {
-                Range r = candidateRanges[i];
 
+            // most applicable range with targetFps
+            Vector<Range>& ranges =
+                    candidateRanges.size() > 0 ? candidateRanges : candidateFastRanges;
+            Range bestRange = ranges[0];
+            for (i = 1; i < ranges.size(); ++i) {
+                Range r = ranges[i];
                 // Find by largest minIndex in recording mode
                 if (validatedParams.recordingHint) {
                     if (r.min > bestRange.min) {
@@ -1976,6 +1990,19 @@ status_t Parameters::set(const String8& paramString) {
     // Need to flatten again in case of overrides
     paramsFlattened = newParams.flatten();
     params = newParams;
+
+    slowJpegMode = false;
+    Size pictureSize = { pictureWidth, pictureHeight };
+    int64_t minFrameDurationNs = getJpegStreamMinFrameDurationNs(pictureSize);
+    if (previewFpsRange[1] > 1e9/minFrameDurationNs + FPS_MARGIN) {
+        slowJpegMode = true;
+    }
+    if (slowJpegMode || property_get_bool("camera.disable_zsl_mode", false)) {
+        allowZslMode = false;
+    } else {
+        allowZslMode = isZslReprocessPresent;
+    }
+    ALOGV("%s: allowZslMode: %d slowJpegMode %d", __FUNCTION__, allowZslMode, slowJpegMode);
 
     return OK;
 }
@@ -2984,7 +3011,6 @@ bool Parameters::isFpsSupported(const Vector<Size> &sizes, int format, int32_t f
     }
 
     // Get min frame duration for each size and check if the given fps range can be supported.
-    const int32_t FPS_MARGIN = 1;
     for (size_t i = 0 ; i < sizes.size(); i++) {
         int64_t minFrameDuration = getMinFrameDurationNs(sizes[i], format);
         if (minFrameDuration <= 0) {

@@ -173,6 +173,8 @@ struct Parameters {
     // Whether the jpeg stream is slower than 30FPS and can slow down preview.
     // When slowJpegMode is true, allowZslMode must be false to avoid slowing down preview.
     bool slowJpegMode;
+    // Whether ZSL reprocess is supported by the device.
+    bool isZslReprocessPresent;
 
     // Overall camera state
     enum State {
@@ -199,6 +201,10 @@ struct Parameters {
     static const CONSTEXPR float ASPECT_RATIO_TOLERANCE = 0.001;
     // Threshold for slow jpeg mode
     static const int64_t kSlowJpegModeThreshold = 33400000LL; // 33.4 ms
+    // Margin for checking FPS
+    static const int32_t FPS_MARGIN = 1;
+    // Max FPS for default parameters
+    static const int32_t MAX_DEFAULT_FPS = 30;
 
     // Full static camera info, object owned by someone else, such as
     // Camera2Device.
