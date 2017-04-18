@@ -1,1 +1,1 @@
-../../media/libmedia/include/MediaProfiles.h
+../../media/libmedia/include/media/MediaProfiles.h

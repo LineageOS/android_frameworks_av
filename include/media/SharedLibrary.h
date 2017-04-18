@@ -1,1 +1,1 @@
-../../media/libmedia/include/SharedLibrary.h
+../../media/libmedia/include/media/SharedLibrary.h

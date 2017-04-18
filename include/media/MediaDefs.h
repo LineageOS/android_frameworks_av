@@ -1,1 +1,1 @@
-../../media/libmedia/include/MediaDefs.h
+../../media/libmedia/include/media/MediaDefs.h

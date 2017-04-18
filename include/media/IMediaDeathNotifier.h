@@ -1,1 +1,1 @@
-../../media/libmedia/include/IMediaDeathNotifier.h
+../../media/libmedia/include/media/IMediaDeathNotifier.h

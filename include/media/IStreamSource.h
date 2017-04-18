@@ -1,1 +1,1 @@
-../../media/libmedia/include/IStreamSource.h
+../../media/libmedia/include/media/IStreamSource.h

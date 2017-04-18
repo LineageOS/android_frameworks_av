@@ -1,1 +1,1 @@
-../../media/libmedia/include/mediaplayer.h
+../../media/libmedia/include/media/mediaplayer.h

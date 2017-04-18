@@ -1,1 +1,1 @@
-../../media/libmedia/include/DrmHal.h
+../../media/libmedia/include/media/DrmHal.h

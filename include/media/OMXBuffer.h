@@ -1,1 +1,1 @@
-../../media/libmedia/include/OMXBuffer.h
+../../media/libmedia/include/media/OMXBuffer.h
