@@ -1,6 +1,7 @@
 // Effect factory library
 cc_library_shared {
     name: "libeffects",
+    vendor: true,
     srcs: ["EffectsFactory.c"],
 
     shared_libs: [
@@ -14,4 +15,6 @@ cc_library_shared {
     local_include_dirs:["include"],
 
     export_include_dirs: ["include"],
+    header_libs: ["libhardware_headers"],
+    export_header_lib_headers: ["libhardware_headers"],
 }

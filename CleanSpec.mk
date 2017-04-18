@@ -67,6 +67,8 @@ $(call add-clean-step, rm -rf $(PRODUCT_OUT)/obj_arm/STATIC_LIBRARIES/liboboe*)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/obj_arm/SHARED_LIBRARIES/liboboe*)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/bin/mediacodec)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/etc/init/mediacodec.rc)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/libeffects.so)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib64/libeffects.so)
 
 # ************************************************
 # NEWER CLEAN STEPS MUST BE AT THE END OF THE LIST
