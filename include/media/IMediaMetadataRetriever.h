@@ -1,1 +1,1 @@
-../../media/libmedia/include/IMediaMetadataRetriever.h
+../../media/libmedia/include/media/IMediaMetadataRetriever.h

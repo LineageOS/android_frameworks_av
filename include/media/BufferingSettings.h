@@ -1,1 +1,1 @@
-../../media/libmedia/include/BufferingSettings.h
+../../media/libmedia/include/media/BufferingSettings.h

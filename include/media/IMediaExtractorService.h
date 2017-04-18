@@ -1,1 +1,1 @@
-../../media/libmedia/include/IMediaExtractorService.h
+../../media/libmedia/include/media/IMediaExtractorService.h

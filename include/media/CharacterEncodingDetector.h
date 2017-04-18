@@ -1,1 +1,1 @@
-../../media/libmedia/include/CharacterEncodingDetector.h
+../../media/libmedia/include/media/CharacterEncodingDetector.h

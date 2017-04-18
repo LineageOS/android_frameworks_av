@@ -1,1 +1,1 @@
-../../media/libmedia/include/JetPlayer.h
+../../media/libmedia/include/media/JetPlayer.h

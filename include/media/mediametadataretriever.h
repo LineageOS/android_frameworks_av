@@ -1,1 +1,1 @@
-../../media/libmedia/include/mediametadataretriever.h
+../../media/libmedia/include/media/mediametadataretriever.h

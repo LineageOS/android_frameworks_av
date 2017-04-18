@@ -1,1 +1,1 @@
-../../media/libmedia/include/IResourceManagerService.h
+../../media/libmedia/include/media/IResourceManagerService.h

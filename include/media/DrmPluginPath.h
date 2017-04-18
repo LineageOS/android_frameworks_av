@@ -1,1 +1,1 @@
-../../media/libmedia/include/DrmPluginPath.h
+../../media/libmedia/include/media/DrmPluginPath.h

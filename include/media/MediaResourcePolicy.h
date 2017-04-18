@@ -1,1 +1,1 @@
-../../media/libmedia/include/MediaResourcePolicy.h
+../../media/libmedia/include/media/MediaResourcePolicy.h
