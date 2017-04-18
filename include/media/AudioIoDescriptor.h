@@ -1,1 +1,1 @@
-../../media/libaudioclient/include/AudioIoDescriptor.h
+../../media/libaudioclient/include/media/AudioIoDescriptor.h

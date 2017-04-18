@@ -1,3 +1,9 @@
+cc_library_headers {
+    name: "libaudioclient_headers",
+    vendor_available: true,
+    export_include_dirs: ["include"],
+}
+
 cc_library_shared {
     name: "libaudioclient",
     srcs: [
@@ -26,17 +32,20 @@ cc_library_shared {
         "libaudioutils",
     ],
     export_shared_lib_headers: ["libbinder"],
-    local_include_dirs: ["include"],
-    export_include_dirs: ["include"],
+
+    local_include_dirs: ["include/media"],
+    header_libs: ["libaudioclient_headers"],
+    export_header_lib_headers: ["libaudioclient_headers"],
+
     // for memory heap analysis
     static_libs: [
         "libc_malloc_debug_backtrace",
         "libc_logging",
     ],
     cflags: [
+        "-Wall",
         "-Werror",
         "-Wno-error=deprecated-declarations",
-        "-Wall",
     ],
     sanitize: {
         misc_undefined : [

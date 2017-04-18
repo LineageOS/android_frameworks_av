@@ -1,1 +1,1 @@
-../../media/libaudioclient/include/IAudioFlingerClient.h
+../../media/libaudioclient/include/media/IAudioFlingerClient.h
