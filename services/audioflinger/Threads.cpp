@@ -100,10 +100,6 @@ static inline T min(const T& a, const T& b)
     return a < b ? a : b;
 }
 
-#ifndef ARRAY_SIZE
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
-#endif
-
 namespace android {
 
 // retry counts for buffer fill timeout
@@ -2182,7 +2178,7 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
         }
 
         char buffer[256];
-        track->dump(buffer, ARRAY_SIZE(buffer), false /* active */);
+        track->dump(buffer, arraysize(buffer), false /* active */);
         mLocalLog.log("addTrack_l    (%p) %s", track.get(), buffer + 4); // log for analysis
 
         status = NO_ERROR;
@@ -2212,7 +2208,7 @@ void AudioFlinger::PlaybackThread::removeTrack_l(const sp<Track>& track)
     track->triggerEvents(AudioSystem::SYNC_EVENT_PRESENTATION_COMPLETE);
 
     char buffer[256];
-    track->dump(buffer, ARRAY_SIZE(buffer), false /* active */);
+    track->dump(buffer, arraysize(buffer), false /* active */);
     mLocalLog.log("removeTrack_l (%p) %s", track.get(), buffer + 4); // log for analysis
 
     mTracks.remove(track);
@@ -3388,7 +3384,7 @@ void AudioFlinger::PlaybackThread::removeTracks_l(const Vector< sp<Track> >& tra
                 removeTrack_l(track);
             } else { // inactive but not terminated
                 char buffer[256];
-                track->dump(buffer, ARRAY_SIZE(buffer), false /* active */);
+                track->dump(buffer, arraysize(buffer), false /* active */);
                 mLocalLog.log("removeTracks_l(%p) %s", track.get(), buffer + 4);
             }
         }

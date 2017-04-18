@@ -340,7 +340,6 @@ static const char * const audio_interfaces[] = {
     AUDIO_HARDWARE_MODULE_ID_A2DP,
     AUDIO_HARDWARE_MODULE_ID_USB,
 };
-#define ARRAY_SIZE(x) (sizeof((x))/sizeof(((x)[0])))
 
 AudioHwDevice* AudioFlinger::findSuitableHwDev_l(
         audio_module_handle_t module,
@@ -350,7 +349,7 @@ AudioHwDevice* AudioFlinger::findSuitableHwDev_l(
     // well known modules
     if (module == 0) {
         ALOGW("findSuitableHwDev_l() loading well know audio hw modules");
-        for (size_t i = 0; i < ARRAY_SIZE(audio_interfaces); i++) {
+        for (size_t i = 0; i < arraysize(audio_interfaces); i++) {
             loadHwModule_l(audio_interfaces[i]);
         }
         // then try to find a module supporting the requested device.
