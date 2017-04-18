@@ -185,6 +185,9 @@ LOCAL_MODULE_TAGS := optional
 
 LOCAL_MODULE:= mediafilter
 
+LOCAL_SANITIZE := cfi
+LOCAL_SANITIZE_DIAG := cfi
+
 include $(BUILD_EXECUTABLE)
 
 ################################################################################
