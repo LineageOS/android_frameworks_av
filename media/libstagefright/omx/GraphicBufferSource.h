@@ -41,7 +41,8 @@ using ::android::binder::Status;
 struct FrameDropper;
 
 /*
- * This class is used to feed OMX codecs from a Surface via BufferQueue.
+ * This class is used to feed OMX codecs from a Surface via BufferQueue or
+ * HW producer.
  *
  * Instances of the class don't run on a dedicated thread.  Instead,
  * various events trigger data movement:
@@ -55,6 +56,22 @@ struct FrameDropper;
  * Frames of data (and, perhaps, the end-of-stream indication) can arrive
  * before the codec is in the "executing" state, so we need to queue
  * things up until we're ready to go.
+ *
+ * The GraphicBufferSource can be configure dynamically to discard frames
+ * from the source:
+ *
+ * - if their timestamp is less than a start time
+ * - if the source is suspended or stopped and the suspend/stop-time is reached
+ * - if EOS was signaled
+ * - if there is no encoder connected to it
+ *
+ * The source, furthermore, may choose to not encode (drop) frames if:
+ *
+ * - to throttle the frame rate (keep it under a certain limit)
+ *
+ * Finally the source may optionally hold onto the last non-discarded frame
+ * (even if it was dropped) to reencode it after an interval if no further
+ * frames are sent by the producer.
  */
 class GraphicBufferSource : public BufferQueue::ConsumerListener {
 public:
@@ -74,6 +91,9 @@ public:
         return mProducer;
     }
 
+    // OmxBufferSource interface
+    // ------------------------------
+
     // This is called when OMX transitions to OMX_StateExecuting, which means
     // we can start handing it buffers.  If we already have buffers of data
     // sitting in the BufferQueue, this will send them to the codec.
@@ -91,12 +111,14 @@ public:
     // A "codec buffer", i.e. a buffer that can be used to pass data into
     // the encoder, has been allocated.  (This call does not call back into
     // OMXNodeInstance.)
-    Status onInputBufferAdded(int32_t bufferID);
+    Status onInputBufferAdded(int32_t bufferId);
 
     // Called from OnEmptyBufferDone.  If we have a BQ buffer available,
     // fill it with a new frame of data; otherwise, just mark it as available.
-    Status onInputBufferEmptied(
-            int32_t bufferID, int fenceFd);
+    Status onInputBufferEmptied(int32_t bufferId, int fenceFd);
+
+    // IGraphicBufferSource interface
+    // ------------------------------
 
     // Configure the buffer source to be used with an OMX node with the default
     // data space.
@@ -154,6 +176,9 @@ public:
     status_t setColorAspects(int32_t aspectsPacked);
 
 protected:
+    // BQ::ConsumerListener interface
+    // ------------------------------
+
     // BufferQueue::ConsumerListener interface, called when a new frame of
     // data is available.  If we're executing and a codec buffer is
     // available, we acquire the buffer, copy the GraphicBuffer reference
@@ -173,70 +198,135 @@ protected:
     void onSidebandStreamChanged() override;
 
 private:
-
-    // Keep track of codec input buffers.  They may either be available
-    // (mGraphicBuffer == NULL) or in use by the codec.
-    struct CodecBuffer {
-        IOMX::buffer_id mBufferID;
-
-        // buffer producer's frame-number for buffer
-        uint64_t mFrameNumber;
-
-        // buffer producer's buffer slot for buffer
-        int mSlot;
-
-        sp<GraphicBuffer> mGraphicBuffer;
-    };
-
-    // Returns the index of an available codec buffer.  If none are
-    // available, returns -1.  Mutex must be held by caller.
-    int findAvailableCodecBuffer_l();
-
-    // Returns true if a codec buffer is available.
-    bool isCodecBufferAvailable_l() {
-        return findAvailableCodecBuffer_l() >= 0;
-    }
-
-    // Finds the mCodecBuffers entry that matches.  Returns -1 if not found.
-    int findMatchingCodecBuffer_l(IOMX::buffer_id bufferID);
-
-    // Fills a codec buffer with a frame from the BufferQueue.  This must
-    // only be called when we know that a frame of data is ready (i.e. we're
-    // in the onFrameAvailable callback, or if we're in codecBufferEmptied
-    // and mNumFramesAvailable is nonzero).  Returns without doing anything if
-    // we don't have a codec buffer available.
-    //
-    // Returns true if we successfully filled a codec buffer with a BQ buffer.
-    bool fillCodecBuffer_l();
-
-    // Marks the mCodecBuffers entry as in-use, copies the GraphicBuffer
-    // reference into the codec buffer, and submits the data to the codec.
-    status_t submitBuffer_l(const BufferItem &item, int cbi);
-
-    // Submits an empty buffer, with the EOS flag set.   Returns without
-    // doing anything if we don't have a codec buffer available.
-    void submitEndOfInputStream_l();
-
-    // Acquire buffer from the consumer
-    status_t acquireBuffer(BufferItem *bi);
-
-    bool releaseAllBuffers();
-
-    // Release buffer to the consumer
-    void releaseBuffer(int id, uint64_t frameNum, const sp<Fence> &fence);
-
-    void setLatestBuffer_l(const BufferItem &item);
-    bool repeatLatestBuffer_l();
-    bool getTimestamp(const BufferItem &item, int64_t *codecTimeUs);
-
-    // called when the data space of the input buffer changes
-    void onDataSpaceChanged_l(android_dataspace dataSpace, android_pixel_format pixelFormat);
-
     // Lock, covers all member variables.
     mutable Mutex mMutex;
 
     // Used to report constructor failure.
     status_t mInitCheck;
+
+    // Graphic buffer reference objects
+    // --------------------------------
+
+    // These are used to keep a shared reference to GraphicBuffers and gralloc handles owned by the
+    // GraphicBufferSource as well as to manage the cache slots. Separate references are owned by
+    // the buffer cache (controlled by the buffer queue/buffer producer) and the codec.
+
+    // When we get a buffer from the producer (BQ) it designates them to be cached into specific
+    // slots. Each slot owns a shared reference to the graphic buffer (we track these using
+    // CachedBuffer) that is in that slot, but the producer controls the slots.
+    struct CachedBuffer;
+
+    // When we acquire a buffer, we must release it back to the producer once we (or the codec)
+    // no longer uses it (as long as the buffer is still in the cache slot). We use shared
+    // AcquiredBuffer instances for this purpose - and we call release buffer when the last
+    // reference is relinquished.
+    struct AcquiredBuffer;
+
+    // We also need to keep some extra metadata (other than the buffer reference) for acquired
+    // buffers. These are tracked in VideoBuffer struct.
+    struct VideoBuffer {
+        std::shared_ptr<AcquiredBuffer> mBuffer;
+        nsecs_t mTimestampNs;
+        android_dataspace_t mDataspace;
+    };
+
+    // Cached and aquired buffers
+    // --------------------------------
+
+    typedef int slot_id;
+
+    // Maps a slot to the cached buffer in that slot
+    KeyedVector<slot_id, std::shared_ptr<CachedBuffer>> mBufferSlots;
+
+    // Queue of buffers acquired in chronological order that are not yet submitted to the codec
+    List<VideoBuffer> mAvailableBuffers;
+
+    // Number of buffers that have been signaled by the producer that they are available, but
+    // we've been unable to acquire them due to our max acquire count
+    int32_t mNumAvailableUnacquiredBuffers;
+
+    // Number of frames acquired from consumer (debug only)
+    // (as in aquireBuffer called, and release needs to be called)
+    int32_t mNumOutstandingAcquires;
+
+    // Acquire a buffer from the BQ and store it in |item| if successful
+    // \return OK on success, or error on failure.
+    status_t acquireBuffer_l(VideoBuffer *item);
+
+    // Called when a buffer was acquired from the producer
+    void onBufferAcquired_l(const VideoBuffer &buffer);
+
+    // marks the buffer at the slot no longer cached, and accounts for the outstanding
+    // acquire count
+    void discardBufferInSlot_l(slot_id i);
+
+    // marks the buffer at the slot index no longer cached, and accounts for the outstanding
+    // acquire count
+    void discardBufferAtSlotIndex_l(ssize_t bsi);
+
+    // release all acquired and unacquired available buffers
+    // This method will return if it fails to acquire an unacquired available buffer, which will
+    // leave mNumAvailableUnacquiredBuffers positive on return.
+    void releaseAllAvailableBuffers_l();
+
+    // returns whether we have any available buffers (acquired or not-yet-acquired)
+    bool haveAvailableBuffers_l() const {
+        return !mAvailableBuffers.empty() || mNumAvailableUnacquiredBuffers > 0;
+    }
+
+    // Codec buffers
+    // -------------
+
+    // When we queue buffers to the encoder, we must hold the references to the graphic buffers
+    // in those buffers - as the producer may free the slots.
+
+    typedef int32_t codec_buffer_id;
+
+    // set of codec buffer ID-s of buffers available to fill
+    List<codec_buffer_id> mFreeCodecBuffers;
+
+    // maps codec buffer ID-s to buffer info submitted to the codec. Used to keep a reference for
+    // the graphics buffer.
+    KeyedVector<codec_buffer_id, std::shared_ptr<AcquiredBuffer>> mSubmittedCodecBuffers;
+
+    // Processes the next acquired frame. If there is no available codec buffer, it returns false
+    // without any further action.
+    //
+    // Otherwise, it consumes the next acquired frame and determines if it needs to be discarded or
+    // dropped. If neither are needed, it submits it to the codec. It also saves the latest
+    // non-dropped frame and submits it for repeat encoding (if this is enabled).
+    //
+    // \require there must be an acquired frame (i.e. we're in the onFrameAvailable callback,
+    // or if we're in codecBufferEmptied and mNumFramesAvailable is nonzero).
+    // \require codec must be executing
+    // \returns true if acquired (and handled) the next frame. Otherwise, false.
+    bool fillCodecBuffer_l();
+
+    // Calculates the media timestamp for |item| and on success it submits the buffer to the codec,
+    // while also keeping a reference for it in mSubmittedCodecBuffers.
+    // Returns UNKNOWN_ERROR if the buffer was not submitted due to buffer timestamp. Otherwise,
+    // it returns any submit success or error value returned by the codec.
+    status_t submitBuffer_l(const VideoBuffer &item);
+
+    // Submits an empty buffer, with the EOS flag set if there is an available codec buffer and
+    // sets mEndOfStreamSent flag. Does nothing if there is no codec buffer available.
+    void submitEndOfInputStream_l();
+
+    // Set to true if we want to send end-of-stream after we run out of available frames from the
+    // producer
+    bool mEndOfStream;
+
+    // Flag that the EOS was submitted to the encoder
+    bool mEndOfStreamSent;
+
+    // Dataspace for the last frame submitted to the codec
+    android_dataspace mLastDataspace;
+
+    // Default color aspects for this source
+    int32_t mDefaultColorAspectsPacked;
+
+    // called when the data space of the input buffer changes
+    void onDataspaceChanged_l(android_dataspace dataspace, android_pixel_format pixelFormat);
 
     // Pointer back to the Omx node that created us.  We send buffers here.
     sp<IOmxNodeWrapper> mOMXNode;
@@ -246,11 +336,9 @@ private:
 
     bool mSuspended;
 
-    // The time to stop sending buffers.
-    int64_t mStopTimeUs;
-
-    // Last dataspace seen
-    android_dataspace mLastDataSpace;
+    // returns true if this source is unconditionally discarding acquired buffers at the moment
+    // regardless of the metadata of those buffers
+    bool areWeDiscardingAvailableBuffers_l();
 
     // Our BufferQueue interfaces. mProducer is passed to the producer through
     // getIGraphicBufferProducer, and mConsumer is used internally to retrieve
@@ -258,26 +346,8 @@ private:
     sp<IGraphicBufferProducer> mProducer;
     sp<IGraphicBufferConsumer> mConsumer;
 
-    // Number of frames pending in BufferQueue that haven't yet been
-    // forwarded to the codec.
-    size_t mNumFramesAvailable;
-
-    // Number of frames acquired from consumer (debug only)
-    int32_t mNumBufferAcquired;
-
-    // Set to true if we want to send end-of-stream after we run out of
-    // frames in BufferQueue.
-    bool mEndOfStream;
-    bool mEndOfStreamSent;
-
-    // Cache of GraphicBuffers from the buffer queue.  When the codec
-    // is done processing a GraphicBuffer, we can use this to map back
-    // to a slot number.
-    sp<GraphicBuffer> mBufferSlot[BufferQueue::NUM_BUFFER_SLOTS];
-    int32_t mBufferUseCount[BufferQueue::NUM_BUFFER_SLOTS];
-
-    // Tracks codec buffers.
-    Vector<CodecBuffer> mCodecBuffers;
+    // The time to stop sending buffers.
+    int64_t mStopTimeUs;
 
     struct ActionItem {
         typedef enum {
@@ -302,13 +372,12 @@ private:
     friend struct AHandlerReflector<GraphicBufferSource>;
 
     enum {
-        kWhatRepeatLastFrame,
+        kWhatRepeatLastFrame,   ///< queue last frame for reencoding
     };
     enum {
         kRepeatLastFrameCount = 10,
     };
 
-    int64_t mPrevOriginalTimeUs;
     int64_t mSkipFramesBeforeNs;
 
     sp<FrameDropper> mFrameDropper;
@@ -316,28 +385,74 @@ private:
     sp<ALooper> mLooper;
     sp<AHandlerReflector<GraphicBufferSource> > mReflector;
 
-    int64_t mRepeatAfterUs;
-    int32_t mRepeatLastFrameGeneration;
-    int64_t mRepeatLastFrameTimestamp;
-    int32_t mRepeatLastFrameCount;
+    // Repeat last frame feature
+    // -------------------------
+    // configuration parameter: repeat interval for frame repeating (<0 if repeating is disabled)
+    int64_t mFrameRepeatIntervalUs;
 
-    int mLatestBufferId;
-    uint64_t mLatestBufferFrameNum;
-    sp<Fence> mLatestBufferFence;
+    // current frame repeat generation - used to cancel a pending frame repeat
+    int32_t mRepeatLastFrameGeneration;
+
+    // number of times to repeat latest frame (0 = none)
+    int32_t mOutstandingFrameRepeatCount;
 
     // The previous buffer should've been repeated but
     // no codec buffer was available at the time.
-    bool mRepeatBufferDeferred;
+    bool mFrameRepeatBlockedOnCodecBuffer;
+
+    // hold a reference to the last acquired (and not discarded) frame for frame repeating
+    VideoBuffer mLatestBuffer;
+
+    // queue last frame for reencode after the repeat interval.
+    void queueFrameRepeat_l();
+
+    // save |item| as the latest buffer and queue it for reencode (repeat)
+    void setLatestBuffer_l(const VideoBuffer &item);
+
+    // submit last frame to encoder and queue it for reencode
+    // \return true if buffer was submitted, false if it wasn't (e.g. source is suspended, there
+    // is no available codec buffer)
+    bool repeatLatestBuffer_l();
 
     // Time lapse / slow motion configuration
+    // --------------------------------------
+
+    // desired time interval between captured frames (capture interval) - value <= 0 if undefined
     int64_t mTimePerCaptureUs;
+
+    // desired time interval between encoded frames (media time interval) - value <= 0 if undefined
     int64_t mTimePerFrameUs;
+
+    // Time lapse mode is enabled if capture interval is defined and it is more than twice the
+    // media time interval (if defined). In this mode frames that come in between the capture
+    // interval are dropped and the media timestamp is adjusted to have exactly the desired
+    // media time interval.
+    //
+    // Slow motion mode is enabled if both media and capture intervals are defined and the media
+    // time interval is more than twice the capture interval. In this mode frames that come in
+    // between the capture interval are dropped (though there isn't expected to be any, but there
+    // could eventually be a frame drop if the actual capture interval is smaller than the
+    // configured capture interval). The media timestamp is adjusted to have exactly the desired
+    // media time interval.
+
+    // These modes must be enabled before using this source.
+
+    // adjusted capture timestamp for previous frame
     int64_t mPrevCaptureUs;
+
+    // adjusted media timestamp for previous frame (negative if there were none)
     int64_t mPrevFrameUs;
 
+    // desired offset between media time and capture time
     int64_t mInputBufferTimeOffsetUs;
 
-    int32_t mColorAspectsPacked;
+    // Calculates and outputs the timestamp to use for a buffer with a specific buffer timestamp
+    // |bufferTimestampNs|. Returns false on failure (buffer too close or timestamp is moving
+    // backwards). Otherwise, stores the media timestamp in |*codecTimeUs| and returns true.
+    //
+    // This method takes into account the start time offset and any time lapse or slow motion time
+    // adjustment requests.
+    bool calculateCodecTimestamp_l(nsecs_t bufferTimeNs, int64_t *codecTimeUs);
 
     void onMessageReceived(const sp<AMessage> &msg);
 
