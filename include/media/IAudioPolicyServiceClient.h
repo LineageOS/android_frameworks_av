@@ -1,1 +1,1 @@
-../../media/libaudioclient/include/IAudioPolicyServiceClient.h
+../../media/libaudioclient/include/media/IAudioPolicyServiceClient.h

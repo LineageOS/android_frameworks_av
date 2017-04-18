@@ -1,1 +1,1 @@
-../../media/libaudioclient/include/IEffectClient.h
+../../media/libaudioclient/include/media/IEffectClient.h

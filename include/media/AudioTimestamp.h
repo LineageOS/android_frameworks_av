@@ -1,1 +1,1 @@
-../../media/libaudioclient/include/AudioTimestamp.h
+../../media/libaudioclient/include/media/AudioTimestamp.h
