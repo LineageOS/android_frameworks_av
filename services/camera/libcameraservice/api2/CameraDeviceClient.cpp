@@ -1269,6 +1269,13 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
         surfaceId++;
     }
 
+    // Gracefully handle case where finalizeOutputConfigurations is called
+    // without any new surface.
+    if (consumerSurfaces.size() == 0) {
+        mStreamInfoMap[streamId].finalized = true;
+        return res;
+    }
+
     // Finish the deferred stream configuration with the surface.
     status_t err;
     err = mDevice->setConsumerSurfaces(streamId, consumerSurfaces);
