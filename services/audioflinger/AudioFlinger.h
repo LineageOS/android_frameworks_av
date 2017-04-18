@@ -25,6 +25,8 @@
 #include <sys/types.h>
 #include <limits.h>
 
+#include <android-base/macros.h>
+
 #include <cutils/compiler.h>
 #include <cutils/properties.h>
 
@@ -445,8 +447,8 @@ private:
         sp<AudioFlinger>    audioFlinger() const { return mAudioFlinger; }
 
     private:
-                            Client(const Client&);
-                            Client& operator = (const Client&);
+        DISALLOW_COPY_AND_ASSIGN(Client);
+
         const sp<AudioFlinger> mAudioFlinger;
               sp<MemoryDealer> mMemoryDealer;
         const pid_t         mPid;
@@ -466,8 +468,7 @@ private:
                 virtual     void        binderDied(const wp<IBinder>& who);
 
     private:
-                            NotificationClient(const NotificationClient&);
-                            NotificationClient& operator = (const NotificationClient&);
+        DISALLOW_COPY_AND_ASSIGN(NotificationClient);
 
         const sp<AudioFlinger>  mAudioFlinger;
         const pid_t             mPid;

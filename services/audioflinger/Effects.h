@@ -135,15 +135,14 @@ public:
 
     void             dump(int fd, const Vector<String16>& args);
 
-protected:
+private:
     friend class AudioFlinger;      // for mHandles
     bool                mPinned;
 
     // Maximum time allocated to effect engines to complete the turn off sequence
     static const uint32_t MAX_DISABLE_TIME_MS = 10000;
 
-    EffectModule(const EffectModule&);
-    EffectModule& operator = (const EffectModule&);
+    DISALLOW_COPY_AND_ASSIGN(EffectModule);
 
     status_t start_l();
     status_t stop_l();
@@ -232,10 +231,9 @@ public:
 
     void dumpToBuffer(char* buffer, size_t size);
 
-protected:
+private:
     friend class AudioFlinger;          // for mEffect, mHasControl, mEnabled
-    EffectHandle(const EffectHandle&);
-    EffectHandle& operator =(const EffectHandle&);
+    DISALLOW_COPY_AND_ASSIGN(EffectHandle);
 
     Mutex mLock;                        // protects IEffect method calls
     wp<EffectModule> mEffect;           // pointer to controlled EffectModule
@@ -366,10 +364,9 @@ public:
 
     void dump(int fd, const Vector<String16>& args);
 
-protected:
+private:
     friend class AudioFlinger;  // for mThread, mEffects
-    EffectChain(const EffectChain&);
-    EffectChain& operator =(const EffectChain&);
+    DISALLOW_COPY_AND_ASSIGN(EffectChain);
 
     class SuspendedEffectDesc : public RefBase {
     public:

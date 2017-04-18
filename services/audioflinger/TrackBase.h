@@ -92,8 +92,7 @@ public:
 
 
 protected:
-                        TrackBase(const TrackBase&);
-                        TrackBase& operator = (const TrackBase&);
+    DISALLOW_COPY_AND_ASSIGN(TrackBase);
 
     // AudioBufferProvider interface
     virtual status_t getNextBuffer(AudioBufferProvider::Buffer* buffer) = 0;

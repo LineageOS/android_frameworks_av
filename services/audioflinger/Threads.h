@@ -229,8 +229,7 @@ public:
         virtual     void        binderDied(const wp<IBinder>& who);
 
     private:
-                    PMDeathRecipient(const PMDeathRecipient&);
-                    PMDeathRecipient& operator = (const PMDeathRecipient&);
+        DISALLOW_COPY_AND_ASSIGN(PMDeathRecipient);
 
         wp<ThreadBase> mThread;
     };
@@ -895,7 +894,7 @@ private:
 
     friend class AudioFlinger;      // for numerous
 
-    PlaybackThread& operator = (const PlaybackThread&);
+    DISALLOW_COPY_AND_ASSIGN(PlaybackThread);
 
     status_t    addTrack_l(const sp<Track>& track);
     bool        destroyTrack_l(const sp<Track>& track);

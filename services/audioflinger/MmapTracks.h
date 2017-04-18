@@ -41,11 +41,10 @@ public:
      static void        appendDumpHeader(String8& result);
             void        dump(char* buffer, size_t size);
 
-protected:
+private:
     friend class MmapThread;
 
-                MmapTrack(const MmapTrack&);
-                MmapTrack& operator = (const MmapTrack&);
+    DISALLOW_COPY_AND_ASSIGN(MmapTrack);
 
     // AudioBufferProvider interface
     virtual status_t getNextBuffer(AudioBufferProvider::Buffer* buffer);
