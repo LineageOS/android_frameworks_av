@@ -1,1 +1,1 @@
-../../media/libaudioclient/include/AudioPolicyHelper.h
+../../media/libaudioclient/include/media/AudioPolicyHelper.h

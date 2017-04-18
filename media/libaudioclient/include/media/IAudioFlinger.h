@@ -259,6 +259,9 @@ public:
                                     const Parcel& data,
                                     Parcel* reply,
                                     uint32_t flags = 0);
+
+    // Requests media.log to start merging log buffers
+    virtual void requestLogMerge() = 0;
 };
 
 // ----------------------------------------------------------------------------

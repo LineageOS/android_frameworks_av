@@ -1,1 +1,1 @@
-../../media/libaudioclient/include/AudioRecord.h
+../../media/libaudioclient/include/media/AudioRecord.h

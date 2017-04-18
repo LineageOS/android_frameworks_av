@@ -1,1 +1,1 @@
-../../media/libaudioclient/include/AudioParameter.h
+../../media/libaudioclient/include/media/AudioParameter.h

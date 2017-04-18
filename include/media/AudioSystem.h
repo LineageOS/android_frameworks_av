@@ -1,1 +1,1 @@
-../../media/libaudioclient/include/AudioSystem.h
+../../media/libaudioclient/include/media/AudioSystem.h
