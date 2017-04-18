@@ -17,7 +17,7 @@
 #include <inttypes.h>
 
 #define LOG_TAG "GraphicBufferSource"
-#define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
 #define STRINGIFY_ENUMS // for asString in HardwareAPI.h/VideoAPI.h
