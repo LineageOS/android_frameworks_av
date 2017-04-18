@@ -26,7 +26,7 @@ namespace android {
 
 PipeReader::PipeReader(Pipe& pipe) :
         NBAIO_Source(pipe.mFormat),
-        mPipe(pipe), mFifoReader(mPipe.mFifo, false /*throttlesWriter*/),
+        mPipe(pipe), mFifoReader(mPipe.mFifo, false /*throttlesWriter*/, true /*flush*/),
         mFramesOverrun(0),
         mOverruns(0)
 {
