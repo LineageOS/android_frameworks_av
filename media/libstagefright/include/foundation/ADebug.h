@@ -99,10 +99,30 @@ MAKE_COMPARATOR(GT,>)
 #define CHECK_GE(x,y)   CHECK_OP(x,y,GE,>=)
 #define CHECK_GT(x,y)   CHECK_OP(x,y,GT,>)
 
-#define TRESPASS() \
+#define TRESPASS(...) \
         LOG_ALWAYS_FATAL(                                       \
             __FILE__ ":" LITERAL_TO_STRING(__LINE__)            \
-                " Should not be here.");
+                " Should not be here. " __VA_ARGS__);
+
+#ifdef NDEBUG
+#define CHECK_DBG CHECK
+#define CHECK_EQ_DBG CHECK_EQ
+#define CHECK_NE_DBG CHECK_NE
+#define CHECK_LE_DBG CHECK_LE
+#define CHECK_LT_DBG CHECK_LT
+#define CHECK_GE_DBG CHECK_GE
+#define CHECK_GT_DBG CHECK_GT
+#define TRESPASS_DBG TRESPASS
+#else
+#define CHECK_DBG(condition)
+#define CHECK_EQ_DBG(x,y)
+#define CHECK_NE_DBG(x,y)
+#define CHECK_LE_DBG(x,y)
+#define CHECK_LT_DBG(x,y)
+#define CHECK_GE_DBG(x,y)
+#define CHECK_GT_DBG(x,y)
+#define TRESPASS_DBG(...)
+#endif
 
 struct ADebug {
     enum Level {
