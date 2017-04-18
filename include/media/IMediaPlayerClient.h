@@ -1,1 +1,1 @@
-../../media/libmedia/include/IMediaPlayerClient.h
+../../media/libmedia/include/media/IMediaPlayerClient.h

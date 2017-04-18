@@ -1,1 +1,1 @@
-../../media/libmedia/include/IMediaCodecList.h
+../../media/libmedia/include/media/IMediaCodecList.h

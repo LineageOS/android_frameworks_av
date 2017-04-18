@@ -1,1 +1,1 @@
-../../media/libmedia/include/SingleStateQueue.h
+../../media/libmedia/include/media/SingleStateQueue.h

@@ -1,1 +1,1 @@
-../../media/libmedia/include/Visualizer.h
+../../media/libmedia/include/media/Visualizer.h

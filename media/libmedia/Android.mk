@@ -86,6 +86,8 @@ LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := \
         android.hardware.media.omx@1.0 \
         android.hidl.memory@1.0 \
 
+LOCAL_HEADER_LIBRARIES := libmedia_headers
+
 # for memory heap analysis
 LOCAL_STATIC_LIBRARIES := libc_malloc_debug_backtrace libc_logging
 

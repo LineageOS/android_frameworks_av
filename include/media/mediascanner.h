@@ -1,1 +1,1 @@
-../../media/libmedia/include/mediascanner.h
+../../media/libmedia/include/media/mediascanner.h

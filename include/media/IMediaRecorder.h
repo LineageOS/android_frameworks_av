@@ -1,1 +1,1 @@
-../../media/libmedia/include/IMediaRecorder.h
+../../media/libmedia/include/media/IMediaRecorder.h

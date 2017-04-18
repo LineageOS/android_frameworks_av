@@ -31,6 +31,7 @@ public:
     virtual void    registerWriter(const sp<IMemory>& shared, size_t size, const char *name) = 0;
     virtual void    unregisterWriter(const sp<IMemory>& shared) = 0;
 
+    virtual void    requestMergeWakeup() = 0;
 };
 
 class BnMediaLogService: public BnInterface<IMediaLogService>

@@ -1,1 +1,1 @@
-../../media/libmedia/include/IMediaHTTPConnection.h
+../../media/libmedia/include/media/IMediaHTTPConnection.h

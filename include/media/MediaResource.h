@@ -1,1 +1,1 @@
-../../media/libmedia/include/MediaResource.h
+../../media/libmedia/include/media/MediaResource.h
