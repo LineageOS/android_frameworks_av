@@ -1628,6 +1628,8 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
                                                               isSoundTrigger,
                                                               policyMix, mpClientInterface);
 
+// FIXME: disable concurrent capture until UI is ready
+#if 0
     // reuse an open input if possible
     sp<AudioInputDescriptor> reusedInputDesc;
     for (size_t i = 0; i < mInputs.size(); i++) {
@@ -1690,6 +1692,7 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
             releaseInput(reusedInputDesc->mIoHandle, currentSession);
         }
     }
+#endif
 
     audio_config_t config = AUDIO_CONFIG_INITIALIZER;
     config.sample_rate = profileSamplingRate;
@@ -1795,6 +1798,8 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
         return BAD_VALUE;
     }
 
+// FIXME: disable concurrent capture until UI is ready
+#if 0
     if (!isConcurentCaptureAllowed(inputDesc, audioSession)) {
         ALOGW("startInput(%d) failed: other input already started", input);
         return INVALID_OPERATION;
@@ -1806,6 +1811,70 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
     if (mInputs.activeInputsCountOnDevices() != 0) {
         *concurrency |= API_INPUT_CONCURRENCY_CAPTURE;
     }
+#else
+    if (!is_virtual_input_device(inputDesc->mDevice)) {
+        if (mCallTxPatch != 0 &&
+            inputDesc->getModuleHandle() == mCallTxPatch->mPatch.sources[0].ext.device.hw_module) {
+            ALOGW("startInput(%d) failed: call in progress", input);
+            return INVALID_OPERATION;
+        }
+
+        Vector< sp<AudioInputDescriptor> > activeInputs = mInputs.getActiveInputs();
+        for (size_t i = 0; i < activeInputs.size(); i++) {
+            sp<AudioInputDescriptor> activeDesc = activeInputs[i];
+
+            if (is_virtual_input_device(activeDesc->mDevice)) {
+                continue;
+            }
+
+            audio_source_t activeSource = activeDesc->inputSource(true);
+            if (audioSession->inputSource() == AUDIO_SOURCE_HOTWORD) {
+                if (activeSource == AUDIO_SOURCE_HOTWORD) {
+                    if (activeDesc->hasPreemptedSession(session)) {
+                        ALOGW("startInput(%d) failed for HOTWORD: "
+                                "other input %d already started for HOTWORD",
+                              input, activeDesc->mIoHandle);
+                        return INVALID_OPERATION;
+                    }
+                } else {
+                    ALOGV("startInput(%d) failed for HOTWORD: other input %d already started",
+                          input, activeDesc->mIoHandle);
+                    return INVALID_OPERATION;
+                }
+            } else {
+                if (activeSource != AUDIO_SOURCE_HOTWORD) {
+                    ALOGW("startInput(%d) failed: other input %d already started",
+                          input, activeDesc->mIoHandle);
+                    return INVALID_OPERATION;
+                }
+            }
+        }
+
+        // if capture is allowed, preempt currently active HOTWORD captures
+        for (size_t i = 0; i < activeInputs.size(); i++) {
+            sp<AudioInputDescriptor> activeDesc = activeInputs[i];
+
+            if (is_virtual_input_device(activeDesc->mDevice)) {
+                continue;
+            }
+
+            audio_source_t activeSource = activeDesc->inputSource(true);
+            if (activeSource == AUDIO_SOURCE_HOTWORD) {
+                AudioSessionCollection activeSessions =
+                        activeDesc->getAudioSessions(true /*activeOnly*/);
+                audio_session_t activeSession = activeSessions.keyAt(0);
+                audio_io_handle_t activeHandle = activeDesc->mIoHandle;
+                SortedVector<audio_session_t> sessions = activeDesc->getPreemptedSessions();
+                sessions.add(activeSession);
+                inputDesc->setPreemptedSessions(sessions);
+                stopInput(activeHandle, activeSession);
+                releaseInput(activeHandle, activeSession);
+                ALOGV("startInput(%d) for HOTWORD preempting HOTWORD input %d",
+                      input, activeDesc->mIoHandle);
+            }
+        }
+    }
+#endif
 
     // increment activity count before calling getNewInputDevice() below as only active sessions
     // are considered for device selection
