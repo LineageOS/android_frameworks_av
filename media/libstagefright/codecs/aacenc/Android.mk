@@ -131,8 +131,7 @@ else # visualon
   LOCAL_CFLAGS := -DOSCL_IMPORT_REF=
 
   LOCAL_CFLAGS += -Werror
-  LOCAL_SANITIZE := signed-integer-overflow unsigned-integer-overflow cfi
-  LOCAL_SANITIZE_DIAG := cfi
+  LOCAL_SANITIZE := signed-integer-overflow unsigned-integer-overflow
 
   LOCAL_STATIC_LIBRARIES := \
           libstagefright_aacenc
