@@ -18,9 +18,9 @@ LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils) \
     frameworks/av/media/libaaudio/include
 
-LOCAL_SRC_FILES:= ../src/write_sine_threaded.cpp
+LOCAL_SRC_FILES:= ../src/write_sine_callback.cpp
 LOCAL_SHARED_LIBRARIES := libaaudio
-LOCAL_MODULE := write_sine_threaded_ndk
+LOCAL_MODULE := write_sine_callback_ndk
 include $(BUILD_EXECUTABLE)
 
 include $(CLEAR_VARS)
