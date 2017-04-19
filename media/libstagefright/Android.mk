@@ -78,6 +78,7 @@ LOCAL_SHARED_LIBRARIES := \
         libaudioutils \
         libbinder \
         libcamera_client \
+        libcrypto \
         libcutils \
         libdl \
         libdrmframework \
