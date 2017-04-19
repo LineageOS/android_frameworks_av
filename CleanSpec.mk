@@ -69,6 +69,7 @@ $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/bin/mediacodec)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/etc/init/mediacodec.rc)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/libeffects.so)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib64/libeffects.so)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/obj/SHARED_LIBRARIES/libeffects_intermediates)
 
 # ************************************************
 # NEWER CLEAN STEPS MUST BE AT THE END OF THE LIST
