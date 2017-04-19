@@ -54,7 +54,8 @@ LOCAL_CFLAGS := \
         -D"OSCL_UNUSED_ARG(x)=(void)(x)"
 
 LOCAL_CFLAGS += -Werror
-LOCAL_SANITIZE := signed-integer-overflow
+LOCAL_SANITIZE := signed-integer-overflow cfi
+LOCAL_SANITIZE_DIAG := cfi
 
 LOCAL_MODULE := libstagefright_mp3dec
 
@@ -102,7 +103,9 @@ LOCAL_C_INCLUDES := \
         $(LOCAL_PATH)/test/include \
         $(call include-path-for, audio-utils)
 
-LOCAL_SANITIZE := signed-integer-overflow
+LOCAL_SANITIZE := signed-integer-overflow cfi
+LOCAL_SANITIZE_DIAG := cfi
+
 LOCAL_STATIC_LIBRARIES := \
         libstagefright_mp3dec libsndfile
 
