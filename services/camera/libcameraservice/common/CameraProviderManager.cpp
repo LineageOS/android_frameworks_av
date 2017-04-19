@@ -912,8 +912,15 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
                 if (s == Status::OK) {
                     camera_metadata_t *buffer =
                             reinterpret_cast<camera_metadata_t*>(metadata.data());
-                    set_camera_metadata_vendor_id(buffer, mProviderTagid);
-                    mCameraCharacteristics = buffer;
+                    size_t expectedSize = metadata.size();
+                    int res = validate_camera_metadata_structure(buffer, &expectedSize);
+                    if (res == OK || res == CAMERA_METADATA_VALIDATION_SHIFTED) {
+                        set_camera_metadata_vendor_id(buffer, mProviderTagid);
+                        mCameraCharacteristics = buffer;
+                    } else {
+                        ALOGE("%s: Malformed camera metadata received from HAL", __FUNCTION__);
+                        status = Status::INTERNAL_ERROR;
+                    }
                 }
             });
     if (!ret.isOk()) {

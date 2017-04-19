@@ -3180,7 +3180,7 @@ status_t Camera3Device::HalInterface::constructDefaultRequestSettings(
                                 reinterpret_cast<const camera_metadata_t*>(request.data());
                         size_t expectedSize = request.size();
                         int ret = validate_camera_metadata_structure(r, &expectedSize);
-                        if (ret == OK) {
+                        if (ret == OK || ret == CAMERA_METADATA_VALIDATION_SHIFTED) {
                             *requestTemplate = clone_camera_metadata(r);
                             if (*requestTemplate == nullptr) {
                                 ALOGE("%s: Unable to clone camera metadata received from HAL",
