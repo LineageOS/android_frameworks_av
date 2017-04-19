@@ -88,7 +88,7 @@ bool FactoryLoader<T>::findFactoryForScheme(
     }
 
     // no luck, have to search
-    String8 dirPath("/vendor/lib/mediacas");
+    String8 dirPath("/system/lib/mediacas");
     DIR* pDir = opendir(dirPath.string());
 
     if (pDir == NULL) {
@@ -123,7 +123,7 @@ bool FactoryLoader<T>::enumeratePlugins(
 
     results->clear();
 
-    String8 dirPath("/vendor/lib/mediacas");
+    String8 dirPath("/system/lib/mediacas");
     DIR* pDir = opendir(dirPath.string());
 
     if (pDir == NULL) {
