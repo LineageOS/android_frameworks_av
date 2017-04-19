@@ -28,7 +28,8 @@ LOCAL_SRC_FILES:= \
 
 LOCAL_MODULE := libclearkeycasplugin
 
-LOCAL_PROPRIETARY_MODULE := true
+#TODO: move this back to /vendor/lib after conversion to treble
+#LOCAL_PROPRIETARY_MODULE := true
 LOCAL_MODULE_RELATIVE_PATH := mediacas
 
 LOCAL_SHARED_LIBRARIES := \
