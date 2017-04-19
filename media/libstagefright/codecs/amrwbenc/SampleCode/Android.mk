@@ -24,7 +24,7 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/../../common \
     $(LOCAL_PATH)/../../common/include
 
+LOCAL_SANITIZE := cfi
+LOCAL_SANITIZE_DIAG := cfi
+
 include $(BUILD_EXECUTABLE)
-
-
-
