@@ -33,10 +33,6 @@ int32_t AAudioConvert_formatToSizeInBytes(aaudio_audio_format_t format) {
         case AAUDIO_FORMAT_PCM_I16:
             size = sizeof(int16_t);
             break;
-        case AAUDIO_FORMAT_PCM_I32:
-        case AAUDIO_FORMAT_PCM_I8_24:
-            size = sizeof(int32_t);
-            break;
         case AAUDIO_FORMAT_PCM_FLOAT:
             size = sizeof(float);
             break;
@@ -135,12 +131,6 @@ audio_format_t AAudioConvert_aaudioToAndroidDataFormat(aaudio_audio_format_t aau
     case AAUDIO_FORMAT_PCM_FLOAT:
         androidFormat = AUDIO_FORMAT_PCM_FLOAT;
         break;
-    case AAUDIO_FORMAT_PCM_I8_24:
-        androidFormat = AUDIO_FORMAT_PCM_8_24_BIT;
-        break;
-    case AAUDIO_FORMAT_PCM_I32:
-        androidFormat = AUDIO_FORMAT_PCM_32_BIT;
-        break;
     default:
         androidFormat = AUDIO_FORMAT_DEFAULT;
         ALOGE("AAudioConvert_aaudioToAndroidDataFormat 0x%08X unrecognized", aaudioFormat);
@@ -157,12 +147,6 @@ aaudio_audio_format_t AAudioConvert_androidToAAudioDataFormat(audio_format_t and
         break;
     case AUDIO_FORMAT_PCM_FLOAT:
         aaudioFormat = AAUDIO_FORMAT_PCM_FLOAT;
-        break;
-    case AUDIO_FORMAT_PCM_32_BIT:
-        aaudioFormat = AAUDIO_FORMAT_PCM_I32;
-        break;
-    case AUDIO_FORMAT_PCM_8_24_BIT:
-        aaudioFormat = AAUDIO_FORMAT_PCM_I8_24;
         break;
     default:
         aaudioFormat = AAUDIO_FORMAT_INVALID;

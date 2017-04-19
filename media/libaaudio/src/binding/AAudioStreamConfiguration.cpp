@@ -93,8 +93,6 @@ aaudio_result_t AAudioStreamConfiguration::validate() const {
     switch (mAudioFormat) {
     case AAUDIO_FORMAT_PCM_I16:
     case AAUDIO_FORMAT_PCM_FLOAT:
-    case AAUDIO_FORMAT_PCM_I8_24:
-    case AAUDIO_FORMAT_PCM_I32:
         break;
     default:
         ALOGE("AAudioStreamConfiguration.validate() invalid audioFormat = %d", mAudioFormat);
