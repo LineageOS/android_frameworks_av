@@ -17,6 +17,7 @@
 //#define LOG_NDEBUG 0
 
 #include <inttypes.h>
+#include <media/hardware/HardwareAPI.h> // For VideoNativeHandleMetadata
 #include "CameraHardwareInterface.h"
 
 namespace android {
