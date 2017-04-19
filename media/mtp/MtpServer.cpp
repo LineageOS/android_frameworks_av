@@ -1015,6 +1015,7 @@ MtpResponseCode MtpServer::doSendObject() {
     mode_t mask;
     int ret, initialData;
     bool isCanceled = false;
+    struct stat sstat = {};
 
     auto start = std::chrono::steady_clock::now();
 
@@ -1071,7 +1072,6 @@ MtpResponseCode MtpServer::doSendObject() {
             }
         }
     }
-    struct stat sstat;
     fstat(mfr.fd, &sstat);
     close(mfr.fd);
 
