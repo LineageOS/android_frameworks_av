@@ -22,11 +22,11 @@
 
 #include "binding/IAAudioService.h"
 #include "binding/AudioEndpointParcelable.h"
+#include "binding/AAudioServiceInterface.h"
 #include "client/IsochronousClockModel.h"
 #include "client/AudioEndpoint.h"
 #include "core/AudioStream.h"
-
-#include "binding/AAudioServiceInterface.h"
+#include "utility/LinearRamp.h"
 
 using android::sp;
 using android::IAAudioService;
@@ -154,7 +154,7 @@ private:
     int64_t                  mLastFramesRead = 0; // used to prevent retrograde motion
     int32_t                  mFramesPerBurst;     // frames per HAL transfer
     int32_t                  mXRunCount = 0;      // how many underrun events?
-    float                    mVolume = 1.0;       // volume that the server told us to use
+    LinearRamp               mVolumeRamp;
 
     AAudioServiceInterface  &mServiceInterface;   // abstract interface to the service
 

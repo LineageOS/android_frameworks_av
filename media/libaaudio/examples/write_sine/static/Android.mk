@@ -4,6 +4,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE_TAGS := examples
 LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils) \
+    frameworks/av/media/libaaudio/src \
     frameworks/av/media/libaaudio/include
 
 # NDK recommends using this kind of relative path instead of an absolute path.
