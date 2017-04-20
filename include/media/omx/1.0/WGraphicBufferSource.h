@@ -67,14 +67,11 @@ typedef ::android::hardware::media::omx::V1_0::IGraphicBufferSource
 struct LWGraphicBufferSource : public BnGraphicBufferSource {
     sp<TGraphicBufferSource> mBase;
     LWGraphicBufferSource(sp<TGraphicBufferSource> const& base);
-    BnStatus configure(
-            const sp<IOMXNode>& omxNode, int32_t dataSpace) override;
+    BnStatus configure(const sp<IOMXNode>& omxNode, int32_t dataSpace) override;
     BnStatus setSuspend(bool suspend, int64_t timeUs) override;
-    BnStatus setRepeatPreviousFrameDelayUs(
-            int64_t repeatAfterUs) override;
+    BnStatus setRepeatPreviousFrameDelayUs(int64_t repeatAfterUs) override;
     BnStatus setMaxFps(float maxFps) override;
-    BnStatus setTimeLapseConfig(
-            int64_t timePerFrameUs, int64_t timePerCaptureUs) override;
+    BnStatus setTimeLapseConfig(double fps, double captureFps) override;
     BnStatus setStartTimeUs(int64_t startTimeUs) override;
     BnStatus setStopTimeUs(int64_t stopTimeUs) override;
     BnStatus setColorAspects(int32_t aspects) override;

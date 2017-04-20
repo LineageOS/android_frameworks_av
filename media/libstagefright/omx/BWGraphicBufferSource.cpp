@@ -145,9 +145,9 @@ BWGraphicBufferSource::BWGraphicBufferSource(
 }
 
 ::android::binder::Status BWGraphicBufferSource::setTimeLapseConfig(
-        int64_t timePerFrameUs, int64_t timePerCaptureUs) {
+        double fps, double captureFps) {
     return Status::fromStatusT(mBase->setTimeLapseConfig(
-            timePerFrameUs, timePerCaptureUs));
+            fps, captureFps));
 }
 
 ::android::binder::Status BWGraphicBufferSource::setStartTimeUs(
