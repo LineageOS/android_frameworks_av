@@ -8,3 +8,97 @@ cc_library_static {
     ],
     clang: true,
 }
+
+cc_library_shared {
+    name: "libmedia",
+
+    srcs: [
+        "IDataSource.cpp",
+        "IHDCP.cpp",
+        "mediaplayer.cpp",
+        "IMediaCodecList.cpp",
+        "IMediaCodecService.cpp",
+        "IMediaHTTPConnection.cpp",
+        "IMediaHTTPService.cpp",
+        "IMediaExtractor.cpp",
+        "IMediaExtractorService.cpp",
+        "IMediaPlayerService.cpp",
+        "IMediaPlayerClient.cpp",
+        "IMediaRecorderClient.cpp",
+        "IMediaPlayer.cpp",
+        "IMediaRecorder.cpp",
+        "IMediaSource.cpp",
+        "IRemoteDisplay.cpp",
+        "IRemoteDisplayClient.cpp",
+        "IResourceManagerClient.cpp",
+        "IResourceManagerService.cpp",
+        "IStreamSource.cpp",
+        "MediaCodecInfo.cpp",
+        "MediaDefs.cpp",
+        "MediaUtils.cpp",
+        "Metadata.cpp",
+        "mediarecorder.cpp",
+        "IMediaMetadataRetriever.cpp",
+        "mediametadataretriever.cpp",
+        "MidiIoWrapper.cpp",
+        "JetPlayer.cpp",
+        "IOMX.cpp",
+        "MediaScanner.cpp",
+        "MediaScannerClient.cpp",
+        "CharacterEncodingDetector.cpp",
+        "IMediaDeathNotifier.cpp",
+        "MediaProfiles.cpp",
+        "MediaResource.cpp",
+        "MediaResourcePolicy.cpp",
+        "Visualizer.cpp",
+        "StringArray.cpp",
+    ],
+
+    shared_libs: [
+        "libui",
+        "liblog",
+        "libcutils",
+        "libutils",
+        "libbinder",
+        "libsonivox",
+        "libicuuc",
+        "libicui18n",
+        "libexpat",
+        "libcamera_client",
+        "libstagefright_foundation",
+        "libgui",
+        "libdl",
+        "libaudioutils",
+        "libaudioclient",
+    ],
+
+    header_libs: ["libaudioeffects"],
+
+    export_shared_lib_headers: ["libbinder"],
+
+    whole_static_libs: ["libmedia_helper"],
+
+    // for memory heap analysis
+    static_libs: [
+        "libc_malloc_debug_backtrace",
+    ],
+
+    include_dirs: [
+        "frameworks/native/include/media/openmax",
+        "frameworks/av/include/media/",
+        "frameworks/av/media/libstagefright",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wno-error=deprecated-declarations",
+        "-Wall",
+    ],
+
+    sanitize: {
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+    },
+}
