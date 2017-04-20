@@ -33,7 +33,7 @@
 // Enable a mixer in AAudio service that will mix stream to an ALSA MMAP buffer.
 #define MMAP_SHARED_ENABLED      0
 // Enable AAUDIO_SHARING_MODE_EXCLUSIVE that uses an ALSA MMAP buffer.
-#define MMAP_EXCLUSIVE_ENABLED   1
+#define MMAP_EXCLUSIVE_ENABLED   0
 
 using namespace aaudio;
 
