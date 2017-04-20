@@ -21,7 +21,7 @@
 #include <OMX_IndexExt.h>
 
 #include <media/OMXBuffer.h>
-#include <IOMX.h>
+#include <media/IOMX.h>
 
 #include "OMXUtils.h"
 #include "BWGraphicBufferSource.h"
