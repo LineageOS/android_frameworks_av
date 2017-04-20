@@ -102,7 +102,8 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/inc
 
 LOCAL_CFLAGS += -Werror
-#LOCAL_SANITIZE := signed-integer-overflow
+LOCAL_SANITIZE := cfi
+LOCAL_SANITIZE_DIAG := cfi
 
 include $(BUILD_STATIC_LIBRARY)
 
