@@ -325,29 +325,6 @@ AAUDIO_API aaudio_result_t AAudioStream_write(AAudioStream* stream,
 }
 
 // ============================================================
-// Miscellaneous
-// ============================================================
-
-AAUDIO_API aaudio_result_t AAudioStream_createThread(AAudioStream* stream,
-                                     int64_t periodNanoseconds,
-                                     aaudio_audio_thread_proc_t threadProc, void *arg)
-{
-    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    if (audioStream->getDataCallbackProc() != nullptr) {
-        return AAUDIO_ERROR_INCOMPATIBLE;
-    }
-    return audioStream->createThread(periodNanoseconds, threadProc, arg);
-}
-
-AAUDIO_API aaudio_result_t AAudioStream_joinThread(AAudioStream* stream,
-                                   void **returnArg,
-                                   int64_t timeoutNanoseconds)
-{
-    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    return audioStream->joinThread(returnArg, timeoutNanoseconds);
-}
-
-// ============================================================
 // Stream - queries
 // ============================================================
 

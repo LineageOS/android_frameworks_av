@@ -582,60 +582,9 @@ AAUDIO_API aaudio_result_t AAudioStream_write(AAudioStream* stream,
                                int32_t numFrames,
                                int64_t timeoutNanoseconds);
 
-
-// ============================================================
-// High priority audio threads
-// ============================================================
-
-/**
- * @deprecated Use AudioStreamBuilder_setCallback()
- */
-typedef void *(*aaudio_audio_thread_proc_t)(void *);
-
-/**
- * @deprecated Use AudioStreamBuilder_setCallback()
- *
- * Create a thread associated with a stream. The thread has special properties for
- * low latency audio performance. This thread can be used to implement a callback API.
- *
- * Only one thread may be associated with a stream.
- *
- * If you are using multiple streams then we recommend that you only do
- * blocking reads or writes on one stream. You can do non-blocking I/O on the
- * other streams by setting the timeout to zero.
- * This thread should be created for the stream that you will block on.
- *
- * Note that this API is in flux.
- *
- * @param stream A stream created using AAudioStreamBuilder_openStream().
- * @param periodNanoseconds the estimated period at which the audio thread will need to wake up
- * @param threadProc your thread entry point
- * @param arg an argument that will be passed to your thread entry point
- * @return AAUDIO_OK or a negative error.
- */
-AAUDIO_API aaudio_result_t AAudioStream_createThread(AAudioStream* stream,
-                                     int64_t periodNanoseconds,
-                                     aaudio_audio_thread_proc_t threadProc,
-                                     void *arg);
-
-/**
- * @deprecated Use AudioStreamBuilder_setCallback()
- *
- * Wait until the thread exits or an error occurs.
- *
- * @param stream A stream created using AAudioStreamBuilder_openStream().
- * @param returnArg a pointer to a variable to receive the return value
- * @param timeoutNanoseconds Maximum number of nanoseconds to wait for completion.
- * @return AAUDIO_OK or a negative error.
- */
-AAUDIO_API aaudio_result_t AAudioStream_joinThread(AAudioStream* stream,
-                                   void **returnArg,
-                                   int64_t timeoutNanoseconds);
-
 // ============================================================
 // Stream - queries
 // ============================================================
-
 
 /**
  * This can be used to adjust the latency of the buffer by changing

@@ -24,8 +24,6 @@ LIBAAUDIO {
     AAudioStream_waitForStateChange;
     AAudioStream_read;
     AAudioStream_write;
-    AAudioStream_createThread;
-    AAudioStream_joinThread;
     AAudioStream_setBufferSizeInFrames;
     AAudioStream_getBufferSizeInFrames;
     AAudioStream_getFramesPerDataCallback;

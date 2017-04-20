@@ -27,6 +27,8 @@
 
 namespace aaudio {
 
+typedef void *(*aaudio_audio_thread_proc_t)(void *);
+
 class AudioStreamBuilder;
 
 /**
