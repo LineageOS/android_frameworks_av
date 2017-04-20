@@ -1952,12 +1952,12 @@ status_t NuPlayer::GenericSource::checkDrmInfo()
     size_t psshsize;
 
     if (!mFileMeta->findData(kKeyPssh, &type, &pssh, &psshsize)) {
-        ALOGE("checkDrmInfo: No PSSH");
+        ALOGV("checkDrmInfo: No PSSH");
         return OK; // source without DRM info
     }
 
     Parcel parcel;
-    NuPlayerDrm::retrieveDrmInfo(pssh, psshsize, mMimes, &parcel);
+    NuPlayerDrm::retrieveDrmInfo(pssh, psshsize, &parcel);
     ALOGV("checkDrmInfo: MEDIA_DRM_INFO PSSH size: %d  Parcel size: %d  objects#: %d",
           (int)psshsize, (int)parcel.dataSize(), (int)parcel.objectsCount());
 
