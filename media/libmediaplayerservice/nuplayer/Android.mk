@@ -44,5 +44,7 @@ LOCAL_MODULE:= libstagefright_nuplayer
 
 LOCAL_MODULE_TAGS := eng
 
-include $(BUILD_STATIC_LIBRARY)
+LOCAL_SANITIZE := cfi
+LOCAL_SANITIZE_DIAG := cfi
 
+include $(BUILD_STATIC_LIBRARY)
