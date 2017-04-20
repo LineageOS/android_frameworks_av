@@ -15,7 +15,7 @@ ndk_headers {
 }
 
 subdirs = [
-    "camera/ndk",
+    "camera",
     "media/*",
     "radio",
     "soundtrigger",
