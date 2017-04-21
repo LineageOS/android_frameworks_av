@@ -7,6 +7,7 @@ LOCAL_SRC_FILES:=                 \
         ATSParser.cpp             \
         CasManager.cpp            \
         ESQueue.cpp               \
+        HlsSampleDecryptor.cpp    \
         MPEG2PSExtractor.cpp      \
         MPEG2TSExtractor.cpp      \
 
@@ -18,7 +19,9 @@ LOCAL_CFLAGS += -Werror -Wall
 LOCAL_SANITIZE := unsigned-integer-overflow signed-integer-overflow cfi
 LOCAL_SANITIZE_DIAG := cfi
 
-LOCAL_SHARED_LIBRARIES := libmedia
+LOCAL_SHARED_LIBRARIES := \
+        libcrypto \
+        libmedia \
 
 LOCAL_MODULE:= libstagefright_mpeg2ts
 
