@@ -101,13 +101,13 @@ void IsochronousClockModel::processTimestamp(int64_t framePosition,
             // or we may be drifting due to a slow HW clock.
             mMarkerFramePosition = framePosition;
             mMarkerNanoTime = nanoTime;
-            ALOGI("processTimestamp() - STATE_RUNNING - %d < %d micros - EARLY",
+            ALOGV("processTimestamp() - STATE_RUNNING - %d < %d micros - EARLY",
                  (int) (nanosDelta / 1000), (int)(expectedNanosDelta / 1000));
         } else if (nanosDelta > (expectedNanosDelta + mMaxLatenessInNanos)) {
             // Later than expected timestamp.
             mMarkerFramePosition = framePosition;
             mMarkerNanoTime = nanoTime - mMaxLatenessInNanos;
-            ALOGI("processTimestamp() - STATE_RUNNING - %d > %d + %d micros - LATE",
+            ALOGV("processTimestamp() - STATE_RUNNING - %d > %d + %d micros - LATE",
                  (int) (nanosDelta / 1000), (int)(expectedNanosDelta / 1000),
                  (int) (mMaxLatenessInNanos / 1000));
         }

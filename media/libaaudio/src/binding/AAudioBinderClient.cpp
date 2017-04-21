@@ -75,6 +75,10 @@ static const sp<IAAudioService> getAAudioService() {
     return gAAudioService;
 }
 
+static void dropAAudioService() {
+    Mutex::Autolock _l(gServiceLock);
+    gAAudioService.clear(); // force a reconnect
+}
 
 AAudioBinderClient::AAudioBinderClient()
         : AAudioServiceInterface() {}
@@ -88,14 +92,26 @@ AAudioBinderClient::~AAudioBinderClient() {}
 */
 aaudio_handle_t AAudioBinderClient::openStream(const AAudioStreamRequest &request,
                                                AAudioStreamConfiguration &configurationOutput) {
+    aaudio_handle_t stream;
+    for (int i = 0; i < 2; i++) {
+        const sp<IAAudioService> &service = getAAudioService();
+        if (service == 0) {
+            return AAUDIO_ERROR_NO_SERVICE;
+        }
 
-    const sp<IAAudioService> &service = getAAudioService();
-    if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
-    return service->openStream(request, configurationOutput);
+        stream = service->openStream(request, configurationOutput);
+
+        if (stream == AAUDIO_ERROR_NO_SERVICE) {
+            ALOGE("AAudioBinderClient: lost connection to AAudioService.");
+            dropAAudioService(); // force a reconnect
+        } else {
+            break;
+        }
+    }
+    return stream;
 }
 
 aaudio_result_t AAudioBinderClient::closeStream(aaudio_handle_t streamHandle) {
-
     const sp<IAAudioService> &service = getAAudioService();
     if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
     return service->closeStream(streamHandle);
@@ -106,37 +122,33 @@ aaudio_result_t AAudioBinderClient::closeStream(aaudio_handle_t streamHandle) {
 */
 aaudio_result_t AAudioBinderClient::getStreamDescription(aaudio_handle_t streamHandle,
                                                          AudioEndpointParcelable &parcelable) {
-
     const sp<IAAudioService> &service = getAAudioService();
     if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
     return service->getStreamDescription(streamHandle, parcelable);
 }
 
-/**
-* Start the flow of data.
-*/
 aaudio_result_t AAudioBinderClient::startStream(aaudio_handle_t streamHandle) {
     const sp<IAAudioService> &service = getAAudioService();
     if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
     return service->startStream(streamHandle);
 }
 
-/**
-* Stop the flow of data such that start() can resume without loss of data.
-*/
 aaudio_result_t AAudioBinderClient::pauseStream(aaudio_handle_t streamHandle) {
     const sp<IAAudioService> &service = getAAudioService();
     if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
-    return service->startStream(streamHandle);
+    return service->pauseStream(streamHandle);
 }
 
-/**
-*  Discard any data held by the underlying HAL or Service.
-*/
+aaudio_result_t AAudioBinderClient::stopStream(aaudio_handle_t streamHandle) {
+    const sp<IAAudioService> &service = getAAudioService();
+    if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
+    return service->stopStream(streamHandle);
+}
+
 aaudio_result_t AAudioBinderClient::flushStream(aaudio_handle_t streamHandle) {
     const sp<IAAudioService> &service = getAAudioService();
     if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
-    return service->startStream(streamHandle);
+    return service->flushStream(streamHandle);
 }
 
 /**
@@ -163,5 +175,3 @@ aaudio_result_t AAudioBinderClient::unregisterAudioThread(aaudio_handle_t stream
                                           clientProcessId,
                                           clientThreadId);
 }
-
-

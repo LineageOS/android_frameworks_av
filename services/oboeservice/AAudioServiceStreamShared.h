@@ -66,6 +66,11 @@ public:
     aaudio_result_t pause() override;
 
     /**
+     * Stop the flow of data after data in buffer has played.
+     */
+    aaudio_result_t stop() override;
+
+    /**
      *  Discard any data held by the underlying HAL or Service.
      *
      * This is not guaranteed to be synchronous but it currently is.
@@ -76,6 +81,11 @@ public:
     aaudio_result_t close() override;
 
     android::FifoBuffer *getDataFifoBuffer() { return mAudioDataQueue->getFifoBuffer(); }
+
+    /* Keep a record of when a buffer transfer completed.
+     * This allows for a more accurate timing model.
+     */
+    void markTransferTime(int64_t nanoseconds);
 
     void onStop();
 
@@ -91,6 +101,9 @@ private:
     android::AAudioService  &mAudioService;
     AAudioServiceEndpoint   *mServiceEndpoint = nullptr;
     SharedRingBuffer        *mAudioDataQueue;
+
+    int64_t                  mMarkedPosition = 0;
+    int64_t                  mMarkedTime = 0;
 };
 
 } /* namespace aaudio */

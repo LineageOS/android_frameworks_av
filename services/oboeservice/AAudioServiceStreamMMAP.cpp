@@ -55,6 +55,11 @@ AAudioServiceStreamMMAP::~AAudioServiceStreamMMAP() {
 aaudio_result_t AAudioServiceStreamMMAP::close() {
     ALOGD("AAudioServiceStreamMMAP::close() called, %p", mMmapStream.get());
     mMmapStream.clear(); // TODO review. Is that all we have to do?
+    // Apparently the above close is asynchronous. An attempt to open a new device
+    // right after a close can fail. Also some callbacks may still be in flight!
+    // FIXME Make closing synchronous.
+    AudioClock::sleepForNanos(100 * AAUDIO_NANOS_PER_MILLISECOND);
+
     return AAudioServiceStreamBase::close();
 }
 
@@ -79,8 +84,8 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
     const AAudioStreamConfiguration &configurationInput = request.getConstantConfiguration();
     audio_port_handle_t deviceId = configurationInput.getDeviceId();
 
-    ALOGI("open request dump()");
-    request.dump();
+    // ALOGI("open request dump()");
+    // request.dump();
 
     mMmapClient.clientUid = request.getUserId();
     mMmapClient.clientPid = request.getProcessId();
@@ -198,16 +203,25 @@ aaudio_result_t AAudioServiceStreamMMAP::pause() {
     return (result1 != AAUDIO_OK) ? result1 : result2;
 }
 
+aaudio_result_t AAudioServiceStreamMMAP::stop() {
+    if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
+
+    aaudio_result_t result1 = AAudioServiceStreamBase::stop();
+    aaudio_result_t result2 = mMmapStream->stop(mPortHandle);
+    mFramesRead.reset32();
+    return (result1 != AAUDIO_OK) ? result1 : result2;
+}
+
 /**
  *  Discard any data held by the underlying HAL or Service.
  */
 aaudio_result_t AAudioServiceStreamMMAP::flush() {
     if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
     // TODO how do we flush an MMAP/NOIRQ buffer? sync pointers?
-    ALOGD("AAudioServiceStreamMMAP::pause() send AAUDIO_SERVICE_EVENT_FLUSHED");
+    ALOGD("AAudioServiceStreamMMAP::flush() send AAUDIO_SERVICE_EVENT_FLUSHED");
     sendServiceEvent(AAUDIO_SERVICE_EVENT_FLUSHED);
     mState = AAUDIO_STREAM_STATE_FLUSHED;
-    return AAUDIO_OK;
+    return AAudioServiceStreamBase::flush();;
 }
 
 

@@ -63,6 +63,11 @@ public:
     virtual aaudio_result_t pauseStream(aaudio_handle_t streamHandle) = 0;
 
     /**
+     * Stop the flow of data after data currently inthe buffer has played.
+     */
+    virtual aaudio_result_t stopStream(aaudio_handle_t streamHandle) = 0;
+
+    /**
      *  Discard any data held by the underlying HAL or Service.
      */
     virtual aaudio_result_t flushStream(aaudio_handle_t streamHandle) = 0;

@@ -56,6 +56,16 @@ public:
 
     void *callbackLoop();
 
+    // This should only be called from the AAudioEndpointManager under a mutex.
+    int32_t getReferenceCount() const {
+        return mReferenceCount;
+    }
+
+    // This should only be called from the AAudioEndpointManager under a mutex.
+    void setReferenceCount(int32_t count) {
+        mReferenceCount = count;
+    }
+
 private:
     aaudio_result_t startMixer_l();
     aaudio_result_t stopMixer_l();
@@ -64,13 +74,14 @@ private:
 
     AudioStreamInternal      mStreamInternal;
     AAudioMixer              mMixer;
-    AAudioServiceStreamMMAP  mStreamMMAP;
 
     std::atomic<bool>        mCallbackEnabled;
+    int32_t                  mReferenceCount = 0;
 
     std::mutex               mLockStreams;
     std::vector<AAudioServiceStreamShared *> mRegisteredStreams;
     std::vector<AAudioServiceStreamShared *> mRunningStreams;
+
 };
 
 } /* namespace aaudio */

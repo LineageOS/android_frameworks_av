@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "AAudioService"
+//#define LOG_NDEBUG 0
+#include <utils/Log.h>
+
 #include <assert.h>
 #include <map>
 #include <mutex>
@@ -28,13 +32,18 @@ using namespace aaudio;
 ANDROID_SINGLETON_STATIC_INSTANCE(AAudioEndpointManager);
 
 AAudioEndpointManager::AAudioEndpointManager()
-        : Singleton<AAudioEndpointManager>() {
+        : Singleton<AAudioEndpointManager>()
+        , mInputs()
+        , mOutputs() {
 }
 
-AAudioServiceEndpoint *AAudioEndpointManager::findEndpoint(AAudioService &audioService, int32_t deviceId,
+AAudioServiceEndpoint *AAudioEndpointManager::openEndpoint(AAudioService &audioService, int32_t deviceId,
                                                            aaudio_direction_t direction) {
     AAudioServiceEndpoint *endpoint = nullptr;
     std::lock_guard<std::mutex> lock(mLock);
+
+    // Try to find an existing endpoint.
+    ALOGD("AAudioEndpointManager::openEndpoint(), device = %d, dir = %d", deviceId, direction);
     switch (direction) {
         case AAUDIO_DIRECTION_INPUT:
             endpoint = mInputs[deviceId];
@@ -48,11 +57,11 @@ AAudioServiceEndpoint *AAudioEndpointManager::findEndpoint(AAudioService &audioS
     }
 
     // If we can't find an existing one then open one.
-    ALOGD("AAudioEndpointManager::findEndpoint(), found %p", endpoint);
+    ALOGD("AAudioEndpointManager::openEndpoint(), found %p", endpoint);
     if (endpoint == nullptr) {
         endpoint = new AAudioServiceEndpoint(audioService);
         if (endpoint->open(deviceId, direction) != AAUDIO_OK) {
-            ALOGD("AAudioEndpointManager::findEndpoint(), open failed");
+            ALOGE("AAudioEndpointManager::findEndpoint(), open failed");
             delete endpoint;
             endpoint = nullptr;
         } else {
@@ -66,22 +75,37 @@ AAudioServiceEndpoint *AAudioEndpointManager::findEndpoint(AAudioService &audioS
             }
         }
     }
+
+    if (endpoint != nullptr) {
+        // Increment the reference count under this lock.
+        endpoint->setReferenceCount(endpoint->getReferenceCount() + 1);
+    }
+
     return endpoint;
 }
 
-// FIXME add reference counter for serviceEndpoints and removed on last use.
-
-void AAudioEndpointManager::removeEndpoint(AAudioServiceEndpoint *serviceEndpoint) {
-    aaudio_direction_t direction = serviceEndpoint->getDirection();
-    int32_t deviceId = serviceEndpoint->getDeviceId();
-
+void AAudioEndpointManager::closeEndpoint(AAudioServiceEndpoint *serviceEndpoint) {
     std::lock_guard<std::mutex> lock(mLock);
-    switch(direction) {
-        case AAUDIO_DIRECTION_INPUT:
-            mInputs.erase(deviceId);
-            break;
-        case AAUDIO_DIRECTION_OUTPUT:
-            mOutputs.erase(deviceId);
-            break;
+    if (serviceEndpoint == nullptr) {
+        return;
+    }
+
+    // Decrement the reference count under this lock.
+    int32_t newRefCount = serviceEndpoint->getReferenceCount() - 1;
+    serviceEndpoint->setReferenceCount(newRefCount);
+    if (newRefCount <= 0) {
+        aaudio_direction_t direction = serviceEndpoint->getDirection();
+        int32_t deviceId = serviceEndpoint->getDeviceId();
+
+        switch (direction) {
+            case AAUDIO_DIRECTION_INPUT:
+                mInputs.erase(deviceId);
+                break;
+            case AAUDIO_DIRECTION_OUTPUT:
+                mOutputs.erase(deviceId);
+                break;
+        }
+        serviceEndpoint->close();
+        delete serviceEndpoint;
     }
 }
