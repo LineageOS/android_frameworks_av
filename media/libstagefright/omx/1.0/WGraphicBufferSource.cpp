@@ -204,6 +204,13 @@ Return<Status> TWGraphicBufferSource::setStopTimeUs(int64_t stopTimeUs) {
     return toStatus(mBase->setStopTimeUs(stopTimeUs));
 }
 
+Return<void> TWGraphicBufferSource::getStopTimeOffsetUs(
+        getStopTimeOffsetUs_cb _hidl_cb) {
+    // TODO: Implement this when needed.
+    _hidl_cb(Status::OK, 0);
+    return Void();
+}
+
 Return<Status> TWGraphicBufferSource::setColorAspects(
         const ColorAspects& aspects) {
     return toStatus(mBase->setColorAspects(toCompactColorAspects(aspects)));
