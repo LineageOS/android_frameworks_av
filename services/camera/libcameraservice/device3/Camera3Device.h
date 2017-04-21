@@ -294,9 +294,7 @@ class Camera3Device :
 
                 size_t result = 1;
                 result = 31 * result + buf->numFds;
-                result = 31 * result + buf->numInts;
-                int length = buf->numFds + buf->numInts;
-                for (int i = 0; i < length; i++) {
+                for (int i = 0; i < buf->numFds; i++) {
                     result = 31 * result + buf->data[i];
                 }
                 return result;
@@ -305,9 +303,8 @@ class Camera3Device :
 
         struct BufferComparator {
             bool operator()(const buffer_handle_t& buf1, const buffer_handle_t& buf2) const {
-                if (buf1->numFds == buf2->numFds && buf1->numInts == buf2->numInts) {
-                    int length = buf1->numFds + buf1->numInts;
-                    for (int i = 0; i < length; i++) {
+                if (buf1->numFds == buf2->numFds) {
+                    for (int i = 0; i < buf1->numFds; i++) {
                         if (buf1->data[i] != buf2->data[i]) {
                             return false;
                         }
