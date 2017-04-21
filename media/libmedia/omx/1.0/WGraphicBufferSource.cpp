@@ -53,9 +53,8 @@ BnStatus LWGraphicBufferSource::setMaxFps(float maxFps) {
 }
 
 BnStatus LWGraphicBufferSource::setTimeLapseConfig(
-        int64_t timePerFrameUs, int64_t timePerCaptureUs) {
-    return toBinderStatus(mBase->setTimeLapseConfig(
-            timePerFrameUs, timePerCaptureUs));
+        double fps, double captureFps) {
+    return toBinderStatus(mBase->setTimeLapseConfig(fps, captureFps));
 }
 
 BnStatus LWGraphicBufferSource::setStartTimeUs(

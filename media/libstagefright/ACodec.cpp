@@ -546,8 +546,8 @@ ACodec::ACodec()
       mRepeatFrameDelayUs(-1ll),
       mMaxPtsGapUs(-1ll),
       mMaxFps(-1),
-      mTimePerFrameUs(-1ll),
-      mTimePerCaptureUs(-1ll),
+      mFps(-1.0),
+      mCaptureFps(-1.0),
       mCreateInputBuffersSuspended(false),
       mLatency(0),
       mTunneled(false),
@@ -1802,8 +1802,8 @@ status_t ACodec::configureCodec(
             mMaxFps = -1;
         }
 
-        if (!msg->findInt64("time-lapse", &mTimePerCaptureUs)) {
-            mTimePerCaptureUs = -1ll;
+        if (!msg->findDouble("time-lapse-fps", &mCaptureFps)) {
+            mCaptureFps = -1.0;
         }
 
         if (!msg->findInt32(
@@ -3739,17 +3739,18 @@ status_t ACodec::setupVideoEncoder(
 
     def.nBufferSize = (video_def->nStride * video_def->nSliceHeight * 3) / 2;
 
-    float frameRate;
-    if (!msg->findFloat("frame-rate", &frameRate)) {
+    float framerate;
+    if (!msg->findFloat("frame-rate", &framerate)) {
         int32_t tmp;
         if (!msg->findInt32("frame-rate", &tmp)) {
             return INVALID_OPERATION;
         }
-        frameRate = (float)tmp;
-        mTimePerFrameUs = (int64_t) (1000000.0f / frameRate);
+        mFps = (double)tmp;
+    } else {
+        mFps = (double)framerate;
     }
 
-    video_def->xFramerate = (OMX_U32)(frameRate * 65536.0f);
+    video_def->xFramerate = (OMX_U32)(mFps * 65536);
     video_def->eCompressionFormat = OMX_VIDEO_CodingUnused;
     // this is redundant as it was already set up in setVideoPortFormatType
     // FIXME for now skip this only for flexible YUV formats
@@ -6597,11 +6598,10 @@ status_t ACodec::LoadedState::setupInputSurface() {
         }
     }
 
-    if (mCodec->mTimePerCaptureUs > 0ll
-            && mCodec->mTimePerFrameUs > 0ll) {
+    if (mCodec->mCaptureFps > 0. && mCodec->mFps > 0.) {
         err = statusFromBinderStatus(
                 mCodec->mGraphicBufferSource->setTimeLapseConfig(
-                        mCodec->mTimePerFrameUs, mCodec->mTimePerCaptureUs));
+                        mCodec->mFps, mCodec->mCaptureFps));
 
         if (err != OK) {
             ALOGE("[%s] Unable to configure time lapse (err %d)",
