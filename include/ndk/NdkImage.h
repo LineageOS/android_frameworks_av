@@ -136,7 +136,7 @@ enum AIMAGE_FORMATS {
      * <p>
      * Corresponding formats:
      * <ul>
-     * <li>AHardwareBuffer: AHARDWAREBUFFER_FORMAT_R16G16B16A16_SFLOAT</li>
+     * <li>AHardwareBuffer: AHARDWAREBUFFER_FORMAT_R16G16B16A16_FLOAT</li>
      * <li>Vulkan: VK_FORMAT_R16G16B16A16_SFLOAT</li>
      * <li>OpenGL ES: GL_RGBA16F</li>
      * </ul>
