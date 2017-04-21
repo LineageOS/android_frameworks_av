@@ -43,8 +43,7 @@ NuPlayer::DecoderBase::DecoderBase(const sp<AMessage> &notify)
 }
 
 NuPlayer::DecoderBase::~DecoderBase() {
-    mDecoderLooper->unregisterHandler(id());
-    mDecoderLooper->stop();
+    stopLooper();
 }
 
 static
@@ -71,6 +70,11 @@ void NuPlayer::DecoderBase::configure(const sp<AMessage> &format) {
 
 void NuPlayer::DecoderBase::init() {
     mDecoderLooper->registerHandler(this);
+}
+
+void NuPlayer::DecoderBase::stopLooper() {
+    mDecoderLooper->unregisterHandler(id());
+    mDecoderLooper->stop();
 }
 
 void NuPlayer::DecoderBase::setParameters(const sp<AMessage> &params) {
