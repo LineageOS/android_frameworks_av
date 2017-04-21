@@ -50,7 +50,7 @@ struct BWGraphicBufferSource : public BnGraphicBufferSource {
             int64_t repeatAfterUs) override;
     Status setMaxFps(float maxFps) override;
     Status setTimeLapseConfig(
-            int64_t timePerFrameUs, int64_t timePerCaptureUs) override;
+            double fps, double captureFps) override;
     Status setStartTimeUs(int64_t startTimeUs) override;
     Status setStopTimeUs(int64_t stopTimeUs) override;
     Status setColorAspects(int32_t aspects) override;

@@ -163,7 +163,7 @@ void StagefrightRecorder::updateMetrics() {
     // TBD mTrackEveryTimeDurationUs = 0;
     mAnalyticsItem->setInt32(kRecorderCaptureFpsEnable, mCaptureFpsEnable);
     mAnalyticsItem->setDouble(kRecorderCaptureFps, mCaptureFps);
-    // TBD mTimeBetweenCaptureUs = -1;
+    // TBD mCaptureFps = -1.0;
     // TBD mCameraSourceTimeLapse = NULL;
     // TBD mMetaDataStoredInVideoBuffers = kMetadataBufferTypeInvalid;
     // TBD mEncoderProfiles = MediaProfiles::getInstance();
@@ -709,18 +709,11 @@ status_t StagefrightRecorder::setParamCaptureFpsEnable(int32_t captureFpsEnable)
 status_t StagefrightRecorder::setParamCaptureFps(double fps) {
     ALOGV("setParamCaptureFps: %.2f", fps);
 
-    // FPS value is from Java layer where double follows IEEE-754, which is not
-    // necessarily true for double here.
-    constexpr double kIeee754Epsilon = 2.220446049250313e-16;
-    constexpr double kEpsilon = std::max(std::numeric_limits<double>::epsilon(), kIeee754Epsilon);
-    // Not allowing fps less than 1 frame / day minus epsilon.
-    if (fps < 1.0 / 86400 - kEpsilon) {
-        ALOGE("fps (%lf) is out of range (>= 1 frame / day)", fps);
+    if (!(fps >= 1.0 / 86400)) {
+        ALOGE("FPS is too small");
         return BAD_VALUE;
     }
-
     mCaptureFps = fps;
-    mTimeBetweenCaptureUs = std::llround(1e6 / fps);
     return OK;
 }
 
@@ -1574,16 +1567,15 @@ status_t StagefrightRecorder::setupCameraSource(
     videoSize.width = mVideoWidth;
     videoSize.height = mVideoHeight;
     if (mCaptureFpsEnable) {
-        if (mTimeBetweenCaptureUs < 0) {
-            ALOGE("Invalid mTimeBetweenTimeLapseFrameCaptureUs value: %lld",
-                    (long long)mTimeBetweenCaptureUs);
+        if (!(mCaptureFps > 0.)) {
+            ALOGE("Invalid mCaptureFps value: %lf", mCaptureFps);
             return BAD_VALUE;
         }
 
         mCameraSourceTimeLapse = CameraSourceTimeLapse::CreateFromCamera(
                 mCamera, mCameraProxy, mCameraId, mClientName, mClientUid, mClientPid,
                 videoSize, mFrameRate, mPreviewSurface,
-                mTimeBetweenCaptureUs);
+                std::llround(1e6 / mCaptureFps));
         *cameraSource = mCameraSourceTimeLapse;
     } else {
         *cameraSource = CameraSource::CreateFromCamera(
@@ -1679,12 +1671,11 @@ status_t StagefrightRecorder::setupVideoEncoder(
 
         // set up time lapse/slow motion for surface source
         if (mCaptureFpsEnable) {
-            if (mTimeBetweenCaptureUs <= 0) {
-                ALOGE("Invalid mTimeBetweenCaptureUs value: %lld",
-                        (long long)mTimeBetweenCaptureUs);
+            if (!(mCaptureFps > 0.)) {
+                ALOGE("Invalid mCaptureFps value: %lf", mCaptureFps);
                 return BAD_VALUE;
             }
-            format->setInt64("time-lapse", mTimeBetweenCaptureUs);
+            format->setDouble("time-lapse-fps", mCaptureFps);
         }
     }
 
@@ -2075,8 +2066,7 @@ status_t StagefrightRecorder::reset() {
     mMaxFileSizeBytes = 0;
     mTrackEveryTimeDurationUs = 0;
     mCaptureFpsEnable = false;
-    mCaptureFps = 0.0;
-    mTimeBetweenCaptureUs = -1;
+    mCaptureFps = -1.0;
     mCameraSourceTimeLapse = NULL;
     mMetaDataStoredInVideoBuffers = kMetadataBufferTypeInvalid;
     mEncoderProfiles = MediaProfiles::getInstance();

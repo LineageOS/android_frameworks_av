@@ -162,7 +162,7 @@ public:
     // Sets the time lapse (or slow motion) parameters.
     // When set, the sample's timestamp will be modified to playback framerate,
     // and capture timestamp will be modified to capture rate.
-    status_t setTimeLapseConfig(int64_t timePerFrameUs, int64_t timePerCaptureUs);
+    status_t setTimeLapseConfig(double fps, double captureFps);
 
     // Sets the start time us (in system time), samples before which should
     // be dropped and not submitted to encoder
@@ -417,27 +417,39 @@ private:
     // Time lapse / slow motion configuration
     // --------------------------------------
 
-    // desired time interval between captured frames (capture interval) - value <= 0 if undefined
-    int64_t mTimePerCaptureUs;
+    // desired frame rate for encoding - value <= 0 if undefined
+    double mFps;
 
-    // desired time interval between encoded frames (media time interval) - value <= 0 if undefined
-    int64_t mTimePerFrameUs;
+    // desired frame rate for capture - value <= 0 if undefined
+    double mCaptureFps;
 
-    // Time lapse mode is enabled if capture interval is defined and it is more than twice the
-    // media time interval (if defined). In this mode frames that come in between the capture
-    // interval are dropped and the media timestamp is adjusted to have exactly the desired
-    // media time interval.
+    // Time lapse mode is enabled if the capture frame rate is defined and it is
+    // smaller than half the encoding frame rate (if defined). In this mode,
+    // frames that come in between the capture interval (the reciprocal of the
+    // capture frame rate) are dropped and the encoding timestamp is adjusted to
+    // match the desired encoding frame rate.
     //
-    // Slow motion mode is enabled if both media and capture intervals are defined and the media
-    // time interval is more than twice the capture interval. In this mode frames that come in
-    // between the capture interval are dropped (though there isn't expected to be any, but there
-    // could eventually be a frame drop if the actual capture interval is smaller than the
-    // configured capture interval). The media timestamp is adjusted to have exactly the desired
-    // media time interval.
+    // Slow motion mode is enabled if both encoding and capture frame rates are
+    // defined and the encoding frame rate is less than half the capture frame
+    // rate. In this mode, the source is expected to produce frames with an even
+    // timestamp interval (after rounding) with the configured capture fps. The
+    // first source timestamp is used as the source base time. Afterwards, the
+    // timestamp of each source frame is snapped to the nearest expected capture
+    // timestamp and scaled to match the configured encoding frame rate.
 
     // These modes must be enabled before using this source.
 
-    // adjusted capture timestamp for previous frame
+    // adjusted capture timestamp of the base frame
+    int64_t mBaseCaptureUs;
+
+    // adjusted encoding timestamp of the base frame
+    int64_t mBaseFrameUs;
+
+    // number of frames from the base time
+    int64_t mFrameCount;
+
+    // adjusted capture timestamp for previous frame (negative if there were
+    // none)
     int64_t mPrevCaptureUs;
 
     // adjusted media timestamp for previous frame (negative if there were none)
