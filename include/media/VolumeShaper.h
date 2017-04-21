@@ -528,6 +528,10 @@ public:
         mDelayXOffset = xOffset;
     }
 
+    bool isStarted() const {
+        return mStartFrame >= 0;
+    }
+
     std::pair<T /* volume */, bool /* active */> getVolume(
             int64_t trackFrameCount, double trackSampleRate) {
         if ((getFlags() & VolumeShaper::Operation::FLAG_DELAY) != 0) {
@@ -752,6 +756,8 @@ public:
         return it->getState();
     }
 
+    // getVolume() is not const, as it updates internal state.
+    // Once called, any VolumeShapers not already started begin running.
     std::pair<T /* volume */, bool /* active */> getVolume(int64_t trackFrameCount) {
         AutoMutex _l(mLock);
         mLastFrame = trackFrameCount;
@@ -766,6 +772,14 @@ public:
         }
         mLastVolume = std::make_pair(volume, activeCount != 0);
         return mLastVolume;
+    }
+
+    // Used by a client side VolumeHandler to ensure all the VolumeShapers
+    // indicate that they have been started.  Upon a change in audioserver
+    // output sink, this information is used for restoration of the server side
+    // VolumeHandler.
+    void setStarted() {
+        (void)getVolume(mLastFrame);  // getVolume() will start the individual VolumeShapers.
     }
 
     std::pair<T /* volume */, bool /* active */> getLastVolume() const {
@@ -784,14 +798,12 @@ public:
         return ss.str();
     }
 
-    void forall(const std::function<VolumeShaper::Status (
-            const sp<VolumeShaper::Configuration> &configuration,
-            const sp<VolumeShaper::Operation> &operation)> &lambda) {
+    void forall(const std::function<VolumeShaper::Status (const VolumeShaper &)> &lambda) {
         AutoMutex _l(mLock);
         VS_LOG("forall: mVolumeShapers.size() %zu", mVolumeShapers.size());
         for (const auto &shaper : mVolumeShapers) {
-            VS_LOG("forall applying lambda");
-            (void)lambda(shaper.mConfiguration, shaper.mOperation);
+            VolumeShaper::Status status = lambda(shaper);
+            VS_LOG("forall applying lambda on shaper (%p): %d", &shaper, (int)status);
         }
     }
 

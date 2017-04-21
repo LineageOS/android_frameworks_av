@@ -2029,12 +2029,23 @@ status_t MediaPlayerService::AudioOutput::open(
     ALOGV("setVolume");
     t->setVolume(mLeftVolume, mRightVolume);
 
-    // Dispatch any queued VolumeShapers when the track was not open.
-    mVolumeHandler->forall([&t](const sp<VolumeShaper::Configuration> &configuration,
-            const sp<VolumeShaper::Operation> &operation) -> VolumeShaper::Status {
-        return t->applyVolumeShaper(configuration, operation);
+    // Restore VolumeShapers for the MediaPlayer in case the track was recreated
+    // due to an output sink error (e.g. offload to non-offload switch).
+    mVolumeHandler->forall([&t](const VolumeShaper &shaper) -> VolumeShaper::Status {
+        sp<VolumeShaper::Operation> operationToEnd =
+                new VolumeShaper::Operation(shaper.mOperation);
+        // TODO: Ideally we would restore to the exact xOffset position
+        // as returned by getVolumeShaperState(), but we don't have that
+        // information when restoring at the client unless we periodically poll
+        // the server or create shared memory state.
+        //
+        // For now, we simply advance to the end of the VolumeShaper effect
+        // if it has been started.
+        if (shaper.isStarted()) {
+            operationToEnd->setXOffset(1.f);
+        }
+        return t->applyVolumeShaper(shaper.mConfiguration, operationToEnd);
     });
-    mVolumeHandler->reset(); // After dispatching, clear VolumeShaper queue.
 
     mSampleRateHz = sampleRate;
     mFlags = flags;
@@ -2075,7 +2086,11 @@ status_t MediaPlayerService::AudioOutput::start()
     if (mTrack != 0) {
         mTrack->setVolume(mLeftVolume, mRightVolume);
         mTrack->setAuxEffectSendLevel(mSendLevel);
-        return mTrack->start();
+        status_t status = mTrack->start();
+        if (status == NO_ERROR) {
+            mVolumeHandler->setStarted();
+        }
+        return status;
     }
     return NO_INIT;
 }
@@ -2279,13 +2294,20 @@ VolumeShaper::Status MediaPlayerService::AudioOutput::applyVolumeShaper(
     Mutex::Autolock lock(mLock);
     ALOGV("AudioOutput::applyVolumeShaper");
 
-    // We take ownership of the VolumeShaper if set before the track is created.
     mVolumeHandler->setIdIfNecessary(configuration);
+
+    VolumeShaper::Status status;
     if (mTrack != 0) {
-        return mTrack->applyVolumeShaper(configuration, operation);
+        status = mTrack->applyVolumeShaper(configuration, operation);
+        if (status >= 0) {
+            (void)mVolumeHandler->applyVolumeShaper(configuration, operation);
+            // TODO: start on exact AudioTrack state (STATE_ACTIVE || STATE_STOPPING)
+            mVolumeHandler->setStarted();
+        }
     } else {
-        return mVolumeHandler->applyVolumeShaper(configuration, operation);
+        status = mVolumeHandler->applyVolumeShaper(configuration, operation);
     }
+    return status;
 }
 
 sp<VolumeShaper::State> MediaPlayerService::AudioOutput::getVolumeShaperState(int id)
