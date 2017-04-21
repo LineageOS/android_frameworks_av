@@ -1,0 +1,26 @@
+cc_library_static {
+    name: "libstagefright_matroska",
+
+    srcs: ["MatroskaExtractor.cpp"],
+
+    include_dirs: [
+        "external/libvpx/libwebm",
+        "frameworks/native/include/media/openmax",
+        "frameworks/av/media/libstagefright/include",
+    ],
+
+    cflags: [
+        "-Wno-multichar",
+        "-Werror",
+        "-Wall",
+    ],
+
+    sanitize: {
+        misc_undefined: [
+            "signed-integer-overflow",
+            "unsigned-integer-overflow",
+        ],
+    },
+
+    shared_libs: ["libmedia"],
+}
