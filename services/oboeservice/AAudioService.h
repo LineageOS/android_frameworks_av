@@ -57,6 +57,8 @@ public:
 
     virtual aaudio_result_t pauseStream(aaudio_handle_t streamHandle);
 
+    virtual aaudio_result_t stopStream(aaudio_handle_t streamHandle);
+
     virtual aaudio_result_t flushStream(aaudio_handle_t streamHandle);
 
     virtual aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle,

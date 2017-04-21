@@ -30,9 +30,10 @@
 #include "legacy/AudioStreamRecord.h"
 #include "legacy/AudioStreamTrack.h"
 
-// Enable a mixer in AAudio service that will mix stream to an ALSA MMAP buffer.
+// Enable a mixer in AAudio service that will mix streams to an ALSA MMAP buffer.
 #define MMAP_SHARED_ENABLED      0
-// Enable AAUDIO_SHARING_MODE_EXCLUSIVE that uses an ALSA MMAP buffer.
+
+// Enable AAUDIO_SHARING_MODE_EXCLUSIVE that uses an ALSA MMAP buffer directly.
 #define MMAP_EXCLUSIVE_ENABLED   0
 
 using namespace aaudio;
@@ -50,7 +51,7 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     AudioStream* audioStream = nullptr;
     AAudioBinderClient *aaudioClient = nullptr;
     const aaudio_sharing_mode_t sharingMode = getSharingMode();
-    ALOGD("AudioStreamBuilder.build() sharingMode = %d", sharingMode);
+
     switch (getDirection()) {
 
     case AAUDIO_DIRECTION_INPUT:

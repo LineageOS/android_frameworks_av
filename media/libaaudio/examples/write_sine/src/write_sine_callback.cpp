@@ -31,8 +31,6 @@
 //#define SHARING_MODE  AAUDIO_SHARING_MODE_EXCLUSIVE
 #define SHARING_MODE  AAUDIO_SHARING_MODE_SHARED
 
-#define  CALLBACK_SIZE_FRAMES    128
-
 // TODO refactor common code into a single SimpleAAudio class
 /**
  * Simple wrapper for AAudio that opens a default stream and then calls
@@ -87,8 +85,8 @@ public:
         AAudioStreamBuilder_setSharingMode(mBuilder, mRequestedSharingMode);
         AAudioStreamBuilder_setDataCallback(mBuilder, dataProc, userContext);
         AAudioStreamBuilder_setFormat(mBuilder, AAUDIO_FORMAT_PCM_FLOAT);
-        AAudioStreamBuilder_setFramesPerDataCallback(mBuilder, CALLBACK_SIZE_FRAMES);
- //       AAudioStreamBuilder_setBufferCapacityInFrames(mBuilder, CALLBACK_SIZE_FRAMES * 4);
+ //       AAudioStreamBuilder_setFramesPerDataCallback(mBuilder, CALLBACK_SIZE_FRAMES);
+        AAudioStreamBuilder_setBufferCapacityInFrames(mBuilder, 48 * 8);
 
         // Open an AAudioStream using the Builder.
         result = AAudioStreamBuilder_openStream(mBuilder, &mStream);
@@ -136,7 +134,7 @@ public:
      aaudio_result_t start() {
         aaudio_result_t result = AAudioStream_requestStart(mStream);
         if (result != AAUDIO_OK) {
-            fprintf(stderr, "ERROR - AAudioStream_requestStart() returned %d %s\n",
+            printf("ERROR - AAudioStream_requestStart() returned %d %s\n",
                     result, AAudio_convertResultToText(result));
         }
         return result;
@@ -146,7 +144,7 @@ public:
     aaudio_result_t stop() {
         aaudio_result_t result = AAudioStream_requestStop(mStream);
         if (result != AAUDIO_OK) {
-            fprintf(stderr, "ERROR - AAudioStream_requestStop() returned %d %s\n",
+            printf("ERROR - AAudioStream_requestStop() returned %d %s\n",
                     result, AAudio_convertResultToText(result));
         }
         int32_t xRunCount = AAudioStream_getXRunCount(mStream);
@@ -169,9 +167,6 @@ private:
 typedef struct SineThreadedData_s {
     SineGenerator  sineOsc1;
     SineGenerator  sineOsc2;
-    // Remove these variables used for testing.
-    int32_t        numFrameCounts;
-    int32_t        frameCounts[MAX_FRAME_COUNT_RECORDS];
     int            scheduler;
     bool           schedulerChecked;
 } SineThreadedData_t;
@@ -185,10 +180,6 @@ aaudio_data_callback_result_t MyDataCallbackProc(
         ) {
 
     SineThreadedData_t *sineData = (SineThreadedData_t *) userData;
-
-    if (sineData->numFrameCounts < MAX_FRAME_COUNT_RECORDS) {
-        sineData->frameCounts[sineData->numFrameCounts++] = numFrames;
-    }
 
     if (!sineData->schedulerChecked) {
         sineData->scheduler = sched_getscheduler(gettid());
@@ -236,11 +227,10 @@ int main(int argc, char **argv)
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
-    printf("%s - Play a sine sweep using an AAudio callback\n", argv[0]);
+    printf("%s - Play a sine sweep using an AAudio callback, Z1\n", argv[0]);
 
     player.setSharingMode(SHARING_MODE);
 
-    myData.numFrameCounts = 0;
     myData.schedulerChecked = false;
 
     result = player.open(MyDataCallbackProc, &myData);
@@ -291,19 +281,17 @@ int main(int argc, char **argv)
     }
     printf("Woke up now.\n");
 
+    printf("call stop()\n");
     result = player.stop();
     if (result != AAUDIO_OK) {
         goto error;
     }
+    printf("call close()\n");
     result = player.close();
     if (result != AAUDIO_OK) {
         goto error;
     }
 
-    // Report data gathered in the callback.
-    for (int i = 0; i < myData.numFrameCounts; i++) {
-        printf("numFrames[%4d] = %4d\n", i, myData.frameCounts[i]);
-    }
     if (myData.schedulerChecked) {
         printf("scheduler = 0x%08x, SCHED_FIFO = 0x%08X\n",
                myData.scheduler,

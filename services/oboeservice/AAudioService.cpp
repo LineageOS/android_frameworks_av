@@ -54,8 +54,8 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
     aaudio_result_t result = AAUDIO_OK;
     AAudioServiceStreamBase *serviceStream = nullptr;
     const AAudioStreamConfiguration &configurationInput = request.getConstantConfiguration();
+    bool sharingModeMatchRequired = request.isSharingModeMatchRequired();
     aaudio_sharing_mode_t sharingMode = configurationInput.getSharingMode();
-    ALOGE("AAudioService::openStream(): sharingMode = %d", sharingMode);
 
     if (sharingMode != AAUDIO_SHARING_MODE_EXCLUSIVE && sharingMode != AAUDIO_SHARING_MODE_SHARED) {
         ALOGE("AAudioService::openStream(): unrecognized sharing mode = %d", sharingMode);
@@ -77,8 +77,9 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
     }
 
     // if SHARED requested or if EXCLUSIVE failed
-    if (serviceStream == nullptr) {
-        ALOGD("AAudioService::openStream(), sharingMode = AAUDIO_SHARING_MODE_SHARED");
+    if (sharingMode == AAUDIO_SHARING_MODE_SHARED
+         || (serviceStream == nullptr && !sharingModeMatchRequired)) {
+        ALOGD("AAudioService::openStream(), try AAUDIO_SHARING_MODE_SHARED");
         serviceStream =  new AAudioServiceStreamShared(*this);
         result = serviceStream->open(request, configurationOutput);
         configurationOutput.setSharingMode(AAUDIO_SHARING_MODE_SHARED);
@@ -126,9 +127,7 @@ aaudio_result_t AAudioService::getStreamDescription(
         ALOGE("AAudioService::getStreamDescription(), illegal stream handle = 0x%0x", streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
-    ALOGD("AAudioService::getStreamDescription(), handle = 0x%08x", streamHandle);
     aaudio_result_t result = serviceStream->getDescription(parcelable);
-    ALOGD("AAudioService::getStreamDescription(), result = %d", result);
     // parcelable.dump();
     return result;
 }
@@ -140,7 +139,6 @@ aaudio_result_t AAudioService::startStream(aaudio_handle_t streamHandle) {
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
     aaudio_result_t result = serviceStream->start();
-    ALOGD("AAudioService::startStream(), serviceStream->start() returned %d", result);
     return result;
 }
 
@@ -151,6 +149,16 @@ aaudio_result_t AAudioService::pauseStream(aaudio_handle_t streamHandle) {
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
     aaudio_result_t result = serviceStream->pause();
+    return result;
+}
+
+aaudio_result_t AAudioService::stopStream(aaudio_handle_t streamHandle) {
+    AAudioServiceStreamBase *serviceStream = convertHandleToServiceStream(streamHandle);
+    if (serviceStream == nullptr) {
+        ALOGE("AAudioService::pauseStream(), illegal stream handle = 0x%0x", streamHandle);
+        return AAUDIO_ERROR_INVALID_HANDLE;
+    }
+    aaudio_result_t result = serviceStream->stop();
     return result;
 }
 
@@ -168,7 +176,6 @@ aaudio_result_t AAudioService::registerAudioThread(aaudio_handle_t streamHandle,
                                                          pid_t clientThreadId,
                                                          int64_t periodNanoseconds) {
     AAudioServiceStreamBase *serviceStream = convertHandleToServiceStream(streamHandle);
-    ALOGD("AAudioService::registerAudioThread(), serviceStream = %p", serviceStream);
     if (serviceStream == nullptr) {
         ALOGE("AAudioService::registerAudioThread(), illegal stream handle = 0x%0x", streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
@@ -193,7 +200,6 @@ aaudio_result_t AAudioService::unregisterAudioThread(aaudio_handle_t streamHandl
                                                      pid_t clientProcessId,
                                                      pid_t clientThreadId) {
     AAudioServiceStreamBase *serviceStream = convertHandleToServiceStream(streamHandle);
-    ALOGI("AAudioService::unregisterAudioThread(), serviceStream = %p", serviceStream);
     if (serviceStream == nullptr) {
         ALOGE("AAudioService::unregisterAudioThread(), illegal stream handle = 0x%0x",
               streamHandle);

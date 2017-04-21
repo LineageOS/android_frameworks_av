@@ -60,6 +60,15 @@ public:
         mDirection = direction;
     }
 
+    bool isSharingModeMatchRequired() const {
+        return mSharingModeMatchRequired;
+    }
+
+    void setSharingModeMatchRequired(bool required) {
+        mSharingModeMatchRequired = required;
+    }
+
+
     const AAudioStreamConfiguration &getConstantConfiguration() const {
         return mConfiguration;
     }
@@ -81,6 +90,7 @@ protected:
     uid_t                      mUserId;
     pid_t                      mProcessId;
     aaudio_direction_t         mDirection;
+    bool                       mSharingModeMatchRequired = false;
 };
 
 } /* namespace aaudio */

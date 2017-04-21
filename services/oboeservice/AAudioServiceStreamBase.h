@@ -17,6 +17,7 @@
 #ifndef AAUDIO_AAUDIO_SERVICE_STREAM_BASE_H
 #define AAUDIO_AAUDIO_SERVICE_STREAM_BASE_H
 
+#include <assert.h>
 #include <mutex>
 
 #include "fifo/FifoBuffer.h"
@@ -60,17 +61,22 @@ public:
     /**
      * Start the flow of data.
      */
-    virtual aaudio_result_t start() = 0;
+    virtual aaudio_result_t start();
 
     /**
      * Stop the flow of data such that start() can resume with loss of data.
      */
-    virtual aaudio_result_t pause() = 0;
+    virtual aaudio_result_t pause();
+
+    /**
+     * Stop the flow of data after data in buffer has played.
+     */
+    virtual aaudio_result_t stop();
 
     /**
      *  Discard any data held by the underlying HAL or Service.
      */
-    virtual aaudio_result_t flush() = 0;
+    virtual aaudio_result_t flush();
 
     // -------------------------------------------------------------------
 
