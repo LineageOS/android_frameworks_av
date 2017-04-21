@@ -95,7 +95,11 @@ NuPlayer::Decoder::Decoder(
 }
 
 NuPlayer::Decoder::~Decoder() {
-    mCodec->release();
+    // Need to stop looper first since mCodec could be accessed on the mDecoderLooper.
+    stopLooper();
+    if (mCodec != NULL) {
+        mCodec->release();
+    }
     releaseAndResetMediaBuffers();
 }
 

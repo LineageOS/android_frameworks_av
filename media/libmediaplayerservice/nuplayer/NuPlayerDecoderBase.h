@@ -69,6 +69,8 @@ protected:
 
     virtual ~DecoderBase();
 
+    void stopLooper();
+
     virtual void onMessageReceived(const sp<AMessage> &msg);
 
     virtual void onConfigure(const sp<AMessage> &format) = 0;
