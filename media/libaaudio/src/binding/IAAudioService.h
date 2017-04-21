@@ -69,6 +69,12 @@ public:
     virtual aaudio_result_t pauseStream(aaudio::aaudio_handle_t streamHandle) = 0;
 
     /**
+     * Stop the flow of data such that the data currently in the buffer is played.
+     * This is asynchronous. When complete, the service will send a STOPPED event.
+     */
+    virtual aaudio_result_t stopStream(aaudio::aaudio_handle_t streamHandle) = 0;
+
+    /**
      *  Discard any data held by the underlying HAL or Service.
      * This is asynchronous. When complete, the service will send a FLUSHED event.
      */

@@ -94,6 +94,7 @@ protected:
     aaudio_result_t processCommands();
 
     aaudio_result_t requestPauseInternal();
+    aaudio_result_t requestStopInternal();
 
     aaudio_result_t stopCallback();
 
@@ -128,6 +129,11 @@ private:
     aaudio_result_t writeNowWithConversion(const void *buffer,
                                      int32_t numFrames);
     void processTimestamp(uint64_t position, int64_t time);
+
+
+    const char *getLocationName() const {
+        return mInService ? "SERVICE" : "CLIENT";
+    }
 
     // Adjust timing model based on timestamp from service.
 

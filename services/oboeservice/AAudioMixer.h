@@ -31,7 +31,13 @@ public:
 
     void clear();
 
-    void mix(android::FifoBuffer *fifo, float volume);
+    /**
+     * Mix from this FIFO
+     * @param fifo
+     * @param volume
+     * @return true if underflowed
+     */
+    bool mix(android::FifoBuffer *fifo, float volume);
 
     void mixPart(float *destination, float *source, int32_t numFrames, float volume);
 

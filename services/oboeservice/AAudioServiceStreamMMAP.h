@@ -66,6 +66,8 @@ public:
     */
     aaudio_result_t pause() override;
 
+    aaudio_result_t stop() override;
+
     /**
      *  Discard any data held by the underlying HAL or Service.
      *

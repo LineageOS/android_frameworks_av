@@ -61,7 +61,7 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
 
     ALOGD("AAudioServiceStreamShared::open(), direction = %d", direction);
     AAudioEndpointManager &mEndpointManager = AAudioEndpointManager::getInstance();
-    mServiceEndpoint = mEndpointManager.findEndpoint(mAudioService, deviceId, direction);
+    mServiceEndpoint = mEndpointManager.openEndpoint(mAudioService, deviceId, direction);
     ALOGD("AAudioServiceStreamShared::open(), mServiceEndPoint = %p", mServiceEndpoint);
     if (mServiceEndpoint == nullptr) {
         return AAUDIO_ERROR_UNAVAILABLE;
@@ -72,6 +72,7 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
     if (mAudioFormat == AAUDIO_FORMAT_UNSPECIFIED) {
         mAudioFormat = AAUDIO_FORMAT_PCM_FLOAT;
     } else if (mAudioFormat != AAUDIO_FORMAT_PCM_FLOAT) {
+        ALOGE("AAudioServiceStreamShared::open(), mAudioFormat = %d, need FLOAT", mAudioFormat);
         return AAUDIO_ERROR_INVALID_FORMAT;
     }
 
@@ -79,6 +80,8 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
     if (mSampleRate == AAUDIO_FORMAT_UNSPECIFIED) {
         mSampleRate = mServiceEndpoint->getSampleRate();
     } else if (mSampleRate != mServiceEndpoint->getSampleRate()) {
+        ALOGE("AAudioServiceStreamShared::open(), mAudioFormat = %d, need %d",
+              mSampleRate, mServiceEndpoint->getSampleRate());
         return AAUDIO_ERROR_INVALID_RATE;
     }
 
@@ -86,17 +89,22 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
     if (mSamplesPerFrame == AAUDIO_FORMAT_UNSPECIFIED) {
         mSamplesPerFrame = mServiceEndpoint->getSamplesPerFrame();
     } else if (mSamplesPerFrame != mServiceEndpoint->getSamplesPerFrame()) {
+        ALOGE("AAudioServiceStreamShared::open(), mSamplesPerFrame = %d, need %d",
+              mSamplesPerFrame, mServiceEndpoint->getSamplesPerFrame());
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
 
     // Determine this stream's shared memory buffer capacity.
     mFramesPerBurst = mServiceEndpoint->getFramesPerBurst();
     int32_t minCapacityFrames = configurationInput.getBufferCapacity();
-    int32_t numBursts = (minCapacityFrames + mFramesPerBurst - 1) / mFramesPerBurst;
-    if (numBursts < MIN_BURSTS_PER_BUFFER) {
-        numBursts = MIN_BURSTS_PER_BUFFER;
-    } else if (numBursts > MAX_BURSTS_PER_BUFFER) {
-        numBursts = MAX_BURSTS_PER_BUFFER;
+    int32_t numBursts = MAX_BURSTS_PER_BUFFER;
+    if (minCapacityFrames != AAUDIO_UNSPECIFIED) {
+        numBursts = (minCapacityFrames + mFramesPerBurst - 1) / mFramesPerBurst;
+        if (numBursts < MIN_BURSTS_PER_BUFFER) {
+            numBursts = MIN_BURSTS_PER_BUFFER;
+        } else if (numBursts > MAX_BURSTS_PER_BUFFER) {
+            numBursts = MAX_BURSTS_PER_BUFFER;
+        }
     }
     mCapacityInFrames = numBursts * mFramesPerBurst;
     ALOGD("AAudioServiceStreamShared::open(), mCapacityInFrames = %d", mCapacityInFrames);
@@ -122,8 +130,12 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
  * An AAUDIO_SERVICE_EVENT_STARTED will be sent to the client when complete.
  */
 aaudio_result_t AAudioServiceStreamShared::start()  {
+    AAudioServiceEndpoint *endpoint = mServiceEndpoint;
+    if (endpoint == nullptr) {
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
     // Add this stream to the mixer.
-    aaudio_result_t result = mServiceEndpoint->startStream(this);
+    aaudio_result_t result = endpoint->startStream(this);
     if (result != AAUDIO_OK) {
         ALOGE("AAudioServiceStreamShared::start() mServiceEndpoint returned %d", result);
         processError();
@@ -139,15 +151,31 @@ aaudio_result_t AAudioServiceStreamShared::start()  {
  * An AAUDIO_SERVICE_EVENT_PAUSED will be sent to the client when complete.
 */
 aaudio_result_t AAudioServiceStreamShared::pause()  {
+    AAudioServiceEndpoint *endpoint = mServiceEndpoint;
+    if (endpoint == nullptr) {
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
     // Add this stream to the mixer.
-    aaudio_result_t result = mServiceEndpoint->stopStream(this);
+    aaudio_result_t result = endpoint->stopStream(this);
+    if (result != AAUDIO_OK) {
+        ALOGE("AAudioServiceStreamShared::pause() mServiceEndpoint returned %d", result);
+        processError();
+    }
+    return AAudioServiceStreamBase::pause();
+}
+
+aaudio_result_t AAudioServiceStreamShared::stop()  {
+    AAudioServiceEndpoint *endpoint = mServiceEndpoint;
+    if (endpoint == nullptr) {
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    // Add this stream to the mixer.
+    aaudio_result_t result = endpoint->stopStream(this);
     if (result != AAUDIO_OK) {
         ALOGE("AAudioServiceStreamShared::stop() mServiceEndpoint returned %d", result);
         processError();
-    } else {
-        result = AAudioServiceStreamBase::start();
     }
-    return AAUDIO_OK;
+    return AAudioServiceStreamBase::stop();
 }
 
 /**
@@ -157,15 +185,21 @@ aaudio_result_t AAudioServiceStreamShared::pause()  {
  */
 aaudio_result_t AAudioServiceStreamShared::flush()  {
     // TODO make sure we are paused
-    return AAUDIO_OK;
+    // TODO actually flush the data
+    return AAudioServiceStreamBase::flush() ;
 }
 
 aaudio_result_t AAudioServiceStreamShared::close()  {
     pause();
     // TODO wait for pause() to synchronize
-    mServiceEndpoint->unregisterStream(this);
-    mServiceEndpoint->close();
-    mServiceEndpoint = nullptr;
+    AAudioServiceEndpoint *endpoint = mServiceEndpoint;
+    if (endpoint != nullptr) {
+        endpoint->unregisterStream(this);
+
+        AAudioEndpointManager &mEndpointManager = AAudioEndpointManager::getInstance();
+        mEndpointManager.closeEndpoint(endpoint);
+        mServiceEndpoint = nullptr;
+    }
     return AAudioServiceStreamBase::close();
 }
 
@@ -189,10 +223,15 @@ void AAudioServiceStreamShared::onDisconnect() {
     mServiceEndpoint = nullptr;
 }
 
+void AAudioServiceStreamShared::markTransferTime(int64_t nanoseconds) {
+    mMarkedPosition = mAudioDataQueue->getFifoBuffer()->getReadCounter();
+    mMarkedTime = nanoseconds;
+}
 
 aaudio_result_t AAudioServiceStreamShared::getFreeRunningPosition(int64_t *positionFrames,
                                                                 int64_t *timeNanos) {
-    *positionFrames = mAudioDataQueue->getFifoBuffer()->getReadCounter();
-    *timeNanos = AudioClock::getNanoseconds();
+    // TODO get these two numbers as an atomic pair
+    *positionFrames = mMarkedPosition;
+    *timeNanos = mMarkedTime;
     return AAUDIO_OK;
 }

@@ -154,6 +154,10 @@ public:
         return mSharingMode;
     }
 
+    bool isSharingModeMatchRequired() const {
+        return mSharingModeMatchRequired;
+    }
+
     aaudio_direction_t getDirection() const {
         return mDirection;
     }
@@ -227,16 +231,6 @@ protected:
     }
 
     /**
-     * Wait for a transition from one state to another.
-     * @return AAUDIO_OK if the endingState was observed, or AAUDIO_ERROR_UNEXPECTED_STATE
-     *   if any state that was not the startingState or endingState was observed
-     *   or AAUDIO_ERROR_TIMEOUT
-     */
-    virtual aaudio_result_t waitForStateTransition(aaudio_stream_state_t startingState,
-                                                   aaudio_stream_state_t endingState,
-                                                   int64_t timeoutNanoseconds);
-
-    /**
      * This should not be called after the open() call.
      */
     void setSampleRate(int32_t sampleRate) {
@@ -294,6 +288,7 @@ private:
     int32_t                mSampleRate = AAUDIO_UNSPECIFIED;
     int32_t                mDeviceId = AAUDIO_UNSPECIFIED;
     aaudio_sharing_mode_t  mSharingMode = AAUDIO_SHARING_MODE_SHARED;
+    bool                   mSharingModeMatchRequired = false; // must match sharing mode requested
     aaudio_audio_format_t  mFormat = AAUDIO_FORMAT_UNSPECIFIED;
     aaudio_direction_t     mDirection = AAUDIO_DIRECTION_OUTPUT;
     aaudio_stream_state_t  mState = AAUDIO_STREAM_STATE_UNINITIALIZED;

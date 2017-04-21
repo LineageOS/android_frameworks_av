@@ -82,6 +82,15 @@ public:
         return this;
     }
 
+    bool isSharingModeMatchRequired() const {
+        return mSharingModeMatchRequired;
+    }
+
+    AudioStreamBuilder* setSharingModeMatchRequired(bool required) {
+        mSharingModeMatchRequired = required;
+        return this;
+    }
+
     int32_t getBufferCapacity() const {
         return mBufferCapacity;
     }
@@ -108,7 +117,6 @@ public:
         mDataCallbackProc = proc;
         return this;
     }
-
 
     void *getDataCallbackUserData() const {
         return mDataCallbackUserData;
@@ -153,6 +161,7 @@ private:
     int32_t                mSampleRate = AAUDIO_UNSPECIFIED;
     int32_t                mDeviceId = AAUDIO_DEVICE_UNSPECIFIED;
     aaudio_sharing_mode_t  mSharingMode = AAUDIO_SHARING_MODE_SHARED;
+    bool                   mSharingModeMatchRequired = false; // must match sharing mode requested
     aaudio_audio_format_t  mFormat = AAUDIO_FORMAT_UNSPECIFIED;
     aaudio_direction_t     mDirection = AAUDIO_DIRECTION_OUTPUT;
     int32_t                mBufferCapacity = AAUDIO_UNSPECIFIED;

@@ -60,14 +60,11 @@ FifoBuffer::FifoBuffer( int32_t   bytesPerFrame,
         , mFramesUnderrunCount(0)
         , mUnderrunCount(0)
 {
-    // TODO Handle possible failures to allocate. Move out of constructor?
     mFifo = new FifoControllerIndirect(capacityInFrames,
                                        capacityInFrames,
                                        readIndexAddress,
                                        writeIndexAddress);
     mStorageOwned = false;
-    ALOGD("FifoProcessor: capacityInFrames = %d, bytesPerFrame = %d",
-          capacityInFrames, bytesPerFrame);
 }
 
 FifoBuffer::~FifoBuffer() {
@@ -132,8 +129,6 @@ fifo_frames_t FifoBuffer::read(void *buffer, fifo_frames_t numFrames) {
     while (framesLeft > 0 && partIndex < WrappingBuffer::SIZE) {
         fifo_frames_t framesToRead = framesLeft;
         fifo_frames_t framesAvailable = wrappingBuffer.numFrames[partIndex];
-        //ALOGD("FifoProcessor::read() framesAvailable = %d, partIndex = %d",
-        //      framesAvailable, partIndex);
         if (framesAvailable > 0) {
             if (framesToRead > framesAvailable) {
                 framesToRead = framesAvailable;
@@ -143,6 +138,8 @@ fifo_frames_t FifoBuffer::read(void *buffer, fifo_frames_t numFrames) {
 
             destination += numBytes;
             framesLeft -= framesToRead;
+        } else {
+            break;
         }
         partIndex++;
     }
@@ -172,6 +169,8 @@ fifo_frames_t FifoBuffer::write(const void *buffer, fifo_frames_t numFrames) {
 
             source += numBytes;
             framesLeft -= framesToWrite;
+        } else {
+            break;
         }
         partIndex++;
     }
