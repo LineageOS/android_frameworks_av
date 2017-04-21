@@ -2675,12 +2675,14 @@ AudioFlinger::MmapThread *AudioFlinger::checkMmapThread_l(audio_io_handle_t io) 
 // checkPlaybackThread_l() must be called with AudioFlinger::mLock held
 AudioFlinger::VolumeInterface *AudioFlinger::getVolumeInterface_l(audio_io_handle_t output) const
 {
-    VolumeInterface *volumeInterface = (VolumeInterface *)mPlaybackThreads.valueFor(output).get();
+    VolumeInterface *volumeInterface = mPlaybackThreads.valueFor(output).get();
     if (volumeInterface == nullptr) {
         MmapThread *mmapThread = mMmapThreads.valueFor(output).get();
         if (mmapThread != nullptr) {
             if (mmapThread->isOutput()) {
-                volumeInterface = (VolumeInterface *)mmapThread;
+                MmapPlaybackThread *mmapPlaybackThread =
+                        static_cast<MmapPlaybackThread *>(mmapThread);
+                volumeInterface = mmapPlaybackThread;
             }
         }
     }
@@ -2691,11 +2693,13 @@ Vector <AudioFlinger::VolumeInterface *> AudioFlinger::getAllVolumeInterfaces_l(
 {
     Vector <VolumeInterface *> volumeInterfaces;
     for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
-        volumeInterfaces.add((VolumeInterface *)mPlaybackThreads.valueAt(i).get());
+        volumeInterfaces.add(mPlaybackThreads.valueAt(i).get());
     }
     for (size_t i = 0; i < mMmapThreads.size(); i++) {
         if (mMmapThreads.valueAt(i)->isOutput()) {
-            volumeInterfaces.add((VolumeInterface *)mMmapThreads.valueAt(i).get());
+            MmapPlaybackThread *mmapPlaybackThread =
+                    static_cast<MmapPlaybackThread *>(mMmapThreads.valueAt(i).get());
+            volumeInterfaces.add(mmapPlaybackThread);
         }
     }
     return volumeInterfaces;
