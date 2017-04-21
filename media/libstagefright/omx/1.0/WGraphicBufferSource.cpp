@@ -192,8 +192,8 @@ Return<Status> TWGraphicBufferSource::setMaxFps(float maxFps) {
 }
 
 Return<Status> TWGraphicBufferSource::setTimeLapseConfig(
-        int64_t timePerFrameUs, int64_t timePerCaptureUs) {
-    return toStatus(mBase->setTimeLapseConfig(timePerFrameUs, timePerCaptureUs));
+        double fps, double captureFps) {
+    return toStatus(mBase->setTimeLapseConfig(fps, captureFps));
 }
 
 Return<Status> TWGraphicBufferSource::setStartTimeUs(int64_t startTimeUs) {

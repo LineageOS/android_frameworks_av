@@ -293,8 +293,8 @@ private:
     int64_t mRepeatFrameDelayUs;
     int64_t mMaxPtsGapUs;
     float mMaxFps;
-    int64_t mTimePerFrameUs;
-    int64_t mTimePerCaptureUs;
+    double mFps;
+    double mCaptureFps;
     bool mCreateInputBuffersSuspended;
     uint32_t mLatency;
 

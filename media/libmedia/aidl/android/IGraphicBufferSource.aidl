@@ -28,7 +28,7 @@ interface IGraphicBufferSource {
     void setSuspend(boolean suspend, long suspendTimeUs);
     void setRepeatPreviousFrameDelayUs(long repeatAfterUs);
     void setMaxFps(float maxFps);
-    void setTimeLapseConfig(long timePerFrameUs, long timePerCaptureUs);
+    void setTimeLapseConfig(double fps, double captureFps);
     void setStartTimeUs(long startTimeUs);
     void setStopTimeUs(long stopTimeUs);
     void setColorAspects(int aspects);

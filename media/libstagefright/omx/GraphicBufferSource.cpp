@@ -42,6 +42,7 @@
 
 #include <functional>
 #include <memory>
+#include <cmath>
 
 namespace android {
 
@@ -270,8 +271,11 @@ GraphicBufferSource::GraphicBufferSource() :
     mRepeatLastFrameGeneration(0),
     mOutstandingFrameRepeatCount(0),
     mFrameRepeatBlockedOnCodecBuffer(false),
-    mTimePerCaptureUs(-1ll),
-    mTimePerFrameUs(-1ll),
+    mFps(-1.0),
+    mCaptureFps(-1.0),
+    mBaseCaptureUs(-1ll),
+    mBaseFrameUs(-1ll),
+    mFrameCount(0),
     mPrevCaptureUs(-1ll),
     mPrevFrameUs(-1ll),
     mInputBufferTimeOffsetUs(0ll) {
@@ -713,26 +717,31 @@ bool GraphicBufferSource::calculateCodecTimestamp_l(
     int64_t timeUs = bufferTimeNs / 1000;
     timeUs += mInputBufferTimeOffsetUs;
 
-    if (mTimePerCaptureUs > 0ll
-            && (mTimePerCaptureUs > 2 * mTimePerFrameUs
-            || mTimePerFrameUs > 2 * mTimePerCaptureUs)) {
+    if (mCaptureFps > 0.
+            && (mFps > 2 * mCaptureFps
+            || mCaptureFps > 2 * mFps)) {
         // Time lapse or slow motion mode
         if (mPrevCaptureUs < 0ll) {
             // first capture
-            mPrevCaptureUs = timeUs;
+            mPrevCaptureUs = mBaseCaptureUs = timeUs;
             // adjust the first sample timestamp.
-            mPrevFrameUs = (timeUs * mTimePerFrameUs) / mTimePerCaptureUs;
+            mPrevFrameUs = mBaseFrameUs =
+                    std::llround((timeUs * mCaptureFps) / mFps);
+            mFrameCount = 0;
         } else {
             // snap to nearest capture point
-            int64_t nFrames = (timeUs + mTimePerCaptureUs / 2 - mPrevCaptureUs)
-                    / mTimePerCaptureUs;
+            int64_t nFrames = std::llround(
+                    (timeUs - mPrevCaptureUs) * mCaptureFps);
             if (nFrames <= 0) {
                 // skip this frame as it's too close to previous capture
                 ALOGV("skipping frame, timeUs %lld", static_cast<long long>(timeUs));
                 return false;
             }
-            mPrevCaptureUs += mTimePerCaptureUs * nFrames;
-            mPrevFrameUs += mTimePerFrameUs * nFrames;
+            mFrameCount += nFrames;
+            mPrevCaptureUs = mBaseCaptureUs + std::llround(
+                    mFrameCount / mCaptureFps);
+            mPrevFrameUs = mBaseFrameUs + std::llround(
+                    mFrameCount / mFps);
         }
 
         ALOGV("timeUs %lld, captureUs %lld, frameUs %lld",
@@ -1054,10 +1063,13 @@ status_t GraphicBufferSource::configure(
         mOutstandingFrameRepeatCount = 0;
         mLatestBuffer.mBuffer.reset();
         mFrameRepeatBlockedOnCodecBuffer = false;
-        mTimePerCaptureUs = -1ll;
-        mTimePerFrameUs = -1ll;
+        mFps = -1.0;
+        mCaptureFps = -1.0;
+        mBaseCaptureUs = -1ll;
+        mBaseFrameUs = -1ll;
         mPrevCaptureUs = -1ll;
         mPrevFrameUs = -1ll;
+        mFrameCount = 0;
         mInputBufferTimeOffsetUs = 0;
         mStopTimeUs = -1;
         mActionQueue.clear();
@@ -1202,18 +1214,18 @@ status_t GraphicBufferSource::setStopTimeUs(int64_t stopTimeUs) {
     return OK;
 }
 
-status_t GraphicBufferSource::setTimeLapseConfig(int64_t timePerFrameUs, int64_t timePerCaptureUs) {
-    ALOGV("setTimeLapseConfig: timePerFrameUs=%lld, timePerCaptureUs=%lld",
-            (long long)timePerFrameUs, (long long)timePerCaptureUs);
+status_t GraphicBufferSource::setTimeLapseConfig(double fps, double captureFps) {
+    ALOGV("setTimeLapseConfig: fps=%lg, captureFps=%lg",
+            fps, captureFps);
 
     Mutex::Autolock autoLock(mMutex);
 
-    if (mExecuting || timePerFrameUs <= 0ll || timePerCaptureUs <= 0ll) {
+    if (mExecuting || !(fps > 0) || !(captureFps > 0)) {
         return INVALID_OPERATION;
     }
 
-    mTimePerFrameUs = timePerFrameUs;
-    mTimePerCaptureUs = timePerCaptureUs;
+    mFps = fps;
+    mCaptureFps = captureFps;
 
     return OK;
 }
