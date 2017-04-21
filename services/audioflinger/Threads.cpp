@@ -8296,22 +8296,24 @@ void AudioFlinger::MmapPlaybackThread::processVolume_l()
             mEffectChains[0]->setVolume_l(&vol, &vol);
             volume = (float)vol / (1 << 24);
         }
-
-        mOutput->stream->setVolume(volume, volume);
-
-        sp<MmapStreamCallback> callback = mCallback.promote();
-        if (callback != 0) {
-            int channelCount;
-            if (isOutput()) {
-                channelCount = audio_channel_count_from_out_mask(mChannelMask);
+        // Try to use HW volume control and fall back to SW control if not implemented
+        if (mOutput->stream->setVolume(volume, volume) != NO_ERROR) {
+            sp<MmapStreamCallback> callback = mCallback.promote();
+            if (callback != 0) {
+                int channelCount;
+                if (isOutput()) {
+                    channelCount = audio_channel_count_from_out_mask(mChannelMask);
+                } else {
+                    channelCount = audio_channel_count_from_in_mask(mChannelMask);
+                }
+                Vector<float> values;
+                for (int i = 0; i < channelCount; i++) {
+                    values.add(volume);
+                }
+                callback->onVolumeChanged(mChannelMask, values);
             } else {
-                channelCount = audio_channel_count_from_in_mask(mChannelMask);
+                ALOGW("Could not set MMAP stream volume: no volume callback!");
             }
-            Vector<float> values;
-            for (int i = 0; i < channelCount; i++) {
-                values.add(volume);
-            }
-            callback->onVolumeChanged(mChannelMask, values);
         }
     }
 }
