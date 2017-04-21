@@ -26,6 +26,7 @@
 #include "include/avc_utils.h"
 #include "include/ID3.h"
 #include "mpeg2ts/AnotherPacketSource.h"
+#include "mpeg2ts/HlsSampleDecryptor.h"
 
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -36,7 +37,6 @@
 
 #include <ctype.h>
 #include <inttypes.h>
-#include <openssl/aes.h>
 
 #define FLOGV(fmt, ...) ALOGV("[fetcher-%d] " fmt, mFetcherID, ##__VA_ARGS__)
 #define FSLOGV(stream, fmt, ...) ALOGV("[fetcher-%d] [%s] " fmt, mFetcherID, \
@@ -167,11 +167,15 @@ PlaylistFetcher::PlaylistFetcher(
       mFirstPTSValid(false),
       mFirstTimeUs(-1ll),
       mVideoBuffer(new AnotherPacketSource(NULL)),
+      mSampleAesKeyItemChanged(false),
       mThresholdRatio(-1.0f),
       mDownloadState(new DownloadState()),
       mHasMetadata(false) {
     memset(mPlaylistHash, 0, sizeof(mPlaylistHash));
     mHTTPDownloader = mSession->getHTTPDownloader();
+
+    memset(mKeyData, 0, sizeof(mKeyData));
+    memset(mAESInitVec, 0, sizeof(mAESInitVec));
 }
 
 PlaylistFetcher::~PlaylistFetcher() {
@@ -306,6 +310,15 @@ status_t PlaylistFetcher::decryptBuffer(
         }
     }
 
+    // TODO: Revise this when we add support for KEYFORMAT
+    // If method has changed (e.g., -> NONE); sufficient to check at the segment boundary
+    if (mSampleAesKeyItem != NULL && first && found && method != "SAMPLE-AES") {
+        ALOGI("decryptBuffer: resetting mSampleAesKeyItem(%p) with method %s",
+                mSampleAesKeyItem.get(), method.c_str());
+        mSampleAesKeyItem = NULL;
+        mSampleAesKeyItemChanged = true;
+    }
+
     if (!found) {
         method = "NONE";
     }
@@ -313,6 +326,8 @@ status_t PlaylistFetcher::decryptBuffer(
 
     if (method == "NONE") {
         return OK;
+    } else if (method == "SAMPLE-AES") {
+        ALOGV("decryptBuffer: Non-Widevine SAMPLE-AES is supported now.");
     } else if (!(method == "AES-128")) {
         ALOGE("Unsupported cipher method '%s'", method.c_str());
         return ERROR_UNSUPPORTED;
@@ -345,6 +360,79 @@ status_t PlaylistFetcher::decryptBuffer(
         mAESKeyForURI.add(keyURI, key);
     }
 
+    if (first) {
+        // If decrypting the first block in a file, read the iv from the manifest
+        // or derive the iv from the file's sequence number.
+
+        unsigned char AESInitVec[AES_BLOCK_SIZE];
+        AString iv;
+        if (itemMeta->findString("cipher-iv", &iv)) {
+            if ((!iv.startsWith("0x") && !iv.startsWith("0X"))
+                    || iv.size() > 16 * 2 + 2) {
+                ALOGE("malformed cipher IV '%s'.", iv.c_str());
+                return ERROR_MALFORMED;
+            }
+
+            while (iv.size() < 16 * 2 + 2) {
+                iv.insert("0", 1, 2);
+            }
+
+            memset(AESInitVec, 0, sizeof(AESInitVec));
+            for (size_t i = 0; i < 16; ++i) {
+                char c1 = tolower(iv.c_str()[2 + 2 * i]);
+                char c2 = tolower(iv.c_str()[3 + 2 * i]);
+                if (!isxdigit(c1) || !isxdigit(c2)) {
+                    ALOGE("malformed cipher IV '%s'.", iv.c_str());
+                    return ERROR_MALFORMED;
+                }
+                uint8_t nibble1 = isdigit(c1) ? c1 - '0' : c1 - 'a' + 10;
+                uint8_t nibble2 = isdigit(c2) ? c2 - '0' : c2 - 'a' + 10;
+
+                AESInitVec[i] = nibble1 << 4 | nibble2;
+            }
+        } else {
+            memset(AESInitVec, 0, sizeof(AESInitVec));
+            AESInitVec[15] = mSeqNumber & 0xff;
+            AESInitVec[14] = (mSeqNumber >> 8) & 0xff;
+            AESInitVec[13] = (mSeqNumber >> 16) & 0xff;
+            AESInitVec[12] = (mSeqNumber >> 24) & 0xff;
+        }
+
+        bool newKey = memcmp(mKeyData, key->data(), AES_BLOCK_SIZE) != 0;
+        bool newInitVec = memcmp(mAESInitVec, AESInitVec, AES_BLOCK_SIZE) != 0;
+        bool newSampleAesKeyItem = newKey || newInitVec;
+        ALOGV("decryptBuffer: SAMPLE-AES newKeyItem %d/%d (Key %d initVec %d)",
+                mSampleAesKeyItemChanged, newSampleAesKeyItem, newKey, newInitVec);
+
+        if (newSampleAesKeyItem) {
+            memcpy(mKeyData, key->data(), AES_BLOCK_SIZE);
+            memcpy(mAESInitVec, AESInitVec, AES_BLOCK_SIZE);
+
+            if (method == "SAMPLE-AES") {
+                mSampleAesKeyItemChanged = true;
+
+                sp<ABuffer> keyDataBuffer = ABuffer::CreateAsCopy(mKeyData, sizeof(mKeyData));
+                sp<ABuffer> initVecBuffer = ABuffer::CreateAsCopy(mAESInitVec, sizeof(mAESInitVec));
+
+                // always allocating a new one rather than updating the old message
+                // lower layer might still have a reference to the old message
+                mSampleAesKeyItem = new AMessage();
+                mSampleAesKeyItem->setBuffer("keyData", keyDataBuffer);
+                mSampleAesKeyItem->setBuffer("initVec", initVecBuffer);
+
+                ALOGV("decryptBuffer: New SampleAesKeyItem: Key: %s  IV: %s",
+                        HlsSampleDecryptor::aesBlockToStr(mKeyData).c_str(),
+                        HlsSampleDecryptor::aesBlockToStr(mAESInitVec).c_str());
+            } // SAMPLE-AES
+        } // newSampleAesKeyItem
+    } // first
+
+    if (method == "SAMPLE-AES") {
+        ALOGV("decryptBuffer: skipping full-seg decrypt for SAMPLE-AES");
+        return OK;
+    }
+
+
     AES_KEY aes_key;
     if (AES_set_decrypt_key(key->data(), 128, &aes_key) != 0) {
         ALOGE("failed to set AES decryption key.");
@@ -361,44 +449,6 @@ status_t PlaylistFetcher::decryptBuffer(
         return ERROR_MALFORMED;
     }
 
-    if (first) {
-        // If decrypting the first block in a file, read the iv from the manifest
-        // or derive the iv from the file's sequence number.
-
-        AString iv;
-        if (itemMeta->findString("cipher-iv", &iv)) {
-            if ((!iv.startsWith("0x") && !iv.startsWith("0X"))
-                    || iv.size() > 16 * 2 + 2) {
-                ALOGE("malformed cipher IV '%s'.", iv.c_str());
-                return ERROR_MALFORMED;
-            }
-
-            while (iv.size() < 16 * 2 + 2) {
-                iv.insert("0", 1, 2);
-            }
-
-            memset(mAESInitVec, 0, sizeof(mAESInitVec));
-            for (size_t i = 0; i < 16; ++i) {
-                char c1 = tolower(iv.c_str()[2 + 2 * i]);
-                char c2 = tolower(iv.c_str()[3 + 2 * i]);
-                if (!isxdigit(c1) || !isxdigit(c2)) {
-                    ALOGE("malformed cipher IV '%s'.", iv.c_str());
-                    return ERROR_MALFORMED;
-                }
-                uint8_t nibble1 = isdigit(c1) ? c1 - '0' : c1 - 'a' + 10;
-                uint8_t nibble2 = isdigit(c2) ? c2 - '0' : c2 - 'a' + 10;
-
-                mAESInitVec[i] = nibble1 << 4 | nibble2;
-            }
-        } else {
-            memset(mAESInitVec, 0, sizeof(mAESInitVec));
-            mAESInitVec[15] = mSeqNumber & 0xff;
-            mAESInitVec[14] = (mSeqNumber >> 8) & 0xff;
-            mAESInitVec[13] = (mSeqNumber >> 16) & 0xff;
-            mAESInitVec[12] = (mSeqNumber >> 24) & 0xff;
-        }
-    }
-
     AES_cbc_encrypt(
             buffer->data(), buffer->data(), buffer->size(),
             &aes_key, mAESInitVec, AES_DECRYPT);
@@ -409,7 +459,7 @@ status_t PlaylistFetcher::decryptBuffer(
 status_t PlaylistFetcher::checkDecryptPadding(const sp<ABuffer> &buffer) {
     AString method;
     CHECK(buffer->meta()->findString("cipher-method", &method));
-    if (method == "NONE") {
+    if (method == "NONE" || method == "SAMPLE-AES") {
         return OK;
     }
 
@@ -1656,6 +1706,11 @@ status_t PlaylistFetcher::extractAndQueueAccessUnitsFromTs(const sp<ABuffer> &bu
         mNextPTSTimeUs = -1ll;
     }
 
+    if (mSampleAesKeyItemChanged) {
+        mTSParser->signalNewSampleAesKey(mSampleAesKeyItem);
+        mSampleAesKeyItemChanged = false;
+    }
+
     size_t offset = 0;
     while (offset + 188 <= buffer->size()) {
         status_t err = mTSParser->feedTSPacket(buffer->data() + offset, 188);
@@ -2038,10 +2093,24 @@ status_t PlaylistFetcher::extractAndQueueAccessUnits(
         }
     }
 
+    sp<HlsSampleDecryptor> sampleDecryptor = NULL;
+    if (mSampleAesKeyItem != NULL) {
+        ALOGV("extractAndQueueAccessUnits[%d] SampleAesKeyItem: Key: %s  IV: %s",
+                mSeqNumber,
+                HlsSampleDecryptor::aesBlockToStr(mKeyData).c_str(),
+                HlsSampleDecryptor::aesBlockToStr(mAESInitVec).c_str());
+
+        sampleDecryptor = new HlsSampleDecryptor(mSampleAesKeyItem);
+    }
+
+    int frameId = 0;
+
     size_t offset = 0;
     while (offset < buffer->size()) {
         const uint8_t *adtsHeader = buffer->data() + offset;
         CHECK_LT(offset + 5, buffer->size());
+        // non-const pointer for decryption if needed
+        uint8_t *adtsFrame = buffer->data() + offset;
 
         unsigned aac_frame_length =
             ((adtsHeader[3] & 3) << 11)
@@ -2098,6 +2167,18 @@ status_t PlaylistFetcher::extractAndQueueAccessUnits(
                 return ERROR_OUT_OF_RANGE;
             }
         }
+
+        if (sampleDecryptor != NULL) {
+            bool protection_absent = (adtsHeader[1] & 0x1);
+            size_t headerSize = protection_absent ? 7 : 9;
+            if (frameId == 0) {
+                ALOGV("extractAndQueueAAC[%d] protection_absent %d (%02x) headerSize %zu",
+                        mSeqNumber, protection_absent, adtsHeader[1], headerSize);
+            }
+
+            sampleDecryptor->processAAC(headerSize, adtsFrame, aac_frame_length);
+        }
+        frameId++;
 
         sp<ABuffer> unit = new ABuffer(aac_frame_length);
         memcpy(unit->data(), adtsHeader, aac_frame_length);

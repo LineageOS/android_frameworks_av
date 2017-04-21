@@ -131,6 +131,8 @@ struct ATSParser : public RefBase {
 
     int64_t getFirstPTSTimeUs();
 
+    void signalNewSampleAesKey(const sp<AMessage> &keyItem);
+
     enum {
         // From ISO/IEC 13818-1: 2000 (E), Table 2-29
         STREAMTYPE_RESERVED             = 0x00,
@@ -149,6 +151,11 @@ struct ATSParser : public RefBase {
         // Stream type 0x83 is non-standard,
         // it could be LPCM or TrueHD AC3
         STREAMTYPE_LPCM_AC3             = 0x83,
+
+        //Sample Encrypted types
+        STREAMTYPE_H264_ENCRYPTED       = 0xDB,
+        STREAMTYPE_AAC_ENCRYPTED        = 0xCF,
+        STREAMTYPE_AC3_ENCRYPTED        = 0xC1,
     };
 
 protected:
@@ -180,6 +187,8 @@ private:
     int64_t mLastRecoveredPTS;
 
     size_t mNumTSPacketsParsed;
+
+    sp<AMessage> mSampleAesKeyItem;
 
     void parseProgramAssociationTable(ABitReader *br);
     void parseProgramMap(ABitReader *br);
