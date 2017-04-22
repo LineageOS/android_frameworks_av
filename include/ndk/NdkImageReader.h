@@ -307,22 +307,38 @@ media_status_t AImageReader_setImageListener(
  * for the consumer usage. All other parameters and the return values are identical to those passed
  * to {@line AImageReader_new}.
  *
- * @param usage0 specifies how the consumer will access the AImage, using combination of the
- *            AHARDWAREBUFFER_USAGE0 flags described in {@link hardware_buffer.h}.
- *            Passing {@link AHARDWAREBUFFER_USAGE0_CPU_READ_OFTEN} is equivalent to calling
- *            {@link AImageReader_new} with the same parameters. Note that consumers that do not
- *            require CPU access to the buffer should omit {@link
- *            AHARDWAREBUFFER_USAGE0_CPU_READ_OFTEN} to improve performance.
- * @param usage1 specifies how the consumer will access the AImage, using combination of the
- *            AHARDWAREBUFFER_USAGE1 flags described in {@link hardware_buffer.h}.
+ * @param usage specifies how the consumer will access the AImage, using combination of the
+ *            AHARDWAREBUFFER_USAGE flags described in {@link hardware_buffer.h}.
+ *            Passing {@link AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN} is equivalent to calling
+ *            {@link AImageReader_new} with the same parameters.
+ *
+ * Note that not all format and usage flag combination is supported by the {@link AImageReader}.
+ * Below are the combinations supported by the {@link AImageReader}.
+ * <table>
+ * <tr>
+ *   <th>Format</th>
+ *   <th>Compatible usage flags</th>
+ * </tr>
+ * <tr>
+ *   <td>non-{@link AIMAGE_FORMAT_PRIVATE PRIVATE} formats defined in {@link AImage.h}
+ * </td>
+ *   <td>{@link AHARDWAREBUFFER_USAGE_CPU_READ_RARELY} or
+ *   {@link AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN}</td>
+ * </tr>
+ * <tr>
+ *   <td>{@link AIMAGE_FORMAT_RGBA_8888}</td>
+ *   <td>{@link AHARDWAREBUFFER_USAGE_VIDEO_ENCODE} or
+ *   {@link AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE}, or combined</td>
+ * </tr>
+ * </table>
  *
  * @see AImage
  * @see AImageReader_new
  * @see AHardwareBuffer
  */
 media_status_t AImageReader_newWithUsage(
-        int32_t width, int32_t height, int32_t format, uint64_t usage0,
-        uint64_t usage1, int32_t maxImages, /*out*/ AImageReader** reader);
+        int32_t width, int32_t height, int32_t format, uint64_t usage, int32_t maxImages,
+        /*out*/ AImageReader** reader);
 
 /*
  * Acquire the next {@link AImage} from the image reader's queue asynchronously.
