@@ -53,6 +53,7 @@ struct BWGraphicBufferSource : public BnGraphicBufferSource {
             double fps, double captureFps) override;
     Status setStartTimeUs(int64_t startTimeUs) override;
     Status setStopTimeUs(int64_t stopTimeUs) override;
+    Status getStopTimeOffsetUs(int64_t* stopTimeOffsetUs) override;
     Status setColorAspects(int32_t aspects) override;
     Status setTimeOffsetUs(int64_t timeOffsetsUs) override;
     Status signalEndOfInputStream() override;

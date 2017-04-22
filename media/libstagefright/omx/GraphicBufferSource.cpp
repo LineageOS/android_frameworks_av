@@ -264,6 +264,7 @@ GraphicBufferSource::GraphicBufferSource() :
     mLastDataspace(HAL_DATASPACE_UNKNOWN),
     mExecuting(false),
     mSuspended(false),
+    mLastFrameTimestampUs(-1),
     mStopTimeUs(-1),
     mLastActionTimeUs(-1ll),
     mSkipFramesBeforeNs(-1ll),
@@ -1214,10 +1215,20 @@ status_t GraphicBufferSource::setStopTimeUs(int64_t stopTimeUs) {
     return OK;
 }
 
+status_t GraphicBufferSource::getStopTimeOffsetUs(int64_t *stopTimeOffsetUs) {
+    ALOGV("getStopTimeOffsetUs");
+    Mutex::Autolock autoLock(mMutex);
+    if (mStopTimeUs == -1) {
+        ALOGW("Fail to return stopTimeOffsetUs as stop time is not set");
+        return INVALID_OPERATION;
+    }
+    *stopTimeOffsetUs = mStopTimeUs - mLastFrameTimestampUs;
+    return OK;
+}
+
 status_t GraphicBufferSource::setTimeLapseConfig(double fps, double captureFps) {
     ALOGV("setTimeLapseConfig: fps=%lg, captureFps=%lg",
             fps, captureFps);
-
     Mutex::Autolock autoLock(mMutex);
 
     if (mExecuting || !(fps > 0) || !(captureFps > 0)) {

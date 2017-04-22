@@ -67,6 +67,14 @@ BnStatus LWGraphicBufferSource::setStopTimeUs(
     return toBinderStatus(mBase->setStopTimeUs(stopTimeUs));
 }
 
+BnStatus LWGraphicBufferSource::getStopTimeOffsetUs(
+        int64_t *stopTimeOffsetUs) {
+    return toBinderStatus(mBase->getStopTimeOffsetUs(
+            [stopTimeOffsetUs](auto, auto offsetUs) {
+                *stopTimeOffsetUs = offsetUs;
+            }));
+}
+
 BnStatus LWGraphicBufferSource::setColorAspects(
         int32_t aspects) {
     return toBinderStatus(mBase->setColorAspects(

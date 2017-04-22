@@ -172,6 +172,13 @@ public:
     // and not submitted to encoder. timeUs uses SYSTEM_TIME_MONOTONIC time base.
     status_t setStopTimeUs(int64_t stopTimeUs);
 
+    // Gets the stop time offset in us. This is the time offset between latest buffer
+    // time and the stopTimeUs. If stop time is not set, INVALID_OPERATION will be returned.
+    // If return is OK, *stopTimeOffsetUs will contain the valid offset. Otherwise,
+    // *stopTimeOffsetUs will not be modified. Positive stopTimeOffsetUs means buffer time
+    // larger than stopTimeUs.
+    status_t getStopTimeOffsetUs(int64_t *stopTimeOffsetUs);
+
     // Sets the desired color aspects, e.g. to be used when producer does not specify a dataspace.
     status_t setColorAspects(int32_t aspectsPacked);
 
@@ -339,6 +346,8 @@ private:
     // returns true if this source is unconditionally discarding acquired buffers at the moment
     // regardless of the metadata of those buffers
     bool areWeDiscardingAvailableBuffers_l();
+
+    int64_t mLastFrameTimestampUs;
 
     // Our BufferQueue interfaces. mProducer is passed to the producer through
     // getIGraphicBufferProducer, and mConsumer is used internally to retrieve
