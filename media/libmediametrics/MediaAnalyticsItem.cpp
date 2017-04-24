@@ -34,6 +34,7 @@
 #include <binder/IServiceManager.h>
 #include <media/IMediaAnalyticsService.h>
 #include <media/MediaAnalyticsItem.h>
+#include <private/android_filesystem_config.h>
 
 namespace android {
 
@@ -774,6 +775,24 @@ sp<IMediaAnalyticsService> MediaAnalyticsItem::getInstance() {
                 ALOGD("disabled");
         }
         return NULL;
+    }
+
+    // completely skip logging from certain UIDs. We do this here
+    // to avoid the multi-second timeouts while we learn that
+    // sepolicy will not let us find the service.
+    // We do this only for a select set of UIDs
+    // The sepolicy protection is still in place, we just want a faster
+    // response from this specific, small set of uids.
+    {
+        uid_t uid = getuid();
+        switch (uid) {
+            case AID_RADIO:     // telephony subsystem, RIL
+                return NULL;
+                break;
+            default:
+                // let sepolicy deny access if appropriate
+                break;
+        }
     }
 
     {
