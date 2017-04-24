@@ -14,6 +14,7 @@ mprotect: 1
 madvise: 1
 getuid: 1
 fstat: 1
+fstatfs: 1
 read: 1
 setpriority: 1
 sigaltstack: 1
