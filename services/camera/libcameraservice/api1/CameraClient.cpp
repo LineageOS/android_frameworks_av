@@ -478,14 +478,23 @@ void CameraClient::stopPreview() {
 // stop recording mode
 void CameraClient::stopRecording() {
     LOG1("stopRecording (pid %d)", getCallingPid());
-    Mutex::Autolock lock(mLock);
-    if (checkPidAndHardware() != NO_ERROR) return;
+    {
+        Mutex::Autolock lock(mLock);
+        if (checkPidAndHardware() != NO_ERROR) return;
 
-    disableMsgType(CAMERA_MSG_VIDEO_FRAME);
-    mHardware->stopRecording();
-    sCameraService->playSound(CameraService::SOUND_RECORDING_STOP);
+        disableMsgType(CAMERA_MSG_VIDEO_FRAME);
+        mHardware->stopRecording();
+        sCameraService->playSound(CameraService::SOUND_RECORDING_STOP);
 
-    mPreviewBuffer.clear();
+        mPreviewBuffer.clear();
+    }
+
+    {
+        Mutex::Autolock l(mAvailableCallbackBuffersLock);
+        if (!mAvailableCallbackBuffers.empty()) {
+            mAvailableCallbackBuffers.clear();
+        }
+    }
 }
 
 // release a recording frame
