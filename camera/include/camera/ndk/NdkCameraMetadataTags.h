@@ -1542,7 +1542,11 @@ typedef enum acamera_metadata_tag {
      * request A.</p>
      * <p>Note that when enableZsl is <code>true</code>, it is not guaranteed to get output images captured in the
      * past for requests with STILL_CAPTURE capture intent.</p>
-     * <p>The value of enableZsl in capture templates is always <code>false</code> if present.</p>
+     * <p>For applications targeting SDK versions O and newer, the value of enableZsl in
+     * TEMPLATE_STILL_CAPTURE template may be <code>true</code>. The value in other templates is always
+     * <code>false</code> if present.</p>
+     * <p>For applications targeting SDK versions older than O, the value of enableZsl in all
+     * capture templates is always <code>false</code> if present.</p>
      *
      * @see ACAMERA_CONTROL_CAPTURE_INTENT
      * @see ACAMERA_SENSOR_TIMESTAMP
