@@ -628,7 +628,8 @@ public:
     explicit VolumeHandler(uint32_t sampleRate)
         : mSampleRate((double)sampleRate)
         , mLastFrame(0)
-        , mVolumeShaperIdCounter(VolumeShaper::kSystemIdMax) {
+        , mVolumeShaperIdCounter(VolumeShaper::kSystemIdMax)
+        , mLastVolume(1.f, false) {
     }
 
     VolumeShaper::Status applyVolumeShaper(
@@ -758,7 +759,13 @@ public:
             activeCount += shaperVolume.second;
             ++it;
         }
-        return std::make_pair(volume, activeCount != 0);
+        mLastVolume = std::make_pair(volume, activeCount != 0);
+        return mLastVolume;
+    }
+
+    std::pair<T /* volume */, bool /* active */> getLastVolume() const {
+        AutoMutex _l(mLock);
+        return mLastVolume;
     }
 
     std::string toString() const {
@@ -776,6 +783,7 @@ public:
             const sp<VolumeShaper::Configuration> &configuration,
             const sp<VolumeShaper::Operation> &operation)> &lambda) {
         AutoMutex _l(mLock);
+        VS_LOG("forall: mVolumeShapers.size() %zu", mVolumeShapers.size());
         for (const auto &shaper : mVolumeShapers) {
             VS_LOG("forall applying lambda");
             (void)lambda(shaper.mConfiguration, shaper.mOperation);
@@ -829,6 +837,7 @@ private:
     double mSampleRate; // in samples (frames) per second
     int64_t mLastFrame; // logging purpose only
     int32_t mVolumeShaperIdCounter; // a counter to return a unique volume shaper id.
+    std::pair<T /* volume */, bool /* active */> mLastVolume;
     std::list<VolumeShaper> mVolumeShapers; // list provides stable iterators on erase
 }; // VolumeHandler
 
