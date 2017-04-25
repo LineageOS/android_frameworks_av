@@ -29,7 +29,6 @@ cc_library_shared {
     // for memory heap analysis
     static_libs: [
         "libc_malloc_debug_backtrace",
-        "libc_logging",
     ],
     cflags: [
         "-Werror",
