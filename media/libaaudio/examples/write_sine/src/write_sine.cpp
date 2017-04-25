@@ -63,8 +63,8 @@ int main(int argc, char **argv)
 
     aaudio_result_t result = AAUDIO_OK;
 
-    const int requestedSamplesPerFrame = 2;
-    int actualSamplesPerFrame = 0;
+    const int requestedChannelCount = 2;
+    int actualChannelCount = 0;
     const int requestedSampleRate = SAMPLE_RATE;
     int actualSampleRate = 0;
     aaudio_audio_format_t actualDataFormat = AAUDIO_FORMAT_UNSPECIFIED;
@@ -90,7 +90,7 @@ int main(int argc, char **argv)
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
 
-    printf("%s - Play a sine wave using AAudio, Z2\n", argv[0]);
+    printf("%s - Play a sine wave using AAudio\n", argv[0]);
 
     // Use an AAudioStreamBuilder to contain requested parameters.
     result = AAudio_createStreamBuilder(&aaudioBuilder);
@@ -100,7 +100,7 @@ int main(int argc, char **argv)
 
     // Request stream properties.
     AAudioStreamBuilder_setSampleRate(aaudioBuilder, requestedSampleRate);
-    AAudioStreamBuilder_setSamplesPerFrame(aaudioBuilder, requestedSamplesPerFrame);
+    AAudioStreamBuilder_setChannelCount(aaudioBuilder, requestedChannelCount);
     AAudioStreamBuilder_setFormat(aaudioBuilder, REQUESTED_FORMAT);
     AAudioStreamBuilder_setSharingMode(aaudioBuilder, REQUESTED_SHARING_MODE);
 
@@ -120,9 +120,9 @@ int main(int argc, char **argv)
     sineOsc1.setup(440.0, actualSampleRate);
     sineOsc2.setup(660.0, actualSampleRate);
 
-    actualSamplesPerFrame = AAudioStream_getSamplesPerFrame(aaudioStream);
-    printf("SamplesPerFrame: requested = %d, actual = %d\n",
-            requestedSamplesPerFrame, actualSamplesPerFrame);
+    actualChannelCount = AAudioStream_getChannelCount(aaudioStream);
+    printf("ChannelCount: requested = %d, actual = %d\n",
+            requestedChannelCount, actualChannelCount);
 
     actualSharingMode = AAudioStream_getSharingMode(aaudioStream);
     printf("SharingMode: requested = %s, actual = %s\n",
@@ -152,9 +152,9 @@ int main(int argc, char **argv)
 
     // Allocate a buffer for the audio data.
     if (actualDataFormat == AAUDIO_FORMAT_PCM_FLOAT) {
-        floatData = new float[framesPerWrite * actualSamplesPerFrame];
+        floatData = new float[framesPerWrite * actualChannelCount];
     } else if (actualDataFormat == AAUDIO_FORMAT_PCM_I16) {
-        shortData = new int16_t[framesPerWrite * actualSamplesPerFrame];
+        shortData = new int16_t[framesPerWrite * actualChannelCount];
     } else {
         printf("ERROR Unsupported data format!\n");
         goto finish;
@@ -178,15 +178,15 @@ int main(int argc, char **argv)
 
         if (actualDataFormat == AAUDIO_FORMAT_PCM_FLOAT) {
             // Render sine waves to left and right channels.
-            sineOsc1.render(&floatData[0], actualSamplesPerFrame, framesPerWrite);
-            if (actualSamplesPerFrame > 1) {
-                sineOsc2.render(&floatData[1], actualSamplesPerFrame, framesPerWrite);
+            sineOsc1.render(&floatData[0], actualChannelCount, framesPerWrite);
+            if (actualChannelCount > 1) {
+                sineOsc2.render(&floatData[1], actualChannelCount, framesPerWrite);
             }
         } else if (actualDataFormat == AAUDIO_FORMAT_PCM_I16) {
             // Render sine waves to left and right channels.
-            sineOsc1.render(&shortData[0], actualSamplesPerFrame, framesPerWrite);
-            if (actualSamplesPerFrame > 1) {
-                sineOsc2.render(&shortData[1], actualSamplesPerFrame, framesPerWrite);
+            sineOsc1.render(&shortData[0], actualChannelCount, framesPerWrite);
+            if (actualChannelCount > 1) {
+                sineOsc2.render(&shortData[1], actualChannelCount, framesPerWrite);
             }
         }
 
