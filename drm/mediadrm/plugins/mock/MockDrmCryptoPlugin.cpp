@@ -791,8 +791,9 @@ namespace android {
     }
 
     ssize_t
-    MockCryptoPlugin::decrypt(bool secure, const uint8_t key[16], const uint8_t iv[16],
-            Mode mode, const Pattern &pattern, const void *srcPtr,
+    MockCryptoPlugin::decrypt(bool secure, const uint8_t key[DECRYPT_KEY_SIZE],
+            const uint8_t iv[DECRYPT_KEY_SIZE], Mode mode,
+            const Pattern &pattern, const void *srcPtr,
             const SubSample *subSamples, size_t numSubSamples,
             void *dstPtr, AString * /* errorDetailMsg */)
     {
@@ -800,8 +801,8 @@ namespace android {
               "pattern:{encryptBlocks=%d, skipBlocks=%d} src=%p, "
               "subSamples=%s, dst=%p)",
               (int)secure,
-              arrayToString(key, sizeof(key)).string(),
-              arrayToString(iv, sizeof(iv)).string(),
+              arrayToString(key, DECRYPT_KEY_SIZE).string(),
+              arrayToString(iv, DECRYPT_KEY_SIZE).string(),
               (int)mode, pattern.mEncryptBlocks, pattern.mSkipBlocks, srcPtr,
               subSamplesToString(subSamples, numSubSamples).string(),
               dstPtr);
