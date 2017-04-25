@@ -128,8 +128,15 @@ AAUDIO_API void AAudioStreamBuilder_setSampleRate(AAudioStreamBuilder* builder,
     streamBuilder->setSampleRate(sampleRate);
 }
 
+AAUDIO_API void AAudioStreamBuilder_setChannelCount(AAudioStreamBuilder* builder,
+                                                       int32_t channelCount)
+{
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setSamplesPerFrame(channelCount);
+}
+
 AAUDIO_API void AAudioStreamBuilder_setSamplesPerFrame(AAudioStreamBuilder* builder,
-                                                   int32_t samplesPerFrame)
+                                                       int32_t samplesPerFrame)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
     streamBuilder->setSamplesPerFrame(samplesPerFrame);
@@ -332,6 +339,12 @@ AAUDIO_API int32_t AAudioStream_getSampleRate(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getSampleRate();
+}
+
+AAUDIO_API int32_t AAudioStream_getChannelCount(AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    return audioStream->getSamplesPerFrame();
 }
 
 AAUDIO_API int32_t AAudioStream_getSamplesPerFrame(AAudioStream* stream)
