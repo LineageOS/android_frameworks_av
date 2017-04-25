@@ -46,7 +46,6 @@ LOCAL_SRC_FILES:=                         \
         NuMediaExtractor.cpp              \
         OMXClient.cpp                     \
         OggExtractor.cpp                  \
-        ProcessInfo.cpp                   \
         SampleIterator.cpp                \
         SampleTable.cpp                   \
         SimpleDecodingSource.cpp          \
