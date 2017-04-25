@@ -25,16 +25,9 @@ LOCAL_SRC_FILES += \
     IDrmClient.cpp \
     IMediaDrmService.cpp \
     MediaCasDefs.cpp \
-    SharedLibrary.cpp
-ifneq ($(DISABLE_TREBLE_DRM), true)
-LOCAL_SRC_FILES += \
+    SharedLibrary.cpp \
     DrmHal.cpp \
     CryptoHal.cpp
-else
-LOCAL_SRC_FILES += \
-    Drm.cpp \
-    Crypto.cpp
-endif
 
 LOCAL_SHARED_LIBRARIES := \
     libbinder \
@@ -43,15 +36,12 @@ LOCAL_SHARED_LIBRARIES := \
     liblog \
     libmediautils \
     libstagefright_foundation \
-    libutils
-ifneq ($(DISABLE_TREBLE_DRM), true)
-LOCAL_SHARED_LIBRARIES += \
+    libutils \
     android.hidl.base@1.0 \
     android.hardware.drm@1.0 \
     libhidlbase \
     libhidlmemory \
     libhidltransport
-endif
 
 LOCAL_CFLAGS += -Werror -Wno-error=deprecated-declarations -Wall
 
