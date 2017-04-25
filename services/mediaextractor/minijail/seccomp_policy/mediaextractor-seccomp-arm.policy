@@ -20,6 +20,7 @@ clock_gettime: 1
 lseek: 1
 writev: 1
 fstatat64: 1
+fstatfs64: 1
 fstat64: 1
 restart_syscall: 1
 exit: 1
