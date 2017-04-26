@@ -302,6 +302,12 @@ bool AudioMixer::setChannelMasks(int name,
 void AudioMixer::track_t::unprepareForDownmix() {
     ALOGV("AudioMixer::unprepareForDownmix(%p)", this);
 
+    if (mPostDownmixReformatBufferProvider != nullptr) {
+        // release any buffers held by the mPostDownmixReformatBufferProvider
+        // before deallocating the downmixerBufferProvider.
+        mPostDownmixReformatBufferProvider->reset();
+    }
+
     mDownmixRequiresFormat = AUDIO_FORMAT_INVALID;
     if (downmixerBufferProvider != NULL) {
         // this track had previously been configured with a downmixer, delete it
