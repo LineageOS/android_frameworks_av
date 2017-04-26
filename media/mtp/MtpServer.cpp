@@ -25,6 +25,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 
 #define LOG_TAG "MtpServer"
 
@@ -113,7 +114,8 @@ MtpServer::MtpServer(MtpDatabase* database, bool ptp,
         mSessionOpen(false),
         mSendObjectHandle(kInvalidObjectHandle),
         mSendObjectFormat(0),
-        mSendObjectFileSize(0)
+        mSendObjectFileSize(0),
+        mSendObjectModifiedTime(0)
 {
 }
 
@@ -999,6 +1001,7 @@ MtpResponseCode MtpServer::doSendObjectInfo() {
         // save the handle for the SendObject call, which should follow
         mSendObjectHandle = handle;
         mSendObjectFormat = format;
+        mSendObjectModifiedTime = modifiedTime;
     }
 
     mResponse.setParameter(1, storageID);
@@ -1072,6 +1075,17 @@ MtpResponseCode MtpServer::doSendObject() {
             }
         }
     }
+
+    if (mSendObjectModifiedTime) {
+        struct timespec newTime[2];
+        newTime[0].tv_nsec = UTIME_NOW;
+        newTime[1].tv_sec = mSendObjectModifiedTime;
+        newTime[1].tv_nsec = 0;
+        if (futimens(mfr.fd, newTime) < 0) {
+            ALOGW("changing modified time failed, %s", strerror(errno));
+        }
+    }
+
     fstat(mfr.fd, &sstat);
     close(mfr.fd);
 
@@ -1092,6 +1106,7 @@ done:
             result == MTP_RESPONSE_OK);
     mSendObjectHandle = kInvalidObjectHandle;
     mSendObjectFormat = 0;
+    mSendObjectModifiedTime = 0;
 
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> diff = end - start;
