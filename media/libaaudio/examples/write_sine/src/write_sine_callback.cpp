@@ -65,11 +65,11 @@ public:
     /**
      * Only call this after open() has been called.
      */
-    int32_t getSamplesPerFrame() {
+    int32_t getChannelCount() {
         if (mStream == nullptr) {
             return AAUDIO_ERROR_INVALID_STATE;
         }
-        return AAudioStream_getSamplesPerFrame(mStream);;
+        return AAudioStream_getChannelCount(mStream);;
     }
 
     /**
@@ -119,7 +119,7 @@ public:
 
     // Write zero data to fill up the buffer and prevent underruns.
     aaudio_result_t prime() {
-        int32_t samplesPerFrame = AAudioStream_getSamplesPerFrame(mStream);
+        int32_t samplesPerFrame = AAudioStream_getChannelCount(mStream);
         const int numFrames = 32;
         float zeros[numFrames * samplesPerFrame];
         memset(zeros, 0, sizeof(zeros));
@@ -186,7 +186,7 @@ aaudio_data_callback_result_t MyDataCallbackProc(
         sineData->schedulerChecked = true;
     }
 
-    int32_t samplesPerFrame = AAudioStream_getSamplesPerFrame(stream);
+    int32_t samplesPerFrame = AAudioStream_getChannelCount(stream);
     // This code only plays on the first one or two channels.
     // TODO Support arbitrary number of channels.
     switch (AAudioStream_getFormat(stream)) {
@@ -239,7 +239,7 @@ int main(int argc, char **argv)
         goto error;
     }
     printf("player.getFramesPerSecond() = %d\n", player.getFramesPerSecond());
-    printf("player.getSamplesPerFrame() = %d\n", player.getSamplesPerFrame());
+    printf("player.getChannelCount() = %d\n", player.getChannelCount());
     myData.sineOsc1.setup(440.0, 48000);
     myData.sineOsc1.setSweep(300.0, 600.0, 5.0);
     myData.sineOsc2.setup(660.0, 48000);

@@ -295,6 +295,8 @@ public:
     std::string toString() const {
         std::stringstream ss;
         ss << "mInterpolatorType: " << mInterpolatorType << std::endl;
+        ss << "mFirstSlope: " << mFirstSlope << std::endl;
+        ss << "mLastSlope: " << mLastSlope << std::endl;
         for (const auto &pt : *this) {
             ss << pt.first << " " << pt.second << std::endl;
         }
