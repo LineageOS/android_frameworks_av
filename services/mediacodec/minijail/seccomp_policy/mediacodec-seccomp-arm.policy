@@ -21,6 +21,7 @@ clone: 1
 setpriority: 1
 getuid32: 1
 fstat64: 1
+fstatfs64: 1
 pread64: 1
 faccessat: 1
 readlinkat: 1
