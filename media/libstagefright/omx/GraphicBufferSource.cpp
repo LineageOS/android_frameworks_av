@@ -898,7 +898,7 @@ void GraphicBufferSource::onFrameAvailable(const BufferItem& item __unused) {
     ++mNumAvailableUnacquiredBuffers;
 
     // For BufferQueue we cannot acquire a buffer if we cannot immediately feed it to the codec
-    // OR we are discarding this buffer (acquiring and immediately releasing it), which makes
+    // UNLESS we are discarding this buffer (acquiring and immediately releasing it), which makes
     // this an ugly logic.
     // NOTE: We could also rely on our debug counter but that is meant only as a debug counter.
     if (!areWeDiscardingAvailableBuffers_l() && mFreeCodecBuffers.empty()) {
@@ -907,6 +907,7 @@ void GraphicBufferSource::onFrameAvailable(const BufferItem& item __unused) {
         ALOGV("onFrameAvailable: cannot acquire buffer right now, do it later");
 
         ++mRepeatLastFrameGeneration; // cancel any pending frame repeat
+        return;
     }
 
     VideoBuffer buffer;
