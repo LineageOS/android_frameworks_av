@@ -39,13 +39,13 @@ status_t EffectBufferHalInterface::mirror(
 
 EffectBufferHalLocal::EffectBufferHalLocal(size_t size)
         : mOwnBuffer(new uint8_t[size]),
-          mBufferSize(size),
+          mBufferSize(size), mFrameCountChanged(false),
           mAudioBuffer{0, {mOwnBuffer.get()}} {
 }
 
 EffectBufferHalLocal::EffectBufferHalLocal(void* external, size_t size)
         : mOwnBuffer(nullptr),
-          mBufferSize(size),
+          mBufferSize(size), mFrameCountChanged(false),
           mAudioBuffer{0, {external}} {
 }
 
@@ -62,11 +62,18 @@ void* EffectBufferHalLocal::externalData() const {
 
 void EffectBufferHalLocal::setFrameCount(size_t frameCount) {
     mAudioBuffer.frameCount = frameCount;
+    mFrameCountChanged = true;
 }
 
 void EffectBufferHalLocal::setExternalData(void* external) {
     ALOGE_IF(mOwnBuffer != nullptr, "Attempt to set external data for allocated buffer");
     mAudioBuffer.raw = external;
+}
+
+bool EffectBufferHalLocal::checkFrameCountChange() {
+    bool result = mFrameCountChanged;
+    mFrameCountChanged = false;
+    return result;
 }
 
 void EffectBufferHalLocal::update() {
