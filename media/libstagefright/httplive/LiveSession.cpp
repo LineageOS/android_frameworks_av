@@ -699,7 +699,7 @@ void LiveSession::onMessageReceived(const sp<AMessage> &msg) {
                     }
 
                     if (mContinuation != NULL) {
-                        CHECK_GT(mContinuationCounter, 0);
+                        CHECK_GT(mContinuationCounter, 0u);
                         if (--mContinuationCounter == 0) {
                             mContinuation->post();
                         }

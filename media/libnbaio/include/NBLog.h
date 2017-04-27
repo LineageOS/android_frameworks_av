@@ -469,7 +469,7 @@ private:
                                          String8 *timestamp,
                                          String8 *body);
     // dummy method for handling absent author entry
-    virtual void handleAuthor(const AbstractEntry &fmtEntry, String8 *body) {}
+    virtual void handleAuthor(const AbstractEntry& /*fmtEntry*/, String8* /*body*/) {}
 
     static void drawHistogram(String8 *body, const std::vector<int64_t> &samples,
                               bool logScale, int indent = 0, int maxHeight = 10);

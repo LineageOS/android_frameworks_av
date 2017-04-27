@@ -45,7 +45,7 @@ struct MediaRecorderBase {
                                const sp<ICameraRecordingProxy>& proxy) = 0;
     virtual status_t setPreviewSurface(const sp<IGraphicBufferProducer>& surface) = 0;
     virtual status_t setOutputFile(int fd) = 0;
-    virtual status_t setNextOutputFile(int fd) {return INVALID_OPERATION;}
+    virtual status_t setNextOutputFile(int /*fd*/) {return INVALID_OPERATION;}
     virtual status_t setOutputFileAuxiliary(int /*fd*/) {return INVALID_OPERATION;}
     virtual status_t setParameters(const String8& params) = 0;
     virtual status_t setListener(const sp<IMediaRecorderClient>& listener) = 0;

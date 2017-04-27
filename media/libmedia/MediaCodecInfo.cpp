@@ -85,13 +85,13 @@ sp<MediaCodecInfo::Capabilities> MediaCodecInfo::Capabilities::FromParcel(
 }
 
 status_t MediaCodecInfo::Capabilities::writeToParcel(Parcel *parcel) const {
-    CHECK_LE(mProfileLevels.size(), INT32_MAX);
+    CHECK_LE(mProfileLevels.size(), static_cast<size_t>(INT32_MAX));
     parcel->writeInt32(mProfileLevels.size());
     for (size_t i = 0; i < mProfileLevels.size(); i++) {
         parcel->writeInt32(mProfileLevels.itemAt(i).mProfile);
         parcel->writeInt32(mProfileLevels.itemAt(i).mLevel);
     }
-    CHECK_LE(mColorFormats.size(), INT32_MAX);
+    CHECK_LE(mColorFormats.size(), static_cast<size_t>(INT32_MAX));
     parcel->writeInt32(mColorFormats.size());
     for (size_t i = 0; i < mColorFormats.size(); i++) {
         parcel->writeInt32(mColorFormats.itemAt(i));

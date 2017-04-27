@@ -59,7 +59,7 @@ SoftAMRWBEncoder::SoftAMRWBEncoder(
 
 SoftAMRWBEncoder::~SoftAMRWBEncoder() {
     if (mEncoderHandle != NULL) {
-        CHECK_EQ(VO_ERR_NONE, mApiHandle->Uninit(mEncoderHandle));
+        CHECK_EQ((VO_U32)VO_ERR_NONE, mApiHandle->Uninit(mEncoderHandle));
         mEncoderHandle = NULL;
     }
 
@@ -435,7 +435,7 @@ void SoftAMRWBEncoder::onQueueFilled(OMX_U32 /* portIndex */) {
         inputData.Buffer = (unsigned char *) mInputFrame;
         inputData.Length = mInputSize;
 
-        CHECK_EQ(VO_ERR_NONE,
+        CHECK_EQ((VO_U32)VO_ERR_NONE,
                  mApiHandle->SetInputData(mEncoderHandle, &inputData));
 
         VO_CODECBUFFER outputData;
