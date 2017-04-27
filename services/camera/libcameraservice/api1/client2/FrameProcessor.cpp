@@ -41,11 +41,7 @@ FrameProcessor::FrameProcessor(wp<CameraDeviceBase> device,
     {
         SharedParameters::Lock l(client->getParameters());
 
-        if (client->getCameraDeviceVersion() >= CAMERA_DEVICE_API_VERSION_3_2) {
-            mUsePartialResult = (mNumPartialResults > 1);
-        } else {
-            mUsePartialResult = l.mParameters.quirks.partialResults;
-        }
+        mUsePartialResult = (mNumPartialResults > 1);
 
         // Initialize starting 3A state
         m3aState.afTriggerId = l.mParameters.afTriggerCounter;
@@ -76,16 +72,7 @@ bool FrameProcessor::processSingleFrame(CaptureResult &frame,
 
     bool isPartialResult = false;
     if (mUsePartialResult) {
-        if (client->getCameraDeviceVersion() >= CAMERA_DEVICE_API_VERSION_3_2) {
-            isPartialResult = frame.mResultExtras.partialResultCount < mNumPartialResults;
-        } else {
-            camera_metadata_entry_t entry;
-            entry = frame.mMetadata.find(ANDROID_QUIRKS_PARTIAL_RESULT);
-            if (entry.count > 0 &&
-                    entry.data.u8[0] == ANDROID_QUIRKS_PARTIAL_RESULT_PARTIAL) {
-                isPartialResult = true;
-            }
-        }
+        isPartialResult = frame.mResultExtras.partialResultCount < mNumPartialResults;
     }
 
     if (!isPartialResult && processFaceDetect(frame.mMetadata, client) != OK) {
@@ -291,16 +278,8 @@ status_t FrameProcessor::process3aState(const CaptureResult &frame,
     gotAllStates &= updatePendingState<uint8_t>(metadata, ANDROID_CONTROL_AWB_STATE,
             &pendingState.awbState, frameNumber, cameraId);
 
-    if (client->getCameraDeviceVersion() >= CAMERA_DEVICE_API_VERSION_3_2) {
-        pendingState.afTriggerId = frame.mResultExtras.afTriggerId;
-        pendingState.aeTriggerId = frame.mResultExtras.precaptureTriggerId;
-    } else {
-        gotAllStates &= updatePendingState<int32_t>(metadata,
-                ANDROID_CONTROL_AF_TRIGGER_ID, &pendingState.afTriggerId, frameNumber, cameraId);
-
-        gotAllStates &= updatePendingState<int32_t>(metadata,
-            ANDROID_CONTROL_AE_PRECAPTURE_ID, &pendingState.aeTriggerId, frameNumber, cameraId);
-    }
+    pendingState.afTriggerId = frame.mResultExtras.afTriggerId;
+    pendingState.aeTriggerId = frame.mResultExtras.precaptureTriggerId;
 
     if (!gotAllStates) {
         // If not all states are received, put the pending state to mPending3AStates.
