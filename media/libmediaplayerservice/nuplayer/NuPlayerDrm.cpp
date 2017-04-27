@@ -205,26 +205,8 @@ sp<ICrypto> NuPlayerDrm::createCryptoAndPlugin(const uint8_t uuid[16],
 }
 
 // Parcel has only private copy constructor so passing it in rather than returning
-void NuPlayerDrm::retrieveDrmInfo(const void *pssh, size_t psshsize,
-        const Vector<String8> &mimes_in, Parcel *parcel)
+void NuPlayerDrm::retrieveDrmInfo(const void *pssh, size_t psshsize, Parcel *parcel)
 {
-    // 0) Make mimes a vector of unique items while keeping the original order; video first
-    Vector<String8> mimes;
-    for (size_t j = 0; j < mimes_in.size(); j++) {
-        String8 mime = mimes_in[j];
-        bool exists = false;
-        for (size_t i = 0; i < mimes.size() && !exists; i++) {
-            if (mimes[i] == mime) {
-                exists = true;
-            }
-        } // for i
-
-        if (!exists) {
-            mimes.add(mime);
-        }
-    } // for j
-
-
     // 1) PSSH bytes
     parcel->writeUint32(psshsize);
     parcel->writeByteArray(psshsize, (const uint8_t*)pssh);
@@ -241,18 +223,6 @@ void NuPlayerDrm::retrieveDrmInfo(const void *pssh, size_t psshsize,
 
         ALOGV("retrieveDrmInfo: MEDIA_DRM_INFO  supportedScheme[%zu] %s", i,
                 uuid.toHexString().string());
-    }
-
-    // TODO: remove mimes after it's removed from Java DrmInfo
-    // 3) mimes
-    parcel->writeUint32(mimes.size());
-    for (size_t i = 0; i < mimes.size(); i++) {
-        // writing as String16 so the Java framework side can unpack it to Java String
-        String16 mime(mimes[i]);
-        parcel->writeString16(mime);
-
-        ALOGV("retrieveDrmInfo: MEDIA_DRM_INFO  MIME[%zu] %s",
-                i, mimes[i].string());
     }
 }
 
