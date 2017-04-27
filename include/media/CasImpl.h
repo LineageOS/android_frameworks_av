@@ -27,7 +27,7 @@ class ICasListener;
 using namespace media;
 using namespace MediaCas;
 using binder::Status;
-class CasPlugin;
+struct CasPlugin;
 class SharedLibrary;
 
 class CasImpl : public BnCas {

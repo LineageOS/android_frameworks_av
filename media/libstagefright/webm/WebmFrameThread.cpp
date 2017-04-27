@@ -124,7 +124,7 @@ void WebmFrameSinkThread::initCluster(
 
 void WebmFrameSinkThread::writeCluster(List<sp<WebmElement> >& children) {
     // children must contain at least one simpleblock and its timecode
-    CHECK_GE(children.size(), 2);
+    CHECK_GE(children.size(), 2u);
 
     uint64_t size;
     sp<WebmElement> cluster = new WebmMaster(kMkvCluster, children);
@@ -155,7 +155,7 @@ void WebmFrameSinkThread::flushFrames(List<const sp<WebmFrame> >& frames, bool l
         // flushing the second to last frame before we check its type. A audio frame
         // should precede the aforementioned video key frame in the next sequence, a video
         // frame should be the last frame in the current (to-be-flushed) sequence.
-        CHECK_GE(n, 2);
+        CHECK_GE(n, 2u);
         n -= 2;
     }
 

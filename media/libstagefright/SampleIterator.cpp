@@ -282,7 +282,7 @@ status_t SampleIterator::getSampleSizeDirect(
 
         default:
         {
-            CHECK_EQ(mTable->mSampleSizeFieldSize, 4);
+            CHECK_EQ(mTable->mSampleSizeFieldSize, 4u);
 
             uint8_t x;
             if (mTable->mDataSource->readAt(

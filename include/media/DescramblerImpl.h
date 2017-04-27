@@ -24,7 +24,7 @@ namespace android {
 using namespace media;
 using namespace MediaDescrambler;
 using binder::Status;
-class DescramblerPlugin;
+struct DescramblerPlugin;
 class SharedLibrary;
 
 class DescramblerImpl : public BnDescrambler {
