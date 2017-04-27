@@ -251,6 +251,7 @@ protected:
 
     virtual PortMode getPortMode(OMX_U32 portIndex);
 
+    virtual void stateExited();
     virtual bool onMessageReceived(const sp<AMessage> &msg);
 
     virtual bool onOMXEvent(OMX_EVENTTYPE event, OMX_U32 data1, OMX_U32 data2);
@@ -553,6 +554,7 @@ ACodec::ACodec()
       mTunneled(false),
       mDescribeColorAspectsIndex((OMX_INDEXTYPE)0),
       mDescribeHDRStaticInfoIndex((OMX_INDEXTYPE)0),
+      mStateGeneration(0),
       mVendorExtensionsStatus(kExtensionsUnchecked) {
     mUninitializedState = new UninitializedState(this);
     mLoadedState = new LoadedState(this);
@@ -5322,6 +5324,10 @@ ACodec::BaseState::PortMode ACodec::BaseState::getPortMode(
     return KEEP_BUFFERS;
 }
 
+void ACodec::BaseState::stateExited() {
+    ++mCodec->mStateGeneration;
+}
+
 bool ACodec::BaseState::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
         case kWhatInputBufferFilled:
@@ -5395,6 +5401,12 @@ bool ACodec::BaseState::onMessageReceived(const sp<AMessage> &msg) {
             ALOGE_IF("[%s] failed to release codec instance: err=%d",
                        mCodec->mComponentName.c_str(), err);
             mCodec->mCallback->onReleaseCompleted();
+            break;
+        }
+
+        case ACodec::kWhatForceStateTransition:
+        {
+            ALOGV("Already transitioned --- ignore");
             break;
         }
 
@@ -6988,7 +7000,6 @@ void ACodec::ExecutingState::resume() {
 
 void ACodec::ExecutingState::stateEntered() {
     ALOGV("[%s] Now Executing", mCodec->mComponentName.c_str());
-
     mCodec->mRenderTracker.clear(systemTime(CLOCK_MONOTONIC));
     mCodec->processDeferredMessages();
 }
@@ -7624,6 +7635,30 @@ void ACodec::onSignalEndOfInputStream() {
     mCallback->onSignaledInputEOS(err);
 }
 
+void ACodec::forceStateTransition(int generation) {
+    if (generation != mStateGeneration) {
+        ALOGV("Ignoring stale force state transition message: #%d (now #%d)",
+                generation, mStateGeneration);
+        return;
+    }
+    ALOGE("State machine stuck");
+    // Error must have already been signalled to the client.
+
+    // Deferred messages will be handled at LoadedState at the end of the
+    // transition.
+    mShutdownInProgress = true;
+    // No shutdown complete callback at the end of the transition.
+    mExplicitShutdown = false;
+    mKeepComponentAllocated = true;
+
+    status_t err = mOMXNode->sendCommand(OMX_CommandStateSet, OMX_StateIdle);
+    if (err != OK) {
+        // TODO: do some recovery here.
+    } else {
+        changeState(mExecutingToIdleState);
+    }
+}
+
 bool ACodec::ExecutingState::onOMXFrameRendered(int64_t mediaTimeUs, nsecs_t systemNano) {
     mCodec->onFrameRendered(mediaTimeUs, systemNano);
     return true;
@@ -7690,7 +7725,14 @@ bool ACodec::OutputPortSettingsChangedState::onMessageReceived(
 
     switch (msg->what()) {
         case kWhatFlush:
-        case kWhatShutdown:
+        case kWhatShutdown: {
+            if (mCodec->mFatalError) {
+                sp<AMessage> msg = new AMessage(ACodec::kWhatForceStateTransition, mCodec);
+                msg->setInt32("generation", mCodec->mStateGeneration);
+                msg->post(3000000);
+            }
+            // fall-through
+        }
         case kWhatResume:
         case kWhatSetParameters:
         {
@@ -7699,6 +7741,16 @@ bool ACodec::OutputPortSettingsChangedState::onMessageReceived(
             }
 
             mCodec->deferMessage(msg);
+            handled = true;
+            break;
+        }
+
+        case kWhatForceStateTransition:
+        {
+            int32_t generation = 0;
+            CHECK(msg->findInt32("generation", &generation));
+            mCodec->forceStateTransition(generation);
+
             handled = true;
             break;
         }
@@ -7762,15 +7814,7 @@ bool ACodec::OutputPortSettingsChangedState::onOMXEvent(
 
                 if (err != OK) {
                     mCodec->signalError(OMX_ErrorUndefined, makeNoSideEffectStatus(err));
-
-                    // This is technically not correct, but appears to be
-                    // the only way to free the component instance.
-                    // Controlled transitioning from excecuting->idle
-                    // and idle->loaded seem impossible probably because
-                    // the output port never finishes re-enabling.
-                    mCodec->mShutdownInProgress = true;
-                    mCodec->mKeepComponentAllocated = false;
-                    mCodec->changeState(mCodec->mLoadedState);
+                    ALOGE("Error occurred while disabling the output port");
                 }
 
                 return true;
@@ -7795,7 +7839,7 @@ bool ACodec::OutputPortSettingsChangedState::onOMXEvent(
         }
 
         default:
-            return false;
+            return BaseState::onOMXEvent(event, data1, data2);
     }
 }
 
@@ -7997,12 +8041,27 @@ bool ACodec::FlushingState::onMessageReceived(const sp<AMessage> &msg) {
         case kWhatShutdown:
         {
             mCodec->deferMessage(msg);
+            if (mCodec->mFatalError) {
+                sp<AMessage> msg = new AMessage(ACodec::kWhatForceStateTransition, mCodec);
+                msg->setInt32("generation", mCodec->mStateGeneration);
+                msg->post(3000000);
+            }
             break;
         }
 
         case kWhatFlush:
         {
             // We're already doing this right now.
+            handled = true;
+            break;
+        }
+
+        case kWhatForceStateTransition:
+        {
+            int32_t generation = 0;
+            CHECK(msg->findInt32("generation", &generation));
+            mCodec->forceStateTransition(generation);
+
             handled = true;
             break;
         }

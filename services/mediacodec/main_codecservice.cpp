@@ -31,9 +31,9 @@
 #include "MediaCodecService.h"
 #include "minijail.h"
 
-#include <android/hardware/media/omx/1.0/IOmx.h>
 #include <hidl/HidlTransportSupport.h>
 #include <omx/1.0/Omx.h>
+#include <omx/1.0/OmxStore.h>
 
 using namespace android;
 
@@ -61,17 +61,23 @@ int main(int argc __unused, char** argv)
 
     if (treble) {
         using namespace ::android::hardware::media::omx::V1_0;
+        sp<IOmxStore> omxStore = new implementation::OmxStore();
+        if (omxStore == nullptr) {
+            LOG(ERROR) << "Cannot create IOmxStore HAL service.";
+        } else if (omxStore->registerAsService() != OK) {
+            LOG(ERROR) << "Cannot register IOmxStore HAL service.";
+        }
         sp<IOmx> omx = new implementation::Omx();
         if (omx == nullptr) {
-            LOG(ERROR) << "Cannot create a Treble IOmx service.";
+            LOG(ERROR) << "Cannot create IOmx HAL service.";
         } else if (omx->registerAsService() != OK) {
-            LOG(ERROR) << "Cannot register a Treble IOmx service.";
+            LOG(ERROR) << "Cannot register IOmx HAL service.";
         } else {
-            LOG(INFO) << "Treble IOmx service created.";
+            LOG(INFO) << "Treble OMX service created.";
         }
     } else {
         MediaCodecService::instantiate();
-        LOG(INFO) << "Non-Treble IOMX service created.";
+        LOG(INFO) << "Non-Treble OMX service created.";
     }
 
     ProcessState::self()->startThreadPool();
