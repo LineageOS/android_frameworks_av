@@ -66,15 +66,14 @@ int main(int argc __unused, char** argv)
             LOG(ERROR) << "Cannot create IOmxStore HAL service.";
         } else if (omxStore->registerAsService() != OK) {
             LOG(ERROR) << "Cannot register IOmxStore HAL service.";
+        }
+        sp<IOmx> omx = new implementation::Omx();
+        if (omx == nullptr) {
+            LOG(ERROR) << "Cannot create IOmx HAL service.";
+        } else if (omx->registerAsService() != OK) {
+            LOG(ERROR) << "Cannot register IOmx HAL service.";
         } else {
-            sp<IOmx> omx = new implementation::Omx();
-            if (omx == nullptr) {
-                LOG(ERROR) << "Cannot create IOmx HAL service.";
-            } else if (omx->registerAsService() != OK) {
-                LOG(ERROR) << "Cannot register IOmx HAL service.";
-            } else {
-                LOG(INFO) << "Treble OMX service created.";
-            }
+            LOG(INFO) << "Treble OMX service created.";
         }
     } else {
         MediaCodecService::instantiate();
