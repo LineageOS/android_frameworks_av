@@ -62,7 +62,7 @@ enum {
     SET_VOICE_VOLUME,
     GET_RENDER_POSITION,
     GET_INPUT_FRAMES_LOST,
-    NEW_AUDIO_SESSION_ID,
+    NEW_AUDIO_UNIQUE_ID,
     ACQUIRE_AUDIO_SESSION_ID,
     RELEASE_AUDIO_SESSION_ID,
     QUERY_NUM_EFFECTS,
@@ -80,7 +80,7 @@ enum {
     RELEASE_AUDIO_PATCH,
     LIST_AUDIO_PATCHES,
     SET_AUDIO_PORT_CONFIG,
-    GET_AUDIO_HW_SYNC,
+    GET_AUDIO_HW_SYNC_FOR_SESSION,
     SYSTEM_READY,
     FRAME_COUNT_HAL,
 };
@@ -628,8 +628,8 @@ public:
         Parcel data, reply;
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
         data.writeInt32((int32_t) use);
-        status_t status = remote()->transact(NEW_AUDIO_SESSION_ID, data, &reply);
-        audio_unique_id_t id = AUDIO_SESSION_ALLOCATE;
+        status_t status = remote()->transact(NEW_AUDIO_UNIQUE_ID, data, &reply);
+        audio_unique_id_t id = AUDIO_UNIQUE_ID_ALLOCATE;
         if (status == NO_ERROR) {
             id = reply.readInt32();
         }
@@ -912,7 +912,7 @@ public:
         Parcel data, reply;
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
         data.writeInt32(sessionId);
-        status_t status = remote()->transact(GET_AUDIO_HW_SYNC, data, &reply);
+        status_t status = remote()->transact(GET_AUDIO_HW_SYNC_FOR_SESSION, data, &reply);
         if (status != NO_ERROR) {
             return AUDIO_HW_SYNC_INVALID;
         }
@@ -1262,7 +1262,7 @@ status_t BnAudioFlinger::onTransact(
             reply->writeInt32((int32_t) getInputFramesLost(ioHandle));
             return NO_ERROR;
         } break;
-        case NEW_AUDIO_SESSION_ID: {
+        case NEW_AUDIO_UNIQUE_ID: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
             reply->writeInt32(newAudioUniqueId((audio_unique_id_use_t) data.readInt32()));
             return NO_ERROR;
@@ -1466,7 +1466,7 @@ status_t BnAudioFlinger::onTransact(
             reply->writeInt32(status);
             return NO_ERROR;
         } break;
-        case GET_AUDIO_HW_SYNC: {
+        case GET_AUDIO_HW_SYNC_FOR_SESSION: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
             reply->writeInt32(getAudioHwSyncForSession((audio_session_t) data.readInt32()));
             return NO_ERROR;
