@@ -47,7 +47,7 @@ status_t LWOmxNode::getParameter(
     status_t transStatus = toStatusT(mBase->getParameter(
             toRawIndexType(index),
             tParams,
-            [&fnStatus, params, size](
+            [&fnStatus, params](
                     Status status, hidl_vec<uint8_t> const& outParams) {
                 fnStatus = toStatusT(status);
                 std::copy(
@@ -145,7 +145,7 @@ status_t LWOmxNode::allocateSecureBuffer(
     status_t transStatus = toStatusT(mBase->allocateSecureBuffer(
             portIndex,
             static_cast<uint64_t>(size),
-            [&fnStatus, buffer, buffer_data, native_handle](
+            [&fnStatus, buffer, native_handle](
                     Status status,
                     uint32_t outBuffer,
                     hidl_handle const& outNativeHandle) {
