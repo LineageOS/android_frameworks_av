@@ -55,7 +55,6 @@ LOCAL_C_INCLUDES :=                                                 \
     $(TOP)/external/tremolo/Tremolo                                 \
 
 LOCAL_CFLAGS += -Werror -Wno-error=deprecated-declarations -Wall
-LOCAL_CLANG := true
 
 LOCAL_MODULE:= libmediaplayerservice
 
