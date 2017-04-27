@@ -84,8 +84,7 @@ namespace android {
         static sp<ICrypto> createCryptoAndPlugin(const uint8_t uuid[16],
                 const Vector<uint8_t> &drmSessionId, status_t &status);
         // Parcel has only private copy constructor so passing it in rather than returning
-        static void retrieveDrmInfo(const void *pssh, size_t psshsize,
-                const Vector<String8> &mimes_in, Parcel *parcel);
+        static void retrieveDrmInfo(const void *pssh, size_t psshsize, Parcel *parcel);
 
         ////////////////////////////////////////////////////////////////////////////////////////////
         /// Helpers for NuPlayerDecoder
