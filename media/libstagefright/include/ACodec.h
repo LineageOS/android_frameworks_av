@@ -150,6 +150,7 @@ private:
         kWhatSubmitOutputMetadataBufferIfEOS = 'subm',
         kWhatOMXDied                 = 'OMXd',
         kWhatReleaseCodecInstance    = 'relC',
+        kWhatForceStateTransition    = 'fstt',
     };
 
     enum {
@@ -304,6 +305,8 @@ private:
     OMX_INDEXTYPE mDescribeHDRStaticInfoIndex;
 
     std::shared_ptr<ACodecBufferChannel> mBufferChannel;
+
+    int32_t mStateGeneration;
 
     enum {
         kExtensionsUnchecked,
@@ -568,6 +571,9 @@ private:
 
     // Send EOS on input stream.
     void onSignalEndOfInputStream();
+
+    // Force EXEC->IDLE->LOADED shutdown sequence if not stale.
+    void forceStateTransition(int generation);
 
     DISALLOW_EVIL_CONSTRUCTORS(ACodec);
 };
