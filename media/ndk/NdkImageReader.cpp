@@ -587,7 +587,7 @@ media_status_t AImageReader_new(
         /*out*/AImageReader** reader) {
     ALOGV("%s", __FUNCTION__);
     return AImageReader_newWithUsage(
-            width, height, format, AHARDWAREBUFFER_USAGE0_CPU_READ_OFTEN, 0, maxImages, reader);
+            width, height, format, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, 0, maxImages, reader);
 }
 
 EXPORT

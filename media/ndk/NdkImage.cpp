@@ -178,7 +178,7 @@ media_status_t AImage::lockImage() {
         return AMEDIA_ERROR_INVALID_OBJECT;
     }
 
-    if ((mUsage0 & AHARDWAREBUFFER_USAGE0_CPU_READ_OFTEN) == 0) {
+    if ((mUsage0 & AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN) == 0) {
         ALOGE("%s: AImage %p does not have any software read usage bits set, usage=%" PRIu64 "",
               __FUNCTION__, this, mUsage0);
         return AMEDIA_IMGREADER_CANNOT_LOCK_IMAGE;
