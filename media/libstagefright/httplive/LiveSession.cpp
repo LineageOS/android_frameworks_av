@@ -1535,7 +1535,7 @@ void LiveSession::changeConfiguration(
                     mOrigBandwidthIndex, mCurBandwidthIndex);
         }
     }
-    CHECK_LT(mCurBandwidthIndex, mBandwidthItems.size());
+    CHECK_LT((size_t)mCurBandwidthIndex, mBandwidthItems.size());
     const BandwidthItem &item = mBandwidthItems.itemAt(mCurBandwidthIndex);
 
     uint32_t streamMask = 0; // streams that should be fetched by the new fetcher
