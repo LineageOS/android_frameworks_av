@@ -97,13 +97,13 @@ void SurfaceMediaSource::setFrameAvailableListener(
     mFrameAvailableListener = listener;
 }
 
-void SurfaceMediaSource::dump(String8& result) const
+void SurfaceMediaSource::dumpState(String8& result) const
 {
     char buffer[1024];
-    dump(result, "", buffer, 1024);
+    dumpState(result, "", buffer, 1024);
 }
 
-void SurfaceMediaSource::dump(
+void SurfaceMediaSource::dumpState(
         String8& result,
         const char* /* prefix */,
         char* buffer,
