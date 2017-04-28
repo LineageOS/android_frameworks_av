@@ -10,14 +10,13 @@ LOCAL_C_INCLUDES := \
         frameworks/native/include/media/openmax \
 
 LOCAL_SHARED_LIBRARIES := \
-        libvorbisidec libstagefright libstagefright_omx \
+        libvorbisidec libmedia libstagefright_omx \
         libstagefright_foundation libutils liblog
 
 LOCAL_MODULE := libstagefright_soft_vorbisdec
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_CFLAGS += -Werror
-LOCAL_CLANG := true
 LOCAL_SANITIZE := signed-integer-overflow unsigned-integer-overflow
 
 include $(BUILD_SHARED_LIBRARY)

@@ -5,7 +5,6 @@ LOCAL_SRC_FILES := \
 	ID3.cpp
 
 LOCAL_CFLAGS += -Werror -Wall
-LOCAL_CLANG := true
 LOCAL_SANITIZE := unsigned-integer-overflow signed-integer-overflow
 
 LOCAL_SHARED_LIBRARIES := libmedia
@@ -22,7 +21,6 @@ LOCAL_SRC_FILES := \
 	testid3.cpp
 
 LOCAL_CFLAGS += -Werror -Wall
-LOCAL_CLANG := true
 
 LOCAL_SHARED_LIBRARIES := \
 	libstagefright libutils liblog libbinder libstagefright_foundation

@@ -35,7 +35,6 @@ LOCAL_SRC_FILES:=                         \
         MediaCodecList.cpp                \
         MediaCodecListOverrides.cpp       \
         MediaCodecSource.cpp              \
-        MediaDefs.cpp                     \
         MediaExtractor.cpp                \
         MediaSync.cpp                     \
         MidiExtractor.cpp                 \
@@ -125,7 +124,6 @@ ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
 LOCAL_CFLAGS += -DENABLE_STAGEFRIGHT_EXPERIMENTS
 endif
 
-LOCAL_CLANG := true
 LOCAL_SANITIZE := unsigned-integer-overflow signed-integer-overflow
 
 LOCAL_MODULE:= libstagefright
