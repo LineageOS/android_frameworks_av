@@ -92,6 +92,7 @@ class EffectHalHidl : public EffectHalInterface
 
     status_t getConfigImpl(uint32_t cmdCode, uint32_t *replySize, void *pReplyData);
     status_t prepareForProcessing();
+    bool needToResetBuffers();
     status_t processImpl(uint32_t mqFlag);
     status_t setConfigImpl(
             uint32_t cmdCode, uint32_t cmdSize, void *pCmdData,

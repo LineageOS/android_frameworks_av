@@ -56,7 +56,8 @@ status_t EffectBufferHalInterface::mirror(
 }
 
 EffectBufferHalHidl::EffectBufferHalHidl(size_t size)
-        : mBufferSize(size), mExternalData(nullptr), mAudioBuffer{0, {nullptr}} {
+        : mBufferSize(size), mFrameCountChanged(false),
+          mExternalData(nullptr), mAudioBuffer{0, {nullptr}} {
     mHidlBuffer.id = makeUniqueId();
     mHidlBuffer.frameCount = 0;
 }
@@ -107,6 +108,13 @@ void* EffectBufferHalHidl::externalData() const {
 void EffectBufferHalHidl::setFrameCount(size_t frameCount) {
     mHidlBuffer.frameCount = frameCount;
     mAudioBuffer.frameCount = frameCount;
+    mFrameCountChanged = true;
+}
+
+bool EffectBufferHalHidl::checkFrameCountChange() {
+    bool result = mFrameCountChanged;
+    mFrameCountChanged = false;
+    return result;
 }
 
 void EffectBufferHalHidl::setExternalData(void* external) {
