@@ -72,6 +72,7 @@ public:
     class iterator;
     explicit FormatEntry(const uint8_t *entry);
     explicit FormatEntry(const iterator &it);
+    virtual ~FormatEntry() {}
 
     // entry representation in memory
     struct entry {
@@ -422,7 +423,6 @@ private:
     // vector of the readers the merger is supposed to merge from.
     // every reader reads from a writer's buffer
     std::vector<NamedReader> mNamedReaders;
-    uint8_t *mBuffer;
     Shared * const mShared;
     std::unique_ptr<audio_utils_fifo> mFifo;
     std::unique_ptr<audio_utils_fifo_writer> mFifoWriter;

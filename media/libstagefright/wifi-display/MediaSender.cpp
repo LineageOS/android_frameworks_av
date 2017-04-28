@@ -420,7 +420,7 @@ status_t MediaSender::packetizeAccessUnit(
             CHECK(accessUnit->meta()->findInt32("rangeLength", &rangeLength));
             CHECK(accessUnit->meta()->findMessage("notify", &notify)
                     && notify != NULL);
-            CHECK_GE(accessUnit->size(), rangeLength);
+            CHECK_GE((int32_t)accessUnit->size(), rangeLength);
 
             sp<GraphicBuffer> grbuf(new GraphicBuffer(
                     rangeOffset + rangeLength /* width */, 1 /* height */,
