@@ -1239,7 +1239,6 @@ void NBLog::Reader::drawHistogram(String8 *body,
 // ---------------------------------------------------------------------------
 
 NBLog::Merger::Merger(const void *shared, size_t size):
-      mBuffer(NULL),
       mShared((Shared *) shared),
       mFifo(mShared != NULL ?
         new audio_utils_fifo(size, sizeof(uint8_t),
