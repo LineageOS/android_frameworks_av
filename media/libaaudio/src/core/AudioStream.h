@@ -223,11 +223,11 @@ public:
 protected:
 
     virtual int64_t incrementFramesWritten(int32_t frames) {
-        return static_cast<int64_t>(mFramesWritten.increment(frames));
+        return mFramesWritten.increment(frames);
     }
 
     virtual int64_t incrementFramesRead(int32_t frames) {
-        return static_cast<int64_t>(mFramesRead.increment(frames));
+        return mFramesRead.increment(frames);
     }
 
     /**

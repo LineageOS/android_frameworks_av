@@ -83,6 +83,7 @@ void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode
             }
             if (callbackResult == AAUDIO_CALLBACK_RESULT_CONTINUE) {
                 audioBuffer->size = audioBuffer->frameCount * getBytesPerFrame();
+                incrementClientFrameCounter(audioBuffer->frameCount);
             } else {
                 audioBuffer->size = 0;
             }
@@ -107,4 +108,3 @@ void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode
             break;
     }
 }
-
