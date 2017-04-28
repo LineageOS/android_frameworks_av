@@ -15,7 +15,6 @@
  */
 
 #ifndef A_CODEC_H_
-
 #define A_CODEC_H_
 
 #include <stdint.h>
@@ -30,6 +29,7 @@
 #include <utils/NativeHandle.h>
 #include <OMX_Audio.h>
 #include <hardware/gralloc.h>
+#include <nativebase/nativebase.h>
 
 #define TRACK_BUFFER_TIMING     0
 

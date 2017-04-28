@@ -19,7 +19,6 @@
 
 #include <cutils/native_handle.h>
 #include <media/IOMX.h>
-#include <system/window.h>
 #include <utils/StrongPointer.h>
 #include <hidl/HidlSupport.h>
 

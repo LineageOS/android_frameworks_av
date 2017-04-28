@@ -14,7 +14,7 @@ cc_library {
         "-Wall",
     ],
     shared: {
-      shared_libs: ["libutils", "liblog"],
+      shared_libs: ["libutils", "liblog", "libgui"],
     },
     clang: true,
 }

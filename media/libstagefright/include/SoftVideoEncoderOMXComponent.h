@@ -21,7 +21,6 @@
 #include <media/IOMX.h>
 
 #include "SimpleSoftOMXComponent.h"
-#include <system/window.h>
 
 struct hw_module_t;
 

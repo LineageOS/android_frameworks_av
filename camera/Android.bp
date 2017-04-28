@@ -61,6 +61,7 @@ cc_library_shared {
         "libbinder",
         "libgui",
         "libcamera_metadata",
+        "libnativewindow",
     ],
 
     include_dirs: [
