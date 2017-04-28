@@ -32,6 +32,7 @@ class EffectBufferHalLocal : public EffectBufferHalInterface
 
     virtual void setExternalData(void* external);
     virtual void setFrameCount(size_t frameCount);
+    virtual bool checkFrameCountChange();
 
     virtual void update();
     virtual void commit();
@@ -43,6 +44,7 @@ class EffectBufferHalLocal : public EffectBufferHalInterface
 
     std::unique_ptr<uint8_t[]> mOwnBuffer;
     const size_t mBufferSize;
+    bool mFrameCountChanged;
     audio_buffer_t mAudioBuffer;
 
     // Can not be constructed directly by clients.
