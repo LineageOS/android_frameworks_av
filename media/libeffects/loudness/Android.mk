@@ -3,6 +3,7 @@ LOCAL_PATH:= $(call my-dir)
 # LoudnessEnhancer library
 include $(CLEAR_VARS)
 
+LOCAL_VENDOR_MODULE := true
 LOCAL_SRC_FILES:= \
 	EffectLoudnessEnhancer.cpp \
 	dsp/core/dynamic_range_compression.cpp
