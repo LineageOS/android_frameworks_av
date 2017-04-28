@@ -15,13 +15,12 @@ LOCAL_STATIC_LIBRARIES := \
         libvpx
 
 LOCAL_SHARED_LIBRARIES := \
-        libstagefright libstagefright_omx libstagefright_foundation libutils liblog
+        libmedia libstagefright_omx libstagefright_foundation libutils liblog
 
 LOCAL_MODULE := libstagefright_soft_vpxdec
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_CFLAGS += -Werror
-LOCAL_CLANG := true
 LOCAL_SANITIZE := signed-integer-overflow unsigned-integer-overflow
 
 include $(BUILD_SHARED_LIBRARY)

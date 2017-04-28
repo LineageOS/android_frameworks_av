@@ -26,7 +26,6 @@ LOCAL_SHARED_LIBRARIES := \
     libutils
 
 LOCAL_CFLAGS += -Werror -Wno-error=deprecated-declarations -Wall
-LOCAL_CLANG := true
 
 LOCAL_MODULE:= libmediadrm
 

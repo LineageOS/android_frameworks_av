@@ -11,14 +11,13 @@ LOCAL_C_INCLUDES := \
         frameworks/av/media/libstagefright/include \
         frameworks/native/include/media/openmax \
 
-LOCAL_CLANG := true
 LOCAL_SANITIZE := signed-integer-overflow unsigned-integer-overflow
 
 LOCAL_STATIC_LIBRARIES := \
         libvpx
 
 LOCAL_SHARED_LIBRARIES := \
-        libstagefright libstagefright_omx libstagefright_foundation libutils liblog \
+        libmedia libstagefright_omx libstagefright_foundation libutils liblog \
 
 LOCAL_MODULE := libstagefright_soft_vpxenc
 LOCAL_MODULE_TAGS := optional

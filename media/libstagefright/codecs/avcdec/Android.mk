@@ -14,13 +14,12 @@ LOCAL_C_INCLUDES += $(TOP)/external/libavc/common
 LOCAL_C_INCLUDES += $(TOP)/frameworks/av/media/libstagefright/include
 LOCAL_C_INCLUDES += $(TOP)/frameworks/native/include/media/openmax
 
-LOCAL_SHARED_LIBRARIES  := libstagefright
+LOCAL_SHARED_LIBRARIES  := libmedia
 LOCAL_SHARED_LIBRARIES  += libstagefright_omx
 LOCAL_SHARED_LIBRARIES  += libstagefright_foundation
 LOCAL_SHARED_LIBRARIES  += libutils
 LOCAL_SHARED_LIBRARIES  += liblog
 
-LOCAL_CLANG := true
 LOCAL_SANITIZE := signed-integer-overflow
 
 LOCAL_LDFLAGS := -Wl,-Bsymbolic
