@@ -650,6 +650,7 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
         }
         ALOGV("buffer submitted [slot=%d, useCount=%ld] acquired=%d",
                 item.mBuffer->getSlot(), item.mBuffer.use_count(), mNumOutstandingAcquires);
+        mLastFrameTimestampUs = itemTimeUs;
     }
 
     return true;
