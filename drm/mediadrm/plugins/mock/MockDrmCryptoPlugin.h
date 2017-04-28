@@ -16,8 +16,8 @@
 
 #include <utils/Mutex.h>
 
-#include "drm/DrmAPI.h"
-#include "hardware/CryptoAPI.h"
+#include "media/drm/DrmAPI.h"
+#include "media/hardware/CryptoAPI.h"
 
 extern "C" {
       android::DrmFactory *createDrmFactory();
