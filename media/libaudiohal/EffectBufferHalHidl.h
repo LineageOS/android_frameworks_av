@@ -37,6 +37,7 @@ class EffectBufferHalHidl : public EffectBufferHalInterface
 
     virtual void setExternalData(void* external);
     virtual void setFrameCount(size_t frameCount);
+    virtual bool checkFrameCountChange();
 
     virtual void update();
     virtual void commit();
@@ -51,6 +52,7 @@ class EffectBufferHalHidl : public EffectBufferHalInterface
     static uint64_t makeUniqueId();
 
     const size_t mBufferSize;
+    bool mFrameCountChanged;
     void* mExternalData;
     AudioBuffer mHidlBuffer;
     sp<IMemory> mMemory;

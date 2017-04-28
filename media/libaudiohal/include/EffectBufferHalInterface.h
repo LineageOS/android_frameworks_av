@@ -39,6 +39,8 @@ class EffectBufferHalInterface : public RefBase
 
     virtual void setExternalData(void* external) = 0;
     virtual void setFrameCount(size_t frameCount) = 0;
+    virtual bool checkFrameCountChange() = 0;  // returns whether frame count has been updated
+                                               // since the last call to this method
 
     virtual void update() = 0;  // copies data from the external buffer, noop for allocated buffers
     virtual void commit() = 0;  // copies data to the external buffer, noop for allocated buffers
