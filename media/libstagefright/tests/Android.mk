@@ -33,7 +33,6 @@ LOCAL_C_INCLUDES := \
 	$(TOP)/frameworks/native/include/media/hardware \
 
 LOCAL_CFLAGS += -Werror -Wall
-LOCAL_CLANG := true
 
 LOCAL_32_BIT_ONLY := true
 
@@ -65,7 +64,6 @@ LOCAL_C_INCLUDES := \
 	$(TOP)/frameworks/native/include/media/openmax \
 
 LOCAL_CFLAGS += -Werror -Wall
-LOCAL_CLANG := true
 
 include $(BUILD_NATIVE_TEST)
 
@@ -95,7 +93,6 @@ LOCAL_C_INCLUDES := \
 LOCAL_32_BIT_ONLY := true
 
 LOCAL_CFLAGS += -Werror -Wall
-LOCAL_CLANG := true
 
 include $(BUILD_NATIVE_TEST)
 

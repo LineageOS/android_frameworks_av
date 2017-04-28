@@ -51,8 +51,6 @@ LOCAL_SHARED_LIBRARIES := \
     libcutils \
     libcamera_metadata
 
-LOCAL_CLANG := true
-
 include $(BUILD_SHARED_LIBRARY)
 
 endif
