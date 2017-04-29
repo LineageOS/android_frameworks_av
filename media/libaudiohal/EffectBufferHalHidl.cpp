@@ -47,7 +47,7 @@ status_t EffectBufferHalInterface::allocate(
 status_t EffectBufferHalInterface::mirror(
         void* external, size_t size, sp<EffectBufferHalInterface>* buffer) {
     sp<EffectBufferHalInterface> tempBuffer = new EffectBufferHalHidl(size);
-    status_t result = reinterpret_cast<EffectBufferHalHidl*>(tempBuffer.get())->init();
+    status_t result = static_cast<EffectBufferHalHidl*>(tempBuffer.get())->init();
     if (result == OK) {
         tempBuffer->setExternalData(external);
         *buffer = tempBuffer;
