@@ -48,6 +48,9 @@ class EffectHalLocal : public EffectHalInterface
     // Free resources on the remote side.
     virtual status_t close();
 
+    // Whether it's a local implementation.
+    virtual bool isLocal() const { return true; }
+
     effect_handle_t handle() const { return mHandle; }
 
   private:

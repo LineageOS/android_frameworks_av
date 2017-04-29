@@ -209,8 +209,8 @@ retry:
 
 status_t EffectHalHidl::setProcessBuffers() {
     Return<Result> ret = mEffect->setProcessBuffers(
-            reinterpret_cast<EffectBufferHalHidl*>(mInBuffer.get())->hidlBuffer(),
-            reinterpret_cast<EffectBufferHalHidl*>(mOutBuffer.get())->hidlBuffer());
+            static_cast<EffectBufferHalHidl*>(mInBuffer.get())->hidlBuffer(),
+            static_cast<EffectBufferHalHidl*>(mOutBuffer.get())->hidlBuffer());
     if (ret.isOk() && ret == Result::OK) {
         mBuffersChanged = false;
         return OK;
