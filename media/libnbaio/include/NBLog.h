@@ -133,6 +133,7 @@ public:
 
     // Entry starting in the given pointer
     explicit AbstractEntry(const uint8_t *entry);
+    virtual ~AbstractEntry() {}
 
     // build concrete entry of appropriate class from pointer
     static std::unique_ptr<AbstractEntry> buildEntry(const uint8_t *ptr);
@@ -164,6 +165,7 @@ class FormatEntry : public AbstractEntry {
 public:
     // explicit FormatEntry(const EntryIterator &it);
     explicit FormatEntry(const uint8_t *ptr) : AbstractEntry(ptr) {}
+    virtual ~FormatEntry() {}
 
     // Entry's format string
     const   char* formatString() const;
@@ -196,6 +198,7 @@ class HistogramEntry : public AbstractEntry {
 public:
     explicit HistogramEntry(const uint8_t *ptr) : AbstractEntry(ptr) {
     }
+    virtual ~HistogramEntry() {}
 
     virtual int64_t     timestamp() const override;
 
@@ -466,7 +469,7 @@ private:
                                          String8 *timestamp,
                                          String8 *body);
     // dummy method for handling absent author entry
-    virtual void handleAuthor(const AbstractEntry &fmtEntry, String8 *body) {}
+    virtual void handleAuthor(const AbstractEntry& /*fmtEntry*/, String8* /*body*/) {}
 
     static void drawHistogram(String8 *body, const std::vector<int64_t> &samples,
                               bool logScale, int indent = 0, int maxHeight = 10);
@@ -516,7 +519,6 @@ private:
     std::vector<NamedReader> mNamedReaders;
 
     // TODO Need comments on all of these
-    uint8_t *mBuffer;
     Shared * const mShared;
     std::unique_ptr<audio_utils_fifo> mFifo;
     std::unique_ptr<audio_utils_fifo_writer> mFifoWriter;

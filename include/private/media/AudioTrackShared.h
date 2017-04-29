@@ -172,7 +172,7 @@ private:
                 // client write-only, server read-only
                 uint16_t    mSendLevel;      // Fixed point U4.12 so 0x1000 means 1.0
 
-                uint16_t    mPad2;           // unused
+                uint16_t    mPad2 __attribute__((__unused__)); // unused
 
                 // server write-only, client read
                 ExtendedTimestampQueue::Shared mExtendedTimestampQueue;
