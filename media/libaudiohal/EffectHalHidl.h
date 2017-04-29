@@ -58,6 +58,9 @@ class EffectHalHidl : public EffectHalInterface
     // Free resources on the remote side.
     virtual status_t close();
 
+    // Whether it's a local implementation.
+    virtual bool isLocal() const { return false; }
+
     uint64_t effectId() const { return mEffectId; }
 
     static void effectDescriptorToHal(

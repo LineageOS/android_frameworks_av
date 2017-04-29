@@ -52,6 +52,9 @@ class EffectHalInterface : public RefBase
     // Free resources on the remote side.
     virtual status_t close() = 0;
 
+    // Whether it's a local implementation.
+    virtual bool isLocal() const = 0;
+
   protected:
     // Subclasses can not be constructed directly by clients.
     EffectHalInterface() {}
