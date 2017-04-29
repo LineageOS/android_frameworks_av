@@ -53,6 +53,7 @@ static const char *kPlayerDuration = "android.media.mediaplayer.durationMs";
 static const char *kPlayerPlaying = "android.media.mediaplayer.playingMs";
 static const char *kPlayerError = "android.media.mediaplayer.err";
 static const char *kPlayerErrorCode = "android.media.mediaplayer.errcode";
+static const char *kPlayerDataSourceType = "android.media.mediaplayer.dataSource";
 
 
 NuPlayerDriver::NuPlayerDriver(pid_t pid)
@@ -570,6 +571,8 @@ void NuPlayerDriver::updateMetrics(const char *where) {
     mAnalyticsItem->setInt64(kPlayerDuration, duration_ms);
 
     mAnalyticsItem->setInt64(kPlayerPlaying, (mPlayingTimeUs+500)/1000 );
+
+    mAnalyticsItem->setCString(kPlayerDataSourceType, mPlayer->getDataSourceType());
 }
 
 
