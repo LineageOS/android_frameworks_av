@@ -40,7 +40,7 @@
 namespace android {
 using namespace media;
 class BufferChannelBase;
-class BufferProducerWrapper;
+struct BufferProducerWrapper;
 class MediaCodecBuffer;
 struct PersistentSurface;
 struct RenderedFrameInfo;

@@ -652,6 +652,9 @@ status_t AudioTrack::start()
             get_sched_policy(0, &mPreviousSchedulingGroup);
             androidSetThreadPriority(0, ANDROID_PRIORITY_AUDIO);
         }
+
+        // Start our local VolumeHandler for restoration purposes.
+        mVolumeHandler->setStarted();
     } else {
         ALOGE("start() status %d", status);
         mState = previousState;
@@ -2254,17 +2257,20 @@ status_t AudioTrack::restoreTrack_l(const char *from)
             }
         }
         // restore volume handler
-        mVolumeHandler->forall([this](const sp<VolumeShaper::Configuration> &configuration,
-                const sp<VolumeShaper::Operation> &operation) -> VolumeShaper::Status {
-            sp<VolumeShaper::Operation> operationToEnd = new VolumeShaper::Operation(*operation);
+        mVolumeHandler->forall([this](const VolumeShaper &shaper) -> VolumeShaper::Status {
+            sp<VolumeShaper::Operation> operationToEnd =
+                    new VolumeShaper::Operation(shaper.mOperation);
             // TODO: Ideally we would restore to the exact xOffset position
             // as returned by getVolumeShaperState(), but we don't have that
             // information when restoring at the client unless we periodically poll
             // the server or create shared memory state.
             //
-            // For now, we simply advance to the end of the VolumeShaper effect.
-            operationToEnd->setXOffset(1.f);
-            return mAudioTrack->applyVolumeShaper(configuration, operationToEnd);
+            // For now, we simply advance to the end of the VolumeShaper effect
+            // if it has been started.
+            if (shaper.isStarted()) {
+                operationToEnd->setXOffset(1.f);
+            }
+            return mAudioTrack->applyVolumeShaper(shaper.mConfiguration, operationToEnd);
         });
 
         if (mState == STATE_ACTIVE) {
@@ -2334,19 +2340,36 @@ VolumeShaper::Status AudioTrack::applyVolumeShaper(
     AutoMutex lock(mLock);
     mVolumeHandler->setIdIfNecessary(configuration);
     VolumeShaper::Status status = mAudioTrack->applyVolumeShaper(configuration, operation);
+
+    if (status == DEAD_OBJECT) {
+        if (restoreTrack_l("applyVolumeShaper") == OK) {
+            status = mAudioTrack->applyVolumeShaper(configuration, operation);
+        }
+    }
     if (status >= 0) {
         // save VolumeShaper for restore
         mVolumeHandler->applyVolumeShaper(configuration, operation);
+        if (mState == STATE_ACTIVE || mState == STATE_STOPPING) {
+            mVolumeHandler->setStarted();
+        }
+    } else {
+        // warn only if not an expected restore failure.
+        ALOGW_IF(!((isOffloadedOrDirect_l() || mDoNotReconnect) && status == DEAD_OBJECT),
+                "applyVolumeShaper failed: %d", status);
     }
     return status;
 }
 
 sp<VolumeShaper::State> AudioTrack::getVolumeShaperState(int id)
 {
-    // TODO: To properly restore the AudioTrack
-    // we will need to save the last state in AudioTrackShared.
     AutoMutex lock(mLock);
-    return mAudioTrack->getVolumeShaperState(id);
+    sp<VolumeShaper::State> state = mAudioTrack->getVolumeShaperState(id);
+    if (state.get() == nullptr && (mCblk->mFlags & CBLK_INVALID) != 0) {
+        if (restoreTrack_l("getVolumeShaperState") == OK) {
+            state = mAudioTrack->getVolumeShaperState(id);
+        }
+    }
+    return state;
 }
 
 status_t AudioTrack::getTimestamp(ExtendedTimestamp *timestamp)

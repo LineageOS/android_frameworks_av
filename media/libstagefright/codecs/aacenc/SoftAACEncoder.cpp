@@ -65,7 +65,7 @@ SoftAACEncoder::~SoftAACEncoder() {
     onReset();
 
     if (mEncoderHandle) {
-        CHECK_EQ(VO_ERR_NONE, mApiHandle->Uninit(mEncoderHandle));
+        CHECK_EQ((VO_U32)VO_ERR_NONE, mApiHandle->Uninit(mEncoderHandle));
         mEncoderHandle = NULL;
     }
 
@@ -524,7 +524,7 @@ void SoftAACEncoder::onQueueFilled(OMX_U32 portIndex) {
         memset(&inputData, 0, sizeof(inputData));
         inputData.Buffer = (unsigned char *)mInputFrame;
         inputData.Length = numBytesPerInputFrame;
-        CHECK(VO_ERR_NONE ==
+        CHECK((VO_U32)VO_ERR_NONE ==
                 mApiHandle->SetInputData(mEncoderHandle, &inputData));
 
         VO_CODECBUFFER outputData;

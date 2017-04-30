@@ -168,13 +168,20 @@ status_t EffectHalHidl::prepareForProcessing() {
     return OK;
 }
 
+bool EffectHalHidl::needToResetBuffers() {
+    if (mBuffersChanged) return true;
+    bool inBufferFrameCountUpdated = mInBuffer->checkFrameCountChange();
+    bool outBufferFrameCountUpdated = mOutBuffer->checkFrameCountChange();
+    return inBufferFrameCountUpdated || outBufferFrameCountUpdated;
+}
+
 status_t EffectHalHidl::processImpl(uint32_t mqFlag) {
     if (mEffect == 0 || mInBuffer == 0 || mOutBuffer == 0) return NO_INIT;
     status_t status;
     if (!mStatusMQ && (status = prepareForProcessing()) != OK) {
         return status;
     }
-    if (mBuffersChanged && (status = setProcessBuffers()) != OK) {
+    if (needToResetBuffers() && (status = setProcessBuffers()) != OK) {
         return status;
     }
     // The data is already in the buffers, just need to flush it and wake up the server side.
@@ -202,8 +209,8 @@ retry:
 
 status_t EffectHalHidl::setProcessBuffers() {
     Return<Result> ret = mEffect->setProcessBuffers(
-            reinterpret_cast<EffectBufferHalHidl*>(mInBuffer.get())->hidlBuffer(),
-            reinterpret_cast<EffectBufferHalHidl*>(mOutBuffer.get())->hidlBuffer());
+            static_cast<EffectBufferHalHidl*>(mInBuffer.get())->hidlBuffer(),
+            static_cast<EffectBufferHalHidl*>(mOutBuffer.get())->hidlBuffer());
     if (ret.isOk() && ret == Result::OK) {
         mBuffersChanged = false;
         return OK;

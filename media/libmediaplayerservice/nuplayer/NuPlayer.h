@@ -93,6 +93,8 @@ struct NuPlayer : public AHandler {
     status_t prepareDrm(const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId);
     status_t releaseDrm();
 
+    const char *getDataSourceType();
+
 protected:
     virtual ~NuPlayer();
 
@@ -235,6 +237,18 @@ private:
     // Modular DRM
     sp<ICrypto> mCrypto;
     bool mIsDrmProtected;
+
+    typedef enum {
+        DATA_SOURCE_TYPE_NONE,
+        DATA_SOURCE_TYPE_HTTP_LIVE,
+        DATA_SOURCE_TYPE_RTSP,
+        DATA_SOURCE_TYPE_GENERIC_URL,
+        DATA_SOURCE_TYPE_GENERIC_FD,
+        DATA_SOURCE_TYPE_MEDIA,
+        DATA_SOURCE_TYPE_STREAM,
+    } DATA_SOURCE_TYPE;
+
+    std::atomic<DATA_SOURCE_TYPE> mDataSourceType;
 
     inline const sp<DecoderBase> &getDecoder(bool audio) {
         return audio ? mAudioDecoder : mVideoDecoder;

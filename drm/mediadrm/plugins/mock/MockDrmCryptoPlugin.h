@@ -158,9 +158,12 @@ namespace android {
 
         bool requiresSecureDecoderComponent(const char *mime) const;
 
+        static constexpr size_t DECRYPT_KEY_SIZE = 16;
+
         ssize_t decrypt(bool secure,
-            const uint8_t key[16], const uint8_t iv[16],
-            Mode mode, const Pattern &pattern, const void *srcPtr,
+            const uint8_t key[DECRYPT_KEY_SIZE],
+            const uint8_t iv[DECRYPT_KEY_SIZE], Mode mode,
+            const Pattern &pattern, const void *srcPtr,
             const SubSample *subSamples, size_t numSubSamples,
             void *dstPtr, AString *errorDetailMsg);
     private:

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,18 +14,16 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_DEVICES_FACTORY_HAL_LOCAL_H
-#define ANDROID_HARDWARE_DEVICES_FACTORY_HAL_LOCAL_H
+#ifndef ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HYBRID_H
+#define ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HYBRID_H
 
 #include <media/audiohal/DevicesFactoryHalInterface.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 
-#include "DeviceHalLocal.h"
-
 namespace android {
 
-class DevicesFactoryHalLocal : public DevicesFactoryHalInterface
+class DevicesFactoryHalHybrid : public DevicesFactoryHalInterface
 {
   public:
     // Opens a device with the specified name. To close the device, it is
@@ -33,14 +31,17 @@ class DevicesFactoryHalLocal : public DevicesFactoryHalInterface
     virtual status_t openDevice(const char *name, sp<DeviceHalInterface> *device);
 
   private:
-    friend class DevicesFactoryHalHybrid;
+    friend class DevicesFactoryHalInterface;
 
     // Can not be constructed directly by clients.
-    DevicesFactoryHalLocal() {}
+    DevicesFactoryHalHybrid();
 
-    virtual ~DevicesFactoryHalLocal() {}
+    virtual ~DevicesFactoryHalHybrid();
+
+    sp<DevicesFactoryHalInterface> mLocalFactory;
+    sp<DevicesFactoryHalInterface> mHidlFactory;
 };
 
 } // namespace android
 
-#endif // ANDROID_HARDWARE_DEVICES_FACTORY_HAL_LOCAL_H
+#endif // ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HYBRID_H

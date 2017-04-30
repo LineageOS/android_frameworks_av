@@ -96,13 +96,13 @@ void SurfaceMediaSource::setFrameAvailableListener(
     mFrameAvailableListener = listener;
 }
 
-void SurfaceMediaSource::dump(String8& result) const
+void SurfaceMediaSource::dumpState(String8& result) const
 {
     char buffer[1024];
-    dump(result, "", buffer, 1024);
+    dumpState(result, "", buffer, 1024);
 }
 
-void SurfaceMediaSource::dump(
+void SurfaceMediaSource::dumpState(
         String8& result,
         const char* /* prefix */,
         char* buffer,
@@ -166,7 +166,7 @@ status_t SurfaceMediaSource::start(MetaData *params)
         mMaxAcquiredBufferCount = bufferCount;
     }
 
-    CHECK_GT(mMaxAcquiredBufferCount, 1);
+    CHECK_GT(mMaxAcquiredBufferCount, 1u);
 
     status_t err =
         mConsumer->setMaxAcquiredBufferCount(mMaxAcquiredBufferCount);
@@ -185,7 +185,7 @@ status_t SurfaceMediaSource::setMaxAcquiredBufferCount(size_t count) {
     ALOGV("setMaxAcquiredBufferCount(%zu)", count);
     Mutex::Autolock lock(mMutex);
 
-    CHECK_GT(count, 1);
+    CHECK_GT(count, 1u);
     mMaxAcquiredBufferCount = count;
 
     return OK;

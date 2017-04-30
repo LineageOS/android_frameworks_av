@@ -32,8 +32,7 @@ FrameProcessorBase::FrameProcessorBase(wp<CameraDeviceBase> device) :
     mDevice(device),
     mNumPartialResults(1) {
     sp<CameraDeviceBase> cameraDevice = device.promote();
-    if (cameraDevice != 0 &&
-            cameraDevice->getDeviceVersion() >= CAMERA_DEVICE_API_VERSION_3_2) {
+    if (cameraDevice != 0) {
         CameraMetadata staticInfo = cameraDevice->info();
         camera_metadata_entry_t entry = staticInfo.find(ANDROID_REQUEST_PARTIAL_RESULT_COUNT);
         if (entry.count > 0) {
@@ -171,18 +170,8 @@ status_t FrameProcessorBase::processListeners(const CaptureResult &result,
     camera_metadata_ro_entry_t entry;
 
     // Check if this result is partial.
-    bool isPartialResult = false;
-    if (device->getDeviceVersion() >= CAMERA_DEVICE_API_VERSION_3_2) {
-        isPartialResult = result.mResultExtras.partialResultCount < mNumPartialResults;
-    } else {
-        entry = result.mMetadata.find(ANDROID_QUIRKS_PARTIAL_RESULT);
-        if (entry.count != 0 &&
-                entry.data.u8[0] == ANDROID_QUIRKS_PARTIAL_RESULT_PARTIAL) {
-            ALOGV("%s: Camera %s: This is a partial result",
-                    __FUNCTION__, device->getId().string());
-            isPartialResult = true;
-        }
-    }
+    bool isPartialResult =
+            result.mResultExtras.partialResultCount < mNumPartialResults;
 
     // TODO: instead of getting requestID from CameraMetadata, we should get it
     // from CaptureResultExtras. This will require changing Camera2Device.

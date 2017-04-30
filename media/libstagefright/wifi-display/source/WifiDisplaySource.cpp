@@ -454,7 +454,7 @@ void WifiDisplaySource::onMessageReceived(const sp<AMessage> &msg) {
                 sp<ABuffer> data;
                 CHECK(msg->findBuffer("data", &data));
 
-                CHECK_LE(channel, 0xffu);
+                CHECK_LE(channel, 0xff);
                 CHECK_LE(data->size(), 0xffffu);
 
                 int32_t sessionID;
