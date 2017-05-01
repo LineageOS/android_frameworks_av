@@ -55,8 +55,7 @@ struct AImageReader : public RefBase {
     AImageReader(int32_t width,
                  int32_t height,
                  int32_t format,
-                 uint64_t usage0,
-                 uint64_t usage1,
+                 uint64_t usage,
                  int32_t maxImages);
     ~AImageReader();
 
@@ -117,8 +116,7 @@ struct AImageReader : public RefBase {
     const int32_t mWidth;
     const int32_t mHeight;
     const int32_t mFormat;
-    const uint64_t mUsage0;  // AHARDWAREBUFFER_USAGE0* flags.
-    const uint64_t mUsage1;  // AHARDWAREBUFFER_USAGE1* flags.
+    const uint64_t mUsage;  // AHARDWAREBUFFER_USAGE_* flags.
     const int32_t mMaxImages;
 
     // TODO(jwcai) Seems completely unused in AImageReader class.
