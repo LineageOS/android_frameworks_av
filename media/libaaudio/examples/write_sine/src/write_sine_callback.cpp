@@ -26,7 +26,7 @@
 #include <aaudio/AAudio.h>
 #include "SineGenerator.h"
 
-#define NUM_SECONDS              5
+#define NUM_SECONDS              15
 
 //#define SHARING_MODE  AAUDIO_SHARING_MODE_EXCLUSIVE
 #define SHARING_MODE  AAUDIO_SHARING_MODE_SHARED

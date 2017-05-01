@@ -32,6 +32,7 @@ using namespace aaudio;
 
 // Arbitrary and somewhat generous number of bursts.
 #define DEFAULT_BURSTS_PER_BUFFER_CAPACITY     8
+static const bool FAST_TRACKS_ENABLED = true;
 
 /*
  * Create a stream that uses the AudioTrack.
@@ -69,7 +70,9 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             samplesPerFrame, channelMask);
 
     // TODO add more performance options
-    audio_output_flags_t flags = (audio_output_flags_t) AUDIO_OUTPUT_FLAG_FAST;
+    audio_output_flags_t flags = FAST_TRACKS_ENABLED
+                                 ? AUDIO_OUTPUT_FLAG_FAST
+                                 : AUDIO_OUTPUT_FLAG_NONE;
 
     int32_t frameCount = builder.getBufferCapacity();
     ALOGD("AudioStreamTrack::open(), requested buffer capacity %d", frameCount);
