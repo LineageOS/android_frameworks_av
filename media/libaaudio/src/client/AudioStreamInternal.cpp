@@ -32,9 +32,10 @@
 #include "binding/AAudioStreamConfiguration.h"
 #include "binding/IAAudioService.h"
 #include "binding/AAudioServiceMessage.h"
-#include "fifo/FifoBuffer.h"
-
 #include "core/AudioStreamBuilder.h"
+#include "fifo/FifoBuffer.h"
+#include "utility/LinearRamp.h"
+
 #include "AudioStreamInternal.h"
 
 #define LOG_TIMESTAMPS   0
@@ -478,8 +479,9 @@ aaudio_result_t AudioStreamInternal::onEventFromServer(AAudioServiceMessage *mes
             ALOGW("WARNING - processCommands() AAUDIO_SERVICE_EVENT_DISCONNECTED");
             break;
         case AAUDIO_SERVICE_EVENT_VOLUME:
-            mVolume = message->event.dataDouble;
-            ALOGD_IF(MYLOG_CONDITION, "processCommands() AAUDIO_SERVICE_EVENT_VOLUME %f", mVolume);
+            mVolumeRamp.setTarget((float) message->event.dataDouble);
+            ALOGD_IF(MYLOG_CONDITION, "processCommands() AAUDIO_SERVICE_EVENT_VOLUME %f",
+                     message->event.dataDouble);
             break;
         default:
             ALOGW("WARNING - processCommands() Unrecognized event = %d",
@@ -639,10 +641,10 @@ aaudio_result_t AudioStreamInternal::writeNow(const void *buffer, int32_t numFra
 }
 
 
-// TODO this function needs a major cleanup.
 aaudio_result_t AudioStreamInternal::writeNowWithConversion(const void *buffer,
                                        int32_t numFrames) {
-    // ALOGD_IF(MYLOG_CONDITION, "AudioStreamInternal::writeNowWithConversion(%p, %d)", buffer, numFrames);
+    // ALOGD_IF(MYLOG_CONDITION, "AudioStreamInternal::writeNowWithConversion(%p, %d)",
+    //              buffer, numFrames);
     WrappingBuffer wrappingBuffer;
     uint8_t *source = (uint8_t *) buffer;
     int32_t framesLeft = numFrames;
@@ -659,31 +661,67 @@ aaudio_result_t AudioStreamInternal::writeNowWithConversion(const void *buffer,
                 framesToWrite = framesAvailable;
             }
             int32_t numBytes = getBytesPerFrame() * framesToWrite;
-            // TODO handle volume scaling
-            if (getFormat() == mDeviceFormat) {
-                // Copy straight through.
-                memcpy(wrappingBuffer.data[partIndex], source, numBytes);
-            } else if (getFormat() == AAUDIO_FORMAT_PCM_FLOAT
-                       && mDeviceFormat == AAUDIO_FORMAT_PCM_I16) {
-                // Data conversion.
-                AAudioConvert_floatToPcm16(
-                        (const float *) source,
-                        framesToWrite * getSamplesPerFrame(),
-                        (int16_t *) wrappingBuffer.data[partIndex]);
-            } else if (getFormat() == AAUDIO_FORMAT_PCM_I16
-                       && mDeviceFormat == AAUDIO_FORMAT_PCM_FLOAT) {
-                // Data conversion.
-                AAudioConvert_pcm16ToFloat(
-                        (const int16_t *) source,
-                        framesToWrite * getSamplesPerFrame(),
-                        (float *) wrappingBuffer.data[partIndex]);
-            } else {
-                // TODO handle more conversions
-                ALOGE("AudioStreamInternal::writeNowWithConversion() unsupported formats: %d, %d",
-                      getFormat(), mDeviceFormat);
-                return AAUDIO_ERROR_UNEXPECTED_VALUE;
+            int32_t numSamples = framesToWrite * getSamplesPerFrame();
+            // Data conversion.
+            float levelFrom;
+            float levelTo;
+            bool ramping = mVolumeRamp.nextSegment(framesToWrite * getSamplesPerFrame(),
+                                    &levelFrom, &levelTo);
+            // The formats are validated when the stream is opened so we do not have to
+            // check for illegal combinations here.
+            if (getFormat() == AAUDIO_FORMAT_PCM_FLOAT) {
+                if (mDeviceFormat == AAUDIO_FORMAT_PCM_FLOAT) {
+                    AAudio_linearRamp(
+                            (const float *) source,
+                            (float *) wrappingBuffer.data[partIndex],
+                            framesToWrite,
+                            getSamplesPerFrame(),
+                            levelFrom,
+                            levelTo);
+                } else if (mDeviceFormat == AAUDIO_FORMAT_PCM_I16) {
+                    if (ramping) {
+                        AAudioConvert_floatToPcm16(
+                                (const float *) source,
+                                (int16_t *) wrappingBuffer.data[partIndex],
+                                framesToWrite,
+                                getSamplesPerFrame(),
+                                levelFrom,
+                                levelTo);
+                    } else {
+                        AAudioConvert_floatToPcm16(
+                                (const float *) source,
+                                (int16_t *) wrappingBuffer.data[partIndex],
+                                numSamples,
+                                levelTo);
+                    }
+                }
+            } else if (getFormat() == AAUDIO_FORMAT_PCM_I16) {
+                if (mDeviceFormat == AAUDIO_FORMAT_PCM_FLOAT) {
+                    if (ramping) {
+                        AAudioConvert_pcm16ToFloat(
+                                (const int16_t *) source,
+                                (float *) wrappingBuffer.data[partIndex],
+                                framesToWrite,
+                                getSamplesPerFrame(),
+                                levelFrom,
+                                levelTo);
+                    } else {
+                        AAudioConvert_pcm16ToFloat(
+                                (const int16_t *) source,
+                                (float *) wrappingBuffer.data[partIndex],
+                                numSamples,
+                                levelTo);
+                    }
+                } else if (mDeviceFormat == AAUDIO_FORMAT_PCM_I16) {
+                    AAudio_linearRamp(
+                            (const int16_t *) source,
+                            (int16_t *) wrappingBuffer.data[partIndex],
+                            framesToWrite,
+                            getSamplesPerFrame(),
+                            levelFrom,
+                            levelTo);
+                }
             }
-
             source += numBytes;
             framesLeft -= framesToWrite;
         } else {
