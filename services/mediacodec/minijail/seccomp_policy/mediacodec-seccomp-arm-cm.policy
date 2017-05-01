@@ -7,3 +7,5 @@ recvfrom: 1
 _llseek: 1
 sysinfo: 1
 getcwd: 1
+# ffmpeg needs this
+getdents64: 1
