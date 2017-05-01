@@ -35,9 +35,120 @@ android::status_t AAudioConvert_aaudioToAndroidStatus(aaudio_result_t result);
  */
 aaudio_result_t AAudioConvert_androidToAAudioResult(android::status_t status);
 
-void AAudioConvert_floatToPcm16(const float *source, int32_t numSamples, int16_t *destination);
+/**
+ * Convert an array of floats to an array of int16_t.
+ *
+ * @param source
+ * @param destination
+ * @param numSamples number of values in the array
+ * @param amplitude level between 0.0 and 1.0
+ */
+void AAudioConvert_floatToPcm16(const float *source,
+                                int16_t *destination,
+                                int32_t numSamples,
+                                float amplitude);
 
-void AAudioConvert_pcm16ToFloat(const int16_t *source, int32_t numSamples, float *destination);
+/**
+ * Convert floats to int16_t and scale by a linear ramp.
+ *
+ * The ramp stops just short of reaching amplitude2 so that the next
+ * ramp can start at amplitude2 without causing a discontinuity.
+ *
+ * @param source
+ * @param destination
+ * @param numFrames
+ * @param samplesPerFrame AKA number of channels
+ * @param amplitude1 level at start of ramp, between 0.0 and 1.0
+ * @param amplitude2 level past end of ramp, between 0.0 and 1.0
+ */
+void AAudioConvert_floatToPcm16(const float *source,
+                                int16_t *destination,
+                                int32_t numFrames,
+                                int32_t samplesPerFrame,
+                                float amplitude1,
+                                float amplitude2);
+
+/**
+ * Convert int16_t array to float array ranging from -1.0 to +1.0.
+ * @param source
+ * @param destination
+ * @param numSamples
+ */
+//void AAudioConvert_pcm16ToFloat(const int16_t *source, int32_t numSamples,
+//                                float *destination);
+
+/**
+ *
+ * Convert int16_t array to float array ranging from +/- amplitude.
+ * @param source
+ * @param destination
+ * @param numSamples
+ * @param amplitude
+ */
+void AAudioConvert_pcm16ToFloat(const int16_t *source,
+                                float *destination,
+                                int32_t numSamples,
+                                float amplitude);
+
+/**
+ * Convert floats to int16_t and scale by a linear ramp.
+ *
+ * The ramp stops just short of reaching amplitude2 so that the next
+ * ramp can start at amplitude2 without causing a discontinuity.
+ *
+ * @param source
+ * @param destination
+ * @param numFrames
+ * @param samplesPerFrame AKA number of channels
+ * @param amplitude1 level at start of ramp, between 0.0 and 1.0
+ * @param amplitude2 level at end of ramp, between 0.0 and 1.0
+ */
+void AAudioConvert_pcm16ToFloat(const int16_t *source,
+                                float *destination,
+                                int32_t numFrames,
+                                int32_t samplesPerFrame,
+                                float amplitude1,
+                                float amplitude2);
+
+/**
+ * Scale floats by a linear ramp.
+ *
+ * The ramp stops just short of reaching amplitude2 so that the next
+ * ramp can start at amplitude2 without causing a discontinuity.
+ *
+ * @param source
+ * @param destination
+ * @param numFrames
+ * @param samplesPerFrame
+ * @param amplitude1
+ * @param amplitude2
+ */
+void AAudio_linearRamp(const float *source,
+                       float *destination,
+                       int32_t numFrames,
+                       int32_t samplesPerFrame,
+                       float amplitude1,
+                       float amplitude2);
+
+/**
+ * Scale int16_t's by a linear ramp.
+ *
+ * The ramp stops just short of reaching amplitude2 so that the next
+ * ramp can start at amplitude2 without causing a discontinuity.
+ *
+ * @param source
+ * @param destination
+ * @param numFrames
+ * @param samplesPerFrame
+ * @param amplitude1
+ * @param amplitude2
+ */
+void AAudio_linearRamp(const int16_t *source,
+                       int16_t *destination,
+                       int32_t numFrames,
+                       int32_t samplesPerFrame,
+                       float amplitude1,
+                       float amplitude2);
 
 /**
  * Calculate the number of bytes and prevent numeric overflow.

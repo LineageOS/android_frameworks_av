@@ -27,6 +27,11 @@
 
 using namespace android;
 
+// This is 3 dB, (10^(3/20)), to match the maximum headroom in AudioTrack for float data.
+// It is designed to allow occasional transient peaks.
+#define MAX_HEADROOM (1.41253754f)
+#define MIN_HEADROOM (0 - MAX_HEADROOM)
+
 int32_t AAudioConvert_formatToSizeInBytes(aaudio_audio_format_t format) {
     int32_t size = AAUDIO_ERROR_ILLEGAL_ARGUMENT;
     switch (format) {
@@ -42,24 +47,153 @@ int32_t AAudioConvert_formatToSizeInBytes(aaudio_audio_format_t format) {
     return size;
 }
 
-// TODO This similar to a function in audio_utils. Consider using that instead.
-void AAudioConvert_floatToPcm16(const float *source, int32_t numSamples, int16_t *destination) {
+
+// TODO call clamp16_from_float function in primitives.h
+static inline int16_t clamp16_from_float(float f) {
+    /* Offset is used to expand the valid range of [-1.0, 1.0) into the 16 lsbs of the
+     * floating point significand. The normal shift is 3<<22, but the -15 offset
+     * is used to multiply by 32768.
+     */
+    static const float offset = (float)(3 << (22 - 15));
+    /* zero = (0x10f << 22) =  0x43c00000 (not directly used) */
+    static const int32_t limneg = (0x10f << 22) /*zero*/ - 32768; /* 0x43bf8000 */
+    static const int32_t limpos = (0x10f << 22) /*zero*/ + 32767; /* 0x43c07fff */
+
+    union {
+        float f;
+        int32_t i;
+    } u;
+
+    u.f = f + offset; /* recenter valid range */
+    /* Now the valid range is represented as integers between [limneg, limpos].
+     * Clamp using the fact that float representation (as an integer) is an ordered set.
+     */
+    if (u.i < limneg)
+        u.i = -32768;
+    else if (u.i > limpos)
+        u.i = 32767;
+    return u.i; /* Return lower 16 bits, the part of interest in the significand. */
+}
+
+// Same but without clipping.
+// Convert -1.0f to +1.0f to -32768 to +32767
+static inline int16_t floatToInt16(float f) {
+    static const float offset = (float)(3 << (22 - 15));
+    union {
+        float f;
+        int32_t i;
+    } u;
+    u.f = f + offset; /* recenter valid range */
+    return u.i; /* Return lower 16 bits, the part of interest in the significand. */
+}
+
+static float clipAndClampFloatToPcm16(float sample, float scaler) {
+    // Clip to valid range of a float sample to prevent excessive volume.
+    if (sample > MAX_HEADROOM) sample = MAX_HEADROOM;
+    else if (sample < MIN_HEADROOM) sample = MIN_HEADROOM;
+
+    // Scale and convert to a short.
+    float fval = sample * scaler;
+    return clamp16_from_float(fval);
+}
+
+void AAudioConvert_floatToPcm16(const float *source,
+                                int16_t *destination,
+                                int32_t numSamples,
+                                float amplitude) {
+    float scaler = amplitude;
     for (int i = 0; i < numSamples; i++) {
-        float fval = source[i];
-        fval += 1.0; // to avoid discontinuity at 0.0 caused by truncation
-        fval *= 32768.0f;
-        int32_t sample = (int32_t) fval;
-        // clip to 16-bit range
-        if (sample < 0) sample = 0;
-        else if (sample > 0x0FFFF) sample = 0x0FFFF;
-        sample -= 32768; // center at zero
-        destination[i] = (int16_t) sample;
+        float sample = *source++;
+        *destination++ = clipAndClampFloatToPcm16(sample, scaler);
     }
 }
 
-void AAudioConvert_pcm16ToFloat(const int16_t *source, int32_t numSamples, float *destination) {
+void AAudioConvert_floatToPcm16(const float *source,
+                                int16_t *destination,
+                                int32_t numFrames,
+                                int32_t samplesPerFrame,
+                                float amplitude1,
+                                float amplitude2) {
+    float scaler = amplitude1;
+    // divide by numFrames so that we almost reach amplitude2
+    float delta = (amplitude2 - amplitude1) / numFrames;
+    for (int frameIndex = 0; frameIndex < numFrames; frameIndex++) {
+        for (int sampleIndex = 0; sampleIndex < samplesPerFrame; sampleIndex++) {
+            float sample = *source++;
+            *destination++ = clipAndClampFloatToPcm16(sample, scaler);
+        }
+        scaler += delta;
+    }
+}
+
+#define SHORT_SCALE  32768
+
+void AAudioConvert_pcm16ToFloat(const int16_t *source,
+                                float *destination,
+                                int32_t numSamples,
+                                float amplitude) {
+    float scaler = amplitude / SHORT_SCALE;
     for (int i = 0; i < numSamples; i++) {
-        destination[i] = source[i] * (1.0f / 32768.0f);
+        destination[i] = source[i] * scaler;
+    }
+}
+
+// This code assumes amplitude1 and amplitude2 are between 0.0 and 1.0
+void AAudioConvert_pcm16ToFloat(const int16_t *source,
+                                float *destination,
+                                int32_t numFrames,
+                                int32_t samplesPerFrame,
+                                float amplitude1,
+                                float amplitude2) {
+    float scaler = amplitude1 / SHORT_SCALE;
+    float delta = (amplitude2 - amplitude1) / (SHORT_SCALE * (float) numFrames);
+    for (int frameIndex = 0; frameIndex < numFrames; frameIndex++) {
+        for (int sampleIndex = 0; sampleIndex < samplesPerFrame; sampleIndex++) {
+            *destination++ = *source++ * scaler;
+        }
+        scaler += delta;
+    }
+}
+
+// This code assumes amplitude1 and amplitude2 are between 0.0 and 1.0
+void AAudio_linearRamp(const float *source,
+                       float *destination,
+                       int32_t numFrames,
+                       int32_t samplesPerFrame,
+                       float amplitude1,
+                       float amplitude2) {
+    float scaler = amplitude1;
+    float delta = (amplitude2 - amplitude1) / numFrames;
+    for (int frameIndex = 0; frameIndex < numFrames; frameIndex++) {
+        for (int sampleIndex = 0; sampleIndex < samplesPerFrame; sampleIndex++) {
+            float sample = *source++;
+
+            // Clip to valid range of a float sample to prevent excessive volume.
+            if (sample > MAX_HEADROOM) sample = MAX_HEADROOM;
+            else if (sample < MIN_HEADROOM) sample = MIN_HEADROOM;
+
+            *destination++ = sample * scaler;
+        }
+        scaler += delta;
+    }
+}
+
+// This code assumes amplitude1 and amplitude2 are between 0.0 and 1.0
+void AAudio_linearRamp(const int16_t *source,
+                       int16_t *destination,
+                       int32_t numFrames,
+                       int32_t samplesPerFrame,
+                       float amplitude1,
+                       float amplitude2) {
+    float scaler = amplitude1 / SHORT_SCALE;
+    float delta = (amplitude2 - amplitude1) / (SHORT_SCALE * (float) numFrames);
+    for (int frameIndex = 0; frameIndex < numFrames; frameIndex++) {
+        for (int sampleIndex = 0; sampleIndex < samplesPerFrame; sampleIndex++) {
+            // No need to clip because int16_t range is inherently limited.
+            float sample =  *source++ * scaler;
+            *destination++ =  floatToInt16(sample);
+        }
+        scaler += delta;
     }
 }
 
