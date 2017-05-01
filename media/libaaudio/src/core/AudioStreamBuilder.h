@@ -100,6 +100,15 @@ public:
         return this;
     }
 
+    int32_t getPerformanceMode() const {
+        return mPerformanceMode;
+    }
+
+    AudioStreamBuilder* setPerformanceMode(aaudio_performance_mode_t performanceMode) {
+        mPerformanceMode = performanceMode;
+        return this;
+    }
+
     int32_t getDeviceId() const {
         return mDeviceId;
     }
@@ -157,14 +166,15 @@ public:
     aaudio_result_t build(AudioStream **streamPtr);
 
 private:
-    int32_t                mSamplesPerFrame = AAUDIO_UNSPECIFIED;
-    int32_t                mSampleRate = AAUDIO_UNSPECIFIED;
-    int32_t                mDeviceId = AAUDIO_DEVICE_UNSPECIFIED;
-    aaudio_sharing_mode_t  mSharingMode = AAUDIO_SHARING_MODE_SHARED;
-    bool                   mSharingModeMatchRequired = false; // must match sharing mode requested
-    aaudio_audio_format_t  mFormat = AAUDIO_FORMAT_UNSPECIFIED;
-    aaudio_direction_t     mDirection = AAUDIO_DIRECTION_OUTPUT;
-    int32_t                mBufferCapacity = AAUDIO_UNSPECIFIED;
+    int32_t                    mSamplesPerFrame = AAUDIO_UNSPECIFIED;
+    int32_t                    mSampleRate = AAUDIO_UNSPECIFIED;
+    int32_t                    mDeviceId = AAUDIO_DEVICE_UNSPECIFIED;
+    aaudio_sharing_mode_t      mSharingMode = AAUDIO_SHARING_MODE_SHARED;
+    bool                       mSharingModeMatchRequired = false; // must match sharing mode requested
+    aaudio_audio_format_t      mFormat = AAUDIO_FORMAT_UNSPECIFIED;
+    aaudio_direction_t         mDirection = AAUDIO_DIRECTION_OUTPUT;
+    int32_t                    mBufferCapacity = AAUDIO_UNSPECIFIED;
+    aaudio_performance_mode_t  mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
 
     AAudioStream_dataCallback  mDataCallbackProc = nullptr;  // external callback functions
     void                      *mDataCallbackUserData = nullptr;

@@ -114,8 +114,15 @@ AAUDIO_API aaudio_result_t AAudio_createStreamBuilder(AAudioStreamBuilder** buil
     return AAUDIO_OK;
 }
 
+AAUDIO_API void AAudioStreamBuilder_setPerformanceMode(AAudioStreamBuilder* builder,
+                                                       aaudio_performance_mode_t mode)
+{
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setPerformanceMode(mode);
+}
+
 AAUDIO_API void AAudioStreamBuilder_setDeviceId(AAudioStreamBuilder* builder,
-                                                     int32_t deviceId)
+                                                int32_t deviceId)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
     streamBuilder->setDeviceId(deviceId);
@@ -401,6 +408,12 @@ AAUDIO_API int32_t AAudioStream_getXRunCount(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getXRunCount();
+}
+
+AAUDIO_API aaudio_performance_mode_t AAudioStream_getPerformanceMode(AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    return audioStream->getPerformanceMode();
 }
 
 AAUDIO_API int32_t AAudioStream_getDeviceId(AAudioStream* stream)
