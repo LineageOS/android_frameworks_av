@@ -1,0 +1,33 @@
+//
+// libmediadrm
+//
+
+cc_library_shared {
+    name: "libmediadrm",
+
+    srcs: [
+        "Crypto.cpp",
+        "Drm.cpp",
+        "DrmSessionManager.cpp",
+        "ICrypto.cpp",
+        "IDrm.cpp",
+        "IDrmClient.cpp",
+        "IMediaDrmService.cpp",
+        "SharedLibrary.cpp",
+    ],
+
+    shared_libs: [
+        "libbinder",
+        "libcutils",
+        "libdl",
+        "liblog",
+        "libmediautils",
+        "libstagefright_foundation",
+        "libutils",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+}
