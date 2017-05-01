@@ -41,7 +41,6 @@
 #include <utils/threads.h>
 #include <utils/Atomic.h>
 
-#include <cutils/bitops.h>
 #include <cutils/properties.h>
 
 #include <system/audio.h>
