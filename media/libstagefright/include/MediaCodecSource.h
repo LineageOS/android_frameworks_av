@@ -54,7 +54,8 @@ struct MediaCodecSource : public MediaSource,
     // MediaSource
     virtual status_t start(MetaData *params = NULL);
     virtual status_t stop();
-    virtual status_t pause(MetaData *params = NULL);
+    virtual status_t pause() { return pause(NULL); }
+    virtual status_t pause(MetaData *params);
     virtual sp<MetaData> getFormat();
     virtual status_t read(
             MediaBuffer **buffer,
