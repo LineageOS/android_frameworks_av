@@ -24,8 +24,6 @@
 #include <sys/types.h>
 #include <limits.h>
 
-#include <cutils/bitops.h>
-
 #include <media/Visualizer.h>
 #include <audio_utils/fixedfft.h>
 #include <utils/Thread.h>

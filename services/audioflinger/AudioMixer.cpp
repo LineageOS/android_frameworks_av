@@ -28,7 +28,6 @@
 #include <utils/Errors.h>
 #include <utils/Log.h>
 
-#include <cutils/bitops.h>
 #include <cutils/compiler.h>
 #include <utils/Debug.h>
 
