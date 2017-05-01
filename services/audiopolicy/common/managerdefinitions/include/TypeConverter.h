@@ -131,6 +131,17 @@ typedef TypeConverter<GainModeTraits> GainModeConverter;
 typedef TypeConverter<StreamTraits> StreamTypeConverter;
 typedef TypeConverter<DeviceCategoryTraits> DeviceCategoryConverter;
 
+template<> const DeviceConverter::Table DeviceConverter::mTable[];
+template<> const OutputFlagConverter::Table OutputFlagConverter::mTable[];
+template<> const InputFlagConverter::Table InputFlagConverter::mTable[];
+template<> const FormatConverter::Table FormatConverter::mTable[];
+template<> const OutputChannelConverter::Table OutputChannelConverter::mTable[];
+template<> const InputChannelConverter::Table InputChannelConverter::mTable[];
+template<> const ChannelIndexConverter::Table ChannelIndexConverter::mTable[];
+template<> const GainModeConverter::Table GainModeConverter::mTable[];
+template<> const DeviceCategoryConverter::Table DeviceCategoryConverter::mTable[];
+template<> const StreamTypeConverter::Table StreamTypeConverter::mTable[];
+
 inline
 static SampleRateTraits::Collection samplingRatesFromString(const std::string &samplingRates,
                                                             const char *del = "|")
