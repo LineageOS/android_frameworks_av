@@ -5,7 +5,12 @@ LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:= \
-    main_mediametrics.cpp          \
+    main_mediametrics.cpp              \
+    MetricsSummarizerCodec.cpp         \
+    MetricsSummarizerExtractor.cpp     \
+    MetricsSummarizerPlayer.cpp        \
+    MetricsSummarizerRecorder.cpp      \
+    MetricsSummarizer.cpp              \
     MediaAnalyticsService.cpp
 
 LOCAL_SHARED_LIBRARIES := \
