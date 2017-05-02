@@ -152,8 +152,8 @@ public:
                         : mLastSlope;
             } else {
                 // finite difference spline
-                m0 = (sec0 + sec) * 0.5;
-                m1 = (sec1 + sec) * 0.5;
+                m0 = (sec0 + sec) * 0.5f;
+                m1 = (sec1 + sec) * 0.5f;
             }
 
             if (monotonic) {
@@ -294,7 +294,7 @@ public:
 
     std::string toString() const {
         std::stringstream ss;
-        ss << "mInterpolatorType: " << mInterpolatorType << std::endl;
+        ss << "mInterpolatorType: " << static_cast<int32_t>(mInterpolatorType) << std::endl;
         ss << "mFirstSlope: " << mFirstSlope << std::endl;
         ss << "mLastSlope: " << mLastSlope << std::endl;
         for (const auto &pt : *this) {
