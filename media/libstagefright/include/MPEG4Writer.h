@@ -29,7 +29,7 @@
 
 namespace android {
 
-class AMessage;
+struct AMessage;
 class MediaBuffer;
 class MetaData;
 

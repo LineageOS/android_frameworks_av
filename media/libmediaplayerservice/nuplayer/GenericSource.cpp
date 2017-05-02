@@ -379,6 +379,11 @@ void NuPlayer::GenericSource::onPrepareAsync() {
                             source.get(), mFd, (long long)mOffset, (long long)mLength);
                     if (source.get() != nullptr) {
                         mDataSource = DataSource::CreateFromIDataSource(source);
+                        if (mDataSource != nullptr) {
+                            // Close the local file descriptor as it is not needed anymore.
+                            close(mFd);
+                            mFd = -1;
+                        }
                     } else {
                         ALOGW("extractor service cannot make data source");
                     }
@@ -390,7 +395,9 @@ void NuPlayer::GenericSource::onPrepareAsync() {
                 ALOGD("FileSource local");
                 mDataSource = new FileSource(mFd, mOffset, mLength);
             }
-
+            // TODO: close should always be done on mFd, see the lines following
+            // DataSource::CreateFromIDataSource above,
+            // and the FileSource constructor should dup the mFd argument as needed.
             mFd = -1;
         }
 
@@ -1954,12 +1961,12 @@ status_t NuPlayer::GenericSource::checkDrmInfo()
     size_t psshsize;
 
     if (!mFileMeta->findData(kKeyPssh, &type, &pssh, &psshsize)) {
-        ALOGE("checkDrmInfo: No PSSH");
+        ALOGV("checkDrmInfo: No PSSH");
         return OK; // source without DRM info
     }
 
     Parcel parcel;
-    NuPlayerDrm::retrieveDrmInfo(pssh, psshsize, mMimes, &parcel);
+    NuPlayerDrm::retrieveDrmInfo(pssh, psshsize, &parcel);
     ALOGV("checkDrmInfo: MEDIA_DRM_INFO PSSH size: %d  Parcel size: %d  objects#: %d",
           (int)psshsize, (int)parcel.dataSize(), (int)parcel.objectsCount());
 

@@ -32,9 +32,8 @@ using namespace android;
 
 // TODO: this only supports ImageReader
 struct AImage {
-    AImage(AImageReader* reader, int32_t format, uint64_t usage0, uint64_t usage1,
-           BufferItem* buffer, int64_t timestamp,
-           int32_t width, int32_t height, int32_t numPlanes);
+    AImage(AImageReader* reader, int32_t format, uint64_t usage, BufferItem* buffer,
+           int64_t timestamp, int32_t width, int32_t height, int32_t numPlanes);
 
     // free all resources while keeping object alive. Caller must obtain reader lock
     void close() { close(-1); }
@@ -75,8 +74,7 @@ struct AImage {
     // When reader is close, AImage will only accept close API call
     wp<AImageReader>           mReader;
     const int32_t              mFormat;
-    const uint64_t             mUsage0;  // AHARDWAREBUFFER_USAGE0* flags.
-    const uint64_t             mUsage1;  // AHARDWAREBUFFER_USAGE1* flags.
+    const uint64_t             mUsage;  // AHARDWAREBUFFER_USAGE_* flags.
     BufferItem*                mBuffer;
     std::unique_ptr<CpuConsumer::LockedBuffer> mLockedBuffer;
     const int64_t              mTimestamp;

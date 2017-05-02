@@ -79,11 +79,13 @@ status_t StreamHalLocal::getParameters(const String8& keys, String8 *values) {
 }
 
 status_t StreamHalLocal::addEffect(sp<EffectHalInterface> effect) {
+    LOG_ALWAYS_FATAL_IF(!effect->isLocal(), "Only local effects can be added for a local stream");
     return mStream->add_audio_effect(mStream,
             static_cast<EffectHalLocal*>(effect.get())->handle());
 }
 
 status_t StreamHalLocal::removeEffect(sp<EffectHalInterface> effect) {
+    LOG_ALWAYS_FATAL_IF(!effect->isLocal(), "Only local effects can be removed for a local stream");
     return mStream->remove_audio_effect(mStream,
             static_cast<EffectHalLocal*>(effect.get())->handle());
 }
@@ -162,7 +164,7 @@ int StreamOutHalLocal::asyncCallback(stream_callback_event_t event, void*, void 
     // correctly the case when the callback is invoked while StreamOutHalLocal's destructor is
     // already running, because the destructor is invoked after the refcount has been atomically
     // decremented.
-    wp<StreamOutHalLocal> weakSelf(reinterpret_cast<StreamOutHalLocal*>(cookie));
+    wp<StreamOutHalLocal> weakSelf(static_cast<StreamOutHalLocal*>(cookie));
     sp<StreamOutHalLocal> self = weakSelf.promote();
     if (self == 0) return 0;
     sp<StreamOutHalInterfaceCallback> callback = self->mCallback.promote();

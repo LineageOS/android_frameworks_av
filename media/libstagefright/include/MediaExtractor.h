@@ -70,7 +70,7 @@ public:
     }
     virtual void setUID(uid_t /*uid*/) {
     }
-    virtual status_t setMediaCas(const sp<ICas> &cas) override {
+    virtual status_t setMediaCas(const sp<ICas>& /*cas*/) override {
         return INVALID_OPERATION;
     }
 

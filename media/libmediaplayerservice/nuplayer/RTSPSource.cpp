@@ -544,7 +544,7 @@ void NuPlayer::RTSPSource::onMessageReceived(const sp<AMessage> &msg) {
         return;
     }
 
-    CHECK_EQ(msg->what(), (int)kWhatNotify);
+    CHECK_EQ(msg->what(), kWhatNotify);
 
     int32_t what;
     CHECK(msg->findInt32("what", &what));

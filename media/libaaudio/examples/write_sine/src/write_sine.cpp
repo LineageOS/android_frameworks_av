@@ -22,8 +22,8 @@
 #include <aaudio/AAudio.h>
 #include "SineGenerator.h"
 
-#define SAMPLE_RATE   48000
-#define NUM_SECONDS   5
+#define SAMPLE_RATE           48000
+#define NUM_SECONDS           15
 #define NANOS_PER_MICROSECOND ((int64_t)1000)
 #define NANOS_PER_MILLISECOND (NANOS_PER_MICROSECOND * 1000)
 #define NANOS_PER_SECOND      (NANOS_PER_MILLISECOND * 1000)

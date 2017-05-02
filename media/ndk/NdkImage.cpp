@@ -31,12 +31,10 @@ using namespace android;
 
 #define ALIGN(x, mask) ( ((x) + (mask) - 1) & ~((mask) - 1) )
 
-AImage::AImage(AImageReader* reader, int32_t format, uint64_t usage0, uint64_t usage1,
-        BufferItem* buffer, int64_t timestamp,
-        int32_t width, int32_t height, int32_t numPlanes) :
-        mReader(reader), mFormat(format), mUsage0(usage0), mUsage1(usage1),
-        mBuffer(buffer), mLockedBuffer(nullptr), mTimestamp(timestamp),
-        mWidth(width), mHeight(height), mNumPlanes(numPlanes) {
+AImage::AImage(AImageReader* reader, int32_t format, uint64_t usage, BufferItem* buffer,
+        int64_t timestamp, int32_t width, int32_t height, int32_t numPlanes) :
+        mReader(reader), mFormat(format), mUsage(usage), mBuffer(buffer), mLockedBuffer(nullptr),
+        mTimestamp(timestamp), mWidth(width), mHeight(height), mNumPlanes(numPlanes) {
 }
 
 // Can only be called by free() with mLock hold
@@ -178,9 +176,9 @@ media_status_t AImage::lockImage() {
         return AMEDIA_ERROR_INVALID_OBJECT;
     }
 
-    if ((mUsage0 & AHARDWAREBUFFER_USAGE0_CPU_READ_OFTEN) == 0) {
+    if ((mUsage & AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN) == 0) {
         ALOGE("%s: AImage %p does not have any software read usage bits set, usage=%" PRIu64 "",
-              __FUNCTION__, this, mUsage0);
+              __FUNCTION__, this, mUsage);
         return AMEDIA_IMGREADER_CANNOT_LOCK_IMAGE;
     }
 
@@ -191,13 +189,10 @@ media_status_t AImage::lockImage() {
 
     auto lockedBuffer = std::make_unique<CpuConsumer::LockedBuffer>();
 
-    uint64_t producerUsage;
-    uint64_t consumerUsage;
-    android_hardware_HardwareBuffer_convertToGrallocUsageBits(
-            &producerUsage, &consumerUsage, mUsage0, mUsage1);
+    uint64_t grallocUsage = android_hardware_HardwareBuffer_convertToGrallocUsageBits(mUsage);
 
     status_t ret =
-            lockImageFromBuffer(mBuffer, consumerUsage, mBuffer->mFence->dup(), lockedBuffer.get());
+            lockImageFromBuffer(mBuffer, grallocUsage, mBuffer->mFence->dup(), lockedBuffer.get());
     if (ret != OK) {
         ALOGE("%s: AImage %p failed to lock, error=%d", __FUNCTION__, this, ret);
         return AMEDIA_IMGREADER_CANNOT_LOCK_IMAGE;
