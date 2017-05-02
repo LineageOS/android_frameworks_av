@@ -278,7 +278,7 @@ public:
             if (res != NO_ERROR) {
                 return res;
             }
-            if (i > 0 && !(x > lastx) /* handle nan */
+            if ((i > 0 && !(x > lastx)) /* handle nan */
                     || y != y /* handle nan */) {
                 // This is a std::map object which imposes sorted order
                 // automatically on emplace.

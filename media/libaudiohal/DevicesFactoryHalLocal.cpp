@@ -27,11 +27,6 @@
 
 namespace android {
 
-// static
-sp<DevicesFactoryHalInterface> DevicesFactoryHalInterface::create() {
-    return new DevicesFactoryHalLocal();
-}
-
 static status_t load_audio_interface(const char *if_name, audio_hw_device_t **dev)
 {
     const hw_module_t *mod;

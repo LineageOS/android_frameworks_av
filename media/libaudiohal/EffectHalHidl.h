@@ -58,6 +58,9 @@ class EffectHalHidl : public EffectHalInterface
     // Free resources on the remote side.
     virtual status_t close();
 
+    // Whether it's a local implementation.
+    virtual bool isLocal() const { return false; }
+
     uint64_t effectId() const { return mEffectId; }
 
     static void effectDescriptorToHal(
@@ -92,6 +95,7 @@ class EffectHalHidl : public EffectHalInterface
 
     status_t getConfigImpl(uint32_t cmdCode, uint32_t *replySize, void *pReplyData);
     status_t prepareForProcessing();
+    bool needToResetBuffers();
     status_t processImpl(uint32_t mqFlag);
     status_t setConfigImpl(
             uint32_t cmdCode, uint32_t cmdSize, void *pCmdData,

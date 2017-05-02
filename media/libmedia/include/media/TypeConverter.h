@@ -203,7 +203,8 @@ inline void TypeConverter<Traits>::maskToString(uint32_t mask, std::string &str,
     if (mask != 0) {
         bool first_flag = true;
         for (size_t i = 0; mTable[i].literal; i++) {
-            if (mTable[i].value != 0 && (mask & mTable[i].value) == mTable[i].value) {
+            uint32_t value = static_cast<uint32_t>(mTable[i].value);
+            if (mTable[i].value != 0 && ((mask & value) == value)) {
                 if (!first_flag) str += del;
                 first_flag = false;
                 str += mTable[i].literal;
@@ -227,6 +228,20 @@ typedef TypeConverter<StreamTraits> StreamTypeConverter;
 typedef TypeConverter<AudioModeTraits> AudioModeConverter;
 typedef TypeConverter<UsageTraits> UsageTypeConverter;
 typedef TypeConverter<SourceTraits> SourceTypeConverter;
+
+template<> const OutputDeviceConverter::Table OutputDeviceConverter::mTable[];
+template<> const InputDeviceConverter::Table InputDeviceConverter::mTable[];
+template<> const OutputFlagConverter::Table OutputFlagConverter::mTable[];
+template<> const InputFlagConverter::Table InputFlagConverter::mTable[];
+template<> const FormatConverter::Table FormatConverter::mTable[];
+template<> const OutputChannelConverter::Table OutputChannelConverter::mTable[];
+template<> const InputChannelConverter::Table InputChannelConverter::mTable[];
+template<> const ChannelIndexConverter::Table ChannelIndexConverter::mTable[];
+template<> const GainModeConverter::Table GainModeConverter::mTable[];
+template<> const StreamTypeConverter::Table StreamTypeConverter::mTable[];
+template<> const AudioModeConverter::Table AudioModeConverter::mTable[];
+template<> const UsageTypeConverter::Table UsageTypeConverter::mTable[];
+template<> const SourceTypeConverter::Table SourceTypeConverter::mTable[];
 
 bool deviceFromString(const std::string& literalDevice, audio_devices_t& device);
 

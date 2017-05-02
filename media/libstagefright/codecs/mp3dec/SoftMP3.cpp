@@ -274,7 +274,7 @@ void SoftMP3::onQueueFilled(OMX_U32 /* portIndex */) {
         mConfig->inputBufferUsedLength = 0;
 
         mConfig->outputFrameSize = kOutputBufferSize / sizeof(int16_t);
-        if ((int32)outHeader->nAllocLen < mConfig->outputFrameSize) {
+        if ((int32_t)outHeader->nAllocLen < mConfig->outputFrameSize) {
             ALOGE("input buffer too small: got %u, expected %u",
                 outHeader->nAllocLen, mConfig->outputFrameSize);
             android_errorWriteLog(0x534e4554, "27793371");
@@ -363,7 +363,7 @@ void SoftMP3::onQueueFilled(OMX_U32 /* portIndex */) {
             mAnchorTimeUs + (mNumFramesOutput * 1000000ll) / mSamplingRate;
 
         if (inHeader) {
-            CHECK_GE(inHeader->nFilledLen, mConfig->inputBufferUsedLength);
+            CHECK_GE((int32_t)inHeader->nFilledLen, mConfig->inputBufferUsedLength);
 
             inHeader->nOffset += mConfig->inputBufferUsedLength;
             inHeader->nFilledLen -= mConfig->inputBufferUsedLength;

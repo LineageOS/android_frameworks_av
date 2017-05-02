@@ -33,11 +33,6 @@ using ::android::hardware::Return;
 
 namespace android {
 
-// static
-sp<DevicesFactoryHalInterface> DevicesFactoryHalInterface::create() {
-    return new DevicesFactoryHalHidl();
-}
-
 DevicesFactoryHalHidl::DevicesFactoryHalHidl() {
     mDevicesFactory = IDevicesFactory::getService();
     if (mDevicesFactory != 0) {

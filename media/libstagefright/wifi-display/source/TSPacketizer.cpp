@@ -273,8 +273,8 @@ void TSPacketizer::Track::finalize() {
                 CHECK(mFormat->findInt32("profile-idc", &profileIdc));
                 CHECK(mFormat->findInt32("level-idc", &levelIdc));
                 CHECK(mFormat->findInt32("constraint-set", &constraintSet));
-                CHECK_GE(profileIdc, 0u);
-                CHECK_GE(levelIdc, 0u);
+                CHECK_GE(profileIdc, 0);
+                CHECK_GE(levelIdc, 0);
                 data[2] = profileIdc;    // profile_idc
                 data[3] = constraintSet; // constraint_set*
                 data[4] = levelIdc;      // level_idc
@@ -771,7 +771,7 @@ status_t TSPacketizer::packetize(
             program_info_length += mProgramInfoDescriptors.itemAt(i)->size();
         }
 
-        CHECK_LT(program_info_length, 0x400);
+        CHECK_LT(program_info_length, 0x400u);
         *ptr++ = 0xf0 | (program_info_length >> 8);
         *ptr++ = (program_info_length & 0xff);
 
@@ -795,7 +795,7 @@ status_t TSPacketizer::packetize(
             for (size_t i = 0; i < track->countDescriptors(); ++i) {
                 ES_info_length += track->descriptorAt(i)->size();
             }
-            CHECK_LE(ES_info_length, 0xfff);
+            CHECK_LE(ES_info_length, 0xfffu);
 
             *ptr++ = 0xf0 | (ES_info_length >> 8);
             *ptr++ = (ES_info_length & 0xff);

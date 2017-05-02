@@ -730,7 +730,7 @@ namespace android {
 
     ssize_t MockDrmPlugin::findSession(Vector<uint8_t> const &sessionId) const
     {
-        ALOGD("findSession: nsessions=%u, size=%u", mSessions.size(), sessionId.size());
+        ALOGD("findSession: nsessions=%zu, size=%zu", mSessions.size(), sessionId.size());
         for (size_t i = 0; i < mSessions.size(); ++i) {
             if (memcmp(mSessions[i].array(), sessionId.array(), sessionId.size()) == 0) {
                 return i;
@@ -741,7 +741,7 @@ namespace android {
 
     ssize_t MockDrmPlugin::findKeySet(Vector<uint8_t> const &keySetId) const
     {
-        ALOGD("findKeySet: nkeySets=%u, size=%u", mKeySets.size(), keySetId.size());
+        ALOGD("findKeySet: nkeySets=%zu, size=%zu", mKeySets.size(), keySetId.size());
         for (size_t i = 0; i < mKeySets.size(); ++i) {
             if (memcmp(mKeySets[i].array(), keySetId.array(), keySetId.size()) == 0) {
                 return i;
@@ -792,8 +792,9 @@ namespace android {
     }
 
     ssize_t
-    MockCryptoPlugin::decrypt(bool secure, const uint8_t key[16], const uint8_t iv[16],
-            Mode mode, const Pattern &pattern, const void *srcPtr,
+    MockCryptoPlugin::decrypt(bool secure, const uint8_t key[DECRYPT_KEY_SIZE],
+            const uint8_t iv[DECRYPT_KEY_SIZE], Mode mode,
+            const Pattern &pattern, const void *srcPtr,
             const SubSample *subSamples, size_t numSubSamples,
             void *dstPtr, AString * /* errorDetailMsg */)
     {
@@ -801,8 +802,8 @@ namespace android {
               "pattern:{encryptBlocks=%d, skipBlocks=%d} src=%p, "
               "subSamples=%s, dst=%p)",
               (int)secure,
-              arrayToString(key, sizeof(key)).string(),
-              arrayToString(iv, sizeof(iv)).string(),
+              arrayToString(key, DECRYPT_KEY_SIZE).string(),
+              arrayToString(iv, DECRYPT_KEY_SIZE).string(),
               (int)mode, pattern.mEncryptBlocks, pattern.mSkipBlocks, srcPtr,
               subSamplesToString(subSamples, numSubSamples).string(),
               dstPtr);

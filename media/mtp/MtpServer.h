@@ -78,6 +78,7 @@ private:
     MtpObjectFormat     mSendObjectFormat;
     MtpString           mSendObjectFilePath;
     size_t              mSendObjectFileSize;
+    time_t              mSendObjectModifiedTime;
 
     Mutex               mMutex;
 

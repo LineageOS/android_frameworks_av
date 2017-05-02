@@ -3,6 +3,7 @@ LOCAL_PATH:= $(call my-dir)
 # Visualizer library
 include $(CLEAR_VARS)
 
+LOCAL_VENDOR_MODULE := true
 LOCAL_SRC_FILES:= \
 	EffectVisualizer.cpp
 

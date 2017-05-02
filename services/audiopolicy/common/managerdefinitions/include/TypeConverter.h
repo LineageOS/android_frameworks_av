@@ -49,4 +49,13 @@ typedef TypeConverter<MixTypeTraits> MixTypeConverter;
 typedef TypeConverter<RouteFlagTraits> RouteFlagTypeConverter;
 typedef TypeConverter<RuleTraits> RuleTypeConverter;
 
+template <>
+const DeviceCategoryConverter::Table DeviceCategoryConverter::mTable[];
+template <>
+const MixTypeConverter::Table MixTypeConverter::mTable[];
+template <>
+const RouteFlagTypeConverter::Table RouteFlagTypeConverter::mTable[];
+template <>
+const RuleTypeConverter::Table RuleTypeConverter::mTable[];
+
 }; // namespace android

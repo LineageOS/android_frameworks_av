@@ -36,7 +36,7 @@ class DevicesFactoryHalHidl : public DevicesFactoryHalInterface
     virtual status_t openDevice(const char *name, sp<DeviceHalInterface> *device);
 
   private:
-    friend class DevicesFactoryHalInterface;
+    friend class DevicesFactoryHalHybrid;
 
     sp<IDevicesFactory> mDevicesFactory;
 

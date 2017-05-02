@@ -171,7 +171,8 @@ MyConvertingStreamSource::MyConvertingStreamSource(const char *filename)
     mWriter = new MPEG2TSWriter(
             this, &MyConvertingStreamSource::WriteDataWrapper);
 
-    for (size_t i = 0; i < extractor->countTracks(); ++i) {
+    size_t numTracks = extractor->countTracks();
+    for (size_t i = 0; i < numTracks; ++i) {
         const sp<MetaData> &meta = extractor->getTrackMetaData(i);
 
         const char *mime;
@@ -181,7 +182,12 @@ MyConvertingStreamSource::MyConvertingStreamSource(const char *filename)
             continue;
         }
 
-        CHECK_EQ(mWriter->addSource(extractor->getTrack(i)), (status_t)OK);
+        sp<IMediaSource> track = extractor->getTrack(i);
+        if (track == nullptr) {
+            fprintf(stderr, "skip NULL track %zu, total tracks %zu\n", i, numTracks);
+            continue;
+        }
+        CHECK_EQ(mWriter->addSource(track), (status_t)OK);
     }
 
     CHECK_EQ(mWriter->start(), (status_t)OK);

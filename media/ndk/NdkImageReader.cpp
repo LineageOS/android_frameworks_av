@@ -238,14 +238,12 @@ void AImageReader::CallbackHandler::onMessageReceived(
 AImageReader::AImageReader(int32_t width,
                            int32_t height,
                            int32_t format,
-                           uint64_t usage0,
-                           uint64_t usage1,
+                           uint64_t usage,
                            int32_t maxImages)
     : mWidth(width),
       mHeight(height),
       mFormat(format),
-      mUsage0(usage0),
-      mUsage1(usage1),
+      mUsage(usage),
       mMaxImages(maxImages),
       mNumPlanes(getNumPlanesForFormat(format)),
       mFrameListener(new FrameListener(this)),
@@ -256,20 +254,14 @@ AImageReader::init() {
     PublicFormat publicFormat = static_cast<PublicFormat>(mFormat);
     mHalFormat = android_view_Surface_mapPublicFormatToHalFormat(publicFormat);
     mHalDataSpace = android_view_Surface_mapPublicFormatToHalDataspace(publicFormat);
-
-    uint64_t producerUsage;
-    uint64_t consumerUsage;
-    android_hardware_HardwareBuffer_convertToGrallocUsageBits(
-            &producerUsage, &consumerUsage, mUsage0, mUsage1);
-    // Strip out producerUsage here.
-    mHalUsage = android_convertGralloc1To0Usage(0, consumerUsage);
+    mHalUsage = android_hardware_HardwareBuffer_convertToGrallocUsageBits(mUsage);
 
     sp<IGraphicBufferProducer> gbProducer;
     sp<IGraphicBufferConsumer> gbConsumer;
     BufferQueue::createBufferQueue(&gbProducer, &gbConsumer);
 
-    String8 consumerName = String8::format("ImageReader-%dx%df%xu%" PRIu64 "u%" PRIu64 "m%d-%d-%d",
-            mWidth, mHeight, mFormat, mUsage0, mUsage1, mMaxImages, getpid(),
+    String8 consumerName = String8::format("ImageReader-%dx%df%xu%" PRIu64 "m%d-%d-%d",
+            mWidth, mHeight, mFormat, mUsage, mMaxImages, getpid(),
             createProcessUniqueId());
 
     mBufferItemConsumer =
@@ -445,10 +437,10 @@ AImageReader::acquireImageLocked(/*out*/AImage** image, /*out*/int* acquireFence
     }
 
     if (mHalFormat == HAL_PIXEL_FORMAT_BLOB) {
-        *image = new AImage(this, mFormat, mUsage0, mUsage1, buffer, buffer->mTimestamp,
+        *image = new AImage(this, mFormat, mUsage, buffer, buffer->mTimestamp,
                 readerWidth, readerHeight, mNumPlanes);
     } else {
-        *image = new AImage(this, mFormat, mUsage0, mUsage1, buffer, buffer->mTimestamp,
+        *image = new AImage(this, mFormat, mUsage, buffer, buffer->mTimestamp,
                 bufferWidth, bufferHeight, mNumPlanes);
     }
     mAcquiredImages.push_back(*image);
@@ -587,12 +579,12 @@ media_status_t AImageReader_new(
         /*out*/AImageReader** reader) {
     ALOGV("%s", __FUNCTION__);
     return AImageReader_newWithUsage(
-            width, height, format, AHARDWAREBUFFER_USAGE0_CPU_READ_OFTEN, 0, maxImages, reader);
+            width, height, format, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, maxImages, reader);
 }
 
 EXPORT
 media_status_t AImageReader_newWithUsage(
-        int32_t width, int32_t height, int32_t format, uint64_t usage0, uint64_t usage1,
+        int32_t width, int32_t height, int32_t format, uint64_t usage,
         int32_t maxImages, /*out*/ AImageReader** reader) {
     ALOGV("%s", __FUNCTION__);
 
@@ -626,7 +618,7 @@ media_status_t AImageReader_newWithUsage(
     }
 
     AImageReader* tmpReader = new AImageReader(
-        width, height, format, usage0, usage1, maxImages);
+        width, height, format, usage, maxImages);
     if (tmpReader == nullptr) {
         ALOGE("%s: AImageReader allocation failed", __FUNCTION__);
         return AMEDIA_ERROR_UNKNOWN;

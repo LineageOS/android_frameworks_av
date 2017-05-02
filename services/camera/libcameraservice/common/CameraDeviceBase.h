@@ -307,11 +307,6 @@ class CameraDeviceBase : public virtual RefBase {
     virtual status_t prepare(int maxCount, int streamId) = 0;
 
     /**
-     * Get the HAL device version.
-     */
-    virtual uint32_t getDeviceVersion() = 0;
-
-    /**
      * Set the deferred consumer surface and finish the rest of the stream configuration.
      */
     virtual status_t setConsumerSurfaces(int streamId,

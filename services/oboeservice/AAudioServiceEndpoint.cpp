@@ -46,6 +46,7 @@ using namespace aaudio;   // TODO just import names needed
 
 // Use 2 for "double buffered"
 #define BUFFER_SIZE_IN_BURSTS     2
+#define BURSTS_PER_MIX_LOOP       1
 
 // The mStreamInternal will use a service interface that does not go through Binder.
 AAudioServiceEndpoint::AAudioServiceEndpoint(AAudioService &audioService)

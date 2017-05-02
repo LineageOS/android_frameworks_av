@@ -72,7 +72,6 @@ private:
 
             Mutex                               mLock;
             sp<ISoundTrigger>                   mISoundTrigger;
-            const sound_trigger_module_handle_t mModule;
             sp<SoundTriggerCallback>            mCallback;
 };
 
