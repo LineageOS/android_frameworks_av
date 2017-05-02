@@ -1939,6 +1939,8 @@ status_t Parameters::set(const String8& paramString) {
     if (validatedParams.videoWidth != videoWidth ||
             validatedParams.videoHeight != videoHeight) {
         if (state == RECORD) {
+            /* supporting jpeg as only picture format in case of video record */
+            newParams.set(CameraParameters::KEY_PICTURE_FORMAT,CameraParameters::PIXEL_FORMAT_JPEG);
             ALOGW("%s: Video size cannot be updated (from %d x %d to %d x %d)"
                     " when recording is active! Ignore the size update!",
                     __FUNCTION__, videoWidth, videoHeight, validatedParams.videoWidth,
@@ -2399,8 +2401,15 @@ const char* Parameters::getStateName(State state) {
 }
 
 int Parameters::formatStringToEnum(const char *format) {
-    return CameraParameters::previewFormatToEnum(format);
+    int ret = -1;
+    ret = CameraParameters::previewFormatToEnum(format);
+    if(-1==ret)
+    {
+        ret = QTIParameters::PictureFormatStringToEnum(format);
+    }
+    return ret;
 }
+
 
 const char* Parameters::formatEnumToString(int format) {
     const char *fmt;
@@ -2917,6 +2926,13 @@ Parameters::Size Parameters::getMaxSize(const Vector<Parameters::Size> &sizes) {
     }
     return maxSize;
 }
+void Parameters::getMaxRawSize(int * width , int * height)
+{
+    *width = *height = -1;
+    Parameters::Size s = getMaxSize(getAvailableRawSizes());
+    *width = s.width;
+    *height = s.height;
+}
 
 Vector<Parameters::StreamConfiguration> Parameters::getStreamConfigurations() {
     const int STREAM_CONFIGURATION_SIZE = 4;
@@ -3009,6 +3025,22 @@ Vector<Parameters::Size> Parameters::getAvailableJpegSizes() {
     }
 
     return jpegSizes;
+}
+
+Vector<Parameters::Size> Parameters::getAvailableRawSizes() {
+    Vector<Parameters::Size> rawSizes;
+    const int JPEG_SIZE_ENTRY_COUNT = 2;
+    const int WIDTH_OFFSET = 0;
+    const int HEIGHT_OFFSET = 1;
+    camera_metadata_ro_entry_t availableRawSizes =
+    staticInfo(ANDROID_SCALER_AVAILABLE_RAW_SIZES);
+    for (size_t i = 0; i < availableRawSizes.count; i+= JPEG_SIZE_ENTRY_COUNT) {
+        int width = availableRawSizes.data.i32[i + WIDTH_OFFSET];
+        int height = availableRawSizes.data.i32[i + HEIGHT_OFFSET];
+        Size sz = {width, height};
+        rawSizes.add(sz);
+    }
+    return rawSizes;
 }
 
 Parameters::CropRegion Parameters::calculateCropRegion(bool previewOnly) const {

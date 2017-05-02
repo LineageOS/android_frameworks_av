@@ -43,6 +43,9 @@ namespace camera2 {
 
 class StreamingProcessor;
 class JpegProcessor;
+#ifdef USE_QTI_CAMERA2CLIENT
+class RawProcessor;
+#endif
 class ZslProcessor;
 class CaptureSequencer;
 class CallbackProcessor;
@@ -139,7 +142,9 @@ public:
     int getCallbackStreamId() const;
     int getRecordingStreamId() const;
     int getZslStreamId() const;
-
+#ifdef USE_QTI_CAMERA2CLIENT
+    int getRawStreamId() const;
+#endif
     status_t registerFrameListener(int32_t minId, int32_t maxId,
             const wp<camera2::FrameProcessor::FilteredListener>& listener,
             bool sendPartials = true);
@@ -224,6 +229,9 @@ private:
 
     sp<camera2::CaptureSequencer> mCaptureSequencer;
     sp<camera2::JpegProcessor> mJpegProcessor;
+#ifdef USE_QTI_CAMERA2CLIENT
+    sp<camera2::RawProcessor> mRawProcessor;
+#endif
     sp<camera2::ZslProcessor> mZslProcessor;
 #ifdef USE_QTI_CAMERA2CLIENT
     sp<QTICamera2Client> mQTICamera2Client;

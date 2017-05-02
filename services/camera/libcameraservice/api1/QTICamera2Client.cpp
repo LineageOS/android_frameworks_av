@@ -45,6 +45,8 @@
 #include "api1/qticlient2/CaptureSequencer.h"
 #include "api1/qticlient2/CallbackProcessor.h"
 #include "api1/qticlient2/ZslProcessor.h"
+#include "api1/qticlient2/RawProcessor.h"
+
 
 
 #define ALOG1(...) ALOGD_IF(gLogLevel >= 1, __VA_ARGS__);
@@ -346,5 +348,19 @@ status_t QTICamera2Client::sendCommand(Parameters &params,int32_t cmd, int32_t a
     return res;
 }
 
+status_t QTICamera2Client::configureRaw(Parameters &params) {
+    char value[PROPERTY_VALUE_MAX];
+    status_t res = OK;
+    sp<Camera2Client> client = mParentClient.promote();
+
+    property_get("persist.camera.raw_yuv", value, "0");
+    params.qtiParams->isRawPlusYuv = atoi(value) > 0 ? true : false;
+
+    if((params.state == Parameters::RECORD) || (params.allowZslMode)) {
+        params.qtiParams->isRawPlusYuv = false;
+    }
+
+    return res;
+}
 } // namespace android
 

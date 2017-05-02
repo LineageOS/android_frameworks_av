@@ -45,6 +45,7 @@ class CaptureSequencer:
             virtual public Thread,
             virtual public FrameProcessor::FilteredListener {
   public:
+    sp<QTICaptureSequencer> mQTICaptureSequencer;
     explicit CaptureSequencer(wp<Camera2Client> client);
     ~CaptureSequencer();
 
@@ -116,7 +117,6 @@ class CaptureSequencer:
 
     wp<Camera2Client> mClient;
     wp<ZslProcessor> mZslProcessor;
-    sp<QTICaptureSequencer> mQTICaptureSequencer;
 
     bool mUseQTICaptureSequencer;
 

@@ -197,6 +197,9 @@ const char HISTOGRAM_DISABLE[] = "disable";
 const char KEY_QTI_SUPPORTED_DIS_MODES[] = "dis-values";
 const char KEY_QTI_DIS[] = "dis";
 
+// Values for raw image formats
+const char QTIParameters::QC_PIXEL_FORMAT_BAYER_MIPI_RAW_10RGGB[] = "bayer-mipi-10rggb";
+
 status_t QTIParameters::initialize(void *parametersParent,
             sp<CameraDeviceBase> device, sp<CameraProviderManager> manager) {
     status_t res = OK;
@@ -215,6 +218,7 @@ status_t QTIParameters::initialize(void *parametersParent,
     uint32_t tag = 0;
     isoValue = -1;
     exposureTime = -1;
+    isRawPlusYuv = false;
 
     // Temp Initialize
     ParentParams->params.set("max-contrast", 10);
@@ -298,6 +302,35 @@ status_t QTIParameters::initialize(void *parametersParent,
         ParentParams->params.set(KEY_QTI_ISO_MODE,
                 ISO_AUTO);
     }
+
+    String8 supportedPicutreFormats;
+    SortedVector<int32_t> outputFormats = ParentParams->getAvailableOutputFormats();
+    bool addComma = false;
+    for (size_t i=0; i < outputFormats.size(); i++) {
+        if (addComma)
+            supportedPicutreFormats += ",";
+        addComma = true;
+        switch (outputFormats[i]) {
+            case HAL_PIXEL_FORMAT_RAW10:
+                supportedPicutreFormats += PictureFormatEnumToString(outputFormats[i]);
+                break;
+            case HAL_PIXEL_FORMAT_BLOB:
+                supportedPicutreFormats += CameraParameters::PIXEL_FORMAT_JPEG;
+                break;
+
+            default:
+                ALOGW("%s: Camera %d: Unknown preview format: %x",
+                        __FUNCTION__, ParentParams->cameraId, outputFormats[i]);
+                addComma = false;
+                break;
+        }
+    }
+
+    ParentParams->params.set(CameraParameters::KEY_SUPPORTED_PICTURE_FORMATS,
+        supportedPicutreFormats);
+    ParentParams->params.set(CameraParameters::KEY_PICTURE_FORMAT,
+        CameraParameters::PIXEL_FORMAT_JPEG);
+    pictureFormat = PictureFormatStringToEnum(ParentParams->params.getPictureFormat());
 
     //Sharpness
     res = CameraMetadata::getTagFromName(KEY_QTI_VENDOR_SHARPNESS_RANGE, vTags.get(), &tag);
@@ -1181,6 +1214,28 @@ int32_t  QTIParameters::setContinuousISO(const char *isoVal, CameraParameters2& 
     }
     ALOGE("Invalid iso value: %d", continousIso);
     return BAD_VALUE;
+}
+
+const char*  QTIParameters::PictureFormatEnumToString(int format)
+{
+    switch (format) {
+        case HAL_PIXEL_FORMAT_RAW10:
+            return QC_PIXEL_FORMAT_BAYER_MIPI_RAW_10RGGB;
+        default:
+            ALOGE("%s: Unknown picuture format enum %d",
+                    __FUNCTION__, format);
+            return "unknown";
+        }
+}
+
+int QTIParameters::PictureFormatStringToEnum(const char * format)
+{
+        return
+        !strcmp(format, CameraParameters::PIXEL_FORMAT_JPEG) ?
+                HAL_PIXEL_FORMAT_BLOB :    // jpeg
+        !strcmp(format, QC_PIXEL_FORMAT_BAYER_MIPI_RAW_10RGGB) ?
+            HAL_PIXEL_FORMAT_RAW10 :    // RGB10
+        -1;
 }
 
 }; // namespace camera2

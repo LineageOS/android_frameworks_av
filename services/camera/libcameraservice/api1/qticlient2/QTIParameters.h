@@ -91,7 +91,6 @@ private:
     int64_t exposureTime;
     cam_manual_wb_parm_t manualWb;
     int32_t aeBracketValues[MAX_BURST_COUNT_AE_BRACKETING];
-
     enum flashMode_t {
         FLASH_MODE_RED_EYE = ANDROID_CONTROL_AE_MODE_ON_AUTO_FLASH_REDEYE,
         FLASH_MODE_INVALID = -1
@@ -114,6 +113,8 @@ public:
     bool Hdr1xEnable;
     bool HdrSceneEnable;
     metadata_vendor_id_t vendorTagId;
+    bool isRawPlusYuv;
+    int pictureFormat;
     // Sets up default QTI parameters
     status_t initialize(void *parametersParent, sp<CameraDeviceBase> device, sp<CameraProviderManager> manager);
     // Validate and update camera parameters based on new settings
@@ -125,6 +126,10 @@ public:
     static int wbModeStringToEnum(const char *wbMode);
     static int sceneModeStringToEnum(const char *sceneMode);
 
+    static const char* PictureFormatEnumToString(int format);
+
+    static int PictureFormatStringToEnum(const char * format);
+
 private:
     int32_t setContinuousISO(const char *isoValue, CameraParameters2& newParams);
     int32_t setExposureTime(const char *expTimeStr, CameraParameters2& newParams);
@@ -132,6 +137,8 @@ private:
     int32_t parseGains(const char *gainStr, double &r_gain,
             double &g_gain, double &b_gain);
     const char *flashModeEnumToString(flashMode_t flashMode);
+
+    static const char QC_PIXEL_FORMAT_BAYER_MIPI_RAW_10RGGB[];
 };
 
 }; // namespace camera2

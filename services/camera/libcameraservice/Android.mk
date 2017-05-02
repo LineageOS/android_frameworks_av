@@ -59,6 +59,7 @@ LOCAL_SRC_FILES +=  \
     api1/qticlient2/QTIFrameProcessor.cpp \
     api1/qticlient2/StreamingProcessor.cpp \
     api1/qticlient2/JpegProcessor.cpp \
+    api1/qticlient2/RawProcessor.cpp \
     api1/qticlient2/CallbackProcessor.cpp \
     api1/qticlient2/JpegCompressor.cpp \
     api1/qticlient2/CaptureSequencer.cpp \

@@ -56,6 +56,7 @@ struct Parameters {
     int previewTransform; // set by CAMERA_CMD_SET_DISPLAY_ORIENTATION
 
     int pictureWidth, pictureHeight;
+    int rawpictureWidth, rawpictureHeight;
     // Store the picture size before they are overriden by video snapshot
     int pictureWidthLastSet, pictureHeightLastSet;
     bool pictureSizeOverriden;
@@ -273,6 +274,9 @@ struct Parameters {
     // Validate and update camera parameters based on new settings
     status_t set(const String8 &paramString);
 
+    // Helper function to get non-duplicated available output formats
+    SortedVector<int32_t> getAvailableOutputFormats();
+
     // Retrieve the current settings
     String8 get() const;
 
@@ -361,6 +365,7 @@ struct Parameters {
     };
 
     int32_t fpsFromRange(int32_t min, int32_t max) const;
+    void getMaxRawSize(int * width,int * height);
 
 private:
 
@@ -416,10 +421,9 @@ private:
     // return true if the device doesn't support min frame duration metadata tag.
     bool isFpsSupported(const Vector<Size> &size, int format, int32_t fps);
 
-    // Helper function to get non-duplicated available output formats
-    SortedVector<int32_t> getAvailableOutputFormats();
     // Helper function to get available output jpeg sizes
     Vector<Size> getAvailableJpegSizes();
+    Vector<Size> getAvailableRawSizes();
     // Helper function to get maximum size in input Size vector.
     // The maximum size is defined by comparing width first, when width ties comparing height.
     Size getMaxSize(const Vector<Size>& sizes);
