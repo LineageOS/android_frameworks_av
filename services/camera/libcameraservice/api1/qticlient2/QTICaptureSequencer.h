@@ -1,4 +1,5 @@
 /* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  */
 /*
  * Copyright (C) 2012 The Android Open Source Project
@@ -75,6 +76,8 @@ class QTICaptureSequencer:
     // Notifications from the JPEG processor
     void onCaptureAvailable(nsecs_t timestamp, sp<MemoryBase> captureBuffer, bool captureError);
 
+    void onRawCaptureAvailable(nsecs_t timestamp, sp<MemoryBase> captureBuffer, bool captureError);
+
     void dump(int fd);
 
     bool threadLoop();
@@ -100,10 +103,15 @@ class QTICaptureSequencer:
     Condition mNewFrameSignal;
 
     bool mNewCaptureReceived;
+    bool mNewRawCaptureReceived;
     int32_t mNewCaptureErrorCnt;
+    int32_t mNewRawCaptureErrorCnt;
     nsecs_t mCaptureTimestamp[MAX_BURST_COUNT_PER_SHUTTER];
+    nsecs_t mRawCaptureTimestamp;
     sp<MemoryBase> mCaptureBuffer[MAX_BURST_COUNT_PER_SHUTTER];
+    sp<MemoryBase> mRawCaptureBuffer;
     Condition mNewCaptureSignal;
+    Condition mNewRawCaptureSignal;
 
     bool mShutterNotified; // Has CaptureSequencer sent shutter to Client
     bool mHalNotifiedShutter; // Has HAL sent shutter to CaptureSequencer

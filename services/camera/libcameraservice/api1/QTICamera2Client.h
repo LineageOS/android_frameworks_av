@@ -31,6 +31,7 @@
 #define ANDROID_SERVERS_CAMERA_QTICAMERA2CLIENT_H
 
 namespace android {
+
 using namespace camera2;
 
 class Camera2Client;
@@ -47,13 +48,13 @@ public:
     status_t startHFRRecording(Parameters &params);
     void stopHFRRecording(Parameters &params);
     status_t sendCommand(Parameters &params,int32_t cmd, int32_t arg1, int32_t arg2);
+    status_t configureRaw(Parameters &params);
 
 private:
     void stopPreviewForRestart(Parameters &params);
     status_t restartVideoHdr(Parameters &params);
 
 };
-
 }; // namespace android
 
 #endif

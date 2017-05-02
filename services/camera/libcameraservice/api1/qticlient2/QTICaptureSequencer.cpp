@@ -1,4 +1,5 @@
 /* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  */
 /*
  * Copyright (C) 2012 The Android Open Source Project
@@ -42,6 +43,7 @@ QTICaptureSequencer::QTICaptureSequencer(wp<Camera2Client> client):
         mNewAEState(false),
         mNewFrameReceived(false),
         mNewCaptureReceived(false),
+        mNewRawCaptureReceived(false),
         mNewCaptureErrorCnt(0),
         mShutterNotified(false),
         mHalNotifiedShutter(false),
@@ -87,11 +89,11 @@ status_t QTICaptureSequencer::startCapture(int msgType, bool& useQTISequencer) {
     {
         SharedParameters::Lock lp(client->getParameters());
         mBurstCount = lp.mParameters.qtiParams->burstCount;
-
         // Set QTI capture sequencer for ZSL,
         // For AE bracketing,
         if ((mBurstCount > 1) ||
                 (lp.mParameters.allowZslMode) ||
+                (lp.mParameters.qtiParams->isRawPlusYuv) ||
                 (lp.mParameters.qtiParams->autoHDREnabled &&
                 lp.mParameters.qtiParams->isHdrScene)) {
             useQTISequencer = true;
@@ -196,6 +198,23 @@ void QTICaptureSequencer::onCaptureAvailable(nsecs_t timestamp,
     }
 }
 
+void QTICaptureSequencer::onRawCaptureAvailable(nsecs_t timestamp,
+        sp<MemoryBase> captureBuffer, bool captureError) {
+    ATRACE_CALL();
+    ALOGV("%s", __FUNCTION__);
+    Mutex::Autolock l(mInputMutex);
+    mRawCaptureTimestamp = timestamp;
+    mRawCaptureBuffer = captureBuffer;
+    if (!mNewRawCaptureReceived) {
+        mNewRawCaptureReceived = true;
+        if (captureError) {
+            mNewRawCaptureErrorCnt++;
+        } else {
+            mNewRawCaptureErrorCnt = 0;
+        }
+        mNewRawCaptureSignal.signal();
+    }
+}
 
 void QTICaptureSequencer::dump(int fd) {
     String8 result;
@@ -307,6 +326,8 @@ QTICaptureSequencer::CaptureState QTICaptureSequencer::manageIdle(
 QTICaptureSequencer::CaptureState QTICaptureSequencer::manageDone(sp<Camera2Client> &client) {
     status_t res = OK;
     ATRACE_CALL();
+    int pictureFormat;
+    bool isRawPlusYuv;
     mCaptureId++;
     if (mCaptureId >= Camera2Client::kCaptureRequestIdEnd) {
         mCaptureId = Camera2Client::kCaptureRequestIdStart;
@@ -319,6 +340,8 @@ QTICaptureSequencer::CaptureState QTICaptureSequencer::manageDone(sp<Camera2Clie
     int takePictureCounter = 0;
     {
         SharedParameters::Lock l(client->getParameters());
+        pictureFormat = l.mParameters.qtiParams->pictureFormat;
+        isRawPlusYuv = l.mParameters.qtiParams->isRawPlusYuv;
         switch (l.mParameters.state) {
             case Parameters::DISCONNECTED:
                 ALOGW("%s: Camera %d: Discarding image data during shutdown ",
@@ -361,22 +384,44 @@ QTICaptureSequencer::CaptureState QTICaptureSequencer::manageDone(sp<Camera2Clie
     /**
      * Fire the jpegCallback in Camera#takePicture(..., jpegCallback)
      */
-    for (int i = 0; i < mBurstCount; i++) {
-        if (mCaptureBuffer[i] != 0 && res == OK) {
-        ATRACE_ASYNC_END(Camera2Client::kTakepictureLabel, takePictureCounter);
+    if (pictureFormat == HAL_PIXEL_FORMAT_BLOB ) {
+        for (int i = 0; i < mBurstCount; i++) {
+            if (mCaptureBuffer[i] != 0 && res == OK) {
+                ATRACE_ASYNC_END(Camera2Client::kTakepictureLabel, takePictureCounter);
 
-        Camera2Client::SharedCameraCallbacks::Lock
-            l(client->mSharedCameraCallbacks);
-        ALOGV("%s: Sending still image to client", __FUNCTION__);
-        if (l.mRemoteCallback != 0) {
-            l.mRemoteCallback->dataCallback(CAMERA_MSG_COMPRESSED_IMAGE,
-                        mCaptureBuffer[i], NULL);
-        } else {
-            ALOGV("%s: No client!", __FUNCTION__);
+                Camera2Client::SharedCameraCallbacks::Lock
+                    l(client->mSharedCameraCallbacks);
+                ALOGV("%s: Sending still image to client", __FUNCTION__);
+                if (l.mRemoteCallback != 0) {
+                    l.mRemoteCallback->dataCallback(CAMERA_MSG_COMPRESSED_IMAGE,
+                            mCaptureBuffer[i], NULL);
+                } else {
+                    ALOGV("%s: No client!", __FUNCTION__);
+                }
+                mCaptureBuffer[i].clear();
+            }
         }
-        }
-        mCaptureBuffer[i].clear();
     }
+
+    if (pictureFormat == HAL_PIXEL_FORMAT_RAW10 || isRawPlusYuv) {
+        for (int i = 0; i < mBurstCount; i++) {
+            if (mRawCaptureBuffer != 0 && res == OK) {
+                ATRACE_ASYNC_END(Camera2Client::kTakepictureLabel, takePictureCounter);
+
+                Camera2Client::SharedCameraCallbacks::Lock
+                    l(client->mSharedCameraCallbacks);
+                ALOGV("%s: Sending Raw image to client", __FUNCTION__);
+                if (l.mRemoteCallback != 0 && isRawPlusYuv) {
+                    l.mRemoteCallback->dataCallback(CAMERA_MSG_COMPRESSED_IMAGE,
+                            mRawCaptureBuffer, NULL);
+                } else {
+                    ALOGV("%s: No client!", __FUNCTION__);
+                }
+                mRawCaptureBuffer.clear();
+            }
+        }
+    }
+
     return IDLE;
 }
 
@@ -590,16 +635,29 @@ QTICaptureSequencer::CaptureState QTICaptureSequencer::manageStandardCapture(
     outputStreams.push(client->getPreviewStreamId());
 
     int captureStreamId = client->getCaptureStreamId();
-    if (captureStreamId == Camera2Client::NO_STREAM) {
-        res = client->createJpegStreamL(l.mParameters);
-        if (res != OK || client->getCaptureStreamId() == Camera2Client::NO_STREAM) {
-            ALOGE("%s: Camera %d: cannot create jpeg stream for slowJpeg mode: %s (%d)",
-                  __FUNCTION__, client->getCameraId(), strerror(-res), res);
+
+    if (l.mParameters.qtiParams->pictureFormat == HAL_PIXEL_FORMAT_BLOB) {
+        if (captureStreamId == Camera2Client::NO_STREAM) {
+            res = client->createJpegStreamL(l.mParameters);
+            if (res != OK || client->getCaptureStreamId() == Camera2Client::NO_STREAM) {
+                ALOGE("%s: Camera %d: cannot create jpeg stream for slowJpeg mode: %s (%d)",
+                      __FUNCTION__, client->getCameraId(), strerror(-res), res);
+                return DONE;
+            }
+        }
+        outputStreams.push(client->getCaptureStreamId());
+
+    }
+
+    if(l.mParameters.qtiParams->pictureFormat == HAL_PIXEL_FORMAT_RAW10 ||
+            l.mParameters.qtiParams->isRawPlusYuv) {
+        int rawStreamId = client->getRawStreamId();
+        if (rawStreamId != Camera2Client::NO_STREAM) {
+            outputStreams.push(client->getRawStreamId());
+        } else {
             return DONE;
         }
     }
-
-    outputStreams.push(client->getCaptureStreamId());
 
     if (l.mParameters.previewCallbackFlags &
             CAMERA_FRAME_CALLBACK_FLAG_ENABLE_MASK) {
@@ -672,7 +730,8 @@ QTICaptureSequencer::CaptureState QTICaptureSequencer::manageStandardCaptureWait
     status_t res;
     ATRACE_CALL();
     Mutex::Autolock l(mInputMutex);
-
+    int pictureFormat;
+    bool isRawPlusYuv;
 
     // Wait for shutter callback
     while (!mHalNotifiedShutter) {
@@ -697,6 +756,11 @@ QTICaptureSequencer::CaptureState QTICaptureSequencer::manageStandardCaptureWait
         ALOGW("Timed out waiting for shutter notification");
         return DONE;
     }
+    {
+        SharedParameters::Lock l(client->getParameters());
+        pictureFormat = l.mParameters.qtiParams->pictureFormat;
+        isRawPlusYuv = l.mParameters.qtiParams->isRawPlusYuv;
+    }
 
     // Wait for new metadata result (mNewFrame)
     while (!mNewFrameReceived) {
@@ -708,13 +772,28 @@ QTICaptureSequencer::CaptureState QTICaptureSequencer::manageStandardCaptureWait
     }
 
     // Wait until jpeg was captured by JpegProcessor
-    while (mNewFrameReceived && !mNewCaptureReceived) {
-        res = mNewCaptureSignal.waitRelative(mInputMutex, kWaitDuration);
-        if (res == TIMED_OUT) {
-            mTimeoutCount--;
-            break;
+    if (pictureFormat == HAL_PIXEL_FORMAT_BLOB) {
+        while (mNewFrameReceived && !mNewCaptureReceived) {
+            res = mNewCaptureSignal.waitRelative(mInputMutex, kWaitDuration);
+            if (res == TIMED_OUT) {
+                mTimeoutCount--;
+                break;
+            }
         }
     }
+
+    // Wait until raw was captured by RawProcessor
+    if (pictureFormat == HAL_PIXEL_FORMAT_RAW10 || isRawPlusYuv) {
+        while (mNewFrameReceived && !mNewRawCaptureReceived) {
+            res = mNewRawCaptureSignal.waitRelative(mInputMutex, kWaitDuration);
+            if (res == TIMED_OUT) {
+                mTimeoutCount--;
+                break;
+            }
+        }
+    }
+
+    if (pictureFormat == HAL_PIXEL_FORMAT_BLOB) {
     if (mNewCaptureReceived) {
         if (mNewCaptureErrorCnt > kMaxRetryCount) {
             ALOGW("Exceeding multiple retry limit of %d due to buffer drop", kMaxRetryCount);
@@ -726,37 +805,81 @@ QTICaptureSequencer::CaptureState QTICaptureSequencer::manageStandardCaptureWait
         }
     }
 
+    }
+
+    if (pictureFormat == HAL_PIXEL_FORMAT_RAW10 || isRawPlusYuv) {
+        if (mNewRawCaptureReceived) {
+            if (mNewRawCaptureErrorCnt > kMaxRetryCount) {
+                ALOGE("Exceeding multiple retry limit of %d due to buffer drop", kMaxRetryCount);
+                return DONE;
+            } else if (mNewRawCaptureErrorCnt > 0) {
+                ALOGE("Capture error happened, retry %d...", mNewRawCaptureErrorCnt);
+                mNewRawCaptureReceived = false;
+                return STANDARD_CAPTURE;
+            }
+        }
+    }
+
     if (mTimeoutCount <= 0) {
         ALOGW("Timed out waiting for capture to complete");
         return DONE;
     }
-    if (mNewFrameReceived && mNewCaptureReceived) {
+
+    if (mNewFrameReceived ) {
         for (int i = 0; i < mBurstCount; i++) {
-            if (mNewFrameId[i] != (mCaptureId + i)) {
-                ALOGW("Mismatched capture frame IDs: Expected %d, got %d",
-                        mCaptureId, mNewFrameId[0]);
+            if (mNewCaptureReceived || mNewRawCaptureReceived) {
+                if (mNewFrameId[i] != (mCaptureId + i)) {
+                    ALOGW("Mismatched capture frame IDs: Expected %d, got %d",
+                            mCaptureId, mNewFrameId[0]);
+                }
             }
             camera_metadata_entry_t entry;
             entry = mNewFrame[i].find(ANDROID_SENSOR_TIMESTAMP);
             if (entry.count == 0) {
                 ALOGE("No timestamp field in capture frame!");
             } else if (entry.count == 1) {
-                if (entry.data.i64[i] != mCaptureTimestamp[i]) {
+                if (mNewCaptureReceived && entry.data.i64[i] != mCaptureTimestamp[i]) {
                     ALOGW("Mismatched capture timestamps: Metadata frame %" PRId64 ","
-                            " captured buffer %" PRId64,
-                            entry.data.i64[i],
-                            mCaptureTimestamp[i]);
+                                " captured buffer %" PRId64,
+                                entry.data.i64[i],
+                                mCaptureTimestamp[i]);
+                }
+                if (mNewRawCaptureReceived && entry.data.i64[i] != mCaptureTimestamp[i]) {
+                    ALOGW("Mismatched capture timestamps: Metadata frame %" PRId64 ","
+                                " captured buffer %" PRId64,
+                                entry.data.i64[i],
+                                mCaptureTimestamp[i]);
                 }
             } else {
                 ALOGE("Timestamp metadata is malformed!");
             }
         }
-        client->removeFrameListener(mCaptureId, mCaptureId + 1 + mBurstCount, this);
+        client->removeFrameListener(mCaptureId, mCaptureId + 1, this);
 
-        mNewFrameReceived = false;
-        mNewCaptureReceived = false;
-        return DONE;
+        if(pictureFormat == HAL_PIXEL_FORMAT_BLOB ) {
+            if(mNewCaptureReceived) {
+                if (isRawPlusYuv) {
+                    if(mNewRawCaptureReceived) {
+                        mNewFrameReceived = false;
+                        mNewCaptureReceived = false;
+                        mNewRawCaptureReceived = false;
+                        return DONE;
+                    }
+                }
+                else {
+                    mNewFrameReceived = false;
+                    mNewCaptureReceived = false;
+                    return DONE;
+                }
+            }
+        } else if((pictureFormat == HAL_PIXEL_FORMAT_RAW10 || isRawPlusYuv) &&
+                    mNewRawCaptureReceived ) {
+                mNewFrameReceived = false;
+                mNewRawCaptureReceived = false;
+                return DONE;
+        }
     }
+
     return STANDARD_CAPTURE_WAIT;
 }
 
