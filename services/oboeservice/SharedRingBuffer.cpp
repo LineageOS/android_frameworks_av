@@ -18,6 +18,8 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include <sys/mman.h>
+
 #include "binding/RingBufferParcelable.h"
 #include "binding/AudioEndpointParcelable.h"
 

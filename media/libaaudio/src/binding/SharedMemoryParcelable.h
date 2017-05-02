@@ -64,9 +64,12 @@ public:
     void dump();
 
 protected:
+
+#define MMAP_UNRESOLVED_ADDRESS    reinterpret_cast<uint8_t*>(MAP_FAILED)
+
     int mFd = -1;
     int32_t mSizeInBytes = 0;
-    uint8_t *mResolvedAddress = nullptr;
+    uint8_t *mResolvedAddress = MMAP_UNRESOLVED_ADDRESS;
 };
 
 } /* namespace aaudio */
