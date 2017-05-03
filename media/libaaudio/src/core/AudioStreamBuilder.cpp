@@ -108,5 +108,6 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     } else {
         *streamPtr = audioStream;
     }
+    ALOGD("AudioStreamBuilder(): return %d", result);
     return result;
 }
