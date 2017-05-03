@@ -200,6 +200,10 @@ aaudio_result_t AAudioServiceStreamShared::close()  {
         mEndpointManager.closeEndpoint(endpoint);
         mServiceEndpoint = nullptr;
     }
+    if (mAudioDataQueue != nullptr) {
+        delete mAudioDataQueue;
+        mAudioDataQueue = nullptr;
+    }
     return AAudioServiceStreamBase::close();
 }
 

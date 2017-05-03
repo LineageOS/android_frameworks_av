@@ -59,6 +59,7 @@ aaudio_result_t AAudioServiceStreamBase::close() {
     std::lock_guard<std::mutex> lock(mLockUpMessageQueue);
     delete mUpMessageQueue;
     mUpMessageQueue = nullptr;
+
     return AAUDIO_OK;
 }
 

@@ -60,6 +60,13 @@ aaudio_result_t AAudioServiceStreamMMAP::close() {
     // FIXME Make closing synchronous.
     AudioClock::sleepForNanos(100 * AAUDIO_NANOS_PER_MILLISECOND);
 
+    if (mAudioDataFileDescriptor != -1) {
+        ALOGV("AAudioServiceStreamMMAP: LEAK? close(mAudioDataFileDescriptor = %d)\n",
+              mAudioDataFileDescriptor);
+        ::close(mAudioDataFileDescriptor);
+        mAudioDataFileDescriptor = -1;
+    }
+
     return AAudioServiceStreamBase::close();
 }
 
@@ -164,6 +171,8 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
                            : audio_channel_count_from_in_mask(config.channel_mask);
 
     mAudioDataFileDescriptor = mMmapBufferinfo.shared_memory_fd;
+    ALOGV("AAudioServiceStreamMMAP::open LEAK? mAudioDataFileDescriptor = %d\n",
+          mAudioDataFileDescriptor);
     mFramesPerBurst = mMmapBufferinfo.burst_size_frames;
     mCapacityInFrames = mMmapBufferinfo.buffer_size_frames;
     mAudioFormat = AAudioConvert_androidToAAudioDataFormat(config.format);

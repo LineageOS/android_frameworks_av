@@ -127,6 +127,7 @@ private:
     MonotonicCounter                    mFramesWritten;
     MonotonicCounter                    mFramesRead;
     int32_t                             mPreviousFrameCounter = 0;   // from HAL
+    int                                 mAudioDataFileDescriptor = -1;
 
     // Interface to the AudioFlinger MMAP support.
     android::sp<android::MmapStreamInterface> mMmapStream;

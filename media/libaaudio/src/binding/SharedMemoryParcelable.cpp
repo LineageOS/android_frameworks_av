@@ -50,7 +50,8 @@ status_t SharedMemoryParcelable::writeToParcel(Parcel* parcel) const {
     if (status != NO_ERROR) return status;
     if (mSizeInBytes > 0) {
         status = parcel->writeDupFileDescriptor(mFd);
-        ALOGE_IF(status != NO_ERROR, "SharedMemoryParcelable writeDupFileDescriptor failed : %d", status);
+        ALOGE_IF(status != NO_ERROR, "SharedMemoryParcelable writeDupFileDescriptor failed : %d",
+                 status);
     }
     return status;
 }
@@ -61,11 +62,13 @@ status_t SharedMemoryParcelable::readFromParcel(const Parcel* parcel) {
         return status;
     }
     if (mSizeInBytes > 0) {
-        int originalFD = parcel->readFileDescriptor();
-        mFd = fcntl(originalFD, F_DUPFD_CLOEXEC, 0);
+        mOriginalFd = parcel->readFileDescriptor();
+        ALOGV("SharedMemoryParcelable::readFromParcel() LEAK? mOriginalFd = %d\n", mOriginalFd);
+        mFd = fcntl(mOriginalFd, F_DUPFD_CLOEXEC, 0);
+        ALOGV("SharedMemoryParcelable::readFromParcel() LEAK? mFd = %d\n", mFd);
         if (mFd == -1) {
             status = -errno;
-            ALOGE("SharedMemoryParcelable readFileDescriptor fcntl() failed : %d", status);
+            ALOGE("SharedMemoryParcelable readFromParcel fcntl() failed : %d", status);
         }
     }
     return status;
@@ -81,8 +84,14 @@ aaudio_result_t SharedMemoryParcelable::close() {
         mResolvedAddress = MMAP_UNRESOLVED_ADDRESS;
     }
     if (mFd != -1) {
+        ALOGV("SharedMemoryParcelable::close() LEAK? mFd = %d\n", mFd);
         ::close(mFd);
         mFd = -1;
+    }
+    if (mOriginalFd != -1) {
+        ALOGV("SharedMemoryParcelable::close() LEAK? mOriginalFd = %d\n", mOriginalFd);
+        ::close(mOriginalFd);
+        mOriginalFd = -1;
     }
     return AAUDIO_OK;
 }
