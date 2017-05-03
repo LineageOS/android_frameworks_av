@@ -32,11 +32,8 @@
 #define LOG_TAG "VolumeShaper"
 
 // turn on VolumeShaper logging
-#if 0
-#define VS_LOG ALOGD
-#else
-#define VS_LOG(...)
-#endif
+#define VS_LOGGING 0
+#define VS_LOG(...) ALOGD_IF(VS_LOGGING, __VA_ARGS__)
 
 namespace android {
 
@@ -90,17 +87,17 @@ public:
         Configuration()
             : Interpolator<S, T>()
             , mType(TYPE_SCALE)
+            , mId(-1)
             , mOptionFlags(OPTION_FLAG_NONE)
-            , mDurationMs(1000.)
-            , mId(-1) {
+            , mDurationMs(1000.) {
         }
 
         explicit Configuration(const Configuration &configuration)
             : Interpolator<S, T>(*static_cast<const Interpolator<S, T> *>(&configuration))
             , mType(configuration.mType)
+            , mId(configuration.mId)
             , mOptionFlags(configuration.mOptionFlags)
-            , mDurationMs(configuration.mDurationMs)
-            , mId(configuration.mId) {
+            , mDurationMs(configuration.mDurationMs) {
         }
 
         Type getType() const {

@@ -957,7 +957,6 @@ NBLog::FormatEntry::iterator NBLog::Reader::handleFormat(const FormatEntry &fmtE
 // ---------------------------------------------------------------------------
 
 NBLog::Merger::Merger(const void *shared, size_t size):
-      mBuffer(NULL),
       mShared((Shared *) shared),
       mFifo(mShared != NULL ?
         new audio_utils_fifo(size, sizeof(uint8_t),

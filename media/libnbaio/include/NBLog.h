@@ -72,6 +72,7 @@ public:
     class iterator;
     explicit FormatEntry(const uint8_t *entry);
     explicit FormatEntry(const iterator &it);
+    virtual ~FormatEntry() {}
 
     // entry representation in memory
     struct entry {
@@ -380,7 +381,7 @@ private:
                                          String8 *timestamp,
                                          String8 *body);
     // dummy method for handling absent author entry
-    virtual size_t handleAuthor(const FormatEntry &fmtEntry, String8 *body) { return 0; }
+    virtual size_t handleAuthor(const FormatEntry& /*fmtEntry*/, String8* /*body*/) { return 0; }
 
     // Searches for the last entry of type <type> in the range [front, back)
     // back has to be entry-aligned. Returns nullptr if none enconuntered.
@@ -422,7 +423,6 @@ private:
     // vector of the readers the merger is supposed to merge from.
     // every reader reads from a writer's buffer
     std::vector<NamedReader> mNamedReaders;
-    uint8_t *mBuffer;
     Shared * const mShared;
     std::unique_ptr<audio_utils_fifo> mFifo;
     std::unique_ptr<audio_utils_fifo_writer> mFifoWriter;
