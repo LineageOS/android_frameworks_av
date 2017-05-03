@@ -52,6 +52,7 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     mDataCallbackProc = builder.getDataCallbackProc();
     mErrorCallbackProc = builder.getErrorCallbackProc();
     mDataCallbackUserData = builder.getDataCallbackUserData();
+    mErrorCallbackUserData = builder.getErrorCallbackUserData();
 
     // This is very helpful for debugging in the future.
     ALOGI("AudioStream.open(): rate = %d, channels = %d, format = %d, sharing = %d",

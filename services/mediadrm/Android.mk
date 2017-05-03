@@ -28,7 +28,7 @@ LOCAL_SHARED_LIBRARIES:= \
     libutils \
     libhidlbase \
     libhidlmemory \
-    android.hidl.base@1.0 \
+    libhidltransport \
     android.hardware.drm@1.0
 
 LOCAL_CFLAGS += -Wall -Wextra -Werror
