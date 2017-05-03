@@ -133,7 +133,7 @@ private:
             mTotalNumTableEntries(0),
             mNumValuesInCurrEntry(0),
             mCurrTableEntriesElement(NULL) {
-            CHECK_GT(mElementCapacity, 0);
+            CHECK_GT(mElementCapacity, 0u);
             // Ensure no integer overflow on allocation in add().
             CHECK_LT(ENTRY_SIZE, UINT32_MAX / mElementCapacity);
         }
@@ -161,7 +161,7 @@ private:
                 --iterations;
             }
             CHECK(it != mTableEntryList.end());
-            CHECK_EQ(iterations, 0);
+            CHECK_EQ(iterations, 0u);
 
             (*it)[(pos % (mElementCapacity * ENTRY_SIZE))] = value;
         }
@@ -182,7 +182,7 @@ private:
                 --iterations;
             }
             CHECK(it != mTableEntryList.end());
-            CHECK_EQ(iterations, 0);
+            CHECK_EQ(iterations, 0u);
 
             value = (*it)[(pos % (mElementCapacity * ENTRY_SIZE))];
             return true;
@@ -230,12 +230,12 @@ private:
         // 2. followed by the values in the table enties in order
         // @arg writer the writer to actual write to the storage
         void write(MPEG4Writer *writer) const {
-            CHECK_EQ(mNumValuesInCurrEntry % ENTRY_SIZE, 0);
+            CHECK_EQ(mNumValuesInCurrEntry % ENTRY_SIZE, 0u);
             uint32_t nEntries = mTotalNumTableEntries;
             writer->writeInt32(nEntries);
             for (typename List<TYPE *>::iterator it = mTableEntryList.begin();
                 it != mTableEntryList.end(); ++it) {
-                CHECK_GT(nEntries, 0);
+                CHECK_GT(nEntries, 0u);
                 if (nEntries >= mElementCapacity) {
                     writer->write(*it, sizeof(TYPE) * ENTRY_SIZE, mElementCapacity);
                     nEntries -= mElementCapacity;
@@ -1237,7 +1237,7 @@ off64_t MPEG4Writer::addLengthPrefixedSample_l(MediaBuffer *buffer) {
 
         mOffset += length + 4;
     } else {
-        CHECK_LT(length, 65536);
+        CHECK_LT(length, 65536u);
 
         uint8_t x = length >> 8;
         ::write(mFd, &x, 1);
@@ -1297,7 +1297,7 @@ void MPEG4Writer::beginBox(uint32_t id) {
 }
 
 void MPEG4Writer::beginBox(const char *fourcc) {
-    CHECK_EQ(strlen(fourcc), 4);
+    CHECK_EQ(strlen(fourcc), 4u);
 
     mBoxes.push_back(mWriteMoovBoxToMemory?
             mMoovBoxBufferOffset: mOffset);
@@ -1348,7 +1348,7 @@ void MPEG4Writer::writeCString(const char *s) {
 }
 
 void MPEG4Writer::writeFourcc(const char *s) {
-    CHECK_EQ(strlen(s), 4);
+    CHECK_EQ(strlen(s), 4u);
     write(s, 1, 4);
 }
 
@@ -3129,10 +3129,10 @@ void MPEG4Writer::Track::writeAudioFourCCBox() {
 void MPEG4Writer::Track::writeMp4aEsdsBox() {
     mOwner->beginBox("esds");
     CHECK(mCodecSpecificData);
-    CHECK_GT(mCodecSpecificDataSize, 0);
+    CHECK_GT(mCodecSpecificDataSize, 0u);
 
     // Make sure all sizes encode to a single byte.
-    CHECK_LT(mCodecSpecificDataSize + 23, 128);
+    CHECK_LT(mCodecSpecificDataSize + 23, 128u);
 
     mOwner->writeInt32(0);     // version=0, flags=0
     mOwner->writeInt8(0x03);   // ES_DescrTag
@@ -3171,10 +3171,10 @@ void MPEG4Writer::Track::writeMp4aEsdsBox() {
 
 void MPEG4Writer::Track::writeMp4vEsdsBox() {
     CHECK(mCodecSpecificData);
-    CHECK_GT(mCodecSpecificDataSize, 0);
+    CHECK_GT(mCodecSpecificDataSize, 0u);
 
     // Make sure all sizes encode to a single byte.
-    CHECK_LT(23 + mCodecSpecificDataSize, 128);
+    CHECK_LT(23 + mCodecSpecificDataSize, 128u);
 
     mOwner->beginBox("esds");
 
@@ -3349,7 +3349,7 @@ void MPEG4Writer::Track::writeDinfBox() {
 
 void MPEG4Writer::Track::writeAvccBox() {
     CHECK(mCodecSpecificData);
-    CHECK_GE(mCodecSpecificDataSize, 5);
+    CHECK_GE(mCodecSpecificDataSize, 5u);
 
     // Patch avcc's lengthSize field to match the number
     // of bytes we use to indicate the size of a nal unit.
@@ -3363,7 +3363,7 @@ void MPEG4Writer::Track::writeAvccBox() {
 
 void MPEG4Writer::Track::writeHvccBox() {
     CHECK(mCodecSpecificData);
-    CHECK_GE(mCodecSpecificDataSize, 5);
+    CHECK_GE(mCodecSpecificDataSize, 5u);
 
     // Patch avcc's lengthSize field to match the number
     // of bytes we use to indicate the size of a nal unit.

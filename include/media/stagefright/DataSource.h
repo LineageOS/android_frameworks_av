@@ -165,7 +165,7 @@ bool DataSource::getVector(off64_t offset, Vector<T>* x, size_t count,
         if (numBytesRead == -1) { // If readAt() returns -1, there is an error.
             return false;
         }
-        if (numBytesRead < numBytesPerChunk) {
+        if (static_cast<size_t>(numBytesRead) < numBytesPerChunk) {
             // This case is triggered when the stream ends before the whole
             // chunk is read.
             x->appendArray(tmp, (size_t)numBytesRead / sizeof(T));

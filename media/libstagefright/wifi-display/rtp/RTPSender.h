@@ -66,11 +66,9 @@ private:
         kWhatRTCPNotify,
     };
 
-    enum {
-        kMaxNumTSPacketsPerRTPPacket = (kMaxUDPPacketSize - 12) / 188,
-        kMaxHistorySize              = 1024,
-        kSourceID                    = 0xdeadbeef,
-    };
+    const unsigned int kMaxNumTSPacketsPerRTPPacket = (kMaxUDPPacketSize - 12) / 188;
+    const unsigned int kMaxHistorySize              = 1024;
+    const unsigned int kSourceID                    = 0xdeadbeef;
 
     sp<ANetworkSession> mNetSession;
     sp<AMessage> mNotify;

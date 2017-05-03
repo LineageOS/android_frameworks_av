@@ -488,7 +488,7 @@ status_t WebmWriter::start(MetaData *params) {
             params->findInt32(kKeyBitRate, &bitRate);
         }
         mEstimatedCuesSize = estimateCuesSize(bitRate);
-        CHECK_GE(mEstimatedCuesSize, 8);
+        CHECK_GE(mEstimatedCuesSize, 8u);
         cues = new EbmlVoid(mEstimatedCuesSize);
     }
 

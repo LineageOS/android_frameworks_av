@@ -739,7 +739,7 @@ void MPEG2TSWriter::writeProgramAssociationTable() {
     uint32_t crc = htonl(crc32(&buffer->data()[5], 12));
     memcpy(&buffer->data()[17], &crc, sizeof(crc));
 
-    CHECK_EQ(internalWrite(buffer->data(), buffer->size()), buffer->size());
+    CHECK_EQ(internalWrite(buffer->data(), buffer->size()), (ssize_t)buffer->size());
 }
 
 void MPEG2TSWriter::writeProgramMap() {
@@ -815,7 +815,7 @@ void MPEG2TSWriter::writeProgramMap() {
     uint32_t crc = htonl(crc32(&buffer->data()[5], 12+mSources.size()*5));
     memcpy(&buffer->data()[17+mSources.size()*5], &crc, sizeof(crc));
 
-    CHECK_EQ(internalWrite(buffer->data(), buffer->size()), buffer->size());
+    CHECK_EQ(internalWrite(buffer->data(), buffer->size()), (ssize_t)buffer->size());
 }
 
 void MPEG2TSWriter::writeAccessUnit(
@@ -920,7 +920,7 @@ void MPEG2TSWriter::writeAccessUnit(
 
     memcpy(ptr, accessUnit->data(), copy);
 
-    CHECK_EQ(internalWrite(buffer->data(), buffer->size()), buffer->size());
+    CHECK_EQ(internalWrite(buffer->data(), buffer->size()), (ssize_t)buffer->size());
 
     size_t offset = copy;
     while (offset < accessUnit->size()) {
@@ -966,7 +966,7 @@ void MPEG2TSWriter::writeAccessUnit(
 
         memcpy(ptr, accessUnit->data() + offset, copy);
         CHECK_EQ(internalWrite(buffer->data(), buffer->size()),
-                 buffer->size());
+                 (ssize_t)buffer->size());
 
         offset += copy;
     }
