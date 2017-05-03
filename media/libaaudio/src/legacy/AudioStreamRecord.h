@@ -68,6 +68,10 @@ public:
     // This is public so it can be called from the C callback function.
     void processCallback(int event, void *info) override;
 
+    int64_t incrementClientFrameCounter(int32_t frames) override {
+        return incrementFramesRead(frames);
+    }
+
 private:
     android::sp<android::AudioRecord> mAudioRecord;
     // adapts between variable sized blocks and fixed size blocks
