@@ -117,8 +117,8 @@ sp<Radio> Radio::attach(radio_handle_t handle,
 
 
 // Radio
-Radio::Radio(radio_handle_t handle, const sp<RadioCallback>& callback)
-    : mHandle(handle), mCallback(callback)
+Radio::Radio(radio_handle_t /*handle*/, const sp<RadioCallback>& callback)
+    : mCallback(callback)
 {
 }
 

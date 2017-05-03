@@ -36,10 +36,8 @@ struct RTPBase {
         TRANSPORT_TCP_INTERLEAVED,
     };
 
-    enum {
-        // Really UDP _payload_ size
-        kMaxUDPPacketSize = 1472,   // 1472 good, 1473 bad on Android@Home
-    };
+    // Really UDP _payload_ size
+    const unsigned int kMaxUDPPacketSize = 1472;   // 1472 good, 1473 bad on Android@Home
 
     static int32_t PickRandomRTPPort();
 };

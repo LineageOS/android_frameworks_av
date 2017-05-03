@@ -1028,7 +1028,7 @@ bool NuPlayer::Renderer::onDrainAudioQueue() {
             // (Case 1)
             // Must be a multiple of the frame size.  If it is not a multiple of a frame size, it
             // needs to fail, as we should not carry over fractional frames between calls.
-            CHECK_EQ(copy % mAudioSink->frameSize(), 0);
+            CHECK_EQ(copy % mAudioSink->frameSize(), 0u);
 
             // (Case 2, 3, 4)
             // Return early to the caller.
