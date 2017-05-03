@@ -42,8 +42,8 @@ LOCAL_SHARED_LIBRARIES :=                         \
         libdl                                     \
         libhidlbase                               \
         libhidlmemory                             \
+        libhidltransport                          \
         libstagefright_xmlparser@1.0              \
-        android.hidl.base@1.0                     \
         android.hidl.memory@1.0                   \
         android.hardware.media@1.0                \
         android.hardware.media.omx@1.0            \

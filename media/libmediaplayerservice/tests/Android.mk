@@ -14,7 +14,6 @@ LOCAL_SHARED_LIBRARIES := \
 	libmediaplayerservice \
 	libmediadrm \
 	libutils \
-	android.hidl.base@1.0 \
 	android.hardware.drm@1.0 \
 
 LOCAL_C_INCLUDES := \
