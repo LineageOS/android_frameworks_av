@@ -791,4 +791,10 @@ int64_t AudioStreamInternal::getFramesRead()
     return framesRead;
 }
 
-// TODO implement getTimestamp
+int64_t AudioStreamInternal::getFramesWritten()
+{
+    int64_t getFramesWritten = mAudioEndpoint.getDownDataWriteCounter()
+            + mFramesOffsetFromService;
+    ALOGD_IF(MYLOG_CONDITION, "AudioStreamInternal::getFramesWritten() returns %lld", (long long)getFramesWritten);
+    return getFramesWritten;
+}

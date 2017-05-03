@@ -195,26 +195,21 @@ AAUDIO_API void AAudioStreamBuilder_setFramesPerDataCallback(AAudioStreamBuilder
     streamBuilder->setFramesPerDataCallback(frames);
 }
 
-// TODO merge AAudioInternal_openStream into AAudioStreamBuilder_openStream
-static aaudio_result_t  AAudioInternal_openStream(AudioStreamBuilder *streamBuilder,
-                                              AAudioStream** streamPtr)
-{
-    AudioStream *audioStream = nullptr;
-    aaudio_result_t result = streamBuilder->build(&audioStream);
-    if (result != AAUDIO_OK) {
-        return result;
-    } else {
-        *streamPtr = (AAudioStream*) audioStream;
-        return AAUDIO_OK;
-    }
-}
-
 AAUDIO_API aaudio_result_t  AAudioStreamBuilder_openStream(AAudioStreamBuilder* builder,
                                                      AAudioStream** streamPtr)
 {
+    AudioStream *audioStream = nullptr;
     ALOGD("AAudioStreamBuilder_openStream() ----------------------------------------------");
     AudioStreamBuilder *streamBuilder = COMMON_GET_FROM_BUILDER_OR_RETURN(streamPtr);
-    return AAudioInternal_openStream(streamBuilder, streamPtr);
+    aaudio_result_t result = streamBuilder->build(&audioStream);
+    ALOGD("AAudioStreamBuilder_openStream() returns %d -----------------------------------",
+          result);
+    if (result == AAUDIO_OK) {
+        *streamPtr = (AAudioStream*) audioStream;
+    } else {
+        *streamPtr = nullptr;
+    }
+    return result;
 }
 
 AAUDIO_API aaudio_result_t  AAudioStreamBuilder_delete(AAudioStreamBuilder* builder)
