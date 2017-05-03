@@ -79,7 +79,6 @@ private:
 
             Mutex                   mLock;
             sp<IRadio>              mIRadio;
-            const radio_handle_t    mHandle;
             sp<RadioCallback>       mCallback;
 };
 

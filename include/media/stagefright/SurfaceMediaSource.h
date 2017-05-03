@@ -107,8 +107,8 @@ public:
     void setFrameAvailableListener(const sp<FrameAvailableListener>& listener);
 
     // dump our state in a String
-    void dump(String8& result) const;
-    void dump(String8& result, const char* prefix, char* buffer,
+    void dumpState(String8& result) const;
+    void dumpState(String8& result, const char* prefix, char* buffer,
                                                     size_t SIZE) const;
 
     // metaDataStoredInVideoBuffers tells the encoder what kind of metadata
