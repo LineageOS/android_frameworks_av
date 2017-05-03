@@ -223,7 +223,7 @@ private:
         // Caution: atomic_int_fast32_t is 64 bits on LP64.
         std::atomic_int_least32_t mFlags;
         std::atomic_int_least32_t mRemoteRefcount;
-        int32_t unused[6]; // additional buffer space
+        int32_t unused[6] __attribute__((__unused__)); // additional buffer space
     };
 
     inline SharedControl *getSharedControl() const {

@@ -162,7 +162,7 @@ static void dumpSource(const sp<IMediaSource> &source, const String8 &filename) 
                        1,
                        mbuf->range_length(),
                        out),
-                (ssize_t)mbuf->range_length());
+                mbuf->range_length());
 
         mbuf->release();
         mbuf = NULL;

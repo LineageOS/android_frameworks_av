@@ -124,9 +124,9 @@ status_t SoundTrigger::setCaptureState(bool active)
 }
 
 // SoundTrigger
-SoundTrigger::SoundTrigger(sound_trigger_module_handle_t module,
+SoundTrigger::SoundTrigger(sound_trigger_module_handle_t /*module*/,
                                  const sp<SoundTriggerCallback>& callback)
-    : mModule(module), mCallback(callback)
+    : mCallback(callback)
 {
 }
 

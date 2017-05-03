@@ -699,7 +699,7 @@ void LiveSession::onMessageReceived(const sp<AMessage> &msg) {
                     }
 
                     if (mContinuation != NULL) {
-                        CHECK_GT(mContinuationCounter, 0);
+                        CHECK_GT(mContinuationCounter, 0u);
                         if (--mContinuationCounter == 0) {
                             mContinuation->post();
                         }
@@ -1550,7 +1550,7 @@ void LiveSession::changeConfiguration(
                     mOrigBandwidthIndex, mCurBandwidthIndex);
         }
     }
-    CHECK_LT(mCurBandwidthIndex, mBandwidthItems.size());
+    CHECK_LT((size_t)mCurBandwidthIndex, mBandwidthItems.size());
     const BandwidthItem &item = mBandwidthItems.itemAt(mCurBandwidthIndex);
 
     uint32_t streamMask = 0; // streams that should be fetched by the new fetcher

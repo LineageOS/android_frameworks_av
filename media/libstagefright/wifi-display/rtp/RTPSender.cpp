@@ -247,7 +247,7 @@ status_t RTPSender::queueRawPacket(
 
 status_t RTPSender::queueTSPackets(
         const sp<ABuffer> &tsPackets, uint8_t packetType) {
-    CHECK_EQ(0, tsPackets->size() % 188);
+    CHECK_EQ(0u, tsPackets->size() % 188);
 
     int64_t timeUs;
     CHECK(tsPackets->meta()->findInt64("timeUs", &timeUs));
