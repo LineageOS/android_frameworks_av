@@ -53,7 +53,7 @@ LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder
 LOCAL_WHOLE_STATIC_LIBRARIES := libmedia_helper
 
 # for memory heap analysis
-LOCAL_STATIC_LIBRARIES := libc_malloc_debug_backtrace libc_logging
+LOCAL_STATIC_LIBRARIES := libc_malloc_debug_backtrace
 
 LOCAL_MODULE:= libmedia
 
