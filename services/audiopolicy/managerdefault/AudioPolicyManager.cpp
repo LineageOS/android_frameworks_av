@@ -1007,11 +1007,14 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
         if (offloadInfo != NULL) {
             config.offload_info = *offloadInfo;
         }
+        DeviceVector outputDevices = mAvailableOutputDevices.getDevicesFromType(device);
+        String8 address = outputDevices.size() > 0 ? outputDevices.itemAt(0)->mAddress
+                : String8("");
         status = mpClientInterface->openOutput(profile->getModuleHandle(),
                                                &output,
                                                &config,
                                                &outputDesc->mDevice,
-                                               String8(""),
+                                               address,
                                                &outputDesc->mLatency,
                                                outputDesc->mFlags);
 
@@ -1698,6 +1701,12 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
     config.sample_rate = profileSamplingRate;
     config.channel_mask = profileChannelMask;
     config.format = profileFormat;
+
+    if (address == "") {
+        DeviceVector inputDevices = mAvailableInputDevices.getDevicesFromType(device);
+        //   the inputs vector must be of size 1, but we don't want to crash here
+        address = inputDevices.size() > 0 ? inputDevices.itemAt(0)->mAddress : String8("");
+    }
 
     status_t status = mpClientInterface->openInput(profile->getModuleHandle(),
                                                    &input,
