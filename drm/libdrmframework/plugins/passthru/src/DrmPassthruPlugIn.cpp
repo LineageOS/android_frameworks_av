@@ -245,6 +245,8 @@ status_t DrmPassthruPlugIn::onOpenDecryptSession(
     decryptHandle->status = DRM_NO_ERROR;
     decryptHandle->decryptInfo = NULL;
     return DRM_NO_ERROR;
+#else
+    (void)(decryptHandle); // unused
 #endif
 
     return DRM_ERROR_CANNOT_HANDLE;
