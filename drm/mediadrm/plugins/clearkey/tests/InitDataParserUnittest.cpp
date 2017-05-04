@@ -56,7 +56,7 @@ class InitDataParserTest : public ::testing::Test {
                               request.size());
         EXPECT_EQ(0, requestString.find(kRequestPrefix));
         EXPECT_EQ(requestString.size() - kRequestSuffix.size(),
-                  requestString.find(kRequestSuffix));
+                  (size_t)requestString.find(kRequestSuffix));
         for (size_t i = 0; i < expectedKeys.size(); ++i) {
             AString encodedIdAString;
             android::encodeBase64(expectedKeys[i], kKeyIdSize,
@@ -71,7 +71,7 @@ class InitDataParserTest : public ::testing::Test {
                                       const String8& mimeType) {
         Vector<uint8_t> request;
         ASSERT_NE(android::OK, attemptParse(initData, mimeType, &request));
-        EXPECT_EQ(0, request.size());
+        EXPECT_EQ(0u, request.size());
     }
 };
 
