@@ -70,6 +70,8 @@ public:
     // Implement FixedBlockProcessor
     int32_t onProcessFixedBlock(uint8_t *buffer, int32_t numBytes) override;
 
+    virtual int64_t incrementClientFrameCounter(int32_t frames)  = 0;
+
 protected:
     FixedBlockAdapter         *mBlockAdapter = nullptr;
     aaudio_wrapping_frames_t   mPositionWhenStarting = 0;

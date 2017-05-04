@@ -125,6 +125,9 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
     MmapStreamInterface::stream_direction_t streamDirection = (direction == AAUDIO_DIRECTION_OUTPUT)
         ? MmapStreamInterface::DIRECTION_OUTPUT : MmapStreamInterface::DIRECTION_INPUT;
 
+    ALOGD("AAudioServiceStreamMMAP::open() request devId = %d, sRate = %d",
+          deviceId, config.sample_rate);
+
     // Open HAL stream.
     status_t status = MmapStreamInterface::openMmapStream(streamDirection,
                                                           &attributes,
@@ -165,6 +168,9 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
     mCapacityInFrames = mMmapBufferinfo.buffer_size_frames;
     mAudioFormat = AAudioConvert_androidToAAudioDataFormat(config.format);
     mSampleRate = config.sample_rate;
+
+    ALOGD("AAudioServiceStreamMMAP::open() got devId = %d, sRate = %d",
+          deviceId, config.sample_rate);
 
     // Fill in AAudioStreamConfiguration
     configurationOutput.setSampleRate(mSampleRate);
