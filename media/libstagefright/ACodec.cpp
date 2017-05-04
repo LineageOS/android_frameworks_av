@@ -72,10 +72,6 @@
 #include <OMX_IndexExt.h>
 #include <OMX_AsString.h>
 
-#ifdef USE_SAMSUNG_COLORFORMAT
-#include <sec_format.h>
-#endif
-
 #include "include/avc_utils.h"
 #include "include/DataConverter.h"
 #include "omx/OMXUtils.h"
