@@ -6,6 +6,7 @@ include $(CLEAR_VARS)
 
 LOCAL_ARM_MODE := arm
 
+LOCAL_VENDOR_MODULE := true
 LOCAL_SRC_FILES:= \
     StereoWidening/src/LVCS_BypassMix.c \
     StereoWidening/src/LVCS_Control.c \
@@ -130,6 +131,7 @@ include $(CLEAR_VARS)
 
 LOCAL_ARM_MODE := arm
 
+LOCAL_VENDOR_MODULE := true
 LOCAL_SRC_FILES:= \
     Reverb/src/LVREV_ApplyNewSettings.c \
     Reverb/src/LVREV_ClearAudioBuffers.c \

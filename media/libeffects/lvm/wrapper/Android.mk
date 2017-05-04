@@ -6,6 +6,7 @@ include $(CLEAR_VARS)
 
 LOCAL_ARM_MODE := arm
 
+LOCAL_VENDOR_MODULE := true
 LOCAL_SRC_FILES:= \
 	Bundle/EffectBundle.cpp
 
@@ -36,6 +37,7 @@ include $(CLEAR_VARS)
 
 LOCAL_ARM_MODE := arm
 
+LOCAL_VENDOR_MODULE := true
 LOCAL_SRC_FILES:= \
     Reverb/EffectReverb.cpp
 
