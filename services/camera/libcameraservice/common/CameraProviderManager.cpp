@@ -82,12 +82,16 @@ int CameraProviderManager::getCameraCount() const {
     return count;
 }
 
-int CameraProviderManager::getStandardCameraCount() const {
+int CameraProviderManager::getAPI1CompatibleCameraCount() const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
     int count = 0;
     for (auto& provider : mProviders) {
         if (kStandardProviderTypes.find(provider->getType()) != std::string::npos) {
-            count += provider->mUniqueDeviceCount;
+            for (auto& device : provider->mDevices) {
+                if (device->isAPI1Compatible()) {
+                    count++;
+                }
+            }
         }
     }
     return count;
@@ -104,13 +108,15 @@ std::vector<std::string> CameraProviderManager::getCameraDeviceIds() const {
     return deviceIds;
 }
 
-std::vector<std::string> CameraProviderManager::getStandardCameraDeviceIds() const {
+std::vector<std::string> CameraProviderManager::getAPI1CompatibleCameraDeviceIds() const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
     std::vector<std::string> deviceIds;
     for (auto& provider : mProviders) {
         if (kStandardProviderTypes.find(provider->getType()) != std::string::npos) {
-            for (auto& id : provider->mUniqueCameraIds) {
-                deviceIds.push_back(id);
+            for (auto& device : provider->mDevices) {
+                if (device->isAPI1Compatible()) {
+                    deviceIds.push_back(device->mId);
+                }
             }
         }
     }
@@ -982,6 +988,20 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::getCameraInfo(
     }
 
     return OK;
+}
+bool CameraProviderManager::ProviderInfo::DeviceInfo3::isAPI1Compatible() const {
+    bool isBackwardCompatible = false;
+    camera_metadata_ro_entry_t caps = mCameraCharacteristics.find(
+            ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+    for (size_t i = 0; i < caps.count; i++) {
+        if (caps.data.u8[i] ==
+                ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE) {
+            isBackwardCompatible = true;
+            break;
+        }
+    }
+
+    return isBackwardCompatible;
 }
 
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::getCameraCharacteristics(
