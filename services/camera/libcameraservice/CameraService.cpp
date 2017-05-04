@@ -198,13 +198,17 @@ void CameraService::onFirstRef()
 }
 
 status_t CameraService::enumerateProviders() {
-    mCameraProviderManager = new CameraProviderManager();
     status_t res;
-    res = mCameraProviderManager->initialize(this);
-    if (res != OK) {
-        ALOGE("%s: Unable to initialize camera provider manager: %s (%d)",
-                __FUNCTION__, strerror(-res), res);
-        return res;
+    Mutex::Autolock l(mServiceLock);
+
+    if (nullptr == mCameraProviderManager.get()) {
+        mCameraProviderManager = new CameraProviderManager();
+        res = mCameraProviderManager->initialize(this);
+        if (res != OK) {
+            ALOGE("%s: Unable to initialize camera provider manager: %s (%d)",
+                    __FUNCTION__, strerror(-res), res);
+            return res;
+        }
     }
 
     mNumberOfCameras = mCameraProviderManager->getCameraCount();
@@ -216,15 +220,25 @@ status_t CameraService::enumerateProviders() {
     // TODO: maybe put this into CameraProviderManager::initialize()?
     mCameraProviderManager->setUpVendorTags();
 
-    mFlashlight = new CameraFlashlight(mCameraProviderManager, this);
+    if (nullptr == mFlashlight.get()) {
+        mFlashlight = new CameraFlashlight(mCameraProviderManager, this);
+    }
+
     res = mFlashlight->findFlashUnits();
     if (res != OK) {
         ALOGE("Failed to enumerate flash units: %s (%d)", strerror(-res), res);
     }
 
-    // TODO: Verify device versions are in support
-
     for (auto& cameraId : mCameraProviderManager->getCameraDeviceIds()) {
+        String8 id8 = String8(cameraId.c_str());
+        {
+            Mutex::Autolock lock(mCameraStatesLock);
+            auto iter = mCameraStates.find(id8);
+            if (iter != mCameraStates.end()) {
+                continue;
+            }
+        }
+
         hardware::camera::common::V1_0::CameraResourceCost cost;
         res = mCameraProviderManager->getResourceCost(cameraId, &cost);
         if (res != OK) {
@@ -235,21 +249,18 @@ status_t CameraService::enumerateProviders() {
         for (size_t i = 0; i < cost.conflictingDevices.size(); i++) {
             conflicting.emplace(String8(cost.conflictingDevices[i].c_str()));
         }
-        String8 id8 = String8(cameraId.c_str());
 
         Mutex::Autolock lock(mCameraStatesLock);
         mCameraStates.emplace(id8,
             std::make_shared<CameraState>(id8, cost.resourceCost, conflicting));
 
         if (mFlashlight->hasFlashUnit(id8)) {
-            mTorchStatusMap.add(id8,
-                TorchModeStatus::AVAILABLE_OFF);
+            mTorchStatusMap.add(id8, TorchModeStatus::AVAILABLE_OFF);
         }
     }
 
     return OK;
 }
-
 
 sp<ICameraServiceProxy> CameraService::getCameraServiceProxy() {
     sp<ICameraServiceProxy> proxyBinder = nullptr;
@@ -274,6 +285,10 @@ void CameraService::pingCameraServiceProxy() {
 
 CameraService::~CameraService() {
     VendorTagDescriptor::clearGlobalVendorTagDescriptor();
+}
+
+void CameraService::onNewProviderRegistered() {
+    enumerateProviders();
 }
 
 void CameraService::onDeviceStatusChanged(const String8& id,
@@ -407,6 +422,7 @@ void CameraService::onTorchStatusChangedLocked(const String8& cameraId,
 
 Status CameraService::getNumberOfCameras(int32_t type, int32_t* numCameras) {
     ATRACE_CALL();
+    Mutex::Autolock l(mServiceLock);
     switch (type) {
         case CAMERA_TYPE_BACKWARD_COMPATIBLE:
             *numCameras = mNumberOfNormalCameras;
@@ -426,6 +442,8 @@ Status CameraService::getNumberOfCameras(int32_t type, int32_t* numCameras) {
 Status CameraService::getCameraInfo(int cameraId,
         CameraInfo* cameraInfo) {
     ATRACE_CALL();
+    Mutex::Autolock l(mServiceLock);
+
     if (!mInitialized) {
         return STATUS_ERROR(ERROR_DISCONNECTED,
                 "Camera subsystem is not available");
