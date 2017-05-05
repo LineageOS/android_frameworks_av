@@ -19,7 +19,7 @@
 
 #include <inttypes.h>
 
-#include "NdkImageReader.h"
+#include <media/NdkImageReader.h>
 
 #include <utils/List.h>
 #include <utils/Mutex.h>
