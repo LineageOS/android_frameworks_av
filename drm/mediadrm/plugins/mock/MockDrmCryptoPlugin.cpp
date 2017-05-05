@@ -729,7 +729,7 @@ namespace android {
 
     ssize_t MockDrmPlugin::findSession(Vector<uint8_t> const &sessionId) const
     {
-        ALOGD("findSession: nsessions=%d, size=%d", mSessions.size(), sessionId.size());
+        ALOGD("findSession: nsessions=%zu, size=%zu", mSessions.size(), sessionId.size());
         for (size_t i = 0; i < mSessions.size(); ++i) {
             if (memcmp(mSessions[i].array(), sessionId.array(), sessionId.size()) == 0) {
                 return i;
@@ -740,7 +740,7 @@ namespace android {
 
     ssize_t MockDrmPlugin::findKeySet(Vector<uint8_t> const &keySetId) const
     {
-        ALOGD("findKeySet: nkeySets=%d, size=%d", mKeySets.size(), keySetId.size());
+        ALOGD("findKeySet: nkeySets=%zu, size=%zu", mKeySets.size(), keySetId.size());
         for (size_t i = 0; i < mKeySets.size(); ++i) {
             if (memcmp(mKeySets[i].array(), keySetId.array(), keySetId.size()) == 0) {
                 return i;
