@@ -16,7 +16,7 @@
 #ifndef _ACAPTURE_REQUEST_H
 #define _ACAPTURE_REQUEST_H
 
-#include "NdkCaptureRequest.h"
+#include <camera/NdkCaptureRequest.h>
 #include <set>
 
 using namespace android;
