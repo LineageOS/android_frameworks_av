@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef BINDING_AAUDIO_STREAM_REQUEST_H
-#define BINDING_AAUDIO_STREAM_REQUEST_H
+#ifndef ANDROID_BINDING_AAUDIO_STREAM_REQUEST_H
+#define ANDROID_BINDING_AAUDIO_STREAM_REQUEST_H
 
 #include <stdint.h>
 
@@ -95,4 +95,4 @@ protected:
 
 } /* namespace aaudio */
 
-#endif //BINDING_AAUDIO_STREAM_REQUEST_H
+#endif //ANDROID_BINDING_AAUDIO_STREAM_REQUEST_H

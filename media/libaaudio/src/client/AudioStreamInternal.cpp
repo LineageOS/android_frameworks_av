@@ -244,7 +244,7 @@ void *AudioStreamInternal::callbackLoop() {
 
     ALOGD("AudioStreamInternal(): callbackLoop() exiting, result = %d, isPlaying() = %d",
           result, (int) isPlaying());
-    return NULL; // TODO review
+    return NULL;
 }
 
 static void *aaudio_callback_thread_proc(void *context)
@@ -402,7 +402,7 @@ aaudio_result_t AudioStreamInternal::unregisterThread() {
 aaudio_result_t AudioStreamInternal::getTimestamp(clockid_t clockId,
                            int64_t *framePosition,
                            int64_t *timeNanoseconds) {
-    // TODO implement using real HAL
+    // TODO Generate in server and pass to client. Return latest.
     int64_t time = AudioClock::getNanoseconds();
     *framePosition = mClockModel.convertTimeToPosition(time);
     *timeNanoseconds = time + (10 * AAUDIO_NANOS_PER_MILLISECOND); // Fake hardware delay
@@ -574,12 +574,9 @@ aaudio_result_t AudioStreamInternal::write(const void *buffer, int32_t numFrames
 // Write as much data as we can without blocking.
 aaudio_result_t AudioStreamInternal::writeNow(const void *buffer, int32_t numFrames,
                                          int64_t currentNanoTime, int64_t *wakeTimePtr) {
-
-    {
-        aaudio_result_t result = processCommands();
-        if (result != AAUDIO_OK) {
-            return result;
-        }
+    aaudio_result_t result = processCommands();
+    if (result != AAUDIO_OK) {
+        return result;
     }
 
     if (mAudioEndpoint.isOutputFreeRunning()) {

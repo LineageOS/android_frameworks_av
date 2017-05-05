@@ -28,6 +28,9 @@
 using namespace android;
 using namespace aaudio;
 
+#define RIDICULOUSLY_LARGE_BUFFER_CAPACITY   (256 * 1024)
+#define RIDICULOUSLY_LARGE_FRAME_SIZE        4096
+
 AudioEndpoint::AudioEndpoint()
     : mOutputFreeRunning(false)
     , mDataReadCounter(0)
@@ -45,16 +48,22 @@ static aaudio_result_t AudioEndpoint_validateQueueDescriptor(const char *type,
         ALOGE("AudioEndpoint_validateQueueDescriptor() NULL descriptor");
         return AAUDIO_ERROR_NULL;
     }
-    if (descriptor->capacityInFrames <= 0) {
+
+    if (descriptor->capacityInFrames < 1
+        || descriptor->capacityInFrames > RIDICULOUSLY_LARGE_BUFFER_CAPACITY) {
         ALOGE("AudioEndpoint_validateQueueDescriptor() bad capacityInFrames = %d",
               descriptor->capacityInFrames);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
-    if (descriptor->bytesPerFrame <= 1) {
+
+    // Reject extreme values to catch bugs and prevent numeric overflows.
+    if (descriptor->bytesPerFrame < 1
+        || descriptor->bytesPerFrame > RIDICULOUSLY_LARGE_FRAME_SIZE) {
         ALOGE("AudioEndpoint_validateQueueDescriptor() bad bytesPerFrame = %d",
               descriptor->bytesPerFrame);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
+
     if (descriptor->dataAddress == nullptr) {
         ALOGE("AudioEndpoint_validateQueueDescriptor() NULL dataAddress");
         return AAUDIO_ERROR_NULL;
@@ -82,6 +91,7 @@ static aaudio_result_t AudioEndpoint_validateQueueDescriptor(const char *type,
         *descriptor->readCounterAddress = counter;
         ALOGV("AudioEndpoint_validateQueueDescriptor() wrote readCounterAddress successfully");
     }
+
     if (descriptor->writeCounterAddress) {
         fifo_counter_t counter = *descriptor->writeCounterAddress;
         ALOGV("AudioEndpoint_validateQueueDescriptor() *writeCounterAddress = %d, now write",
@@ -89,6 +99,7 @@ static aaudio_result_t AudioEndpoint_validateQueueDescriptor(const char *type,
         *descriptor->writeCounterAddress = counter;
         ALOGV("AudioEndpoint_validateQueueDescriptor() wrote writeCounterAddress successfully");
     }
+
     return AAUDIO_OK;
 }
 
@@ -104,7 +115,6 @@ aaudio_result_t AudioEndpoint_validateDescriptor(const EndpointDescriptor *pEndp
 
 aaudio_result_t AudioEndpoint::configure(const EndpointDescriptor *pEndpointDescriptor)
 {
-    // TODO maybe remove after debugging
     aaudio_result_t result = AudioEndpoint_validateDescriptor(pEndpointDescriptor);
     if (result != AAUDIO_OK) {
         ALOGE("AudioEndpoint_validateQueueDescriptor returned %d %s",
@@ -112,10 +122,19 @@ aaudio_result_t AudioEndpoint::configure(const EndpointDescriptor *pEndpointDesc
         return result;
     }
 
+    // ============================ up message queue =============================
     const RingBufferDescriptor *descriptor = &pEndpointDescriptor->upMessageQueueDescriptor;
-    assert(descriptor->bytesPerFrame == sizeof(AAudioServiceMessage));
-    assert(descriptor->readCounterAddress != nullptr);
-    assert(descriptor->writeCounterAddress != nullptr);
+    if(descriptor->bytesPerFrame != sizeof(AAudioServiceMessage)) {
+        ALOGE("AudioEndpoint::configure() bytesPerFrame != sizeof(AAudioServiceMessage) = %d",
+              descriptor->bytesPerFrame);
+        return AAUDIO_ERROR_INTERNAL;
+    }
+
+    if(descriptor->readCounterAddress == nullptr || descriptor->writeCounterAddress == nullptr) {
+        ALOGE("AudioEndpoint_validateQueueDescriptor() NULL counter address");
+        return AAUDIO_ERROR_NULL;
+    }
+
     mUpCommandQueue = new FifoBuffer(
             descriptor->bytesPerFrame,
             descriptor->capacityInFrames,
@@ -123,25 +142,9 @@ aaudio_result_t AudioEndpoint::configure(const EndpointDescriptor *pEndpointDesc
             descriptor->writeCounterAddress,
             descriptor->dataAddress
     );
-    /* TODO mDownCommandQueue
-    if (descriptor->capacityInFrames > 0) {
-        descriptor = &pEndpointDescriptor->downMessageQueueDescriptor;
-        mDownCommandQueue = new FifoBuffer(
-                descriptor->capacityInFrames,
-                descriptor->bytesPerFrame,
-                descriptor->readCounterAddress,
-                descriptor->writeCounterAddress,
-                descriptor->dataAddress
-        );
-    }
-     */
+
+    // ============================ down data queue =============================
     descriptor = &pEndpointDescriptor->downDataQueueDescriptor;
-    assert(descriptor->capacityInFrames > 0);
-    assert(descriptor->bytesPerFrame > 1);
-    assert(descriptor->bytesPerFrame < 4 * 16); // FIXME just for initial debugging
-    assert(descriptor->framesPerBurst > 0);
-    assert(descriptor->framesPerBurst < 8 * 1024); // FIXME just for initial debugging
-    assert(descriptor->dataAddress != nullptr);
     ALOGV("AudioEndpoint::configure() data framesPerBurst = %d", descriptor->framesPerBurst);
     ALOGV("AudioEndpoint::configure() data readCounterAddress = %p", descriptor->readCounterAddress);
     mOutputFreeRunning = descriptor->readCounterAddress == nullptr;
@@ -172,8 +175,6 @@ aaudio_result_t AudioEndpoint::readUpCommand(AAudioServiceMessage *commandPtr)
 
 aaudio_result_t AudioEndpoint::writeDataNow(const void *buffer, int32_t numFrames)
 {
-    // TODO Make it easier for the AAudioStreamInternal to scale floats and write shorts
-    // TODO Similar to block adapter write through technique. Add a DataConverter.
     return mDownDataQueue->write(buffer, numFrames);
 }
 

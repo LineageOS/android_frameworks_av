@@ -79,29 +79,49 @@ void RingBufferParcelable::setCapacityInFrames(int32_t capacityInFrames) {
  * The read and write must be symmetric.
  */
 status_t RingBufferParcelable::writeToParcel(Parcel* parcel) const {
-    parcel->writeInt32(mCapacityInFrames);
+    status_t status = parcel->writeInt32(mCapacityInFrames);
+    if (status != NO_ERROR) goto error;
     if (mCapacityInFrames > 0) {
-        parcel->writeInt32(mBytesPerFrame);
-        parcel->writeInt32(mFramesPerBurst);
-        parcel->writeInt32(mFlags);
-        mReadCounterParcelable.writeToParcel(parcel);
-        mWriteCounterParcelable.writeToParcel(parcel);
-        mDataParcelable.writeToParcel(parcel);
+        status = parcel->writeInt32(mBytesPerFrame);
+        if (status != NO_ERROR) goto error;
+        status = parcel->writeInt32(mFramesPerBurst);
+        if (status != NO_ERROR) goto error;
+        status = parcel->writeInt32(mFlags);
+        if (status != NO_ERROR) goto error;
+        status = mReadCounterParcelable.writeToParcel(parcel);
+        if (status != NO_ERROR) goto error;
+        status = mWriteCounterParcelable.writeToParcel(parcel);
+        if (status != NO_ERROR) goto error;
+        status = mDataParcelable.writeToParcel(parcel);
+        if (status != NO_ERROR) goto error;
     }
-    return NO_ERROR; // TODO check for errors above
+    return NO_ERROR;
+error:
+    ALOGE("RingBufferParcelable::writeToParcel() error = %d", status);
+    return status;
 }
 
 status_t RingBufferParcelable::readFromParcel(const Parcel* parcel) {
-    parcel->readInt32(&mCapacityInFrames);
+    status_t status = parcel->readInt32(&mCapacityInFrames);
+    if (status != NO_ERROR) goto error;
     if (mCapacityInFrames > 0) {
-        parcel->readInt32(&mBytesPerFrame);
-        parcel->readInt32(&mFramesPerBurst);
-        parcel->readInt32((int32_t *)&mFlags);
-        mReadCounterParcelable.readFromParcel(parcel);
-        mWriteCounterParcelable.readFromParcel(parcel);
-        mDataParcelable.readFromParcel(parcel);
+        status = parcel->readInt32(&mBytesPerFrame);
+        if (status != NO_ERROR) goto error;
+        status = parcel->readInt32(&mFramesPerBurst);
+        if (status != NO_ERROR) goto error;
+        status = parcel->readInt32((int32_t *)&mFlags);
+        if (status != NO_ERROR) goto error;
+        status = mReadCounterParcelable.readFromParcel(parcel);
+        if (status != NO_ERROR) goto error;
+        status = mWriteCounterParcelable.readFromParcel(parcel);
+        if (status != NO_ERROR) goto error;
+        status = mDataParcelable.readFromParcel(parcel);
+        if (status != NO_ERROR) goto error;
     }
-    return NO_ERROR; // TODO check for errors above
+    return NO_ERROR;
+error:
+    ALOGE("RingBufferParcelable::readFromParcel() error = %d", status);
+    return status;
 }
 
 aaudio_result_t RingBufferParcelable::resolve(SharedMemoryParcelable *memoryParcels, RingBufferDescriptor *descriptor) {
@@ -141,7 +161,7 @@ aaudio_result_t RingBufferParcelable::validate() {
         ALOGE("RingBufferParcelable invalid mBytesPerFrame = %d", mBytesPerFrame);
         return AAUDIO_ERROR_INTERNAL;
     }
-    if (mFramesPerBurst < 0 || mFramesPerBurst >= 1024) {
+    if (mFramesPerBurst < 0 || mFramesPerBurst >= 16 * 1024) {
         ALOGE("RingBufferParcelable invalid mFramesPerBurst = %d", mFramesPerBurst);
         return AAUDIO_ERROR_INTERNAL;
     }

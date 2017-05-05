@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef BINDING_RINGBUFFER_PARCELABLE_H
-#define BINDING_RINGBUFFER_PARCELABLE_H
+#ifndef ANDROID_AAUDIO_RINGBUFFER_PARCELABLE_H
+#define ANDROID_AAUDIO_RINGBUFFER_PARCELABLE_H
 
 #include <stdint.h>
 
@@ -82,4 +82,4 @@ private:
 
 } /* namespace aaudio */
 
-#endif //BINDING_RINGBUFFER_PARCELABLE_H
+#endif //ANDROID_AAUDIO_RINGBUFFER_PARCELABLE_H
