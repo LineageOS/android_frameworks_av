@@ -24,7 +24,7 @@
 #include <gui/CpuConsumer.h>
 
 #include "NdkImageReaderPriv.h"
-#include "NdkImage.h"
+#include <media/NdkImage.h>
 
 
 using namespace android;
