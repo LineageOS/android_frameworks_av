@@ -24,7 +24,7 @@
 #include <utils/Vector.h>
 #include <camera/CameraMetadata.h>
 
-#include "NdkCameraMetadata.h"
+#include <camera/NdkCameraMetadata.h>
 
 using namespace android;
 
