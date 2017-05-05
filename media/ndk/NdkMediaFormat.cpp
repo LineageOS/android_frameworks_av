@@ -19,7 +19,7 @@
 
 #include <inttypes.h>
 
-#include "NdkMediaFormat.h"
+#include <media/NdkMediaFormat.h>
 
 #include <utils/Log.h>
 #include <utils/StrongPointer.h>
