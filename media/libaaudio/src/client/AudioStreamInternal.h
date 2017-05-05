@@ -90,6 +90,11 @@ public:
     // Called internally from 'C'
     void *callbackLoop();
 
+
+    bool isMMap() override {
+        return true;
+    }
+
 protected:
 
     aaudio_result_t processCommands();
