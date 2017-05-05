@@ -47,6 +47,8 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     mSharingMode = builder.getSharingMode();
     mSharingModeMatchRequired = builder.isSharingModeMatchRequired();
 
+    mPerformanceMode = builder.getPerformanceMode();
+
     // callbacks
     mFramesPerDataCallback = builder.getFramesPerDataCallback();
     mDataCallbackProc = builder.getDataCallbackProc();
@@ -71,6 +73,16 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     if (mDirection != AAUDIO_DIRECTION_INPUT && mDirection != AAUDIO_DIRECTION_OUTPUT) {
         ALOGE("AudioStream::open(): illegal direction %d", mDirection);
         return AAUDIO_ERROR_UNEXPECTED_VALUE;
+    }
+
+    switch(mPerformanceMode) {
+        case AAUDIO_PERFORMANCE_MODE_NONE:
+        case AAUDIO_PERFORMANCE_MODE_POWER_SAVING:
+        case AAUDIO_PERFORMANCE_MODE_LOW_LATENCY:
+            break;
+        default:
+            ALOGE("AudioStream::open(): illegal performanceMode %d", mPerformanceMode);
+            return AAUDIO_ERROR_UNEXPECTED_VALUE;
     }
 
     return AAUDIO_OK;

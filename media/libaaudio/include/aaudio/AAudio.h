@@ -125,6 +125,25 @@ enum {
 };
 typedef int32_t aaudio_sharing_mode_t;
 
+
+enum {
+    /**
+     * No particular performance needs. Default.
+     */
+            AAUDIO_PERFORMANCE_MODE_NONE = 10,
+
+    /**
+     * Extending battery life is most important.
+     */
+            AAUDIO_PERFORMANCE_MODE_POWER_SAVING,
+
+    /**
+     * Reducing latency is most important.
+     */
+            AAUDIO_PERFORMANCE_MODE_LOW_LATENCY
+};
+typedef int32_t aaudio_performance_mode_t;
+
 typedef struct AAudioStreamStruct         AAudioStream;
 typedef struct AAudioStreamBuilderStruct  AAudioStreamBuilder;
 
@@ -279,6 +298,18 @@ AAUDIO_API void AAudioStreamBuilder_setDirection(AAudioStreamBuilder* builder,
  */
 AAUDIO_API void AAudioStreamBuilder_setBufferCapacityInFrames(AAudioStreamBuilder* builder,
                                                                  int32_t numFrames);
+
+/**
+ * Set the requested performance mode.
+ *
+ * The default, if you do not call this function, is AAUDIO_PERFORMANCE_MODE_NONE.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param mode the desired performance mode, eg. AAUDIO_PERFORMANCE_MODE_LOW_LATENCY
+ */
+AAUDIO_API void AAudioStreamBuilder_setPerformanceMode(AAudioStreamBuilder* builder,
+                                                aaudio_performance_mode_t mode);
+
 /**
  * Return one of these values from the data callback function.
  */
@@ -720,6 +751,13 @@ AAUDIO_API aaudio_audio_format_t AAudioStream_getFormat(AAudioStream* stream);
  * @return  actual sharing mode
  */
 AAUDIO_API aaudio_sharing_mode_t AAudioStream_getSharingMode(AAudioStream* stream);
+
+/**
+ * Get the performance mode used by the stream.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ */
+AAUDIO_API aaudio_performance_mode_t AAudioStream_getPerformanceMode(AAudioStream* stream);
 
 /**
  * @param stream reference provided by AAudioStreamBuilder_openStream()

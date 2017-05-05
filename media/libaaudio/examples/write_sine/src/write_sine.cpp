@@ -23,7 +23,7 @@
 #include "SineGenerator.h"
 
 #define SAMPLE_RATE           48000
-#define NUM_SECONDS           15
+#define NUM_SECONDS           5
 #define NANOS_PER_MICROSECOND ((int64_t)1000)
 #define NANOS_PER_MILLISECOND (NANOS_PER_MICROSECOND * 1000)
 #define NANOS_PER_SECOND      (NANOS_PER_MILLISECOND * 1000)
@@ -104,6 +104,10 @@ int main(int argc, char **argv)
     AAudioStreamBuilder_setFormat(aaudioBuilder, REQUESTED_FORMAT);
     AAudioStreamBuilder_setSharingMode(aaudioBuilder, REQUESTED_SHARING_MODE);
 
+    AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, AAUDIO_PERFORMANCE_MODE_NONE);
+    //AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+    //AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, AAUDIO_PERFORMANCE_MODE_POWER_SAVING);
+
     // Create an AAudioStream using the Builder.
     result = AAudioStreamBuilder_openStream(aaudioBuilder, &aaudioStream);
     if (result != AAUDIO_OK) {
@@ -132,7 +136,6 @@ int main(int argc, char **argv)
     // This is the number of frames that are read in one chunk by a DMA controller
     // or a DSP or a mixer.
     framesPerBurst = AAudioStream_getFramesPerBurst(aaudioStream);
-    printf("Buffer: framesPerBurst = %d\n",framesPerBurst);
     printf("Buffer: bufferSize = %d\n", AAudioStream_getBufferSizeInFrames(aaudioStream));
     bufferCapacity = AAudioStream_getBufferCapacityInFrames(aaudioStream);
     printf("Buffer: bufferCapacity = %d, remainder = %d\n",
@@ -144,11 +147,14 @@ int main(int argc, char **argv)
     while (framesPerWrite < 48) {
         framesPerWrite *= 2;
     }
-    printf("DataFormat: framesPerWrite = %d\n",framesPerWrite);
+    printf("Buffer: framesPerBurst = %d\n",framesPerBurst);
+    printf("Buffer: framesPerWrite = %d\n",framesPerWrite);
 
     actualDataFormat = AAudioStream_getFormat(aaudioStream);
     printf("DataFormat: requested = %d, actual = %d\n", REQUESTED_FORMAT, actualDataFormat);
     // TODO handle other data formats
+
+    printf("PerformanceMode: %d\n", AAudioStream_getPerformanceMode(aaudioStream));
 
     // Allocate a buffer for the audio data.
     if (actualDataFormat == AAUDIO_FORMAT_PCM_FLOAT) {
