@@ -2962,6 +2962,10 @@ bool AudioFlinger::PlaybackThread::threadLoop()
     // See reference to logString below.
     const char *logString = NULL;
 
+    // Estimated time for next buffer to be written to hal. This is used only on
+    // suspended mode (for now) to help schedule the wait time until next iteration.
+    nsecs_t timeLoopNextNs = 0;
+
     checkSilentMode_l();
 
     while (!exitPending())
@@ -3326,6 +3330,29 @@ bool AudioFlinger::PlaybackThread::threadLoop()
             } else {
                 ATRACE_BEGIN("sleep");
                 Mutex::Autolock _l(mLock);
+                // suspended requires accurate metering of sleep time.
+                if (isSuspended()) {
+                    // advance by expected sleepTime
+                    timeLoopNextNs += microseconds((nsecs_t)mSleepTimeUs);
+                    const nsecs_t nowNs = systemTime();
+
+                    // compute expected next time vs current time.
+                    // (negative deltas are treated as delays).
+                    nsecs_t deltaNs = timeLoopNextNs - nowNs;
+                    if (deltaNs < -kMaxNextBufferDelayNs) {
+                        // Delays longer than the max allowed trigger a reset.
+                        ALOGV("DelayNs: %lld, resetting timeLoopNextNs", (long long) deltaNs);
+                        deltaNs = microseconds((nsecs_t)mSleepTimeUs);
+                        timeLoopNextNs = nowNs + deltaNs;
+                    } else if (deltaNs < 0) {
+                        // Delays within the max delay allowed: zero the delta/sleepTime
+                        // to help the system catch up in the next iteration(s)
+                        ALOGV("DelayNs: %lld, catching-up", (long long) deltaNs);
+                        deltaNs = 0;
+                    }
+                    // update sleep time (which is >= 0)
+                    mSleepTimeUs = deltaNs / 1000;
+                }
                 if (!mSignalPending && mConfigEvents.isEmpty() && !exitPending()) {
                     mWaitWorkCV.waitRelative(mLock, microseconds((nsecs_t)mSleepTimeUs));
                 }

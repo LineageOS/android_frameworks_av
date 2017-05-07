@@ -32,7 +32,6 @@ using namespace aaudio;
 
 // Arbitrary and somewhat generous number of bursts.
 #define DEFAULT_BURSTS_PER_BUFFER_CAPACITY     8
-static const bool FAST_TRACKS_ENABLED = true;
 
 /*
  * Create a stream that uses the AudioTrack.
@@ -69,17 +68,29 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     ALOGD("AudioStreamTrack::open(), samplesPerFrame = %d, channelMask = 0x%08x",
             samplesPerFrame, channelMask);
 
-    // TODO add more performance options
-    audio_output_flags_t flags = FAST_TRACKS_ENABLED
-                                 ? AUDIO_OUTPUT_FLAG_FAST
-                                 : AUDIO_OUTPUT_FLAG_NONE;
+    audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE;
+    switch(getPerformanceMode()) {
+        case AAUDIO_PERFORMANCE_MODE_LOW_LATENCY:
+            // Bypass the normal mixer and go straight to the FAST mixer.
+            flags = (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_RAW);
+            break;
+
+        case AAUDIO_PERFORMANCE_MODE_POWER_SAVING:
+            // This uses a mixer that wakes up less often than the FAST mixer.
+            flags = AUDIO_OUTPUT_FLAG_DEEP_BUFFER;
+            break;
+
+        case AAUDIO_PERFORMANCE_MODE_NONE:
+        default:
+            // No flags. Use a normal mixer in front of the FAST mixer.
+            break;
+    }
 
     int32_t frameCount = builder.getBufferCapacity();
     ALOGD("AudioStreamTrack::open(), requested buffer capacity %d", frameCount);
 
     int32_t notificationFrames = 0;
 
-    // TODO implement an unspecified AudioTrack format then use that.
     audio_format_t format = (getFormat() == AAUDIO_FORMAT_UNSPECIFIED)
             ? AUDIO_FORMAT_PCM_FLOAT
             : AAudioConvert_aaudioToAndroidDataFormat(getFormat());

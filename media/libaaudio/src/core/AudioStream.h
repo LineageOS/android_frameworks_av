@@ -134,6 +134,10 @@ public:
         return mState == AAUDIO_STREAM_STATE_STARTING || mState == AAUDIO_STREAM_STATE_STARTED;
     }
 
+    virtual bool isMMap() {
+        return false;
+    }
+
     aaudio_result_t getSampleRate() const {
         return mSampleRate;
     }
@@ -144,6 +148,14 @@ public:
 
     aaudio_result_t getSamplesPerFrame() const {
         return mSamplesPerFrame;
+    }
+
+    virtual int32_t getPerformanceMode() const {
+        return mPerformanceMode;
+    }
+
+    void setPerformanceMode(aaudio_performance_mode_t performanceMode) {
+        mPerformanceMode = performanceMode;
     }
 
     int32_t getDeviceId() const {
@@ -292,6 +304,8 @@ private:
     aaudio_audio_format_t  mFormat = AAUDIO_FORMAT_UNSPECIFIED;
     aaudio_direction_t     mDirection = AAUDIO_DIRECTION_OUTPUT;
     aaudio_stream_state_t  mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
+
+    aaudio_performance_mode_t mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
 
     // callback ----------------------------------
 

@@ -17,7 +17,7 @@
 #ifndef _ACAMERA_MANAGER_H
 #define _ACAMERA_MANAGER_H
 
-#include "NdkCameraManager.h"
+#include <camera/NdkCameraManager.h>
 
 #include <android/hardware/ICameraService.h>
 #include <android/hardware/BnCameraServiceListener.h>

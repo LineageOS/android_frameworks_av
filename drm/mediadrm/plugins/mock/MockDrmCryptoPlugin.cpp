@@ -19,7 +19,7 @@
 #include <utils/Log.h>
 
 
-#include "drm/DrmAPI.h"
+#include "media/drm/DrmAPI.h"
 #include "MockDrmCryptoPlugin.h"
 #include "media/stagefright/MediaErrors.h"
 
