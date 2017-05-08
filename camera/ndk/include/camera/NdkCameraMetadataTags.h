@@ -1547,6 +1547,7 @@ typedef enum acamera_metadata_tag {
      * <code>false</code> if present.</p>
      * <p>For applications targeting SDK versions older than O, the value of enableZsl in all
      * capture templates is always <code>false</code> if present.</p>
+     * <p>For application-operated ZSL, use CAMERA3_TEMPLATE_ZERO_SHUTTER_LAG template.</p>
      *
      * @see ACAMERA_CONTROL_CAPTURE_INTENT
      * @see ACAMERA_SENSOR_TIMESTAMP
