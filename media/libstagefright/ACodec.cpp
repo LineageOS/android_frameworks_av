@@ -5401,6 +5401,8 @@ bool ACodec::BaseState::onMessageReceived(const sp<AMessage> &msg) {
             ALOGE_IF("[%s] failed to release codec instance: err=%d",
                        mCodec->mComponentName.c_str(), err);
             mCodec->mCallback->onReleaseCompleted();
+
+            mCodec->changeState(mCodec->mUninitializedState);
             break;
         }
 
