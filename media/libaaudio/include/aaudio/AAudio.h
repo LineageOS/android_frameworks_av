@@ -507,6 +507,9 @@ AAUDIO_API aaudio_result_t  AAudioStream_requestStart(AAudioStream* stream);
  * Use AAudioStream_Start() to resume playback after a pause.
  * After this call the state will be in AAUDIO_STREAM_STATE_PAUSING or AAUDIO_STREAM_STATE_PAUSED.
  *
+ * This will return AAUDIO_ERROR_UNIMPLEMENTED for input streams.
+ * For input streams use AAudioStream_requestStop().
+ *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return AAUDIO_OK or a negative error.
  */
@@ -518,6 +521,8 @@ AAUDIO_API aaudio_result_t  AAudioStream_requestPause(AAudioStream* stream);
  * This call only works if the stream is pausing or paused. TODO review
  * Frame counters are not reset by a flush. They may be advanced.
  * After this call the state will be in AAUDIO_STREAM_STATE_FLUSHING or AAUDIO_STREAM_STATE_FLUSHED.
+ *
+ * This will return AAUDIO_ERROR_UNIMPLEMENTED for input streams.
  *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return AAUDIO_OK or a negative error.
@@ -703,6 +708,9 @@ AAUDIO_API int32_t AAudioStream_getFramesPerDataCallback(AAudioStream* stream);
  * and there is no place to put the incoming data so it is discarded.
  *
  * An underrun or overrun can cause an audible "pop" or "glitch".
+ *
+ * Note that some INPUT devices may not support this function.
+ * In that case a 0 will always be returned.
  *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return the underrun or overrun count
