@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1a486d77_a6125f60",
+        "filename": "media/libstagefright/AMRExtractor.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 256,
+      "author": {
+        "id": 11883
+      },
+      "writtenOn": "2017-05-08T20:08:18Z",
+      "side": 1,
+      "message": "Are we sure this is from this patch?\nIt\u0027s not used anywhere to \"divide\" a value",
+      "range": {
+        "startLine": 256,
+        "startChar": 8,
+        "endLine": 256,
+        "endChar": 26
+      },
+      "revId": "c27ef8df0ca71624ce841fc32a8ecc75a061b564",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
