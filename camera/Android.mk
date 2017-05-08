@@ -39,7 +39,6 @@ LOCAL_SRC_FILES += \
 	Camera.cpp \
 	CameraMetadata.cpp \
 	CaptureResult.cpp \
-	CameraParameters2.cpp \
 	ICamera.cpp \
 	ICameraClient.cpp \
 	ICameraServiceProxy.cpp \
@@ -75,9 +74,9 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := \
 LOCAL_CFLAGS += -Werror -Wall -Wextra
 
 ifneq ($(TARGET_SPECIFIC_CAMERA_PARAMETER_LIBRARY),)
-LOCAL_WHOLE_STATIC_LIBRARIES += $(TARGET_SPECIFIC_CAMERA_PARAMETER_LIBRARY)
+LOCAL_SHARED_LIBRARIES += $(TARGET_SPECIFIC_CAMERA_PARAMETER_LIBRARY)
 else
-LOCAL_WHOLE_STATIC_LIBRARIES += libcamera_parameters
+LOCAL_SHARED_LIBRARIES += libcamera_parameters
 endif
 
 LOCAL_MODULE:= libcamera_client
@@ -87,8 +86,9 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-	CameraParameters.cpp
+	CameraParameters.cpp \
+	CameraParameters2.cpp
 
 LOCAL_MODULE := libcamera_parameters
 
-include $(BUILD_STATIC_LIBRARY)
+include $(BUILD_SHARED_LIBRARY)
