@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1a486d77_66c46792",
+        "filename": "services/audioflinger/Threads.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 513,
+      "author": {
+        "id": 6351
+      },
+      "writtenOn": "2017-05-08T12:23:37Z",
+      "side": 1,
+      "message": "Looking at AudioMixer.cpp, I think that there are only a total of 32 tracks.  That means that this change would be\n\n// 16 tracks max per client allows for 2 misbehaving application leaving 0 available tracks",
+      "revId": "e0d693a5194f338919757fb72ebab0d05c664a87",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
