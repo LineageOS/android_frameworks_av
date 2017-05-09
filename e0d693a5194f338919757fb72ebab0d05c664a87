@@ -16,6 +16,24 @@
       "revId": "e0d693a5194f338919757fb72ebab0d05c664a87",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a486d77_a9dd9044",
+        "filename": "services/audioflinger/Threads.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 513,
+      "author": {
+        "id": 12604
+      },
+      "writtenOn": "2017-05-09T00:34:39Z",
+      "side": 1,
+      "message": "Thanks, I will fix that comment.  I will also verify if I can get this working with 15 max tracks leaving 2 available tracks.",
+      "parentUuid": "1a486d77_66c46792",
+      "revId": "e0d693a5194f338919757fb72ebab0d05c664a87",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
