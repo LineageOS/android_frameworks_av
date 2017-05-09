@@ -1861,7 +1861,7 @@ status_t OMXNodeInstance::emptyNativeHandleBuffer_l(
 }
 
 void OMXNodeInstance::codecBufferFilled(omx_message &msg) {
-    Mutex::Autolock autoLock(mBufferIDLock);
+    Mutex::Autolock autoLock(mLock);
 
     if (mMaxTimestampGapUs <= 0ll || mRestorePtsFailed) {
         return;
