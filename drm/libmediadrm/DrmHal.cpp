@@ -410,6 +410,7 @@ status_t DrmHal::destroyPlugin() {
     }
 
     setListener(NULL);
+    mPlugin->setListener(NULL);
     mPlugin.clear();
 
     return OK;
