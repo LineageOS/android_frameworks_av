@@ -56,6 +56,9 @@ public:
 
     void getEmptyRoomAvailable(android::WrappingBuffer *wrappingBuffer);
 
+    int32_t getEmptyFramesAvailable();
+    int32_t getFullFramesAvailable();
+
     void advanceWriteIndex(int32_t deltaFrames);
 
     /**
@@ -80,8 +83,6 @@ public:
     int32_t getBufferSizeInFrames() const;
 
     int32_t getBufferCapacityInFrames() const;
-
-    int32_t getFullFramesAvailable();
 
 private:
     android::FifoBuffer    *mUpCommandQueue;
