@@ -1,0 +1,52 @@
+cc_library_shared {
+    name: "libstagefright_omx",
+
+    srcs: [
+        "FrameDropper.cpp",
+        "GraphicBufferSource.cpp",
+        "OMX.cpp",
+        "OMXMaster.cpp",
+        "OMXNodeInstance.cpp",
+        "OMXUtils.cpp",
+        "SimpleSoftOMXComponent.cpp",
+        "SoftOMXComponent.cpp",
+        "SoftOMXPlugin.cpp",
+        "SoftVideoDecoderOMXComponent.cpp",
+        "SoftVideoEncoderOMXComponent.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/libstagefright",
+        "frameworks/native/include/media/hardware",
+        // TODO: export this?
+        "frameworks/native/include/media/openmax",
+    ],
+
+    shared_libs: [
+        "libbinder",
+        "libmedia",
+        "libutils",
+        "liblog",
+        "libui",
+        "libgui",
+        "libcutils",
+        "libstagefright_foundation",
+        "libdl",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+    sanitize: {
+        misc_undefined: [
+            "signed-integer-overflow",
+            "unsigned-integer-overflow",
+        ],
+    },
+}
+
+//###############################################################################
+
+subdirs = ["tests"]

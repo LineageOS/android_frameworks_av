@@ -1,0 +1,30 @@
+cc_library_static {
+    name: "libstagefright_mpeg2ts",
+
+    srcs: [
+        "AnotherPacketSource.cpp",
+        "ATSParser.cpp",
+        "ESQueue.cpp",
+        "MPEG2PSExtractor.cpp",
+        "MPEG2TSExtractor.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/libstagefright",
+        "frameworks/native/include/media/openmax",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+    sanitize: {
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+    },
+
+    shared_libs: ["libmedia"],
+}

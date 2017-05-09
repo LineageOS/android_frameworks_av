@@ -1,0 +1,15 @@
+cc_library {
+    name: "libstagefright_enc_common",
+
+    srcs: ["cmnMemory.c"],
+
+    arch: {
+        arm: {
+            instruction_set: "arm",
+        },
+    },
+
+    export_include_dirs: ["include"],
+
+    cflags: ["-Werror"],
+}

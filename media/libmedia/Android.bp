@@ -74,7 +74,11 @@ cc_library_shared {
 
     header_libs: ["libaudioeffects"],
 
-    export_shared_lib_headers: ["libbinder"],
+    export_shared_lib_headers: [
+        "libbinder",
+        "libicuuc",
+        "libicui18n",
+    ],
 
     whole_static_libs: ["libmedia_helper"],
 

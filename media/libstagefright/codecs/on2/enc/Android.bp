@@ -1,0 +1,27 @@
+cc_library_shared {
+    name: "libstagefright_soft_vpxenc",
+
+    srcs: ["SoftVPXEncoder.cpp"],
+
+    include_dirs: [
+        "frameworks/av/media/libstagefright/include",
+        "frameworks/native/include/media/openmax",
+    ],
+
+    sanitize: {
+        misc_undefined: [
+            "signed-integer-overflow",
+            "unsigned-integer-overflow",
+        ],
+    },
+
+    static_libs: ["libvpx"],
+
+    shared_libs: [
+        "libmedia",
+        "libstagefright_omx",
+        "libstagefright_foundation",
+        "libutils",
+        "liblog",
+    ],
+}
