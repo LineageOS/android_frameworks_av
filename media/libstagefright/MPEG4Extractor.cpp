@@ -2388,6 +2388,7 @@ status_t MPEG4Extractor::parseMetaData(off64_t offset, size_t size) {
                     if (sscanf(mLastCommentData,
                                " %*x %x %x %*x", &delay, &padding) == 2) {
                         if (mLastTrack == NULL) {
+                            delete[] buffer;
                             return ERROR_MALFORMED;
                         }
                         mLastTrack->meta->setInt32(kKeyEncoderDelay, delay);
