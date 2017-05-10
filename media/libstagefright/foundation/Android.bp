@@ -37,7 +37,10 @@ cc_library_shared {
         "libpowermanager",
     ],
 
-    export_shared_lib_headers: ["libbinder", "libui"],
+    export_shared_lib_headers: [
+        "libbinder",
+        "libui",
+    ],
 
     cflags: [
         "-Wno-multichar",
@@ -52,7 +55,7 @@ cc_library_shared {
         ],
         cfi: true,
         diag: {
-          cfi: true,
+            cfi: true,
         },
     },
 }

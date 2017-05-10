@@ -21,6 +21,7 @@
 #include "WGraphicBufferProducer.h"
 #include "WProducerListener.h"
 #include "Conversion.h"
+#include <system/window.h>
 
 namespace android {
 namespace hardware {
@@ -248,7 +249,7 @@ Return<int32_t> TWGraphicBufferProducer::disconnect(
 
 Return<int32_t> TWGraphicBufferProducer::setSidebandStream(const hidl_handle& stream) {
     return static_cast<int32_t>(mBase->setSidebandStream(NativeHandle::create(
-            native_handle_clone(stream), true)));
+            stream ? native_handle_clone(stream) : NULL, true)));
 }
 
 Return<void> TWGraphicBufferProducer::allocateBuffers(

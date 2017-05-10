@@ -20,12 +20,13 @@
 
 #include <utils/RefBase.h>
 #include <utils/Timers.h>
-#include <system/window.h>
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AString.h>
 
 #include <list>
+
+struct ANativeWindowBuffer;
 
 namespace android {
 

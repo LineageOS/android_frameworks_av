@@ -14,7 +14,7 @@ cc_library {
         "-Wall",
     ],
     shared: {
-      shared_libs: ["libutils", "liblog"],
+      shared_libs: ["libutils", "liblog", "libgui"],
     },
     clang: true,
 }
@@ -115,6 +115,8 @@ cc_library_shared {
 
     export_shared_lib_headers: [
         "libbinder",
+        "libicuuc",
+        "libicui18n",
         "libsonivox",
         "libmediadrm",
         "android.hidl.token@1.0-utils",
