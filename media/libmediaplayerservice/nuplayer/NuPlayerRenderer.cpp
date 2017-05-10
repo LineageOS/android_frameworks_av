@@ -1010,6 +1010,13 @@ bool NuPlayer::Renderer::onDrainAudioQueue() {
             }
 
             // EOS
+            if (mPaused) {
+                // Do not notify EOS when paused.
+                // This is needed to avoid switch to next clip while in pause.
+                ALOGV("onDrainAudioQueue(): Do not notify EOS when paused");
+                return false;
+            }
+
             int64_t postEOSDelayUs = 0;
             if (mAudioSink->needsTrailingPadding()) {
                 postEOSDelayUs = getPendingAudioPlayoutDurationUs(ALooper::GetNowUs());
