@@ -89,6 +89,7 @@ public:
 
         Configuration()
             : Interpolator<S, T>()
+            , RefBase()
             , mType(TYPE_SCALE)
             , mOptionFlags(OPTION_FLAG_NONE)
             , mDurationMs(1000.)
@@ -97,6 +98,7 @@ public:
 
         explicit Configuration(const Configuration &configuration)
             : Interpolator<S, T>(*static_cast<const Interpolator<S, T> *>(&configuration))
+            , RefBase()
             , mType(configuration.mType)
             , mOptionFlags(configuration.mOptionFlags)
             , mDurationMs(configuration.mDurationMs)
@@ -150,7 +152,7 @@ public:
 
         T adjustVolume(T volume) const {
             if ((getOptionFlags() & OPTION_FLAG_VOLUME_IN_DBFS) != 0) {
-                const T out = powf(10.f, volume / 10.);
+                const T out = powf(10.f, volume / 10.0f);
                 VS_LOG("in: %f  out: %f", volume, out);
                 volume = out;
             }
@@ -264,10 +266,10 @@ public:
 
         std::string toString() const {
             std::stringstream ss;
-            ss << "mType: " << mType << std::endl;
+            ss << "mType: " << static_cast<int32_t>(mType) << std::endl;
             ss << "mId: " << mId << std::endl;
             if (mType != TYPE_ID) {
-                ss << "mOptionFlags: " << mOptionFlags << std::endl;
+                ss << "mOptionFlags: " << static_cast<int32_t>(mOptionFlags) << std::endl;
                 ss << "mDurationMs: " << mDurationMs << std::endl;
                 ss << Interpolator<S, T>::toString().c_str();
             }
@@ -365,7 +367,7 @@ public:
 
         std::string toString() const {
             std::stringstream ss;
-            ss << "mFlags: " << mFlags << std::endl;
+            ss << "mFlags: " << static_cast<int32_t>(mFlags) << std::endl;
             ss << "mReplaceId: " << mReplaceId << std::endl;
             ss << "mXOffset: " << mXOffset << std::endl;
             return ss.str();
@@ -503,14 +505,15 @@ public:
     void updatePosition(int64_t startFrame, double sampleRate) {
         double scale = (mConfiguration->last().first - mConfiguration->first().first)
                         / (mConfiguration->getDurationMs() * 0.001 * sampleRate);
-        const double minScale = 1. / INT64_MAX;
+        const double minScale = 1. / static_cast<double>(INT64_MAX);
         scale = std::max(scale, minScale);
         const S xOffset = std::isnan(mDelayXOffset) ? mConfiguration->first().first : mDelayXOffset;
         VS_LOG("update position: scale %lf  frameCount:%lld, sampleRate:%lf, xOffset:%f",
                 scale, (long long) startFrame, sampleRate, xOffset);
 
-        mXTranslate.setOffset(startFrame - xOffset / scale);
-        mXTranslate.setScale(scale);
+        mXTranslate.setOffset(static_cast<float>(static_cast<double>(startFrame)
+                                                 - static_cast<double>(xOffset) / scale));
+        mXTranslate.setScale(static_cast<float>(scale));
         VS_LOG("translate: %s", mXTranslate.toString().c_str());
     }
 
