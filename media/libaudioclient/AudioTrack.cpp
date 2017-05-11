@@ -2268,7 +2268,7 @@ status_t AudioTrack::restoreTrack_l(const char *from)
             // For now, we simply advance to the end of the VolumeShaper effect
             // if it has been started.
             if (shaper.isStarted()) {
-                operationToEnd->setXOffset(1.f);
+                operationToEnd->setNormalizedTime(1.f);
             }
             return mAudioTrack->applyVolumeShaper(shaper.mConfiguration, operationToEnd);
         });

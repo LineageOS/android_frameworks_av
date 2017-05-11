@@ -874,6 +874,10 @@ public:
      */
             bool hasStarted(); // not const
 
+            bool isPlaying() {
+                AutoMutex lock(mLock);
+                return mState == STATE_ACTIVE || mState == STATE_STOPPING;
+            }
 protected:
     /* copying audio tracks is not allowed */
                         AudioTrack(const AudioTrack& other);

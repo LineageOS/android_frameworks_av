@@ -177,10 +177,13 @@ aaudio_result_t AudioStreamRecord::requestStart()
 
 aaudio_result_t AudioStreamRecord::requestPause()
 {
+    // This does not make sense for an input stream.
+    // There is no real difference between pause() and stop().
     return AAUDIO_ERROR_UNIMPLEMENTED;
 }
 
 aaudio_result_t AudioStreamRecord::requestFlush() {
+    // This does not make sense for an input stream.
     return AAUDIO_ERROR_UNIMPLEMENTED;
 }
 
@@ -259,7 +262,7 @@ int32_t AudioStreamRecord::getBufferCapacity() const
 
 int32_t AudioStreamRecord::getXRunCount() const
 {
-    return AAUDIO_ERROR_UNIMPLEMENTED; // TODO implement when AudioRecord supports it
+    return 0; // TODO implement when AudioRecord supports it
 }
 
 int32_t AudioStreamRecord::getFramesPerBurst() const
