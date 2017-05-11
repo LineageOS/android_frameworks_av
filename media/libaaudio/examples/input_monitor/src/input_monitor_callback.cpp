@@ -24,7 +24,7 @@
 #include <time.h>
 #include <aaudio/AAudio.h>
 
-#define NUM_SECONDS           10
+#define NUM_SECONDS           5
 #define NANOS_PER_MICROSECOND ((int64_t)1000)
 #define NANOS_PER_MILLISECOND (NANOS_PER_MICROSECOND * 1000)
 #define NANOS_PER_SECOND      (NANOS_PER_MILLISECOND * 1000)
@@ -33,13 +33,13 @@
 #define SHARING_MODE  AAUDIO_SHARING_MODE_SHARED
 
 /**
- * Simple wrapper for AAudio that opens a default stream and then calls
- * a callback function to fill the output buffers.
+ * Simple wrapper for AAudio that opens an input stream and then calls
+ * a callback function to process the input data.
  */
-class SimpleAAudioPlayer {
+class SimpleAAudioRecorder {
 public:
-    SimpleAAudioPlayer() {}
-    ~SimpleAAudioPlayer() {
+    SimpleAAudioRecorder() {}
+    ~SimpleAAudioRecorder() {
         close();
     };
 
@@ -71,6 +71,15 @@ public:
         }
         return AAudioStream_getSamplesPerFrame(mStream);;
     }
+    /**
+     * Only call this after open() has been called.
+     */
+    int64_t getFramesRead() {
+        if (mStream == nullptr) {
+            return AAUDIO_ERROR_INVALID_STATE;
+        }
+        return AAudioStream_getFramesRead(mStream);;
+    }
 
     /**
      * Open a stream
@@ -85,7 +94,7 @@ public:
         AAudioStreamBuilder_setDirection(mBuilder, AAUDIO_DIRECTION_INPUT);
         AAudioStreamBuilder_setSharingMode(mBuilder, mRequestedSharingMode);
         AAudioStreamBuilder_setDataCallback(mBuilder, proc, userContext);
-        AAudioStreamBuilder_setFormat(mBuilder, AAUDIO_FORMAT_PCM_I16);
+        AAudioStreamBuilder_setFormat(mBuilder, AAUDIO_FORMAT_PCM_FLOAT);
 
         // Open an AAudioStream using the Builder.
         result = AAudioStreamBuilder_openStream(mBuilder, &mStream);
@@ -121,11 +130,10 @@ public:
     }
 
     // Write zero data to fill up the buffer and prevent underruns.
-    // Assume format is PCM_I16. TODO use floats.
     aaudio_result_t prime() {
         int32_t samplesPerFrame = AAudioStream_getSamplesPerFrame(mStream);
         const int numFrames = 32; // arbitrary
-        int16_t zeros[numFrames * samplesPerFrame];
+        float zeros[numFrames * samplesPerFrame];
         memset(zeros, 0, sizeof(zeros));
         aaudio_result_t result = numFrames;
         while (result == numFrames) {
@@ -151,8 +159,16 @@ public:
             fprintf(stderr, "ERROR - AAudioStream_requestStop() returned %d %s\n",
                     result, AAudio_convertResultToText(result));
         }
-        int32_t xRunCount = AAudioStream_getXRunCount(mStream);
-        printf("AAudioStream_getXRunCount %d\n", xRunCount);
+        return result;
+    }
+
+    // Pause the stream. AAudio will stop calling your callback function.
+    aaudio_result_t pause() {
+        aaudio_result_t result = AAudioStream_requestPause(mStream);
+        if (result != AAUDIO_OK) {
+            fprintf(stderr, "ERROR - AAudioStream_requestPause() returned %d %s\n",
+                    result, AAudio_convertResultToText(result));
+        }
         return result;
     }
 
@@ -227,7 +243,7 @@ void displayPeakLevel(float peakLevel) {
 int main(int argc, char **argv)
 {
     (void)argc; // unused
-    SimpleAAudioPlayer player;
+    SimpleAAudioRecorder recorder;
     PeakTrackerData_t myData = {0.0};
     aaudio_result_t result;
     const int displayRateHz = 20; // arbitrary
@@ -238,37 +254,60 @@ int main(int argc, char **argv)
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
     printf("%s - Display audio input using an AAudio callback\n", argv[0]);
 
-    player.setSharingMode(SHARING_MODE);
+    recorder.setSharingMode(SHARING_MODE);
 
-    result = player.open(MyDataCallbackProc, &myData);
+    result = recorder.open(MyDataCallbackProc, &myData);
     if (result != AAUDIO_OK) {
-        fprintf(stderr, "ERROR -  player.open() returned %d\n", result);
+        fprintf(stderr, "ERROR -  recorder.open() returned %d\n", result);
         goto error;
     }
-    printf("player.getFramesPerSecond() = %d\n", player.getFramesPerSecond());
-    printf("player.getSamplesPerFrame() = %d\n", player.getSamplesPerFrame());
+    printf("recorder.getFramesPerSecond() = %d\n", recorder.getFramesPerSecond());
+    printf("recorder.getSamplesPerFrame() = %d\n", recorder.getSamplesPerFrame());
 
-    result = player.start();
+    result = recorder.start();
     if (result != AAUDIO_OK) {
-        fprintf(stderr, "ERROR -  player.start() returned %d\n", result);
+        fprintf(stderr, "ERROR -  recorder.start() returned %d\n", result);
         goto error;
     }
 
-    printf("Sleep for %d seconds while audio plays in a callback thread.\n", NUM_SECONDS);
-   for (int i = 0; i < loopsNeeded; i++)
+    printf("Sleep for %d seconds while audio record in a callback thread.\n", NUM_SECONDS);
+    for (int i = 0; i < loopsNeeded; i++)
     {
         const struct timespec request = { .tv_sec = 0,
                 .tv_nsec = NANOS_PER_SECOND / displayRateHz };
         (void) clock_nanosleep(CLOCK_MONOTONIC, 0 /*flags*/, &request, NULL /*remain*/);
+        printf("%08d: ", (int)recorder.getFramesRead());
+        displayPeakLevel(myData.peakLevel);
+    }
+    printf("Woke up. Stop for a moment.\n");
+
+    result = recorder.stop();
+    if (result != AAUDIO_OK) {
+        goto error;
+    }
+    sleep(1);
+    result = recorder.start();
+    if (result != AAUDIO_OK) {
+        fprintf(stderr, "ERROR -  recorder.start() returned %d\n", result);
+        goto error;
+    }
+
+    printf("Sleep for %d seconds while audio records in a callback thread.\n", NUM_SECONDS);
+    for (int i = 0; i < loopsNeeded; i++)
+    {
+        const struct timespec request = { .tv_sec = 0,
+                .tv_nsec = NANOS_PER_SECOND / displayRateHz };
+        (void) clock_nanosleep(CLOCK_MONOTONIC, 0 /*flags*/, &request, NULL /*remain*/);
+        printf("%08d: ", (int)recorder.getFramesRead());
         displayPeakLevel(myData.peakLevel);
     }
     printf("Woke up now.\n");
 
-    result = player.stop();
+    result = recorder.stop();
     if (result != AAUDIO_OK) {
         goto error;
     }
-    result = player.close();
+    result = recorder.close();
     if (result != AAUDIO_OK) {
         goto error;
     }
@@ -276,7 +315,7 @@ int main(int argc, char **argv)
     printf("SUCCESS\n");
     return EXIT_SUCCESS;
 error:
-    player.close();
+    recorder.close();
     printf("exiting - AAudio result = %d = %s\n", result, AAudio_convertResultToText(result));
     return EXIT_FAILURE;
 }
