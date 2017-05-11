@@ -271,7 +271,6 @@ class Camera3Device :
         void getInflightBufferKeys(std::vector<std::pair<int32_t, int32_t>>* out);
 
       private:
-        camera3_device_t *mHal3Device;
         sp<hardware::camera::device::V3_2::ICameraDeviceSession> mHidlSession;
         std::shared_ptr<RequestMetadataQueue> mRequestMetadataQueue;
 
