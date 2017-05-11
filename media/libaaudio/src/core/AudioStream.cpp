@@ -66,6 +66,18 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
         ALOGE("AudioStream::open(): samplesPerFrame out of range = %d", mSamplesPerFrame);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
+
+    switch(mFormat) {
+        case AAUDIO_FORMAT_UNSPECIFIED:
+        case AAUDIO_FORMAT_PCM_I16:
+        case AAUDIO_FORMAT_PCM_FLOAT:
+            break; // valid
+        default:
+            ALOGE("AudioStream::open(): audioFormat not valid = %d", mFormat);
+            return AAUDIO_ERROR_INVALID_FORMAT;
+            // break;
+    }
+
     if (mSampleRate < 0 || mSampleRate > 1000000) {
         ALOGE("AudioStream::open(): mSampleRate out of range = %d", mSampleRate);
         return AAUDIO_ERROR_INVALID_RATE;
@@ -101,7 +113,6 @@ aaudio_result_t AudioStream::waitForStateChange(aaudio_stream_state_t currentSta
         return result;
     }
 
-    // TODO replace this when similar functionality added to AudioTrack.cpp
     int64_t durationNanos = 20 * AAUDIO_NANOS_PER_MILLISECOND; // arbitrary
     aaudio_stream_state_t state = getState();
     while (state == currentState && timeoutNanoseconds > 0) {
@@ -145,6 +156,8 @@ static void* AudioStream_internalThreadProc(void* threadArg) {
     return audioStream->wrapUserThread();
 }
 
+// This is not exposed in the API.
+// But it is still used internally to implement callbacks for MMAP mode.
 aaudio_result_t AudioStream::createThread(int64_t periodNanoseconds,
                                      aaudio_audio_thread_proc_t threadProc,
                                      void* threadArg)
@@ -161,8 +174,7 @@ aaudio_result_t AudioStream::createThread(int64_t periodNanoseconds,
     setPeriodNanoseconds(periodNanoseconds);
     int err = pthread_create(&mThread, nullptr, AudioStream_internalThreadProc, this);
     if (err != 0) {
-        // TODO convert errno to aaudio_result_t
-        return AAUDIO_ERROR_INTERNAL;
+        return AAudioConvert_androidToAAudioResult(-errno);
     } else {
         mHasThread = true;
         return AAUDIO_OK;
@@ -182,7 +194,6 @@ aaudio_result_t AudioStream::joinThread(void** returnArg, int64_t timeoutNanosec
     int err = pthread_join(mThread, returnArg);
 #endif
     mHasThread = false;
-    // TODO convert errno to aaudio_result_t
-    return err ? AAUDIO_ERROR_INTERNAL : mThreadRegistrationResult;
+    return err ? AAudioConvert_androidToAAudioResult(-errno) : mThreadRegistrationResult;
 }
 

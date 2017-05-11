@@ -61,7 +61,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     ALOGD("AudioStreamTrack::open = %p", this);
 
     // Try to create an AudioTrack
-    // TODO Support UNSPECIFIED in AudioTrack. For now, use stereo if unspecified.
+    // Use stereo if unspecified.
     int32_t samplesPerFrame = (getSamplesPerFrame() == AAUDIO_UNSPECIFIED)
                               ? 2 : getSamplesPerFrame();
     audio_channel_mask_t channelMask = audio_channel_out_mask_from_count(samplesPerFrame);
@@ -163,9 +163,8 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
 aaudio_result_t AudioStreamTrack::close()
 {
-    // TODO maybe add close() or release() to AudioTrack API then call it from here
     if (getState() != AAUDIO_STREAM_STATE_CLOSED) {
-        mAudioTrack.clear(); // TODO is this right?
+        mAudioTrack.clear();
         setState(AAUDIO_STREAM_STATE_CLOSED);
     }
     mFixedBlockReader.close();
@@ -290,7 +289,7 @@ aaudio_result_t AudioStreamTrack::updateStateWhileWaiting()
             if (err != OK) {
                 return AAudioConvert_androidToAAudioResult(err);
             } else if (position == 0) {
-                // Advance frames read to match written.
+                // TODO Advance frames read to match written.
                 setState(AAUDIO_STREAM_STATE_FLUSHED);
             }
         }
@@ -389,20 +388,5 @@ aaudio_result_t AudioStreamTrack::getTimestamp(clockid_t clockId,
     if (status != NO_ERROR) {
         return AAudioConvert_androidToAAudioResult(status);
     }
-    // TODO Merge common code into AudioStreamLegacy after rebasing.
-    int timebase;
-    switch (clockId) {
-        case CLOCK_BOOTTIME:
-            timebase = ExtendedTimestamp::TIMEBASE_BOOTTIME;
-            break;
-        case CLOCK_MONOTONIC:
-            timebase = ExtendedTimestamp::TIMEBASE_MONOTONIC;
-            break;
-        default:
-            ALOGE("getTimestamp() - Unrecognized clock type %d", (int) clockId);
-            return AAUDIO_ERROR_UNEXPECTED_VALUE;
-            break;
-    }
-    status = extendedTimestamp.getBestTimestamp(framePosition, timeNanoseconds, timebase);
-    return AAudioConvert_androidToAAudioResult(status);
+    return getBestTimestamp(clockId, framePosition, timeNanoseconds, &extendedTimestamp);
 }
