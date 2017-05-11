@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AAUDIO_AAUDIO_SERVICE_MESSAGE_H
-#define AAUDIO_AAUDIO_SERVICE_MESSAGE_H
+#ifndef ANDROID_AAUDIO_AAUDIO_SERVICE_MESSAGE_H
+#define ANDROID_AAUDIO_AAUDIO_SERVICE_MESSAGE_H
 
 #include <stdint.h>
 
@@ -64,4 +64,4 @@ typedef struct AAudioServiceMessage_s {
 
 } /* namespace aaudio */
 
-#endif //AAUDIO_AAUDIO_SERVICE_MESSAGE_H
+#endif //ANDROID_AAUDIO_AAUDIO_SERVICE_MESSAGE_H

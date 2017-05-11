@@ -108,3 +108,24 @@ void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode
             break;
     }
 }
+
+aaudio_result_t AudioStreamLegacy::getBestTimestamp(clockid_t clockId,
+                                                   int64_t *framePosition,
+                                                   int64_t *timeNanoseconds,
+                                                   ExtendedTimestamp *extendedTimestamp) {
+    int timebase;
+    switch (clockId) {
+        case CLOCK_BOOTTIME:
+            timebase = ExtendedTimestamp::TIMEBASE_BOOTTIME;
+            break;
+        case CLOCK_MONOTONIC:
+            timebase = ExtendedTimestamp::TIMEBASE_MONOTONIC;
+            break;
+        default:
+            ALOGE("getTimestamp() - Unrecognized clock type %d", (int) clockId);
+            return AAUDIO_ERROR_UNEXPECTED_VALUE;
+            break;
+    }
+    status_t status = extendedTimestamp->getBestTimestamp(framePosition, timeNanoseconds, timebase);
+    return AAudioConvert_androidToAAudioResult(status);
+}
