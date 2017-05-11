@@ -136,6 +136,20 @@ hardware::Return<void> CameraHardwareInterface::dataCallback(
     return hardware::Void();
 }
 
+hardware::Return<void> CameraHardwareInterface::QDataCallback(
+        DataCallbackMsg msgType, uint32_t data, uint32_t bufferIndex,
+        const vendor::qti::hardware::camera::device::V1_0::QCameraFrameMetadata& metadata) {
+    if (mHidlMemPoolMap.count(data) == 0) {
+        ALOGE("%s: memory pool ID %d not found", __FUNCTION__, data);
+        return hardware::Void();
+    }
+    camera_frame_metadata_t md;
+    md.number_of_faces = metadata.faces.size();
+    md.faces = (camera_face_t*) metadata.faces.data();
+    sDataCb((int32_t) msgType, mHidlMemPoolMap.at(data), bufferIndex, &md, this);
+    return hardware::Void();
+}
+
 hardware::Return<void> CameraHardwareInterface::dataCallbackTimestamp(
         DataCallbackMsg msgType, uint32_t data,
         uint32_t bufferIndex, int64_t timestamp) {
