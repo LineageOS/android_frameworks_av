@@ -209,14 +209,13 @@ AAUDIO_API void AAudioStreamBuilder_setDeviceId(AAudioStreamBuilder* builder,
 /**
  * Request a sample rate in Hertz.
  *
- * The stream may be opened with a different sample rate.
- * So the application should query for the actual rate after the stream is opened.
- *
- * Technically, this should be called the "frame rate" or "frames per second",
- * because it refers to the number of complete frames transferred per second.
- * But it is traditionally called "sample rate". So we use that term.
- *
  * The default, if you do not call this function, is AAUDIO_UNSPECIFIED.
+ * An optimal value will then be chosen when the stream is opened.
+ * After opening a stream with an unspecified value, the application must
+ * query for the actual value, which may vary by device.
+ *
+ * If an exact value is specified then an opened stream will use that value.
+ * If a stream cannot be opened with the specified value then the open will fail.
  *
  * @param builder reference provided by AAudio_createStreamBuilder()
  * @param sampleRate frames per second. Common rates include 44100 and 48000 Hz.
@@ -227,12 +226,13 @@ AAUDIO_API void AAudioStreamBuilder_setSampleRate(AAudioStreamBuilder* builder,
 /**
  * Request a number of channels for the stream.
  *
- * The stream may be opened with a different value.
- * So the application should query for the actual value after the stream is opened.
- *
  * The default, if you do not call this function, is AAUDIO_UNSPECIFIED.
+ * An optimal value will then be chosen when the stream is opened.
+ * After opening a stream with an unspecified value, the application must
+ * query for the actual value, which may vary by device.
  *
- * Note, this quantity is sometimes referred to as "samples per frame".
+ * If an exact value is specified then an opened stream will use that value.
+ * If a stream cannot be opened with the specified value then the open will fail.
  *
  * @param builder reference provided by AAudio_createStreamBuilder()
  * @param channelCount Number of channels desired.
@@ -252,12 +252,15 @@ AAUDIO_API void AAudioStreamBuilder_setSamplesPerFrame(AAudioStreamBuilder* buil
  * Request a sample data format, for example AAUDIO_FORMAT_PCM_I16.
  *
  * The default, if you do not call this function, is AAUDIO_UNSPECIFIED.
+ * An optimal value will then be chosen when the stream is opened.
+ * After opening a stream with an unspecified value, the application must
+ * query for the actual value, which may vary by device.
  *
- * The stream may be opened with a different value.
- * So the application should query for the actual value after the stream is opened.
+ * If an exact value is specified then an opened stream will use that value.
+ * If a stream cannot be opened with the specified value then the open will fail.
  *
  * @param builder reference provided by AAudio_createStreamBuilder()
- * @param format Most common formats are AAUDIO_FORMAT_PCM_FLOAT and AAUDIO_FORMAT_PCM_I16.
+ * @param format common formats are AAUDIO_FORMAT_PCM_FLOAT and AAUDIO_FORMAT_PCM_I16.
  */
 AAUDIO_API void AAudioStreamBuilder_setFormat(AAudioStreamBuilder* builder,
                                                    aaudio_audio_format_t format);
