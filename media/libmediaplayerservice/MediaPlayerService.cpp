@@ -2042,7 +2042,7 @@ status_t MediaPlayerService::AudioOutput::open(
         // For now, we simply advance to the end of the VolumeShaper effect
         // if it has been started.
         if (shaper.isStarted()) {
-            operationToEnd->setXOffset(1.f);
+            operationToEnd->setNormalizedTime(1.f);
         }
         return t->applyVolumeShaper(shaper.mConfiguration, operationToEnd);
     });
@@ -2301,8 +2301,9 @@ VolumeShaper::Status MediaPlayerService::AudioOutput::applyVolumeShaper(
         status = mTrack->applyVolumeShaper(configuration, operation);
         if (status >= 0) {
             (void)mVolumeHandler->applyVolumeShaper(configuration, operation);
-            // TODO: start on exact AudioTrack state (STATE_ACTIVE || STATE_STOPPING)
-            mVolumeHandler->setStarted();
+            if (mTrack->isPlaying()) { // match local AudioTrack to properly restore.
+                mVolumeHandler->setStarted();
+            }
         }
     } else {
         status = mVolumeHandler->applyVolumeShaper(configuration, operation);
