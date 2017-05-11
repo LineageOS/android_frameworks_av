@@ -246,51 +246,62 @@ public:
         CAMERA_PROCESS_DEATH = 4
     };
 
-    // For battery usage tracking purpose
-    struct BatteryUsageInfo {
-        // how many streams are being played by one UID
-        int     refCount;
-        // a temp variable to store the duration(ms) of audio codecs
-        // when we start a audio codec, we minus the system time from audioLastTime
-        // when we pause it, we add the system time back to the audioLastTime
-        // so after the pause, audioLastTime = pause time - start time
-        // if multiple audio streams are played (or recorded), then audioLastTime
-        // = the total playing time of all the streams
-        int32_t audioLastTime;
-        // when all the audio streams are being paused, we assign audioLastTime to
-        // this variable, so this value could be provided to the battery app
-        // in the next pullBatteryData call
-        int32_t audioTotalTime;
-
-        int32_t videoLastTime;
-        int32_t videoTotalTime;
-    };
-    KeyedVector<int, BatteryUsageInfo>    mBatteryData;
-
-    enum {
-        SPEAKER,
-        OTHER_AUDIO_DEVICE,
-        SPEAKER_AND_OTHER,
-        NUM_AUDIO_DEVICES
-    };
-
-    struct BatteryAudioFlingerUsageInfo {
-        int refCount; // how many audio streams are being played
-        int deviceOn[NUM_AUDIO_DEVICES]; // whether the device is currently used
-        int32_t lastTime[NUM_AUDIO_DEVICES]; // in ms
-        // totalTime[]: total time of audio output devices usage
-        int32_t totalTime[NUM_AUDIO_DEVICES]; // in ms
-    };
-
-    // This varialble is used to record the usage of audio output device
-    // for battery app
-    BatteryAudioFlingerUsageInfo mBatteryAudio;
-
     // Collect info of the codec usage from media player and media recorder
     virtual void                addBatteryData(uint32_t params);
     // API for the Battery app to pull the data of codecs usage
     virtual status_t            pullBatteryData(Parcel* reply);
 private:
+    struct BatteryTracker {
+        BatteryTracker();
+        // Collect info of the codec usage from media player and media recorder
+        void addBatteryData(uint32_t params);
+        // API for the Battery app to pull the data of codecs usage
+        status_t pullBatteryData(Parcel* reply);
+
+    private:
+        // For battery usage tracking purpose
+        struct BatteryUsageInfo {
+            // how many streams are being played by one UID
+            int     refCount;
+            // a temp variable to store the duration(ms) of audio codecs
+            // when we start a audio codec, we minus the system time from audioLastTime
+            // when we pause it, we add the system time back to the audioLastTime
+            // so after the pause, audioLastTime = pause time - start time
+            // if multiple audio streams are played (or recorded), then audioLastTime
+            // = the total playing time of all the streams
+            int32_t audioLastTime;
+            // when all the audio streams are being paused, we assign audioLastTime to
+            // this variable, so this value could be provided to the battery app
+            // in the next pullBatteryData call
+            int32_t audioTotalTime;
+
+            int32_t videoLastTime;
+            int32_t videoTotalTime;
+        };
+        KeyedVector<int, BatteryUsageInfo>    mBatteryData;
+
+        enum {
+            SPEAKER,
+            OTHER_AUDIO_DEVICE,
+            SPEAKER_AND_OTHER,
+            NUM_AUDIO_DEVICES
+        };
+
+        struct BatteryAudioFlingerUsageInfo {
+            int refCount; // how many audio streams are being played
+            int deviceOn[NUM_AUDIO_DEVICES]; // whether the device is currently used
+            int32_t lastTime[NUM_AUDIO_DEVICES]; // in ms
+            // totalTime[]: total time of audio output devices usage
+            int32_t totalTime[NUM_AUDIO_DEVICES]; // in ms
+        };
+
+        // This varialble is used to record the usage of audio output device
+        // for battery app
+        BatteryAudioFlingerUsageInfo mBatteryAudio;
+
+        mutable Mutex mLock;
+    };
+    BatteryTracker mBatteryTracker;
 
     class Client : public BnMediaPlayer {
         // IMediaPlayer interface
