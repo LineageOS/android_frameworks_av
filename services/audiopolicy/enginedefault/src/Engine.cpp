@@ -552,6 +552,15 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
                 AUDIO_POLICY_FORCE_HDMI_SYSTEM_AUDIO_ENFORCED)) {
             device &= ~AUDIO_DEVICE_OUT_SPEAKER;
         }
+
+        // for STRATEGY_SONIFICATION:
+        // if SPEAKER was selected, and SPEAKER_SAFE is available, use SPEAKER_SAFE instead
+        if ((strategy == STRATEGY_SONIFICATION) &&
+                (device & AUDIO_DEVICE_OUT_SPEAKER) &&
+                (availableOutputDevicesType & AUDIO_DEVICE_OUT_SPEAKER_SAFE)) {
+            device |= AUDIO_DEVICE_OUT_SPEAKER_SAFE;
+            device &= ~AUDIO_DEVICE_OUT_SPEAKER;
+        }
         } break;
 
     default:
