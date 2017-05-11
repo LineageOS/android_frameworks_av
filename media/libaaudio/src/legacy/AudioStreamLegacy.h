@@ -17,6 +17,7 @@
 #ifndef LEGACY_AUDIO_STREAM_LEGACY_H
 #define LEGACY_AUDIO_STREAM_LEGACY_H
 
+#include <media/AudioTimestamp.h>
 
 #include <aaudio/AAudio.h>
 
@@ -73,6 +74,12 @@ public:
     virtual int64_t incrementClientFrameCounter(int32_t frames)  = 0;
 
 protected:
+
+    aaudio_result_t getBestTimestamp(clockid_t clockId,
+                                     int64_t *framePosition,
+                                     int64_t *timeNanoseconds,
+                                     android::ExtendedTimestamp *extendedTimestamp);
+
     FixedBlockAdapter         *mBlockAdapter = nullptr;
     aaudio_wrapping_frames_t   mPositionWhenStarting = 0;
     int32_t                    mCallbackBufferSize = 0;

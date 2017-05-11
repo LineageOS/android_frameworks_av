@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef BINDING_IAAUDIOSERVICE_H
-#define BINDING_IAAUDIOSERVICE_H
+#ifndef ANDROID_AAUDIO_IAAUDIO_SERVICE_H
+#define ANDROID_AAUDIO_IAAUDIO_SERVICE_H
 
 #include <stdint.h>
 #include <utils/RefBase.h>
@@ -103,4 +103,4 @@ public:
 
 } /* namespace android */
 
-#endif //BINDING_IAAUDIOSERVICE_H
+#endif //ANDROID_AAUDIO_IAAUDIO_SERVICE_H
