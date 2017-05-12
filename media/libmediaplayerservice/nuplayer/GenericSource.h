@@ -91,6 +91,8 @@ struct NuPlayer::GenericSource : public NuPlayer::Source,
     virtual status_t prepareDrm(
             const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId, sp<ICrypto> *crypto);
 
+    virtual status_t releaseDrm();
+
 
 protected:
     virtual ~GenericSource();
@@ -119,6 +121,7 @@ private:
         kWhatSecureDecodersInstantiated,
         // Modular DRM
         kWhatPrepareDrm,
+        kWhatReleaseDrm,
     };
 
     struct Track {
@@ -308,10 +311,12 @@ private:
 
     // Modular DRM
     bool mIsDrmProtected;
+    bool mIsDrmReleased;
     Vector<String8> mMimes;
 
     status_t checkDrmInfo();
     status_t onPrepareDrm(const sp<AMessage> &msg);
+    status_t onReleaseDrm();
 
     DISALLOW_EVIL_CONSTRUCTORS(GenericSource);
 };

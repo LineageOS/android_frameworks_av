@@ -98,6 +98,7 @@ void NuPlayer::GenericSource::resetDataSource() {
     mBufferingMonitor->stop();
 
     mIsDrmProtected = false;
+    mIsDrmReleased = false;
     mIsSecure = false;
     mMimes.clear();
 }
@@ -690,6 +691,17 @@ void NuPlayer::GenericSource::onMessageReceived(const sp<AMessage> &msg) {
           break;
       }
 
+      case kWhatReleaseDrm:
+      {
+          status_t status = onReleaseDrm();
+          sp<AMessage> response = new AMessage;
+          response->setInt32("status", status);
+          sp<AReplyToken> replyID;
+          CHECK(msg->senderAwaitsResponse(&replyID));
+          response->postReply(replyID);
+          break;
+      }
+
       default:
           Source::onMessageReceived(msg);
           break;
@@ -836,6 +848,13 @@ sp<MetaData> NuPlayer::GenericSource::doGetFormatMeta(bool audio) const {
 status_t NuPlayer::GenericSource::dequeueAccessUnit(
         bool audio, sp<ABuffer> *accessUnit) {
     if (audio && !mStarted) {
+        return -EWOULDBLOCK;
+    }
+
+    // If has gone through stop/releaseDrm sequence, we no longer send down any buffer b/c
+    // the codec's crypto object has gone away (b/37960096).
+    // Note: This will be unnecessary when stop() changes behavior and releases codec (b/35248283).
+    if (!mStarted && mIsDrmReleased) {
         return -EWOULDBLOCK;
     }
 
@@ -1897,11 +1916,31 @@ status_t NuPlayer::GenericSource::prepareDrm(
     return status;
 }
 
+status_t NuPlayer::GenericSource::releaseDrm()
+{
+    ALOGV("releaseDrm");
+
+    sp<AMessage> msg = new AMessage(kWhatReleaseDrm, this);
+
+    // synchronous call to update the source states before the player proceedes with crypto cleanup
+    sp<AMessage> response;
+    status_t status = msg->postAndAwaitResponse(&response);
+
+    if (status == OK && response != NULL) {
+        ALOGD("releaseDrm ret: OK ");
+    } else {
+        ALOGE("releaseDrm err: %d", status);
+    }
+
+    return status;
+}
+
 status_t NuPlayer::GenericSource::onPrepareDrm(const sp<AMessage> &msg)
 {
     ALOGV("onPrepareDrm ");
 
     mIsDrmProtected = false;
+    mIsDrmReleased = false;
     mIsSecure = false;
 
     uint8_t *uuid;
@@ -1949,8 +1988,26 @@ status_t NuPlayer::GenericSource::onPrepareDrm(const sp<AMessage> &msg)
     return status;
 }
 
+status_t NuPlayer::GenericSource::onReleaseDrm()
+{
+    if (mIsDrmProtected) {
+        mIsDrmProtected = false;
+        // to prevent returning any more buffer after stop/releaseDrm (b/37960096)
+        mIsDrmReleased = true;
+        ALOGV("onReleaseDrm: mIsDrmProtected is reset.");
+    } else {
+        ALOGE("onReleaseDrm: mIsDrmProtected is already false.");
+    }
+
+    return OK;
+}
+
 status_t NuPlayer::GenericSource::checkDrmInfo()
 {
+    // clearing the flag at prepare in case the player is reused after stop/releaseDrm with the
+    // same source without being reset (called by prepareAsync/initFromDataSource)
+    mIsDrmReleased = false;
+
     if (mFileMeta == NULL) {
         ALOGI("checkDrmInfo: No metadata");
         return OK; // letting the caller responds accordingly

@@ -2787,6 +2787,11 @@ status_t NuPlayer::onReleaseDrm()
 
     status_t status;
     if (mCrypto != NULL) {
+        // notifying the source first before removing crypto from codec
+        if (mSource != NULL) {
+            mSource->releaseDrm();
+        }
+
         status=OK;
         // first making sure the codecs have released their crypto reference
         const sp<DecoderBase> &videoDecoder = getDecoder(false/*audio*/);
