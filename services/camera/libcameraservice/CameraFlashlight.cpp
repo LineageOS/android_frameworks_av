@@ -93,10 +93,6 @@ status_t CameraFlashlight::setTorchMode(const String8& cameraId, bool enabled) {
     }
 
     if (mFlashControl == NULL) {
-        if (enabled == false) {
-            return OK;
-        }
-
         res = createFlashlightControl(cameraId);
         if (res) {
             return res;
@@ -139,10 +135,14 @@ status_t CameraFlashlight::findFlashUnits() {
         cameraIds[i] = String8(ids[i].c_str());
     }
 
-    mHasFlashlightMap.clear();
-    mFlashlightMapInitialized = false;
+    mFlashControl.clear();
 
     for (auto &id : cameraIds) {
+        ssize_t index = mHasFlashlightMap.indexOfKey(id);
+        if (0 <= index) {
+            continue;
+        }
+
         bool hasFlash = false;
         res = createFlashlightControl(id);
         if (res) {

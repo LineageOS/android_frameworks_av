@@ -231,7 +231,6 @@ status_t CameraProviderManager::setTorchMode(const std::string &id, bool enabled
 status_t CameraProviderManager::setUpVendorTags() {
     sp<VendorTagDescriptorCache> tagCache = new VendorTagDescriptorCache();
 
-    VendorTagDescriptorCache::clearGlobalVendorTagCache();
     for (auto& provider : mProviders) {
         hardware::hidl_vec<VendorTagSection> vts;
         Status status;
@@ -331,9 +330,17 @@ hardware::Return<void> CameraProviderManager::onRegistration(
         const hardware::hidl_string& /*fqName*/,
         const hardware::hidl_string& name,
         bool /*preexisting*/) {
-    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+    {
+        std::lock_guard<std::mutex> lock(mInterfaceMutex);
 
-    addProviderLocked(name);
+        addProviderLocked(name);
+    }
+
+    sp<StatusListener> listener = getStatusListener();
+    if (nullptr != listener.get()) {
+        listener->onNewProviderRegistered();
+    }
+
     return hardware::Return<void>();
 }
 

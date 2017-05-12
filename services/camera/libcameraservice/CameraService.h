@@ -99,6 +99,7 @@ public:
             hardware::camera::common::V1_0::CameraDeviceStatus newHalStatus) override;
     virtual void        onTorchStatusChanged(const String8& cameraId,
             hardware::camera::common::V1_0::TorchModeStatus newStatus) override;
+    virtual void        onNewProviderRegistered() override;
 
     /////////////////////////////////////////////////////////////////////
     // ICameraService
