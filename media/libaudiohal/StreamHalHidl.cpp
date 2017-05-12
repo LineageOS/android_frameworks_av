@@ -158,7 +158,7 @@ status_t StreamHalHidl::createMmapBuffer(int32_t minSizeFrames,
                 if (retval == Result::OK) {
                     const native_handle *handle = hidlInfo.sharedMemory.handle();
                     if (handle->numFds > 0) {
-                        info->shared_memory_fd = dup(handle->data[0]);
+                        info->shared_memory_fd = handle->data[0];
                         info->buffer_size_frames = hidlInfo.bufferSizeFrames;
                         info->burst_size_frames = hidlInfo.burstSizeFrames;
                         // info->shared_memory_address is not needed in HIDL context
