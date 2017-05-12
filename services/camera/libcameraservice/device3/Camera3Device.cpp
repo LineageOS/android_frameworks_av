@@ -4080,6 +4080,13 @@ void Camera3Device::RequestThread::cleanUpFailedRequests(bool sendRequestError) 
         }
 
         for (size_t i = 0; i < halRequest->num_output_buffers; i++) {
+            //Buffers that failed processing could still have
+            //valid acquire fence.
+            int acquireFence = (*outputBuffers)[i].acquire_fence;
+            if (0 <= acquireFence) {
+                close(acquireFence);
+                outputBuffers->editItemAt(i).acquire_fence = -1;
+            }
             outputBuffers->editItemAt(i).status = CAMERA3_BUFFER_STATUS_ERROR;
             captureRequest->mOutputStreams.editItemAt(i)->returnBuffer((*outputBuffers)[i], 0);
         }
