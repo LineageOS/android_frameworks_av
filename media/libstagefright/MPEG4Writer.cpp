@@ -72,8 +72,10 @@ static const int64_t kInitialDelayTimeUs     = 700000LL;
 static const int64_t kMaxMetadataSize = 0x4000000LL;   // 64MB max per-frame metadata size
 
 static const char kMetaKey_Version[]    = "com.android.version";
-#ifdef SHOW_MODEL_BUILD
+static const char kMetaKey_Manufacturer[]      = "com.android.manufacturer";
 static const char kMetaKey_Model[]      = "com.android.model";
+
+#ifdef SHOW_BUILD
 static const char kMetaKey_Build[]      = "com.android.build";
 #endif
 static const char kMetaKey_CaptureFps[] = "com.android.capture.fps";
@@ -93,7 +95,7 @@ static const uint8_t kHevcNalUnitTypes[5] = {
     kHevcNalUnitTypePrefixSei,
     kHevcNalUnitTypeSuffixSei,
 };
-/* uncomment to include model and build in meta */
+/* uncomment to include build in meta */
 //#define SHOW_MODEL_BUILD 1
 
 class MPEG4Writer::Track {
@@ -611,12 +613,20 @@ void MPEG4Writer::addDeviceMeta() {
         mMetaKeys->setString(kMetaKey_Version, val, n + 1);
         mMoovExtraSize += sizeof(kMetaKey_Version) + n + 32;
     }
-#ifdef SHOW_MODEL_BUILD
-    if (property_get("ro.product.model", val, NULL)
-            && (n = strlen(val)) > 0) {
-        mMetaKeys->setString(kMetaKey_Model, val, n + 1);
-        mMoovExtraSize += sizeof(kMetaKey_Model) + n + 32;
+
+    if (property_get_bool("media.recorder.show_manufacturer_and_model", false)) {
+        if (property_get("ro.product.manufacturer", val, NULL)
+                && (n = strlen(val)) > 0) {
+            mMetaKeys->setString(kMetaKey_Manufacturer, val, n + 1);
+            mMoovExtraSize += sizeof(kMetaKey_Manufacturer) + n + 32;
+        }
+        if (property_get("ro.product.model", val, NULL)
+                && (n = strlen(val)) > 0) {
+            mMetaKeys->setString(kMetaKey_Model, val, n + 1);
+            mMoovExtraSize += sizeof(kMetaKey_Model) + n + 32;
+        }
     }
+#ifdef SHOW_MODEL_BUILD
     if (property_get("ro.build.display.id", val, NULL)
             && (n = strlen(val)) > 0) {
         mMetaKeys->setString(kMetaKey_Build, val, n + 1);
