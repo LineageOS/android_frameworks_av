@@ -91,7 +91,8 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     AudioStream *audioStream = nullptr;
     *streamPtr = nullptr;
 
-    bool tryMMap = (sharingMode == AAUDIO_SHARING_MODE_SHARED) && MMAP_SHARED_ENABLED;
+    bool tryMMap = ((sharingMode == AAUDIO_SHARING_MODE_SHARED) && MMAP_SHARED_ENABLED) ||
+            ((sharingMode == AAUDIO_SHARING_MODE_EXCLUSIVE) && MMAP_EXCLUSIVE_ENABLED);
     aaudio_result_t result = builder_createStream(getDirection(), sharingMode,
                                                   tryMMap, &audioStream);
     if (result == AAUDIO_OK) {
