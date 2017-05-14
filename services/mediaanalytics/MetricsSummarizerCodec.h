@@ -14,27 +14,34 @@
  * limitations under the License.
  */
 
-#include <stdint.h>
 
-#include "FixedBlockAdapter.h"
+#ifndef ANDROID_METRICSSUMMARIZERCODEC_H
+#define ANDROID_METRICSSUMMARIZERCODEC_H
 
-FixedBlockAdapter::~FixedBlockAdapter() {
-    close();
-}
+#include <utils/threads.h>
+#include <utils/Errors.h>
+#include <utils/KeyedVector.h>
+#include <utils/String8.h>
+#include <utils/List.h>
 
-int32_t FixedBlockAdapter::open(int32_t bytesPerFixedBlock)
+#include <media/IMediaAnalyticsService.h>
+#include "MetricsSummarizer.h"
+
+
+namespace android {
+
+class MetricsSummarizerCodec : public MetricsSummarizer
 {
-    mSize = bytesPerFixedBlock;
-    mStorage = new uint8_t[bytesPerFixedBlock];
-    mPosition = 0;
-    return 0;
-}
 
-int32_t FixedBlockAdapter::close()
-{
-    delete[] mStorage;
-    mStorage = nullptr;
-    mSize = 0;
-    mPosition = 0;
-    return 0;
-}
+ public:
+
+    MetricsSummarizerCodec(const char *key);
+    virtual ~MetricsSummarizerCodec() {};
+
+};
+
+// ----------------------------------------------------------------------------
+
+}; // namespace android
+
+#endif // ANDROID_METRICSSUMMARIZERCODEC_H

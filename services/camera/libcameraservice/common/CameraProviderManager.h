@@ -106,6 +106,7 @@ public:
                 hardware::camera::common::V1_0::CameraDeviceStatus newStatus) = 0;
         virtual void onTorchStatusChanged(const String8 &cameraId,
                 hardware::camera::common::V1_0::TorchModeStatus newStatus) = 0;
+        virtual void onNewProviderRegistered() = 0;
     };
 
     /**

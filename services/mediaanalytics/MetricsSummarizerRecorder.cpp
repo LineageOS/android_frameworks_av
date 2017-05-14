@@ -14,27 +14,32 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "MetricsSummarizerRecorder"
+#include <utils/Log.h>
+
 #include <stdint.h>
+#include <inttypes.h>
 
-#include "FixedBlockAdapter.h"
+#include <utils/threads.h>
+#include <utils/Errors.h>
+#include <utils/KeyedVector.h>
+#include <utils/String8.h>
+#include <utils/List.h>
 
-FixedBlockAdapter::~FixedBlockAdapter() {
-    close();
-}
+#include <media/IMediaAnalyticsService.h>
 
-int32_t FixedBlockAdapter::open(int32_t bytesPerFixedBlock)
+#include "MetricsSummarizer.h"
+#include "MetricsSummarizerRecorder.h"
+
+
+
+
+namespace android {
+
+MetricsSummarizerRecorder::MetricsSummarizerRecorder(const char *key)
+    : MetricsSummarizer(key)
 {
-    mSize = bytesPerFixedBlock;
-    mStorage = new uint8_t[bytesPerFixedBlock];
-    mPosition = 0;
-    return 0;
+    ALOGV("MetricsSummarizerRecorder::MetricsSummarizerRecorder");
 }
 
-int32_t FixedBlockAdapter::close()
-{
-    delete[] mStorage;
-    mStorage = nullptr;
-    mSize = 0;
-    mPosition = 0;
-    return 0;
-}
+} // namespace android

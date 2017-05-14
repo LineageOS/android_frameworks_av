@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef BINDING_SHAREDREGIONPARCELABLE_H
-#define BINDING_SHAREDREGIONPARCELABLE_H
+#ifndef ANDROID_AAUDIO_SHARED_REGION_PARCELABLE_H
+#define ANDROID_AAUDIO_SHARED_REGION_PARCELABLE_H
 
 #include <stdint.h>
 
@@ -59,4 +59,4 @@ protected:
 
 } /* namespace aaudio */
 
-#endif //BINDING_SHAREDREGIONPARCELABLE_H
+#endif //ANDROID_AAUDIO_SHARED_REGION_PARCELABLE_H
