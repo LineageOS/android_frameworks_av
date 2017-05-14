@@ -25,7 +25,7 @@ FixedBlockAdapter::~FixedBlockAdapter() {
 int32_t FixedBlockAdapter::open(int32_t bytesPerFixedBlock)
 {
     mSize = bytesPerFixedBlock;
-    mStorage = new uint8_t[bytesPerFixedBlock]; // TODO use std::nothrow
+    mStorage = new uint8_t[bytesPerFixedBlock];
     mPosition = 0;
     return 0;
 }

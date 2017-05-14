@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AAUDIO_BINDING_AAUDIO_SERVICE_INTERFACE_H
-#define AAUDIO_BINDING_AAUDIO_SERVICE_INTERFACE_H
+#ifndef ANDROID_AAUDIO_BINDING_AAUDIO_SERVICE_INTERFACE_H
+#define ANDROID_AAUDIO_BINDING_AAUDIO_SERVICE_INTERFACE_H
 
 #include "binding/AAudioServiceDefinitions.h"
 #include "binding/AAudioStreamRequest.h"
@@ -87,4 +87,4 @@ public:
 
 } /* namespace aaudio */
 
-#endif //AAUDIO_BINDING_AAUDIO_SERVICE_INTERFACE_H
+#endif //ANDROID_AAUDIO_BINDING_AAUDIO_SERVICE_INTERFACE_H

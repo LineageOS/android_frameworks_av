@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AAUDIO_AUDIOSTREAMINTERNAL_H
-#define AAUDIO_AUDIOSTREAMINTERNAL_H
+#ifndef ANDROID_AAUDIO_AUDIO_STREAM_INTERNAL_H
+#define ANDROID_AAUDIO_AUDIO_STREAM_INTERNAL_H
 
 #include <stdint.h>
 #include <aaudio/AAudio.h>
@@ -49,15 +49,11 @@ public:
 
     aaudio_result_t requestStop() override;
 
-    // TODO use aaudio_clockid_t all the way down to AudioClock
     aaudio_result_t getTimestamp(clockid_t clockId,
                                        int64_t *framePosition,
                                        int64_t *timeNanoseconds) override;
 
-
-
     virtual aaudio_result_t updateStateWhileWaiting() override;
-
     // =========== End ABSTRACT methods ===========================
 
     aaudio_result_t open(const AudioStreamBuilder &builder) override;
@@ -170,4 +166,4 @@ private:
 
 } /* namespace aaudio */
 
-#endif //AAUDIO_AUDIOSTREAMINTERNAL_H
+#endif //ANDROID_AAUDIO_AUDIO_STREAM_INTERNAL_H

@@ -278,20 +278,5 @@ aaudio_result_t AudioStreamRecord::getTimestamp(clockid_t clockId,
     if (status != NO_ERROR) {
         return AAudioConvert_androidToAAudioResult(status);
     }
-    // TODO Merge common code into AudioStreamLegacy after rebasing.
-    int timebase;
-    switch(clockId) {
-        case CLOCK_BOOTTIME:
-            timebase = ExtendedTimestamp::TIMEBASE_BOOTTIME;
-            break;
-        case CLOCK_MONOTONIC:
-            timebase = ExtendedTimestamp::TIMEBASE_MONOTONIC;
-            break;
-        default:
-            ALOGE("getTimestamp() - Unrecognized clock type %d", (int) clockId);
-            return AAUDIO_ERROR_UNEXPECTED_VALUE;
-            break;
-    }
-    status = extendedTimestamp.getBestTimestamp(framePosition, timeNanoseconds, timebase);
-    return AAudioConvert_androidToAAudioResult(status);
+    return getBestTimestamp(clockId, framePosition, timeNanoseconds, &extendedTimestamp);
 }
