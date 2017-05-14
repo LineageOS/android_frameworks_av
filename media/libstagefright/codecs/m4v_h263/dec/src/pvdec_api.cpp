@@ -15,6 +15,8 @@
  * and limitations under the License.
  * -------------------------------------------------------------------
  */
+#define LOG_TAG "pvdec_api"
+#include <log/log.h>
 #include "mp4dec_lib.h"
 #include "vlc_decode.h"
 #include "bitstream.h"
@@ -1335,6 +1337,11 @@ Bool PVDecodeVopBody(VideoDecControls *decCtrl, int32 buffer_size[])
             }
         }
 
+        if (!video->prevVop->yChan) {
+            ALOGE("b/35269635");
+            android_errorWriteLog(0x534e4554, "35269635");
+            return PV_FALSE;
+        }
         oscl_memcpy(currVop->yChan, video->prevVop->yChan, (decCtrl->size*3) / 2);
 
         video->prevVop = prevVop;
