@@ -379,7 +379,7 @@ bool ID3::removeUnsynchronizationV2_4(bool iTunesHack) {
             flags &= ~1;
         }
 
-        if (flags & 2) {
+        if ((flags & 2) && (dataSize >= 2)) {
             // This file has "unsynchronization", so we have to replace occurrences
             // of 0xff 0x00 with just 0xff in order to get the real data.
 
@@ -395,11 +395,15 @@ bool ID3::removeUnsynchronizationV2_4(bool iTunesHack) {
                 mData[writeOffset++] = mData[readOffset++];
             }
             // move the remaining data following this frame
-            memmove(&mData[writeOffset], &mData[readOffset], oldSize - readOffset);
+            if (readOffset <= oldSize) {
+                memmove(&mData[writeOffset], &mData[readOffset], oldSize - readOffset);
+            } else {
+                ALOGE("b/34618607 (%zu %zu %zu %zu)", readOffset, writeOffset, oldSize, mSize);
+                android_errorWriteLog(0x534e4554, "34618607");
+            }
 
-            flags &= ~2;
         }
-
+        flags &= ~2;
         if (flags != prevFlags || iTunesHack) {
             WriteSyncsafeInteger(&mData[offset + 4], dataSize);
             mData[offset + 8] = flags >> 8;
