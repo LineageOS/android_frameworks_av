@@ -315,6 +315,7 @@ private:
         std::vector<std::unique_ptr<DeviceInfo>> mDevices;
         std::set<std::string> mUniqueCameraIds;
         int mUniqueDeviceCount;
+        std::set<std::string> mUniqueAPI1CompatibleCameraIds;
 
         // HALv1-specific camera fields, including the actual device interface
         struct DeviceInfo1 : public DeviceInfo {

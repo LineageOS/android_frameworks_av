@@ -87,11 +87,7 @@ int CameraProviderManager::getAPI1CompatibleCameraCount() const {
     int count = 0;
     for (auto& provider : mProviders) {
         if (kStandardProviderTypes.find(provider->getType()) != std::string::npos) {
-            for (auto& device : provider->mDevices) {
-                if (device->isAPI1Compatible()) {
-                    count++;
-                }
-            }
+            count += provider->mUniqueAPI1CompatibleCameraIds.size();
         }
     }
     return count;
@@ -113,10 +109,8 @@ std::vector<std::string> CameraProviderManager::getAPI1CompatibleCameraDeviceIds
     std::vector<std::string> deviceIds;
     for (auto& provider : mProviders) {
         if (kStandardProviderTypes.find(provider->getType()) != std::string::npos) {
-            for (auto& device : provider->mDevices) {
-                if (device->isAPI1Compatible()) {
-                    deviceIds.push_back(device->mId);
-                }
+            for (auto& id : provider->mUniqueAPI1CompatibleCameraIds) {
+                deviceIds.push_back(id);
             }
         }
     }
@@ -466,6 +460,7 @@ CameraProviderManager::ProviderInfo::ProviderInfo(
         mProviderName(providerName),
         mInterface(interface),
         mProviderTagid(generateVendorTagId(providerName)),
+        mUniqueDeviceCount(0),
         mManager(manager) {
     (void) mManager;
 }
@@ -539,6 +534,9 @@ status_t CameraProviderManager::ProviderInfo::initialize() {
 
     for (auto& device : mDevices) {
         mUniqueCameraIds.insert(device->mId);
+        if (device->isAPI1Compatible()) {
+            mUniqueAPI1CompatibleCameraIds.insert(device->mId);
+        }
     }
     mUniqueDeviceCount = mUniqueCameraIds.size();
 
