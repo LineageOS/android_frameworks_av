@@ -194,7 +194,18 @@ DrmHal::DrmHal()
      mInitCheck((mFactories.size() == 0) ? ERROR_UNSUPPORTED : NO_INIT) {
 }
 
+void DrmHal::closeOpenSessions() {
+    if (mPlugin != NULL) {
+        for (size_t i = 0; i < mOpenSessions.size(); i++) {
+            mPlugin->closeSession(toHidlVec(mOpenSessions[i]));
+            DrmSessionManager::Instance()->removeSession(mOpenSessions[i]);
+        }
+    }
+    mOpenSessions.clear();
+}
+
 DrmHal::~DrmHal() {
+    closeOpenSessions();
     DrmSessionManager::Instance()->removeDrm(mDrmSessionClient);
 }
 
@@ -405,11 +416,11 @@ status_t DrmHal::createPlugin(const uint8_t uuid[16],
 
 status_t DrmHal::destroyPlugin() {
     Mutex::Autolock autoLock(mLock);
-
     if (mInitCheck != OK) {
         return mInitCheck;
     }
 
+    closeOpenSessions();
     setListener(NULL);
     if (mPlugin != NULL) {
         mPlugin->setListener(NULL);
@@ -461,6 +472,7 @@ status_t DrmHal::openSession(Vector<uint8_t> &sessionId) {
     if (err == OK) {
         DrmSessionManager::Instance()->addSession(getCallingPid(),
                 mDrmSessionClient, sessionId);
+        mOpenSessions.push(sessionId);
     }
     return err;
 }
@@ -475,6 +487,12 @@ status_t DrmHal::closeSession(Vector<uint8_t> const &sessionId) {
     Status status = mPlugin->closeSession(toHidlVec(sessionId));
     if (status == Status::OK) {
         DrmSessionManager::Instance()->removeSession(sessionId);
+        for (size_t i = 0; i < mOpenSessions.size(); i++) {
+            if (mOpenSessions[i] == sessionId) {
+                mOpenSessions.removeAt(i);
+                break;
+            }
+        }
     }
     return toStatusT(status);
 }
@@ -962,6 +980,7 @@ status_t DrmHal::signRSA(Vector<uint8_t> const &sessionId,
 void DrmHal::binderDied(const wp<IBinder> &the_late_who __unused)
 {
     Mutex::Autolock autoLock(mLock);
+    closeOpenSessions();
     setListener(NULL);
     if (mPlugin != NULL) {
         mPlugin->setListener(NULL);

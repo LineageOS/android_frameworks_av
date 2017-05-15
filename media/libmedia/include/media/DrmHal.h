@@ -39,6 +39,11 @@ namespace android {
 
 struct DrmSessionClientInterface;
 
+inline bool operator==(const Vector<uint8_t> &l, const Vector<uint8_t> &r) {
+    if (l.size() != r.size()) return false;
+    return memcmp(l.array(), r.array(), l.size()) == 0;
+}
+
 struct DrmHal : public BnDrm,
              public IBinder::DeathRecipient,
              public IDrmPluginListener {
@@ -160,6 +165,9 @@ private:
 
     const Vector<sp<IDrmFactory>> mFactories;
     sp<IDrmPlugin> mPlugin;
+
+    Vector<Vector<uint8_t>> mOpenSessions;
+    void closeOpenSessions();
 
     /**
      * mInitCheck is:
