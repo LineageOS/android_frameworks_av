@@ -466,6 +466,22 @@ sp<MetaData> MPEG4Extractor::getTrackMetaData(
         const char *mime;
         CHECK(track->meta->findCString(kKeyMIMEType, &mime));
         if (!strncasecmp("video/", mime, 6)) {
+            // MPEG2 tracks do not provide CSD, so read the stream header
+            if (!strcmp(mime, MEDIA_MIMETYPE_VIDEO_MPEG2)) {
+                off64_t offset;
+                size_t size;
+                if (track->sampleTable->getMetaDataForSample(
+                            0 /* sampleIndex */, &offset, &size, NULL /* sampleTime */) == OK) {
+                    if (size > kMaxTrackHeaderSize) {
+                        size = kMaxTrackHeaderSize;
+                    }
+                    uint8_t header[kMaxTrackHeaderSize];
+                    if (mDataSource->readAt(offset, &header, size) == (ssize_t)size) {
+                        track->meta->setData(kKeyStreamHeader, 'mdat', header, size);
+                    }
+                }
+            }
+
             if (mMoofOffset > 0) {
                 int64_t duration;
                 if (track->meta->findInt64(kKeyDuration, &duration)) {
@@ -484,22 +500,6 @@ sp<MetaData> MPEG4Extractor::getTrackMetaData(
                     track->meta->setInt64(
                             kKeyThumbnailTime,
                             ((int64_t)sampleTime * 1000000) / track->timescale);
-                }
-            }
-
-            // MPEG2 tracks do not provide CSD, so read the stream header
-            if (!strcmp(mime, MEDIA_MIMETYPE_VIDEO_MPEG2)) {
-                off64_t offset;
-                size_t size;
-                if (track->sampleTable->getMetaDataForSample(
-                            0 /* sampleIndex */, &offset, &size, NULL /* sampleTime */) == OK) {
-                    if (size > kMaxTrackHeaderSize) {
-                        size = kMaxTrackHeaderSize;
-                    }
-                    uint8_t header[kMaxTrackHeaderSize];
-                    if (mDataSource->readAt(offset, &header, size) == (ssize_t)size) {
-                        track->meta->setData(kKeyStreamHeader, 'mdat', header, size);
-                    }
                 }
             }
         }
