@@ -491,7 +491,21 @@ status_t MyVorbisExtractor::readNextPacket(MediaBuffer **out, bool conf) {
             if (buffer != NULL) {
                 fullSize += buffer->range_length();
             }
-            MediaBuffer *tmp = new MediaBuffer(fullSize);
+            if (fullSize > 16 * 1024 * 1024) { // arbitrary limit of 16 MB packet size
+                if (buffer != NULL) {
+                    buffer->release();
+                }
+                ALOGE("b/36592202");
+                return ERROR_MALFORMED;
+            }
+            MediaBuffer *tmp = new (std::nothrow) MediaBuffer(fullSize);
+            if (tmp == NULL) {
+                if (buffer != NULL) {
+                    buffer->release();
+                }
+                ALOGE("b/36592202");
+                return ERROR_MALFORMED;
+            }
             if (buffer != NULL) {
                 memcpy(tmp->data(), buffer->data(), buffer->range_length());
                 tmp->set_range(0, buffer->range_length());
