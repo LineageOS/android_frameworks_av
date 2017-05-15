@@ -72,6 +72,10 @@ NBLog::AbstractEntry::AbstractEntry(const uint8_t *entry) : mEntry(entry) {
 
 // ---------------------------------------------------------------------------
 
+NBLog::EntryIterator NBLog::FormatEntry::begin() const {
+    return EntryIterator(mEntry);
+}
+
 const char *NBLog::FormatEntry::formatString() const {
     return (const char*) mEntry + offsetof(entry, data);
 }
@@ -163,10 +167,6 @@ void NBLog::EntryIterator::copyTo(std::unique_ptr<audio_utils_fifo_writer> &dst)
 
 void NBLog::EntryIterator::copyData(uint8_t *dst) const {
     memcpy((void*) dst, ptr + offsetof(entry, data), ptr[offsetof(entry, length)]);
-}
-
-NBLog::EntryIterator NBLog::FormatEntry::begin() const {
-    return EntryIterator(mEntry);
 }
 
 NBLog::EntryIterator::EntryIterator()
