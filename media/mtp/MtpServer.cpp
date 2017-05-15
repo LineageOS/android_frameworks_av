@@ -1052,23 +1052,22 @@ MtpResponseCode MtpServer::doSendObject() {
         ALOGE("failed to write initial data");
         result = MTP_RESPONSE_GENERAL_ERROR;
     } else {
-        if (mSendObjectFileSize - initialData > 0) {
-            mfr.offset = initialData;
-            if (mSendObjectFileSize == 0xFFFFFFFF) {
-                // tell driver to read until it receives a short packet
-                mfr.length = 0xFFFFFFFF;
-            } else {
-                mfr.length = mSendObjectFileSize - initialData;
-            }
+        mfr.offset = initialData;
+        if (mSendObjectFileSize == 0xFFFFFFFF) {
+            // tell driver to read until it receives a short packet
+            mfr.length = 0xFFFFFFFF;
+        } else {
+            mfr.length = mSendObjectFileSize - initialData;
+        }
 
-            mfr.command = 0;
-            mfr.transaction_id = 0;
+        mfr.command = 0;
+        mfr.transaction_id = 0;
 
-            // transfer the file
-            ret = sHandle->receiveFile(mfr);
-            if ((ret < 0) && (errno == ECANCELED)) {
-                isCanceled = true;
-            }
+        // transfer the file
+        ret = sHandle->receiveFile(mfr, mfr.length == 0 &&
+                initialData == MTP_BUFFER_SIZE - MTP_CONTAINER_HEADER_SIZE);
+        if ((ret < 0) && (errno == ECANCELED)) {
+            isCanceled = true;
         }
     }
     struct stat sstat;
@@ -1256,19 +1255,18 @@ MtpResponseCode MtpServer::doSendPartialObject() {
     if (ret < 0) {
         ALOGE("failed to write initial data");
     } else {
-        if (length > 0) {
-            mtp_file_range  mfr;
-            mfr.fd = edit->mFD;
-            mfr.offset = offset;
-            mfr.length = length;
-            mfr.command = 0;
-            mfr.transaction_id = 0;
+        mtp_file_range  mfr;
+        mfr.fd = edit->mFD;
+        mfr.offset = offset;
+        mfr.length = length;
+        mfr.command = 0;
+        mfr.transaction_id = 0;
 
-            // transfer the file
-            ret = sHandle->receiveFile(mfr);
-            if ((ret < 0) && (errno == ECANCELED)) {
-                isCanceled = true;
-            }
+        // transfer the file
+        ret = sHandle->receiveFile(mfr, mfr.length == 0 &&
+                initialData == MTP_BUFFER_SIZE - MTP_CONTAINER_HEADER_SIZE);
+        if ((ret < 0) && (errno == ECANCELED)) {
+            isCanceled = true;
         }
     }
     if (ret < 0) {

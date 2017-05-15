@@ -45,7 +45,7 @@ public:
     int read(void *data, int len);
     int write(const void *data, int len);
 
-    int receiveFile(mtp_file_range mfr);
+    int receiveFile(mtp_file_range mfr, bool);
     int sendFile(mtp_file_range mfr);
     int sendEvent(mtp_event me);
 
@@ -68,7 +68,7 @@ int MtpDevHandle::write(const void *data, int len) {
     return ::write(mFd, data, len);
 }
 
-int MtpDevHandle::receiveFile(mtp_file_range mfr) {
+int MtpDevHandle::receiveFile(mtp_file_range mfr, bool) {
     return ioctl(mFd, MTP_RECEIVE_FILE, reinterpret_cast<unsigned long>(&mfr));
 }
 
