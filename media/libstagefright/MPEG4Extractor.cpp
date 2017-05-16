@@ -1228,6 +1228,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             ALOGV("allocated pssh @ %p", pssh.data);
             ssize_t requested = (ssize_t) pssh.datalen;
             if (mDataSource->readAt(data_offset + 24, pssh.data, requested) < requested) {
+                delete[] pssh.data;
                 return ERROR_IO;
             }
             mPssh.push_back(pssh);
