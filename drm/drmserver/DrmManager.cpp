@@ -88,14 +88,9 @@ void DrmManager::removeUniqueId(int uniqueId) {
 }
 
 status_t DrmManager::loadPlugIns() {
-
-    String8 vendorPluginDirPath("/vendor/lib/drm");
-    loadPlugIns(vendorPluginDirPath);
-
     String8 pluginDirPath("/system/lib/drm");
     loadPlugIns(pluginDirPath);
     return DRM_NO_ERROR;
-
 }
 
 status_t DrmManager::loadPlugIns(const String8& plugInDirPath) {
