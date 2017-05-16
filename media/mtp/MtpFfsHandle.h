@@ -55,7 +55,7 @@ public:
     int read(void *data, int len);
     int write(const void *data, int len);
 
-    int receiveFile(mtp_file_range mfr);
+    int receiveFile(mtp_file_range mfr, bool zero_packet);
     int sendFile(mtp_file_range mfr);
     int sendEvent(mtp_event me);
 
