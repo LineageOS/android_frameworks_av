@@ -22,6 +22,7 @@
 #include <binder/IServiceManager.h>
 #include <utils/Mutex.h>
 #include <utils/RefBase.h>
+#include <utils/Singleton.h>
 
 #include <aaudio/AAudio.h>
 
@@ -46,6 +47,8 @@ using namespace aaudio;
 
 static android::Mutex gServiceLock;
 static sp<IAAudioService>  gAAudioService;
+
+ANDROID_SINGLETON_STATIC_INSTANCE(AAudioBinderClient);
 
 // TODO Share code with other service clients.
 // Helper function to get access to the "AAudioService" service.
@@ -81,7 +84,8 @@ static void dropAAudioService() {
 }
 
 AAudioBinderClient::AAudioBinderClient()
-        : AAudioServiceInterface() {}
+        : AAudioServiceInterface()
+        , Singleton<AAudioBinderClient>() {}
 
 AAudioBinderClient::~AAudioBinderClient() {}
 
