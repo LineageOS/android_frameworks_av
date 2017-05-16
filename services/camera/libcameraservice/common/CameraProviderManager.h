@@ -106,6 +106,7 @@ public:
                 hardware::camera::common::V1_0::CameraDeviceStatus newStatus) = 0;
         virtual void onTorchStatusChanged(const String8 &cameraId,
                 hardware::camera::common::V1_0::TorchModeStatus newStatus) = 0;
+        virtual void onNewProviderRegistered() = 0;
     };
 
     /**
@@ -314,6 +315,7 @@ private:
         std::vector<std::unique_ptr<DeviceInfo>> mDevices;
         std::set<std::string> mUniqueCameraIds;
         int mUniqueDeviceCount;
+        std::set<std::string> mUniqueAPI1CompatibleCameraIds;
 
         // HALv1-specific camera fields, including the actual device interface
         struct DeviceInfo1 : public DeviceInfo {

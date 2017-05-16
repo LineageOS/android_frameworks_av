@@ -27,7 +27,7 @@ public:
     virtual int write(const void *data, int len) = 0;
 
     // Return 0 if send/receive is successful, or -1 and errno is set
-    virtual int receiveFile(mtp_file_range mfr) = 0;
+    virtual int receiveFile(mtp_file_range mfr, bool zero_packet) = 0;
     virtual int sendFile(mtp_file_range mfr) = 0;
     virtual int sendEvent(mtp_event me) = 0;
 

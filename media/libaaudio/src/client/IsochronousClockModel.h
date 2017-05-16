@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AAUDIO_ISOCHRONOUS_CLOCK_MODEL_H
-#define AAUDIO_ISOCHRONOUS_CLOCK_MODEL_H
+#ifndef ANDROID_AAUDIO_ISOCHRONOUS_CLOCK_MODEL_H
+#define ANDROID_AAUDIO_ISOCHRONOUS_CLOCK_MODEL_H
 
 #include <stdint.h>
 
@@ -106,4 +106,4 @@ private:
 
 } /* namespace aaudio */
 
-#endif //AAUDIO_ISOCHRONOUS_CLOCK_MODEL_H
+#endif //ANDROID_AAUDIO_ISOCHRONOUS_CLOCK_MODEL_H

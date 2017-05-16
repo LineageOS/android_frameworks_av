@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AAUDIO_AUDIO_ENDPOINT_H
-#define AAUDIO_AUDIO_ENDPOINT_H
+#ifndef ANDROID_AAUDIO_AUDIO_ENDPOINT_H
+#define ANDROID_AAUDIO_AUDIO_ENDPOINT_H
 
 #include <aaudio/AAudio.h>
 
@@ -93,4 +93,4 @@ private:
 
 } // namespace aaudio
 
-#endif //AAUDIO_AUDIO_ENDPOINT_H
+#endif //ANDROID_AAUDIO_AUDIO_ENDPOINT_H

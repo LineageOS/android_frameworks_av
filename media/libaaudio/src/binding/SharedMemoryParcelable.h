@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef BINDING_SHAREDMEMORYPARCELABLE_H
-#define BINDING_SHAREDMEMORYPARCELABLE_H
+#ifndef ANDROID_AAUDIO_SHARED_MEMORY_PARCELABLE_H
+#define ANDROID_AAUDIO_SHARED_MEMORY_PARCELABLE_H
 
 #include <stdint.h>
 
@@ -75,4 +75,4 @@ protected:
 
 } /* namespace aaudio */
 
-#endif //BINDING_SHAREDMEMORYPARCELABLE_H
+#endif //ANDROID_AAUDIO_SHARED_MEMORY_PARCELABLE_H

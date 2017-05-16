@@ -167,6 +167,8 @@ public:
     explicit FormatEntry(const uint8_t *ptr) : AbstractEntry(ptr) {}
     virtual ~FormatEntry() {}
 
+    EntryIterator begin() const;
+
     // Entry's format string
     const   char* formatString() const;
 
@@ -191,7 +193,6 @@ public:
     virtual EntryIterator    copyWithAuthor(std::unique_ptr<audio_utils_fifo_writer> &dst,
                                        int author) const override;
 
-            EntryIterator    begin() const;
 };
 
 class HistogramEntry : public AbstractEntry {

@@ -510,34 +510,81 @@ int loadLibraries(cnode *root)
     return 0;
 }
 
+#ifdef __LP64__
+// audio_effects.conf always specifies 32 bit lib path: convert to 64 bit path if needed
+static const char *kLibraryPathRoot[] =
+        {"/odm/lib64/soundfx", "/vendor/lib64/soundfx", "/system/lib64/soundfx"};
+#else
+static const char *kLibraryPathRoot[] =
+        {"/odm/lib/soundfx", "/vendor/lib/soundfx", "/system/lib/soundfx"};
+#endif
+
+static const int kLibraryPathRootSize =
+        (sizeof(kLibraryPathRoot) / sizeof(kLibraryPathRoot[0]));
+
+// Checks if the library path passed as lib_path_in can be opened and if not
+// tries in standard effect library directories with just the library name and returns correct path
+// in lib_path_out
+int checkLibraryPath(const char *lib_path_in, char *lib_path_out) {
+    char *str;
+    const char *lib_name;
+    size_t len;
+
+    if (lib_path_in == NULL || lib_path_out == NULL) {
+        return -EINVAL;
+    }
+
+    strlcpy(lib_path_out, lib_path_in, PATH_MAX);
+
+    // Try exact path first
+    str = strstr(lib_path_out, "/lib/soundfx/");
+    if (str == NULL) {
+        return -EINVAL;
+    }
+
+    // Extract library name from input path
+    len = str - lib_path_out;
+    lib_name = lib_path_in + len + strlen("/lib/soundfx/");
+
+    // Then try with library name and standard path names in order of preference
+    for (int i = 0; i < kLibraryPathRootSize; i++) {
+        char path[PATH_MAX];
+
+        snprintf(path,
+                 PATH_MAX,
+                 "%s/%s",
+                 kLibraryPathRoot[i],
+                 lib_name);
+        if (F_OK == access(path, 0)) {
+            strcpy(lib_path_out, path);
+            ALOGW_IF(strncmp(lib_path_out, lib_path_in, PATH_MAX) != 0,
+                "checkLibraryPath() corrected library path %s to %s", lib_path_in, lib_path_out);
+            return 0;
+        }
+    }
+    return -EINVAL;
+}
+
+
+
 int loadLibrary(cnode *root, const char *name)
 {
     cnode *node;
-    void *hdl;
+    void *hdl = NULL;
     audio_effect_library_t *desc;
     list_elem_t *e;
     lib_entry_t *l;
     char path[PATH_MAX];
-    char *str;
-    size_t len;
 
     node = config_find(root, PATH_TAG);
     if (node == NULL) {
         return -EINVAL;
     }
-    // audio_effects.conf always specifies 32 bit lib path: convert to 64 bit path if needed
-    strlcpy(path, node->value, PATH_MAX);
-#ifdef __LP64__
-    str = strstr(path, "/lib/");
-    if (str == NULL)
-        return -EINVAL;
-    len = str - path;
-    path[len] = '\0';
-    strlcat(path, "/lib64/", PATH_MAX);
-    strlcat(path, node->value + len + strlen("/lib/"), PATH_MAX);
-#endif
-    if (strlen(path) >= PATH_MAX - 1)
-        return -EINVAL;
+
+    if (checkLibraryPath((const char *)node->value, path) != 0) {
+        ALOGW("loadLibrary() could not find library %s", path);
+        goto error;
+    }
 
     hdl = dlopen(path, RTLD_NOW);
     if (hdl == NULL) {
