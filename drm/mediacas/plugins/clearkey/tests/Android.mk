@@ -26,7 +26,7 @@ LOCAL_MODULE := ClearKeyFetcherTest
 # the plugin is not in standard library search path. Without this .so
 # loading fails at run-time (linking is okay).
 LOCAL_LDFLAGS := \
-    -Wl,--rpath,\$${ORIGIN}/../../../system/lib/mediacas -Wl,--enable-new-dtags
+    -Wl,--rpath,\$${ORIGIN}/../../../system/vendor/lib/mediacas -Wl,--enable-new-dtags
 
 LOCAL_SHARED_LIBRARIES := \
     libutils libclearkeycasplugin libstagefright_foundation libprotobuf-cpp-lite liblog

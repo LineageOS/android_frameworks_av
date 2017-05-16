@@ -20,14 +20,12 @@
 
 #include <media/IMediaSource.h>
 #include <media/stagefright/DataSource.h>
+#include <vector>
 
 namespace android {
 
 class MetaData;
-namespace media {
-class ICas;
-};
-using namespace media;
+typedef std::vector<uint8_t> HInterfaceToken;
 
 class IMediaExtractor : public IInterface {
 public:
@@ -65,7 +63,7 @@ public:
     // for DRM
     virtual char* getDrmTrackInfo(size_t trackID, int *len)  = 0;
 
-    virtual status_t setMediaCas(const sp<ICas> &cas) = 0;
+    virtual status_t setMediaCas(const HInterfaceToken &casToken) = 0;
 
     virtual void setUID(uid_t uid)  = 0;
 

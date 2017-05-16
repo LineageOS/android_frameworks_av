@@ -29,11 +29,13 @@
 #include <vector>
 
 namespace android {
-namespace media {
-class ICas;
-class IDescrambler;
-};
-using namespace media;
+namespace hardware {
+namespace cas {
+namespace V1_0 {
+struct ICas;
+}}}
+using hardware::cas::V1_0::ICas;
+
 class ABitReader;
 struct ABuffer;
 struct AnotherPacketSource;

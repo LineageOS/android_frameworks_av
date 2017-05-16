@@ -24,27 +24,31 @@
 
 #define STRINGIFY_ENUMS
 
-#include <media/ICrypto.h>
+#include <media/hardware/CryptoAPI.h>
+#include <media/hardware/HardwareAPI.h>
 #include <media/IOMX.h>
 #include <media/MediaCodecInfo.h>
-#include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/foundation/AHandler.h>
 #include <media/stagefright/foundation/ColorUtils.h>
-#include <media/hardware/HardwareAPI.h>
-
+#include <media/stagefright/MediaErrors.h>
+#include <system/graphics.h>
 #include <utils/NativeHandle.h>
 
-#include <system/graphics.h>
-#include <android/media/IDescrambler.h>
-
 namespace android {
-using namespace media;
 class BufferChannelBase;
 struct BufferProducerWrapper;
 class MediaCodecBuffer;
 struct PersistentSurface;
 struct RenderedFrameInfo;
 class Surface;
+struct ICrypto;
+namespace hardware {
+namespace cas {
+namespace native {
+namespace V1_0 {
+struct IDescrambler;
+}}}}
+using hardware::cas::native::V1_0::IDescrambler;
 
 struct CodecBase : public AHandler, /* static */ ColorUtils {
     /**
@@ -256,13 +260,9 @@ public:
         mCallback = std::move(callback);
     }
 
-    inline void setCrypto(const sp<ICrypto> &crypto) {
-        mCrypto = crypto;
-    }
+    void setCrypto(const sp<ICrypto> &crypto);
 
-    inline void setDescrambler(const sp<IDescrambler> &descrambler) {
-        mDescrambler = descrambler;
-    }
+    void setDescrambler(const sp<IDescrambler> &descrambler);
 
     /**
      * Queue an input buffer into the buffer channel.
