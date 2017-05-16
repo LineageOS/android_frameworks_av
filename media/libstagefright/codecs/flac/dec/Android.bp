@@ -1,21 +1,18 @@
-cc_library_static {
-    name: "libstagefright_matroska",
+cc_library_shared {
+    name: "libstagefright_soft_flacdec",
 
-    srcs: ["MatroskaExtractor.cpp"],
+    srcs: [
+        "SoftFlacDecoder.cpp",
+    ],
 
     include_dirs: [
         "external/flac/include",
-        "external/libvpx/libwebm",
-        "frameworks/native/include/media/openmax",
         "frameworks/av/media/libstagefright/flac/dec",
         "frameworks/av/media/libstagefright/include",
+        "frameworks/native/include/media/openmax",
     ],
 
-    cflags: [
-        "-Wno-multichar",
-        "-Werror",
-        "-Wall",
-    ],
+    cflags: ["-Werror"],
 
     sanitize: {
         misc_undefined: [
@@ -29,7 +26,11 @@ cc_library_static {
     },
 
     shared_libs: [
-        "libmedia",
-        "libstagefright_flacdec"
+        "libcutils",
+        "liblog",
+        "libstagefright_flacdec",
+        "libstagefright_omx",
+        "libstagefright_foundation",
+        "libutils",
     ],
 }
