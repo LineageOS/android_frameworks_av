@@ -18,6 +18,7 @@
 //#define LOG_NDEBUG 0
 
 #include <climits>
+#include <math.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -54,7 +55,7 @@ int NBLog::Entry::readAt(size_t offset) const
 
 /*static*/
 std::unique_ptr<NBLog::AbstractEntry> NBLog::AbstractEntry::buildEntry(const uint8_t *ptr) {
-    uint8_t type = EntryIterator(ptr)->type;
+    const uint8_t type = EntryIterator(ptr)->type;
     switch (type) {
     case EVENT_START_FMT:
         return std::make_unique<FormatEntry>(FormatEntry(ptr));
@@ -937,18 +938,17 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
         case EVENT_HISTOGRAM_FLUSH: {
             HistogramEntry histEntry(entry);
             // Log timestamp
-            int64_t ts = histEntry.timestamp();
+            const int64_t ts = histEntry.timestamp();
             timestamp.clear();
             timestamp.appendFormat("[%d.%03d]", (int) (ts / (1000 * 1000 * 1000)),
                             (int) ((ts / (1000 * 1000)) % 1000));
             // Log histograms
             body.appendFormat("Histogram flush - ");
             handleAuthor(histEntry, &body);
-            body.appendFormat("\n");
             for (auto hist = mHists.begin(); hist != mHists.end();) {
                 if (hist->first.second == histEntry.author()) {
-                    body.appendFormat("Histogram %X", (int)hist->first.first);
-                    drawHistogram(&body, hist->second, true/*logScale*/, indent + timestamp.size());
+                    body.appendFormat("%X", (int)hist->first.first);
+                    drawHistogram(&body, hist->second, true, indent);
                     hist = mHists.erase(hist);
                 } else {
                     ++hist;
@@ -1178,65 +1178,69 @@ void NBLog::Reader::drawHistogram(String8 *body,
                                   bool logScale,
                                   int indent,
                                   int maxHeight) {
+    // this avoids some corner cases
     if (samples.size() <= 1) {
         return;
     }
     std::map<int, int> buckets = buildBuckets(samples);
     // TODO consider changing all ints to uint32_t or uint64_t
-    static const char *underscores = "________________";
-    static const char *spaces = "                ";
+
+    // underscores and spaces length corresponds to maximum width of histogram
+    static const int kLen = 40;
+    std::string underscores(kLen, '-');
+    std::string spaces(kLen, ' ');
 
     auto it = buckets.begin();
-    int maxLabel = it->first;
-    int maxVal = it->second;
+    int maxDelta = it->first;
+    int maxCount = it->second;
     // Compute maximum values
     while (++it != buckets.end()) {
-        if (it->first > maxLabel) {
-            maxLabel = it->first;
+        if (it->first > maxDelta) {
+            maxDelta = it->first;
         }
-        if (it->second > maxVal) {
-            maxVal = it->second;
+        if (it->second > maxCount) {
+            maxCount = it->second;
         }
     }
-    int height = (logScale) ? log2(maxVal) + 1 : maxVal; // maxVal > 0, safe to call log2
-    int leftPadding = widthOf(maxVal);
-    int colWidth = std::max(std::max(widthOf(maxLabel) + 1, 3), leftPadding + 2);
+    int height = logScale ? log2(maxCount) + 1 : maxCount; // maxCount > 0, safe to call log2
+    const int leftPadding = widthOf(logScale ? pow(2, height) : maxCount);
+    const int colWidth = std::max(std::max(widthOf(maxDelta) + 1, 3), leftPadding + 2);
     int scalingFactor = 1;
     // scale data if it exceeds maximum height
     if (height > maxHeight) {
         scalingFactor = (height + maxHeight) / maxHeight;
         height /= scalingFactor;
     }
-    // write header line with bucket values
+    body->appendFormat("\n%*s", leftPadding + 11, "Occurrences");
+    // write histogram label line with bucket values
     body->appendFormat("\n%*s", indent, " ");
-    body->appendFormat("%*s", leftPadding + 2, " ");
-    for (auto const &x : buckets)
-    {
-        body->appendFormat("[%*d]", colWidth - 2, x.second);
+    body->appendFormat("%*s", leftPadding, " ");
+    for (auto const &x : buckets) {
+        body->appendFormat("%*d", colWidth, x.second);
     }
     // write histogram ascii art
     body->appendFormat("\n%*s", indent, " ");
-    for (int row = height * scalingFactor; row > 0; row -= scalingFactor)
-    {
-        int value = ((logScale) ? (1 << row) : row);
-        body->appendFormat("%*u|", leftPadding, value);
+    for (int row = height * scalingFactor; row >= 0; row -= scalingFactor) {
+        const int value = logScale ? (1 << row) : row;
+        body->appendFormat("%.*s", leftPadding, spaces.c_str());
         for (auto const &x : buckets) {
-            body->appendFormat("%.*s%s", colWidth - 2,
-                   (row <= scalingFactor) ? underscores : spaces,
-                   x.second < value ? ((row <= scalingFactor) ? "__" : "  ") : "[]");
+          body->appendFormat("%.*s%s", colWidth - 1, spaces.c_str(), x.second < value ? " " : "|");
         }
         body->appendFormat("\n%*s", indent, " ");
     }
+    // print x-axis
+    const int columns = static_cast<int>(buckets.size());
+    body->appendFormat("%*c", leftPadding, ' ');
+    body->appendFormat("%.*s", (columns + 1) * colWidth, underscores.c_str());
+    body->appendFormat("\n%*s", indent, " ");
+
     // write footer with bucket labels
-    body->appendFormat("%*s", leftPadding + 1, " ");
-    for (auto const &x : buckets)
-    {
+    body->appendFormat("%*s", leftPadding, " ");
+    for (auto const &x : buckets) {
         body->appendFormat("%*d", colWidth, x.first);
     }
-    body->appendFormat("\n");
+    body->appendFormat("%.*s%s", colWidth, spaces.c_str(), "ms\n");
 }
-
-// ---------------------------------------------------------------------------
 
 NBLog::Merger::Merger(const void *shared, size_t size):
       mShared((Shared *) shared),
