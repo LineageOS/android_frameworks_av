@@ -170,4 +170,54 @@ aaudio_audio_format_t AAudioConvert_androidToAAudioDataFormat(audio_format_t for
  */
 int32_t AAudioConvert_formatToSizeInBytes(aaudio_audio_format_t format);
 
+
+// Note that this code may be replaced by Settings or by some other system configuration tool.
+
+enum : int32_t {
+    // Related feature is disabled
+    AAUDIO_USE_NEVER = 0,
+    // If related feature works then use it. Otherwise fall back to something else.
+    AAUDIO_USE_AUTO = 1,
+    // Related feature must be used. If not available then fail.
+    AAUDIO_USE_ALWAYS = 2
+};
+
+#define AAUDIO_PROP_MMAP_ENABLED           "aaudio.mmap_enabled"
+
+/**
+ * Read system property.
+ * @return AAUDIO_USE_NEVER or AAUDIO_USE_AUTO or AAUDIO_USE_ALWAYS
+ */
+int32_t AAudioProperty_getMMapEnabled();
+
+#define AAUDIO_PROP_MMAP_EXCLUSIVE_ENABLED "aaudio.mmap_exclusive_enabled"
+
+/**
+ * Read system property.
+ * @return AAUDIO_USE_NEVER or AAUDIO_USE_AUTO or AAUDIO_USE_ALWAYS
+ */
+int32_t AAudioProperty_getMMapExclusiveEnabled();
+
+#define AAUDIO_PROP_MIXER_BURSTS           "aaudio.mixer_bursts"
+
+/**
+ * Read system property.
+ * @return number of bursts per mixer cycle
+ */
+int32_t AAudioProperty_getMixerBursts();
+
+#define AAUDIO_PROP_HW_BURST_MIN_USEC      "aaudio.hw_burst_min_usec"
+
+/**
+ * Read system property.
+ * This is handy in case the DMA is bursting too quickly for the CPU to keep up.
+ * For example, there may be a DMA burst every 100 usec but you only
+ * want to feed the MMAP buffer every 2000 usec.
+ *
+ * This will affect the framesPerBurst for an MMAP stream.
+ *
+ * @return minimum number of microseconds for a MMAP HW burst
+ */
+int32_t AAudioProperty_getHardwareBurstMinMicros();
+
 #endif //UTILITY_AAUDIO_UTILITIES_H

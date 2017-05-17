@@ -77,6 +77,7 @@ private:
 
     std::atomic<bool>        mCallbackEnabled;
     int32_t                  mReferenceCount = 0;
+    bool                     mLatencyTuningEnabled = false; // TODO implement tuning
 
     std::mutex               mLockStreams;
     std::vector<AAudioServiceStreamShared *> mRegisteredStreams;
