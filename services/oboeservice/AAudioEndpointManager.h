@@ -23,6 +23,8 @@
 
 #include "binding/AAudioServiceMessage.h"
 #include "AAudioServiceEndpoint.h"
+#include "AAudioServiceEndpointCapture.h"
+#include "AAudioServiceEndpointPlay.h"
 
 namespace aaudio {
 
@@ -49,10 +51,8 @@ private:
 
     std::mutex    mLock;
 
-    // We need separate inputs and outputs because they may both have device==0.
-    // TODO review
-    std::map<int32_t, AAudioServiceEndpoint *> mInputs;
-    std::map<int32_t, AAudioServiceEndpoint *> mOutputs;
+    std::map<int32_t, AAudioServiceEndpointCapture *> mInputs;
+    std::map<int32_t, AAudioServiceEndpointPlay *> mOutputs;
 
 };
 

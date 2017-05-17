@@ -94,7 +94,7 @@ public:
         AAudioStreamBuilder_setDirection(mBuilder, AAUDIO_DIRECTION_INPUT);
         AAudioStreamBuilder_setSharingMode(mBuilder, mRequestedSharingMode);
         AAudioStreamBuilder_setDataCallback(mBuilder, proc, userContext);
-        AAudioStreamBuilder_setFormat(mBuilder, AAUDIO_FORMAT_PCM_FLOAT);
+        AAudioStreamBuilder_setFormat(mBuilder, AAUDIO_FORMAT_PCM_I16);
 
         // Open an AAudioStream using the Builder.
         result = AAudioStreamBuilder_openStream(mBuilder, &mStream);
@@ -104,9 +104,9 @@ public:
             goto finish1;
         }
 
-        printf("AAudioStream_getFramesPerBurst() = %d\n",
+        printf("AAudioStream_getFramesPerBurst()         = %d\n",
                AAudioStream_getFramesPerBurst(mStream));
-        printf("AAudioStream_getBufferSizeInFrames() = %d\n",
+        printf("AAudioStream_getBufferSizeInFrames()     = %d\n",
                AAudioStream_getBufferSizeInFrames(mStream));
         printf("AAudioStream_getBufferCapacityInFrames() = %d\n",
                AAudioStream_getBufferCapacityInFrames(mStream));
@@ -285,7 +285,7 @@ int main(int argc, char **argv)
     if (result != AAUDIO_OK) {
         goto error;
     }
-    sleep(1);
+    usleep(2000 * 1000);
     result = recorder.start();
     if (result != AAUDIO_OK) {
         fprintf(stderr, "ERROR -  recorder.start() returned %d\n", result);

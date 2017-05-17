@@ -65,6 +65,10 @@ public:
 
     aaudio_result_t updateStateWhileWaiting() override;
 
+    aaudio_direction_t getDirection() const override {
+        return AAUDIO_DIRECTION_INPUT;
+    }
+
     // This is public so it can be called from the C callback function.
     void processCallback(int event, void *info) override;
 

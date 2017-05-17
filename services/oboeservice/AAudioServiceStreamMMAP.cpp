@@ -76,7 +76,7 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
     const audio_attributes_t attributes = {
         .content_type = AUDIO_CONTENT_TYPE_MUSIC,
         .usage = AUDIO_USAGE_MEDIA,
-        .source = AUDIO_SOURCE_DEFAULT,
+        .source = AUDIO_SOURCE_VOICE_RECOGNITION,
         .flags = AUDIO_FLAG_LOW_LATENCY,
         .tags = ""
     };
@@ -91,8 +91,8 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
     const AAudioStreamConfiguration &configurationInput = request.getConstantConfiguration();
     audio_port_handle_t deviceId = configurationInput.getDeviceId();
 
-    // ALOGI("open request dump()");
-    // request.dump();
+    ALOGI("open request dump()");
+    request.dump();
 
     mMmapClient.clientUid = request.getUserId();
     mMmapClient.clientPid = request.getProcessId();
@@ -171,7 +171,7 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
                            : audio_channel_count_from_in_mask(config.channel_mask);
 
     mAudioDataFileDescriptor = mMmapBufferinfo.shared_memory_fd;
-    ALOGV("AAudioServiceStreamMMAP::open LEAK? mAudioDataFileDescriptor = %d\n",
+    ALOGD("AAudioServiceStreamMMAP::open LEAK? mAudioDataFileDescriptor = %d\n",
           mAudioDataFileDescriptor);
     mFramesPerBurst = mMmapBufferinfo.burst_size_frames;
     mCapacityInFrames = mMmapBufferinfo.buffer_size_frames;
@@ -205,16 +205,17 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
     return AAUDIO_OK;
 }
 
-
 /**
  * Start the flow of data.
  */
 aaudio_result_t AAudioServiceStreamMMAP::start() {
     if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
-    aaudio_result_t result = mMmapStream->start(mMmapClient, &mPortHandle);
-    if (result != AAUDIO_OK) {
-        ALOGE("AAudioServiceStreamMMAP::start() mMmapStream->start() returned %d", result);
+    aaudio_result_t result;
+    status_t status = mMmapStream->start(mMmapClient, &mPortHandle);
+    if (status != OK) {
+        ALOGE("AAudioServiceStreamMMAP::start() mMmapStream->start() returned %d", status);
         processError();
+        result = AAudioConvert_androidToAAudioResult(status);
     } else {
         result = AAudioServiceStreamBase::start();
     }
@@ -228,18 +229,18 @@ aaudio_result_t AAudioServiceStreamMMAP::pause() {
     if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
 
     aaudio_result_t result1 = AAudioServiceStreamBase::pause();
-    aaudio_result_t result2 = mMmapStream->stop(mPortHandle);
+    status_t status = mMmapStream->stop(mPortHandle);
     mFramesRead.reset32();
-    return (result1 != AAUDIO_OK) ? result1 : result2;
+    return (result1 != AAUDIO_OK) ? result1 : AAudioConvert_androidToAAudioResult(status);
 }
 
 aaudio_result_t AAudioServiceStreamMMAP::stop() {
     if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
 
     aaudio_result_t result1 = AAudioServiceStreamBase::stop();
-    aaudio_result_t result2 = mMmapStream->stop(mPortHandle);
+    aaudio_result_t status = mMmapStream->stop(mPortHandle);
     mFramesRead.reset32();
-    return (result1 != AAUDIO_OK) ? result1 : result2;
+    return (result1 != AAUDIO_OK) ? result1 :  AAudioConvert_androidToAAudioResult(status);
 }
 
 /**
