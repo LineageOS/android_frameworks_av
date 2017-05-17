@@ -60,14 +60,28 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
                               ? 2 : getSamplesPerFrame();
     audio_channel_mask_t channelMask = audio_channel_in_mask_from_count(samplesPerFrame);
 
-    audio_input_flags_t flags = (audio_input_flags_t) AUDIO_INPUT_FLAG_NONE;
-
     size_t frameCount = (builder.getBufferCapacity() == AAUDIO_UNSPECIFIED) ? 0
                         : builder.getBufferCapacity();
+
     // TODO implement an unspecified Android format then use that.
     audio_format_t format = (getFormat() == AAUDIO_UNSPECIFIED)
             ? AUDIO_FORMAT_PCM_FLOAT
             : AAudioConvert_aaudioToAndroidDataFormat(getFormat());
+
+    audio_input_flags_t flags = AUDIO_INPUT_FLAG_NONE;
+    switch(getPerformanceMode()) {
+        case AAUDIO_PERFORMANCE_MODE_LOW_LATENCY:
+            flags = (audio_input_flags_t) (AUDIO_INPUT_FLAG_FAST | AUDIO_INPUT_FLAG_RAW);
+            break;
+
+        case AAUDIO_PERFORMANCE_MODE_POWER_SAVING:
+        case AAUDIO_PERFORMANCE_MODE_NONE:
+        default:
+            // No flags.
+            break;
+    }
+
+    uint32_t notificationFrames = 0;
 
     // Setup the callback if there is one.
     AudioRecord::callback_t callback = nullptr;
@@ -77,11 +91,12 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
         streamTransferType = AudioRecord::transfer_type::TRANSFER_CALLBACK;
         callback = getLegacyCallback();
         callbackData = this;
+        notificationFrames = builder.getFramesPerDataCallback();
     }
     mCallbackBufferSize = builder.getFramesPerDataCallback();
 
     mAudioRecord = new AudioRecord(
-            AUDIO_SOURCE_DEFAULT,
+            AUDIO_SOURCE_VOICE_RECOGNITION,
             getSampleRate(),
             format,
             channelMask,
@@ -89,7 +104,7 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
             frameCount,
             callback,
             callbackData,
-            0,    //    uint32_t notificationFrames = 0,
+            notificationFrames,
             AUDIO_SESSION_ALLOCATE,
             streamTransferType,
             flags
