@@ -61,9 +61,7 @@ static aaudio_result_t builder_createStream(aaudio_direction_t direction,
 
         case AAUDIO_DIRECTION_OUTPUT:
             if (tryMMap) {
-                // TODO use a singleton for the AAudioBinderClient
-                AAudioBinderClient *aaudioClient = new AAudioBinderClient();
-                *audioStreamPtr = new AudioStreamInternal(*aaudioClient, false);
+                *audioStreamPtr = new AudioStreamInternal(AAudioBinderClient::getInstance(), false);
             } else {
                 *audioStreamPtr = new AudioStreamTrack();
             }
