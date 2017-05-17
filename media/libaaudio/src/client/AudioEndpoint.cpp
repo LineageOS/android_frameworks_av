@@ -182,6 +182,15 @@ void AudioEndpoint::getEmptyRoomAvailable(WrappingBuffer *wrappingBuffer) {
     mDownDataQueue->getEmptyRoomAvailable(wrappingBuffer);
 }
 
+int32_t AudioEndpoint::getEmptyFramesAvailable() {
+    return mDownDataQueue->getFifoControllerBase()->getEmptyFramesAvailable();
+}
+
+int32_t AudioEndpoint::getFullFramesAvailable()
+{
+    return mDownDataQueue->getFifoControllerBase()->getFullFramesAvailable();
+}
+
 void AudioEndpoint::advanceWriteIndex(int32_t deltaFrames) {
     mDownDataQueue->getFifoControllerBase()->advanceWriteIndex(deltaFrames);
 }
@@ -227,7 +236,3 @@ int32_t AudioEndpoint::getBufferCapacityInFrames() const
     return (int32_t)mDownDataQueue->getBufferCapacityInFrames();
 }
 
-int32_t AudioEndpoint::getFullFramesAvailable()
-{
-    return mDownDataQueue->getFifoControllerBase()->getFullFramesAvailable();
-}
