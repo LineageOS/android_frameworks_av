@@ -105,12 +105,14 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
         callback = getLegacyCallback();
         callbackData = this;
 
-        notificationFrames = builder.getFramesPerDataCallback();
         // If the total buffer size is unspecified then base the size on the burst size.
-        if (frameCount == AAUDIO_UNSPECIFIED) {
+        if (frameCount == 0
+                && ((flags & AUDIO_OUTPUT_FLAG_FAST) != 0)) {
             // Take advantage of a special trick that allows us to create a buffer
             // that is some multiple of the burst size.
             notificationFrames = 0 - DEFAULT_BURSTS_PER_BUFFER_CAPACITY;
+        } else {
+            notificationFrames = builder.getFramesPerDataCallback();
         }
     }
     mCallbackBufferSize = builder.getFramesPerDataCallback();

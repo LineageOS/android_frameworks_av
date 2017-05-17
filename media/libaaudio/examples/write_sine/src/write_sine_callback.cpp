@@ -85,11 +85,11 @@ public:
         AAudioStreamBuilder_setSharingMode(mBuilder, mRequestedSharingMode);
         AAudioStreamBuilder_setDataCallback(mBuilder, dataProc, userContext);
         AAudioStreamBuilder_setFormat(mBuilder, AAUDIO_FORMAT_PCM_FLOAT);
- //       AAudioStreamBuilder_setFramesPerDataCallback(mBuilder, CALLBACK_SIZE_FRAMES);
-        AAudioStreamBuilder_setBufferCapacityInFrames(mBuilder, 48 * 8);
+        // AAudioStreamBuilder_setFramesPerDataCallback(mBuilder, CALLBACK_SIZE_FRAMES);
+        // AAudioStreamBuilder_setBufferCapacityInFrames(mBuilder, 48 * 8);
 
-        //AAudioStreamBuilder_setPerformanceMode(mBuilder, AAUDIO_PERFORMANCE_MODE_NONE);
-        AAudioStreamBuilder_setPerformanceMode(mBuilder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+        AAudioStreamBuilder_setPerformanceMode(mBuilder, AAUDIO_PERFORMANCE_MODE_NONE);
+        //AAudioStreamBuilder_setPerformanceMode(mBuilder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
         //AAudioStreamBuilder_setPerformanceMode(mBuilder, AAUDIO_PERFORMANCE_MODE_POWER_SAVING);
 
         // Open an AAudioStream using the Builder.
