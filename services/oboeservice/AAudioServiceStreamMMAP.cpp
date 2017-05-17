@@ -178,6 +178,21 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
     mAudioFormat = AAudioConvert_androidToAAudioDataFormat(config.format);
     mSampleRate = config.sample_rate;
 
+    // Scale up the burst size to meet the minimum equivalent in microseconds.
+    // This is to avoid waking the CPU too often when the HW burst is very small
+    // or at high sample rates.
+    int32_t burstMinMicros = AAudioProperty_getHardwareBurstMinMicros();
+    int32_t burstMicros = 0;
+    do {
+        if (burstMicros > 0) {  // skip first loop
+            mFramesPerBurst *= 2;
+        }
+        burstMicros = mFramesPerBurst * static_cast<int64_t>(1000000) / mSampleRate;
+    } while (burstMicros < burstMinMicros);
+
+    ALOGD("AAudioServiceStreamMMAP::open() original burst = %d, minMicros = %d, final burst = %d\n",
+          mMmapBufferinfo.burst_size_frames, burstMinMicros, mFramesPerBurst);
+
     ALOGD("AAudioServiceStreamMMAP::open() got devId = %d, sRate = %d",
           deviceId, config.sample_rate);
 
