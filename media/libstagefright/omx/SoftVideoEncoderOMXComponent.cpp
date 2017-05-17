@@ -551,6 +551,7 @@ const uint8_t *SoftVideoEncoderOMXComponent::extractGraphicBuffer(
         srcVStride = buffer->height;
         // convert stride from pixels to bytes
         if (format != HAL_PIXEL_FORMAT_YV12 &&
+            format != HAL_PIXEL_FORMAT_YCrCb_420_SP &&
             format != HAL_PIXEL_FORMAT_YCbCr_420_888) {
             // TODO do we need to support other formats?
             srcStride *= 4;
