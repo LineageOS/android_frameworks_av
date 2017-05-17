@@ -116,7 +116,7 @@ TEST_F(MtpFfsHandleTest, testReceiveFileSmall) {
         ss << dummyDataStr;
 
     EXPECT_EQ(write(bulk_out, ss.str().c_str(), size), size);
-    EXPECT_EQ(handle->receiveFile(mfr), 0);
+    EXPECT_EQ(handle->receiveFile(mfr, false), 0);
 
     EXPECT_EQ(read(dummy_file.fd, buf, size), size);
 
@@ -136,7 +136,7 @@ TEST_F(MtpFfsHandleTest, testReceiveFileMed) {
         ss << dummyDataStr;
 
     EXPECT_EQ(write(bulk_out, ss.str().c_str(), size), size);
-    EXPECT_EQ(handle->receiveFile(mfr), 0);
+    EXPECT_EQ(handle->receiveFile(mfr, false), 0);
 
     EXPECT_EQ(read(dummy_file.fd, buf, size), size);
 

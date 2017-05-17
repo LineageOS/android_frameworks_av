@@ -18,8 +18,8 @@
 #define LOG_TAG "NdkMediaExtractor"
 
 
-#include "NdkMediaError.h"
-#include "NdkMediaExtractor.h"
+#include <media/NdkMediaError.h>
+#include <media/NdkMediaExtractor.h>
 #include "NdkMediaFormatPriv.h"
 
 

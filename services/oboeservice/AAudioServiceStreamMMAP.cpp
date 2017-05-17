@@ -60,6 +60,13 @@ aaudio_result_t AAudioServiceStreamMMAP::close() {
     // FIXME Make closing synchronous.
     AudioClock::sleepForNanos(100 * AAUDIO_NANOS_PER_MILLISECOND);
 
+    if (mAudioDataFileDescriptor != -1) {
+        ALOGV("AAudioServiceStreamMMAP: LEAK? close(mAudioDataFileDescriptor = %d)\n",
+              mAudioDataFileDescriptor);
+        ::close(mAudioDataFileDescriptor);
+        mAudioDataFileDescriptor = -1;
+    }
+
     return AAudioServiceStreamBase::close();
 }
 
@@ -125,6 +132,9 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
     MmapStreamInterface::stream_direction_t streamDirection = (direction == AAUDIO_DIRECTION_OUTPUT)
         ? MmapStreamInterface::DIRECTION_OUTPUT : MmapStreamInterface::DIRECTION_INPUT;
 
+    ALOGD("AAudioServiceStreamMMAP::open() request devId = %d, sRate = %d",
+          deviceId, config.sample_rate);
+
     // Open HAL stream.
     status_t status = MmapStreamInterface::openMmapStream(streamDirection,
                                                           &attributes,
@@ -161,10 +171,30 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
                            : audio_channel_count_from_in_mask(config.channel_mask);
 
     mAudioDataFileDescriptor = mMmapBufferinfo.shared_memory_fd;
+    ALOGV("AAudioServiceStreamMMAP::open LEAK? mAudioDataFileDescriptor = %d\n",
+          mAudioDataFileDescriptor);
     mFramesPerBurst = mMmapBufferinfo.burst_size_frames;
     mCapacityInFrames = mMmapBufferinfo.buffer_size_frames;
     mAudioFormat = AAudioConvert_androidToAAudioDataFormat(config.format);
     mSampleRate = config.sample_rate;
+
+    // Scale up the burst size to meet the minimum equivalent in microseconds.
+    // This is to avoid waking the CPU too often when the HW burst is very small
+    // or at high sample rates.
+    int32_t burstMinMicros = AAudioProperty_getHardwareBurstMinMicros();
+    int32_t burstMicros = 0;
+    do {
+        if (burstMicros > 0) {  // skip first loop
+            mFramesPerBurst *= 2;
+        }
+        burstMicros = mFramesPerBurst * static_cast<int64_t>(1000000) / mSampleRate;
+    } while (burstMicros < burstMinMicros);
+
+    ALOGD("AAudioServiceStreamMMAP::open() original burst = %d, minMicros = %d, final burst = %d\n",
+          mMmapBufferinfo.burst_size_frames, burstMinMicros, mFramesPerBurst);
+
+    ALOGD("AAudioServiceStreamMMAP::open() got devId = %d, sRate = %d",
+          deviceId, config.sample_rate);
 
     // Fill in AAudioStreamConfiguration
     configurationOutput.setSampleRate(mSampleRate);

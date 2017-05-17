@@ -36,6 +36,12 @@ const int64_t kTimeoutWaitForInputUs = 5000; // 5 milliseconds
 
 //static
 sp<SimpleDecodingSource> SimpleDecodingSource::Create(
+        const sp<IMediaSource> &source, uint32_t flags) {
+    return SimpleDecodingSource::Create(source, flags, nullptr, nullptr);
+}
+
+//static
+sp<SimpleDecodingSource> SimpleDecodingSource::Create(
         const sp<IMediaSource> &source, uint32_t flags, const sp<ANativeWindow> &nativeWindow,
         const char *desiredCodec) {
     sp<Surface> surface = static_cast<Surface*>(nativeWindow.get());

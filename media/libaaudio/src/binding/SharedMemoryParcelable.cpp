@@ -50,7 +50,8 @@ status_t SharedMemoryParcelable::writeToParcel(Parcel* parcel) const {
     if (status != NO_ERROR) return status;
     if (mSizeInBytes > 0) {
         status = parcel->writeDupFileDescriptor(mFd);
-        ALOGE_IF(status != NO_ERROR, "SharedMemoryParcelable writeDupFileDescriptor failed : %d", status);
+        ALOGE_IF(status != NO_ERROR, "SharedMemoryParcelable writeDupFileDescriptor failed : %d",
+                 status);
     }
     return status;
 }
@@ -61,28 +62,36 @@ status_t SharedMemoryParcelable::readFromParcel(const Parcel* parcel) {
         return status;
     }
     if (mSizeInBytes > 0) {
-        int originalFD = parcel->readFileDescriptor();
-        mFd = fcntl(originalFD, F_DUPFD_CLOEXEC, 0);
+        mOriginalFd = parcel->readFileDescriptor();
+        ALOGV("SharedMemoryParcelable::readFromParcel() LEAK? mOriginalFd = %d\n", mOriginalFd);
+        mFd = fcntl(mOriginalFd, F_DUPFD_CLOEXEC, 0);
+        ALOGV("SharedMemoryParcelable::readFromParcel() LEAK? mFd = %d\n", mFd);
         if (mFd == -1) {
             status = -errno;
-            ALOGE("SharedMemoryParcelable readFileDescriptor fcntl() failed : %d", status);
+            ALOGE("SharedMemoryParcelable readFromParcel fcntl() failed : %d", status);
         }
     }
     return status;
 }
 
 aaudio_result_t SharedMemoryParcelable::close() {
-    if (mResolvedAddress != nullptr) {
+    if (mResolvedAddress != MMAP_UNRESOLVED_ADDRESS) {
         int err = munmap(mResolvedAddress, mSizeInBytes);
         if (err < 0) {
             ALOGE("SharedMemoryParcelable::close() munmap() failed %d", err);
             return AAudioConvert_androidToAAudioResult(err);
         }
-        mResolvedAddress = nullptr;
+        mResolvedAddress = MMAP_UNRESOLVED_ADDRESS;
     }
     if (mFd != -1) {
+        ALOGV("SharedMemoryParcelable::close() LEAK? mFd = %d\n", mFd);
         ::close(mFd);
         mFd = -1;
+    }
+    if (mOriginalFd != -1) {
+        ALOGV("SharedMemoryParcelable::close() LEAK? mOriginalFd = %d\n", mOriginalFd);
+        ::close(mOriginalFd);
+        mOriginalFd = -1;
     }
     return AAUDIO_OK;
 }
@@ -99,11 +108,12 @@ aaudio_result_t SharedMemoryParcelable::resolve(int32_t offsetInBytes, int32_t s
               offsetInBytes, sizeInBytes, mSizeInBytes);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
-    if (mResolvedAddress == nullptr) {
+    if (mResolvedAddress == MMAP_UNRESOLVED_ADDRESS) {
         mResolvedAddress = (uint8_t *) mmap(0, mSizeInBytes, PROT_READ|PROT_WRITE,
                                           MAP_SHARED, mFd, 0);
-        if (mResolvedAddress == nullptr) {
-            ALOGE("SharedMemoryParcelable mmap failed for fd = %d", mFd);
+        if (mResolvedAddress == MMAP_UNRESOLVED_ADDRESS) {
+            ALOGE("SharedMemoryParcelable mmap failed for fd = %d, errno = %s",
+                  mFd, strerror(errno));
             return AAUDIO_ERROR_INTERNAL;
         }
     }

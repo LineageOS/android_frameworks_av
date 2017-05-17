@@ -180,26 +180,22 @@ status_t Omx::freeNode(sp<OMXNodeInstance> const& instance) {
         return OK;
     }
 
-    wp<IBase> observer;
     {
         Mutex::Autolock autoLock(mLock);
         ssize_t observerIndex = mNode2Observer.indexOfKey(instance.get());
-        if (observerIndex < 0) {
-            return OK;
-        }
-        observer = mNode2Observer.valueAt(observerIndex);
-        ssize_t nodeIndex = mLiveNodes.indexOfKey(observer);
-        if (nodeIndex < 0) {
-            return OK;
-        }
-        mNode2Observer.removeItemsAt(observerIndex);
-        mLiveNodes.removeItemsAt(nodeIndex);
-    }
-
-    {
-        sp<IBase> sObserver = observer.promote();
-        if (sObserver != nullptr) {
-            sObserver->unlinkToDeath(this);
+        if (observerIndex >= 0) {
+            wp<IBase> observer = mNode2Observer.valueAt(observerIndex);
+            ssize_t nodeIndex = mLiveNodes.indexOfKey(observer);
+            if (nodeIndex >= 0) {
+                mNode2Observer.removeItemsAt(observerIndex);
+                mLiveNodes.removeItemsAt(nodeIndex);
+                sp<IBase> sObserver = observer.promote();
+                if (sObserver != nullptr) {
+                    sObserver->unlinkToDeath(this);
+                }
+            } else {
+                LOG(WARNING) << "Inconsistent observer record";
+            }
         }
     }
 

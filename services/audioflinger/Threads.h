@@ -622,6 +622,12 @@ public:
     // 14 tracks max per client allows for 2 misbehaving application leaving 4 available tracks.
     static const uint32_t kMaxTracksPerUid = 14;
 
+    // Maximum delay (in nanoseconds) for upcoming buffers in suspend mode, otherwise
+    // if delay is greater, the estimated time for timeLoopNextNs is reset.
+    // This allows for catch-up to be done for small delays, while resetting the estimate
+    // for initial conditions or large delays.
+    static const nsecs_t kMaxNextBufferDelayNs = 100000000;
+
     PlaybackThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
                    audio_io_handle_t id, audio_devices_t device, type_t type, bool systemReady);
     virtual             ~PlaybackThread();

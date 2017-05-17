@@ -36,7 +36,7 @@
 #include <camera/camera2/OutputConfiguration.h>
 #include <camera/camera2/CaptureRequest.h>
 
-#include <NdkCameraDevice.h>
+#include <camera/NdkCameraDevice.h>
 #include "ACameraMetadata.h"
 
 namespace android {

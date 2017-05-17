@@ -22,3 +22,11 @@ ndk_library {
     first_version: "24",
     unversioned_until: "current",
 }
+
+ndk_headers {
+    name: "libcamera2ndk_headers",
+    from: "include/camera",
+    to: "camera",
+    srcs: ["include/camera/**/*.h"],
+    license: "NOTICE",
+}

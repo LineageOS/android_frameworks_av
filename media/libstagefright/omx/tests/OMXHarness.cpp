@@ -41,6 +41,7 @@
 #include <media/OMXBuffer.h>
 #include <android/hardware/media/omx/1.0/IOmx.h>
 #include <media/omx/1.0/WOmx.h>
+#include <system/window.h>
 
 #define DEFAULT_TIMEOUT         500000
 

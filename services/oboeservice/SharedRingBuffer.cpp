@@ -18,6 +18,8 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include <sys/mman.h>
+
 #include "binding/RingBufferParcelable.h"
 #include "binding/AudioEndpointParcelable.h"
 
@@ -31,8 +33,12 @@ SharedRingBuffer::~SharedRingBuffer()
     if (mSharedMemory != nullptr) {
         delete mFifoBuffer;
         munmap(mSharedMemory, mSharedMemorySizeInBytes);
-        close(mFileDescriptor);
         mSharedMemory = nullptr;
+    }
+    if (mFileDescriptor != -1) {
+        ALOGV("SharedRingBuffer: LEAK? close(mFileDescriptor = %d)\n", mFileDescriptor);
+        close(mFileDescriptor);
+        mFileDescriptor = -1;
     }
 }
 
@@ -44,10 +50,12 @@ aaudio_result_t SharedRingBuffer::allocate(fifo_frames_t   bytesPerFrame,
     mDataMemorySizeInBytes = bytesPerFrame * capacityInFrames;
     mSharedMemorySizeInBytes = mDataMemorySizeInBytes + (2 * (sizeof(fifo_counter_t)));
     mFileDescriptor = ashmem_create_region("AAudioSharedRingBuffer", mSharedMemorySizeInBytes);
+    ALOGV("SharedRingBuffer::allocate() LEAK? mFileDescriptor = %d\n", mFileDescriptor);
     if (mFileDescriptor < 0) {
         ALOGE("SharedRingBuffer::allocate() ashmem_create_region() failed %d", errno);
         return AAUDIO_ERROR_INTERNAL;
     }
+
     int err = ashmem_set_prot_region(mFileDescriptor, PROT_READ|PROT_WRITE); // TODO error handling?
     if (err < 0) {
         ALOGE("SharedRingBuffer::allocate() ashmem_set_prot_region() failed %d", errno);
@@ -73,9 +81,9 @@ aaudio_result_t SharedRingBuffer::allocate(fifo_frames_t   bytesPerFrame,
             (fifo_counter_t *) &mSharedMemory[SHARED_RINGBUFFER_WRITE_OFFSET];
     uint8_t *dataAddress = &mSharedMemory[SHARED_RINGBUFFER_DATA_OFFSET];
 
-    mFifoBuffer = new(std::nothrow) FifoBuffer(bytesPerFrame, capacityInFrames,
+    mFifoBuffer = new FifoBuffer(bytesPerFrame, capacityInFrames,
                                  readCounterAddress, writeCounterAddress, dataAddress);
-    return (mFifoBuffer == nullptr) ? AAUDIO_ERROR_NO_MEMORY : AAUDIO_OK;
+    return AAUDIO_OK;
 }
 
 void SharedRingBuffer::fillParcelable(AudioEndpointParcelable &endpointParcelable,

@@ -152,8 +152,8 @@ public:
                         : mLastSlope;
             } else {
                 // finite difference spline
-                m0 = (sec0 + sec) * 0.5;
-                m1 = (sec1 + sec) * 0.5;
+                m0 = (sec0 + sec) * 0.5f;
+                m1 = (sec1 + sec) * 0.5f;
             }
 
             if (monotonic) {
@@ -294,12 +294,21 @@ public:
 
     std::string toString() const {
         std::stringstream ss;
-        ss << "mInterpolatorType: " << mInterpolatorType << std::endl;
-        ss << "mFirstSlope: " << mFirstSlope << std::endl;
-        ss << "mLastSlope: " << mLastSlope << std::endl;
+        ss << "Interpolator{mInterpolatorType=" << static_cast<int32_t>(mInterpolatorType);
+        ss << ", mFirstSlope=" << mFirstSlope;
+        ss << ", mLastSlope=" << mLastSlope;
+        ss << ", {";
+        bool first = true;
         for (const auto &pt : *this) {
-            ss << pt.first << " " << pt.second << std::endl;
+            if (first) {
+                first = false;
+                ss << "{";
+            } else {
+                ss << ", {";
+            }
+            ss << pt.first << ", " << pt.second << "}";
         }
+        ss << "}}";
         return ss.str();
     }
 
@@ -324,7 +333,7 @@ private:
 
     // spline cubic polynomial coefficient cache
     std::unordered_map<S, std::tuple<S /* c1 */, S /* c2 */, S /* c3 */>> mMemo;
-};
+}; // Interpolator
 
 } // namespace android
 

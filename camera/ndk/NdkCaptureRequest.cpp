@@ -21,7 +21,7 @@
 #include <utils/Log.h>
 #include <utils/Trace.h>
 
-#include "NdkCaptureRequest.h"
+#include <camera/NdkCaptureRequest.h>
 #include "impl/ACameraMetadata.h"
 #include "impl/ACaptureRequest.h"
 

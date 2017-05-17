@@ -21,7 +21,7 @@
 #include <utils/Log.h>
 #include <utils/Trace.h>
 
-#include <NdkCameraDevice.h>
+#include <camera/NdkCameraDevice.h>
 #include "impl/ACameraCaptureSession.h"
 
 using namespace android;

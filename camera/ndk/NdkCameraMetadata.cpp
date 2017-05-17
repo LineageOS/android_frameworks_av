@@ -21,7 +21,7 @@
 #include <utils/Log.h>
 #include <utils/Trace.h>
 
-#include "NdkCameraMetadata.h"
+#include <camera/NdkCameraMetadata.h>
 #include "impl/ACameraMetadata.h"
 
 using namespace android;

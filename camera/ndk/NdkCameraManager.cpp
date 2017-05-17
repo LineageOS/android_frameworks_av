@@ -21,7 +21,7 @@
 #include <utils/Log.h>
 #include <utils/Trace.h>
 
-#include <NdkCameraManager.h>
+#include <camera/NdkCameraManager.h>
 #include "impl/ACameraManager.h"
 
 using namespace android;

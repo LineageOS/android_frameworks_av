@@ -87,7 +87,6 @@ class Camera3Device :
     const String8& getId() const override;
 
     // Transitions to idle state on success.
-    status_t initialize(CameraModule *module) override;
     status_t initialize(sp<CameraProviderManager> manager) override;
     status_t disconnect() override;
     status_t dump(int fd, const Vector<String16> &args) override;
@@ -233,7 +232,6 @@ class Camera3Device :
      */
     class HalInterface : public camera3::Camera3StreamBufferFreedListener {
       public:
-        HalInterface(camera3_device_t *device);
         HalInterface(sp<hardware::camera::device::V3_2::ICameraDeviceSession> &session,
                      std::shared_ptr<RequestMetadataQueue> queue);
         HalInterface(const HalInterface &other);

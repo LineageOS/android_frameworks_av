@@ -23,9 +23,9 @@
 #include <utils/StrongPointer.h>
 #include <utils/Trace.h>
 
-#include "NdkCameraDevice.h"
-#include <NdkCaptureRequest.h>
-#include <NdkCameraCaptureSession.h>
+#include <camera/NdkCameraDevice.h>
+#include <camera/NdkCaptureRequest.h>
+#include <camera/NdkCameraCaptureSession.h>
 #include "impl/ACameraCaptureSession.h"
 
 using namespace android;

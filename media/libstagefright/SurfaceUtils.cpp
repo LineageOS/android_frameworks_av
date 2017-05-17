@@ -91,9 +91,19 @@ status_t setNativeWindowSizeFormatAndUsage(
             return err;
         }
 
-        // Check if the ANativeWindow uses hardware protected buffers.
-        if (queuesToNativeWindow != 1 && !(consumerUsage & GRALLOC_USAGE_PROTECTED)) {
-            ALOGE("native window could not be authenticated");
+        // Check if the consumer end of the ANativeWindow can handle protected content.
+        int isConsumerProtected = 0;
+        err = nativeWindow->query(
+                nativeWindow, NATIVE_WINDOW_CONSUMER_IS_PROTECTED, &isConsumerProtected);
+        if (err != NO_ERROR) {
+            ALOGE("error query native window: %s (%d)", strerror(-err), -err);
+            return err;
+        }
+
+        // Deny queuing into native window if neither condition is satisfied.
+        if (queuesToNativeWindow != 1 && isConsumerProtected != 1) {
+            ALOGE("native window cannot handle protected buffers: the consumer should either be "
+                  "a hardware composer or support hardware protection");
             return PERMISSION_DENIED;
         }
     }

@@ -39,6 +39,7 @@ LOCAL_SRC_FILES = \
     utility/FixedBlockAdapter.cpp \
     utility/FixedBlockReader.cpp \
     utility/FixedBlockWriter.cpp \
+    utility/LinearRamp.cpp \
     fifo/FifoBuffer.cpp \
     fifo/FifoControllerBase.cpp \
     client/AudioEndpoint.cpp \
@@ -93,6 +94,7 @@ LOCAL_SRC_FILES = core/AudioStream.cpp \
     utility/FixedBlockAdapter.cpp \
     utility/FixedBlockReader.cpp \
     utility/FixedBlockWriter.cpp \
+    utility/LinearRamp.cpp \
     fifo/FifoBuffer.cpp \
     fifo/FifoControllerBase.cpp \
     client/AudioEndpoint.cpp \

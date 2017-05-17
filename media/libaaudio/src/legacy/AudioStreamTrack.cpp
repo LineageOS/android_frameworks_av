@@ -61,22 +61,36 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     ALOGD("AudioStreamTrack::open = %p", this);
 
     // Try to create an AudioTrack
-    // TODO Support UNSPECIFIED in AudioTrack. For now, use stereo if unspecified.
+    // Use stereo if unspecified.
     int32_t samplesPerFrame = (getSamplesPerFrame() == AAUDIO_UNSPECIFIED)
                               ? 2 : getSamplesPerFrame();
     audio_channel_mask_t channelMask = audio_channel_out_mask_from_count(samplesPerFrame);
     ALOGD("AudioStreamTrack::open(), samplesPerFrame = %d, channelMask = 0x%08x",
             samplesPerFrame, channelMask);
 
-    // TODO add more performance options
-    audio_output_flags_t flags = (audio_output_flags_t) AUDIO_OUTPUT_FLAG_FAST;
+    audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE;
+    switch(getPerformanceMode()) {
+        case AAUDIO_PERFORMANCE_MODE_LOW_LATENCY:
+            // Bypass the normal mixer and go straight to the FAST mixer.
+            flags = (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_RAW);
+            break;
+
+        case AAUDIO_PERFORMANCE_MODE_POWER_SAVING:
+            // This uses a mixer that wakes up less often than the FAST mixer.
+            flags = AUDIO_OUTPUT_FLAG_DEEP_BUFFER;
+            break;
+
+        case AAUDIO_PERFORMANCE_MODE_NONE:
+        default:
+            // No flags. Use a normal mixer in front of the FAST mixer.
+            break;
+    }
 
     int32_t frameCount = builder.getBufferCapacity();
     ALOGD("AudioStreamTrack::open(), requested buffer capacity %d", frameCount);
 
     int32_t notificationFrames = 0;
 
-    // TODO implement an unspecified AudioTrack format then use that.
     audio_format_t format = (getFormat() == AAUDIO_FORMAT_UNSPECIFIED)
             ? AUDIO_FORMAT_PCM_FLOAT
             : AAudioConvert_aaudioToAndroidDataFormat(getFormat());
@@ -149,9 +163,8 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
 aaudio_result_t AudioStreamTrack::close()
 {
-    // TODO maybe add close() or release() to AudioTrack API then call it from here
     if (getState() != AAUDIO_STREAM_STATE_CLOSED) {
-        mAudioTrack.clear(); // TODO is this right?
+        mAudioTrack.clear();
         setState(AAUDIO_STREAM_STATE_CLOSED);
     }
     mFixedBlockReader.close();
@@ -276,7 +289,7 @@ aaudio_result_t AudioStreamTrack::updateStateWhileWaiting()
             if (err != OK) {
                 return AAudioConvert_androidToAAudioResult(err);
             } else if (position == 0) {
-                // Advance frames read to match written.
+                // TODO Advance frames read to match written.
                 setState(AAUDIO_STREAM_STATE_FLUSHED);
             }
         }
@@ -354,6 +367,8 @@ int64_t AudioStreamTrack::getFramesRead() {
     case AAUDIO_STREAM_STATE_STARTING:
     case AAUDIO_STREAM_STATE_STARTED:
     case AAUDIO_STREAM_STATE_STOPPING:
+    case AAUDIO_STREAM_STATE_PAUSING:
+    case AAUDIO_STREAM_STATE_PAUSED:
         result = mAudioTrack->getPosition(&position);
         if (result == OK) {
             mFramesRead.update32(position);
@@ -373,20 +388,5 @@ aaudio_result_t AudioStreamTrack::getTimestamp(clockid_t clockId,
     if (status != NO_ERROR) {
         return AAudioConvert_androidToAAudioResult(status);
     }
-    // TODO Merge common code into AudioStreamLegacy after rebasing.
-    int timebase;
-    switch (clockId) {
-        case CLOCK_BOOTTIME:
-            timebase = ExtendedTimestamp::TIMEBASE_BOOTTIME;
-            break;
-        case CLOCK_MONOTONIC:
-            timebase = ExtendedTimestamp::TIMEBASE_MONOTONIC;
-            break;
-        default:
-            ALOGE("getTimestamp() - Unrecognized clock type %d", (int) clockId);
-            return AAUDIO_ERROR_UNEXPECTED_VALUE;
-            break;
-    }
-    status = extendedTimestamp.getBestTimestamp(framePosition, timeNanoseconds, timebase);
-    return AAudioConvert_androidToAAudioResult(status);
+    return getBestTimestamp(clockId, framePosition, timeNanoseconds, &extendedTimestamp);
 }

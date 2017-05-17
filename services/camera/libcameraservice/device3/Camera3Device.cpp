@@ -94,81 +94,6 @@ const String8& Camera3Device::getId() const {
     return mId;
 }
 
-/**
- * CameraDeviceBase interface
- */
-
-status_t Camera3Device::initialize(CameraModule *module)
-{
-    ATRACE_CALL();
-    Mutex::Autolock il(mInterfaceLock);
-    Mutex::Autolock l(mLock);
-
-    ALOGV("%s: Initializing device for camera %s", __FUNCTION__, mId.string());
-    if (mStatus != STATUS_UNINITIALIZED) {
-        CLOGE("Already initialized!");
-        return INVALID_OPERATION;
-    }
-
-    /** Open HAL device */
-
-    status_t res;
-
-    camera3_device_t *device;
-
-    ATRACE_BEGIN("CameraHal::open");
-    res = module->open(mId.string(),
-            reinterpret_cast<hw_device_t**>(&device));
-    ATRACE_END();
-
-    if (res != OK) {
-        SET_ERR_L("Could not open camera: %s (%d)", strerror(-res), res);
-        return res;
-    }
-
-    /** Cross-check device version */
-    if (device->common.version < CAMERA_DEVICE_API_VERSION_3_2) {
-        SET_ERR_L("Could not open camera: "
-                "Camera device should be at least %x, reports %x instead",
-                CAMERA_DEVICE_API_VERSION_3_2,
-                device->common.version);
-        device->common.close(&device->common);
-        return BAD_VALUE;
-    }
-
-    camera_info info;
-    res = module->getCameraInfo(atoi(mId), &info);
-    if (res != OK) return res;
-
-    if (info.device_version != device->common.version) {
-        SET_ERR_L("HAL reporting mismatched camera_info version (%x)"
-                " and device version (%x).",
-                info.device_version, device->common.version);
-        device->common.close(&device->common);
-        return BAD_VALUE;
-    }
-
-    /** Initialize device with callback functions */
-
-    ATRACE_BEGIN("CameraHal::initialize");
-    res = device->ops->initialize(device, this);
-    ATRACE_END();
-
-    if (res != OK) {
-        SET_ERR_L("Unable to initialize HAL device: %s (%d)",
-                strerror(-res), res);
-        device->common.close(&device->common);
-        return res;
-    }
-
-    /** Everything is good to go */
-
-    mDeviceInfo = info.static_camera_characteristics;
-    mInterface = std::make_unique<HalInterface>(device);
-
-    return initializeCommonLocked();
-}
-
 status_t Camera3Device::initialize(sp<CameraProviderManager> manager) {
     ATRACE_CALL();
     Mutex::Autolock il(mInterfaceLock);
@@ -211,8 +136,7 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager) {
     if (!requestQueueRet.isOk()) {
         ALOGE("Transaction error when getting request metadata fmq: %s, not use it",
                 requestQueueRet.description().c_str());
-        queue = nullptr;
-        // Don't use the queue onwards.
+        return DEAD_OBJECT;
     }
     auto resultQueueRet = session->getCaptureResultMetadataQueue(
         [&queue = mResultMetadataQueue](const auto& descriptor) {
@@ -226,8 +150,7 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager) {
     if (!resultQueueRet.isOk()) {
         ALOGE("Transaction error when getting result metadata queue from camera session: %s",
                 resultQueueRet.description().c_str());
-        mResultMetadataQueue = nullptr;
-        // Don't use the queue onwards.
+        return DEAD_OBJECT;
     }
 
     mInterface = std::make_unique<HalInterface>(session, queue);
@@ -2938,9 +2861,6 @@ void Camera3Device::monitorMetadata(TagMonitor::eventSource source,
  * HalInterface inner class methods
  */
 
-Camera3Device::HalInterface::HalInterface(camera3_device_t *device) :
-        mHal3Device(device) {}
-
 Camera3Device::HalInterface::HalInterface(
             sp<ICameraDeviceSession> &session,
             std::shared_ptr<RequestMetadataQueue> queue) :
@@ -3013,7 +2933,7 @@ status_t Camera3Device::HalInterface::constructDefaultRequestSettings(
                 // Unknown template ID
                 return BAD_VALUE;
         }
-        mHidlSession->constructDefaultRequestSettings(id,
+        auto err = mHidlSession->constructDefaultRequestSettings(id,
                 [&status, &requestTemplate]
                 (common::V1_0::Status s, const device::V3_2::CameraMetadata& request) {
                     status = s;
@@ -3035,7 +2955,12 @@ status_t Camera3Device::HalInterface::constructDefaultRequestSettings(
                         }
                     }
                 });
-        res = CameraProviderManager::mapToStatusT(status);
+        if (!err.isOk()) {
+            ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
+            res = DEAD_OBJECT;
+        } else {
+            res = CameraProviderManager::mapToStatusT(status);
+        }
     }
     return res;
 }
@@ -3109,12 +3034,17 @@ status_t Camera3Device::HalInterface::configureStreams(camera3_stream_configurat
 
         HalStreamConfiguration finalConfiguration;
         common::V1_0::Status status;
-        mHidlSession->configureStreams(requestedConfiguration,
+        auto err = mHidlSession->configureStreams(requestedConfiguration,
                 [&status, &finalConfiguration]
                 (common::V1_0::Status s, const HalStreamConfiguration& halConfiguration) {
                     finalConfiguration = halConfiguration;
                     status = s;
                 });
+        if (!err.isOk()) {
+            ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
+            return DEAD_OBJECT;
+        }
+
         if (status != common::V1_0::Status::OK ) {
             return CameraProviderManager::mapToStatusT(status);
         }
@@ -3300,12 +3230,15 @@ status_t Camera3Device::HalInterface::processBatchCaptureRequests(
             captureRequest->fmqSettingsSize = 0u;
         }
     }
-    mHidlSession->processCaptureRequest(captureRequests, cachesToRemove,
+    auto err = mHidlSession->processCaptureRequest(captureRequests, cachesToRemove,
             [&status, &numRequestProcessed] (auto s, uint32_t n) {
                 status = s;
                 *numRequestProcessed = n;
             });
-
+    if (!err.isOk()) {
+        ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
+        return DEAD_OBJECT;
+    }
     if (status == common::V1_0::Status::OK && *numRequestProcessed != batchSize) {
         ALOGE("%s: processCaptureRequest returns OK but processed %d/%zu requests",
                 __FUNCTION__, *numRequestProcessed, batchSize);
@@ -3343,7 +3276,13 @@ status_t Camera3Device::HalInterface::flush() {
     if (mHal3Device != nullptr) {
         res = mHal3Device->ops->flush(mHal3Device);
     } else {
-        res = CameraProviderManager::mapToStatusT(mHidlSession->flush());
+        auto err = mHidlSession->flush();
+        if (!err.isOk()) {
+            ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
+            res = DEAD_OBJECT;
+        } else {
+            res = CameraProviderManager::mapToStatusT(err);
+        }
     }
     return res;
 }
@@ -3369,7 +3308,11 @@ status_t Camera3Device::HalInterface::close() {
     if (mHal3Device != nullptr) {
         mHal3Device->common.close(&mHal3Device->common);
     } else {
-        mHidlSession->close();
+        auto err = mHidlSession->close();
+        // Interface will be dead shortly anyway, so don't log errors
+        if (!err.isOk()) {
+            res = DEAD_OBJECT;
+        }
     }
     return res;
 }
@@ -4137,6 +4080,13 @@ void Camera3Device::RequestThread::cleanUpFailedRequests(bool sendRequestError) 
         }
 
         for (size_t i = 0; i < halRequest->num_output_buffers; i++) {
+            //Buffers that failed processing could still have
+            //valid acquire fence.
+            int acquireFence = (*outputBuffers)[i].acquire_fence;
+            if (0 <= acquireFence) {
+                close(acquireFence);
+                outputBuffers->editItemAt(i).acquire_fence = -1;
+            }
             outputBuffers->editItemAt(i).status = CAMERA3_BUFFER_STATUS_ERROR;
             captureRequest->mOutputStreams.editItemAt(i)->returnBuffer((*outputBuffers)[i], 0);
         }

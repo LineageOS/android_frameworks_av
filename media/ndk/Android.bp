@@ -22,3 +22,11 @@ ndk_library {
     first_version: "21",
     unversioned_until: "current",
 }
+
+ndk_headers {
+    name: "libmediandk_headers",
+    from: "include/media",
+    to: "media",
+    srcs: ["include/media/**/*.h"],
+    license: "NOTICE",
+}

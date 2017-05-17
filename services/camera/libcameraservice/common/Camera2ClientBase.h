@@ -18,7 +18,6 @@
 #define ANDROID_SERVERS_CAMERA_CAMERA2CLIENT_BASE_H
 
 #include "common/CameraDeviceBase.h"
-#include "common/CameraModule.h"
 #include "camera/CaptureResult.h"
 
 namespace android {
@@ -56,7 +55,6 @@ public:
                       int servicePid);
     virtual ~Camera2ClientBase();
 
-    virtual status_t      initialize(CameraModule *module);
     virtual status_t      initialize(sp<CameraProviderManager> manager);
     virtual status_t      dumpClient(int fd, const Vector<String16>& args);
 

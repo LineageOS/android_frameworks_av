@@ -88,6 +88,10 @@ public:
  //       AAudioStreamBuilder_setFramesPerDataCallback(mBuilder, CALLBACK_SIZE_FRAMES);
         AAudioStreamBuilder_setBufferCapacityInFrames(mBuilder, 48 * 8);
 
+        //AAudioStreamBuilder_setPerformanceMode(mBuilder, AAUDIO_PERFORMANCE_MODE_NONE);
+        AAudioStreamBuilder_setPerformanceMode(mBuilder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+        //AAudioStreamBuilder_setPerformanceMode(mBuilder, AAUDIO_PERFORMANCE_MODE_POWER_SAVING);
+
         // Open an AAudioStream using the Builder.
         result = AAudioStreamBuilder_openStream(mBuilder, &mStream);
         if (result != AAUDIO_OK) goto finish1;
@@ -98,7 +102,6 @@ public:
                AAudioStream_getBufferSizeInFrames(mStream));
         printf("AAudioStream_getBufferCapacityInFrames() = %d\n",
                AAudioStream_getBufferCapacityInFrames(mStream));
-        return result;
 
      finish1:
         AAudioStreamBuilder_delete(mBuilder);
@@ -227,7 +230,7 @@ int main(int argc, char **argv)
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
-    printf("%s - Play a sine sweep using an AAudio callback, Z1\n", argv[0]);
+    printf("%s - Play a sine sweep using an AAudio callback\n", argv[0]);
 
     player.setSharingMode(SHARING_MODE);
 
@@ -278,6 +281,7 @@ int main(int argc, char **argv)
             printf("Stream state is %d %s!\n", state, AAudio_convertStreamStateToText(state));
             break;
         }
+        printf("framesWritten = %d\n", (int) AAudioStream_getFramesWritten(player.getStream()));
     }
     printf("Woke up now.\n");
 

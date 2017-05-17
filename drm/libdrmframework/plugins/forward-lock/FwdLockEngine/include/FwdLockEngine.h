@@ -18,14 +18,14 @@
 #define __FWDLOCKENGINE_H__
 
 #include <DrmEngineBase.h>
-#include <DrmConstraints.h>
-#include <DrmRights.h>
-#include <DrmInfo.h>
-#include <DrmInfoStatus.h>
-#include <DrmConvertedStatus.h>
-#include <DrmInfoRequest.h>
-#include <DrmSupportInfo.h>
-#include <DrmInfoEvent.h>
+#include <drm/DrmConstraints.h>
+#include <drm/DrmRights.h>
+#include <drm/DrmInfo.h>
+#include <drm/DrmInfoStatus.h>
+#include <drm/DrmConvertedStatus.h>
+#include <drm/DrmInfoRequest.h>
+#include <drm/DrmSupportInfo.h>
+#include <drm/DrmInfoEvent.h>
 
 #include "SessionMap.h"
 #include "FwdLockConv.h"

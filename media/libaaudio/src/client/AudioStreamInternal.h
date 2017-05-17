@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-#ifndef AAUDIO_AUDIOSTREAMINTERNAL_H
-#define AAUDIO_AUDIOSTREAMINTERNAL_H
+#ifndef ANDROID_AAUDIO_AUDIO_STREAM_INTERNAL_H
+#define ANDROID_AAUDIO_AUDIO_STREAM_INTERNAL_H
 
 #include <stdint.h>
 #include <aaudio/AAudio.h>
 
 #include "binding/IAAudioService.h"
 #include "binding/AudioEndpointParcelable.h"
+#include "binding/AAudioServiceInterface.h"
 #include "client/IsochronousClockModel.h"
 #include "client/AudioEndpoint.h"
 #include "core/AudioStream.h"
-
-#include "binding/AAudioServiceInterface.h"
+#include "utility/LinearRamp.h"
 
 using android::sp;
 using android::IAAudioService;
@@ -49,15 +49,11 @@ public:
 
     aaudio_result_t requestStop() override;
 
-    // TODO use aaudio_clockid_t all the way down to AudioClock
     aaudio_result_t getTimestamp(clockid_t clockId,
                                        int64_t *framePosition,
                                        int64_t *timeNanoseconds) override;
 
-
-
     virtual aaudio_result_t updateStateWhileWaiting() override;
-
     // =========== End ABSTRACT methods ===========================
 
     aaudio_result_t open(const AudioStreamBuilder &builder) override;
@@ -77,6 +73,7 @@ public:
     int32_t getFramesPerBurst() const override;
 
     int64_t getFramesRead() override;
+    int64_t getFramesWritten() override;
 
     int32_t getXRunCount() const override {
         return mXRunCount;
@@ -88,6 +85,11 @@ public:
 
     // Called internally from 'C'
     void *callbackLoop();
+
+
+    bool isMMap() override {
+        return true;
+    }
 
 protected:
 
@@ -154,7 +156,7 @@ private:
     int64_t                  mLastFramesRead = 0; // used to prevent retrograde motion
     int32_t                  mFramesPerBurst;     // frames per HAL transfer
     int32_t                  mXRunCount = 0;      // how many underrun events?
-    float                    mVolume = 1.0;       // volume that the server told us to use
+    LinearRamp               mVolumeRamp;
 
     AAudioServiceInterface  &mServiceInterface;   // abstract interface to the service
 
@@ -164,4 +166,4 @@ private:
 
 } /* namespace aaudio */
 
-#endif //AAUDIO_AUDIOSTREAMINTERNAL_H
+#endif //ANDROID_AAUDIO_AUDIO_STREAM_INTERNAL_H

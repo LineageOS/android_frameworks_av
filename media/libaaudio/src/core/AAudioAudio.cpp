@@ -114,8 +114,15 @@ AAUDIO_API aaudio_result_t AAudio_createStreamBuilder(AAudioStreamBuilder** buil
     return AAUDIO_OK;
 }
 
+AAUDIO_API void AAudioStreamBuilder_setPerformanceMode(AAudioStreamBuilder* builder,
+                                                       aaudio_performance_mode_t mode)
+{
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setPerformanceMode(mode);
+}
+
 AAUDIO_API void AAudioStreamBuilder_setDeviceId(AAudioStreamBuilder* builder,
-                                                     int32_t deviceId)
+                                                int32_t deviceId)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
     streamBuilder->setDeviceId(deviceId);
@@ -195,26 +202,21 @@ AAUDIO_API void AAudioStreamBuilder_setFramesPerDataCallback(AAudioStreamBuilder
     streamBuilder->setFramesPerDataCallback(frames);
 }
 
-// TODO merge AAudioInternal_openStream into AAudioStreamBuilder_openStream
-static aaudio_result_t  AAudioInternal_openStream(AudioStreamBuilder *streamBuilder,
-                                              AAudioStream** streamPtr)
-{
-    AudioStream *audioStream = nullptr;
-    aaudio_result_t result = streamBuilder->build(&audioStream);
-    if (result != AAUDIO_OK) {
-        return result;
-    } else {
-        *streamPtr = (AAudioStream*) audioStream;
-        return AAUDIO_OK;
-    }
-}
-
 AAUDIO_API aaudio_result_t  AAudioStreamBuilder_openStream(AAudioStreamBuilder* builder,
                                                      AAudioStream** streamPtr)
 {
+    AudioStream *audioStream = nullptr;
     ALOGD("AAudioStreamBuilder_openStream() ----------------------------------------------");
     AudioStreamBuilder *streamBuilder = COMMON_GET_FROM_BUILDER_OR_RETURN(streamPtr);
-    return AAudioInternal_openStream(streamBuilder, streamPtr);
+    aaudio_result_t result = streamBuilder->build(&audioStream);
+    ALOGD("AAudioStreamBuilder_openStream() returns %d -----------------------------------",
+          result);
+    if (result == AAUDIO_OK) {
+        *streamPtr = (AAudioStream*) audioStream;
+    } else {
+        *streamPtr = nullptr;
+    }
+    return result;
 }
 
 AAUDIO_API aaudio_result_t  AAudioStreamBuilder_delete(AAudioStreamBuilder* builder)
@@ -406,6 +408,12 @@ AAUDIO_API int32_t AAudioStream_getXRunCount(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getXRunCount();
+}
+
+AAUDIO_API aaudio_performance_mode_t AAudioStream_getPerformanceMode(AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    return audioStream->getPerformanceMode();
 }
 
 AAUDIO_API int32_t AAudioStream_getDeviceId(AAudioStream* stream)

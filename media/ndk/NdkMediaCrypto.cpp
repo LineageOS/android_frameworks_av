@@ -18,8 +18,8 @@
 #define LOG_TAG "NdkMediaCrypto"
 
 
-#include "NdkMediaCrypto.h"
-#include "NdkMediaCodec.h"
+#include <media/NdkMediaCrypto.h>
+#include <media/NdkMediaCodec.h>
 #include "NdkMediaFormatPriv.h"
 
 

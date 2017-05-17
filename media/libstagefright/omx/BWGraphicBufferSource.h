@@ -21,7 +21,7 @@
 #include <binder/Status.h>
 #include <android/BnGraphicBufferSource.h>
 #include <android/BnOMXBufferSource.h>
-#include <IOMX.h>
+#include <media/IOMX.h>
 
 #include "GraphicBufferSource.h"
 #include "IOmxNodeWrapper.h"

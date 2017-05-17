@@ -37,11 +37,13 @@ LOCAL_C_INCLUDES := \
     external/piex \
     frameworks/base/core/jni \
     frameworks/base/media/jni \
-    frameworks/av/include/ndk \
     frameworks/native/include \
     frameworks/native/include/media/openmax \
     system/media/camera/include \
     $(call include-path-for, libhardware)/hardware \
+    $(LOCAL_PATH)/include
+
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
 
 LOCAL_CFLAGS += -fvisibility=hidden -D EXPORT='__attribute__ ((visibility ("default")))'
 

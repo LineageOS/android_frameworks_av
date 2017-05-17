@@ -18,8 +18,8 @@
 #define LOG_TAG "NdkMediaMuxer"
 
 
-#include "NdkMediaMuxer.h"
-#include "NdkMediaCodec.h"
+#include <media/NdkMediaMuxer.h>
+#include <media/NdkMediaCodec.h>
 #include "NdkMediaFormatPriv.h"
 
 

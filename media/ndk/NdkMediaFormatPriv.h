@@ -27,7 +27,7 @@
 #ifndef _NDK_MEDIA_FORMAT_PRIV_H
 #define _NDK_MEDIA_FORMAT_PRIV_H
 
-#include <NdkMediaFormat.h>
+#include <media/NdkMediaFormat.h>
 
 #ifdef __cplusplus
 extern "C" {

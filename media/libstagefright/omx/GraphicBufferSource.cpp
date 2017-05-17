@@ -35,7 +35,7 @@
 #include "omx/OMXUtils.h"
 #include <OMX_Component.h>
 #include <OMX_IndexExt.h>
-#include "OMXBuffer.h"
+#include "media/OMXBuffer.h"
 
 #include <inttypes.h>
 #include "FrameDropper.h"

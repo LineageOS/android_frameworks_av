@@ -35,9 +35,120 @@ android::status_t AAudioConvert_aaudioToAndroidStatus(aaudio_result_t result);
  */
 aaudio_result_t AAudioConvert_androidToAAudioResult(android::status_t status);
 
-void AAudioConvert_floatToPcm16(const float *source, int32_t numSamples, int16_t *destination);
+/**
+ * Convert an array of floats to an array of int16_t.
+ *
+ * @param source
+ * @param destination
+ * @param numSamples number of values in the array
+ * @param amplitude level between 0.0 and 1.0
+ */
+void AAudioConvert_floatToPcm16(const float *source,
+                                int16_t *destination,
+                                int32_t numSamples,
+                                float amplitude);
 
-void AAudioConvert_pcm16ToFloat(const int16_t *source, int32_t numSamples, float *destination);
+/**
+ * Convert floats to int16_t and scale by a linear ramp.
+ *
+ * The ramp stops just short of reaching amplitude2 so that the next
+ * ramp can start at amplitude2 without causing a discontinuity.
+ *
+ * @param source
+ * @param destination
+ * @param numFrames
+ * @param samplesPerFrame AKA number of channels
+ * @param amplitude1 level at start of ramp, between 0.0 and 1.0
+ * @param amplitude2 level past end of ramp, between 0.0 and 1.0
+ */
+void AAudioConvert_floatToPcm16(const float *source,
+                                int16_t *destination,
+                                int32_t numFrames,
+                                int32_t samplesPerFrame,
+                                float amplitude1,
+                                float amplitude2);
+
+/**
+ * Convert int16_t array to float array ranging from -1.0 to +1.0.
+ * @param source
+ * @param destination
+ * @param numSamples
+ */
+//void AAudioConvert_pcm16ToFloat(const int16_t *source, int32_t numSamples,
+//                                float *destination);
+
+/**
+ *
+ * Convert int16_t array to float array ranging from +/- amplitude.
+ * @param source
+ * @param destination
+ * @param numSamples
+ * @param amplitude
+ */
+void AAudioConvert_pcm16ToFloat(const int16_t *source,
+                                float *destination,
+                                int32_t numSamples,
+                                float amplitude);
+
+/**
+ * Convert floats to int16_t and scale by a linear ramp.
+ *
+ * The ramp stops just short of reaching amplitude2 so that the next
+ * ramp can start at amplitude2 without causing a discontinuity.
+ *
+ * @param source
+ * @param destination
+ * @param numFrames
+ * @param samplesPerFrame AKA number of channels
+ * @param amplitude1 level at start of ramp, between 0.0 and 1.0
+ * @param amplitude2 level at end of ramp, between 0.0 and 1.0
+ */
+void AAudioConvert_pcm16ToFloat(const int16_t *source,
+                                float *destination,
+                                int32_t numFrames,
+                                int32_t samplesPerFrame,
+                                float amplitude1,
+                                float amplitude2);
+
+/**
+ * Scale floats by a linear ramp.
+ *
+ * The ramp stops just short of reaching amplitude2 so that the next
+ * ramp can start at amplitude2 without causing a discontinuity.
+ *
+ * @param source
+ * @param destination
+ * @param numFrames
+ * @param samplesPerFrame
+ * @param amplitude1
+ * @param amplitude2
+ */
+void AAudio_linearRamp(const float *source,
+                       float *destination,
+                       int32_t numFrames,
+                       int32_t samplesPerFrame,
+                       float amplitude1,
+                       float amplitude2);
+
+/**
+ * Scale int16_t's by a linear ramp.
+ *
+ * The ramp stops just short of reaching amplitude2 so that the next
+ * ramp can start at amplitude2 without causing a discontinuity.
+ *
+ * @param source
+ * @param destination
+ * @param numFrames
+ * @param samplesPerFrame
+ * @param amplitude1
+ * @param amplitude2
+ */
+void AAudio_linearRamp(const int16_t *source,
+                       int16_t *destination,
+                       int32_t numFrames,
+                       int32_t samplesPerFrame,
+                       float amplitude1,
+                       float amplitude2);
 
 /**
  * Calculate the number of bytes and prevent numeric overflow.
@@ -58,5 +169,55 @@ aaudio_audio_format_t AAudioConvert_androidToAAudioDataFormat(audio_format_t for
  * @return the size of a sample of the given format in bytes or AAUDIO_ERROR_ILLEGAL_ARGUMENT
  */
 int32_t AAudioConvert_formatToSizeInBytes(aaudio_audio_format_t format);
+
+
+// Note that this code may be replaced by Settings or by some other system configuration tool.
+
+enum : int32_t {
+    // Related feature is disabled
+    AAUDIO_USE_NEVER = 0,
+    // If related feature works then use it. Otherwise fall back to something else.
+    AAUDIO_USE_AUTO = 1,
+    // Related feature must be used. If not available then fail.
+    AAUDIO_USE_ALWAYS = 2
+};
+
+#define AAUDIO_PROP_MMAP_ENABLED           "aaudio.mmap_enabled"
+
+/**
+ * Read system property.
+ * @return AAUDIO_USE_NEVER or AAUDIO_USE_AUTO or AAUDIO_USE_ALWAYS
+ */
+int32_t AAudioProperty_getMMapEnabled();
+
+#define AAUDIO_PROP_MMAP_EXCLUSIVE_ENABLED "aaudio.mmap_exclusive_enabled"
+
+/**
+ * Read system property.
+ * @return AAUDIO_USE_NEVER or AAUDIO_USE_AUTO or AAUDIO_USE_ALWAYS
+ */
+int32_t AAudioProperty_getMMapExclusiveEnabled();
+
+#define AAUDIO_PROP_MIXER_BURSTS           "aaudio.mixer_bursts"
+
+/**
+ * Read system property.
+ * @return number of bursts per mixer cycle
+ */
+int32_t AAudioProperty_getMixerBursts();
+
+#define AAUDIO_PROP_HW_BURST_MIN_USEC      "aaudio.hw_burst_min_usec"
+
+/**
+ * Read system property.
+ * This is handy in case the DMA is bursting too quickly for the CPU to keep up.
+ * For example, there may be a DMA burst every 100 usec but you only
+ * want to feed the MMAP buffer every 2000 usec.
+ *
+ * This will affect the framesPerBurst for an MMAP stream.
+ *
+ * @return minimum number of microseconds for a MMAP HW burst
+ */
+int32_t AAudioProperty_getHardwareBurstMinMicros();
 
 #endif //UTILITY_AAUDIO_UTILITIES_H

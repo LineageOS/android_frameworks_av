@@ -27,7 +27,6 @@ LOCAL_SRC_FILES :=  \
     CameraFlashlight.cpp \
     common/Camera2ClientBase.cpp \
     common/CameraDeviceBase.cpp \
-    common/CameraModule.cpp \
     common/CameraProviderManager.cpp \
     common/FrameProcessorBase.cpp \
     api1/CameraClient.cpp \
@@ -77,8 +76,7 @@ LOCAL_SHARED_LIBRARIES:= \
     android.hardware.camera.common@1.0 \
     android.hardware.camera.provider@2.4 \
     android.hardware.camera.device@1.0 \
-    android.hardware.camera.device@3.2 \
-    android.hidl.manager@1.0
+    android.hardware.camera.device@3.2
 
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder libcamera_client libfmq
 

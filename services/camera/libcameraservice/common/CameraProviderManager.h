@@ -106,6 +106,7 @@ public:
                 hardware::camera::common::V1_0::CameraDeviceStatus newStatus) = 0;
         virtual void onTorchStatusChanged(const String8 &cameraId,
                 hardware::camera::common::V1_0::TorchModeStatus newStatus) = 0;
+        virtual void onNewProviderRegistered() = 0;
     };
 
     /**
@@ -125,16 +126,16 @@ public:
     int getCameraCount() const;
 
     /**
-     * Retrieve the number of 'standard' cameras; these are internal and
+     * Retrieve the number of API1 compatible cameras; these are internal and
      * backwards-compatible. This is the set of cameras that will be
      * accessible via the old camera API, with IDs in range of
-     * [0, getStandardCameraCount()-1]. This value is not expected to change dynamically.
+     * [0, getAPI1CompatibleCameraCount()-1]. This value is not expected to change dynamically.
      */
-    int getStandardCameraCount() const;
+    int getAPI1CompatibleCameraCount() const;
 
     std::vector<std::string> getCameraDeviceIds() const;
 
-    std::vector<std::string> getStandardCameraDeviceIds() const;
+    std::vector<std::string> getAPI1CompatibleCameraDeviceIds() const;
 
     /**
      * Return true if a device with a given ID and major version exists
@@ -291,6 +292,7 @@ private:
             bool hasFlashUnit() const { return mHasFlashUnit; }
             virtual status_t setTorchMode(bool enabled) = 0;
             virtual status_t getCameraInfo(hardware::CameraInfo *info) const = 0;
+            virtual bool isAPI1Compatible() const = 0;
             virtual status_t getCameraCharacteristics(CameraMetadata *characteristics) const {
                 (void) characteristics;
                 return INVALID_OPERATION;
@@ -313,6 +315,7 @@ private:
         std::vector<std::unique_ptr<DeviceInfo>> mDevices;
         std::set<std::string> mUniqueCameraIds;
         int mUniqueDeviceCount;
+        std::set<std::string> mUniqueAPI1CompatibleCameraIds;
 
         // HALv1-specific camera fields, including the actual device interface
         struct DeviceInfo1 : public DeviceInfo {
@@ -321,7 +324,8 @@ private:
 
             virtual status_t setTorchMode(bool enabled) override;
             virtual status_t getCameraInfo(hardware::CameraInfo *info) const override;
-
+            //In case of Device1Info assume that we are always API1 compatible
+            virtual bool isAPI1Compatible() const override { return true; }
             DeviceInfo1(const std::string& name, const metadata_vendor_id_t tagId,
                     const std::string &id, uint16_t minorVersion,
                     const hardware::camera::common::V1_0::CameraResourceCost& resourceCost,
@@ -338,6 +342,7 @@ private:
 
             virtual status_t setTorchMode(bool enabled) override;
             virtual status_t getCameraInfo(hardware::CameraInfo *info) const override;
+            virtual bool isAPI1Compatible() const override;
             virtual status_t getCameraCharacteristics(
                     CameraMetadata *characteristics) const override;
 

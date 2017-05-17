@@ -19,8 +19,8 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "NdkMediaCodec"
 
-#include "NdkMediaCodec.h"
-#include "NdkMediaError.h"
+#include <media/NdkMediaCodec.h>
+#include <media/NdkMediaError.h>
 #include "NdkMediaCryptoPriv.h"
 #include "NdkMediaFormatPriv.h"
 

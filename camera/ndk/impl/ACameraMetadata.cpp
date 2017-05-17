@@ -20,7 +20,7 @@
 #include "ACameraMetadata.h"
 #include <utils/Vector.h>
 #include <system/graphics.h>
-#include "NdkImage.h"
+#include <media/NdkImage.h>
 
 using namespace android;
 

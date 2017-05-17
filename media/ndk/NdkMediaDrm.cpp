@@ -17,7 +17,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "NdkMediaDrm"
 
-#include "NdkMediaDrm.h"
+#include <media/NdkMediaDrm.h>
 
 #include <cutils/properties.h>
 #include <utils/Log.h>
@@ -29,7 +29,7 @@
 #include <media/stagefright/MediaErrors.h>
 #include <binder/IServiceManager.h>
 #include <media/IMediaDrmService.h>
-#include <ndk/NdkMediaCrypto.h>
+#include <media/NdkMediaCrypto.h>
 
 
 using namespace android;

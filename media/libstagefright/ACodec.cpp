@@ -1063,6 +1063,34 @@ status_t ACodec::setupNativeWindowSizeFormatAndUsage(
         return err;
     }
 
+    OMX_INDEXTYPE index;
+    err = mOMXNode->getExtensionIndex(
+            "OMX.google.android.index.AndroidNativeBufferConsumerUsage",
+            &index);
+
+    if (err != OK) {
+        // allow failure
+        err = OK;
+    } else {
+        int usageBits = 0;
+        if (nativeWindow->query(
+                nativeWindow,
+                NATIVE_WINDOW_CONSUMER_USAGE_BITS,
+                &usageBits) == OK) {
+            OMX_PARAM_U32TYPE params;
+            InitOMXParams(&params);
+            params.nPortIndex = kPortIndexOutput;
+            params.nU32 = (OMX_U32)usageBits;
+
+            err = mOMXNode->setParameter(index, &params, sizeof(params));
+
+            if (err != OK) {
+                ALOGE("Fail to set AndroidNativeBufferConsumerUsage: %d", err);
+                return err;
+            }
+        }
+    }
+
     OMX_U32 usage = 0;
     err = mOMXNode->getGraphicBufferUsage(kPortIndexOutput, &usage);
     if (err != 0) {
@@ -1106,7 +1134,8 @@ status_t ACodec::configureOutputBuffersFromNativeWindow(
 
     if (err == OK) {
         err = setupNativeWindowSizeFormatAndUsage(
-                mNativeWindow.get(), &mNativeWindowUsageBits, preregister /* reconnect */);
+                mNativeWindow.get(), &mNativeWindowUsageBits,
+                preregister && !mTunneled /* reconnect */);
     }
     if (err != OK) {
         mNativeWindowUsageBits = 0;
@@ -5401,6 +5430,8 @@ bool ACodec::BaseState::onMessageReceived(const sp<AMessage> &msg) {
             ALOGE_IF("[%s] failed to release codec instance: err=%d",
                        mCodec->mComponentName.c_str(), err);
             mCodec->mCallback->onReleaseCompleted();
+
+            mCodec->changeState(mCodec->mUninitializedState);
             break;
         }
 
