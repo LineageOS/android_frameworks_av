@@ -30,12 +30,6 @@
 #include "legacy/AudioStreamRecord.h"
 #include "legacy/AudioStreamTrack.h"
 
-// Enable a mixer in AAudio service that will mix streams to an ALSA MMAP buffer.
-#define MMAP_SHARED_ENABLED      0
-
-// Enable AAUDIO_SHARING_MODE_EXCLUSIVE that uses an ALSA MMAP buffer directly.
-#define MMAP_EXCLUSIVE_ENABLED   0
-
 using namespace aaudio;
 
 /*
@@ -53,6 +47,7 @@ static aaudio_result_t builder_createStream(aaudio_direction_t direction,
                                          AudioStream **audioStreamPtr) {
     *audioStreamPtr = nullptr;
     aaudio_result_t result = AAUDIO_OK;
+
     switch (direction) {
 
         case AAUDIO_DIRECTION_INPUT:
@@ -81,20 +76,30 @@ static aaudio_result_t builder_createStream(aaudio_direction_t direction,
     return result;
 }
 
+// Try to open using MMAP path if that is enabled.
+// Fall back to Legacy path is MMAP not available.
 aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
-    aaudio_sharing_mode_t sharingMode = getSharingMode();
-    if ((sharingMode == AAUDIO_SHARING_MODE_EXCLUSIVE) && (MMAP_EXCLUSIVE_ENABLED == 0)) {
-        ALOGE("AudioStreamBuilder(): EXCLUSIVE sharing mode not supported");
-        return AAUDIO_ERROR_UNAVAILABLE;
-    }
-
     AudioStream *audioStream = nullptr;
     *streamPtr = nullptr;
 
-    bool tryMMap = ((sharingMode == AAUDIO_SHARING_MODE_SHARED) && MMAP_SHARED_ENABLED) ||
-            ((sharingMode == AAUDIO_SHARING_MODE_EXCLUSIVE) && MMAP_EXCLUSIVE_ENABLED);
+    int32_t mmapEnabled = AAudioProperty_getMMapEnabled();
+    int32_t mmapExclusiveEnabled = AAudioProperty_getMMapExclusiveEnabled();
+    ALOGD("AudioStreamBuilder(): mmapEnabled = %d, mmapExclusiveEnabled = %d",
+          mmapEnabled, mmapExclusiveEnabled);
+
+    aaudio_sharing_mode_t sharingMode = getSharingMode();
+    if ((sharingMode == AAUDIO_SHARING_MODE_EXCLUSIVE)
+        && (mmapExclusiveEnabled == AAUDIO_USE_NEVER)) {
+        ALOGW("AudioStreamBuilder(): EXCLUSIVE sharing mode not supported. Use SHARED.");
+        sharingMode = AAUDIO_SHARING_MODE_SHARED;
+        setSharingMode(sharingMode);
+    }
+
+    bool allowMMap = mmapEnabled != AAUDIO_USE_NEVER;
+    bool allowLegacy = mmapEnabled != AAUDIO_USE_ALWAYS;
+
     aaudio_result_t result = builder_createStream(getDirection(), sharingMode,
-                                                  tryMMap, &audioStream);
+                                                  allowMMap, &audioStream);
     if (result == AAUDIO_OK) {
         // Open the stream using the parameters from the builder.
         result = audioStream->open(*this);
@@ -105,7 +110,7 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
             delete audioStream;
             audioStream = nullptr;
 
-            if (isMMap) {
+            if (isMMap && allowLegacy) {
                 ALOGD("AudioStreamBuilder.build() MMAP stream did not open so try Legacy path");
                 // If MMAP stream failed to open then TRY using a legacy stream.
                 result = builder_createStream(getDirection(), sharingMode,

@@ -44,10 +44,6 @@ using namespace aaudio;   // TODO just import names needed
 // This is the maximum size in frames. The effective size can be tuned smaller at runtime.
 #define DEFAULT_BUFFER_CAPACITY   (48 * 8)
 
-// Use 2 for "double buffered"
-#define BUFFER_SIZE_IN_BURSTS     2
-#define BURSTS_PER_MIX_LOOP       1
-
 // The mStreamInternal will use a service interface that does not go through Binder.
 AAudioServiceEndpoint::AAudioServiceEndpoint(AAudioService &audioService)
         : mStreamInternal(audioService, true)
@@ -71,7 +67,13 @@ aaudio_result_t AAudioServiceEndpoint::open(int32_t deviceId, aaudio_direction_t
     if (result == AAUDIO_OK) {
         mMixer.allocate(mStreamInternal.getSamplesPerFrame(), mStreamInternal.getFramesPerBurst());
 
-        int32_t desiredBufferSize = BUFFER_SIZE_IN_BURSTS * mStreamInternal.getFramesPerBurst();
+        int32_t burstsPerBuffer = AAudioProperty_getMixerBursts();
+        if (burstsPerBuffer == 0) {
+            mLatencyTuningEnabled = true;
+            burstsPerBuffer = 2;
+        }
+        ALOGD("AAudioServiceEndpoint(): burstsPerBuffer = %d", burstsPerBuffer);
+        int32_t desiredBufferSize = burstsPerBuffer * mStreamInternal.getFramesPerBurst();
         mStreamInternal.setBufferSize(desiredBufferSize);
     }
     return result;
@@ -117,7 +119,6 @@ aaudio_result_t AAudioServiceEndpoint::stopStream(AAudioServiceStreamShared *sha
 
 static void *aaudio_mixer_thread_proc(void *context) {
     AAudioServiceEndpoint *stream = (AAudioServiceEndpoint *) context;
-    //LOGD("AudioStreamAAudio(): oboe_callback_thread, stream = %p", stream);
     if (stream != NULL) {
         return stream->callbackLoop();
     } else {
