@@ -435,7 +435,7 @@ private:
     int mPreviewWidth;
     int mPreviewHeight;
     int mPreviewFormat;
-    int mPreviewUsage;
+    uint64_t mPreviewUsage;
     int mPreviewSwapInterval;
     android_native_rect_t mPreviewCrop;
 
