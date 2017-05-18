@@ -78,7 +78,7 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
             // break;
     }
 
-    if (mSampleRate < 0 || mSampleRate > 1000000) {
+    if (mSampleRate != AAUDIO_UNSPECIFIED && (mSampleRate < 8000 || mSampleRate > 1000000)) {
         ALOGE("AudioStream::open(): mSampleRate out of range = %d", mSampleRate);
         return AAUDIO_ERROR_INVALID_RATE;
     }
