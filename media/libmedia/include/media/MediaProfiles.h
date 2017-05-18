@@ -71,9 +71,34 @@ class MediaProfiles
 {
 public:
 
+    /*
+     * If property media.settings.xml is not set:
+     *
+     * getInstance() will search through paths listed in xmlFiles.
+     * The search goes through members of xmlFiles in the order that they are
+     * defined, so files at lower indices have higher priority than those at
+     * higher indices.
+     *
+     * TODO: Add runtime validation of xml files. A search should be considered
+     * successful only when validation is successful.
+     */
+    static constexpr char const * const xmlFiles[] = {
+            "vendor/etc/media_profiles_V1_0.xml",
+            "system/etc/media_profiles.xml"
+            };
+
     /**
-     * Returns the singleton instance for subsequence queries.
-     * or NULL if error.
+     * Returns the singleton instance for subsequence queries or NULL if error.
+     *
+     * If property media.settings.xml is set, getInstance() will attempt to read
+     * from file path in media.settings.xml. Otherwise, getInstance() will
+     * search through the list xmlFiles as described above.
+     *
+     * If the search is unsuccessful, the default instance will be created
+     * instead.
+     *
+     * TODO: After validation is added, getInstance() should handle validation
+     * failure properly.
      */
     static MediaProfiles* getInstance();
 
@@ -334,6 +359,10 @@ private:
     static void logAudioEncoderCap(const AudioEncoderCap& cap);
     static void logVideoDecoderCap(const VideoDecoderCap& cap);
     static void logAudioDecoderCap(const AudioDecoderCap& cap);
+
+    // Returns true if xmlFile exists.
+    // TODO: Add runtime validation.
+    static bool checkXmlFile(const char* xmlFile);
 
     // If the xml configuration file does exist, use the settings
     // from the xml
