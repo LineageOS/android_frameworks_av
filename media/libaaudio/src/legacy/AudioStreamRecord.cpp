@@ -207,7 +207,9 @@ aaudio_result_t AudioStreamRecord::requestStop() {
         return AAUDIO_ERROR_INVALID_STATE;
     }
     setState(AAUDIO_STREAM_STATE_STOPPING);
+    incrementFramesWritten(getFramesRead() - getFramesWritten()); // TODO review
     mAudioRecord->stop();
+    mFramesRead.reset32();
     return AAUDIO_OK;
 }
 
@@ -257,6 +259,7 @@ aaudio_result_t AudioStreamRecord::read(void *buffer,
         return AAudioConvert_androidToAAudioResult(bytesRead);
     }
     int32_t framesRead = (int32_t)(bytesRead / bytesPerFrame);
+    incrementFramesRead(framesRead);
     return (aaudio_result_t) framesRead;
 }
 
