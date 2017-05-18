@@ -30,3 +30,63 @@ ndk_headers {
     srcs: ["include/media/**/*.h"],
     license: "NOTICE",
 }
+
+cc_library_shared {
+    name: "libmediandk",
+
+    srcs: [
+        "NdkMediaCodec.cpp",
+        "NdkMediaCrypto.cpp",
+        "NdkMediaExtractor.cpp",
+        "NdkMediaFormat.cpp",
+        "NdkMediaMuxer.cpp",
+        "NdkMediaDrm.cpp",
+        "NdkImage.cpp",
+        "NdkImageReader.cpp",
+    ],
+
+    include_dirs: [
+        "bionic/libc/private",
+        "frameworks/base/core/jni",
+        "frameworks/native/include/media/openmax",
+        "system/media/camera/include",
+    ],
+
+    cflags: [
+        "-fvisibility=hidden",
+        "-DEXPORT=__attribute__((visibility(\"default\")))",
+
+        "-Werror",
+        "-Wall",
+    ],
+
+    static_libs: [
+        "libgrallocusage",
+    ],
+
+    shared_libs: [
+        "libbinder",
+        "libmedia",
+        "libmedia_jni",
+        "libmediadrm",
+        "libskia",
+        "libstagefright",
+        "libstagefright_foundation",
+        "liblog",
+        "libutils",
+        "libcutils",
+        "libandroid",
+        "libandroid_runtime",
+        "libbinder",
+        "libgui",
+        "libui",
+    ],
+
+    export_include_dirs: ["include"],
+
+    product_variables: {
+        pdk: {
+            enabled: false,
+        },
+    },
+}

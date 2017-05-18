@@ -29,7 +29,7 @@
 namespace aaudio {
 
 /**
- * Internal stream that uses the legacy AudioTrack path.
+ * Internal stream that uses the legacy AudioRecord path.
  */
 class AudioStreamRecord : public AudioStreamLegacy {
 public:
