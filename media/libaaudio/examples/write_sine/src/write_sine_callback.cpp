@@ -82,15 +82,17 @@ public:
         result = AAudio_createStreamBuilder(&mBuilder);
         if (result != AAUDIO_OK) return result;
 
+        //AAudioStreamBuilder_setSampleRate(mBuilder, 44100);
         AAudioStreamBuilder_setSharingMode(mBuilder, mRequestedSharingMode);
         AAudioStreamBuilder_setDataCallback(mBuilder, dataProc, userContext);
         AAudioStreamBuilder_setFormat(mBuilder, AAUDIO_FORMAT_PCM_FLOAT);
- //       AAudioStreamBuilder_setFramesPerDataCallback(mBuilder, CALLBACK_SIZE_FRAMES);
+        //AAudioStreamBuilder_setFramesPerDataCallback(mBuilder, CALLBACK_SIZE_FRAMES);
         AAudioStreamBuilder_setBufferCapacityInFrames(mBuilder, 48 * 8);
 
-        //AAudioStreamBuilder_setPerformanceMode(mBuilder, AAUDIO_PERFORMANCE_MODE_NONE);
-        AAudioStreamBuilder_setPerformanceMode(mBuilder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
-        //AAudioStreamBuilder_setPerformanceMode(mBuilder, AAUDIO_PERFORMANCE_MODE_POWER_SAVING);
+        //aaudio_performance_mode_t perfMode = AAUDIO_PERFORMANCE_MODE_NONE;
+        aaudio_performance_mode_t perfMode = AAUDIO_PERFORMANCE_MODE_LOW_LATENCY;
+        //aaudio_performance_mode_t perfMode = AAUDIO_PERFORMANCE_MODE_POWER_SAVING;
+        AAudioStreamBuilder_setPerformanceMode(mBuilder, perfMode);
 
         // Open an AAudioStream using the Builder.
         result = AAudioStreamBuilder_openStream(mBuilder, &mStream);
@@ -102,6 +104,8 @@ public:
                AAudioStream_getBufferSizeInFrames(mStream));
         printf("AAudioStream_getBufferCapacityInFrames() = %d\n",
                AAudioStream_getBufferCapacityInFrames(mStream));
+        printf("AAudioStream_getPerformanceMode() = %d, requested %d\n",
+               AAudioStream_getPerformanceMode(mStream), perfMode);
 
      finish1:
         AAudioStreamBuilder_delete(mBuilder);
