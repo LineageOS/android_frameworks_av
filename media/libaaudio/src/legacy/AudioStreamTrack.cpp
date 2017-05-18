@@ -69,7 +69,8 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             samplesPerFrame, channelMask);
 
     audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE;
-    switch(getPerformanceMode()) {
+    aaudio_performance_mode_t perfMode = getPerformanceMode();
+    switch(perfMode) {
         case AAUDIO_PERFORMANCE_MODE_LOW_LATENCY:
             // Bypass the normal mixer and go straight to the FAST mixer.
             flags = (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_RAW);
@@ -105,12 +106,14 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
         callback = getLegacyCallback();
         callbackData = this;
 
-        notificationFrames = builder.getFramesPerDataCallback();
         // If the total buffer size is unspecified then base the size on the burst size.
-        if (frameCount == AAUDIO_UNSPECIFIED) {
+        if (frameCount == 0
+                && ((flags & AUDIO_OUTPUT_FLAG_FAST) != 0)) {
             // Take advantage of a special trick that allows us to create a buffer
             // that is some multiple of the burst size.
             notificationFrames = 0 - DEFAULT_BURSTS_PER_BUFFER_CAPACITY;
+        } else {
+            notificationFrames = builder.getFramesPerDataCallback();
         }
     }
     mCallbackBufferSize = builder.getFramesPerDataCallback();
@@ -157,6 +160,26 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
     setState(AAUDIO_STREAM_STATE_OPEN);
     setDeviceId(mAudioTrack->getRoutedDeviceId());
+
+    // Update performance mode based on the actual stream.
+    // For example, if the sample rate is not allowed then you won't get a FAST track.
+    audio_output_flags_t actualFlags = mAudioTrack->getFlags();
+    aaudio_performance_mode_t actualPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
+    if ((actualFlags & (AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_RAW))
+        == (AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_RAW)) {
+        actualPerformanceMode = AAUDIO_PERFORMANCE_MODE_LOW_LATENCY;
+
+    } else if ((actualFlags & AUDIO_OUTPUT_FLAG_DEEP_BUFFER) != 0) {
+        actualPerformanceMode = AAUDIO_PERFORMANCE_MODE_POWER_SAVING;
+    }
+    setPerformanceMode(actualPerformanceMode);
+    // Log warning if we did not get what we asked for.
+    ALOGW_IF(actualFlags != flags,
+             "AudioStreamTrack::open() flags changed from 0x%08X to 0x%08X",
+             flags, actualFlags);
+    ALOGW_IF(actualPerformanceMode != perfMode,
+             "AudioStreamTrack::open() perfMode changed from %d to %d",
+             perfMode, actualPerformanceMode);
 
     return AAUDIO_OK;
 }

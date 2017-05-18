@@ -18,6 +18,8 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#define ATRACE_TAG ATRACE_TAG_AUDIO
+
 #include <stdint.h>
 #include <assert.h>
 
@@ -25,6 +27,7 @@
 
 #include <aaudio/AAudio.h>
 #include <utils/String16.h>
+#include <utils/Trace.h>
 
 #include "AudioClock.h"
 #include "AudioEndpointParcelable.h"
@@ -188,11 +191,25 @@ aaudio_result_t AudioStreamInternal::close() {
     ALOGD_IF(MYLOG_CONDITION, "AudioStreamInternal.close(): mServiceStreamHandle = 0x%08X",
              mServiceStreamHandle);
     if (mServiceStreamHandle != AAUDIO_HANDLE_INVALID) {
+        // Don't close a stream while it is running.
+        aaudio_stream_state_t currentState = getState();
+        if (isPlaying()) {
+            requestStop();
+            aaudio_stream_state_t nextState;
+            int64_t timeoutNanoseconds = MIN_TIMEOUT_NANOS;
+            aaudio_result_t result = waitForStateChange(currentState, &nextState,
+                                                       timeoutNanoseconds);
+            if (result != AAUDIO_OK) {
+                ALOGE("AudioStreamInternal::close() waitForStateChange() returned %d %s",
+                result, AAudio_convertResultToText(result));
+            }
+        }
         aaudio_handle_t serviceStreamHandle = mServiceStreamHandle;
         mServiceStreamHandle = AAUDIO_HANDLE_INVALID;
 
         mServiceInterface.closeStream(serviceStreamHandle);
         delete[] mCallbackBuffer;
+        mCallbackBuffer = nullptr;
         return mEndPointParcelable.close();
     } else {
         return AAUDIO_ERROR_INVALID_HANDLE;
@@ -524,12 +541,20 @@ aaudio_result_t AudioStreamInternal::processCommands() {
 aaudio_result_t AudioStreamInternal::write(const void *buffer, int32_t numFrames,
                                          int64_t timeoutNanoseconds)
 {
+    const char * traceName = (mInService) ? "aaWrtS" : "aaWrtC";
+    ATRACE_BEGIN(traceName);
     aaudio_result_t result = AAUDIO_OK;
     int32_t loopCount = 0;
     uint8_t* source = (uint8_t*)buffer;
     int64_t currentTimeNanos = AudioClock::getNanoseconds();
     int64_t deadlineNanos = currentTimeNanos + timeoutNanoseconds;
     int32_t framesLeft = numFrames;
+
+    int32_t fullFrames = mAudioEndpoint.getFullFramesAvailable();
+    if (ATRACE_ENABLED()) {
+        const char * traceName = (mInService) ? "aaFullS" : "aaFullC";
+        ATRACE_INT(traceName, fullFrames);
+    }
 
     // Write until all the data has been written or until a timeout occurs.
     while (framesLeft > 0) {
@@ -568,6 +593,7 @@ aaudio_result_t AudioStreamInternal::write(const void *buffer, int32_t numFrames
 
     // return error or framesWritten
     (void) loopCount;
+    ATRACE_END();
     return (result < 0) ? result : numFrames - framesLeft;
 }
 

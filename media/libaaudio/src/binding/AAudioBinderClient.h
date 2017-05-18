@@ -17,6 +17,8 @@
 #ifndef ANDROID_AAUDIO_AAUDIO_BINDER_CLIENT_H
 #define ANDROID_AAUDIO_AAUDIO_BINDER_CLIENT_H
 
+#include <utils/Singleton.h>
+
 #include <aaudio/AAudio.h>
 #include "AAudioServiceDefinitions.h"
 #include "AAudioServiceInterface.h"
@@ -30,7 +32,8 @@
 
 namespace aaudio {
 
-class AAudioBinderClient : public AAudioServiceInterface {
+class AAudioBinderClient : public AAudioServiceInterface
+        , public android::Singleton<AAudioBinderClient> {
 
 public:
 
