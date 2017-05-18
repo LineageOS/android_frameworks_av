@@ -18,7 +18,9 @@
 //#define LOG_NDEBUG 0
 
 #include <climits>
+#include <deque>
 #include <math.h>
+#include <numeric>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -701,7 +703,8 @@ NBLog::Reader::Reader(const void *shared, size_t size)
       mFifo(mShared != NULL ?
         new audio_utils_fifo(size, sizeof(uint8_t),
             mShared->mBuffer, mShared->mRear, NULL /*throttlesFront*/) : NULL),
-      mFifoReader(mFifo != NULL ? new audio_utils_fifo_reader(*mFifo) : NULL)
+      mFifoReader(mFifo != NULL ? new audio_utils_fifo_reader(*mFifo) : NULL),
+      findGlitch(false)
 {
 }
 
@@ -715,6 +718,39 @@ NBLog::Reader::~Reader()
 {
     delete mFifoReader;
     delete mFifo;
+}
+
+inline static int deltaMs(int64_t ns1, int64_t ns2) {
+    return (ns2 - ns1) / (1000 * 1000);
+}
+
+// Produces a log warning if the timing of recent buffer periods caused a glitch
+// Computes sum of running window of three buffer periods
+// Checks whether the buffer periods leave enough CPU time for the next one
+// e.g. if a buffer period is expected to be 4 ms and a buffer requires 3 ms of CPU time,
+// here are some glitch cases:
+// 4 + 4 + 6 ; 5 + 4 + 5; 2 + 2 + 10
+// TODO: develop this code to track changes in histogram distribution in addition
+// to / instead of glitches
+void NBLog::Reader::alertIfGlitch(const std::vector<int64_t> &samples) {
+    //TODO: measure kPeriodLen and kRatio from the data as they may change.
+    static const int kPeriodLen = 4; // current period length is ideally 4 ms
+    static const double kRatio = 0.75; // estimate of CPU time as ratio of period length
+    // DAC processing time for 4 ms buffer
+    static const int kPeriodTime = static_cast<int>(round(kPeriodLen * kRatio));
+    static const int kNumBuff = 3; // number of buffers considered in local history
+    std::deque<int> periods(kNumBuff, kPeriodLen);
+    for (size_t i = 2; i < samples.size(); ++i) { // skip first time entry
+        periods.push_front(deltaMs(samples[i - 1], samples[i]));
+        periods.pop_back();
+        // TODO: check that all glitch cases are covered
+        if (std::accumulate(periods.begin(), periods.end(), 0) > kNumBuff * kPeriodLen +
+            kPeriodLen - kPeriodTime) {
+                ALOGW("A glitch occurred");
+                periods.assign(kNumBuff, kPeriodLen);
+        }
+    }
+    return;
 }
 
 const uint8_t *NBLog::Reader::findLastEntryOfTypes(const uint8_t *front, const uint8_t *back,
@@ -798,10 +834,6 @@ std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
     snapshot->mLost = lost;
     return snapshot;
 
-}
-
-inline static int deltaMs(int64_t t1, int64_t t2) {
-    return (t2 - t1) / (1000 * 1000);
 }
 
 void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapshot)
@@ -917,7 +949,6 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             break;
 #endif
         case EVENT_START_FMT:
-            // right now, this is the only supported case
             entry = handleFormat(FormatEntry(entry), &timestamp, &body);
             break;
         case EVENT_HISTOGRAM_ENTRY_TS: {
@@ -938,16 +969,24 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
         case EVENT_HISTOGRAM_FLUSH: {
             HistogramEntry histEntry(entry);
             // Log timestamp
+            // Timestamp of call to drawHistogram, not when audio was generated
             const int64_t ts = histEntry.timestamp();
             timestamp.clear();
             timestamp.appendFormat("[%d.%03d]", (int) (ts / (1000 * 1000 * 1000)),
                             (int) ((ts / (1000 * 1000)) % 1000));
             // Log histograms
+            setFindGlitch(true);
             body.appendFormat("Histogram flush - ");
             handleAuthor(histEntry, &body);
+            int debug = 0;
             for (auto hist = mHists.begin(); hist != mHists.end();) {
+                // TODO: "debug" is always 0. Is a for loop necessary here?
+                ALOGW("EVENT_HISTOGRAM_FLUSH case hist: %d", debug++);
                 if (hist->first.second == histEntry.author()) {
                     body.appendFormat("%X", (int)hist->first.first);
+                    if (findGlitch) {
+                        alertIfGlitch(hist->second);
+                    }
                     drawHistogram(&body, hist->second, true, indent);
                     hist = mHists.erase(hist);
                 } else {
@@ -998,6 +1037,16 @@ void NBLog::Reader::dumpLine(const String8 &timestamp, String8 &body)
 bool NBLog::Reader::isIMemory(const sp<IMemory>& iMemory) const
 {
     return iMemory != 0 && mIMemory != 0 && iMemory->pointer() == mIMemory->pointer();
+}
+
+void NBLog::Reader::setFindGlitch(bool s)
+{
+    findGlitch = s;
+}
+
+bool NBLog::Reader::isFindGlitch() const
+{
+    return findGlitch;
 }
 
 // ---------------------------------------------------------------------------
@@ -1147,6 +1196,7 @@ static std::map<int, int> buildBuckets(const std::vector<int64_t> &samples) {
     // TODO allow buckets of variable resolution
     std::map<int, int> buckets;
     for (size_t i = 1; i < samples.size(); ++i) {
+        // ALOGW("sample %d ", deltaMs(samples[i - 1], samples[i]));
         ++buckets[deltaMs(samples[i - 1], samples[i])];
     }
     return buckets;
