@@ -15,6 +15,8 @@
  * and limitations under the License.
  * -------------------------------------------------------------------
  */
+#include "log/log.h"
+
 #include "mp4dec_lib.h"
 #include "bitstream.h"
 #include "vlc_decode.h"
@@ -1332,8 +1334,7 @@ PV_STATUS DecodeShortHeader(VideoDecData *video, Vop *currVop)
             }
             tmpvar = BitstreamReadBits16(stream, 9);
 
-            video->displayWidth = (tmpvar + 1) << 2;
-            video->width = (video->displayWidth + 15) & -16;
+            int tmpDisplayWidth = (tmpvar + 1) << 2;
             /* marker bit */
             if (!BitstreamRead1Bits(stream))
             {
@@ -1346,14 +1347,21 @@ PV_STATUS DecodeShortHeader(VideoDecData *video, Vop *currVop)
                 status = PV_FAIL;
                 goto return_point;
             }
-            video->displayHeight = tmpvar << 2;
-            video->height = (video->displayHeight + 15) & -16;
+            int tmpDisplayHeight = tmpvar << 2;
+            int tmpHeight = (tmpDisplayHeight + 15) & -16;
+            int tmpWidth = (tmpDisplayWidth + 15) & -16;
 
-            if (video->height * video->width > video->size)
+            if (tmpHeight * tmpWidth > video->size)
             {
+                // This is just possibly "b/37079296".
+                ALOGE("b/37079296");
                 status = PV_FAIL;
                 goto return_point;
             }
+            video->displayWidth = tmpDisplayWidth;
+            video->width = tmpWidth;
+            video->displayHeight = tmpDisplayHeight;
+            video->height = tmpHeight;
 
             video->nTotalMB = video->width / MB_SIZE * video->height / MB_SIZE;
 
