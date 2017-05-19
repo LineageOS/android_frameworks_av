@@ -239,13 +239,28 @@ void SoftMPEG4::onQueueFilled(OMX_U32 portIndex) {
             mSignalledError = true;
             return;
         }
+
+        // Need to check if header contains new info, e.g., width/height, etc.
+        VopHeaderInfo header_info;
+        uint8_t *bitstreamTmp = bitstream;
+        if (PVDecodeVopHeader(
+                    mHandle, &bitstreamTmp, &timestamp, &tmp,
+                    &header_info, &useExtTimestamp,
+                    outHeader->pBuffer) != PV_TRUE) {
+            ALOGE("failed to decode vop header.");
+
+            notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
+            mSignalledError = true;
+            return;
+        }
+        if (portSettingsChanged()) {
+            return;
+        }
+
         // The PV decoder is lying to us, sometimes it'll claim to only have
         // consumed a subset of the buffer when it clearly consumed all of it.
         // ignore whatever it says...
-        if (PVDecodeVideoFrame(
-                    mHandle, &bitstream, &timestamp, &tmp,
-                    &useExtTimestamp,
-                    outHeader->pBuffer) != PV_TRUE) {
+        if (PVDecodeVopBody(mHandle, &tmp) != PV_TRUE) {
             ALOGE("failed to decode video frame.");
 
             notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
