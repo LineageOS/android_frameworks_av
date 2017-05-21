@@ -3,6 +3,7 @@ LOCAL_PATH:= $(call my-dir)
 # Multichannel downmix effect library
 include $(CLEAR_VARS)
 
+LOCAL_VENDOR_MODULE := true
 LOCAL_SRC_FILES:= \
 	EffectDownmix.c
 

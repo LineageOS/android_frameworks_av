@@ -70,6 +70,12 @@ $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/etc/init/mediacodec.rc)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/libeffects.so)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib64/libeffects.so)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/obj/SHARED_LIBRARIES/libeffects_intermediates)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/soundfx/libeffectproxy.so)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/soundfx/libldnhncr.so)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/soundfx/libdownmix.so)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/soundfx/libvisualizer.so)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/soundfx/libreverbwrapper.so)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/soundfx/libbundlewrapper.so)
 
 # ************************************************
 # NEWER CLEAN STEPS MUST BE AT THE END OF THE LIST
