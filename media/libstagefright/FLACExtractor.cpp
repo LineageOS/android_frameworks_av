@@ -493,7 +493,7 @@ status_t FLACParser::init()
     }
     if (mStreamInfoValid) {
         // check channel count
-        if (getChannels() == 0 || getChannels() > 8) {
+        if (getChannels() == 0 || getChannels() > FLAC__MAX_CHANNELS) {
             ALOGE("unsupported channel count %u", getChannels());
             return NO_INIT;
         }
