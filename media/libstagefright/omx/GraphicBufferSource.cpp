@@ -473,6 +473,12 @@ void GraphicBufferSource::suspend(bool suspend) {
             } else if (err != OK) {
                 ALOGW("suspend: acquireBuffer returned err=%d", err);
                 break;
+            } else if (item.mSlot < 0 ||
+                    item.mSlot >= BufferQueue::NUM_BUFFER_SLOTS) {
+                // Invalid buffer index
+                ALOGW("suspend: corrupted buffer index (%d)",
+                        item.mSlot);
+                break;
             }
 
             ++mNumBufferAcquired;
@@ -523,6 +529,10 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
     } else if (err != OK) {
         // now what? fake end-of-stream?
         ALOGW("fillCodecBuffer_l: acquireBuffer returned err=%d", err);
+        return false;
+    } else if (item.mSlot < 0 || item.mSlot >= BufferQueue::NUM_BUFFER_SLOTS) {
+        // Invalid buffer index
+        ALOGW("fillCodecBuffer_l: corrupted buffer index (%d)", item.mSlot);
         return false;
     }
 
@@ -877,8 +887,14 @@ void GraphicBufferSource::onFrameAvailable(const BufferItem& /*item*/) {
         BufferItem item;
         status_t err = mConsumer->acquireBuffer(&item, 0);
         if (err == OK) {
+            if (item.mSlot < 0 ||
+                    item.mSlot >= BufferQueue::NUM_BUFFER_SLOTS) {
+                // Invalid buffer index
+                ALOGW("onFrameAvailable: corrupted buffer index (%d)",
+                        item.mSlot);
+                return;
+            }
             mNumBufferAcquired++;
-
             // If this is the first time we're seeing this buffer, add it to our
             // slot table.
             if (item.mGraphicBuffer != NULL) {
