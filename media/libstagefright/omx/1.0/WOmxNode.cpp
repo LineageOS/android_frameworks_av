@@ -353,7 +353,8 @@ Return<void> TWOmxNode::allocateSecureBuffer(
             &buffer,
             &bufferData,
             &nativeHandle));
-    _hidl_cb(status, buffer, nativeHandle->handle());
+    _hidl_cb(status, buffer, nativeHandle == nullptr ?
+            nullptr : nativeHandle->handle());
     return Void();
 }
 
