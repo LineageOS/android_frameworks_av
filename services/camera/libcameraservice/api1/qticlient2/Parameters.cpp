@@ -2560,7 +2560,7 @@ int Parameters::sceneModeStringToEnum(const char *sceneMode) {
             ANDROID_CONTROL_SCENE_MODE_BARCODE:
         !strcmp(sceneMode, CameraParameters::SCENE_MODE_HDR) ?
             ANDROID_CONTROL_SCENE_MODE_HDR:
-        -1;
+        QTIParameters::sceneModeStringToEnum(sceneMode);;
 }
 
 Parameters::Parameters::flashMode_t Parameters::flashModeStringToEnum(
