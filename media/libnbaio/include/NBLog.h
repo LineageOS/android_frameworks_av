@@ -425,7 +425,6 @@ public:
         // iterator to end of readable segment of snapshot
         EntryIterator end() { return mEnd; }
 
-
     private:
         friend class Reader;
         uint8_t              *mData;
@@ -441,6 +440,8 @@ public:
 
     virtual ~Reader();
 
+    void alertIfGlitch(const std::vector<int64_t> &samples);
+
     // get snapshot of readers fifo buffer, effectively consuming the buffer
     std::unique_ptr<Snapshot> getSnapshot();
     // dump a particular snapshot of the reader
@@ -448,6 +449,9 @@ public:
     // dump the current content of the reader's buffer
     void     dump(int fd, size_t indent = 0);
     bool     isIMemory(const sp<IMemory>& iMemory) const;
+    // if findGlitch is true, log warning when buffer periods caused glitch
+    void     setFindGlitch(bool s);
+    bool     isFindGlitch() const;
 
 private:
     static const std::set<Event> startingTypes;
@@ -481,6 +485,8 @@ private:
                                          const std::set<Event> &types);
 
     static const size_t kSquashTimestamp = 5; // squash this many or more adjacent timestamps
+
+    bool findGlitch; // alert if a local buffer period sequence caused an audio glitch
 };
 
 // Wrapper for a reader with a name. Contains a pointer to the reader and a pointer to the name

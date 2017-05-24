@@ -484,11 +484,18 @@ bool IsIDR(const sp<MediaCodecBuffer> &buffer) {
 bool IsAVCReferenceFrame(const sp<ABuffer> &accessUnit) {
     const uint8_t *data = accessUnit->data();
     size_t size = accessUnit->size();
+    if (data == NULL) {
+        ALOGE("IsAVCReferenceFrame: called on NULL data (%p, %zu)", accessUnit.get(), size);
+        return false;
+    }
 
     const uint8_t *nalStart;
     size_t nalSize;
     while (getNextNALUnit(&data, &size, &nalStart, &nalSize, true) == OK) {
-        CHECK_GT(nalSize, 0u);
+        if (nalSize == 0) {
+            ALOGE("IsAVCReferenceFrame: invalid nalSize: 0 (%p, %zu)", accessUnit.get(), size);
+            return false;
+        }
 
         unsigned nalType = nalStart[0] & 0x1f;
 
