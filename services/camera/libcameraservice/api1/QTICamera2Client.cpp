@@ -322,5 +322,29 @@ void QTICamera2Client::stopPreviewForRestart(Parameters &params) {
     client->mZslProcessor->deleteStream();
 
 }
+
+status_t QTICamera2Client::sendCommand(Parameters &params,int32_t cmd, int32_t arg1, int32_t arg2) {
+    status_t res = OK;
+    switch (cmd) {
+        case CAMERA_CMD_METADATA_ON:
+            return OK;
+        case CAMERA_CMD_METADATA_OFF:
+            return OK;
+        case CAMERA_CMD_HISTOGRAM_ON:
+            params.qtiParams->histogramMode = 1;
+            break;
+        case CAMERA_CMD_HISTOGRAM_OFF:
+            params.qtiParams->histogramMode = 0;
+            break;
+        case CAMERA_CMD_HISTOGRAM_SEND_DATA:
+            return OK;
+        default:
+            ALOGE("%s: Unknown command %d (arguments %d, %d)",
+                    __FUNCTION__, cmd, arg1, arg2);
+            return BAD_VALUE;
+    }
+    return res;
+}
+
 } // namespace android
 

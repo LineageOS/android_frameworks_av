@@ -24,6 +24,8 @@
 #include <utils/List.h>
 #include <camera/CameraMetadata.h>
 
+#include "QTIFrameProcessor.h"
+
 #include "common/FrameProcessorBase.h"
 
 struct camera_frame_metadata;
@@ -105,6 +107,9 @@ class FrameProcessor : public FrameProcessorBase {
     // Used to filter against sending 3A notifications for the same frame
     // several times.
     int32_t mLast3AFrameNumber;
+
+    sp<QTIFrameProcessor> qtiFrameProcessor;
+
 
     // Emit FaceDetection event to java if faces changed
     void callbackFaceDetection(const sp<Camera2Client>& client,

@@ -180,6 +180,18 @@ const char KEY_QTI_SUPPORTED_HFR_SIZES[] = "hfr-size-values";
 // HDR need 1x frame(one non-HDR extra frame).
 const char KEY_QTI_SUPPORTED_HDR_NEED_1X[] = "hdr-need-1x-values";
 const char KEY_QTI_HDR_NEED_1X[] = "hdr-need-1x";
+// AUTO HDR
+const char KEY_QTI_AUTO_HDR_SUPPORTED[] = "auto-hdr-supported";
+const char KEY_QTI_AUTO_HDR_ENABLE [] = "auto-hdr-enable";
+const char VALUE_TRUE[] = "true";
+const char VALUE_FALSE[] = "false";
+
+//Histogram
+const char KEY_QTI_VENDOR_HISTOGRAM[] = "org.codeaurora.qcamera3.histogram.enable";
+const char KEY_QTI_HISTOGRAM_MODES[] = "histogram-values";
+const char KEY_QTI_HISTOGRAM[] = "histogram";
+const char HISTOGRAM_ENABLE[] = "enable";
+const char HISTOGRAM_DISABLE[] = "disable";
 
 // DIS
 const char KEY_QTI_SUPPORTED_DIS_MODES[] = "dis-values";
@@ -190,14 +202,14 @@ status_t QTIParameters::initialize(void *parametersParent,
     status_t res = OK;
 
     Parameters* ParentParams = (Parameters*)parametersParent;
-    mVendorTagId = manager->getProviderTagIdLocked(device->getId().string());
+    vendorTagId = manager->getProviderTagIdLocked(device->getId().string());
     sp<VendorTagDescriptor> vTags =
         VendorTagDescriptor::getGlobalVendorTagDescriptor();
     if ((nullptr == vTags.get()) || (0 >= vTags->getTagCount())) {
         sp<VendorTagDescriptorCache> cache =
                 VendorTagDescriptorCache::getGlobalVendorTagCache();
         if (cache.get()) {
-            cache->getVendorTagDescriptor(mVendorTagId, &vTags);
+            cache->getVendorTagDescriptor(vendorTagId, &vTags);
         }
     }
     uint32_t tag = 0;
@@ -517,6 +529,30 @@ status_t QTIParameters::initialize(void *parametersParent,
     // Default
     ParentParams->params.set(KEY_QTI_DIS, "disable");
 
+    // Support for auto HDR scene mode detection
+    String8 supportedAutoHDRValue(VALUE_FALSE);
+    //Default Auto Hdr is Enabled.
+    supportedAutoHDRValue = VALUE_TRUE;
+    ParentParams->params.set(KEY_QTI_AUTO_HDR_SUPPORTED, supportedAutoHDRValue);
+    //Default value
+    ParentParams->params.set(KEY_QTI_AUTO_HDR_ENABLE, "disable");
+    isHdrScene = false;
+
+    //Default histogram values
+    String8 availableHistogramModes;
+    availableHistogramModes += HISTOGRAM_ENABLE;
+    availableHistogramModes += ",";
+    availableHistogramModes += HISTOGRAM_DISABLE;
+    availableHistogramModes += ",";
+    ParentParams->params.set(KEY_QTI_HISTOGRAM_MODES,availableHistogramModes);
+    ParentParams->params.set(KEY_QTI_HISTOGRAM,HISTOGRAM_DISABLE);
+    tag=0;
+    res = CameraMetadata::getTagFromName("org.codeaurora.qcamera3.histogram.buckets", vTags.get(), &tag);
+    camera_metadata_ro_entry_t histogramBuckets = ParentParams->staticInfo(tag);
+    if (histogramBuckets.count > 0) {
+        histogramBucketSize = histogramBuckets.data.i32[0];
+    }
+
     return res;
 }
 
@@ -525,29 +561,9 @@ status_t QTIParameters::set(CameraParameters2& newParams, void *parametersParent
     char prop[PROPERTY_VALUE_MAX];
     Parameters* ParentParams = (Parameters*)parametersParent;
 
-    //Video-Hdr
-    const char *videoHdrMode = newParams.get(KEY_QTI_VIDEO_HDR);
-    int32_t vidHDR = 0;
-    if(videoHdrMode) {
-        if (!strcmp(videoHdrMode, VALUE_OFF)) {
-            vidHDR = 0;
-        } else {
-            vidHDR = 1;
-        }
-    }
-    //Sensor-HDR
-    const char *HdrMode = newParams.get(KEY_SNAPCAM_HDR_MODE);
-    int32_t sensHDR = 0;
-    if(HdrMode) {
-        if(!strcmp(HdrMode,"hdr-mode-sensor")) {
-            sensHDR = 1;
-        }
-        if(!strcmp(HdrMode,"hdr-mode-multiframe")) {
-            sensHDR = 0;
-        }
-    }
-    prevVideoHdr = videoHdr;
-    videoHdr = vidHDR|sensHDR;
+    //restore previously burst count
+    burstCount = 1;
+    newParams.set("num-snaps-per-shutter",burstCount);
 
     // ISO
     const char *isoMode = newParams.get(KEY_QTI_ISO_MODE);
@@ -576,6 +592,30 @@ status_t QTIParameters::set(CameraParameters2& newParams, void *parametersParent
             isoValue = 0;
         }
     }
+
+    //Video-Hdr
+    const char *videoHdrMode = newParams.get(KEY_QTI_VIDEO_HDR);
+    int32_t vidHDR = 0;
+    if(videoHdrMode) {
+        if (!strcmp(videoHdrMode, VALUE_OFF)) {
+            vidHDR = 0;
+        } else {
+            vidHDR = 1;
+        }
+    }
+    //Sensor-HDR
+    const char *HdrMode = newParams.get(KEY_SNAPCAM_HDR_MODE);
+    int32_t sensHDR = 0;
+    if(HdrMode) {
+        if(!strcmp(HdrMode,"hdr-mode-sensor")) {
+            sensHDR = 1;
+        }
+        if(!strcmp(HdrMode,"hdr-mode-multiframe")) {
+            sensHDR = 0;
+        }
+    }
+    prevVideoHdr = videoHdr;
+    videoHdr = vidHDR|sensHDR;
 
     //exposure time
     const char *str = newParams.get(KEY_QTI_EXPOSURE_TIME);
@@ -731,6 +771,21 @@ status_t QTIParameters::set(CameraParameters2& newParams, void *parametersParent
         ParentParams->qtiParams->hfrMode = false;
     }
 
+    // AUTO HDR
+    const char *qtiAutoHdrMode = newParams.get(KEY_QTI_AUTO_HDR_ENABLE);
+    autoHDREnabled = false;
+    if (qtiAutoHdrMode != NULL) {
+        if (!strcmp(qtiAutoHdrMode, "enable")) {
+           autoHDREnabled = true;
+        }
+    } else {
+        memset(prop, 0, sizeof(prop));
+        property_get("persist.camera.auto.hdr.enable", prop, "disable");
+        if (!strcmp(prop, "enable")) {
+            autoHDREnabled = true;
+        }
+   }
+
     //hdr_need_1x
     const char *Hdr1x = newParams.get(KEY_QTI_HDR_NEED_1X);
     const char *HdrSceneMode = newParams.get(CameraParameters::KEY_SCENE_MODE);
@@ -744,7 +799,8 @@ status_t QTIParameters::set(CameraParameters2& newParams, void *parametersParent
     } else {
         Hdr1xEnable = false;
     }
-    if(HdrSceneEnable && Hdr1xEnable ) {
+
+    if(Hdr1xEnable && (HdrSceneEnable||(isHdrScene && autoHDREnabled))) {
         burstCount = 2;
         newParams.set("num-snaps-per-shutter", String8::format("%d", burstCount));
     }
@@ -780,6 +836,12 @@ const char *QTIParameters::flashModeEnumToString(flashMode_t flashMode) {
     }
 }
 
+int QTIParameters::sceneModeStringToEnum(const char *sceneMode) {
+       return
+           !strcmp(sceneMode, "asd") ?
+               ANDROID_CONTROL_SCENE_MODE_FACE_PRIORITY :
+           -1;
+}
 
 int QTIParameters::wbModeStringToEnum(const char *wbMode) {
     return
@@ -809,7 +871,7 @@ status_t QTIParameters::updateRequest(CameraMetadata *request) const {
         sp<VendorTagDescriptorCache> cache =
                 VendorTagDescriptorCache::getGlobalVendorTagCache();
         if (cache.get()) {
-            cache->getVendorTagDescriptor(mVendorTagId, &vTags);
+            cache->getVendorTagDescriptor(vendorTagId, &vTags);
         }
     }
 
@@ -817,11 +879,18 @@ status_t QTIParameters::updateRequest(CameraMetadata *request) const {
        return BAD_VALUE;
     }
 
-    //Video-Hdr
-    res = CameraMetadata::getTagFromName(KEY_QTI_VENDOR_VIDEO_HDR_MODE, vTags.get(), &tag);
-    res = request->update(tag,&videoHdr, 1);
-    if (res != OK) {
-        return res;
+    if(autoHDREnabled) {
+        uint8_t reqControlMode = ANDROID_CONTROL_MODE_USE_SCENE_MODE;
+        res = request->update(ANDROID_CONTROL_MODE,
+              &reqControlMode, 1);
+        if (res != OK) return res;
+
+        uint8_t reqSceneMode = ANDROID_CONTROL_SCENE_MODE_FACE_PRIORITY;
+        res = request->update(ANDROID_CONTROL_SCENE_MODE,
+        &reqSceneMode, 1);
+        if (res != OK) {
+            return res;
+        }
     }
 
     if (isoValue != -1) {
@@ -847,6 +916,13 @@ status_t QTIParameters::updateRequest(CameraMetadata *request) const {
             return res;
         }
 
+    }
+
+    //Video-Hdr
+    res = CameraMetadata::getTagFromName(KEY_QTI_VENDOR_VIDEO_HDR_MODE, vTags.get(), &tag);
+    res = request->update(tag,&videoHdr, 1);
+    if (res != OK) {
+        return res;
     }
 
     if (exposureTime > 0) {
@@ -916,6 +992,13 @@ status_t QTIParameters::updateRequest(CameraMetadata *request) const {
         if (res != OK) return res;
     }
 
+    //Histogram
+    res = CameraMetadata::getTagFromName(KEY_QTI_VENDOR_HISTOGRAM, vTags.get(), &tag);
+    res = request->update(tag, &histogramMode, 1);
+    if (res != OK) {
+        return res;
+    }
+
     return res;
 }
 
@@ -931,7 +1014,7 @@ status_t QTIParameters::updateRequestForQTICapture(Vector<CameraMetadata> *reque
     // Check if any Capture request settings need to be changed for QTI features
 
     // For HDR need one extra frame.
-    if(Hdr1xEnable && HdrSceneEnable){
+    if(Hdr1xEnable && (HdrSceneEnable||(isHdrScene && autoHDREnabled))){
         for (size_t i = 0; i < burstCount; i++) {
             CameraMetadata &request = requests->editItemAt(i);
             uint8_t reqSceneMode;
@@ -952,6 +1035,24 @@ status_t QTIParameters::updateRequestForQTICapture(Vector<CameraMetadata> *reque
 
             res = request.update(ANDROID_CONTROL_SCENE_MODE,
                     &reqSceneMode, 1);
+            if (res != OK) {
+                return res;
+            }
+        }
+    }
+    else {
+        if(autoHDREnabled && isHdrScene) {
+            CameraMetadata &request = requests->editItemAt(0);
+            uint8_t reqSceneMode;
+            uint8_t reqControlMode;
+            reqSceneMode = ANDROID_CONTROL_SCENE_MODE_HDR;
+            reqControlMode = ANDROID_CONTROL_MODE_USE_SCENE_MODE;
+
+            res = request.update(ANDROID_CONTROL_MODE, &reqControlMode, 1);
+            if (res != OK) {
+                return res;
+            }
+            res = request.update(ANDROID_CONTROL_SCENE_MODE, &reqSceneMode, 1);
             if (res != OK) {
                 return res;
             }
