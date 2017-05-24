@@ -42,10 +42,10 @@ public:
     int32_t getSamplesPerFrame() const { return mStreamInternal->getSamplesPerFrame();  }
     int32_t getFramesPerBurst() const { return mStreamInternal->getFramesPerBurst();  }
 
-    aaudio_result_t registerStream(AAudioServiceStreamShared *sharedStream);
-    aaudio_result_t unregisterStream(AAudioServiceStreamShared *sharedStream);
-    aaudio_result_t startStream(AAudioServiceStreamShared *sharedStream);
-    aaudio_result_t stopStream(AAudioServiceStreamShared *sharedStream);
+    aaudio_result_t registerStream(android::sp<AAudioServiceStreamShared> sharedStream);
+    aaudio_result_t unregisterStream(android::sp<AAudioServiceStreamShared> sharedStream);
+    aaudio_result_t startStream(android::sp<AAudioServiceStreamShared> sharedStream);
+    aaudio_result_t stopStream(android::sp<AAudioServiceStreamShared> sharedStream);
     aaudio_result_t close();
 
     int32_t getRequestedDeviceId() const { return mRequestedDeviceId; }
@@ -73,8 +73,9 @@ public:
 
     std::mutex               mLockStreams;
 
-    std::vector<AAudioServiceStreamShared *> mRegisteredStreams;
-    std::vector<AAudioServiceStreamShared *> mRunningStreams;
+    std::vector<android::sp<AAudioServiceStreamShared>> mRegisteredStreams;
+
+    std::vector<android::sp<AAudioServiceStreamShared>> mRunningStreams;
 
 private:
     aaudio_result_t startSharingThread_l();

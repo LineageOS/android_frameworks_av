@@ -38,7 +38,7 @@ using namespace aaudio;
 #define AAUDIO_SAMPLE_RATE_DEFAULT    48000
 
 /**
- * Stream that uses an MMAP buffer.
+ * Service Stream that uses an MMAP buffer.
  */
 
 AAudioServiceStreamMMAP::AAudioServiceStreamMMAP()
@@ -244,7 +244,6 @@ aaudio_result_t AAudioServiceStreamMMAP::flush() {
     return AAudioServiceStreamBase::flush();;
 }
 
-
 aaudio_result_t AAudioServiceStreamMMAP::getFreeRunningPosition(int64_t *positionFrames,
                                                                 int64_t *timeNanos) {
     struct audio_mmap_position position;
@@ -266,7 +265,7 @@ aaudio_result_t AAudioServiceStreamMMAP::getFreeRunningPosition(int64_t *positio
 }
 
 void AAudioServiceStreamMMAP::onTearDown() {
-    ALOGE("AAudioServiceStreamMMAP::onTearDown() called - TODO");
+    ALOGD("AAudioServiceStreamMMAP::onTearDown() called"); // TODO what is needed here?
 };
 
 void AAudioServiceStreamMMAP::onVolumeChanged(audio_channel_mask_t channels,

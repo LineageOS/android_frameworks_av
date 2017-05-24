@@ -79,7 +79,7 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
         mMixer.clear();
         { // use lock guard
             std::lock_guard <std::mutex> lock(mLockStreams);
-            for (AAudioServiceStreamShared *sharedStream : mRunningStreams) {
+            for (sp<AAudioServiceStreamShared> sharedStream : mRunningStreams) {
                 FifoBuffer *fifo = sharedStream->getDataFifoBuffer();
                 float volume = 0.5; // TODO get from system
                 bool underflowed = mMixer.mix(fifo, volume);

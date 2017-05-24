@@ -20,6 +20,8 @@
 #include <assert.h>
 #include <mutex>
 
+#include <utils/RefBase.h>
+
 #include "fifo/FifoBuffer.h"
 #include "binding/IAAudioService.h"
 #include "binding/AudioEndpointParcelable.h"
@@ -39,7 +41,8 @@ namespace aaudio {
  * Base class for a stream in the AAudio service.
  */
 class AAudioServiceStreamBase
-    : public Runnable  {
+    : public virtual android::RefBase
+    , public Runnable  {
 
 public:
     AAudioServiceStreamBase();
@@ -78,6 +81,9 @@ public:
      */
     virtual aaudio_result_t flush();
 
+    bool isRunning() const {
+        return mState == AAUDIO_STREAM_STATE_STARTED;
+    }
     // -------------------------------------------------------------------
 
     /**
@@ -120,6 +126,13 @@ public:
         mOwnerUserId = uid;
     }
 
+    aaudio_handle_t getHandle() const {
+        return mHandle;
+    }
+    void setHandle(aaudio_handle_t handle) {
+        mHandle = handle;
+    }
+
 protected:
     aaudio_result_t writeUpMessageQueue(AAudioServiceMessage *command);
 
@@ -146,6 +159,8 @@ protected:
     int32_t            mSampleRate = AAUDIO_UNSPECIFIED;
     int32_t            mCapacityInFrames = AAUDIO_UNSPECIFIED;
     uid_t              mOwnerUserId = -1;
+private:
+    aaudio_handle_t    mHandle = -1;
 };
 
 } /* namespace aaudio */

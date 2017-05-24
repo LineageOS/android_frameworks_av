@@ -17,10 +17,13 @@
 #ifndef ANDROID_AAUDIO_BINDING_AAUDIO_SERVICE_INTERFACE_H
 #define ANDROID_AAUDIO_BINDING_AAUDIO_SERVICE_INTERFACE_H
 
+#include <utils/StrongPointer.h>
+
 #include "binding/AAudioServiceDefinitions.h"
 #include "binding/AAudioStreamRequest.h"
 #include "binding/AAudioStreamConfiguration.h"
 #include "binding/AudioEndpointParcelable.h"
+#include "binding/IAAudioClient.h"
 
 /**
  * This has the same methods as IAAudioService but without the Binder features.
@@ -35,6 +38,8 @@ public:
 
     AAudioServiceInterface() {};
     virtual ~AAudioServiceInterface() = default;
+
+    virtual void registerClient(const android::sp<android::IAAudioClient>& client) = 0;
 
     /**
      * @param request info needed to create the stream
