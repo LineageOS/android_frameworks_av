@@ -79,6 +79,8 @@ NuPlayer::Decoder::Decoder(
       mIsAudio(true),
       mIsVideoAVC(false),
       mIsSecure(false),
+      mIsEncrypted(false),
+      mIsEncryptedObservedEarlier(false),
       mFormatChangePending(false),
       mTimeChangePending(false),
       mFrameRateTotal(kDefaultVideoFrameRateTotal),
@@ -330,6 +332,10 @@ void NuPlayer::Decoder::onConfigure(const sp<AMessage> &format) {
         pCrypto = NULL;
     }
     sp<ICrypto> crypto = (ICrypto*)pCrypto;
+    // non-encrypted source won't have a crypto
+    mIsEncrypted = (crypto != NULL);
+    // configure is called once; still using OR in case the behavior changes.
+    mIsEncryptedObservedEarlier = mIsEncryptedObservedEarlier || mIsEncrypted;
     ALOGV("onConfigure mCrypto: %p (%d)  mIsSecure: %d",
             crypto.get(), (crypto != NULL ? crypto->getStrongCount() : 0), mIsSecure);
 
@@ -611,6 +617,9 @@ void NuPlayer::Decoder::onReleaseCrypto(const sp<AMessage>& msg)
 
     sp<AMessage> response = new AMessage;
     response->setInt32("status", status);
+    // Clearing the state as it's tied to crypto. mIsEncryptedObservedEarlier is sticky though
+    // and lasts for the lifetime of this codec. See its use in fetchInputData.
+    mIsEncrypted = false;
 
     sp<AReplyToken> replyID;
     CHECK(msg->senderAwaitsResponse(&replyID));
@@ -878,7 +887,20 @@ status_t NuPlayer::Decoder::fetchInputData(sp<AMessage> &reply) {
         }
 
         dropAccessUnit = false;
-        if (!mIsAudio && !mIsSecure) {
+        if (!mIsAudio && !mIsEncrypted) {
+            // Extra safeguard if higher-level behavior changes. Otherwise, not required now.
+            // Preventing the buffer from being processed (and sent to codec) if this is a later
+            // round of playback but this time without prepareDrm. Or if there is a race between
+            // stop (which is not blocking) and releaseDrm allowing buffers being processed after
+            // Crypto has been released (GenericSource currently prevents this race though).
+            // Particularly doing this check before IsAVCReferenceFrame call to prevent parsing
+            // of encrypted data.
+            if (mIsEncryptedObservedEarlier) {
+                ALOGE("fetchInputData: mismatched mIsEncrypted/mIsEncryptedObservedEarlier (0/1)");
+
+                return INVALID_OPERATION;
+            }
+
             int32_t layerId = 0;
             bool haveLayerId = accessUnit->meta()->findInt32("temporal-layer-id", &layerId);
             if (mRenderer->getVideoLateByUs() > 100000ll
