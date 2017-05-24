@@ -550,6 +550,10 @@ status_t Camera3OutputStream::getBufferLockedCommon(ANativeWindowBuffer** anb, i
         res = mConsumer->getAndFlushRemovedBuffers(&removedBuffers);
         if (res == OK) {
             onBuffersRemovedLocked(removedBuffers);
+
+            if (mUseBufferManager && removedBuffers.size() > 0) {
+                mBufferManager->onBuffersRemoved(getId(), getStreamSetId(), removedBuffers.size());
+            }
         }
     }
 

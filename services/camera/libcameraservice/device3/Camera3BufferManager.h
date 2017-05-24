@@ -147,31 +147,22 @@ public:
     status_t onBufferReleased(int streamId, int streamSetId);
 
     /**
-     * This method returns a buffer for a stream to this buffer manager.
+     * This method notifies the manager that certain buffers has been removed from the
+     * buffer queue by detachBuffer from the consumer.
      *
-     * When a buffer is returned, it is treated as a free buffer and may either be reused for future
-     * getBufferForStream() calls, or freed if there total number of outstanding allocated buffers
-     * is too large. The latter only applies to the case where the buffer are physically shared
-     * between streams in the same stream set. A physically shared buffer is the buffer that has one
-     * physical back store but multiple handles. Multiple stream can access the same physical memory
-     * with their own handles. Physically shared buffer can only be supported by Gralloc HAL V1.
-     * See hardware/libhardware/include/hardware/gralloc1.h for more details.
+     * The notification lets the manager update its internal handout buffer count and
+     * attached buffer counts accordingly. When buffers are detached from
+     * consumer, both handout and attached counts are decremented.
      *
+     * Return values:
      *
-     * This call takes the ownership of the returned buffer if it was allocated by this buffer
-     * manager; clients should not use this buffer after this call. Attempting to access this buffer
-     * after this call will have undefined behavior. Holding a reference to this buffer after this
-     * call may cause memory leakage. If a BufferQueue is used to track the buffers handed out by
-     * this buffer queue, it is recommended to call detachNextBuffer() from the buffer queue after
-     * BufferQueueProducer onBufferReleased callback is fired, and return it to this buffer manager.
-     *
-     *  OK:        Buffer return for this stream was successful.
-     *  BAD_VALUE: stream ID or streamSetId are invalid, or stream ID and stream set ID combination
-     *             doesn't match what was registered, or this stream wasn't registered to this
-     *             buffer manager before.
+     *  OK:        Buffer removal was processed succesfully
+     *  BAD_VALUE: stream ID or streamSetId are invalid, or stream ID and stream set ID
+     *             combination doesn't match what was registered, or this stream wasn't registered
+     *             to this buffer manager before, or the removed buffer count is larger than
+     *             current total handoutCount or attachedCount.
      */
-    status_t returnBufferForStream(int streamId, int streamSetId, const sp<GraphicBuffer>& buffer,
-            int fenceFd);
+    status_t onBuffersRemoved(int streamId, int streamSetId, size_t count);
 
     /**
      * Dump the buffer manager statistics.
@@ -256,11 +247,6 @@ private:
          */
         InfoMap streamInfoMap;
         /**
-         * The free buffer list for all the buffers belong to this set. The free buffers are
-         * returned by the returnBufferForStream() call, and available for reuse.
-         */
-        BufferList freeBuffers;
-        /**
          * The count of the buffers that were handed out to the streams of this set.
          */
         BufferCountMap handoutBufferCountMap;
@@ -293,38 +279,6 @@ private:
      */
     bool checkIfStreamRegisteredLocked(int streamId, int streamSetId) const;
 
-    /**
-     * Add a buffer entry to the BufferList. This method needs to be called with mLock held.
-     */
-    status_t addBufferToBufferListLocked(BufferList &bufList, const BufferEntry &buffer);
-
-    /**
-     * Remove all buffers from the BufferList.
-     *
-     * Note that this doesn't mean that the buffers are freed after this call. A buffer is freed
-     * only if all other references to it are dropped.
-     *
-     * This method needs to be called with mLock held.
-     */
-    status_t removeBuffersFromBufferListLocked(BufferList &bufList, int streamId);
-
-    /**
-     * Get the first available buffer from the buffer list for this stream. The graphicBuffer inside
-     * this entry will be NULL if there is no any GraphicBufferEntry found. After this call, the
-     * GraphicBufferEntry will be removed from the BufferList if a GraphicBufferEntry is found.
-     *
-     * This method needs to be called with mLock held.
-     *
-     */
-    GraphicBufferEntry getFirstBufferFromBufferListLocked(BufferList& buffers, int streamId);
-
-    /**
-     * Check if there is any buffer associated with this stream in the given buffer list.
-     *
-     * This method needs to be called with mLock held.
-     *
-     */
-    bool inline hasBufferForStreamLocked(BufferList& buffers, int streamId);
 };
 
 } // namespace camera3
