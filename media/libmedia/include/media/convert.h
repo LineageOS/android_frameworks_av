@@ -119,7 +119,7 @@ static inline bool fromString(const std::string &str, T &result)
     /* Check for a '-' in string. If type is unsigned and a - is found, the
      * parsing fails. This is made necessary because "-1" is read as 65535 for
      * uint16_t, for example */
-    if (str.find("-") != std::string::npos
+    if (str.find('-') != std::string::npos
         && !std::numeric_limits<T>::is_signed) {
         return false;
     }
