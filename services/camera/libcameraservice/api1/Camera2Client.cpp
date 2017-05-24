@@ -1622,9 +1622,14 @@ status_t Camera2Client::sendCommand(int32_t cmd, int32_t arg1, int32_t arg2) {
                     __FUNCTION__, cmd, arg1, arg2);
             return BAD_VALUE;
         default:
+#ifdef USE_QTI_CAMERA2CLIENT
+            SharedParameters::Lock l(mParameters);
+            return mQTICamera2Client->sendCommand(l.mParameters,cmd, arg1, arg2);
+#else
             ALOGE("%s: Unknown command %d (arguments %d, %d)",
                     __FUNCTION__, cmd, arg1, arg2);
             return BAD_VALUE;
+#endif
     }
 }
 

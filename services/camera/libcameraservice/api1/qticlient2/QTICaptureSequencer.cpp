@@ -91,7 +91,9 @@ status_t QTICaptureSequencer::startCapture(int msgType, bool& useQTISequencer) {
         // Set QTI capture sequencer for ZSL,
         // For AE bracketing,
         if ((mBurstCount > 1) ||
-                (lp.mParameters.allowZslMode)) {
+                (lp.mParameters.allowZslMode) ||
+                (lp.mParameters.qtiParams->autoHDREnabled &&
+                lp.mParameters.qtiParams->isHdrScene)) {
             useQTISequencer = true;
         }
     }

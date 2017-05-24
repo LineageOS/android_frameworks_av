@@ -96,19 +96,24 @@ private:
         FLASH_MODE_RED_EYE = ANDROID_CONTROL_AE_MODE_ON_AUTO_FLASH_REDEYE,
         FLASH_MODE_INVALID = -1
     } flashMode;
-    metadata_vendor_id_t mVendorTagId;
 
 public:
     int32_t videoHdr;
     int32_t prevVideoHdr;
+    uint8_t histogramMode;
+    int32_t histogramBucketSize;
+    bool isHdrScene;
+    bool autoHDREnabled;
     bool mNeedRestart;
     uint8_t burstCount;
+    uint8_t lastBurstCount;
     bool aeBracketEnable;
     bool hfrMode;
     int32_t hfrPreviewFpsRange[2];
     int32_t nonHfrPreviewFpsRange[2];
     bool Hdr1xEnable;
     bool HdrSceneEnable;
+    metadata_vendor_id_t vendorTagId;
     // Sets up default QTI parameters
     status_t initialize(void *parametersParent, sp<CameraDeviceBase> device, sp<CameraProviderManager> manager);
     // Validate and update camera parameters based on new settings
@@ -118,6 +123,7 @@ public:
     status_t updateRequestForQTICapture(Vector<CameraMetadata> *requests) const;
     static const char* wbModeEnumToString(uint8_t wbMode);
     static int wbModeStringToEnum(const char *wbMode);
+    static int sceneModeStringToEnum(const char *sceneMode);
 
 private:
     int32_t setContinuousISO(const char *isoValue, CameraParameters2& newParams);

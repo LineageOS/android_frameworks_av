@@ -57,6 +57,8 @@ FrameProcessor::FrameProcessor(wp<CameraDeviceBase> device,
         m3aState.afState = ANDROID_CONTROL_AF_STATE_INACTIVE;
         m3aState.awbState = ANDROID_CONTROL_AWB_STATE_INACTIVE;
     }
+
+    qtiFrameProcessor = new QTIFrameProcessor();
 }
 
 FrameProcessor::~FrameProcessor() {
@@ -71,6 +73,9 @@ bool FrameProcessor::processSingleFrame(CaptureResult &frame,
     }
 
     bool isPartialResult = false;
+
+    qtiFrameProcessor->processSingleFrameExtn(frame.mMetadata, client);
+
     if (mUsePartialResult) {
         isPartialResult = frame.mResultExtras.partialResultCount < mNumPartialResults;
     }

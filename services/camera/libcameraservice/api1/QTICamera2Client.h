@@ -46,6 +46,7 @@ public:
     status_t setParametersExtn(Parameters &params);
     status_t startHFRRecording(Parameters &params);
     void stopHFRRecording(Parameters &params);
+    status_t sendCommand(Parameters &params,int32_t cmd, int32_t arg1, int32_t arg2);
 
 private:
     void stopPreviewForRestart(Parameters &params);
