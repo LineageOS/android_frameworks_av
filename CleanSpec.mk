@@ -76,6 +76,7 @@ $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/soundfx/libdownmix.so)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/soundfx/libvisualizer.so)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/soundfx/libreverbwrapper.so)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/soundfx/libbundlewrapper.so)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/soundfx/libaudiopreprocessing.so)
 
 # ************************************************
 # NEWER CLEAN STEPS MUST BE AT THE END OF THE LIST

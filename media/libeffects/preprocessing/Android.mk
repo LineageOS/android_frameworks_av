@@ -7,6 +7,7 @@ LOCAL_MODULE:= libaudiopreprocessing
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_RELATIVE_PATH := soundfx
 
+LOCAL_VENDOR_MODULE := true
 LOCAL_SRC_FILES:= \
     PreProcessing.cpp
 
