@@ -69,7 +69,8 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
             : AAudioConvert_aaudioToAndroidDataFormat(getFormat());
 
     audio_input_flags_t flags = AUDIO_INPUT_FLAG_NONE;
-    switch(getPerformanceMode()) {
+    aaudio_performance_mode_t perfMode = getPerformanceMode();
+    switch (perfMode) {
         case AAUDIO_PERFORMANCE_MODE_LOW_LATENCY:
             flags = (audio_input_flags_t) (AUDIO_INPUT_FLAG_FAST | AUDIO_INPUT_FLAG_RAW);
             break;
@@ -134,6 +135,24 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     } else {
         mBlockAdapter = nullptr;
     }
+
+    // Update performance mode based on the actual stream.
+    // For example, if the sample rate does not match native then you won't get a FAST track.
+    audio_input_flags_t actualFlags = mAudioRecord->getFlags();
+    aaudio_performance_mode_t actualPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
+    // FIXME Some platforms do not advertise RAW mode for low latency inputs.
+    if ((actualFlags & (AUDIO_INPUT_FLAG_FAST))
+        == (AUDIO_INPUT_FLAG_FAST)) {
+        actualPerformanceMode = AAUDIO_PERFORMANCE_MODE_LOW_LATENCY;
+    }
+    setPerformanceMode(actualPerformanceMode);
+    // Log warning if we did not get what we asked for.
+    ALOGW_IF(actualFlags != flags,
+             "AudioStreamRecord::open() flags changed from 0x%08X to 0x%08X",
+             flags, actualFlags);
+    ALOGW_IF(actualPerformanceMode != perfMode,
+             "AudioStreamRecord::open() perfMode changed from %d to %d",
+             perfMode, actualPerformanceMode);
 
     setState(AAUDIO_STREAM_STATE_OPEN);
 
