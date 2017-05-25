@@ -11,8 +11,8 @@ LOCAL_SHARED_LIBRARIES := \
     liblog \
     libstagefright_omx
 LOCAL_C_INCLUDES := \
-    $(TOP)/frameworks/av/media/libstagefright \
-    $(TOP)/frameworks/native/include/media/openmax
+    frameworks/av/media/libstagefright \
+    frameworks/native/include/media/openmax
 LOCAL_MODULE:= libmediacodecservice
 LOCAL_32_BIT_ONLY := true
 include $(BUILD_SHARED_LIBRARY)
@@ -38,9 +38,9 @@ LOCAL_SHARED_LIBRARIES := \
     android.hardware.media.omx@1.0 \
     android.hidl.memory@1.0
 LOCAL_C_INCLUDES := \
-    $(TOP)/frameworks/av/media/libstagefright \
-    $(TOP)/frameworks/av/media/libstagefright/include \
-    $(TOP)/frameworks/native/include/media/openmax
+    frameworks/av/media/libstagefright \
+    frameworks/av/media/libstagefright/include \
+    frameworks/native/include/media/openmax
 LOCAL_MODULE := android.hardware.media.omx@1.0-service
 LOCAL_MODULE_RELATIVE_PATH := hw
 LOCAL_PROPRIETARY_MODULE := true
