@@ -170,9 +170,12 @@ GraphicBufferSource::GraphicBufferSource(
         mIsPersistent = true;
     }
     mConsumer->setDefaultBufferSize(bufferWidth, bufferHeight);
-    // Note that we can't create an sp<...>(this) in a ctor that will not keep a
-    // reference once the ctor ends, as that would cause the refcount of 'this'
-    // dropping to 0 at the end of the ctor.  Since all we need is a wp<...>
+}
+
+status_t GraphicBufferSource::init() {
+    // Note that we can't create an sp<...>(this) in a method that will not keep a
+    // reference once the method ends, as that may cause the refcount of 'this'
+    // dropping to 0 at the end of the method.  Since all we need is a wp<...>
     // that's what we create.
     wp<BufferQueue::ConsumerListener> listener = static_cast<BufferQueue::ConsumerListener*>(this);
     sp<IConsumerListener> proxy;
@@ -186,10 +189,9 @@ GraphicBufferSource::GraphicBufferSource(
     if (mInitCheck != NO_ERROR) {
         ALOGE("Error connecting to BufferQueue: %s (%d)",
                 strerror(-mInitCheck), mInitCheck);
-        return;
     }
 
-    CHECK(mInitCheck == NO_ERROR);
+    return mInitCheck;
 }
 
 GraphicBufferSource::~GraphicBufferSource() {
