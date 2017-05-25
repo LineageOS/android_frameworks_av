@@ -327,7 +327,7 @@ int32_t AAudioConvert_framesToBytes(int32_t numFrames,
 static int32_t AAudioProperty_getMMapProperty(const char *propName,
                                               int32_t defaultValue,
                                               const char * caller) {
-    int32_t prop = property_get_int32(AAUDIO_PROP_MMAP_ENABLED, defaultValue);
+    int32_t prop = property_get_int32(propName, defaultValue);
     switch (prop) {
         case AAUDIO_USE_NEVER:
         case AAUDIO_USE_ALWAYS:
@@ -352,9 +352,9 @@ int32_t AAudioProperty_getMMapExclusiveEnabled() {
 }
 
 int32_t AAudioProperty_getMixerBursts() {
-    const int32_t defaultBursts = 2; // arbitrary
+    const int32_t defaultBursts = 2; // arbitrary, use 2 for double buffered
     const int32_t maxBursts = 1024; // arbitrary
-    int32_t prop = property_get_int32(AAUDIO_PROP_MIXER_BURSTS, defaultBursts); // use 2 for double buffered
+    int32_t prop = property_get_int32(AAUDIO_PROP_MIXER_BURSTS, defaultBursts);
     if (prop < 1 || prop > maxBursts) {
         ALOGE("AAudioProperty_getMixerBursts: invalid = %d", prop);
         prop = defaultBursts;
