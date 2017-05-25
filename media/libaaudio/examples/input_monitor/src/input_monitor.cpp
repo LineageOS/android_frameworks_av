@@ -23,8 +23,8 @@
 #include <math.h>
 #include <aaudio/AAudio.h>
 
-#define SAMPLE_RATE           48000
-#define NUM_SECONDS           6
+#define SAMPLE_RATE        48000
+#define NUM_SECONDS        5
 #define NANOS_PER_MICROSECOND ((int64_t)1000)
 #define NANOS_PER_MILLISECOND (NANOS_PER_MICROSECOND * 1000)
 #define NANOS_PER_SECOND      (NANOS_PER_MILLISECOND * 1000)
@@ -57,6 +57,11 @@ int main(int argc, char **argv)
     const aaudio_audio_format_t requestedDataFormat = AAUDIO_FORMAT_PCM_I16;
     aaudio_audio_format_t actualDataFormat;
 
+    const int requestedInputChannelCount = 1; // Can affect whether we get a FAST path.
+
+    //aaudio_performance_mode_t requestedPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
+    const aaudio_performance_mode_t requestedPerformanceMode = AAUDIO_PERFORMANCE_MODE_LOW_LATENCY;
+    //aaudio_performance_mode_t requestedPerformanceMode = AAUDIO_PERFORMANCE_MODE_POWER_SAVING;
     const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_SHARED;
     //const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_EXCLUSIVE;
     aaudio_sharing_mode_t actualSharingMode;
@@ -89,6 +94,8 @@ int main(int argc, char **argv)
     AAudioStreamBuilder_setDirection(aaudioBuilder, AAUDIO_DIRECTION_INPUT);
     AAudioStreamBuilder_setFormat(aaudioBuilder, requestedDataFormat);
     AAudioStreamBuilder_setSharingMode(aaudioBuilder, requestedSharingMode);
+    AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, requestedPerformanceMode);
+    AAudioStreamBuilder_setChannelCount(aaudioBuilder, requestedInputChannelCount);
 
     // Create an AAudioStream using the Builder.
     result = AAudioStreamBuilder_openStream(aaudioBuilder, &aaudioStream);
@@ -117,12 +124,15 @@ int main(int argc, char **argv)
     while (framesPerRead < MIN_FRAMES_TO_READ) {
         framesPerRead *= 2;
     }
-    printf("DataFormat: framesPerRead = %d\n",framesPerRead);
+    printf("DataFormat: framesPerRead  = %d\n",framesPerRead);
 
     actualDataFormat = AAudioStream_getFormat(aaudioStream);
-    printf("DataFormat: requested = %d, actual = %d\n", requestedDataFormat, actualDataFormat);
+    printf("DataFormat: requested      = %d, actual = %d\n", requestedDataFormat, actualDataFormat);
     // TODO handle other data formats
     assert(actualDataFormat == AAUDIO_FORMAT_PCM_I16);
+
+    printf("PerformanceMode: requested = %d, actual = %d\n", requestedPerformanceMode,
+           AAudioStream_getPerformanceMode(aaudioStream));
 
     // Allocate a buffer for the audio data.
     data = new(std::nothrow) int16_t[framesPerRead * actualSamplesPerFrame];
