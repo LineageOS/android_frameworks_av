@@ -60,3 +60,5 @@ ppoll: 1
 # Required by AddressSanitizer
 gettid: 1
 sched_yield: 1
+getpid: 1
+gettid: 1

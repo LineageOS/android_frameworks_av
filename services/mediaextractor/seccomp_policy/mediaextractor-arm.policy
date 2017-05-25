@@ -59,3 +59,5 @@ getgroups32: 1
 getdents64: 1
 pipe2: 1
 ppoll: 1
+getpid: 1
+gettid: 1

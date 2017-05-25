@@ -93,10 +93,8 @@ aaudio_result_t AudioEndpointParcelable::resolve(EndpointDescriptor *descriptor)
                                         &descriptor->downMessageQueueDescriptor);
     if (result != AAUDIO_OK) return result;
 
-    result = mUpDataQueueParcelable.resolve(mSharedMemories, &descriptor->upDataQueueDescriptor);
-    if (result != AAUDIO_OK) return result;
     result = mDownDataQueueParcelable.resolve(mSharedMemories,
-                                              &descriptor->downDataQueueDescriptor);
+                                              &descriptor->dataQueueDescriptor);
     return result;
 }
 

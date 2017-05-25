@@ -316,7 +316,7 @@ AAUDIO_API aaudio_result_t AAudioStream_write(AAudioStream* stream,
     }
 
     // Don't allow writes when playing with a callback.
-    if (audioStream->getDataCallbackProc() != nullptr && audioStream->isPlaying()) {
+    if (audioStream->getDataCallbackProc() != nullptr && audioStream->isActive()) {
         ALOGE("Cannot write to a callback stream when running.");
         return AAUDIO_ERROR_INVALID_STATE;
     }

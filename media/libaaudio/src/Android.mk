@@ -44,6 +44,8 @@ LOCAL_SRC_FILES = \
     fifo/FifoControllerBase.cpp \
     client/AudioEndpoint.cpp \
     client/AudioStreamInternal.cpp \
+    client/AudioStreamInternalCapture.cpp \
+    client/AudioStreamInternalPlay.cpp \
     client/IsochronousClockModel.cpp \
     binding/AudioEndpointParcelable.cpp \
     binding/AAudioBinderClient.cpp \
@@ -99,6 +101,8 @@ LOCAL_SRC_FILES = core/AudioStream.cpp \
     fifo/FifoControllerBase.cpp \
     client/AudioEndpoint.cpp \
     client/AudioStreamInternal.cpp \
+    client/AudioStreamInternalCapture.cpp \
+    client/AudioStreamInternalPlay.cpp \
     client/IsochronousClockModel.cpp \
     binding/AudioEndpointParcelable.cpp \
     binding/AAudioBinderClient.cpp \

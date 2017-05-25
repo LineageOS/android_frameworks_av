@@ -77,8 +77,7 @@ typedef struct EndpointDescriptor_s {
     // Set capacityInFrames to zero if Queue is unused.
     RingBufferDescriptor upMessageQueueDescriptor;   // server to client
     RingBufferDescriptor downMessageQueueDescriptor; // client to server
-    RingBufferDescriptor upDataQueueDescriptor;      // eg. record
-    RingBufferDescriptor downDataQueueDescriptor;    // eg. playback
+    RingBufferDescriptor dataQueueDescriptor;    // playback or capture
 } EndpointDescriptor;
 
 } // namespace aaudio
