@@ -21,9 +21,9 @@ LOCAL_CFLAGS += \
     -fvisibility=hidden
 
 LOCAL_C_INCLUDES := \
-    $(TOPDIR)frameworks/av/services/audiopolicy/common/include \
-    $(TOPDIR)frameworks/av/services/audiopolicy/engineconfigurable/include \
-    $(TOPDIR)frameworks/av/services/audiopolicy/engineconfigurable/interface \
+    frameworks/av/services/audiopolicy/common/include \
+    frameworks/av/services/audiopolicy/engineconfigurable/include \
+    frameworks/av/services/audiopolicy/engineconfigurable/interface \
 
 LOCAL_SHARED_LIBRARIES := \
     libaudiopolicyengineconfigurable  \
