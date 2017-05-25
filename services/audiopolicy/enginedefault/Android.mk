@@ -11,7 +11,7 @@ LOCAL_SRC_FILES := \
 
 audio_policy_engine_includes_common := \
     $(LOCAL_PATH)/include \
-    $(TOPDIR)frameworks/av/services/audiopolicy/engine/interface
+    frameworks/av/services/audiopolicy/engine/interface
 
 LOCAL_CFLAGS += \
     -Wall \
@@ -27,7 +27,7 @@ LOCAL_C_INCLUDES := \
     $(call include-path-for, frameworks-av) \
     $(call include-path-for, audio-utils) \
     $(call include-path-for, bionic) \
-    $(TOPDIR)frameworks/av/services/audiopolicy/common/include
+    frameworks/av/services/audiopolicy/common/include
 
 LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
 

@@ -31,7 +31,7 @@ LOCAL_SHARED_LIBRARIES := \
 LOCAL_C_INCLUDES := \
 	frameworks/av/media/libstagefright \
 	frameworks/av/media/libstagefright/include \
-	$(TOP)/frameworks/native/include/media/openmax \
+	frameworks/native/include/media/openmax \
 	external/jpeg
 
 LOCAL_CFLAGS := -Werror -Wall
