@@ -62,6 +62,8 @@ status_t SharedMemoryParcelable::readFromParcel(const Parcel* parcel) {
         return status;
     }
     if (mSizeInBytes > 0) {
+        // Keep the original FD until you are done with the mFd.
+        // If you close it in here then it will prevent mFd from working.
         mOriginalFd = parcel->readFileDescriptor();
         ALOGV("SharedMemoryParcelable::readFromParcel() LEAK? mOriginalFd = %d\n", mOriginalFd);
         mFd = fcntl(mOriginalFd, F_DUPFD_CLOEXEC, 0);

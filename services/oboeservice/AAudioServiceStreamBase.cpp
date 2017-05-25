@@ -162,11 +162,12 @@ aaudio_result_t AAudioServiceStreamBase::writeUpMessageQueue(AAudioServiceMessag
 
 aaudio_result_t AAudioServiceStreamBase::sendCurrentTimestamp() {
     AAudioServiceMessage command;
-    //ALOGD("sendCurrentTimestamp() called");
     aaudio_result_t result = getFreeRunningPosition(&command.timestamp.position,
                                                     &command.timestamp.timestamp);
     if (result == AAUDIO_OK) {
-        //ALOGD("sendCurrentTimestamp(): position %d", (int) command.timestamp.position);
+    //    ALOGD("sendCurrentTimestamp(): position = %lld, nanos = %lld",
+    //          (long long) command.timestamp.position,
+    //          (long long) command.timestamp.timestamp);
         command.what = AAudioServiceMessage::code::TIMESTAMP;
         result = writeUpMessageQueue(&command);
     }

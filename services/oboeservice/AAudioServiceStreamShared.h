@@ -100,7 +100,7 @@ protected:
 private:
     android::AAudioService  &mAudioService;
     AAudioServiceEndpoint   *mServiceEndpoint = nullptr;
-    SharedRingBuffer        *mAudioDataQueue;
+    SharedRingBuffer        *mAudioDataQueue = nullptr;
 
     int64_t                  mMarkedPosition = 0;
     int64_t                  mMarkedTime = 0;

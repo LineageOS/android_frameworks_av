@@ -23,14 +23,13 @@
 #include <math.h>
 #include <aaudio/AAudio.h>
 
-#define SAMPLE_RATE        48000
-#define NUM_SECONDS        10
+#define SAMPLE_RATE           48000
+#define NUM_SECONDS           6
 #define NANOS_PER_MICROSECOND ((int64_t)1000)
 #define NANOS_PER_MILLISECOND (NANOS_PER_MICROSECOND * 1000)
-#define NANOS_PER_SECOND   (NANOS_PER_MILLISECOND * 1000)
+#define NANOS_PER_SECOND      (NANOS_PER_MILLISECOND * 1000)
 
-#define DECAY_FACTOR       0.999
-#define MIN_FRAMES_TO_READ 48  /* arbitrary, 1 msec at 48000 Hz */
+#define MIN_FRAMES_TO_READ    48  /* arbitrary, 1 msec at 48000 Hz */
 
 static const char *getSharingModeText(aaudio_sharing_mode_t mode) {
     const char *modeText = "unknown";
@@ -59,6 +58,7 @@ int main(int argc, char **argv)
     aaudio_audio_format_t actualDataFormat;
 
     const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_SHARED;
+    //const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_EXCLUSIVE;
     aaudio_sharing_mode_t actualSharingMode;
 
     AAudioStreamBuilder *aaudioBuilder = nullptr;
@@ -143,27 +143,27 @@ int main(int argc, char **argv)
     state = AAudioStream_getState(aaudioStream);
     printf("after start, state = %s\n", AAudio_convertStreamStateToText(state));
 
-    // Play for a while.
+    // Record for a while.
     framesToRecord = actualSampleRate * NUM_SECONDS;
     framesLeft = framesToRecord;
     while (framesLeft > 0) {
         // Read audio data from the stream.
-        int64_t timeoutNanos = 100 * NANOS_PER_MILLISECOND;
+        const int64_t timeoutNanos = 100 * NANOS_PER_MILLISECOND;
         int minFrames = (framesToRecord < framesPerRead) ? framesToRecord : framesPerRead;
         int actual = AAudioStream_read(aaudioStream, data, minFrames, timeoutNanos);
         if (actual < 0) {
-            fprintf(stderr, "ERROR - AAudioStream_read() returned %zd\n", actual);
+            fprintf(stderr, "ERROR - AAudioStream_read() returned %d\n", actual);
+            result = actual;
             goto finish;
         } else if (actual == 0) {
-            fprintf(stderr, "WARNING - AAudioStream_read() returned %zd\n", actual);
+            fprintf(stderr, "WARNING - AAudioStream_read() returned %d\n", actual);
             goto finish;
         }
         framesLeft -= actual;
 
-        // Peak follower.
+        // Peak finder.
         for (int frameIndex = 0; frameIndex < actual; frameIndex++) {
             float sample = data[frameIndex * actualSamplesPerFrame] * (1.0/32768);
-            peakLevel *= DECAY_FACTOR;
             if (sample > peakLevel) {
                 peakLevel = sample;
             }
@@ -177,6 +177,7 @@ int main(int argc, char **argv)
                 printf("*");
             }
             printf("\n");
+            peakLevel = 0.0;
         }
     }
 
@@ -184,9 +185,9 @@ int main(int argc, char **argv)
     printf("AAudioStream_getXRunCount %d\n", xRunCount);
 
 finish:
-    delete[] data;
     AAudioStream_close(aaudioStream);
     AAudioStreamBuilder_delete(aaudioBuilder);
+    delete[] data;
     printf("exiting - AAudio result = %d = %s\n", result, AAudio_convertResultToText(result));
     return (result != AAUDIO_OK) ? EXIT_FAILURE : EXIT_SUCCESS;
 }
