@@ -344,8 +344,8 @@ int main(int argc, const char **argv)
     aaudio_audio_format_t actualInputFormat;
     aaudio_audio_format_t actualOutputFormat;
 
-    //const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_EXCLUSIVE;
-    const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_SHARED;
+    const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_EXCLUSIVE;
+    //const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_SHARED;
     aaudio_sharing_mode_t       actualSharingMode;
 
     AAudioStreamBuilder  *builder = nullptr;

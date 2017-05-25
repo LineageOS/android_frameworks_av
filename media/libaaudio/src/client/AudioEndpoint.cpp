@@ -32,7 +32,7 @@ using namespace aaudio;
 #define RIDICULOUSLY_LARGE_FRAME_SIZE        4096
 
 AudioEndpoint::AudioEndpoint()
-    : mOutputFreeRunning(false)
+    : mFreeRunning(false)
     , mDataReadCounter(0)
     , mDataWriteCounter(0)
 {
@@ -108,7 +108,7 @@ aaudio_result_t AudioEndpoint_validateDescriptor(const EndpointDescriptor *pEndp
                                     &pEndpointDescriptor->upMessageQueueDescriptor);
     if (result == AAUDIO_OK) {
         result = AudioEndpoint_validateQueueDescriptor("data",
-                                                &pEndpointDescriptor->downDataQueueDescriptor);
+                                                &pEndpointDescriptor->dataQueueDescriptor);
     }
     return result;
 }
@@ -144,11 +144,11 @@ aaudio_result_t AudioEndpoint::configure(const EndpointDescriptor *pEndpointDesc
     );
 
     // ============================ down data queue =============================
-    descriptor = &pEndpointDescriptor->downDataQueueDescriptor;
+    descriptor = &pEndpointDescriptor->dataQueueDescriptor;
     ALOGV("AudioEndpoint::configure() data framesPerBurst = %d", descriptor->framesPerBurst);
     ALOGV("AudioEndpoint::configure() data readCounterAddress = %p", descriptor->readCounterAddress);
-    mOutputFreeRunning = descriptor->readCounterAddress == nullptr;
-    ALOGV("AudioEndpoint::configure() mOutputFreeRunning = %d", mOutputFreeRunning ? 1 : 0);
+    mFreeRunning = descriptor->readCounterAddress == nullptr;
+    ALOGV("AudioEndpoint::configure() mFreeRunning = %d", mFreeRunning ? 1 : 0);
     int64_t *readCounterAddress = (descriptor->readCounterAddress == nullptr)
                                   ? &mDataReadCounter
                                   : descriptor->readCounterAddress;
@@ -156,7 +156,7 @@ aaudio_result_t AudioEndpoint::configure(const EndpointDescriptor *pEndpointDesc
                                   ? &mDataWriteCounter
                                   : descriptor->writeCounterAddress;
 
-    mDownDataQueue = new FifoBuffer(
+    mDataQueue = new FifoBuffer(
             descriptor->bytesPerFrame,
             descriptor->capacityInFrames,
             readCounterAddress,
@@ -164,7 +164,7 @@ aaudio_result_t AudioEndpoint::configure(const EndpointDescriptor *pEndpointDesc
             descriptor->dataAddress
     );
     uint32_t threshold = descriptor->capacityInFrames / 2;
-    mDownDataQueue->setThreshold(threshold);
+    mDataQueue->setThreshold(threshold);
     return result;
 }
 
@@ -175,44 +175,54 @@ aaudio_result_t AudioEndpoint::readUpCommand(AAudioServiceMessage *commandPtr)
 
 aaudio_result_t AudioEndpoint::writeDataNow(const void *buffer, int32_t numFrames)
 {
-    return mDownDataQueue->write(buffer, numFrames);
+    return mDataQueue->write(buffer, numFrames);
 }
 
-void AudioEndpoint::getEmptyRoomAvailable(WrappingBuffer *wrappingBuffer) {
-    mDownDataQueue->getEmptyRoomAvailable(wrappingBuffer);
+void AudioEndpoint::getEmptyFramesAvailable(WrappingBuffer *wrappingBuffer) {
+    mDataQueue->getEmptyRoomAvailable(wrappingBuffer);
 }
 
-int32_t AudioEndpoint::getEmptyFramesAvailable() {
-    return mDownDataQueue->getFifoControllerBase()->getEmptyFramesAvailable();
+int32_t AudioEndpoint::getEmptyFramesAvailable()
+{
+    return mDataQueue->getFifoControllerBase()->getEmptyFramesAvailable();
+}
+
+void AudioEndpoint::getFullFramesAvailable(WrappingBuffer *wrappingBuffer)
+{
+    return mDataQueue->getFullDataAvailable(wrappingBuffer);
 }
 
 int32_t AudioEndpoint::getFullFramesAvailable()
 {
-    return mDownDataQueue->getFifoControllerBase()->getFullFramesAvailable();
+    return mDataQueue->getFifoControllerBase()->getFullFramesAvailable();
 }
 
 void AudioEndpoint::advanceWriteIndex(int32_t deltaFrames) {
-    mDownDataQueue->getFifoControllerBase()->advanceWriteIndex(deltaFrames);
+    mDataQueue->getFifoControllerBase()->advanceWriteIndex(deltaFrames);
 }
 
-void AudioEndpoint::setDownDataReadCounter(fifo_counter_t framesRead)
-{
-    mDownDataQueue->setReadCounter(framesRead);
+void AudioEndpoint::advanceReadIndex(int32_t deltaFrames) {
+    mDataQueue->getFifoControllerBase()->advanceReadIndex(deltaFrames);
 }
 
-fifo_counter_t AudioEndpoint::getDownDataReadCounter()
+void AudioEndpoint::setDataReadCounter(fifo_counter_t framesRead)
 {
-    return mDownDataQueue->getReadCounter();
+    mDataQueue->setReadCounter(framesRead);
 }
 
-void AudioEndpoint::setDownDataWriteCounter(fifo_counter_t framesRead)
+fifo_counter_t AudioEndpoint::getDataReadCounter()
 {
-    mDownDataQueue->setWriteCounter(framesRead);
+    return mDataQueue->getReadCounter();
 }
 
-fifo_counter_t AudioEndpoint::getDownDataWriteCounter()
+void AudioEndpoint::setDataWriteCounter(fifo_counter_t framesRead)
 {
-    return mDownDataQueue->getWriteCounter();
+    mDataQueue->setWriteCounter(framesRead);
+}
+
+fifo_counter_t AudioEndpoint::getDataWriteCounter()
+{
+    return mDataQueue->getWriteCounter();
 }
 
 int32_t AudioEndpoint::setBufferSizeInFrames(int32_t requestedFrames,
@@ -221,18 +231,18 @@ int32_t AudioEndpoint::setBufferSizeInFrames(int32_t requestedFrames,
     if (requestedFrames < ENDPOINT_DATA_QUEUE_SIZE_MIN) {
         requestedFrames = ENDPOINT_DATA_QUEUE_SIZE_MIN;
     }
-    mDownDataQueue->setThreshold(requestedFrames);
-    *actualFrames = mDownDataQueue->getThreshold();
+    mDataQueue->setThreshold(requestedFrames);
+    *actualFrames = mDataQueue->getThreshold();
     return AAUDIO_OK;
 }
 
 int32_t AudioEndpoint::getBufferSizeInFrames() const
 {
-    return mDownDataQueue->getThreshold();
+    return mDataQueue->getThreshold();
 }
 
 int32_t AudioEndpoint::getBufferCapacityInFrames() const
 {
-    return (int32_t)mDownDataQueue->getBufferCapacityInFrames();
+    return (int32_t)mDataQueue->getBufferCapacityInFrames();
 }
 

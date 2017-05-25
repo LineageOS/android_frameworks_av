@@ -43,7 +43,6 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     mSampleRate = builder.getSampleRate();
     mDeviceId = builder.getDeviceId();
     mFormat = builder.getFormat();
-    mDirection = builder.getDirection();
     mSharingMode = builder.getSharingMode();
     mSharingModeMatchRequired = builder.isSharingModeMatchRequired();
 
@@ -81,10 +80,6 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     if (mSampleRate != AAUDIO_UNSPECIFIED && (mSampleRate < 8000 || mSampleRate > 1000000)) {
         ALOGE("AudioStream::open(): mSampleRate out of range = %d", mSampleRate);
         return AAUDIO_ERROR_INVALID_RATE;
-    }
-    if (mDirection != AAUDIO_DIRECTION_INPUT && mDirection != AAUDIO_DIRECTION_OUTPUT) {
-        ALOGE("AudioStream::open(): illegal direction %d", mDirection);
-        return AAUDIO_ERROR_UNEXPECTED_VALUE;
     }
 
     switch(mPerformanceMode) {
