@@ -65,3 +65,5 @@ getgid32: 1
 getegid32: 1
 getgroups32: 1
 recvmsg: 1
+getpid: 1
+gettid: 1
