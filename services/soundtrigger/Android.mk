@@ -35,7 +35,7 @@ LOCAL_SHARED_LIBRARIES:= \
     libserviceutility
 
 LOCAL_C_INCLUDES += \
-    $(TOPDIR)frameworks/av/services/audioflinger
+    frameworks/av/services/audioflinger
 
 LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
 

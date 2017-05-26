@@ -33,9 +33,9 @@ LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libmedia
 
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/include \
-    $(TOPDIR)frameworks/av/services/audiopolicy/common/include \
-    $(TOPDIR)frameworks/av/services/audiopolicy \
-    $(TOPDIR)frameworks/av/services/audiopolicy/utilities \
+    frameworks/av/services/audiopolicy/common/include \
+    frameworks/av/services/audiopolicy \
+    frameworks/av/services/audiopolicy/utilities \
 
 ifeq ($(USE_XML_AUDIO_POLICY_CONF), 1)
 
@@ -46,8 +46,8 @@ LOCAL_STATIC_LIBRARIES += libxml2
 LOCAL_SHARED_LIBRARIES += libicuuc
 
 LOCAL_C_INCLUDES += \
-    $(TOPDIR)external/libxml2/include \
-    $(TOPDIR)external/icu/icu4c/source/common
+    external/libxml2/include \
+    external/icu/icu4c/source/common
 
 else
 
