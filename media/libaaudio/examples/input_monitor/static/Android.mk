@@ -4,7 +4,8 @@ include $(CLEAR_VARS)
 LOCAL_MODULE_TAGS := examples
 LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils) \
-    frameworks/av/media/libaaudio/include
+    frameworks/av/media/libaaudio/include \
+    frameworks/av/media/libaaudio/examples/utils
 
 # TODO reorganize folders to avoid using ../
 LOCAL_SRC_FILES:= ../src/input_monitor.cpp
@@ -22,7 +23,8 @@ include $(CLEAR_VARS)
 LOCAL_MODULE_TAGS := tests
 LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils) \
-    frameworks/av/media/libaaudio/include
+    frameworks/av/media/libaaudio/include \
+    frameworks/av/media/libaaudio/examples/utils
 
 LOCAL_SRC_FILES:= ../src/input_monitor_callback.cpp
 

@@ -20,58 +20,33 @@
 #include <stdlib.h>
 #include <math.h>
 #include <aaudio/AAudio.h>
-#include "SineGenerator.h"
+#include "AAudioExampleUtils.h"
+#include "AAudioSimplePlayer.h"
 
 #define SAMPLE_RATE           48000
-#define NUM_SECONDS           5
-#define NANOS_PER_MICROSECOND ((int64_t)1000)
-#define NANOS_PER_MILLISECOND (NANOS_PER_MICROSECOND * 1000)
-#define NANOS_PER_SECOND      (NANOS_PER_MILLISECOND * 1000)
+#define NUM_SECONDS           20
 
 #define REQUESTED_FORMAT  AAUDIO_FORMAT_PCM_I16
 #define REQUESTED_SHARING_MODE  AAUDIO_SHARING_MODE_SHARED
 //#define REQUESTED_SHARING_MODE  AAUDIO_SHARING_MODE_EXCLUSIVE
 
-static const char *getSharingModeText(aaudio_sharing_mode_t mode) {
-    const char *modeText = "unknown";
-    switch (mode) {
-    case AAUDIO_SHARING_MODE_EXCLUSIVE:
-        modeText = "EXCLUSIVE";
-        break;
-    case AAUDIO_SHARING_MODE_SHARED:
-        modeText = "SHARED";
-        break;
-    default:
-        break;
-    }
-    return modeText;
-}
-
-// TODO move to a common utility library
-static int64_t getNanoseconds(clockid_t clockId = CLOCK_MONOTONIC) {
-    struct timespec time;
-    int result = clock_gettime(clockId, &time);
-    if (result < 0) {
-        return -errno;
-    }
-    return (time.tv_sec * NANOS_PER_SECOND) + time.tv_nsec;
-}
 
 int main(int argc, char **argv)
 {
     (void)argc; // unused
 
+    AAudioSimplePlayer player;
+    SineThreadedData_t myData;
     aaudio_result_t result = AAUDIO_OK;
 
     const int requestedChannelCount = 2;
     int actualChannelCount = 0;
     const int requestedSampleRate = SAMPLE_RATE;
     int actualSampleRate = 0;
+    aaudio_audio_format_t requestedDataFormat = REQUESTED_FORMAT;
     aaudio_audio_format_t actualDataFormat = AAUDIO_FORMAT_UNSPECIFIED;
-
     aaudio_sharing_mode_t actualSharingMode = AAUDIO_SHARING_MODE_SHARED;
 
-    AAudioStreamBuilder *aaudioBuilder = nullptr;
     AAudioStream *aaudioStream = nullptr;
     aaudio_stream_state_t state = AAUDIO_STREAM_STATE_UNINITIALIZED;
     int32_t  framesPerBurst = 0;
@@ -83,36 +58,23 @@ int main(int argc, char **argv)
     float   *floatData = nullptr;
     int16_t *shortData = nullptr;
 
-    SineGenerator sineOsc1;
-    SineGenerator sineOsc2;
-
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
 
     printf("%s - Play a sine wave using AAudio\n", argv[0]);
 
-    // Use an AAudioStreamBuilder to contain requested parameters.
-    result = AAudio_createStreamBuilder(&aaudioBuilder);
+    player.setSharingMode(REQUESTED_SHARING_MODE);
+
+    result = player.open(requestedChannelCount, requestedSampleRate, requestedDataFormat,
+                         nullptr, nullptr, &myData);
     if (result != AAUDIO_OK) {
+        fprintf(stderr, "ERROR -  player.open() returned %d\n", result);
         goto finish;
     }
 
+    aaudioStream = player.getStream();
     // Request stream properties.
-    AAudioStreamBuilder_setSampleRate(aaudioBuilder, requestedSampleRate);
-    AAudioStreamBuilder_setChannelCount(aaudioBuilder, requestedChannelCount);
-    AAudioStreamBuilder_setFormat(aaudioBuilder, REQUESTED_FORMAT);
-    AAudioStreamBuilder_setSharingMode(aaudioBuilder, REQUESTED_SHARING_MODE);
-
-    AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, AAUDIO_PERFORMANCE_MODE_NONE);
-    //AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
-    //AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, AAUDIO_PERFORMANCE_MODE_POWER_SAVING);
-
-    // Create an AAudioStream using the Builder.
-    result = AAudioStreamBuilder_openStream(aaudioBuilder, &aaudioStream);
-    if (result != AAUDIO_OK) {
-        goto finish;
-    }
 
     state = AAudioStream_getState(aaudioStream);
     printf("after open, state = %s\n", AAudio_convertStreamStateToText(state));
@@ -121,8 +83,8 @@ int main(int argc, char **argv)
     actualSampleRate = AAudioStream_getSampleRate(aaudioStream);
     printf("SampleRate: requested = %d, actual = %d\n", requestedSampleRate, actualSampleRate);
 
-    sineOsc1.setup(440.0, actualSampleRate);
-    sineOsc2.setup(660.0, actualSampleRate);
+    myData.sineOsc1.setup(440.0, actualSampleRate);
+    myData.sineOsc2.setup(660.0, actualSampleRate);
 
     actualChannelCount = AAudioStream_getChannelCount(aaudioStream);
     printf("ChannelCount: requested = %d, actual = %d\n",
@@ -167,8 +129,8 @@ int main(int argc, char **argv)
     }
 
     // Start the stream.
-    printf("call AAudioStream_requestStart()\n");
-    result = AAudioStream_requestStart(aaudioStream);
+    printf("call player.start()\n");
+    result = player.start();
     if (result != AAUDIO_OK) {
         fprintf(stderr, "ERROR - AAudioStream_requestStart() returned %d\n", result);
         goto finish;
@@ -184,15 +146,15 @@ int main(int argc, char **argv)
 
         if (actualDataFormat == AAUDIO_FORMAT_PCM_FLOAT) {
             // Render sine waves to left and right channels.
-            sineOsc1.render(&floatData[0], actualChannelCount, framesPerWrite);
+            myData.sineOsc1.render(&floatData[0], actualChannelCount, framesPerWrite);
             if (actualChannelCount > 1) {
-                sineOsc2.render(&floatData[1], actualChannelCount, framesPerWrite);
+                myData.sineOsc2.render(&floatData[1], actualChannelCount, framesPerWrite);
             }
         } else if (actualDataFormat == AAUDIO_FORMAT_PCM_I16) {
             // Render sine waves to left and right channels.
-            sineOsc1.render(&shortData[0], actualChannelCount, framesPerWrite);
+            myData.sineOsc1.render(&shortData[0], actualChannelCount, framesPerWrite);
             if (actualChannelCount > 1) {
-                sineOsc2.render(&shortData[1], actualChannelCount, framesPerWrite);
+                myData.sineOsc2.render(&shortData[1], actualChannelCount, framesPerWrite);
             }
         }
 
@@ -240,11 +202,16 @@ int main(int argc, char **argv)
     xRunCount = AAudioStream_getXRunCount(aaudioStream);
     printf("AAudioStream_getXRunCount %d\n", xRunCount);
 
+    printf("call stop()\n");
+    result = player.stop();
+    if (result != AAUDIO_OK) {
+        goto finish;
+    }
+
 finish:
+    player.close();
     delete[] floatData;
     delete[] shortData;
-    AAudioStream_close(aaudioStream);
-    AAudioStreamBuilder_delete(aaudioBuilder);
     printf("exiting - AAudio result = %d = %s\n", result, AAudio_convertResultToText(result));
     return (result != AAUDIO_OK) ? EXIT_FAILURE : EXIT_SUCCESS;
 }

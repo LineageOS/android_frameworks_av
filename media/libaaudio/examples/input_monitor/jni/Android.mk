@@ -4,32 +4,30 @@ include $(CLEAR_VARS)
 LOCAL_MODULE_TAGS := tests
 LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils) \
-    frameworks/av/media/liboboe/include
+    frameworks/av/media/libaaudio/include \
+    frameworks/av/media/libaaudio/src \
+    frameworks/av/media/libaaudio/examples/utils
 
-LOCAL_SRC_FILES:= frameworks/av/media/liboboe/src/write_sine.cpp
-LOCAL_SHARED_LIBRARIES := libaudioutils libmedia libtinyalsa \
-        libbinder libcutils libutils
-LOCAL_STATIC_LIBRARIES := libsndfile
-LOCAL_MODULE := write_sine_ndk
-LOCAL_SHARED_LIBRARIES += liboboe_prebuilt
+# NDK recommends using this kind of relative path instead of an absolute path.
+LOCAL_SRC_FILES:= ../src/input_monitor.cpp
+LOCAL_SHARED_LIBRARIES := libaaudio
+LOCAL_MODULE := input_monitor_ndk
 include $(BUILD_EXECUTABLE)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE_TAGS := tests
 LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils) \
-    frameworks/av/media/liboboe/include
+    frameworks/av/media/libaaudio/include \
+    frameworks/av/media/libaaudio/examples/utils
 
-LOCAL_SRC_FILES:= frameworks/av/media/liboboe/src/write_sine_threaded.cpp
-LOCAL_SHARED_LIBRARIES := libaudioutils libmedia libtinyalsa \
-        libbinder libcutils libutils
-LOCAL_STATIC_LIBRARIES := libsndfile
-LOCAL_MODULE := write_sine_threaded_ndk
-LOCAL_SHARED_LIBRARIES += liboboe_prebuilt
+LOCAL_SRC_FILES:= ../src/input_monitor_callback.cpp
+LOCAL_SHARED_LIBRARIES := libaaudio
+LOCAL_MODULE := input_monitor_callback_ndk
 include $(BUILD_EXECUTABLE)
 
 include $(CLEAR_VARS)
-LOCAL_MODULE := liboboe_prebuilt
-LOCAL_SRC_FILES := liboboe.so
+LOCAL_MODULE := libaaudio_prebuilt
+LOCAL_SRC_FILES := libaaudio.so
 LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH)/include
 include $(PREBUILT_SHARED_LIBRARY)
