@@ -57,7 +57,7 @@ aaudio_data_callback_result_t MyDataCallbackProc(
 static void testOpenOptions(aaudio_direction_t direction,
                             int32_t channelCount,
                             int32_t sampleRate,
-                            aaudio_audio_format_t format) {
+                            aaudio_format_t format) {
 
     aaudio_result_t result = AAUDIO_OK;
 
@@ -66,7 +66,7 @@ static void testOpenOptions(aaudio_direction_t direction,
 
     int32_t actualChannelCount = 0;
     int32_t actualSampleRate = 0;
-    aaudio_audio_format_t actualDataFormat = AAUDIO_FORMAT_UNSPECIFIED;
+    aaudio_format_t actualDataFormat = AAUDIO_FORMAT_UNSPECIFIED;
     aaudio_sharing_mode_t actualSharingMode = AAUDIO_SHARING_MODE_SHARED;
     aaudio_direction_t actualDirection;
 
@@ -134,7 +134,8 @@ finish:
 //void foo() { // for tricking the Android Studio formatter
 TEST(test_open_params, aaudio_open_all) {
     aaudio_direction_t directions[] = {AAUDIO_DIRECTION_OUTPUT, AAUDIO_DIRECTION_INPUT};
-    aaudio_audio_format_t formats[] = {AAUDIO_FORMAT_UNSPECIFIED, AAUDIO_FORMAT_PCM_I16, AAUDIO_FORMAT_PCM_FLOAT};
+    aaudio_format_t formats[] = {AAUDIO_FORMAT_UNSPECIFIED,
+                                 AAUDIO_FORMAT_PCM_I16, AAUDIO_FORMAT_PCM_FLOAT};
     int32_t rates[] = {AAUDIO_UNSPECIFIED, 22050, 32000, 44100, 48000, 88200, 96000, 37913, 59132};
 
     // Make printf print immediately so that debug info is not stuck

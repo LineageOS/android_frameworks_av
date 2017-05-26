@@ -58,12 +58,6 @@ enum {
 };
 typedef int32_t aaudio_format_t;
 
-/**
- * @deprecated use aaudio_format_t instead
- * TODO remove when tests and examples are updated
- */
-typedef int32_t aaudio_audio_format_t;
-
 enum {
     AAUDIO_OK,
     AAUDIO_ERROR_BASE = -900, // TODO review
@@ -263,7 +257,7 @@ AAUDIO_API void AAudioStreamBuilder_setSamplesPerFrame(AAudioStreamBuilder* buil
  * @param format common formats are AAUDIO_FORMAT_PCM_FLOAT and AAUDIO_FORMAT_PCM_I16.
  */
 AAUDIO_API void AAudioStreamBuilder_setFormat(AAudioStreamBuilder* builder,
-                                                   aaudio_audio_format_t format);
+                                                   aaudio_format_t format);
 
 /**
  * Request a mode for sharing the device.
@@ -754,7 +748,7 @@ AAUDIO_API int32_t AAudioStream_getDeviceId(AAudioStream* stream);
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return actual data format
  */
-AAUDIO_API aaudio_audio_format_t AAudioStream_getFormat(AAudioStream* stream);
+AAUDIO_API aaudio_format_t AAudioStream_getFormat(AAudioStream* stream);
 
 /**
  * Provide actual sharing mode.

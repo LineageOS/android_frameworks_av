@@ -124,7 +124,7 @@ protected:
     // Calculate timeout for an operation involving framesPerOperation.
     int64_t calculateReasonableTimeout(int32_t framesPerOperation);
 
-    aaudio_audio_format_t    mDeviceFormat = AAUDIO_FORMAT_UNSPECIFIED;
+    aaudio_format_t          mDeviceFormat = AAUDIO_FORMAT_UNSPECIFIED;
 
     IsochronousClockModel    mClockModel;      // timing model for chasing the HAL
 

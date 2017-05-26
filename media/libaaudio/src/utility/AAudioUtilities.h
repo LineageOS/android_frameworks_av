@@ -161,14 +161,14 @@ int32_t AAudioConvert_framesToBytes(int32_t numFrames,
                                             int32_t bytesPerFrame,
                                             int32_t *sizeInBytes);
 
-audio_format_t AAudioConvert_aaudioToAndroidDataFormat(aaudio_audio_format_t aaudio_format);
+audio_format_t AAudioConvert_aaudioToAndroidDataFormat(aaudio_format_t aaudio_format);
 
-aaudio_audio_format_t AAudioConvert_androidToAAudioDataFormat(audio_format_t format);
+aaudio_format_t AAudioConvert_androidToAAudioDataFormat(audio_format_t format);
 
 /**
  * @return the size of a sample of the given format in bytes or AAUDIO_ERROR_ILLEGAL_ARGUMENT
  */
-int32_t AAudioConvert_formatToSizeInBytes(aaudio_audio_format_t format);
+int32_t AAudioConvert_formatToSizeInBytes(aaudio_format_t format);
 
 
 // Note that this code may be replaced by Settings or by some other system configuration tool.
