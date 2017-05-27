@@ -155,10 +155,6 @@ private:
     // Adjust timing model based on timestamp from service.
     void processTimestamp(uint64_t position, int64_t time);
 
-    const char *getLocationName() const {
-        return mInService ? "SERVICE" : "CLIENT";
-    }
-
     AudioEndpointParcelable  mEndPointParcelable; // description of the buffers filled by service
     EndpointDescriptor       mEndpointDescriptor; // buffer description with resolved addresses
     AAudioServiceInterface  &mServiceInterface;   // abstract interface to the service

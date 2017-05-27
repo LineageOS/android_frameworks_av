@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AudioStreamRecord"
+#define LOG_TAG "AAudio"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -96,6 +96,8 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     }
     mCallbackBufferSize = builder.getFramesPerDataCallback();
 
+    ALOGD("AudioStreamRecord::open(), request notificationFrames = %u, frameCount = %u",
+          notificationFrames, (uint)frameCount);
     mAudioRecord = new AudioRecord(
             AUDIO_SOURCE_VOICE_RECOGNITION,
             getSampleRate(),
@@ -124,8 +126,13 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
 
     // Get the actual rate.
     setSampleRate(mAudioRecord->getSampleRate());
-    setSamplesPerFrame(mAudioRecord->channelCount());
     setFormat(AAudioConvert_androidToAAudioDataFormat(mAudioRecord->format()));
+
+    int32_t actualSampleRate = mAudioRecord->getSampleRate();
+    ALOGW_IF(actualSampleRate != getSampleRate(),
+             "AudioStreamRecord::open() sampleRate changed from %d to %d",
+             getSampleRate(), actualSampleRate);
+    setSampleRate(actualSampleRate);
 
     // We may need to pass the data through a block size adapter to guarantee constant size.
     if (mCallbackBufferSize != AAUDIO_UNSPECIFIED) {
@@ -171,8 +178,6 @@ aaudio_result_t AudioStreamRecord::close()
 }
 
 void AudioStreamRecord::processCallback(int event, void *info) {
-
-    ALOGD("AudioStreamRecord::processCallback(), event %d", event);
     switch (event) {
         case AudioRecord::EVENT_MORE_DATA:
             processCallbackCommon(AAUDIO_CALLBACK_OPERATION_PROCESS_DATA, info);
