@@ -59,7 +59,6 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
     int32_t deviceId = configurationInput.getDeviceId();
     aaudio_direction_t direction = request.getDirection();
 
-    ALOGD("AAudioServiceStreamShared::open(), direction = %d", direction);
     AAudioEndpointManager &mEndpointManager = AAudioEndpointManager::getInstance();
     mServiceEndpoint = mEndpointManager.openEndpoint(mAudioService, deviceId, direction);
     if (mServiceEndpoint == nullptr) {
