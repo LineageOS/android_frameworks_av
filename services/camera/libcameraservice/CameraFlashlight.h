@@ -100,6 +100,19 @@ class CameraFlashlight : public virtual VirtualLightRefBase {
 };
 
 /**
+ * Flash control via sysfs
+ */
+class SysFsFlashControl : public FlashControlBase {
+    public:
+        SysFsFlashControl();
+        virtual ~SysFsFlashControl();
+
+        // FlashControlBase
+        status_t hasFlashUnit(const String8& cameraId, bool *hasFlash);
+        status_t setTorchMode(const String8& cameraId, bool enabled);
+};
+
+/**
  * Flash control for camera module v2.4 and above.
  */
 class ModuleFlashControl : public FlashControlBase {

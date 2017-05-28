@@ -55,42 +55,52 @@ status_t CameraFlashlight::createFlashlightControl(const String8& cameraId) {
 
     status_t res = OK;
 
-    if (mCameraModule->getModuleApiVersion() >= CAMERA_MODULE_API_VERSION_2_4) {
-        mFlashControl = new ModuleFlashControl(*mCameraModule, *mCallbacks);
+    /* TODO: Make this configurable */
+    if (1) {
+        mFlashControl = new SysFsFlashControl();
         if (mFlashControl == NULL) {
-            ALOGV("%s: cannot create flash control for module api v2.4+",
+            ALOGV("%s: cannot create flash control via syfs",
                      __FUNCTION__);
             return NO_MEMORY;
         }
     } else {
-        uint32_t deviceVersion = CAMERA_DEVICE_API_VERSION_1_0;
-
-        if (mCameraModule->getModuleApiVersion() >=
-                    CAMERA_MODULE_API_VERSION_2_0) {
-            camera_info info;
-            res = mCameraModule->getCameraInfo(
-                    atoi(String8(cameraId).string()), &info);
-            if (res) {
-                ALOGE("%s: failed to get camera info for camera %s",
-                        __FUNCTION__, cameraId.string());
-                return res;
-            }
-            deviceVersion = info.device_version;
-        }
-
-        if (deviceVersion >= CAMERA_DEVICE_API_VERSION_3_0) {
-            CameraDeviceClientFlashControl *flashControl =
-                    new CameraDeviceClientFlashControl(*mCameraModule,
-                                                       *mCallbacks);
-            if (!flashControl) {
+        if (mCameraModule->getModuleApiVersion() >= CAMERA_MODULE_API_VERSION_2_4) {
+            mFlashControl = new ModuleFlashControl(*mCameraModule, *mCallbacks);
+            if (mFlashControl == NULL) {
+                ALOGV("%s: cannot create flash control for module api v2.4+",
+                         __FUNCTION__);
                 return NO_MEMORY;
             }
-
-            mFlashControl = flashControl;
         } else {
-            mFlashControl =
-                    new CameraHardwareInterfaceFlashControl(*mCameraModule,
-                                                            *mCallbacks);
+            uint32_t deviceVersion = CAMERA_DEVICE_API_VERSION_1_0;
+
+            if (mCameraModule->getModuleApiVersion() >=
+                        CAMERA_MODULE_API_VERSION_2_0) {
+                camera_info info;
+                res = mCameraModule->getCameraInfo(
+                        atoi(String8(cameraId).string()), &info);
+                if (res) {
+                    ALOGE("%s: failed to get camera info for camera %s",
+                            __FUNCTION__, cameraId.string());
+                    return res;
+                }
+                deviceVersion = info.device_version;
+            }
+
+            if (deviceVersion >= CAMERA_DEVICE_API_VERSION_3_0) {
+                CameraDeviceClientFlashControl *flashControl =
+                        new CameraDeviceClientFlashControl(*mCameraModule,
+                                                           *mCallbacks);
+                if (!flashControl) {
+                    return NO_MEMORY;
+                }
+
+                mFlashControl = flashControl;
+            } else {
+                mFlashControl =
+                        new CameraHardwareInterfaceFlashControl(*mCameraModule,
+                                                                *mCallbacks);
+            }
         }
     }
 
@@ -293,6 +303,82 @@ status_t CameraFlashlight::deviceClosed(const String8& cameraId) {
 
 FlashControlBase::~FlashControlBase() {
 }
+
+/////////////////////////////////////////////////////////////////////
+// SysFsFlashControl implementation begins
+// Flash control via sysfs
+/////////////////////////////////////////////////////////////////////
+
+// TODO: Make this configurable
+#ifndef SYSFS_FLASH_BRIGHTNESS_OFF
+#define SYSFS_FLASH_BRIGHTNESS_OFF 0
+#endif
+
+#ifndef SYSFS_FLASH_BRIGHTNESS_ON
+#define SYSFS_FLASH_BRIGHTNESS_ON 100
+#endif
+
+#ifndef SYSFS_FLASH_PATH_BRIGHTNESS
+#define SYSFS_FLASH_PATH_BRIGHTNESS "/sys/class/leds/led:switch/brightness"
+#endif
+
+SysFsFlashControl::SysFsFlashControl() {
+}
+
+SysFsFlashControl::~SysFsFlashControl() {
+}
+
+status_t SysFsFlashControl::hasFlashUnit(__attribute__((unused)) const String8& cameraId, bool *hasFlash) {
+    if (!hasFlash) {
+        return BAD_VALUE;
+    }
+
+    *hasFlash = false;
+
+    if (access(SYSFS_FLASH_PATH_BRIGHTNESS, W_OK)) {
+        ALOGD("%s: has flash unit via sysfs", __FUNCTION__);
+        *hasFlash = true;
+        return OK;
+    }
+
+    ALOGE("%s: access denied!", __FUNCTION__);
+    return -ENOSYS;
+}
+
+status_t SysFsFlashControl::setTorchMode(const String8& cameraId, bool enabled) {
+    ALOGD("%s: set camera %s torch mode to %d", __FUNCTION__,
+            cameraId.string(), enabled);
+    int fd, rc;
+    char buffer[16];
+
+    fd = open(SYSFS_FLASH_PATH_BRIGHTNESS, O_RDWR);
+    if (fd < 0) {
+        ALOGE("%s: failed to open '%s'\n", __FUNCTION__, SYSFS_FLASH_PATH_BRIGHTNESS);
+        return -EBADF;
+    }
+
+    if (enabled) {
+        ALOGE("%s: enabling flash unit via sysfs\n", __FUNCTION__);
+        int bytes = snprintf(buffer, sizeof(buffer), "%d\n", SYSFS_FLASH_BRIGHTNESS_ON);
+        rc = write(fd, buffer, (size_t)bytes);
+        if (rc) {
+            ALOGE("%s: failed to write to '%s'\n", __FUNCTION__, SYSFS_FLASH_PATH_BRIGHTNESS);
+            return -EBADFD;
+        }
+    } else {
+        ALOGE("%s: disabling flash unit via sysfs\n", __FUNCTION__);
+        int bytes = snprintf(buffer, sizeof(buffer), "%d\n", SYSFS_FLASH_BRIGHTNESS_OFF);
+        rc = write(fd, buffer, (size_t)bytes);
+        if (rc) {
+            ALOGE("%s: failed to write to '%s'\n", __FUNCTION__, SYSFS_FLASH_PATH_BRIGHTNESS);
+            return -EBADFD;
+        }
+    }
+    close(fd);
+
+    return OK;
+}
+// SysFsFlashControl implementation ends
 
 /////////////////////////////////////////////////////////////////////
 // ModuleFlashControl implementation begins
