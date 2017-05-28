@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudio"
+// This file is used in both client and server processes.
+// This is needed to make sense of the logs more easily.
+#define LOG_TAG (mInService ? "AAudioService" : "AAudio")
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -51,11 +53,6 @@ using namespace aaudio;
 
 // Wait at least this many times longer than the operation should take.
 #define MIN_TIMEOUT_OPERATIONS    4
-
-//static int64_t s_logCounter = 0;
-//#define MYLOG_CONDITION   (mInService == true && s_logCounter++ < 500)
-//#define MYLOG_CONDITION   (s_logCounter++ < 500000)
-#define MYLOG_CONDITION   (1)
 
 #define LOG_TIMESTAMPS   0
 
@@ -106,7 +103,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     mServiceStreamHandle = mServiceInterface.openStream(request, configuration);
     if (mServiceStreamHandle < 0) {
         result = mServiceStreamHandle;
-        ALOGE("AudioStreamInternal.open(): %s openStream() returned %d", getLocationName(), result);
+        ALOGE("AudioStreamInternal.open(): openStream() returned %d", result);
     } else {
         result = configuration.validate();
         if (result != AAUDIO_OK) {
@@ -123,8 +120,6 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 
         result = mServiceInterface.getStreamDescription(mServiceStreamHandle, mEndPointParcelable);
         if (result != AAUDIO_OK) {
-            ALOGE("AudioStreamInternal.open(): %s getStreamDescriptor returns %d",
-                  getLocationName(), result);
             mServiceInterface.closeStream(mServiceStreamHandle);
             return result;
         }
@@ -132,7 +127,6 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         // resolve parcelable into a descriptor
         result = mEndPointParcelable.resolve(&mEndpointDescriptor);
         if (result != AAUDIO_OK) {
-            ALOGE("AudioStreamInternal.open(): resolve() returns %d", result);
             mServiceInterface.closeStream(mServiceStreamHandle);
             return result;
         }
@@ -143,8 +137,6 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         mFramesPerBurst = mEndpointDescriptor.dataQueueDescriptor.framesPerBurst;
         int32_t capacity = mEndpointDescriptor.dataQueueDescriptor.capacityInFrames;
 
-        ALOGD_IF(MYLOG_CONDITION, "AudioStreamInternal.open() %s framesPerBurst = %d, capacity = %d",
-                 getLocationName(), mFramesPerBurst, capacity);
         // Validate result from server.
         if (mFramesPerBurst < 16 || mFramesPerBurst > 16 * 1024) {
             ALOGE("AudioStream::open(): framesPerBurst out of range = %d", mFramesPerBurst);
@@ -188,7 +180,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 }
 
 aaudio_result_t AudioStreamInternal::close() {
-    ALOGD_IF(MYLOG_CONDITION, "AudioStreamInternal.close(): mServiceStreamHandle = 0x%08X",
+    ALOGD("AudioStreamInternal.close(): mServiceStreamHandle = 0x%08X",
              mServiceStreamHandle);
     if (mServiceStreamHandle != AAUDIO_HANDLE_INVALID) {
         // Don't close a stream while it is running.
@@ -231,7 +223,7 @@ static void *aaudio_callback_thread_proc(void *context)
 aaudio_result_t AudioStreamInternal::requestStart()
 {
     int64_t startTime;
-    ALOGD_IF(MYLOG_CONDITION, "AudioStreamInternal(): start()");
+    ALOGD("AudioStreamInternal(): start()");
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
         return AAUDIO_ERROR_INVALID_STATE;
     }
@@ -294,18 +286,15 @@ aaudio_result_t AudioStreamInternal::requestPauseInternal()
 
 aaudio_result_t AudioStreamInternal::requestPause()
 {
-    ALOGD_IF(MYLOG_CONDITION, "AudioStreamInternal(): %s requestPause()", getLocationName());
     aaudio_result_t result = stopCallback();
     if (result != AAUDIO_OK) {
         return result;
     }
     result = requestPauseInternal();
-    ALOGD("AudioStreamInternal(): requestPause() returns %d", result);
     return result;
 }
 
 aaudio_result_t AudioStreamInternal::requestFlush() {
-    ALOGD_IF(MYLOG_CONDITION, "AudioStreamInternal(): requestFlush()");
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
         ALOGE("AudioStreamInternal(): requestFlush() mServiceStreamHandle invalid = 0x%08X",
               mServiceStreamHandle);
@@ -318,7 +307,7 @@ aaudio_result_t AudioStreamInternal::requestFlush() {
 
 // TODO for Play only
 void AudioStreamInternal::onFlushFromServer() {
-    ALOGD_IF(MYLOG_CONDITION, "AudioStreamInternal(): onFlushFromServer()");
+    ALOGD("AudioStreamInternal(): onFlushFromServer()");
     int64_t readCounter = mAudioEndpoint.getDataReadCounter();
     int64_t writeCounter = mAudioEndpoint.getDataWriteCounter();
 
@@ -346,13 +335,11 @@ aaudio_result_t AudioStreamInternal::requestStopInternal()
 
 aaudio_result_t AudioStreamInternal::requestStop()
 {
-    ALOGD_IF(MYLOG_CONDITION, "AudioStreamInternal(): %s requestStop()", getLocationName());
     aaudio_result_t result = stopCallback();
     if (result != AAUDIO_OK) {
         return result;
     }
     result = requestStopInternal();
-    ALOGD("AudioStreamInternal(): requestStop() returns %d", result);
     return result;
 }
 
@@ -397,16 +384,16 @@ static void AudioStreamInternal_logTimestamp(AAudioServiceMessage &command) {
     static int64_t oldTime = 0;
     int64_t framePosition = command.timestamp.position;
     int64_t nanoTime = command.timestamp.timestamp;
-    ALOGD_IF(MYLOG_CONDITION, "AudioStreamInternal() timestamp says framePosition = %08lld at nanoTime %llu",
+    ALOGD("AudioStreamInternal() timestamp says framePosition = %08lld at nanoTime %lld",
          (long long) framePosition,
          (long long) nanoTime);
     int64_t nanosDelta = nanoTime - oldTime;
     if (nanosDelta > 0 && oldTime > 0) {
         int64_t framesDelta = framePosition - oldPosition;
         int64_t rate = (framesDelta * AAUDIO_NANOS_PER_SECOND) / nanosDelta;
-        ALOGD_IF(MYLOG_CONDITION, "AudioStreamInternal() - framesDelta = %08lld", (long long) framesDelta);
-        ALOGD_IF(MYLOG_CONDITION, "AudioStreamInternal() - nanosDelta = %08lld", (long long) nanosDelta);
-        ALOGD_IF(MYLOG_CONDITION, "AudioStreamInternal() - measured rate = %llu", (unsigned long long) rate);
+        ALOGD("AudioStreamInternal() - framesDelta = %08lld", (long long) framesDelta);
+        ALOGD("AudioStreamInternal() - nanosDelta = %08lld", (long long) nanosDelta);
+        ALOGD("AudioStreamInternal() - measured rate = %lld", (long long) rate);
     }
     oldPosition = framePosition;
     oldTime = nanoTime;
@@ -423,35 +410,34 @@ aaudio_result_t AudioStreamInternal::onTimestampFromServer(AAudioServiceMessage 
 
 aaudio_result_t AudioStreamInternal::onEventFromServer(AAudioServiceMessage *message) {
     aaudio_result_t result = AAUDIO_OK;
-    ALOGD_IF(MYLOG_CONDITION, "processCommands() got event %d", message->event.event);
     switch (message->event.event) {
         case AAUDIO_SERVICE_EVENT_STARTED:
-            ALOGD_IF(MYLOG_CONDITION, "processCommands() got AAUDIO_SERVICE_EVENT_STARTED");
+            ALOGD("processCommands() got AAUDIO_SERVICE_EVENT_STARTED");
             if (getState() == AAUDIO_STREAM_STATE_STARTING) {
                 setState(AAUDIO_STREAM_STATE_STARTED);
             }
             break;
         case AAUDIO_SERVICE_EVENT_PAUSED:
-            ALOGD_IF(MYLOG_CONDITION, "processCommands() got AAUDIO_SERVICE_EVENT_PAUSED");
+            ALOGD("processCommands() got AAUDIO_SERVICE_EVENT_PAUSED");
             if (getState() == AAUDIO_STREAM_STATE_PAUSING) {
                 setState(AAUDIO_STREAM_STATE_PAUSED);
             }
             break;
         case AAUDIO_SERVICE_EVENT_STOPPED:
-            ALOGD_IF(MYLOG_CONDITION, "processCommands() got AAUDIO_SERVICE_EVENT_STOPPED");
+            ALOGD("processCommands() got AAUDIO_SERVICE_EVENT_STOPPED");
             if (getState() == AAUDIO_STREAM_STATE_STOPPING) {
                 setState(AAUDIO_STREAM_STATE_STOPPED);
             }
             break;
         case AAUDIO_SERVICE_EVENT_FLUSHED:
-            ALOGD_IF(MYLOG_CONDITION, "processCommands() got AAUDIO_SERVICE_EVENT_FLUSHED");
+            ALOGD("processCommands() got AAUDIO_SERVICE_EVENT_FLUSHED");
             if (getState() == AAUDIO_STREAM_STATE_FLUSHING) {
                 setState(AAUDIO_STREAM_STATE_FLUSHED);
                 onFlushFromServer();
             }
             break;
         case AAUDIO_SERVICE_EVENT_CLOSED:
-            ALOGD_IF(MYLOG_CONDITION, "processCommands() got AAUDIO_SERVICE_EVENT_CLOSED");
+            ALOGD("processCommands() got AAUDIO_SERVICE_EVENT_CLOSED");
             setState(AAUDIO_STREAM_STATE_CLOSED);
             break;
         case AAUDIO_SERVICE_EVENT_DISCONNECTED:
@@ -461,7 +447,7 @@ aaudio_result_t AudioStreamInternal::onEventFromServer(AAudioServiceMessage *mes
             break;
         case AAUDIO_SERVICE_EVENT_VOLUME:
             mVolumeRamp.setTarget((float) message->event.dataDouble);
-            ALOGD_IF(MYLOG_CONDITION, "processCommands() AAUDIO_SERVICE_EVENT_VOLUME %f",
+            ALOGD("processCommands() AAUDIO_SERVICE_EVENT_VOLUME %lf",
                      message->event.dataDouble);
             break;
         default:
@@ -477,7 +463,7 @@ aaudio_result_t AudioStreamInternal::processCommands() {
     aaudio_result_t result = AAUDIO_OK;
 
     while (result == AAUDIO_OK) {
-        //ALOGD_IF(MYLOG_CONDITION, "AudioStreamInternal::processCommands() - looping, %d", result);
+        //ALOGD("AudioStreamInternal::processCommands() - looping, %d", result);
         AAudioServiceMessage message;
         if (mAudioEndpoint.readUpCommand(&message) != 1) {
             break; // no command this time, no problem
@@ -544,19 +530,17 @@ aaudio_result_t AudioStreamInternal::processData(void *buffer, int32_t numFrames
             }
             if (wakeTimeNanos > deadlineNanos) {
                 // If we time out, just return the framesWritten so far.
+                // TODO remove after we fix the deadline bug
                 ALOGE("AudioStreamInternal::processData(): timed out after %lld nanos",
                       (long long) timeoutNanoseconds);
                 ALOGE("AudioStreamInternal::processData(): wakeTime = %lld, deadline = %lld nanos",
                       (long long) wakeTimeNanos, (long long) deadlineNanos);
                 ALOGE("AudioStreamInternal::processData(): past deadline by %d micros",
                       (int)((wakeTimeNanos - deadlineNanos) / AAUDIO_NANOS_PER_MICROSECOND));
-
                 break;
             }
 
             int64_t sleepForNanos = wakeTimeNanos - currentTimeNanos;
-            //ALOGE("AudioStreamInternal::processData(): sleep for %d micros",
-            //      (int)(sleepForNanos / AAUDIO_NANOS_PER_MICROSECOND));
             AudioClock::sleepForNanos(sleepForNanos);
             currentTimeNanos = AudioClock::getNanoseconds();
         }
@@ -581,8 +565,7 @@ aaudio_result_t AudioStreamInternal::setBufferSize(int32_t requestedFrames) {
     }
 
     aaudio_result_t result = mAudioEndpoint.setBufferSizeInFrames(requestedFrames, &actualFrames);
-    ALOGD_IF(MYLOG_CONDITION, "AudioStreamInternal::setBufferSize() %s req = %d => %d",
-             getLocationName(), requestedFrames, actualFrames);
+    ALOGD("AudioStreamInternal::setBufferSize() req = %d => %d", requestedFrames, actualFrames);
     if (result < 0) {
         return result;
     } else {

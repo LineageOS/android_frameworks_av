@@ -41,7 +41,6 @@ AAudioServiceEndpoint *AAudioEndpointManager::openEndpoint(AAudioService &audioS
     std::lock_guard<std::mutex> lock(mLock);
 
     // Try to find an existing endpoint.
-    ALOGD("AAudioEndpointManager::openEndpoint(), device = %d, dir = %d", deviceId, direction);
     switch (direction) {
         case AAUDIO_DIRECTION_INPUT:
             endpoint = mInputs[deviceId];
@@ -53,7 +52,8 @@ AAudioServiceEndpoint *AAudioEndpointManager::openEndpoint(AAudioService &audioS
             assert(false); // There are only two possible directions.
             break;
     }
-    ALOGD("AAudioEndpointManager::openEndpoint(), found %p", endpoint);
+    ALOGD("AAudioEndpointManager::openEndpoint(), found %p for device = %d, dir = %d",
+          endpoint, deviceId, (int)direction);
 
     // If we can't find an existing one then open a new one.
     if (endpoint == nullptr) {

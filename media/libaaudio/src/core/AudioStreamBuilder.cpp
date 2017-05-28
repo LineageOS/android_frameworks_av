@@ -84,8 +84,6 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
 
     int32_t mmapEnabled = AAudioProperty_getMMapEnabled();
     int32_t mmapExclusiveEnabled = AAudioProperty_getMMapExclusiveEnabled();
-    ALOGD("AudioStreamBuilder(): mmapEnabled = %d, mmapExclusiveEnabled = %d",
-          mmapEnabled, mmapExclusiveEnabled);
 
     aaudio_sharing_mode_t sharingMode = getSharingMode();
     if ((sharingMode == AAUDIO_SHARING_MODE_EXCLUSIVE)
@@ -127,6 +125,5 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
         }
     }
 
-    ALOGD("AudioStreamBuilder(): returned %d", result);
     return result;
 }

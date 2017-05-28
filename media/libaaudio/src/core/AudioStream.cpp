@@ -55,9 +55,12 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     mDataCallbackUserData = builder.getDataCallbackUserData();
     mErrorCallbackUserData = builder.getErrorCallbackUserData();
 
-    // This is very helpful for debugging in the future.
-    ALOGI("AudioStream.open(): rate = %d, channels = %d, format = %d, sharing = %d",
-          mSampleRate, mSamplesPerFrame, mFormat, mSharingMode);
+    // This is very helpful for debugging in the future. Please leave it in.
+    ALOGI("AudioStream::open() rate = %d, channels = %d, format = %d, sharing = %d, dir = %s",
+          mSampleRate, mSamplesPerFrame, mFormat, mSharingMode,
+          (getDirection() == AAUDIO_DIRECTION_OUTPUT) ? "OUTPUT" : "INPUT");
+    ALOGI("AudioStream::open() device = %d, perfMode = %d, callbackFrames = %d",
+          mDeviceId, mPerformanceMode, mFramesPerDataCallback);
 
     // Check for values that are ridiculously out of range to prevent math overflow exploits.
     // The service will do a better check.

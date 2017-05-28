@@ -250,9 +250,13 @@ status_t CameraService::enumerateProviders() {
             conflicting.emplace(String8(cost.conflictingDevices[i].c_str()));
         }
 
-        Mutex::Autolock lock(mCameraStatesLock);
-        mCameraStates.emplace(id8,
-            std::make_shared<CameraState>(id8, cost.resourceCost, conflicting));
+        {
+            Mutex::Autolock lock(mCameraStatesLock);
+            mCameraStates.emplace(id8,
+                std::make_shared<CameraState>(id8, cost.resourceCost, conflicting));
+        }
+
+        onDeviceStatusChanged(id8, CameraDeviceStatus::PRESENT);
 
         if (mFlashlight->hasFlashUnit(id8)) {
             mTorchStatusMap.add(id8, TorchModeStatus::AVAILABLE_OFF);
@@ -301,7 +305,12 @@ void CameraService::onDeviceStatusChanged(const String8& id,
     std::shared_ptr<CameraState> state = getCameraState(id);
 
     if (state == nullptr) {
-        ALOGE("%s: Bad camera ID %s", __FUNCTION__, id.string());
+        if (newStatus == StatusInternal::PRESENT) {
+            ALOGW("%s: Unknown camera ID %s, probably newly registered?",
+                    __FUNCTION__, id.string());
+        } else {
+            ALOGE("%s: Bad camera ID %s", __FUNCTION__, id.string());
+        }
         return;
     }
 
