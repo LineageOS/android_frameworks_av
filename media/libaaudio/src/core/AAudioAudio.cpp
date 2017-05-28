@@ -206,11 +206,12 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_openStream(AAudioStreamBuilder* 
                                                      AAudioStream** streamPtr)
 {
     AudioStream *audioStream = nullptr;
-    ALOGD("AAudioStreamBuilder_openStream() ----------------------------------------------");
+    // Please leave these logs because they are very helpful when debugging.
+    ALOGD("AAudioStreamBuilder_openStream() called ----------------------------------------");
     AudioStreamBuilder *streamBuilder = COMMON_GET_FROM_BUILDER_OR_RETURN(streamPtr);
     aaudio_result_t result = streamBuilder->build(&audioStream);
-    ALOGD("AAudioStreamBuilder_openStream() returns %d -----------------------------------",
-          result);
+    ALOGD("AAudioStreamBuilder_openStream() returns %d = %s for (%p) ----------------",
+          result, AAudio_convertResultToText(result), audioStream);
     if (result == AAUDIO_OK) {
         *streamPtr = (AAudioStream*) audioStream;
     } else {
@@ -236,7 +237,6 @@ AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream)
     if (audioStream != nullptr) {
         audioStream->close();
         delete audioStream;
-        ALOGD("AAudioStream_close() ----------------------------------------------");
         return AAUDIO_OK;
     }
     return AAUDIO_ERROR_INVALID_HANDLE;
@@ -300,7 +300,6 @@ AAUDIO_API aaudio_result_t AAudioStream_read(AAudioStream* stream,
     }
 
     aaudio_result_t result = audioStream->read(buffer, numFrames, timeoutNanoseconds);
-    // ALOGD("AAudioStream_read(): read returns %d", result);
 
     return result;
 }
@@ -328,7 +327,6 @@ AAUDIO_API aaudio_result_t AAudioStream_write(AAudioStream* stream,
     }
 
     aaudio_result_t result = audioStream->write(buffer, numFrames, timeoutNanoseconds);
-    // ALOGD("AAudioStream_write(): write returns %d", result);
 
     return result;
 }

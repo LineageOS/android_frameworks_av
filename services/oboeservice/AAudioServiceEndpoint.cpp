@@ -122,10 +122,8 @@ aaudio_result_t AAudioServiceEndpoint::startSharingThread_l() {
 }
 
 aaudio_result_t AAudioServiceEndpoint::stopSharingThread() {
-    ALOGD("AAudioServiceEndpoint(): call joinThread()");
     mCallbackEnabled.store(false);
     aaudio_result_t result = getStreamInternal()->joinThread(NULL);
-    ALOGD("AAudioServiceEndpoint(): joinThread() returned %d", result);
     return result;
 }
 
