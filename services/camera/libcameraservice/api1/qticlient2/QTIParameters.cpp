@@ -140,6 +140,20 @@ const char KEY_QTI_REDEYE_REDUCTION[] = "redeye-reduction";
 //face-detection
 const char  KEY_QTI_FACE_DETECTION_MODES[] = "face-detection-values";
 
+//Video-HDR
+const char KEY_QTI_VENDOR_VIDEO_HDR_MODES[] =
+        "org.codeaurora.qcamera3.video_hdr_mode.vhdr_supported_modes";
+const char KEY_QTI_VENDOR_VIDEO_HDR_MODE[] =
+        "org.codeaurora.qcamera3.video_hdr_mode.vhdr_mode";
+const char KEY_QTI_VIDEO_HDR[] = "video-hdr";
+const char KEY_QTI_SUPPORTED_VIDEO_HDR_MODES[] = "video-hdr-values";
+
+//Sensor-HDR
+const char KEY_SNAPCAM_SUPPORTED_HDR_MODES[] = "hdr-mode-values";
+const char HDR_MODE_SENSOR[] = "hdr-mode-sensor";
+const char HDR_MODE_MULTIFRAME[] = "hdr-mode-multiframe";
+const char KEY_SNAPCAM_HDR_MODE[] = "hdr-mode";
+
 camera_metadata_ro_entry_t g_availableSensitivityRange;
 double minExposureTime;
 double maxExposureTime;
@@ -211,6 +225,25 @@ status_t QTIParameters::initialize(void *parametersParent,
     ParentParams->params.set(KEY_QTI_HDR_NEED_1X,"false");
     Hdr1xEnable = false;
     HdrSceneEnable = false;
+
+    //Video-Hdr, Sensor-Hdr
+    res = CameraMetadata::getTagFromName(KEY_QTI_VENDOR_VIDEO_HDR_MODES, vTags.get(), &tag);
+    camera_metadata_ro_entry_t availableVideoHdrModes = ParentParams->staticInfo(tag);
+    if (availableVideoHdrModes.count == 2) {
+        String8 supportedVideoHdrModes(VALUE_OFF);
+        supportedVideoHdrModes += ",";
+        supportedVideoHdrModes += VALUE_ON;
+
+        ParentParams->params.set(KEY_QTI_SUPPORTED_VIDEO_HDR_MODES,
+                supportedVideoHdrModes);
+        ParentParams->params.set(KEY_QTI_VIDEO_HDR,VALUE_OFF);
+
+        String8 supportedSnapHdrModes(HDR_MODE_SENSOR);
+        supportedSnapHdrModes += ",";
+        supportedSnapHdrModes += HDR_MODE_MULTIFRAME;
+        ParentParams->params.set(KEY_SNAPCAM_SUPPORTED_HDR_MODES,
+                supportedSnapHdrModes);
+    }
 
     // ISO
     // Get the supported sensitivity range from device3 static info
@@ -492,6 +525,30 @@ status_t QTIParameters::set(CameraParameters2& newParams, void *parametersParent
     char prop[PROPERTY_VALUE_MAX];
     Parameters* ParentParams = (Parameters*)parametersParent;
 
+    //Video-Hdr
+    const char *videoHdrMode = newParams.get(KEY_QTI_VIDEO_HDR);
+    int32_t vidHDR = 0;
+    if(videoHdrMode) {
+        if (!strcmp(videoHdrMode, VALUE_OFF)) {
+            vidHDR = 0;
+        } else {
+            vidHDR = 1;
+        }
+    }
+    //Sensor-HDR
+    const char *HdrMode = newParams.get(KEY_SNAPCAM_HDR_MODE);
+    int32_t sensHDR = 0;
+    if(HdrMode) {
+        if(!strcmp(HdrMode,"hdr-mode-sensor")) {
+            sensHDR = 1;
+        }
+        if(!strcmp(HdrMode,"hdr-mode-multiframe")) {
+            sensHDR = 0;
+        }
+    }
+    prevVideoHdr = videoHdr;
+    videoHdr = vidHDR|sensHDR;
+
     // ISO
     const char *isoMode = newParams.get(KEY_QTI_ISO_MODE);
     if (isoMode) {
@@ -758,6 +815,13 @@ status_t QTIParameters::updateRequest(CameraMetadata *request) const {
 
     if (!request) {
        return BAD_VALUE;
+    }
+
+    //Video-Hdr
+    res = CameraMetadata::getTagFromName(KEY_QTI_VENDOR_VIDEO_HDR_MODE, vTags.get(), &tag);
+    res = request->update(tag,&videoHdr, 1);
+    if (res != OK) {
+        return res;
     }
 
     if (isoValue != -1) {

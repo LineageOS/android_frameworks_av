@@ -49,6 +49,7 @@ public:
 
 private:
     void stopPreviewForRestart(Parameters &params);
+    status_t restartVideoHdr(Parameters &params);
 
 };
 
