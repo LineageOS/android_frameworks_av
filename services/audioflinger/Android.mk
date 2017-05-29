@@ -34,8 +34,8 @@ LOCAL_SRC_FILES:=               \
     TypedLogger.cpp
 
 LOCAL_C_INCLUDES := \
-    $(TOPDIR)frameworks/av/services/audiopolicy \
-    $(TOPDIR)frameworks/av/services/medialog \
+    frameworks/av/services/audiopolicy \
+    frameworks/av/services/medialog \
     $(call include-path-for, audio-utils)
 
 LOCAL_SHARED_LIBRARIES := \

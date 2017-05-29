@@ -527,9 +527,6 @@ status_t CameraProviderManager::ProviderInfo::initialize() {
                     __FUNCTION__, device.c_str(), strerror(-res), res);
             continue;
         }
-        if (listener != nullptr) {
-            listener->onDeviceStatusChanged(String8(id.c_str()), CameraDeviceStatus::PRESENT);
-        }
     }
 
     for (auto& device : mDevices) {

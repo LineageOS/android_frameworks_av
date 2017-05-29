@@ -10,4 +10,13 @@ cc_library_static {
         "-Werror",
         "-Wall",
     ],
+
+    host_supported: true,
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
+
 }

@@ -37,7 +37,7 @@ namespace aaudio {
 class AudioStreamInternal : public AudioStream {
 
 public:
-    AudioStreamInternal(AAudioServiceInterface  &serviceInterface, bool inService = false);
+    AudioStreamInternal(AAudioServiceInterface  &serviceInterface, bool inService);
     virtual ~AudioStreamInternal();
 
     // =========== Begin ABSTRACT methods ===========================
@@ -60,10 +60,6 @@ public:
 
     aaudio_result_t close() override;
 
-    aaudio_result_t write(const void *buffer,
-                             int32_t numFrames,
-                             int64_t timeoutNanoseconds) override;
-
     aaudio_result_t setBufferSize(int32_t requestedFrames) override;
 
     int32_t getBufferSize() const override;
@@ -71,9 +67,6 @@ public:
     int32_t getBufferCapacity() const override;
 
     int32_t getFramesPerBurst() const override;
-
-    int64_t getFramesRead() override;
-    int64_t getFramesWritten() override;
 
     int32_t getXRunCount() const override {
         return mXRunCount;
@@ -83,15 +76,36 @@ public:
 
     aaudio_result_t unregisterThread() override;
 
+    aaudio_result_t joinThread(void** returnArg);
+
     // Called internally from 'C'
-    void *callbackLoop();
+    virtual void *callbackLoop() = 0;
 
 
     bool isMMap() override {
         return true;
     }
 
+    // Calculate timeout based on framesPerBurst
+    int64_t calculateReasonableTimeout();
+
 protected:
+
+    aaudio_result_t processData(void *buffer,
+                         int32_t numFrames,
+                         int64_t timeoutNanoseconds);
+
+/**
+ * Low level data processing that will not block. It will just read or write as much as it can.
+ *
+ * It passed back a recommended time to wake up if wakeTimePtr is not NULL.
+ *
+ * @return the number of frames processed or a negative error code.
+ */
+    virtual aaudio_result_t processDataNow(void *buffer,
+                            int32_t numFrames,
+                            int64_t currentTimeNanos,
+                            int64_t *wakeTimePtr) = 0;
 
     aaudio_result_t processCommands();
 
@@ -100,17 +114,6 @@ protected:
 
     aaudio_result_t stopCallback();
 
-/**
- * Low level write that will not block. It will just write as much as it can.
- *
- * It passed back a recommended time to wake up if wakeTimePtr is not NULL.
- *
- * @return the number of frames written or a negative error code.
- */
-    aaudio_result_t writeNow(const void *buffer,
-                                     int32_t numFrames,
-                                     int64_t currentTimeNanos,
-                                     int64_t *wakeTimePtr);
 
     void onFlushFromServer();
 
@@ -121,6 +124,24 @@ protected:
     // Calculate timeout for an operation involving framesPerOperation.
     int64_t calculateReasonableTimeout(int32_t framesPerOperation);
 
+    aaudio_audio_format_t    mDeviceFormat = AAUDIO_FORMAT_UNSPECIFIED;
+
+    IsochronousClockModel    mClockModel;      // timing model for chasing the HAL
+
+    AudioEndpoint            mAudioEndpoint;   // source for reads or sink for writes
+    aaudio_handle_t          mServiceStreamHandle; // opaque handle returned from service
+
+    int32_t                  mFramesPerBurst;     // frames per HAL transfer
+    int32_t                  mXRunCount = 0;      // how many underrun events?
+
+    LinearRamp               mVolumeRamp;
+
+    // Offset from underlying frame position.
+    int64_t                  mFramesOffsetFromService = 0; // offset for timestamps
+
+    uint8_t                 *mCallbackBuffer = nullptr;
+    int32_t                  mCallbackFrames = 0;
+
 private:
     /*
      * Asynchronous write with data conversion.
@@ -130,38 +151,16 @@ private:
      */
     aaudio_result_t writeNowWithConversion(const void *buffer,
                                      int32_t numFrames);
-    void processTimestamp(uint64_t position, int64_t time);
-
-
-    const char *getLocationName() const {
-        return mInService ? "SERVICE" : "CLIENT";
-    }
 
     // Adjust timing model based on timestamp from service.
-
-    IsochronousClockModel    mClockModel;      // timing model for chasing the HAL
-    AudioEndpoint            mAudioEndpoint;   // sink for writes
-    aaudio_handle_t          mServiceStreamHandle; // opaque handle returned from service
+    void processTimestamp(uint64_t position, int64_t time);
 
     AudioEndpointParcelable  mEndPointParcelable; // description of the buffers filled by service
     EndpointDescriptor       mEndpointDescriptor; // buffer description with resolved addresses
-
-    aaudio_audio_format_t    mDeviceFormat = AAUDIO_FORMAT_UNSPECIFIED;
-
-    uint8_t                 *mCallbackBuffer = nullptr;
-    int32_t                  mCallbackFrames = 0;
-
-    // Offset from underlying frame position.
-    int64_t                  mFramesOffsetFromService = 0; // offset for timestamps
-    int64_t                  mLastFramesRead = 0; // used to prevent retrograde motion
-    int32_t                  mFramesPerBurst;     // frames per HAL transfer
-    int32_t                  mXRunCount = 0;      // how many underrun events?
-    LinearRamp               mVolumeRamp;
-
     AAudioServiceInterface  &mServiceInterface;   // abstract interface to the service
 
     // The service uses this for SHARED mode.
-    bool                     mInService = false;  // Are running in the client or the service?
+    bool                     mInService = false;  // Is this running in the client or the service?
 };
 
 } /* namespace aaudio */

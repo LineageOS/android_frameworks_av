@@ -49,15 +49,15 @@ LOCAL_STATIC_LIBRARIES :=       \
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libmedia
 
 LOCAL_C_INCLUDES :=                                                 \
-    $(TOP)/frameworks/av/media/libstagefright/include               \
-    $(TOP)/frameworks/av/media/libstagefright/rtsp                  \
-    $(TOP)/frameworks/av/media/libstagefright/wifi-display          \
-    $(TOP)/frameworks/av/media/libstagefright/webm                  \
+    frameworks/av/media/libstagefright/include               \
+    frameworks/av/media/libstagefright/rtsp                  \
+    frameworks/av/media/libstagefright/wifi-display          \
+    frameworks/av/media/libstagefright/webm                  \
     $(LOCAL_PATH)/include/media                              \
-    $(TOP)/frameworks/av/include/camera                             \
-    $(TOP)/frameworks/native/include/media/openmax                  \
-    $(TOP)/frameworks/native/include/media/hardware                 \
-    $(TOP)/external/tremolo/Tremolo                                 \
+    frameworks/av/include/camera                             \
+    frameworks/native/include/media/openmax                  \
+    frameworks/native/include/media/hardware                 \
+    external/tremolo/Tremolo                                 \
 
 LOCAL_CFLAGS += -Werror -Wno-error=deprecated-declarations -Wall
 

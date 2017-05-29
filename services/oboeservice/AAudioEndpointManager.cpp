@@ -21,10 +21,8 @@
 #include <assert.h>
 #include <map>
 #include <mutex>
-#include <utils/Singleton.h>
 
 #include "AAudioEndpointManager.h"
-#include "AAudioServiceEndpoint.h"
 
 using namespace android;
 using namespace aaudio;
@@ -43,7 +41,6 @@ AAudioServiceEndpoint *AAudioEndpointManager::openEndpoint(AAudioService &audioS
     std::lock_guard<std::mutex> lock(mLock);
 
     // Try to find an existing endpoint.
-    ALOGD("AAudioEndpointManager::openEndpoint(), device = %d, dir = %d", deviceId, direction);
     switch (direction) {
         case AAUDIO_DIRECTION_INPUT:
             endpoint = mInputs[deviceId];
@@ -55,32 +52,37 @@ AAudioServiceEndpoint *AAudioEndpointManager::openEndpoint(AAudioService &audioS
             assert(false); // There are only two possible directions.
             break;
     }
+    ALOGD("AAudioEndpointManager::openEndpoint(), found %p for device = %d, dir = %d",
+          endpoint, deviceId, (int)direction);
 
-    // If we can't find an existing one then open one.
-    ALOGD("AAudioEndpointManager::openEndpoint(), found %p", endpoint);
+    // If we can't find an existing one then open a new one.
     if (endpoint == nullptr) {
-        endpoint = new AAudioServiceEndpoint(audioService);
-        if (endpoint->open(deviceId, direction) != AAUDIO_OK) {
-            ALOGE("AAudioEndpointManager::findEndpoint(), open failed");
-            delete endpoint;
-            endpoint = nullptr;
-        } else {
-            switch(direction) {
-                case AAUDIO_DIRECTION_INPUT:
-                    mInputs[deviceId] = endpoint;
-                    break;
-                case AAUDIO_DIRECTION_OUTPUT:
-                    mOutputs[deviceId] = endpoint;
-                    break;
+        if (direction == AAUDIO_DIRECTION_INPUT) {
+            AAudioServiceEndpointCapture *capture = new AAudioServiceEndpointCapture(audioService);
+            if (capture->open(deviceId) != AAUDIO_OK) {
+                ALOGE("AAudioEndpointManager::openEndpoint(), open failed");
+                delete capture;
+            } else {
+                mInputs[deviceId] = capture;
+                endpoint = capture;
+            }
+        } else if (direction == AAUDIO_DIRECTION_OUTPUT) {
+            AAudioServiceEndpointPlay *player = new AAudioServiceEndpointPlay(audioService);
+            if (player->open(deviceId) != AAUDIO_OK) {
+                ALOGE("AAudioEndpointManager::openEndpoint(), open failed");
+                delete player;
+            } else {
+                mOutputs[deviceId] = player;
+                endpoint = player;
             }
         }
+
     }
 
     if (endpoint != nullptr) {
         // Increment the reference count under this lock.
         endpoint->setReferenceCount(endpoint->getReferenceCount() + 1);
     }
-
     return endpoint;
 }
 
@@ -105,6 +107,7 @@ void AAudioEndpointManager::closeEndpoint(AAudioServiceEndpoint *serviceEndpoint
                 mOutputs.erase(deviceId);
                 break;
         }
+
         serviceEndpoint->close();
         delete serviceEndpoint;
     }

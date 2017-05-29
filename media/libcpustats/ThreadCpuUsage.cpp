@@ -26,6 +26,11 @@
 
 #include <cpustats/ThreadCpuUsage.h>
 
+// implemented by host, but not declared in <string.h> as FreeBSD does
+extern "C" {
+    extern size_t strlcpy(char *dst, const char *src, size_t dstsize);
+}
+
 namespace android {
 
 bool ThreadCpuUsage::setEnabled(bool isEnabled)

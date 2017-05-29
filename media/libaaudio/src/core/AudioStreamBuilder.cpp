@@ -24,7 +24,8 @@
 #include <aaudio/AAudio.h>
 
 #include "binding/AAudioBinderClient.h"
-#include "client/AudioStreamInternal.h"
+#include "client/AudioStreamInternalCapture.h"
+#include "client/AudioStreamInternalPlay.h"
 #include "core/AudioStream.h"
 #include "core/AudioStreamBuilder.h"
 #include "legacy/AudioStreamRecord.h"
@@ -51,17 +52,18 @@ static aaudio_result_t builder_createStream(aaudio_direction_t direction,
     switch (direction) {
 
         case AAUDIO_DIRECTION_INPUT:
-            if (sharingMode == AAUDIO_SHARING_MODE_SHARED) {
-                *audioStreamPtr = new AudioStreamRecord();
+            if (tryMMap) {
+                *audioStreamPtr = new AudioStreamInternalCapture(AAudioBinderClient::getInstance(),
+                                                                 false);
             } else {
-                ALOGE("AudioStreamBuilder(): bad sharing mode = %d for input", sharingMode);
-                result = AAUDIO_ERROR_ILLEGAL_ARGUMENT;
+                *audioStreamPtr = new AudioStreamRecord();
             }
             break;
 
         case AAUDIO_DIRECTION_OUTPUT:
             if (tryMMap) {
-                *audioStreamPtr = new AudioStreamInternal(AAudioBinderClient::getInstance(), false);
+                *audioStreamPtr = new AudioStreamInternalPlay(AAudioBinderClient::getInstance(),
+                                                              false);
             } else {
                 *audioStreamPtr = new AudioStreamTrack();
             }
@@ -82,8 +84,6 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
 
     int32_t mmapEnabled = AAudioProperty_getMMapEnabled();
     int32_t mmapExclusiveEnabled = AAudioProperty_getMMapExclusiveEnabled();
-    ALOGD("AudioStreamBuilder(): mmapEnabled = %d, mmapExclusiveEnabled = %d",
-          mmapEnabled, mmapExclusiveEnabled);
 
     aaudio_sharing_mode_t sharingMode = getSharingMode();
     if ((sharingMode == AAUDIO_SHARING_MODE_EXCLUSIVE)
@@ -125,6 +125,5 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
         }
     }
 
-    ALOGD("AudioStreamBuilder(): returned %d", result);
     return result;
 }

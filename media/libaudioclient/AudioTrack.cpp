@@ -2942,6 +2942,7 @@ bool AudioTrack::AudioTrackThread::threadLoop()
     {
         AutoMutex _l(mMyLock);
         if (mPaused) {
+            // TODO check return value and handle or log
             mMyCond.wait(mMyLock);
             // caller will check for exitPending()
             return true;
@@ -2953,8 +2954,10 @@ bool AudioTrack::AudioTrackThread::threadLoop()
         if (mPausedInt) {
             // TODO use futex instead of condition, for event flag "or"
             if (mPausedNs > 0) {
+                // TODO check return value and handle or log
                 (void) mMyCond.waitRelative(mMyLock, mPausedNs);
             } else {
+                // TODO check return value and handle or log
                 mMyCond.wait(mMyLock);
             }
             mPausedInt = false;

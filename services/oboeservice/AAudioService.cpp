@@ -63,7 +63,6 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
     }
 
     if (sharingMode == AAUDIO_SHARING_MODE_EXCLUSIVE) {
-        ALOGD("AAudioService::openStream(), sharingMode = AAUDIO_SHARING_MODE_EXCLUSIVE");
         serviceStream = new AAudioServiceStreamMMAP();
         result = serviceStream->open(request, configurationOutput);
         if (result != AAUDIO_OK) {
@@ -79,7 +78,6 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
     // if SHARED requested or if EXCLUSIVE failed
     if (sharingMode == AAUDIO_SHARING_MODE_SHARED
          || (serviceStream == nullptr && !sharingModeMatchRequired)) {
-        ALOGD("AAudioService::openStream(), try AAUDIO_SHARING_MODE_SHARED");
         serviceStream =  new AAudioServiceStreamShared(*this);
         result = serviceStream->open(request, configurationOutput);
         configurationOutput.setSharingMode(AAUDIO_SHARING_MODE_SHARED);
@@ -91,7 +89,7 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
         return result;
     } else {
         aaudio_handle_t handle = mHandleTracker.put(AAUDIO_HANDLE_TYPE_STREAM, serviceStream);
-        ALOGD("AAudioService::openStream(): handle = 0x%08X", handle);
+        ALOGV("AAudioService::openStream(): handle = 0x%08X", handle);
         if (handle < 0) {
             ALOGE("AAudioService::openStream(): handle table full");
             delete serviceStream;
@@ -104,7 +102,7 @@ aaudio_result_t AAudioService::closeStream(aaudio_handle_t streamHandle) {
     AAudioServiceStreamBase *serviceStream = (AAudioServiceStreamBase *)
             mHandleTracker.remove(AAUDIO_HANDLE_TYPE_STREAM,
                                   streamHandle);
-    ALOGD("AAudioService.closeStream(0x%08X)", streamHandle);
+    ALOGV("AAudioService.closeStream(0x%08X)", streamHandle);
     if (serviceStream != nullptr) {
         serviceStream->close();
         delete serviceStream;
