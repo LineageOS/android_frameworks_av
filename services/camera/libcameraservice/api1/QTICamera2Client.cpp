@@ -64,6 +64,15 @@ QTICamera2Client::~QTICamera2Client() {
 status_t QTICamera2Client::setParametersExtn(Parameters &params) {
     status_t res = OK;
     sp<Camera2Client> client = mParentClient.promote();
+    int32_t prevVidHdr,currVidHdr;
+
+    prevVidHdr = params.qtiParams->prevVideoHdr;
+    currVidHdr = params.qtiParams->videoHdr;
+
+    if(prevVidHdr != currVidHdr) {
+        ALOGE(" video hdr mode changed %d %d",prevVidHdr,currVidHdr);
+        restartVideoHdr(params);
+    }
 
     // Check whether preview restart needed.
     // Stop the preview, if there is a need for restart.
@@ -83,6 +92,29 @@ status_t QTICamera2Client::setParametersExtn(Parameters &params) {
 
     return res;
 }
+
+status_t QTICamera2Client::restartVideoHdr(Parameters &params)
+{
+    sp<Camera2Client> client = mParentClient.promote();
+
+    stopPreviewExtn();
+
+    client->mStreamingProcessor->deletePreviewStream();
+    client->mStreamingProcessor->deleteRecordingStream();
+    client->mJpegProcessor->deleteStream();
+    client->mCallbackProcessor->deleteStream();
+    client->mZslProcessor->deleteStream();
+    client->mZslProcessor->clearZslQueue();
+
+    params.slowJpegMode = false;
+    client->updateRequests(params);
+
+    if (params.state == Parameters::STOPPED) {
+        client->startPreviewL(params,false);
+    }
+    return OK;
+}
+
 
 status_t QTICamera2Client::stopPreviewExtn() {
     status_t res = OK;

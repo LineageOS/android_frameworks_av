@@ -99,6 +99,8 @@ private:
     metadata_vendor_id_t mVendorTagId;
 
 public:
+    int32_t videoHdr;
+    int32_t prevVideoHdr;
     bool mNeedRestart;
     uint8_t burstCount;
     bool aeBracketEnable;
