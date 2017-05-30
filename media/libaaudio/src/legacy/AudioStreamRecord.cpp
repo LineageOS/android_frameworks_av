@@ -64,7 +64,7 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
                         : builder.getBufferCapacity();
 
     // TODO implement an unspecified Android format then use that.
-    audio_format_t format = (getFormat() == AAUDIO_UNSPECIFIED)
+    audio_format_t format = (getFormat() == AAUDIO_FORMAT_UNSPECIFIED)
             ? AUDIO_FORMAT_PCM_FLOAT
             : AAudioConvert_aaudioToAndroidDataFormat(getFormat());
 
