@@ -91,7 +91,7 @@ public:
     void dump() const;
 
 private:
-    int32_t               mDeviceId        = AAUDIO_DEVICE_UNSPECIFIED;
+    int32_t               mDeviceId        = AAUDIO_UNSPECIFIED;
     int32_t               mSampleRate      = AAUDIO_UNSPECIFIED;
     int32_t               mSamplesPerFrame = AAUDIO_UNSPECIFIED;
     aaudio_sharing_mode_t mSharingMode     = AAUDIO_SHARING_MODE_SHARED;
