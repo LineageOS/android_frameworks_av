@@ -14,6 +14,73 @@
  * limitations under the License.
  */
 
+/*
+* Documentation: Workflow summary for histogram data processing:
+* For more details on FIFO, please see system/media/audio_utils; doxygen
+* TODO: add this documentation to doxygen once it is further developed
+* 1) writing the data to a buffer
+* onWork
+*     Called every period length (e.g., 4ms)
+*     Calls LOG_HIST_TS
+* LOG_HIST_TS
+*     Hashes file name and line number
+*     calls NBLOG::Writer::logHistTS once
+* NBLOG::Writer::logHistTS
+*     calls NBLOG::Writer::log on hash and current timestamp
+*     time is in CLOCK_MONOTONIC converted to ns
+* NBLOG::Writer::log(Event, const void*, size_t)
+*     Initializes Entry, a struct containing one log entry
+*     Entry contains the event type (mEvent), data length (mLength),
+*     and data pointer (mData)
+*     TODO: why mLength (max length of buffer data)  must be <= kMaxLength = 255?
+*     calls NBLOG::Writer::log(Entry *, bool)
+* NBLog::Writer::log(Entry *, bool)
+*     Calls copyEntryDataAt to format data as follows in temp array:
+*     [type][length][data ... ][length]
+*     calls audio_utils_fifo_writer.write on temp
+* audio_utils_fifo_writer.write
+*     calls obtain(), memcpy (reference in doxygen)
+*     returns number of frames written
+* ssize_t audio_utils_fifo_reader::obtain
+*     Determines readable buffer section via pointer arithmetic on reader
+*     and writer pointers
+*
+* 2) reading the data from shared memory
+* Thread::threadloop()
+*     TODO: add description?
+* NBLog::MergeThread::threadLoop()
+*     calls NBLog::Merger::merge
+* NBLog::Merger::merge
+*     for each reader in vector of class NamedReader,
+*     callsNamedReader::reader()->getSnapshot
+*     TODO: check whether the rest of this function is relevant
+* NBLog::Reader::getSnapshot
+*     copies snapshot of reader's fifo buffer into its own buffer
+*     calls mFifoReader->obtain to find readable data
+*     sets snapshot.begin() and .end() iterators to boundaries of valid entries
+*     moves the fifo reader index to after the last entry read
+*     in this case, the buffer is in shared memory. in (3), the buffer is private
+*
+* 3) reading the data from private buffer
+* MediaLogService::dump
+*     calls NBLog::Reader::dump(int) on instance of subclass mergeReader
+* NBLog::Reader::dump(int)
+*     calls getSnapshot on the current reader
+*     calls dump(int, size_t, Snapshot)
+* NBLog::Reader::dump(int, size, snapshot)
+*     iterates through snapshot's events and switches based on their type
+*     (string, timestamp, etc...)
+*     In the case of EVENT_HISTOGRAM_ENTRY_TS, adds a list of timestamp sequences
+*     (histogram entry) to NBLog::mHists
+*     In the case of EVENT_HISTOGRAM_FLUSH, calls drawHistogram on each element in
+*     the list and erases it
+*     TODO: when do these events occur?
+* NBLog::drawHistogram
+*     input: timestamp array
+*     buckets this to a histogram and prints
+*
+*/
+
 #define LOG_TAG "NBLog"
 //#define LOG_NDEBUG 0
 
@@ -30,6 +97,7 @@
 #include <new>
 #include <audio_utils/roundup.h>
 #include <media/nbaio/NBLog.h>
+// #include <utils/CallStack.h> // used to print callstack
 #include <utils/Log.h>
 #include <utils/String8.h>
 
@@ -38,9 +106,9 @@
 
 namespace android {
 
-int NBLog::Entry::readAt(size_t offset) const
+int NBLog::Entry::copyEntryDataAt(size_t offset) const
 {
-    // FIXME This is too slow, despite the name it is used during writing
+    // FIXME This is too slow
     if (offset == 0)
         return mEvent;
     else if (offset == 1)
@@ -138,8 +206,7 @@ NBLog::EntryIterator NBLog::FormatEntry::copyWithAuthor(
     // copy fmt start entry
     it.copyTo(dst);
     // copy timestamp
-    (++it).copyTo(dst);
-    // copy hash
+    (++it).copyTo(dst);    // copy hash
     (++it).copyTo(dst);
     // insert author entry
     size_t authorEntrySize = NBLog::Entry::kOverhead + sizeof(author);
@@ -556,28 +623,31 @@ void NBLog::Writer::log(Event event, const void *data, size_t length)
     if (event == EVENT_RESERVED || event >= EVENT_UPPER_BOUND) {
         return;
     }
-    Entry entry(event, data, length);
-    log(&entry, true /*trusted*/);
+    Entry etr(event, data, length);
+    log(&etr, true /*trusted*/);
 }
 
-void NBLog::Writer::log(const NBLog::Entry *entry, bool trusted)
+void NBLog::Writer::log(const NBLog::Entry *etr, bool trusted)
 {
     if (!mEnabled) {
         return;
     }
     if (!trusted) {
-        log(entry->mEvent, entry->mData, entry->mLength);
+        log(etr->mEvent, etr->mData, etr->mLength);
         return;
     }
-    size_t need = entry->mLength + Entry::kOverhead;    // mEvent, mLength, data[length], mLength
-                                                        // need = number of bytes remaining to write
+    size_t need = etr->mLength + Entry::kOverhead;    // mEvent, mLength, data[mLength], mLength
+                                                      // need = number of bytes written to FIFO
 
     // FIXME optimize this using memcpy for the data part of the Entry.
     // The Entry could have a method copyTo(ptr, offset, size) to optimize the copy.
+    // checks size of a single log Entry: type, length, data pointer and ending
     uint8_t temp[Entry::kMaxLength + Entry::kOverhead];
+    // write this data to temp array
     for (size_t i = 0; i < need; i++) {
-        temp[i] = entry->readAt(i);
+        temp[i] = etr->copyEntryDataAt(i);
     }
+    // write to circular buffer
     mFifoWriter->write(temp, need);
 }
 
@@ -838,6 +908,7 @@ std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
 
 void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapshot)
 {
+  //  CallStack cs(LOG_TAG);
 #if 0
     struct timespec ts;
     time_t maxSec = -1;
@@ -866,7 +937,7 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
     if (lost > 0) {
         body.appendFormat("warning: lost %zu bytes worth of events", lost);
         // TODO timestamp empty here, only other choice to wait for the first timestamp event in the
-        //      log to push it out.  Consider keeping the timestamp/body between calls to readAt().
+        //      log to push it out.  Consider keeping the timestamp/body between calls to copyEntryDataAt().
         dumpLine(timestamp, body);
     }
 #if 0
@@ -966,6 +1037,7 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             ++entry;
             break;
         }
+        // draws histograms stored in global Reader::mHists and erases them
         case EVENT_HISTOGRAM_FLUSH: {
             HistogramEntry histEntry(entry);
             // Log timestamp
@@ -978,15 +1050,13 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             setFindGlitch(true);
             body.appendFormat("Histogram flush - ");
             handleAuthor(histEntry, &body);
-            int debug = 0;
             for (auto hist = mHists.begin(); hist != mHists.end();) {
-                // TODO: "debug" is always 0. Is a for loop necessary here?
-                ALOGW("EVENT_HISTOGRAM_FLUSH case hist: %d", debug++);
                 if (hist->first.second == histEntry.author()) {
                     body.appendFormat("%X", (int)hist->first.first);
                     if (findGlitch) {
                         alertIfGlitch(hist->second);
                     }
+                    // validateFirstTimestamp(hist->second);
                     drawHistogram(&body, hist->second, true, indent);
                     hist = mHists.erase(hist);
                 } else {
@@ -1196,7 +1266,6 @@ static std::map<int, int> buildBuckets(const std::vector<int64_t> &samples) {
     // TODO allow buckets of variable resolution
     std::map<int, int> buckets;
     for (size_t i = 1; i < samples.size(); ++i) {
-        // ALOGW("sample %d ", deltaMs(samples[i - 1], samples[i]));
         ++buckets[deltaMs(samples[i - 1], samples[i])];
     }
     return buckets;
@@ -1232,6 +1301,18 @@ void NBLog::Reader::drawHistogram(String8 *body,
     if (samples.size() <= 1) {
         return;
     }
+    // temp code for debugging the outlier timestamp
+    const int kMaxMs = 100;
+    for (size_t i = 1; i < samples.size()-1; ++i) {
+        const int currDelta = deltaMs(samples[i - 1], samples[i]);
+        if (currDelta > kMaxMs) {
+            body->appendFormat("\nlocation: %zu, size: %zu, pos from end: %zu, %d\t", i,
+                           samples.size(), samples.size() - i, currDelta);
+        }
+    }
+    // FIXME: as can be seen when printing the values, the outlier timestamps typically occur
+    // in the first histogram 35 to 38 indices from the end (most often 35).
+    // TODO: build histogram buckets earlier and discard timestamps to save memory
     std::map<int, int> buckets = buildBuckets(samples);
     // TODO consider changing all ints to uint32_t or uint64_t
 

@@ -219,7 +219,8 @@ struct Entry {
         : mEvent(event), mLength(length), mData(data) { }
     /*virtual*/ ~Entry() { }
 
-    int     readAt(size_t offset) const;
+    // used during writing to format Entry information as follows: [type][length][data ... ][length]
+    int     copyEntryDataAt(size_t offset) const;
 
 private:
     friend class Writer;
@@ -353,7 +354,9 @@ public:
 
 private:
     // 0 <= length <= kMaxLength
+    // writes a single Entry to the FIFO
     void    log(Event event, const void *data, size_t length);
+    // checks validity of an event before calling log above this one
     void    log(const Entry *entry, bool trusted = false);
 
     Shared* const   mShared;    // raw pointer to shared memory
@@ -445,7 +448,7 @@ public:
     std::unique_ptr<Snapshot> getSnapshot();
     // dump a particular snapshot of the reader
     void     dump(int fd, size_t indent, Snapshot & snap);
-    // dump the current content of the reader's buffer
+    // dump the current content of the reader's buffer (call getSnapshot() and previous dump())
     void     dump(int fd, size_t indent = 0);
     bool     isIMemory(const sp<IMemory>& iMemory) const;
     // if findGlitch is true, log warning when buffer periods caused glitch
@@ -465,8 +468,14 @@ private:
     audio_utils_fifo_reader * const mFifoReader;    // used to read from FIFO,
                                                     // non-NULL unless constructor fails
 
+    // each pair contains a sequence of timestamps (one histogram's worth)
+    // pair's log_hash_t is the hash of the source code location where the timestamp was taken
+    // pair's int points to the Reader that originated the entry
     std::map<std::pair<log_hash_t, int>, std::vector<int64_t>> mHists;
-
+    // TODO: it might be clearer, instead of a direct map from source location to vector of
+    // timestamps, if we instead first mapped from source location to an object that
+    // represented that location. And one_of its fields would be a vector of timestamps.
+    // That would allow us to record other information about the source location beyond timestamps.
     void    dumpLine(const String8& timestamp, String8& body);
 
     EntryIterator   handleFormat(const FormatEntry &fmtEntry,
