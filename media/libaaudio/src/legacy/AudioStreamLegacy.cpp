@@ -30,7 +30,7 @@ using namespace android;
 using namespace aaudio;
 
 AudioStreamLegacy::AudioStreamLegacy()
-        : AudioStream() {
+        : AudioStream(), mDeviceCallback(new StreamDeviceCallback(this)) {
 }
 
 AudioStreamLegacy::~AudioStreamLegacy() {
@@ -60,44 +60,54 @@ int32_t AudioStreamLegacy::onProcessFixedBlock(uint8_t *buffer, int32_t numBytes
 
 void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode, void *info) {
     aaudio_data_callback_result_t callbackResult;
+
+    if (!mCallbackEnabled.load()) {
+        return;
+    }
+
     switch (opcode) {
         case AAUDIO_CALLBACK_OPERATION_PROCESS_DATA: {
-            // Note that this code assumes an AudioTrack::Buffer is the same as AudioRecord::Buffer
-            // TODO define our own AudioBuffer and pass it from the subclasses.
-            AudioTrack::Buffer *audioBuffer = static_cast<AudioTrack::Buffer *>(info);
-            if (audioBuffer->frameCount == 0) return;
+            if (getState() != AAUDIO_STREAM_STATE_DISCONNECTED) {
+                // Note that this code assumes an AudioTrack::Buffer is the same as
+                // AudioRecord::Buffer
+                // TODO define our own AudioBuffer and pass it from the subclasses.
+                AudioTrack::Buffer *audioBuffer = static_cast<AudioTrack::Buffer *>(info);
+                if (audioBuffer->frameCount == 0) return;
 
-            // If the caller specified an exact size then use a block size adapter.
-            if (mBlockAdapter != nullptr) {
-                int32_t byteCount = audioBuffer->frameCount * getBytesPerFrame();
-                callbackResult = mBlockAdapter->processVariableBlock((uint8_t *) audioBuffer->raw,
-                                                                     byteCount);
-            } else {
-                // Call using the AAudio callback interface.
-                callbackResult = (*getDataCallbackProc())(
-                        (AAudioStream *) this,
-                        getDataCallbackUserData(),
-                        audioBuffer->raw,
-                        audioBuffer->frameCount
-                        );
-            }
-            if (callbackResult == AAUDIO_CALLBACK_RESULT_CONTINUE) {
-                audioBuffer->size = audioBuffer->frameCount * getBytesPerFrame();
-                incrementClientFrameCounter(audioBuffer->frameCount);
-            } else {
-                audioBuffer->size = 0;
+                // If the caller specified an exact size then use a block size adapter.
+                if (mBlockAdapter != nullptr) {
+                    int32_t byteCount = audioBuffer->frameCount * getBytesPerFrame();
+                    callbackResult = mBlockAdapter->processVariableBlock(
+                            (uint8_t *) audioBuffer->raw, byteCount);
+                } else {
+                    // Call using the AAudio callback interface.
+                    callbackResult = (*getDataCallbackProc())(
+                            (AAudioStream *) this,
+                            getDataCallbackUserData(),
+                            audioBuffer->raw,
+                            audioBuffer->frameCount
+                            );
+                }
+                if (callbackResult == AAUDIO_CALLBACK_RESULT_CONTINUE) {
+                    audioBuffer->size = audioBuffer->frameCount * getBytesPerFrame();
+                    incrementClientFrameCounter(audioBuffer->frameCount);
+                } else {
+                    audioBuffer->size = 0;
+                }
+                break;
             }
         }
-            break;
+        /// FALL THROUGH
 
             // Stream got rerouted so we disconnect.
         case AAUDIO_CALLBACK_OPERATION_DISCONNECTED: {
-            ALOGD("AudioStreamAAudio(): callbackLoop() stream disconnected");
+            setState(AAUDIO_STREAM_STATE_DISCONNECTED);
+            ALOGD("processCallbackCommon() stream disconnected");
             if (getErrorCallbackProc() != nullptr) {
                 (*getErrorCallbackProc())(
                         (AAudioStream *) this,
                         getErrorCallbackUserData(),
-                        AAUDIO_OK
+                        AAUDIO_ERROR_DISCONNECTED
                         );
             }
             mCallbackEnabled.store(false);
@@ -128,4 +138,23 @@ aaudio_result_t AudioStreamLegacy::getBestTimestamp(clockid_t clockId,
     }
     status_t status = extendedTimestamp->getBestTimestamp(framePosition, timeNanoseconds, timebase);
     return AAudioConvert_androidToAAudioResult(status);
+}
+
+void AudioStreamLegacy::onAudioDeviceUpdate(audio_port_handle_t deviceId)
+{
+    ALOGD("onAudioDeviceUpdate() deviceId %d", (int)deviceId);
+    if (getDeviceId() != AAUDIO_UNSPECIFIED && getDeviceId() != deviceId &&
+            getState() != AAUDIO_STREAM_STATE_DISCONNECTED) {
+        setState(AAUDIO_STREAM_STATE_DISCONNECTED);
+        // if we have a data callback and the stream is active, send the error callback from
+        // data callback thread when it sees the DISCONNECTED state
+        if (!isDataCallbackActive() && getErrorCallbackProc() != nullptr) {
+            (*getErrorCallbackProc())(
+                    (AAudioStream *) this,
+                    getErrorCallbackUserData(),
+                    AAUDIO_ERROR_DISCONNECTED
+                    );
+        }
+    }
+    setDeviceId(deviceId);
 }
