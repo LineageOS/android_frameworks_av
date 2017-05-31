@@ -39,8 +39,8 @@ int main(int argc, char **argv)
     AAudioSimpleRecorder recorder;
     int actualSamplesPerFrame;
     int actualSampleRate;
-    const aaudio_audio_format_t requestedDataFormat = AAUDIO_FORMAT_PCM_I16;
-    aaudio_audio_format_t actualDataFormat;
+    const aaudio_format_t requestedDataFormat = AAUDIO_FORMAT_PCM_I16;
+    aaudio_format_t actualDataFormat;
 
     const int requestedInputChannelCount = 1; // Can affect whether we get a FAST path.
 
