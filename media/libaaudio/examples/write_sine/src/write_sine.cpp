@@ -50,8 +50,8 @@ int main(int argc, char **argv)
     int actualChannelCount = 0;
     const int requestedSampleRate = SAMPLE_RATE;
     int actualSampleRate = 0;
-    aaudio_audio_format_t requestedDataFormat = REQUESTED_FORMAT;
-    aaudio_audio_format_t actualDataFormat = AAUDIO_FORMAT_UNSPECIFIED;
+    aaudio_format_t requestedDataFormat = REQUESTED_FORMAT;
+    aaudio_format_t actualDataFormat = AAUDIO_FORMAT_UNSPECIFIED;
     aaudio_sharing_mode_t actualSharingMode = AAUDIO_SHARING_MODE_SHARED;
 
     AAudioStream *aaudioStream = nullptr;

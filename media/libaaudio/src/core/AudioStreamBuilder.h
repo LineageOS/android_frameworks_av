@@ -64,11 +64,11 @@ public:
         return this;
     }
 
-    aaudio_audio_format_t getFormat() const {
+    aaudio_format_t getFormat() const {
         return mFormat;
     }
 
-    AudioStreamBuilder *setFormat(aaudio_audio_format_t format) {
+    AudioStreamBuilder *setFormat(aaudio_format_t format) {
         mFormat = format;
         return this;
     }
@@ -171,7 +171,7 @@ private:
     int32_t                    mDeviceId = AAUDIO_DEVICE_UNSPECIFIED;
     aaudio_sharing_mode_t      mSharingMode = AAUDIO_SHARING_MODE_SHARED;
     bool                       mSharingModeMatchRequired = false; // must match sharing mode requested
-    aaudio_audio_format_t      mFormat = AAUDIO_FORMAT_UNSPECIFIED;
+    aaudio_format_t            mFormat = AAUDIO_FORMAT_UNSPECIFIED;
     aaudio_direction_t         mDirection = AAUDIO_DIRECTION_OUTPUT;
     int32_t                    mBufferCapacity = AAUDIO_UNSPECIFIED;
     aaudio_performance_mode_t  mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;

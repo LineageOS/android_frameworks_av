@@ -93,7 +93,7 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
     aaudio_direction_t direction = request.getDirection();
 
     // Fill in config
-    aaudio_audio_format_t aaudioFormat = configurationInput.getAudioFormat();
+    aaudio_format_t aaudioFormat = configurationInput.getAudioFormat();
     if (aaudioFormat == AAUDIO_UNSPECIFIED || aaudioFormat == AAUDIO_FORMAT_PCM_FLOAT) {
         aaudioFormat = AAUDIO_FORMAT_PCM_I16;
     }
