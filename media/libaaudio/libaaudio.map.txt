@@ -3,6 +3,8 @@ LIBAAUDIO {
     AAudio_convertResultToText;
     AAudio_convertStreamStateToText;
     AAudio_createStreamBuilder;
+    AAudio_getMMapPolicy;
+    AAudio_setMMapPolicy;
     AAudioStreamBuilder_setPerformanceMode;
     AAudioStreamBuilder_setDeviceId;
     AAudioStreamBuilder_setDataCallback;
@@ -43,6 +45,7 @@ LIBAAUDIO {
     AAudioStream_getFramesWritten;
     AAudioStream_getFramesRead;
     AAudioStream_getTimestamp;
+    AAudioStream_isMMapUsed;
   local:
     *;
 };
