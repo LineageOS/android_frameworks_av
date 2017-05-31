@@ -20,15 +20,22 @@
 #include <stdlib.h>
 #include <math.h>
 #include <aaudio/AAudio.h>
+#include <aaudio/AAudioTesting.h>
 #include "AAudioExampleUtils.h"
 #include "AAudioSimplePlayer.h"
 
 #define SAMPLE_RATE           48000
 #define NUM_SECONDS           20
 
-#define REQUESTED_FORMAT  AAUDIO_FORMAT_PCM_I16
-#define REQUESTED_SHARING_MODE  AAUDIO_SHARING_MODE_SHARED
-//#define REQUESTED_SHARING_MODE  AAUDIO_SHARING_MODE_EXCLUSIVE
+#define MMAP_POLICY              AAUDIO_UNSPECIFIED
+//#define MMAP_POLICY              AAUDIO_POLICY_NEVER
+//#define MMAP_POLICY              AAUDIO_POLICY_AUTO
+//#define MMAP_POLICY              AAUDIO_POLICY_ALWAYS
+
+#define REQUESTED_FORMAT         AAUDIO_FORMAT_PCM_I16
+
+#define REQUESTED_SHARING_MODE   AAUDIO_SHARING_MODE_SHARED
+//#define REQUESTED_SHARING_MODE   AAUDIO_SHARING_MODE_EXCLUSIVE
 
 
 int main(int argc, char **argv)
@@ -64,6 +71,9 @@ int main(int argc, char **argv)
 
     printf("%s - Play a sine wave using AAudio\n", argv[0]);
 
+    AAudio_setMMapPolicy(MMAP_POLICY);
+    printf("requested MMapPolicy = %d\n", AAudio_getMMapPolicy());
+
     player.setSharingMode(REQUESTED_SHARING_MODE);
 
     result = player.open(requestedChannelCount, requestedSampleRate, requestedDataFormat,
@@ -98,7 +108,7 @@ int main(int argc, char **argv)
     // This is the number of frames that are read in one chunk by a DMA controller
     // or a DSP or a mixer.
     framesPerBurst = AAudioStream_getFramesPerBurst(aaudioStream);
-    printf("Buffer: bufferSize = %d\n", AAudioStream_getBufferSizeInFrames(aaudioStream));
+    printf("Buffer: bufferSize     = %d\n", AAudioStream_getBufferSizeInFrames(aaudioStream));
     bufferCapacity = AAudioStream_getBufferCapacityInFrames(aaudioStream);
     printf("Buffer: bufferCapacity = %d, remainder = %d\n",
            bufferCapacity, bufferCapacity % framesPerBurst);
@@ -112,11 +122,12 @@ int main(int argc, char **argv)
     printf("Buffer: framesPerBurst = %d\n",framesPerBurst);
     printf("Buffer: framesPerWrite = %d\n",framesPerWrite);
 
-    actualDataFormat = AAudioStream_getFormat(aaudioStream);
-    printf("DataFormat: requested = %d, actual = %d\n", REQUESTED_FORMAT, actualDataFormat);
-    // TODO handle other data formats
+    printf("PerformanceMode        = %d\n", AAudioStream_getPerformanceMode(aaudioStream));
+    printf("is MMAP used?          = %s\n", AAudioStream_isMMapUsed(aaudioStream) ? "yes" : "no");
 
-    printf("PerformanceMode: %d\n", AAudioStream_getPerformanceMode(aaudioStream));
+    actualDataFormat = AAudioStream_getFormat(aaudioStream);
+    printf("DataFormat: requested  = %d, actual = %d\n", REQUESTED_FORMAT, actualDataFormat);
+    // TODO handle other data formats
 
     // Allocate a buffer for the audio data.
     if (actualDataFormat == AAUDIO_FORMAT_PCM_FLOAT) {
