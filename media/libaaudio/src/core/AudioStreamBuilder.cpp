@@ -22,15 +22,20 @@
 #include <stdint.h>
 
 #include <aaudio/AAudio.h>
+#include <aaudio/AAudioTesting.h>
 
 #include "binding/AAudioBinderClient.h"
-#include "client/AudioStreamInternal.h"
+#include "client/AudioStreamInternalCapture.h"
+#include "client/AudioStreamInternalPlay.h"
 #include "core/AudioStream.h"
 #include "core/AudioStreamBuilder.h"
 #include "legacy/AudioStreamRecord.h"
 #include "legacy/AudioStreamTrack.h"
 
 using namespace aaudio;
+
+#define AAUDIO_MMAP_POLICY_DEFAULT             AAUDIO_POLICY_NEVER
+#define AAUDIO_MMAP_EXCLUSIVE_POLICY_DEFAULT   AAUDIO_POLICY_NEVER
 
 /*
  * AudioStreamBuilder
@@ -51,17 +56,18 @@ static aaudio_result_t builder_createStream(aaudio_direction_t direction,
     switch (direction) {
 
         case AAUDIO_DIRECTION_INPUT:
-            if (sharingMode == AAUDIO_SHARING_MODE_SHARED) {
-                *audioStreamPtr = new AudioStreamRecord();
+            if (tryMMap) {
+                *audioStreamPtr = new AudioStreamInternalCapture(AAudioBinderClient::getInstance(),
+                                                                 false);
             } else {
-                ALOGE("AudioStreamBuilder(): bad sharing mode = %d for input", sharingMode);
-                result = AAUDIO_ERROR_ILLEGAL_ARGUMENT;
+                *audioStreamPtr = new AudioStreamRecord();
             }
             break;
 
         case AAUDIO_DIRECTION_OUTPUT:
             if (tryMMap) {
-                *audioStreamPtr = new AudioStreamInternal(AAudioBinderClient::getInstance(), false);
+                *audioStreamPtr = new AudioStreamInternalPlay(AAudioBinderClient::getInstance(),
+                                                              false);
             } else {
                 *audioStreamPtr = new AudioStreamTrack();
             }
@@ -74,27 +80,41 @@ static aaudio_result_t builder_createStream(aaudio_direction_t direction,
     return result;
 }
 
-// Try to open using MMAP path if that is enabled.
-// Fall back to Legacy path is MMAP not available.
+// Try to open using MMAP path if that is allowed.
+// Fall back to Legacy path if MMAP not available.
+// Exact behavior is controlled by MMapPolicy.
 aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     AudioStream *audioStream = nullptr;
     *streamPtr = nullptr;
 
-    int32_t mmapEnabled = AAudioProperty_getMMapEnabled();
-    int32_t mmapExclusiveEnabled = AAudioProperty_getMMapExclusiveEnabled();
-    ALOGD("AudioStreamBuilder(): mmapEnabled = %d, mmapExclusiveEnabled = %d",
-          mmapEnabled, mmapExclusiveEnabled);
+    // The API setting is the highest priority.
+    aaudio_policy_t mmapPolicy = AAudio_getMMapPolicy();
+    // If not specified then get from a system property.
+    if (mmapPolicy == AAUDIO_UNSPECIFIED) {
+        mmapPolicy = AAudioProperty_getMMapPolicy();
+    }
+    // If still not specified then use the default.
+    if (mmapPolicy == AAUDIO_UNSPECIFIED) {
+        mmapPolicy = AAUDIO_MMAP_POLICY_DEFAULT;
+    }
+
+    int32_t mapExclusivePolicy = AAudioProperty_getMMapExclusivePolicy();
+    if (mapExclusivePolicy == AAUDIO_UNSPECIFIED) {
+        mapExclusivePolicy = AAUDIO_MMAP_EXCLUSIVE_POLICY_DEFAULT;
+    }
+    ALOGD("AudioStreamBuilder(): mmapPolicy = %d, mapExclusivePolicy = %d",
+          mmapPolicy, mapExclusivePolicy);
 
     aaudio_sharing_mode_t sharingMode = getSharingMode();
     if ((sharingMode == AAUDIO_SHARING_MODE_EXCLUSIVE)
-        && (mmapExclusiveEnabled == AAUDIO_USE_NEVER)) {
+        && (mapExclusivePolicy == AAUDIO_POLICY_NEVER)) {
         ALOGW("AudioStreamBuilder(): EXCLUSIVE sharing mode not supported. Use SHARED.");
         sharingMode = AAUDIO_SHARING_MODE_SHARED;
         setSharingMode(sharingMode);
     }
 
-    bool allowMMap = mmapEnabled != AAUDIO_USE_NEVER;
-    bool allowLegacy = mmapEnabled != AAUDIO_USE_ALWAYS;
+    bool allowMMap = mmapPolicy != AAUDIO_POLICY_NEVER;
+    bool allowLegacy = mmapPolicy != AAUDIO_POLICY_ALWAYS;
 
     aaudio_result_t result = builder_createStream(getDirection(), sharingMode,
                                                   allowMMap, &audioStream);
@@ -125,6 +145,5 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
         }
     }
 
-    ALOGD("AudioStreamBuilder(): returned %d", result);
     return result;
 }

@@ -25,6 +25,7 @@
 #include <android/hardware/drm/1.0/IDrmPlugin.h>
 #include <android/hardware/drm/1.0/types.h>
 #include <android/hidl/manager/1.0/IServiceManager.h>
+#include <hidl/ServiceManagement.h>
 
 #include <media/DrmHal.h>
 #include <media/DrmSessionClientInterface.h>
@@ -200,7 +201,7 @@ DrmHal::~DrmHal() {
 Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
     Vector<sp<IDrmFactory>> factories;
 
-    auto manager = ::IServiceManager::getService();
+    auto manager = hardware::defaultServiceManager();
 
     if (manager != NULL) {
         manager->listByInterface(IDrmFactory::descriptor,

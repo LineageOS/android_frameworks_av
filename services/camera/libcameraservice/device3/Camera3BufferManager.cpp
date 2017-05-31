@@ -128,11 +128,9 @@ status_t Camera3BufferManager::unregisterStream(int streamId, int streamSetId) {
 
     // De-list all the buffers associated with this stream first.
     StreamSet& currentSet = mStreamSetMap.editValueFor(streamSetId);
-    BufferList& freeBufs = currentSet.freeBuffers;
     BufferCountMap& handOutBufferCounts = currentSet.handoutBufferCountMap;
     BufferCountMap& attachedBufferCounts = currentSet.attachedBufferCountMap;
     InfoMap& infoMap = currentSet.streamInfoMap;
-    removeBuffersFromBufferListLocked(freeBufs, streamId);
     handOutBufferCounts.removeItem(streamId);
     attachedBufferCounts.removeItem(streamId);
 
@@ -151,7 +149,7 @@ status_t Camera3BufferManager::unregisterStream(int streamId, int streamSetId) {
     currentSet.allocatedBufferWaterMark = 0;
 
     // Remove this stream set if all its streams have been removed.
-    if (freeBufs.size() == 0 && handOutBufferCounts.size() == 0 && infoMap.size() == 0) {
+    if (handOutBufferCounts.size() == 0 && infoMap.size() == 0) {
         mStreamSetMap.removeItem(streamSetId);
     }
 
@@ -191,31 +189,25 @@ status_t Camera3BufferManager::getBufferForStream(int streamId, int streamSetId,
     }
     ALOGV("Stream %d set %d: Get buffer for stream: Allocate new", streamId, streamSetId);
 
-    GraphicBufferEntry buffer =
-            getFirstBufferFromBufferListLocked(streamSet.freeBuffers, streamId);
-
     if (mGrallocVersion < HARDWARE_DEVICE_API_VERSION(1,0)) {
-        // Allocate one if there is no free buffer available.
-        if (buffer.graphicBuffer == nullptr) {
-            const StreamInfo& info = streamSet.streamInfoMap.valueFor(streamId);
-            buffer.fenceFd = -1;
+        const StreamInfo& info = streamSet.streamInfoMap.valueFor(streamId);
+        GraphicBufferEntry buffer;
+        buffer.fenceFd = -1;
+        buffer.graphicBuffer = new GraphicBuffer(
+                info.width, info.height, PixelFormat(info.format), info.combinedUsage,
+                std::string("Camera3BufferManager pid [") +
+                        std::to_string(getpid()) + "]");
+        status_t res = buffer.graphicBuffer->initCheck();
 
-            buffer.graphicBuffer = new GraphicBuffer(
-                    info.width, info.height, PixelFormat(info.format), info.combinedUsage,
-                    std::string("Camera3BufferManager pid [") +
-                            std::to_string(getpid()) + "]");
-            status_t res = buffer.graphicBuffer->initCheck();
-
-            ALOGV("%s: allocating a new graphic buffer (%dx%d, format 0x%x) %p with handle %p",
-                    __FUNCTION__, info.width, info.height, info.format,
-                    buffer.graphicBuffer.get(), buffer.graphicBuffer->handle);
-            if (res < 0) {
-                ALOGE("%s: graphic buffer allocation failed: (error %d %s) ",
-                        __FUNCTION__, res, strerror(-res));
-                return res;
-            }
-            ALOGV("%s: allocation done", __FUNCTION__);
+        ALOGV("%s: allocating a new graphic buffer (%dx%d, format 0x%x) %p with handle %p",
+                __FUNCTION__, info.width, info.height, info.format,
+                buffer.graphicBuffer.get(), buffer.graphicBuffer->handle);
+        if (res < 0) {
+            ALOGE("%s: graphic buffer allocation failed: (error %d %s) ",
+                    __FUNCTION__, res, strerror(-res));
+            return res;
         }
+        ALOGV("%s: allocation done", __FUNCTION__);
 
         // Increase the hand-out and attached buffer counts for tracking purposes.
         bufferCount++;
@@ -242,17 +234,12 @@ status_t Camera3BufferManager::getBufferForStream(int streamId, int streamSetId,
             for (size_t i = 0; i < streamSet.streamInfoMap.size(); i++) {
                 firstOtherStreamId = streamSet.streamInfoMap[i].streamId;
                 if (firstOtherStreamId != streamId) {
-
                     size_t otherBufferCount  =
                             streamSet.handoutBufferCountMap.valueFor(firstOtherStreamId);
                     size_t otherAttachedBufferCount =
                             streamSet.attachedBufferCountMap.valueFor(firstOtherStreamId);
                     if (otherAttachedBufferCount > otherBufferCount) {
                         freeBufferIsAttached = true;
-                        break;
-                    }
-                    if (hasBufferForStreamLocked(streamSet.freeBuffers, firstOtherStreamId)) {
-                        freeBufferIsAttached = false;
                         break;
                     }
                 }
@@ -263,8 +250,8 @@ status_t Camera3BufferManager::getBufferForStream(int streamId, int streamSetId,
             }
 
             // This will drop the reference to one free buffer, which will effectively free one
-            // buffer (from the free buffer list) for the inactive streams.
-            size_t totalAllocatedBufferCount = streamSet.freeBuffers.size();
+            // buffer for the inactive streams.
+            size_t totalAllocatedBufferCount = 0;
             for (size_t i = 0; i < streamSet.attachedBufferCountMap.size(); i++) {
                 totalAllocatedBufferCount += streamSet.attachedBufferCountMap[i];
             }
@@ -294,9 +281,6 @@ status_t Camera3BufferManager::getBufferForStream(int streamId, int streamSetId,
                     size_t& otherAttachedBufferCount =
                             streamSet.attachedBufferCountMap.editValueFor(firstOtherStreamId);
                     otherAttachedBufferCount--;
-                } else {
-                    // Droppable buffer is in the free buffer list, grab and drop
-                    getFirstBufferFromBufferListLocked(streamSet.freeBuffers, firstOtherStreamId);
                 }
             }
         }
@@ -335,40 +319,42 @@ status_t Camera3BufferManager::onBufferReleased(int streamId, int streamSetId) {
     return OK;
 }
 
-status_t Camera3BufferManager::returnBufferForStream(int streamId,
-        int streamSetId, const sp<GraphicBuffer>& buffer, int fenceFd) {
+status_t Camera3BufferManager::onBuffersRemoved(int streamId, int streamSetId, size_t count) {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);
-    ALOGV_IF(buffer != 0, "%s: return buffer (%p) with handle (%p) for stream %d and stream set %d",
-            __FUNCTION__, buffer.get(), buffer->handle, streamId, streamSetId);
+
+    ALOGV("Stream %d set %d: Buffer removed", streamId, streamSetId);
 
     if (!checkIfStreamRegisteredLocked(streamId, streamSetId)){
-        ALOGV("%s: returning buffer for an already unregistered stream (stream %d with set id %d),"
-                "buffer will be dropped right away!", __FUNCTION__, streamId, streamSetId);
+        ALOGV("%s: signaling buffer removal for an already unregistered stream "
+                "(stream %d with set id %d)", __FUNCTION__, streamId, streamSetId);
         return OK;
     }
 
     if (mGrallocVersion < HARDWARE_DEVICE_API_VERSION(1,0)) {
-        // Add to the freeBuffer list.
         StreamSet& streamSet = mStreamSetMap.editValueFor(streamSetId);
-        if (buffer != 0) {
-            BufferEntry entry;
-            entry.add(streamId, GraphicBufferEntry(buffer, fenceFd));
-            status_t res = addBufferToBufferListLocked(streamSet.freeBuffers, entry);
-            if (res != OK) {
-                ALOGE("%s: add buffer to free buffer list failed", __FUNCTION__);
-                return res;
-            }
+        BufferCountMap& handOutBufferCounts = streamSet.handoutBufferCountMap;
+        size_t& totalHandoutCount = handOutBufferCounts.editValueFor(streamId);
+        BufferCountMap& attachedBufferCounts = streamSet.attachedBufferCountMap;
+        size_t& totalAttachedCount = attachedBufferCounts.editValueFor(streamId);
+
+        if (count > totalHandoutCount) {
+            ALOGE("%s: Removed buffer count %zu greater than current handout count %zu",
+                    __FUNCTION__, count, totalHandoutCount);
+            return BAD_VALUE;
+        }
+        if (count > totalAttachedCount) {
+            ALOGE("%s: Removed buffer count %zu greater than current attached count %zu",
+                  __FUNCTION__, count, totalAttachedCount);
+            return BAD_VALUE;
         }
 
-        // Update the handed out and attached buffer count for this buffer.
-        BufferCountMap& handOutBufferCounts = streamSet.handoutBufferCountMap;
-        size_t& bufferCount = handOutBufferCounts.editValueFor(streamId);
-        bufferCount--;
-        size_t& attachedBufferCount = streamSet.attachedBufferCountMap.editValueFor(streamId);
-        attachedBufferCount--;
+        totalHandoutCount -= count;
+        totalAttachedCount -= count;
+        ALOGV("%s: Stream %d set %d: Buffer count now %zu, attached buffer count now %zu",
+                __FUNCTION__, streamId, streamSetId, totalHandoutCount, totalAttachedCount);
     } else {
-        // TODO: implement this.
+        // TODO: implement gralloc V1 support
         return BAD_VALUE;
     }
 
@@ -404,17 +390,6 @@ void Camera3BufferManager::dump(int fd, const Vector<String16>& args) const {
             lines.appendFormat("            stream id: %d, attached buffer count: %zu.\n",
                     streamId, bufferCount);
         }
-
-        lines.appendFormat("          Free buffer count: %zu\n",
-                mStreamSetMap[i].freeBuffers.size());
-        for (auto& bufEntry : mStreamSetMap[i].freeBuffers) {
-            for (size_t m = 0; m < bufEntry.size(); m++) {
-                const sp<GraphicBuffer>& buffer = bufEntry.valueAt(m).graphicBuffer;
-                int streamId = bufEntry.keyAt(m);
-                lines.appendFormat("            stream id: %d, buffer: %p, handle: %p.\n",
-                        streamId, buffer.get(), buffer->handle);
-            }
-        }
     }
     write(fd, lines.string(), lines.size());
 }
@@ -442,68 +417,6 @@ bool Camera3BufferManager::checkIfStreamRegisteredLocked(int streamId, int strea
     }
 
     return true;
-}
-
-status_t Camera3BufferManager::addBufferToBufferListLocked(BufferList& bufList,
-        const BufferEntry& buffer) {
-    // TODO: need add some sanity check here.
-    bufList.push_back(buffer);
-
-    return OK;
-}
-
-status_t Camera3BufferManager::removeBuffersFromBufferListLocked(BufferList& bufferList,
-        int streamId) {
-    BufferList::iterator i = bufferList.begin();
-    while (i != bufferList.end()) {
-        ssize_t idx = i->indexOfKey(streamId);
-        if (idx != NAME_NOT_FOUND) {
-            ALOGV("%s: Remove a buffer for stream %d, free buffer total count: %zu",
-                    __FUNCTION__, streamId, bufferList.size());
-            i->removeItem(streamId);
-            if (i->isEmpty()) {
-                i = bufferList.erase(i);
-            }
-        } else {
-            i++;
-        }
-    }
-
-    return OK;
-}
-
-bool Camera3BufferManager::hasBufferForStreamLocked(BufferList& buffers, int streamId) {
-    BufferList::iterator i = buffers.begin();
-    while (i != buffers.end()) {
-        ssize_t idx = i->indexOfKey(streamId);
-        if (idx != NAME_NOT_FOUND) {
-            return true;
-        }
-        i++;
-    }
-
-    return false;
-}
-
-Camera3BufferManager::GraphicBufferEntry Camera3BufferManager::getFirstBufferFromBufferListLocked(
-        BufferList& buffers, int streamId) {
-    // Try to get the first buffer from the free buffer list if there is one.
-    GraphicBufferEntry entry;
-    BufferList::iterator i = buffers.begin();
-    while (i != buffers.end()) {
-        ssize_t idx = i->indexOfKey(streamId);
-        if (idx != NAME_NOT_FOUND) {
-            entry = GraphicBufferEntry(i->valueAt(idx));
-            i = buffers.erase(i);
-            break;
-        } else {
-            i++;
-        }
-    }
-
-    ALOGV_IF(entry.graphicBuffer == 0, "%s: Unable to find free buffer for stream %d",
-            __FUNCTION__, streamId);
-    return entry;
 }
 
 } // namespace camera3

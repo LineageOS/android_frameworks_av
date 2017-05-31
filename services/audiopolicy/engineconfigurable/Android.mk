@@ -16,9 +16,9 @@ LOCAL_SRC_FILES := \
     src/InputSource.cpp \
 
 audio_policy_engine_includes_common := \
-    $(TOPDIR)frameworks/av/services/audiopolicy/engineconfigurable/include \
-    $(TOPDIR)frameworks/av/services/audiopolicy/engineconfigurable/interface \
-    $(TOPDIR)frameworks/av/services/audiopolicy/engine/interface
+    frameworks/av/services/audiopolicy/engineconfigurable/include \
+    frameworks/av/services/audiopolicy/engineconfigurable/interface \
+    frameworks/av/services/audiopolicy/engine/interface
 
 LOCAL_CFLAGS += \
     -Wall \
@@ -33,7 +33,7 @@ LOCAL_C_INCLUDES := \
     $(TARGET_OUT_HEADERS)/hw \
     $(call include-path-for, frameworks-av) \
     $(call include-path-for, audio-utils) \
-    $(TOPDIR)frameworks/av/services/audiopolicy/common/include
+    frameworks/av/services/audiopolicy/common/include
 
 LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
 

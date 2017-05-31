@@ -23,6 +23,9 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaDefs.h>
 
+static int kDefaultChannelCount = 1;
+static int kDefaultSamplingRate = 48000;
+
 extern "C" {
     #include <Tremolo/codec_internal.h>
 
@@ -148,8 +151,8 @@ OMX_ERRORTYPE SoftVorbis::internalGetParameter(
             vorbisParams->bDownmix = OMX_FALSE;
 
             if (!isConfigured()) {
-                vorbisParams->nChannels = 1;
-                vorbisParams->nSampleRate = 44100;
+                vorbisParams->nChannels = kDefaultChannelCount;
+                vorbisParams->nSampleRate = kDefaultSamplingRate;
             } else {
                 vorbisParams->nChannels = mVi->channels;
                 vorbisParams->nSampleRate = mVi->rate;
@@ -157,7 +160,6 @@ OMX_ERRORTYPE SoftVorbis::internalGetParameter(
                 vorbisParams->nMinBitRate = mVi->bitrate_lower;
                 vorbisParams->nMaxBitRate = mVi->bitrate_upper;
             }
-
             return OMX_ErrorNone;
         }
 
@@ -183,8 +185,8 @@ OMX_ERRORTYPE SoftVorbis::internalGetParameter(
             pcmParams->eChannelMapping[1] = OMX_AUDIO_ChannelRF;
 
             if (!isConfigured()) {
-                pcmParams->nChannels = 1;
-                pcmParams->nSamplingRate = 44100;
+                pcmParams->nChannels = kDefaultChannelCount;
+                pcmParams->nSamplingRate = kDefaultSamplingRate;
             } else {
                 pcmParams->nChannels = mVi->channels;
                 pcmParams->nSamplingRate = mVi->rate;
@@ -313,8 +315,12 @@ void SoftVorbis::onQueueFilled(OMX_U32 portIndex) {
             mState = new vorbis_dsp_state;
             CHECK_EQ(0, vorbis_dsp_init(mState, mVi));
 
-            notify(OMX_EventPortSettingsChanged, 1, 0, NULL);
-            mOutputPortSettingsChange = AWAITING_DISABLED;
+            if (mVi->rate != kDefaultSamplingRate ||
+                    mVi->channels != kDefaultChannelCount) {
+                ALOGV("vorbis: rate/channels changed: %ld/%d", mVi->rate, mVi->channels);
+                notify(OMX_EventPortSettingsChanged, 1, 0, NULL);
+                mOutputPortSettingsChange = AWAITING_DISABLED;
+            }
         }
 
         inQueue.erase(inQueue.begin());

@@ -64,7 +64,6 @@ aaudio_result_t AAudioServiceStreamBase::close() {
 }
 
 aaudio_result_t AAudioServiceStreamBase::start() {
-    ALOGD("AAudioServiceStreamBase::start() send AAUDIO_SERVICE_EVENT_STARTED");
     sendServiceEvent(AAUDIO_SERVICE_EVENT_STARTED);
     mState = AAUDIO_STREAM_STATE_STARTED;
     mThreadEnabled.store(true);
@@ -80,7 +79,6 @@ aaudio_result_t AAudioServiceStreamBase::pause() {
         processError();
         return result;
     }
-    ALOGD("AAudioServiceStreamBase::pause() send AAUDIO_SERVICE_EVENT_PAUSED");
     sendServiceEvent(AAUDIO_SERVICE_EVENT_PAUSED);
     mState = AAUDIO_STREAM_STATE_PAUSED;
     return result;
@@ -95,20 +93,18 @@ aaudio_result_t AAudioServiceStreamBase::stop() {
         processError();
         return result;
     }
-    ALOGD("AAudioServiceStreamBase::stop() send AAUDIO_SERVICE_EVENT_STOPPED");
     sendServiceEvent(AAUDIO_SERVICE_EVENT_STOPPED);
     mState = AAUDIO_STREAM_STATE_STOPPED;
     return result;
 }
 
 aaudio_result_t AAudioServiceStreamBase::flush() {
-    ALOGD("AAudioServiceStreamBase::flush() send AAUDIO_SERVICE_EVENT_FLUSHED");
     sendServiceEvent(AAUDIO_SERVICE_EVENT_FLUSHED);
     mState = AAUDIO_STREAM_STATE_FLUSHED;
     return AAUDIO_OK;
 }
 
-// implement Runnable
+// implement Runnable, periodically send timestamps to client
 void AAudioServiceStreamBase::run() {
     ALOGD("AAudioServiceStreamBase::run() entering ----------------");
     TimestampScheduler timestampScheduler;
@@ -162,17 +158,17 @@ aaudio_result_t AAudioServiceStreamBase::writeUpMessageQueue(AAudioServiceMessag
 
 aaudio_result_t AAudioServiceStreamBase::sendCurrentTimestamp() {
     AAudioServiceMessage command;
-    //ALOGD("sendCurrentTimestamp() called");
     aaudio_result_t result = getFreeRunningPosition(&command.timestamp.position,
                                                     &command.timestamp.timestamp);
     if (result == AAUDIO_OK) {
-        //ALOGD("sendCurrentTimestamp(): position %d", (int) command.timestamp.position);
+    //    ALOGD("sendCurrentTimestamp(): position = %lld, nanos = %lld",
+    //          (long long) command.timestamp.position,
+    //          (long long) command.timestamp.timestamp);
         command.what = AAudioServiceMessage::code::TIMESTAMP;
         result = writeUpMessageQueue(&command);
     }
     return result;
 }
-
 
 /**
  * Get an immutable description of the in-memory queues

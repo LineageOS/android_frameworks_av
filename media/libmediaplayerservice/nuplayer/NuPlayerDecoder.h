@@ -99,6 +99,8 @@ private:
     bool mIsAudio;
     bool mIsVideoAVC;
     bool mIsSecure;
+    bool mIsEncrypted;
+    bool mIsEncryptedObservedEarlier;
     bool mFormatChangePending;
     bool mTimeChangePending;
     float mFrameRateTotal;

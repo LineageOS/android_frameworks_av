@@ -53,7 +53,6 @@ AAudioServiceStreamMMAP::~AAudioServiceStreamMMAP() {
 }
 
 aaudio_result_t AAudioServiceStreamMMAP::close() {
-    ALOGD("AAudioServiceStreamMMAP::close() called, %p", mMmapStream.get());
     mMmapStream.clear(); // TODO review. Is that all we have to do?
     // Apparently the above close is asynchronous. An attempt to open a new device
     // right after a close can fail. Also some callbacks may still be in flight!
@@ -61,8 +60,6 @@ aaudio_result_t AAudioServiceStreamMMAP::close() {
     AudioClock::sleepForNanos(100 * AAUDIO_NANOS_PER_MILLISECOND);
 
     if (mAudioDataFileDescriptor != -1) {
-        ALOGV("AAudioServiceStreamMMAP: LEAK? close(mAudioDataFileDescriptor = %d)\n",
-              mAudioDataFileDescriptor);
         ::close(mAudioDataFileDescriptor);
         mAudioDataFileDescriptor = -1;
     }
@@ -76,7 +73,7 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
     const audio_attributes_t attributes = {
         .content_type = AUDIO_CONTENT_TYPE_MUSIC,
         .usage = AUDIO_USAGE_MEDIA,
-        .source = AUDIO_SOURCE_DEFAULT,
+        .source = AUDIO_SOURCE_VOICE_RECOGNITION,
         .flags = AUDIO_FLAG_LOW_LATENCY,
         .tags = ""
     };
@@ -91,9 +88,6 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
     const AAudioStreamConfiguration &configurationInput = request.getConstantConfiguration();
     audio_port_handle_t deviceId = configurationInput.getDeviceId();
 
-    // ALOGI("open request dump()");
-    // request.dump();
-
     mMmapClient.clientUid = request.getUserId();
     mMmapClient.clientPid = request.getProcessId();
     aaudio_direction_t direction = request.getDirection();
@@ -101,7 +95,6 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
     // Fill in config
     aaudio_audio_format_t aaudioFormat = configurationInput.getAudioFormat();
     if (aaudioFormat == AAUDIO_UNSPECIFIED || aaudioFormat == AAUDIO_FORMAT_PCM_FLOAT) {
-        ALOGI("open forcing use of AAUDIO_FORMAT_PCM_I16");
         aaudioFormat = AAUDIO_FORMAT_PCM_I16;
     }
     config.format = AAudioConvert_aaudioToAndroidDataFormat(aaudioFormat);
@@ -131,9 +124,6 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
 
     MmapStreamInterface::stream_direction_t streamDirection = (direction == AAUDIO_DIRECTION_OUTPUT)
         ? MmapStreamInterface::DIRECTION_OUTPUT : MmapStreamInterface::DIRECTION_INPUT;
-
-    ALOGD("AAudioServiceStreamMMAP::open() request devId = %d, sRate = %d",
-          deviceId, config.sample_rate);
 
     // Open HAL stream.
     status_t status = MmapStreamInterface::openMmapStream(streamDirection,
@@ -171,8 +161,6 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
                            : audio_channel_count_from_in_mask(config.channel_mask);
 
     mAudioDataFileDescriptor = mMmapBufferinfo.shared_memory_fd;
-    ALOGV("AAudioServiceStreamMMAP::open LEAK? mAudioDataFileDescriptor = %d\n",
-          mAudioDataFileDescriptor);
     mFramesPerBurst = mMmapBufferinfo.burst_size_frames;
     mCapacityInFrames = mMmapBufferinfo.buffer_size_frames;
     mAudioFormat = AAudioConvert_androidToAAudioDataFormat(config.format);
@@ -193,9 +181,6 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
     ALOGD("AAudioServiceStreamMMAP::open() original burst = %d, minMicros = %d, final burst = %d\n",
           mMmapBufferinfo.burst_size_frames, burstMinMicros, mFramesPerBurst);
 
-    ALOGD("AAudioServiceStreamMMAP::open() got devId = %d, sRate = %d",
-          deviceId, config.sample_rate);
-
     // Fill in AAudioStreamConfiguration
     configurationOutput.setSampleRate(mSampleRate);
     configurationOutput.setSamplesPerFrame(mSamplesPerFrame);
@@ -205,16 +190,17 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
     return AAUDIO_OK;
 }
 
-
 /**
  * Start the flow of data.
  */
 aaudio_result_t AAudioServiceStreamMMAP::start() {
     if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
-    aaudio_result_t result = mMmapStream->start(mMmapClient, &mPortHandle);
-    if (result != AAUDIO_OK) {
-        ALOGE("AAudioServiceStreamMMAP::start() mMmapStream->start() returned %d", result);
+    aaudio_result_t result;
+    status_t status = mMmapStream->start(mMmapClient, &mPortHandle);
+    if (status != OK) {
+        ALOGE("AAudioServiceStreamMMAP::start() mMmapStream->start() returned %d", status);
         processError();
+        result = AAudioConvert_androidToAAudioResult(status);
     } else {
         result = AAudioServiceStreamBase::start();
     }
@@ -228,18 +214,18 @@ aaudio_result_t AAudioServiceStreamMMAP::pause() {
     if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
 
     aaudio_result_t result1 = AAudioServiceStreamBase::pause();
-    aaudio_result_t result2 = mMmapStream->stop(mPortHandle);
+    status_t status = mMmapStream->stop(mPortHandle);
     mFramesRead.reset32();
-    return (result1 != AAUDIO_OK) ? result1 : result2;
+    return (result1 != AAUDIO_OK) ? result1 : AAudioConvert_androidToAAudioResult(status);
 }
 
 aaudio_result_t AAudioServiceStreamMMAP::stop() {
     if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
 
     aaudio_result_t result1 = AAudioServiceStreamBase::stop();
-    aaudio_result_t result2 = mMmapStream->stop(mPortHandle);
+    aaudio_result_t status = mMmapStream->stop(mPortHandle);
     mFramesRead.reset32();
-    return (result1 != AAUDIO_OK) ? result1 : result2;
+    return (result1 != AAUDIO_OK) ? result1 :  AAudioConvert_androidToAAudioResult(status);
 }
 
 /**
@@ -248,7 +234,6 @@ aaudio_result_t AAudioServiceStreamMMAP::stop() {
 aaudio_result_t AAudioServiceStreamMMAP::flush() {
     if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
     // TODO how do we flush an MMAP/NOIRQ buffer? sync pointers?
-    ALOGD("AAudioServiceStreamMMAP::flush() send AAUDIO_SERVICE_EVENT_FLUSHED");
     sendServiceEvent(AAUDIO_SERVICE_EVENT_FLUSHED);
     mState = AAUDIO_STREAM_STATE_FLUSHED;
     return AAudioServiceStreamBase::flush();;
@@ -276,7 +261,7 @@ aaudio_result_t AAudioServiceStreamMMAP::getFreeRunningPosition(int64_t *positio
 }
 
 void AAudioServiceStreamMMAP::onTearDown() {
-    ALOGD("AAudioServiceStreamMMAP::onTearDown() called - TODO");
+    ALOGE("AAudioServiceStreamMMAP::onTearDown() called - TODO");
 };
 
 void AAudioServiceStreamMMAP::onVolumeChanged(audio_channel_mask_t channels,

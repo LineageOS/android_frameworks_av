@@ -44,43 +44,23 @@ using namespace aaudio;   // TODO just import names needed
 // This is the maximum size in frames. The effective size can be tuned smaller at runtime.
 #define DEFAULT_BUFFER_CAPACITY   (48 * 8)
 
-// The mStreamInternal will use a service interface that does not go through Binder.
-AAudioServiceEndpoint::AAudioServiceEndpoint(AAudioService &audioService)
-        : mStreamInternal(audioService, true)
-        {
-}
-
-AAudioServiceEndpoint::~AAudioServiceEndpoint() {
-}
-
 // Set up an EXCLUSIVE MMAP stream that will be shared.
-aaudio_result_t AAudioServiceEndpoint::open(int32_t deviceId, aaudio_direction_t direction) {
+aaudio_result_t AAudioServiceEndpoint::open(int32_t deviceId) {
+    mStreamInternal = getStreamInternal();
+
     AudioStreamBuilder builder;
     builder.setSharingMode(AAUDIO_SHARING_MODE_EXCLUSIVE);
     // Don't fall back to SHARED because that would cause recursion.
     builder.setSharingModeMatchRequired(true);
     builder.setDeviceId(deviceId);
-    builder.setDirection(direction);
+    builder.setDirection(getDirection());
     builder.setBufferCapacity(DEFAULT_BUFFER_CAPACITY);
 
-    aaudio_result_t result = mStreamInternal.open(builder);
-    if (result == AAUDIO_OK) {
-        mMixer.allocate(mStreamInternal.getSamplesPerFrame(), mStreamInternal.getFramesPerBurst());
-
-        int32_t burstsPerBuffer = AAudioProperty_getMixerBursts();
-        if (burstsPerBuffer == 0) {
-            mLatencyTuningEnabled = true;
-            burstsPerBuffer = 2;
-        }
-        ALOGD("AAudioServiceEndpoint(): burstsPerBuffer = %d", burstsPerBuffer);
-        int32_t desiredBufferSize = burstsPerBuffer * mStreamInternal.getFramesPerBurst();
-        mStreamInternal.setBufferSize(desiredBufferSize);
-    }
-    return result;
+    return getStreamInternal()->open(builder);
 }
 
 aaudio_result_t AAudioServiceEndpoint::close() {
-    return mStreamInternal.close();
+    return getStreamInternal()->close();
 }
 
 // TODO, maybe use an interface to reduce exposure
@@ -102,96 +82,49 @@ aaudio_result_t AAudioServiceEndpoint::startStream(AAudioServiceStreamShared *sh
     std::lock_guard<std::mutex> lock(mLockStreams);
     mRunningStreams.push_back(sharedStream);
     if (mRunningStreams.size() == 1) {
-        startMixer_l();
+        startSharingThread_l();
     }
     return AAUDIO_OK;
 }
 
 aaudio_result_t AAudioServiceEndpoint::stopStream(AAudioServiceStreamShared *sharedStream) {
-    std::lock_guard<std::mutex> lock(mLockStreams);
-    mRunningStreams.erase(std::remove(mRunningStreams.begin(), mRunningStreams.end(), sharedStream),
-              mRunningStreams.end());
-    if (mRunningStreams.size() == 0) {
-        stopMixer_l();
+    int numRunningStreams = 0;
+    {
+        std::lock_guard<std::mutex> lock(mLockStreams);
+        mRunningStreams.erase(
+                std::remove(mRunningStreams.begin(), mRunningStreams.end(), sharedStream),
+                mRunningStreams.end());
+        numRunningStreams = mRunningStreams.size();
+    }
+    if (numRunningStreams == 0) {
+        // Don't call this under a lock because the callbackLoop also uses the lock.
+        stopSharingThread();
     }
     return AAUDIO_OK;
 }
 
-static void *aaudio_mixer_thread_proc(void *context) {
-    AAudioServiceEndpoint *stream = (AAudioServiceEndpoint *) context;
-    if (stream != NULL) {
-        return stream->callbackLoop();
+static void *aaudio_endpoint_thread_proc(void *context) {
+    AAudioServiceEndpoint *endpoint = (AAudioServiceEndpoint *) context;
+    if (endpoint != NULL) {
+        return endpoint->callbackLoop();
     } else {
         return NULL;
     }
 }
 
-// Render audio in the application callback and then write the data to the stream.
-void *AAudioServiceEndpoint::callbackLoop() {
-    ALOGD("AAudioServiceEndpoint(): callbackLoop() entering");
-    int32_t underflowCount = 0;
-
-    aaudio_result_t result = mStreamInternal.requestStart();
-
-    // result might be a frame count
-    while (mCallbackEnabled.load() && mStreamInternal.isPlaying() && (result >= 0)) {
-        // Mix data from each active stream.
-        {
-            mMixer.clear();
-            std::lock_guard<std::mutex> lock(mLockStreams);
-            for(AAudioServiceStreamShared *sharedStream : mRunningStreams) {
-                FifoBuffer *fifo = sharedStream->getDataFifoBuffer();
-                float volume = 0.5; // TODO get from system
-                bool underflowed = mMixer.mix(fifo, volume);
-                underflowCount += underflowed ? 1 : 0;
-                // TODO log underflows in each stream
-                sharedStream->markTransferTime(AudioClock::getNanoseconds());
-            }
-        }
-
-        // Write audio data to stream using a blocking write.
-        int64_t timeoutNanos = calculateReasonableTimeout(mStreamInternal.getFramesPerBurst());
-        result = mStreamInternal.write(mMixer.getOutputBuffer(), getFramesPerBurst(), timeoutNanos);
-        if (result == AAUDIO_ERROR_DISCONNECTED) {
-            disconnectRegisteredStreams();
-            break;
-        } else if (result != getFramesPerBurst()) {
-            ALOGW("AAudioServiceEndpoint(): callbackLoop() wrote %d / %d",
-                  result, getFramesPerBurst());
-            break;
-        }
-    }
-
-    result = mStreamInternal.requestStop();
-
-    ALOGD("AAudioServiceEndpoint(): callbackLoop() exiting, %d underflows", underflowCount);
-    return NULL; // TODO review
-}
-
-aaudio_result_t AAudioServiceEndpoint::startMixer_l() {
+aaudio_result_t AAudioServiceEndpoint::startSharingThread_l() {
     // Launch the callback loop thread.
-    int64_t periodNanos = mStreamInternal.getFramesPerBurst()
+    int64_t periodNanos = getStreamInternal()->getFramesPerBurst()
                           * AAUDIO_NANOS_PER_SECOND
                           / getSampleRate();
     mCallbackEnabled.store(true);
-    return mStreamInternal.createThread(periodNanos, aaudio_mixer_thread_proc, this);
+    return getStreamInternal()->createThread(periodNanos, aaudio_endpoint_thread_proc, this);
 }
 
-aaudio_result_t AAudioServiceEndpoint::stopMixer_l() {
+aaudio_result_t AAudioServiceEndpoint::stopSharingThread() {
     mCallbackEnabled.store(false);
-    return mStreamInternal.joinThread(NULL, calculateReasonableTimeout(mStreamInternal.getFramesPerBurst()));
-}
-
-// TODO Call method in AudioStreamInternal when that callback CL is merged.
-int64_t AAudioServiceEndpoint::calculateReasonableTimeout(int32_t framesPerOperation) {
-
-    // Wait for at least a second or some number of callbacks to join the thread.
-    int64_t timeoutNanoseconds = (MIN_TIMEOUT_OPERATIONS * framesPerOperation * AAUDIO_NANOS_PER_SECOND)
-                                 / getSampleRate();
-    if (timeoutNanoseconds < MIN_TIMEOUT_NANOS) { // arbitrary number of seconds
-        timeoutNanoseconds = MIN_TIMEOUT_NANOS;
-    }
-    return timeoutNanoseconds;
+    aaudio_result_t result = getStreamInternal()->joinThread(NULL);
+    return result;
 }
 
 void AAudioServiceEndpoint::disconnectRegisteredStreams() {
