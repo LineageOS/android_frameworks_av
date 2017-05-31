@@ -644,6 +644,7 @@ void SoftAVC::onQueueFilled(OMX_U32 portIndex) {
                 handlePortSettingsChange(&portWillReset, width, height);
                 if (portWillReset) {
                     resetDecoder();
+                    resetPlugin();
                     return;
                 }
             } else if (mUpdateColorAspects) {
