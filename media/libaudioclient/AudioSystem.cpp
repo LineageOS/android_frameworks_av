@@ -19,6 +19,7 @@
 
 #include <utils/Log.h>
 #include <binder/IServiceManager.h>
+#include <binder/ProcessState.h>
 #include <media/AudioSystem.h>
 #include <media/IAudioFlinger.h>
 #include <media/IAudioPolicyService.h>
@@ -68,6 +69,8 @@ const sp<IAudioFlinger> AudioSystem::get_audio_flinger()
             gAudioFlinger = interface_cast<IAudioFlinger>(binder);
             LOG_ALWAYS_FATAL_IF(gAudioFlinger == 0);
             afc = gAudioFlingerClient;
+            // Make sure callbacks can be received by gAudioFlingerClient
+            ProcessState::self()->startThreadPool();
         }
         af = gAudioFlinger;
     }
@@ -711,6 +714,8 @@ const sp<IAudioPolicyService> AudioSystem::get_audio_policy_service()
             gAudioPolicyService = interface_cast<IAudioPolicyService>(binder);
             LOG_ALWAYS_FATAL_IF(gAudioPolicyService == 0);
             apc = gAudioPolicyServiceClient;
+            // Make sure callbacks can be received by gAudioPolicyServiceClient
+            ProcessState::self()->startThreadPool();
         }
         ap = gAudioPolicyService;
     }

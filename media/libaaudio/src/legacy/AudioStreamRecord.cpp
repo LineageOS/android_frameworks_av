@@ -99,15 +99,21 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     ALOGD("AudioStreamRecord::open(), request notificationFrames = %u, frameCount = %u",
           notificationFrames, (uint)frameCount);
     mAudioRecord = new AudioRecord(
+            mOpPackageName // const String16& opPackageName TODO does not compile
+            );
+    if (getDeviceId() != AAUDIO_UNSPECIFIED) {
+        mAudioRecord->setInputDevice(getDeviceId());
+    }
+    mAudioRecord->set(
             AUDIO_SOURCE_VOICE_RECOGNITION,
             getSampleRate(),
             format,
             channelMask,
-            mOpPackageName, // const String16& opPackageName TODO does not compile
             frameCount,
             callback,
             callbackData,
             notificationFrames,
+            false /*threadCanCallJava*/,
             AUDIO_SESSION_ALLOCATE,
             streamTransferType,
             flags
@@ -162,6 +168,8 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
              perfMode, actualPerformanceMode);
 
     setState(AAUDIO_STREAM_STATE_OPEN);
+    setDeviceId(mAudioRecord->getRoutedDeviceId());
+    mAudioRecord->addAudioDeviceCallback(mDeviceCallback);
 
     return AAUDIO_OK;
 }
@@ -209,6 +217,7 @@ aaudio_result_t AudioStreamRecord::requestStart()
     if (err != OK) {
         return AAudioConvert_androidToAAudioResult(err);
     } else {
+        onStart();
         setState(AAUDIO_STREAM_STATE_STARTING);
     }
     return AAUDIO_OK;
@@ -230,6 +239,7 @@ aaudio_result_t AudioStreamRecord::requestStop() {
     if (mAudioRecord.get() == nullptr) {
         return AAUDIO_ERROR_INVALID_STATE;
     }
+    onStop();
     setState(AAUDIO_STREAM_STATE_STOPPING);
     incrementFramesWritten(getFramesRead() - getFramesWritten()); // TODO review
     mAudioRecord->stop();
@@ -274,12 +284,22 @@ aaudio_result_t AudioStreamRecord::read(void *buffer,
         return result;
     }
 
+    if (getState() == AAUDIO_STREAM_STATE_DISCONNECTED) {
+        return AAUDIO_ERROR_DISCONNECTED;
+    }
+
     // TODO add timeout to AudioRecord
     bool blocking = (timeoutNanoseconds > 0);
     ssize_t bytesRead = mAudioRecord->read(buffer, numBytes, blocking);
     if (bytesRead == WOULD_BLOCK) {
         return 0;
     } else if (bytesRead < 0) {
+        // in this context, a DEAD_OBJECT is more likely to be a disconnect notification due to
+        // AudioRecord invalidation
+        if (bytesRead == DEAD_OBJECT) {
+            setState(AAUDIO_STREAM_STATE_DISCONNECTED);
+            return AAUDIO_ERROR_DISCONNECTED;
+        }
         return AAudioConvert_androidToAAudioResult(bytesRead);
     }
     int32_t framesRead = (int32_t)(bytesRead / bytesPerFrame);

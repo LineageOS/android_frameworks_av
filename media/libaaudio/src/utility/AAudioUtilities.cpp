@@ -24,7 +24,9 @@
 #include <utils/Errors.h>
 
 #include "aaudio/AAudio.h"
-#include "AAudioUtilities.h"
+#include <aaudio/AAudioTesting.h>
+
+#include "utility/AAudioUtilities.h"
 
 using namespace android;
 
@@ -329,9 +331,10 @@ static int32_t AAudioProperty_getMMapProperty(const char *propName,
                                               const char * caller) {
     int32_t prop = property_get_int32(propName, defaultValue);
     switch (prop) {
-        case AAUDIO_USE_NEVER:
-        case AAUDIO_USE_ALWAYS:
-        case AAUDIO_USE_AUTO:
+        case AAUDIO_UNSPECIFIED:
+        case AAUDIO_POLICY_NEVER:
+        case AAUDIO_POLICY_ALWAYS:
+        case AAUDIO_POLICY_AUTO:
             break;
         default:
             ALOGE("%s: invalid = %d", caller, prop);
@@ -341,14 +344,14 @@ static int32_t AAudioProperty_getMMapProperty(const char *propName,
     return prop;
 }
 
-int32_t AAudioProperty_getMMapEnabled() {
-    return AAudioProperty_getMMapProperty(AAUDIO_PROP_MMAP_ENABLED,
-                                          AAUDIO_USE_NEVER, __func__);
+int32_t AAudioProperty_getMMapPolicy() {
+    return AAudioProperty_getMMapProperty(AAUDIO_PROP_MMAP_POLICY,
+                                          AAUDIO_UNSPECIFIED, __func__);
 }
 
-int32_t AAudioProperty_getMMapExclusiveEnabled() {
-    return AAudioProperty_getMMapProperty(AAUDIO_PROP_MMAP_EXCLUSIVE_ENABLED,
-                                          AAUDIO_USE_NEVER, __func__);
+int32_t AAudioProperty_getMMapExclusivePolicy() {
+    return AAudioProperty_getMMapProperty(AAUDIO_PROP_MMAP_EXCLUSIVE_POLICY,
+                                          AAUDIO_UNSPECIFIED, __func__);
 }
 
 int32_t AAudioProperty_getMixerBursts() {

@@ -5,7 +5,8 @@ LOCAL_MODULE_TAGS := examples
 LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils) \
     frameworks/av/media/libaaudio/src \
-    frameworks/av/media/libaaudio/include
+    frameworks/av/media/libaaudio/include \
+    frameworks/av/media/libaaudio/examples/utils
 
 # NDK recommends using this kind of relative path instead of an absolute path.
 LOCAL_SRC_FILES:= ../src/write_sine.cpp
@@ -23,7 +24,8 @@ include $(CLEAR_VARS)
 LOCAL_MODULE_TAGS := tests
 LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils) \
-    frameworks/av/media/libaaudio/include
+    frameworks/av/media/libaaudio/include \
+    frameworks/av/media/libaaudio/examples/utils
 
 LOCAL_SRC_FILES:= ../src/write_sine_callback.cpp
 
