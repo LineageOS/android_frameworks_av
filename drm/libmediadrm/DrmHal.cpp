@@ -958,11 +958,9 @@ status_t DrmHal::signRSA(Vector<uint8_t> const &sessionId,
 
 void DrmHal::binderDied(const wp<IBinder> &the_late_who __unused)
 {
-    mEventLock.lock();
-    mListener.clear();
-    mEventLock.unlock();
-
     Mutex::Autolock autoLock(mLock);
+    setListener(NULL);
+    mPlugin->setListener(NULL);
     mPlugin.clear();
 }
 
