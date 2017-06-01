@@ -133,7 +133,7 @@ protected:
     // This is used by one thread to tell another thread to exit. So it must be atomic.
     std::atomic<bool>   mThreadEnabled;
 
-    aaudio_audio_format_t mAudioFormat = AAUDIO_FORMAT_UNSPECIFIED;
+    aaudio_format_t    mAudioFormat = AAUDIO_FORMAT_UNSPECIFIED;
     int32_t            mFramesPerBurst = 0;
     int32_t            mSamplesPerFrame = AAUDIO_UNSPECIFIED;
     int32_t            mSampleRate = AAUDIO_UNSPECIFIED;
