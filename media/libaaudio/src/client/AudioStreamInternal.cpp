@@ -81,7 +81,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     }
 
     // We have to do volume scaling. So we prefer FLOAT format.
-    if (getFormat() == AAUDIO_UNSPECIFIED) {
+    if (getFormat() == AAUDIO_FORMAT_UNSPECIFIED) {
         setFormat(AAUDIO_FORMAT_PCM_FLOAT);
     }
     // Request FLOAT for the shared mixer.
