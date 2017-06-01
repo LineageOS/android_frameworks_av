@@ -168,7 +168,7 @@ public:
 private:
     int32_t                    mSamplesPerFrame = AAUDIO_UNSPECIFIED;
     int32_t                    mSampleRate = AAUDIO_UNSPECIFIED;
-    int32_t                    mDeviceId = AAUDIO_DEVICE_UNSPECIFIED;
+    int32_t                    mDeviceId = AAUDIO_UNSPECIFIED;
     aaudio_sharing_mode_t      mSharingMode = AAUDIO_SHARING_MODE_SHARED;
     bool                       mSharingModeMatchRequired = false; // must match sharing mode requested
     aaudio_format_t            mFormat = AAUDIO_FORMAT_UNSPECIFIED;
