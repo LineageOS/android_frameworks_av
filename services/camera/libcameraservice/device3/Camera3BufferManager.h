@@ -137,14 +137,17 @@ public:
      * buffer has been reused. The manager will call detachBuffer on the stream
      * if it needs the released buffer otherwise.
      *
+     * When shouldFreeBuffer is set to true, caller must detach and free one buffer from the
+     * buffer queue, and then call notifyBufferRemoved to update the manager.
+     *
      * Return values:
      *
      *  OK:        Buffer release was processed succesfully
      *  BAD_VALUE: stream ID or streamSetId are invalid, or stream ID and stream set ID
      *             combination doesn't match what was registered, or this stream wasn't registered
-     *             to this buffer manager before.
+     *             to this buffer manager before, or shouldFreeBuffer is null/
      */
-    status_t onBufferReleased(int streamId, int streamSetId);
+    status_t onBufferReleased(int streamId, int streamSetId, /*out*/bool* shouldFreeBuffer);
 
     /**
      * This method notifies the manager that certain buffers has been removed from the
@@ -165,11 +168,29 @@ public:
     status_t onBuffersRemoved(int streamId, int streamSetId, size_t count);
 
     /**
+     * This method notifiers the manager that a buffer is freed from the buffer queue, usually
+     * because onBufferReleased signals the caller to free a buffer via the shouldFreeBuffer flag.
+     */
+    void notifyBufferRemoved(int streamId, int streamSetId);
+
+    /**
      * Dump the buffer manager statistics.
      */
     void     dump(int fd, const Vector<String16> &args) const;
 
 private:
+    // allocatedBufferWaterMark will be decreased when:
+    //   numAllocatedBuffersThisSet > numHandoutBuffersThisSet + BUFFER_WATERMARK_DEC_THRESHOLD
+    // This allows the watermark go back down after a burst of buffer requests
+    static const int BUFFER_WATERMARK_DEC_THRESHOLD = 3;
+
+    // onBufferReleased will set shouldFreeBuffer to true when:
+    //   numAllocatedBuffersThisSet > allocatedBufferWaterMark AND
+    //   numAllocatedBuffersThisStream > numHandoutBuffersThisStream + BUFFER_FREE_THRESHOLD
+    // So after a burst of buffer requests and back to steady state, the buffer queue should have
+    // (BUFFER_FREE_THRESHOLD + steady state handout buffer count) buffers.
+    static const int BUFFER_FREE_THRESHOLD = 3;
+
     /**
      * Lock to synchronize the access to the methods of this class.
      */
@@ -279,6 +300,11 @@ private:
      */
     bool checkIfStreamRegisteredLocked(int streamId, int streamSetId) const;
 
+    /**
+     * Check if other streams in the stream set has extra buffer available to be freed, and
+     * free one if so.
+     */
+    status_t checkAndFreeBufferOnOtherStreamsLocked(int streamId, int streamSetId);
 };
 
 } // namespace camera3
