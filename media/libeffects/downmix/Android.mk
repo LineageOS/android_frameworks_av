@@ -22,4 +22,5 @@ LOCAL_C_INCLUDES := \
 
 LOCAL_CFLAGS += -fvisibility=hidden
 
+LOCAL_HEADER_LIBRARIES += libhardware_headers
 include $(BUILD_SHARED_LIBRARY)
