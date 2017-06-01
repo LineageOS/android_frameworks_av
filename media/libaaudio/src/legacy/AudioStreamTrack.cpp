@@ -145,7 +145,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
     // Get the actual values from the AudioTrack.
     setSamplesPerFrame(mAudioTrack->channelCount());
-    aaudio_audio_format_t aaudioFormat =
+    aaudio_format_t aaudioFormat =
             AAudioConvert_androidToAAudioDataFormat(mAudioTrack->format());
     setFormat(aaudioFormat);
 

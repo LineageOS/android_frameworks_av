@@ -165,7 +165,7 @@ AAUDIO_API void AAudioStreamBuilder_setDirection(AAudioStreamBuilder* builder,
 }
 
 AAUDIO_API void AAudioStreamBuilder_setFormat(AAudioStreamBuilder* builder,
-                                                   aaudio_audio_format_t format)
+                                                   aaudio_format_t format)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
     streamBuilder->setFormat(format);
@@ -367,7 +367,7 @@ AAUDIO_API aaudio_stream_state_t AAudioStream_getState(AAudioStream* stream)
     return audioStream->getState();
 }
 
-AAUDIO_API aaudio_audio_format_t AAudioStream_getFormat(AAudioStream* stream)
+AAUDIO_API aaudio_format_t AAudioStream_getFormat(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getFormat();

@@ -55,19 +55,16 @@ error:
 }
 
 status_t AAudioStreamConfiguration::readFromParcel(const Parcel* parcel) {
-    int32_t temp;
     status_t status = parcel->readInt32(&mDeviceId);
     if (status != NO_ERROR) goto error;
     status = parcel->readInt32(&mSampleRate);
     if (status != NO_ERROR) goto error;
     status = parcel->readInt32(&mSamplesPerFrame);
     if (status != NO_ERROR) goto error;
-    status = parcel->readInt32(&temp);
+    status = parcel->readInt32(&mSharingMode);
     if (status != NO_ERROR) goto error;
-    mSharingMode = (aaudio_sharing_mode_t) temp;
-    status = parcel->readInt32(&temp);
+    status = parcel->readInt32(&mAudioFormat);
     if (status != NO_ERROR) goto error;
-    mAudioFormat = (aaudio_audio_format_t) temp;
     status = parcel->readInt32(&mBufferCapacity);
     if (status != NO_ERROR) goto error;
     return NO_ERROR;
