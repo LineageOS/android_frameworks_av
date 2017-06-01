@@ -263,7 +263,11 @@ class Camera3OutputStream :
 
     virtual status_t getEndpointUsage(uint32_t *usage) const;
 
+    /**
+     * Private methods
+     */
     void onBuffersRemovedLocked(const std::vector<sp<GraphicBuffer>>&);
+    status_t detachBufferLocked(sp<GraphicBuffer>* buffer, int* fenceFd);
 
 }; // class Camera3OutputStream
 

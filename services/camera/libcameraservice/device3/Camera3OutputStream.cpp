@@ -691,12 +691,23 @@ void Camera3OutputStream::BufferReleasedListener::onBufferReleased() {
     }
 
     ALOGV("Stream %d: Buffer released", stream->getId());
+    bool shouldFreeBuffer = false;
     status_t res = stream->mBufferManager->onBufferReleased(
-        stream->getId(), stream->getStreamSetId());
+        stream->getId(), stream->getStreamSetId(), &shouldFreeBuffer);
     if (res != OK) {
         ALOGE("%s: signaling buffer release to buffer manager failed: %s (%d).", __FUNCTION__,
                 strerror(-res), res);
         stream->mState = STATE_ERROR;
+    }
+
+    if (shouldFreeBuffer) {
+        sp<GraphicBuffer> buffer;
+        // Detach and free a buffer (when buffer goes out of scope)
+        stream->detachBufferLocked(&buffer, /*fenceFd*/ nullptr);
+        if (buffer.get() != nullptr) {
+            stream->mBufferManager->notifyBufferRemoved(
+                    stream->getId(), stream->getStreamSetId());
+        }
     }
 }
 
@@ -712,7 +723,10 @@ void Camera3OutputStream::onBuffersRemovedLocked(
 
 status_t Camera3OutputStream::detachBuffer(sp<GraphicBuffer>* buffer, int* fenceFd) {
     Mutex::Autolock l(mLock);
+    return detachBufferLocked(buffer, fenceFd);
+}
 
+status_t Camera3OutputStream::detachBufferLocked(sp<GraphicBuffer>* buffer, int* fenceFd) {
     ALOGV("Stream %d: detachBuffer", getId());
     if (buffer == nullptr) {
         return BAD_VALUE;
