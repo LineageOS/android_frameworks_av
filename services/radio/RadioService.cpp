@@ -34,6 +34,7 @@
 #include <binder/IServiceManager.h>
 #include <binder/MemoryBase.h>
 #include <binder/MemoryHeapBase.h>
+#include <binder/PermissionCache.h>
 #include <hardware/radio.h>
 #include <media/AudioSystem.h>
 #include "RadioService.h"
@@ -42,6 +43,8 @@
 namespace android {
 
 static const char kRadioTunerAudioDeviceName[] = "Radio tuner source";
+
+static const String16 RADIO_PERMISSION("android.permission.ACCESS_FM_RADIO");
 
 RadioService::RadioService()
     : BnRadioService(), mNextUniqueId(1)
@@ -84,6 +87,9 @@ RadioService::~RadioService()
 status_t RadioService::listModules(struct radio_properties *properties,
                              uint32_t *numModules)
 {
+    if (!PermissionCache::checkCallingPermission(RADIO_PERMISSION)) {
+        return PERMISSION_DENIED;
+    }
     ALOGV("listModules");
 
     AutoMutex lock(mServiceLock);
@@ -104,6 +110,9 @@ status_t RadioService::attach(radio_handle_t handle,
                         bool withAudio,
                         sp<IRadio>& radio)
 {
+    if (!PermissionCache::checkCallingPermission(RADIO_PERMISSION)) {
+        return PERMISSION_DENIED;
+    }
     ALOGV("%s %d config %p withAudio %d", __FUNCTION__, handle, config, withAudio);
 
     AutoMutex lock(mServiceLock);
@@ -717,6 +726,9 @@ void RadioService::ModuleClient::setTuner(sp<TunerInterface>& tuner)
 
 status_t RadioService::ModuleClient::setConfiguration(const struct radio_band_config *config)
 {
+    if (!PermissionCache::checkCallingPermission(RADIO_PERMISSION)) {
+        return PERMISSION_DENIED;
+    }
     AutoMutex lock(mLock);
     status_t status = NO_ERROR;
     ALOGV("%s locked", __FUNCTION__);
@@ -738,6 +750,9 @@ status_t RadioService::ModuleClient::setConfiguration(const struct radio_band_co
 
 status_t RadioService::ModuleClient::getConfiguration(struct radio_band_config *config)
 {
+    if (!PermissionCache::checkCallingPermission(RADIO_PERMISSION)) {
+        return PERMISSION_DENIED;
+    }
     AutoMutex lock(mLock);
     status_t status = NO_ERROR;
     ALOGV("%s locked", __FUNCTION__);
@@ -756,6 +771,9 @@ status_t RadioService::ModuleClient::getConfiguration(struct radio_band_config *
 
 status_t RadioService::ModuleClient::setMute(bool mute)
 {
+    if (!PermissionCache::checkCallingPermission(RADIO_PERMISSION)) {
+        return PERMISSION_DENIED;
+    }
     sp<Module> module;
     {
         Mutex::Autolock _l(mLock);
@@ -774,6 +792,9 @@ status_t RadioService::ModuleClient::setMute(bool mute)
 
 status_t RadioService::ModuleClient::getMute(bool *mute)
 {
+    if (!PermissionCache::checkCallingPermission(RADIO_PERMISSION)) {
+        return PERMISSION_DENIED;
+    }
     sp<Module> module;
     {
         Mutex::Autolock _l(mLock);
@@ -788,6 +809,9 @@ status_t RadioService::ModuleClient::getMute(bool *mute)
 
 status_t RadioService::ModuleClient::scan(radio_direction_t direction, bool skipSubChannel)
 {
+    if (!PermissionCache::checkCallingPermission(RADIO_PERMISSION)) {
+        return PERMISSION_DENIED;
+    }
     AutoMutex lock(mLock);
     ALOGV("%s locked", __FUNCTION__);
     status_t status;
@@ -801,6 +825,9 @@ status_t RadioService::ModuleClient::scan(radio_direction_t direction, bool skip
 
 status_t RadioService::ModuleClient::step(radio_direction_t direction, bool skipSubChannel)
 {
+    if (!PermissionCache::checkCallingPermission(RADIO_PERMISSION)) {
+        return PERMISSION_DENIED;
+    }
     AutoMutex lock(mLock);
     ALOGV("%s locked", __FUNCTION__);
     status_t status;
@@ -814,6 +841,9 @@ status_t RadioService::ModuleClient::step(radio_direction_t direction, bool skip
 
 status_t RadioService::ModuleClient::tune(uint32_t channel, uint32_t subChannel)
 {
+    if (!PermissionCache::checkCallingPermission(RADIO_PERMISSION)) {
+        return PERMISSION_DENIED;
+    }
     AutoMutex lock(mLock);
     ALOGV("%s locked", __FUNCTION__);
     status_t status;
@@ -827,6 +857,9 @@ status_t RadioService::ModuleClient::tune(uint32_t channel, uint32_t subChannel)
 
 status_t RadioService::ModuleClient::cancel()
 {
+    if (!PermissionCache::checkCallingPermission(RADIO_PERMISSION)) {
+        return PERMISSION_DENIED;
+    }
     AutoMutex lock(mLock);
     ALOGV("%s locked", __FUNCTION__);
     status_t status;
@@ -840,6 +873,9 @@ status_t RadioService::ModuleClient::cancel()
 
 status_t RadioService::ModuleClient::getProgramInformation(struct radio_program_info *info)
 {
+    if (!PermissionCache::checkCallingPermission(RADIO_PERMISSION)) {
+        return PERMISSION_DENIED;
+    }
     AutoMutex lock(mLock);
     ALOGV("%s locked", __FUNCTION__);
     status_t status;
@@ -854,6 +890,9 @@ status_t RadioService::ModuleClient::getProgramInformation(struct radio_program_
 
 status_t RadioService::ModuleClient::hasControl(bool *hasControl)
 {
+    if (!PermissionCache::checkCallingPermission(RADIO_PERMISSION)) {
+        return PERMISSION_DENIED;
+    }
     Mutex::Autolock lock(mLock);
     ALOGV("%s locked", __FUNCTION__);
     *hasControl = mTuner != 0;
