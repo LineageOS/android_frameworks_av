@@ -5970,12 +5970,17 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
     switch (kUseFastCapture) {
     case FastCapture_Never:
         initFastCapture = false;
+        ALOGV("%p kUseFastCapture = Never, initFastCapture = false", this);
         break;
     case FastCapture_Always:
         initFastCapture = true;
+        ALOGV("%p kUseFastCapture = Always, initFastCapture = true", this);
         break;
     case FastCapture_Static:
         initFastCapture = (mFrameCount * 1000) / mSampleRate < kMinNormalCaptureBufferSizeMs;
+        ALOGV("%p kUseFastCapture = Static, (%lld * 1000) / %u vs %u, initFastCapture = %d",
+                this, (long long)mFrameCount, mSampleRate, kMinNormalCaptureBufferSizeMs,
+                initFastCapture);
         break;
     // case FastCapture_Dynamic:
     }
@@ -5986,13 +5991,16 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
         // quadruple-buffering of 20 ms each; this ensures we can sleep for 20ms in RecordThread
         size_t pipeFramesP2 = roundup(4 * FMS_20 * mSampleRate / 1000);
         size_t pipeSize = pipeFramesP2 * Format_frameSize(format);
-        void *pipeBuffer;
+        void *pipeBuffer = nullptr;
         const sp<MemoryDealer> roHeap(readOnlyHeap());
         sp<IMemory> pipeMemory;
         if ((roHeap == 0) ||
                 (pipeMemory = roHeap->allocate(pipeSize)) == 0 ||
-                (pipeBuffer = pipeMemory->pointer()) == NULL) {
-            ALOGE("not enough memory for pipe buffer size=%zu", pipeSize);
+                (pipeBuffer = pipeMemory->pointer()) == nullptr) {
+            ALOGE("not enough memory for pipe buffer size=%zu; "
+                    "roHeap=%p, pipeMemory=%p, pipeBuffer=%p; roHeapSize: %lld",
+                    pipeSize, roHeap.get(), pipeMemory.get(), pipeBuffer,
+                    (long long)kRecordThreadReadOnlyHeapSize);
             goto failed;
         }
         // pipe will be shared directly with fast clients, so clear to avoid leaking old information
@@ -6634,19 +6642,19 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
               audio_input_flags_t old = *flags;
               chain->checkInputFlagCompatibility(flags);
               if (old != *flags) {
-                  ALOGV("AUDIO_INPUT_FLAGS denied by effect old=%#x new=%#x",
-                          (int)old, (int)*flags);
+                  ALOGV("%p AUDIO_INPUT_FLAGS denied by effect old=%#x new=%#x",
+                          this, (int)old, (int)*flags);
               }
           }
           ALOGV_IF((*flags & AUDIO_INPUT_FLAG_FAST) != 0,
-                   "AUDIO_INPUT_FLAG_FAST accepted: frameCount=%zu mFrameCount=%zu",
-                   frameCount, mFrameCount);
+                   "%p AUDIO_INPUT_FLAG_FAST accepted: frameCount=%zu mFrameCount=%zu",
+                   this, frameCount, mFrameCount);
       } else {
-        ALOGV("AUDIO_INPUT_FLAG_FAST denied: frameCount=%zu mFrameCount=%zu mPipeFramesP2=%zu "
-                "format=%#x isLinear=%d channelMask=%#x sampleRate=%u mSampleRate=%u "
+        ALOGV("%p AUDIO_INPUT_FLAG_FAST denied: frameCount=%zu mFrameCount=%zu mPipeFramesP2=%zu "
+                "format=%#x isLinear=%d mFormat=%#x channelMask=%#x sampleRate=%u mSampleRate=%u "
                 "hasFastCapture=%d tid=%d mFastTrackAvail=%d",
-                frameCount, mFrameCount, mPipeFramesP2,
-                format, audio_is_linear_pcm(format), channelMask, sampleRate, mSampleRate,
+                this, frameCount, mFrameCount, mPipeFramesP2,
+                format, audio_is_linear_pcm(format), mFormat, channelMask, sampleRate, mSampleRate,
                 hasFastCapture(), tid, mFastTrackAvail);
         *flags = (audio_input_flags_t)(*flags & ~AUDIO_INPUT_FLAG_FAST);
       }
@@ -7243,6 +7251,10 @@ void AudioFlinger::RecordThread::readInputParameters_l()
     result = mInput->stream->getBufferSize(&mBufferSize);
     LOG_ALWAYS_FATAL_IF(result != OK, "Error retrieving buffer size from HAL: %d", result);
     mFrameCount = mBufferSize / mFrameSize;
+    ALOGV("%p RecordThread params: mChannelCount=%u, mFormat=%#x, mFrameSize=%lld, "
+            "mBufferSize=%lld, mFrameCount=%lld",
+            this, mChannelCount, mFormat, (long long)mFrameSize, (long long)mBufferSize,
+            (long long)mFrameCount);
     // This is the formula for calculating the temporary buffer size.
     // With 7 HAL buffers, we can guarantee ability to down-sample the input by ratio of 6:1 to
     // 1 full output buffer, regardless of the alignment of the available input.
