@@ -18,6 +18,7 @@
 #define LOG_TAG "MatroskaExtractor"
 #include <utils/Log.h>
 
+#include "FLACDecoder.h"
 #include "MatroskaExtractor.h"
 #include "avc_utils.h"
 
@@ -1051,6 +1052,37 @@ status_t addVorbisCodecInfo(
     return OK;
 }
 
+static status_t addFlacMetadata(
+        const sp<MetaData> &meta,
+        const void *codecPrivate, size_t codecPrivateSize) {
+    // hexdump(codecPrivate, codecPrivateSize);
+
+    meta->setData(kKeyFlacMetadata, 0, codecPrivate, codecPrivateSize);
+
+    int32_t maxInputSize = 64 << 10;
+    sp<FLACDecoder> flacDecoder = FLACDecoder::Create();
+    if (flacDecoder != NULL
+            && flacDecoder->parseMetadata((const uint8_t*)codecPrivate, codecPrivateSize) == OK) {
+        FLAC__StreamMetadata_StreamInfo streamInfo = flacDecoder->getStreamInfo();
+        maxInputSize = streamInfo.max_framesize;
+        if (maxInputSize == 0) {
+            // In case max framesize is not available, use raw data size as max framesize,
+            // assuming there is no expansion.
+            if (streamInfo.max_blocksize != 0
+                    && streamInfo.channels != 0
+                    && ((streamInfo.bits_per_sample + 7) / 8) >
+                        INT32_MAX / streamInfo.max_blocksize / streamInfo.channels) {
+                return ERROR_MALFORMED;
+            }
+            maxInputSize = ((streamInfo.bits_per_sample + 7) / 8)
+                * streamInfo.max_blocksize * streamInfo.channels;
+        }
+    }
+    meta->setInt32(kKeyMaxInputSize, maxInputSize);
+
+    return OK;
+}
+
 status_t MatroskaExtractor::synthesizeAVCC(TrackInfo *trackInfo, size_t index) {
     BlockIterator iter(this, trackInfo->mTrackNum, index);
     if (iter.eos()) {
@@ -1363,6 +1395,9 @@ void MatroskaExtractor::addTracks() {
                     mSeekPreRollNs = track->GetSeekPreRoll();
                 } else if (!strcmp("A_MPEG/L3", codecID)) {
                     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_MPEG);
+                } else if (!strcmp("A_FLAC", codecID)) {
+                    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_FLAC);
+                    err = addFlacMetadata(meta, codecPrivate, codecPrivateSize);
                 } else {
                     ALOGW("%s is not supported.", codecID);
                     continue;
