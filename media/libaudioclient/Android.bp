@@ -22,6 +22,8 @@ cc_library_shared {
         "IEffect.cpp",
         "IEffectClient.cpp",
         "ToneGenerator.cpp",
+        "PlayerBase.cpp",
+        "TrackPlayerBase.cpp",
     ],
     shared_libs: [
         "liblog",
@@ -30,6 +32,7 @@ cc_library_shared {
         "libbinder",
         "libdl",
         "libaudioutils",
+        "libaudiomanager",
     ],
     export_shared_lib_headers: ["libbinder"],
 
