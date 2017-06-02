@@ -84,15 +84,21 @@ void PlayerBase::reportEvent(player_state_t event) {
     servicePlayerEvent(event);
 }
 
-//------------------------------------------------------------------------------
-// Implementation of IPlayer
-void PlayerBase::start() {
-    if (playerStart() == NO_ERROR) {
+status_t PlayerBase::startWithStatus() {
+    status_t status = playerStart();
+    if (status == NO_ERROR) {
         ALOGD("PlayerBase::start() from IPlayer");
         servicePlayerEvent(PLAYER_STATE_STARTED);
     } else {
         ALOGD("PlayerBase::start() no AudioTrack to start from IPlayer");
     }
+    return status;
+}
+
+//------------------------------------------------------------------------------
+// Implementation of IPlayer
+void PlayerBase::start() {
+    (void)startWithStatus();
 }
 
 void PlayerBase::pause() {
