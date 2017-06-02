@@ -84,10 +84,15 @@
 #define LOG_TAG "NBLog"
 //#define LOG_NDEBUG 0
 
+#include <algorithm>
 #include <climits>
 #include <deque>
+#include <fstream>
+// #include <inttypes.h>
+#include <iostream>
 #include <math.h>
 #include <numeric>
+#include <vector>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -906,6 +911,34 @@ std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
 
 }
 
+// writes sample deltas to file, either truncating or appending
+inline void writeHistToFile(const std::vector<int64_t> &samples, bool append) {
+    // name of file on audioserver
+    static const char* const kName = (char *)"/data/misc/audioserver/sample_results.txt";
+    // stores deltas between the samples
+    std::vector<int64_t> intervals;
+    if (samples.size() == 0) return;
+    for (size_t i = 1; i < samples.size(); ++i) {
+        intervals.push_back(deltaMs(samples[i - 1], samples[i]));
+    }
+    // Deletes maximum value in a histogram. Temp quick fix.
+    // FIXME: need to find root cause of approx. 35th element from the end
+    // consistently being an outlier in the first histogram of a flush
+    // ALOGW("%" PRId64 "before", (int64_t) *(std::max_element(intervals.begin(), intervals.end())));
+    intervals.erase(std::max_element(intervals.begin(), intervals.end()));
+    // ALOGW("%" PRId64 "after", (int64_t) *(std::max_element(intervals.begin(), intervals.end())));
+    std::ofstream ofs;
+    ofs.open(kName, append ? std::ios::app : std::ios::trunc);
+    if (!ofs) {
+        ALOGW("couldn't open file %s", kName);
+        return;
+    }
+    for (size_t i = 0; i < intervals.size(); ++i) {
+        ofs << intervals[i] << "\n";
+    }
+    ofs.close();
+}
+
 void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapshot)
 {
   //  CallStack cs(LOG_TAG);
@@ -1056,7 +1089,8 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
                     if (findGlitch) {
                         alertIfGlitch(hist->second);
                     }
-                    // validateFirstTimestamp(hist->second);
+                    // set file to empty and write data for all histograms in this set
+                    writeHistToFile(hist->second, hist != mHists.begin());
                     drawHistogram(&body, hist->second, true, indent);
                     hist = mHists.erase(hist);
                 } else {
@@ -1079,12 +1113,8 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
 
         if (!body.isEmpty()) {
             dumpLine(timestamp, body);
-            // deferredTimestamp = false;
         }
     }
-    // if (deferredTimestamp) {
-    //     dumpLine(timestamp, body);
-    // }
 }
 
 void NBLog::Reader::dump(int fd, size_t indent)
