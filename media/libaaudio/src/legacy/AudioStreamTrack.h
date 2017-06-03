@@ -18,7 +18,7 @@
 #define LEGACY_AUDIO_STREAM_TRACK_H
 
 #include <math.h>
-#include <media/AudioTrack.h>
+#include <media/TrackPlayerBase.h>
 #include <aaudio/AAudio.h>
 
 #include "AudioStreamBuilder.h"
@@ -32,7 +32,7 @@ namespace aaudio {
 /**
  * Internal stream that uses the legacy AudioTrack path.
  */
-class AudioStreamTrack : public AudioStreamLegacy {
+class AudioStreamTrack : public AudioStreamLegacy, public android::TrackPlayerBase {
 public:
     AudioStreamTrack();
 
@@ -78,7 +78,6 @@ public:
 
 private:
 
-    android::sp<android::AudioTrack> mAudioTrack;
     // adapts between variable sized blocks and fixed size blocks
     FixedBlockReader                 mFixedBlockReader;
 

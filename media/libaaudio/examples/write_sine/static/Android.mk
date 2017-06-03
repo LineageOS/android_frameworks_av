@@ -13,7 +13,7 @@ LOCAL_SRC_FILES:= ../src/write_sine.cpp
 
 LOCAL_SHARED_LIBRARIES := libaudioutils libmedia \
                           libbinder libcutils libutils \
-                          libaudioclient liblog libtinyalsa
+                          libaudioclient liblog libtinyalsa libaudiomanager
 LOCAL_STATIC_LIBRARIES := libaaudio
 
 LOCAL_MODULE := write_sine
@@ -31,7 +31,7 @@ LOCAL_SRC_FILES:= ../src/write_sine_callback.cpp
 
 LOCAL_SHARED_LIBRARIES := libaudioutils libmedia \
                           libbinder libcutils libutils \
-                          libaudioclient liblog
+                          libaudioclient liblog libaudiomanager
 LOCAL_STATIC_LIBRARIES := libaaudio
 
 LOCAL_MODULE := write_sine_callback
