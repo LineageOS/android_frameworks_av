@@ -47,6 +47,8 @@ public:
                 uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags);
 
 
+            status_t startWithStatus();
+
             //FIXME temporary method while some player state is outside of this class
             void reportEvent(player_state_t event);
 
