@@ -76,7 +76,7 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
     }
 
     mSampleRate = configurationInput.getSampleRate();
-    if (mSampleRate == AAUDIO_FORMAT_UNSPECIFIED) {
+    if (mSampleRate == AAUDIO_UNSPECIFIED) {
         mSampleRate = mServiceEndpoint->getSampleRate();
     } else if (mSampleRate != mServiceEndpoint->getSampleRate()) {
         ALOGE("AAudioServiceStreamShared::open(), mAudioFormat = %d, need %d",
@@ -85,7 +85,7 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
     }
 
     mSamplesPerFrame = configurationInput.getSamplesPerFrame();
-    if (mSamplesPerFrame == AAUDIO_FORMAT_UNSPECIFIED) {
+    if (mSamplesPerFrame == AAUDIO_UNSPECIFIED) {
         mSamplesPerFrame = mServiceEndpoint->getSamplesPerFrame();
     } else if (mSamplesPerFrame != mServiceEndpoint->getSamplesPerFrame()) {
         ALOGE("AAudioServiceStreamShared::open(), mSamplesPerFrame = %d, need %d",
