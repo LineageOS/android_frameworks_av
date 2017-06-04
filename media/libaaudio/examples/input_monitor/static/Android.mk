@@ -12,7 +12,7 @@ LOCAL_SRC_FILES:= ../src/input_monitor.cpp
 
 LOCAL_SHARED_LIBRARIES := libaudioutils libmedia \
                           libbinder libcutils libutils \
-                          libaudioclient liblog libtinyalsa
+                          libaudioclient liblog libtinyalsa libaudiomanager
 LOCAL_STATIC_LIBRARIES := libaaudio
 
 LOCAL_MODULE := input_monitor
@@ -30,7 +30,7 @@ LOCAL_SRC_FILES:= ../src/input_monitor_callback.cpp
 
 LOCAL_SHARED_LIBRARIES := libaudioutils libmedia \
                           libbinder libcutils libutils \
-                          libaudioclient liblog
+                          libaudioclient liblog libaudiomanager
 LOCAL_STATIC_LIBRARIES := libaaudio
 
 LOCAL_MODULE := input_monitor_callback

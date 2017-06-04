@@ -143,6 +143,9 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
         return AAudioConvert_androidToAAudioResult(status);
     }
 
+    //TrackPlayerBase init
+    init(mAudioTrack.get(), PLAYER_TYPE_AAUDIO, AUDIO_USAGE_MEDIA);
+
     // Get the actual values from the AudioTrack.
     setSamplesPerFrame(mAudioTrack->channelCount());
     aaudio_format_t aaudioFormat =
@@ -194,7 +197,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 aaudio_result_t AudioStreamTrack::close()
 {
     if (getState() != AAUDIO_STREAM_STATE_CLOSED) {
-        mAudioTrack.clear();
+        destroy();
         setState(AAUDIO_STREAM_STATE_CLOSED);
     }
     mFixedBlockReader.close();
@@ -232,7 +235,7 @@ aaudio_result_t AudioStreamTrack::requestStart()
         return AAudioConvert_androidToAAudioResult(err);
     }
 
-    err = mAudioTrack->start();
+    err = startWithStatus();
     if (err != OK) {
         return AAudioConvert_androidToAAudioResult(err);
     } else {
@@ -256,7 +259,7 @@ aaudio_result_t AudioStreamTrack::requestPause()
     }
     onStop();
     setState(AAUDIO_STREAM_STATE_PAUSING);
-    mAudioTrack->pause();
+    pause();
     status_t err = mAudioTrack->getPosition(&mPositionWhenPausing);
     if (err != OK) {
         return AAudioConvert_androidToAAudioResult(err);
@@ -288,7 +291,7 @@ aaudio_result_t AudioStreamTrack::requestStop() {
     onStop();
     setState(AAUDIO_STREAM_STATE_STOPPING);
     incrementFramesRead(getFramesWritten() - getFramesRead()); // TODO review
-    mAudioTrack->stop();
+    stop();
     mFramesWritten.reset32();
     return AAUDIO_OK;
 }

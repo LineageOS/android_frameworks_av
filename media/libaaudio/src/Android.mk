@@ -18,6 +18,7 @@ LOCAL_C_INCLUDES := \
     frameworks/native/media/libaaudio/include/include \
     frameworks/av/media/libaaudio/include \
     frameworks/native/include \
+    frameworks/av/media/libaudioclient/include \
     $(LOCAL_PATH) \
     $(LOCAL_PATH)/binding \
     $(LOCAL_PATH)/client \
@@ -120,6 +121,6 @@ LOCAL_CFLAGS += -Wno-unused-parameter -Wall -Werror
 # AAUDIO_API is used to explicitly export a function or a variable as a visible symbol.
 LOCAL_CFLAGS += -DAAUDIO_API='__attribute__((visibility("default")))'
 
-LOCAL_SHARED_LIBRARIES := libaudioclient liblog libcutils libutils libbinder
+LOCAL_SHARED_LIBRARIES := libaudioclient liblog libcutils libutils libbinder libaudiomanager
 
 include $(BUILD_SHARED_LIBRARY)
