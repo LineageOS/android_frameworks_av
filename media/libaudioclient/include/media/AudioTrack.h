@@ -326,7 +326,7 @@ public:
      * This includes the latency due to AudioTrack buffer size, AudioMixer (if any)
      * and audio hardware driver.
      */
-            uint32_t    latency() const     { return mLatency; }
+            uint32_t    latency();
 
     /* Returns the number of application-level buffer underruns
      * since the AudioTrack was created.
@@ -927,6 +927,8 @@ protected:
 
             // caller must hold lock on mLock for all _l methods
 
+            void updateLatency_l(); // updates mAfLatency and mLatency from AudioSystem cache
+
             status_t createTrack_l();
 
             // can only be called when mState != STATE_ACTIVE
@@ -962,7 +964,7 @@ protected:
             Modulo<uint32_t> updateAndGetPosition_l();
 
             // check sample rate and speed is compatible with AudioTrack
-            bool     isSampleRateSpeedAllowed_l(uint32_t sampleRate, float speed) const;
+            bool     isSampleRateSpeedAllowed_l(uint32_t sampleRate, float speed);
 
             void     restartIfDisabled();
 
