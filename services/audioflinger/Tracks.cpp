@@ -71,6 +71,7 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
             audio_channel_mask_t channelMask,
             size_t frameCount,
             void *buffer,
+            size_t bufferSize,
             audio_session_t sessionId,
             uid_t clientUid,
             bool isOut,
@@ -81,7 +82,7 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
         mThread(thread),
         mClient(client),
         mCblk(NULL),
-        // mBuffer
+        // mBuffer, mBufferSize
         mState(IDLE),
         mSampleRate(sampleRate),
         mFormat(format),
@@ -113,15 +114,22 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
 
     // ALOGD("Creating track with %d buffers @ %d bytes", bufferCount, bufferSize);
 
-    size_t bufferSize = buffer == NULL ? roundup(frameCount) : frameCount;
+    size_t minBufferSize = buffer == NULL ? roundup(frameCount) : frameCount;
     // check overflow when computing bufferSize due to multiplication by mFrameSize.
-    if (bufferSize < frameCount  // roundup rounds down for values above UINT_MAX / 2
+    if (minBufferSize < frameCount  // roundup rounds down for values above UINT_MAX / 2
             || mFrameSize == 0   // format needs to be correct
-            || bufferSize > SIZE_MAX / mFrameSize) {
+            || minBufferSize > SIZE_MAX / mFrameSize) {
         android_errorWriteLog(0x534e4554, "34749571");
         return;
     }
-    bufferSize *= mFrameSize;
+    minBufferSize *= mFrameSize;
+
+    if (buffer == nullptr) {
+        bufferSize = minBufferSize; // allocated here.
+    } else if (minBufferSize > bufferSize) {
+        android_errorWriteLog(0x534e4554, "38340117");
+        return;
+    }
 
     size_t size = sizeof(audio_track_cblk_t);
     if (buffer == NULL && alloc == ALLOC_CBLK) {
@@ -177,6 +185,7 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
             // It should references the buffer via the pipe.
             // Therefore, to detect incorrect usage of the buffer, we set mBuffer to NULL.
             mBuffer = NULL;
+            bufferSize = 0;
             break;
         case ALLOC_CBLK:
             // clear all buffers
@@ -196,7 +205,10 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
         case ALLOC_NONE:
             mBuffer = buffer;
             break;
+        default:
+            LOG_ALWAYS_FATAL("invalid allocation type: %d", (int)alloc);
         }
+        mBufferSize = bufferSize;
 
 #ifdef TEE_SINK
         if (mTeeSinkTrackEnabled) {
@@ -368,6 +380,7 @@ AudioFlinger::PlaybackThread::Track::Track(
             audio_channel_mask_t channelMask,
             size_t frameCount,
             void *buffer,
+            size_t bufferSize,
             const sp<IMemory>& sharedBuffer,
             audio_session_t sessionId,
             uid_t uid,
@@ -376,6 +389,7 @@ AudioFlinger::PlaybackThread::Track::Track(
             audio_port_handle_t portId)
     :   TrackBase(thread, client, sampleRate, format, channelMask, frameCount,
                   (sharedBuffer != 0) ? sharedBuffer->pointer() : buffer,
+                  (sharedBuffer != 0) ? sharedBuffer->size() : bufferSize,
                   sessionId, uid, true /*isOut*/,
                   (type == TYPE_PATCH) ? ( buffer == NULL ? ALLOC_LOCAL : ALLOC_NONE) : ALLOC_CBLK,
                   type, portId),
@@ -1220,7 +1234,8 @@ AudioFlinger::PlaybackThread::OutputTrack::OutputTrack(
             uid_t uid)
     :   Track(playbackThread, NULL, AUDIO_STREAM_PATCH,
               sampleRate, format, channelMask, frameCount,
-              NULL, 0, AUDIO_SESSION_NONE, uid, AUDIO_OUTPUT_FLAG_NONE,
+              nullptr /* buffer */, (size_t)0 /* bufferSize */, nullptr /* sharedBuffer */,
+              AUDIO_SESSION_NONE, uid, AUDIO_OUTPUT_FLAG_NONE,
               TYPE_OUTPUT),
     mActive(false), mSourceThread(sourceThread)
 {
@@ -1417,10 +1432,12 @@ AudioFlinger::PlaybackThread::PatchTrack::PatchTrack(PlaybackThread *playbackThr
                                                      audio_format_t format,
                                                      size_t frameCount,
                                                      void *buffer,
+                                                     size_t bufferSize,
                                                      audio_output_flags_t flags)
     :   Track(playbackThread, NULL, streamType,
               sampleRate, format, channelMask, frameCount,
-              buffer, 0, AUDIO_SESSION_NONE, getuid(), flags, TYPE_PATCH),
+              buffer, bufferSize, nullptr /* sharedBuffer */,
+              AUDIO_SESSION_NONE, getuid(), flags, TYPE_PATCH),
               mProxy(new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, true, true))
 {
     uint64_t mixBufferNs = ((uint64_t)2 * playbackThread->frameCount() * 1000000000) /
@@ -1554,13 +1571,14 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
             audio_channel_mask_t channelMask,
             size_t frameCount,
             void *buffer,
+            size_t bufferSize,
             audio_session_t sessionId,
             uid_t uid,
             audio_input_flags_t flags,
             track_type type,
             audio_port_handle_t portId)
     :   TrackBase(thread, client, sampleRate, format,
-                  channelMask, frameCount, buffer, sessionId, uid, false /*isOut*/,
+                  channelMask, frameCount, buffer, bufferSize, sessionId, uid, false /*isOut*/,
                   (type == TYPE_DEFAULT) ?
                           ((flags & AUDIO_INPUT_FLAG_FAST) ? ALLOC_PIPE : ALLOC_CBLK) :
                           ((buffer == NULL) ? ALLOC_LOCAL : ALLOC_NONE),
@@ -1754,9 +1772,10 @@ AudioFlinger::RecordThread::PatchRecord::PatchRecord(RecordThread *recordThread,
                                                      audio_format_t format,
                                                      size_t frameCount,
                                                      void *buffer,
+                                                     size_t bufferSize,
                                                      audio_input_flags_t flags)
     :   RecordTrack(recordThread, NULL, sampleRate, format, channelMask, frameCount,
-                buffer, AUDIO_SESSION_NONE, getuid(), flags, TYPE_PATCH),
+                buffer, bufferSize, AUDIO_SESSION_NONE, getuid(), flags, TYPE_PATCH),
                 mProxy(new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, false, true))
 {
     uint64_t mixBufferNs = ((uint64_t)2 * recordThread->frameCount() * 1000000000) /
@@ -1823,7 +1842,9 @@ AudioFlinger::MmapThread::MmapTrack::MmapTrack(ThreadBase *thread,
         uid_t uid,
         audio_port_handle_t portId)
     :   TrackBase(thread, NULL, sampleRate, format,
-                  channelMask, 0, NULL, sessionId, uid, false,
+                  channelMask, (size_t)0 /* frameCount */,
+                  nullptr /* buffer */, (size_t)0 /* bufferSize */,
+                  sessionId, uid, false /* isOut */,
                   ALLOC_NONE,
                   TYPE_DEFAULT, portId)
 {
