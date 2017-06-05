@@ -1023,9 +1023,12 @@ status_t MediaPlayer::prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>& 
         return NO_INIT;
     }
 
-    // Only allowing it in player's prepared state
-    if (!(mCurrentState & MEDIA_PLAYER_PREPARED)) {
-        ALOGE("prepareDrm must only be called in the prepared state.");
+    // Only allowed it in player's preparing/prepared state.
+    // We get here only if MEDIA_DRM_INFO has already arrived (e.g., prepare is half-way through or
+    // completed) so the state change to "prepared" might not have happened yet (e.g., buffering).
+    // Still, we can allow prepareDrm for the use case of being called in OnDrmInfoListener.
+    if (!(mCurrentState & (MEDIA_PLAYER_PREPARING | MEDIA_PLAYER_PREPARED))) {
+        ALOGE("prepareDrm is called in the wrong state (%d).", mCurrentState);
         return INVALID_OPERATION;
     }
 
