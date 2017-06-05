@@ -114,7 +114,7 @@ android::status_t InitDataParser::parsePssh(const Vector<uint8_t>& initData,
     memcpy(&keyIdCount, &initData[readPosition], sizeof(keyIdCount));
     keyIdCount = ntohl(keyIdCount);
     readPosition += sizeof(keyIdCount);
-    if (readPosition + (keyIdCount * kKeyIdSize) !=
+    if (readPosition + ((uint64_t)keyIdCount * kKeyIdSize) !=
             initData.size() - sizeof(uint32_t)) {
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
