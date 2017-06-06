@@ -39,6 +39,7 @@ typedef struct tagBitstream
 
 typedef struct tagVOP
 {
+    PIXEL   *allChan;           /* [yuv]Chan point into this buffer */
     PIXEL   *yChan;             /* The Y component */
     PIXEL   *uChan;             /* The U component */
     PIXEL   *vChan;             /* The V component */
