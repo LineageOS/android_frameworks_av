@@ -480,7 +480,7 @@ aaudio_result_t AudioStreamInternal::processCommands() {
         default:
             ALOGE("WARNING - AudioStreamInternal::processCommands() Unrecognized what = %d",
                  (int) message.what);
-            result = AAUDIO_ERROR_UNEXPECTED_VALUE;
+            result = AAUDIO_ERROR_INTERNAL;
             break;
         }
     }
