@@ -1336,7 +1336,9 @@ bool AudioFlinger::PlaybackThread::OutputTrack::write(void* data, uint32_t frame
             if (mBufferQueue.size()) {
                 mBufferQueue.removeAt(0);
                 free(pInBuffer->mBuffer);
-                delete pInBuffer;
+                if (pInBuffer != &inBuffer) {
+                    delete pInBuffer;
+                }
                 ALOGV("OutputTrack::write() %p thread %p released overflow buffer %zu", this,
                         mThread.unsafe_get(), mBufferQueue.size());
             } else {
