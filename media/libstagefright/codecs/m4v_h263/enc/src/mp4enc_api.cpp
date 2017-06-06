@@ -773,7 +773,7 @@ OSCL_EXPORT_REF Bool    PVInitVideoEncoder(VideoEncControls *encoderControl, Vid
             || (size_t)(size + (size >> 1)) > SIZE_MAX / sizeof(PIXEL)) {
         goto CLEAN_UP;
     }
-    video->currVop->yChan = (PIXEL *)M4VENC_MALLOC(sizeof(PIXEL) * (size + (size >> 1))); /* Memory for currVop Y */
+    video->currVop->allChan = video->currVop->yChan = (PIXEL *)M4VENC_MALLOC(sizeof(PIXEL) * (size + (size >> 1))); /* Memory for currVop Y */
     if (video->currVop->yChan == NULL) goto CLEAN_UP;
     video->currVop->uChan = video->currVop->yChan + size;/* Memory for currVop U */
     video->currVop->vChan = video->currVop->uChan + (size >> 2);/* Memory for currVop V */
@@ -791,7 +791,7 @@ OSCL_EXPORT_REF Bool    PVInitVideoEncoder(VideoEncControls *encoderControl, Vid
 
     video->prevBaseVop = (Vop *) M4VENC_MALLOC(sizeof(Vop));         /* Memory for Previous Base Vop */
     if (video->prevBaseVop == NULL) goto CLEAN_UP;
-    video->prevBaseVop->yChan = (PIXEL *) M4VENC_MALLOC(sizeof(PIXEL) * (size + (size >> 1))); /* Memory for prevBaseVop Y */
+    video->prevBaseVop->allChan = video->prevBaseVop->yChan = (PIXEL *) M4VENC_MALLOC(sizeof(PIXEL) * (size + (size >> 1))); /* Memory for prevBaseVop Y */
     if (video->prevBaseVop->yChan == NULL) goto CLEAN_UP;
     video->prevBaseVop->uChan = video->prevBaseVop->yChan + size; /* Memory for prevBaseVop U */
     video->prevBaseVop->vChan = video->prevBaseVop->uChan + (size >> 2); /* Memory for prevBaseVop V */
@@ -808,7 +808,7 @@ OSCL_EXPORT_REF Bool    PVInitVideoEncoder(VideoEncControls *encoderControl, Vid
     {
         video->nextBaseVop = (Vop *) M4VENC_MALLOC(sizeof(Vop));         /* Memory for Next Base Vop */
         if (video->nextBaseVop == NULL) goto CLEAN_UP;
-        video->nextBaseVop->yChan = (PIXEL *) M4VENC_MALLOC(sizeof(PIXEL) * (size + (size >> 1))); /* Memory for nextBaseVop Y */
+        video->nextBaseVop->allChan = video->nextBaseVop->yChan = (PIXEL *) M4VENC_MALLOC(sizeof(PIXEL) * (size + (size >> 1))); /* Memory for nextBaseVop Y */
         if (video->nextBaseVop->yChan == NULL) goto CLEAN_UP;
         video->nextBaseVop->uChan = video->nextBaseVop->yChan + size; /* Memory for nextBaseVop U */
         video->nextBaseVop->vChan = video->nextBaseVop->uChan + (size >> 2); /* Memory for nextBaseVop V */
@@ -825,7 +825,7 @@ OSCL_EXPORT_REF Bool    PVInitVideoEncoder(VideoEncControls *encoderControl, Vid
     {
         video->prevEnhanceVop = (Vop *) M4VENC_MALLOC(sizeof(Vop));      /* Memory for Previous Enhancement Vop */
         if (video->prevEnhanceVop == NULL) goto CLEAN_UP;
-        video->prevEnhanceVop->yChan = (PIXEL *) M4VENC_MALLOC(sizeof(PIXEL) * (size + (size >> 1))); /* Memory for Previous Ehancement Y */
+        video->prevEnhanceVop->allChan = video->prevEnhanceVop->yChan = (PIXEL *) M4VENC_MALLOC(sizeof(PIXEL) * (size + (size >> 1))); /* Memory for Previous Ehancement Y */
         if (video->prevEnhanceVop->yChan == NULL) goto CLEAN_UP;
         video->prevEnhanceVop->uChan = video->prevEnhanceVop->yChan + size; /* Memory for Previous Enhancement U */
         video->prevEnhanceVop->vChan = video->prevEnhanceVop->uChan + (size >> 2); /* Memory for Previous Enhancement V */
@@ -1196,39 +1196,35 @@ OSCL_EXPORT_REF Bool    PVCleanUpVideoEncoder(VideoEncControls *encoderControl)
 
         if (video->currVop)
         {
-            if (video->currVop->yChan)
+            if (video->currVop->allChan)
             {
-                video->currVop->yChan -= offset;
-                M4VENC_FREE(video->currVop->yChan);
+                M4VENC_FREE(video->currVop->allChan);
             }
             M4VENC_FREE(video->currVop);
         }
 
         if (video->nextBaseVop)
         {
-            if (video->nextBaseVop->yChan)
+            if (video->nextBaseVop->allChan)
             {
-                video->nextBaseVop->yChan -= offset;
-                M4VENC_FREE(video->nextBaseVop->yChan);
+                M4VENC_FREE(video->nextBaseVop->allChan);
             }
             M4VENC_FREE(video->nextBaseVop);
         }
 
         if (video->prevBaseVop)
         {
-            if (video->prevBaseVop->yChan)
+            if (video->prevBaseVop->allChan)
             {
-                video->prevBaseVop->yChan -= offset;
-                M4VENC_FREE(video->prevBaseVop->yChan);
+                M4VENC_FREE(video->prevBaseVop->allChan);
             }
             M4VENC_FREE(video->prevBaseVop);
         }
         if (video->prevEnhanceVop)
         {
-            if (video->prevEnhanceVop->yChan)
+            if (video->prevEnhanceVop->allChan)
             {
-                video->prevEnhanceVop->yChan -= offset;
-                M4VENC_FREE(video->prevEnhanceVop->yChan);
+                M4VENC_FREE(video->prevEnhanceVop->allChan);
             }
             M4VENC_FREE(video->prevEnhanceVop);
         }
