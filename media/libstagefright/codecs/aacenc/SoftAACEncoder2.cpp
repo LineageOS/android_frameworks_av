@@ -305,10 +305,6 @@ OMX_ERRORTYPE SoftAACEncoder2::internalSetParameter(
                 return OMX_ErrorUndefined;
             }
 
-            if (formatParams->nIndex > 0) {
-                return OMX_ErrorNoMore;
-            }
-
             if ((formatParams->nPortIndex == 0
                         && formatParams->eEncoding != OMX_AUDIO_CodingPCM)
                 || (formatParams->nPortIndex == 1
