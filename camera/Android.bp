@@ -21,7 +21,6 @@ cc_library_shared {
         export_aidl_headers: true,
         local_include_dirs: ["aidl"],
         include_dirs: [
-            "frameworks/base/core/java",
             "frameworks/native/aidl/gui",
         ],
     },
@@ -76,4 +75,5 @@ cc_library_shared {
         "-Wall",
         "-Wextra",
     ],
+
 }
