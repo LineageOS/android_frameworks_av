@@ -38,8 +38,8 @@ struct NuPlayer::Source : public AHandler {
         FLAG_CAN_SEEK_FORWARD   = 4,  // the "10 sec forward button"
         FLAG_CAN_SEEK           = 8,  // the "seek bar"
         FLAG_DYNAMIC_DURATION   = 16,
-        FLAG_SECURE             = 32,
-        FLAG_PROTECTED          = 64,
+        FLAG_SECURE             = 32, // Secure codec is required.
+        FLAG_PROTECTED          = 64, // The screen needs to be protected (screenshot is disabled).
     };
 
     enum {

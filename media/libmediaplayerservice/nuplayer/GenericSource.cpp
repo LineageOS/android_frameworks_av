@@ -1979,7 +1979,8 @@ status_t NuPlayer::GenericSource::onPrepareDrm(const sp<AMessage> &msg)
     // The legacy mDecryptHandle!=NULL check (for FLAG_PROTECTED) is equivalent to mIsDrmProtected.
     notifyFlagsChanged(
             (mIsSecure ? FLAG_SECURE : 0) |
-            (mIsDrmProtected ? FLAG_PROTECTED : 0) |
+            // Setting "protected screen" only for L1: b/38390836
+            (mIsSecure ? FLAG_PROTECTED : 0) |
             FLAG_CAN_PAUSE |
             FLAG_CAN_SEEK_BACKWARD |
             FLAG_CAN_SEEK_FORWARD |
