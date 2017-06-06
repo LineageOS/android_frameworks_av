@@ -15,7 +15,7 @@
  */
 
 /**
- * @addtogroup Media Camera
+ * @addtogroup Media
  * @{
  */
 
