@@ -92,7 +92,7 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
             break;
         default:
             ALOGE("AudioStream::open(): illegal performanceMode %d", mPerformanceMode);
-            return AAUDIO_ERROR_UNEXPECTED_VALUE;
+            return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
     }
 
     return AAUDIO_OK;
