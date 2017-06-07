@@ -261,7 +261,7 @@ void GraphicBufferSource::codecBufferEmptied(OMX_BUFFERHEADERTYPE* header) {
     // has dropped that GraphicBuffer, and there's nothing for us to release.
     int id = codecBuffer.mBuf;
     if (mBufferSlot[id] != NULL &&
-        mBufferSlot[id]->handle == codecBuffer.mGraphicBuffer->handle) {
+            mBufferSlot[id]->handle == codecBuffer.mGraphicBuffer->handle) {
         ALOGV("cbi %d matches bq slot %d, handle=%p",
                 cbi, id, mBufferSlot[id]->handle);
 
@@ -346,6 +346,12 @@ void GraphicBufferSource::suspend(bool suspend) {
             } else if (err != OK) {
                 ALOGW("suspend: acquireBuffer returned err=%d", err);
                 break;
+            } else if (item.mBuf < 0 ||
+                    item.mBuf >= BufferQueue::NUM_BUFFER_SLOTS) {
+                // Invalid buffer index
+                ALOGW("suspend: corrupted buffer index (%d)",
+                        item.mBuf);
+                break;
             }
 
             --mNumFramesAvailable;
@@ -395,6 +401,10 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
     } else if (err != OK) {
         // now what? fake end-of-stream?
         ALOGW("fillCodecBuffer_l: acquireBuffer returned err=%d", err);
+        return false;
+    } else if (item.mBuf < 0 || item.mBuf >= BufferQueue::NUM_BUFFER_SLOTS) {
+        // Invalid buffer index
+        ALOGW("fillCodecBuffer_l: corrupted buffer index (%d)", item.mBuf);
         return false;
     }
 
@@ -696,10 +706,17 @@ void GraphicBufferSource::onFrameAvailable() {
         BufferQueue::BufferItem item;
         status_t err = mBufferQueue->acquireBuffer(&item, 0);
         if (err == OK) {
+            if (item.mBuf < 0 ||
+                    item.mBuf >= BufferQueue::NUM_BUFFER_SLOTS) {
+                // Invalid buffer index
+                ALOGW("onFrameAvailable: corrupted buffer index (%d)",
+                        item.mBuf);
+                return;
+            }
             // If this is the first time we're seeing this buffer, add it to our
             // slot table.
             if (item.mGraphicBuffer != NULL) {
-                ALOGV("fillCodecBuffer_l: setting mBufferSlot %d", item.mBuf);
+                ALOGV("onFrameAvailable: setting mBufferSlot %d", item.mBuf);
                 mBufferSlot[item.mBuf] = item.mGraphicBuffer;
             }
             mBufferQueue->releaseBuffer(item.mBuf, item.mFrameNumber,
