@@ -212,10 +212,8 @@ status_t AAudioConvert_aaudioToAndroidStatus(aaudio_result_t result) {
         status = DEAD_OBJECT;
         break;
     case AAUDIO_ERROR_INVALID_STATE:
-    case AAUDIO_ERROR_UNEXPECTED_STATE:
         status = INVALID_OPERATION;
         break;
-    case AAUDIO_ERROR_UNEXPECTED_VALUE:
     case AAUDIO_ERROR_INVALID_RATE:
     case AAUDIO_ERROR_INVALID_FORMAT:
     case AAUDIO_ERROR_ILLEGAL_ARGUMENT:
@@ -229,9 +227,7 @@ status_t AAudioConvert_aaudioToAndroidStatus(aaudio_result_t result) {
         status = UNEXPECTED_NULL;
         break;
     // TODO translate these result codes
-    case AAUDIO_ERROR_INCOMPATIBLE:
     case AAUDIO_ERROR_INTERNAL:
-    case AAUDIO_ERROR_INVALID_QUERY:
     case AAUDIO_ERROR_UNIMPLEMENTED:
     case AAUDIO_ERROR_UNAVAILABLE:
     case AAUDIO_ERROR_NO_FREE_HANDLES:
@@ -265,7 +261,7 @@ aaudio_result_t AAudioConvert_androidToAAudioResult(status_t status) {
             result = AAUDIO_ERROR_NULL;
             break;
         case BAD_VALUE:
-            result = AAUDIO_ERROR_UNEXPECTED_VALUE;
+            result = AAUDIO_ERROR_ILLEGAL_ARGUMENT;
             break;
     case WOULD_BLOCK:
         result = AAUDIO_ERROR_WOULD_BLOCK;
