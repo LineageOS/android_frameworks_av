@@ -51,13 +51,13 @@ AAUDIO_API const char * AAudio_convertResultToText(aaudio_result_t returnCode) {
         AAUDIO_CASE_ENUM(AAUDIO_OK);
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_DISCONNECTED);
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_ILLEGAL_ARGUMENT);
-        AAUDIO_CASE_ENUM(AAUDIO_ERROR_INCOMPATIBLE);
+        // reserved
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_INTERNAL);
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_INVALID_STATE);
-        AAUDIO_CASE_ENUM(AAUDIO_ERROR_UNEXPECTED_STATE);
-        AAUDIO_CASE_ENUM(AAUDIO_ERROR_UNEXPECTED_VALUE);
+        // reserved
+        // reserved
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_INVALID_HANDLE);
-        AAUDIO_CASE_ENUM(AAUDIO_ERROR_INVALID_QUERY);
+         // reserved
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_UNIMPLEMENTED);
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_UNAVAILABLE);
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_NO_FREE_HANDLES);
@@ -114,7 +114,7 @@ static AudioStreamBuilder *convertAAudioBuilderToStreamBuilder(AAudioStreamBuild
 
 AAUDIO_API aaudio_result_t AAudio_createStreamBuilder(AAudioStreamBuilder** builder)
 {
-    AudioStreamBuilder *audioStreamBuilder =  new AudioStreamBuilder();
+    AudioStreamBuilder *audioStreamBuilder =  new(std::nothrow) AudioStreamBuilder();
     if (audioStreamBuilder == nullptr) {
         return AAUDIO_ERROR_NO_MEMORY;
     }
@@ -235,7 +235,7 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_delete(AAudioStreamBuilder* buil
         delete streamBuilder;
         return AAUDIO_OK;
     }
-    return AAUDIO_ERROR_INVALID_HANDLE;
+    return AAUDIO_ERROR_NULL;
 }
 
 AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream)
@@ -247,7 +247,7 @@ AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream)
         delete audioStream;
         return AAUDIO_OK;
     }
-    return AAUDIO_ERROR_INVALID_HANDLE;
+    return AAUDIO_ERROR_NULL;
 }
 
 AAUDIO_API aaudio_result_t  AAudioStream_requestStart(AAudioStream* stream)
