@@ -22,4 +22,5 @@ LOCAL_C_INCLUDES := \
 	$(call include-path-for, audio-effects)
 
 
+LOCAL_HEADER_LIBRARIES += libhardware_headers
 include $(BUILD_SHARED_LIBRARY)
