@@ -25,6 +25,7 @@
 #include <string>
 
 #include <android-base/logging.h>
+#include <utils/misc.h>
 
 // from LOCAL_C_INCLUDES
 #include "IcuUtils.h"
@@ -47,6 +48,13 @@ int main(int argc __unused, char** argv)
         20 /* upper limit as percentage of physical RAM */);
 
     signal(SIGPIPE, SIG_IGN);
+
+    //b/62255959: this forces libutis.so to dlopen vendor version of libutils.so
+    //before minijail is on. This is dirty but required since some syscalls such
+    //as pread64 are used by linker but aren't allowed in the minijail. By
+    //calling the function before entering minijail, we can force dlopen.
+    android::report_sysprop_change();
+
     SetUpMinijail(kSystemSeccompPolicyPath, kVendorSeccompPolicyPath);
 
     InitializeIcuOrDie();
