@@ -133,7 +133,7 @@ aaudio_result_t AudioStreamLegacy::getBestTimestamp(clockid_t clockId,
             break;
         default:
             ALOGE("getTimestamp() - Unrecognized clock type %d", (int) clockId);
-            return AAUDIO_ERROR_UNEXPECTED_VALUE;
+            return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
             break;
     }
     status_t status = extendedTimestamp->getBestTimestamp(framePosition, timeNanoseconds, timebase);

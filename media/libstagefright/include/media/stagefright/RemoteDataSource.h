@@ -54,6 +54,9 @@ public:
         return mSource->getSize(size);
     }
     virtual void close() {
+        // Protect strong pointer assignments. This also can be called from the binder
+        // clean-up procedure which is running on a separate thread.
+        Mutex::Autolock lock(mCloseLock);
         mSource = nullptr;
         mMemory = nullptr;
     }
@@ -75,6 +78,7 @@ private:
     sp<IMemory> mMemory;
     sp<DataSource> mSource;
     String8 mName;
+    Mutex mCloseLock;
 
     explicit RemoteDataSource(const sp<DataSource> &source) {
         mSource = source;
