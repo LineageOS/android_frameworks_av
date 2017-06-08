@@ -284,7 +284,7 @@ sp<MemoryDealer> ACodecBufferChannel::makeMemoryDealer(size_t heapSize) {
     return dealer;
 }
 
-void ACodecBufferChannel::setInputBufferArray(const std::vector<BufferAndId> &array) {
+status_t ACodecBufferChannel::setInputBufferArray(const std::vector<BufferAndId> &array) {
     if (hasCryptoOrDescrambler()) {
         size_t totalSize = std::accumulate(
                 array.begin(), array.end(), 0u,
@@ -311,11 +311,15 @@ void ACodecBufferChannel::setInputBufferArray(const std::vector<BufferAndId> &ar
         if (hasCryptoOrDescrambler()) {
             sharedEncryptedBuffer = mDealer->allocate(elem.mBuffer->capacity());
         }
+        if (elem.mBuffer->data() == NULL && sharedEncryptedBuffer == NULL) {
+            return BAD_VALUE;
+        }
         inputBuffers.emplace_back(elem.mBuffer, elem.mBufferId, sharedEncryptedBuffer);
     }
     std::atomic_store(
             &mInputBuffers,
             std::make_shared<const std::vector<const BufferInfo>>(inputBuffers));
+    return OK;
 }
 
 void ACodecBufferChannel::setOutputBufferArray(const std::vector<BufferAndId> &array) {
