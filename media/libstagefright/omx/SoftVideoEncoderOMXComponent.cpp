@@ -613,26 +613,24 @@ const uint8_t *SoftVideoEncoderOMXComponent::extractGraphicBuffer(
 
     switch (format) {
         case HAL_PIXEL_FORMAT_YV12:  // YCrCb / YVU planar
-            // convert to flex YUV
             ycbcr.y = bits;
             ycbcr.cr = (uint8_t *)bits + srcStride * srcVStride;
             ycbcr.cb = (uint8_t *)ycbcr.cr + (srcStride >> 1) * (srcVStride >> 1);
             ycbcr.chroma_step = 1;
-            ycbcr.cstride = srcVStride >> 1;
-            ycbcr.ystride = srcVStride;
+            ycbcr.cstride = srcStride >> 1;
+            ycbcr.ystride = srcStride;
             ConvertFlexYUVToPlanar(dst, dstStride, dstVStride, &ycbcr, width, height);
             break;
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:  // YCrCb / YVU semiplanar, NV21
-            // convert to flex YUV
             ycbcr.y = bits;
             ycbcr.cr = (uint8_t *)bits + srcStride * srcVStride;
             ycbcr.cb = (uint8_t *)ycbcr.cr + 1;
             ycbcr.chroma_step = 2;
-            ycbcr.cstride = srcVStride;
-            ycbcr.ystride = srcVStride;
+            ycbcr.cstride = srcStride;
+            ycbcr.ystride = srcStride;
             ConvertFlexYUVToPlanar(dst, dstStride, dstVStride, &ycbcr, width, height);
             break;
-        case HAL_PIXEL_FORMAT_YCbCr_420_888:
+        case HAL_PIXEL_FORMAT_YCbCr_420_888:  // YCbCr / YUV planar
             ConvertFlexYUVToPlanar(dst, dstStride, dstVStride, &ycbcr, width, height);
             break;
         case HAL_PIXEL_FORMAT_RGBX_8888:

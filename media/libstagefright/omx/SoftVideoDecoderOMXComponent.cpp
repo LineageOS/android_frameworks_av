@@ -430,10 +430,6 @@ OMX_ERRORTYPE SoftVideoDecoderOMXComponent::internalSetParameter(
                 return OMX_ErrorBadPortIndex;
             }
 
-            if (formatParams->nIndex != 0) {
-                return OMX_ErrorNoMore;
-            }
-
             if (formatParams->nPortIndex == kInputPortIndex) {
                 if (formatParams->eCompressionFormat != mCodingType
                         || formatParams->eColorFormat != OMX_COLOR_FormatUnused) {
