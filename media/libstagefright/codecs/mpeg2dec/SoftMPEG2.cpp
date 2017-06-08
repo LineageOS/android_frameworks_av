@@ -752,6 +752,7 @@ void SoftMPEG2::onQueueFilled(OMX_U32 portIndex) {
 
                 if (portWillReset) {
                     resetDecoder();
+                    resetPlugin();
                     return;
                 }
             } else if (mUpdateColorAspects) {
