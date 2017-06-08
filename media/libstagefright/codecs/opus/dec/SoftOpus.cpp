@@ -350,6 +350,11 @@ void SoftOpus::onQueueFilled(OMX_U32 portIndex) {
         const uint8_t *data = header->pBuffer + header->nOffset;
         size_t size = header->nFilledLen;
 
+        if ((header->nFlags & OMX_BUFFERFLAG_EOS) && size == 0) {
+            header->nFlags &= ~OMX_BUFFERFLAG_CODECCONFIG;
+            goto L_eos;
+        }
+
         if (mInputBufferCount == 0) {
             CHECK(mHeader == NULL);
             mHeader = new OpusHeader();
@@ -408,6 +413,11 @@ void SoftOpus::onQueueFilled(OMX_U32 portIndex) {
             mOutputPortSettingsChange = AWAITING_DISABLED;
         }
 
+        if (header->nFlags & OMX_BUFFERFLAG_EOS) {
+            header->nFilledLen = 0;
+            header->nFlags &= ~OMX_BUFFERFLAG_CODECCONFIG;
+            goto L_eos;
+        }
         inQueue.erase(inQueue.begin());
         info->mOwnedByUs = false;
         notifyEmptyBufferDone(header);
@@ -415,6 +425,7 @@ void SoftOpus::onQueueFilled(OMX_U32 portIndex) {
         return;
     }
 
+L_eos:
     while (!inQueue.empty() && !outQueue.empty()) {
         BufferInfo *inInfo = *inQueue.begin();
         OMX_BUFFERHEADERTYPE *inHeader = inInfo->mHeader;
@@ -430,7 +441,7 @@ void SoftOpus::onQueueFilled(OMX_U32 portIndex) {
         BufferInfo *outInfo = *outQueue.begin();
         OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
 
-        if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
+        if ((inHeader->nFlags & OMX_BUFFERFLAG_EOS) && inHeader->nFilledLen == 0) {
             inQueue.erase(inQueue.begin());
             inInfo->mOwnedByUs = false;
             notifyEmptyBufferDone(inHeader);
@@ -498,11 +509,15 @@ void SoftOpus::onQueueFilled(OMX_U32 portIndex) {
 
         mNumFramesOutput += numFrames;
 
-        inInfo->mOwnedByUs = false;
-        inQueue.erase(inQueue.begin());
-        inInfo = NULL;
-        notifyEmptyBufferDone(inHeader);
-        inHeader = NULL;
+        if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
+            inHeader->nFilledLen = 0;
+        } else {
+            inInfo->mOwnedByUs = false;
+            inQueue.erase(inQueue.begin());
+            inInfo = NULL;
+            notifyEmptyBufferDone(inHeader);
+            inHeader = NULL;
+        }
 
         outInfo->mOwnedByUs = false;
         outQueue.erase(outQueue.begin());
