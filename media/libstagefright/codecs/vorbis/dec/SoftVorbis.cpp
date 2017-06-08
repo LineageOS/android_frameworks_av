@@ -276,6 +276,11 @@ void SoftVorbis::onQueueFilled(OMX_U32 portIndex) {
 
         const uint8_t *data = header->pBuffer + header->nOffset;
         size_t size = header->nFilledLen;
+
+        if ((header->nFlags & OMX_BUFFERFLAG_EOS) && size == 0) {
+            goto L_eos;
+        }
+
         if (size < 7) {
             ALOGE("Too small input buffer: %zu bytes", size);
             android_errorWriteLog(0x534e4554, "27833616");
@@ -323,6 +328,11 @@ void SoftVorbis::onQueueFilled(OMX_U32 portIndex) {
             }
         }
 
+        if (header->nFlags & OMX_BUFFERFLAG_EOS) {
+            header->nFilledLen = 0;
+            goto L_eos;
+        }
+
         inQueue.erase(inQueue.begin());
         info->mOwnedByUs = false;
         notifyEmptyBufferDone(header);
@@ -332,6 +342,7 @@ void SoftVorbis::onQueueFilled(OMX_U32 portIndex) {
         return;
     }
 
+L_eos:
     while ((!inQueue.empty() || (mSawInputEos && !mSignalledOutputEos)) && !outQueue.empty()) {
         BufferInfo *inInfo = NULL;
         OMX_BUFFERHEADERTYPE *inHeader = NULL;

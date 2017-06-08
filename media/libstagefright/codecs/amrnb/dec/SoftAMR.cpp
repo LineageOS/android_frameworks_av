@@ -309,7 +309,7 @@ void SoftAMR::onQueueFilled(OMX_U32 /* portIndex */) {
         BufferInfo *outInfo = *outQueue.begin();
         OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
 
-        if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
+        if ((inHeader->nFlags & OMX_BUFFERFLAG_EOS) && inHeader->nFilledLen == 0) {
             inQueue.erase(inQueue.begin());
             inInfo->mOwnedByUs = false;
             notifyEmptyBufferDone(inHeader);
@@ -471,7 +471,7 @@ void SoftAMR::onQueueFilled(OMX_U32 /* portIndex */) {
             mNumSamplesOutput += kNumSamplesPerFrameWB;
         }
 
-        if (inHeader->nFilledLen == 0) {
+        if (inHeader->nFilledLen == 0 && (inHeader->nFlags & OMX_BUFFERFLAG_EOS) == 0) {
             inInfo->mOwnedByUs = false;
             inQueue.erase(inQueue.begin());
             inInfo = NULL;
