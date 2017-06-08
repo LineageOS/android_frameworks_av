@@ -1562,9 +1562,9 @@ status_t AudioTrack::createTrack_l()
     }
 
     mAudioTrack->attachAuxEffect(mAuxEffectId);
+    mFrameCount = frameCount;
     updateLatency_l();  // this refetches mAfLatency and sets mLatency
 
-    mFrameCount = frameCount;
     // If IAudioTrack is re-created, don't let the requested frameCount
     // decrease.  This can confuse clients that cache frameCount().
     if (frameCount > mReqFrameCount) {
