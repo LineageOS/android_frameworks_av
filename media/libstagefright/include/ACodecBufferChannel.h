@@ -87,8 +87,9 @@ public:
      *
      * @param array     Newly allocated buffers. Empty if buffers are
      *                  deallocated.
+     * @return OK if no error.
      */
-    void setInputBufferArray(const std::vector<BufferAndId> &array);
+    status_t setInputBufferArray(const std::vector<BufferAndId> &array);
     /**
      * Set output buffer array.
      *
