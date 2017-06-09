@@ -404,6 +404,8 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
     } else {
         dumpRecent(result, ts_since, only);
     }
+    free((void*)only);
+    only=NULL;
 
 
     if (clear) {
