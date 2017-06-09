@@ -44,6 +44,9 @@ extern "C" {
 
 #define LVM_MAXINT_8            127                 /* Maximum positive integer size */
 #define LVM_MAXINT_16           32767
+#ifdef BUILD_FLOAT
+#define LVM_MAXFLOAT            1.0f
+#endif
 #define LVM_MAXINT_32           2147483647
 #define LVM_MAXENUM             2147483647
 
@@ -95,7 +98,9 @@ typedef     uint16_t            LVM_UINT16;         /* Unsigned 16-bit word */
 typedef     int32_t             LVM_INT32;          /* Signed 32-bit word */
 typedef     uint32_t            LVM_UINT32;         /* Unsigned 32-bit word */
 
-
+#ifdef BUILD_FLOAT
+typedef     float               LVM_FLOAT;          /* single precission floating point*/
+#endif
 /****************************************************************************************/
 /*                                                                                      */
 /*  Standard Enumerated types                                                           */
@@ -133,6 +138,10 @@ typedef enum
     LVM_FS_32000 = 6,
     LVM_FS_44100 = 7,
     LVM_FS_48000 = 8,
+#ifdef HIGHER_FS
+    LVM_FS_96000 = 9,
+    LVM_FS_192000 = 10,
+#endif
     LVM_FS_INVALID = LVM_MAXENUM-1,
     LVM_FS_DUMMY = LVM_MAXENUM
 } LVM_Fs_en;

@@ -57,7 +57,121 @@
 /* NOTES:                                                                               */
 /*                                                                                      */
 /****************************************************************************************/
+#ifdef BUILD_FLOAT
+LVEQNB_ReturnStatus_en LVEQNB_Process(LVEQNB_Handle_t       hInstance,
+                                      const LVM_FLOAT       *pInData,
+                                      LVM_FLOAT             *pOutData,
+                                      LVM_UINT16            NumSamples)
+{
 
+    LVM_UINT16          i;
+    Biquad_FLOAT_Instance_t   *pBiquad;
+    LVEQNB_Instance_t   *pInstance = (LVEQNB_Instance_t  *)hInstance;
+    LVM_FLOAT           *pScratch;
+
+
+     /* Check for NULL pointers */
+    if((hInstance == LVM_NULL) || (pInData == LVM_NULL) || (pOutData == LVM_NULL))
+    {
+        return LVEQNB_NULLADDRESS;
+    }
+
+    /* Check if the input and output data buffers are 32-bit aligned */
+    if ((((uintptr_t)pInData % 4) != 0) || (((uintptr_t)pOutData % 4) != 0))
+    {
+        return LVEQNB_ALIGNMENTERROR;
+    }
+
+    pScratch  = (LVM_FLOAT *)pInstance->pFastTemporary;
+
+    /*
+    * Check the number of samples is not too large
+    */
+    if (NumSamples > pInstance->Capabilities.MaxBlockSize)
+    {
+        return(LVEQNB_TOOMANYSAMPLES);
+    }
+
+    if (pInstance->Params.OperatingMode == LVEQNB_ON)
+    {
+        /*
+         * Copy input data in to scratch buffer
+         */
+
+        Copy_Float((LVM_FLOAT *)pInData,      /* Source */
+                   pScratch,                  /* Destination */
+                   (LVM_INT16)(2 * NumSamples)); /* Left and Right */
+        /*
+         * For each section execte the filter unless the gain is 0dB
+         */
+        if (pInstance->NBands != 0)
+        {
+            for (i = 0; i < pInstance->NBands; i++)
+            {
+                /*
+                 * Check if band is non-zero dB gain
+                 */
+                if (pInstance->pBandDefinitions[i].Gain != 0)
+                {
+                    /*
+                     * Get the address of the biquad instance
+                     */
+                    pBiquad = &pInstance->pEQNB_FilterState_Float[i];
+
+
+                    /*
+                     * Select single or double precision as required
+                     */
+                    switch (pInstance->pBiquadType[i])
+                    {
+                        case LVEQNB_SinglePrecision_Float:
+                        {
+                            PK_2I_D32F32C14G11_TRC_WRA_01(pBiquad,
+                                                          (LVM_FLOAT *)pScratch,
+                                                          (LVM_FLOAT *)pScratch,
+                                                          (LVM_INT16)NumSamples);
+                            break;
+                        }
+                        default:
+                            break;
+                    }
+                }
+            }
+        }
+
+
+        if(pInstance->bInOperatingModeTransition == LVM_TRUE){
+            LVC_MixSoft_2St_D16C31_SAT(&pInstance->BypassMixer,
+                                       (LVM_FLOAT *)pScratch,
+                                       (LVM_FLOAT *)pInData,
+                                       (LVM_FLOAT *)pScratch,
+                                       (LVM_INT16)(2 * NumSamples));
+            Copy_Float((LVM_FLOAT*)pScratch,                           /* Source */
+                       pOutData,                                       /* Destination */
+                       (LVM_INT16)(2 * NumSamples));                     /* Left and Right samples */
+        }
+        else{
+            Copy_Float(pScratch,              /* Source */
+                       pOutData,              /* Destination */
+                       (LVM_INT16 )(2 * NumSamples)); /* Left and Right */
+        }
+    }
+    else
+    {
+        /*
+         * Mode is OFF so copy the data if necessary
+         */
+        if (pInData != pOutData)
+        {
+            Copy_Float(pInData,                                    /* Source */
+                       pOutData,                                   /* Destination */
+                       (LVM_INT16)(2 * NumSamples));                 /* Left and Right samples */
+        }
+    }
+    return(LVEQNB_SUCCESS);
+
+}
+#else
 LVEQNB_ReturnStatus_en LVEQNB_Process(LVEQNB_Handle_t       hInstance,
                                       const LVM_INT16       *pInData,
                                       LVM_INT16             *pOutData,
@@ -198,3 +312,4 @@ LVEQNB_ReturnStatus_en LVEQNB_Process(LVEQNB_Handle_t       hInstance,
     return(LVEQNB_SUCCESS);
 
 }
+#endif

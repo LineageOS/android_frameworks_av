@@ -49,6 +49,31 @@ void JoinTo2i_32x32( const LVM_INT32    *srcL,
 
     return;
 }
+#ifdef BUILD_FLOAT
+void JoinTo2i_Float( const LVM_FLOAT    *srcL,
+                     const LVM_FLOAT    *srcR,
+                           LVM_FLOAT    *dst,
+                           LVM_INT16    n )
+{
+    LVM_INT16 ii;
 
+    srcL += n - 1;
+    srcR += n - 1;
+    dst  += ((2 * n) - 1);
+
+    for (ii = n; ii != 0; ii--)
+    {
+        *dst = *srcR;
+        dst--;
+        srcR--;
+
+        *dst = *srcL;
+        dst--;
+        srcL--;
+    }
+
+    return;
+}
+#endif
 /**********************************************************************************/
 

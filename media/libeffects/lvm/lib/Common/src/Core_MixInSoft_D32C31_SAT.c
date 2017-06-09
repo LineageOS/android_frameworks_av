@@ -26,6 +26,70 @@
    FUNCTION CORE_MIXSOFT_1ST_D32C31_WRA
 ***********************************************************************************/
 
+#ifdef BUILD_FLOAT /* BUILD_FLOAT */
+void Core_MixInSoft_D32C31_SAT(     Mix_1St_Cll_FLOAT_t       *pInstance,
+                                    const LVM_FLOAT     *src,
+                                          LVM_FLOAT     *dst,
+                                          LVM_INT16     n)
+{
+    LVM_FLOAT    Temp1,Temp2,Temp3;
+    LVM_INT16     OutLoop;
+    LVM_INT16     InLoop;
+    LVM_FLOAT    TargetTimesOneMinAlpha;
+    LVM_FLOAT    CurrentTimesAlpha;
+    LVM_INT16     ii,jj;
+
+
+    InLoop = (LVM_INT16)(n >> 2); /* Process per 4 samples */
+    OutLoop = (LVM_INT16)(n - (InLoop << 2));
+
+    TargetTimesOneMinAlpha = ((1.0f -pInstance->Alpha) * pInstance->Target);
+    if (pInstance->Target >= pInstance->Current){
+        TargetTimesOneMinAlpha +=(LVM_FLOAT)(2.0f / 2147483647.0f); /* Ceil*/
+    }
+
+    if (OutLoop){
+
+        CurrentTimesAlpha = pInstance->Current * pInstance->Alpha;
+        pInstance->Current = TargetTimesOneMinAlpha + CurrentTimesAlpha;
+
+        for (ii = OutLoop; ii != 0; ii--){
+        Temp1 = *src++;
+        Temp2 = *dst;
+
+        Temp3 = Temp1 * (pInstance->Current);
+        Temp1 = Temp2 + Temp3;
+
+        if (Temp1 > 1.0f)
+            Temp1 = 1.0f;
+        else if (Temp1 < -1.0f)
+            Temp1 = -1.0f;
+
+        *dst++ = Temp1;
+        }
+    }
+
+    for (ii = InLoop; ii != 0; ii--){
+
+        CurrentTimesAlpha = pInstance->Current * pInstance->Alpha;
+        pInstance->Current = TargetTimesOneMinAlpha + CurrentTimesAlpha;
+
+        for (jj = 4; jj!=0 ; jj--){
+            Temp1 = *src++;
+            Temp2 = *dst;
+
+            Temp3 = Temp1 * (pInstance->Current);
+            Temp1 = Temp2 + Temp3;
+
+            if (Temp1 > 1.0f)
+                Temp1 = 1.0f;
+            else if (Temp1 < -1.0f)
+                Temp1 = -1.0f;
+            *dst++ = Temp1;
+        }
+    }
+}
+#else
 void Core_MixInSoft_D32C31_SAT(     Mix_1St_Cll_t       *pInstance,
                                     const LVM_INT32     *src,
                                           LVM_INT32     *dst,
@@ -89,6 +153,5 @@ void Core_MixInSoft_D32C31_SAT(     Mix_1St_Cll_t       *pInstance,
         }
     }
 }
-
-
+#endif
 /**********************************************************************************/

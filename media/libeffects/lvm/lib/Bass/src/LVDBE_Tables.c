@@ -36,7 +36,11 @@
 /*
  * High Pass Filter Coefficient table
  */
+#ifndef BUILD_FLOAT
 const BQ_C32_Coefs_t LVDBE_HPF_Table[] = {
+#else /*BUILD_FLOAT*/
+const BQ_FLOAT_Coefs_t LVDBE_HPF_Table[] = {
+#endif /*BUILD_FLOAT*/
     /* Coefficients for 55Hz centre frequency */
     {HPF_Fs8000_Fc55_A2,                /* 8kS/s coefficients */
      HPF_Fs8000_Fc55_A1,
@@ -83,6 +87,18 @@ const BQ_C32_Coefs_t LVDBE_HPF_Table[] = {
      HPF_Fs48000_Fc55_A0,
      -HPF_Fs48000_Fc55_B2,
      -HPF_Fs48000_Fc55_B1},
+#ifdef HIGHER_FS
+    {HPF_Fs96000_Fc55_A2,                /* 96kS/s coefficients */
+     HPF_Fs96000_Fc55_A1,
+     HPF_Fs96000_Fc55_A0,
+     -HPF_Fs96000_Fc55_B2,
+     -HPF_Fs96000_Fc55_B1},
+    {HPF_Fs192000_Fc55_A2,                /* 192kS/s coefficients */
+     HPF_Fs192000_Fc55_A1,
+     HPF_Fs192000_Fc55_A0,
+     -HPF_Fs192000_Fc55_B2,
+     -HPF_Fs192000_Fc55_B1},
+#endif
 
     /* Coefficients for 66Hz centre frequency */
     {HPF_Fs8000_Fc66_A2,                /* 8kS/s coefficients */
@@ -130,6 +146,19 @@ const BQ_C32_Coefs_t LVDBE_HPF_Table[] = {
      HPF_Fs48000_Fc66_A0,
      -HPF_Fs48000_Fc66_B2,
      -HPF_Fs48000_Fc66_B1},
+#ifdef HIGHER_FS
+    {HPF_Fs96000_Fc66_A2,                /* 96kS/s coefficients */
+     HPF_Fs96000_Fc66_A1,
+     HPF_Fs96000_Fc66_A0,
+     -HPF_Fs96000_Fc66_B2,
+     -HPF_Fs96000_Fc66_B1},
+    {HPF_Fs192000_Fc66_A2,                /* 192kS/s coefficients */
+     HPF_Fs192000_Fc66_A1,
+     HPF_Fs192000_Fc66_A0,
+     -HPF_Fs192000_Fc66_B2,
+     -HPF_Fs192000_Fc66_B1},
+#endif
+
 
     /* Coefficients for 78Hz centre frequency */
     {HPF_Fs8000_Fc78_A2,                /* 8kS/s coefficients */
@@ -177,6 +206,19 @@ const BQ_C32_Coefs_t LVDBE_HPF_Table[] = {
      HPF_Fs48000_Fc78_A0,
      -HPF_Fs48000_Fc78_B2,
      -HPF_Fs48000_Fc78_B1},
+#ifdef HIGHER_FS
+    {HPF_Fs96000_Fc78_A2,                /* 96kS/s coefficients */
+     HPF_Fs96000_Fc78_A1,
+     HPF_Fs96000_Fc78_A0,
+     -HPF_Fs96000_Fc78_B2,
+     -HPF_Fs96000_Fc78_B1},
+    {HPF_Fs192000_Fc78_A2,                /* 192kS/s coefficients */
+     HPF_Fs192000_Fc78_A1,
+     HPF_Fs192000_Fc78_A0,
+     -HPF_Fs192000_Fc78_B2,
+     -HPF_Fs192000_Fc78_B1},
+#endif
+
 
     /* Coefficients for 90Hz centre frequency */
     {HPF_Fs8000_Fc90_A2,                /* 8kS/s coefficients */
@@ -223,12 +265,32 @@ const BQ_C32_Coefs_t LVDBE_HPF_Table[] = {
      HPF_Fs48000_Fc90_A1,
      HPF_Fs48000_Fc90_A0,
      -HPF_Fs48000_Fc90_B2,
-     -HPF_Fs48000_Fc90_B1}};
+     -HPF_Fs48000_Fc90_B1}
+
+#ifdef HIGHER_FS
+    ,
+    {HPF_Fs96000_Fc90_A2,                /* 96kS/s coefficients */
+     HPF_Fs96000_Fc90_A1,
+     HPF_Fs96000_Fc90_A0,
+     -HPF_Fs96000_Fc90_B2,
+     -HPF_Fs96000_Fc90_B1},
+    {HPF_Fs192000_Fc90_A2,                /* 192kS/s coefficients */
+     HPF_Fs192000_Fc90_A1,
+     HPF_Fs192000_Fc90_A0,
+     -HPF_Fs192000_Fc90_B2,
+     -HPF_Fs192000_Fc90_B1}
+#endif
+
+};
 
 /*
  * Band Pass Filter coefficient table
  */
+#ifndef BUILD_FLOAT
 const BP_C32_Coefs_t LVDBE_BPF_Table[] = {
+#else /*BUILD_FLOAT*/
+const BP_FLOAT_Coefs_t LVDBE_BPF_Table[] = {
+#endif /*BUILD_FLOAT*/
     /* Coefficients for 55Hz centre frequency */
     {BPF_Fs8000_Fc55_A0,                /* 8kS/s coefficients */
      -BPF_Fs8000_Fc55_B2,
@@ -257,6 +319,14 @@ const BP_C32_Coefs_t LVDBE_BPF_Table[] = {
     {BPF_Fs48000_Fc55_A0,                /* 48kS/s coefficients */
      -BPF_Fs48000_Fc55_B2,
      -BPF_Fs48000_Fc55_B1},
+#ifdef HIGHER_FS
+     {BPF_Fs96000_Fc55_A0,                /* 96kS/s coefficients */
+     -BPF_Fs96000_Fc55_B2,
+     -BPF_Fs96000_Fc55_B1},
+     {BPF_Fs192000_Fc55_A0,                /* 192kS/s coefficients */
+     -BPF_Fs192000_Fc55_B2,
+     -BPF_Fs192000_Fc55_B1},
+#endif
 
     /* Coefficients for 66Hz centre frequency */
     {BPF_Fs8000_Fc66_A0,                /* 8kS/s coefficients */
@@ -286,6 +356,14 @@ const BP_C32_Coefs_t LVDBE_BPF_Table[] = {
     {BPF_Fs48000_Fc66_A0,                /* 48kS/s coefficients */
      -BPF_Fs48000_Fc66_B2,
      -BPF_Fs48000_Fc66_B1},
+#ifdef HIGHER_FS
+    {BPF_Fs96000_Fc66_A0,                /* 96kS/s coefficients */
+     -BPF_Fs96000_Fc66_B2,
+     -BPF_Fs96000_Fc66_B1},
+    {BPF_Fs192000_Fc66_A0,                /* 192kS/s coefficients */
+     -BPF_Fs192000_Fc66_B2,
+     -BPF_Fs192000_Fc66_B1},
+#endif
 
     /* Coefficients for 78Hz centre frequency */
     {BPF_Fs8000_Fc78_A0,                /* 8kS/s coefficients */
@@ -315,6 +393,14 @@ const BP_C32_Coefs_t LVDBE_BPF_Table[] = {
     {BPF_Fs48000_Fc78_A0,                /* 48kS/s coefficients */
      -BPF_Fs48000_Fc78_B2,
      -BPF_Fs48000_Fc78_B1},
+#ifdef HIGHER_FS
+    {BPF_Fs96000_Fc78_A0,                /* 96kS/s coefficients */
+     -BPF_Fs96000_Fc78_B2,
+     -BPF_Fs96000_Fc78_B1},
+    {BPF_Fs192000_Fc78_A0,                /* 192kS/s coefficients */
+     -BPF_Fs192000_Fc78_B2,
+     -BPF_Fs192000_Fc78_B1},
+#endif
 
     /* Coefficients for 90Hz centre frequency */
     {BPF_Fs8000_Fc90_A0,                /* 8kS/s coefficients */
@@ -343,7 +429,19 @@ const BP_C32_Coefs_t LVDBE_BPF_Table[] = {
      -BPF_Fs44100_Fc90_B1},
     {BPF_Fs48000_Fc90_A0,                /* 48kS/s coefficients */
      -BPF_Fs48000_Fc90_B2,
-     -BPF_Fs48000_Fc90_B1}};
+     -BPF_Fs48000_Fc90_B1}
+#ifdef HIGHER_FS
+    ,
+    {BPF_Fs96000_Fc90_A0,                /* 96kS/s coefficients */
+     -BPF_Fs96000_Fc90_B2,
+     -BPF_Fs96000_Fc90_B1},
+    {BPF_Fs192000_Fc90_A0,                /* 192kS/s coefficients */
+     -BPF_Fs192000_Fc90_B2,
+     -BPF_Fs192000_Fc90_B1}
+#endif
+
+
+};
 
 
 /************************************************************************************/
@@ -353,7 +451,11 @@ const BP_C32_Coefs_t LVDBE_BPF_Table[] = {
 /************************************************************************************/
 
 /* Attack time (signal too large) */
+#ifndef BUILD_FLOAT
 const LVM_INT16 LVDBE_AGC_ATTACK_Table[] = {
+#else /*BUILD_FLOAT*/
+const LVM_FLOAT LVDBE_AGC_ATTACK_Table[] = {
+#endif /*BUILD_FLOAT*/
     AGC_ATTACK_Fs8000,
     AGC_ATTACK_Fs11025,
     AGC_ATTACK_Fs12000,
@@ -362,10 +464,20 @@ const LVM_INT16 LVDBE_AGC_ATTACK_Table[] = {
     AGC_ATTACK_Fs24000,
     AGC_ATTACK_Fs32000,
     AGC_ATTACK_Fs44100,
-    AGC_ATTACK_Fs48000};
+    AGC_ATTACK_Fs48000
+#ifdef HIGHER_FS
+    ,AGC_ATTACK_Fs96000
+    ,AGC_ATTACK_Fs192000
+#endif
+
+};
 
 /* Decay time (signal too small) */
+#ifndef BUILD_FLOAT
 const LVM_INT16 LVDBE_AGC_DECAY_Table[] = {
+#else /*BUILD_FLOAT*/
+const LVM_FLOAT LVDBE_AGC_DECAY_Table[] = {
+#endif /*BUILD_FLOAT*/
     AGC_DECAY_Fs8000,
     AGC_DECAY_Fs11025,
     AGC_DECAY_Fs12000,
@@ -374,10 +486,20 @@ const LVM_INT16 LVDBE_AGC_DECAY_Table[] = {
     AGC_DECAY_Fs24000,
     AGC_DECAY_Fs32000,
     AGC_DECAY_Fs44100,
-    AGC_DECAY_Fs48000};
+    AGC_DECAY_Fs48000
+#ifdef HIGHER_FS
+    ,AGC_DECAY_FS96000
+    ,AGC_DECAY_FS192000
+#endif
+
+};
 
 /* Gain for use without the high pass filter */
+#ifndef BUILD_FLOAT
 const LVM_INT32 LVDBE_AGC_GAIN_Table[] = {
+#else /*BUILD_FLOAT*/
+const LVM_FLOAT LVDBE_AGC_GAIN_Table[] = {
+#endif /*BUILD_FLOAT*/
     AGC_GAIN_0dB,
     AGC_GAIN_1dB,
     AGC_GAIN_2dB,
@@ -396,7 +518,11 @@ const LVM_INT32 LVDBE_AGC_GAIN_Table[] = {
     AGC_GAIN_15dB};
 
 /* Gain for use with the high pass filter */
+#ifndef BUILD_FLOAT
 const LVM_INT32 LVDBE_AGC_HPFGAIN_Table[] = {
+#else /*BUILD_FLOAT*/
+const LVM_FLOAT LVDBE_AGC_HPFGAIN_Table[] = {
+#endif /*BUILD_FLOAT*/
     AGC_HPFGAIN_0dB,
     AGC_HPFGAIN_1dB,
     AGC_HPFGAIN_2dB,
@@ -422,6 +548,7 @@ const LVM_INT32 LVDBE_AGC_HPFGAIN_Table[] = {
 /************************************************************************************/
 
 /* dB to linear conversion table */
+#ifndef BUILD_FLOAT
 const LVM_INT16 LVDBE_VolumeTable[] = {
     0x4000,             /* -6dB */
     0x47FB,             /* -5dB */
@@ -430,8 +557,22 @@ const LVM_INT16 LVDBE_VolumeTable[] = {
     0x65AD,             /* -2dB */
     0x7215,             /* -1dB */
     0x7FFF};            /*  0dB */
+#else /*BUILD_FLOAT*/
+const LVM_FLOAT LVDBE_VolumeTable[] = {
+    0.500000f,         /* -6dB */
+    0.562341f,         /* -5dB */
+    0.630957f,         /* -4dB */
+    0.707946f,         /* -3dB */
+    0.794328f,         /* -2dB */
+    0.891251f,         /* -1dB */
+    1.000000f};        /*  0dB */
+#endif /*BUILD_FLOAT*/
 
+#ifndef BUILD_FLOAT
 const LVM_INT16 LVDBE_VolumeTCTable[] = {
+#else /*BUILD_FLOAT*/
+const LVM_FLOAT LVDBE_VolumeTCTable[] = {
+#endif /*BUILD_FLOAT*/
     VOL_TC_Fs8000,
     VOL_TC_Fs11025,
     VOL_TC_Fs12000,
@@ -440,9 +581,17 @@ const LVM_INT16 LVDBE_VolumeTCTable[] = {
     VOL_TC_Fs24000,
     VOL_TC_Fs32000,
     VOL_TC_Fs44100,
-    VOL_TC_Fs48000};
+    VOL_TC_Fs48000
+#ifdef HIGHER_FS
+    ,VOL_TC_Fs96000
+    ,VOL_TC_Fs192000
+#endif
+};
+
+
 
 const LVM_INT16 LVDBE_MixerTCTable[] = {
+
     MIX_TC_Fs8000,
     MIX_TC_Fs11025,
     MIX_TC_Fs12000,
@@ -451,6 +600,10 @@ const LVM_INT16 LVDBE_MixerTCTable[] = {
     MIX_TC_Fs24000,
     MIX_TC_Fs32000,
     MIX_TC_Fs44100,
-    MIX_TC_Fs48000};
+    MIX_TC_Fs48000
+#ifdef HIGHER_FS
+    ,MIX_TC_Fs96000
+    ,MIX_TC_Fs192000
+#endif
 
-
+};

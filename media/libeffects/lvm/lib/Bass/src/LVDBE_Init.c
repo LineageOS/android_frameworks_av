@@ -80,7 +80,11 @@ LVDBE_ReturnStatus_en LVDBE_Memory(LVDBE_Handle_t            hInstance,
         /*
          * Data memory
          */
+#ifdef BUILD_FLOAT
+        pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_DATA].Size   = sizeof(LVDBE_Data_FLOAT_t);
+#else
         pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_DATA].Size         = sizeof(LVDBE_Data_t);
+#endif
         pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_DATA].Alignment    = LVDBE_PERSISTENT_DATA_ALIGN;
         pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_DATA].Type         = LVDBE_PERSISTENT_DATA;
         pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_DATA].pBaseAddress = LVM_NULL;
@@ -88,7 +92,11 @@ LVDBE_ReturnStatus_en LVDBE_Memory(LVDBE_Handle_t            hInstance,
         /*
          * Coef memory
          */
-        pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_COEF].Size         = sizeof(LVDBE_Coef_t);
+#ifdef BUILD_FLOAT
+        pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_COEF].Size   = sizeof(LVDBE_Coef_FLOAT_t);
+#else
+        pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_COEF].Size         = sizeof(LVDBE_Coef_t);   
+#endif
         pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_COEF].Alignment    = LVDBE_PERSISTENT_COEF_ALIGN;
         pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_COEF].Type         = LVDBE_PERSISTENT_COEF;
         pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_COEF].pBaseAddress = LVM_NULL;
@@ -96,7 +104,12 @@ LVDBE_ReturnStatus_en LVDBE_Memory(LVDBE_Handle_t            hInstance,
         /*
          * Scratch memory
          */
+#ifdef BUILD_FLOAT
+        ScratchSize = (LVM_UINT32)(LVDBE_SCRATCHBUFFERS_INPLACE*sizeof(LVM_FLOAT) * \
+                                        pCapabilities->MaxBlockSize);
+#else /*BUILD_FLOAT*/
         ScratchSize = (LVM_UINT32)(LVDBE_SCRATCHBUFFERS_INPLACE*sizeof(LVM_INT16)*pCapabilities->MaxBlockSize);
+#endif
         pMemoryTable->Region[LVDBE_MEMREGION_SCRATCH].Size         = ScratchSize;
         pMemoryTable->Region[LVDBE_MEMREGION_SCRATCH].Alignment    = LVDBE_SCRATCH_ALIGN;
         pMemoryTable->Region[LVDBE_MEMREGION_SCRATCH].Type         = LVDBE_SCRATCH;
@@ -151,10 +164,16 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t         *phInstance,
 {
 
     LVDBE_Instance_t      *pInstance;
+#ifdef BUILD_FLOAT
+    LVMixer3_1St_FLOAT_st       *pMixer_Instance;
+    LVMixer3_2St_FLOAT_st       *pBypassMixer_Instance;
+    LVM_FLOAT             MixGain;
+#else
     LVMixer3_1St_st       *pMixer_Instance;
     LVMixer3_2St_st       *pBypassMixer_Instance;
-    LVM_INT16             i;
     LVM_INT32             MixGain;
+#endif
+    LVM_INT16             i;
 
 
     /*
@@ -235,7 +254,11 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t         *phInstance,
     // initialize the mixer with some fixes values since otherwise LVDBE_SetVolume ends up
     // reading uninitialized data
     pMixer_Instance = &pInstance->pData->BypassVolume;
+#ifndef BUILD_FLOAT
     LVC_Mixer_Init(&pMixer_Instance->MixerStream[0],0x00007FFF,0x00007FFF);
+#else
+    LVC_Mixer_Init(&pMixer_Instance->MixerStream[0], 1.0, 1.0);
+#endif
 
     /*
      * Initialise the volume
@@ -245,9 +268,13 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t         *phInstance,
 
     pInstance->pData->AGCInstance.Volume = pInstance->pData->AGCInstance.Target;
                                                 /* Initialise as the target */
-
+#ifndef BUILD_FLOAT
     MixGain = LVC_Mixer_GetTarget(&pMixer_Instance->MixerStream[0]);
     LVC_Mixer_Init(&pMixer_Instance->MixerStream[0],MixGain,MixGain);
+#else
+    MixGain = LVC_Mixer_GetTarget(&pMixer_Instance->MixerStream[0]);
+    LVC_Mixer_Init(&pMixer_Instance->MixerStream[0], MixGain, MixGain);
+#endif
 
     /* Configure the mixer process path */
     pMixer_Instance->MixerStream[0].CallbackParam = 0;
@@ -268,9 +295,11 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t         *phInstance,
     pBypassMixer_Instance->MixerStream[0].pCallbackHandle = LVM_NULL;
     pBypassMixer_Instance->MixerStream[0].pCallBack = LVM_NULL;
     pBypassMixer_Instance->MixerStream[0].CallbackSet=0;
+
     LVC_Mixer_Init(&pBypassMixer_Instance->MixerStream[0],0,0);
     LVC_Mixer_SetTimeConstant(&pBypassMixer_Instance->MixerStream[0],
         LVDBE_BYPASS_MIXER_TC,(LVM_Fs_en)pInstance->Params.SampleRate,2);
+
     /*
      * Setup the mixer gain for the unprocessed path
      */
@@ -278,9 +307,15 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t         *phInstance,
     pBypassMixer_Instance->MixerStream[1].pCallbackHandle = LVM_NULL;
     pBypassMixer_Instance->MixerStream[1].pCallBack = LVM_NULL;
     pBypassMixer_Instance->MixerStream[1].CallbackSet=0;
+#ifndef BUILD_FLOAT
     LVC_Mixer_Init(&pBypassMixer_Instance->MixerStream[1],0x00007FFF,0x00007FFF);
     LVC_Mixer_SetTimeConstant(&pBypassMixer_Instance->MixerStream[1],
         LVDBE_BYPASS_MIXER_TC,(LVM_Fs_en)pInstance->Params.SampleRate,2);
+#else
+    LVC_Mixer_Init(&pBypassMixer_Instance->MixerStream[1], 1.0, 1.0);
+    LVC_Mixer_SetTimeConstant(&pBypassMixer_Instance->MixerStream[1],
+        LVDBE_BYPASS_MIXER_TC,(LVM_Fs_en)pInstance->Params.SampleRate, 2);
+#endif
 
     return(LVDBE_SUCCESS);
 }

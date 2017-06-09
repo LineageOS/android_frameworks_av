@@ -95,10 +95,17 @@ typedef enum
 /* Volume correction structure */
 typedef struct
 {
+#ifdef BUILD_FLOAT
+    LVM_FLOAT   CompFull;                       /* Post CS compression 100% effect */
+    LVM_FLOAT   CompMin;                        /* Post CS compression 0% effect */
+    LVM_FLOAT   GainFull;                       /* CS gain correct 100% effect */
+    LVM_FLOAT   GainMin;                        /* CS gain correct 0% effect */
+#else
     LVM_INT16   CompFull;                       /* Post CS compression 100% effect */
     LVM_INT16   CompMin;                        /* Post CS compression 0% effect */
     LVM_INT16   GainFull;                       /* CS gain correct 100% effect */
     LVM_INT16   GainMin;                        /* CS gain correct 0% effect */
+#endif
 } LVCS_VolCorrect_t;
 
 /* Instance structure */
@@ -112,8 +119,13 @@ typedef struct
     /* Private parameters */
     LVCS_OutputDevice_en    OutputDevice;       /* Selected output device type */
     LVCS_VolCorrect_t       VolCorrect;         /* Volume correction settings */
+#ifndef BUILD_FLOAT
     LVM_INT16               TransitionGain;     /* Transition gain */
     LVM_INT16               CompressGain;       /* Last used compressor gain*/
+#else
+    LVM_FLOAT               TransitionGain;     /* Transition gain */
+    LVM_FLOAT               CompressGain;       /* Last used compressor gain*/
+#endif
 
     /* Sub-block configurations */
     LVCS_StereoEnhancer_t   StereoEnhancer;     /* Stereo enhancer configuration */
@@ -134,23 +146,34 @@ typedef struct
 /* Coefficient Structure */
 typedef struct
 {
+#ifdef BUILD_FLOAT
+    Biquad_FLOAT_Instance_t       EqualiserBiquadInstance;
+    Biquad_FLOAT_Instance_t       ReverbBiquadInstance;
+    Biquad_FLOAT_Instance_t       SEBiquadInstanceMid;
+    Biquad_FLOAT_Instance_t       SEBiquadInstanceSide;
+#else
     Biquad_Instance_t       EqualiserBiquadInstance;
     Biquad_Instance_t       ReverbBiquadInstance;
     Biquad_Instance_t       SEBiquadInstanceMid;
     Biquad_Instance_t       SEBiquadInstanceSide;
-
+#endif
 } LVCS_Coefficient_t;
 
 /* Data Structure */
 typedef struct
 {
+#ifdef BUILD_FLOAT
+    Biquad_2I_Order2_FLOAT_Taps_t EqualiserBiquadTaps;
+    Biquad_2I_Order2_FLOAT_Taps_t ReverbBiquadTaps;
+    Biquad_1I_Order1_FLOAT_Taps_t SEBiquadTapsMid;
+    Biquad_1I_Order2_FLOAT_Taps_t SEBiquadTapsSide;
+#else
     Biquad_2I_Order2_Taps_t EqualiserBiquadTaps;
     Biquad_2I_Order2_Taps_t ReverbBiquadTaps;
     Biquad_1I_Order1_Taps_t SEBiquadTapsMid;
     Biquad_1I_Order2_Taps_t SEBiquadTapsSide;
-
+#endif
 } LVCS_Data_t;
-
 
 void LVCS_TimerCallBack (   void* hInstance,
                             void* pCallBackParams,

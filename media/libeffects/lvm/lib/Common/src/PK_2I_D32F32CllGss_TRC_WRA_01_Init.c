@@ -18,7 +18,7 @@
 #include "BIQUAD.h"
 #include "PK_2I_D32F32CllGss_TRC_WRA_01_Private.h"
 
-
+#ifndef BUILD_FLOAT
 void  PK_2I_D32F32CllGss_TRC_WRA_01_Init(Biquad_Instance_t         *pInstance,
                                          Biquad_2I_Order2_Taps_t   *pTaps,
                                          PK_C32_Coefs_t            *pCoef)
@@ -35,4 +35,4 @@ void  PK_2I_D32F32CllGss_TRC_WRA_01_Init(Biquad_Instance_t         *pInstance,
   pBiquadState->coefs[3]=pCoef->G;
 
 }
-
+#endif

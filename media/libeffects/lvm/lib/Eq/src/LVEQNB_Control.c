@@ -140,8 +140,12 @@ LVEQNB_ReturnStatus_en LVEQNB_GetCapabilities(LVEQNB_Handle_t           hInstanc
 void    LVEQNB_SetFilters(LVEQNB_Instance_t     *pInstance,
                           LVEQNB_Params_t       *pParams)
 {
-
+#ifdef HIGHER_FS
+    extern const LVM_UINT32   LVEQNB_SampleRateTab[];           /* Sample rate table */
+#else
     extern const LVM_UINT16   LVEQNB_SampleRateTab[];           /* Sample rate table */
+#endif
+
     LVM_UINT16          i;                                      /* Filter band index */
     LVM_UINT32          fs = (LVM_UINT32)LVEQNB_SampleRateTab[(LVM_UINT16)pParams->SampleRate];  /* Sample rate */
     LVM_UINT32          fc;                                     /* Filter centre frequency */
@@ -158,11 +162,15 @@ void    LVEQNB_SetFilters(LVEQNB_Instance_t     *pInstance,
         fc = (LVM_UINT32)pParams->pBandDefinition[i].Frequency;     /* Get the band centre frequency */
         QFactor = (LVM_INT16)pParams->pBandDefinition[i].QFactor;   /* Get the band Q factor */
 
-
+#ifdef BUILD_FLOAT
+        pInstance->pBiquadType[i] = LVEQNB_SinglePrecision_Float; /* Default to single precision */
+#else
         /*
          * For each filter set the type of biquad required
          */
         pInstance->pBiquadType[i] = LVEQNB_SinglePrecision;         /* Default to single precision */
+#endif
+#ifndef BUILD_FLOAT
         if ((fc << 15) <= (LOW_FREQ * fs))
         {
             /*
@@ -177,7 +185,7 @@ void    LVEQNB_SetFilters(LVEQNB_Instance_t     *pInstance,
              */
             pInstance->pBiquadType[i] = LVEQNB_DoublePrecision;
         }
-
+#endif
 
         /*
          * Check for out of range frequencies
@@ -230,6 +238,25 @@ void    LVEQNB_SetCoefficients(LVEQNB_Instance_t     *pInstance)
         BiquadType = pInstance->pBiquadType[i];
         switch  (BiquadType)
         {
+#ifdef BUILD_FLOAT
+            case    LVEQNB_SinglePrecision_Float:
+            {
+                PK_FLOAT_Coefs_t      Coefficients;
+                /*
+                 * Calculate the single precision coefficients
+                 */
+                LVEQNB_SinglePrecCoefs((LVM_UINT16)pInstance->Params.SampleRate,
+                                       &pInstance->pBandDefinitions[i],
+                                       &Coefficients);
+                /*
+                 * Set the coefficients
+                 */
+                PK_2I_D32F32CssGss_TRC_WRA_01_Init(&pInstance->pEQNB_FilterState_Float[i],
+                                                   &pInstance->pEQNB_Taps_Float[i],
+                                                   &Coefficients);
+                break;
+            }
+#else
             case    LVEQNB_DoublePrecision:
             {
                 PK_C32_Coefs_t      Coefficients;
@@ -269,6 +296,7 @@ void    LVEQNB_SetCoefficients(LVEQNB_Instance_t     *pInstance)
                                                    &Coefficients);
                 break;
             }
+#endif
             default:
                 break;
         }
@@ -288,7 +316,7 @@ void    LVEQNB_SetCoefficients(LVEQNB_Instance_t     *pInstance)
 /*  pInstance           Pointer to the instance                                     */
 /*                                                                                  */
 /************************************************************************************/
-
+#ifndef BUILD_FLOAT
 void    LVEQNB_ClearFilterHistory(LVEQNB_Instance_t     *pInstance)
 {
     LVM_INT16       *pTapAddress;
@@ -305,8 +333,24 @@ void    LVEQNB_ClearFilterHistory(LVEQNB_Instance_t     *pInstance)
                      NumTaps);                          /* Number of words */
     }
 }
+#else
+void    LVEQNB_ClearFilterHistory(LVEQNB_Instance_t     *pInstance)
+{
+    LVM_FLOAT       *pTapAddress;
+    LVM_INT16       NumTaps;
 
+    pTapAddress = (LVM_FLOAT *)pInstance->pEQNB_Taps_Float;
+    NumTaps     = (LVM_INT16)((pInstance->Capabilities.MaxBands * \
+                                    sizeof(Biquad_2I_Order2_FLOAT_Taps_t)) / sizeof(LVM_FLOAT));
 
+    if (NumTaps != 0)
+    {
+        LoadConst_Float(0,                                 /* Clear the history, value 0 */
+                        pTapAddress,                       /* Destination */
+                        NumTaps);                          /* Number of words */
+    }
+}
+#endif
 /****************************************************************************************/
 /*                                                                                      */
 /* FUNCTION:                LVEQNB_Control                                              */
@@ -422,9 +466,13 @@ LVEQNB_ReturnStatus_en LVEQNB_Control(LVEQNB_Handle_t        hInstance,
         {
             if(pParams->OperatingMode == LVEQNB_ON)
             {
+#ifdef BUILD_FLOAT
+                LVC_Mixer_SetTarget(&pInstance->BypassMixer.MixerStream[0], 1.0f);
+                LVC_Mixer_SetTarget(&pInstance->BypassMixer.MixerStream[1], 0.0f);
+#else
                 LVC_Mixer_SetTarget(&pInstance->BypassMixer.MixerStream[0],LVM_MAXINT_16);
                 LVC_Mixer_SetTarget(&pInstance->BypassMixer.MixerStream[1],0);
-
+#endif
                 pInstance->BypassMixer.MixerStream[0].CallbackSet        = 1;
                 pInstance->BypassMixer.MixerStream[1].CallbackSet        = 1;
             }
@@ -432,15 +480,18 @@ LVEQNB_ReturnStatus_en LVEQNB_Control(LVEQNB_Handle_t        hInstance,
             {
                 /* Stay on the ON operating mode until the transition is done */
                 pInstance->Params.OperatingMode = LVEQNB_ON;
-
+#ifdef BUILD_FLOAT
+                LVC_Mixer_SetTarget(&pInstance->BypassMixer.MixerStream[0], 0.0f);
+                LVC_Mixer_SetTarget(&pInstance->BypassMixer.MixerStream[1], 1.0f);
+#else
                 LVC_Mixer_SetTarget(&pInstance->BypassMixer.MixerStream[0],0);
                 LVC_Mixer_SetTarget(&pInstance->BypassMixer.MixerStream[1],LVM_MAXINT_16);
+#endif
                 pInstance->BypassMixer.MixerStream[0].CallbackSet        = 1;
                 pInstance->BypassMixer.MixerStream[1].CallbackSet        = 1;
             }
             LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->BypassMixer.MixerStream[0],LVEQNB_BYPASS_MIXER_TC,(LVM_Fs_en)pParams->SampleRate,2);
             LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->BypassMixer.MixerStream[1],LVEQNB_BYPASS_MIXER_TC,(LVM_Fs_en)pParams->SampleRate,2);
-
             pInstance->bInOperatingModeTransition = LVM_TRUE;
         }
 
@@ -470,8 +521,13 @@ LVM_INT32 LVEQNB_BypassMixerCallBack (void* hInstance,
      /*
       * Send an ALGOFF event if the ON->OFF switch transition is finished
       */
+#ifdef BUILD_FLOAT
+    if((LVC_Mixer_GetTarget(&pInstance->BypassMixer.MixerStream[0]) == 0) &&
+       (CallbackParam == 0)){
+#else
     if((LVC_Mixer_GetTarget(&pInstance->BypassMixer.MixerStream[0]) == 0x00000000) &&
        (CallbackParam == 0)){
+#endif
         pInstance->Params.OperatingMode = LVEQNB_BYPASS;
         if (CallBack != LVM_NULL){
             CallBack(pInstance->Capabilities.pBundleInstance, LVM_NULL, ALGORITHM_EQNB_ID|LVEQNB_EVENT_ALGOFF);
@@ -485,9 +541,3 @@ LVM_INT32 LVEQNB_BypassMixerCallBack (void* hInstance,
 
     return 1;
 }
-
-
-
-
-
-

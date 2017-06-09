@@ -54,5 +54,35 @@ void Copy_16( const LVM_INT16 *src,
 
     return;
 }
+#ifdef BUILD_FLOAT
+void Copy_Float( const LVM_FLOAT *src,
+                 LVM_FLOAT *dst,
+                 LVM_INT16  n )
+{
+    LVM_INT16 ii;
 
+    if (src > dst)
+    {
+        for (ii = n; ii != 0; ii--)
+        {
+            *dst = *src;
+            dst++;
+            src++;
+        }
+    }
+    else
+    {
+        src += n - 1;
+        dst += n - 1;
+        for (ii = n; ii != 0; ii--)
+        {
+            *dst = *src;
+            dst--;
+            src--;
+        }
+    }
+
+    return;
+}
+#endif
 /**********************************************************************************/

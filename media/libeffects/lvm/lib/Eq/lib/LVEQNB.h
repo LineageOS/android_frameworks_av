@@ -200,6 +200,10 @@ typedef enum
 #define LVEQNB_CAP_FS_32000                64
 #define LVEQNB_CAP_FS_44100                128
 #define LVEQNB_CAP_FS_48000                256
+#if defined(BUILD_FLOAT) && defined(HIGHER_FS)
+#define LVEQNB_CAP_FS_96000                512
+#define LVEQNB_CAP_FS_192000               1024
+#endif
 
 typedef enum
 {
@@ -212,6 +216,10 @@ typedef enum
     LVEQNB_FS_32000 = 6,
     LVEQNB_FS_44100 = 7,
     LVEQNB_FS_48000 = 8,
+#ifdef HIGHER_FS
+    LVEQNB_FS_96000 = 9,
+    LVEQNB_FS_192000 = 10,
+#endif
     LVEQNB_FS_MAX   = LVM_MAXINT_32
 } LVEQNB_Fs_en;
 
@@ -268,6 +276,7 @@ typedef struct
 {
     /* General parameters */
     LVM_UINT16                  SampleRate;
+
     LVM_UINT16                  SourceFormat;
     LVM_UINT16                  MaxBlockSize;
     LVM_UINT16                  MaxBands;
@@ -460,11 +469,17 @@ LVEQNB_ReturnStatus_en LVEQNB_Control(LVEQNB_Handle_t       hInstance,
 /* NOTES:                                                                               */
 /*                                                                                      */
 /****************************************************************************************/
-
+#ifdef BUILD_FLOAT
+LVEQNB_ReturnStatus_en LVEQNB_Process(LVEQNB_Handle_t       hInstance,
+                                      const LVM_FLOAT       *pInData,
+                                      LVM_FLOAT             *pOutData,
+                                      LVM_UINT16            NumSamples);
+#else
 LVEQNB_ReturnStatus_en LVEQNB_Process(LVEQNB_Handle_t       hInstance,
                                       const LVM_INT16       *pInData,
                                       LVM_INT16             *pOutData,
                                       LVM_UINT16            NumSamples);
+#endif
 
 
 
