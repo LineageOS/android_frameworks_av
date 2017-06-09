@@ -3372,6 +3372,12 @@ status_t AudioPolicyManager::getMasterMono(bool *mono)
     return NO_ERROR;
 }
 
+float AudioPolicyManager::getStreamVolumeDB(
+        audio_stream_type_t stream, int index, audio_devices_t device)
+{
+    return computeVolume(stream, index, device);
+}
+
 status_t AudioPolicyManager::disconnectAudioSource(const sp<AudioSourceDescriptor>& sourceDesc)
 {
     ALOGV("%s handle %d", __FUNCTION__, sourceDesc->getHandle());

@@ -1225,6 +1225,13 @@ status_t AudioSystem::getMasterMono(bool *mono)
     return aps->getMasterMono(mono);
 }
 
+float AudioSystem::getStreamVolumeDB(audio_stream_type_t stream, int index, audio_devices_t device)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return NAN;
+    return aps->getStreamVolumeDB(stream, index, device);
+}
+
 // ---------------------------------------------------------------------------
 
 int AudioSystem::AudioPolicyServiceClient::addAudioPortCallback(
