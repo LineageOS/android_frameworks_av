@@ -1039,7 +1039,10 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
         array[i] = {mBuffers[portIndex][i].mData, mBuffers[portIndex][i].mBufferID};
     }
     if (portIndex == kPortIndexInput) {
-        mBufferChannel->setInputBufferArray(array);
+        err = mBufferChannel->setInputBufferArray(array);
+        if (err != OK) {
+            return err;
+        }
     } else if (portIndex == kPortIndexOutput) {
         mBufferChannel->setOutputBufferArray(array);
     } else {
