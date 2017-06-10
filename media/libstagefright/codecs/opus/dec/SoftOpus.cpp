@@ -350,11 +350,6 @@ void SoftOpus::onQueueFilled(OMX_U32 portIndex) {
         const uint8_t *data = header->pBuffer + header->nOffset;
         size_t size = header->nFilledLen;
 
-        if ((header->nFlags & OMX_BUFFERFLAG_EOS) && size == 0) {
-            header->nFlags &= ~OMX_BUFFERFLAG_CODECCONFIG;
-            goto L_eos;
-        }
-
         if (mInputBufferCount == 0) {
             CHECK(mHeader == NULL);
             mHeader = new OpusHeader();
@@ -413,11 +408,6 @@ void SoftOpus::onQueueFilled(OMX_U32 portIndex) {
             mOutputPortSettingsChange = AWAITING_DISABLED;
         }
 
-        if (header->nFlags & OMX_BUFFERFLAG_EOS) {
-            header->nFilledLen = 0;
-            header->nFlags &= ~OMX_BUFFERFLAG_CODECCONFIG;
-            goto L_eos;
-        }
         inQueue.erase(inQueue.begin());
         info->mOwnedByUs = false;
         notifyEmptyBufferDone(header);
@@ -425,7 +415,6 @@ void SoftOpus::onQueueFilled(OMX_U32 portIndex) {
         return;
     }
 
-L_eos:
     while (!inQueue.empty() && !outQueue.empty()) {
         BufferInfo *inInfo = *inQueue.begin();
         OMX_BUFFERHEADERTYPE *inHeader = inInfo->mHeader;
