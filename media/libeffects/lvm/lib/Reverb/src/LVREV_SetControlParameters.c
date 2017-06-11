@@ -61,10 +61,15 @@ LVREV_ReturnStatus_en LVREV_SetControlParameters(LVREV_Handle_t           hInsta
      * Check all new control parameters are in range
      */
     if(    ((pNewParams->OperatingMode != LVM_MODE_OFF) && (pNewParams->OperatingMode != LVM_MODE_ON))                                         ||
-        ((pNewParams->SampleRate != LVM_FS_8000) && (pNewParams->SampleRate != LVM_FS_11025) && (pNewParams->SampleRate != LVM_FS_12000)       &&
+        (
+        (pNewParams->SampleRate != LVM_FS_8000) && (pNewParams->SampleRate != LVM_FS_11025) && (pNewParams->SampleRate != LVM_FS_12000)       &&
         (pNewParams->SampleRate != LVM_FS_16000) && (pNewParams->SampleRate != LVM_FS_22050) && (pNewParams->SampleRate != LVM_FS_24000)       &&
-        (pNewParams->SampleRate != LVM_FS_32000) && (pNewParams->SampleRate != LVM_FS_44100) && (pNewParams->SampleRate != LVM_FS_48000))      ||
-        ((pNewParams->SourceFormat != LVM_STEREO) && (pNewParams->SourceFormat != LVM_MONOINSTEREO) && (pNewParams->SourceFormat != LVM_MONO)) )
+        (pNewParams->SampleRate != LVM_FS_32000) && (pNewParams->SampleRate != LVM_FS_44100) && (pNewParams->SampleRate != LVM_FS_48000)      
+#ifdef HIGHER_FS
+        && (pNewParams->SampleRate != LVM_FS_96000) && (pNewParams->SampleRate != LVM_FS_192000)
+#endif
+        )
+        || ((pNewParams->SourceFormat != LVM_STEREO) && (pNewParams->SourceFormat != LVM_MONOINSTEREO) && (pNewParams->SourceFormat != LVM_MONO)) )
     {
         return (LVREV_OUTOFRANGE);
     }

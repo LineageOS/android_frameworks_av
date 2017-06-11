@@ -32,7 +32,92 @@ pBiquadState->pDelays[1] is y(n-1)L in Q30 format
 pBiquadState->pDelays[2] is x(n-1)R in Q15 format
 pBiquadState->pDelays[3] is y(n-1)R in Q30 format
 ***************************************************************************/
+#ifdef BUILD_FLOAT
+void FO_2I_D16F32C15_LShx_TRC_WRA_01(Biquad_FLOAT_Instance_t       *pInstance,
+                                     LVM_FLOAT               *pDataIn,
+                                     LVM_FLOAT               *pDataOut,
+                                     LVM_INT16               NrSamples)
+    {
+        LVM_FLOAT   ynL,ynR;
+        LVM_FLOAT   Temp;
+        LVM_FLOAT   NegSatValue;
+        LVM_INT16   ii;
 
+        PFilter_Float_State pBiquadState = (PFilter_Float_State) pInstance;
+
+        NegSatValue = -1.0f;
+
+        for (ii = NrSamples; ii != 0; ii--)
+        {
+
+            /**************************************************************************
+                            PROCESSING OF THE LEFT CHANNEL
+            ***************************************************************************/
+
+            // ynL =A1  * x(n-1)L
+            ynL = (LVM_FLOAT)pBiquadState->coefs[0] * pBiquadState->pDelays[0];
+            // ynR =A1  * x(n-1)R
+            ynR = (LVM_FLOAT)pBiquadState->coefs[0] * pBiquadState->pDelays[2];
+
+
+            // ynL+=A0  * x(n)L
+            ynL += (LVM_FLOAT)pBiquadState->coefs[1] * (*pDataIn);
+            // ynR+=A0  * x(n)L
+            ynR += (LVM_FLOAT)pBiquadState->coefs[1] * (*(pDataIn+1));
+
+
+            // ynL +=  (-B1  * y(n-1)L  )
+            Temp = pBiquadState->pDelays[1] * pBiquadState->coefs[2];
+            ynL += Temp;
+            // ynR +=  (-B1  * y(n-1)R ) )
+            Temp = pBiquadState->pDelays[3] * pBiquadState->coefs[2];
+            ynR += Temp;
+
+
+            /**************************************************************************
+                            UPDATING THE DELAYS
+            ***************************************************************************/
+            pBiquadState->pDelays[1] = ynL; // Update y(n-1)L
+            pBiquadState->pDelays[0] = (*pDataIn++); // Update x(n-1)L
+
+            pBiquadState->pDelays[3] = ynR; // Update y(n-1)R
+            pBiquadState->pDelays[2] = (*pDataIn++); // Update x(n-1)R
+
+            /**************************************************************************
+                            WRITING THE OUTPUT
+            ***************************************************************************/
+
+            /*Saturate results*/
+            if(ynL > 1.0f)
+            {
+                ynL = 1.0f;
+            }
+            else
+            {
+                if(ynL < NegSatValue)
+                {
+                    ynL = NegSatValue;
+                }
+            }
+
+            if(ynR > 1.0f)
+            {
+                ynR = 1.0f;
+            }
+            else
+            {
+                if(ynR < NegSatValue)
+                {
+                    ynR = NegSatValue;
+                }
+            }
+
+            *pDataOut++ = (LVM_FLOAT)ynL;
+            *pDataOut++ = (LVM_FLOAT)ynR;
+        }
+
+    }
+#else
 void FO_2I_D16F32C15_LShx_TRC_WRA_01(Biquad_Instance_t       *pInstance,
                                      LVM_INT16               *pDataIn,
                                      LVM_INT16               *pDataOut,
@@ -125,4 +210,4 @@ void FO_2I_D16F32C15_LShx_TRC_WRA_01(Biquad_Instance_t       *pInstance,
         }
 
     }
-
+#endif

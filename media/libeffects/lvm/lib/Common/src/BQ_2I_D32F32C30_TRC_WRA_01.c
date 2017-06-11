@@ -36,7 +36,94 @@
  pBiquadState->pDelays[6] is y(n-2)L in Q0 format
  pBiquadState->pDelays[7] is y(n-2)R in Q0 format
 ***************************************************************************/
+#ifdef BUILD_FLOAT
+void BQ_2I_D32F32C30_TRC_WRA_01 (           Biquad_FLOAT_Instance_t       *pInstance,
+                                            LVM_FLOAT                    *pDataIn,
+                                            LVM_FLOAT                    *pDataOut,
+                                            LVM_INT16                    NrSamples)
 
+
+    {
+        LVM_FLOAT ynL,ynR,templ,tempd;
+        LVM_INT16 ii;
+        PFilter_State_FLOAT pBiquadState = (PFilter_State_FLOAT) pInstance;
+
+         for (ii = NrSamples; ii != 0; ii--)
+         {
+
+
+            /**************************************************************************
+                            PROCESSING OF THE LEFT CHANNEL
+            ***************************************************************************/
+            /* ynL= ( A2  * x(n-2)L  ) */
+            ynL = pBiquadState->coefs[0] * pBiquadState->pDelays[2];
+
+            /* ynL+= ( A1  * x(n-1)L  )*/
+            templ = pBiquadState->coefs[1] * pBiquadState->pDelays[0];
+            ynL += templ;
+
+            /* ynL+= ( A0  * x(n)L  ) */
+            templ = pBiquadState->coefs[2] * (*pDataIn);
+            ynL += templ;
+
+             /* ynL+= (-B2  * y(n-2)L  ) */
+            templ = pBiquadState->coefs[3] * pBiquadState->pDelays[6];
+            ynL += templ;
+
+            /* ynL+= (-B1  * y(n-1)L  )*/
+            templ = pBiquadState->coefs[4] * pBiquadState->pDelays[4];
+            ynL += templ;
+
+            /**************************************************************************
+                            PROCESSING OF THE RIGHT CHANNEL
+            ***************************************************************************/
+            /* ynR= ( A2  * x(n-2)R  ) */
+            ynR = pBiquadState->coefs[0] * pBiquadState->pDelays[3];
+
+            /* ynR+= ( A1  * x(n-1)R  ) */
+            templ = pBiquadState->coefs[1] * pBiquadState->pDelays[1];
+            ynR += templ;
+
+            /* ynR+= ( A0  * x(n)R  ) */
+            tempd =* (pDataIn+1);
+            templ = pBiquadState->coefs[2] * tempd;
+            ynR += templ;
+
+            /* ynR+= (-B2  * y(n-2)R  ) */
+            templ = pBiquadState->coefs[3] * pBiquadState->pDelays[7];
+            ynR += templ;
+
+            /* ynR+= (-B1  * y(n-1)R  )  */
+            templ = pBiquadState->coefs[4] * pBiquadState->pDelays[5];
+            ynR += templ;
+
+            /**************************************************************************
+                            UPDATING THE DELAYS
+            ***************************************************************************/
+            pBiquadState->pDelays[7] = pBiquadState->pDelays[5]; /* y(n-2)R=y(n-1)R*/
+            pBiquadState->pDelays[6] = pBiquadState->pDelays[4]; /* y(n-2)L=y(n-1)L*/
+            pBiquadState->pDelays[3] = pBiquadState->pDelays[1]; /* x(n-2)R=x(n-1)R*/
+            pBiquadState->pDelays[2] = pBiquadState->pDelays[0]; /* x(n-2)L=x(n-1)L*/
+            pBiquadState->pDelays[5] = (LVM_FLOAT)ynR; /* Update y(n-1)R */
+            pBiquadState->pDelays[4] = (LVM_FLOAT)ynL; /* Update y(n-1)L */
+            pBiquadState->pDelays[0] = (*pDataIn); /* Update x(n-1)L */
+            pDataIn++;
+            pBiquadState->pDelays[1] = (*pDataIn); /* Update x(n-1)R */
+            pDataIn++;
+
+            /**************************************************************************
+                            WRITING THE OUTPUT
+            ***************************************************************************/
+            *pDataOut = (LVM_FLOAT)ynL; /* Write Left output */
+            pDataOut++;
+            *pDataOut = (LVM_FLOAT)ynR; /* Write Right ouput */
+            pDataOut++;
+
+
+        }
+
+    }
+#else
 void BQ_2I_D32F32C30_TRC_WRA_01 (           Biquad_Instance_t       *pInstance,
                                             LVM_INT32                    *pDataIn,
                                             LVM_INT32                    *pDataOut,
@@ -123,4 +210,4 @@ void BQ_2I_D32F32C30_TRC_WRA_01 (           Biquad_Instance_t       *pInstance,
         }
 
     }
-
+#endif /*BUILD_FLOAT*/

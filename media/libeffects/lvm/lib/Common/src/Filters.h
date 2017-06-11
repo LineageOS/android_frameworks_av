@@ -34,6 +34,7 @@ extern "C" {
  * Biquad with coefficients A0, A1, A2, B1 and B2 coefficients
  */
 /* Single precision (16-bit) Biquad section coefficients */
+#ifndef BUILD_FLOAT
 typedef struct
 {
         LVM_INT16   A0;
@@ -43,12 +44,22 @@ typedef struct
         LVM_INT16   B2;
         LVM_UINT16  Scale;
 } BiquadA012B12CoefsSP_t;
-
-
+#else
+typedef struct
+{
+    LVM_FLOAT   A0;
+    LVM_FLOAT   A1;
+    LVM_FLOAT   A2;
+    LVM_FLOAT   B1;
+    LVM_FLOAT   B2;
+    LVM_UINT16  Scale;
+} BiquadA012B12CoefsSP_t;
+#endif
 /*
  * Biquad with coefficients A0, A1 and B1 coefficients
  */
 /* Single precision (16-bit) Biquad section coefficients */
+#ifndef BUILD_FLOAT
 typedef struct
 {
         LVM_INT16   A0;
@@ -56,8 +67,15 @@ typedef struct
         LVM_INT16   B1;
         LVM_UINT16  Scale;
 } BiquadA01B1CoefsSP_t;
-
-
+#else
+typedef struct
+{
+    LVM_FLOAT   A0;
+    LVM_FLOAT   A1;
+    LVM_FLOAT   B1;
+    LVM_UINT16  Scale;
+} BiquadA01B1CoefsSP_t;
+#endif
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

@@ -29,6 +29,9 @@
 /*######################################################################################*/
 
 #include "ScalarArithmetic.h"
+#ifdef BUILD_FLOAT
+#include <math.h>
+#endif
 
 
 /****************************************************************************************
@@ -64,6 +67,18 @@
 #define SECOND_COEF      38836
 #define MAX_VALUE        1536                   /* 96 * 16 */
 
+#ifdef BUILD_FLOAT
+LVM_FLOAT   dB_to_LinFloat(LVM_INT16    db_fix)
+{
+    LVM_FLOAT    dB_Float;
+    LVM_FLOAT    LinFloat;
+
+    dB_Float = (LVM_FLOAT)((LVM_FLOAT)db_fix / 16.0f);
+    LinFloat = pow(10, dB_Float / 20.0);
+
+    return LinFloat;
+}
+#else
 LVM_INT32   dB_to_Lin32(LVM_INT16    db_fix)
 {
     LVM_INT32 Lin_val_32;
@@ -106,4 +121,4 @@ LVM_INT32   dB_to_Lin32(LVM_INT16    db_fix)
 
     return Lin_val_32;  /* format 1.16.15 */
 }
-
+#endif

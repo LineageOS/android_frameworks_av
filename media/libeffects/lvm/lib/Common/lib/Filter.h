@@ -33,11 +33,32 @@ extern "C" {
    DEFINES
 ***********************************************************************************/
 #define FILTER_LOSS     32730       /* -0.01dB loss to avoid wrapping due to band ripple */
-
+#ifdef BUILD_FLOAT
+#define FILTER_LOSS_FLOAT    0.998849f
+#endif
 /**********************************************************************************
    FUNCTION PROTOTYPES
 ***********************************************************************************/
+#ifdef BUILD_FLOAT
 
+LVM_FLOAT LVM_Power10(   LVM_FLOAT  X);
+
+LVM_FLOAT LVM_Polynomial(LVM_UINT16 N,
+                         LVM_FLOAT  *pCoefficients,
+                         LVM_FLOAT  X);
+#ifdef HIGHER_FS
+LVM_FLOAT   LVM_GetOmega(LVM_UINT32  Fc,
+#else
+LVM_FLOAT   LVM_GetOmega(LVM_UINT16  Fc,
+#endif
+                         LVM_Fs_en   SampleRate);
+
+LVM_FLOAT LVM_FO_LPF(    LVM_FLOAT  w,
+                         FO_FLOAT_Coefs_t  *pCoeffs);
+
+LVM_FLOAT LVM_FO_HPF(    LVM_FLOAT  w,
+                         FO_FLOAT_Coefs_t  *pCoeffs);
+#else
 LVM_INT32 LVM_Polynomial(LVM_UINT16 N,
                          LVM_INT32  *pCoefficients,
                          LVM_INT32  X);
@@ -52,7 +73,7 @@ LVM_INT32 LVM_FO_HPF(    LVM_INT32  w,
 
 LVM_INT32   LVM_GetOmega(LVM_UINT16  Fc,
                          LVM_Fs_en   SampleRate);
-
+#endif
 /**********************************************************************************/
 #ifdef __cplusplus
 }

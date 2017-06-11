@@ -103,6 +103,10 @@ struct BundledEffectContext{
     FILE                            *PcmInPtr;
     FILE                            *PcmOutPtr;
     #endif
+    #ifdef BUILD_FLOAT
+    LVM_FLOAT                       *pInputBuffer;
+    LVM_FLOAT                       *pOutputBuffer;
+    #endif
 };
 
 /* SessionContext : One session */

@@ -27,7 +27,6 @@
 #include "AGC.h"
 #include "LVDBE_Coeffs.h"               /* Filter coefficients */
 
-
 /********************************************************************************************/
 /*                                                                                          */
 /* FUNCTION:                 LVDBE_Process                                                  */
@@ -72,136 +71,236 @@
 /*     overall end to end gain is odB.                                                      */
 /*                                                                                          */
 /********************************************************************************************/
+#ifndef BUILD_FLOAT
+LVDBE_ReturnStatus_en LVDBE_Process(LVDBE_Handle_t hInstance,
+    const LVM_INT16 *pInData, LVM_INT16 *pOutData, LVM_UINT16 NumSamples) {
 
-LVDBE_ReturnStatus_en LVDBE_Process(LVDBE_Handle_t            hInstance,
-                                       const LVM_INT16         *pInData,
-                                       LVM_INT16               *pOutData,
-                                       LVM_UINT16                   NumSamples)
+  LVDBE_Instance_t *pInstance = (LVDBE_Instance_t *) hInstance;
+  LVM_INT32 *pScratch =
+      (LVM_INT32 *) pInstance->MemoryTable.Region[LVDBE_MEMREGION_SCRATCH].pBaseAddress;
+  LVM_INT32 *pMono;
+  LVM_INT16 *pInput = (LVM_INT16 *) pInData;
+
+  /* Scratch for Volume Control starts at offset of 2*NumSamples short values from pScratch */
+  LVM_INT16 *pScratchVol = (LVM_INT16 *) (&pScratch[NumSamples]);
+
+  /* Scratch for Mono path starts at offset of 2*NumSamples 32-bit values from pScratch */
+  pMono = &pScratch[2 * NumSamples];
+
+  /*
+   * Check the number of samples is not too large
+   */
+  if (NumSamples > pInstance->Capabilities.MaxBlockSize) {
+    return (LVDBE_TOOMANYSAMPLES);
+  }
+
+  /*
+   * Check if the algorithm is enabled
+   */
+  /* DBE path is processed when DBE is ON or during On/Off transitions */
+  if ((pInstance->Params.OperatingMode == LVDBE_ON)
+      || (LVC_Mixer_GetCurrent(
+          &pInstance->pData->BypassMixer.MixerStream[0])
+          != LVC_Mixer_GetTarget(
+              &pInstance->pData->BypassMixer.MixerStream[0]))) {
+
+    /*
+     * Convert 16-bit samples to 32-bit and scale
+     * (For a 16-bit implementation apply headroom loss here)
+     */
+    Int16LShiftToInt32_16x32(pInput, /* Source 16-bit data    */
+    pScratch, /* Dest. 32-bit data     */
+    (LVM_INT16) (2 * NumSamples), /* Left and right        */
+    LVDBE_SCALESHIFT); /* Shift scale           */
+
+    /*
+     * Apply the high pass filter if selected
+     */
+    if (pInstance->Params.HPFSelect == LVDBE_HPF_ON) {
+      BQ_2I_D32F32C30_TRC_WRA_01(&pInstance->pCoef->HPFInstance,/* Filter instance      */
+      (LVM_INT32 *) pScratch, /* Source               */
+      (LVM_INT32 *) pScratch, /* Destination          */
+      (LVM_INT16) NumSamples); /* Number of samples    */
+    }
+
+    /*
+     * Create the mono stream
+     */
+    From2iToMono_32(pScratch, /* Stereo source         */
+    pMono, /* Mono destination      */
+    (LVM_INT16) NumSamples); /* Number of samples     */
+
+    /*
+     * Apply the band pass filter
+     */
+    BP_1I_D32F32C30_TRC_WRA_02(&pInstance->pCoef->BPFInstance, /* Filter instance       */
+    (LVM_INT32 *) pMono, /* Source                */
+    (LVM_INT32 *) pMono, /* Destination           */
+    (LVM_INT16) NumSamples); /* Number of samples     */
+
+    /*
+     * Apply the AGC and mix
+     */
+    AGC_MIX_VOL_2St1Mon_D32_WRA(&pInstance->pData->AGCInstance, /* Instance pointer      */
+    pScratch, /* Stereo source         */
+    pMono, /* Mono band pass source */
+    pScratch, /* Stereo destination    */
+    NumSamples); /* Number of samples     */
+
+    /*
+     * Convert 32-bit samples to 16-bit and saturate
+     * (Not required for 16-bit implemenations)
+     */
+    Int32RShiftToInt16_Sat_32x16(pScratch, /* Source 32-bit data    */
+    (LVM_INT16 *) pScratch, /* Dest. 16-bit data     */
+    (LVM_INT16) (2 * NumSamples), /* Left and right        */
+    LVDBE_SCALESHIFT); /* Shift scale           */
+
+  }
+
+  /* Bypass Volume path is processed when DBE is OFF or during On/Off transitions */
+  if ((pInstance->Params.OperatingMode == LVDBE_OFF)
+      || (LVC_Mixer_GetCurrent(
+          &pInstance->pData->BypassMixer.MixerStream[1])
+          != LVC_Mixer_GetTarget(
+              &pInstance->pData->BypassMixer.MixerStream[1]))) {
+
+    /*
+     * The algorithm is disabled but volume management is required to compensate for
+     * headroom and volume (if enabled)
+     */
+    LVC_MixSoft_1St_D16C31_SAT(&pInstance->pData->BypassVolume, pInData,
+        pScratchVol, (LVM_INT16) (2 * NumSamples)); /* Left and right          */
+
+  }
+
+  /*
+   * Mix DBE processed path and bypass volume path
+   */
+  LVC_MixSoft_2St_D16C31_SAT(&pInstance->pData->BypassMixer,
+      (LVM_INT16 *) pScratch, pScratchVol, pOutData,
+      (LVM_INT16) (2 * NumSamples));
+
+  return (LVDBE_SUCCESS);
+}
+#else /*BUILD_FLOAT*/
+LVDBE_ReturnStatus_en LVDBE_Process(LVDBE_Handle_t hInstance,
+    const LVM_FLOAT *pInData,
+    LVM_FLOAT *pOutData,
+    LVM_UINT16 NumSamples)
 {
 
-    LVDBE_Instance_t    *pInstance =(LVDBE_Instance_t  *)hInstance;
-    LVM_INT32           *pScratch  = (LVM_INT32 *)pInstance->MemoryTable.Region[LVDBE_MEMREGION_SCRATCH].pBaseAddress;
-    LVM_INT32           *pMono;
-    LVM_INT16           *pInput    = (LVM_INT16 *)pInData;
+  LVDBE_Instance_t *pInstance =(LVDBE_Instance_t *)hInstance;
+  LVM_FLOAT *pScratch_in = (LVM_FLOAT *)pInstance->MemoryTable.Region
+  [LVDBE_MEMREGION_SCRATCH].pBaseAddress;
+  LVM_FLOAT *pScratch = pScratch_in + 2 * NumSamples;
+  LVM_FLOAT *pMono;
+  LVM_INT32 ii = 0;
 
+  /* Scratch for Volume Control starts at offset of 4*NumSamples float values from pScratch */
+  LVM_FLOAT           *pScratchVol = (LVM_FLOAT *)(&pScratch_in[4 * NumSamples]);
+//  LVM_INT16 *pScratchVol_int = (LVM_INT16 *)(pScratchVol);
 
-    /* Scratch for Volume Control starts at offset of 2*NumSamples short values from pScratch */
-    LVM_INT16           *pScratchVol = (LVM_INT16 *)(&pScratch[NumSamples]);
+  /* Scratch for Mono path starts at offset of 6*NumSamples 32-bit values from pScratch */
+  pMono = &pScratch_in[4 * NumSamples];
 
-    /* Scratch for Mono path starts at offset of 2*NumSamples 32-bit values from pScratch */
-    pMono                            = &pScratch[2*NumSamples];
+  /*
+   * Check the number of samples is not too large
+   */
+  if (NumSamples > pInstance->Capabilities.MaxBlockSize)
+  {
+    return(LVDBE_TOOMANYSAMPLES);
+  }
+
+  /*
+   * Convert 16-bit samples to Float
+   */
+  Copy_Float(pInData, /* Source 16-bit data    */
+      pScratch_in, /* Dest. 32-bit data     */
+      (LVM_INT16)(2 * NumSamples)); /* Left and right        */
+
+  for (ii = 0; ii < 2 * NumSamples; ii++) {
+    pScratch[ii] = pScratch_in[ii];
+  }
+  /*
+   * Check if the algorithm is enabled
+   */
+  /* DBE path is processed when DBE is ON or during On/Off transitions */
+  if ((pInstance->Params.OperatingMode == LVDBE_ON)||
+      (LVC_Mixer_GetCurrent(&pInstance->pData->BypassMixer.MixerStream[0])
+          !=LVC_Mixer_GetTarget(&pInstance->pData->BypassMixer.MixerStream[0])))
+  {
 
     /*
-     * Check the number of samples is not too large
+     * Apply the high pass filter if selected
      */
-    if (NumSamples > pInstance->Capabilities.MaxBlockSize)
+    if (pInstance->Params.HPFSelect == LVDBE_HPF_ON)
     {
-        return(LVDBE_TOOMANYSAMPLES);
+      BQ_2I_D32F32C30_TRC_WRA_01(&pInstance->pCoef->HPFInstance,/* Filter instance      */
+          (LVM_FLOAT *)pScratch, /* Source               */
+          (LVM_FLOAT *)pScratch, /* Destination          */
+          (LVM_INT16)NumSamples); /* Number of samples    */
     }
 
     /*
-     * Check if the algorithm is enabled
+     * Create the mono stream
      */
-    /* DBE path is processed when DBE is ON or during On/Off transitions */
-    if ((pInstance->Params.OperatingMode == LVDBE_ON)||
-        (LVC_Mixer_GetCurrent(&pInstance->pData->BypassMixer.MixerStream[0])
-         !=LVC_Mixer_GetTarget(&pInstance->pData->BypassMixer.MixerStream[0])))
-    {
-
-        /*
-         * Convert 16-bit samples to 32-bit and scale
-         * (For a 16-bit implementation apply headroom loss here)
-         */
-        Int16LShiftToInt32_16x32(pInput,                               /* Source 16-bit data    */
-                                 pScratch,                             /* Dest. 32-bit data     */
-                                 (LVM_INT16)(2*NumSamples),            /* Left and right        */
-                                 LVDBE_SCALESHIFT);                    /* Shift scale           */
-
-
-        /*
-         * Apply the high pass filter if selected
-         */
-        if (pInstance->Params.HPFSelect == LVDBE_HPF_ON)
-        {
-              BQ_2I_D32F32C30_TRC_WRA_01(&pInstance->pCoef->HPFInstance,/* Filter instance      */
-                                       (LVM_INT32 *)pScratch,           /* Source               */
-                                       (LVM_INT32 *)pScratch,           /* Destination          */
-                                       (LVM_INT16)NumSamples);          /* Number of samples    */
-        }
-
-
-        /*
-         * Create the mono stream
-         */
-        From2iToMono_32(pScratch,                                      /* Stereo source         */
-                        pMono,                                         /* Mono destination      */
-                        (LVM_INT16)NumSamples);                        /* Number of samples     */
-
-
-        /*
-         * Apply the band pass filter
-         */
-        BP_1I_D32F32C30_TRC_WRA_02(&pInstance->pCoef->BPFInstance,     /* Filter instance       */
-                                   (LVM_INT32 *)pMono,                 /* Source                */
-                                   (LVM_INT32 *)pMono,                 /* Destination           */
-                                   (LVM_INT16)NumSamples);             /* Number of samples     */
-
-
-        /*
-         * Apply the AGC and mix
-         */
-        AGC_MIX_VOL_2St1Mon_D32_WRA(&pInstance->pData->AGCInstance,    /* Instance pointer      */
-                                    pScratch,                          /* Stereo source         */
-                                    pMono,                             /* Mono band pass source */
-                                    pScratch,                          /* Stereo destination    */
-                                    NumSamples);                       /* Number of samples     */
-
-        /*
-         * Convert 32-bit samples to 16-bit and saturate
-         * (Not required for 16-bit implemenations)
-         */
-        Int32RShiftToInt16_Sat_32x16(pScratch,                         /* Source 32-bit data    */
-                                     (LVM_INT16 *)pScratch,            /* Dest. 16-bit data     */
-                                     (LVM_INT16)(2*NumSamples),        /* Left and right        */
-                                     LVDBE_SCALESHIFT);                /* Shift scale           */
-
-    }
-
-    /* Bypass Volume path is processed when DBE is OFF or during On/Off transitions */
-    if ((pInstance->Params.OperatingMode == LVDBE_OFF)||
-        (LVC_Mixer_GetCurrent(&pInstance->pData->BypassMixer.MixerStream[1])
-         !=LVC_Mixer_GetTarget(&pInstance->pData->BypassMixer.MixerStream[1])))
-    {
-
-        /*
-         * The algorithm is disabled but volume management is required to compensate for
-         * headroom and volume (if enabled)
-         */
-        LVC_MixSoft_1St_D16C31_SAT(&pInstance->pData->BypassVolume,
-                                  pInData,
-                                  pScratchVol,
-                               (LVM_INT16)(2*NumSamples));           /* Left and right          */
-
-    }
+    From2iToMono_Float((LVM_FLOAT *)pScratch, /* Stereo source         */
+        pMono, /* Mono destination      */
+        (LVM_INT16)NumSamples); /* Number of samples     */
 
     /*
-     * Mix DBE processed path and bypass volume path
+     * Apply the band pass filter
      */
-    LVC_MixSoft_2St_D16C31_SAT(&pInstance->pData->BypassMixer,
-                                    (LVM_INT16 *) pScratch,
-                                    pScratchVol,
-                                    pOutData,
-                                    (LVM_INT16)(2*NumSamples));
+    BP_1I_D32F32C30_TRC_WRA_02(&pInstance->pCoef->BPFInstance, /* Filter instance       */
+        (LVM_FLOAT *)pMono, /* Source                */
+        (LVM_FLOAT *)pMono, /* Destination           */
+        (LVM_INT16)NumSamples); /* Number of samples     */
 
-    return(LVDBE_SUCCESS);
+    /*
+     * Apply the AGC and mix
+     */
+    AGC_MIX_VOL_2St1Mon_D32_WRA(&pInstance->pData->AGCInstance, /* Instance pointer      */
+        pScratch, /* Stereo source         */
+        pMono, /* Mono band pass source */
+        pScratch, /* Stereo destination    */
+        NumSamples); /* Number of samples     */
+
+    for (ii = 0; ii < 2 * NumSamples; ii++) {
+      //TODO: replace with existing clamping function
+      if(pScratch[ii] < -1.0) {
+        pScratch[ii] = -1.0;
+      } else if(pScratch[ii] > 1.0) {
+        pScratch[ii] = 1.0;
+      }
+    }
+  }
+
+  /* Bypass Volume path is processed when DBE is OFF or during On/Off transitions */
+  if ((pInstance->Params.OperatingMode == LVDBE_OFF)||
+      (LVC_Mixer_GetCurrent(&pInstance->pData->BypassMixer.MixerStream[1])
+          !=LVC_Mixer_GetTarget(&pInstance->pData->BypassMixer.MixerStream[1])))
+  {
+
+    /*
+     * The algorithm is disabled but volume management is required to compensate for
+     * headroom and volume (if enabled)
+     */
+    LVC_MixSoft_1St_D16C31_SAT(&pInstance->pData->BypassVolume,
+        pScratch_in,
+        pScratchVol,
+        (LVM_INT16)(2 * NumSamples)); /* Left and right */
+  }
+
+  /*
+   * Mix DBE processed path and bypass volume path
+   */
+  LVC_MixSoft_2St_D16C31_SAT(&pInstance->pData->BypassMixer,
+      pScratch,
+      pScratchVol,
+      pOutData,
+      (LVM_INT16)(2 * NumSamples));
+
+  return(LVDBE_SUCCESS);
 }
-
-
-
-
-
-
-
-
-
-
+#endif

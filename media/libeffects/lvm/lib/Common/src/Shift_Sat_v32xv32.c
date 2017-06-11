@@ -24,7 +24,62 @@
 /**********************************************************************************
    FUNCTION Shift_Sat_v32xv32
 ***********************************************************************************/
+#ifdef BUILD_FLOAT
+void Shift_Sat_Float (const   LVM_INT16   val,
+                      const   LVM_FLOAT   *src,
+                      LVM_FLOAT   *dst,
+                      LVM_INT16   n)
+{
+    LVM_FLOAT   temp;
+    LVM_INT32   ii,ij;
+    LVM_INT16   RShift;
 
+    if(val > 0)
+    {
+        for (ii = n; ii != 0; ii--)
+        {
+            temp = (LVM_FLOAT)*src;
+            src++;
+            for(ij = 0; ij < val; ij++)
+            {
+                temp = temp * 2;
+            }
+
+            if(temp > 1.0)
+                temp = 1.0;
+            if(temp < -1.0)
+                temp = -1.0;
+
+            *dst = (LVM_FLOAT)temp;
+            dst++;
+        }
+    }
+    else if(val < 0)
+    {
+        RShift=(LVM_INT16)(-val);
+
+        for (ii = n; ii != 0; ii--)
+        {
+            temp = (LVM_FLOAT)*src;
+            src++;
+            for(ij = 0; ij < RShift; ij++)
+            {
+                temp = temp / 2;
+            }
+            *dst = (LVM_FLOAT)temp;
+            dst++;
+        }
+    }
+    else
+    {
+        if(src != dst)
+        {
+            Copy_Float(src, dst, n);
+        }
+    }
+    return;
+}
+#else
 void Shift_Sat_v32xv32 (const   LVM_INT16   val,
                         const   LVM_INT32   *src,
                         LVM_INT32   *dst,
@@ -79,5 +134,5 @@ void Shift_Sat_v32xv32 (const   LVM_INT16   val,
     }
     return;
 }
-
+#endif
 /**********************************************************************************/

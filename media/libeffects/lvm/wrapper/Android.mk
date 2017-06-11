@@ -10,7 +10,7 @@ LOCAL_VENDOR_MODULE := true
 LOCAL_SRC_FILES:= \
 	Bundle/EffectBundle.cpp
 
-LOCAL_CFLAGS += -fvisibility=hidden
+LOCAL_CFLAGS += -fvisibility=hidden -DBUILD_FLOAT -DHIGHER_FS
 LOCAL_CFLAGS += -Wall -Werror
 
 LOCAL_MODULE:= libbundlewrapper
@@ -43,7 +43,7 @@ LOCAL_VENDOR_MODULE := true
 LOCAL_SRC_FILES:= \
     Reverb/EffectReverb.cpp
 
-LOCAL_CFLAGS += -fvisibility=hidden
+LOCAL_CFLAGS += -fvisibility=hidden -DBUILD_FLOAT -DHIGHER_FS
 LOCAL_CFLAGS += -Wall -Werror
 
 LOCAL_MODULE:= libreverbwrapper
