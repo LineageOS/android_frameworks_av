@@ -137,6 +137,8 @@ status_t SoftVPXEncoder::initEncoder() {
     mCodecConfiguration->rc_end_usage = mBitrateControlMode;
     // Disable frame drop - not allowed in MediaCodec now.
     mCodecConfiguration->rc_dropframe_thresh = 0;
+    // Disable lagged encoding.
+    mCodecConfiguration->g_lag_in_frames = 0;
     if (mBitrateControlMode == VPX_CBR) {
         // Disable spatial resizing.
         mCodecConfiguration->rc_resize_allowed = 0;
@@ -157,8 +159,6 @@ status_t SoftVPXEncoder::initEncoder() {
         mCodecConfiguration->rc_buf_sz = 1000;
         // Enable error resilience - needed for packet loss.
         mCodecConfiguration->g_error_resilient = 1;
-        // Disable lagged encoding.
-        mCodecConfiguration->g_lag_in_frames = 0;
         // Maximum key frame interval - for CBR boost to 3000
         mCodecConfiguration->kf_max_dist = 3000;
         // Encoder determines optimal key frame placement automatically.

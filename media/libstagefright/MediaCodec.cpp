@@ -734,6 +734,9 @@ status_t MediaCodec::configure(
             // XXX: save indication that it's crypto in some way...
             mAnalyticsItem->setInt32(kCodecCrypto, 1);
         }
+    } else if (mFlags & kFlagIsSecure) {
+        ALOGE("Crypto or descrambler should be given for secure codec");
+        return BAD_VALUE;
     }
 
     // save msg for reset

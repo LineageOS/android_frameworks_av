@@ -202,7 +202,7 @@ void SoftGSM::onQueueFilled(OMX_U32 /* portIndex */) {
         BufferInfo *outInfo = *outQueue.begin();
         OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
 
-        if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
+        if ((inHeader->nFlags & OMX_BUFFERFLAG_EOS) && inHeader->nFilledLen == 0) {
             inQueue.erase(inQueue.begin());
             inInfo->mOwnedByUs = false;
             notifyEmptyBufferDone(inHeader);
@@ -246,11 +246,15 @@ void SoftGSM::onQueueFilled(OMX_U32 /* portIndex */) {
         outHeader->nFilledLen = n * sizeof(int16_t);
         outHeader->nFlags = 0;
 
-        inInfo->mOwnedByUs = false;
-        inQueue.erase(inQueue.begin());
-        inInfo = NULL;
-        notifyEmptyBufferDone(inHeader);
-        inHeader = NULL;
+        if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
+            inHeader->nFilledLen = 0;
+        } else {
+            inInfo->mOwnedByUs = false;
+            inQueue.erase(inQueue.begin());
+            inInfo = NULL;
+            notifyEmptyBufferDone(inHeader);
+            inHeader = NULL;
+        }
 
         outInfo->mOwnedByUs = false;
         outQueue.erase(outQueue.begin());
