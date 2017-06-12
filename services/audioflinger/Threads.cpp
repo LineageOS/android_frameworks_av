@@ -6924,6 +6924,12 @@ void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& a
     if (mActiveTracks.size() == 0) {
         dprintf(fd, "  No active record clients\n");
     }
+
+    if (input != nullptr) {
+        dprintf(fd, "  Hal stream dump:\n");
+        (void)input->stream->dump(fd);
+    }
+
     dprintf(fd, "  Fast capture thread: %s\n", hasFastCapture() ? "yes" : "no");
     dprintf(fd, "  Fast track available: %s\n", mFastTrackAvail ? "yes" : "no");
 
