@@ -85,6 +85,8 @@ void CharacterEncodingDetector::detectAndConvert() {
         UErrorCode status = U_ZERO_ERROR;
         UCharsetDetector *csd = ucsdet_open(&status);
         const UCharsetMatch *ucm;
+        bool goodmatch = true;
+        int highest = 0;
 
         // try combined detection of artist/album/title etc.
         char buf[1024];
@@ -116,8 +118,6 @@ void CharacterEncodingDetector::detectAndConvert() {
             ucsdet_setText(csd, buf, strlen(buf), &status);
             int32_t matches;
             const UCharsetMatch** ucma = ucsdet_detectAll(csd, &matches, &status);
-            bool goodmatch = true;
-            int highest = 0;
             const UCharsetMatch* bestCombinedMatch = getPreferred(buf, strlen(buf),
                     ucma, matches, &goodmatch, &highest);
 
@@ -180,8 +180,24 @@ void CharacterEncodingDetector::detectAndConvert() {
                     !strcmp(name, "genre") ||
                     !strcmp(name, "album") ||
                     !strcmp(name, "title"))) {
-                // use encoding determined from the combination of artist/album/title etc.
-                enc = combinedenc;
+                if (!goodmatch && highest < 0) {
+                    // Give it one more chance if there is no good match.
+                    ALOGV("Trying to detect %s separately", name);
+                    int32_t matches;
+                    bool goodmatchSingle = true;
+                    int highestSingle = 0;
+                    ucsdet_setText(csd, s, inputLength, &status);
+                    const UCharsetMatch** ucma = ucsdet_detectAll(csd, &matches, &status);
+                    const UCharsetMatch* bestSingleMatch = getPreferred(s, inputLength,
+                            ucma, matches, &goodmatchSingle, &highestSingle);
+                    if (goodmatchSingle || highestSingle > highest)
+                        enc = ucsdet_getName(bestSingleMatch, &status);
+                    else
+                        enc = combinedenc;
+                } else {
+                    // use encoding determined from the combination of artist/album/title etc.
+                    enc = combinedenc;
+                }
             } else {
                 if (isPrintableAscii(s, inputLength)) {
                     enc = "UTF-8";
