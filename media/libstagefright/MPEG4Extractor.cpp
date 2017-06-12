@@ -3129,6 +3129,13 @@ status_t MPEG4Extractor::parse3GPPMetaData(off64_t offset, size_t size, int dept
         }
         case FOURCC('y', 'r', 'r', 'c'):
         {
+            if (size < 6) {
+                delete[] buffer;
+                buffer = NULL;
+                ALOGE("b/62133227");
+                android_errorWriteLog(0x534e4554, "62133227");
+                return ERROR_MALFORMED;
+            }
             char tmp[5];
             uint16_t year = U16_AT(&buffer[4]);
 
@@ -3151,6 +3158,8 @@ status_t MPEG4Extractor::parse3GPPMetaData(off64_t offset, size_t size, int dept
 
         // smallest possible valid UTF-16 string w BOM: 0xfe 0xff 0x00 0x00
         if (size < 6) {
+            delete[] buffer;
+            buffer = NULL;
             return ERROR_MALFORMED;
         }
 
