@@ -4736,9 +4736,9 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
                             rect.nTop < 0 ||
                             rect.nLeft + rect.nWidth > videoDef->nFrameWidth ||
                             rect.nTop + rect.nHeight > videoDef->nFrameHeight) {
-                            ALOGE("Wrong cropped rect (%d, %d) - (%u, %u) vs. frame (%u, %u)",
+                            ALOGE("Wrong cropped rect (%d, %d, %u, %u) vs. frame (%u, %u)",
                                     rect.nLeft, rect.nTop,
-                                    rect.nLeft + rect.nWidth, rect.nTop + rect.nHeight,
+                                    rect.nWidth, rect.nHeight,
                                     videoDef->nFrameWidth, videoDef->nFrameHeight);
                             return BAD_VALUE;
                         }
