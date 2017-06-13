@@ -18,6 +18,7 @@
 #define ANDROID_HARDWARE_STREAM_HAL_LOCAL_H
 
 #include <media/audiohal/StreamHalInterface.h>
+#include "StreamPowerLog.h"
 
 namespace android {
 
@@ -82,6 +83,9 @@ class StreamHalLocal : public virtual StreamHalInterface
     virtual ~StreamHalLocal();
 
     sp<DeviceHalLocal> mDevice;
+
+    // mStreamPowerLog is used for audio signal power logging.
+    StreamPowerLog mStreamPowerLog;
 
   private:
     audio_stream_t *mStream;
