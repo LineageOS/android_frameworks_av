@@ -422,6 +422,21 @@ AudioFlinger::PlaybackThread::Track::Track(
         mAudioTrackServerProxy = new AudioTrackServerProxy(mCblk, mBuffer, frameCount,
                 mFrameSize, !isExternalTrack(), sampleRate);
     } else {
+        // Is the shared buffer of sufficient size?
+        // (frameCount * mFrameSize) is <= SIZE_MAX, checked in TrackBase.
+        if (sharedBuffer->size() < frameCount * mFrameSize) {
+            // Workaround: clear out mCblk to indicate track hasn't been properly created.
+            mCblk->~audio_track_cblk_t();   // destroy our shared-structure.
+            if (mClient == 0) {
+                free(mCblk);
+            }
+            mCblk = NULL;
+
+            mSharedBuffer.clear(); // release shared buffer early
+            android_errorWriteLog(0x534e4554, "38340117");
+            return;
+        }
+
         mAudioTrackServerProxy = new StaticAudioTrackServerProxy(mCblk, mBuffer, frameCount,
                 mFrameSize);
     }
