@@ -9,7 +9,7 @@ cc_library_headers {
 // Effect factory library
 cc_library_shared {
     name: "libeffects",
-    vendor: true,
+    vendor_available: true,
     srcs: ["EffectsFactory.c"],
 
     shared_libs: [
