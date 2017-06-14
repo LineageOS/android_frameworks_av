@@ -62,6 +62,7 @@ SoftVideoDecoderOMXComponent::SoftVideoDecoderOMXComponent(
         mCropWidth(width),
         mCropHeight(height),
         mOutputPortSettingsChange(NONE),
+        mUpdateColorAspects(false),
         mMinInputBufferSize(384), // arbitrary, using one uncompressed macroblock
         mMinCompressionRatio(1),  // max input size is normally the output size
         mComponentRole(componentRole),
