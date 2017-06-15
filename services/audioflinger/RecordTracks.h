@@ -29,6 +29,7 @@ public:
                                 audio_channel_mask_t channelMask,
                                 size_t frameCount,
                                 void *buffer,
+                                size_t bufferSize,
                                 audio_session_t sessionId,
                                 uid_t uid,
                                 audio_input_flags_t flags,
@@ -102,6 +103,7 @@ public:
                 audio_format_t format,
                 size_t frameCount,
                 void *buffer,
+                size_t bufferSize,
                 audio_input_flags_t flags);
     virtual             ~PatchRecord();
 

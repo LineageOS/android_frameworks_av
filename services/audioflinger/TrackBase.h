@@ -61,6 +61,7 @@ public:
                                 audio_channel_mask_t channelMask,
                                 size_t frameCount,
                                 void *buffer,
+                                size_t bufferSize,
                                 audio_session_t sessionId,
                                 uid_t uid,
                                 bool isOut,
@@ -82,6 +83,7 @@ public:
 
             sp<IMemory> getBuffers() const { return mBufferMemory; }
             void*       buffer() const { return mBuffer; }
+            size_t      bufferSize() const { return mBufferSize; }
     virtual bool        isFastTrack() const = 0;
             bool        isOutputTrack() const { return (mType == TYPE_OUTPUT); }
             bool        isPatchTrack() const { return (mType == TYPE_PATCH); }
@@ -144,6 +146,7 @@ protected:
     sp<IMemory>         mBufferMemory;  // currently non-0 for fast RecordTrack only
     void*               mBuffer;    // start of track buffer, typically in shared memory
                                     // except for OutputTrack when it is in local memory
+    size_t              mBufferSize; // size of mBuffer in bytes
     // we don't really need a lock for these
     track_state         mState;
     const uint32_t      mSampleRate;    // initial sample rate only; for tracks which
