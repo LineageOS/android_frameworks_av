@@ -177,9 +177,12 @@ GraphicBufferSource::GraphicBufferSource(
         mIsPersistent = true;
     }
     mConsumer->setDefaultBufferSize(bufferWidth, bufferHeight);
-    // Note that we can't create an sp<...>(this) in a ctor that will not keep a
-    // reference once the ctor ends, as that would cause the refcount of 'this'
-    // dropping to 0 at the end of the ctor.  Since all we need is a wp<...>
+}
+
+status_t GraphicBufferSource::init() {
+    // Note that we can't create an sp<...>(this) in a method that will not keep a
+    // reference once the method ends, as that may cause the refcount of 'this'
+    // dropping to 0 at the end of the method.  Since all we need is a wp<...>
     // that's what we create.
     wp<BufferQueue::ConsumerListener> listener = static_cast<BufferQueue::ConsumerListener*>(this);
     sp<IConsumerListener> proxy;
@@ -190,15 +193,14 @@ GraphicBufferSource::GraphicBufferSource(
     }
 
     mInitCheck = mConsumer->consumerConnect(proxy, false);
-    if (mInitCheck != NO_ERROR) {
+    if (mInitCheck == NO_ERROR) {
+        memset(&mColorAspects, 0, sizeof(mColorAspects));
+    } else {
         ALOGE("Error connecting to BufferQueue: %s (%d)",
                 strerror(-mInitCheck), mInitCheck);
-        return;
     }
 
-    memset(&mColorAspects, 0, sizeof(mColorAspects));
-
-    CHECK(mInitCheck == NO_ERROR);
+    return mInitCheck;
 }
 
 GraphicBufferSource::~GraphicBufferSource() {
@@ -396,7 +398,7 @@ void GraphicBufferSource::codecBufferEmptied(OMX_BUFFERHEADERTYPE* header, int f
     int id = codecBuffer.mSlot;
     sp<Fence> fence = new Fence(fenceFd);
     if (mBufferSlot[id] != NULL &&
-        mBufferSlot[id]->handle == codecBuffer.mGraphicBuffer->handle) {
+            mBufferSlot[id]->handle == codecBuffer.mGraphicBuffer->handle) {
         mBufferUseCount[id]--;
 
         ALOGV("codecBufferEmptied: slot=%d, cbi=%d, useCount=%d, handle=%p",
@@ -485,6 +487,12 @@ void GraphicBufferSource::suspend(bool suspend) {
                 break;
             } else if (err != OK) {
                 ALOGW("suspend: acquireBuffer returned err=%d", err);
+                break;
+            } else if (item.mSlot < 0 ||
+                    item.mSlot >= BufferQueue::NUM_BUFFER_SLOTS) {
+                // Invalid buffer index
+                ALOGW("suspend: corrupted buffer index (%d)",
+                        item.mSlot);
                 break;
             }
 
@@ -606,6 +614,10 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
     } else if (err != OK) {
         // now what? fake end-of-stream?
         ALOGW("fillCodecBuffer_l: acquireBuffer returned err=%d", err);
+        return false;
+    } else if (item.mSlot < 0 || item.mSlot >= BufferQueue::NUM_BUFFER_SLOTS) {
+        // Invalid buffer index
+        ALOGW("fillCodecBuffer_l: corrupted buffer index (%d)", item.mSlot);
         return false;
     }
 
@@ -981,8 +993,14 @@ void GraphicBufferSource::onFrameAvailable(const BufferItem& /*item*/) {
         BufferItem item;
         status_t err = mConsumer->acquireBuffer(&item, 0);
         if (err == OK) {
+            if (item.mSlot < 0 ||
+                    item.mSlot >= BufferQueue::NUM_BUFFER_SLOTS) {
+                // Invalid buffer index
+                ALOGW("onFrameAvailable: corrupted buffer index (%d)",
+                        item.mSlot);
+                return;
+            }
             mNumBufferAcquired++;
-
             // If this is the first time we're seeing this buffer, add it to our
             // slot table.
             if (item.mGraphicBuffer != NULL) {
