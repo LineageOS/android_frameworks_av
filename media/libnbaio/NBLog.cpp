@@ -18,8 +18,8 @@
 * Documentation: Workflow summary for histogram data processing:
 * For more details on FIFO, please see system/media/audio_utils; doxygen
 * TODO: add this documentation to doxygen once it is further developed
-* 1) writing the data to a buffer
-* onWork
+* 1) Writing buffer period timestamp to the circular buffer
+* onWork()
 *     Called every period length (e.g., 4ms)
 *     Calls LOG_HIST_TS
 * LOG_HIST_TS
@@ -45,12 +45,27 @@
 *     Determines readable buffer section via pointer arithmetic on reader
 *     and writer pointers
 *
-* 2) reading the data from shared memory
+* 2) Writing LOG_HIST_FLUSH event to console when audio is turned on or off
+*    When this event is found when reading from the buffer, all histograms are
+*    printed to the console
+*    TODO: remove this: always write data to another data structure or the console
+* FastMixer::onStateChange()
+*     is called when audio is turned on/off
+*     calls LOG_HIST_FLUSH()
+* LOG_HIST_FLUSH()
+*     calls logHistFlush
+* NBLog::Writer::logHistFlush
+*     records current timestamp to write it to the console
+*     calls log(EVENT_HISTOGRAM_FLUSH)
+*     From here, everything is the same as in 1), resulting in call to fifo write
+*
+* 3) reading the data from shared memory
 * Thread::threadloop()
 *     TODO: add description?
 * NBLog::MergeThread::threadLoop()
 *     calls NBLog::Merger::merge
 * NBLog::Merger::merge
+*     Merges snapshots sorted by timestamp
 *     for each reader in vector of class NamedReader,
 *     callsNamedReader::reader()->getSnapshot
 *     TODO: check whether the rest of this function is relevant
@@ -59,11 +74,13 @@
 *     calls mFifoReader->obtain to find readable data
 *     sets snapshot.begin() and .end() iterators to boundaries of valid entries
 *     moves the fifo reader index to after the last entry read
-*     in this case, the buffer is in shared memory. in (3), the buffer is private
+*     in this case, the buffer is in shared memory. in (4), the buffer is private
 *
-* 3) reading the data from private buffer
+* 4) reading the data from private buffer
 * MediaLogService::dump
-*     calls NBLog::Reader::dump(int) on instance of subclass mergeReader
+*     TODO: when was MediaLogService::dump called?
+*     For each NBLog::Reader in vector NamedReaders (subclass mergeReader):
+*     calls NBLog::Reader::dump(int)
 * NBLog::Reader::dump(int)
 *     calls getSnapshot on the current reader
 *     calls dump(int, size_t, Snapshot)
@@ -74,7 +91,10 @@
 *     (histogram entry) to NBLog::mHists
 *     In the case of EVENT_HISTOGRAM_FLUSH, calls drawHistogram on each element in
 *     the list and erases it
-*     TODO: when do these events occur?
+*     TODO: get rid of the FLUSH, instead add every HISTOGRAM_ENTRY_TS to two
+*     circular buffers: one short-term and one long-term (can add even longer-term
+*     structures in the future). When dump is called, print everything currently
+*     in the buffer.
 * NBLog::drawHistogram
 *     input: timestamp array
 *     buckets this to a histogram and prints
@@ -82,7 +102,7 @@
 */
 
 #define LOG_TAG "NBLog"
-//#define LOG_NDEBUG 0
+// #define LOG_NDEBUG 0
 
 #include <algorithm>
 #include <climits>
