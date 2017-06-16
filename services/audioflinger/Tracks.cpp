@@ -502,58 +502,40 @@ void AudioFlinger::PlaybackThread::Track::destroy()
 
 /*static*/ void AudioFlinger::PlaybackThread::Track::appendDumpHeader(String8& result)
 {
-    result.append("    Name Active Client Type      Fmt Chn mask Session fCount S F SRate  "
-                  "L dB  R dB  VS dB    Server Main buf  Aux buf Flags UndFrmCnt  Flushed\n");
+    result.append("T Name Active Client Session S  Flags "
+                  "  Format Chn mask  SRate "
+                  "ST  L dB  R dB  VS dB "
+                  "  Server FrmCnt  FrmRdy F Underruns  Flushed "
+                  "Main Buf  Aux Buf\n");
 }
 
-void AudioFlinger::PlaybackThread::Track::dump(char* buffer, size_t size, bool active)
+void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool active)
 {
-    gain_minifloat_packed_t vlr = mAudioTrackServerProxy->getVolumeLR();
-    if (isFastTrack()) {
-        sprintf(buffer, "    F %2d", mFastIndex);
-    } else if (mName >= AudioMixer::TRACK0) {
-        sprintf(buffer, "    %4d", mName - AudioMixer::TRACK0);
-    } else {
-        sprintf(buffer, "    none");
-    }
-    track_state state = mState;
-    char stateChar;
-    if (isTerminated()) {
-        stateChar = 'T';
-    } else {
-        switch (state) {
-        case IDLE:
-            stateChar = 'I';
-            break;
-        case STOPPING_1:
-            stateChar = 's';
-            break;
-        case STOPPING_2:
-            stateChar = '5';
-            break;
-        case STOPPED:
-            stateChar = 'S';
-            break;
-        case RESUMING:
-            stateChar = 'R';
-            break;
-        case ACTIVE:
-            stateChar = 'A';
-            break;
-        case PAUSING:
-            stateChar = 'p';
-            break;
-        case PAUSED:
-            stateChar = 'P';
-            break;
-        case FLUSHED:
-            stateChar = 'F';
-            break;
-        default:
-            stateChar = '?';
-            break;
+    char trackType;
+    switch (mType) {
+    case TYPE_DEFAULT:
+    case TYPE_OUTPUT:
+        if (mSharedBuffer.get() != nullptr) {
+            trackType = 'S'; // static
+        } else {
+            trackType = ' '; // normal
         }
+        break;
+    case TYPE_PATCH:
+        trackType = 'P';
+        break;
+    default:
+        trackType = '?';
     }
+
+    if (isFastTrack()) {
+        result.appendFormat("F%c %3d", trackType, mFastIndex);
+    } else if (mName >= AudioMixer::TRACK0) {
+        result.appendFormat("%c %4d", trackType, mName - AudioMixer::TRACK0);
+    } else {
+        result.appendFormat("%c none", trackType);
+    }
+
     char nowInUnderrun;
     switch (mObservedUnderruns.mBitFields.mMostRecent) {
     case UNDERRUN_FULL:
@@ -570,31 +552,75 @@ void AudioFlinger::PlaybackThread::Track::dump(char* buffer, size_t size, bool a
         break;
     }
 
-    std::pair<float /* volume */, bool /* active */> vsVolume = mVolumeHandler->getLastVolume();
-    snprintf(&buffer[8], size - 8, " %6s %6u %4u %08X %08X %7u %6zu %1c %1d %5u "
-                                   "%5.2g %5.2g %5.2g%c  "
-                                   "%08X %08zX %08zX 0x%03X %9u%c %7u\n",
+    char fillingStatus;
+    switch (mFillingUpStatus) {
+    case FS_INVALID:
+        fillingStatus = 'I';
+        break;
+    case FS_FILLING:
+        fillingStatus = 'f';
+        break;
+    case FS_FILLED:
+        fillingStatus = 'F';
+        break;
+    case FS_ACTIVE:
+        fillingStatus = 'A';
+        break;
+    default:
+        fillingStatus = '?';
+        break;
+    }
+
+    // clip framesReadySafe to max representation in dump
+    const size_t framesReadySafe =
+            std::min(mAudioTrackServerProxy->framesReadySafe(), (size_t)99999999);
+
+    // obtain volumes
+    const gain_minifloat_packed_t vlr = mAudioTrackServerProxy->getVolumeLR();
+    const std::pair<float /* volume */, bool /* active */> vsVolume =
+            mVolumeHandler->getLastVolume();
+
+    // Our effective frame count is obtained by ServerProxy::getBufferSizeInFrames()
+    // as it may be reduced by the application.
+    const size_t bufferSizeInFrames = (size_t)mAudioTrackServerProxy->getBufferSizeInFrames();
+    // Check whether the buffer size has been modified by the app.
+    const char modifiedBufferChar = bufferSizeInFrames < mFrameCount
+            ? 'r' /* buffer reduced */: bufferSizeInFrames > mFrameCount
+                    ? 'e' /* error */ : ' ' /* identical */;
+
+    result.appendFormat("%7s %6u %7u %2s 0x%03X "
+                           "%08X %08X %6u "
+                           "%2u %5.2g %5.2g %5.2g%c "
+                           "%08X %6zu%c %6zu %c %9u%c %7u "
+                           "%08zX %08zX\n",
             active ? "yes" : "no",
             (mClient == 0) ? getpid_cached : mClient->pid(),
-            mStreamType,
+            mSessionId,
+            getTrackStateString(),
+            mCblk->mFlags,
+
             mFormat,
             mChannelMask,
-            mSessionId,
-            mFrameCount,
-            stateChar,
-            mFillingUpStatus,
             mAudioTrackServerProxy->getSampleRate(),
+
+            mStreamType,
             20.0 * log10(float_from_gain(gain_minifloat_unpack_left(vlr))),
             20.0 * log10(float_from_gain(gain_minifloat_unpack_right(vlr))),
             20.0 * log10(vsVolume.first), // VolumeShaper(s) total volume
             vsVolume.second ? 'A' : ' ',  // if any VolumeShapers active
+
             mCblk->mServer,
-            (size_t)mMainBuffer, // use %zX as %p appends 0x
-            (size_t)mAuxBuffer,  // use %zX as %p appends 0x
-            mCblk->mFlags,
+            bufferSizeInFrames,
+            modifiedBufferChar,
+            framesReadySafe,
+            fillingStatus,
             mAudioTrackServerProxy->getUnderrunFrames(),
             nowInUnderrun,
-            (unsigned)mAudioTrackServerProxy->framesFlushed() % 10000000); // 7 digits
+            (unsigned)mAudioTrackServerProxy->framesFlushed() % 10000000,
+
+            (size_t)mMainBuffer, // use %zX as %p appends 0x
+            (size_t)mAuxBuffer   // use %zX as %p appends 0x
+            );
 }
 
 uint32_t AudioFlinger::PlaybackThread::Track::sampleRate() const {
@@ -1706,22 +1732,28 @@ void AudioFlinger::RecordThread::RecordTrack::invalidate()
 
 /*static*/ void AudioFlinger::RecordThread::RecordTrack::appendDumpHeader(String8& result)
 {
-    result.append("    Active Client Fmt Chn mask Session S   Server fCount SRate\n");
+    result.append("Active Client Session S  Flags   Format Chn mask  SRate   Server FrmCnt\n");
 }
 
-void AudioFlinger::RecordThread::RecordTrack::dump(char* buffer, size_t size, bool active)
+void AudioFlinger::RecordThread::RecordTrack::appendDump(String8& result, bool active)
 {
-    snprintf(buffer, size, "    %6s %6u %3u %08X %7u %1d %08X %6zu %5u\n",
+    result.appendFormat("%c%5s %6u %7u %2s 0x%03X "
+            "%08X %08X %6u "
+            "%08X %6zu\n",
+            isFastTrack() ? 'F' : ' ',
             active ? "yes" : "no",
             (mClient == 0) ? getpid_cached : mClient->pid(),
+            mSessionId,
+            getTrackStateString(),
+            mCblk->mFlags,
+
             mFormat,
             mChannelMask,
-            mSessionId,
-            mState,
-            mCblk->mServer,
-            mFrameCount,
-            mSampleRate);
+            mSampleRate,
 
+            mCblk->mServer,
+            mFrameCount
+            );
 }
 
 void AudioFlinger::RecordThread::RecordTrack::handleSyncStartEvent(const sp<SyncEvent>& event)
@@ -1840,13 +1872,15 @@ AudioFlinger::MmapThread::MmapTrack::MmapTrack(ThreadBase *thread,
         audio_channel_mask_t channelMask,
         audio_session_t sessionId,
         uid_t uid,
+        pid_t pid,
         audio_port_handle_t portId)
     :   TrackBase(thread, NULL, sampleRate, format,
                   channelMask, (size_t)0 /* frameCount */,
                   nullptr /* buffer */, (size_t)0 /* bufferSize */,
                   sessionId, uid, false /* isOut */,
                   ALLOC_NONE,
-                  TYPE_DEFAULT, portId)
+                  TYPE_DEFAULT, portId),
+        mPid(pid)
 {
 }
 
@@ -1893,17 +1927,17 @@ void AudioFlinger::MmapThread::MmapTrack::onTimestamp(const ExtendedTimestamp &t
 
 /*static*/ void AudioFlinger::MmapThread::MmapTrack::appendDumpHeader(String8& result)
 {
-    result.append("    Client Fmt Chn mask  SRate\n");
+    result.append("Client Session   Format Chn mask  SRate\n");
 }
 
-void AudioFlinger::MmapThread::MmapTrack::dump(char* buffer, size_t size)
+void AudioFlinger::MmapThread::MmapTrack::appendDump(String8& result, bool active __unused)
 {
-    snprintf(buffer, size, "            %6u %3u    %08X %5u\n",
-            mUid,
+    result.appendFormat("%6u %7u %08X %08X %6u\n",
+            mPid,
+            mSessionId,
             mFormat,
             mChannelMask,
             mSampleRate);
-
 }
 
 } // namespace android

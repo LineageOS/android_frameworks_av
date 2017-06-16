@@ -1549,6 +1549,7 @@ ssize_t AudioFlinger::ThreadBase::ActiveTracks<T>::add(const sp<T> &track) {
         ALOGW("ActiveTracks<T>::add track %p already there", track.get());
         return index;
     }
+    logTrack("add", track);
     mActiveTracksGeneration++;
     mLatestActiveTrack = track;
     ++mBatteryCounter[track->uid()].second;
@@ -1562,6 +1563,7 @@ ssize_t AudioFlinger::ThreadBase::ActiveTracks<T>::remove(const sp<T> &track) {
         ALOGW("ActiveTracks<T>::remove nonexistent track %p", track.get());
         return index;
     }
+    logTrack("remove", track);
     mActiveTracksGeneration++;
     --mBatteryCounter[track->uid()].second;
     // mLatestActiveTrack is not cleared even if is the same as track.
@@ -1572,6 +1574,7 @@ template <typename T>
 void AudioFlinger::ThreadBase::ActiveTracks<T>::clear() {
     for (const sp<T> &track : mActiveTracks) {
         BatteryNotifier::getInstance().noteStopAudio(track->uid());
+        logTrack("clear", track);
     }
     mLastActiveTracksGeneration = mActiveTracksGeneration;
     mActiveTracks.clear();
@@ -1610,6 +1613,16 @@ void AudioFlinger::ThreadBase::ActiveTracks<T>::updatePowerState(
     }
 }
 
+template <typename T>
+void AudioFlinger::ThreadBase::ActiveTracks<T>::logTrack(
+        const char *funcName, const sp<T> &track) const {
+    if (mLocalLog != nullptr) {
+        String8 result;
+        track->appendDump(result, false /* active */);
+        mLocalLog->log("AT::%-10s(%p) %s", funcName, track.get(), result.string());
+    }
+}
+
 void AudioFlinger::ThreadBase::broadcast_l()
 {
     // Thread could be blocked waiting for async
@@ -1645,6 +1658,7 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
         mSuspended(0), mBytesWritten(0),
         mFramesWritten(0),
         mSuspendedFrames(0),
+        mActiveTracks(&this->mLocalLog),
         // mStreamTypes[] initialized in constructor body
         mOutput(output),
         mLastWriteTime(-1), mNumWrites(0), mNumDelayedWrites(0), mInWrite(false),
@@ -1712,8 +1726,6 @@ void AudioFlinger::PlaybackThread::dump(int fd, const Vector<String16>& args)
 
 void AudioFlinger::PlaybackThread::dumpTracks(int fd, const Vector<String16>& args __unused)
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
     String8 result;
 
     result.appendFormat("  Stream volumes in dB: ");
@@ -1740,8 +1752,10 @@ void AudioFlinger::PlaybackThread::dumpTracks(int fd, const Vector<String16>& ar
     size_t numactive = mActiveTracks.size();
     dprintf(fd, "  %zu Tracks", numtracks);
     size_t numactiveseen = 0;
+    const char *prefix = "    ";
     if (numtracks) {
         dprintf(fd, " of which %zu are active\n", numactive);
+        result.append(prefix);
         Track::appendDumpHeader(result);
         for (size_t i = 0; i < numtracks; ++i) {
             sp<Track> track = mTracks[i];
@@ -1750,8 +1764,8 @@ void AudioFlinger::PlaybackThread::dumpTracks(int fd, const Vector<String16>& ar
                 if (active) {
                     numactiveseen++;
                 }
-                track->dump(buffer, SIZE, active);
-                result.append(buffer);
+                result.append(prefix);
+                track->appendDump(result, active);
             }
         }
     } else {
@@ -1759,15 +1773,15 @@ void AudioFlinger::PlaybackThread::dumpTracks(int fd, const Vector<String16>& ar
     }
     if (numactiveseen != numactive) {
         // some tracks in the active list were not in the tracks list
-        snprintf(buffer, SIZE, "  The following tracks are in the active list but"
+        result.append("  The following tracks are in the active list but"
                 " not in the track list\n");
-        result.append(buffer);
+        result.append(prefix);
         Track::appendDumpHeader(result);
         for (size_t i = 0; i < numactive; ++i) {
             sp<Track> track = mActiveTracks[i];
             if (mTracks.indexOf(track) < 0) {
-                track->dump(buffer, SIZE, true);
-                result.append(buffer);
+                result.append(prefix);
+                track->appendDump(result, true /* active */);
             }
         }
     }
@@ -2178,10 +2192,6 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
             chain->incActiveTrackCnt();
         }
 
-        char buffer[256];
-        track->dump(buffer, arraysize(buffer), false /* active */);
-        mLocalLog.log("addTrack_l    (%p) %s", track.get(), buffer + 4); // log for analysis
-
         status = NO_ERROR;
     }
 
@@ -2208,9 +2218,9 @@ void AudioFlinger::PlaybackThread::removeTrack_l(const sp<Track>& track)
 {
     track->triggerEvents(AudioSystem::SYNC_EVENT_PRESENTATION_COMPLETE);
 
-    char buffer[256];
-    track->dump(buffer, arraysize(buffer), false /* active */);
-    mLocalLog.log("removeTrack_l (%p) %s", track.get(), buffer + 4); // log for analysis
+    String8 result;
+    track->appendDump(result, false /* active */);
+    mLocalLog.log("removeTrack_l (%p) %s", track.get(), result.string());
 
     mTracks.remove(track);
     deleteTrackName_l(track->name());
@@ -3410,10 +3420,6 @@ void AudioFlinger::PlaybackThread::removeTracks_l(const Vector< sp<Track> >& tra
             }
             if (track->isTerminated()) {
                 removeTrack_l(track);
-            } else { // inactive but not terminated
-                char buffer[256];
-                track->dump(buffer, arraysize(buffer), false /* active */);
-                mLocalLog.log("removeTracks_l(%p) %s", track.get(), buffer + 4);
             }
         }
     }
@@ -5931,7 +5937,9 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
 #endif
                                          ) :
     ThreadBase(audioFlinger, id, outDevice, inDevice, RECORD, systemReady),
-    mInput(input), mRsmpInBuffer(NULL),
+    mInput(input),
+    mActiveTracks(&this->mLocalLog),
+    mRsmpInBuffer(NULL),
     // mRsmpInFrames, mRsmpInFramesP2, and mRsmpInFramesOA are set by readInputParameters_l()
     mRsmpInRear(0)
 #ifdef TEE_SINK
@@ -6900,6 +6908,10 @@ void AudioFlinger::RecordThread::destroyTrack_l(const sp<RecordTrack>& track)
 
 void AudioFlinger::RecordThread::removeTrack_l(const sp<RecordTrack>& track)
 {
+    String8 result;
+    track->appendDump(result, false /* active */);
+    mLocalLog.log("removeTrack_l (%p) %s", track.get(), result.string());
+
     mTracks.remove(track);
     // need anything related to effects here?
     if (track->isFastTrack()) {
@@ -6913,6 +6925,8 @@ void AudioFlinger::RecordThread::dump(int fd, const Vector<String16>& args)
     dumpInternals(fd, args);
     dumpTracks(fd, args);
     dumpEffectChains(fd, args);
+    dprintf(fd, "  Local log:\n");
+    mLocalLog.dump(fd, "   " /* prefix */, 40 /* lines */);
 }
 
 void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& args)
@@ -6946,16 +6960,15 @@ void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& a
 
 void AudioFlinger::RecordThread::dumpTracks(int fd, const Vector<String16>& args __unused)
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
     String8 result;
-
     size_t numtracks = mTracks.size();
     size_t numactive = mActiveTracks.size();
     size_t numactiveseen = 0;
     dprintf(fd, "  %zu Tracks", numtracks);
+    const char *prefix = "    ";
     if (numtracks) {
         dprintf(fd, " of which %zu are active\n", numactive);
+        result.append(prefix);
         RecordTrack::appendDumpHeader(result);
         for (size_t i = 0; i < numtracks ; ++i) {
             sp<RecordTrack> track = mTracks[i];
@@ -6964,8 +6977,8 @@ void AudioFlinger::RecordThread::dumpTracks(int fd, const Vector<String16>& args
                 if (active) {
                     numactiveseen++;
                 }
-                track->dump(buffer, SIZE, active);
-                result.append(buffer);
+                result.append(prefix);
+                track->appendDump(result, active);
             }
         }
     } else {
@@ -6973,15 +6986,15 @@ void AudioFlinger::RecordThread::dumpTracks(int fd, const Vector<String16>& args
     }
 
     if (numactiveseen != numactive) {
-        snprintf(buffer, SIZE, "  The following tracks are in the active list but"
+        result.append("  The following tracks are in the active list but"
                 " not in the track list\n");
-        result.append(buffer);
+        result.append(prefix);
         RecordTrack::appendDumpHeader(result);
         for (size_t i = 0; i < numactive; ++i) {
             sp<RecordTrack> track = mActiveTracks[i];
             if (mTracks.indexOf(track) < 0) {
-                track->dump(buffer, SIZE, true);
-                result.append(buffer);
+                result.append(prefix);
+                track->appendDump(result, true /* active */);
             }
         }
 
@@ -7563,7 +7576,8 @@ AudioFlinger::MmapThread::MmapThread(
         AudioHwDevice *hwDev, sp<StreamHalInterface> stream,
         audio_devices_t outDevice, audio_devices_t inDevice, bool systemReady)
     : ThreadBase(audioFlinger, id, outDevice, inDevice, MMAP, systemReady),
-      mHalStream(stream), mHalDevice(hwDev->hwDevice()), mAudioHwDev(hwDev)
+      mHalStream(stream), mHalDevice(hwDev->hwDevice()), mAudioHwDev(hwDev),
+      mActiveTracks(&this->mLocalLog)
 {
     mStandby = true;
     readHalParameters_l();
@@ -7711,7 +7725,8 @@ status_t AudioFlinger::MmapThread::start(const MmapStreamInterface::Client& clie
     }
 
     sp<MmapTrack> track = new MmapTrack(this, mSampleRate, mFormat, mChannelMask, sessionId,
-                                        client.clientUid, portId);
+                                        client.clientUid, client.clientPid,
+                                        portId);
 
     mActiveTracks.add(track);
     sp<EffectChain> chain = getEffectChain_l(sessionId);
@@ -8182,6 +8197,8 @@ void AudioFlinger::MmapThread::dump(int fd, const Vector<String16>& args)
     dumpInternals(fd, args);
     dumpTracks(fd, args);
     dumpEffectChains(fd, args);
+    dprintf(fd, "  Local log:\n");
+    mLocalLog.dump(fd, "   " /* prefix */, 40 /* lines */);
 }
 
 void AudioFlinger::MmapThread::dumpInternals(int fd, const Vector<String16>& args)
@@ -8198,18 +8215,17 @@ void AudioFlinger::MmapThread::dumpInternals(int fd, const Vector<String16>& arg
 
 void AudioFlinger::MmapThread::dumpTracks(int fd, const Vector<String16>& args __unused)
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
     String8 result;
-
     size_t numtracks = mActiveTracks.size();
-    dprintf(fd, "  %zu Tracks", numtracks);
+    dprintf(fd, "  %zu Tracks\n", numtracks);
+    const char *prefix = "    ";
     if (numtracks) {
+        result.append(prefix);
         MmapTrack::appendDumpHeader(result);
         for (size_t i = 0; i < numtracks ; ++i) {
             sp<MmapTrack> track = mActiveTracks[i];
-            track->dump(buffer, SIZE);
-            result.append(buffer);
+            result.append(prefix);
+            track->appendDump(result, true /* active */);
         }
     } else {
         dprintf(fd, "\n");

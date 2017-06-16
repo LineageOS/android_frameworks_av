@@ -51,7 +51,7 @@ public:
                                                 return tmp; }
 
     static  void        appendDumpHeader(String8& result);
-            void        dump(char* buffer, size_t size, bool active);
+            void        appendDump(String8& result, bool active);
 
             void        handleSyncStartEvent(const sp<SyncEvent>& event);
             void        clearSyncStartEvent();

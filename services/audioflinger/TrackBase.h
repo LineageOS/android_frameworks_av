@@ -135,6 +135,40 @@ protected:
         mTerminated = true;
     }
 
+    // Upper case characters are final states.
+    // Lower case characters are transitory.
+    const char *getTrackStateString() const {
+        if (isTerminated()) {
+            return "T ";
+        }
+        switch (mState) {
+        case IDLE:
+            return "I ";
+        case STOPPING_1: // for Fast and Offload
+            return "s1";
+        case STOPPING_2: // for Fast and Offload
+            return "s2";
+        case STOPPED:
+            return "S ";
+        case RESUMING:
+            return "r ";
+        case ACTIVE:
+            return "A ";
+        case PAUSING:
+            return "p ";
+        case PAUSED:
+            return "P ";
+        case FLUSHED:
+            return "F ";
+        case STARTING_1: // for RecordTrack
+            return "r1";
+        case STARTING_2: // for RecordTrack
+            return "r2";
+        default:
+            return "? ";
+        }
+    }
+
     bool isOut() const { return mIsOut; }
                                     // true for Track, false for RecordTrack,
                                     // this could be a track type if needed later
