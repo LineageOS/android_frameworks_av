@@ -234,14 +234,6 @@ AAUDIO_API void AAudioStreamBuilder_setChannelCount(AAudioStreamBuilder* builder
                                                    int32_t channelCount);
 
 /**
- *
- * @deprecated use AAudioStreamBuilder_setChannelCount()
- */
-// TODO remove as soon as the NDK and OS are in sync, before RC1
-AAUDIO_API void AAudioStreamBuilder_setSamplesPerFrame(AAudioStreamBuilder* builder,
-                                                       int32_t samplesPerFrame);
-
-/**
  * Request a sample data format, for example AAUDIO_FORMAT_PCM_I16.
  *
  * The default, if you do not call this function, is AAUDIO_UNSPECIFIED.
@@ -727,15 +719,6 @@ AAUDIO_API int32_t AAudioStream_getSampleRate(AAudioStream* stream);
  * @return actual number of channels
  */
 AAUDIO_API int32_t AAudioStream_getChannelCount(AAudioStream* stream);
-
-/**
- * The samplesPerFrame is also known as channelCount.
- *
- * @deprecated use AAudioStream_getChannelCount()
- * @param stream reference provided by AAudioStreamBuilder_openStream()
- * @return actual samples per frame
- */
-AAUDIO_API int32_t AAudioStream_getSamplesPerFrame(AAudioStream* stream);
 
 /**
  * @param stream reference provided by AAudioStreamBuilder_openStream()
