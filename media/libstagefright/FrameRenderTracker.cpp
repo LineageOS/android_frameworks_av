@@ -88,7 +88,9 @@ FrameRenderTracker::Info *FrameRenderTracker::updateInfoForDequeuedBuffer(
 
 status_t FrameRenderTracker::onFrameRendered(int64_t mediaTimeUs, nsecs_t systemNano) {
     // ensure monotonic timestamps
-    if (mLastRenderTimeNs >= systemNano) {
+    if (mLastRenderTimeNs > systemNano ||
+        // EOS is normally marked on the last frame
+        (mLastRenderTimeNs == systemNano && mediaTimeUs != INT64_MAX)) {
         ALOGW("[%s] Ignoring out of order/stale system nano %lld for media time %lld from codec.",
                 mComponentName.c_str(), (long long)systemNano, (long long)mediaTimeUs);
         return BAD_VALUE;
