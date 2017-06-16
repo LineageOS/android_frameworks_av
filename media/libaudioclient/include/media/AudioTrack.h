@@ -564,6 +564,12 @@ public:
      */
             status_t    reload();
 
+    /**
+     * @param transferType
+     * @return text string that matches the enum name
+     */
+            static const char * convertTransferToText(transfer_type transferType);
+
     /* Returns a handle on the audio output used by this AudioTrack.
      *
      * Parameters:

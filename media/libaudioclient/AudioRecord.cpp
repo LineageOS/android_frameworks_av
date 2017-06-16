@@ -507,6 +507,18 @@ audio_port_handle_t AudioRecord::getRoutedDeviceId() {
 }
 
 // -------------------------------------------------------------------------
+// TODO Move this macro to a common header file for enum to string conversion in audio framework.
+#define MEDIA_CASE_ENUM(name) case name: return #name
+const char * AudioRecord::convertTransferToText(transfer_type transferType) {
+    switch (transferType) {
+        MEDIA_CASE_ENUM(TRANSFER_DEFAULT);
+        MEDIA_CASE_ENUM(TRANSFER_CALLBACK);
+        MEDIA_CASE_ENUM(TRANSFER_OBTAIN);
+        MEDIA_CASE_ENUM(TRANSFER_SYNC);
+        default:
+            return "UNRECOGNIZED";
+    }
+}
 
 // must be called with mLock held
 status_t AudioRecord::openRecord_l(const Modulo<uint32_t> &epoch, const String16& opPackageName)
@@ -590,12 +602,20 @@ status_t AudioRecord::openRecord_l(const Modulo<uint32_t> &epoch, const String16
             (mTransfer == TRANSFER_SYNC) ||
             // use case 3: obtain/release mode
             (mTransfer == TRANSFER_OBTAIN);
+        if (!useCaseAllowed) {
+            ALOGW("AUDIO_INPUT_FLAG_FAST denied, incompatible transfer = %s",
+                  convertTransferToText(mTransfer));
+        }
+
         // sample rates must also match
-        bool fastAllowed = useCaseAllowed && (mSampleRate == afSampleRate);
+        bool sampleRateAllowed = mSampleRate == afSampleRate;
+        if (!sampleRateAllowed) {
+            ALOGW("AUDIO_INPUT_FLAG_FAST denied, rates do not match %u Hz, require %u Hz",
+                  mSampleRate, afSampleRate);
+        }
+
+        bool fastAllowed = useCaseAllowed && sampleRateAllowed;
         if (!fastAllowed) {
-            ALOGW("AUDIO_INPUT_FLAG_FAST denied by client; transfer %d, "
-                "track %u Hz, input %u Hz",
-                mTransfer, mSampleRate, afSampleRate);
             mFlags = (audio_input_flags_t) (mFlags & ~(AUDIO_INPUT_FLAG_FAST |
                     AUDIO_INPUT_FLAG_RAW));
             AudioSystem::releaseInput(input, mSessionId);
