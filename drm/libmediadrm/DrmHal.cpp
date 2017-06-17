@@ -411,8 +411,11 @@ status_t DrmHal::destroyPlugin() {
     }
 
     setListener(NULL);
-    mPlugin->setListener(NULL);
+    if (mPlugin != NULL) {
+        mPlugin->setListener(NULL);
+    }
     mPlugin.clear();
+    mInitCheck = NO_INIT;
 
     return OK;
 }
@@ -960,8 +963,11 @@ void DrmHal::binderDied(const wp<IBinder> &the_late_who __unused)
 {
     Mutex::Autolock autoLock(mLock);
     setListener(NULL);
-    mPlugin->setListener(NULL);
+    if (mPlugin != NULL) {
+        mPlugin->setListener(NULL);
+    }
     mPlugin.clear();
+    mInitCheck = NO_INIT;
 }
 
 void DrmHal::writeByteArray(Parcel &obj, hidl_vec<uint8_t> const &vec)
