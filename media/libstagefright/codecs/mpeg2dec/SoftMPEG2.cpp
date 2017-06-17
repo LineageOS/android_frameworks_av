@@ -81,11 +81,21 @@ SoftMPEG2::SoftMPEG2(
     GENERATE_FILE_NAMES();
     CREATE_DUMP_FILE(mInFile);
 
-    CHECK_EQ(initDecoder(), (status_t)OK);
+    if (OK != initDecoder()) {
+        ALOGE("Failed to initialize decoder");
+        notify(OMX_EventError, OMX_ErrorUnsupportedSetting, 0, NULL);
+        mSignalledError = true;
+        return;
+    }
 }
 
 SoftMPEG2::~SoftMPEG2() {
-    CHECK_EQ(deInitDecoder(), (status_t)OK);
+    if (OK != deInitDecoder()) {
+        ALOGE("Failed to deinit decoder");
+        notify(OMX_EventError, OMX_ErrorUnsupportedSetting, 0, NULL);
+        mSignalledError = true;
+        return;
+    }
 }
 
 
@@ -201,6 +211,9 @@ status_t SoftMPEG2::resetDecoder() {
 
     /* Set number of cores/threads to be used by the codec */
     setNumCores();
+
+    mStride = 0;
+    mSignalledError = false;
 
     return OK;
 }
@@ -384,7 +397,8 @@ status_t SoftMPEG2::initDecoder() {
     resetPlugin();
 
     /* Set the run time (dynamic) parameters */
-    setParams(displayStride);
+    mStride = outputBufferWidth();
+    setParams(mStride);
 
     /* Set number of cores/threads to be used by the codec */
     setNumCores();
@@ -429,6 +443,7 @@ status_t SoftMPEG2::deInitDecoder() {
 
     mInitNeeded = true;
     mChangingResolution = false;
+    mCodecCtx = NULL;
 
     return OK;
 }
@@ -440,10 +455,13 @@ status_t SoftMPEG2::reInitDecoder() {
 
     ret = initDecoder();
     if (OK != ret) {
-        ALOGE("Create failure");
+        ALOGE("Failed to initialize decoder");
         deInitDecoder();
-        return NO_MEMORY;
+        notify(OMX_EventError, OMX_ErrorUnsupportedSetting, 0, NULL);
+        mSignalledError = true;
+        return ret;
     }
+    mSignalledError = false;
     return OK;
 }
 
@@ -541,12 +559,21 @@ void SoftMPEG2::onPortFlushCompleted(OMX_U32 portIndex) {
 void SoftMPEG2::onQueueFilled(OMX_U32 portIndex) {
     UNUSED(portIndex);
 
+    if (mSignalledError) {
+        return;
+    }
     if (mOutputPortSettingsChange != NONE) {
         return;
     }
 
     List<BufferInfo *> &inQueue = getPortQueue(kInputPortIndex);
     List<BufferInfo *> &outQueue = getPortQueue(kOutputPortIndex);
+
+    if (outputBufferWidth() != mStride) {
+        /* Set the run-time (dynamic) parameters */
+        mStride = outputBufferWidth();
+        setParams(mStride);
+    }
 
     /* If input EOS is seen and decoder is not in flush mode,
      * set the decoder in flush mode.
@@ -601,7 +628,12 @@ void SoftMPEG2::onQueueFilled(OMX_U32 portIndex) {
             bool portWillReset = false;
             handlePortSettingsChange(&portWillReset, mNewWidth, mNewHeight);
 
-            CHECK_EQ(reInitDecoder(), (status_t)OK);
+            if (OK != reInitDecoder()) {
+                ALOGE("Failed to reinitialize decoder");
+                notify(OMX_EventError, OMX_ErrorUnsupportedSetting, 0, NULL);
+                mSignalledError = true;
+                return;
+            }
             return;
         }
 
@@ -672,7 +704,12 @@ void SoftMPEG2::onQueueFilled(OMX_U32 portIndex) {
                 bool portWillReset = false;
                 handlePortSettingsChange(&portWillReset, s_dec_op.u4_pic_wd, s_dec_op.u4_pic_ht);
 
-                CHECK_EQ(reInitDecoder(), (status_t)OK);
+                if (OK != reInitDecoder()) {
+                    ALOGE("Failed to reinitialize decoder");
+                    notify(OMX_EventError, OMX_ErrorUnsupportedSetting, 0, NULL);
+                    mSignalledError = true;
+                    return;
+                }
 
                 if (setDecodeArgs(&s_dec_ip, &s_dec_op, inHeader, outHeader, timeStampIx)) {
                     ivdec_api_function(mCodecCtx, (void *)&s_dec_ip, (void *)&s_dec_op);
@@ -686,6 +723,8 @@ void SoftMPEG2::onQueueFilled(OMX_U32 portIndex) {
                 mChangingResolution = false;
                 resetDecoder();
                 resetPlugin();
+                mStride = outputBufferWidth();
+                setParams(mStride);
                 continue;
             }
 
