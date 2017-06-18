@@ -769,4 +769,16 @@ status_t AudioPolicyService::getMasterMono(bool *mono)
     return mAudioPolicyManager->getMasterMono(mono);
 }
 
+
+float AudioPolicyService::getStreamVolumeDB(
+            audio_stream_type_t stream, int index, audio_devices_t device)
+{
+    if (mAudioPolicyManager == NULL) {
+        return NAN;
+    }
+    Mutex::Autolock _l(mLock);
+    return mAudioPolicyManager->getStreamVolumeDB(stream, index, device);
+}
+
+
 }; // namespace android

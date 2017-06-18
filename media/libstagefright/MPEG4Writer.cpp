@@ -343,6 +343,7 @@ private:
 
     void dumpTimeStamps();
 
+    int64_t getStartTimeOffsetScaledTimeUs() const;
     int32_t getStartTimeOffsetScaledTime() const;
 
     static void *ThreadWrapper(void *me);
@@ -3162,7 +3163,7 @@ void MPEG4Writer::Track::bufferChunk(int64_t timestampUs) {
 }
 
 int64_t MPEG4Writer::Track::getDurationUs() const {
-    return mTrackDurationUs;
+    return mTrackDurationUs + getStartTimeOffsetScaledTimeUs();
 }
 
 int64_t MPEG4Writer::Track::getEstimatedTrackSizeBytes() const {
@@ -3646,14 +3647,18 @@ void MPEG4Writer::Track::writePaspBox() {
     mOwner->endBox();  // pasp
 }
 
-int32_t MPEG4Writer::Track::getStartTimeOffsetScaledTime() const {
+int64_t MPEG4Writer::Track::getStartTimeOffsetScaledTimeUs() const {
     int64_t trackStartTimeOffsetUs = 0;
     int64_t moovStartTimeUs = mOwner->getStartTimestampUs();
     if (mStartTimestampUs != moovStartTimeUs) {
         CHECK_GT(mStartTimestampUs, moovStartTimeUs);
         trackStartTimeOffsetUs = mStartTimestampUs - moovStartTimeUs;
     }
-    return (trackStartTimeOffsetUs *  mTimeScale + 500000LL) / 1000000LL;
+    return trackStartTimeOffsetUs;
+}
+
+int32_t MPEG4Writer::Track::getStartTimeOffsetScaledTime() const {
+    return (getStartTimeOffsetScaledTimeUs() *  mTimeScale + 500000LL) / 1000000LL;
 }
 
 void MPEG4Writer::Track::writeSttsBox() {
