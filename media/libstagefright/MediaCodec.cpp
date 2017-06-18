@@ -735,8 +735,7 @@ status_t MediaCodec::configure(
             mAnalyticsItem->setInt32(kCodecCrypto, 1);
         }
     } else if (mFlags & kFlagIsSecure) {
-        ALOGE("Crypto or descrambler should be given for secure codec");
-        return BAD_VALUE;
+        ALOGW("Crypto or descrambler should be given for secure codec");
     }
 
     // save msg for reset
@@ -2594,6 +2593,10 @@ status_t MediaCodec::queueCSDInputBuffer(size_t bufferIndex) {
     const sp<MediaCodecBuffer> &codecInputData = info.mData;
 
     if (csd->size() > codecInputData->capacity()) {
+        return -EINVAL;
+    }
+    if (codecInputData->data() == NULL) {
+        ALOGV("Input buffer %zu is not properly allocated", bufferIndex);
         return -EINVAL;
     }
 
