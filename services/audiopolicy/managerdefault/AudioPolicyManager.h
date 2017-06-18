@@ -234,6 +234,8 @@ public:
 
         virtual status_t setMasterMono(bool mono);
         virtual status_t getMasterMono(bool *mono);
+        virtual float    getStreamVolumeDB(
+                    audio_stream_type_t stream, int index, audio_devices_t device);
 
         // return the strategy corresponding to a given stream type
         routing_strategy getStrategy(audio_stream_type_t stream) const;
