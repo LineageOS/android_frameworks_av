@@ -30,6 +30,7 @@ public:
                                 audio_channel_mask_t channelMask,
                                 size_t frameCount,
                                 void *buffer,
+                                size_t bufferSize,
                                 const sp<IMemory>& sharedBuffer,
                                 audio_session_t sessionId,
                                 uid_t uid,
@@ -240,6 +241,7 @@ public:
                                    audio_format_t format,
                                    size_t frameCount,
                                    void *buffer,
+                                   size_t bufferSize,
                                    audio_output_flags_t flags);
     virtual             ~PatchTrack();
 

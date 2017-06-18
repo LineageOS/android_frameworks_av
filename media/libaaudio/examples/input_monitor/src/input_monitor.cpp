@@ -79,7 +79,7 @@ int main(int argc, char **argv)
     }
     aaudioStream = recorder.getStream();
 
-    actualSamplesPerFrame = AAudioStream_getSamplesPerFrame(aaudioStream);
+    actualSamplesPerFrame = AAudioStream_getChannelCount(aaudioStream);
     printf("SamplesPerFrame = %d\n", actualSamplesPerFrame);
     actualSampleRate = AAudioStream_getSampleRate(aaudioStream);
     printf("SamplesPerFrame = %d\n", actualSampleRate);

@@ -106,6 +106,7 @@ private:
     // codec. So the codec is switching to decode the new resolution.
     bool mChangingResolution;
     bool mFlushNeeded;
+    bool mSignalledError;
     bool mWaitForI;
     size_t mStride;
 

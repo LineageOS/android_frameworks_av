@@ -11,7 +11,6 @@ LIBAAUDIO {
     AAudioStreamBuilder_setErrorCallback;
     AAudioStreamBuilder_setFramesPerDataCallback;
     AAudioStreamBuilder_setSampleRate;
-    AAudioStreamBuilder_setSamplesPerFrame;
     AAudioStreamBuilder_setChannelCount;
     AAudioStreamBuilder_setFormat;
     AAudioStreamBuilder_setSharingMode;
@@ -35,7 +34,6 @@ LIBAAUDIO {
     AAudioStream_getBufferCapacityInFrames;
     AAudioStream_getXRunCount;
     AAudioStream_getSampleRate;
-    AAudioStream_getSamplesPerFrame;
     AAudioStream_getChannelCount;
     AAudioStream_getPerformanceMode;
     AAudioStream_getDeviceId;

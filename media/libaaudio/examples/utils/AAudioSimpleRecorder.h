@@ -68,7 +68,7 @@ public:
         if (mStream == nullptr) {
             return AAUDIO_ERROR_INVALID_STATE;
         }
-        return AAudioStream_getSamplesPerFrame(mStream);;
+        return AAudioStream_getChannelCount(mStream);;
     }
     /**
      * Only call this after open() has been called.
@@ -140,7 +140,7 @@ public:
 
     // Write zero data to fill up the buffer and prevent underruns.
     aaudio_result_t prime() {
-        int32_t samplesPerFrame = AAudioStream_getSamplesPerFrame(mStream);
+        int32_t samplesPerFrame = AAudioStream_getChannelCount(mStream);
         const int numFrames = 32; // arbitrary
         float zeros[numFrames * samplesPerFrame];
         memset(zeros, 0, sizeof(zeros));
@@ -214,7 +214,7 @@ aaudio_data_callback_result_t SimpleRecorderDataCallbackProc(
     }
     PeakTrackerData_t *data = (PeakTrackerData_t *) userData;
     // printf("MyCallbackProc(): frameCount = %d\n", numFrames);
-    int32_t samplesPerFrame = AAudioStream_getSamplesPerFrame(stream);
+    int32_t samplesPerFrame = AAudioStream_getChannelCount(stream);
     float sample;
     // This code assume mono or stereo.
     switch (AAudioStream_getFormat(stream)) {
