@@ -19,6 +19,7 @@
 #include <utils/Log.h>
 
 #include <stdint.h>
+#include <math.h>
 #include <sys/types.h>
 
 #include <binder/Parcel.h>
@@ -77,6 +78,7 @@ enum {
     SET_AUDIO_PORT_CALLBACK_ENABLED,
     SET_MASTER_MONO,
     GET_MASTER_MONO,
+    GET_STREAM_VOLUME_DB
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -815,6 +817,20 @@ public:
         }
         return status;
     }
+
+    virtual float getStreamVolumeDB(audio_stream_type_t stream, int index, audio_devices_t device)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeInt32(static_cast <int32_t>(stream));
+        data.writeInt32(static_cast <int32_t>(index));
+        data.writeUint32(static_cast <uint32_t>(device));
+        status_t status = remote()->transact(GET_STREAM_VOLUME_DB, data, &reply);
+        if (status != NO_ERROR) {
+            return NAN;
+        }
+        return reply.readFloat();
+    }
 };
 
 IMPLEMENT_META_INTERFACE(AudioPolicyService, "android.media.IAudioPolicyService");
@@ -1404,6 +1420,17 @@ status_t BnAudioPolicyService::onTransact(
             }
             return NO_ERROR;
         } break;
+
+        case GET_STREAM_VOLUME_DB: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            audio_stream_type_t stream =
+                    static_cast <audio_stream_type_t>(data.readInt32());
+            int index = static_cast <int>(data.readInt32());
+            audio_devices_t device =
+                    static_cast <audio_devices_t>(data.readUint32());
+            reply->writeFloat(getStreamVolumeDB(stream, index, device));
+            return NO_ERROR;
+        }
 
         default:
             return BBinder::onTransact(code, data, reply, flags);

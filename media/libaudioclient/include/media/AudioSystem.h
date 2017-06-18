@@ -338,6 +338,9 @@ public:
     static status_t setMasterMono(bool mono);
     static status_t getMasterMono(bool *mono);
 
+    static float    getStreamVolumeDB(
+            audio_stream_type_t stream, int index, audio_devices_t device);
+
     // ----------------------------------------------------------------------------
 
     class AudioPortCallback : public RefBase
