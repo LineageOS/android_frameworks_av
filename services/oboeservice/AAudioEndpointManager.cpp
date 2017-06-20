@@ -52,15 +52,17 @@ AAudioServiceEndpoint *AAudioEndpointManager::openEndpoint(AAudioService &audioS
             assert(false); // There are only two possible directions.
             break;
     }
-    ALOGD("AAudioEndpointManager::openEndpoint(), found %p for device = %d, dir = %d",
-          endpoint, deviceId, (int)direction);
 
     // If we can't find an existing one then open a new one.
-    if (endpoint == nullptr) {
+    if (endpoint != nullptr) {
+        ALOGD("AAudioEndpointManager::openEndpoint(), found %p for device = %d, dir = %d",
+              endpoint, deviceId, (int)direction);
+
+    } else {
         if (direction == AAUDIO_DIRECTION_INPUT) {
             AAudioServiceEndpointCapture *capture = new AAudioServiceEndpointCapture(audioService);
             if (capture->open(deviceId) != AAUDIO_OK) {
-                ALOGE("AAudioEndpointManager::openEndpoint(), open failed");
+                ALOGE("AAudioEndpointManager::openEndpoint(), open input failed");
                 delete capture;
             } else {
                 mInputs[deviceId] = capture;
@@ -69,17 +71,20 @@ AAudioServiceEndpoint *AAudioEndpointManager::openEndpoint(AAudioService &audioS
         } else if (direction == AAUDIO_DIRECTION_OUTPUT) {
             AAudioServiceEndpointPlay *player = new AAudioServiceEndpointPlay(audioService);
             if (player->open(deviceId) != AAUDIO_OK) {
-                ALOGE("AAudioEndpointManager::openEndpoint(), open failed");
+                ALOGE("AAudioEndpointManager::openEndpoint(), open output failed");
                 delete player;
             } else {
                 mOutputs[deviceId] = player;
                 endpoint = player;
             }
         }
-
+        ALOGD("AAudioEndpointManager::openEndpoint(), created %p for device = %d, dir = %d",
+              endpoint, deviceId, (int)direction);
     }
 
     if (endpoint != nullptr) {
+        ALOGD("AAudioEndpointManager::openEndpoint(), sampleRate = %d, framesPerBurst = %d",
+              endpoint->getSampleRate(), endpoint->getFramesPerBurst());
         // Increment the reference count under this lock.
         endpoint->setReferenceCount(endpoint->getReferenceCount() + 1);
     }
@@ -95,9 +100,15 @@ void AAudioEndpointManager::closeEndpoint(AAudioServiceEndpoint *serviceEndpoint
     // Decrement the reference count under this lock.
     int32_t newRefCount = serviceEndpoint->getReferenceCount() - 1;
     serviceEndpoint->setReferenceCount(newRefCount);
+    ALOGD("AAudioEndpointManager::closeEndpoint(%p) newRefCount = %d",
+          serviceEndpoint, newRefCount);
+
+    // If no longer in use then close and delete it.
     if (newRefCount <= 0) {
         aaudio_direction_t direction = serviceEndpoint->getDirection();
-        int32_t deviceId = serviceEndpoint->getDeviceId();
+        // Track endpoints based on requested deviceId because UNSPECIFIED
+        // can change to a specific device after opening.
+        int32_t deviceId = serviceEndpoint->getRequestedDeviceId();
 
         switch (direction) {
             case AAUDIO_DIRECTION_INPUT:
@@ -109,6 +120,8 @@ void AAudioEndpointManager::closeEndpoint(AAudioServiceEndpoint *serviceEndpoint
         }
 
         serviceEndpoint->close();
+        ALOGD("AAudioEndpointManager::closeEndpoint() delete %p for device %d, dir = %d",
+              serviceEndpoint, deviceId, (int)direction);
         delete serviceEndpoint;
     }
 }

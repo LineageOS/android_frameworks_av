@@ -63,8 +63,8 @@ AudioStreamInternal::AudioStreamInternal(AAudioServiceInterface  &serviceInterfa
         , mServiceStreamHandle(AAUDIO_HANDLE_INVALID)
         , mFramesPerBurst(16)
         , mStreamVolume(1.0f)
-        , mServiceInterface(serviceInterface)
-        , mInService(inService) {
+        , mInService(inService)
+        , mServiceInterface(serviceInterface) {
 }
 
 AudioStreamInternal::~AudioStreamInternal() {
@@ -154,13 +154,13 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         if (getDataCallbackProc()) {
             mCallbackFrames = builder.getFramesPerDataCallback();
             if (mCallbackFrames > getBufferCapacity() / 2) {
-                ALOGE("AudioStreamInternal.open(): framesPerCallback too large = %d, capacity = %d",
+                ALOGE("AudioStreamInternal::open(): framesPerCallback too big = %d, capacity = %d",
                       mCallbackFrames, getBufferCapacity());
                 mServiceInterface.closeStream(mServiceStreamHandle);
                 return AAUDIO_ERROR_OUT_OF_RANGE;
 
             } else if (mCallbackFrames < 0) {
-                ALOGE("AudioStreamInternal.open(): framesPerCallback negative");
+                ALOGE("AudioStreamInternal::open(): framesPerCallback negative");
                 mServiceInterface.closeStream(mServiceStreamHandle);
                 return AAUDIO_ERROR_OUT_OF_RANGE;
 
@@ -185,7 +185,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 }
 
 aaudio_result_t AudioStreamInternal::close() {
-    ALOGD("AudioStreamInternal.close(): mServiceStreamHandle = 0x%08X",
+    ALOGD("AudioStreamInternal::close(): mServiceStreamHandle = 0x%08X",
              mServiceStreamHandle);
     if (mServiceStreamHandle != AAUDIO_HANDLE_INVALID) {
         // Don't close a stream while it is running.
@@ -201,12 +201,14 @@ aaudio_result_t AudioStreamInternal::close() {
                 result, AAudio_convertResultToText(result));
             }
         }
+        setState(AAUDIO_STREAM_STATE_CLOSING);
         aaudio_handle_t serviceStreamHandle = mServiceStreamHandle;
         mServiceStreamHandle = AAUDIO_HANDLE_INVALID;
 
         mServiceInterface.closeStream(serviceStreamHandle);
         delete[] mCallbackBuffer;
         mCallbackBuffer = nullptr;
+        setState(AAUDIO_STREAM_STATE_CLOSED);
         return mEndPointParcelable.close();
     } else {
         return AAUDIO_ERROR_INVALID_HANDLE;
@@ -228,15 +230,20 @@ static void *aaudio_callback_thread_proc(void *context)
 aaudio_result_t AudioStreamInternal::requestStart()
 {
     int64_t startTime;
-    ALOGD("AudioStreamInternal(): start()");
+    ALOGD("AudioStreamInternal()::requestStart()");
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
         return AAUDIO_ERROR_INVALID_STATE;
     }
+    if (isActive()) {
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    aaudio_stream_state_t originalState = getState();
+
+    setState(AAUDIO_STREAM_STATE_STARTING);
+    aaudio_result_t result = AAudioConvert_androidToAAudioResult(startWithStatus());
 
     startTime = AudioClock::getNanoseconds();
     mClockModel.start(startTime);
-    setState(AAUDIO_STREAM_STATE_STARTING);
-    aaudio_result_t result = AAudioConvert_androidToAAudioResult(startWithStatus());
 
     if (result == AAUDIO_OK && getDataCallbackProc() != nullptr) {
         // Launch the callback loop thread.
@@ -245,6 +252,9 @@ aaudio_result_t AudioStreamInternal::requestStart()
                               / getSampleRate();
         mCallbackEnabled.store(true);
         result = createThread(periodNanos, aaudio_callback_thread_proc, this);
+    }
+    if (result != AAUDIO_OK) {
+        setState(originalState);
     }
     return result;
 }
@@ -279,7 +289,7 @@ aaudio_result_t AudioStreamInternal::stopCallback()
 aaudio_result_t AudioStreamInternal::requestPauseInternal()
 {
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
-        ALOGE("AudioStreamInternal(): requestPauseInternal() mServiceStreamHandle invalid = 0x%08X",
+        ALOGE("AudioStreamInternal::requestPauseInternal() mServiceStreamHandle invalid = 0x%08X",
               mServiceStreamHandle);
         return AAUDIO_ERROR_INVALID_STATE;
     }
@@ -301,7 +311,7 @@ aaudio_result_t AudioStreamInternal::requestPause()
 
 aaudio_result_t AudioStreamInternal::requestFlush() {
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
-        ALOGE("AudioStreamInternal(): requestFlush() mServiceStreamHandle invalid = 0x%08X",
+        ALOGE("AudioStreamInternal::requestFlush() mServiceStreamHandle invalid = 0x%08X",
               mServiceStreamHandle);
         return AAUDIO_ERROR_INVALID_STATE;
     }
@@ -312,13 +322,14 @@ aaudio_result_t AudioStreamInternal::requestFlush() {
 
 // TODO for Play only
 void AudioStreamInternal::onFlushFromServer() {
-    ALOGD("AudioStreamInternal(): onFlushFromServer()");
     int64_t readCounter = mAudioEndpoint.getDataReadCounter();
     int64_t writeCounter = mAudioEndpoint.getDataWriteCounter();
 
     // Bump offset so caller does not see the retrograde motion in getFramesRead().
     int64_t framesFlushed = writeCounter - readCounter;
     mFramesOffsetFromService += framesFlushed;
+    ALOGD("AudioStreamInternal::onFlushFromServer() readN = %lld, writeN = %lld, offset = %lld",
+          (long long)readCounter, (long long)writeCounter, (long long)mFramesOffsetFromService);
 
     // Flush written frames by forcing writeCounter to readCounter.
     // This is because we cannot move the read counter in the hardware.
@@ -328,7 +339,7 @@ void AudioStreamInternal::onFlushFromServer() {
 aaudio_result_t AudioStreamInternal::requestStopInternal()
 {
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
-        ALOGE("AudioStreamInternal(): requestStopInternal() mServiceStreamHandle invalid = 0x%08X",
+        ALOGE("AudioStreamInternal::requestStopInternal() mServiceStreamHandle invalid = 0x%08X",
               mServiceStreamHandle);
         return AAUDIO_ERROR_INVALID_STATE;
     }
@@ -370,7 +381,7 @@ aaudio_result_t AudioStreamInternal::getTimestamp(clockid_t clockId,
                            int64_t *timeNanoseconds) {
     // TODO Generate in server and pass to client. Return latest.
     int64_t time = AudioClock::getNanoseconds();
-    *framePosition = mClockModel.convertTimeToPosition(time);
+    *framePosition = mClockModel.convertTimeToPosition(time) + mFramesOffsetFromService;
     // TODO Get a more accurate timestamp from the service. This code just adds a fudge factor.
     *timeNanoseconds = time + (6 * AAUDIO_NANOS_PER_MILLISECOND);
     return AAUDIO_OK;
@@ -383,31 +394,28 @@ aaudio_result_t AudioStreamInternal::updateStateWhileWaiting() {
     return processCommands();
 }
 
-#if LOG_TIMESTAMPS
-static void AudioStreamInternal_logTimestamp(AAudioServiceMessage &command) {
+void AudioStreamInternal::logTimestamp(AAudioServiceMessage &command) {
     static int64_t oldPosition = 0;
     static int64_t oldTime = 0;
     int64_t framePosition = command.timestamp.position;
     int64_t nanoTime = command.timestamp.timestamp;
-    ALOGD("AudioStreamInternal() timestamp says framePosition = %08lld at nanoTime %lld",
+    ALOGD("AudioStreamInternal: timestamp says framePosition = %08lld at nanoTime %lld",
          (long long) framePosition,
          (long long) nanoTime);
     int64_t nanosDelta = nanoTime - oldTime;
     if (nanosDelta > 0 && oldTime > 0) {
         int64_t framesDelta = framePosition - oldPosition;
         int64_t rate = (framesDelta * AAUDIO_NANOS_PER_SECOND) / nanosDelta;
-        ALOGD("AudioStreamInternal() - framesDelta = %08lld", (long long) framesDelta);
-        ALOGD("AudioStreamInternal() - nanosDelta = %08lld", (long long) nanosDelta);
-        ALOGD("AudioStreamInternal() - measured rate = %lld", (long long) rate);
+        ALOGD("AudioStreamInternal: framesDelta = %08lld, nanosDelta = %08lld, rate = %lld",
+              (long long) framesDelta, (long long) nanosDelta, (long long) rate);
     }
     oldPosition = framePosition;
     oldTime = nanoTime;
 }
-#endif
 
 aaudio_result_t AudioStreamInternal::onTimestampFromServer(AAudioServiceMessage *message) {
 #if LOG_TIMESTAMPS
-    AudioStreamInternal_logTimestamp(*message);
+    logTimestamp(*message);
 #endif
     processTimestamp(message->timestamp.position, message->timestamp.timestamp);
     return AAUDIO_OK;
@@ -417,47 +425,48 @@ aaudio_result_t AudioStreamInternal::onEventFromServer(AAudioServiceMessage *mes
     aaudio_result_t result = AAUDIO_OK;
     switch (message->event.event) {
         case AAUDIO_SERVICE_EVENT_STARTED:
-            ALOGD("processCommands() got AAUDIO_SERVICE_EVENT_STARTED");
+            ALOGD("AudioStreamInternal::onEventFromServergot() AAUDIO_SERVICE_EVENT_STARTED");
             if (getState() == AAUDIO_STREAM_STATE_STARTING) {
                 setState(AAUDIO_STREAM_STATE_STARTED);
             }
             break;
         case AAUDIO_SERVICE_EVENT_PAUSED:
-            ALOGD("processCommands() got AAUDIO_SERVICE_EVENT_PAUSED");
+            ALOGD("AudioStreamInternal::onEventFromServergot() AAUDIO_SERVICE_EVENT_PAUSED");
             if (getState() == AAUDIO_STREAM_STATE_PAUSING) {
                 setState(AAUDIO_STREAM_STATE_PAUSED);
             }
             break;
         case AAUDIO_SERVICE_EVENT_STOPPED:
-            ALOGD("processCommands() got AAUDIO_SERVICE_EVENT_STOPPED");
+            ALOGD("AudioStreamInternal::onEventFromServergot() AAUDIO_SERVICE_EVENT_STOPPED");
             if (getState() == AAUDIO_STREAM_STATE_STOPPING) {
                 setState(AAUDIO_STREAM_STATE_STOPPED);
             }
             break;
         case AAUDIO_SERVICE_EVENT_FLUSHED:
-            ALOGD("processCommands() got AAUDIO_SERVICE_EVENT_FLUSHED");
+            ALOGD("AudioStreamInternal::onEventFromServer() got AAUDIO_SERVICE_EVENT_FLUSHED");
             if (getState() == AAUDIO_STREAM_STATE_FLUSHING) {
                 setState(AAUDIO_STREAM_STATE_FLUSHED);
                 onFlushFromServer();
             }
             break;
         case AAUDIO_SERVICE_EVENT_CLOSED:
-            ALOGD("processCommands() got AAUDIO_SERVICE_EVENT_CLOSED");
+            ALOGD("AudioStreamInternal::onEventFromServer() got AAUDIO_SERVICE_EVENT_CLOSED");
             setState(AAUDIO_STREAM_STATE_CLOSED);
             break;
         case AAUDIO_SERVICE_EVENT_DISCONNECTED:
             result = AAUDIO_ERROR_DISCONNECTED;
             setState(AAUDIO_STREAM_STATE_DISCONNECTED);
-            ALOGW("WARNING - processCommands() AAUDIO_SERVICE_EVENT_DISCONNECTED");
+            ALOGW("WARNING - AudioStreamInternal::onEventFromServer()"
+                          " AAUDIO_SERVICE_EVENT_DISCONNECTED");
             break;
         case AAUDIO_SERVICE_EVENT_VOLUME:
             mStreamVolume = (float)message->event.dataDouble;
             doSetVolume();
-            ALOGD("processCommands() AAUDIO_SERVICE_EVENT_VOLUME %lf",
+            ALOGD("AudioStreamInternal::onEventFromServer() AAUDIO_SERVICE_EVENT_VOLUME %lf",
                      message->event.dataDouble);
             break;
         default:
-            ALOGW("WARNING - processCommands() Unrecognized event = %d",
+            ALOGW("WARNING - AudioStreamInternal::onEventFromServer() Unrecognized event = %d",
                  (int) message->event.event);
             break;
     }
@@ -499,27 +508,27 @@ aaudio_result_t AudioStreamInternal::processData(void *buffer, int32_t numFrames
 {
     const char * traceName = (mInService) ? "aaWrtS" : "aaWrtC";
     ATRACE_BEGIN(traceName);
-    aaudio_result_t result = AAUDIO_OK;
-    int32_t loopCount = 0;
-    uint8_t* audioData = (uint8_t*)buffer;
-    int64_t currentTimeNanos = AudioClock::getNanoseconds();
-    int64_t deadlineNanos = currentTimeNanos + timeoutNanoseconds;
-    int32_t framesLeft = numFrames;
-
     int32_t fullFrames = mAudioEndpoint.getFullFramesAvailable();
     if (ATRACE_ENABLED()) {
         const char * traceName = (mInService) ? "aaFullS" : "aaFullC";
         ATRACE_INT(traceName, fullFrames);
     }
 
+    aaudio_result_t result = AAUDIO_OK;
+    int32_t loopCount = 0;
+    uint8_t* audioData = (uint8_t*)buffer;
+    int64_t currentTimeNanos = AudioClock::getNanoseconds();
+    const int64_t entryTimeNanos = currentTimeNanos;
+    const int64_t deadlineNanos = currentTimeNanos + timeoutNanoseconds;
+    int32_t framesLeft = numFrames;
+
     // Loop until all the data has been processed or until a timeout occurs.
     while (framesLeft > 0) {
-        // The call to processDataNow() will not block. It will just read as much as it can.
+        // The call to processDataNow() will not block. It will just process as much as it can.
         int64_t wakeTimeNanos = 0;
         aaudio_result_t framesProcessed = processDataNow(audioData, framesLeft,
                                                   currentTimeNanos, &wakeTimeNanos);
         if (framesProcessed < 0) {
-            ALOGE("AudioStreamInternal::processData() loop: framesProcessed = %d", framesProcessed);
             result = framesProcessed;
             break;
         }
@@ -537,12 +546,16 @@ aaudio_result_t AudioStreamInternal::processData(void *buffer, int32_t numFrames
             if (wakeTimeNanos > deadlineNanos) {
                 // If we time out, just return the framesWritten so far.
                 // TODO remove after we fix the deadline bug
-                ALOGE("AudioStreamInternal::processData(): timed out after %lld nanos",
+                ALOGW("AudioStreamInternal::processData(): entered at %lld nanos, currently %lld",
+                      (long long) entryTimeNanos, (long long) currentTimeNanos);
+                ALOGW("AudioStreamInternal::processData(): timed out after %lld nanos",
                       (long long) timeoutNanoseconds);
-                ALOGE("AudioStreamInternal::processData(): wakeTime = %lld, deadline = %lld nanos",
+                ALOGW("AudioStreamInternal::processData(): wakeTime = %lld, deadline = %lld nanos",
                       (long long) wakeTimeNanos, (long long) deadlineNanos);
-                ALOGE("AudioStreamInternal::processData(): past deadline by %d micros",
+                ALOGW("AudioStreamInternal::processData(): past deadline by %d micros",
                       (int)((wakeTimeNanos - deadlineNanos) / AAUDIO_NANOS_PER_MICROSECOND));
+                mClockModel.dump();
+                mAudioEndpoint.dump();
                 break;
             }
 

@@ -111,7 +111,7 @@ public:
 
     void run() override; // to implement Runnable
 
-    void processError();
+    void processFatalError();
 
 protected:
     aaudio_result_t writeUpMessageQueue(AAudioServiceMessage *command);
@@ -122,16 +122,16 @@ protected:
 
     virtual aaudio_result_t getDownDataDescription(AudioEndpointParcelable &parcelable) = 0;
 
-    aaudio_stream_state_t               mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
+    aaudio_stream_state_t   mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
 
     pid_t              mRegisteredClientThread = ILLEGAL_THREAD_ID;
 
     SharedRingBuffer*  mUpMessageQueue;
     std::mutex         mLockUpMessageQueue;
 
-    AAudioThread        mAAudioThread;
+    AAudioThread       mAAudioThread;
     // This is used by one thread to tell another thread to exit. So it must be atomic.
-    std::atomic<bool>   mThreadEnabled;
+    std::atomic<bool>  mThreadEnabled;
 
     aaudio_format_t    mAudioFormat = AAUDIO_FORMAT_UNSPECIFIED;
     int32_t            mFramesPerBurst = 0;
