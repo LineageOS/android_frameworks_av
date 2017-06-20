@@ -613,6 +613,11 @@ status_t Camera3Device::dump(int fd, const Vector<String16> &args) {
     }
     write(fd, lines.string(), lines.size());
 
+    if (mRequestThread != NULL) {
+        mRequestThread->dumpCaptureRequestLatency(fd,
+                "    ProcessCaptureRequest latency histogram:");
+    }
+
     {
         lines = String8("    Last request sent:\n");
         write(fd, lines.string(), lines.size());
@@ -3407,7 +3412,8 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mCurrentPreCaptureTriggerId(0),
         mRepeatingLastFrameNumber(
             hardware::camera2::ICameraDeviceUser::NO_IN_FLIGHT_REPEATING_FRAMES),
-        mPrepareVideoStream(false) {
+        mPrepareVideoStream(false),
+        mRequestLatency(kRequestLatencyBinSize) {
     mStatusId = statusTracker->addComponent();
 }
 
@@ -3632,6 +3638,9 @@ void Camera3Device::RequestThread::requestExit() {
     // The exit from any possible waits
     mDoPauseSignal.signal();
     mRequestSignal.signal();
+
+    mRequestLatency.log("ProcessCaptureRequest latency histogram");
+    mRequestLatency.reset();
 }
 
 void Camera3Device::RequestThread::checkAndStopRepeatingRequest() {
@@ -3848,11 +3857,14 @@ bool Camera3Device::RequestThread::threadLoop() {
             mNextRequests.size());
 
     bool submitRequestSuccess = false;
+    nsecs_t tRequestStart = systemTime(SYSTEM_TIME_MONOTONIC);
     if (mInterface->supportBatchRequest()) {
         submitRequestSuccess = sendRequestsBatch();
     } else {
         submitRequestSuccess = sendRequestsOneByOne();
     }
+    nsecs_t tRequestEnd = systemTime(SYSTEM_TIME_MONOTONIC);
+    mRequestLatency.add(tRequestStart, tRequestEnd);
 
     if (useFlushLock) {
         mFlushLock.unlock();

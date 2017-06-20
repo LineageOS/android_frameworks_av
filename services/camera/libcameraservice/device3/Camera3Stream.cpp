@@ -60,7 +60,8 @@ Camera3Stream::Camera3Stream(int id,
     mOldMaxBuffers(0),
     mPrepared(false),
     mPreparedBufferIdx(0),
-    mLastMaxCount(Camera3StreamInterface::ALLOCATE_PIPELINE_MAX) {
+    mLastMaxCount(Camera3StreamInterface::ALLOCATE_PIPELINE_MAX),
+    mBufferLimitLatency(kBufferLimitLatencyBinSize) {
 
     camera3_stream::stream_type = type;
     camera3_stream::width = width;
@@ -459,8 +460,11 @@ status_t Camera3Stream::getBuffer(camera3_stream_buffer *buffer,
     // Wait for new buffer returned back if we are running into the limit.
     if (getHandoutOutputBufferCountLocked() == camera3_stream::max_buffers) {
         ALOGV("%s: Already dequeued max output buffers (%d), wait for next returned one.",
-                __FUNCTION__, camera3_stream::max_buffers);
+                        __FUNCTION__, camera3_stream::max_buffers);
+        nsecs_t waitStart = systemTime(SYSTEM_TIME_MONOTONIC);
         res = mOutputBufferReturnedSignal.waitRelative(mLock, kWaitForBufferDuration);
+        nsecs_t waitEnd = systemTime(SYSTEM_TIME_MONOTONIC);
+        mBufferLimitLatency.add(waitStart, waitEnd);
         if (res != OK) {
             if (res == TIMED_OUT) {
                 ALOGE("%s: wait for output buffer return timed out after %lldms (max_buffers %d)",
@@ -655,12 +659,22 @@ status_t Camera3Stream::disconnect() {
     ALOGV("%s: Stream %d: Disconnecting...", __FUNCTION__, mId);
     status_t res = disconnectLocked();
 
+    mBufferLimitLatency.log("Stream %d latency histogram for wait on max_buffers", mId);
+    mBufferLimitLatency.reset();
+
     if (res == -ENOTCONN) {
         // "Already disconnected" -- not an error
         return OK;
     } else {
         return res;
     }
+}
+
+void Camera3Stream::dump(int fd, const Vector<String16> &args) const
+{
+    (void)args;
+    mBufferLimitLatency.dump(fd,
+            "      Latency histogram for wait on max_buffers");
 }
 
 status_t Camera3Stream::getBufferLocked(camera3_stream_buffer *,

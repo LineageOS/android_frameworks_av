@@ -85,6 +85,8 @@ void Camera3IOStreamBase::dump(int fd, const Vector<String16> &args) const {
     lines.appendFormat("      Total buffers: %zu, currently dequeued: %zu\n",
             mTotalBufferCount, mHandoutTotalBufferCount);
     write(fd, lines.string(), lines.size());
+
+    Camera3Stream::dump(fd, args);
 }
 
 status_t Camera3IOStreamBase::configureQueueLocked() {
