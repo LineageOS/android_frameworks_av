@@ -1229,7 +1229,8 @@ status_t GraphicBufferSource::getStopTimeOffsetUs(int64_t *stopTimeOffsetUs) {
         ALOGW("Fail to return stopTimeOffsetUs as stop time is not set");
         return INVALID_OPERATION;
     }
-    *stopTimeOffsetUs = mStopTimeUs - mLastFrameTimestampUs;
+    *stopTimeOffsetUs =
+        mLastFrameTimestampUs == -1 ? 0 : mStopTimeUs - mLastFrameTimestampUs;
     return OK;
 }
 
