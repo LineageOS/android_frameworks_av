@@ -1,6 +1,15 @@
+cc_library_headers {
+    name: "libeffects_headers",
+    vendor_available: true,
+    export_include_dirs: ["include"],
+    header_libs: ["libhardware_headers"],
+    export_header_lib_headers: ["libhardware_headers"],
+}
+
 // Effect factory library
 cc_library_shared {
     name: "libeffects",
+    vendor_available: true,
     srcs: ["EffectsFactory.c"],
 
     shared_libs: [
@@ -10,4 +19,9 @@ cc_library_shared {
     ],
 
     include_dirs: ["system/media/audio_effects/include"],
+
+    local_include_dirs:["include/media"],
+
+    header_libs: ["libeffects_headers"],
+    export_header_lib_headers: ["libeffects_headers"],
 }
