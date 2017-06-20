@@ -55,7 +55,7 @@
 * LOG_HIST_FLUSH()
 *     calls logHistFlush
 * NBLog::Writer::logHistFlush
-*     records current timestamp to write it to the console
+*     records current timestamp
 *     calls log(EVENT_HISTOGRAM_FLUSH)
 *     From here, everything is the same as in 1), resulting in call to fifo write
 *
@@ -78,9 +78,8 @@
 *
 * 4) reading the data from private buffer
 * MediaLogService::dump
-*     TODO: when was MediaLogService::dump called?
-*     For each NBLog::Reader in vector NamedReaders (subclass mergeReader):
-*     calls NBLog::Reader::dump(int)
+*     calls NBLog::Reader::dump(CONSOLE)
+*     The private buffer contains all logs for all readers in shared memory
 * NBLog::Reader::dump(int)
 *     calls getSnapshot on the current reader
 *     calls dump(int, size_t, Snapshot)
@@ -959,30 +958,19 @@ inline void writeHistToFile(const std::vector<int64_t> &samples, bool append) {
     ofs.close();
 }
 
+// converts a time series into a map. key: buffer period length. value: count
+static std::map<int, int> buildBuckets(const std::vector<int64_t> &samples) {
+    // TODO allow buckets of variable resolution
+    std::map<int, int> buckets;
+    for (size_t i = 1; i < samples.size(); ++i) {
+        ++buckets[deltaMs(samples[i - 1], samples[i])];
+    }
+    return buckets;
+}
+
 void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapshot)
 {
-  //  CallStack cs(LOG_TAG);
-#if 0
-    struct timespec ts;
-    time_t maxSec = -1;
-    while (entry - start >= (int) Entry::kOverhead) {
-        if (prevEntry - start < 0 || !prevEntry.hasConsistentLength()) {
-            break;
-        }
-        if (prevEntry->type == EVENT_TIMESTAMP) {
-            if (prevEntry->length != sizeof(struct timespec)) {
-                // corrupt
-                break;
-            }
-            prevEntry.copyData((uint8_t*) &ts);
-            if (ts.tv_sec > maxSec) {
-                maxSec = ts.tv_sec;
-            }
-        }
-        --entry;
-        --prevEntry;
-    }
-#endif
+    //  CallStack cs(LOG_TAG);
     mFd = fd;
     mIndent = indent;
     String8 timestamp, body;
@@ -993,85 +981,9 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
         //      log to push it out.  Consider keeping the timestamp/body between calls to copyEntryDataAt().
         dumpLine(timestamp, body);
     }
-#if 0
-    size_t width = 1;
-    while (maxSec >= 10) {
-        ++width;
-        maxSec /= 10;
-    }
-    if (maxSec >= 0) {
-        timestamp.appendFormat("[%*s]", (int) width + 4, "");
-    }
-    bool deferredTimestamp = false;
-#endif
 
     for (auto entry = snapshot.begin(); entry != snapshot.end();) {
         switch (entry->type) {
-#if 0
-        case EVENT_STRING:
-            body.appendFormat("%.*s", (int) entry.length(), entry.data());
-            break;
-        case EVENT_TIMESTAMP: {
-            // already checked that length == sizeof(struct timespec);
-            entry.copyData((const uint8_t*) &ts);
-            long prevNsec = ts.tv_nsec;
-            long deltaMin = LONG_MAX;
-            long deltaMax = -1;
-            long deltaTotal = 0;
-            auto aux(entry);
-            for (;;) {
-                ++aux;
-                if (end - aux >= 0 || aux.type() != EVENT_TIMESTAMP) {
-                    break;
-                }
-                struct timespec tsNext;
-                aux.copyData((const uint8_t*) &tsNext);
-                if (tsNext.tv_sec != ts.tv_sec) {
-                    break;
-                }
-                long delta = tsNext.tv_nsec - prevNsec;
-                if (delta < 0) {
-                    break;
-                }
-                if (delta < deltaMin) {
-                    deltaMin = delta;
-                }
-                if (delta > deltaMax) {
-                    deltaMax = delta;
-                }
-                deltaTotal += delta;
-                prevNsec = tsNext.tv_nsec;
-            }
-            size_t n = (aux - entry) / (sizeof(struct timespec) + 3 /*Entry::kOverhead?*/);
-            if (deferredTimestamp) {
-                dumpLine(timestamp, body);
-                deferredTimestamp = false;
-            }
-            timestamp.clear();
-            if (n >= kSquashTimestamp) {
-                timestamp.appendFormat("[%d.%03d to .%.03d by .%.03d to .%.03d]",
-                        (int) ts.tv_sec, (int) (ts.tv_nsec / 1000000),
-                        (int) ((ts.tv_nsec + deltaTotal) / 1000000),
-                        (int) (deltaMin / 1000000), (int) (deltaMax / 1000000));
-                entry = aux;
-                // advance = 0;
-                break;
-            }
-            timestamp.appendFormat("[%d.%03d]", (int) ts.tv_sec,
-                    (int) (ts.tv_nsec / 1000000));
-            deferredTimestamp = true;
-            }
-            break;
-        case EVENT_INTEGER:
-            appendInt(&body, entry.data());
-            break;
-        case EVENT_FLOAT:
-            appendFloat(&body, entry.data());
-            break;
-        case EVENT_PID:
-            appendPID(&body, entry.data(), entry.length());
-            break;
-#endif
         case EVENT_START_FMT:
             entry = handleFormat(FormatEntry(entry), &timestamp, &body);
             break;
@@ -1087,36 +999,27 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             // TODO might want to filter excessively high outliers, which are usually caused
             // by the thread being inactive.
             mHists[key].push_back(ts);
+            // store time series data for each reader in order to bucket it once there
+            // is enough data. Then, it is written to recentHists as a histogram.
+            mTimeStampSeries[data->author].push_back(ts);
+            // if length of the time series has reached kShortHistSize samples,
+            // compute its histogram, append this to mRecentHists and erase the time series
+            if (mTimeStampSeries[data->author].size() >= kShortHistSize) {
+                mRecentHists.emplace_front(data->author,
+                                           buildBuckets(mTimeStampSeries[data->author]));
+                // do not let mRecentHists exceed capacity
+                // TODO: turn the FIFO queue into a circular buffer
+                if (mRecentHists.size() >= kRecentHistsCapacity) {
+                    mRecentHists.pop_back();
+                }
+                mTimeStampSeries.erase(data->author);
+            }
+            // if an element in mHists has not grown for a long time, delete
+            // TODO copy histogram data only to mRecentHistsBuffer and pop oldest
             ++entry;
             break;
         }
-        // draws histograms stored in global Reader::mHists and erases them
         case EVENT_HISTOGRAM_FLUSH: {
-            HistogramEntry histEntry(entry);
-            // Log timestamp
-            // Timestamp of call to drawHistogram, not when audio was generated
-            const int64_t ts = histEntry.timestamp();
-            timestamp.clear();
-            timestamp.appendFormat("[%d.%03d]", (int) (ts / (1000 * 1000 * 1000)),
-                            (int) ((ts / (1000 * 1000)) % 1000));
-            // Log histograms
-            setFindGlitch(true);
-            body.appendFormat("Histogram flush - ");
-            handleAuthor(histEntry, &body);
-            for (auto hist = mHists.begin(); hist != mHists.end();) {
-                if (hist->first.second == histEntry.author()) {
-                    body.appendFormat("%X", (int)hist->first.first);
-                    if (findGlitch) {
-                        alertIfGlitch(hist->second);
-                    }
-                    // set file to empty and write data for all histograms in this set
-                    writeHistToFile(hist->second, hist != mHists.begin());
-                    drawHistogram(&body, hist->second, true, indent);
-                    hist = mHists.erase(hist);
-                } else {
-                    ++hist;
-                }
-            }
             ++entry;
             break;
         }
@@ -1130,10 +1033,13 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             ++entry;
             break;
         }
-
-        if (!body.isEmpty()) {
-            dumpLine(timestamp, body);
-        }
+        // if (!body.isEmpty()) {
+        //    dumpLine(timestamp, body);
+        // }
+    }
+    reportPerformance(&body, mRecentHists);
+    if (!body.isEmpty()) {
+        dumpLine(timestamp, body);
     }
 }
 
@@ -1312,36 +1218,88 @@ static int widthOf(int x) {
     return width;
 }
 
-static std::map<int, int> buildBuckets(const std::vector<int64_t> &samples) {
-    // TODO allow buckets of variable resolution
-    std::map<int, int> buckets;
-    for (size_t i = 1; i < samples.size(); ++i) {
-        ++buckets[deltaMs(samples[i - 1], samples[i])];
-    }
-    return buckets;
-}
-
 static inline uint32_t log2(uint32_t x) {
     // This works for x > 0
     return 31 - __builtin_clz(x);
 }
 
+// TODO create a subclass of Reader for this and related work
+void NBLog::Reader::reportPerformance(String8 *body,
+                                  const std::deque<std::pair
+                                         <int, short_histogram>> &shortHists,
+                                         int maxHeight) {
+    if (shortHists.size() < 1) {
+        return;
+    }
+    // this is temporary code, which only prints out one histogram
+    // of all data stored in buffer. The data is not erased, only overwritten.
+    // TODO: more elaborate data analysis
+    std::map<int, int> buckets;
+    for (const auto &shortHist: shortHists) {
+        for (const auto &countPair : shortHist.second) {
+            buckets[countPair.first] += countPair.second;
+        }
+    }
+
+    // underscores and spaces length corresponds to maximum width of histogram
+    static const int kLen = 40;
+    std::string underscores(kLen, '_');
+    std::string spaces(kLen, ' ');
+
+    auto it = buckets.begin();
+    int maxDelta = it->first;
+    int maxCount = it->second;
+    // Compute maximum values
+    while (++it != buckets.end()) {
+        if (it->first > maxDelta) {
+            maxDelta = it->first;
+        }
+        if (it->second > maxCount) {
+            maxCount = it->second;
+        }
+    }
+    int height = log2(maxCount) + 1; // maxCount > 0, safe to call log2
+    const int leftPadding = widthOf(1 << height);
+    const int colWidth = std::max(std::max(widthOf(maxDelta) + 1, 3), leftPadding + 2);
+    int scalingFactor = 1;
+    // scale data if it exceeds maximum height
+    if (height > maxHeight) {
+        scalingFactor = (height + maxHeight) / maxHeight;
+        height /= scalingFactor;
+    }
+    body->appendFormat("\n%*s", leftPadding + 11, "Occurrences");
+    // write histogram label line with bucket values
+    body->appendFormat("\n%s", " ");
+    body->appendFormat("%*s", leftPadding, " ");
+    for (auto const &x : buckets) {
+        body->appendFormat("%*d", colWidth, x.second);
+    }
+    // write histogram ascii art
+    body->appendFormat("\n%s", " ");
+    for (int row = height * scalingFactor; row >= 0; row -= scalingFactor) {
+        const int value = 1 << row;
+        body->appendFormat("%.*s", leftPadding, spaces.c_str());
+        for (auto const &x : buckets) {
+          body->appendFormat("%.*s%s", colWidth - 1, spaces.c_str(), x.second < value ? " " : "|");
+        }
+        body->appendFormat("\n%s", " ");
+    }
+    // print x-axis
+    const int columns = static_cast<int>(buckets.size());
+    body->appendFormat("%*c", leftPadding, ' ');
+    body->appendFormat("%.*s", (columns + 1) * colWidth, underscores.c_str());
+    body->appendFormat("\n%s", " ");
+
+    // write footer with bucket labels
+    body->appendFormat("%*s", leftPadding, " ");
+    for (auto const &x : buckets) {
+        body->appendFormat("%*d", colWidth, x.first);
+    }
+    body->appendFormat("%.*s%s", colWidth, spaces.c_str(), "ms\n");
+
+}
+
 // TODO put this function in separate file. Make it return a std::string instead of modifying body
-/*
-Example output:
-[54.234] Histogram flush - AudioOut_D:
-Histogram 33640BF1
-            [ 1][ 1][ 1][ 3][54][69][ 1][ 2][ 1]
-        64|                      []
-        32|                  []  []
-        16|                  []  []
-         8|                  []  []
-         4|                  []  []
-         2|______________[]__[]__[]______[]____
-              4   5   6   8   9  10  11  13  15
-Notice that all values that fall in the same row have the same height (65 and 127 are displayed
-identically). That's why exact counts are added at the top.
-*/
 void NBLog::Reader::drawHistogram(String8 *body,
                                   const std::vector<int64_t> &samples,
                                   bool logScale,
@@ -1368,7 +1326,7 @@ void NBLog::Reader::drawHistogram(String8 *body,
 
     // underscores and spaces length corresponds to maximum width of histogram
     static const int kLen = 40;
-    std::string underscores(kLen, '-');
+    std::string underscores(kLen, '_');
     std::string spaces(kLen, ' ');
 
     auto it = buckets.begin();
@@ -1384,7 +1342,7 @@ void NBLog::Reader::drawHistogram(String8 *body,
         }
     }
     int height = logScale ? log2(maxCount) + 1 : maxCount; // maxCount > 0, safe to call log2
-    const int leftPadding = widthOf(logScale ? pow(2, height) : maxCount);
+    const int leftPadding = widthOf(logScale ? 1 << height : maxCount);
     const int colWidth = std::max(std::max(widthOf(maxDelta) + 1, 3), leftPadding + 2);
     int scalingFactor = 1;
     // scale data if it exceeds maximum height
