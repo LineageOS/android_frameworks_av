@@ -30,7 +30,7 @@ LOCAL_SHARED_LIBRARIES := \
     libgui \
     liblog \
     libbase \
-    libavservices_minijail \
+    libavservices_minijail_vendor \
     libcutils \
     libhwbinder \
     libhidltransport \
