@@ -65,6 +65,49 @@ private:
     const std::shared_ptr<C2Allocator> mAllocator;
 };
 
+class C2AllocatorGralloc : public C2Allocator {
+public:
+    // (usage, capacity) => (align, heapMask, flags)
+    typedef std::function<int (C2MemoryUsage, size_t,
+                      /* => */ size_t*, unsigned*, unsigned*)> usage_mapper_fn;
+
+    virtual C2Error allocateGraphicBuffer(
+            uint32_t width, uint32_t height, uint32_t format, C2MemoryUsage usage,
+            std::shared_ptr<C2GraphicAllocation> *allocation) override;
+
+    virtual C2Error recreateGraphicBuffer(
+            const C2Handle *handle,
+            std::shared_ptr<C2GraphicAllocation> *allocation) override;
+
+    C2AllocatorGralloc();
+
+    C2Error status() const;
+
+    virtual ~C2AllocatorGralloc();
+
+private:
+    class Impl;
+    Impl *mImpl;
+};
+
+class C2DefaultGraphicBlockAllocator : public C2BlockAllocator {
+public:
+    explicit C2DefaultGraphicBlockAllocator(const std::shared_ptr<C2Allocator> &allocator);
+
+    virtual ~C2DefaultGraphicBlockAllocator() = default;
+
+    virtual C2Error allocateGraphicBlock(
+            uint32_t width,
+            uint32_t height,
+            uint32_t format,
+            C2MemoryUsage usage,
+            std::shared_ptr<C2GraphicBlock> *block /* nonnull */) override;
+
+private:
+    const std::shared_ptr<C2Allocator> mAllocator;
+};
+
+
 #if 0
 class C2Allocation::Impl {
 public:
