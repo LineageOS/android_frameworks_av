@@ -25,6 +25,7 @@
 #include <utils/threads.h>
 
 #include <map>
+#include <deque>
 #include <set>
 #include <vector>
 
@@ -457,6 +458,9 @@ public:
     bool     isFindGlitch() const;
 
 private:
+
+    static const int kShortHistSize = 50; // number of samples in a short-term histogram
+    static const int kRecentHistsCapacity = 100; // number of short-term histograms stored in memory
     static const std::set<Event> startingTypes;
     static const std::set<Event> endingTypes;
     /*const*/ Shared* const mShared;    // raw pointer to shared memory, actually const but not
@@ -469,10 +473,23 @@ private:
     audio_utils_fifo_reader * const mFifoReader;    // used to read from FIFO,
                                                     // non-NULL unless constructor fails
 
+    // stores a short-term histogram of size determined by kShortHistSize
+    // TODO: unsigned, unsigned
+    using short_histogram = std::map<int, int>;
+
     // each pair contains a sequence of timestamps (one histogram's worth)
     // pair's log_hash_t is the hash of the source code location where the timestamp was taken
     // pair's int points to the Reader that originated the entry
     std::map<std::pair<log_hash_t, int>, std::vector<int64_t>> mHists;
+
+    // mHistsCopy stores timestamp vectors whose key is the reader thread index.
+    // TODO remove old mHists after changing the code
+    std::map<int, std::vector<int64_t>> mTimeStampSeries;
+
+    // stores fixed-size short buffer period histograms with hash and thread data
+    // TODO: Turn it into a circular buffer for better data flow
+    std::deque<std::pair<int, short_histogram>> mRecentHists;
+
     // TODO: it might be clearer, instead of a direct map from source location to vector of
     // timestamps, if we instead first mapped from source location to an object that
     // represented that location. And one_of its fields would be a vector of timestamps.
@@ -487,6 +504,11 @@ private:
 
     static void drawHistogram(String8 *body, const std::vector<int64_t> &samples,
                               bool logScale, int indent = 0, int maxHeight = 10);
+
+    static void reportPerformance(String8 *body,
+                                  const std::deque<std::pair
+                                         <int, short_histogram>> &shortHists,
+                                  int maxHeight = 10);
 
     // Searches for the last entry of type <type> in the range [front, back)
     // back has to be entry-aligned. Returns nullptr if none enconuntered.
