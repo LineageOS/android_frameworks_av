@@ -3598,7 +3598,8 @@ status_t Camera3Device::RequestThread::clear(
             // Abort the input buffers for reprocess requests.
             if ((*it)->mInputStream != NULL) {
                 camera3_stream_buffer_t inputBuffer;
-                status_t res = (*it)->mInputStream->getInputBuffer(&inputBuffer);
+                status_t res = (*it)->mInputStream->getInputBuffer(&inputBuffer,
+                        /*respectHalLimit*/ false);
                 if (res != OK) {
                     ALOGW("%s: %d: couldn't get input buffer while clearing the request "
                             "list: %s (%d)", __FUNCTION__, __LINE__, strerror(-res), res);

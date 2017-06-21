@@ -308,8 +308,10 @@ class Camera3Stream :
      * For bidirectional streams, this method applies to the input-side
      * buffers.
      *
+     * Normally this call will block until the handed out buffer count is less than the stream
+     * max buffer count; if respectHalLimit is set to false, this is ignored.
      */
-    status_t         getInputBuffer(camera3_stream_buffer *buffer);
+    status_t         getInputBuffer(camera3_stream_buffer *buffer, bool respectHalLimit = true);
 
     /**
      * Return a buffer to the stream after use by the HAL.
