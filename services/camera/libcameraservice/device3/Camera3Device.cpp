@@ -606,9 +606,6 @@ ssize_t Camera3Device::getJpegBufferSize(uint32_t width, uint32_t height) const 
             (maxJpegResolution.width * maxJpegResolution.height);
     ssize_t jpegBufferSize = scaleFactor * (maxJpegBufferSize - kMinJpegBufferSize) +
             kMinJpegBufferSize;
-    if (jpegBufferSize > maxJpegBufferSize) {
-        jpegBufferSize = maxJpegBufferSize;
-    }
 
     return jpegBufferSize;
 }

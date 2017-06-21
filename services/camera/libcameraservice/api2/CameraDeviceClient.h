@@ -307,6 +307,7 @@ private:
     static const int32_t REQUEST_ID_NONE = -1;
 
     int32_t mRequestIdCounter;
+    bool mPrivilegedClient;
 
     // The list of output streams whose surfaces are deferred. We have to track them separately
     // as there are no surfaces available and can not be put into mStreamMap. Once the deferred
