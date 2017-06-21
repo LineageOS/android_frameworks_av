@@ -80,13 +80,6 @@ SoftMPEG2::SoftMPEG2(
     // If input dump is enabled, then open create an empty file
     GENERATE_FILE_NAMES();
     CREATE_DUMP_FILE(mInFile);
-
-    if (OK != initDecoder()) {
-        ALOGE("Failed to initialize decoder");
-        notify(OMX_EventError, OMX_ErrorUnsupportedSetting, 0, NULL);
-        mSignalledError = true;
-        return;
-    }
 }
 
 SoftMPEG2::~SoftMPEG2() {
@@ -457,8 +450,6 @@ status_t SoftMPEG2::reInitDecoder() {
     if (OK != ret) {
         ALOGE("Failed to initialize decoder");
         deInitDecoder();
-        notify(OMX_EventError, OMX_ErrorUnsupportedSetting, 0, NULL);
-        mSignalledError = true;
         return ret;
     }
     mSignalledError = false;
@@ -566,6 +557,15 @@ void SoftMPEG2::onQueueFilled(OMX_U32 portIndex) {
         return;
     }
 
+    if (NULL == mCodecCtx) {
+        if (OK != initDecoder()) {
+            ALOGE("Failed to initialize decoder");
+            notify(OMX_EventError, OMX_ErrorUnsupportedSetting, 0, NULL);
+            mSignalledError = true;
+            return;
+        }
+    }
+
     List<BufferInfo *> &inQueue = getPortQueue(kInputPortIndex);
     List<BufferInfo *> &outQueue = getPortQueue(kOutputPortIndex);
 
@@ -630,9 +630,6 @@ void SoftMPEG2::onQueueFilled(OMX_U32 portIndex) {
 
             if (OK != reInitDecoder()) {
                 ALOGE("Failed to reinitialize decoder");
-                notify(OMX_EventError, OMX_ErrorUnsupportedSetting, 0, NULL);
-                mSignalledError = true;
-                return;
             }
             return;
         }
@@ -706,8 +703,6 @@ void SoftMPEG2::onQueueFilled(OMX_U32 portIndex) {
 
                 if (OK != reInitDecoder()) {
                     ALOGE("Failed to reinitialize decoder");
-                    notify(OMX_EventError, OMX_ErrorUnsupportedSetting, 0, NULL);
-                    mSignalledError = true;
                     return;
                 }
 
