@@ -3005,6 +3005,8 @@ status_t MPEG4Extractor::parse3GPPMetaData(off64_t offset, size_t size, int dept
 
         // smallest possible valid UTF-16 string w BOM: 0xfe 0xff 0x00 0x00
         if (size < 6) {
+            delete[] buffer;
+            buffer = NULL;
             return ERROR_MALFORMED;
         }
 
