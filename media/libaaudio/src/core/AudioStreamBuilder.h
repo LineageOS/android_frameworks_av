@@ -165,6 +165,8 @@ public:
 
     aaudio_result_t build(AudioStream **streamPtr);
 
+    aaudio_result_t validate() const;
+
 private:
     int32_t                    mSamplesPerFrame = AAUDIO_UNSPECIFIED;
     int32_t                    mSampleRate = AAUDIO_UNSPECIFIED;
