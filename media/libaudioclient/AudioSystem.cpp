@@ -1297,7 +1297,7 @@ void AudioSystem::AudioPolicyServiceClient::onDynamicPolicyMixStateUpdate(
 }
 
 void AudioSystem::AudioPolicyServiceClient::onRecordingConfigurationUpdate(
-        int event, audio_session_t session, audio_source_t source,
+        int event, const record_client_info_t *clientInfo,
         const audio_config_base_t *clientConfig, const audio_config_base_t *deviceConfig,
         audio_patch_handle_t patchHandle) {
     record_config_callback cb = NULL;
@@ -1307,7 +1307,7 @@ void AudioSystem::AudioPolicyServiceClient::onRecordingConfigurationUpdate(
     }
 
     if (cb != NULL) {
-        cb(event, session, source, clientConfig, deviceConfig, patchHandle);
+        cb(event, clientInfo, clientConfig, deviceConfig, patchHandle);
     }
 }
 
