@@ -318,7 +318,7 @@ Return<void> RadioHalHidl::Tuner::newMetadata(uint32_t channel, uint32_t subChan
 {
     ALOGV("%s IN", __FUNCTION__);
     radio_hal_event_t event = {};
-    RadioMetadataWrapper metadataWrapper(&event.info.metadata);
+    RadioMetadataWrapper metadataWrapper(&event.metadata);
 
     event.type = RADIO_EVENT_METADATA;
     HidlUtils::convertMetaDataFromHal(&event.metadata, metadata, channel, subChannel);
