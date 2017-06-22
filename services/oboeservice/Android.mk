@@ -46,6 +46,7 @@ LOCAL_CFLAGS += -Wall -Werror
 LOCAL_SHARED_LIBRARIES :=  \
     libaaudio \
     libaudioflinger \
+    libaudioclient \
     libbinder \
     libcutils \
     libmediautils \
