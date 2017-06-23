@@ -22,7 +22,6 @@
 #include <climits>
 #include <deque>
 #include <fstream>
-// #include <inttypes.h>
 #include <iostream>
 #include <math.h>
 #include <numeric>
@@ -47,8 +46,7 @@
 namespace android {
 
 PerformanceAnalysis::PerformanceAnalysis() : findGlitch(false) {
-	ALOGE("this value should be 4: %d", kPeriodMs);
-	kPeriodMsCPU = static_cast<int>(PerformanceAnalysis::kPeriodMs * kRatio);
+    kPeriodMsCPU = static_cast<int>(PerformanceAnalysis::kPeriodMs * kRatio);
 }
 
 static int widthOf(int x) {
@@ -60,55 +58,57 @@ static int widthOf(int x) {
     return width;
 }
 
-// WIP: uploading this half-written function to get code review on
-// cleanup and new file creation.
-/*
-static std::vector<std::pair<int, int>> outlierIntervals(
-        const std::deque<std::pair<int, short_histogram>> &shortHists) {
-    // TODO: need the timestamps
-    if (shortHists.size() < 1) {
+// FIXME: delete this temporary test code, recycled for various new functions
+void PerformanceAnalysis::testFunction() {
+    // produces values (4: 5000000), (13: 18000000)
+    // ns timestamps of buffer periods
+    const std::vector<int64_t>kTempTestData = {1000000, 4000000, 5000000,
+                                               16000000, 18000000, 28000000};
+    const int kTestAuthor = 1;
+    PerformanceAnalysis::storeOutlierData(kTestAuthor, kTempTestData);
+    for (const auto &outlier: mOutlierData) {
+        ALOGE("PerformanceAnalysis test %lld: %lld",
+              static_cast<long long>(outlier.first), static_cast<long long>(outlier.second));
+    }
+}
+
+// Each pair consists of: <outlier timestamp, time elapsed since previous outlier>.
+// The timestamp of the beginning of the outlier is recorded.
+// The elapsed time is from the timestamp of the previous outlier
+// e.g. timestamps (ms) 1, 4, 5, 16, 18, 28 will produce pairs (4, 5), (13, 18).
+// This function is applied to the time series before it is converted into a histogram.
+void PerformanceAnalysis::storeOutlierData(
+    int author, const std::vector<int64_t> &timestamps) {
+    if (timestamps.size() < 1) {
+        ALOGE("storeOutlierData called on empty vector");
         return;
     }
-    // count number of outliers in histogram
-    // TODO: need the alertIfGlitch analysis on the time series in NBLog::reader
-    // to find all the glitches
-    const std::vector<int> glitchCount = std::vector<int>(shortHists.size());
-    // Total ms elapsed in each shortHist
-    const std::vector<int> timeElapsedMs = std::vector<int>(shortHists.size());
-    int i = 0;
-    for (const auto &shortHist: shortHists) {
-        for (const auto &bin: shortHist) {
-            timeElapsedMs.at(i) += bin->first * bin->second;
-            if (bin->first >= kGlitchThreshMs) {
-                glitchCount.at(i) += bin->second;
-            }
+    author++; // temp to avoid unused error until this value is
+    // either TODO: used or discarded from the arglist
+    author--;
+    uint64_t elapsed = 0;
+    int64_t prev = timestamps.at(0);
+    for (const auto &ts: timestamps) {
+        const uint64_t diff = static_cast<uint64_t>(deltaMs(prev, ts));
+        if (diff >= static_cast<uint64_t>(kOutlierMs)) {
+            mOutlierData.emplace_back(elapsed, static_cast<uint64_t>(prev));
+            elapsed = 0;
         }
-        i++;
+        elapsed += diff;
+        prev = ts;
     }
-    // seconds between glitches and corresponding timestamp
-    const std::vector<std::pair<double, int>> glitchFreeIntervalsSec;
-    // Sec since last glitch. nonzero if the duration spans many shortHists
-    double glitchFreeSec = 0;
-    for (int i = 0; i < kGlitchCount.size(); i++) {
-      if (kGlitchCount.at(i) == 0) {
-        glitchFreeSec += static_cast<double>timeElapsedMs.at(i) / kMsPerSec;
-      }
-      else {
-        // average time between glitches in this interval
-        const double kInterval = static_cast<double>(timeElapsedMs.at(i)) / kGlitchCount.at(i);
-        for (int j = 0; j < kGlitchCount.at(i); j++) {
-          kIntervals.emplace_front(kInterval);
-        }
-      }
-    }
-    return;
-}*/
+    // ALOGE("storeOutlierData: result length %zu", outlierData.size());
+    // for (const auto &outlier: OutlierData) {
+    //    ALOGE("PerformanceAnalysis test %lld: %lld",
+    //          static_cast<long long>(outlier.first), static_cast<long long>(outlier.second));
+    //}
+}
 
 // TODO: implement peak detector
 /*
-static void peakDetector() {
-    return;
-} */
+  static void peakDetector() {
+  return;
+  } */
 
 // TODO put this function in separate file. Make it return a std::string instead of modifying body
 // TODO create a subclass of Reader for this and related work
@@ -117,9 +117,9 @@ static void peakDetector() {
 // TODO: build histogram buckets earlier and discard timestamps to save memory
 // TODO consider changing all ints to uint32_t or uint64_t
 void PerformanceAnalysis::reportPerformance(String8 *body,
-                                  const std::deque<std::pair
-                                         <int, short_histogram>> &shortHists,
-                                         int maxHeight) {
+                                            const std::deque<std::pair
+                                            <int, short_histogram>> &shortHists,
+                                            int maxHeight) {
     if (shortHists.size() < 1) {
         return;
     }
@@ -189,6 +189,13 @@ void PerformanceAnalysis::reportPerformance(String8 *body,
     }
     body->appendFormat("%.*s%s", colWidth, spaces.c_str(), "ms\n");
 
+    // Now report glitches
+    body->appendFormat("\ntime elapsed between glitches and glitch timestamps\n");
+    for (const auto &outlier: mOutlierData) {
+        body->appendFormat("%lld: %lld\n", static_cast<long long>(outlier.first),
+                           static_cast<long long>(outlier.second));
+    }
+
 }
 
 
@@ -224,7 +231,5 @@ void PerformanceAnalysis::setFindGlitch(bool s)
 {
     findGlitch = s;
 }
-//TODO: ask Andy where to keep '= 4'
-const int PerformanceAnalysis::kPeriodMs; //  = 4;
 
 }   // namespace android
