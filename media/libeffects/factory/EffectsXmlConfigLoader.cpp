@@ -313,7 +313,7 @@ size_t loadEffects(const Effects& effects, list_elem_t* libList, list_elem_t** s
 //      Interface function
 /////////////////////////////////////////////////
 
-extern "C" ssize_t loadXmlEffectConfig(const char* path)
+extern "C" ssize_t EffectLoadXmlEffectConfig(const char* path)
 {
     using effectsConfig::parse;
     auto result = path ? parse(path) : parse();

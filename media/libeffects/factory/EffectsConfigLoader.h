@@ -17,6 +17,7 @@
 #ifndef ANDROID_EFFECTSCONFIGLOADER_H
 #define ANDROID_EFFECTSCONFIGLOADER_H
 
+#include <cutils/compiler.h>
 #include "EffectsFactoryState.h"
 
 #ifdef  __cplusplus
@@ -26,7 +27,8 @@ extern "C" {
 
 /** Parses the platform effect configuration
  * and stores its content in the global EffectFactoryState. */
-int loadEffectConfig();
+ANDROID_API
+int EffectLoadEffectConfig();
 
 
 #ifdef  __cplusplus

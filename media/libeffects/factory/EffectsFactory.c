@@ -27,8 +27,8 @@
 #include <media/EffectsFactoryApi.h>
 
 #include "EffectsConfigLoader.h"
-#include "EffectsXmlConfigLoader.h"
 #include "EffectsFactoryState.h"
+#include "EffectsXmlConfigLoader.h"
 
 #include "EffectsFactory.h"
 
@@ -437,10 +437,10 @@ int init() {
     if (ignoreFxConfFiles) {
         ALOGI("Audio effects in configuration files will be ignored");
     } else {
-        ssize_t loadResult = loadXmlEffectConfig(NULL);
+        ssize_t loadResult = EffectLoadXmlEffectConfig(NULL);
         if (loadResult < 0) {
             ALOGW("Failed to load XML effect configuration, fallback to .conf");
-            loadEffectConfig();
+            EffectLoadEffectConfig();
         } else if (loadResult > 0) {
             ALOGE("Effect config is partially invalid, skipped %zd elements", loadResult);
         }

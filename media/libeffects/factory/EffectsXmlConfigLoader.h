@@ -19,6 +19,10 @@
 
 #include <unistd.h>
 
+#include <cutils/compiler.h>
+
+#include "EffectsFactoryState.h"
+
 #if __cplusplus
 extern "C" {
 #endif
@@ -28,8 +32,10 @@ extern "C" {
  * @return -1 on unrecoverable error (eg: no configuration file)
  *         0 on success
  *         the number of invalid elements (lib & effect) skipped if the config is partially invalid
+ * @note this function is exported for test purpose only. Do not call from outside this library.
  */
-ssize_t loadXmlEffectConfig(const char* path);
+ANDROID_API
+ssize_t EffectLoadXmlEffectConfig(const char* path);
 
 #if __cplusplus
 } // extern "C"
