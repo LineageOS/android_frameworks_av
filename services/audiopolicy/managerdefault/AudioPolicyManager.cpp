@@ -769,7 +769,7 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
                                               uid_t uid,
                                               const audio_config_t *config,
                                               audio_output_flags_t flags,
-                                              audio_port_handle_t selectedDeviceId,
+                                              audio_port_handle_t *selectedDeviceId,
                                               audio_port_handle_t *portId)
 {
     audio_attributes_t attributes;
@@ -813,16 +813,18 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
     ALOGV("getOutputForAttr() usage=%d, content=%d, tag=%s flags=%08x"
             " session %d selectedDeviceId %d",
             attributes.usage, attributes.content_type, attributes.tags, attributes.flags,
-            session, selectedDeviceId);
+            session, *selectedDeviceId);
 
     *stream = streamTypefromAttributesInt(&attributes);
 
     // Explicit routing?
     sp<DeviceDescriptor> deviceDesc;
-    for (size_t i = 0; i < mAvailableOutputDevices.size(); i++) {
-        if (mAvailableOutputDevices[i]->getId() == selectedDeviceId) {
-            deviceDesc = mAvailableOutputDevices[i];
-            break;
+    if (*selectedDeviceId != AUDIO_PORT_HANDLE_NONE) {
+        for (size_t i = 0; i < mAvailableOutputDevices.size(); i++) {
+            if (mAvailableOutputDevices[i]->getId() == *selectedDeviceId) {
+                deviceDesc = mAvailableOutputDevices[i];
+                break;
+            }
         }
     }
     mOutputRoutes.addRoute(session, *stream, SessionRoute::SOURCE_TYPE_NA, deviceDesc, uid);
@@ -844,6 +846,12 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
         mOutputRoutes.removeRoute(session);
         return INVALID_OPERATION;
     }
+
+    DeviceVector outputDevices = mAvailableOutputDevices.getDevicesFromType(device);
+    *selectedDeviceId = outputDevices.size() > 0 ? outputDevices.itemAt(0)->getId()
+            : AUDIO_PORT_HANDLE_NONE;
+
+    ALOGV("  getOutputForAttr() returns output %d selectedDeviceId %d", *output, *selectedDeviceId);
 
     return NO_ERROR;
 }
@@ -1084,8 +1092,6 @@ non_direct_output:
     }
     ALOGW_IF((output == 0), "getOutput() could not find output for stream %d, samplingRate %d,"
             "format %d, channels %x, flags %x", stream, samplingRate, format, channelMask, flags);
-
-    ALOGV("  getOutputForDevice() returns output %d", output);
 
     return output;
 }
@@ -1481,7 +1487,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
                                              uid_t uid,
                                              const audio_config_base_t *config,
                                              audio_input_flags_t flags,
-                                             audio_port_handle_t selectedDeviceId,
+                                             audio_port_handle_t *selectedDeviceId,
                                              input_type_t *inputType,
                                              audio_port_handle_t *portId)
 {
@@ -1511,10 +1517,12 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
 
     // Explicit routing?
     sp<DeviceDescriptor> deviceDesc;
-    for (size_t i = 0; i < mAvailableInputDevices.size(); i++) {
-        if (mAvailableInputDevices[i]->getId() == selectedDeviceId) {
-            deviceDesc = mAvailableInputDevices[i];
-            break;
+    if (*selectedDeviceId != AUDIO_PORT_HANDLE_NONE) {
+        for (size_t i = 0; i < mAvailableInputDevices.size(); i++) {
+            if (mAvailableInputDevices[i]->getId() == *selectedDeviceId) {
+                deviceDesc = mAvailableInputDevices[i];
+                break;
+            }
         }
     }
     mInputRoutes.addRoute(session, SessionRoute::STREAM_TYPE_NA, inputSource, deviceDesc, uid);
@@ -1565,7 +1573,13 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
         return INVALID_OPERATION;
     }
 
-    ALOGV("getInputForAttr() returns input type = %d", *inputType);
+    DeviceVector inputDevices = mAvailableInputDevices.getDevicesFromType(device);
+    *selectedDeviceId = inputDevices.size() > 0 ? inputDevices.itemAt(0)->getId()
+            : AUDIO_PORT_HANDLE_NONE;
+
+    ALOGV("getInputForAttr() returns input %d type %d selectedDeviceId %d",
+            *input, *inputType, *selectedDeviceId);
+
     return NO_ERROR;
 }
 
