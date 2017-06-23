@@ -40,6 +40,7 @@
 #include "device3/StatusTracker.h"
 #include "device3/Camera3BufferManager.h"
 #include "utils/TagMonitor.h"
+#include "utils/LatencyHistogram.h"
 #include <camera_metadata_hidden.h>
 
 /**
@@ -699,6 +700,11 @@ class Camera3Device :
          */
         bool isStreamPending(sp<camera3::Camera3StreamInterface>& stream);
 
+        // dump processCaptureRequest latency
+        void dumpCaptureRequestLatency(int fd, const char* name) {
+            mRequestLatency.dump(fd, name);
+        }
+
       protected:
 
         virtual bool threadLoop();
@@ -820,6 +826,9 @@ class Camera3Device :
 
         // Flag indicating if we should prepare video stream for video requests.
         bool               mPrepareVideoStream;
+
+        static const int32_t kRequestLatencyBinSize = 40; // in ms
+        CameraLatencyHistogram mRequestLatency;
     };
     sp<RequestThread> mRequestThread;
 
