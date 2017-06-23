@@ -23,7 +23,7 @@
 *     Called every period length (e.g., 4ms)
 *     Calls LOG_HIST_TS
 * LOG_HIST_TS
-*     Hashes file name and line number
+*     Hashes file name and line number, and writes single timestamp to buffer
 *     calls NBLOG::Writer::logHistTS once
 * NBLOG::Writer::logHistTS
 *     calls NBLOG::Writer::log on hash and current timestamp
@@ -45,21 +45,7 @@
 *     Determines readable buffer section via pointer arithmetic on reader
 *     and writer pointers
 *
-* 2) Writing LOG_HIST_FLUSH event to console when audio is turned on or off
-*    When this event is found when reading from the buffer, all histograms are
-*    printed to the console
-*    TODO: remove this: always write data to another data structure or the console
-* FastMixer::onStateChange()
-*     is called when audio is turned on/off
-*     calls LOG_HIST_FLUSH()
-* LOG_HIST_FLUSH()
-*     calls logHistFlush
-* NBLog::Writer::logHistFlush
-*     records current timestamp
-*     calls log(EVENT_HISTOGRAM_FLUSH)
-*     From here, everything is the same as in 1), resulting in call to fifo write
-*
-* 3) reading the data from shared memory
+* 2) reading the data from shared memory
 * Thread::threadloop()
 *     TODO: add description?
 * NBLog::MergeThread::threadLoop()
@@ -76,7 +62,7 @@
 *     moves the fifo reader index to after the last entry read
 *     in this case, the buffer is in shared memory. in (4), the buffer is private
 *
-* 4) reading the data from private buffer
+* 3) reading the data from private buffer
 * MediaLogService::dump
 *     calls NBLog::Reader::dump(CONSOLE)
 *     The private buffer contains all logs for all readers in shared memory
@@ -88,9 +74,7 @@
 *     (string, timestamp, etc...)
 *     In the case of EVENT_HISTOGRAM_ENTRY_TS, adds a list of timestamp sequences
 *     (histogram entry) to NBLog::mHists
-*     In the case of EVENT_HISTOGRAM_FLUSH, calls drawHistogram on each element in
-*     the list and erases it
-*     TODO: get rid of the FLUSH, instead add every HISTOGRAM_ENTRY_TS to two
+*     TODO: add every HISTOGRAM_ENTRY_TS to two
 *     circular buffers: one short-term and one long-term (can add even longer-term
 *     structures in the future). When dump is called, print everything currently
 *     in the buffer.
@@ -154,7 +138,6 @@ std::unique_ptr<NBLog::AbstractEntry> NBLog::AbstractEntry::buildEntry(const uin
     switch (type) {
     case EVENT_START_FMT:
         return std::make_unique<FormatEntry>(FormatEntry(ptr));
-    case EVENT_HISTOGRAM_FLUSH:
     case EVENT_HISTOGRAM_ENTRY_TS:
         return std::make_unique<HistogramEntry>(HistogramEntry(ptr));
     default:
@@ -548,21 +531,6 @@ void NBLog::Writer::logHistTS(log_hash_t hash)
     }
 }
 
-void NBLog::Writer::logHistFlush(log_hash_t hash)
-{
-    if (!mEnabled) {
-        return;
-    }
-    HistTsEntry data;
-    data.hash = hash;
-    data.ts = get_monotonic_ns();
-    if (data.ts > 0) {
-        log(EVENT_HISTOGRAM_FLUSH, &data, sizeof(data));
-    } else {
-        ALOGE("Failed to get timestamp");
-    }
-}
-
 void NBLog::Writer::logFormat(const char *fmt, log_hash_t hash, ...)
 {
     if (!mEnabled) {
@@ -790,8 +758,7 @@ bool NBLog::LockedWriter::setEnabled(bool enabled)
 const std::set<NBLog::Event> NBLog::Reader::startingTypes {NBLog::Event::EVENT_START_FMT,
                                                            NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS};
 const std::set<NBLog::Event> NBLog::Reader::endingTypes   {NBLog::Event::EVENT_END_FMT,
-                                                           NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS,
-                                                           NBLog::Event::EVENT_HISTOGRAM_FLUSH};
+                                                           NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS};
 NBLog::Reader::Reader(const void *shared, size_t size)
     : mShared((/*const*/ Shared *) shared), /*mIMemory*/
       mFd(-1), mIndent(0),
@@ -983,10 +950,6 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             }
             // if an element in mHists has not grown for a long time, delete
             // TODO copy histogram data only to mRecentHistsBuffer and pop oldest
-            ++entry;
-            break;
-        }
-        case EVENT_HISTOGRAM_FLUSH: {
             ++entry;
             break;
         }

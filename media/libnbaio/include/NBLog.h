@@ -60,7 +60,6 @@ enum Event : uint8_t {
     EVENT_HASH,                 // unique HASH of log origin, originates from hash of file name
                                 // and line number
     EVENT_HISTOGRAM_ENTRY_TS,   // single datum for timestamp histogram
-    EVENT_HISTOGRAM_FLUSH,      // show histogram on log
     EVENT_END_FMT,              // end of logFormat argument list
 
     EVENT_UPPER_BOUND,          // to check for invalid events
@@ -343,7 +342,6 @@ public:
     virtual void    logEnd();
     virtual void    logHash(log_hash_t hash);
     virtual void    logHistTS(log_hash_t hash);
-    virtual void    logHistFlush(log_hash_t hash);
 
     virtual bool    isEnabled() const;
 
