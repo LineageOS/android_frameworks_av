@@ -43,7 +43,8 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mTraceFirstBuffer(true),
         mUseBufferManager(false),
         mTimestampOffset(timestampOffset),
-        mConsumerUsage(0) {
+        mConsumerUsage(0),
+        mDequeueBufferLatency(kDequeueLatencyBinSize) {
 
     if (mConsumer == NULL) {
         ALOGE("%s: Consumer is NULL!", __FUNCTION__);
@@ -68,7 +69,8 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mUseMonoTimestamp(false),
         mUseBufferManager(false),
         mTimestampOffset(timestampOffset),
-        mConsumerUsage(0) {
+        mConsumerUsage(0),
+        mDequeueBufferLatency(kDequeueLatencyBinSize) {
 
     if (format != HAL_PIXEL_FORMAT_BLOB && format != HAL_PIXEL_FORMAT_RAW_OPAQUE) {
         ALOGE("%s: Bad format for size-only stream: %d", __FUNCTION__,
@@ -97,7 +99,8 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mTraceFirstBuffer(true),
         mUseBufferManager(false),
         mTimestampOffset(timestampOffset),
-        mConsumerUsage(consumerUsage) {
+        mConsumerUsage(consumerUsage),
+        mDequeueBufferLatency(kDequeueLatencyBinSize) {
     // Deferred consumer only support preview surface format now.
     if (format != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
         ALOGE("%s: Deferred consumer only supports IMPLEMENTATION_DEFINED format now!",
@@ -134,7 +137,8 @@ Camera3OutputStream::Camera3OutputStream(int id, camera3_stream_type_t type,
         mUseMonoTimestamp(false),
         mUseBufferManager(false),
         mTimestampOffset(timestampOffset),
-        mConsumerUsage(consumerUsage) {
+        mConsumerUsage(consumerUsage),
+        mDequeueBufferLatency(kDequeueLatencyBinSize) {
 
     if (setId > CAMERA3_STREAM_SET_ID_INVALID) {
         mBufferReleasedListener = new BufferReleasedListener(this);
@@ -290,6 +294,9 @@ void Camera3OutputStream::dump(int fd, const Vector<String16> &args) const {
     write(fd, lines.string(), lines.size());
 
     Camera3IOStreamBase::dump(fd, args);
+
+    mDequeueBufferLatency.dump(fd,
+        "      DequeueBuffer latency histogram:");
 }
 
 status_t Camera3OutputStream::setTransform(int transform) {
@@ -529,7 +536,11 @@ status_t Camera3OutputStream::getBufferLockedCommon(ANativeWindowBuffer** anb, i
         sp<ANativeWindow> currentConsumer = mConsumer;
         mLock.unlock();
 
+        nsecs_t dequeueStart = systemTime(SYSTEM_TIME_MONOTONIC);
         res = currentConsumer->dequeueBuffer(currentConsumer.get(), anb, fenceFd);
+        nsecs_t dequeueEnd = systemTime(SYSTEM_TIME_MONOTONIC);
+        mDequeueBufferLatency.add(dequeueStart, dequeueEnd);
+
         mLock.lock();
         if (res != OK) {
             ALOGE("%s: Stream %d: Can't dequeue next output buffer: %s (%d)",
@@ -611,6 +622,9 @@ status_t Camera3OutputStream::disconnectLocked() {
 
     mState = (mState == STATE_IN_RECONFIG) ? STATE_IN_CONFIG
                                            : STATE_CONSTRUCTED;
+
+    mDequeueBufferLatency.log("Stream %d dequeueBuffer latency histogram", mId);
+    mDequeueBufferLatency.reset();
     return OK;
 }
 
