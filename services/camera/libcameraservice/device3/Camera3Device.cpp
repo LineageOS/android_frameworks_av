@@ -251,9 +251,11 @@ status_t Camera3Device::disconnect() {
                 SET_ERR_L("Can't stop streaming");
                 // Continue to close device even in case of error
             } else {
-                res = waitUntilStateThenRelock(/*active*/ false, kShutdownTimeout);
+                nsecs_t maxExpectedDuration = getExpectedInFlightDurationLocked();
+                res = waitUntilStateThenRelock(/*active*/ false, maxExpectedDuration);
                 if (res != OK) {
-                    SET_ERR_L("Timeout waiting for HAL to drain");
+                    SET_ERR_L("Timeout waiting for HAL to drain (% " PRIi64 " ns)",
+                            maxExpectedDuration);
                     // Continue to close device even in case of error
                 }
             }
@@ -309,6 +311,7 @@ status_t Camera3Device::disconnect() {
 
     {
         Mutex::Autolock l(mLock);
+        mExpectedInflightDuration = 0;
         mInterface->clear();
         mOutputStreams.clear();
         mInputStream.clear();
@@ -1555,8 +1558,11 @@ status_t Camera3Device::waitUntilDrainedLocked() {
             return INVALID_OPERATION;
     }
 
-    ALOGV("%s: Camera %s: Waiting until idle", __FUNCTION__, mId.string());
-    status_t res = waitUntilStateThenRelock(/*active*/ false, kShutdownTimeout);
+    nsecs_t maxExpectedDuration = getExpectedInFlightDurationLocked();
+
+    ALOGV("%s: Camera %s: Waiting until idle (%" PRIi64 "ns)", __FUNCTION__, mId.string(),
+            maxExpectedDuration);
+    status_t res = waitUntilStateThenRelock(/*active*/ false, maxExpectedDuration);
     if (res != OK) {
         SET_ERR_L("Error waiting for HAL to drain: %s (%d)", strerror(-res),
                 res);
@@ -1576,11 +1582,13 @@ status_t Camera3Device::internalPauseAndWaitLocked() {
     mRequestThread->setPaused(true);
     mPauseStateNotify = true;
 
-    ALOGV("%s: Camera %s: Internal wait until idle", __FUNCTION__, mId.string());
-    status_t res = waitUntilStateThenRelock(/*active*/ false, kShutdownTimeout);
+    nsecs_t maxExpectedDuration = getExpectedInFlightDurationLocked();
+    ALOGV("%s: Camera %s: Internal wait until idle (% " PRIi64 " ns)", __FUNCTION__, mId.string(),
+          maxExpectedDuration);
+    status_t res = waitUntilStateThenRelock(/*active*/ false, maxExpectedDuration);
     if (res != OK) {
         SET_ERR_L("Can't idle device in %f seconds!",
-                kShutdownTimeout/1e9);
+                maxExpectedDuration/1e9);
     }
 
     return res;
@@ -2347,13 +2355,13 @@ void Camera3Device::setErrorStateLockedV(const char *fmt, va_list args) {
 
 status_t Camera3Device::registerInFlight(uint32_t frameNumber,
         int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
-        bool hasAppCallback) {
+        bool hasAppCallback, nsecs_t maxExpectedDuration) {
     ATRACE_CALL();
     Mutex::Autolock l(mInFlightLock);
 
     ssize_t res;
     res = mInFlightMap.add(frameNumber, InFlightRequest(numBuffers, resultExtras, hasInput,
-            hasAppCallback));
+            hasAppCallback, maxExpectedDuration));
     if (res < 0) return res;
 
     if (mInFlightMap.size() == 1) {
@@ -2363,6 +2371,9 @@ status_t Camera3Device::registerInFlight(uint32_t frameNumber,
             mStatusTracker->markComponentActive(mInFlightStatusId);
         }
     }
+
+    Mutex::Autolock ml(mLock);
+    mExpectedInflightDuration += maxExpectedDuration;
 
     return OK;
 }
@@ -2384,6 +2395,7 @@ void Camera3Device::returnOutputBuffers(
 }
 
 void Camera3Device::removeInFlightMapEntryLocked(int idx) {
+    nsecs_t duration = mInFlightMap.valueAt(idx).maxExpectedDuration;
     mInFlightMap.removeItemsAt(idx, 1);
 
     // Indicate idle inFlightMap to the status tracker
@@ -2394,6 +2406,8 @@ void Camera3Device::removeInFlightMapEntryLocked(int idx) {
             mStatusTracker->markComponentIdle(mInFlightStatusId, Fence::NO_FENCE);
         }
     }
+    Mutex::Autolock l(mLock);
+    mExpectedInflightDuration -= duration;
 }
 
 void Camera3Device::removeInFlightRequestIfReadyLocked(int idx) {
@@ -3913,6 +3927,42 @@ bool Camera3Device::RequestThread::sendRequestsOneByOne() {
     return true;
 }
 
+nsecs_t Camera3Device::RequestThread::calculateMaxExpectedDuration(const camera_metadata_t *request) {
+    nsecs_t maxExpectedDuration = kDefaultExpectedDuration;
+    camera_metadata_ro_entry_t e = camera_metadata_ro_entry_t();
+    find_camera_metadata_ro_entry(request,
+            ANDROID_CONTROL_AE_MODE,
+            &e);
+    if (e.count == 0) return maxExpectedDuration;
+
+    switch (e.data.u8[0]) {
+        case ANDROID_CONTROL_AE_MODE_OFF:
+            find_camera_metadata_ro_entry(request,
+                    ANDROID_SENSOR_EXPOSURE_TIME,
+                    &e);
+            if (e.count > 0) {
+                maxExpectedDuration = e.data.i64[0];
+            }
+            find_camera_metadata_ro_entry(request,
+                    ANDROID_SENSOR_FRAME_DURATION,
+                    &e);
+            if (e.count > 0) {
+                maxExpectedDuration = std::max(e.data.i64[0], maxExpectedDuration);
+            }
+            break;
+        default:
+            find_camera_metadata_ro_entry(request,
+                    ANDROID_CONTROL_AE_TARGET_FPS_RANGE,
+                    &e);
+            if (e.count > 1) {
+                maxExpectedDuration = 1e9 / e.data.u8[0];
+            }
+            break;
+    }
+
+    return maxExpectedDuration;
+}
+
 bool Camera3Device::RequestThread::threadLoop() {
     ATRACE_CALL();
     status_t res;
@@ -4133,7 +4183,8 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         res = parent->registerInFlight(halRequest->frame_number,
                 totalNumBuffers, captureRequest->mResultExtras,
                 /*hasInput*/halRequest->input_buffer != NULL,
-                hasCallback);
+                hasCallback,
+                calculateMaxExpectedDuration(halRequest->settings));
         ALOGVV("%s: registered in flight requestId = %" PRId32 ", frameNumber = %" PRId64
                ", burstId = %" PRId32 ".",
                 __FUNCTION__,
@@ -4185,6 +4236,11 @@ bool Camera3Device::RequestThread::isStreamPending(
     }
 
     return false;
+}
+
+nsecs_t Camera3Device::getExpectedInFlightDurationLocked() {
+    return mExpectedInflightDuration > kMinInflightDuration ?
+            mExpectedInflightDuration : kMinInflightDuration;
 }
 
 void Camera3Device::RequestThread::cleanUpFailedRequests(bool sendRequestError) {
