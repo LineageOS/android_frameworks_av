@@ -1630,6 +1630,7 @@ MPEG4Writer::Track::Track(
       mCodecSpecificDataSize(0),
       mGotAllCodecSpecificData(false),
       mReachedEOS(false),
+      mStartTimestampUs(-1),
       mRotation(0) {
     getCodecSpecificDataFromInputFormatIfPossible();
 
@@ -3650,7 +3651,7 @@ void MPEG4Writer::Track::writePaspBox() {
 int64_t MPEG4Writer::Track::getStartTimeOffsetScaledTimeUs() const {
     int64_t trackStartTimeOffsetUs = 0;
     int64_t moovStartTimeUs = mOwner->getStartTimestampUs();
-    if (mStartTimestampUs != moovStartTimeUs) {
+    if (mStartTimestampUs != -1 && mStartTimestampUs != moovStartTimeUs) {
         CHECK_GT(mStartTimestampUs, moovStartTimeUs);
         trackStartTimeOffsetUs = mStartTimestampUs - moovStartTimeUs;
     }
