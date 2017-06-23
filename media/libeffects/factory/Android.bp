@@ -17,6 +17,7 @@ cc_library_shared {
         "liblog",
         "libdl",
     ],
+    cflags: ["-fvisibility=hidden"],
 
     include_dirs: ["system/media/audio_effects/include"],
 

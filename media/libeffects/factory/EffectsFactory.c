@@ -29,6 +29,7 @@
 #include <cutils/properties.h>
 #include <log/log.h>
 
+#include <media/EffectsFactoryApi.h>
 #include <system/audio_effects/audio_effects_conf.h>
 
 static list_elem_t *gEffectList; // list of effect_entry_t: all currently created effects
