@@ -167,7 +167,7 @@ status_t AudioPolicyService::getOutputForAttr(const audio_attributes_t *attr,
                                               uid_t uid,
                                               const audio_config_t *config,
                                               audio_output_flags_t flags,
-                                              audio_port_handle_t selectedDeviceId,
+                                              audio_port_handle_t *selectedDeviceId,
                                               audio_port_handle_t *portId)
 {
     if (mAudioPolicyManager == NULL) {
@@ -277,7 +277,7 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
                                              uid_t uid,
                                              const audio_config_base_t *config,
                                              audio_input_flags_t flags,
-                                             audio_port_handle_t selectedDeviceId,
+                                             audio_port_handle_t *selectedDeviceId,
                                              audio_port_handle_t *portId)
 {
     if (mAudioPolicyManager == NULL) {
