@@ -832,6 +832,25 @@ size_t AudioTrackServerProxy::framesReady()
     return filled;
 }
 
+__attribute__((no_sanitize("integer")))
+size_t AudioTrackServerProxy::framesReadySafe() const
+{
+    if (mIsShutdown) {
+        return 0;
+    }
+    const audio_track_cblk_t* cblk = mCblk;
+    const int32_t flush = android_atomic_acquire_load(&cblk->u.mStreaming.mFlush);
+    if (flush != mFlush) {
+        return mFrameCount;
+    }
+    const int32_t rear = android_atomic_acquire_load(&cblk->u.mStreaming.mRear);
+    const ssize_t filled = rear - cblk->u.mStreaming.mFront;
+    if (!(0 <= filled && (size_t) filled <= mFrameCount)) {
+        return 0; // error condition, silently return 0.
+    }
+    return filled;
+}
+
 bool  AudioTrackServerProxy::setStreamEndDone() {
     audio_track_cblk_t* cblk = mCblk;
     bool old =
@@ -897,6 +916,11 @@ size_t StaticAudioTrackServerProxy::framesReady()
     if (!mFramesReadyIsCalledByMultipleThreads) {
         (void) pollPosition();
     }
+    return mFramesReadySafe;
+}
+
+size_t StaticAudioTrackServerProxy::framesReadySafe() const
+{
     return mFramesReadySafe;
 }
 
