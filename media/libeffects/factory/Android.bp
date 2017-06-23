@@ -10,7 +10,9 @@ cc_library_headers {
 cc_library_shared {
     name: "libeffects",
     vendor: true,
-    srcs: ["EffectsFactory.c"],
+    srcs: ["EffectsFactory.c",
+           "EffectsConfigLoader.c",
+           "EffectsFactoryState.c"],
 
     shared_libs: [
         "libcutils",
