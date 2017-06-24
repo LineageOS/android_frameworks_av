@@ -35,7 +35,7 @@ public:
 
     /**
      * Find a service endpoint for the given deviceId and direction.
-     * If an endpoint does not already exist then it will try to create one.
+     * If an endpoint does not already exist then try to create one.
      *
      * @param deviceId
      * @param direction

@@ -125,6 +125,8 @@ protected:
 
     aaudio_result_t onTimestampFromServer(AAudioServiceMessage *message);
 
+    void logTimestamp(AAudioServiceMessage &message);
+
     // Calculate timeout for an operation involving framesPerOperation.
     int64_t calculateReasonableTimeout(int32_t framesPerOperation);
 
@@ -155,6 +157,9 @@ protected:
     uint8_t                 *mCallbackBuffer = nullptr;
     int32_t                  mCallbackFrames = 0;
 
+    // The service uses this for SHARED mode.
+    bool                     mInService = false;  // Is this running in the client or the service?
+
 private:
     /*
      * Asynchronous write with data conversion.
@@ -172,8 +177,6 @@ private:
     EndpointDescriptor       mEndpointDescriptor; // buffer description with resolved addresses
     AAudioServiceInterface  &mServiceInterface;   // abstract interface to the service
 
-    // The service uses this for SHARED mode.
-    bool                     mInService = false;  // Is this running in the client or the service?
 };
 
 } /* namespace aaudio */

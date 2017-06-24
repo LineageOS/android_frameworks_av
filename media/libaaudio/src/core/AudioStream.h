@@ -186,13 +186,9 @@ public:
         return AAudioConvert_formatToSizeInBytes(mFormat);
     }
 
-    virtual int64_t getFramesWritten() {
-        return mFramesWritten.get();
-    }
+    virtual int64_t getFramesWritten() = 0;
 
-    virtual int64_t getFramesRead() {
-        return mFramesRead.get();
-    }
+    virtual int64_t getFramesRead() = 0;
 
     AAudioStream_dataCallback getDataCallbackProc() const {
         return mDataCallbackProc;
@@ -232,13 +228,6 @@ public:
 
 protected:
 
-    virtual int64_t incrementFramesWritten(int32_t frames) {
-        return mFramesWritten.increment(frames);
-    }
-
-    virtual int64_t incrementFramesRead(int32_t frames) {
-        return mFramesRead.increment(frames);
-    }
 
     /**
      * This should not be called after the open() call.
@@ -281,8 +270,6 @@ protected:
     std::atomic<bool>    mCallbackEnabled;
 
 protected:
-    MonotonicCounter     mFramesWritten;
-    MonotonicCounter     mFramesRead;
 
     void setPeriodNanoseconds(int64_t periodNanoseconds) {
         mPeriodNanoseconds.store(periodNanoseconds, std::memory_order_release);

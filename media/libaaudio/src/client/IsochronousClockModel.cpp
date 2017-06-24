@@ -41,6 +41,13 @@ IsochronousClockModel::IsochronousClockModel()
 IsochronousClockModel::~IsochronousClockModel() {
 }
 
+void IsochronousClockModel::setPositionAndTime(int64_t framePosition, int64_t nanoTime) {
+    ALOGV("IsochronousClockModel::setPositionAndTime(%lld, %lld)",
+          (long long) framePosition, (long long) nanoTime);
+    mMarkerFramePosition = framePosition;
+    mMarkerNanoTime = nanoTime;
+}
+
 void IsochronousClockModel::start(int64_t nanoTime) {
     ALOGD("IsochronousClockModel::start(nanos = %lld)\n", (long long) nanoTime);
     mMarkerNanoTime = nanoTime;
@@ -49,8 +56,8 @@ void IsochronousClockModel::start(int64_t nanoTime) {
 
 void IsochronousClockModel::stop(int64_t nanoTime) {
     ALOGD("IsochronousClockModel::stop(nanos = %lld)\n", (long long) nanoTime);
-    mMarkerNanoTime = nanoTime;
-    mMarkerFramePosition = convertTimeToPosition(nanoTime); // TODO should we do this?
+    setPositionAndTime(convertTimeToPosition(nanoTime), nanoTime);
+    // TODO should we set position?
     mState = STATE_STOPPED;
 }
 
@@ -79,15 +86,13 @@ void IsochronousClockModel::processTimestamp(int64_t framePosition, int64_t nano
     case STATE_STOPPED:
         break;
     case STATE_STARTING:
-        mMarkerFramePosition = framePosition;
-        mMarkerNanoTime = nanoTime;
+        setPositionAndTime(framePosition, nanoTime);
         mState = STATE_SYNCING;
         break;
     case STATE_SYNCING:
         // This will handle a burst of rapid transfer at the beginning.
         if (nanosDelta < expectedNanosDelta) {
-            mMarkerFramePosition = framePosition;
-            mMarkerNanoTime = nanoTime;
+            setPositionAndTime(framePosition, nanoTime);
         } else {
 //            ALOGD("processTimestamp() - advance to STATE_RUNNING");
             mState = STATE_RUNNING;
@@ -98,17 +103,15 @@ void IsochronousClockModel::processTimestamp(int64_t framePosition, int64_t nano
             // Earlier than expected timestamp.
             // This data is probably more accurate so use it.
             // or we may be drifting due to a slow HW clock.
-            mMarkerFramePosition = framePosition;
-            mMarkerNanoTime = nanoTime;
 //            ALOGD("processTimestamp() - STATE_RUNNING - %d < %d micros - EARLY",
 //                 (int) (nanosDelta / 1000), (int)(expectedNanosDelta / 1000));
+            setPositionAndTime(framePosition, nanoTime);
         } else if (nanosDelta > (expectedNanosDelta + mMaxLatenessInNanos)) {
             // Later than expected timestamp.
-            mMarkerFramePosition = framePosition;
-            mMarkerNanoTime = nanoTime - mMaxLatenessInNanos;
 //            ALOGD("processTimestamp() - STATE_RUNNING - %d > %d + %d micros - LATE",
 //                 (int) (nanosDelta / 1000), (int)(expectedNanosDelta / 1000),
 //                 (int) (mMaxLatenessInNanos / 1000));
+            setPositionAndTime(framePosition - mFramesPerBurst,  nanoTime - mMaxLatenessInNanos);
         }
         break;
     default:
@@ -131,8 +134,7 @@ void IsochronousClockModel::update() {
     mMaxLatenessInNanos = (nanosLate > MIN_LATENESS_NANOS) ? nanosLate : MIN_LATENESS_NANOS;
 }
 
-int64_t IsochronousClockModel::convertDeltaPositionToTime(
-        int64_t framesDelta) const {
+int64_t IsochronousClockModel::convertDeltaPositionToTime(int64_t framesDelta) const {
     return (AAUDIO_NANOS_PER_SECOND * framesDelta) / mSampleRate;
 }
 
@@ -170,4 +172,13 @@ int64_t IsochronousClockModel::convertTimeToPosition(int64_t nanoTime) const {
 //    ALOGD("IsochronousClockModel::convertTimeToPosition: framesDelta = %llu, mFramesPerBurst = %d",
 //         (long long) framesDelta, mFramesPerBurst);
     return position;
+}
+
+void IsochronousClockModel::dump() const {
+    ALOGD("IsochronousClockModel::mMarkerFramePosition = %lld", (long long) mMarkerFramePosition);
+    ALOGD("IsochronousClockModel::mMarkerNanoTime      = %lld", (long long) mMarkerNanoTime);
+    ALOGD("IsochronousClockModel::mSampleRate          = %6d", mSampleRate);
+    ALOGD("IsochronousClockModel::mFramesPerBurst      = %6d", mFramesPerBurst);
+    ALOGD("IsochronousClockModel::mMaxLatenessInNanos  = %6d", mMaxLatenessInNanos);
+    ALOGD("IsochronousClockModel::mState               = %6d", mState);
 }

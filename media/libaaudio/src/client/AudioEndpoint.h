@@ -91,6 +91,8 @@ public:
 
     int32_t getBufferCapacityInFrames() const;
 
+    void dump() const;
+
 private:
     android::FifoBuffer    *mUpCommandQueue;
     android::FifoBuffer    *mDataQueue;

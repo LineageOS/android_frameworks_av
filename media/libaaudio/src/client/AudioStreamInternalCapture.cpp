@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudio"
+#define LOG_TAG (mInService ? "AAudioService" : "AAudio")
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include <algorithm>
 #include <aaudio/AAudio.h>
 
 #include "client/AudioStreamInternalCapture.h"
@@ -155,29 +156,27 @@ aaudio_result_t AudioStreamInternalCapture::readNowWithConversion(void *buffer,
 
     int32_t framesProcessed = numFrames - framesLeft;
     mAudioEndpoint.advanceReadIndex(framesProcessed);
-    incrementFramesRead(framesProcessed);
 
     //ALOGD("AudioStreamInternalCapture::readNowWithConversion() returns %d", framesProcessed);
     return framesProcessed;
 }
 
-int64_t AudioStreamInternalCapture::getFramesWritten()
-{
-    int64_t frames =
-            mClockModel.convertTimeToPosition(AudioClock::getNanoseconds())
-            + mFramesOffsetFromService;
-    // Prevent retrograde motion.
-    if (frames < mLastFramesWritten) {
-        frames = mLastFramesWritten;
+int64_t AudioStreamInternalCapture::getFramesWritten() {
+    int64_t framesWrittenHardware;
+    if (isActive()) {
+        framesWrittenHardware = mClockModel.convertTimeToPosition(AudioClock::getNanoseconds());
     } else {
-        mLastFramesWritten = frames;
+        framesWrittenHardware = mAudioEndpoint.getDataWriteCounter();
     }
-    //ALOGD("AudioStreamInternalCapture::getFramesWritten() returns %lld", (long long)frames);
-    return frames;
+    // Prevent retrograde motion.
+    mLastFramesWritten = std::max(mLastFramesWritten,
+                                  framesWrittenHardware + mFramesOffsetFromService);
+    //ALOGD("AudioStreamInternalCapture::getFramesWritten() returns %lld",
+    //      (long long)mLastFramesWritten);
+    return mLastFramesWritten;
 }
 
-int64_t AudioStreamInternalCapture::getFramesRead()
-{
+int64_t AudioStreamInternalCapture::getFramesRead() {
     int64_t frames = mAudioEndpoint.getDataWriteCounter()
                                + mFramesOffsetFromService;
     //ALOGD("AudioStreamInternalCapture::getFramesRead() returns %lld", (long long)frames);
