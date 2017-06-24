@@ -95,6 +95,7 @@ private:
     int64_t mNumFramesSkipped;
     int64_t mNumFramesLost;
     int64_t mNumClientOwnedBuffers;
+    bool mNoMoreFramesToRead;
 
     List<MediaBuffer * > mBuffersReceived;
 
