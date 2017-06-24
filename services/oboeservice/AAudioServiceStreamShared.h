@@ -97,6 +97,14 @@ protected:
 
     aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) override;
 
+    /**
+     * @param requestedCapacityFrames
+     * @param framesPerBurst
+     * @return capacity or negative error
+     */
+    static int32_t calculateBufferCapacity(int32_t requestedCapacityFrames,
+                                            int32_t framesPerBurst);
+
 private:
     android::AAudioService  &mAudioService;
     AAudioServiceEndpoint   *mServiceEndpoint = nullptr;

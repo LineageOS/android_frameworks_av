@@ -423,7 +423,7 @@ int64_t AudioStreamTrack::getFramesRead() {
     default:
         break;
     }
-    return AudioStream::getFramesRead();
+    return AudioStreamLegacy::getFramesRead();
 }
 
 aaudio_result_t AudioStreamTrack::getTimestamp(clockid_t clockId,

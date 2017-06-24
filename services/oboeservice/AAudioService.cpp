@@ -89,7 +89,7 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
         return result;
     } else {
         aaudio_handle_t handle = mHandleTracker.put(AAUDIO_HANDLE_TYPE_STREAM, serviceStream);
-        ALOGV("AAudioService::openStream(): handle = 0x%08X", handle);
+        ALOGD("AAudioService::openStream(): handle = 0x%08X", handle);
         if (handle < 0) {
             ALOGE("AAudioService::openStream(): handle table full");
             delete serviceStream;

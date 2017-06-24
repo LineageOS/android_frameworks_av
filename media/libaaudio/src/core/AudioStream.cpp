@@ -36,6 +36,22 @@ AudioStream::AudioStream()
     setPeriodNanoseconds(0);
 }
 
+static const char *AudioStream_convertSharingModeToShortText(aaudio_sharing_mode_t sharingMode) {
+    const char *result;
+    switch (sharingMode) {
+        case AAUDIO_SHARING_MODE_EXCLUSIVE:
+            result = "EX";
+            break;
+        case AAUDIO_SHARING_MODE_SHARED:
+            result = "SH";
+            break;
+        default:
+            result = "?!";
+            break;
+    }
+    return result;
+}
+
 aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
 {
     // Call here as well because the AAudioService will call this without calling build().
@@ -62,8 +78,9 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     mErrorCallbackUserData = builder.getErrorCallbackUserData();
 
     // This is very helpful for debugging in the future. Please leave it in.
-    ALOGI("AudioStream::open() rate = %d, channels = %d, format = %d, sharing = %d, dir = %s",
-          mSampleRate, mSamplesPerFrame, mFormat, mSharingMode,
+    ALOGI("AudioStream::open() rate = %d, channels = %d, format = %d, sharing = %s, dir = %s",
+          mSampleRate, mSamplesPerFrame, mFormat,
+          AudioStream_convertSharingModeToShortText(mSharingMode),
           (getDirection() == AAUDIO_DIRECTION_OUTPUT) ? "OUTPUT" : "INPUT");
     ALOGI("AudioStream::open() device = %d, perfMode = %d, callbackFrames = %d",
           mDeviceId, mPerformanceMode, mFramesPerDataCallback);

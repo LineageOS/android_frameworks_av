@@ -32,6 +32,9 @@
 
 namespace aaudio {
 
+/**
+ * Contains a mixer and a stream for writing the result of the mix.
+ */
 class AAudioServiceEndpointPlay : public AAudioServiceEndpoint {
 public:
     explicit AAudioServiceEndpointPlay(android::AAudioService &audioService);
