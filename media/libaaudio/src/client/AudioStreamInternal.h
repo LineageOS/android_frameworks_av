@@ -18,6 +18,7 @@
 #define ANDROID_AAUDIO_AUDIO_STREAM_INTERNAL_H
 
 #include <stdint.h>
+#include <media/PlayerBase.h>
 #include <aaudio/AAudio.h>
 
 #include "binding/IAAudioService.h"
@@ -34,7 +35,7 @@ using android::IAAudioService;
 namespace aaudio {
 
 // A stream that talks to the AAudioService or directly to a HAL.
-class AudioStreamInternal : public AudioStream {
+class AudioStreamInternal : public AudioStream, public android::PlayerBase  {
 
 public:
     AudioStreamInternal(AAudioServiceInterface  &serviceInterface, bool inService);
@@ -89,6 +90,9 @@ public:
     // Calculate timeout based on framesPerBurst
     int64_t calculateReasonableTimeout();
 
+    //PlayerBase virtuals
+    virtual void destroy();
+
 protected:
 
     aaudio_result_t processData(void *buffer,
@@ -124,6 +128,14 @@ protected:
     // Calculate timeout for an operation involving framesPerOperation.
     int64_t calculateReasonableTimeout(int32_t framesPerOperation);
 
+    void doSetVolume();
+
+    //PlayerBase virtuals
+    virtual status_t playerStart();
+    virtual status_t playerPause();
+    virtual status_t playerStop();
+    virtual status_t playerSetVolume();
+
     aaudio_format_t          mDeviceFormat = AAUDIO_FORMAT_UNSPECIFIED;
 
     IsochronousClockModel    mClockModel;      // timing model for chasing the HAL
@@ -135,6 +147,7 @@ protected:
     int32_t                  mXRunCount = 0;      // how many underrun events?
 
     LinearRamp               mVolumeRamp;
+    float                    mStreamVolume;
 
     // Offset from underlying frame position.
     int64_t                  mFramesOffsetFromService = 0; // offset for timestamps
