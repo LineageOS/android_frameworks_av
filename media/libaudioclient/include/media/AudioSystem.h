@@ -33,7 +33,7 @@ namespace android {
 
 typedef void (*audio_error_callback)(status_t err);
 typedef void (*dynamic_policy_callback)(int event, String8 regId, int val);
-typedef void (*record_config_callback)(int event, audio_session_t session, int source,
+typedef void (*record_config_callback)(int event, const record_client_info_t *clientInfo,
                 const audio_config_base_t *clientConfig, const audio_config_base_t *deviceConfig,
                 audio_patch_handle_t patchHandle);
 
@@ -440,8 +440,9 @@ private:
         virtual void onAudioPortListUpdate();
         virtual void onAudioPatchListUpdate();
         virtual void onDynamicPolicyMixStateUpdate(String8 regId, int32_t state);
-        virtual void onRecordingConfigurationUpdate(int event, audio_session_t session,
-                        audio_source_t source, const audio_config_base_t *clientConfig,
+        virtual void onRecordingConfigurationUpdate(int event,
+                        const record_client_info_t *clientInfo,
+                        const audio_config_base_t *clientConfig,
                         const audio_config_base_t *deviceConfig, audio_patch_handle_t patchHandle);
 
     private:

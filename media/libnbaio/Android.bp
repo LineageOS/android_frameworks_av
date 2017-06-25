@@ -8,6 +8,7 @@ cc_library_shared {
         "MonoPipeReader.cpp",
         "NBAIO.cpp",
         "NBLog.cpp",
+        "PerformanceAnalysis.cpp",
         "Pipe.cpp",
         "PipeReader.cpp",
         "SourceAudioBufferProvider.cpp",

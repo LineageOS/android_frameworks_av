@@ -509,9 +509,10 @@ protected:
                 template <typename T>
                 class ActiveTracks {
                 public:
-                    ActiveTracks()
+                    explicit ActiveTracks(SimpleLog *localLog = nullptr)
                         : mActiveTracksGeneration(0)
                         , mLastActiveTracksGeneration(0)
+                        , mLocalLog(localLog)
                     { }
 
                     ~ActiveTracks() {
@@ -563,6 +564,8 @@ protected:
                     void            updatePowerState(sp<ThreadBase> thread, bool force = false);
 
                 private:
+                    void            logTrack(const char *funcName, const sp<T> &track) const;
+
                     SortedVector<uid_t> getWakeLockUids() {
                         SortedVector<uid_t> wakeLockUids;
                         for (const sp<T> &track : mActiveTracks) {
@@ -577,6 +580,7 @@ protected:
                     int                 mActiveTracksGeneration;
                     int                 mLastActiveTracksGeneration;
                     wp<T>               mLatestActiveTrack; // latest track added to ActiveTracks
+                    SimpleLog * const   mLocalLog;
                 };
 
                 SimpleLog mLocalLog;

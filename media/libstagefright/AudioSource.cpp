@@ -66,7 +66,8 @@ AudioSource::AudioSource(
       mNumFramesReceived(0),
       mNumFramesSkipped(0),
       mNumFramesLost(0),
-      mNumClientOwnedBuffers(0) {
+      mNumClientOwnedBuffers(0),
+      mNoMoreFramesToRead(false) {
     ALOGV("sampleRate: %u, outSampleRate: %u, channelCount: %u",
             sampleRate, outSampleRate, channelCount);
     CHECK(channelCount == 1 || channelCount == 2);
@@ -178,6 +179,7 @@ status_t AudioSource::reset() {
 
     mStarted = false;
     mStopSystemTimeUs = -1;
+    mNoMoreFramesToRead = false;
     mFrameAvailableCondition.signal();
 
     mRecord->stop();
@@ -246,6 +248,9 @@ status_t AudioSource::read(
 
     while (mStarted && mBuffersReceived.empty()) {
         mFrameAvailableCondition.wait(mLock);
+        if (mNoMoreFramesToRead) {
+            return OK;
+        }
     }
     if (!mStarted) {
         return OK;
@@ -359,6 +364,8 @@ status_t AudioSource::dataCallback(const AudioRecord::Buffer& audioBuffer) {
     if (mStopSystemTimeUs != -1 && timeUs >= mStopSystemTimeUs) {
         ALOGV("Drop Audio frame at %lld  stop time: %lld us",
                 (long long)timeUs, (long long)mStopSystemTimeUs);
+        mNoMoreFramesToRead = true;
+        mFrameAvailableCondition.signal();
         return OK;
     }
 

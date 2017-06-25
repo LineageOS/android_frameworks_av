@@ -67,7 +67,10 @@ cc_library_shared {
         "system/media/private/camera/include",
         "frameworks/native/include/media/openmax",
     ],
-    export_include_dirs: ["include/camera"],
+    export_include_dirs: [
+         "include",
+         "include/camera"
+    ],
     export_shared_lib_headers: ["libcamera_metadata"],
 
     cflags: [

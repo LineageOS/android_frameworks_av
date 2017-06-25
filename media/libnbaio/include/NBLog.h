@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -444,8 +444,6 @@ public:
 
     virtual ~Reader();
 
-    void alertIfGlitch(const std::vector<int64_t> &samples);
-
     // get snapshot of readers fifo buffer, effectively consuming the buffer
     std::unique_ptr<Snapshot> getSnapshot();
     // dump a particular snapshot of the reader
@@ -453,12 +451,10 @@ public:
     // dump the current content of the reader's buffer (call getSnapshot() and previous dump())
     void     dump(int fd, size_t indent = 0);
     bool     isIMemory(const sp<IMemory>& iMemory) const;
-    // if findGlitch is true, log warning when buffer periods caused glitch
-    void     setFindGlitch(bool s);
-    bool     isFindGlitch() const;
 
 private:
 
+    // TODO: decide whether these belong in NBLog::Reader or in PerformanceAnalysis
     static const int kShortHistSize = 50; // number of samples in a short-term histogram
     static const int kRecentHistsCapacity = 100; // number of short-term histograms stored in memory
     static const std::set<Event> startingTypes;
@@ -502,22 +498,12 @@ private:
     // dummy method for handling absent author entry
     virtual void handleAuthor(const AbstractEntry& /*fmtEntry*/, String8* /*body*/) {}
 
-    static void drawHistogram(String8 *body, const std::vector<int64_t> &samples,
-                              bool logScale, int indent = 0, int maxHeight = 10);
-
-    static void reportPerformance(String8 *body,
-                                  const std::deque<std::pair
-                                         <int, short_histogram>> &shortHists,
-                                  int maxHeight = 10);
-
     // Searches for the last entry of type <type> in the range [front, back)
     // back has to be entry-aligned. Returns nullptr if none enconuntered.
     static const uint8_t *findLastEntryOfTypes(const uint8_t *front, const uint8_t *back,
                                          const std::set<Event> &types);
 
     static const size_t kSquashTimestamp = 5; // squash this many or more adjacent timestamps
-
-    bool findGlitch; // alert if a local buffer period sequence caused an audio glitch
 };
 
 // Wrapper for a reader with a name. Contains a pointer to the reader and a pointer to the name

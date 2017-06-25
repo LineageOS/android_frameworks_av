@@ -36,8 +36,30 @@ AudioStream::AudioStream()
     setPeriodNanoseconds(0);
 }
 
+static const char *AudioStream_convertSharingModeToShortText(aaudio_sharing_mode_t sharingMode) {
+    const char *result;
+    switch (sharingMode) {
+        case AAUDIO_SHARING_MODE_EXCLUSIVE:
+            result = "EX";
+            break;
+        case AAUDIO_SHARING_MODE_SHARED:
+            result = "SH";
+            break;
+        default:
+            result = "?!";
+            break;
+    }
+    return result;
+}
+
 aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
 {
+    // Call here as well because the AAudioService will call this without calling build().
+    aaudio_result_t result = builder.validate();
+    if (result != AAUDIO_OK) {
+        return result;
+    }
+
     // Copy parameters from the Builder because the Builder may be deleted after this call.
     mSamplesPerFrame = builder.getSamplesPerFrame();
     mSampleRate = builder.getSampleRate();
@@ -56,44 +78,13 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     mErrorCallbackUserData = builder.getErrorCallbackUserData();
 
     // This is very helpful for debugging in the future. Please leave it in.
-    ALOGI("AudioStream::open() rate = %d, channels = %d, format = %d, sharing = %d, dir = %s",
-          mSampleRate, mSamplesPerFrame, mFormat, mSharingMode,
+    ALOGI("AudioStream::open() rate = %d, channels = %d, format = %d, sharing = %s, dir = %s",
+          mSampleRate, mSamplesPerFrame, mFormat,
+          AudioStream_convertSharingModeToShortText(mSharingMode),
           (getDirection() == AAUDIO_DIRECTION_OUTPUT) ? "OUTPUT" : "INPUT");
     ALOGI("AudioStream::open() device = %d, perfMode = %d, callbackFrames = %d",
           mDeviceId, mPerformanceMode, mFramesPerDataCallback);
 
-    // Check for values that are ridiculously out of range to prevent math overflow exploits.
-    // The service will do a better check.
-    if (mSamplesPerFrame < 0 || mSamplesPerFrame > 128) {
-        ALOGE("AudioStream::open(): samplesPerFrame out of range = %d", mSamplesPerFrame);
-        return AAUDIO_ERROR_OUT_OF_RANGE;
-    }
-
-    switch(mFormat) {
-        case AAUDIO_FORMAT_UNSPECIFIED:
-        case AAUDIO_FORMAT_PCM_I16:
-        case AAUDIO_FORMAT_PCM_FLOAT:
-            break; // valid
-        default:
-            ALOGE("AudioStream::open(): audioFormat not valid = %d", mFormat);
-            return AAUDIO_ERROR_INVALID_FORMAT;
-            // break;
-    }
-
-    if (mSampleRate != AAUDIO_UNSPECIFIED && (mSampleRate < 8000 || mSampleRate > 1000000)) {
-        ALOGE("AudioStream::open(): mSampleRate out of range = %d", mSampleRate);
-        return AAUDIO_ERROR_INVALID_RATE;
-    }
-
-    switch(mPerformanceMode) {
-        case AAUDIO_PERFORMANCE_MODE_NONE:
-        case AAUDIO_PERFORMANCE_MODE_POWER_SAVING:
-        case AAUDIO_PERFORMANCE_MODE_LOW_LATENCY:
-            break;
-        default:
-            ALOGE("AudioStream::open(): illegal performanceMode %d", mPerformanceMode);
-            return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
-    }
 
     return AAUDIO_OK;
 }
