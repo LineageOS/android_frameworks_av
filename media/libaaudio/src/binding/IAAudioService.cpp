@@ -45,11 +45,9 @@ public:
         Parcel data, reply;
         // send command
         data.writeInterfaceToken(IAAudioService::getInterfaceDescriptor());
-        ALOGV("BpAAudioService::client openStream --------------------");
         // request.dump();
         request.writeToParcel(&data);
         status_t err = remote()->transact(OPEN_STREAM, data, &reply);
-        ALOGV("BpAAudioService::client openStream returned %d", err);
         if (err != NO_ERROR) {
             ALOGE("BpAAudioService::client openStream transact failed %d", err);
             return AAudioConvert_androidToAAudioResult(err);
@@ -57,6 +55,7 @@ public:
         // parse reply
         aaudio_handle_t stream;
         err = reply.readInt32(&stream);
+        ALOGD("BpAAudioService::client openStream returned stream = 0x%08x", stream);
         if (err != NO_ERROR) {
             ALOGE("BpAAudioService::client transact(OPEN_STREAM) readInt %d", err);
             return AAudioConvert_androidToAAudioResult(err);

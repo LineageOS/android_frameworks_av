@@ -46,6 +46,7 @@ using namespace aaudio;   // TODO just import names needed
 
 // Set up an EXCLUSIVE MMAP stream that will be shared.
 aaudio_result_t AAudioServiceEndpoint::open(int32_t deviceId) {
+    mRequestedDeviceId = deviceId;
     mStreamInternal = getStreamInternal();
 
     AudioStreamBuilder builder;

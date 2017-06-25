@@ -48,6 +48,7 @@ public:
     aaudio_result_t stopStream(AAudioServiceStreamShared *sharedStream);
     aaudio_result_t close();
 
+    int32_t getRequestedDeviceId() const { return mRequestedDeviceId; }
     int32_t getDeviceId() const { return mStreamInternal->getDeviceId(); }
 
     aaudio_direction_t getDirection() const { return mStreamInternal->getDirection(); }
@@ -81,6 +82,7 @@ private:
 
     AudioStreamInternal     *mStreamInternal = nullptr;
     int32_t                  mReferenceCount = 0;
+    int32_t                  mRequestedDeviceId = 0;
 };
 
 } /* namespace aaudio */
