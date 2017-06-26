@@ -19,6 +19,10 @@
 
 #include "EffectsFactory.h"
 
+#if __cplusplus
+extern "C" {
+#endif
+
 /** @file Contains the state shared with configuration loader of the Effect factory.
  *        This global state should probably be refactor in a structure
  *        provided by the config loader on EffectsFactory init.
@@ -26,7 +30,8 @@
  */
 
 extern list_elem_t *gLibraryList; // list of lib_entry_t: all currently loaded libraries
-extern list_elem_t *gSkippedEffects; // list of effects skipped because of duplicate uuid
+// list of effects skipped because of duplicate uuid or invalid version
+extern list_elem_t *gSkippedEffects;
 // list of effect_descriptor and list of sub effects : all currently loaded
 // It does not contain effects without sub effects.
 extern list_sub_elem_t *gSubEffectList;
@@ -47,5 +52,9 @@ int uuidToString(const effect_uuid_t *uuid, char *str, size_t maxLen);
 
 /** Used for debuging. */
 void dumpEffectDescriptor(effect_descriptor_t *desc, char *str, size_t len, int indent);
+
+#if __cplusplus
+} // extern "C"
+#endif
 
 #endif // ANDROID_EFFECTSFACTORYSTATE_H_

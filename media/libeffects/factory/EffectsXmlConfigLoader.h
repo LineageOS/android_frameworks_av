@@ -14,23 +14,25 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_EFFECTSCONFIGLOADER_H
-#define ANDROID_EFFECTSCONFIGLOADER_H
+#ifndef ANDROID_EFFECTSXMLCONFIGLOADER_H
+#define ANDROID_EFFECTSXMLCONFIGLOADER_H
 
-#include "EffectsFactoryState.h"
+#include <unistd.h>
 
-#ifdef  __cplusplus
+#if __cplusplus
 extern "C" {
 #endif
 
+/** Parses the platform effect xml configuration and stores its content in EffectFactoryState.
+ * @param[in] path of the configuration file or NULL to load the default one
+ * @return -1 on unrecoverable error (eg: no configuration file)
+ *         0 on success
+ *         the number of invalid elements (lib & effect) skipped if the config is partially invalid
+ */
+ssize_t loadXmlEffectConfig(const char* path);
 
-/** Parses the platform effect configuration
- * and stores its content in the global EffectFactoryState. */
-int loadEffectConfig();
-
-
-#ifdef  __cplusplus
+#if __cplusplus
 } // extern "C"
 #endif
 
-#endif  // ANDROID_EFFECTSCONFIGLOADER_H
+#endif  // ANDROID_EFFECTSXMLCONFIGLOADER_H
