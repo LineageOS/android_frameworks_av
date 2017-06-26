@@ -334,6 +334,12 @@ public:
      */
             status_t getTimestamp(ExtendedTimestamp *timestamp);
 
+    /**
+     * @param transferType
+     * @return text string that matches the enum name
+     */
+    static const char * convertTransferToText(transfer_type transferType);
+
     /* Returns a handle on the audio input used by this AudioRecord.
      *
      * Parameters:
