@@ -64,6 +64,7 @@ int main(int argc, char **argv)
     int32_t  xRunCount = 0;
     float   *floatData = nullptr;
     int16_t *shortData = nullptr;
+    int32_t deviceId;
 
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
@@ -85,6 +86,9 @@ int main(int argc, char **argv)
 
     aaudioStream = player.getStream();
     // Request stream properties.
+
+    deviceId = AAudioStream_getDeviceId(aaudioStream);
+    printf("deviceId = %d\n", deviceId);
 
     state = AAudioStream_getState(aaudioStream);
     printf("after open, state = %s\n", AAudio_convertStreamStateToText(state));

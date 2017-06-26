@@ -306,14 +306,14 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
                                             &fullConfig,
                                             (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ |
                                                     AUDIO_OUTPUT_FLAG_DIRECT),
-                                            *deviceId, &portId);
+                                            deviceId, &portId);
     } else {
         ret = AudioSystem::getInputForAttr(attr, &io,
                                               sessionId,
                                               client.clientPid,
                                               client.clientUid,
                                               config,
-                                              AUDIO_INPUT_FLAG_MMAP_NOIRQ, *deviceId, &portId);
+                                              AUDIO_INPUT_FLAG_MMAP_NOIRQ, deviceId, &portId);
     }
     if (ret != NO_ERROR) {
         return ret;

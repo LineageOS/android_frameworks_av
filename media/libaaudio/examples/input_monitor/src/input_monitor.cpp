@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <aaudio/AAudio.h>
+#include <aaudio/AAudioTesting.h>
 #include "AAudioExampleUtils.h"
 #include "AAudioSimpleRecorder.h"
 
@@ -42,7 +43,7 @@ int main(int argc, char **argv)
     const aaudio_format_t requestedDataFormat = AAUDIO_FORMAT_PCM_I16;
     aaudio_format_t actualDataFormat;
 
-    const int requestedInputChannelCount = 1; // Can affect whether we get a FAST path.
+    const int requestedInputChannelCount = 2; // Can affect whether we get a FAST path.
 
     //aaudio_performance_mode_t requestedPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
     const aaudio_performance_mode_t requestedPerformanceMode = AAUDIO_PERFORMANCE_MODE_LOW_LATENCY;
@@ -61,12 +62,15 @@ int main(int argc, char **argv)
     int16_t *data = nullptr;
     float peakLevel = 0.0;
     int loopCounter = 0;
+    int32_t deviceId;
 
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
 
     printf("%s - Monitor input level using AAudio\n", argv[0]);
+
+//    AAudio_setMMapPolicy(AAUDIO_POLICY_ALWAYS);
 
     recorder.setPerformanceMode(requestedPerformanceMode);
     recorder.setSharingMode(requestedSharingMode);
@@ -78,6 +82,9 @@ int main(int argc, char **argv)
         goto finish;
     }
     aaudioStream = recorder.getStream();
+
+    deviceId = AAudioStream_getDeviceId(aaudioStream);
+    printf("deviceId = %d\n", deviceId);
 
     actualSamplesPerFrame = AAudioStream_getChannelCount(aaudioStream);
     printf("SamplesPerFrame = %d\n", actualSamplesPerFrame);
@@ -133,7 +140,7 @@ int main(int argc, char **argv)
     framesLeft = framesToRecord;
     while (framesLeft > 0) {
         // Read audio data from the stream.
-        const int64_t timeoutNanos = 100 * NANOS_PER_MILLISECOND;
+        const int64_t timeoutNanos = 1000 * NANOS_PER_MILLISECOND;
         int minFrames = (framesToRecord < framesPerRead) ? framesToRecord : framesPerRead;
         int actual = AAudioStream_read(aaudioStream, data, minFrames, timeoutNanos);
         if (actual < 0) {
