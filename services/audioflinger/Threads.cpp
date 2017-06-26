@@ -36,7 +36,7 @@
 #include <hardware/audio.h>
 #include <audio_effects/effect_ns.h>
 #include <audio_effects/effect_aec.h>
-#include <audio_utils/conversion.h>
+#include <audio_utils/mono_blend.h>
 #include <audio_utils/primitives.h>
 #include <audio_utils/format.h>
 #include <audio_utils/minifloat.h>
