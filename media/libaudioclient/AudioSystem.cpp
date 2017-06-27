@@ -819,7 +819,7 @@ status_t AudioSystem::getOutputForAttr(const audio_attributes_t *attr,
                                         uid_t uid,
                                         const audio_config_t *config,
                                         audio_output_flags_t flags,
-                                        audio_port_handle_t selectedDeviceId,
+                                        audio_port_handle_t *selectedDeviceId,
                                         audio_port_handle_t *portId)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
@@ -863,7 +863,7 @@ status_t AudioSystem::getInputForAttr(const audio_attributes_t *attr,
                                 uid_t uid,
                                 const audio_config_base_t *config,
                                 audio_input_flags_t flags,
-                                audio_port_handle_t selectedDeviceId,
+                                audio_port_handle_t *selectedDeviceId,
                                 audio_port_handle_t *portId)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();

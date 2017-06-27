@@ -7650,26 +7650,28 @@ status_t AudioFlinger::MmapThread::start(const MmapStreamInterface::Client& clie
             audio_stream_type_t stream = streamType();
             audio_output_flags_t flags =
                     (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ | AUDIO_OUTPUT_FLAG_DIRECT);
+            audio_port_handle_t deviceId = AUDIO_PORT_HANDLE_NONE;
             ret = AudioSystem::getOutputForAttr(&mAttr, &io,
                                                 sessionId,
                                                 &stream,
                                                 client.clientUid,
                                                 &config,
                                                 flags,
-                                                AUDIO_PORT_HANDLE_NONE,
+                                                &deviceId,
                                                 &portId);
         } else {
             audio_config_base_t config;
             config.sample_rate = mSampleRate;
             config.channel_mask = mChannelMask;
             config.format = mFormat;
+            audio_port_handle_t deviceId = AUDIO_PORT_HANDLE_NONE;
             ret = AudioSystem::getInputForAttr(&mAttr, &io,
                                                   sessionId,
                                                   client.clientPid,
                                                   client.clientUid,
                                                   &config,
                                                   AUDIO_INPUT_FLAG_MMAP_NOIRQ,
-                                                  AUDIO_PORT_HANDLE_NONE,
+                                                  &deviceId,
                                                   &portId);
         }
         // APM should not chose a different input or output stream for the same set of attributes

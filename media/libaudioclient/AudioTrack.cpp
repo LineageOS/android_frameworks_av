@@ -184,6 +184,7 @@ AudioTrack::AudioTrack()
       mPreviousSchedulingGroup(SP_DEFAULT),
       mPausedPosition(0),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
+      mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE),
       mPortId(AUDIO_PORT_HANDLE_NONE)
 {
     mAttributes.content_type = AUDIO_CONTENT_TYPE_UNKNOWN;
@@ -1226,7 +1227,14 @@ audio_port_handle_t AudioTrack::getRoutedDeviceId() {
     if (mOutput == AUDIO_IO_HANDLE_NONE) {
         return AUDIO_PORT_HANDLE_NONE;
     }
-    return AudioSystem::getDeviceIdForIo(mOutput);
+    // if the output stream does not have an active audio patch, use either the device initially
+    // selected by audio policy manager or the last routed device
+    audio_port_handle_t deviceId = AudioSystem::getDeviceIdForIo(mOutput);
+    if (deviceId == AUDIO_PORT_HANDLE_NONE) {
+        deviceId = mRoutedDeviceId;
+    }
+    mRoutedDeviceId = deviceId;
+    return deviceId;
 }
 
 status_t AudioTrack::attachAuxEffect(int effectId)
@@ -1306,10 +1314,11 @@ status_t AudioTrack::createTrack_l()
     config.channel_mask = mChannelMask;
     config.format = mFormat;
     config.offload_info = mOffloadInfoCopy;
+    mRoutedDeviceId = mSelectedDeviceId;
     status = AudioSystem::getOutputForAttr(attr, &output,
                                            mSessionId, &streamType, mClientUid,
                                            &config,
-                                           mFlags, mSelectedDeviceId, &mPortId);
+                                           mFlags, &mRoutedDeviceId, &mPortId);
 
     if (status != NO_ERROR || output == AUDIO_IO_HANDLE_NONE) {
         ALOGE("Could not get audio output for session %d, stream type %d, usage %d, sample rate %u,"

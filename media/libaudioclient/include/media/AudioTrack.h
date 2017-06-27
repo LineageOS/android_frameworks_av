@@ -1141,7 +1141,10 @@ protected:
 
     // For Device Selection API
     //  a value of AUDIO_PORT_HANDLE_NONE indicated default (AudioPolicyManager) routing.
-    audio_port_handle_t     mSelectedDeviceId;
+    audio_port_handle_t    mSelectedDeviceId; // Device requested by the application.
+    audio_port_handle_t    mRoutedDeviceId;   // Device actually selected by audio policy manager:
+                                              // May not match the app selection depending on other
+                                              // activity and connected devices.
 
     sp<VolumeHandler>       mVolumeHandler;
 

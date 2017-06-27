@@ -193,7 +193,7 @@ public:
                                         uid_t uid,
                                         const audio_config_t *config,
                                         audio_output_flags_t flags,
-                                        audio_port_handle_t selectedDeviceId,
+                                        audio_port_handle_t *selectedDeviceId,
                                         audio_port_handle_t *portId)
         {
             Parcel data, reply;
@@ -210,6 +210,10 @@ public:
             }
             if (output == NULL) {
                 ALOGE("getOutputForAttr NULL output - shouldn't happen");
+                return BAD_VALUE;
+            }
+            if (selectedDeviceId == NULL) {
+                ALOGE("getOutputForAttr NULL selectedDeviceId - shouldn't happen");
                 return BAD_VALUE;
             }
             if (portId == NULL) {
@@ -232,7 +236,7 @@ public:
             data.writeInt32(uid);
             data.write(config, sizeof(audio_config_t));
             data.writeInt32(static_cast <uint32_t>(flags));
-            data.writeInt32(selectedDeviceId);
+            data.writeInt32(*selectedDeviceId);
             data.writeInt32(*portId);
             status_t status = remote()->transact(GET_OUTPUT_FOR_ATTR, data, &reply);
             if (status != NO_ERROR) {
@@ -247,6 +251,7 @@ public:
             if (stream != NULL) {
                 *stream = lStream;
             }
+            *selectedDeviceId = (audio_port_handle_t)reply.readInt32();
             *portId = (audio_port_handle_t)reply.readInt32();
             return status;
         }
@@ -296,7 +301,7 @@ public:
                                      uid_t uid,
                                      const audio_config_base_t *config,
                                      audio_input_flags_t flags,
-                                     audio_port_handle_t selectedDeviceId,
+                                     audio_port_handle_t *selectedDeviceId,
                                      audio_port_handle_t *portId)
     {
         Parcel data, reply;
@@ -309,6 +314,10 @@ public:
             ALOGE("getInputForAttr NULL input - shouldn't happen");
             return BAD_VALUE;
         }
+        if (selectedDeviceId == NULL) {
+            ALOGE("getInputForAttr NULL selectedDeviceId - shouldn't happen");
+            return BAD_VALUE;
+        }
         if (portId == NULL) {
             ALOGE("getInputForAttr NULL portId - shouldn't happen");
             return BAD_VALUE;
@@ -319,7 +328,7 @@ public:
         data.writeInt32(uid);
         data.write(config, sizeof(audio_config_base_t));
         data.writeInt32(flags);
-        data.writeInt32(selectedDeviceId);
+        data.writeInt32(*selectedDeviceId);
         data.writeInt32(*portId);
         status_t status = remote()->transact(GET_INPUT_FOR_ATTR, data, &reply);
         if (status != NO_ERROR) {
@@ -330,6 +339,7 @@ public:
             return status;
         }
         *input = (audio_io_handle_t)reply.readInt32();
+        *selectedDeviceId = (audio_port_handle_t)reply.readInt32();
         *portId = (audio_port_handle_t)reply.readInt32();
         return NO_ERROR;
     }
@@ -968,10 +978,11 @@ status_t BnAudioPolicyService::onTransact(
             status_t status = getOutputForAttr(hasAttributes ? &attr : NULL,
                     &output, session, &stream, uid,
                     &config,
-                    flags, selectedDeviceId, &portId);
+                    flags, &selectedDeviceId, &portId);
             reply->writeInt32(status);
             reply->writeInt32(output);
             reply->writeInt32(stream);
+            reply->writeInt32(selectedDeviceId);
             reply->writeInt32(portId);
             return NO_ERROR;
         } break;
@@ -1025,10 +1036,11 @@ status_t BnAudioPolicyService::onTransact(
             audio_io_handle_t input = AUDIO_IO_HANDLE_NONE;
             status_t status = getInputForAttr(&attr, &input, session, pid, uid,
                                               &config,
-                                              flags, selectedDeviceId, &portId);
+                                              flags, &selectedDeviceId, &portId);
             reply->writeInt32(status);
             if (status == NO_ERROR) {
                 reply->writeInt32(input);
+                reply->writeInt32(selectedDeviceId);
                 reply->writeInt32(portId);
             }
             return NO_ERROR;
