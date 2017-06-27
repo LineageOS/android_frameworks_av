@@ -334,6 +334,12 @@ public:
      */
             status_t getTimestamp(ExtendedTimestamp *timestamp);
 
+    /**
+     * @param transferType
+     * @return text string that matches the enum name
+     */
+    static const char * convertTransferToText(transfer_type transferType);
+
     /* Returns a handle on the audio input used by this AudioRecord.
      *
      * Parameters:
@@ -655,7 +661,10 @@ private:
 
     // For Device Selection API
     //  a value of AUDIO_PORT_HANDLE_NONE indicated default (AudioPolicyManager) routing.
-    audio_port_handle_t    mSelectedDeviceId;
+    audio_port_handle_t     mSelectedDeviceId; // Device requested by the application.
+    audio_port_handle_t     mRoutedDeviceId;   // Device actually selected by audio policy manager:
+                                              // May not match the app selection depending on other
+                                              // activity and connected devices
     sp<AudioSystem::AudioDeviceCallback> mDeviceCallback;
     audio_port_handle_t    mPortId;  // unique ID allocated by audio policy
 

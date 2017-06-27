@@ -184,6 +184,7 @@ AudioTrack::AudioTrack()
       mPreviousSchedulingGroup(SP_DEFAULT),
       mPausedPosition(0),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
+      mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE),
       mPortId(AUDIO_PORT_HANDLE_NONE)
 {
     mAttributes.content_type = AUDIO_CONTENT_TYPE_UNKNOWN;
@@ -1226,7 +1227,14 @@ audio_port_handle_t AudioTrack::getRoutedDeviceId() {
     if (mOutput == AUDIO_IO_HANDLE_NONE) {
         return AUDIO_PORT_HANDLE_NONE;
     }
-    return AudioSystem::getDeviceIdForIo(mOutput);
+    // if the output stream does not have an active audio patch, use either the device initially
+    // selected by audio policy manager or the last routed device
+    audio_port_handle_t deviceId = AudioSystem::getDeviceIdForIo(mOutput);
+    if (deviceId == AUDIO_PORT_HANDLE_NONE) {
+        deviceId = mRoutedDeviceId;
+    }
+    mRoutedDeviceId = deviceId;
+    return deviceId;
 }
 
 status_t AudioTrack::attachAuxEffect(int effectId)
@@ -1268,6 +1276,20 @@ void AudioTrack::updateLatency_l()
     }
 }
 
+// TODO Move this macro to a common header file for enum to string conversion in audio framework.
+#define MEDIA_CASE_ENUM(name) case name: return #name
+const char * AudioTrack::convertTransferToText(transfer_type transferType) {
+    switch (transferType) {
+        MEDIA_CASE_ENUM(TRANSFER_DEFAULT);
+        MEDIA_CASE_ENUM(TRANSFER_CALLBACK);
+        MEDIA_CASE_ENUM(TRANSFER_OBTAIN);
+        MEDIA_CASE_ENUM(TRANSFER_SYNC);
+        MEDIA_CASE_ENUM(TRANSFER_SHARED);
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+
 status_t AudioTrack::createTrack_l()
 {
     const sp<IAudioFlinger>& audioFlinger = AudioSystem::get_audio_flinger();
@@ -1292,10 +1314,11 @@ status_t AudioTrack::createTrack_l()
     config.channel_mask = mChannelMask;
     config.format = mFormat;
     config.offload_info = mOffloadInfoCopy;
+    mRoutedDeviceId = mSelectedDeviceId;
     status = AudioSystem::getOutputForAttr(attr, &output,
                                            mSessionId, &streamType, mClientUid,
                                            &config,
-                                           mFlags, mSelectedDeviceId, &mPortId);
+                                           mFlags, &mRoutedDeviceId, &mPortId);
 
     if (status != NO_ERROR || output == AUDIO_IO_HANDLE_NONE) {
         ALOGE("Could not get audio output for session %d, stream type %d, usage %d, sample rate %u,"
@@ -1343,22 +1366,32 @@ status_t AudioTrack::createTrack_l()
 
     // Client can only express a preference for FAST.  Server will perform additional tests.
     if (mFlags & AUDIO_OUTPUT_FLAG_FAST) {
-        bool useCaseAllowed =
-            // either of these use cases:
-            // use case 1: shared buffer
-            (mSharedBuffer != 0) ||
+        // either of these use cases:
+        // use case 1: shared buffer
+        bool sharedBuffer = mSharedBuffer != 0;
+        bool transferAllowed =
             // use case 2: callback transfer mode
             (mTransfer == TRANSFER_CALLBACK) ||
             // use case 3: obtain/release mode
             (mTransfer == TRANSFER_OBTAIN) ||
             // use case 4: synchronous write
             ((mTransfer == TRANSFER_SYNC) && mThreadCanCallJava);
+
+        bool useCaseAllowed = sharedBuffer || transferAllowed;
+        if (!useCaseAllowed) {
+            ALOGW("AUDIO_OUTPUT_FLAG_FAST denied, not shared buffer and transfer = %s",
+                  convertTransferToText(mTransfer));
+        }
+
         // sample rates must also match
-        bool fastAllowed = useCaseAllowed && (mSampleRate == mAfSampleRate);
+        bool sampleRateAllowed = mSampleRate == mAfSampleRate;
+        if (!sampleRateAllowed) {
+            ALOGW("AUDIO_OUTPUT_FLAG_FAST denied, rates do not match %u Hz, require %u Hz",
+                  mSampleRate, mAfSampleRate);
+        }
+
+        bool fastAllowed = useCaseAllowed && sampleRateAllowed;
         if (!fastAllowed) {
-            ALOGW("AUDIO_OUTPUT_FLAG_FAST denied by client; transfer %d, "
-                "track %u Hz, output %u Hz",
-                mTransfer, mSampleRate, mAfSampleRate);
             mFlags = (audio_output_flags_t) (mFlags & ~AUDIO_OUTPUT_FLAG_FAST);
         }
     }

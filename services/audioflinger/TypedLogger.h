@@ -90,10 +90,6 @@ constexpr uint64_t hash(const char (&file)[n], uint32_t line) {
 #define LOG_HIST_TS() do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
                                 x->logHistTS(hash(__FILE__, __LINE__)); } while(0)
 
-// flush all histogram
-#define LOG_HIST_FLUSH() do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
-                                x->logHistFlush(hash(__FILE__, __LINE__)); } while(0)
-
 namespace android {
 extern "C" {
 extern thread_local NBLog::Writer *tlNBLogWriter;
