@@ -69,7 +69,8 @@ AudioRecord::AudioRecord(const String16 &opPackageName)
     : mActive(false), mStatus(NO_INIT), mOpPackageName(opPackageName),
       mSessionId(AUDIO_SESSION_ALLOCATE),
       mPreviousPriority(ANDROID_PRIORITY_NORMAL), mPreviousSchedulingGroup(SP_DEFAULT),
-      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE), mPortId(AUDIO_PORT_HANDLE_NONE)
+      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE), mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE),
+      mPortId(AUDIO_PORT_HANDLE_NONE)
 {
 }
 
@@ -503,7 +504,14 @@ audio_port_handle_t AudioRecord::getRoutedDeviceId() {
     if (mInput == AUDIO_IO_HANDLE_NONE) {
         return AUDIO_PORT_HANDLE_NONE;
     }
-    return AudioSystem::getDeviceIdForIo(mInput);
+    // if the input stream does not have an active audio patch, use either the device initially
+    // selected by audio policy manager or the last routed device
+    audio_port_handle_t deviceId = AudioSystem::getDeviceIdForIo(mInput);
+    if (deviceId == AUDIO_PORT_HANDLE_NONE) {
+        deviceId = mRoutedDeviceId;
+    }
+    mRoutedDeviceId = deviceId;
+    return deviceId;
 }
 
 // -------------------------------------------------------------------------
@@ -550,13 +558,14 @@ status_t AudioRecord::openRecord_l(const Modulo<uint32_t> &epoch, const String16
             .channel_mask = mChannelMask,
             .format = mFormat
         };
+    mRoutedDeviceId = mSelectedDeviceId;
     status = AudioSystem::getInputForAttr(&mAttributes, &input,
                                         mSessionId,
                                         // FIXME compare to AudioTrack
                                         mClientPid,
                                         mClientUid,
                                         &config,
-                                        mFlags, mSelectedDeviceId, &mPortId);
+                                        mFlags, &mRoutedDeviceId, &mPortId);
 
     if (status != NO_ERROR || input == AUDIO_IO_HANDLE_NONE) {
         ALOGE("Could not get audio input for session %d, record source %d, sample rate %u, "
