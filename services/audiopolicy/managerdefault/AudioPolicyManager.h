@@ -116,7 +116,7 @@ public:
                                           uid_t uid,
                                           const audio_config_t *config,
                                           audio_output_flags_t flags,
-                                          audio_port_handle_t selectedDeviceId,
+                                          audio_port_handle_t *selectedDeviceId,
                                           audio_port_handle_t *portId);
         virtual status_t startOutput(audio_io_handle_t output,
                                      audio_stream_type_t stream,
@@ -133,7 +133,7 @@ public:
                                          uid_t uid,
                                          const audio_config_base_t *config,
                                          audio_input_flags_t flags,
-                                         audio_port_handle_t selectedDeviceId,
+                                         audio_port_handle_t *selectedDeviceId,
                                          input_type_t *inputType,
                                          audio_port_handle_t *portId);
 
