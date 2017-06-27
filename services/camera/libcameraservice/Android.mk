@@ -54,7 +54,8 @@ LOCAL_SRC_FILES :=  \
     gui/RingBufferConsumer.cpp \
     utils/CameraTraces.cpp \
     utils/AutoConditionLock.cpp \
-    utils/TagMonitor.cpp
+    utils/TagMonitor.cpp \
+    utils/LatencyHistogram.cpp
 
 LOCAL_SHARED_LIBRARIES:= \
     libui \
