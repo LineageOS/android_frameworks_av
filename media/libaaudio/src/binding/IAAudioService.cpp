@@ -244,10 +244,10 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
     int64_t nanoseconds;
     aaudio_result_t result;
     ALOGV("BnAAudioService::onTransact(%i) %i", code, flags);
-    data.checkInterface(this);
 
     switch(code) {
         case OPEN_STREAM: {
+            CHECK_INTERFACE(IAAudioService, data, reply);
             request.readFromParcel(&data);
 
             //ALOGD("BnAAudioService::client openStream request dump --------------------");
@@ -261,6 +261,7 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
         } break;
 
         case CLOSE_STREAM: {
+            CHECK_INTERFACE(IAAudioService, data, reply);
             data.readInt32(&stream);
             result = closeStream(stream);
             //ALOGD("BnAAudioService::onTransact CLOSE_STREAM 0x%08X, result = %d",
@@ -270,6 +271,7 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
         } break;
 
         case GET_STREAM_DESCRIPTION: {
+            CHECK_INTERFACE(IAAudioService, data, reply);
             data.readInt32(&stream);
             aaudio::AudioEndpointParcelable parcelable;
             result = getStreamDescription(stream, parcelable);
@@ -288,6 +290,7 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
         } break;
 
         case START_STREAM: {
+            CHECK_INTERFACE(IAAudioService, data, reply);
             data.readInt32(&stream);
             result = startStream(stream);
             ALOGV("BnAAudioService::onTransact START_STREAM 0x%08X, result = %d",
@@ -297,6 +300,7 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
         } break;
 
         case PAUSE_STREAM: {
+            CHECK_INTERFACE(IAAudioService, data, reply);
             data.readInt32(&stream);
             result = pauseStream(stream);
             ALOGV("BnAAudioService::onTransact PAUSE_STREAM 0x%08X, result = %d",
@@ -306,6 +310,7 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
         } break;
 
         case STOP_STREAM: {
+            CHECK_INTERFACE(IAAudioService, data, reply);
             data.readInt32(&stream);
             result = stopStream(stream);
             ALOGV("BnAAudioService::onTransact STOP_STREAM 0x%08X, result = %d",
@@ -315,6 +320,7 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
         } break;
 
         case FLUSH_STREAM: {
+            CHECK_INTERFACE(IAAudioService, data, reply);
             data.readInt32(&stream);
             result = flushStream(stream);
             ALOGV("BnAAudioService::onTransact FLUSH_STREAM 0x%08X, result = %d",
@@ -324,6 +330,7 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
         } break;
 
         case REGISTER_AUDIO_THREAD: {
+            CHECK_INTERFACE(IAAudioService, data, reply);
             data.readInt32(&stream);
             data.readInt32(&pid);
             data.readInt32(&tid);
@@ -336,6 +343,7 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
         } break;
 
         case UNREGISTER_AUDIO_THREAD: {
+            CHECK_INTERFACE(IAAudioService, data, reply);
             data.readInt32(&stream);
             data.readInt32(&pid);
             data.readInt32(&tid);
