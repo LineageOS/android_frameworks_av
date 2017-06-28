@@ -20,7 +20,7 @@
 
 #include <numeric>
 
-#include <android/media/IDescrambler.h>
+#include <android/hardware/cas/native/1.0/IDescrambler.h>
 #include <binder/MemoryDealer.h>
 #include <media/openmax/OMX_Core.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -34,8 +34,11 @@
 #include "include/SharedMemoryBuffer.h"
 
 namespace android {
-using binder::Status;
-using MediaDescrambler::DescrambleInfo;
+using hardware::hidl_handle;
+using hardware::hidl_string;
+using hardware::hidl_vec;
+using namespace hardware::cas::V1_0;
+using namespace hardware::cas::native::V1_0;
 using BufferInfo = ACodecBufferChannel::BufferInfo;
 using BufferInfoIterator = std::vector<const BufferInfo>::const_iterator;
 
@@ -114,72 +117,95 @@ status_t ACodecBufferChannel::queueSecureInputBuffer(
         return -ENOENT;
     }
 
-    ICrypto::DestinationBuffer destination;
+    native_handle_t *secureHandle = NULL;
     if (secure) {
         sp<SecureBuffer> secureData =
                 static_cast<SecureBuffer *>(it->mCodecBuffer.get());
-        destination.mType = secureData->getDestinationType();
-        if (destination.mType != ICrypto::kDestinationTypeNativeHandle) {
+        if (secureData->getDestinationType() != ICrypto::kDestinationTypeNativeHandle) {
             return BAD_VALUE;
         }
-        destination.mHandle =
-                static_cast<native_handle_t *>(secureData->getDestinationPointer());
-    } else {
-        destination.mType = ICrypto::kDestinationTypeSharedMemory;
-        destination.mSharedMemory = mDecryptDestination;
+        secureHandle = static_cast<native_handle_t *>(secureData->getDestinationPointer());
     }
-
-    ICrypto::SourceBuffer source;
-    source.mSharedMemory = it->mSharedEncryptedBuffer;
-    source.mHeapSeqNum = mHeapSeqNum;
-
     ssize_t result = -1;
     if (mCrypto != NULL) {
+        ICrypto::DestinationBuffer destination;
+        if (secure) {
+            destination.mType = ICrypto::kDestinationTypeNativeHandle;
+            destination.mHandle = secureHandle;
+        } else {
+            destination.mType = ICrypto::kDestinationTypeSharedMemory;
+            destination.mSharedMemory = mDecryptDestination;
+        }
+
+        ICrypto::SourceBuffer source;
+        source.mSharedMemory = it->mSharedEncryptedBuffer;
+        source.mHeapSeqNum = mHeapSeqNum;
+
         result = mCrypto->decrypt(key, iv, mode, pattern,
                 source, it->mClientBuffer->offset(),
                 subSamples, numSubSamples, destination, errorDetailMsg);
-    } else {
-        DescrambleInfo descrambleInfo;
-        descrambleInfo.dstType = destination.mType ==
-                ICrypto::kDestinationTypeSharedMemory ?
-                DescrambleInfo::kDestinationTypeVmPointer :
-                DescrambleInfo::kDestinationTypeNativeHandle;
-        descrambleInfo.scramblingControl = key != NULL ?
-                (DescramblerPlugin::ScramblingControl)key[0] :
-                DescramblerPlugin::kScrambling_Unscrambled;
-        descrambleInfo.numSubSamples = numSubSamples;
-        descrambleInfo.subSamples = (DescramblerPlugin::SubSample *)subSamples;
-        descrambleInfo.srcMem = it->mSharedEncryptedBuffer;
-        descrambleInfo.srcOffset = 0;
-        descrambleInfo.dstPtr = NULL;
-        descrambleInfo.dstOffset = 0;
-
-        int32_t descrambleResult = -1;
-        Status status = mDescrambler->descramble(descrambleInfo, &descrambleResult);
-
-        if (status.isOk()) {
-            result = descrambleResult;
-        }
 
         if (result < 0) {
-            ALOGE("descramble failed, exceptionCode=%d, err=%d, result=%zd",
-                    status.exceptionCode(), status.transactionError(), result);
-        } else {
-            ALOGV("descramble succeeded, result=%zd", result);
+            return result;
         }
 
-        if (result > 0 && destination.mType == ICrypto::kDestinationTypeSharedMemory) {
-            memcpy(destination.mSharedMemory->pointer(),
+        if (destination.mType == ICrypto::kDestinationTypeSharedMemory) {
+            memcpy(it->mCodecBuffer->base(), destination.mSharedMemory->pointer(), result);
+        }
+    } else {
+        // Here we cast CryptoPlugin::SubSample to hardware::cas::native::V1_0::SubSample
+        // directly, the structure definitions should match as checked in DescramblerImpl.cpp.
+        hidl_vec<SubSample> hidlSubSamples;
+        hidlSubSamples.setToExternal((SubSample *)subSamples, numSubSamples, false /*own*/);
+
+        ssize_t offset;
+        size_t size;
+        it->mSharedEncryptedBuffer->getMemory(&offset, &size);
+        hardware::cas::native::V1_0::SharedBuffer srcBuffer = {
+                .heapBase = mHidlMemory,
+                .offset = (uint64_t) offset,
+                .size = size
+        };
+
+        DestinationBuffer dstBuffer;
+        if (secure) {
+            dstBuffer.type = BufferType::NATIVE_HANDLE;
+            dstBuffer.secureMemory = hidl_handle(secureHandle);
+        } else {
+            dstBuffer.type = BufferType::SHARED_MEMORY;
+            dstBuffer.nonsecureMemory = srcBuffer;
+        }
+
+        Status status = Status::OK;
+        hidl_string detailedError;
+
+        auto returnVoid = mDescrambler->descramble(
+                key != NULL ? (ScramblingControl)key[0] : ScramblingControl::UNSCRAMBLED,
+                hidlSubSamples,
+                srcBuffer,
+                0,
+                dstBuffer,
+                0,
+                [&status, &result, &detailedError] (
+                        Status _status, uint32_t _bytesWritten,
+                        const hidl_string& _detailedError) {
+                    status = _status;
+                    result = (ssize_t)_bytesWritten;
+                    detailedError = _detailedError;
+                });
+
+        if (!returnVoid.isOk() || status != Status::OK || result < 0) {
+            ALOGE("descramble failed, trans=%s, status=%d, result=%zd",
+                    returnVoid.description().c_str(), status, result);
+            return UNKNOWN_ERROR;
+        }
+
+        ALOGV("descramble succeeded, %zd bytes", result);
+
+        if (dstBuffer.type == BufferType::SHARED_MEMORY) {
+            memcpy(it->mCodecBuffer->base(),
                     (uint8_t*)it->mSharedEncryptedBuffer->pointer(), result);
         }
-    }
-
-    if (result < 0) {
-        return result;
-    }
-
-    if (destination.mType == ICrypto::kDestinationTypeSharedMemory) {
-        memcpy(it->mCodecBuffer->base(), destination.mSharedMemory->pointer(), result);
     }
 
     it->mCodecBuffer->setRange(0, result);
@@ -275,10 +301,21 @@ sp<MemoryDealer> ACodecBufferChannel::makeMemoryDealer(size_t heapSize) {
         int32_t seqNum = mCrypto->setHeap(dealer->getMemoryHeap());
         if (seqNum >= 0) {
             mHeapSeqNum = seqNum;
-            ALOGD("setHeap returned mHeapSeqNum=%d", mHeapSeqNum);
+            ALOGV("setHeap returned mHeapSeqNum=%d", mHeapSeqNum);
         } else {
             mHeapSeqNum = -1;
-            ALOGD("setHeap failed, setting mHeapSeqNum=-1");
+            ALOGE("setHeap failed, setting mHeapSeqNum=-1");
+        }
+    } else if (mDescrambler != nullptr) {
+        sp<IMemoryHeap> heap = dealer->getMemoryHeap();
+        native_handle_t* nativeHandle = native_handle_create(1, 0);
+        if (nativeHandle != nullptr) {
+            int fd = heap->getHeapID();
+            nativeHandle->data[0] = fd;
+            mHidlMemory = hidl_memory("ashmem", hidl_handle(nativeHandle), heap->getSize());
+            ALOGV("created hidl_memory for descrambler");
+        } else {
+            ALOGE("failed to create hidl_memory for descrambler");
         }
     }
     return dealer;

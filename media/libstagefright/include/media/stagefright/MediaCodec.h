@@ -47,10 +47,13 @@ class IResourceManagerService;
 struct PersistentSurface;
 class SoftwareRenderer;
 class Surface;
-namespace media {
-class IDescrambler;
-};
-using namespace media;
+namespace hardware {
+namespace cas {
+namespace native {
+namespace V1_0 {
+struct IDescrambler;
+}}}}
+using hardware::cas::native::V1_0::IDescrambler;
 
 struct MediaCodec : public AHandler {
     enum ConfigureFlags {

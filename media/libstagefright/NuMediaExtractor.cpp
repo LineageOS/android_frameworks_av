@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define LOG_TAG "NuMediaExtractor"
 #include <utils/Log.h>
 
@@ -35,7 +35,6 @@
 #include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
-#include <android/media/ICas.h>
 
 namespace android {
 
@@ -83,8 +82,8 @@ status_t NuMediaExtractor::setDataSource(
         return ERROR_UNSUPPORTED;
     }
 
-    if (mCas != NULL) {
-        mImpl->setMediaCas(mCas);
+    if (!mCasToken.empty()) {
+        mImpl->setMediaCas(mCasToken);
     }
 
     status_t err = updateDurationAndBitrate();
@@ -119,8 +118,8 @@ status_t NuMediaExtractor::setDataSource(int fd, off64_t offset, off64_t size) {
         return ERROR_UNSUPPORTED;
     }
 
-    if (mCas != NULL) {
-        mImpl->setMediaCas(mCas);
+    if (!mCasToken.empty()) {
+        mImpl->setMediaCas(mCasToken);
     }
 
     err = updateDurationAndBitrate();
@@ -149,8 +148,8 @@ status_t NuMediaExtractor::setDataSource(const sp<DataSource> &source) {
         return ERROR_UNSUPPORTED;
     }
 
-    if (mCas != NULL) {
-        mImpl->setMediaCas(mCas);
+    if (!mCasToken.empty()) {
+        mImpl->setMediaCas(mCasToken);
     }
 
     err = updateDurationAndBitrate();
@@ -161,24 +160,36 @@ status_t NuMediaExtractor::setDataSource(const sp<DataSource> &source) {
     return err;
 }
 
-status_t NuMediaExtractor::setMediaCas(const sp<ICas> &cas) {
-    ALOGV("setMediaCas: cas=%p", cas.get());
+static String8 arrayToString(const std::vector<uint8_t> &array) {
+    String8 result;
+    for (size_t i = 0; i < array.size(); i++) {
+        result.appendFormat("%02x ", array[i]);
+    }
+    if (result.isEmpty()) {
+        result.append("(null)");
+    }
+    return result;
+}
+
+status_t NuMediaExtractor::setMediaCas(const HInterfaceToken &casToken) {
+    ALOGV("setMediaCas: casToken={%s}", arrayToString(casToken).c_str());
 
     Mutex::Autolock autoLock(mLock);
 
-    if (cas == NULL) {
+    if (casToken.empty()) {
         return BAD_VALUE;
     }
 
+    mCasToken = casToken;
+
     if (mImpl != NULL) {
-        mImpl->setMediaCas(cas);
+        mImpl->setMediaCas(casToken);
         status_t err = updateDurationAndBitrate();
         if (err != OK) {
             return err;
         }
     }
 
-    mCas = cas;
     return OK;
 }
 
