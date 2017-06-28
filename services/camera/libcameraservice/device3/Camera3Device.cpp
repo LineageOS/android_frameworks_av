@@ -2326,7 +2326,11 @@ status_t Camera3Device::registerInFlight(uint32_t frameNumber,
     if (res < 0) return res;
 
     if (mInFlightMap.size() == 1) {
-        mStatusTracker->markComponentActive(mInFlightStatusId);
+        // hold mLock to prevent race with disconnect
+        Mutex::Autolock l(mLock);
+        if (mStatusTracker != nullptr) {
+            mStatusTracker->markComponentActive(mInFlightStatusId);
+        }
     }
 
     return OK;
@@ -2353,7 +2357,11 @@ void Camera3Device::removeInFlightMapEntryLocked(int idx) {
 
     // Indicate idle inFlightMap to the status tracker
     if (mInFlightMap.size() == 0) {
-        mStatusTracker->markComponentIdle(mInFlightStatusId, Fence::NO_FENCE);
+        // hold mLock to prevent race with disconnect
+        Mutex::Autolock l(mLock);
+        if (mStatusTracker != nullptr) {
+            mStatusTracker->markComponentIdle(mInFlightStatusId, Fence::NO_FENCE);
+        }
     }
 }
 
