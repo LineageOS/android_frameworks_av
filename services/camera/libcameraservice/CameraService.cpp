@@ -231,29 +231,33 @@ status_t CameraService::enumerateProviders() {
 
     for (auto& cameraId : mCameraProviderManager->getCameraDeviceIds()) {
         String8 id8 = String8(cameraId.c_str());
+        bool cameraFound = false;
         {
+
             Mutex::Autolock lock(mCameraStatesLock);
             auto iter = mCameraStates.find(id8);
             if (iter != mCameraStates.end()) {
-                continue;
+                cameraFound = true;
             }
         }
 
-        hardware::camera::common::V1_0::CameraResourceCost cost;
-        res = mCameraProviderManager->getResourceCost(cameraId, &cost);
-        if (res != OK) {
-            ALOGE("Failed to query device resource cost: %s (%d)", strerror(-res), res);
-            continue;
-        }
-        std::set<String8> conflicting;
-        for (size_t i = 0; i < cost.conflictingDevices.size(); i++) {
-            conflicting.emplace(String8(cost.conflictingDevices[i].c_str()));
-        }
+        if (!cameraFound) {
+            hardware::camera::common::V1_0::CameraResourceCost cost;
+            res = mCameraProviderManager->getResourceCost(cameraId, &cost);
+            if (res != OK) {
+                ALOGE("Failed to query device resource cost: %s (%d)", strerror(-res), res);
+                continue;
+            }
+            std::set<String8> conflicting;
+            for (size_t i = 0; i < cost.conflictingDevices.size(); i++) {
+                conflicting.emplace(String8(cost.conflictingDevices[i].c_str()));
+            }
 
-        {
-            Mutex::Autolock lock(mCameraStatesLock);
-            mCameraStates.emplace(id8,
-                std::make_shared<CameraState>(id8, cost.resourceCost, conflicting));
+            {
+                Mutex::Autolock lock(mCameraStatesLock);
+                mCameraStates.emplace(id8,
+                    std::make_shared<CameraState>(id8, cost.resourceCost, conflicting));
+            }
         }
 
         onDeviceStatusChanged(id8, CameraDeviceStatus::PRESENT);
