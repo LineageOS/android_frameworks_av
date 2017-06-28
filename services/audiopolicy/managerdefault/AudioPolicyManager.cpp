@@ -2165,7 +2165,8 @@ status_t AudioPolicyManager::setStreamVolumeIndex(audio_stream_type_t stream,
                 continue;
             }
             routing_strategy curStrategy = getStrategy((audio_stream_type_t)curStream);
-            audio_devices_t curStreamDevice = getDeviceForStrategy(curStrategy, false /*fromCache*/);
+            audio_devices_t curStreamDevice = Volume::getDeviceForVolume(getDeviceForStrategy(
+                    curStrategy, false /*fromCache*/));
             if ((device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) &&
                     ((curStreamDevice & device) == 0)) {
                 continue;
@@ -2176,7 +2177,7 @@ status_t AudioPolicyManager::setStreamVolumeIndex(audio_stream_type_t stream,
                 applyVolume = (curDevice & curStreamDevice) != 0;
             } else {
                 applyVolume = !mVolumeCurves->hasVolumeIndexForDevice(
-                        stream, Volume::getDeviceForVolume(curStreamDevice));
+                        stream, curStreamDevice);
             }
 
             if (applyVolume) {
