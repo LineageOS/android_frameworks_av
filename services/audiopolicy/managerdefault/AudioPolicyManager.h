@@ -671,6 +671,10 @@ private:
             param.addInt(String8(AudioParameter::keyMonoOutput), (int)mMasterMono);
             mpClientInterface->setParameters(output, param.toString());
         }
+
+        bool soundTriggerSupportsConcurrentCapture();
+        bool mSoundTriggerSupportsConcurrentCapture;
+        bool mHasComputedSoundTriggerSupportsConcurrentCapture;
 };
 
 };
