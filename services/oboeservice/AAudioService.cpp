@@ -18,6 +18,7 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include <sstream>
 //#include <time.h>
 //#include <pthread.h>
 
@@ -26,11 +27,13 @@
 #include <utils/String16.h>
 
 #include "binding/AAudioServiceMessage.h"
+#include "AAudioEndpointManager.h"
 #include "AAudioService.h"
 #include "AAudioServiceStreamMMAP.h"
 #include "AAudioServiceStreamShared.h"
 #include "AAudioServiceStreamMMAP.h"
 #include "binding/IAAudioService.h"
+#include "ServiceUtilities.h"
 #include "utility/HandleTracker.h"
 
 using namespace android;
@@ -47,6 +50,23 @@ android::AAudioService::AAudioService()
 }
 
 AAudioService::~AAudioService() {
+}
+
+status_t AAudioService::dump(int fd, const Vector<String16>& args) {
+    std::string result;
+
+    if (!dumpAllowed()) {
+        std::stringstream ss;
+        ss << "Permission denial: can't dump AAudioService from pid="
+                << IPCThreadState::self()->getCallingPid() << ", uid="
+                << IPCThreadState::self()->getCallingUid() << "\n";
+        result = ss.str();
+        ALOGW("%s", result.c_str());
+    } else {
+        result = mHandleTracker.dump() + AAudioEndpointManager::getInstance().dump();
+    }
+    (void)write(fd, result.c_str(), result.size());
+    return NO_ERROR;
 }
 
 aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &request,

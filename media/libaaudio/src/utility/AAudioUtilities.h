@@ -17,6 +17,8 @@
 #ifndef UTILITY_AAUDIO_UTILITIES_H
 #define UTILITY_AAUDIO_UTILITIES_H
 
+#include <algorithm>
+#include <functional>
 #include <stdint.h>
 #include <sys/types.h>
 
@@ -210,5 +212,28 @@ int32_t AAudioProperty_getMixerBursts();
  * @return minimum number of microseconds for a MMAP HW burst
  */
 int32_t AAudioProperty_getHardwareBurstMinMicros();
+
+/**
+ * Try a function f until it returns true.
+ *
+ * The function is always called at least once.
+ *
+ * @param f the function to evaluate, which returns a bool.
+ * @param times the number of times to evaluate f.
+ * @param sleepMs the sleep time per check of f, if greater than 0.
+ * @return true if f() eventually returns true.
+ */
+static inline bool AAudio_tryUntilTrue(
+        std::function<bool()> f, int times, int sleepMs) {
+    static const useconds_t US_PER_MS = 1000;
+
+    sleepMs = std::max(sleepMs, 0);
+    for (;;) {
+        if (f()) return true;
+        if (times <= 1) return false;
+        --times;
+        usleep(sleepMs * US_PER_MS);
+    }
+}
 
 #endif //UTILITY_AAUDIO_UTILITIES_H
