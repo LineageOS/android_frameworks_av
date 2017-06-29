@@ -37,6 +37,11 @@ static uint32_t gNumEffects;         // total number number of effects
 static list_elem_t *gCurLib;    // current library in enumeration process
 static list_elem_t *gCurEffect; // current effect in enumeration process
 static uint32_t gCurEffectIdx;       // current effect index in enumeration process
+/** Number of elements skipped during the effects configuration loading.
+ *  -1 if the config loader failed
+ *  -2 if config load was skipped
+ */
+static ssize_t gConfigNbElemSkipped = -2;
 
 static int gInitDone; // true is global initialization has been preformed
 static int gCanQueryEffect; // indicates that call to EffectQueryEffect() is valid, i.e. that the list of effects
@@ -437,12 +442,12 @@ int init() {
     if (ignoreFxConfFiles) {
         ALOGI("Audio effects in configuration files will be ignored");
     } else {
-        ssize_t loadResult = EffectLoadXmlEffectConfig(NULL);
-        if (loadResult < 0) {
+        gConfigNbElemSkipped = EffectLoadXmlEffectConfig(NULL);
+        if (gConfigNbElemSkipped < 0) {
             ALOGW("Failed to load XML effect configuration, fallback to .conf");
             EffectLoadEffectConfig();
-        } else if (loadResult > 0) {
-            ALOGE("Effect config is partially invalid, skipped %zd elements", loadResult);
+        } else if (gConfigNbElemSkipped > 0) {
+            ALOGE("Effect config is partially invalid, skipped %zd elements", gConfigNbElemSkipped);
         }
     }
 
@@ -577,6 +582,20 @@ int EffectDumpEffects(int fd) {
             dprintf(fd, "%s", s);
             e = e->next;
         }
+    }
+    switch (gConfigNbElemSkipped) {
+    case -2:
+        dprintf(fd, "Effect configuration loading skipped.\n");
+        break;
+    case -1:
+        dprintf(fd, "XML effect configuration failed to load.\n");
+        break;
+    case 0:
+        dprintf(fd, "XML effect configuration loaded successfully.\n");
+        break;
+    default:
+        dprintf(fd, "XML effect configuration partially loaded, skipped %zd elements.\n",
+                gConfigNbElemSkipped);
     }
     return ret;
 }
