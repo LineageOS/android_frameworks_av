@@ -544,7 +544,7 @@ status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
     return res;
 }
 
-status_t Camera3Stream::getInputBuffer(camera3_stream_buffer *buffer) {
+status_t Camera3Stream::getInputBuffer(camera3_stream_buffer *buffer, bool respectHalLimit) {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);
     status_t res = OK;
@@ -557,7 +557,7 @@ status_t Camera3Stream::getInputBuffer(camera3_stream_buffer *buffer) {
     }
 
     // Wait for new buffer returned back if we are running into the limit.
-    if (getHandoutInputBufferCountLocked() == camera3_stream::max_buffers) {
+    if (getHandoutInputBufferCountLocked() == camera3_stream::max_buffers && respectHalLimit) {
         ALOGV("%s: Already dequeued max input buffers (%d), wait for next returned one.",
                 __FUNCTION__, camera3_stream::max_buffers);
         res = mInputBufferReturnedSignal.waitRelative(mLock, kWaitForBufferDuration);
