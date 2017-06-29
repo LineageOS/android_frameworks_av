@@ -26,6 +26,7 @@
 namespace android {
 
 class DataSource;
+struct ExtractorPlugin;
 
 class MediaExtractorFactory {
 public:
@@ -37,20 +38,24 @@ public:
     // will be alsp returned with |out|.
     static sp<IMediaExtractor> CreateFromFd(
             int fd, int64_t offset, int64_t length, const char *mime, sp<DataSource> *out);
-    static sp<MediaExtractor> CreateFromService(
+    static sp<IMediaExtractor> CreateFromService(
             const sp<DataSource> &source, const char *mime = NULL);
 
 private:
-    static Mutex gSnifferMutex;
-    static List<MediaExtractor::ExtractorDef> gSniffers;
-    static bool gSniffersRegistered;
+    static Mutex gPluginMutex;
+    static std::shared_ptr<List<sp<ExtractorPlugin>>> gPlugins;
+    static bool gPluginsRegistered;
 
-    static void RegisterSniffer_l(const MediaExtractor::ExtractorDef &def);
+    static void RegisterExtractors(
+            const char *libDirPath, List<sp<ExtractorPlugin>> &pluginList);
+    static void RegisterExtractor(
+            const sp<ExtractorPlugin> &plugin, List<sp<ExtractorPlugin>> &pluginList);
 
     static MediaExtractor::CreatorFunc sniff(const sp<DataSource> &source,
-            String8 *mimeType, float *confidence, sp<AMessage> *meta);
+            String8 *mimeType, float *confidence, sp<AMessage> *meta,
+            sp<ExtractorPlugin> &plugin);
 
-    static void RegisterDefaultSniffers();
+    static void UpdateExtractors(const char *newlyInstalledLibPath);
 };
 
 }  // namespace android

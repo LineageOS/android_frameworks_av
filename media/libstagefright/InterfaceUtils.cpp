@@ -38,11 +38,12 @@ sp<IDataSource> CreateIDataSourceFromDataSource(const sp<DataSource> &source) {
     return RemoteDataSource::wrap(source);
 }
 
-sp<IMediaExtractor> CreateIMediaExtractorFromMediaExtractor(const sp<MediaExtractor> &extractor) {
+sp<IMediaExtractor> CreateIMediaExtractorFromMediaExtractor(
+        const sp<MediaExtractor> &extractor, const sp<RefBase> &plugin) {
     if (extractor == nullptr) {
         return nullptr;
     }
-    return RemoteMediaExtractor::wrap(extractor);
+    return RemoteMediaExtractor::wrap(extractor, plugin);
 }
 
 sp<MediaSource> CreateMediaSourceFromIMediaSource(const sp<IMediaSource> &source) {
@@ -52,11 +53,12 @@ sp<MediaSource> CreateMediaSourceFromIMediaSource(const sp<IMediaSource> &source
     return new CallbackMediaSource(source);
 }
 
-sp<IMediaSource> CreateIMediaSourceFromMediaSource(const sp<MediaSource> &source) {
+sp<IMediaSource> CreateIMediaSourceFromMediaSource(
+        const sp<MediaSource> &source, const sp<RefBase> &plugin) {
     if (source == nullptr) {
         return nullptr;
     }
-    return RemoteMediaSource::wrap(source);
+    return RemoteMediaSource::wrap(source, plugin);
 }
 
 }  // namespace android

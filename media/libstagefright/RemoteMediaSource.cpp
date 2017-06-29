@@ -19,10 +19,14 @@
 
 namespace android {
 
-RemoteMediaSource::RemoteMediaSource(const sp<MediaSource> &source)
-    :mSource(source) {}
+RemoteMediaSource::RemoteMediaSource(const sp<MediaSource> &source, const sp<RefBase> &plugin)
+    :mSource(source),
+    mExtractorPlugin(plugin) {}
 
-RemoteMediaSource::~RemoteMediaSource() {}
+RemoteMediaSource::~RemoteMediaSource() {
+    mSource = nullptr;
+    mExtractorPlugin = nullptr;
+}
 
 status_t RemoteMediaSource::start(MetaData *params) {
     return mSource->start(params);
@@ -51,11 +55,11 @@ status_t RemoteMediaSource::setStopTimeUs(int64_t stopTimeUs) {
 ////////////////////////////////////////////////////////////////////////////////
 
 // static
-sp<IMediaSource> RemoteMediaSource::wrap(const sp<MediaSource> &source) {
+sp<IMediaSource> RemoteMediaSource::wrap(const sp<MediaSource> &source, const sp<RefBase> &plugin) {
     if (source.get() == nullptr) {
         return nullptr;
     }
-    return new RemoteMediaSource(source);
+    return new RemoteMediaSource(source, plugin);
 }
 
 }  // namespace android

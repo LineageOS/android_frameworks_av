@@ -26,7 +26,7 @@ namespace android {
 // IMediaSrouce wrapper to the MediaSource.
 class RemoteMediaSource : public BnMediaSource {
 public:
-    static sp<IMediaSource> wrap(const sp<MediaSource> &source);
+    static sp<IMediaSource> wrap(const sp<MediaSource> &source, const sp<RefBase> &plugin);
     virtual ~RemoteMediaSource();
     virtual status_t start(MetaData *params = NULL);
     virtual status_t stop();
@@ -39,8 +39,9 @@ public:
 
 private:
     sp<MediaSource> mSource;
+    sp<RefBase> mExtractorPlugin;
 
-    explicit RemoteMediaSource(const sp<MediaSource> &source);
+    explicit RemoteMediaSource(const sp<MediaSource> &source, const sp<RefBase> &plugin);
 
     DISALLOW_EVIL_CONSTRUCTORS(RemoteMediaSource);
 };
