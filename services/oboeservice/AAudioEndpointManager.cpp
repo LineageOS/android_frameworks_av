@@ -19,8 +19,11 @@
 #include <utils/Log.h>
 
 #include <assert.h>
+#include <functional>
 #include <map>
 #include <mutex>
+#include <sstream>
+#include <utility/AAudioUtilities.h>
 
 #include "AAudioEndpointManager.h"
 
@@ -33,6 +36,34 @@ AAudioEndpointManager::AAudioEndpointManager()
         : Singleton<AAudioEndpointManager>()
         , mInputs()
         , mOutputs() {
+}
+
+std::string AAudioEndpointManager::dump() const {
+    std::stringstream result;
+    const bool isLocked = AAudio_tryUntilTrue(
+            [this]()->bool { return mLock.try_lock(); } /* f */,
+            50 /* times */,
+            20 /* sleepMs */);
+    if (!isLocked) {
+        result << "EndpointManager may be deadlocked\n";
+    }
+
+    size_t inputs = mInputs.size();
+    result << "Inputs: " << inputs << "\n";
+    for (const auto &input : mInputs) {
+        result << "  Input(" << input.first << ", " << input.second << ")\n";
+    }
+
+    size_t outputs = mOutputs.size();
+    result << "Outputs: " << outputs << "\n";
+    for (const auto &output : mOutputs) {
+        result << "  Output(" << output.first << ", " << output.second << ")\n";
+    }
+
+    if (isLocked) {
+        mLock.unlock();
+    }
+    return result.str();
 }
 
 AAudioServiceEndpoint *AAudioEndpointManager::openEndpoint(AAudioService &audioService, int32_t deviceId,
