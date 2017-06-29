@@ -40,6 +40,7 @@ public:
             int fd, int64_t offset, int64_t length, const char *mime, sp<DataSource> *out);
     static sp<IMediaExtractor> CreateFromService(
             const sp<DataSource> &source, const char *mime = NULL);
+    static void LoadPlugins(const ::std::string& apkPath);
 
 private:
     static Mutex gPluginMutex;
@@ -47,7 +48,7 @@ private:
     static bool gPluginsRegistered;
 
     static void RegisterExtractors(
-            const char *libDirPath, List<sp<ExtractorPlugin>> &pluginList);
+            const char *apkPath, List<sp<ExtractorPlugin>> &pluginList);
     static void RegisterExtractor(
             const sp<ExtractorPlugin> &plugin, List<sp<ExtractorPlugin>> &pluginList);
 
@@ -55,7 +56,7 @@ private:
             String8 *mimeType, float *confidence, sp<AMessage> *meta,
             sp<ExtractorPlugin> &plugin);
 
-    static void UpdateExtractors(const char *newlyInstalledLibPath);
+    static void UpdateExtractors(const char *newUpdateApkPath);
 };
 
 }  // namespace android

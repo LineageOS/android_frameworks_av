@@ -31,11 +31,14 @@
 #include <media/IMediaExtractorService.h>
 #include <cutils/properties.h>
 #include <utils/String8.h>
+#include <ziparchive/zip_archive.h>
 
 #include <dirent.h>
 #include <dlfcn.h>
 
 namespace android {
+
+static const char *kUpdateApkPath = "/system/priv-app/MediaUpdate/MediaUpdate.apk";
 
 // static
 sp<IMediaExtractor> MediaExtractorFactory::Create(
@@ -106,6 +109,7 @@ sp<IMediaExtractor> MediaExtractorFactory::CreateFromService(
         const sp<DataSource> &source, const char *mime) {
 
     ALOGV("MediaExtractorFactory::CreateFromService %s", mime);
+
     UpdateExtractors(nullptr);
 
     // initialize source decryption if needed
@@ -132,9 +136,10 @@ sp<IMediaExtractor> MediaExtractorFactory::CreateFromService(
 }
 
 //static
-void MediaExtractorFactory::LoadPlugins(const ::std::string& libraryPath) {
-    ALOGV("Load plugins from: %s", libraryPath.c_str());
-    UpdateExtractors(libraryPath.c_str());
+void MediaExtractorFactory::LoadPlugins(const ::std::string& apkPath) {
+    // TODO: Verify apk path with package manager in extractor process.
+    ALOGV("Load plugins from: %s", apkPath.c_str());
+    UpdateExtractors(apkPath.empty() ? nullptr : apkPath.c_str());
 }
 
 struct ExtractorPlugin : public RefBase {
@@ -237,40 +242,53 @@ void MediaExtractorFactory::RegisterExtractor(const sp<ExtractorPlugin> &plugin,
 
 //static
 void MediaExtractorFactory::RegisterExtractors(
-        const char *libDirPath, List<sp<ExtractorPlugin>> &pluginList) {
-    ALOGV("search for plugins at %s", libDirPath);
-    DIR *libDir = opendir(libDirPath);
-    if (libDir) {
-        struct dirent* libEntry;
-        while ((libEntry = readdir(libDir))) {
-            String8 libPath = String8(libDirPath) + "/" + libEntry->d_name;
-            void *libHandle = dlopen(libPath.string(), RTLD_NOW | RTLD_LOCAL);
-            if (libHandle) {
-                MediaExtractor::GetExtractorDef getDef =
-                    (MediaExtractor::GetExtractorDef) dlsym(libHandle, "GETEXTRACTORDEF");
-                if (getDef) {
-                    ALOGV("registering sniffer for %s", libPath.string());
-                    RegisterExtractor(
-                            new ExtractorPlugin(getDef(), libHandle, libPath), pluginList);
+        const char *apkPath, List<sp<ExtractorPlugin>> &pluginList) {
+    ALOGV("search for plugins at %s", apkPath);
+    ZipArchiveHandle zipHandle;
+    int32_t ret = OpenArchive(apkPath, &zipHandle);
+    if (ret == 0) {
+        char abi[PROPERTY_VALUE_MAX];
+        property_get("ro.product.cpu.abi", abi, "arm64-v8a");
+        ZipString prefix(String8::format("lib/%s/", abi).c_str());
+        ZipString suffix("extractor.so");
+        void* cookie;
+        ret = StartIteration(zipHandle, &cookie, &prefix, &suffix);
+        if (ret == 0) {
+            ZipEntry entry;
+            ZipString name;
+            while (Next(cookie, &entry, &name) == 0) {
+                String8 libPath = String8(apkPath) + "!/" +
+                    String8(reinterpret_cast<const char*>(name.name), name.name_length);
+                void *libHandle = dlopen(libPath.string(), RTLD_NOW | RTLD_LOCAL);
+                if (libHandle) {
+                    MediaExtractor::GetExtractorDef getDef =
+                        (MediaExtractor::GetExtractorDef) dlsym(libHandle, "GETEXTRACTORDEF");
+                    if (getDef) {
+                        ALOGV("registering sniffer for %s", libPath.string());
+                        RegisterExtractor(
+                                new ExtractorPlugin(getDef(), libHandle, libPath), pluginList);
+                    } else {
+                        ALOGW("%s does not contain sniffer", libPath.string());
+                        dlclose(libHandle);
+                    }
                 } else {
-                    ALOGW("%s does not contain sniffer", libPath.string());
-                    dlclose(libHandle);
+                    ALOGW("couldn't dlopen(%s) %s", libPath.string(), strerror(errno));
                 }
-            } else {
-                ALOGW("couldn't dlopen(%s) %s", libPath.string(), strerror(errno));
             }
+            EndIteration(cookie);
+        } else {
+            ALOGW("couldn't find plugins from %s, %d", apkPath, ret);
         }
-
-        closedir(libDir);
+        CloseArchive(zipHandle);
     } else {
-        ALOGE("couldn't opendir(%s)", libDirPath);
+        ALOGW("couldn't open(%s) %d", apkPath, ret);
     }
 }
 
 // static
-void MediaExtractorFactory::UpdateExtractors(const char *newlyInstalledLibPath) {
+void MediaExtractorFactory::UpdateExtractors(const char *newUpdateApkPath) {
     Mutex::Autolock autoLock(gPluginMutex);
-    if (newlyInstalledLibPath != nullptr) {
+    if (newUpdateApkPath != nullptr) {
         gPluginsRegistered = false;
     }
     if (gPluginsRegistered) {
@@ -279,20 +297,10 @@ void MediaExtractorFactory::UpdateExtractors(const char *newlyInstalledLibPath) 
 
     std::shared_ptr<List<sp<ExtractorPlugin>>> newList(new List<sp<ExtractorPlugin>>());
 
-    RegisterExtractors("/system/lib"
-#ifdef __LP64__
-            "64"
-#endif
-            "/extractors", *newList);
+    RegisterExtractors(kUpdateApkPath, *newList);
 
-    RegisterExtractors("/vendor/lib"
-#ifdef __LP64__
-            "64"
-#endif
-            "/extractors", *newList);
-
-    if (newlyInstalledLibPath != nullptr) {
-        RegisterExtractors(newlyInstalledLibPath, *newList);
+    if (newUpdateApkPath != nullptr) {
+        RegisterExtractors(newUpdateApkPath, *newList);
     }
 
     gPlugins = newList;

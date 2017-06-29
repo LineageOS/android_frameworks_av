@@ -30,6 +30,7 @@
 // from LOCAL_C_INCLUDES
 #include "IcuUtils.h"
 #include "MediaExtractorService.h"
+#include "MediaExtractorUpdateService.h"
 #include "MediaUtils.h"
 #include "minijail.h"
 
@@ -63,6 +64,7 @@ int main(int argc __unused, char** argv)
     sp<ProcessState> proc(ProcessState::self());
     sp<IServiceManager> sm = defaultServiceManager();
     MediaExtractorService::instantiate();
+    media::MediaExtractorUpdateService::instantiate();
     ProcessState::self()->startThreadPool();
     IPCThreadState::self()->joinThreadPool();
 }
