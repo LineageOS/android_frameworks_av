@@ -45,15 +45,18 @@ using namespace aaudio;   // TODO just import names needed
 #define DEFAULT_BUFFER_CAPACITY   (48 * 8)
 
 // Set up an EXCLUSIVE MMAP stream that will be shared.
-aaudio_result_t AAudioServiceEndpoint::open(int32_t deviceId) {
-    mRequestedDeviceId = deviceId;
+aaudio_result_t AAudioServiceEndpoint::open(const AAudioStreamConfiguration& configuration) {
+    mRequestedDeviceId = configuration.getDeviceId();
     mStreamInternal = getStreamInternal();
 
     AudioStreamBuilder builder;
     builder.setSharingMode(AAUDIO_SHARING_MODE_EXCLUSIVE);
     // Don't fall back to SHARED because that would cause recursion.
     builder.setSharingModeMatchRequired(true);
-    builder.setDeviceId(deviceId);
+    builder.setDeviceId(mRequestedDeviceId);
+    builder.setFormat(configuration.getAudioFormat());
+    builder.setSampleRate(configuration.getSampleRate());
+    builder.setSamplesPerFrame(configuration.getSamplesPerFrame());
     builder.setDirection(getDirection());
     builder.setBufferCapacity(DEFAULT_BUFFER_CAPACITY);
 
@@ -138,4 +141,21 @@ void AAudioServiceEndpoint::disconnectRegisteredStreams() {
         sharedStream->onDisconnect();
     }
     mRegisteredStreams.clear();
+}
+
+bool AAudioServiceEndpoint::matches(const AAudioStreamConfiguration& configuration) {
+    if (configuration.getDeviceId() != AAUDIO_UNSPECIFIED &&
+            configuration.getDeviceId() != mStreamInternal->getDeviceId()) {
+        return false;
+    }
+    if (configuration.getSampleRate() != AAUDIO_UNSPECIFIED &&
+            configuration.getSampleRate() != mStreamInternal->getSampleRate()) {
+        return false;
+    }
+    if (configuration.getSamplesPerFrame() != AAUDIO_UNSPECIFIED &&
+            configuration.getSamplesPerFrame() != mStreamInternal->getSamplesPerFrame()) {
+        return false;
+    }
+
+    return true;
 }

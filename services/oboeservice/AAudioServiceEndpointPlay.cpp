@@ -46,8 +46,8 @@ AAudioServiceEndpointPlay::AAudioServiceEndpointPlay(AAudioService &audioService
 AAudioServiceEndpointPlay::~AAudioServiceEndpointPlay() {
 }
 
-aaudio_result_t AAudioServiceEndpointPlay::open(int32_t deviceId) {
-    aaudio_result_t result = AAudioServiceEndpoint::open(deviceId);
+aaudio_result_t AAudioServiceEndpointPlay::open(const AAudioStreamConfiguration& configuration) {
+    aaudio_result_t result = AAudioServiceEndpoint::open(configuration);
     if (result == AAUDIO_OK) {
         mMixer.allocate(getStreamInternal()->getSamplesPerFrame(),
                         getStreamInternal()->getFramesPerBurst());

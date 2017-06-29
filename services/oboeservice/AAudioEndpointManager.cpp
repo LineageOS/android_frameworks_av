@@ -51,13 +51,13 @@ std::string AAudioEndpointManager::dump() const {
     size_t inputs = mInputs.size();
     result << "Inputs: " << inputs << "\n";
     for (const auto &input : mInputs) {
-        result << "  Input(" << input.first << ", " << input.second << ")\n";
+        result << "  Input(" << input << ")\n";
     }
 
     size_t outputs = mOutputs.size();
     result << "Outputs: " << outputs << "\n";
     for (const auto &output : mOutputs) {
-        result << "  Output(" << output.first << ", " << output.second << ")\n";
+        result << "  Output(" << output << ")\n";
     }
 
     if (isLocked) {
@@ -66,27 +66,40 @@ std::string AAudioEndpointManager::dump() const {
     return result.str();
 }
 
-AAudioServiceEndpoint *AAudioEndpointManager::openEndpoint(AAudioService &audioService, int32_t deviceId,
-                                                           aaudio_direction_t direction) {
+AAudioServiceEndpoint *AAudioEndpointManager::openEndpoint(AAudioService &audioService,
+        const AAudioStreamConfiguration& configuration, aaudio_direction_t direction) {
     AAudioServiceEndpoint *endpoint = nullptr;
     AAudioServiceEndpointCapture *capture = nullptr;
     AAudioServiceEndpointPlay *player = nullptr;
     std::lock_guard<std::mutex> lock(mLock);
 
     // Try to find an existing endpoint.
+
+
+
     switch (direction) {
         case AAUDIO_DIRECTION_INPUT:
-            endpoint = mInputs[deviceId];
+            for (AAudioServiceEndpoint *ep : mInputs) {
+                if (ep->matches(configuration)) {
+                    endpoint = ep;
+                    break;
+                }
+            }
             break;
         case AAUDIO_DIRECTION_OUTPUT:
-            endpoint = mOutputs[deviceId];
+            for (AAudioServiceEndpoint *ep : mOutputs) {
+                if (ep->matches(configuration)) {
+                    endpoint = ep;
+                    break;
+                }
+            }
             break;
         default:
             assert(false); // There are only two possible directions.
             break;
     }
     ALOGD("AAudioEndpointManager::openEndpoint(), found %p for device = %d, dir = %d",
-          endpoint, deviceId, (int)direction);
+          endpoint, configuration.getDeviceId(), (int)direction);
 
     // If we can't find an existing one then open a new one.
     if (endpoint == nullptr) {
@@ -105,7 +118,7 @@ AAudioServiceEndpoint *AAudioEndpointManager::openEndpoint(AAudioService &audioS
     }
 
     if (endpoint != nullptr) {
-        aaudio_result_t result = endpoint->open(deviceId);
+        aaudio_result_t result = endpoint->open(configuration);
         if (result != AAUDIO_OK) {
             ALOGE("AAudioEndpointManager::findEndpoint(), open failed");
             delete endpoint;
@@ -113,17 +126,17 @@ AAudioServiceEndpoint *AAudioEndpointManager::openEndpoint(AAudioService &audioS
         } else {
             switch(direction) {
                 case AAUDIO_DIRECTION_INPUT:
-                    mInputs[deviceId] = capture;
+                    mInputs.push_back(capture);
                     break;
                 case AAUDIO_DIRECTION_OUTPUT:
-                    mOutputs[deviceId] = player;
+                    mOutputs.push_back(player);
                     break;
                 default:
                     break;
             }
         }
         ALOGD("AAudioEndpointManager::openEndpoint(), created %p for device = %d, dir = %d",
-              endpoint, deviceId, (int)direction);
+              endpoint, configuration.getDeviceId(), (int)direction);
     }
 
     if (endpoint != nullptr) {
@@ -156,10 +169,12 @@ void AAudioEndpointManager::closeEndpoint(AAudioServiceEndpoint *serviceEndpoint
 
         switch (direction) {
             case AAUDIO_DIRECTION_INPUT:
-                mInputs.erase(deviceId);
+                mInputs.erase(
+                  std::remove(mInputs.begin(), mInputs.end(), serviceEndpoint), mInputs.end());
                 break;
             case AAUDIO_DIRECTION_OUTPUT:
-                mOutputs.erase(deviceId);
+                mOutputs.erase(
+                  std::remove(mOutputs.begin(), mOutputs.end(), serviceEndpoint), mOutputs.end());
                 break;
             default:
                 break;
