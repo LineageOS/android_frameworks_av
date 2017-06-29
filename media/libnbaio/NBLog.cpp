@@ -908,6 +908,7 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
     mFd = fd;
     mIndent = indent;
     String8 timestamp, body;
+    PerformanceAnalysis performanceAnalyzer; // used to call analysis functions
     size_t lost = snapshot.lost() + (snapshot.begin() - EntryIterator(snapshot.data()));
     if (lost > 0) {
         body.appendFormat("warning: lost %zu bytes worth of events", lost);
@@ -936,9 +937,11 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             // store time series data for each reader in order to bucket it once there
             // is enough data. Then, it is written to recentHists as a histogram.
             mTimeStampSeries[data->author].push_back(ts);
-            // if length of the time series has reached kShortHistSize samples,
-            // compute its histogram, append this to mRecentHists and erase the time series
+            // if length of the time series has reached kShortHistSize samples, do 1) and 2):
             if (mTimeStampSeries[data->author].size() >= kShortHistSize) {
+                // 1) analyze the series to store all outliers and their exact timestamps:
+                performanceAnalyzer.storeOutlierData(data->author, mTimeStampSeries[data->author]);
+                 // 2) compute its histogram, append this to mRecentHists and erase the time series
                 mRecentHists.emplace_front(data->author,
                                            buildBuckets(mTimeStampSeries[data->author]));
                 // do not let mRecentHists exceed capacity
@@ -964,11 +967,12 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             break;
         }
     }
-    PerformanceAnalysis performanceAnalyzer;
     performanceAnalyzer.reportPerformance(&body, mRecentHists);
     if (!body.isEmpty()) {
         dumpLine(timestamp, body);
     }
+    // comment in for tests
+    // performanceAnalyzer.testFunction();
 }
 
 void NBLog::Reader::dump(int fd, size_t indent)
