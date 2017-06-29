@@ -232,8 +232,10 @@ class Camera3StreamInterface : public virtual RefBase {
      * For bidirectional streams, this method applies to the input-side
      * buffers.
      *
+     * Normally this call will block until the handed out buffer count is less than the stream
+     * max buffer count; if respectHalLimit is set to false, this is ignored.
      */
-    virtual status_t getInputBuffer(camera3_stream_buffer *buffer) = 0;
+    virtual status_t getInputBuffer(camera3_stream_buffer *buffer, bool respectHalLimit = true) = 0;
 
     /**
      * Return a buffer to the stream after use by the HAL.
