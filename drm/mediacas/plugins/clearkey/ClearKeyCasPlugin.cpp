@@ -121,7 +121,7 @@ status_t ClearKeyCasPlugin::closeSession(const CasSessionId &sessionId) {
     sp<ClearKeyCasSession> session =
             ClearKeySessionLibrary::get()->findSession(sessionId);
     if (session == NULL) {
-        return ERROR_DRM_SESSION_NOT_OPENED;
+        return ERROR_CAS_SESSION_NOT_OPENED;
     }
 
     ClearKeySessionLibrary::get()->destroySession(sessionId);
@@ -135,7 +135,7 @@ status_t ClearKeyCasPlugin::setSessionPrivateData(
     sp<ClearKeyCasSession> session =
             ClearKeySessionLibrary::get()->findSession(sessionId);
     if (session == NULL) {
-        return ERROR_DRM_SESSION_NOT_OPENED;
+        return ERROR_CAS_SESSION_NOT_OPENED;
     }
     return OK;
 }
@@ -146,7 +146,7 @@ status_t ClearKeyCasPlugin::processEcm(
     sp<ClearKeyCasSession> session =
             ClearKeySessionLibrary::get()->findSession(sessionId);
     if (session == NULL) {
-        return ERROR_DRM_SESSION_NOT_OPENED;
+        return ERROR_CAS_SESSION_NOT_OPENED;
     }
 
     Mutex::Autolock lock(mKeyFetcherLock);
@@ -293,7 +293,7 @@ const static size_t kUserKeyLength = 16;
 status_t ClearKeyCasSession::updateECM(
         KeyFetcher *keyFetcher, void *ecm, size_t size) {
     if (keyFetcher == nullptr) {
-        return ERROR_DRM_NOT_PROVISIONED;
+        return ERROR_CAS_NOT_PROVISIONED;
     }
 
     if (size < kEcmHeaderLength) {
@@ -344,7 +344,7 @@ ssize_t ClearKeyCasSession::decrypt(
         size_t numSubSamples, const DescramblerPlugin::SubSample *subSamples,
         const void *srcPtr, void *dstPtr, AString * /* errorDetailMsg */) {
     if (secure) {
-        return ERROR_DRM_CANNOT_HANDLE;
+        return ERROR_CAS_CANNOT_HANDLE;
     }
 
     AES_KEY contentKey;
@@ -356,7 +356,7 @@ ssize_t ClearKeyCasSession::decrypt(
         int32_t keyIndex = (scramblingControl & 1);
         if (!mKeyInfo[keyIndex].valid) {
             ALOGE("decrypt: key %d is invalid", keyIndex);
-            return ERROR_DRM_DECRYPT;
+            return ERROR_CAS_DECRYPT;
         }
         contentKey = mKeyInfo[keyIndex].contentKey;
     }
@@ -420,7 +420,7 @@ status_t ClearKeyDescramblerPlugin::setMediaCasSession(
 
     if (session == NULL) {
         ALOGE("ClearKeyDescramblerPlugin: session not found");
-        return ERROR_DRM_SESSION_NOT_OPENED;
+        return ERROR_CAS_SESSION_NOT_OPENED;
     }
 
     mCASSession = session;
@@ -446,7 +446,7 @@ ssize_t ClearKeyDescramblerPlugin::descramble(
 
     if (mCASSession == NULL) {
         ALOGE("Uninitialized CAS session!");
-        return ERROR_DRM_DECRYPT_UNIT_NOT_INITIALIZED;
+        return ERROR_CAS_DECRYPT_UNIT_NOT_INITIALIZED;
     }
 
     return mCASSession->decrypt(

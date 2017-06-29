@@ -79,6 +79,26 @@ enum {
     HEARTBEAT_ERROR_BASE = -3000,
     ERROR_HEARTBEAT_TERMINATE_REQUESTED                     = HEARTBEAT_ERROR_BASE,
 
+    // CAS-related error codes
+    CAS_ERROR_BASE = -4000,
+
+    ERROR_CAS_UNKNOWN                        = CAS_ERROR_BASE,
+    ERROR_CAS_NO_LICENSE                     = CAS_ERROR_BASE - 1,
+    ERROR_CAS_LICENSE_EXPIRED                = CAS_ERROR_BASE - 2,
+    ERROR_CAS_SESSION_NOT_OPENED             = CAS_ERROR_BASE - 3,
+    ERROR_CAS_DECRYPT_UNIT_NOT_INITIALIZED   = CAS_ERROR_BASE - 4,
+    ERROR_CAS_DECRYPT                        = CAS_ERROR_BASE - 5,
+    ERROR_CAS_CANNOT_HANDLE                  = CAS_ERROR_BASE - 6,
+    ERROR_CAS_TAMPER_DETECTED                = CAS_ERROR_BASE - 7,
+    ERROR_CAS_NOT_PROVISIONED                = CAS_ERROR_BASE - 8,
+    ERROR_CAS_DEVICE_REVOKED                 = CAS_ERROR_BASE - 9,
+    ERROR_CAS_RESOURCE_BUSY                  = CAS_ERROR_BASE - 10,
+    ERROR_CAS_INSUFFICIENT_OUTPUT_PROTECTION = CAS_ERROR_BASE - 11,
+    ERROR_CAS_LAST_USED_ERRORCODE            = CAS_ERROR_BASE - 11,
+
+    ERROR_CAS_VENDOR_MAX                     = CAS_ERROR_BASE - 500,
+    ERROR_CAS_VENDOR_MIN                     = CAS_ERROR_BASE - 999,
+
     // NDK Error codes
     // frameworks/av/include/ndk/NdkMediaError.h
     // from -10000 (0xFFFFD8F0 - 0xFFFFD8EC)

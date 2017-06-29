@@ -23,7 +23,8 @@
 #include "include/SharedMemoryBuffer.h"
 #include "include/SoftwareRenderer.h"
 
-#include <android/media/IDescrambler.h>
+#include <android/hardware/cas/native/1.0/IDescrambler.h>
+
 #include <binder/IMemory.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>

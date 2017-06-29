@@ -44,6 +44,8 @@ public:
 
     static const char* getServiceName() { return AAUDIO_SERVICE_NAME; }
 
+    virtual status_t        dump(int fd, const Vector<String16>& args) override;
+
     virtual aaudio_handle_t openStream(const aaudio::AAudioStreamRequest &request,
                                      aaudio::AAudioStreamConfiguration &configuration);
 

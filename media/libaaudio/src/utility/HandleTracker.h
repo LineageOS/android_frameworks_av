@@ -18,6 +18,7 @@
 #define UTILITY_HANDLE_TRACKER_H
 
 #include <stdint.h>
+#include <string>
 #include <utils/Mutex.h>
 
 typedef int32_t  aaudio_handle_t;
@@ -51,6 +52,18 @@ public:
      * @return true if the internal allocation succeeded
      */
     bool isInitialized() const;
+
+    /**
+     * Returns HandleTracker information.
+     *
+     * Will attempt to get the object lock, but will proceed
+     * even if it cannot.
+     *
+     * Each line of information ends with a newline.
+     *
+     * @return a string representing the HandleTracker info.
+     */
+    std::string dump() const;
 
     /**
      * Store a pointer and return a handle that can be used to retrieve the pointer.
@@ -99,7 +112,7 @@ private:
     // This Mutex protects the linked list of free nodes.
     // The list is managed using mHandleAddresses and mNextFreeAddress.
     // The data in mHandleHeaders is only changed by put() and remove().
-    android::Mutex              mLock;
+    mutable android::Mutex      mLock;
 
     /**
      * Pull slot off of a list of empty slots.

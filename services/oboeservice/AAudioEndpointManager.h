@@ -34,6 +34,18 @@ public:
     ~AAudioEndpointManager() = default;
 
     /**
+     * Returns EndpointManager information.
+     *
+     * Will attempt to get the object lock, but will proceed
+     * even if it cannot.
+     *
+     * Each line of information ends with a newline.
+     *
+     * @return a string representing the EndpointManager info
+     */
+    std::string dump() const;
+
+    /**
      * Find a service endpoint for the given deviceId and direction.
      * If an endpoint does not already exist then try to create one.
      *
@@ -49,7 +61,7 @@ public:
 
 private:
 
-    std::mutex    mLock;
+    mutable std::mutex mLock;
 
     std::map<int32_t, AAudioServiceEndpointCapture *> mInputs;
     std::map<int32_t, AAudioServiceEndpointPlay *> mOutputs;

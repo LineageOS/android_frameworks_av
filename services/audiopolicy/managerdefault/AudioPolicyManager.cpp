@@ -1815,6 +1815,40 @@ bool AudioPolicyManager::isConcurentCaptureAllowed(const sp<AudioInputDescriptor
     return true;
 }
 
+// FIXME: remove when concurrent capture is ready. This is a hack to work around bug b/63083537.
+bool AudioPolicyManager::soundTriggerSupportsConcurrentCapture() {
+    if (!mHasComputedSoundTriggerSupportsConcurrentCapture) {
+        bool soundTriggerSupportsConcurrentCapture = false;
+        unsigned int numModules = 0;
+        struct sound_trigger_module_descriptor* nModules = NULL;
+
+        status_t status = SoundTrigger::listModules(nModules, &numModules);
+        if (status == NO_ERROR && numModules != 0) {
+            nModules = (struct sound_trigger_module_descriptor*) calloc(
+                    numModules, sizeof(struct sound_trigger_module_descriptor));
+            if (nModules == NULL) {
+              // We failed to malloc the buffer, so just say no for now, and hope that we have more
+              // ram the next time this function is called.
+              ALOGE("Failed to allocate buffer for module descriptors");
+              return false;
+            }
+
+            status = SoundTrigger::listModules(nModules, &numModules);
+            if (status == NO_ERROR) {
+                soundTriggerSupportsConcurrentCapture = true;
+                for (size_t i = 0; i < numModules; ++i) {
+                    soundTriggerSupportsConcurrentCapture &=
+                            nModules[i].properties.concurrent_capture;
+                }
+            }
+            free(nModules);
+        }
+        mSoundTriggerSupportsConcurrentCapture = soundTriggerSupportsConcurrentCapture;
+        mHasComputedSoundTriggerSupportsConcurrentCapture = true;
+    }
+    return mSoundTriggerSupportsConcurrentCapture;
+}
+
 
 status_t AudioPolicyManager::startInput(audio_io_handle_t input,
                                         audio_session_t session,
@@ -1887,11 +1921,21 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
             }
         }
 
+        // We only need to check if the sound trigger session supports concurrent capture if the
+        // input is also a sound trigger input. Otherwise, we should preempt any hotword stream
+        // that's running.
+        const bool allowConcurrentWithSoundTrigger =
+            inputDesc->isSoundTrigger() ? soundTriggerSupportsConcurrentCapture() : false;
+
         // if capture is allowed, preempt currently active HOTWORD captures
         for (size_t i = 0; i < activeInputs.size(); i++) {
             sp<AudioInputDescriptor> activeDesc = activeInputs[i];
 
             if (is_virtual_input_device(activeDesc->mDevice)) {
+                continue;
+            }
+
+            if (allowConcurrentWithSoundTrigger && activeDesc->isSoundTrigger()) {
                 continue;
             }
 
@@ -2165,7 +2209,8 @@ status_t AudioPolicyManager::setStreamVolumeIndex(audio_stream_type_t stream,
                 continue;
             }
             routing_strategy curStrategy = getStrategy((audio_stream_type_t)curStream);
-            audio_devices_t curStreamDevice = getDeviceForStrategy(curStrategy, false /*fromCache*/);
+            audio_devices_t curStreamDevice = Volume::getDeviceForVolume(getDeviceForStrategy(
+                    curStrategy, false /*fromCache*/));
             if ((device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) &&
                     ((curStreamDevice & device) == 0)) {
                 continue;
@@ -2176,7 +2221,7 @@ status_t AudioPolicyManager::setStreamVolumeIndex(audio_stream_type_t stream,
                 applyVolume = (curDevice & curStreamDevice) != 0;
             } else {
                 applyVolume = !mVolumeCurves->hasVolumeIndexForDevice(
-                        stream, Volume::getDeviceForVolume(curStreamDevice));
+                        stream, curStreamDevice);
             }
 
             if (applyVolume) {
@@ -3490,7 +3535,8 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
     mBeaconMuted(false),
     mTtsOutputAvailable(false),
     mMasterMono(false),
-    mMusicEffectOutput(AUDIO_IO_HANDLE_NONE)
+    mMusicEffectOutput(AUDIO_IO_HANDLE_NONE),
+    mHasComputedSoundTriggerSupportsConcurrentCapture(false)
 {
     mUidCached = getuid();
     mpClientInterface = clientInterface;

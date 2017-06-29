@@ -50,6 +50,7 @@ LOCAL_SHARED_LIBRARIES :=  \
     libbinder \
     libcutils \
     libmediautils \
+    libserviceutility \
     libutils \
     liblog
 
