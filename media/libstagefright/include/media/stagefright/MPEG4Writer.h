@@ -83,10 +83,6 @@ private:
         kWhatSwitch                          = 'swch',
     };
 
-    enum {
-        kMaxCttsOffsetTimeUs = 1000000LL,  // 1 second
-    };
-
     int  mFd;
     int mNextFd;
     sp<MetaData> mStartMeta;
