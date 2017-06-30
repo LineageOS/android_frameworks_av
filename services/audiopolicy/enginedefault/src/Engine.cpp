@@ -277,8 +277,11 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
                 device &= ~AUDIO_DEVICE_OUT_SPEAKER;
             }
         } else if (outputs.isStreamActive(
-                                AUDIO_STREAM_MUSIC, SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY)) {
-            // while media is playing (or has recently played), use the same device
+                                AUDIO_STREAM_MUSIC, SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY)
+                    || outputs.isStreamActive(
+                            AUDIO_STREAM_ACCESSIBILITY, SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY))
+        {
+            // while media/a11y is playing (or has recently played), use the same device
             device = getDeviceForStrategyInt(
                     STRATEGY_MEDIA, availableOutputDevices, availableInputDevices, outputs);
         } else {
