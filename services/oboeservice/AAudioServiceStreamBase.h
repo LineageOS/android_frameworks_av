@@ -52,6 +52,8 @@ public:
         ILLEGAL_THREAD_ID = 0
     };
 
+    std::string dump() const;
+
     // -------------------------------------------------------------------
     /**
      * Open the device.

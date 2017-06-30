@@ -18,16 +18,17 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include <algorithm>
 #include <assert.h>
 #include <map>
 #include <mutex>
+#include <sstream>
+#include <vector>
+
 #include <utils/Singleton.h>
 
 #include "AAudioEndpointManager.h"
 #include "AAudioServiceEndpoint.h"
-#include <algorithm>
-#include <mutex>
-#include <vector>
 
 #include "core/AudioStreamBuilder.h"
 #include "AAudioServiceEndpoint.h"
@@ -43,6 +44,35 @@ using namespace aaudio;   // TODO just import names needed
 
 // This is the maximum size in frames. The effective size can be tuned smaller at runtime.
 #define DEFAULT_BUFFER_CAPACITY   (48 * 8)
+
+std::string AAudioServiceEndpoint::dump() const {
+    std::stringstream result;
+
+    const bool isLocked = AAudio_tryUntilTrue(
+            [this]()->bool { return mLockStreams.try_lock(); } /* f */,
+            50 /* times */,
+            20 /* sleepMs */);
+    if (!isLocked) {
+        result << "EndpointManager may be deadlocked\n";
+    }
+
+    AudioStreamInternal     *stream = mStreamInternal;
+    if (stream == nullptr) {
+        result << "null stream!" << "\n";
+    } else {
+        result << "mmap stream: rate = " << stream->getSampleRate() << "\n";
+    }
+
+    result << "    Registered Streams:" << "\n";
+    for (sp<AAudioServiceStreamShared> sharedStream : mRegisteredStreams) {
+        result << sharedStream->dump();
+    }
+
+    if (isLocked) {
+        mLockStreams.unlock();
+    }
+    return result.str();
+}
 
 // Set up an EXCLUSIVE MMAP stream that will be shared.
 aaudio_result_t AAudioServiceEndpoint::open(const AAudioStreamConfiguration& configuration) {

@@ -34,14 +34,14 @@ public:
     ~AAudioEndpointManager() = default;
 
     /**
-     * Returns EndpointManager information.
+     * Returns information about the state of the this class.
      *
      * Will attempt to get the object lock, but will proceed
      * even if it cannot.
      *
      * Each line of information ends with a newline.
      *
-     * @return a string representing the EndpointManager info
+     * @return a string with useful information
      */
     std::string dump() const;
 

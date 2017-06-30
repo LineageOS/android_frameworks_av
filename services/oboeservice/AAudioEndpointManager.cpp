@@ -48,16 +48,17 @@ std::string AAudioEndpointManager::dump() const {
         result << "EndpointManager may be deadlocked\n";
     }
 
+    result << "AAudioEndpointManager:" << "\n";
     size_t inputs = mInputs.size();
-    result << "Inputs: " << inputs << "\n";
+    result << "Input Endpoints: " << inputs << "\n";
     for (const auto &input : mInputs) {
-        result << "  Input(" << input << ")\n";
+        result << "  Input: " << input->dump() << "\n";
     }
 
     size_t outputs = mOutputs.size();
-    result << "Outputs: " << outputs << "\n";
+    result << "Output Endpoints: " << outputs << "\n";
     for (const auto &output : mOutputs) {
-        result << "  Output(" << output << ")\n";
+        result << "  Output: " << output->dump() << "\n";
     }
 
     if (isLocked) {

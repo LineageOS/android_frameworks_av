@@ -36,6 +36,8 @@ class AAudioServiceEndpoint {
 public:
     virtual ~AAudioServiceEndpoint() = default;
 
+    std::string dump() const;
+
     virtual aaudio_result_t open(const AAudioStreamConfiguration& configuration);
 
     int32_t getSampleRate() const { return mStreamInternal->getSampleRate(); }
@@ -73,7 +75,7 @@ public:
 
     std::atomic<bool>        mCallbackEnabled;
 
-    std::mutex               mLockStreams;
+    mutable std::mutex       mLockStreams;
 
     std::vector<android::sp<AAudioServiceStreamShared>> mRegisteredStreams;
 
