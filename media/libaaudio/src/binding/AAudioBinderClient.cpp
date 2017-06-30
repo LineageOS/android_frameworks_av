@@ -159,23 +159,19 @@ aaudio_result_t AAudioBinderClient::flushStream(aaudio_handle_t streamHandle) {
 * Manage the specified thread as a low latency audio thread.
 */
 aaudio_result_t AAudioBinderClient::registerAudioThread(aaudio_handle_t streamHandle,
-                                                        pid_t clientProcessId,
                                                         pid_t clientThreadId,
                                                         int64_t periodNanoseconds) {
     const sp<IAAudioService> &service = getAAudioService();
     if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
     return service->registerAudioThread(streamHandle,
-                                        clientProcessId,
                                         clientThreadId,
                                         periodNanoseconds);
 }
 
 aaudio_result_t AAudioBinderClient::unregisterAudioThread(aaudio_handle_t streamHandle,
-                                                          pid_t clientProcessId,
                                                           pid_t clientThreadId) {
     const sp<IAAudioService> &service = getAAudioService();
     if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
     return service->unregisterAudioThread(streamHandle,
-                                          clientProcessId,
                                           clientThreadId);
 }
