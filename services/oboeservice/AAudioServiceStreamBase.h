@@ -126,6 +126,13 @@ public:
         mOwnerUserId = uid;
     }
 
+    pid_t getOwnerProcessId() const {
+        return mOwnerProcessId;
+    }
+    void setOwnerProcessId(pid_t pid) {
+        mOwnerProcessId = pid;
+    }
+
     aaudio_handle_t getHandle() const {
         return mHandle;
     }
@@ -159,6 +166,7 @@ protected:
     int32_t            mSampleRate = AAUDIO_UNSPECIFIED;
     int32_t            mCapacityInFrames = AAUDIO_UNSPECIFIED;
     uid_t              mOwnerUserId = -1;
+    pid_t              mOwnerProcessId = -1;
 private:
     aaudio_handle_t    mHandle = -1;
 };
