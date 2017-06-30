@@ -76,12 +76,10 @@ public:
      * Manage the specified thread as a low latency audio thread.
      */
     virtual aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle,
-                                                pid_t clientProcessId,
                                                 pid_t clientThreadId,
                                                 int64_t periodNanoseconds) = 0;
 
     virtual aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
-                                                  pid_t clientProcessId,
                                                   pid_t clientThreadId) = 0;
 };
 

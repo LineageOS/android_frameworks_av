@@ -113,6 +113,13 @@ public:
 
     void processFatalError();
 
+    uid_t getOwnerUserId() const {
+        return mOwnerUserId;
+    }
+    void setOwnerUserId(uid_t uid) {
+        mOwnerUserId = uid;
+    }
+
 protected:
     aaudio_result_t writeUpMessageQueue(AAudioServiceMessage *command);
 
@@ -138,6 +145,7 @@ protected:
     int32_t            mSamplesPerFrame = AAUDIO_UNSPECIFIED;
     int32_t            mSampleRate = AAUDIO_UNSPECIFIED;
     int32_t            mCapacityInFrames = AAUDIO_UNSPECIFIED;
+    uid_t              mOwnerUserId = -1;
 };
 
 } /* namespace aaudio */

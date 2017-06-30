@@ -64,17 +64,20 @@ public:
     virtual aaudio_result_t flushStream(aaudio_handle_t streamHandle);
 
     virtual aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle,
-                                              pid_t pid, pid_t tid,
-                                              int64_t periodNanoseconds) ;
+                                                pid_t tid,
+                                                int64_t periodNanoseconds) ;
 
     virtual aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
-                                                  pid_t pid, pid_t tid);
+                                                  pid_t tid);
 
 private:
 
     aaudio::AAudioServiceStreamBase *convertHandleToServiceStream(aaudio_handle_t streamHandle) const;
 
     HandleTracker mHandleTracker;
+
+    uid_t   mCachedUserId = -1;
+    pid_t   mCachedProcessId = -1;
 
     enum constants {
         DEFAULT_AUDIO_PRIORITY = 2
