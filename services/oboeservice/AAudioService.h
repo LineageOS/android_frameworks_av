@@ -46,8 +46,10 @@ public:
 
     virtual status_t        dump(int fd, const Vector<String16>& args) override;
 
+    virtual void            registerClient(const sp<IAAudioClient>& client);
+
     virtual aaudio_handle_t openStream(const aaudio::AAudioStreamRequest &request,
-                                     aaudio::AAudioStreamConfiguration &configuration);
+                                     aaudio::AAudioStreamConfiguration &configurationOutput);
 
     virtual aaudio_result_t closeStream(aaudio_handle_t streamHandle);
 
