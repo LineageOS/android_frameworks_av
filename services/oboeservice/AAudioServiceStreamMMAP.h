@@ -43,7 +43,7 @@ class AAudioServiceStreamMMAP
     , public android::MmapStreamCallback {
 
 public:
-    AAudioServiceStreamMMAP();
+    AAudioServiceStreamMMAP(uid_t serviceUid);
     virtual ~AAudioServiceStreamMMAP();
 
 
@@ -134,6 +134,7 @@ private:
     struct audio_mmap_buffer_info             mMmapBufferinfo;
     android::MmapStreamInterface::Client      mMmapClient;
     audio_port_handle_t                       mPortHandle = -1; // TODO review best default
+    uid_t                                     mCachedUserId = -1;
 };
 
 } // namespace aaudio

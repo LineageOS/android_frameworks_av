@@ -115,6 +115,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         setSampleRate(configuration.getSampleRate());
         setSamplesPerFrame(configuration.getSamplesPerFrame());
         setDeviceId(configuration.getDeviceId());
+        setSharingMode(configuration.getSharingMode());
 
         // Save device format so we can do format conversion and volume scaling together.
         mDeviceFormat = configuration.getAudioFormat();

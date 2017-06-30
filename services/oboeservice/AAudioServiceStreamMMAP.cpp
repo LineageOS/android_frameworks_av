@@ -41,11 +41,12 @@ using namespace aaudio;
  * Service Stream that uses an MMAP buffer.
  */
 
-AAudioServiceStreamMMAP::AAudioServiceStreamMMAP()
+AAudioServiceStreamMMAP::AAudioServiceStreamMMAP(uid_t serviceUid)
         : AAudioServiceStreamBase()
         , mMmapStreamCallback(new MyMmapStreamCallback(*this))
         , mPreviousFrameCounter(0)
-        , mMmapStream(nullptr) {
+        , mMmapStream(nullptr)
+        , mCachedUserId(serviceUid) {
 }
 
 AAudioServiceStreamMMAP::~AAudioServiceStreamMMAP() {
@@ -153,10 +154,29 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
               status);
         return AAUDIO_ERROR_UNAVAILABLE;
     } else {
-        ALOGD("createMmapBuffer status %d shared_address = %p buffer_size %d burst_size %d",
+        ALOGD("createMmapBuffer status %d shared_address = %p buffer_size %d burst_size %d"
+                "Sharable FD: %s",
               status, mMmapBufferinfo.shared_memory_address,
-              mMmapBufferinfo.buffer_size_frames,
-              mMmapBufferinfo.burst_size_frames);
+              abs(mMmapBufferinfo.buffer_size_frames),
+              mMmapBufferinfo.burst_size_frames,
+              mMmapBufferinfo.buffer_size_frames < 0 ? "Yes" : "No");
+    }
+
+    mCapacityInFrames = mMmapBufferinfo.buffer_size_frames;
+    // FIXME: the audio HAL indicates if the shared memory fd can be shared outside of audioserver
+    // by returning a negative buffer size
+    if (mCapacityInFrames < 0) {
+        // Exclusive mode is possible from any client
+        mCapacityInFrames = -mCapacityInFrames;
+    } else {
+        // exclusive mode is only possible if the final fd destination is inside audioserver
+        if ((mMmapClient.clientUid != mCachedUserId) &&
+                configurationInput.getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE) {
+            // Fallback is handled by caller but indicate what is possible in case
+            // this is used in the future
+            configurationOutput.setSharingMode(AAUDIO_SHARING_MODE_SHARED);
+            return AAUDIO_ERROR_UNAVAILABLE;
+        }
     }
 
     // Get information about the stream and pass it back to the caller.
@@ -166,7 +186,6 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
 
     mAudioDataFileDescriptor = mMmapBufferinfo.shared_memory_fd;
     mFramesPerBurst = mMmapBufferinfo.burst_size_frames;
-    mCapacityInFrames = mMmapBufferinfo.buffer_size_frames;
     mAudioFormat = AAudioConvert_androidToAAudioDataFormat(config.format);
     mSampleRate = config.sample_rate;
 
