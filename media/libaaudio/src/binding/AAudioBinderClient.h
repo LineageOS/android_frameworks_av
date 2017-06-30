@@ -82,12 +82,10 @@ public:
      * TODO Consider passing this information as part of the startStream() call.
      */
     aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle,
-                                                pid_t clientProcessId,
                                                 pid_t clientThreadId,
                                                 int64_t periodNanoseconds) override;
 
     aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
-                                                  pid_t clientProcessId,
                                                   pid_t clientThreadId) override;
 };
 

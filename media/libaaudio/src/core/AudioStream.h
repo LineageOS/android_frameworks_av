@@ -84,9 +84,7 @@ public:
         return AAUDIO_OK;
     }
 
-    virtual aaudio_result_t setBufferSize(int32_t requestedFrames) {
-        return AAUDIO_ERROR_UNIMPLEMENTED;
-    }
+    virtual aaudio_result_t setBufferSize(int32_t requestedFrames) = 0;
 
     virtual aaudio_result_t createThread(int64_t periodNanoseconds,
                                        aaudio_audio_thread_proc_t threadProc,
@@ -214,15 +212,15 @@ public:
 
     // ============== I/O ===========================
     // A Stream will only implement read() or write() depending on its direction.
-    virtual aaudio_result_t write(const void *buffer,
-                             int32_t numFrames,
-                             int64_t timeoutNanoseconds) {
+    virtual aaudio_result_t write(const void *buffer __unused,
+                             int32_t numFrames __unused,
+                             int64_t timeoutNanoseconds __unused) {
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
-    virtual aaudio_result_t read(void *buffer,
-                            int32_t numFrames,
-                            int64_t timeoutNanoseconds) {
+    virtual aaudio_result_t read(void *buffer __unused,
+                            int32_t numFrames __unused,
+                            int64_t timeoutNanoseconds __unused) {
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 

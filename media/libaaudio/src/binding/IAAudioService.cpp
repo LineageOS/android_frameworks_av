@@ -15,6 +15,7 @@
  */
 
 #include <aaudio/AAudio.h>
+#include <binder/IPCThreadState.h>
 
 #include "binding/AudioEndpointParcelable.h"
 #include "binding/AAudioStreamRequest.h"
@@ -185,15 +186,13 @@ public:
     }
 
     virtual aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle,
-                                              pid_t clientProcessId,
-                                              pid_t clientThreadId,
-                                              int64_t periodNanoseconds)
+                                                pid_t clientThreadId,
+                                                int64_t periodNanoseconds)
     override {
         Parcel data, reply;
         // send command
         data.writeInterfaceToken(IAAudioService::getInterfaceDescriptor());
         data.writeInt32(streamHandle);
-        data.writeInt32((int32_t) clientProcessId);
         data.writeInt32((int32_t) clientThreadId);
         data.writeInt64(periodNanoseconds);
         status_t err = remote()->transact(REGISTER_AUDIO_THREAD, data, &reply);
@@ -207,14 +206,12 @@ public:
     }
 
     virtual aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
-                                                  pid_t clientProcessId,
                                                   pid_t clientThreadId)
     override {
         Parcel data, reply;
         // send command
         data.writeInterfaceToken(IAAudioService::getInterfaceDescriptor());
         data.writeInt32(streamHandle);
-        data.writeInt32((int32_t) clientProcessId);
         data.writeInt32((int32_t) clientThreadId);
         status_t err = remote()->transact(UNREGISTER_AUDIO_THREAD, data, &reply);
         if (err != NO_ERROR) {
@@ -239,7 +236,6 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
     aaudio_handle_t stream;
     aaudio::AAudioStreamRequest request;
     aaudio::AAudioStreamConfiguration configuration;
-    pid_t pid;
     pid_t tid;
     int64_t nanoseconds;
     aaudio_result_t result;
@@ -249,12 +245,13 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
         case OPEN_STREAM: {
             CHECK_INTERFACE(IAAudioService, data, reply);
             request.readFromParcel(&data);
-
             //ALOGD("BnAAudioService::client openStream request dump --------------------");
             //request.dump();
-
+            // Override the uid and pid from the client in case they are incorrect.
+            request.setUserId(IPCThreadState::self()->getCallingUid());
+            request.setProcessId(IPCThreadState::self()->getCallingPid());
             stream = openStream(request, configuration);
-            //ALOGD("BnAAudioService::onTransact OPEN_STREAM server handle = 0x%08X", stream);
+            //ALOGD("BnAAudioService::onTransact OPEN_STREAM server handle = 0x%08X ----", stream);
             reply->writeInt32(stream);
             configuration.writeToParcel(reply);
             return NO_ERROR;
@@ -332,10 +329,9 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
         case REGISTER_AUDIO_THREAD: {
             CHECK_INTERFACE(IAAudioService, data, reply);
             data.readInt32(&stream);
-            data.readInt32(&pid);
             data.readInt32(&tid);
             data.readInt64(&nanoseconds);
-            result = registerAudioThread(stream, pid, tid, nanoseconds);
+            result = registerAudioThread(stream, tid, nanoseconds);
             ALOGV("BnAAudioService::onTransact REGISTER_AUDIO_THREAD 0x%08X, result = %d",
                     stream, result);
             reply->writeInt32(result);
@@ -345,9 +341,8 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
         case UNREGISTER_AUDIO_THREAD: {
             CHECK_INTERFACE(IAAudioService, data, reply);
             data.readInt32(&stream);
-            data.readInt32(&pid);
             data.readInt32(&tid);
-            result = unregisterAudioThread(stream, pid, tid);
+            result = unregisterAudioThread(stream, tid);
             ALOGV("BnAAudioService::onTransact UNREGISTER_AUDIO_THREAD 0x%08X, result = %d",
                     stream, result);
             reply->writeInt32(result);
