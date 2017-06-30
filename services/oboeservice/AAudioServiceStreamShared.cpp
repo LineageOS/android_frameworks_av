@@ -202,7 +202,7 @@ aaudio_result_t AAudioServiceStreamShared::start()  {
     aaudio_result_t result = endpoint->startStream(this);
     if (result != AAUDIO_OK) {
         ALOGE("AAudioServiceStreamShared::start() mServiceEndpoint returned %d", result);
-        processFatalError();
+        disconnect();
     } else {
         result = AAudioServiceStreamBase::start();
     }
@@ -222,7 +222,7 @@ aaudio_result_t AAudioServiceStreamShared::pause()  {
     aaudio_result_t result = endpoint->stopStream(this);
     if (result != AAUDIO_OK) {
         ALOGE("AAudioServiceStreamShared::pause() mServiceEndpoint returned %d", result);
-        processFatalError();
+        disconnect(); // TODO should we return or pause Base first?
     }
     return AAudioServiceStreamBase::pause();
 }
@@ -235,7 +235,7 @@ aaudio_result_t AAudioServiceStreamShared::stop()  {
     aaudio_result_t result = endpoint->stopStream(this);
     if (result != AAUDIO_OK) {
         ALOGE("AAudioServiceStreamShared::stop() mServiceEndpoint returned %d", result);
-        processFatalError();
+        disconnect();
     }
     return AAudioServiceStreamBase::stop();
 }
@@ -291,10 +291,6 @@ aaudio_result_t AAudioServiceStreamShared::getDownDataDescription(AudioEndpointP
 }
 
 void AAudioServiceStreamShared::onStop() {
-}
-
-void AAudioServiceStreamShared::onDisconnect() {
-    processFatalError();
 }
 
 void AAudioServiceStreamShared::markTransferTime(int64_t nanoseconds) {
