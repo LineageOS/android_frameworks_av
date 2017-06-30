@@ -65,20 +65,20 @@ aaudio_result_t AAudioServiceEndpoint::close() {
 }
 
 // TODO, maybe use an interface to reduce exposure
-aaudio_result_t AAudioServiceEndpoint::registerStream(AAudioServiceStreamShared *sharedStream) {
+aaudio_result_t AAudioServiceEndpoint::registerStream(sp<AAudioServiceStreamShared>sharedStream) {
     std::lock_guard<std::mutex> lock(mLockStreams);
     mRegisteredStreams.push_back(sharedStream);
     return AAUDIO_OK;
 }
 
-aaudio_result_t AAudioServiceEndpoint::unregisterStream(AAudioServiceStreamShared *sharedStream) {
+aaudio_result_t AAudioServiceEndpoint::unregisterStream(sp<AAudioServiceStreamShared>sharedStream) {
     std::lock_guard<std::mutex> lock(mLockStreams);
     mRegisteredStreams.erase(std::remove(mRegisteredStreams.begin(), mRegisteredStreams.end(), sharedStream),
               mRegisteredStreams.end());
     return AAUDIO_OK;
 }
 
-aaudio_result_t AAudioServiceEndpoint::startStream(AAudioServiceStreamShared *sharedStream) {
+aaudio_result_t AAudioServiceEndpoint::startStream(sp<AAudioServiceStreamShared> sharedStream) {
     // TODO use real-time technique to avoid mutex, eg. atomic command FIFO
     std::lock_guard<std::mutex> lock(mLockStreams);
     mRunningStreams.push_back(sharedStream);
@@ -88,7 +88,7 @@ aaudio_result_t AAudioServiceEndpoint::startStream(AAudioServiceStreamShared *sh
     return AAUDIO_OK;
 }
 
-aaudio_result_t AAudioServiceEndpoint::stopStream(AAudioServiceStreamShared *sharedStream) {
+aaudio_result_t AAudioServiceEndpoint::stopStream(sp<AAudioServiceStreamShared> sharedStream) {
     int numRunningStreams = 0;
     {
         std::lock_guard<std::mutex> lock(mLockStreams);
@@ -130,11 +130,11 @@ aaudio_result_t AAudioServiceEndpoint::stopSharingThread() {
 
 void AAudioServiceEndpoint::disconnectRegisteredStreams() {
     std::lock_guard<std::mutex> lock(mLockStreams);
-    for(AAudioServiceStreamShared *sharedStream : mRunningStreams) {
-        sharedStream->onStop();
+    for(auto baseStream : mRunningStreams) {
+        baseStream->onStop();
     }
     mRunningStreams.clear();
-    for(AAudioServiceStreamShared *sharedStream : mRegisteredStreams) {
+    for(auto sharedStream : mRegisteredStreams) {
         sharedStream->onDisconnect();
     }
     mRegisteredStreams.clear();

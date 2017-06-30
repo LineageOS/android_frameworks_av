@@ -42,6 +42,7 @@ AAudioServiceStreamBase::AAudioServiceStreamBase()
 
 AAudioServiceStreamBase::~AAudioServiceStreamBase() {
     close();
+    ALOGD("AAudioServiceStreamBase::~AAudioServiceStreamBase() destroyed %p", this);
 }
 
 aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest &request,
@@ -56,6 +57,7 @@ aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest 
 }
 
 aaudio_result_t AAudioServiceStreamBase::close() {
+    stop();
     std::lock_guard<std::mutex> lock(mLockUpMessageQueue);
     delete mUpMessageQueue;
     mUpMessageQueue = nullptr;
@@ -71,28 +73,34 @@ aaudio_result_t AAudioServiceStreamBase::start() {
 }
 
 aaudio_result_t AAudioServiceStreamBase::pause() {
-    sendCurrentTimestamp();
-    mThreadEnabled.store(false);
-    aaudio_result_t result = mAAudioThread.stop();
-    if (result != AAUDIO_OK) {
-        processFatalError();
-        return result;
+    aaudio_result_t result = AAUDIO_OK;
+    if (isRunning()) {
+        sendCurrentTimestamp();
+        mThreadEnabled.store(false);
+        result = mAAudioThread.stop();
+        if (result != AAUDIO_OK) {
+            processFatalError();
+            return result;
+        }
+        sendServiceEvent(AAUDIO_SERVICE_EVENT_PAUSED);
     }
-    sendServiceEvent(AAUDIO_SERVICE_EVENT_PAUSED);
     mState = AAUDIO_STREAM_STATE_PAUSED;
     return result;
 }
 
 aaudio_result_t AAudioServiceStreamBase::stop() {
-    // TODO wait for data to be played out
-    sendCurrentTimestamp();
-    mThreadEnabled.store(false);
-    aaudio_result_t result = mAAudioThread.stop();
-    if (result != AAUDIO_OK) {
-        processFatalError();
-        return result;
+    aaudio_result_t result = AAUDIO_OK;
+    if (isRunning()) {
+        // TODO wait for data to be played out
+        sendCurrentTimestamp();
+        mThreadEnabled.store(false);
+        result = mAAudioThread.stop();
+        if (result != AAUDIO_OK) {
+            processFatalError();
+            return result;
+        }
+        sendServiceEvent(AAUDIO_SERVICE_EVENT_STOPPED);
     }
-    sendServiceEvent(AAUDIO_SERVICE_EVENT_STOPPED);
     mState = AAUDIO_STREAM_STATE_STOPPED;
     return result;
 }

@@ -25,7 +25,7 @@
 #include "AAudioSimplePlayer.h"
 
 #define SAMPLE_RATE           48000
-#define NUM_SECONDS           20
+#define NUM_SECONDS           4
 
 #define MMAP_POLICY              AAUDIO_UNSPECIFIED
 //#define MMAP_POLICY              AAUDIO_POLICY_NEVER

@@ -28,17 +28,23 @@
 #include "binding/AudioEndpointParcelable.h"
 #include "binding/AAudioStreamRequest.h"
 #include "binding/AAudioStreamConfiguration.h"
+#include "binding/IAAudioClient.h"
 #include "utility/HandleTracker.h"
 
 namespace android {
 
 #define AAUDIO_SERVICE_NAME  "media.aaudio"
 
-// Interface (our AIDL) - Shared by server and client
+// Interface (our AIDL) - service methods called by client
 class IAAudioService : public IInterface {
 public:
 
     DECLARE_META_INTERFACE(AAudioService);
+
+    // Register an object to receive audio input/output change and track notifications.
+    // For a given calling pid, AAudio service disregards any registrations after the first.
+    // Thus the IAAudioClient must be a singleton per process.
+    virtual void registerClient(const sp<IAAudioClient>& client) = 0;
 
     /**
      * @param request info needed to create the stream
