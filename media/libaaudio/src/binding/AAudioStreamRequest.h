@@ -68,7 +68,6 @@ public:
         mSharingModeMatchRequired = required;
     }
 
-
     const AAudioStreamConfiguration &getConstantConfiguration() const {
         return mConfiguration;
     }

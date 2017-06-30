@@ -78,7 +78,7 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
         // Distribute data to each active stream.
         { // use lock guard
             std::lock_guard <std::mutex> lock(mLockStreams);
-            for (AAudioServiceStreamShared *sharedStream : mRunningStreams) {
+            for (sp<AAudioServiceStreamShared> sharedStream : mRunningStreams) {
                 FifoBuffer *fifo = sharedStream->getDataFifoBuffer();
                 if (fifo->getFifoControllerBase()->getEmptyFramesAvailable() <
                     getFramesPerBurst()) {
