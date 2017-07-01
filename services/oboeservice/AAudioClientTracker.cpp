@@ -68,6 +68,16 @@ void AAudioClientTracker::unregisterClient(pid_t pid) {
     mNotificationClients.erase(pid);
 }
 
+int32_t AAudioClientTracker::getStreamCount(pid_t pid) {
+    std::lock_guard<std::mutex> lock(mLock);
+    auto it = mNotificationClients.find(pid);
+    if (it != mNotificationClients.end()) {
+        return it->second->getStreamCount();
+    } else {
+        return 0; // no existing client
+    }
+}
+
 aaudio_result_t
 AAudioClientTracker::registerClientStream(pid_t pid, sp<AAudioServiceStreamBase> serviceStream) {
     aaudio_result_t result = AAUDIO_OK;
@@ -90,8 +100,7 @@ AAudioClientTracker::unregisterClientStream(pid_t pid,
                                             sp<AAudioServiceStreamBase> serviceStream) {
     ALOGV("AAudioClientTracker::unregisterClientStream(%d, %p)\n", pid, serviceStream.get());
     std::lock_guard<std::mutex> lock(mLock);
-    std::map<pid_t, android::sp<NotificationClient>>::iterator it;
-    it = mNotificationClients.find(pid);
+    auto it = mNotificationClients.find(pid);
     if (it != mNotificationClients.end()) {
         it->second->unregisterClientStream(serviceStream);
     }
@@ -105,6 +114,11 @@ AAudioClientTracker::NotificationClient::NotificationClient(pid_t pid)
 
 AAudioClientTracker::NotificationClient::~NotificationClient() {
     //ALOGD("AAudioClientTracker::~NotificationClient() destroyed %p\n", this);
+}
+
+int32_t AAudioClientTracker::NotificationClient::getStreamCount() {
+    std::lock_guard<std::mutex> lock(mLock);
+    return mStreams.size();
 }
 
 aaudio_result_t AAudioClientTracker::NotificationClient::registerClientStream(
