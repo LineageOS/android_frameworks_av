@@ -45,6 +45,20 @@ AAudioServiceStreamBase::~AAudioServiceStreamBase() {
     ALOGD("AAudioServiceStreamBase::~AAudioServiceStreamBase() destroyed %p", this);
 }
 
+std::string AAudioServiceStreamBase::dump() const {
+    std::stringstream result;
+
+    result << "      -------- handle = 0x" << std::hex << mHandle << std::dec << "\n";
+    result << "      state          = " << AAudio_convertStreamStateToText(mState) << "\n";
+    result << "      format         = " << mAudioFormat << "\n";
+    result << "      framesPerBurst = " << mFramesPerBurst << "\n";
+    result << "      channelCount   = " << mSamplesPerFrame << "\n";
+    result << "      capacityFrames = " << mCapacityInFrames << "\n";
+    result << "      owner uid      = " << mOwnerUserId << "\n";
+
+    return result.str();
+}
+
 aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest &request,
                      aaudio::AAudioStreamConfiguration &configurationOutput) {
     std::lock_guard<std::mutex> lock(mLockUpMessageQueue);

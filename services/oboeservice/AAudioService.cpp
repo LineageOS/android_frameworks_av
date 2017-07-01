@@ -69,7 +69,9 @@ status_t AAudioService::dump(int fd, const Vector<String16>& args) {
         result = ss.str();
         ALOGW("%s", result.c_str());
     } else {
-        result = mHandleTracker.dump() + AAudioEndpointManager::getInstance().dump();
+        result = mHandleTracker.dump()
+                 + AAudioClientTracker::getInstance().dump()
+                 + AAudioEndpointManager::getInstance().dump();
     }
     (void)write(fd, result.c_str(), result.size());
     return NO_ERROR;
