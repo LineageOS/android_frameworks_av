@@ -36,7 +36,7 @@ class AAudioServiceEndpoint {
 public:
     virtual ~AAudioServiceEndpoint() = default;
 
-    virtual aaudio_result_t open(int32_t deviceId);
+    virtual aaudio_result_t open(const AAudioStreamConfiguration& configuration);
 
     int32_t getSampleRate() const { return mStreamInternal->getSampleRate(); }
     int32_t getSamplesPerFrame() const { return mStreamInternal->getSamplesPerFrame();  }
@@ -66,6 +66,8 @@ public:
     void setReferenceCount(int32_t count) {
         mReferenceCount = count;
     }
+
+    bool matches(const AAudioStreamConfiguration& configuration);
 
     virtual AudioStreamInternal *getStreamInternal() = 0;
 
