@@ -115,24 +115,24 @@ AAudioServiceEndpoint *AAudioEndpointManager::openEndpoint(AAudioService &audioS
             default:
                 break;
         }
-    }
 
-    if (endpoint != nullptr) {
-        aaudio_result_t result = endpoint->open(configuration);
-        if (result != AAUDIO_OK) {
-            ALOGE("AAudioEndpointManager::findEndpoint(), open failed");
-            delete endpoint;
-            endpoint = nullptr;
-        } else {
-            switch(direction) {
-                case AAUDIO_DIRECTION_INPUT:
-                    mInputs.push_back(capture);
-                    break;
-                case AAUDIO_DIRECTION_OUTPUT:
-                    mOutputs.push_back(player);
-                    break;
-                default:
-                    break;
+        if (endpoint != nullptr) {
+            aaudio_result_t result = endpoint->open(configuration);
+            if (result != AAUDIO_OK) {
+                ALOGE("AAudioEndpointManager::findEndpoint(), open failed");
+                delete endpoint;
+                endpoint = nullptr;
+            } else {
+                switch(direction) {
+                    case AAUDIO_DIRECTION_INPUT:
+                        mInputs.push_back(capture);
+                        break;
+                    case AAUDIO_DIRECTION_OUTPUT:
+                        mOutputs.push_back(player);
+                        break;
+                    default:
+                        break;
+                }
             }
         }
         ALOGD("AAudioEndpointManager::openEndpoint(), created %p for device = %d, dir = %d",

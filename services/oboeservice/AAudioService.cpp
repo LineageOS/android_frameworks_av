@@ -40,6 +40,8 @@
 using namespace android;
 using namespace aaudio;
 
+#define MAX_STREAMS_PER_PROCESS   8
+
 typedef enum
 {
     AAUDIO_HANDLE_TYPE_STREAM
@@ -85,6 +87,17 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
     const AAudioStreamConfiguration &configurationInput = request.getConstantConfiguration();
     bool sharingModeMatchRequired = request.isSharingModeMatchRequired();
     aaudio_sharing_mode_t sharingMode = configurationInput.getSharingMode();
+
+    // Enforce limit on client processes.
+    pid_t pid = request.getProcessId();
+    if (pid != mCachedProcessId) {
+        int32_t count = AAudioClientTracker::getInstance().getStreamCount(pid);
+        if (count >= MAX_STREAMS_PER_PROCESS) {
+            ALOGE("AAudioService::openStream(): exceeded max streams per process %d >= %d",
+                  count,  MAX_STREAMS_PER_PROCESS);
+            return AAUDIO_ERROR_UNAVAILABLE;
+        }
+    }
 
     if (sharingMode != AAUDIO_SHARING_MODE_EXCLUSIVE && sharingMode != AAUDIO_SHARING_MODE_SHARED) {
         ALOGE("AAudioService::openStream(): unrecognized sharing mode = %d", sharingMode);
@@ -135,7 +148,14 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
 }
 
 aaudio_result_t AAudioService::closeStream(aaudio_handle_t streamHandle) {
-    AAudioServiceStreamBase *serviceStream = (AAudioServiceStreamBase *)
+    // Check permission first.
+    AAudioServiceStreamBase *serviceStream = convertHandleToServiceStream(streamHandle);
+    if (serviceStream == nullptr) {
+        ALOGE("AAudioService::startStream(), illegal stream handle = 0x%0x", streamHandle);
+        return AAUDIO_ERROR_INVALID_HANDLE;
+    }
+
+    serviceStream = (AAudioServiceStreamBase *)
             mHandleTracker.remove(AAUDIO_HANDLE_TYPE_STREAM,
                                   streamHandle);
     ALOGD("AAudioService.closeStream(0x%08X)", streamHandle);
