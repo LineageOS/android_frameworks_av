@@ -127,6 +127,7 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
             ALOGD("AAudioService::openStream(): handle = 0x%08X", handle);
             serviceStream->setHandle(handle);
             pid_t pid = request.getProcessId();
+            serviceStream->setOwnerProcessId(pid);
             AAudioClientTracker::getInstance().registerClientStream(pid, serviceStream);
         }
         return handle;
@@ -140,7 +141,7 @@ aaudio_result_t AAudioService::closeStream(aaudio_handle_t streamHandle) {
     ALOGD("AAudioService.closeStream(0x%08X)", streamHandle);
     if (serviceStream != nullptr) {
         serviceStream->close();
-        pid_t pid = IPCThreadState::self()->getCallingPid();
+        pid_t pid = serviceStream->getOwnerProcessId();
         AAudioClientTracker::getInstance().unregisterClientStream(pid, serviceStream);
         return AAUDIO_OK;
     }
