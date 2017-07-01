@@ -34,6 +34,18 @@ public:
     AAudioClientTracker();
     ~AAudioClientTracker() = default;
 
+    /**
+     * Returns information about the state of the this class.
+     *
+     * Will attempt to get the object lock, but will proceed
+     * even if it cannot.
+     *
+     * Each line of information ends with a newline.
+     *
+     * @return a string with useful information
+     */
+    std::string dump() const;
+
     aaudio_result_t registerClient(pid_t pid, const android::sp<android::IAAudioClient>& client);
 
     void unregisterClient(pid_t pid);
@@ -66,6 +78,8 @@ private:
 
         int32_t getStreamCount();
 
+        std::string dump() const;
+
         aaudio_result_t registerClientStream(android::sp<AAudioServiceStreamBase> serviceStream);
 
         aaudio_result_t unregisterClientStream(android::sp<AAudioServiceStreamBase> serviceStream);
@@ -74,12 +88,12 @@ private:
         virtual     void    binderDied(const android::wp<IBinder>& who);
 
     protected:
-        std::mutex                                      mLock;
+        mutable std::mutex                              mLock;
         const pid_t                                     mProcessId;
         std::set<android::sp<AAudioServiceStreamBase>>  mStreams;
     };
 
-    std::mutex                                       mLock;
+    mutable std::mutex                               mLock;
     std::map<pid_t, android::sp<NotificationClient>> mNotificationClients;
     android::AAudioService                          *mAAudioService = nullptr;
 };

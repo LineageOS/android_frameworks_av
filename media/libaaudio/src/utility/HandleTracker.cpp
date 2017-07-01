@@ -113,7 +113,8 @@ std::string HandleTracker::dump() const {
         result << "HandleTracker may be deadlocked\n";
     }
 
-    result << "Handles:\n";
+    result << "HandleTracker:\n";
+    result << "  HandleHeaders:\n";
     // atLineStart() can be changed to support an arbitrary line breaking algorithm;
     // it should return true when a new line starts.
     // For simplicity, we will use a constant 16 items per line.
@@ -125,7 +126,7 @@ std::string HandleTracker::dump() const {
 
     for (int i = 0; i < mMaxHandleCount; ++i) {
         if (atLineStart(i)) {
-            result << "  ";
+            result << "    ";
         }
         result << std::hex << std::setw(4) << std::setfill('0') << mHandleHeaders[i]
                << (atLineEnd(i) ? "\n" : " ");
