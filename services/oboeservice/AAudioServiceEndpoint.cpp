@@ -138,7 +138,7 @@ void AAudioServiceEndpoint::disconnectRegisteredStreams() {
     }
     mRunningStreams.clear();
     for(auto sharedStream : mRegisteredStreams) {
-        sharedStream->onDisconnect();
+        sharedStream->disconnect();
     }
     mRegisteredStreams.clear();
 }

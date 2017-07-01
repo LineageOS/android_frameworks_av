@@ -117,7 +117,7 @@ public:
 
     void run() override; // to implement Runnable
 
-    void processFatalError();
+    void disconnect();
 
     uid_t getOwnerUserId() const {
         return mOwnerUserId;

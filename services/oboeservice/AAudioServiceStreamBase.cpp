@@ -79,7 +79,7 @@ aaudio_result_t AAudioServiceStreamBase::pause() {
         mThreadEnabled.store(false);
         result = mAAudioThread.stop();
         if (result != AAUDIO_OK) {
-            processFatalError();
+            disconnect();
             return result;
         }
         sendServiceEvent(AAUDIO_SERVICE_EVENT_PAUSED);
@@ -96,7 +96,7 @@ aaudio_result_t AAudioServiceStreamBase::stop() {
         mThreadEnabled.store(false);
         result = mAAudioThread.stop();
         if (result != AAUDIO_OK) {
-            processFatalError();
+            disconnect();
             return result;
         }
         sendServiceEvent(AAUDIO_SERVICE_EVENT_STOPPED);
@@ -133,8 +133,11 @@ void AAudioServiceStreamBase::run() {
     ALOGD("AAudioServiceStreamBase::run() exiting ----------------");
 }
 
-void AAudioServiceStreamBase::processFatalError() {
-    sendServiceEvent(AAUDIO_SERVICE_EVENT_DISCONNECTED);
+void AAudioServiceStreamBase::disconnect() {
+    if (mState != AAUDIO_STREAM_STATE_DISCONNECTED) {
+        sendServiceEvent(AAUDIO_SERVICE_EVENT_DISCONNECTED);
+        mState = AAUDIO_STREAM_STATE_DISCONNECTED;
+    }
 }
 
 aaudio_result_t AAudioServiceStreamBase::sendServiceEvent(aaudio_service_event_t event,
