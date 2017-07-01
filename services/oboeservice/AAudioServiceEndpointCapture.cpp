@@ -42,8 +42,8 @@ AAudioServiceEndpointCapture::~AAudioServiceEndpointCapture() {
     delete mDistributionBuffer;
 }
 
-aaudio_result_t AAudioServiceEndpointCapture::open(int32_t deviceId) {
-    aaudio_result_t result = AAudioServiceEndpoint::open(deviceId);
+aaudio_result_t AAudioServiceEndpointCapture::open(const AAudioStreamConfiguration& configuration) {
+    aaudio_result_t result = AAudioServiceEndpoint::open(configuration);
     if (result == AAUDIO_OK) {
         delete mDistributionBuffer;
         int distributionBufferSizeBytes = getStreamInternal()->getFramesPerBurst()
