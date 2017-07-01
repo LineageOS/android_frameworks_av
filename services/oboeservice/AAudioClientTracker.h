@@ -38,6 +38,8 @@ public:
 
     void unregisterClient(pid_t pid);
 
+    int32_t getStreamCount(pid_t pid);
+
     aaudio_result_t registerClientStream(pid_t pid,
                                          android::sp<AAudioServiceStreamBase> serviceStream);
 
@@ -53,10 +55,16 @@ public:
     }
 
 private:
+
+    /**
+     * One per process.
+     */
     class NotificationClient : public IBinder::DeathRecipient {
     public:
         NotificationClient(pid_t pid);
         virtual ~NotificationClient();
+
+        int32_t getStreamCount();
 
         aaudio_result_t registerClientStream(android::sp<AAudioServiceStreamBase> serviceStream);
 
