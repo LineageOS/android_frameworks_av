@@ -27,7 +27,7 @@ public:
     explicit AAudioServiceEndpointCapture(android::AAudioService &audioService);
     virtual ~AAudioServiceEndpointCapture();
 
-    aaudio_result_t open(int32_t deviceId) override;
+    aaudio_result_t open(const AAudioStreamConfiguration& configuration) override;
 
     AudioStreamInternal *getStreamInternal() override {
         return &mStreamInternalCapture;

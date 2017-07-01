@@ -106,11 +106,10 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
     }
 
     const AAudioStreamConfiguration &configurationInput = request.getConstantConfiguration();
-    int32_t deviceId = configurationInput.getDeviceId();
     aaudio_direction_t direction = request.getDirection();
 
     AAudioEndpointManager &mEndpointManager = AAudioEndpointManager::getInstance();
-    mServiceEndpoint = mEndpointManager.openEndpoint(mAudioService, deviceId, direction);
+    mServiceEndpoint = mEndpointManager.openEndpoint(mAudioService, configurationOutput, direction);
     if (mServiceEndpoint == nullptr) {
         ALOGE("AAudioServiceStreamShared::open() mServiceEndPoint = %p", mServiceEndpoint);
         return AAUDIO_ERROR_UNAVAILABLE;
