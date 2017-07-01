@@ -206,7 +206,7 @@ aaudio_result_t AAudioServiceStreamMMAP::start() {
     status_t status = mMmapStream->start(mMmapClient, &mPortHandle);
     if (status != OK) {
         ALOGE("AAudioServiceStreamMMAP::start() mMmapStream->start() returned %d", status);
-        processFatalError();
+        disconnect();
         result = AAudioConvert_androidToAAudioResult(status);
     } else {
         result = AAudioServiceStreamBase::start();
@@ -248,13 +248,13 @@ aaudio_result_t AAudioServiceStreamMMAP::getFreeRunningPosition(int64_t *positio
                                                                 int64_t *timeNanos) {
     struct audio_mmap_position position;
     if (mMmapStream == nullptr) {
-        processFatalError();
+        disconnect();
         return AAUDIO_ERROR_NULL;
     }
     status_t status = mMmapStream->getMmapPosition(&position);
     if (status != OK) {
         ALOGE("sendCurrentTimestamp(): getMmapPosition() returned %d", status);
-        processFatalError();
+        disconnect();
         return AAudioConvert_androidToAAudioResult(status);
     } else {
         mFramesRead.update32(position.position_frames);
@@ -265,7 +265,8 @@ aaudio_result_t AAudioServiceStreamMMAP::getFreeRunningPosition(int64_t *positio
 }
 
 void AAudioServiceStreamMMAP::onTearDown() {
-    ALOGD("AAudioServiceStreamMMAP::onTearDown() called"); // TODO what is needed here?
+    ALOGD("AAudioServiceStreamMMAP::onTearDown() called");
+    disconnect();
 };
 
 void AAudioServiceStreamMMAP::onVolumeChanged(audio_channel_mask_t channels,
@@ -280,7 +281,7 @@ void AAudioServiceStreamMMAP::onRoutingChanged(audio_port_handle_t deviceId) {
     ALOGD("AAudioServiceStreamMMAP::onRoutingChanged() called with %d, old = %d",
           deviceId, mPortHandle);
     if (mPortHandle > 0 && mPortHandle != deviceId) {
-        sendServiceEvent(AAUDIO_SERVICE_EVENT_DISCONNECTED);
+        disconnect();
     }
     mPortHandle = deviceId;
 };
