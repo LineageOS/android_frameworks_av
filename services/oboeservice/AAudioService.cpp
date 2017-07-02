@@ -107,7 +107,7 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
     }
 
     if (sharingMode == AAUDIO_SHARING_MODE_EXCLUSIVE) {
-        serviceStream = new AAudioServiceStreamMMAP();
+        serviceStream = new AAudioServiceStreamMMAP(mCachedUserId);
         result = serviceStream->open(request, configurationOutput);
         if (result != AAUDIO_OK) {
             // fall back to using a shared stream
