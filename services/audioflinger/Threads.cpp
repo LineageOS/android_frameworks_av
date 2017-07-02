@@ -7544,7 +7544,7 @@ status_t AudioFlinger::MmapThreadHandle::getMmapPosition(struct audio_mmap_posit
     return mThread->getMmapPosition(position);
 }
 
-status_t AudioFlinger::MmapThreadHandle::start(const MmapStreamInterface::Client& client,
+status_t AudioFlinger::MmapThreadHandle::start(const AudioClient& client,
         audio_port_handle_t *handle)
 
 {
@@ -7638,77 +7638,75 @@ status_t AudioFlinger::MmapThread::getMmapPosition(struct audio_mmap_position *p
     return mHalStream->getMmapPosition(position);
 }
 
-status_t AudioFlinger::MmapThread::start(const MmapStreamInterface::Client& client,
+status_t AudioFlinger::MmapThread::start(const AudioClient& client,
                                          audio_port_handle_t *handle)
 {
-    ALOGV("%s clientUid %d mStandby %d", __FUNCTION__, client.clientUid, mStandby);
+    ALOGV("%s clientUid %d mStandby %d mPortId %d *handle %d", __FUNCTION__,
+          client.clientUid, mStandby, mPortId, *handle);
     if (mHalStream == 0) {
         return NO_INIT;
     }
 
     status_t ret;
-    audio_session_t sessionId;
-    audio_port_handle_t portId;
 
-    if (mActiveTracks.size() == 0) {
+    if (*handle == mPortId) {
         // for the first track, reuse portId and session allocated when the stream was opened
         ret = mHalStream->start();
         if (ret != NO_ERROR) {
             ALOGE("%s: error mHalStream->start() = %d for first track", __FUNCTION__, ret);
             return ret;
         }
-        portId = mPortId;
-        sessionId = mSessionId;
         mStandby = false;
+        return NO_ERROR;
+    }
+
+    audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
+
+    audio_io_handle_t io = mId;
+    if (isOutput()) {
+        audio_config_t config = AUDIO_CONFIG_INITIALIZER;
+        config.sample_rate = mSampleRate;
+        config.channel_mask = mChannelMask;
+        config.format = mFormat;
+        audio_stream_type_t stream = streamType();
+        audio_output_flags_t flags =
+                (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ | AUDIO_OUTPUT_FLAG_DIRECT);
+        audio_port_handle_t deviceId = AUDIO_PORT_HANDLE_NONE;
+        ret = AudioSystem::getOutputForAttr(&mAttr, &io,
+                                            mSessionId,
+                                            &stream,
+                                            client.clientUid,
+                                            &config,
+                                            flags,
+                                            &deviceId,
+                                            &portId);
     } else {
-        // for other tracks than first one, get a new port ID from APM.
-        sessionId = (audio_session_t)mAudioFlinger->newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
-        audio_io_handle_t io;
-        if (isOutput()) {
-            audio_config_t config = AUDIO_CONFIG_INITIALIZER;
-            config.sample_rate = mSampleRate;
-            config.channel_mask = mChannelMask;
-            config.format = mFormat;
-            audio_stream_type_t stream = streamType();
-            audio_output_flags_t flags =
-                    (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ | AUDIO_OUTPUT_FLAG_DIRECT);
-            audio_port_handle_t deviceId = AUDIO_PORT_HANDLE_NONE;
-            ret = AudioSystem::getOutputForAttr(&mAttr, &io,
-                                                sessionId,
-                                                &stream,
-                                                client.clientUid,
-                                                &config,
-                                                flags,
-                                                &deviceId,
-                                                &portId);
-        } else {
-            audio_config_base_t config;
-            config.sample_rate = mSampleRate;
-            config.channel_mask = mChannelMask;
-            config.format = mFormat;
-            audio_port_handle_t deviceId = AUDIO_PORT_HANDLE_NONE;
-            ret = AudioSystem::getInputForAttr(&mAttr, &io,
-                                                  sessionId,
-                                                  client.clientPid,
-                                                  client.clientUid,
-                                                  &config,
-                                                  AUDIO_INPUT_FLAG_MMAP_NOIRQ,
-                                                  &deviceId,
-                                                  &portId);
-        }
-        // APM should not chose a different input or output stream for the same set of attributes
-        // and audo configuration
-        if (ret != NO_ERROR || io != mId) {
-            ALOGE("%s: error getting output or input from APM (error %d, io %d expected io %d)",
-                  __FUNCTION__, ret, io, mId);
-            return BAD_VALUE;
-        }
+        audio_config_base_t config;
+        config.sample_rate = mSampleRate;
+        config.channel_mask = mChannelMask;
+        config.format = mFormat;
+        audio_port_handle_t deviceId = AUDIO_PORT_HANDLE_NONE;
+        ret = AudioSystem::getInputForAttr(&mAttr, &io,
+                                              mSessionId,
+                                              client.clientPid,
+                                              client.clientUid,
+                                              &config,
+                                              AUDIO_INPUT_FLAG_MMAP_NOIRQ,
+                                              &deviceId,
+                                              &portId);
+    }
+    // APM should not chose a different input or output stream for the same set of attributes
+    // and audo configuration
+    if (ret != NO_ERROR || io != mId) {
+        ALOGE("%s: error getting output or input from APM (error %d, io %d expected io %d)",
+              __FUNCTION__, ret, io, mId);
+        return BAD_VALUE;
     }
 
     if (isOutput()) {
-        ret = AudioSystem::startOutput(mId, streamType(), sessionId);
+        ret = AudioSystem::startOutput(mId, streamType(), mSessionId);
     } else {
-        ret = AudioSystem::startInput(mId, sessionId);
+        ret = AudioSystem::startInput(mId, mSessionId);
     }
 
     // abort if start is rejected by audio policy manager
@@ -7716,9 +7714,9 @@ status_t AudioFlinger::MmapThread::start(const MmapStreamInterface::Client& clie
         ALOGE("%s: error start rejected by AudioPolicyManager = %d", __FUNCTION__, ret);
         if (mActiveTracks.size() != 0) {
             if (isOutput()) {
-                AudioSystem::releaseOutput(mId, streamType(), sessionId);
+                AudioSystem::releaseOutput(mId, streamType(), mSessionId);
             } else {
-                AudioSystem::releaseInput(mId, sessionId);
+                AudioSystem::releaseInput(mId, mSessionId);
             }
         } else {
             mHalStream->stop();
@@ -7726,12 +7724,11 @@ status_t AudioFlinger::MmapThread::start(const MmapStreamInterface::Client& clie
         return PERMISSION_DENIED;
     }
 
-    sp<MmapTrack> track = new MmapTrack(this, mSampleRate, mFormat, mChannelMask, sessionId,
-                                        client.clientUid, client.clientPid,
-                                        portId);
+    sp<MmapTrack> track = new MmapTrack(this, mSampleRate, mFormat, mChannelMask, mSessionId,
+                                        client.clientUid, client.clientPid, portId);
 
     mActiveTracks.add(track);
-    sp<EffectChain> chain = getEffectChain_l(sessionId);
+    sp<EffectChain> chain = getEffectChain_l(mSessionId);
     if (chain != 0) {
         chain->setStrategy(AudioSystem::getStrategyForStream(streamType()));
         chain->incTrackCnt();
@@ -7739,10 +7736,9 @@ status_t AudioFlinger::MmapThread::start(const MmapStreamInterface::Client& clie
     }
 
     *handle = portId;
-
     broadcast_l();
 
-    ALOGV("%s DONE handle %d stream %p", __FUNCTION__, portId, mHalStream.get());
+    ALOGV("%s DONE handle %d stream %p", __FUNCTION__, *handle, mHalStream.get());
 
     return NO_ERROR;
 }
@@ -7753,6 +7749,11 @@ status_t AudioFlinger::MmapThread::stop(audio_port_handle_t handle)
 
     if (mHalStream == 0) {
         return NO_INIT;
+    }
+
+    if (handle == mPortId) {
+        mHalStream->stop();
+        return NO_ERROR;
     }
 
     sp<MmapTrack> track;
@@ -7770,14 +7771,10 @@ status_t AudioFlinger::MmapThread::stop(audio_port_handle_t handle)
 
     if (isOutput()) {
         AudioSystem::stopOutput(mId, streamType(), track->sessionId());
-        if (mActiveTracks.size() != 0) {
-            AudioSystem::releaseOutput(mId, streamType(), track->sessionId());
-        }
+        AudioSystem::releaseOutput(mId, streamType(), track->sessionId());
     } else {
         AudioSystem::stopInput(mId, track->sessionId());
-        if (mActiveTracks.size() != 0) {
-            AudioSystem::releaseInput(mId, track->sessionId());
-        }
+        AudioSystem::releaseInput(mId, track->sessionId());
     }
 
     sp<EffectChain> chain = getEffectChain_l(track->sessionId());
@@ -7788,9 +7785,6 @@ status_t AudioFlinger::MmapThread::stop(audio_port_handle_t handle)
 
     broadcast_l();
 
-    if (mActiveTracks.size() == 0) {
-        mHalStream->stop();
-    }
     return NO_ERROR;
 }
 

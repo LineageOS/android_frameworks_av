@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudioService"
+#define LOG_TAG "AAudioEndpointManager"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -104,6 +104,8 @@ AAudioServiceEndpoint *AAudioEndpointManager::openEndpoint(AAudioService &audioS
 
     // If we can't find an existing one then open a new one.
     if (endpoint == nullptr) {
+        // we must call openStream with audioserver identity
+        int64_t token = IPCThreadState::self()->clearCallingIdentity();
         switch(direction) {
             case AAUDIO_DIRECTION_INPUT:
                 capture = new AAudioServiceEndpointCapture(audioService);
@@ -138,6 +140,7 @@ AAudioServiceEndpoint *AAudioEndpointManager::openEndpoint(AAudioService &audioS
         }
         ALOGD("AAudioEndpointManager::openEndpoint(), created %p for device = %d, dir = %d",
               endpoint, configuration.getDeviceId(), (int)direction);
+        IPCThreadState::self()->restoreCallingIdentity(token);
     }
 
     if (endpoint != nullptr) {

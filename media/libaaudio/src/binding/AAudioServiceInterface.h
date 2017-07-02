@@ -18,6 +18,7 @@
 #define ANDROID_AAUDIO_BINDING_AAUDIO_SERVICE_INTERFACE_H
 
 #include <utils/StrongPointer.h>
+#include <media/AudioClient.h>
 
 #include "binding/AAudioServiceDefinitions.h"
 #include "binding/AAudioStreamRequest.h"
@@ -86,6 +87,13 @@ public:
 
     virtual aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
                                                   pid_t clientThreadId) = 0;
+
+    virtual aaudio_result_t startClient(aaudio_handle_t streamHandle,
+                                      const android::AudioClient& client,
+                                      audio_port_handle_t *clientHandle) = 0;
+
+    virtual aaudio_result_t stopClient(aaudio_handle_t streamHandle,
+                                       audio_port_handle_t clientHandle) = 0;
 };
 
 } /* namespace aaudio */

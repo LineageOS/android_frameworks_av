@@ -21,6 +21,7 @@
 #include <pthread.h>
 
 #include <binder/BinderService.h>
+#include <media/AudioClient.h>
 
 #include <aaudio/AAudio.h>
 #include "utility/HandleTracker.h"
@@ -72,14 +73,20 @@ public:
     virtual aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
                                                   pid_t tid);
 
+    virtual aaudio_result_t startClient(aaudio_handle_t streamHandle,
+                                      const android::AudioClient& client,
+                                      audio_port_handle_t *clientHandle);
+
+    virtual aaudio_result_t stopClient(aaudio_handle_t streamHandle,
+                                       audio_port_handle_t clientHandle);
+
 private:
 
     aaudio::AAudioServiceStreamBase *convertHandleToServiceStream(aaudio_handle_t streamHandle) const;
 
     HandleTracker mHandleTracker;
 
-    uid_t   mCachedUserId = -1;
-    pid_t   mCachedProcessId = -1;
+    android::AudioClient mAudioClient;
 
     enum constants {
         DEFAULT_AUDIO_PRIORITY = 2
