@@ -42,6 +42,21 @@ AAudioServiceStreamBase::AAudioServiceStreamBase()
 
 AAudioServiceStreamBase::~AAudioServiceStreamBase() {
     close();
+    ALOGD("AAudioServiceStreamBase::~AAudioServiceStreamBase() destroyed %p", this);
+}
+
+std::string AAudioServiceStreamBase::dump() const {
+    std::stringstream result;
+
+    result << "      -------- handle = 0x" << std::hex << mHandle << std::dec << "\n";
+    result << "      state          = " << AAudio_convertStreamStateToText(mState) << "\n";
+    result << "      format         = " << mAudioFormat << "\n";
+    result << "      framesPerBurst = " << mFramesPerBurst << "\n";
+    result << "      channelCount   = " << mSamplesPerFrame << "\n";
+    result << "      capacityFrames = " << mCapacityInFrames << "\n";
+    result << "      owner uid      = " << mOwnerUserId << "\n";
+
+    return result.str();
 }
 
 aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest &request,
@@ -56,6 +71,7 @@ aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest 
 }
 
 aaudio_result_t AAudioServiceStreamBase::close() {
+    stop();
     std::lock_guard<std::mutex> lock(mLockUpMessageQueue);
     delete mUpMessageQueue;
     mUpMessageQueue = nullptr;
@@ -71,28 +87,34 @@ aaudio_result_t AAudioServiceStreamBase::start() {
 }
 
 aaudio_result_t AAudioServiceStreamBase::pause() {
-    sendCurrentTimestamp();
-    mThreadEnabled.store(false);
-    aaudio_result_t result = mAAudioThread.stop();
-    if (result != AAUDIO_OK) {
-        processFatalError();
-        return result;
+    aaudio_result_t result = AAUDIO_OK;
+    if (isRunning()) {
+        sendCurrentTimestamp();
+        mThreadEnabled.store(false);
+        result = mAAudioThread.stop();
+        if (result != AAUDIO_OK) {
+            disconnect();
+            return result;
+        }
+        sendServiceEvent(AAUDIO_SERVICE_EVENT_PAUSED);
     }
-    sendServiceEvent(AAUDIO_SERVICE_EVENT_PAUSED);
     mState = AAUDIO_STREAM_STATE_PAUSED;
     return result;
 }
 
 aaudio_result_t AAudioServiceStreamBase::stop() {
-    // TODO wait for data to be played out
-    sendCurrentTimestamp();
-    mThreadEnabled.store(false);
-    aaudio_result_t result = mAAudioThread.stop();
-    if (result != AAUDIO_OK) {
-        processFatalError();
-        return result;
+    aaudio_result_t result = AAUDIO_OK;
+    if (isRunning()) {
+        // TODO wait for data to be played out
+        sendCurrentTimestamp();
+        mThreadEnabled.store(false);
+        result = mAAudioThread.stop();
+        if (result != AAUDIO_OK) {
+            disconnect();
+            return result;
+        }
+        sendServiceEvent(AAUDIO_SERVICE_EVENT_STOPPED);
     }
-    sendServiceEvent(AAUDIO_SERVICE_EVENT_STOPPED);
     mState = AAUDIO_STREAM_STATE_STOPPED;
     return result;
 }
@@ -125,8 +147,11 @@ void AAudioServiceStreamBase::run() {
     ALOGD("AAudioServiceStreamBase::run() exiting ----------------");
 }
 
-void AAudioServiceStreamBase::processFatalError() {
-    sendServiceEvent(AAUDIO_SERVICE_EVENT_DISCONNECTED);
+void AAudioServiceStreamBase::disconnect() {
+    if (mState != AAUDIO_STREAM_STATE_DISCONNECTED) {
+        sendServiceEvent(AAUDIO_SERVICE_EVENT_DISCONNECTED);
+        mState = AAUDIO_STREAM_STATE_DISCONNECTED;
+    }
 }
 
 aaudio_result_t AAudioServiceStreamBase::sendServiceEvent(aaudio_service_event_t event,

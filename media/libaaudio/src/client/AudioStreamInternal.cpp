@@ -115,6 +115,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         setSampleRate(configuration.getSampleRate());
         setSamplesPerFrame(configuration.getSamplesPerFrame());
         setDeviceId(configuration.getDeviceId());
+        setSharingMode(configuration.getSharingMode());
 
         // Save device format so we can do format conversion and volume scaling together.
         mDeviceFormat = configuration.getAudioFormat();
@@ -364,7 +365,6 @@ aaudio_result_t AudioStreamInternal::registerThread() {
         return AAUDIO_ERROR_INVALID_STATE;
     }
     return mServiceInterface.registerAudioThread(mServiceStreamHandle,
-                                              getpid(),
                                               gettid(),
                                               getPeriodNanoseconds());
 }
@@ -373,7 +373,7 @@ aaudio_result_t AudioStreamInternal::unregisterThread() {
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
         return AAUDIO_ERROR_INVALID_STATE;
     }
-    return mServiceInterface.unregisterAudioThread(mServiceStreamHandle, getpid(), gettid());
+    return mServiceInterface.unregisterAudioThread(mServiceStreamHandle, gettid());
 }
 
 aaudio_result_t AudioStreamInternal::getTimestamp(clockid_t clockId,

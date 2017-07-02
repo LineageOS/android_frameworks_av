@@ -42,8 +42,8 @@ AAudioServiceEndpointCapture::~AAudioServiceEndpointCapture() {
     delete mDistributionBuffer;
 }
 
-aaudio_result_t AAudioServiceEndpointCapture::open(int32_t deviceId) {
-    aaudio_result_t result = AAudioServiceEndpoint::open(deviceId);
+aaudio_result_t AAudioServiceEndpointCapture::open(const AAudioStreamConfiguration& configuration) {
+    aaudio_result_t result = AAudioServiceEndpoint::open(configuration);
     if (result == AAUDIO_OK) {
         delete mDistributionBuffer;
         int distributionBufferSizeBytes = getStreamInternal()->getFramesPerBurst()
@@ -78,7 +78,7 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
         // Distribute data to each active stream.
         { // use lock guard
             std::lock_guard <std::mutex> lock(mLockStreams);
-            for (AAudioServiceStreamShared *sharedStream : mRunningStreams) {
+            for (sp<AAudioServiceStreamShared> sharedStream : mRunningStreams) {
                 FifoBuffer *fifo = sharedStream->getDataFifoBuffer();
                 if (fifo->getFifoControllerBase()->getEmptyFramesAvailable() <
                     getFramesPerBurst()) {

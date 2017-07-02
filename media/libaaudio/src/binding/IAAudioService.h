@@ -28,17 +28,23 @@
 #include "binding/AudioEndpointParcelable.h"
 #include "binding/AAudioStreamRequest.h"
 #include "binding/AAudioStreamConfiguration.h"
+#include "binding/IAAudioClient.h"
 #include "utility/HandleTracker.h"
 
 namespace android {
 
 #define AAUDIO_SERVICE_NAME  "media.aaudio"
 
-// Interface (our AIDL) - Shared by server and client
+// Interface (our AIDL) - service methods called by client
 class IAAudioService : public IInterface {
 public:
 
     DECLARE_META_INTERFACE(AAudioService);
+
+    // Register an object to receive audio input/output change and track notifications.
+    // For a given calling pid, AAudio service disregards any registrations after the first.
+    // Thus the IAAudioClient must be a singleton per process.
+    virtual void registerClient(const sp<IAAudioClient>& client) = 0;
 
     /**
      * @param request info needed to create the stream
@@ -82,15 +88,12 @@ public:
 
     /**
      * Manage the specified thread as a low latency audio thread.
-     * TODO Consider passing this information as part of the startStream() call.
      */
     virtual aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle,
-                                              pid_t clientProcessId,
                                               pid_t clientThreadId,
                                               int64_t periodNanoseconds) = 0;
 
     virtual aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
-                                                pid_t clientProcessId,
                                                 pid_t clientThreadId) = 0;
 };
 

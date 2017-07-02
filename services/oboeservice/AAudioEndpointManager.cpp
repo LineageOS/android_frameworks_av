@@ -48,16 +48,17 @@ std::string AAudioEndpointManager::dump() const {
         result << "EndpointManager may be deadlocked\n";
     }
 
+    result << "AAudioEndpointManager:" << "\n";
     size_t inputs = mInputs.size();
-    result << "Inputs: " << inputs << "\n";
+    result << "Input Endpoints: " << inputs << "\n";
     for (const auto &input : mInputs) {
-        result << "  Input(" << input.first << ", " << input.second << ")\n";
+        result << "  Input: " << input->dump() << "\n";
     }
 
     size_t outputs = mOutputs.size();
-    result << "Outputs: " << outputs << "\n";
+    result << "Output Endpoints: " << outputs << "\n";
     for (const auto &output : mOutputs) {
-        result << "  Output(" << output.first << ", " << output.second << ")\n";
+        result << "  Output: " << output->dump() << "\n";
     }
 
     if (isLocked) {
@@ -66,51 +67,77 @@ std::string AAudioEndpointManager::dump() const {
     return result.str();
 }
 
-AAudioServiceEndpoint *AAudioEndpointManager::openEndpoint(AAudioService &audioService, int32_t deviceId,
-                                                           aaudio_direction_t direction) {
+AAudioServiceEndpoint *AAudioEndpointManager::openEndpoint(AAudioService &audioService,
+        const AAudioStreamConfiguration& configuration, aaudio_direction_t direction) {
     AAudioServiceEndpoint *endpoint = nullptr;
+    AAudioServiceEndpointCapture *capture = nullptr;
+    AAudioServiceEndpointPlay *player = nullptr;
     std::lock_guard<std::mutex> lock(mLock);
 
     // Try to find an existing endpoint.
+
+
+
     switch (direction) {
         case AAUDIO_DIRECTION_INPUT:
-            endpoint = mInputs[deviceId];
+            for (AAudioServiceEndpoint *ep : mInputs) {
+                if (ep->matches(configuration)) {
+                    endpoint = ep;
+                    break;
+                }
+            }
             break;
         case AAUDIO_DIRECTION_OUTPUT:
-            endpoint = mOutputs[deviceId];
+            for (AAudioServiceEndpoint *ep : mOutputs) {
+                if (ep->matches(configuration)) {
+                    endpoint = ep;
+                    break;
+                }
+            }
             break;
         default:
             assert(false); // There are only two possible directions.
             break;
     }
+    ALOGD("AAudioEndpointManager::openEndpoint(), found %p for device = %d, dir = %d",
+          endpoint, configuration.getDeviceId(), (int)direction);
 
     // If we can't find an existing one then open a new one.
-    if (endpoint != nullptr) {
-        ALOGD("AAudioEndpointManager::openEndpoint(), found %p for device = %d, dir = %d",
-              endpoint, deviceId, (int)direction);
-
-    } else {
-        if (direction == AAUDIO_DIRECTION_INPUT) {
-            AAudioServiceEndpointCapture *capture = new AAudioServiceEndpointCapture(audioService);
-            if (capture->open(deviceId) != AAUDIO_OK) {
-                ALOGE("AAudioEndpointManager::openEndpoint(), open input failed");
-                delete capture;
-            } else {
-                mInputs[deviceId] = capture;
+    if (endpoint == nullptr) {
+        switch(direction) {
+            case AAUDIO_DIRECTION_INPUT:
+                capture = new AAudioServiceEndpointCapture(audioService);
                 endpoint = capture;
-            }
-        } else if (direction == AAUDIO_DIRECTION_OUTPUT) {
-            AAudioServiceEndpointPlay *player = new AAudioServiceEndpointPlay(audioService);
-            if (player->open(deviceId) != AAUDIO_OK) {
-                ALOGE("AAudioEndpointManager::openEndpoint(), open output failed");
-                delete player;
-            } else {
-                mOutputs[deviceId] = player;
+                break;
+            case AAUDIO_DIRECTION_OUTPUT:
+                player = new AAudioServiceEndpointPlay(audioService);
                 endpoint = player;
+                break;
+            default:
+                break;
+        }
+
+        if (endpoint != nullptr) {
+            aaudio_result_t result = endpoint->open(configuration);
+            if (result != AAUDIO_OK) {
+                ALOGE("AAudioEndpointManager::findEndpoint(), open failed");
+                delete endpoint;
+                endpoint = nullptr;
+            } else {
+                switch(direction) {
+                    case AAUDIO_DIRECTION_INPUT:
+                        mInputs.push_back(capture);
+                        break;
+                    case AAUDIO_DIRECTION_OUTPUT:
+                        mOutputs.push_back(player);
+                        break;
+                    default:
+                        break;
+                }
             }
         }
         ALOGD("AAudioEndpointManager::openEndpoint(), created %p for device = %d, dir = %d",
-              endpoint, deviceId, (int)direction);
+              endpoint, configuration.getDeviceId(), (int)direction);
     }
 
     if (endpoint != nullptr) {
@@ -143,10 +170,14 @@ void AAudioEndpointManager::closeEndpoint(AAudioServiceEndpoint *serviceEndpoint
 
         switch (direction) {
             case AAUDIO_DIRECTION_INPUT:
-                mInputs.erase(deviceId);
+                mInputs.erase(
+                  std::remove(mInputs.begin(), mInputs.end(), serviceEndpoint), mInputs.end());
                 break;
             case AAUDIO_DIRECTION_OUTPUT:
-                mOutputs.erase(deviceId);
+                mOutputs.erase(
+                  std::remove(mOutputs.begin(), mOutputs.end(), serviceEndpoint), mOutputs.end());
+                break;
+            default:
                 break;
         }
 

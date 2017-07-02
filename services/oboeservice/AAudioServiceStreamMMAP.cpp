@@ -38,14 +38,15 @@ using namespace aaudio;
 #define AAUDIO_SAMPLE_RATE_DEFAULT    48000
 
 /**
- * Stream that uses an MMAP buffer.
+ * Service Stream that uses an MMAP buffer.
  */
 
-AAudioServiceStreamMMAP::AAudioServiceStreamMMAP()
+AAudioServiceStreamMMAP::AAudioServiceStreamMMAP(uid_t serviceUid)
         : AAudioServiceStreamBase()
         , mMmapStreamCallback(new MyMmapStreamCallback(*this))
         , mPreviousFrameCounter(0)
-        , mMmapStream(nullptr) {
+        , mMmapStream(nullptr)
+        , mCachedUserId(serviceUid) {
 }
 
 AAudioServiceStreamMMAP::~AAudioServiceStreamMMAP() {
@@ -153,10 +154,29 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
               status);
         return AAUDIO_ERROR_UNAVAILABLE;
     } else {
-        ALOGD("createMmapBuffer status %d shared_address = %p buffer_size %d burst_size %d",
+        ALOGD("createMmapBuffer status %d shared_address = %p buffer_size %d burst_size %d"
+                "Sharable FD: %s",
               status, mMmapBufferinfo.shared_memory_address,
-              mMmapBufferinfo.buffer_size_frames,
-              mMmapBufferinfo.burst_size_frames);
+              abs(mMmapBufferinfo.buffer_size_frames),
+              mMmapBufferinfo.burst_size_frames,
+              mMmapBufferinfo.buffer_size_frames < 0 ? "Yes" : "No");
+    }
+
+    mCapacityInFrames = mMmapBufferinfo.buffer_size_frames;
+    // FIXME: the audio HAL indicates if the shared memory fd can be shared outside of audioserver
+    // by returning a negative buffer size
+    if (mCapacityInFrames < 0) {
+        // Exclusive mode is possible from any client
+        mCapacityInFrames = -mCapacityInFrames;
+    } else {
+        // exclusive mode is only possible if the final fd destination is inside audioserver
+        if ((mMmapClient.clientUid != mCachedUserId) &&
+                configurationInput.getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE) {
+            // Fallback is handled by caller but indicate what is possible in case
+            // this is used in the future
+            configurationOutput.setSharingMode(AAUDIO_SHARING_MODE_SHARED);
+            return AAUDIO_ERROR_UNAVAILABLE;
+        }
     }
 
     // Get information about the stream and pass it back to the caller.
@@ -166,7 +186,6 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
 
     mAudioDataFileDescriptor = mMmapBufferinfo.shared_memory_fd;
     mFramesPerBurst = mMmapBufferinfo.burst_size_frames;
-    mCapacityInFrames = mMmapBufferinfo.buffer_size_frames;
     mAudioFormat = AAudioConvert_androidToAAudioDataFormat(config.format);
     mSampleRate = config.sample_rate;
 
@@ -206,7 +225,7 @@ aaudio_result_t AAudioServiceStreamMMAP::start() {
     status_t status = mMmapStream->start(mMmapClient, &mPortHandle);
     if (status != OK) {
         ALOGE("AAudioServiceStreamMMAP::start() mMmapStream->start() returned %d", status);
-        processFatalError();
+        disconnect();
         result = AAudioConvert_androidToAAudioResult(status);
     } else {
         result = AAudioServiceStreamBase::start();
@@ -244,18 +263,17 @@ aaudio_result_t AAudioServiceStreamMMAP::flush() {
     return AAudioServiceStreamBase::flush();;
 }
 
-
 aaudio_result_t AAudioServiceStreamMMAP::getFreeRunningPosition(int64_t *positionFrames,
                                                                 int64_t *timeNanos) {
     struct audio_mmap_position position;
     if (mMmapStream == nullptr) {
-        processFatalError();
+        disconnect();
         return AAUDIO_ERROR_NULL;
     }
     status_t status = mMmapStream->getMmapPosition(&position);
     if (status != OK) {
         ALOGE("sendCurrentTimestamp(): getMmapPosition() returned %d", status);
-        processFatalError();
+        disconnect();
         return AAudioConvert_androidToAAudioResult(status);
     } else {
         mFramesRead.update32(position.position_frames);
@@ -266,7 +284,8 @@ aaudio_result_t AAudioServiceStreamMMAP::getFreeRunningPosition(int64_t *positio
 }
 
 void AAudioServiceStreamMMAP::onTearDown() {
-    ALOGE("AAudioServiceStreamMMAP::onTearDown() called - TODO");
+    ALOGD("AAudioServiceStreamMMAP::onTearDown() called");
+    disconnect();
 };
 
 void AAudioServiceStreamMMAP::onVolumeChanged(audio_channel_mask_t channels,
@@ -281,7 +300,7 @@ void AAudioServiceStreamMMAP::onRoutingChanged(audio_port_handle_t deviceId) {
     ALOGD("AAudioServiceStreamMMAP::onRoutingChanged() called with %d, old = %d",
           deviceId, mPortHandle);
     if (mPortHandle > 0 && mPortHandle != deviceId) {
-        sendServiceEvent(AAUDIO_SERVICE_EVENT_DISCONNECTED);
+        disconnect();
     }
     mPortHandle = deviceId;
 };

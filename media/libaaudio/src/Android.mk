@@ -52,6 +52,7 @@ LOCAL_SRC_FILES = \
     binding/AAudioBinderClient.cpp \
     binding/AAudioStreamRequest.cpp \
     binding/AAudioStreamConfiguration.cpp \
+    binding/IAAudioClient.cpp \
     binding/IAAudioService.cpp \
     binding/RingBufferParcelable.cpp \
     binding/SharedMemoryParcelable.cpp \
@@ -109,6 +110,7 @@ LOCAL_SRC_FILES = core/AudioStream.cpp \
     binding/AAudioBinderClient.cpp \
     binding/AAudioStreamRequest.cpp \
     binding/AAudioStreamConfiguration.cpp \
+    binding/IAAudioClient.cpp \
     binding/IAAudioService.cpp \
     binding/RingBufferParcelable.cpp \
     binding/SharedMemoryParcelable.cpp \

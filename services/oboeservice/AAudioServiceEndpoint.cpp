@@ -18,16 +18,17 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include <algorithm>
 #include <assert.h>
 #include <map>
 #include <mutex>
+#include <sstream>
+#include <vector>
+
 #include <utils/Singleton.h>
 
 #include "AAudioEndpointManager.h"
 #include "AAudioServiceEndpoint.h"
-#include <algorithm>
-#include <mutex>
-#include <vector>
 
 #include "core/AudioStreamBuilder.h"
 #include "AAudioServiceEndpoint.h"
@@ -44,16 +45,48 @@ using namespace aaudio;   // TODO just import names needed
 // This is the maximum size in frames. The effective size can be tuned smaller at runtime.
 #define DEFAULT_BUFFER_CAPACITY   (48 * 8)
 
+std::string AAudioServiceEndpoint::dump() const {
+    std::stringstream result;
+
+    const bool isLocked = AAudio_tryUntilTrue(
+            [this]()->bool { return mLockStreams.try_lock(); } /* f */,
+            50 /* times */,
+            20 /* sleepMs */);
+    if (!isLocked) {
+        result << "EndpointManager may be deadlocked\n";
+    }
+
+    AudioStreamInternal     *stream = mStreamInternal;
+    if (stream == nullptr) {
+        result << "null stream!" << "\n";
+    } else {
+        result << "mmap stream: rate = " << stream->getSampleRate() << "\n";
+    }
+
+    result << "    Registered Streams:" << "\n";
+    for (sp<AAudioServiceStreamShared> sharedStream : mRegisteredStreams) {
+        result << sharedStream->dump();
+    }
+
+    if (isLocked) {
+        mLockStreams.unlock();
+    }
+    return result.str();
+}
+
 // Set up an EXCLUSIVE MMAP stream that will be shared.
-aaudio_result_t AAudioServiceEndpoint::open(int32_t deviceId) {
-    mRequestedDeviceId = deviceId;
+aaudio_result_t AAudioServiceEndpoint::open(const AAudioStreamConfiguration& configuration) {
+    mRequestedDeviceId = configuration.getDeviceId();
     mStreamInternal = getStreamInternal();
 
     AudioStreamBuilder builder;
     builder.setSharingMode(AAUDIO_SHARING_MODE_EXCLUSIVE);
     // Don't fall back to SHARED because that would cause recursion.
     builder.setSharingModeMatchRequired(true);
-    builder.setDeviceId(deviceId);
+    builder.setDeviceId(mRequestedDeviceId);
+    builder.setFormat(configuration.getAudioFormat());
+    builder.setSampleRate(configuration.getSampleRate());
+    builder.setSamplesPerFrame(configuration.getSamplesPerFrame());
     builder.setDirection(getDirection());
     builder.setBufferCapacity(DEFAULT_BUFFER_CAPACITY);
 
@@ -65,20 +98,20 @@ aaudio_result_t AAudioServiceEndpoint::close() {
 }
 
 // TODO, maybe use an interface to reduce exposure
-aaudio_result_t AAudioServiceEndpoint::registerStream(AAudioServiceStreamShared *sharedStream) {
+aaudio_result_t AAudioServiceEndpoint::registerStream(sp<AAudioServiceStreamShared>sharedStream) {
     std::lock_guard<std::mutex> lock(mLockStreams);
     mRegisteredStreams.push_back(sharedStream);
     return AAUDIO_OK;
 }
 
-aaudio_result_t AAudioServiceEndpoint::unregisterStream(AAudioServiceStreamShared *sharedStream) {
+aaudio_result_t AAudioServiceEndpoint::unregisterStream(sp<AAudioServiceStreamShared>sharedStream) {
     std::lock_guard<std::mutex> lock(mLockStreams);
     mRegisteredStreams.erase(std::remove(mRegisteredStreams.begin(), mRegisteredStreams.end(), sharedStream),
               mRegisteredStreams.end());
     return AAUDIO_OK;
 }
 
-aaudio_result_t AAudioServiceEndpoint::startStream(AAudioServiceStreamShared *sharedStream) {
+aaudio_result_t AAudioServiceEndpoint::startStream(sp<AAudioServiceStreamShared> sharedStream) {
     // TODO use real-time technique to avoid mutex, eg. atomic command FIFO
     std::lock_guard<std::mutex> lock(mLockStreams);
     mRunningStreams.push_back(sharedStream);
@@ -88,7 +121,7 @@ aaudio_result_t AAudioServiceEndpoint::startStream(AAudioServiceStreamShared *sh
     return AAUDIO_OK;
 }
 
-aaudio_result_t AAudioServiceEndpoint::stopStream(AAudioServiceStreamShared *sharedStream) {
+aaudio_result_t AAudioServiceEndpoint::stopStream(sp<AAudioServiceStreamShared> sharedStream) {
     int numRunningStreams = 0;
     {
         std::lock_guard<std::mutex> lock(mLockStreams);
@@ -130,12 +163,29 @@ aaudio_result_t AAudioServiceEndpoint::stopSharingThread() {
 
 void AAudioServiceEndpoint::disconnectRegisteredStreams() {
     std::lock_guard<std::mutex> lock(mLockStreams);
-    for(AAudioServiceStreamShared *sharedStream : mRunningStreams) {
-        sharedStream->onStop();
+    for(auto baseStream : mRunningStreams) {
+        baseStream->onStop();
     }
     mRunningStreams.clear();
-    for(AAudioServiceStreamShared *sharedStream : mRegisteredStreams) {
-        sharedStream->onDisconnect();
+    for(auto sharedStream : mRegisteredStreams) {
+        sharedStream->disconnect();
     }
     mRegisteredStreams.clear();
+}
+
+bool AAudioServiceEndpoint::matches(const AAudioStreamConfiguration& configuration) {
+    if (configuration.getDeviceId() != AAUDIO_UNSPECIFIED &&
+            configuration.getDeviceId() != mStreamInternal->getDeviceId()) {
+        return false;
+    }
+    if (configuration.getSampleRate() != AAUDIO_UNSPECIFIED &&
+            configuration.getSampleRate() != mStreamInternal->getSampleRate()) {
+        return false;
+    }
+    if (configuration.getSamplesPerFrame() != AAUDIO_UNSPECIFIED &&
+            configuration.getSamplesPerFrame() != mStreamInternal->getSamplesPerFrame()) {
+        return false;
+    }
+
+    return true;
 }

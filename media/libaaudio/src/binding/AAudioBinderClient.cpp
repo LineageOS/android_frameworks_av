@@ -19,75 +19,101 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include <binder/IInterface.h>
 #include <binder/IServiceManager.h>
+#include <binder/ProcessState.h>
 #include <utils/Mutex.h>
 #include <utils/RefBase.h>
 #include <utils/Singleton.h>
+#include <media/AudioSystem.h>
 
 #include <aaudio/AAudio.h>
 
 #include "AudioEndpointParcelable.h"
-#include "binding/AAudioStreamRequest.h"
-#include "binding/AAudioStreamConfiguration.h"
-#include "binding/IAAudioService.h"
-#include "binding/AAudioServiceMessage.h"
+#include "binding/AAudioBinderClient.h"
+//#include "binding/AAudioStreamRequest.h"
+//#include "binding/AAudioStreamConfiguration.h"
+//#include "binding/IAAudioService.h"
+//#include "binding/AAudioServiceMessage.h"
 
-#include "AAudioBinderClient.h"
-#include "AAudioServiceInterface.h"
+//#include "AAudioServiceInterface.h"
 
 using android::String16;
 using android::IServiceManager;
 using android::defaultServiceManager;
 using android::interface_cast;
+using android::IInterface;
 using android::IAAudioService;
 using android::Mutex;
 using android::sp;
+using android::wp;
 
 using namespace aaudio;
 
-static android::Mutex gServiceLock;
-static sp<IAAudioService>  gAAudioService;
-
 ANDROID_SINGLETON_STATIC_INSTANCE(AAudioBinderClient);
+
+AAudioBinderClient::AAudioBinderClient()
+        : AAudioServiceInterface()
+        , Singleton<AAudioBinderClient>() {
+
+    mAAudioClient = new AAudioClient(this);
+    ALOGD("AAudioBinderClient() created mAAudioClient = %p", mAAudioClient.get());
+}
+
+AAudioBinderClient::~AAudioBinderClient() {
+    Mutex::Autolock _l(mServiceLock);
+    if (mAAudioService != 0) {
+        IInterface::asBinder(mAAudioService)->unlinkToDeath(mAAudioClient);
+    }
+}
 
 // TODO Share code with other service clients.
 // Helper function to get access to the "AAudioService" service.
 // This code was modeled after frameworks/av/media/libaudioclient/AudioSystem.cpp
-static const sp<IAAudioService> getAAudioService() {
-    sp<IBinder> binder;
-    Mutex::Autolock _l(gServiceLock);
-    if (gAAudioService == 0) {
-        sp<IServiceManager> sm = defaultServiceManager();
-        // Try several times to get the service.
-        int retries = 4;
-        do {
-            binder = sm->getService(String16(AAUDIO_SERVICE_NAME)); // This will wait a while.
+const sp<IAAudioService> AAudioBinderClient::getAAudioService() {
+    sp<IAAudioService> aaudioService;
+    bool needToRegister = false;
+    {
+        Mutex::Autolock _l(mServiceLock);
+        if (mAAudioService == 0) {
+            sp<IBinder> binder;
+            sp<IServiceManager> sm = defaultServiceManager();
+            // Try several times to get the service.
+            int retries = 4;
+            do {
+                binder = sm->getService(String16(AAUDIO_SERVICE_NAME)); // This will wait a while.
+                if (binder != 0) {
+                    break;
+                }
+            } while (retries-- > 0);
+
             if (binder != 0) {
-                break;
+                // Ask for notification if the service dies.
+                status_t status = binder->linkToDeath(mAAudioClient);
+                ALOGD("getAAudioService: linkToDeath(mAAudioClient = %p) returned %d",
+                      mAAudioClient.get(), status);
+                mAAudioService = interface_cast<IAAudioService>(binder);
+                needToRegister = true;
+                // Make sure callbacks can be received by mAAudioClient
+                android::ProcessState::self()->startThreadPool();
+            } else {
+                ALOGE("AAudioBinderClient could not connect to %s", AAUDIO_SERVICE_NAME);
             }
-        } while (retries-- > 0);
-
-        if (binder != 0) {
-            // TODO Add linkToDeath() like in frameworks/av/media/libaudioclient/AudioSystem.cpp
-            // TODO Create a DeathRecipient that disconnects all active streams.
-            gAAudioService = interface_cast<IAAudioService>(binder);
-        } else {
-            ALOGE("AudioStreamInternal could not get %s", AAUDIO_SERVICE_NAME);
         }
+        aaudioService = mAAudioService;
     }
-    return gAAudioService;
+    // Do this outside the mutex lock.
+    if (needToRegister && aaudioService != 0) { // new client?
+        aaudioService->registerClient(mAAudioClient);
+    }
+    return aaudioService;
 }
 
-static void dropAAudioService() {
-    Mutex::Autolock _l(gServiceLock);
-    gAAudioService.clear(); // force a reconnect
+void AAudioBinderClient::dropAAudioService() {
+    Mutex::Autolock _l(mServiceLock);
+    mAAudioService.clear(); // force a reconnect
 }
 
-AAudioBinderClient::AAudioBinderClient()
-        : AAudioServiceInterface()
-        , Singleton<AAudioBinderClient>() {}
-
-AAudioBinderClient::~AAudioBinderClient() {}
 
 /**
 * @param request info needed to create the stream
@@ -159,23 +185,19 @@ aaudio_result_t AAudioBinderClient::flushStream(aaudio_handle_t streamHandle) {
 * Manage the specified thread as a low latency audio thread.
 */
 aaudio_result_t AAudioBinderClient::registerAudioThread(aaudio_handle_t streamHandle,
-                                                        pid_t clientProcessId,
                                                         pid_t clientThreadId,
                                                         int64_t periodNanoseconds) {
     const sp<IAAudioService> &service = getAAudioService();
     if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
     return service->registerAudioThread(streamHandle,
-                                        clientProcessId,
                                         clientThreadId,
                                         periodNanoseconds);
 }
 
 aaudio_result_t AAudioBinderClient::unregisterAudioThread(aaudio_handle_t streamHandle,
-                                                          pid_t clientProcessId,
                                                           pid_t clientThreadId) {
     const sp<IAAudioService> &service = getAAudioService();
     if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
     return service->unregisterAudioThread(streamHandle,
-                                          clientProcessId,
                                           clientThreadId);
 }

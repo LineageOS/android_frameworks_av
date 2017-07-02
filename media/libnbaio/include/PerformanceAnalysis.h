@@ -39,12 +39,14 @@ PerformanceAnalysis();
 // both in this header file and in NBLog.h?
 using short_histogram = std::map<int, int>;
 
-// returns a 2d array where the first values are ms time intervals between
-// outliers and the second values are the timestamps at which the outliers
-// occurred. The first values do not keep track of time spent *on* the outlier.
+// returns a vector of pairs <outlier timestamp, time elapsed since previous outlier
+// called by NBLog::Reader::dump before data is converted into histogram
+// TODO: currently, the elapsed time
 // The resolution is only as good as the ms duration of one shortHist
-// static void outlierIntervals(const std::deque<std::pair
-//                                    <int, short_histogram>> &shortHists);
+void storeOutlierData(int author, const std::vector<int64_t> &timestamps);
+
+// TODO: delete this. temp for testing
+void testFunction();
 
 // Given a series, looks for changes in distribution (peaks)
 // Returns a 'signal' array of the same length as the series, where each
@@ -60,10 +62,10 @@ using short_histogram = std::map<int, int>;
 // data to the console
 // TODO: change this so that it writes the analysis to the long-term
 // circular buffer and prints an analyses both for the short and long-term
-static void reportPerformance(String8 *body,
-							  const std::deque<std::pair
-									 <int, short_histogram>> &shortHists,
-							  int maxHeight = 10);
+void reportPerformance(String8 *body,
+                       const std::deque<std::pair
+                       <int, short_histogram>> &shortHists,
+                       int maxHeight = 10);
 
 // if findGlitch is true, log warning when buffer periods caused glitch
 // TODO adapt this to the analysis in reportPerformance instead of logging
@@ -75,6 +77,9 @@ void     setFindGlitch(bool s);
 
 private:
 
+// stores outlier analysis
+std::vector<std::pair<uint64_t, uint64_t>> mOutlierData;
+
 // stores long-term audio performance data
 // TODO: Turn it into a circular buffer
 std::deque<std::pair<int, int>> mPerformanceAnalysis;
@@ -82,10 +87,11 @@ std::deque<std::pair<int, int>> mPerformanceAnalysis;
 // alert if a local buffer period sequence caused an audio glitch
 bool findGlitch;
 //TODO: measure these from the data (e.g., mode) as they may change.
-static const int kGlitchThreshMs = 7;
-static const int kMsPerSec = 1000;
-static const int kNumBuff = 3; // number of buffers considered in local history
-static const int kPeriodMs = 4; // current period length is ideally 4 ms
+//const int kGlitchThreshMs = 7;
+// const int kMsPerSec = 1000;
+const int kNumBuff = 3; // number of buffers considered in local history
+const int kPeriodMs = 4; // current period length is ideally 4 ms
+const int kOutlierMs = 7; // values greater or equal to this cause glitches every time
 // DAC processing time for 4 ms buffer
 static constexpr double kRatio = 0.75; // estimate of CPU time as ratio of period length
 int kPeriodMsCPU; //compute based on kPeriodLen and kRatio
