@@ -16,7 +16,7 @@
 
 // This file is used in both client and server processes.
 // This is needed to make sense of the logs more easily.
-#define LOG_TAG (mInService ? "AAudioService" : "AAudio")
+#define LOG_TAG (mInService ? "AudioStreamInternal_Service" : "AudioStreamInternal_Client")
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -93,6 +93,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     request.setProcessId(getpid());
     request.setDirection(getDirection());
     request.setSharingModeMatchRequired(isSharingModeMatchRequired());
+    request.setInService(mInService);
 
     request.getConfiguration().setDeviceId(getDeviceId());
     request.getConfiguration().setSampleRate(getSampleRate());
@@ -324,6 +325,21 @@ aaudio_result_t AudioStreamInternal::unregisterThread() {
         return AAUDIO_ERROR_INVALID_STATE;
     }
     return mServiceInterface.unregisterAudioThread(mServiceStreamHandle, gettid());
+}
+
+aaudio_result_t AudioStreamInternal::startClient(const android::AudioClient& client,
+                                                 audio_port_handle_t *clientHandle) {
+    if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    return mServiceInterface.startClient(mServiceStreamHandle, client, clientHandle);
+}
+
+aaudio_result_t AudioStreamInternal::stopClient(audio_port_handle_t clientHandle) {
+    if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    return mServiceInterface.stopClient(mServiceStreamHandle, clientHandle);
 }
 
 aaudio_result_t AudioStreamInternal::getTimestamp(clockid_t clockId,

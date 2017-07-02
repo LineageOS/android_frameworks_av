@@ -79,7 +79,7 @@ public:
 
     std::vector<android::sp<AAudioServiceStreamShared>> mRegisteredStreams;
 
-    std::vector<android::sp<AAudioServiceStreamShared>> mRunningStreams;
+    size_t                   mRunningStreams = 0;
 
 private:
     aaudio_result_t startSharingThread_l();

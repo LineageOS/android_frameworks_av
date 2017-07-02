@@ -294,10 +294,11 @@ public:
     status_t openMmapStream(MmapStreamInterface::stream_direction_t direction,
                             const audio_attributes_t *attr,
                             audio_config_base_t *config,
-                            const MmapStreamInterface::Client& client,
+                            const AudioClient& client,
                             audio_port_handle_t *deviceId,
                             const sp<MmapStreamCallback>& callback,
-                            sp<MmapStreamInterface>& interface);
+                            sp<MmapStreamInterface>& interface,
+                            audio_port_handle_t *handle);
 private:
     // FIXME The 400 is temporarily too high until a leak of writers in media.log is fixed.
     static const size_t kLogMemorySize = 400 * 1024;
@@ -596,7 +597,7 @@ private:
         virtual status_t createMmapBuffer(int32_t minSizeFrames,
                                           struct audio_mmap_buffer_info *info);
         virtual status_t getMmapPosition(struct audio_mmap_position *position);
-        virtual status_t start(const MmapStreamInterface::Client& client,
+        virtual status_t start(const AudioClient& client,
                                          audio_port_handle_t *handle);
         virtual status_t stop(audio_port_handle_t handle);
         virtual status_t standby();

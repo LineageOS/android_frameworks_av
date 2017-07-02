@@ -87,6 +87,11 @@ public:
     //PlayerBase virtuals
     virtual void destroy();
 
+    aaudio_result_t startClient(const android::AudioClient& client,
+                                audio_port_handle_t *clientHandle);
+
+    aaudio_result_t stopClient(audio_port_handle_t clientHandle);
+
 protected:
 
     aaudio_result_t processData(void *buffer,
@@ -170,7 +175,6 @@ private:
 
     AudioEndpointParcelable  mEndPointParcelable; // description of the buffers filled by service
     EndpointDescriptor       mEndpointDescriptor; // buffer description with resolved addresses
-
 };
 
 } /* namespace aaudio */

@@ -43,7 +43,7 @@ class AAudioServiceStreamMMAP
     , public android::MmapStreamCallback {
 
 public:
-    AAudioServiceStreamMMAP(uid_t serviceUid);
+    AAudioServiceStreamMMAP(const android::AudioClient& serviceClient, bool inService);
     virtual ~AAudioServiceStreamMMAP() = default;
 
     aaudio_result_t open(const aaudio::AAudioStreamRequest &request,
@@ -76,6 +76,11 @@ public:
     aaudio_result_t flush() override;
 
     aaudio_result_t close() override;
+
+    virtual aaudio_result_t startClient(const android::AudioClient& client,
+                                        audio_port_handle_t *clientHandle);
+
+    virtual aaudio_result_t stopClient(audio_port_handle_t clientHandle);
 
     /**
      * Send a MMAP/NOIRQ buffer timestamp to the client.
@@ -131,9 +136,10 @@ private:
     // Interface to the AudioFlinger MMAP support.
     android::sp<android::MmapStreamInterface> mMmapStream;
     struct audio_mmap_buffer_info             mMmapBufferinfo;
-    android::MmapStreamInterface::Client      mMmapClient;
-    audio_port_handle_t                       mPortHandle = -1; // TODO review best default
-    uid_t                                     mCachedUserId = -1;
+    audio_port_handle_t                       mPortHandle = AUDIO_PORT_HANDLE_NONE;
+    audio_port_handle_t                       mDeviceId = AUDIO_PORT_HANDLE_NONE;
+    android::AudioClient                      mServiceClient;
+    bool                                      mInService = false;
 };
 
 } // namespace aaudio
