@@ -45,8 +45,7 @@ AAudioStreamRequest::~AAudioStreamRequest() {}
 status_t AAudioStreamRequest::writeToParcel(Parcel* parcel) const {
     status_t status = parcel->writeInt32((int32_t) mUserId);
     if (status != NO_ERROR) goto error;
-    status = parcel->writeInt32((int32_t) mProcessId);
-    if (status != NO_ERROR) goto error;
+
     status = parcel->writeInt32((int32_t) mDirection);
     if (status != NO_ERROR) goto error;
 
@@ -67,10 +66,6 @@ status_t AAudioStreamRequest::readFromParcel(const Parcel* parcel) {
     status_t status = parcel->readInt32(&temp);
     if (status != NO_ERROR) goto error;
     mUserId = (uid_t) temp;
-
-    status = parcel->readInt32(&temp);
-    if (status != NO_ERROR) goto error;
-    mProcessId = (pid_t) temp;
 
     status = parcel->readInt32(&temp);
     if (status != NO_ERROR) goto error;

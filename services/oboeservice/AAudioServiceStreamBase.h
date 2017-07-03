@@ -20,6 +20,8 @@
 #include <assert.h>
 #include <mutex>
 
+#include <utils/RefBase.h>
+
 #include "fifo/FifoBuffer.h"
 #include "binding/IAAudioService.h"
 #include "binding/AudioEndpointParcelable.h"
@@ -39,7 +41,8 @@ namespace aaudio {
  * Base class for a stream in the AAudio service.
  */
 class AAudioServiceStreamBase
-    : public Runnable  {
+    : public virtual android::RefBase
+    , public Runnable  {
 
 public:
     AAudioServiceStreamBase();
@@ -48,6 +51,8 @@ public:
     enum {
         ILLEGAL_THREAD_ID = 0
     };
+
+    std::string dump() const;
 
     // -------------------------------------------------------------------
     /**
@@ -78,6 +83,9 @@ public:
      */
     virtual aaudio_result_t flush();
 
+    bool isRunning() const {
+        return mState == AAUDIO_STREAM_STATE_STARTED;
+    }
     // -------------------------------------------------------------------
 
     /**
@@ -111,7 +119,28 @@ public:
 
     void run() override; // to implement Runnable
 
-    void processFatalError();
+    void disconnect();
+
+    uid_t getOwnerUserId() const {
+        return mOwnerUserId;
+    }
+    void setOwnerUserId(uid_t uid) {
+        mOwnerUserId = uid;
+    }
+
+    pid_t getOwnerProcessId() const {
+        return mOwnerProcessId;
+    }
+    void setOwnerProcessId(pid_t pid) {
+        mOwnerProcessId = pid;
+    }
+
+    aaudio_handle_t getHandle() const {
+        return mHandle;
+    }
+    void setHandle(aaudio_handle_t handle) {
+        mHandle = handle;
+    }
 
 protected:
     aaudio_result_t writeUpMessageQueue(AAudioServiceMessage *command);
@@ -138,6 +167,10 @@ protected:
     int32_t            mSamplesPerFrame = AAUDIO_UNSPECIFIED;
     int32_t            mSampleRate = AAUDIO_UNSPECIFIED;
     int32_t            mCapacityInFrames = AAUDIO_UNSPECIFIED;
+    uid_t              mOwnerUserId = -1;
+    pid_t              mOwnerProcessId = -1;
+private:
+    aaudio_handle_t    mHandle = -1;
 };
 
 } /* namespace aaudio */

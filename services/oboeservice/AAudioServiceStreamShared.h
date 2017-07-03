@@ -89,8 +89,6 @@ public:
 
     void onStop();
 
-    void onDisconnect();
-
 protected:
 
     aaudio_result_t getDownDataDescription(AudioEndpointParcelable &parcelable) override;

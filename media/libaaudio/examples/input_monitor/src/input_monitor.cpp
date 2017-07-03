@@ -48,8 +48,8 @@ int main(int argc, char **argv)
     //aaudio_performance_mode_t requestedPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
     const aaudio_performance_mode_t requestedPerformanceMode = AAUDIO_PERFORMANCE_MODE_LOW_LATENCY;
     //aaudio_performance_mode_t requestedPerformanceMode = AAUDIO_PERFORMANCE_MODE_POWER_SAVING;
-    const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_SHARED;
-    //const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_EXCLUSIVE;
+    //const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_SHARED;
+    const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_EXCLUSIVE;
     aaudio_sharing_mode_t actualSharingMode;
 
     AAudioStream *aaudioStream = nullptr;
@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 
     printf("%s - Monitor input level using AAudio\n", argv[0]);
 
-//    AAudio_setMMapPolicy(AAUDIO_POLICY_ALWAYS);
+    AAudio_setMMapPolicy(AAUDIO_POLICY_ALWAYS);
 
     recorder.setPerformanceMode(requestedPerformanceMode);
     recorder.setSharingMode(requestedSharingMode);

@@ -20,11 +20,15 @@
 #include <utils/Log.h>
 
 #include <assert.h>
+#include <functional>
+#include <iomanip>
 #include <new>
+#include <sstream>
 #include <stdint.h>
 #include <utils/Mutex.h>
 
 #include <aaudio/AAudio.h>
+#include "AAudioUtilities.h"
 #include "HandleTracker.h"
 
 using android::Mutex;
@@ -91,6 +95,47 @@ HandleTracker::~HandleTracker()
 
 bool HandleTracker::isInitialized() const {
     return mHandleAddresses != nullptr;
+}
+
+
+
+std::string HandleTracker::dump() const {
+    if (!isInitialized()) {
+        return "HandleTracker is not initialized\n";
+    }
+
+    std::stringstream result;
+    const bool isLocked = AAudio_tryUntilTrue(
+            [this]()->bool { return mLock.tryLock(); } /* f */,
+            50 /* times */,
+            20 /* sleepMs */);
+    if (!isLocked) {
+        result << "HandleTracker may be deadlocked\n";
+    }
+
+    result << "HandleTracker:\n";
+    result << "  HandleHeaders:\n";
+    // atLineStart() can be changed to support an arbitrary line breaking algorithm;
+    // it should return true when a new line starts.
+    // For simplicity, we will use a constant 16 items per line.
+    const auto atLineStart = [](int index) -> bool {
+        // Magic constant of 0xf used for mask to detect start every 16 items.
+        return (index & 0xf) == 0; };
+    const auto atLineEnd = [this, &atLineStart](int index) -> bool {
+        return atLineStart(index + 1) || index == mMaxHandleCount - 1; };
+
+    for (int i = 0; i < mMaxHandleCount; ++i) {
+        if (atLineStart(i)) {
+            result << "    ";
+        }
+        result << std::hex << std::setw(4) << std::setfill('0') << mHandleHeaders[i]
+               << (atLineEnd(i) ? "\n" : " ");
+    }
+
+    if (isLocked) {
+        mLock.unlock();
+    }
+    return result.str();
 }
 
 handle_tracker_slot_t HandleTracker::allocateSlot_l() {

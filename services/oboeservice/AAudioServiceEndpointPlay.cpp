@@ -46,8 +46,8 @@ AAudioServiceEndpointPlay::AAudioServiceEndpointPlay(AAudioService &audioService
 AAudioServiceEndpointPlay::~AAudioServiceEndpointPlay() {
 }
 
-aaudio_result_t AAudioServiceEndpointPlay::open(int32_t deviceId) {
-    aaudio_result_t result = AAudioServiceEndpoint::open(deviceId);
+aaudio_result_t AAudioServiceEndpointPlay::open(const AAudioStreamConfiguration& configuration) {
+    aaudio_result_t result = AAudioServiceEndpoint::open(configuration);
     if (result == AAUDIO_OK) {
         mMixer.allocate(getStreamInternal()->getSamplesPerFrame(),
                         getStreamInternal()->getFramesPerBurst());
@@ -79,9 +79,9 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
         mMixer.clear();
         { // use lock guard
             std::lock_guard <std::mutex> lock(mLockStreams);
-            for (AAudioServiceStreamShared *sharedStream : mRunningStreams) {
+            for (sp<AAudioServiceStreamShared> sharedStream : mRunningStreams) {
                 FifoBuffer *fifo = sharedStream->getDataFifoBuffer();
-                float volume = 0.5; // TODO get from system
+                float volume = 1.0; // to match legacy volume
                 bool underflowed = mMixer.mix(fifo, volume);
                 underflowCount += underflowed ? 1 : 0;
                 // TODO log underflows in each stream
