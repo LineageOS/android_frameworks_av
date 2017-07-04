@@ -38,6 +38,9 @@ LOCAL_SHARED_LIBRARIES := \
     libstagefright_foundation \
     libprotobuf-cpp-lite \
 
+LOCAL_HEADER_LIBRARIES := \
+    media_plugin_headers
+
 LOCAL_STATIC_LIBRARIES := \
     libjsmn \
 
