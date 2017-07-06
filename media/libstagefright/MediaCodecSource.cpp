@@ -44,6 +44,9 @@ const int32_t kDefaultHwVideoEncoderFormat = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEF
 const int32_t kDefaultVideoEncoderDataSpace = HAL_DATASPACE_V0_BT709;
 
 const int kStopTimeoutUs = 300000; // allow 1 sec for shutting down encoder
+// allow maximum 1 sec for stop time offset. This limits the the delay in the
+// input source.
+const int kMaxStopTimeOffsetUs = 1000000;
 
 struct MediaCodecSource::Puller : public AHandler {
     explicit Puller(const sp<MediaSource> &source);
@@ -1017,7 +1020,15 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
             if (mEncoder->getInputFormat(&inputFormat) == OK &&
                     inputFormat->findInt64("android._stop-time-offset-us", &stopTimeOffsetUs) &&
                     stopTimeOffsetUs > 0) {
+                if (stopTimeOffsetUs > kMaxStopTimeOffsetUs) {
+                    ALOGW("Source stopTimeOffsetUs %lld too large, limit at %lld us",
+                        (long long)stopTimeOffsetUs, (long long)kMaxStopTimeOffsetUs);
+                    stopTimeOffsetUs = kMaxStopTimeOffsetUs;
+                }
                 timeoutUs += stopTimeOffsetUs;
+            } else {
+                // Use kMaxStopTimeOffsetUs if stop time offset is not provided by input source
+                timeoutUs = kMaxStopTimeOffsetUs;
             }
         } else {
             mPuller->stop();
