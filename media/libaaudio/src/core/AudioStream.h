@@ -48,8 +48,18 @@ public:
      * Use waitForStateChange() to wait for completion.
      */
     virtual aaudio_result_t requestStart() = 0;
-    virtual aaudio_result_t requestPause() = 0;
-    virtual aaudio_result_t requestFlush() = 0;
+
+    virtual aaudio_result_t requestPause()
+    {
+        // Only implement this for OUTPUT streams.
+        return AAUDIO_ERROR_UNIMPLEMENTED;
+    }
+
+    virtual aaudio_result_t requestFlush() {
+        // Only implement this for OUTPUT streams.
+        return AAUDIO_ERROR_UNIMPLEMENTED;
+    }
+
     virtual aaudio_result_t requestStop() = 0;
 
     virtual aaudio_result_t getTimestamp(clockid_t clockId,

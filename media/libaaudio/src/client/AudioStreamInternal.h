@@ -41,12 +41,7 @@ public:
     AudioStreamInternal(AAudioServiceInterface  &serviceInterface, bool inService);
     virtual ~AudioStreamInternal();
 
-    // =========== Begin ABSTRACT methods ===========================
     aaudio_result_t requestStart() override;
-
-    aaudio_result_t requestPause() override;
-
-    aaudio_result_t requestFlush() override;
 
     aaudio_result_t requestStop() override;
 
@@ -55,7 +50,6 @@ public:
                                        int64_t *timeNanoseconds) override;
 
     virtual aaudio_result_t updateStateWhileWaiting() override;
-    // =========== End ABSTRACT methods ===========================
 
     aaudio_result_t open(const AudioStreamBuilder &builder) override;
 
@@ -113,13 +107,12 @@ protected:
 
     aaudio_result_t processCommands();
 
-    aaudio_result_t requestPauseInternal();
     aaudio_result_t requestStopInternal();
 
     aaudio_result_t stopCallback();
 
 
-    void onFlushFromServer();
+    virtual void onFlushFromServer() {}
 
     aaudio_result_t onEventFromServer(AAudioServiceMessage *message);
 
@@ -160,6 +153,8 @@ protected:
     // The service uses this for SHARED mode.
     bool                     mInService = false;  // Is this running in the client or the service?
 
+    AAudioServiceInterface  &mServiceInterface;   // abstract interface to the service
+
 private:
     /*
      * Asynchronous write with data conversion.
@@ -175,7 +170,6 @@ private:
 
     AudioEndpointParcelable  mEndPointParcelable; // description of the buffers filled by service
     EndpointDescriptor       mEndpointDescriptor; // buffer description with resolved addresses
-    AAudioServiceInterface  &mServiceInterface;   // abstract interface to the service
 
 };
 
