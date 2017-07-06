@@ -19,8 +19,8 @@
 #ifndef ANDROID_AUDIO_BUFFER_PROVIDER_SOURCE_H
 #define ANDROID_AUDIO_BUFFER_PROVIDER_SOURCE_H
 
-#include "NBAIO.h"
 #include <media/AudioBufferProvider.h>
+#include <media/nbaio/NBAIO.h>
 
 namespace android {
 
