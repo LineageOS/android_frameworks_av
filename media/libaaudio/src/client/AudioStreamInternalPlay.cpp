@@ -34,6 +34,55 @@ AudioStreamInternalPlay::AudioStreamInternalPlay(AAudioServiceInterface  &servic
 AudioStreamInternalPlay::~AudioStreamInternalPlay() {}
 
 
+aaudio_result_t AudioStreamInternalPlay::requestPauseInternal()
+{
+    if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
+        ALOGE("AudioStreamInternal::requestPauseInternal() mServiceStreamHandle invalid = 0x%08X",
+              mServiceStreamHandle);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+
+    mClockModel.stop(AudioClock::getNanoseconds());
+    setState(AAUDIO_STREAM_STATE_PAUSING);
+    return AAudioConvert_androidToAAudioResult(pauseWithStatus());
+}
+
+aaudio_result_t AudioStreamInternalPlay::requestPause()
+{
+    aaudio_result_t result = stopCallback();
+    if (result != AAUDIO_OK) {
+        return result;
+    }
+    result = requestPauseInternal();
+    return result;
+}
+
+aaudio_result_t AudioStreamInternalPlay::requestFlush() {
+    if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
+        ALOGE("AudioStreamInternal::requestFlush() mServiceStreamHandle invalid = 0x%08X",
+              mServiceStreamHandle);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+
+    setState(AAUDIO_STREAM_STATE_FLUSHING);
+    return mServiceInterface.flushStream(mServiceStreamHandle);
+}
+
+void AudioStreamInternalPlay::onFlushFromServer() {
+    int64_t readCounter = mAudioEndpoint.getDataReadCounter();
+    int64_t writeCounter = mAudioEndpoint.getDataWriteCounter();
+
+    // Bump offset so caller does not see the retrograde motion in getFramesRead().
+    int64_t framesFlushed = writeCounter - readCounter;
+    mFramesOffsetFromService += framesFlushed;
+    ALOGD("AudioStreamInternal::onFlushFromServer() readN = %lld, writeN = %lld, offset = %lld",
+          (long long)readCounter, (long long)writeCounter, (long long)mFramesOffsetFromService);
+
+    // Flush written frames by forcing writeCounter to readCounter.
+    // This is because we cannot move the read counter in the hardware.
+    mAudioEndpoint.setDataWriteCounter(readCounter);
+}
+
 // Write the data, block if needed and timeoutMillis > 0
 aaudio_result_t AudioStreamInternalPlay::write(const void *buffer, int32_t numFrames,
                                            int64_t timeoutNanoseconds)
