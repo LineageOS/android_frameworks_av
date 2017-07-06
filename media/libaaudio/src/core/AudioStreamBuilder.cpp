@@ -138,6 +138,12 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     bool allowMMap = mmapPolicy != AAUDIO_POLICY_NEVER;
     bool allowLegacy = mmapPolicy != AAUDIO_POLICY_ALWAYS;
 
+    // TODO Support other performance settings in MMAP mode.
+    // Disable MMAP if low latency not requested.
+    if (getPerformanceMode() != AAUDIO_PERFORMANCE_MODE_LOW_LATENCY) {
+        allowMMap = false;
+    }
+
     result = builder_createStream(getDirection(), sharingMode, allowMMap, &audioStream);
     if (result == AAUDIO_OK) {
         // Open the stream using the parameters from the builder.
