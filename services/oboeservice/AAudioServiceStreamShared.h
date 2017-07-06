@@ -44,7 +44,7 @@ class AAudioServiceStreamShared : public AAudioServiceStreamBase {
 
 public:
     AAudioServiceStreamShared(android::AAudioService &aAudioService);
-    virtual ~AAudioServiceStreamShared();
+    virtual ~AAudioServiceStreamShared() = default;
 
     aaudio_result_t open(const aaudio::AAudioStreamRequest &request,
                          aaudio::AAudioStreamConfiguration &configurationOutput) override;
