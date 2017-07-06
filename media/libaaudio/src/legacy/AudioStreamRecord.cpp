@@ -223,18 +223,6 @@ aaudio_result_t AudioStreamRecord::requestStart()
     return AAUDIO_OK;
 }
 
-aaudio_result_t AudioStreamRecord::requestPause()
-{
-    // This does not make sense for an input stream.
-    // There is no real difference between pause() and stop().
-    return AAUDIO_ERROR_UNIMPLEMENTED;
-}
-
-aaudio_result_t AudioStreamRecord::requestFlush() {
-    // This does not make sense for an input stream.
-    return AAUDIO_ERROR_UNIMPLEMENTED;
-}
-
 aaudio_result_t AudioStreamRecord::requestStop() {
     if (mAudioRecord.get() == nullptr) {
         return AAUDIO_ERROR_INVALID_STATE;

@@ -287,56 +287,6 @@ aaudio_result_t AudioStreamInternal::stopCallback()
     }
 }
 
-aaudio_result_t AudioStreamInternal::requestPauseInternal()
-{
-    if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
-        ALOGE("AudioStreamInternal::requestPauseInternal() mServiceStreamHandle invalid = 0x%08X",
-              mServiceStreamHandle);
-        return AAUDIO_ERROR_INVALID_STATE;
-    }
-
-    mClockModel.stop(AudioClock::getNanoseconds());
-    setState(AAUDIO_STREAM_STATE_PAUSING);
-    return AAudioConvert_androidToAAudioResult(pauseWithStatus());
-}
-
-aaudio_result_t AudioStreamInternal::requestPause()
-{
-    aaudio_result_t result = stopCallback();
-    if (result != AAUDIO_OK) {
-        return result;
-    }
-    result = requestPauseInternal();
-    return result;
-}
-
-aaudio_result_t AudioStreamInternal::requestFlush() {
-    if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
-        ALOGE("AudioStreamInternal::requestFlush() mServiceStreamHandle invalid = 0x%08X",
-              mServiceStreamHandle);
-        return AAUDIO_ERROR_INVALID_STATE;
-    }
-
-    setState(AAUDIO_STREAM_STATE_FLUSHING);
-    return mServiceInterface.flushStream(mServiceStreamHandle);
-}
-
-// TODO for Play only
-void AudioStreamInternal::onFlushFromServer() {
-    int64_t readCounter = mAudioEndpoint.getDataReadCounter();
-    int64_t writeCounter = mAudioEndpoint.getDataWriteCounter();
-
-    // Bump offset so caller does not see the retrograde motion in getFramesRead().
-    int64_t framesFlushed = writeCounter - readCounter;
-    mFramesOffsetFromService += framesFlushed;
-    ALOGD("AudioStreamInternal::onFlushFromServer() readN = %lld, writeN = %lld, offset = %lld",
-          (long long)readCounter, (long long)writeCounter, (long long)mFramesOffsetFromService);
-
-    // Flush written frames by forcing writeCounter to readCounter.
-    // This is because we cannot move the read counter in the hardware.
-    mAudioEndpoint.setDataWriteCounter(readCounter);
-}
-
 aaudio_result_t AudioStreamInternal::requestStopInternal()
 {
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
