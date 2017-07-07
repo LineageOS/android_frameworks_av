@@ -215,6 +215,7 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
     configurationOutput.setAudioFormat(mAudioFormat);
     configurationOutput.setDeviceId(deviceId);
 
+    setState(AAUDIO_STREAM_STATE_OPEN);
     return AAUDIO_OK;
 }
 
