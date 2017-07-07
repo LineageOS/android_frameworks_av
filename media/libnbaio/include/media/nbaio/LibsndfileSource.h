@@ -17,7 +17,8 @@
 #ifndef ANDROID_AUDIO_LIBSNDFILE_SOURCE_H
 #define ANDROID_AUDIO_LIBSNDFILE_SOURCE_H
 
-#include "NBAIO.h"
+#include <media/nbaio/NBAIO.h>
+
 #include "sndfile.h"
 
 // Implementation of NBAIO_Source that wraps a libsndfile opened in SFM_READ mode

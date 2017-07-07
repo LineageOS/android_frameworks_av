@@ -17,7 +17,7 @@
 #ifndef ANDROID_AUDIO_STREAM_IN_SOURCE_H
 #define ANDROID_AUDIO_STREAM_IN_SOURCE_H
 
-#include "NBAIO.h"
+#include <media/nbaio/NBAIO.h>
 
 namespace android {
 
