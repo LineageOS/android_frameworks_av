@@ -177,6 +177,7 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
         goto error;
     }
 
+    setState(AAUDIO_STREAM_STATE_OPEN);
     return AAUDIO_OK;
 
 error:
