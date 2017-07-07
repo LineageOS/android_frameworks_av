@@ -50,10 +50,6 @@
 #define ALOGVV(a...) do { } while(0)
 #endif
 
-// TODO move to a common header  (Also shared with AudioTrack.cpp)
-#define NANOS_PER_SECOND    1000000000
-#define TIME_TO_NANOS(time) ((uint64_t)(time).tv_sec * NANOS_PER_SECOND + (time).tv_nsec)
-
 namespace android {
 
 // ----------------------------------------------------------------------------

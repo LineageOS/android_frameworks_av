@@ -41,8 +41,11 @@ AAudioServiceStreamBase::AAudioServiceStreamBase()
 }
 
 AAudioServiceStreamBase::~AAudioServiceStreamBase() {
-    close();
-    ALOGD("AAudioServiceStreamBase::~AAudioServiceStreamBase() destroyed %p", this);
+    ALOGD("AAudioServiceStreamBase::~AAudioServiceStreamBase() destroying %p", this);
+    // If the stream is deleted without closing then audio resources will leak.
+    // Not being closed here would indicate an internal error. So we want to find this ASAP.
+    LOG_ALWAYS_FATAL_IF(mState != AAUDIO_STREAM_STATE_CLOSED,
+                        "service stream not closed, state = %d", mState);
 }
 
 std::string AAudioServiceStreamBase::dump() const {
@@ -71,11 +74,13 @@ aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest 
 }
 
 aaudio_result_t AAudioServiceStreamBase::close() {
-    stop();
-    std::lock_guard<std::mutex> lock(mLockUpMessageQueue);
-    delete mUpMessageQueue;
-    mUpMessageQueue = nullptr;
-
+    if (mState != AAUDIO_STREAM_STATE_CLOSED) {
+        stopTimestampThread();
+        std::lock_guard<std::mutex> lock(mLockUpMessageQueue);
+        delete mUpMessageQueue;
+        mUpMessageQueue = nullptr;
+        mState = AAUDIO_STREAM_STATE_CLOSED;
+    }
     return AAUDIO_OK;
 }
 
@@ -106,9 +111,8 @@ aaudio_result_t AAudioServiceStreamBase::stop() {
     aaudio_result_t result = AAUDIO_OK;
     if (isRunning()) {
         // TODO wait for data to be played out
-        sendCurrentTimestamp();
-        mThreadEnabled.store(false);
-        result = mAAudioThread.stop();
+        sendCurrentTimestamp(); // warning - this calls a virtual function
+        result = stopTimestampThread();
         if (result != AAUDIO_OK) {
             disconnect();
             return result;
@@ -116,6 +120,15 @@ aaudio_result_t AAudioServiceStreamBase::stop() {
         sendServiceEvent(AAUDIO_SERVICE_EVENT_STOPPED);
     }
     mState = AAUDIO_STREAM_STATE_STOPPED;
+    return result;
+}
+
+aaudio_result_t AAudioServiceStreamBase::stopTimestampThread() {
+    aaudio_result_t result = AAUDIO_OK;
+    // clear flag that tells thread to loop
+    if (mThreadEnabled.exchange(false)) {
+        result = mAAudioThread.stop();
+    }
     return result;
 }
 
@@ -141,6 +154,7 @@ void AAudioServiceStreamBase::run() {
             nextTime = timestampScheduler.nextAbsoluteTime();
         } else  {
             // Sleep until it is time to send the next timestamp.
+            // TODO Wait for a signal with a timeout so that we can stop more quickly.
             AudioClock::sleepUntilNanoTime(nextTime);
         }
     }

@@ -22,6 +22,7 @@
 #include <math.h>
 #include <sys/resource.h>
 
+#include <audio_utils/clock.h>
 #include <audio_utils/primitives.h>
 #include <binder/IPCThreadState.h>
 #include <media/AudioTrack.h>
@@ -60,11 +61,6 @@ static inline nsecs_t framesToNanoseconds(ssize_t frames, uint32_t sampleRate, f
 static int64_t convertTimespecToUs(const struct timespec &tv)
 {
     return tv.tv_sec * 1000000ll + tv.tv_nsec / 1000;
-}
-
-static inline nsecs_t convertTimespecToNs(const struct timespec &tv)
-{
-    return tv.tv_sec * (long long)NANOS_PER_SECOND + tv.tv_nsec;
 }
 
 // current monotonic time in microseconds.
@@ -2563,7 +2559,7 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
                 // We update the timestamp time even when paused.
                 if (mState == STATE_PAUSED /* not needed: STATE_PAUSED_STOPPING */) {
                     const int64_t now = systemTime();
-                    const int64_t at = convertTimespecToNs(timestamp.mTime);
+                    const int64_t at = audio_utils_ns_from_timespec(&timestamp.mTime);
                     const int64_t lag =
                             (ets.mTimeNs[ExtendedTimestamp::LOCATION_SERVER_LASTKERNELOK] < 0 ||
                                 ets.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL_LASTKERNELOK] < 0)
@@ -2695,8 +2691,9 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
     // This is sometimes caused by erratic reports of the available space in the ALSA drivers.
     if (status == NO_ERROR) {
         if (previousTimestampValid) {
-            const int64_t previousTimeNanos = convertTimespecToNs(mPreviousTimestamp.mTime);
-            const int64_t currentTimeNanos = convertTimespecToNs(timestamp.mTime);
+            const int64_t previousTimeNanos =
+                    audio_utils_ns_from_timespec(&mPreviousTimestamp.mTime);
+            const int64_t currentTimeNanos = audio_utils_ns_from_timespec(&timestamp.mTime);
             if (currentTimeNanos < previousTimeNanos) {
                 ALOGW("retrograde timestamp time corrected, %lld < %lld",
                         (long long)currentTimeNanos, (long long)previousTimeNanos);
@@ -2726,7 +2723,7 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
 #if 0
             // Uncomment this to verify audio timestamp rate.
             const int64_t deltaTime =
-                    convertTimespecToNs(timestamp.mTime) - previousTimeNanos;
+                    audio_utils_ns_from_timespec(&timestamp.mTime) - previousTimeNanos;
             if (deltaTime != 0) {
                 const int64_t computedSampleRate =
                         deltaPosition * (long long)NANOS_PER_SECOND / deltaTime;

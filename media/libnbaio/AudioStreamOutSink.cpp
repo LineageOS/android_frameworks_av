@@ -18,6 +18,7 @@
 //#define LOG_NDEBUG 0
 
 #include <utils/Log.h>
+#include <audio_utils/clock.h>
 #include <media/audiohal/StreamHalInterface.h>
 #include <media/nbaio/AudioStreamOutSink.h>
 
@@ -82,8 +83,7 @@ status_t AudioStreamOutSink::getTimestamp(ExtendedTimestamp &timestamp)
         return INVALID_OPERATION;
     }
     timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL] = position64;
-    timestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL] =
-            time.tv_sec * 1000000000LL + time.tv_nsec;
+    timestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL] = audio_utils_ns_from_timespec(&time);
     return OK;
 }
 

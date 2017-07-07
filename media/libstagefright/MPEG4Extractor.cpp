@@ -19,6 +19,7 @@
 
 #include <ctype.h>
 #include <inttypes.h>
+#include <memory>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1770,35 +1771,49 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         {
             *offset += chunk_size;
 
-            // Best case the total data length inside "\xA9xyz" box
-            // would be 8, for instance "\xA9xyz" + "\x00\x04\x15\xc7" + "0+0/",
-            // where "\x00\x04" is the text string length with value = 4,
-            // "\0x15\xc7" is the language code = en, and "0+0" is a
+            // Best case the total data length inside "\xA9xyz" box would
+            // be 9, for instance "\xA9xyz" + "\x00\x05\x15\xc7" + "+0+0/",
+            // where "\x00\x05" is the text string length with value = 5,
+            // "\0x15\xc7" is the language code = en, and "+0+0/" is a
             // location (string) value with longitude = 0 and latitude = 0.
-            if (chunk_data_size < 8) {
+            // Since some devices encountered in the wild omit the trailing
+            // slash, we'll allow that.
+            if (chunk_data_size < 8) { // 8 instead of 9 to allow for missing /
                 return ERROR_MALFORMED;
             }
 
-            // Worst case the location string length would be 18,
-            // for instance +90.0000-180.0000, without the trailing "/" and
-            // the string length + language code, and some devices include
-            // an additional 8 bytes of altitude, e.g. +007.186
-            char buffer[18 + 8];
-
-            // Substracting 5 from the data size is because the text string length +
-            // language code takes 4 bytes, and the trailing slash "/" takes 1 byte.
-            off64_t location_length = chunk_data_size - 5;
-            if (location_length >= (off64_t) sizeof(buffer)) {
-                return ERROR_MALFORMED;
-            }
-
-            if (mDataSource->readAt(
-                        data_offset + 4, buffer, location_length) < location_length) {
+            uint16_t len;
+            if (!mDataSource->getUInt16(data_offset, &len)) {
                 return ERROR_IO;
             }
 
-            buffer[location_length] = '\0';
-            mFileMetaData->setCString(kKeyLocation, buffer);
+            // allow "+0+0" without trailing slash
+            if (len < 4 || len > chunk_data_size - 4) {
+                return ERROR_MALFORMED;
+            }
+            // The location string following the language code is formatted
+            // according to ISO 6709:2008 (https://en.wikipedia.org/wiki/ISO_6709).
+            // Allocate 2 extra bytes, in case we need to add a trailing slash,
+            // and to add a terminating 0.
+            std::unique_ptr<char[]> buffer(new (std::nothrow) char[len+2]());
+            if (!buffer) {
+                return NO_MEMORY;
+            }
+
+            if (mDataSource->readAt(
+                        data_offset + 4, &buffer[0], len) < len) {
+                return ERROR_IO;
+            }
+
+            len = strlen(&buffer[0]);
+            if (len < 4) {
+                return ERROR_MALFORMED;
+            }
+            // Add a trailing slash if there wasn't one.
+            if (buffer[len - 1] != '/') {
+                buffer[len] = '/';
+            }
+            mFileMetaData->setCString(kKeyLocation, &buffer[0]);
             break;
         }
 
@@ -5194,6 +5209,7 @@ static bool isCompatibleBrand(uint32_t fourcc) {
         FOURCC('3', 'g', 'p', '4'),
         FOURCC('m', 'p', '4', '1'),
         FOURCC('m', 'p', '4', '2'),
+        FOURCC('d', 'a', 's', 'h'),
 
         // Won't promise that the following file types can be played.
         // Just give these file types a chance.
