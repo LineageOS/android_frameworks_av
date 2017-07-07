@@ -42,10 +42,11 @@ AAudioServiceStreamBase::AAudioServiceStreamBase()
 
 AAudioServiceStreamBase::~AAudioServiceStreamBase() {
     ALOGD("AAudioServiceStreamBase::~AAudioServiceStreamBase() destroying %p", this);
-    // If the stream is deleted without closing then audio resources will leak.
-    // Not being closed here would indicate an internal error. So we want to find this ASAP.
-    LOG_ALWAYS_FATAL_IF(mState != AAUDIO_STREAM_STATE_CLOSED,
-                        "service stream not closed, state = %d", mState);
+    // If the stream is deleted when OPEN or in use then audio resources will leak.
+    // This would indicate an internal error. So we want to find this ASAP.
+    LOG_ALWAYS_FATAL_IF(!(mState == AAUDIO_STREAM_STATE_CLOSED
+                        || mState == AAUDIO_STREAM_STATE_UNINITIALIZED),
+                        "service stream still open, state = %d", mState);
 }
 
 std::string AAudioServiceStreamBase::dump() const {
