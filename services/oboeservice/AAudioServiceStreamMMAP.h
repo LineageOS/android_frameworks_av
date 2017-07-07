@@ -44,8 +44,7 @@ class AAudioServiceStreamMMAP
 
 public:
     AAudioServiceStreamMMAP(uid_t serviceUid);
-    virtual ~AAudioServiceStreamMMAP();
-
+    virtual ~AAudioServiceStreamMMAP() = default;
 
     aaudio_result_t open(const aaudio::AAudioStreamRequest &request,
                                  aaudio::AAudioStreamConfiguration &configurationOutput) override;
