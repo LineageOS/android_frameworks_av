@@ -179,6 +179,12 @@ ssize_t AMediaCodec_dequeueOutputBuffer(AMediaCodec*, AMediaCodecBufferInfo *inf
 AMediaFormat* AMediaCodec_getOutputFormat(AMediaCodec*);
 
 /**
+ * Get format of the buffer. The specified buffer index must have been previously obtained from
+ * dequeueOutputBuffer.
+ */
+AMediaFormat* AMediaCodec_getBufferFormat(AMediaCodec*, size_t index);
+
+/**
  * If you are done with a buffer, use this call to return the buffer to
  * the codec. If you previously specified a surface when configuring this
  * video decoder you can optionally render the buffer.
