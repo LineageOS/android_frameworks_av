@@ -777,6 +777,11 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitAAC() {
         bits.skipBits(2);
 
         unsigned aac_frame_length = bits.getBits(13);
+        if (aac_frame_length == 0){
+            ALOGE("b/62673179, Invalid AAC frame length!");
+            android_errorWriteLog(0x534e4554, "62673179");
+            return NULL;
+        }
 
         bits.skipBits(11);  // adts_buffer_fullness
 
