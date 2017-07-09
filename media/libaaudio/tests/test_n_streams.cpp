@@ -26,42 +26,31 @@
 #define MMAP_POLICY              AAUDIO_POLICY_AUTO
 //#define MMAP_POLICY              AAUDIO_POLICY_ALWAYS
 
-#define MAX_STREAMS   100
+#define MAX_STREAMS   200
 
-int main(int argc, char **argv)
-{
-    (void)argc; // unused
-    (void)argv; // unused
-
+aaudio_result_t testMaxStreams(aaudio_direction_t direction) {
     aaudio_result_t result = AAUDIO_OK;
     AAudioStreamBuilder *aaudioBuilder = nullptr;
-    AAudioStream *aaudioStream[MAX_STREAMS];
+    AAudioStream *aaudioStreams[MAX_STREAMS];
     int32_t numStreams = 0;
-
-    // Make printf print immediately so that debug info is not stuck
-    // in a buffer if we hang or crash.
-    setvbuf(stdout, NULL, _IONBF, (size_t) 0);
-
-    printf("Try to open a maximum of %d streams.\n", MAX_STREAMS);
-
-    AAudio_setMMapPolicy(MMAP_POLICY);
-    printf("requested MMapPolicy = %d\n", AAudio_getMMapPolicy());
 
     result = AAudio_createStreamBuilder(&aaudioBuilder);
     if (result != AAUDIO_OK) {
         return 1;
     }
 
+    AAudioStreamBuilder_setDirection(aaudioBuilder, direction);
+
     for (int i = 0; i < MAX_STREAMS; i++) {
         // Create an AAudioStream using the Builder.
-        result = AAudioStreamBuilder_openStream(aaudioBuilder, &aaudioStream[i]);
+        result = AAudioStreamBuilder_openStream(aaudioBuilder, &aaudioStreams[i]);
         if (result != AAUDIO_OK) {
             printf("ERROR could not open AAudio stream, %d %s\n",
                    result, AAudio_convertResultToText(result));
             break;
         } else {
             printf("AAudio stream[%2d] opened successfully. MMAP = %s\n",
-                   i, AAudioStream_isMMapUsed(aaudioStream[i]) ? "YES" : "NO");
+                   i, AAudioStream_isMMapUsed(aaudioStreams[i]) ? "YES" : "NO");
             numStreams++;
         }
     }
@@ -70,7 +59,7 @@ int main(int argc, char **argv)
 
     // Close all the streams.
     for (int i = 0; i < numStreams; i++) {
-        result = AAudioStream_close(aaudioStream[i]);
+        result = AAudioStream_close(aaudioStreams[i]);
         if (result != AAUDIO_OK) {
             printf("ERROR could not close AAudio stream, %d %s\n",
                    result, AAudio_convertResultToText(result));
@@ -83,6 +72,28 @@ int main(int argc, char **argv)
     AAudioStreamBuilder_delete(aaudioBuilder);
 
 finish:
-    return (result != AAUDIO_OK) ? EXIT_FAILURE : EXIT_SUCCESS;
+    return result;
 }
 
+int main(int argc, char **argv) {
+    (void)argc; // unused
+    (void)argv; // unused
+
+    // Make printf print immediately so that debug info is not stuck
+    // in a buffer if we hang or crash.
+    setvbuf(stdout, NULL, _IONBF, (size_t) 0);
+
+    printf("Try to open a maximum of %d streams.\n", MAX_STREAMS);
+
+    AAudio_setMMapPolicy(MMAP_POLICY);
+    printf("requested MMapPolicy = %d\n", AAudio_getMMapPolicy());
+
+    printf("Test AAUDIO_DIRECTION_OUTPUT ---------\n");
+    aaudio_result_t result = testMaxStreams(AAUDIO_DIRECTION_OUTPUT);
+    if (result == AAUDIO_OK) {
+        printf("Test AAUDIO_DIRECTION_INPUT ---------\n");
+        result = testMaxStreams(AAUDIO_DIRECTION_INPUT);
+    }
+
+    return (result != AAUDIO_OK) ? EXIT_FAILURE : EXIT_SUCCESS;
+}

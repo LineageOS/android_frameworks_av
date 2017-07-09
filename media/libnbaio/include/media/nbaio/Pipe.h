@@ -18,7 +18,7 @@
 #define ANDROID_AUDIO_PIPE_H
 
 #include <audio_utils/fifo.h>
-#include "NBAIO.h"
+#include <media/nbaio/NBAIO.h>
 
 namespace android {
 
