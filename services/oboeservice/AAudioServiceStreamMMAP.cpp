@@ -49,16 +49,18 @@ AAudioServiceStreamMMAP::AAudioServiceStreamMMAP(uid_t serviceUid)
         , mCachedUserId(serviceUid) {
 }
 
-AAudioServiceStreamMMAP::~AAudioServiceStreamMMAP() {
-    close();
-}
-
 aaudio_result_t AAudioServiceStreamMMAP::close() {
-    mMmapStream.clear(); // TODO review. Is that all we have to do?
-    // Apparently the above close is asynchronous. An attempt to open a new device
-    // right after a close can fail. Also some callbacks may still be in flight!
-    // FIXME Make closing synchronous.
-    AudioClock::sleepForNanos(100 * AAUDIO_NANOS_PER_MILLISECOND);
+    if (mState == AAUDIO_STREAM_STATE_CLOSED) {
+        return AAUDIO_OK;
+    }
+
+    if (mMmapStream != 0) {
+        mMmapStream.clear(); // TODO review. Is that all we have to do?
+        // Apparently the above close is asynchronous. An attempt to open a new device
+        // right after a close can fail. Also some callbacks may still be in flight!
+        // FIXME Make closing synchronous.
+        AudioClock::sleepForNanos(100 * AAUDIO_NANOS_PER_MILLISECOND);
+    }
 
     if (mAudioDataFileDescriptor != -1) {
         ::close(mAudioDataFileDescriptor);
@@ -213,6 +215,7 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
     configurationOutput.setAudioFormat(mAudioFormat);
     configurationOutput.setDeviceId(deviceId);
 
+    setState(AAUDIO_STREAM_STATE_OPEN);
     return AAUDIO_OK;
 }
 

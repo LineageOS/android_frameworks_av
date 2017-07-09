@@ -78,6 +78,8 @@ public:
      */
     virtual aaudio_result_t stop();
 
+    aaudio_result_t stopTimestampThread();
+
     /**
      *  Discard any data held by the underlying HAL or Service.
      */
@@ -142,7 +144,16 @@ public:
         mHandle = handle;
     }
 
+    aaudio_stream_state_t getState() const {
+        return mState;
+    }
+
 protected:
+
+    void setState(aaudio_stream_state_t state) {
+        mState = state;
+    }
+
     aaudio_result_t writeUpMessageQueue(AAudioServiceMessage *command);
 
     aaudio_result_t sendCurrentTimestamp();

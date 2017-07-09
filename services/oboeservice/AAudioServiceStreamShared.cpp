@@ -44,10 +44,6 @@ AAudioServiceStreamShared::AAudioServiceStreamShared(AAudioService &audioService
     {
 }
 
-AAudioServiceStreamShared::~AAudioServiceStreamShared() {
-    close();
-}
-
 int32_t AAudioServiceStreamShared::calculateBufferCapacity(int32_t requestedCapacityFrames,
                                                            int32_t framesPerBurst) {
 
@@ -181,6 +177,7 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
         goto error;
     }
 
+    setState(AAUDIO_STREAM_STATE_OPEN);
     return AAUDIO_OK;
 
 error:
@@ -260,21 +257,27 @@ aaudio_result_t AAudioServiceStreamShared::flush()  {
 }
 
 aaudio_result_t AAudioServiceStreamShared::close()  {
-    pause();
-    // TODO wait for pause() to synchronize
-    AAudioServiceEndpoint *endpoint = mServiceEndpoint;
-    if (endpoint != nullptr) {
-        sp<AAudioServiceStreamShared> keep(this);
-        endpoint->unregisterStream(keep);
-
-        AAudioEndpointManager &mEndpointManager = AAudioEndpointManager::getInstance();
-        mEndpointManager.closeEndpoint(endpoint);
-        mServiceEndpoint = nullptr;
+    if (mState == AAUDIO_STREAM_STATE_CLOSED) {
+        return AAUDIO_OK;
     }
+
+    AAudioServiceEndpoint *endpoint = mServiceEndpoint;
+    if (endpoint == nullptr) {
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    endpoint->stopStream(this);
+
+    endpoint->unregisterStream(this);
+
+    AAudioEndpointManager &mEndpointManager = AAudioEndpointManager::getInstance();
+    mEndpointManager.closeEndpoint(endpoint);
+    mServiceEndpoint = nullptr;
+
     if (mAudioDataQueue != nullptr) {
         delete mAudioDataQueue;
         mAudioDataQueue = nullptr;
     }
+
     return AAudioServiceStreamBase::close();
 }
 

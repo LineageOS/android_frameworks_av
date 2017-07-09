@@ -137,6 +137,7 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
         aaudio_handle_t handle = mHandleTracker.put(AAUDIO_HANDLE_TYPE_STREAM, serviceStream.get());
         if (handle < 0) {
             ALOGE("AAudioService::openStream(): handle table full");
+            serviceStream->close();
             serviceStream.clear();
         } else {
             ALOGD("AAudioService::openStream(): handle = 0x%08X", handle);
@@ -150,17 +151,18 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
 }
 
 aaudio_result_t AAudioService::closeStream(aaudio_handle_t streamHandle) {
-    // Check permission first.
-    AAudioServiceStreamBase *serviceStream = convertHandleToServiceStream(streamHandle);
+    // Check permission and ownership first.
+    sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream == nullptr) {
         ALOGE("AAudioService::startStream(), illegal stream handle = 0x%0x", streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
 
+    ALOGD("AAudioService.closeStream(0x%08X)", streamHandle);
+    // Remove handle from tracker so that we cannot look up the raw address any more.
     serviceStream = (AAudioServiceStreamBase *)
             mHandleTracker.remove(AAUDIO_HANDLE_TYPE_STREAM,
                                   streamHandle);
-    ALOGD("AAudioService.closeStream(0x%08X)", streamHandle);
     if (serviceStream != nullptr) {
         serviceStream->close();
         pid_t pid = serviceStream->getOwnerProcessId();
