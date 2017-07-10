@@ -28,6 +28,8 @@ LOCAL_MODULE_RELATIVE_PATH := mediacas
 LOCAL_SHARED_LIBRARIES := \
     libutils liblog
 
+LOCAL_HEADER_LIBRARIES := media_plugin_headers
+
 LOCAL_C_INCLUDES += \
     $(TOP)/frameworks/av/include \
     $(TOP)/frameworks/native/include/media \
