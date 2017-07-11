@@ -138,6 +138,8 @@ bool FastMixer::isSubClassCommand(FastThreadState::Command command)
 
 void FastMixer::onStateChange()
 {
+    // log that audio was turned on/off
+    LOG_AUDIO_STATE();
     const FastMixerState * const current = (const FastMixerState *) mCurrent;
     const FastMixerState * const previous = (const FastMixerState *) mPrevious;
     FastMixerDumpState * const dumpState = (FastMixerDumpState *) mDumpState;

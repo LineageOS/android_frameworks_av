@@ -88,7 +88,11 @@ constexpr uint64_t hash(const char (&file)[n], uint32_t line) {
 
 // Write histogram timestamp entry
 #define LOG_HIST_TS() do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
-                                x->logHistTS(hash(__FILE__, __LINE__)); } while(0)
+        x->logEventHistTs(NBLog::EVENT_HISTOGRAM_ENTRY_TS, hash(__FILE__, __LINE__)); } while(0)
+
+// Record that audio was turned on/off
+#define LOG_AUDIO_STATE() do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+        x->logEventHistTs(NBLog::EVENT_AUDIO_STATE, hash(__FILE__, __LINE__)); } while(0)
 
 namespace android {
 extern "C" {

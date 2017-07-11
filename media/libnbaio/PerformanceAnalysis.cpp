@@ -71,6 +71,40 @@ static int widthOf(int x) {
     return width;
 }
 
+// Given a series of audio processing wakeup timestamps,
+// buckets the time intervals into a histogram, searches for
+// outliers, analyzes the outlier series for unexpectedly
+// small or large values and stores these as peaks, and flushes
+// the timestamp series from memory.
+void PerformanceAnalysis::processAndFlushTimeStampSeries(int author) {
+    // 1) analyze the series to store all outliers and their exact timestamps:
+    storeOutlierData(mTimeStampSeries[author]);
+
+    // 2) detect peaks in the outlier series
+    detectPeaks();
+
+    // 3) compute its histogram, append this to mRecentHists and erase the time series
+    // FIXME: need to store the timestamp of the beginning of each histogram
+    // FIXME: Restore LOG_HIST_FLUSH to separate histograms at every end-of-stream event
+    // A histogram should not span data between audio off/on timespans
+    mRecentHists.emplace_back(author, buildBuckets(mTimeStampSeries[author]));
+    // do not let mRecentHists exceed capacity
+    // ALOGD("mRecentHists size: %d", static_cast<int>(mRecentHists.size()));
+    if (mRecentHists.size() >= kRecentHistsCapacity) {
+        //  ALOGD("popped back mRecentHists");
+        mRecentHists.pop_front();
+    }
+    mTimeStampSeries[author].clear();
+}
+
+// forces short-term histogram storage to avoid adding idle audio time interval
+// to buffer period data
+void PerformanceAnalysis::handleStateChange(int author) {
+    ALOGD("handleStateChange");
+    processAndFlushTimeStampSeries(author);
+    return;
+}
+
 // Takes a single buffer period timestamp entry with author information and stores it
 // in a temporary series of timestamps. Once the series is full, the data is analyzed,
 // stored, and emptied.
@@ -82,25 +116,10 @@ void PerformanceAnalysis::logTsEntry(int author, int64_t ts) {
     // Store time series data for each reader in order to bucket it once there
     // is enough data. Then, write to recentHists as a histogram.
     mTimeStampSeries[author].push_back(ts);
-    // if length of the time series has reached kShortHistSize samples, do 1) and 2):
+    // if length of the time series has reached kShortHistSize samples,
+    // analyze the data and flush the timestamp series from memory
     if (mTimeStampSeries[author].size() >= kShortHistSize) {
-        // 1) analyze the series to store all outliers and their exact timestamps:
-        storeOutlierData(mTimeStampSeries[author]);
-        // 2) detect peaks in the outlier series
-        detectPeaks();
-        // 3) compute its histogram, append this to mRecentHists and erase the time series
-        // FIXME: need to store the timestamp of the beginning of each histogram
-        // FIXME: Restore LOG_HIST_FLUSH to separate histograms at every end-of-stream event
-        // A histogram should not span data between audio off/on timespans
-        mRecentHists.emplace_back(author,
-                                   buildBuckets(mTimeStampSeries[author]));
-        // do not let mRecentHists exceed capacity
-        // ALOGD("mRecentHists size: %d", static_cast<int>(mRecentHists.size()));
-        if (mRecentHists.size() >= kRecentHistsCapacity) {
-            //  ALOGD("popped back mRecentHists");
-            mRecentHists.pop_front();
-        }
-        mTimeStampSeries[author].clear();
+        processAndFlushTimeStampSeries(author);
     }
 }
 
