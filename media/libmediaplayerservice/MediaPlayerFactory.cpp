@@ -246,8 +246,12 @@ void MediaPlayerFactory::registerBuiltinFactories() {
     if (sInitComplete)
         return;
 
-    registerFactory_l(new NuPlayerFactory(), NU_PLAYER);
-    registerFactory_l(new TestPlayerFactory(), TEST_PLAYER);
+    IFactory* factory = new NuPlayerFactory();
+    if (registerFactory_l(factory, NU_PLAYER) != OK)
+        delete factory;
+    factory = new TestPlayerFactory();
+    if (registerFactory_l(factory, TEST_PLAYER) != OK)
+        delete factory;
 
     sInitComplete = true;
 }
