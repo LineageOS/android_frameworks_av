@@ -20,7 +20,7 @@
 #include <media/IOMX.h>
 #include <utils/threads.h>
 #include <utils/KeyedVector.h>
-#include <media/vndk/xmlparser/1.0/MediaCodecsXmlParser.h>
+#include <media/stagefright/xmlparser/MediaCodecsXmlParser.h>
 #include "OmxNodeOwner.h"
 
 namespace android {

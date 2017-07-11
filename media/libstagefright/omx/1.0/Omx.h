@@ -23,7 +23,7 @@
 #include "../../include/OMXNodeInstance.h"
 
 #include <android/hardware/media/omx/1.0/IOmx.h>
-#include <media/vndk/xmlparser/1.0/MediaCodecsXmlParser.h>
+#include <media/stagefright/xmlparser/MediaCodecsXmlParser.h>
 
 namespace android {
 

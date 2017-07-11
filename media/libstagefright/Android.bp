@@ -99,6 +99,7 @@ cc_library_shared {
         "libmedia_helper",
         "libstagefright_flacdec",
         "libstagefright_foundation",
+        "libstagefright_xmlparser",
         "libdl",
         "libRScpp",
         "libhidlbase",
@@ -109,7 +110,6 @@ cc_library_shared {
         "android.hardware.cas@1.0",
         "android.hardware.cas.native@1.0",
         "android.hardware.media.omx@1.0",
-        "libstagefright_xmlparser@1.0",
     ],
 
     static_libs: [
@@ -177,4 +177,5 @@ subdirs = [
     "timedtext",
     "webm",
     "wifi-display",
+    "xmlparser",
 ]
