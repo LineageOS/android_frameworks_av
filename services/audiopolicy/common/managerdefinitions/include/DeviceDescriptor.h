@@ -48,7 +48,7 @@ public:
     // AudioPort
     virtual void attach(const sp<HwModule>& module);
     virtual void toAudioPort(struct audio_port *port) const;
-    virtual void importAudioPort(const sp<AudioPort>& port);
+    virtual void importAudioPort(const sp<AudioPort>& port, bool force = false);
 
     audio_port_handle_t getId() const;
     status_t dump(int fd, int spaces, int index, bool verbose = true) const;
