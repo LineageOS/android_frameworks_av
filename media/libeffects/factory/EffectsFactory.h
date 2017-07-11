@@ -21,6 +21,7 @@
 #include <pthread.h>
 
 #include <android/log.h>
+#include <cutils/compiler.h>
 #include <hardware/audio_effect.h>
 
 #if __cplusplus
@@ -96,6 +97,7 @@ typedef struct sub_effect_entry_s {
 //        *pDescriptor:     updated with the sub effect descriptors.
 //
 ////////////////////////////////////////////////////////////////////////////////
+ANDROID_API
 int EffectGetSubEffects(const effect_uuid_t *pEffectUuid,
                         sub_effect_entry_t **pSube,
                         size_t size);

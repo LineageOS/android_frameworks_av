@@ -10,13 +10,19 @@ cc_library_headers {
 cc_library_shared {
     name: "libeffects",
     vendor: true,
-    srcs: ["EffectsFactory.c"],
+    srcs: ["EffectsFactory.c",
+           "EffectsConfigLoader.c",
+           "EffectsFactoryState.c",
+           "EffectsXmlConfigLoader.cpp",
+    ],
 
     shared_libs: [
         "libcutils",
         "liblog",
         "libdl",
+        "libeffectsconfig",
     ],
+    cflags: ["-fvisibility=hidden"],
 
     include_dirs: ["system/media/audio_effects/include"],
 
@@ -24,4 +30,25 @@ cc_library_shared {
 
     header_libs: ["libeffects_headers"],
     export_header_lib_headers: ["libeffects_headers"],
+}
+
+cc_binary {
+    name: "dumpEffectConfigFile",
+    vendor: true,
+    srcs: ["test/DumpConfig.cpp"],
+
+    compile_multilib: "32",
+
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    ],
+
+
+    shared_libs: [
+        "libeffectsconfig",
+        "libeffects",
+    ],
+    local_include_dirs:[".", "include"],
 }

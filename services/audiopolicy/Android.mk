@@ -24,7 +24,8 @@ LOCAL_SHARED_LIBRARIES := \
     libhardware_legacy \
     libserviceutility \
     libaudiopolicymanager \
-    libmedia_helper
+    libmedia_helper \
+    libeffectsconfig
 
 LOCAL_STATIC_LIBRARIES := \
     libaudiopolicycomponents

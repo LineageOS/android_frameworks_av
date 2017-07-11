@@ -1,0 +1,14 @@
+// Effect configuration
+cc_library_shared {
+    name: "libeffectsconfig",
+    vendor_available: true,
+
+    srcs: ["src/EffectsConfig.cpp"],
+
+    shared_libs: [
+        "liblog",
+        "libtinyxml2",
+    ],
+
+    export_include_dirs: ["include"],
+}
