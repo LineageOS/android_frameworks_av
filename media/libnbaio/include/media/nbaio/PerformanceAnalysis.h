@@ -23,10 +23,11 @@
 #include <deque>
 #include <vector>
 #include "NBLog.h"
+#include "ReportPerformance.h"
 
 namespace android {
 
-class String8;
+namespace ReportPerformance {
 
 class PerformanceAnalysis {
     // This class stores and analyzes audio processing wakeup timestamps from NBLog
@@ -37,42 +38,25 @@ public:
 
     PerformanceAnalysis();
 
-    // FIXME: decide whether to use 64 or 32 bits
-    typedef uint64_t log_hash_t;
-
-    // stores a short-term histogram of size determined by kShortHistSize
-    // key: observed buffer period. value: count
-    // TODO: unsigned, unsigned
-    // TODO: change this name to histogram
-    using short_histogram = std::map<int, int>;
-
-    using outlierInterval = uint64_t;
-    // int64_t timestamps are converted to uint64_t in PerformanceAnalysis::storeOutlierData,
-    // and all further analysis functions use uint64_t.
-    using timestamp = uint64_t;
-    using timestamp_raw = int64_t;
-
     // Given a series of audio processing wakeup timestamps,
     // compresses and and analyzes the data, and flushes
     // the timestamp series from memory.
-    void processAndFlushTimeStampSeries(int author);
+    void processAndFlushTimeStampSeries();
 
-    // Called when an audio on/off event is read from the buffer
+    // Called when an audio on/off event is read from the buffer,
+    // e.g. EVENT_AUDIO_STATE.
     // calls flushTimeStampSeries on the data up to the event,
-    // effectively skipping over the idle audio time interval
-    // when writing buffer period data to memory.
-    void handleStateChange(int author);
+    // effectively discarding the idle audio time interval
+    void handleStateChange();
+
+    // When the short-term histogram array mRecentHists has reached capacity,
+    // merges histograms for data compression and stores them in mLongTermHists
+    void processAndFlushRecentHists();
 
     // Writes wakeup timestamp entry to log and runs analysis
-    // author is the thread ID
-    // TODO: check. if the thread has multiple histograms, is author info correct
-    // FIXME: remove author from arglist. Want to call these function separately on
-    // each thread’s data.
-    // FIXME: decide whether to store the hash (source file location) instead
-    // FIXME: If thread has multiple histograms, check that code works and correct
-    // author is stored (test with multiple threads). Need to check that the current
-    // code is not receiving data from multiple threads. This could cause odd values.
-    void logTsEntry(int author, timestamp_raw ts);
+    // TODO: make this thread safe. Each thread should have its own instance
+    // of PerformanceAnalysis.
+    void logTsEntry(timestamp_raw ts);
 
     // FIXME: make peakdetector and storeOutlierData a single function
     // Input: mOutlierData. Looks at time elapsed between outliers
@@ -95,9 +79,7 @@ public:
 
     // This function used to detect glitches in a time series
     // TODO incorporate this into the analysis (currently unused)
-    void     alertIfGlitch(const std::vector<timestamp_raw> &samples);
-
-    ~PerformanceAnalysis() {}
+    void alertIfGlitch(const std::vector<timestamp_raw> &samples);
 
 private:
 
@@ -108,23 +90,24 @@ private:
     // a peak is a moment at which the average outlier interval changed significantly
     std::deque<timestamp> mPeakTimestamps;
 
+    // TODO: turn these into circular buffers for better data flow
     // FIFO of small histograms
-    // stores fixed-size short buffer period histograms with hash and thread data
-    // TODO: Turn it into a circular buffer for better data flow
-    std::deque<std::pair<int, short_histogram>> mRecentHists;
+    // stores fixed-size short buffer period histograms with timestamp of first sample
+    std::deque<std::pair<timestamp, Histogram>> mRecentHists;
 
-    // map from author to vector of timestamps, collected from NBLog
-    // when a vector reaches its maximum size, analysis is run and the data is deleted
-    std::map<int, std::vector<timestamp_raw>> mTimeStampSeries;
+    // FIFO of small histograms
+    // stores fixed-size long-term buffer period histograms with timestamp of first sample
+    std::deque<std::pair<timestamp, Histogram>> mLongTermHists;
 
-    // TODO: measure these from the data (e.g., mode) as they may change.
-    // const int kGlitchThreshMs = 7;
-    // const int kMsPerSec = 1000;
+    // vector of timestamps, collected from NBLog for a (TODO) specific thread
+    // when a vector reaches its maximum size, the data is processed and flushed
+    std::vector<timestamp_raw> mTimeStampSeries;
+
+    static const int kMsPerSec = 1000;
 
     // Parameters used when detecting outliers
     // TODO: learn some of these from the data, delete unused ones
     // FIXME: decide whether to make kPeriodMs static.
-    // The non-const values are (TODO: will be) learned from the data
     static const int kNumBuff = 3; // number of buffers considered in local history
     int kPeriodMs; // current period length is ideally 4 ms
     static const int kOutlierMs = 7; // values greater or equal to this cause glitches
@@ -135,8 +118,15 @@ private:
     // Peak detection: number of standard deviations from mean considered a significant change
     static const int kStddevThreshold = 5;
 
+    // capacity allocated to data structures
+    // TODO: adjust all of these values
     static const int kRecentHistsCapacity = 100; // number of short-term histograms stored in memory
     static const int kShortHistSize = 50; // number of samples in a short-term histogram
+    static const int kOutlierSeriesSize = 100; // number of values stored in outlier array
+    static const int kPeakSeriesSize = 100; // number of values stored in peak array
+    static const int kLongTermHistsCapacity = 20; // number of long-term histogram stored in memory
+    // maximum elapsed time between first and last timestamp of a long-term histogram
+    static const int kMaxHistTimespanMs = 5 * kMsPerSec;
 
     // these variables are stored in-class to ensure continuity while analyzing the timestamp
     // series one short sequence at a time: the variables are not re-initialized every time.
@@ -149,14 +139,7 @@ private:
 
 };
 
-static inline int deltaMs(int64_t ns1, int64_t ns2) {
-    return (ns2 - ns1) / (1000 * 1000);
-}
-
-static inline uint32_t log2(uint32_t x) {
-    // This works for x > 0
-    return 31 - __builtin_clz(x);
-}
+} // namespace ReportPerformance
 
 }   // namespace android
 

@@ -45,6 +45,7 @@ cc_library_shared {
         "PerformanceAnalysis.cpp",
         "Pipe.cpp",
         "PipeReader.cpp",
+        "ReportPerformance.cpp",
         "SourceAudioBufferProvider.cpp",
     ],
 
