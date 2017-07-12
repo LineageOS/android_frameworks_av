@@ -23,6 +23,7 @@
 #include <sched.h>
 
 #include <aaudio/AAudio.h>
+#include "AAudioArgsParser.h"
 #include "SineGenerator.h"
 
 //#define SHARING_MODE  AAUDIO_SHARING_MODE_EXCLUSIVE
@@ -55,15 +56,23 @@ public:
         mRequestedPerformanceMode = requestedPerformanceMode;
     }
 
+    // TODO Extract a common base class for record and playback.
     /**
      * Also known as "sample rate"
      * Only call this after open() has been called.
      */
-    int32_t getFramesPerSecond() {
+    int32_t getFramesPerSecond() const {
+        return getSampleRate(); // alias
+    }
+
+    /**
+     * Only call this after open() has been called.
+     */
+    int32_t getSampleRate() const {
         if (mStream == nullptr) {
             return AAUDIO_ERROR_INVALID_STATE;
         }
-        return AAudioStream_getSampleRate(mStream);;
+        return AAudioStream_getSampleRate(mStream);
     }
 
     /**
@@ -73,57 +82,83 @@ public:
         if (mStream == nullptr) {
             return AAUDIO_ERROR_INVALID_STATE;
         }
-        return AAudioStream_getChannelCount(mStream);;
+        return AAudioStream_getChannelCount(mStream);
     }
 
     /**
      * Open a stream
      */
+    aaudio_result_t open(const AAudioParameters &parameters,
+                         AAudioStream_dataCallback dataCallback = nullptr,
+                         AAudioStream_errorCallback errorCallback = nullptr,
+                         void *userContext = nullptr) {
+        aaudio_result_t result = AAUDIO_OK;
+
+        // Use an AAudioStreamBuilder to contain requested parameters.
+        AAudioStreamBuilder *builder = nullptr;
+        result = AAudio_createStreamBuilder(&builder);
+        if (result != AAUDIO_OK) return result;
+
+        parameters.applyParameters(builder); // apply args
+
+        AAudioStreamBuilder_setDirection(builder, AAUDIO_DIRECTION_OUTPUT);
+
+        if (dataCallback != nullptr) {
+            AAudioStreamBuilder_setDataCallback(builder, dataCallback, userContext);
+        }
+        if (errorCallback != nullptr) {
+            AAudioStreamBuilder_setErrorCallback(builder, errorCallback, userContext);
+        }
+        //AAudioStreamBuilder_setFramesPerDataCallback(builder, CALLBACK_SIZE_FRAMES);
+        //AAudioStreamBuilder_setBufferCapacityInFrames(builder, 48 * 8);
+
+        // Open an AAudioStream using the Builder.
+        result = AAudioStreamBuilder_openStream(builder, &mStream);
+
+        if (result == AAUDIO_OK) {
+            int32_t sizeInBursts = parameters.getNumberOfBursts();
+            if (sizeInBursts > 0) {
+                int32_t framesPerBurst = AAudioStream_getFramesPerBurst(mStream);
+                AAudioStream_setBufferSizeInFrames(mStream, sizeInBursts * framesPerBurst);
+            }
+        }
+
+        AAudioStreamBuilder_delete(builder);
+        return result;
+    }
+
     aaudio_result_t open(int channelCount, int sampSampleRate, aaudio_format_t format,
-                         AAudioStream_dataCallback dataProc, AAudioStream_errorCallback errorProc,
+                         AAudioStream_dataCallback dataProc,
+                         AAudioStream_errorCallback errorProc,
                          void *userContext) {
         aaudio_result_t result = AAUDIO_OK;
 
         // Use an AAudioStreamBuilder to contain requested parameters.
-        result = AAudio_createStreamBuilder(&mBuilder);
+        AAudioStreamBuilder *builder = nullptr;
+        result = AAudio_createStreamBuilder(&builder);
         if (result != AAUDIO_OK) return result;
 
-        //AAudioStreamBuilder_setSampleRate(mBuilder, 44100);
-        AAudioStreamBuilder_setPerformanceMode(mBuilder, mRequestedPerformanceMode);
-        AAudioStreamBuilder_setSharingMode(mBuilder, mRequestedSharingMode);
+        AAudioStreamBuilder_setDirection(builder, AAUDIO_DIRECTION_OUTPUT);
+        AAudioStreamBuilder_setPerformanceMode(builder, mRequestedPerformanceMode);
+        AAudioStreamBuilder_setSharingMode(builder, mRequestedSharingMode);
+
+        AAudioStreamBuilder_setChannelCount(builder, channelCount);
+        AAudioStreamBuilder_setSampleRate(builder, sampSampleRate);
+        AAudioStreamBuilder_setFormat(builder, format);
+
         if (dataProc != nullptr) {
-            AAudioStreamBuilder_setDataCallback(mBuilder, dataProc, userContext);
+            AAudioStreamBuilder_setDataCallback(builder, dataProc, userContext);
         }
         if (errorProc != nullptr) {
-            AAudioStreamBuilder_setErrorCallback(mBuilder, errorProc, userContext);
+            AAudioStreamBuilder_setErrorCallback(builder, errorProc, userContext);
         }
-        AAudioStreamBuilder_setChannelCount(mBuilder, channelCount);
-        AAudioStreamBuilder_setSampleRate(mBuilder, sampSampleRate);
-        AAudioStreamBuilder_setFormat(mBuilder, format);
-        //AAudioStreamBuilder_setFramesPerDataCallback(mBuilder, CALLBACK_SIZE_FRAMES);
-        AAudioStreamBuilder_setBufferCapacityInFrames(mBuilder, 48 * 8);
-
-        //aaudio_performance_mode_t perfMode = AAUDIO_PERFORMANCE_MODE_NONE;
-        aaudio_performance_mode_t perfMode = AAUDIO_PERFORMANCE_MODE_LOW_LATENCY;
-        //aaudio_performance_mode_t perfMode = AAUDIO_PERFORMANCE_MODE_POWER_SAVING;
-        AAudioStreamBuilder_setPerformanceMode(mBuilder, perfMode);
+        //AAudioStreamBuilder_setFramesPerDataCallback(builder, CALLBACK_SIZE_FRAMES);
+        //AAudioStreamBuilder_setBufferCapacityInFrames(builder, 48 * 8);
 
         // Open an AAudioStream using the Builder.
-        result = AAudioStreamBuilder_openStream(mBuilder, &mStream);
-        if (result != AAUDIO_OK) goto finish1;
+        result = AAudioStreamBuilder_openStream(builder, &mStream);
 
-        printf("AAudioStream_getFramesPerBurst() = %d\n",
-               AAudioStream_getFramesPerBurst(mStream));
-        printf("AAudioStream_getBufferSizeInFrames() = %d\n",
-               AAudioStream_getBufferSizeInFrames(mStream));
-        printf("AAudioStream_getBufferCapacityInFrames() = %d\n",
-               AAudioStream_getBufferCapacityInFrames(mStream));
-        printf("AAudioStream_getPerformanceMode() = %d, requested %d\n",
-               AAudioStream_getPerformanceMode(mStream), perfMode);
-
-     finish1:
-        AAudioStreamBuilder_delete(mBuilder);
-        mBuilder = nullptr;
+        AAudioStreamBuilder_delete(builder);
         return result;
     }
 
@@ -132,8 +167,6 @@ public:
             printf("call AAudioStream_close(%p)\n", mStream);  fflush(stdout);
             AAudioStream_close(mStream);
             mStream = nullptr;
-            AAudioStreamBuilder_delete(mBuilder);
-            mBuilder = nullptr;
         }
         return AAUDIO_OK;
     }
@@ -178,7 +211,6 @@ public:
     }
 
 private:
-    AAudioStreamBuilder      *mBuilder = nullptr;
     AAudioStream             *mStream = nullptr;
     aaudio_sharing_mode_t     mRequestedSharingMode = SHARING_MODE;
     aaudio_performance_mode_t mRequestedPerformanceMode = PERFORMANCE_MODE;

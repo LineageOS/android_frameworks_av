@@ -52,8 +52,12 @@ status_t AAudioStreamRequest::writeToParcel(Parcel* parcel) const {
     status = parcel->writeBool(mSharingModeMatchRequired);
     if (status != NO_ERROR) goto error;
 
+    status = parcel->writeBool(mInService);
+    if (status != NO_ERROR) goto error;
+
     status = mConfiguration.writeToParcel(parcel);
     if (status != NO_ERROR) goto error;
+
     return NO_ERROR;
 
 error:
@@ -74,8 +78,12 @@ status_t AAudioStreamRequest::readFromParcel(const Parcel* parcel) {
     status = parcel->readBool(&mSharingModeMatchRequired);
     if (status != NO_ERROR) goto error;
 
+    status = parcel->readBool(&mInService);
+    if (status != NO_ERROR) goto error;
+
     status = mConfiguration.readFromParcel(parcel);
     if (status != NO_ERROR) goto error;
+
     return NO_ERROR;
 
 error:
@@ -91,5 +99,7 @@ void AAudioStreamRequest::dump() const {
     ALOGD("AAudioStreamRequest mUserId    = %d", mUserId);
     ALOGD("AAudioStreamRequest mProcessId = %d", mProcessId);
     ALOGD("AAudioStreamRequest mDirection = %d", mDirection);
+    ALOGD("AAudioStreamRequest mSharingModeMatchRequired = %d", mSharingModeMatchRequired);
+    ALOGD("AAudioStreamRequest mInService = %d", mInService);
     mConfiguration.dump();
 }

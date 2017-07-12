@@ -128,7 +128,7 @@ void AudioPort::toAudioPort(struct audio_port *port) const
     port->num_gains = i;
 }
 
-void AudioPort::importAudioPort(const sp<AudioPort>& port)
+void AudioPort::importAudioPort(const sp<AudioPort>& port, bool force __unused)
 {
     size_t indexToImport;
     for (indexToImport = 0; indexToImport < port->mProfiles.size(); indexToImport++) {

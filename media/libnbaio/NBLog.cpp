@@ -892,23 +892,14 @@ inline void writeHistToFile(const std::vector<int64_t> &samples, bool append) {
     ofs.close();
 }
 
-// converts a time series into a map. key: buffer period length. value: count
-static std::map<int, int> buildBuckets(const std::vector<int64_t> &samples) {
-    // TODO allow buckets of variable resolution
-    std::map<int, int> buckets;
-    for (size_t i = 1; i < samples.size(); ++i) {
-        ++buckets[deltaMs(samples[i - 1], samples[i])];
-    }
-    return buckets;
-}
-
 void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapshot)
 {
     //  CallStack cs(LOG_TAG);
     mFd = fd;
     mIndent = indent;
     String8 timestamp, body;
-    PerformanceAnalysis performanceAnalyzer; // used to call analysis functions
+    // FIXME: this is not thread safe
+    static PerformanceAnalysis performanceAnalysis; // used to store data and to call analysis functions
     size_t lost = snapshot.lost() + (snapshot.begin() - EntryIterator(snapshot.data()));
     if (lost > 0) {
         body.appendFormat("warning: lost %zu bytes worth of events", lost);
@@ -930,29 +921,7 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             memcpy(&hash, &(data->hash), sizeof(hash));
             int64_t ts;
             memcpy(&ts, &data->ts, sizeof(ts));
-            const std::pair<log_hash_t, int> key(hash, data->author);
-            // TODO might want to filter excessively high outliers, which are usually caused
-            // by the thread being inactive.
-            mHists[key].push_back(ts);
-            // store time series data for each reader in order to bucket it once there
-            // is enough data. Then, it is written to recentHists as a histogram.
-            mTimeStampSeries[data->author].push_back(ts);
-            // if length of the time series has reached kShortHistSize samples, do 1) and 2):
-            if (mTimeStampSeries[data->author].size() >= kShortHistSize) {
-                // 1) analyze the series to store all outliers and their exact timestamps:
-                performanceAnalyzer.storeOutlierData(data->author, mTimeStampSeries[data->author]);
-                 // 2) compute its histogram, append this to mRecentHists and erase the time series
-                mRecentHists.emplace_front(data->author,
-                                           buildBuckets(mTimeStampSeries[data->author]));
-                // do not let mRecentHists exceed capacity
-                // TODO: turn the FIFO queue into a circular buffer
-                if (mRecentHists.size() >= kRecentHistsCapacity) {
-                    mRecentHists.pop_back();
-                }
-                mTimeStampSeries.erase(data->author);
-            }
-            // if an element in mHists has not grown for a long time, delete
-            // TODO copy histogram data only to mRecentHistsBuffer and pop oldest
+            performanceAnalysis.logTsEntry(data->author, ts);
             ++entry;
             break;
         }
@@ -967,12 +936,10 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             break;
         }
     }
-    performanceAnalyzer.reportPerformance(&body, mRecentHists);
+    performanceAnalysis.reportPerformance(&body);
     if (!body.isEmpty()) {
         dumpLine(timestamp, body);
     }
-    // comment in for tests
-    // performanceAnalyzer.testFunction();
 }
 
 void NBLog::Reader::dump(int fd, size_t indent)

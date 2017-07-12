@@ -22,79 +22,119 @@
 #include <map>
 #include <deque>
 #include <vector>
+#include "NBLog.h"
 
 namespace android {
 
 class String8;
 
 class PerformanceAnalysis {
-
+    // This class stores and analyzes audio processing wakeup timestamps from NBLog
+    // FIXME: currently, all performance data is stored in deques. Need to add a mutex.
+    // FIXME: continue this way until analysis is done in a separate thread. Then, use
+    // the fifo writer utilities.
 public:
 
-PerformanceAnalysis();
+    PerformanceAnalysis();
 
-// stores a short-term histogram of size determined by kShortHistSize
-// TODO: unsigned, unsigned
-// CHECK: is there a better way to use short_histogram than to write 'using'
-// both in this header file and in NBLog.h?
-using short_histogram = std::map<int, int>;
+    // FIXME: decide whether to use 64 or 32 bits
+    typedef uint64_t log_hash_t;
 
-// returns a vector of pairs <outlier timestamp, time elapsed since previous outlier
-// called by NBLog::Reader::dump before data is converted into histogram
-// TODO: currently, the elapsed time
-// The resolution is only as good as the ms duration of one shortHist
-void storeOutlierData(int author, const std::vector<int64_t> &timestamps);
+    // stores a short-term histogram of size determined by kShortHistSize
+    // key: observed buffer period. value: count
+    // TODO: unsigned, unsigned
+    // TODO: change this name to histogram
+    using short_histogram = std::map<int, int>;
 
-// TODO: delete this. temp for testing
-void testFunction();
+    using outlierInterval = uint64_t;
+    // int64_t timestamps are converted to uint64_t in PerformanceAnalysis::storeOutlierData,
+    // and all further analysis functions use uint64_t.
+    using timestamp = uint64_t;
+    using timestamp_raw = int64_t;
 
-// Given a series, looks for changes in distribution (peaks)
-// Returns a 'signal' array of the same length as the series, where each
-// value is mapped to -1, 0, or 1 based on whether a negative or positive peak
-// was detected, or no significant change occurred.
-// The function sets the mean to the starting value and sigma to 0, and updates
-// them as long as no peak is detected. When a value is more than 'threshold'
-// standard deviations from the mean, a peak is detected and the mean and sigma
-// are set to the peak value and 0.
-// static void peakDetector();
+    // Writes wakeup timestamp entry to log and runs analysis
+    // author is the thread ID
+    // TODO: check. if the thread has multiple histograms, is author info correct
+    // FIXME: remove author from arglist. Want to call these function separately on
+    // each thread’s data.
+    // FIXME: decide whether to store the hash (source file location) instead
+    // FIXME: If thread has multiple histograms, check that code works and correct
+    // author is stored (test with multiple threads). Need to check that the current
+    // code is not receiving data from multiple threads. This could cause odd values.
+    void logTsEntry(int author, timestamp_raw ts);
 
-// input: series of short histograms. output: prints an analysis of the
-// data to the console
-// TODO: change this so that it writes the analysis to the long-term
-// circular buffer and prints an analyses both for the short and long-term
-void reportPerformance(String8 *body,
-                       const std::deque<std::pair
-                       <int, short_histogram>> &shortHists,
-                       int maxHeight = 10);
+    // FIXME: make peakdetector and storeOutlierData a single function
+    // Input: mOutlierData. Looks at time elapsed between outliers
+    // finds significant changes in the distribution
+    // writes timestamps of significant changes to mPeakTimestamps
+    void detectPeaks();
 
-// if findGlitch is true, log warning when buffer periods caused glitch
-// TODO adapt this to the analysis in reportPerformance instead of logging
-void     alertIfGlitch(const std::vector<int64_t> &samples);
-bool     isFindGlitch() const;
-void     setFindGlitch(bool s);
+    // runs analysis on timestamp series before it is converted to a histogram
+    // finds outliers
+    // writes to mOutlierData <time elapsed since previous outlier, outlier timestamp>
+    void storeOutlierData(const std::vector<timestamp_raw> &timestamps);
 
-~PerformanceAnalysis() {}
+    // input: series of short histograms. Generates a string of analysis of the buffer periods
+    // TODO: WIP write more detailed analysis
+    // FIXME: move this data visualization to a separate class. Model/view/controller
+    void reportPerformance(String8 *body, int maxHeight = 10);
+
+    // TODO: delete this. temp for testing
+    void testFunction();
+
+    // This function used to detect glitches in a time series
+    // TODO incorporate this into the analysis (currently unused)
+    void     alertIfGlitch(const std::vector<timestamp_raw> &samples);
+
+    ~PerformanceAnalysis() {}
 
 private:
 
-// stores outlier analysis
-std::vector<std::pair<uint64_t, uint64_t>> mOutlierData;
+    // stores outlier analysis: <elapsed time between outliers in ms, outlier timestamp>
+    std::deque<std::pair<outlierInterval, timestamp>> mOutlierData;
 
-// stores long-term audio performance data
-// TODO: Turn it into a circular buffer
-std::deque<std::pair<int, int>> mPerformanceAnalysis;
+    // stores each timestamp at which a peak was detected
+    // a peak is a moment at which the average outlier interval changed significantly
+    std::deque<timestamp> mPeakTimestamps;
 
-// alert if a local buffer period sequence caused an audio glitch
-bool findGlitch;
-//TODO: measure these from the data (e.g., mode) as they may change.
-//const int kGlitchThreshMs = 7;
-// const int kMsPerSec = 1000;
-const int kNumBuff = 3; // number of buffers considered in local history
-const int kPeriodMs = 4; // current period length is ideally 4 ms
-const int kOutlierMs = 7; // values greater or equal to this cause glitches every time
-// DAC processing time for 4 ms buffer
-static constexpr double kRatio = 0.75; // estimate of CPU time as ratio of period length
-int kPeriodMsCPU; //compute based on kPeriodLen and kRatio
+    // FIFO of small histograms
+    // stores fixed-size short buffer period histograms with hash and thread data
+    // TODO: Turn it into a circular buffer for better data flow
+    std::deque<std::pair<int, short_histogram>> mRecentHists;
+
+    // map from author to vector of timestamps, collected from NBLog
+    // when a vector reaches its maximum size, analysis is run and the data is deleted
+    std::map<int, std::vector<timestamp_raw>> mTimeStampSeries;
+
+    // TODO: measure these from the data (e.g., mode) as they may change.
+    // const int kGlitchThreshMs = 7;
+    // const int kMsPerSec = 1000;
+
+    // Parameters used when detecting outliers
+    // TODO: learn some of these from the data, delete unused ones
+    // FIXME: decide whether to make kPeriodMs static.
+    // The non-const values are (TODO: will be) learned from the data
+    static const int kNumBuff = 3; // number of buffers considered in local history
+    int kPeriodMs; // current period length is ideally 4 ms
+    static const int kOutlierMs = 7; // values greater or equal to this cause glitches
+    // DAC processing time for 4 ms buffer
+    static constexpr double kRatio = 0.75; // estimate of CPU time as ratio of period length
+    int kPeriodMsCPU; // compute based on kPeriodLen and kRatio
+
+    // Peak detection: number of standard deviations from mean considered a significant change
+    static const int kStddevThreshold = 5;
+
+    static const int kRecentHistsCapacity = 100; // number of short-term histograms stored in memory
+    static const int kShortHistSize = 50; // number of samples in a short-term histogram
+
+    // these variables are stored in-class to ensure continuity while analyzing the timestamp
+    // series one short sequence at a time: the variables are not re-initialized every time.
+    // FIXME: create inner class for these variables and decide which other ones to add to it
+    double mPeakDetectorMean = -1;
+    double mPeakDetectorSd = -1;
+    // variables for storeOutlierData
+    uint64_t mElapsed = 0;
+    int64_t mPrevNs = -1;
 
 };
 
