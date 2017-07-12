@@ -960,7 +960,9 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
                             return NO_MEMORY;
                         }
                         hidlMem = mapMemory(hidlMemToken);
-
+                        if (hidlMem == nullptr) {
+                            return NO_MEMORY;
+                        }
                         err = mOMXNode->useBuffer(
                                 portIndex, hidlMemToken, &info.mBufferID);
                     } else {
@@ -1008,6 +1010,9 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
                                 return NO_MEMORY;
                             }
                             hidlMem = mapMemory(hidlMemToken);
+                            if (hidlMem == nullptr) {
+                                return NO_MEMORY;
+                            }
                             info.mData = new SharedMemoryBuffer(format, hidlMem);
                             info.mMemRef = hidlMem;
                         } else {
