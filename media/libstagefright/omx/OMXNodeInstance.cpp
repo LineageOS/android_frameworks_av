@@ -1052,6 +1052,10 @@ status_t OMXNodeInstance::useBuffer(
 
         case OMXBuffer::kBufferTypeHidlMemory: {
                 sp<IHidlMemory> hidlMemory = mapMemory(omxBuffer.mHidlMemory);
+                if (hidlMemory == nullptr) {
+                    ALOGE("OMXNodeInstance useBuffer() failed to map memory");
+                    return NO_MEMORY;
+                }
                 return useBuffer_l(portIndex, NULL, hidlMemory, buffer);
             }
         default:
