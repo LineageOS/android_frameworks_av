@@ -51,6 +51,7 @@ public:
     audio_channel_mask_t channelMask() const { return mConfig.channel_mask; }
     audio_input_flags_t flags() const { return mFlags; }
     uid_t uid() const { return mUid; }
+    void setUid(uid_t uid) { mUid = uid; }
     bool matches(const sp<AudioSession> &other) const;
     bool isSoundTrigger() const { return mIsSoundTrigger; }
     uint32_t openCount() const { return mOpenCount; } ;
@@ -68,7 +69,7 @@ private:
     const audio_source_t mInputSource;
     const struct audio_config_base mConfig;
     const audio_input_flags_t mFlags;
-    const uid_t mUid;
+    uid_t mUid;
     bool  mIsSoundTrigger;
     uint32_t  mOpenCount;
     uint32_t  mActiveCount;

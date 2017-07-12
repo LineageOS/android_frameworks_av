@@ -14,27 +14,25 @@
  * limitations under the License.
  */
 
-#ifndef AAUDIO_AAUDIO_SERVICE_STREAM_EXCLUSIVE_H
-#define AAUDIO_AAUDIO_SERVICE_STREAM_EXCLUSIVE_H
 
-#include "AAudioServiceStreamMMAP.h"
+#ifndef ANDROID_AUDIO_CLIENT_H
+#define ANDROID_AUDIO_CLIENT_H
 
-namespace aaudio {
+#include <system/audio.h>
+#include <utils/String16.h>
 
-/**
- * Exclusive mode stream in the AAudio service.
- *
- * This is currently a stub.
- * We may move code from AAudioServiceStreamMMAP into this class.
- * If not, then it will be removed.
- */
-class AAudioServiceStreamExclusive : public AAudioServiceStreamMMAP {
+namespace android {
 
-public:
-    AAudioServiceStreamExclusive() {};
-    virtual ~AAudioServiceStreamExclusive() = default;
+class AudioClient {
+ public:
+    AudioClient() :
+        clientUid(-1), clientPid(-1), packageName("") {}
+
+    uid_t clientUid;
+    pid_t clientPid;
+    String16 packageName;
 };
 
-} /* namespace aaudio */
+}; // namespace android
 
-#endif //AAUDIO_AAUDIO_SERVICE_STREAM_EXCLUSIVE_H
+#endif  // ANDROID_AUDIO_CLIENT_H

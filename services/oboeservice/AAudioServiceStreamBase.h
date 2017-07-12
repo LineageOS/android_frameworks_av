@@ -27,6 +27,7 @@
 #include "binding/AudioEndpointParcelable.h"
 #include "binding/AAudioServiceMessage.h"
 #include "utility/AAudioUtilities.h"
+#include <media/AudioClient.h>
 
 #include "SharedRingBuffer.h"
 #include "AAudioThread.h"
@@ -85,9 +86,19 @@ public:
      */
     virtual aaudio_result_t flush();
 
+    virtual aaudio_result_t startClient(const android::AudioClient& client __unused,
+                                        audio_port_handle_t *clientHandle __unused) {
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
+    virtual aaudio_result_t stopClient(audio_port_handle_t clientHandle __unused) {
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
     bool isRunning() const {
         return mState == AAUDIO_STREAM_STATE_STARTED;
     }
+
     // -------------------------------------------------------------------
 
     /**
@@ -124,17 +135,11 @@ public:
     void disconnect();
 
     uid_t getOwnerUserId() const {
-        return mOwnerUserId;
-    }
-    void setOwnerUserId(uid_t uid) {
-        mOwnerUserId = uid;
+        return mMmapClient.clientUid;
     }
 
     pid_t getOwnerProcessId() const {
-        return mOwnerProcessId;
-    }
-    void setOwnerProcessId(pid_t pid) {
-        mOwnerProcessId = pid;
+        return mMmapClient.clientPid;
     }
 
     aaudio_handle_t getHandle() const {
@@ -164,24 +169,25 @@ protected:
 
     aaudio_stream_state_t   mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
 
-    pid_t              mRegisteredClientThread = ILLEGAL_THREAD_ID;
+    pid_t                   mRegisteredClientThread = ILLEGAL_THREAD_ID;
 
-    SharedRingBuffer*  mUpMessageQueue;
-    std::mutex         mLockUpMessageQueue;
+    SharedRingBuffer*       mUpMessageQueue;
+    std::mutex              mLockUpMessageQueue;
 
-    AAudioThread       mAAudioThread;
+    AAudioThread            mAAudioThread;
     // This is used by one thread to tell another thread to exit. So it must be atomic.
-    std::atomic<bool>  mThreadEnabled;
+    std::atomic<bool>       mThreadEnabled;
 
-    aaudio_format_t    mAudioFormat = AAUDIO_FORMAT_UNSPECIFIED;
-    int32_t            mFramesPerBurst = 0;
-    int32_t            mSamplesPerFrame = AAUDIO_UNSPECIFIED;
-    int32_t            mSampleRate = AAUDIO_UNSPECIFIED;
-    int32_t            mCapacityInFrames = AAUDIO_UNSPECIFIED;
-    uid_t              mOwnerUserId = -1;
-    pid_t              mOwnerProcessId = -1;
+    aaudio_format_t         mAudioFormat = AAUDIO_FORMAT_UNSPECIFIED;
+    int32_t                 mFramesPerBurst = 0;
+    int32_t                 mSamplesPerFrame = AAUDIO_UNSPECIFIED;
+    int32_t                 mSampleRate = AAUDIO_UNSPECIFIED;
+    int32_t                 mCapacityInFrames = AAUDIO_UNSPECIFIED;
+    android::AudioClient    mMmapClient;
+    audio_port_handle_t     mClientHandle = AUDIO_PORT_HANDLE_NONE;
+
 private:
-    aaudio_handle_t    mHandle = -1;
+    aaudio_handle_t         mHandle = -1;
 };
 
 } /* namespace aaudio */

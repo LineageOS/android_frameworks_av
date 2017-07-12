@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudioService"
+#define LOG_TAG "AAudioServiceEndpoint"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -94,7 +94,7 @@ aaudio_result_t AAudioServiceEndpoint::open(const AAudioStreamConfiguration& con
 }
 
 aaudio_result_t AAudioServiceEndpoint::close() {
-    return getStreamInternal()->close();
+     return getStreamInternal()->close();
 }
 
 // TODO, maybe use an interface to reduce exposure
@@ -113,26 +113,25 @@ aaudio_result_t AAudioServiceEndpoint::unregisterStream(sp<AAudioServiceStreamSh
 
 aaudio_result_t AAudioServiceEndpoint::startStream(sp<AAudioServiceStreamShared> sharedStream) {
     // TODO use real-time technique to avoid mutex, eg. atomic command FIFO
+    aaudio_result_t result = AAUDIO_OK;
     std::lock_guard<std::mutex> lock(mLockStreams);
-    mRunningStreams.push_back(sharedStream);
-    if (mRunningStreams.size() == 1) {
+    if (++mRunningStreams == 1) {
+        result = getStreamInternal()->requestStart();
         startSharingThread_l();
     }
-    return AAUDIO_OK;
+    return result;
 }
 
 aaudio_result_t AAudioServiceEndpoint::stopStream(sp<AAudioServiceStreamShared> sharedStream) {
     int numRunningStreams = 0;
     {
         std::lock_guard<std::mutex> lock(mLockStreams);
-        mRunningStreams.erase(
-                std::remove(mRunningStreams.begin(), mRunningStreams.end(), sharedStream),
-                mRunningStreams.end());
-        numRunningStreams = mRunningStreams.size();
+        numRunningStreams = --mRunningStreams;
     }
     if (numRunningStreams == 0) {
         // Don't call this under a lock because the callbackLoop also uses the lock.
         stopSharingThread();
+        getStreamInternal()->requestStop();
     }
     return AAUDIO_OK;
 }
@@ -163,11 +162,8 @@ aaudio_result_t AAudioServiceEndpoint::stopSharingThread() {
 
 void AAudioServiceEndpoint::disconnectRegisteredStreams() {
     std::lock_guard<std::mutex> lock(mLockStreams);
-    for(auto baseStream : mRunningStreams) {
-        baseStream->onStop();
-    }
-    mRunningStreams.clear();
     for(auto sharedStream : mRegisteredStreams) {
+        sharedStream->stop();
         sharedStream->disconnect();
     }
     mRegisteredStreams.clear();
@@ -189,3 +185,4 @@ bool AAudioServiceEndpoint::matches(const AAudioStreamConfiguration& configurati
 
     return true;
 }
+
