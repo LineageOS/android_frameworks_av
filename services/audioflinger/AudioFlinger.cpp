@@ -260,10 +260,11 @@ __attribute__ ((visibility ("default")))
 status_t MmapStreamInterface::openMmapStream(MmapStreamInterface::stream_direction_t direction,
                                              const audio_attributes_t *attr,
                                              audio_config_base_t *config,
-                                             const MmapStreamInterface::Client& client,
+                                             const AudioClient& client,
                                              audio_port_handle_t *deviceId,
                                              const sp<MmapStreamCallback>& callback,
-                                             sp<MmapStreamInterface>& interface)
+                                             sp<MmapStreamInterface>& interface,
+                                             audio_port_handle_t *handle)
 {
     sp<AudioFlinger> af;
     {
@@ -273,7 +274,7 @@ status_t MmapStreamInterface::openMmapStream(MmapStreamInterface::stream_directi
     status_t ret = NO_INIT;
     if (af != 0) {
         ret = af->openMmapStream(
-                direction, attr, config, client, deviceId, callback, interface);
+                direction, attr, config, client, deviceId, callback, interface, handle);
     }
     return ret;
 }
@@ -281,10 +282,11 @@ status_t MmapStreamInterface::openMmapStream(MmapStreamInterface::stream_directi
 status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t direction,
                                       const audio_attributes_t *attr,
                                       audio_config_base_t *config,
-                                      const MmapStreamInterface::Client& client,
+                                      const AudioClient& client,
                                       audio_port_handle_t *deviceId,
                                       const sp<MmapStreamCallback>& callback,
-                                      sp<MmapStreamInterface>& interface)
+                                      sp<MmapStreamInterface>& interface,
+                                      audio_port_handle_t *handle)
 {
     status_t ret = initCheck();
     if (ret != NO_ERROR) {
@@ -293,7 +295,7 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
 
     audio_session_t sessionId = (audio_session_t) newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
     audio_stream_type_t streamType = AUDIO_STREAM_DEFAULT;
-    audio_io_handle_t io;
+    audio_io_handle_t io = AUDIO_IO_HANDLE_NONE;
     audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
     if (direction == MmapStreamInterface::DIRECTION_OUTPUT) {
         audio_config_t fullConfig = AUDIO_CONFIG_INITIALIZER;
@@ -325,6 +327,7 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
     if (thread != 0) {
         interface = new MmapThreadHandle(thread);
         thread->configure(attr, streamType, sessionId, callback, portId);
+        *handle = portId;
     } else {
         ret = NO_INIT;
     }
