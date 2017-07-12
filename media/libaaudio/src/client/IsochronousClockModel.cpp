@@ -16,7 +16,7 @@
 
 #define LOG_TAG "AAudio"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
+#include <log/log.h>
 
 #include <stdint.h>
 
@@ -25,7 +25,6 @@
 
 #define MIN_LATENESS_NANOS (10 * AAUDIO_NANOS_PER_MICROSECOND)
 
-using namespace android;
 using namespace aaudio;
 
 IsochronousClockModel::IsochronousClockModel()
