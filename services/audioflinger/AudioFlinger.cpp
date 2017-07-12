@@ -1282,7 +1282,7 @@ String8 AudioFlinger::getParameters(audio_io_handle_t ioHandle, const String8& k
         if (thread == NULL) {
             thread = (ThreadBase *)checkMmapThread_l(ioHandle);
             if (thread == NULL) {
-                String8("");
+                return String8("");
             }
         }
     }
