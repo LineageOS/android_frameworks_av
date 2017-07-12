@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudioService"
+#define LOG_TAG "AAudioServiceStreamBase"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -38,6 +38,9 @@ using namespace aaudio;   // TODO just import names needed
 AAudioServiceStreamBase::AAudioServiceStreamBase()
         : mUpMessageQueue(nullptr)
         , mAAudioThread() {
+    mMmapClient.clientUid = -1;
+    mMmapClient.clientPid = -1;
+    mMmapClient.packageName = String16("");
 }
 
 AAudioServiceStreamBase::~AAudioServiceStreamBase() {
@@ -45,7 +48,8 @@ AAudioServiceStreamBase::~AAudioServiceStreamBase() {
     // If the stream is deleted when OPEN or in use then audio resources will leak.
     // This would indicate an internal error. So we want to find this ASAP.
     LOG_ALWAYS_FATAL_IF(!(mState == AAUDIO_STREAM_STATE_CLOSED
-                        || mState == AAUDIO_STREAM_STATE_UNINITIALIZED),
+                        || mState == AAUDIO_STREAM_STATE_UNINITIALIZED
+                        || mState == AAUDIO_STREAM_STATE_DISCONNECTED),
                         "service stream still open, state = %d", mState);
 }
 
@@ -58,13 +62,18 @@ std::string AAudioServiceStreamBase::dump() const {
     result << "      framesPerBurst = " << mFramesPerBurst << "\n";
     result << "      channelCount   = " << mSamplesPerFrame << "\n";
     result << "      capacityFrames = " << mCapacityInFrames << "\n";
-    result << "      owner uid      = " << mOwnerUserId << "\n";
+    result << "      owner uid      = " << mMmapClient.clientUid << "\n";
 
     return result.str();
 }
 
 aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest &request,
                      aaudio::AAudioStreamConfiguration &configurationOutput) {
+
+    mMmapClient.clientUid = request.getUserId();
+    mMmapClient.clientPid = request.getProcessId();
+    mMmapClient.packageName.setTo(String16("")); // FIXME what should we do here?
+
     std::lock_guard<std::mutex> lock(mLockUpMessageQueue);
     if (mUpMessageQueue != nullptr) {
         return AAUDIO_ERROR_INVALID_STATE;
@@ -86,6 +95,9 @@ aaudio_result_t AAudioServiceStreamBase::close() {
 }
 
 aaudio_result_t AAudioServiceStreamBase::start() {
+    if (isRunning()) {
+        return AAUDIO_OK;
+    }
     sendServiceEvent(AAUDIO_SERVICE_EVENT_STARTED);
     mState = AAUDIO_STREAM_STATE_STARTED;
     mThreadEnabled.store(true);
@@ -94,32 +106,34 @@ aaudio_result_t AAudioServiceStreamBase::start() {
 
 aaudio_result_t AAudioServiceStreamBase::pause() {
     aaudio_result_t result = AAUDIO_OK;
-    if (isRunning()) {
-        sendCurrentTimestamp();
-        mThreadEnabled.store(false);
-        result = mAAudioThread.stop();
-        if (result != AAUDIO_OK) {
-            disconnect();
-            return result;
-        }
-        sendServiceEvent(AAUDIO_SERVICE_EVENT_PAUSED);
+    if (!isRunning()) {
+        return result;
     }
+    sendCurrentTimestamp();
+    mThreadEnabled.store(false);
+    result = mAAudioThread.stop();
+    if (result != AAUDIO_OK) {
+        disconnect();
+        return result;
+    }
+    sendServiceEvent(AAUDIO_SERVICE_EVENT_PAUSED);
     mState = AAUDIO_STREAM_STATE_PAUSED;
     return result;
 }
 
 aaudio_result_t AAudioServiceStreamBase::stop() {
     aaudio_result_t result = AAUDIO_OK;
-    if (isRunning()) {
-        // TODO wait for data to be played out
-        sendCurrentTimestamp(); // warning - this calls a virtual function
-        result = stopTimestampThread();
-        if (result != AAUDIO_OK) {
-            disconnect();
-            return result;
-        }
-        sendServiceEvent(AAUDIO_SERVICE_EVENT_STOPPED);
+    if (!isRunning()) {
+        return result;
     }
+    // TODO wait for data to be played out
+    sendCurrentTimestamp(); // warning - this calls a virtual function
+    result = stopTimestampThread();
+    if (result != AAUDIO_OK) {
+        disconnect();
+        return result;
+    }
+    sendServiceEvent(AAUDIO_SERVICE_EVENT_STOPPED);
     mState = AAUDIO_STREAM_STATE_STOPPED;
     return result;
 }

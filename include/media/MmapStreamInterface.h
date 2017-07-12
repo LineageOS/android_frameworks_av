@@ -18,6 +18,7 @@
 #define ANDROID_AUDIO_MMAP_STREAM_INTERFACE_H
 
 #include <system/audio.h>
+#include <media/AudioClient.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 
@@ -37,12 +38,6 @@ class MmapStreamInterface : public virtual RefBase
         DIRECTION_INPUT,       /**< open a capture mmap stream */
     } stream_direction_t;
 
-    class Client {
-     public:
-        uid_t clientUid;
-        pid_t clientPid;
-        String16 packageName;
-    };
     /**
      * Open a playback or capture stream in MMAP mode at the audio HAL.
      *
@@ -53,13 +48,14 @@ class MmapStreamInterface : public virtual RefBase
      * \param[in,out] config audio parameters (sampling rate, format ...) for the stream.
      *                       Requested parameters as input,
      *                       Actual parameters as output
-     * \param[in] client a Client struct describing the first client using this stream.
+     * \param[in] client a AudioClient struct describing the first client using this stream.
      * \param[in,out] deviceId audio device the stream should preferably be routed to/from
      *                       Requested as input,
      *                       Actual as output
      * \param[in] callback the MmapStreamCallback interface used by AudioFlinger to notify
      *                     condition changes affecting the stream operation
      * \param[out] interface the MmapStreamInterface interface controlling the created stream
+     * \param[out] same unique handle as the one used for the first client stream started.
      * \return OK if the stream was successfully created.
      *         NO_INIT if AudioFlinger is not properly initialized
      *         BAD_VALUE if the stream cannot be opened because of invalid arguments
@@ -68,10 +64,11 @@ class MmapStreamInterface : public virtual RefBase
     static status_t openMmapStream(stream_direction_t direction,
                                            const audio_attributes_t *attr,
                                            audio_config_base_t *config,
-                                           const Client& client,
+                                           const AudioClient& client,
                                            audio_port_handle_t *deviceId,
                                            const sp<MmapStreamCallback>& callback,
-                                           sp<MmapStreamInterface>& interface);
+                                           sp<MmapStreamInterface>& interface,
+                                           audio_port_handle_t *handle);
 
     /**
      * Retrieve information on the mmap buffer used for audio samples transfer.
@@ -105,13 +102,13 @@ class MmapStreamInterface : public virtual RefBase
      * Start a stream operating in mmap mode.
      * createMmapBuffer() must be called before calling start()
      *
-     * \param[in] client a Client struct describing the client starting on this stream.
+     * \param[in] client a AudioClient struct describing the client starting on this stream.
      * \param[out] handle unique handle for this instance. Used with stop().
      * \return OK in case of success.
      *         NO_INIT in case of initialization error
      *         INVALID_OPERATION if called out of sequence
      */
-    virtual status_t start(const Client& client, audio_port_handle_t *handle) = 0;
+    virtual status_t start(const AudioClient& client, audio_port_handle_t *handle) = 0;
 
     /**
      * Stop a stream operating in mmap mode.
