@@ -73,6 +73,7 @@ namespace android {
 using binder::Status;
 using hardware::ICamera;
 using hardware::ICameraClient;
+using hardware::ICameraServiceProxy;
 using hardware::ICameraServiceListener;
 using hardware::camera::common::V1_0::CameraDeviceStatus;
 using hardware::camera::common::V1_0::TorchModeStatus;
@@ -2213,7 +2214,7 @@ status_t CameraService::BasicClient::startCameraOps() {
 
     // Transition device state to OPEN
     sCameraService->updateProxyDeviceState(ICameraServiceProxy::CAMERA_STATE_OPEN,
-            mCameraIdStr);
+            mCameraIdStr, mCameraFacing, mClientPackageName);
 
     return OK;
 }
@@ -2237,7 +2238,7 @@ status_t CameraService::BasicClient::finishCameraOps() {
 
         // Transition device state to CLOSED
         sCameraService->updateProxyDeviceState(ICameraServiceProxy::CAMERA_STATE_CLOSED,
-                mCameraIdStr);
+                mCameraIdStr, mCameraFacing, mClientPackageName);
     }
     // Always stop watching, even if no camera op is active
     if (mOpsCallback != NULL) {
@@ -2741,12 +2742,12 @@ void CameraService::CameraState::updateStatus(StatusInternal status,
     onStatusUpdatedLocked(cameraId, status);
 }
 
-void CameraService::updateProxyDeviceState(ICameraServiceProxy::CameraState newState,
-        const String8& cameraId) {
+void CameraService::updateProxyDeviceState(int newState,
+        const String8& cameraId, int facing, const String16& clientName) {
     sp<ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
     if (proxyBinder == nullptr) return;
     String16 id(cameraId);
-    proxyBinder->notifyCameraState(id, newState);
+    proxyBinder->notifyCameraState(id, newState, facing, clientName);
 }
 
 status_t CameraService::getTorchStatusLocked(
