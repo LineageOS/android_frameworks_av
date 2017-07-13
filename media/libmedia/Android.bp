@@ -1,7 +1,7 @@
 cc_library_headers {
     name: "libmedia_headers",
     vendor_available: true,
-    export_include_dirs: ["include"],
+    export_include_dirs: ["include", "omx/1.0/include"],
 }
 
 cc_library {

@@ -29,7 +29,7 @@
 #include <utils/NativeHandle.h>
 #include <gui/IGraphicBufferProducer.h>
 
-#include <omx/1.0/WOmxNode.h>
+#include <media/omx/1.0/WOmxNode.h>
 #include <android/IGraphicBufferSource.h>
 #include <android/IOMXBufferSource.h>
 
