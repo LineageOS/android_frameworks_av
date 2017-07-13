@@ -264,13 +264,19 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
         case OPEN_STREAM: {
             CHECK_INTERFACE(IAAudioService, data, reply);
             request.readFromParcel(&data);
-            //ALOGD("BnAAudioService::client openStream request dump --------------------");
-            //request.dump();
-            // Override the uid and pid from the client in case they are incorrect.
-            request.setUserId(IPCThreadState::self()->getCallingUid());
-            request.setProcessId(IPCThreadState::self()->getCallingPid());
-            streamHandle = openStream(request, configuration);
-            //ALOGD("BnAAudioService::onTransact OPEN_STREAM server handle = 0x%08X", streamHandle);
+            result = request.validate();
+            if (result != AAUDIO_OK) {
+                streamHandle = result;
+            } else {
+                //ALOGD("BnAAudioService::client openStream request dump --------------------");
+                //request.dump();
+                // Override the uid and pid from the client in case they are incorrect.
+                request.setUserId(IPCThreadState::self()->getCallingUid());
+                request.setProcessId(IPCThreadState::self()->getCallingPid());
+                streamHandle = openStream(request, configuration);
+                //ALOGD("BnAAudioService::onTransact OPEN_STREAM server handle = 0x%08X",
+                //        streamHandle);
+            }
             reply->writeInt32(streamHandle);
             configuration.writeToParcel(reply);
             return NO_ERROR;

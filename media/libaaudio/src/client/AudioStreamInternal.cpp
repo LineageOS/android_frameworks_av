@@ -86,7 +86,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         setFormat(AAUDIO_FORMAT_PCM_FLOAT);
     }
     // Request FLOAT for the shared mixer.
-    request.getConfiguration().setAudioFormat(AAUDIO_FORMAT_PCM_FLOAT);
+    request.getConfiguration().setFormat(AAUDIO_FORMAT_PCM_FLOAT);
 
     // Build the request to send to the server.
     request.setUserId(getuid());
@@ -119,7 +119,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         setSharingMode(configuration.getSharingMode());
 
         // Save device format so we can do format conversion and volume scaling together.
-        mDeviceFormat = configuration.getAudioFormat();
+        mDeviceFormat = configuration.getFormat();
 
         result = mServiceInterface.getStreamDescription(mServiceStreamHandle, mEndPointParcelable);
         if (result != AAUDIO_OK) {
