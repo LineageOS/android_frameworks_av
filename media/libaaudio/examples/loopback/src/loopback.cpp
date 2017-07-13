@@ -17,6 +17,7 @@
 // Play an impulse and then record it.
 // Measure the round trip latency.
 
+#include <algorithm>
 #include <assert.h>
 #include <cctype>
 #include <math.h>
@@ -25,11 +26,13 @@
 #include <unistd.h>
 
 #include <aaudio/AAudio.h>
+#include <aaudio/AAudioTesting.h>
 
-#define INPUT_PEAK_THRESHOLD    0.1f
-#define SILENCE_FRAMES          10000
+// Tag for machine readable results as property = value pairs
+#define RESULT_TAG              "RESULT: "
 #define SAMPLE_RATE             48000
-#define NUM_SECONDS             7
+#define NUM_SECONDS             5
+#define NUM_INPUT_CHANNELS      1
 #define FILENAME                "/data/oboe_input.raw"
 
 #define NANOS_PER_MICROSECOND ((int64_t)1000)
@@ -37,12 +40,172 @@
 #define MILLIS_PER_SECOND     1000
 #define NANOS_PER_SECOND      (NANOS_PER_MILLISECOND * MILLIS_PER_SECOND)
 
-class AudioRecorder
+#define MAX_ZEROTH_PARTIAL_BINS   40
+
+static const float s_Impulse[] = {
+        0.0f, 0.0f, 0.0f, 0.0f, 0.0f, // silence on each side of the impulse
+        0.5f, 0.9f, 0.0f, -0.9f, -0.5f, // bipolar
+        0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+
+
+static double calculateCorrelation(const float *a,
+                                   const float *b,
+                                   int windowSize)
+{
+    double correlation = 0.0;
+    double sumProducts = 0.0;
+    double sumSquares = 0.0;
+
+    // Correlate a against b.
+    for (int i = 0; i < windowSize; i++) {
+        float s1 = a[i];
+        float s2 = b[i];
+        // Use a normalized cross-correlation.
+        sumProducts += s1 * s2;
+        sumSquares += ((s1 * s1) + (s2 * s2));
+    }
+
+    if (sumSquares >= 0.00000001) {
+        correlation = (float) (2.0 * sumProducts / sumSquares);
+    }
+    return correlation;
+}
+
+static int calculateCorrelations(const float *haystack, int haystackSize,
+                                 const float *needle, int needleSize,
+                                 float *results, int resultSize)
+{
+    int ic;
+    int maxCorrelations = haystackSize - needleSize;
+    int numCorrelations = std::min(maxCorrelations, resultSize);
+
+    for (ic = 0; ic < numCorrelations; ic++) {
+        double correlation = calculateCorrelation(&haystack[ic], needle, needleSize);
+        results[ic] = correlation;
+    }
+
+    return numCorrelations;
+}
+
+/*==========================================================================================*/
+/**
+ * Scan until we get a correlation of a single scan that goes over the tolerance level,
+ * peaks then drops back down.
+ */
+static double findFirstMatch(const float *haystack, int haystackSize,
+                             const float *needle, int needleSize, double threshold  )
+{
+    int ic;
+    // How many correlations can we calculate?
+    int numCorrelations = haystackSize - needleSize;
+    double maxCorrelation = 0.0;
+    int peakIndex = -1;
+    double location = -1.0;
+
+    for (ic = 0; ic < numCorrelations; ic++) {
+        double correlation = calculateCorrelation(&haystack[ic], needle, needleSize);
+
+        if( (correlation > maxCorrelation) ) {
+            maxCorrelation = correlation;
+            peakIndex = ic;
+        }
+
+        //printf("PaQa_FindFirstMatch: ic = %4d, correlation = %8f, maxSum = %8f\n",
+        //    ic, correlation, maxSum );
+        // Are we past what we were looking for?
+        if((maxCorrelation > threshold) && (correlation < 0.5 * maxCorrelation)) {
+            location = peakIndex;
+            break;
+        }
+    }
+
+    return location;
+}
+
+typedef struct LatencyReport_s {
+    double latencyInFrames;
+    double confidence;
+} LatencyReport;
+
+// Apply a technique similar to Harmonic Product Spectrum Analysis to find echo fundamental.
+// Using first echo instead of the original impulse for a better match.
+int measureLatencyFromEchos(const float *haystack, int haystackSize,
+                          const float *needle, int needleSize,
+                          LatencyReport *report) {
+    double threshold = 0.1;
+
+    // Find first peak
+    int first = (int) (findFirstMatch(haystack,
+                                      haystackSize,
+                                      needle,
+                                      needleSize,
+                                      threshold) + 0.5);
+
+    // Use first echo as the needle for the other echos because
+    // it will be more similar.
+    needle = &haystack[first];
+    int again = (int) (findFirstMatch(haystack,
+                                      haystackSize,
+                                      needle,
+                                      needleSize,
+                                      threshold) + 0.5);
+
+    printf("first = %d, again at %d\n", first, again);
+    first = again;
+
+    // Allocate results array
+    int remaining = haystackSize - first;
+    int generous = 48000 * 2;
+    int numCorrelations = std::min(remaining, generous);
+    float *correlations = new float[numCorrelations];
+    float *harmonicSums = new float[numCorrelations](); // cleared to zero
+
+    // Generate correlation for every position.
+    numCorrelations = calculateCorrelations(&haystack[first], remaining,
+                                            needle, needleSize,
+                                            correlations, numCorrelations);
+
+    // Add higher harmonics mapped onto lower harmonics.
+    // This reinforces the "fundamental" echo.
+    const int numEchoes = 10;
+    for (int partial = 1; partial < numEchoes; partial++) {
+        for (int i = 0; i < numCorrelations; i++) {
+            harmonicSums[i / partial] += correlations[i] / partial;
+        }
+    }
+
+    // Find highest peak in correlation array.
+    float maxCorrelation = 0.0;
+    float sumOfPeaks = 0.0;
+    int peakIndex = 0;
+    const int skip = MAX_ZEROTH_PARTIAL_BINS; // skip low bins
+    for (int i = skip; i < numCorrelations; i++) {
+        if (harmonicSums[i] > maxCorrelation) {
+            maxCorrelation = harmonicSums[i];
+            sumOfPeaks += maxCorrelation;
+            peakIndex = i;
+            printf("maxCorrelation = %f at %d\n", maxCorrelation, peakIndex);
+        }
+    }
+
+    report->latencyInFrames = peakIndex;
+    if (sumOfPeaks < 0.0001) {
+        report->confidence = 0.0;
+    } else {
+        report->confidence = maxCorrelation / sumOfPeaks;
+    }
+
+    delete[] correlations;
+    delete[] harmonicSums;
+    return 0;
+}
+
+class AudioRecording
 {
 public:
-    AudioRecorder() {
+    AudioRecording() {
     }
-    ~AudioRecorder() {
+    ~AudioRecording() {
         delete[] mData;
     }
 
@@ -52,7 +215,8 @@ public:
         mMaxFrames = maxFrames;
     }
 
-    void record(int16_t *inputData, int inputChannelCount, int numFrames) {
+    // Write SHORT data from the first channel.
+    int write(int16_t *inputData, int inputChannelCount, int numFrames) {
         // stop at end of buffer
         if ((mFrameCounter + numFrames) > mMaxFrames) {
             numFrames = mMaxFrames - mFrameCounter;
@@ -60,9 +224,11 @@ public:
         for (int i = 0; i < numFrames; i++) {
             mData[mFrameCounter++] = inputData[i * inputChannelCount] * (1.0f / 32768);
         }
+        return numFrames;
     }
 
-    void record(float *inputData, int inputChannelCount, int numFrames) {
+    // Write FLOAT data from the first channel.
+    int write(float *inputData, int inputChannelCount, int numFrames) {
         // stop at end of buffer
         if ((mFrameCounter + numFrames) > mMaxFrames) {
             numFrames = mMaxFrames - mFrameCounter;
@@ -70,162 +236,253 @@ public:
         for (int i = 0; i < numFrames; i++) {
             mData[mFrameCounter++] = inputData[i * inputChannelCount];
         }
+        return numFrames;
     }
 
-    int save(const char *fileName) {
+    int size() {
+        return mFrameCounter;
+    }
+
+    float *getData() {
+        return mData;
+    }
+
+    int save(const char *fileName, bool writeShorts = true) {
+        int written = 0;
+        const int chunkSize = 64;
         FILE *fid = fopen(fileName, "wb");
         if (fid == NULL) {
-            return errno;
+            return -errno;
         }
-        int written = fwrite(mData, sizeof(float), mFrameCounter, fid);
+
+        if (writeShorts) {
+            int16_t buffer[chunkSize];
+            int32_t framesLeft = mFrameCounter;
+            int32_t cursor = 0;
+            while (framesLeft) {
+                int32_t framesToWrite = framesLeft < chunkSize ? framesLeft : chunkSize;
+                for (int i = 0; i < framesToWrite; i++) {
+                    buffer[i] = (int16_t) (mData[cursor++] * 32767);
+                }
+                written += fwrite(buffer, sizeof(int16_t), framesToWrite, fid);
+                framesLeft -= framesToWrite;
+            }
+        } else {
+            written = fwrite(mData, sizeof(float), mFrameCounter, fid);
+        }
         fclose(fid);
         return written;
     }
 
 private:
-    float *mData = NULL;
+    float  *mData = nullptr;
     int32_t mFrameCounter = 0;
     int32_t mMaxFrames = 0;
 };
 
 // ====================================================================================
-// ========================= Loopback Processor =======================================
-// ====================================================================================
 class LoopbackProcessor {
 public:
+    virtual ~LoopbackProcessor() = default;
 
-    // Calculate mean and standard deviation.
-    double calculateAverageLatency(double *deviation) {
-        if (mLatencyCount <= 0) {
-            return -1.0;
-        }
-        double sum = 0.0;
-        for (int i = 0; i < mLatencyCount; i++) {
-            sum += mLatencyArray[i];
-        }
-        double average = sum /  mLatencyCount;
-        sum = 0.0;
-        for (int i = 0; i < mLatencyCount; i++) {
-            double error = average - mLatencyArray[i];
-            sum += error * error; // squared
-        }
-        *deviation = sqrt(sum / mLatencyCount);
-        return average;
+    virtual void process(float *inputData, int inputChannelCount,
+                 float *outputData, int outputChannelCount,
+                 int numFrames) = 0;
+
+
+    virtual void report() = 0;
+
+    void setSampleRate(int32_t sampleRate) {
+        mSampleRate = sampleRate;
     }
 
-    float getMaxAmplitude() const { return mMaxAmplitude; }
-    int   getMeasurementCount() const { return mLatencyCount; }
-    float getAverageAmplitude() const { return mAmplitudeTotal / mAmplitudeCount; }
-
-    // TODO Convert this to a feedback circuit and then use auto-correlation to measure the period.
-    void process(float *inputData, int inputChannelCount,
-            float *outputData, int outputChannelCount,
-            int numFrames) {
-        (void) outputChannelCount;
-
-        // Measure peak and average amplitude.
-        for (int i = 0; i < numFrames; i++) {
-            float sample = inputData[i * inputChannelCount];
-            if (sample > mMaxAmplitude) {
-                mMaxAmplitude = sample;
-            }
-            if (sample < 0) {
-                sample = 0 - sample;
-            }
-            mAmplitudeTotal += sample;
-            mAmplitudeCount++;
-        }
-
-        // Clear output.
-        memset(outputData, 0, numFrames * outputChannelCount * sizeof(float));
-
-        // Wait a while between hearing the pulse and starting a new one.
-        if (mState == STATE_SILENT) {
-            mCounter += numFrames;
-            if (mCounter > SILENCE_FRAMES) {
-                //printf("LoopbackProcessor send impulse, burst #%d\n", mBurstCounter);
-                // copy impulse
-                for (float sample : mImpulse) {
-                    *outputData = sample;
-                    outputData += outputChannelCount;
-                }
-                mState = STATE_LISTENING;
-                mCounter = 0;
-            }
-        }
-        // Start listening as soon as we send the impulse.
-        if (mState ==  STATE_LISTENING) {
-            for (int i = 0; i < numFrames; i++) {
-                float sample = inputData[i * inputChannelCount];
-                if (sample >= INPUT_PEAK_THRESHOLD) {
-                    mLatencyArray[mLatencyCount++] = mCounter;
-                    if (mLatencyCount >= MAX_LATENCY_VALUES) {
-                        mState = STATE_DONE;
-                    } else {
-                        mState = STATE_SILENT;
-                    }
-                    mCounter = 0;
-                    break;
-                } else {
-                    mCounter++;
-                }
-            }
-        }
+    int32_t getSampleRate() {
+        return mSampleRate;
     }
 
-    void echo(float *inputData, int inputChannelCount,
-            float *outputData, int outputChannelCount,
-            int numFrames) {
-        int channelsValid = (inputChannelCount < outputChannelCount)
-            ? inputChannelCount : outputChannelCount;
-        for (int i = 0; i < numFrames; i++) {
-            int ic;
-            for (ic = 0; ic < channelsValid; ic++) {
-                outputData[ic] = inputData[ic];
-            }
-            for (ic = 0; ic < outputChannelCount; ic++) {
-                outputData[ic] = 0;
-            }
-            inputData += inputChannelCount;
-            outputData += outputChannelCount;
-        }
-    }
 private:
-    enum {
-        STATE_SILENT,
-        STATE_LISTENING,
-        STATE_DONE
-    };
-
-    enum {
-        MAX_LATENCY_VALUES = 64
-    };
-
-    int     mState = STATE_SILENT;
-    int32_t mCounter = 0;
-    int32_t mLatencyArray[MAX_LATENCY_VALUES];
-    int32_t mLatencyCount = 0;
-    float   mMaxAmplitude = 0;
-    float   mAmplitudeTotal = 0;
-    int32_t mAmplitudeCount = 0;
-    static const float mImpulse[5];
+    int32_t mSampleRate = SAMPLE_RATE;
 };
 
-const float LoopbackProcessor::mImpulse[5] = {0.5f, 0.9f, 0.0f, -0.9f, -0.5f};
+
+// ====================================================================================
+class EchoAnalyzer : public LoopbackProcessor {
+public:
+
+    EchoAnalyzer() : LoopbackProcessor() {
+        audioRecorder.allocate(NUM_SECONDS * SAMPLE_RATE);
+    }
+
+    void setGain(float gain) {
+        mGain = gain;
+    }
+
+    float getGain() {
+        return mGain;
+    }
+
+    void report() override {
+
+        const float *needle = s_Impulse;
+        int needleSize = (int)(sizeof(s_Impulse) / sizeof(float));
+        float *haystack = audioRecorder.getData();
+        int haystackSize = audioRecorder.size();
+        int result = measureLatencyFromEchos(haystack, haystackSize,
+                                              needle, needleSize,
+                                              &latencyReport);
+        if (latencyReport.confidence < 0.01) {
+            printf(" ERROR - confidence too low = %f\n", latencyReport.confidence);
+        } else {
+            double latencyMillis = 1000.0 * latencyReport.latencyInFrames / getSampleRate();
+            printf(RESULT_TAG "latency.frames     = %8.2f\n", latencyReport.latencyInFrames);
+            printf(RESULT_TAG "latency.msec       = %8.2f\n", latencyMillis);
+            printf(RESULT_TAG "latency.confidence = %8.6f\n", latencyReport.confidence);
+        }
+    }
+
+    void process(float *inputData, int inputChannelCount,
+                 float *outputData, int outputChannelCount,
+                 int numFrames) override {
+        int channelsValid = std::min(inputChannelCount, outputChannelCount);
+
+        audioRecorder.write(inputData, inputChannelCount, numFrames);
+
+        if (mLoopCounter < mLoopStart) {
+            // Output silence at the beginning.
+            for (int i = 0; i < numFrames; i++) {
+                int ic;
+                for (ic = 0; ic < outputChannelCount; ic++) {
+                    outputData[ic] = 0;
+                }
+                inputData += inputChannelCount;
+                outputData += outputChannelCount;
+            }
+        } else if (mLoopCounter == mLoopStart) {
+            // Send a bipolar impulse that we can easily detect.
+            for (float sample : s_Impulse) {
+                *outputData = sample;
+                outputData += outputChannelCount;
+            }
+        } else {
+            // Echo input to output.
+            for (int i = 0; i < numFrames; i++) {
+                int ic;
+                for (ic = 0; ic < channelsValid; ic++) {
+                    outputData[ic] = inputData[ic] * mGain;
+                }
+                for (; ic < outputChannelCount; ic++) {
+                    outputData[ic] = 0;
+                }
+                inputData += inputChannelCount;
+                outputData += outputChannelCount;
+            }
+        }
+
+        mLoopCounter++;
+    }
+
+private:
+    int   mLoopCounter = 0;
+    int   mLoopStart = 1000;
+    float mGain = 1.0f;
+
+    AudioRecording     audioRecorder;
+    LatencyReport      latencyReport;
+};
+
+
+// ====================================================================================
+class SineAnalyzer : public LoopbackProcessor {
+public:
+
+    void report() override {
+        double magnitude = calculateMagnitude();
+        printf("sine magnitude = %7.5f\n", magnitude);
+        printf("sine frames    = %7d\n", mFrameCounter);
+        printf("sine frequency = %7.1f Hz\n", mFrequency);
+    }
+
+    double calculateMagnitude(double *phasePtr = NULL) {
+        if (mFrameCounter == 0) {
+            return 0.0;
+        }
+        double sinMean = mSinAccumulator / mFrameCounter;
+        double cosMean = mCosAccumulator / mFrameCounter;
+        double magnitude = 2.0 * sqrt( (sinMean * sinMean) + (cosMean * cosMean ));
+        if( phasePtr != NULL )
+        {
+            double phase = atan2( sinMean, cosMean );
+            *phasePtr = phase;
+        }
+        return magnitude;
+    }
+
+    void process(float *inputData, int inputChannelCount,
+                 float *outputData, int outputChannelCount,
+                 int numFrames) override {
+        double phaseIncrement = 2.0 * M_PI * mFrequency / getSampleRate();
+
+        for (int i = 0; i < numFrames; i++) {
+            // Multiply input by sine/cosine
+            float sample = inputData[i * inputChannelCount];
+            float sinOut = sinf(mPhase);
+            mSinAccumulator += sample * sinOut;
+            mCosAccumulator += sample * cosf(mPhase);
+            // Advance and wrap phase
+            mPhase += phaseIncrement;
+            if (mPhase > (2.0 * M_PI)) {
+                mPhase -= (2.0 * M_PI);
+            }
+
+            // Output sine wave so we can measure it.
+            outputData[i * outputChannelCount] = sinOut;
+        }
+        mFrameCounter += numFrames;
+
+        double magnitude = calculateMagnitude();
+        if (mWaiting) {
+            if (magnitude < 0.001) {
+                // discard silence
+                mFrameCounter = 0;
+                mSinAccumulator = 0.0;
+                mCosAccumulator = 0.0;
+            } else {
+                mWaiting = false;
+            }
+        }
+    };
+
+    void setFrequency(int32_t frequency) {
+        mFrequency = frequency;
+    }
+
+    int32_t getFrequency() {
+        return mFrequency;
+    }
+
+private:
+    double  mFrequency = 300.0;
+    double  mPhase = 0.0;
+    int32_t mFrameCounter = 0;
+    double  mSinAccumulator = 0.0;
+    double  mCosAccumulator = 0.0;
+    bool    mWaiting = true;
+};
 
 // TODO make this a class that manages its own buffer allocation
 struct LoopbackData {
-    AAudioStream     *inputStream = nullptr;
-    int32_t           inputFramesMaximum = 0;
-    int16_t          *inputData = nullptr;
-    float            *conversionBuffer = nullptr;
-    int32_t           actualInputChannelCount = 0;
-    int32_t           actualOutputChannelCount = 0;
-    int32_t           inputBuffersToDiscard = 10;
+    AAudioStream      *inputStream = nullptr;
+    int32_t            inputFramesMaximum = 0;
+    int16_t           *inputData = nullptr;
+    float             *conversionBuffer = nullptr;
+    int32_t            actualInputChannelCount = 0;
+    int32_t            actualOutputChannelCount = 0;
+    int32_t            inputBuffersToDiscard = 10;
 
-    aaudio_result_t   inputError;
-    LoopbackProcessor loopbackProcessor;
-    AudioRecorder     audioRecorder;
+    aaudio_result_t    inputError;
+    SineAnalyzer       sineAnalyzer;
+    EchoAnalyzer       echoAnalyzer;
+    LoopbackProcessor *loopbackProcessor;
 };
 
 static void convertPcm16ToFloat(const int16_t *source,
@@ -248,6 +505,7 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
         int32_t numFrames
 ) {
     (void) outputStream;
+    aaudio_data_callback_result_t result = AAUDIO_CALLBACK_RESULT_CONTINUE;
     LoopbackData *myData = (LoopbackData *) userData;
     float  *outputData = (float  *) audioData;
 
@@ -266,6 +524,7 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
                                        numFrames, 0);
             if (framesRead < 0) {
                 myData->inputError = framesRead;
+                result = AAUDIO_CALLBACK_RESULT_STOP;
             } else if (framesRead > 0) {
                 myData->inputBuffersToDiscard--;
             }
@@ -275,16 +534,13 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
                                        numFrames, 0);
         if (framesRead < 0) {
             myData->inputError = framesRead;
+            result = AAUDIO_CALLBACK_RESULT_STOP;
         } else if (framesRead > 0) {
-            // Process valid input data.
-            myData->audioRecorder.record(myData->inputData,
-                                         myData->actualInputChannelCount,
-                                         framesRead);
 
             int32_t numSamples = framesRead * myData->actualInputChannelCount;
             convertPcm16ToFloat(myData->inputData, myData->conversionBuffer, numSamples);
 
-            myData->loopbackProcessor.process(myData->conversionBuffer,
+            myData->loopbackProcessor->process(myData->conversionBuffer,
                                               myData->actualInputChannelCount,
                                               outputData,
                                               myData->actualOutputChannelCount,
@@ -292,17 +548,25 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
         }
     }
 
-    return AAUDIO_CALLBACK_RESULT_CONTINUE;
+    return result;
 }
 
+
 static void usage() {
-    printf("loopback: -b{burstsPerBuffer} -p{outputPerfMode} -P{inputPerfMode}\n");
-    printf("          -b{burstsPerBuffer} for example 2 for double buffered\n");
-    printf("          -p{outputPerfMode}  set output AAUDIO_PERFORMANCE_MODE*\n");
-    printf("          -P{inputPerfMode}   set input AAUDIO_PERFORMANCE_MODE*\n");
+    printf("loopback: -n{numBursts} -p{outPerf} -P{inPerf} -t{test} -g{gain} -f{freq}\n");
+    printf("          -c{inputChannels}\n");
+    printf("          -f{freq}  sine frequency\n");
+    printf("          -g{gain}  recirculating loopback gain\n");
+    printf("          -m enable MMAP mode\n");
+    printf("          -n{numBursts} buffer size, for example 2 for double buffered\n");
+    printf("          -p{outPerf}  set output AAUDIO_PERFORMANCE_MODE*\n");
+    printf("          -P{inPerf}   set input AAUDIO_PERFORMANCE_MODE*\n");
     printf("              n for _NONE\n");
     printf("              l for _LATENCY\n");
     printf("              p for _POWER_SAVING;\n");
+    printf("          -t{test}   select test mode\n");
+    printf("              m for sine magnitude\n");
+    printf("              e for echo latency (default)\n");
     printf("For example:  loopback -b2 -pl -Pn\n");
 }
 
@@ -320,10 +584,32 @@ static aaudio_performance_mode_t parsePerformanceMode(char c) {
             mode = AAUDIO_PERFORMANCE_MODE_POWER_SAVING;
             break;
         default:
-            printf("ERROR invalue performance mode %c\n", c);
+            printf("ERROR in value performance mode %c\n", c);
             break;
     }
     return mode;
+}
+
+enum {
+    TEST_SINE_MAGNITUDE = 0,
+    TEST_ECHO_LATENCY,
+};
+
+static int parseTestMode(char c) {
+    int testMode = TEST_ECHO_LATENCY;
+    c = tolower(c);
+    switch (c) {
+        case 'm':
+            testMode = TEST_SINE_MAGNITUDE;
+            break;
+        case 'e':
+            testMode = TEST_ECHO_LATENCY;
+            break;
+        default:
+            printf("ERROR in value test mode %c\n", c);
+            break;
+    }
+    return testMode;
 }
 
 // ====================================================================================
@@ -334,7 +620,7 @@ int main(int argc, const char **argv)
     LoopbackData loopbackData;
     AAudioStream *outputStream = nullptr;
 
-    const int requestedInputChannelCount = 1;
+    int requestedInputChannelCount = NUM_INPUT_CHANNELS;
     const int requestedOutputChannelCount = AAUDIO_UNSPECIFIED;
     const int requestedSampleRate = SAMPLE_RATE;
     int actualSampleRate = 0;
@@ -342,6 +628,9 @@ int main(int argc, const char **argv)
     const aaudio_format_t requestedOutputFormat = AAUDIO_FORMAT_PCM_FLOAT;
     aaudio_format_t actualInputFormat;
     aaudio_format_t actualOutputFormat;
+    int testMode = TEST_ECHO_LATENCY;
+    double frequency = 1000.0;
+    double gain = 1.0;
 
     const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_EXCLUSIVE;
     //const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_SHARED;
@@ -363,7 +652,19 @@ int main(int argc, const char **argv)
         if (arg[0] == '-') {
             char option = arg[1];
             switch (option) {
-                case 'b':
+                case 'c':
+                    requestedInputChannelCount = atoi(&arg[2]);
+                    break;
+                case 'f':
+                    frequency = atof(&arg[2]);
+                    break;
+                case 'g':
+                    gain = atof(&arg[2]);
+                    break;
+                case 'm':
+                    AAudio_setMMapPolicy(AAUDIO_POLICY_AUTO);
+                    break;
+                case 'n':
                     burstsPerBuffer = atoi(&arg[2]);
                     break;
                 case 'p':
@@ -372,16 +673,35 @@ int main(int argc, const char **argv)
                 case 'P':
                     inputPerformanceLevel = parsePerformanceMode(arg[2]);
                     break;
+                case 't':
+                    testMode = parseTestMode(arg[2]);
+                    break;
                 default:
                     usage();
+                    exit(0);
                     break;
             }
         } else {
+            usage();
+            exit(0);
             break;
         }
     }
 
-    loopbackData.audioRecorder.allocate(NUM_SECONDS * SAMPLE_RATE);
+
+    switch(testMode) {
+        case TEST_SINE_MAGNITUDE:
+            loopbackData.sineAnalyzer.setFrequency(frequency);
+            loopbackData.loopbackProcessor = &loopbackData.sineAnalyzer;
+            break;
+        case TEST_ECHO_LATENCY:
+            loopbackData.echoAnalyzer.setGain(gain);
+            loopbackData.loopbackProcessor = &loopbackData.echoAnalyzer;
+            break;
+        default:
+            exit(1);
+            break;
+    }
 
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
@@ -431,47 +751,68 @@ int main(int argc, const char **argv)
     printf("    channelCount: requested = %d, actual = %d\n", requestedInputChannelCount,
            loopbackData.actualInputChannelCount);
     printf("    framesPerBurst = %d\n", AAudioStream_getFramesPerBurst(loopbackData.inputStream));
+    printf("    bufferSize     = %d\n",
+           AAudioStream_getBufferSizeInFrames(loopbackData.inputStream));
+    printf("    bufferCapacity = %d\n",
+           AAudioStream_getBufferCapacityInFrames(loopbackData.inputStream));
+
+    actualSharingMode = AAudioStream_getSharingMode(loopbackData.inputStream);
+    printf("    sharingMode: requested = %d, actual = %d\n",
+           requestedSharingMode, actualSharingMode);
 
     actualInputFormat = AAudioStream_getFormat(loopbackData.inputStream);
-    printf("    dataFormat: requested = %d, actual = %d\n", requestedInputFormat, actualInputFormat);
+    printf("    dataFormat: requested = %d, actual = %d\n",
+           requestedInputFormat, actualInputFormat);
     assert(actualInputFormat == AAUDIO_FORMAT_PCM_I16);
+
+    printf("    is MMAP used?         = %s\n", AAudioStream_isMMapUsed(loopbackData.inputStream)
+                                               ? "yes" : "no");
+
 
     printf("Stream OUTPUT ---------------------\n");
     // Check to see what kind of stream we actually got.
     actualSampleRate = AAudioStream_getSampleRate(outputStream);
     printf("    sampleRate: requested = %d, actual = %d\n", requestedSampleRate, actualSampleRate);
+    loopbackData.echoAnalyzer.setSampleRate(actualSampleRate);
 
     loopbackData.actualOutputChannelCount = AAudioStream_getChannelCount(outputStream);
     printf("    channelCount: requested = %d, actual = %d\n", requestedOutputChannelCount,
            loopbackData.actualOutputChannelCount);
 
     actualSharingMode = AAudioStream_getSharingMode(outputStream);
-    printf("    sharingMode: requested = %d, actual = %d\n", requestedSharingMode, actualSharingMode);
+    printf("    sharingMode: requested = %d, actual = %d\n",
+           requestedSharingMode, actualSharingMode);
 
     // This is the number of frames that are read in one chunk by a DMA controller
     // or a DSP or a mixer.
     framesPerBurst = AAudioStream_getFramesPerBurst(outputStream);
     printf("    framesPerBurst = %d\n", framesPerBurst);
 
-    printf("    bufferCapacity = %d\n", AAudioStream_getBufferCapacityInFrames(outputStream));
-
-    actualOutputFormat = AAudioStream_getFormat(outputStream);
-    printf("    dataFormat: requested = %d, actual = %d\n", requestedOutputFormat, actualOutputFormat);
-    assert(actualOutputFormat == AAUDIO_FORMAT_PCM_FLOAT);
-
-    // Allocate a buffer for the audio data.
-    loopbackData.inputFramesMaximum = 32 * framesPerBurst;
-
-    loopbackData.inputData = new int16_t[loopbackData.inputFramesMaximum * loopbackData.actualInputChannelCount];
-    loopbackData.conversionBuffer = new float[loopbackData.inputFramesMaximum *
-                                              loopbackData.actualInputChannelCount];
-
     result = AAudioStream_setBufferSizeInFrames(outputStream, burstsPerBuffer * framesPerBurst);
     if (result < 0) { // may be positive buffer size
         fprintf(stderr, "ERROR - AAudioStream_setBufferSize() returned %d\n", result);
         goto finish;
     }
-    printf("AAudioStream_setBufferSize() actual = %d\n",result);
+    printf("    bufferSize     = %d\n", AAudioStream_getBufferSizeInFrames(outputStream));
+    printf("    bufferCapacity = %d\n", AAudioStream_getBufferCapacityInFrames(outputStream));
+
+    actualOutputFormat = AAudioStream_getFormat(outputStream);
+    printf("    dataFormat: requested = %d, actual = %d\n",
+           requestedOutputFormat, actualOutputFormat);
+    assert(actualOutputFormat == AAUDIO_FORMAT_PCM_FLOAT);
+
+    printf("    is MMAP used?         = %s\n", AAudioStream_isMMapUsed(outputStream)
+                                               ? "yes" : "no");
+
+    // Allocate a buffer for the audio data.
+    loopbackData.inputFramesMaximum = 32 * framesPerBurst;
+    loopbackData.inputBuffersToDiscard = 100;
+
+    loopbackData.inputData = new int16_t[loopbackData.inputFramesMaximum
+                                         * loopbackData.actualInputChannelCount];
+    loopbackData.conversionBuffer = new float[loopbackData.inputFramesMaximum *
+                                              loopbackData.actualInputChannelCount];
+
 
     // Start output first so input stream runs low.
     result = AAudioStream_requestStart(outputStream);
@@ -500,18 +841,13 @@ int main(int argc, const char **argv)
     printf("framesRead    = %d\n", (int) AAudioStream_getFramesRead(outputStream));
     printf("framesWritten = %d\n", (int) AAudioStream_getFramesWritten(outputStream));
 
-    latency = loopbackData.loopbackProcessor.calculateAverageLatency(&deviation);
-    printf("measured peak    = %8.5f\n", loopbackData.loopbackProcessor.getMaxAmplitude());
-    printf("threshold        = %8.5f\n", INPUT_PEAK_THRESHOLD);
-    printf("measured average = %8.5f\n", loopbackData.loopbackProcessor.getAverageAmplitude());
-    printf("# latency measurements = %d\n", loopbackData.loopbackProcessor.getMeasurementCount());
-    printf("measured latency = %8.2f +/- %4.5f frames\n", latency, deviation);
-    printf("measured latency = %8.2f msec  <===== !!\n", (1000.0 * latency / actualSampleRate));
+    loopbackData.loopbackProcessor->report();
 
-    {
-        int written = loopbackData.audioRecorder.save(FILENAME);
-        printf("wrote %d samples to %s\n", written, FILENAME);
-    }
+//    {
+//        int written = loopbackData.audioRecorder.save(FILENAME);
+//        printf("wrote %d mono samples to %s on Android device\n", written, FILENAME);
+//    }
+
 
 finish:
     AAudioStream_close(outputStream);
@@ -521,7 +857,13 @@ finish:
     delete[] outputData;
     AAudioStreamBuilder_delete(builder);
 
-    printf("exiting - AAudio result = %d = %s\n", result, AAudio_convertResultToText(result));
-    return (result != AAUDIO_OK) ? EXIT_FAILURE : EXIT_SUCCESS;
+    printf(RESULT_TAG "error = %d = %s\n", result, AAudio_convertResultToText(result));
+    if ((result != AAUDIO_OK)) {
+        printf("error %d = %s\n", result, AAudio_convertResultToText(result));
+        return EXIT_FAILURE;
+    } else {
+        printf("SUCCESS\n");
+        return EXIT_SUCCESS;
+    }
 }
 
