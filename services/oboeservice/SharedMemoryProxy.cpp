@@ -16,12 +16,11 @@
 
 #define LOG_TAG "AAudioService"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
+#include <log/log.h>
 
 #include <aaudio/AAudio.h>
 #include "SharedMemoryProxy.h"
 
-using namespace android;
 using namespace aaudio;
 
 SharedMemoryProxy::~SharedMemoryProxy()
