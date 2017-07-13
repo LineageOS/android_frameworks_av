@@ -87,8 +87,6 @@ public:
      */
     void markTransferTime(int64_t nanoseconds);
 
-    void onStop();
-
 protected:
 
     aaudio_result_t getDownDataDescription(AudioEndpointParcelable &parcelable) override;

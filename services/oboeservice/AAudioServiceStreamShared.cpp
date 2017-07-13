@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudioService"
+#define LOG_TAG "AAudioServiceStreamShared"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -191,6 +191,9 @@ error:
  * An AAUDIO_SERVICE_EVENT_STARTED will be sent to the client when complete.
  */
 aaudio_result_t AAudioServiceStreamShared::start()  {
+    if (isRunning()) {
+        return AAUDIO_OK;
+    }
     AAudioServiceEndpoint *endpoint = mServiceEndpoint;
     if (endpoint == nullptr) {
         return AAUDIO_ERROR_INVALID_STATE;
@@ -201,7 +204,10 @@ aaudio_result_t AAudioServiceStreamShared::start()  {
         ALOGE("AAudioServiceStreamShared::start() mServiceEndpoint returned %d", result);
         disconnect();
     } else {
-        result = AAudioServiceStreamBase::start();
+        result = endpoint->getStreamInternal()->startClient(mMmapClient, &mClientHandle);
+        if (result == AAUDIO_OK) {
+            result = AAudioServiceStreamBase::start();
+        }
     }
     return result;
 }
@@ -212,10 +218,14 @@ aaudio_result_t AAudioServiceStreamShared::start()  {
  * An AAUDIO_SERVICE_EVENT_PAUSED will be sent to the client when complete.
 */
 aaudio_result_t AAudioServiceStreamShared::pause()  {
+    if (!isRunning()) {
+        return AAUDIO_OK;
+    }
     AAudioServiceEndpoint *endpoint = mServiceEndpoint;
     if (endpoint == nullptr) {
         return AAUDIO_ERROR_INVALID_STATE;
     }
+    endpoint->getStreamInternal()->stopClient(mClientHandle);
     aaudio_result_t result = endpoint->stopStream(this);
     if (result != AAUDIO_OK) {
         ALOGE("AAudioServiceStreamShared::pause() mServiceEndpoint returned %d", result);
@@ -225,10 +235,14 @@ aaudio_result_t AAudioServiceStreamShared::pause()  {
 }
 
 aaudio_result_t AAudioServiceStreamShared::stop()  {
+    if (!isRunning()) {
+        return AAUDIO_OK;
+    }
     AAudioServiceEndpoint *endpoint = mServiceEndpoint;
     if (endpoint == nullptr) {
         return AAUDIO_ERROR_INVALID_STATE;
     }
+    endpoint->getStreamInternal()->stopClient(mClientHandle);
     aaudio_result_t result = endpoint->stopStream(this);
     if (result != AAUDIO_OK) {
         ALOGE("AAudioServiceStreamShared::stop() mServiceEndpoint returned %d", result);
@@ -248,7 +262,7 @@ aaudio_result_t AAudioServiceStreamShared::flush()  {
         return AAUDIO_ERROR_INVALID_STATE;
     }
     if (mState != AAUDIO_STREAM_STATE_PAUSED) {
-        ALOGE("AAudioServiceStreamShared::flush() stream not paused, state = %s",
+         ALOGE("AAudioServiceStreamShared::flush() stream not paused, state = %s",
             AAudio_convertStreamStateToText(mState));
         return AAUDIO_ERROR_INVALID_STATE;
     }
@@ -261,11 +275,12 @@ aaudio_result_t AAudioServiceStreamShared::close()  {
         return AAUDIO_OK;
     }
 
+    stop();
+
     AAudioServiceEndpoint *endpoint = mServiceEndpoint;
     if (endpoint == nullptr) {
         return AAUDIO_ERROR_INVALID_STATE;
     }
-    endpoint->stopStream(this);
 
     endpoint->unregisterStream(this);
 
@@ -277,7 +292,6 @@ aaudio_result_t AAudioServiceStreamShared::close()  {
         delete mAudioDataQueue;
         mAudioDataQueue = nullptr;
     }
-
     return AAudioServiceStreamBase::close();
 }
 
@@ -291,9 +305,6 @@ aaudio_result_t AAudioServiceStreamShared::getDownDataDescription(AudioEndpointP
                                     parcelable.mDownDataQueueParcelable);
     parcelable.mDownDataQueueParcelable.setFramesPerBurst(getFramesPerBurst());
     return AAUDIO_OK;
-}
-
-void AAudioServiceStreamShared::onStop() {
 }
 
 void AAudioServiceStreamShared::markTransferTime(int64_t nanoseconds) {

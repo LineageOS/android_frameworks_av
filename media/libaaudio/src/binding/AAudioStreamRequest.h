@@ -76,6 +76,14 @@ public:
         return mConfiguration;
     }
 
+    bool isInService() const {
+        return mInService;
+    }
+
+    void setInService(bool inService) {
+        mInService = inService;
+    }
+
     virtual status_t writeToParcel(Parcel* parcel) const override;
 
     virtual status_t readFromParcel(const Parcel* parcel) override;
@@ -90,6 +98,7 @@ protected:
     pid_t                      mProcessId;
     aaudio_direction_t         mDirection;
     bool                       mSharingModeMatchRequired = false;
+    bool                       mInService = false; // Stream opened by AAudioservice
 };
 
 } /* namespace aaudio */

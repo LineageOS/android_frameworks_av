@@ -1495,6 +1495,43 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
             "session %d, flags %#x",
           attr->source, config->sample_rate, config->format, config->channel_mask, session, flags);
 
+    // special case for mmap capture: if an input IO handle is specified, we reuse this input if
+    // possible
+    if ((flags & AUDIO_INPUT_FLAG_MMAP_NOIRQ) == AUDIO_INPUT_FLAG_MMAP_NOIRQ &&
+            *input != AUDIO_IO_HANDLE_NONE) {
+        ssize_t index = mInputs.indexOfKey(*input);
+        if (index < 0) {
+            ALOGW("getInputForAttr() unknown MMAP input %d", *input);
+            return BAD_VALUE;
+        }
+        sp<AudioInputDescriptor> inputDesc = mInputs.valueAt(index);
+        sp<AudioSession> audioSession = inputDesc->getAudioSession(session);
+        if (audioSession == 0) {
+            ALOGW("getInputForAttr() unknown session %d on input %d", session, *input);
+            return BAD_VALUE;
+        }
+        // For MMAP mode, the first call to getInputForAttr() is made on behalf of audioflinger.
+        // The second call is for the first active client and sets the UID. Any further call
+        // corresponds to a new client and is only permitted from the same UId.
+        if (audioSession->openCount() == 1) {
+            audioSession->setUid(uid);
+        } else if (audioSession->uid() != uid) {
+            ALOGW("getInputForAttr() bad uid %d for session %d uid %d",
+                  uid, session, audioSession->uid());
+            return INVALID_OPERATION;
+        }
+        audioSession->changeOpenCount(1);
+        *inputType = API_INPUT_LEGACY;
+        if (*portId == AUDIO_PORT_HANDLE_NONE) {
+            *portId = AudioPort::getNextUniqueId();
+        }
+        DeviceVector inputDevices = mAvailableInputDevices.getDevicesFromType(inputDesc->mDevice);
+        *selectedDeviceId = inputDevices.size() > 0 ? inputDevices.itemAt(0)->getId()
+                : AUDIO_PORT_HANDLE_NONE;
+        ALOGI("%s reusing MMAP input %d for session %d", __FUNCTION__, *input, session);
+        return NO_ERROR;
+    }
+
     *input = AUDIO_IO_HANDLE_NONE;
     *inputType = API_INPUT_INVALID;
 
@@ -1895,6 +1932,11 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
             sp<AudioInputDescriptor> activeDesc = activeInputs[i];
 
             if (is_virtual_input_device(activeDesc->mDevice)) {
+                continue;
+            }
+
+            if ((audioSession->flags() & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0 &&
+                    activeDesc->getId() == inputDesc->getId()) {
                 continue;
             }
 
