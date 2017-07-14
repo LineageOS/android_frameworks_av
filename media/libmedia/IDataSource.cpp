@@ -54,8 +54,16 @@ struct BpDataSource : public BpInterface<IDataSource> {
         data.writeInterfaceToken(IDataSource::getInterfaceDescriptor());
         data.writeInt64(offset);
         data.writeInt64(size);
-        remote()->transact(READ_AT, data, &reply);
-        return reply.readInt64();
+        status_t err = remote()->transact(READ_AT, data, &reply);
+        if (err != OK) {
+            return err;
+        }
+        int64_t value = 0;
+        err = reply.readInt64(&value);
+        if (err != OK) {
+            return err;
+        }
+        return (ssize_t)value;
     }
 
     virtual status_t getSize(off64_t* size) {
