@@ -19,11 +19,11 @@
 #ifndef ANDROID_MEDIA_PERFORMANCEANALYSIS_H
 #define ANDROID_MEDIA_PERFORMANCEANALYSIS_H
 
-#include <map>
 #include <deque>
+#include <map>
 #include <vector>
-#include "NBLog.h"
-#include "ReportPerformance.h"
+
+#include <media/nbaio/ReportPerformance.h>
 
 namespace android {
 

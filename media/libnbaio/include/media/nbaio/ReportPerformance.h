@@ -24,7 +24,7 @@
 namespace android {
 
 // This class is used by reportPerformance function
-// TODO move reportPerformance function to ReportPerformance.cpp
+// TODO move PerformanceAnalysis::reportPerformance function to ReportPerformance.cpp
 class String8;
 
 namespace ReportPerformance {
@@ -52,10 +52,12 @@ static inline uint32_t log2(uint32_t x) {
     return 31 - __builtin_clz(x);
 }
 
+// TODO: delete dump in NBLog::Reader and add it here
+
 // Writes outlier intervals, timestamps, and histograms spanning long time
 // intervals to a file.
-void writeToFile(std::deque<std::pair<outlierInterval, timestamp>> &outlierData,
-                 std::deque<std::pair<timestamp, Histogram>> &hists,
+void writeToFile(const std::deque<std::pair<outlierInterval, timestamp>> &outlierData,
+                 const std::deque<std::pair<timestamp, Histogram>> &hists,
                  const char * kName,
                  bool append);
 

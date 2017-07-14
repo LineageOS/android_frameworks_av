@@ -19,15 +19,17 @@
 #ifndef ANDROID_MEDIA_NBLOG_H
 #define ANDROID_MEDIA_NBLOG_H
 
-#include <binder/IMemory.h>
-#include <audio_utils/fifo.h>
-#include <utils/Mutex.h>
-#include <utils/threads.h>
-
-#include <map>
 #include <deque>
+#include <map>
 #include <set>
 #include <vector>
+
+#include <audio_utils/fifo.h>
+#include <binder/IMemory.h>
+#include <media/nbaio/PerformanceAnalysis.h>
+#include <media/nbaio/ReportPerformance.h>
+#include <utils/Mutex.h>
+#include <utils/threads.h>
 
 namespace android {
 
@@ -409,7 +411,6 @@ public:
 
     class Reader : public RefBase {
     public:
-
         // A snapshot of a readers buffer
         // This is raw data. No analysis has been done on it
         class Snapshot {
@@ -434,6 +435,7 @@ public:
             EntryIterator end() { return mEnd; }
 
         private:
+            friend class MergeReader;
             friend class Reader;
             uint8_t              *mData;
             size_t                mLost;
@@ -450,22 +452,26 @@ public:
 
         // get snapshot of readers fifo buffer, effectively consuming the buffer
         std::unique_ptr<Snapshot> getSnapshot();
-        // dump a particular snapshot of the reader
-        // TODO: move dump to PerformanceAnalysis. Model/view/controller design
-        void     dump(int fd, size_t indent, Snapshot & snap);
-        // dump the current content of the reader's buffer (call getSnapshot() and previous dump())
-        void     dump(int fd, size_t indent = 0);
+        // print a summary of the performance to the console
         bool     isIMemory(const sp<IMemory>& iMemory) const;
 
-    private:
+    protected:
+        void    dumpLine(const String8& timestamp, String8& body);
+        EntryIterator   handleFormat(const FormatEntry &fmtEntry,
+                                     String8 *timestamp,
+                                     String8 *body);
+        int mFd;                // file descriptor
+        int mIndent;            // indentation level
+        int mLost;              // bytes of data lost before buffer was read
 
+    private:
         static const std::set<Event> startingTypes;
         static const std::set<Event> endingTypes;
-        /*const*/ Shared* const mShared;    // raw pointer to shared memory, actually const but not
+
         // declared as const because audio_utils_fifo() constructor
         sp<IMemory> mIMemory;       // ref-counted version, assigned only in constructor
-        int     mFd;                // file descriptor
-        int     mIndent;            // indentation level
+
+        /*const*/ Shared* const mShared;    // raw pointer to shared memory, actually const but not
         audio_utils_fifo * const mFifo;                 // FIFO itself,
         // non-NULL unless constructor fails
         audio_utils_fifo_reader * const mFifoReader;    // used to read from FIFO,
@@ -476,20 +482,14 @@ public:
         // represented that location. And one_of its fields would be a vector of timestamps.
         // That would allow us to record other information about the source location beyond
         // timestamps.
-        void    dumpLine(const String8& timestamp, String8& body);
-
-        EntryIterator   handleFormat(const FormatEntry &fmtEntry,
-                                     String8 *timestamp,
-                                     String8 *body);
-        // dummy method for handling absent author entry
-        virtual void handleAuthor(const AbstractEntry& /*fmtEntry*/, String8* /*body*/) {}
 
         // Searches for the last entry of type <type> in the range [front, back)
         // back has to be entry-aligned. Returns nullptr if none enconuntered.
         static const uint8_t *findLastEntryOfTypes(const uint8_t *front, const uint8_t *back,
                                                    const std::set<Event> &types);
 
-        static const size_t kSquashTimestamp = 5; // squash this many or more adjacent timestamps
+        // dummy method for handling absent author entry
+        virtual void handleAuthor(const AbstractEntry& /*fmtEntry*/, String8* /*body*/) {}
     };
 
     // Wrapper for a reader with a name. Contains a pointer to the reader and a pointer to the name
@@ -511,6 +511,8 @@ public:
 
     // ---------------------------------------------------------------------------
 
+    // This class is used to read data from each thread's individual FIFO in shared memory
+    // and write it to a single FIFO in local memory.
     class Merger : public RefBase {
     public:
         Merger(const void *shared, size_t size);
@@ -520,27 +522,43 @@ public:
         void addReader(const NamedReader &reader);
         // TODO add removeReader
         void merge();
+
         // FIXME This is returning a reference to a shared variable that needs a lock
         const std::vector<NamedReader>& getNamedReaders() const;
+
     private:
         // vector of the readers the merger is supposed to merge from.
         // every reader reads from a writer's buffer
         // FIXME Needs to be protected by a lock
         std::vector<NamedReader> mNamedReaders;
 
-        // TODO Need comments on all of these
-        Shared * const mShared;
-        std::unique_ptr<audio_utils_fifo> mFifo;
-        std::unique_ptr<audio_utils_fifo_writer> mFifoWriter;
+        Shared * const mShared; // raw pointer to shared memory
+        std::unique_ptr<audio_utils_fifo> mFifo; // FIFO itself
+        std::unique_ptr<audio_utils_fifo_writer> mFifoWriter; // used to write to FIFO
     };
 
+    // This class has a pointer to the FIFO in local memory which stores the merged
+    // data collected by NBLog::Merger from all NamedReaders. It is used to process
+    // this data and write the result to PerformanceAnalysis.
     class MergeReader : public Reader {
     public:
         MergeReader(const void *shared, size_t size, Merger &merger);
+
+        // TODO: consider moving dump to ReportPerformance
+        void dump(int fd, size_t indent = 0);
+        // process a particular snapshot of the reader
+        void getAndProcessSnapshot(Snapshot & snap);
+        // call getSnapshot of the content of the reader's buffer and process the data
+        void getAndProcessSnapshot();
+
     private:
         // FIXME Needs to be protected by a lock,
         //       because even though our use of it is read-only there may be asynchronous updates
         const std::vector<NamedReader>& mNamedReaders;
+
+        // analyzes, compresses and stores the merged data
+        std::map<int, ReportPerformance::PerformanceAnalysis> mThreadPerformanceAnalysis;
+
         // handle author entry by looking up the author's name and appending it to the body
         // returns number of bytes read from fmtEntry
         void handleAuthor(const AbstractEntry &fmtEntry, String8 *body);
@@ -552,7 +570,7 @@ public:
     // The thread is triggered on AudioFlinger binder activity.
     class MergeThread : public Thread {
     public:
-        MergeThread(Merger &merger);
+        MergeThread(Merger &merger, MergeReader &mergeReader);
         virtual ~MergeThread() override;
 
         // Reset timeout and activate thread to merge periodically if it's idle
@@ -566,6 +584,9 @@ public:
 
         // the merger who actually does the work of merging the logs
         Merger&     mMerger;
+
+        // the mergereader used to process data merged by mMerger
+        MergeReader& mMergeReader;
 
         // mutex for the condition variable
         Mutex       mMutex;
