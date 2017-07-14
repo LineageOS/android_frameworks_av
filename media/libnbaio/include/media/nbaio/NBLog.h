@@ -44,8 +44,6 @@ typedef uint64_t log_hash_t;
 class Writer;
 class Reader;
 
-private:
-
 enum Event : uint8_t {
     EVENT_RESERVED,
     EVENT_STRING,               // ASCII string, not NUL-terminated
@@ -60,11 +58,13 @@ enum Event : uint8_t {
     EVENT_HASH,                 // unique HASH of log origin, originates from hash of file name
                                 // and line number
     EVENT_HISTOGRAM_ENTRY_TS,   // single datum for timestamp histogram
+    EVENT_AUDIO_STATE,          // audio on/off event: logged upon FastMixer::onStateChange() call
     EVENT_END_FMT,              // end of logFormat argument list
 
     EVENT_UPPER_BOUND,          // to check for invalid events
 };
 
+private:
 
 // ---------------------------------------------------------------------------
 // API for handling format entry operations
@@ -248,6 +248,8 @@ struct HistTsEntryWithAuthor {
     int author;
 }; //TODO __attribute__((packed));
 
+using StateTsEntryWithAuthor = HistTsEntryWithAuthor;
+
 struct HistIntEntry {
     log_hash_t hash;
     int value;
@@ -341,7 +343,7 @@ public:
     virtual void    logStart(const char *fmt);
     virtual void    logEnd();
     virtual void    logHash(log_hash_t hash);
-    virtual void    logHistTS(log_hash_t hash);
+    virtual void    logEventHistTs(Event event, log_hash_t hash);
 
     virtual bool    isEnabled() const;
 
