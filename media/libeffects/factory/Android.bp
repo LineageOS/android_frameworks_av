@@ -10,10 +10,11 @@ cc_library_headers {
 cc_library_shared {
     name: "libeffects",
     vendor: true,
-    srcs: ["EffectsFactory.c",
-           "EffectsConfigLoader.c",
-           "EffectsFactoryState.c",
-           "EffectsXmlConfigLoader.cpp",
+    srcs: [
+         "EffectsFactory.c",
+         "EffectsConfigLoader.c",
+         "EffectsFactoryState.c",
+         "EffectsXmlConfigLoader.cpp",
     ],
 
     shared_libs: [
@@ -24,11 +25,12 @@ cc_library_shared {
     ],
     cflags: ["-fvisibility=hidden"],
 
-    include_dirs: ["system/media/audio_effects/include"],
-
     local_include_dirs:["include/media"],
 
-    header_libs: ["libeffects_headers"],
+    header_libs: [
+        "libaudioeffects",
+        "libeffects_headers",
+    ],
     export_header_lib_headers: ["libeffects_headers"],
 }
 
