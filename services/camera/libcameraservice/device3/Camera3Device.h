@@ -265,6 +265,10 @@ class Camera3Device :
         status_t popInflightBuffer(int32_t frameNumber, int32_t streamId,
                 /*out*/ buffer_handle_t **buffer);
 
+        // Get a vector of (frameNumber, streamId) pair of currently inflight
+        // buffers
+        void getInflightBufferKeys(std::vector<std::pair<int32_t, int32_t>>* out);
+
       private:
         camera3_device_t *mHal3Device;
         sp<hardware::camera::device::V3_2::ICameraDeviceSession> mHidlSession;
@@ -1023,6 +1027,10 @@ class Camera3Device :
     // Remove the in-flight request of the given index from mInFlightMap
     // if it's no longer needed. It must only be called with mInFlightLock held.
     void removeInFlightRequestIfReadyLocked(int idx);
+    // Remove all in-flight requests and return all buffers.
+    // This is used after HAL interface is closed to cleanup any request/buffers
+    // not returned by HAL.
+    void flushInflightRequests();
 
     /**** End scope for mInFlightLock ****/
 
