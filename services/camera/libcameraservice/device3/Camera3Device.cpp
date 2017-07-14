@@ -138,13 +138,15 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager) {
                 requestQueueRet.description().c_str());
         return DEAD_OBJECT;
     }
+
+    std::unique_ptr<ResultMetadataQueue>& resQueue = mResultMetadataQueue;
     auto resultQueueRet = session->getCaptureResultMetadataQueue(
-        [&queue = mResultMetadataQueue](const auto& descriptor) {
-            queue = std::make_unique<ResultMetadataQueue>(descriptor);
-            if (!queue->isValid() ||  queue->availableToWrite() <= 0) {
+        [&resQueue](const auto& descriptor) {
+            resQueue = std::make_unique<ResultMetadataQueue>(descriptor);
+            if (!resQueue->isValid() || resQueue->availableToWrite() <= 0) {
                 ALOGE("HAL returns empty result metadata fmq, not use it");
-                queue = nullptr;
-                // Don't use the queue onwards.
+                resQueue = nullptr;
+                // Don't use the resQueue onwards.
             }
         });
     if (!resultQueueRet.isOk()) {
@@ -237,7 +239,7 @@ status_t Camera3Device::disconnect() {
     ALOGI("%s: E", __FUNCTION__);
 
     status_t res = OK;
-
+    std::vector<wp<Camera3StreamInterface>> streams;
     {
         Mutex::Autolock l(mLock);
         if (mStatus == STATUS_UNINITIALIZED) return res;
@@ -269,8 +271,13 @@ status_t Camera3Device::disconnect() {
             mRequestThread->requestExit();
         }
 
-        mOutputStreams.clear();
-        mInputStream.clear();
+        streams.reserve(mOutputStreams.size() + (mInputStream != nullptr ? 1 : 0));
+        for (size_t i = 0; i < mOutputStreams.size(); i++) {
+            streams.push_back(mOutputStreams[i]);
+        }
+        if (mInputStream != nullptr) {
+            streams.push_back(mInputStream);
+        }
     }
 
     // Joining done without holding mLock, otherwise deadlocks may ensue
@@ -289,11 +296,8 @@ status_t Camera3Device::disconnect() {
     HalInterface* interface;
     {
         Mutex::Autolock l(mLock);
-
         mRequestThread.clear();
         mStatusTracker.clear();
-        mBufferManager.clear();
-
         interface = mInterface.get();
     }
 
@@ -301,10 +305,23 @@ status_t Camera3Device::disconnect() {
     // wait on assorted callbacks,etc, to complete before it can return.
     interface->close();
 
+    flushInflightRequests();
+
     {
         Mutex::Autolock l(mLock);
         mInterface->clear();
+        mOutputStreams.clear();
+        mInputStream.clear();
+        mBufferManager.clear();
         internalUpdateStatusLocked(STATUS_UNINITIALIZED);
+    }
+
+    for (auto& weakStream : streams) {
+        sp<Camera3StreamInterface> stream = weakStream.promote();
+        if (stream != nullptr) {
+            ALOGE("%s: Stream %d leaked! strong reference (%d)!",
+                    __FUNCTION__, stream->getId(), stream->getStrongCount() - 1);
+        }
     }
 
     ALOGI("%s: X", __FUNCTION__);
@@ -834,6 +851,13 @@ status_t Camera3Device::submitRequestsHelper(
 hardware::Return<void> Camera3Device::processCaptureResult(
         const hardware::hidl_vec<
                 hardware::camera::device::V3_2::CaptureResult>& results) {
+    {
+        Mutex::Autolock l(mLock);
+        if (mStatus == STATUS_ERROR) {
+            // Per API contract, HAL should act as closed after device error
+            ALOGW("%s: received capture result in error state!", __FUNCTION__);
+        }
+    }
 
     if (mProcessCaptureResultLock.tryLock() != OK) {
         // This should never happen; it indicates a wrong client implementation
@@ -965,6 +989,13 @@ void Camera3Device::processOneCaptureResultLocked(
 
 hardware::Return<void> Camera3Device::notify(
         const hardware::hidl_vec<hardware::camera::device::V3_2::NotifyMsg>& msgs) {
+    {
+        Mutex::Autolock l(mLock);
+        if (mStatus == STATUS_ERROR) {
+            // Per API contract, HAL should act as closed after device error
+            ALOGW("%s: received notify message in error state!", __FUNCTION__);
+        }
+    }
     for (const auto& msg : msgs) {
         notify(msg);
     }
@@ -2434,6 +2465,53 @@ void Camera3Device::removeInFlightRequestIfReadyLocked(int idx) {
     }
 }
 
+void Camera3Device::flushInflightRequests() {
+    { // First return buffers cached in mInFlightMap
+        Mutex::Autolock l(mInFlightLock);
+        for (size_t idx = 0; idx < mInFlightMap.size(); idx++) {
+            const InFlightRequest &request = mInFlightMap.valueAt(idx);
+            returnOutputBuffers(request.pendingOutputBuffers.array(),
+                request.pendingOutputBuffers.size(), 0);
+        }
+        mInFlightMap.clear();
+    }
+
+    // Then return all inflight buffers not returned by HAL
+    std::vector<std::pair<int32_t, int32_t>> inflightKeys;
+    mInterface->getInflightBufferKeys(&inflightKeys);
+
+    int32_t inputStreamId = (mInputStream != nullptr) ? mInputStream->getId() : -1;
+    for (auto& pair : inflightKeys) {
+        int32_t frameNumber = pair.first;
+        int32_t streamId = pair.second;
+        buffer_handle_t* buffer;
+        status_t res = mInterface->popInflightBuffer(frameNumber, streamId, &buffer);
+        if (res != OK) {
+            ALOGE("%s: Frame %d: No in-flight buffer for stream %d",
+                    __FUNCTION__, frameNumber, streamId);
+            continue;
+        }
+
+        camera3_stream_buffer_t streamBuffer;
+        streamBuffer.buffer = buffer;
+        streamBuffer.status = CAMERA3_BUFFER_STATUS_ERROR;
+        streamBuffer.acquire_fence = -1;
+        streamBuffer.release_fence = -1;
+        if (streamId == inputStreamId) {
+            streamBuffer.stream = mInputStream->asHalStream();
+            res = mInputStream->returnInputBuffer(streamBuffer);
+            if (res != OK) {
+                ALOGE("%s: Can't return input buffer for frame %d to"
+                      "  its stream:%s (%d)",  __FUNCTION__,
+                      frameNumber, strerror(-res), res);
+            }
+        } else {
+            streamBuffer.stream = mOutputStreams.valueFor(streamId)->asHalStream();
+            returnOutputBuffers(&streamBuffer, /*size*/1, /*timestamp*/ 0);
+        }
+    }
+}
+
 void Camera3Device::insertResultLocked(CaptureResult *result,
         uint32_t frameNumber) {
     if (result == nullptr) return;
@@ -3347,6 +3425,20 @@ status_t Camera3Device::HalInterface::close() {
         }
     }
     return res;
+}
+
+void Camera3Device::HalInterface::getInflightBufferKeys(
+        std::vector<std::pair<int32_t, int32_t>>* out) {
+    std::lock_guard<std::mutex> lock(mInflightLock);
+    out->clear();
+    out->reserve(mInflightBufferMap.size());
+    for (auto& pair : mInflightBufferMap) {
+        uint64_t key = pair.first;
+        int32_t streamId = key & 0xFFFFFFFF;
+        int32_t frameNumber = (key >> 32) & 0xFFFFFFFF;
+        out->push_back(std::make_pair(frameNumber, streamId));
+    }
+    return;
 }
 
 status_t Camera3Device::HalInterface::pushInflightBufferLocked(
