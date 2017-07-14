@@ -10,5 +10,8 @@ cc_library_shared {
         "libtinyxml2",
     ],
 
+    header_libs: ["libaudio_system_headers"],
+    export_header_lib_headers: ["libaudio_system_headers"],
+
     export_include_dirs: ["include"],
 }
