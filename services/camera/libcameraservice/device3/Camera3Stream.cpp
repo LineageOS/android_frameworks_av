@@ -744,7 +744,7 @@ void Camera3Stream::removeBufferListener(
 }
 
 void Camera3Stream::setBufferFreedListener(
-        Camera3StreamBufferFreedListener* listener) {
+        wp<Camera3StreamBufferFreedListener> listener) {
     Mutex::Autolock l(mLock);
     // Only allow set listener during stream configuration because stream is guaranteed to be IDLE
     // at this state, so setBufferFreedListener won't collide with onBufferFreed callbacks
