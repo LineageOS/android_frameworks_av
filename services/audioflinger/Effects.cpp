@@ -21,10 +21,12 @@
 
 #include "Configuration.h"
 #include <utils/Log.h>
+#include <system/audio_effects/effect_aec.h>
+#include <system/audio_effects/effect_ns.h>
+#include <system/audio_effects/effect_visualizer.h>
 #include <audio_utils/primitives.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
-#include <system/audio_effects/effect_visualizer.h>
 
 #include "AudioFlinger.h"
 #include "ServiceUtilities.h"
@@ -1809,6 +1811,7 @@ status_t AudioFlinger::EffectChain::addEffect_ll(const sp<EffectModule>& effect)
                 idx_insert);
     }
     effect->configure();
+
     return NO_ERROR;
 }
 
@@ -2030,6 +2033,7 @@ void AudioFlinger::EffectChain::setEffectSuspended_l(
             mSuspendedEffects.add(type->timeLow, desc);
             ALOGV("setEffectSuspended_l() add entry for %08x", type->timeLow);
         }
+
         if (desc->mRefCount++ == 0) {
             sp<EffectModule> effect = getEffectIfEnabled(type);
             if (effect != 0) {
@@ -2045,7 +2049,8 @@ void AudioFlinger::EffectChain::setEffectSuspended_l(
         desc = mSuspendedEffects.valueAt(index);
         if (desc->mRefCount <= 0) {
             ALOGW("setEffectSuspended_l() restore refcount should not be 0 %d", desc->mRefCount);
-            desc->mRefCount = 1;
+            desc->mRefCount = 0;
+            return;
         }
         if (--desc->mRefCount == 0) {
             ALOGV("setEffectSuspended_l() remove entry for %08x", mSuspendedEffects.keyAt(index));
@@ -2123,6 +2128,17 @@ static const effect_uuid_t SL_IID_VOLUME_ = { 0x09e8ede0, 0xddde, 0x11db, 0xb4f6
 const effect_uuid_t * const SL_IID_VOLUME = &SL_IID_VOLUME_;
 #endif //OPENSL_ES_H_
 
+/* static */
+bool AudioFlinger::EffectChain::isEffectEligibleForBtNrecSuspend(const effect_uuid_t *type)
+{
+    // Only NS and AEC are suspended when BtNRec is off
+    if ((memcmp(type, FX_IID_AEC, sizeof(effect_uuid_t)) == 0) ||
+        (memcmp(type, FX_IID_NS, sizeof(effect_uuid_t)) == 0)) {
+        return true;
+    }
+    return false;
+}
+
 bool AudioFlinger::EffectChain::isEffectEligibleForSuspend(const effect_descriptor_t& desc)
 {
     // auxiliary effects and visualizer are never suspended on output mix
@@ -2177,7 +2193,7 @@ void AudioFlinger::EffectChain::checkSuspendOnEffectEnabled(const sp<EffectModul
         ALOGV("checkSuspendOnEffectEnabled() enable suspending fx %08x",
             effect->desc().type.timeLow);
         sp<SuspendedEffectDesc> desc = mSuspendedEffects.valueAt(index);
-        // if effect is requested to suspended but was not yet enabled, supend it now.
+        // if effect is requested to suspended but was not yet enabled, suspend it now.
         if (desc->mEffect == 0) {
             desc->mEffect = effect;
             effect->setEnabled(false);
