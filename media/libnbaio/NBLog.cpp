@@ -24,8 +24,8 @@
 *     Calls LOG_HIST_TS
 * LOG_HIST_TS
 *     Hashes file name and line number, and writes single timestamp to buffer
-*     calls NBLOG::Writer::logHistTS once
-* NBLOG::Writer::logHistTS
+*     calls NBLOG::Writer::logEventHistTS once
+* NBLOG::Writer::logEventHistTS
 *     calls NBLOG::Writer::log on hash and current timestamp
 *     time is in CLOCK_MONOTONIC converted to ns
 * NBLOG::Writer::log(Event, const void*, size_t)
@@ -44,6 +44,8 @@
 * ssize_t audio_utils_fifo_reader::obtain
 *     Determines readable buffer section via pointer arithmetic on reader
 *     and writer pointers
+* Similarly, LOG_AUDIO_STATE() is called by onStateChange whenever audio is
+* turned on or off, and writes this notification to the FIFO.
 *
 * 2) reading the data from shared memory
 * Thread::threadloop()
@@ -138,6 +140,7 @@ std::unique_ptr<NBLog::AbstractEntry> NBLog::AbstractEntry::buildEntry(const uin
     switch (type) {
     case EVENT_START_FMT:
         return std::make_unique<FormatEntry>(FormatEntry(ptr));
+    case EVENT_AUDIO_STATE:
     case EVENT_HISTOGRAM_ENTRY_TS:
         return std::make_unique<HistogramEntry>(HistogramEntry(ptr));
     default:
@@ -516,7 +519,7 @@ void NBLog::Writer::logHash(log_hash_t hash)
     log(EVENT_HASH, &hash, sizeof(hash));
 }
 
-void NBLog::Writer::logHistTS(log_hash_t hash)
+void NBLog::Writer::logEventHistTs(Event event, log_hash_t hash)
 {
     if (!mEnabled) {
         return;
@@ -525,7 +528,7 @@ void NBLog::Writer::logHistTS(log_hash_t hash)
     data.hash = hash;
     data.ts = get_monotonic_ns();
     if (data.ts > 0) {
-        log(EVENT_HISTOGRAM_ENTRY_TS, &data, sizeof(data));
+        log(event, &data, sizeof(data));
     } else {
         ALOGE("Failed to get timestamp");
     }
@@ -758,7 +761,9 @@ bool NBLog::LockedWriter::setEnabled(bool enabled)
 const std::set<NBLog::Event> NBLog::Reader::startingTypes {NBLog::Event::EVENT_START_FMT,
                                                            NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS};
 const std::set<NBLog::Event> NBLog::Reader::endingTypes   {NBLog::Event::EVENT_END_FMT,
-                                                           NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS};
+                                                           NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS,
+                                                           NBLog::Event::EVENT_AUDIO_STATE};
+
 NBLog::Reader::Reader(const void *shared, size_t size)
     : mShared((/*const*/ Shared *) shared), /*mIMemory*/
       mFd(-1), mIndent(0),
@@ -922,6 +927,14 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             int64_t ts;
             memcpy(&ts, &data->ts, sizeof(ts));
             performanceAnalysis.logTsEntry(data->author, ts);
+            ++entry;
+            break;
+        }
+        case EVENT_AUDIO_STATE: {
+            StateTsEntryWithAuthor *data = (StateTsEntryWithAuthor *) (entry->data);
+            // TODO This memcpies are here to avoid unaligned memory access crash.
+            // There's probably a more efficient way to do it
+            performanceAnalysis.handleStateChange(data->author);
             ++entry;
             break;
         }

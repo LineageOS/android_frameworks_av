@@ -21,6 +21,7 @@ LOCAL_SRC_FILES := \
     ClearKeyFetcherTest.cpp
 
 LOCAL_MODULE := ClearKeyFetcherTest
+LOCAL_VENDOR_MODULE := true
 
 # LOCAL_LDFLAGS is needed here for the test to use the plugin, because
 # the plugin is not in standard library search path. Without this .so

@@ -20,7 +20,6 @@
 #include <dirent.h>
 #include <pthread.h>
 
-#include <android/log.h>
 #include <cutils/compiler.h>
 #include <hardware/audio_effect.h>
 

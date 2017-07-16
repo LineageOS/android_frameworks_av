@@ -52,6 +52,17 @@ public:
     using timestamp = uint64_t;
     using timestamp_raw = int64_t;
 
+    // Given a series of audio processing wakeup timestamps,
+    // compresses and and analyzes the data, and flushes
+    // the timestamp series from memory.
+    void processAndFlushTimeStampSeries(int author);
+
+    // Called when an audio on/off event is read from the buffer
+    // calls flushTimeStampSeries on the data up to the event,
+    // effectively skipping over the idle audio time interval
+    // when writing buffer period data to memory.
+    void handleStateChange(int author);
+
     // Writes wakeup timestamp entry to log and runs analysis
     // author is the thread ID
     // TODO: check. if the thread has multiple histograms, is author info correct
