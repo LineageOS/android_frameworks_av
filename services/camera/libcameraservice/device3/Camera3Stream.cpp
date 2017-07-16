@@ -523,6 +523,8 @@ status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
         return BAD_VALUE;
     }
 
+    removeOutstandingBuffer(buffer);
+
     /**
      * TODO: Check that the state is valid first.
      *
@@ -540,7 +542,6 @@ status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
     // buffer to be returned.
     mOutputBufferReturnedSignal.signal();
 
-    removeOutstandingBuffer(buffer);
     return res;
 }
 
@@ -591,13 +592,14 @@ status_t Camera3Stream::returnInputBuffer(const camera3_stream_buffer &buffer) {
         return BAD_VALUE;
     }
 
+    removeOutstandingBuffer(buffer);
+
     status_t res = returnInputBufferLocked(buffer);
     if (res == OK) {
         fireBufferListenersLocked(buffer, /*acquired*/false, /*output*/false);
         mInputBufferReturnedSignal.signal();
     }
 
-    removeOutstandingBuffer(buffer);
     return res;
 }
 

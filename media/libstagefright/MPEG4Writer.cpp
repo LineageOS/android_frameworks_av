@@ -311,8 +311,14 @@ private:
     int64_t mMinCttsOffsetTicks;
     int64_t mMaxCttsOffsetTicks;
 
-    // Save the last 10 frames' timestamp for debug.
-    std::list<std::pair<int64_t, int64_t>> mTimestampDebugHelper;
+    // Save the last 10 frames' timestamp and frame type for debug.
+    struct TimestampDebugHelperEntry {
+        int64_t pts;
+        int64_t dts;
+        std::string frameType;
+    };
+
+    std::list<TimestampDebugHelperEntry> mTimestampDebugHelper;
 
     // Sequence parameter set or picture parameter set
     struct AVCParamSet {
@@ -2543,12 +2549,12 @@ void MPEG4Writer::Track::updateDriftTime(const sp<MetaData>& meta) {
 }
 
 void MPEG4Writer::Track::dumpTimeStamps() {
-    ALOGE("Dumping %s track's last 10 frames timestamp ", getTrackType());
+    ALOGE("Dumping %s track's last 10 frames timestamp and frame type ", getTrackType());
     std::string timeStampString;
-    for (std::list<std::pair<int64_t, int64_t>>::iterator num = mTimestampDebugHelper.begin();
-            num != mTimestampDebugHelper.end(); ++num) {
-        timeStampString += "(" + std::to_string(num->first)+
-                "us, " + std::to_string(num->second) + "us) ";
+    for (std::list<TimestampDebugHelperEntry>::iterator entry = mTimestampDebugHelper.begin();
+            entry != mTimestampDebugHelper.end(); ++entry) {
+        timeStampString += "(" + std::to_string(entry->pts)+
+                "us, " + std::to_string(entry->dts) + "us " + entry->frameType + ") ";
     }
     ALOGE("%s", timeStampString.c_str());
 }
@@ -2758,9 +2764,9 @@ status_t MPEG4Writer::Track::threadEntry() {
             previousPausedDurationUs += pausedDurationUs - lastDurationUs;
             mResumed = false;
         }
-        std::pair<int64_t, int64_t> timestampPair;
+        TimestampDebugHelperEntry timestampDebugEntry;
         timestampUs -= previousPausedDurationUs;
-        timestampPair.first = timestampUs;
+        timestampDebugEntry.pts = timestampUs;
         if (WARN_UNLESS(timestampUs >= 0ll, "for %s track", trackName)) {
             copy->release();
             mSource->stop();
@@ -2790,6 +2796,14 @@ status_t MPEG4Writer::Track::threadEntry() {
             }
 
             mLastDecodingTimeUs = decodingTimeUs;
+            timestampDebugEntry.dts = decodingTimeUs;
+            timestampDebugEntry.frameType = isSync ? "Key frame" : "Non-Key frame";
+            // Insert the timestamp into the mTimestampDebugHelper
+            if (mTimestampDebugHelper.size() >= kTimestampDebugCount) {
+                mTimestampDebugHelper.pop_front();
+            }
+            mTimestampDebugHelper.push_back(timestampDebugEntry);
+
             cttsOffsetTimeUs =
                     timestampUs + kMaxCttsOffsetTimeUs - decodingTimeUs;
             if (WARN_UNLESS(cttsOffsetTimeUs >= 0ll, "for %s track", trackName)) {
@@ -2919,12 +2933,6 @@ status_t MPEG4Writer::Track::threadEntry() {
         lastDurationUs = timestampUs - lastTimestampUs;
         lastDurationTicks = currDurationTicks;
         lastTimestampUs = timestampUs;
-        timestampPair.second = timestampUs;
-        // Insert the timestamp into the mTimestampDebugHelper
-        if (mTimestampDebugHelper.size() >= kTimestampDebugCount) {
-            mTimestampDebugHelper.pop_front();
-        }
-        mTimestampDebugHelper.push_back(timestampPair);
 
         if (isSync != 0) {
             addOneStssTableEntry(mStszTableEntries->count());
