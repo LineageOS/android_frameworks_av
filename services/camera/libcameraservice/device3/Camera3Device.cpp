@@ -155,7 +155,7 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager) {
         return DEAD_OBJECT;
     }
 
-    mInterface = std::make_unique<HalInterface>(session, queue);
+    mInterface = new HalInterface(session, queue);
     std::string providerType;
     mVendorTagId = manager->getProviderTagIdLocked(mId.string());
 
@@ -184,7 +184,7 @@ status_t Camera3Device::initializeCommonLocked() {
     mTagMonitor.initialize(mVendorTagId);
 
     /** Start up request queue thread */
-    mRequestThread = new RequestThread(this, mStatusTracker, mInterface.get());
+    mRequestThread = new RequestThread(this, mStatusTracker, mInterface);
     res = mRequestThread->run(String8::format("C3Dev-%s-ReqQueue", mId.string()).string());
     if (res != OK) {
         SET_ERR_L("Unable to start request queue thread: %s (%d)",
@@ -3515,7 +3515,7 @@ void Camera3Device::HalInterface::onBufferFreed(
 
 Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         sp<StatusTracker> statusTracker,
-        HalInterface* interface) :
+        sp<HalInterface> interface) :
         Thread(/*canCallJava*/false),
         mParent(parent),
         mStatusTracker(statusTracker),

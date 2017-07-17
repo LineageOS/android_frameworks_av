@@ -293,8 +293,9 @@ status_t Camera3InputStream::getEndpointUsage(uint32_t *usage) const {
 void Camera3InputStream::onBufferFreed(const wp<GraphicBuffer>& gb) {
     const sp<GraphicBuffer> buffer = gb.promote();
     if (buffer != nullptr) {
-        if (mBufferFreedListener != nullptr) {
-            mBufferFreedListener->onBufferFreed(mId, buffer->handle);
+        sp<Camera3StreamBufferFreedListener> callback = mBufferFreedListener.promote();
+        if (callback != nullptr) {
+            callback->onBufferFreed(mId, buffer->handle);
         }
     } else {
         ALOGE("%s: GraphicBuffer is freed before onBufferFreed callback finishes!", __FUNCTION__);
