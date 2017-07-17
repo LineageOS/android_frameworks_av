@@ -179,36 +179,9 @@ aaudio_result_t AudioStreamBuilder::validate() const {
 
     // Check for values that are ridiculously out of range to prevent math overflow exploits.
     // The service will do a better check.
-    if (mSamplesPerFrame != AAUDIO_UNSPECIFIED
-        && (mSamplesPerFrame < SAMPLES_PER_FRAME_MIN || mSamplesPerFrame > SAMPLES_PER_FRAME_MAX)) {
-        ALOGE("AudioStreamBuilder: channelCount out of range = %d", mSamplesPerFrame);
-        return AAUDIO_ERROR_OUT_OF_RANGE;
-    }
-
-    if (mDeviceId < 0) {
-        ALOGE("AudioStreamBuilder: deviceId out of range = %d", mDeviceId);
-        return AAUDIO_ERROR_OUT_OF_RANGE;
-    }
-
-    switch (mSharingMode) {
-        case AAUDIO_SHARING_MODE_EXCLUSIVE:
-        case AAUDIO_SHARING_MODE_SHARED:
-            break;
-        default:
-            ALOGE("AudioStreamBuilder: illegal sharingMode = %d", mSharingMode);
-            return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
-            // break;
-    }
-
-    switch (mFormat) {
-        case AAUDIO_FORMAT_UNSPECIFIED:
-        case AAUDIO_FORMAT_PCM_I16:
-        case AAUDIO_FORMAT_PCM_FLOAT:
-            break; // valid
-        default:
-            ALOGE("AudioStreamBuilder: audioFormat not valid = %d", mFormat);
-            return AAUDIO_ERROR_INVALID_FORMAT;
-            // break;
+    aaudio_result_t result = AAudioStreamParameters::validate();
+    if (result != AAUDIO_OK) {
+        return result;
     }
 
     switch (mDirection) {
@@ -219,17 +192,6 @@ aaudio_result_t AudioStreamBuilder::validate() const {
             ALOGE("AudioStreamBuilder: direction not valid = %d", mDirection);
             return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
             // break;
-    }
-
-    if (mSampleRate != AAUDIO_UNSPECIFIED
-        && (mSampleRate < SAMPLE_RATE_HZ_MIN || mSampleRate > SAMPLE_RATE_HZ_MAX)) {
-        ALOGE("AudioStreamBuilder: sampleRate out of range = %d", mSampleRate);
-        return AAUDIO_ERROR_INVALID_RATE;
-    }
-
-    if (mBufferCapacity < 0) {
-        ALOGE("AudioStreamBuilder: bufferCapacity out of range = %d", mBufferCapacity);
-        return AAUDIO_ERROR_OUT_OF_RANGE;
     }
 
     switch (mPerformanceMode) {
