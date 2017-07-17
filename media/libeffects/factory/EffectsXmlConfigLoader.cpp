@@ -281,7 +281,7 @@ size_t loadEffects(const Effects& effects, list_elem_t* libList, list_elem_t** s
                 ++nbSkippedElement;
                 continue;
             }
-            listPush(&effectLoadResult.effectDesc, subEffectList);
+            listPush(effectLoadResult.effectDesc.get(), subEffectList);
 
             // Since we return a dummy descriptor for the proxy during
             // get_descriptor call, we replace it with the corresponding
