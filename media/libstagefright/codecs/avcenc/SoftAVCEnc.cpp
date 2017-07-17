@@ -629,8 +629,10 @@ OMX_ERRORTYPE SoftAVC::initEncoder() {
         level = 30;
     } else if (displaySizeY > (352 * 288)) {
         level = 21;
-    } else {
+    } else if (displaySizeY > (176 * 144)) {
         level = 20;
+    } else {
+        level = 10;
     }
     mAVCEncLevel = MAX(level, mAVCEncLevel);
 
