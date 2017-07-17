@@ -337,7 +337,7 @@ class Camera3Device :
         std::vector<std::pair<int, uint64_t>> mFreedBuffers;
     };
 
-    std::unique_ptr<HalInterface> mInterface;
+    sp<HalInterface> mInterface;
 
     CameraMetadata             mDeviceInfo;
 
@@ -628,7 +628,7 @@ class Camera3Device :
 
         RequestThread(wp<Camera3Device> parent,
                 sp<camera3::StatusTracker> statusTracker,
-                HalInterface* interface);
+                sp<HalInterface> interface);
         ~RequestThread();
 
         void     setNotificationListener(wp<NotificationListener> listener);
@@ -778,7 +778,7 @@ class Camera3Device :
 
         wp<Camera3Device>  mParent;
         wp<camera3::StatusTracker>  mStatusTracker;
-        HalInterface*      mInterface;
+        sp<HalInterface>   mInterface;
 
         wp<NotificationListener> mListener;
 
