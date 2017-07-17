@@ -21,6 +21,7 @@
 
 #include <aaudio/AAudio.h>
 
+#include "AAudioStreamParameters.h"
 #include "AudioStream.h"
 
 namespace aaudio {
@@ -28,23 +29,11 @@ namespace aaudio {
 /**
  * Factory class for an AudioStream.
  */
-class AudioStreamBuilder {
+class AudioStreamBuilder : public AAudioStreamParameters {
 public:
     AudioStreamBuilder();
 
     ~AudioStreamBuilder();
-
-    int getSamplesPerFrame() const {
-        return mSamplesPerFrame;
-    }
-
-    /**
-     * This is also known as channelCount.
-     */
-    AudioStreamBuilder* setSamplesPerFrame(int samplesPerFrame) {
-        mSamplesPerFrame = samplesPerFrame;
-        return this;
-    }
 
     aaudio_direction_t getDirection() const {
         return mDirection;
@@ -52,33 +41,6 @@ public:
 
     AudioStreamBuilder* setDirection(aaudio_direction_t direction) {
         mDirection = direction;
-        return this;
-    }
-
-    int32_t getSampleRate() const {
-        return mSampleRate;
-    }
-
-    AudioStreamBuilder* setSampleRate(int32_t sampleRate) {
-        mSampleRate = sampleRate;
-        return this;
-    }
-
-    aaudio_format_t getFormat() const {
-        return mFormat;
-    }
-
-    AudioStreamBuilder *setFormat(aaudio_format_t format) {
-        mFormat = format;
-        return this;
-    }
-
-    aaudio_sharing_mode_t getSharingMode() const {
-        return mSharingMode;
-    }
-
-    AudioStreamBuilder* setSharingMode(aaudio_sharing_mode_t sharingMode) {
-        mSharingMode = sharingMode;
         return this;
     }
 
@@ -91,30 +53,12 @@ public:
         return this;
     }
 
-    int32_t getBufferCapacity() const {
-        return mBufferCapacity;
-    }
-
-    AudioStreamBuilder* setBufferCapacity(int32_t frames) {
-        mBufferCapacity = frames;
-        return this;
-    }
-
     int32_t getPerformanceMode() const {
         return mPerformanceMode;
     }
 
     AudioStreamBuilder* setPerformanceMode(aaudio_performance_mode_t performanceMode) {
         mPerformanceMode = performanceMode;
-        return this;
-    }
-
-    int32_t getDeviceId() const {
-        return mDeviceId;
-    }
-
-    AudioStreamBuilder* setDeviceId(int32_t deviceId) {
-        mDeviceId = deviceId;
         return this;
     }
 
@@ -165,17 +109,11 @@ public:
 
     aaudio_result_t build(AudioStream **streamPtr);
 
-    aaudio_result_t validate() const;
+    virtual aaudio_result_t validate() const override;
 
 private:
-    int32_t                    mSamplesPerFrame = AAUDIO_UNSPECIFIED;
-    int32_t                    mSampleRate = AAUDIO_UNSPECIFIED;
-    int32_t                    mDeviceId = AAUDIO_UNSPECIFIED;
-    aaudio_sharing_mode_t      mSharingMode = AAUDIO_SHARING_MODE_SHARED;
     bool                       mSharingModeMatchRequired = false; // must match sharing mode requested
-    aaudio_format_t            mFormat = AAUDIO_FORMAT_UNSPECIFIED;
     aaudio_direction_t         mDirection = AAUDIO_DIRECTION_OUTPUT;
-    int32_t                    mBufferCapacity = AAUDIO_UNSPECIFIED;
     aaudio_performance_mode_t  mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
 
     AAudioStream_dataCallback  mDataCallbackProc = nullptr;  // external callback functions

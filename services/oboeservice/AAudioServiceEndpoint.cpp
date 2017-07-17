@@ -84,7 +84,7 @@ aaudio_result_t AAudioServiceEndpoint::open(const AAudioStreamConfiguration& con
     // Don't fall back to SHARED because that would cause recursion.
     builder.setSharingModeMatchRequired(true);
     builder.setDeviceId(mRequestedDeviceId);
-    builder.setFormat(configuration.getAudioFormat());
+    builder.setFormat(configuration.getFormat());
     builder.setSampleRate(configuration.getSampleRate());
     builder.setSamplesPerFrame(configuration.getSamplesPerFrame());
     builder.setDirection(getDirection());
