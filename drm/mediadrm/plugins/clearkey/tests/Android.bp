@@ -34,4 +34,5 @@ cc_test {
         "libstagefright_foundation",
         "libutils",
     ],
+    header_libs: ["media_plugin_headers"],
 }
