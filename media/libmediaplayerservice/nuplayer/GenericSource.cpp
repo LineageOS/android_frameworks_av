@@ -847,10 +847,6 @@ sp<MetaData> NuPlayer::GenericSource::doGetFormatMeta(bool audio) const {
 
 status_t NuPlayer::GenericSource::dequeueAccessUnit(
         bool audio, sp<ABuffer> *accessUnit) {
-    if (audio && !mStarted) {
-        return -EWOULDBLOCK;
-    }
-
     // If has gone through stop/releaseDrm sequence, we no longer send down any buffer b/c
     // the codec's crypto object has gone away (b/37960096).
     // Note: This will be unnecessary when stop() changes behavior and releases codec (b/35248283).
