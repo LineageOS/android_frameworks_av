@@ -112,10 +112,10 @@ aaudio_result_t AAudioServiceEndpoint::unregisterStream(sp<AAudioServiceStreamSh
 }
 
 aaudio_result_t AAudioServiceEndpoint::startStream(sp<AAudioServiceStreamShared> sharedStream) {
-    // TODO use real-time technique to avoid mutex, eg. atomic command FIFO
     aaudio_result_t result = AAUDIO_OK;
-    std::lock_guard<std::mutex> lock(mLockStreams);
     if (++mRunningStreams == 1) {
+        // TODO use real-time technique to avoid mutex, eg. atomic command FIFO
+        std::lock_guard<std::mutex> lock(mLockStreams);
         result = getStreamInternal()->requestStart();
         startSharingThread_l();
     }
@@ -123,13 +123,8 @@ aaudio_result_t AAudioServiceEndpoint::startStream(sp<AAudioServiceStreamShared>
 }
 
 aaudio_result_t AAudioServiceEndpoint::stopStream(sp<AAudioServiceStreamShared> sharedStream) {
-    int numRunningStreams = 0;
-    {
-        std::lock_guard<std::mutex> lock(mLockStreams);
-        numRunningStreams = --mRunningStreams;
-    }
-    if (numRunningStreams == 0) {
-        // Don't call this under a lock because the callbackLoop also uses the lock.
+    // Don't lock here because the disconnectRegisteredStreams also uses the lock.
+    if (--mRunningStreams == 0) { // atomic
         stopSharingThread();
         getStreamInternal()->requestStop();
     }
