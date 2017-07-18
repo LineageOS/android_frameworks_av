@@ -112,7 +112,7 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
     }
 
     // Is the request compatible with the shared endpoint?
-    mAudioFormat = configurationInput.getAudioFormat();
+    mAudioFormat = configurationInput.getFormat();
     if (mAudioFormat == AAUDIO_FORMAT_UNSPECIFIED) {
         mAudioFormat = AAUDIO_FORMAT_PCM_FLOAT;
     } else if (mAudioFormat != AAUDIO_FORMAT_PCM_FLOAT) {
@@ -169,7 +169,7 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
     // Fill in configuration for client.
     configurationOutput.setSampleRate(mSampleRate);
     configurationOutput.setSamplesPerFrame(mSamplesPerFrame);
-    configurationOutput.setAudioFormat(mAudioFormat);
+    configurationOutput.setFormat(mAudioFormat);
     configurationOutput.setDeviceId(mServiceEndpoint->getDeviceId());
 
     result = mServiceEndpoint->registerStream(keep);

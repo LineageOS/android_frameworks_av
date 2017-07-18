@@ -371,7 +371,7 @@ class Camera3Stream :
 
     // Setting listener will remove previous listener (if exists)
     virtual void     setBufferFreedListener(
-            Camera3StreamBufferFreedListener* listener) override;
+            wp<Camera3StreamBufferFreedListener> listener) override;
 
     /**
      * Return if the buffer queue of the stream is abandoned.
@@ -416,7 +416,7 @@ class Camera3Stream :
             android_dataspace dataSpace, camera3_stream_rotation_t rotation,
             int setId);
 
-    Camera3StreamBufferFreedListener* mBufferFreedListener;
+    wp<Camera3StreamBufferFreedListener> mBufferFreedListener;
 
     /**
      * Interface to be implemented by derived classes
