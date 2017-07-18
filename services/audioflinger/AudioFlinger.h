@@ -350,11 +350,12 @@ public:
                                         sync_event_callback_t callBack,
                                         const wp<RefBase>& cookie);
 
+    bool        btNrecIsOff() const { return mBtNrecIsOff.load(); }
+
+
 private:
 
                audio_mode_t getMode() const { return mMode; }
-
-                bool        btNrecIsOff() const { return mBtNrecIsOff; }
 
                             AudioFlinger() ANDROID_API;
     virtual                 ~AudioFlinger();
@@ -781,7 +782,7 @@ private:
                 volatile atomic_uint_fast32_t       mNextUniqueIds[AUDIO_UNIQUE_ID_USE_MAX];
 
                 audio_mode_t                        mMode;
-                bool                                mBtNrecIsOff;
+                std::atomic_bool                    mBtNrecIsOff;
 
                 // protected by mLock
                 Vector<AudioSessionRef*> mAudioSessionRefs;
