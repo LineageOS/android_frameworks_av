@@ -1193,25 +1193,10 @@ status_t AudioFlinger::setParameters(audio_io_handle_t ioHandle, const String8& 
         String8 value;
         if (param.get(String8(AudioParameter::keyBtNrec), value) == NO_ERROR) {
             bool btNrecIsOff = (value == AudioParameter::valueOff);
-            if (mBtNrecIsOff != btNrecIsOff) {
+            if (mBtNrecIsOff.exchange(btNrecIsOff) != btNrecIsOff) {
                 for (size_t i = 0; i < mRecordThreads.size(); i++) {
-                    sp<RecordThread> thread = mRecordThreads.valueAt(i);
-                    audio_devices_t device = thread->inDevice();
-                    bool suspend = audio_is_bluetooth_sco_device(device) && btNrecIsOff;
-                    // collect all of the thread's session IDs
-                    KeyedVector<audio_session_t, bool> ids = thread->sessionIds();
-                    // suspend effects associated with those session IDs
-                    for (size_t j = 0; j < ids.size(); ++j) {
-                        audio_session_t sessionId = ids.keyAt(j);
-                        thread->setEffectSuspended(FX_IID_AEC,
-                                                   suspend,
-                                                   sessionId);
-                        thread->setEffectSuspended(FX_IID_NS,
-                                                   suspend,
-                                                   sessionId);
-                    }
+                    mRecordThreads.valueAt(i)->checkBtNrec();
                 }
-                mBtNrecIsOff = btNrecIsOff;
             }
         }
         String8 screenState;
@@ -3214,6 +3199,11 @@ void AudioFlinger::onNonOffloadableGlobalEffectEnable()
 
 status_t AudioFlinger::putOrphanEffectChain_l(const sp<AudioFlinger::EffectChain>& chain)
 {
+    // clear possible suspended state before parking the chain so that it starts in default state
+    // when attached to a new record thread
+    chain->setEffectSuspended_l(FX_IID_AEC, false);
+    chain->setEffectSuspended_l(FX_IID_NS, false);
+
     audio_session_t session = chain->sessionId();
     ssize_t index = mOrphanEffectChains.indexOfKey(session);
     ALOGV("putOrphanEffectChain_l session %d index %zd", session, index);
