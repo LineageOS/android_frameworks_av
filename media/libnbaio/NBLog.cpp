@@ -875,10 +875,10 @@ inline void writeHistToFile(const std::vector<int64_t> &samples, bool append) {
     static const char* const kName = (char *)"/data/misc/audioserver/sample_results.txt";
     // stores deltas between the samples
     std::vector<int64_t> intervals;
-    if (samples.size() == 0) return;
     for (size_t i = 1; i < samples.size(); ++i) {
         intervals.push_back(deltaMs(samples[i - 1], samples[i]));
     }
+    if (intervals.empty()) return;
     // Deletes maximum value in a histogram. Temp quick fix.
     // FIXME: need to find root cause of approx. 35th element from the end
     // consistently being an outlier in the first histogram of a flush
