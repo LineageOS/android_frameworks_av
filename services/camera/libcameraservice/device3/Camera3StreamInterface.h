@@ -298,7 +298,7 @@ class Camera3StreamInterface : public virtual RefBase {
      * Client is responsible to keep the listener object alive throughout the lifecycle of this
      * Camera3Stream.
      */
-    virtual void setBufferFreedListener(Camera3StreamBufferFreedListener* listener) = 0;
+    virtual void setBufferFreedListener(wp<Camera3StreamBufferFreedListener> listener) = 0;
 };
 
 } // namespace camera3

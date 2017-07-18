@@ -331,7 +331,8 @@ public:
     void setStrategy(uint32_t strategy)
             { mStrategy = strategy; }
 
-    // suspend effect of the given type
+    // suspend or restore effects of the specified type. The number of suspend requests is counted
+    // and restore occurs once all suspend requests are cancelled.
     void setEffectSuspended_l(const effect_uuid_t *type,
                               bool suspend);
     // suspend all eligible effects
@@ -372,7 +373,7 @@ private:
     public:
         SuspendedEffectDesc() : mRefCount(0) {}
 
-        int mRefCount;
+        int mRefCount;   // > 0 when suspended
         effect_uuid_t mType;
         wp<EffectModule> mEffect;
     };
@@ -387,6 +388,8 @@ private:
     // OEMs can modify the rules implemented in this method to exclude specific effect
     // types or implementations from the suspend/restore mechanism.
     bool isEffectEligibleForSuspend(const effect_descriptor_t& desc);
+
+    static bool isEffectEligibleForBtNrecSuspend(const effect_uuid_t *type);
 
     void clearInputBuffer_l(const sp<ThreadBase>& thread);
 
@@ -414,6 +417,6 @@ private:
              // mSuspendedEffects lists all effects currently suspended in the chain.
              // Use effect type UUID timelow field as key. There is no real risk of identical
              // timeLow fields among effect type UUIDs.
-             // Updated by updateSuspendedSessions_l() only.
+             // Updated by setEffectSuspended_l() and setEffectSuspendedAll_l() only.
              KeyedVector< int, sp<SuspendedEffectDesc> > mSuspendedEffects;
 };

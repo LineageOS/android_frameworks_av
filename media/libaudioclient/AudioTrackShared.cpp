@@ -36,7 +36,7 @@ size_t clampToSize(T x) {
 // a value between "other" + 1 and "other" + INT32_MAX, the choice of
 // which needs to be the "least recently used" sequence value for "self".
 // In general, this means (new_self) returned is max(self, other) + 1.
-
+__attribute__((no_sanitize("integer")))
 static uint32_t incrementSequence(uint32_t self, uint32_t other) {
     int32_t diff = (int32_t) self - (int32_t) other;
     if (diff >= 0 && diff < INT32_MAX) {
@@ -389,6 +389,7 @@ size_t ClientProxy::getMisalignment()
 
 // ---------------------------------------------------------------------------
 
+__attribute__((no_sanitize("integer")))
 void AudioTrackClientProxy::flush()
 {
     // This works for mFrameCountP2 <= 2^30
@@ -862,6 +863,7 @@ bool  AudioTrackServerProxy::setStreamEndDone() {
     return old;
 }
 
+__attribute__((no_sanitize("integer")))
 void AudioTrackServerProxy::tallyUnderrunFrames(uint32_t frameCount)
 {
     audio_track_cblk_t* cblk = mCblk;
@@ -1017,6 +1019,7 @@ ssize_t StaticAudioTrackServerProxy::pollPosition()
     return (ssize_t) mState.mPosition;
 }
 
+__attribute__((no_sanitize("integer")))
 status_t StaticAudioTrackServerProxy::obtainBuffer(Buffer* buffer, bool ackFlush)
 {
     if (mIsShutdown) {
@@ -1061,6 +1064,7 @@ status_t StaticAudioTrackServerProxy::obtainBuffer(Buffer* buffer, bool ackFlush
     return NO_ERROR;
 }
 
+__attribute__((no_sanitize("integer")))
 void StaticAudioTrackServerProxy::releaseBuffer(Buffer* buffer)
 {
     size_t stepCount = buffer->mFrameCount;

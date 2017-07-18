@@ -32,6 +32,7 @@ LOCAL_SRC_FILES = \
     core/AudioStream.cpp \
     core/AudioStreamBuilder.cpp \
     core/AAudioAudio.cpp \
+    core/AAudioStreamParameters.cpp \
     legacy/AudioStreamLegacy.cpp \
     legacy/AudioStreamRecord.cpp \
     legacy/AudioStreamTrack.cpp \
@@ -90,6 +91,7 @@ LOCAL_C_INCLUDES := \
 LOCAL_SRC_FILES = core/AudioStream.cpp \
     core/AudioStreamBuilder.cpp \
     core/AAudioAudio.cpp \
+    core/AAudioStreamParameters.cpp \
     legacy/AudioStreamLegacy.cpp \
     legacy/AudioStreamRecord.cpp \
     legacy/AudioStreamTrack.cpp \
