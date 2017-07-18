@@ -92,10 +92,10 @@ SoftMPEG2::~SoftMPEG2() {
 }
 
 
-static size_t getMinTimestampIdx(OMX_S64 *pNTimeStamp, bool *pIsTimeStampValid) {
+static ssize_t getMinTimestampIdx(OMX_S64 *pNTimeStamp, bool *pIsTimeStampValid) {
     OMX_S64 minTimeStamp = LLONG_MAX;
-    int idx = -1;
-    for (size_t i = 0; i < MAX_TIME_STAMPS; i++) {
+    ssize_t idx = -1;
+    for (ssize_t i = 0; i < MAX_TIME_STAMPS; i++) {
         if (pIsTimeStampValid[i]) {
             if (pNTimeStamp[i] < minTimeStamp) {
                 minTimeStamp = pNTimeStamp[i];
@@ -750,10 +750,15 @@ void SoftMPEG2::onQueueFilled(OMX_U32 portIndex) {
             }
 
             if (s_dec_op.u4_output_present) {
-                size_t timeStampIdx;
+                ssize_t timeStampIdx;
                 outHeader->nFilledLen = (mWidth * mHeight * 3) / 2;
 
                 timeStampIdx = getMinTimestampIdx(mTimeStamps, mTimeStampsValid);
+                if (timeStampIdx < 0) {
+                    ALOGE("b/62872863, Invalid timestamp index!");
+                    android_errorWriteLog(0x534e4554, "62872863");
+                    return;
+                }
                 outHeader->nTimeStamp = mTimeStamps[timeStampIdx];
                 mTimeStampsValid[timeStampIdx] = false;
 
