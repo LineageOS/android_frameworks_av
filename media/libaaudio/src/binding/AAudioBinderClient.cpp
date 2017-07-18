@@ -57,7 +57,7 @@ AAudioBinderClient::AAudioBinderClient()
         , Singleton<AAudioBinderClient>() {
 
     mAAudioClient = new AAudioClient(this);
-    ALOGD("AAudioBinderClient() created mAAudioClient = %p", mAAudioClient.get());
+    ALOGV("AAudioBinderClient() created mAAudioClient = %p", mAAudioClient.get());
 }
 
 AAudioBinderClient::~AAudioBinderClient() {
@@ -90,8 +90,11 @@ const sp<IAAudioService> AAudioBinderClient::getAAudioService() {
             if (binder != 0) {
                 // Ask for notification if the service dies.
                 status_t status = binder->linkToDeath(mAAudioClient);
-                ALOGD("getAAudioService: linkToDeath(mAAudioClient = %p) returned %d",
-                      mAAudioClient.get(), status);
+                // TODO review what we should do if this fails
+                if (status != NO_ERROR) {
+                    ALOGE("getAAudioService: linkToDeath(mAAudioClient = %p) returned %d",
+                          mAAudioClient.get(), status);
+                }
                 mAAudioService = interface_cast<IAAudioService>(binder);
                 needToRegister = true;
                 // Make sure callbacks can be received by mAAudioClient
