@@ -229,10 +229,13 @@ status_t AAudioConvert_aaudioToAndroidStatus(aaudio_result_t result) {
     case AAUDIO_ERROR_NULL:
         status = UNEXPECTED_NULL;
         break;
+    case AAUDIO_ERROR_UNAVAILABLE:
+        status = NOT_ENOUGH_DATA;
+        break;
+
     // TODO translate these result codes
     case AAUDIO_ERROR_INTERNAL:
     case AAUDIO_ERROR_UNIMPLEMENTED:
-    case AAUDIO_ERROR_UNAVAILABLE:
     case AAUDIO_ERROR_NO_FREE_HANDLES:
     case AAUDIO_ERROR_NO_MEMORY:
     case AAUDIO_ERROR_TIMEOUT:
@@ -267,6 +270,9 @@ aaudio_result_t AAudioConvert_androidToAAudioResult(status_t status) {
         break;
     case WOULD_BLOCK:
         result = AAUDIO_ERROR_WOULD_BLOCK;
+        break;
+    case NOT_ENOUGH_DATA:
+        result = AAUDIO_ERROR_UNAVAILABLE;
         break;
     default:
         result = AAUDIO_ERROR_INTERNAL;

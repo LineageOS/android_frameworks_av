@@ -163,6 +163,11 @@ protected:
 
     aaudio_result_t sendCurrentTimestamp();
 
+    /**
+     * @param positionFrames
+     * @param timeNanos
+     * @return AAUDIO_OK or AAUDIO_ERROR_UNAVAILABLE or other negative error
+     */
     virtual aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) = 0;
 
     virtual aaudio_result_t getDownDataDescription(AudioEndpointParcelable &parcelable) = 0;
