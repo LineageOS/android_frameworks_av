@@ -219,6 +219,8 @@ aaudio_result_t AAudioServiceStreamBase::sendCurrentTimestamp() {
     //          (long long) command.timestamp.timestamp);
         command.what = AAudioServiceMessage::code::TIMESTAMP;
         result = writeUpMessageQueue(&command);
+    } else if (result == AAUDIO_ERROR_UNAVAILABLE) {
+        result = AAUDIO_OK; // just not available yet, try again later
     }
     return result;
 }

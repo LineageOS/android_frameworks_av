@@ -73,13 +73,13 @@ public:
 
     virtual AudioStreamInternal *getStreamInternal() = 0;
 
-    std::atomic<bool>        mCallbackEnabled;
+    std::atomic<bool>        mCallbackEnabled{false};
 
     mutable std::mutex       mLockStreams;
 
     std::vector<android::sp<AAudioServiceStreamShared>> mRegisteredStreams;
 
-    size_t                   mRunningStreams = 0;
+    std::atomic<int>         mRunningStreams{0};
 
 private:
     aaudio_result_t startSharingThread_l();
