@@ -64,10 +64,9 @@ Return<void> TWGraphicBufferProducer::dequeueBuffer(
     sp<Fence> fence;
     ::android::FrameEventHistoryDelta outTimestamps;
     status_t status = mBase->dequeueBuffer(
-            &slot, &fence,
-            width, height,
-            static_cast<::android::PixelFormat>(format), usage,
-            getFrameTimestamps ? &outTimestamps : nullptr);
+        &slot, &fence, width, height,
+        static_cast<::android::PixelFormat>(format), usage, nullptr,
+        getFrameTimestamps ? &outTimestamps : nullptr);
     hidl_handle tFence;
     FrameEventHistoryDelta tOutTimestamps;
 
