@@ -30,6 +30,7 @@
 #include <media/DrmHal.h>
 #include <media/DrmSessionClientInterface.h>
 #include <media/DrmSessionManager.h>
+#include <media/PluginMetricsReporting.h>
 #include <media/drm/DrmAPI.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AString.h>
@@ -421,6 +422,7 @@ status_t DrmHal::destroyPlugin() {
     }
 
     closeOpenSessions();
+    reportMetrics();
     setListener(NULL);
     if (mPlugin != NULL) {
         mPlugin->setListener(NULL);
@@ -494,6 +496,7 @@ status_t DrmHal::closeSession(Vector<uint8_t> const &sessionId) {
             }
         }
     }
+    reportMetrics();
     return toStatusT(status);
 }
 
@@ -745,6 +748,12 @@ status_t DrmHal::releaseAllSecureStops() {
 
 status_t DrmHal::getPropertyString(String8 const &name, String8 &value ) const {
     Mutex::Autolock autoLock(mLock);
+    return getPropertyStringInternal(name, value);
+}
+
+status_t DrmHal::getPropertyStringInternal(String8 const &name, String8 &value) const {
+    // This function is internal to the class and should only be called while
+    // mLock is already held.
 
     if (mInitCheck != OK) {
         return mInitCheck;
@@ -766,6 +775,12 @@ status_t DrmHal::getPropertyString(String8 const &name, String8 &value ) const {
 
 status_t DrmHal::getPropertyByteArray(String8 const &name, Vector<uint8_t> &value ) const {
     Mutex::Autolock autoLock(mLock);
+    return getPropertyByteArrayInternal(name, value);
+}
+
+status_t DrmHal::getPropertyByteArrayInternal(String8 const &name, Vector<uint8_t> &value ) const {
+    // This function is internal to the class and should only be called while
+    // mLock is already held.
 
     if (mInitCheck != OK) {
         return mInitCheck;
@@ -996,6 +1011,22 @@ void DrmHal::writeByteArray(Parcel &obj, hidl_vec<uint8_t> const &vec)
         obj.write(vec.data(), vec.size());
     } else {
         obj.writeInt32(0);
+    }
+}
+
+void DrmHal::reportMetrics() const
+{
+    Vector<uint8_t> metrics;
+    String8 vendor;
+    String8 description;
+    if (getPropertyStringInternal(String8("vendor"), vendor) == OK &&
+            getPropertyStringInternal(String8("description"), description) == OK &&
+            getPropertyByteArrayInternal(String8("metrics"), metrics) == OK) {
+        status_t res = android::reportDrmPluginMetrics(
+                metrics, vendor, description);
+        if (res != OK) {
+            ALOGE("Metrics were retrieved but could not be reported: %i", res);
+        }
     }
 }
 

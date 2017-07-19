@@ -13,16 +13,23 @@ cc_library_shared {
         "IDrm.cpp",
         "IDrmClient.cpp",
         "IMediaDrmService.cpp",
+        "PluginMetricsReporting.cpp",
         "SharedLibrary.cpp",
         "DrmHal.cpp",
         "CryptoHal.cpp",
+        "protos/plugin_metrics.proto",
     ],
+
+    proto: {
+        type: "lite",
+    },
 
     shared_libs: [
         "libbinder",
         "libcutils",
         "libdl",
         "liblog",
+        "libmediametrics",
         "libmediautils",
         "libstagefright_foundation",
         "libutils",
