@@ -40,7 +40,8 @@ public:
     /**
      * Configure based on the EndPointDescriptor_t.
      */
-    aaudio_result_t configure(const EndpointDescriptor *pEndpointDescriptor);
+    aaudio_result_t configure(const EndpointDescriptor *pEndpointDescriptor,
+                              aaudio_direction_t direction);
 
     /**
      * Read from a command passed up from the Server.
@@ -48,17 +49,11 @@ public:
      */
     aaudio_result_t readUpCommand(AAudioServiceMessage *commandPtr);
 
-    /**
-     * Non-blocking write.
-     * @return framesWritten or a negative error code.
-     */
-    aaudio_result_t writeDataNow(const void *buffer, int32_t numFrames);
-
-    void getEmptyFramesAvailable(android::WrappingBuffer *wrappingBuffer);
+    int32_t getEmptyFramesAvailable(android::WrappingBuffer *wrappingBuffer);
 
     int32_t getEmptyFramesAvailable();
 
-    void getFullFramesAvailable(android::WrappingBuffer *wrappingBuffer);
+    int32_t getFullFramesAvailable(android::WrappingBuffer *wrappingBuffer);
 
     int32_t getFullFramesAvailable();
 
