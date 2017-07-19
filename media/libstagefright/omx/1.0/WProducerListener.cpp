@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "WProducerListener.h"
+#include <media/stagefright/omx/1.0/WProducerListener.h>
 
 namespace android {
 namespace hardware {

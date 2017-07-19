@@ -77,7 +77,7 @@
 #include "TestPlayerStub.h"
 #include "nuplayer/NuPlayerDriver.h"
 
-#include <OMX.h>
+#include <media/stagefright/omx/OMX.h>
 
 #include "HDCP.h"
 #include "HTTPBase.h"

@@ -21,7 +21,7 @@
 #include <hidl/Status.h>
 
 #include <binder/Binder.h>
-#include <OMXFenceParcelable.h>
+#include <media/OMXFenceParcelable.h>
 
 #include <android/hardware/media/omx/1.0/IOmxBufferSource.h>
 #include <android/BnOMXBufferSource.h>

@@ -18,7 +18,7 @@
 
 #define SOFT_GSM_H_
 
-#include "SimpleSoftOMXComponent.h"
+#include <media/stagefright/omx/SimpleSoftOMXComponent.h>
 
 extern "C" {
 #include "gsm.h"

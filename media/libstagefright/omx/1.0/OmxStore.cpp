@@ -19,8 +19,8 @@
 
 #include <android-base/logging.h>
 
-#include "Conversion.h"
-#include "OmxStore.h"
+#include <media/stagefright/omx/1.0/Conversion.h>
+#include <media/stagefright/omx/1.0/OmxStore.h>
 
 namespace android {
 namespace hardware {

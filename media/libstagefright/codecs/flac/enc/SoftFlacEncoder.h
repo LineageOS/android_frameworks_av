@@ -18,7 +18,7 @@
 
 #define SOFT_FLAC_ENC_H_
 
-#include "SimpleSoftOMXComponent.h"
+#include <media/stagefright/omx/SimpleSoftOMXComponent.h>
 
 #include "FLAC/stream_encoder.h"
 

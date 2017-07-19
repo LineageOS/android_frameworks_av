@@ -17,7 +17,7 @@
 #ifndef SOFT_AAC_2_H_
 #define SOFT_AAC_2_H_
 
-#include "SimpleSoftOMXComponent.h"
+#include <media/stagefright/omx/SimpleSoftOMXComponent.h>
 
 #include "aacdecoder_lib.h"
 #include "DrcPresModeWrap.h"

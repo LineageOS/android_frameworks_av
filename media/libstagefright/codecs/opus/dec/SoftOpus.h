@@ -23,7 +23,7 @@
 
 #define SOFT_OPUS_H_
 
-#include "SimpleSoftOMXComponent.h"
+#include <media/stagefright/omx/SimpleSoftOMXComponent.h>
 
 struct OpusMSDecoder;
 

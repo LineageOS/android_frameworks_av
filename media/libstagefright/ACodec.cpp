@@ -49,18 +49,18 @@
 
 #include <hidlmemory/mapping.h>
 
-#include <OMX_AudioExt.h>
-#include <OMX_VideoExt.h>
-#include <OMX_Component.h>
-#include <OMX_IndexExt.h>
-#include <OMX_AsString.h>
+#include <media/openmax/OMX_AudioExt.h>
+#include <media/openmax/OMX_VideoExt.h>
+#include <media/openmax/OMX_Component.h>
+#include <media/openmax/OMX_IndexExt.h>
+#include <media/openmax/OMX_AsString.h>
 
 #include "include/avc_utils.h"
 #include "include/ACodecBufferChannel.h"
 #include "include/DataConverter.h"
 #include "include/SecureBuffer.h"
 #include "include/SharedMemoryBuffer.h"
-#include "omx/OMXUtils.h"
+#include <media/stagefright/omx/OMXUtils.h>
 
 #include <android/hidl/allocator/1.0/IAllocator.h>
 #include <android/hidl/memory/1.0/IMemory.h>
