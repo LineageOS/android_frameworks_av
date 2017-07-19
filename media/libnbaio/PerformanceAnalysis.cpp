@@ -21,7 +21,6 @@
 #include <algorithm>
 #include <climits>
 #include <deque>
-#include <fstream>
 #include <iostream>
 #include <math.h>
 #include <numeric>
@@ -36,6 +35,7 @@
 #include <audio_utils/roundup.h>
 #include <media/nbaio/NBLog.h>
 #include <media/nbaio/PerformanceAnalysis.h>
+#include <media/nbaio/ReportPerformance.h>
 // #include <utils/CallStack.h> // used to print callstack
 #include <utils/Log.h>
 #include <utils/String8.h>
@@ -44,6 +44,8 @@
 #include <utility>
 
 namespace android {
+
+namespace ReportPerformance {
 
 PerformanceAnalysis::PerformanceAnalysis() {
     // These variables will be (FIXME) learned from the data
@@ -76,51 +78,85 @@ static int widthOf(int x) {
 // outliers, analyzes the outlier series for unexpectedly
 // small or large values and stores these as peaks, and flushes
 // the timestamp series from memory.
-void PerformanceAnalysis::processAndFlushTimeStampSeries(int author) {
+void PerformanceAnalysis::processAndFlushTimeStampSeries() {
     // 1) analyze the series to store all outliers and their exact timestamps:
-    storeOutlierData(mTimeStampSeries[author]);
+    storeOutlierData(mTimeStampSeries);
 
     // 2) detect peaks in the outlier series
     detectPeaks();
 
-    // 3) compute its histogram, append this to mRecentHists and erase the time series
-    // FIXME: need to store the timestamp of the beginning of each histogram
-    // FIXME: Restore LOG_HIST_FLUSH to separate histograms at every end-of-stream event
-    // A histogram should not span data between audio off/on timespans
-    mRecentHists.emplace_back(author, buildBuckets(mTimeStampSeries[author]));
+    // 3) compute its histogram, append to mRecentHists and clear the time series
+    mRecentHists.emplace_back(static_cast<timestamp>(mTimeStampSeries[0]),
+                              buildBuckets(mTimeStampSeries));
     // do not let mRecentHists exceed capacity
     // ALOGD("mRecentHists size: %d", static_cast<int>(mRecentHists.size()));
     if (mRecentHists.size() >= kRecentHistsCapacity) {
         //  ALOGD("popped back mRecentHists");
         mRecentHists.pop_front();
     }
-    mTimeStampSeries[author].clear();
+    mTimeStampSeries.clear();
 }
 
 // forces short-term histogram storage to avoid adding idle audio time interval
 // to buffer period data
-void PerformanceAnalysis::handleStateChange(int author) {
+void PerformanceAnalysis::handleStateChange() {
     ALOGD("handleStateChange");
-    processAndFlushTimeStampSeries(author);
+    processAndFlushTimeStampSeries();
     return;
 }
 
-// Takes a single buffer period timestamp entry with author information and stores it
-// in a temporary series of timestamps. Once the series is full, the data is analyzed,
+// Takes a single buffer period timestamp entry information and stores it in a
+// temporary series of timestamps. Once the series is full, the data is analyzed,
 // stored, and emptied.
-// TODO: decide whether author or file location information is more important to store
-// for now, only stores author (thread)
-void PerformanceAnalysis::logTsEntry(int author, int64_t ts) {
+void PerformanceAnalysis::logTsEntry(int64_t ts) {
     // TODO might want to filter excessively high outliers, which are usually caused
     // by the thread being inactive.
     // Store time series data for each reader in order to bucket it once there
     // is enough data. Then, write to recentHists as a histogram.
-    mTimeStampSeries[author].push_back(ts);
+    mTimeStampSeries.push_back(ts);
     // if length of the time series has reached kShortHistSize samples,
     // analyze the data and flush the timestamp series from memory
-    if (mTimeStampSeries[author].size() >= kShortHistSize) {
-        processAndFlushTimeStampSeries(author);
+    if (mTimeStampSeries.size() >= kShortHistSize) {
+        processAndFlushTimeStampSeries();
     }
+}
+
+// When the short-term histogram array mRecentHists has reached capacity,
+// merge histograms for data compression and store them in mLongTermHists
+// clears mRecentHists
+// TODO: have logTsEntry write directly to mLongTermHists, discard mRecentHists,
+// start a new histogram when a peak occurs
+void PerformanceAnalysis::processAndFlushRecentHists() {
+
+    // Buckets is used to aggregate short-term histograms.
+    Histogram buckets;
+    timestamp startingTs = mRecentHists[0].first;
+
+    for (const auto &shortHist: mRecentHists) {
+        // If the time between starting and ending timestamps has reached the maximum,
+        // add the current histogram (buckets) to the long-term histogram buffer,
+        // clear buckets, and start a new long-term histogram aggregation process.
+        if (deltaMs(startingTs, shortHist.first) >= kMaxHistTimespanMs) {
+            mLongTermHists.emplace_back(startingTs, std::move(buckets));
+            buckets.clear();
+            startingTs = shortHist.first;
+            // When memory is full, delete oldest histogram
+            // TODO use a circular buffer
+            if (mLongTermHists.size() >= kLongTermHistsCapacity) {
+                mLongTermHists.pop_front();
+            }
+        }
+
+        // add current histogram to buckets
+        for (const auto &countPair : shortHist.second) {
+            buckets[countPair.first] += countPair.second;
+        }
+    }
+    mRecentHists.clear();
+    // TODO: decide when/where to call writeToFile
+    // TODO: add a thread-specific extension to the file name
+    static const char* const kName = (const char *) "/data/misc/audioserver/sample_results.txt";
+    writeToFile(mOutlierData, mLongTermHists, kName, false);
 }
 
 // Given a series of outlier intervals (mOutlier data),
@@ -131,7 +167,6 @@ void PerformanceAnalysis::logTsEntry(int author, int64_t ts) {
 // are set to the peak value and 0.
 void PerformanceAnalysis::detectPeaks() {
     if (mOutlierData.empty()) {
-        ALOGD("peak detector called on empty array");
         return;
     }
 
@@ -166,14 +201,12 @@ void PerformanceAnalysis::detectPeaks() {
             mPeakDetectorSd = sqrt(std::accumulate(start, it + 1, 0.0,
                       [=](auto &a, auto &b){ return a + sqr(b.first - mPeakDetectorMean);})) /
                       ((kN > 1)? kN - 1 : kN); // kN - 1: mean is correlated with variance
-            // ALOGD("value, mean, sd: %f, %f, %f", static_cast<double>(it->first), mean, sd);
         }
         // surprising value: store peak timestamp and reset mean, sd, and start iterator
         else {
             mPeakTimestamps.emplace_back(it->second);
             // TODO: remove pop_front once a circular buffer is in place
-            if (mPeakTimestamps.size() >= kShortHistSize) {
-                ALOGD("popped back mPeakTimestamps");
+            if (mPeakTimestamps.size() >= kPeakSeriesSize) {
                 mPeakTimestamps.pop_front();
             }
             mPeakDetectorMean = static_cast<double>(it->first);
@@ -181,9 +214,6 @@ void PerformanceAnalysis::detectPeaks() {
             start = it;
         }
     }
-    //for (const auto &it : mPeakTimestamps) {
-    //    ALOGE("mPeakTimestamps %f", static_cast<double>(it));
-    //}
     return;
 }
 
@@ -194,7 +224,6 @@ void PerformanceAnalysis::detectPeaks() {
 // This function is applied to the time series before it is converted into a histogram.
 void PerformanceAnalysis::storeOutlierData(const std::vector<int64_t> &timestamps) {
     if (timestamps.size() < 1) {
-        ALOGE("storeOutlierData called on empty vector");
         return;
     }
     // first pass: need to initialize
@@ -207,10 +236,9 @@ void PerformanceAnalysis::storeOutlierData(const std::vector<int64_t> &timestamp
             mOutlierData.emplace_back(mElapsed, static_cast<uint64_t>(mPrevNs));
             // Remove oldest value if the vector is full
             // TODO: remove pop_front once circular buffer is in place
-            // FIXME: change kShortHistSize to some other constant. Make sure it is large
-            // enough that data will never be lost before being written to a long-term FIFO
-            if (mOutlierData.size() >= kShortHistSize) {
-                ALOGD("popped back mOutlierData");
+            // FIXME: make sure kShortHistSize is large enough that that data will never be lost
+            // before being written to file or to a FIFO
+            if (mOutlierData.size() >= kOutlierSeriesSize) {
                 mOutlierData.pop_front();
             }
             mElapsed = 0;
@@ -236,9 +264,8 @@ void PerformanceAnalysis::testFunction() {
 }
 
 // TODO Make it return a std::string instead of modifying body --> is this still relevant?
-// FIXME: as can be seen when printing the values, the outlier timestamps typically occur
-// in the first histogram 35 to 38 indices from the end (most often 35).
 // TODO consider changing all ints to uint32_t or uint64_t
+// TODO: move this to ReportPerformance, probably make it a friend function of PerformanceAnalysis
 void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
     if (mRecentHists.size() < 1) {
         ALOGD("reportPerformance: mRecentHists is empty");
@@ -341,5 +368,7 @@ void PerformanceAnalysis::alertIfGlitch(const std::vector<int64_t> &samples) {
     }
     return;
 }
+
+} // namespace ReportPerformance
 
 }   // namespace android
