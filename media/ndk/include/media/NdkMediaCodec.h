@@ -27,6 +27,7 @@
 #ifndef _NDK_MEDIA_CODEC_H
 #define _NDK_MEDIA_CODEC_H
 
+#include <stdint.h>
 #include <sys/cdefs.h>
 
 #include "NdkMediaCrypto.h"
@@ -130,17 +131,45 @@ uint8_t* AMediaCodec_getOutputBuffer(AMediaCodec*, size_t idx, size_t *out_size)
  */
 ssize_t AMediaCodec_dequeueInputBuffer(AMediaCodec*, int64_t timeoutUs);
 
-/**
- * Send the specified buffer to the codec for processing.
+/*
+ * __USE_FILE_OFFSET64 changes the type of off_t in LP32, which changes the ABI
+ * of these declarations to  not match the platform. In that case, define these
+ * APIs in terms of int32_t instead. Passing an off_t in this situation will
+ * result in silent truncation unless the user builds with -Wconversion, but the
+ * only alternative it to not expose them at all for this configuration, which
+ * makes the whole API unusable.
+ *
+ * https://github.com/android-ndk/ndk/issues/459
  */
-media_status_t AMediaCodec_queueInputBuffer(AMediaCodec*,
-        size_t idx, off_t offset, size_t size, uint64_t time, uint32_t flags);
+#if defined(__USE_FILE_OFFSET64) && !defined(__LP64__)
+#define _off_t_compat int32_t
+#else
+#define _off_t_compat off_t
+#endif  /* defined(__USE_FILE_OFFSET64) && !defined(__LP64__) */
+
+#if (defined(__cplusplus) && __cplusplus >= 201103L) || \
+    __STDC_VERSION__ >= 201112L
+static_assert(sizeof(_off_t_compat) == sizeof(long),
+              "_off_t_compat does not match the NDK ABI. See "
+              "https://github.com/android-ndk/ndk/issues/459.");
+#endif
 
 /**
  * Send the specified buffer to the codec for processing.
  */
-media_status_t AMediaCodec_queueSecureInputBuffer(AMediaCodec*,
-        size_t idx, off_t offset, AMediaCodecCryptoInfo*, uint64_t time, uint32_t flags);
+media_status_t AMediaCodec_queueInputBuffer(AMediaCodec*, size_t idx,
+                                            _off_t_compat offset, size_t size,
+                                            uint64_t time, uint32_t flags);
+
+/**
+ * Send the specified buffer to the codec for processing.
+ */
+media_status_t AMediaCodec_queueSecureInputBuffer(AMediaCodec*, size_t idx,
+                                                  _off_t_compat offset,
+                                                  AMediaCodecCryptoInfo*,
+                                                  uint64_t time, uint32_t flags);
+
+#undef _off_t_compat
 
 /**
  * Get the index of the next available buffer of processed data.
