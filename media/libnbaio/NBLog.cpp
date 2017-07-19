@@ -108,6 +108,7 @@
 #include <audio_utils/roundup.h>
 #include <media/nbaio/NBLog.h>
 #include <media/nbaio/PerformanceAnalysis.h>
+#include <media/nbaio/ReportPerformance.h>
 // #include <utils/CallStack.h> // used to print callstack
 #include <utils/Log.h>
 #include <utils/String8.h>
@@ -869,42 +870,17 @@ std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
 
 }
 
-// writes sample deltas to file, either truncating or appending
-inline void writeHistToFile(const std::vector<int64_t> &samples, bool append) {
-    // name of file on audioserver
-    static const char* const kName = (char *)"/data/misc/audioserver/sample_results.txt";
-    // stores deltas between the samples
-    std::vector<int64_t> intervals;
-    for (size_t i = 1; i < samples.size(); ++i) {
-        intervals.push_back(deltaMs(samples[i - 1], samples[i]));
-    }
-    if (intervals.empty()) return;
-    // Deletes maximum value in a histogram. Temp quick fix.
-    // FIXME: need to find root cause of approx. 35th element from the end
-    // consistently being an outlier in the first histogram of a flush
-    // ALOGW("%" PRId64 "before", (int64_t) *(std::max_element(intervals.begin(), intervals.end())));
-    intervals.erase(std::max_element(intervals.begin(), intervals.end()));
-    // ALOGW("%" PRId64 "after", (int64_t) *(std::max_element(intervals.begin(), intervals.end())));
-    std::ofstream ofs;
-    ofs.open(kName, append ? std::ios::app : std::ios::trunc);
-    if (!ofs) {
-        ALOGW("couldn't open file %s", kName);
-        return;
-    }
-    for (size_t i = 0; i < intervals.size(); ++i) {
-        ofs << intervals[i] << "\n";
-    }
-    ofs.close();
-}
-
+// TODO: move this to PerformanceAnalysis
+// TODO: make call to dump periodic so that data in shared FIFO does not get overwritten
 void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapshot)
 {
-    //  CallStack cs(LOG_TAG);
     mFd = fd;
     mIndent = indent;
     String8 timestamp, body;
     // FIXME: this is not thread safe
-    static PerformanceAnalysis performanceAnalysis; // used to store data and to call analysis functions
+    // TODO: need a separate instance of performanceAnalysis for each thread
+    // used to store data and to call analysis functions
+    static ReportPerformance::PerformanceAnalysis performanceAnalysis;
     size_t lost = snapshot.lost() + (snapshot.begin() - EntryIterator(snapshot.data()));
     if (lost > 0) {
         body.appendFormat("warning: lost %zu bytes worth of events", lost);
@@ -926,15 +902,12 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             memcpy(&hash, &(data->hash), sizeof(hash));
             int64_t ts;
             memcpy(&ts, &data->ts, sizeof(ts));
-            performanceAnalysis.logTsEntry(data->author, ts);
+            performanceAnalysis.logTsEntry(ts);
             ++entry;
             break;
         }
         case EVENT_AUDIO_STATE: {
-            StateTsEntryWithAuthor *data = (StateTsEntryWithAuthor *) (entry->data);
-            // TODO This memcpies are here to avoid unaligned memory access crash.
-            // There's probably a more efficient way to do it
-            performanceAnalysis.handleStateChange(data->author);
+            performanceAnalysis.handleStateChange();
             ++entry;
             break;
         }
