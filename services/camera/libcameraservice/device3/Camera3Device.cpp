@@ -851,12 +851,14 @@ status_t Camera3Device::submitRequestsHelper(
 hardware::Return<void> Camera3Device::processCaptureResult(
         const hardware::hidl_vec<
                 hardware::camera::device::V3_2::CaptureResult>& results) {
-    {
-        Mutex::Autolock l(mLock);
-        if (mStatus == STATUS_ERROR) {
-            // Per API contract, HAL should act as closed after device error
-            ALOGW("%s: received capture result in error state!", __FUNCTION__);
-        }
+    // Ideally we should grab mLock, but that can lead to deadlock, and
+    // it's not super important to get up to date value of mStatus for this
+    // warning print, hence skipping the lock here
+    if (mStatus == STATUS_ERROR) {
+        // Per API contract, HAL should act as closed after device error
+        // But mStatus can be set to error by framework as well, so just log
+        // a warning here.
+        ALOGW("%s: received capture result in error state.", __FUNCTION__);
     }
 
     if (mProcessCaptureResultLock.tryLock() != OK) {
@@ -989,13 +991,16 @@ void Camera3Device::processOneCaptureResultLocked(
 
 hardware::Return<void> Camera3Device::notify(
         const hardware::hidl_vec<hardware::camera::device::V3_2::NotifyMsg>& msgs) {
-    {
-        Mutex::Autolock l(mLock);
-        if (mStatus == STATUS_ERROR) {
-            // Per API contract, HAL should act as closed after device error
-            ALOGW("%s: received notify message in error state!", __FUNCTION__);
-        }
+    // Ideally we should grab mLock, but that can lead to deadlock, and
+    // it's not super important to get up to date value of mStatus for this
+    // warning print, hence skipping the lock here
+    if (mStatus == STATUS_ERROR) {
+        // Per API contract, HAL should act as closed after device error
+        // But mStatus can be set to error by framework as well, so just log
+        // a warning here.
+        ALOGW("%s: received notify message in error state.", __FUNCTION__);
     }
+
     for (const auto& msg : msgs) {
         notify(msg);
     }
