@@ -30,6 +30,7 @@
 #include <media/DrmHal.h>
 #include <media/DrmSessionClientInterface.h>
 #include <media/DrmSessionManager.h>
+#include <media/PluginMetricsReporting.h>
 #include <media/drm/DrmAPI.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AString.h>
@@ -194,7 +195,18 @@ DrmHal::DrmHal()
      mInitCheck((mFactories.size() == 0) ? ERROR_UNSUPPORTED : NO_INIT) {
 }
 
+void DrmHal::closeOpenSessions() {
+    if (mPlugin != NULL) {
+        for (size_t i = 0; i < mOpenSessions.size(); i++) {
+            mPlugin->closeSession(toHidlVec(mOpenSessions[i]));
+            DrmSessionManager::Instance()->removeSession(mOpenSessions[i]);
+        }
+    }
+    mOpenSessions.clear();
+}
+
 DrmHal::~DrmHal() {
+    closeOpenSessions();
     DrmSessionManager::Instance()->removeDrm(mDrmSessionClient);
 }
 
@@ -405,11 +417,12 @@ status_t DrmHal::createPlugin(const uint8_t uuid[16],
 
 status_t DrmHal::destroyPlugin() {
     Mutex::Autolock autoLock(mLock);
-
     if (mInitCheck != OK) {
         return mInitCheck;
     }
 
+    closeOpenSessions();
+    reportMetrics();
     setListener(NULL);
     if (mPlugin != NULL) {
         mPlugin->setListener(NULL);
@@ -461,6 +474,7 @@ status_t DrmHal::openSession(Vector<uint8_t> &sessionId) {
     if (err == OK) {
         DrmSessionManager::Instance()->addSession(getCallingPid(),
                 mDrmSessionClient, sessionId);
+        mOpenSessions.push(sessionId);
     }
     return err;
 }
@@ -475,7 +489,14 @@ status_t DrmHal::closeSession(Vector<uint8_t> const &sessionId) {
     Status status = mPlugin->closeSession(toHidlVec(sessionId));
     if (status == Status::OK) {
         DrmSessionManager::Instance()->removeSession(sessionId);
+        for (size_t i = 0; i < mOpenSessions.size(); i++) {
+            if (mOpenSessions[i] == sessionId) {
+                mOpenSessions.removeAt(i);
+                break;
+            }
+        }
     }
+    reportMetrics();
     return toStatusT(status);
 }
 
@@ -727,6 +748,12 @@ status_t DrmHal::releaseAllSecureStops() {
 
 status_t DrmHal::getPropertyString(String8 const &name, String8 &value ) const {
     Mutex::Autolock autoLock(mLock);
+    return getPropertyStringInternal(name, value);
+}
+
+status_t DrmHal::getPropertyStringInternal(String8 const &name, String8 &value) const {
+    // This function is internal to the class and should only be called while
+    // mLock is already held.
 
     if (mInitCheck != OK) {
         return mInitCheck;
@@ -748,6 +775,12 @@ status_t DrmHal::getPropertyString(String8 const &name, String8 &value ) const {
 
 status_t DrmHal::getPropertyByteArray(String8 const &name, Vector<uint8_t> &value ) const {
     Mutex::Autolock autoLock(mLock);
+    return getPropertyByteArrayInternal(name, value);
+}
+
+status_t DrmHal::getPropertyByteArrayInternal(String8 const &name, Vector<uint8_t> &value ) const {
+    // This function is internal to the class and should only be called while
+    // mLock is already held.
 
     if (mInitCheck != OK) {
         return mInitCheck;
@@ -962,6 +995,7 @@ status_t DrmHal::signRSA(Vector<uint8_t> const &sessionId,
 void DrmHal::binderDied(const wp<IBinder> &the_late_who __unused)
 {
     Mutex::Autolock autoLock(mLock);
+    closeOpenSessions();
     setListener(NULL);
     if (mPlugin != NULL) {
         mPlugin->setListener(NULL);
@@ -977,6 +1011,22 @@ void DrmHal::writeByteArray(Parcel &obj, hidl_vec<uint8_t> const &vec)
         obj.write(vec.data(), vec.size());
     } else {
         obj.writeInt32(0);
+    }
+}
+
+void DrmHal::reportMetrics() const
+{
+    Vector<uint8_t> metrics;
+    String8 vendor;
+    String8 description;
+    if (getPropertyStringInternal(String8("vendor"), vendor) == OK &&
+            getPropertyStringInternal(String8("description"), description) == OK &&
+            getPropertyByteArrayInternal(String8("metrics"), metrics) == OK) {
+        status_t res = android::reportDrmPluginMetrics(
+                metrics, vendor, description);
+        if (res != OK) {
+            ALOGE("Metrics were retrieved but could not be reported: %i", res);
+        }
     }
 }
 

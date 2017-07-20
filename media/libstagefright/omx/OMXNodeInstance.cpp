@@ -41,7 +41,7 @@
 #include <utils/misc.h>
 #include <utils/NativeHandle.h>
 #include <media/OMXBuffer.h>
-#include <media/vndk/xmlparser/1.0/MediaCodecsXmlParser.h>
+#include <media/stagefright/xmlparser/MediaCodecsXmlParser.h>
 
 #include <hidlmemory/mapping.h>
 

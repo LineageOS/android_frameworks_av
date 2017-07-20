@@ -1,5 +1,5 @@
 cc_library_shared {
-    name: "libstagefright_xmlparser@1.0",
+    name: "libstagefright_xmlparser",
     vendor_available: true,
 
     srcs: [
@@ -9,6 +9,10 @@ cc_library_shared {
     include_dirs: [
         "frameworks/av/media/libstagefright",
         "frameworks/av/include",
+    ],
+
+    export_include_dirs: [
+        "include",
     ],
 
     shared_libs: [

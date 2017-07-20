@@ -18,7 +18,7 @@
 #define LOG_TAG "MediaCodecsXmlParser"
 #include <utils/Log.h>
 
-#include <media/vndk/xmlparser/1.0/MediaCodecsXmlParser.h>
+#include <media/stagefright/xmlparser/MediaCodecsXmlParser.h>
 
 #include <media/MediaCodecInfo.h>
 

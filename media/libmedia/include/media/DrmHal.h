@@ -39,6 +39,11 @@ namespace android {
 
 struct DrmSessionClientInterface;
 
+inline bool operator==(const Vector<uint8_t> &l, const Vector<uint8_t> &r) {
+    if (l.size() != r.size()) return false;
+    return memcmp(l.array(), r.array(), l.size()) == 0;
+}
+
 struct DrmHal : public BnDrm,
              public IBinder::DeathRecipient,
              public IDrmPluginListener {
@@ -161,6 +166,9 @@ private:
     const Vector<sp<IDrmFactory>> mFactories;
     sp<IDrmPlugin> mPlugin;
 
+    Vector<Vector<uint8_t>> mOpenSessions;
+    void closeOpenSessions();
+
     /**
      * mInitCheck is:
      *   NO_INIT if a plugin hasn't been created yet
@@ -174,6 +182,11 @@ private:
             const uint8_t uuid[16], const String8& appPackageName);
 
     void writeByteArray(Parcel &obj, const hidl_vec<uint8_t>& array);
+
+    void reportMetrics() const;
+    status_t getPropertyStringInternal(String8 const &name, String8 &value) const;
+    status_t getPropertyByteArrayInternal(String8 const &name,
+                                          Vector<uint8_t> &value) const;
 
     DISALLOW_EVIL_CONSTRUCTORS(DrmHal);
 };
