@@ -71,7 +71,6 @@ cc_defaults {
     ],
 
     include_dirs: [
-        "frameworks/av/include", // for media/vndk/xmlparser/1.0/MediaCodecsXmlParser.h
         "frameworks/av/include/media",
         "frameworks/native/include", // for media/hardware/MetadataBufferType.h
         "frameworks/native/include/media/openmax",

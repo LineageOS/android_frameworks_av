@@ -26,7 +26,6 @@ cc_library_shared {
     ],
 
     include_dirs: [
-        "frameworks/av/include", // for media/vndk/xmlparser/1.0/MediaCodecsXmlParser.h
         "frameworks/av/include/media/",
         "frameworks/av/media/libstagefright",
         "frameworks/av/media/libstagefright/include",
@@ -45,12 +44,12 @@ cc_library_shared {
         "libgui",
         "libcutils",
         "libstagefright_foundation",
+        "libstagefright_xmlparser",
         "libdl",
         "libhidlbase",
         "libhidlmemory",
         "libhidltransport",
         "libnativewindow", // TODO(b/62923479): use header library
-        "libstagefright_xmlparser@1.0",
         "android.hidl.memory@1.0",
         "android.hidl.token@1.0-utils",
         "android.hardware.media@1.0",
@@ -59,7 +58,10 @@ cc_library_shared {
         "android.hardware.graphics.bufferqueue@1.0",
     ],
 
-    export_shared_lib_headers: ["android.hidl.memory@1.0"],
+    export_shared_lib_headers: [
+        "android.hidl.memory@1.0",
+	"libstagefright_xmlparser",
+    ],
 
     cflags: [
         "-Werror",
