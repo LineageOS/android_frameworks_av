@@ -135,7 +135,11 @@ status_t AudioEffect::set(const effect_uuid_t *type,
             &mStatus, &mId, &enabled);
 
     if (iEffect == 0 || (mStatus != NO_ERROR && mStatus != ALREADY_EXISTS)) {
-        ALOGE("set(): AudioFlinger could not create effect, status: %d", mStatus);
+        char typeBuffer[64], uuidBuffer[64];
+        guidToString(type, typeBuffer, sizeof(typeBuffer));
+        guidToString(uuid, uuidBuffer, sizeof(uuidBuffer));
+        ALOGE("set(): AudioFlinger could not create effect %s / %s, status: %d",
+                typeBuffer, uuidBuffer, mStatus);
         if (iEffect == 0) {
             mStatus = NO_INIT;
         }

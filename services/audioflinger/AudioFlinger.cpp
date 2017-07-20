@@ -2603,7 +2603,7 @@ void AudioFlinger::purgeStaleEffects_l() {
             while (ec->mEffects.size()) {
                 sp<EffectModule> effect = ec->mEffects[0];
                 effect->unPin();
-                t->removeEffect_l(effect);
+                t->removeEffect_l(effect, /*release*/ true);
                 if (effect->purgeHandles()) {
                     t->checkSuspendOnEffectEnabled_l(effect, false, effect->sessionId());
                 }
