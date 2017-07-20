@@ -34,6 +34,7 @@ cc_defaults {
         "IMediaCodecList.cpp",
         "IMediaCodecService.cpp",
         "IOMX.cpp",
+        "IOMXStore.cpp",
         "MediaCodecBuffer.cpp",
         "MediaCodecInfo.cpp",
         "MediaDefs.cpp",
