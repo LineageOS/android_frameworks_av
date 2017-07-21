@@ -369,12 +369,43 @@ int32_t AAudioProperty_getMixerBursts() {
     return prop;
 }
 
+int32_t AAudioProperty_getWakeupDelayMicros() {
+    const int32_t minMicros = 0; // arbitrary
+    const int32_t defaultMicros = 200; // arbitrary, based on some observed jitter
+    const int32_t maxMicros = 5000; // arbitrary, probably don't want more than 500
+    int32_t prop = property_get_int32(AAUDIO_PROP_WAKEUP_DELAY_USEC, defaultMicros);
+    if (prop < minMicros) {
+        ALOGW("AAudioProperty_getWakeupDelayMicros: clipped %d to %d", prop, minMicros);
+        prop = minMicros;
+    } else if (prop > maxMicros) {
+        ALOGW("AAudioProperty_getWakeupDelayMicros: clipped %d to %d", prop, maxMicros);
+        prop = maxMicros;
+    }
+    return prop;
+}
+
+int32_t AAudioProperty_getMinimumSleepMicros() {
+    const int32_t minMicros = 20; // arbitrary
+    const int32_t defaultMicros = 200; // arbitrary
+    const int32_t maxMicros = 2000; // arbitrary
+    int32_t prop = property_get_int32(AAUDIO_PROP_MINIMUM_SLEEP_USEC, defaultMicros);
+    if (prop < minMicros) {
+        ALOGW("AAudioProperty_getMinimumSleepMicros: clipped %d to %d", prop, minMicros);
+        prop = minMicros;
+    } else if (prop > maxMicros) {
+        ALOGW("AAudioProperty_getMinimumSleepMicros: clipped %d to %d", prop, maxMicros);
+        prop = maxMicros;
+    }
+    return prop;
+}
+
 int32_t AAudioProperty_getHardwareBurstMinMicros() {
     const int32_t defaultMicros = 1000; // arbitrary
     const int32_t maxMicros = 1000 * 1000; // arbitrary
     int32_t prop = property_get_int32(AAUDIO_PROP_HW_BURST_MIN_USEC, defaultMicros);
     if (prop < 1 || prop > maxMicros) {
-        ALOGE("AAudioProperty_getHardwareBurstMinMicros: invalid = %d", prop);
+        ALOGE("AAudioProperty_getHardwareBurstMinMicros: invalid = %d, use %d",
+              prop, defaultMicros);
         prop = defaultMicros;
     }
     return prop;

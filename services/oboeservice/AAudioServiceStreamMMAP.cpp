@@ -154,7 +154,7 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
               status);
         return AAUDIO_ERROR_UNAVAILABLE;
     } else {
-        ALOGD("createMmapBuffer status %d, buffer_size, %d burst_size %d"
+        ALOGD("createMmapBuffer status = %d, buffer_size = %d, burst_size %d"
                 ", Sharable FD: %s",
               status,
               abs(mMmapBufferinfo.buffer_size_frames),

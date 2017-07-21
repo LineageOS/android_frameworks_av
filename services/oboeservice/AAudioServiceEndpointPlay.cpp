@@ -74,16 +74,18 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
         // Mix data from each active stream.
         mMixer.clear();
         { // use lock guard
+            int index = 0;
             std::lock_guard <std::mutex> lock(mLockStreams);
             for (sp<AAudioServiceStreamShared> sharedStream : mRegisteredStreams) {
                 if (sharedStream->isRunning()) {
                     FifoBuffer *fifo = sharedStream->getDataFifoBuffer();
                     float volume = 1.0; // to match legacy volume
-                    bool underflowed = mMixer.mix(fifo, volume);
+                    bool underflowed = mMixer.mix(index, fifo, volume);
                     underflowCount += underflowed ? 1 : 0;
                     // TODO log underflows in each stream
                     sharedStream->markTransferTime(AudioClock::getNanoseconds());
                 }
+                index++;
             }
         }
 
