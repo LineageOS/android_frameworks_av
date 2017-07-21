@@ -25,7 +25,7 @@
 #define NANOS_PER_MILLISECOND (NANOS_PER_MICROSECOND * 1000)
 #define NANOS_PER_SECOND      (NANOS_PER_MILLISECOND * 1000)
 
-static const char *getSharingModeText(aaudio_sharing_mode_t mode) {
+const char *getSharingModeText(aaudio_sharing_mode_t mode) {
     const char *modeText = "unknown";
     switch (mode) {
     case AAUDIO_SHARING_MODE_EXCLUSIVE:
@@ -49,7 +49,7 @@ static int64_t getNanoseconds(clockid_t clockId = CLOCK_MONOTONIC) {
     return (time.tv_sec * NANOS_PER_SECOND) + time.tv_nsec;
 }
 
-void displayPeakLevel(float peakLevel) {
+static void displayPeakLevel(float peakLevel) {
     printf("%5.3f ", peakLevel);
     const int maxStars = 50; // arbitrary, fits on one line
     int numStars = (int) (peakLevel * maxStars);
@@ -57,6 +57,26 @@ void displayPeakLevel(float peakLevel) {
         printf("*");
     }
     printf("\n");
+}
+
+/**
+ * @param position1 position of hardware frame
+ * @param nanoseconds1
+ * @param position2 position of client read/write
+ * @param nanoseconds2
+ * @param sampleRate
+ * @return latency in milliseconds
+ */
+static double calculateLatencyMillis(int64_t position1, int64_t nanoseconds1,
+                              int64_t position2, int64_t nanoseconds2,
+                              int64_t sampleRate) {
+    int64_t deltaFrames = position2 - position1;
+    int64_t deltaTime =
+            (NANOS_PER_SECOND * deltaFrames / sampleRate);
+    int64_t timeCurrentFramePlayed = nanoseconds1 + deltaTime;
+    int64_t latencyNanos = timeCurrentFramePlayed - nanoseconds2;
+    double latencyMillis = latencyNanos / 1000000.0;
+    return latencyMillis;
 }
 
 #endif // AAUDIO_EXAMPLE_UTILS_H

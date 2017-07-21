@@ -20,6 +20,7 @@
 #include <assert.h>
 #include <mutex>
 
+#include <media/AudioClient.h>
 #include <utils/RefBase.h>
 
 #include "fifo/FifoBuffer.h"
@@ -27,7 +28,7 @@
 #include "binding/AudioEndpointParcelable.h"
 #include "binding/AAudioServiceMessage.h"
 #include "utility/AAudioUtilities.h"
-#include <media/AudioClient.h>
+#include "utility/AudioClock.h"
 
 #include "SharedRingBuffer.h"
 #include "AAudioThread.h"
@@ -170,6 +171,8 @@ protected:
      */
     virtual aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) = 0;
 
+    virtual aaudio_result_t getHardwareTimestamp(int64_t *positionFrames, int64_t *timeNanos) = 0;
+
     virtual aaudio_result_t getDownDataDescription(AudioEndpointParcelable &parcelable) = 0;
 
     aaudio_stream_state_t   mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
@@ -190,6 +193,8 @@ protected:
     int32_t                 mCapacityInFrames = AAUDIO_UNSPECIFIED;
     android::AudioClient    mMmapClient;
     audio_port_handle_t     mClientHandle = AUDIO_PORT_HANDLE_NONE;
+
+    SimpleDoubleBuffer<Timestamp>  mAtomicTimestamp;
 
 private:
     aaudio_handle_t         mHandle = -1;

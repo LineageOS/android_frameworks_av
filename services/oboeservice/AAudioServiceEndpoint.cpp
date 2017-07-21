@@ -177,7 +177,10 @@ bool AAudioServiceEndpoint::matches(const AAudioStreamConfiguration& configurati
             configuration.getSamplesPerFrame() != mStreamInternal->getSamplesPerFrame()) {
         return false;
     }
-
     return true;
 }
 
+
+aaudio_result_t AAudioServiceEndpoint::getTimestamp(int64_t *positionFrames, int64_t *timeNanos) {
+    return mStreamInternal->getTimestamp(CLOCK_MONOTONIC, positionFrames, timeNanos);
+}

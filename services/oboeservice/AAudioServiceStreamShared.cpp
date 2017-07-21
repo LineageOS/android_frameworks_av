@@ -41,6 +41,7 @@ using namespace aaudio;
 
 AAudioServiceStreamShared::AAudioServiceStreamShared(AAudioService &audioService)
     : mAudioService(audioService)
+    , mTimestampPositionOffset(0)
     {
 }
 
@@ -307,15 +308,30 @@ aaudio_result_t AAudioServiceStreamShared::getDownDataDescription(AudioEndpointP
     return AAUDIO_OK;
 }
 
-void AAudioServiceStreamShared::markTransferTime(int64_t nanoseconds) {
-    mMarkedPosition = mAudioDataQueue->getFifoBuffer()->getReadCounter();
-    mMarkedTime = nanoseconds;
+void AAudioServiceStreamShared::markTransferTime(Timestamp &timestamp) {
+    mAtomicTimestamp.write(timestamp);
 }
 
+// Get timestamp that was written by the real-time service thread, eg. mixer.
 aaudio_result_t AAudioServiceStreamShared::getFreeRunningPosition(int64_t *positionFrames,
                                                                 int64_t *timeNanos) {
-    // TODO get these two numbers as an atomic pair
-    *positionFrames = mMarkedPosition;
-    *timeNanos = mMarkedTime;
-    return AAUDIO_OK;
+    if (mAtomicTimestamp.isValid()) {
+        Timestamp timestamp = mAtomicTimestamp.read();
+        *positionFrames = timestamp.getPosition();
+        *timeNanos = timestamp.getNanoseconds();
+        return AAUDIO_OK;
+    } else {
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+}
+
+// Get timestamp from lower level service.
+aaudio_result_t AAudioServiceStreamShared::getHardwareTimestamp(int64_t *positionFrames,
+                                                              int64_t *timeNanos) {
+
+    aaudio_result_t result = mServiceEndpoint->getTimestamp(positionFrames, timeNanos);
+    if (result == AAUDIO_OK) {
+        *positionFrames -= mTimestampPositionOffset.load(); // Offset from shared MMAP stream
+    }
+    return result;
 }

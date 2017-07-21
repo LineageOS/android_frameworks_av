@@ -28,7 +28,6 @@ namespace aaudio {
 // Used to send information about the HAL to the client.
 struct AAudioMessageTimestamp {
     int64_t position;     // number of frames transferred so far
-    int64_t deviceOffset; // add to client position to get device position
     int64_t timestamp;    // time when that position was reached
 };
 
@@ -51,7 +50,8 @@ struct AAudioMessageEvent {
 typedef struct AAudioServiceMessage_s {
     enum class code : uint32_t {
         NOTHING,
-        TIMESTAMP,
+        TIMESTAMP_SERVICE, // when frame is read or written by the service to the client
+        TIMESTAMP_HARDWARE, // when frame is at DAC or ADC
         EVENT,
     };
 
