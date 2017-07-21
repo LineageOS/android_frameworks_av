@@ -150,7 +150,7 @@ int64_t IsochronousClockModel::convertPositionToTime(int64_t framePosition) cons
     int64_t nextBurstPosition = mFramesPerBurst * nextBurstIndex;
     int64_t framesDelta = nextBurstPosition - mMarkerFramePosition;
     int64_t nanosDelta = convertDeltaPositionToTime(framesDelta);
-    int64_t time = (int64_t) (mMarkerNanoTime + nanosDelta);
+    int64_t time = mMarkerNanoTime + nanosDelta;
 //    ALOGD("IsochronousClockModel::convertPositionToTime: pos = %llu --> time = %llu",
 //         (unsigned long long)framePosition,
 //         (unsigned long long)time);
