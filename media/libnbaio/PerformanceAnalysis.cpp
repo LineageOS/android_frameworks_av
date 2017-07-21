@@ -271,7 +271,6 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
         ALOGD("reportPerformance: mRecentHists is empty");
         return;
     }
-    ALOGD("reportPerformance: hists size %d", static_cast<int>(mRecentHists.size()));
     // TODO: more elaborate data analysis
     std::map<int, int> buckets;
     for (const auto &shortHist: mRecentHists) {
@@ -306,6 +305,7 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
         scalingFactor = (height + maxHeight) / maxHeight;
         height /= scalingFactor;
     }
+    // TODO: print reader (author) ID
     body->appendFormat("\n%*s", leftPadding + 11, "Occurrences");
     // write histogram label line with bucket values
     body->appendFormat("\n%s", " ");

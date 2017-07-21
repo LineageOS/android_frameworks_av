@@ -38,8 +38,8 @@ namespace ReportPerformance {
 
 // Writes outlier intervals, timestamps, and histograms spanning long time intervals to a file.
 // TODO: format the data efficiently and write different types of data to different files
-void writeToFile(std::deque<std::pair<outlierInterval, timestamp>> &outlierData,
-                                    std::deque<std::pair<timestamp, Histogram>> &hists,
+void writeToFile(const std::deque<std::pair<outlierInterval, timestamp>> &outlierData,
+                                    const std::deque<std::pair<timestamp, Histogram>> &hists,
                                     const char * kName,
                                     bool append) {
     ALOGD("writing performance data to file");
@@ -65,6 +65,7 @@ void writeToFile(std::deque<std::pair<outlierInterval, timestamp>> &outlierData,
         for (const auto &bucket : hist.second) {
             ofs << bucket.first << ": " << bucket.second << "\n";
         }
+        ofs << "\n"; // separate histograms with a newline
     }
     ofs.close();
 }

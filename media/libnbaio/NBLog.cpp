@@ -87,7 +87,6 @@
 */
 
 #define LOG_TAG "NBLog"
-// #define LOG_NDEBUG 0
 
 #include <algorithm>
 #include <climits>
@@ -109,7 +108,7 @@
 #include <media/nbaio/NBLog.h>
 #include <media/nbaio/PerformanceAnalysis.h>
 #include <media/nbaio/ReportPerformance.h>
-// #include <utils/CallStack.h> // used to print callstack
+#include <utils/CallStack.h>
 #include <utils/Log.h>
 #include <utils/String8.h>
 
@@ -766,8 +765,8 @@ const std::set<NBLog::Event> NBLog::Reader::endingTypes   {NBLog::Event::EVENT_E
                                                            NBLog::Event::EVENT_AUDIO_STATE};
 
 NBLog::Reader::Reader(const void *shared, size_t size)
-    : mShared((/*const*/ Shared *) shared), /*mIMemory*/
-      mFd(-1), mIndent(0),
+    : mFd(-1), mIndent(0), mLost(0),
+      mShared((/*const*/ Shared *) shared), /*mIMemory*/
       mFifo(mShared != NULL ?
         new audio_utils_fifo(size, sizeof(uint8_t),
             mShared->mBuffer, mShared->mRear, NULL /*throttlesFront*/) : NULL),
@@ -805,6 +804,9 @@ const uint8_t *NBLog::Reader::findLastEntryOfTypes(const uint8_t *front, const u
     return nullptr; // no entry found
 }
 
+// Copies content of a Reader FIFO into its Snapshot
+// The Snapshot has the same raw data, but represented as a sequence of entries
+// and an EntryIterator making it possible to process the data.
 std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
 {
     if (mFifoReader == NULL) {
@@ -870,23 +872,19 @@ std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
 
 }
 
-// TODO: move this to PerformanceAnalysis
-// TODO: make call to dump periodic so that data in shared FIFO does not get overwritten
-void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapshot)
+// Takes raw content of the local merger FIFO, processes log entries, and
+// writes the data to a map of class PerformanceAnalysis, based on their thread ID.
+void NBLog::MergeReader::getAndProcessSnapshot(NBLog::Reader::Snapshot &snapshot)
 {
-    mFd = fd;
-    mIndent = indent;
     String8 timestamp, body;
+    // TODO: check: is the FIXME below still a problem?
     // FIXME: this is not thread safe
-    // TODO: need a separate instance of performanceAnalysis for each thread
-    // used to store data and to call analysis functions
-    static ReportPerformance::PerformanceAnalysis performanceAnalysis;
+    // TODO: add lost data information and notification to ReportPerformance
     size_t lost = snapshot.lost() + (snapshot.begin() - EntryIterator(snapshot.data()));
     if (lost > 0) {
-        body.appendFormat("warning: lost %zu bytes worth of events", lost);
-        // TODO timestamp empty here, only other choice to wait for the first timestamp event in the
-        //      log to push it out.  Consider keeping the timestamp/body between calls to copyEntryDataAt().
-        dumpLine(timestamp, body);
+        // TODO: ultimately, this will be += and reset to 0. TODO: check that this is
+        // obsolete now that Merger::merge is called periodically. No data should be lost
+        mLost = lost;
     }
 
     for (auto entry = snapshot.begin(); entry != snapshot.end();) {
@@ -902,12 +900,20 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             memcpy(&hash, &(data->hash), sizeof(hash));
             int64_t ts;
             memcpy(&ts, &data->ts, sizeof(ts));
-            performanceAnalysis.logTsEntry(ts);
+            mThreadPerformanceAnalysis[data->author].logTsEntry(ts);
             ++entry;
             break;
         }
         case EVENT_AUDIO_STATE: {
-            performanceAnalysis.handleStateChange();
+            HistTsEntryWithAuthor *data = (HistTsEntryWithAuthor *) (entry->data);
+            // TODO This memcpies are here to avoid unaligned memory access crash.
+            // There's probably a more efficient way to do it
+            // TODO: incorporate hash information in mThreadPerformanceAnalysis
+            // log_hash_t hash;
+            // memcpy(&hash, &(data->hash), sizeof(hash));
+            // int64_t ts;
+            // memcpy(&ts, &data->ts, sizeof(ts));
+            mThreadPerformanceAnalysis[data->author].handleStateChange();
             ++entry;
             break;
         }
@@ -922,19 +928,38 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             break;
         }
     }
-    performanceAnalysis.reportPerformance(&body);
+    // FIXME: decide whether to print the warnings here or elsewhere
     if (!body.isEmpty()) {
         dumpLine(timestamp, body);
     }
 }
 
-void NBLog::Reader::dump(int fd, size_t indent)
+void NBLog::MergeReader::getAndProcessSnapshot()
 {
-    // get a snapshot, dump it
+    // get a snapshot, process it
     std::unique_ptr<Snapshot> snap = getSnapshot();
-    dump(fd, indent, *snap);
+    getAndProcessSnapshot(*snap);
 }
 
+// TODO: move this function to a different class than NBLog::Reader
+// writes summary of performance to the console
+void NBLog::MergeReader::dump(int fd, size_t indent)
+{
+    mFd = fd;
+    mIndent = indent;
+    String8 body, timestamp;
+    // TODO: check: is the FIXME below still a problem?
+    // FIXME: this is not thread safe
+    for (auto & threadReport : mThreadPerformanceAnalysis) {
+        threadReport.second.reportPerformance(&body);
+    }
+    if (!body.isEmpty()) {
+        ALOGD("body is not empty");
+        dumpLine(timestamp, body);
+    }
+}
+
+// Writes a string to the console
 void NBLog::Reader::dumpLine(const String8 &timestamp, String8 &body)
 {
     if (mFd >= 0) {
@@ -1093,6 +1118,7 @@ NBLog::Merger::Merger(const void *shared, size_t size):
       {}
 
 void NBLog::Merger::addReader(const NBLog::NamedReader &reader) {
+
     // FIXME This is called by binder thread in MediaLogService::registerWriter
     //       but the access to shared variable mNamedReaders is not yet protected by a lock.
     mNamedReaders.push_back(reader);
@@ -1116,7 +1142,7 @@ bool operator>(const struct MergeItem &i1, const struct MergeItem &i2) {
     return i1.ts > i2.ts || (i1.ts == i2.ts && i1.index > i2.index);
 }
 
-// Merge registered readers, sorted by timestamp
+// Merge registered readers, sorted by timestamp, and write data to a single FIFO in local memory
 void NBLog::Merger::merge() {
     // FIXME This is called by merge thread
     //       but the access to shared variable mNamedReaders is not yet protected by a lock.
@@ -1173,8 +1199,9 @@ void NBLog::MergeReader::handleAuthor(const NBLog::AbstractEntry &entry, String8
 
 // ---------------------------------------------------------------------------
 
-NBLog::MergeThread::MergeThread(NBLog::Merger &merger)
+NBLog::MergeThread::MergeThread(NBLog::Merger &merger, NBLog::MergeReader &mergeReader)
     : mMerger(merger),
+      mMergeReader(mergeReader),
       mTimeoutUs(0) {}
 
 NBLog::MergeThread::~MergeThread() {
@@ -1196,7 +1223,12 @@ bool NBLog::MergeThread::threadLoop() {
         mTimeoutUs -= kThreadSleepPeriodUs;
     }
     if (doMerge) {
+        // Merge data from all the readers
         mMerger.merge();
+        // Process the data collected by mMerger and write it to PerformanceAnalysis
+        // FIXME: decide whether to call getAndProcessSnapshot every time
+        // or whether to have a separate thread that calls it with a lower frequency
+        mMergeReader.getAndProcessSnapshot();
     }
     return true;
 }
