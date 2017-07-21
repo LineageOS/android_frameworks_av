@@ -461,6 +461,9 @@ class Camera3Stream :
     // INVALID_OPERATION if they cannot be obtained.
     virtual status_t getEndpointUsage(uint32_t *usage) const = 0;
 
+    // Return whether the buffer is in the list of outstanding buffers.
+    bool isOutstandingBuffer(const camera3_stream_buffer& buffer) const;
+
     // Tracking for idle state
     wp<StatusTracker> mStatusTracker;
     // Status tracker component ID
@@ -483,9 +486,6 @@ class Camera3Stream :
 
     status_t        cancelPrepareLocked();
 
-    // Return whether the buffer is in the list of outstanding buffers.
-    bool isOutstandingBuffer(const camera3_stream_buffer& buffer);
-
     // Remove the buffer from the list of outstanding buffers.
     void removeOutstandingBuffer(const camera3_stream_buffer& buffer);
 
@@ -502,6 +502,7 @@ class Camera3Stream :
     // Number of buffers allocated on last prepare call.
     size_t mLastMaxCount;
 
+    mutable Mutex mOutstandingBuffersLock;
     // Outstanding buffers dequeued from the stream's buffer queue.
     List<buffer_handle_t> mOutstandingBuffers;
 
