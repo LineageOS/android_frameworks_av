@@ -37,6 +37,8 @@ class EffectBufferHalInterface : public RefBase
         return externalData() != nullptr ? externalData() : audioBuffer()->raw;
     }
 
+    virtual size_t getSize() const = 0;
+
     virtual void setExternalData(void* external) = 0;
     virtual void setFrameCount(size_t frameCount) = 0;
     virtual bool checkFrameCountChange() = 0;  // returns whether frame count has been updated

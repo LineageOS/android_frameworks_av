@@ -68,8 +68,8 @@ public:
             status_t    attachAuxEffect(int EffectId);
             void        setAuxBuffer(int EffectId, int32_t *buffer);
             int32_t     *auxBuffer() const { return mAuxBuffer; }
-            void        setMainBuffer(int16_t *buffer) { mMainBuffer = buffer; }
-            int16_t     *mainBuffer() const { return mMainBuffer; }
+            void        setMainBuffer(effect_buffer_t *buffer) { mMainBuffer = buffer; }
+            effect_buffer_t *mainBuffer() const { return mMainBuffer; }
             int         auxEffectId() const { return mAuxEffectId; }
     virtual status_t    getTimestamp(AudioTimestamp& timestamp);
             void        signal();
@@ -150,7 +150,8 @@ protected:
                                     // allocated statically at track creation time,
                                     // and is even allocated (though unused) for fast tracks
                                     // FIXME don't allocate track name for fast tracks
-    int16_t             *mMainBuffer;
+    effect_buffer_t     *mMainBuffer;
+
     int32_t             *mAuxBuffer;
     int                 mAuxEffectId;
     bool                mHasVolumeController;

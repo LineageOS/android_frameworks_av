@@ -41,4 +41,7 @@
 // uncomment to log CPU statistics every n wall clock seconds
 //#define DEBUG_CPU_USAGE 10
 
+// define FLOAT_EFFECT_CHAIN to request float effects (falls back to int16_t if unavailable)
+#define FLOAT_EFFECT_CHAIN
+
 #endif // ANDROID_AUDIOFLINGER_CONFIGURATION_H
