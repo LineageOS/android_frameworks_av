@@ -479,6 +479,7 @@ status_t Camera3Stream::getBuffer(camera3_stream_buffer *buffer,
     if (res == OK) {
         fireBufferListenersLocked(*buffer, /*acquired*/true, /*output*/true);
         if (buffer->buffer) {
+            Mutex::Autolock l(mOutstandingBuffersLock);
             mOutstandingBuffers.push_back(*buffer->buffer);
         }
     }
@@ -486,10 +487,12 @@ status_t Camera3Stream::getBuffer(camera3_stream_buffer *buffer,
     return res;
 }
 
-bool Camera3Stream::isOutstandingBuffer(const camera3_stream_buffer &buffer) {
+bool Camera3Stream::isOutstandingBuffer(const camera3_stream_buffer &buffer) const{
     if (buffer.buffer == nullptr) {
         return false;
     }
+
+    Mutex::Autolock l(mOutstandingBuffersLock);
 
     for (auto b : mOutstandingBuffers) {
         if (b == *buffer.buffer) {
@@ -503,6 +506,8 @@ void Camera3Stream::removeOutstandingBuffer(const camera3_stream_buffer &buffer)
     if (buffer.buffer == nullptr) {
         return;
     }
+
+    Mutex::Autolock l(mOutstandingBuffersLock);
 
     for (auto b = mOutstandingBuffers.begin(); b != mOutstandingBuffers.end(); b++) {
         if (*b == *buffer.buffer) {
@@ -575,6 +580,7 @@ status_t Camera3Stream::getInputBuffer(camera3_stream_buffer *buffer, bool respe
     if (res == OK) {
         fireBufferListenersLocked(*buffer, /*acquired*/true, /*output*/false);
         if (buffer->buffer) {
+            Mutex::Autolock l(mOutstandingBuffersLock);
             mOutstandingBuffers.push_back(*buffer->buffer);
         }
     }
