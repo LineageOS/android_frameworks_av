@@ -27,6 +27,7 @@
 #include "client/IsochronousClockModel.h"
 #include "client/AudioEndpoint.h"
 #include "core/AudioStream.h"
+#include "utility/AudioClock.h"
 #include "utility/LinearRamp.h"
 
 using android::sp;
@@ -172,6 +173,11 @@ private:
 
     // Adjust timing model based on timestamp from service.
     void processTimestamp(uint64_t position, int64_t time);
+
+    // Thread on other side of FIFO will have wakeup jitter.
+    // By delaying slightly we can avoid waking up before other side is ready.
+    const int32_t            mWakeupDelayNanos; // delay past typical wakeup jitter
+    const int32_t            mMinimumSleepNanos; // minimum sleep while polling
 
     AudioEndpointParcelable  mEndPointParcelable; // description of the buffers filled by service
     EndpointDescriptor       mEndpointDescriptor; // buffer description with resolved addresses

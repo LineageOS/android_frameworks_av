@@ -195,11 +195,33 @@ int32_t AAudioProperty_getMMapExclusivePolicy();
 
 /**
  * Read system property.
- * @return number of bursts per mixer cycle
+ * @return number of bursts per AAudio service mixer cycle
  */
 int32_t AAudioProperty_getMixerBursts();
 
 #define AAUDIO_PROP_HW_BURST_MIN_USEC      "aaudio.hw_burst_min_usec"
+
+/**
+ * Read a system property that specifies the number of extra microseconds that a thread
+ * should sleep when waiting for another thread to service a FIFO. This is used
+ * to avoid the waking thread from being overly optimistic about the other threads
+ * wakeup timing. This value should be set high enough to cover typical scheduling jitter
+ * for a real-time thread.
+ *
+ * @return number of microseconds to delay the wakeup.
+ */
+int32_t AAudioProperty_getWakeupDelayMicros();
+
+#define AAUDIO_PROP_WAKEUP_DELAY_USEC      "aaudio.wakeup_delay_usec"
+
+/**
+ * Read a system property that specifies the minimum sleep time when polling the FIFO.
+ *
+ * @return minimum number of microseconds to sleep.
+ */
+int32_t AAudioProperty_getMinimumSleepMicros();
+
+#define AAUDIO_PROP_MINIMUM_SLEEP_USEC      "aaudio.minimum_sleep_usec"
 
 /**
  * Read system property.
