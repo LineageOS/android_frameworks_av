@@ -2108,6 +2108,14 @@ status_t Parameters::updateRequest(CameraMetadata *request) const {
                 normalizedXToArray(meteringAreas[j].right);
             reqMeteringAreas[i + 3] =
                 normalizedYToArray(meteringAreas[j].bottom);
+            // Requested size may be zero by rounding error with/without zooming.
+            // The ae regions should be at least 1 if metering width/height is not zero.
+            if (reqMeteringAreas[i + 0] == reqMeteringAreas[i + 2]) {
+                reqMeteringAreas[i + 2]++;
+            }
+            if (reqMeteringAreas[i + 1] == reqMeteringAreas[i + 3]) {
+                reqMeteringAreas[i + 3]++;
+            }
         } else {
             reqMeteringAreas[i + 0] = 0;
             reqMeteringAreas[i + 1] = 0;
