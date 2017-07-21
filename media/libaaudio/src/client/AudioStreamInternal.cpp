@@ -28,10 +28,10 @@
 #include <binder/IServiceManager.h>
 
 #include <aaudio/AAudio.h>
+#include <cutils/properties.h>
 #include <utils/String16.h>
 #include <utils/Trace.h>
 
-#include "AudioClock.h"
 #include "AudioEndpointParcelable.h"
 #include "binding/AAudioStreamRequest.h"
 #include "binding/AAudioStreamConfiguration.h"
@@ -39,6 +39,7 @@
 #include "binding/AAudioServiceMessage.h"
 #include "core/AudioStreamBuilder.h"
 #include "fifo/FifoBuffer.h"
+#include "utility/AudioClock.h"
 #include "utility/LinearRamp.h"
 
 #include "AudioStreamInternal.h"
@@ -64,7 +65,12 @@ AudioStreamInternal::AudioStreamInternal(AAudioServiceInterface  &serviceInterfa
         , mFramesPerBurst(16)
         , mStreamVolume(1.0f)
         , mInService(inService)
-        , mServiceInterface(serviceInterface) {
+        , mServiceInterface(serviceInterface)
+        , mWakeupDelayNanos(AAudioProperty_getWakeupDelayMicros() * AAUDIO_NANOS_PER_MICROSECOND)
+        , mMinimumSleepNanos(AAudioProperty_getMinimumSleepMicros() * AAUDIO_NANOS_PER_MICROSECOND)
+        {
+    ALOGD("AudioStreamInternal(): mWakeupDelayNanos = %d, mMinimumSleepNanos = %d",
+          mWakeupDelayNanos, mMinimumSleepNanos);
 }
 
 AudioStreamInternal::~AudioStreamInternal() {
@@ -135,7 +141,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         }
 
         // Configure endpoint based on descriptor.
-        mAudioEndpoint.configure(&mEndpointDescriptor);
+        mAudioEndpoint.configure(&mEndpointDescriptor, getDirection());
 
         mFramesPerBurst = mEndpointDescriptor.dataQueueDescriptor.framesPerBurst;
         int32_t capacity = mEndpointDescriptor.dataQueueDescriptor.capacityInFrames;
@@ -472,12 +478,12 @@ aaudio_result_t AudioStreamInternal::processCommands() {
 aaudio_result_t AudioStreamInternal::processData(void *buffer, int32_t numFrames,
                                                  int64_t timeoutNanoseconds)
 {
-    const char * traceName = (mInService) ? "aaWrtS" : "aaWrtC";
+    const char * traceName = "aaProc";
+    const char * fifoName = "aaRdy";
     ATRACE_BEGIN(traceName);
-    int32_t fullFrames = mAudioEndpoint.getFullFramesAvailable();
     if (ATRACE_ENABLED()) {
-        const char * traceName = (mInService) ? "aaFullS" : "aaFullC";
-        ATRACE_INT(traceName, fullFrames);
+        int32_t fullFrames = mAudioEndpoint.getFullFramesAvailable();
+        ATRACE_INT(fifoName, fullFrames);
     }
 
     aaudio_result_t result = AAUDIO_OK;
@@ -505,10 +511,12 @@ aaudio_result_t AudioStreamInternal::processData(void *buffer, int32_t numFrames
         if (timeoutNanoseconds == 0) {
             break; // don't block
         } else if (framesLeft > 0) {
-            // clip the wake time to something reasonable
-            if (wakeTimeNanos < currentTimeNanos) {
-                wakeTimeNanos = currentTimeNanos;
+            if (!mAudioEndpoint.isFreeRunning()) {
+                // If there is software on the other end of the FIFO then it may get delayed.
+                // So wake up just a little after we expect it to be ready.
+                wakeTimeNanos += mWakeupDelayNanos;
             }
+
             if (wakeTimeNanos > deadlineNanos) {
                 // If we time out, just return the framesWritten so far.
                 // TODO remove after we fix the deadline bug
@@ -525,10 +533,28 @@ aaudio_result_t AudioStreamInternal::processData(void *buffer, int32_t numFrames
                 break;
             }
 
-            int64_t sleepForNanos = wakeTimeNanos - currentTimeNanos;
-            AudioClock::sleepForNanos(sleepForNanos);
+            currentTimeNanos = AudioClock::getNanoseconds();
+            int64_t earliestWakeTime = currentTimeNanos + mMinimumSleepNanos;
+            // Guarantee a minimum sleep time.
+            if (wakeTimeNanos < earliestWakeTime) {
+                wakeTimeNanos = earliestWakeTime;
+            }
+
+            if (ATRACE_ENABLED()) {
+                int32_t fullFrames = mAudioEndpoint.getFullFramesAvailable();
+                ATRACE_INT(fifoName, fullFrames);
+                int64_t sleepForNanos = wakeTimeNanos - currentTimeNanos;
+                ATRACE_INT("aaSlpNs", (int32_t)sleepForNanos);
+            }
+
+            AudioClock::sleepUntilNanoTime(wakeTimeNanos);
             currentTimeNanos = AudioClock::getNanoseconds();
         }
+    }
+
+    if (ATRACE_ENABLED()) {
+        int32_t fullFrames = mAudioEndpoint.getFullFramesAvailable();
+        ATRACE_INT(fifoName, fullFrames);
     }
 
     // return error or framesProcessed
