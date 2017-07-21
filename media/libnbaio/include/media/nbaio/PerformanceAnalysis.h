@@ -43,15 +43,16 @@ public:
     // the timestamp series from memory.
     void processAndFlushTimeStampSeries();
 
+    // Given a series of audio processing wakeup timestamps,
+    // compresses and and analyzes the data, and flushes
+    // the timestamp series from memory.
+    void processAndFlushTimeStampSeriesOld();
+
     // Called when an audio on/off event is read from the buffer,
     // e.g. EVENT_AUDIO_STATE.
     // calls flushTimeStampSeries on the data up to the event,
     // effectively discarding the idle audio time interval
     void handleStateChange();
-
-    // When the short-term histogram array mRecentHists has reached capacity,
-    // merges histograms for data compression and stores them in mLongTermHists
-    void processAndFlushRecentHists();
 
     // Writes wakeup timestamp entry to log and runs analysis
     // TODO: make this thread safe. Each thread should have its own instance
@@ -90,16 +91,11 @@ private:
     // a peak is a moment at which the average outlier interval changed significantly
     std::deque<timestamp> mPeakTimestamps;
 
-    // TODO: turn these into circular buffers for better data flow
-    // FIFO of small histograms
-    // stores fixed-size short buffer period histograms with timestamp of first sample
-    std::deque<std::pair<timestamp, Histogram>> mRecentHists;
+    // stores stores buffer period histograms with timestamp of first sample
+    // TODO use a circular buffer
+    std::deque<std::pair<timestamp, Histogram>> mHists;
 
-    // FIFO of small histograms
-    // stores fixed-size long-term buffer period histograms with timestamp of first sample
-    std::deque<std::pair<timestamp, Histogram>> mLongTermHists;
-
-    // vector of timestamps, collected from NBLog for a (TODO) specific thread
+    // vector of timestamps, collected from NBLog for a specific thread
     // when a vector reaches its maximum size, the data is processed and flushed
     std::vector<timestamp_raw> mTimeStampSeries;
 
@@ -119,12 +115,11 @@ private:
     static const int kStddevThreshold = 5;
 
     // capacity allocated to data structures
-    // TODO: adjust all of these values
-    static const int kRecentHistsCapacity = 100; // number of short-term histograms stored in memory
-    static const int kShortHistSize = 50; // number of samples in a short-term histogram
+    // TODO: make these values longer when testing is finished
+    static const int kHistsCapacity = 20; // number of short-term histograms stored in memory
+    static const int kHistSize = 1000; // max number of samples stored in a histogram
     static const int kOutlierSeriesSize = 100; // number of values stored in outlier array
     static const int kPeakSeriesSize = 100; // number of values stored in peak array
-    static const int kLongTermHistsCapacity = 20; // number of long-term histogram stored in memory
     // maximum elapsed time between first and last timestamp of a long-term histogram
     static const int kMaxHistTimespanMs = 5 * kMsPerSec;
 
