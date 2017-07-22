@@ -92,7 +92,6 @@
 #include <climits>
 #include <deque>
 #include <fstream>
-// #include <inttypes.h>
 #include <iostream>
 #include <math.h>
 #include <numeric>
@@ -941,22 +940,8 @@ void NBLog::MergeReader::getAndProcessSnapshot()
     getAndProcessSnapshot(*snap);
 }
 
-// TODO: move this function to a different class than NBLog::Reader
-// writes summary of performance to the console
-void NBLog::MergeReader::dump(int fd, size_t indent)
-{
-    mFd = fd;
-    mIndent = indent;
-    String8 body, timestamp;
-    // TODO: check: is the FIXME below still a problem?
-    // FIXME: this is not thread safe
-    for (auto & threadReport : mThreadPerformanceAnalysis) {
-        threadReport.second.reportPerformance(&body);
-    }
-    if (!body.isEmpty()) {
-        ALOGD("body is not empty");
-        dumpLine(timestamp, body);
-    }
+void NBLog::MergeReader::dump(int fd, int indent) {
+    ReportPerformance::dump(fd, indent, mThreadPerformanceAnalysis);
 }
 
 // Writes a string to the console

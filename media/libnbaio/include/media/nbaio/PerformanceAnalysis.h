@@ -73,7 +73,7 @@ public:
     // input: series of short histograms. Generates a string of analysis of the buffer periods
     // TODO: WIP write more detailed analysis
     // FIXME: move this data visualization to a separate class. Model/view/controller
-    void reportPerformance(String8 *body, int maxHeight = 10);
+    void reportPerformance(String8 *body, int maxHeight = 10) const;
 
     // TODO: delete this. temp for testing
     void testFunction();
@@ -133,6 +133,11 @@ private:
     int64_t mPrevNs = -1;
 
 };
+
+void dump(int fd, int indent, const std::map<int, PerformanceAnalysis>
+          &threadPerformanceAnalysis);
+
+void dumpLine(int fd, int indent, const String8 &body);
 
 } // namespace ReportPerformance
 

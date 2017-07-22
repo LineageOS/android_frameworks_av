@@ -36,7 +36,6 @@
 #include <media/nbaio/NBLog.h>
 #include <media/nbaio/PerformanceAnalysis.h>
 #include <media/nbaio/ReportPerformance.h>
-// #include <utils/CallStack.h> // used to print callstack
 #include <utils/Log.h>
 #include <utils/String8.h>
 
@@ -242,7 +241,7 @@ void PerformanceAnalysis::testFunction() {
 // TODO Make it return a std::string instead of modifying body --> is this still relevant?
 // TODO consider changing all ints to uint32_t or uint64_t
 // TODO: move this to ReportPerformance, probably make it a friend function of PerformanceAnalysis
-void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
+void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) const {
     if (mHists.empty()) {
         ALOGD("reportPerformance: mHists is empty");
         return;
@@ -344,6 +343,26 @@ void PerformanceAnalysis::alertIfGlitch(const std::vector<int64_t> &samples) {
         }
     }
     return;
+}
+
+//------------------------------------------------------------------------------
+
+// writes summary of performance into specified file descriptor
+void dump(int fd, int indent, const std::map<int, PerformanceAnalysis>
+          &threadPerformanceAnalysis) {
+    String8 body;
+    for (auto & thread : threadPerformanceAnalysis) {
+        thread.second.reportPerformance(&body);
+    }
+    if (!body.isEmpty()) {
+        dumpLine(fd, indent, body);
+        body.clear();
+    }
+}
+
+// Writes a string into specified file descriptor
+void dumpLine(int fd, int indent, const String8 &body) {
+    dprintf(fd, "%.*s%s \n", indent, "", body.string());
 }
 
 } // namespace ReportPerformance

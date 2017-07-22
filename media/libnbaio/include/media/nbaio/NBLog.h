@@ -452,10 +452,11 @@ public:
 
         // get snapshot of readers fifo buffer, effectively consuming the buffer
         std::unique_ptr<Snapshot> getSnapshot();
-        // print a summary of the performance to the console
+
         bool     isIMemory(const sp<IMemory>& iMemory) const;
 
     protected:
+        // print a summary of the performance to the console
         void    dumpLine(const String8& timestamp, String8& body);
         EntryIterator   handleFormat(const FormatEntry &fmtEntry,
                                      String8 *timestamp,
@@ -544,8 +545,7 @@ public:
     public:
         MergeReader(const void *shared, size_t size, Merger &merger);
 
-        // TODO: consider moving dump to ReportPerformance
-        void dump(int fd, size_t indent = 0);
+        void dump(int fd, int indent = 0);
         // process a particular snapshot of the reader
         void getAndProcessSnapshot(Snapshot & snap);
         // call getSnapshot of the content of the reader's buffer and process the data
