@@ -18,8 +18,16 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#define ATRACE_TAG ATRACE_TAG_AUDIO
+
 #include <cstring>
+#include <utils/Trace.h>
+
 #include "AAudioMixer.h"
+
+#ifndef AAUDIO_MIXER_ATRACE_ENABLED
+#define AAUDIO_MIXER_ATRACE_ENABLED    1
+#endif
 
 using android::WrappingBuffer;
 using android::FifoBuffer;
@@ -41,13 +49,28 @@ void AAudioMixer::clear() {
     memset(mOutputBuffer, 0, mBufferSizeInBytes);
 }
 
-bool AAudioMixer::mix(FifoBuffer *fifo, float volume) {
+bool AAudioMixer::mix(int trackIndex, FifoBuffer *fifo, float volume) {
     WrappingBuffer wrappingBuffer;
     float *destination = mOutputBuffer;
     fifo_frames_t framesLeft = mFramesPerBurst;
 
+#if AAUDIO_MIXER_ATRACE_ENABLED
+    ATRACE_BEGIN("aaMix");
+#endif /* AAUDIO_MIXER_ATRACE_ENABLED */
+
     // Gather the data from the client. May be in two parts.
-    fifo->getFullDataAvailable(&wrappingBuffer);
+    fifo_frames_t fullFrames = fifo->getFullDataAvailable(&wrappingBuffer);
+#if AAUDIO_MIXER_ATRACE_ENABLED
+    if (ATRACE_ENABLED()) {
+        char rdyText[] = "aaMixRdy#";
+        char letter = 'A' + (trackIndex % 26);
+        rdyText[sizeof(rdyText) - 2] = letter;
+        ATRACE_INT(rdyText, fullFrames);
+    }
+#else /* MIXER_ATRACE_ENABLED */
+    (void) trackIndex;
+    (void) fullFrames;
+#endif /* AAUDIO_MIXER_ATRACE_ENABLED */
 
     // Mix data in one or two parts.
     int partIndex = 0;
@@ -70,6 +93,10 @@ bool AAudioMixer::mix(FifoBuffer *fifo, float volume) {
         //ALOGW("AAudioMixer::mix() UNDERFLOW by %d / %d frames ----- UNDERFLOW !!!!!!!!!!",
         //      framesLeft, mFramesPerBurst);
     }
+#if AAUDIO_MIXER_ATRACE_ENABLED
+    ATRACE_END();
+#endif /* AAUDIO_MIXER_ATRACE_ENABLED */
+
     return (framesLeft > 0); // did not get all the frames we needed, ie. "underflow"
 }
 
