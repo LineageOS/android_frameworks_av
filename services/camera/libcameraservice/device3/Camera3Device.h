@@ -187,10 +187,11 @@ class Camera3Device :
 
     static const size_t        kDumpLockAttempts  = 10;
     static const size_t        kDumpSleepDuration = 100000; // 0.10 sec
-    static const nsecs_t       kShutdownTimeout   = 5000000000; // 5 sec
     static const nsecs_t       kActiveTimeout     = 500000000;  // 500 ms
     static const size_t        kInFlightWarnLimit = 30;
     static const size_t        kInFlightWarnLimitHighSpeed = 256; // batch size 32 * pipe depth 8
+    static const nsecs_t       kDefaultExpectedDuration = 100000000; // 100 ms
+    static const nsecs_t       kMinInflightDuration = 5000000000; // 5 s
     // SCHED_FIFO priority for request submission thread in HFR mode
     static const int           kRequestThreadPriority = 1;
 
@@ -776,6 +777,9 @@ class Camera3Device :
         // send request in mNextRequests to HAL in a batch. Return true = sucssess
         bool sendRequestsBatch();
 
+        // Calculate the expected maximum duration for a request
+        nsecs_t calculateMaxExpectedDuration(const camera_metadata_t *request);
+
         wp<Camera3Device>  mParent;
         wp<camera3::StatusTracker>  mStatusTracker;
         sp<HalInterface>   mInterface;
@@ -877,6 +881,11 @@ class Camera3Device :
         // is not for constrained high speed recording, this flag will also be true.
         bool hasCallback;
 
+        // Maximum expected frame duration for this request.
+        // For manual captures, equal to the max of requested exposure time and frame duration
+        // For auto-exposure modes, equal to 1/(lower end of target FPS range)
+        nsecs_t maxExpectedDuration;
+
         // Default constructor needed by KeyedVector
         InFlightRequest() :
                 shutterTimestamp(0),
@@ -885,11 +894,12 @@ class Camera3Device :
                 haveResultMetadata(false),
                 numBuffersLeft(0),
                 hasInputBuffer(false),
-                hasCallback(true) {
+                hasCallback(true),
+                maxExpectedDuration(kDefaultExpectedDuration) {
         }
 
         InFlightRequest(int numBuffers, CaptureResultExtras extras, bool hasInput,
-                bool hasAppCallback) :
+                bool hasAppCallback, nsecs_t maxDuration) :
                 shutterTimestamp(0),
                 sensorTimestamp(0),
                 requestStatus(OK),
@@ -897,20 +907,28 @@ class Camera3Device :
                 numBuffersLeft(numBuffers),
                 resultExtras(extras),
                 hasInputBuffer(hasInput),
-                hasCallback(hasAppCallback) {
+                hasCallback(hasAppCallback),
+                maxExpectedDuration(maxDuration) {
         }
     };
 
     // Map from frame number to the in-flight request state
     typedef KeyedVector<uint32_t, InFlightRequest> InFlightMap;
 
+    nsecs_t                mExpectedInflightDuration = 0;
     Mutex                  mInFlightLock; // Protects mInFlightMap
     InFlightMap            mInFlightMap;
     int                    mInFlightStatusId;
 
     status_t registerInFlight(uint32_t frameNumber,
             int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
-            bool callback);
+            bool callback, nsecs_t maxExpectedDuration);
+
+    /**
+     * Returns the maximum expected time it'll take for all currently in-flight
+     * requests to complete, based on their settings
+     */
+    nsecs_t getExpectedInFlightDurationLocked();
 
     /**
      * Tracking for idle detection

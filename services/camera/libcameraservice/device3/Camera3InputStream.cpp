@@ -293,6 +293,15 @@ status_t Camera3InputStream::getEndpointUsage(uint32_t *usage) const {
 void Camera3InputStream::onBufferFreed(const wp<GraphicBuffer>& gb) {
     const sp<GraphicBuffer> buffer = gb.promote();
     if (buffer != nullptr) {
+        camera3_stream_buffer streamBuffer =
+                {nullptr, &buffer->handle, 0, -1, -1};
+        // Check if this buffer is outstanding.
+        if (isOutstandingBuffer(streamBuffer)) {
+            ALOGV("%s: Stream %d: Trying to free a buffer that is still being "
+                    "processed.", __FUNCTION__, mId);
+            return;
+        }
+
         sp<Camera3StreamBufferFreedListener> callback = mBufferFreedListener.promote();
         if (callback != nullptr) {
             callback->onBufferFreed(mId, buffer->handle);
