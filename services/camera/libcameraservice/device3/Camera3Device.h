@@ -486,7 +486,7 @@ class Camera3Device :
      * CameraDeviceBase interface we shouldn't need to.
      * Must be called with mLock and mInterfaceLock both held.
      */
-    status_t internalPauseAndWaitLocked();
+    status_t internalPauseAndWaitLocked(nsecs_t maxExpectedDuration);
 
     /**
      * Resume work after internalPauseAndWaitLocked()
@@ -512,7 +512,7 @@ class Camera3Device :
      *
      * Need to be called with mLock and mInterfaceLock held.
      */
-    status_t waitUntilDrainedLocked();
+    status_t waitUntilDrainedLocked(nsecs_t maxExpectedDuration);
 
     /**
      * Do common work for setting up a streaming or single capture request.
@@ -915,10 +915,13 @@ class Camera3Device :
     // Map from frame number to the in-flight request state
     typedef KeyedVector<uint32_t, InFlightRequest> InFlightMap;
 
-    nsecs_t                mExpectedInflightDuration = 0;
-    Mutex                  mInFlightLock; // Protects mInFlightMap
+
+    Mutex                  mInFlightLock; // Protects mInFlightMap and
+                                          // mExpectedInflightDuration
     InFlightMap            mInFlightMap;
+    nsecs_t                mExpectedInflightDuration = 0;
     int                    mInFlightStatusId;
+
 
     status_t registerInFlight(uint32_t frameNumber,
             int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
@@ -928,7 +931,7 @@ class Camera3Device :
      * Returns the maximum expected time it'll take for all currently in-flight
      * requests to complete, based on their settings
      */
-    nsecs_t getExpectedInFlightDurationLocked();
+    nsecs_t getExpectedInFlightDuration();
 
     /**
      * Tracking for idle detection
