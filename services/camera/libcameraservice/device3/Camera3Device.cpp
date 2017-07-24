@@ -315,6 +315,7 @@ status_t Camera3Device::disconnect() {
         mInterface->clear();
         mOutputStreams.clear();
         mInputStream.clear();
+        mDeletedStreams.clear();
         mBufferManager.clear();
         internalUpdateStatusLocked(STATUS_UNINITIALIZED);
     }
@@ -1428,6 +1429,12 @@ status_t Camera3Device::deleteStream(int id) {
         return -EBUSY;
     }
 
+    if (mStatus == STATUS_ERROR) {
+        ALOGW("%s: Camera %s: deleteStream not allowed in ERROR state",
+                __FUNCTION__, mId.string());
+        return -EBUSY;
+    }
+
     sp<Camera3StreamInterface> deletedStream;
     ssize_t outputStreamIdx = mOutputStreams.indexOfKey(id);
     if (mInputStream != NULL && id == mInputStream->getId()) {
@@ -2516,16 +2523,60 @@ void Camera3Device::flushInflightRequests() {
         streamBuffer.status = CAMERA3_BUFFER_STATUS_ERROR;
         streamBuffer.acquire_fence = -1;
         streamBuffer.release_fence = -1;
+
+        // First check if the buffer belongs to deleted stream
+        bool streamDeleted = false;
+        for (auto& stream : mDeletedStreams) {
+            if (streamId == stream->getId()) {
+                streamDeleted = true;
+                // Return buffer to deleted stream
+                camera3_stream* halStream = stream->asHalStream();
+                streamBuffer.stream = halStream;
+                switch (halStream->stream_type) {
+                    case CAMERA3_STREAM_OUTPUT:
+                        res = stream->returnBuffer(streamBuffer, /*timestamp*/ 0);
+                        if (res != OK) {
+                            ALOGE("%s: Can't return output buffer for frame %d to"
+                                  " stream %d: %s (%d)",  __FUNCTION__,
+                                  frameNumber, streamId, strerror(-res), res);
+                        }
+                        break;
+                    case CAMERA3_STREAM_INPUT:
+                        res = stream->returnInputBuffer(streamBuffer);
+                        if (res != OK) {
+                            ALOGE("%s: Can't return input buffer for frame %d to"
+                                  " stream %d: %s (%d)",  __FUNCTION__,
+                                  frameNumber, streamId, strerror(-res), res);
+                        }
+                        break;
+                    default: // Bi-direcitonal stream is deprecated
+                        ALOGE("%s: stream %d has unknown stream type %d",
+                                __FUNCTION__, streamId, halStream->stream_type);
+                        break;
+                }
+                break;
+            }
+        }
+        if (streamDeleted) {
+            continue;
+        }
+
+        // Then check against configured streams
         if (streamId == inputStreamId) {
             streamBuffer.stream = mInputStream->asHalStream();
             res = mInputStream->returnInputBuffer(streamBuffer);
             if (res != OK) {
                 ALOGE("%s: Can't return input buffer for frame %d to"
-                      "  its stream:%s (%d)",  __FUNCTION__,
-                      frameNumber, strerror(-res), res);
+                      " stream %d: %s (%d)",  __FUNCTION__,
+                      frameNumber, streamId, strerror(-res), res);
             }
         } else {
-            streamBuffer.stream = mOutputStreams.valueFor(streamId)->asHalStream();
+            ssize_t idx = mOutputStreams.indexOfKey(streamId);
+            if (idx == NAME_NOT_FOUND) {
+                ALOGE("%s: Output stream id %d not found!", __FUNCTION__, streamId);
+                continue;
+            }
+            streamBuffer.stream = mOutputStreams.valueAt(idx)->asHalStream();
             returnOutputBuffers(&streamBuffer, /*size*/1, /*timestamp*/ 0);
         }
     }

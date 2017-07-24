@@ -85,7 +85,7 @@ public:
 
     virtual binder::Status endConfigure(int operatingMode) override;
 
-    // Returns -EBUSY if device is not idle
+    // Returns -EBUSY if device is not idle or in error state
     virtual binder::Status deleteStream(int streamId) override;
 
     virtual binder::Status createStream(
