@@ -557,7 +557,9 @@ public:
         const std::vector<NamedReader>& mNamedReaders;
 
         // analyzes, compresses and stores the merged data
-        std::map<int, ReportPerformance::PerformanceAnalysis> mThreadPerformanceAnalysis;
+        // contains a separate instance for every author (thread), and for every source file
+        // location within each author
+        ReportPerformance::PerformanceAnalysisMap mThreadPerformanceAnalysis;
 
         // handle author entry by looking up the author's name and appending it to the body
         // returns number of bytes read from fmtEntry

@@ -134,8 +134,11 @@ private:
 
 };
 
-void dump(int fd, int indent, const std::map<int, PerformanceAnalysis>
-          &threadPerformanceAnalysis);
+// a map of PerformanceAnalysis instances
+// The outer key is for the thread, the inner key for the source file location.
+using PerformanceAnalysisMap = std::map<int, std::map<log_hash_t, PerformanceAnalysis>>;
+
+void dump(int fd, int indent, const PerformanceAnalysisMap &threadPerformanceAnalysis);
 
 void dumpLine(int fd, int indent, const String8 &body);
 

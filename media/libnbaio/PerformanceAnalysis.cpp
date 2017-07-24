@@ -348,11 +348,12 @@ void PerformanceAnalysis::alertIfGlitch(const std::vector<int64_t> &samples) {
 //------------------------------------------------------------------------------
 
 // writes summary of performance into specified file descriptor
-void dump(int fd, int indent, const std::map<int, PerformanceAnalysis>
-          &threadPerformanceAnalysis) {
+void dump(int fd, int indent, const PerformanceAnalysisMap &threadPerformanceAnalysis) {
     String8 body;
     for (auto & thread : threadPerformanceAnalysis) {
-        thread.second.reportPerformance(&body);
+        for (auto & hash: thread.second) {
+            hash.second.reportPerformance(&body);
+        }
     }
     if (!body.isEmpty()) {
         dumpLine(fd, indent, body);

@@ -49,20 +49,25 @@
 *
 * 2) reading the data from shared memory
 * Thread::threadloop()
-*     TODO: add description?
 * NBLog::MergeThread::threadLoop()
-*     calls NBLog::Merger::merge
+*     Waits on a mutex, called periodically
+*     Calls NBLog::Merger::merge and MergeReader.getAndProcessSnapshot.
 * NBLog::Merger::merge
 *     Merges snapshots sorted by timestamp
-*     for each reader in vector of class NamedReader,
-*     callsNamedReader::reader()->getSnapshot
-*     TODO: check whether the rest of this function is relevant
+*     Calls Reader::getSnapshot on each individual thread buffer to in shared
+*     memory and writes all their data to the single FIFO stored in mMerger.
 * NBLog::Reader::getSnapshot
 *     copies snapshot of reader's fifo buffer into its own buffer
 *     calls mFifoReader->obtain to find readable data
 *     sets snapshot.begin() and .end() iterators to boundaries of valid entries
 *     moves the fifo reader index to after the last entry read
 *     in this case, the buffer is in shared memory. in (4), the buffer is private
+* NBLog::MergeThread::getAndProcessSnapshot
+*     Iterates through the entries in the local FIFO. Processes the data in
+*     specific ways depending on the entry type. If the data is a histogram
+*     timestamp or an audio on/off signal, writes to a map of PerformanceAnalysis
+*     class instances, where the wakeup() intervals are stored as histograms
+*     and analyzed.
 *
 * 3) reading the data from private buffer
 * MediaLogService::dump
@@ -876,8 +881,7 @@ std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
 void NBLog::MergeReader::getAndProcessSnapshot(NBLog::Reader::Snapshot &snapshot)
 {
     String8 timestamp, body;
-    // TODO: check: is the FIXME below still a problem?
-    // FIXME: this is not thread safe
+    // TODO: check: is this thread safe?
     // TODO: add lost data information and notification to ReportPerformance
     size_t lost = snapshot.lost() + (snapshot.begin() - EntryIterator(snapshot.data()));
     if (lost > 0) {
@@ -899,7 +903,7 @@ void NBLog::MergeReader::getAndProcessSnapshot(NBLog::Reader::Snapshot &snapshot
             memcpy(&hash, &(data->hash), sizeof(hash));
             int64_t ts;
             memcpy(&ts, &data->ts, sizeof(ts));
-            mThreadPerformanceAnalysis[data->author].logTsEntry(ts);
+            mThreadPerformanceAnalysis[data->author][hash].logTsEntry(ts);
             ++entry;
             break;
         }
@@ -907,12 +911,9 @@ void NBLog::MergeReader::getAndProcessSnapshot(NBLog::Reader::Snapshot &snapshot
             HistTsEntryWithAuthor *data = (HistTsEntryWithAuthor *) (entry->data);
             // TODO This memcpies are here to avoid unaligned memory access crash.
             // There's probably a more efficient way to do it
-            // TODO: incorporate hash information in mThreadPerformanceAnalysis
-            // log_hash_t hash;
-            // memcpy(&hash, &(data->hash), sizeof(hash));
-            // int64_t ts;
-            // memcpy(&ts, &data->ts, sizeof(ts));
-            mThreadPerformanceAnalysis[data->author].handleStateChange();
+            log_hash_t hash;
+            memcpy(&hash, &(data->hash), sizeof(hash));
+            mThreadPerformanceAnalysis[data->author][hash].handleStateChange();
             ++entry;
             break;
         }
