@@ -54,16 +54,6 @@ PerformanceAnalysis::PerformanceAnalysis() {
     kPeriodMsCPU = static_cast<int>(kPeriodMs * kRatio);
 }
 
-// converts a time series into a map. key: buffer period length. value: count
-static std::map<int, int> buildBuckets(const std::vector<int64_t> &samples) {
-    // TODO allow buckets of variable resolution
-    std::map<int, int> buckets;
-    for (size_t i = 1; i < samples.size(); ++i) {
-        ++buckets[deltaMs(samples[i - 1], samples[i])];
-    }
-    return buckets;
-}
-
 static int widthOf(int x) {
     int width = 0;
     while (x > 0) {
@@ -79,21 +69,41 @@ static int widthOf(int x) {
 // small or large values and stores these as peaks, and flushes
 // the timestamp series from memory.
 void PerformanceAnalysis::processAndFlushTimeStampSeries() {
+    if (mTimeStampSeries.empty()) {
+        ALOGD("Timestamp series is empty");
+        return;
+    }
+
+    // mHists is empty if program just started
+    if (mHists.empty()) {
+        mHists.emplace_front(static_cast<uint64_t>(mTimeStampSeries[0]),
+                            std::map<int, int>());
+    }
+
     // 1) analyze the series to store all outliers and their exact timestamps:
     storeOutlierData(mTimeStampSeries);
 
     // 2) detect peaks in the outlier series
     detectPeaks();
 
-    // 3) compute its histogram, append to mRecentHists and clear the time series
-    mRecentHists.emplace_back(static_cast<timestamp>(mTimeStampSeries[0]),
-                              buildBuckets(mTimeStampSeries));
-    // do not let mRecentHists exceed capacity
-    // ALOGD("mRecentHists size: %d", static_cast<int>(mRecentHists.size()));
-    if (mRecentHists.size() >= kRecentHistsCapacity) {
-        //  ALOGD("popped back mRecentHists");
-        mRecentHists.pop_front();
+    // if the current histogram has spanned its maximum time interval,
+    // insert a new empty histogram to the front of mHists
+    if (deltaMs(mHists[0].first, mTimeStampSeries[0]) >= kMaxHistTimespanMs) {
+        mHists.emplace_front(static_cast<uint64_t>(mTimeStampSeries[0]),
+                             std::map<int, int>());
+        // When memory is full, delete oldest histogram
+        if (mHists.size() >= kHistsCapacity) {
+            mHists.resize(kHistsCapacity);
+        }
     }
+
+    // 3) add current time intervals to histogram
+    for (size_t i = 1; i < mTimeStampSeries.size(); ++i) {
+        ++mHists[0].second[deltaMs(
+                mTimeStampSeries[i - 1], mTimeStampSeries[i])];
+    }
+
+    // clear the timestamps
     mTimeStampSeries.clear();
 }
 
@@ -116,48 +126,14 @@ void PerformanceAnalysis::logTsEntry(int64_t ts) {
     mTimeStampSeries.push_back(ts);
     // if length of the time series has reached kShortHistSize samples,
     // analyze the data and flush the timestamp series from memory
-    if (mTimeStampSeries.size() >= kShortHistSize) {
+    if (mTimeStampSeries.size() >= kHistSize) {
         processAndFlushTimeStampSeries();
     }
 }
 
-// When the short-term histogram array mRecentHists has reached capacity,
-// merge histograms for data compression and store them in mLongTermHists
-// clears mRecentHists
-// TODO: have logTsEntry write directly to mLongTermHists, discard mRecentHists,
-// start a new histogram when a peak occurs
-void PerformanceAnalysis::processAndFlushRecentHists() {
-
-    // Buckets is used to aggregate short-term histograms.
-    Histogram buckets;
-    timestamp startingTs = mRecentHists[0].first;
-
-    for (const auto &shortHist: mRecentHists) {
-        // If the time between starting and ending timestamps has reached the maximum,
-        // add the current histogram (buckets) to the long-term histogram buffer,
-        // clear buckets, and start a new long-term histogram aggregation process.
-        if (deltaMs(startingTs, shortHist.first) >= kMaxHistTimespanMs) {
-            mLongTermHists.emplace_back(startingTs, std::move(buckets));
-            buckets.clear();
-            startingTs = shortHist.first;
-            // When memory is full, delete oldest histogram
-            // TODO use a circular buffer
-            if (mLongTermHists.size() >= kLongTermHistsCapacity) {
-                mLongTermHists.pop_front();
-            }
-        }
-
-        // add current histogram to buckets
-        for (const auto &countPair : shortHist.second) {
-            buckets[countPair.first] += countPair.second;
-        }
-    }
-    mRecentHists.clear();
-    // TODO: decide when/where to call writeToFile
-    // TODO: add a thread-specific extension to the file name
-    static const char* const kName = (const char *) "/data/misc/audioserver/sample_results.txt";
-    writeToFile(mOutlierData, mLongTermHists, kName, false);
-}
+// TODO: move this someplace
+// static const char* const kName = (const char *) "/data/misc/audioserver/sample_results.txt";
+//    writeToFile(mOutlierData, mLongTermHists, kName, false);
 
 // Given a series of outlier intervals (mOutlier data),
 // looks for changes in distribution (peaks), which can be either positive or negative.
@@ -267,13 +243,14 @@ void PerformanceAnalysis::testFunction() {
 // TODO consider changing all ints to uint32_t or uint64_t
 // TODO: move this to ReportPerformance, probably make it a friend function of PerformanceAnalysis
 void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
-    if (mRecentHists.size() < 1) {
-        ALOGD("reportPerformance: mRecentHists is empty");
+    if (mHists.empty()) {
+        ALOGD("reportPerformance: mHists is empty");
         return;
     }
+    ALOGD("reportPerformance: hists size %d", static_cast<int>(mHists.size()));
     // TODO: more elaborate data analysis
     std::map<int, int> buckets;
-    for (const auto &shortHist: mRecentHists) {
+    for (const auto &shortHist: mHists) {
         for (const auto &countPair : shortHist.second) {
             buckets[countPair.first] += countPair.second;
         }
