@@ -56,9 +56,10 @@ static inline uint32_t log2(uint32_t x) {
 
 // Writes outlier intervals, timestamps, and histograms spanning long time
 // intervals to a file.
-void writeToFile(const std::deque<std::pair<outlierInterval, timestamp>> &outlierData,
-                 const std::deque<std::pair<timestamp, Histogram>> &hists,
-                 const char * kName, bool append, int author, log_hash_t hash);
+void writeToFile(const std::deque<std::pair<timestamp, Histogram>> &hists,
+                 const std::deque<std::pair<outlierInterval, timestamp>> &outlierData,
+                 const std::deque<timestamp> &peakTimestamps,
+                 const char * kDirectory, bool append, int author, log_hash_t hash);
 
 } // namespace ReportPerformance
 

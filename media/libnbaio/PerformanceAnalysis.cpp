@@ -219,20 +219,6 @@ void PerformanceAnalysis::storeOutlierData(const std::vector<int64_t> &timestamp
     }
 }
 
-// FIXME: delete this temporary test code, recycled for various new functions
-void PerformanceAnalysis::testFunction() {
-    // produces values (4: 5000000), (13: 18000000)
-    // ns timestamps of buffer periods
-    const std::vector<int64_t>kTempTestData = {1000000, 4000000, 5000000,
-                                               16000000, 18000000, 28000000};
-    PerformanceAnalysis::storeOutlierData(kTempTestData);
-    for (const auto &outlier: mOutlierData) {
-        ALOGE("PerformanceAnalysis test %lld: %lld",
-              static_cast<long long>(outlier.first), static_cast<long long>(outlier.second));
-    }
-    detectPeaks();
-}
-
 // TODO Make it return a std::string instead of modifying body --> is this still relevant?
 // TODO consider changing all ints to uint32_t or uint64_t
 // TODO: move this to ReportPerformance, probably make it a friend function of PerformanceAnalysis
@@ -319,15 +305,15 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
 
 }
 
-
+// TODO: decide whether to use this or whether it is overkill, and it is enough
+// to only treat as glitches single wakeup call intervals which are too long.
+// Ultimately, glitch detection will be directly on the audio signal.
 // Produces a log warning if the timing of recent buffer periods caused a glitch
 // Computes sum of running window of three buffer periods
 // Checks whether the buffer periods leave enough CPU time for the next one
 // e.g. if a buffer period is expected to be 4 ms and a buffer requires 3 ms of CPU time,
 // here are some glitch cases:
 // 4 + 4 + 6 ; 5 + 4 + 5; 2 + 2 + 10
-// TODO: develop this code to track changes in histogram distribution in addition
-// to / instead of glitches.
 void PerformanceAnalysis::alertIfGlitch(const std::vector<int64_t> &samples) {
     std::deque<int> periods(kNumBuff, kPeriodMs);
     for (size_t i = 2; i < samples.size(); ++i) { // skip first time entry
@@ -348,7 +334,7 @@ void PerformanceAnalysis::alertIfGlitch(const std::vector<int64_t> &samples) {
 // writes summary of performance into specified file descriptor
 void dump(int fd, int indent, PerformanceAnalysisMap &threadPerformanceAnalysis) {
     String8 body;
-    const char* const kName = "/data/misc/audioserver/";
+    const char* const kDirectory = "/data/misc/audioserver/";
     for (auto & thread : threadPerformanceAnalysis) {
         for (auto & hash: thread.second) {
             PerformanceAnalysis& curr = hash.second;
@@ -356,8 +342,8 @@ void dump(int fd, int indent, PerformanceAnalysisMap &threadPerformanceAnalysis)
             // write performance data to console
             curr.reportPerformance(&body);
             // write to file
-            writeToFile(curr.mOutlierData, curr.mHists, kName, false,
-                        thread.first, hash.first);
+            writeToFile(curr.mHists, curr.mOutlierData, curr.mPeakTimestamps,
+                        kDirectory, false, thread.first, hash.first);
         }
     }
     if (!body.isEmpty()) {

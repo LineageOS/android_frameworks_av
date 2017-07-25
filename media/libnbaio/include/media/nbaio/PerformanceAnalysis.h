@@ -79,11 +79,10 @@ public:
     // FIXME: move this data visualization to a separate class. Model/view/controller
     void reportPerformance(String8 *body, int maxHeight = 10);
 
-    // TODO: delete this. temp for testing
-    void testFunction();
-
-    // This function used to detect glitches in a time series
-    // TODO incorporate this into the analysis (currently unused)
+    // This function detects glitches in a time series.
+    // TODO: decide whether to use this or whether it is overkill, and it is enough
+    // to only treat as glitches single wakeup call intervals which are too long.
+    // Ultimately, glitch detection will be directly on the audio signal.
     void alertIfGlitch(const std::vector<timestamp_raw> &samples);
 
 private:
