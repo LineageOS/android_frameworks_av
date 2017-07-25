@@ -29,6 +29,12 @@ namespace android {
 
 namespace ReportPerformance {
 
+class PerformanceAnalysis;
+
+// a map of PerformanceAnalysis instances
+// The outer key is for the thread, the inner key for the source file location.
+using PerformanceAnalysisMap = std::map<int, std::map<log_hash_t, PerformanceAnalysis>>;
+
 class PerformanceAnalysis {
     // This class stores and analyzes audio processing wakeup timestamps from NBLog
     // FIXME: currently, all performance data is stored in deques. Need to add a mutex.
@@ -38,15 +44,13 @@ public:
 
     PerformanceAnalysis();
 
-    // Given a series of audio processing wakeup timestamps,
-    // compresses and and analyzes the data, and flushes
-    // the timestamp series from memory.
-    void processAndFlushTimeStampSeries();
+    friend void dump(int fd, int indent,
+                     PerformanceAnalysisMap &threadPerformanceAnalysis);
 
     // Given a series of audio processing wakeup timestamps,
     // compresses and and analyzes the data, and flushes
     // the timestamp series from memory.
-    void processAndFlushTimeStampSeriesOld();
+    void processAndFlushTimeStampSeries();
 
     // Called when an audio on/off event is read from the buffer,
     // e.g. EVENT_AUDIO_STATE.
@@ -73,7 +77,7 @@ public:
     // input: series of short histograms. Generates a string of analysis of the buffer periods
     // TODO: WIP write more detailed analysis
     // FIXME: move this data visualization to a separate class. Model/view/controller
-    void reportPerformance(String8 *body, int maxHeight = 10) const;
+    void reportPerformance(String8 *body, int maxHeight = 10);
 
     // TODO: delete this. temp for testing
     void testFunction();
@@ -134,12 +138,7 @@ private:
 
 };
 
-// a map of PerformanceAnalysis instances
-// The outer key is for the thread, the inner key for the source file location.
-using PerformanceAnalysisMap = std::map<int, std::map<log_hash_t, PerformanceAnalysis>>;
-
-void dump(int fd, int indent, const PerformanceAnalysisMap &threadPerformanceAnalysis);
-
+void dump(int fd, int indent, PerformanceAnalysisMap &threadPerformanceAnalysis);
 void dumpLine(int fd, int indent, const String8 &body);
 
 } // namespace ReportPerformance
