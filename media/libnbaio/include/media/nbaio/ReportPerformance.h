@@ -29,6 +29,8 @@ class String8;
 
 namespace ReportPerformance {
 
+const int kMsPerSec = 1000;
+
 // stores a histogram: key: observed buffer period. value: count
 // TODO: unsigned, unsigned
 using Histogram = std::map<int, int>;

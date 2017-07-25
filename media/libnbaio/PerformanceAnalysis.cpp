@@ -87,12 +87,12 @@ void PerformanceAnalysis::processAndFlushTimeStampSeries() {
 
     // if the current histogram has spanned its maximum time interval,
     // insert a new empty histogram to the front of mHists
-    if (deltaMs(mHists[0].first, mTimeStampSeries[0]) >= kMaxHistTimespanMs) {
+    if (deltaMs(mHists[0].first, mTimeStampSeries[0]) >= kMaxLength.HistTimespanMs) {
         mHists.emplace_front(static_cast<uint64_t>(mTimeStampSeries[0]),
                              std::map<int, int>());
         // When memory is full, delete oldest histogram
-        if (mHists.size() >= kHistsCapacity) {
-            mHists.resize(kHistsCapacity);
+        if (mHists.size() >= kMaxLength.Hists) {
+            mHists.resize(kMaxLength.Hists);
         }
     }
 
@@ -125,7 +125,7 @@ void PerformanceAnalysis::logTsEntry(int64_t ts) {
     mTimeStampSeries.push_back(ts);
     // if length of the time series has reached kShortHistSize samples,
     // analyze the data and flush the timestamp series from memory
-    if (mTimeStampSeries.size() >= kHistSize) {
+    if (mTimeStampSeries.size() >= kMaxLength.TimeStamps) {
         processAndFlushTimeStampSeries();
     }
 }
@@ -152,36 +152,39 @@ void PerformanceAnalysis::detectPeaks() {
     // the mean and standard deviation are updated every time a peak is detected
     // initialize first time. The mean from the previous sequence is stored
     // for the next sequence. Here, they are initialized for the first time.
-    if (mPeakDetectorMean < 0) {
-        mPeakDetectorMean = static_cast<double>(start->first);
-        mPeakDetectorSd = 0;
+    if (mOutlierDistribution.Mean < 0) {
+        mOutlierDistribution.Mean = static_cast<double>(start->first);
+        mOutlierDistribution.Sd = 0;
     }
     auto sqr = [](auto x){ return x * x; };
     for (auto it = mOutlierData.begin(); it != mOutlierData.end(); ++it) {
         // no surprise occurred:
         // the new element is a small number of standard deviations from the mean
-        if ((fabs(it->first - mPeakDetectorMean) < kStddevThreshold * mPeakDetectorSd) ||
+        if ((fabs(it->first - mOutlierDistribution.Mean) <
+             mOutlierDistribution.kMaxDeviation * mOutlierDistribution.Sd) ||
              // or: right after peak has been detected, the delta is smaller than average
-            (mPeakDetectorSd == 0 && fabs(it->first - mPeakDetectorMean) < kTypicalDiff)) {
+            (mOutlierDistribution.Sd == 0 &&
+                     fabs(it->first - mOutlierDistribution.Mean) < kTypicalDiff)) {
             // update the mean and sd:
             // count number of elements (distance between start interator and current)
             const int kN = std::distance(start, it) + 1;
             // usual formulas for mean and sd
-            mPeakDetectorMean = std::accumulate(start, it + 1, 0.0,
+            mOutlierDistribution.Mean = std::accumulate(start, it + 1, 0.0,
                                    [](auto &a, auto &b){return a + b.first;}) / kN;
-            mPeakDetectorSd = sqrt(std::accumulate(start, it + 1, 0.0,
-                      [=](auto &a, auto &b){ return a + sqr(b.first - mPeakDetectorMean);})) /
-                      ((kN > 1)? kN - 1 : kN); // kN - 1: mean is correlated with variance
+            mOutlierDistribution.Sd = sqrt(std::accumulate(start, it + 1, 0.0,
+                    [=](auto &a, auto &b){
+                    return a + sqr(b.first - mOutlierDistribution.Mean);})) /
+                    ((kN > 1)? kN - 1 : kN); // kN - 1: mean is correlated with variance
         }
         // surprising value: store peak timestamp and reset mean, sd, and start iterator
         else {
-            mPeakTimestamps.emplace_back(it->second);
-            // TODO: remove pop_front once a circular buffer is in place
-            if (mPeakTimestamps.size() >= kPeakSeriesSize) {
-                mPeakTimestamps.pop_front();
+            mPeakTimestamps.emplace_front(it->second);
+            // TODO: turn this into a circular buffer
+            if (mPeakTimestamps.size() >= kMaxLength.Peaks) {
+                mPeakTimestamps.resize(kMaxLength.Peaks);
             }
-            mPeakDetectorMean = static_cast<double>(it->first);
-            mPeakDetectorSd = 0;
+            mOutlierDistribution.Mean = static_cast<double>(it->first);
+            mOutlierDistribution.Sd = 0;
             start = it;
         }
     }
@@ -190,7 +193,8 @@ void PerformanceAnalysis::detectPeaks() {
 
 // Called by LogTsEntry. The input is a vector of timestamps.
 // Finds outliers and writes to mOutlierdata.
-// Each value in mOutlierdata consists of: <outlier timestamp, time elapsed since previous outlier>.
+// Each value in mOutlierdata consists of: <outlier timestamp,
+// time elapsed since previous outlier>.
 // e.g. timestamps (ms) 1, 4, 5, 16, 18, 28 will produce pairs (4, 5), (13, 18).
 // This function is applied to the time series before it is converted into a histogram.
 void PerformanceAnalysis::storeOutlierData(const std::vector<int64_t> &timestamps) {
@@ -198,24 +202,25 @@ void PerformanceAnalysis::storeOutlierData(const std::vector<int64_t> &timestamp
         return;
     }
     // first pass: need to initialize
-    if (mElapsed == 0) {
-        mPrevNs = timestamps[0];
+    if (mOutlierDistribution.Elapsed == 0) {
+        mOutlierDistribution.PrevNs = timestamps[0];
     }
     for (const auto &ts: timestamps) {
-        const uint64_t diffMs = static_cast<uint64_t>(deltaMs(mPrevNs, ts));
+        const uint64_t diffMs = static_cast<uint64_t>(deltaMs(mOutlierDistribution.PrevNs, ts));
         if (diffMs >= static_cast<uint64_t>(kOutlierMs)) {
-            mOutlierData.emplace_back(mElapsed, static_cast<uint64_t>(mPrevNs));
+            mOutlierData.emplace_front(mOutlierDistribution.Elapsed,
+                                      static_cast<uint64_t>(mOutlierDistribution.PrevNs));
             // Remove oldest value if the vector is full
             // TODO: remove pop_front once circular buffer is in place
             // FIXME: make sure kShortHistSize is large enough that that data will never be lost
             // before being written to file or to a FIFO
-            if (mOutlierData.size() >= kOutlierSeriesSize) {
-                mOutlierData.pop_front();
+            if (mOutlierData.size() >= kMaxLength.Outliers) {
+                mOutlierData.resize(kMaxLength.Outliers);
             }
-            mElapsed = 0;
+            mOutlierDistribution.Elapsed = 0;
         }
-        mElapsed += diffMs;
-        mPrevNs = ts;
+        mOutlierDistribution.Elapsed += diffMs;
+        mOutlierDistribution.PrevNs = ts;
     }
 }
 
@@ -279,7 +284,8 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
         const int value = 1 << row;
         body->appendFormat("%.*s", leftPadding, spaces.c_str());
         for (auto const &x : buckets) {
-          body->appendFormat("%.*s%s", colWidth - 1, spaces.c_str(), x.second < value ? " " : "|");
+          body->appendFormat("%.*s%s", colWidth - 1,
+                             spaces.c_str(), x.second < value ? " " : "|");
         }
         body->appendFormat("\n%s", " ");
     }
