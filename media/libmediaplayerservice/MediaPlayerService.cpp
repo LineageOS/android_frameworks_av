@@ -2318,6 +2318,33 @@ VolumeShaper::Status MediaPlayerService::AudioOutput::applyVolumeShaper(
             }
         }
     } else {
+        // VolumeShapers are not affected when a track moves between players for
+        // gapless playback (setNextMediaPlayer).
+        // We forward VolumeShaper operations that do not change configuration
+        // to the new player so that unducking may occur as expected.
+        // Unducking is an idempotent operation, same if applied back-to-back.
+        if (configuration->getType() == VolumeShaper::Configuration::TYPE_ID
+                && mNextOutput != nullptr) {
+            ALOGV("applyVolumeShaper: Attempting to forward missed operation: %s %s",
+                    configuration->toString().c_str(), operation->toString().c_str());
+            Mutex::Autolock nextLock(mNextOutput->mLock);
+
+            // recycled track should be forwarded from this AudioSink by switchToNextOutput
+            sp<AudioTrack> track = mNextOutput->mRecycledTrack;
+            if (track != nullptr) {
+                ALOGD("Forward VolumeShaper operation to recycled track %p", track.get());
+                (void)track->applyVolumeShaper(configuration, operation);
+            } else {
+                // There is a small chance that the unduck occurs after the next
+                // player has already started, but before it is registered to receive
+                // the unduck command.
+                track = mNextOutput->mTrack;
+                if (track != nullptr) {
+                    ALOGD("Forward VolumeShaper operation to track %p", track.get());
+                    (void)track->applyVolumeShaper(configuration, operation);
+                }
+            }
+        }
         status = mVolumeHandler->applyVolumeShaper(configuration, operation);
     }
     return status;
