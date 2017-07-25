@@ -178,12 +178,13 @@ int  Reverb_init            (ReverbContext *pContext);
 void Reverb_free            (ReverbContext *pContext);
 int  Reverb_setConfig       (ReverbContext *pContext, effect_config_t *pConfig);
 void Reverb_getConfig       (ReverbContext *pContext, effect_config_t *pConfig);
-int  Reverb_setParameter    (ReverbContext *pContext, void *pParam, void *pValue);
+int  Reverb_setParameter    (ReverbContext *pContext, void *pParam, void *pValue, int vsize);
 int  Reverb_getParameter    (ReverbContext *pContext,
                              void          *pParam,
-                             size_t        *pValueSize,
+                             uint32_t      *pValueSize,
                              void          *pValue);
 int Reverb_LoadPreset       (ReverbContext   *pContext);
+int Reverb_paramValueSize   (int32_t param);
 
 /* Effect Library Interface Implementation */
 
@@ -1744,12 +1745,13 @@ int Reverb_getParameter(ReverbContext *pContext,
 //  pContext         - handle to instance data
 //  pParam           - pointer to parameter
 //  pValue           - pointer to value
+//  vsize            - value size
 //
 // Outputs:
 //
 //----------------------------------------------------------------------------
 
-int Reverb_setParameter (ReverbContext *pContext, void *pParam, void *pValue){
+int Reverb_setParameter (ReverbContext *pContext, void *pParam, void *pValue, int vsize){
     int status = 0;
     int16_t level;
     int16_t ratio;
@@ -1771,6 +1773,11 @@ int Reverb_setParameter (ReverbContext *pContext, void *pParam, void *pValue){
         }
         pContext->nextPreset = preset;
         return 0;
+    }
+
+    if (vsize < Reverb_paramValueSize(param)) {
+        android_errorWriteLog(0x534e4554, "63526567");
+        return -EINVAL;
     }
 
     switch (param){
@@ -1847,6 +1854,31 @@ int Reverb_setParameter (ReverbContext *pContext, void *pParam, void *pValue){
     //ALOGV("\tReverb_setParameter end");
     return status;
 } /* end Reverb_setParameter */
+
+
+/**
+ * returns the size in bytes of the value of each environmental reverb parameter
+ */
+int Reverb_paramValueSize(int32_t param) {
+    switch (param) {
+    case REVERB_PARAM_ROOM_LEVEL:
+    case REVERB_PARAM_ROOM_HF_LEVEL:
+    case REVERB_PARAM_REFLECTIONS_LEVEL:
+    case REVERB_PARAM_REVERB_LEVEL:
+        return sizeof(int16_t); // millibel
+    case REVERB_PARAM_DECAY_TIME:
+    case REVERB_PARAM_REFLECTIONS_DELAY:
+    case REVERB_PARAM_REVERB_DELAY:
+        return sizeof(uint32_t); // milliseconds
+    case REVERB_PARAM_DECAY_HF_RATIO:
+    case REVERB_PARAM_DIFFUSION:
+    case REVERB_PARAM_DENSITY:
+        return sizeof(int16_t); // permille
+    case REVERB_PARAM_PROPERTIES:
+        return sizeof(s_reverb_settings); // struct of all reverb properties
+    }
+    return sizeof(int32_t);
+}
 
 } // namespace
 } // namespace
@@ -2019,7 +2051,8 @@ int Reverb_command(effect_handle_t  self,
 
             *(int *)pReplyData = android::Reverb_setParameter(pContext,
                                                              (void *)p->data,
-                                                              p->data + p->psize);
+                                                              p->data + p->psize,
+                                                              p->vsize);
         } break;
 
         case EFFECT_CMD_ENABLE:
