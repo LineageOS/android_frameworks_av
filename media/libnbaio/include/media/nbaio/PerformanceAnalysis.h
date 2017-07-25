@@ -67,12 +67,12 @@ public:
     // Input: mOutlierData. Looks at time elapsed between outliers
     // finds significant changes in the distribution
     // writes timestamps of significant changes to mPeakTimestamps
-    void detectPeaks();
+    bool detectAndStorePeak(outlierInterval delta, timestamp ts);
 
     // runs analysis on timestamp series before it is converted to a histogram
     // finds outliers
     // writes to mOutlierData <time elapsed since previous outlier, outlier timestamp>
-    void storeOutlierData(const std::vector<timestamp_raw> &timestamps);
+    bool detectAndStoreOutlier(const timestamp_raw timestamp);
 
     // input: series of short histograms. Generates a string of analysis of the buffer periods
     // TODO: WIP write more detailed analysis
@@ -87,15 +87,17 @@ public:
 
 private:
 
-    // stores outlier analysis: <elapsed time between outliers in ms, outlier timestamp>
+    // TODO use a circular buffer for the deques and vectors below
+
+    // stores outlier analysis:
+    // <elapsed time between outliers in ms, outlier beginning timestamp>
     std::deque<std::pair<outlierInterval, timestamp>> mOutlierData;
 
     // stores each timestamp at which a peak was detected
     // a peak is a moment at which the average outlier interval changed significantly
     std::deque<timestamp> mPeakTimestamps;
 
-    // stores stores buffer period histograms with timestamp of first sample
-    // TODO use a circular buffer
+    // stores buffer period histograms with timestamp of first sample
     std::deque<std::pair<timestamp, Histogram>> mHists;
 
     // vector of timestamps, collected from NBLog for a specific thread
@@ -129,12 +131,15 @@ private:
     // these variables are stored in-class to ensure continuity while analyzing the timestamp
     // series one short sequence at a time: the variables are not re-initialized every time.
     struct OutlierDistribution {
-        double Mean = -1;
-        double Sd = -1;
-        uint64_t Elapsed = 0;
-        int64_t PrevNs = -1;
+        double mMean = 0; // sample mean since previous peak
+        double mSd = 0; // sample sd since previous peak
+        outlierInterval mElapsed = 0; // time since previous detected outlier
+        int64_t mPrevNs = -1; // previous timestamp
         // number of standard deviations from mean considered a significant change
         const int kMaxDeviation = 5;
+        double mTypicalDiff = 0; // global mean of outliers
+        double mN = 0; // length of sequence since the last peak
+        double mM2 = 0;
     } mOutlierDistribution;
 };
 

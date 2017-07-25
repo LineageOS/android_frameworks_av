@@ -69,41 +69,41 @@ static int widthOf(int x) {
 // the timestamp series from memory.
 void PerformanceAnalysis::processAndFlushTimeStampSeries() {
     if (mTimeStampSeries.empty()) {
-        ALOGD("Timestamp series is empty");
         return;
     }
 
-    // mHists is empty if thread/hash pair is sending data for the first time
-    if (mHists.empty()) {
-        mHists.emplace_front(static_cast<uint64_t>(mTimeStampSeries[0]),
-                            std::map<int, int>());
-    }
-
-    // 1) analyze the series to store all outliers and their exact timestamps:
-    storeOutlierData(mTimeStampSeries);
-
-    // 2) detect peaks in the outlier series
-    detectPeaks();
-
-    // if the current histogram has spanned its maximum time interval,
-    // insert a new empty histogram to the front of mHists
-    if (deltaMs(mHists[0].first, mTimeStampSeries[0]) >= kMaxLength.HistTimespanMs) {
-        mHists.emplace_front(static_cast<uint64_t>(mTimeStampSeries[0]),
-                             std::map<int, int>());
-        // When memory is full, delete oldest histogram
-        if (mHists.size() >= kMaxLength.Hists) {
-            mHists.resize(kMaxLength.Hists);
+    // TODO: add mPrev ts depending on whether or not handleStateChange was called
+    for (size_t i = 1; i < mTimeStampSeries.size(); i++) {
+        // Check whether the current timestamp is an outlier
+        const bool isOutlier = detectAndStoreOutlier(mTimeStampSeries[i]);
+        // If an outlier was found, check whether it was a peak
+        if (isOutlier) {
+            /*bool isPeak =*/ detectAndStorePeak(
+                mOutlierData[0].first, mOutlierData[0].second);
         }
-    }
-
-    // 3) add current time intervals to histogram
-    for (size_t i = 1; i < mTimeStampSeries.size(); ++i) {
-        ++mHists[0].second[deltaMs(
-                mTimeStampSeries[i - 1], mTimeStampSeries[i])];
+        // Insert a histogram to mHists if it is empty, or
+        // close the current histogram and insert a new empty one if
+        // if the current histogram has spanned its maximum time interval.
+        // Also insert a new empty histogram if a change in behavior (peak)
+        // occurred at the current timestamp
+        if (mHists.empty() || deltaMs(mHists[0].first, mTimeStampSeries[i]) >=
+                kMaxLength.HistTimespanMs) {
+            mHists.emplace_front(static_cast<uint64_t>(mTimeStampSeries[i]),
+                                 std::map<int, int>());
+            // When memory is full, delete oldest histogram
+            // TODO: use a circular buffer
+            if (mHists.size() >= kMaxLength.Hists) {
+                mHists.resize(kMaxLength.Hists);
+            }
+        }
+        // add current time intervals to histogram
+        ++mHists[0].second[deltaMs(mTimeStampSeries[i-1], mTimeStampSeries[i])];
     }
 
     // clear the timestamps
     mTimeStampSeries.clear();
+    // reset outlier values
+    mOutlierDistribution.mPrevNs = -1;
 }
 
 // forces short-term histogram storage to avoid adding idle audio time interval
@@ -130,113 +130,115 @@ void PerformanceAnalysis::logTsEntry(int64_t ts) {
     }
 }
 
-// Given a series of outlier intervals (mOutlier data),
+// Checks whether the time interval between two outliers is far enough from
+// a typical delta to be considered a peak.
 // looks for changes in distribution (peaks), which can be either positive or negative.
 // The function sets the mean to the starting value and sigma to 0, and updates
 // them as long as no peak is detected. When a value is more than 'threshold'
 // standard deviations from the mean, a peak is detected and the mean and sigma
 // are set to the peak value and 0.
-void PerformanceAnalysis::detectPeaks() {
+bool PerformanceAnalysis::detectAndStorePeak(outlierInterval diff, timestamp ts) {
+    bool isPeak = false;
     if (mOutlierData.empty()) {
-        return;
+        ALOGD("mOutlierData is empty");
+        return false;
     }
+    // Update mean of the distribution
+    // TypicalDiff is used to check whether a value is unusually large
+    // when we cannot use standard deviations from the mean because the sd is set to 0.
+    mOutlierDistribution.mTypicalDiff = (mOutlierDistribution.mTypicalDiff *
+            (mOutlierData.size() - 1) + diff) / mOutlierData.size();
 
-    // compute mean of the distribution. Used to check whether a value is large
-    const double kTypicalDiff = std::accumulate(
-        mOutlierData.begin(), mOutlierData.end(), 0,
-        [](auto &a, auto &b){return a + b.first;}) / mOutlierData.size();
-    // ALOGD("typicalDiff %f", kTypicalDiff);
+    // Initialize short-term mean at start of program
+    if (mOutlierDistribution.mMean == 0) {
+        mOutlierDistribution.mMean = static_cast<double>(diff);
+    }
+    // Update length of current sequence of outliers
+    mOutlierDistribution.mN++;
 
-    // iterator at the beginning of a sequence, or updated to the most recent peak
-    std::deque<std::pair<uint64_t, uint64_t>>::iterator start = mOutlierData.begin();
-    // the mean and standard deviation are updated every time a peak is detected
-    // initialize first time. The mean from the previous sequence is stored
-    // for the next sequence. Here, they are initialized for the first time.
-    if (mOutlierDistribution.Mean < 0) {
-        mOutlierDistribution.Mean = static_cast<double>(start->first);
-        mOutlierDistribution.Sd = 0;
-    }
-    auto sqr = [](auto x){ return x * x; };
-    for (auto it = mOutlierData.begin(); it != mOutlierData.end(); ++it) {
-        // no surprise occurred:
-        // the new element is a small number of standard deviations from the mean
-        if ((fabs(it->first - mOutlierDistribution.Mean) <
-             mOutlierDistribution.kMaxDeviation * mOutlierDistribution.Sd) ||
-             // or: right after peak has been detected, the delta is smaller than average
-            (mOutlierDistribution.Sd == 0 &&
-                     fabs(it->first - mOutlierDistribution.Mean) < kTypicalDiff)) {
-            // update the mean and sd:
-            // count number of elements (distance between start interator and current)
-            const int kN = std::distance(start, it) + 1;
-            // usual formulas for mean and sd
-            mOutlierDistribution.Mean = std::accumulate(start, it + 1, 0.0,
-                                   [](auto &a, auto &b){return a + b.first;}) / kN;
-            mOutlierDistribution.Sd = sqrt(std::accumulate(start, it + 1, 0.0,
-                    [=](auto &a, auto &b){
-                    return a + sqr(b.first - mOutlierDistribution.Mean);})) /
-                    ((kN > 1)? kN - 1 : kN); // kN - 1: mean is correlated with variance
+    // If statement checks whether a large deviation from the mean occurred.
+    // If the standard deviation has been reset to zero, the comparison is
+    // instead to the mean of the full mOutlierInterval sequence.
+    if ((fabs(static_cast<double>(diff) - mOutlierDistribution.mMean) <
+            mOutlierDistribution.kMaxDeviation * mOutlierDistribution.mSd) ||
+            (mOutlierDistribution.mSd == 0 &&
+            fabs(diff - mOutlierDistribution.mMean) <
+            mOutlierDistribution.mTypicalDiff)) {
+        // update the mean and sd using online algorithm
+        // https://en.wikipedia.org/wiki/
+        // Algorithms_for_calculating_variance#Online_algorithm
+        mOutlierDistribution.mN++;
+        const double kDelta = diff - mOutlierDistribution.mMean;
+        mOutlierDistribution.mMean += kDelta / mOutlierDistribution.mN;
+        const double kDelta2 = diff - mOutlierDistribution.mMean;
+        mOutlierDistribution.mM2 += kDelta * kDelta2;
+        mOutlierDistribution.mSd = (mOutlierDistribution.mN < 2) ? 0 :
+                mOutlierDistribution.mM2 / (mOutlierDistribution.mN - 1);
+    } else {
+        // new value is far from the mean:
+        // store peak timestamp and reset mean, sd, and short-term sequence
+        isPeak = true;
+        mPeakTimestamps.emplace_front(ts);
+        // if mPeaks has reached capacity, delete oldest data
+        // Note: this means that mOutlierDistribution values do not exactly
+        // match the data we have in mPeakTimestamps, but this is not an issue
+        // in practice for estimating future peaks.
+        // TODO: turn this into a circular buffer
+        if (mPeakTimestamps.size() >= kMaxLength.Peaks) {
+            mPeakTimestamps.resize(kMaxLength.Peaks);
         }
-        // surprising value: store peak timestamp and reset mean, sd, and start iterator
-        else {
-            mPeakTimestamps.emplace_front(it->second);
-            // TODO: turn this into a circular buffer
-            if (mPeakTimestamps.size() >= kMaxLength.Peaks) {
-                mPeakTimestamps.resize(kMaxLength.Peaks);
-            }
-            mOutlierDistribution.Mean = static_cast<double>(it->first);
-            mOutlierDistribution.Sd = 0;
-            start = it;
-        }
+        mOutlierDistribution.mMean = 0;
+        mOutlierDistribution.mSd = 0;
+        mOutlierDistribution.mN = 0;
+        mOutlierDistribution.mM2 = 0;
     }
-    return;
+    ALOGD("outlier distr %f %f", mOutlierDistribution.mMean, mOutlierDistribution.mSd);
+    return isPeak;
 }
 
-// Called by LogTsEntry. The input is a vector of timestamps.
-// Finds outliers and writes to mOutlierdata.
-// Each value in mOutlierdata consists of: <outlier timestamp,
-// time elapsed since previous outlier>.
+// Determines whether the difference between a timestamp and the previous
+// one is beyond a threshold. If yes, stores the timestamp as an outlier
+// and writes to mOutlierdata in the following format:
+// Time elapsed since previous outlier: Timestamp of start of outlier
 // e.g. timestamps (ms) 1, 4, 5, 16, 18, 28 will produce pairs (4, 5), (13, 18).
-// This function is applied to the time series before it is converted into a histogram.
-void PerformanceAnalysis::storeOutlierData(const std::vector<int64_t> &timestamps) {
-    if (timestamps.size() < 1) {
-        return;
-    }
+bool PerformanceAnalysis::detectAndStoreOutlier(const int64_t ts) {
     // first pass: need to initialize
-    if (mOutlierDistribution.Elapsed == 0) {
-        mOutlierDistribution.PrevNs = timestamps[0];
+    if (mOutlierDistribution.mPrevNs == -1) {
+        mOutlierDistribution.mPrevNs = ts;
     }
-    for (const auto &ts: timestamps) {
-        const uint64_t diffMs = static_cast<uint64_t>(deltaMs(mOutlierDistribution.PrevNs, ts));
-        if (diffMs >= static_cast<uint64_t>(kOutlierMs)) {
-            mOutlierData.emplace_front(mOutlierDistribution.Elapsed,
-                                      static_cast<uint64_t>(mOutlierDistribution.PrevNs));
-            // Remove oldest value if the vector is full
-            // TODO: remove pop_front once circular buffer is in place
-            // FIXME: make sure kShortHistSize is large enough that that data will never be lost
-            // before being written to file or to a FIFO
-            if (mOutlierData.size() >= kMaxLength.Outliers) {
-                mOutlierData.resize(kMaxLength.Outliers);
-            }
-            mOutlierDistribution.Elapsed = 0;
+    bool isOutlier = false;
+    const uint64_t diffMs = static_cast<uint64_t>(deltaMs(mOutlierDistribution.mPrevNs, ts));
+    // ALOGD("%d\t", static_cast<int>(diffMs));
+    if (diffMs >= static_cast<uint64_t>(kOutlierMs)) {
+        isOutlier = true;
+        //ALOGD("outlier outlier %d %d", static_cast<int>(diffMs),
+        //      static_cast<int>(mOutlierDistribution.mElapsed));
+        mOutlierData.emplace_front(mOutlierDistribution.mElapsed,
+                                  static_cast<uint64_t>(mOutlierDistribution.mPrevNs));
+        // Remove oldest value if the vector is full
+        // TODO: turn this into a circular buffer
+        // TODO: make sure kShortHistSize is large enough that that data will never be lost
+        // before being written to file or to a FIFO
+        if (mOutlierData.size() >= kMaxLength.Outliers) {
+            mOutlierData.resize(kMaxLength.Outliers);
         }
-        mOutlierDistribution.Elapsed += diffMs;
-        mOutlierDistribution.PrevNs = ts;
+        mOutlierDistribution.mElapsed = 0;
     }
+    mOutlierDistribution.mElapsed += diffMs;
+    mOutlierDistribution.mPrevNs = ts;
+    return isOutlier;
 }
 
 // TODO Make it return a std::string instead of modifying body --> is this still relevant?
 // TODO consider changing all ints to uint32_t or uint64_t
 // TODO: move this to ReportPerformance, probably make it a friend function of PerformanceAnalysis
 void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
-    // Add any new data
-    processAndFlushTimeStampSeries();
-
     if (mHists.empty()) {
         ALOGD("reportPerformance: mHists is empty");
         return;
     }
     ALOGD("reportPerformance: hists size %d", static_cast<int>(mHists.size()));
-    // TODO: more elaborate data analysis
+
     std::map<int, int> buckets;
     for (const auto &shortHist: mHists) {
         for (const auto &countPair : shortHist.second) {
@@ -308,7 +310,6 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
         body->appendFormat("%lld: %lld\n", static_cast<long long>(outlier.first),
                            static_cast<long long>(outlier.second));
     }
-
 }
 
 // TODO: decide whether to use this or whether it is overkill, and it is enough
@@ -340,21 +341,24 @@ void PerformanceAnalysis::alertIfGlitch(const std::vector<int64_t> &samples) {
 // writes summary of performance into specified file descriptor
 void dump(int fd, int indent, PerformanceAnalysisMap &threadPerformanceAnalysis) {
     String8 body;
+    int i = 0; // TODO: delete
     const char* const kDirectory = "/data/misc/audioserver/";
     for (auto & thread : threadPerformanceAnalysis) {
         for (auto & hash: thread.second) {
+            ALOGD("hash number %d", i++);
             PerformanceAnalysis& curr = hash.second;
+            // Add any new data
             curr.processAndFlushTimeStampSeries();
             // write performance data to console
             curr.reportPerformance(&body);
+            if (!body.isEmpty()) {
+                dumpLine(fd, indent, body);
+                body.clear();
+            }
             // write to file
             writeToFile(curr.mHists, curr.mOutlierData, curr.mPeakTimestamps,
                         kDirectory, false, thread.first, hash.first);
         }
-    }
-    if (!body.isEmpty()) {
-        dumpLine(fd, indent, body);
-        body.clear();
     }
 }
 
