@@ -29,6 +29,8 @@ class String8;
 
 namespace ReportPerformance {
 
+const int kMsPerSec = 1000;
+
 // stores a histogram: key: observed buffer period. value: count
 // TODO: unsigned, unsigned
 using Histogram = std::map<int, int>;
@@ -56,9 +58,10 @@ static inline uint32_t log2(uint32_t x) {
 
 // Writes outlier intervals, timestamps, and histograms spanning long time
 // intervals to a file.
-void writeToFile(const std::deque<std::pair<outlierInterval, timestamp>> &outlierData,
-                 const std::deque<std::pair<timestamp, Histogram>> &hists,
-                 const char * kName, bool append, int author, log_hash_t hash);
+void writeToFile(const std::deque<std::pair<timestamp, Histogram>> &hists,
+                 const std::deque<std::pair<outlierInterval, timestamp>> &outlierData,
+                 const std::deque<timestamp> &peakTimestamps,
+                 const char * kDirectory, bool append, int author, log_hash_t hash);
 
 } // namespace ReportPerformance
 

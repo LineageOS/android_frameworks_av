@@ -79,11 +79,10 @@ public:
     // FIXME: move this data visualization to a separate class. Model/view/controller
     void reportPerformance(String8 *body, int maxHeight = 10);
 
-    // TODO: delete this. temp for testing
-    void testFunction();
-
-    // This function used to detect glitches in a time series
-    // TODO incorporate this into the analysis (currently unused)
+    // This function detects glitches in a time series.
+    // TODO: decide whether to use this or whether it is overkill, and it is enough
+    // to only treat as glitches single wakeup call intervals which are too long.
+    // Ultimately, glitch detection will be directly on the audio signal.
     void alertIfGlitch(const std::vector<timestamp_raw> &samples);
 
 private:
@@ -103,10 +102,9 @@ private:
     // when a vector reaches its maximum size, the data is processed and flushed
     std::vector<timestamp_raw> mTimeStampSeries;
 
-    static const int kMsPerSec = 1000;
-
     // Parameters used when detecting outliers
     // TODO: learn some of these from the data, delete unused ones
+    // TODO: put used variables in a struct
     // FIXME: decide whether to make kPeriodMs static.
     static const int kNumBuff = 3; // number of buffers considered in local history
     int kPeriodMs; // current period length is ideally 4 ms
@@ -115,27 +113,29 @@ private:
     static constexpr double kRatio = 0.75; // estimate of CPU time as ratio of period length
     int kPeriodMsCPU; // compute based on kPeriodLen and kRatio
 
-    // Peak detection: number of standard deviations from mean considered a significant change
-    static const int kStddevThreshold = 5;
-
     // capacity allocated to data structures
     // TODO: make these values longer when testing is finished
-    static const int kHistsCapacity = 20; // number of short-term histograms stored in memory
-    static const int kHistSize = 1000; // max number of samples stored in a histogram
-    static const int kOutlierSeriesSize = 100; // number of values stored in outlier array
-    static const int kPeakSeriesSize = 100; // number of values stored in peak array
-    // maximum elapsed time between first and last timestamp of a long-term histogram
-    static const int kMaxHistTimespanMs = 5 * kMsPerSec;
+    struct MaxLength {
+        size_t Hists; // number of histograms stored in memory
+        size_t TimeStamps; // histogram size, e.g. maximum length of timestamp series
+        size_t Outliers; // number of values stored in outlier array
+        size_t Peaks; // number of values stored in peak array
+        // maximum elapsed time between first and last timestamp of a long-term histogram
+        int HistTimespanMs;
+    };
+    static constexpr MaxLength kMaxLength = {.Hists = 20, .TimeStamps = 1000,
+            .Outliers = 100, .Peaks = 100, .HistTimespanMs = 5 * kMsPerSec };
 
     // these variables are stored in-class to ensure continuity while analyzing the timestamp
     // series one short sequence at a time: the variables are not re-initialized every time.
-    // FIXME: create inner class for these variables and decide which other ones to add to it
-    double mPeakDetectorMean = -1;
-    double mPeakDetectorSd = -1;
-    // variables for storeOutlierData
-    uint64_t mElapsed = 0;
-    int64_t mPrevNs = -1;
-
+    struct OutlierDistribution {
+        double Mean = -1;
+        double Sd = -1;
+        uint64_t Elapsed = 0;
+        int64_t PrevNs = -1;
+        // number of standard deviations from mean considered a significant change
+        const int kMaxDeviation = 5;
+    } mOutlierDistribution;
 };
 
 void dump(int fd, int indent, PerformanceAnalysisMap &threadPerformanceAnalysis);

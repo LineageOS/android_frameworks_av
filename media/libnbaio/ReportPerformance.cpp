@@ -38,10 +38,10 @@ namespace ReportPerformance {
 
 // Writes outlier intervals, timestamps, and histograms spanning long time intervals to a file.
 // TODO: format the data efficiently and write different types of data to different files
-void writeToFile(const std::deque<std::pair<outlierInterval, timestamp>> &outlierData,
-                                    const std::deque<std::pair<timestamp, Histogram>> &hists,
-                                    const char * kDirectory,
-                                    bool append, int author, log_hash_t hash) {
+void writeToFile(const std::deque<std::pair<timestamp, Histogram>> &hists,
+                 const std::deque<std::pair<outlierInterval, timestamp>> &outlierData,
+                 const std::deque<timestamp> &peakTimestamps,
+                 const char * directory, bool append, int author, log_hash_t hash) {
     if (outlierData.empty() || hists.empty()) {
         ALOGW("No data, returning.");
         return;
@@ -49,24 +49,14 @@ void writeToFile(const std::deque<std::pair<outlierInterval, timestamp>> &outlie
 
     std::stringstream outlierName;
     std::stringstream histogramName;
+    std::stringstream peakName;
 
-    outlierName << kDirectory << "outliers_" << author << "_" << hash;
-    histogramName << kDirectory << "histograms_" << author << "_" << hash;
-
-    std::ofstream ofs;
-    ofs.open(outlierName.str().c_str(), append ? std::ios::app : std::ios::trunc);
-    if (!ofs.is_open()) {
-        ALOGW("couldn't open file %s", outlierName.str().c_str());
-        return;
-    }
-    ofs << "Outlier data: interval and timestamp\n";
-    for (const auto &outlier : outlierData) {
-        ofs << outlier.first << ": " << outlier.second << "\n";
-    }
-    ofs.close();
+    histogramName << directory << "histograms_" << author << "_" << hash;
+    outlierName << directory << "outliers_" << author << "_" << hash;
+    peakName << directory << "peaks_" << author << "_" << hash;
 
     std::ofstream hfs;
-    hfs.open(histogramName.str().c_str(), append ? std::ios::app : std::ios::trunc);
+    hfs.open(histogramName.str(), append ? std::ios::app : std::ios::trunc);
     if (!hfs.is_open()) {
         ALOGW("couldn't open file %s", histogramName.str().c_str());
         return;
@@ -82,6 +72,30 @@ void writeToFile(const std::deque<std::pair<outlierInterval, timestamp>> &outlie
         hfs << "\n"; // separate histograms with a newline
     }
     hfs.close();
+
+    std::ofstream ofs;
+    ofs.open(outlierName.str(), append ? std::ios::app : std::ios::trunc);
+    if (!ofs.is_open()) {
+        ALOGW("couldn't open file %s", outlierName.str().c_str());
+        return;
+    }
+    ofs << "Outlier data: interval and timestamp\n";
+    for (const auto &outlier : outlierData) {
+        ofs << outlier.first << ": " << outlier.second << "\n";
+    }
+    ofs.close();
+
+    std::ofstream pfs;
+    pfs.open(peakName.str(), append ? std::ios::app : std::ios::trunc);
+    if (!pfs.is_open()) {
+        ALOGW("couldn't open file %s", peakName.str().c_str());
+        return;
+    }
+    pfs << "Peak data: timestamp\n";
+    for (const auto &peak : peakTimestamps) {
+        pfs << peak << "\n";
+    }
+    pfs.close();
 }
 
 } // namespace ReportPerformance
