@@ -170,6 +170,7 @@ private:
     KeyedVector<OMX::buffer_id, OMX_BUFFERHEADERTYPE *> mBufferIDToBufferHeader;
     KeyedVector<OMX_BUFFERHEADERTYPE *, OMX::buffer_id> mBufferHeaderToBufferID;
     MetadataBufferType mMetadataType[2];
+    bool mGraphicBufferEnabled[2];
 
     // For debug support
     char *mName;
