@@ -235,6 +235,8 @@ OMXNodeInstance::OMXNodeInstance(
     mDebugLevelBumpPendingBuffers[1] = 0;
     mMetadataType[0] = kMetadataBufferTypeInvalid;
     mMetadataType[1] = kMetadataBufferTypeInvalid;
+    mGraphicBufferEnabled[0] = false;
+    mGraphicBufferEnabled[1] = false;
     mIsSecure = AString(name).endsWith(".secure");
     atomic_store(&mDying, false);
 }
@@ -576,6 +578,11 @@ status_t OMXNodeInstance::enableGraphicBuffers(
     err = OMX_SetParameter(mHandle, index, &params);
     CLOG_IF_ERROR(setParameter, err, "%s(%#x): %s:%u en=%d", name, index,
             portString(portIndex), portIndex, enable);
+    if (err == OMX_ErrorNone) {
+        mGraphicBufferEnabled[portIndex] = enable;
+    } else if (enable) {
+        mGraphicBufferEnabled[portIndex] = false;
+    }
     return StatusFromOMXError(err);
 }
 
@@ -779,6 +786,13 @@ status_t OMXNodeInstance::useBuffer(
         return BAD_VALUE;
     }
 
+    if (mMetadataType[portIndex] == kMetadataBufferTypeInvalid
+            && mGraphicBufferEnabled[portIndex]) {
+        ALOGE("b/62948670");
+        android_errorWriteLog(0x534e4554, "62948670");
+        return INVALID_OPERATION;
+    }
+
     // metadata buffers are not connected cross process
     BufferMeta *buffer_meta;
     bool isMeta = mMetadataType[portIndex] != kMetadataBufferTypeInvalid;
@@ -889,6 +903,14 @@ status_t OMXNodeInstance::useGraphicBuffer(
         OMX_U32 portIndex, const sp<GraphicBuffer>& graphicBuffer,
         OMX::buffer_id *buffer) {
     Mutex::Autolock autoLock(mLock);
+
+    if (!mGraphicBufferEnabled[portIndex]
+            || mMetadataType[portIndex] != kMetadataBufferTypeInvalid) {
+        // Report error if this is not in graphic buffer mode.
+        ALOGE("b/62948670");
+        android_errorWriteLog(0x534e4554, "62948670");
+        return INVALID_OPERATION;
+    }
 
     // See if the newer version of the extension is present.
     OMX_INDEXTYPE index;
