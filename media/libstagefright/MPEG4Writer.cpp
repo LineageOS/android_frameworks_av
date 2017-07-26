@@ -1684,10 +1684,12 @@ void MPEG4Writer::Track::getCodecSpecificDataFromInputFormatIfPossible() {
             || !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC)) {
         if (mMeta->findData(kKeyESDS, &type, &data, &size)) {
             ESDS esds(data, size);
-            if (esds.getCodecSpecificInfo(&data, &size) != OK) {
-                data = NULL;
-                size = 0;
+            if (esds.getCodecSpecificInfo(&data, &size) == OK &&
+                    data != NULL &&
+                    copyCodecSpecificData((uint8_t*)data, size) == OK) {
+                mGotAllCodecSpecificData = true;
             }
+            return;
         }
     }
     if (data != NULL && copyCodecSpecificData((uint8_t *)data, size) == OK) {
