@@ -36,6 +36,7 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/ColorUtils.h>
+#include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
@@ -285,45 +286,6 @@ status_t MPEG4DataSource::setCachedRange(off64_t offset, size_t size) {
 
 static const bool kUseHexDump = false;
 
-static void hexdump(const void *_data, size_t size) {
-    const uint8_t *data = (const uint8_t *)_data;
-    size_t offset = 0;
-    while (offset < size) {
-        printf("0x%04zx  ", offset);
-
-        size_t n = size - offset;
-        if (n > 16) {
-            n = 16;
-        }
-
-        for (size_t i = 0; i < 16; ++i) {
-            if (i == 8) {
-                printf(" ");
-            }
-
-            if (offset + i < size) {
-                printf("%02x ", data[offset + i]);
-            } else {
-                printf("   ");
-            }
-        }
-
-        printf(" ");
-
-        for (size_t i = 0; i < n; ++i) {
-            if (isprint(data[offset + i])) {
-                printf("%c", data[offset + i]);
-            } else {
-                printf(".");
-            }
-        }
-
-        printf("\n");
-
-        offset += 16;
-    }
-}
-
 static const char *FourCC2MIME(uint32_t fourcc) {
     switch (fourcc) {
         case FOURCC('m', 'p', '4', 'a'):
@@ -510,14 +472,6 @@ sp<MetaData> MPEG4Extractor::getTrackMetaData(
     }
 
     return track->meta;
-}
-
-static void MakeFourCCString(uint32_t x, char *s) {
-    s[0] = x >> 24;
-    s[1] = (x >> 16) & 0xff;
-    s[2] = (x >> 8) & 0xff;
-    s[3] = x & 0xff;
-    s[4] = '\0';
 }
 
 status_t MPEG4Extractor::readMetaData() {
@@ -961,8 +915,9 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                     }
                 }
 
-                if (mLastTrack == NULL)
+                if (mLastTrack == NULL) {
                     return ERROR_MALFORMED;
+                }
 
                 mLastTrack->sampleTable = new SampleTable(mDataSource);
             }
@@ -1134,8 +1089,9 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             original_fourcc = ntohl(original_fourcc);
             ALOGV("read original format: %d", original_fourcc);
 
-            if (mLastTrack == NULL)
+            if (mLastTrack == NULL) {
                 return ERROR_MALFORMED;
+            }
 
             mLastTrack->meta->setCString(kKeyMIMEType, FourCC2MIME(original_fourcc));
             uint32_t num_channels = 0;
@@ -1575,8 +1531,9 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case FOURCC('s', 't', 'c', 'o'):
         case FOURCC('c', 'o', '6', '4'):
         {
-            if ((mLastTrack == NULL) || (mLastTrack->sampleTable == NULL))
+            if ((mLastTrack == NULL) || (mLastTrack->sampleTable == NULL)) {
                 return ERROR_MALFORMED;
+            }
 
             status_t err =
                 mLastTrack->sampleTable->setChunkOffsetParams(
@@ -1612,8 +1569,9 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case FOURCC('s', 't', 's', 'z'):
         case FOURCC('s', 't', 'z', '2'):
         {
-            if ((mLastTrack == NULL) || (mLastTrack->sampleTable == NULL))
+            if ((mLastTrack == NULL) || (mLastTrack->sampleTable == NULL)) {
                 return ERROR_MALFORMED;
+            }
 
             status_t err =
                 mLastTrack->sampleTable->setSampleSizeParams(
