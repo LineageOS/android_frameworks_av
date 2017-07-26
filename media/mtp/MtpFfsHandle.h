@@ -33,6 +33,7 @@ private:
     bool initFunctionfs();
     void closeConfig();
     void closeEndpoints();
+    void doSendEvent(mtp_event me);
 
     bool mPtp;
 
