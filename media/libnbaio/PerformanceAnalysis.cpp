@@ -73,7 +73,7 @@ void PerformanceAnalysis::processAndFlushTimeStampSeries() {
         return;
     }
 
-    // mHists is empty if program just started
+    // mHists is empty if thread/hash pair is sending data for the first time
     if (mHists.empty()) {
         mHists.emplace_front(static_cast<uint64_t>(mTimeStampSeries[0]),
                             std::map<int, int>());
@@ -129,10 +129,6 @@ void PerformanceAnalysis::logTsEntry(int64_t ts) {
         processAndFlushTimeStampSeries();
     }
 }
-
-// TODO: move this someplace
-// static const char* const kName = (const char *) "/data/misc/audioserver/sample_results.txt";
-//    writeToFile(mOutlierData, mLongTermHists, kName, false);
 
 // Given a series of outlier intervals (mOutlier data),
 // looks for changes in distribution (peaks), which can be either positive or negative.
@@ -223,7 +219,6 @@ void PerformanceAnalysis::storeOutlierData(const std::vector<int64_t> &timestamp
     }
 }
 
-
 // FIXME: delete this temporary test code, recycled for various new functions
 void PerformanceAnalysis::testFunction() {
     // produces values (4: 5000000), (13: 18000000)
@@ -241,7 +236,10 @@ void PerformanceAnalysis::testFunction() {
 // TODO Make it return a std::string instead of modifying body --> is this still relevant?
 // TODO consider changing all ints to uint32_t or uint64_t
 // TODO: move this to ReportPerformance, probably make it a friend function of PerformanceAnalysis
-void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) const {
+void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
+    // Add any new data
+    processAndFlushTimeStampSeries();
+
     if (mHists.empty()) {
         ALOGD("reportPerformance: mHists is empty");
         return;
@@ -348,11 +346,19 @@ void PerformanceAnalysis::alertIfGlitch(const std::vector<int64_t> &samples) {
 //------------------------------------------------------------------------------
 
 // writes summary of performance into specified file descriptor
-void dump(int fd, int indent, const std::map<int, PerformanceAnalysis>
-          &threadPerformanceAnalysis) {
+void dump(int fd, int indent, PerformanceAnalysisMap &threadPerformanceAnalysis) {
     String8 body;
+    const char* const kName = "/data/misc/audioserver/";
     for (auto & thread : threadPerformanceAnalysis) {
-        thread.second.reportPerformance(&body);
+        for (auto & hash: thread.second) {
+            PerformanceAnalysis& curr = hash.second;
+            curr.processAndFlushTimeStampSeries();
+            // write performance data to console
+            curr.reportPerformance(&body);
+            // write to file
+            writeToFile(curr.mOutlierData, curr.mHists, kName, false,
+                        thread.first, hash.first);
+        }
     }
     if (!body.isEmpty()) {
         dumpLine(fd, indent, body);
