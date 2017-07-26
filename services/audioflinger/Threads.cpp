@@ -7855,17 +7855,34 @@ bool AudioFlinger::MmapThread::checkForNewParameter_l(const String8& keyValuePai
 {
     AudioParameter param = AudioParameter(keyValuePair);
     int value;
+    bool sendToHal = true;
     if (param.getInt(String8(AudioParameter::keyRouting), value) == NO_ERROR) {
+        audio_devices_t device = (audio_devices_t)value;
         // forward device change to effects that have requested to be
         // aware of attached audio device.
-        if (value != AUDIO_DEVICE_NONE) {
-            mOutDevice = value;
+        if (device != AUDIO_DEVICE_NONE) {
             for (size_t i = 0; i < mEffectChains.size(); i++) {
-                mEffectChains[i]->setDevice_l(mOutDevice);
+                mEffectChains[i]->setDevice_l(device);
             }
         }
+        if (audio_is_output_devices(device)) {
+            mOutDevice = device;
+            if (!isOutput()) {
+                sendToHal = false;
+            }
+        } else {
+            mInDevice = device;
+            if (device != AUDIO_DEVICE_NONE) {
+                mPrevInDevice = value;
+            }
+            // TODO: implement and call checkBtNrec_l();
+        }
     }
-    status = mHalStream->setParameters(keyValuePair);
+    if (sendToHal) {
+        status = mHalStream->setParameters(keyValuePair);
+    } else {
+        status = NO_ERROR;
+    }
 
     return false;
 }
