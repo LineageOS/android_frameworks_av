@@ -114,15 +114,23 @@ Return<void> Omx::allocateNode(
             return Void();
         }
         instance->setHandle(handle);
-        std::vector<AString> quirkVector;
-        if (mParser.getQuirks(name.c_str(), &quirkVector) == OK) {
+
+        // Find quirks from mParser
+        const auto& codec = mParser.getCodecMap().find(name.c_str());
+        if (codec == mParser.getCodecMap().cend()) {
+            LOG(WARNING) << "Failed to obtain quirks for omx component "
+                    "'" << name.c_str() << "' "
+                    "from XML files";
+        } else {
             uint32_t quirks = 0;
-            for (const AString quirk : quirkVector) {
+            for (const auto& quirk : codec->second.quirkSet) {
                 if (quirk == "requires-allocate-on-input-ports") {
-                    quirks |= kRequiresAllocateBufferOnInputPorts;
+                    quirks |= OMXNodeInstance::
+                            kRequiresAllocateBufferOnInputPorts;
                 }
                 if (quirk == "requires-allocate-on-output-ports") {
-                    quirks |= kRequiresAllocateBufferOnOutputPorts;
+                    quirks |= OMXNodeInstance::
+                            kRequiresAllocateBufferOnOutputPorts;
                 }
             }
             instance->setQuirks(quirks);

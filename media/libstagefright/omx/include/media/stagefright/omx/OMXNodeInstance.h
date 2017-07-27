@@ -92,6 +92,15 @@ struct OMXNodeInstance : public BnOMXNode {
     status_t getExtensionIndex(
             const char *parameterName, OMX_INDEXTYPE *index);
 
+    // Quirk still supported, even though deprecated
+    enum Quirks {
+        kRequiresAllocateBufferOnInputPorts   = 1,
+        kRequiresAllocateBufferOnOutputPorts  = 2,
+
+        kQuirksMask = kRequiresAllocateBufferOnInputPorts
+                    | kRequiresAllocateBufferOnOutputPorts,
+    };
+
     status_t setQuirks(OMX_U32 quirks);
 
     bool isSecure() const {
