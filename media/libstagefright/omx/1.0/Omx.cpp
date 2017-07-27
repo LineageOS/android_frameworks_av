@@ -19,20 +19,19 @@
 
 #include <android-base/logging.h>
 #include <gui/IGraphicBufferProducer.h>
-#include <OMX_Core.h>
-#include <OMX_AsString.h>
+#include <media/openmax/OMX_Core.h>
+#include <media/openmax/OMX_AsString.h>
 
-#include "../OMXUtils.h"
-#include "../OMXMaster.h"
-#include "../GraphicBufferSource.h"
+#include <media/stagefright/omx/OMXUtils.h>
+#include <media/stagefright/omx/OMXMaster.h>
+#include <media/stagefright/omx/GraphicBufferSource.h>
 
-#include "WOmxNode.h"
-#include "WOmxObserver.h"
-#include "WGraphicBufferProducer.h"
-#include "WGraphicBufferSource.h"
-#include "Conversion.h"
-
-#include "Omx.h"
+#include <media/stagefright/omx/1.0/WOmxNode.h>
+#include <media/stagefright/omx/1.0/WOmxObserver.h>
+#include <media/stagefright/omx/1.0/WGraphicBufferProducer.h>
+#include <media/stagefright/omx/1.0/WGraphicBufferSource.h>
+#include <media/stagefright/omx/1.0/Conversion.h>
+#include <media/stagefright/omx/1.0/Omx.h>
 
 namespace android {
 namespace hardware {

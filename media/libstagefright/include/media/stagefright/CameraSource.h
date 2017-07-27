@@ -29,7 +29,7 @@
 #include <utils/List.h>
 #include <utils/RefBase.h>
 #include <utils/String16.h>
-#include <MetadataBufferType.h>
+#include <media/hardware/MetadataBufferType.h>
 
 namespace android {
 

@@ -18,7 +18,7 @@
 
 #define SOFT_RAW_H_
 
-#include "SimpleSoftOMXComponent.h"
+#include <media/stagefright/omx/SimpleSoftOMXComponent.h>
 
 struct tPVMP4AudioDecoderExternal;
 

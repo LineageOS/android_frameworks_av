@@ -20,8 +20,8 @@
 
 #include <media/mediascanner.h>
 
-#include "CharacterEncodingDetector.h"
-#include "StringArray.h"
+#include <media/CharacterEncodingDetector.h>
+#include <media/StringArray.h>
 
 namespace android {
 

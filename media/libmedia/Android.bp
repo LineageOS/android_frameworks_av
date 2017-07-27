@@ -1,9 +1,15 @@
 cc_library_headers {
     name: "libmedia_headers",
     vendor_available: true,
-    export_include_dirs: ["include", "omx/1.0/include"],
-    header_libs: ["libstagefright_headers"],
-    export_header_lib_headers: ["libstagefright_headers"],
+    export_include_dirs: ["include"],
+    header_libs:[
+        "libstagefright_headers",
+        "media_plugin_headers",
+    ],
+    export_header_lib_headers: [
+        "libstagefright_headers",
+        "media_plugin_headers",
+    ],
 }
 
 cc_library {
@@ -70,13 +76,6 @@ cc_defaults {
         "libstagefright_foundation",
         "libui",
         "libutils",
-    ],
-
-    include_dirs: [
-        "frameworks/av/include/media",
-        "frameworks/native/include", // for media/hardware/MetadataBufferType.h
-        "frameworks/native/include/media/openmax",
-        "frameworks/av/media/libstagefright",
     ],
 
     export_shared_lib_headers: [
@@ -204,6 +203,7 @@ cc_library_shared {
         "libicui18n",
         "libsonivox",
         "libmediadrm",
+        "libmedia_helper",
         "android.hidl.memory@1.0",
     ],
 
@@ -212,15 +212,10 @@ cc_library_shared {
         "libc_malloc_debug_backtrace",
     ],
 
-    include_dirs: [
-        "frameworks/native/include/media/openmax",
-        "frameworks/av/include/media/",
-        "frameworks/av/media/libstagefright",
-    ],
-
     export_include_dirs: [
         "include",
     ],
+
     cflags: [
         "-Werror",
         "-Wno-error=deprecated-declarations",

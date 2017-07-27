@@ -18,8 +18,7 @@
 #define LOG_TAG "SoftOMXComponent"
 #include <utils/Log.h>
 
-#include "include/SoftOMXComponent.h"
-
+#include <media/stagefright/omx/SoftOMXComponent.h>
 #include <media/stagefright/foundation/ADebug.h>
 
 namespace android {

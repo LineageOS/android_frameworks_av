@@ -18,9 +18,9 @@
 
 #include <android-base/logging.h>
 
-#include "WGraphicBufferProducer.h"
-#include "WProducerListener.h"
-#include "Conversion.h"
+#include <media/stagefright/omx/1.0/WGraphicBufferProducer.h>
+#include <media/stagefright/omx/1.0/WProducerListener.h>
+#include <media/stagefright/omx/1.0/Conversion.h>
 #include <system/window.h>
 
 namespace android {
