@@ -28,7 +28,7 @@
 
 #include <android/BnGraphicBufferSource.h>
 
-#include "../GraphicBufferSource.h"
+#include <media/stagefright/omx/GraphicBufferSource.h>
 
 namespace android {
 namespace hardware {

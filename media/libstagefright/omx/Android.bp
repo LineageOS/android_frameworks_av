@@ -25,6 +25,10 @@ cc_library_shared {
         "1.0/WOmxBufferSource.cpp",
     ],
 
+    export_include_dirs: [
+        "include",
+    ],
+
     include_dirs: [
         "frameworks/av/include/media/",
         "frameworks/av/media/libstagefright",
@@ -32,6 +36,14 @@ cc_library_shared {
         "frameworks/native/include", // for media/hardware/MetadataBufferType.h
         "frameworks/native/include/media/hardware",
         "frameworks/native/include/media/openmax",
+    ],
+
+    header_libs: [
+        "media_plugin_headers",
+    ],
+
+    export_header_lib_headers: [
+        "media_plugin_headers",
     ],
 
     shared_libs: [
@@ -60,7 +72,9 @@ cc_library_shared {
 
     export_shared_lib_headers: [
         "android.hidl.memory@1.0",
-	"libstagefright_xmlparser",
+        "libmedia_omx",
+        "libstagefright_foundation",
+        "libstagefright_xmlparser",
     ],
 
     cflags: [
@@ -85,12 +99,21 @@ cc_library_shared {
 cc_library_static {
     name: "libstagefright_omx_utils",
     srcs: ["OMXUtils.cpp"],
-    include_dirs: [
-        "frameworks/av/media/libstagefright",
-        "frameworks/native/include/media/hardware",
-        "frameworks/native/include/media/openmax",
+    export_include_dirs: [
+        "include",
     ],
-    shared_libs: ["libmedia"],
+    header_libs: [
+        "media_plugin_headers",
+    ],
+    export_header_lib_headers: [
+        "media_plugin_headers",
+    ],
+    shared_libs: [
+        "libmedia",
+    ],
+    export_shared_lib_headers: [
+        "libmedia",
+    ],
     sanitize: {
         misc_undefined: [
             "signed-integer-overflow",

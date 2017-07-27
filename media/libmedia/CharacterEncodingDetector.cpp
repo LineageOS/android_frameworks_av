@@ -18,15 +18,15 @@
 #define LOG_TAG "CharacterEncodingDector"
 #include <utils/Log.h>
 
-#include <CharacterEncodingDetector.h>
+#include <media/CharacterEncodingDetector.h>
 #include "CharacterEncodingDetectorTables.h"
 
-#include "utils/Vector.h"
-#include "StringArray.h"
+#include <utils/Vector.h>
+#include <media/StringArray.h>
 
-#include "unicode/ucnv.h"
-#include "unicode/ucsdet.h"
-#include "unicode/ustring.h"
+#include <unicode/ucnv.h>
+#include <unicode/ucsdet.h>
+#include <unicode/ustring.h>
 
 namespace android {
 

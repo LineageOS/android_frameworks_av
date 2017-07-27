@@ -18,7 +18,7 @@
 
 #define SOFT_AMRWB_ENCODER_H_
 
-#include "SimpleSoftOMXComponent.h"
+#include <media/stagefright/omx/SimpleSoftOMXComponent.h>
 
 #include "voAMRWB.h"
 
