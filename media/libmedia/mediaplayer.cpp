@@ -649,8 +649,12 @@ status_t MediaPlayer::doSetRetransmitEndpoint(const sp<IMediaPlayer>& player) {
 status_t MediaPlayer::reset()
 {
     ALOGV("reset");
+    mLockThreadId = getThreadId();
     Mutex::Autolock _l(mLock);
-    return reset_l();
+    status_t result = reset_l();
+    mLockThreadId = 0;
+
+    return result;
 }
 
 status_t MediaPlayer::setAudioStreamType(audio_stream_type_t type)
@@ -860,7 +864,7 @@ void MediaPlayer::notify(int msg, int ext1, int ext2, const Parcel *obj)
     // this will deadlock.
     //
     // The threadId hack below works around this for the care of prepare,
-    // seekTo and start within the same process.
+    // seekTo, start, and reset within the same process.
     // FIXME: Remember, this is a hack, it's not even a hack that is applied
     // consistently for all use-cases, this needs to be revisited.
     if (mLockThreadId != getThreadId()) {
