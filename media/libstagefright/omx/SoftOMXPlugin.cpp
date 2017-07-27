@@ -18,8 +18,8 @@
 #define LOG_TAG "SoftOMXPlugin"
 #include <utils/Log.h>
 
-#include "SoftOMXPlugin.h"
-#include "include/SoftOMXComponent.h"
+#include <media/stagefright/omx/SoftOMXPlugin.h>
+#include <media/stagefright/omx/SoftOMXComponent.h>
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AString.h>

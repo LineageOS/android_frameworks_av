@@ -19,7 +19,7 @@
 
 #include <binder/BinderService.h>
 #include <media/IMediaCodecService.h>
-#include <include/OMX.h>
+#include <media/stagefright/omx/OMX.h>
 
 namespace android {
 

@@ -16,9 +16,9 @@
 
 #include <algorithm>
 
-#include "WOmxNode.h"
-#include "WOmxBufferSource.h"
-#include "Conversion.h"
+#include <media/stagefright/omx/1.0/WOmxNode.h>
+#include <media/stagefright/omx/1.0/WOmxBufferSource.h>
+#include <media/stagefright/omx/1.0/Conversion.h>
 
 namespace android {
 namespace hardware {

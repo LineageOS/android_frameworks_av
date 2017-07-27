@@ -68,11 +68,6 @@ cc_library_shared {
         "avc_utils.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/native/include/media/openmax",
-        "frameworks/native/include/media/hardware",
-    ],
-
     shared_libs: [
         "libaudioutils",
         "libbinder",

@@ -20,20 +20,20 @@
 
 #include <inttypes.h>
 
-#include "../include/OMXNodeInstance.h"
-#include "OMXMaster.h"
-#include "OMXUtils.h"
+#include <media/stagefright/omx/OMXNodeInstance.h>
+#include <media/stagefright/omx/OMXMaster.h>
+#include <media/stagefright/omx/OMXUtils.h>
 #include <android/IOMXBufferSource.h>
 
-#include <OMX_Component.h>
-#include <OMX_IndexExt.h>
-#include <OMX_VideoExt.h>
-#include <OMX_AsString.h>
+#include <media/openmax/OMX_Component.h>
+#include <media/openmax/OMX_IndexExt.h>
+#include <media/openmax/OMX_VideoExt.h>
+#include <media/openmax/OMX_AsString.h>
 
 #include <binder/IMemory.h>
 #include <cutils/properties.h>
 #include <gui/BufferQueue.h>
-#include <HardwareAPI.h>
+#include <media/hardware/HardwareAPI.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ColorUtils.h>
