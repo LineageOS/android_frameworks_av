@@ -100,10 +100,6 @@ private:
     // stores buffer period histograms with timestamp of first sample
     std::deque<std::pair<timestamp, Histogram>> mHists;
 
-    // vector of timestamps, collected from NBLog for a specific thread
-    // when a vector reaches its maximum size, the data is processed and flushed
-    std::vector<timestamp_raw> mTimeStampSeries;
-
     // Parameters used when detecting outliers
     // TODO: learn some of these from the data, delete unused ones
     // TODO: put used variables in a struct
@@ -130,11 +126,13 @@ private:
 
     // these variables are stored in-class to ensure continuity while analyzing the timestamp
     // series one short sequence at a time: the variables are not re-initialized every time.
+    // TODO: use m prefix
+    // TODO: change this to a running variance/mean class
     struct OutlierDistribution {
         double mMean = 0; // sample mean since previous peak
         double mSd = 0; // sample sd since previous peak
         outlierInterval mElapsed = 0; // time since previous detected outlier
-        int64_t mPrevNs = -1; // previous timestamp
+        int64_t mPrevTs = -1; // previous timestamp
         // number of standard deviations from mean considered a significant change
         const int kMaxDeviation = 5;
         double mTypicalDiff = 0; // global mean of outliers

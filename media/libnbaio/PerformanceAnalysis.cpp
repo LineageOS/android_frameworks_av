@@ -62,73 +62,58 @@ static int widthOf(int x) {
     return width;
 }
 
-// Given a series of audio processing wakeup timestamps,
-// buckets the time intervals into a histogram, searches for
+
+// Given a the most recent timestamp of a series of audio processing
+// wakeup timestamps,
+// buckets the time interval into a histogram, searches for
 // outliers, analyzes the outlier series for unexpectedly
-// small or large values and stores these as peaks, and flushes
-// the timestamp series from memory.
-void PerformanceAnalysis::processAndFlushTimeStampSeries() {
-    if (mTimeStampSeries.empty()) {
+// small or large values and stores these as peaks
+void PerformanceAnalysis::logTsEntry(int64_t ts) {
+    // after a state change, start a new series and do not
+    // record time intervals in-between
+    if (mOutlierDistribution.mPrevTs == 0) {
+        mOutlierDistribution.mPrevTs = ts;
         return;
     }
 
-    // TODO: add mPrev ts depending on whether or not handleStateChange was called
-    for (size_t i = 1; i < mTimeStampSeries.size(); i++) {
-        // Check whether the current timestamp is an outlier
-        const bool isOutlier = detectAndStoreOutlier(mTimeStampSeries[i]);
-        // If an outlier was found, check whether it was a peak
-        if (isOutlier) {
-            /*bool isPeak =*/ detectAndStorePeak(
-                mOutlierData[0].first, mOutlierData[0].second);
-        }
-        // Insert a histogram to mHists if it is empty, or
-        // close the current histogram and insert a new empty one if
-        // if the current histogram has spanned its maximum time interval.
-        // Also insert a new empty histogram if a change in behavior (peak)
+    // Check whether the time interval between the current timestamp
+    // and the previous one is long enough to count as an outlier
+    const bool isOutlier = detectAndStoreOutlier(ts);
+    // If an outlier was found, check whether it was a peak
+    if (isOutlier) {
+        /*bool isPeak =*/ detectAndStorePeak(
+            mOutlierData[0].first, mOutlierData[0].second);
+        // TODO: decide whether to insert a new empty histogram if a peak
+        // TODO: remove isPeak if unused to avoid "unused variable" error
         // occurred at the current timestamp
-        if (mHists.empty() || deltaMs(mHists[0].first, mTimeStampSeries[i]) >=
-                kMaxLength.HistTimespanMs) {
-            mHists.emplace_front(static_cast<uint64_t>(mTimeStampSeries[i]),
-                                 std::map<int, int>());
-            // When memory is full, delete oldest histogram
-            // TODO: use a circular buffer
-            if (mHists.size() >= kMaxLength.Hists) {
-                mHists.resize(kMaxLength.Hists);
-            }
-        }
-        // add current time intervals to histogram
-        ++mHists[0].second[deltaMs(mTimeStampSeries[i-1], mTimeStampSeries[i])];
     }
 
-    // clear the timestamps
-    mTimeStampSeries.clear();
-    // reset outlier values
-    mOutlierDistribution.mPrevNs = -1;
+    // Insert a histogram to mHists if it is empty, or
+    // close the current histogram and insert a new empty one if
+    // if the current histogram has spanned its maximum time interval.
+    if (mHists.empty() ||
+        deltaMs(mHists[0].first, ts) >= kMaxLength.HistTimespanMs) {
+        mHists.emplace_front(static_cast<uint64_t>(ts), std::map<int, int>());
+        // When memory is full, delete oldest histogram
+        // TODO: use a circular buffer
+        if (mHists.size() >= kMaxLength.Hists) {
+            mHists.resize(kMaxLength.Hists);
+        }
+    }
+    // add current time intervals to histogram
+    ++mHists[0].second[deltaMs(mOutlierDistribution.mPrevTs, ts)];
+    // update previous timestamp
+    mOutlierDistribution.mPrevTs = ts;
 }
+
 
 // forces short-term histogram storage to avoid adding idle audio time interval
 // to buffer period data
 void PerformanceAnalysis::handleStateChange() {
-    ALOGD("handleStateChange");
-    processAndFlushTimeStampSeries();
+    mOutlierDistribution.mPrevTs = 0;
     return;
 }
 
-// Takes a single buffer period timestamp entry information and stores it in a
-// temporary series of timestamps. Once the series is full, the data is analyzed,
-// stored, and emptied.
-void PerformanceAnalysis::logTsEntry(int64_t ts) {
-    // TODO might want to filter excessively high outliers, which are usually caused
-    // by the thread being inactive.
-    // Store time series data for each reader in order to bucket it once there
-    // is enough data. Then, write to recentHists as a histogram.
-    mTimeStampSeries.push_back(ts);
-    // if length of the time series has reached kShortHistSize samples,
-    // analyze the data and flush the timestamp series from memory
-    if (mTimeStampSeries.size() >= kMaxLength.TimeStamps) {
-        processAndFlushTimeStampSeries();
-    }
-}
 
 // Checks whether the time interval between two outliers is far enough from
 // a typical delta to be considered a peak.
@@ -140,7 +125,6 @@ void PerformanceAnalysis::logTsEntry(int64_t ts) {
 bool PerformanceAnalysis::detectAndStorePeak(outlierInterval diff, timestamp ts) {
     bool isPeak = false;
     if (mOutlierData.empty()) {
-        ALOGD("mOutlierData is empty");
         return false;
     }
     // Update mean of the distribution
@@ -173,7 +157,7 @@ bool PerformanceAnalysis::detectAndStorePeak(outlierInterval diff, timestamp ts)
         const double kDelta2 = diff - mOutlierDistribution.mMean;
         mOutlierDistribution.mM2 += kDelta * kDelta2;
         mOutlierDistribution.mSd = (mOutlierDistribution.mN < 2) ? 0 :
-                mOutlierDistribution.mM2 / (mOutlierDistribution.mN - 1);
+                sqrt(mOutlierDistribution.mM2 / (mOutlierDistribution.mN - 1));
     } else {
         // new value is far from the mean:
         // store peak timestamp and reset mean, sd, and short-term sequence
@@ -196,25 +180,19 @@ bool PerformanceAnalysis::detectAndStorePeak(outlierInterval diff, timestamp ts)
     return isPeak;
 }
 
+
 // Determines whether the difference between a timestamp and the previous
 // one is beyond a threshold. If yes, stores the timestamp as an outlier
 // and writes to mOutlierdata in the following format:
 // Time elapsed since previous outlier: Timestamp of start of outlier
 // e.g. timestamps (ms) 1, 4, 5, 16, 18, 28 will produce pairs (4, 5), (13, 18).
 bool PerformanceAnalysis::detectAndStoreOutlier(const int64_t ts) {
-    // first pass: need to initialize
-    if (mOutlierDistribution.mPrevNs == -1) {
-        mOutlierDistribution.mPrevNs = ts;
-    }
     bool isOutlier = false;
-    const uint64_t diffMs = static_cast<uint64_t>(deltaMs(mOutlierDistribution.mPrevNs, ts));
-    // ALOGD("%d\t", static_cast<int>(diffMs));
-    if (diffMs >= static_cast<uint64_t>(kOutlierMs)) {
+    const int64_t diffMs = static_cast<int64_t>(deltaMs(mOutlierDistribution.mPrevTs, ts));
+    if (diffMs >= static_cast<int64_t>(kOutlierMs)) {
         isOutlier = true;
-        //ALOGD("outlier outlier %d %d", static_cast<int>(diffMs),
-        //      static_cast<int>(mOutlierDistribution.mElapsed));
         mOutlierData.emplace_front(mOutlierDistribution.mElapsed,
-                                  static_cast<uint64_t>(mOutlierDistribution.mPrevNs));
+                                  static_cast<uint64_t>(mOutlierDistribution.mPrevTs));
         // Remove oldest value if the vector is full
         // TODO: turn this into a circular buffer
         // TODO: make sure kShortHistSize is large enough that that data will never be lost
@@ -225,9 +203,9 @@ bool PerformanceAnalysis::detectAndStoreOutlier(const int64_t ts) {
         mOutlierDistribution.mElapsed = 0;
     }
     mOutlierDistribution.mElapsed += diffMs;
-    mOutlierDistribution.mPrevNs = ts;
     return isOutlier;
 }
+
 
 // TODO Make it return a std::string instead of modifying body --> is this still relevant?
 // TODO consider changing all ints to uint32_t or uint64_t
@@ -237,7 +215,6 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
         ALOGD("reportPerformance: mHists is empty");
         return;
     }
-    ALOGD("reportPerformance: hists size %d", static_cast<int>(mHists.size()));
 
     std::map<int, int> buckets;
     for (const auto &shortHist: mHists) {
@@ -312,6 +289,7 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
     }
 }
 
+
 // TODO: decide whether to use this or whether it is overkill, and it is enough
 // to only treat as glitches single wakeup call intervals which are too long.
 // Ultimately, glitch detection will be directly on the audio signal.
@@ -329,7 +307,6 @@ void PerformanceAnalysis::alertIfGlitch(const std::vector<int64_t> &samples) {
         // TODO: check that all glitch cases are covered
         if (std::accumulate(periods.begin(), periods.end(), 0) > kNumBuff * kPeriodMs +
             kPeriodMs - kPeriodMsCPU) {
-                ALOGW("A glitch occurred");
                 periods.assign(kNumBuff, kPeriodMs);
         }
     }
@@ -341,14 +318,10 @@ void PerformanceAnalysis::alertIfGlitch(const std::vector<int64_t> &samples) {
 // writes summary of performance into specified file descriptor
 void dump(int fd, int indent, PerformanceAnalysisMap &threadPerformanceAnalysis) {
     String8 body;
-    int i = 0; // TODO: delete
     const char* const kDirectory = "/data/misc/audioserver/";
     for (auto & thread : threadPerformanceAnalysis) {
         for (auto & hash: thread.second) {
-            ALOGD("hash number %d", i++);
             PerformanceAnalysis& curr = hash.second;
-            // Add any new data
-            curr.processAndFlushTimeStampSeries();
             // write performance data to console
             curr.reportPerformance(&body);
             if (!body.isEmpty()) {
@@ -361,6 +334,7 @@ void dump(int fd, int indent, PerformanceAnalysisMap &threadPerformanceAnalysis)
         }
     }
 }
+
 
 // Writes a string into specified file descriptor
 void dumpLine(int fd, int indent, const String8 &body) {

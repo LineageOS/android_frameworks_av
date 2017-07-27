@@ -138,8 +138,6 @@ bool FastMixer::isSubClassCommand(FastThreadState::Command command)
 
 void FastMixer::onStateChange()
 {
-    // log that audio was turned on/off
-    LOG_AUDIO_STATE();
     const FastMixerState * const current = (const FastMixerState *) mCurrent;
     const FastMixerState * const previous = (const FastMixerState *) mPrevious;
     FastMixerDumpState * const dumpState = (FastMixerDumpState *) mDumpState;
@@ -336,7 +334,13 @@ void FastMixer::onStateChange()
 
 void FastMixer::onWork()
 {
-    LOG_HIST_TS();
+    // TODO: pass an ID parameter to indicate which time series we want to write to in NBLog.cpp
+    // Or: pass both of these into a single call with a boolean
+    if (mIsWarm) {
+        LOG_HIST_TS();
+    } else {
+        LOG_AUDIO_STATE();
+    }
     const FastMixerState * const current = (const FastMixerState *) mCurrent;
     FastMixerDumpState * const dumpState = (FastMixerDumpState *) mDumpState;
     const FastMixerState::Command command = mCommand;
