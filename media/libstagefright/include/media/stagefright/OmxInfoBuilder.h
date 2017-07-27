@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,37 +14,20 @@
  * limitations under the License.
  */
 
-#ifndef OMX_CLIENT_H_
+#ifndef OMX_INFO_BUILDER_H_
+#define OMX_INFO_BUILDER_H_
 
-#define OMX_CLIENT_H_
+#include <media/stagefright/MediaCodecList.h>
+#include <utils/Errors.h>
 
 namespace android {
 
-class IOMX;
-
-class OMXClient {
+class OmxInfoBuilder : public MediaCodecListBuilderBase {
 public:
-    OMXClient();
-
-    status_t connect();
-    status_t connect(bool* trebleFlag);
-    status_t connect(const char* name, bool* trebleFlag = nullptr);
-
-    status_t connectLegacy();
-    status_t connectTreble(const char* name = "default");
-    void disconnect();
-
-    sp<IOMX> interface() {
-        return mOMX;
-    }
-
-private:
-    sp<IOMX> mOMX;
-
-    OMXClient(const OMXClient &) = delete;
-    OMXClient &operator=(const OMXClient &) = delete;
+    OmxInfoBuilder();
+    status_t buildMediaCodecList(MediaCodecListWriter* writer) override;
 };
 
 }  // namespace android
 
-#endif  // OMX_CLIENT_H_
+#endif  // OMX_INFO_BUILDER_H_

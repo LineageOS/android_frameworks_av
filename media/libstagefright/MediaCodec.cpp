@@ -429,22 +429,6 @@ sp<MediaCodec> MediaCodec::CreateByComponentName(
 }
 
 // static
-status_t MediaCodec::QueryCapabilities(
-        const AString &name, const AString &mime, bool isEncoder,
-        sp<MediaCodecInfo::Capabilities> *caps /* nonnull */) {
-    // TRICKY: this method is used by MediaCodecList/Info during its
-    // initialization. As such, we cannot create a MediaCodec instance
-    // because that requires an initialized MediaCodecList.
-
-    sp<CodecBase> codec = GetCodecBase(name);
-    if (codec == NULL) {
-        return NAME_NOT_FOUND;
-    }
-
-    return codec->queryCapabilities(name, mime, isEncoder, caps);
-}
-
-// static
 sp<PersistentSurface> MediaCodec::CreatePersistentInputSurface() {
     OMXClient client;
     if (client.connect() != OK) {

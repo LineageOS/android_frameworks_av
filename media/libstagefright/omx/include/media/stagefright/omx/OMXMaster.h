@@ -18,7 +18,7 @@
 
 #define OMX_MASTER_H_
 
-#include <OMXPluginBase.h>
+#include <media/hardware/OMXPluginBase.h>
 
 #include <utils/threads.h>
 #include <utils/KeyedVector.h>

@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <android/native_window.h>
 #include <media/hardware/MetadataBufferType.h>
+#include <media/MediaCodecInfo.h>
 #include <media/IOMX.h>
 #include <media/stagefright/foundation/AHierarchicalStateMachine.h>
 #include <media/stagefright/CodecBase.h>
@@ -30,6 +31,8 @@
 #include <OMX_Audio.h>
 #include <hardware/gralloc.h>
 #include <nativebase/nativebase.h>
+#include <android/hidl/allocator/1.0/IAllocator.h>
+#include <android/hidl/memory/1.0/IMemory.h>
 
 #define TRACK_BUFFER_TIMING     0
 
@@ -41,20 +44,6 @@ class MediaCodecBuffer;
 class MemoryDealer;
 struct DescribeColorFormat2Params;
 struct DataConverter;
-
-// Treble shared memory
-namespace hidl {
-namespace allocator {
-namespace V1_0 {
-struct IAllocator;
-} // V1_0
-} // allocator
-namespace memory {
-namespace V1_0 {
-struct IMemory;
-} // V1_0
-} // memory
-} // hidl
 
 typedef hidl::allocator::V1_0::IAllocator TAllocator;
 typedef hidl::memory::V1_0::IMemory TMemory;
@@ -72,9 +61,10 @@ struct ACodec : public AHierarchicalStateMachine, public CodecBase {
     virtual void initiateStart();
     virtual void initiateShutdown(bool keepComponentAllocated = false);
 
-    virtual status_t queryCapabilities(
-            const AString &name, const AString &mime, bool isEncoder,
-            sp<MediaCodecInfo::Capabilities> *caps);
+    status_t queryCapabilities(
+            const char* owner, const char* name,
+            const char* mime, bool isEncoder,
+            MediaCodecInfo::CapabilitiesWriter* caps);
 
     virtual status_t setSurface(const sp<Surface> &surface);
 

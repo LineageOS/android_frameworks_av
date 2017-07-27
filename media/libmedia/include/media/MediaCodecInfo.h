@@ -18,6 +18,7 @@
 
 #define MEDIA_CODEC_INFO_H_
 
+#include <android-base/macros.h>
 #include <binder/Parcel.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/foundation/AString.h>
@@ -36,6 +37,9 @@ class Parcel;
 
 typedef KeyedVector<AString, AString> CodecSettings;
 
+struct MediaCodecInfoWriter;
+struct MediaCodecListWriter;
+
 struct MediaCodecInfo : public RefBase {
     struct ProfileLevel {
         uint32_t mProfile;
@@ -44,6 +48,8 @@ struct MediaCodecInfo : public RefBase {
             return mProfile < o.mProfile || (mProfile == o.mProfile && mLevel < o.mLevel);
         }
     };
+
+    struct CapabilitiesWriter;
 
     struct Capabilities : public RefBase {
         enum {
@@ -77,24 +83,93 @@ struct MediaCodecInfo : public RefBase {
         static sp<Capabilities> FromParcel(const Parcel &parcel);
         status_t writeToParcel(Parcel *parcel) const;
 
-        DISALLOW_EVIL_CONSTRUCTORS(Capabilities);
+        DISALLOW_COPY_AND_ASSIGN(Capabilities);
 
         friend struct MediaCodecInfo;
+        friend struct MediaCodecInfoWriter;
+        friend struct CapabilitiesWriter;
     };
 
-    // Use a subclass to allow setting fields on construction without allowing
-    // to do the same throughout the framework.
-    struct CapabilitiesBuilder : public Capabilities {
+    /**
+     * This class is used for modifying information inside a `Capabilities`
+     * object. An object of type `CapabilitiesWriter` can be obtained by calling
+     * `MediaCodecInfoWriter::addMime()` or
+     * `MediaCodecInfoWriter::updateMime()`.
+     */
+    struct CapabilitiesWriter {
+        /**
+         * Add a key-value pair to the list of details. If the key already
+         * exists, the old value will be replaced.
+         *
+         * A pair added by this function will be accessible by
+         * `Capabilities::getDetails()`. Call `AMessage::getString()` with the
+         * same key to retrieve the value.
+         *
+         * @param key The key.
+         * @param value The string value.
+         */
+        void addDetail(const char* key, const char* value);
+        /**
+         * Add a key-value pair to the list of details. If the key already
+         * exists, the old value will be replaced.
+         *
+         * A pair added by this function will be accessible by
+         * `Capabilities::getDetails()`. Call `AMessage::getInt32()` with the
+         * same key to retrieve the value.
+         *
+         * @param key The key.
+         * @param value The `int32_t` value.
+         */
+        void addDetail(const char* key, int32_t value);
+        /**
+         * Add a profile-level pair. If this profile-level pair already exists,
+         * it will be ignored.
+         *
+         * @param profile The "profile" component.
+         * @param level The "level" component.
+         */
         void addProfileLevel(uint32_t profile, uint32_t level);
+        /**
+         * Add a color format. If this color format already exists, it will be
+         * ignored.
+         *
+         * @param format The color format.
+         */
         void addColorFormat(uint32_t format);
+        /**
+         * Add flags. The underlying operation is bitwise-or. In other words,
+         * bits that have already been set will be ignored.
+         *
+         * @param flags The additional flags.
+         */
         void addFlags(uint32_t flags);
+    private:
+        /**
+         * The associated `Capabilities` object.
+         */
+        Capabilities* mCap;
+        /**
+         * Construct a writer for the given `Capabilities` object.
+         *
+         * @param cap The `Capabilities` object to be written to.
+         */
+        CapabilitiesWriter(Capabilities* cap);
+
+        friend MediaCodecInfoWriter;
     };
 
     bool isEncoder() const;
-    bool hasQuirk(const char *name) const;
     void getSupportedMimes(Vector<AString> *mimes) const;
     const sp<Capabilities> getCapabilitiesFor(const char *mime) const;
     const char *getCodecName() const;
+
+    /**
+     * Return the name of the service that hosts the codec. This value is not
+     * visible at the Java level.
+     *
+     * Currently, this is the "instance name" of the IOmx service.
+     */
+    const char *getOwnerName() const;
 
     /**
      * Serialization over Binder
@@ -103,46 +178,96 @@ struct MediaCodecInfo : public RefBase {
     status_t writeToParcel(Parcel *parcel) const;
 
 private:
-    // variable set only in constructor - these are accessed by MediaCodecList
-    // to avoid duplication of same variables
     AString mName;
+    AString mOwner;
     bool mIsEncoder;
-    bool mHasSoleMime; // was initialized with mime
-
-    Vector<AString> mQuirks;
     KeyedVector<AString, sp<Capabilities> > mCaps;
-
-    sp<Capabilities> mCurrentCaps; // currently initalized capabilities
 
     ssize_t getCapabilityIndex(const char *mime) const;
 
-    /* Methods used by MediaCodecList to construct the info
-     * object from XML.
-     *
-     * After info object is created:
-     * - additional quirks can be added
-     * - additional mimes can be added
-     *   - OMX codec capabilities can be set for the current mime-type
-     *   - a capability detail can be set for the current mime-type
-     *   - a feature can be set for the current mime-type
-     *   - info object can be completed when parsing of a mime-type is done
+    /**
+     * Construct an `MediaCodecInfo` object. After the construction, its
+     * information can be set via an `MediaCodecInfoWriter` object obtained from
+     * `MediaCodecListWriter::addMediaCodecInfo()`.
      */
-    MediaCodecInfo(AString name, bool encoder, const char *mime);
-    void addQuirk(const char *name);
-    status_t addMime(const char *mime);
-    status_t updateMime(const char *mime);
+    MediaCodecInfo();
 
-    status_t initializeCapabilities(const sp<Capabilities> &caps);
-    void addDetail(const AString &key, const AString &value);
-    void addFeature(const AString &key, int32_t value);
-    void addFeature(const AString &key, const char *value);
-    void removeMime(const char *mime);
-    void complete();
+    DISALLOW_COPY_AND_ASSIGN(MediaCodecInfo);
 
-    DISALLOW_EVIL_CONSTRUCTORS(MediaCodecInfo);
-
-    friend struct MediaCodecList;
     friend class MediaCodecListOverridesTest;
+    friend struct MediaCodecInfoWriter;
+    friend struct MediaCodecListWriter;
+};
+
+/**
+ * This class is to be used by a `MediaCodecListBuilderBase` instance to
+ * populate information inside the associated `MediaCodecInfo` object.
+ *
+ * The only place where an instance of `MediaCodecInfoWriter` can be constructed
+ * is `MediaCodecListWriter::addMediaCodecInfo()`. A `MediaCodecListBuilderBase`
+ * instance should call `MediaCodecListWriter::addMediaCodecInfo()` on the given
+ * `MediaCodecListWriter` object given as an input to
+ * `MediaCodecListBuilderBase::buildMediaCodecList()`.
+ */
+struct MediaCodecInfoWriter {
+    /**
+     * Set the name of the codec.
+     *
+     * @param name The new name.
+     */
+    void setName(const char* name);
+    /**
+     * Set the owner name of the codec.
+     *
+     * This "owner name" is the name of the `IOmx` instance that supports this
+     * codec.
+     *
+     * @param owner The new owner name.
+     */
+    void setOwner(const char* owner);
+    /**
+     * Set whether this codec is an encoder or a decoder.
+     *
+     * @param isEncoder Whether this codec is an encoder or a decoder.
+     */
+    void setEncoder(bool isEncoder = true);
+    /**
+     * Add a mime to an indexed list and return a `CapabilitiesWriter` object
+     * that can be used for modifying the associated `Capabilities`.
+     *
+     * If the mime already exists, this function will return the
+     * `CapabilitiesWriter` associated with the mime.
+     *
+     * @param[in] mime The name of a new mime to add.
+     * @return writer The `CapabilitiesWriter` object for modifying the
+     * `Capabilities` associated with the mime. `writer` will be valid
+     * regardless of whether `mime` already exists or not.
+     */
+    std::unique_ptr<MediaCodecInfo::CapabilitiesWriter> addMime(
+            const char* mime);
+    /**
+     * Remove a mime.
+     *
+     * @param mime The name of the mime to remove.
+     * @return `true` if `mime` is removed; `false` if `mime` is not found.
+     */
+    bool removeMime(const char* mime);
+private:
+    /**
+     * The associated `MediaCodecInfo`.
+     */
+    MediaCodecInfo* mInfo;
+    /**
+     * Construct the `MediaCodecInfoWriter` object associated with the given
+     * `MediaCodecInfo` object.
+     *
+     * @param info The underlying `MediaCodecInfo` object.
+     */
+    MediaCodecInfoWriter(MediaCodecInfo* info);
+
+    DISALLOW_COPY_AND_ASSIGN(MediaCodecInfoWriter);
+
+    friend struct MediaCodecListWriter;
 };
 
 }  // namespace android

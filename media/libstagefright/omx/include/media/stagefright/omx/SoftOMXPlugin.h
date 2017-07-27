@@ -19,7 +19,7 @@
 #define SOFT_OMX_PLUGIN_H_
 
 #include <media/stagefright/foundation/ABase.h>
-#include <OMXPluginBase.h>
+#include <media/hardware/OMXPluginBase.h>
 
 namespace android {
 
