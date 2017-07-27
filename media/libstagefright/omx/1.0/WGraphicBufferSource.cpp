@@ -17,15 +17,14 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "TWGraphicBufferSource"
 
+#include <media/stagefright/omx/1.0/WGraphicBufferSource.h>
+#include <media/stagefright/omx/1.0/WOmxNode.h>
+#include <media/stagefright/omx/1.0/Conversion.h>
+#include <media/stagefright/omx/OMXUtils.h>
 #include <android/hardware/media/omx/1.0/IOmxBufferSource.h>
 #include <android/hardware/media/omx/1.0/IOmxNode.h>
-#include <OMX_Component.h>
-#include <OMX_IndexExt.h>
-
-#include "omx/OMXUtils.h"
-#include "WGraphicBufferSource.h"
-#include "WOmxNode.h"
-#include "Conversion.h"
+#include <media/openmax/OMX_Component.h>
+#include <media/openmax/OMX_IndexExt.h>
 
 namespace android {
 namespace hardware {

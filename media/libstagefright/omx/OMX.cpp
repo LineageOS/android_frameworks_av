@@ -22,15 +22,12 @@
 
 #include <dlfcn.h>
 
-#include "../include/OMX.h"
-
-#include "../include/OMXNodeInstance.h"
-
+#include <media/stagefright/omx/OMX.h>
+#include <media/stagefright/omx/OMXNodeInstance.h>
+#include <media/stagefright/omx/BWGraphicBufferSource.h>
+#include <media/stagefright/omx/OMXMaster.h>
+#include <media/stagefright/omx/OMXUtils.h>
 #include <media/stagefright/foundation/ADebug.h>
-#include "BWGraphicBufferSource.h"
-
-#include "OMXMaster.h"
-#include "OMXUtils.h"
 
 namespace android {
 

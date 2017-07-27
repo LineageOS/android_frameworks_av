@@ -32,8 +32,8 @@
 #include "minijail.h"
 
 #include <hidl/HidlTransportSupport.h>
-#include <omx/1.0/Omx.h>
-#include <omx/1.0/OmxStore.h>
+#include <media/stagefright/omx/1.0/Omx.h>
+#include <media/stagefright/omx/1.0/OmxStore.h>
 
 using namespace android;
 

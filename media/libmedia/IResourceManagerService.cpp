@@ -19,7 +19,7 @@
 #define LOG_TAG "IResourceManagerService"
 #include <utils/Log.h>
 
-#include "media/IResourceManagerService.h"
+#include <media/IResourceManagerService.h>
 
 #include <binder/Parcel.h>
 

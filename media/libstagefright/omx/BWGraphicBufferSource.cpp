@@ -17,14 +17,12 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "BWGraphicBufferSource"
 
-#include <OMX_Component.h>
-#include <OMX_IndexExt.h>
-
+#include <media/stagefright/omx/BWGraphicBufferSource.h>
+#include <media/stagefright/omx/OMXUtils.h>
+#include <media/openmax/OMX_Component.h>
+#include <media/openmax/OMX_IndexExt.h>
 #include <media/OMXBuffer.h>
 #include <media/IOMX.h>
-
-#include "OMXUtils.h"
-#include "BWGraphicBufferSource.h"
 
 namespace android {
 

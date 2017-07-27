@@ -29,12 +29,12 @@
 #include <binder/Binder.h>
 #include <binder/Status.h>
 #include <ui/FenceTime.h>
-#include <media/OMXFenceParcelable.h>
 #include <cutils/native_handle.h>
 #include <gui/IGraphicBufferProducer.h>
 
+#include <media/OMXFenceParcelable.h>
 #include <media/OMXBuffer.h>
-#include <VideoAPI.h>
+#include <media/hardware/VideoAPI.h>
 
 #include <android/hidl/memory/1.0/IMemory.h>
 #include <android/hardware/graphics/bufferqueue/1.0/IProducerListener.h>
