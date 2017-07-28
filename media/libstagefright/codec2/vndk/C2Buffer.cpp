@@ -1284,4 +1284,150 @@ C2Error C2DefaultGraphicBlockAllocator::allocateGraphicBlock(
     return C2_OK;
 }
 
+/* ========================================== BUFFER ========================================= */
+
+class C2BufferData::Impl {
+public:
+    explicit Impl(const std::list<C2ConstLinearBlock> &blocks)
+        : mType(blocks.size() == 1 ? LINEAR : LINEAR_CHUNKS),
+          mLinearBlocks(blocks) {
+    }
+
+    explicit Impl(const std::list<C2ConstGraphicBlock> &blocks)
+        : mType(blocks.size() == 1 ? GRAPHIC : GRAPHIC_CHUNKS),
+          mGraphicBlocks(blocks) {
+    }
+
+    Type type() const { return mType; }
+    const std::list<C2ConstLinearBlock> &linearBlocks() const { return mLinearBlocks; }
+    const std::list<C2ConstGraphicBlock> &graphicBlocks() const { return mGraphicBlocks; }
+
+private:
+    Type mType;
+    std::list<C2ConstLinearBlock> mLinearBlocks;
+    std::list<C2ConstGraphicBlock> mGraphicBlocks;
+};
+
+C2BufferData::C2BufferData(const std::list<C2ConstLinearBlock> &blocks) : mImpl(new Impl(blocks)) {}
+C2BufferData::C2BufferData(const std::list<C2ConstGraphicBlock> &blocks) : mImpl(new Impl(blocks)) {}
+
+C2BufferData::Type C2BufferData::type() const { return mImpl->type(); }
+
+const std::list<C2ConstLinearBlock> C2BufferData::linearBlocks() const {
+    return mImpl->linearBlocks();
+}
+
+const std::list<C2ConstGraphicBlock> C2BufferData::graphicBlocks() const {
+    return mImpl->graphicBlocks();
+}
+
+class C2Buffer::Impl {
+public:
+    Impl(C2Buffer *thiz, const std::list<C2ConstLinearBlock> &blocks)
+        : mThis(thiz), mData(blocks) {}
+    Impl(C2Buffer *thiz, const std::list<C2ConstGraphicBlock> &blocks)
+        : mThis(thiz), mData(blocks) {}
+
+    ~Impl() {
+        for (const auto &pair : mNotify) {
+            pair.first(mThis, pair.second);
+        }
+    }
+
+    const C2BufferData &data() const { return mData; }
+
+    C2Error registerOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg = nullptr) {
+        auto it = std::find_if(
+                mNotify.begin(), mNotify.end(),
+                [onDestroyNotify, arg] (const auto &pair) {
+                    return pair.first == onDestroyNotify && pair.second == arg;
+                });
+        if (it != mNotify.end()) {
+            return C2_DUPLICATE;
+        }
+        mNotify.emplace_back(onDestroyNotify, arg);
+        return C2_OK;
+    }
+
+    C2Error unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify) {
+        auto it = std::find_if(
+                mNotify.begin(), mNotify.end(),
+                [onDestroyNotify] (const auto &pair) {
+                    return pair.first == onDestroyNotify;
+                });
+        if (it == mNotify.end()) {
+            return C2_NOT_FOUND;
+        }
+        mNotify.erase(it);
+        return C2_OK;
+    }
+
+    std::list<std::shared_ptr<const C2Info>> infos() const {
+        std::list<std::shared_ptr<const C2Info>> result(mInfos.size());
+        std::transform(
+                mInfos.begin(), mInfos.end(), result.begin(),
+                [] (const auto &elem) { return elem.second; });
+        return result;
+    }
+
+    C2Error setInfo(const std::shared_ptr<C2Info> &info) {
+        // To "update" you need to erase the existing one if any, and then insert.
+        (void) mInfos.erase(info->type());
+        (void) mInfos.insert({ info->type(), info });
+        return C2_OK;
+    }
+
+    bool hasInfo(C2Param::Type index) const {
+        return mInfos.count(index.type()) > 0;
+    }
+
+    std::shared_ptr<C2Info> removeInfo(C2Param::Type index) {
+        auto it = mInfos.find(index.type());
+        if (it == mInfos.end()) {
+            return nullptr;
+        }
+        std::shared_ptr<C2Info> ret = it->second;
+        (void) mInfos.erase(it);
+        return ret;
+    }
+
+private:
+    C2Buffer * const mThis;
+    C2DefaultBufferData mData;
+    std::map<uint32_t, std::shared_ptr<C2Info>> mInfos;
+    std::list<std::pair<OnDestroyNotify, void *>> mNotify;
+};
+
+C2Buffer::C2Buffer(const std::list<C2ConstLinearBlock> &blocks)
+    : mImpl(new Impl(this, blocks)) {}
+
+C2Buffer::C2Buffer(const std::list<C2ConstGraphicBlock> &blocks)
+    : mImpl(new Impl(this, blocks)) {}
+
+const C2BufferData C2Buffer::data() const { return mImpl->data(); }
+
+C2Error C2Buffer::registerOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg) {
+    return mImpl->registerOnDestroyNotify(onDestroyNotify, arg);
+}
+
+C2Error C2Buffer::unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify) {
+    return mImpl->unregisterOnDestroyNotify(onDestroyNotify);
+}
+
+const std::list<std::shared_ptr<const C2Info>> C2Buffer::infos() const {
+    return mImpl->infos();
+}
+
+C2Error C2Buffer::setInfo(const std::shared_ptr<C2Info> &info) {
+    return mImpl->setInfo(info);
+}
+
+bool C2Buffer::hasInfo(C2Param::Type index) const {
+    return mImpl->hasInfo(index);
+}
+
+std::shared_ptr<C2Info> C2Buffer::removeInfo(C2Param::Type index) {
+    return mImpl->removeInfo(index);
+}
+
 } // namespace android

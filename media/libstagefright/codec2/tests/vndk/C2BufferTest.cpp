@@ -18,6 +18,7 @@
 
 #include <C2Buffer.h>
 #include <C2BufferPriv.h>
+#include <C2ParamDef.h>
 
 #include <system/graphics.h>
 
@@ -352,6 +353,178 @@ TEST_F(C2BufferTest, GraphicBlockAllocatorTest) {
     ASSERT_TRUE(verifyPlane({ 0, 0, kWidth / 4, kHeight }, yInfo, cy, 0));
     ASSERT_TRUE(verifyPlane({ 0, 0, kWidth / 4, kHeight }, uInfo, cu, 0));
     ASSERT_TRUE(verifyPlane({ 0, 0, kWidth / 4, kHeight }, vInfo, cv, 0));
+}
+
+class BufferData : public C2BufferData {
+public:
+    explicit BufferData(const std::list<C2ConstLinearBlock> &blocks) : C2BufferData(blocks) {}
+    explicit BufferData(const std::list<C2ConstGraphicBlock> &blocks) : C2BufferData(blocks) {}
+};
+
+class Buffer : public C2Buffer {
+public:
+    explicit Buffer(const std::list<C2ConstLinearBlock> &blocks) : C2Buffer(blocks) {}
+    explicit Buffer(const std::list<C2ConstGraphicBlock> &blocks) : C2Buffer(blocks) {}
+};
+
+TEST_F(C2BufferTest, BufferDataTest) {
+    std::shared_ptr<C2BlockAllocator> linearBlockAllocator(makeLinearBlockAllocator());
+    std::shared_ptr<C2BlockAllocator> graphicBlockAllocator(makeGraphicBlockAllocator());
+
+    constexpr uint32_t kWidth1 = 320;
+    constexpr uint32_t kHeight1 = 240;
+    constexpr C2Rect kCrop1(kWidth1, kHeight1);
+    constexpr uint32_t kWidth2 = 176;
+    constexpr uint32_t kHeight2 = 144;
+    constexpr C2Rect kCrop2(kWidth2, kHeight2);
+    constexpr size_t kCapacity1 = 1024u;
+    constexpr size_t kCapacity2 = 2048u;
+
+    std::shared_ptr<C2LinearBlock> linearBlock1;
+    std::shared_ptr<C2LinearBlock> linearBlock2;
+    ASSERT_EQ(C2_OK, linearBlockAllocator->allocateLinearBlock(
+            kCapacity1,
+            { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+            &linearBlock1));
+    ASSERT_EQ(C2_OK, linearBlockAllocator->allocateLinearBlock(
+            kCapacity2,
+            { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+            &linearBlock2));
+    std::shared_ptr<C2GraphicBlock> graphicBlock1;
+    std::shared_ptr<C2GraphicBlock> graphicBlock2;
+    ASSERT_EQ(C2_OK, graphicBlockAllocator->allocateGraphicBlock(
+            kWidth1,
+            kHeight1,
+            HAL_PIXEL_FORMAT_YCBCR_420_888,
+            { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+            &graphicBlock1));
+    ASSERT_EQ(C2_OK, graphicBlockAllocator->allocateGraphicBlock(
+            kWidth2,
+            kHeight2,
+            HAL_PIXEL_FORMAT_YCBCR_420_888,
+            { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+            &graphicBlock2));
+
+    std::shared_ptr<C2BufferData> data(new BufferData({ linearBlock1->share(0, kCapacity1, C2Fence()) }));
+    EXPECT_EQ(C2BufferData::LINEAR, data->type());
+    ASSERT_EQ(1u, data->linearBlocks().size());
+    EXPECT_EQ(linearBlock1->handle(), data->linearBlocks().front().handle());
+    EXPECT_TRUE(data->graphicBlocks().empty());
+
+    data.reset(new BufferData({
+        linearBlock1->share(0, kCapacity1, C2Fence()),
+        linearBlock2->share(0, kCapacity2, C2Fence()),
+    }));
+    EXPECT_EQ(C2BufferData::LINEAR_CHUNKS, data->type());
+    ASSERT_EQ(2u, data->linearBlocks().size());
+    EXPECT_EQ(linearBlock1->handle(), data->linearBlocks().front().handle());
+    EXPECT_EQ(linearBlock2->handle(), data->linearBlocks().back().handle());
+    EXPECT_TRUE(data->graphicBlocks().empty());
+
+    data.reset(new BufferData({ graphicBlock1->share(kCrop1, C2Fence()) }));
+    EXPECT_EQ(C2BufferData::GRAPHIC, data->type());
+    ASSERT_EQ(1u, data->graphicBlocks().size());
+    EXPECT_EQ(graphicBlock1->handle(), data->graphicBlocks().front().handle());
+    EXPECT_TRUE(data->linearBlocks().empty());
+
+    data.reset(new BufferData({
+        graphicBlock1->share(kCrop1, C2Fence()),
+        graphicBlock2->share(kCrop2, C2Fence()),
+    }));
+    EXPECT_EQ(C2BufferData::GRAPHIC_CHUNKS, data->type());
+    ASSERT_EQ(2u, data->graphicBlocks().size());
+    EXPECT_EQ(graphicBlock1->handle(), data->graphicBlocks().front().handle());
+    EXPECT_EQ(graphicBlock2->handle(), data->graphicBlocks().back().handle());
+    EXPECT_TRUE(data->linearBlocks().empty());
+}
+
+void DestroyCallback(const C2Buffer * /* buf */, void *arg) {
+    std::function<void(void)> *cb = (std::function<void(void)> *)arg;
+    (*cb)();
+}
+
+enum : uint32_t {
+    kParamIndexNumber1,
+    kParamIndexNumber2,
+};
+
+typedef C2GlobalParam<C2Info, C2Int32Value, kParamIndexNumber1> C2Number1Info;
+typedef C2GlobalParam<C2Info, C2Int32Value, kParamIndexNumber2> C2Number2Info;
+
+TEST_F(C2BufferTest, BufferTest) {
+    std::shared_ptr<C2BlockAllocator> alloc(makeLinearBlockAllocator());
+    constexpr size_t kCapacity = 1024u;
+    std::shared_ptr<C2LinearBlock> block;
+
+    ASSERT_EQ(C2_OK, alloc->allocateLinearBlock(
+            kCapacity,
+            { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+            &block));
+
+    std::atomic_bool destroyed(false);
+    std::function<void(void)> arg = [&destroyed](){ destroyed = true; };
+
+    std::shared_ptr<C2Buffer> buffer(new Buffer( { block->share(0, kCapacity, C2Fence()) }));
+    ASSERT_EQ(C2_OK, buffer->registerOnDestroyNotify(&DestroyCallback, &arg));
+    EXPECT_FALSE(destroyed);
+    ASSERT_EQ(C2_DUPLICATE, buffer->registerOnDestroyNotify(&DestroyCallback, &arg));
+    buffer.reset();
+    EXPECT_TRUE(destroyed);
+
+    buffer.reset(new Buffer( { block->share(0, kCapacity, C2Fence()) }));
+    destroyed = false;
+    ASSERT_EQ(C2_OK, buffer->registerOnDestroyNotify(&DestroyCallback, &arg));
+    EXPECT_FALSE(destroyed);
+    ASSERT_EQ(C2_OK, buffer->unregisterOnDestroyNotify(&DestroyCallback));
+    EXPECT_FALSE(destroyed);
+    ASSERT_EQ(C2_NOT_FOUND, buffer->unregisterOnDestroyNotify(&DestroyCallback));
+    buffer.reset();
+    EXPECT_FALSE(destroyed);
+
+    std::shared_ptr<C2Info> info1(new C2Number1Info(1));
+    std::shared_ptr<C2Info> info2(new C2Number2Info(2));
+    buffer.reset(new Buffer( { block->share(0, kCapacity, C2Fence()) }));
+    EXPECT_TRUE(buffer->infos().empty());
+    EXPECT_FALSE(buffer->hasInfo(info1->type()));
+    EXPECT_FALSE(buffer->hasInfo(info2->type()));
+
+    ASSERT_EQ(C2_OK, buffer->setInfo(info1));
+    EXPECT_EQ(1u, buffer->infos().size());
+    EXPECT_EQ(*info1, *buffer->infos().front());
+    EXPECT_TRUE(buffer->hasInfo(info1->type()));
+    EXPECT_FALSE(buffer->hasInfo(info2->type()));
+
+    ASSERT_EQ(C2_OK, buffer->setInfo(info2));
+    EXPECT_EQ(2u, buffer->infos().size());
+    EXPECT_TRUE(buffer->hasInfo(info1->type()));
+    EXPECT_TRUE(buffer->hasInfo(info2->type()));
+
+    std::shared_ptr<C2Info> removed = buffer->removeInfo(info1->type());
+    ASSERT_TRUE(removed);
+    EXPECT_EQ(*removed, *info1);
+    EXPECT_EQ(1u, buffer->infos().size());
+    EXPECT_EQ(*info2, *buffer->infos().front());
+    EXPECT_FALSE(buffer->hasInfo(info1->type()));
+    EXPECT_TRUE(buffer->hasInfo(info2->type()));
+
+    removed = buffer->removeInfo(info1->type());
+    ASSERT_FALSE(removed);
+    EXPECT_EQ(1u, buffer->infos().size());
+    EXPECT_FALSE(buffer->hasInfo(info1->type()));
+    EXPECT_TRUE(buffer->hasInfo(info2->type()));
+
+    std::shared_ptr<C2Info> info3(new C2Number2Info(3));
+    ASSERT_EQ(C2_OK, buffer->setInfo(info3));
+    EXPECT_EQ(1u, buffer->infos().size());
+    EXPECT_FALSE(buffer->hasInfo(info1->type()));
+    EXPECT_TRUE(buffer->hasInfo(info2->type()));
+
+    removed = buffer->removeInfo(info2->type());
+    ASSERT_TRUE(removed);
+    EXPECT_EQ(*info3, *removed);
+    EXPECT_TRUE(buffer->infos().empty());
+    EXPECT_FALSE(buffer->hasInfo(info1->type()));
+    EXPECT_FALSE(buffer->hasInfo(info2->type()));
 }
 
 } // namespace android

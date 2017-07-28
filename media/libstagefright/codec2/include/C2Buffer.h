@@ -767,10 +767,10 @@ struct C2Rect {
     uint32_t mWidth;
     uint32_t mHeight;
 
-    inline C2Rect(uint32_t width, uint32_t height)
+    constexpr inline C2Rect(uint32_t width, uint32_t height)
         : C2Rect(width, height, 0, 0) { }
 
-    inline C2Rect(uint32_t width, uint32_t height, uint32_t left, uint32_t top)
+    constexpr inline C2Rect(uint32_t width, uint32_t height, uint32_t left, uint32_t top)
         : mLeft(left), mTop(top), mWidth(width), mHeight(height) { }
 
     // utility methods
@@ -1167,7 +1167,8 @@ private:
 
 protected:
     // no public constructor
-    // C2BufferData(const std::shared_ptr<const Impl> &impl) : mImpl(impl) {}
+    explicit C2BufferData(const std::list<C2ConstLinearBlock> &blocks);
+    explicit C2BufferData(const std::list<C2ConstGraphicBlock> &blocks);
 };
 
 /**
@@ -1223,7 +1224,7 @@ public:
      * \retval C2_NO_MEMORY not enough memory to register for this callback
      * \retval C2_CORRUPTED an unknown error prevented the registration (unexpected)
      */
-    C2Error registerOnDestroyNotify(OnDestroyNotify *onDestroyNotify, void *arg = nullptr);
+    C2Error registerOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg = nullptr);
 
     /**
      * Unregisters a previously registered pre-destroy notification.
@@ -1235,7 +1236,7 @@ public:
      * \retval C2_NOT_FOUND the notification was not found
      * \retval C2_CORRUPTED an unknown error prevented the registration (unexpected)
      */
-    C2Error unregisterOnDestroyNotify(OnDestroyNotify *onDestroyNotify, void *args = nullptr);
+    C2Error unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify);
 
     ///@}
 
@@ -1271,14 +1272,17 @@ public:
      * \return true iff there is a metadata with the parameter type attached to this buffer.
      */
     bool hasInfo(C2Param::Type index) const;
-    std::shared_ptr<C2Info> removeInfo(C2Param::Type index) const;
+    std::shared_ptr<C2Info> removeInfo(C2Param::Type index);
     ///@}
 
 protected:
     // no public constructor
-    inline C2Buffer() = default;
+    explicit C2Buffer(const std::list<C2ConstLinearBlock> &blocks);
+    explicit C2Buffer(const std::list<C2ConstGraphicBlock> &blocks);
 
 private:
+    class Impl;
+    std::shared_ptr<Impl> mImpl;
 //    Type _mType;
 };
 
