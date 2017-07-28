@@ -39,7 +39,7 @@ class NBLog {
 
 public:
 
-    typedef uint64_t log_hash_t;
+    using log_hash_t = ReportPerformance::log_hash_t;
 
     // FIXME Everything needed for client (writer API and registration) should be isolated
     //       from the rest of the implementation.
@@ -142,7 +142,6 @@ private:
         static std::unique_ptr<AbstractEntry> buildEntry(const uint8_t *ptr);
 
         // get format entry timestamp
-        // TODO consider changing to uint64_t
         virtual int64_t      timestamp() const = 0;
 
         // get format entry's unique id

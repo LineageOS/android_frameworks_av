@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-// Non-blocking event logger intended for safe communication between processes via shared memory
+// Non-blocking event logger intended for safe communication between
+// processes via shared memory
 
 #ifndef ANDROID_MEDIA_PERFORMANCEANALYSIS_H
 #define ANDROID_MEDIA_PERFORMANCEANALYSIS_H
@@ -42,7 +43,7 @@ class PerformanceAnalysis {
     // the fifo writer utilities.
 public:
 
-    PerformanceAnalysis();
+    PerformanceAnalysis() {};
 
     friend void dump(int fd, int indent,
                      PerformanceAnalysisMap &threadPerformanceAnalysis);
@@ -61,29 +62,28 @@ public:
     // Writes wakeup timestamp entry to log and runs analysis
     // TODO: make this thread safe. Each thread should have its own instance
     // of PerformanceAnalysis.
-    void logTsEntry(timestamp_raw ts);
+    void logTsEntry(timestamp ts);
 
     // FIXME: make peakdetector and storeOutlierData a single function
     // Input: mOutlierData. Looks at time elapsed between outliers
     // finds significant changes in the distribution
     // writes timestamps of significant changes to mPeakTimestamps
-    bool detectAndStorePeak(outlierInterval delta, timestamp ts);
+    bool detectAndStorePeak(msInterval delta, timestamp ts);
 
     // runs analysis on timestamp series before it is converted to a histogram
     // finds outliers
     // writes to mOutlierData <time elapsed since previous outlier, outlier timestamp>
-    bool detectAndStoreOutlier(const timestamp_raw timestamp);
+    bool detectAndStoreOutlier(const msInterval diffMs);
 
-    // input: series of short histograms. Generates a string of analysis of the buffer periods
+    // Generates a string of analysis of the buffer periods and prints to console
     // TODO: WIP write more detailed analysis
     // FIXME: move this data visualization to a separate class. Model/view/controller
     void reportPerformance(String8 *body, int maxHeight = 10);
 
     // This function detects glitches in a time series.
-    // TODO: decide whether to use this or whether it is overkill, and it is enough
-    // to only treat as glitches single wakeup call intervals which are too long.
-    // Ultimately, glitch detection will be directly on the audio signal.
-    void alertIfGlitch(const std::vector<timestamp_raw> &samples);
+    // TODO: learn what timestamp sequences correlate with glitches instead of
+    // manually designing a heuristic. Ultimately, detect glitches directly from audio.
+    // void alertIfGlitch(const std::vector<timestamp_raw> &samples);
 
 private:
 
@@ -91,7 +91,7 @@ private:
 
     // stores outlier analysis:
     // <elapsed time between outliers in ms, outlier beginning timestamp>
-    std::deque<std::pair<outlierInterval, timestamp>> mOutlierData;
+    std::deque<std::pair<msInterval, timestamp>> mOutlierData;
 
     // stores each timestamp at which a peak was detected
     // a peak is a moment at which the average outlier interval changed significantly
@@ -101,43 +101,45 @@ private:
     std::deque<std::pair<timestamp, Histogram>> mHists;
 
     // Parameters used when detecting outliers
-    // TODO: learn some of these from the data, delete unused ones
-    // TODO: put used variables in a struct
+    struct BufferPeriod {
+        double    mMean = -1;          // average time between audio processing wakeups
+        double    mOutlierFactor = -1; // values > mMean * mOutlierFactor are outliers
+        double    mOutlier = -1;       // this is set to mMean * mOutlierFactor
+        timestamp mPrevTs = -1;        // previous timestamp
+    } mBufferPeriod;
+
+    // TODO: delete values below if unused or add them to the BufferPeriod struct
     // FIXME: decide whether to make kPeriodMs static.
-    static const int kNumBuff = 3; // number of buffers considered in local history
-    int kPeriodMs; // current period length is ideally 4 ms
-    static const int kOutlierMs = 7; // values greater or equal to this cause glitches
+    // static const int kNumBuff = 3; // number of buffers considered in local history
+    // int kPeriodMs; // current period length is ideally 4 ms
+    // static const int kOutlierMs = 7; // values greater or equal to this cause glitches
     // DAC processing time for 4 ms buffer
-    static constexpr double kRatio = 0.75; // estimate of CPU time as ratio of period length
-    int kPeriodMsCPU; // compute based on kPeriodLen and kRatio
+    // static constexpr double kRatio = 0.75; // estimate CPU time as ratio of period
+    // int kPeriodMsCPU; // compute based on kPeriodLen and kRatio
 
     // capacity allocated to data structures
     // TODO: make these values longer when testing is finished
     struct MaxLength {
         size_t Hists; // number of histograms stored in memory
-        size_t TimeStamps; // histogram size, e.g. maximum length of timestamp series
+        size_t TimeStamps; // histogram size
         size_t Outliers; // number of values stored in outlier array
         size_t Peaks; // number of values stored in peak array
-        // maximum elapsed time between first and last timestamp of a long-term histogram
-        int HistTimespanMs;
+        int HistTimespanMs; // maximum histogram timespan
     };
     static constexpr MaxLength kMaxLength = {.Hists = 20, .TimeStamps = 1000,
             .Outliers = 100, .Peaks = 100, .HistTimespanMs = 5 * kMsPerSec };
 
-    // these variables are stored in-class to ensure continuity while analyzing the timestamp
-    // series one short sequence at a time: the variables are not re-initialized every time.
-    // TODO: use m prefix
+    // these variables ensure continuity while analyzing the timestamp
+    // series one sample at a time.
     // TODO: change this to a running variance/mean class
     struct OutlierDistribution {
-        double mMean = 0; // sample mean since previous peak
-        double mSd = 0; // sample sd since previous peak
-        outlierInterval mElapsed = 0; // time since previous detected outlier
-        int64_t mPrevTs = -1; // previous timestamp
-        // number of standard deviations from mean considered a significant change
-        const int kMaxDeviation = 5;
-        double mTypicalDiff = 0; // global mean of outliers
-        double mN = 0; // length of sequence since the last peak
-        double mM2 = 0;
+        msInterval mMean = 0;         // sample mean since previous peak
+        msInterval mSd = 0;           // sample sd since previous peak
+        msInterval mElapsed = 0;      // time since previous detected outlier
+        const int  kMaxDeviation = 5; // standard deviations from the mean threshold
+        msInterval mTypicalDiff = 0;  // global mean of outliers
+        double     mN = 0;            // length of sequence since the last peak
+        double     mM2 = 0;           // used to calculate sd
     } mOutlierDistribution;
 };
 

@@ -46,13 +46,6 @@ namespace android {
 
 namespace ReportPerformance {
 
-PerformanceAnalysis::PerformanceAnalysis() {
-    // These variables will be (FIXME) learned from the data
-    kPeriodMs = 4; // typical buffer period (mode)
-    // average number of Ms spent processing buffer
-    kPeriodMsCPU = static_cast<int>(kPeriodMs * kRatio);
-}
-
 static int widthOf(int x) {
     int width = 0;
     while (x > 0) {
@@ -68,17 +61,39 @@ static int widthOf(int x) {
 // buckets the time interval into a histogram, searches for
 // outliers, analyzes the outlier series for unexpectedly
 // small or large values and stores these as peaks
-void PerformanceAnalysis::logTsEntry(int64_t ts) {
+void PerformanceAnalysis::logTsEntry(timestamp ts) {
     // after a state change, start a new series and do not
     // record time intervals in-between
-    if (mOutlierDistribution.mPrevTs == 0) {
-        mOutlierDistribution.mPrevTs = ts;
+    if (mBufferPeriod.mPrevTs == 0) {
+        mBufferPeriod.mPrevTs = ts;
         return;
     }
 
+    // calculate time interval between current and previous timestamp
+    const msInterval diffMs = static_cast<msInterval>(
+        deltaMs(mBufferPeriod.mPrevTs, ts));
+
+    const int diffJiffy = deltaJiffy(mBufferPeriod.mPrevTs, ts);
+
+
+    // update buffer period distribution
+    // old versus new weight ratio when updating the buffer period mean
+    static constexpr double exponentialWeight = 0.999;
+    // update buffer period mean with exponential weighting
+    mBufferPeriod.mMean = (mBufferPeriod.mMean < 0) ? diffMs :
+            exponentialWeight * mBufferPeriod.mMean + (1.0 - exponentialWeight) * diffMs;
+    // set mOutlierFactor to a smaller value for the fastmixer thread
+    const int kFastMixerMax = 10;
+    // NormalMixer times vary much more than FastMixer times.
+    // TODO: mOutlierFactor values are set empirically based on what appears to be
+    // an outlier. Learn these values from the data.
+    mBufferPeriod.mOutlierFactor = mBufferPeriod.mMean < kFastMixerMax ? 1.8 : 2.5;
+    // set outlier threshold
+    mBufferPeriod.mOutlier = mBufferPeriod.mMean * mBufferPeriod.mOutlierFactor;
+
     // Check whether the time interval between the current timestamp
     // and the previous one is long enough to count as an outlier
-    const bool isOutlier = detectAndStoreOutlier(ts);
+    const bool isOutlier = detectAndStoreOutlier(diffMs);
     // If an outlier was found, check whether it was a peak
     if (isOutlier) {
         /*bool isPeak =*/ detectAndStorePeak(
@@ -93,7 +108,7 @@ void PerformanceAnalysis::logTsEntry(int64_t ts) {
     // if the current histogram has spanned its maximum time interval.
     if (mHists.empty() ||
         deltaMs(mHists[0].first, ts) >= kMaxLength.HistTimespanMs) {
-        mHists.emplace_front(static_cast<uint64_t>(ts), std::map<int, int>());
+        mHists.emplace_front(ts, std::map<int, int>());
         // When memory is full, delete oldest histogram
         // TODO: use a circular buffer
         if (mHists.size() >= kMaxLength.Hists) {
@@ -101,16 +116,16 @@ void PerformanceAnalysis::logTsEntry(int64_t ts) {
         }
     }
     // add current time intervals to histogram
-    ++mHists[0].second[deltaMs(mOutlierDistribution.mPrevTs, ts)];
+    ++mHists[0].second[diffJiffy];
     // update previous timestamp
-    mOutlierDistribution.mPrevTs = ts;
+    mBufferPeriod.mPrevTs = ts;
 }
 
 
 // forces short-term histogram storage to avoid adding idle audio time interval
 // to buffer period data
 void PerformanceAnalysis::handleStateChange() {
-    mOutlierDistribution.mPrevTs = 0;
+    mBufferPeriod.mPrevTs = 0;
     return;
 }
 
@@ -122,7 +137,7 @@ void PerformanceAnalysis::handleStateChange() {
 // them as long as no peak is detected. When a value is more than 'threshold'
 // standard deviations from the mean, a peak is detected and the mean and sigma
 // are set to the peak value and 0.
-bool PerformanceAnalysis::detectAndStorePeak(outlierInterval diff, timestamp ts) {
+bool PerformanceAnalysis::detectAndStorePeak(msInterval diff, timestamp ts) {
     bool isPeak = false;
     if (mOutlierData.empty()) {
         return false;
@@ -135,15 +150,15 @@ bool PerformanceAnalysis::detectAndStorePeak(outlierInterval diff, timestamp ts)
 
     // Initialize short-term mean at start of program
     if (mOutlierDistribution.mMean == 0) {
-        mOutlierDistribution.mMean = static_cast<double>(diff);
+        mOutlierDistribution.mMean = diff;
     }
     // Update length of current sequence of outliers
     mOutlierDistribution.mN++;
 
-    // If statement checks whether a large deviation from the mean occurred.
+    // Check whether a large deviation from the mean occurred.
     // If the standard deviation has been reset to zero, the comparison is
     // instead to the mean of the full mOutlierInterval sequence.
-    if ((fabs(static_cast<double>(diff) - mOutlierDistribution.mMean) <
+    if ((fabs(diff - mOutlierDistribution.mMean) <
             mOutlierDistribution.kMaxDeviation * mOutlierDistribution.mSd) ||
             (mOutlierDistribution.mSd == 0 &&
             fabs(diff - mOutlierDistribution.mMean) <
@@ -176,7 +191,6 @@ bool PerformanceAnalysis::detectAndStorePeak(outlierInterval diff, timestamp ts)
         mOutlierDistribution.mN = 0;
         mOutlierDistribution.mM2 = 0;
     }
-    ALOGD("outlier distr %f %f", mOutlierDistribution.mMean, mOutlierDistribution.mSd);
     return isPeak;
 }
 
@@ -186,13 +200,12 @@ bool PerformanceAnalysis::detectAndStorePeak(outlierInterval diff, timestamp ts)
 // and writes to mOutlierdata in the following format:
 // Time elapsed since previous outlier: Timestamp of start of outlier
 // e.g. timestamps (ms) 1, 4, 5, 16, 18, 28 will produce pairs (4, 5), (13, 18).
-bool PerformanceAnalysis::detectAndStoreOutlier(const int64_t ts) {
+bool PerformanceAnalysis::detectAndStoreOutlier(const msInterval diffMs) {
     bool isOutlier = false;
-    const int64_t diffMs = static_cast<int64_t>(deltaMs(mOutlierDistribution.mPrevTs, ts));
-    if (diffMs >= static_cast<int64_t>(kOutlierMs)) {
+    if (diffMs >= mBufferPeriod.mOutlier) {
         isOutlier = true;
-        mOutlierData.emplace_front(mOutlierDistribution.mElapsed,
-                                  static_cast<uint64_t>(mOutlierDistribution.mPrevTs));
+        mOutlierData.emplace_front(
+                mOutlierDistribution.mElapsed, mBufferPeriod.mPrevTs);
         // Remove oldest value if the vector is full
         // TODO: turn this into a circular buffer
         // TODO: make sure kShortHistSize is large enough that that data will never be lost
@@ -206,13 +219,15 @@ bool PerformanceAnalysis::detectAndStoreOutlier(const int64_t ts) {
     return isOutlier;
 }
 
+// computes the column width required for a specific histogram value
+inline int numberWidth(int number, int leftPadding) {
+    return std::max(std::max(widthOf(number) + 4, 3), leftPadding + 2);
+}
 
-// TODO Make it return a std::string instead of modifying body --> is this still relevant?
-// TODO consider changing all ints to uint32_t or uint64_t
+// TODO Make it return a std::string instead of modifying body
 // TODO: move this to ReportPerformance, probably make it a friend function of PerformanceAnalysis
 void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
     if (mHists.empty()) {
-        ALOGD("reportPerformance: mHists is empty");
         return;
     }
 
@@ -224,7 +239,7 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
     }
 
     // underscores and spaces length corresponds to maximum width of histogram
-    static const int kLen = 40;
+    static const int kLen = 100;
     std::string underscores(kLen, '_');
     std::string spaces(kLen, ' ');
 
@@ -242,7 +257,7 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
     }
     int height = log2(maxCount) + 1; // maxCount > 0, safe to call log2
     const int leftPadding = widthOf(1 << height);
-    const int colWidth = std::max(std::max(widthOf(maxDelta) + 1, 3), leftPadding + 2);
+    const int bucketWidth = numberWidth(maxDelta, leftPadding);
     int scalingFactor = 1;
     // scale data if it exceeds maximum height
     if (height > maxHeight) {
@@ -255,6 +270,7 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
     body->appendFormat("\n%s", " ");
     body->appendFormat("%*s", leftPadding, " ");
     for (auto const &x : buckets) {
+        const int colWidth = numberWidth(x.first / kJiffyPerMs, leftPadding);
         body->appendFormat("%*d", colWidth, x.second);
     }
     // write histogram ascii art
@@ -263,23 +279,26 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
         const int value = 1 << row;
         body->appendFormat("%.*s", leftPadding, spaces.c_str());
         for (auto const &x : buckets) {
-          body->appendFormat("%.*s%s", colWidth - 1,
-                             spaces.c_str(), x.second < value ? " " : "|");
+            const int colWidth = numberWidth(x.first / kJiffyPerMs, leftPadding);
+            body->appendFormat("%.*s%s", colWidth - 1,
+                               spaces.c_str(), x.second < value ? " " : "|");
         }
         body->appendFormat("\n%s", " ");
     }
     // print x-axis
     const int columns = static_cast<int>(buckets.size());
     body->appendFormat("%*c", leftPadding, ' ');
-    body->appendFormat("%.*s", (columns + 1) * colWidth, underscores.c_str());
+    body->appendFormat("%.*s", (columns + 1) * bucketWidth, underscores.c_str());
     body->appendFormat("\n%s", " ");
 
     // write footer with bucket labels
     body->appendFormat("%*s", leftPadding, " ");
     for (auto const &x : buckets) {
-        body->appendFormat("%*d", colWidth, x.first);
+        const int colWidth = numberWidth(x.first / kJiffyPerMs, leftPadding);
+        body->appendFormat("%*.*f", colWidth, 1,
+                           static_cast<double>(x.first) / kJiffyPerMs);
     }
-    body->appendFormat("%.*s%s", colWidth, spaces.c_str(), "ms\n");
+    body->appendFormat("%.*s%s", bucketWidth, spaces.c_str(), "ms\n");
 
     // Now report glitches
     body->appendFormat("\ntime elapsed between glitches and glitch timestamps\n");
@@ -289,29 +308,28 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
     }
 }
 
-
-// TODO: decide whether to use this or whether it is overkill, and it is enough
-// to only treat as glitches single wakeup call intervals which are too long.
-// Ultimately, glitch detection will be directly on the audio signal.
+// TODO: learn what timestamp sequences correlate with glitches instead of
+// manually designing a heuristic. Ultimately, detect glitches directly from audio.
 // Produces a log warning if the timing of recent buffer periods caused a glitch
 // Computes sum of running window of three buffer periods
 // Checks whether the buffer periods leave enough CPU time for the next one
 // e.g. if a buffer period is expected to be 4 ms and a buffer requires 3 ms of CPU time,
 // here are some glitch cases:
 // 4 + 4 + 6 ; 5 + 4 + 5; 2 + 2 + 10
-void PerformanceAnalysis::alertIfGlitch(const std::vector<int64_t> &samples) {
-    std::deque<int> periods(kNumBuff, kPeriodMs);
-    for (size_t i = 2; i < samples.size(); ++i) { // skip first time entry
-        periods.push_front(deltaMs(samples[i - 1], samples[i]));
-        periods.pop_back();
-        // TODO: check that all glitch cases are covered
-        if (std::accumulate(periods.begin(), periods.end(), 0) > kNumBuff * kPeriodMs +
-            kPeriodMs - kPeriodMsCPU) {
-                periods.assign(kNumBuff, kPeriodMs);
-        }
-    }
-    return;
-}
+
+// void PerformanceAnalysis::alertIfGlitch(const std::vector<int64_t> &samples) {
+//    std::deque<int> periods(kNumBuff, kPeriodMs);
+//  for (size_t i = 2; i < samples.size(); ++i) { // skip first time entry
+//      periods.push_front(deltaMs(samples[i - 1], samples[i]));
+//      periods.pop_back();
+//      // TODO: check that all glitch cases are covered
+//      if (std::accumulate(periods.begin(), periods.end(), 0) > kNumBuff * kPeriodMs +
+//          kPeriodMs - kPeriodMsCPU) {
+//              periods.assign(kNumBuff, kPeriodMs);
+//      }
+//  }
+//  return;
+//}
 
 //------------------------------------------------------------------------------
 
