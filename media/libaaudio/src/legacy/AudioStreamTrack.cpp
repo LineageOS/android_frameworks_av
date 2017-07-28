@@ -296,7 +296,7 @@ aaudio_result_t AudioStreamTrack::requestStop() {
     return AAUDIO_OK;
 }
 
-aaudio_result_t AudioStreamTrack::updateStateWhileWaiting()
+aaudio_result_t AudioStreamTrack::updateStateMachine()
 {
     status_t err;
     aaudio_wrapping_frames_t position;
@@ -373,6 +373,12 @@ aaudio_result_t AudioStreamTrack::write(const void *buffer,
     }
     int32_t framesWritten = (int32_t)(bytesWritten / bytesPerFrame);
     incrementFramesWritten(framesWritten);
+
+    result = updateStateMachine();
+    if (result != AAUDIO_OK) {
+        return result;
+    }
+
     return framesWritten;
 }
 

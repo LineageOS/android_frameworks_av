@@ -50,7 +50,7 @@ public:
                                        int64_t *framePosition,
                                        int64_t *timeNanoseconds) override;
 
-    virtual aaudio_result_t updateStateWhileWaiting() override;
+    virtual aaudio_result_t updateStateMachine() override;
 
     aaudio_result_t open(const AudioStreamBuilder &builder) override;
 
