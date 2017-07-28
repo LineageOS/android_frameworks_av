@@ -793,7 +793,7 @@ AAUDIO_API int64_t AAudioStream_getFramesRead(AAudioStream* stream);
  * The position and time passed back are monotonically increasing.
  *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
- * @param clockid AAUDIO_CLOCK_MONOTONIC or AAUDIO_CLOCK_BOOTTIME
+ * @param clockid CLOCK_MONOTONIC or CLOCK_BOOTTIME
  * @param framePosition pointer to a variable to receive the position
  * @param timeNanoseconds pointer to a variable to receive the time
  * @return AAUDIO_OK or a negative error
