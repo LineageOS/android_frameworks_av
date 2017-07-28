@@ -120,6 +120,9 @@ int main(int argc, const char **argv)
                SCHED_FIFO);
     }
 
+    printf("min numFrames = %8d\n", (int) myData.minNumFrames);
+    printf("max numFrames = %8d\n", (int) myData.maxNumFrames);
+
     printf("SUCCESS\n");
     return EXIT_SUCCESS;
 error:
