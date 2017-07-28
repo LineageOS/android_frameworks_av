@@ -219,6 +219,8 @@ private:
 typedef struct SineThreadedData_s {
     SineGenerator  sineOsc1;
     SineGenerator  sineOsc2;
+    int32_t        minNumFrames = INT32_MAX;
+    int32_t        maxNumFrames = 0;
     int            scheduler;
     bool           schedulerChecked;
 } SineThreadedData_t;
@@ -241,6 +243,13 @@ aaudio_data_callback_result_t SimplePlayerDataCallbackProc(
     if (!sineData->schedulerChecked) {
         sineData->scheduler = sched_getscheduler(gettid());
         sineData->schedulerChecked = true;
+    }
+
+    if (numFrames > sineData->maxNumFrames) {
+        sineData->maxNumFrames = numFrames;
+    }
+    if (numFrames < sineData->minNumFrames) {
+        sineData->minNumFrames = numFrames;
     }
 
     int32_t samplesPerFrame = AAudioStream_getChannelCount(stream);

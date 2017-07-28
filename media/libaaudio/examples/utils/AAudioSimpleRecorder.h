@@ -73,12 +73,20 @@ public:
     /**
      * Only call this after open() has been called.
      */
-    int32_t getSamplesPerFrame() {
+    int32_t getChannelCount() {
         if (mStream == nullptr) {
             return AAUDIO_ERROR_INVALID_STATE;
         }
         return AAudioStream_getChannelCount(mStream);;
     }
+
+    /**
+     * @deprecated use getChannelCount()
+     */
+    int32_t getSamplesPerFrame() {
+        return getChannelCount();
+    }
+
     /**
      * Only call this after open() has been called.
      */
