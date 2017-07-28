@@ -121,7 +121,7 @@ private:
     aaudio_sharing_mode_t      mSharingMode     = AAUDIO_SHARING_MODE_SHARED;
     aaudio_performance_mode_t  mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
 
-    int32_t                    mNumberOfBursts = AAUDIO_UNSPECIFIED;
+    int32_t                    mNumberOfBursts  = AAUDIO_UNSPECIFIED;
 };
 
 class AAudioArgsParser : public AAudioParameters {
@@ -151,9 +151,13 @@ public:
                 case 'd':
                     mDurationSeconds = atoi(&arg[2]);
                     break;
-                case 'm':
-                    AAudio_setMMapPolicy(AAUDIO_POLICY_AUTO);
-                    break;
+                case 'm': {
+                    aaudio_policy_t policy = AAUDIO_POLICY_AUTO;
+                    if (strlen(arg) > 2) {
+                        policy = atoi(&arg[2]);
+                    }
+                    AAudio_setMMapPolicy(policy);
+                } break;
                 case 'n':
                     setNumberOfBursts(atoi(&arg[2]));
                     break;
@@ -198,7 +202,11 @@ public:
         printf("      -b{bufferCapacity} frames\n");
         printf("      -c{channels} for example 2 for stereo\n");
         printf("      -d{duration} in seconds, default is %d\n", DEFAULT_DURATION_SECONDS);
-        printf("      -m enable MMAP\n");
+        printf("      -m{0|1|2|3} set MMAP policy\n");
+        printf("          0 = _UNSPECIFIED, default\n");
+        printf("          1 = _NEVER\n");
+        printf("          2 = _AUTO, also if -m is used with no number\n");
+        printf("          3 = _ALWAYS\n");
         printf("      -n{numberOfBursts} for setBufferSize\n");
         printf("      -p{performanceMode} set output AAUDIO_PERFORMANCE_MODE*, default NONE\n");
         printf("          n for _NONE\n");
