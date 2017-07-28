@@ -241,9 +241,11 @@ aaudio_result_t AudioStreamInternal::requestStart()
     int64_t startTime;
     ALOGD("AudioStreamInternal()::requestStart()");
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
+        ALOGE("AudioStreamInternal::requestStart() mServiceStreamHandle invalid");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     if (isActive()) {
+        ALOGE("AudioStreamInternal::requestStart() already active");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     aaudio_stream_state_t originalState = getState();
@@ -320,6 +322,7 @@ aaudio_result_t AudioStreamInternal::requestStop()
 
 aaudio_result_t AudioStreamInternal::registerThread() {
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
+        ALOGE("AudioStreamInternal::registerThread() mServiceStreamHandle invalid");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     return mServiceInterface.registerAudioThread(mServiceStreamHandle,
@@ -329,6 +332,7 @@ aaudio_result_t AudioStreamInternal::registerThread() {
 
 aaudio_result_t AudioStreamInternal::unregisterThread() {
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
+        ALOGE("AudioStreamInternal::unregisterThread() mServiceStreamHandle invalid");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     return mServiceInterface.unregisterAudioThread(mServiceStreamHandle, gettid());
@@ -407,19 +411,19 @@ aaudio_result_t AudioStreamInternal::onEventFromServer(AAudioServiceMessage *mes
     aaudio_result_t result = AAUDIO_OK;
     switch (message->event.event) {
         case AAUDIO_SERVICE_EVENT_STARTED:
-            ALOGD("AudioStreamInternal::onEventFromServergot() AAUDIO_SERVICE_EVENT_STARTED");
+            ALOGD("AudioStreamInternal::onEventFromServer() got AAUDIO_SERVICE_EVENT_STARTED");
             if (getState() == AAUDIO_STREAM_STATE_STARTING) {
                 setState(AAUDIO_STREAM_STATE_STARTED);
             }
             break;
         case AAUDIO_SERVICE_EVENT_PAUSED:
-            ALOGD("AudioStreamInternal::onEventFromServergot() AAUDIO_SERVICE_EVENT_PAUSED");
+            ALOGD("AudioStreamInternal::onEventFromServer() got AAUDIO_SERVICE_EVENT_PAUSED");
             if (getState() == AAUDIO_STREAM_STATE_PAUSING) {
                 setState(AAUDIO_STREAM_STATE_PAUSED);
             }
             break;
         case AAUDIO_SERVICE_EVENT_STOPPED:
-            ALOGD("AudioStreamInternal::onEventFromServergot() AAUDIO_SERVICE_EVENT_STOPPED");
+            ALOGD("AudioStreamInternal::onEventFromServer() got AAUDIO_SERVICE_EVENT_STOPPED");
             if (getState() == AAUDIO_STREAM_STATE_STOPPING) {
                 setState(AAUDIO_STREAM_STATE_STOPPED);
             }

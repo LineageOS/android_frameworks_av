@@ -24,7 +24,8 @@
 
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
-#include <AAudioExampleUtils.h>
+
+#include "AAudioExampleUtils.h"
 
 // TODO use this as a base class within AAudio
 class AAudioParameters {
@@ -239,7 +240,7 @@ public:
      * Print stream parameters in comparison with requested values.
      * @param stream
      */
-    void compareWithStream(AAudioStream *stream) {
+    void compareWithStream(AAudioStream *stream) const {
 
         printf("  DeviceId:     requested = %d, actual = %d\n",
                getDeviceId(), AAudioStream_getDeviceId(stream));

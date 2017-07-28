@@ -65,7 +65,6 @@ aaudio_result_t AAudioServiceEndpointPlay::open(const AAudioStreamConfiguration&
 
 // Mix data from each application stream and write result to the shared MMAP stream.
 void *AAudioServiceEndpointPlay::callbackLoop() {
-    int32_t underflowCount = 0;
     aaudio_result_t result = AAUDIO_OK;
     int64_t timeoutNanos = getStreamInternal()->calculateReasonableTimeout();
 
@@ -90,14 +89,16 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
 
                     float volume = 1.0; // to match legacy volume
                     bool underflowed = mMixer.mix(index, fifo, volume);
-                    underflowCount += underflowed ? 1 : 0;
-                    // TODO log underflows in each stream
 
                     // This timestamp represents the completion of data being read out of the
                     // client buffer. It is sent to the client and used in the timing model
                     // to decide when the client has room to write more data.
                     Timestamp timestamp(fifo->getReadCounter(), AudioClock::getNanoseconds());
                     clientStream->markTransferTime(timestamp);
+
+                    if (underflowed) {
+                        clientStream->incrementXRunCount();
+                    }
                 }
                 index++;
             }
@@ -115,9 +116,6 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
             break;
         }
     }
-
-    ALOGW_IF((underflowCount > 0),
-             "AAudioServiceEndpointPlay(): callbackLoop() had %d underflows", underflowCount);
 
     return NULL; // TODO review
 }
