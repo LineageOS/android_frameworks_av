@@ -2350,7 +2350,9 @@ void Camera3Device::setErrorStateLockedV(const char *fmt, va_list args) {
 
     mErrorCause = errorCause;
 
-    mRequestThread->setPaused(true);
+    if (mRequestThread != nullptr) {
+        mRequestThread->setPaused(true);
+    }
     internalUpdateStatusLocked(STATUS_ERROR);
 
     // Notify upstream about a device error
