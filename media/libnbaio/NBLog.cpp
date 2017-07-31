@@ -69,26 +69,19 @@
 *     class instances, where the wakeup() intervals are stored as histograms
 *     and analyzed.
 *
-* 3) reading the data from private buffer
-* MediaLogService::dump
-*     calls NBLog::Reader::dump(CONSOLE)
-*     The private buffer contains all logs for all readers in shared memory
-* NBLog::Reader::dump(int)
-*     calls getSnapshot on the current reader
-*     calls dump(int, size_t, Snapshot)
-* NBLog::Reader::dump(int, size, snapshot)
-*     iterates through snapshot's events and switches based on their type
-*     (string, timestamp, etc...)
-*     In the case of EVENT_HISTOGRAM_ENTRY_TS, adds a list of timestamp sequences
-*     (histogram entry) to NBLog::mHists
-*     TODO: add every HISTOGRAM_ENTRY_TS to two
-*     circular buffers: one short-term and one long-term (can add even longer-term
-*     structures in the future). When dump is called, print everything currently
-*     in the buffer.
-* NBLog::drawHistogram
-*     input: timestamp array
-*     buckets this to a histogram and prints
-*
+* 3) Dumpsys media.log call to report the data
+* MediaLogService::dump in MediaLogService.cpp
+*     calls NBLog::Reader::dump, which calls ReportPerformance::dump
+* ReportPerformance::dump
+*     calls PerformanceAnalysis::ReportPerformance
+*     and ReportPerformance::WriteToFile
+* PerformanceAnalysis::ReportPerformance
+*     for each thread/source file location instance of PerformanceAnalysis data,
+*     combines all histograms into a single one and prints it to the console
+*     along with outlier data
+* ReportPerformance::WriteToFile
+*     writes histogram, outlier, and peak information to file separately for each
+*     instance of PerformanceAnalysis data.
 */
 
 #define LOG_TAG "NBLog"
@@ -763,10 +756,11 @@ bool NBLog::LockedWriter::setEnabled(bool enabled)
 // ---------------------------------------------------------------------------
 
 const std::set<NBLog::Event> NBLog::Reader::startingTypes {NBLog::Event::EVENT_START_FMT,
-                                                           NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS};
+        NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS,
+        NBLog::Event::EVENT_AUDIO_STATE};
 const std::set<NBLog::Event> NBLog::Reader::endingTypes   {NBLog::Event::EVENT_END_FMT,
-                                                           NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS,
-                                                           NBLog::Event::EVENT_AUDIO_STATE};
+        NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS,
+        NBLog::Event::EVENT_AUDIO_STATE};
 
 NBLog::Reader::Reader(const void *shared, size_t size)
     : mFd(-1), mIndent(0), mLost(0),
@@ -903,7 +897,9 @@ void NBLog::MergeReader::getAndProcessSnapshot(NBLog::Reader::Snapshot &snapshot
             memcpy(&hash, &(data->hash), sizeof(hash));
             int64_t ts;
             memcpy(&ts, &data->ts, sizeof(ts));
-            mThreadPerformanceAnalysis[data->author][hash].logTsEntry(ts);
+            // TODO: hash for histogram ts and audio state need to match
+            // and correspond to audio production source file location
+            mThreadPerformanceAnalysis[data->author][0 /*hash*/].logTsEntry(ts);
             ++entry;
             break;
         }
@@ -913,7 +909,10 @@ void NBLog::MergeReader::getAndProcessSnapshot(NBLog::Reader::Snapshot &snapshot
             // There's probably a more efficient way to do it
             log_hash_t hash;
             memcpy(&hash, &(data->hash), sizeof(hash));
-            mThreadPerformanceAnalysis[data->author][hash].handleStateChange();
+            // TODO: remove ts if unused
+            int64_t ts;
+            memcpy(&ts, &data->ts, sizeof(ts));
+            mThreadPerformanceAnalysis[data->author][0 /*hash*/].handleStateChange();
             ++entry;
             break;
         }
@@ -942,6 +941,7 @@ void NBLog::MergeReader::getAndProcessSnapshot()
 }
 
 void NBLog::MergeReader::dump(int fd, int indent) {
+    // TODO: add a mutex around media.log dump
     ReportPerformance::dump(fd, indent, mThreadPerformanceAnalysis);
 }
 

@@ -252,8 +252,6 @@ private:
         int author;
     }; //TODO __attribute__((packed));
 
-    using StateTsEntryWithAuthor = HistTsEntryWithAuthor;
-
     struct HistIntEntry {
         log_hash_t hash;
         int value;
