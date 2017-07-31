@@ -26,9 +26,7 @@
 #include <aaudio/AAudio.h>
 #include "AAudioExampleUtils.h"
 #include "AAudioSimplePlayer.h"
-
-// Application data that gets passed to the callback.
-#define MAX_FRAME_COUNT_RECORDS    256
+#include "../../utils/AAudioSimplePlayer.h"
 
 int main(int argc, const char **argv)
 {
@@ -42,9 +40,10 @@ int main(int argc, const char **argv)
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
 
-    printf("%s - Play a sine sweep using an AAudio callback V0.1.1\n", argv[0]);
+    printf("%s - Play a sine sweep using an AAudio callback V0.1.2\n", argv[0]);
 
     myData.schedulerChecked = false;
+    myData.forceUnderruns = false; // set true to test AAudioStream_getXRunCount()
 
     if (argParser.parseArgs(argc, argv)) {
         return EXIT_FAILURE;
@@ -99,7 +98,10 @@ int main(int argc, const char **argv)
             printf("Stream state is %d %s!\n", state, AAudio_convertStreamStateToText(state));
             break;
         }
-        printf("framesWritten = %d\n", (int) AAudioStream_getFramesWritten(player.getStream()));
+        printf("framesWritten = %d, underruns = %d\n",
+               (int) AAudioStream_getFramesWritten(player.getStream()),
+               (int) AAudioStream_getXRunCount(player.getStream())
+        );
     }
     printf("Woke up now.\n");
 
