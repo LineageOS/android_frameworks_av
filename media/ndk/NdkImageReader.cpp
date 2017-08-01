@@ -44,7 +44,11 @@ const char* AImageReader::kContextKey    = "Context";
 const char* AImageReader::kGraphicBufferKey = "GraphicBuffer";
 
 bool
-AImageReader::isSupportedFormat(int32_t format) {
+AImageReader::isSupportedFormatAndUsage(int32_t format, uint64_t usage) {
+    // Check whether usage has either CPU_READ_OFTEN or CPU_READ set. Note that check against
+    // AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN (0x6) is sufficient as it implies
+    // AHARDWAREBUFFER_USAGE_CPU_READ (0x2).
+    bool hasCpuUsage = usage & AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN;
     switch (format) {
         case AIMAGE_FORMAT_RGBA_8888:
         case AIMAGE_FORMAT_RGBX_8888:
@@ -60,6 +64,9 @@ AImageReader::isSupportedFormat(int32_t format) {
         case AIMAGE_FORMAT_DEPTH16:
         case AIMAGE_FORMAT_DEPTH_POINT_CLOUD:
             return true;
+        case AIMAGE_FORMAT_PRIVATE:
+            // For private format, cpu usage is prohibited.
+            return !hasCpuUsage;
         default:
             return false;
     }
@@ -83,6 +90,8 @@ AImageReader::getNumPlanesForFormat(int32_t format) {
         case AIMAGE_FORMAT_DEPTH16:
         case AIMAGE_FORMAT_DEPTH_POINT_CLOUD:
             return 1;
+        case AIMAGE_FORMAT_PRIVATE:
+            return 0;
         default:
             return -1;
     }
@@ -606,9 +615,9 @@ media_status_t AImageReader_newWithUsage(
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
-    if (!AImageReader::isSupportedFormat(format)) {
-        ALOGE("%s: format %d is not supported by AImageReader",
-                __FUNCTION__, format);
+    if (!AImageReader::isSupportedFormatAndUsage(format, usage)) {
+        ALOGE("%s: format %d is not supported with usage 0x%" PRIx64 " by AImageReader",
+                __FUNCTION__, format, usage);
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
