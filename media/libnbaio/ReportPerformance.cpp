@@ -39,7 +39,7 @@ namespace ReportPerformance {
 // Writes outlier intervals, timestamps, and histograms spanning long time intervals to a file.
 // TODO: format the data efficiently and write different types of data to different files
 void writeToFile(const std::deque<std::pair<timestamp, Histogram>> &hists,
-                 const std::deque<std::pair<outlierInterval, timestamp>> &outlierData,
+                 const std::deque<std::pair<msInterval, timestamp>> &outlierData,
                  const std::deque<timestamp> &peakTimestamps,
                  const char * directory, bool append, int author, log_hash_t hash) {
     if (outlierData.empty() || hists.empty()) {
@@ -65,9 +65,10 @@ void writeToFile(const std::deque<std::pair<timestamp, Histogram>> &hists,
     for (const auto &hist : hists) {
         hfs << "\ttimestamp\n";
         hfs << hist.first << "\n";
-        hfs << "\tbuckets and counts\n";
+        hfs << "\tbuckets (in ms) and counts\n";
         for (const auto &bucket : hist.second) {
-            hfs << bucket.first << ": " << bucket.second << "\n";
+            hfs << bucket.first / static_cast<double>(kJiffyPerMs)
+                    << ": " << bucket.second << "\n";
         }
         hfs << "\n"; // separate histograms with a newline
     }
