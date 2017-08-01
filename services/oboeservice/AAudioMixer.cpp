@@ -88,11 +88,11 @@ bool AAudioMixer::mix(int trackIndex, FifoBuffer *fifo, float volume) {
         }
         partIndex++;
     }
-    fifo->getFifoControllerBase()->advanceReadIndex(mFramesPerBurst - framesLeft);
-    if (framesLeft > 0) {
-        //ALOGW("AAudioMixer::mix() UNDERFLOW by %d / %d frames ----- UNDERFLOW !!!!!!!!!!",
-        //      framesLeft, mFramesPerBurst);
-    }
+    // Always advance by one burst even if we do not have the data.
+    // Otherwise the stream timing will drift whenever there is an underflow.
+    // This actual underflow can then be detected by the client for XRun counting.
+    fifo->getFifoControllerBase()->advanceReadIndex(mFramesPerBurst);
+
 #if AAUDIO_MIXER_ATRACE_ENABLED
     ATRACE_END();
 #endif /* AAUDIO_MIXER_ATRACE_ENABLED */
