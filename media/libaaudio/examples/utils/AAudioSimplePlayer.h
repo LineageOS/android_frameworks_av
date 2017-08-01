@@ -30,6 +30,11 @@
 #define SHARING_MODE  AAUDIO_SHARING_MODE_SHARED
 #define PERFORMANCE_MODE AAUDIO_PERFORMANCE_MODE_NONE
 
+// Arbitrary period for glitches, once per second at 48000 Hz.
+#define FORCED_UNDERRUN_PERIOD_FRAMES    48000
+// How long to sleep in a callback to cause an intentional glitch. For testing.
+#define FORCED_UNDERRUN_SLEEP_MICROS     (10 * 1000)
+
 /**
  * Simple wrapper for AAudio that opens an output stream either in callback or blocking write mode.
  */
@@ -219,10 +224,13 @@ private:
 typedef struct SineThreadedData_s {
     SineGenerator  sineOsc1;
     SineGenerator  sineOsc2;
+    int64_t        framesTotal = 0;
+    int64_t        nextFrameToGlitch = FORCED_UNDERRUN_PERIOD_FRAMES;
     int32_t        minNumFrames = INT32_MAX;
     int32_t        maxNumFrames = 0;
     int            scheduler;
-    bool           schedulerChecked;
+    bool           schedulerChecked = false;
+    bool           forceUnderruns = false;
 } SineThreadedData_t;
 
 // Callback function that fills the audio output buffer.
@@ -235,10 +243,20 @@ aaudio_data_callback_result_t SimplePlayerDataCallbackProc(
 
     // should not happen but just in case...
     if (userData == nullptr) {
-        fprintf(stderr, "ERROR - SimplePlayerDataCallbackProc needs userData\n");
+        printf("ERROR - SimplePlayerDataCallbackProc needs userData\n");
         return AAUDIO_CALLBACK_RESULT_STOP;
     }
     SineThreadedData_t *sineData = (SineThreadedData_t *) userData;
+
+    sineData->framesTotal += numFrames;
+
+    if (sineData->forceUnderruns) {
+        if (sineData->framesTotal > sineData->nextFrameToGlitch) {
+            usleep(FORCED_UNDERRUN_SLEEP_MICROS);
+            printf("Simulate glitch at %lld\n", (long long) sineData->framesTotal);
+            sineData->nextFrameToGlitch += FORCED_UNDERRUN_PERIOD_FRAMES;
+        }
+    }
 
     if (!sineData->schedulerChecked) {
         sineData->scheduler = sched_getscheduler(gettid());
