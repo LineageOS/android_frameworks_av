@@ -1242,6 +1242,16 @@ status_t NuPlayer::GenericSource::doSeek(int64_t seekTimeUs, MediaPlayerSeekMode
         mAudioLastDequeueTimeUs = seekTimeUs;
     }
 
+    if (mSubtitleTrack.mSource != NULL) {
+        mSubtitleTrack.mPackets->clear();
+        mFetchSubtitleDataGeneration++;
+    }
+
+    if (mTimedTextTrack.mSource != NULL) {
+        mTimedTextTrack.mPackets->clear();
+        mFetchTimedTextDataGeneration++;
+    }
+
     // If currently buffering, post kWhatBufferingEnd first, so that
     // NuPlayer resumes. Otherwise, if cache hits high watermark
     // before new polling happens, no one will resume the playback.
