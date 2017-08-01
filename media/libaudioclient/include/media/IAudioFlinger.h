@@ -25,7 +25,6 @@
 #include <utils/Errors.h>
 #include <binder/IInterface.h>
 #include <media/IAudioTrack.h>
-#include <media/IAudioRecord.h>
 #include <media/IAudioFlingerClient.h>
 #include <system/audio.h>
 #include <system/audio_effect.h>
@@ -33,6 +32,8 @@
 #include <media/IEffect.h>
 #include <media/IEffectClient.h>
 #include <utils/String8.h>
+
+#include "android/media/IAudioRecord.h"
 
 namespace android {
 
@@ -69,7 +70,7 @@ public:
                                 status_t *status,
                                 audio_port_handle_t portId) = 0;
 
-    virtual sp<IAudioRecord> openRecord(
+    virtual sp<media::IAudioRecord> openRecord(
                                 // On successful return, AudioFlinger takes over the handle
                                 // reference and will release it when the track is destroyed.
                                 // However on failure, the client is responsible for release.

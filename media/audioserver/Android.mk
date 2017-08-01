@@ -3,7 +3,8 @@ LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-	main_audioserver.cpp
+	main_audioserver.cpp \
+	../libaudioclient/aidl/android/media/IAudioRecord.aidl
 
 LOCAL_SHARED_LIBRARIES := \
 	libaaudioservice \
@@ -35,6 +36,9 @@ LOCAL_C_INCLUDES := \
 	frameworks/av/media/libaaudio/src/binding \
 	$(call include-path-for, audio-utils) \
 	external/sonic \
+
+LOCAL_AIDL_INCLUDES := \
+        frameworks/av/media/libaudioclient/aidl
 
 # If AUDIOSERVER_MULTILIB in device.mk is non-empty then it is used to control
 # the LOCAL_MULTILIB for all audioserver exclusive libraries.

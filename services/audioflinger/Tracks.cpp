@@ -1561,25 +1561,21 @@ AudioFlinger::RecordHandle::~RecordHandle() {
     mRecordTrack->destroy();
 }
 
-status_t AudioFlinger::RecordHandle::start(int /*AudioSystem::sync_event_t*/ event,
-        audio_session_t triggerSession) {
+binder::Status AudioFlinger::RecordHandle::start(int /*AudioSystem::sync_event_t*/ event,
+        int /*audio_session_t*/ triggerSession) {
     ALOGV("RecordHandle::start()");
-    return mRecordTrack->start((AudioSystem::sync_event_t)event, triggerSession);
+    return binder::Status::fromStatusT(
+        mRecordTrack->start((AudioSystem::sync_event_t)event, (audio_session_t) triggerSession));
 }
 
-void AudioFlinger::RecordHandle::stop() {
+binder::Status AudioFlinger::RecordHandle::stop() {
     stop_nonvirtual();
+    return binder::Status::ok();
 }
 
 void AudioFlinger::RecordHandle::stop_nonvirtual() {
     ALOGV("RecordHandle::stop()");
     mRecordTrack->stop();
-}
-
-status_t AudioFlinger::RecordHandle::onTransact(
-    uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
-{
-    return BnAudioRecord::onTransact(code, data, reply, flags);
 }
 
 // ----------------------------------------------------------------------------

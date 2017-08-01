@@ -17,12 +17,15 @@
 #ifndef ANDROID_AUDIORECORD_H
 #define ANDROID_AUDIORECORD_H
 
+#include <binder/IMemory.h>
 #include <cutils/sched_policy.h>
 #include <media/AudioSystem.h>
 #include <media/AudioTimestamp.h>
-#include <media/IAudioRecord.h>
 #include <media/Modulo.h>
+#include <utils/RefBase.h>
 #include <utils/threads.h>
+
+#include "android/media/IAudioRecord.h"
 
 namespace android {
 
@@ -624,7 +627,7 @@ private:
 
     // Next 5 fields may be changed if IAudioRecord is re-created, but always != 0
     // provided the initial set() was successful
-    sp<IAudioRecord>        mAudioRecord;
+    sp<media::IAudioRecord> mAudioRecord;
     sp<IMemory>             mCblkMemory;
     audio_track_cblk_t*     mCblk;              // re-load after mLock.unlock()
     sp<IMemory>             mBufferMemory;
