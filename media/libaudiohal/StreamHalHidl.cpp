@@ -47,7 +47,8 @@ namespace android {
 StreamHalHidl::StreamHalHidl(IStream *stream)
         : ConversionHelperHidl("Stream"),
           mStream(stream),
-          mHalThreadPriority(HAL_THREAD_PRIORITY_DEFAULT) {
+          mHalThreadPriority(HAL_THREAD_PRIORITY_DEFAULT),
+          mCachedBufferSize(0){
 
     // Instrument audio signal power logging.
     // Note: This assumes channel mask, format, and sample rate do not change after creation.
@@ -73,7 +74,11 @@ status_t StreamHalHidl::getSampleRate(uint32_t *rate) {
 
 status_t StreamHalHidl::getBufferSize(size_t *size) {
     if (!mStream) return NO_INIT;
-    return processReturn("getBufferSize", mStream->getBufferSize(), size);
+    status_t status = processReturn("getBufferSize", mStream->getBufferSize(), size);
+    if (status == OK) {
+        mCachedBufferSize = *size;
+    }
+    return status;
 }
 
 status_t StreamHalHidl::getChannelMask(audio_channel_mask_t *mask) {
@@ -202,6 +207,14 @@ status_t StreamHalHidl::setHalThreadPriority(int priority) {
     return OK;
 }
 
+status_t StreamHalHidl::getCachedBufferSize(size_t *size) {
+    if (mCachedBufferSize != 0) {
+        *size = mCachedBufferSize;
+        return OK;
+    }
+    return getBufferSize(size);
+}
+
 bool StreamHalHidl::requestHalThreadPriority(pid_t threadPid, pid_t threadId) {
     if (mHalThreadPriority == HAL_THREAD_PRIORITY_DEFAULT) {
         return true;
@@ -320,8 +333,19 @@ status_t StreamOutHalHidl::write(const void *buffer, size_t bytes, size_t *writt
     }
 
     status_t status;
-    if (!mDataMQ && (status = prepareForWriting(bytes)) != OK) {
-        return status;
+    if (!mDataMQ) {
+        // In case if playback starts close to the end of a compressed track, the bytes
+        // that need to be written is less than the actual buffer size. Need to use
+        // full buffer size for the MQ since otherwise after seeking back to the middle
+        // data will be truncated.
+        size_t bufferSize;
+        if ((status = getCachedBufferSize(&bufferSize)) != OK) {
+            return status;
+        }
+        if (bytes > bufferSize) bufferSize = bytes;
+        if ((status = prepareForWriting(bufferSize)) != OK) {
+            return status;
+        }
     }
 
     status = callWriterThread(
