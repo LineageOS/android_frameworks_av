@@ -159,6 +159,9 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
         actualPerformanceMode = AAUDIO_PERFORMANCE_MODE_LOW_LATENCY;
     }
     setPerformanceMode(actualPerformanceMode);
+
+    setSharingMode(AAUDIO_SHARING_MODE_SHARED); // EXCLUSIVE mode not supported in legacy
+
     // Log warning if we did not get what we asked for.
     ALOGW_IF(actualFlags != flags,
              "AudioStreamRecord::open() flags changed from 0x%08X to 0x%08X",
