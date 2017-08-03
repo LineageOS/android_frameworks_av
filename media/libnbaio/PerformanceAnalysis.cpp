@@ -46,16 +46,6 @@ namespace android {
 
 namespace ReportPerformance {
 
-static int widthOf(int x) {
-    int width = 0;
-    while (x > 0) {
-        ++width;
-        x /= 10;
-    }
-    return width;
-}
-
-
 // Given a the most recent timestamp of a series of audio processing
 // wakeup timestamps,
 // buckets the time interval into a histogram, searches for
@@ -75,8 +65,6 @@ void PerformanceAnalysis::logTsEntry(timestamp ts) {
 
     const int diffJiffy = deltaJiffy(mBufferPeriod.mPrevTs, ts);
 
-
-    // update buffer period distribution
     // old versus new weight ratio when updating the buffer period mean
     static constexpr double exponentialWeight = 0.999;
     // update buffer period mean with exponential weighting
@@ -200,6 +188,8 @@ bool PerformanceAnalysis::detectAndStorePeak(msInterval diff, timestamp ts) {
 // and writes to mOutlierdata in the following format:
 // Time elapsed since previous outlier: Timestamp of start of outlier
 // e.g. timestamps (ms) 1, 4, 5, 16, 18, 28 will produce pairs (4, 5), (13, 18).
+// TODO: learn what timestamp sequences correlate with glitches instead of
+// manually designing a heuristic.
 bool PerformanceAnalysis::detectAndStoreOutlier(const msInterval diffMs) {
     bool isOutlier = false;
     if (diffMs >= mBufferPeriod.mOutlier) {
@@ -219,32 +209,73 @@ bool PerformanceAnalysis::detectAndStoreOutlier(const msInterval diffMs) {
     return isOutlier;
 }
 
+static int widthOf(int x) {
+    int width = 0;
+    if (x < 0) {
+        width++;
+        x = x == INT_MIN ? INT_MAX : -x;
+    }
+    // assert (x >= 0)
+    do {
+        ++width;
+        x /= 10;
+    } while (x > 0);
+    return width;
+}
+
 // computes the column width required for a specific histogram value
-inline int numberWidth(int number, int leftPadding) {
-    return std::max(std::max(widthOf(number) + 4, 3), leftPadding + 2);
+inline int numberWidth(double number, int leftPadding) {
+    // Added values account for whitespaces needed around numbers, and for the
+    // dot and decimal digit not accounted for by widthOf
+    return std::max(std::max(widthOf(static_cast<int>(number)) + 3, 2), leftPadding + 1);
+}
+
+// rounds value to precision based on log-distance from mean
+inline double logRound(double x, double mean) {
+    // Larger values increase range of high resolution
+    constexpr double kBase = 2;
+    const double power = floor(
+        log(abs(x - mean) / mean) / log(kBase)) + 1;
+    // do not round values close to the mean
+    if (power < 1) {
+        return x;
+    }
+    const int factor = static_cast<int>(pow(10, power));
+    return (static_cast<int>(x) * factor) / factor;
 }
 
 // TODO Make it return a std::string instead of modifying body
-// TODO: move this to ReportPerformance, probably make it a friend function of PerformanceAnalysis
-void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
+// TODO: move this to ReportPerformance, probably make it a friend function
+// of PerformanceAnalysis
+void PerformanceAnalysis::reportPerformance(String8 *body, int author, log_hash_t hash,
+                                            int maxHeight) {
     if (mHists.empty()) {
         return;
     }
 
-    std::map<int, int> buckets;
+    // ms of active audio in displayed histogram
+    double elapsedMs = 0;
+    // starting timestamp of histogram
+    timestamp startingTs = mHists[0].first;
+
+    // histogram which stores .1 precision ms counts instead of Jiffy multiple counts
+    // TODO: when there is more data, print many histograms, possibly separated at peaks
+    std::map<double, int> buckets;
     for (const auto &shortHist: mHists) {
         for (const auto &countPair : shortHist.second) {
-            buckets[countPair.first] += countPair.second;
+            const double ms = static_cast<double>(countPair.first) / kJiffyPerMs;
+            buckets[logRound(ms, mBufferPeriod.mMean)] += countPair.second;
+            elapsedMs += ms;
         }
     }
 
     // underscores and spaces length corresponds to maximum width of histogram
-    static const int kLen = 100;
+    static const int kLen = 200;
     std::string underscores(kLen, '_');
     std::string spaces(kLen, ' ');
 
     auto it = buckets.begin();
-    int maxDelta = it->first;
+    double maxDelta = it->first;
     int maxCount = it->second;
     // Compute maximum values
     while (++it != buckets.end()) {
@@ -264,13 +295,16 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
         scalingFactor = (height + maxHeight) / maxHeight;
         height /= scalingFactor;
     }
-    // TODO: print reader (author) ID
-    body->appendFormat("\n%*s", leftPadding + 11, "Occurrences");
+    body->appendFormat("\n%*s %3.2f %s", leftPadding + 11,
+            "Occurrences in", (elapsedMs / kMsPerSec), "seconds of audio:");
+    body->appendFormat("\n%*s%d, %lld, %lld\n", leftPadding + 11,
+            "Thread, hash, starting timestamp: ", author,
+            static_cast<long long int>(hash), static_cast<long long int>(startingTs));
     // write histogram label line with bucket values
     body->appendFormat("\n%s", " ");
     body->appendFormat("%*s", leftPadding, " ");
     for (auto const &x : buckets) {
-        const int colWidth = numberWidth(x.first / kJiffyPerMs, leftPadding);
+        const int colWidth = numberWidth(x.first, leftPadding);
         body->appendFormat("%*d", colWidth, x.second);
     }
     // write histogram ascii art
@@ -279,7 +313,7 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
         const int value = 1 << row;
         body->appendFormat("%.*s", leftPadding, spaces.c_str());
         for (auto const &x : buckets) {
-            const int colWidth = numberWidth(x.first / kJiffyPerMs, leftPadding);
+            const int colWidth = numberWidth(x.first, leftPadding);
             body->appendFormat("%.*s%s", colWidth - 1,
                                spaces.c_str(), x.second < value ? " " : "|");
         }
@@ -294,42 +328,18 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int maxHeight) {
     // write footer with bucket labels
     body->appendFormat("%*s", leftPadding, " ");
     for (auto const &x : buckets) {
-        const int colWidth = numberWidth(x.first / kJiffyPerMs, leftPadding);
-        body->appendFormat("%*.*f", colWidth, 1,
-                           static_cast<double>(x.first) / kJiffyPerMs);
+        const int colWidth = numberWidth(x.first, leftPadding);
+        body->appendFormat("%*.*f", colWidth, 1, x.first);
     }
     body->appendFormat("%.*s%s", bucketWidth, spaces.c_str(), "ms\n");
 
     // Now report glitches
-    body->appendFormat("\ntime elapsed between glitches and glitch timestamps\n");
+    body->appendFormat("\ntime elapsed between glitches and glitch timestamps:\n");
     for (const auto &outlier: mOutlierData) {
         body->appendFormat("%lld: %lld\n", static_cast<long long>(outlier.first),
                            static_cast<long long>(outlier.second));
     }
 }
-
-// TODO: learn what timestamp sequences correlate with glitches instead of
-// manually designing a heuristic. Ultimately, detect glitches directly from audio.
-// Produces a log warning if the timing of recent buffer periods caused a glitch
-// Computes sum of running window of three buffer periods
-// Checks whether the buffer periods leave enough CPU time for the next one
-// e.g. if a buffer period is expected to be 4 ms and a buffer requires 3 ms of CPU time,
-// here are some glitch cases:
-// 4 + 4 + 6 ; 5 + 4 + 5; 2 + 2 + 10
-
-// void PerformanceAnalysis::alertIfGlitch(const std::vector<int64_t> &samples) {
-//    std::deque<int> periods(kNumBuff, kPeriodMs);
-//  for (size_t i = 2; i < samples.size(); ++i) { // skip first time entry
-//      periods.push_front(deltaMs(samples[i - 1], samples[i]));
-//      periods.pop_back();
-//      // TODO: check that all glitch cases are covered
-//      if (std::accumulate(periods.begin(), periods.end(), 0) > kNumBuff * kPeriodMs +
-//          kPeriodMs - kPeriodMsCPU) {
-//              periods.assign(kNumBuff, kPeriodMs);
-//      }
-//  }
-//  return;
-//}
 
 //------------------------------------------------------------------------------
 
@@ -341,7 +351,7 @@ void dump(int fd, int indent, PerformanceAnalysisMap &threadPerformanceAnalysis)
         for (auto & hash: thread.second) {
             PerformanceAnalysis& curr = hash.second;
             // write performance data to console
-            curr.reportPerformance(&body);
+            curr.reportPerformance(&body, thread.first, hash.first);
             if (!body.isEmpty()) {
                 dumpLine(fd, indent, body);
                 body.clear();

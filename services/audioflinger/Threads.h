@@ -485,6 +485,7 @@ protected:
                 // Updated by updateSuspendedSessions_l() only.
                 KeyedVector< audio_session_t, KeyedVector< int, sp<SuspendedSessionDesc> > >
                                         mSuspendedSessions;
+                // TODO: add comment and adjust size as needed
                 static const size_t     kLogSize = 4 * 1024;
                 sp<NBLog::Writer>       mNBLogWriter;
                 bool                    mSystemReady;
@@ -984,6 +985,7 @@ private:
     sp<NBAIO_Source>        mTeeSource;
 #endif
     uint32_t                mScreenState;   // cached copy of gScreenState
+    // TODO: add comment and adjust size as needed
     static const size_t     kFastMixerLogSize = 8 * 1024;
     sp<NBLog::Writer>       mFastMixerNBLogWriter;
 
@@ -1456,6 +1458,7 @@ private:
             // If a fast capture is present, the Pipe as IMemory, otherwise clear
             sp<IMemory>                         mPipeMemory;
 
+            // TODO: add comment and adjust size as needed
             static const size_t                 kFastCaptureLogSize = 4 * 1024;
             sp<NBLog::Writer>                   mFastCaptureNBLogWriter;
 
