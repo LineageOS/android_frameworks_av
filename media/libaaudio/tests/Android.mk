@@ -34,6 +34,17 @@ include $(CLEAR_VARS)
 LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils) \
     frameworks/av/media/libaaudio/include \
+    frameworks/av/media/libaaudio/src \
+    frameworks/av/media/libaaudio/examples
+LOCAL_SRC_FILES:= test_timestamps.cpp
+LOCAL_SHARED_LIBRARIES := libaaudio
+LOCAL_MODULE := test_timestamps
+include $(BUILD_NATIVE_TEST)
+
+include $(CLEAR_VARS)
+LOCAL_C_INCLUDES := \
+    $(call include-path-for, audio-utils) \
+    frameworks/av/media/libaaudio/include \
     frameworks/av/media/libaaudio/src
 LOCAL_SRC_FILES:= test_linear_ramp.cpp
 LOCAL_SHARED_LIBRARIES := libaaudio

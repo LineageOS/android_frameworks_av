@@ -37,7 +37,8 @@ using namespace aaudio;   // TODO just import names needed
 
 AAudioServiceStreamBase::AAudioServiceStreamBase()
         : mUpMessageQueue(nullptr)
-        , mAAudioThread() {
+        , mAAudioThread()
+        , mAtomicTimestamp() {
     mMmapClient.clientUid = -1;
     mMmapClient.clientPid = -1;
     mMmapClient.packageName = String16("");
@@ -211,15 +212,25 @@ aaudio_result_t AAudioServiceStreamBase::writeUpMessageQueue(AAudioServiceMessag
 
 aaudio_result_t AAudioServiceStreamBase::sendCurrentTimestamp() {
     AAudioServiceMessage command;
+    // Send a timestamp for the clock model.
     aaudio_result_t result = getFreeRunningPosition(&command.timestamp.position,
                                                     &command.timestamp.timestamp);
     if (result == AAUDIO_OK) {
-    //    ALOGD("sendCurrentTimestamp(): position = %lld, nanos = %lld",
-    //          (long long) command.timestamp.position,
-    //          (long long) command.timestamp.timestamp);
-        command.what = AAudioServiceMessage::code::TIMESTAMP;
+        command.what = AAudioServiceMessage::code::TIMESTAMP_SERVICE;
         result = writeUpMessageQueue(&command);
-    } else if (result == AAUDIO_ERROR_UNAVAILABLE) {
+
+        if (result == AAUDIO_OK) {
+            // Send a hardware timestamp for presentation time.
+            result = getHardwareTimestamp(&command.timestamp.position,
+                                          &command.timestamp.timestamp);
+            if (result == AAUDIO_OK) {
+                command.what = AAudioServiceMessage::code::TIMESTAMP_HARDWARE;
+                result = writeUpMessageQueue(&command);
+            }
+        }
+    }
+
+    if (result == AAUDIO_ERROR_UNAVAILABLE) {
         result = AAUDIO_OK; // just not available yet, try again later
     }
     return result;
