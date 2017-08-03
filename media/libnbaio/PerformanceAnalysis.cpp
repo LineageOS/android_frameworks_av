@@ -75,7 +75,8 @@ void PerformanceAnalysis::logTsEntry(timestamp ts) {
     // NormalMixer times vary much more than FastMixer times.
     // TODO: mOutlierFactor values are set empirically based on what appears to be
     // an outlier. Learn these values from the data.
-    mBufferPeriod.mOutlierFactor = mBufferPeriod.mMean < kFastMixerMax ? 1.8 : 2.5;
+    // TODO: the current settings are too high, change after next data collection is over
+    mBufferPeriod.mOutlierFactor = mBufferPeriod.mMean < kFastMixerMax ? 1.8 : 2.0;
     // set outlier threshold
     mBufferPeriod.mOutlier = mBufferPeriod.mMean * mBufferPeriod.mOutlierFactor;
 
@@ -232,10 +233,15 @@ inline int numberWidth(double number, int leftPadding) {
 
 // rounds value to precision based on log-distance from mean
 inline double logRound(double x, double mean) {
-    // Larger values increase range of high resolution
-    constexpr double kBase = 2;
+    // Larger values decrease range of high resolution and prevent overflow
+    // of a histogram on the console.
+    // The following formula adjusts kBase based on the buffer period length.
+    // Different threads have buffer periods ranging from 2 to 40. The
+    // formula below maps buffer period 2 to kBase = ~1, 4 to ~2, 20 to ~3, 40 to ~4.
+    // TODO: tighten this for higher means, the data still overflows
+    const double kBase = log(mean) / log(2.2);
     const double power = floor(
-        log(abs(x - mean) / mean) / log(kBase)) + 1;
+        log(abs(x - mean) / mean) / log(kBase)) + 2;
     // do not round values close to the mean
     if (power < 1) {
         return x;
@@ -265,7 +271,7 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int author, log_hash_
         for (const auto &countPair : shortHist.second) {
             const double ms = static_cast<double>(countPair.first) / kJiffyPerMs;
             buckets[logRound(ms, mBufferPeriod.mMean)] += countPair.second;
-            elapsedMs += ms;
+            elapsedMs += ms * countPair.second;
         }
     }
 
