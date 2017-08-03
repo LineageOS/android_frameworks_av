@@ -578,6 +578,10 @@ status_t MyOpusExtractor::readNextPacket(MediaBuffer **out) {
             }
             // First two pages are header pages.
             if (err == ERROR_END_OF_STREAM || mCurrentPage.mPageNo > 2) {
+                if (mBuf != NULL) {
+                    mBuf->release();
+                    mBuf = NULL;
+                }
                 break;
             }
             curGranulePosition = mCurrentPage.mGranulePosition;
