@@ -207,7 +207,7 @@ aaudio_result_t AudioStreamRecord::requestStart()
     if (mAudioRecord.get() == nullptr) {
         return AAUDIO_ERROR_INVALID_STATE;
     }
-    // Get current position so we can detect when the track is playing.
+    // Get current position so we can detect when the track is recording.
     status_t err = mAudioRecord->getPosition(&mPositionWhenStarting);
     if (err != OK) {
         return AAudioConvert_androidToAAudioResult(err);
@@ -235,7 +235,7 @@ aaudio_result_t AudioStreamRecord::requestStop() {
     return AAUDIO_OK;
 }
 
-aaudio_result_t AudioStreamRecord::updateStateWhileWaiting()
+aaudio_result_t AudioStreamRecord::updateStateMachine()
 {
     aaudio_result_t result = AAUDIO_OK;
     aaudio_wrapping_frames_t position;
@@ -292,6 +292,12 @@ aaudio_result_t AudioStreamRecord::read(void *buffer,
     }
     int32_t framesRead = (int32_t)(bytesRead / bytesPerFrame);
     incrementFramesRead(framesRead);
+
+    result = updateStateMachine();
+    if (result != AAUDIO_OK) {
+        return result;
+    }
+
     return (aaudio_result_t) framesRead;
 }
 
@@ -329,4 +335,22 @@ aaudio_result_t AudioStreamRecord::getTimestamp(clockid_t clockId,
         return AAudioConvert_androidToAAudioResult(status);
     }
     return getBestTimestamp(clockId, framePosition, timeNanoseconds, &extendedTimestamp);
+}
+
+int64_t AudioStreamRecord::getFramesWritten() {
+    aaudio_wrapping_frames_t position;
+    status_t result;
+    switch (getState()) {
+        case AAUDIO_STREAM_STATE_STARTING:
+        case AAUDIO_STREAM_STATE_STARTED:
+        case AAUDIO_STREAM_STATE_STOPPING:
+            result = mAudioRecord->getPosition(&position);
+            if (result == OK) {
+                mFramesWritten.update32(position);
+            }
+            break;
+        default:
+            break;
+    }
+    return AudioStreamLegacy::getFramesWritten();
 }

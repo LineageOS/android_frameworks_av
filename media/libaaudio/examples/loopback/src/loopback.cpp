@@ -417,11 +417,18 @@ int main(int argc, const char **argv)
             sleep(1);
             printf("%4d: ", i);
             loopbackData.loopbackProcessor->printStatus();
-            int64_t framesWritten = AAudioStream_getFramesWritten(loopbackData.inputStream);
-            int64_t framesRead = AAudioStream_getFramesRead(loopbackData.inputStream);
-            printf(" input written = %lld, read %lld, xruns = %d\n",
-                   (long long) framesWritten,
-                   (long long) framesRead,
+
+            int64_t inputFramesWritten = AAudioStream_getFramesWritten(loopbackData.inputStream);
+            int64_t inputFramesRead = AAudioStream_getFramesRead(loopbackData.inputStream);
+            int64_t outputFramesWritten = AAudioStream_getFramesWritten(outputStream);
+            int64_t outputFramesRead = AAudioStream_getFramesRead(outputStream);
+            printf(" INPUT: wr %lld rd %lld state %s, OUTPUT: wr %lld rd %lld state %s, xruns %d\n",
+                   (long long) inputFramesWritten,
+                   (long long) inputFramesRead,
+                   AAudio_convertStreamStateToText(AAudioStream_getState(loopbackData.inputStream)),
+                   (long long) outputFramesWritten,
+                   (long long) outputFramesRead,
+                   AAudio_convertStreamStateToText(AAudioStream_getState(outputStream)),
                    AAudioStream_getXRunCount(outputStream)
             );
         }
