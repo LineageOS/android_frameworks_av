@@ -98,7 +98,7 @@ aaudio_result_t AudioStream::waitForStateChange(aaudio_stream_state_t currentSta
                                                 aaudio_stream_state_t *nextState,
                                                 int64_t timeoutNanoseconds)
 {
-    aaudio_result_t result = updateStateWhileWaiting();
+    aaudio_result_t result = updateStateMachine();
     if (result != AAUDIO_OK) {
         return result;
     }
@@ -112,7 +112,7 @@ aaudio_result_t AudioStream::waitForStateChange(aaudio_stream_state_t currentSta
         AudioClock::sleepForNanos(durationNanos);
         timeoutNanoseconds -= durationNanos;
 
-        aaudio_result_t result = updateStateWhileWaiting();
+        aaudio_result_t result = updateStateMachine();
         if (result != AAUDIO_OK) {
             return result;
         }

@@ -363,7 +363,7 @@ aaudio_result_t AudioStreamInternal::getTimestamp(clockid_t clockId,
     }
 }
 
-aaudio_result_t AudioStreamInternal::updateStateWhileWaiting() {
+aaudio_result_t AudioStreamInternal::updateStateMachine() {
     if (isDataCallbackActive()) {
         return AAUDIO_OK; // state is getting updated by the callback thread read/write call
     }
