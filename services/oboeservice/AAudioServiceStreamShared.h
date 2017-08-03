@@ -85,13 +85,20 @@ public:
     /* Keep a record of when a buffer transfer completed.
      * This allows for a more accurate timing model.
      */
-    void markTransferTime(int64_t nanoseconds);
+    void markTransferTime(Timestamp &timestamp);
+
+    void setTimestampPositionOffset(int64_t deltaFrames) {
+        mTimestampPositionOffset.store(deltaFrames);
+    }
 
 protected:
 
     aaudio_result_t getDownDataDescription(AudioEndpointParcelable &parcelable) override;
 
     aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) override;
+
+    virtual aaudio_result_t getHardwareTimestamp(int64_t *positionFrames,
+                                                 int64_t *timeNanos) override;
 
     /**
      * @param requestedCapacityFrames
@@ -106,8 +113,7 @@ private:
     AAudioServiceEndpoint   *mServiceEndpoint = nullptr;
     SharedRingBuffer        *mAudioDataQueue = nullptr;
 
-    int64_t                  mMarkedPosition = 0;
-    int64_t                  mMarkedTime = 0;
+    std::atomic<int64_t>     mTimestampPositionOffset;
 };
 
 } /* namespace aaudio */
