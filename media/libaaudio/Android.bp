@@ -16,12 +16,14 @@ ndk_headers {
     name: "libAAudio_headers",
     from: "include",
     to: "",
-    srcs: ["include/aaudio/*.h"],
+    // omit AAudioTesting.h; supplied separately to those who need it
+    srcs: ["include/aaudio/AAudio.h"],
     license: "include/aaudio/NOTICE",
 }
 
 ndk_library {
     name: "libaaudio",
+    // deliberately includes symbols from AAudioTesting.h
     symbol_file: "libaaudio.map.txt",
     first_version: "26",
     unversioned_until: "current",
