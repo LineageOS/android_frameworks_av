@@ -70,7 +70,9 @@ typedef struct AImageReader AImageReader;
  * @param height The default height in pixels of the Images that this reader will produce.
  * @param format The format of the Image that this reader will produce. This must be one of the
  *            AIMAGE_FORMAT_* enum value defined in {@link AIMAGE_FORMATS}. Note that not all
- *            formats are supported, like {@link AIMAGE_FORMAT_PRIVATE}.
+ *            formats are supported. One example is {@link AIMAGE_FORMAT_PRIVATE}, as it is not
+ *            intended to be read by applications directly. That format is supported by
+ *            {@link AImageReader_newWithUsage} introduced in API 26.
  * @param maxImages The maximum number of images the user will want to access simultaneously. This
  *            should be as small as possible to limit memory use. Once maxImages Images are obtained
  *            by the user, one of them has to be released before a new {@link AImage} will become
@@ -307,6 +309,28 @@ media_status_t AImageReader_setImageListener(
  * for the consumer usage. All other parameters and the return values are identical to those passed
  * to {@line AImageReader_new}.
  *
+ * <p>If the {@code format} is {@link AIMAGE_FORMAT_PRIVATE}, the created {@link AImageReader}
+ * will produce images whose contents are not directly accessible by the application. The application can
+ * still acquire images from this {@link AImageReader} and access {@link AHardwareBuffer} via
+ * {@link AImage_getHardwareBuffer()}. The {@link AHardwareBuffer} gained this way can then
+ * be passed back to hardware (such as GPU or hardware encoder if supported) for future processing.
+ * For example, you can obtain an {@link EGLClientBuffer} from the {@link AHardwareBuffer} by using
+ * {@link eglGetNativeClientBufferANDROID} extension and pass that {@link EGLClientBuffer} to {@link
+ * eglCreateImageKHR} to create an {@link EGLImage} resource type, which may then be bound to a
+ * texture via {@link glEGLImageTargetTexture2DOES} on supported devices. This can be useful for
+ * transporting textures that may be shared cross-process.</p>
+ * <p>In general, when software access to image data is not necessary, an {@link AImageReader}
+ * created with {@link AIMAGE_FORMAT_PRIVATE} format is more efficient, compared with {@link
+ * AImageReader}s using other format such as {@link AIMAGE_FORMAT_YUV_420_888}.</p>
+ *
+ * <p>Note that not all format and usage flag combination is supported by the {@link AImageReader},
+ * especially if {@code format} is {@link AIMAGE_FORMAT_PRIVATE}, {@code usage} must not include either
+ * {@link AHARDWAREBUFFER_USAGE_READ_RARELY} or {@link AHARDWAREBUFFER_USAGE_READ_OFTEN}</p>
+ *
+ * @param width The default width in pixels of the Images that this reader will produce.
+ * @param height The default height in pixels of the Images that this reader will produce.
+ * @param format The format of the Image that this reader will produce. This must be one of the
+ *            AIMAGE_FORMAT_* enum value defined in {@link AIMAGE_FORMATS}.
  * @param usage specifies how the consumer will access the AImage, using combination of the
  *            AHARDWAREBUFFER_USAGE flags described in {@link hardware_buffer.h}.
  *            Passing {@link AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN} is equivalent to calling
@@ -331,6 +355,11 @@ media_status_t AImageReader_setImageListener(
  *   {@link AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE}, or combined</td>
  * </tr>
  * </table>
+ * @return <ul>
+ *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
+ *         <li>{@link AMEDIA_ERROR_INVALID_PARAMETER} if reader is NULL, or one or more of width,
+ *                 height, format, maxImages, or usage arguments is not supported.</li>
+ *         <li>{@link AMEDIA_ERROR_UNKNOWN} if the method fails for some other reasons.</li></ul>
  *
  * @see AImage
  * @see AImageReader_new

@@ -94,12 +94,15 @@ void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode
                 } else {
                     audioBuffer->size = 0;
                 }
-                break;
+
+                if (updateStateMachine() == AAUDIO_OK) {
+                    break; // don't fall through
+                }
             }
         }
         /// FALL THROUGH
 
-            // Stream got rerouted so we disconnect.
+        // Stream got rerouted so we disconnect.
         case AAUDIO_CALLBACK_OPERATION_DISCONNECTED: {
             setState(AAUDIO_STREAM_STATE_DISCONNECTED);
             ALOGD("processCallbackCommon() stream disconnected");

@@ -62,6 +62,9 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
 
     // result might be a frame count
     while (mCallbackEnabled.load() && getStreamInternal()->isActive() && (result >= 0)) {
+
+        int64_t mmapFramesRead = getStreamInternal()->getFramesRead();
+
         // Read audio data from stream using a blocking read.
         result = getStreamInternal()->read(mDistributionBuffer, getFramesPerBurst(), timeoutNanos);
         if (result == AAUDIO_ERROR_DISCONNECTED) {
@@ -74,18 +77,32 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
         }
 
         // Distribute data to each active stream.
-        { // use lock guard
+        { // brackets are for lock_guard
+
             std::lock_guard <std::mutex> lock(mLockStreams);
-            for (sp<AAudioServiceStreamShared> sharedStream : mRegisteredStreams) {
-                if (sharedStream->isRunning()) {
-                    FifoBuffer *fifo = sharedStream->getDataFifoBuffer();
+            for (sp<AAudioServiceStreamShared> clientStream : mRegisteredStreams) {
+                if (clientStream->isRunning()) {
+                    FifoBuffer *fifo = clientStream->getDataFifoBuffer();
+
+                    // Determine offset between framePosition in client's stream vs the underlying
+                    // MMAP stream.
+                    int64_t clientFramesWritten = fifo->getWriteCounter();
+                    // There are two indices that refer to the same frame.
+                    int64_t positionOffset = mmapFramesRead - clientFramesWritten;
+                    clientStream->setTimestampPositionOffset(positionOffset);
+
                     if (fifo->getFifoControllerBase()->getEmptyFramesAvailable() <
                         getFramesPerBurst()) {
                         underflowCount++;
                     } else {
                         fifo->write(mDistributionBuffer, getFramesPerBurst());
                     }
-                    sharedStream->markTransferTime(AudioClock::getNanoseconds());
+
+                    // This timestamp represents the completion of data being written into the
+                    // client buffer. It is sent to the client and used in the timing model
+                    // to decide when data will be available to read.
+                    Timestamp timestamp(fifo->getWriteCounter(), AudioClock::getNanoseconds());
+                    clientStream->markTransferTime(timestamp);
                 }
             }
         }

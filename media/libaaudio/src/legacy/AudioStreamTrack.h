@@ -67,7 +67,7 @@ public:
         return AAUDIO_DIRECTION_OUTPUT;
     }
 
-    aaudio_result_t updateStateWhileWaiting() override;
+    aaudio_result_t updateStateMachine() override;
 
     // This is public so it can be called from the C callback function.
     void processCallback(int event, void *info) override;
@@ -81,8 +81,7 @@ private:
     // adapts between variable sized blocks and fixed size blocks
     FixedBlockReader                 mFixedBlockReader;
 
-    // TODO add 64-bit position reporting to AudioRecord and use it.
-    aaudio_wrapping_frames_t         mPositionWhenStarting = 0;
+    // TODO add 64-bit position reporting to AudioTrack and use it.
     aaudio_wrapping_frames_t         mPositionWhenPausing = 0;
 };
 

@@ -29,24 +29,28 @@ class String8;
 
 namespace ReportPerformance {
 
-const int kMsPerSec = 1000;
+constexpr int kMsPerSec = 1000;
 
-// stores a histogram: key: observed buffer period. value: count
+constexpr int kJiffyPerMs = 10; // time unit for histogram as a multiple of milliseconds
+
+// stores a histogram: key: observed buffer period (multiple of jiffy). value: count
 // TODO: unsigned, unsigned
 using Histogram = std::map<int, int>;
 
-using outlierInterval = uint64_t;
-// int64_t timestamps are converted to uint64_t in PerformanceAnalysis::storeOutlierData,
-// and all analysis functions use uint64_t.
-using timestamp = uint64_t;
-using timestamp_raw = int64_t;
+using msInterval = double;
+using jiffyInterval = double;
 
-// FIXME: decide whether to use 64 or 32 bits
-// TODO: the code has a mix of typedef and using. Standardize to one or the other.
-typedef uint64_t log_hash_t;
+using timestamp = int64_t;
 
+using log_hash_t = uint64_t;
+
+// TODO: should this return an int64_t?
 static inline int deltaMs(int64_t ns1, int64_t ns2) {
     return (ns2 - ns1) / (1000 * 1000);
+}
+
+static inline int deltaJiffy(int64_t ns1, int64_t ns2) {
+    return (kJiffyPerMs * (ns2 - ns1)) / (1000 * 1000);
 }
 
 static inline uint32_t log2(uint32_t x) {
@@ -54,12 +58,10 @@ static inline uint32_t log2(uint32_t x) {
     return 31 - __builtin_clz(x);
 }
 
-// TODO: delete dump in NBLog::Reader and add it here
-
 // Writes outlier intervals, timestamps, and histograms spanning long time
 // intervals to a file.
 void writeToFile(const std::deque<std::pair<timestamp, Histogram>> &hists,
-                 const std::deque<std::pair<outlierInterval, timestamp>> &outlierData,
+                 const std::deque<std::pair<msInterval, timestamp>> &outlierData,
                  const std::deque<timestamp> &peakTimestamps,
                  const char * kDirectory, bool append, int author, log_hash_t hash);
 

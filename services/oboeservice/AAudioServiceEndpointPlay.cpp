@@ -73,17 +73,31 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
     while (mCallbackEnabled.load() && getStreamInternal()->isActive() && (result >= 0)) {
         // Mix data from each active stream.
         mMixer.clear();
-        { // use lock guard
+        { // brackets are for lock_guard
             int index = 0;
+            int64_t mmapFramesWritten = getStreamInternal()->getFramesWritten();
+
             std::lock_guard <std::mutex> lock(mLockStreams);
-            for (sp<AAudioServiceStreamShared> sharedStream : mRegisteredStreams) {
-                if (sharedStream->isRunning()) {
-                    FifoBuffer *fifo = sharedStream->getDataFifoBuffer();
+            for (sp<AAudioServiceStreamShared> clientStream : mRegisteredStreams) {
+                if (clientStream->isRunning()) {
+                    FifoBuffer *fifo = clientStream->getDataFifoBuffer();
+                    // Determine offset between framePosition in client's stream vs the underlying
+                    // MMAP stream.
+                    int64_t clientFramesRead = fifo->getReadCounter();
+                    // These two indices refer to the same frame.
+                    int64_t positionOffset = mmapFramesWritten - clientFramesRead;
+                    clientStream->setTimestampPositionOffset(positionOffset);
+
                     float volume = 1.0; // to match legacy volume
                     bool underflowed = mMixer.mix(index, fifo, volume);
                     underflowCount += underflowed ? 1 : 0;
                     // TODO log underflows in each stream
-                    sharedStream->markTransferTime(AudioClock::getNanoseconds());
+
+                    // This timestamp represents the completion of data being read out of the
+                    // client buffer. It is sent to the client and used in the timing model
+                    // to decide when the client has room to write more data.
+                    Timestamp timestamp(fifo->getReadCounter(), AudioClock::getNanoseconds());
+                    clientStream->markTransferTime(timestamp);
                 }
                 index++;
             }

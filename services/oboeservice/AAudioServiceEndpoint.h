@@ -69,6 +69,8 @@ public:
         mReferenceCount = count;
     }
 
+    aaudio_result_t getTimestamp(int64_t *positionFrames, int64_t *timeNanos);
+
     bool matches(const AAudioStreamConfiguration& configuration);
 
     virtual AudioStreamInternal *getStreamInternal() = 0;
