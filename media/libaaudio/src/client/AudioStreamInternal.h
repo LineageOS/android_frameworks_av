@@ -50,7 +50,7 @@ public:
                                        int64_t *framePosition,
                                        int64_t *timeNanoseconds) override;
 
-    virtual aaudio_result_t updateStateWhileWaiting() override;
+    virtual aaudio_result_t updateStateMachine() override;
 
     aaudio_result_t open(const AudioStreamBuilder &builder) override;
 
@@ -122,7 +122,9 @@ protected:
 
     aaudio_result_t onEventFromServer(AAudioServiceMessage *message);
 
-    aaudio_result_t onTimestampFromServer(AAudioServiceMessage *message);
+    aaudio_result_t onTimestampService(AAudioServiceMessage *message);
+
+    aaudio_result_t onTimestampHardware(AAudioServiceMessage *message);
 
     void logTimestamp(AAudioServiceMessage &message);
 
@@ -181,6 +183,11 @@ private:
 
     AudioEndpointParcelable  mEndPointParcelable; // description of the buffers filled by service
     EndpointDescriptor       mEndpointDescriptor; // buffer description with resolved addresses
+
+    SimpleDoubleBuffer<Timestamp>  mAtomicTimestamp;
+
+    int64_t                  mServiceLatencyNanos = 0;
+
 };
 
 } /* namespace aaudio */

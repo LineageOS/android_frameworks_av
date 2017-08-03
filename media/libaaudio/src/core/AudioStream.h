@@ -68,10 +68,10 @@ public:
 
 
     /**
-     * Update state while in the middle of waitForStateChange()
+     * Update state machine.()
      * @return
      */
-    virtual aaudio_result_t updateStateWhileWaiting() = 0;
+    virtual aaudio_result_t updateStateMachine() = 0;
 
 
     // =========== End ABSTRACT methods ===========================

@@ -183,6 +183,9 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
         actualPerformanceMode = AAUDIO_PERFORMANCE_MODE_POWER_SAVING;
     }
     setPerformanceMode(actualPerformanceMode);
+
+    setSharingMode(AAUDIO_SHARING_MODE_SHARED); // EXCLUSIVE mode not supported in legacy
+
     // Log warning if we did not get what we asked for.
     ALOGW_IF(actualFlags != flags,
              "AudioStreamTrack::open() flags changed from 0x%08X to 0x%08X",
@@ -296,7 +299,7 @@ aaudio_result_t AudioStreamTrack::requestStop() {
     return AAUDIO_OK;
 }
 
-aaudio_result_t AudioStreamTrack::updateStateWhileWaiting()
+aaudio_result_t AudioStreamTrack::updateStateMachine()
 {
     status_t err;
     aaudio_wrapping_frames_t position;
@@ -373,6 +376,12 @@ aaudio_result_t AudioStreamTrack::write(const void *buffer,
     }
     int32_t framesWritten = (int32_t)(bytesWritten / bytesPerFrame);
     incrementFramesWritten(framesWritten);
+
+    result = updateStateMachine();
+    if (result != AAUDIO_OK) {
+        return result;
+    }
+
     return framesWritten;
 }
 

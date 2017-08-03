@@ -102,6 +102,8 @@ class StreamHalHidl : public virtual StreamHalInterface, public ConversionHelper
     // The destructor automatically closes the stream.
     virtual ~StreamHalHidl();
 
+    status_t getCachedBufferSize(size_t *size);
+
     bool requestHalThreadPriority(pid_t threadPid, pid_t threadId);
 
     // mStreamPowerLog is used for audio signal power logging.
@@ -111,6 +113,7 @@ class StreamHalHidl : public virtual StreamHalInterface, public ConversionHelper
     const int HAL_THREAD_PRIORITY_DEFAULT = -1;
     IStream *mStream;
     int mHalThreadPriority;
+    size_t mCachedBufferSize;
 };
 
 class StreamOutHalHidl : public StreamOutHalInterface, public StreamHalHidl {
