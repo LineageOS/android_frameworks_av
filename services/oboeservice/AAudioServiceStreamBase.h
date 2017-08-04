@@ -54,7 +54,10 @@ public:
         ILLEGAL_THREAD_ID = 0
     };
 
-    std::string dump() const;
+    static std::string dumpHeader();
+
+    // does not include EOL
+    virtual std::string dump() const;
 
     // -------------------------------------------------------------------
     /**

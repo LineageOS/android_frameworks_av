@@ -18,6 +18,8 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include <iomanip>
+#include <iostream>
 #include <mutex>
 
 #include <aaudio/AAudio.h>
@@ -42,7 +44,30 @@ using namespace aaudio;
 AAudioServiceStreamShared::AAudioServiceStreamShared(AAudioService &audioService)
     : mAudioService(audioService)
     , mTimestampPositionOffset(0)
+    , mXRunCount(0)
     {
+}
+
+std::string AAudioServiceStreamShared::dumpHeader() {
+    std::stringstream result;
+    result << AAudioServiceStreamBase::dumpHeader();
+    result << "    Write#     Read#   Avail   XRuns";
+    return result.str();
+}
+
+std::string AAudioServiceStreamShared::dump() const {
+    std::stringstream result;
+    result << AAudioServiceStreamBase::dump();
+
+    auto fifo = mAudioDataQueue->getFifoBuffer();
+    int32_t readCounter = fifo->getReadCounter();
+    int32_t writeCounter = fifo->getWriteCounter();
+    result << std::setw(10) << writeCounter;
+    result << std::setw(10) << readCounter;
+    result << std::setw(8) << (writeCounter - readCounter);
+    result << std::setw(8) << getXRunCount();
+
+    return result.str();
 }
 
 int32_t AAudioServiceStreamShared::calculateBufferCapacity(int32_t requestedCapacityFrames,
@@ -197,6 +222,7 @@ aaudio_result_t AAudioServiceStreamShared::start()  {
     }
     AAudioServiceEndpoint *endpoint = mServiceEndpoint;
     if (endpoint == nullptr) {
+        ALOGE("AAudioServiceStreamShared::start() missing endpoint");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     // For output streams, this will add the stream to the mixer.
@@ -224,6 +250,7 @@ aaudio_result_t AAudioServiceStreamShared::pause()  {
     }
     AAudioServiceEndpoint *endpoint = mServiceEndpoint;
     if (endpoint == nullptr) {
+        ALOGE("AAudioServiceStreamShared::pause() missing endpoint");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     endpoint->getStreamInternal()->stopClient(mClientHandle);
@@ -241,6 +268,7 @@ aaudio_result_t AAudioServiceStreamShared::stop()  {
     }
     AAudioServiceEndpoint *endpoint = mServiceEndpoint;
     if (endpoint == nullptr) {
+        ALOGE("AAudioServiceStreamShared::stop() missing endpoint");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     endpoint->getStreamInternal()->stopClient(mClientHandle);
@@ -260,6 +288,7 @@ aaudio_result_t AAudioServiceStreamShared::stop()  {
 aaudio_result_t AAudioServiceStreamShared::flush()  {
     AAudioServiceEndpoint *endpoint = mServiceEndpoint;
     if (endpoint == nullptr) {
+        ALOGE("AAudioServiceStreamShared::flush() missing endpoint");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     if (mState != AAUDIO_STREAM_STATE_PAUSED) {

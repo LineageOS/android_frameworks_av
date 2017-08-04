@@ -53,7 +53,7 @@ static void * AAudioThread_internalThreadProc(void *arg) {
 
 aaudio_result_t AAudioThread::start(Runnable *runnable) {
     if (mHasThread) {
-        ALOGE("AAudioThread::start() - mHasThread.load() already true");
+        ALOGE("AAudioThread::start() - mHasThread already true");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     // mRunnable will be read by the new thread when it starts.
@@ -71,6 +71,7 @@ aaudio_result_t AAudioThread::start(Runnable *runnable) {
 
 aaudio_result_t AAudioThread::stop() {
     if (!mHasThread) {
+        ALOGE("AAudioThread::stop() but no thread running");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     int err = pthread_join(mThread, nullptr);

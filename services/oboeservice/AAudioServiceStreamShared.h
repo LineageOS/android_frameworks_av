@@ -46,6 +46,10 @@ public:
     AAudioServiceStreamShared(android::AAudioService &aAudioService);
     virtual ~AAudioServiceStreamShared() = default;
 
+    static std::string dumpHeader();
+
+    std::string dump() const override;
+
     aaudio_result_t open(const aaudio::AAudioStreamRequest &request,
                          aaudio::AAudioStreamConfiguration &configurationOutput) override;
 
@@ -91,6 +95,14 @@ public:
         mTimestampPositionOffset.store(deltaFrames);
     }
 
+    void incrementXRunCount() {
+        mXRunCount++;
+    }
+
+    int32_t getXRunCount() const {
+        return mXRunCount.load();
+    }
+
 protected:
 
     aaudio_result_t getDownDataDescription(AudioEndpointParcelable &parcelable) override;
@@ -114,6 +126,7 @@ private:
     SharedRingBuffer        *mAudioDataQueue = nullptr;
 
     std::atomic<int64_t>     mTimestampPositionOffset;
+    std::atomic<int32_t>     mXRunCount;
 };
 
 } /* namespace aaudio */

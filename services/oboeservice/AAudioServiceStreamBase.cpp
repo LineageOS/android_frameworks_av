@@ -18,6 +18,8 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include <iomanip>
+#include <iostream>
 #include <mutex>
 
 #include "binding/IAAudioService.h"
@@ -54,16 +56,22 @@ AAudioServiceStreamBase::~AAudioServiceStreamBase() {
                         "service stream still open, state = %d", mState);
 }
 
+std::string AAudioServiceStreamBase::dumpHeader() {
+    return std::string("    T   Handle   UId Run State Format Burst Chan Capacity");
+}
+
 std::string AAudioServiceStreamBase::dump() const {
     std::stringstream result;
 
-    result << "      -------- handle = 0x" << std::hex << mHandle << std::dec << "\n";
-    result << "      state          = " << AAudio_convertStreamStateToText(mState) << "\n";
-    result << "      format         = " << mAudioFormat << "\n";
-    result << "      framesPerBurst = " << mFramesPerBurst << "\n";
-    result << "      channelCount   = " << mSamplesPerFrame << "\n";
-    result << "      capacityFrames = " << mCapacityInFrames << "\n";
-    result << "      owner uid      = " << mMmapClient.clientUid << "\n";
+    result << "    0x" << std::setfill('0') << std::setw(8) << std::hex << mHandle
+           << std::dec << std::setfill(' ') ;
+    result << std::setw(6) << mMmapClient.clientUid;
+    result << std::setw(4) << (isRunning() ? "yes" : " no");
+    result << std::setw(6) << mState;
+    result << std::setw(7) << mAudioFormat;
+    result << std::setw(6) << mFramesPerBurst;
+    result << std::setw(5) << mSamplesPerFrame;
+    result << std::setw(9) << mCapacityInFrames;
 
     return result.str();
 }
