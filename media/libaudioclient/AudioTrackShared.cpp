@@ -111,7 +111,8 @@ __attribute__((no_sanitize("integer")))
 status_t ClientProxy::obtainBuffer(Buffer* buffer, const struct timespec *requested,
         struct timespec *elapsed)
 {
-    LOG_ALWAYS_FATAL_IF(buffer == NULL || buffer->mFrameCount == 0);
+    LOG_ALWAYS_FATAL_IF(buffer == NULL || buffer->mFrameCount == 0,
+            "%s: null or zero frame buffer, buffer:%p", __func__, buffer);
     struct timespec total;          // total elapsed time spent waiting
     total.tv_sec = 0;
     total.tv_nsec = 0;
@@ -345,7 +346,10 @@ void ClientProxy::releaseBuffer(Buffer* buffer)
         buffer->mNonContig = 0;
         return;
     }
-    LOG_ALWAYS_FATAL_IF(!(stepCount <= mUnreleased && mUnreleased <= mFrameCount));
+    LOG_ALWAYS_FATAL_IF(!(stepCount <= mUnreleased && mUnreleased <= mFrameCount),
+            "%s: mUnreleased out of range, "
+            "!(stepCount:%zu <= mUnreleased:%zu <= mFrameCount:%zu), BufferSizeInFrames:%u",
+            __func__, stepCount, mUnreleased, mFrameCount, getBufferSizeInFrames());
     mUnreleased -= stepCount;
     audio_track_cblk_t* cblk = mCblk;
     // Both of these barriers are required
@@ -675,7 +679,8 @@ void ServerProxy::flushBufferIfNeeded()
 __attribute__((no_sanitize("integer")))
 status_t ServerProxy::obtainBuffer(Buffer* buffer, bool ackFlush)
 {
-    LOG_ALWAYS_FATAL_IF(buffer == NULL || buffer->mFrameCount == 0);
+    LOG_ALWAYS_FATAL_IF(buffer == NULL || buffer->mFrameCount == 0,
+            "%s: null or zero frame buffer, buffer:%p", __func__, buffer);
     if (mIsShutdown) {
         goto no_init;
     }
@@ -761,7 +766,10 @@ void ServerProxy::releaseBuffer(Buffer* buffer)
         buffer->mNonContig = 0;
         return;
     }
-    LOG_ALWAYS_FATAL_IF(!(stepCount <= mUnreleased && mUnreleased <= mFrameCount));
+    LOG_ALWAYS_FATAL_IF(!(stepCount <= mUnreleased && mUnreleased <= mFrameCount),
+            "%s: mUnreleased out of range, "
+            "!(stepCount:%zu <= mUnreleased:%zu <= mFrameCount:%zu)",
+            __func__, stepCount, mUnreleased, mFrameCount);
     mUnreleased -= stepCount;
     audio_track_cblk_t* cblk = mCblk;
     if (mIsOut) {
@@ -1056,7 +1064,9 @@ status_t StaticAudioTrackServerProxy::obtainBuffer(Buffer* buffer, bool ackFlush
     }
     // As mFramesReady is the total remaining frames in the static audio track,
     // it is always larger or equal to avail.
-    LOG_ALWAYS_FATAL_IF(mFramesReady < (int64_t) avail);
+    LOG_ALWAYS_FATAL_IF(mFramesReady < (int64_t) avail,
+            "%s: mFramesReady out of range, mFramesReady:%lld < avail:%zu",
+            __func__, (long long)mFramesReady, avail);
     buffer->mNonContig = mFramesReady == INT64_MAX ? SIZE_MAX : clampToSize(mFramesReady - avail);
     if (!ackFlush) {
         mUnreleased = avail;
@@ -1068,8 +1078,14 @@ __attribute__((no_sanitize("integer")))
 void StaticAudioTrackServerProxy::releaseBuffer(Buffer* buffer)
 {
     size_t stepCount = buffer->mFrameCount;
-    LOG_ALWAYS_FATAL_IF(!((int64_t) stepCount <= mFramesReady));
-    LOG_ALWAYS_FATAL_IF(!(stepCount <= mUnreleased));
+    LOG_ALWAYS_FATAL_IF(!((int64_t) stepCount <= mFramesReady),
+            "%s: stepCount out of range, "
+            "!(stepCount:%zu <= mFramesReady:%lld)",
+            __func__, stepCount, (long long)mFramesReady);
+    LOG_ALWAYS_FATAL_IF(!(stepCount <= mUnreleased),
+            "%s: stepCount out of range, "
+            "!(stepCount:%zu <= mUnreleased:%zu)",
+            __func__, stepCount, mUnreleased);
     if (stepCount == 0) {
         // prevent accidental re-use of buffer
         buffer->mRaw = NULL;
