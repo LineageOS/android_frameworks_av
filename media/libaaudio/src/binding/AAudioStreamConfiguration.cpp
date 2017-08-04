@@ -46,6 +46,8 @@ status_t AAudioStreamConfiguration::writeToParcel(Parcel* parcel) const {
     if (status != NO_ERROR) goto error;
     status = parcel->writeInt32((int32_t) getFormat());
     if (status != NO_ERROR) goto error;
+    status = parcel->writeInt32((int32_t) getDirection());
+    if (status != NO_ERROR) goto error;
     status = parcel->writeInt32(getBufferCapacity());
     if (status != NO_ERROR) goto error;
     return NO_ERROR;
@@ -71,6 +73,9 @@ status_t AAudioStreamConfiguration::readFromParcel(const Parcel* parcel) {
     status = parcel->readInt32(&value);
     if (status != NO_ERROR) goto error;
     setFormat(value);
+    status = parcel->readInt32(&value);
+    if (status != NO_ERROR) goto error;
+    setDirection((aaudio_direction_t) value);
     status = parcel->readInt32(&value);
     if (status != NO_ERROR) goto error;
     setBufferCapacity(value);

@@ -24,72 +24,93 @@
 
 #include "client/AudioStreamInternal.h"
 #include "client/AudioStreamInternalPlay.h"
+#include "core/AAudioStreamParameters.h"
 #include "binding/AAudioServiceMessage.h"
-#include "AAudioServiceStreamShared.h"
-#include "AAudioServiceStreamMMAP.h"
-#include "AAudioMixer.h"
-#include "AAudioService.h"
+#include "binding/AAudioStreamConfiguration.h"
+
+#include "AAudioServiceStreamBase.h"
 
 namespace aaudio {
 
-class AAudioServiceEndpoint {
+/**
+ * AAudioServiceEndpoint is used by a subclass of AAudioServiceStreamBase
+ * to communicate with the underlying audio device or port.
+ */
+class AAudioServiceEndpoint
+        : public virtual android::RefBase
+        , public AAudioStreamParameters {
 public:
-    virtual ~AAudioServiceEndpoint() = default;
 
-    std::string dump() const;
+    virtual ~AAudioServiceEndpoint();
 
-    virtual aaudio_result_t open(const AAudioStreamConfiguration& configuration);
+    virtual std::string dump() const;
 
-    int32_t getSampleRate() const { return mStreamInternal->getSampleRate(); }
-    int32_t getSamplesPerFrame() const { return mStreamInternal->getSamplesPerFrame();  }
-    int32_t getFramesPerBurst() const { return mStreamInternal->getFramesPerBurst();  }
+    virtual aaudio_result_t open(const aaudio::AAudioStreamRequest &request) = 0;
 
-    aaudio_result_t registerStream(android::sp<AAudioServiceStreamShared> sharedStream);
-    aaudio_result_t unregisterStream(android::sp<AAudioServiceStreamShared> sharedStream);
-    aaudio_result_t startStream(android::sp<AAudioServiceStreamShared> sharedStream);
-    aaudio_result_t stopStream(android::sp<AAudioServiceStreamShared> sharedStream);
-    aaudio_result_t close();
+    virtual aaudio_result_t close() = 0;
+
+    virtual aaudio_result_t registerStream(android::sp<AAudioServiceStreamBase> stream);
+
+    virtual aaudio_result_t unregisterStream(android::sp<AAudioServiceStreamBase> stream);
+
+    virtual aaudio_result_t startStream(android::sp<AAudioServiceStreamBase> stream,
+                                        audio_port_handle_t *clientHandle) = 0;
+
+    virtual aaudio_result_t stopStream(android::sp<AAudioServiceStreamBase> stream,
+                                       audio_port_handle_t clientHandle) = 0;
+
+    virtual aaudio_result_t startClient(const android::AudioClient& client,
+                                        audio_port_handle_t *clientHandle) {
+        ALOGD("AAudioServiceEndpoint::startClient(%p, ...) AAUDIO_ERROR_UNAVAILABLE", &client);
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
+    virtual aaudio_result_t stopClient(audio_port_handle_t clientHandle) {
+        ALOGD("AAudioServiceEndpoint::stopClient(...) AAUDIO_ERROR_UNAVAILABLE");
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
+    /**
+     * @param positionFrames
+     * @param timeNanos
+     * @return AAUDIO_OK or AAUDIO_ERROR_UNAVAILABLE or other negative error
+     */
+    virtual aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) = 0;
+
+    virtual aaudio_result_t getTimestamp(int64_t *positionFrames, int64_t *timeNanos) = 0;
+
+    int32_t getFramesPerBurst() const {
+        return mFramesPerBurst;
+    }
 
     int32_t getRequestedDeviceId() const { return mRequestedDeviceId; }
-    int32_t getDeviceId() const { return mStreamInternal->getDeviceId(); }
-
-    aaudio_direction_t getDirection() const { return mStreamInternal->getDirection(); }
-
-    void disconnectRegisteredStreams();
-
-    virtual void *callbackLoop() = 0;
-
-    // This should only be called from the AAudioEndpointManager under a mutex.
-    int32_t getReferenceCount() const {
-        return mReferenceCount;
-    }
-
-    // This should only be called from the AAudioEndpointManager under a mutex.
-    void setReferenceCount(int32_t count) {
-        mReferenceCount = count;
-    }
-
-    aaudio_result_t getTimestamp(int64_t *positionFrames, int64_t *timeNanos);
 
     bool matches(const AAudioStreamConfiguration& configuration);
 
-    virtual AudioStreamInternal *getStreamInternal() = 0;
+    // This should only be called from the AAudioEndpointManager under a mutex.
+    int32_t getOpenCount() const {
+        return mOpenCount;
+    }
 
-    std::atomic<bool>        mCallbackEnabled{false};
+    // This should only be called from the AAudioEndpointManager under a mutex.
+    void setOpenCount(int32_t count) {
+        mOpenCount = count;
+    }
+
+protected:
+    void                     disconnectRegisteredStreams();
 
     mutable std::mutex       mLockStreams;
+    std::vector<android::sp<AAudioServiceStreamBase>> mRegisteredStreams;
 
-    std::vector<android::sp<AAudioServiceStreamShared>> mRegisteredStreams;
+    SimpleDoubleBuffer<Timestamp>  mAtomicTimestamp;
 
-    std::atomic<int>         mRunningStreams{0};
+    android::AudioClient     mMmapClient;   // set in open, used in open and startStream
 
-private:
-    aaudio_result_t startSharingThread_l();
-    aaudio_result_t stopSharingThread();
-
-    AudioStreamInternal     *mStreamInternal = nullptr;
-    int32_t                  mReferenceCount = 0;
+    int32_t                  mFramesPerBurst = 0;
+    int32_t                  mOpenCount = 0;
     int32_t                  mRequestedDeviceId = 0;
+
 };
 
 } /* namespace aaudio */
