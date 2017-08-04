@@ -200,7 +200,7 @@ status_t Camera3SharedOutputStream::getEndpointUsage(uint32_t *usage) const {
         // Called before shared buffer queue is constructed.
         *usage = getPresetConsumerUsage();
 
-        for (auto surface : mSurfaces) {
+        for (const auto& surface : mSurfaces) {
             if (surface != nullptr) {
                 res = getEndpointUsageForSurface(&u, surface);
                 *usage |= u;

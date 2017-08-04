@@ -65,7 +65,7 @@ std::string AAudioServiceEndpoint::dump() const {
 
     result << "    Registered Streams:" << "\n";
     result << AAudioServiceStreamShared::dumpHeader() << "\n";
-    for (sp<AAudioServiceStreamShared> sharedStream : mRegisteredStreams) {
+    for (const sp<AAudioServiceStreamShared>& sharedStream : mRegisteredStreams) {
         result << sharedStream->dump() << "\n";
     }
 
@@ -158,7 +158,7 @@ aaudio_result_t AAudioServiceEndpoint::stopSharingThread() {
 
 void AAudioServiceEndpoint::disconnectRegisteredStreams() {
     std::lock_guard<std::mutex> lock(mLockStreams);
-    for(auto sharedStream : mRegisteredStreams) {
+    for(const auto& sharedStream : mRegisteredStreams) {
         sharedStream->stop();
         sharedStream->disconnect();
     }

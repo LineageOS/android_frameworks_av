@@ -729,7 +729,7 @@ void Camera3OutputStream::onBuffersRemovedLocked(
         const std::vector<sp<GraphicBuffer>>& removedBuffers) {
     sp<Camera3StreamBufferFreedListener> callback = mBufferFreedListener.promote();
     if (callback != nullptr) {
-        for (auto gb : removedBuffers) {
+        for (const auto& gb : removedBuffers) {
             callback->onBufferFreed(mId, gb->handle);
         }
     }
