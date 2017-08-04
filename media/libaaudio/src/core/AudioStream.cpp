@@ -153,6 +153,7 @@ aaudio_result_t AudioStream::createThread(int64_t periodNanoseconds,
                                      void* threadArg)
 {
     if (mHasThread) {
+        ALOGE("AudioStream::createThread() - mHasThread already true");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     if (threadProc == nullptr) {
@@ -174,6 +175,7 @@ aaudio_result_t AudioStream::createThread(int64_t periodNanoseconds,
 aaudio_result_t AudioStream::joinThread(void** returnArg, int64_t timeoutNanoseconds)
 {
     if (!mHasThread) {
+        ALOGE("AudioStream::joinThread() - but has no thread");
         return AAUDIO_ERROR_INVALID_STATE;
     }
 #if 0

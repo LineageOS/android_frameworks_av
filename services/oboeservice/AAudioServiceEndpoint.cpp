@@ -64,8 +64,9 @@ std::string AAudioServiceEndpoint::dump() const {
     }
 
     result << "    Registered Streams:" << "\n";
+    result << AAudioServiceStreamShared::dumpHeader() << "\n";
     for (sp<AAudioServiceStreamShared> sharedStream : mRegisteredStreams) {
-        result << sharedStream->dump();
+        result << sharedStream->dump() << "\n";
     }
 
     if (isLocked) {
