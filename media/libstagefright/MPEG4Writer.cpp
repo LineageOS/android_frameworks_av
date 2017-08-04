@@ -127,7 +127,7 @@ public:
 
 private:
     enum {
-        kMaxCttsOffsetTimeUs = 2000000LL,  // 2 seconds
+        kMaxCttsOffsetTimeUs = 1000000LL,  // 1 second
         kSampleArraySize = 1000,
     };
 
