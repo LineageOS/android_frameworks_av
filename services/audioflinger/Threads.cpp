@@ -2636,6 +2636,7 @@ void AudioFlinger::PlaybackThread::checkSilentMode_l()
 // shared by MIXER and DIRECT, overridden by DUPLICATING
 ssize_t AudioFlinger::PlaybackThread::threadLoop_write()
 {
+    LOG_HIST_TS();
     mInWrite = true;
     ssize_t bytesWritten;
     const size_t offset = mCurrentWriteLength - mBytesRemaining;
@@ -3114,6 +3115,10 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 
                     threadLoop_standby();
 
+                    // This is where we go into standby
+                    if (!mStandby) {
+                        LOG_AUDIO_STATE();
+                    }
                     mStandby = true;
                 }
 
@@ -5429,7 +5434,7 @@ AudioFlinger::OffloadThread::OffloadThread(const sp<AudioFlinger>& audioFlinger,
         mPausedWriteLength(0), mPausedBytesRemaining(0), mKeepWakeLock(true),
         mOffloadUnderrunPosition(~0LL)
 {
-    //FIXME: mStandby should be set to true by ThreadBase constructor
+    //FIXME: mStandby should be set to true by ThreadBase constructo
     mStandby = true;
     mKeepWakeLock = property_get_bool("ro.audio.offload_wakelock", true /* default_value */);
 }

@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 
-// Non-blocking event logger intended for safe communication between
-// processes via shared memory
-
 #ifndef ANDROID_MEDIA_PERFORMANCEANALYSIS_H
 #define ANDROID_MEDIA_PERFORMANCEANALYSIS_H
 
@@ -78,12 +75,8 @@ public:
     // Generates a string of analysis of the buffer periods and prints to console
     // TODO: WIP write more detailed analysis
     // FIXME: move this data visualization to a separate class. Model/view/controller
-    void reportPerformance(String8 *body, int maxHeight = 10);
-
-    // This function detects glitches in a time series.
-    // TODO: learn what timestamp sequences correlate with glitches instead of
-    // manually designing a heuristic. Ultimately, detect glitches directly from audio.
-    // void alertIfGlitch(const std::vector<timestamp_raw> &samples);
+    void reportPerformance(String8 *body, int author, log_hash_t hash,
+                           int maxHeight = 10);
 
 private:
 
@@ -107,15 +100,6 @@ private:
         double    mOutlier = -1;       // this is set to mMean * mOutlierFactor
         timestamp mPrevTs = -1;        // previous timestamp
     } mBufferPeriod;
-
-    // TODO: delete values below if unused or add them to the BufferPeriod struct
-    // FIXME: decide whether to make kPeriodMs static.
-    // static const int kNumBuff = 3; // number of buffers considered in local history
-    // int kPeriodMs; // current period length is ideally 4 ms
-    // static const int kOutlierMs = 7; // values greater or equal to this cause glitches
-    // DAC processing time for 4 ms buffer
-    // static constexpr double kRatio = 0.75; // estimate CPU time as ratio of period
-    // int kPeriodMsCPU; // compute based on kPeriodLen and kRatio
 
     // capacity allocated to data structures
     // TODO: make these values longer when testing is finished
