@@ -230,6 +230,7 @@ aaudio_result_t AudioStreamTrack::requestStart()
     std::lock_guard<std::mutex> lock(mStreamMutex);
 
     if (mAudioTrack.get() == nullptr) {
+        ALOGE("AudioStreamTrack::requestStart() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     // Get current position so we can detect when the track is playing.
@@ -253,6 +254,7 @@ aaudio_result_t AudioStreamTrack::requestPause()
     std::lock_guard<std::mutex> lock(mStreamMutex);
 
     if (mAudioTrack.get() == nullptr) {
+        ALOGE("AudioStreamTrack::requestPause() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
     } else if (getState() != AAUDIO_STREAM_STATE_STARTING
             && getState() != AAUDIO_STREAM_STATE_STARTED) {
@@ -274,8 +276,10 @@ aaudio_result_t AudioStreamTrack::requestFlush() {
     std::lock_guard<std::mutex> lock(mStreamMutex);
 
     if (mAudioTrack.get() == nullptr) {
+        ALOGE("AudioStreamTrack::requestFlush() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
     } else if (getState() != AAUDIO_STREAM_STATE_PAUSED) {
+        ALOGE("AudioStreamTrack::requestFlush() not paused");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     setState(AAUDIO_STREAM_STATE_FLUSHING);
@@ -289,6 +293,7 @@ aaudio_result_t AudioStreamTrack::requestStop() {
     std::lock_guard<std::mutex> lock(mStreamMutex);
 
     if (mAudioTrack.get() == nullptr) {
+        ALOGE("AudioStreamTrack::requestStop() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     onStop();
