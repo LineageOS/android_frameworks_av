@@ -1,5 +1,6 @@
 cc_library_static {
     name: "libstagefright_amrnbenc",
+    vendor_available: true,
 
     srcs: [
         "src/amrencode.cpp",
@@ -83,6 +84,10 @@ cc_library_static {
 
 cc_library_shared {
     name: "libstagefright_soft_amrnbenc",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     srcs: ["SoftAMRNBEncoder.cpp"],
 

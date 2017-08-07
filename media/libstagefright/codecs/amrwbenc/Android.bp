@@ -1,5 +1,6 @@
 cc_library_static {
     name: "libstagefright_amrwbenc",
+    vendor_available: true,
 
     srcs: [
         "src/autocorr.c",
@@ -144,6 +145,10 @@ cc_library_static {
 
 cc_library_shared {
     name: "libstagefright_soft_amrwbenc",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     srcs: ["SoftAMRWBEncoder.cpp"],
 
