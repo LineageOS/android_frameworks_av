@@ -37,6 +37,10 @@ namespace android {
 
 namespace ReportPerformance {
 
+
+// TODO: use a function like this to extract logic from writeToFile
+// https://stackoverflow.com/a/9279620
+
 // Writes outlier intervals, timestamps, and histograms spanning long time intervals to file.
 // TODO: write data in binary format
 void writeToFile(const std::deque<std::pair<timestamp, Histogram>> &hists,
@@ -80,13 +84,18 @@ void writeToFile(const std::deque<std::pair<timestamp, Histogram>> &hists,
     // each histogram is written as a line where the first value is the timestamp and
     // subsequent values are pairs of buckets and counts. Each value is separated
     // by a comma, and each histogram is separated by a newline.
-    for (const auto &hist : hists) {
-        hfs << hist.first << ", ";
-        for (const auto &bucket : hist.second) {
-            hfs << bucket.first / static_cast<double>(kJiffyPerMs)
-                    << ", " << bucket.second << ", ";
+    for (auto hist = hists.begin(); hist != hists.end(); ++hist) {
+        hfs << hist->first << ", ";
+        for (auto bucket = hist->second.begin(); bucket != hist->second.end(); ++bucket) {
+            hfs << bucket->first / static_cast<double>(kJiffyPerMs)
+                << ", " << bucket->second;
+            if (std::next(bucket) != end(hist->second)) {
+                hfs << ", ";
+            }
         }
-        hfs << "\n";
+        if (std::next(hist) != end(hists)) {
+            hfs << "\n";
+        }
     }
     hfs.close();
 
@@ -110,8 +119,11 @@ void writeToFile(const std::deque<std::pair<timestamp, Histogram>> &hists,
         return;
     }
     // peaks are simply timestamps separated by commas
-    for (const auto &peak : peakTimestamps) {
-        pfs << peak << ", ";
+    for (auto peak = peakTimestamps.begin(); peak != peakTimestamps.end(); ++peak) {
+        pfs << *peak;
+        if (std::next(peak) != end(peakTimestamps)) {
+            pfs << ", ";
+        }
     }
     pfs.close();
 }
