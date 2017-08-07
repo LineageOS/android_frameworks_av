@@ -101,7 +101,6 @@ AAUDIO_API const char * AAudio_convertStreamStateToText(aaudio_stream_state_t st
  */
 static aaudio_policy_t s_MMapPolicy = AAUDIO_UNSPECIFIED;
 
-
 static AudioStream *convertAAudioStreamToAudioStream(AAudioStream* stream)
 {
     return (AudioStream*) stream;
@@ -144,10 +143,16 @@ AAUDIO_API void AAudioStreamBuilder_setSampleRate(AAudioStreamBuilder* builder,
 }
 
 AAUDIO_API void AAudioStreamBuilder_setChannelCount(AAudioStreamBuilder* builder,
-                                                       int32_t channelCount)
+                                                    int32_t channelCount)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
     streamBuilder->setSamplesPerFrame(channelCount);
+}
+
+AAUDIO_API void AAudioStreamBuilder_setSamplesPerFrame(AAudioStreamBuilder* builder,
+                                                       int32_t channelCount)
+{
+    AAudioStreamBuilder_setChannelCount(builder, channelCount);
 }
 
 AAUDIO_API void AAudioStreamBuilder_setDirection(AAudioStreamBuilder* builder,
@@ -348,6 +353,11 @@ AAUDIO_API int32_t AAudioStream_getChannelCount(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getSamplesPerFrame();
+}
+
+AAUDIO_API int32_t AAudioStream_getSamplesPerFrame(AAudioStream* stream)
+{
+    return AAudioStream_getChannelCount(stream);
 }
 
 AAUDIO_API aaudio_stream_state_t AAudioStream_getState(AAudioStream* stream)
