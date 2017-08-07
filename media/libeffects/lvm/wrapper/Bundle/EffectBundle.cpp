@@ -148,7 +148,10 @@ int  Virtualizer_getParameter  (EffectContext *pContext,
                                void           *pParam,
                                uint32_t       *pValueSize,
                                void           *pValue);
-int  Equalizer_setParameter    (EffectContext *pContext, void *pParam, void *pValue);
+int  Equalizer_setParameter    (EffectContext *pContext,
+                               void *pParam,
+                               uint32_t valueSize,
+                               void *pValue);
 int  Equalizer_getParameter    (EffectContext *pContext,
                                 void          *pParam,
                                 uint32_t      *pValueSize,
@@ -2473,12 +2476,17 @@ int Equalizer_getParameter(EffectContext     *pContext,
 // Inputs:
 //  pEqualizer    - handle to instance data
 //  pParam        - pointer to parameter
+//  valueSize     - value size
 //  pValue        - pointer to value
+
 //
 // Outputs:
 //
 //----------------------------------------------------------------------------
-int Equalizer_setParameter (EffectContext *pContext, void *pParam, void *pValue){
+int Equalizer_setParameter (EffectContext *pContext,
+                            void *pParam,
+                            uint32_t valueSize,
+                            void *pValue) {
     int status = 0;
     int32_t preset;
     int32_t band;
@@ -2490,6 +2498,10 @@ int Equalizer_setParameter (EffectContext *pContext, void *pParam, void *pValue)
     //ALOGV("\tEqualizer_setParameter start");
     switch (param) {
     case EQ_PARAM_CUR_PRESET:
+        if (valueSize < sizeof(int16_t)) {
+          status = -EINVAL;
+          break;
+        }
         preset = (int32_t)(*(uint16_t *)pValue);
 
         //ALOGV("\tEqualizer_setParameter() EQ_PARAM_CUR_PRESET %d", preset);
@@ -2500,6 +2512,10 @@ int Equalizer_setParameter (EffectContext *pContext, void *pParam, void *pValue)
         EqualizerSetPreset(pContext, preset);
         break;
     case EQ_PARAM_BAND_LEVEL:
+        if (valueSize < sizeof(int16_t)) {
+          status = -EINVAL;
+          break;
+        }
         band =  *pParamTemp;
         level = (int32_t)(*(int16_t *)pValue);
         //ALOGV("\tEqualizer_setParameter() EQ_PARAM_BAND_LEVEL band %d, level %d", band, level);
@@ -2515,6 +2531,10 @@ int Equalizer_setParameter (EffectContext *pContext, void *pParam, void *pValue)
         break;
     case EQ_PARAM_PROPERTIES: {
         //ALOGV("\tEqualizer_setParameter() EQ_PARAM_PROPERTIES");
+        if (valueSize < sizeof(int16_t)) {
+          status = -EINVAL;
+          break;
+        }
         int16_t *p = (int16_t *)pValue;
         if ((int)p[0] >= EqualizerGetNumPresets()) {
             status = -EINVAL;
@@ -2523,6 +2543,13 @@ int Equalizer_setParameter (EffectContext *pContext, void *pParam, void *pValue)
         if (p[0] >= 0) {
             EqualizerSetPreset(pContext, (int)p[0]);
         } else {
+            if (valueSize < (2 + FIVEBAND_NUMBANDS) * sizeof(int16_t)) {
+              android_errorWriteLog(0x534e4554, "37563371");
+              ALOGE("\tERROR Equalizer_setParameter() EQ_PARAM_PROPERTIES valueSize %d < %d",
+                    (int)valueSize, (int)((2 + FIVEBAND_NUMBANDS) * sizeof(int16_t)));
+              status = -EINVAL;
+              break;
+            }
             if ((int)p[1] != FIVEBAND_NUMBANDS) {
                 status = -EINVAL;
                 break;
@@ -3311,7 +3338,8 @@ int Effect_command(effect_handle_t  self,
 
                 *(int *)pReplyData = android::Equalizer_setParameter(pContext,
                                                                     (void *)p->data,
-                                                                     p->data + p->psize);
+                                                                    p->vsize,
+                                                                    p->data + p->psize);
             }
             if(pContext->EffectType == LVM_VOLUME){
                 //ALOGV("\tVolume_command cmdCode Case: EFFECT_CMD_SET_PARAM start");
