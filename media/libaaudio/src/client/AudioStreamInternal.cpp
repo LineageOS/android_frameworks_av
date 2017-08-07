@@ -436,10 +436,14 @@ aaudio_result_t AudioStreamInternal::onEventFromServer(AAudioServiceMessage *mes
             setState(AAUDIO_STREAM_STATE_CLOSED);
             break;
         case AAUDIO_SERVICE_EVENT_DISCONNECTED:
+            // Prevent hardware from looping on old data and making buzzing sounds.
+            if (getDirection() == AAUDIO_DIRECTION_OUTPUT) {
+                mAudioEndpoint.eraseDataMemory();
+            }
             result = AAUDIO_ERROR_DISCONNECTED;
             setState(AAUDIO_STREAM_STATE_DISCONNECTED);
             ALOGW("WARNING - AudioStreamInternal::onEventFromServer()"
-                          " AAUDIO_SERVICE_EVENT_DISCONNECTED");
+                          " AAUDIO_SERVICE_EVENT_DISCONNECTED - FIFO cleared");
             break;
         case AAUDIO_SERVICE_EVENT_VOLUME:
             mStreamVolume = (float)message->event.dataDouble;
