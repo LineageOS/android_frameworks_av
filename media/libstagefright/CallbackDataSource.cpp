@@ -127,10 +127,6 @@ status_t TinyCacheSource::initCheck() const {
 }
 
 ssize_t TinyCacheSource::readAt(off64_t offset, void* data, size_t size) {
-    if (size >= kCacheSize) {
-        return mSource->readAt(offset, data, size);
-    }
-
     // Check if the cache satisfies the read.
     if (mCachedOffset <= offset
             && offset < (off64_t) (mCachedOffset + mCachedSize)) {
@@ -154,6 +150,9 @@ ssize_t TinyCacheSource::readAt(off64_t offset, void* data, size_t size) {
         }
     }
 
+    if (size >= kCacheSize) {
+        return mSource->readAt(offset, data, size);
+    }
 
     // Fill the cache and copy to the caller.
     const ssize_t numRead = mSource->readAt(offset, mCache, kCacheSize);

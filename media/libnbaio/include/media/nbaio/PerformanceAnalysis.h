@@ -102,16 +102,16 @@ private:
     } mBufferPeriod;
 
     // capacity allocated to data structures
-    // TODO: make these values longer when testing is finished
     struct MaxLength {
         size_t Hists; // number of histograms stored in memory
-        size_t TimeStamps; // histogram size
         size_t Outliers; // number of values stored in outlier array
         size_t Peaks; // number of values stored in peak array
         int HistTimespanMs; // maximum histogram timespan
     };
-    static constexpr MaxLength kMaxLength = {.Hists = 20, .TimeStamps = 1000,
-            .Outliers = 100, .Peaks = 100, .HistTimespanMs = 5 * kMsPerSec };
+    // These values allow for 10 hours of data allowing for a glitch and a peak
+    // as often as every 3 seconds
+    static constexpr MaxLength kMaxLength = {.Hists = 60, .Outliers = 12000,
+            .Peaks = 12000, .HistTimespanMs = 10 * kSecPerMin * kMsPerSec };
 
     // these variables ensure continuity while analyzing the timestamp
     // series one sample at a time.

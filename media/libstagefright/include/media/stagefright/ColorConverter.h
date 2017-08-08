@@ -49,14 +49,17 @@ private:
                 void *bits,
                 size_t width, size_t height,
                 size_t cropLeft, size_t cropTop,
-                size_t cropRight, size_t cropBottom);
+                size_t cropRight, size_t cropBottom,
+                OMX_COLOR_FORMATTYPE colorFromat);
 
         size_t cropWidth() const;
         size_t cropHeight() const;
 
         void *mBits;
+        OMX_COLOR_FORMATTYPE mColorFormat;
         size_t mWidth, mHeight;
         size_t mCropLeft, mCropTop, mCropRight, mCropBottom;
+        size_t mBpp, mStride;
     };
 
     OMX_COLOR_FORMATTYPE mSrcFormat, mDstFormat;
@@ -81,6 +84,10 @@ private:
 
     status_t convertTIYUV420PackedSemiPlanar(
             const BitmapParams &src, const BitmapParams &dst);
+
+    void writeToDst(void *dst_ptr, uint8_t *kAdjustedClip, bool uncropped,
+            signed r1, signed g1, signed b1,
+            signed r2, signed g2, signed b2);
 
     ColorConverter(const ColorConverter &);
     ColorConverter &operator=(const ColorConverter &);

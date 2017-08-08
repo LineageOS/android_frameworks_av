@@ -30,6 +30,7 @@ class String8;
 namespace ReportPerformance {
 
 constexpr int kMsPerSec = 1000;
+constexpr int kSecPerMin = 60;
 
 constexpr int kJiffyPerMs = 10; // time unit for histogram as a multiple of milliseconds
 

@@ -23,6 +23,7 @@
 #include <media/stagefright/MediaErrors.h>
 
 #include "libyuv/convert_from.h"
+#include "libyuv/video_common.h"
 
 #define USE_LIBYUV
 
@@ -41,17 +42,17 @@ ColorConverter::~ColorConverter() {
 }
 
 bool ColorConverter::isValid() const {
-    if (mDstFormat != OMX_COLOR_Format16bitRGB565) {
-        return false;
-    }
-
     switch (mSrcFormat) {
         case OMX_COLOR_FormatYUV420Planar:
+            return mDstFormat == OMX_COLOR_Format16bitRGB565
+                    || mDstFormat == OMX_COLOR_Format32BitRGBA8888
+                    || mDstFormat == OMX_COLOR_Format32bitBGRA8888;
+
         case OMX_COLOR_FormatCbYCrY:
         case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
         case OMX_COLOR_FormatYUV420SemiPlanar:
         case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar:
-            return true;
+            return mDstFormat == OMX_COLOR_Format16bitRGB565;
 
         default:
             return false;
@@ -62,14 +63,43 @@ ColorConverter::BitmapParams::BitmapParams(
         void *bits,
         size_t width, size_t height,
         size_t cropLeft, size_t cropTop,
-        size_t cropRight, size_t cropBottom)
+        size_t cropRight, size_t cropBottom,
+        OMX_COLOR_FORMATTYPE colorFromat)
     : mBits(bits),
+      mColorFormat(colorFromat),
       mWidth(width),
       mHeight(height),
       mCropLeft(cropLeft),
       mCropTop(cropTop),
       mCropRight(cropRight),
       mCropBottom(cropBottom) {
+    switch(mColorFormat) {
+    case OMX_COLOR_Format16bitRGB565:
+        mBpp = 2;
+        mStride = 2 * mWidth;
+        break;
+
+    case OMX_COLOR_Format32bitBGRA8888:
+    case OMX_COLOR_Format32BitRGBA8888:
+        mBpp = 4;
+        mStride = 4 * mWidth;
+        break;
+
+    case OMX_COLOR_FormatYUV420Planar:
+    case OMX_COLOR_FormatCbYCrY:
+    case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
+    case OMX_COLOR_FormatYUV420SemiPlanar:
+    case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar:
+        mBpp = 1;
+        mStride = mWidth;
+        break;
+
+    default:
+        ALOGE("Unsupported color format %d", mColorFormat);
+        mBpp = 1;
+        mStride = mWidth;
+        break;
+    }
 }
 
 size_t ColorConverter::BitmapParams::cropWidth() const {
@@ -89,19 +119,15 @@ status_t ColorConverter::convert(
         size_t dstWidth, size_t dstHeight,
         size_t dstCropLeft, size_t dstCropTop,
         size_t dstCropRight, size_t dstCropBottom) {
-    if (mDstFormat != OMX_COLOR_Format16bitRGB565) {
-        return ERROR_UNSUPPORTED;
-    }
-
     BitmapParams src(
             const_cast<void *>(srcBits),
             srcWidth, srcHeight,
-            srcCropLeft, srcCropTop, srcCropRight, srcCropBottom);
+            srcCropLeft, srcCropTop, srcCropRight, srcCropBottom, mSrcFormat);
 
     BitmapParams dst(
             dstBits,
             dstWidth, dstHeight,
-            dstCropLeft, dstCropTop, dstCropRight, dstCropBottom);
+            dstCropLeft, dstCropTop, dstCropRight, dstCropBottom, mDstFormat);
 
     status_t err;
 
@@ -212,26 +238,104 @@ status_t ColorConverter::convertYUV420PlanarUseLibYUV(
         return ERROR_UNSUPPORTED;
     }
 
-    uint16_t *dst_ptr = (uint16_t *)dst.mBits
-        + dst.mCropTop * dst.mWidth + dst.mCropLeft;
+    uint8_t *dst_ptr = (uint8_t *)dst.mBits
+        + dst.mCropTop * dst.mStride + dst.mCropLeft * dst.mBpp;
 
     const uint8_t *src_y =
-        (const uint8_t *)src.mBits + src.mCropTop * src.mWidth + src.mCropLeft;
+        (const uint8_t *)src.mBits + src.mCropTop * src.mStride + src.mCropLeft;
 
     const uint8_t *src_u =
-        (const uint8_t *)src_y + src.mWidth * src.mHeight
-        + src.mCropTop * (src.mWidth / 2) + src.mCropLeft / 2;
+        (const uint8_t *)src.mBits + src.mStride * src.mHeight
+        + (src.mCropTop / 2) * (src.mStride / 2) + (src.mCropLeft / 2);
 
     const uint8_t *src_v =
-        src_u + (src.mWidth / 2) * (src.mHeight / 2);
+        src_u + (src.mStride / 2) * (src.mHeight / 2);
 
+    switch (mDstFormat) {
+    case OMX_COLOR_Format16bitRGB565:
+        libyuv::I420ToRGB565(src_y, src.mStride, src_u, src.mStride / 2, src_v, src.mStride / 2,
+                (uint8 *)dst_ptr, dst.mStride, src.cropWidth(), src.cropHeight());
+        break;
 
-    libyuv::I420ToRGB565(src_y, src.mWidth, src_u, src.mWidth / 2, src_v, src.mWidth / 2,
-            (uint8 *)dst_ptr, dst.mWidth * 2, dst.mWidth, dst.mHeight);
+    case OMX_COLOR_Format32BitRGBA8888:
+        libyuv::ConvertFromI420(src_y, src.mStride, src_u, src.mStride / 2, src_v, src.mStride / 2,
+                (uint8 *)dst_ptr, dst.mStride, src.cropWidth(), src.cropHeight(), libyuv::FOURCC_ABGR);
+        break;
+
+    case OMX_COLOR_Format32bitBGRA8888:
+        libyuv::ConvertFromI420(src_y, src.mStride, src_u, src.mStride / 2, src_v, src.mStride / 2,
+                (uint8 *)dst_ptr, dst.mStride, src.cropWidth(), src.cropHeight(), libyuv::FOURCC_ARGB);
+        break;
+
+    default:
+        return ERROR_UNSUPPORTED;
+    }
 
     return OK;
 }
 
+void ColorConverter::writeToDst(
+        void *dst_ptr, uint8_t *kAdjustedClip, bool uncropped,
+        signed r1, signed g1, signed b1,
+        signed r2, signed g2, signed b2) {
+    switch (mDstFormat) {
+    case OMX_COLOR_Format16bitRGB565:
+    {
+        uint32_t rgb1 =
+            ((kAdjustedClip[r1] >> 3) << 11)
+            | ((kAdjustedClip[g1] >> 2) << 5)
+            | (kAdjustedClip[b1] >> 3);
+
+        if (uncropped) {
+            uint32_t rgb2 =
+                ((kAdjustedClip[r2] >> 3) << 11)
+                | ((kAdjustedClip[g2] >> 2) << 5)
+                | (kAdjustedClip[b2] >> 3);
+
+            *(uint32_t *)dst_ptr = (rgb2 << 16) | rgb1;
+        } else {
+            *(uint16_t *)dst_ptr = rgb1;
+        }
+        break;
+    }
+    case OMX_COLOR_Format32BitRGBA8888:
+    {
+        ((uint32_t *)dst_ptr)[0] =
+                (kAdjustedClip[r1])
+                | (kAdjustedClip[g1] << 8)
+                | (kAdjustedClip[b1] << 16)
+                | (0xFF << 24);
+
+        if (uncropped) {
+            ((uint32_t *)dst_ptr)[1] =
+                    (kAdjustedClip[r2])
+                    | (kAdjustedClip[g2] << 8)
+                    | (kAdjustedClip[b2] << 16)
+                    | (0xFF << 24);
+        }
+        break;
+    }
+    case OMX_COLOR_Format32bitBGRA8888:
+    {
+        ((uint32_t *)dst_ptr)[0] =
+                (kAdjustedClip[b1])
+                | (kAdjustedClip[g1] << 8)
+                | (kAdjustedClip[r1] << 16)
+                | (0xFF << 24);
+
+        if (uncropped) {
+            ((uint32_t *)dst_ptr)[1] =
+                    (kAdjustedClip[b2])
+                    | (kAdjustedClip[g2] << 8)
+                    | (kAdjustedClip[r2] << 16)
+                    | (0xFF << 24);
+        }
+        break;
+    }
+    default:
+        break;
+    }
+}
 status_t ColorConverter::convertYUV420Planar(
         const BitmapParams &src, const BitmapParams &dst) {
     if (!((src.mCropLeft & 1) == 0
@@ -242,18 +346,18 @@ status_t ColorConverter::convertYUV420Planar(
 
     uint8_t *kAdjustedClip = initClip();
 
-    uint16_t *dst_ptr = (uint16_t *)dst.mBits
-        + dst.mCropTop * dst.mWidth + dst.mCropLeft;
+    uint8_t *dst_ptr = (uint8_t *)dst.mBits
+        + dst.mCropTop * dst.mStride + dst.mCropLeft * dst.mBpp;
 
     const uint8_t *src_y =
-        (const uint8_t *)src.mBits + src.mCropTop * src.mWidth + src.mCropLeft;
+        (const uint8_t *)src.mBits + src.mCropTop * src.mStride + src.mCropLeft;
 
     const uint8_t *src_u =
-        (const uint8_t *)src_y + src.mWidth * src.mHeight
-        + src.mCropTop * (src.mWidth / 2) + src.mCropLeft / 2;
+        (const uint8_t *)src.mBits + src.mStride * src.mHeight
+        + (src.mCropTop / 2) * (src.mStride / 2) + src.mCropLeft / 2;
 
     const uint8_t *src_v =
-        src_u + (src.mWidth / 2) * (src.mHeight / 2);
+        src_u + (src.mStride / 2) * (src.mHeight / 2);
 
     for (size_t y = 0; y < src.cropHeight(); ++y) {
         for (size_t x = 0; x < src.cropWidth(); x += 2) {
@@ -296,31 +400,19 @@ status_t ColorConverter::convertYUV420Planar(
             signed g2 = (tmp2 + v_g + u_g) / 256;
             signed r2 = (tmp2 + v_r) / 256;
 
-            uint32_t rgb1 =
-                ((kAdjustedClip[r1] >> 3) << 11)
-                | ((kAdjustedClip[g1] >> 2) << 5)
-                | (kAdjustedClip[b1] >> 3);
-
-            uint32_t rgb2 =
-                ((kAdjustedClip[r2] >> 3) << 11)
-                | ((kAdjustedClip[g2] >> 2) << 5)
-                | (kAdjustedClip[b2] >> 3);
-
-            if (x + 1 < src.cropWidth()) {
-                *(uint32_t *)(&dst_ptr[x]) = (rgb2 << 16) | rgb1;
-            } else {
-                dst_ptr[x] = rgb1;
-            }
+            bool uncropped = x + 1 < src.cropWidth();
+            (void)writeToDst(dst_ptr + x * dst.mBpp,
+                    kAdjustedClip, uncropped, r1, g1, b1, r2, g2, b2);
         }
 
-        src_y += src.mWidth;
+        src_y += src.mStride;
 
         if (y & 1) {
-            src_u += src.mWidth / 2;
-            src_v += src.mWidth / 2;
+            src_u += src.mStride / 2;
+            src_v += src.mStride / 2;
         }
 
-        dst_ptr += dst.mWidth;
+        dst_ptr += dst.mStride;
     }
 
     return OK;
