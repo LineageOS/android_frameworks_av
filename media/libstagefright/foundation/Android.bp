@@ -7,6 +7,9 @@ cc_library_headers {
 cc_library_shared {
     name: "libstagefright_foundation",
     vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
     include_dirs: [
         "frameworks/av/include",
         "frameworks/native/include",
