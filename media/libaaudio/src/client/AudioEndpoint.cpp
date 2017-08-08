@@ -254,3 +254,7 @@ void AudioEndpoint::dump() const {
     ALOGD("AudioEndpoint: data readCounter  = %lld", (long long) mDataQueue->getReadCounter());
     ALOGD("AudioEndpoint: data writeCounter = %lld", (long long) mDataQueue->getWriteCounter());
 }
+
+void AudioEndpoint::eraseDataMemory() {
+    mDataQueue->eraseMemory();
+}
