@@ -31,6 +31,7 @@
 #include "SharedMemoryProxy.h"
 #include "utility/AAudioUtilities.h"
 
+using android::base::unique_fd;
 using namespace android;
 using namespace aaudio;
 
@@ -62,11 +63,6 @@ aaudio_result_t AAudioServiceStreamMMAP::close() {
         // right after a close can fail. Also some callbacks may still be in flight!
         // FIXME Make closing synchronous.
         AudioClock::sleepForNanos(100 * AAUDIO_NANOS_PER_MILLISECOND);
-    }
-
-    if (mAudioDataFileDescriptor != -1) {
-        ::close(mAudioDataFileDescriptor);
-        mAudioDataFileDescriptor = -1;
     }
 
     return AAudioServiceStreamBase::close();
@@ -184,7 +180,13 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
                            ? audio_channel_count_from_out_mask(config.channel_mask)
                            : audio_channel_count_from_in_mask(config.channel_mask);
 
-    mAudioDataFileDescriptor = mMmapBufferinfo.shared_memory_fd;
+    // AAudio creates a copy of this FD and retains ownership of the copy.
+    // Assume that AudioFlinger will close the original shared_memory_fd.
+    mAudioDataFileDescriptor.reset(dup(mMmapBufferinfo.shared_memory_fd));
+    if (mAudioDataFileDescriptor.get() == -1) {
+        ALOGE("AAudioServiceStreamMMAP::open() - could not dup shared_memory_fd");
+        return AAUDIO_ERROR_INTERNAL; // TODO review
+    }
     mFramesPerBurst = mMmapBufferinfo.burst_size_frames;
     mAudioFormat = AAudioConvert_androidToAAudioDataFormat(config.format);
     mSampleRate = config.sample_rate;
