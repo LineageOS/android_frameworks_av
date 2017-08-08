@@ -811,7 +811,7 @@ size_t FLACExtractor::countTracks()
     return mInitCheck == OK ? 1 : 0;
 }
 
-sp<IMediaSource> FLACExtractor::getTrack(size_t index)
+sp<MediaSource> FLACExtractor::getTrack(size_t index)
 {
     if (mInitCheck != OK || index > 0) {
         return NULL;

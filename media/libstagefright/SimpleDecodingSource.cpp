@@ -36,13 +36,13 @@ const int64_t kTimeoutWaitForInputUs = 5000; // 5 milliseconds
 
 //static
 sp<SimpleDecodingSource> SimpleDecodingSource::Create(
-        const sp<IMediaSource> &source, uint32_t flags) {
+        const sp<MediaSource> &source, uint32_t flags) {
     return SimpleDecodingSource::Create(source, flags, nullptr, nullptr);
 }
 
 //static
 sp<SimpleDecodingSource> SimpleDecodingSource::Create(
-        const sp<IMediaSource> &source, uint32_t flags, const sp<ANativeWindow> &nativeWindow,
+        const sp<MediaSource> &source, uint32_t flags, const sp<ANativeWindow> &nativeWindow,
         const char *desiredCodec) {
     sp<Surface> surface = static_cast<Surface*>(nativeWindow.get());
     const char *mime = NULL;
@@ -99,7 +99,7 @@ sp<SimpleDecodingSource> SimpleDecodingSource::Create(
 }
 
 SimpleDecodingSource::SimpleDecodingSource(
-        const sp<MediaCodec> &codec, const sp<IMediaSource> &source, const sp<ALooper> &looper,
+        const sp<MediaCodec> &codec, const sp<MediaSource> &source, const sp<ALooper> &looper,
         bool usingSurface, bool isVorbis, const sp<AMessage> &format)
     : mCodec(codec),
       mSource(source),
@@ -212,7 +212,7 @@ status_t SimpleDecodingSource::doRead(
     status_t res;
 
     // flush codec on seek
-    IMediaSource::ReadOptions::SeekMode mode;
+    MediaSource::ReadOptions::SeekMode mode;
     if (options != NULL && options->getSeekTo(&out_pts, &mode)) {
         me->mQueuedInputEOS = false;
         me->mGotOutputEOS = false;

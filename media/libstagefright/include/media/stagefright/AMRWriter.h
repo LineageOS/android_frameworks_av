@@ -20,7 +20,6 @@
 
 #include <stdio.h>
 
-#include <media/IMediaSource.h>
 #include <media/stagefright/MediaWriter.h>
 #include <utils/threads.h>
 
@@ -33,7 +32,7 @@ struct AMRWriter : public MediaWriter {
 
     status_t initCheck() const;
 
-    virtual status_t addSource(const sp<IMediaSource> &source);
+    virtual status_t addSource(const sp<MediaSource> &source);
     virtual bool reachedEOS();
     virtual status_t start(MetaData *params = NULL);
     virtual status_t stop() { return reset(); }
@@ -45,7 +44,7 @@ protected:
 private:
     int   mFd;
     status_t mInitCheck;
-    sp<IMediaSource> mSource;
+    sp<MediaSource> mSource;
     bool mStarted;
     volatile bool mPaused;
     volatile bool mResumed;

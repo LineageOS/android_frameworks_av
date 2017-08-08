@@ -100,7 +100,7 @@ static const uint8_t kHevcNalUnitTypes[5] = {
 
 class MPEG4Writer::Track {
 public:
-    Track(MPEG4Writer *owner, const sp<IMediaSource> &source, size_t trackId);
+    Track(MPEG4Writer *owner, const sp<MediaSource> &source, size_t trackId);
 
     ~Track();
 
@@ -271,7 +271,7 @@ private:
 
     MPEG4Writer *mOwner;
     sp<MetaData> mMeta;
-    sp<IMediaSource> mSource;
+    sp<MediaSource> mSource;
     volatile bool mDone;
     volatile bool mPaused;
     volatile bool mResumed;
@@ -572,7 +572,7 @@ const char *MPEG4Writer::Track::getFourCCForMime(const char *mime) {
     return NULL;
 }
 
-status_t MPEG4Writer::addSource(const sp<IMediaSource> &source) {
+status_t MPEG4Writer::addSource(const sp<MediaSource> &source) {
     Mutex::Autolock l(mLock);
     if (mStarted) {
         ALOGE("Attempt to add source AFTER recording is started");
@@ -1626,7 +1626,7 @@ size_t MPEG4Writer::numTracks() {
 ////////////////////////////////////////////////////////////////////////////////
 
 MPEG4Writer::Track::Track(
-        MPEG4Writer *owner, const sp<IMediaSource> &source, size_t trackId)
+        MPEG4Writer *owner, const sp<MediaSource> &source, size_t trackId)
     : mOwner(owner),
       mMeta(source->getFormat()),
       mSource(source),

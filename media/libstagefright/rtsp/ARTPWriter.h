@@ -37,7 +37,7 @@ class MediaBuffer;
 struct ARTPWriter : public MediaWriter {
     explicit ARTPWriter(int fd);
 
-    virtual status_t addSource(const sp<IMediaSource> &source);
+    virtual status_t addSource(const sp<MediaSource> &source);
     virtual bool reachedEOS();
     virtual status_t start(MetaData *params);
     virtual status_t stop();
@@ -72,7 +72,7 @@ private:
     int mRTCPFd;
 #endif
 
-    sp<IMediaSource> mSource;
+    sp<MediaSource> mSource;
     sp<ALooper> mLooper;
     sp<AHandlerReflector<ARTPWriter> > mReflector;
 

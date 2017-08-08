@@ -22,6 +22,7 @@
 
 #include <media/IMediaSource.h>
 #include <media/stagefright/MediaErrors.h>
+#include <media/stagefright/MetaData.h>
 #include <utils/RefBase.h>
 #include <utils/Vector.h>
 
@@ -29,8 +30,18 @@ namespace android {
 
 class MediaBuffer;
 class MetaData;
+class IMediaSource;
 
-struct MediaSource : public BnMediaSource {
+struct MediaSource : public virtual RefBase {
+    // TODO: Move ReadOptions implementation from IMediaSource to MediaSource
+    // once this class moves to a separate extractor lib on which both libmedia
+    // and libstagefright rely. For now, alias is added to avoid circular
+    // dependency.
+    using ReadOptions = IMediaSource::ReadOptions;
+
+    // Creates a MediaSource which wraps the given IMediaSource object.
+    static sp<MediaSource> CreateFromIMediaSource(const sp<IMediaSource> &source);
+
     MediaSource();
 
     // To be called before any other methods on this object, except
@@ -91,6 +102,9 @@ struct MediaSource : public BnMediaSource {
     virtual status_t setStopTimeUs(int64_t /* stopTimeUs */) {
         return ERROR_UNSUPPORTED;
     }
+
+    // Creates an IMediaSource wrapper to this MediaSource.
+    virtual sp<IMediaSource> asIMediaSource();
 
 protected:
     virtual ~MediaSource();

@@ -20,7 +20,7 @@
 
 #include <utils/RefBase.h>
 #include <media/IMediaRecorderClient.h>
-#include <media/IMediaSource.h>
+#include <media/stagefright/MediaSource.h>
 
 namespace android {
 
@@ -32,7 +32,7 @@ struct MediaWriter : public RefBase {
           mMaxFileDurationLimitUs(0) {
     }
 
-    virtual status_t addSource(const sp<IMediaSource> &source) = 0;
+    virtual status_t addSource(const sp<MediaSource> &source) = 0;
     virtual bool reachedEOS() = 0;
     virtual status_t start(MetaData *params = NULL) = 0;
     virtual status_t stop() = 0;
