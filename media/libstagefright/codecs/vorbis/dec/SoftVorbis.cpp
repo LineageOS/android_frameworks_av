@@ -309,7 +309,33 @@ static void makeBitReader(
     oggpack_readinit(bits, ref);
 }
 
-void SoftVorbis::onQueueFilled(OMX_U32 portIndex) {
+void SoftVorbis::handleEOS() {
+    List<BufferInfo *> &inQueue = getPortQueue(0);
+    List<BufferInfo *> &outQueue = getPortQueue(1);
+
+    CHECK(!inQueue.empty() && !outQueue.empty());
+
+    mSawInputEos = true;
+
+    BufferInfo *outInfo = *outQueue.begin();
+    OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
+    outHeader->nFilledLen = 0;
+    outHeader->nFlags = OMX_BUFFERFLAG_EOS;
+
+    outQueue.erase(outQueue.begin());
+    outInfo->mOwnedByUs = false;
+    notifyFillBufferDone(outHeader);
+    mSignalledOutputEos = true;
+
+    BufferInfo *inInfo = *inQueue.begin();
+    OMX_BUFFERHEADERTYPE *inHeader = inInfo->mHeader;
+    inQueue.erase(inQueue.begin());
+    inInfo->mOwnedByUs = false;
+    notifyEmptyBufferDone(inHeader);
+    ++mInputBufferCount;
+}
+
+void SoftVorbis::onQueueFilled(OMX_U32 /* portIndex */) {
     List<BufferInfo *> &inQueue = getPortQueue(0);
     List<BufferInfo *> &outQueue = getPortQueue(1);
 
@@ -317,69 +343,7 @@ void SoftVorbis::onQueueFilled(OMX_U32 portIndex) {
         return;
     }
 
-    if (portIndex == 0 && mInputBufferCount < 2) {
-        BufferInfo *info = *inQueue.begin();
-        OMX_BUFFERHEADERTYPE *header = info->mHeader;
-
-        const uint8_t *data = header->pBuffer + header->nOffset;
-        size_t size = header->nFilledLen;
-        if (size < 7) {
-            ALOGE("Too small input buffer: %zu bytes", size);
-            android_errorWriteLog(0x534e4554, "27833616");
-            notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
-            mSignalledError = true;
-            return;
-        }
-
-        ogg_buffer buf;
-        ogg_reference ref;
-        oggpack_buffer bits;
-
-        makeBitReader(
-                (const uint8_t *)data + 7, size - 7,
-                &buf, &ref, &bits);
-
-        if (mInputBufferCount == 0) {
-            CHECK(mVi == NULL);
-            mVi = new vorbis_info;
-            vorbis_info_init(mVi);
-
-            int ret = _vorbis_unpack_info(mVi, &bits);
-            if (ret != 0) {
-                notify(OMX_EventError, OMX_ErrorUndefined, ret, NULL);
-                mSignalledError = true;
-                return;
-            }
-        } else {
-            int ret = _vorbis_unpack_books(mVi, &bits);
-            if (ret != 0) {
-                notify(OMX_EventError, OMX_ErrorUndefined, ret, NULL);
-                mSignalledError = true;
-                return;
-            }
-
-            CHECK(mState == NULL);
-            mState = new vorbis_dsp_state;
-            CHECK_EQ(0, vorbis_dsp_init(mState, mVi));
-
-            if (mVi->rate != kDefaultSamplingRate ||
-                    mVi->channels != kDefaultChannelCount) {
-                ALOGV("vorbis: rate/channels changed: %ld/%d", mVi->rate, mVi->channels);
-                notify(OMX_EventPortSettingsChanged, 1, 0, NULL);
-                mOutputPortSettingsChange = AWAITING_DISABLED;
-            }
-        }
-
-        inQueue.erase(inQueue.begin());
-        info->mOwnedByUs = false;
-        notifyEmptyBufferDone(header);
-
-        ++mInputBufferCount;
-
-        return;
-    }
-
-    while ((!inQueue.empty() || (mSawInputEos && !mSignalledOutputEos)) && !outQueue.empty()) {
+    while (!mSignalledOutputEos && (!inQueue.empty() || mSawInputEos) && !outQueue.empty()) {
         BufferInfo *inInfo = NULL;
         OMX_BUFFERHEADERTYPE *inHeader = NULL;
         if (!inQueue.empty()) {
@@ -393,6 +357,73 @@ void SoftVorbis::onQueueFilled(OMX_U32 portIndex) {
         int32_t numPageSamples = 0;
 
         if (inHeader) {
+            if (mInputBufferCount < 2) {
+                const uint8_t *data = inHeader->pBuffer + inHeader->nOffset;
+                size_t size = inHeader->nFilledLen;
+
+                if ((inHeader->nFlags & OMX_BUFFERFLAG_EOS) && size == 0) {
+                    handleEOS();
+                    return;
+                }
+
+                if (size < 7) {
+                    ALOGE("Too small input buffer: %zu bytes", size);
+                    android_errorWriteLog(0x534e4554, "27833616");
+                    notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
+                    mSignalledError = true;
+                    return;
+                }
+
+                ogg_buffer buf;
+                ogg_reference ref;
+                oggpack_buffer bits;
+
+                makeBitReader((const uint8_t *)data + 7, size - 7, &buf, &ref, &bits);
+
+                if (mInputBufferCount == 0) {
+                    CHECK(mVi == NULL);
+                    mVi = new vorbis_info;
+                    vorbis_info_init(mVi);
+
+                    int ret = _vorbis_unpack_info(mVi, &bits);
+                    if (ret != 0) {
+                        notify(OMX_EventError, OMX_ErrorUndefined, ret, NULL);
+                        mSignalledError = true;
+                        return;
+                    }
+                } else {
+                    int ret = _vorbis_unpack_books(mVi, &bits);
+                    if (ret != 0) {
+                        notify(OMX_EventError, OMX_ErrorUndefined, ret, NULL);
+                        mSignalledError = true;
+                        return;
+                    }
+
+                    CHECK(mState == NULL);
+                    mState = new vorbis_dsp_state;
+                    CHECK_EQ(0, vorbis_dsp_init(mState, mVi));
+
+                    if (mVi->rate != kDefaultSamplingRate ||
+                            mVi->channels != kDefaultChannelCount) {
+                        ALOGV("vorbis: rate/channels changed: %ld/%d", mVi->rate, mVi->channels);
+                        notify(OMX_EventPortSettingsChanged, 1, 0, NULL);
+                        mOutputPortSettingsChange = AWAITING_DISABLED;
+                    }
+                }
+
+                if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
+                    handleEOS();
+                    return;
+                }
+
+                inQueue.erase(inQueue.begin());
+                inInfo->mOwnedByUs = false;
+                notifyEmptyBufferDone(inHeader);
+                ++mInputBufferCount;
+
+                continue;
+            }
+
             if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
                 mSawInputEos = true;
             }
@@ -406,8 +437,7 @@ void SoftVorbis::onQueueFilled(OMX_U32 portIndex) {
                     return;
                 }
                 memcpy(&numPageSamples,
-                       inHeader->pBuffer
-                        + inHeader->nOffset + inHeader->nFilledLen - 4,
+                       inHeader->pBuffer + inHeader->nOffset + inHeader->nFilledLen - 4,
                        sizeof(numPageSamples));
 
                 if (inHeader->nOffset == 0) {
@@ -446,6 +476,14 @@ void SoftVorbis::onQueueFilled(OMX_U32 portIndex) {
         int numFrames = 0;
 
         outHeader->nFlags = 0;
+
+        if (mState == nullptr || mVi == nullptr) {
+            notify(OMX_EventError, OMX_ErrorStreamCorrupt, 0, NULL);
+            mSignalledError = true;
+            ALOGE("onQueueFilled, input does not have CSD");
+            return;
+        }
+
         int err = vorbis_dsp_synthesis(mState, &pack, 1);
         if (err != 0) {
             // FIXME temporary workaround for log spam
@@ -495,18 +533,13 @@ void SoftVorbis::onQueueFilled(OMX_U32 portIndex) {
         if (inHeader) {
             inInfo->mOwnedByUs = false;
             inQueue.erase(inQueue.begin());
-            inInfo = NULL;
             notifyEmptyBufferDone(inHeader);
-            inHeader = NULL;
+            ++mInputBufferCount;
         }
 
         outInfo->mOwnedByUs = false;
         outQueue.erase(outQueue.begin());
-        outInfo = NULL;
         notifyFillBufferDone(outHeader);
-        outHeader = NULL;
-
-        ++mInputBufferCount;
     }
 }
 
