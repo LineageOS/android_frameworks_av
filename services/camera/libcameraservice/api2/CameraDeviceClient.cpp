@@ -313,11 +313,13 @@ binder::Status CameraDeviceClient::cancelRequest(
 
 binder::Status CameraDeviceClient::beginConfigure() {
     // TODO: Implement this.
+    ATRACE_CALL();
     ALOGV("%s: Not implemented yet.", __FUNCTION__);
     return binder::Status::ok();
 }
 
 binder::Status CameraDeviceClient::endConfigure(int operatingMode) {
+    ATRACE_CALL();
     ALOGV("%s: ending configure (%d input stream, %zu output surfaces)",
             __FUNCTION__, mInputStream.configured ? 1 : 0,
             mStreamMap.size());
