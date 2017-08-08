@@ -86,6 +86,11 @@ public:
 
     int32_t getBufferCapacityInFrames() const;
 
+    /**
+     * Write zeros to the data queue memory.
+     */
+    void eraseDataMemory();
+
     void dump() const;
 
 private:
