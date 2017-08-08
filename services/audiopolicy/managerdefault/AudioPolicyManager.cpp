@@ -54,6 +54,11 @@ namespace android {
 //FIXME: workaround for truncated touch sounds
 // to be removed when the problem is handled by system UI
 #define TOUCH_SOUND_FIXED_DELAY_MS 100
+
+// Largest difference in dB on earpiece in call between the voice volume and another
+// media / notification / system volume.
+constexpr float IN_CALL_EARPIECE_HEADROOM_DB = 3.f;
+
 // ----------------------------------------------------------------------------
 // AudioPolicyInterface implementation
 // ----------------------------------------------------------------------------
@@ -5346,6 +5351,30 @@ float AudioPolicyManager::computeVolume(audio_stream_type_t stream,
             && isStreamActive(AUDIO_STREAM_RING, 0)) {
         const float ringVolumeDB = computeVolume(AUDIO_STREAM_RING, index, device);
         return ringVolumeDB - 4 > volumeDB ? ringVolumeDB - 4 : volumeDB;
+    }
+
+    // in-call: always cap earpiece volume by voice volume + some low headroom
+    if ((stream != AUDIO_STREAM_VOICE_CALL) && (device & AUDIO_DEVICE_OUT_EARPIECE) && isInCall()) {
+        switch (stream) {
+        case AUDIO_STREAM_SYSTEM:
+        case AUDIO_STREAM_RING:
+        case AUDIO_STREAM_MUSIC:
+        case AUDIO_STREAM_ALARM:
+        case AUDIO_STREAM_NOTIFICATION:
+        case AUDIO_STREAM_ENFORCED_AUDIBLE:
+        case AUDIO_STREAM_DTMF:
+        case AUDIO_STREAM_ACCESSIBILITY: {
+            const float maxVoiceVolDb = computeVolume(AUDIO_STREAM_VOICE_CALL, index, device)
+                    + IN_CALL_EARPIECE_HEADROOM_DB;
+            if (volumeDB > maxVoiceVolDb) {
+                ALOGV("computeVolume() stream %d at vol=%f overriden by stream %d at vol=%f",
+                        stream, volumeDB, AUDIO_STREAM_VOICE_CALL, maxVoiceVolDb);
+                volumeDB = maxVoiceVolDb;
+            }
+            } break;
+        default:
+            break;
+        }
     }
 
     // if a headset is connected, apply the following rules to ring tones and notifications
