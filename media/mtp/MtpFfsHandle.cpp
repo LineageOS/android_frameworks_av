@@ -719,9 +719,22 @@ int MtpFfsHandle::sendFile(mtp_file_range mfr) {
 }
 
 int MtpFfsHandle::sendEvent(mtp_event me) {
+    // Mimic the behavior of f_mtp by sending the event async.
+    // Events aren't critical to the connection, so we don't need to check the return value.
+    char *temp = new char[me.length];
+    memcpy(temp, me.data, me.length);
+    me.data = temp;
+    std::thread t([&me](MtpFfsHandle *h) { return h->doSendEvent(me); }, this);
+    t.detach();
+    return 0;
+}
+
+void MtpFfsHandle::doSendEvent(mtp_event me) {
     unsigned length = me.length;
-    int ret = writeHandle(mIntr, me.data, length);
-    return static_cast<unsigned>(ret) == length ? 0 : -1;
+    int ret = ::write(mIntr, me.data, length);
+    delete[] reinterpret_cast<char*>(me.data);
+    if (static_cast<unsigned>(ret) != length)
+        PLOG(ERROR) << "Mtp error sending event thread!";
 }
 
 } // namespace android
