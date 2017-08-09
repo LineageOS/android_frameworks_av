@@ -175,7 +175,7 @@ status_t MetadataRetrieverClient::setDataSource(int fd, int64_t offset, int64_t 
 }
 
 status_t MetadataRetrieverClient::setDataSource(
-        const sp<IDataSource>& source)
+        const sp<IDataSource>& source, const char *mime)
 {
     ALOGV("setDataSource(IDataSource)");
     Mutex::Autolock lock(mLock);
@@ -186,16 +186,18 @@ status_t MetadataRetrieverClient::setDataSource(
     ALOGV("player type = %d", playerType);
     sp<MediaMetadataRetrieverBase> p = createRetriever(playerType);
     if (p == NULL) return NO_INIT;
-    status_t ret = p->setDataSource(dataSource);
+    status_t ret = p->setDataSource(dataSource, mime);
     if (ret == NO_ERROR) mRetriever = p;
     return ret;
 }
 
 Mutex MetadataRetrieverClient::sLock;
 
-sp<IMemory> MetadataRetrieverClient::getFrameAtTime(int64_t timeUs, int option)
+sp<IMemory> MetadataRetrieverClient::getFrameAtTime(
+        int64_t timeUs, int option, int colorFormat, bool metaOnly)
 {
-    ALOGV("getFrameAtTime: time(%lld us) option(%d)", (long long)timeUs, option);
+    ALOGV("getFrameAtTime: time(%lld us) option(%d) colorFormat(%d), metaOnly(%d)",
+            (long long)timeUs, option, colorFormat, metaOnly);
     Mutex::Autolock lock(mLock);
     Mutex::Autolock glock(sLock);
     mThumbnail.clear();
@@ -203,7 +205,8 @@ sp<IMemory> MetadataRetrieverClient::getFrameAtTime(int64_t timeUs, int option)
         ALOGE("retriever is not initialized");
         return NULL;
     }
-    VideoFrame *frame = mRetriever->getFrameAtTime(timeUs, option);
+    VideoFrame *frame = mRetriever->getFrameAtTime(
+            timeUs, option, colorFormat, metaOnly);
     if (frame == NULL) {
         ALOGE("failed to capture a video frame");
         return NULL;
