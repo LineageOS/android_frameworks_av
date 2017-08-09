@@ -121,12 +121,12 @@ status_t StagefrightMetadataRetriever::setDataSource(
 }
 
 status_t StagefrightMetadataRetriever::setDataSource(
-        const sp<DataSource>& source) {
+        const sp<DataSource>& source, const char *mime) {
     ALOGV("setDataSource(DataSource)");
 
     clearMetadata();
     mSource = source;
-    mExtractor = MediaExtractor::Create(mSource);
+    mExtractor = MediaExtractor::Create(mSource, mime);
 
     if (mExtractor == NULL) {
         ALOGE("Failed to instantiate a MediaExtractor.");
@@ -142,7 +142,9 @@ static VideoFrame *extractVideoFrame(
         const sp<MetaData> &trackMeta,
         const sp<IMediaSource> &source,
         int64_t frameTimeUs,
-        int seekMode) {
+        int seekMode,
+        int /*colorFormat*/,
+        bool /*metaOnly*/) {
 
     sp<MetaData> format = source->getFormat();
 
@@ -463,9 +465,10 @@ static VideoFrame *extractVideoFrame(
 }
 
 VideoFrame *StagefrightMetadataRetriever::getFrameAtTime(
-        int64_t timeUs, int option) {
+        int64_t timeUs, int option, int colorFormat, bool metaOnly) {
 
-    ALOGV("getFrameAtTime: %" PRId64 " us option: %d", timeUs, option);
+    ALOGV("getFrameAtTime: %" PRId64 " us option: %d colorFormat: %d, metaOnly: %d",
+            timeUs, option, colorFormat, metaOnly);
 
     if (mExtractor.get() == NULL) {
         ALOGV("no extractor.");
@@ -533,8 +536,8 @@ VideoFrame *StagefrightMetadataRetriever::getFrameAtTime(
 
     for (size_t i = 0; i < matchingCodecs.size(); ++i) {
         const AString &componentName = matchingCodecs[i];
-        VideoFrame *frame =
-            extractVideoFrame(componentName, trackMeta, source, timeUs, option);
+        VideoFrame *frame = extractVideoFrame(
+                componentName, trackMeta, source, timeUs, option, colorFormat, metaOnly);
 
         if (frame != NULL) {
             return frame;

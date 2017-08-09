@@ -130,7 +130,7 @@ status_t MediaMetadataRetriever::setDataSource(int fd, int64_t offset, int64_t l
 }
 
 status_t MediaMetadataRetriever::setDataSource(
-    const sp<IDataSource>& dataSource)
+    const sp<IDataSource>& dataSource, const char *mime)
 {
     ALOGV("setDataSource(IDataSource)");
     Mutex::Autolock _l(mLock);
@@ -138,18 +138,20 @@ status_t MediaMetadataRetriever::setDataSource(
         ALOGE("retriever is not initialized");
         return INVALID_OPERATION;
     }
-    return mRetriever->setDataSource(dataSource);
+    return mRetriever->setDataSource(dataSource, mime);
 }
 
-sp<IMemory> MediaMetadataRetriever::getFrameAtTime(int64_t timeUs, int option)
+sp<IMemory> MediaMetadataRetriever::getFrameAtTime(
+        int64_t timeUs, int option, int colorFormat, bool metaOnly)
 {
-    ALOGV("getFrameAtTime: time(%" PRId64 " us) option(%d)", timeUs, option);
+    ALOGV("getFrameAtTime: time(%" PRId64 " us) option(%d) colorFormat(%d) metaOnly(%d)",
+            timeUs, option, colorFormat, metaOnly);
     Mutex::Autolock _l(mLock);
     if (mRetriever == 0) {
         ALOGE("retriever is not initialized");
         return NULL;
     }
-    return mRetriever->getFrameAtTime(timeUs, option);
+    return mRetriever->getFrameAtTime(timeUs, option, colorFormat, metaOnly);
 }
 
 const char* MediaMetadataRetriever::extractMetadata(int keyCode)
