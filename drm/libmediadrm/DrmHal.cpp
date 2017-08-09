@@ -257,6 +257,11 @@ sp<IDrmPlugin> DrmHal::makeDrmPlugin(const sp<IDrmFactory>& factory,
                 plugin = hPlugin;
             }
         );
+
+    if (!hResult.isOk()) {
+        ALOGE("createPlugin remote call failed");
+    }
+
     return plugin;
 }
 
