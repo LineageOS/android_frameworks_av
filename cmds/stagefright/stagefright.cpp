@@ -870,7 +870,9 @@ int main(int argc, char **argv) {
 
             sp<IMemory> mem =
                     retriever->getFrameAtTime(-1,
-                                    MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC);
+                            MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC,
+                            HAL_PIXEL_FORMAT_RGB_565,
+                            false /*metaOnly*/);
 
             if (mem != NULL) {
                 failed = false;
