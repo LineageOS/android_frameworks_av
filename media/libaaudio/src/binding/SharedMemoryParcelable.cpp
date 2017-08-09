@@ -64,9 +64,9 @@ status_t SharedMemoryParcelable::readFromParcel(const Parcel* parcel) {
     if (mSizeInBytes > 0) {
         // Keep the original FD until you are done with the mFd.
         // If you close it in here then it will prevent mFd from working.
-        mOriginalFd = parcel->readFileDescriptor();
-        ALOGV("SharedMemoryParcelable::readFromParcel() LEAK? mOriginalFd = %d\n", mOriginalFd);
-        mFd = fcntl(mOriginalFd, F_DUPFD_CLOEXEC, 0);
+        int originalFd = parcel->readFileDescriptor();
+        ALOGV("SharedMemoryParcelable::readFromParcel() LEAK? originalFd = %d\n", originalFd);
+        mFd = fcntl(originalFd, F_DUPFD_CLOEXEC, 0);
         ALOGV("SharedMemoryParcelable::readFromParcel() LEAK? mFd = %d\n", mFd);
         if (mFd == -1) {
             status = -errno;
@@ -87,13 +87,12 @@ aaudio_result_t SharedMemoryParcelable::close() {
     }
     if (mFd != -1) {
         ALOGV("SharedMemoryParcelable::close() LEAK? mFd = %d\n", mFd);
-        ::close(mFd);
+        if(::close(mFd) < 0) {
+            int err = errno;
+            ALOGE("SharedMemoryParcelable close failed for fd = %d, errno = %d (%s)",
+                  mFd, err, strerror(err));
+        }
         mFd = -1;
-    }
-    if (mOriginalFd != -1) {
-        ALOGV("SharedMemoryParcelable::close() LEAK? mOriginalFd = %d\n", mOriginalFd);
-        ::close(mOriginalFd);
-        mOriginalFd = -1;
     }
     return AAUDIO_OK;
 }
