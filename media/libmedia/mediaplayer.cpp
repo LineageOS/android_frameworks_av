@@ -48,6 +48,8 @@
 
 namespace android {
 
+using media::VolumeShaper;
+
 MediaPlayer::MediaPlayer()
 {
     ALOGV("constructor");

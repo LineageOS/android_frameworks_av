@@ -77,12 +77,12 @@ public:
     virtual void        signal() = 0;
 
     /* Sets the volume shaper */
-    virtual VolumeShaper::Status applyVolumeShaper(
-            const sp<VolumeShaper::Configuration>& configuration,
-            const sp<VolumeShaper::Operation>& operation) = 0;
+    virtual media::VolumeShaper::Status applyVolumeShaper(
+            const sp<media::VolumeShaper::Configuration>& configuration,
+            const sp<media::VolumeShaper::Operation>& operation) = 0;
 
     /* gets the volume shaper state */
-    virtual sp<VolumeShaper::State> getVolumeShaperState(int id) = 0;
+    virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id) = 0;
 };
 
 // ----------------------------------------------------------------------------

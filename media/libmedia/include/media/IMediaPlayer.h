@@ -91,10 +91,10 @@ public:
     virtual status_t        getRetransmitEndpoint(struct sockaddr_in* endpoint) = 0;
     virtual status_t        setNextPlayer(const sp<IMediaPlayer>& next) = 0;
 
-    virtual VolumeShaper::Status applyVolumeShaper(
-                                    const sp<VolumeShaper::Configuration>& configuration,
-                                    const sp<VolumeShaper::Operation>& operation) = 0;
-    virtual sp<VolumeShaper::State> getVolumeShaperState(int id) = 0;
+    virtual media::VolumeShaper::Status applyVolumeShaper(
+                                    const sp<media::VolumeShaper::Configuration>& configuration,
+                                    const sp<media::VolumeShaper::Operation>& operation) = 0;
+    virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id) = 0;
 
     // Modular DRM
     virtual status_t        prepareDrm(const uint8_t uuid[16],

@@ -39,6 +39,8 @@ static const int kMaxLoopCountNotifications = 32;
 namespace android {
 // ---------------------------------------------------------------------------
 
+using media::VolumeShaper;
+
 // TODO: Move to a separate .h
 
 template <typename T>
@@ -553,7 +555,7 @@ status_t AudioTrack::set(
     mFramesWritten = 0;
     mFramesWrittenServerOffset = 0;
     mFramesWrittenAtRestore = -1; // -1 is a unique initializer.
-    mVolumeHandler = new VolumeHandler();
+    mVolumeHandler = new media::VolumeHandler();
     return NO_ERROR;
 }
 

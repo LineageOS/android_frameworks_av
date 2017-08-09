@@ -266,10 +266,10 @@ public:
             status_t        setRetransmitEndpoint(const char* addrString, uint16_t port);
             status_t        setNextMediaPlayer(const sp<MediaPlayer>& player);
 
-            VolumeShaper::Status applyVolumeShaper(
-                                    const sp<VolumeShaper::Configuration>& configuration,
-                                    const sp<VolumeShaper::Operation>& operation);
-            sp<VolumeShaper::State> getVolumeShaperState(int id);
+            media::VolumeShaper::Status applyVolumeShaper(
+                                    const sp<media::VolumeShaper::Configuration>& configuration,
+                                    const sp<media::VolumeShaper::Operation>& operation);
+            sp<media::VolumeShaper::State> getVolumeShaperState(int id);
             // Modular DRM
             status_t        prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>& drmSessionId);
             status_t        releaseDrm();

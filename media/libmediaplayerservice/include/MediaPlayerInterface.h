@@ -146,10 +146,10 @@ public:
         virtual status_t    setParameters(const String8& /* keyValuePairs */) { return NO_ERROR; }
         virtual String8     getParameters(const String8& /* keys */) { return String8::empty(); }
 
-        virtual VolumeShaper::Status applyVolumeShaper(
-                                    const sp<VolumeShaper::Configuration>& configuration,
-                                    const sp<VolumeShaper::Operation>& operation);
-        virtual sp<VolumeShaper::State> getVolumeShaperState(int id);
+        virtual media::VolumeShaper::Status applyVolumeShaper(
+                                    const sp<media::VolumeShaper::Configuration>& configuration,
+                                    const sp<media::VolumeShaper::Operation>& operation);
+        virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id);
     };
 
                         MediaPlayerBase() : mCookie(0), mNotify(0) {}
