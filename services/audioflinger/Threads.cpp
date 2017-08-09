@@ -7508,34 +7508,22 @@ void AudioFlinger::RecordThread::getAudioPortConfig(struct audio_port_config *co
 AudioFlinger::MmapThreadHandle::MmapThreadHandle(const sp<MmapThread>& thread)
     : mThread(thread)
 {
+    assert(thread != 0); // thread must start non-null and stay non-null
 }
 
 AudioFlinger::MmapThreadHandle::~MmapThreadHandle()
 {
-    MmapThread *thread = mThread.get();
-    // clear our strong reference before disconnecting the thread: the last strong reference
-    // will be removed when closeInput/closeOutput is executed upon call from audio policy manager
-    // and the thread removed from mMMapThreads list causing the thread destruction.
-    mThread.clear();
-    if (thread != nullptr) {
-        thread->disconnect();
-    }
+    mThread->disconnect();
 }
 
 status_t AudioFlinger::MmapThreadHandle::createMmapBuffer(int32_t minSizeFrames,
                                   struct audio_mmap_buffer_info *info)
 {
-    if (mThread == 0) {
-        return NO_INIT;
-    }
     return mThread->createMmapBuffer(minSizeFrames, info);
 }
 
 status_t AudioFlinger::MmapThreadHandle::getMmapPosition(struct audio_mmap_position *position)
 {
-    if (mThread == 0) {
-        return NO_INIT;
-    }
     return mThread->getMmapPosition(position);
 }
 
@@ -7543,25 +7531,16 @@ status_t AudioFlinger::MmapThreadHandle::start(const AudioClient& client,
         audio_port_handle_t *handle)
 
 {
-    if (mThread == 0) {
-        return NO_INIT;
-    }
     return mThread->start(client, handle);
 }
 
 status_t AudioFlinger::MmapThreadHandle::stop(audio_port_handle_t handle)
 {
-    if (mThread == 0) {
-        return NO_INIT;
-    }
     return mThread->stop(handle);
 }
 
 status_t AudioFlinger::MmapThreadHandle::standby()
 {
-    if (mThread == 0) {
-        return NO_INIT;
-    }
     return mThread->standby();
 }
 
@@ -7593,7 +7572,7 @@ void AudioFlinger::MmapThread::disconnect()
     for (const sp<MmapTrack> &t : mActiveTracks) {
         stop(t->portId());
     }
-    // this will cause the destruction of this thread.
+    // This will decrement references and may cause the destruction of this thread.
     if (isOutput()) {
         AudioSystem::releaseOutput(mId, streamType(), mSessionId);
     } else {

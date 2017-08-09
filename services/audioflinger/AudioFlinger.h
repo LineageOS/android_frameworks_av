@@ -604,7 +604,7 @@ private:
         virtual status_t standby();
 
     private:
-        sp<MmapThread> mThread;
+        const sp<MmapThread> mThread;
     };
 
               ThreadBase *checkThread_l(audio_io_handle_t ioHandle) const;

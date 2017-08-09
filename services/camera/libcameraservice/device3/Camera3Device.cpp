@@ -1478,6 +1478,7 @@ status_t Camera3Device::configureStreams(int operatingMode) {
 
 status_t Camera3Device::getInputBufferProducer(
         sp<IGraphicBufferProducer> *producer) {
+    ATRACE_CALL();
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
 
@@ -1691,6 +1692,7 @@ bool Camera3Device::willNotify3A() {
 }
 
 status_t Camera3Device::waitForNextFrame(nsecs_t timeout) {
+    ATRACE_CALL();
     status_t res;
     Mutex::Autolock l(mOutputLock);
 
@@ -1884,6 +1886,7 @@ status_t Camera3Device::addBufferListenerForStream(int streamId,
  */
 
 void Camera3Device::notifyStatus(bool idle) {
+    ATRACE_CALL();
     {
         // Need mLock to safely update state and synchronize to current
         // state of methods in flight.
@@ -2317,6 +2320,7 @@ status_t Camera3Device::tryRemoveDummyStreamLocked() {
 }
 
 void Camera3Device::setErrorState(const char *fmt, ...) {
+    ATRACE_CALL();
     Mutex::Autolock l(mLock);
     va_list args;
     va_start(args, fmt);
@@ -2327,6 +2331,7 @@ void Camera3Device::setErrorState(const char *fmt, ...) {
 }
 
 void Camera3Device::setErrorStateV(const char *fmt, va_list args) {
+    ATRACE_CALL();
     Mutex::Autolock l(mLock);
     setErrorStateLockedV(fmt, args);
 }
@@ -2411,6 +2416,7 @@ void Camera3Device::returnOutputBuffers(
 }
 
 void Camera3Device::removeInFlightMapEntryLocked(int idx) {
+    ATRACE_CALL();
     nsecs_t duration = mInFlightMap.valueAt(idx).maxExpectedDuration;
     mInFlightMap.removeItemsAt(idx, 1);
 
@@ -2495,6 +2501,7 @@ void Camera3Device::removeInFlightRequestIfReadyLocked(int idx) {
 }
 
 void Camera3Device::flushInflightRequests() {
+    ATRACE_CALL();
     { // First return buffers cached in mInFlightMap
         Mutex::Autolock l(mInFlightLock);
         for (size_t idx = 0; idx < mInFlightMap.size(); idx++) {
@@ -2621,6 +2628,7 @@ void Camera3Device::insertResultLocked(CaptureResult *result,
 
 void Camera3Device::sendPartialCaptureResult(const camera_metadata_t * partialResult,
         const CaptureResultExtras &resultExtras, uint32_t frameNumber) {
+    ATRACE_CALL();
     Mutex::Autolock l(mOutputLock);
 
     CaptureResult captureResult;
@@ -2636,6 +2644,7 @@ void Camera3Device::sendCaptureResult(CameraMetadata &pendingMetadata,
         CameraMetadata &collectedPartialResult,
         uint32_t frameNumber,
         bool reprocess) {
+    ATRACE_CALL();
     if (pendingMetadata.isEmpty())
         return;
 
@@ -2884,7 +2893,7 @@ void Camera3Device::notify(const camera3_notify_msg *msg) {
 
 void Camera3Device::notifyError(const camera3_error_msg_t &msg,
         sp<NotificationListener> listener) {
-
+    ATRACE_CALL();
     // Map camera HAL error codes to ICameraDeviceCallback error codes
     // Index into this with the HAL error code
     static const int32_t halErrorMap[CAMERA3_MSG_NUM_ERRORS] = {
@@ -2962,6 +2971,7 @@ void Camera3Device::notifyError(const camera3_error_msg_t &msg,
 
 void Camera3Device::notifyShutter(const camera3_shutter_msg_t &msg,
         sp<NotificationListener> listener) {
+    ATRACE_CALL();
     ssize_t idx;
 
     // Set timestamp for the request in the in-flight tracking
@@ -3292,7 +3302,7 @@ status_t Camera3Device::HalInterface::configureStreams(camera3_stream_configurat
 void Camera3Device::HalInterface::wrapAsHidlRequest(camera3_capture_request_t* request,
         /*out*/device::V3_2::CaptureRequest* captureRequest,
         /*out*/std::vector<native_handle_t*>* handlesCreated) {
-
+    ATRACE_CALL();
     if (captureRequest == nullptr || handlesCreated == nullptr) {
         ALOGE("%s: captureRequest (%p) and handlesCreated (%p) must not be null",
                 __FUNCTION__, captureRequest, handlesCreated);
@@ -3614,11 +3624,13 @@ Camera3Device::RequestThread::~RequestThread() {}
 
 void Camera3Device::RequestThread::setNotificationListener(
         wp<NotificationListener> listener) {
+    ATRACE_CALL();
     Mutex::Autolock l(mRequestLock);
     mListener = listener;
 }
 
 void Camera3Device::RequestThread::configurationComplete(bool isConstrainedHighSpeed) {
+    ATRACE_CALL();
     Mutex::Autolock l(mRequestLock);
     mReconfigured = true;
     // Prepare video stream for high speed recording.
@@ -3629,6 +3641,7 @@ status_t Camera3Device::RequestThread::queueRequestList(
         List<sp<CaptureRequest> > &requests,
         /*out*/
         int64_t *lastFrameNumber) {
+    ATRACE_CALL();
     Mutex::Autolock l(mRequestLock);
     for (List<sp<CaptureRequest> >::iterator it = requests.begin(); it != requests.end();
             ++it) {
@@ -3651,7 +3664,7 @@ status_t Camera3Device::RequestThread::queueRequestList(
 status_t Camera3Device::RequestThread::queueTrigger(
         RequestTrigger trigger[],
         size_t count) {
-
+    ATRACE_CALL();
     Mutex::Autolock l(mTriggerMutex);
     status_t ret;
 
@@ -3708,6 +3721,7 @@ status_t Camera3Device::RequestThread::setRepeatingRequests(
         const RequestList &requests,
         /*out*/
         int64_t *lastFrameNumber) {
+    ATRACE_CALL();
     Mutex::Autolock l(mRequestLock);
     if (lastFrameNumber != NULL) {
         *lastFrameNumber = mRepeatingLastFrameNumber;
@@ -3734,6 +3748,7 @@ bool Camera3Device::RequestThread::isRepeatingRequestLocked(const sp<CaptureRequ
 }
 
 status_t Camera3Device::RequestThread::clearRepeatingRequests(/*out*/int64_t *lastFrameNumber) {
+    ATRACE_CALL();
     Mutex::Autolock l(mRequestLock);
     return clearRepeatingRequestsLocked(lastFrameNumber);
 
@@ -3750,6 +3765,7 @@ status_t Camera3Device::RequestThread::clearRepeatingRequestsLocked(/*out*/int64
 
 status_t Camera3Device::RequestThread::clear(
         /*out*/int64_t *lastFrameNumber) {
+    ATRACE_CALL();
     Mutex::Autolock l(mRequestLock);
     ALOGV("RequestThread::%s:", __FUNCTION__);
 
@@ -3805,6 +3821,7 @@ status_t Camera3Device::RequestThread::flush() {
 }
 
 void Camera3Device::RequestThread::setPaused(bool paused) {
+    ATRACE_CALL();
     Mutex::Autolock l(mPauseLock);
     mDoPause = paused;
     mDoPauseSignal.signal();
@@ -3812,6 +3829,7 @@ void Camera3Device::RequestThread::setPaused(bool paused) {
 
 status_t Camera3Device::RequestThread::waitUntilRequestProcessed(
         int32_t requestId, nsecs_t timeout) {
+    ATRACE_CALL();
     Mutex::Autolock l(mLatestRequestMutex);
     status_t res;
     while (mLatestRequestId != requestId) {
@@ -3838,6 +3856,7 @@ void Camera3Device::RequestThread::requestExit() {
 }
 
 void Camera3Device::RequestThread::checkAndStopRepeatingRequest() {
+    ATRACE_CALL();
     bool surfaceAbandoned = false;
     int64_t lastFrameNumber = 0;
     sp<NotificationListener> listener;
@@ -3866,6 +3885,7 @@ void Camera3Device::RequestThread::checkAndStopRepeatingRequest() {
 }
 
 bool Camera3Device::RequestThread::sendRequestsBatch() {
+    ATRACE_CALL();
     status_t res;
     size_t batchSize = mNextRequests.size();
     std::vector<camera3_capture_request_t*> requests(batchSize);
@@ -4261,6 +4281,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
 }
 
 CameraMetadata Camera3Device::RequestThread::getLatestRequest() const {
+    ATRACE_CALL();
     Mutex::Autolock al(mLatestRequestMutex);
 
     ALOGV("RequestThread::%s", __FUNCTION__);
@@ -4270,6 +4291,7 @@ CameraMetadata Camera3Device::RequestThread::getLatestRequest() const {
 
 bool Camera3Device::RequestThread::isStreamPending(
         sp<Camera3StreamInterface>& stream) {
+    ATRACE_CALL();
     Mutex::Autolock l(mRequestLock);
 
     for (const auto& nextRequest : mNextRequests) {
@@ -4299,6 +4321,7 @@ bool Camera3Device::RequestThread::isStreamPending(
 }
 
 nsecs_t Camera3Device::getExpectedInFlightDuration() {
+    ATRACE_CALL();
     Mutex::Autolock al(mInFlightLock);
     return mExpectedInflightDuration > kMinInflightDuration ?
             mExpectedInflightDuration : kMinInflightDuration;
@@ -4370,6 +4393,7 @@ void Camera3Device::RequestThread::cleanUpFailedRequests(bool sendRequestError) 
 }
 
 void Camera3Device::RequestThread::waitForNextRequestBatch() {
+    ATRACE_CALL();
     // Optimized a bit for the simple steady-state case (single repeating
     // request), to avoid putting that request in the queue temporarily.
     Mutex::Autolock l(mRequestLock);
@@ -4519,6 +4543,7 @@ sp<Camera3Device::CaptureRequest>
 }
 
 bool Camera3Device::RequestThread::waitIfPaused() {
+    ATRACE_CALL();
     status_t res;
     Mutex::Autolock l(mPauseLock);
     while (mDoPause) {
@@ -4543,6 +4568,7 @@ bool Camera3Device::RequestThread::waitIfPaused() {
 }
 
 void Camera3Device::RequestThread::unpauseForNewRequests() {
+    ATRACE_CALL();
     // With work to do, mark thread as unpaused.
     // If paused by request (setPaused), don't resume, to avoid
     // extra signaling/waiting overhead to waitUntilPaused
@@ -4574,7 +4600,7 @@ void Camera3Device::RequestThread::setErrorState(const char *fmt, ...) {
 
 status_t Camera3Device::RequestThread::insertTriggers(
         const sp<CaptureRequest> &request) {
-
+    ATRACE_CALL();
     Mutex::Autolock al(mTriggerMutex);
 
     sp<Camera3Device> parent = mParent.promote();
@@ -4663,6 +4689,7 @@ status_t Camera3Device::RequestThread::insertTriggers(
 
 status_t Camera3Device::RequestThread::removeTriggers(
         const sp<CaptureRequest> &request) {
+    ATRACE_CALL();
     Mutex::Autolock al(mTriggerMutex);
 
     CameraMetadata &metadata = request->mSettings;
@@ -4779,6 +4806,7 @@ Camera3Device::PreparerThread::~PreparerThread() {
 }
 
 status_t Camera3Device::PreparerThread::prepare(int maxCount, sp<Camera3StreamInterface>& stream) {
+    ATRACE_CALL();
     status_t res;
 
     Mutex::Autolock l(mLock);
@@ -4822,6 +4850,7 @@ status_t Camera3Device::PreparerThread::prepare(int maxCount, sp<Camera3StreamIn
 }
 
 status_t Camera3Device::PreparerThread::clear() {
+    ATRACE_CALL();
     Mutex::Autolock l(mLock);
 
     for (const auto& stream : mPendingStreams) {
@@ -4834,6 +4863,7 @@ status_t Camera3Device::PreparerThread::clear() {
 }
 
 void Camera3Device::PreparerThread::setNotificationListener(wp<NotificationListener> listener) {
+    ATRACE_CALL();
     Mutex::Autolock l(mLock);
     mListener = listener;
 }
