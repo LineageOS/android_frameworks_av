@@ -49,6 +49,9 @@ EffectHalHidl::~EffectHalHidl() {
         mEffect.clear();
         hardware::IPCThreadState::self()->flushCommands();
     }
+    if (mEfGroup) {
+        EventFlag::deleteEventFlag(&mEfGroup);
+    }
 }
 
 // static
