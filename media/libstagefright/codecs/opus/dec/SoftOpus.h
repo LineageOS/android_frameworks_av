@@ -75,6 +75,7 @@ private:
     int64_t mSamplesToDiscard;
     int64_t mAnchorTimeUs;
     int64_t mNumFramesOutput;
+    bool mHaveEOS;
 
     enum {
         NONE,
@@ -85,6 +86,7 @@ private:
     void initPorts();
     status_t initDecoder();
     bool isConfigured() const;
+    void handleEOS();
 
     DISALLOW_EVIL_CONSTRUCTORS(SoftOpus);
 };
