@@ -1,5 +1,9 @@
 cc_library_shared {
     name: "libstagefright_soft_gsmdec",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     srcs: ["SoftGSM.cpp"],
 
@@ -23,7 +27,7 @@ cc_library_shared {
     },
 
     shared_libs: [
-        "libmedia",
+        "libmedia_omx",
         "libstagefright_omx",
         "libutils",
         "liblog",

@@ -1,5 +1,6 @@
 cc_library_static {
     name: "libstagefright_m4vh263enc",
+    vendor_available: true,
 
     srcs: [
         "src/bitstream_io.cpp",
@@ -52,6 +53,10 @@ cc_library_static {
 
 cc_library_shared {
     name: "libstagefright_soft_mpeg4enc",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     srcs: ["SoftMPEG4Encoder.cpp"],
 
@@ -75,7 +80,7 @@ cc_library_shared {
     static_libs: ["libstagefright_m4vh263enc"],
 
     shared_libs: [
-        "libmedia",
+        "libmedia_omx",
         "libstagefright_omx",
         "libutils",
         "liblog",

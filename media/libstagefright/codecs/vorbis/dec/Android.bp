@@ -1,5 +1,9 @@
 cc_library_shared {
     name: "libstagefright_soft_vorbisdec",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     srcs: ["SoftVorbis.cpp"],
 
@@ -10,7 +14,7 @@ cc_library_shared {
 
     shared_libs: [
         "libvorbisidec",
-        "libmedia",
+        "libmedia_omx",
         "libstagefright_omx",
         "libstagefright_foundation",
         "libutils",
