@@ -211,7 +211,7 @@ sp<IMemory> MetadataRetrieverClient::getFrameAtTime(
         ALOGE("failed to capture a video frame");
         return NULL;
     }
-    size_t size = sizeof(VideoFrame) + frame->mSize;
+    size_t size = frame->getFlattenedSize();
     sp<MemoryHeapBase> heap = new MemoryHeapBase(size, 0, "MetadataRetrieverClient");
     if (heap == NULL) {
         ALOGE("failed to create MemoryDealer");
@@ -225,16 +225,7 @@ sp<IMemory> MetadataRetrieverClient::getFrameAtTime(
         return NULL;
     }
     VideoFrame *frameCopy = static_cast<VideoFrame *>(mThumbnail->pointer());
-    frameCopy->mWidth = frame->mWidth;
-    frameCopy->mHeight = frame->mHeight;
-    frameCopy->mDisplayWidth = frame->mDisplayWidth;
-    frameCopy->mDisplayHeight = frame->mDisplayHeight;
-    frameCopy->mSize = frame->mSize;
-    frameCopy->mRotationAngle = frame->mRotationAngle;
-    ALOGV("rotation: %d", frameCopy->mRotationAngle);
-    frameCopy->mData = (uint8_t *)frameCopy + sizeof(VideoFrame);
-    memcpy(frameCopy->mData, frame->mData, frame->mSize);
-    frameCopy->mData = 0;
+    frameCopy->copyFlattened(*frame);
     delete frame;  // Fix memory leakage
     return mThumbnail;
 }

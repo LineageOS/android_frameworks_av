@@ -38,6 +38,8 @@ enum {
     kKeyDisplayHeight     = 'dHgt',  // int32_t, display/presentation
     kKeySARWidth          = 'sarW',  // int32_t, sampleAspectRatio width
     kKeySARHeight         = 'sarH',  // int32_t, sampleAspectRatio height
+    kKeyThumbnailWidth    = 'thbW',  // int32_t, thumbnail width
+    kKeyThumbnailHeight   = 'thbH',  // int32_t, thumbnail height
 
     // a rectangle, if absent assumed to be (0, 0, width - 1, height - 1)
     kKeyCropRect          = 'crop',
@@ -58,6 +60,7 @@ enum {
     kKeyAACProfile        = 'aacp',  // int32_t
     kKeyAVCC              = 'avcc',  // raw data
     kKeyHVCC              = 'hvcc',  // raw data
+    kKeyThumbnailHVCC     = 'thvc',  // raw data
     kKeyD263              = 'd263',  // raw data
     kKeyVorbisInfo        = 'vinf',  // raw data
     kKeyVorbisBooks       = 'vboo',  // raw data
@@ -209,6 +212,10 @@ enum {
                                    // color Matrix, value defined by ColorAspects.MatrixCoeffs.
     kKeyTemporalLayerId  = 'iLyr', // int32_t, temporal layer-id. 0-based (0 => base layer)
     kKeyTemporalLayerCount = 'cLyr', // int32_t, number of temporal layers encoded
+
+    kKeyGridRows         = 'rows', // int32_t, HEIF grid rows
+    kKeyGridCols         = 'clms', // int32_t, HEIF grid columns
+    kKeyIccProfile       = 'prof', // raw data
 };
 
 enum {
