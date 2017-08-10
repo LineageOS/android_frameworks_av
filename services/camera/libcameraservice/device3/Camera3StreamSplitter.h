@@ -52,7 +52,7 @@ public:
     // Connect to the stream splitter by creating buffer queue and connecting it
     // with output surfaces.
     status_t connect(const std::vector<sp<Surface> >& surfaces,
-            uint32_t consumerUsage, size_t halMaxBuffers,
+            uint64_t consumerUsage, size_t halMaxBuffers,
             sp<Surface>* consumer);
 
     // addOutput adds an output BufferQueue to the splitter. The splitter

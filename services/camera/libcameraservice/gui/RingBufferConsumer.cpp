@@ -38,7 +38,7 @@ typedef android::RingBufferConsumer::PinnedBufferItem PinnedBufferItem;
 namespace android {
 
 RingBufferConsumer::RingBufferConsumer(const sp<IGraphicBufferConsumer>& consumer,
-        uint32_t consumerUsage,
+        uint64_t consumerUsage,
         int bufferCount) :
     ConsumerBase(consumer),
     mBufferCount(bufferCount),
@@ -368,7 +368,7 @@ status_t RingBufferConsumer::setDefaultBufferFormat(uint32_t defaultFormat) {
     return mConsumer->setDefaultBufferFormat(defaultFormat);
 }
 
-status_t RingBufferConsumer::setConsumerUsage(uint32_t usage) {
+status_t RingBufferConsumer::setConsumerUsage(uint64_t usage) {
     Mutex::Autolock _l(mMutex);
     return mConsumer->setConsumerUsageBits(usage);
 }
