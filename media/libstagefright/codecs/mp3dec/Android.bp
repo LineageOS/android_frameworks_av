@@ -1,5 +1,6 @@
 cc_library_static {
     name: "libstagefright_mp3dec",
+    vendor_available: true,
 
     srcs: [
         "src/pvmp3_normalize.cpp",
@@ -77,6 +78,10 @@ cc_library_static {
 
 cc_library_shared {
     name: "libstagefright_soft_mp3dec",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     srcs: ["SoftMP3.cpp"],
 
@@ -102,7 +107,7 @@ cc_library_shared {
     },
 
     shared_libs: [
-        "libmedia",
+        "libmedia_omx",
         "libstagefright_omx",
         "libstagefright_foundation",
         "libutils",

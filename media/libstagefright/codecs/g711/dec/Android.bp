@@ -1,5 +1,9 @@
 cc_library_shared {
     name: "libstagefright_soft_g711dec",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     srcs: ["SoftG711.cpp"],
 
@@ -9,7 +13,7 @@ cc_library_shared {
     ],
 
     shared_libs: [
-        "libmedia",
+        "libmedia_omx",
         "libstagefright_omx",
         "libutils",
         "liblog",
