@@ -79,7 +79,7 @@ public:
     status_t setDataSource(
             const sp<IDataSource>& dataSource, const char *mime = NULL);
     sp<IMemory> getFrameAtTime(int64_t timeUs, int option,
-            int colorFormat = 0, bool metaOnly = false);
+            int colorFormat = HAL_PIXEL_FORMAT_RGB_565, bool metaOnly = false);
     sp<IMemory> extractAlbumArt();
     const char* extractMetadata(int keyCode);
 
