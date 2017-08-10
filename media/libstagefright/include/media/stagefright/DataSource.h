@@ -73,6 +73,11 @@ public:
     bool getUInt32(off64_t offset, uint32_t *x);
     bool getUInt64(off64_t offset, uint64_t *x);
 
+    // read either int<N> or int<2N> into a uint<2N>_t, size is the int size in bytes.
+    bool getUInt16Var(off64_t offset, uint16_t *x, size_t size);
+    bool getUInt32Var(off64_t offset, uint32_t *x, size_t size);
+    bool getUInt64Var(off64_t offset, uint64_t *x, size_t size);
+
     // Reads in "count" entries of type T into vector *x.
     // Returns true if "count" entries can be read.
     // If fewer than "count" entries can be read, return false. In this case,

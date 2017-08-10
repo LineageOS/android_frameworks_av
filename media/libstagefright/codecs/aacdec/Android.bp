@@ -1,5 +1,9 @@
 cc_library_shared {
     name: "libstagefright_soft_aacdec",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     srcs: [
         "SoftAAC2.cpp",

@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include <android-base/unique_fd.h>
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
 #include <cutils/ashmem.h>
@@ -28,6 +29,7 @@
 #include <aaudio/AAudio.h>
 #include <binding/AudioEndpointParcelable.h>
 
+using android::base::unique_fd;
 using namespace android;
 using namespace aaudio;
 
@@ -48,7 +50,7 @@ TEST(test_marshalling, aaudio_shared_memory) {
     SharedMemoryParcelable sharedMemoryA;
     SharedMemoryParcelable sharedMemoryB;
     const size_t memSizeBytes = 840;
-    int fd = ashmem_create_region("TestMarshalling", memSizeBytes);
+    unique_fd fd(ashmem_create_region("TestMarshalling", memSizeBytes));
     ASSERT_LE(0, fd);
     sharedMemoryA.setup(fd, memSizeBytes);
     void *region1;
@@ -81,7 +83,7 @@ TEST(test_marshalling, aaudio_shared_region) {
     SharedRegionParcelable sharedRegionA;
     SharedRegionParcelable sharedRegionB;
     const size_t memSizeBytes = 840;
-    int fd = ashmem_create_region("TestMarshalling", memSizeBytes);
+    unique_fd fd(ashmem_create_region("TestMarshalling", memSizeBytes));
     ASSERT_LE(0, fd);
     sharedMemories[0].setup(fd, memSizeBytes);
     int32_t regionOffset1 = 32;
@@ -119,7 +121,7 @@ TEST(test_marshalling, aaudio_ring_buffer_parcelable) {
     const int32_t counterSizeBytes = sizeof(int64_t);
     const size_t memSizeBytes = dataSizeBytes + (2 * counterSizeBytes);
 
-    int fd = ashmem_create_region("TestMarshalling", memSizeBytes);
+    unique_fd fd(ashmem_create_region("TestMarshalling Z", memSizeBytes));
     ASSERT_LE(0, fd);
     sharedMemories[0].setup(fd, memSizeBytes);
 
