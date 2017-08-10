@@ -27,6 +27,8 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/legacy \
     $(LOCAL_PATH)/utility
 
+LOCAL_AIDL_INCLUDES := frameworks/av/media/libaudioclient/aidl
+
 # If you add a file here then also add it below in the SHARED target
 LOCAL_SRC_FILES = \
     core/AudioStream.cpp \
@@ -57,7 +59,8 @@ LOCAL_SRC_FILES = \
     binding/IAAudioService.cpp \
     binding/RingBufferParcelable.cpp \
     binding/SharedMemoryParcelable.cpp \
-    binding/SharedRegionParcelable.cpp
+    binding/SharedRegionParcelable.cpp \
+    ../../libaudioclient/aidl/android/media/IAudioRecord.aidl
 
 LOCAL_CFLAGS += -Wno-unused-parameter -Wall -Werror
 

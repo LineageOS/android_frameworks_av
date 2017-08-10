@@ -33,7 +33,6 @@
 #include <media/IAudioFlinger.h>
 #include <media/IAudioFlingerClient.h>
 #include <media/IAudioTrack.h>
-#include <media/IAudioRecord.h>
 #include <media/AudioSystem.h>
 #include <media/AudioTrack.h>
 #include <media/MmapStreamInterface.h>
@@ -75,6 +74,8 @@
 #include <media/nbaio/NBLog.h>
 #include <private/media/AudioEffectShared.h>
 #include <private/media/AudioTrackShared.h>
+
+#include "android/media/BnAudioRecord.h"
 
 namespace android {
 
@@ -129,7 +130,7 @@ public:
                                 status_t *status /*non-NULL*/,
                                 audio_port_handle_t portId);
 
-    virtual sp<IAudioRecord> openRecord(
+    virtual sp<media::IAudioRecord> openRecord(
                                 audio_io_handle_t input,
                                 uint32_t sampleRate,
                                 audio_format_t format,
@@ -571,15 +572,13 @@ private:
     };
 
     // server side of the client's IAudioRecord
-    class RecordHandle : public android::BnAudioRecord {
+    class RecordHandle : public android::media::BnAudioRecord {
     public:
         explicit RecordHandle(const sp<RecordThread::RecordTrack>& recordTrack);
         virtual             ~RecordHandle();
-        virtual status_t    start(int /*AudioSystem::sync_event_t*/ event,
-                audio_session_t triggerSession);
-        virtual void        stop();
-        virtual status_t onTransact(
-            uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags);
+        virtual binder::Status    start(int /*AudioSystem::sync_event_t*/ event,
+                int /*audio_session_t*/ triggerSession);
+        virtual binder::Status   stop();
     private:
         const sp<RecordThread::RecordTrack> mRecordTrack;
 
