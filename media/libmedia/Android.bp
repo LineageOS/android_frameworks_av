@@ -124,6 +124,9 @@ cc_defaults {
 cc_library_shared {
     name: "libmedia_omx",
     vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     defaults: ["libmedia_omx_defaults"],
 }
@@ -201,6 +204,7 @@ cc_library_shared {
     ],
 
     export_shared_lib_headers: [
+        "libaudioclient",
         "libbinder",
         "libicuuc",
         "libicui18n",

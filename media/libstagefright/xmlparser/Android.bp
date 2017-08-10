@@ -1,6 +1,9 @@
 cc_library_shared {
     name: "libstagefright_xmlparser",
     vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     srcs: [
         "MediaCodecsXmlParser.cpp",

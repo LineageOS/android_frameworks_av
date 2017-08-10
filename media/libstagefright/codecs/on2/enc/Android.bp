@@ -1,5 +1,9 @@
 cc_library_shared {
     name: "libstagefright_soft_vpxenc",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     srcs: [
         "SoftVPXEncoder.cpp",
@@ -26,7 +30,7 @@ cc_library_shared {
     static_libs: ["libvpx"],
 
     shared_libs: [
-        "libmedia",
+        "libmedia_omx",
         "libstagefright_omx",
         "libstagefright_foundation",
         "libutils",

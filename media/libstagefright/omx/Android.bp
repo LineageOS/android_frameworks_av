@@ -1,6 +1,9 @@
 cc_library_shared {
     name: "libstagefright_omx",
     vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     srcs: [
         "FrameDropper.cpp",

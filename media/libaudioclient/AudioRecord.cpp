@@ -323,7 +323,7 @@ status_t AudioRecord::start(AudioSystem::sync_event_t event, audio_session_t tri
 
     status_t status = NO_ERROR;
     if (!(flags & CBLK_INVALID)) {
-        status = mAudioRecord->start(event, triggerSession);
+        status = mAudioRecord->start(event, triggerSession).transactionError();
         if (status == DEAD_OBJECT) {
             flags |= CBLK_INVALID;
         }
@@ -652,22 +652,22 @@ status_t AudioRecord::openRecord_l(const Modulo<uint32_t> &epoch, const String16
 
     sp<IMemory> iMem;           // for cblk
     sp<IMemory> bufferMem;
-    sp<IAudioRecord> record = audioFlinger->openRecord(input,
-                                                       mSampleRate,
-                                                       mFormat,
-                                                       mChannelMask,
-                                                       opPackageName,
-                                                       &temp,
-                                                       &flags,
-                                                       mClientPid,
-                                                       tid,
-                                                       mClientUid,
-                                                       &mSessionId,
-                                                       &notificationFrames,
-                                                       iMem,
-                                                       bufferMem,
-                                                       &status,
-                                                       mPortId);
+    sp<media::IAudioRecord> record = audioFlinger->openRecord(input,
+                                                              mSampleRate,
+                                                              mFormat,
+                                                              mChannelMask,
+                                                              opPackageName,
+                                                              &temp,
+                                                              &flags,
+                                                              mClientPid,
+                                                              tid,
+                                                              mClientUid,
+                                                              &mSessionId,
+                                                              &notificationFrames,
+                                                              iMem,
+                                                              bufferMem,
+                                                              &status,
+                                                              mPortId);
     ALOGE_IF(originalSessionId != AUDIO_SESSION_ALLOCATE && mSessionId != originalSessionId,
             "session ID changed from %d to %d", originalSessionId, mSessionId);
 
@@ -1219,7 +1219,8 @@ status_t AudioRecord::restoreRecord_l(const char *from)
         if (mActive) {
             // callback thread or sync event hasn't changed
             // FIXME this fails if we have a new AudioFlinger instance
-            result = mAudioRecord->start(AudioSystem::SYNC_EVENT_SAME, AUDIO_SESSION_NONE);
+            result = mAudioRecord->start(
+                AudioSystem::SYNC_EVENT_SAME, AUDIO_SESSION_NONE).transactionError();
         }
         mFramesReadServerOffset = mFramesRead; // server resets to zero so we need an offset.
     }

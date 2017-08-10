@@ -175,7 +175,7 @@ public:
         return track;
     }
 
-    virtual sp<IAudioRecord> openRecord(
+    virtual sp<media::IAudioRecord> openRecord(
                                 audio_io_handle_t input,
                                 uint32_t sampleRate,
                                 audio_format_t format,
@@ -194,7 +194,7 @@ public:
                                 audio_port_handle_t portId)
     {
         Parcel data, reply;
-        sp<IAudioRecord> record;
+        sp<media::IAudioRecord> record;
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
         data.writeInt32((int32_t) input);
         data.writeInt32(sampleRate);
@@ -238,7 +238,7 @@ public:
                 *notificationFrames = lNotificationFrames;
             }
             lStatus = reply.readInt32();
-            record = interface_cast<IAudioRecord>(reply.readStrongBinder());
+            record = interface_cast<media::IAudioRecord>(reply.readStrongBinder());
             cblk = interface_cast<IMemory>(reply.readStrongBinder());
             if (cblk != 0 && cblk->pointer() == NULL) {
                 cblk.clear();
@@ -1025,7 +1025,7 @@ status_t BnAudioFlinger::onTransact(
             sp<IMemory> cblk;
             sp<IMemory> buffers;
             status_t status = NO_ERROR;
-            sp<IAudioRecord> record = openRecord(input,
+            sp<media::IAudioRecord> record = openRecord(input,
                     sampleRate, format, channelMask, opPackageName, &frameCount, &flags,
                     pid, tid, clientUid, &sessionId, &notificationFrames, cblk, buffers,
                     &status, portId);

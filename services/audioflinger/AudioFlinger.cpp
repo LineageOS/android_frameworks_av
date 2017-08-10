@@ -1561,7 +1561,7 @@ void AudioFlinger::requestLogMerge() {
 
 // ----------------------------------------------------------------------------
 
-sp<IAudioRecord> AudioFlinger::openRecord(
+sp<media::IAudioRecord> AudioFlinger::openRecord(
         audio_io_handle_t input,
         uint32_t sampleRate,
         audio_format_t format,

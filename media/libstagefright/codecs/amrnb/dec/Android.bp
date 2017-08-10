@@ -1,5 +1,6 @@
 cc_library_static {
     name: "libstagefright_amrnbdec",
+    vendor_available: true,
 
     srcs: [
         "src/a_refl.cpp",
@@ -55,13 +56,20 @@ cc_library_static {
     //    ],
     //},
 
-    shared_libs: ["libstagefright_amrnb_common"],
+    shared_libs: [
+        "libstagefright_amrnb_common",
+        "liblog",
+    ],
 }
 
 //###############################################################################
 
 cc_library_shared {
     name: "libstagefright_soft_amrdec",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     srcs: ["SoftAMR.cpp"],
 
