@@ -40,7 +40,7 @@ using ::android::hardware::Return;
 namespace android {
 
 EffectHalHidl::EffectHalHidl(const sp<IEffect>& effect, uint64_t effectId)
-        : mEffect(effect), mEffectId(effectId), mBuffersChanged(true) {
+        : mEffect(effect), mEffectId(effectId), mBuffersChanged(true), mEfGroup(nullptr) {
 }
 
 EffectHalHidl::~EffectHalHidl() {
