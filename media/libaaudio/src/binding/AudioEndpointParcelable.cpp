@@ -28,6 +28,7 @@
 #include "binding/RingBufferParcelable.h"
 #include "binding/AudioEndpointParcelable.h"
 
+using android::base::unique_fd;
 using android::NO_ERROR;
 using android::status_t;
 using android::Parcel;
@@ -49,7 +50,8 @@ AudioEndpointParcelable::~AudioEndpointParcelable() {}
  * Add the file descriptor to the table.
  * @return index in table or negative error
  */
-int32_t AudioEndpointParcelable::addFileDescriptor(int fd, int32_t sizeInBytes) {
+int32_t AudioEndpointParcelable::addFileDescriptor(const unique_fd& fd,
+                                                   int32_t sizeInBytes) {
     if (mNumSharedMemories >= MAX_SHARED_MEMORIES) {
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
