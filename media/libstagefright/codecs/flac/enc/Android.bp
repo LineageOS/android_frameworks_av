@@ -22,7 +22,7 @@ cc_library_shared {
     },
 
     shared_libs: [
-        "libmedia",
+        "libmedia_omx",
         "libstagefright_omx",
         "libstagefright_foundation",
         "libutils",
@@ -32,5 +32,9 @@ cc_library_shared {
     static_libs: ["libFLAC"],
 
     name: "libstagefright_soft_flacenc",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
 }
