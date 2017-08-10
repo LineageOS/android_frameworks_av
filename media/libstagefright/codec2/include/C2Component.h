@@ -543,6 +543,7 @@ public:
 };
 
 class C2ComponentStore {
+public:
     /**
      * Creates a component.
      *
