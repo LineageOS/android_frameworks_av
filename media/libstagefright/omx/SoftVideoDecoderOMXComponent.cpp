@@ -182,11 +182,11 @@ void SoftVideoDecoderOMXComponent::updatePortDefinitions(bool updateCrop, bool u
 
 
 uint32_t SoftVideoDecoderOMXComponent::outputBufferWidth() {
-    return mIsAdaptive ? mAdaptiveMaxWidth : mWidth;
+    return max(mIsAdaptive ? mAdaptiveMaxWidth : 0, mWidth);
 }
 
 uint32_t SoftVideoDecoderOMXComponent::outputBufferHeight() {
-    return mIsAdaptive ? mAdaptiveMaxHeight : mHeight;
+    return max(mIsAdaptive ? mAdaptiveMaxHeight : 0, mHeight);
 }
 
 void SoftVideoDecoderOMXComponent::handlePortSettingsChange(
