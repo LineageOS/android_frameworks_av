@@ -90,3 +90,9 @@ cc_library_shared {
         },
     },
 }
+
+llndk_library {
+    name: "libmediandk",
+    symbol_file: "libmediandk.map.txt",
+    export_include_dirs: ["include"],
+}
