@@ -19,6 +19,7 @@
 
 #include <atomic>
 
+#include <android-base/unique_fd.h>
 #include <media/audiohal/StreamHalInterface.h>
 #include <media/MmapStreamCallback.h>
 #include <media/MmapStreamInterface.h>
@@ -32,6 +33,7 @@
 #include "SharedMemoryProxy.h"
 #include "TimestampScheduler.h"
 #include "utility/MonotonicCounter.h"
+
 
 namespace aaudio {
 
@@ -131,7 +133,6 @@ private:
     MonotonicCounter                    mFramesWritten;
     MonotonicCounter                    mFramesRead;
     int32_t                             mPreviousFrameCounter = 0;   // from HAL
-    int                                 mAudioDataFileDescriptor = -1;
 
     // Interface to the AudioFlinger MMAP support.
     android::sp<android::MmapStreamInterface> mMmapStream;
@@ -140,6 +141,7 @@ private:
     audio_port_handle_t                       mDeviceId = AUDIO_PORT_HANDLE_NONE;
     android::AudioClient                      mServiceClient;
     bool                                      mInService = false;
+    android::base::unique_fd                  mAudioDataFileDescriptor;
 };
 
 } // namespace aaudio

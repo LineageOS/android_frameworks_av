@@ -16,11 +16,14 @@
 
 // Play sine waves using AAudio.
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
+#include <asm/fcntl.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
 #include "AAudioExampleUtils.h"
 #include "AAudioSimplePlayer.h"
 #include "AAudioArgsParser.h"
@@ -47,6 +50,8 @@ int main(int argc, const char **argv)
     int32_t  xRunCount = 0;
     float   *floatData = nullptr;
     int16_t *shortData = nullptr;
+
+    int      testFd = -1;
 
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
@@ -94,6 +99,9 @@ int main(int argc, const char **argv)
         printf("ERROR Unsupported data format!\n");
         goto finish;
     }
+
+    testFd = open("/data/aaudio_temp.raw", O_CREAT | O_RDWR, S_IRWXU);
+    printf("testFd = %d, pid = %d\n", testFd, getpid());
 
     // Start the stream.
     printf("call player.start()\n");
@@ -176,7 +184,17 @@ int main(int argc, const char **argv)
     }
 
 finish:
+    printf("testFd = %d, fcntl before aaudio close returns 0x%08X\n",
+           testFd, fcntl(testFd, F_GETFD));
     player.close();
+    printf("testFd = %d, fcntl after aaudio close returns 0x%08X\n",
+           testFd, fcntl(testFd, F_GETFD));
+    if (::close(testFd) != 0) {
+        printf("ERROR SharedMemoryParcelable::close() of testFd = %d, errno = %s\n",
+               testFd, strerror(errno));
+    }
+    printf("testFd = %d, fcntl after close() returns 0x%08X\n", testFd, fcntl(testFd, F_GETFD));
+
     delete[] floatData;
     delete[] shortData;
     printf("exiting - AAudio result = %d = %s\n", result, AAudio_convertResultToText(result));
