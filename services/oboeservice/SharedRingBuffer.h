@@ -17,6 +17,7 @@
 #ifndef AAUDIO_SHARED_RINGBUFFER_H
 #define AAUDIO_SHARED_RINGBUFFER_H
 
+#include <android-base/unique_fd.h>
 #include <stdint.h>
 #include <cutils/ashmem.h>
 #include <sys/mman.h>
@@ -51,12 +52,12 @@ public:
     }
 
 private:
-    int                    mFileDescriptor = -1;
-    android::FifoBuffer   *mFifoBuffer = nullptr;
-    uint8_t               *mSharedMemory = nullptr;
-    int32_t                mSharedMemorySizeInBytes = 0;
-    int32_t                mDataMemorySizeInBytes = 0;
-    android::fifo_frames_t mCapacityInFrames = 0;
+    android::base::unique_fd  mFileDescriptor;
+    android::FifoBuffer      *mFifoBuffer = nullptr;
+    uint8_t                  *mSharedMemory = nullptr;
+    int32_t                   mSharedMemorySizeInBytes = 0;
+    int32_t                   mDataMemorySizeInBytes = 0;
+    android::fifo_frames_t    mCapacityInFrames = 0;
 };
 
 } /* namespace aaudio */
