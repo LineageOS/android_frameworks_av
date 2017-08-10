@@ -35,11 +35,6 @@ SharedRingBuffer::~SharedRingBuffer()
         munmap(mSharedMemory, mSharedMemorySizeInBytes);
         mSharedMemory = nullptr;
     }
-    if (mFileDescriptor != -1) {
-        ALOGV("SharedRingBuffer: LEAK? close(mFileDescriptor = %d)\n", mFileDescriptor);
-        close(mFileDescriptor);
-        mFileDescriptor = -1;
-    }
 }
 
 aaudio_result_t SharedRingBuffer::allocate(fifo_frames_t   bytesPerFrame,
@@ -49,17 +44,17 @@ aaudio_result_t SharedRingBuffer::allocate(fifo_frames_t   bytesPerFrame,
     // Create shared memory large enough to hold the data and the read and write counters.
     mDataMemorySizeInBytes = bytesPerFrame * capacityInFrames;
     mSharedMemorySizeInBytes = mDataMemorySizeInBytes + (2 * (sizeof(fifo_counter_t)));
-    mFileDescriptor = ashmem_create_region("AAudioSharedRingBuffer", mSharedMemorySizeInBytes);
-    ALOGV("SharedRingBuffer::allocate() LEAK? mFileDescriptor = %d\n", mFileDescriptor);
-    if (mFileDescriptor < 0) {
+    mFileDescriptor.reset(ashmem_create_region("AAudioSharedRingBuffer", mSharedMemorySizeInBytes));
+    if (mFileDescriptor.get() == -1) {
         ALOGE("SharedRingBuffer::allocate() ashmem_create_region() failed %d", errno);
         return AAUDIO_ERROR_INTERNAL;
     }
+    ALOGV("SharedRingBuffer::allocate() mFileDescriptor = %d\n", mFileDescriptor.get());
 
-    int err = ashmem_set_prot_region(mFileDescriptor, PROT_READ|PROT_WRITE); // TODO error handling?
+    int err = ashmem_set_prot_region(mFileDescriptor.get(), PROT_READ|PROT_WRITE); // TODO error handling?
     if (err < 0) {
         ALOGE("SharedRingBuffer::allocate() ashmem_set_prot_region() failed %d", errno);
-        close(mFileDescriptor);
+        mFileDescriptor.reset();
         return AAUDIO_ERROR_INTERNAL; // TODO convert errno to a better AAUDIO_ERROR;
     }
 
@@ -67,10 +62,10 @@ aaudio_result_t SharedRingBuffer::allocate(fifo_frames_t   bytesPerFrame,
     mSharedMemory = (uint8_t *) mmap(0, mSharedMemorySizeInBytes,
                          PROT_READ|PROT_WRITE,
                          MAP_SHARED,
-                         mFileDescriptor, 0);
+                         mFileDescriptor.get(), 0);
     if (mSharedMemory == MAP_FAILED) {
         ALOGE("SharedRingBuffer::allocate() mmap() failed %d", errno);
-        close(mFileDescriptor);
+        mFileDescriptor.reset();
         return AAUDIO_ERROR_INTERNAL; // TODO convert errno to a better AAUDIO_ERROR;
     }
 
