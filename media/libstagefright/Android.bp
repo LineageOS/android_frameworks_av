@@ -30,6 +30,7 @@ cc_library_shared {
         "FrameRenderTracker.cpp",
         "HTTPBase.cpp",
         "HevcUtils.cpp",
+        "ItemTable.cpp",
         "JPEGSource.cpp",
         "MP3Extractor.cpp",
         "MPEG2TSWriter.cpp",
