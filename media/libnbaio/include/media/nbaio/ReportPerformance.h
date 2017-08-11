@@ -23,8 +23,7 @@
 
 namespace android {
 
-// This class is used by reportPerformance function
-// TODO move PerformanceAnalysis::reportPerformance function to ReportPerformance.cpp
+// The String8 class is used by reportPerformance function
 class String8;
 
 namespace ReportPerformance {
@@ -35,7 +34,6 @@ constexpr int kSecPerMin = 60;
 constexpr int kJiffyPerMs = 10; // time unit for histogram as a multiple of milliseconds
 
 // stores a histogram: key: observed buffer period (multiple of jiffy). value: count
-// TODO: unsigned, unsigned
 using Histogram = std::map<int, int>;
 
 using msInterval = double;
@@ -45,7 +43,6 @@ using timestamp = int64_t;
 
 using log_hash_t = uint64_t;
 
-// TODO: should this return an int64_t?
 static inline int deltaMs(int64_t ns1, int64_t ns2) {
     return (ns2 - ns1) / (1000 * 1000);
 }
@@ -59,8 +56,7 @@ static inline uint32_t log2(uint32_t x) {
     return 31 - __builtin_clz(x);
 }
 
-// Writes outlier intervals, timestamps, and histograms spanning long time
-// intervals to a file.
+// Writes outlier intervals, timestamps, peaks timestamps, and histograms to a file.
 void writeToFile(const std::deque<std::pair<timestamp, Histogram>> &hists,
                  const std::deque<std::pair<msInterval, timestamp>> &outlierData,
                  const std::deque<timestamp> &peakTimestamps,

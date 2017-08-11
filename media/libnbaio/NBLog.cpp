@@ -12,77 +12,9 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ *
  */
-
-/*
-* Documentation: Workflow summary for histogram data processing:
-* For more details on FIFO, please see system/media/audio_utils; doxygen
-* TODO: add this documentation to doxygen once it is further developed
-* 1) Writing buffer period timestamp to the circular buffer
-* onWork()
-*     Called every period length (e.g., 4ms)
-*     Calls LOG_HIST_TS
-* LOG_HIST_TS
-*     Hashes file name and line number, and writes single timestamp to buffer
-*     calls NBLOG::Writer::logEventHistTS once
-* NBLOG::Writer::logEventHistTS
-*     calls NBLOG::Writer::log on hash and current timestamp
-*     time is in CLOCK_MONOTONIC converted to ns
-* NBLOG::Writer::log(Event, const void*, size_t)
-*     Initializes Entry, a struct containing one log entry
-*     Entry contains the event type (mEvent), data length (mLength),
-*     and data pointer (mData)
-*     TODO: why mLength (max length of buffer data)  must be <= kMaxLength = 255?
-*     calls NBLOG::Writer::log(Entry *, bool)
-* NBLog::Writer::log(Entry *, bool)
-*     Calls copyEntryDataAt to format data as follows in temp array:
-*     [type][length][data ... ][length]
-*     calls audio_utils_fifo_writer.write on temp
-* audio_utils_fifo_writer.write
-*     calls obtain(), memcpy (reference in doxygen)
-*     returns number of frames written
-* ssize_t audio_utils_fifo_reader::obtain
-*     Determines readable buffer section via pointer arithmetic on reader
-*     and writer pointers
-* Similarly, LOG_AUDIO_STATE() is called by onStateChange whenever audio is
-* turned on or off, and writes this notification to the FIFO.
-*
-* 2) reading the data from shared memory
-* Thread::threadloop()
-* NBLog::MergeThread::threadLoop()
-*     Waits on a mutex, called periodically
-*     Calls NBLog::Merger::merge and MergeReader.getAndProcessSnapshot.
-* NBLog::Merger::merge
-*     Merges snapshots sorted by timestamp
-*     Calls Reader::getSnapshot on each individual thread buffer to in shared
-*     memory and writes all their data to the single FIFO stored in mMerger.
-* NBLog::Reader::getSnapshot
-*     copies snapshot of reader's fifo buffer into its own buffer
-*     calls mFifoReader->obtain to find readable data
-*     sets snapshot.begin() and .end() iterators to boundaries of valid entries
-*     moves the fifo reader index to after the last entry read
-*     in this case, the buffer is in shared memory. in (4), the buffer is private
-* NBLog::MergeThread::getAndProcessSnapshot
-*     Iterates through the entries in the local FIFO. Processes the data in
-*     specific ways depending on the entry type. If the data is a histogram
-*     timestamp or an audio on/off signal, writes to a map of PerformanceAnalysis
-*     class instances, where the wakeup() intervals are stored as histograms
-*     and analyzed.
-*
-* 3) Dumpsys media.log call to report the data
-* MediaLogService::dump in MediaLogService.cpp
-*     calls NBLog::Reader::dump, which calls ReportPerformance::dump
-* ReportPerformance::dump
-*     calls PerformanceAnalysis::ReportPerformance
-*     and ReportPerformance::WriteToFile
-* PerformanceAnalysis::ReportPerformance
-*     for each thread/source file location instance of PerformanceAnalysis data,
-*     combines all histograms into a single one and prints it to the console
-*     along with outlier data
-* ReportPerformance::WriteToFile
-*     writes histogram, outlier, and peak information to file separately for each
-*     instance of PerformanceAnalysis data.
-*/
 
 #define LOG_TAG "NBLog"
 
@@ -875,14 +807,6 @@ std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
 void NBLog::MergeReader::getAndProcessSnapshot(NBLog::Reader::Snapshot &snapshot)
 {
     String8 timestamp, body;
-    // TODO: check: is this thread safe?
-    // TODO: add lost data information and notification to ReportPerformance
-    size_t lost = snapshot.lost() + (snapshot.begin() - EntryIterator(snapshot.data()));
-    if (lost > 0) {
-        // TODO: ultimately, this will be += and reset to 0. TODO: check that this is
-        // obsolete now that Merger::merge is called periodically. No data should be lost
-        mLost = lost;
-    }
 
     for (auto entry = snapshot.begin(); entry != snapshot.end();) {
         switch (entry->type) {

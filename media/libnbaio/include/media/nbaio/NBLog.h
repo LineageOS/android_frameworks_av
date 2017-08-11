@@ -475,12 +475,6 @@ public:
         audio_utils_fifo_reader * const mFifoReader;    // used to read from FIFO,
         // non-NULL unless constructor fails
 
-        // TODO: it might be clearer, instead of a direct map from source location to vector of
-        // timestamps, if we instead first mapped from source location to an object that
-        // represented that location. And one_of its fields would be a vector of timestamps.
-        // That would allow us to record other information about the source location beyond
-        // timestamps.
-
         // Searches for the last entry of type <type> in the range [front, back)
         // back has to be entry-aligned. Returns nullptr if none enconuntered.
         static const uint8_t *findLastEntryOfTypes(const uint8_t *front, const uint8_t *back,
