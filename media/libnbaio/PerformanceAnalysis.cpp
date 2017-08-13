@@ -46,9 +46,8 @@ namespace android {
 
 namespace ReportPerformance {
 
-// Given a the most recent timestamp of a series of audio processing
-// wakeup timestamps,
-// buckets the time interval into a histogram, searches for
+// Given an audio processing wakeup timestamp, buckets the time interval
+// since the previous timestamp into a histogram, searches for
 // outliers, analyzes the outlier series for unexpectedly
 // small or large values and stores these as peaks
 void PerformanceAnalysis::logTsEntry(timestamp ts) {
@@ -75,7 +74,6 @@ void PerformanceAnalysis::logTsEntry(timestamp ts) {
     // NormalMixer times vary much more than FastMixer times.
     // TODO: mOutlierFactor values are set empirically based on what appears to be
     // an outlier. Learn these values from the data.
-    // TODO: the current settings are too high, change after next data collection is over
     mBufferPeriod.mOutlierFactor = mBufferPeriod.mMean < kFastMixerMax ? 1.8 : 2.0;
     // set outlier threshold
     mBufferPeriod.mOutlier = mBufferPeriod.mMean * mBufferPeriod.mOutlierFactor;
@@ -265,7 +263,6 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int author, log_hash_
     timestamp startingTs = mHists[0].first;
 
     // histogram which stores .1 precision ms counts instead of Jiffy multiple counts
-    // TODO: when there is more data, print many histograms, possibly separated at peaks
     std::map<double, int> buckets;
     for (const auto &shortHist: mHists) {
         for (const auto &countPair : shortHist.second) {

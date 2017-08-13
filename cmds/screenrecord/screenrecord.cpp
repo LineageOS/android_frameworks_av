@@ -78,7 +78,7 @@ static bool gWantInfoScreen = false;    // do we want initial info screen?
 static bool gWantFrameTime = false;     // do we want times on each frame?
 static uint32_t gVideoWidth = 0;        // default width+height
 static uint32_t gVideoHeight = 0;
-static uint32_t gBitRate = 4000000;     // 4Mbps
+static uint32_t gBitRate = 20000000;     // 20Mbps
 static uint32_t gTimeLimitSec = kMaxTimeLimitSec;
 
 // Set by signal handler to stop recording.

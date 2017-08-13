@@ -35,9 +35,9 @@ using PerformanceAnalysisMap = std::map<int, std::map<log_hash_t, PerformanceAna
 
 class PerformanceAnalysis {
     // This class stores and analyzes audio processing wakeup timestamps from NBLog
-    // FIXME: currently, all performance data is stored in deques. Need to add a mutex.
-    // FIXME: continue this way until analysis is done in a separate thread. Then, use
-    // the fifo writer utilities.
+    // FIXME: currently, all performance data is stored in deques. Turn these into circular
+    // buffers.
+    // TODO: add a mutex.
 public:
 
     PerformanceAnalysis() {};
@@ -45,20 +45,11 @@ public:
     friend void dump(int fd, int indent,
                      PerformanceAnalysisMap &threadPerformanceAnalysis);
 
-    // Given a series of audio processing wakeup timestamps,
-    // compresses and and analyzes the data, and flushes
-    // the timestamp series from memory.
-    void processAndFlushTimeStampSeries();
-
-    // Called when an audio on/off event is read from the buffer,
-    // e.g. EVENT_AUDIO_STATE.
-    // calls flushTimeStampSeries on the data up to the event,
-    // effectively discarding the idle audio time interval
+    // Called in the case of an audio on/off event, e.g., EVENT_AUDIO_STATE.
+    // Used to discard idle time intervals
     void handleStateChange();
 
     // Writes wakeup timestamp entry to log and runs analysis
-    // TODO: make this thread safe. Each thread should have its own instance
-    // of PerformanceAnalysis.
     void logTsEntry(timestamp ts);
 
     // FIXME: make peakdetector and storeOutlierData a single function
@@ -67,13 +58,11 @@ public:
     // writes timestamps of significant changes to mPeakTimestamps
     bool detectAndStorePeak(msInterval delta, timestamp ts);
 
-    // runs analysis on timestamp series before it is converted to a histogram
-    // finds outliers
+    // stores timestamps of intervals above a threshold: these are assumed outliers.
     // writes to mOutlierData <time elapsed since previous outlier, outlier timestamp>
     bool detectAndStoreOutlier(const msInterval diffMs);
 
     // Generates a string of analysis of the buffer periods and prints to console
-    // TODO: WIP write more detailed analysis
     // FIXME: move this data visualization to a separate class. Model/view/controller
     void reportPerformance(String8 *body, int author, log_hash_t hash,
                            int maxHeight = 10);
