@@ -258,7 +258,7 @@ status_t Camera3InputStream::configureQueueLocked() {
             camera3_stream::max_buffers : minBufs;
         // TODO: somehow set the total buffer count when producer connects?
 
-        mConsumer = new BufferItemConsumer(consumer, camera3_stream::usage,
+        mConsumer = new BufferItemConsumer(consumer, mUsage,
                                            mTotalBufferCount);
         mConsumer->setName(String8::format("Camera3-InputStream-%d", mId));
 
@@ -284,7 +284,7 @@ status_t Camera3InputStream::configureQueueLocked() {
     return OK;
 }
 
-status_t Camera3InputStream::getEndpointUsage(uint32_t *usage) const {
+status_t Camera3InputStream::getEndpointUsage(uint64_t *usage) const {
     // Per HAL3 spec, input streams have 0 for their initial usage field.
     *usage = 0;
     return OK;

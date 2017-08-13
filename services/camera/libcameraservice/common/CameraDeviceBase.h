@@ -119,7 +119,7 @@ class CameraDeviceBase : public virtual RefBase {
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
-            bool isShared = false, uint32_t consumerUsage = 0) = 0;
+            bool isShared = false, uint64_t consumerUsage = 0) = 0;
 
     /**
      * Create an output stream of the requested size, format, rotation and
@@ -132,7 +132,7 @@ class CameraDeviceBase : public virtual RefBase {
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
-            bool isShared = false, uint32_t consumerUsage = 0) = 0;
+            bool isShared = false, uint64_t consumerUsage = 0) = 0;
 
     /**
      * Create an input stream of width, height, and format.
