@@ -31,6 +31,7 @@
 
 #include <media/openmax/OMX_Core.h>
 #include <media/openmax/OMX_Video.h>
+#include <media/openmax/OMX_VideoExt.h>
 
 namespace android {
 

@@ -105,11 +105,17 @@ void MediaCodecInfo::CapabilitiesBuilder::addProfileLevel(uint32_t profile, uint
     ProfileLevel profileLevel;
     profileLevel.mProfile = profile;
     profileLevel.mLevel = level;
-    mProfileLevels.push_back(profileLevel);
+    if (mProfileLevelsSorted.indexOf(profileLevel) < 0) {
+        mProfileLevels.push_back(profileLevel);
+        mProfileLevelsSorted.add(profileLevel);
+    }
 }
 
 void MediaCodecInfo::CapabilitiesBuilder::addColorFormat(uint32_t format) {
-    mColorFormats.push(format);
+    if (mColorFormatsSorted.indexOf(format) < 0) {
+        mColorFormats.push(format);
+        mColorFormatsSorted.add(format);
+    }
 }
 
 void MediaCodecInfo::CapabilitiesBuilder::addFlags(uint32_t flags) {
