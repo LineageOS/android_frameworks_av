@@ -62,6 +62,7 @@ SoftOpus::SoftOpus(
       mSeekPreRoll(0),
       mAnchorTimeUs(0),
       mNumFramesOutput(0),
+      mHaveEOS(false),
       mOutputPortSettingsChange(NONE) {
     initPorts();
     CHECK_EQ(initDecoder(), (status_t)OK);
@@ -384,7 +385,31 @@ static uint64_t ns_to_samples(uint64_t ns, int kRate) {
     return static_cast<double>(ns) * kRate / 1000000000;
 }
 
-void SoftOpus::onQueueFilled(OMX_U32 portIndex) {
+void SoftOpus::handleEOS() {
+    List<BufferInfo *> &inQueue = getPortQueue(0);
+    List<BufferInfo *> &outQueue = getPortQueue(1);
+    CHECK(!inQueue.empty() && !outQueue.empty());
+
+    BufferInfo *outInfo = *outQueue.begin();
+    OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
+    outHeader->nFilledLen = 0;
+    outHeader->nFlags = OMX_BUFFERFLAG_EOS;
+    mHaveEOS = true;
+
+    outQueue.erase(outQueue.begin());
+    outInfo->mOwnedByUs = false;
+    notifyFillBufferDone(outHeader);
+
+    BufferInfo *inInfo = *inQueue.begin();
+    OMX_BUFFERHEADERTYPE *inHeader = inInfo->mHeader;
+    inQueue.erase(inQueue.begin());
+    inInfo->mOwnedByUs = false;
+    notifyEmptyBufferDone(inHeader);
+
+    ++mInputBufferCount;
+}
+
+void SoftOpus::onQueueFilled(OMX_U32 /* portIndex */) {
     List<BufferInfo *> &inQueue = getPortQueue(0);
     List<BufferInfo *> &outQueue = getPortQueue(1);
 
@@ -392,104 +417,108 @@ void SoftOpus::onQueueFilled(OMX_U32 portIndex) {
         return;
     }
 
-    if (portIndex == 0 && mInputBufferCount < 3) {
-        BufferInfo *info = *inQueue.begin();
-        OMX_BUFFERHEADERTYPE *header = info->mHeader;
-
-        const uint8_t *data = header->pBuffer + header->nOffset;
-        size_t size = header->nFilledLen;
-
-        if (mInputBufferCount == 0) {
-            CHECK(mHeader == NULL);
-            mHeader = new OpusHeader();
-            memset(mHeader, 0, sizeof(*mHeader));
-            if (!ParseOpusHeader(data, size, mHeader)) {
-                ALOGV("Parsing Opus Header failed.");
-                notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
-                return;
-            }
-
-            uint8_t channel_mapping[kMaxChannels] = {0};
-            if (mHeader->channels <= kMaxChannelsWithDefaultLayout) {
-                memcpy(&channel_mapping,
-                       kDefaultOpusChannelLayout,
-                       kMaxChannelsWithDefaultLayout);
-            } else {
-                memcpy(&channel_mapping,
-                       mHeader->stream_map,
-                       mHeader->channels);
-            }
-
-            int status = OPUS_INVALID_STATE;
-            mDecoder = opus_multistream_decoder_create(kRate,
-                                                       mHeader->channels,
-                                                       mHeader->num_streams,
-                                                       mHeader->num_coupled,
-                                                       channel_mapping,
-                                                       &status);
-            if (!mDecoder || status != OPUS_OK) {
-                ALOGV("opus_multistream_decoder_create failed status=%s",
-                      opus_strerror(status));
-                notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
-                return;
-            }
-            status =
-                opus_multistream_decoder_ctl(mDecoder,
-                                             OPUS_SET_GAIN(mHeader->gain_db));
-            if (status != OPUS_OK) {
-                ALOGV("Failed to set OPUS header gain; status=%s",
-                      opus_strerror(status));
-                notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
-                return;
-            }
-        } else if (mInputBufferCount == 1) {
-            mCodecDelay = ns_to_samples(
-                              *(reinterpret_cast<int64_t*>(header->pBuffer +
-                                                           header->nOffset)),
-                              kRate);
-            mSamplesToDiscard = mCodecDelay;
-        } else {
-            mSeekPreRoll = ns_to_samples(
-                               *(reinterpret_cast<int64_t*>(header->pBuffer +
-                                                            header->nOffset)),
-                               kRate);
-            notify(OMX_EventPortSettingsChanged, 1, 0, NULL);
-            mOutputPortSettingsChange = AWAITING_DISABLED;
-        }
-
-        inQueue.erase(inQueue.begin());
-        info->mOwnedByUs = false;
-        notifyEmptyBufferDone(header);
-        ++mInputBufferCount;
-        return;
-    }
-
-    while (!inQueue.empty() && !outQueue.empty()) {
+    while (!mHaveEOS && !inQueue.empty() && !outQueue.empty()) {
         BufferInfo *inInfo = *inQueue.begin();
         OMX_BUFFERHEADERTYPE *inHeader = inInfo->mHeader;
 
-        // Ignore CSD re-submissions.
-        if (inHeader->nFlags & OMX_BUFFERFLAG_CODECCONFIG) {
+        if (mInputBufferCount < 3) {
+            const uint8_t *data = inHeader->pBuffer + inHeader->nOffset;
+            size_t size = inHeader->nFilledLen;
+
+            if ((inHeader->nFlags & OMX_BUFFERFLAG_EOS) && size == 0) {
+                handleEOS();
+                return;
+            }
+
+            if (mInputBufferCount == 0) {
+                CHECK(mHeader == NULL);
+                mHeader = new OpusHeader();
+                memset(mHeader, 0, sizeof(*mHeader));
+                if (!ParseOpusHeader(data, size, mHeader)) {
+                    ALOGV("Parsing Opus Header failed.");
+                    notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
+                    return;
+                }
+
+                uint8_t channel_mapping[kMaxChannels] = {0};
+                if (mHeader->channels <= kMaxChannelsWithDefaultLayout) {
+                    memcpy(&channel_mapping,
+                           kDefaultOpusChannelLayout,
+                           kMaxChannelsWithDefaultLayout);
+                } else {
+                    memcpy(&channel_mapping,
+                           mHeader->stream_map,
+                           mHeader->channels);
+                }
+
+                int status = OPUS_INVALID_STATE;
+                mDecoder = opus_multistream_decoder_create(kRate,
+                                                           mHeader->channels,
+                                                           mHeader->num_streams,
+                                                           mHeader->num_coupled,
+                                                           channel_mapping,
+                                                           &status);
+                if (!mDecoder || status != OPUS_OK) {
+                    ALOGV("opus_multistream_decoder_create failed status=%s",
+                          opus_strerror(status));
+                    notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
+                    return;
+                }
+                status =
+                    opus_multistream_decoder_ctl(mDecoder,
+                                                 OPUS_SET_GAIN(mHeader->gain_db));
+                if (status != OPUS_OK) {
+                    ALOGV("Failed to set OPUS header gain; status=%s",
+                          opus_strerror(status));
+                    notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
+                    return;
+                }
+            } else if (mInputBufferCount == 1) {
+                mCodecDelay = ns_to_samples(
+                                  *(reinterpret_cast<int64_t*>(inHeader->pBuffer +
+                                                               inHeader->nOffset)),
+                                  kRate);
+                mSamplesToDiscard = mCodecDelay;
+            } else {
+                mSeekPreRoll = ns_to_samples(
+                                   *(reinterpret_cast<int64_t*>(inHeader->pBuffer +
+                                                                inHeader->nOffset)),
+                                   kRate);
+                notify(OMX_EventPortSettingsChanged, 1, 0, NULL);
+                mOutputPortSettingsChange = AWAITING_DISABLED;
+            }
+
+            if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
+                handleEOS();
+                return;
+            }
+
             inQueue.erase(inQueue.begin());
             inInfo->mOwnedByUs = false;
             notifyEmptyBufferDone(inHeader);
-            return;
+            ++mInputBufferCount;
+
+            continue;
+        }
+
+        // Ignore CSD re-submissions.
+        if (mInputBufferCount >= 3 && (inHeader->nFlags & OMX_BUFFERFLAG_CODECCONFIG)) {
+            if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
+                handleEOS();
+                return;
+            }
+
+            inQueue.erase(inQueue.begin());
+            inInfo->mOwnedByUs = false;
+            notifyEmptyBufferDone(inHeader);
+            continue;
         }
 
         BufferInfo *outInfo = *outQueue.begin();
         OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
 
         if ((inHeader->nFlags & OMX_BUFFERFLAG_EOS) && inHeader->nFilledLen == 0) {
-            inQueue.erase(inQueue.begin());
-            inInfo->mOwnedByUs = false;
-            notifyEmptyBufferDone(inHeader);
-
-            outHeader->nFilledLen = 0;
-            outHeader->nFlags = OMX_BUFFERFLAG_EOS;
-
-            outQueue.erase(outQueue.begin());
-            outInfo->mOwnedByUs = false;
-            notifyFillBufferDone(outHeader);
+            handleEOS();
             return;
         }
 
@@ -539,7 +568,6 @@ void SoftOpus::onQueueFilled(OMX_U32 portIndex) {
         }
 
         outHeader->nFilledLen = numFrames * sizeof(int16_t) * mHeader->channels;
-        outHeader->nFlags = 0;
 
         outHeader->nTimeStamp = mAnchorTimeUs +
                                 (mNumFramesOutput * 1000000ll) /
@@ -548,22 +576,20 @@ void SoftOpus::onQueueFilled(OMX_U32 portIndex) {
         mNumFramesOutput += numFrames;
 
         if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
-            inHeader->nFilledLen = 0;
+            outHeader->nFlags = OMX_BUFFERFLAG_EOS;
+            mHaveEOS = true;
         } else {
-            inInfo->mOwnedByUs = false;
-            inQueue.erase(inQueue.begin());
-            inInfo = NULL;
-            notifyEmptyBufferDone(inHeader);
-            inHeader = NULL;
+            outHeader->nFlags = 0;
         }
+
+        inInfo->mOwnedByUs = false;
+        inQueue.erase(inQueue.begin());
+        notifyEmptyBufferDone(inHeader);
+        ++mInputBufferCount;
 
         outInfo->mOwnedByUs = false;
         outQueue.erase(outQueue.begin());
-        outInfo = NULL;
         notifyFillBufferDone(outHeader);
-        outHeader = NULL;
-
-        ++mInputBufferCount;
     }
 }
 
@@ -575,6 +601,7 @@ void SoftOpus::onPortFlushCompleted(OMX_U32 portIndex) {
         opus_multistream_decoder_ctl(mDecoder, OPUS_RESET_STATE);
         mAnchorTimeUs = 0;
         mSamplesToDiscard = mSeekPreRoll;
+        mHaveEOS = false;
     }
 }
 
@@ -591,6 +618,7 @@ void SoftOpus::onReset() {
     }
 
     mOutputPortSettingsChange = NONE;
+    mHaveEOS = false;
 }
 
 void SoftOpus::onPortEnableCompleted(OMX_U32 portIndex, bool enabled) {
