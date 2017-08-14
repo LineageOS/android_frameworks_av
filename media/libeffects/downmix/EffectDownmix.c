@@ -445,6 +445,10 @@ static int Downmix_Command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdS
             return -EINVAL;
         }
         effect_param_t *cmd = (effect_param_t *) pCmdData;
+        if (cmd->psize != sizeof(int32_t)) {
+            android_errorWriteLog(0x534e4554, "63662938");
+            return -EINVAL;
+        }
         *(int *)pReplyData = Downmix_setParameter(pDownmixer, *(int32_t *)cmd->data,
                 cmd->vsize, cmd->data + sizeof(int32_t));
         break;
