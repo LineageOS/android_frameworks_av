@@ -31,20 +31,12 @@
 namespace android {
 
 static const CodecProfileLevel kM4VProfileLevels[] = {
-    { OMX_VIDEO_MPEG4ProfileSimple, OMX_VIDEO_MPEG4Level0 },
-    { OMX_VIDEO_MPEG4ProfileSimple, OMX_VIDEO_MPEG4Level0b },
-    { OMX_VIDEO_MPEG4ProfileSimple, OMX_VIDEO_MPEG4Level1 },
-    { OMX_VIDEO_MPEG4ProfileSimple, OMX_VIDEO_MPEG4Level2 },
     { OMX_VIDEO_MPEG4ProfileSimple, OMX_VIDEO_MPEG4Level3 },
 };
 
 static const CodecProfileLevel kH263ProfileLevels[] = {
-    { OMX_VIDEO_H263ProfileBaseline, OMX_VIDEO_H263Level10 },
-    { OMX_VIDEO_H263ProfileBaseline, OMX_VIDEO_H263Level20 },
     { OMX_VIDEO_H263ProfileBaseline, OMX_VIDEO_H263Level30 },
     { OMX_VIDEO_H263ProfileBaseline, OMX_VIDEO_H263Level45 },
-    { OMX_VIDEO_H263ProfileISWV2,    OMX_VIDEO_H263Level10 },
-    { OMX_VIDEO_H263ProfileISWV2,    OMX_VIDEO_H263Level20 },
     { OMX_VIDEO_H263ProfileISWV2,    OMX_VIDEO_H263Level30 },
     { OMX_VIDEO_H263ProfileISWV2,    OMX_VIDEO_H263Level45 },
 };
