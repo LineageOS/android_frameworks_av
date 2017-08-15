@@ -34,22 +34,22 @@
             <Feature name="adaptive-playback" />
         </MediaCodec>
         <MediaCodec name="OMX.google.h264.decoder" type="video/avc">
-            <!-- profiles and levels:  ProfileBaseline : Level51 -->
+            <!-- profiles and levels:  ProfileHigh : Level51 -->
             <Limit name="size" min="2x2" max="2048x2048" />
             <Limit name="alignment" value="2x2" />
             <Limit name="block-size" value="16x16" />
-            <Limit name="block-count" range="1-8160" />
-            <Limit name="blocks-per-second" range="1-489600" />
+            <Limit name="block-count" range="1-16384" />
+            <Limit name="blocks-per-second" range="1-491520" />
             <Limit name="bitrate" range="1-40000000" />
             <Feature name="adaptive-playback" />
         </MediaCodec>
         <MediaCodec name="OMX.google.hevc.decoder" type="video/hevc">
             <!-- profiles and levels:  ProfileMain : MainTierLevel51 -->
-            <Limit name="size" min="2x2" max="1280x1280" />
+            <Limit name="size" min="2x2" max="2048x2048" />
             <Limit name="alignment" value="2x2" />
             <Limit name="block-size" value="8x8" />
-            <Limit name="block-count" range="1-139264" />
-            <Limit name="blocks-per-second" range="1-432000" />
+            <Limit name="block-count" range="1-65536" />
+            <Limit name="blocks-per-second" range="1-491520" />
             <Limit name="bitrate" range="1-5000000" />
             <Feature name="adaptive-playback" />
         </MediaCodec>
@@ -57,7 +57,7 @@
             <Limit name="size" min="2x2" max="2048x2048" />
             <Limit name="alignment" value="2x2" />
             <Limit name="block-size" value="16x16" />
-            <Limit name="block-count" range="1-8160" />
+            <Limit name="block-count" range="1-8192" /> <!-- max 2048x1024 -->
             <Limit name="blocks-per-second" range="1-500000" />
             <Limit name="bitrate" range="1-40000000" />
             <Feature name="adaptive-playback" />
@@ -66,7 +66,7 @@
             <Limit name="size" min="2x2" max="1280x1280" />
             <Limit name="alignment" value="2x2" />
             <Limit name="block-size" value="16x16" />
-            <Limit name="block-count" range="1-3600" />
+            <Limit name="block-count" range="1-3600" /> <!-- max 1280x720 -->
             <Limit name="blocks-per-second" range="1-108000" />
             <Limit name="bitrate" range="1-5000000" />
             <Feature name="adaptive-playback" />
@@ -81,12 +81,14 @@
             <Limit name="bitrate" range="1-128000" />
         </MediaCodec>
         <MediaCodec name="OMX.google.h264.encoder" type="video/avc">
-            <!-- profiles and levels:  ProfileBaseline : Level2 -->
-            <Limit name="size" min="16x16" max="896x896" />
-            <Limit name="alignment" value="16x16" />
+            <!-- profiles and levels:  ProfileBaseline : Level3 -->
+            <Limit name="size" min="16x16" max="1808x1808" />
+            <Limit name="alignment" value="2x2" />
             <Limit name="block-size" value="16x16" />
-            <Limit name="blocks-per-second" range="1-11880" />
+            <Limit name="block-count" range="1-1620" />
+            <Limit name="blocks-per-second" range="1-40500" />
             <Limit name="bitrate" range="1-2000000" />
+            <Feature name="intra-refresh" />
         </MediaCodec>
         <MediaCodec name="OMX.google.mpeg4.encoder" type="video/mp4v-es">
             <!-- profiles and levels:  ProfileCore : Level2 -->
@@ -100,7 +102,8 @@
             <!-- profiles and levels:  ProfileMain : Level_Version0-3 -->
             <Limit name="size" min="2x2" max="1280x1280" />
             <Limit name="alignment" value="2x2" />
-            <Limit name="block-count" range="1-3600" />
+            <Limit name="block-size" value="16x16" />
+            <Limit name="block-count" range="1-3600" /> <!-- max 1280x720 -->
             <Limit name="bitrate" range="1-20000000" />
             <Feature name="bitrate-modes" value="VBR,CBR" />
         </MediaCodec>
