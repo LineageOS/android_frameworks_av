@@ -2064,8 +2064,10 @@ inline bool convertTo(
     int const* constFds = static_cast<int const*>(baseFds.get());
     numFds = baseNumFds;
     if (l->unflatten(constBuffer, size, constFds, numFds) != NO_ERROR) {
-        native_handle_close(nh);
-        native_handle_delete(nh);
+        if (nh != nullptr) {
+            native_handle_close(nh);
+            native_handle_delete(nh);
+        }
         return false;
     }
 
