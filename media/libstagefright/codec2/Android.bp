@@ -1,6 +1,10 @@
 cc_library_shared {
     name: "libstagefright_codec2",
 
+    tags: [
+        "optional",
+    ],
+
     srcs: ["C2.cpp"],
 
     include_dirs: [
@@ -24,4 +28,5 @@ cc_library_shared {
 
 subdirs = [
     "tests",
+    "vndk",
 ]
