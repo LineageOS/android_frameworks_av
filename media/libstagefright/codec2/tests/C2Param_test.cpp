@@ -968,6 +968,10 @@ TEST_F(C2ParamTest, ParamOpsTest) {
         EXPECT_EQ(C2NumberStreamTuning::From(&tun), nullptr);
         EXPECT_EQ(C2NumberStreamTuning::input::From(&tun), nullptr);
         EXPECT_EQ(C2NumberStreamTuning::output::From(&tun), nullptr);
+
+        EXPECT_EQ(*(C2Param::Copy(btun)), btun);
+        btun.invalidate();
+        EXPECT_FALSE(C2Param::Copy(btun));
     }
 
     const C2NumberPortTuning outp1(true, 100), inp1(false, 100);
@@ -1171,6 +1175,11 @@ TEST_F(C2ParamTest, ParamOpsTest) {
         EXPECT_EQ(C2NumberStreamTuning::output::From(&inp2), nullptr);
         EXPECT_EQ(C2NumberStreamTuning::output::From(&outp1), nullptr);
         EXPECT_EQ(C2NumberStreamTuning::output::From(&outp2), nullptr);
+
+        EXPECT_EQ(*(C2Param::Copy(inp1)), inp1);
+        EXPECT_EQ(*(C2Param::Copy(inp2)), inp2);
+        EXPECT_EQ(*(C2Param::Copy(outp1)), outp1);
+        EXPECT_EQ(*(C2Param::Copy(outp2)), outp2);
     }
 
     const C2NumberStreamTuning outs1(true, 1u, 100), ins1(false, 1u, 100);
@@ -1383,6 +1392,10 @@ TEST_F(C2ParamTest, ParamOpsTest) {
         EXPECT_EQ(C2NumberStreamTuning::output::From(&outs1), (C2NumberStreamTuning::output*)&outs1);
         EXPECT_EQ(C2NumberStreamTuning::output::From(&outs2), &outs2);
 
+        EXPECT_EQ(*(C2Param::Copy(ins1)), ins1);
+        EXPECT_EQ(*(C2Param::Copy(ins2)), ins2);
+        EXPECT_EQ(*(C2Param::Copy(outs1)), outs1);
+        EXPECT_EQ(*(C2Param::Copy(outs2)), outs2);
     }
 
     {
@@ -1518,6 +1531,8 @@ TEST_F(C2ParamTest, FlexParamOpsTest) {
         EXPECT_EQ(C2NumbersStreamTuning::From(tun.get()), nullptr);
         EXPECT_EQ(C2NumbersStreamTuning::input::From(tun.get()), nullptr);
         EXPECT_EQ(C2NumbersStreamTuning::output::From(tun.get()), nullptr);
+
+        EXPECT_EQ(*(C2Param::Copy(*tun)), *tun);
     }
 
     std::unique_ptr<C2NumbersPortTuning> outp1_(C2NumbersPortTuning::alloc_unique(1, true)),
@@ -1739,6 +1754,10 @@ TEST_F(C2ParamTest, FlexParamOpsTest) {
         EXPECT_EQ(C2NumbersStreamTuning::output::From(outp1.get()), nullptr);
         EXPECT_EQ(C2NumbersStreamTuning::output::From(outp2.get()), nullptr);
 
+        EXPECT_EQ(*(C2Param::Copy(*inp1)), *inp1);
+        EXPECT_EQ(*(C2Param::Copy(*inp2)), *inp2);
+        EXPECT_EQ(*(C2Param::Copy(*outp1)), *outp1);
+        EXPECT_EQ(*(C2Param::Copy(*outp2)), *outp2);
     }
 
     std::unique_ptr<C2NumbersStreamTuning> outs1_(C2NumbersStreamTuning::alloc_unique(1, true, 1u));
@@ -1968,6 +1987,10 @@ TEST_F(C2ParamTest, FlexParamOpsTest) {
         EXPECT_EQ(C2NumbersStreamTuning::output::From(outs1.get()), (C2NumbersStreamTuning::output*)outs1.get());
         EXPECT_EQ(C2NumbersStreamTuning::output::From(outs2.get()), outs2.get());
 
+        EXPECT_EQ(*(C2Param::Copy(*ins1)), *ins1);
+        EXPECT_EQ(*(C2Param::Copy(*ins2)), *ins2);
+        EXPECT_EQ(*(C2Param::Copy(*outs1)), *outs1);
+        EXPECT_EQ(*(C2Param::Copy(*outs2)), *outs2);
     }
 
     {
@@ -2262,7 +2285,7 @@ public:
         for (const C2Param::Index index : heapParamIndices) {
             if (mMyParams.count(index)) {
                 C2Param & myParam = mMyParams.find(index)->second;
-                std::unique_ptr<C2Param> paramCopy(C2Param::From(&myParam, myParam.size()));
+                std::unique_ptr<C2Param> paramCopy(C2Param::Copy(myParam));
                 heapParams->push_back(std::move(paramCopy));
             }
         }
@@ -2303,7 +2326,7 @@ public:
     };
 
     virtual status_t getSupportedValues(
-            const std::vector<const C2ParamField> fields,
+            const std::vector<const C2ParamField> &fields,
             std::vector<C2FieldSupportedValues>* const values) const {
         for (const C2ParamField &field : fields) {
             if (field == C2ParamField(&mDomainInfo, &C2ComponentDomainInfo::mValue)) {

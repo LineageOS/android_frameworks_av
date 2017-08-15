@@ -21,6 +21,8 @@ cc_library_shared {
         "liblog",
     ],
 
+    cflags: ["-Werror"],
+
     sanitize: {
         misc_undefined: [
             "signed-integer-overflow",

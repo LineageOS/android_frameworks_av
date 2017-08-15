@@ -362,6 +362,17 @@ public:
         return param;
     }
 
+    /// Returns managed clone of |orig| at heap.
+    inline static std::unique_ptr<C2Param> Copy(const C2Param &orig) {
+        if (orig.size() == 0) {
+            return nullptr;
+        }
+        void *mem = ::operator new (orig.size());
+        C2Param *param = new (mem) C2Param(orig.size(), orig._mIndex);
+        param->updateFrom(orig);
+        return std::unique_ptr<C2Param>(param);
+    }
+
 #if 0
     template<typename P, class=decltype(C2Param(P()))>
     P *As() { return P::From(this); }
@@ -661,11 +672,11 @@ private:
     Primitive mValue;
 };
 
-template<> const int32_t &C2Value::Primitive::ref<int32_t>() const { return i32; }
-template<> const int64_t &C2Value::Primitive::ref<int64_t>() const { return i64; }
-template<> const uint32_t &C2Value::Primitive::ref<uint32_t>() const { return u32; }
-template<> const uint64_t &C2Value::Primitive::ref<uint64_t>() const { return u64; }
-template<> const float &C2Value::Primitive::ref<float>() const { return fp; }
+template<> inline const int32_t &C2Value::Primitive::ref<int32_t>() const { return i32; }
+template<> inline const int64_t &C2Value::Primitive::ref<int64_t>() const { return i64; }
+template<> inline const uint32_t &C2Value::Primitive::ref<uint32_t>() const { return u32; }
+template<> inline const uint64_t &C2Value::Primitive::ref<uint64_t>() const { return u64; }
+template<> inline const float &C2Value::Primitive::ref<float>() const { return fp; }
 
 template<> constexpr C2Value::Type C2Value::typeFor<int32_t>() { return INT32; }
 template<> constexpr C2Value::Type C2Value::typeFor<int64_t>() { return INT64; }

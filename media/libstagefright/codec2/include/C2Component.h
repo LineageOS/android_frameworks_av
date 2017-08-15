@@ -282,7 +282,7 @@ public:
      * fields in the same list?
      */
     virtual status_t getSupportedValues(
-            const std::vector<const C2ParamField> fields,
+            const std::vector<const C2ParamField> &fields,
             std::vector<C2FieldSupportedValues>* const values) const = 0;
 
     virtual ~C2ComponentInterface() = default;
