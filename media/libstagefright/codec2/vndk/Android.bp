@@ -1,0 +1,30 @@
+cc_library_static {
+    name: "libstagefright_codec2_vndk",
+
+    srcs: ["C2Buffer.cpp"],
+
+    include_dirs: [
+        "frameworks/av/media/libstagefright/codec2/include",
+        "frameworks/av/media/libstagefright/codec2/vndk/include",
+        "frameworks/native/include/media/hardware",
+    ],
+
+    shared_libs: [
+        "libbinder",
+        "libcutils",
+        "libdl",
+        "libhardware",
+        "libhidlbase",
+        "libion",
+        "liblog",
+        "libmedia",
+        "libstagefright_foundation",
+        "libutils",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+        "-std=c++14",
+    ],
+}
