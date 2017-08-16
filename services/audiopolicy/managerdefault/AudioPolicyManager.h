@@ -76,10 +76,6 @@ namespace android {
 // ----------------------------------------------------------------------------
 
 class AudioPolicyManager : public AudioPolicyInterface, public AudioPolicyManagerObserver
-
-#ifdef AUDIO_POLICY_TEST
-    , public Thread
-#endif //AUDIO_POLICY_TEST
 {
 
 public:
@@ -419,11 +415,6 @@ protected:
         {
             return mEffects.getMaxEffectsMemory();
         }
-#ifdef AUDIO_POLICY_TEST
-        virtual     bool        threadLoop();
-                    void        exit();
-        int testOutputIndex(audio_io_handle_t output);
-#endif //AUDIO_POLICY_TEST
 
         SortedVector<audio_io_handle_t> getOutputsForDevice(audio_devices_t device,
                                                             const SwAudioOutputCollection& openOutputs);
@@ -573,22 +564,6 @@ protected:
         bool mMasterMono;               // true if we wish to force all outputs to mono
         AudioPolicyMixCollection mPolicyMixes; // list of registered mixes
         audio_io_handle_t mMusicEffectOutput;     // output selected for music effects
-
-
-#ifdef AUDIO_POLICY_TEST
-        Mutex   mLock;
-        Condition mWaitWorkCV;
-
-        int             mCurOutput;
-        bool            mDirectOutput;
-        audio_io_handle_t mTestOutputs[NUM_TEST_OUTPUTS];
-        int             mTestInput;
-        uint32_t        mTestDevice;
-        uint32_t        mTestSamplingRate;
-        uint32_t        mTestFormat;
-        uint32_t        mTestChannels;
-        uint32_t        mTestLatencyMs;
-#endif //AUDIO_POLICY_TEST
 
         uint32_t nextAudioPortGeneration();
 
