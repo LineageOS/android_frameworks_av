@@ -874,48 +874,6 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
     audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
     status_t status;
 
-#ifdef AUDIO_POLICY_TEST
-    if (mCurOutput != 0) {
-        ALOGV("getOutput() test output mCurOutput %d, samplingRate %d, format %d, channelMask %x, mDirectOutput %d",
-                mCurOutput, mTestSamplingRate, mTestFormat, mTestChannels, mDirectOutput);
-
-        if (mTestOutputs[mCurOutput] == 0) {
-            ALOGV("getOutput() opening test output");
-            sp<AudioOutputDescriptor> outputDesc = new SwAudioOutputDescriptor(NULL,
-                                                                               mpClientInterface);
-            outputDesc->mDevice = mTestDevice;
-            outputDesc->mLatency = mTestLatencyMs;
-            outputDesc->mFlags =
-                    (audio_output_flags_t)(mDirectOutput ? AUDIO_OUTPUT_FLAG_DIRECT : 0);
-            outputDesc->mRefCount[stream] = 0;
-            audio_config_t config = AUDIO_CONFIG_INITIALIZER;
-            config.sample_rate = mTestSamplingRate;
-            config.channel_mask = mTestChannels;
-            config.format = mTestFormat;
-            if (offloadInfo != NULL) {
-                config.offload_info = *offloadInfo;
-            }
-            status = mpClientInterface->openOutput(0,
-                                                  &mTestOutputs[mCurOutput],
-                                                  &config,
-                                                  &outputDesc->mDevice,
-                                                  String8(""),
-                                                  &outputDesc->mLatency,
-                                                  outputDesc->mFlags);
-            if (status == NO_ERROR) {
-                outputDesc->mSamplingRate = config.sample_rate;
-                outputDesc->mFormat = config.format;
-                outputDesc->mChannelMask = config.channel_mask;
-                AudioParameter outputCmd = AudioParameter();
-                outputCmd.addInt(String8("set_id"),mCurOutput);
-                mpClientInterface->setParameters(mTestOutputs[mCurOutput],outputCmd.toString());
-                addOutput(mTestOutputs[mCurOutput], outputDesc);
-            }
-        }
-        return mTestOutputs[mCurOutput];
-    }
-#endif //AUDIO_POLICY_TEST
-
     // open a direct output if required by specified parameters
     //force direct flag if offload flag is set: offloading implies a direct output stream
     // and all common behaviors are driven by checking only the direct flag
@@ -1453,19 +1411,6 @@ void AudioPolicyManager::releaseOutput(audio_io_handle_t output,
         ALOGW("releaseOutput() releasing unknown output %d", output);
         return;
     }
-
-#ifdef AUDIO_POLICY_TEST
-    int testIndex = testOutputIndex(output);
-    if (testIndex != 0) {
-        sp<AudioOutputDescriptor> outputDesc = mOutputs.valueAt(index);
-        if (outputDesc->isActive()) {
-            mpClientInterface->closeOutput(output);
-            removeOutput(output);
-            mTestOutputs[testIndex] = 0;
-        }
-        return;
-    }
-#endif //AUDIO_POLICY_TEST
 
     // Routing
     mOutputRoutes.removeRoute(session);
@@ -3569,9 +3514,6 @@ static status_t deserializeAudioPolicyXmlConfig(AudioPolicyConfig &config) {
 
 AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterface)
     :
-#ifdef AUDIO_POLICY_TEST
-    Thread(false),
-#endif //AUDIO_POLICY_TEST
     mLimitRingtoneVolume(false), mLastVoiceVolume(-1.0f),
     mA2dpSuspended(false),
     mAudioPortGeneration(1),
@@ -3812,37 +3754,10 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
     ALOGE_IF((mPrimaryOutput == 0), "Failed to open primary output");
 
     updateDevicesAndOutputs();
-
-#ifdef AUDIO_POLICY_TEST
-    if (mPrimaryOutput != 0) {
-        AudioParameter outputCmd = AudioParameter();
-        outputCmd.addInt(String8("set_id"), 0);
-        mpClientInterface->setParameters(mPrimaryOutput->mIoHandle, outputCmd.toString());
-
-        mTestDevice = AUDIO_DEVICE_OUT_SPEAKER;
-        mTestSamplingRate = 44100;
-        mTestFormat = AUDIO_FORMAT_PCM_16_BIT;
-        mTestChannels =  AUDIO_CHANNEL_OUT_STEREO;
-        mTestLatencyMs = 0;
-        mCurOutput = 0;
-        mDirectOutput = false;
-        for (int i = 0; i < NUM_TEST_OUTPUTS; i++) {
-            mTestOutputs[i] = 0;
-        }
-
-        const size_t SIZE = 256;
-        char buffer[SIZE];
-        snprintf(buffer, SIZE, "AudioPolicyManagerTest");
-        run(buffer, ANDROID_PRIORITY_AUDIO);
-    }
-#endif //AUDIO_POLICY_TEST
 }
 
 AudioPolicyManager::~AudioPolicyManager()
 {
-#ifdef AUDIO_POLICY_TEST
-    exit();
-#endif //AUDIO_POLICY_TEST
    for (size_t i = 0; i < mOutputs.size(); i++) {
         mpClientInterface->closeOutput(mOutputs.keyAt(i));
    }
@@ -3860,164 +3775,6 @@ status_t AudioPolicyManager::initCheck()
 {
     return hasPrimaryOutput() ? NO_ERROR : NO_INIT;
 }
-
-#ifdef AUDIO_POLICY_TEST
-bool AudioPolicyManager::threadLoop()
-{
-    ALOGV("entering threadLoop()");
-    while (!exitPending())
-    {
-        String8 command;
-        int valueInt;
-        String8 value;
-
-        Mutex::Autolock _l(mLock);
-        mWaitWorkCV.waitRelative(mLock, milliseconds(50));
-
-        command = mpClientInterface->getParameters(0, String8("test_cmd_policy"));
-        AudioParameter param = AudioParameter(command);
-
-        if (param.getInt(String8("test_cmd_policy"), valueInt) == NO_ERROR &&
-            valueInt != 0) {
-            ALOGV("Test command %s received", command.string());
-            String8 target;
-            if (param.get(String8("target"), target) != NO_ERROR) {
-                target = "Manager";
-            }
-            if (param.getInt(String8("test_cmd_policy_output"), valueInt) == NO_ERROR) {
-                param.remove(String8("test_cmd_policy_output"));
-                mCurOutput = valueInt;
-            }
-            if (param.get(String8("test_cmd_policy_direct"), value) == NO_ERROR) {
-                param.remove(String8("test_cmd_policy_direct"));
-                if (value == "false") {
-                    mDirectOutput = false;
-                } else if (value == "true") {
-                    mDirectOutput = true;
-                }
-            }
-            if (param.getInt(String8("test_cmd_policy_input"), valueInt) == NO_ERROR) {
-                param.remove(String8("test_cmd_policy_input"));
-                mTestInput = valueInt;
-            }
-
-            if (param.get(String8("test_cmd_policy_format"), value) == NO_ERROR) {
-                param.remove(String8("test_cmd_policy_format"));
-                int format = AUDIO_FORMAT_INVALID;
-                if (value == "PCM 16 bits") {
-                    format = AUDIO_FORMAT_PCM_16_BIT;
-                } else if (value == "PCM 8 bits") {
-                    format = AUDIO_FORMAT_PCM_8_BIT;
-                } else if (value == "Compressed MP3") {
-                    format = AUDIO_FORMAT_MP3;
-                }
-                if (format != AUDIO_FORMAT_INVALID) {
-                    if (target == "Manager") {
-                        mTestFormat = format;
-                    } else if (mTestOutputs[mCurOutput] != 0) {
-                        AudioParameter outputParam = AudioParameter();
-                        outputParam.addInt(String8(AudioParameter::keyStreamSupportedFormats), format);
-                        mpClientInterface->setParameters(mTestOutputs[mCurOutput], outputParam.toString());
-                    }
-                }
-            }
-            if (param.get(String8("test_cmd_policy_channels"), value) == NO_ERROR) {
-                param.remove(String8("test_cmd_policy_channels"));
-                int channels = 0;
-
-                if (value == "Channels Stereo") {
-                    channels =  AUDIO_CHANNEL_OUT_STEREO;
-                } else if (value == "Channels Mono") {
-                    channels =  AUDIO_CHANNEL_OUT_MONO;
-                }
-                if (channels != 0) {
-                    if (target == "Manager") {
-                        mTestChannels = channels;
-                    } else if (mTestOutputs[mCurOutput] != 0) {
-                        AudioParameter outputParam = AudioParameter();
-                        outputParam.addInt(String8(AudioParameter::keyStreamSupportedChannels), channels);
-                        mpClientInterface->setParameters(mTestOutputs[mCurOutput], outputParam.toString());
-                    }
-                }
-            }
-            if (param.getInt(String8("test_cmd_policy_sampleRate"), valueInt) == NO_ERROR) {
-                param.remove(String8("test_cmd_policy_sampleRate"));
-                if (valueInt >= 0 && valueInt <= 96000) {
-                    int samplingRate = valueInt;
-                    if (target == "Manager") {
-                        mTestSamplingRate = samplingRate;
-                    } else if (mTestOutputs[mCurOutput] != 0) {
-                        AudioParameter outputParam = AudioParameter();
-                        outputParam.addInt(String8(AudioParameter::keyStreamSupportedSamplingRates), samplingRate);
-                        mpClientInterface->setParameters(mTestOutputs[mCurOutput], outputParam.toString());
-                    }
-                }
-            }
-
-            if (param.get(String8("test_cmd_policy_reopen"), value) == NO_ERROR) {
-                param.remove(String8("test_cmd_policy_reopen"));
-
-                mpClientInterface->closeOutput(mpClientInterface->closeOutput(mPrimaryOutput););
-
-                audio_module_handle_t moduleHandle = mPrimaryOutput->getModuleHandle();
-
-                removeOutput(mPrimaryOutput->mIoHandle);
-                sp<SwAudioOutputDescriptor> outputDesc = new AudioOutputDescriptor(NULL,
-                                                                               mpClientInterface);
-                outputDesc->mDevice = AUDIO_DEVICE_OUT_SPEAKER;
-                audio_config_t config = AUDIO_CONFIG_INITIALIZER;
-                config.sample_rate = outputDesc->mSamplingRate;
-                config.channel_mask = outputDesc->mChannelMask;
-                config.format = outputDesc->mFormat;
-                audio_io_handle_t handle;
-                status_t status = mpClientInterface->openOutput(moduleHandle,
-                                                                &handle,
-                                                                &config,
-                                                                &outputDesc->mDevice,
-                                                                String8(""),
-                                                                &outputDesc->mLatency,
-                                                                outputDesc->mFlags);
-                if (status != NO_ERROR) {
-                    ALOGE("Failed to reopen hardware output stream, "
-                        "samplingRate: %d, format %d, channels %d",
-                        outputDesc->mSamplingRate, outputDesc->mFormat, outputDesc->mChannelMask);
-                } else {
-                    outputDesc->mSamplingRate = config.sample_rate;
-                    outputDesc->mChannelMask = config.channel_mask;
-                    outputDesc->mFormat = config.format;
-                    mPrimaryOutput = outputDesc;
-                    AudioParameter outputCmd = AudioParameter();
-                    outputCmd.addInt(String8("set_id"), 0);
-                    mpClientInterface->setParameters(handle, outputCmd.toString());
-                    addOutput(handle, outputDesc);
-                }
-            }
-
-
-            mpClientInterface->setParameters(0, String8("test_cmd_policy="));
-        }
-    }
-    return false;
-}
-
-void AudioPolicyManager::exit()
-{
-    {
-        AutoMutex _l(mLock);
-        requestExit();
-        mWaitWorkCV.signal();
-    }
-    requestExitAndWait();
-}
-
-int AudioPolicyManager::testOutputIndex(audio_io_handle_t output)
-{
-    for (int i = 0; i < NUM_TEST_OUTPUTS; i++) {
-        if (output == mTestOutputs[i]) return i;
-    }
-    return 0;
-}
-#endif //AUDIO_POLICY_TEST
 
 // ---
 
