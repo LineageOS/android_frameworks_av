@@ -172,12 +172,12 @@ void AAudioClientTracker::NotificationClient::binderDied(const wp<IBinder>& who 
 
         {
             std::lock_guard<std::mutex> lock(mLock);
-            for (auto serviceStream : mStreams) {
+            for (const auto& serviceStream : mStreams) {
                 streamsToClose.insert(serviceStream);
             }
         }
 
-        for (auto serviceStream : streamsToClose) {
+        for (const auto& serviceStream : streamsToClose) {
             aaudio_handle_t handle = serviceStream->getHandle();
             ALOGW("AAudioClientTracker::binderDied() close abandoned stream 0x%08X\n", handle);
             aaudioService->closeStream(handle);
@@ -200,7 +200,7 @@ std::string AAudioClientTracker::NotificationClient::dump() const {
     }
 
     result << "  client: pid = " << mProcessId << " has " << mStreams.size() << " streams\n";
-    for (auto serviceStream : mStreams) {
+    for (const auto& serviceStream : mStreams) {
         result << "     stream: 0x" << std::hex << serviceStream->getHandle() << std::dec << "\n";
     }
 
