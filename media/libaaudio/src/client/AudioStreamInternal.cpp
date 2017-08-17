@@ -80,9 +80,16 @@ AudioStreamInternal::~AudioStreamInternal() {
 aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 
     aaudio_result_t result = AAUDIO_OK;
+    int32_t capacity;
     AAudioStreamRequest request;
-    AAudioStreamConfiguration configuration;
+    AAudioStreamConfiguration configurationOutput;
 
+    if (getState() != AAUDIO_STREAM_STATE_UNINITIALIZED) {
+        ALOGE("AudioStreamInternal::open(): already open! state = %d", getState());
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+
+    // Copy requested parameters to the stream.
     result = AudioStream::open(builder);
     if (result < 0) {
         return result;
@@ -109,87 +116,95 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 
     request.getConfiguration().setBufferCapacity(builder.getBufferCapacity());
 
-    mServiceStreamHandle = mServiceInterface.openStream(request, configuration);
+    mServiceStreamHandle = mServiceInterface.openStream(request, configurationOutput);
     if (mServiceStreamHandle < 0) {
         result = mServiceStreamHandle;
-        ALOGE("AudioStreamInternal.open(): openStream() returned %d", result);
-    } else {
-        result = configuration.validate();
-        if (result != AAUDIO_OK) {
-            close();
-            return result;
-        }
-        // Save results of the open.
-        setSampleRate(configuration.getSampleRate());
-        setSamplesPerFrame(configuration.getSamplesPerFrame());
-        setDeviceId(configuration.getDeviceId());
-        setSharingMode(configuration.getSharingMode());
-
-        // Save device format so we can do format conversion and volume scaling together.
-        mDeviceFormat = configuration.getFormat();
-
-        result = mServiceInterface.getStreamDescription(mServiceStreamHandle, mEndPointParcelable);
-        if (result != AAUDIO_OK) {
-            mServiceInterface.closeStream(mServiceStreamHandle);
-            return result;
-        }
-
-        // resolve parcelable into a descriptor
-        result = mEndPointParcelable.resolve(&mEndpointDescriptor);
-        if (result != AAUDIO_OK) {
-            mServiceInterface.closeStream(mServiceStreamHandle);
-            return result;
-        }
-
-        // Configure endpoint based on descriptor.
-        mAudioEndpoint.configure(&mEndpointDescriptor, getDirection());
-
-        mFramesPerBurst = mEndpointDescriptor.dataQueueDescriptor.framesPerBurst;
-        int32_t capacity = mEndpointDescriptor.dataQueueDescriptor.capacityInFrames;
-
-        // Validate result from server.
-        if (mFramesPerBurst < 16 || mFramesPerBurst > 16 * 1024) {
-            ALOGE("AudioStream::open(): framesPerBurst out of range = %d", mFramesPerBurst);
-            return AAUDIO_ERROR_OUT_OF_RANGE;
-        }
-        if (capacity < mFramesPerBurst || capacity > 32 * 1024) {
-            ALOGE("AudioStream::open(): bufferCapacity out of range = %d", capacity);
-            return AAUDIO_ERROR_OUT_OF_RANGE;
-        }
-
-        mClockModel.setSampleRate(getSampleRate());
-        mClockModel.setFramesPerBurst(mFramesPerBurst);
-
-        if (getDataCallbackProc()) {
-            mCallbackFrames = builder.getFramesPerDataCallback();
-            if (mCallbackFrames > getBufferCapacity() / 2) {
-                ALOGE("AudioStreamInternal::open(): framesPerCallback too big = %d, capacity = %d",
-                      mCallbackFrames, getBufferCapacity());
-                mServiceInterface.closeStream(mServiceStreamHandle);
-                return AAUDIO_ERROR_OUT_OF_RANGE;
-
-            } else if (mCallbackFrames < 0) {
-                ALOGE("AudioStreamInternal::open(): framesPerCallback negative");
-                mServiceInterface.closeStream(mServiceStreamHandle);
-                return AAUDIO_ERROR_OUT_OF_RANGE;
-
-            }
-            if (mCallbackFrames == AAUDIO_UNSPECIFIED) {
-                mCallbackFrames = mFramesPerBurst;
-            }
-
-            int32_t bytesPerFrame = getSamplesPerFrame()
-                                    * AAudioConvert_formatToSizeInBytes(getFormat());
-            int32_t callbackBufferSize = mCallbackFrames * bytesPerFrame;
-            mCallbackBuffer = new uint8_t[callbackBufferSize];
-        }
-
-        setState(AAUDIO_STREAM_STATE_OPEN);
-        // only connect to AudioManager if this is a playback stream running in client process
-        if (!mInService && getDirection() == AAUDIO_DIRECTION_OUTPUT) {
-            init(android::PLAYER_TYPE_AAUDIO, AUDIO_USAGE_MEDIA);
-        }
+        ALOGE("AudioStreamInternal::open(): openStream() returned %d", result);
+        return result;
     }
+
+    result = configurationOutput.validate();
+    if (result != AAUDIO_OK) {
+        goto error;
+    }
+    // Save results of the open.
+    setSampleRate(configurationOutput.getSampleRate());
+    setSamplesPerFrame(configurationOutput.getSamplesPerFrame());
+    setDeviceId(configurationOutput.getDeviceId());
+    setSharingMode(configurationOutput.getSharingMode());
+
+    // Save device format so we can do format conversion and volume scaling together.
+    mDeviceFormat = configurationOutput.getFormat();
+
+    result = mServiceInterface.getStreamDescription(mServiceStreamHandle, mEndPointParcelable);
+    if (result != AAUDIO_OK) {
+        goto error;
+    }
+
+    // Resolve parcelable into a descriptor.
+    result = mEndPointParcelable.resolve(&mEndpointDescriptor);
+    if (result != AAUDIO_OK) {
+        goto error;
+    }
+
+    // Configure endpoint based on descriptor.
+    result = mAudioEndpoint.configure(&mEndpointDescriptor, getDirection());
+    if (result != AAUDIO_OK) {
+        goto error;
+    }
+
+    mFramesPerBurst = mEndpointDescriptor.dataQueueDescriptor.framesPerBurst;
+    capacity = mEndpointDescriptor.dataQueueDescriptor.capacityInFrames;
+
+    // Validate result from server.
+    if (mFramesPerBurst < 16 || mFramesPerBurst > 16 * 1024) {
+        ALOGE("AudioStreamInternal::open(): framesPerBurst out of range = %d", mFramesPerBurst);
+        result = AAUDIO_ERROR_OUT_OF_RANGE;
+        goto error;
+    }
+    if (capacity < mFramesPerBurst || capacity > 32 * 1024) {
+        ALOGE("AudioStreamInternal::open(): bufferCapacity out of range = %d", capacity);
+        result = AAUDIO_ERROR_OUT_OF_RANGE;
+        goto error;
+    }
+
+    mClockModel.setSampleRate(getSampleRate());
+    mClockModel.setFramesPerBurst(mFramesPerBurst);
+
+    if (getDataCallbackProc()) {
+        mCallbackFrames = builder.getFramesPerDataCallback();
+        if (mCallbackFrames > getBufferCapacity() / 2) {
+            ALOGE("AudioStreamInternal::open(): framesPerCallback too big = %d, capacity = %d",
+                  mCallbackFrames, getBufferCapacity());
+            result = AAUDIO_ERROR_OUT_OF_RANGE;
+            goto error;
+
+        } else if (mCallbackFrames < 0) {
+            ALOGE("AudioStreamInternal::open(): framesPerCallback negative");
+            result = AAUDIO_ERROR_OUT_OF_RANGE;
+            goto error;
+
+        }
+        if (mCallbackFrames == AAUDIO_UNSPECIFIED) {
+            mCallbackFrames = mFramesPerBurst;
+        }
+
+        int32_t bytesPerFrame = getSamplesPerFrame()
+                                * AAudioConvert_formatToSizeInBytes(getFormat());
+        int32_t callbackBufferSize = mCallbackFrames * bytesPerFrame;
+        mCallbackBuffer = new uint8_t[callbackBufferSize];
+    }
+
+    setState(AAUDIO_STREAM_STATE_OPEN);
+    // Only connect to AudioManager if this is a playback stream running in client process.
+    if (!mInService && getDirection() == AAUDIO_DIRECTION_OUTPUT) {
+        init(android::PLAYER_TYPE_AAUDIO, AUDIO_USAGE_MEDIA);
+    }
+
+    return result;
+
+error:
+    close();
     return result;
 }
 
@@ -223,7 +238,6 @@ aaudio_result_t AudioStreamInternal::close() {
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
 }
-
 
 static void *aaudio_callback_thread_proc(void *context)
 {
