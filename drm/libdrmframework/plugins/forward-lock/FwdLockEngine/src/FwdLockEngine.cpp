@@ -502,8 +502,8 @@ status_t FwdLockEngine::onOpenDecryptSession(int /* uniqueId */,
         int retVal = FwdLockFile_CheckHeaderIntegrity(fileDesc);
         DecodeSession* decodeSession = new DecodeSession(fileDesc);
 
-        if (retVal && NULL != decodeSession) {
-            decodeSessionMap.addValue(decryptHandle->decryptId, decodeSession);
+        if (retVal && NULL != decodeSession &&
+            decodeSessionMap.addValue(decryptHandle->decryptId, decodeSession)) {
             const char *pmime= FwdLockFile_GetContentType(fileDesc);
             String8 contentType = String8(pmime == NULL ? "" : pmime);
             contentType.toLower();
@@ -513,7 +513,11 @@ status_t FwdLockEngine::onOpenDecryptSession(int /* uniqueId */,
             decryptHandle->decryptInfo = NULL;
             result = DRM_NO_ERROR;
         } else {
-            LOG_VERBOSE("FwdLockEngine::onOpenDecryptSession Integrity Check failed for the fd");
+            if (retVal && NULL != decodeSession) {
+              LOG_VERBOSE("FwdLockEngine::onOpenDecryptSession Integrity Check failed for the fd");
+            } else {
+              LOG_VERBOSE("FwdLockEngine::onOpenDecryptSession DecodeSesssion insertion failed");
+            }
             FwdLockFile_detach(fileDesc);
             delete decodeSession;
         }
@@ -631,7 +635,7 @@ ssize_t FwdLockEngine::onRead(int /* uniqueId */,
     ssize_t size = -1;
 
     if (NULL != decryptHandle &&
-       decodeSessionMap.isCreated(decryptHandle->decryptId) &&
+        decodeSessionMap.isCreated(decryptHandle->decryptId) &&
         NULL != buffer &&
         numBytes > -1) {
         DecodeSession* session = decodeSessionMap.getValue(decryptHandle->decryptId);
