@@ -733,7 +733,7 @@ bool GraphicBufferSource::calculateCodecTimestamp_l(
         } else {
             // snap to nearest capture point
             int64_t nFrames = std::llround(
-                    (timeUs - mPrevCaptureUs) * mCaptureFps);
+                    (timeUs - mPrevCaptureUs) * mCaptureFps / 1000000);
             if (nFrames <= 0) {
                 // skip this frame as it's too close to previous capture
                 ALOGV("skipping frame, timeUs %lld", static_cast<long long>(timeUs));
@@ -741,9 +741,9 @@ bool GraphicBufferSource::calculateCodecTimestamp_l(
             }
             mFrameCount += nFrames;
             mPrevCaptureUs = mBaseCaptureUs + std::llround(
-                    mFrameCount / mCaptureFps);
+                    mFrameCount * 1000000 / mCaptureFps);
             mPrevFrameUs = mBaseFrameUs + std::llround(
-                    mFrameCount / mFps);
+                    mFrameCount * 1000000 / mFps);
         }
 
         ALOGV("timeUs %lld, captureUs %lld, frameUs %lld",
