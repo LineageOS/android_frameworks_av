@@ -1866,16 +1866,15 @@ status_t ACodec::configureCodec(
             mFlags |= kFlagIsGrallocUsageProtected;
             mFlags |= kFlagPushBlankBuffersToNativeWindowOnShutdown;
         }
+    }
+    if (mFlags & kFlagIsSecure) {
+        // use native_handles for secure input buffers
+        err = setPortMode(kPortIndexInput, IOMX::kPortModePresetSecureBuffer);
 
-        if (mFlags & kFlagIsSecure) {
-            // use native_handles for secure input buffers
-            err = setPortMode(kPortIndexInput, IOMX::kPortModePresetSecureBuffer);
-
-            if (err != OK) {
-                ALOGI("falling back to non-native_handles");
-                setPortMode(kPortIndexInput, IOMX::kPortModePresetByteBuffer);
-                err = OK; // ignore error for now
-            }
+        if (err != OK) {
+            ALOGI("falling back to non-native_handles");
+            setPortMode(kPortIndexInput, IOMX::kPortModePresetByteBuffer);
+            err = OK; // ignore error for now
         }
     }
     if (haveNativeWindow) {

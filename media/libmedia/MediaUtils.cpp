@@ -24,6 +24,8 @@
 
 #include "MediaUtils.h"
 
+extern "C" size_t __cfi_shadow_size();
+
 namespace android {
 
 void limitProcessMemory(
@@ -61,6 +63,19 @@ void limitProcessMemory(
     int64_t propVal = property_get_int64(property, maxMem);
     if (propVal > 0 && uint64_t(propVal) <= SIZE_MAX) {
         maxMem = propVal;
+    }
+
+    // Increase by the size of the CFI shadow mapping. Most of the shadow is not
+    // backed with physical pages, and it is possible for the result to be
+    // higher than total physical memory. This is fine for RLIMIT_AS.
+    size_t cfi_size = __cfi_shadow_size();
+    if (cfi_size) {
+      ALOGV("cfi shadow size: %zu", cfi_size);
+      if (maxMem <= SIZE_MAX - cfi_size) {
+        maxMem += cfi_size;
+      } else {
+        maxMem = SIZE_MAX;
+      }
     }
     ALOGV("actual limit: %zu", maxMem);
 
