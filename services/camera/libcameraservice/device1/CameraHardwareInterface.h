@@ -156,6 +156,29 @@ public:
         }
     }
 
+    /** Set the notification and data callbacks */
+    void setCallbacksEx(notify_callback notify_cb,
+                      data_callback data_cb,
+                      data_callback_timestamp data_cb_timestamp,
+                      void* user)
+    {
+        mNotifyCb = notify_cb;
+        mDataCb = data_cb;
+        mDataCbTimestamp = data_cb_timestamp;
+        mCbUser = user;
+
+        ALOGV("%s(%s)", __FUNCTION__, mName.string());
+
+        if (mDevice->ops->set_CallBacks_Ex) {
+            mDevice->ops->set_CallBacks_Ex(mDevice,
+                                   __notify_cb,
+                                   __data_cb,
+                                   __data_cb_timestamp,
+                                   __get_memory,
+                                   this);
+        }
+    }
+
     /**
      * The following three functions all take a msgtype,
      * which is a bitmask of the messages defined in
