@@ -80,7 +80,7 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
         { // brackets are for lock_guard
 
             std::lock_guard <std::mutex> lock(mLockStreams);
-            for (sp<AAudioServiceStreamShared> clientStream : mRegisteredStreams) {
+            for (const sp<AAudioServiceStreamShared>& clientStream : mRegisteredStreams) {
                 if (clientStream->isRunning()) {
                     FifoBuffer *fifo = clientStream->getDataFifoBuffer();
 

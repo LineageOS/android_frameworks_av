@@ -193,7 +193,7 @@ binder::Status CameraDeviceClient::submitRequestList(
          */
         SurfaceMap surfaceMap;
         Vector<int32_t> outputStreamIds;
-        for (sp<Surface> surface : request.mSurfaceList) {
+        for (const sp<Surface>& surface : request.mSurfaceList) {
             if (surface == 0) continue;
 
             sp<IGraphicBufferProducer> gbp = surface->getIGraphicBufferProducer();

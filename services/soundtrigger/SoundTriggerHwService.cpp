@@ -89,7 +89,8 @@ status_t SoundTriggerHwService::listModules(struct sound_trigger_module_descript
                              uint32_t *numModules)
 {
     ALOGV("listModules");
-    if (!captureHotwordAllowed()) {
+    if (!captureHotwordAllowed(IPCThreadState::self()->getCallingPid(),
+                               IPCThreadState::self()->getCallingUid())) {
         return PERMISSION_DENIED;
     }
 
@@ -110,7 +111,8 @@ status_t SoundTriggerHwService::attach(const sound_trigger_module_handle_t handl
                         sp<ISoundTrigger>& moduleInterface)
 {
     ALOGV("attach module %d", handle);
-    if (!captureHotwordAllowed()) {
+    if (!captureHotwordAllowed(IPCThreadState::self()->getCallingPid(),
+                               IPCThreadState::self()->getCallingUid())) {
         return PERMISSION_DENIED;
     }
 
@@ -942,7 +944,8 @@ status_t SoundTriggerHwService::ModuleClient::dump(int fd __unused,
 
 void SoundTriggerHwService::ModuleClient::detach() {
     ALOGV("detach()");
-    if (!captureHotwordAllowed()) {
+    if (!captureHotwordAllowed(IPCThreadState::self()->getCallingPid(),
+                               IPCThreadState::self()->getCallingUid())) {
         return;
     }
 
@@ -965,7 +968,8 @@ status_t SoundTriggerHwService::ModuleClient::loadSoundModel(const sp<IMemory>& 
                                 sound_model_handle_t *handle)
 {
     ALOGV("loadSoundModel() handle");
-    if (!captureHotwordAllowed()) {
+    if (!captureHotwordAllowed(IPCThreadState::self()->getCallingPid(),
+                               IPCThreadState::self()->getCallingUid())) {
         return PERMISSION_DENIED;
     }
 
@@ -979,7 +983,8 @@ status_t SoundTriggerHwService::ModuleClient::loadSoundModel(const sp<IMemory>& 
 status_t SoundTriggerHwService::ModuleClient::unloadSoundModel(sound_model_handle_t handle)
 {
     ALOGV("unloadSoundModel() model handle %d", handle);
-    if (!captureHotwordAllowed()) {
+    if (!captureHotwordAllowed(IPCThreadState::self()->getCallingPid(),
+                               IPCThreadState::self()->getCallingUid())) {
         return PERMISSION_DENIED;
     }
 
@@ -994,7 +999,8 @@ status_t SoundTriggerHwService::ModuleClient::startRecognition(sound_model_handl
                                  const sp<IMemory>& dataMemory)
 {
     ALOGV("startRecognition() model handle %d", handle);
-    if (!captureHotwordAllowed()) {
+    if (!captureHotwordAllowed(IPCThreadState::self()->getCallingPid(),
+                               IPCThreadState::self()->getCallingUid())) {
         return PERMISSION_DENIED;
     }
 
@@ -1008,7 +1014,8 @@ status_t SoundTriggerHwService::ModuleClient::startRecognition(sound_model_handl
 status_t SoundTriggerHwService::ModuleClient::stopRecognition(sound_model_handle_t handle)
 {
     ALOGV("stopRecognition() model handle %d", handle);
-    if (!captureHotwordAllowed()) {
+    if (!captureHotwordAllowed(IPCThreadState::self()->getCallingPid(),
+                               IPCThreadState::self()->getCallingUid())) {
         return PERMISSION_DENIED;
     }
 

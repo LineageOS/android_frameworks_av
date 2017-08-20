@@ -118,7 +118,7 @@ status_t OMX::allocateNode(
     std::vector<AString> quirkVector;
     if (mParser.getQuirks(name, &quirkVector) == OK) {
         uint32_t quirks = 0;
-        for (const AString quirk : quirkVector) {
+        for (const AString& quirk : quirkVector) {
             if (quirk == "requires-allocate-on-input-ports") {
                 quirks |= kRequiresAllocateBufferOnInputPorts;
             }

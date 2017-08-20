@@ -77,7 +77,7 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
             int64_t mmapFramesWritten = getStreamInternal()->getFramesWritten();
 
             std::lock_guard <std::mutex> lock(mLockStreams);
-            for (sp<AAudioServiceStreamShared> clientStream : mRegisteredStreams) {
+            for (const sp<AAudioServiceStreamShared>& clientStream : mRegisteredStreams) {
                 if (clientStream->isRunning()) {
                     FifoBuffer *fifo = clientStream->getDataFifoBuffer();
                     // Determine offset between framePosition in client's stream vs the underlying
