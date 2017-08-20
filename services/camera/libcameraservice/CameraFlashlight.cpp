@@ -55,10 +55,10 @@ status_t CameraFlashlight::createFlashlightControl(const String8& cameraId) {
 
     status_t res = OK;
 
-    if (mCameraModule->getModuleApiVersion() >= CAMERA_MODULE_API_VERSION_2_4) {
+    if (mCameraModule->getModuleApiVersion() >= CAMERA_MODULE_API_VERSION_2_2) {
         mFlashControl = new ModuleFlashControl(*mCameraModule, *mCallbacks);
         if (mFlashControl == NULL) {
-            ALOGV("%s: cannot create flash control for module api v2.4+",
+            ALOGV("%s: cannot create flash control for module api v2.2+",
                      __FUNCTION__);
             return NO_MEMORY;
         }
@@ -313,22 +313,37 @@ status_t ModuleFlashControl::hasFlashUnit(const String8& cameraId, bool *hasFlas
         return BAD_VALUE;
     }
 
-    *hasFlash = false;
-    Mutex::Autolock l(mLock);
-
-    camera_info info;
-    status_t res = mCameraModule->getCameraInfo(atoi(cameraId.string()),
-            &info);
-    if (res != 0) {
-        return res;
+    if (mCameraModule->getModuleApiVersion() == 515)
+    {
+        if (atoi(cameraId.string()) == 1)
+        {
+            *hasFlash = false;
+        }
+        else
+        {
+            *hasFlash = true;
+        }
     }
+    else
+    {
 
-    CameraMetadata metadata;
-    metadata = info.static_camera_characteristics;
-    camera_metadata_entry flashAvailable =
-            metadata.find(ANDROID_FLASH_INFO_AVAILABLE);
-    if (flashAvailable.count == 1 && flashAvailable.data.u8[0] == 1) {
-        *hasFlash = true;
+        *hasFlash = false;
+        Mutex::Autolock l(mLock);
+
+        camera_info info;
+        status_t res = mCameraModule->getCameraInfo(atoi(cameraId.string()),
+                &info);
+        if (res != 0) {
+            return res;
+        }
+
+        CameraMetadata metadata;
+        metadata = info.static_camera_characteristics;
+        camera_metadata_entry flashAvailable =
+                metadata.find(ANDROID_FLASH_INFO_AVAILABLE);
+        if (flashAvailable.count == 1 && flashAvailable.data.u8[0] == 1) {
+            *hasFlash = true;
+        }
     }
 
     return OK;
