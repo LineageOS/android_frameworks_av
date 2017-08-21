@@ -22,7 +22,7 @@
 #include <media/hardware/HardwareAPI.h>
 
 #include "api1/CameraClient.h"
-#include "device1/CameraHardwareInterface.h"
+#include <device1/CameraHardwareInterface.h>
 #include "CameraService.h"
 
 namespace android {

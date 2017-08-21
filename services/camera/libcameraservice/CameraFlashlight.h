@@ -23,7 +23,7 @@
 #include "gui/GLConsumer.h"
 #include "gui/Surface.h"
 #include "common/CameraDeviceBase.h"
-#include "device1/CameraHardwareInterface.h"
+#include <device1/CameraHardwareInterface.h>
 
 namespace android {
 
