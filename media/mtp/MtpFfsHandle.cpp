@@ -724,7 +724,7 @@ int MtpFfsHandle::sendEvent(mtp_event me) {
     char *temp = new char[me.length];
     memcpy(temp, me.data, me.length);
     me.data = temp;
-    std::thread t([&me](MtpFfsHandle *h) { return h->doSendEvent(me); }, this);
+    std::thread t([this, me]() { return this->doSendEvent(me); });
     t.detach();
     return 0;
 }
@@ -732,9 +732,9 @@ int MtpFfsHandle::sendEvent(mtp_event me) {
 void MtpFfsHandle::doSendEvent(mtp_event me) {
     unsigned length = me.length;
     int ret = ::write(mIntr, me.data, length);
-    delete[] reinterpret_cast<char*>(me.data);
     if (static_cast<unsigned>(ret) != length)
         PLOG(ERROR) << "Mtp error sending event thread!";
+    delete[] reinterpret_cast<char*>(me.data);
 }
 
 } // namespace android
