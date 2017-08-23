@@ -213,9 +213,9 @@ enum {
     kKeyTemporalLayerId  = 'iLyr', // int32_t, temporal layer-id. 0-based (0 => base layer)
     kKeyTemporalLayerCount = 'cLyr', // int32_t, number of temporal layers encoded
 
-    kKeyGridRows         = 'rows', // int32_t, HEIF grid rows
-    kKeyGridCols         = 'clms', // int32_t, HEIF grid columns
-    kKeyIccProfile       = 'prof', // raw data
+    kKeyGridWidth        = 'grdW', // int32_t, HEIF grid width
+    kKeyGridHeight       = 'grdH', // int32_t, HEIF grid height
+    kKeyIccProfile       = 'prof', // raw data, ICC prifile data
 };
 
 enum {
