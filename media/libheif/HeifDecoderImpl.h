@@ -54,6 +54,7 @@ private:
     sp<IMemory> mFrameMemory;
     android_pixel_format_t mOutputColor;
     size_t mCurScanline;
+    bool mFrameDecoded;
 };
 
 } // namespace android
