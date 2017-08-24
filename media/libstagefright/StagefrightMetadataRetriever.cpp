@@ -250,6 +250,8 @@ static VideoFrame *extractVideoFrame(
          && trackMeta->findInt32(kKeyThumbnailHeight, &thumbnailHeight)
          && trackMeta->findData(kKeyThumbnailHVCC, &type, &data, &size)){
             overrideMeta = new MetaData(*trackMeta);
+            overrideMeta->remove(kKeyDisplayWidth);
+            overrideMeta->remove(kKeyDisplayHeight);
             overrideMeta->setInt32(kKeyWidth, thumbnailWidth);
             overrideMeta->setInt32(kKeyHeight, thumbnailHeight);
             overrideMeta->setData(kKeyHVCC, type, data, size);
@@ -266,32 +268,39 @@ static VideoFrame *extractVideoFrame(
     }
 
     int32_t gridRows = 1, gridCols = 1;
-    int32_t numTiles = 1, tilesDecoded = 0;
     if (overrideMeta == NULL) {
         // check if we're dealing with a tiled heif
-        if (trackMeta->findInt32(kKeyGridRows, &gridRows) && gridRows > 0
-         && trackMeta->findInt32(kKeyGridCols, &gridCols) && gridCols > 0) {
-            int32_t width, height;
+        int32_t gridWidth, gridHeight;
+        if (trackMeta->findInt32(kKeyGridWidth, &gridWidth) && gridWidth > 0
+         && trackMeta->findInt32(kKeyGridHeight, &gridHeight) && gridHeight > 0) {
+            int32_t width, height, displayWidth, displayHeight;
             CHECK(trackMeta->findInt32(kKeyWidth, &width));
             CHECK(trackMeta->findInt32(kKeyHeight, &height));
+            CHECK(trackMeta->findInt32(kKeyDisplayWidth, &displayWidth));
+            CHECK(trackMeta->findInt32(kKeyDisplayHeight, &displayHeight));
 
-            if ((width % gridCols == 0) && (height % gridRows == 0)) {
-                width /= gridCols;
-                height /= gridRows;
-                numTiles = gridCols * gridRows;
-
-                ALOGV("tile: %dx%d, numTiles %d", width, height, numTiles);
+            if (width >= displayWidth && height >= displayHeight
+                    && (width % gridWidth == 0) && (height % gridHeight == 0)) {
+                ALOGV("grid config: %dx%d, display %dx%d, grid %dx%d",
+                        width, height, displayWidth, displayHeight, gridWidth, gridHeight);
 
                 overrideMeta = new MetaData(*trackMeta);
-                overrideMeta->setInt32(kKeyWidth, width);
-                overrideMeta->setInt32(kKeyHeight, height);
+                overrideMeta->remove(kKeyDisplayWidth);
+                overrideMeta->remove(kKeyDisplayHeight);
+                overrideMeta->setInt32(kKeyWidth, gridWidth);
+                overrideMeta->setInt32(kKeyHeight, gridHeight);
+                gridCols = width / gridWidth;
+                gridRows = height / gridHeight;
+            } else {
+                ALOGE("Bad grid config: %dx%d, display %dx%d, grid %dx%d",
+                        width, height, displayWidth, displayHeight, gridWidth, gridHeight);
             }
         }
         if (overrideMeta == NULL) {
-            gridRows = gridCols = numTiles = 1;
             overrideMeta = trackMeta;
         }
     }
+    int32_t numTiles = gridRows * gridCols;
 
     sp<AMessage> videoFormat;
     if (convertMetaDataToMessage(overrideMeta, &videoFormat) != OK) {
@@ -383,6 +392,7 @@ static VideoFrame *extractVideoFrame(
     int64_t targetTimeUs = -1ll;
 
     VideoFrame *frame = NULL;
+    int32_t tilesDecoded = 0;
 
     do {
         size_t inputIndex = -1;
@@ -500,7 +510,7 @@ static VideoFrame *extractVideoFrame(
 
                     if (frame == NULL) {
                         frame = allocVideoFrame(
-                                overrideMeta,
+                                trackMeta,
                                 (crop_right - crop_left + 1) * gridCols,
                                 (crop_bottom - crop_top + 1) * gridRows,
                                 dstBpp,
