@@ -46,17 +46,17 @@ AudioOutputDescriptor::AudioOutputDescriptor(const sp<AudioPort>& port,
     for (int i = 0; i < NUM_STRATEGIES; i++) {
         mStrategyMutedByDevice[i] = false;
     }
-    if (port != NULL) {
-        port->pickAudioProfile(mSamplingRate, mChannelMask, mFormat);
-        if (port->mGains.size() > 0) {
-            port->mGains[0]->getDefaultConfig(&mGain);
+    if (mPort.get() != nullptr) {
+        mPort->pickAudioProfile(mSamplingRate, mChannelMask, mFormat);
+        if (mPort->mGains.size() > 0) {
+            mPort->mGains[0]->getDefaultConfig(&mGain);
         }
     }
 }
 
 audio_module_handle_t AudioOutputDescriptor::getModuleHandle() const
 {
-    return mPort->getModuleHandle();
+    return mPort.get() != nullptr ? mPort->getModuleHandle() : AUDIO_MODULE_HANDLE_NONE;
 }
 
 audio_port_handle_t AudioOutputDescriptor::getId() const
@@ -175,9 +175,9 @@ void AudioOutputDescriptor::toAudioPortConfig(
     dstConfig->ext.mix.usecase.stream = AUDIO_STREAM_DEFAULT;
 }
 
-void AudioOutputDescriptor::toAudioPort(
-                                                    struct audio_port *port) const
+void AudioOutputDescriptor::toAudioPort(struct audio_port *port) const
 {
+    // Should not be called for duplicated ports, see SwAudioOutputDescriptor::toAudioPortConfig.
     mPort->toAudioPort(port);
     port->id = mId;
     port->ext.mix.hw_module = getModuleHandle();
