@@ -20,6 +20,7 @@
 #include <stdint.h>
 
 #include <aaudio/AAudio.h>
+#include <utility/AAudioUtilities.h>
 
 namespace aaudio {
 
@@ -79,6 +80,24 @@ public:
         mBufferCapacity = frames;
     }
 
+    aaudio_direction_t getDirection() const {
+        return mDirection;
+    }
+
+    void setDirection(aaudio_direction_t direction) {
+        mDirection = direction;
+    }
+
+    int32_t calculateBytesPerFrame() const {
+        return getSamplesPerFrame() * AAudioConvert_formatToSizeInBytes(getFormat());
+    }
+
+    /**
+     * Copy variables defined in other AAudioStreamParameters instance to this one.
+     * @param other
+     */
+    void copyFrom(const AAudioStreamParameters &other);
+
     virtual aaudio_result_t validate() const;
 
     void dump() const;
@@ -89,6 +108,7 @@ private:
     int32_t                    mDeviceId        = AAUDIO_UNSPECIFIED;
     aaudio_sharing_mode_t      mSharingMode     = AAUDIO_SHARING_MODE_SHARED;
     aaudio_format_t            mAudioFormat     = AAUDIO_FORMAT_UNSPECIFIED;
+    aaudio_direction_t         mDirection       = AAUDIO_DIRECTION_OUTPUT;
     int32_t                    mBufferCapacity  = AAUDIO_UNSPECIFIED;
 };
 

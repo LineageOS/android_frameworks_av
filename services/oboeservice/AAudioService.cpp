@@ -114,14 +114,12 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
                 mAudioClient.clientUid == IPCThreadState::self()->getCallingUid()) {
             inService = request.isInService();
         }
-        serviceStream = new AAudioServiceStreamMMAP(mAudioClient, inService);
-        result = serviceStream->open(request, configurationOutput);
+        serviceStream = new AAudioServiceStreamMMAP(*this, inService);
+        result = serviceStream->open(request);
         if (result != AAUDIO_OK) {
-            // fall back to using a shared stream
+            // Clear it so we can possibly fall back to using a shared stream.
             ALOGW("AAudioService::openStream(), could not open in EXCLUSIVE mode");
             serviceStream.clear();
-        } else {
-            configurationOutput.setSharingMode(AAUDIO_SHARING_MODE_EXCLUSIVE);
         }
     }
 
@@ -129,8 +127,7 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
     if (sharingMode == AAUDIO_SHARING_MODE_SHARED
          || (serviceStream == nullptr && !sharingModeMatchRequired)) {
         serviceStream =  new AAudioServiceStreamShared(*this);
-        result = serviceStream->open(request, configurationOutput);
-        configurationOutput.setSharingMode(AAUDIO_SHARING_MODE_SHARED);
+        result = serviceStream->open(request);
     }
 
     if (result != AAUDIO_OK) {
@@ -149,6 +146,7 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
             serviceStream->setHandle(handle);
             pid_t pid = request.getProcessId();
             AAudioClientTracker::getInstance().registerClientStream(pid, serviceStream);
+            configurationOutput.copyFrom(*serviceStream);
         }
         return handle;
     }

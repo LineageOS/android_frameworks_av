@@ -31,7 +31,9 @@ LOCAL_SRC_FILES += \
     AAudioService.cpp \
     AAudioServiceEndpoint.cpp \
     AAudioServiceEndpointCapture.cpp \
+    AAudioServiceEndpointMMAP.cpp \
     AAudioServiceEndpointPlay.cpp \
+    AAudioServiceEndpointShared.cpp \
     AAudioServiceStreamBase.cpp \
     AAudioServiceStreamMMAP.cpp \
     AAudioServiceStreamShared.cpp \

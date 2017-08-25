@@ -37,19 +37,20 @@
 
 namespace aaudio {
 
-    /**
-     * Manage one memory mapped buffer that originated from a HAL.
-     */
-class AAudioServiceStreamMMAP
-    : public AAudioServiceStreamBase
-    , public android::MmapStreamCallback {
+
+/**
+ * These corresponds to an EXCLUSIVE mode MMAP client stream.
+ * It has exclusive use of one AAudioServiceEndpointMMAP to communicate with the underlying
+ * device or port.
+ */
+class AAudioServiceStreamMMAP : public AAudioServiceStreamBase {
 
 public:
-    AAudioServiceStreamMMAP(const android::AudioClient& serviceClient, bool inService);
+    AAudioServiceStreamMMAP(android::AAudioService &aAudioService,
+                            bool inService);
     virtual ~AAudioServiceStreamMMAP() = default;
 
-    aaudio_result_t open(const aaudio::AAudioStreamRequest &request,
-                                 aaudio::AAudioStreamConfiguration &configurationOutput) override;
+    aaudio_result_t open(const aaudio::AAudioStreamRequest &request) override;
 
     /**
      * Start the flow of audio data.
@@ -69,83 +70,28 @@ public:
 
     aaudio_result_t stop() override;
 
-    /**
-     *  Discard any data held by the underlying HAL or Service.
-     *
-     * This is not guaranteed to be synchronous but it currently is.
-     * An AAUDIO_SERVICE_EVENT_FLUSHED will be sent to the client when complete.
-     */
-    aaudio_result_t flush() override;
+    aaudio_result_t startClient(const android::AudioClient& client,
+                                audio_port_handle_t *clientHandle) override;
+
+    aaudio_result_t stopClient(audio_port_handle_t clientHandle) override;
 
     aaudio_result_t close() override;
-
-    virtual aaudio_result_t startClient(const android::AudioClient& client,
-                                        audio_port_handle_t *clientHandle);
-
-    virtual aaudio_result_t stopClient(audio_port_handle_t clientHandle);
 
     /**
      * Send a MMAP/NOIRQ buffer timestamp to the client.
      */
-    aaudio_result_t sendCurrentTimestamp();
-
-    // -------------- Callback functions ---------------------
-    void onTearDown() override;
-
-    void onVolumeChanged(audio_channel_mask_t channels,
-                         android::Vector<float> values) override;
-
-    void onRoutingChanged(audio_port_handle_t deviceId) override;
 
 protected:
 
     aaudio_result_t getDownDataDescription(AudioEndpointParcelable &parcelable) override;
 
     aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) override;
-    virtual aaudio_result_t getHardwareTimestamp(int64_t *positionFrames,
-                                                 int64_t *timeNanos) override;
+
+    aaudio_result_t getHardwareTimestamp(int64_t *positionFrames, int64_t *timeNanos) override;
 
 private:
-    // This proxy class was needed to prevent a crash in AudioFlinger
-    // when the stream was closed.
-    class MyMmapStreamCallback : public android::MmapStreamCallback {
-    public:
-        explicit MyMmapStreamCallback(android::MmapStreamCallback &serviceCallback)
-            : mServiceCallback(serviceCallback){}
-        virtual ~MyMmapStreamCallback() = default;
 
-        void onTearDown() override {
-            mServiceCallback.onTearDown();
-        };
-
-        void onVolumeChanged(audio_channel_mask_t channels, android::Vector<float> values) override
-        {
-            mServiceCallback.onVolumeChanged(channels, values);
-        };
-
-        void onRoutingChanged(audio_port_handle_t deviceId) override {
-            mServiceCallback.onRoutingChanged(deviceId);
-        };
-
-    private:
-        android::MmapStreamCallback &mServiceCallback;
-    };
-
-    android::sp<MyMmapStreamCallback>   mMmapStreamCallback;
-    MonotonicCounter                    mFramesWritten;
-    MonotonicCounter                    mFramesRead;
-    int32_t                             mPreviousFrameCounter = 0;   // from HAL
-    int64_t                             mHardwareTimeOffsetNanos = 0; // TODO get from HAL
-
-
-    // Interface to the AudioFlinger MMAP support.
-    android::sp<android::MmapStreamInterface> mMmapStream;
-    struct audio_mmap_buffer_info             mMmapBufferinfo;
-    audio_port_handle_t                       mPortHandle = AUDIO_PORT_HANDLE_NONE;
-    audio_port_handle_t                       mDeviceId = AUDIO_PORT_HANDLE_NONE;
-    android::AudioClient                      mServiceClient;
-    bool                                      mInService = false;
-    android::base::unique_fd                  mAudioDataFileDescriptor;
+    bool                     mInService = false;
 };
 
 } // namespace aaudio

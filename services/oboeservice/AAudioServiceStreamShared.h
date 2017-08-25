@@ -50,37 +50,7 @@ public:
 
     std::string dump() const override;
 
-    aaudio_result_t open(const aaudio::AAudioStreamRequest &request,
-                         aaudio::AAudioStreamConfiguration &configurationOutput) override;
-
-    /**
-     * Start the flow of audio data.
-     *
-     * This is not guaranteed to be synchronous but it currently is.
-     * An AAUDIO_SERVICE_EVENT_STARTED will be sent to the client when complete.
-     */
-    aaudio_result_t start() override;
-
-    /**
-     * Stop the flow of data so that start() can resume without loss of data.
-     *
-     * This is not guaranteed to be synchronous but it currently is.
-     * An AAUDIO_SERVICE_EVENT_PAUSED will be sent to the client when complete.
-    */
-    aaudio_result_t pause() override;
-
-    /**
-     * Stop the flow of data after data in buffer has played.
-     */
-    aaudio_result_t stop() override;
-
-    /**
-     *  Discard any data held by the underlying HAL or Service.
-     *
-     * This is not guaranteed to be synchronous but it currently is.
-     * An AAUDIO_SERVICE_EVENT_FLUSHED will be sent to the client when complete.
-     */
-    aaudio_result_t flush() override;
+    aaudio_result_t open(const aaudio::AAudioStreamRequest &request) override;
 
     aaudio_result_t close() override;
 
@@ -109,8 +79,7 @@ protected:
 
     aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) override;
 
-    virtual aaudio_result_t getHardwareTimestamp(int64_t *positionFrames,
-                                                 int64_t *timeNanos) override;
+    aaudio_result_t getHardwareTimestamp(int64_t *positionFrames, int64_t *timeNanos) override;
 
     /**
      * @param requestedCapacityFrames
@@ -121,12 +90,11 @@ protected:
                                             int32_t framesPerBurst);
 
 private:
-    android::AAudioService  &mAudioService;
-    AAudioServiceEndpoint   *mServiceEndpoint = nullptr;
     SharedRingBuffer        *mAudioDataQueue = nullptr;
 
     std::atomic<int64_t>     mTimestampPositionOffset;
     std::atomic<int32_t>     mXRunCount;
+
 };
 
 } /* namespace aaudio */

@@ -28,7 +28,9 @@
 #include "binding/IAAudioService.h"
 #include "binding/AAudioServiceInterface.h"
 
-#include "AAudioServiceStreamBase.h"
+namespace aaudio {
+    class AAudioServiceStreamBase;
+};
 
 namespace android {
 
