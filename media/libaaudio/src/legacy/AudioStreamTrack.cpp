@@ -171,14 +171,13 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     setDeviceId(mAudioTrack->getRoutedDeviceId());
     mAudioTrack->addAudioDeviceCallback(mDeviceCallback);
 
-    // Update performance mode based on the actual stream.
+    // Update performance mode based on the actual stream flags.
     // For example, if the sample rate is not allowed then you won't get a FAST track.
     audio_output_flags_t actualFlags = mAudioTrack->getFlags();
     aaudio_performance_mode_t actualPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
-    if ((actualFlags & (AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_RAW))
-        == (AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_RAW)) {
+    // We may not get the RAW flag. But as long as we get the FAST flag we can call it LOW_LATENCY.
+    if ((actualFlags & AUDIO_OUTPUT_FLAG_FAST) != 0) {
         actualPerformanceMode = AAUDIO_PERFORMANCE_MODE_LOW_LATENCY;
-
     } else if ((actualFlags & AUDIO_OUTPUT_FLAG_DEEP_BUFFER) != 0) {
         actualPerformanceMode = AAUDIO_PERFORMANCE_MODE_POWER_SAVING;
     }
