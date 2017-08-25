@@ -61,6 +61,7 @@ MediaSync::MediaSync()
         mNextBufferItemMediaUs(-1),
         mPlaybackRate(0.0) {
     mMediaClock = new MediaClock;
+    mMediaClock->init();
 
     // initialize settings
     mPlaybackSettings = AUDIO_PLAYBACK_RATE_DEFAULT;

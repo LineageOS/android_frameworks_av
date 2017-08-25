@@ -78,6 +78,8 @@ NuPlayerDriver::NuPlayerDriver(pid_t pid)
     ALOGD("NuPlayerDriver(%p) created, clientPid(%d)", this, pid);
     mLooper->setName("NuPlayerDriver Looper");
 
+    mMediaClock->init();
+
     // set up an analytics record
     mAnalyticsItem = new MediaAnalyticsItem(kKeyPlayer);
     mAnalyticsItem->generateSessionID();

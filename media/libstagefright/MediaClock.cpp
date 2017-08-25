@@ -21,7 +21,7 @@
 #include <media/stagefright/MediaClock.h>
 
 #include <media/stagefright/foundation/ADebug.h>
-#include <media/stagefright/foundation/ALooper.h>
+#include <media/stagefright/foundation/AMessage.h>
 
 namespace android {
 
@@ -34,10 +34,41 @@ MediaClock::MediaClock()
       mAnchorTimeRealUs(-1),
       mMaxTimeMediaUs(INT64_MAX),
       mStartingTimeMediaUs(-1),
-      mPlaybackRate(1.0) {
+      mPlaybackRate(1.0),
+      mGeneration(0) {
+    mLooper = new ALooper;
+    mLooper->setName("MediaClock");
+    mLooper->start(false /* runOnCallingThread */,
+                   false /* canCallJava */,
+                   ANDROID_PRIORITY_AUDIO);
+}
+
+void MediaClock::init() {
+    mLooper->registerHandler(this);
 }
 
 MediaClock::~MediaClock() {
+    reset();
+    if (mLooper != NULL) {
+        mLooper->unregisterHandler(id());
+        mLooper->stop();
+    }
+}
+
+void MediaClock::reset() {
+    Mutex::Autolock autoLock(mLock);
+    auto it = mTimers.begin();
+    while (it != mTimers.end()) {
+        it->second->setInt32("reason", TIMER_REASON_RESET);
+        it->second->post();
+        it = mTimers.erase(it);
+    }
+    mAnchorTimeMediaUs = -1;
+    mAnchorTimeRealUs = -1;
+    mMaxTimeMediaUs = INT64_MAX;
+    mStartingTimeMediaUs = -1;
+    mPlaybackRate = 1.0;
+    ++mGeneration;
 }
 
 void MediaClock::setStartingTimeMedia(int64_t startingTimeMediaUs) {
@@ -82,6 +113,9 @@ void MediaClock::updateAnchor(
     }
     mAnchorTimeRealUs = nowUs;
     mAnchorTimeMediaUs = nowMediaUs;
+
+    ++mGeneration;
+    processTimers_l();
 }
 
 void MediaClock::updateMaxTimeMedia(int64_t maxTimeMediaUs) {
@@ -105,6 +139,11 @@ void MediaClock::setPlaybackRate(float rate) {
     }
     mAnchorTimeRealUs = nowUs;
     mPlaybackRate = rate;
+
+    if (rate > 0.0) {
+        ++mGeneration;
+        processTimers_l();
+    }
 }
 
 float MediaClock::getPlaybackRate() const {
@@ -163,6 +202,66 @@ status_t MediaClock::getRealTimeFor(
     }
     *outRealUs = (targetMediaUs - nowMediaUs) / (double)mPlaybackRate + nowUs;
     return OK;
+}
+
+void MediaClock::addTimer(const sp<AMessage> &notify, int64_t mediaTimeUs) {
+    Mutex::Autolock autoLock(mLock);
+    int64_t nextMediaTimeUs = INT64_MAX;
+    if (!mTimers.empty()) {
+        nextMediaTimeUs = mTimers.begin()->first;
+    }
+
+    mTimers.emplace(mediaTimeUs, notify);
+    if (mediaTimeUs < nextMediaTimeUs) {
+        ++mGeneration;
+        processTimers_l();
+    }
+}
+
+void MediaClock::onMessageReceived(const sp<AMessage> &msg) {
+    switch (msg->what()) {
+        case kWhatTimeIsUp:
+        {
+            int32_t generation;
+            CHECK(msg->findInt32("generation", &generation));
+
+            Mutex::Autolock autoLock(mLock);
+            if (generation != mGeneration) {
+                break;
+            }
+            processTimers_l();
+            break;
+        }
+
+        default:
+            TRESPASS();
+            break;
+    }
+}
+
+void MediaClock::processTimers_l() {
+    int64_t nowMediaTimeUs;
+    status_t status = getMediaTime_l(
+            ALooper::GetNowUs(), &nowMediaTimeUs, false /* allowPastMaxTime */);
+
+    if (status != OK) {
+        return;
+    }
+
+    auto it = mTimers.begin();
+    while (it != mTimers.end() && it->first <= nowMediaTimeUs) {
+        it->second->setInt32("reason", TIMER_REASON_REACHED);
+        it->second->post();
+        it = mTimers.erase(it);
+    }
+
+    if (it == mTimers.end() || mPlaybackRate == 0.0 || mAnchorTimeMediaUs < 0) {
+        return;
+    }
+
+    sp<AMessage> msg = new AMessage(kWhatTimeIsUp, this);
+    msg->setInt32("generation", mGeneration);
+    msg->post((it->first - nowMediaTimeUs) / (double)mPlaybackRate);
 }
 
 }  // namespace android
