@@ -94,7 +94,8 @@ struct ACodec : public AHierarchicalStateMachine, public CodecBase {
     // some OMX components as auto level, and by others as invalid level.
     static int /* OMX_VIDEO_AVCLEVELTYPE */ getAVCLevelFor(
             int width, int height, int rate, int bitrate,
-            OMX_VIDEO_AVCPROFILETYPE profile = OMX_VIDEO_AVCProfileBaseline);
+            OMX_VIDEO_AVCPROFILEEXTTYPE profile =
+                (OMX_VIDEO_AVCPROFILEEXTTYPE)OMX_VIDEO_AVCProfileBaseline);
 
     // Quirk still supported, even though deprecated
     enum Quirks {
