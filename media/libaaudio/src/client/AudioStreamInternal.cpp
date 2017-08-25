@@ -105,13 +105,13 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     // Build the request to send to the server.
     request.setUserId(getuid());
     request.setProcessId(getpid());
-    request.setDirection(getDirection());
     request.setSharingModeMatchRequired(isSharingModeMatchRequired());
     request.setInService(mInService);
 
     request.getConfiguration().setDeviceId(getDeviceId());
     request.getConfiguration().setSampleRate(getSampleRate());
     request.getConfiguration().setSamplesPerFrame(getSamplesPerFrame());
+    request.getConfiguration().setDirection(getDirection());
     request.getConfiguration().setSharingMode(getSharingMode());
 
     request.getConfiguration().setBufferCapacity(builder.getBufferCapacity());
@@ -357,6 +357,7 @@ aaudio_result_t AudioStreamInternal::startClient(const android::AudioClient& cli
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
         return AAUDIO_ERROR_INVALID_STATE;
     }
+
     return mServiceInterface.startClient(mServiceStreamHandle, client, clientHandle);
 }
 

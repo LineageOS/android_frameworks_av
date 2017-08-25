@@ -26,6 +26,9 @@
 #include "binding/AAudioServiceMessage.h"
 #include "utility/AudioClock.h"
 
+#include "AAudioEndpointManager.h"
+#include "AAudioService.h"
+#include "AAudioServiceEndpoint.h"
 #include "AAudioServiceStreamBase.h"
 #include "TimestampScheduler.h"
 
@@ -37,10 +40,11 @@ using namespace aaudio;   // TODO just import names needed
  * @return
  */
 
-AAudioServiceStreamBase::AAudioServiceStreamBase()
+AAudioServiceStreamBase::AAudioServiceStreamBase(AAudioService &audioService)
         : mUpMessageQueue(nullptr)
         , mAAudioThread()
-        , mAtomicTimestamp() {
+        , mAtomicTimestamp()
+        , mAudioService(audioService) {
     mMmapClient.clientUid = -1;
     mMmapClient.clientPid = -1;
     mMmapClient.packageName = String16("");
@@ -68,49 +72,112 @@ std::string AAudioServiceStreamBase::dump() const {
     result << std::setw(6) << mMmapClient.clientUid;
     result << std::setw(4) << (isRunning() ? "yes" : " no");
     result << std::setw(6) << mState;
-    result << std::setw(7) << mAudioFormat;
+    result << std::setw(7) << getFormat();
     result << std::setw(6) << mFramesPerBurst;
-    result << std::setw(5) << mSamplesPerFrame;
-    result << std::setw(9) << mCapacityInFrames;
+    result << std::setw(5) << getSamplesPerFrame();
+    result << std::setw(9) << getBufferCapacity();
 
     return result.str();
 }
 
 aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest &request,
-                     aaudio::AAudioStreamConfiguration &configurationOutput) {
+                                              aaudio_sharing_mode_t sharingMode) {
+    AAudioEndpointManager &mEndpointManager = AAudioEndpointManager::getInstance();
+    aaudio_result_t result = AAUDIO_OK;
 
     mMmapClient.clientUid = request.getUserId();
     mMmapClient.clientPid = request.getProcessId();
-    mMmapClient.packageName.setTo(String16("")); // FIXME what should we do here?
+    mMmapClient.packageName.setTo(String16("")); // TODO What should we do here?
 
-    std::lock_guard<std::mutex> lock(mLockUpMessageQueue);
-    if (mUpMessageQueue != nullptr) {
-        return AAUDIO_ERROR_INVALID_STATE;
-    } else {
+    // Limit scope of lock to avoid recursive lock in close().
+    {
+        std::lock_guard<std::mutex> lock(mUpMessageQueueLock);
+        if (mUpMessageQueue != nullptr) {
+            ALOGE("AAudioServiceStreamBase::open() called twice");
+            return AAUDIO_ERROR_INVALID_STATE;
+        }
+
         mUpMessageQueue = new SharedRingBuffer();
-        return mUpMessageQueue->allocate(sizeof(AAudioServiceMessage), QUEUE_UP_CAPACITY_COMMANDS);
+        result = mUpMessageQueue->allocate(sizeof(AAudioServiceMessage),
+                                           QUEUE_UP_CAPACITY_COMMANDS);
+        if (result != AAUDIO_OK) {
+            goto error;
+        }
+
+        mServiceEndpoint = mEndpointManager.openEndpoint(mAudioService,
+                                                         request,
+                                                         sharingMode);
+        if (mServiceEndpoint == nullptr) {
+            ALOGE("AAudioServiceStreamBase::open() openEndpoint() failed");
+            result = AAUDIO_ERROR_UNAVAILABLE;
+            goto error;
+        }
+        mFramesPerBurst = mServiceEndpoint->getFramesPerBurst();
+        copyFrom(*mServiceEndpoint);
     }
+    return result;
+
+error:
+    close();
+    return result;
 }
 
 aaudio_result_t AAudioServiceStreamBase::close() {
-    if (mState != AAUDIO_STREAM_STATE_CLOSED) {
+    aaudio_result_t result = AAUDIO_OK;
+    if (mState == AAUDIO_STREAM_STATE_CLOSED) {
+        return AAUDIO_OK;
+    }
+
+    stop();
+
+    if (mServiceEndpoint == nullptr) {
+        result = AAUDIO_ERROR_INVALID_STATE;
+    } else {
+        mServiceEndpoint->unregisterStream(this);
+        AAudioEndpointManager &mEndpointManager = AAudioEndpointManager::getInstance();
+        mEndpointManager.closeEndpoint(mServiceEndpoint);
+        mServiceEndpoint.clear();
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(mUpMessageQueueLock);
         stopTimestampThread();
-        std::lock_guard<std::mutex> lock(mLockUpMessageQueue);
         delete mUpMessageQueue;
         mUpMessageQueue = nullptr;
-        mState = AAUDIO_STREAM_STATE_CLOSED;
     }
-    return AAUDIO_OK;
+
+    mState = AAUDIO_STREAM_STATE_CLOSED;
+    return result;
 }
 
+/**
+ * Start the flow of audio data.
+ *
+ * An AAUDIO_SERVICE_EVENT_STARTED will be sent to the client when complete.
+ */
 aaudio_result_t AAudioServiceStreamBase::start() {
     if (isRunning()) {
         return AAUDIO_OK;
     }
-    sendServiceEvent(AAUDIO_SERVICE_EVENT_STARTED);
-    mState = AAUDIO_STREAM_STATE_STARTED;
-    mThreadEnabled.store(true);
-    return mAAudioThread.start(this);
+
+    if (mServiceEndpoint == nullptr) {
+        ALOGE("AAudioServiceStreamBase::start() missing endpoint");
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    mClientHandle = AUDIO_PORT_HANDLE_NONE;
+    aaudio_result_t result = mServiceEndpoint->startStream(this, &mClientHandle);
+    if (result != AAUDIO_OK) {
+        ALOGE("AAudioServiceStreamBase::start() mServiceEndpoint returned %d", result);
+        disconnect();
+    } else {
+        if (result == AAUDIO_OK) {
+            sendServiceEvent(AAUDIO_SERVICE_EVENT_STARTED);
+            mState = AAUDIO_STREAM_STATE_STARTED;
+            mThreadEnabled.store(true);
+            result = mAAudioThread.start(this);
+        }
+    }
+    return result;
 }
 
 aaudio_result_t AAudioServiceStreamBase::pause() {
@@ -118,6 +185,16 @@ aaudio_result_t AAudioServiceStreamBase::pause() {
     if (!isRunning()) {
         return result;
     }
+    if (mServiceEndpoint == nullptr) {
+        ALOGE("AAudioServiceStreamShared::pause() missing endpoint");
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    result = mServiceEndpoint->stopStream(this, mClientHandle);
+    if (result != AAUDIO_OK) {
+        ALOGE("AAudioServiceStreamShared::pause() mServiceEndpoint returned %d", result);
+        disconnect(); // TODO should we return or pause Base first?
+    }
+
     sendCurrentTimestamp();
     mThreadEnabled.store(false);
     result = mAAudioThread.stop();
@@ -135,13 +212,27 @@ aaudio_result_t AAudioServiceStreamBase::stop() {
     if (!isRunning()) {
         return result;
     }
-    // TODO wait for data to be played out
+
+    if (mServiceEndpoint == nullptr) {
+        ALOGE("AAudioServiceStreamShared::stop() missing endpoint");
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+
     sendCurrentTimestamp(); // warning - this calls a virtual function
     result = stopTimestampThread();
     if (result != AAUDIO_OK) {
         disconnect();
         return result;
     }
+
+    // TODO wait for data to be played out
+    result = mServiceEndpoint->stopStream(this, mClientHandle);
+    if (result != AAUDIO_OK) {
+        ALOGE("AAudioServiceStreamShared::stop() mServiceEndpoint returned %d", result);
+        disconnect();
+        // TODO what to do with result here?
+    }
+
     sendServiceEvent(AAUDIO_SERVICE_EVENT_STOPPED);
     mState = AAUDIO_STREAM_STATE_STOPPED;
     return result;
@@ -157,6 +248,12 @@ aaudio_result_t AAudioServiceStreamBase::stopTimestampThread() {
 }
 
 aaudio_result_t AAudioServiceStreamBase::flush() {
+    if (mState != AAUDIO_STREAM_STATE_PAUSED) {
+        ALOGE("AAudioServiceStreamBase::flush() stream not paused, state = %s",
+              AAudio_convertStreamStateToText(mState));
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    // Data will get flushed when the client receives the FLUSHED event.
     sendServiceEvent(AAUDIO_SERVICE_EVENT_FLUSHED);
     mState = AAUDIO_STREAM_STATE_FLUSHED;
     return AAUDIO_OK;
@@ -166,7 +263,7 @@ aaudio_result_t AAudioServiceStreamBase::flush() {
 void AAudioServiceStreamBase::run() {
     ALOGD("AAudioServiceStreamBase::run() entering ----------------");
     TimestampScheduler timestampScheduler;
-    timestampScheduler.setBurstPeriod(mFramesPerBurst, mSampleRate);
+    timestampScheduler.setBurstPeriod(mFramesPerBurst, getSampleRate());
     timestampScheduler.start(AudioClock::getNanoseconds());
     int64_t nextTime = timestampScheduler.nextAbsoluteTime();
     while(mThreadEnabled.load()) {
@@ -204,7 +301,7 @@ aaudio_result_t AAudioServiceStreamBase::sendServiceEvent(aaudio_service_event_t
 }
 
 aaudio_result_t AAudioServiceStreamBase::writeUpMessageQueue(AAudioServiceMessage *command) {
-    std::lock_guard<std::mutex> lock(mLockUpMessageQueue);
+    std::lock_guard<std::mutex> lock(mUpMessageQueueLock);
     if (mUpMessageQueue == nullptr) {
         ALOGE("writeUpMessageQueue(): mUpMessageQueue null! - stream not open");
         return AAUDIO_ERROR_NULL;
@@ -253,4 +350,8 @@ aaudio_result_t AAudioServiceStreamBase::getDescription(AudioEndpointParcelable 
     mUpMessageQueue->fillParcelable(parcelable,
                                     parcelable.mUpMessageQueueParcelable);
     return getDownDataDescription(parcelable);
+}
+
+void AAudioServiceStreamBase::onVolumeChanged(float volume) {
+    sendServiceEvent(AAUDIO_SERVICE_EVENT_VOLUME, volume);
 }
