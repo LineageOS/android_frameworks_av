@@ -237,6 +237,11 @@ static void parseAvcProfileLevelFromAvcc(const uint8_t *ptr, size_t size, sp<AMe
     OMX_VIDEO_AVCPROFILETYPE codecProfile;
     OMX_VIDEO_AVCLEVELTYPE codecLevel;
     if (profiles.map(profile, &codecProfile)) {
+        if (profile == 66 && (constraints & 0x40)) {
+            codecProfile = (OMX_VIDEO_AVCPROFILETYPE)OMX_VIDEO_AVCProfileConstrainedBaseline;
+        } else if (profile == 100 && (constraints & 0x0C) == 0x0C) {
+            codecProfile = (OMX_VIDEO_AVCPROFILETYPE)OMX_VIDEO_AVCProfileConstrainedHigh;
+        }
         format->setInt32("profile", codecProfile);
         if (levels.map(level, &codecLevel)) {
             // for 9 && 11 decide level based on profile and constraint_set3 flag

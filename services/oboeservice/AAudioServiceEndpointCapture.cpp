@@ -30,20 +30,22 @@
 #include "AAudioServiceEndpoint.h"
 #include "AAudioServiceStreamShared.h"
 #include "AAudioServiceEndpointCapture.h"
+#include "AAudioServiceEndpointShared.h"
 
 using namespace android;  // TODO just import names needed
 using namespace aaudio;   // TODO just import names needed
 
 AAudioServiceEndpointCapture::AAudioServiceEndpointCapture(AAudioService &audioService)
         : mStreamInternalCapture(audioService, true) {
+    mStreamInternal = &mStreamInternalCapture;
 }
 
 AAudioServiceEndpointCapture::~AAudioServiceEndpointCapture() {
     delete mDistributionBuffer;
 }
 
-aaudio_result_t AAudioServiceEndpointCapture::open(const AAudioStreamConfiguration& configuration) {
-    aaudio_result_t result = AAudioServiceEndpoint::open(configuration);
+aaudio_result_t AAudioServiceEndpointCapture::open(const aaudio::AAudioStreamRequest &request) {
+    aaudio_result_t result = AAudioServiceEndpointShared::open(request);
     if (result == AAUDIO_OK) {
         delete mDistributionBuffer;
         int distributionBufferSizeBytes = getStreamInternal()->getFramesPerBurst()
@@ -80,16 +82,19 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
         { // brackets are for lock_guard
 
             std::lock_guard <std::mutex> lock(mLockStreams);
-            for (sp<AAudioServiceStreamShared> clientStream : mRegisteredStreams) {
+            for (const auto clientStream : mRegisteredStreams) {
                 if (clientStream->isRunning()) {
-                    FifoBuffer *fifo = clientStream->getDataFifoBuffer();
+                    AAudioServiceStreamShared *streamShared =
+                            static_cast<AAudioServiceStreamShared *>(clientStream.get());
+
+                    FifoBuffer *fifo = streamShared->getDataFifoBuffer();
 
                     // Determine offset between framePosition in client's stream vs the underlying
                     // MMAP stream.
                     int64_t clientFramesWritten = fifo->getWriteCounter();
                     // There are two indices that refer to the same frame.
                     int64_t positionOffset = mmapFramesRead - clientFramesWritten;
-                    clientStream->setTimestampPositionOffset(positionOffset);
+                    streamShared->setTimestampPositionOffset(positionOffset);
 
                     if (fifo->getFifoControllerBase()->getEmptyFramesAvailable() <
                         getFramesPerBurst()) {
@@ -102,7 +107,7 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
                     // client buffer. It is sent to the client and used in the timing model
                     // to decide when data will be available to read.
                     Timestamp timestamp(fifo->getWriteCounter(), AudioClock::getNanoseconds());
-                    clientStream->markTransferTime(timestamp);
+                    streamShared->markTransferTime(timestamp);
                 }
             }
         }

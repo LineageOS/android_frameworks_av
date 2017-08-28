@@ -40,6 +40,9 @@ struct MediaCodecInfo : public RefBase {
     struct ProfileLevel {
         uint32_t mProfile;
         uint32_t mLevel;
+        bool operator <(const ProfileLevel &o) const {
+            return mProfile < o.mProfile || (mProfile == o.mProfile && mLevel < o.mLevel);
+        }
     };
 
     struct Capabilities : public RefBase {
@@ -61,7 +64,9 @@ struct MediaCodecInfo : public RefBase {
 
     protected:
         Vector<ProfileLevel> mProfileLevels;
+        SortedVector<ProfileLevel> mProfileLevelsSorted;
         Vector<uint32_t> mColorFormats;
+        SortedVector<uint32_t> mColorFormatsSorted;
         uint32_t mFlags;
         sp<AMessage> mDetails;
 

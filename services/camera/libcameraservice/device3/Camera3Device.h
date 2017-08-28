@@ -885,6 +885,11 @@ class Camera3Device :
         // For auto-exposure modes, equal to 1/(lower end of target FPS range)
         nsecs_t maxExpectedDuration;
 
+        // Whether the result metadata for this request is to be skipped. The
+        // result metadata should be skipped in the case of
+        // REQUEST/RESULT error.
+        bool skipResultMetadata;
+
         // Default constructor needed by KeyedVector
         InFlightRequest() :
                 shutterTimestamp(0),
@@ -894,7 +899,8 @@ class Camera3Device :
                 numBuffersLeft(0),
                 hasInputBuffer(false),
                 hasCallback(true),
-                maxExpectedDuration(kDefaultExpectedDuration) {
+                maxExpectedDuration(kDefaultExpectedDuration),
+                skipResultMetadata(false) {
         }
 
         InFlightRequest(int numBuffers, CaptureResultExtras extras, bool hasInput,
@@ -907,7 +913,8 @@ class Camera3Device :
                 resultExtras(extras),
                 hasInputBuffer(hasInput),
                 hasCallback(hasAppCallback),
-                maxExpectedDuration(maxDuration) {
+                maxExpectedDuration(maxDuration),
+                skipResultMetadata(false) {
         }
     };
 

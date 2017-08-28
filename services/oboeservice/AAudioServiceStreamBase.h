@@ -32,22 +32,28 @@
 
 #include "SharedRingBuffer.h"
 #include "AAudioThread.h"
+#include "AAudioService.h"
 
 namespace aaudio {
+
+class AAudioServiceEndpoint;
 
 // We expect the queue to only have a few commands.
 // This should be way more than we need.
 #define QUEUE_UP_CAPACITY_COMMANDS (128)
 
 /**
- * Base class for a stream in the AAudio service.
+ * Each instance of AAudioServiceStreamBase corresponds to a client stream.
+ * It uses a subclass of AAudioServiceEndpoint to communicate with the underlying device or port.
  */
 class AAudioServiceStreamBase
     : public virtual android::RefBase
+    , public AAudioStreamParameters
     , public Runnable  {
 
 public:
-    AAudioServiceStreamBase();
+    AAudioServiceStreamBase(android::AAudioService &aAudioService);
+
     virtual ~AAudioServiceStreamBase();
 
     enum {
@@ -63,39 +69,53 @@ public:
     /**
      * Open the device.
      */
-    virtual aaudio_result_t open(const aaudio::AAudioStreamRequest &request,
-                                 aaudio::AAudioStreamConfiguration &configurationOutput) = 0;
+    virtual aaudio_result_t open(const aaudio::AAudioStreamRequest &request) = 0;
 
     virtual aaudio_result_t close();
 
     /**
-     * Start the flow of data.
+     * Start the flow of audio data.
+     *
+     * This is not guaranteed to be synchronous but it currently is.
+     * An AAUDIO_SERVICE_EVENT_STARTED will be sent to the client when complete.
      */
     virtual aaudio_result_t start();
 
     /**
-     * Stop the flow of data such that start() can resume with loss of data.
-     */
+     * Stop the flow of data so that start() can resume without loss of data.
+     *
+     * This is not guaranteed to be synchronous but it currently is.
+     * An AAUDIO_SERVICE_EVENT_PAUSED will be sent to the client when complete.
+    */
     virtual aaudio_result_t pause();
 
     /**
-     * Stop the flow of data after data in buffer has played.
+     * Stop the flow of data after the currently queued data has finished playing.
+     *
+     * This is not guaranteed to be synchronous but it currently is.
+     * An AAUDIO_SERVICE_EVENT_STOPPED will be sent to the client when complete.
+     *
      */
     virtual aaudio_result_t stop();
 
     aaudio_result_t stopTimestampThread();
 
     /**
-     *  Discard any data held by the underlying HAL or Service.
+     * Discard any data held by the underlying HAL or Service.
+     *
+     * An AAUDIO_SERVICE_EVENT_FLUSHED will be sent to the client when complete.
      */
     virtual aaudio_result_t flush();
 
+
     virtual aaudio_result_t startClient(const android::AudioClient& client __unused,
                                         audio_port_handle_t *clientHandle __unused) {
+        ALOGD("AAudioServiceStreamBase::startClient(%p, ...) AAUDIO_ERROR_UNAVAILABLE", &client);
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
     virtual aaudio_result_t stopClient(audio_port_handle_t clientHandle __unused) {
+        ALOGD("AAudioServiceStreamBase::stopClient(%d) AAUDIO_ERROR_UNAVAILABLE", clientHandle);
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
@@ -130,13 +150,13 @@ public:
         return mFramesPerBurst;
     }
 
-    int32_t calculateBytesPerFrame() const {
-        return mSamplesPerFrame * AAudioConvert_formatToSizeInBytes(mAudioFormat);
-    }
-
     void run() override; // to implement Runnable
 
     void disconnect();
+
+    const android::AudioClient &getAudioClient() {
+        return mMmapClient;
+    }
 
     uid_t getOwnerUserId() const {
         return mMmapClient.clientUid;
@@ -157,7 +177,15 @@ public:
         return mState;
     }
 
+    void onVolumeChanged(float volume);
+
 protected:
+
+    /**
+     * Open the device.
+     */
+    aaudio_result_t open(const aaudio::AAudioStreamRequest &request,
+                         aaudio_sharing_mode_t sharingMode);
 
     void setState(aaudio_stream_state_t state) {
         mState = state;
@@ -183,21 +211,20 @@ protected:
     pid_t                   mRegisteredClientThread = ILLEGAL_THREAD_ID;
 
     SharedRingBuffer*       mUpMessageQueue;
-    std::mutex              mLockUpMessageQueue;
+    std::mutex              mUpMessageQueueLock;
 
     AAudioThread            mAAudioThread;
     // This is used by one thread to tell another thread to exit. So it must be atomic.
-    std::atomic<bool>       mThreadEnabled;
+    std::atomic<bool>       mThreadEnabled{false};
 
-    aaudio_format_t         mAudioFormat = AAUDIO_FORMAT_UNSPECIFIED;
     int32_t                 mFramesPerBurst = 0;
-    int32_t                 mSamplesPerFrame = AAUDIO_UNSPECIFIED;
-    int32_t                 mSampleRate = AAUDIO_UNSPECIFIED;
-    int32_t                 mCapacityInFrames = AAUDIO_UNSPECIFIED;
-    android::AudioClient    mMmapClient;
+    android::AudioClient    mMmapClient; // set in open, used in MMAP start()
     audio_port_handle_t     mClientHandle = AUDIO_PORT_HANDLE_NONE;
 
     SimpleDoubleBuffer<Timestamp>  mAtomicTimestamp;
+
+    android::AAudioService &mAudioService;
+    android::sp<AAudioServiceEndpoint> mServiceEndpoint;
 
 private:
     aaudio_handle_t         mHandle = -1;

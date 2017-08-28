@@ -2439,25 +2439,6 @@ void Camera3Device::removeInFlightRequestIfReadyLocked(int idx) {
     nsecs_t sensorTimestamp = request.sensorTimestamp;
     nsecs_t shutterTimestamp = request.shutterTimestamp;
 
-    bool skipResultMetadata = false;
-    if (request.requestStatus != OK) {
-        switch (request.requestStatus) {
-            case CAMERA3_MSG_ERROR_DEVICE:
-            case CAMERA3_MSG_ERROR_REQUEST:
-            case CAMERA3_MSG_ERROR_RESULT:
-                skipResultMetadata = true;
-                break;
-            case CAMERA3_MSG_ERROR_BUFFER:
-                //Result metadata should return in this case.
-                skipResultMetadata = false;
-                break;
-            default:
-                SET_ERR("Unknown error message: %d", request.requestStatus);
-                skipResultMetadata = false;
-                break;
-        }
-    }
-
     // Check if it's okay to remove the request from InFlightMap:
     // In the case of a successful request:
     //      all input and output buffers, all result metadata, shutter callback
@@ -2465,7 +2446,7 @@ void Camera3Device::removeInFlightRequestIfReadyLocked(int idx) {
     // In the case of a unsuccessful request:
     //      all input and output buffers arrived.
     if (request.numBuffersLeft == 0 &&
-            (skipResultMetadata ||
+            (request.skipResultMetadata ||
             (request.haveResultMetadata && shutterTimestamp != 0))) {
         ATRACE_ASYNC_END("frame capture", frameNumber);
 
@@ -2941,6 +2922,11 @@ void Camera3Device::notifyError(const camera3_error_msg_t &msg,
                     InFlightRequest &r = mInFlightMap.editValueAt(idx);
                     r.requestStatus = msg.error_code;
                     resultExtras = r.resultExtras;
+                    if (hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_RESULT == errorCode
+                            ||  hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_REQUEST ==
+                            errorCode) {
+                        r.skipResultMetadata = true;
+                    }
                     if (hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_RESULT ==
                             errorCode) {
                         // In case of missing result check whether the buffers
