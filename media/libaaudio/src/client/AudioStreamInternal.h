@@ -93,6 +93,10 @@ public:
 
     aaudio_result_t stopClient(audio_port_handle_t clientHandle);
 
+    aaudio_handle_t getServiceHandle() const {
+        return mServiceStreamHandle;
+    }
+
 protected:
 
     aaudio_result_t processData(void *buffer,

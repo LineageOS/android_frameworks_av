@@ -4173,11 +4173,12 @@ status_t ACodec::setupH263EncoderParameters(const sp<AMessage> &msg) {
 // static
 int /* OMX_VIDEO_AVCLEVELTYPE */ ACodec::getAVCLevelFor(
         int width, int height, int rate, int bitrate,
-        OMX_VIDEO_AVCPROFILETYPE profile) {
+        OMX_VIDEO_AVCPROFILEEXTTYPE profile) {
     // convert bitrate to main/baseline profile kbps equivalent
-    switch (profile) {
+    switch ((uint32_t)profile) {
         case OMX_VIDEO_AVCProfileHigh10:
             bitrate = divUp(bitrate, 3000); break;
+        case OMX_VIDEO_AVCProfileConstrainedHigh:
         case OMX_VIDEO_AVCProfileHigh:
             bitrate = divUp(bitrate, 1250); break;
         default:
@@ -8262,6 +8263,17 @@ status_t ACodec::queryCapabilities(
             }
             builder->addProfileLevel(param.eProfile, param.eLevel);
 
+            // AVC components may not list the constrained profiles explicitly, but
+            // decoders that support a profile also support its constrained version.
+            // Encoders must explicitly support constrained profiles.
+            if (!isEncoder && mime.equalsIgnoreCase(MEDIA_MIMETYPE_VIDEO_AVC)) {
+                if (param.eProfile == OMX_VIDEO_AVCProfileHigh) {
+                    builder->addProfileLevel(OMX_VIDEO_AVCProfileConstrainedHigh, param.eLevel);
+                } else if (param.eProfile == OMX_VIDEO_AVCProfileBaseline) {
+                    builder->addProfileLevel(OMX_VIDEO_AVCProfileConstrainedBaseline, param.eLevel);
+                }
+            }
+
             if (index == kMaxIndicesToCheck) {
                 ALOGW("[%s] stopping checking profiles after %u: %x/%x",
                         name.c_str(), index,
@@ -8275,7 +8287,6 @@ status_t ACodec::queryCapabilities(
         OMX_VIDEO_PARAM_PORTFORMATTYPE portFormat;
         InitOMXParams(&portFormat);
         portFormat.nPortIndex = isEncoder ? kPortIndexInput : kPortIndexOutput;
-        Vector<uint32_t> supportedColors; // shadow copy to check for duplicates
         for (OMX_U32 index = 0; index <= kMaxIndicesToCheck; ++index) {
             portFormat.nIndex = index;
             status_t err = omxNode->getParameter(
@@ -8289,19 +8300,8 @@ status_t ACodec::queryCapabilities(
             if (IsFlexibleColorFormat(
                     omxNode, portFormat.eColorFormat, false /* usingNativeWindow */,
                     &flexibleEquivalent)) {
-                bool marked = false;
-                for (size_t i = 0; i < supportedColors.size(); ++i) {
-                    if (supportedColors[i] == flexibleEquivalent) {
-                        marked = true;
-                        break;
-                    }
-                }
-                if (!marked) {
-                    supportedColors.push(flexibleEquivalent);
-                    builder->addColorFormat(flexibleEquivalent);
-                }
+                builder->addColorFormat(flexibleEquivalent);
             }
-            supportedColors.push(portFormat.eColorFormat);
             builder->addColorFormat(portFormat.eColorFormat);
 
             if (index == kMaxIndicesToCheck) {
