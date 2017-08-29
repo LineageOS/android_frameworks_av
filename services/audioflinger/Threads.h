@@ -1479,6 +1479,7 @@ class MmapThread : public ThreadBase
                                       audio_stream_type_t streamType,
                                       audio_session_t sessionId,
                                       const sp<MmapStreamCallback>& callback,
+                                      audio_port_handle_t deviceId,
                                       audio_port_handle_t portId);
 
                 void        disconnect();
@@ -1540,6 +1541,7 @@ class MmapThread : public ThreadBase
 
                 audio_attributes_t      mAttr;
                 audio_session_t         mSessionId;
+                audio_port_handle_t     mDeviceId;
                 audio_port_handle_t     mPortId;
 
                 wp<MmapStreamCallback>  mCallback;
@@ -1562,6 +1564,7 @@ public:
                                       audio_stream_type_t streamType,
                                       audio_session_t sessionId,
                                       const sp<MmapStreamCallback>& callback,
+                                      audio_port_handle_t deviceId,
                                       audio_port_handle_t portId);
 
                 AudioStreamOut* clearOutput();
