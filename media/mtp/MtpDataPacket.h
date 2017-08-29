@@ -20,12 +20,12 @@
 #include "MtpPacket.h"
 #include "mtp.h"
 
-class IMtpHandle;
 struct usb_device;
 struct usb_request;
 
 namespace android {
 
+class IMtpHandle;
 class MtpStringBuffer;
 
 class MtpDataPacket : public MtpPacket {
