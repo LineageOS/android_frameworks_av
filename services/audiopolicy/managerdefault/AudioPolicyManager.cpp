@@ -1052,7 +1052,7 @@ non_direct_output:
         flags = (audio_output_flags_t)(flags & ~AUDIO_OUTPUT_FLAG_DIRECT);
         output = selectOutput(outputs, flags, format);
     }
-    ALOGW_IF((output == 0), "getOutput() could not find output for stream %d, samplingRate %d,"
+    ALOGW_IF((output == 0), "getOutput() could not find output for stream %d, samplingRate %d, "
             "format %d, channels %x, flags %x", stream, samplingRate, format, channelMask, flags);
 
     return output;
@@ -1618,7 +1618,7 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
         } else if (profileFlags != AUDIO_INPUT_FLAG_NONE) {
             profileFlags = AUDIO_INPUT_FLAG_NONE; // retry
         } else { // fail
-            ALOGW("getInputForDevice() could not find profile for device 0x%X,"
+            ALOGW("getInputForDevice() could not find profile for device 0x%X, "
                   "samplingRate %u, format %#x, channelMask 0x%X, flags %#x",
                     device, samplingRate, format, channelMask, flags);
             return input;
