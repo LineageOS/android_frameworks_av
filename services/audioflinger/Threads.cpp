@@ -7550,6 +7550,8 @@ AudioFlinger::MmapThread::MmapThread(
         AudioHwDevice *hwDev, sp<StreamHalInterface> stream,
         audio_devices_t outDevice, audio_devices_t inDevice, bool systemReady)
     : ThreadBase(audioFlinger, id, outDevice, inDevice, MMAP, systemReady),
+      mSessionId(AUDIO_SESSION_NONE),
+      mDeviceId(AUDIO_PORT_HANDLE_NONE), mPortId(AUDIO_PORT_HANDLE_NONE),
       mHalStream(stream), mHalDevice(hwDev->hwDevice()), mAudioHwDev(hwDev),
       mActiveTracks(&this->mLocalLog)
 {
@@ -7585,11 +7587,13 @@ void AudioFlinger::MmapThread::configure(const audio_attributes_t *attr,
                                                 audio_stream_type_t streamType __unused,
                                                 audio_session_t sessionId,
                                                 const sp<MmapStreamCallback>& callback,
+                                                audio_port_handle_t deviceId,
                                                 audio_port_handle_t portId)
 {
     mAttr = *attr;
     mSessionId = sessionId;
     mCallback = callback;
+    mDeviceId = deviceId;
     mPortId = portId;
 }
 
@@ -7645,7 +7649,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         audio_stream_type_t stream = streamType();
         audio_output_flags_t flags =
                 (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ | AUDIO_OUTPUT_FLAG_DIRECT);
-        audio_port_handle_t deviceId = AUDIO_PORT_HANDLE_NONE;
+        audio_port_handle_t deviceId = mDeviceId;
         ret = AudioSystem::getOutputForAttr(&mAttr, &io,
                                             mSessionId,
                                             &stream,
@@ -7659,7 +7663,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         config.sample_rate = mSampleRate;
         config.channel_mask = mChannelMask;
         config.format = mFormat;
-        audio_port_handle_t deviceId = AUDIO_PORT_HANDLE_NONE;
+        audio_port_handle_t deviceId = mDeviceId;
         ret = AudioSystem::getInputForAttr(&mAttr, &io,
                                               mSessionId,
                                               client.clientPid,
@@ -7996,17 +8000,19 @@ status_t AudioFlinger::MmapThread::createAudioPatch_l(const struct audio_patch *
         mPrevOutDevice = type;
         sendIoConfigEvent_l(AUDIO_OUTPUT_CONFIG_CHANGED);
         sp<MmapStreamCallback> callback = mCallback.promote();
-        if (callback != 0) {
+        if (mDeviceId != deviceId && callback != 0) {
             callback->onRoutingChanged(deviceId);
         }
+        mDeviceId = deviceId;
     }
     if (!isOutput() && mPrevInDevice != mInDevice) {
         mPrevInDevice = type;
         sendIoConfigEvent_l(AUDIO_INPUT_CONFIG_CHANGED);
         sp<MmapStreamCallback> callback = mCallback.promote();
-        if (callback != 0) {
+        if (mDeviceId != deviceId && callback != 0) {
             callback->onRoutingChanged(deviceId);
         }
+        mDeviceId = deviceId;
     }
     return status;
 }
@@ -8247,9 +8253,10 @@ void AudioFlinger::MmapPlaybackThread::configure(const audio_attributes_t *attr,
                                                 audio_stream_type_t streamType,
                                                 audio_session_t sessionId,
                                                 const sp<MmapStreamCallback>& callback,
+                                                audio_port_handle_t deviceId,
                                                 audio_port_handle_t portId)
 {
-    MmapThread::configure(attr, streamType, sessionId, callback, portId);
+    MmapThread::configure(attr, streamType, sessionId, callback, deviceId, portId);
     mStreamType = streamType;
 }
 

@@ -26,12 +26,11 @@
 #include <utils/Log.h>
 
 #include "MtpFfsHandle.h"
+#include "MtpFfsCompatHandle.h"
 
 namespace android {
 
-constexpr int MAX_FILE_CHUNK_SIZE = 3 * 1024 * 1024;
-
-constexpr int TEST_PACKET_SIZE = 512;
+constexpr int TEST_PACKET_SIZE = 500;
 constexpr int SMALL_MULT = 30;
 constexpr int MED_MULT = 510;
 
@@ -43,17 +42,19 @@ static const std::string dummyDataStr =
     "-2.0\n *\n * Unless required by applicable law or agreed to in writing, s"
     "oftware\n * distributed under the License is distributed on an \"AS IS\" "
     "BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o"
-    "r implied.\n * Se";
+    "r im";
 
 /**
  * Functional tests for the MtpFfsHandle class. Ensures header and data integrity
  * by mocking ffs endpoints as pipes to capture input / output.
  */
+template <class T>
 class MtpFfsHandleTest : public ::testing::Test {
 protected:
-    std::unique_ptr<IMtpHandle> handle;
+    std::unique_ptr<MtpFfsHandle> handle;
 
     // Pipes for reading endpoint data
+    android::base::unique_fd control;
     android::base::unique_fd bulk_in;
     android::base::unique_fd bulk_out;
     android::base::unique_fd intr;
@@ -62,88 +63,144 @@ protected:
 
     MtpFfsHandleTest() {
         int fd[2];
-        handle = std::unique_ptr<IMtpHandle>(get_ffs_handle());
-        MtpFfsHandle *ffs_handle = static_cast<MtpFfsHandle*>(handle.get());
-        EXPECT_TRUE(ffs_handle != NULL);
+        handle = std::make_unique<T>();
+
+        EXPECT_EQ(pipe(fd), 0);
+        handle->mControl.reset(fd[0]);
+        control.reset(fd[1]);
 
         EXPECT_EQ(pipe(fd), 0);
         EXPECT_EQ(fcntl(fd[0], F_SETPIPE_SZ, 1048576), 1048576);
         bulk_in.reset(fd[0]);
-        ffs_handle->mBulkIn.reset(fd[1]);
+        handle->mBulkIn.reset(fd[1]);
 
         EXPECT_EQ(pipe(fd), 0);
         EXPECT_EQ(fcntl(fd[0], F_SETPIPE_SZ, 1048576), 1048576);
         bulk_out.reset(fd[1]);
-        ffs_handle->mBulkOut.reset(fd[0]);
+        handle->mBulkOut.reset(fd[0]);
 
         EXPECT_EQ(pipe(fd), 0);
         intr.reset(fd[0]);
-        ffs_handle->mIntr.reset(fd[1]);
+        handle->mIntr.reset(fd[1]);
 
-        ffs_handle->mBuffer1.resize(MAX_FILE_CHUNK_SIZE);
-        ffs_handle->mBuffer2.resize(MAX_FILE_CHUNK_SIZE);
+        handle->start();
     }
 
-    ~MtpFfsHandleTest() {}
+    ~MtpFfsHandleTest() {
+        handle->close();
+    }
 };
 
-TEST_F(MtpFfsHandleTest, testRead) {
-    EXPECT_EQ(write(bulk_out, dummyDataStr.c_str(), TEST_PACKET_SIZE), TEST_PACKET_SIZE);
+typedef ::testing::Types<MtpFfsHandle, MtpFfsCompatHandle> mtpHandles;
+TYPED_TEST_CASE(MtpFfsHandleTest, mtpHandles);
+
+TYPED_TEST(MtpFfsHandleTest, testRead) {
+    EXPECT_EQ(write(this->bulk_out, dummyDataStr.c_str(), TEST_PACKET_SIZE), TEST_PACKET_SIZE);
     char buf[TEST_PACKET_SIZE + 1];
     buf[TEST_PACKET_SIZE] = '\0';
-    EXPECT_EQ(handle->read(buf, TEST_PACKET_SIZE), TEST_PACKET_SIZE);
+    EXPECT_EQ(this->handle->read(buf, TEST_PACKET_SIZE), TEST_PACKET_SIZE);
     EXPECT_STREQ(buf, dummyDataStr.c_str());
 }
 
-TEST_F(MtpFfsHandleTest, testWrite) {
+TYPED_TEST(MtpFfsHandleTest, testWrite) {
     char buf[TEST_PACKET_SIZE + 1];
     buf[TEST_PACKET_SIZE] = '\0';
-    EXPECT_EQ(handle->write(dummyDataStr.c_str(), TEST_PACKET_SIZE), TEST_PACKET_SIZE);
-    EXPECT_EQ(read(bulk_in, buf, TEST_PACKET_SIZE), TEST_PACKET_SIZE);
+    EXPECT_EQ(this->handle->write(dummyDataStr.c_str(), TEST_PACKET_SIZE), TEST_PACKET_SIZE);
+    EXPECT_EQ(read(this->bulk_in, buf, TEST_PACKET_SIZE), TEST_PACKET_SIZE);
     EXPECT_STREQ(buf, dummyDataStr.c_str());
 }
 
-TEST_F(MtpFfsHandleTest, testReceiveFileSmall) {
+TYPED_TEST(MtpFfsHandleTest, testReceiveFileEmpty) {
+    std::stringstream ss;
+    mtp_file_range mfr;
+    int size = 0;
+    char buf[size + 1];
+    buf[size] = '\0';
+
+    mfr.offset = 0;
+    mfr.length = size;
+    mfr.fd = this->dummy_file.fd;
+
+    EXPECT_EQ(write(this->bulk_out, ss.str().c_str(), size), size);
+    EXPECT_EQ(this->handle->receiveFile(mfr, false), 0);
+
+    EXPECT_EQ(read(this->dummy_file.fd, buf, size), size);
+}
+
+TYPED_TEST(MtpFfsHandleTest, testReceiveFileSmall) {
     std::stringstream ss;
     mtp_file_range mfr;
     int size = TEST_PACKET_SIZE * SMALL_MULT;
     char buf[size + 1];
     buf[size] = '\0';
 
+    mfr.offset = 0;
     mfr.length = size;
-    mfr.fd = dummy_file.fd;
+    mfr.fd = this->dummy_file.fd;
     for (int i = 0; i < SMALL_MULT; i++)
         ss << dummyDataStr;
 
-    EXPECT_EQ(write(bulk_out, ss.str().c_str(), size), size);
-    EXPECT_EQ(handle->receiveFile(mfr, false), 0);
+    EXPECT_EQ(write(this->bulk_out, ss.str().c_str(), size), size);
+    EXPECT_EQ(this->handle->receiveFile(mfr, false), 0);
 
-    EXPECT_EQ(read(dummy_file.fd, buf, size), size);
+    EXPECT_EQ(read(this->dummy_file.fd, buf, size), size);
 
     EXPECT_STREQ(buf, ss.str().c_str());
 }
 
-TEST_F(MtpFfsHandleTest, testReceiveFileMed) {
+TYPED_TEST(MtpFfsHandleTest, testReceiveFileMed) {
     std::stringstream ss;
     mtp_file_range mfr;
     int size = TEST_PACKET_SIZE * MED_MULT;
     char buf[size + 1];
     buf[size] = '\0';
 
+    mfr.offset = 0;
     mfr.length = size;
-    mfr.fd = dummy_file.fd;
+    mfr.fd = this->dummy_file.fd;
     for (int i = 0; i < MED_MULT; i++)
         ss << dummyDataStr;
 
-    EXPECT_EQ(write(bulk_out, ss.str().c_str(), size), size);
-    EXPECT_EQ(handle->receiveFile(mfr, false), 0);
+    EXPECT_EQ(write(this->bulk_out, ss.str().c_str(), size), size);
+    EXPECT_EQ(this->handle->receiveFile(mfr, false), 0);
 
-    EXPECT_EQ(read(dummy_file.fd, buf, size), size);
+    EXPECT_EQ(read(this->dummy_file.fd, buf, size), size);
 
     EXPECT_STREQ(buf, ss.str().c_str());
 }
 
-TEST_F(MtpFfsHandleTest, testSendFileSmall) {
+TYPED_TEST(MtpFfsHandleTest, testReceiveFileMedPartial) {
+    std::stringstream ss;
+    mtp_file_range mfr;
+    int size = TEST_PACKET_SIZE * MED_MULT;
+    char buf[size + 1];
+    buf[size] = '\0';
+
+    mfr.fd = this->dummy_file.fd;
+    for (int i = 0; i < MED_MULT; i++)
+        ss << dummyDataStr;
+
+    EXPECT_EQ(write(this->bulk_out, ss.str().c_str(), size), size);
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(1, TEST_PACKET_SIZE);
+    int offset = 0;
+    while (offset != size) {
+        mfr.offset = offset;
+        int length = std::min(size - offset, dis(gen));
+        mfr.length = length;
+
+        EXPECT_EQ(this->handle->receiveFile(mfr, false), 0);
+        offset += length;
+    }
+
+    EXPECT_EQ(read(this->dummy_file.fd, buf, size), size);
+
+    EXPECT_STREQ(buf, ss.str().c_str());
+}
+
+TYPED_TEST(MtpFfsHandleTest, testSendFileSmall) {
     std::stringstream ss;
     mtp_file_range mfr;
     mfr.command = 42;
@@ -154,14 +211,14 @@ TEST_F(MtpFfsHandleTest, testSendFileSmall) {
     buf[size + sizeof(mtp_data_header)] = '\0';
 
     mfr.length = size;
-    mfr.fd = dummy_file.fd;
+    mfr.fd = this->dummy_file.fd;
     for (int i = 0; i < SMALL_MULT; i++)
         ss << dummyDataStr;
 
-    EXPECT_EQ(write(dummy_file.fd, ss.str().c_str(), size), size);
-    EXPECT_EQ(handle->sendFile(mfr), 0);
+    EXPECT_EQ(write(this->dummy_file.fd, ss.str().c_str(), size), size);
+    EXPECT_EQ(this->handle->sendFile(mfr), 0);
 
-    EXPECT_EQ(read(bulk_in, buf, size + sizeof(mtp_data_header)),
+    EXPECT_EQ(read(this->bulk_in, buf, size + sizeof(mtp_data_header)),
             static_cast<long>(size + sizeof(mtp_data_header)));
 
     struct mtp_data_header *header = reinterpret_cast<struct mtp_data_header*>(buf);
@@ -172,7 +229,7 @@ TEST_F(MtpFfsHandleTest, testSendFileSmall) {
     EXPECT_EQ(header->transaction_id, static_cast<unsigned int>(1337));
 }
 
-TEST_F(MtpFfsHandleTest, testSendFileMed) {
+TYPED_TEST(MtpFfsHandleTest, testSendFileMed) {
     std::stringstream ss;
     mtp_file_range mfr;
     mfr.command = 42;
@@ -183,14 +240,14 @@ TEST_F(MtpFfsHandleTest, testSendFileMed) {
     buf[size + sizeof(mtp_data_header)] = '\0';
 
     mfr.length = size;
-    mfr.fd = dummy_file.fd;
+    mfr.fd = this->dummy_file.fd;
     for (int i = 0; i < MED_MULT; i++)
         ss << dummyDataStr;
 
-    EXPECT_EQ(write(dummy_file.fd, ss.str().c_str(), size), size);
-    EXPECT_EQ(handle->sendFile(mfr), 0);
+    EXPECT_EQ(write(this->dummy_file.fd, ss.str().c_str(), size), size);
+    EXPECT_EQ(this->handle->sendFile(mfr), 0);
 
-    EXPECT_EQ(read(bulk_in, buf, size + sizeof(mtp_data_header)),
+    EXPECT_EQ(read(this->bulk_in, buf, size + sizeof(mtp_data_header)),
             static_cast<long>(size + sizeof(mtp_data_header)));
 
     struct mtp_data_header *header = reinterpret_cast<struct mtp_data_header*>(buf);
@@ -201,10 +258,10 @@ TEST_F(MtpFfsHandleTest, testSendFileMed) {
     EXPECT_EQ(header->transaction_id, static_cast<unsigned int>(1337));
 }
 
-TEST_F(MtpFfsHandleTest, testSendFileMedPartial) {
+TYPED_TEST(MtpFfsHandleTest, testSendFileMedPartial) {
     std::stringstream ss;
     mtp_file_range mfr;
-    mfr.fd = dummy_file.fd;
+    mfr.fd = this->dummy_file.fd;
     mfr.command = 42;
     mfr.transaction_id = 1337;
     int size = TEST_PACKET_SIZE * MED_MULT;
@@ -214,7 +271,7 @@ TEST_F(MtpFfsHandleTest, testSendFileMedPartial) {
     for (int i = 0; i < MED_MULT; i++)
         ss << dummyDataStr;
 
-    EXPECT_EQ(write(dummy_file.fd, ss.str().c_str(), size), size);
+    EXPECT_EQ(write(this->dummy_file.fd, ss.str().c_str(), size), size);
 
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -225,9 +282,9 @@ TEST_F(MtpFfsHandleTest, testSendFileMedPartial) {
         int length = std::min(size - offset, dis(gen));
         mfr.length = length;
         char temp_buf[length + sizeof(mtp_data_header)];
-        EXPECT_EQ(handle->sendFile(mfr), 0);
+        EXPECT_EQ(this->handle->sendFile(mfr), 0);
 
-        EXPECT_EQ(read(bulk_in, temp_buf, length + sizeof(mtp_data_header)),
+        EXPECT_EQ(read(this->bulk_in, temp_buf, length + sizeof(mtp_data_header)),
                 static_cast<long>(length + sizeof(mtp_data_header)));
 
         struct mtp_data_header *header = reinterpret_cast<struct mtp_data_header*>(temp_buf);
@@ -241,7 +298,7 @@ TEST_F(MtpFfsHandleTest, testSendFileMedPartial) {
     EXPECT_STREQ(buf, ss.str().c_str());
 }
 
-TEST_F(MtpFfsHandleTest, testSendFileEmpty) {
+TYPED_TEST(MtpFfsHandleTest, testSendFileEmpty) {
     mtp_file_range mfr;
     mfr.command = 42;
     mfr.transaction_id = 1337;
@@ -251,11 +308,11 @@ TEST_F(MtpFfsHandleTest, testSendFileEmpty) {
     buf[size + sizeof(mtp_data_header)] = '\0';
 
     mfr.length = size;
-    mfr.fd = dummy_file.fd;
+    mfr.fd = this->dummy_file.fd;
 
-    EXPECT_EQ(handle->sendFile(mfr), 0);
+    EXPECT_EQ(this->handle->sendFile(mfr), 0);
 
-    EXPECT_EQ(read(bulk_in, buf, size + sizeof(mtp_data_header)),
+    EXPECT_EQ(read(this->bulk_in, buf, size + sizeof(mtp_data_header)),
             static_cast<long>(size + sizeof(mtp_data_header)));
 
     struct mtp_data_header *header = reinterpret_cast<struct mtp_data_header*>(buf);
@@ -265,15 +322,15 @@ TEST_F(MtpFfsHandleTest, testSendFileEmpty) {
     EXPECT_EQ(header->transaction_id, static_cast<unsigned int>(1337));
 }
 
-TEST_F(MtpFfsHandleTest, testSendEvent) {
+TYPED_TEST(MtpFfsHandleTest, testSendEvent) {
     struct mtp_event event;
     event.length = TEST_PACKET_SIZE;
     event.data = const_cast<char*>(dummyDataStr.c_str());
     char buf[TEST_PACKET_SIZE + 1];
     buf[TEST_PACKET_SIZE] = '\0';
 
-    handle->sendEvent(event);
-    read(intr, buf, TEST_PACKET_SIZE);
+    this->handle->sendEvent(event);
+    read(this->intr, buf, TEST_PACKET_SIZE);
     EXPECT_STREQ(buf, dummyDataStr.c_str());
 }
 
