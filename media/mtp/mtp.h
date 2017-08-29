@@ -494,4 +494,10 @@
 #define MTP_ASSOCIATION_TYPE_UNDEFINED              0x0000
 #define MTP_ASSOCIATION_TYPE_GENERIC_FOLDER         0x0001
 
+// MTP class reqeusts
+#define MTP_REQ_CANCEL              0x64
+#define MTP_REQ_GET_EXT_EVENT_DATA  0x65
+#define MTP_REQ_RESET               0x66
+#define MTP_REQ_GET_DEVICE_STATUS   0x67
+
 #endif // _MTP_H

@@ -31,6 +31,9 @@
 
 #include "MtpDebug.h"
 #include "MtpDatabase.h"
+#include "MtpDevHandle.h"
+#include "MtpFfsCompatHandle.h"
+#include "MtpFfsHandle.h"
 #include "MtpObjectInfo.h"
 #include "MtpProperty.h"
 #include "MtpServer.h"
@@ -125,16 +128,21 @@ MtpServer::~MtpServer() {
 IMtpHandle* MtpServer::sHandle = nullptr;
 
 int MtpServer::configure(bool usePtp) {
+    bool ffs_ok = access(FFS_MTP_EP0, W_OK) == 0;
     if (sHandle == nullptr) {
-        bool ffs_ok = access(FFS_MTP_EP0, W_OK) == 0;
-        sHandle = ffs_ok ? get_ffs_handle() : get_mtp_handle();
+        if (ffs_ok) {
+            bool aio_compat = android::base::GetBoolProperty("sys.usb.ffs.aio_compat", false);
+            sHandle = aio_compat ? new MtpFfsCompatHandle() : new MtpFfsHandle();
+        } else {
+            sHandle = new MtpDevHandle();
+        }
     }
-
-    int ret = sHandle->configure(usePtp);
-    if (ret) ALOGE("Failed to configure MTP driver!");
-    else android::base::SetProperty("sys.usb.ffs.mtp.ready", "1");
-
-    return ret;
+    if (sHandle->configure(usePtp)) {
+        ALOGE("Failed to configure Mtp driver!");
+        return -1;
+    }
+    android::base::SetProperty("sys.usb.ffs.mtp.ready", "1");
+    return 0;
 }
 
 void MtpServer::addStorage(MtpStorage* storage) {
@@ -878,6 +886,7 @@ MtpResponseCode MtpServer::doGetPartialObject(MtpOperationCode operation) {
         length = fileLength - offset;
 
     const char* filePath = (const char *)pathBuf;
+    ALOGV("sending partial %s %" PRIu64 " %" PRIu32, filePath, offset, length);
     mtp_file_range  mfr;
     mfr.fd = open(filePath, O_RDONLY);
     if (mfr.fd < 0) {
