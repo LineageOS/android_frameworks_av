@@ -34,4 +34,5 @@ cc_library_shared {
     ],
 
     static_libs: ["libgsm"],
+    compile_multilib: "32",
 }
