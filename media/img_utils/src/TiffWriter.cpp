@@ -350,7 +350,7 @@ sp<TiffIfd> TiffWriter::findLastIfd() {
         if (nextIfd == NULL) {
             break;
         }
-        ifd = nextIfd;
+        ifd = std::move(nextIfd);
     }
     return ifd;
 }
