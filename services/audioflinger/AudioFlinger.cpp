@@ -326,7 +326,7 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
     sp<MmapThread> thread = mMmapThreads.valueFor(io);
     if (thread != 0) {
         interface = new MmapThreadHandle(thread);
-        thread->configure(attr, streamType, sessionId, callback, portId);
+        thread->configure(attr, streamType, sessionId, callback, *deviceId, portId);
         *handle = portId;
     } else {
         ret = NO_INIT;
