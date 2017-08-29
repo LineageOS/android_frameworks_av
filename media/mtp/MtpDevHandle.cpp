@@ -14,57 +14,37 @@
  * limitations under the License.
  */
 
-#include <utils/Log.h>
-#include <fcntl.h>
-#include <sys/stat.h>
+#include <android-base/logging.h>
 #include <cutils/properties.h>
 #include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <linux/usb/ch9.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/endian.h>
 #include <unistd.h>
 
-#include <android-base/logging.h>
-#include <android-base/unique_fd.h>
-#include "IMtpHandle.h"
+#include "MtpDevHandle.h"
+
+namespace android {
 
 constexpr char mtp_dev_path[] = "/dev/mtp_usb";
-
-class MtpDevHandle : public IMtpHandle {
-private:
-    android::base::unique_fd mFd;
-
-public:
-    MtpDevHandle();
-    ~MtpDevHandle();
-    int read(void *data, int len);
-    int write(const void *data, int len);
-
-    int receiveFile(mtp_file_range mfr, bool);
-    int sendFile(mtp_file_range mfr);
-    int sendEvent(mtp_event me);
-
-    int start();
-    void close();
-
-    int configure(bool ptp);
-};
 
 MtpDevHandle::MtpDevHandle()
     : mFd(-1) {};
 
 MtpDevHandle::~MtpDevHandle() {}
 
-int MtpDevHandle::read(void *data, int len) {
+int MtpDevHandle::read(void *data, size_t len) {
     return ::read(mFd, data, len);
 }
 
-int MtpDevHandle::write(const void *data, int len) {
+int MtpDevHandle::write(const void *data, size_t len) {
     return ::write(mFd, data, len);
 }
 
@@ -81,7 +61,7 @@ int MtpDevHandle::sendEvent(mtp_event me) {
 }
 
 int MtpDevHandle::start() {
-    mFd = android::base::unique_fd(TEMP_FAILURE_RETRY(open(mtp_dev_path, O_RDWR)));
+    mFd.reset(TEMP_FAILURE_RETRY(open(mtp_dev_path, O_RDWR)));
     if (mFd == -1) return -1;
     return 0;
 }
@@ -95,6 +75,4 @@ int MtpDevHandle::configure(bool) {
     return 0;
 }
 
-IMtpHandle *get_mtp_handle() {
-    return new MtpDevHandle();
-}
+} // namespace android
