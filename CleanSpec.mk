@@ -79,6 +79,8 @@ $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/soundfx/libbundlewrapper
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/soundfx/libaudiopreprocessing.so)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/libmediacodecservice.so)
 $(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/libstagefright_xmlparser@1.0.so)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/libstagefright_soft_*)
+$(call add-clean-step, rm -rf $(PRODUCT_OUT)/system/lib/vndk/libstagefright_soft_*)
 
 # ************************************************
 # NEWER CLEAN STEPS MUST BE AT THE END OF THE LIST
