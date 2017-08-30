@@ -34,4 +34,5 @@ cc_library_shared {
     },
 
     ldflags: ["-Wl,-Bsymbolic"],
+    compile_multilib: "32",
 }
