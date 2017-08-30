@@ -57,7 +57,7 @@ int main(int argc, const char **argv)
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
 
-    printf("%s - Play a sine wave using AAudio V0.1.1\n", argv[0]);
+    printf("%s - Play a sine wave using AAudio V0.1.2\n", argv[0]);
 
     if (argParser.parseArgs(argc, argv)) {
         return EXIT_FAILURE;
