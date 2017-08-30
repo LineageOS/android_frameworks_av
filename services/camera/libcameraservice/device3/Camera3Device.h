@@ -128,9 +128,7 @@ class Camera3Device :
             uint32_t width, uint32_t height, int format,
             int *id) override;
 
-    status_t getStreamInfo(int id,
-            uint32_t *width, uint32_t *height,
-            uint32_t *format, android_dataspace *dataSpace) override;
+    status_t getStreamInfo(int id, StreamInfo *streamInfo) override;
     status_t setStreamTransform(int id, int transform) override;
 
     status_t deleteStream(int id) override;
