@@ -29,4 +29,5 @@ cc_library_shared {
             "unsigned-integer-overflow",
         ],
     },
+    compile_multilib: "32",
 }
