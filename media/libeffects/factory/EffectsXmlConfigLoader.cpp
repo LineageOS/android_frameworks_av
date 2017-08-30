@@ -327,7 +327,7 @@ extern "C" ssize_t EffectLoadXmlEffectConfig(const char* path)
                                            &gSkippedEffects, &gSubEffectList);
 
     ALOGE_IF(result.nbSkippedElement != 0, "%zu errors during loading of configuration: %s",
-             result.nbSkippedElement, path ?: effectsConfig::DEFAULT_PATH);
+             result.nbSkippedElement, result.configPath ?: "No config file found");
 
     return result.nbSkippedElement;
 }
