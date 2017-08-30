@@ -233,8 +233,10 @@ aaudio_result_t AudioStreamRecord::requestStop() {
     onStop();
     setState(AAUDIO_STREAM_STATE_STOPPING);
     incrementFramesWritten(getFramesRead() - getFramesWritten()); // TODO review
+    mTimestampPosition.set(getFramesRead());
     mAudioRecord->stop();
     mFramesRead.reset32();
+    mTimestampPosition.reset32();
     return AAUDIO_OK;
 }
 

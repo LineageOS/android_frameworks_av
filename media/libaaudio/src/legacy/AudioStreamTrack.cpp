@@ -285,6 +285,7 @@ aaudio_result_t AudioStreamTrack::requestFlush() {
     incrementFramesRead(getFramesWritten() - getFramesRead());
     mAudioTrack->flush();
     mFramesWritten.reset32();
+    mTimestampPosition.reset32();
     return AAUDIO_OK;
 }
 
@@ -298,8 +299,10 @@ aaudio_result_t AudioStreamTrack::requestStop() {
     onStop();
     setState(AAUDIO_STREAM_STATE_STOPPING);
     incrementFramesRead(getFramesWritten() - getFramesRead()); // TODO review
+    mTimestampPosition.set(getFramesWritten());
     stop();
     mFramesWritten.reset32();
+    mTimestampPosition.reset32();
     return AAUDIO_OK;
 }
 
@@ -447,5 +450,18 @@ aaudio_result_t AudioStreamTrack::getTimestamp(clockid_t clockId,
     if (status != NO_ERROR) {
         return AAudioConvert_androidToAAudioResult(status);
     }
-    return getBestTimestamp(clockId, framePosition, timeNanoseconds, &extendedTimestamp);
+    int64_t position = 0;
+    int64_t nanoseconds = 0;
+    aaudio_result_t result = getBestTimestamp(clockId, &position,
+                                              &nanoseconds, &extendedTimestamp);
+    if (result == AAUDIO_OK) {
+        if (position < getFramesWritten()) {
+            *framePosition = position;
+            *timeNanoseconds = nanoseconds;
+            return result;
+        } else {
+            return AAUDIO_ERROR_INVALID_STATE; // TODO review, documented but not consistent
+        }
+    }
+    return result;
 }

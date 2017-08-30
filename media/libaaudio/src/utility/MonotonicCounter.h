@@ -41,6 +41,13 @@ public:
     }
 
     /**
+     * set the current value of the counter
+     */
+    void set(int64_t counter) {
+        mCounter64 = counter;
+    }
+
+    /**
      * Advance the counter if delta is positive.
      * @return current value of the counter
      */
