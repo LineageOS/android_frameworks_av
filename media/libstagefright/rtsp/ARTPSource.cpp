@@ -43,7 +43,10 @@ ARTPSource::ARTPSource(
         const sp<AMessage> &notify)
     : mID(id),
       mHighestSeqNumber(0),
+      mPrevExpected(0),
+      mBaseSeqNumber(0),
       mNumBuffersReceived(0),
+      mPrevNumBuffersReceived(0),
       mLastNTPTime(0),
       mLastNTPTimeUpdateUs(0),
       mIssueFIRRequests(false),
@@ -107,6 +110,7 @@ bool ARTPSource::queuePacket(const sp<ABuffer> &buffer) {
 
     if (mNumBuffersReceived++ == 0) {
         mHighestSeqNumber = seqNum;
+        mBaseSeqNumber = seqNum;
         mQueue.push_back(buffer);
         return true;
     }
@@ -226,6 +230,22 @@ void ARTPSource::addReceiverReport(const sp<ABuffer> &buffer) {
         return;
     }
 
+    uint8_t fraction = 0;
+
+    // According to appendix A.3 in RFC 3550
+    uint32_t expected = mHighestSeqNumber - mBaseSeqNumber + 1;
+    int64_t intervalExpected = expected - mPrevExpected;
+    int64_t intervalReceived = mNumBuffersReceived - mPrevNumBuffersReceived;
+    int64_t intervalPacketLost = intervalExpected - intervalReceived;
+
+    if (intervalExpected > 0 && intervalPacketLost > 0) {
+        fraction = (intervalPacketLost << 8) / intervalExpected;
+    }
+
+    mPrevExpected = expected;
+    mPrevNumBuffersReceived = mNumBuffersReceived;
+    int32_t cumulativePacketLost = (int32_t)expected - mNumBuffersReceived;
+
     uint8_t *data = buffer->data() + buffer->size();
 
     data[0] = 0x80 | 1;
@@ -242,11 +262,11 @@ void ARTPSource::addReceiverReport(const sp<ABuffer> &buffer) {
     data[10] = (mID >> 8) & 0xff;
     data[11] = mID & 0xff;
 
-    data[12] = 0x00;  // fraction lost
+    data[12] = fraction;  // fraction lost
 
-    data[13] = 0x00;  // cumulative lost
-    data[14] = 0x00;
-    data[15] = 0x00;
+    data[13] = cumulativePacketLost >> 16;  // cumulative lost
+    data[14] = (cumulativePacketLost >> 8) & 0xff;
+    data[15] = cumulativePacketLost & 0xff;
 
     data[16] = mHighestSeqNumber >> 24;
     data[17] = (mHighestSeqNumber >> 16) & 0xff;
