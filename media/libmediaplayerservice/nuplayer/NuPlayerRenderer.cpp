@@ -1429,6 +1429,7 @@ void NuPlayer::Renderer::notifyEOS_l(bool audio, status_t finalResult, int64_t d
     if (audio) {
         // Video might outlive audio. Clear anchor to enable video only case.
         mAnchorTimeMediaUs = -1;
+        mHasAudio = false;
     }
 }
 

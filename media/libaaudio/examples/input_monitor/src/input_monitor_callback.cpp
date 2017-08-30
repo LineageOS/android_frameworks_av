@@ -41,7 +41,7 @@ int main(int argc, char **argv)
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
-    printf("%s - Display audio input using an AAudio callback\n", argv[0]);
+    printf("%s - Display audio input using an AAudio callback, V0.1.2\n", argv[0]);
 
     result = recorder.open(2, 48000, AAUDIO_FORMAT_PCM_I16,
                        SimpleRecorderDataCallbackProc, SimpleRecorderErrorCallbackProc, &myData);

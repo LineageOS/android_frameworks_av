@@ -1234,7 +1234,7 @@ status_t NuPlayer::GenericSource::doSeek(int64_t seekTimeUs, MediaPlayerSeekMode
     }
 
     if (mAudioTrack.mSource != NULL) {
-        readBuffer(MEDIA_TRACK_TYPE_AUDIO, seekTimeUs);
+        readBuffer(MEDIA_TRACK_TYPE_AUDIO, seekTimeUs, MediaPlayerSeekMode::SEEK_CLOSEST);
         mAudioLastDequeueTimeUs = seekTimeUs;
     }
 

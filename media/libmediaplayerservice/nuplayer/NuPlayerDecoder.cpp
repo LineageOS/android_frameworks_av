@@ -750,12 +750,20 @@ bool NuPlayer::Decoder::handleAnOutputBuffer(
 
         buffer->meta()->setInt32("eos", true);
         reply->setInt32("eos", true);
-    } else if (mSkipRenderingUntilMediaTimeUs >= 0) {
+    }
+
+    if (mSkipRenderingUntilMediaTimeUs >= 0) {
         if (timeUs < mSkipRenderingUntilMediaTimeUs) {
             ALOGV("[%s] dropping buffer at time %lld as requested.",
                      mComponentName.c_str(), (long long)timeUs);
 
             reply->post();
+            if (eos) {
+                notifyResumeCompleteIfNecessary();
+                if (mRenderer != NULL && !isDiscontinuityPending()) {
+                    mRenderer->queueEOS(mIsAudio, ERROR_END_OF_STREAM);
+                }
+            }
             return true;
         }
 

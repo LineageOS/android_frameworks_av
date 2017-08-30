@@ -40,7 +40,7 @@ int main(int argc, const char **argv)
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
 
-    printf("%s - Play a sine sweep using an AAudio callback V0.1.2\n", argv[0]);
+    printf("%s - Play a sine sweep using an AAudio callback V0.1.3\n", argv[0]);
 
     myData.schedulerChecked = false;
     myData.forceUnderruns = false; // set true to test AAudioStream_getXRunCount()
