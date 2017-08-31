@@ -65,6 +65,7 @@ cc_library_shared {
         "libhidlmemory",
         "libhidltransport",
         "libnativewindow", // TODO(b/62923479): use header library
+        "libvndksupport",
         "android.hidl.memory@1.0",
         "android.hidl.token@1.0-utils",
         "android.hardware.media@1.0",

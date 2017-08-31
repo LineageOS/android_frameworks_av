@@ -22,6 +22,8 @@
 #include <media/stagefright/omx/SoftOMXPlugin.h>
 #include <media/stagefright/foundation/ADebug.h>
 
+#include <vndksupport/linker.h>
+
 #include <dlfcn.h>
 #include <fcntl.h>
 
@@ -67,7 +69,7 @@ void OMXMaster::addVendorPlugin() {
 }
 
 void OMXMaster::addPlugin(const char *libname) {
-    mVendorLibHandle = dlopen(libname, RTLD_NOW);
+    mVendorLibHandle = android_load_sphal_library(libname, RTLD_NOW);
 
     if (mVendorLibHandle == NULL) {
         return;
