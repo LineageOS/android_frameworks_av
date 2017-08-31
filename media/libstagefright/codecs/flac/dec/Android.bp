@@ -37,4 +37,5 @@ cc_library_shared {
         "libstagefright_foundation",
         "libutils",
     ],
+    compile_multilib: "32",
 }

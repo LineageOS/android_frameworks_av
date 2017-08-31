@@ -49,7 +49,10 @@ struct ARTPSource : public RefBase {
 private:
     uint32_t mID;
     uint32_t mHighestSeqNumber;
+    uint32_t mPrevExpected;
+    uint32_t mBaseSeqNumber;
     int32_t mNumBuffersReceived;
+    int32_t mPrevNumBuffersReceived;
 
     List<sp<ABuffer> > mQueue;
     sp<ARTPAssembler> mAssembler;
