@@ -136,7 +136,7 @@ String8 InitDataParser::generateRequest(const Vector<const uint8_t*>& keyIds) {
     AString encodedId;
     for (size_t i = 0; i < keyIds.size(); ++i) {
         encodedId.clear();
-        android::encodeBase64(keyIds[i], kKeyIdSize, &encodedId);
+        android::encodeBase64Url(keyIds[i], kKeyIdSize, &encodedId);
         if (i != 0) {
             request.append(",");
         }
