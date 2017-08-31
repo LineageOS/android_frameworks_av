@@ -59,10 +59,9 @@ class MetricsSummarizer
 
     // various comparators
     // "do these records have same attributes and values in those attrs"
-    // ditto, but watch for "error" fields
     bool sameAttributes(MediaAnalyticsItem *summ, MediaAnalyticsItem *single, const char **ignoreables);
-    // attributes + from the same app/userid
-    bool sameAttributesId(MediaAnalyticsItem *summ, MediaAnalyticsItem *single, const char **ignoreables);
+
+    void minMaxVar64(MediaAnalyticsItem &summ, const char *key, int64_t value);
 
     static int PropSorter(const void *a, const void *b);
     void sortProps(MediaAnalyticsItem *item);
