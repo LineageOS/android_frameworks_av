@@ -49,6 +49,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/MediaBuffer.h>
+#include <media/stagefright/MediaClock.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
@@ -172,9 +173,10 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-NuPlayer::NuPlayer(pid_t pid)
+NuPlayer::NuPlayer(pid_t pid, const sp<MediaClock> &mediaClock)
     : mUIDValid(false),
       mPID(pid),
+      mMediaClock(mediaClock),
       mSourceFlags(0),
       mOffloadAudio(false),
       mAudioDecoderGeneration(0),
@@ -204,6 +206,7 @@ NuPlayer::NuPlayer(pid_t pid)
       mPausedForBuffering(false),
       mIsDrmProtected(false),
       mDataSourceType(DATA_SOURCE_TYPE_NONE) {
+    CHECK(mediaClock != NULL);
     clearFlushComplete();
 }
 
@@ -1523,7 +1526,7 @@ void NuPlayer::onStart(int64_t startPositionUs, MediaPlayerSeekMode mode) {
     sp<AMessage> notify = new AMessage(kWhatRendererNotify, this);
     ++mRendererGeneration;
     notify->setInt32("generation", mRendererGeneration);
-    mRenderer = new Renderer(mAudioSink, notify, flags);
+    mRenderer = new Renderer(mAudioSink, mMediaClock, notify, flags);
     mRendererLooper = new ALooper;
     mRendererLooper->setName("NuPlayerRenderer");
     mRendererLooper->start(false, false, ANDROID_PRIORITY_AUDIO);

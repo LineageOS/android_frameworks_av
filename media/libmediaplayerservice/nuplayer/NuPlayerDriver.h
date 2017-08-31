@@ -22,6 +22,7 @@
 namespace android {
 
 struct ALooper;
+struct MediaClock;
 struct NuPlayer;
 
 struct NuPlayerDriver : public MediaPlayerInterface {
@@ -127,6 +128,7 @@ private:
     // <<<
 
     sp<ALooper> mLooper;
+    const sp<MediaClock> mMediaClock;
     const sp<NuPlayer> mPlayer;
     sp<AudioSink> mAudioSink;
     uint32_t mPlayerFlags;

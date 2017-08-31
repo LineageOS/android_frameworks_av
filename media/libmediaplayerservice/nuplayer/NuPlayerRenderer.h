@@ -36,6 +36,7 @@ struct NuPlayer::Renderer : public AHandler {
         FLAG_OFFLOAD_AUDIO = 2,
     };
     Renderer(const sp<MediaPlayerBase::AudioSink> &sink,
+             const sp<MediaClock> &mediaClock,
              const sp<AMessage> &notify,
              uint32_t flags = 0);
 
@@ -165,7 +166,7 @@ private:
     int32_t mVideoDrainGeneration;
     int32_t mAudioEOSGeneration;
 
-    sp<MediaClock> mMediaClock;
+    const sp<MediaClock> mMediaClock;
     float mPlaybackRate; // audio track rate
 
     AudioPlaybackRate mPlaybackSettings;

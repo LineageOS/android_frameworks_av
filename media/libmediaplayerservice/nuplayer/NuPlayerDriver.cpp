@@ -28,6 +28,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AUtils.h>
+#include <media/stagefright/MediaClock.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
 
@@ -66,7 +67,8 @@ NuPlayerDriver::NuPlayerDriver(pid_t pid)
       mSeekInProgress(false),
       mPlayingTimeUs(0),
       mLooper(new ALooper),
-      mPlayer(new NuPlayer(pid)),
+      mMediaClock(new MediaClock),
+      mPlayer(new NuPlayer(pid, mMediaClock)),
       mPlayerFlags(0),
       mAnalyticsItem(NULL),
       mAtEOS(false),
