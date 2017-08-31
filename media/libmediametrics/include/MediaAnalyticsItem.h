@@ -75,6 +75,14 @@ class MediaAnalyticsItem {
         typedef const char *Attr;
 
 
+        enum {
+            PROTO_V0 = 0,
+            PROTO_FIRST = PROTO_V0,
+            PROTO_V1 = 1,
+            PROTO_LAST = PROTO_V1,
+        };
+
+
     public:
 
         // access functions for the class
@@ -161,11 +169,18 @@ class MediaAnalyticsItem {
         MediaAnalyticsItem &setUid(uid_t);
         uid_t getUid() const;
 
+        MediaAnalyticsItem &setPkgName(AString);
+        AString getPkgName() const;
+
+        MediaAnalyticsItem &setPkgVersionCode(int32_t);
+        int32_t getPkgVersionCode() const;
+
         // our serialization code for binder calls
         int32_t writeToParcel(Parcel *);
         int32_t readFromParcel(const Parcel&);
 
         AString toString();
+        AString toString(int version);
 
         // are we collecting analytics data
         static bool isEnabled();
@@ -188,6 +203,8 @@ class MediaAnalyticsItem {
         // to help validate that A doesn't mess with B's records
         pid_t     mPid;
         uid_t     mUid;
+        AString   mPkgName;
+        int32_t   mPkgVersionCode;
 
         // let's reuse a binder connection
         static sp<IMediaAnalyticsService> sAnalyticsService;
@@ -228,6 +245,7 @@ class MediaAnalyticsItem {
         size_t findPropIndex(const char *name, size_t len);
         Prop *findProp(const char *name);
         Prop *allocateProp(const char *name);
+        bool removeProp(const char *name);
 
         size_t mPropCount;
         size_t mPropSize;
