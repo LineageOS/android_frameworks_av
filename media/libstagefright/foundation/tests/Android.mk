@@ -9,11 +9,13 @@ LOCAL_MODULE_TAGS := tests
 
 LOCAL_SRC_FILES := \
 	AData_test.cpp \
+	Base64_test.cpp \
 	Flagged_test.cpp \
 	TypeTraits_test.cpp \
 	Utils_test.cpp \
 
 LOCAL_SHARED_LIBRARIES := \
+	liblog \
 	libstagefright_foundation \
 	libutils \
 
