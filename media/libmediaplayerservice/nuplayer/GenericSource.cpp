@@ -31,6 +31,7 @@
 #include <media/stagefright/DataSource.h>
 #include <media/stagefright/FileSource.h>
 #include <media/stagefright/MediaBuffer.h>
+#include <media/stagefright/MediaClock.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaExtractor.h>
 #include <media/stagefright/MediaSource.h>
@@ -51,7 +52,8 @@ static const int kHighWaterMarkKB = 200;
 NuPlayer::GenericSource::GenericSource(
         const sp<AMessage> &notify,
         bool uidValid,
-        uid_t uid)
+        uid_t uid,
+        const sp<MediaClock> &mediaClock)
     : Source(notify),
       mAudioTimeUs(0),
       mAudioLastDequeueTimeUs(0),
@@ -65,10 +67,12 @@ NuPlayer::GenericSource::GenericSource(
       mIsStreaming(false),
       mUIDValid(uidValid),
       mUID(uid),
+      mMediaClock(mediaClock),
       mFd(-1),
       mBitrate(-1ll),
       mPendingReadBufferTypes(0) {
     ALOGV("GenericSource");
+    CHECK(mediaClock != NULL);
 
     mBufferingMonitor = new BufferingMonitor(notify);
     resetDataSource();
@@ -729,17 +733,20 @@ void NuPlayer::GenericSource::fetchTextData(
     int64_t timeUs;
     CHECK(msg->findInt64("timeUs", &timeUs));
 
-    int64_t subTimeUs;
+    int64_t subTimeUs = 0;
     readBuffer(type, timeUs, MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC /* mode */, &subTimeUs);
 
-    int64_t delayUs = subTimeUs - timeUs;
+    status_t eosResult;
+    if (!packets->hasBufferAvailable(&eosResult)) {
+        return;
+    }
+
     if (msg->what() == kWhatFetchSubtitleData) {
-        const int64_t oneSecUs = 1000000ll;
-        delayUs -= oneSecUs;
+        subTimeUs -= 1000000ll;  // send subtile data one second earlier
     }
     sp<AMessage> msg2 = new AMessage(sendWhat, this);
     msg2->setInt32("generation", msgGeneration);
-    msg2->post(delayUs < 0 ? 0 : delayUs);
+    mMediaClock->addTimer(msg2, subTimeUs);
 }
 
 void NuPlayer::GenericSource::sendTextData(
@@ -771,8 +778,10 @@ void NuPlayer::GenericSource::sendTextData(
         notify->setBuffer("buffer", buffer);
         notify->post();
 
-        const int64_t delayUs = nextSubTimeUs - subTimeUs;
-        msg->post(delayUs < 0 ? 0 : delayUs);
+        if (msg->what() == kWhatSendSubtitleData) {
+            nextSubTimeUs -= 1000000ll;  // send subtile data one second earlier
+        }
+        mMediaClock->addTimer(msg, nextSubTimeUs);
     }
 }
 

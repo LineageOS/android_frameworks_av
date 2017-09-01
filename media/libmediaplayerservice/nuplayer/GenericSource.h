@@ -35,12 +35,14 @@ class IDataSource;
 struct IMediaHTTPService;
 struct MediaSource;
 class MediaBuffer;
+struct MediaClock;
 struct NuCachedSource2;
 
 struct NuPlayer::GenericSource : public NuPlayer::Source,
                                  public MediaBufferObserver // Modular DRM
 {
-    GenericSource(const sp<AMessage> &notify, bool uidValid, uid_t uid);
+    GenericSource(const sp<AMessage> &notify, bool uidValid, uid_t uid,
+                  const sp<MediaClock> &mediaClock);
 
     status_t setDataSource(
             const sp<IMediaHTTPService> &httpService,
@@ -227,6 +229,7 @@ private:
     bool mIsStreaming;
     bool mUIDValid;
     uid_t mUID;
+    const sp<MediaClock> mMediaClock;
     sp<IMediaHTTPService> mHTTPService;
     AString mUri;
     KeyedVector<String8, String8> mUriHeaders;
