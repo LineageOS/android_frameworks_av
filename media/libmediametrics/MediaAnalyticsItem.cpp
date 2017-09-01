@@ -120,6 +120,8 @@ MediaAnalyticsItem *MediaAnalyticsItem::dup() {
         // key as part of constructor
         dst->mPid = this->mPid;
         dst->mUid = this->mUid;
+        dst->mPkgName = this->mPkgName;
+        dst->mPkgVersionCode = this->mPkgVersionCode;
         dst->mSessionID = this->mSessionID;
         dst->mTimestamp = this->mTimestamp;
         dst->mFinalized = this->mFinalized;
@@ -201,6 +203,24 @@ uid_t MediaAnalyticsItem::getUid() const {
     return mUid;
 }
 
+MediaAnalyticsItem &MediaAnalyticsItem::setPkgName(AString pkgName) {
+    mPkgName = pkgName;
+    return *this;
+}
+
+AString MediaAnalyticsItem::getPkgName() const {
+    return mPkgName;
+}
+
+MediaAnalyticsItem &MediaAnalyticsItem::setPkgVersionCode(int32_t pkgVersionCode) {
+    mPkgVersionCode = pkgVersionCode;
+    return *this;
+}
+
+int32_t MediaAnalyticsItem::getPkgVersionCode() const {
+    return mPkgVersionCode;
+}
+
 // this key is for the overall record -- "codec", "player", "drm", etc
 MediaAnalyticsItem &MediaAnalyticsItem::setKey(MediaAnalyticsItem::Key key) {
     mKey = key;
@@ -263,9 +283,27 @@ MediaAnalyticsItem::Prop *MediaAnalyticsItem::allocateProp(const char *name) {
         i = mPropCount++;
         prop = &mProps[i];
         prop->setName(name, len);
+        prop->mType = kTypeNone;        // make caller set type info
     }
 
     return prop;
+}
+
+// used within the summarizers; return whether property existed
+bool MediaAnalyticsItem::removeProp(const char *name) {
+    size_t len = strlen(name);
+    size_t i = findPropIndex(name, len);
+    if (i < mPropCount) {
+        Prop *prop = &mProps[i];
+        clearProp(prop);
+        if (i != mPropCount-1) {
+            // in the middle, bring last one down to fill gap
+            mProps[i] = mProps[mPropCount-1];
+        }
+        mPropCount--;
+        return true;
+    }
+    return false;
 }
 
 // set the values
@@ -568,6 +606,10 @@ int32_t MediaAnalyticsItem::readFromParcel(const Parcel& data) {
     // into 'this' object
     // .. we make a copy of the string to put away.
     mKey = data.readCString();
+    mPid = data.readInt32();
+    mUid = data.readInt32();
+    mPkgName = data.readCString();
+    mPkgVersionCode = data.readInt32();
     mSessionID = data.readInt64();
     mFinalized = data.readInt32();
     mTimestamp = data.readInt64();
@@ -611,6 +653,10 @@ int32_t MediaAnalyticsItem::writeToParcel(Parcel *data) {
 
 
     data->writeCString(mKey.c_str());
+    data->writeInt32(mPid);
+    data->writeInt32(mUid);
+    data->writeCString(mPkgName.c_str());
+    data->writeInt32(mPkgVersionCode);
     data->writeInt64(mSessionID);
     data->writeInt32(mFinalized);
     data->writeInt64(mTimestamp);
@@ -651,21 +697,54 @@ int32_t MediaAnalyticsItem::writeToParcel(Parcel *data) {
 
 
 AString MediaAnalyticsItem::toString() {
+   return toString(-1);
+}
 
-    AString result = "(";
+AString MediaAnalyticsItem::toString(int version) {
+
+    // v0 : released with 'o'
+    // v1 : bug fix (missing pid/finalized separator),
+    //      adds apk name, apk version code
+
+    if (version <= PROTO_FIRST) {
+        // default to original v0 format, until proper parsers are in place
+        version = PROTO_V0;
+    } else if (version > PROTO_LAST) {
+        version = PROTO_LAST;
+    }
+
+    AString result;
     char buffer[512];
+
+    if (version == PROTO_V0) {
+        result = "(";
+    } else {
+        snprintf(buffer, sizeof(buffer), "[%d:", version);
+        result.append(buffer);
+    }
 
     // same order as we spill into the parcel, although not required
     // key+session are our primary matching criteria
-    //RBE ALOGD("mKey.c_str");
     result.append(mKey.c_str());
-    //RBE ALOGD("post-mKey.c_str");
     result.append(":");
     snprintf(buffer, sizeof(buffer), "%" PRId64 ":", mSessionID);
     result.append(buffer);
 
-    // we need these internally, but don't want to upload them
-    snprintf(buffer, sizeof(buffer), "%d:%d", mUid, mPid);
+    snprintf(buffer, sizeof(buffer), "%d:", mUid);
+    result.append(buffer);
+
+    if (version >= PROTO_V1) {
+        result.append(mPkgName);
+        snprintf(buffer, sizeof(buffer), ":%d:", mPkgVersionCode);
+        result.append(buffer);
+    }
+
+    // in 'o' (v1) , the separator between pid and finalized was omitted
+    if (version <= PROTO_V0) {
+        snprintf(buffer, sizeof(buffer), "%d", mPid);
+    } else {
+        snprintf(buffer, sizeof(buffer), "%d:", mPid);
+    }
     result.append(buffer);
 
     snprintf(buffer, sizeof(buffer), "%d:", mFinalized);
@@ -713,7 +792,11 @@ AString MediaAnalyticsItem::toString() {
             result.append(buffer);
     }
 
-    result.append(")");
+    if (version == PROTO_V0) {
+        result.append(")");
+    } else {
+        result.append("]");
+    }
 
     return result;
 }

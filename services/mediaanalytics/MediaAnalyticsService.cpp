@@ -29,11 +29,14 @@
 #include <unistd.h>
 
 #include <string.h>
+#include <pwd.h>
 
 #include <cutils/atomic.h>
 #include <cutils/properties.h> // for property_get
 
 #include <utils/misc.h>
+
+#include <android/content/pm/IPackageManagerNative.h>
 
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
@@ -80,26 +83,25 @@
 
 namespace android {
 
+    using namespace android::base;
+    using namespace android::content::pm;
+
 
 
 // summarized records
-// up to 48 sets, each covering an hour -- at least 2 days of coverage
+// up to 36 sets, each covering an hour -- so at least 1.5 days
 // (will be longer if there are hours without any media action)
 static const nsecs_t kNewSetIntervalNs = 3600*(1000*1000*1000ll);
-static const int kMaxRecordSets = 48;
-// individual records kept in memory
-static const int kMaxRecords    = 100;
+static const int kMaxRecordSets = 36;
 
+// individual records kept in memory: age or count
+// age: <= 36 hours (1.5 days)
+// count: hard limit of # records
+// (0 for either of these disables that threshold)
+static const nsecs_t kMaxRecordAgeNs =  36 * 3600 * (1000*1000*1000ll);
+static const int kMaxRecords    = 0;
 
 static const char *kServiceName = "media.metrics";
-
-
-//using android::status_t;
-//using android::OK;
-//using android::BAD_VALUE;
-//using android::NOT_ENOUGH_DATA;
-//using android::Parcel;
-
 
 void MediaAnalyticsService::instantiate() {
     defaultServiceManager()->addService(
@@ -110,6 +112,7 @@ void MediaAnalyticsService::instantiate() {
 MediaAnalyticsService::SummarizerSet::SummarizerSet() {
     mSummarizers = new List<MetricsSummarizer *>();
 }
+
 MediaAnalyticsService::SummarizerSet::~SummarizerSet() {
     // empty the list
     List<MetricsSummarizer *> *l = mSummarizers;
@@ -153,8 +156,10 @@ void MediaAnalyticsService::newSummarizerSet() {
 
 MediaAnalyticsService::MediaAnalyticsService()
         : mMaxRecords(kMaxRecords),
+          mMaxRecordAgeNs(kMaxRecordAgeNs),
           mMaxRecordSets(kMaxRecordSets),
-          mNewSetInterval(kNewSetIntervalNs) {
+          mNewSetInterval(kNewSetIntervalNs),
+          mDumpProto(MediaAnalyticsItem::PROTO_V0) {
 
     ALOGD("MediaAnalyticsService created");
     // clear our queues
@@ -167,6 +172,8 @@ MediaAnalyticsService::MediaAnalyticsService()
     mItemsSubmitted = 0;
     mItemsFinalized = 0;
     mItemsDiscarded = 0;
+    mItemsDiscardedExpire = 0;
+    mItemsDiscardedCount = 0;
 
     mLastSessionID = 0;
     // recover any persistency we set up
@@ -177,8 +184,23 @@ MediaAnalyticsService::~MediaAnalyticsService() {
         ALOGD("MediaAnalyticsService destroyed");
 
     // clean out mOpen and mFinalized
+    while (mOpen->size() > 0) {
+        MediaAnalyticsItem * oitem = *(mOpen->begin());
+        mOpen->erase(mOpen->begin());
+        delete oitem;
+        mItemsDiscarded++;
+        mItemsDiscardedCount++;
+    }
     delete mOpen;
     mOpen = NULL;
+
+    while (mFinalized->size() > 0) {
+        MediaAnalyticsItem * oitem = *(mFinalized->begin());
+        mFinalized->erase(mFinalized->begin());
+        delete oitem;
+        mItemsDiscarded++;
+        mItemsDiscardedCount++;
+    }
     delete mFinalized;
     mFinalized = NULL;
 
@@ -212,13 +234,15 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(MediaAnalyticsItem
     //
     bool isTrusted = false;
 
+    ALOGV("caller has uid=%d, embedded uid=%d", uid, uid_given);
+
     switch (uid)  {
         case AID_MEDIA:
         case AID_MEDIA_CODEC:
         case AID_MEDIA_EX:
         case AID_MEDIA_DRM:
             // trusted source, only override default values
-                isTrusted = true;
+            isTrusted = true;
             if (uid_given == (-1)) {
                 item->setUid(uid);
             }
@@ -233,6 +257,9 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(MediaAnalyticsItem
             break;
     }
 
+    item->setPkgName(getPkgName(item->getUid(), true));
+    item->setPkgVersionCode(0);
+    ALOGD("info is from uid %d pkg '%s', version %d", item->getUid(), item->getPkgName().c_str(), item->getPkgVersionCode());
 
     mItemsSubmitted++;
 
@@ -316,6 +343,7 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(MediaAnalyticsItem
     return id;
 }
 
+
 status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
 {
     const size_t SIZE = 512;
@@ -333,22 +361,41 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
     }
 
     // crack any parameters
-    bool clear = false;
-    bool summary = false;
-    nsecs_t ts_since = 0;
     String16 summaryOption("-summary");
+    bool summary = false;
+    String16 protoOption("-proto");
     String16 clearOption("-clear");
+    bool clear = false;
     String16 sinceOption("-since");
+    nsecs_t ts_since = 0;
     String16 helpOption("-help");
     String16 onlyOption("-only");
-    const char *only = NULL;
+    AString only;
     int n = args.size();
+
     for (int i = 0; i < n; i++) {
         String8 myarg(args[i]);
         if (args[i] == clearOption) {
             clear = true;
         } else if (args[i] == summaryOption) {
             summary = true;
+        } else if (args[i] == protoOption) {
+            i++;
+            if (i < n) {
+                String8 value(args[i]);
+                int proto = MediaAnalyticsItem::PROTO_V0;       // default to original
+                char *endp;
+                const char *p = value.string();
+                proto = strtol(p, &endp, 10);
+                if (endp != p || *endp == '\0') {
+                    if (proto < MediaAnalyticsItem::PROTO_FIRST) {
+                        proto = MediaAnalyticsItem::PROTO_FIRST;
+                    } else if (proto > MediaAnalyticsItem::PROTO_LAST) {
+                        proto = MediaAnalyticsItem::PROTO_LAST;
+                    }
+                    mDumpProto = proto;
+                }
+            }
         } else if (args[i] == sinceOption) {
             i++;
             if (i < n) {
@@ -368,18 +415,12 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
             i++;
             if (i < n) {
                 String8 value(args[i]);
-                const char *p = value.string();
-                char *q = strdup(p);
-                if (q != NULL) {
-                    if (only != NULL) {
-                        free((void*)only);
-                    }
-                only = q;
-                }
+                only = value.string();
             }
         } else if (args[i] == helpOption) {
             result.append("Recognized parameters:\n");
             result.append("-help        this help message\n");
+            result.append("-proto X     dump using protocol X (defaults to 1)");
             result.append("-summary     show summary info\n");
             result.append("-clear       clears out saved records\n");
             result.append("-only X      process records for component X\n");
@@ -398,14 +439,12 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
 
     dumpHeaders(result, ts_since);
 
-    // only want 1, to avoid confusing folks that parse the output
+    // want exactly 1, to avoid confusing folks that parse the output
     if (summary) {
-        dumpSummaries(result, ts_since, only);
+        dumpSummaries(result, ts_since, only.c_str());
     } else {
-        dumpRecent(result, ts_since, only);
+        dumpRecent(result, ts_since, only.c_str());
     }
-    free((void*)only);
-    only=NULL;
 
 
     if (clear) {
@@ -430,6 +469,9 @@ void MediaAnalyticsService::dumpHeaders(String8 &result, nsecs_t ts_since) {
     const size_t SIZE = 512;
     char buffer[SIZE];
 
+    snprintf(buffer, SIZE, "Protocol Version: %d\n", mDumpProto);
+    result.append(buffer);
+
     int enabled = MediaAnalyticsItem::isEnabled();
     if (enabled) {
         snprintf(buffer, SIZE, "Metrics gathering: enabled\n");
@@ -439,10 +481,14 @@ void MediaAnalyticsService::dumpHeaders(String8 &result, nsecs_t ts_since) {
     result.append(buffer);
 
     snprintf(buffer, SIZE,
-        "Since Boot: Submissions: %" PRId64
-            " Finalizations: %" PRId64
-        " Discarded: %" PRId64 "\n",
-        mItemsSubmitted, mItemsFinalized, mItemsDiscarded);
+        "Since Boot: Submissions: %8" PRId64
+            " Finalizations: %8" PRId64 "\n",
+        mItemsSubmitted, mItemsFinalized);
+    result.append(buffer);
+    snprintf(buffer, SIZE,
+        "Records Discarded: %8" PRId64
+            " (by Count: %" PRId64 " by Expiration: %" PRId64 ")\n",
+         mItemsDiscarded, mItemsDiscardedCount, mItemsDiscardedExpire);
     result.append(buffer);
     snprintf(buffer, SIZE,
         "Summary Sets Discarded: %" PRId64 "\n", mSetsDiscarded);
@@ -463,6 +509,10 @@ void MediaAnalyticsService::dumpSummaries(String8 &result, nsecs_t ts_since, con
 
     snprintf(buffer, SIZE, "\nSummarized Metrics:\n");
     result.append(buffer);
+
+    if (only != NULL && *only == '\0') {
+        only = NULL;
+    }
 
     // have each of the distillers dump records
     if (mSummarizerSets != NULL) {
@@ -489,6 +539,10 @@ void MediaAnalyticsService::dumpSummaries(String8 &result, nsecs_t ts_since, con
 void MediaAnalyticsService::dumpRecent(String8 &result, nsecs_t ts_since, const char * only) {
     const size_t SIZE = 512;
     char buffer[SIZE];
+
+    if (only != NULL && *only == '\0') {
+        only = NULL;
+    }
 
     // show the recently recorded records
     snprintf(buffer, sizeof(buffer), "\nFinalized Metrics (oldest first):\n");
@@ -526,7 +580,7 @@ String8 MediaAnalyticsService::dumpQueue(List<MediaAnalyticsItem *> *theList, ns
                 ALOGV("Omit '%s', it's not '%s'", (*it)->getKey().c_str(), only);
                 continue;
             }
-            AString entry = (*it)->toString();
+            AString entry = (*it)->toString(mDumpProto);
             result.appendFormat("%5d: %s\n", slot, entry.c_str());
             slot++;
         }
@@ -551,13 +605,35 @@ void MediaAnalyticsService::saveItem(List<MediaAnalyticsItem *> *l, MediaAnalyti
         l->push_back(item);
     }
 
-    // keep removing old records the front until we're in-bounds
+    // keep removing old records the front until we're in-bounds (count)
     if (mMaxRecords > 0) {
         while (l->size() > (size_t) mMaxRecords) {
             MediaAnalyticsItem * oitem = *(l->begin());
             l->erase(l->begin());
             delete oitem;
             mItemsDiscarded++;
+            mItemsDiscardedCount++;
+        }
+    }
+
+    // keep removing old records the front until we're in-bounds (count)
+    if (mMaxRecordAgeNs > 0) {
+        nsecs_t now = systemTime(SYSTEM_TIME_REALTIME);
+        while (l->size() > 0) {
+            MediaAnalyticsItem * oitem = *(l->begin());
+            nsecs_t when = oitem->getTimestamp();
+// DEBUGGING -- remove this ALOGD() call
+            if(0) ALOGD("@ now=%10" PRId64 " record when=%10" PRId64 "",
+                  now, when);
+            // careful about timejumps too
+            if ((now > when) && (now-when) <= mMaxRecordAgeNs) {
+                // this (and the rest) are recent enough to keep
+                break;
+            }
+            l->erase(l->begin());
+            delete oitem;
+            mItemsDiscarded++;
+            mItemsDiscardedExpire++;
         }
     }
 }
@@ -718,6 +794,87 @@ void MediaAnalyticsService::summarize(MediaAnalyticsItem *item) {
 
     (*it)->handleRecord(item);
 
+}
+
+// mapping uids to package names
+
+// give me the package name, perhaps going to find it
+AString MediaAnalyticsService::getPkgName(uid_t uid, bool addIfMissing) {
+    ssize_t i = mPkgMappings.indexOfKey(uid);
+    if (i >= 0) {
+        AString pkg = mPkgMappings.valueAt(i);
+        ALOGV("returning pkg '%s' for uid %d", pkg.c_str(), uid);
+        return pkg;
+    }
+
+    AString pkg;
+
+    if (addIfMissing == false) {
+        return pkg;
+    }
+
+    struct passwd *pw = getpwuid(uid);
+    if (pw) {
+        pkg = pw->pw_name;
+    } else {
+        pkg = "-";
+    }
+
+    // find the proper value
+
+    sp<IBinder> binder = NULL;
+    sp<IServiceManager> sm = defaultServiceManager();
+    if (sm == NULL) {
+        ALOGE("defaultServiceManager failed");
+    } else {
+        binder = sm->getService(String16("package_native"));
+        if (binder == NULL) {
+            ALOGE("getService package_native failed");
+        }
+    }
+
+    if (binder != NULL) {
+        sp<IPackageManagerNative> package_mgr = interface_cast<IPackageManagerNative>(binder);
+
+        std::vector<int> uids;
+        std::vector<std::string> names;
+
+        uids.push_back(uid);
+
+        binder::Status status = package_mgr->getNamesForUids(uids, &names);
+        if (!status.isOk()) {
+            ALOGE("package_native::getNamesForUids failed: %s",
+                  status.exceptionMessage().c_str());
+        } else {
+            if (!names[0].empty()) {
+                pkg = names[0].c_str();
+            }
+        }
+    }
+
+    // XXX determine whether package was side-loaded or from playstore.
+    // for privacy, we only list apps loaded from playstore.
+
+    // Sanitize the package name for ":"
+    // as an example, we get "shared:android.uid.systemui"
+    // replace : with something benign (I'm going to use !)
+    if (!pkg.empty()) {
+        int n = pkg.size();
+        char *p = (char *) pkg.c_str();
+        for (int i = 0 ; i < n; i++) {
+            if (p[i] == ':') {
+                p[i] = '!';
+            }
+        }
+    }
+
+    // add it to the map, to save a subsequent lookup
+    if (!pkg.empty()) {
+        ALOGV("Adding uid %d pkg '%s'", uid, pkg.c_str());
+        mPkgMappings.add(uid, pkg);
+    }
+
+    return pkg;
 }
 
 } // namespace android
