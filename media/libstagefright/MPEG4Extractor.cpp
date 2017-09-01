@@ -5224,6 +5224,7 @@ MPEG4Extractor::Track *MPEG4Extractor::findTrackByMimePrefix(
 
 void MPEG4Extractor::populateMetrics() {
     ALOGV("MPEG4Extractor::populateMetrics");
+    // write into mAnalyticsItem
 }
 
 static bool LegacySniffMPEG4(
