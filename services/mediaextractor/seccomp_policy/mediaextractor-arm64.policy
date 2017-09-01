@@ -28,6 +28,7 @@ exit_group: 1
 rt_sigreturn: 1
 getrlimit: 1
 nanosleep: 1
+getrandom: 1
 
 # for FileSource
 readlinkat: 1

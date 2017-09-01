@@ -52,6 +52,7 @@ sched_setscheduler: 1
 fstatat64: 1
 ugetrlimit: 1
 getdents64: 1
+getrandom: 1
 
 # for attaching to debuggerd on process crash
 sigaction: 1

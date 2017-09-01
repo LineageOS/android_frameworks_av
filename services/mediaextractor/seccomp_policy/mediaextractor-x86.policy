@@ -37,6 +37,7 @@ getgid32: 1
 getegid32: 1
 getgroups32: 1
 nanosleep: 1
+getrandom: 1
 
 # for FileSource
 readlinkat: 1
