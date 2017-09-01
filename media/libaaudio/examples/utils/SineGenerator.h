@@ -58,6 +58,13 @@ public:
         }
     }
 
+    void setAmplitude(double amplitude) {
+        mAmplitude = amplitude;
+    }
+    double getAmplitude() const {
+        return mAmplitude;
+    }
+
 private:
     void advancePhase() {
         mPhase += mPhaseIncrement;
