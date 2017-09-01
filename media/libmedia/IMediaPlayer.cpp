@@ -35,6 +35,8 @@
 
 namespace android {
 
+using media::VolumeShaper;
+
 enum {
     DISCONNECT = IBinder::FIRST_CALL_TRANSACTION,
     SET_DATA_SOURCE_URL,
@@ -509,7 +511,7 @@ public:
             return nullptr;
         }
         sp<VolumeShaper::State> state = new VolumeShaper::State();
-        status = state->readFromParcel(reply);
+        status = state->readFromParcel(&reply);
         if (status != NO_ERROR) {
             return nullptr;
         }
@@ -851,14 +853,14 @@ status_t BnMediaPlayer::onTransact(
             status_t status = data.readInt32(&present);
             if (status == NO_ERROR && present != 0) {
                 configuration = new VolumeShaper::Configuration();
-                status = configuration->readFromParcel(data);
+                status = configuration->readFromParcel(&data);
             }
             if (status == NO_ERROR) {
                 status = data.readInt32(&present);
             }
             if (status == NO_ERROR && present != 0) {
                 operation = new VolumeShaper::Operation();
-                status = operation->readFromParcel(data);
+                status = operation->readFromParcel(&data);
             }
             if (status == NO_ERROR) {
                 status = (status_t)applyVolumeShaper(configuration, operation);

@@ -60,7 +60,8 @@ LOCAL_SRC_FILES = \
     binding/RingBufferParcelable.cpp \
     binding/SharedMemoryParcelable.cpp \
     binding/SharedRegionParcelable.cpp \
-    ../../libaudioclient/aidl/android/media/IAudioRecord.aidl
+    ../../libaudioclient/aidl/android/media/IAudioRecord.aidl \
+    ../../libaudioclient/aidl/android/media/IPlayer.aidl
 
 LOCAL_CFLAGS += -Wno-unused-parameter -Wall -Werror
 

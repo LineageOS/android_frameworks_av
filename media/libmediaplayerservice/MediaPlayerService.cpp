@@ -93,6 +93,7 @@ using android::OK;
 using android::BAD_VALUE;
 using android::NOT_ENOUGH_DATA;
 using android::Parcel;
+using android::media::VolumeShaper;
 
 // Max number of entries in the filter.
 const int kMaxFilterSize = 64;  // I pulled that out of thin air.
@@ -1577,7 +1578,7 @@ MediaPlayerService::AudioOutput::AudioOutput(audio_session_t sessionId, uid_t ui
       mSendLevel(0.0),
       mAuxEffectId(0),
       mFlags(AUDIO_OUTPUT_FLAG_NONE),
-      mVolumeHandler(new VolumeHandler())
+      mVolumeHandler(new media::VolumeHandler())
 {
     ALOGV("AudioOutput(%d)", sessionId);
     if (attr != NULL) {
