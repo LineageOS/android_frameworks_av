@@ -31,18 +31,51 @@
 #define NANOS_PER_SECOND      (NANOS_PER_MILLISECOND * 1000)
 
 const char *getSharingModeText(aaudio_sharing_mode_t mode) {
-    const char *modeText = "unknown";
+    const char *text = "unknown";
     switch (mode) {
-    case AAUDIO_SHARING_MODE_EXCLUSIVE:
-        modeText = "EXCLUSIVE";
-        break;
-    case AAUDIO_SHARING_MODE_SHARED:
-        modeText = "SHARED";
-        break;
-    default:
-        break;
+        case AAUDIO_SHARING_MODE_EXCLUSIVE:
+            text = "EXCLUSIVE";
+            break;
+        case AAUDIO_SHARING_MODE_SHARED:
+            text = "SHARED";
+            break;
+        default:
+            break;
     }
-    return modeText;
+    return text;
+}
+
+const char *getPerformanceModeText(aaudio_performance_mode_t mode) {
+    const char *text = "unknown";
+    switch (mode) {
+        case AAUDIO_PERFORMANCE_MODE_NONE:
+            text = "NONE";
+            break;
+        case AAUDIO_PERFORMANCE_MODE_LOW_LATENCY:
+            text = "LOW_LATENCY";
+            break;
+        case AAUDIO_PERFORMANCE_MODE_POWER_SAVING:
+            text = "POWER_SAVING";
+            break;
+        default:
+            break;
+    }
+    return text;
+}
+
+const char *getDirectionText(aaudio_direction_t direction) {
+    const char *text = "unknown";
+    switch (direction) {
+        case AAUDIO_DIRECTION_INPUT:
+            text = "INPUT";
+            break;
+        case AAUDIO_DIRECTION_OUTPUT:
+            text = "OUTPUT";
+            break;
+        default:
+            break;
+    }
+    return text;
 }
 
 static void convertNanosecondsToTimespec(int64_t nanoseconds, struct timespec *time) {
