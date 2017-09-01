@@ -54,6 +54,8 @@ protected:
 
     aaudio_result_t requestPauseInternal();
 
+    void advanceClientToMatchServerPosition() override;
+
     void onFlushFromServer() override;
 
 /**
