@@ -17,9 +17,14 @@
 #ifndef AAUDIO_EXAMPLE_UTILS_H
 #define AAUDIO_EXAMPLE_UTILS_H
 
-#include <unistd.h>
+#include <atomic>
+#include <linux/futex.h>
 #include <sched.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+
 #include <aaudio/AAudio.h>
+#include <utils/Errors.h>
 
 #define NANOS_PER_MICROSECOND ((int64_t)1000)
 #define NANOS_PER_MILLISECOND (NANOS_PER_MICROSECOND * 1000)
@@ -38,6 +43,12 @@ const char *getSharingModeText(aaudio_sharing_mode_t mode) {
         break;
     }
     return modeText;
+}
+
+static void convertNanosecondsToTimespec(int64_t nanoseconds, struct timespec *time) {
+    time->tv_sec = nanoseconds / NANOS_PER_SECOND;
+    // Calculate the fractional nanoseconds. Avoids expensive % operation.
+    time->tv_nsec = nanoseconds - (time->tv_sec * NANOS_PER_SECOND);
 }
 
 static int64_t getNanoseconds(clockid_t clockId = CLOCK_MONOTONIC) {
@@ -78,5 +89,78 @@ static double calculateLatencyMillis(int64_t position1, int64_t nanoseconds1,
     double latencyMillis = latencyNanos / 1000000.0;
     return latencyMillis;
 }
+
+// ================================================================================
+// These Futex calls are common online examples.
+static android::status_t sys_futex(void *addr1, int op, int val1,
+                      struct timespec *timeout, void *addr2, int val3) {
+    android::status_t result = (android::status_t) syscall(SYS_futex, addr1,
+                                                           op, val1, timeout,
+                                                           addr2, val3);
+    return (result == 0) ? 0 : -errno;
+}
+
+static android::status_t futex_wake(void *addr, int numWake) {
+    // Use _PRIVATE because we are just using the futex in one process.
+    return sys_futex(addr, FUTEX_WAKE_PRIVATE, numWake, NULL, NULL, 0);
+}
+
+static android::status_t futex_wait(void *addr, int current, struct timespec *time) {
+    // Use _PRIVATE because we are just using the futex in one process.
+    return sys_futex(addr, FUTEX_WAIT_PRIVATE, current, time, NULL, 0);
+}
+
+// TODO better name?
+/**
+ * The WakeUp class is used to send a wakeup signal to one or more sleeping threads.
+ */
+class WakeUp {
+public:
+    WakeUp() : mValue(0) {}
+    explicit WakeUp(int32_t value) : mValue(value) {}
+
+    /**
+     * Wait until the internal value no longer matches the given value.
+     * Note that this code uses a futex, which is subject to spurious wake-ups.
+     * So check to make sure that the desired condition has been met.
+     *
+     * @return zero if the value changes or various negative errors including
+     *    -ETIMEDOUT if a timeout occurs,
+     *    or -EINTR if interrupted by a signal,
+     *    or -EAGAIN or -EWOULDBLOCK if the internal value does not match the specified value
+     */
+    android::status_t wait(int32_t value, int64_t timeoutNanoseconds) {
+        struct timespec time;
+        convertNanosecondsToTimespec(timeoutNanoseconds, &time);
+        return futex_wait(&mValue, value, &time);
+    }
+
+    /**
+     * Increment value and wake up any threads that need to be woken.
+     *
+     * @return number of waiters woken up
+     */
+    android::status_t wake() {
+        ++mValue;
+        return futex_wake(&mValue, INT_MAX);
+    }
+
+    /**
+     * Set value and wake up any threads that need to be woken.
+     *
+     * @return number of waiters woken up
+     */
+    android::status_t wake(int32_t value) {
+        mValue.store(value);
+        return futex_wake(&mValue, INT_MAX);
+    }
+
+    int32_t get() {
+        return mValue.load();
+    }
+
+private:
+    std::atomic<int32_t>   mValue;
+};
 
 #endif // AAUDIO_EXAMPLE_UTILS_H
