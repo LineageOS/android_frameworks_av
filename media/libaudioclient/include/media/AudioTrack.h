@@ -744,12 +744,12 @@ public:
             status_t    setParameters(const String8& keyValuePairs);
 
     /* Sets the volume shaper object */
-            VolumeShaper::Status applyVolumeShaper(
-                    const sp<VolumeShaper::Configuration>& configuration,
-                    const sp<VolumeShaper::Operation>& operation);
+            media::VolumeShaper::Status applyVolumeShaper(
+                    const sp<media::VolumeShaper::Configuration>& configuration,
+                    const sp<media::VolumeShaper::Operation>& operation);
 
     /* Gets the volume shaper state */
-            sp<VolumeShaper::State> getVolumeShaperState(int id);
+            sp<media::VolumeShaper::State> getVolumeShaperState(int id);
 
     /* Get parameters */
             String8     getParameters(const String8& keys);
@@ -1146,7 +1146,7 @@ protected:
                                               // May not match the app selection depending on other
                                               // activity and connected devices.
 
-    sp<VolumeHandler>       mVolumeHandler;
+    sp<media::VolumeHandler>       mVolumeHandler;
 
 private:
     class DeathNotifier : public IBinder::DeathRecipient {

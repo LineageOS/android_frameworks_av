@@ -37,6 +37,8 @@
 
 namespace android {
 
+namespace media {
+
 // The native VolumeShaper class mirrors the java VolumeShaper class;
 // in addition, the native class contains implementation for actual operation.
 //
@@ -101,7 +103,7 @@ public:
      * See "frameworks/base/media/java/android/media/VolumeShaper.java" for
      * details on the Java implementation.
      */
-    class Configuration : public Interpolator<S, T>, public RefBase {
+    class Configuration : public Interpolator<S, T>, public RefBase, public Parcelable {
     public:
         // Must match with VolumeShaper.java in frameworks/base.
         enum Type : int32_t {
@@ -283,7 +285,7 @@ public:
         }
 
         // The parcel layout must match VolumeShaper.java
-        status_t writeToParcel(Parcel *parcel) const {
+        status_t writeToParcel(Parcel *parcel) const override {
             if (parcel == nullptr) return BAD_VALUE;
             return parcel->writeInt32((int32_t)mType)
                     ?: parcel->writeInt32(mId)
@@ -294,17 +296,17 @@ public:
                             ?: Interpolator<S, T>::writeToParcel(parcel);
         }
 
-        status_t readFromParcel(const Parcel &parcel) {
+        status_t readFromParcel(const Parcel *parcel) override {
             int32_t type, optionFlags;
-            return parcel.readInt32(&type)
+            return parcel->readInt32(&type)
                     ?: setType((Type)type)
-                    ?: parcel.readInt32(&mId)
+                    ?: parcel->readInt32(&mId)
                     ?: mType == TYPE_ID
                         ? NO_ERROR
-                        : parcel.readInt32(&optionFlags)
+                        : parcel->readInt32(&optionFlags)
                             ?: setOptionFlags((OptionFlag)optionFlags)
-                            ?: parcel.readDouble(&mDurationMs)
-                            ?: Interpolator<S, T>::readFromParcel(parcel)
+                            ?: parcel->readDouble(&mDurationMs)
+                            ?: Interpolator<S, T>::readFromParcel(*parcel)
                             ?: checkCurve();
         }
 
@@ -336,7 +338,7 @@ public:
      * See "frameworks/base/media/java/android/media/VolumeShaper.java" for
      * details on the Java implementation.
      */
-    class Operation : public RefBase {
+    class Operation : public RefBase, public Parcelable {
     public:
         // Must match with VolumeShaper.java.
         enum Flag : int32_t {
@@ -418,18 +420,18 @@ public:
             return NO_ERROR;
         }
 
-        status_t writeToParcel(Parcel *parcel) const {
+        status_t writeToParcel(Parcel *parcel) const override {
             if (parcel == nullptr) return BAD_VALUE;
             return parcel->writeInt32((int32_t)mFlags)
                     ?: parcel->writeInt32(mReplaceId)
                     ?: parcel->writeFloat(mXOffset);
         }
 
-        status_t readFromParcel(const Parcel &parcel) {
+        status_t readFromParcel(const Parcel *parcel) override {
             int32_t flags;
-            return parcel.readInt32(&flags)
-                    ?: parcel.readInt32(&mReplaceId)
-                    ?: parcel.readFloat(&mXOffset)
+            return parcel->readInt32(&flags)
+                    ?: parcel->readInt32(&mReplaceId)
+                    ?: parcel->readFloat(&mXOffset)
                     ?: setFlags((Flag)flags);
         }
 
@@ -455,7 +457,7 @@ public:
      * See "frameworks/base/media/java/android/media/VolumeShaper.java" for
      * details on the Java implementation.
      */
-    class State : public RefBase {
+    class State : public RefBase, public Parcelable {
     public:
         State(T volume, S xOffset)
             : mVolume(volume)
@@ -481,15 +483,15 @@ public:
             mXOffset = xOffset;
         }
 
-        status_t writeToParcel(Parcel *parcel) const {
+        status_t writeToParcel(Parcel *parcel) const override {
             if (parcel == nullptr) return BAD_VALUE;
             return parcel->writeFloat(mVolume)
                     ?: parcel->writeFloat(mXOffset);
         }
 
-        status_t readFromParcel(const Parcel &parcel) {
-            return parcel.readFloat(&mVolume)
-                     ?: parcel.readFloat(&mXOffset);
+        status_t readFromParcel(const Parcel *parcel) override {
+            return parcel->readFloat(&mVolume)
+                     ?: parcel->readFloat(&mXOffset);
         }
 
         std::string toString() const {
@@ -1019,6 +1021,8 @@ private:
     std::pair<T /* volume */, bool /* active */> mLastVolume;
     std::list<VolumeShaper> mVolumeShapers; // list provides stable iterators on erase
 }; // VolumeHandler
+
+} // namespace media
 
 } // namespace android
 

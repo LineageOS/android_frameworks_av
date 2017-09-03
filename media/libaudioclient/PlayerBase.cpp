@@ -22,6 +22,8 @@
 
 namespace android {
 
+using media::VolumeShaper;
+
 //--------------------------------------------------------------------------------------------------
 PlayerBase::PlayerBase() : BnPlayer(),
         mPanMultiplierL(1.0f), mPanMultiplierR(1.0f),
@@ -117,23 +119,26 @@ status_t PlayerBase::stopWithStatus() {
 
 //------------------------------------------------------------------------------
 // Implementation of IPlayer
-void PlayerBase::start() {
+binder::Status PlayerBase::start() {
     ALOGD("PlayerBase::start() from IPlayer");
     (void)startWithStatus();
+    return binder::Status::ok();
 }
 
-void PlayerBase::pause() {
+binder::Status PlayerBase::pause() {
     ALOGD("PlayerBase::pause() from IPlayer");
     (void)pauseWithStatus();
+    return binder::Status::ok();
 }
 
 
-void PlayerBase::stop() {
+binder::Status PlayerBase::stop() {
     ALOGD("PlayerBase::stop() from IPlayer");
     (void)stopWithStatus();
+    return binder::Status::ok();
 }
 
-void PlayerBase::setVolume(float vol) {
+binder::Status PlayerBase::setVolume(float vol) {
     ALOGD("PlayerBase::setVolume() from IPlayer");
     {
         Mutex::Autolock _l(mSettingsLock);
@@ -144,9 +149,10 @@ void PlayerBase::setVolume(float vol) {
     if (status != NO_ERROR) {
         ALOGW("PlayerBase::setVolume() error %d", status);
     }
+    return binder::Status::fromStatusT(status);
 }
 
-void PlayerBase::setPan(float pan) {
+binder::Status PlayerBase::setPan(float pan) {
     ALOGD("PlayerBase::setPan() from IPlayer");
     {
         Mutex::Autolock _l(mSettingsLock);
@@ -163,22 +169,19 @@ void PlayerBase::setPan(float pan) {
     if (status != NO_ERROR) {
         ALOGW("PlayerBase::setPan() error %d", status);
     }
+    return binder::Status::fromStatusT(status);
 }
 
-void PlayerBase::setStartDelayMs(int32_t delayMs __unused) {
+binder::Status PlayerBase::setStartDelayMs(int32_t delayMs __unused) {
     ALOGW("setStartDelay() is not supported");
+    return binder::Status::ok();
 }
 
-void PlayerBase::applyVolumeShaper(
-        const sp<VolumeShaper::Configuration>& configuration  __unused,
-        const sp<VolumeShaper::Operation>& operation __unused) {
+binder::Status PlayerBase::applyVolumeShaper(
+            const VolumeShaper::Configuration& configuration __unused,
+            const VolumeShaper::Operation& operation __unused) {
     ALOGW("applyVolumeShaper() is not supported");
-}
-
-status_t PlayerBase::onTransact(
-    uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
-{
-    return BnPlayer::onTransact(code, data, reply, flags);
+    return binder::Status::ok();
 }
 
 } // namespace android

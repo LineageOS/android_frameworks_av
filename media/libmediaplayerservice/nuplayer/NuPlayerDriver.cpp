@@ -28,6 +28,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AUtils.h>
+#include <media/stagefright/MediaClock.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
 
@@ -66,9 +67,11 @@ NuPlayerDriver::NuPlayerDriver(pid_t pid)
       mSeekInProgress(false),
       mPlayingTimeUs(0),
       mLooper(new ALooper),
-      mPlayer(new NuPlayer(pid)),
+      mMediaClock(new MediaClock),
+      mPlayer(new NuPlayer(pid, mMediaClock)),
       mPlayerFlags(0),
       mAnalyticsItem(NULL),
+      mClientUid(-1),
       mAtEOS(false),
       mLooping(false),
       mAutoLoop(false) {
@@ -109,6 +112,10 @@ status_t NuPlayerDriver::initCheck() {
 
 status_t NuPlayerDriver::setUID(uid_t uid) {
     mPlayer->setUID(uid);
+    mClientUid = uid;
+    if (mAnalyticsItem) {
+        mAnalyticsItem->setUid(mClientUid);
+    }
 
     return OK;
 }
@@ -601,6 +608,7 @@ void NuPlayerDriver::logMetrics(const char *where) {
         mAnalyticsItem = new MediaAnalyticsItem("nuplayer");
         if (mAnalyticsItem) {
             mAnalyticsItem->generateSessionID();
+            mAnalyticsItem->setUid(mClientUid);
         }
     } else {
         ALOGV("did not have anything to record");

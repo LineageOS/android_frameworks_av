@@ -89,6 +89,7 @@ const int64_t NuPlayer::Renderer::kMinPositionUpdateDelayUs = 100000ll;
 
 NuPlayer::Renderer::Renderer(
         const sp<MediaPlayerBase::AudioSink> &sink,
+        const sp<MediaClock> &mediaClock,
         const sp<AMessage> &notify,
         uint32_t flags)
     : mAudioSink(sink),
@@ -103,6 +104,7 @@ NuPlayer::Renderer::Renderer(
       mAudioDrainGeneration(0),
       mVideoDrainGeneration(0),
       mAudioEOSGeneration(0),
+      mMediaClock(mediaClock),
       mPlaybackSettings(AUDIO_PLAYBACK_RATE_DEFAULT),
       mAudioFirstAnchorTimeMediaUs(-1),
       mAnchorTimeMediaUs(-1),
@@ -130,7 +132,7 @@ NuPlayer::Renderer::Renderer(
       mLastAudioBufferDrained(0),
       mUseAudioCallback(false),
       mWakeLock(new AWakeLock()) {
-    mMediaClock = new MediaClock;
+    CHECK(mediaClock != NULL);
     mPlaybackRate = mPlaybackSettings.mSpeed;
     mMediaClock->setPlaybackRate(mPlaybackRate);
 }
@@ -149,7 +151,6 @@ NuPlayer::Renderer::~Renderer() {
         flushQueue(&mVideoQueue);
     }
     mWakeLock.clear();
-    mMediaClock.clear();
     mVideoScheduler.clear();
     mNotify.clear();
     mAudioSink.clear();

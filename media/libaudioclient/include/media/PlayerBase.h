@@ -17,35 +17,31 @@
 #ifndef __ANDROID_PLAYER_BASE_H__
 #define __ANDROID_PLAYER_BASE_H__
 
-#include <audiomanager/IPlayer.h>
 #include <audiomanager/AudioManager.h>
 #include <audiomanager/IAudioManager.h>
 
+#include "android/media/BnPlayer.h"
 
 namespace android {
 
-class PlayerBase : public BnPlayer
+class PlayerBase : public ::android::media::BnPlayer
 {
 public:
     explicit PlayerBase();
-    virtual ~PlayerBase();
+    virtual ~PlayerBase() override;
 
     virtual void destroy() = 0;
 
     //IPlayer implementation
-    virtual void start();
-    virtual void pause();
-    virtual void stop();
-    virtual void setVolume(float vol);
-    virtual void setPan(float pan);
-    virtual void setStartDelayMs(int32_t delayMs);
-    virtual void applyVolumeShaper(
-            const sp<VolumeShaper::Configuration>& configuration,
-            const sp<VolumeShaper::Operation>& operation) override;
-
-    virtual status_t onTransact(
-                uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags);
-
+    virtual binder::Status start() override;
+    virtual binder::Status pause() override;
+    virtual binder::Status stop() override;
+    virtual binder::Status setVolume(float vol) override;
+    virtual binder::Status setPan(float pan) override;
+    virtual binder::Status setStartDelayMs(int32_t delayMs) override;
+    virtual binder::Status applyVolumeShaper(
+            const media::VolumeShaper::Configuration& configuration,
+            const media::VolumeShaper::Operation& operation) override;
 
             status_t startWithStatus();
             status_t pauseWithStatus();

@@ -30,11 +30,12 @@ struct AMessage;
 struct AudioPlaybackRate;
 struct AVSyncSettings;
 class IDataSource;
+struct MediaClock;
 class MetaData;
 struct NuPlayerDriver;
 
 struct NuPlayer : public AHandler {
-    explicit NuPlayer(pid_t pid);
+    explicit NuPlayer(pid_t pid, const sp<MediaClock> &mediaClock);
 
     void setUID(uid_t uid);
 
@@ -157,6 +158,7 @@ private:
     bool mUIDValid;
     uid_t mUID;
     pid_t mPID;
+    const sp<MediaClock> mMediaClock;
     Mutex mSourceLock;  // guard |mSource|.
     sp<Source> mSource;
     uint32_t mSourceFlags;

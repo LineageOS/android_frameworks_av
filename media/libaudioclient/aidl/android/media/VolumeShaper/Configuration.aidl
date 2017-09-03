@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,22 +14,6 @@
  * limitations under the License.
  */
 
-#ifndef BASE_64_H_
+package android.media.VolumeShaper;
 
-#define BASE_64_H_
-
-#include <utils/RefBase.h>
-
-namespace android {
-
-struct ABuffer;
-struct AString;
-
-sp<ABuffer> decodeBase64(const AString &s);
-void encodeBase64(const void *data, size_t size, AString *out);
-
-void encodeBase64Url(const void *data, size_t size, AString *out);
-
-}  // namespace android
-
-#endif  // BASE_64_H_
+parcelable Configuration cpp_header "media/VolumeShaper.h";
