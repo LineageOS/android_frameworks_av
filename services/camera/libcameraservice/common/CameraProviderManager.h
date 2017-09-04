@@ -126,16 +126,16 @@ public:
     int getCameraCount() const;
 
     /**
-     * Retrieve the number of API1 compatible cameras; these are internal and
+     * Retrieve the number of 'standard' cameras; these are internal and
      * backwards-compatible. This is the set of cameras that will be
      * accessible via the old camera API, with IDs in range of
-     * [0, getAPI1CompatibleCameraCount()-1]. This value is not expected to change dynamically.
+     * [0, getStandardCameraCount()-1]. This value is not expected to change dynamically.
      */
-    int getAPI1CompatibleCameraCount() const;
+    int getStandardCameraCount() const;
 
     std::vector<std::string> getCameraDeviceIds() const;
 
-    std::vector<std::string> getAPI1CompatibleCameraDeviceIds() const;
+    std::vector<std::string> getStandardCameraDeviceIds() const;
 
     /**
      * Return true if a device with a given ID and major version exists
@@ -292,7 +292,6 @@ private:
             bool hasFlashUnit() const { return mHasFlashUnit; }
             virtual status_t setTorchMode(bool enabled) = 0;
             virtual status_t getCameraInfo(hardware::CameraInfo *info) const = 0;
-            virtual bool isAPI1Compatible() const = 0;
             virtual status_t getCameraCharacteristics(CameraMetadata *characteristics) const {
                 (void) characteristics;
                 return INVALID_OPERATION;
@@ -324,8 +323,7 @@ private:
 
             virtual status_t setTorchMode(bool enabled) override;
             virtual status_t getCameraInfo(hardware::CameraInfo *info) const override;
-            //In case of Device1Info assume that we are always API1 compatible
-            virtual bool isAPI1Compatible() const override { return true; }
+
             DeviceInfo1(const std::string& name, const metadata_vendor_id_t tagId,
                     const std::string &id, uint16_t minorVersion,
                     const hardware::camera::common::V1_0::CameraResourceCost& resourceCost,
@@ -342,7 +340,6 @@ private:
 
             virtual status_t setTorchMode(bool enabled) override;
             virtual status_t getCameraInfo(hardware::CameraInfo *info) const override;
-            virtual bool isAPI1Compatible() const override;
             virtual status_t getCameraCharacteristics(
                     CameraMetadata *characteristics) const override;
 

@@ -167,7 +167,7 @@ static void torch_mode_status_change(
 CameraService::CameraService() :
         mEventLog(DEFAULT_EVENT_LOG_LENGTH),
         mNumberOfCameras(0), mNumberOfNormalCameras(0),
-        mSoundRef(0), mInitialized(false) {
+        mSoundRef(0), mInitialized(false), mModule(nullptr) {
     ALOGI("CameraService started (pid=%d)", getpid());
 
     this->camera_device_status_change = android::camera_device_status_change;
@@ -189,12 +189,120 @@ void CameraService::onFirstRef()
 
     status_t res = INVALID_OPERATION;
 
-    res = enumerateProviders();
+    bool disableTreble = property_get_bool("camera.disable_treble", false);
+    if (disableTreble) {
+        ALOGI("Treble disabled - using legacy path");
+        res = loadLegacyHalModule();
+    } else {
+        res = enumerateProviders();
+    }
     if (res == OK) {
         mInitialized = true;
     }
 
     CameraService::pingCameraServiceProxy();
+}
+
+status_t CameraService::loadLegacyHalModule() {
+    camera_module_t *rawModule;
+    int err = hw_get_module(CAMERA_HARDWARE_MODULE_ID,
+            (const hw_module_t **)&rawModule);
+    if (err < 0) {
+        ALOGE("Could not load camera HAL module: %d (%s)", err, strerror(-err));
+        logServiceError("Could not load camera HAL module", err);
+        return INVALID_OPERATION;
+    }
+
+    mModule = new CameraModule(rawModule);
+    err = mModule->init();
+    if (err != OK) {
+        ALOGE("Could not initialize camera HAL module: %d (%s)", err,
+            strerror(-err));
+        logServiceError("Could not initialize camera HAL module", err);
+
+        delete mModule;
+        mModule = nullptr;
+        return INVALID_OPERATION;
+    }
+    ALOGI("Loaded \"%s\" camera module", mModule->getModuleName());
+
+    mNumberOfCameras = mModule->getNumberOfCameras();
+    mNumberOfNormalCameras = mNumberOfCameras;
+
+    // Setup vendor tags before we call get_camera_info the first time
+    // because HAL might need to setup static vendor keys in get_camera_info
+    VendorTagDescriptor::clearGlobalVendorTagDescriptor();
+    if (mModule->getModuleApiVersion() >= CAMERA_MODULE_API_VERSION_2_2) {
+        setUpVendorTags();
+    }
+
+    mFlashlight = new CameraFlashlight(mModule, this);
+    status_t res = mFlashlight->findFlashUnits();
+    if (res) {
+        // impossible because we haven't open any camera devices.
+        ALOGE("Failed to find flash units.");
+    }
+
+    int latestStrangeCameraId = INT_MAX;
+    for (int i = 0; i < mNumberOfCameras; i++) {
+        String8 cameraId = String8::format("%d", i);
+
+        // Get camera info
+
+        struct camera_info info;
+        bool haveInfo = true;
+        status_t rc = mModule->getCameraInfo(i, &info);
+        if (rc != NO_ERROR) {
+            ALOGE("%s: Received error loading camera info for device %d, cost and"
+                    " conflicting devices fields set to defaults for this device.",
+                    __FUNCTION__, i);
+            haveInfo = false;
+        }
+
+        // Check for backwards-compatibility support
+        if (haveInfo) {
+            if (checkCameraCapabilities(i, info, &latestStrangeCameraId) != OK) {
+                delete mModule;
+                mModule = nullptr;
+                return INVALID_OPERATION;
+            }
+        }
+
+        // Defaults to use for cost and conflicting devices
+        int cost = 100;
+        char** conflicting_devices = nullptr;
+        size_t conflicting_devices_length = 0;
+
+        // If using post-2.4 module version, query the cost + conflicting devices from the HAL
+        if (mModule->getModuleApiVersion() >= CAMERA_MODULE_API_VERSION_2_4 && haveInfo) {
+            cost = info.resource_cost;
+            conflicting_devices = info.conflicting_devices;
+            conflicting_devices_length = info.conflicting_devices_length;
+        }
+
+        std::set<String8> conflicting;
+        for (size_t i = 0; i < conflicting_devices_length; i++) {
+            conflicting.emplace(String8(conflicting_devices[i]));
+        }
+
+        // Initialize state for each camera device
+        {
+            Mutex::Autolock lock(mCameraStatesLock);
+            mCameraStates.emplace(cameraId, std::make_shared<CameraState>(cameraId, cost,
+                    conflicting));
+        }
+
+        if (mFlashlight->hasFlashUnit(cameraId)) {
+            mTorchStatusMap.add(cameraId,
+                    TorchModeStatus::AVAILABLE_OFF);
+        }
+    }
+
+    if (mModule->getModuleApiVersion() >= CAMERA_MODULE_API_VERSION_2_1) {
+        mModule->setCallbacks(this);
+    }
+
+    return OK;
 }
 
 status_t CameraService::enumerateProviders() {
@@ -212,8 +320,7 @@ status_t CameraService::enumerateProviders() {
     }
 
     mNumberOfCameras = mCameraProviderManager->getCameraCount();
-    mNumberOfNormalCameras =
-            mCameraProviderManager->getAPI1CompatibleCameraCount();
+    mNumberOfNormalCameras = mCameraProviderManager->getStandardCameraCount();
 
     // Setup vendor tags before we call get_camera_info the first time
     // because HAL might need to setup static vendor keys in get_camera_info
@@ -288,6 +395,10 @@ void CameraService::pingCameraServiceProxy() {
 }
 
 CameraService::~CameraService() {
+    if (mModule) {
+        delete mModule;
+        mModule = nullptr;
+    }
     VendorTagDescriptor::clearGlobalVendorTagDescriptor();
 }
 
@@ -464,13 +575,28 @@ Status CameraService::getCameraInfo(int cameraId,
     }
 
     Status ret = Status::ok();
-    status_t err = mCameraProviderManager->getCameraInfo(std::to_string(cameraId), cameraInfo);
-    if (err != OK) {
-        ret = STATUS_ERROR_FMT(ERROR_INVALID_OPERATION,
-                "Error retrieving camera info from device %d: %s (%d)", cameraId,
-                strerror(-err), err);
-    }
+    if (mModule != nullptr) {
+        struct camera_info info;
+        ret = filterGetInfoErrorCode(mModule->getCameraInfo(cameraId, &info));
 
+        if (ret.isOk()) {
+            cameraInfo->facing = info.facing;
+            cameraInfo->orientation = info.orientation;
+            // CameraInfo is for android.hardware.Camera which does not
+            // support external camera facing. The closest approximation would be
+            // front camera.
+            if (cameraInfo->facing == CAMERA_FACING_EXTERNAL) {
+                cameraInfo->facing = hardware::CAMERA_FACING_FRONT;
+            }
+        }
+    } else {
+        status_t err = mCameraProviderManager->getCameraInfo(std::to_string(cameraId), cameraInfo);
+        if (err != OK) {
+            ret = STATUS_ERROR_FMT(ERROR_INVALID_OPERATION,
+                    "Error retrieving camera info from device %d: %s (%d)", cameraId,
+                    strerror(-err), err);
+        }
+    }
     return ret;
 }
 
@@ -499,12 +625,34 @@ Status CameraService::getCameraCharacteristics(const String16& cameraId,
 
     Status ret{};
 
-    status_t res = mCameraProviderManager->getCameraCharacteristics(
-            String8(cameraId).string(), cameraInfo);
-    if (res != OK) {
-        return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION, "Unable to retrieve camera "
-                "characteristics for device %s: %s (%d)", String8(cameraId).string(),
-                strerror(-res), res);
+    if (mModule != nullptr) {
+        int id = cameraIdToInt(String8(cameraId));
+
+        if (id < 0 || id >= mNumberOfCameras) {
+            ALOGE("%s: Invalid camera id: %d", __FUNCTION__, id);
+            return STATUS_ERROR_FMT(ERROR_ILLEGAL_ARGUMENT,
+                    "Invalid camera id: %d", id);
+        }
+
+        int version = getDeviceVersion(String8(cameraId));
+        if (version < CAMERA_DEVICE_API_VERSION_3_0) {
+            return STATUS_ERROR_FMT(ERROR_ILLEGAL_ARGUMENT, "Can't get camera characteristics"
+                    " for devices with HAL version < 3.0, %d is version %x", id, version);
+        }
+
+        struct camera_info info;
+        ret = filterGetInfoErrorCode(mModule->getCameraInfo(id, &info));
+        if (ret.isOk()) {
+            *cameraInfo = info.static_camera_characteristics;
+        }
+    } else {
+        status_t res = mCameraProviderManager->getCameraCharacteristics(
+                String8(cameraId).string(), cameraInfo);
+        if (res != OK) {
+            return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION, "Unable to retrieve camera "
+                    "characteristics for device %s: %s (%d)", String8(cameraId).string(),
+                    strerror(-res), res);
+        }
     }
 
     return ret;
@@ -561,20 +709,39 @@ int CameraService::getDeviceVersion(const String8& cameraId, int* facing) {
 
     int deviceVersion = 0;
 
-    status_t res;
-    hardware::hidl_version maxVersion{0,0};
-    res = mCameraProviderManager->getHighestSupportedVersion(cameraId.string(),
-            &maxVersion);
-    if (res != OK) return -1;
-    deviceVersion = HARDWARE_DEVICE_API_VERSION(maxVersion.get_major(), maxVersion.get_minor());
+    if (mModule != nullptr) {
+        int id = cameraIdToInt(cameraId);
+        if (id < 0) return -1;
 
-    hardware::CameraInfo info;
-    if (facing) {
-        res = mCameraProviderManager->getCameraInfo(cameraId.string(), &info);
+        struct camera_info info;
+        if (mModule->getCameraInfo(id, &info) != OK) {
+            return -1;
+        }
+
+        if (mModule->getModuleApiVersion() >= CAMERA_MODULE_API_VERSION_2_0) {
+            deviceVersion = info.device_version;
+        } else {
+            deviceVersion = CAMERA_DEVICE_API_VERSION_1_0;
+        }
+
+        if (facing) {
+            *facing = info.facing;
+        }
+    } else {
+        status_t res;
+        hardware::hidl_version maxVersion{0,0};
+        res = mCameraProviderManager->getHighestSupportedVersion(cameraId.string(),
+                &maxVersion);
         if (res != OK) return -1;
-        *facing = info.facing;
-    }
+        deviceVersion = HARDWARE_DEVICE_API_VERSION(maxVersion.get_major(), maxVersion.get_minor());
 
+        hardware::CameraInfo info;
+        if (facing) {
+            res = mCameraProviderManager->getCameraInfo(cameraId.string(), &info);
+            if (res != OK) return -1;
+            *facing = info.facing;
+        }
+    }
     return deviceVersion;
 }
 
@@ -593,6 +760,45 @@ Status CameraService::filterGetInfoErrorCode(status_t err) {
                     "Camera HAL encountered error %d: %s",
                     err, strerror(-err));
     }
+}
+
+bool CameraService::setUpVendorTags() {
+    ATRACE_CALL();
+    if (mModule == nullptr) return false;
+
+    vendor_tag_ops_t vOps = vendor_tag_ops_t();
+
+    // Check if vendor operations have been implemented
+    if (!mModule->isVendorTagDefined()) {
+        ALOGI("%s: No vendor tags defined for this device.", __FUNCTION__);
+        return false;
+    }
+
+    mModule->getVendorTagOps(&vOps);
+
+    // Ensure all vendor operations are present
+    if (vOps.get_tag_count == NULL || vOps.get_all_tags == NULL ||
+            vOps.get_section_name == NULL || vOps.get_tag_name == NULL ||
+            vOps.get_tag_type == NULL) {
+        ALOGE("%s: Vendor tag operations not fully defined. Ignoring definitions."
+               , __FUNCTION__);
+        return false;
+    }
+
+    // Read all vendor tag definitions into a descriptor
+    sp<VendorTagDescriptor> desc;
+    status_t res;
+    if ((res = VendorTagDescriptor::createDescriptorFromOps(&vOps, /*out*/desc))
+            != OK) {
+        ALOGE("%s: Could not generate descriptor from vendor tag operations,"
+              "received error %s (%d). Camera clients will not be able to use"
+              "vendor tags", __FUNCTION__, strerror(res), res);
+        return false;
+    }
+
+    // Set the global descriptor to use with camera metadata
+    VendorTagDescriptor::setAsGlobalVendorTagDescriptor(desc);
+    return true;
 }
 
 Status CameraService::makeClient(const sp<CameraService>& cameraService,
@@ -1224,6 +1430,25 @@ Status CameraService::connectLegacy(
 
     ATRACE_CALL();
     String8 id = String8::format("%d", cameraId);
+    if (mModule != nullptr) {
+        int apiVersion = mModule->getModuleApiVersion();
+        if (halVersion != CAMERA_HAL_API_VERSION_UNSPECIFIED &&
+                apiVersion < CAMERA_MODULE_API_VERSION_2_3) {
+            /*
+             * Either the HAL version is unspecified in which case this just creates
+             * a camera client selected by the latest device version, or
+             * it's a particular version in which case the HAL must supported
+             * the open_legacy call
+             */
+            String8 msg = String8::format("Camera HAL module version %x too old for connectLegacy!",
+                    apiVersion);
+            ALOGE("%s: %s",
+                    __FUNCTION__, msg.string());
+            logRejected(id, getCallingPid(), String8(clientPackageName),
+                    msg);
+            return STATUS_ERROR(ERROR_ILLEGAL_ARGUMENT, msg.string());
+        }
+    }
 
     Status ret = Status::ok();
     sp<Client> client = nullptr;
@@ -1366,7 +1591,12 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         LOG_ALWAYS_FATAL_IF(client.get() == nullptr, "%s: CameraService in invalid state",
                 __FUNCTION__);
 
-        err = client->initialize(mCameraProviderManager);
+        if (mModule != nullptr) {
+            err = client->initialize(mModule);
+        } else {
+            err = client->initialize(mCameraProviderManager);
+        }
+
         if (err != OK) {
             ALOGE("%s: Could not initialize client from HAL.", __FUNCTION__);
             // Errors could be from the HAL module open call or from AppOpsManager
@@ -1783,6 +2013,83 @@ bool CameraService::evictClientIdByRemote(const wp<IBinder>& remote) {
     } // lock is destroyed, allow further connect calls
 
     return ret;
+}
+
+
+/**
+ * Check camera capabilities, such as support for basic color operation
+ * Also check that the device HAL version is still in support
+ */
+int CameraService::checkCameraCapabilities(int id, camera_info info, int *latestStrangeCameraId) {
+    if (mModule == nullptr) return NO_INIT;
+
+    // device_version undefined in CAMERA_MODULE_API_VERSION_1_0,
+    // All CAMERA_MODULE_API_VERSION_1_0 devices are backward-compatible
+    if (mModule->getModuleApiVersion() >= CAMERA_MODULE_API_VERSION_2_0) {
+        // Verify the device version is in the supported range
+        switch (info.device_version) {
+            case CAMERA_DEVICE_API_VERSION_1_0:
+            case CAMERA_DEVICE_API_VERSION_3_0:
+            case CAMERA_DEVICE_API_VERSION_3_1:
+            case CAMERA_DEVICE_API_VERSION_3_2:
+            case CAMERA_DEVICE_API_VERSION_3_3:
+            case CAMERA_DEVICE_API_VERSION_3_4:
+                // in support
+                break;
+            case CAMERA_DEVICE_API_VERSION_2_0:
+            case CAMERA_DEVICE_API_VERSION_2_1:
+                // no longer supported
+            default:
+                ALOGE("%s: Device %d has HAL version %x, which is not supported",
+                        __FUNCTION__, id, info.device_version);
+                String8 msg = String8::format(
+                        "Unsupported device HAL version %x for device %d",
+                        info.device_version, id);
+                logServiceError(msg.string(), NO_INIT);
+                return NO_INIT;
+        }
+    }
+
+    // Assume all devices pre-v3.3 are backward-compatible
+    bool isBackwardCompatible = true;
+    if (mModule->getModuleApiVersion() >= CAMERA_MODULE_API_VERSION_2_0
+            && info.device_version >= CAMERA_DEVICE_API_VERSION_3_3) {
+        isBackwardCompatible = false;
+        status_t res;
+        camera_metadata_ro_entry_t caps;
+        res = find_camera_metadata_ro_entry(
+            info.static_camera_characteristics,
+            ANDROID_REQUEST_AVAILABLE_CAPABILITIES,
+            &caps);
+        if (res != 0) {
+            ALOGW("%s: Unable to find camera capabilities for camera device %d",
+                    __FUNCTION__, id);
+            caps.count = 0;
+        }
+        for (size_t i = 0; i < caps.count; i++) {
+            if (caps.data.u8[i] ==
+                    ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE) {
+                isBackwardCompatible = true;
+                break;
+            }
+        }
+    }
+
+    if (!isBackwardCompatible) {
+        mNumberOfNormalCameras--;
+        *latestStrangeCameraId = id;
+    } else {
+        if (id > *latestStrangeCameraId) {
+            ALOGE("%s: Normal camera ID %d higher than strange camera ID %d. "
+                    "This is not allowed due backward-compatibility requirements",
+                    __FUNCTION__, id, *latestStrangeCameraId);
+            logServiceError("Invalid order of camera devices", NO_INIT);
+            mNumberOfCameras = 0;
+            mNumberOfNormalCameras = 0;
+            return NO_INIT;
+        }
+    }
+    return OK;
 }
 
 std::shared_ptr<CameraService::CameraState> CameraService::getCameraState(
@@ -2535,13 +2842,61 @@ status_t CameraService::dump(int fd, const Vector<String16>& args) {
                     cameraId.string());
         }
 
+        if (mModule != nullptr) {
+            dprintf(fd, "== Camera HAL device %s static information: ==\n", cameraId.string());
+
+            camera_info info;
+            status_t rc = mModule->getCameraInfo(cameraIdToInt(cameraId), &info);
+            int deviceVersion = -1;
+            if (rc != OK) {
+                dprintf(fd, "  Error reading static information!\n");
+            } else {
+                dprintf(fd, "  Facing: %s\n",
+                        info.facing == CAMERA_FACING_BACK ? "BACK" :
+                        info.facing == CAMERA_FACING_FRONT ? "FRONT" : "EXTERNAL");
+                dprintf(fd, "  Orientation: %d\n", info.orientation);
+
+                if (mModule->getModuleApiVersion() < CAMERA_MODULE_API_VERSION_2_0) {
+                    deviceVersion = CAMERA_DEVICE_API_VERSION_1_0;
+                } else {
+                    deviceVersion = info.device_version;
+                }
+            }
+
+            auto conflicting = state.second->getConflicting();
+            dprintf(fd, "  Resource Cost: %d\n", state.second->getCost());
+            dprintf(fd, "  Conflicting Devices:");
+            for (auto& id : conflicting) {
+                dprintf(fd, " %s", id.string());
+            }
+            if (conflicting.size() == 0) {
+                dprintf(fd, " NONE");
+            }
+            dprintf(fd, "\n");
+
+            dprintf(fd, "  Device version: %#x\n", deviceVersion);
+            if (deviceVersion >= CAMERA_DEVICE_API_VERSION_3_0) {
+                dprintf(fd, "  Device static metadata:\n");
+                dump_indented_camera_metadata(info.static_camera_characteristics,
+                        fd, /*verbosity*/2, /*indentation*/4);
+            }
+        }
+
     }
 
     if (stateLocked) mCameraStatesLock.unlock();
 
     if (locked) mServiceLock.unlock();
 
-    mCameraProviderManager->dump(fd, args);
+    if (mModule == nullptr) {
+        mCameraProviderManager->dump(fd, args);
+    } else {
+        dprintf(fd, "\n== Camera Module HAL static info: ==\n");
+        dprintf(fd, "Camera module HAL API version: 0x%x\n", mModule->getHalApiVersion());
+        dprintf(fd, "Camera module API version: 0x%x\n", mModule->getModuleApiVersion());
+        dprintf(fd, "Camera module name: %s\n", mModule->getModuleName());
+        dprintf(fd, "Camera module author: %s\n", mModule->getModuleAuthor());
+    }
 
     dprintf(fd, "\n== Vendor tags: ==\n\n");
 

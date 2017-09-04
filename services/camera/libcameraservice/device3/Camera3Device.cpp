@@ -94,6 +94,81 @@ const String8& Camera3Device::getId() const {
     return mId;
 }
 
+/**
+ * CameraDeviceBase interface
+ */
+
+status_t Camera3Device::initialize(CameraModule *module)
+{
+    ATRACE_CALL();
+    Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock l(mLock);
+
+    ALOGV("%s: Initializing device for camera %s", __FUNCTION__, mId.string());
+    if (mStatus != STATUS_UNINITIALIZED) {
+        CLOGE("Already initialized!");
+        return INVALID_OPERATION;
+    }
+
+    /** Open HAL device */
+
+    status_t res;
+
+    camera3_device_t *device;
+
+    ATRACE_BEGIN("CameraHal::open");
+    res = module->open(mId.string(),
+            reinterpret_cast<hw_device_t**>(&device));
+    ATRACE_END();
+
+    if (res != OK) {
+        SET_ERR_L("Could not open camera: %s (%d)", strerror(-res), res);
+        return res;
+    }
+
+    /** Cross-check device version */
+    if (device->common.version < CAMERA_DEVICE_API_VERSION_3_2) {
+        SET_ERR_L("Could not open camera: "
+                "Camera device should be at least %x, reports %x instead",
+                CAMERA_DEVICE_API_VERSION_3_2,
+                device->common.version);
+        device->common.close(&device->common);
+        return BAD_VALUE;
+    }
+
+    camera_info info;
+    res = module->getCameraInfo(atoi(mId), &info);
+    if (res != OK) return res;
+
+    if (info.device_version != device->common.version) {
+        SET_ERR_L("HAL reporting mismatched camera_info version (%x)"
+                " and device version (%x).",
+                info.device_version, device->common.version);
+        device->common.close(&device->common);
+        return BAD_VALUE;
+    }
+
+    /** Initialize device with callback functions */
+
+    ATRACE_BEGIN("CameraHal::initialize");
+    res = device->ops->initialize(device, this);
+    ATRACE_END();
+
+    if (res != OK) {
+        SET_ERR_L("Unable to initialize HAL device: %s (%d)",
+                strerror(-res), res);
+        device->common.close(&device->common);
+        return res;
+    }
+
+    /** Everything is good to go */
+
+    mDeviceInfo = info.static_camera_characteristics;
+    mInterface = std::make_unique<HalInterface>(device);
+
+    return initializeCommonLocked();
+}
+
 status_t Camera3Device::initialize(sp<CameraProviderManager> manager) {
     ATRACE_CALL();
     Mutex::Autolock il(mInterfaceLock);
@@ -2865,6 +2940,9 @@ void Camera3Device::monitorMetadata(TagMonitor::eventSource source,
 /**
  * HalInterface inner class methods
  */
+
+Camera3Device::HalInterface::HalInterface(camera3_device_t *device) :
+        mHal3Device(device) {}
 
 Camera3Device::HalInterface::HalInterface(
             sp<ICameraDeviceSession> &session,

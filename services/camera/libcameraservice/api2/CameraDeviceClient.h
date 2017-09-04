@@ -149,6 +149,7 @@ public:
             int servicePid);
     virtual ~CameraDeviceClient();
 
+    virtual status_t      initialize(CameraModule *module) override;
     virtual status_t      initialize(sp<CameraProviderManager> manager) override;
 
     virtual status_t      dump(int fd, const Vector<String16>& args);

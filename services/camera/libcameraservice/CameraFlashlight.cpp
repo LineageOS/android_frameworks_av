@@ -36,9 +36,16 @@ namespace android {
 // CameraFlashlight implementation begins
 // used by camera service to control flashflight.
 /////////////////////////////////////////////////////////////////////
+CameraFlashlight::CameraFlashlight(CameraModule* cameraModule,
+        camera_module_callbacks_t* callbacks) :
+        mCameraModule(cameraModule),
+        mCallbacks(callbacks),
+        mFlashlightMapInitialized(false) {
+}
 
 CameraFlashlight::CameraFlashlight(sp<CameraProviderManager> providerManager,
         camera_module_callbacks_t* callbacks) :
+        mCameraModule(nullptr),
         mProviderManager(providerManager),
         mCallbacks(callbacks),
         mFlashlightMapInitialized(false) {
@@ -54,12 +61,52 @@ status_t CameraFlashlight::createFlashlightControl(const String8& cameraId) {
         return INVALID_OPERATION;
     }
 
-    if (mProviderManager->supportSetTorchMode(cameraId.string())) {
-        mFlashControl = new ProviderFlashControl(mProviderManager);
+    status_t res = OK;
+
+    if (mCameraModule == nullptr) {
+        if (mProviderManager->supportSetTorchMode(cameraId.string())) {
+            mFlashControl = new ProviderFlashControl(mProviderManager);
+        } else {
+            // Only HAL1 devices do not support setTorchMode
+            mFlashControl =
+                    new CameraHardwareInterfaceFlashControl(mProviderManager, *mCallbacks);
+        }
+    } else if (mCameraModule->getModuleApiVersion() >= CAMERA_MODULE_API_VERSION_2_4) {
+        mFlashControl = new ModuleFlashControl(*mCameraModule);
+        if (mFlashControl == NULL) {
+            ALOGV("%s: cannot create flash control for module api v2.4+",
+                     __FUNCTION__);
+            return NO_MEMORY;
+        }
     } else {
-        // Only HAL1 devices do not support setTorchMode
-        mFlashControl =
-                new CameraHardwareInterfaceFlashControl(mProviderManager, *mCallbacks);
+        uint32_t deviceVersion = CAMERA_DEVICE_API_VERSION_1_0;
+
+        if (mCameraModule->getModuleApiVersion() >=
+                    CAMERA_MODULE_API_VERSION_2_0) {
+            camera_info info;
+            res = mCameraModule->getCameraInfo(
+                    atoi(cameraId.string()), &info);
+            if (res) {
+                ALOGE("%s: failed to get camera info for camera %s",
+                        __FUNCTION__, cameraId.string());
+                return res;
+            }
+            deviceVersion = info.device_version;
+        }
+
+        if (deviceVersion >= CAMERA_DEVICE_API_VERSION_3_0) {
+            CameraDeviceClientFlashControl *flashControl =
+                    new CameraDeviceClientFlashControl(*mCameraModule,
+                                                       *mCallbacks);
+            if (!flashControl) {
+                return NO_MEMORY;
+            }
+
+            mFlashControl = flashControl;
+        } else {
+            mFlashControl =
+                    new CameraHardwareInterfaceFlashControl(mCameraModule, *mCallbacks);
+        }
     }
 
     return OK;
@@ -119,7 +166,11 @@ status_t CameraFlashlight::setTorchMode(const String8& cameraId, bool enabled) {
 }
 
 int CameraFlashlight::getNumberOfCameras() {
-    return mProviderManager->getAPI1CompatibleCameraCount();
+    if (mCameraModule) {
+        return mCameraModule->getNumberOfCameras();
+    } else {
+        return mProviderManager->getStandardCameraCount();
+    }
 }
 
 status_t CameraFlashlight::findFlashUnits() {
@@ -129,10 +180,16 @@ status_t CameraFlashlight::findFlashUnits() {
     std::vector<String8> cameraIds;
     int numberOfCameras = getNumberOfCameras();
     cameraIds.resize(numberOfCameras);
-    // No module, must be provider
-    std::vector<std::string> ids = mProviderManager->getAPI1CompatibleCameraDeviceIds();
-    for (size_t i = 0; i < cameraIds.size(); i++) {
-        cameraIds[i] = String8(ids[i].c_str());
+    if (mCameraModule) {
+        for (size_t i = 0; i < cameraIds.size(); i++) {
+            cameraIds[i] = String8::format("%zu", i);
+        }
+    } else {
+        // No module, must be provider
+        std::vector<std::string> ids = mProviderManager->getStandardCameraDeviceIds();
+        for (size_t i = 0; i < cameraIds.size(); i++) {
+            cameraIds[i] = String8(ids[i].c_str());
+        }
     }
 
     mFlashControl.clear();
@@ -194,7 +251,9 @@ bool CameraFlashlight::hasFlashUnitLocked(const String8& cameraId) {
 
 bool CameraFlashlight::isBackwardCompatibleMode(const String8& cameraId) {
     bool backwardCompatibleMode = false;
-    if (mProviderManager != nullptr &&
+    if (mCameraModule && mCameraModule->getModuleApiVersion() < CAMERA_MODULE_API_VERSION_2_4) {
+        backwardCompatibleMode = true;
+    } else if (mProviderManager != nullptr &&
             !mProviderManager->supportSetTorchMode(cameraId.string())) {
         backwardCompatibleMode = true;
     }
@@ -309,13 +368,366 @@ status_t ProviderFlashControl::setTorchMode(const String8& cameraId, bool enable
 // ProviderFlashControl implementation ends
 
 /////////////////////////////////////////////////////////////////////
+// ModuleFlashControl implementation begins
+// Flash control for camera module v2.4 and above.
+/////////////////////////////////////////////////////////////////////
+ModuleFlashControl::ModuleFlashControl(CameraModule& cameraModule) :
+        mCameraModule(&cameraModule) {
+}
+
+ModuleFlashControl::~ModuleFlashControl() {
+}
+
+status_t ModuleFlashControl::hasFlashUnit(const String8& cameraId, bool *hasFlash) {
+    if (!hasFlash) {
+        return BAD_VALUE;
+    }
+
+    *hasFlash = false;
+    Mutex::Autolock l(mLock);
+
+    camera_info info;
+    status_t res = mCameraModule->getCameraInfo(atoi(cameraId.string()),
+            &info);
+    if (res != 0) {
+        return res;
+    }
+
+    CameraMetadata metadata;
+    metadata = info.static_camera_characteristics;
+    camera_metadata_entry flashAvailable =
+            metadata.find(ANDROID_FLASH_INFO_AVAILABLE);
+    if (flashAvailable.count == 1 && flashAvailable.data.u8[0] == 1) {
+        *hasFlash = true;
+    }
+
+    return OK;
+}
+
+status_t ModuleFlashControl::setTorchMode(const String8& cameraId, bool enabled) {
+    ALOGV("%s: set camera %s torch mode to %d", __FUNCTION__,
+            cameraId.string(), enabled);
+
+    Mutex::Autolock l(mLock);
+    return mCameraModule->setTorchMode(cameraId.string(), enabled);
+}
+// ModuleFlashControl implementation ends
+
+/////////////////////////////////////////////////////////////////////
+// CameraDeviceClientFlashControl implementation begins
+// Flash control for camera module <= v2.3 and camera HAL v2-v3
+/////////////////////////////////////////////////////////////////////
+CameraDeviceClientFlashControl::CameraDeviceClientFlashControl(
+        CameraModule& cameraModule,
+        const camera_module_callbacks_t& callbacks) :
+        mCameraModule(&cameraModule),
+        mCallbacks(&callbacks),
+        mTorchEnabled(false),
+        mMetadata(NULL),
+        mStreaming(false) {
+}
+
+CameraDeviceClientFlashControl::~CameraDeviceClientFlashControl() {
+    disconnectCameraDevice();
+    if (mMetadata) {
+        delete mMetadata;
+    }
+
+    mSurface.clear();
+    mSurfaceTexture.clear();
+    mProducer.clear();
+    mConsumer.clear();
+
+    if (mTorchEnabled) {
+        if (mCallbacks) {
+            ALOGV("%s: notify the framework that torch was turned off",
+                    __FUNCTION__);
+            mCallbacks->torch_mode_status_change(mCallbacks,
+                    mCameraId.string(), TORCH_MODE_STATUS_AVAILABLE_OFF);
+        }
+    }
+}
+
+status_t CameraDeviceClientFlashControl::initializeSurface(
+        sp<CameraDeviceBase> &device, int32_t width, int32_t height) {
+    status_t res;
+    BufferQueue::createBufferQueue(&mProducer, &mConsumer);
+
+    mSurfaceTexture = new GLConsumer(mConsumer, 0, GLConsumer::TEXTURE_EXTERNAL,
+            true, true);
+    if (mSurfaceTexture == NULL) {
+        return NO_MEMORY;
+    }
+
+    int32_t format = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
+    res = mSurfaceTexture->setDefaultBufferSize(width, height);
+    if (res) {
+        return res;
+    }
+    res = mSurfaceTexture->setDefaultBufferFormat(format);
+    if (res) {
+        return res;
+    }
+
+    mSurface = new Surface(mProducer, /*useAsync*/ true);
+    if (mSurface == NULL) {
+        return NO_MEMORY;
+    }
+    res = device->createStream(mSurface, width, height, format,
+            HAL_DATASPACE_UNKNOWN, CAMERA3_STREAM_ROTATION_0, &mStreamId);
+    if (res) {
+        return res;
+    }
+
+    res = device->configureStreams();
+    if (res) {
+        return res;
+    }
+
+    return res;
+}
+
+status_t CameraDeviceClientFlashControl::getSmallestSurfaceSize(
+        const camera_info& info, int32_t *width, int32_t *height) {
+    if (!width || !height) {
+        return BAD_VALUE;
+    }
+
+    int32_t w = INT32_MAX;
+    int32_t h = 1;
+
+    CameraMetadata metadata;
+    metadata = info.static_camera_characteristics;
+    camera_metadata_entry streamConfigs =
+            metadata.find(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS);
+    for (size_t i = 0; i < streamConfigs.count; i += 4) {
+        int32_t fmt = streamConfigs.data.i32[i];
+        if (fmt == ANDROID_SCALER_AVAILABLE_FORMATS_IMPLEMENTATION_DEFINED) {
+            int32_t ww = streamConfigs.data.i32[i + 1];
+            int32_t hh = streamConfigs.data.i32[i + 2];
+
+            if (w * h > ww * hh) {
+                w = ww;
+                h = hh;
+            }
+        }
+    }
+
+    // if stream configuration is not found, try available processed sizes.
+    if (streamConfigs.count == 0) {
+        camera_metadata_entry availableProcessedSizes =
+            metadata.find(ANDROID_SCALER_AVAILABLE_PROCESSED_SIZES);
+        for (size_t i = 0; i < availableProcessedSizes.count; i += 2) {
+            int32_t ww = availableProcessedSizes.data.i32[i];
+            int32_t hh = availableProcessedSizes.data.i32[i + 1];
+            if (w * h > ww * hh) {
+                w = ww;
+                h = hh;
+            }
+        }
+    }
+
+    if (w == INT32_MAX) {
+        return NAME_NOT_FOUND;
+    }
+
+    *width = w;
+    *height = h;
+
+    return OK;
+}
+
+status_t CameraDeviceClientFlashControl::connectCameraDevice(
+        const String8& cameraId) {
+    camera_info info;
+    status_t res = mCameraModule->getCameraInfo(atoi(cameraId.string()), &info);
+    if (res != 0) {
+        ALOGE("%s: failed to get camera info for camera %s", __FUNCTION__,
+                cameraId.string());
+        return res;
+    }
+
+    sp<CameraDeviceBase> device =
+            new Camera3Device(cameraId);
+    if (device == NULL) {
+        return NO_MEMORY;
+    }
+
+    res = device->initialize(mCameraModule);
+    if (res) {
+        return res;
+    }
+
+    int32_t width, height;
+    res = getSmallestSurfaceSize(info, &width, &height);
+    if (res) {
+        return res;
+    }
+    res = initializeSurface(device, width, height);
+    if (res) {
+        return res;
+    }
+
+    mCameraId = cameraId;
+    mStreaming = (info.device_version <= CAMERA_DEVICE_API_VERSION_3_1);
+    mDevice = device;
+
+    return OK;
+}
+
+status_t CameraDeviceClientFlashControl::disconnectCameraDevice() {
+    if (mDevice != NULL) {
+        mDevice->disconnect();
+        mDevice.clear();
+    }
+
+    return OK;
+}
+
+
+
+status_t CameraDeviceClientFlashControl::hasFlashUnit(const String8& cameraId,
+        bool *hasFlash) {
+    ALOGV("%s: checking if camera %s has a flash unit", __FUNCTION__,
+            cameraId.string());
+
+    Mutex::Autolock l(mLock);
+    return hasFlashUnitLocked(cameraId, hasFlash);
+
+}
+
+status_t CameraDeviceClientFlashControl::hasFlashUnitLocked(
+        const String8& cameraId, bool *hasFlash) {
+    if (!hasFlash) {
+        return BAD_VALUE;
+    }
+
+    camera_info info;
+    status_t res = mCameraModule->getCameraInfo(
+            atoi(cameraId.string()), &info);
+    if (res != 0) {
+        ALOGE("%s: failed to get camera info for camera %s", __FUNCTION__,
+                cameraId.string());
+        return res;
+    }
+
+    CameraMetadata metadata;
+    metadata = info.static_camera_characteristics;
+    camera_metadata_entry flashAvailable =
+            metadata.find(ANDROID_FLASH_INFO_AVAILABLE);
+    if (flashAvailable.count == 1 && flashAvailable.data.u8[0] == 1) {
+        *hasFlash = true;
+    }
+
+    return OK;
+}
+
+status_t CameraDeviceClientFlashControl::submitTorchEnabledRequest() {
+    status_t res;
+
+    if (mMetadata == NULL) {
+        mMetadata = new CameraMetadata();
+        if (mMetadata == NULL) {
+            return NO_MEMORY;
+        }
+        res = mDevice->createDefaultRequest(
+                CAMERA3_TEMPLATE_PREVIEW, mMetadata);
+        if (res) {
+            return res;
+        }
+    }
+
+    uint8_t torchOn = ANDROID_FLASH_MODE_TORCH;
+    mMetadata->update(ANDROID_FLASH_MODE, &torchOn, 1);
+    mMetadata->update(ANDROID_REQUEST_OUTPUT_STREAMS, &mStreamId, 1);
+
+    uint8_t aeMode = ANDROID_CONTROL_AE_MODE_ON;
+    mMetadata->update(ANDROID_CONTROL_AE_MODE, &aeMode, 1);
+
+    int32_t requestId = 0;
+    mMetadata->update(ANDROID_REQUEST_ID, &requestId, 1);
+
+    if (mStreaming) {
+        res = mDevice->setStreamingRequest(*mMetadata);
+    } else {
+        res = mDevice->capture(*mMetadata);
+    }
+    return res;
+}
+
+
+
+
+status_t CameraDeviceClientFlashControl::setTorchMode(
+        const String8& cameraId, bool enabled) {
+    bool hasFlash = false;
+
+    Mutex::Autolock l(mLock);
+    status_t res = hasFlashUnitLocked(cameraId, &hasFlash);
+
+    // pre-check
+    if (enabled) {
+        // invalid camera?
+        if (res) {
+            return -EINVAL;
+        }
+        // no flash unit?
+        if (!hasFlash) {
+            return -ENOSYS;
+        }
+        // already opened for a different device?
+        if (mDevice != NULL && cameraId != mCameraId) {
+            return BAD_INDEX;
+        }
+    } else if (mDevice == NULL || cameraId != mCameraId) {
+        // disabling the torch mode of an un-opened or different device.
+        return OK;
+    } else {
+        // disabling the torch mode of currently opened device
+        disconnectCameraDevice();
+        mTorchEnabled = false;
+        mCallbacks->torch_mode_status_change(mCallbacks,
+            cameraId.string(), TORCH_MODE_STATUS_AVAILABLE_OFF);
+        return OK;
+    }
+
+    if (mDevice == NULL) {
+        res = connectCameraDevice(cameraId);
+        if (res) {
+            return res;
+        }
+    }
+
+    res = submitTorchEnabledRequest();
+    if (res) {
+        return res;
+    }
+
+    mTorchEnabled = true;
+    mCallbacks->torch_mode_status_change(mCallbacks,
+            cameraId.string(), TORCH_MODE_STATUS_AVAILABLE_ON);
+    return OK;
+}
+// CameraDeviceClientFlashControl implementation ends
+
+
+/////////////////////////////////////////////////////////////////////
 // CameraHardwareInterfaceFlashControl implementation begins
 // Flash control for camera module <= v2.3 and camera HAL v1
 /////////////////////////////////////////////////////////////////////
+CameraHardwareInterfaceFlashControl::CameraHardwareInterfaceFlashControl(
+        CameraModule* cameraModule,
+        const camera_module_callbacks_t& callbacks) :
+        mCameraModule(cameraModule),
+        mProviderManager(nullptr),
+        mCallbacks(&callbacks),
+        mTorchEnabled(false) {
+}
 
 CameraHardwareInterfaceFlashControl::CameraHardwareInterfaceFlashControl(
         sp<CameraProviderManager> manager,
         const camera_module_callbacks_t& callbacks) :
+        mCameraModule(nullptr),
         mProviderManager(manager),
         mCallbacks(&callbacks),
         mTorchEnabled(false) {
@@ -519,7 +931,12 @@ status_t CameraHardwareInterfaceFlashControl::connectCameraDevice(
     sp<CameraHardwareInterface> device =
             new CameraHardwareInterface(cameraId.string());
 
-    status_t res = device->initialize(mProviderManager);
+    status_t res;
+    if (mCameraModule != nullptr) {
+        res = device->initialize(mCameraModule);
+    } else {
+        res = device->initialize(mProviderManager);
+    }
     if (res) {
         ALOGE("%s: initializing camera %s failed", __FUNCTION__,
                 cameraId.string());

@@ -79,6 +79,11 @@ status_t Camera2ClientBase<TClientBase>::checkPid(const char* checkLocation)
 }
 
 template <typename TClientBase>
+status_t Camera2ClientBase<TClientBase>::initialize(CameraModule *module) {
+    return initializeImpl(module);
+}
+
+template <typename TClientBase>
 status_t Camera2ClientBase<TClientBase>::initialize(sp<CameraProviderManager> manager) {
     return initializeImpl(manager);
 }

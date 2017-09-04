@@ -68,6 +68,10 @@ Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
     mLegacyMode = legacyMode;
 }
 
+status_t Camera2Client::initialize(CameraModule *module) {
+    return initializeImpl(module);
+}
+
 status_t Camera2Client::initialize(sp<CameraProviderManager> manager) {
     return initializeImpl(manager);
 }

@@ -41,6 +41,37 @@ CameraHardwareInterface::~CameraHardwareInterface()
     }
 }
 
+status_t CameraHardwareInterface::initialize(CameraModule *module)
+{
+    if (mHidlDevice != nullptr) {
+        ALOGE("%s: camera hardware interface has been initialized to HIDL path!", __FUNCTION__);
+        return INVALID_OPERATION;
+    }
+    ALOGI("Opening camera %s", mName.string());
+    camera_info info;
+    status_t res = module->getCameraInfo(atoi(mName.string()), &info);
+    if (res != OK) {
+        return res;
+    }
+
+    int rc = OK;
+    if (module->getModuleApiVersion() >= CAMERA_MODULE_API_VERSION_2_3 &&
+        info.device_version > CAMERA_DEVICE_API_VERSION_1_0) {
+        // Open higher version camera device as HAL1.0 device.
+        rc = module->openLegacy(mName.string(),
+                                 CAMERA_DEVICE_API_VERSION_1_0,
+                                 (hw_device_t **)&mDevice);
+    } else {
+        rc = module->open(mName.string(), (hw_device_t **)&mDevice);
+    }
+    if (rc != OK) {
+        ALOGE("Could not open camera %s: %d", mName.string(), rc);
+        return rc;
+    }
+    initHalPreviewWindow();
+    return rc;
+}
+
 status_t CameraHardwareInterface::initialize(sp<CameraProviderManager> manager) {
     if (mDevice) {
         ALOGE("%s: camera hardware interface has been initialized to libhardware path!",

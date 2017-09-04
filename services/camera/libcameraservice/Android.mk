@@ -27,6 +27,7 @@ LOCAL_SRC_FILES :=  \
     CameraFlashlight.cpp \
     common/Camera2ClientBase.cpp \
     common/CameraDeviceBase.cpp \
+    common/CameraModule.cpp \
     common/CameraProviderManager.cpp \
     common/FrameProcessorBase.cpp \
     api1/CameraClient.cpp \

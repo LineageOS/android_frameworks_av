@@ -72,6 +72,7 @@ public:
             bool legacyMode = false);
     ~CameraClient();
 
+    virtual status_t initialize(CameraModule *module) override;
     virtual status_t initialize(sp<CameraProviderManager> manager) override;
 
     virtual status_t dump(int fd, const Vector<String16>& args);
@@ -79,6 +80,9 @@ public:
     virtual status_t dumpClient(int fd, const Vector<String16>& args);
 
 private:
+
+    template<typename TProviderPtr>
+    status_t initializeImpl(TProviderPtr providerPtr);
 
     // check whether the calling process matches mClientPid.
     status_t                checkPid() const;

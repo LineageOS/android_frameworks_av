@@ -28,6 +28,7 @@
 #include <system/window.h>
 #include <hardware/camera.h>
 
+#include <common/CameraModule.h>
 #include <common/CameraProviderManager.h>
 
 namespace android {
@@ -106,6 +107,7 @@ public:
 
     ~CameraHardwareInterface();
 
+    status_t initialize(CameraModule *module);
     status_t initialize(sp<CameraProviderManager> manager);
 
     /** Set the ANativeWindow to which preview frames are sent */

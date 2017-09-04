@@ -37,6 +37,7 @@
 
 #include "CameraFlashlight.h"
 
+#include "common/CameraModule.h"
 #include "common/CameraProviderManager.h"
 #include "media/RingBuffer.h"
 #include "utils/AutoConditionLock.h"
@@ -198,6 +199,7 @@ public:
 
     class BasicClient : public virtual RefBase {
     public:
+        virtual status_t       initialize(CameraModule *module) = 0;
         virtual status_t       initialize(sp<CameraProviderManager> manager) = 0;
         virtual binder::Status disconnect();
 
@@ -507,6 +509,9 @@ private:
     // Delay-load the Camera HAL module
     virtual void onFirstRef();
 
+    // Load the legacy HAL module
+    status_t loadLegacyHalModule();
+
     // Eumerate all camera providers in the system
     status_t enumerateProviders();
 
@@ -562,6 +567,11 @@ private:
 
     // Currently allowed user IDs
     std::set<userid_t> mAllowedUsers;
+
+    /**
+     * Check camera capabilities, such as support for basic color operation
+     */
+    int checkCameraCapabilities(int id, camera_info info, int *latestStrangeCameraId);
 
     /**
      * Get the camera state for a given camera id.
@@ -678,6 +688,7 @@ private:
     // Basic flag on whether the camera subsystem is in a usable state
     bool                mInitialized;
 
+    CameraModule*       mModule;
     sp<CameraProviderManager> mCameraProviderManager;
 
     // Guarded by mStatusListenerMutex
@@ -734,6 +745,10 @@ private:
 
     // IBinder::DeathRecipient implementation
     virtual void        binderDied(const wp<IBinder> &who);
+
+    // Helpers
+
+    bool                setUpVendorTags();
 
     /**
      * Initialize and cache the metadata used by the HAL1 shim for a given cameraId.
