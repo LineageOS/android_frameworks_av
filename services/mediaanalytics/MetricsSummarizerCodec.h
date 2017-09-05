@@ -38,6 +38,8 @@ class MetricsSummarizerCodec : public MetricsSummarizer
     MetricsSummarizerCodec(const char *key);
     virtual ~MetricsSummarizerCodec() {};
 
+    virtual void mergeRecord(MediaAnalyticsItem &have, MediaAnalyticsItem &incoming);
+
 };
 
 // ----------------------------------------------------------------------------
