@@ -92,7 +92,7 @@ aaudio_result_t AAudioServiceStreamMMAP::start() {
 
     aaudio_result_t result = AAudioServiceStreamBase::start();
     if (!mInService && result == AAUDIO_OK) {
-        startClient(mMmapClient, &mClientHandle);
+        result = startClient(mMmapClient, &mClientHandle);
     }
     return result;
 }
@@ -107,7 +107,7 @@ aaudio_result_t AAudioServiceStreamMMAP::pause() {
     aaudio_result_t result = AAudioServiceStreamBase::pause();
     // TODO put before base::pause()?
     if (!mInService) {
-        stopClient(mClientHandle);
+        (void) stopClient(mClientHandle);
     }
     return result;
 }
@@ -119,7 +119,7 @@ aaudio_result_t AAudioServiceStreamMMAP::stop() {
     aaudio_result_t result = AAudioServiceStreamBase::stop();
     // TODO put before base::stop()?
     if (!mInService) {
-        stopClient(mClientHandle);
+        (void) stopClient(mClientHandle);
     }
     return result;
 }
