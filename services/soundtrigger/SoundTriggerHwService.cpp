@@ -840,7 +840,7 @@ void SoundTriggerHwService::Module::setCaptureState_l(bool active)
         }
 
         const bool supports_stop_all =
-                (mHalInterface != 0) && (mHalInterface->stopAllRecognitions() == ENOSYS);
+                (mHalInterface != 0) && (mHalInterface->stopAllRecognitions() != -ENOSYS);
 
         for (size_t i = 0; i < mModels.size(); i++) {
             sp<Model> model = mModels.valueAt(i);
