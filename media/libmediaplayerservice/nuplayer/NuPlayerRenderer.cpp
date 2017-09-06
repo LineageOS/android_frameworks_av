@@ -1152,7 +1152,18 @@ int64_t NuPlayer::Renderer::getPendingAudioPlayoutDurationUs(int64_t nowUs) {
             return writtenAudioDurationUs - (mediaUs - mAudioFirstAnchorTimeMediaUs);
         }
     }
-    return writtenAudioDurationUs - mAudioSink->getPlayedOutDurationUs(nowUs);
+
+    const int64_t audioSinkPlayedUs = mAudioSink->getPlayedOutDurationUs(nowUs);
+    int64_t pendingUs = writtenAudioDurationUs - audioSinkPlayedUs;
+    if (pendingUs < 0) {
+        // This shouldn't happen unless the timestamp is stale.
+        ALOGW("%s: pendingUs %lld < 0, clamping to zero, potential resume after pause "
+                "writtenAudioDurationUs: %lld, audioSinkPlayedUs: %lld",
+                __func__, (long long)pendingUs,
+                (long long)writtenAudioDurationUs, (long long)audioSinkPlayedUs);
+        pendingUs = 0;
+    }
+    return pendingUs;
 }
 
 int64_t NuPlayer::Renderer::getRealTimeUs(int64_t mediaTimeUs, int64_t nowUs) {
