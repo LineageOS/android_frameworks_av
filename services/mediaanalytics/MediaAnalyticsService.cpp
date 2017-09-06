@@ -259,7 +259,7 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(MediaAnalyticsItem
 
     item->setPkgName(getPkgName(item->getUid(), true));
     item->setPkgVersionCode(0);
-    ALOGD("info is from uid %d pkg '%s', version %d", item->getUid(), item->getPkgName().c_str(), item->getPkgVersionCode());
+    ALOGV("info is from uid %d pkg '%s', version %d", item->getUid(), item->getPkgName().c_str(), item->getPkgVersionCode());
 
     mItemsSubmitted++;
 
@@ -622,9 +622,6 @@ void MediaAnalyticsService::saveItem(List<MediaAnalyticsItem *> *l, MediaAnalyti
         while (l->size() > 0) {
             MediaAnalyticsItem * oitem = *(l->begin());
             nsecs_t when = oitem->getTimestamp();
-// DEBUGGING -- remove this ALOGD() call
-            if(0) ALOGD("@ now=%10" PRId64 " record when=%10" PRId64 "",
-                  now, when);
             // careful about timejumps too
             if ((now > when) && (now-when) <= mMaxRecordAgeNs) {
                 // this (and the rest) are recent enough to keep
