@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "86c81cf9_d7ab8377",
+        "filename": "media/libstagefright/Android.mk",
+        "patchSetId": 3
+      },
+      "lineNbr": 129,
+      "author": {
+        "id": 444
+      },
+      "writtenOn": "2017-09-06T18:04:56Z",
+      "side": 1,
+      "message": "Missing a check for TARGET_USES_MEDIA_EXTENSIONS here.",
+      "revId": "dd3a2a78e25b33c202c43d6af5adc49560e17bf1",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
