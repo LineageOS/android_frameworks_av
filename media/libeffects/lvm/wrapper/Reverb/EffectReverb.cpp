@@ -429,9 +429,7 @@ static void FloatToInt16_SAT(const LVM_FLOAT *src, LVM_INT16 *dst, size_t n) {
     size_t ii;
     LVM_INT32 temp;
 
-    src += n-1;
-    dst += n-1;
-    for (ii = n; ii != 0; ii--) {
+    for (ii = 0; ii < n; ii++) {
         temp = (LVM_INT32)((*src) * 32768.0f);
         if (temp >= 32767) {
             *dst = 32767;
@@ -440,8 +438,8 @@ static void FloatToInt16_SAT(const LVM_FLOAT *src, LVM_INT16 *dst, size_t n) {
         } else {
             *dst = (LVM_INT16)temp;
         }
-        src--;
-        dst--;
+        src++;
+        dst++;
     }
     return;
 }
