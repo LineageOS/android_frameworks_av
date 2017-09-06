@@ -42,7 +42,9 @@ interface ICameraDeviceCallbacks
      * Repeating request encountered an error and was stopped.
      *
      * @param lastFrameNumber Frame number of the last frame of the streaming request.
+     * @param repeatingRequestId the ID of the repeating request being stopped
      */
-    oneway void onRepeatingRequestError(in long lastFrameNumber);
+    oneway void onRepeatingRequestError(in long lastFrameNumber,
+                                        in int repeatingRequestId);
     oneway void onRequestQueueEmpty();
 }
