@@ -31,20 +31,20 @@ public:
     }
 
     void setSweep(double frequencyLow, double frequencyHigh, double seconds) {
-        mPhaseIncrementLow = frequencyLow * M_PI * 2 / mFrameRate;
-        mPhaseIncrementHigh = frequencyHigh * M_PI * 2 / mFrameRate;
-
-        double numFrames = seconds * mFrameRate;
-        mUpScaler = pow((frequencyHigh / frequencyLow), (1.0 / numFrames));
-        mDownScaler = 1.0 / mUpScaler;
-        mGoingUp = true;
-        mSweeping = true;
+        mSweeping = seconds > 0.0;
+        if (mSweeping) {
+            mPhaseIncrementLow = frequencyLow * M_PI * 2 / mFrameRate;
+            mPhaseIncrementHigh = frequencyHigh * M_PI * 2 / mFrameRate;
+            double numFrames = seconds * mFrameRate;
+            mUpScaler = pow((frequencyHigh / frequencyLow), (1.0 / numFrames));
+            mDownScaler = 1.0 / mUpScaler;
+        }
     }
 
     void render(int16_t *buffer, int32_t channelStride, int32_t numFrames) {
         int sampleIndex = 0;
         for (int i = 0; i < numFrames; i++) {
-            buffer[sampleIndex] = (int16_t) (32767 * sin(mPhase) * mAmplitude);
+            buffer[sampleIndex] = (int16_t) (INT16_MAX * sin(mPhase) * mAmplitude);
             sampleIndex += channelStride;
             advancePhase();
         }
@@ -61,6 +61,7 @@ public:
     void setAmplitude(double amplitude) {
         mAmplitude = amplitude;
     }
+
     double getAmplitude() const {
         return mAmplitude;
     }
