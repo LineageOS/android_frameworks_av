@@ -41,7 +41,9 @@ Return<void> TWGraphicBufferProducer::requestBuffer(
     sp<GraphicBuffer> buf;
     status_t status = mBase->requestBuffer(slot, &buf);
     AnwBuffer anwBuffer;
-    wrapAs(&anwBuffer, *buf);
+    if (buf != nullptr) {
+        wrapAs(&anwBuffer, *buf);
+    }
     _hidl_cb(static_cast<int32_t>(status), anwBuffer);
     return Void();
 }
