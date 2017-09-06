@@ -1339,7 +1339,7 @@ status_t HidlVendorTagDescriptor::createDescriptorFromHidl(
         desc->mReverseMapping[reverseIndex]->add(desc->mTagToNameMap.valueFor(tag), tag);
     }
 
-    descriptor = desc;
+    descriptor = std::move(desc);
     return OK;
 }
 
