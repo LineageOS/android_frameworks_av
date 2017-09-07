@@ -146,6 +146,10 @@ class Camera3Stream :
     android_dataspace getDataSpace() const;
     uint64_t          getUsage() const;
     void              setUsage(uint64_t usage);
+    void              setFormatOverride(bool formatOverriden);
+    bool              isFormatOverridden();
+    void              setOriginalFormat(int originalFormat);
+    int               getOriginalFormat();
 
     camera3_stream*   asHalStream() override {
         return this;
@@ -514,6 +518,10 @@ class Camera3Stream :
     // max_buffers.
     static const int32_t kBufferLimitLatencyBinSize = 33; //in ms
     CameraLatencyHistogram mBufferLimitLatency;
+
+    //Keep track of original format in case it gets overridden
+    bool mFormatOverridden;
+    int mOriginalFormat;
 }; // class Camera3Stream
 
 }; // namespace camera3

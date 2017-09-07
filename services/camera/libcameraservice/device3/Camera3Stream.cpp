@@ -62,7 +62,9 @@ Camera3Stream::Camera3Stream(int id,
     mPrepared(false),
     mPreparedBufferIdx(0),
     mLastMaxCount(Camera3StreamInterface::ALLOCATE_PIPELINE_MAX),
-    mBufferLimitLatency(kBufferLimitLatencyBinSize) {
+    mBufferLimitLatency(kBufferLimitLatencyBinSize),
+    mFormatOverridden(false),
+    mOriginalFormat(-1) {
 
     camera3_stream::stream_type = type;
     camera3_stream::width = width;
@@ -110,6 +112,22 @@ uint64_t Camera3Stream::getUsage() const {
 
 void Camera3Stream::setUsage(uint64_t usage) {
     mUsage = usage;
+}
+
+void Camera3Stream::setFormatOverride(bool formatOverridden) {
+    mFormatOverridden = formatOverridden;
+}
+
+bool Camera3Stream::isFormatOverridden() {
+    return mFormatOverridden;
+}
+
+void Camera3Stream::setOriginalFormat(int originalFormat) {
+    mOriginalFormat = originalFormat;
+}
+
+int Camera3Stream::getOriginalFormat() {
+    return mOriginalFormat;
 }
 
 camera3_stream* Camera3Stream::startConfiguration() {
