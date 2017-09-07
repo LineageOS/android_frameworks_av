@@ -617,7 +617,8 @@ status_t AudioTrack::start()
                             + mStartEts.mPosition[ExtendedTimestamp::LOCATION_SERVER]),
                     (long long)mStartEts.mFlushed,
                     (long long)mFramesWritten);
-            mFramesWrittenServerOffset = -mStartEts.mPosition[ExtendedTimestamp::LOCATION_SERVER];
+            // mStartEts is already adjusted by mFramesWrittenServerOffset, so we delta adjust.
+            mFramesWrittenServerOffset -= mStartEts.mPosition[ExtendedTimestamp::LOCATION_SERVER];
         }
         mFramesWritten = 0;
         mProxy->clearTimestamp(); // need new server push for valid timestamp
