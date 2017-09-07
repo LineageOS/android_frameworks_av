@@ -87,11 +87,6 @@ struct MediaCodec : public AHandler {
 
     static sp<PersistentSurface> CreatePersistentInputSurface();
 
-    // utility method to query capabilities
-    static status_t QueryCapabilities(
-            const AString &name, const AString &mime, bool isEncoder,
-            sp<MediaCodecInfo::Capabilities> *caps /* nonnull */);
-
     status_t configure(
             const sp<AMessage> &format,
             const sp<Surface> &nativeWindow,

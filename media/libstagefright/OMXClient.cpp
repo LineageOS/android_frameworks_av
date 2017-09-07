@@ -38,7 +38,7 @@ OMXClient::OMXClient() {
 }
 
 status_t OMXClient::connect() {
-    return connect(nullptr);
+    return connect("default", nullptr);
 }
 
 status_t OMXClient::connect(bool* trebleFlag) {
@@ -47,6 +47,19 @@ status_t OMXClient::connect(bool* trebleFlag) {
             *trebleFlag = true;
         }
         return connectTreble();
+    }
+    if (trebleFlag != nullptr) {
+        *trebleFlag = false;
+    }
+    return connectLegacy();
+}
+
+status_t OMXClient::connect(const char* name, bool* trebleFlag) {
+    if (property_get_bool("persist.media.treble_omx", true)) {
+        if (trebleFlag != nullptr) {
+            *trebleFlag = true;
+        }
+        return connectTreble(name);
     }
     if (trebleFlag != nullptr) {
         *trebleFlag = false;
@@ -73,9 +86,12 @@ status_t OMXClient::connectLegacy() {
     return OK;
 }
 
-status_t OMXClient::connectTreble() {
+status_t OMXClient::connectTreble(const char* name) {
     using namespace ::android::hardware::media::omx::V1_0;
-    sp<IOmx> tOmx = IOmx::getService("default");
+    if (name == nullptr) {
+        name = "default";
+    }
+    sp<IOmx> tOmx = IOmx::getService(name);
     if (tOmx.get() == nullptr) {
         ALOGE("Cannot obtain Treble IOmx.");
         return NO_INIT;

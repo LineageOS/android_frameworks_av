@@ -1,5 +1,5 @@
 /*
- * Copyright 2017, The Android Open Source Project
+ * Copyright (C) 2009 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,48 +14,53 @@
  * limitations under the License.
  */
 
-#include <ios>
-#include <list>
+//#define LOG_NDEBUG 0
+#define LOG_TAG "OMXStore"
+#include <utils/Log.h>
 
-#include <android-base/logging.h>
-
-#include <media/stagefright/omx/1.0/Conversion.h>
-#include <media/stagefright/omx/1.0/OmxStore.h>
+#include <media/stagefright/omx/OMXUtils.h>
+#include <media/stagefright/omx/OMX.h>
+#include <media/stagefright/omx/OMXStore.h>
 #include <media/stagefright/xmlparser/MediaCodecsXmlParser.h>
 
-namespace android {
-namespace hardware {
-namespace media {
-namespace omx {
-namespace V1_0 {
-namespace implementation {
+#include <map>
+#include <string>
 
-OmxStore::OmxStore(
+namespace android {
+
+namespace {
+    struct RoleProperties {
+        std::string type;
+        bool isEncoder;
+        bool preferPlatformNodes;
+        std::multimap<size_t, IOMXStore::NodeInfo> nodeList;
+    };
+}  // Unnamed namespace
+
+OMXStore::OMXStore(
         const char* owner,
         const char* const* searchDirs,
         const char* mainXmlName,
         const char* performanceXmlName,
         const char* profilingResultsXmlPath) {
-    MediaCodecsXmlParser parser(searchDirs,
+    MediaCodecsXmlParser parser(
+            searchDirs,
             mainXmlName,
             performanceXmlName,
             profilingResultsXmlPath);
-    mParsingStatus = toStatus(parser.getParsingStatus());
+    mParsingStatus = parser.getParsingStatus();
 
     const auto& serviceAttributeMap = parser.getServiceAttributeMap();
-    mServiceAttributeList.resize(serviceAttributeMap.size());
-    size_t i = 0;
+    mServiceAttributeList.reserve(serviceAttributeMap.size());
     for (const auto& attributePair : serviceAttributeMap) {
-        ServiceAttribute attribute;
+        Attribute attribute;
         attribute.key = attributePair.first;
         attribute.value = attributePair.second;
-        mServiceAttributeList[i] = std::move(attribute);
-        ++i;
+        mServiceAttributeList.push_back(std::move(attribute));
     }
 
     const auto& roleMap = parser.getRoleMap();
-    mRoleList.resize(roleMap.size());
-    i = 0;
+    mRoleList.reserve(roleMap.size());
     for (const auto& rolePair : roleMap) {
         RoleInfo role;
         role.role = rolePair.first;
@@ -65,62 +70,50 @@ OmxStore::OmxStore(
         // the xml file. Once we have a way to provide this information, it
         // should be parsed properly.
         role.preferPlatformNodes = rolePair.first.compare(0, 5, "audio") == 0;
-        hidl_vec<NodeInfo>& nodeList = role.nodes;
-        nodeList.resize(rolePair.second.nodeList.size());
-        size_t j = 0;
+        std::vector<NodeInfo>& nodeList = role.nodes;
+        nodeList.reserve(rolePair.second.nodeList.size());
         for (const auto& nodePair : rolePair.second.nodeList) {
             NodeInfo node;
             node.name = nodePair.second.name;
             node.owner = owner;
-            hidl_vec<NodeAttribute>& attributeList = node.attributes;
-            attributeList.resize(nodePair.second.attributeList.size());
-            size_t k = 0;
+            std::vector<Attribute>& attributeList = node.attributes;
+            attributeList.reserve(nodePair.second.attributeList.size());
             for (const auto& attributePair : nodePair.second.attributeList) {
-                NodeAttribute attribute;
+                Attribute attribute;
                 attribute.key = attributePair.first;
                 attribute.value = attributePair.second;
-                attributeList[k] = std::move(attribute);
-                ++k;
+                attributeList.push_back(std::move(attribute));
             }
-            nodeList[j] = std::move(node);
-            ++j;
+            nodeList.push_back(std::move(node));
         }
-        mRoleList[i] = std::move(role);
-        ++i;
+        mRoleList.push_back(std::move(role));
     }
 
     mPrefix = parser.getCommonPrefix();
 }
 
-OmxStore::~OmxStore() {
+status_t OMXStore::listServiceAttributes(std::vector<Attribute>* attributes) {
+    *attributes = mServiceAttributeList;
+    return mParsingStatus;
 }
 
-Return<void> OmxStore::listServiceAttributes(listServiceAttributes_cb _hidl_cb) {
-    if (mParsingStatus == Status::NO_ERROR) {
-        _hidl_cb(Status::NO_ERROR, mServiceAttributeList);
-    } else {
-        _hidl_cb(mParsingStatus, hidl_vec<ServiceAttribute>());
-    }
-    return Void();
+status_t OMXStore::getNodePrefix(std::string* prefix) {
+    *prefix = mPrefix;
+    return mParsingStatus;
 }
 
-Return<void> OmxStore::getNodePrefix(getNodePrefix_cb _hidl_cb) {
-    _hidl_cb(mPrefix);
-    return Void();
+status_t OMXStore::listRoles(std::vector<RoleInfo>* roleList) {
+    *roleList = mRoleList;
+    return mParsingStatus;
 }
 
-Return<void> OmxStore::listRoles(listRoles_cb _hidl_cb) {
-    _hidl_cb(mRoleList);
-    return Void();
+status_t OMXStore::getOmx(const std::string& name, sp<IOMX>* omx) {
+    *omx = new OMX();
+    return NO_ERROR;
 }
 
-Return<sp<IOmx>> OmxStore::getOmx(hidl_string const& omxName) {
-    return IOmx::tryGetService(omxName);
+OMXStore::~OMXStore() {
 }
 
-}  // namespace implementation
-}  // namespace V1_0
-}  // namespace omx
-}  // namespace media
-}  // namespace hardware
 }  // namespace android
+

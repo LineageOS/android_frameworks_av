@@ -62,9 +62,6 @@
 #include "include/SharedMemoryBuffer.h"
 #include <media/stagefright/omx/OMXUtils.h>
 
-#include <android/hidl/allocator/1.0/IAllocator.h>
-#include <android/hidl/memory/1.0/IMemory.h>
-
 namespace android {
 
 using binder::Status;
@@ -6344,19 +6341,10 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
 
     CHECK(mCodec->mOMXNode == NULL);
 
-    OMXClient client;
-    bool trebleFlag;
-    if (client.connect(&trebleFlag) != OK) {
-        mCodec->signalError(OMX_ErrorUndefined, NO_INIT);
-        return false;
-    }
-    mCodec->setTrebleFlag(trebleFlag);
-
-    sp<IOMX> omx = client.interface();
-
     sp<AMessage> notify = new AMessage(kWhatOMXDied, mCodec);
 
     Vector<AString> matchingCodecs;
+    Vector<AString> owners;
 
     AString mime;
 
@@ -6364,9 +6352,28 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
     int32_t encoder = false;
     if (msg->findString("componentName", &componentName)) {
         sp<IMediaCodecList> list = MediaCodecList::getInstance();
-        if (list != NULL && list->findCodecByName(componentName.c_str()) >= 0) {
-            matchingCodecs.add(componentName);
+        if (list == nullptr) {
+            ALOGE("Unable to obtain MediaCodecList while "
+                    "attempting to create codec \"%s\"",
+                    componentName.c_str());
+            return false;
         }
+        ssize_t index = list->findCodecByName(componentName.c_str());
+        if (index < 0) {
+            ALOGE("Unable to find codec \"%s\"",
+                    componentName.c_str());
+            return false;
+        }
+        sp<MediaCodecInfo> info = list->getCodecInfo(index);
+        if (info == nullptr) {
+            ALOGE("Unexpected error (index out-of-bound) while "
+                    "retrieving information for codec \"%s\"",
+                    componentName.c_str());
+            return false;
+        }
+        matchingCodecs.add(info->getCodecName());
+        owners.add(info->getOwnerName() == nullptr ?
+                "default" : info->getOwnerName());
     } else {
         CHECK(msg->findString("mime", &mime));
 
@@ -6378,16 +6385,26 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
                 mime.c_str(),
                 encoder, // createEncoder
                 0,       // flags
-                &matchingCodecs);
+                &matchingCodecs,
+                &owners);
     }
 
     sp<CodecObserver> observer = new CodecObserver;
+    sp<IOMX> omx;
     sp<IOMXNode> omxNode;
 
     status_t err = NAME_NOT_FOUND;
     for (size_t matchIndex = 0; matchIndex < matchingCodecs.size();
             ++matchIndex) {
         componentName = matchingCodecs[matchIndex];
+
+        OMXClient client;
+        bool trebleFlag;
+        if (client.connect(owners[matchIndex].c_str(), &trebleFlag) != OK) {
+            mCodec->signalError(OMX_ErrorUndefined, NO_INIT);
+            return false;
+        }
+        omx = client.interface();
 
         pid_t tid = gettid();
         int prevPriority = androidGetThreadPriority(tid);
@@ -6396,6 +6413,7 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
         androidSetThreadPriority(tid, prevPriority);
 
         if (err == OK) {
+            mCodec->setTrebleFlag(trebleFlag);
             break;
         } else {
             ALOGW("Allocating component '%s' failed, try next one.", componentName.c_str());
@@ -8219,16 +8237,15 @@ void ACodec::FlushingState::changeStateIfWeOwnAllBuffers() {
 }
 
 status_t ACodec::queryCapabilities(
-        const AString &name, const AString &mime, bool isEncoder,
-        sp<MediaCodecInfo::Capabilities> *caps) {
-    (*caps).clear();
-    const char *role = GetComponentRole(isEncoder, mime.c_str());
+        const char* owner, const char* name, const char* mime, bool isEncoder,
+        MediaCodecInfo::CapabilitiesWriter* caps) {
+    const char *role = GetComponentRole(isEncoder, mime);
     if (role == NULL) {
         return BAD_VALUE;
     }
 
     OMXClient client;
-    status_t err = client.connect();
+    status_t err = client.connect(owner);
     if (err != OK) {
         return err;
     }
@@ -8237,7 +8254,7 @@ status_t ACodec::queryCapabilities(
     sp<CodecObserver> observer = new CodecObserver;
     sp<IOMXNode> omxNode;
 
-    err = omx->allocateNode(name.c_str(), observer, &omxNode);
+    err = omx->allocateNode(name, observer, &omxNode);
     if (err != OK) {
         client.disconnect();
         return err;
@@ -8250,8 +8267,7 @@ status_t ACodec::queryCapabilities(
         return err;
     }
 
-    sp<MediaCodecInfo::CapabilitiesBuilder> builder = new MediaCodecInfo::CapabilitiesBuilder();
-    bool isVideo = mime.startsWithIgnoreCase("video/");
+    bool isVideo = strncasecmp(mime, "video/", 6) == 0;
 
     if (isVideo) {
         OMX_VIDEO_PARAM_PROFILELEVELTYPE param;
@@ -8266,22 +8282,22 @@ status_t ACodec::queryCapabilities(
             if (err != OK) {
                 break;
             }
-            builder->addProfileLevel(param.eProfile, param.eLevel);
+            caps->addProfileLevel(param.eProfile, param.eLevel);
 
             // AVC components may not list the constrained profiles explicitly, but
             // decoders that support a profile also support its constrained version.
             // Encoders must explicitly support constrained profiles.
-            if (!isEncoder && mime.equalsIgnoreCase(MEDIA_MIMETYPE_VIDEO_AVC)) {
+            if (!isEncoder && strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC) == 0) {
                 if (param.eProfile == OMX_VIDEO_AVCProfileHigh) {
-                    builder->addProfileLevel(OMX_VIDEO_AVCProfileConstrainedHigh, param.eLevel);
+                    caps->addProfileLevel(OMX_VIDEO_AVCProfileConstrainedHigh, param.eLevel);
                 } else if (param.eProfile == OMX_VIDEO_AVCProfileBaseline) {
-                    builder->addProfileLevel(OMX_VIDEO_AVCProfileConstrainedBaseline, param.eLevel);
+                    caps->addProfileLevel(OMX_VIDEO_AVCProfileConstrainedBaseline, param.eLevel);
                 }
             }
 
             if (index == kMaxIndicesToCheck) {
                 ALOGW("[%s] stopping checking profiles after %u: %x/%x",
-                        name.c_str(), index,
+                        name, index,
                         param.eProfile, param.eLevel);
             }
         }
@@ -8305,17 +8321,17 @@ status_t ACodec::queryCapabilities(
             if (IsFlexibleColorFormat(
                     omxNode, portFormat.eColorFormat, false /* usingNativeWindow */,
                     &flexibleEquivalent)) {
-                builder->addColorFormat(flexibleEquivalent);
+                caps->addColorFormat(flexibleEquivalent);
             }
-            builder->addColorFormat(portFormat.eColorFormat);
+            caps->addColorFormat(portFormat.eColorFormat);
 
             if (index == kMaxIndicesToCheck) {
                 ALOGW("[%s] stopping checking formats after %u: %s(%x)",
-                        name.c_str(), index,
+                        name, index,
                         asString(portFormat.eColorFormat), portFormat.eColorFormat);
             }
         }
-    } else if (mime.equalsIgnoreCase(MEDIA_MIMETYPE_AUDIO_AAC)) {
+    } else if (strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC) == 0) {
         // More audio codecs if they have profiles.
         OMX_AUDIO_PARAM_ANDROID_PROFILETYPE param;
         InitOMXParams(&param);
@@ -8329,11 +8345,11 @@ status_t ACodec::queryCapabilities(
                 break;
             }
             // For audio, level is ignored.
-            builder->addProfileLevel(param.eProfile, 0 /* level */);
+            caps->addProfileLevel(param.eProfile, 0 /* level */);
 
             if (index == kMaxIndicesToCheck) {
                 ALOGW("[%s] stopping checking profiles after %u: %x",
-                        name.c_str(), index,
+                        name, index,
                         param.eProfile);
             }
         }
@@ -8341,7 +8357,7 @@ status_t ACodec::queryCapabilities(
         // NOTE: Without Android extensions, OMX does not provide a way to query
         // AAC profile support
         if (param.nProfileIndex == 0) {
-            ALOGW("component %s doesn't support profile query.", name.c_str());
+            ALOGW("component %s doesn't support profile query.", name);
         }
     }
 
@@ -8350,14 +8366,14 @@ status_t ACodec::queryCapabilities(
         if (omxNode->configureVideoTunnelMode(
                 kPortIndexOutput, OMX_TRUE, 0, &sidebandHandle) == OK) {
             // tunneled playback includes adaptive playback
-            builder->addFlags(MediaCodecInfo::Capabilities::kFlagSupportsAdaptivePlayback
+            caps->addFlags(MediaCodecInfo::Capabilities::kFlagSupportsAdaptivePlayback
                     | MediaCodecInfo::Capabilities::kFlagSupportsTunneledPlayback);
         } else if (omxNode->setPortMode(
                 kPortIndexOutput, IOMX::kPortModeDynamicANWBuffer) == OK ||
                 omxNode->prepareForAdaptivePlayback(
                 kPortIndexOutput, OMX_TRUE,
                 1280 /* width */, 720 /* height */) == OK) {
-            builder->addFlags(MediaCodecInfo::Capabilities::kFlagSupportsAdaptivePlayback);
+            caps->addFlags(MediaCodecInfo::Capabilities::kFlagSupportsAdaptivePlayback);
         }
     }
 
@@ -8369,11 +8385,10 @@ status_t ACodec::queryCapabilities(
         if (omxNode->getConfig(
                 (OMX_INDEXTYPE)OMX_IndexConfigAndroidIntraRefresh,
                 &params, sizeof(params)) == OK) {
-            builder->addFlags(MediaCodecInfo::Capabilities::kFlagSupportsIntraRefresh);
+            caps->addFlags(MediaCodecInfo::Capabilities::kFlagSupportsIntraRefresh);
         }
     }
 
-    *caps = builder;
     omxNode->freeNode();
     client.disconnect();
     return OK;

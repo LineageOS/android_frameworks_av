@@ -27,11 +27,6 @@
 #include <vector>
 #include <string>
 
-/*
-#include <OMX_Core.h>
-#include <OMX_Video.h>
-*/
-
 namespace android {
 
 using hardware::media::omx::V1_0::IOmxStore;
