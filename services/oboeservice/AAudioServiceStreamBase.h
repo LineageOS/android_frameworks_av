@@ -191,6 +191,12 @@ protected:
         mState = state;
     }
 
+    /**
+     * Device specific startup.
+     * @return AAUDIO_OK or negative error.
+     */
+    virtual aaudio_result_t startDevice();
+
     aaudio_result_t writeUpMessageQueue(AAudioServiceMessage *command);
 
     aaudio_result_t sendCurrentTimestamp();
@@ -213,7 +219,7 @@ protected:
     SharedRingBuffer*       mUpMessageQueue;
     std::mutex              mUpMessageQueueLock;
 
-    AAudioThread            mAAudioThread;
+    AAudioThread            mTimestampThread;
     // This is used by one thread to tell another thread to exit. So it must be atomic.
     std::atomic<bool>       mThreadEnabled{false};
 

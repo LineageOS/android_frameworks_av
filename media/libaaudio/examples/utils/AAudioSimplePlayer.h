@@ -36,6 +36,13 @@
 // How long to sleep in a callback to cause an intentional glitch. For testing.
 #define FORCED_UNDERRUN_SLEEP_MICROS     (10 * 1000)
 
+#define MAX_TIMESTAMPS   16
+
+typedef struct Timestamp {
+    int64_t position;
+    int64_t nanoseconds;
+} Timestamp;
+
 /**
  * Simple wrapper for AAudio that opens an output stream either in callback or blocking write mode.
  */
@@ -227,10 +234,12 @@ typedef struct SineThreadedData_s {
 
     SineGenerator  sineOsc1;
     SineGenerator  sineOsc2;
+    Timestamp      timestamps[MAX_TIMESTAMPS];
     int64_t        framesTotal = 0;
     int64_t        nextFrameToGlitch = FORCED_UNDERRUN_PERIOD_FRAMES;
     int32_t        minNumFrames = INT32_MAX;
     int32_t        maxNumFrames = 0;
+    int32_t        timestampCount = 0; // in timestamps
 
     int            scheduler = 0;
     bool           schedulerChecked = false;
@@ -271,6 +280,17 @@ aaudio_data_callback_result_t SimplePlayerDataCallbackProc(
     if (!sineData->schedulerChecked) {
         sineData->scheduler = sched_getscheduler(gettid());
         sineData->schedulerChecked = true;
+    }
+
+    if (sineData->timestampCount < MAX_TIMESTAMPS) {
+        Timestamp *timestamp = &sineData->timestamps[sineData->timestampCount];
+        aaudio_result_t result = AAudioStream_getTimestamp(stream,
+            CLOCK_MONOTONIC, &timestamp->position, &timestamp->nanoseconds);
+        if (result == AAUDIO_OK && // valid?
+                (sineData->timestampCount == 0 || // first one?
+                (timestamp->position != (timestamp - 1)->position))) { // advanced position?
+            sineData->timestampCount++; // keep this one
+        }
     }
 
     if (numFrames > sineData->maxNumFrames) {
