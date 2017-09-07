@@ -70,6 +70,30 @@
       "revId": "407cea0e824d4a30c61aeac6d56142ff11058054",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "867b20cc_63e4a946",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 4
+      },
+      "lineNbr": 151,
+      "author": {
+        "id": 17941
+      },
+      "writtenOn": "2017-09-07T19:42:20Z",
+      "side": 1,
+      "message": "Hmm.. Maybe just remove changes from Android.mk and add \n#define USE_SAMSUNG_CAMERAFORMAT_NV21\nto devicetree/include/camera/CameraParameters.h\n\nAlso removing L149 and L154 should break nothing (but really bad idea).",
+      "parentUuid": "2664dd46_a869e932",
+      "range": {
+        "startLine": 151,
+        "startChar": 25,
+        "endLine": 151,
+        "endChar": 55
+      },
+      "revId": "407cea0e824d4a30c61aeac6d56142ff11058054",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
