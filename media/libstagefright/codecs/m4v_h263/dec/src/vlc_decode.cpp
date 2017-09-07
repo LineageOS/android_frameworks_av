@@ -560,7 +560,7 @@ int PV_VlcDecMCBPC_com_inter_H263(BitstreamDecVideo *stream)
 
     BitstreamShow13Bits(stream, &code);
 
-    if (code == 0)
+    if (code < 8)
     {
         return VLC_CODE_ERROR;
     }
