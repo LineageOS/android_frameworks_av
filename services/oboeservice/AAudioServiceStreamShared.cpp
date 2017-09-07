@@ -237,9 +237,15 @@ aaudio_result_t AAudioServiceStreamShared::getFreeRunningPosition(int64_t *posit
 aaudio_result_t AAudioServiceStreamShared::getHardwareTimestamp(int64_t *positionFrames,
                                                                 int64_t *timeNanos) {
 
-    aaudio_result_t result = mServiceEndpoint->getTimestamp(positionFrames, timeNanos);
+    int64_t position = 0;
+    aaudio_result_t result = mServiceEndpoint->getTimestamp(&position, timeNanos);
     if (result == AAUDIO_OK) {
-        *positionFrames -= mTimestampPositionOffset.load(); // Offset from shared MMAP stream
+        int64_t offset = mTimestampPositionOffset.load();
+        // TODO, do not go below starting value
+        position -= offset; // Offset from shared MMAP stream
+        ALOGV("getHardwareTimestamp() %8lld = %8lld - %8lld",
+              (long long) position, (long long) (position + offset), (long long) offset);
     }
+    *positionFrames = position;
     return result;
 }

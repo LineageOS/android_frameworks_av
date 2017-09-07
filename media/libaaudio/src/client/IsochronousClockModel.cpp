@@ -48,19 +48,26 @@ void IsochronousClockModel::setPositionAndTime(int64_t framePosition, int64_t na
 }
 
 void IsochronousClockModel::start(int64_t nanoTime) {
-    ALOGD("IsochronousClockModel::start(nanos = %lld)\n", (long long) nanoTime);
+    ALOGV("IsochronousClockModel::start(nanos = %lld)\n", (long long) nanoTime);
     mMarkerNanoTime = nanoTime;
     mState = STATE_STARTING;
 }
 
 void IsochronousClockModel::stop(int64_t nanoTime) {
-    ALOGD("IsochronousClockModel::stop(nanos = %lld)\n", (long long) nanoTime);
+    ALOGV("IsochronousClockModel::stop(nanos = %lld)\n", (long long) nanoTime);
     setPositionAndTime(convertTimeToPosition(nanoTime), nanoTime);
     // TODO should we set position?
     mState = STATE_STOPPED;
 }
 
+bool IsochronousClockModel::isStarting() {
+    return mState == STATE_STARTING;
+}
+
 void IsochronousClockModel::processTimestamp(int64_t framePosition, int64_t nanoTime) {
+//    ALOGD("processTimestamp() - framePosition = %lld at nanoTime %llu",
+//         (long long)framePosition,
+//         (long long)nanoTime);
     int64_t framesDelta = framePosition - mMarkerFramePosition;
     int64_t nanosDelta = nanoTime - mMarkerNanoTime;
     if (nanosDelta < 1000) {
@@ -70,9 +77,6 @@ void IsochronousClockModel::processTimestamp(int64_t framePosition, int64_t nano
 //    ALOGD("processTimestamp() - mMarkerFramePosition = %lld at mMarkerNanoTime %llu",
 //         (long long)mMarkerFramePosition,
 //         (long long)mMarkerNanoTime);
-//    ALOGD("processTimestamp() - framePosition = %lld at nanoTime %llu",
-//         (long long)framePosition,
-//         (long long)nanoTime);
 
     int64_t expectedNanosDelta = convertDeltaPositionToTime(framesDelta);
 //    ALOGD("processTimestamp() - expectedNanosDelta = %lld, nanosDelta = %llu",
@@ -116,6 +120,8 @@ void IsochronousClockModel::processTimestamp(int64_t framePosition, int64_t nano
     default:
         break;
     }
+
+//    ALOGD("processTimestamp() - mState = %d", mState);
 }
 
 void IsochronousClockModel::setSampleRate(int32_t sampleRate) {
