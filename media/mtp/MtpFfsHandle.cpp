@@ -62,6 +62,8 @@ constexpr int MAX_FILE_CHUNK_SIZE = 3145728;
 constexpr int USB_FFS_MAX_WRITE = MTP_BUFFER_SIZE;
 constexpr int USB_FFS_MAX_READ = MTP_BUFFER_SIZE;
 
+constexpr unsigned FFS_NUM_EVENTS = 5;
+
 static_assert(USB_FFS_MAX_WRITE > 0, "Max r/w values must be > 0!");
 static_assert(USB_FFS_MAX_READ > 0, "Max r/w values must be > 0!");
 
@@ -315,6 +317,11 @@ struct usb_ext_compat_desc ptp_os_desc_compat = {
     .Reserved2 = {0},
 };
 
+struct mtp_device_status {
+    uint16_t  wLength;
+    uint16_t  wCode;
+};
+
 } // anonymous namespace
 
 namespace android {
@@ -390,6 +397,88 @@ err:
 
 void MtpFfsHandle::closeConfig() {
     mControl.reset();
+}
+
+void MtpFfsHandle::controlLoop() {
+    while (!handleEvent()) {}
+    LOG(DEBUG) << "Mtp server shutting down";
+}
+
+int MtpFfsHandle::handleEvent() {
+    std::vector<usb_functionfs_event> events(FFS_NUM_EVENTS);
+    usb_functionfs_event *event = events.data();
+    int nbytes = TEMP_FAILURE_RETRY(::read(mControl, event,
+                events.size() * sizeof(usb_functionfs_event)));
+    if (nbytes == -1) {
+        return -1;
+    }
+    int ret = 0;
+    for (size_t n = nbytes / sizeof *event; n; --n, ++event) {
+        switch (event->type) {
+        case FUNCTIONFS_BIND:
+        case FUNCTIONFS_ENABLE:
+        case FUNCTIONFS_RESUME:
+            ret = 0;
+            errno = 0;
+            break;
+        case FUNCTIONFS_SUSPEND:
+        case FUNCTIONFS_UNBIND:
+        case FUNCTIONFS_DISABLE:
+            errno = ESHUTDOWN;
+            ret = -1;
+            break;
+        case FUNCTIONFS_SETUP:
+            if (handleControlRequest(&event->u.setup) == -1)
+                ret = -1;
+            break;
+        default:
+            LOG(DEBUG) << "Mtp Event " << event->type << " (unknown)";
+        }
+    }
+    return ret;
+}
+
+int MtpFfsHandle::handleControlRequest(const struct usb_ctrlrequest *setup) {
+    uint8_t type = setup->bRequestType;
+    uint8_t code = setup->bRequest;
+    uint16_t length = setup->wLength;
+    uint16_t index = setup->wIndex;
+    uint16_t value = setup->wValue;
+    std::vector<char> buf;
+    buf.resize(length);
+
+    if (!(type & USB_DIR_IN)) {
+        if (::read(mControl, buf.data(), length) != length) {
+            PLOG(DEBUG) << "Mtp error ctrlreq read data";
+        }
+    }
+
+    if ((type & USB_TYPE_MASK) == USB_TYPE_CLASS && index == 0 && value == 0) {
+        switch(code) {
+        case MTP_REQ_GET_DEVICE_STATUS:
+        {
+            if (length < sizeof(struct mtp_device_status)) {
+                return -1;
+            }
+            struct mtp_device_status *st = reinterpret_cast<struct mtp_device_status*>(buf.data());
+            st->wLength = htole16(sizeof(st));
+            st->wCode = MTP_RESPONSE_OK;
+            length = st->wLength;
+            break;
+        }
+        default:
+            LOG(DEBUG) << "Unrecognized Mtp class request! " << code;
+        }
+    } else {
+        LOG(DEBUG) << "Unrecognized request type " << type;
+    }
+
+    if (type & USB_DIR_IN) {
+        if (::write(mControl, buf.data(), length) != length) {
+            PLOG(DEBUG) << "Mtp error ctrlreq write data";
+        }
+    }
+    return 0;
 }
 
 int MtpFfsHandle::writeHandle(int fd, const void* data, int len) {
@@ -490,6 +579,10 @@ int MtpFfsHandle::start() {
             POSIX_MADV_SEQUENTIAL | POSIX_MADV_WILLNEED);
     posix_madvise(mBuffer2.data(), MAX_FILE_CHUNK_SIZE,
             POSIX_MADV_SEQUENTIAL | POSIX_MADV_WILLNEED);
+
+    // Handle control requests.
+    std::thread t([this]() { this->controlLoop(); });
+    t.detach();
 
     // Get device specific r/w size
     mMaxWrite = android::base::GetIntProperty("sys.usb.ffs.max_write", USB_FFS_MAX_WRITE);
