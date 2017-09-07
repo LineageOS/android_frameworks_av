@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "e96b35c4_1a9ed80a",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 4
+      },
+      "lineNbr": 151,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2017-09-07T15:13:16Z",
+      "side": 1,
+      "message": "If you made this a #define that is defined by your camera parameter header, you could check for #ifdef OMX_SEC_COLOR_FormatNV21Linear for this block and avoid having to add any specific flag in the Android.mk.",
+      "range": {
+        "startLine": 151,
+        "startChar": 25,
+        "endLine": 151,
+        "endChar": 55
+      },
+      "revId": "407cea0e824d4a30c61aeac6d56142ff11058054",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
