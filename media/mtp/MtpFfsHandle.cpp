@@ -542,6 +542,7 @@ int MtpFfsHandle::receiveFile(mtp_file_range mfr, bool zero_packet) {
     size_t length;
     bool read = false;
     bool write = false;
+    bool short_packet = false;
 
     posix_fadvise(mfr.fd, 0, 0, POSIX_FADV_SEQUENTIAL | POSIX_FADV_NOREUSE);
 
@@ -586,6 +587,7 @@ int MtpFfsHandle::receiveFile(mtp_file_range mfr, bool zero_packet) {
                 // For larger files, receive until a short packet is received.
                 if (static_cast<size_t>(ret) < length) {
                     file_length = 0;
+                    short_packet = true;
                 }
             } else {
                 // Receive an empty packet if size is a multiple of the endpoint size.
@@ -605,7 +607,7 @@ int MtpFfsHandle::receiveFile(mtp_file_range mfr, bool zero_packet) {
             read = false;
         }
     }
-    if (ret % packet_size == 0 || zero_packet) {
+    if ((ret % packet_size == 0 && !short_packet) || zero_packet) {
         if (TEMP_FAILURE_RETRY(::read(mBulkOut, data, packet_size)) != 0) {
             return -1;
         }
