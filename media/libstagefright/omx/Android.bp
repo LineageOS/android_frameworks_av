@@ -10,6 +10,7 @@ cc_library_shared {
         "GraphicBufferSource.cpp",
         "BWGraphicBufferSource.cpp",
         "OMX.cpp",
+        "OMXStore.cpp",
         "OMXMaster.cpp",
         "OMXNodeInstance.cpp",
         "OMXUtils.cpp",
@@ -30,15 +31,6 @@ cc_library_shared {
 
     export_include_dirs: [
         "include",
-    ],
-
-    include_dirs: [
-        "frameworks/av/include/media/",
-        "frameworks/av/media/libstagefright",
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/native/include", // for media/hardware/MetadataBufferType.h
-        "frameworks/native/include/media/hardware",
-        "frameworks/native/include/media/openmax",
     ],
 
     header_libs: [
@@ -99,8 +91,12 @@ cc_library_shared {
     },
 }
 
-cc_library_static {
+cc_library_shared {
     name: "libstagefright_omx_utils",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
     srcs: ["OMXUtils.cpp"],
     export_include_dirs: [
         "include",
@@ -112,10 +108,11 @@ cc_library_static {
         "media_plugin_headers",
     ],
     shared_libs: [
-        "libmedia",
+        "libmedia_omx",
+        "liblog",
     ],
     export_shared_lib_headers: [
-        "libmedia",
+        "libmedia_omx",
     ],
     sanitize: {
         misc_undefined: [

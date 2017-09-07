@@ -21,6 +21,7 @@
 #include <hidl/Status.h>
 
 #include <android/hardware/media/omx/1.0/IOmxStore.h>
+#include <media/stagefright/xmlparser/MediaCodecsXmlParser.h>
 
 namespace android {
 namespace hardware {
@@ -41,17 +42,31 @@ using ::android::sp;
 using ::android::wp;
 
 struct OmxStore : public IOmxStore {
-    OmxStore();
+    OmxStore(
+            const char* owner = "default",
+            const char* const* searchDirs
+                = MediaCodecsXmlParser::defaultSearchDirs,
+            const char* mainXmlName
+                = MediaCodecsXmlParser::defaultMainXmlName,
+            const char* performanceXmlName
+                = MediaCodecsXmlParser::defaultPerformanceXmlName,
+            const char* profilingResultsXmlPath
+                = MediaCodecsXmlParser::defaultProfilingResultsXmlPath);
+
     virtual ~OmxStore();
 
-    // Methods from IOmx
+    // Methods from IOmxStore
     Return<void> listServiceAttributes(listServiceAttributes_cb) override;
     Return<void> getNodePrefix(getNodePrefix_cb) override;
     Return<void> listRoles(listRoles_cb) override;
     Return<sp<IOmx>> getOmx(hidl_string const&) override;
-};
 
-extern "C" IOmxStore* HIDL_FETCH_IOmxStore(const char* name);
+protected:
+    Status mParsingStatus;
+    hidl_string mPrefix;
+    hidl_vec<ServiceAttribute> mServiceAttributeList;
+    hidl_vec<RoleInfo> mRoleList;
+};
 
 }  // namespace implementation
 }  // namespace V1_0
