@@ -46,6 +46,30 @@
       "revId": "407cea0e824d4a30c61aeac6d56142ff11058054",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "2664dd46_a869e932",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 4
+      },
+      "lineNbr": 151,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2017-09-07T17:28:51Z",
+      "side": 1,
+      "message": "Doesn\u0027t mean it can\u0027t be improved.\n\nIf you remove L149 and L154, it will break everyone else. I\u0027m saying you should #define OMX_SEC_COLOR_FormatNV21Linear in your custom camera parameters, and check for existence of such a define here. It doesn\u0027t matter that the original definition is in Samsung\u0027s camera HAL, since your code does not have access to the definition inside their HAL.",
+      "parentUuid": "235ccefb_961f6217",
+      "range": {
+        "startLine": 151,
+        "startChar": 25,
+        "endLine": 151,
+        "endChar": 55
+      },
+      "revId": "407cea0e824d4a30c61aeac6d56142ff11058054",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
