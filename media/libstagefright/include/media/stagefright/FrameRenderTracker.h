@@ -23,15 +23,14 @@
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AString.h>
+#include <ui/Fence.h>
+#include <ui/GraphicBuffer.h>
 
 #include <list>
 
 struct ANativeWindowBuffer;
 
 namespace android {
-
-class Fence;
-class GraphicBuffer;
 
 // Tracks the render information about a frame. Frames go through several states while
 // the render information is tracked:

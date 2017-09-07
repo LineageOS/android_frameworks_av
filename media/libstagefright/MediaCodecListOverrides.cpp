@@ -33,8 +33,6 @@
 
 namespace android {
 
-const char *kProfilingResults = "/data/misc/media/media_codecs_profiling_results.xml";
-
 AString getProfilingVersionString() {
     char val[PROPERTY_VALUE_MAX];
     if (property_get("ro.build.display.id", val, NULL) && (strlen(val) > 0)) {
@@ -205,24 +203,24 @@ bool splitString(
     return true;
 }
 
-void profileCodecs(const Vector<sp<MediaCodecInfo>> &infos) {
+void profileCodecs(const std::vector<sp<MediaCodecInfo>> &infos,
+        const char* profilingResults) {
     CodecSettings global_results;
     KeyedVector<AString, CodecSettings> encoder_results;
     KeyedVector<AString, CodecSettings> decoder_results;
     profileCodecs(infos, &global_results, &encoder_results, &decoder_results);
-    exportResultsToXML(kProfilingResults, global_results, encoder_results, decoder_results);
+    exportResultsToXML(profilingResults, global_results, encoder_results, decoder_results);
 }
 
 void profileCodecs(
-        const Vector<sp<MediaCodecInfo>> &infos,
+        const std::vector<sp<MediaCodecInfo>> &infos,
         CodecSettings *global_results,
         KeyedVector<AString, CodecSettings> *encoder_results,
         KeyedVector<AString, CodecSettings> *decoder_results,
         bool forceToMeasure) {
     KeyedVector<AString, sp<MediaCodecInfo::Capabilities>> codecsNeedMeasure;
     AString supportMultipleSecureCodecs = "true";
-    for (size_t i = 0; i < infos.size(); ++i) {
-        const sp<MediaCodecInfo> info = infos[i];
+    for (const auto& info : infos) {
         AString name = info->getCodecName();
         if (name.startsWith("OMX.google.") ||
                 // TODO: reenable below codecs once fixed

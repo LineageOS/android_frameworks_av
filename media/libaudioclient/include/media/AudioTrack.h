@@ -1085,8 +1085,10 @@ protected:
                                                     // reset by stop() but continues monotonically
                                                     // after new IAudioTrack to restore mPosition,
                                                     // and could be easily widened to uint64_t
-    int64_t                 mStartUs;               // the start time after flush or stop.
+    int64_t                 mStartFromZeroUs;       // the start time after flush or stop,
+                                                    // when position should be 0.
                                                     // only used for offloaded and direct tracks.
+    int64_t                 mStartNs;               // the time when start() is called.
     ExtendedTimestamp       mStartEts;              // Extended timestamp at start for normal
                                                     // AudioTracks.
     AudioTimestamp          mStartTs;               // Timestamp at start for offloaded or direct

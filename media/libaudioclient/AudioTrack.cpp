@@ -65,6 +65,14 @@ static int64_t convertTimespecToUs(const struct timespec &tv)
     return tv.tv_sec * 1000000ll + tv.tv_nsec / 1000;
 }
 
+// TODO move to audio_utils.
+static inline struct timespec convertNsToTimespec(int64_t ns) {
+    struct timespec tv;
+    tv.tv_sec = static_cast<time_t>(ns / NANOS_PER_SECOND);
+    tv.tv_nsec = static_cast<long>(ns % NANOS_PER_SECOND);
+    return tv;
+}
+
 // current monotonic time in microseconds.
 static int64_t getNowUs()
 {
@@ -541,7 +549,8 @@ status_t AudioTrack::set(
     mUpdatePeriod = 0;
     mPosition = 0;
     mReleased = 0;
-    mStartUs = 0;
+    mStartNs = 0;
+    mStartFromZeroUs = 0;
     AudioSystem::acquireAudioSessionId(mSessionId, mClientPid);
     mSequence = 1;
     mObservedSequence = mSequence;
@@ -589,6 +598,7 @@ status_t AudioTrack::start()
             mStartEts.clear();
         }
     }
+    mStartNs = systemTime(); // save this for timestamp adjustment after starting.
     if (previousState == STATE_STOPPED || previousState == STATE_FLUSHED) {
         // reset current position as seen by client to 0
         mPosition = 0;
@@ -617,7 +627,7 @@ status_t AudioTrack::start()
         // since the flush is asynchronous and stop may not fully drain.
         // We save the time when the track is started to later verify whether
         // the counters are realistic (i.e. start from zero after this time).
-        mStartUs = getNowUs();
+        mStartFromZeroUs = mStartNs / 1000;
 
         // force refresh of remaining frames by processAudioBuffer() as last
         // write before stop could be partial.
@@ -2573,8 +2583,7 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
                     if (at < limit) {
                         ALOGV("timestamp pause lag:%lld adjusting from %lld to %lld",
                                 (long long)lag, (long long)at, (long long)limit);
-                        timestamp.mTime.tv_sec = limit / NANOS_PER_SECOND;
-                        timestamp.mTime.tv_nsec = limit % NANOS_PER_SECOND; // compiler opt.
+                        timestamp.mTime = convertNsToTimespec(limit);
                     }
                 }
                 mPreviousLocation = location;
@@ -2617,18 +2626,18 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
         // the previous song under gapless playback.
         // However, we sometimes see zero timestamps, then a glitch of
         // the previous song's position, and then correct timestamps afterwards.
-        if (mStartUs != 0 && mSampleRate != 0) {
+        if (mStartFromZeroUs != 0 && mSampleRate != 0) {
             static const int kTimeJitterUs = 100000; // 100 ms
             static const int k1SecUs = 1000000;
 
             const int64_t timeNow = getNowUs();
 
-            if (timeNow < mStartUs + k1SecUs) { // within first second of starting
+            if (timeNow < mStartFromZeroUs + k1SecUs) { // within first second of starting
                 const int64_t timestampTimeUs = convertTimespecToUs(timestamp.mTime);
-                if (timestampTimeUs < mStartUs) {
+                if (timestampTimeUs < mStartFromZeroUs) {
                     return WOULD_BLOCK;  // stale timestamp time, occurs before start.
                 }
-                const int64_t deltaTimeUs = timestampTimeUs - mStartUs;
+                const int64_t deltaTimeUs = timestampTimeUs - mStartFromZeroUs;
                 const int64_t deltaPositionByUs = (double)timestamp.mPosition * 1000000
                         / ((double)mSampleRate * mPlaybackRate.mSpeed);
 
@@ -2651,10 +2660,10 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
                     return WOULD_BLOCK;
                 }
                 if (deltaPositionByUs != 0) {
-                    mStartUs = 0; // don't check again, we got valid nonzero position.
+                    mStartFromZeroUs = 0; // don't check again, we got valid nonzero position.
                 }
             } else {
-                mStartUs = 0; // don't check again, start time expired.
+                mStartFromZeroUs = 0; // don't check again, start time expired.
             }
             mTimestampStartupGlitchReported = false;
         }
@@ -2692,14 +2701,33 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
     // Prevent retrograde motion in timestamp.
     // This is sometimes caused by erratic reports of the available space in the ALSA drivers.
     if (status == NO_ERROR) {
+        // previousTimestampValid is set to false when starting after a stop or flush.
         if (previousTimestampValid) {
             const int64_t previousTimeNanos =
                     audio_utils_ns_from_timespec(&mPreviousTimestamp.mTime);
-            const int64_t currentTimeNanos = audio_utils_ns_from_timespec(&timestamp.mTime);
+            int64_t currentTimeNanos = audio_utils_ns_from_timespec(&timestamp.mTime);
+
+            // Fix stale time when checking timestamp right after start().
+            //
+            // For offload compatibility, use a default lag value here.
+            // Any time discrepancy between this update and the pause timestamp is handled
+            // by the retrograde check afterwards.
+            const int64_t lagNs = int64_t(mAfLatency * 1000000LL);
+            const int64_t limitNs = mStartNs - lagNs;
+            if (currentTimeNanos < limitNs) {
+                ALOGD("correcting timestamp time for pause, "
+                        "currentTimeNanos: %lld < limitNs: %lld < mStartNs: %lld",
+                        (long long)currentTimeNanos, (long long)limitNs, (long long)mStartNs);
+                timestamp.mTime = convertNsToTimespec(limitNs);
+                currentTimeNanos = limitNs;
+            }
+
+            // retrograde check
             if (currentTimeNanos < previousTimeNanos) {
                 ALOGW("retrograde timestamp time corrected, %lld < %lld",
                         (long long)currentTimeNanos, (long long)previousTimeNanos);
                 timestamp.mTime = mPreviousTimestamp.mTime;
+                // currentTimeNanos not used below.
             }
 
             // Looking at signed delta will work even when the timestamps
@@ -2909,7 +2937,7 @@ bool AudioTrack::hasStarted()
     case STATE_STOPPED:
         if (isOffloadedOrDirect_l()) {
             // check if we have started in the past to return true.
-            return mStartUs > 0;
+            return mStartFromZeroUs > 0;
         }
         // A normal audio track may still be draining, so
         // check if stream has ended.  This covers fasttrack position

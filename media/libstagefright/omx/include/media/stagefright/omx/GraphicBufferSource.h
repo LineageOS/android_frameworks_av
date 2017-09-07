@@ -22,7 +22,7 @@
 #include <gui/BufferQueue.h>
 #include <utils/RefBase.h>
 
-#include <VideoAPI.h>
+#include <media/hardware/VideoAPI.h>
 #include <media/IOMX.h>
 #include <media/OMXFenceParcelable.h>
 #include <media/stagefright/foundation/ABase.h>

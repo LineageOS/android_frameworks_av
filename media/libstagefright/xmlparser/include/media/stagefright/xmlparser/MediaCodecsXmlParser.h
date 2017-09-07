@@ -14,65 +14,107 @@
  * limitations under the License.
  */
 
-#ifndef MEDIA_CODECS_XML_PARSER_H_
-
-#define MEDIA_CODECS_XML_PARSER_H_
-
-#include <map>
-#include <vector>
-
-#include <media/stagefright/foundation/ABase.h>
-#include <media/stagefright/foundation/AString.h>
+#ifndef MEDIA_STAGEFRIGHT_XMLPARSER_H_
+#define MEDIA_STAGEFRIGHT_XMLPARSER_H_
 
 #include <sys/types.h>
 #include <utils/Errors.h>
 #include <utils/Vector.h>
 #include <utils/StrongPointer.h>
 
+#include <string>
+#include <set>
+#include <map>
+#include <vector>
+
 namespace android {
-
-struct AMessage;
-
-// Quirk still supported, even though deprecated
-enum Quirks {
-    kRequiresAllocateBufferOnInputPorts   = 1,
-    kRequiresAllocateBufferOnOutputPorts  = 2,
-
-    kQuirksMask = kRequiresAllocateBufferOnInputPorts
-                | kRequiresAllocateBufferOnOutputPorts,
-};
-
-// Lightweight struct for querying components.
-struct TypeInfo {
-    AString mName;
-    std::map<AString, AString> mStringFeatures;
-    std::map<AString, bool> mBoolFeatures;
-    std::map<AString, AString> mDetails;
-};
-
-struct ProfileLevel {
-    uint32_t mProfile;
-    uint32_t mLevel;
-};
-
-struct CodecInfo {
-    std::vector<TypeInfo> mTypes;
-    std::vector<ProfileLevel> mProfileLevels;
-    std::vector<uint32_t> mColorFormats;
-    uint32_t mFlags;
-    bool mIsEncoder;
-};
 
 class MediaCodecsXmlParser {
 public:
-    MediaCodecsXmlParser();
+
+    // Treblized media codec list will be located in /odm/etc or /vendor/etc.
+    static constexpr char const* defaultSearchDirs[] =
+            {"/odm/etc", "/vendor/etc", "/etc", nullptr};
+    static constexpr char const* defaultMainXmlName =
+            "media_codecs.xml";
+    static constexpr char const* defaultPerformanceXmlName =
+            "media_codecs_performance.xml";
+    static constexpr char const* defaultProfilingResultsXmlPath =
+            "/data/misc/media/media_codecs_profiling_results.xml";
+
+    MediaCodecsXmlParser(
+            const char* const* searchDirs = defaultSearchDirs,
+            const char* mainXmlName = defaultMainXmlName,
+            const char* performanceXmlName = defaultPerformanceXmlName,
+            const char* profilingResultsXmlPath = defaultProfilingResultsXmlPath);
     ~MediaCodecsXmlParser();
 
-    void getGlobalSettings(std::map<AString, AString> *settings) const;
+    typedef std::pair<std::string, std::string> Attribute;
+    typedef std::map<std::string, std::string> AttributeMap;
 
-    status_t getCodecInfo(const char *name, CodecInfo *info) const;
+    typedef std::pair<std::string, AttributeMap> Type;
+    typedef std::map<std::string, AttributeMap> TypeMap;
 
-    status_t getQuirks(const char *name, std::vector<AString> *quirks) const;
+    typedef std::set<std::string> QuirkSet;
+
+    /**
+     * Properties of a codec (node)
+     */
+    struct CodecProperties {
+        bool isEncoder;    ///< Whether this codec is an encoder or a decoder
+        size_t order;      ///< Order of appearance in the file (starting from 0)
+        QuirkSet quirkSet; ///< Set of quirks requested by this codec
+        TypeMap typeMap;   ///< Map of types supported by this codec
+    };
+
+    typedef std::pair<std::string, CodecProperties> Codec;
+    typedef std::map<std::string, CodecProperties> CodecMap;
+
+    /**
+     * Properties of a node (for IOmxStore)
+     */
+    struct NodeInfo {
+        std::string name;
+        std::vector<Attribute> attributeList;
+    };
+
+    /**
+     * Properties of a role (for IOmxStore)
+     */
+    struct RoleProperties {
+        std::string type;
+        bool isEncoder;
+        std::multimap<size_t, NodeInfo> nodeList;
+    };
+
+    typedef std::pair<std::string, RoleProperties> Role;
+    typedef std::map<std::string, RoleProperties> RoleMap;
+
+    /**
+     * Return a map for attributes that are service-specific.
+     */
+    const AttributeMap& getServiceAttributeMap() const;
+
+    /**
+     * Return a map for codecs and their properties.
+     */
+    const CodecMap& getCodecMap() const;
+
+    /**
+     * Return a map for roles and their properties.
+     * This map is generated from the CodecMap.
+     */
+    const RoleMap& getRoleMap() const;
+
+    /**
+     * Return a common prefix of all node names.
+     *
+     * The prefix is not provided in the xml, so it has to be computed by taking
+     * the longest common prefix of all node names.
+     */
+    const char* getCommonPrefix() const;
+
+    status_t getParsingStatus() const;
 
 private:
     enum Section {
@@ -87,23 +129,31 @@ private:
         SECTION_INCLUDE,
     };
 
-    status_t mInitCheck;
+    status_t mParsingStatus;
     Section mCurrentSection;
     bool mUpdate;
-    Vector<Section> mPastSections;
-    int32_t mDepth;
-    AString mHrefBase;
+    std::vector<Section> mSectionStack;
+    std::string mHrefBase;
 
-    std::map<AString, AString> mGlobalSettings;
+    // Service attributes
+    AttributeMap mServiceAttributeMap;
 
-    // name -> CodecInfo
-    std::map<AString, CodecInfo> mCodecInfos;
-    std::map<AString, std::vector<AString>> mQuirks;
-    AString mCurrentName;
-    std::vector<TypeInfo>::iterator mCurrentType;
+    // Codec attributes
+    std::string mCurrentName;
+    std::set<std::string> mCodecSet;
+    Codec mCodecListTemp[2048];
+    CodecMap mCodecMap;
+    size_t mCodecCounter;
+    CodecMap::iterator mCurrentCodec;
+    TypeMap::iterator mCurrentType;
 
-    status_t initCheck() const;
-    void parseTopLevelXMLFile(const char *path, bool ignore_errors = false);
+    // Role map
+    mutable RoleMap mRoleMap;
+
+    // Computed longest common prefix
+    mutable std::string mCommonPrefix;
+
+    bool parseTopLevelXMLFile(const char *path, bool ignore_errors = false);
 
     void parseXMLFile(const char *path);
 
@@ -118,7 +168,8 @@ private:
     status_t includeXMLFile(const char **attrs);
     status_t addSettingFromAttributes(const char **attrs);
     status_t addMediaCodecFromAttributes(bool encoder, const char **attrs);
-    void addMediaCodec(bool encoder, const char *name, const char *type = NULL);
+    void addMediaCodec(bool encoder, const char *name,
+            const char *type = nullptr);
 
     status_t addQuirk(const char **attrs);
     status_t addTypeFromAttributes(const char **attrs, bool encoder);
@@ -126,10 +177,14 @@ private:
     status_t addFeature(const char **attrs);
     void addType(const char *name);
 
-    DISALLOW_EVIL_CONSTRUCTORS(MediaCodecsXmlParser);
+    void generateRoleMap() const;
+    void generateCommonPrefix() const;
+
+    MediaCodecsXmlParser(const MediaCodecsXmlParser&) = delete;
+    MediaCodecsXmlParser& operator=(const MediaCodecsXmlParser&) = delete;
 };
 
-}  // namespace android
+} // namespace android
 
-#endif  // MEDIA_CODECS_XML_PARSER_H_
+#endif // MEDIA_STAGEFRIGHT_XMLPARSER_H_
 
