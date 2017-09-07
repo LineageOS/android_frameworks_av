@@ -378,6 +378,10 @@ status_t OMXNodeInstance::freeNode(OMXMaster *master) {
             break;
     }
 
+#ifndef SKIP_CVE_2017_13154
+    Mutex::Autolock _l(mLock);
+#endif
+
     ALOGV("[%x:%s] calling destroyComponentInstance", mNodeID, mName);
     OMX_ERRORTYPE err = master->destroyComponentInstance(
             static_cast<OMX_COMPONENTTYPE *>(mHandle));
