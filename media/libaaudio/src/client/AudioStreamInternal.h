@@ -115,12 +115,15 @@ protected:
                             int64_t currentTimeNanos,
                             int64_t *wakeTimePtr) = 0;
 
+    aaudio_result_t drainTimestampsFromService();
+
     aaudio_result_t processCommands();
 
     aaudio_result_t requestStopInternal();
 
     aaudio_result_t stopCallback();
 
+    virtual void advanceClientToMatchServerPosition() = 0;
 
     virtual void onFlushFromServer() {}
 
@@ -167,6 +170,10 @@ protected:
 
     AAudioServiceInterface  &mServiceInterface;   // abstract interface to the service
 
+    SimpleDoubleBuffer<Timestamp>  mAtomicTimestamp;
+
+    AtomicRequestor          mNeedCatchUp;   // Ask read() or write() to sync on first timestamp.
+
 private:
     /*
      * Asynchronous write with data conversion.
@@ -187,8 +194,6 @@ private:
 
     AudioEndpointParcelable  mEndPointParcelable; // description of the buffers filled by service
     EndpointDescriptor       mEndpointDescriptor; // buffer description with resolved addresses
-
-    SimpleDoubleBuffer<Timestamp>  mAtomicTimestamp;
 
     int64_t                  mServiceLatencyNanos = 0;
 
