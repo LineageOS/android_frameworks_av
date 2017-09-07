@@ -24,15 +24,25 @@ namespace android {
 
 sp<IOMX> MediaCodecService::getOMX() {
 
-    Mutex::Autolock autoLock(mLock);
+    Mutex::Autolock autoLock(mOMXLock);
 
     if (mOMX.get() == NULL) {
-        mOMX = new OMX;
+        mOMX = new OMX();
     }
 
     return mOMX;
 }
 
+sp<IOMXStore> MediaCodecService::getOMXStore() {
+
+    Mutex::Autolock autoLock(mOMXStoreLock);
+
+    if (mOMXStore.get() == NULL) {
+        mOMXStore = new OMXStore();
+    }
+
+    return mOMXStore;
+}
 
 status_t MediaCodecService::onTransact(uint32_t code, const Parcel& data, Parcel* reply,
         uint32_t flags)

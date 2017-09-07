@@ -20,10 +20,12 @@
 #include <binder/BinderService.h>
 #include <media/IMediaCodecService.h>
 #include <media/stagefright/omx/OMX.h>
+#include <media/stagefright/omx/OMXStore.h>
 
 namespace android {
 
-class MediaCodecService : public BinderService<MediaCodecService>, public BnMediaCodecService
+class MediaCodecService : public BinderService<MediaCodecService>,
+        public BnMediaCodecService
 {
     friend class BinderService<MediaCodecService>;    // for MediaCodecService()
 public:
@@ -31,16 +33,20 @@ public:
     virtual ~MediaCodecService() { }
     virtual void onFirstRef() { }
 
-    static const char*  getServiceName() { return "media.codec"; }
+    static const char*    getServiceName() { return "media.codec"; }
 
-    virtual sp<IOMX>    getOMX();
+    virtual sp<IOMX>      getOMX();
 
-    virtual status_t    onTransact(uint32_t code, const Parcel& data, Parcel* reply,
-                                uint32_t flags);
+    virtual sp<IOMXStore> getOMXStore();
+
+    virtual status_t      onTransact(uint32_t code, const Parcel& data,
+                                     Parcel* reply, uint32_t flags);
 
 private:
-    Mutex               mLock;
-    sp<IOMX>            mOMX;
+    Mutex                 mOMXLock;
+    sp<IOMX>              mOMX;
+    Mutex                 mOMXStoreLock;
+    sp<IOMXStore>         mOMXStore;
 };
 
 }   // namespace android
