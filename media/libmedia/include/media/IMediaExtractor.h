@@ -68,6 +68,8 @@ public:
     virtual void setUID(uid_t uid)  = 0;
 
     virtual const char * name() = 0;
+
+    virtual void release() = 0;
 };
 
 
