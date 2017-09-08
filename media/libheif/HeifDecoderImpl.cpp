@@ -401,6 +401,10 @@ bool HeifDecoderImpl::decode(HeifFrameInfo* frameInfo) {
                 videoFrame->getFlattenedIccData());
     }
     mFrameDecoded = true;
+
+    // Aggressive clear to avoid holding on to resources
+    mRetriever.clear();
+    mDataSource.clear();
     return true;
 }
 
