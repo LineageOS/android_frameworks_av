@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudio"
+#define LOG_TAG "AAudioStream"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -29,11 +29,22 @@
 using namespace aaudio;
 
 AudioStream::AudioStream()
-        : mCallbackEnabled(false)
+        : mPlayerBase(new MyPlayerBase(this))
 {
     // mThread is a pthread_t of unknown size so we need memset.
     memset(&mThread, 0, sizeof(mThread));
     setPeriodNanoseconds(0);
+}
+
+AudioStream::~AudioStream() {
+    ALOGD("destroying %p, state = %s", this, AAudio_convertStreamStateToText(getState()));
+    // If the stream is deleted when OPEN or in use then audio resources will leak.
+    // This would indicate an internal error. So we want to find this ASAP.
+    LOG_ALWAYS_FATAL_IF(!(getState() == AAUDIO_STREAM_STATE_CLOSED
+                          || getState() == AAUDIO_STREAM_STATE_UNINITIALIZED
+                          || getState() == AAUDIO_STREAM_STATE_DISCONNECTED),
+                        "aaudio stream still in use, state = %s",
+                        AAudio_convertStreamStateToText(getState()));
 }
 
 static const char *AudioStream_convertSharingModeToShortText(aaudio_sharing_mode_t sharingMode) {
@@ -90,9 +101,6 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     return AAUDIO_OK;
 }
 
-AudioStream::~AudioStream() {
-    close();
-}
 
 aaudio_result_t AudioStream::waitForStateChange(aaudio_stream_state_t currentState,
                                                 aaudio_stream_state_t *nextState,

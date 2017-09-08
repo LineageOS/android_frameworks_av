@@ -23,7 +23,6 @@
 #define ATRACE_TAG ATRACE_TAG_AUDIO
 
 #include <stdint.h>
-#include <assert.h>
 
 #include <binder/IServiceManager.h>
 
@@ -63,7 +62,6 @@ AudioStreamInternal::AudioStreamInternal(AAudioServiceInterface  &serviceInterfa
         , mAudioEndpoint()
         , mServiceStreamHandle(AAUDIO_HANDLE_INVALID)
         , mFramesPerBurst(16)
-        , mStreamVolume(1.0f)
         , mInService(inService)
         , mServiceInterface(serviceInterface)
         , mAtomicTimestamp()
@@ -196,10 +194,6 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     }
 
     setState(AAUDIO_STREAM_STATE_OPEN);
-    // Only connect to AudioManager if this is a playback stream running in client process.
-    if (!mInService && getDirection() == AAUDIO_DIRECTION_OUTPUT) {
-        init(android::PLAYER_TYPE_AAUDIO, AUDIO_USAGE_MEDIA);
-    }
 
     return result;
 
@@ -209,7 +203,8 @@ error:
 }
 
 aaudio_result_t AudioStreamInternal::close() {
-    ALOGD("AudioStreamInternal::close(): mServiceStreamHandle = 0x%08X",
+    aaudio_result_t result = AAUDIO_OK;
+    ALOGD("close(): mServiceStreamHandle = 0x%08X",
              mServiceStreamHandle);
     if (mServiceStreamHandle != AAUDIO_HANDLE_INVALID) {
         // Don't close a stream while it is running.
@@ -218,10 +213,10 @@ aaudio_result_t AudioStreamInternal::close() {
             requestStop();
             aaudio_stream_state_t nextState;
             int64_t timeoutNanoseconds = MIN_TIMEOUT_NANOS;
-            aaudio_result_t result = waitForStateChange(currentState, &nextState,
+            result = waitForStateChange(currentState, &nextState,
                                                        timeoutNanoseconds);
             if (result != AAUDIO_OK) {
-                ALOGE("AudioStreamInternal::close() waitForStateChange() returned %d %s",
+                ALOGE("close() waitForStateChange() returned %d %s",
                 result, AAudio_convertResultToText(result));
             }
         }
@@ -232,8 +227,11 @@ aaudio_result_t AudioStreamInternal::close() {
         mServiceInterface.closeStream(serviceStreamHandle);
         delete[] mCallbackBuffer;
         mCallbackBuffer = nullptr;
+
         setState(AAUDIO_STREAM_STATE_CLOSED);
-        return mEndPointParcelable.close();
+        result = mEndPointParcelable.close();
+        aaudio_result_t result2 = AudioStream::close();
+        return (result != AAUDIO_OK) ? result : result2;
     } else {
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
@@ -283,13 +281,13 @@ aaudio_result_t AudioStreamInternal::requestStart()
     // Clear any stale timestamps from the previous run.
     drainTimestampsFromService();
 
-    status_t status = startWithStatus(); // Call PlayerBase, which will start the device stream.
-    aaudio_result_t result = AAudioConvert_androidToAAudioResult(status);
+    aaudio_result_t result = mServiceInterface.startStream(mServiceStreamHandle);
 
     startTime = AudioClock::getNanoseconds();
     mClockModel.start(startTime);
     mNeedCatchUp.request();  // Ask data processing code to catch up when first timestamp received.
 
+    // Start data callback thread.
     if (result == AAUDIO_OK && getDataCallbackProc() != nullptr) {
         // Launch the callback loop thread.
         int64_t periodNanos = mCallbackFrames
@@ -342,7 +340,8 @@ aaudio_result_t AudioStreamInternal::requestStopInternal()
     mClockModel.stop(AudioClock::getNanoseconds());
     setState(AAUDIO_STREAM_STATE_STOPPING);
     mAtomicTimestamp.clear();
-    return AAudioConvert_androidToAAudioResult(stopWithStatus());
+
+    return mServiceInterface.stopStream(mServiceStreamHandle);
 }
 
 aaudio_result_t AudioStreamInternal::requestStop()
@@ -686,33 +685,4 @@ int32_t AudioStreamInternal::getFramesPerBurst() const {
 
 aaudio_result_t AudioStreamInternal::joinThread(void** returnArg) {
     return AudioStream::joinThread(returnArg, calculateReasonableTimeout(getFramesPerBurst()));
-}
-
-void AudioStreamInternal::doSetVolume() {
-    // No pan and only left volume is taken into account from IPLayer interface
-    mVolumeRamp.setTarget(mStreamVolume * mVolumeMultiplierL /* * mPanMultiplierL */);
-}
-
-
-//------------------------------------------------------------------------------
-// Implementation of PlayerBase
-status_t AudioStreamInternal::playerStart() {
-    return AAudioConvert_aaudioToAndroidStatus(mServiceInterface.startStream(mServiceStreamHandle));
-}
-
-status_t AudioStreamInternal::playerPause() {
-    return AAudioConvert_aaudioToAndroidStatus(mServiceInterface.pauseStream(mServiceStreamHandle));
-}
-
-status_t AudioStreamInternal::playerStop() {
-    return AAudioConvert_aaudioToAndroidStatus(mServiceInterface.stopStream(mServiceStreamHandle));
-}
-
-status_t AudioStreamInternal::playerSetVolume() {
-    doSetVolume();
-    return NO_ERROR;
-}
-
-void AudioStreamInternal::destroy() {
-    baseDestroy();
 }
