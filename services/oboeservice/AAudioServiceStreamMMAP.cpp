@@ -50,7 +50,7 @@ AAudioServiceStreamMMAP::AAudioServiceStreamMMAP(android::AAudioService &aAudioS
 }
 
 aaudio_result_t AAudioServiceStreamMMAP::close() {
-    if (mState == AAUDIO_STREAM_STATE_CLOSED) {
+    if (getState() == AAUDIO_STREAM_STATE_CLOSED) {
         return AAUDIO_OK;
     }
 
@@ -67,7 +67,6 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
     aaudio_result_t result = AAudioServiceStreamBase::open(request,
                                                            AAUDIO_SHARING_MODE_EXCLUSIVE);
     if (result != AAUDIO_OK) {
-        ALOGE("AAudioServiceStreamBase open returned %d", result);
         return result;
     }
 
@@ -85,13 +84,10 @@ error:
 /**
  * Start the flow of data.
  */
-aaudio_result_t AAudioServiceStreamMMAP::start() {
-    if (isRunning()) {
-        return AAUDIO_OK;
-    }
-
-    aaudio_result_t result = AAudioServiceStreamBase::start();
+aaudio_result_t AAudioServiceStreamMMAP::startDevice() {
+    aaudio_result_t result = AAudioServiceStreamBase::startDevice();
     if (!mInService && result == AAUDIO_OK) {
+        // Note that this can sometimes take 200 to 300 msec for a cold start!
         result = startClient(mMmapClient, &mClientHandle);
     }
     return result;
@@ -126,6 +122,7 @@ aaudio_result_t AAudioServiceStreamMMAP::stop() {
 
 aaudio_result_t AAudioServiceStreamMMAP::startClient(const android::AudioClient& client,
                                                        audio_port_handle_t *clientHandle) {
+    // Start the client on behalf of the application. Generate a new porthandle.
     aaudio_result_t result = mServiceEndpoint->startClient(client, clientHandle);
     return result;
 }

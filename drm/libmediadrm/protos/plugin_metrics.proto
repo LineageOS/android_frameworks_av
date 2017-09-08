@@ -44,4 +44,7 @@ message MetricsGroup {
 
   // Allow multiple sub groups of metrics.
   repeated MetricsGroup metric_sub_group = 2;
+
+  // Name of the application package associated with the metrics.
+  optional string app_package_name = 3;
 }

@@ -257,9 +257,21 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(MediaAnalyticsItem
             break;
     }
 
-    item->setPkgName(getPkgName(item->getUid(), true));
-    item->setPkgVersionCode(0);
-    ALOGV("info is from uid %d pkg '%s', version %d", item->getUid(), item->getPkgName().c_str(), item->getPkgVersionCode());
+    // Overwrite package name and version if the caller was untrusted.
+    if (!isTrusted) {
+      item->setPkgName(getPkgName(item->getUid(), true));
+      item->setPkgVersionCode(0);
+    } else if (item->getPkgName().empty()) {
+      // Only overwrite the package name if it was empty. Trust whatever
+      // version code was provided by the trusted caller.
+      item->setPkgName(getPkgName(uid, true));
+    }
+
+    ALOGV("given uid %d; sanitized uid: %d sanitized pkg: %s "
+          "sanitized pkg version: %d",
+          uid_given, item->getUid(),
+          item->getPkgName().c_str(),
+          item->getPkgVersionCode());
 
     mItemsSubmitted++;
 
@@ -637,11 +649,6 @@ void MediaAnalyticsService::saveItem(List<MediaAnalyticsItem *> *l, MediaAnalyti
 
 // are they alike enough that nitem can be folded into oitem?
 static bool compatibleItems(MediaAnalyticsItem * oitem, MediaAnalyticsItem * nitem) {
-
-    if (0) {
-        ALOGD("Compare: o %s n %s",
-              oitem->toString().c_str(), nitem->toString().c_str());
-    }
 
     // general safety
     if (nitem->getUid() != oitem->getUid()) {
