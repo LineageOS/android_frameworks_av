@@ -102,8 +102,11 @@ struct desc_v2 {
     __le32 fs_count;
     __le32 hs_count;
     __le32 ss_count;
+    __le32 os_count;
     struct func_desc fs_descs, hs_descs;
     struct ss_func_desc ss_descs;
+    struct usb_os_desc_header os_header;
+    struct usb_ext_compat_desc os_desc;
 } __attribute__((packed));
 
 const struct usb_interface_descriptor mtp_interface_desc = {
@@ -287,6 +290,31 @@ const struct {
     },
 };
 
+struct usb_os_desc_header mtp_os_desc_header = {
+    .interface = htole32(1),
+    .dwLength = htole32(sizeof(usb_os_desc_header) + sizeof(usb_ext_compat_desc)),
+    .bcdVersion = htole16(1),
+    .wIndex = htole16(4),
+    .bCount = htole16(1),
+    .Reserved = htole16(0),
+};
+
+struct usb_ext_compat_desc mtp_os_desc_compat = {
+    .bFirstInterfaceNumber = 0,
+    .Reserved1 = htole32(1),
+    .CompatibleID = { 'M', 'T', 'P' },
+    .SubCompatibleID = {0},
+    .Reserved2 = {0},
+};
+
+struct usb_ext_compat_desc ptp_os_desc_compat = {
+    .bFirstInterfaceNumber = 0,
+    .Reserved1 = htole32(1),
+    .CompatibleID = { 'P', 'T', 'P' },
+    .SubCompatibleID = {0},
+    .Reserved2 = {0},
+};
+
 } // anonymous namespace
 
 namespace android {
@@ -311,13 +339,16 @@ bool MtpFfsHandle::initFunctionfs() {
     v2_descriptor.header.magic = cpu_to_le32(FUNCTIONFS_DESCRIPTORS_MAGIC_V2);
     v2_descriptor.header.length = cpu_to_le32(sizeof(v2_descriptor));
     v2_descriptor.header.flags = FUNCTIONFS_HAS_FS_DESC | FUNCTIONFS_HAS_HS_DESC |
-                                 FUNCTIONFS_HAS_SS_DESC;
+                                 FUNCTIONFS_HAS_SS_DESC | FUNCTIONFS_HAS_MS_OS_DESC;
     v2_descriptor.fs_count = 4;
     v2_descriptor.hs_count = 4;
     v2_descriptor.ss_count = 7;
+    v2_descriptor.os_count = 1;
     v2_descriptor.fs_descs = mPtp ? ptp_fs_descriptors : mtp_fs_descriptors;
     v2_descriptor.hs_descs = mPtp ? ptp_hs_descriptors : mtp_hs_descriptors;
     v2_descriptor.ss_descs = mPtp ? ptp_ss_descriptors : mtp_ss_descriptors;
+    v2_descriptor.os_header = mtp_os_desc_header;
+    v2_descriptor.os_desc = mPtp ? ptp_os_desc_compat : mtp_os_desc_compat;
 
     if (mControl < 0) { // might have already done this before
         mControl.reset(TEMP_FAILURE_RETRY(open(FFS_MTP_EP0, O_RDWR)));
