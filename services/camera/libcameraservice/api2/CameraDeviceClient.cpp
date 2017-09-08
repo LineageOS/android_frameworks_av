@@ -1354,7 +1354,7 @@ void CameraDeviceClient::notifyRepeatingRequestError(long lastFrameNumber) {
     sp<hardware::camera2::ICameraDeviceCallbacks> remoteCb = getRemoteCallback();
 
     if (remoteCb != 0) {
-        remoteCb->onRepeatingRequestError(lastFrameNumber);
+        remoteCb->onRepeatingRequestError(lastFrameNumber, mStreamingRequestId);
     }
 
     Mutex::Autolock idLock(mStreamingRequestIdLock);
