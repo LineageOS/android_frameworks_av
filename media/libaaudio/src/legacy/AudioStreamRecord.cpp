@@ -337,7 +337,9 @@ aaudio_result_t AudioStreamRecord::getTimestamp(clockid_t clockId,
                                                int64_t *timeNanoseconds) {
     ExtendedTimestamp extendedTimestamp;
     status_t status = mAudioRecord->getTimestamp(&extendedTimestamp);
-    if (status != NO_ERROR) {
+    if (status == WOULD_BLOCK) {
+        return AAUDIO_ERROR_INVALID_STATE;
+    } else if (status != NO_ERROR) {
         return AAudioConvert_androidToAAudioResult(status);
     }
     return getBestTimestamp(clockId, framePosition, timeNanoseconds, &extendedTimestamp);

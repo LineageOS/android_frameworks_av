@@ -295,37 +295,45 @@ int main(int argc, char **argv) {
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
 
-    printf("Test Timestamps V0.1.2\n");
+    printf("Test Timestamps V0.1.3\n");
+
     // Legacy
-//    result = testTimeStamps(AAUDIO_POLICY_NEVER,
-//                            AAUDIO_SHARING_MODE_SHARED,
-//                            AAUDIO_PERFORMANCE_MODE_NONE,
-//                            AAUDIO_DIRECTION_INPUT);
-//    result = testTimeStamps(AAUDIO_POLICY_NEVER,
-//                            AAUDIO_SHARING_MODE_SHARED,
-//                            AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
-//                            AAUDIO_DIRECTION_INPUT);
-//    result = testTimeStamps(AAUDIO_POLICY_NEVER, AAUDIO_SHARING_MODE_SHARED,
-//                            AAUDIO_PERFORMANCE_MODE_NONE,
-//                            AAUDIO_DIRECTION_OUTPUT);
-    result = testTimeStamps(AAUDIO_POLICY_NEVER, AAUDIO_SHARING_MODE_SHARED,
+    aaudio_policy_t policy = AAUDIO_POLICY_NEVER;
+    result = testTimeStamps(policy,
+                            AAUDIO_SHARING_MODE_SHARED,
+                            AAUDIO_PERFORMANCE_MODE_NONE,
+                            AAUDIO_DIRECTION_INPUT);
+    result = testTimeStamps(policy,
+                            AAUDIO_SHARING_MODE_SHARED,
+                            AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+                            AAUDIO_DIRECTION_INPUT);
+    result = testTimeStamps(policy,
+                            AAUDIO_SHARING_MODE_SHARED,
+                            AAUDIO_PERFORMANCE_MODE_NONE,
+                            AAUDIO_DIRECTION_OUTPUT);
+    result = testTimeStamps(policy,
+                            AAUDIO_SHARING_MODE_SHARED,
                             AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
                             AAUDIO_DIRECTION_OUTPUT);
-   // MMAP
-//    result = testTimeStamps(AAUDIO_POLICY_ALWAYS,
-//                            AAUDIO_SHARING_MODE_EXCLUSIVE,
-//                            AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
-//                            AAUDIO_DIRECTION_INPUT);
-//    result = testTimeStamps(AAUDIO_POLICY_ALWAYS,
-//                            AAUDIO_SHARING_MODE_EXCLUSIVE,
-//                            AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
-//                            AAUDIO_DIRECTION_OUTPUT);
-//    result = testTimeStamps(AAUDIO_POLICY_ALWAYS, AAUDIO_SHARING_MODE_SHARED,
-//                            AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
-//                            AAUDIO_DIRECTION_INPUT);
-//    result = testTimeStamps(AAUDIO_POLICY_ALWAYS, AAUDIO_SHARING_MODE_SHARED,
-//                            AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
-//                            AAUDIO_DIRECTION_OUTPUT);
+
+    // MMAP
+    policy = AAUDIO_POLICY_ALWAYS;
+    result = testTimeStamps(policy,
+                            AAUDIO_SHARING_MODE_EXCLUSIVE,
+                            AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+                            AAUDIO_DIRECTION_INPUT);
+    result = testTimeStamps(policy,
+                            AAUDIO_SHARING_MODE_EXCLUSIVE,
+                            AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+                            AAUDIO_DIRECTION_OUTPUT);
+    result = testTimeStamps(policy,
+                            AAUDIO_SHARING_MODE_SHARED,
+                            AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+                            AAUDIO_DIRECTION_INPUT);
+    result = testTimeStamps(policy,
+                            AAUDIO_SHARING_MODE_SHARED,
+                            AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+                            AAUDIO_DIRECTION_OUTPUT);
 
     return (result == AAUDIO_OK) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

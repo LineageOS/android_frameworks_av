@@ -401,7 +401,7 @@ aaudio_result_t AudioStreamInternal::getTimestamp(clockid_t clockId,
             return AAUDIO_OK;
         }
     }
-    return AAUDIO_ERROR_UNAVAILABLE;
+    return AAUDIO_ERROR_INVALID_STATE;
 }
 
 aaudio_result_t AudioStreamInternal::updateStateMachine() {
