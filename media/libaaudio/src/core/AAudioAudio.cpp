@@ -219,6 +219,7 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_openStream(AAudioStreamBuilder* 
     ALOGD("AAudioStreamBuilder_openStream() returns %d = %s for (%p) ----------------",
           result, AAudio_convertResultToText(result), audioStream);
     if (result == AAUDIO_OK) {
+        audioStream->systemRegister();
         *streamPtr = (AAudioStream*) audioStream;
     } else {
         *streamPtr = nullptr;
@@ -242,6 +243,7 @@ AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream)
     ALOGD("AAudioStream_close(%p)", stream);
     if (audioStream != nullptr) {
         audioStream->close();
+        audioStream->systemUnRegister();
         delete audioStream;
         return AAUDIO_OK;
     }
@@ -252,7 +254,7 @@ AAUDIO_API aaudio_result_t  AAudioStream_requestStart(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     ALOGD("AAudioStream_requestStart(%p) called --------------", stream);
-    aaudio_result_t result = audioStream->requestStart();
+    aaudio_result_t result = audioStream->systemStart();
     ALOGD("AAudioStream_requestStart(%p) returned %d ---------", stream, result);
     return result;
 }
@@ -261,7 +263,7 @@ AAUDIO_API aaudio_result_t  AAudioStream_requestPause(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     ALOGD("AAudioStream_requestPause(%p)", stream);
-    return audioStream->requestPause();
+    return audioStream->systemPause();
 }
 
 AAUDIO_API aaudio_result_t  AAudioStream_requestFlush(AAudioStream* stream)
@@ -275,7 +277,7 @@ AAUDIO_API aaudio_result_t  AAudioStream_requestStop(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     ALOGD("AAudioStream_requestStop(%p)", stream);
-    return audioStream->requestStop();
+    return audioStream->systemStop();
 }
 
 AAUDIO_API aaudio_result_t AAudioStream_waitForStateChange(AAudioStream* stream,

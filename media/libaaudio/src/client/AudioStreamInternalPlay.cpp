@@ -49,7 +49,7 @@ aaudio_result_t AudioStreamInternalPlay::requestPauseInternal()
     mClockModel.stop(AudioClock::getNanoseconds());
     setState(AAUDIO_STREAM_STATE_PAUSING);
     mAtomicTimestamp.clear();
-    return AAudioConvert_androidToAAudioResult(pauseWithStatus());
+    return mServiceInterface.pauseStream(mServiceStreamHandle);
 }
 
 aaudio_result_t AudioStreamInternalPlay::requestPause()
@@ -290,7 +290,6 @@ aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(const void *buff
     return framesWritten;
 }
 
-
 int64_t AudioStreamInternalPlay::getFramesRead()
 {
     int64_t framesReadHardware;
@@ -363,4 +362,11 @@ void *AudioStreamInternalPlay::callbackLoop() {
     ALOGD("AudioStreamInternalPlay(): callbackLoop() exiting, result = %d, isActive() = %d",
           result, (int) isActive());
     return NULL;
+}
+
+//------------------------------------------------------------------------------
+// Implementation of PlayerBase
+status_t AudioStreamInternalPlay::doSetVolume() {
+    mVolumeRamp.setTarget(mStreamVolume * getDuckAndMuteVolume());
+    return android::NO_ERROR;
 }
