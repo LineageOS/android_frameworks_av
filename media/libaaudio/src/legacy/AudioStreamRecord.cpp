@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudio"
+#define LOG_TAG "AudioStreamRecord"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -181,11 +181,12 @@ aaudio_result_t AudioStreamRecord::close()
 {
     // TODO add close() or release() to AudioRecord API then call it from here
     if (getState() != AAUDIO_STREAM_STATE_CLOSED) {
+        mAudioRecord->removeAudioDeviceCallback(mDeviceCallback);
         mAudioRecord.clear();
         setState(AAUDIO_STREAM_STATE_CLOSED);
     }
     mFixedBlockWriter.close();
-    return AAUDIO_OK;
+    return AudioStream::close();
 }
 
 void AudioStreamRecord::processCallback(int event, void *info) {
