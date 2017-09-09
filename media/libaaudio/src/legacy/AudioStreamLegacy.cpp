@@ -163,7 +163,11 @@ aaudio_result_t AudioStreamLegacy::getBestTimestamp(clockid_t clockId,
 //          (long long) extendedTimestamp->mPosition[ExtendedTimestamp::Location::LOCATION_SERVER],
 //          (long long) extendedTimestamp->mPosition[ExtendedTimestamp::Location::LOCATION_KERNEL],
 //          (int)location);
-    return AAudioConvert_androidToAAudioResult(status);
+    if (status == WOULD_BLOCK) {
+        return AAUDIO_ERROR_INVALID_STATE;
+    } else {
+        return AAudioConvert_androidToAAudioResult(status);
+    }
 }
 
 void AudioStreamLegacy::onAudioDeviceUpdate(audio_port_handle_t deviceId)

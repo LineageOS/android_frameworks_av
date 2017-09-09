@@ -444,7 +444,9 @@ aaudio_result_t AudioStreamTrack::getTimestamp(clockid_t clockId,
                                      int64_t *timeNanoseconds) {
     ExtendedTimestamp extendedTimestamp;
     status_t status = mAudioTrack->getTimestamp(&extendedTimestamp);
-    if (status != NO_ERROR) {
+    if (status == WOULD_BLOCK) {
+        return AAUDIO_ERROR_INVALID_STATE;
+    } if (status != NO_ERROR) {
         return AAudioConvert_androidToAAudioResult(status);
     }
     int64_t position = 0;
