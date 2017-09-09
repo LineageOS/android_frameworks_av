@@ -34,9 +34,9 @@
 #include <time.h>
 #include <new>
 #include <audio_utils/roundup.h>
-#include <media/nbaio/NBLog.h>
-#include <media/nbaio/PerformanceAnalysis.h>
-#include <media/nbaio/ReportPerformance.h>
+#include <media/nblog/NBLog.h>
+#include <media/nblog/PerformanceAnalysis.h>
+#include <media/nblog/ReportPerformance.h>
 #include <utils/CallStack.h>
 #include <utils/Log.h>
 #include <utils/String8.h>

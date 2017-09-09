@@ -19,7 +19,7 @@
 
 #include <binder/BinderService.h>
 #include <media/IMediaLogService.h>
-#include <media/nbaio/NBLog.h>
+#include <media/nblog/NBLog.h>
 
 namespace android {
 

@@ -20,7 +20,7 @@
 #include <sys/mman.h>
 #include <utils/Log.h>
 #include <binder/PermissionCache.h>
-#include <media/nbaio/NBLog.h>
+#include <media/nblog/NBLog.h>
 #include <private/android_filesystem_config.h>
 #include "MediaLogService.h"
 

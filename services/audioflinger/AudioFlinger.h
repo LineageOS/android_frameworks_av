@@ -71,7 +71,7 @@
 
 #include <powermanager/IPowerManager.h>
 
-#include <media/nbaio/NBLog.h>
+#include <media/nblog/NBLog.h>
 #include <private/media/AudioEffectShared.h>
 #include <private/media/AudioTrackShared.h>
 

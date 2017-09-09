@@ -21,7 +21,7 @@
 #include <system/audio.h>
 #include <media/ExtendedAudioBufferProvider.h>
 #include <media/nbaio/NBAIO.h>
-#include <media/nbaio/NBLog.h>
+#include <media/nblog/NBLog.h>
 #include "FastThreadState.h"
 
 namespace android {

@@ -27,9 +27,9 @@
 #include <sys/prctl.h>
 #include <sys/time.h>
 #include <utility>
-#include <media/nbaio/NBLog.h>
-#include <media/nbaio/PerformanceAnalysis.h>
-#include <media/nbaio/ReportPerformance.h>
+#include <media/nblog/NBLog.h>
+#include <media/nblog/PerformanceAnalysis.h>
+#include <media/nblog/ReportPerformance.h>
 #include <utils/Log.h>
 #include <utils/String8.h>
 

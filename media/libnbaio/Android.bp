@@ -41,11 +41,8 @@ cc_library_shared {
         "AudioBufferProviderSource.cpp",
         "AudioStreamInSource.cpp",
         "AudioStreamOutSink.cpp",
-        "NBLog.cpp",
-        "PerformanceAnalysis.cpp",
         "Pipe.cpp",
         "PipeReader.cpp",
-        "ReportPerformance.cpp",
         "SourceAudioBufferProvider.cpp",
     ],
 

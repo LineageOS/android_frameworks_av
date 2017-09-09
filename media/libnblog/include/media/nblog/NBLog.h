@@ -26,8 +26,8 @@
 
 #include <audio_utils/fifo.h>
 #include <binder/IMemory.h>
-#include <media/nbaio/PerformanceAnalysis.h>
-#include <media/nbaio/ReportPerformance.h>
+#include <media/nblog/PerformanceAnalysis.h>
+#include <media/nblog/ReportPerformance.h>
 #include <utils/Mutex.h>
 #include <utils/threads.h>
 
