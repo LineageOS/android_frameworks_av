@@ -200,10 +200,22 @@ void FindAVCDimensions(
              frame_crop_top_offset, frame_crop_bottom_offset,
              cropUnitX, cropUnitY);
 
-        *width -=
-            (frame_crop_left_offset + frame_crop_right_offset) * cropUnitX;
-        *height -=
-            (frame_crop_top_offset + frame_crop_bottom_offset) * cropUnitY;
+
+        // *width -= (frame_crop_left_offset + frame_crop_right_offset) * cropUnitX;
+        if(__builtin_add_overflow(frame_crop_left_offset, frame_crop_right_offset, &frame_crop_left_offset) ||
+            __builtin_mul_overflow(frame_crop_left_offset, cropUnitX, &frame_crop_left_offset) ||
+            __builtin_sub_overflow(*width, frame_crop_left_offset, width) ||
+            *width < 0) {
+            *width = 0;
+        }
+
+        //*height -= (frame_crop_top_offset + frame_crop_bottom_offset) * cropUnitY;
+        if(__builtin_add_overflow(frame_crop_top_offset, frame_crop_bottom_offset, &frame_crop_top_offset) ||
+            __builtin_mul_overflow(frame_crop_top_offset, cropUnitY, &frame_crop_top_offset) ||
+            __builtin_sub_overflow(*height, frame_crop_top_offset, height) ||
+            *height < 0) {
+            *height = 0;
+        }
     }
 
     if (sarWidth != NULL) {
