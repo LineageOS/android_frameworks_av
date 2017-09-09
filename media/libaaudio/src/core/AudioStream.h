@@ -21,9 +21,17 @@
 #include <mutex>
 #include <stdint.h>
 #include <aaudio/AAudio.h>
+#include <binder/IServiceManager.h>
+#include <binder/Status.h>
+#include <utils/StrongPointer.h>
 
+#include "media/VolumeShaper.h"
+#include "media/PlayerBase.h"
 #include "utility/AAudioUtilities.h"
 #include "utility/MonotonicCounter.h"
+
+// Cannot get android::media::VolumeShaper to compile!
+#define AAUDIO_USE_VOLUME_SHAPER  0
 
 namespace aaudio {
 
@@ -234,7 +242,121 @@ public:
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
+    // This is used by the AudioManager to duck and mute the stream when changing audio focus.
+    void setDuckAndMuteVolume(float duckAndMuteVolume) {
+        mDuckAndMuteVolume = duckAndMuteVolume;
+        doSetVolume(); // apply this change
+    }
+
+    float getDuckAndMuteVolume() {
+        return mDuckAndMuteVolume;
+    }
+
+    // Implement this in the output subclasses.
+    virtual android::status_t doSetVolume() { return android::NO_ERROR; }
+
+#if AAUDIO_USE_VOLUME_SHAPER
+    virtual android::binder::Status applyVolumeShaper(
+            const ::android::media::VolumeShaper::Configuration& configuration __unused,
+            const ::android::media::VolumeShaper::Operation& operation __unused) {
+        ALOGW("applyVolumeShaper() is not supported");
+        return android::binder::Status::ok();
+    }
+#endif
+
+    // Should this object be registered with the AudioManager?
+    virtual bool needsSystemRegistration() { return false; }
+
+    // Register this stream's PlayerBase with the AudioManager
+    void systemRegister() {
+        if (needsSystemRegistration()) {
+            mPlayerBase->registerWithAudioManager();
+        }
+    }
+
+    // UnRegister this stream's PlayerBase with the AudioManager
+    void systemUnRegister() {
+        if (needsSystemRegistration()) {
+            mPlayerBase->destroy();
+        }
+    }
+
+    // Pass start request through PlayerBase for tracking.
+    aaudio_result_t systemStart() {
+        mPlayerBase->start();
+        // Pass aaudio_result_t around the PlayerBase interface, which uses status__t.
+        return mPlayerBase->getResult();
+    }
+
+    aaudio_result_t systemPause() {
+        mPlayerBase->pause();
+        return mPlayerBase->getResult();
+    }
+
+    aaudio_result_t systemStop() {
+        mPlayerBase->stop();
+        return mPlayerBase->getResult();
+    }
+
 protected:
+
+    // PlayerBase allows the system to control the stream.
+    // Calling through PlayerBase->start() notifies the AudioManager of the player state.
+    // The AudioManager also can start/stop a stream by calling mPlayerBase->playerStart().
+    // systemStart() ==> mPlayerBase->start()   mPlayerBase->playerStart() ==> requestStart()
+    //                        \                           /
+    //                         ------ AudioManager -------
+    class MyPlayerBase : public android::PlayerBase {
+    public:
+        MyPlayerBase(AudioStream *parent) : mParent(parent) {}
+        virtual ~MyPlayerBase() {}
+
+        void registerWithAudioManager() {
+            init(android::PLAYER_TYPE_AAUDIO, AUDIO_USAGE_MEDIA);
+        }
+
+        void destroy() override {
+            // FIXME what else should this do? close()? disconnect()?
+            baseDestroy();
+        }
+
+        virtual android::status_t playerStart() {
+            mResult = mParent->requestStart();
+            return AAudioConvert_aaudioToAndroidStatus(mResult);
+        }
+
+        virtual android::status_t playerPause() {
+            mResult = mParent->requestPause();
+            return AAudioConvert_aaudioToAndroidStatus(mResult);
+        }
+
+        virtual android::status_t playerStop() {
+            mResult = mParent->requestStop();
+            return AAudioConvert_aaudioToAndroidStatus(mResult);
+        }
+
+        virtual android::status_t playerSetVolume() {
+            // No pan and only left volume is taken into account from IPLayer interface
+            mParent->setDuckAndMuteVolume(mVolumeMultiplierL  /* * mPanMultiplierL */);
+            return android::NO_ERROR;
+        }
+
+#if AAUDIO_USE_VOLUME_SHAPER
+        android::binder::Status applyVolumeShaper(
+                const android::media::VolumeShaper::Configuration& configuration,
+                const android::media::VolumeShaper::Operation& operation) {
+            return mParent->applyVolumeShaper(configuration, operation);
+        }
+#endif
+
+        aaudio_result_t getResult() {
+            return mResult;
+        }
+
+        AudioStream *mParent;
+        aaudio_result_t       mResult = AAUDIO_OK;
+    };
+
 
 
     /**
@@ -275,7 +397,9 @@ protected:
 
     std::mutex           mStreamMutex;
 
-    std::atomic<bool>    mCallbackEnabled;
+    std::atomic<bool>    mCallbackEnabled{false};
+
+    float                mDuckAndMuteVolume = 1.0f;
 
 protected:
 
@@ -288,6 +412,8 @@ protected:
     }
 
 private:
+    const android::sp<MyPlayerBase>   mPlayerBase;
+
     // These do not change after open().
     int32_t                mSamplesPerFrame = AAUDIO_UNSPECIFIED;
     int32_t                mSampleRate = AAUDIO_UNSPECIFIED;
