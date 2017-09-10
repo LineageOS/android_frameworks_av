@@ -986,6 +986,12 @@ void MediaCodecsXmlParser::generateRoleMap() const {
         for (const auto& type : typeMap) {
             const auto& typeName = type.first;
             const char* roleName = GetComponentRole(isEncoder, typeName.data());
+            if (roleName == nullptr) {
+                ALOGE("Cannot find the role for %s of type %s",
+                        isEncoder ? "an encoder" : "a decoder",
+                        typeName.data());
+                continue;
+            }
             const auto& typeAttributeMap = type.second;
 
             auto roleIterator = mRoleMap.find(roleName);

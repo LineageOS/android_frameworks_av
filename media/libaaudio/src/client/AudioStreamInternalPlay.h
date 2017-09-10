@@ -50,11 +50,18 @@ public:
         return AAUDIO_DIRECTION_OUTPUT;
     }
 
+    // Only register client side streams.
+    bool needsSystemRegistration() override { return !mInService; }
+
 protected:
 
     aaudio_result_t requestPauseInternal();
 
+    void advanceClientToMatchServerPosition() override;
+
     void onFlushFromServer() override;
+
+    android::status_t doSetVolume() override;
 
 /**
  * Low level write that will not block. It will just write as much as it can.
@@ -78,6 +85,9 @@ private:
                                            int32_t numFrames);
 
     int64_t                  mLastFramesRead = 0; // used to prevent retrograde motion
+
+    LinearRamp               mVolumeRamp;
+
 };
 
 } /* namespace aaudio */

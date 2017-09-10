@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudio"
+#define LOG_TAG "AudioStreamTrack"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -115,7 +115,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
     ALOGD("AudioStreamTrack::open(), request notificationFrames = %d, frameCount = %u",
           notificationFrames, (uint)frameCount);
-    mAudioTrack = new AudioTrack();
+    mAudioTrack = new AudioTrack(); // TODO review
     if (getDeviceId() != AAUDIO_UNSPECIFIED) {
         mAudioTrack->setOutputDevice(getDeviceId());
     }
@@ -143,8 +143,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
         return AAudioConvert_androidToAAudioResult(status);
     }
 
-    //TrackPlayerBase init
-    init(mAudioTrack.get(), PLAYER_TYPE_AAUDIO, AUDIO_USAGE_MEDIA);
+    doSetVolume();
 
     // Get the actual values from the AudioTrack.
     setSamplesPerFrame(mAudioTrack->channelCount());
@@ -199,7 +198,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 aaudio_result_t AudioStreamTrack::close()
 {
     if (getState() != AAUDIO_STREAM_STATE_CLOSED) {
-        destroy();
+        mAudioTrack->removeAudioDeviceCallback(mDeviceCallback);
         setState(AAUDIO_STREAM_STATE_CLOSED);
     }
     mFixedBlockReader.close();
@@ -224,8 +223,7 @@ void AudioStreamTrack::processCallback(int event, void *info) {
     return;
 }
 
-aaudio_result_t AudioStreamTrack::requestStart()
-{
+aaudio_result_t AudioStreamTrack::requestStart() {
     std::lock_guard<std::mutex> lock(mStreamMutex);
 
     if (mAudioTrack.get() == nullptr) {
@@ -238,7 +236,7 @@ aaudio_result_t AudioStreamTrack::requestStart()
         return AAudioConvert_androidToAAudioResult(err);
     }
 
-    err = startWithStatus();
+    err = mAudioTrack->start();
     if (err != OK) {
         return AAudioConvert_androidToAAudioResult(err);
     } else {
@@ -248,12 +246,11 @@ aaudio_result_t AudioStreamTrack::requestStart()
     return AAUDIO_OK;
 }
 
-aaudio_result_t AudioStreamTrack::requestPause()
-{
+aaudio_result_t AudioStreamTrack::requestPause() {
     std::lock_guard<std::mutex> lock(mStreamMutex);
 
     if (mAudioTrack.get() == nullptr) {
-        ALOGE("AudioStreamTrack::requestPause() no AudioTrack");
+        ALOGE("requestPause() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
     } else if (getState() != AAUDIO_STREAM_STATE_STARTING
             && getState() != AAUDIO_STREAM_STATE_STARTED) {
@@ -263,7 +260,7 @@ aaudio_result_t AudioStreamTrack::requestPause()
     }
     onStop();
     setState(AAUDIO_STREAM_STATE_PAUSING);
-    pause();
+    mAudioTrack->pause();
     status_t err = mAudioTrack->getPosition(&mPositionWhenPausing);
     if (err != OK) {
         return AAudioConvert_androidToAAudioResult(err);
@@ -285,6 +282,7 @@ aaudio_result_t AudioStreamTrack::requestFlush() {
     incrementFramesRead(getFramesWritten() - getFramesRead());
     mAudioTrack->flush();
     mFramesWritten.reset32();
+    mTimestampPosition.reset32();
     return AAUDIO_OK;
 }
 
@@ -298,8 +296,10 @@ aaudio_result_t AudioStreamTrack::requestStop() {
     onStop();
     setState(AAUDIO_STREAM_STATE_STOPPING);
     incrementFramesRead(getFramesWritten() - getFramesRead()); // TODO review
-    stop();
+    mTimestampPosition.set(getFramesWritten());
     mFramesWritten.reset32();
+    mTimestampPosition.reset32();
+    mAudioTrack->stop();
     return AAUDIO_OK;
 }
 
@@ -444,8 +444,56 @@ aaudio_result_t AudioStreamTrack::getTimestamp(clockid_t clockId,
                                      int64_t *timeNanoseconds) {
     ExtendedTimestamp extendedTimestamp;
     status_t status = mAudioTrack->getTimestamp(&extendedTimestamp);
-    if (status != NO_ERROR) {
+    if (status == WOULD_BLOCK) {
+        return AAUDIO_ERROR_INVALID_STATE;
+    } if (status != NO_ERROR) {
         return AAudioConvert_androidToAAudioResult(status);
     }
-    return getBestTimestamp(clockId, framePosition, timeNanoseconds, &extendedTimestamp);
+    int64_t position = 0;
+    int64_t nanoseconds = 0;
+    aaudio_result_t result = getBestTimestamp(clockId, &position,
+                                              &nanoseconds, &extendedTimestamp);
+    if (result == AAUDIO_OK) {
+        if (position < getFramesWritten()) {
+            *framePosition = position;
+            *timeNanoseconds = nanoseconds;
+            return result;
+        } else {
+            return AAUDIO_ERROR_INVALID_STATE; // TODO review, documented but not consistent
+        }
+    }
+    return result;
 }
+
+status_t AudioStreamTrack::doSetVolume() {
+    status_t status = NO_INIT;
+    if (mAudioTrack.get() != nullptr) {
+        float volume = getDuckAndMuteVolume();
+        mAudioTrack->setVolume(volume, volume);
+        status = NO_ERROR;
+    }
+    return status;
+}
+
+#if AAUDIO_USE_VOLUME_SHAPER
+binder::Status AudioStreamTrack::applyVolumeShaper(
+        const VolumeShaper::Configuration& configuration,
+        const VolumeShaper::Operation& operation) {
+
+    sp<VolumeShaper::Configuration> spConfiguration = new VolumeShaper::Configuration(configuration);
+    sp<VolumeShaper::Operation> spOperation = new VolumeShaper::Operation(operation);
+
+    if (mAudioTrack.get() != nullptr) {
+        ALOGD("applyVolumeShaper() from IPlayer");
+        VolumeShaper::Status status = mAudioTrack->applyVolumeShaper(spConfiguration, spOperation);
+        if (status < 0) { // a non-negative value is the volume shaper id.
+            ALOGE("applyVolumeShaper() failed with status %d", status);
+        }
+        return binder::Status::fromStatusT(status);
+    } else {
+        ALOGD("applyVolumeShaper()"
+                      " no AudioTrack for volume control from IPlayer");
+        return binder::Status::ok();
+    }
+}
+#endif

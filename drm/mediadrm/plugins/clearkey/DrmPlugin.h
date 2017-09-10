@@ -39,8 +39,8 @@ using android::Vector;
 
 class DrmPlugin : public android::DrmPlugin {
 public:
-    explicit DrmPlugin(SessionLibrary* sessionLibrary)
-            : mSessionLibrary(sessionLibrary) {}
+    explicit DrmPlugin(SessionLibrary* sessionLibrary);
+
     virtual ~DrmPlugin() {}
 
     virtual status_t openSession(Vector<uint8_t>& sessionId);
@@ -81,13 +81,7 @@ public:
 
     virtual status_t queryKeyStatus(
             const Vector<uint8_t>& sessionId,
-            KeyedVector<String8, String8>& infoMap) const {
-        if (sessionId.size() == 0) {
-            return android::BAD_VALUE;
-        }
-        UNUSED(infoMap);
-        return android::ERROR_DRM_CANNOT_HANDLE;
-    }
+            KeyedVector<String8, String8>& infoMap) const;
 
     virtual status_t getProvisionRequest(
             const String8& cert_type,
@@ -248,9 +242,12 @@ public:
     }
 
 private:
-    DISALLOW_EVIL_CONSTRUCTORS(DrmPlugin);
+    void setPlayPolicy();
 
+    android::KeyedVector<android::String8, android::String8> mPlayPolicy;
     SessionLibrary* mSessionLibrary;
+
+    DISALLOW_EVIL_CONSTRUCTORS(DrmPlugin);
 };
 
 } // namespace clearkeydrm

@@ -250,6 +250,8 @@ aaudio_result_t AAudioServiceEndpointMMAP::close() {
 
 aaudio_result_t AAudioServiceEndpointMMAP::startStream(sp<AAudioServiceStreamBase> stream,
                                                    audio_port_handle_t *clientHandle) {
+    // Start the client on behalf of the AAudio service.
+    // Use the port handle that was provided by openMmapStream().
     return startClient(mMmapClient, &mPortHandle);
 }
 
@@ -262,11 +264,12 @@ aaudio_result_t AAudioServiceEndpointMMAP::stopStream(sp<AAudioServiceStreamBase
 aaudio_result_t AAudioServiceEndpointMMAP::startClient(const android::AudioClient& client,
                                                        audio_port_handle_t *clientHandle) {
     if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
+    ALOGD("AAudioServiceEndpointMMAP::startClient(%p(uid=%d, pid=%d))",
+          &client, client.clientUid, client.clientPid);
     audio_port_handle_t originalHandle =  *clientHandle;
-    aaudio_result_t result = AAudioConvert_androidToAAudioResult(mMmapStream->start(client,
-                                                                                    clientHandle));
-    ALOGD("AAudioServiceEndpointMMAP::startClient(%p(uid=%d, pid=%d), %d => %d) returns %d",
-          &client, client.clientUid, client.clientPid,
+    status_t status = mMmapStream->start(client, clientHandle);
+    aaudio_result_t result = AAudioConvert_androidToAAudioResult(status);
+    ALOGD("AAudioServiceEndpointMMAP::startClient() , %d => %d returns %d",
           originalHandle, *clientHandle, result);
     return result;
 }

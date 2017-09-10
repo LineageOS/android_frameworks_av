@@ -1345,10 +1345,11 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
     return OK;
 }
 
-status_t Camera3Device::getStreamInfo(int id,
-        uint32_t *width, uint32_t *height,
-        uint32_t *format, android_dataspace *dataSpace) {
+status_t Camera3Device::getStreamInfo(int id, StreamInfo *streamInfo) {
     ATRACE_CALL();
+    if (nullptr == streamInfo) {
+        return BAD_VALUE;
+    }
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
 
@@ -1375,10 +1376,12 @@ status_t Camera3Device::getStreamInfo(int id,
         return idx;
     }
 
-    if (width) *width  = mOutputStreams[idx]->getWidth();
-    if (height) *height = mOutputStreams[idx]->getHeight();
-    if (format) *format = mOutputStreams[idx]->getFormat();
-    if (dataSpace) *dataSpace = mOutputStreams[idx]->getDataSpace();
+    streamInfo->width  = mOutputStreams[idx]->getWidth();
+    streamInfo->height = mOutputStreams[idx]->getHeight();
+    streamInfo->format = mOutputStreams[idx]->getFormat();
+    streamInfo->dataSpace = mOutputStreams[idx]->getDataSpace();
+    streamInfo->formatOverridden = mOutputStreams[idx]->isFormatOverridden();
+    streamInfo->originalFormat = mOutputStreams[idx]->getOriginalFormat();
     return OK;
 }
 
@@ -3233,6 +3236,8 @@ status_t Camera3Device::HalInterface::configureStreams(camera3_stream_configurat
         }
         HalStream &src = finalConfiguration.streams[realIdx];
 
+        Camera3Stream* dstStream = Camera3Stream::cast(dst);
+        dstStream->setFormatOverride(false);
         int overrideFormat = mapToFrameworkFormat(src.overrideFormat);
         if (dst->format != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
             if (dst->format != overrideFormat) {
@@ -3240,6 +3245,8 @@ status_t Camera3Device::HalInterface::configureStreams(camera3_stream_configurat
                         streamId, dst->format);
             }
         } else {
+            dstStream->setFormatOverride((dst->format != overrideFormat) ? true : false);
+            dstStream->setOriginalFormat(dst->format);
             // Override allowed with IMPLEMENTATION_DEFINED
             dst->format = overrideFormat;
         }

@@ -233,17 +233,16 @@ status_t ZslProcessor::updateStream(const Parameters &params) {
 
     if ((mZslStreamId != NO_STREAM) || (mInputStreamId != NO_STREAM)) {
         // Check if stream parameters have to change
-        uint32_t currentWidth, currentHeight;
-        res = device->getStreamInfo(mZslStreamId,
-                &currentWidth, &currentHeight, 0, 0);
+        CameraDeviceBase::StreamInfo streamInfo;
+        res = device->getStreamInfo(mZslStreamId, &streamInfo);
         if (res != OK) {
             ALOGE("%s: Camera %d: Error querying capture output stream info: "
                     "%s (%d)", __FUNCTION__,
                     client->getCameraId(), strerror(-res), res);
             return res;
         }
-        if (currentWidth != (uint32_t)params.fastInfo.arrayWidth ||
-                currentHeight != (uint32_t)params.fastInfo.arrayHeight) {
+        if (streamInfo.width != (uint32_t)params.fastInfo.arrayWidth ||
+                streamInfo.height != (uint32_t)params.fastInfo.arrayHeight) {
             if (mZslStreamId != NO_STREAM) {
                 ALOGV("%s: Camera %d: Deleting stream %d since the buffer "
                       "dimensions changed",

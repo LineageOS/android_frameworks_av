@@ -421,7 +421,7 @@ media_status_t AMediaDrm_queryKeyStatus(AMediaDrm *mObj, const AMediaDrmSessionI
 
     for (size_t i = 0; i < mObj->mQueryResults.size(); i++) {
         keyValuePairs[i].mKey = mObj->mQueryResults.keyAt(i).string();
-        keyValuePairs[i].mValue = mObj->mQueryResults.keyAt(i).string();
+        keyValuePairs[i].mValue = mObj->mQueryResults.valueAt(i).string();
     }
     *numPairs = mObj->mQueryResults.size();
     return AMEDIA_OK;

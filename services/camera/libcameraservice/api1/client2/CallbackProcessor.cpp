@@ -121,18 +121,17 @@ status_t CallbackProcessor::updateStream(const Parameters &params) {
 
     if (mCallbackStreamId != NO_STREAM) {
         // Check if stream parameters have to change
-        uint32_t currentWidth, currentHeight, currentFormat;
-        res = device->getStreamInfo(mCallbackStreamId,
-                &currentWidth, &currentHeight, &currentFormat, 0);
+        CameraDeviceBase::StreamInfo streamInfo;
+        res = device->getStreamInfo(mCallbackStreamId, &streamInfo);
         if (res != OK) {
             ALOGE("%s: Camera %d: Error querying callback output stream info: "
                     "%s (%d)", __FUNCTION__, mId,
                     strerror(-res), res);
             return res;
         }
-        if (currentWidth != (uint32_t)params.previewWidth ||
-                currentHeight != (uint32_t)params.previewHeight ||
-                currentFormat != (uint32_t)callbackFormat) {
+        if (streamInfo.width != (uint32_t)params.previewWidth ||
+                streamInfo.height != (uint32_t)params.previewHeight ||
+                !streamInfo.matchFormat((uint32_t)callbackFormat)) {
             // Since size should only change while preview is not running,
             // assuming that all existing use of old callback stream is
             // completed.
