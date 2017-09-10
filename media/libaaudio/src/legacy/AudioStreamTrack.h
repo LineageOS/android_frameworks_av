@@ -19,6 +19,7 @@
 
 #include <math.h>
 #include <media/TrackPlayerBase.h>
+#include <media/AudioTrack.h>
 #include <aaudio/AAudio.h>
 
 #include "AudioStreamBuilder.h"
@@ -32,7 +33,7 @@ namespace aaudio {
 /**
  * Internal stream that uses the legacy AudioTrack path.
  */
-class AudioStreamTrack : public AudioStreamLegacy, public android::TrackPlayerBase {
+class AudioStreamTrack : public AudioStreamLegacy {
 public:
     AudioStreamTrack();
 
@@ -76,7 +77,19 @@ public:
         return incrementFramesWritten(frames);
     }
 
+    bool needsSystemRegistration() override { return true; }
+
+    android::status_t doSetVolume() override;
+
+#if AAUDIO_USE_VOLUME_SHAPER
+    virtual android::binder::Status applyVolumeShaper(
+            const android::media::VolumeShaper::Configuration& configuration,
+            const android::media::VolumeShaper::Operation& operation) override;
+#endif
+
 private:
+
+    android::sp<android::AudioTrack> mAudioTrack;
 
     // adapts between variable sized blocks and fixed size blocks
     FixedBlockReader                 mFixedBlockReader;

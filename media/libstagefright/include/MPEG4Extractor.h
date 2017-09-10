@@ -62,6 +62,7 @@ public:
     virtual sp<MetaData> getMetaData();
     virtual uint32_t flags() const;
     virtual const char * name() { return "MPEG4Extractor"; }
+    virtual void release();
 
     // for DRM
     virtual char* getDrmTrackInfo(size_t trackID, int *len);
