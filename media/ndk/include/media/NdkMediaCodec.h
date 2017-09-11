@@ -208,6 +208,8 @@ media_status_t AMediaCodec_setOutputSurface(AMediaCodec*, ANativeWindow* surface
 media_status_t AMediaCodec_releaseOutputBufferAtTime(
         AMediaCodec *mData, size_t idx, int64_t timestampNs);
 
+#if __ANDROID_API__ >= 26
+
 /**
  * Creates a Surface that can be used as the input to encoder, in place of input buffers
  *
@@ -278,7 +280,7 @@ media_status_t AMediaCodec_setParameters(
  */
 media_status_t AMediaCodec_signalEndOfInputStream(AMediaCodec *mData);
 
-
+#endif /* __ANDROID_API__ >= 26 */
 
 typedef enum {
     AMEDIACODECRYPTOINFO_MODE_CLEAR = 0,
