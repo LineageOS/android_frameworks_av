@@ -31,7 +31,8 @@ using namespace android;
 using namespace aaudio;
 
 AudioStreamLegacy::AudioStreamLegacy()
-        : AudioStream(), mDeviceCallback(new StreamDeviceCallback(this)) {
+        : AudioStream()
+        , mDeviceCallback(new StreamDeviceCallback(this)) {
 }
 
 AudioStreamLegacy::~AudioStreamLegacy() {
@@ -78,18 +79,20 @@ int32_t AudioStreamLegacy::onProcessFixedBlock(uint8_t *buffer, int32_t numBytes
 void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode, void *info) {
     aaudio_data_callback_result_t callbackResult;
 
-    if (!mCallbackEnabled.load()) {
-        return;
-    }
-
     switch (opcode) {
         case AAUDIO_CALLBACK_OPERATION_PROCESS_DATA: {
-            if (getState() != AAUDIO_STREAM_STATE_DISCONNECTED) {
-                // Note that this code assumes an AudioTrack::Buffer is the same as
-                // AudioRecord::Buffer
-                // TODO define our own AudioBuffer and pass it from the subclasses.
-                AudioTrack::Buffer *audioBuffer = static_cast<AudioTrack::Buffer *>(info);
-                if (audioBuffer->frameCount == 0) return;
+            checkForDisconnectRequest();
+
+            // Note that this code assumes an AudioTrack::Buffer is the same as
+            // AudioRecord::Buffer
+            // TODO define our own AudioBuffer and pass it from the subclasses.
+            AudioTrack::Buffer *audioBuffer = static_cast<AudioTrack::Buffer *>(info);
+            if (getState() == AAUDIO_STREAM_STATE_DISCONNECTED || !mCallbackEnabled.load()) {
+                audioBuffer->size = 0; // silence the buffer
+            } else {
+                if (audioBuffer->frameCount == 0) {
+                    return;
+                }
 
                 // If the caller specified an exact size then use a block size adapter.
                 if (mBlockAdapter != nullptr) {
@@ -107,30 +110,47 @@ void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode
                     audioBuffer->size = 0;
                 }
 
-                if (updateStateMachine() == AAUDIO_OK) {
-                    break; // don't fall through
+                if (updateStateMachine() != AAUDIO_OK) {
+                    forceDisconnect();
+                    mCallbackEnabled.store(false);
                 }
             }
         }
-        /// FALL THROUGH
+            break;
 
         // Stream got rerouted so we disconnect.
-        case AAUDIO_CALLBACK_OPERATION_DISCONNECTED: {
-            setState(AAUDIO_STREAM_STATE_DISCONNECTED);
+        case AAUDIO_CALLBACK_OPERATION_DISCONNECTED:
             ALOGD("processCallbackCommon() stream disconnected");
-            if (getErrorCallbackProc() != nullptr) {
-                (*getErrorCallbackProc())(
-                        (AAudioStream *) this,
-                        getErrorCallbackUserData(),
-                        AAUDIO_ERROR_DISCONNECTED
-                        );
-            }
+            forceDisconnect();
             mCallbackEnabled.store(false);
-        }
             break;
 
         default:
             break;
+    }
+}
+
+
+
+void AudioStreamLegacy::checkForDisconnectRequest() {
+    if (mRequestDisconnect.isRequested()) {
+        ALOGD("checkForDisconnectRequest() mRequestDisconnect acknowledged");
+        forceDisconnect();
+        mRequestDisconnect.acknowledge();
+        mCallbackEnabled.store(false);
+    }
+}
+
+void AudioStreamLegacy::forceDisconnect() {
+    if (getState() != AAUDIO_STREAM_STATE_DISCONNECTED) {
+        setState(AAUDIO_STREAM_STATE_DISCONNECTED);
+        if (getErrorCallbackProc() != nullptr) {
+            (*getErrorCallbackProc())(
+                    (AAudioStream *) this,
+                    getErrorCallbackUserData(),
+                    AAUDIO_ERROR_DISCONNECTED
+            );
+        }
     }
 }
 
@@ -175,15 +195,18 @@ void AudioStreamLegacy::onAudioDeviceUpdate(audio_port_handle_t deviceId)
     ALOGD("onAudioDeviceUpdate() deviceId %d", (int)deviceId);
     if (getDeviceId() != AAUDIO_UNSPECIFIED && getDeviceId() != deviceId &&
             getState() != AAUDIO_STREAM_STATE_DISCONNECTED) {
-        setState(AAUDIO_STREAM_STATE_DISCONNECTED);
-        // if we have a data callback and the stream is active, send the error callback from
-        // data callback thread when it sees the DISCONNECTED state
-        if (!isDataCallbackActive() && getErrorCallbackProc() != nullptr) {
-            (*getErrorCallbackProc())(
-                    (AAudioStream *) this,
-                    getErrorCallbackUserData(),
-                    AAUDIO_ERROR_DISCONNECTED
-                    );
+        // Note that isDataCallbackActive() is affected by state so call it before DISCONNECTING.
+        // If we have a data callback and the stream is active, then ask the data callback
+        // to DISCONNECT and call the error callback.
+        if (isDataCallbackActive()) {
+            ALOGD("onAudioDeviceUpdate() request DISCONNECT in data callback due to device change");
+            // If the stream is stopped before the data callback has a chance to handle the
+            // request then the requestStop() and requestPause() methods will handle it after
+            // the callback has stopped.
+            mRequestDisconnect.request();
+        } else {
+            ALOGD("onAudioDeviceUpdate() DISCONNECT the stream now");
+            forceDisconnect();
         }
     }
     setDeviceId(deviceId);
