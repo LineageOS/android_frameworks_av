@@ -4,46 +4,52 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES := MediaCodecService.cpp
 LOCAL_SHARED_LIBRARIES := \
-    libmedia \
+    libmedia_omx \
     libbinder \
     libgui \
     libutils \
     liblog \
     libstagefright_omx
 LOCAL_C_INCLUDES := \
+    frameworks/av/include \
     frameworks/av/media/libstagefright \
+    frameworks/av/media/libstagefright/include \
+    frameworks/native/include \
     frameworks/native/include/media/openmax
 LOCAL_MODULE:= libmediacodecservice
+LOCAL_VENDOR_MODULE := true
 LOCAL_32_BIT_ONLY := true
 include $(BUILD_SHARED_LIBRARY)
-
 
 # service executable
 include $(CLEAR_VARS)
 LOCAL_REQUIRED_MODULES_arm := mediacodec.policy
 LOCAL_SRC_FILES := main_codecservice.cpp
 LOCAL_SHARED_LIBRARIES := \
-    libmedia \
+    libmedia_omx \
     libmediacodecservice \
     libbinder \
     libutils \
     libgui \
     liblog \
     libbase \
-    libavservices_minijail \
+    libavservices_minijail_vendor \
     libcutils \
     libhwbinder \
     libhidltransport \
     libstagefright_omx \
     android.hardware.media.omx@1.0 \
     android.hidl.memory@1.0
+
 LOCAL_C_INCLUDES := \
+    frameworks/av/include \
     frameworks/av/media/libstagefright \
     frameworks/av/media/libstagefright/include \
+    frameworks/native/include \
     frameworks/native/include/media/openmax
 LOCAL_MODULE := android.hardware.media.omx@1.0-service
 LOCAL_MODULE_RELATIVE_PATH := hw
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 LOCAL_32_BIT_ONLY := true
 LOCAL_INIT_RC := android.hardware.media.omx@1.0-service.rc
 include $(BUILD_EXECUTABLE)

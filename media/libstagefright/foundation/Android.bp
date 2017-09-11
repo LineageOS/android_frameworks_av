@@ -1,35 +1,6 @@
-COMMON_SRCS = [
-        "AAtomizer.cpp",
-        "ABitReader.cpp",
-        "ABuffer.cpp",
-        "ADebug.cpp",
-        "AHandler.cpp",
-        "AHierarchicalStateMachine.cpp",
-        "ALooper.cpp",
-        "ALooperRoster.cpp",
-        "AMessage.cpp",
-        "ANetworkSession.cpp",
-        "AString.cpp",
-        "AStringUtils.cpp",
-        "ColorUtils.cpp",
-        "MediaBuffer.cpp",
-        "MediaBufferGroup.cpp",
-        "MetaData.cpp",
-        "ParsedMessage.cpp",
-        "base64.cpp",
-        "hexdump.cpp",
-]
-
-COMMON_LIBS = [
-        "libbinder",
-        "libutils",
-        "libui",
-        "libcutils",
-        "liblog",
-]
-
-cc_defaults {
-    name: "libstagefright_foundation-defaults",
+cc_library_shared {
+    name: "libstagefright_foundation",
+    vendor_available: true,
 
     include_dirs: [
         "frameworks/av/include",
@@ -59,6 +30,45 @@ cc_defaults {
         "-Wall",
     ],
 
+    shared_libs: [
+        "libbinder",
+        "libutils",
+        "libui",
+        "libcutils",
+        "liblog",
+        "libpowermanager",
+    ],
+
+    srcs: [
+        "AAtomizer.cpp",
+        "ABitReader.cpp",
+        "ABuffer.cpp",
+        "ADebug.cpp",
+        "AHandler.cpp",
+        "AHierarchicalStateMachine.cpp",
+        "ALooper.cpp",
+        "ALooperRoster.cpp",
+        "AMessage.cpp",
+        "ANetworkSession.cpp",
+        "AString.cpp",
+        "AStringUtils.cpp",
+        "AWakeLock.cpp",
+        "ColorUtils.cpp",
+        "MediaBuffer.cpp",
+        "MediaBufferGroup.cpp",
+        "MetaData.cpp",
+        "ParsedMessage.cpp",
+        "base64.cpp",
+        "hexdump.cpp",
+    ],
+
+    target: {
+        vendor: {
+            exclude_shared_libs: ["libpowermanager"],
+            exclude_srcs: ["AWakeLock.cpp"],
+        },
+    },
+
     clang: true,
 
     sanitize: {
@@ -71,21 +81,4 @@ cc_defaults {
             cfi: true,
         },
     },
-}
-
-cc_library_shared {
-    name: "libstagefright_foundation",
-    defaults: ["libstagefright_foundation-defaults"],
-
-    srcs: COMMON_SRCS + ["AWakeLock.cpp"],
-    shared_libs: COMMON_LIBS + ["libpowermanager"],
-}
-
-cc_library_shared {
-    name: "libstagefright_foundation_vendor",
-    defaults: ["libstagefright_foundation-defaults"],
-    vendor: true,
-
-    srcs: COMMON_SRCS,
-    shared_libs: COMMON_LIBS,
 }

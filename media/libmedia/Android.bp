@@ -19,24 +19,117 @@ cc_library {
     clang: true,
 }
 
-cc_library_shared {
-    name: "libmedia",
+// TODO(b/35449087): merge back with libmedia when OMX implementatoins
+// no longer use aidl wrappers (or remove OMX component form libmedia)
+cc_defaults {
+    name: "libmedia_omx_defaults",
+
+    srcs: [
+        "aidl/android/IGraphicBufferSource.aidl",
+        "aidl/android/IOMXBufferSource.aidl",
+
+        "IMediaCodecList.cpp",
+        "IMediaCodecService.cpp",
+        "IOMX.cpp",
+        "MediaCodecBuffer.cpp",
+        "MediaCodecInfo.cpp",
+        "MediaDefs.cpp",
+        "OMXBuffer.cpp",
+        "omx/1.0/WGraphicBufferSource.cpp",
+        "omx/1.0/WOmx.cpp",
+        "omx/1.0/WOmxBufferSource.cpp",
+        "omx/1.0/WOmxNode.cpp",
+        "omx/1.0/WOmxObserver.cpp",
+    ],
 
     aidl: {
         local_include_dirs: ["aidl"],
         export_aidl_headers: true,
     },
 
-    srcs: [
-        "aidl/android/IGraphicBufferSource.aidl",
-        "aidl/android/IOMXBufferSource.aidl",
+    shared_libs: [
+        "android.hidl.memory@1.0",
+        "android.hidl.token@1.0-utils",
+        "android.hardware.media.omx@1.0",
+        "android.hardware.media@1.0",
+        "libbase",
+        "libbinder",
+        "libcutils",
+        "libgui",
+        "libhidlbase",
+        "libhidlmemory",
+        "libhidltransport",
+        "libhwbinder",
+        "liblog",
+        "libstagefright_foundation",
+        "libui",
+        "libutils",
+    ],
 
+    include_dirs: [
+        "frameworks/av/include", // for media/vndk/xmlparser/1.0/MediaCodecsXmlParser.h
+        "frameworks/av/include/media",
+        "frameworks/native/include", // for media/hardware/MetadataBufferType.h
+        "frameworks/native/include/media/openmax",
+        "frameworks/av/media/libstagefright",
+    ],
+
+    export_shared_lib_headers: [
+        "android.hidl.memory@1.0",
+        "android.hidl.token@1.0-utils",
+        "android.hardware.media.omx@1.0",
+        "android.hardware.media@1.0",
+        "libhidlmemory",
+        "libstagefright_foundation",
+        "libui",
+    ],
+
+    header_libs: [
+        "libmedia_headers",
+    ],
+
+    export_header_lib_headers: [
+        "libmedia_headers",
+    ],
+
+    export_include_dirs: [
+        "aidl",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wno-error=deprecated-declarations",
+        "-Wall",
+    ],
+
+    sanitize: {
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+        diag: {
+            cfi: true,
+        },
+    },
+}
+
+cc_library_shared {
+    name: "libmedia_omx",
+    vendor_available: true,
+
+    defaults: ["libmedia_omx_defaults"],
+}
+
+cc_library_shared {
+    name: "libmedia",
+    defaults: ["libmedia_omx_defaults"],
+
+    srcs: [
         "IDataSource.cpp",
         "IHDCP.cpp",
         "BufferingSettings.cpp",
         "mediaplayer.cpp",
-        "IMediaCodecList.cpp",
-        "IMediaCodecService.cpp",
         "IMediaHTTPConnection.cpp",
         "IMediaHTTPService.cpp",
         "IMediaExtractor.cpp",
@@ -52,9 +145,6 @@ cc_library_shared {
         "IResourceManagerClient.cpp",
         "IResourceManagerService.cpp",
         "IStreamSource.cpp",
-        "MediaCodecBuffer.cpp",
-        "MediaCodecInfo.cpp",
-        "MediaDefs.cpp",
         "MediaUtils.cpp",
         "Metadata.cpp",
         "mediarecorder.cpp",
@@ -63,7 +153,6 @@ cc_library_shared {
         "MidiDeviceInfo.cpp",
         "MidiIoWrapper.cpp",
         "JetPlayer.cpp",
-        "IOMX.cpp",
         "MediaScanner.cpp",
         "MediaScannerClient.cpp",
         "CharacterEncodingDetector.cpp",
@@ -71,14 +160,8 @@ cc_library_shared {
         "MediaProfiles.cpp",
         "MediaResource.cpp",
         "MediaResourcePolicy.cpp",
-        "OMXBuffer.cpp",
         "Visualizer.cpp",
         "StringArray.cpp",
-        "omx/1.0/WGraphicBufferSource.cpp",
-        "omx/1.0/WOmx.cpp",
-        "omx/1.0/WOmxBufferSource.cpp",
-        "omx/1.0/WOmxNode.cpp",
-        "omx/1.0/WOmxObserver.cpp",
     ],
 
     shared_libs: [
@@ -106,11 +189,8 @@ cc_library_shared {
         "libhwbinder",
         "libhidlmemory",
         "android.hidl.memory@1.0",
-        "android.hidl.token@1.0-utils",
         "android.hardware.graphics.common@1.0",
         "android.hardware.graphics.bufferqueue@1.0",
-        "android.hardware.media@1.0",
-        "android.hardware.media.omx@1.0",
     ],
 
     export_shared_lib_headers: [
@@ -119,8 +199,6 @@ cc_library_shared {
         "libicui18n",
         "libsonivox",
         "libmediadrm",
-        "android.hidl.token@1.0-utils",
-        "android.hardware.media.omx@1.0",
         "android.hidl.memory@1.0",
     ],
 
@@ -136,7 +214,6 @@ cc_library_shared {
     ],
 
     export_include_dirs: [
-        "aidl",
         "include",
     ],
     cflags: [

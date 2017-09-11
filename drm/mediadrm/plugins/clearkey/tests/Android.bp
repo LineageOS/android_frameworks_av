@@ -31,7 +31,7 @@ cc_test {
         "libcrypto",
         "libdrmclearkeyplugin",
         "liblog",
-        "libstagefright_foundation_vendor",
+        "libstagefright_foundation",
         "libutils",
     ],
 }

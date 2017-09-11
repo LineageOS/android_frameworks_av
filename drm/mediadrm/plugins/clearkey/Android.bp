@@ -38,7 +38,7 @@ cc_library_shared {
     shared_libs: [
         "libcrypto",
         "liblog",
-        "libstagefright_foundation_vendor",
+        "libstagefright_foundation",
         "libutils",
     ],
 
