@@ -363,6 +363,8 @@ OMXNodeInstance::OMXNodeInstance(
     mPortMode[1] = IOMX::kPortModePresetByteBuffer;
     mSecureBufferType[0] = kSecureBufferTypeUnknown;
     mSecureBufferType[1] = kSecureBufferTypeUnknown;
+    mGraphicBufferEnabled[0] = false;
+    mGraphicBufferEnabled[1] = false;
     mIsSecure = AString(name).endsWith(".secure");
     mLegacyAdaptiveExperiment = ADebug::isExperimentEnabled("legacy-adaptive");
 }
@@ -796,6 +798,12 @@ status_t OMXNodeInstance::enableNativeBuffers_l(
             } else if (mSecureBufferType[portIndex] == kSecureBufferTypeUnknown) {
                 mSecureBufferType[portIndex] = kSecureBufferTypeOpaque;
             }
+        } else {
+            if (err == OMX_ErrorNone) {
+                mGraphicBufferEnabled[portIndex] = enable;
+            } else if (enable) {
+                mGraphicBufferEnabled[portIndex] = false;
+            }
         }
     } else {
         CLOG_ERROR_IF(enable, getExtensionIndex, err, "%s", name);
@@ -1059,10 +1067,17 @@ status_t OMXNodeInstance::useBuffer(
 status_t OMXNodeInstance::useBuffer_l(
         OMX_U32 portIndex, const sp<IMemory> &params,
         const sp<IHidlMemory> &hParams, IOMX::buffer_id *buffer) {
+
     BufferMeta *buffer_meta;
     OMX_BUFFERHEADERTYPE *header;
     OMX_ERRORTYPE err = OMX_ErrorNone;
     bool isMetadata = mMetadataType[portIndex] != kMetadataBufferTypeInvalid;
+
+    if (!isMetadata && mGraphicBufferEnabled[portIndex]) {
+        ALOGE("b/62948670");
+        android_errorWriteLog(0x534e4554, "62948670");
+        return INVALID_OPERATION;
+    }
 
     size_t paramsSize;
     void* paramsPointer;
@@ -1247,6 +1262,13 @@ status_t OMXNodeInstance::useGraphicBuffer_l(
     if (mMetadataType[portIndex] != kMetadataBufferTypeInvalid) {
         return useGraphicBufferWithMetadata_l(
                 portIndex, graphicBuffer, buffer);
+    }
+
+    if (!mGraphicBufferEnabled[portIndex]) {
+        // Report error if this is not in graphic buffer mode.
+        ALOGE("b/62948670");
+        android_errorWriteLog(0x534e4554, "62948670");
+        return INVALID_OPERATION;
     }
 
     // See if the newer version of the extension is present.
