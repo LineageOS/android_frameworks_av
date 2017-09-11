@@ -157,8 +157,9 @@ private:
     KeyedVector<OMX::buffer_id, OMX_BUFFERHEADERTYPE *> mBufferIDToBufferHeader;
     KeyedVector<OMX_BUFFERHEADERTYPE *, OMX::buffer_id> mBufferHeaderToBufferID;
 
-    // metadata mode tracking
+    // metadata and graphic buffer mode tracking
     bool mUsingMetadata[2];
+    bool mGraphicBufferEnabled[2];
 
     ~OMXNodeInstance();
 
