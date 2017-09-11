@@ -665,6 +665,7 @@ status_t AudioPolicyService::acquireSoundTriggerSession(audio_session_t *session
                                        audio_io_handle_t *ioHandle,
                                        audio_devices_t *device)
 {
+    Mutex::Autolock _l(mLock);
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
@@ -674,6 +675,7 @@ status_t AudioPolicyService::acquireSoundTriggerSession(audio_session_t *session
 
 status_t AudioPolicyService::releaseSoundTriggerSession(audio_session_t session)
 {
+    Mutex::Autolock _l(mLock);
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
