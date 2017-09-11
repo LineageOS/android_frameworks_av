@@ -1235,6 +1235,12 @@ status_t OMXNodeInstance::allocateSecureBuffer(
         return BAD_VALUE;
     }
 
+    if (mSecureBufferType[portIndex] == kSecureBufferTypeUnknown) {
+        ALOGE("b/63522818");
+        android_errorWriteLog(0x534e4554, "63522818");
+        return ERROR_UNSUPPORTED;
+    }
+
     BufferMeta *buffer_meta = new BufferMeta(size, portIndex);
 
     OMX_BUFFERHEADERTYPE *header;
@@ -1294,6 +1300,12 @@ status_t OMXNodeInstance::allocateBufferWithBackup(
         ALOGE("b/35467458");
         android_errorWriteLog(0x534e4554, "35467458");
         return BAD_VALUE;
+    }
+
+    if (mSecureBufferType[portIndex] != kSecureBufferTypeUnknown) {
+        ALOGE("b/63522818");
+        android_errorWriteLog(0x534e4554, "63522818");
+        return ERROR_UNSUPPORTED;
     }
 
     // metadata buffers are not connected cross process; only copy if not meta
