@@ -132,7 +132,8 @@ int main(int argc __unused, char **argv)
         ALOGI("ServiceManager: %p", sm.get());
         AudioFlinger::instantiate();
         AudioPolicyService::instantiate();
-        AAudioService::instantiate();
+        // AAudioService disabled because we do not support MMAP mode in OC or OC-DR1.
+        // AAudioService::instantiate();
         RadioService::instantiate();
         SoundTriggerHwService::instantiate();
         ProcessState::self()->startThreadPool();
