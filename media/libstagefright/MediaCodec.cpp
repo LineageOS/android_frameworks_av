@@ -1576,6 +1576,19 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     }
                     setState(CONFIGURED);
                     (new AMessage)->postReply(mReplyID);
+
+                    // augment our media metrics info, now that we know more things
+                    if (mAnalyticsItem != NULL) {
+                        sp<AMessage> format;
+                        if (mConfigureMsg != NULL &&
+                            mConfigureMsg->findMessage("format", &format)) {
+                                // format includes: mime
+                                AString mime;
+                                if (format->findString("mime", &mime)) {
+                                    mAnalyticsItem->setCString(kCodecMime, mime.c_str());
+                                }
+                            }
+                    }
                     break;
                 }
 
