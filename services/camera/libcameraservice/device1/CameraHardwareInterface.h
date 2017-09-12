@@ -523,6 +523,7 @@ private:
     uint64_t mNextBufferId = 1;
     static const uint64_t BUFFER_ID_NO_BUFFER = 0;
 
+    std::mutex mHidlMemPoolMapLock; // protecting mHidlMemPoolMap
     std::unordered_map<int, camera_memory_t*> mHidlMemPoolMap;
 };
 
