@@ -35,6 +35,10 @@ private:
     void closeEndpoints();
     void doSendEvent(mtp_event me);
 
+    void controlLoop();
+    int handleEvent();
+    int handleControlRequest(const struct usb_ctrlrequest *setup);
+
     bool mPtp;
 
     std::timed_mutex mLock;
