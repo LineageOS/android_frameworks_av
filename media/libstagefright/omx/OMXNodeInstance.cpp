@@ -679,6 +679,11 @@ status_t OMXNodeInstance::setPortMode(OMX_U32 portIndex, IOMX::PortMode mode) {
         return BAD_VALUE;
     }
 
+    if (mSailed || mNumPortBuffers[portIndex] > 0) {
+        android_errorWriteLog(0x534e4554, "29422020");
+        return INVALID_OPERATION;
+    }
+
     CLOG_CONFIG(setPortMode, "%s(%d), port %d", asString(mode), mode, portIndex);
 
     switch (mode) {
