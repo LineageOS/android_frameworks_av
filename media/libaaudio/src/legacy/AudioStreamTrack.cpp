@@ -478,6 +478,9 @@ status_t AudioStreamTrack::doSetVolume() {
 }
 
 #if AAUDIO_USE_VOLUME_SHAPER
+
+using namespace android::media::VolumeShaper;
+
 binder::Status AudioStreamTrack::applyVolumeShaper(
         const VolumeShaper::Configuration& configuration,
         const VolumeShaper::Operation& operation) {
@@ -487,7 +490,7 @@ binder::Status AudioStreamTrack::applyVolumeShaper(
 
     if (mAudioTrack.get() != nullptr) {
         ALOGD("applyVolumeShaper() from IPlayer");
-        VolumeShaper::Status status = mAudioTrack->applyVolumeShaper(spConfiguration, spOperation);
+        binder::Status status = mAudioTrack->applyVolumeShaper(spConfiguration, spOperation);
         if (status < 0) { // a non-negative value is the volume shaper id.
             ALOGE("applyVolumeShaper() failed with status %d", status);
         }

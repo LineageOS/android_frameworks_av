@@ -256,29 +256,29 @@ public:
     virtual android::status_t doSetVolume() { return android::NO_ERROR; }
 
 #if AAUDIO_USE_VOLUME_SHAPER
-    virtual android::binder::Status applyVolumeShaper(
+    virtual ::android::binder::Status applyVolumeShaper(
             const ::android::media::VolumeShaper::Configuration& configuration __unused,
-            const ::android::media::VolumeShaper::Operation& operation __unused) {
-        ALOGW("applyVolumeShaper() is not supported");
-        return android::binder::Status::ok();
-    }
+            const ::android::media::VolumeShaper::Operation& operation __unused);
 #endif
 
-    // Should this object be registered with the AudioManager?
-    virtual bool needsSystemRegistration() { return false; }
-
-    // Register this stream's PlayerBase with the AudioManager
-    void systemRegister() {
-        if (needsSystemRegistration()) {
+    /**
+     * Register this stream's PlayerBase with the AudioManager if needed.
+     * Only register output streams.
+     * This should only be called for client streams and not for streams
+     * that run in the service.
+     */
+    void registerPlayerBase() {
+        if (getDirection() == AAUDIO_DIRECTION_OUTPUT) {
             mPlayerBase->registerWithAudioManager();
         }
     }
 
-    // UnRegister this stream's PlayerBase with the AudioManager
-    void systemUnRegister() {
-        if (needsSystemRegistration()) {
-            mPlayerBase->destroy();
-        }
+    /**
+     * Unregister this stream's PlayerBase with the AudioManager.
+     * This will only unregister if already registered.
+     */
+    void unregisterPlayerBase() {
+        mPlayerBase->unregisterWithAudioManager();
     }
 
     // Pass start request through PlayerBase for tracking.
@@ -308,43 +308,53 @@ protected:
     //                         ------ AudioManager -------
     class MyPlayerBase : public android::PlayerBase {
     public:
-        MyPlayerBase(AudioStream *parent) : mParent(parent) {}
-        virtual ~MyPlayerBase() {}
+        explicit MyPlayerBase(AudioStream *parent);
 
-        void registerWithAudioManager() {
-            init(android::PLAYER_TYPE_AAUDIO, AUDIO_USAGE_MEDIA);
-        }
+        virtual ~MyPlayerBase();
 
-        void destroy() override {
-            // FIXME what else should this do? close()? disconnect()?
-            baseDestroy();
-        }
+        /**
+         * Register for volume changes and remote control.
+         */
+        void registerWithAudioManager();
 
-        virtual android::status_t playerStart() {
+        /**
+         * UnRegister.
+         */
+        void unregisterWithAudioManager();
+
+        /**
+         * Just calls unregisterWithAudioManager().
+         */
+        void destroy() override;
+
+        void clearParentReference() { mParent = nullptr; }
+
+        android::status_t playerStart() override {
+            // mParent should NOT be null. So go ahead and crash if it is.
             mResult = mParent->requestStart();
             return AAudioConvert_aaudioToAndroidStatus(mResult);
         }
 
-        virtual android::status_t playerPause() {
+        android::status_t playerPause() override {
             mResult = mParent->requestPause();
             return AAudioConvert_aaudioToAndroidStatus(mResult);
         }
 
-        virtual android::status_t playerStop() {
+        android::status_t playerStop() override {
             mResult = mParent->requestStop();
             return AAudioConvert_aaudioToAndroidStatus(mResult);
         }
 
-        virtual android::status_t playerSetVolume() {
+        android::status_t playerSetVolume() override {
             // No pan and only left volume is taken into account from IPLayer interface
             mParent->setDuckAndMuteVolume(mVolumeMultiplierL  /* * mPanMultiplierL */);
             return android::NO_ERROR;
         }
 
 #if AAUDIO_USE_VOLUME_SHAPER
-        android::binder::Status applyVolumeShaper(
-                const android::media::VolumeShaper::Configuration& configuration,
-                const android::media::VolumeShaper::Operation& operation) {
+        ::android::binder::Status applyVolumeShaper(
+                const ::android::media::VolumeShaper::Configuration& configuration,
+                const ::android::media::VolumeShaper::Operation& operation) {
             return mParent->applyVolumeShaper(configuration, operation);
         }
 #endif
@@ -353,11 +363,11 @@ protected:
             return mResult;
         }
 
-        AudioStream *mParent;
+    private:
+        AudioStream          *mParent;
         aaudio_result_t       mResult = AAUDIO_OK;
+        bool                  mRegistered = false;
     };
-
-
 
     /**
      * This should not be called after the open() call.
