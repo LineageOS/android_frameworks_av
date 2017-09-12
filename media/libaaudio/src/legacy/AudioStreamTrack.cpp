@@ -261,6 +261,7 @@ aaudio_result_t AudioStreamTrack::requestPause() {
     onStop();
     setState(AAUDIO_STREAM_STATE_PAUSING);
     mAudioTrack->pause();
+    checkForDisconnectRequest();
     status_t err = mAudioTrack->getPosition(&mPositionWhenPausing);
     if (err != OK) {
         return AAudioConvert_androidToAAudioResult(err);
@@ -300,6 +301,7 @@ aaudio_result_t AudioStreamTrack::requestStop() {
     mFramesWritten.reset32();
     mTimestampPosition.reset32();
     mAudioTrack->stop();
+    checkForDisconnectRequest();
     return AAUDIO_OK;
 }
 
