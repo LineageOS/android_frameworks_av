@@ -215,8 +215,7 @@ aaudio_result_t AAudioService::startStream(aaudio_handle_t streamHandle) {
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
 
-    aaudio_result_t result = serviceStream->start();
-    return result;
+    return serviceStream->start();
 }
 
 aaudio_result_t AAudioService::pauseStream(aaudio_handle_t streamHandle) {

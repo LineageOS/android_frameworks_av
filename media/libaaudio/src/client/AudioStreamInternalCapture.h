@@ -46,6 +46,8 @@ public:
     }
 protected:
 
+    void advanceClientToMatchServerPosition() override;
+
 /**
  * Low level data processing that will not block. It will just read or write as much as it can.
  *

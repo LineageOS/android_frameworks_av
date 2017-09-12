@@ -120,6 +120,18 @@ static aaudio_result_t testOpenPlayClose(AAudioArgsParser &argParser)
         goto error;
     }
 
+    for (int i = 0; i < myData.timestampCount; i++) {
+        Timestamp *timestamp = &myData.timestamps[i];
+        bool retro = (i > 0 &&
+                      ((timestamp->position < (timestamp - 1)->position)
+                       || ((timestamp->nanoseconds < (timestamp - 1)->nanoseconds))));
+        const char *message = retro ? "  <= RETROGRADE!" : "";
+        printf("Timestamp %3d : %8lld, %8lld %s\n", i,
+               (long long) timestamp->position,
+               (long long) timestamp->nanoseconds,
+               message);
+    }
+
     if (myData.schedulerChecked) {
         printf("scheduler = 0x%08x, SCHED_FIFO = 0x%08X\n",
                myData.scheduler,

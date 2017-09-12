@@ -18,7 +18,6 @@
 #define ANDROID_AAUDIO_AUDIO_STREAM_INTERNAL_H
 
 #include <stdint.h>
-#include <media/PlayerBase.h>
 #include <aaudio/AAudio.h>
 
 #include "binding/IAAudioService.h"
@@ -36,7 +35,7 @@ using android::IAAudioService;
 namespace aaudio {
 
 // A stream that talks to the AAudioService or directly to a HAL.
-class AudioStreamInternal : public AudioStream, public android::PlayerBase  {
+class AudioStreamInternal : public AudioStream {
 
 public:
     AudioStreamInternal(AAudioServiceInterface  &serviceInterface, bool inService);
@@ -85,9 +84,6 @@ public:
     // Calculate timeout based on framesPerBurst
     int64_t calculateReasonableTimeout();
 
-    //PlayerBase virtuals
-    virtual void destroy();
-
     aaudio_result_t startClient(const android::AudioClient& client,
                                 audio_port_handle_t *clientHandle);
 
@@ -115,12 +111,15 @@ protected:
                             int64_t currentTimeNanos,
                             int64_t *wakeTimePtr) = 0;
 
+    aaudio_result_t drainTimestampsFromService();
+
     aaudio_result_t processCommands();
 
     aaudio_result_t requestStopInternal();
 
     aaudio_result_t stopCallback();
 
+    virtual void advanceClientToMatchServerPosition() = 0;
 
     virtual void onFlushFromServer() {}
 
@@ -135,14 +134,6 @@ protected:
     // Calculate timeout for an operation involving framesPerOperation.
     int64_t calculateReasonableTimeout(int32_t framesPerOperation);
 
-    void doSetVolume();
-
-    //PlayerBase virtuals
-    virtual status_t playerStart();
-    virtual status_t playerPause();
-    virtual status_t playerStop();
-    virtual status_t playerSetVolume();
-
     aaudio_format_t          mDeviceFormat = AAUDIO_FORMAT_UNSPECIFIED;
 
     IsochronousClockModel    mClockModel;      // timing model for chasing the HAL
@@ -152,9 +143,6 @@ protected:
 
     int32_t                  mFramesPerBurst;     // frames per HAL transfer
     int32_t                  mXRunCount = 0;      // how many underrun events?
-
-    LinearRamp               mVolumeRamp;
-    float                    mStreamVolume;
 
     // Offset from underlying frame position.
     int64_t                  mFramesOffsetFromService = 0; // offset for timestamps
@@ -166,6 +154,12 @@ protected:
     bool                     mInService = false;  // Is this running in the client or the service?
 
     AAudioServiceInterface  &mServiceInterface;   // abstract interface to the service
+
+    SimpleDoubleBuffer<Timestamp>  mAtomicTimestamp;
+
+    AtomicRequestor          mNeedCatchUp;   // Ask read() or write() to sync on first timestamp.
+
+    float                    mStreamVolume = 1.0f;
 
 private:
     /*
@@ -188,10 +182,7 @@ private:
     AudioEndpointParcelable  mEndPointParcelable; // description of the buffers filled by service
     EndpointDescriptor       mEndpointDescriptor; // buffer description with resolved addresses
 
-    SimpleDoubleBuffer<Timestamp>  mAtomicTimestamp;
-
     int64_t                  mServiceLatencyNanos = 0;
-
 };
 
 } /* namespace aaudio */

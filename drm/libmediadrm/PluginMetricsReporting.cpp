@@ -44,6 +44,13 @@ status_t reportMetricsGroup(const MetricsGroup& metricsGroup,
         analyticsItem.setInt64(kParentAttribute, *parentId);
     }
 
+    // Report the package name.
+    if (metricsGroup.has_app_package_name()) {
+      AString app_package_name(metricsGroup.app_package_name().c_str(),
+                               metricsGroup.app_package_name().size());
+      analyticsItem.setPkgName(app_package_name);
+    }
+
     for (int i = 0; i < metricsGroup.metric_size(); ++i) {
         const MetricsGroup_Metric& metric = metricsGroup.metric(i);
         if (!metric.has_name()) {
@@ -73,7 +80,12 @@ status_t reportMetricsGroup(const MetricsGroup& metricsGroup,
     }
 
     analyticsItem.setFinalized(true);
-    analyticsItem.selfrecord();
+    if (!analyticsItem.selfrecord()) {
+      // Note the cast to int is because we build on 32 and 64 bit.
+      // The cast prevents a peculiar printf problem where one format cannot
+      // satisfy both.
+      ALOGE("selfrecord() returned false. sessioId %d", (int) sessionId);
+    }
 
     for (int i = 0; i < metricsGroup.metric_sub_group_size(); ++i) {
         const MetricsGroup& subGroup = metricsGroup.metric_sub_group(i);

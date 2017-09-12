@@ -615,7 +615,8 @@ status_t AudioTrack::start()
                             + mStartEts.mPosition[ExtendedTimestamp::LOCATION_SERVER]),
                     (long long)mStartEts.mFlushed,
                     (long long)mFramesWritten);
-            mFramesWrittenServerOffset = -mStartEts.mPosition[ExtendedTimestamp::LOCATION_SERVER];
+            // mStartEts is already adjusted by mFramesWrittenServerOffset, so we delta adjust.
+            mFramesWrittenServerOffset -= mStartEts.mPosition[ExtendedTimestamp::LOCATION_SERVER];
         }
         mFramesWritten = 0;
         mProxy->clearTimestamp(); // need new server push for valid timestamp
@@ -2096,7 +2097,14 @@ nsecs_t AudioTrack::processAudioBuffer()
     // Convert frame units to time units
     nsecs_t ns = NS_WHENEVER;
     if (minFrames != (uint32_t) ~0) {
-        ns = framesToNanoseconds(minFrames, sampleRate, speed) + kWaitPeriodNs;
+        // AudioFlinger consumption of client data may be irregular when coming out of device
+        // standby since the kernel buffers require filling. This is throttled to no more than 2x
+        // the expected rate in the MixerThread. Hence, we reduce the estimated time to wait by one
+        // half (but no more than half a second) to improve callback accuracy during these temporary
+        // data surges.
+        const nsecs_t estimatedNs = framesToNanoseconds(minFrames, sampleRate, speed);
+        constexpr nsecs_t maxThrottleCompensationNs = 500000000LL;
+        ns = estimatedNs - min(estimatedNs / 2, maxThrottleCompensationNs) + kWaitPeriodNs;
         ns -= (timeAfterCallbacks - timeBeforeCallbacks);  // account for callback time
         // TODO: Should we warn if the callback time is too long?
         if (ns < 0) ns = 0;

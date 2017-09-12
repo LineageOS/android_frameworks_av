@@ -272,14 +272,21 @@ template <class T>
 class SimpleDoubleBuffer {
 public:
     SimpleDoubleBuffer()
-            : mValues()
-            , mCounter(0) {}
+            : mValues() {}
 
     __attribute__((no_sanitize("integer")))
     void write(T value) {
         int index = mCounter.load() & 1;
         mValues[index] = value;
         mCounter++; // Increment AFTER updating storage, OK if it wraps.
+    }
+
+    /**
+     * This should only be called by the same thread that calls write() or when
+     * no other thread is calling write.
+     */
+    void clear() {
+        mCounter.store(0);
     }
 
     T read() const {
@@ -293,7 +300,7 @@ public:
             int index = (before & 1) ^ 1;
             result = mValues[index];
             after = mCounter.load();
-        } while ((after != before) && --timeout > 0);
+        } while ((after != before) && (after > 0) && (--timeout > 0));
         return result;
     }
 
@@ -306,7 +313,7 @@ public:
 
 private:
     T                    mValues[2];
-    std::atomic<int>     mCounter;
+    std::atomic<int>     mCounter{0};
 };
 
 class Timestamp {
@@ -328,4 +335,32 @@ private:
     int64_t mNanoseconds;
 };
 
+
+/**
+ * Pass a request to another thread.
+ * This is used when one thread, A, wants another thread, B, to do something.
+ * A naive approach would be for A to set a flag and for B to clear it when done.
+ * But that creates a race condition. This technique avoids the race condition.
+ *
+ * Assumes only one requester and one acknowledger.
+ */
+class AtomicRequestor {
+public:
+    void request() {
+        // TODO handle overflows, very unlikely
+        mRequested++;
+    }
+
+    bool isRequested() {
+        return mRequested.load() > mAcknowledged.load();
+    }
+
+    void acknowledge() {
+        mAcknowledged++;
+    }
+
+private:
+    std::atomic<int> mRequested{0};
+    std::atomic<int> mAcknowledged{0};
+};
 #endif //UTILITY_AAUDIO_UTILITIES_H

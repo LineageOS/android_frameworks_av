@@ -36,6 +36,8 @@ public:
     void start(int64_t nanoTime);
     void stop(int64_t nanoTime);
 
+    bool isStarting();
+
     void processTimestamp(int64_t framePosition, int64_t nanoTime);
 
     /**

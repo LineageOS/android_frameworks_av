@@ -63,6 +63,8 @@ public:
 
     aaudio_legacy_callback_t getLegacyCallback();
 
+    int32_t callDataCallbackFrames(uint8_t *buffer, int32_t numFrames);
+
     // This is public so it can be called from the C callback function.
     // This is called from the AudioTrack/AudioRecord client.
     virtual void processCallback(int event, void *info) = 0;
@@ -122,6 +124,7 @@ protected:
 
     MonotonicCounter           mFramesWritten;
     MonotonicCounter           mFramesRead;
+    MonotonicCounter           mTimestampPosition;
 
     FixedBlockAdapter         *mBlockAdapter = nullptr;
     aaudio_wrapping_frames_t   mPositionWhenStarting = 0;

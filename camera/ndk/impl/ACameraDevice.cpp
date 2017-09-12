@@ -1353,7 +1353,8 @@ CameraDevice::ServiceCallback::onRequestQueueEmpty() {
 }
 
 binder::Status
-CameraDevice::ServiceCallback::onRepeatingRequestError(int64_t lastFrameNumber) {
+CameraDevice::ServiceCallback::onRepeatingRequestError(
+        int64_t lastFrameNumber, int32_t stoppedSequenceId) {
     binder::Status ret = binder::Status::ok();
 
     sp<CameraDevice> dev = mDevice.promote();
@@ -1364,7 +1365,9 @@ CameraDevice::ServiceCallback::onRepeatingRequestError(int64_t lastFrameNumber) 
     Mutex::Autolock _l(dev->mDeviceLock);
 
     int repeatingSequenceId = dev->mRepeatingSequenceId;
-    dev->mRepeatingSequenceId = REQUEST_ID_NONE;
+    if (stoppedSequenceId == repeatingSequenceId) {
+        dev->mRepeatingSequenceId = REQUEST_ID_NONE;
+    }
 
     dev->checkRepeatingSequenceCompleteLocked(repeatingSequenceId, lastFrameNumber);
 

@@ -122,7 +122,6 @@ aaudio_result_t AAudioServiceEndpointShared::startStream(sp<AAudioServiceStreamB
         startSharingThread_l();
     }
     if (result == AAUDIO_OK) {
-        ALOGD("AAudioServiceEndpointShared::startStream() use shared stream client.");
         result = getStreamInternal()->startClient(sharedStream->getAudioClient(), clientHandle);
     }
     return result;

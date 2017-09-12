@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <utils/String16.h>
 #include <media/AudioTrack.h>
+#include <media/AudioTimestamp.h>
 #include <aaudio/AAudio.h>
 
 #include "core/AudioStream.h"
@@ -46,16 +47,32 @@ aaudio_legacy_callback_t AudioStreamLegacy::getLegacyCallback() {
     return AudioStreamLegacy_callback;
 }
 
-// Implement FixedBlockProcessor
-int32_t AudioStreamLegacy::onProcessFixedBlock(uint8_t *buffer, int32_t numBytes) {
-    int32_t frameCount = numBytes / getBytesPerFrame();
+int32_t AudioStreamLegacy::callDataCallbackFrames(uint8_t *buffer, int32_t numFrames) {
+    if (getDirection() == AAUDIO_DIRECTION_INPUT) {
+        // Increment before because we already got the data from the device.
+        incrementFramesRead(numFrames);
+    }
+
     // Call using the AAudio callback interface.
     AAudioStream_dataCallback appCallback = getDataCallbackProc();
-    return (*appCallback)(
+    aaudio_data_callback_result_t callbackResult = (*appCallback)(
             (AAudioStream *) this,
             getDataCallbackUserData(),
             buffer,
-            frameCount);
+            numFrames);
+
+    if (callbackResult == AAUDIO_CALLBACK_RESULT_CONTINUE
+            && getDirection() == AAUDIO_DIRECTION_OUTPUT) {
+        // Increment after because we are going to write the data to the device.
+        incrementFramesWritten(numFrames);
+    }
+    return callbackResult;
+}
+
+// Implement FixedBlockProcessor
+int32_t AudioStreamLegacy::onProcessFixedBlock(uint8_t *buffer, int32_t numBytes) {
+    int32_t numFrames = numBytes / getBytesPerFrame();
+    return callDataCallbackFrames(buffer, numFrames);
 }
 
 void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode, void *info) {
@@ -81,16 +98,11 @@ void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode
                             (uint8_t *) audioBuffer->raw, byteCount);
                 } else {
                     // Call using the AAudio callback interface.
-                    callbackResult = (*getDataCallbackProc())(
-                            (AAudioStream *) this,
-                            getDataCallbackUserData(),
-                            audioBuffer->raw,
-                            audioBuffer->frameCount
-                            );
+                    callbackResult = callDataCallbackFrames((uint8_t *)audioBuffer->raw,
+                                                            audioBuffer->frameCount);
                 }
                 if (callbackResult == AAUDIO_CALLBACK_RESULT_CONTINUE) {
                     audioBuffer->size = audioBuffer->frameCount * getBytesPerFrame();
-                    incrementClientFrameCounter(audioBuffer->frameCount);
                 } else {
                     audioBuffer->size = 0;
                 }
@@ -139,8 +151,23 @@ aaudio_result_t AudioStreamLegacy::getBestTimestamp(clockid_t clockId,
             return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
             break;
     }
-    status_t status = extendedTimestamp->getBestTimestamp(framePosition, timeNanoseconds, timebase);
-    return AAudioConvert_androidToAAudioResult(status);
+    ExtendedTimestamp::Location location = ExtendedTimestamp::Location::LOCATION_INVALID;
+    int64_t localPosition;
+    status_t status = extendedTimestamp->getBestTimestamp(&localPosition, timeNanoseconds,
+                                                          timebase, &location);
+    // use MonotonicCounter to prevent retrograde motion.
+    mTimestampPosition.update32((int32_t)localPosition);
+    *framePosition = mTimestampPosition.get();
+
+//    ALOGD("getBestTimestamp() fposition: server = %6lld, kernel = %6lld, location = %d",
+//          (long long) extendedTimestamp->mPosition[ExtendedTimestamp::Location::LOCATION_SERVER],
+//          (long long) extendedTimestamp->mPosition[ExtendedTimestamp::Location::LOCATION_KERNEL],
+//          (int)location);
+    if (status == WOULD_BLOCK) {
+        return AAUDIO_ERROR_INVALID_STATE;
+    } else {
+        return AAudioConvert_androidToAAudioResult(status);
+    }
 }
 
 void AudioStreamLegacy::onAudioDeviceUpdate(audio_port_handle_t deviceId)

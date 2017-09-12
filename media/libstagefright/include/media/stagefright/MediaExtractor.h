@@ -72,6 +72,8 @@ public:
 
     virtual const char * name() { return "<unspecified>"; }
 
+    virtual void release() {}
+
 protected:
     MediaExtractor();
     virtual ~MediaExtractor();
