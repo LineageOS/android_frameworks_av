@@ -108,11 +108,13 @@ hardware::Return<uint32_t> CameraHardwareInterface::registerMemory(
         ALOGE("%s: CameraHeapMemory has FD %d (expect >= 0)", __FUNCTION__, memPoolId);
         return 0;
     }
+    std::lock_guard<std::mutex> lock(mHidlMemPoolMapLock);
     mHidlMemPoolMap.insert(std::make_pair(memPoolId, mem));
     return memPoolId;
 }
 
 hardware::Return<void> CameraHardwareInterface::unregisterMemory(uint32_t memId) {
+    std::lock_guard<std::mutex> lock(mHidlMemPoolMapLock);
     if (mHidlMemPoolMap.count(memId) == 0) {
         ALOGE("%s: memory pool ID %d not found", __FUNCTION__, memId);
         return hardware::Void();
@@ -126,6 +128,7 @@ hardware::Return<void> CameraHardwareInterface::unregisterMemory(uint32_t memId)
 hardware::Return<void> CameraHardwareInterface::dataCallback(
         DataCallbackMsg msgType, uint32_t data, uint32_t bufferIndex,
         const hardware::camera::device::V1_0::CameraFrameMetadata& metadata) {
+    std::lock_guard<std::mutex> lock(mHidlMemPoolMapLock);
     if (mHidlMemPoolMap.count(data) == 0) {
         ALOGE("%s: memory pool ID %d not found", __FUNCTION__, data);
         return hardware::Void();
@@ -140,6 +143,7 @@ hardware::Return<void> CameraHardwareInterface::dataCallback(
 hardware::Return<void> CameraHardwareInterface::dataCallbackTimestamp(
         DataCallbackMsg msgType, uint32_t data,
         uint32_t bufferIndex, int64_t timestamp) {
+    std::lock_guard<std::mutex> lock(mHidlMemPoolMapLock);
     if (mHidlMemPoolMap.count(data) == 0) {
         ALOGE("%s: memory pool ID %d not found", __FUNCTION__, data);
         return hardware::Void();
@@ -151,6 +155,7 @@ hardware::Return<void> CameraHardwareInterface::dataCallbackTimestamp(
 hardware::Return<void> CameraHardwareInterface::handleCallbackTimestamp(
         DataCallbackMsg msgType, const hidl_handle& frameData, uint32_t data,
         uint32_t bufferIndex, int64_t timestamp) {
+    std::lock_guard<std::mutex> lock(mHidlMemPoolMapLock);
     if (mHidlMemPoolMap.count(data) == 0) {
         ALOGE("%s: memory pool ID %d not found", __FUNCTION__, data);
         return hardware::Void();
@@ -169,6 +174,7 @@ hardware::Return<void> CameraHardwareInterface::handleCallbackTimestampBatch(
     std::vector<android::HandleTimestampMessage> msgs;
     msgs.reserve(messages.size());
 
+    std::lock_guard<std::mutex> lock(mHidlMemPoolMapLock);
     for (const auto& hidl_msg : messages) {
         if (mHidlMemPoolMap.count(hidl_msg.data) == 0) {
             ALOGE("%s: memory pool ID %d not found", __FUNCTION__, hidl_msg.data);
