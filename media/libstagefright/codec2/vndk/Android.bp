@@ -9,6 +9,10 @@ cc_library_static {
         "C2Store.cpp",
     ],
 
+    export_include_dirs: [
+        "include",
+    ],
+
     include_dirs: [
         "frameworks/av/media/libstagefright/codec2/include",
         "frameworks/av/media/libstagefright/codec2/vndk/include",

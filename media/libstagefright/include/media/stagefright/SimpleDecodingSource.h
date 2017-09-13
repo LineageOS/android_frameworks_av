@@ -47,7 +47,8 @@ public:
     static sp<SimpleDecodingSource> Create(
             const sp<MediaSource> &source, uint32_t flags,
             const sp<ANativeWindow> &nativeWindow,
-            const char *desiredCodec = NULL);
+            const char *desiredCodec = NULL,
+            bool skipMediaCodecList = false);
 
     static sp<SimpleDecodingSource> Create(
             const sp<MediaSource> &source, uint32_t flags = 0);

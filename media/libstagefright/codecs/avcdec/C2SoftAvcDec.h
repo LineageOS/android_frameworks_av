@@ -58,9 +58,6 @@ struct ivd_video_decode_op_t;
 
 #define MIN(a, b) ((a) < (b)) ? (a) : (b)
 
-/** Used to remove warnings about unused parameters */
-#define UNUSED(x) ((void)(x))
-
 /** Get time */
 #define GETTIME(a, b) gettimeofday(a, b);
 

@@ -12,6 +12,10 @@ cc_library_shared {
         "frameworks/native/include/media/hardware",
     ],
 
+    export_include_dirs: [
+        "include",
+    ],
+
     sanitize: {
         misc_undefined: [
             "unsigned-integer-overflow",

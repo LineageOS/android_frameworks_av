@@ -1,0 +1,128 @@
+/*
+ * Copyright (C) 2017 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#ifndef C_CODEC_H_
+#define C_CODEC_H_
+
+#include <chrono>
+
+#include <C2Component.h>
+
+#include <android/native_window.h>
+#include <media/hardware/MetadataBufferType.h>
+#include <media/stagefright/foundation/Mutexed.h>
+#include <media/stagefright/CodecBase.h>
+#include <media/stagefright/FrameRenderTracker.h>
+#include <media/stagefright/MediaDefs.h>
+#include <media/stagefright/SkipCutBuffer.h>
+#include <utils/NativeHandle.h>
+#include <hardware/gralloc.h>
+#include <nativebase/nativebase.h>
+
+namespace android {
+
+class CCodecBufferChannel;
+
+class CCodec : public CodecBase {
+public:
+    CCodec();
+
+    virtual std::shared_ptr<BufferChannelBase> getBufferChannel() override;
+    virtual void initiateAllocateComponent(const sp<AMessage> &msg) override;
+    virtual void initiateConfigureComponent(const sp<AMessage> &msg) override;
+    virtual void initiateCreateInputSurface() override;
+    virtual void initiateSetInputSurface(const sp<PersistentSurface> &surface) override;
+    virtual void initiateStart() override;
+    virtual void initiateShutdown(bool keepComponentAllocated = false) override;
+
+    virtual status_t setSurface(const sp<Surface> &surface) override;
+
+    virtual void signalFlush() override;
+    virtual void signalResume() override;
+
+    virtual void signalSetParameters(const sp<AMessage> &msg) override;
+    virtual void signalEndOfInputStream() override;
+    virtual void signalRequestIDRFrame() override;
+
+    void initiateReleaseIfStuck();
+
+protected:
+    virtual ~CCodec();
+
+    virtual void onMessageReceived(const sp<AMessage> &msg) override;
+
+private:
+    typedef std::chrono::time_point<std::chrono::steady_clock> TimePoint;
+
+    void initiateStop();
+    void initiateRelease(bool sendCallback = true);
+
+    void allocate(const AString &componentName);
+    void configure(const sp<AMessage> &msg);
+    void start();
+    void stop();
+    void flush();
+    void release(bool sendCallback);
+
+    void setDeadline(const TimePoint &deadline);
+
+    enum {
+        kWhatAllocate,
+        kWhatConfigure,
+        kWhatStart,
+        kWhatFlush,
+        kWhatStop,
+        kWhatRelease,
+    };
+
+    enum {
+        RELEASED,
+        ALLOCATED,
+        FLUSHED,
+        RUNNING,
+
+        ALLOCATING,  // RELEASED -> ALLOCATED
+        STARTING,    // ALLOCATED -> RUNNING
+        STOPPING,    // RUNNING -> ALLOCATED
+        FLUSHING,    // RUNNING -> FLUSHED
+        RESUMING,    // FLUSHED -> RUNNING
+        RELEASING,   // {ANY EXCEPT RELEASED} -> RELEASED
+    };
+
+    struct State {
+        inline State() : mState(RELEASED) {}
+
+        int mState;
+        std::shared_ptr<C2Component> mComp;
+    };
+
+    struct Formats {
+        sp<AMessage> mInputFormat;
+        sp<AMessage> mOutputFormat;
+    };
+
+    Mutexed<State> mState;
+    std::shared_ptr<CCodecBufferChannel> mChannel;
+    std::shared_ptr<C2Component::Listener> mListener;
+    Mutexed<TimePoint> mDeadline;
+    Mutexed<Formats> mFormats;
+
+    DISALLOW_EVIL_CONSTRUCTORS(CCodec);
+};
+
+}  // namespace android
+
+#endif  // C_CODEC_H_

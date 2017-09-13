@@ -24,10 +24,13 @@
 #include <media/ICrypto.h>
 #include <utils/NativeHandle.h>
 
+#include "include/Codec2Buffer.h"
 #include "include/SecureBuffer.h"
 #include "include/SharedMemoryBuffer.h"
 
 namespace android {
+
+// SharedMemoryBuffer
 
 SharedMemoryBuffer::SharedMemoryBuffer(const sp<AMessage> &format, const sp<IMemory> &mem)
     : MediaCodecBuffer(format, new ABuffer(mem->pointer(), mem->size())),
@@ -38,6 +41,8 @@ SharedMemoryBuffer::SharedMemoryBuffer(const sp<AMessage> &format, const sp<TMem
     : MediaCodecBuffer(format, new ABuffer(mem->getPointer(), mem->getSize())),
       mTMemory(mem) {
 }
+
+// SecureBuffer
 
 SecureBuffer::SecureBuffer(const sp<AMessage> &format, const void *ptr, size_t size)
     : MediaCodecBuffer(format, new ABuffer(nullptr, size)),
@@ -57,6 +62,30 @@ void *SecureBuffer::getDestinationPointer() {
 
 ICrypto::DestinationType SecureBuffer::getDestinationType() {
     return ICrypto::kDestinationTypeNativeHandle;
+}
+
+// Codec2Buffer
+
+// static
+sp<Codec2Buffer> Codec2Buffer::allocate(
+        const sp<AMessage> &format, const std::shared_ptr<C2LinearBlock> &block) {
+    C2WriteView writeView(block->map().get());
+    if (writeView.error() != C2_OK) {
+        return nullptr;
+    }
+    return new Codec2Buffer(format, new ABuffer(writeView.base(), writeView.capacity()), block);
+}
+
+C2ConstLinearBlock Codec2Buffer::share() {
+    return mBlock->share(offset(), size(), C2Fence());
+}
+
+Codec2Buffer::Codec2Buffer(
+        const sp<AMessage> &format,
+        const sp<ABuffer> &buffer,
+        const std::shared_ptr<C2LinearBlock> &block)
+    : MediaCodecBuffer(format, buffer),
+      mBlock(block) {
 }
 
 }  // namespace android
