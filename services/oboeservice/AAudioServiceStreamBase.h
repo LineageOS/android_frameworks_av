@@ -32,7 +32,10 @@
 
 #include "SharedRingBuffer.h"
 #include "AAudioThread.h"
-#include "AAudioService.h"
+
+namespace android {
+    class AAudioService;
+}
 
 namespace aaudio {
 
@@ -210,7 +213,7 @@ protected:
 
     virtual aaudio_result_t getHardwareTimestamp(int64_t *positionFrames, int64_t *timeNanos) = 0;
 
-    virtual aaudio_result_t getDownDataDescription(AudioEndpointParcelable &parcelable) = 0;
+    virtual aaudio_result_t getAudioDataDescription(AudioEndpointParcelable &parcelable) = 0;
 
     aaudio_stream_state_t   mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
 

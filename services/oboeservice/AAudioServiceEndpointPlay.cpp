@@ -81,32 +81,44 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
 
             std::lock_guard <std::mutex> lock(mLockStreams);
             for (const auto clientStream : mRegisteredStreams) {
+                int64_t clientFramesRead = 0;
+
                 if (!clientStream->isRunning()) {
                     continue;
                 }
 
-                AAudioServiceStreamShared *streamShared =
+                sp<AAudioServiceStreamShared> streamShared =
                         static_cast<AAudioServiceStreamShared *>(clientStream.get());
 
-                FifoBuffer *fifo = streamShared->getDataFifoBuffer();
-                // Determine offset between framePosition in client's stream vs the underlying
-                // MMAP stream.
-                int64_t clientFramesRead = fifo->getReadCounter();
-                // These two indices refer to the same frame.
-                int64_t positionOffset = mmapFramesWritten - clientFramesRead;
-                streamShared->setTimestampPositionOffset(positionOffset);
+                {
+                    // Lock the AudioFifo to protect against close.
+                    std::lock_guard <std::mutex> lock(streamShared->getAudioDataQueueLock());
 
-                float volume = 1.0; // to match legacy volume
-                bool underflowed = mMixer.mix(index, fifo, volume);
+                    FifoBuffer *fifo = streamShared->getAudioDataFifoBuffer_l();
+                    if (fifo != nullptr) {
 
-                // This timestamp represents the completion of data being read out of the
-                // client buffer. It is sent to the client and used in the timing model
-                // to decide when the client has room to write more data.
-                Timestamp timestamp(fifo->getReadCounter(), AudioClock::getNanoseconds());
-                streamShared->markTransferTime(timestamp);
+                        // Determine offset between framePosition in client's stream
+                        // vs the underlying MMAP stream.
+                        clientFramesRead = fifo->getReadCounter();
+                        // These two indices refer to the same frame.
+                        int64_t positionOffset = mmapFramesWritten - clientFramesRead;
+                        streamShared->setTimestampPositionOffset(positionOffset);
 
-                if (underflowed) {
-                    streamShared->incrementXRunCount();
+                        float volume = 1.0; // to match legacy volume
+                        bool underflowed = mMixer.mix(index, fifo, volume);
+                        if (underflowed) {
+                            streamShared->incrementXRunCount();
+                        }
+                        clientFramesRead = fifo->getReadCounter();
+                    }
+                }
+
+                if (clientFramesRead > 0) {
+                    // This timestamp represents the completion of data being read out of the
+                    // client buffer. It is sent to the client and used in the timing model
+                    // to decide when the client has room to write more data.
+                    Timestamp timestamp(clientFramesRead, AudioClock::getNanoseconds());
+                    streamShared->markTransferTime(timestamp);
                 }
 
                 index++; // just used for labelling tracks in systrace

@@ -24,14 +24,13 @@
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
 
+#include "AudioClock.h"
 #include "AudioStreamBuilder.h"
 #include "AudioStream.h"
-#include "AudioClock.h"
+#include "binding/AAudioCommon.h"
 #include "client/AudioStreamInternal.h"
-#include "HandleTracker.h"
 
 using namespace aaudio;
-
 
 // Macros for common code that includes a return.
 // TODO Consider using do{}while(0) construct. I tried but it hung AndroidStudio
