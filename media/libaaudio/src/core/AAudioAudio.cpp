@@ -219,7 +219,7 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_openStream(AAudioStreamBuilder* 
     ALOGD("AAudioStreamBuilder_openStream() returns %d = %s for (%p) ----------------",
           result, AAudio_convertResultToText(result), audioStream);
     if (result == AAUDIO_OK) {
-        audioStream->systemRegister();
+        audioStream->registerPlayerBase();
         *streamPtr = (AAudioStream*) audioStream;
     } else {
         *streamPtr = nullptr;
@@ -243,7 +243,7 @@ AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream)
     ALOGD("AAudioStream_close(%p)", stream);
     if (audioStream != nullptr) {
         audioStream->close();
-        audioStream->systemUnRegister();
+        audioStream->unregisterPlayerBase();
         delete audioStream;
         return AAUDIO_OK;
     }
