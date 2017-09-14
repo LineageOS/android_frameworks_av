@@ -956,28 +956,40 @@ void GraphicBufferSource::onBuffersReleased() {
     Mutex::Autolock lock(mMutex);
 
     uint64_t slotMask;
-    if (mConsumer->getReleasedBuffers(&slotMask) != NO_ERROR) {
-        ALOGW("onBuffersReleased: unable to get released buffer set");
+    uint64_t releaseMask;
+    if (mConsumer->getReleasedBuffers(&releaseMask) != NO_ERROR) {
         slotMask = 0xffffffffffffffffULL;
+        ALOGW("onBuffersReleased: unable to get released buffer set");
+    } else {
+        slotMask = releaseMask;
+        ALOGV("onBuffersReleased: 0x%016" PRIx64, slotMask);
     }
 
-    ALOGV("onBuffersReleased: 0x%016" PRIx64, slotMask);
-
+    AString unpopulated;
     for (int i = 0; i < BufferQueue::NUM_BUFFER_SLOTS; i++) {
         if ((slotMask & 0x01) != 0) {
-            discardBufferInSlot_l(i);
+            if (!discardBufferInSlot_l(i)) {
+                if (!unpopulated.empty()) {
+                    unpopulated.append(", ");
+                }
+                unpopulated.append(i);
+            }
         }
         slotMask >>= 1;
     }
+    if (!unpopulated.empty()) {
+        ALOGW("released unpopulated slots: [%s]", unpopulated.c_str());
+    }
 }
 
-void GraphicBufferSource::discardBufferInSlot_l(GraphicBufferSource::slot_id i) {
+bool GraphicBufferSource::discardBufferInSlot_l(GraphicBufferSource::slot_id i) {
     ssize_t bsi = mBufferSlots.indexOfKey(i);
     if (bsi < 0) {
-        ALOGW("releasing an unpopulated slot: %d", i);
+        return false;
     } else {
         discardBufferAtSlotIndex_l(bsi);
         mBufferSlots.removeItemsAt(bsi);
+        return true;
     }
 }
 

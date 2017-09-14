@@ -264,8 +264,8 @@ private:
     void onBufferAcquired_l(const VideoBuffer &buffer);
 
     // marks the buffer at the slot no longer cached, and accounts for the outstanding
-    // acquire count
-    void discardBufferInSlot_l(slot_id i);
+    // acquire count. Returns true if the slot was populated; otherwise, false.
+    bool discardBufferInSlot_l(slot_id i);
 
     // marks the buffer at the slot index no longer cached, and accounts for the outstanding
     // acquire count
