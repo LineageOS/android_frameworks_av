@@ -767,10 +767,10 @@ struct C2Rect {
     uint32_t mWidth;
     uint32_t mHeight;
 
-    inline C2Rect(uint32_t width, uint32_t height)
+    constexpr inline C2Rect(uint32_t width, uint32_t height)
         : C2Rect(width, height, 0, 0) { }
 
-    inline C2Rect(uint32_t width, uint32_t height, uint32_t left, uint32_t top)
+    constexpr inline C2Rect(uint32_t width, uint32_t height, uint32_t left, uint32_t top)
         : mLeft(left), mTop(top), mWidth(width), mHeight(height) { }
 
     // utility methods
@@ -921,28 +921,50 @@ class _C2PlanarSection : public _C2PlanarCapacityAspect {
 public:
     // crop can be an empty rect, does not have to line up with subsampling
     // NOTE: we do not support floating-point crop
-    inline const C2Rect crop() { return mCrop; }
+    inline const C2Rect crop() const { return mCrop; }
 
     /**
      *  Sets crop to crop intersected with [(0,0) .. (width, height)]
      */
-    inline void setCrop_be(const C2Rect &crop);
+    inline void setCrop_be(const C2Rect &crop) {
+        mCrop.mLeft = std::min(width(), crop.mLeft);
+        mCrop.mTop = std::min(height(), crop.mTop);
+        // It's guaranteed that mCrop.mLeft <= width() && mCrop.mTop <= height()
+        mCrop.mWidth = std::min(width() - mCrop.mLeft, crop.mWidth);
+        mCrop.mHeight = std::min(height() - mCrop.mTop, crop.mHeight);
+    }
 
     /**
      * If crop is within the dimensions of this object, it sets crop to it.
      *
      * \return true iff crop is within the dimensions of this object
      */
-    inline bool setCrop(const C2Rect &crop);
+    inline bool setCrop(const C2Rect &crop) {
+        if (width() < crop.mWidth || height() < crop.mHeight
+                || width() - crop.mWidth < crop.mLeft || height() - crop.mHeight < crop.mTop) {
+            return false;
+        }
+        mCrop = crop;
+        return true;
+    }
+
+protected:
+    inline _C2PlanarSection(const _C2PlanarCapacityAspect *parent)
+        : _C2PlanarCapacityAspect(parent), mCrop(width(), height()) {}
 
 private:
     C2Rect mCrop;
 /// @}
 };
 
+class C2GraphicAllocation;
+
 class C2Block2D : public _C2PlanarSection {
 public:
     const C2Handle *handle() const;
+
+protected:
+    C2Block2D(const std::shared_ptr<C2GraphicAllocation> &alloc);
 
 private:
     class Impl;
@@ -961,14 +983,25 @@ private:
 class C2GraphicView : public _C2PlanarSection {
 public:
     /**
-     * \return pointer to the start of the block or nullptr on error.
+     * \return array of pointers to the start of the planes or nullptr on error.
+     * Regardless of crop rect, they always point to the top-left corner of
+     * each plane.  Access outside of the crop rect results in an undefined
+     * behavior.
      */
-    const uint8_t *data() const;
+    const uint8_t *const *data() const;
 
     /**
-     * \return pointer to the start of the block or nullptr on error.
+     * \return array of pointers to the start of the planes or nullptr on error.
+     * Regardless of crop rect, they always point to the top-left corner of
+     * each plane.  Access outside of the crop rect results in an undefined
+     * behavior.
      */
-    uint8_t *data();
+    uint8_t *const *data();
+
+    /**
+     * \return layout of the graphic block to interpret the returned data.
+     */
+    const C2PlaneLayout layout() const;
 
     /**
      * Returns a section of this view.
@@ -984,6 +1017,13 @@ public:
      * \return error during the creation/mapping of this view.
      */
     C2Error error() const;
+
+protected:
+    C2GraphicView(
+            const _C2PlanarCapacityAspect *parent,
+            uint8_t *const *data,
+            const C2PlaneLayout& layout);
+    explicit C2GraphicView(C2Error error);
 
 private:
     class Impl;
@@ -1022,7 +1062,12 @@ public:
      */
     C2Fence fence() const { return mFence; }
 
+protected:
+    C2ConstGraphicBlock(const std::shared_ptr<C2GraphicAllocation> &alloc, C2Fence fence);
+
 private:
+    class Impl;
+    std::shared_ptr<Impl> mImpl;
     C2Fence mFence;
 };
 
@@ -1050,6 +1095,13 @@ public:
      *    The block shall be modified only until firing the event for the fence.
      */
     C2ConstGraphicBlock share(const C2Rect &crop, C2Fence fence);
+
+protected:
+    explicit C2GraphicBlock(const std::shared_ptr<C2GraphicAllocation> &alloc);
+
+private:
+    class Impl;
+    std::shared_ptr<Impl> mImpl;
 };
 
 /// @}
@@ -1115,7 +1167,8 @@ private:
 
 protected:
     // no public constructor
-    // C2BufferData(const std::shared_ptr<const Impl> &impl) : mImpl(impl) {}
+    explicit C2BufferData(const std::list<C2ConstLinearBlock> &blocks);
+    explicit C2BufferData(const std::list<C2ConstGraphicBlock> &blocks);
 };
 
 /**
@@ -1171,7 +1224,7 @@ public:
      * \retval C2_NO_MEMORY not enough memory to register for this callback
      * \retval C2_CORRUPTED an unknown error prevented the registration (unexpected)
      */
-    C2Error registerOnDestroyNotify(OnDestroyNotify *onDestroyNotify, void *arg = nullptr);
+    C2Error registerOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg = nullptr);
 
     /**
      * Unregisters a previously registered pre-destroy notification.
@@ -1183,7 +1236,7 @@ public:
      * \retval C2_NOT_FOUND the notification was not found
      * \retval C2_CORRUPTED an unknown error prevented the registration (unexpected)
      */
-    C2Error unregisterOnDestroyNotify(OnDestroyNotify *onDestroyNotify, void *arg = nullptr);
+    C2Error unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify);
 
     ///@}
 
@@ -1219,14 +1272,17 @@ public:
      * \return true iff there is a metadata with the parameter type attached to this buffer.
      */
     bool hasInfo(C2Param::Type index) const;
-    std::shared_ptr<C2Info> removeInfo(C2Param::Type index) const;
+    std::shared_ptr<C2Info> removeInfo(C2Param::Type index);
     ///@}
 
 protected:
     // no public constructor
-    inline C2Buffer() = default;
+    explicit C2Buffer(const std::list<C2ConstLinearBlock> &blocks);
+    explicit C2Buffer(const std::list<C2ConstGraphicBlock> &blocks);
 
 private:
+    class Impl;
+    std::shared_ptr<Impl> mImpl;
 //    Type _mType;
 };
 
@@ -1451,10 +1507,11 @@ public:
     /**
      * Returns true if this is the same allocation as |other|.
      */
-    virtual bool equals(const std::shared_ptr<const C2GraphicAllocation> &other) = 0;
+    virtual bool equals(const std::shared_ptr<const C2GraphicAllocation> &other) const = 0;
 
 protected:
-    virtual ~C2GraphicAllocation();
+    using _C2PlanarCapacityAspect::_C2PlanarCapacityAspect;
+    virtual ~C2GraphicAllocation() = default;
 };
 
 /**

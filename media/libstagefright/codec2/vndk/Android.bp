@@ -10,6 +10,8 @@ cc_library_static {
     ],
 
     shared_libs: [
+        "android.hardware.graphics.allocator@2.0",
+        "android.hardware.graphics.mapper@2.0",
         "libbinder",
         "libcutils",
         "libdl",
@@ -19,6 +21,7 @@ cc_library_static {
         "liblog",
         "libmedia",
         "libstagefright_foundation",
+        "libui",
         "libutils",
     ],
 

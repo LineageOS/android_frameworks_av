@@ -20,10 +20,24 @@
 
 #include <C2BufferPriv.h>
 
+#include <android/hardware/graphics/allocator/2.0/IAllocator.h>
+#include <android/hardware/graphics/mapper/2.0/IMapper.h>
+
 #include <ion/ion.h>
+#include <hardware/gralloc.h>
 #include <sys/mman.h>
 
 namespace android {
+
+using ::android::hardware::graphics::allocator::V2_0::IAllocator;
+using ::android::hardware::graphics::common::V1_0::BufferUsage;
+using ::android::hardware::graphics::common::V1_0::PixelFormat;
+using ::android::hardware::graphics::mapper::V2_0::BufferDescriptor;
+using ::android::hardware::graphics::mapper::V2_0::Error;
+using ::android::hardware::graphics::mapper::V2_0::IMapper;
+using ::android::hardware::graphics::mapper::V2_0::YCbCrLayout;
+using ::android::hardware::hidl_handle;
+using ::android::hardware::hidl_vec;
 
 // standard ERRNO mappings
 template<int N> constexpr C2Error _c2_errno2error_impl();
@@ -93,6 +107,37 @@ class C2DefaultConstLinearBlock : public C2ConstLinearBlock {
 class C2DefaultLinearBlock : public C2LinearBlock {
     using C2LinearBlock::C2LinearBlock;
     friend class ::android::C2DefaultBlockAllocator;
+};
+
+class C2DefaultGraphicView : public C2GraphicView {
+    using C2GraphicView::C2GraphicView;
+    friend class ::android::C2ConstGraphicBlock;
+    friend class ::android::C2GraphicBlock;
+};
+
+class C2AcquirableConstGraphicView : public C2Acquirable<const C2GraphicView> {
+    using C2Acquirable::C2Acquirable;
+    friend class ::android::C2ConstGraphicBlock;
+};
+
+class C2AcquirableGraphicView : public C2Acquirable<C2GraphicView> {
+    using C2Acquirable::C2Acquirable;
+    friend class ::android::C2GraphicBlock;
+};
+
+class C2DefaultConstGraphicBlock : public C2ConstGraphicBlock {
+    using C2ConstGraphicBlock::C2ConstGraphicBlock;
+    friend class ::android::C2GraphicBlock;
+};
+
+class C2DefaultGraphicBlock : public C2GraphicBlock {
+    using C2GraphicBlock::C2GraphicBlock;
+    friend class ::android::C2DefaultGraphicBlockAllocator;
+};
+
+class C2DefaultBufferData : public C2BufferData {
+    using C2BufferData::C2BufferData;
+    friend class ::android::C2Buffer;
 };
 
 }  // namespace
@@ -715,6 +760,674 @@ C2Error C2DefaultBlockAllocator::allocateLinearBlock(
     block->reset(new C2DefaultLinearBlock(alloc));
 
     return C2_OK;
+}
+
+/* ===================================== GRALLOC ALLOCATION ==================================== */
+
+static C2Error maperr2error(Error maperr) {
+    switch (maperr) {
+        case Error::NONE:           return C2_OK;
+        case Error::BAD_DESCRIPTOR: return C2_BAD_VALUE;
+        case Error::BAD_BUFFER:     return C2_BAD_VALUE;
+        case Error::BAD_VALUE:      return C2_BAD_VALUE;
+        case Error::NO_RESOURCES:   return C2_NO_MEMORY;
+        case Error::UNSUPPORTED:    return C2_UNSUPPORTED;
+    }
+    return C2_CORRUPTED;
+}
+
+class C2AllocationGralloc : public C2GraphicAllocation {
+public:
+    virtual ~C2AllocationGralloc();
+
+    virtual C2Error map(
+            C2Rect rect, C2MemoryUsage usage, int *fenceFd,
+            C2PlaneLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) override;
+    virtual C2Error unmap(C2Fence *fenceFd /* nullable */) override;
+    virtual bool isValid() const override { return true; }
+    virtual const C2Handle *handle() const override { return mHandle; }
+    virtual bool equals(const std::shared_ptr<const C2GraphicAllocation> &other) const override;
+
+    // internal methods
+    // |handle| will be moved.
+    C2AllocationGralloc(
+              const IMapper::BufferDescriptorInfo &info,
+              const sp<IMapper> &mapper,
+              hidl_handle &handle);
+    int dup() const;
+    C2Error status() const;
+
+private:
+    const IMapper::BufferDescriptorInfo mInfo;
+    const sp<IMapper> mMapper;
+    const hidl_handle mHandle;
+    buffer_handle_t mBuffer;
+    bool mLocked;
+};
+
+C2AllocationGralloc::C2AllocationGralloc(
+          const IMapper::BufferDescriptorInfo &info,
+          const sp<IMapper> &mapper,
+          hidl_handle &handle)
+    : C2GraphicAllocation(info.width, info.height),
+      mInfo(info),
+      mMapper(mapper),
+      mHandle(std::move(handle)),
+      mBuffer(nullptr),
+      mLocked(false) {}
+
+C2AllocationGralloc::~C2AllocationGralloc() {
+    if (!mBuffer) {
+        return;
+    }
+    if (mLocked) {
+        unmap(nullptr);
+    }
+    mMapper->freeBuffer(const_cast<native_handle_t *>(mBuffer));
+}
+
+C2Error C2AllocationGralloc::map(
+        C2Rect rect, C2MemoryUsage usage, int *fenceFd,
+        C2PlaneLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) {
+    // TODO
+    (void) fenceFd;
+    (void) usage;
+
+    if (mBuffer && mLocked) {
+        return C2_DUPLICATE;
+    }
+    if (!layout || !addr) {
+        return C2_BAD_VALUE;
+    }
+
+    C2Error err = C2_OK;
+    if (!mBuffer) {
+        mMapper->importBuffer(
+                mHandle, [&err, this](const auto &maperr, const auto &buffer) {
+                    err = maperr2error(maperr);
+                    if (err == C2_OK) {
+                        mBuffer = static_cast<buffer_handle_t>(buffer);
+                    }
+                });
+        if (err != C2_OK) {
+            return err;
+        }
+    }
+
+    if (mInfo.format == PixelFormat::YCBCR_420_888) {
+        YCbCrLayout ycbcrLayout;
+        mMapper->lockYCbCr(
+                const_cast<native_handle_t *>(mBuffer),
+                BufferUsage::CPU_READ_OFTEN | BufferUsage::CPU_WRITE_OFTEN,
+                { (int32_t)rect.mLeft, (int32_t)rect.mTop, (int32_t)rect.mWidth, (int32_t)rect.mHeight },
+                // TODO: fence
+                hidl_handle(),
+                [&err, &ycbcrLayout](const auto &maperr, const auto &mapLayout) {
+                    err = maperr2error(maperr);
+                    if (err == C2_OK) {
+                        ycbcrLayout = mapLayout;
+                    }
+                });
+        if (err != C2_OK) {
+            return err;
+        }
+        addr[C2PlaneLayout::Y] = (uint8_t *)ycbcrLayout.y;
+        addr[C2PlaneLayout::U] = (uint8_t *)ycbcrLayout.cb;
+        addr[C2PlaneLayout::V] = (uint8_t *)ycbcrLayout.cr;
+        layout->mType = C2PlaneLayout::MEDIA_IMAGE_TYPE_YUV;
+        layout->mNumPlanes = 3;
+        layout->mPlanes[C2PlaneLayout::Y] = {
+            C2PlaneInfo::Y,                 // mChannel
+            1,                              // mColInc
+            (int32_t)ycbcrLayout.yStride,   // mRowInc
+            1,                              // mHorizSubsampling
+            1,                              // mVertSubsampling
+            8,                              // mBitDepth
+            8,                              // mAllocatedDepth
+        };
+        layout->mPlanes[C2PlaneLayout::U] = {
+            C2PlaneInfo::Cb,                  // mChannel
+            (int32_t)ycbcrLayout.chromaStep,  // mColInc
+            (int32_t)ycbcrLayout.cStride,     // mRowInc
+            2,                                // mHorizSubsampling
+            2,                                // mVertSubsampling
+            8,                                // mBitDepth
+            8,                                // mAllocatedDepth
+        };
+        layout->mPlanes[C2PlaneLayout::V] = {
+            C2PlaneInfo::Cr,                  // mChannel
+            (int32_t)ycbcrLayout.chromaStep,  // mColInc
+            (int32_t)ycbcrLayout.cStride,     // mRowInc
+            2,                                // mHorizSubsampling
+            2,                                // mVertSubsampling
+            8,                                // mBitDepth
+            8,                                // mAllocatedDepth
+        };
+    } else {
+        void *pointer = nullptr;
+        mMapper->lock(
+                const_cast<native_handle_t *>(mBuffer),
+                BufferUsage::CPU_READ_OFTEN | BufferUsage::CPU_WRITE_OFTEN,
+                { (int32_t)rect.mLeft, (int32_t)rect.mTop, (int32_t)rect.mWidth, (int32_t)rect.mHeight },
+                // TODO: fence
+                hidl_handle(),
+                [&err, &pointer](const auto &maperr, const auto &mapPointer) {
+                    err = maperr2error(maperr);
+                    if (err == C2_OK) {
+                        pointer = mapPointer;
+                    }
+                });
+        if (err != C2_OK) {
+            return err;
+        }
+        // TODO
+        return C2_UNSUPPORTED;
+    }
+    mLocked = true;
+
+    return C2_OK;
+}
+
+C2Error C2AllocationGralloc::unmap(C2Fence *fenceFd /* nullable */) {
+    // TODO: fence
+    C2Error err = C2_OK;
+    mMapper->unlock(
+            const_cast<native_handle_t *>(mBuffer),
+            [&err, &fenceFd](const auto &maperr, const auto &releaseFence) {
+                // TODO
+                (void) fenceFd;
+                (void) releaseFence;
+                err = maperr2error(maperr);
+                if (err == C2_OK) {
+                    // TODO: fence
+                }
+            });
+    if (err == C2_OK) {
+        mLocked = false;
+    }
+    return err;
+}
+
+bool C2AllocationGralloc::equals(const std::shared_ptr<const C2GraphicAllocation> &other) const {
+    return other && other->handle() == handle();
+}
+
+/* ===================================== GRALLOC ALLOCATOR ==================================== */
+
+class C2AllocatorGralloc::Impl {
+public:
+    Impl();
+
+    C2Error allocateGraphicBuffer(
+            uint32_t width, uint32_t height, uint32_t format, const C2MemoryUsage &usage,
+            std::shared_ptr<C2GraphicAllocation> *allocation);
+
+    C2Error recreateGraphicBuffer(
+            const C2Handle *handle,
+            std::shared_ptr<C2GraphicAllocation> *allocation);
+
+    C2Error status() const { return mInit; }
+
+private:
+    C2Error mInit;
+    sp<IAllocator> mAllocator;
+    sp<IMapper> mMapper;
+};
+
+C2AllocatorGralloc::Impl::Impl() : mInit(C2_OK) {
+    mAllocator = IAllocator::getService();
+    mMapper = IMapper::getService();
+    if (mAllocator == nullptr || mMapper == nullptr) {
+        mInit = C2_CORRUPTED;
+    }
+}
+
+C2Error C2AllocatorGralloc::Impl::allocateGraphicBuffer(
+        uint32_t width, uint32_t height, uint32_t format, const C2MemoryUsage &usage,
+        std::shared_ptr<C2GraphicAllocation> *allocation) {
+    // TODO: buffer usage should be determined according to |usage|
+    (void) usage;
+
+    IMapper::BufferDescriptorInfo info = {
+        width,
+        height,
+        1u,  // layerCount
+        (PixelFormat)format,
+        BufferUsage::CPU_READ_OFTEN | BufferUsage::CPU_WRITE_OFTEN,
+    };
+    C2Error err = C2_OK;
+    BufferDescriptor desc;
+    mMapper->createDescriptor(
+            info, [&err, &desc](const auto &maperr, const auto &descriptor) {
+                err = maperr2error(maperr);
+                if (err == C2_OK) {
+                    desc = descriptor;
+                }
+            });
+    if (err != C2_OK) {
+        return err;
+    }
+
+    // IAllocator shares IMapper error codes.
+    hidl_handle buffer;
+    mAllocator->allocate(
+            desc,
+            1u,
+            [&err, &buffer](const auto &maperr, const auto &stride, auto &buffers) {
+                (void) stride;
+                err = maperr2error(maperr);
+                if (err != C2_OK) {
+                    return;
+                }
+                if (buffers.size() != 1u) {
+                    err = C2_CORRUPTED;
+                    return;
+                }
+                buffer = std::move(buffers[0]);
+            });
+    if (err != C2_OK) {
+        return err;
+    }
+
+    allocation->reset(new C2AllocationGralloc(info, mMapper, buffer));
+    return C2_OK;
+}
+
+C2Error C2AllocatorGralloc::Impl::recreateGraphicBuffer(
+        const C2Handle *handle,
+        std::shared_ptr<C2GraphicAllocation> *allocation) {
+    (void) handle;
+
+    // TODO: need to figure out BufferDescriptorInfo from the handle.
+    allocation->reset();
+    return C2_UNSUPPORTED;
+}
+
+C2AllocatorGralloc::C2AllocatorGralloc() : mImpl(new Impl) {}
+C2AllocatorGralloc::~C2AllocatorGralloc() { delete mImpl; }
+
+C2Error C2AllocatorGralloc::allocateGraphicBuffer(
+        uint32_t width, uint32_t height, uint32_t format, C2MemoryUsage usage,
+        std::shared_ptr<C2GraphicAllocation> *allocation) {
+    return mImpl->allocateGraphicBuffer(width, height, format, usage, allocation);
+}
+
+C2Error C2AllocatorGralloc::recreateGraphicBuffer(
+        const C2Handle *handle,
+        std::shared_ptr<C2GraphicAllocation> *allocation) {
+    return mImpl->recreateGraphicBuffer(handle, allocation);
+}
+
+C2Error C2AllocatorGralloc::status() const { return mImpl->status(); }
+
+/* ========================================== 2D BLOCK ========================================= */
+
+class C2Block2D::Impl {
+public:
+    const C2Handle *handle() const {
+        return mAllocation->handle();
+    }
+
+    Impl(const std::shared_ptr<C2GraphicAllocation> &alloc)
+        : mAllocation(alloc) {}
+
+private:
+    std::shared_ptr<C2GraphicAllocation> mAllocation;
+};
+
+C2Block2D::C2Block2D(const std::shared_ptr<C2GraphicAllocation> &alloc)
+    : _C2PlanarSection(alloc.get()), mImpl(new Impl(alloc)) {}
+
+const C2Handle *C2Block2D::handle() const {
+    return mImpl->handle();
+}
+
+class C2GraphicView::Impl {
+public:
+    Impl(uint8_t *const *data, const C2PlaneLayout &layout)
+        : mData(data), mLayout(layout), mError(C2_OK) {}
+    explicit Impl(C2Error error) : mData(nullptr), mError(error) {}
+
+    uint8_t *const *data() const { return mData; }
+    const C2PlaneLayout &layout() const { return mLayout; }
+    C2Error error() const { return mError; }
+
+private:
+    uint8_t *const *mData;
+    C2PlaneLayout mLayout;
+    C2Error mError;
+};
+
+C2GraphicView::C2GraphicView(
+        const _C2PlanarCapacityAspect *parent,
+        uint8_t *const *data,
+        const C2PlaneLayout& layout)
+    : _C2PlanarSection(parent), mImpl(new Impl(data, layout)) {}
+
+C2GraphicView::C2GraphicView(C2Error error)
+    : _C2PlanarSection(nullptr), mImpl(new Impl(error)) {}
+
+const uint8_t *const *C2GraphicView::data() const {
+    return mImpl->data();
+}
+
+uint8_t *const *C2GraphicView::data() {
+    return mImpl->data();
+}
+
+const C2PlaneLayout C2GraphicView::layout() const {
+    return mImpl->layout();
+}
+
+const C2GraphicView C2GraphicView::subView(const C2Rect &rect) const {
+    C2GraphicView view(this, mImpl->data(), mImpl->layout());
+    view.setCrop_be(rect);
+    return view;
+}
+
+C2GraphicView C2GraphicView::subView(const C2Rect &rect) {
+    C2GraphicView view(this, mImpl->data(), mImpl->layout());
+    view.setCrop_be(rect);
+    return view;
+}
+
+C2Error C2GraphicView::error() const {
+    return mImpl->error();
+}
+
+class C2ConstGraphicBlock::Impl {
+public:
+    explicit Impl(const std::shared_ptr<C2GraphicAllocation> &alloc)
+        : mAllocation(alloc), mData{ nullptr } {}
+
+    ~Impl() {
+        if (mData[0] != nullptr) {
+            // TODO: fence
+            mAllocation->unmap(nullptr);
+        }
+    }
+
+    C2Error map(C2Rect rect) {
+        C2Error err = mAllocation->map(
+                rect,
+                { C2MemoryUsage::kSoftwareRead, 0 },
+                nullptr,
+                &mLayout,
+                mData);
+        if (err != C2_OK) {
+            memset(mData, 0, sizeof(mData));
+        }
+        return err;
+    }
+
+    C2ConstGraphicBlock subBlock(const C2Rect &rect, C2Fence fence) const {
+        C2ConstGraphicBlock block(mAllocation, fence);
+        block.setCrop_be(rect);
+        return block;
+    }
+
+    uint8_t *const *data() const {
+        return mData[0] == nullptr ? nullptr : &mData[0];
+    }
+
+    const C2PlaneLayout &layout() const { return mLayout; }
+
+private:
+    std::shared_ptr<C2GraphicAllocation> mAllocation;
+    C2PlaneLayout mLayout;
+    uint8_t *mData[C2PlaneLayout::MAX_NUM_PLANES];
+};
+
+C2ConstGraphicBlock::C2ConstGraphicBlock(
+        const std::shared_ptr<C2GraphicAllocation> &alloc, C2Fence fence)
+    : C2Block2D(alloc), mImpl(new Impl(alloc)), mFence(fence) {}
+
+C2Acquirable<const C2GraphicView> C2ConstGraphicBlock::map() const {
+    C2Error err = mImpl->map(crop());
+    if (err != C2_OK) {
+        C2DefaultGraphicView view(err);
+        return C2AcquirableConstGraphicView(err, mFence, view);
+    }
+    C2DefaultGraphicView view(this, mImpl->data(), mImpl->layout());
+    return C2AcquirableConstGraphicView(err, mFence, view);
+}
+
+C2ConstGraphicBlock C2ConstGraphicBlock::subBlock(const C2Rect &rect) const {
+    return mImpl->subBlock(rect, mFence);
+}
+
+class C2GraphicBlock::Impl {
+public:
+    explicit Impl(const std::shared_ptr<C2GraphicAllocation> &alloc)
+        : mAllocation(alloc), mData{ nullptr } {}
+
+    ~Impl() {
+        if (mData[0] != nullptr) {
+            // TODO: fence
+            mAllocation->unmap(nullptr);
+        }
+    }
+
+    C2Error map(C2Rect rect) {
+        uint8_t *data[C2PlaneLayout::MAX_NUM_PLANES];
+        C2Error err = mAllocation->map(
+                rect,
+                { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+                nullptr,
+                &mLayout,
+                data);
+        if (err == C2_OK) {
+            memcpy(mData, data, sizeof(mData));
+        } else {
+            memset(mData, 0, sizeof(mData));
+        }
+        return err;
+    }
+
+    C2ConstGraphicBlock share(const C2Rect &crop, C2Fence fence) const {
+        C2DefaultConstGraphicBlock block(mAllocation, fence);
+        block.setCrop_be(crop);
+        return block;
+    }
+
+    uint8_t *const *data() const {
+        return mData[0] == nullptr ? nullptr : mData;
+    }
+
+    const C2PlaneLayout &layout() const { return mLayout; }
+
+private:
+    std::shared_ptr<C2GraphicAllocation> mAllocation;
+    C2PlaneLayout mLayout;
+    uint8_t *mData[C2PlaneLayout::MAX_NUM_PLANES];
+};
+
+C2GraphicBlock::C2GraphicBlock(const std::shared_ptr<C2GraphicAllocation> &alloc)
+    : C2Block2D(alloc), mImpl(new Impl(alloc)) {}
+
+C2Acquirable<C2GraphicView> C2GraphicBlock::map() {
+    C2Error err = mImpl->map(crop());
+    if (err != C2_OK) {
+        C2DefaultGraphicView view(err);
+        // TODO: fence
+        return C2AcquirableGraphicView(err, C2Fence(), view);
+    }
+    C2DefaultGraphicView view(this, mImpl->data(), mImpl->layout());
+    // TODO: fence
+    return C2AcquirableGraphicView(err, C2Fence(), view);
+}
+
+C2ConstGraphicBlock C2GraphicBlock::share(const C2Rect &crop, C2Fence fence) {
+    return mImpl->share(crop, fence);
+}
+
+C2DefaultGraphicBlockAllocator::C2DefaultGraphicBlockAllocator(
+        const std::shared_ptr<C2Allocator> &allocator)
+  : mAllocator(allocator) {}
+
+C2Error C2DefaultGraphicBlockAllocator::allocateGraphicBlock(
+        uint32_t width,
+        uint32_t height,
+        uint32_t format,
+        C2MemoryUsage usage,
+        std::shared_ptr<C2GraphicBlock> *block /* nonnull */) {
+    block->reset();
+
+    std::shared_ptr<C2GraphicAllocation> alloc;
+    C2Error err = mAllocator->allocateGraphicBuffer(width, height, format, usage, &alloc);
+    if (err != C2_OK) {
+        return err;
+    }
+
+    block->reset(new C2DefaultGraphicBlock(alloc));
+
+    return C2_OK;
+}
+
+/* ========================================== BUFFER ========================================= */
+
+class C2BufferData::Impl {
+public:
+    explicit Impl(const std::list<C2ConstLinearBlock> &blocks)
+        : mType(blocks.size() == 1 ? LINEAR : LINEAR_CHUNKS),
+          mLinearBlocks(blocks) {
+    }
+
+    explicit Impl(const std::list<C2ConstGraphicBlock> &blocks)
+        : mType(blocks.size() == 1 ? GRAPHIC : GRAPHIC_CHUNKS),
+          mGraphicBlocks(blocks) {
+    }
+
+    Type type() const { return mType; }
+    const std::list<C2ConstLinearBlock> &linearBlocks() const { return mLinearBlocks; }
+    const std::list<C2ConstGraphicBlock> &graphicBlocks() const { return mGraphicBlocks; }
+
+private:
+    Type mType;
+    std::list<C2ConstLinearBlock> mLinearBlocks;
+    std::list<C2ConstGraphicBlock> mGraphicBlocks;
+};
+
+C2BufferData::C2BufferData(const std::list<C2ConstLinearBlock> &blocks) : mImpl(new Impl(blocks)) {}
+C2BufferData::C2BufferData(const std::list<C2ConstGraphicBlock> &blocks) : mImpl(new Impl(blocks)) {}
+
+C2BufferData::Type C2BufferData::type() const { return mImpl->type(); }
+
+const std::list<C2ConstLinearBlock> C2BufferData::linearBlocks() const {
+    return mImpl->linearBlocks();
+}
+
+const std::list<C2ConstGraphicBlock> C2BufferData::graphicBlocks() const {
+    return mImpl->graphicBlocks();
+}
+
+class C2Buffer::Impl {
+public:
+    Impl(C2Buffer *thiz, const std::list<C2ConstLinearBlock> &blocks)
+        : mThis(thiz), mData(blocks) {}
+    Impl(C2Buffer *thiz, const std::list<C2ConstGraphicBlock> &blocks)
+        : mThis(thiz), mData(blocks) {}
+
+    ~Impl() {
+        for (const auto &pair : mNotify) {
+            pair.first(mThis, pair.second);
+        }
+    }
+
+    const C2BufferData &data() const { return mData; }
+
+    C2Error registerOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg = nullptr) {
+        auto it = std::find_if(
+                mNotify.begin(), mNotify.end(),
+                [onDestroyNotify, arg] (const auto &pair) {
+                    return pair.first == onDestroyNotify && pair.second == arg;
+                });
+        if (it != mNotify.end()) {
+            return C2_DUPLICATE;
+        }
+        mNotify.emplace_back(onDestroyNotify, arg);
+        return C2_OK;
+    }
+
+    C2Error unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify) {
+        auto it = std::find_if(
+                mNotify.begin(), mNotify.end(),
+                [onDestroyNotify] (const auto &pair) {
+                    return pair.first == onDestroyNotify;
+                });
+        if (it == mNotify.end()) {
+            return C2_NOT_FOUND;
+        }
+        mNotify.erase(it);
+        return C2_OK;
+    }
+
+    std::list<std::shared_ptr<const C2Info>> infos() const {
+        std::list<std::shared_ptr<const C2Info>> result(mInfos.size());
+        std::transform(
+                mInfos.begin(), mInfos.end(), result.begin(),
+                [] (const auto &elem) { return elem.second; });
+        return result;
+    }
+
+    C2Error setInfo(const std::shared_ptr<C2Info> &info) {
+        // To "update" you need to erase the existing one if any, and then insert.
+        (void) mInfos.erase(info->type());
+        (void) mInfos.insert({ info->type(), info });
+        return C2_OK;
+    }
+
+    bool hasInfo(C2Param::Type index) const {
+        return mInfos.count(index.type()) > 0;
+    }
+
+    std::shared_ptr<C2Info> removeInfo(C2Param::Type index) {
+        auto it = mInfos.find(index.type());
+        if (it == mInfos.end()) {
+            return nullptr;
+        }
+        std::shared_ptr<C2Info> ret = it->second;
+        (void) mInfos.erase(it);
+        return ret;
+    }
+
+private:
+    C2Buffer * const mThis;
+    C2DefaultBufferData mData;
+    std::map<uint32_t, std::shared_ptr<C2Info>> mInfos;
+    std::list<std::pair<OnDestroyNotify, void *>> mNotify;
+};
+
+C2Buffer::C2Buffer(const std::list<C2ConstLinearBlock> &blocks)
+    : mImpl(new Impl(this, blocks)) {}
+
+C2Buffer::C2Buffer(const std::list<C2ConstGraphicBlock> &blocks)
+    : mImpl(new Impl(this, blocks)) {}
+
+const C2BufferData C2Buffer::data() const { return mImpl->data(); }
+
+C2Error C2Buffer::registerOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg) {
+    return mImpl->registerOnDestroyNotify(onDestroyNotify, arg);
+}
+
+C2Error C2Buffer::unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify) {
+    return mImpl->unregisterOnDestroyNotify(onDestroyNotify);
+}
+
+const std::list<std::shared_ptr<const C2Info>> C2Buffer::infos() const {
+    return mImpl->infos();
+}
+
+C2Error C2Buffer::setInfo(const std::shared_ptr<C2Info> &info) {
+    return mImpl->setInfo(info);
+}
+
+bool C2Buffer::hasInfo(C2Param::Type index) const {
+    return mImpl->hasInfo(index);
+}
+
+std::shared_ptr<C2Info> C2Buffer::removeInfo(C2Param::Type index) {
+    return mImpl->removeInfo(index);
 }
 
 } // namespace android

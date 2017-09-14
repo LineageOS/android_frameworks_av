@@ -45,6 +45,8 @@ AudioStream::~AudioStream() {
                           || getState() == AAUDIO_STREAM_STATE_DISCONNECTED),
                         "aaudio stream still in use, state = %s",
                         AAudio_convertStreamStateToText(getState()));
+
+    mPlayerBase->clearParentReference(); // remove reference to this AudioStream
 }
 
 static const char *AudioStream_convertSharingModeToShortText(aaudio_sharing_mode_t sharingMode) {
@@ -197,3 +199,38 @@ aaudio_result_t AudioStream::joinThread(void** returnArg, int64_t timeoutNanosec
     return err ? AAudioConvert_androidToAAudioResult(-errno) : mThreadRegistrationResult;
 }
 
+
+#if AAUDIO_USE_VOLUME_SHAPER
+android::media::VolumeShaper::Status AudioStream::applyVolumeShaper(
+        const android::media::VolumeShaper::Configuration& configuration __unused,
+        const android::media::VolumeShaper::Operation& operation __unused) {
+    ALOGW("applyVolumeShaper() is not supported");
+    return android::media::VolumeShaper::Status::ok();
+}
+#endif
+
+AudioStream::MyPlayerBase::MyPlayerBase(AudioStream *parent) : mParent(parent) {
+}
+
+AudioStream::MyPlayerBase::~MyPlayerBase() {
+    ALOGV("MyPlayerBase::~MyPlayerBase(%p) deleted", this);
+}
+
+void AudioStream::MyPlayerBase::registerWithAudioManager() {
+    if (!mRegistered) {
+        init(android::PLAYER_TYPE_AAUDIO, AUDIO_USAGE_MEDIA);
+        mRegistered = true;
+    }
+}
+
+void AudioStream::MyPlayerBase::unregisterWithAudioManager() {
+    if (mRegistered) {
+        baseDestroy();
+        mRegistered = false;
+    }
+}
+
+
+void AudioStream::MyPlayerBase::destroy() {
+    unregisterWithAudioManager();
+}
