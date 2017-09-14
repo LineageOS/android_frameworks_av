@@ -50,9 +50,6 @@ public:
         return AAUDIO_DIRECTION_OUTPUT;
     }
 
-    // Only register client side streams.
-    bool needsSystemRegistration() override { return !mInService; }
-
 protected:
 
     aaudio_result_t requestPauseInternal();
