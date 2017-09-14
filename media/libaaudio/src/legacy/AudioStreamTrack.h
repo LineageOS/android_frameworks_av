@@ -77,8 +77,6 @@ public:
         return incrementFramesWritten(frames);
     }
 
-    bool needsSystemRegistration() override { return true; }
-
     android::status_t doSetVolume() override;
 
 #if AAUDIO_USE_VOLUME_SHAPER
