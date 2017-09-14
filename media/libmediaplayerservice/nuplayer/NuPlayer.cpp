@@ -473,6 +473,13 @@ void NuPlayer::resetAsync() {
     (new AMessage(kWhatReset, this))->post();
 }
 
+status_t NuPlayer::notifyAt(int64_t mediaTimeUs) {
+    sp<AMessage> notify = new AMessage(kWhatNotifyTime, this);
+    notify->setInt64("timerUs", mediaTimeUs);
+    mMediaClock->addTimer(notify, mediaTimeUs);
+    return OK;
+}
+
 void NuPlayer::seekToAsync(int64_t seekTimeUs, MediaPlayerSeekMode mode, bool needNotify) {
     sp<AMessage> msg = new AMessage(kWhatSeek, this);
     msg->setInt64("seekTimeUs", seekTimeUs);
@@ -1312,6 +1319,16 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                     new SimpleAction(&NuPlayer::performReset));
 
             processDeferredActions();
+            break;
+        }
+
+        case kWhatNotifyTime:
+        {
+            ALOGV("kWhatNotifyTime");
+            int64_t timerUs;
+            CHECK(msg->findInt64("timerUs", &timerUs));
+
+            notifyListener(MEDIA_NOTIFY_TIME, timerUs, 0);
             break;
         }
 

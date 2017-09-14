@@ -225,6 +225,9 @@ public:
     virtual status_t    getCurrentPosition(int *msec) = 0;
     virtual status_t    getDuration(int *msec) = 0;
     virtual status_t    reset() = 0;
+    virtual status_t    notifyAt(int64_t /* mediaTimeUs */) {
+        return INVALID_OPERATION;
+    }
     virtual status_t    setLooping(int loop) = 0;
     virtual player_type playerType() = 0;
     virtual status_t    setParameter(int key, const Parcel &request) = 0;

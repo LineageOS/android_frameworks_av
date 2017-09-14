@@ -79,6 +79,7 @@ public:
             MediaPlayerSeekMode mode = MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC) = 0;
     virtual status_t        getCurrentPosition(int* msec) = 0;
     virtual status_t        getDuration(int* msec) = 0;
+    virtual status_t        notifyAt(int64_t mediaTimeUs) = 0;
     virtual status_t        reset() = 0;
     virtual status_t        setAudioStreamType(audio_stream_type_t type) = 0;
     virtual status_t        setLooping(int loop) = 0;
