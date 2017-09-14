@@ -1281,7 +1281,7 @@ void AudioTrack::updateLatency_l()
         ALOGW("getLatency(%d) failed status %d", mOutput, status);
     } else {
         // FIXME don't believe this lie
-        mLatency = mAfLatency + (1000 * mFrameCount) / mSampleRate;
+        mLatency = mAfLatency + (1000LL * mFrameCount) / mSampleRate;
     }
 }
 
