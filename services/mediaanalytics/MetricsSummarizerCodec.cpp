@@ -17,6 +17,8 @@
 #define LOG_TAG "MetricsSummarizerCodec"
 #include <utils/Log.h>
 
+#include <stdint.h>
+#include <inttypes.h>
 
 #include <utils/threads.h>
 #include <utils/Errors.h>
@@ -34,10 +36,30 @@
 
 namespace android {
 
+static const char *codec_ignorable[] = {
+    "android.media.mediacodec.bytesin",
+    0
+};
+
 MetricsSummarizerCodec::MetricsSummarizerCodec(const char *key)
     : MetricsSummarizer(key)
 {
     ALOGV("MetricsSummarizerCodec::MetricsSummarizerCodec");
+    setIgnorables(codec_ignorable);
+
+}
+
+void MetricsSummarizerCodec::mergeRecord(MediaAnalyticsItem &summation, MediaAnalyticsItem &item) {
+
+    ALOGV("MetricsSummarizerCodec::mergeRecord()");
+
+    int64_t bytesin = 0;
+    if (item.getInt64("android.media.mediacodec.bytesin", &bytesin)) {
+        ALOGV("found bytesin of %" PRId64, bytesin);
+    }
+    if (bytesin >= 0) {
+        minMaxVar64(summation,"android.media.mediacodec.bytesin", bytesin);
+    }
 }
 
 
