@@ -1011,8 +1011,12 @@ void LvmEffect_limitLevel(EffectContext *pContext) {
     float energyBassBoost = 0;
     float crossCorrection = 0;
 
+    bool eqEnabled = pContext->pBundledContext->bEqualizerEnabled == LVM_TRUE;
+    bool bbEnabled = pContext->pBundledContext->bBassEnabled == LVM_TRUE;
+    bool viEnabled = pContext->pBundledContext->bVirtualizerEnabled == LVM_TRUE;
+
     //EQ contribution
-    if (pContext->pBundledContext->bEqualizerEnabled == LVM_TRUE) {
+    if (eqEnabled) {
         for (int i = 0; i < FIVEBAND_NUMBANDS; i++) {
             float bandFactor = pContext->pBundledContext->bandGaindB[i]/15.0;
             float bandCoefficient = LimitLevel_bandEnergyCoefficient[i];
@@ -1038,35 +1042,37 @@ void LvmEffect_limitLevel(EffectContext *pContext) {
         }
         bandFactorSum -= 1.0;
         if (bandFactorSum > 0)
-            crossCorrection = bandFactorSum * 0.7;
+          crossCorrection = bandFactorSum * 0.7;
     }
 
     //BassBoost contribution
-    if (pContext->pBundledContext->bBassEnabled == LVM_TRUE) {
+    if (bbEnabled) {
         float boostFactor = (pContext->pBundledContext->BassStrengthSaved)/1000.0;
         float boostCoefficient = LimitLevel_bassBoostEnergyCoefficient;
 
         energyContribution += boostFactor * boostCoefficient * boostCoefficient;
 
-        for (int i = 0; i < FIVEBAND_NUMBANDS; i++) {
-            float bandFactor = pContext->pBundledContext->bandGaindB[i]/15.0;
-            float bandCrossCoefficient = LimitLevel_bassBoostEnergyCrossCoefficient[i];
-            float bandEnergy = boostFactor * bandFactor *
+        if (eqEnabled) {
+            for (int i = 0; i < FIVEBAND_NUMBANDS; i++) {
+                float bandFactor = pContext->pBundledContext->bandGaindB[i]/15.0;
+                float bandCrossCoefficient = LimitLevel_bassBoostEnergyCrossCoefficient[i];
+                float bandEnergy = boostFactor * bandFactor *
                     bandCrossCoefficient;
-            if (bandEnergy > 0)
-                energyBassBoost += bandEnergy;
+                if (bandEnergy > 0)
+                  energyBassBoost += bandEnergy;
+            }
         }
     }
 
     //Virtualizer contribution
-    if (pContext->pBundledContext->bVirtualizerEnabled == LVM_TRUE) {
+    if (viEnabled) {
         energyContribution += LimitLevel_virtualizerContribution *
                 LimitLevel_virtualizerContribution;
     }
 
     double totalEnergyEstimation = sqrt(energyContribution + energyCross + energyBassBoost) -
             crossCorrection;
-    ALOGV(" TOTAL energy estimation: %0.2f", totalEnergyEstimation);
+    ALOGV(" TOTAL energy estimation: %0.2f dB", totalEnergyEstimation);
 
     //roundoff
     int maxLevelRound = (int)(totalEnergyEstimation + 0.99);
@@ -1084,6 +1090,8 @@ void LvmEffect_limitLevel(EffectContext *pContext) {
     /* Activate the initial settings */
     LvmStatus = LVM_SetControlParameters(pContext->pBundledContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVM_SetControlParameters", "LvmEffect_limitLevel")
+
+    ALOGV("LVM_SetControlParameters return:%d", (int)LvmStatus);
     //ALOGV("\tLvmEffect_limitLevel just Set -> %d\n",
     //          ActiveParams.pEQNB_BandDefinition[band].Gain);
 
@@ -1333,6 +1341,8 @@ int Effect_setConfig(EffectContext *pContext, effect_config_t *pConfig){
         LVM_ERROR_CHECK(LvmStatus, "LVM_SetControlParameters", "Effect_setConfig")
         ALOGV("\tEffect_setConfig Succesfully called LVM_SetControlParameters\n");
         pContext->pBundledContext->SampleRate = SampleRate;
+
+        LvmEffect_limitLevel(pContext);
 
     }else{
         //ALOGV("\tEffect_setConfig keep sampling rate at %d", SampleRate);
@@ -3824,10 +3834,10 @@ int Effect_command(effect_handle_t  self,
             if(rightdB > maxdB){
                 maxdB = rightdB;
             }
-            //ALOGV("\tEFFECT_CMD_SET_VOLUME Session: %d, SessionID: %d VOLUME is %d dB (%d), "
+            //ALOGV("\tEFFECT_CMD_SET_VOLUME Session: %d, SessionID: %d VOLUME is %d dB, "
             //      "effect is %d",
             //pContext->pBundledContext->SessionNo, pContext->pBundledContext->SessionId,
-            //(int32_t)maxdB, maxVol<<7, pContext->EffectType);
+            //(int32_t)maxdB, pContext->EffectType);
             //ALOGV("\tEFFECT_CMD_SET_VOLUME: Left is %d, Right is %d", leftVolume, rightVolume);
             //ALOGV("\tEFFECT_CMD_SET_VOLUME: Left %ddB, Right %ddB, Position %ddB",
             //        leftdB, rightdB, pandB);
