@@ -744,12 +744,12 @@ WARN_LOGFILE           =
 # Note: If this tag is empty the current directory is searched.
 
 INPUT                  = include/aaudio/AAudio.h \
+                         src/binding/AAudioCommon.h \
                          src/legacy/AudioStreamTrack.h \
                          src/legacy/AudioStreamRecord.h \
                          src/legacy/AAudioLegacy.h \
                          src/core/AudioStreamBuilder.h \
                          src/core/AudioStream.h \
-                         src/utility/HandleTracker.h \
                          src/utility/MonotonicCounter.h \
                          src/utility/AudioClock.h \
                          src/utility/AAudioUtilities.h

@@ -24,13 +24,13 @@
 #include <media/AudioClient.h>
 
 #include <aaudio/AAudio.h>
-#include "utility/HandleTracker.h"
-#include "binding/IAAudioService.h"
-#include "binding/AAudioServiceInterface.h"
 
-namespace aaudio {
-    class AAudioServiceStreamBase;
-};
+#include "binding/AAudioCommon.h"
+#include "binding/AAudioServiceInterface.h"
+#include "binding/IAAudioService.h"
+
+#include "AAudioServiceStreamBase.h"
+#include "AAudioStreamTracker.h"
 
 namespace android {
 
@@ -51,44 +51,52 @@ public:
 
     virtual void            registerClient(const sp<IAAudioClient>& client);
 
-    virtual aaudio_handle_t openStream(const aaudio::AAudioStreamRequest &request,
-                                     aaudio::AAudioStreamConfiguration &configurationOutput);
+    aaudio::aaudio_handle_t openStream(const aaudio::AAudioStreamRequest &request,
+                                       aaudio::AAudioStreamConfiguration &configurationOutput)
+                                       override;
 
-    virtual aaudio_result_t closeStream(aaudio_handle_t streamHandle);
+    aaudio_result_t closeStream(aaudio::aaudio_handle_t streamHandle) override;
 
-    virtual aaudio_result_t getStreamDescription(
-                aaudio_handle_t streamHandle,
-                aaudio::AudioEndpointParcelable &parcelable);
+    aaudio_result_t getStreamDescription(
+                aaudio::aaudio_handle_t streamHandle,
+                aaudio::AudioEndpointParcelable &parcelable) override;
 
-    virtual aaudio_result_t startStream(aaudio_handle_t streamHandle);
+    aaudio_result_t startStream(aaudio::aaudio_handle_t streamHandle) override;
 
-    virtual aaudio_result_t pauseStream(aaudio_handle_t streamHandle);
+    aaudio_result_t pauseStream(aaudio::aaudio_handle_t streamHandle) override;
 
-    virtual aaudio_result_t stopStream(aaudio_handle_t streamHandle);
+    aaudio_result_t stopStream(aaudio::aaudio_handle_t streamHandle) override;
 
-    virtual aaudio_result_t flushStream(aaudio_handle_t streamHandle);
+    aaudio_result_t flushStream(aaudio::aaudio_handle_t streamHandle) override;
 
-    virtual aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle,
+    aaudio_result_t registerAudioThread(aaudio::aaudio_handle_t streamHandle,
                                                 pid_t tid,
-                                                int64_t periodNanoseconds) ;
+                                                int64_t periodNanoseconds) override;
 
-    virtual aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
-                                                  pid_t tid);
+    aaudio_result_t unregisterAudioThread(aaudio::aaudio_handle_t streamHandle,
+                                                  pid_t tid) override;
 
-    virtual aaudio_result_t startClient(aaudio_handle_t streamHandle,
+    aaudio_result_t startClient(aaudio::aaudio_handle_t streamHandle,
                                       const android::AudioClient& client,
-                                      audio_port_handle_t *clientHandle);
+                                      audio_port_handle_t *clientHandle) override;
 
-    virtual aaudio_result_t stopClient(aaudio_handle_t streamHandle,
-                                       audio_port_handle_t clientHandle);
+    aaudio_result_t stopClient(aaudio::aaudio_handle_t streamHandle,
+                                       audio_port_handle_t clientHandle) override;
 
 private:
 
-    aaudio::AAudioServiceStreamBase *convertHandleToServiceStream(aaudio_handle_t streamHandle) const;
+    /**
+     * Lookup stream and then validate access to the stream.
+     * @param streamHandle
+     * @return
+     */
+    sp<aaudio::AAudioServiceStreamBase> convertHandleToServiceStream(
+            aaudio::aaudio_handle_t streamHandle);
 
-    HandleTracker mHandleTracker;
 
     android::AudioClient mAudioClient;
+
+    aaudio::AAudioStreamTracker                 mStreamTracker;
 
     enum constants {
         DEFAULT_AUDIO_PRIORITY = 2

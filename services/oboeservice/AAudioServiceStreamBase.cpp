@@ -365,10 +365,17 @@ aaudio_result_t AAudioServiceStreamBase::sendCurrentTimestamp() {
  * used to communicate with the underlying HAL or Service.
  */
 aaudio_result_t AAudioServiceStreamBase::getDescription(AudioEndpointParcelable &parcelable) {
-    // Gather information on the message queue.
-    mUpMessageQueue->fillParcelable(parcelable,
-                                    parcelable.mUpMessageQueueParcelable);
-    return getDownDataDescription(parcelable);
+    {
+        std::lock_guard<std::mutex> lock(mUpMessageQueueLock);
+        if (mUpMessageQueue == nullptr) {
+            ALOGE("getDescription(): mUpMessageQueue null! - stream not open");
+            return AAUDIO_ERROR_NULL;
+        }
+        // Gather information on the message queue.
+        mUpMessageQueue->fillParcelable(parcelable,
+                                        parcelable.mUpMessageQueueParcelable);
+    }
+    return getAudioDataDescription(parcelable);
 }
 
 void AAudioServiceStreamBase::onVolumeChanged(float volume) {

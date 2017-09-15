@@ -102,7 +102,7 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::findExclusiveEndpoint_l(
         }
     }
 
-    ALOGD("AAudioEndpointManager.findExclusiveEndpoint_l(), found %p for device = %d",
+    ALOGV("AAudioEndpointManager.findExclusiveEndpoint_l(), found %p for device = %d",
           endpoint.get(), configuration.getDeviceId());
     return endpoint;
 }
@@ -118,7 +118,7 @@ sp<AAudioServiceEndpointShared> AAudioEndpointManager::findSharedEndpoint_l(
         }
     }
 
-    ALOGD("AAudioEndpointManager.findSharedEndpoint_l(), found %p for device = %d",
+    ALOGV("AAudioEndpointManager.findSharedEndpoint_l(), found %p for device = %d",
           endpoint.get(), configuration.getDeviceId());
     return endpoint;
 }
@@ -238,8 +238,6 @@ void AAudioEndpointManager::closeExclusiveEndpoint(sp<AAudioServiceEndpoint> ser
     std::lock_guard<std::mutex> lock(mExclusiveLock);
     int32_t newRefCount = serviceEndpoint->getOpenCount() - 1;
     serviceEndpoint->setOpenCount(newRefCount);
-    ALOGD("AAudioEndpointManager::closeExclusiveEndpoint(%p) newRefCount = %d",
-          serviceEndpoint.get(), newRefCount);
 
     // If no longer in use then close and delete it.
     if (newRefCount <= 0) {
@@ -262,8 +260,6 @@ void AAudioEndpointManager::closeSharedEndpoint(sp<AAudioServiceEndpoint> servic
     std::lock_guard<std::mutex> lock(mSharedLock);
     int32_t newRefCount = serviceEndpoint->getOpenCount() - 1;
     serviceEndpoint->setOpenCount(newRefCount);
-    ALOGD("AAudioEndpointManager::closeSharedEndpoint(%p) newRefCount = %d",
-          serviceEndpoint.get(), newRefCount);
 
     // If no longer in use then close and delete it.
     if (newRefCount <= 0) {

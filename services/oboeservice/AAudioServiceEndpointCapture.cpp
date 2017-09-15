@@ -84,30 +84,42 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
             std::lock_guard <std::mutex> lock(mLockStreams);
             for (const auto clientStream : mRegisteredStreams) {
                 if (clientStream->isRunning()) {
-                    AAudioServiceStreamShared *streamShared =
+                    int64_t clientFramesWritten = 0;
+                    sp<AAudioServiceStreamShared> streamShared =
                             static_cast<AAudioServiceStreamShared *>(clientStream.get());
 
-                    FifoBuffer *fifo = streamShared->getDataFifoBuffer();
+                    {
+                        // Lock the AudioFifo to protect against close.
+                        std::lock_guard <std::mutex> lock(streamShared->getAudioDataQueueLock());
 
-                    // Determine offset between framePosition in client's stream vs the underlying
-                    // MMAP stream.
-                    int64_t clientFramesWritten = fifo->getWriteCounter();
-                    // There are two indices that refer to the same frame.
-                    int64_t positionOffset = mmapFramesRead - clientFramesWritten;
-                    streamShared->setTimestampPositionOffset(positionOffset);
+                        FifoBuffer *fifo = streamShared->getAudioDataFifoBuffer_l();
+                        if (fifo != nullptr) {
 
-                    if (fifo->getFifoControllerBase()->getEmptyFramesAvailable() <
-                        getFramesPerBurst()) {
-                        underflowCount++;
-                    } else {
-                        fifo->write(mDistributionBuffer, getFramesPerBurst());
+                            // Determine offset between framePosition in client's stream
+                            // vs the underlying MMAP stream.
+                            clientFramesWritten = fifo->getWriteCounter();
+                            // There are two indices that refer to the same frame.
+                            int64_t positionOffset = mmapFramesRead - clientFramesWritten;
+                            streamShared->setTimestampPositionOffset(positionOffset);
+
+                            if (fifo->getFifoControllerBase()->getEmptyFramesAvailable() <
+                                getFramesPerBurst()) {
+                                underflowCount++;
+                            } else {
+                                fifo->write(mDistributionBuffer, getFramesPerBurst());
+                            }
+                            clientFramesWritten = fifo->getWriteCounter();
+                        }
                     }
 
-                    // This timestamp represents the completion of data being written into the
-                    // client buffer. It is sent to the client and used in the timing model
-                    // to decide when data will be available to read.
-                    Timestamp timestamp(fifo->getWriteCounter(), AudioClock::getNanoseconds());
-                    streamShared->markTransferTime(timestamp);
+                    if (clientFramesWritten > 0) {
+                        // This timestamp represents the completion of data being written into the
+                        // client buffer. It is sent to the client and used in the timing model
+                        // to decide when data will be available to read.
+                        Timestamp timestamp(clientFramesWritten, AudioClock::getNanoseconds());
+                        streamShared->markTransferTime(timestamp);
+                    }
+
                 }
             }
         }
