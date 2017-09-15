@@ -50,6 +50,7 @@ enum media_event_type {
     MEDIA_PAUSED            = 7,
     MEDIA_STOPPED           = 8,
     MEDIA_SKIPPED           = 9,
+    MEDIA_NOTIFY_TIME       = 98,
     MEDIA_TIMED_TEXT        = 99,
     MEDIA_ERROR             = 100,
     MEDIA_INFO              = 200,
@@ -245,6 +246,7 @@ public:
             status_t        seekTo(
                     int msec,
                     MediaPlayerSeekMode mode = MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC);
+            status_t        notifyAt(int64_t mediaTimeUs);
             status_t        getCurrentPosition(int *msec);
             status_t        getDuration(int *msec);
             status_t        reset();

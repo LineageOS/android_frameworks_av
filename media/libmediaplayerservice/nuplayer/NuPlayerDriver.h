@@ -65,6 +65,7 @@ struct NuPlayerDriver : public MediaPlayerInterface {
     virtual status_t getCurrentPosition(int *msec);
     virtual status_t getDuration(int *msec);
     virtual status_t reset();
+    virtual status_t notifyAt(int64_t mediaTimeUs) override;
     virtual status_t setLooping(int loop);
     virtual player_type playerType();
     virtual status_t invoke(const Parcel &request, Parcel *reply);

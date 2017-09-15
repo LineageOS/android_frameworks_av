@@ -327,6 +327,7 @@ private:
         virtual status_t        getCurrentPosition(int* msec);
         virtual status_t        getDuration(int* msec);
         virtual status_t        reset();
+        virtual status_t        notifyAt(int64_t mediaTimeUs);
         virtual status_t        setAudioStreamType(audio_stream_type_t type);
         virtual status_t        setLooping(int loop);
         virtual status_t        setVolume(float leftVolume, float rightVolume);

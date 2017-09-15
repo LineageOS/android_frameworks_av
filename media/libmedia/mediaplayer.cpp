@@ -610,6 +610,15 @@ status_t MediaPlayer::seekTo(int msec, MediaPlayerSeekMode mode)
     return result;
 }
 
+status_t MediaPlayer::notifyAt(int64_t mediaTimeUs)
+{
+    Mutex::Autolock _l(mLock);
+    if (mPlayer != 0) {
+        return mPlayer->notifyAt(mediaTimeUs);
+    }
+    return INVALID_OPERATION;
+}
+
 status_t MediaPlayer::reset_l()
 {
     mLoop = false;
@@ -949,6 +958,9 @@ void MediaPlayer::notify(int msg, int ext1, int ext2, const Parcel *obj)
         ALOGV("New video size %d x %d", ext1, ext2);
         mVideoWidth = ext1;
         mVideoHeight = ext2;
+        break;
+    case MEDIA_NOTIFY_TIME:
+        ALOGV("Received notify time message");
         break;
     case MEDIA_TIMED_TEXT:
         ALOGV("Received timed text message");
