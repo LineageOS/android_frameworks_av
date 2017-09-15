@@ -6356,12 +6356,14 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
             ALOGE("Unable to obtain MediaCodecList while "
                     "attempting to create codec \"%s\"",
                     componentName.c_str());
+            mCodec->signalError(OMX_ErrorUndefined, NO_INIT);
             return false;
         }
         ssize_t index = list->findCodecByName(componentName.c_str());
         if (index < 0) {
             ALOGE("Unable to find codec \"%s\"",
                     componentName.c_str());
+            mCodec->signalError(OMX_ErrorInvalidComponent, NAME_NOT_FOUND);
             return false;
         }
         sp<MediaCodecInfo> info = list->getCodecInfo(index);
@@ -6369,6 +6371,7 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
             ALOGE("Unexpected error (index out-of-bound) while "
                     "retrieving information for codec \"%s\"",
                     componentName.c_str());
+            mCodec->signalError(OMX_ErrorUndefined, UNKNOWN_ERROR);
             return false;
         }
         matchingCodecs.add(info->getCodecName());
