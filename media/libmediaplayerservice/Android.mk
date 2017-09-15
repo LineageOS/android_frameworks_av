@@ -8,12 +8,10 @@ include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:=               \
     ActivityManager.cpp         \
-    HDCP.cpp                    \
     MediaPlayerFactory.cpp      \
     MediaPlayerService.cpp      \
     MediaRecorderClient.cpp     \
     MetadataRetrieverClient.cpp \
-    RemoteDisplay.cpp           \
     StagefrightRecorder.cpp     \
     TestPlayerStub.cpp          \
 
@@ -35,7 +33,6 @@ LOCAL_SHARED_LIBRARIES :=       \
     libstagefright_foundation   \
     libstagefright_httplive     \
     libstagefright_omx          \
-    libstagefright_wfd          \
     libutils                    \
     libnativewindow             \
     libhidlbase                 \
@@ -51,7 +48,6 @@ LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libmedia
 LOCAL_C_INCLUDES :=                                                 \
     frameworks/av/media/libstagefright/include               \
     frameworks/av/media/libstagefright/rtsp                  \
-    frameworks/av/media/libstagefright/wifi-display          \
     frameworks/av/media/libstagefright/webm                  \
     $(LOCAL_PATH)/include/media                              \
     frameworks/av/include/camera                             \
