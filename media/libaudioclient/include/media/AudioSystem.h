@@ -370,9 +370,9 @@ public:
                                          audio_port_handle_t deviceId) = 0;
     };
 
-    static status_t addAudioDeviceCallback(const sp<AudioDeviceCallback>& callback,
+    static status_t addAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
                                            audio_io_handle_t audioIo);
-    static status_t removeAudioDeviceCallback(const sp<AudioDeviceCallback>& callback,
+    static status_t removeAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
                                               audio_io_handle_t audioIo);
 
     static audio_port_handle_t getDeviceIdForIo(audio_io_handle_t audioIo);
@@ -403,9 +403,9 @@ private:
                                      const sp<AudioIoDescriptor>& ioDesc);
 
 
-        status_t addAudioDeviceCallback(const sp<AudioDeviceCallback>& callback,
+        status_t addAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
                                                audio_io_handle_t audioIo);
-        status_t removeAudioDeviceCallback(const sp<AudioDeviceCallback>& callback,
+        status_t removeAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
                                            audio_io_handle_t audioIo);
 
         audio_port_handle_t getDeviceIdForIo(audio_io_handle_t audioIo);
@@ -413,7 +413,7 @@ private:
     private:
         Mutex                               mLock;
         DefaultKeyedVector<audio_io_handle_t, sp<AudioIoDescriptor> >   mIoDescriptors;
-        DefaultKeyedVector<audio_io_handle_t, Vector < sp<AudioDeviceCallback> > >
+        DefaultKeyedVector<audio_io_handle_t, Vector < wp<AudioDeviceCallback> > >
                                                                         mAudioDeviceCallbacks;
         // cached values for recording getInputBufferSize() queries
         size_t                              mInBuffSize;    // zero indicates cache is invalid
