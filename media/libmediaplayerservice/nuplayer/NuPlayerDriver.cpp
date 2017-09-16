@@ -664,6 +664,11 @@ status_t NuPlayerDriver::reset() {
     return OK;
 }
 
+status_t NuPlayerDriver::notifyAt(int64_t mediaTimeUs) {
+    ALOGV("notifyAt(%p), time:%lld", this, (long long)mediaTimeUs);
+    return mPlayer->notifyAt(mediaTimeUs);
+}
+
 status_t NuPlayerDriver::setLooping(int loop) {
     mLooping = loop != 0;
     return OK;

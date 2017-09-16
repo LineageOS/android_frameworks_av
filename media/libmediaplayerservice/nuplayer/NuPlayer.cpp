@@ -281,7 +281,7 @@ void NuPlayer::setDataSourceAsync(
         ALOGV("setDataSourceAsync GenericSource %s", url);
 
         sp<GenericSource> genericSource =
-                new GenericSource(notify, mUIDValid, mUID);
+                new GenericSource(notify, mUIDValid, mUID, mMediaClock);
 
         status_t err = genericSource->setDataSource(httpService, url, headers);
 
@@ -304,7 +304,7 @@ void NuPlayer::setDataSourceAsync(int fd, int64_t offset, int64_t length) {
     sp<AMessage> notify = new AMessage(kWhatSourceNotify, this);
 
     sp<GenericSource> source =
-            new GenericSource(notify, mUIDValid, mUID);
+            new GenericSource(notify, mUIDValid, mUID, mMediaClock);
 
     ALOGV("setDataSourceAsync fd %d/%lld/%lld source: %p",
             fd, (long long)offset, (long long)length, source.get());
@@ -325,7 +325,7 @@ void NuPlayer::setDataSourceAsync(const sp<DataSource> &dataSource) {
     sp<AMessage> msg = new AMessage(kWhatSetDataSource, this);
     sp<AMessage> notify = new AMessage(kWhatSourceNotify, this);
 
-    sp<GenericSource> source = new GenericSource(notify, mUIDValid, mUID);
+    sp<GenericSource> source = new GenericSource(notify, mUIDValid, mUID, mMediaClock);
     status_t err = source->setDataSource(dataSource);
 
     if (err != OK) {
@@ -471,6 +471,13 @@ void NuPlayer::resetAsync() {
     }
 
     (new AMessage(kWhatReset, this))->post();
+}
+
+status_t NuPlayer::notifyAt(int64_t mediaTimeUs) {
+    sp<AMessage> notify = new AMessage(kWhatNotifyTime, this);
+    notify->setInt64("timerUs", mediaTimeUs);
+    mMediaClock->addTimer(notify, mediaTimeUs);
+    return OK;
 }
 
 void NuPlayer::seekToAsync(int64_t seekTimeUs, MediaPlayerSeekMode mode, bool needNotify) {
@@ -1312,6 +1319,16 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                     new SimpleAction(&NuPlayer::performReset));
 
             processDeferredActions();
+            break;
+        }
+
+        case kWhatNotifyTime:
+        {
+            ALOGV("kWhatNotifyTime");
+            int64_t timerUs;
+            CHECK(msg->findInt64("timerUs", &timerUs));
+
+            notifyListener(MEDIA_NOTIFY_TIME, timerUs, 0);
             break;
         }
 

@@ -73,6 +73,9 @@ struct NuPlayer : public AHandler {
     // Will notify the driver through "notifyResetComplete" once finished.
     void resetAsync();
 
+    // Request a notification when specified media time is reached.
+    status_t notifyAt(int64_t mediaTimeUs);
+
     // Will notify the driver through "notifySeekComplete" once finished
     // and needNotify is true.
     void seekToAsync(
@@ -140,6 +143,7 @@ private:
         kWhatClosedCaptionNotify        = 'capN',
         kWhatRendererNotify             = 'renN',
         kWhatReset                      = 'rset',
+        kWhatNotifyTime                 = 'nfyT',
         kWhatSeek                       = 'seek',
         kWhatPause                      = 'paus',
         kWhatResume                     = 'rsme',

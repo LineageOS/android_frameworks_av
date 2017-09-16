@@ -60,7 +60,7 @@ std::string AAudioServiceEndpoint::dump() const {
     result << "    Reference Count:      " << mOpenCount << "\n";
     result << "    Requested Device Id:  " << mRequestedDeviceId << "\n";
     result << "    Device Id:            " << getDeviceId() << "\n";
-    result << "    Registered Streams:  " << "\n";
+    result << "    Registered Streams:" << "\n";
     result << AAudioServiceStreamShared::dumpHeader() << "\n";
     for (const auto stream : mRegisteredStreams) {
         result << stream->dump() << "\n";

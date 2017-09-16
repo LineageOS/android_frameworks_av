@@ -22,7 +22,7 @@
 
 #include <aaudio/AAudio.h>
 
-#include "utility/HandleTracker.h"
+#include "binding/AAudioCommon.h"
 
 namespace android {
 
@@ -33,7 +33,7 @@ public:
 
     DECLARE_META_INTERFACE(AAudioClient);
 
-    virtual void onStreamChange(aaudio_handle_t handle, int32_t opcode, int32_t value) = 0;
+    virtual void onStreamChange(aaudio::aaudio_handle_t handle, int32_t opcode, int32_t value) = 0;
 
 };
 

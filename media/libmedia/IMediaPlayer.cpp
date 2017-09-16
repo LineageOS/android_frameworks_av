@@ -58,6 +58,7 @@ enum {
     GET_CURRENT_POSITION,
     GET_DURATION,
     RESET,
+    NOTIFY_AT,
     SET_AUDIO_STREAM_TYPE,
     SET_LOOPING,
     SET_VOLUME,
@@ -325,6 +326,15 @@ public:
         Parcel data, reply;
         data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
         remote()->transact(RESET, data, &reply);
+        return reply.readInt32();
+    }
+
+    status_t notifyAt(int64_t mediaTimeUs)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
+        data.writeInt64(mediaTimeUs);
+        remote()->transact(NOTIFY_AT, data, &reply);
         return reply.readInt32();
     }
 
@@ -744,6 +754,11 @@ status_t BnMediaPlayer::onTransact(
         case RESET: {
             CHECK_INTERFACE(IMediaPlayer, data, reply);
             reply->writeInt32(reset());
+            return NO_ERROR;
+        } break;
+        case NOTIFY_AT: {
+            CHECK_INTERFACE(IMediaPlayer, data, reply);
+            reply->writeInt32(notifyAt(data.readInt64()));
             return NO_ERROR;
         } break;
         case SET_AUDIO_STREAM_TYPE: {
