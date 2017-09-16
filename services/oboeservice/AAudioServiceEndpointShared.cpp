@@ -115,15 +115,33 @@ aaudio_result_t aaudio::AAudioServiceEndpointShared::stopSharingThread() {
 aaudio_result_t AAudioServiceEndpointShared::startStream(sp<AAudioServiceStreamBase> sharedStream,
                                                          audio_port_handle_t *clientHandle) {
     aaudio_result_t result = AAUDIO_OK;
-    if (++mRunningStreamCount == 1) {
-        // TODO use real-time technique to avoid mutex, eg. atomic command FIFO
+
+    {
         std::lock_guard<std::mutex> lock(mLockStreams);
-        result = getStreamInternal()->requestStart();
-        startSharingThread_l();
+        if (++mRunningStreamCount == 1) { // atomic
+            result = getStreamInternal()->requestStart();
+            if (result != AAUDIO_OK) {
+                --mRunningStreamCount;
+            } else {
+                result = startSharingThread_l();
+                if (result != AAUDIO_OK) {
+                    getStreamInternal()->requestStop();
+                    --mRunningStreamCount;
+                }
+            }
+        }
     }
+
     if (result == AAUDIO_OK) {
         result = getStreamInternal()->startClient(sharedStream->getAudioClient(), clientHandle);
+        if (result != AAUDIO_OK) {
+            if (--mRunningStreamCount == 0) { // atomic
+                stopSharingThread();
+                getStreamInternal()->requestStop();
+            }
+        }
     }
+
     return result;
 }
 
@@ -140,7 +158,6 @@ aaudio_result_t AAudioServiceEndpointShared::stopStream(sp<AAudioServiceStreamBa
     }
     return AAUDIO_OK;
 }
-
 
 // Get timestamp that was written by the real-time service thread, eg. mixer.
 aaudio_result_t AAudioServiceEndpointShared::getFreeRunningPosition(int64_t *positionFrames,
