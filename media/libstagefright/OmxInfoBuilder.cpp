@@ -61,9 +61,9 @@ status_t queryCapabilities(
     }
     for (const auto& attribute : node.attributes) {
         // All features have an int32 value except
-        // "feature-bitrate-control", which has a string value.
+        // "feature-bitrate-modes", which has a string value.
         if ((attribute.key.compare(0, 8, "feature-") == 0) &&
-                (attribute.key.compare(8, 15, "bitrate-control")
+                (attribute.key.compare(8, 15, "bitrate-modes")
                  != 0)) {
             // If this attribute.key is a feature that is not a bitrate
             // control, add an int32 value.
