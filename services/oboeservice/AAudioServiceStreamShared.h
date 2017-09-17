@@ -54,7 +54,21 @@ public:
 
     aaudio_result_t close() override;
 
-    android::FifoBuffer *getDataFifoBuffer() { return mAudioDataQueue->getFifoBuffer(); }
+    /**
+     * This must be locked when calling getAudioDataFifoBuffer_l() and while
+     * using the FifoBuffer it returns.
+     */
+    std::mutex &getAudioDataQueueLock() {
+        return mAudioDataQueueLock;
+    }
+
+    /**
+     * This must only be call under getAudioDataQueueLock().
+     * @return
+     */
+    android::FifoBuffer *getAudioDataFifoBuffer_l() { return (mAudioDataQueue == nullptr)
+                                                      ? nullptr
+                                                      : mAudioDataQueue->getFifoBuffer(); }
 
     /* Keep a record of when a buffer transfer completed.
      * This allows for a more accurate timing model.
@@ -75,7 +89,7 @@ public:
 
 protected:
 
-    aaudio_result_t getDownDataDescription(AudioEndpointParcelable &parcelable) override;
+    aaudio_result_t getAudioDataDescription(AudioEndpointParcelable &parcelable) override;
 
     aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) override;
 
@@ -90,7 +104,8 @@ protected:
                                             int32_t framesPerBurst);
 
 private:
-    SharedRingBuffer        *mAudioDataQueue = nullptr;
+    SharedRingBuffer        *mAudioDataQueue = nullptr; // protected by mAudioDataQueueLock
+    std::mutex               mAudioDataQueueLock;
 
     std::atomic<int64_t>     mTimestampPositionOffset;
     std::atomic<int32_t>     mXRunCount;

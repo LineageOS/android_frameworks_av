@@ -5,16 +5,6 @@ LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils) \
     frameworks/av/media/libaaudio/include \
     frameworks/av/media/libaaudio/src
-LOCAL_SRC_FILES:= test_handle_tracker.cpp
-LOCAL_SHARED_LIBRARIES := libaaudio
-LOCAL_MODULE := test_handle_tracker
-include $(BUILD_NATIVE_TEST)
-
-include $(CLEAR_VARS)
-LOCAL_C_INCLUDES := \
-    $(call include-path-for, audio-utils) \
-    frameworks/av/media/libaaudio/include \
-    frameworks/av/media/libaaudio/src
 LOCAL_SRC_FILES:= test_marshalling.cpp
 LOCAL_SHARED_LIBRARIES := libaaudio libbinder libcutils libutils
 LOCAL_MODULE := test_aaudio_marshalling

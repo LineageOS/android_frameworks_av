@@ -167,14 +167,17 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
         goto error;
     }
 
-    // Create audio data shared memory buffer for client.
-    mAudioDataQueue = new SharedRingBuffer();
-    result = mAudioDataQueue->allocate(calculateBytesPerFrame(), getBufferCapacity());
-    if (result != AAUDIO_OK) {
-        ALOGE("AAudioServiceStreamShared::open() could not allocate FIFO with %d frames",
-              getBufferCapacity());
-        result = AAUDIO_ERROR_NO_MEMORY;
-        goto error;
+    {
+        std::lock_guard<std::mutex> lock(mAudioDataQueueLock);
+        // Create audio data shared memory buffer for client.
+        mAudioDataQueue = new SharedRingBuffer();
+        result = mAudioDataQueue->allocate(calculateBytesPerFrame(), getBufferCapacity());
+        if (result != AAUDIO_OK) {
+            ALOGE("AAudioServiceStreamShared::open() could not allocate FIFO with %d frames",
+                  getBufferCapacity());
+            result = AAUDIO_ERROR_NO_MEMORY;
+            goto error;
+        }
     }
 
     ALOGD("AAudioServiceStreamShared::open() actual rate = %d, channels = %d, deviceId = %d",
@@ -197,8 +200,11 @@ error:
 aaudio_result_t AAudioServiceStreamShared::close()  {
     aaudio_result_t result = AAudioServiceStreamBase::close();
 
-    delete mAudioDataQueue;
-    mAudioDataQueue = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(mAudioDataQueueLock);
+        delete mAudioDataQueue;
+        mAudioDataQueue = nullptr;
+    }
 
     return result;
 }
@@ -206,8 +212,14 @@ aaudio_result_t AAudioServiceStreamShared::close()  {
 /**
  * Get an immutable description of the data queue created by this service.
  */
-aaudio_result_t AAudioServiceStreamShared::getDownDataDescription(AudioEndpointParcelable &parcelable)
+aaudio_result_t AAudioServiceStreamShared::getAudioDataDescription(
+        AudioEndpointParcelable &parcelable)
 {
+    std::lock_guard<std::mutex> lock(mAudioDataQueueLock);
+    if (mAudioDataQueue == nullptr) {
+        ALOGE("getAudioDataDescription(): mUpMessageQueue null! - stream not open");
+        return AAUDIO_ERROR_NULL;
+    }
     // Gather information on the data queue.
     mAudioDataQueue->fillParcelable(parcelable,
                                     parcelable.mDownDataQueueParcelable);

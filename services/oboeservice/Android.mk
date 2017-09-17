@@ -22,7 +22,6 @@ LOCAL_C_INCLUDES := \
     $(TOP)/frameworks/av/media/libaaudio/src
 
 LOCAL_SRC_FILES += \
-    $(LIBAAUDIO_SRC_DIR)/utility/HandleTracker.cpp \
     SharedMemoryProxy.cpp \
     SharedRingBuffer.cpp \
     AAudioClientTracker.cpp \
@@ -37,6 +36,7 @@ LOCAL_SRC_FILES += \
     AAudioServiceStreamBase.cpp \
     AAudioServiceStreamMMAP.cpp \
     AAudioServiceStreamShared.cpp \
+    AAudioStreamTracker.cpp \
     TimestampScheduler.cpp \
     AAudioThread.cpp
 
