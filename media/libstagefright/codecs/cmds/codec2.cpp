@@ -1,0 +1,464 @@
+/*
+ * Copyright (C) 2017 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include <inttypes.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#include <thread>
+
+//#define LOG_NDEBUG 0
+#define LOG_TAG "codec2"
+#include <media/stagefright/foundation/ADebug.h>
+
+#include <binder/IServiceManager.h>
+#include <binder/ProcessState.h>
+#include <media/ICrypto.h>
+#include <media/IMediaHTTPService.h>
+#include <media/stagefright/foundation/ABuffer.h>
+#include <media/stagefright/foundation/ALooper.h>
+#include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/AUtils.h>
+#include <media/stagefright/DataSource.h>
+#include <media/stagefright/MediaDefs.h>
+#include <media/stagefright/MediaErrors.h>
+#include <media/stagefright/MediaExtractor.h>
+#include <media/stagefright/MediaSource.h>
+#include <media/stagefright/MetaData.h>
+#include <media/stagefright/Utils.h>
+
+#include <gui/GLConsumer.h>
+#include <gui/IProducerListener.h>
+#include <gui/Surface.h>
+#include <gui/SurfaceComposerClient.h>
+
+#include <util/C2ParamUtils.h>
+#include <C2Buffer.h>
+#include <C2BufferPriv.h>
+#include <C2Component.h>
+#include <C2Work.h>
+
+#include "../avcdec/C2SoftAvcDec.h"
+
+using namespace android;
+using namespace std::chrono_literals;
+
+namespace {
+
+class LinearBuffer : public C2Buffer {
+public:
+    explicit LinearBuffer(const std::shared_ptr<C2LinearBlock> &block)
+        : C2Buffer({ block->share(block->offset(), block->size(), ::android::C2Fence()) }) {}
+};
+
+class Listener;
+
+class SimplePlayer {
+public:
+    SimplePlayer();
+    ~SimplePlayer();
+
+    void onWorkDone(std::weak_ptr<C2Component> component,
+                    std::vector<std::unique_ptr<C2Work>> workItems);
+    void onTripped(std::weak_ptr<C2Component> component,
+                   std::vector<std::shared_ptr<C2SettingResult>> settingResult);
+    void onError(std::weak_ptr<C2Component> component, uint32_t errorCode);
+
+    void play(const sp<IMediaSource> &source);
+
+private:
+    typedef std::unique_lock<std::mutex> ULock;
+
+    std::shared_ptr<Listener> mListener;
+    std::shared_ptr<C2Component> mComponent;
+
+    sp<IProducerListener> mProducerListener;
+
+    std::shared_ptr<C2Allocator> mAllocIon;
+    std::shared_ptr<C2Allocator> mAllocGralloc;
+    std::shared_ptr<C2BlockAllocator> mLinearAlloc;
+    std::shared_ptr<C2BlockAllocator> mGraphicAlloc;
+
+    std::mutex mQueueLock;
+    std::condition_variable mQueueCondition;
+    std::list<std::unique_ptr<C2Work>> mWorkQueue;
+
+    std::mutex mProcessedLock;
+    std::condition_variable mProcessedCondition;
+    std::list<std::unique_ptr<C2Work>> mProcessedWork;
+
+    sp<Surface> mSurface;
+    sp<SurfaceComposerClient> mComposerClient;
+    sp<SurfaceControl> mControl;
+};
+
+class Listener : public C2ComponentListener {
+public:
+    explicit Listener(SimplePlayer *thiz) : mThis(thiz) {}
+    virtual ~Listener() = default;
+
+    virtual void onWorkDone(std::weak_ptr<C2Component> component,
+                            std::vector<std::unique_ptr<C2Work>> workItems) override {
+        mThis->onWorkDone(component, std::move(workItems));
+    }
+
+    virtual void onTripped(std::weak_ptr<C2Component> component,
+                           std::vector<std::shared_ptr<C2SettingResult>> settingResult) override {
+        mThis->onTripped(component, settingResult);
+    }
+
+    virtual void onError(std::weak_ptr<C2Component> component,
+                         uint32_t errorCode) override {
+        mThis->onError(component, errorCode);
+    }
+
+private:
+    SimplePlayer * const mThis;
+};
+
+
+SimplePlayer::SimplePlayer()
+    : mListener(new Listener(this)),
+      mProducerListener(new DummyProducerListener),
+      mAllocIon(new C2AllocatorIon),
+      mAllocGralloc(new C2AllocatorGralloc),
+      mLinearAlloc(new C2DefaultBlockAllocator(mAllocIon)),
+      mGraphicAlloc(new C2DefaultGraphicBlockAllocator(mAllocGralloc)),
+      mComposerClient(new SurfaceComposerClient) {
+    CHECK_EQ(mComposerClient->initCheck(), (status_t)OK);
+
+    mControl = mComposerClient->createSurface(
+            String8("A Surface"),
+            1280,
+            800,
+            HAL_PIXEL_FORMAT_YV12);
+            //PIXEL_FORMAT_RGB_565);
+
+    CHECK(mControl != NULL);
+    CHECK(mControl->isValid());
+
+    SurfaceComposerClient::openGlobalTransaction();
+    CHECK_EQ(mControl->setLayer(INT_MAX), (status_t)OK);
+    CHECK_EQ(mControl->show(), (status_t)OK);
+    SurfaceComposerClient::closeGlobalTransaction();
+
+    mSurface = mControl->getSurface();
+    CHECK(mSurface != NULL);
+    mSurface->connect(NATIVE_WINDOW_API_CPU, mProducerListener);
+}
+
+SimplePlayer::~SimplePlayer() {
+    mComposerClient->dispose();
+}
+
+void SimplePlayer::onWorkDone(
+        std::weak_ptr<C2Component> component, std::vector<std::unique_ptr<C2Work>> workItems) {
+    (void) component;
+    ULock l(mProcessedLock);
+    for (auto & item : workItems) {
+        mProcessedWork.push_back(std::move(item));
+    }
+    mProcessedCondition.notify_all();
+}
+
+void SimplePlayer::onTripped(
+        std::weak_ptr<C2Component> component,
+        std::vector<std::shared_ptr<C2SettingResult>> settingResult) {
+    (void) component;
+    (void) settingResult;
+    // TODO
+}
+
+void SimplePlayer::onError(std::weak_ptr<C2Component> component, uint32_t errorCode) {
+    (void) component;
+    (void) errorCode;
+    // TODO
+}
+
+void SimplePlayer::play(const sp<IMediaSource> &source) {
+    sp<AMessage> format;
+    (void) convertMetaDataToMessage(source->getFormat(), &format);
+
+    sp<ABuffer> csd0, csd1;
+    format->findBuffer("csd-0", &csd0);
+    format->findBuffer("csd-1", &csd1);
+
+    status_t err = source->start();
+
+    if (err != OK) {
+        fprintf(stderr, "source returned error %d (0x%08x)\n", err, err);
+        return;
+    }
+
+    std::shared_ptr<C2Component> component(std::make_shared<C2SoftAvcDec>("avc", 0, mListener));
+    component->start();
+
+    for (int i = 0; i < 8; ++i) {
+        mWorkQueue.emplace_back(new C2Work);
+    }
+
+    std::atomic_bool running(true);
+    std::thread surfaceThread([this, &running]() {
+        const sp<IGraphicBufferProducer> &igbp = mSurface->getIGraphicBufferProducer();
+        while (running) {
+            std::unique_ptr<C2Work> work;
+            {
+                ULock l(mProcessedLock);
+                if (mProcessedWork.empty()) {
+                    mProcessedCondition.wait_for(l, 100ms);
+                    if (mProcessedWork.empty()) {
+                        continue;
+                    }
+                }
+                work.swap(mProcessedWork.front());
+                mProcessedWork.pop_front();
+            }
+            int slot;
+            sp<Fence> fence;
+            const std::shared_ptr<C2Buffer> &output = work->worklets.front()->output.buffers[0];
+            const C2ConstGraphicBlock &block = output->data().graphicBlocks().front();
+            sp<GraphicBuffer> buffer(new GraphicBuffer(
+                    block.handle(),
+                    GraphicBuffer::CLONE_HANDLE,
+                    block.width(),
+                    block.height(),
+                    HAL_PIXEL_FORMAT_YV12,
+                    1,
+                    (uint64_t)GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN,
+                    block.width()));
+
+            status_t err = igbp->attachBuffer(&slot, buffer);
+
+            IGraphicBufferProducer::QueueBufferInput qbi(
+                    work->worklets.front()->output.ordinal.timestamp * 1000ll,
+                    false,
+                    HAL_DATASPACE_UNKNOWN,
+                    Rect(block.width(), block.height()),
+                    NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW,
+                    0,
+                    Fence::NO_FENCE,
+                    0);
+            IGraphicBufferProducer::QueueBufferOutput qbo;
+            err = igbp->queueBuffer(slot, qbi, &qbo);
+
+            work->input.buffers.clear();
+            work->worklets.clear();
+
+            ULock l(mQueueLock);
+            mWorkQueue.push_back(std::move(work));
+            mQueueCondition.notify_all();
+        }
+    });
+
+    long numFrames = 0;
+    mLinearAlloc.reset(new C2DefaultBlockAllocator(mAllocIon));
+
+    for (;;) {
+        size_t size = 0u;
+        void *data = nullptr;
+        int64_t timestamp = 0u;
+        MediaBuffer *buffer = nullptr;
+        sp<ABuffer> csd;
+        if (csd0 != nullptr) {
+            csd = csd0;
+            csd0 = nullptr;
+        } else if (csd1 != nullptr) {
+            csd = csd1;
+            csd1 = nullptr;
+        } else {
+            status_t err = source->read(&buffer);
+            if (err != OK) {
+                CHECK(buffer == NULL);
+
+                if (err == INFO_FORMAT_CHANGED) {
+                    continue;
+                }
+
+                break;
+            }
+            sp<MetaData> meta = buffer->meta_data();
+            CHECK(meta->findInt64(kKeyTime, &timestamp));
+
+            size = buffer->size();
+            data = buffer->data();
+        }
+
+        if (csd != nullptr) {
+            size = csd->size();
+            data = csd->data();
+        }
+
+        // Prepare C2Work
+
+        std::unique_ptr<C2Work> work;
+        while (!work) {
+            ULock l(mQueueLock);
+            if (!mWorkQueue.empty()) {
+                work.swap(mWorkQueue.front());
+                mWorkQueue.pop_front();
+            } else {
+                mQueueCondition.wait_for(l, 100ms);
+            }
+        }
+        work->input.flags = (flags_t)0;
+        work->input.ordinal.timestamp = timestamp;
+        work->input.ordinal.frame_index = numFrames;
+
+        std::shared_ptr<C2LinearBlock> block;
+        mLinearAlloc->allocateLinearBlock(
+                size,
+                { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+                &block);
+        C2WriteView view = block->map().get();
+        if (view.error() != C2_OK) {
+            fprintf(stderr, "C2LinearBlock::map() failed : %d", view.error());
+            break;
+        }
+        memcpy(view.base(), data, size);
+
+        work->input.buffers.clear();
+        work->input.buffers.emplace_back(new LinearBuffer(block));
+        work->worklets.clear();
+        work->worklets.emplace_back(new C2Worklet);
+        work->worklets.front()->allocators.emplace_back(mGraphicAlloc);
+
+        std::list<std::unique_ptr<C2Work>> items;
+        items.push_back(std::move(work));
+
+        // DO THE DECODING
+        component->queue_nb(&items);
+
+        if (buffer) {
+            buffer->release();
+            buffer = NULL;
+        }
+
+        ++numFrames;
+    }
+    source->stop();
+    component->release();
+
+    running.store(false);
+    surfaceThread.join();
+    printf("\n");
+}
+
+}  // namespace
+
+static void usage(const char *me) {
+    fprintf(stderr, "usage: %s [options] [input_filename]\n", me);
+    fprintf(stderr, "       -h(elp)\n");
+}
+
+int main(int argc, char **argv) {
+    android::ProcessState::self()->startThreadPool();
+
+    int res;
+    while ((res = getopt(argc, argv, "h")) >= 0) {
+        switch (res) {
+            case 'h':
+            default:
+            {
+                usage(argv[0]);
+                exit(1);
+                break;
+            }
+        }
+    }
+
+    argc -= optind;
+    argv += optind;
+
+    if (argc < 1) {
+        fprintf(stderr, "No input file specified\n");
+        return 1;
+    }
+
+    status_t err = OK;
+    SimplePlayer player;
+
+    for (int k = 0; k < argc && err == OK; ++k) {
+        const char *filename = argv[k];
+
+        sp<DataSource> dataSource =
+            DataSource::CreateFromURI(NULL /* httpService */, filename);
+
+        if (strncasecmp(filename, "sine:", 5) && dataSource == NULL) {
+            fprintf(stderr, "Unable to create data source.\n");
+            return 1;
+        }
+
+        Vector<sp<IMediaSource> > mediaSources;
+        sp<IMediaSource> mediaSource;
+
+        sp<IMediaExtractor> extractor = MediaExtractor::Create(dataSource);
+
+        if (extractor == NULL) {
+            fprintf(stderr, "could not create extractor.\n");
+            return -1;
+        }
+
+        sp<MetaData> meta = extractor->getMetaData();
+
+        if (meta != NULL) {
+            const char *mime;
+            if (!meta->findCString(kKeyMIMEType, &mime)) {
+                fprintf(stderr, "extractor did not provide MIME type.\n");
+                return -1;
+            }
+        }
+
+        size_t numTracks = extractor->countTracks();
+
+        size_t i;
+        for (i = 0; i < numTracks; ++i) {
+            meta = extractor->getTrackMetaData(
+                    i, MediaExtractor::kIncludeExtensiveMetaData);
+
+            if (meta == NULL) {
+                break;
+            }
+            const char *mime;
+            meta->findCString(kKeyMIMEType, &mime);
+
+            // TODO: allowing AVC only for the time being
+            if (!strncasecmp(mime, "video/avc", 9)) {
+                break;
+            }
+
+            meta = NULL;
+        }
+
+        if (meta == NULL) {
+            fprintf(stderr, "No AVC track found.\n");
+            return -1;
+        }
+
+        mediaSource = extractor->getTrack(i);
+        if (mediaSource == nullptr) {
+            fprintf(stderr, "skip NULL track %zu, total tracks %zu.\n", i, numTracks);
+            return -1;
+        }
+
+        player.play(mediaSource);
+    }
+
+    return 0;
+}

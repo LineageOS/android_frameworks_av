@@ -52,7 +52,7 @@ public:
     // virtual void onComponentReleased(<id>) = 0;
 
 protected:
-    virtual ~C2ComponentListener();
+    virtual ~C2ComponentListener() = default;
 };
 
 /**
