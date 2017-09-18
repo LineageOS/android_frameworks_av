@@ -2253,6 +2253,7 @@ void AudioFlinger::PlaybackThread::ioConfigChanged(audio_io_config_event event, 
 
     switch (event) {
     case AUDIO_OUTPUT_OPENED:
+    case AUDIO_OUTPUT_REGISTERED:
     case AUDIO_OUTPUT_CONFIG_CHANGED:
         desc->mPatch = mPatch;
         desc->mChannelMask = mChannelMask;
@@ -7247,6 +7248,7 @@ void AudioFlinger::RecordThread::ioConfigChanged(audio_io_config_event event, pi
 
     switch (event) {
     case AUDIO_INPUT_OPENED:
+    case AUDIO_INPUT_REGISTERED:
     case AUDIO_INPUT_CONFIG_CHANGED:
         desc->mPatch = mPatch;
         desc->mChannelMask = mChannelMask;
@@ -7918,8 +7920,10 @@ void AudioFlinger::MmapThread::ioConfigChanged(audio_io_config_event event, pid_
 
     switch (event) {
     case AUDIO_INPUT_OPENED:
+    case AUDIO_INPUT_REGISTERED:
     case AUDIO_INPUT_CONFIG_CHANGED:
     case AUDIO_OUTPUT_OPENED:
+    case AUDIO_OUTPUT_REGISTERED:
     case AUDIO_OUTPUT_CONFIG_CHANGED:
         desc->mPatch = mPatch;
         desc->mChannelMask = mChannelMask;
