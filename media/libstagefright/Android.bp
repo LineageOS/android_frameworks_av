@@ -93,7 +93,6 @@ cc_library_shared {
         "libutils",
         "libvorbisidec",
         "libmediadrm",
-        "libnativewindow",
 
         "libmedia_helper",
         "libstagefright_foundation",
@@ -102,9 +101,7 @@ cc_library_shared {
         "libhidlbase",
         "libhidlmemory",
         "android.hidl.allocator@1.0",
-        "android.hidl.memory@1.0",
         "android.hardware.media.omx@1.0",
-        "libstagefright_xmlparser@1.0",
     ],
 
     static_libs: [
