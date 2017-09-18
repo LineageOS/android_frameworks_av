@@ -33,7 +33,7 @@ class AudioRecordClientProxy;
 
 // ----------------------------------------------------------------------------
 
-class AudioRecord : public RefBase
+class AudioRecord : public AudioSystem::AudioDeviceCallback
 {
 public:
 
@@ -424,7 +424,12 @@ public:
 
      /* Returns the ID of the audio device actually used by the input to which this AudioRecord
       * is attached.
-      * A value of AUDIO_PORT_HANDLE_NONE indicates the AudioRecord is not attached to any input.
+      * The device ID is relevant only if the AudioRecord is active.
+      * When the AudioRecord is inactive, the device ID returned can be either:
+      * - AUDIO_PORT_HANDLE_NONE if the AudioRecord is not attached to any output.
+      * - The device ID used before paused or stopped.
+      * - The device ID selected by audio policy manager of setOutputDevice() if the AudioRecord
+      * has not been started yet.
       *
       * Parameters:
       *  none.
@@ -453,6 +458,10 @@ public:
      */
             status_t removeAudioDeviceCallback(
                     const sp<AudioSystem::AudioDeviceCallback>& callback);
+
+            // AudioSystem::AudioDeviceCallback> virtuals
+            virtual void onAudioDeviceUpdate(audio_io_handle_t audioIo,
+                                             audio_port_handle_t deviceId);
 
 private:
     /* If nonContig is non-NULL, it is an output parameter that will be set to the number of
@@ -561,6 +570,8 @@ private:
             // FIXME enum is faster than strcmp() for parameter 'from'
             status_t restoreRecord_l(const char *from);
 
+            void     updateRoutedDeviceId_l();
+
     sp<AudioRecordThread>   mAudioRecordThread;
     mutable Mutex           mLock;
 
@@ -665,7 +676,7 @@ private:
     audio_port_handle_t     mRoutedDeviceId;   // Device actually selected by audio policy manager:
                                               // May not match the app selection depending on other
                                               // activity and connected devices
-    sp<AudioSystem::AudioDeviceCallback> mDeviceCallback;
+    wp<AudioSystem::AudioDeviceCallback> mDeviceCallback;
     audio_port_handle_t    mPortId;  // unique ID allocated by audio policy
 
 };
