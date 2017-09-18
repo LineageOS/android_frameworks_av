@@ -458,7 +458,12 @@ void SimpleSoftOMXComponent::onChangeState(OMX_STATETYPE state) {
         state = OMX_StateLoaded;
     }
 
-    CHECK_EQ((int)mState, (int)mTargetState);
+    if (mState != mTargetState) {
+        ALOGE("State change to state %d requested while still transitioning from state %d to %d",
+                state, mState, mTargetState);
+        notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
+        return;
+    }
 
     switch (mState) {
         case OMX_StateLoaded:
