@@ -145,23 +145,42 @@ class CameraDeviceBase : public virtual RefBase {
     struct StreamInfo {
         uint32_t width;
         uint32_t height;
+
         uint32_t format;
         bool formatOverridden;
         uint32_t originalFormat;
+
         android_dataspace dataSpace;
+        bool dataSpaceOverridden;
+        android_dataspace originalDataSpace;
+
         StreamInfo() : width(0), height(0), format(0), formatOverridden(false), originalFormat(0),
-                dataSpace(HAL_DATASPACE_UNKNOWN) {}
+                dataSpace(HAL_DATASPACE_UNKNOWN), dataSpaceOverridden(false),
+                originalDataSpace(HAL_DATASPACE_UNKNOWN) {}
         /**
          * Check whether the format matches the current or the original one in case
          * it got overridden.
          */
-        bool matchFormat(uint32_t clientFormat) {
+        bool matchFormat(uint32_t clientFormat) const {
             if ((formatOverridden && (originalFormat == clientFormat)) ||
                     (format == clientFormat)) {
                 return true;
             }
             return false;
         }
+
+        /**
+         * Check whether the dataspace matches the current or the original one in case
+         * it got overridden.
+         */
+        bool matchDataSpace(android_dataspace clientDataSpace) const {
+            if ((dataSpaceOverridden && (originalDataSpace == clientDataSpace)) ||
+                    (dataSpace == clientDataSpace)) {
+                return true;
+            }
+            return false;
+        }
+
     };
 
     /**
