@@ -196,27 +196,27 @@ sp<MediaExtractor> MediaExtractor::CreateFromService(
     }
 
     if (ret != NULL) {
-       // track the container format (mpeg, aac, wvm, etc)
-       if (MEDIA_LOG) {
-          if (ret->mAnalyticsItem != NULL) {
-              size_t ntracks = ret->countTracks();
-              ret->mAnalyticsItem->setCString(kExtractorFormat,  ret->name());
-              // tracks (size_t)
-              ret->mAnalyticsItem->setInt32(kExtractorTracks,  ntracks);
-              // metadata
-              sp<MetaData> pMetaData = ret->getMetaData();
-              if (pMetaData != NULL) {
-                String8 xx = pMetaData->toString();
-                // 'titl' -- but this verges into PII
-                // 'mime'
-                const char *mime = NULL;
-                if (pMetaData->findCString(kKeyMIMEType, &mime)) {
-                    ret->mAnalyticsItem->setCString(kExtractorMime,  mime);
+        // track the container format (mpeg, aac, wvm, etc)
+        if (MEDIA_LOG) {
+            if (ret->mAnalyticsItem != NULL) {
+                size_t ntracks = ret->countTracks();
+                ret->mAnalyticsItem->setCString(kExtractorFormat,  ret->name());
+                // tracks (size_t)
+                ret->mAnalyticsItem->setInt32(kExtractorTracks,  ntracks);
+                // metadata
+                sp<MetaData> pMetaData = ret->getMetaData();
+                if (pMetaData != NULL) {
+                    String8 xx = pMetaData->toString();
+                    // 'titl' -- but this verges into PII
+                    // 'mime'
+                    const char *mime = NULL;
+                    if (pMetaData->findCString(kKeyMIMEType, &mime)) {
+                        ret->mAnalyticsItem->setCString(kExtractorMime,  mime);
+                    }
+                    // what else is interesting and not already available?
                 }
-                // what else is interesting and not already available?
-              }
-	  }
-       }
+            }
+        }
     }
 
     return ret;
