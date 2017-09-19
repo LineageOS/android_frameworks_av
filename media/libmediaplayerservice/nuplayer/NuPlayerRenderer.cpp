@@ -1248,82 +1248,48 @@ void NuPlayer::Renderer::postDrainVideoQueue() {
         return;
     }
 
-    bool needRepostDrainVideoQueue = false;
-    int64_t delayUs;
     int64_t nowUs = ALooper::GetNowUs();
-    int64_t realTimeUs;
     if (mFlags & FLAG_REAL_TIME) {
-        int64_t mediaTimeUs;
-        CHECK(entry.mBuffer->meta()->findInt64("timeUs", &mediaTimeUs));
-        realTimeUs = mediaTimeUs;
-    } else {
-        int64_t mediaTimeUs;
-        CHECK(entry.mBuffer->meta()->findInt64("timeUs", &mediaTimeUs));
+        int64_t realTimeUs;
+        CHECK(entry.mBuffer->meta()->findInt64("timeUs", &realTimeUs));
 
-        {
-            Mutex::Autolock autoLock(mLock);
-            if (mAnchorTimeMediaUs < 0) {
-                mMediaClock->updateAnchor(mediaTimeUs, nowUs, mediaTimeUs);
-                mAnchorTimeMediaUs = mediaTimeUs;
-                realTimeUs = nowUs;
-            } else if (!mVideoSampleReceived) {
-                // Always render the first video frame.
-                realTimeUs = nowUs;
-            } else if (mAudioFirstAnchorTimeMediaUs < 0
-                || mMediaClock->getRealTimeFor(mediaTimeUs, &realTimeUs) == OK) {
-                realTimeUs = getRealTimeUs(mediaTimeUs, nowUs);
-            } else if (mediaTimeUs - mAudioFirstAnchorTimeMediaUs >= 0) {
-                needRepostDrainVideoQueue = true;
-                realTimeUs = nowUs;
-            } else {
-                realTimeUs = nowUs;
-            }
-        }
-        if (!mHasAudio) {
-            // smooth out videos >= 10fps
-            mMediaClock->updateMaxTimeMedia(mediaTimeUs + 100000);
-        }
+        realTimeUs = mVideoScheduler->schedule(realTimeUs * 1000) / 1000;
 
-        // Heuristics to handle situation when media time changed without a
-        // discontinuity. If we have not drained an audio buffer that was
-        // received after this buffer, repost in 10 msec. Otherwise repost
-        // in 500 msec.
-        delayUs = realTimeUs - nowUs;
-        int64_t postDelayUs = -1;
-        if (delayUs > 500000) {
-            postDelayUs = 500000;
-            if (mHasAudio && (mLastAudioBufferDrained - entry.mBufferOrdinal) <= 0) {
-                postDelayUs = 10000;
-            }
-        } else if (needRepostDrainVideoQueue) {
-            // CHECK(mPlaybackRate > 0);
-            // CHECK(mAudioFirstAnchorTimeMediaUs >= 0);
-            // CHECK(mediaTimeUs - mAudioFirstAnchorTimeMediaUs >= 0);
-            postDelayUs = mediaTimeUs - mAudioFirstAnchorTimeMediaUs;
-            postDelayUs /= mPlaybackRate;
-        }
+        int64_t twoVsyncsUs = 2 * (mVideoScheduler->getVsyncPeriod() / 1000);
 
-        if (postDelayUs >= 0) {
-            msg->setWhat(kWhatPostDrainVideoQueue);
-            msg->post(postDelayUs);
-            mVideoScheduler->restart();
-            ALOGI("possible video time jump of %dms (%lld : %lld) or uninitialized media clock,"
-                    " retrying in %dms",
-                    (int)(delayUs / 1000), (long long)mediaTimeUs,
-                    (long long)mAudioFirstAnchorTimeMediaUs, (int)(postDelayUs / 1000));
-            mDrainVideoQueuePending = true;
-            return;
-        }
+        int64_t delayUs = realTimeUs - nowUs;
+
+        ALOGW_IF(delayUs > 500000, "unusually high delayUs: %lld", (long long)delayUs);
+        // post 2 display refreshes before rendering is due
+        msg->post(delayUs > twoVsyncsUs ? delayUs - twoVsyncsUs : 0);
+
+        mDrainVideoQueuePending = true;
+        return;
     }
 
-    realTimeUs = mVideoScheduler->schedule(realTimeUs * 1000) / 1000;
-    int64_t twoVsyncsUs = 2 * (mVideoScheduler->getVsyncPeriod() / 1000);
+    int64_t mediaTimeUs;
+    CHECK(entry.mBuffer->meta()->findInt64("timeUs", &mediaTimeUs));
 
-    delayUs = realTimeUs - nowUs;
+    {
+        Mutex::Autolock autoLock(mLock);
+        if (mAnchorTimeMediaUs < 0) {
+            mMediaClock->updateAnchor(mediaTimeUs, nowUs, mediaTimeUs);
+            mAnchorTimeMediaUs = mediaTimeUs;
+        }
+    }
+    if (!mHasAudio) {
+        // smooth out videos >= 10fps
+        mMediaClock->updateMaxTimeMedia(mediaTimeUs + 100000);
+    }
 
-    ALOGW_IF(delayUs > 500000, "unusually high delayUs: %" PRId64, delayUs);
-    // post 2 display refreshes before rendering is due
-    msg->post(delayUs > twoVsyncsUs ? delayUs - twoVsyncsUs : 0);
+    if (!mVideoSampleReceived || mediaTimeUs < mAudioFirstAnchorTimeMediaUs) {
+        msg->post();
+    } else {
+        int64_t twoVsyncsUs = 2 * (mVideoScheduler->getVsyncPeriod() / 1000);
+
+        // post 2 display refreshes before rendering is due
+        mMediaClock->addTimer(msg, mediaTimeUs, -twoVsyncsUs);
+    }
 
     mDrainVideoQueuePending = true;
 }
@@ -1357,6 +1323,7 @@ void NuPlayer::Renderer::onDrainVideoQueue() {
 
         realTimeUs = getRealTimeUs(mediaTimeUs, nowUs);
     }
+    realTimeUs = mVideoScheduler->schedule(realTimeUs * 1000) / 1000;
 
     bool tooLate = false;
 

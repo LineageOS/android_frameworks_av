@@ -18,7 +18,7 @@
 
 #define MEDIA_CLOCK_H_
 
-#include <map>
+#include <list>
 #include <media/stagefright/foundation/AHandler.h>
 #include <utils/Mutex.h>
 #include <utils/RefBase.h>
@@ -30,8 +30,7 @@ struct AMessage;
 struct MediaClock : public AHandler {
     enum {
         TIMER_REASON_REACHED = 0,
-        TIMER_REASON_NO_CLOCK = 1,
-        TIMER_REASON_RESET = 2,
+        TIMER_REASON_RESET = 1,
     };
 
     MediaClock();
@@ -62,7 +61,10 @@ struct MediaClock : public AHandler {
     // The result is saved in |outRealUs|.
     status_t getRealTimeFor(int64_t targetMediaUs, int64_t *outRealUs) const;
 
-    void addTimer(const sp<AMessage> &notify, int64_t mediaTimeUs);
+    // request to set up a timer. The target time is |mediaTimeUs|, adjusted by
+    // system time of |adjustRealUs|. In other words, the wake up time is
+    // mediaTimeUs + (adjustRealUs / playbackRate)
+    void addTimer(const sp<AMessage> &notify, int64_t mediaTimeUs, int64_t adjustRealUs = 0);
 
     void reset();
 
@@ -74,6 +76,13 @@ protected:
 private:
     enum {
         kWhatTimeIsUp = 'tIsU',
+    };
+
+    struct Timer {
+        Timer(const sp<AMessage> &notify, int64_t mediaTimeUs, int64_t adjustRealUs);
+        const sp<AMessage> mNotify;
+        int64_t mMediaTimeUs;
+        int64_t mAdjustRealUs;
     };
 
     status_t getMediaTime_l(
@@ -94,7 +103,7 @@ private:
     float mPlaybackRate;
 
     int32_t mGeneration;
-    std::multimap<int64_t, sp<AMessage> > mTimers;
+    std::list<Timer> mTimers;
 
     DISALLOW_EVIL_CONSTRUCTORS(MediaClock);
 };
