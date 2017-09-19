@@ -137,7 +137,6 @@ cc_library_shared {
 
     srcs: [
         "IDataSource.cpp",
-        "IHDCP.cpp",
         "BufferingSettings.cpp",
         "mediaplayer.cpp",
         "IMediaHTTPConnection.cpp",

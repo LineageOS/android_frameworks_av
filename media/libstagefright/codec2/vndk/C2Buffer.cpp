@@ -854,7 +854,7 @@ C2Error C2AllocationGralloc::map(
         }
     }
 
-    if (mInfo.format == PixelFormat::YCBCR_420_888) {
+    if (mInfo.format == PixelFormat::YCBCR_420_888 || mInfo.format == PixelFormat::YV12) {
         YCbCrLayout ycbcrLayout;
         mMapper->lockYCbCr(
                 const_cast<native_handle_t *>(mBuffer),
@@ -1148,6 +1148,10 @@ public:
     }
 
     C2Error map(C2Rect rect) {
+        if (mData[0] != nullptr) {
+            // Already mapped.
+            return C2_OK;
+        }
         C2Error err = mAllocation->map(
                 rect,
                 { C2MemoryUsage::kSoftwareRead, 0 },
@@ -1209,6 +1213,10 @@ public:
     }
 
     C2Error map(C2Rect rect) {
+        if (mData[0] != nullptr) {
+            // Already mapped.
+            return C2_OK;
+        }
         uint8_t *data[C2PlaneLayout::MAX_NUM_PLANES];
         C2Error err = mAllocation->map(
                 rect,

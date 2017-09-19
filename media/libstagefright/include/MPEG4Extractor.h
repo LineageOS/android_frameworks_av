@@ -86,6 +86,9 @@ private:
         sp<SampleTable> sampleTable;
         bool includes_expensive_metadata;
         bool skipTrack;
+        bool has_elst;
+        int64_t elst_media_time;
+        uint64_t elst_segment_duration;
     };
 
     Vector<SidxEntry> mSidxEntries;
