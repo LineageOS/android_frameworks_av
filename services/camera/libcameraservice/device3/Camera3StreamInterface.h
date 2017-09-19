@@ -72,9 +72,11 @@ class Camera3StreamInterface : public virtual RefBase {
     virtual int      getFormat() const = 0;
     virtual android_dataspace getDataSpace() const = 0;
     virtual void setFormatOverride(bool formatOverriden) = 0;
-    virtual bool isFormatOverridden() = 0;
-    virtual void setOriginalFormat(int originalFormat) = 0;
-    virtual int getOriginalFormat() = 0;
+    virtual bool isFormatOverridden() const = 0;
+    virtual int getOriginalFormat() const = 0;
+    virtual void setDataSpaceOverride(bool dataSpaceOverriden) = 0;
+    virtual bool isDataSpaceOverridden() const = 0;
+    virtual android_dataspace getOriginalDataSpace() const = 0;
 
     /**
      * Get a HAL3 handle for the stream, without starting stream configuration.

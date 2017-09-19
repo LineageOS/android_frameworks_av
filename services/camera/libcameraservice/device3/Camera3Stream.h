@@ -147,9 +147,11 @@ class Camera3Stream :
     uint64_t          getUsage() const;
     void              setUsage(uint64_t usage);
     void              setFormatOverride(bool formatOverriden);
-    bool              isFormatOverridden();
-    void              setOriginalFormat(int originalFormat);
-    int               getOriginalFormat();
+    bool              isFormatOverridden() const;
+    int               getOriginalFormat() const;
+    void              setDataSpaceOverride(bool dataSpaceOverriden);
+    bool              isDataSpaceOverridden() const;
+    android_dataspace getOriginalDataSpace() const;
 
     camera3_stream*   asHalStream() override {
         return this;
@@ -522,6 +524,11 @@ class Camera3Stream :
     //Keep track of original format in case it gets overridden
     bool mFormatOverridden;
     int mOriginalFormat;
+
+    //Keep track of original dataSpace in case it gets overridden
+    bool mDataSpaceOverridden;
+    android_dataspace mOriginalDataSpace;
+
 }; // class Camera3Stream
 
 }; // namespace camera3
