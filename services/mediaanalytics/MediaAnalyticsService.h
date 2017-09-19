@@ -62,6 +62,7 @@ class MediaAnalyticsService : public BnMediaAnalyticsService
     // partitioned a bit so we don't over serialize
     mutable Mutex           mLock;
     mutable Mutex           mLock_ids;
+    mutable Mutex           mLock_mappings;
 
     // limit how many records we'll retain
     // by count (in each queue (open, finalized))
@@ -135,10 +136,13 @@ class MediaAnalyticsService : public BnMediaAnalyticsService
     struct UidToPkgMap {
         uid_t uid;
         AString pkg;
+        AString installer;
+        int32_t versionCode;
+        nsecs_t expiration;
     };
 
-    KeyedVector<uid_t,AString>  mPkgMappings;
-    AString getPkgName(uid_t uid, bool addIfMissing);
+    KeyedVector<uid_t,struct UidToPkgMap>  mPkgMappings;
+    void setPkgInfo(MediaAnalyticsItem *item, uid_t uid, bool setName, bool setVersion);
 
 };
 
