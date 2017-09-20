@@ -154,6 +154,15 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager) {
                 resultQueueRet.description().c_str());
         return DEAD_OBJECT;
     }
+    IF_ALOGV() {
+        session->interfaceChain([](
+            ::android::hardware::hidl_vec<::android::hardware::hidl_string> interfaceChain) {
+                ALOGV("Session interface chain:");
+                for (auto iface : interfaceChain) {
+                    ALOGV("  %s", iface.c_str());
+                }
+            });
+    }
 
     mInterface = new HalInterface(session, queue);
     std::string providerType;
@@ -458,6 +467,11 @@ camera3_buffer_status_t Camera3Device::mapHidlBufferStatus(BufferStatus status) 
 int Camera3Device::mapToFrameworkFormat(
         hardware::graphics::common::V1_0::PixelFormat pixelFormat) {
     return static_cast<uint32_t>(pixelFormat);
+}
+
+android_dataspace Camera3Device::mapToFrameworkDataspace(
+        DataspaceFlags dataSpace) {
+    return static_cast<android_dataspace>(dataSpace);
 }
 
 uint64_t Camera3Device::mapConsumerToFrameworkUsage(
@@ -1382,6 +1396,8 @@ status_t Camera3Device::getStreamInfo(int id, StreamInfo *streamInfo) {
     streamInfo->dataSpace = mOutputStreams[idx]->getDataSpace();
     streamInfo->formatOverridden = mOutputStreams[idx]->isFormatOverridden();
     streamInfo->originalFormat = mOutputStreams[idx]->getOriginalFormat();
+    streamInfo->dataSpaceOverridden = mOutputStreams[idx]->isDataSpaceOverridden();
+    streamInfo->originalDataSpace = mOutputStreams[idx]->getOriginalDataSpace();
     return OK;
 }
 
@@ -3196,17 +3212,51 @@ status_t Camera3Device::HalInterface::configureStreams(camera3_stream_configurat
 
     // Invoke configureStreams
 
-    HalStreamConfiguration finalConfiguration;
+    device::V3_3::HalStreamConfiguration finalConfiguration;
     common::V1_0::Status status;
-    auto err = mHidlSession->configureStreams(requestedConfiguration,
+
+    // See if we have v3.3 HAL
+    sp<device::V3_3::ICameraDeviceSession> hidlSession_3_3;
+    auto castResult = device::V3_3::ICameraDeviceSession::castFrom(mHidlSession);
+    if (castResult.isOk()) {
+        hidlSession_3_3 = castResult;
+    } else {
+        ALOGE("%s: Transaction error when casting ICameraDeviceSession: %s", __FUNCTION__,
+                castResult.description().c_str());
+    }
+    if (hidlSession_3_3 != nullptr) {
+        // We do; use v3.3 for the call
+        ALOGV("%s: v3.3 device found", __FUNCTION__);
+        auto err = hidlSession_3_3->configureStreams_3_3(requestedConfiguration,
             [&status, &finalConfiguration]
-            (common::V1_0::Status s, const HalStreamConfiguration& halConfiguration) {
+            (common::V1_0::Status s, const device::V3_3::HalStreamConfiguration& halConfiguration) {
                 finalConfiguration = halConfiguration;
                 status = s;
             });
-    if (!err.isOk()) {
-        ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
-        return DEAD_OBJECT;
+        if (!err.isOk()) {
+            ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
+            return DEAD_OBJECT;
+        }
+    } else {
+        // We don't; use v3.2 call and construct a v3.3 HalStreamConfiguration
+        ALOGV("%s: v3.2 device found", __FUNCTION__);
+        HalStreamConfiguration finalConfiguration_3_2;
+        auto err = mHidlSession->configureStreams(requestedConfiguration,
+                [&status, &finalConfiguration_3_2]
+                (common::V1_0::Status s, const HalStreamConfiguration& halConfiguration) {
+                    finalConfiguration_3_2 = halConfiguration;
+                    status = s;
+                });
+        if (!err.isOk()) {
+            ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
+            return DEAD_OBJECT;
+        }
+        finalConfiguration.streams.resize(finalConfiguration_3_2.streams.size());
+        for (size_t i = 0; i < finalConfiguration_3_2.streams.size(); i++) {
+            finalConfiguration.streams[i].v3_2 = finalConfiguration_3_2.streams[i];
+            finalConfiguration.streams[i].overrideDataSpace =
+                    requestedConfiguration.streams[i].dataSpace;
+        }
     }
 
     if (status != common::V1_0::Status::OK ) {
@@ -3223,7 +3273,7 @@ status_t Camera3Device::HalInterface::configureStreams(camera3_stream_configurat
         size_t realIdx = i;
         bool found = false;
         for (size_t idx = 0; idx < finalConfiguration.streams.size(); idx++) {
-            if (finalConfiguration.streams[realIdx].id == streamId) {
+            if (finalConfiguration.streams[realIdx].v3_2.id == streamId) {
                 found = true;
                 break;
             }
@@ -3234,42 +3284,51 @@ status_t Camera3Device::HalInterface::configureStreams(camera3_stream_configurat
                     __FUNCTION__, streamId);
             return INVALID_OPERATION;
         }
-        HalStream &src = finalConfiguration.streams[realIdx];
+        device::V3_3::HalStream &src = finalConfiguration.streams[realIdx];
 
         Camera3Stream* dstStream = Camera3Stream::cast(dst);
         dstStream->setFormatOverride(false);
-        int overrideFormat = mapToFrameworkFormat(src.overrideFormat);
+        dstStream->setDataSpaceOverride(false);
+        int overrideFormat = mapToFrameworkFormat(src.v3_2.overrideFormat);
+        android_dataspace overrideDataSpace = mapToFrameworkDataspace(src.overrideDataSpace);
+
         if (dst->format != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
             if (dst->format != overrideFormat) {
                 ALOGE("%s: Stream %d: Format override not allowed for format 0x%x", __FUNCTION__,
                         streamId, dst->format);
             }
+            if (dst->data_space != overrideDataSpace) {
+                ALOGE("%s: Stream %d: DataSpace override not allowed for format 0x%x", __FUNCTION__,
+                        streamId, dst->format);
+            }
         } else {
             dstStream->setFormatOverride((dst->format != overrideFormat) ? true : false);
-            dstStream->setOriginalFormat(dst->format);
+            dstStream->setDataSpaceOverride((dst->data_space != overrideDataSpace) ? true : false);
+
             // Override allowed with IMPLEMENTATION_DEFINED
             dst->format = overrideFormat;
+            dst->data_space = overrideDataSpace;
         }
 
         if (dst->stream_type == CAMERA3_STREAM_INPUT) {
-            if (src.producerUsage != 0) {
+            if (src.v3_2.producerUsage != 0) {
                 ALOGE("%s: Stream %d: INPUT streams must have 0 for producer usage",
                         __FUNCTION__, streamId);
                 return INVALID_OPERATION;
             }
-            Camera3Stream::cast(dst)->setUsage(
-                    mapConsumerToFrameworkUsage(src.consumerUsage));
+            dstStream->setUsage(
+                    mapConsumerToFrameworkUsage(src.v3_2.consumerUsage));
         } else {
             // OUTPUT
-            if (src.consumerUsage != 0) {
+            if (src.v3_2.consumerUsage != 0) {
                 ALOGE("%s: Stream %d: OUTPUT streams must have 0 for consumer usage",
                         __FUNCTION__, streamId);
                 return INVALID_OPERATION;
             }
-            Camera3Stream::cast(dst)->setUsage(
-                    mapProducerToFrameworkUsage(src.producerUsage));
+            dstStream->setUsage(
+                    mapProducerToFrameworkUsage(src.v3_2.producerUsage));
         }
-        dst->max_buffers = src.maxBuffers;
+        dst->max_buffers = src.v3_2.maxBuffers;
     }
 
     return res;
