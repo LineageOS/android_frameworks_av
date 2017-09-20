@@ -34,13 +34,12 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/OmxInfoBuilder.h>
 #include <media/stagefright/omx/OMXUtils.h>
-#include <media/stagefright/xmlparser/MediaCodecsXmlParser.h>
+#include <xmlparser/include/media/stagefright/xmlparser/MediaCodecsXmlParser.h>
 
 #include <sys/stat.h>
 #include <utils/threads.h>
 
 #include <cutils/properties.h>
-#include <expat.h>
 
 #include <algorithm>
 
