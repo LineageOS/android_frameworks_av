@@ -33,11 +33,8 @@ AudioStreamOut::AudioStreamOut(AudioHwDevice *dev, audio_output_flags_t flags)
         : audioHwDev(dev)
         , stream(NULL)
         , flags(flags)
-        , mFramesWritten(0)
-        , mFramesWrittenAtStandby(0)
         , mRenderPosition(0)
         , mRateMultiplier(1)
-        , mHalFormatHasProportionalFrames(false)
         , mHalFrameSize(0)
 {
 }
@@ -93,26 +90,7 @@ status_t AudioStreamOut::getPresentationPosition(uint64_t *frames, struct timesp
     if (stream == 0) {
         return NO_INIT;
     }
-
-    uint64_t halPosition = 0;
-    status_t status = stream->getPresentationPosition(&halPosition, timestamp);
-    if (status != NO_ERROR) {
-        return status;
-    }
-
-    // Adjust for standby using HAL rate frames.
-    // Only apply this correction if the HAL is getting PCM frames.
-    if (mHalFormatHasProportionalFrames) {
-        uint64_t adjustedPosition = (halPosition <= mFramesWrittenAtStandby) ?
-                0 : (halPosition - mFramesWrittenAtStandby);
-        // Scale from HAL sample rate to application rate.
-        *frames = adjustedPosition / mRateMultiplier;
-    } else {
-        // For offloaded MP3 and other compressed formats.
-        *frames = halPosition;
-    }
-
-    return status;
+    return stream->getPresentationPosition(frames, timestamp);
 }
 
 status_t AudioStreamOut::open(
@@ -161,7 +139,6 @@ status_t AudioStreamOut::open(
 
     if (status == NO_ERROR) {
         stream = outStream;
-        mHalFormatHasProportionalFrames = audio_has_proportional_frames(config->format);
         status = stream->getFrameSize(&mHalFrameSize);
     }
 
@@ -189,8 +166,6 @@ audio_channel_mask_t AudioStreamOut::getChannelMask() const
 int AudioStreamOut::flush()
 {
     mRenderPosition = 0;
-    mFramesWritten = 0;
-    mFramesWrittenAtStandby = 0;
     status_t result = stream->flush();
     return result != INVALID_OPERATION ? result : NO_ERROR;
 }
@@ -198,7 +173,6 @@ int AudioStreamOut::flush()
 int AudioStreamOut::standby()
 {
     mRenderPosition = 0;
-    mFramesWrittenAtStandby = mFramesWritten;
     return stream->standby();
 }
 
@@ -206,9 +180,6 @@ ssize_t AudioStreamOut::write(const void *buffer, size_t numBytes)
 {
     size_t bytesWritten;
     status_t result = stream->write(buffer, numBytes, &bytesWritten);
-    if (result == OK && bytesWritten > 0 && mHalFrameSize > 0) {
-        mFramesWritten += bytesWritten / mHalFrameSize;
-    }
     return result == OK ? bytesWritten : result;
 }
 
