@@ -35,7 +35,7 @@ cc_library_shared {
         "libaudiomanager",
     ],
     export_shared_lib_headers: ["libbinder"],
-
+    include_dirs: ["frameworks/av/media/libavextensions"],
     local_include_dirs: ["include/media"],
     header_libs: ["libaudioclient_headers"],
     export_header_lib_headers: ["libaudioclient_headers"],
@@ -44,6 +44,7 @@ cc_library_shared {
     static_libs: [
         "libc_malloc_debug_backtrace",
         "libc_logging",
+        "libavmediaextentions",
     ],
     cflags: [
         "-Wall",

@@ -44,6 +44,7 @@ EffectHalHidl::EffectHalHidl(const sp<IEffect>& effect, uint64_t effectId)
 }
 
 EffectHalHidl::~EffectHalHidl() {
+    Mutex::Autolock _l(mLock);
     if (mEffect != 0) {
         close();
         mEffect.clear();

@@ -56,6 +56,7 @@
 #include <private/android_filesystem_config.h>
 #include <utils/Log.h>
 #include <utils/Singleton.h>
+#include <stagefright/AVExtensions.h>
 
 namespace android {
 
@@ -548,7 +549,7 @@ void MediaCodec::PostReplyWithError(const sp<AReplyToken> &replyID, int32_t err)
 sp<CodecBase> MediaCodec::GetCodecBase(const AString &name, bool nameIsType) {
     // at this time only ACodec specifies a mime type.
     if (nameIsType || name.startsWithIgnoreCase("omx.")) {
-        return new ACodec;
+        return AVFactory::get()->createACodec();
     } else if (name.startsWithIgnoreCase("android.filter.")) {
         return new MediaFilter;
     } else {
@@ -2778,7 +2779,12 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
     }
 
     if (offset + size > info->mData->capacity()) {
-        return -EINVAL;
+        if ( ((int)size < 0) && !(flags & BUFFER_FLAG_EOS)) {
+            size = 0;
+            ALOGD("EOS, reset size to zero");
+        } else {
+            return -EINVAL;
+        }
     }
 
     info->mData->setRange(offset, size);

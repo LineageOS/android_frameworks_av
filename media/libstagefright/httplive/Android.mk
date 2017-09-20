@@ -10,8 +10,10 @@ LOCAL_SRC_FILES:=               \
         PlaylistFetcher.cpp     \
 
 LOCAL_C_INCLUDES:= \
-	$(TOP)/frameworks/av/media/libstagefright \
-	$(TOP)/frameworks/native/include/media/openmax
+        $(TOP)/frameworks/av/media/libstagefright \
+        $(TOP)/frameworks/av/media/libavextensions \
+        $(TOP)/frameworks/av/media/libstagefright/mpeg2ts \
+        $(TOP)/frameworks/native/include/media/openmax
 
 LOCAL_CFLAGS += -Werror -Wall
 LOCAL_SANITIZE := unsigned-integer-overflow signed-integer-overflow cfi

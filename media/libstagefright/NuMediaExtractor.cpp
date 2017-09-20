@@ -613,7 +613,7 @@ status_t NuMediaExtractor::getMetrics(Parcel *reply) {
 }
 
 bool NuMediaExtractor::getTotalBitrate(int64_t *bitrate) const {
-    if (mTotalBitrate >= 0) {
+    if (mTotalBitrate > 0) {
         *bitrate = mTotalBitrate;
         return true;
     }

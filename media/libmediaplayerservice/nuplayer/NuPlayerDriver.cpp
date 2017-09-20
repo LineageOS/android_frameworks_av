@@ -36,6 +36,9 @@
 static const int kDumpLockRetries = 50;
 static const int kDumpLockSleepUs = 20000;
 
+#include "mediaplayerservice/AVNuExtensions.h"
+#include "mediaplayerservice/AVMediaServiceExtensions.h"
+
 namespace android {
 
 // key for media statistics
@@ -66,7 +69,7 @@ NuPlayerDriver::NuPlayerDriver(pid_t pid)
       mSeekInProgress(false),
       mPlayingTimeUs(0),
       mLooper(new ALooper),
-      mPlayer(new NuPlayer(pid)),
+      mPlayer(AVNuFactory::get()->createNuPlayer(pid)),
       mPlayerFlags(0),
       mAnalyticsItem(NULL),
       mAtEOS(false),
@@ -151,6 +154,7 @@ status_t NuPlayerDriver::setDataSource(int fd, int64_t offset, int64_t length) {
         mCondition.wait(mLock);
     }
 
+    AVNuUtils::get()->printFileName(fd);
     return mAsyncResult;
 }
 
@@ -768,6 +772,8 @@ status_t NuPlayerDriver::getMetadata(
             Metadata::kSeekAvailable,
             mPlayerFlags & NuPlayer::Source::FLAG_CAN_SEEK);
 
+    AVMediaServiceUtils::get()->appendMeta(&meta);
+
     return OK;
 }
 
@@ -935,7 +941,10 @@ void NuPlayerDriver::notifyListener_l(
                     // don't send completion event when looping
                     return;
                 }
-
+                if (property_get_bool("persist.debug.sf.stats", false)) {
+                    Vector<String16> args;
+                    dump(-1, args);
+                }
                 mPlayer->pause();
                 mState = STATE_PAUSED;
             }

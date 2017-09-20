@@ -28,12 +28,13 @@
 namespace android {
 
 sp<IMediaExtractor> MediaExtractorService::makeExtractor(
-        const sp<IDataSource> &remoteSource, const char *mime) {
-    ALOGV("@@@ MediaExtractorService::makeExtractor for %s", mime);
+        const sp<IDataSource> &remoteSource, const char *mime,
+        const uint32_t extFlags) {
+    ALOGV("@@@ MediaExtractorService::makeExtractor for %s extFlags %d", mime, extFlags);
 
     sp<DataSource> localSource = DataSource::CreateFromIDataSource(remoteSource);
 
-    sp<IMediaExtractor> ret = MediaExtractor::CreateFromService(localSource, mime);
+    sp<IMediaExtractor> ret = MediaExtractor::CreateFromService(localSource, mime, extFlags);
 
     ALOGV("extractor service created %p (%s)",
             ret.get(),

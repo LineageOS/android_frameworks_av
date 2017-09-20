@@ -144,7 +144,7 @@ private:
     bool mLegacyAdaptiveExperiment;
     IOMX::PortMode mPortMode[2];
     // metadata and secure buffer types and graphic buffer mode tracking
-    MetadataBufferType mMetadataType[2];
+    MetadataBufferType mMetadataType[4];
     enum SecureBufferType {
         kSecureBufferTypeUnknown,
         kSecureBufferTypeOpaque,
@@ -164,7 +164,7 @@ private:
     // For debug support
     char *mName;
     int DEBUG;
-    size_t mNumPortBuffers[2];  // modified under mLock, read outside for debug
+    size_t mNumPortBuffers[4];  // modified under mLock, read outside for debug
     Mutex mDebugLock;
     // following are modified and read under mDebugLock
     int DEBUG_BUMP;

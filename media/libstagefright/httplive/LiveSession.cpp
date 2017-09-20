@@ -49,7 +49,7 @@ const int64_t LiveSession::kDownSwitchMarkUs = 20000000ll;
 const int64_t LiveSession::kUpSwitchMarginUs = 5000000ll;
 const int64_t LiveSession::kResumeThresholdUs = 100000ll;
 
-struct LiveSession::BandwidthEstimator : public RefBase {
+struct LiveSession::BandwidthEstimator : public LiveSession::BandwidthBaseEstimator {
     BandwidthEstimator();
 
     void addBandwidthMeasurement(size_t numBytes, int64_t delayUs);

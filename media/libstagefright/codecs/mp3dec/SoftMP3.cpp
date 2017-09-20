@@ -51,7 +51,9 @@ SoftMP3::SoftMP3(
       mSignalledError(false),
       mSawInputEos(false),
       mSignalledOutputEos(false),
-      mOutputPortSettingsChange(NONE) {
+      mOutputPortSettingsChange(NONE),
+      mLastAnchorTimeUs(-1),
+      mNextOutBufferTimeUs(0) {
     initPorts();
     initDecoder();
 }
@@ -239,7 +241,7 @@ void SoftMP3::onQueueFilled(OMX_U32 /* portIndex */) {
 
     List<BufferInfo *> &inQueue = getPortQueue(0);
     List<BufferInfo *> &outQueue = getPortQueue(1);
-
+    int64_t tmpTime = 0;
     while ((!inQueue.empty() || (mSawInputEos && !mSignalledOutputEos)) && !outQueue.empty()) {
         BufferInfo *inInfo = NULL;
         OMX_BUFFERHEADERTYPE *inHeader = NULL;
@@ -254,7 +256,20 @@ void SoftMP3::onQueueFilled(OMX_U32 /* portIndex */) {
 
         if (inHeader) {
             if (inHeader->nOffset == 0 && inHeader->nFilledLen) {
-                mAnchorTimeUs = inHeader->nTimeStamp;
+                // use new input buffer timestamp as Anchor Time if its
+                //    a) first buffer or
+                //    b) first buffer post seek or
+                //    c) different from last buffer timestamp
+                //If input buffer timestamp is same as last input buffer timestamp then
+                //treat this as a erroneous timestamp and ignore new input buffer
+                //timestamp and use last output buffer timestamp as Anchor Time.
+                if ((mLastAnchorTimeUs != inHeader->nTimeStamp)) {
+                    mAnchorTimeUs = inHeader->nTimeStamp;
+                    mLastAnchorTimeUs = inHeader->nTimeStamp;
+                } else {
+                    mAnchorTimeUs = mNextOutBufferTimeUs;
+                }
+
                 mNumFramesOutput = 0;
             }
 
@@ -361,7 +376,7 @@ void SoftMP3::onQueueFilled(OMX_U32 /* portIndex */) {
 
         outHeader->nTimeStamp =
             mAnchorTimeUs + (mNumFramesOutput * 1000000ll) / mSamplingRate;
-
+        tmpTime = outHeader->nTimeStamp;
         if (inHeader) {
             CHECK_GE(inHeader->nFilledLen, mConfig->inputBufferUsedLength);
 
@@ -386,6 +401,10 @@ void SoftMP3::onQueueFilled(OMX_U32 /* portIndex */) {
         notifyFillBufferDone(outHeader);
         outHeader = NULL;
     }
+
+    if (tmpTime > 0) {
+        mNextOutBufferTimeUs = tmpTime;
+    }
 }
 
 void SoftMP3::onPortFlushCompleted(OMX_U32 portIndex) {
@@ -397,6 +416,8 @@ void SoftMP3::onPortFlushCompleted(OMX_U32 portIndex) {
         mSignalledError = false;
         mSawInputEos = false;
         mSignalledOutputEos = false;
+        mLastAnchorTimeUs = -1;
+        mNextOutBufferTimeUs = 0;
     }
 }
 
@@ -433,6 +454,8 @@ void SoftMP3::onReset() {
     mSawInputEos = false;
     mSignalledOutputEos = false;
     mOutputPortSettingsChange = NONE;
+    mLastAnchorTimeUs = -1;
+    mNextOutBufferTimeUs = 0;
 }
 
 }  // namespace android

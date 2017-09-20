@@ -50,6 +50,8 @@
 #include "include/HevcUtils.h"
 #include "include/avc_utils.h"
 
+#include <stagefright/AVExtensions.h>
+
 #ifndef __predict_false
 #define __predict_false(exp) __builtin_expect((exp) != 0, 0)
 #endif
@@ -70,6 +72,7 @@ static const uint8_t kNalUnitTypeSeqParamSet = 0x07;
 static const uint8_t kNalUnitTypePicParamSet = 0x08;
 static const int64_t kInitialDelayTimeUs     = 700000LL;
 static const int64_t kMaxMetadataSize = 0x4000000LL;   // 64MB max per-frame metadata size
+static const nsecs_t kWaitDuration = 500000000LL; //500msec   ~15frames delay
 
 static const char kMetaKey_Version[]    = "com.android.version";
 static const char kMetaKey_Manufacturer[]      = "com.android.manufacturer";
@@ -420,6 +423,10 @@ private:
 
     Track(const Track &);
     Track &operator=(const Track &);
+
+    bool mIsStopping;
+    Mutex mTrackCompletionLock;
+    Condition mTrackCompletionSignal;
 };
 
 MPEG4Writer::MPEG4Writer(int fd) {
@@ -474,6 +481,7 @@ void MPEG4Writer::initInternal(int fd) {
     mSwitchPending = false;
     mMetaKeys = new AMessage();
     addDeviceMeta();
+    mLastAudioTimeStampUs = 0;
     // Verify mFd is seekable
     off64_t off = lseek64(mFd, 0, SEEK_SET);
     if (off < 0) {
@@ -563,9 +571,14 @@ status_t MPEG4Writer::addSource(const sp<IMediaSource> &source) {
 
     const char *mime;
     source->getFormat()->findCString(kKeyMIMEType, &mime);
-
+    bool isAudio = !strncasecmp(mime, "audio/", 6);
     if (Track::getFourCCForMime(mime) == NULL) {
         ALOGE("Unsupported mime '%s'", mime);
+        return ERROR_UNSUPPORTED;
+    }
+
+    if (isAudio && !AVUtils::get()->isAudioMuxFormatSupported(mime)) {
+        ALOGE("Muxing is not supported for %s", mime);
         return ERROR_UNSUPPORTED;
     }
 
@@ -650,7 +663,7 @@ int64_t MPEG4Writer::estimateMoovBoxSize(int32_t bitRate) {
 
     // If the estimation is wrong, we will pay the price of wasting
     // some reserved space. This should not happen so often statistically.
-    static const int32_t factor = mUse32BitOffset? 1: 2;
+    int32_t factor = mUse32BitOffset? 1: 2;
     static const int64_t MIN_MOOV_BOX_SIZE = 3 * 1024;  // 3 KB
     static const int64_t MAX_MOOV_BOX_SIZE = (180 * 3000000 * 6LL / 8000);
     int64_t size = MIN_MOOV_BOX_SIZE;
@@ -999,8 +1012,9 @@ status_t MPEG4Writer::reset(bool stopSource) {
     status_t err = OK;
     int64_t maxDurationUs = 0;
     int64_t minDurationUs = 0x7fffffffffffffffLL;
-    for (List<Track *>::iterator it = mTracks.begin();
-         it != mTracks.end(); ++it) {
+    List<Track *>::iterator it = mTracks.end();
+    do {
+        --it;
         status_t status = (*it)->stop(stopSource);
         if (err == OK && status != OK) {
             err = status;
@@ -1013,7 +1027,7 @@ status_t MPEG4Writer::reset(bool stopSource) {
         if (durationUs < minDurationUs) {
             minDurationUs = durationUs;
         }
-    }
+    } while (it != mTracks.begin());
 
     if (mTracks.size() > 1) {
         ALOGD("Duration from tracks range is [%" PRId64 ", %" PRId64 "] us",
@@ -1214,7 +1228,7 @@ off64_t MPEG4Writer::addSample_l(MediaBuffer *buffer) {
     return old_offset;
 }
 
-static void StripStartcode(MediaBuffer *buffer) {
+void MPEG4Writer::StripStartcode(MediaBuffer *buffer) {
     if (buffer->range_length() < 4) {
         return;
     }
@@ -1650,6 +1664,7 @@ MPEG4Writer::Track::Track(
     }
 
     setTimeScale();
+    mIsStopping = false;
 }
 
 // Clear all the internal states except the CSD data.
@@ -2132,6 +2147,17 @@ status_t MPEG4Writer::Track::stop(bool stopSource) {
 
     if (mDone) {
         return OK;
+    }
+
+    if (!mIsAudio && mOwner->getLastAudioTimeStamp() &&
+        !mOwner->exceedsFileDurationLimit() &&
+        !mOwner->exceedsFileSizeLimit() &&
+        !mIsMalformed) {
+        Mutex::Autolock lock(mTrackCompletionLock);
+        mIsStopping = true;
+        if (mTrackCompletionSignal.waitRelative(mTrackCompletionLock, kWaitDuration)) {
+            ALOGW("Timed-out waiting for video track to reach final audio timestamp !");
+        }
     }
     mDone = true;
     if (stopSource) {
@@ -2640,15 +2666,23 @@ status_t MPEG4Writer::Track::threadEntry() {
 
         ++nActualFrames;
 
-        // Make a deep copy of the MediaBuffer and Metadata and release
-        // the original as soon as we can
-        MediaBuffer *copy = new MediaBuffer(buffer->range_length());
-        memcpy(copy->data(), (uint8_t *)buffer->data() + buffer->range_offset(),
-                buffer->range_length());
-        copy->set_range(0, buffer->range_length());
-        meta_data = new MetaData(*buffer->meta_data().get());
-        buffer->release();
-        buffer = NULL;
+        MediaBuffer *copy = NULL;
+        // Check if the upstream source hints it is OK to hold on to the
+        // buffer without releasing immediately and avoid cloning the buffer
+        if (AVUtils::get()->canDeferRelease(buffer->meta_data())) {
+            copy = buffer;
+            meta_data = new MetaData(*buffer->meta_data().get());
+        } else {
+            // Make a deep copy of the MediaBuffer and Metadata and release
+            // the original as soon as we can
+            copy = new MediaBuffer(buffer->range_length());
+            memcpy(copy->data(), (uint8_t *)buffer->data() + buffer->range_offset(),
+                    buffer->range_length());
+            copy->set_range(0, buffer->range_length());
+            meta_data = new MetaData(*buffer->meta_data().get());
+            buffer->release();
+            buffer = NULL;
+        }
 
         if (mIsAvc || mIsHevc) StripStartcode(copy);
 
@@ -2953,6 +2987,15 @@ status_t MPEG4Writer::Track::threadEntry() {
             }
         }
 
+        if (mIsAudio) {
+            mOwner->setLastAudioTimeStamp(lastTimestampUs);
+        } else if (mIsStopping && timestampUs >= mOwner->getLastAudioTimeStamp()) {
+            ALOGI("Video time (%lld) reached last audio time (%lld)", (long long)timestampUs, (long long)mOwner->getLastAudioTimeStamp());
+            Mutex::Autolock lock(mTrackCompletionLock);
+            mTrackCompletionSignal.signal();
+            break;
+        }
+
     }
 
     if (isTrackMalFormed()) {
@@ -3007,8 +3050,10 @@ status_t MPEG4Writer::Track::threadEntry() {
     if (mIsAudio) {
         ALOGI("Audio track drift time: %" PRId64 " us", mOwner->getDriftTimeUs());
     }
-
-    if (err == ERROR_END_OF_STREAM) {
+    // if err is ERROR_IO (ex: during SSR), return OK to save the
+    // recorded file successfully. Session tear down will happen as part of
+    // client callback
+    if ((err == ERROR_IO) || (err == ERROR_END_OF_STREAM)) {
         return OK;
     }
     return err;

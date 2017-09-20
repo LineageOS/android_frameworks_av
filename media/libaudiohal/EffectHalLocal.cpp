@@ -29,9 +29,12 @@ EffectHalLocal::EffectHalLocal(effect_handle_t handle)
 }
 
 EffectHalLocal::~EffectHalLocal() {
-    int status = EffectRelease(mHandle);
-    ALOGW_IF(status, "Error releasing effect %p: %s", mHandle, strerror(-status));
-    mHandle = 0;
+    Mutex::Autolock _l(mLock);
+    if (mHandle != 0) {
+        int status = EffectRelease(mHandle);
+        ALOGW_IF(status, "Error releasing effect %p: %s", mHandle, strerror(-status));
+        mHandle = 0;
+    }
 }
 
 status_t EffectHalLocal::setInBuffer(const sp<EffectBufferHalInterface>& buffer) {
