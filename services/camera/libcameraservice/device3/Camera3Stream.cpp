@@ -116,18 +116,28 @@ void Camera3Stream::setUsage(uint64_t usage) {
 
 void Camera3Stream::setFormatOverride(bool formatOverridden) {
     mFormatOverridden = formatOverridden;
+    if (formatOverridden) mOriginalFormat = camera3_stream::format;
 }
 
-bool Camera3Stream::isFormatOverridden() {
+bool Camera3Stream::isFormatOverridden() const {
     return mFormatOverridden;
 }
 
-void Camera3Stream::setOriginalFormat(int originalFormat) {
-    mOriginalFormat = originalFormat;
+int Camera3Stream::getOriginalFormat() const {
+    return mOriginalFormat;
 }
 
-int Camera3Stream::getOriginalFormat() {
-    return mOriginalFormat;
+void Camera3Stream::setDataSpaceOverride(bool dataSpaceOverridden) {
+    mDataSpaceOverridden = dataSpaceOverridden;
+    if (dataSpaceOverridden) mOriginalDataSpace = camera3_stream::data_space;
+}
+
+bool Camera3Stream::isDataSpaceOverridden() const {
+    return mDataSpaceOverridden;
+}
+
+android_dataspace Camera3Stream::getOriginalDataSpace() const {
+    return mOriginalDataSpace;
 }
 
 camera3_stream* Camera3Stream::startConfiguration() {
