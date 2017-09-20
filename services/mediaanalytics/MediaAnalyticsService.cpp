@@ -222,6 +222,8 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(MediaAnalyticsItem
 
     // we control these, generally not trusting user input
     nsecs_t now = systemTime(SYSTEM_TIME_REALTIME);
+    // round nsecs to seconds
+    now = ((now + 500000000) / 1000000000) * 1000000000;
     item->setTimestamp(now);
     int pid = IPCThreadState::self()->getCallingPid();
     int uid = IPCThreadState::self()->getCallingUid();
