@@ -91,6 +91,8 @@ LOCAL_HEADER_LIBRARIES := libmedia_headers
 # for memory heap analysis
 LOCAL_STATIC_LIBRARIES := libc_malloc_debug_backtrace libc_logging
 
+LOCAL_WHOLE_STATIC_LIBRARIES := libavmediaextentions
+
 LOCAL_MODULE:= libmedia
 
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
@@ -100,6 +102,7 @@ LOCAL_C_INCLUDES := \
     $(TOP)/frameworks/native/include/media/openmax \
     $(TOP)/frameworks/av/include/media/ \
     $(TOP)/frameworks/av/media/libmedia/aidl \
+    $(TOP)/frameworks/av/media/libavextensions \
     $(TOP)/frameworks/av/include \
     $(TOP)/frameworks/native/include \
     $(call include-path-for, audio-utils)

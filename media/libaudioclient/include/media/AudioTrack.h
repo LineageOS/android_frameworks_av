@@ -326,7 +326,7 @@ public:
      * This includes the latency due to AudioTrack buffer size, AudioMixer (if any)
      * and audio hardware driver.
      */
-            uint32_t    latency() const     { return mLatency; }
+            uint32_t    latency();
 
     /* Returns the number of application-level buffer underruns
      * since the AudioTrack was created.
@@ -564,6 +564,7 @@ public:
      */
             status_t    reload();
 
+public:
     /* Returns a handle on the audio output used by this AudioTrack.
      *
      * Parameters:
@@ -573,9 +574,7 @@ public:
      *  handle on audio hardware output, or AUDIO_IO_HANDLE_NONE if the
      *  track needed to be re-created but that failed
      */
-private:
             audio_io_handle_t    getOutput() const;
-public:
 
     /* Selects the audio device to use for output of this AudioTrack. A value of
      * AUDIO_PORT_HANDLE_NONE indicates default (AudioPolicyManager) routing.
@@ -926,6 +925,7 @@ protected:
             nsecs_t processAudioBuffer();
 
             // caller must hold lock on mLock for all _l methods
+            uint32_t latency_l();
 
             status_t createTrack_l();
 
@@ -1154,6 +1154,7 @@ private:
 
     sp<AudioSystem::AudioDeviceCallback> mDeviceCallback;
     audio_port_handle_t     mPortId;  // unique ID allocated by audio policy
+    bool                    mTrackOffloaded;
 };
 
 }; // namespace android

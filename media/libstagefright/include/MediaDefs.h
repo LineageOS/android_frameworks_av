@@ -27,5 +27,6 @@
  */
 
 #include <media/MediaDefs.h>
+#include <media/stagefright/ExtendedMediaDefs.h>
 
 #endif  // STAGEFRIGHT_MEDIA_DEFS_H_

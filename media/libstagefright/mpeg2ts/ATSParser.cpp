@@ -39,6 +39,7 @@
 #include <utils/Vector.h>
 
 #include <inttypes.h>
+#include <stagefright/AVExtensions.h>
 
 namespace android {
 using binder::Status;
@@ -744,7 +745,11 @@ ATSParser::Stream::Stream(
             flags |= (mProgram->parserFlags() & ALIGNED_VIDEO_DATA) ?
                     ElementaryStreamQueue::kFlag_AlignedData : 0;
             break;
-
+        case STREAMTYPE_H265:
+            mode = ElementaryStreamQueue::H265;
+            flags |= (mProgram->parserFlags() & ALIGNED_VIDEO_DATA) ?
+                    ElementaryStreamQueue::kFlag_AlignedData : 0;
+            break;
         case STREAMTYPE_MPEG2_AUDIO_ADTS:
         case STREAMTYPE_AAC_ENCRYPTED:
             mode = ElementaryStreamQueue::AAC;
@@ -780,7 +785,10 @@ ATSParser::Stream::Stream(
             return;
     }
 
-    mQueue = new ElementaryStreamQueue(mode, flags);
+    if (mode == ElementaryStreamQueue::H265)
+        mQueue = AVFactory::get()->createESQueue(mode, flags);
+    else
+        mQueue = new ElementaryStreamQueue(mode, flags);
 
     if (mQueue != NULL) {
         if (mSampleAesKeyItem != NULL) {
@@ -939,6 +947,7 @@ status_t ATSParser::Stream::parse(
 bool ATSParser::Stream::isVideo() const {
     switch (mStreamType) {
         case STREAMTYPE_H264:
+        case STREAMTYPE_H265:
         case STREAMTYPE_H264_ENCRYPTED:
         case STREAMTYPE_MPEG1_VIDEO:
         case STREAMTYPE_MPEG2_VIDEO:
@@ -1512,12 +1521,12 @@ void ATSParser::Stream::onPayloadData(
                      mElementaryPID, mStreamType);
 
                 const char *mime;
-                if (meta->findCString(kKeyMIMEType, &mime)
-                        && !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)) {
-                    int32_t sync = 0;
-                    if (!accessUnit->meta()->findInt32("isSync", &sync) || !sync) {
-                        continue;
-                    }
+                if (meta->findCString(kKeyMIMEType, &mime) &&
+                        ((!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)
+                           && !IsIDR(accessUnit)) ||
+                         (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC)
+                          && !AVUtils::get()->IsHevcIDR(accessUnit)))) {
+                    continue;
                 }
                 mSource = new AnotherPacketSource(meta);
                 mSource->queueAccessUnit(accessUnit);

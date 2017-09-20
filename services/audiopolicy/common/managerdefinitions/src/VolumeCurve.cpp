@@ -29,7 +29,11 @@ float VolumeCurve::volIndexToDb(int indexInUi, int volIndexMin, int volIndexMax)
     size_t nbCurvePoints = mCurvePoints.size();
     // the volume index in the UI is relative to the min and max volume indices for this stream
     int nbSteps = 1 + mCurvePoints[nbCurvePoints - 1].mIndex - mCurvePoints[0].mIndex;
-    int volIdx = (nbSteps * (indexInUi - volIndexMin)) / (volIndexMax - volIndexMin);
+    int volIdx = 0;
+
+    //value of vol index must be equal to or greater than zero
+    if (indexInUi >= volIndexMin)
+        volIdx = (nbSteps * (indexInUi - volIndexMin)) / (volIndexMax - volIndexMin);
 
     // Where would this volume index been inserted in the curve point
     size_t indexInUiPosition = mCurvePoints.orderOf(CurvePoint(volIdx, 0));

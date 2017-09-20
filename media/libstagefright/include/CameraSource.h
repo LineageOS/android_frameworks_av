@@ -128,6 +128,8 @@ public:
 
     virtual void signalBufferReturned(MediaBuffer* buffer);
 
+    virtual void notifyPerformanceMode() {}
+
 protected:
 
     /**

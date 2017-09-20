@@ -96,6 +96,7 @@ class MediaPlayerService : public BnMediaPlayerService
         virtual audio_session_t getSessionId() const;
         virtual uint32_t        getSampleRate() const;
         virtual int64_t         getBufferDurationInUs() const;
+        virtual audio_output_flags_t getFlags() const { return mFlags; }
 
         virtual status_t        open(
                 uint32_t sampleRate, int channelCount, audio_channel_mask_t channelMask,

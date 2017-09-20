@@ -152,7 +152,7 @@ bool HevcParameterSets::write(size_t index, uint8_t* dest, size_t size) {
 }
 
 status_t HevcParameterSets::parseVps(const uint8_t* data, size_t size) {
-    // See Rec. ITU-T H.265 v3 (04/2015) Chapter 7.3.2.1 for reference
+    // See Rec. ITU-T H.265 (12/2016) Chapter 7.3.2.1 for reference
     NALBitReader reader(data, size);
     // Skip vps_video_parameter_set_id
     reader.skipBits(4);
@@ -162,6 +162,8 @@ status_t HevcParameterSets::parseVps(const uint8_t* data, size_t size) {
     reader.skipBits(1);
     // Skip vps_max_layers_minus_1
     reader.skipBits(6);
+    // Skip vps_max_sub_layers_minus_1
+    reader.skipBits(3);
     // Skip vps_temporal_id_nesting_flags
     reader.skipBits(1);
     // Skip reserved
@@ -422,7 +424,7 @@ status_t HevcParameterSets::makeHvcc(uint8_t *hvcc, size_t *hvccSize,
 
     uint8_t *header = hvcc;
     header[0] = 1;
-    header[1] = (kGeneralProfileSpace << 6) | (kGeneralTierFlag << 5) | kGeneralProfileIdc;
+    header[1] = (generalProfileSpace << 6) | (generalTierFlag << 5) | generalProfileIdc;
     header[2] = (compatibilityFlags >> 24) & 0xff;
     header[3] = (compatibilityFlags >> 16) & 0xff;
     header[4] = (compatibilityFlags >> 8) & 0xff;
@@ -455,8 +457,8 @@ status_t HevcParameterSets::makeHvcc(uint8_t *hvcc, size_t *hvccSize,
         if (numNalus == 0) {
             continue;
         }
-        // array_completeness set to 0.
-        header[0] = type;
+        // array_completeness set to 1.
+        header[0] = type | 0x80;
         header[1] = (numNalus >> 8) & 0xff;
         header[2] = numNalus & 0xff;
         header += 3;
