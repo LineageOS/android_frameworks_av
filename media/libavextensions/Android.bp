@@ -1,0 +1,24 @@
+// AV  media utils extention
+// ########################################################
+
+cc_library_static {
+    name: "libavmediaextentions",
+    srcs: ["media/AVMediaUtils.cpp"],
+    shared_libs: [
+        "libhidlbase",
+        "liblog",
+        "libcutils",
+        "libutils",
+    ],
+    include_dirs: [
+        "frameworks/av/include/media",
+        "frameworks/av/media/libavextensions",
+        "frameworks/native/include/media/hardware",
+        "frameworks/native/include/media/openmax",
+        "external/flac/include",
+    ],
+    cflags: [
+        "-Wno-multichar",
+        "-Werror",
+    ],
+}

@@ -709,7 +709,8 @@ sp<IOProfile> AudioPolicyManager::getProfileForDirectOutput(
     // only retain flags that will drive the direct output profile selection
     // if explicitly requested
     static const uint32_t kRelevantFlags =
-            (AUDIO_OUTPUT_FLAG_HW_AV_SYNC | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD);
+            (AUDIO_OUTPUT_FLAG_HW_AV_SYNC | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD |
+             AUDIO_OUTPUT_FLAG_VOIP_RX);
     flags =
         (audio_output_flags_t)((flags & kRelevantFlags) | AUDIO_OUTPUT_FLAG_DIRECT);
 
@@ -733,7 +734,10 @@ sp<IOProfile> AudioPolicyManager::getProfileForDirectOutput(
                 continue;
             }
             // if several profiles are compatible, give priority to one with offload capability
-            if (profile != 0 && ((curProfile->getFlags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) == 0)) {
+            // exact match is also not skipped as it should be preferred over any existing selection
+            if (profile != 0 &&
+                ((curProfile->getFlags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) == 0) &&
+                (curProfile->getFlags() != flags)) {
                 continue;
             }
             profile = curProfile;
@@ -935,15 +939,14 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
         goto non_direct_output;
     }
 
-    // Do not allow offloading if one non offloadable effect is enabled or MasterMono is enabled.
-    // This prevents creating an offloaded track and tearing it down immediately after start
+    // Do not allow Direct Output if one non offloadable effect is enabled or MasterMono is enabled.
+    // This prevents creating an direct track and tearing it down immediately after start
     // when audioflinger detects there is an active non offloadable effect.
     // FIXME: We should check the audio session here but we do not have it in this context.
     // This may prevent offloading in rare situations where effects are left active by apps
     // in the background.
 
-    if (((flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) == 0) ||
-            !(mEffects.isNonOffloadableEffectEnabled() || mMasterMono)) {
+    if (!(mEffects.isNonOffloadableEffectEnabled() || mMasterMono)) {
         profile = getProfileForDirectOutput(device,
                                            samplingRate,
                                            format,
@@ -2199,9 +2202,10 @@ audio_io_handle_t AudioPolicyManager::selectOutputForMusicEffects()
     // 1: An offloaded output. If the effect ends up not being offloadable,
     //    AudioFlinger will invalidate the track and the offloaded output
     //    will be closed causing the effect to be moved to a PCM output.
-    // 2: A deep buffer output
-    // 3: The primary output
-    // 4: the first output in the list
+    // 2: Non offloaded Direct output
+    // 3: A deep buffer output
+    // 4: The primary output
+    // 5: the first output in the list
 
     routing_strategy strategy = getStrategy(AUDIO_STREAM_MUSIC);
     audio_devices_t device = getDeviceForStrategy(strategy, false /*fromCache*/);
@@ -2216,6 +2220,7 @@ audio_io_handle_t AudioPolicyManager::selectOutputForMusicEffects()
 
     while (output == AUDIO_IO_HANDLE_NONE) {
         audio_io_handle_t outputOffloaded = AUDIO_IO_HANDLE_NONE;
+        audio_io_handle_t outputDirect = AUDIO_IO_HANDLE_NONE;
         audio_io_handle_t outputDeepBuffer = AUDIO_IO_HANDLE_NONE;
         audio_io_handle_t outputPrimary = AUDIO_IO_HANDLE_NONE;
 
@@ -2229,6 +2234,9 @@ audio_io_handle_t AudioPolicyManager::selectOutputForMusicEffects()
             if ((desc->mFlags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) != 0) {
                 outputOffloaded = outputs[i];
             }
+            if ((desc->mFlags == AUDIO_OUTPUT_FLAG_DIRECT) != 0) {
+                outputDirect = outputs[i];
+            }
             if ((desc->mFlags & AUDIO_OUTPUT_FLAG_DEEP_BUFFER) != 0) {
                 outputDeepBuffer = outputs[i];
             }
@@ -2238,6 +2246,8 @@ audio_io_handle_t AudioPolicyManager::selectOutputForMusicEffects()
         }
         if (outputOffloaded != AUDIO_IO_HANDLE_NONE) {
             output = outputOffloaded;
+        } else if (outputDirect != AUDIO_IO_HANDLE_NONE) {
+            output = outputDirect;
         } else if (outputDeepBuffer != AUDIO_IO_HANDLE_NONE) {
             output = outputDeepBuffer;
         } else if (outputPrimary != AUDIO_IO_HANDLE_NONE) {
@@ -3344,7 +3354,8 @@ status_t AudioPolicyManager::setMasterMono(bool mono)
         Vector<audio_io_handle_t> offloaded;
         for (size_t i = 0; i < mOutputs.size(); ++i) {
             sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
-            if (desc->mFlags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) {
+            if (desc->mFlags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD ||
+                desc->mFlags == AUDIO_OUTPUT_FLAG_DIRECT) {
                 offloaded.push(desc->mIoHandle);
             }
         }
@@ -3422,7 +3433,7 @@ uint32_t AudioPolicyManager::nextAudioPortGeneration()
 #ifdef USE_XML_AUDIO_POLICY_CONF
 // Treblized audio policy xml config will be located in /odm/etc or /vendor/etc.
 static const char *kConfigLocationList[] =
-        {"/odm/etc", "/vendor/etc", "/system/etc"};
+        {"/odm/etc", "/vendor/etc/audio", "/vendor/etc", "/system/etc"};
 static const int kConfigLocationListSize =
         (sizeof(kConfigLocationList) / sizeof(kConfigLocationList[0]));
 
@@ -4459,7 +4470,7 @@ void AudioPolicyManager::checkOutputForStrategy(routing_strategy strategy)
 {
     audio_devices_t oldDevice = getDeviceForStrategy(strategy, true /*fromCache*/);
     audio_devices_t newDevice = getDeviceForStrategy(strategy, false /*fromCache*/);
-    SortedVector<audio_io_handle_t> srcOutputs = getOutputsForDevice(oldDevice, mPreviousOutputs);
+    SortedVector<audio_io_handle_t> srcOutputs = getOutputsForDevice(oldDevice, mOutputs);
     SortedVector<audio_io_handle_t> dstOutputs = getOutputsForDevice(newDevice, mOutputs);
 
     // also take into account external policy-related changes: add all outputs which are
@@ -4528,7 +4539,7 @@ void AudioPolicyManager::checkOutputForAllStrategies()
 void AudioPolicyManager::checkA2dpSuspend()
 {
     audio_io_handle_t a2dpOutput = mOutputs.getA2dpOutput();
-    if (a2dpOutput == 0) {
+    if (a2dpOutput == 0 || mOutputs.isA2dpOnPrimary()) {
         mA2dpSuspended = false;
         return;
     }
@@ -5175,7 +5186,25 @@ sp<IOProfile> AudioPolicyManager::getInputProfile(audio_devices_t device,
                                              &format /*updatedFormat*/,
                                              channelMask,
                                              &channelMask /*updatedChannelMask*/,
-                                             (audio_output_flags_t) flags)) {
+                                             (audio_output_flags_t) flags,
+                                             true)) {
+
+                return profile;
+            }
+        }
+
+        for (size_t j = 0; j < mHwModules[i]->mInputProfiles.size(); j++)
+        {
+            sp<IOProfile> profile = mHwModules[i]->mInputProfiles[j];
+            // profile->log();
+            if (profile->isCompatibleProfile(device, address, samplingRate,
+                                             &samplingRate /*updatedSamplingRate*/,
+                                             format,
+                                             &format /*updatedFormat*/,
+                                             channelMask,
+                                             &channelMask /*updatedChannelMask*/,
+                                             (audio_output_flags_t) flags,
+                                              false)) {
 
                 return profile;
             }

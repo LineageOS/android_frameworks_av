@@ -110,7 +110,6 @@ protected:
 
     virtual void onMessageReceived(const sp<AMessage> &msg);
 
-private:
     enum {
         kWhatDrainAudioQueue     = 'draA',
         kWhatDrainVideoQueue     = 'draV',
@@ -259,13 +258,13 @@ private:
     status_t onGetSyncSettings(AVSyncSettings *sync /* nonnull */, float *videoFps /* nonnull */);
 
     void onPause();
-    void onResume();
+    virtual void onResume();
     void onSetVideoFrameRate(float fps);
     int32_t getQueueGeneration(bool audio);
     int32_t getDrainGeneration(bool audio);
     bool getSyncQueues();
     void onAudioTearDown(AudioTearDownReason reason);
-    status_t onOpenAudioSink(
+    virtual status_t onOpenAudioSink(
             const sp<AMessage> &format,
             bool offloadOnly,
             bool hasVideo,

@@ -20,6 +20,7 @@
 #include <media/audiohal/EffectBufferHalInterface.h>
 #include <system/audio_effect.h>
 #include <utils/Errors.h>
+#include <utils/Mutex.h>
 #include <utils/RefBase.h>
 
 namespace android {
@@ -58,6 +59,8 @@ class EffectHalInterface : public RefBase
   protected:
     // Subclasses can not be constructed directly by clients.
     EffectHalInterface() {}
+
+    Mutex mLock; // protects effect engine calls
 
     // The destructor automatically releases the effect.
     virtual ~EffectHalInterface() {}

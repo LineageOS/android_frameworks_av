@@ -102,11 +102,8 @@ public:
     virtual status_t standby();
 
 protected:
-    uint64_t             mFramesWritten; // reset by flush
-    uint64_t             mFramesWrittenAtStandby;
     uint64_t             mRenderPosition; // reset by flush or standby
     int                  mRateMultiplier;
-    bool                 mHalFormatHasProportionalFrames;
     size_t               mHalFrameSize;
 };
 

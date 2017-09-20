@@ -367,6 +367,13 @@ AMediaFormat* AMediaCodec_getOutputFormat(AMediaCodec *mData) {
 }
 
 EXPORT
+AMediaFormat* AMediaCodec_getBufferFormat(AMediaCodec *mData, size_t index) {
+    sp<AMessage> format;
+    mData->mCodec->getOutputFormat(index, &format);
+    return AMediaFormat_fromMsg(&format);
+}
+
+EXPORT
 media_status_t AMediaCodec_releaseOutputBuffer(AMediaCodec *mData, size_t idx, bool render) {
     if (render) {
         return translate_error(mData->mCodec->renderOutputBufferAndRelease(idx));

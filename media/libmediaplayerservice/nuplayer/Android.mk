@@ -24,7 +24,8 @@ LOCAL_C_INCLUDES := \
 	$(TOP)/frameworks/av/media/libstagefright/rtsp                \
 	$(TOP)/frameworks/av/media/libstagefright/timedtext           \
 	$(TOP)/frameworks/av/media/libmediaplayerservice              \
-	$(TOP)/frameworks/native/include/media/openmax
+	$(TOP)/frameworks/native/include/media/openmax                \
+	$(TOP)/frameworks/av/media/libavextensions
 
 LOCAL_CFLAGS += -Werror -Wall
 
@@ -35,6 +36,7 @@ endif
 
 LOCAL_SHARED_LIBRARIES :=       \
     libbinder                   \
+    libcrypto                   \
     libui                       \
     libgui                      \
     libmedia                    \
