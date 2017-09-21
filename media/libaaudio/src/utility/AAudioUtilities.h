@@ -346,15 +346,18 @@ private:
  */
 class AtomicRequestor {
 public:
+
+    __attribute__((no_sanitize("integer")))
     void request() {
-        // TODO handle overflows, very unlikely
         mRequested++;
     }
 
+    __attribute__((no_sanitize("integer")))
     bool isRequested() {
-        return mRequested.load() > mAcknowledged.load();
+        return (mRequested.load() - mAcknowledged.load()) > 0;
     }
 
+    __attribute__((no_sanitize("integer")))
     void acknowledge() {
         mAcknowledged++;
     }

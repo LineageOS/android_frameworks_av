@@ -276,7 +276,7 @@ AudioTrack::~AudioTrack()
         }
         // No lock here: worst case we remove a NULL callback which will be a nop
         if (mDeviceCallback != 0 && mOutput != AUDIO_IO_HANDLE_NONE) {
-            AudioSystem::removeAudioDeviceCallback(mDeviceCallback, mOutput);
+            AudioSystem::removeAudioDeviceCallback(this, mOutput);
         }
         IInterface::asBinder(mAudioTrack)->unlinkToDeath(mDeathNotifier, this);
         mAudioTrack.clear();
@@ -1229,19 +1229,26 @@ audio_port_handle_t AudioTrack::getOutputDevice() {
     return mSelectedDeviceId;
 }
 
+// must be called with mLock held
+void AudioTrack::updateRoutedDeviceId_l()
+{
+    // if the track is inactive, do not update actual device as the output stream maybe routed
+    // to a device not relevant to this client because of other active use cases.
+    if (mState != STATE_ACTIVE) {
+        return;
+    }
+    if (mOutput != AUDIO_IO_HANDLE_NONE) {
+        audio_port_handle_t deviceId = AudioSystem::getDeviceIdForIo(mOutput);
+        if (deviceId != AUDIO_PORT_HANDLE_NONE) {
+            mRoutedDeviceId = deviceId;
+        }
+    }
+}
+
 audio_port_handle_t AudioTrack::getRoutedDeviceId() {
     AutoMutex lock(mLock);
-    if (mOutput == AUDIO_IO_HANDLE_NONE) {
-        return AUDIO_PORT_HANDLE_NONE;
-    }
-    // if the output stream does not have an active audio patch, use either the device initially
-    // selected by audio policy manager or the last routed device
-    audio_port_handle_t deviceId = AudioSystem::getDeviceIdForIo(mOutput);
-    if (deviceId == AUDIO_PORT_HANDLE_NONE) {
-        deviceId = mRoutedDeviceId;
-    }
-    mRoutedDeviceId = deviceId;
-    return deviceId;
+    updateRoutedDeviceId_l();
+    return mRoutedDeviceId;
 }
 
 status_t AudioTrack::attachAuxEffect(int effectId)
@@ -1279,7 +1286,7 @@ void AudioTrack::updateLatency_l()
         ALOGW("getLatency(%d) failed status %d", mOutput, status);
     } else {
         // FIXME don't believe this lie
-        mLatency = mAfLatency + (1000 * mFrameCount) / mSampleRate;
+        mLatency = mAfLatency + (1000LL * mFrameCount) / mSampleRate;
     }
 }
 
@@ -1305,12 +1312,10 @@ status_t AudioTrack::createTrack_l()
         return NO_INIT;
     }
 
-    if (mDeviceCallback != 0 && mOutput != AUDIO_IO_HANDLE_NONE) {
-        AudioSystem::removeAudioDeviceCallback(mDeviceCallback, mOutput);
-    }
     audio_io_handle_t output;
     audio_stream_type_t streamType = mStreamType;
     audio_attributes_t *attr = (mStreamType == AUDIO_STREAM_DEFAULT) ? &mAttributes : NULL;
+    bool callbackAdded = false;
 
     // mFlags (not mOrigFlags) is modified depending on whether fast request is accepted.
     // After fast request is denied, we will request again if IAudioTrack is re-created.
@@ -1515,12 +1520,14 @@ status_t AudioTrack::createTrack_l()
     sp<IMemory> iMem = track->getCblk();
     if (iMem == 0) {
         ALOGE("Could not get control block");
-        return NO_INIT;
+        status = NO_INIT;
+        goto release;
     }
     void *iMemPointer = iMem->pointer();
     if (iMemPointer == NULL) {
         ALOGE("Could not get control block pointer");
-        return NO_INIT;
+        status = NO_INIT;
+        goto release;
     }
     // invariant that mAudioTrack != 0 is true only after set() returns successfully
     if (mAudioTrack != 0) {
@@ -1582,6 +1589,15 @@ status_t AudioTrack::createTrack_l()
         }
     }
 
+    //mOutput != output includes the case where mOutput == AUDIO_IO_HANDLE_NONE for first creation
+    if (mDeviceCallback != 0 && mOutput != output) {
+        if (mOutput != AUDIO_IO_HANDLE_NONE) {
+            AudioSystem::removeAudioDeviceCallback(this, mOutput);
+        }
+        AudioSystem::addAudioDeviceCallback(this, output);
+        callbackAdded = true;
+    }
+
     // We retain a copy of the I/O handle, but don't own the reference
     mOutput = output;
     mRefreshRemaining = true;
@@ -1597,7 +1613,8 @@ status_t AudioTrack::createTrack_l()
         buffers = mSharedBuffer->pointer();
         if (buffers == NULL) {
             ALOGE("Could not get buffer pointer");
-            return NO_INIT;
+            status = NO_INIT;
+            goto release;
         }
     }
 
@@ -1642,15 +1659,15 @@ status_t AudioTrack::createTrack_l()
     mDeathNotifier = new DeathNotifier(this);
     IInterface::asBinder(mAudioTrack)->linkToDeath(mDeathNotifier, this);
 
-    if (mDeviceCallback != 0) {
-        AudioSystem::addAudioDeviceCallback(mDeviceCallback, mOutput);
-    }
-
     return NO_ERROR;
     }
 
 release:
     AudioSystem::releaseOutput(output, streamType, mSessionId);
+    if (callbackAdded) {
+        // note: mOutput is always valid is callbackAdded is true
+        AudioSystem::removeAudioDeviceCallback(this, mOutput);
+    }
     if (status == NO_ERROR) {
         status = NO_INIT;
     }
@@ -2851,7 +2868,7 @@ status_t AudioTrack::addAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCal
         return BAD_VALUE;
     }
     AutoMutex lock(mLock);
-    if (mDeviceCallback == callback) {
+    if (mDeviceCallback.unsafe_get() == callback.get()) {
         ALOGW("%s adding same callback!", __FUNCTION__);
         return INVALID_OPERATION;
     }
@@ -2859,9 +2876,9 @@ status_t AudioTrack::addAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCal
     if (mOutput != AUDIO_IO_HANDLE_NONE) {
         if (mDeviceCallback != 0) {
             ALOGW("%s callback already present!", __FUNCTION__);
-            AudioSystem::removeAudioDeviceCallback(mDeviceCallback, mOutput);
+            AudioSystem::removeAudioDeviceCallback(this, mOutput);
         }
-        status = AudioSystem::addAudioDeviceCallback(callback, mOutput);
+        status = AudioSystem::addAudioDeviceCallback(this, mOutput);
     }
     mDeviceCallback = callback;
     return status;
@@ -2875,15 +2892,37 @@ status_t AudioTrack::removeAudioDeviceCallback(
         return BAD_VALUE;
     }
     AutoMutex lock(mLock);
-    if (mDeviceCallback != callback) {
+    if (mDeviceCallback.unsafe_get() != callback.get()) {
         ALOGW("%s removing different callback!", __FUNCTION__);
         return INVALID_OPERATION;
     }
+    mDeviceCallback.clear();
     if (mOutput != AUDIO_IO_HANDLE_NONE) {
-        AudioSystem::removeAudioDeviceCallback(mDeviceCallback, mOutput);
+        AudioSystem::removeAudioDeviceCallback(this, mOutput);
     }
-    mDeviceCallback = 0;
     return NO_ERROR;
+}
+
+
+void AudioTrack::onAudioDeviceUpdate(audio_io_handle_t audioIo,
+                                 audio_port_handle_t deviceId)
+{
+    sp<AudioSystem::AudioDeviceCallback> callback;
+    {
+        AutoMutex lock(mLock);
+        if (audioIo != mOutput) {
+            return;
+        }
+        callback = mDeviceCallback.promote();
+        // only update device if the track is active as route changes due to other use cases are
+        // irrelevant for this client
+        if (mState == STATE_ACTIVE) {
+            mRoutedDeviceId = deviceId;
+        }
+    }
+    if (callback.get() != nullptr) {
+        callback->onAudioDeviceUpdate(mOutput, mRoutedDeviceId);
+    }
 }
 
 status_t AudioTrack::pendingDuration(int32_t *msec, ExtendedTimestamp::Location location)

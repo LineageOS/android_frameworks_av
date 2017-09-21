@@ -168,7 +168,8 @@ aaudio_result_t AAudioServiceStreamMMAP::getHardwareTimestamp(int64_t *positionF
 /**
  * Get an immutable description of the data queue from the HAL.
  */
-aaudio_result_t AAudioServiceStreamMMAP::getDownDataDescription(AudioEndpointParcelable &parcelable)
+aaudio_result_t AAudioServiceStreamMMAP::getAudioDataDescription(
+        AudioEndpointParcelable &parcelable)
 {
     sp<AAudioServiceEndpointMMAP> serviceEndpointMMAP{
             static_cast<AAudioServiceEndpointMMAP *>(mServiceEndpoint.get())};

@@ -36,7 +36,6 @@ LOCAL_SRC_FILES = \
     legacy/AudioStreamLegacy.cpp \
     legacy/AudioStreamRecord.cpp \
     legacy/AudioStreamTrack.cpp \
-    utility/HandleTracker.cpp \
     utility/AAudioUtilities.cpp \
     utility/FixedBlockAdapter.cpp \
     utility/FixedBlockReader.cpp \
@@ -95,7 +94,6 @@ LOCAL_SRC_FILES = core/AudioStream.cpp \
     legacy/AudioStreamLegacy.cpp \
     legacy/AudioStreamRecord.cpp \
     legacy/AudioStreamTrack.cpp \
-    utility/HandleTracker.cpp \
     utility/AAudioUtilities.cpp \
     utility/FixedBlockAdapter.cpp \
     utility/FixedBlockReader.cpp \

@@ -238,6 +238,7 @@ aaudio_result_t AudioStreamRecord::requestStop() {
     mAudioRecord->stop();
     mFramesRead.reset32();
     mTimestampPosition.reset32();
+    checkForDisconnectRequest();
     return AAUDIO_OK;
 }
 

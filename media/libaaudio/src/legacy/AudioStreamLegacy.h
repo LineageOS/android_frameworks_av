@@ -24,6 +24,7 @@
 
 #include "AudioStream.h"
 #include "AAudioLegacy.h"
+#include "utility/AAudioUtilities.h"
 #include "utility/FixedBlockAdapter.h"
 
 namespace aaudio {
@@ -111,6 +112,10 @@ protected:
 
     void onAudioDeviceUpdate(audio_port_handle_t deviceId);
 
+    void checkForDisconnectRequest();
+
+    void forceDisconnect();
+
     void onStart() { mCallbackEnabled.store(true); }
     void onStop() { mCallbackEnabled.store(false); }
 
@@ -130,6 +135,8 @@ protected:
     aaudio_wrapping_frames_t   mPositionWhenStarting = 0;
     int32_t                    mCallbackBufferSize = 0;
     const android::sp<StreamDeviceCallback>   mDeviceCallback;
+
+    AtomicRequestor            mRequestDisconnect;
 };
 
 } /* namespace aaudio */

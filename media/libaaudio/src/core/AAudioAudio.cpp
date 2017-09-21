@@ -24,14 +24,13 @@
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
 
+#include "AudioClock.h"
 #include "AudioStreamBuilder.h"
 #include "AudioStream.h"
-#include "AudioClock.h"
+#include "binding/AAudioCommon.h"
 #include "client/AudioStreamInternal.h"
-#include "HandleTracker.h"
 
 using namespace aaudio;
-
 
 // Macros for common code that includes a return.
 // TODO Consider using do{}while(0) construct. I tried but it hung AndroidStudio
@@ -219,7 +218,7 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_openStream(AAudioStreamBuilder* 
     ALOGD("AAudioStreamBuilder_openStream() returns %d = %s for (%p) ----------------",
           result, AAudio_convertResultToText(result), audioStream);
     if (result == AAUDIO_OK) {
-        audioStream->systemRegister();
+        audioStream->registerPlayerBase();
         *streamPtr = (AAudioStream*) audioStream;
     } else {
         *streamPtr = nullptr;
@@ -243,7 +242,7 @@ AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream)
     ALOGD("AAudioStream_close(%p)", stream);
     if (audioStream != nullptr) {
         audioStream->close();
-        audioStream->systemUnRegister();
+        audioStream->unregisterPlayerBase();
         delete audioStream;
         return AAUDIO_OK;
     }

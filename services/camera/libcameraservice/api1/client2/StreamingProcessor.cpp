@@ -324,7 +324,7 @@ status_t StreamingProcessor::recordingStreamNeedsUpdate(
             streamInfo.width != (uint32_t)params.videoWidth ||
             streamInfo.height != (uint32_t)params.videoHeight ||
             !streamInfo.matchFormat((uint32_t)params.videoFormat) ||
-            streamInfo.dataSpace != params.videoDataSpace) {
+            !streamInfo.matchDataSpace(params.videoDataSpace)) {
         *needsUpdate = true;
         return res;
     }
@@ -356,7 +356,7 @@ status_t StreamingProcessor::updateRecordingStream(const Parameters &params) {
         if (streamInfo.width != (uint32_t)params.videoWidth ||
                 streamInfo.height != (uint32_t)params.videoHeight ||
                 !streamInfo.matchFormat((uint32_t)params.videoFormat) ||
-                streamInfo.dataSpace != params.videoDataSpace) {
+                !streamInfo.matchDataSpace(params.videoDataSpace)) {
             // TODO: Should wait to be sure previous recording has finished
             res = device->deleteStream(mRecordingStreamId);
 
