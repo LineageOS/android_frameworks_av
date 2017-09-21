@@ -59,6 +59,7 @@ const int MediaAnalyticsItem::EnabledProperty_default  = 1;
 MediaAnalyticsItem::MediaAnalyticsItem()
     : mPid(-1),
       mUid(-1),
+      mPkgVersionCode(0),
       mSessionID(MediaAnalyticsItem::SessionIDNone),
       mTimestamp(0),
       mFinalized(0),
@@ -70,6 +71,7 @@ MediaAnalyticsItem::MediaAnalyticsItem()
 MediaAnalyticsItem::MediaAnalyticsItem(MediaAnalyticsItem::Key key)
     : mPid(-1),
       mUid(-1),
+      mPkgVersionCode(0),
       mSessionID(MediaAnalyticsItem::SessionIDNone),
       mTimestamp(0),
       mFinalized(0),
