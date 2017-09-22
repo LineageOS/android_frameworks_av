@@ -78,6 +78,8 @@ static const char *kCodecProfile = "android.media.mediacodec.profile";  /* 0..n 
 static const char *kCodecLevel = "android.media.mediacodec.level";  /* 0..n */
 static const char *kCodecMaxWidth = "android.media.mediacodec.maxwidth";  /* 0..n */
 static const char *kCodecMaxHeight = "android.media.mediacodec.maxheight";  /* 0..n */
+static const char *kCodecError = "android.media.mediacodec.errcode";
+static const char *kCodecErrorState = "android.media.mediacodec.errstate";
 
 
 static int64_t getId(const sp<IResourceManagerClient> &client) {
@@ -465,6 +467,7 @@ MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid)
       mFlags(0),
       mStickyError(OK),
       mSoftRenderer(NULL),
+      mAnalyticsItem(NULL),
       mResourceManagerClient(new ResourceManagerClient(this)),
       mResourceManagerService(new ResourceManagerServiceProxy(pid)),
       mBatteryStatNotified(false),
@@ -483,6 +486,18 @@ MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid)
     } else {
         mUid = uid;
     }
+    initAnalyticsItem();
+}
+
+MediaCodec::~MediaCodec() {
+    CHECK_EQ(mState, UNINITIALIZED);
+    mResourceManagerService->removeResource(getId(mResourceManagerClient));
+
+    flushAnalyticsItem();
+}
+
+void MediaCodec::initAnalyticsItem() {
+    CHECK(mAnalyticsItem == NULL);
     // set up our new record, get a sessionID, put it into the in-progress list
     mAnalyticsItem = new MediaAnalyticsItem(kCodecKeyName);
     if (mAnalyticsItem != NULL) {
@@ -492,11 +507,9 @@ MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid)
     }
 }
 
-MediaCodec::~MediaCodec() {
-    CHECK_EQ(mState, UNINITIALIZED);
-    mResourceManagerService->removeResource(getId(mResourceManagerClient));
-
-    if (mAnalyticsItem != NULL ) {
+void MediaCodec::flushAnalyticsItem() {
+    if (mAnalyticsItem != NULL) {
+        // don't log empty records
         if (mAnalyticsItem->count() > 0) {
             mAnalyticsItem->setFinalized(true);
             mAnalyticsItem->selfrecord();
@@ -1425,6 +1438,12 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
                         case CONFIGURING:
                         {
+                            if (actionCode == ACTION_CODE_FATAL) {
+                                mAnalyticsItem->setInt32(kCodecError, err);
+                                mAnalyticsItem->setInt32(kCodecErrorState, mState);
+                                flushAnalyticsItem();
+                                initAnalyticsItem();
+                            }
                             setState(actionCode == ACTION_CODE_FATAL ?
                                     UNINITIALIZED : INITIALIZED);
                             break;
@@ -1432,6 +1451,12 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
                         case STARTING:
                         {
+                            if (actionCode == ACTION_CODE_FATAL) {
+                                mAnalyticsItem->setInt32(kCodecError, err);
+                                mAnalyticsItem->setInt32(kCodecErrorState, mState);
+                                flushAnalyticsItem();
+                                initAnalyticsItem();
+                            }
                             setState(actionCode == ACTION_CODE_FATAL ?
                                     UNINITIALIZED : CONFIGURED);
                             break;
@@ -1468,6 +1493,11 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         case FLUSHING:
                         {
                             if (actionCode == ACTION_CODE_FATAL) {
+                                mAnalyticsItem->setInt32(kCodecError, err);
+                                mAnalyticsItem->setInt32(kCodecErrorState, mState);
+                                flushAnalyticsItem();
+                                initAnalyticsItem();
+
                                 setState(UNINITIALIZED);
                             } else {
                                 setState(
@@ -1496,6 +1526,10 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                                 setState(INITIALIZED);
                                 break;
                             default:
+                                mAnalyticsItem->setInt32(kCodecError, err);
+                                mAnalyticsItem->setInt32(kCodecErrorState, mState);
+                                flushAnalyticsItem();
+                                initAnalyticsItem();
                                 setState(UNINITIALIZED);
                                 break;
                             }

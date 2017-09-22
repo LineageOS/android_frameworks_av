@@ -1001,6 +1001,9 @@ protected:
                 bool        mHwSupportsPause;
                 bool        mHwPaused;
                 bool        mFlushPending;
+                // volumes last sent to audio HAL with stream->setVolume()
+                float mLeftVolFloat;
+                float mRightVolFloat;
 };
 
 class MixerThread : public PlaybackThread {
@@ -1118,9 +1121,6 @@ protected:
 
     virtual     void        onAddNewTrack_l();
 
-    // volumes last sent to audio HAL with stream->set_volume()
-    float mLeftVolFloat;
-    float mRightVolFloat;
     bool mVolumeShaperActive;
 
     DirectOutputThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,

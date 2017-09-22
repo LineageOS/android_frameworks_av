@@ -63,18 +63,13 @@ cc_defaults {
     },
 
     shared_libs: [
-        "android.hidl.memory@1.0",
         "android.hidl.token@1.0-utils",
         "android.hardware.media.omx@1.0",
-        "android.hardware.media@1.0",
-        "libbase",
         "libbinder",
         "libcutils",
         "libgui",
         "libhidlbase",
-        "libhidlmemory",
         "libhidltransport",
-        "libhwbinder",
         "liblog",
         "libstagefright_foundation",
         "libui",
@@ -82,11 +77,8 @@ cc_defaults {
     ],
 
     export_shared_lib_headers: [
-        "android.hidl.memory@1.0",
         "android.hidl.token@1.0-utils",
         "android.hardware.media.omx@1.0",
-        "android.hardware.media@1.0",
-        "libhidlmemory",
         "libstagefright_foundation",
         "libui",
     ],
@@ -189,17 +181,8 @@ cc_library_shared {
         "libdl",
         "libaudioutils",
         "libaudioclient",
-        "libmedia_helper",
-        "libmediadrm",
-        "libmediametrics",
-        "libbase",
         "libhidlbase",
         "libhidltransport",
-        "libhwbinder",
-        "libhidlmemory",
-        "android.hidl.memory@1.0",
-        "android.hardware.graphics.common@1.0",
-        "android.hardware.graphics.bufferqueue@1.0",
     ],
 
     export_shared_lib_headers: [
@@ -208,9 +191,6 @@ cc_library_shared {
         "libicuuc",
         "libicui18n",
         "libsonivox",
-        "libmediadrm",
-        "libmedia_helper",
-        "android.hidl.memory@1.0",
     ],
 
     // for memory heap analysis

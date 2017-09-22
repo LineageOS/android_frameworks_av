@@ -222,6 +222,8 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(MediaAnalyticsItem
 
     // we control these, generally not trusting user input
     nsecs_t now = systemTime(SYSTEM_TIME_REALTIME);
+    // round nsecs to seconds
+    now = ((now + 500000000) / 1000000000) * 1000000000;
     item->setTimestamp(now);
     int pid = IPCThreadState::self()->getCallingPid();
     int uid = IPCThreadState::self()->getCallingUid();
@@ -257,14 +259,15 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(MediaAnalyticsItem
             break;
     }
 
+
     // Overwrite package name and version if the caller was untrusted.
     if (!isTrusted) {
-      item->setPkgName(getPkgName(item->getUid(), true));
-      item->setPkgVersionCode(0);
+      setPkgInfo(item, item->getUid(), true, true);
     } else if (item->getPkgName().empty()) {
-      // Only overwrite the package name if it was empty. Trust whatever
-      // version code was provided by the trusted caller.
-      item->setPkgName(getPkgName(uid, true));
+      // empty, so fill out both parts
+      setPkgInfo(item, item->getUid(), true, true);
+    } else {
+      // trusted, provided a package, do nothing
     }
 
     ALOGV("given uid %d; sanitized uid: %d sanitized pkg: %s "
@@ -800,85 +803,155 @@ void MediaAnalyticsService::summarize(MediaAnalyticsItem *item) {
 
 }
 
-// mapping uids to package names
+// how long we hold package info before we re-fetch it
+#define PKG_EXPIRATION_NS (30*60*1000000000ll)   // 30 minutes, in nsecs
 
 // give me the package name, perhaps going to find it
-AString MediaAnalyticsService::getPkgName(uid_t uid, bool addIfMissing) {
+void MediaAnalyticsService::setPkgInfo(MediaAnalyticsItem *item, uid_t uid, bool setName, bool setVersion) {
+    ALOGV("asking for packagename to go with uid=%d", uid);
+
+    if (!setName && !setVersion) {
+        // setting nothing? strange
+        return;
+    }
+
+    nsecs_t now = systemTime(SYSTEM_TIME_REALTIME);
+    struct UidToPkgMap mapping;
+    mapping.uid = (-1);
+
     ssize_t i = mPkgMappings.indexOfKey(uid);
     if (i >= 0) {
-        AString pkg = mPkgMappings.valueAt(i);
-        ALOGV("returning pkg '%s' for uid %d", pkg.c_str(), uid);
-        return pkg;
-    }
-
-    AString pkg;
-
-    if (addIfMissing == false) {
-        return pkg;
-    }
-
-    struct passwd *pw = getpwuid(uid);
-    if (pw) {
-        pkg = pw->pw_name;
-    } else {
-        pkg = "-";
-    }
-
-    // find the proper value
-
-    sp<IBinder> binder = NULL;
-    sp<IServiceManager> sm = defaultServiceManager();
-    if (sm == NULL) {
-        ALOGE("defaultServiceManager failed");
-    } else {
-        binder = sm->getService(String16("package_native"));
-        if (binder == NULL) {
-            ALOGE("getService package_native failed");
+        mapping = mPkgMappings.valueAt(i);
+        ALOGV("Expiration? uid %d expiration %" PRId64 " now %" PRId64,
+              uid, mapping.expiration, now);
+        if (mapping.expiration < now) {
+            // purge our current entry and re-query
+            ALOGV("entry for uid %d expired, now= %" PRId64 "", uid, now);
+            mPkgMappings.removeItemsAt(i, 1);
+            // could cheat and use a goto back to the top of the routine.
+            // a good compiler should recognize the local tail recursion...
+            return setPkgInfo(item, uid, setName, setVersion);
         }
-    }
+    } else {
+        AString pkg;
+        std::string installer = "";
+        int32_t versionCode = 0;
 
-    if (binder != NULL) {
-        sp<IPackageManagerNative> package_mgr = interface_cast<IPackageManagerNative>(binder);
+        struct passwd *pw = getpwuid(uid);
+        if (pw) {
+            pkg = pw->pw_name;
+        }
 
-        std::vector<int> uids;
-        std::vector<std::string> names;
+        // find the proper value -- should we cache this binder??
 
-        uids.push_back(uid);
-
-        binder::Status status = package_mgr->getNamesForUids(uids, &names);
-        if (!status.isOk()) {
-            ALOGE("package_native::getNamesForUids failed: %s",
-                  status.exceptionMessage().c_str());
+        sp<IBinder> binder = NULL;
+        sp<IServiceManager> sm = defaultServiceManager();
+        if (sm == NULL) {
+            ALOGE("defaultServiceManager failed");
         } else {
-            if (!names[0].empty()) {
-                pkg = names[0].c_str();
+            binder = sm->getService(String16("package_native"));
+            if (binder == NULL) {
+                ALOGE("getService package_native failed");
+            }
+        }
+
+        if (binder != NULL) {
+            sp<IPackageManagerNative> package_mgr = interface_cast<IPackageManagerNative>(binder);
+            binder::Status status;
+
+            std::vector<int> uids;
+            std::vector<std::string> names;
+
+            uids.push_back(uid);
+
+            status = package_mgr->getNamesForUids(uids, &names);
+            if (!status.isOk()) {
+                ALOGE("package_native::getNamesForUids failed: %s",
+                      status.exceptionMessage().c_str());
+            } else {
+                if (!names[0].empty()) {
+                    pkg = names[0].c_str();
+                }
+            }
+
+            // strip any leading "shared:" strings that came back
+            if (pkg.startsWith("shared:")) {
+                pkg.erase(0, 7);
+            }
+
+            // determine how pkg was installed and the versionCode
+            //
+            if (pkg.empty()) {
+                // no name for us to manage
+            } else if (strchr(pkg.c_str(), '.') == NULL) {
+                // not of form 'com.whatever...'; assume internal and ok
+            } else if (strncmp(pkg.c_str(), "android.", 8) == 0) {
+                // android.* packages are assumed fine
+            } else {
+                String16 pkgName16(pkg.c_str());
+                status = package_mgr->getInstallerForPackage(pkgName16, &installer);
+                if (!status.isOk()) {
+                    ALOGE("package_native::getInstallerForPackage failed: %s",
+                          status.exceptionMessage().c_str());
+                }
+
+                // skip if we didn't get an installer
+                if (status.isOk()) {
+                    status = package_mgr->getVersionCodeForPackage(pkgName16, &versionCode);
+                    if (!status.isOk()) {
+                        ALOGE("package_native::getVersionCodeForPackage failed: %s",
+                          status.exceptionMessage().c_str());
+                    }
+                }
+
+
+                ALOGV("package '%s' installed by '%s' versioncode %d / %08x",
+                      pkg.c_str(), installer.c_str(), versionCode, versionCode);
+
+                if (strncmp(installer.c_str(), "com.android.", 12) == 0) {
+                        // from play store, we keep info
+                } else if (strncmp(installer.c_str(), "com.google.", 11) == 0) {
+                        // some google source, we keep info
+                } else if (strcmp(installer.c_str(), "preload") == 0) {
+                        // preloads, we keep the info
+                } else if (installer.c_str()[0] == '\0') {
+                        // sideload (no installer); do not report
+                        pkg = "";
+                        versionCode = 0;
+                } else {
+                        // unknown installer; do not report
+                        pkg = "";
+                        versionCode = 0;
+                }
+            }
+        }
+
+        // add it to the map, to save a subsequent lookup
+        if (!pkg.empty()) {
+            Mutex::Autolock _l(mLock_mappings);
+            ALOGV("Adding uid %d pkg '%s'", uid, pkg.c_str());
+            ssize_t i = mPkgMappings.indexOfKey(uid);
+            if (i < 0) {
+                mapping.uid = uid;
+                mapping.pkg = pkg;
+                mapping.installer = installer.c_str();
+                mapping.versionCode = versionCode;
+                mapping.expiration = now + PKG_EXPIRATION_NS;
+                ALOGV("expiration for uid %d set to %" PRId64 "", uid, mapping.expiration);
+
+                mPkgMappings.add(uid, mapping);
             }
         }
     }
 
-    // XXX determine whether package was side-loaded or from playstore.
-    // for privacy, we only list apps loaded from playstore.
-
-    // Sanitize the package name for ":"
-    // as an example, we get "shared:android.uid.systemui"
-    // replace : with something benign (I'm going to use !)
-    if (!pkg.empty()) {
-        int n = pkg.size();
-        char *p = (char *) pkg.c_str();
-        for (int i = 0 ; i < n; i++) {
-            if (p[i] == ':') {
-                p[i] = '!';
-            }
+    if (mapping.uid != (uid_t)(-1)) {
+        if (setName) {
+            item->setPkgName(mapping.pkg);
+        }
+        if (setVersion) {
+            item->setPkgVersionCode(mapping.versionCode);
         }
     }
-
-    // add it to the map, to save a subsequent lookup
-    if (!pkg.empty()) {
-        ALOGV("Adding uid %d pkg '%s'", uid, pkg.c_str());
-        mPkgMappings.add(uid, pkg);
-    }
-
-    return pkg;
 }
 
 } // namespace android

@@ -302,10 +302,27 @@ void SoftFlacDecoder::onQueueFilled(OMX_U32 /* portIndex */) {
     while (!inQueue.empty() && !outQueue.empty()) {
         BufferInfo *inInfo = *inQueue.begin();
         OMX_BUFFERHEADERTYPE *inHeader = inInfo->mHeader;
+        BufferInfo *outInfo = *outQueue.begin();
+        OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
         uint8_t* inBuffer = inHeader->pBuffer + inHeader->nOffset;
         uint32_t inBufferLength = inHeader->nFilledLen;
         bool endOfInput = (inHeader->nFlags & OMX_BUFFERFLAG_EOS) != 0;
 
+        if (inHeader->nFilledLen == 0) {
+            if (endOfInput) {
+                outHeader->nFilledLen = 0;
+                outHeader->nFlags = OMX_BUFFERFLAG_EOS;
+                outInfo->mOwnedByUs = false;
+                outQueue.erase(outQueue.begin());
+                notifyFillBufferDone(outHeader);
+            } else {
+                ALOGE("onQueueFilled: emptyInputBuffer received");
+            }
+            inInfo->mOwnedByUs = false;
+            inQueue.erase(inQueue.begin());
+            notifyEmptyBufferDone(inHeader);
+            return;
+        }
         if (mInputBufferCount == 0 && !(inHeader->nFlags & OMX_BUFFERFLAG_CODECCONFIG)) {
             ALOGE("onQueueFilled: first buffer should have OMX_BUFFERFLAG_CODECCONFIG set");
             inHeader->nFlags |= OMX_BUFFERFLAG_CODECCONFIG;
@@ -343,8 +360,6 @@ void SoftFlacDecoder::onQueueFilled(OMX_U32 /* portIndex */) {
             return;
         }
 
-        BufferInfo *outInfo = *outQueue.begin();
-        OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
         short *outBuffer =
                 reinterpret_cast<short *>(outHeader->pBuffer + outHeader->nOffset);
         size_t outBufferSize = outHeader->nAllocLen - outHeader->nOffset;
