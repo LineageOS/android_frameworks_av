@@ -53,21 +53,25 @@ AImage::isClosed() const {
 
 void
 AImage::close(int releaseFenceFd) {
+    lockReader();
     Mutex::Autolock _l(mLock);
     if (mIsClosed) {
         return;
     }
     sp<AImageReader> reader = mReader.promote();
-    if (reader == nullptr) {
-        LOG_ALWAYS_FATAL("Error: AImage not closed before AImageReader close!");
-        return;
+    if (reader != nullptr) {
+        reader->releaseImageLocked(this, releaseFenceFd);
+    } else if (mBuffer != nullptr) {
+        LOG_ALWAYS_FATAL("%s: parent AImageReader closed without releasing image %p",
+                __FUNCTION__, this);
     }
-    reader->releaseImageLocked(this, releaseFenceFd);
+
     // Should have been set to nullptr in releaseImageLocked
     // Set to nullptr here for extra safety only
     mBuffer = nullptr;
     mLockedBuffer = nullptr;
     mIsClosed = true;
+    unlockReader();
 }
 
 void
@@ -618,9 +622,7 @@ EXPORT
 void AImage_deleteAsync(AImage* image, int releaseFenceFd) {
     ALOGV("%s", __FUNCTION__);
     if (image != nullptr) {
-        image->lockReader();
         image->close(releaseFenceFd);
-        image->unlockReader();
         if (!image->isClosed()) {
             LOG_ALWAYS_FATAL("Image close failed!");
         }

@@ -349,6 +349,7 @@ AImageReader::~AImageReader() {
     for (auto it = mAcquiredImages.begin();
               it != mAcquiredImages.end(); it++) {
         AImage* image = *it;
+        releaseImageLocked(image, /*releaseFenceFd*/-1);
         image->close();
     }
 
