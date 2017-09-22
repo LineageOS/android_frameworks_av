@@ -303,7 +303,7 @@ int main(int argc, char **argv) {
     looper->setName("recordvideo");
     looper->start();
 
-    sp<IMediaSource> encoder =
+    sp<MediaSource> encoder =
         MediaCodecSource::Create(
                 looper, enc_meta, source, NULL /* consumer */,
                 preferSoftwareCodec ? MediaCodecSource::FLAG_PREFER_SOFTWARE_CODEC : 0);

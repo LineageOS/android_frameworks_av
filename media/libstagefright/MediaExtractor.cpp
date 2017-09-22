@@ -43,7 +43,10 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaExtractor.h>
 #include <media/stagefright/MetaData.h>
+#include <media/stagefright/RemoteMediaExtractor.h>
+#include <media/IMediaExtractor.h>
 #include <media/IMediaExtractorService.h>
+#include <media/IMediaSource.h>
 #include <cutils/properties.h>
 #include <utils/String8.h>
 #include <private/android_filesystem_config.h>
@@ -92,6 +95,10 @@ MediaExtractor::~MediaExtractor() {
     }
 }
 
+sp<IMediaExtractor> MediaExtractor::asIMediaExtractor() {
+    return RemoteMediaExtractor::wrap(sp<MediaExtractor>(this));
+}
+
 sp<MetaData> MediaExtractor::getMetaData() {
     return new MetaData;
 }
@@ -125,7 +132,8 @@ sp<IMediaExtractor> MediaExtractor::Create(
     if (!property_get_bool("media.stagefright.extractremote", true)) {
         // local extractor
         ALOGW("creating media extractor in calling process");
-        return CreateFromService(source, mime);
+        sp<MediaExtractor> extractor = CreateFromService(source, mime);
+        return (extractor.get() == nullptr) ? nullptr : extractor->asIMediaExtractor();
     } else {
         // remote extractor
         ALOGV("get service manager");

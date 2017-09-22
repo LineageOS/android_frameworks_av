@@ -3344,7 +3344,7 @@ void MPEG4Extractor::parseID3v2MetaData(off64_t offset) {
     }
 }
 
-sp<IMediaSource> MPEG4Extractor::getTrack(size_t index) {
+sp<MediaSource> MPEG4Extractor::getTrack(size_t index) {
     status_t err;
     if ((err = readMetaData()) != OK) {
         return NULL;

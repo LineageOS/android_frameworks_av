@@ -67,7 +67,7 @@ AudioPlayer::~AudioPlayer() {
     }
 }
 
-void AudioPlayer::setSource(const sp<IMediaSource> &source) {
+void AudioPlayer::setSource(const sp<MediaSource> &source) {
     CHECK(mSource == NULL);
     mSource = source;
 }
@@ -363,7 +363,7 @@ void AudioPlayer::reset() {
     // When offloading, the OMX component is not used so this hack
     // is not needed
     if (!useOffload()) {
-        wp<IMediaSource> tmp = mSource;
+        wp<MediaSource> tmp = mSource;
         mSource.clear();
         while (tmp.promote() != NULL) {
             usleep(1000);

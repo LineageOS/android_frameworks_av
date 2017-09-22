@@ -45,12 +45,12 @@ public:
     // does not support secure input or pausing.
     // if |desiredCodec| is given, use this specific codec.
     static sp<SimpleDecodingSource> Create(
-            const sp<IMediaSource> &source, uint32_t flags,
+            const sp<MediaSource> &source, uint32_t flags,
             const sp<ANativeWindow> &nativeWindow,
             const char *desiredCodec = NULL);
 
     static sp<SimpleDecodingSource> Create(
-            const sp<IMediaSource> &source, uint32_t flags = 0);
+            const sp<MediaSource> &source, uint32_t flags = 0);
 
     virtual ~SimpleDecodingSource();
 
@@ -73,11 +73,11 @@ public:
 private:
     // Construct this using a codec, source and looper.
     SimpleDecodingSource(
-            const sp<MediaCodec> &codec, const sp<IMediaSource> &source, const sp<ALooper> &looper,
+            const sp<MediaCodec> &codec, const sp<MediaSource> &source, const sp<ALooper> &looper,
             bool usingSurface, bool isVorbis, const sp<AMessage> &format);
 
     sp<MediaCodec> mCodec;
-    sp<IMediaSource> mSource;
+    sp<MediaSource> mSource;
     sp<ALooper> mLooper;
     bool mUsingSurface;
     bool mIsVorbis;

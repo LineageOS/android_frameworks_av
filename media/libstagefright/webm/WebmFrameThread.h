@@ -123,7 +123,7 @@ public:
 class WebmFrameMediaSourceThread: public WebmFrameSourceThread {
 public:
     WebmFrameMediaSourceThread(
-            const sp<IMediaSource>& source,
+            const sp<MediaSource>& source,
             int type,
             LinkedBlockingQueue<const sp<WebmFrame> >& sink,
             uint64_t timeCodeScale,
@@ -142,7 +142,7 @@ public:
     }
 
 private:
-    const sp<IMediaSource> mSource;
+    const sp<MediaSource> mSource;
     const uint64_t mTimeCodeScale;
     uint64_t mStartTimeUs;
 

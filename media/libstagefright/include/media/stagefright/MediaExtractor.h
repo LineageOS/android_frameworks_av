@@ -19,15 +19,15 @@
 #define MEDIA_EXTRACTOR_H_
 
 #include <media/IMediaExtractor.h>
-#include <media/IMediaSource.h>
 #include <media/MediaAnalyticsItem.h>
 
 namespace android {
+
 class DataSource;
 struct MediaSource;
 class MetaData;
 
-class MediaExtractor : public BnMediaExtractor {
+class MediaExtractor : public RefBase {
 public:
     static sp<IMediaExtractor> Create(
             const sp<DataSource> &source, const char *mime = NULL);
@@ -35,7 +35,7 @@ public:
             const sp<DataSource> &source, const char *mime = NULL);
 
     virtual size_t countTracks() = 0;
-    virtual sp<IMediaSource> getTrack(size_t index) = 0;
+    virtual sp<MediaSource> getTrack(size_t index) = 0;
 
     enum GetTrackMetaDataFlags {
         kIncludeExtensiveMetaData = 1
@@ -60,13 +60,16 @@ public:
     // CAN_SEEK_BACKWARD | CAN_SEEK_FORWARD | CAN_SEEK | CAN_PAUSE
     virtual uint32_t flags() const;
 
+    // Creates an IMediaExtractor wrapper to this MediaExtractor.
+    virtual sp<IMediaExtractor> asIMediaExtractor();
+
     // for DRM
     virtual char* getDrmTrackInfo(size_t /*trackID*/, int * /*len*/) {
         return NULL;
     }
     virtual void setUID(uid_t /*uid*/) {
     }
-    virtual status_t setMediaCas(const HInterfaceToken &/*casToken*/) override {
+    virtual status_t setMediaCas(const HInterfaceToken &/*casToken*/) {
         return INVALID_OPERATION;
     }
 

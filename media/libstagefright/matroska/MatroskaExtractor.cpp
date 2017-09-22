@@ -899,7 +899,7 @@ size_t MatroskaExtractor::countTracks() {
     return mTracks.size();
 }
 
-sp<IMediaSource> MatroskaExtractor::getTrack(size_t index) {
+sp<MediaSource> MatroskaExtractor::getTrack(size_t index) {
     if (index >= mTracks.size()) {
         return NULL;
     }

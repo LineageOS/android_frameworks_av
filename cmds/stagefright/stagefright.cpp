@@ -141,7 +141,7 @@ static void displayAVCProfileLevelIfPossible(const sp<MetaData>& meta) {
     }
 }
 
-static void dumpSource(const sp<IMediaSource> &source, const String8 &filename) {
+static void dumpSource(const sp<MediaSource> &source, const String8 &filename) {
     FILE *out = fopen(filename.string(), "wb");
 
     CHECK_EQ((status_t)OK, source->start());
@@ -174,13 +174,13 @@ static void dumpSource(const sp<IMediaSource> &source, const String8 &filename) 
     out = NULL;
 }
 
-static void playSource(sp<IMediaSource> &source) {
+static void playSource(sp<MediaSource> &source) {
     sp<MetaData> meta = source->getFormat();
 
     const char *mime;
     CHECK(meta->findCString(kKeyMIMEType, &mime));
 
-    sp<IMediaSource> rawSource;
+    sp<MediaSource> rawSource;
     if (!strcasecmp(MEDIA_MIMETYPE_AUDIO_RAW, mime)) {
         rawSource = source;
     } else {
@@ -404,7 +404,7 @@ static void playSource(sp<IMediaSource> &source) {
 ////////////////////////////////////////////////////////////////////////////////
 
 struct DetectSyncSource : public MediaSource {
-    explicit DetectSyncSource(const sp<IMediaSource> &source);
+    explicit DetectSyncSource(const sp<MediaSource> &source);
 
     virtual status_t start(MetaData *params = NULL);
     virtual status_t stop();
@@ -421,14 +421,14 @@ private:
         OTHER,
     };
 
-    sp<IMediaSource> mSource;
+    sp<MediaSource> mSource;
     StreamType mStreamType;
     bool mSawFirstIDRFrame;
 
     DISALLOW_EVIL_CONSTRUCTORS(DetectSyncSource);
 };
 
-DetectSyncSource::DetectSyncSource(const sp<IMediaSource> &source)
+DetectSyncSource::DetectSyncSource(const sp<MediaSource> &source)
     : mSource(source),
       mStreamType(OTHER),
       mSawFirstIDRFrame(false) {
@@ -510,7 +510,7 @@ status_t DetectSyncSource::read(
 ////////////////////////////////////////////////////////////////////////////////
 
 static void writeSourcesToMP4(
-        Vector<sp<IMediaSource> > &sources, bool syncInfoPresent) {
+        Vector<sp<MediaSource> > &sources, bool syncInfoPresent) {
 #if 0
     sp<MPEG4Writer> writer =
         new MPEG4Writer(gWriteMP4Filename.string());
@@ -528,7 +528,7 @@ static void writeSourcesToMP4(
     writer->setMaxFileDuration(60000000ll);
 
     for (size_t i = 0; i < sources.size(); ++i) {
-        sp<IMediaSource> source = sources.editItemAt(i);
+        sp<MediaSource> source = sources.editItemAt(i);
 
         CHECK_EQ(writer->addSource(
                     syncInfoPresent ? source : new DetectSyncSource(source)),
@@ -545,7 +545,7 @@ static void writeSourcesToMP4(
     writer->stop();
 }
 
-static void performSeekTest(const sp<IMediaSource> &source) {
+static void performSeekTest(const sp<MediaSource> &source) {
     CHECK_EQ((status_t)OK, source->start());
 
     int64_t durationUs;
@@ -1002,8 +1002,8 @@ int main(int argc, char **argv) {
             isJPEG = true;
         }
 
-        Vector<sp<IMediaSource> > mediaSources;
-        sp<IMediaSource> mediaSource;
+        Vector<sp<MediaSource> > mediaSources;
+        sp<MediaSource> mediaSource;
 
         if (isJPEG) {
             mediaSource = new JPEGSource(dataSource);
@@ -1049,7 +1049,8 @@ int main(int argc, char **argv) {
                 bool haveAudio = false;
                 bool haveVideo = false;
                 for (size_t i = 0; i < numTracks; ++i) {
-                    sp<IMediaSource> source = extractor->getTrack(i);
+                    sp<MediaSource> source = MediaSource::CreateFromIMediaSource(
+                            extractor->getTrack(i));
                     if (source == nullptr) {
                         fprintf(stderr, "skip NULL track %zu, track count %zu.\n", i, numTracks);
                         continue;
@@ -1115,7 +1116,7 @@ int main(int argc, char **argv) {
                            thumbTimeUs, thumbTimeUs / 1E6);
                 }
 
-                mediaSource = extractor->getTrack(i);
+                mediaSource = MediaSource::CreateFromIMediaSource(extractor->getTrack(i));
                 if (mediaSource == nullptr) {
                     fprintf(stderr, "skip NULL track %zu, total tracks %zu.\n", i, numTracks);
                     return -1;
@@ -1128,7 +1129,7 @@ int main(int argc, char **argv) {
         } else if (dumpStream) {
             dumpSource(mediaSource, dumpStreamFilename);
         } else if (dumpPCMStream) {
-            sp<IMediaSource> decSource = SimpleDecodingSource::Create(mediaSource);
+            sp<MediaSource> decSource = SimpleDecodingSource::Create(mediaSource);
             dumpSource(decSource, dumpStreamFilename);
         } else if (seekTest) {
             performSeekTest(mediaSource);
