@@ -120,7 +120,7 @@ size_t WAVExtractor::countTracks() {
     return mInitCheck == OK ? 1 : 0;
 }
 
-sp<IMediaSource> WAVExtractor::getTrack(size_t index) {
+sp<MediaSource> WAVExtractor::getTrack(size_t index) {
     if (mInitCheck != OK || index > 0) {
         return NULL;
     }

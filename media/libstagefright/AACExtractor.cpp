@@ -213,7 +213,7 @@ size_t AACExtractor::countTracks() {
     return mInitCheck == OK ? 1 : 0;
 }
 
-sp<IMediaSource> AACExtractor::getTrack(size_t index) {
+sp<MediaSource> AACExtractor::getTrack(size_t index) {
     if (mInitCheck != OK || index != 0) {
         return NULL;
     }

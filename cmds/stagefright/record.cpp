@@ -320,7 +320,7 @@ int main(int /* argc */, char ** /* argv */) {
     looper->setName("record");
     looper->start();
 
-    sp<IMediaSource> encoder =
+    sp<MediaSource> encoder =
         MediaCodecSource::Create(looper, encMeta, audioSource);
 
     encoder->start();

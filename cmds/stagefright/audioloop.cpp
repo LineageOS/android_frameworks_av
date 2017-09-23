@@ -112,7 +112,7 @@ int main(int argc, char* argv[])
     looper->setName("audioloop");
     looper->start();
 
-    sp<IMediaSource> encoder = MediaCodecSource::Create(looper, meta, source);
+    sp<MediaSource> encoder = MediaCodecSource::Create(looper, meta, source);
 
     if (fileOut != NULL) {
         // target file specified, write encoded AMR output
@@ -128,7 +128,7 @@ int main(int argc, char* argv[])
         writer->stop();
     } else {
         // otherwise decode to speaker
-        sp<IMediaSource> decoder = SimpleDecodingSource::Create(encoder);
+        sp<MediaSource> decoder = SimpleDecodingSource::Create(encoder);
 
         if (playToSpeaker) {
             AudioPlayer *player = new AudioPlayer(NULL);

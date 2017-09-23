@@ -20,7 +20,6 @@
 
 #include <stdio.h>
 
-#include <media/IMediaSource.h>
 #include <media/stagefright/MediaWriter.h>
 #include <utils/List.h>
 #include <utils/threads.h>
@@ -40,7 +39,7 @@ public:
     // Limitations
     // No more than one video and/or one audio source can be added, but
     // multiple metadata sources can be added.
-    virtual status_t addSource(const sp<IMediaSource> &source);
+    virtual status_t addSource(const sp<MediaSource> &source);
 
     // Returns INVALID_OPERATION if there is no source or track.
     virtual status_t start(MetaData *param = NULL);

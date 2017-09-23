@@ -38,7 +38,7 @@ struct MatroskaExtractor : public MediaExtractor {
 
     virtual size_t countTracks();
 
-    virtual sp<IMediaSource> getTrack(size_t index);
+    virtual sp<MediaSource> getTrack(size_t index);
 
     virtual sp<MetaData> getTrackMetaData(
             size_t index, uint32_t flags);

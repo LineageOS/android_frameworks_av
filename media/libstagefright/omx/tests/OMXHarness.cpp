@@ -543,7 +543,7 @@ static const char *GetURLForMime(const char *mime) {
     return NULL;
 }
 
-static sp<IMediaSource> CreateSourceForMime(const char *mime) {
+static sp<MediaSource> CreateSourceForMime(const char *mime) {
     const char *url = GetURLForMime(mime);
 
     if (url == NULL) {
@@ -564,7 +564,7 @@ static sp<IMediaSource> CreateSourceForMime(const char *mime) {
         CHECK(meta->findCString(kKeyMIMEType, &trackMime));
 
         if (!strcasecmp(mime, trackMime)) {
-            return extractor->getTrack(i);
+            return MediaSource::CreateFromIMediaSource(extractor->getTrack(i));
         }
     }
 
@@ -610,7 +610,7 @@ status_t Harness::testSeek(
         return OK;
     }
 
-    sp<IMediaSource> source = CreateSourceForMime(mime);
+    sp<MediaSource> source = CreateSourceForMime(mime);
 
     if (source == NULL) {
         printf("  * Unable to open test content for type '%s', "
@@ -620,14 +620,14 @@ status_t Harness::testSeek(
         return OK;
     }
 
-    sp<IMediaSource> seekSource = CreateSourceForMime(mime);
+    sp<MediaSource> seekSource = CreateSourceForMime(mime);
     if (source == NULL || seekSource == NULL) {
         return UNKNOWN_ERROR;
     }
 
     CHECK_EQ(seekSource->start(), (status_t)OK);
 
-    sp<IMediaSource> codec = SimpleDecodingSource::Create(
+    sp<MediaSource> codec = SimpleDecodingSource::Create(
             source, 0 /* flags */, NULL /* nativeWindow */, componentName);
 
     CHECK(codec != NULL);

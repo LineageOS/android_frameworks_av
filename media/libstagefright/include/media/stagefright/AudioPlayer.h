@@ -18,9 +18,9 @@
 
 #define AUDIO_PLAYER_H_
 
-#include <media/IMediaSource.h>
 #include <media/MediaPlayerInterface.h>
 #include <media/stagefright/MediaBuffer.h>
+#include <media/stagefright/MediaSource.h>
 #include <utils/threads.h>
 
 namespace android {
@@ -50,7 +50,7 @@ public:
     virtual ~AudioPlayer();
 
     // Caller retains ownership of "source".
-    void setSource(const sp<IMediaSource> &source);
+    void setSource(const sp<MediaSource> &source);
 
     status_t start(bool sourceAlreadyStarted = false);
 
@@ -66,7 +66,7 @@ public:
     status_t getPlaybackRate(AudioPlaybackRate *rate /* nonnull */);
 
 private:
-    sp<IMediaSource> mSource;
+    sp<MediaSource> mSource;
     sp<AudioTrack> mAudioTrack;
 
     MediaBuffer *mInputBuffer;

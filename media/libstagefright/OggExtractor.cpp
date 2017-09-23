@@ -1123,6 +1123,7 @@ status_t MyVorbisExtractor::verifyHeader(
             mMeta->setData(kKeyVorbisInfo, 0, data, size);
             mMeta->setInt32(kKeySampleRate, mVi.rate);
             mMeta->setInt32(kKeyChannelCount, mVi.channels);
+            mMeta->setInt32(kKeyBitRate, mVi.bitrate_nominal);
 
             ALOGV("lower-bitrate = %ld", mVi.bitrate_lower);
             ALOGV("upper-bitrate = %ld", mVi.bitrate_upper);
@@ -1344,7 +1345,7 @@ size_t OggExtractor::countTracks() {
     return mInitCheck != OK ? 0 : 1;
 }
 
-sp<IMediaSource> OggExtractor::getTrack(size_t index) {
+sp<MediaSource> OggExtractor::getTrack(size_t index) {
     if (index >= 1) {
         return NULL;
     }

@@ -14,12 +14,26 @@
  * limitations under the License.
  */
 
+#include <media/stagefright/CallbackMediaSource.h>
 #include <media/stagefright/MediaSource.h>
+#include <media/stagefright/RemoteMediaSource.h>
 
 namespace android {
 
 MediaSource::MediaSource() {}
 
 MediaSource::~MediaSource() {}
+
+// static
+sp<MediaSource> MediaSource::CreateFromIMediaSource(const sp<IMediaSource> &source) {
+    if (source == nullptr) {
+        return nullptr;
+    }
+    return new CallbackMediaSource(source);
+}
+
+sp<IMediaSource> MediaSource::asIMediaSource() {
+    return RemoteMediaSource::wrap(sp<MediaSource>(this));
+}
 
 }  // namespace android
