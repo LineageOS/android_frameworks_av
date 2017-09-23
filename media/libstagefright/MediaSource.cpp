@@ -23,3 +23,14 @@ MediaSource::MediaSource() {}
 MediaSource::~MediaSource() {}
 
 }  // namespace android
+
+extern "C" {
+
+bool _ZNK7android11MediaSource11ReadOptions9getSeekToEPxPNS1_8SeekModeE(android::IMediaSource::ReadOptions *readOptions, int64_t *time_us, android::IMediaSource::ReadOptions::SeekMode *mode) {
+    ALOGW("_ZNK7android11MediaSource11ReadOptions9getSeekToEPxPNS1_8SeekModeE");
+    bool res = readOptions->getSeekTo(time_us, mode);
+    ALOGW("_ZNK7android11MediaSource11ReadOptions9getSeekToEPxPNS1_8SeekModeE %lld, %d, %d", *time_us, *mode, res);
+    return res;
+}
+
+}
