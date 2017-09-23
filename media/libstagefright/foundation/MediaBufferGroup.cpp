@@ -138,6 +138,12 @@ bool MediaBufferGroup::has_buffers() {
     return false;
 }
 
+extern "C" status_t _ZN7android16MediaBufferGroupC1Ev(
+                    MediaBufferGroup* group, MediaBuffer **out, bool nonBlocking) {
+    ALOGD("_ZN7android16MediaBufferGroupC1Ev");
+    return group->acquire_buffer(out, nonBlocking, 0);
+}
+
 status_t MediaBufferGroup::acquire_buffer(
         MediaBuffer **out, bool nonBlocking, size_t requestedSize) {
     Mutex::Autolock autoLock(mLock);
