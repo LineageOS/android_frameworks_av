@@ -13,6 +13,13 @@ LOCAL_C_INCLUDES := \
 LOCAL_STATIC_LIBRARIES := \
         libyuv_static \
 
+ifeq ($(BOARD_HAS_MTK_HARDWARE),true)
+LOCAL_CFLAGS += -DMTK_HARDWARE
+
+LOCAL_C_INCLUDES += \
+        $(TOP)/frameworks/av/include/media/stagefright/dpframework
+endif
+
 LOCAL_CFLAGS += -Werror
 LOCAL_CLANG := true
 LOCAL_SANITIZE := signed-integer-overflow

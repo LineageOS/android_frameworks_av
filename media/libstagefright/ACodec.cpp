@@ -85,6 +85,16 @@
 
 #include <stagefright/AVExtensions.h>
 
+#ifdef MTK_HARDWARE
+#include <media/stagefright/dpframework/DpBlitStream.h>
+
+#define HAL_PIXEL_FORMAT_NV12_BLK 0x7F000001
+#define HAL_PIXEL_FORMAT_I420 (0x32315659 + 0x10)
+
+const OMX_COLOR_FORMATTYPE OMX_MTK_COLOR_FormatYV12 = (OMX_COLOR_FORMATTYPE)0x7F000200;
+const OMX_COLOR_FORMATTYPE OMX_COLOR_FormatVendorMTKYUV = (OMX_COLOR_FORMATTYPE)0x7F000001;
+#endif
+
 namespace android {
 
 enum {
@@ -1036,6 +1046,11 @@ status_t ACodec::setupNativeWindowSizeFormatAndUsage(
     setNativeWindowColorFormat(eNativeColorFormat);
 #endif
 
+#ifdef MTK_HARDWARE
+    OMX_COLOR_FORMATTYPE eHalColorFormat = def.format.video.eColorFormat;
+    setHalWindowColorFormat(eHalColorFormat);
+#endif
+
     ALOGV("gralloc usage: %#x(OMX) => %#x(ACodec)", omxUsage, usage);
     err = setNativeWindowSizeFormatAndUsage(
             nativeWindow,
@@ -1043,6 +1058,8 @@ status_t ACodec::setupNativeWindowSizeFormatAndUsage(
             def.format.video.nFrameHeight,
 #ifdef USE_SAMSUNG_COLORFORMAT
             eNativeColorFormat,
+#elif MTK_HARDWARE
+            eHalColorFormat,
 #else
             def.format.video.eColorFormat,
 #endif
@@ -1427,6 +1444,29 @@ void ACodec::setNativeWindowColorFormat(OMX_COLOR_FORMATTYPE &eNativeColorFormat
             case OMX_COLOR_FormatYUV420Planar:
             default:
                 eNativeColorFormat = (OMX_COLOR_FORMATTYPE)HAL_PIXEL_FORMAT_YCbCr_420_P;
+                break;
+        }
+    }
+}
+#endif
+
+#ifdef MTK_HARDWARE
+void ACodec::setHalWindowColorFormat(OMX_COLOR_FORMATTYPE &eHalColorFormat) {
+    ALOGE("[Decker] setHalWindowColorFormat(%#x) - %s",eHalColorFormat,mComponentName.c_str());
+
+    if (!strncmp("OMX.MTK.", mComponentName.c_str(), 8)) {
+        switch (eHalColorFormat) {
+            case OMX_COLOR_FormatYUV420Planar:
+                eHalColorFormat = (OMX_COLOR_FORMATTYPE)HAL_PIXEL_FORMAT_I420;
+                break;
+            case OMX_MTK_COLOR_FormatYV12:
+                eHalColorFormat = (OMX_COLOR_FORMATTYPE)HAL_PIXEL_FORMAT_YV12;
+                break;
+            case OMX_COLOR_FormatVendorMTKYUV:
+                eHalColorFormat = (OMX_COLOR_FORMATTYPE)HAL_PIXEL_FORMAT_NV12_BLK;
+                break;
+            default:
+                eHalColorFormat = (OMX_COLOR_FORMATTYPE)HAL_PIXEL_FORMAT_I420;
                 break;
         }
     }

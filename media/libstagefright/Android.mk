@@ -202,6 +202,17 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/samsung/exynos4/include
 endif
 
+# Mediatek
+ifeq ($(strip $(BOARD_HAS_MTK_HARDWARE)),true)
+LOCAL_CFLAGS += -DMTK_HARDWARE
+
+LOCAL_C_INCLUDES += \
+	$(TOP)/hardware/mediatek/dpframework/inc
+
+LOCAL_SHARED_LIBRARIES += \
+	libdpframework
+endif
+
 LOCAL_MODULE:= libstagefright
 
 LOCAL_MODULE_TAGS := optional

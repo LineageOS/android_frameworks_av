@@ -351,6 +351,9 @@ protected:
 #ifdef USE_SAMSUNG_COLORFORMAT
     void setNativeWindowColorFormat(OMX_COLOR_FORMATTYPE &eNativeColorFormat);
 #endif
+#ifdef MTK_HARDWARE
+    void setHalWindowColorFormat(OMX_COLOR_FORMATTYPE &eHalColorFormat);
+#endif
     status_t cancelBufferToNativeWindow(BufferInfo *info);
     status_t freeOutputBuffersNotOwnedByComponent();
     BufferInfo *dequeueBufferFromNativeWindow();
