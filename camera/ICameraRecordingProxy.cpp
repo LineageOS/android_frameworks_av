@@ -31,11 +31,6 @@ enum {
     RELEASE_RECORDING_FRAME,
 };
 
-uint8_t ICameraRecordingProxy::baseObject = 0;
-
-size_t ICameraRecordingProxy::getCommonBaseAddress() {
-    return (size_t)&baseObject;
-}
 
 class BpCameraRecordingProxy: public BpInterface<ICameraRecordingProxy>
 {
@@ -111,3 +106,4 @@ status_t BnCameraRecordingProxy::onTransact(
 // ----------------------------------------------------------------------------
 
 }; // namespace android
+

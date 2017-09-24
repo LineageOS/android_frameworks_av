@@ -239,9 +239,6 @@ private:
     status_t checkFrameRate(const CameraParameters& params,
                     int32_t frameRate);
 
-    static void adjustIncomingANWBuffer(IMemory* data);
-    static void adjustOutgoingANWBuffer(IMemory* data);
-
     void stopCameraRecording();
     void releaseCamera();
     status_t reset();
