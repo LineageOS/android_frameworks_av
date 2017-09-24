@@ -29,7 +29,6 @@
 #include <utils/Trace.h>
 #include <gui/Surface.h>
 #include <media/hardware/MetadataBufferType.h>
-#include <camera/ICameraRecordingProxy.h>
 
 #include "common/CameraDeviceBase.h"
 #include "api1/Camera2Client.h"
@@ -709,10 +708,7 @@ status_t StreamingProcessor::processRecordingFrame() {
         uint8_t *data = (uint8_t*)heap->getBase() + offset;
         uint32_t type = kMetadataBufferTypeGrallocSource;
         *((uint32_t*)data) = type;
-        buffer_handle_t* pBuffer = (buffer_handle_t*)(data + 4);
-        *pBuffer = (buffer_handle_t)(
-                (uint8_t*)imgBuffer.mGraphicBuffer->handle -
-                ICameraRecordingProxy::getCommonBaseAddress());
+        *((buffer_handle_t*)(data + 4)) = imgBuffer.mGraphicBuffer->handle;
         ALOGVV("%s: Camera %d: Sending out buffer_handle_t %p",
                 __FUNCTION__, mId,
                 imgBuffer.mGraphicBuffer->handle);
@@ -758,10 +754,8 @@ void StreamingProcessor::releaseRecordingFrame(const sp<IMemory>& mem) {
     }
 
     // Release the buffer back to the recording queue
-    // b/28466701
-    buffer_handle_t* pBuffer = (buffer_handle_t*)(data + 4);
-    buffer_handle_t imgHandle = (buffer_handle_t)((uint8_t*)(*pBuffer) +
-            ICameraRecordingProxy::getCommonBaseAddress());
+
+    buffer_handle_t imgHandle = *(buffer_handle_t*)(data + 4);
 
     size_t itemIndex;
     for (itemIndex = 0; itemIndex < mRecordingBuffers.size(); itemIndex++) {
