@@ -76,7 +76,7 @@ cc_library_static {
 
             instruction_set: "arm",
 
-            armv7_a_neon: {
+            neon: {
                 exclude_srcs: [
                     "src/asm/ARMV5E/convolve_opt.s",
                     "src/asm/ARMV5E/cor_h_vec_opt.s",
