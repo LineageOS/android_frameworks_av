@@ -56,7 +56,7 @@ cc_library_static {
 
             instruction_set: "arm",
 
-            armv7_a_neon: {
+            neon: {
                 exclude_srcs: [
                     "src/asm/ARMV5E/PrePostMDCT_v5.s",
                     "src/asm/ARMV5E/R4R8First_v5.s",
