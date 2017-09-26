@@ -46,9 +46,24 @@ public:
 
     virtual status_t setConsumers(const std::vector<sp<Surface>>& consumers);
 
+    virtual ssize_t getSurfaceId(const sp<Surface> &surface);
+
+    virtual status_t updateStream(const std::vector<sp<Surface>> &outputSurfaces,
+            const std::vector<OutputStreamInfo> &outputInfo,
+            const std::vector<size_t> &removedSurfaceIds,
+            KeyedVector<sp<Surface>, size_t> *outputMap/*out*/);
+
 private:
-    // Surfaces passed in constructor from app
-    std::vector<sp<Surface> > mSurfaces;
+
+    static const size_t kMaxOutputs = 4;
+
+    // Map surfaceId -> output surfaces
+    sp<Surface> mSurfaces[kMaxOutputs];
+
+    ssize_t getNextSurfaceIdLocked();
+
+    status_t revertPartialUpdateLocked(const KeyedVector<sp<Surface>, size_t> &removedSurfaces,
+            const KeyedVector<sp<Surface>, size_t> &attachedSurfaces);
 
     /**
      * The Camera3StreamSplitter object this stream uses for stream

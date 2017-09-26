@@ -1222,7 +1222,7 @@ status_t Camera3Device::createInputStream(
 status_t Camera3Device::createStream(sp<Surface> consumer,
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
-            int streamSetId, bool isShared, uint64_t consumerUsage) {
+            std::vector<int> *surfaceIds, int streamSetId, bool isShared, uint64_t consumerUsage) {
     ATRACE_CALL();
 
     if (consumer == nullptr) {
@@ -1234,14 +1234,15 @@ status_t Camera3Device::createStream(sp<Surface> consumer,
     consumers.push_back(consumer);
 
     return createStream(consumers, /*hasDeferredConsumer*/ false, width, height,
-            format, dataSpace, rotation, id, streamSetId, isShared, consumerUsage);
+            format, dataSpace, rotation, id, surfaceIds, streamSetId, isShared, consumerUsage);
 }
 
 status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
         android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
-        int streamSetId, bool isShared, uint64_t consumerUsage) {
+        std::vector<int> *surfaceIds, int streamSetId, bool isShared, uint64_t consumerUsage) {
     ATRACE_CALL();
+
     Mutex::Autolock il(mInterfaceLock);
     nsecs_t maxExpectedDuration = getExpectedInFlightDuration();
     Mutex::Autolock l(mLock);
@@ -1330,6 +1331,19 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
                 width, height, format, dataSpace, rotation,
                 mTimestampOffset, streamSetId);
     }
+
+    size_t consumerCount = consumers.size();
+    for (size_t i = 0; i < consumerCount; i++) {
+        int id = newStream->getSurfaceId(consumers[i]);
+        if (id < 0) {
+            SET_ERR_L("Invalid surface id");
+            return BAD_VALUE;
+        }
+        if (surfaceIds != nullptr) {
+            surfaceIds->push_back(id);
+        }
+    }
+
     newStream->setStatusTracker(mStatusTracker);
 
     newStream->setBufferManager(mBufferManager);
@@ -1936,10 +1950,15 @@ void Camera3Device::notifyStatus(bool idle) {
 }
 
 status_t Camera3Device::setConsumerSurfaces(int streamId,
-        const std::vector<sp<Surface>>& consumers) {
+        const std::vector<sp<Surface>>& consumers, std::vector<int> *surfaceIds) {
     ATRACE_CALL();
     ALOGV("%s: Camera %s: set consumer surface for stream %d",
             __FUNCTION__, mId.string(), streamId);
+
+    if (surfaceIds == nullptr) {
+        return BAD_VALUE;
+    }
+
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
 
@@ -1960,6 +1979,15 @@ status_t Camera3Device::setConsumerSurfaces(int streamId,
         return res;
     }
 
+    for (auto &consumer : consumers) {
+        int id = stream->getSurfaceId(consumer);
+        if (id < 0) {
+            CLOGE("Invalid surface id!");
+            return BAD_VALUE;
+        }
+        surfaceIds->push_back(id);
+    }
+
     if (stream->isConsumerConfigurationDeferred()) {
         if (!stream->isConfiguring()) {
             CLOGE("Stream %d was already fully configured.", streamId);
@@ -1975,6 +2003,40 @@ status_t Camera3Device::setConsumerSurfaces(int streamId,
     }
 
     return OK;
+}
+
+status_t Camera3Device::updateStream(int streamId, const std::vector<sp<Surface>> &newSurfaces,
+        const std::vector<OutputStreamInfo> &outputInfo,
+        const std::vector<size_t> &removedSurfaceIds, KeyedVector<sp<Surface>, size_t> *outputMap) {
+    Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock l(mLock);
+
+    ssize_t idx = mOutputStreams.indexOfKey(streamId);
+    if (idx == NAME_NOT_FOUND) {
+        CLOGE("Stream %d is unknown", streamId);
+        return idx;
+    }
+
+    for (const auto &it : removedSurfaceIds) {
+        if (mRequestThread->isOutputSurfacePending(streamId, it)) {
+            CLOGE("Shared surface still part of a pending request!");
+            return -EBUSY;
+        }
+    }
+
+    sp<Camera3OutputStreamInterface> stream = mOutputStreams[idx];
+    status_t res = stream->updateStream(newSurfaces, outputInfo, removedSurfaceIds, outputMap);
+    if (res != OK) {
+        CLOGE("Stream %d failed to update stream (error %d %s) ",
+              streamId, res, strerror(-res));
+        if (res == UNKNOWN_ERROR) {
+            SET_ERR_L("%s: Stream update failed to revert to previous output configuration!",
+                    __FUNCTION__);
+        }
+        return res;
+    }
+
+    return res;
 }
 
 /**
@@ -4337,6 +4399,46 @@ bool Camera3Device::RequestThread::isStreamPending(
             if (stream == s) return true;
         }
         if (stream == request->mInputStream) return true;
+    }
+
+    return false;
+}
+
+bool Camera3Device::RequestThread::isOutputSurfacePending(int streamId, size_t surfaceId) {
+    ATRACE_CALL();
+    Mutex::Autolock l(mRequestLock);
+
+    for (const auto& nextRequest : mNextRequests) {
+        for (const auto& s : nextRequest.captureRequest->mOutputSurfaces) {
+            if (s.first == streamId) {
+                const auto &it = std::find(s.second.begin(), s.second.end(), surfaceId);
+                if (it != s.second.end()) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    for (const auto& request : mRequestQueue) {
+        for (const auto& s : request->mOutputSurfaces) {
+            if (s.first == streamId) {
+                const auto &it = std::find(s.second.begin(), s.second.end(), surfaceId);
+                if (it != s.second.end()) {
+                  return true;
+                }
+            }
+        }
+    }
+
+    for (const auto& request : mRepeatingRequests) {
+        for (const auto& s : request->mOutputSurfaces) {
+            if (s.first == streamId) {
+                const auto &it = std::find(s.second.begin(), s.second.end(), surfaceId);
+                if (it != s.second.end()) {
+                  return true;
+                }
+            }
+        }
     }
 
     return false;

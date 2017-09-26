@@ -289,6 +289,82 @@ CameraDevice::submitRequestsLocked(
     return ACAMERA_OK;
 }
 
+camera_status_t CameraDevice::updateOutputConfiguration(ACaptureSessionOutput *output) {
+    camera_status_t ret = checkCameraClosedOrErrorLocked();
+    if (ret != ACAMERA_OK) {
+        return ret;
+    }
+
+    if (output == nullptr) {
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+
+    if (!output->mIsShared) {
+        ALOGE("Error output configuration is not shared");
+        return ACAMERA_ERROR_INVALID_OPERATION;
+    }
+
+    int32_t streamId = -1;
+    for (auto& kvPair : mConfiguredOutputs) {
+        if (kvPair.second.first == output->mWindow) {
+            streamId = kvPair.first;
+            break;
+        }
+    }
+    if (streamId < 0) {
+        ALOGE("Error: Invalid output configuration");
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+
+    sp<IGraphicBufferProducer> iGBP(nullptr);
+    ret = getIGBPfromAnw(output->mWindow, iGBP);
+    if (ret != ACAMERA_OK) {
+        ALOGE("Camera device %s failed to extract graphic producer from native window",
+                getId());
+        return ret;
+    }
+
+    OutputConfiguration outConfig(iGBP, output->mRotation, OutputConfiguration::INVALID_SET_ID,
+            true);
+
+    for (auto& anw : output->mSharedWindows) {
+        ret = getIGBPfromAnw(anw, iGBP);
+        if (ret != ACAMERA_OK) {
+            ALOGE("Camera device %s failed to extract graphic producer from native window",
+                    getId());
+            return ret;
+        }
+        outConfig.addGraphicProducer(iGBP);
+    }
+
+    auto remoteRet = mRemote->updateOutputConfiguration(streamId, outConfig);
+    if (!remoteRet.isOk()) {
+        switch (remoteRet.serviceSpecificErrorCode()) {
+            case hardware::ICameraService::ERROR_INVALID_OPERATION:
+                ALOGE("Camera device %s invalid operation: %s", getId(),
+                        remoteRet.toString8().string());
+                return ACAMERA_ERROR_INVALID_OPERATION;
+                break;
+            case hardware::ICameraService::ERROR_ALREADY_EXISTS:
+                ALOGE("Camera device %s output surface already exists: %s", getId(),
+                        remoteRet.toString8().string());
+                return ACAMERA_ERROR_INVALID_PARAMETER;
+                break;
+            case hardware::ICameraService::ERROR_ILLEGAL_ARGUMENT:
+                ALOGE("Camera device %s invalid input argument: %s", getId(),
+                        remoteRet.toString8().string());
+                return ACAMERA_ERROR_INVALID_PARAMETER;
+                break;
+            default:
+                ALOGE("Camera device %s failed to add shared output: %s", getId(),
+                        remoteRet.toString8().string());
+                return ACAMERA_ERROR_UNKNOWN;
+        }
+    }
+
+    return ACAMERA_OK;
+}
+
 camera_status_t
 CameraDevice::allocateCaptureRequest(
         const ACaptureRequest* request, /*out*/sp<CaptureRequest>& outReq) {
@@ -540,7 +616,8 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
             return ret;
         }
         outputSet.insert(std::make_pair(
-                anw, OutputConfiguration(iGBP, outConfig.mRotation)));
+                anw, OutputConfiguration(iGBP, outConfig.mRotation,
+                        OutputConfiguration::INVALID_SET_ID, outConfig.mIsShared)));
     }
     auto addSet = outputSet;
     std::vector<int> deleteList;

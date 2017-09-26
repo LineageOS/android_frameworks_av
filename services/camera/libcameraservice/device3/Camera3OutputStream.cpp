@@ -691,6 +691,14 @@ status_t Camera3OutputStream::setBufferManager(sp<Camera3BufferManager> bufferMa
     return OK;
 }
 
+status_t Camera3OutputStream::updateStream(const std::vector<sp<Surface>> &/*outputSurfaces*/,
+            const std::vector<OutputStreamInfo> &/*outputInfo*/,
+            const std::vector<size_t> &/*removedSurfaceIds*/,
+            KeyedVector<sp<Surface>, size_t> * /*outputMapo*/) {
+    ALOGE("%s: this method is not supported!", __FUNCTION__);
+    return INVALID_OPERATION;
+}
+
 void Camera3OutputStream::BufferReleasedListener::onBufferReleased() {
     sp<Camera3OutputStream> stream = mParent.promote();
     if (stream == nullptr) {

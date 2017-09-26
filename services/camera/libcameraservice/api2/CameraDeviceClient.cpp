@@ -530,10 +530,11 @@ binder::Status CameraDeviceClient::createStream(
     }
 
     int streamId = camera3::CAMERA3_STREAM_ID_INVALID;
+    std::vector<int> surfaceIds;
     err = mDevice->createStream(surfaces, deferredConsumer, streamInfo.width,
             streamInfo.height, streamInfo.format, streamInfo.dataSpace,
             static_cast<camera3_stream_rotation_t>(outputConfiguration.getRotation()),
-            &streamId, outputConfiguration.getSurfaceSetID(), isShared);
+            &streamId, &surfaceIds, outputConfiguration.getSurfaceSetID(), isShared);
 
     if (err != OK) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
@@ -545,7 +546,8 @@ binder::Status CameraDeviceClient::createStream(
         for (auto& binder : binders) {
             ALOGV("%s: mStreamMap add binder %p streamId %d, surfaceId %d",
                     __FUNCTION__, binder.get(), streamId, i);
-            mStreamMap.add(binder, StreamSurfaceId(streamId, i++));
+            mStreamMap.add(binder, StreamSurfaceId(streamId, surfaceIds[i]));
+            i++;
         }
 
         mStreamInfoMap[streamId] = streamInfo;
@@ -592,10 +594,12 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
     }
     int streamId = camera3::CAMERA3_STREAM_ID_INVALID;
     std::vector<sp<Surface>> noSurface;
+    std::vector<int> surfaceIds;
     err = mDevice->createStream(noSurface, /*hasDeferredConsumer*/true, width,
             height, format, dataSpace,
             static_cast<camera3_stream_rotation_t>(outputConfiguration.getRotation()),
-            &streamId, outputConfiguration.getSurfaceSetID(), isShared, consumerUsage);
+            &streamId, &surfaceIds, outputConfiguration.getSurfaceSetID(), isShared,
+            consumerUsage);
 
     if (err != OK) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
@@ -718,6 +722,130 @@ binder::Status CameraDeviceClient::getInputSurface(/*out*/ view::Surface *inputS
         inputSurface->name = String16("CameraInput");
         inputSurface->graphicBufferProducer = producer;
     }
+    return res;
+}
+
+binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
+        const hardware::camera2::params::OutputConfiguration &outputConfiguration) {
+    ATRACE_CALL();
+
+    binder::Status res;
+    if (!(res = checkPidStatus(__FUNCTION__)).isOk()) return res;
+
+    Mutex::Autolock icl(mBinderSerializationLock);
+
+    if (!mDevice.get()) {
+        return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
+    }
+
+    const std::vector<sp<IGraphicBufferProducer> >& bufferProducers =
+            outputConfiguration.getGraphicBufferProducers();
+    auto producerCount = bufferProducers.size();
+    if (producerCount == 0) {
+        ALOGE("%s: bufferProducers must not be empty", __FUNCTION__);
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                "bufferProducers must not be empty");
+    }
+
+    // The first output is the one associated with the output configuration.
+    // It should always be present, valid and the corresponding stream id should match.
+    sp<IBinder> binder = IInterface::asBinder(bufferProducers[0]);
+    ssize_t index = mStreamMap.indexOfKey(binder);
+    if (index == NAME_NOT_FOUND) {
+        ALOGE("%s: Outputconfiguration is invalid", __FUNCTION__);
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                "OutputConfiguration is invalid");
+    }
+    if (mStreamMap.valueFor(binder).streamId() != streamId) {
+        ALOGE("%s: Stream Id: %d provided doesn't match the id: %d in the stream map",
+                __FUNCTION__, streamId, mStreamMap.valueFor(binder).streamId());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                "Stream id is invalid");
+    }
+
+    std::vector<size_t> removedSurfaceIds;
+    std::vector<sp<IBinder>> removedOutputs;
+    std::vector<sp<Surface>> newOutputs;
+    std::vector<OutputStreamInfo> streamInfos;
+    KeyedVector<sp<IBinder>, sp<IGraphicBufferProducer>> newOutputsMap;
+    for (auto &it : bufferProducers) {
+        newOutputsMap.add(IInterface::asBinder(it), it);
+    }
+
+    for (size_t i = 0; i < mStreamMap.size(); i++) {
+        ssize_t idx = newOutputsMap.indexOfKey(mStreamMap.keyAt(i));
+        if (idx == NAME_NOT_FOUND) {
+            if (mStreamMap[i].streamId() == streamId) {
+                removedSurfaceIds.push_back(mStreamMap[i].surfaceId());
+                removedOutputs.push_back(mStreamMap.keyAt(i));
+            }
+        } else {
+            if (mStreamMap[i].streamId() != streamId) {
+                ALOGE("%s: Output surface already part of a different stream", __FUNCTION__);
+                return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                        "Target Surface is invalid");
+            }
+            newOutputsMap.removeItemsAt(idx);
+        }
+    }
+
+    for (size_t i = 0; i < newOutputsMap.size(); i++) {
+        OutputStreamInfo outInfo;
+        sp<Surface> surface;
+        res = createSurfaceFromGbp(outInfo, /*isStreamInfoValid*/ false, surface,
+                newOutputsMap.valueAt(i));
+        if (!res.isOk())
+            return res;
+
+        // Stream sharing is only supported for IMPLEMENTATION_DEFINED
+        // formats.
+        if (outInfo.format != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
+            String8 msg = String8::format("Camera %s: Stream sharing is only supported for "
+                    "IMPLEMENTATION_DEFINED format", mCameraIdStr.string());
+            ALOGW("%s: %s", __FUNCTION__, msg.string());
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+        }
+        streamInfos.push_back(outInfo);
+        newOutputs.push_back(surface);
+    }
+
+    //Trivial case no changes required
+    if (removedSurfaceIds.empty() && newOutputs.empty()) {
+        return binder::Status::ok();
+    }
+
+    KeyedVector<sp<Surface>, size_t> outputMap;
+    auto ret = mDevice->updateStream(streamId, newOutputs, streamInfos, removedSurfaceIds,
+            &outputMap);
+    if (ret != OK) {
+        switch (ret) {
+            case NAME_NOT_FOUND:
+            case BAD_VALUE:
+            case -EBUSY:
+                res = STATUS_ERROR_FMT(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                        "Camera %s: Error updating stream: %s (%d)",
+                        mCameraIdStr.string(), strerror(ret), ret);
+                break;
+            default:
+                res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
+                        "Camera %s: Error updating stream: %s (%d)",
+                        mCameraIdStr.string(), strerror(ret), ret);
+                break;
+        }
+    } else {
+        for (const auto &it : removedOutputs) {
+            mStreamMap.removeItem(it);
+        }
+
+        for (size_t i = 0; i < outputMap.size(); i++) {
+            mStreamMap.add(IInterface::asBinder(outputMap.keyAt(i)->getIGraphicBufferProducer()),
+                    StreamSurfaceId(streamId, outputMap.valueAt(i)));
+        }
+
+        ALOGV("%s: Camera %s: Successful stream ID %d update",
+                  __FUNCTION__, mCameraIdStr.string(), streamId);
+    }
+
     return res;
 }
 
@@ -1242,15 +1370,12 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
     }
 
     std::vector<sp<Surface>> consumerSurfaces;
-    std::vector<size_t> consumerSurfaceIds;
-    size_t surfaceId = 0;
     for (auto& bufferProducer : bufferProducers) {
         // Don't create multiple streams for the same target surface
         ssize_t index = mStreamMap.indexOfKey(IInterface::asBinder(bufferProducer));
         if (index != NAME_NOT_FOUND) {
             ALOGV("Camera %s: Surface already has a stream created "
                     " for it (ID %zd)", mCameraIdStr.string(), index);
-            surfaceId++;
             continue;
         }
 
@@ -1262,8 +1387,6 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
             return res;
 
         consumerSurfaces.push_back(surface);
-        consumerSurfaceIds.push_back(surfaceId);
-        surfaceId++;
     }
 
     // Gracefully handle case where finalizeOutputConfigurations is called
@@ -1275,12 +1398,13 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
 
     // Finish the deferred stream configuration with the surface.
     status_t err;
-    err = mDevice->setConsumerSurfaces(streamId, consumerSurfaces);
+    std::vector<int> consumerSurfaceIds;
+    err = mDevice->setConsumerSurfaces(streamId, consumerSurfaces, &consumerSurfaceIds);
     if (err == OK) {
         for (size_t i = 0; i < consumerSurfaces.size(); i++) {
             sp<IBinder> binder = IInterface::asBinder(
                     consumerSurfaces[i]->getIGraphicBufferProducer());
-            ALOGV("%s: mStreamMap add binder %p streamId %d, surfaceId %zu", __FUNCTION__,
+            ALOGV("%s: mStreamMap add binder %p streamId %d, surfaceId %d", __FUNCTION__,
                     binder.get(), streamId, consumerSurfaceIds[i]);
             mStreamMap.add(binder, StreamSurfaceId(streamId, consumerSurfaceIds[i]));
         }

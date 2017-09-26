@@ -36,7 +36,8 @@
 #include <camera/camera2/OutputConfiguration.h>
 #include <camera/camera2/CaptureRequest.h>
 
-#include <camera/NdkCameraDevice.h>
+#include <camera/NdkCameraManager.h>
+#include <camera/NdkCameraCaptureSession.h>
 #include "ACameraMetadata.h"
 
 namespace android {
@@ -121,6 +122,8 @@ class CameraDevice final : public RefBase {
             int numRequests, ACaptureRequest** requests,
             /*out*/int* captureSequenceId,
             bool isRepeating);
+
+    camera_status_t updateOutputConfiguration(ACaptureSessionOutput *output);
 
     static camera_status_t allocateCaptureRequest(
             const ACaptureRequest* request, sp<CaptureRequest>& outReq);
