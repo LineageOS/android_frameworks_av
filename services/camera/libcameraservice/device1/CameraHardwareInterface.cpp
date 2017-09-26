@@ -103,57 +103,72 @@ hardware::Return<uint32_t> CameraHardwareInterface::registerMemory(
 }
 
 hardware::Return<void> CameraHardwareInterface::unregisterMemory(uint32_t memId) {
-    std::lock_guard<std::mutex> lock(mHidlMemPoolMapLock);
-    if (mHidlMemPoolMap.count(memId) == 0) {
-        ALOGE("%s: memory pool ID %d not found", __FUNCTION__, memId);
-        return hardware::Void();
+    camera_memory_t* mem = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(mHidlMemPoolMapLock);
+        if (mHidlMemPoolMap.count(memId) == 0) {
+            ALOGE("%s: memory pool ID %d not found", __FUNCTION__, memId);
+            return hardware::Void();
+        }
+        mem = mHidlMemPoolMap.at(memId);
+        mHidlMemPoolMap.erase(memId);
     }
-    camera_memory_t* mem = mHidlMemPoolMap.at(memId);
     sPutMemory(mem);
-    mHidlMemPoolMap.erase(memId);
     return hardware::Void();
 }
 
 hardware::Return<void> CameraHardwareInterface::dataCallback(
         DataCallbackMsg msgType, uint32_t data, uint32_t bufferIndex,
         const hardware::camera::device::V1_0::CameraFrameMetadata& metadata) {
-    std::lock_guard<std::mutex> lock(mHidlMemPoolMapLock);
-    if (mHidlMemPoolMap.count(data) == 0) {
-        ALOGE("%s: memory pool ID %d not found", __FUNCTION__, data);
-        return hardware::Void();
+    camera_memory_t* mem = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(mHidlMemPoolMapLock);
+        if (mHidlMemPoolMap.count(data) == 0) {
+            ALOGE("%s: memory pool ID %d not found", __FUNCTION__, data);
+            return hardware::Void();
+        }
+        mem = mHidlMemPoolMap.at(data);
     }
     camera_frame_metadata_t md;
     md.number_of_faces = metadata.faces.size();
     md.faces = (camera_face_t*) metadata.faces.data();
-    sDataCb((int32_t) msgType, mHidlMemPoolMap.at(data), bufferIndex, &md, this);
+    sDataCb((int32_t) msgType, mem, bufferIndex, &md, this);
     return hardware::Void();
 }
 
 hardware::Return<void> CameraHardwareInterface::dataCallbackTimestamp(
         DataCallbackMsg msgType, uint32_t data,
         uint32_t bufferIndex, int64_t timestamp) {
-    std::lock_guard<std::mutex> lock(mHidlMemPoolMapLock);
-    if (mHidlMemPoolMap.count(data) == 0) {
-        ALOGE("%s: memory pool ID %d not found", __FUNCTION__, data);
-        return hardware::Void();
+    camera_memory_t* mem = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(mHidlMemPoolMapLock);
+        if (mHidlMemPoolMap.count(data) == 0) {
+            ALOGE("%s: memory pool ID %d not found", __FUNCTION__, data);
+            return hardware::Void();
+        }
+        mem = mHidlMemPoolMap.at(data);
     }
-    sDataCbTimestamp(timestamp, (int32_t) msgType, mHidlMemPoolMap.at(data), bufferIndex, this);
+    sDataCbTimestamp(timestamp, (int32_t) msgType, mem, bufferIndex, this);
     return hardware::Void();
 }
 
 hardware::Return<void> CameraHardwareInterface::handleCallbackTimestamp(
         DataCallbackMsg msgType, const hidl_handle& frameData, uint32_t data,
         uint32_t bufferIndex, int64_t timestamp) {
-    std::lock_guard<std::mutex> lock(mHidlMemPoolMapLock);
-    if (mHidlMemPoolMap.count(data) == 0) {
-        ALOGE("%s: memory pool ID %d not found", __FUNCTION__, data);
-        return hardware::Void();
+    camera_memory_t* mem = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(mHidlMemPoolMapLock);
+        if (mHidlMemPoolMap.count(data) == 0) {
+            ALOGE("%s: memory pool ID %d not found", __FUNCTION__, data);
+            return hardware::Void();
+        }
+        mem = mHidlMemPoolMap.at(data);
     }
-    sp<CameraHeapMemory> mem(static_cast<CameraHeapMemory *>(mHidlMemPoolMap.at(data)->handle));
+    sp<CameraHeapMemory> heapMem(static_cast<CameraHeapMemory *>(mem->handle));
     VideoNativeHandleMetadata* md = (VideoNativeHandleMetadata*)
-            mem->mBuffers[bufferIndex]->pointer();
+            heapMem->mBuffers[bufferIndex]->pointer();
     md->pHandle = const_cast<native_handle_t*>(frameData.getNativeHandle());
-    sDataCbTimestamp(timestamp, (int32_t) msgType, mHidlMemPoolMap.at(data), bufferIndex, this);
+    sDataCbTimestamp(timestamp, (int32_t) msgType, mem, bufferIndex, this);
     return hardware::Void();
 }
 
@@ -162,28 +177,28 @@ hardware::Return<void> CameraHardwareInterface::handleCallbackTimestampBatch(
         const hardware::hidl_vec<hardware::camera::device::V1_0::HandleTimestampMessage>& messages) {
     std::vector<android::HandleTimestampMessage> msgs;
     msgs.reserve(messages.size());
+    {
+        std::lock_guard<std::mutex> lock(mHidlMemPoolMapLock);
+        for (const auto& hidl_msg : messages) {
+            if (mHidlMemPoolMap.count(hidl_msg.data) == 0) {
+                ALOGE("%s: memory pool ID %d not found", __FUNCTION__, hidl_msg.data);
+                return hardware::Void();
+            }
+            sp<CameraHeapMemory> mem(
+                    static_cast<CameraHeapMemory *>(mHidlMemPoolMap.at(hidl_msg.data)->handle));
 
-    std::lock_guard<std::mutex> lock(mHidlMemPoolMapLock);
-    for (const auto& hidl_msg : messages) {
-        if (mHidlMemPoolMap.count(hidl_msg.data) == 0) {
-            ALOGE("%s: memory pool ID %d not found", __FUNCTION__, hidl_msg.data);
-            return hardware::Void();
+            if (hidl_msg.bufferIndex >= mem->mNumBufs) {
+                ALOGE("%s: invalid buffer index %d, max allowed is %d", __FUNCTION__,
+                     hidl_msg.bufferIndex, mem->mNumBufs);
+                return hardware::Void();
+            }
+            VideoNativeHandleMetadata* md = (VideoNativeHandleMetadata*)
+                    mem->mBuffers[hidl_msg.bufferIndex]->pointer();
+            md->pHandle = const_cast<native_handle_t*>(hidl_msg.frameData.getNativeHandle());
+
+            msgs.push_back({hidl_msg.timestamp, mem->mBuffers[hidl_msg.bufferIndex]});
         }
-        sp<CameraHeapMemory> mem(
-                static_cast<CameraHeapMemory *>(mHidlMemPoolMap.at(hidl_msg.data)->handle));
-
-        if (hidl_msg.bufferIndex >= mem->mNumBufs) {
-            ALOGE("%s: invalid buffer index %d, max allowed is %d", __FUNCTION__,
-                 hidl_msg.bufferIndex, mem->mNumBufs);
-            return hardware::Void();
-        }
-        VideoNativeHandleMetadata* md = (VideoNativeHandleMetadata*)
-                mem->mBuffers[hidl_msg.bufferIndex]->pointer();
-        md->pHandle = const_cast<native_handle_t*>(hidl_msg.frameData.getNativeHandle());
-
-        msgs.push_back({hidl_msg.timestamp, mem->mBuffers[hidl_msg.bufferIndex]});
     }
-
     mDataCbTimestampBatch((int32_t) msgType, msgs, mCbUser);
     return hardware::Void();
 }
