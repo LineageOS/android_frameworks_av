@@ -69,7 +69,6 @@ cc_library_shared {
         "libmedia",
         "libmedia_jni",
         "libmediadrm",
-        "libskia",
         "libstagefright",
         "libstagefright_foundation",
         "liblog",
