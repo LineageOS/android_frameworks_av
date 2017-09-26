@@ -549,8 +549,10 @@ void NuPlayer::Renderer::onMessageReceived(const sp<AMessage> &msg) {
                 CHECK_EQ(mAudioSink->getPosition(&numFramesPlayed),
                          (status_t)OK);
 
+                // Handle AudioTrack race when start is immediately called after flush.
                 uint32_t numFramesPendingPlayout =
-                    mNumFramesWritten - numFramesPlayed;
+                    (mNumFramesWritten > numFramesPlayed ?
+                        mNumFramesWritten - numFramesPlayed : 0);
 
                 // This is how long the audio sink will have data to
                 // play back.
