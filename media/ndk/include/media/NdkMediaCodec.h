@@ -39,6 +39,7 @@ extern "C" {
 #endif
 
 struct ANativeWindow;
+typedef struct ANativeWindow ANativeWindow;
 
 #if __ANDROID_API__ >= 21
 
