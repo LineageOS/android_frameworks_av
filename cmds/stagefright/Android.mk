@@ -25,9 +25,6 @@ LOCAL_MODULE_TAGS := optional
 
 LOCAL_MODULE:= stagefright
 
-# Tag this module as a cts test artifact
-LOCAL_COMPATIBILITY_SUITE := cts
-
 include $(BUILD_EXECUTABLE)
 
 ################################################################################
