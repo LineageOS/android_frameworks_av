@@ -24,6 +24,10 @@ namespace android {
 bool parseDateTime(const char* dateTime, time_t& outSeconds);
 void formatDateTime(time_t seconds, char* buffer, int bufferLength);
 
+int copyFile(const char *fromPath, const char *toPath);
+void deleteRecursive(const char* path);
+void deletePath(const char* path);
+
 }; // namespace android
 
 #endif // _MTP_UTILS_H
