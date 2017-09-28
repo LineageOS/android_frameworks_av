@@ -8148,10 +8148,8 @@ void AudioFlinger::MmapThread::threadLoop_standby()
 
 void AudioFlinger::MmapThread::threadLoop_exit()
 {
-    sp<MmapStreamCallback> callback = mCallback.promote();
-    if (callback != 0) {
-        callback->onTearDown();
-    }
+    // Do not call callback->onTearDown() because it is redundant for thread exit
+    // and because it can cause a recursive mutex lock on stop().
 }
 
 status_t AudioFlinger::MmapThread::setSyncEvent(const sp<SyncEvent>& event __unused)
