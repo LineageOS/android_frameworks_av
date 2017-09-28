@@ -339,7 +339,7 @@ status_t MediaRecorderClient::release()
         wp<MediaRecorderClient> client(this);
         mMediaPlayerService->removeMediaRecorderClient(client);
     }
-    clearDeathNotifiers();
+    clearDeathNotifiers_l();
     return NO_ERROR;
 }
 
@@ -411,7 +411,7 @@ void MediaRecorderClient::ServiceDeathNotifier::unlinkToDeath() {
     }
 }
 
-void MediaRecorderClient::clearDeathNotifiers() {
+void MediaRecorderClient::clearDeathNotifiers_l() {
     if (mCameraDeathListener != nullptr) {
         mCameraDeathListener->unlinkToDeath();
         mCameraDeathListener = nullptr;
@@ -425,8 +425,8 @@ void MediaRecorderClient::clearDeathNotifiers() {
 status_t MediaRecorderClient::setListener(const sp<IMediaRecorderClient>& listener)
 {
     ALOGV("setListener");
-    clearDeathNotifiers();
     Mutex::Autolock lock(mLock);
+    clearDeathNotifiers_l();
     if (mRecorder == NULL) {
         ALOGE("recorder is not initialized");
         return NO_INIT;
