@@ -17,6 +17,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MediaClock"
 #include <utils/Log.h>
+#include <map>
 
 #include <media/stagefright/MediaClock.h>
 
@@ -28,6 +29,12 @@ namespace android {
 // Maximum allowed time backwards from anchor change.
 // If larger than this threshold, it's treated as discontinuity.
 static const int64_t kAnchorFluctuationAllowedUs = 10000ll;
+
+MediaClock::Timer::Timer(const sp<AMessage> &notify, int64_t mediaTimeUs, int64_t adjustRealUs)
+    : mNotify(notify),
+      mMediaTimeUs(mediaTimeUs),
+      mAdjustRealUs(adjustRealUs) {
+}
 
 MediaClock::MediaClock()
     : mAnchorTimeMediaUs(-1),
@@ -59,8 +66,8 @@ void MediaClock::reset() {
     Mutex::Autolock autoLock(mLock);
     auto it = mTimers.begin();
     while (it != mTimers.end()) {
-        it->second->setInt32("reason", TIMER_REASON_RESET);
-        it->second->post();
+        it->mNotify->setInt32("reason", TIMER_REASON_RESET);
+        it->mNotify->post();
         it = mTimers.erase(it);
     }
     mAnchorTimeMediaUs = -1;
@@ -204,15 +211,26 @@ status_t MediaClock::getRealTimeFor(
     return OK;
 }
 
-void MediaClock::addTimer(const sp<AMessage> &notify, int64_t mediaTimeUs) {
+void MediaClock::addTimer(const sp<AMessage> &notify, int64_t mediaTimeUs,
+                          int64_t adjustRealUs) {
     Mutex::Autolock autoLock(mLock);
-    int64_t nextMediaTimeUs = INT64_MAX;
-    if (!mTimers.empty()) {
-        nextMediaTimeUs = mTimers.begin()->first;
+
+    bool updateTimer = (mPlaybackRate != 0.0);
+    if (updateTimer) {
+        auto it = mTimers.begin();
+        while (it != mTimers.end()) {
+            if (((it->mAdjustRealUs - (double)adjustRealUs) * (double)mPlaybackRate
+                + (it->mMediaTimeUs - mediaTimeUs)) <= 0) {
+                updateTimer = false;
+                break;
+            }
+            ++it;
+        }
     }
 
-    mTimers.emplace(mediaTimeUs, notify);
-    if (mediaTimeUs < nextMediaTimeUs) {
+    mTimers.emplace_back(notify, mediaTimeUs, adjustRealUs);
+
+    if (updateTimer) {
         ++mGeneration;
         processTimers_l();
     }
@@ -248,20 +266,51 @@ void MediaClock::processTimers_l() {
         return;
     }
 
+    int64_t nextLapseRealUs = INT64_MAX;
+    std::multimap<int64_t, Timer> notifyList;
     auto it = mTimers.begin();
-    while (it != mTimers.end() && it->first <= nowMediaTimeUs) {
-        it->second->setInt32("reason", TIMER_REASON_REACHED);
-        it->second->post();
-        it = mTimers.erase(it);
+    while (it != mTimers.end()) {
+        double diff = it->mAdjustRealUs * (double)mPlaybackRate
+            + it->mMediaTimeUs - nowMediaTimeUs;
+        int64_t diffMediaUs;
+        if (diff > (double)INT64_MAX) {
+            diffMediaUs = INT64_MAX;
+        } else if (diff < (double)INT64_MIN) {
+            diffMediaUs = INT64_MIN;
+        } else {
+            diffMediaUs = diff;
+        }
+
+        if (diffMediaUs <= 0) {
+            notifyList.emplace(diffMediaUs, *it);
+            it = mTimers.erase(it);
+        } else {
+            if (mPlaybackRate != 0.0
+                && (double)diffMediaUs < INT64_MAX * (double)mPlaybackRate) {
+                int64_t targetRealUs = diffMediaUs / (double)mPlaybackRate;
+                if (targetRealUs < nextLapseRealUs) {
+                    nextLapseRealUs = targetRealUs;
+                }
+            }
+            ++it;
+        }
     }
 
-    if (it == mTimers.end() || mPlaybackRate == 0.0 || mAnchorTimeMediaUs < 0) {
+    auto itNotify = notifyList.begin();
+    while (itNotify != notifyList.end()) {
+        itNotify->second.mNotify->setInt32("reason", TIMER_REASON_REACHED);
+        itNotify->second.mNotify->post();
+        itNotify = notifyList.erase(itNotify);
+    }
+
+    if (mTimers.empty() || mPlaybackRate == 0.0 || mAnchorTimeMediaUs < 0
+        || nextLapseRealUs == INT64_MAX) {
         return;
     }
 
     sp<AMessage> msg = new AMessage(kWhatTimeIsUp, this);
     msg->setInt32("generation", mGeneration);
-    msg->post((it->first - nowMediaTimeUs) / (double)mPlaybackRate);
+    msg->post(nextLapseRealUs);
 }
 
 }  // namespace android
