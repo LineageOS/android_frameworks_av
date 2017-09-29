@@ -72,6 +72,20 @@ status_t Camera2Client::initialize(sp<CameraProviderManager> manager) {
     return initializeImpl(manager);
 }
 
+bool Camera2Client::isZslEnabledInStillTemplate() {
+    bool zslEnabled = false;
+    CameraMetadata stillTemplate;
+    status_t res = mDevice->createDefaultRequest(CAMERA2_TEMPLATE_STILL_CAPTURE, &stillTemplate);
+    if (res == OK) {
+        camera_metadata_entry_t enableZsl = stillTemplate.find(ANDROID_CONTROL_ENABLE_ZSL);
+        if (enableZsl.count == 1) {
+            zslEnabled = (enableZsl.data.u8[0] == ANDROID_CONTROL_ENABLE_ZSL_TRUE);
+        }
+    }
+
+    return zslEnabled;
+}
+
 template<typename TProviderPtr>
 status_t Camera2Client::initializeImpl(TProviderPtr providerPtr)
 {
@@ -93,6 +107,8 @@ status_t Camera2Client::initializeImpl(TProviderPtr providerPtr)
                     __FUNCTION__, mCameraId, strerror(-res), res);
             return NO_INIT;
         }
+
+        l.mParameters.isDeviceZslSupported = isZslEnabledInStillTemplate();
     }
 
     String8 threadName;
