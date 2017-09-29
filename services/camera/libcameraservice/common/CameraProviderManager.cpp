@@ -202,12 +202,17 @@ bool CameraProviderManager::supportSetTorchMode(const std::string &id) {
     for (auto& provider : mProviders) {
         auto deviceInfo = findDeviceInfoLocked(id);
         if (deviceInfo != nullptr) {
-            provider->mInterface->isSetTorchModeSupported(
+            auto ret = provider->mInterface->isSetTorchModeSupported(
                 [&support](auto status, bool supported) {
                     if (status == Status::OK) {
                         support = supported;
                     }
                 });
+            if (!ret.isOk()) {
+                ALOGE("%s: Transaction error checking torch mode support '%s': %s",
+                        __FUNCTION__, provider->mProviderName.c_str(), ret.description().c_str());
+            }
+            break;
         }
     }
     return support;
