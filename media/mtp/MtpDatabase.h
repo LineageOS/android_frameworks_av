@@ -103,6 +103,9 @@ public:
 
     virtual MtpProperty*            getDevicePropertyDesc(MtpDeviceProperty property) = 0;
 
+    virtual MtpResponseCode         moveObject(MtpObjectHandle handle, MtpObjectHandle newParent,
+                                            MtpString& newPath) = 0;
+
     virtual void                    sessionStarted() = 0;
 
     virtual void                    sessionEnded() = 0;
