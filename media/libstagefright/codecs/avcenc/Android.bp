@@ -29,5 +29,10 @@ cc_library_shared {
         },
     },
 
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wno-unused-variable",
+    ],
     ldflags: ["-Wl,-Bsymbolic"],
 }
