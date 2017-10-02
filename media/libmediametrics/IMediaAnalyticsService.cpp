@@ -60,7 +60,7 @@ public:
         data.writeInterfaceToken(IMediaAnalyticsService::getInterfaceDescriptor());
         err = remote()->transact(GENERATE_UNIQUE_SESSIONID, data, &reply);
         if (err != NO_ERROR) {
-            ALOGW("bad response from service");
+            ALOGW("bad response from service for generateSessionId, err=%d", err);
             return MediaAnalyticsItem::SessionIDInvalid;
         }
         sessionid = reply.readInt64();
@@ -94,6 +94,7 @@ public:
 
         err = remote()->transact(SUBMIT_ITEM, data, &reply);
         if (err != NO_ERROR) {
+            ALOGW("bad response from service for submit, err=%d", err);
             return MediaAnalyticsItem::SessionIDInvalid;
         }
 

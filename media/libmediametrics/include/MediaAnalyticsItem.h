@@ -42,6 +42,7 @@ class MediaAnalyticsItem {
     friend class IMediaAnalyticsService;
     friend class MediaMetricsJNI;
     friend class MetricsSummarizer;
+    friend class MediaMetricsDeathNotifier;
 
     public:
 
@@ -209,6 +210,7 @@ class MediaAnalyticsItem {
         // let's reuse a binder connection
         static sp<IMediaAnalyticsService> sAnalyticsService;
         static sp<IMediaAnalyticsService> getInstance();
+        static void dropInstance();
 
         // tracking information
         SessionID_t mSessionID;         // grouping similar records
