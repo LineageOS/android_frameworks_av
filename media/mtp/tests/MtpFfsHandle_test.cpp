@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <utils/Log.h>
 
+#include "MtpDescriptors.h"
 #include "MtpFfsHandle.h"
 #include "MtpFfsCompatHandle.h"
 
@@ -66,8 +67,8 @@ protected:
         handle = std::make_unique<T>();
 
         EXPECT_EQ(pipe(fd), 0);
-        handle->mControl.reset(fd[0]);
-        control.reset(fd[1]);
+        control.reset(fd[0]);
+        handle->mControl.reset(fd[1]);
 
         EXPECT_EQ(pipe(fd), 0);
         EXPECT_EQ(fcntl(fd[0], F_SETPIPE_SZ, 1048576), 1048576);
@@ -83,7 +84,7 @@ protected:
         intr.reset(fd[0]);
         handle->mIntr.reset(fd[1]);
 
-        handle->start();
+        EXPECT_EQ(handle->start(), 0);
     }
 
     ~MtpFfsHandleTest() {
@@ -93,6 +94,16 @@ protected:
 
 typedef ::testing::Types<MtpFfsHandle, MtpFfsCompatHandle> mtpHandles;
 TYPED_TEST_CASE(MtpFfsHandleTest, mtpHandles);
+
+TYPED_TEST(MtpFfsHandleTest, testControl) {
+    EXPECT_TRUE(this->handle->writeDescriptors());
+    struct desc_v2 desc;
+    struct functionfs_strings strings;
+    EXPECT_EQ(read(this->control, &desc, sizeof(desc)), (long)sizeof(desc));
+    EXPECT_EQ(read(this->control, &strings, sizeof(strings)), (long)sizeof(strings));
+    EXPECT_TRUE(std::memcmp(&desc, &mtp_desc_v2, sizeof(desc)) == 0);
+    EXPECT_TRUE(std::memcmp(&strings, &mtp_strings, sizeof(strings)) == 0);
+}
 
 TYPED_TEST(MtpFfsHandleTest, testRead) {
     EXPECT_EQ(write(this->bulk_out, dummyDataStr.c_str(), TEST_PACKET_SIZE), TEST_PACKET_SIZE);
