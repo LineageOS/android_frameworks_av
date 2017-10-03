@@ -3446,8 +3446,13 @@ void AudioFlinger::dumpTee(int fd, const sp<NBAIO_Source>& source, audio_io_hand
             // FIXME not big-endian safe
             write(teeFd, &temp, sizeof(temp));
             close(teeFd);
-            if (fd >= 0) {
-                dprintf(fd, "tee copied to %s\n", teePath);
+            // TODO Should create file with temporary name and then rename to final if non-empty.
+            if (total > 0) {
+                if (fd >= 0) {
+                    dprintf(fd, "tee copied to %s\n", teePath);
+                }
+            } else {
+                unlink(teePath);
             }
         } else {
             if (fd >= 0) {
