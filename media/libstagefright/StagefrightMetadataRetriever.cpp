@@ -20,38 +20,23 @@
 #include <inttypes.h>
 
 #include <utils/Log.h>
-#include <gui/Surface.h>
 
+#include "include/FrameDecoder.h"
 #include "include/StagefrightMetadataRetriever.h"
 
-#include <media/ICrypto.h>
 #include <media/IMediaHTTPService.h>
-#include <media/MediaCodecBuffer.h>
-
-#include <media/DataSource.h>
-#include <media/MediaExtractor.h>
-#include <media/MediaSource.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/foundation/avc_utils.h>
-#include <media/stagefright/ColorConverter.h>
 #include <media/stagefright/DataSourceFactory.h>
 #include <media/stagefright/FileSource.h>
-#include <media/stagefright/MediaBuffer.h>
-#include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
-#include <media/stagefright/Utils.h>
-
 #include <media/CharacterEncodingDetector.h>
 
 namespace android {
-
-static const int64_t kBufferTimeOutUs = 30000ll; // 30 msec
-static const size_t kRetryCount = 20; // must be >0
 
 StagefrightMetadataRetriever::StagefrightMetadataRetriever()
     : mParsedMetaData(false),
@@ -145,470 +130,123 @@ status_t StagefrightMetadataRetriever::setDataSource(
     return OK;
 }
 
-static VideoFrame *allocVideoFrame(
-        const sp<MetaData> &trackMeta, int32_t width, int32_t height, int32_t bpp, bool metaOnly) {
-    int32_t rotationAngle;
-    if (!trackMeta->findInt32(kKeyRotation, &rotationAngle)) {
-        rotationAngle = 0;  // By default, no rotation
-    }
+VideoFrame* StagefrightMetadataRetriever::getImageAtIndex(
+        int index, int colorFormat, bool metaOnly) {
 
-    uint32_t type;
-    const void *iccData;
-    size_t iccSize;
-    if (!trackMeta->findData(kKeyIccProfile, &type, &iccData, &iccSize)){
-        iccData = NULL;
-        iccSize = 0;
-    }
+    ALOGV("getImageAtIndex: index: %d colorFormat: %d, metaOnly: %d",
+            index, colorFormat, metaOnly);
 
-    int32_t sarWidth, sarHeight;
-    int32_t displayWidth, displayHeight;
-    if (trackMeta->findInt32(kKeySARWidth, &sarWidth)
-            && trackMeta->findInt32(kKeySARHeight, &sarHeight)
-            && sarHeight != 0) {
-        displayWidth = (width * sarWidth) / sarHeight;
-        displayHeight = height;
-    } else if (trackMeta->findInt32(kKeyDisplayWidth, &displayWidth)
-                && trackMeta->findInt32(kKeyDisplayHeight, &displayHeight)
-                && displayWidth > 0 && displayHeight > 0
-                && width > 0 && height > 0) {
-        ALOGV("found display size %dx%d", displayWidth, displayHeight);
-    } else {
-        displayWidth = width;
-        displayHeight = height;
-    }
-
-    return new VideoFrame(width, height, displayWidth, displayHeight,
-            rotationAngle, bpp, !metaOnly, iccData, iccSize);
-}
-
-static bool getDstColorFormat(android_pixel_format_t colorFormat,
-        OMX_COLOR_FORMATTYPE *omxColorFormat, int32_t *bpp) {
-    switch (colorFormat) {
-        case HAL_PIXEL_FORMAT_RGB_565:
-        {
-            *omxColorFormat = OMX_COLOR_Format16bitRGB565;
-            *bpp = 2;
-            return true;
-        }
-        case HAL_PIXEL_FORMAT_RGBA_8888:
-        {
-            *omxColorFormat = OMX_COLOR_Format32BitRGBA8888;
-            *bpp = 4;
-            return true;
-        }
-        case HAL_PIXEL_FORMAT_BGRA_8888:
-        {
-            *omxColorFormat = OMX_COLOR_Format32bitBGRA8888;
-            *bpp = 4;
-            return true;
-        }
-        default:
-        {
-            ALOGE("Unsupported color format: %d", colorFormat);
-            break;
-        }
-    }
-    return false;
-}
-
-static VideoFrame *extractVideoFrame(
-        const AString &componentName,
-        const sp<MetaData> &trackMeta,
-        const sp<IMediaSource> &source,
-        int64_t frameTimeUs,
-        int seekMode,
-        int colorFormat,
-        bool metaOnly) {
-    sp<MetaData> format = source->getFormat();
-
-    MediaSource::ReadOptions::SeekMode mode =
-            static_cast<MediaSource::ReadOptions::SeekMode>(seekMode);
-    if (seekMode < MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC ||
-        seekMode > MediaSource::ReadOptions::SEEK_CLOSEST) {
-        ALOGE("Unknown seek mode: %d", seekMode);
+    if (mExtractor.get() == NULL) {
+        ALOGE("no extractor.");
         return NULL;
     }
 
-    int32_t dstBpp;
-    OMX_COLOR_FORMATTYPE dstFormat;
-    if (!getDstColorFormat(
-            (android_pixel_format_t)colorFormat, &dstFormat, &dstBpp)) {
-        return NULL;
-    }
+    size_t n = mExtractor->countTracks();
+    size_t i;
+    int imageCount = 0;
 
-    if (metaOnly) {
-        int32_t width, height;
-        CHECK(trackMeta->findInt32(kKeyWidth, &width));
-        CHECK(trackMeta->findInt32(kKeyHeight, &height));
-        return allocVideoFrame(trackMeta, width, height, dstBpp, true);
-    }
+    for (i = 0; i < n; ++i) {
+        sp<MetaData> meta = mExtractor->getTrackMetaData(i);
+        ALOGV("getting track %zu of %zu, meta=%s", i, n, meta->toString().c_str());
 
-    MediaSource::ReadOptions options;
-    sp<MetaData> overrideMeta;
-    if (frameTimeUs < 0) {
-        uint32_t type;
-        const void *data;
-        size_t size;
-        int64_t thumbNailTime;
-        int32_t thumbnailWidth, thumbnailHeight;
+        const char *mime;
+        CHECK(meta->findCString(kKeyMIMEType, &mime));
 
-        // if we have a stand-alone thumbnail, set up the override meta,
-        // and set seekTo time to -1.
-        if (trackMeta->findInt32(kKeyThumbnailWidth, &thumbnailWidth)
-         && trackMeta->findInt32(kKeyThumbnailHeight, &thumbnailHeight)
-         && trackMeta->findData(kKeyThumbnailHVCC, &type, &data, &size)){
-            overrideMeta = new MetaData(*trackMeta);
-            overrideMeta->remove(kKeyDisplayWidth);
-            overrideMeta->remove(kKeyDisplayHeight);
-            overrideMeta->setInt32(kKeyWidth, thumbnailWidth);
-            overrideMeta->setInt32(kKeyHeight, thumbnailHeight);
-            overrideMeta->setData(kKeyHVCC, type, data, size);
-            thumbNailTime = -1ll;
-            ALOGV("thumbnail: %dx%d", thumbnailWidth, thumbnailHeight);
-        } else if (!trackMeta->findInt64(kKeyThumbnailTime, &thumbNailTime)
-                || thumbNailTime < 0) {
-            thumbNailTime = 0;
-        }
-
-        options.setSeekTo(thumbNailTime, mode);
-    } else {
-        options.setSeekTo(frameTimeUs, mode);
-    }
-
-    int32_t gridRows = 1, gridCols = 1;
-    if (overrideMeta == NULL) {
-        // check if we're dealing with a tiled heif
-        int32_t gridWidth, gridHeight;
-        if (trackMeta->findInt32(kKeyGridWidth, &gridWidth) && gridWidth > 0
-         && trackMeta->findInt32(kKeyGridHeight, &gridHeight) && gridHeight > 0) {
-            int32_t width, height, displayWidth, displayHeight;
-            CHECK(trackMeta->findInt32(kKeyWidth, &width));
-            CHECK(trackMeta->findInt32(kKeyHeight, &height));
-            CHECK(trackMeta->findInt32(kKeyDisplayWidth, &displayWidth));
-            CHECK(trackMeta->findInt32(kKeyDisplayHeight, &displayHeight));
-
-            if (width >= displayWidth && height >= displayHeight
-                    && (width % gridWidth == 0) && (height % gridHeight == 0)) {
-                ALOGV("grid config: %dx%d, display %dx%d, grid %dx%d",
-                        width, height, displayWidth, displayHeight, gridWidth, gridHeight);
-
-                overrideMeta = new MetaData(*trackMeta);
-                overrideMeta->remove(kKeyDisplayWidth);
-                overrideMeta->remove(kKeyDisplayHeight);
-                overrideMeta->setInt32(kKeyWidth, gridWidth);
-                overrideMeta->setInt32(kKeyHeight, gridHeight);
-                gridCols = width / gridWidth;
-                gridRows = height / gridHeight;
-            } else {
-                ALOGE("Bad grid config: %dx%d, display %dx%d, grid %dx%d",
-                        width, height, displayWidth, displayHeight, gridWidth, gridHeight);
+        if (!strncasecmp(mime, "image/", 6)) {
+            int32_t isPrimary;
+            if ((index < 0 && meta->findInt32(kKeyIsPrimaryImage, &isPrimary) && isPrimary)
+                    || (index == imageCount++)) {
+                break;
             }
         }
-        if (overrideMeta == NULL) {
-            overrideMeta = trackMeta;
-        }
     }
-    int32_t numTiles = gridRows * gridCols;
 
-    sp<AMessage> videoFormat;
-    if (convertMetaDataToMessage(overrideMeta, &videoFormat) != OK) {
-        ALOGE("b/23680780");
-        ALOGW("Failed to convert meta data to message");
+    if (i == n) {
+        ALOGE("image track not found.");
         return NULL;
     }
 
-    // TODO: Use Flexible color instead
-    videoFormat->setInt32("color-format", OMX_COLOR_FormatYUV420Planar);
+    sp<MetaData> trackMeta = mExtractor->getTrackMetaData(i);
 
-    // For the thumbnail extraction case, try to allocate single buffer in both
-    // input and output ports, if seeking to a sync frame. NOTE: This request may
-    // fail if component requires more than that for decoding.
-    bool isSeekingClosest = (seekMode == MediaSource::ReadOptions::SEEK_CLOSEST);
-    bool decodeSingleFrame = !isSeekingClosest && (numTiles == 1);
-    if (decodeSingleFrame) {
-        videoFormat->setInt32("android._num-input-buffers", 1);
-        videoFormat->setInt32("android._num-output-buffers", 1);
-    }
+    sp<IMediaSource> source = mExtractor->getTrack(i);
 
-    status_t err;
-    sp<ALooper> looper = new ALooper;
-    looper->start();
-    sp<MediaCodec> decoder = MediaCodec::CreateByComponentName(
-            looper, componentName, &err);
-
-    if (decoder.get() == NULL || err != OK) {
-        ALOGW("Failed to instantiate decoder [%s]", componentName.c_str());
+    if (source.get() == NULL) {
+        ALOGE("unable to instantiate image track.");
         return NULL;
     }
 
-    err = decoder->configure(videoFormat, NULL /* surface */, NULL /* crypto */, 0 /* flags */);
-    if (err != OK) {
-        ALOGW("configure returned error %d (%s)", err, asString(err));
-        decoder->release();
-        return NULL;
-    }
-
-    err = decoder->start();
-    if (err != OK) {
-        ALOGW("start returned error %d (%s)", err, asString(err));
-        decoder->release();
-        return NULL;
-    }
-
-    err = source->start();
-    if (err != OK) {
-        ALOGW("source failed to start: %d (%s)", err, asString(err));
-        decoder->release();
-        return NULL;
-    }
-
-    Vector<sp<MediaCodecBuffer> > inputBuffers;
-    err = decoder->getInputBuffers(&inputBuffers);
-    if (err != OK) {
-        ALOGW("failed to get input buffers: %d (%s)", err, asString(err));
-        decoder->release();
-        source->stop();
-        return NULL;
-    }
-
-    Vector<sp<MediaCodecBuffer> > outputBuffers;
-    err = decoder->getOutputBuffers(&outputBuffers);
-    if (err != OK) {
-        ALOGW("failed to get output buffers: %d (%s)", err, asString(err));
-        decoder->release();
-        source->stop();
-        return NULL;
-    }
-
-    sp<AMessage> outputFormat = NULL;
-    bool haveMoreInputs = true;
-    size_t index, offset, size;
-    int64_t timeUs;
-    size_t retriesLeft = kRetryCount;
-    bool done = false;
     const char *mime;
-    bool success = format->findCString(kKeyMIMEType, &mime);
-    if (!success) {
-        ALOGE("Could not find mime type");
-        return NULL;
+    CHECK(trackMeta->findCString(kKeyMIMEType, &mime));
+    ALOGV("extracting from %s track", mime);
+    if (!strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC)) {
+        mime = MEDIA_MIMETYPE_VIDEO_HEVC;
+        trackMeta = new MetaData(*trackMeta);
+        trackMeta->setCString(kKeyMIMEType, mime);
     }
 
-    bool isAvcOrHevc = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)
-            || !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC);
+    Vector<AString> matchingCodecs;
+    MediaCodecList::findMatchingCodecs(
+            mime,
+            false, /* encoder */
+            MediaCodecList::kPreferSoftwareCodecs,
+            &matchingCodecs);
 
-    bool firstSample = true;
-    int64_t targetTimeUs = -1ll;
+    for (size_t i = 0; i < matchingCodecs.size(); ++i) {
+        const AString &componentName = matchingCodecs[i];
+        ImageDecoder decoder(componentName, trackMeta, source);
+        VideoFrame* frame = decoder.extractFrame(
+                0 /*frameTimeUs*/, 0 /*seekMode*/, colorFormat, metaOnly);
 
-    VideoFrame *frame = NULL;
-    int32_t tilesDecoded = 0;
-
-    do {
-        size_t inputIndex = -1;
-        int64_t ptsUs = 0ll;
-        uint32_t flags = 0;
-        sp<MediaCodecBuffer> codecBuffer = NULL;
-
-        while (haveMoreInputs) {
-            err = decoder->dequeueInputBuffer(&inputIndex, kBufferTimeOutUs);
-            if (err != OK) {
-                ALOGW("Timed out waiting for input");
-                if (retriesLeft) {
-                    err = OK;
-                }
-                break;
-            }
-            codecBuffer = inputBuffers[inputIndex];
-
-            MediaBuffer *mediaBuffer = NULL;
-
-            err = source->read(&mediaBuffer, &options);
-            options.clearSeekTo();
-            if (err != OK) {
-                ALOGW("Input Error or EOS");
-                haveMoreInputs = false;
-                if (err == ERROR_END_OF_STREAM) {
-                    err = OK;
-                }
-                break;
-            }
-            if (firstSample && isSeekingClosest) {
-                mediaBuffer->meta_data()->findInt64(kKeyTargetTime, &targetTimeUs);
-                ALOGV("Seeking closest: targetTimeUs=%lld", (long long)targetTimeUs);
-            }
-            firstSample = false;
-
-            if (mediaBuffer->range_length() > codecBuffer->capacity()) {
-                ALOGE("buffer size (%zu) too large for codec input size (%zu)",
-                        mediaBuffer->range_length(), codecBuffer->capacity());
-                haveMoreInputs = false;
-                err = BAD_VALUE;
-            } else {
-                codecBuffer->setRange(0, mediaBuffer->range_length());
-
-                CHECK(mediaBuffer->meta_data()->findInt64(kKeyTime, &ptsUs));
-                memcpy(codecBuffer->data(),
-                        (const uint8_t*)mediaBuffer->data() + mediaBuffer->range_offset(),
-                        mediaBuffer->range_length());
-            }
-
-            mediaBuffer->release();
-            break;
+        if (frame != NULL) {
+            return frame;
         }
-
-        if (haveMoreInputs && inputIndex < inputBuffers.size()) {
-            if (isAvcOrHevc && IsIDR(codecBuffer->data(), codecBuffer->size())
-                    && decodeSingleFrame) {
-                // Only need to decode one IDR frame, unless we're seeking with CLOSEST
-                // option, in which case we need to actually decode to targetTimeUs.
-                haveMoreInputs = false;
-                flags |= MediaCodec::BUFFER_FLAG_EOS;
-            }
-
-            ALOGV("QueueInput: size=%zu ts=%" PRId64 " us flags=%x",
-                    codecBuffer->size(), ptsUs, flags);
-            err = decoder->queueInputBuffer(
-                    inputIndex,
-                    codecBuffer->offset(),
-                    codecBuffer->size(),
-                    ptsUs,
-                    flags);
-
-            // we don't expect an output from codec config buffer
-            if (flags & MediaCodec::BUFFER_FLAG_CODECCONFIG) {
-                continue;
-            }
-        }
-
-        while (err == OK) {
-            // wait for a decoded buffer
-            err = decoder->dequeueOutputBuffer(
-                    &index,
-                    &offset,
-                    &size,
-                    &timeUs,
-                    &flags,
-                    kBufferTimeOutUs);
-
-            if (err == INFO_FORMAT_CHANGED) {
-                ALOGV("Received format change");
-                err = decoder->getOutputFormat(&outputFormat);
-            } else if (err == INFO_OUTPUT_BUFFERS_CHANGED) {
-                ALOGV("Output buffers changed");
-                err = decoder->getOutputBuffers(&outputBuffers);
-            } else {
-                if (err == -EAGAIN /* INFO_TRY_AGAIN_LATER */ && --retriesLeft > 0) {
-                    ALOGV("Timed-out waiting for output.. retries left = %zu", retriesLeft);
-                    err = OK;
-                } else if (err == OK) {
-                    // If we're seeking with CLOSEST option and obtained a valid targetTimeUs
-                    // from the extractor, decode to the specified frame. Otherwise we're done.
-                    ALOGV("Received an output buffer, timeUs=%lld", (long long)timeUs);
-                    sp<MediaCodecBuffer> videoFrameBuffer = outputBuffers.itemAt(index);
-
-                    int32_t width, height;
-                    CHECK(outputFormat != NULL);
-                    CHECK(outputFormat->findInt32("width", &width));
-                    CHECK(outputFormat->findInt32("height", &height));
-
-                    int32_t crop_left, crop_top, crop_right, crop_bottom;
-                    if (!outputFormat->findRect("crop", &crop_left, &crop_top, &crop_right, &crop_bottom)) {
-                        crop_left = crop_top = 0;
-                        crop_right = width - 1;
-                        crop_bottom = height - 1;
-                    }
-
-                    if (frame == NULL) {
-                        frame = allocVideoFrame(
-                                trackMeta,
-                                (crop_right - crop_left + 1) * gridCols,
-                                (crop_bottom - crop_top + 1) * gridRows,
-                                dstBpp,
-                                false /*metaOnly*/);
-                    }
-
-                    int32_t srcFormat;
-                    CHECK(outputFormat->findInt32("color-format", &srcFormat));
-
-                    ColorConverter converter((OMX_COLOR_FORMATTYPE)srcFormat, dstFormat);
-
-                    int32_t dstLeft, dstTop, dstRight, dstBottom;
-                    if (numTiles == 1) {
-                        dstLeft = crop_left;
-                        dstTop = crop_top;
-                        dstRight = crop_right;
-                        dstBottom = crop_bottom;
-                    } else {
-                        dstLeft = tilesDecoded % gridCols * width;
-                        dstTop = tilesDecoded / gridCols * height;
-                        dstRight = dstLeft + width - 1;
-                        dstBottom = dstTop + height - 1;
-                    }
-
-                    if (converter.isValid()) {
-                        err = converter.convert(
-                                (const uint8_t *)videoFrameBuffer->data(),
-                                width, height,
-                                crop_left, crop_top, crop_right, crop_bottom,
-                                frame->mData,
-                                frame->mWidth,
-                                frame->mHeight,
-                                dstLeft, dstTop, dstRight, dstBottom);
-                    } else {
-                        ALOGE("Unable to convert from format 0x%08x to 0x%08x",
-                                srcFormat, dstFormat);
-
-                        err = ERROR_UNSUPPORTED;
-                    }
-
-                    done = (targetTimeUs < 0ll) || (timeUs >= targetTimeUs);
-                    if (numTiles > 1) {
-                        tilesDecoded++;
-                        done &= (tilesDecoded >= numTiles);
-                    }
-                    err = decoder->releaseOutputBuffer(index);
-                } else {
-                    ALOGW("Received error %d (%s) instead of output", err, asString(err));
-                    done = true;
-                }
-                break;
-            }
-        }
-    } while (err == OK && !done);
-
-    source->stop();
-    decoder->release();
-
-    if (err != OK) {
-        ALOGE("failed to get video frame (err %d)", err);
-        delete frame;
-        frame = NULL;
+        ALOGV("%s failed to extract thumbnail, trying next decoder.", componentName.c_str());
     }
 
-    return frame;
+    return NULL;
 }
 
-VideoFrame *StagefrightMetadataRetriever::getFrameAtTime(
+VideoFrame* StagefrightMetadataRetriever::getFrameAtTime(
         int64_t timeUs, int option, int colorFormat, bool metaOnly) {
-
     ALOGV("getFrameAtTime: %" PRId64 " us option: %d colorFormat: %d, metaOnly: %d",
             timeUs, option, colorFormat, metaOnly);
 
+    VideoFrame *frame;
+    status_t err = getFrameInternal(
+            timeUs, 1, option, colorFormat, metaOnly, &frame, NULL /*outFrames*/);
+    return (err == OK) ? frame : NULL;
+}
+
+status_t StagefrightMetadataRetriever::getFrameAtIndex(
+        std::vector<VideoFrame*>* frames,
+        int frameIndex, int numFrames, int colorFormat, bool metaOnly) {
+    ALOGV("getFrameAtIndex: frameIndex %d, numFrames %d, colorFormat: %d, metaOnly: %d",
+            frameIndex, numFrames, colorFormat, metaOnly);
+
+    return getFrameInternal(
+            frameIndex, numFrames, MediaSource::ReadOptions::SEEK_FRAME_INDEX,
+            colorFormat, metaOnly, NULL /*outFrame*/, frames);
+}
+
+status_t StagefrightMetadataRetriever::getFrameInternal(
+        int64_t timeUs, int numFrames, int option, int colorFormat, bool metaOnly,
+        VideoFrame **outFrame, std::vector<VideoFrame*>* outFrames) {
     if (mExtractor.get() == NULL) {
-        ALOGV("no extractor.");
-        return NULL;
+        ALOGE("no extractor.");
+        return NO_INIT;
     }
 
     sp<MetaData> fileMeta = mExtractor->getMetaData();
 
     if (fileMeta == NULL) {
-        ALOGV("extractor doesn't publish metadata, failed to initialize?");
-        return NULL;
+        ALOGE("extractor doesn't publish metadata, failed to initialize?");
+        return NO_INIT;
     }
 
     int32_t drm = 0;
     if (fileMeta->findInt32(kKeyIsDRM, &drm) && drm != 0) {
         ALOGE("frame grab not allowed.");
-        return NULL;
+        return ERROR_DRM_UNKNOWN;
     }
 
     size_t n = mExtractor->countTracks();
@@ -625,8 +263,8 @@ VideoFrame *StagefrightMetadataRetriever::getFrameAtTime(
     }
 
     if (i == n) {
-        ALOGV("no video track found.");
-        return NULL;
+        ALOGE("no video track found.");
+        return INVALID_OPERATION;
     }
 
     sp<MetaData> trackMeta = mExtractor->getTrackMetaData(
@@ -636,7 +274,7 @@ VideoFrame *StagefrightMetadataRetriever::getFrameAtTime(
 
     if (source.get() == NULL) {
         ALOGV("unable to instantiate video track.");
-        return NULL;
+        return UNKNOWN_ERROR;
     }
 
     const void *data;
@@ -659,16 +297,25 @@ VideoFrame *StagefrightMetadataRetriever::getFrameAtTime(
 
     for (size_t i = 0; i < matchingCodecs.size(); ++i) {
         const AString &componentName = matchingCodecs[i];
-        VideoFrame *frame = extractVideoFrame(
-                componentName, trackMeta, source, timeUs, option, colorFormat, metaOnly);
-
-        if (frame != NULL) {
-            return frame;
+        VideoFrameDecoder decoder(componentName, trackMeta, source);
+        if (outFrame != NULL) {
+            *outFrame = decoder.extractFrame(
+                    timeUs, option, colorFormat, metaOnly);
+            if (*outFrame != NULL) {
+                return OK;
+            }
+        } else if (outFrames != NULL) {
+            status_t err = decoder.extractFrames(
+                    timeUs, numFrames, option, colorFormat, outFrames);
+            if (err == OK) {
+                return OK;
+            }
         }
-        ALOGV("%s failed to extract thumbnail, trying next decoder.", componentName.c_str());
+        ALOGV("%s failed to extract frame, trying next decoder.", componentName.c_str());
     }
 
-    return NULL;
+    ALOGE("all codecs failed to extract frame.");
+    return UNKNOWN_ERROR;
 }
 
 MediaAlbumArt *StagefrightMetadataRetriever::extractAlbumArt() {
@@ -800,8 +447,14 @@ void StagefrightMetadataRetriever::parseMetaData() {
     bool hasVideo = false;
     int32_t videoWidth = -1;
     int32_t videoHeight = -1;
+    int32_t videoFrameCount = 0;
     int32_t audioBitrate = -1;
     int32_t rotationAngle = -1;
+    int32_t imageCount = 0;
+    int32_t imagePrimary = 0;
+    int32_t imageWidth = -1;
+    int32_t imageHeight = -1;
+    int32_t imageRotation = -1;
 
     // The overall duration is the duration of the longest track.
     int64_t maxDurationUs = 0;
@@ -832,6 +485,20 @@ void StagefrightMetadataRetriever::parseMetaData() {
                 if (!trackMeta->findInt32(kKeyRotation, &rotationAngle)) {
                     rotationAngle = 0;
                 }
+                if (!trackMeta->findInt32(kKeyFrameCount, &videoFrameCount)) {
+                    videoFrameCount = 0;
+                }
+            } else if (!strncasecmp("image/", mime, 6)) {
+                int32_t isPrimary;
+                if (trackMeta->findInt32(kKeyIsPrimaryImage, &isPrimary) && isPrimary) {
+                    imagePrimary = imageCount;
+                    CHECK(trackMeta->findInt32(kKeyWidth, &imageWidth));
+                    CHECK(trackMeta->findInt32(kKeyHeight, &imageHeight));
+                    if (!trackMeta->findInt32(kKeyRotation, &imageRotation)) {
+                        imageRotation = 0;
+                    }
+                }
+                imageCount++;
             } else if (!strcasecmp(mime, MEDIA_MIMETYPE_TEXT_3GPP)) {
                 const char *lang;
                 if (trackMeta->findCString(kKeyMediaLanguage, &lang)) {
@@ -870,6 +537,30 @@ void StagefrightMetadataRetriever::parseMetaData() {
 
         sprintf(tmp, "%d", rotationAngle);
         mMetaData.add(METADATA_KEY_VIDEO_ROTATION, String8(tmp));
+
+        if (videoFrameCount > 0) {
+            sprintf(tmp, "%d", videoFrameCount);
+            mMetaData.add(METADATA_KEY_VIDEO_FRAME_COUNT, String8(tmp));
+        }
+    }
+
+    if (imageCount > 0) {
+        mMetaData.add(METADATA_KEY_HAS_IMAGE, String8("yes"));
+
+        sprintf(tmp, "%d", imageCount);
+        mMetaData.add(METADATA_KEY_IMAGE_COUNT, String8(tmp));
+
+        sprintf(tmp, "%d", imagePrimary);
+        mMetaData.add(METADATA_KEY_IMAGE_PRIMARY, String8(tmp));
+
+        sprintf(tmp, "%d", imageWidth);
+        mMetaData.add(METADATA_KEY_IMAGE_WIDTH, String8(tmp));
+
+        sprintf(tmp, "%d", imageHeight);
+        mMetaData.add(METADATA_KEY_IMAGE_HEIGHT, String8(tmp));
+
+        sprintf(tmp, "%d", imageRotation);
+        mMetaData.add(METADATA_KEY_IMAGE_ROTATION, String8(tmp));
     }
 
     if (numTracks == 1 && hasAudio && audioBitrate >= 0) {

@@ -512,6 +512,8 @@ status_t MPEG2TSExtractor::seek(int64_t seekTimeUs,
                 --index;
             }
             break;
+        default:
+            return ERROR_UNSUPPORTED;
     }
     if (!shouldSeekBeyond || mOffset <= mSeekSyncPoints->valueAt(index)) {
         int64_t actualSeekTimeUs = mSeekSyncPoints->keyAt(index);

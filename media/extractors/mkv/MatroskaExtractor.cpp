@@ -703,18 +703,22 @@ status_t MatroskaSource::read(
 
     int64_t seekTimeUs;
     ReadOptions::SeekMode mode;
-    if (options && options->getSeekTo(&seekTimeUs, &mode)
-            && !mExtractor->isLiveStreaming()) {
-        clearPendingFrames();
+    if (options && options->getSeekTo(&seekTimeUs, &mode)) {
+        if (mode == ReadOptions::SEEK_FRAME_INDEX) {
+            return ERROR_UNSUPPORTED;
+        }
 
-        // The audio we want is located by using the Cues to seek the video
-        // stream to find the target Cluster then iterating to finalize for
-        // audio.
-        int64_t actualFrameTimeUs;
-        mBlockIter.seek(seekTimeUs, mIsAudio, &actualFrameTimeUs);
+        if (!mExtractor->isLiveStreaming()) {
+            clearPendingFrames();
 
-        if (mode == ReadOptions::SEEK_CLOSEST) {
-            targetSampleTimeUs = actualFrameTimeUs;
+            // The audio we want is located by using the Cues to seek the video
+            // stream to find the target Cluster then iterating to finalize for
+            // audio.
+            int64_t actualFrameTimeUs;
+            mBlockIter.seek(seekTimeUs, mIsAudio, &actualFrameTimeUs);
+            if (mode == ReadOptions::SEEK_CLOSEST) {
+                targetSampleTimeUs = actualFrameTimeUs;
+            }
         }
     }
 

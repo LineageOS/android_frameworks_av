@@ -52,7 +52,7 @@ struct Trex {
 class MPEG4Extractor : public MediaExtractor {
 public:
     // Extractor assumes ownership of "source".
-    explicit MPEG4Extractor(const sp<DataSource> &source);
+    explicit MPEG4Extractor(const sp<DataSource> &source, const char *mime = NULL);
 
     virtual size_t countTracks();
     virtual sp<MediaSource> getTrack(size_t index);
@@ -103,7 +103,9 @@ private:
     status_t mInitCheck;
     uint32_t mHeaderTimescale;
     bool mIsQT;
-    bool mIsHEIF;
+    bool mIsHeif;
+    bool mIsHeifSequence;
+    bool mPreferHeif;
 
     Track *mFirstTrack, *mLastTrack;
 

@@ -46,6 +46,7 @@ cc_library_shared {
         "DataSourceFactory.cpp",
         "DataURISource.cpp",
         "FileSource.cpp",
+        "FrameDecoder.cpp",
         "FrameRenderTracker.cpp",
         "HTTPBase.cpp",
         "HevcUtils.cpp",

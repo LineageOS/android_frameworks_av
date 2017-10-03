@@ -19,6 +19,7 @@
 namespace android {
 
 const char *MEDIA_MIMETYPE_IMAGE_JPEG = "image/jpeg";
+const char *MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC = "image/vnd.android.heic";
 
 const char *MEDIA_MIMETYPE_VIDEO_VP8 = "video/x-vnd.on2.vp8";
 const char *MEDIA_MIMETYPE_VIDEO_VP9 = "video/x-vnd.on2.vp9";
@@ -58,6 +59,7 @@ const char *MEDIA_MIMETYPE_CONTAINER_MATROSKA = "video/x-matroska";
 const char *MEDIA_MIMETYPE_CONTAINER_MPEG2TS = "video/mp2ts";
 const char *MEDIA_MIMETYPE_CONTAINER_AVI = "video/avi";
 const char *MEDIA_MIMETYPE_CONTAINER_MPEG2PS = "video/mp2p";
+const char *MEDIA_MIMETYPE_CONTAINER_HEIF = "image/heif";
 
 const char *MEDIA_MIMETYPE_TEXT_3GPP = "text/3gpp-tt";
 const char *MEDIA_MIMETYPE_TEXT_SUBRIP = "application/x-subrip";
