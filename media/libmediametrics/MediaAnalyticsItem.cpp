@@ -100,7 +100,7 @@ void MediaAnalyticsItem::clear() {
 
     // clean attributes
     // contents of the attributes
-    for (size_t i = 0 ; i < mPropSize; i++ ) {
+    for (size_t i = 0 ; i < mPropCount; i++ ) {
         clearProp(&mProps[i]);
     }
     // the attribute records themselves
@@ -300,7 +300,8 @@ bool MediaAnalyticsItem::removeProp(const char *name) {
         clearProp(prop);
         if (i != mPropCount-1) {
             // in the middle, bring last one down to fill gap
-            mProps[i] = mProps[mPropCount-1];
+            copyProp(prop, &mProps[mPropCount-1]);
+            clearProp(&mProps[mPropCount-1]);
         }
         mPropCount--;
         return true;
