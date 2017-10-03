@@ -161,6 +161,8 @@ private:
     MtpResponseCode     doSendObjectInfo();
     MtpResponseCode     doSendObject();
     MtpResponseCode     doDeleteObject();
+    MtpResponseCode     doMoveObject();
+    MtpResponseCode     doCopyObject();
     MtpResponseCode     doGetObjectPropDesc();
     MtpResponseCode     doGetDevicePropDesc();
     MtpResponseCode     doSendPartialObject();
