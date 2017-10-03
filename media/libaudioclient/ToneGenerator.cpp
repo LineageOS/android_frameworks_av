@@ -799,6 +799,18 @@ const ToneGenerator::ToneDescriptor ToneGenerator::sToneDescriptors[] = {
                         { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
           .repeatCnt = ToneGenerator::TONEGEN_INF,
           .repeatSegment = 0 },                              // TONE_SG_RINGTONE
+        { .segments = { { .duration = 500, .waveFreq = { 480, 620, 0 }, 0, 0 },
+                        { .duration = 500, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 },                              // TONE_HK_BUSY
+        { .segments = { { .duration = 400, .waveFreq = { 440, 480, 0 }, 0, 0 },
+                        { .duration = 200, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 400, .waveFreq = { 440, 480, 0 }, 0, 0 },
+                        { .duration = 3000, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 },                              // TONE_HK_RINGTONE
 };
 
 // Used by ToneGenerator::getToneForRegion() to convert user specified supervisory tone type
@@ -853,6 +865,16 @@ const unsigned char /*tone_type*/ ToneGenerator::sToneMappingTable[NUM_REGIONS-1
             TONE_SUP_ERROR,              // TONE_SUP_ERROR
             TONE_SUP_CALL_WAITING,       // TONE_SUP_CALL_WAITING
             TONE_SG_RINGTONE             // TONE_SUP_RINGTONE
+        },
+        {   // HONGKONG
+            TONE_SUP_DIAL,               // TONE_SUP_DIAL
+            TONE_HK_BUSY,                // TONE_SUP_BUSY
+            TONE_SUP_CONGESTION,         // TONE_SUP_CONGESTION
+            TONE_SUP_RADIO_ACK,          // TONE_SUP_RADIO_ACK
+            TONE_SUP_RADIO_NOTAVAIL,     // TONE_SUP_RADIO_NOTAVAIL
+            TONE_SUP_ERROR,              // TONE_SUP_ERROR
+            TONE_SUP_CALL_WAITING,       // TONE_SUP_CALL_WAITING
+            TONE_HK_RINGTONE             // TONE_SUP_RINGTONE
         }
 };
 
@@ -920,6 +942,8 @@ ToneGenerator::ToneGenerator(audio_stream_type_t streamType, float volume, bool 
         mRegion = AUSTRALIA;
     } else if (strstr(value, "sg") != NULL) {
         mRegion = SINGAPORE;
+    } else if (strstr(value, "hk") != NULL) {
+        mRegion = HONGKONG;
     } else {
         mRegion = CEPT;
     }
