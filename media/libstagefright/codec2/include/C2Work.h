@@ -60,9 +60,9 @@ struct C2SettingResult {
 typedef uint32_t node_id;
 
 enum flags_t : uint32_t {
-    BUFFERFLAG_CODEC_CONFIG,
-    BUFFERFLAG_DROP_FRAME,
-    BUFFERFLAG_END_OF_STREAM,
+    BUFFERFLAG_CODEC_CONFIG  = (1 << 0),
+    BUFFERFLAG_DROP_FRAME    = (1 << 1),
+    BUFFERFLAG_END_OF_STREAM = (1 << 2),
 };
 
 enum {
