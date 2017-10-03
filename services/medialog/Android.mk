@@ -4,7 +4,7 @@ include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := MediaLogService.cpp IMediaLogService.cpp
 
-LOCAL_SHARED_LIBRARIES := libbinder libutils liblog libnbaio libaudioutils
+LOCAL_SHARED_LIBRARIES := libbinder libutils liblog libnbaio libnblog libaudioutils
 
 LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
 

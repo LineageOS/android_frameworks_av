@@ -51,6 +51,7 @@ LOCAL_SHARED_LIBRARIES := \
     libmedialogservice \
     libmediautils \
     libnbaio \
+    libnblog \
     libpowermanager \
     libserviceutility \
     libmediautils \

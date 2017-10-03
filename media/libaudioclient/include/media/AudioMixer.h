@@ -25,7 +25,7 @@
 #include <media/AudioResampler.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/BufferProviders.h>
-#include <media/nbaio/NBLog.h>
+#include <media/nblog/NBLog.h>
 #include <system/audio.h>
 #include <utils/Compat.h>
 #include <utils/threads.h>
