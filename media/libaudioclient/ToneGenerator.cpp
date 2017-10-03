@@ -740,6 +740,18 @@ const ToneGenerator::ToneDescriptor ToneGenerator::sToneDescriptors[] = {
                         { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
           .repeatCnt = ToneGenerator::TONEGEN_INF,
           .repeatSegment = 0 },                              // TONE_JAPAN_RADIO_ACK
+        { .segments = { { .duration = 375, .waveFreq = { 400, 0 }, 0, 0 },
+                        { .duration = 375, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 },                              // TONE_GB_BUSY
+        { .segments = { { .duration = 400, .waveFreq = { 400, 0 }, 0, 0 },
+                        { .duration = 350, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 225, .waveFreq = { 400, 0 }, 0, 0 },
+                        { .duration = 525, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 },                              // TONE_GB_CONGESTION
         { .segments = { { .duration = 400, .waveFreq = { 400, 450, 0 }, 0, 0 },
                         { .duration = 200, .waveFreq = { 0 }, 0, 0 },
                         { .duration = 400, .waveFreq = { 400, 450, 0 }, 0, 0 },
@@ -747,6 +759,10 @@ const ToneGenerator::ToneDescriptor ToneGenerator::sToneDescriptors[] = {
                         { .duration = 0, .waveFreq = { 0 }, 0, 0}},
           .repeatCnt = ToneGenerator::TONEGEN_INF,
           .repeatSegment = 0 },                              // TONE_GB_RINGTONE
+        { .segments = { { .duration = ToneGenerator::TONEGEN_INF, .waveFreq = { 400, 425, 450, 0 }, 0, 0 },
+                        { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 },                              // TONE_AUSTRALIA_DIAL
         { .segments = { { .duration = 400, .waveFreq = { 400, 450, 0 }, 0, 0 },
                         { .duration = 200, .waveFreq = { 0 }, 0, 0 },
                         { .duration = 400, .waveFreq = { 400, 450, 0 }, 0, 0 },
@@ -771,6 +787,18 @@ const ToneGenerator::ToneDescriptor ToneGenerator::sToneDescriptors[] = {
                         { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
           .repeatCnt = ToneGenerator::TONEGEN_INF,
           .repeatSegment = 0 },                              // TONE_AUSTRALIA_CONGESTION
+        { .segments = { { .duration = 750, .waveFreq = { 425, 0 }, 0, 0 },
+                        { .duration = 750, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 },                              // TONE_SG_BUSY
+        { .segments = { { .duration = 400, .waveFreq = { 401, 425, 449, 0 }, 0, 0 },
+                        { .duration = 200, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 400, .waveFreq = { 401, 425, 449, 0 }, 0, 0 },
+                        { .duration = 2000, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 },                              // TONE_SG_RINGTONE
 };
 
 // Used by ToneGenerator::getToneForRegion() to convert user specified supervisory tone type
@@ -797,9 +825,9 @@ const unsigned char /*tone_type*/ ToneGenerator::sToneMappingTable[NUM_REGIONS-1
             TONE_SUP_RINGTONE            // TONE_SUP_RINGTONE
         },
         {   // GB
-            TONE_SUP_DIAL,               // TONE_SUP_DIAL
-            TONE_SUP_BUSY,               // TONE_SUP_BUSY
-            TONE_SUP_CONGESTION,         // TONE_SUP_CONGESTION
+            TONE_ANSI_DIAL,              // TONE_SUP_DIAL
+            TONE_GB_BUSY,                // TONE_SUP_BUSY
+            TONE_GB_CONGESTION,          // TONE_SUP_CONGESTION
             TONE_SUP_RADIO_ACK,          // TONE_SUP_RADIO_ACK
             TONE_SUP_RADIO_NOTAVAIL,     // TONE_SUP_RADIO_NOTAVAIL
             TONE_SUP_ERROR,              // TONE_SUP_ERROR
@@ -807,7 +835,7 @@ const unsigned char /*tone_type*/ ToneGenerator::sToneMappingTable[NUM_REGIONS-1
             TONE_GB_RINGTONE             // TONE_SUP_RINGTONE
         },
         {   // AUSTRALIA
-            TONE_ANSI_DIAL,             // TONE_SUP_DIAL
+            TONE_AUSTRALIA_DIAL,        // TONE_SUP_DIAL
             TONE_AUSTRALIA_BUSY,        // TONE_SUP_BUSY
             TONE_AUSTRALIA_CONGESTION,  // TONE_SUP_CONGESTION
             TONE_SUP_RADIO_ACK,         // TONE_SUP_RADIO_ACK
@@ -815,6 +843,16 @@ const unsigned char /*tone_type*/ ToneGenerator::sToneMappingTable[NUM_REGIONS-1
             TONE_SUP_ERROR,             // TONE_SUP_ERROR
             TONE_AUSTRALIA_CALL_WAITING,// TONE_SUP_CALL_WAITING
             TONE_AUSTRALIA_RINGTONE     // TONE_SUP_RINGTONE
+        },
+        {   // SINGAPORE
+            TONE_SUP_DIAL,               // TONE_SUP_DIAL
+            TONE_SG_BUSY,                // TONE_SUP_BUSY
+            TONE_SUP_CONGESTION,         // TONE_SUP_CONGESTION
+            TONE_SUP_RADIO_ACK,          // TONE_SUP_RADIO_ACK
+            TONE_SUP_RADIO_NOTAVAIL,     // TONE_SUP_RADIO_NOTAVAIL
+            TONE_SUP_ERROR,              // TONE_SUP_ERROR
+            TONE_SUP_CALL_WAITING,       // TONE_SUP_CALL_WAITING
+            TONE_SG_RINGTONE             // TONE_SUP_RINGTONE
         }
 };
 
@@ -880,6 +918,8 @@ ToneGenerator::ToneGenerator(audio_stream_type_t streamType, float volume, bool 
         mRegion = GB;
     } else if (strstr(value, "au") != NULL) {
         mRegion = AUSTRALIA;
+    } else if (strstr(value, "sg") != NULL) {
+        mRegion = SINGAPORE;
     } else {
         mRegion = CEPT;
     }
