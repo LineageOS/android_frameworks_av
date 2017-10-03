@@ -67,8 +67,8 @@ static const MtpOperationCode kSupportedOperationCodes[] = {
     MTP_OPERATION_SET_DEVICE_PROP_VALUE,
     MTP_OPERATION_RESET_DEVICE_PROP_VALUE,
 //    MTP_OPERATION_TERMINATE_OPEN_CAPTURE,
-//    MTP_OPERATION_MOVE_OBJECT,
-//    MTP_OPERATION_COPY_OBJECT,
+    MTP_OPERATION_MOVE_OBJECT,
+    MTP_OPERATION_COPY_OBJECT,
     MTP_OPERATION_GET_PARTIAL_OBJECT,
 //    MTP_OPERATION_INITIATE_OPEN_CAPTURE,
     MTP_OPERATION_GET_OBJECT_PROPS_SUPPORTED,
@@ -436,6 +436,12 @@ bool MtpServer::handleRequest() {
             break;
         case MTP_OPERATION_DELETE_OBJECT:
             response = doDeleteObject();
+            break;
+        case MTP_OPERATION_COPY_OBJECT:
+            response = doCopyObject();
+            break;
+        case MTP_OPERATION_MOVE_OBJECT:
+            response = doMoveObject();
             break;
         case MTP_OPERATION_GET_OBJECT_PROP_DESC:
             response = doGetObjectPropDesc();
@@ -1020,6 +1026,137 @@ MtpResponseCode MtpServer::doSendObjectInfo() {
     return MTP_RESPONSE_OK;
 }
 
+MtpResponseCode MtpServer::doMoveObject() {
+    if (!hasStorage())
+        return MTP_RESPONSE_GENERAL_ERROR;
+    if (mRequest.getParameterCount() < 3)
+        return MTP_RESPONSE_INVALID_PARAMETER;
+    MtpObjectHandle objectHandle = mRequest.getParameter(1);
+    MtpStorageID storageID = mRequest.getParameter(2);
+    MtpStorage* storage = getStorage(storageID);
+    MtpObjectHandle parent = mRequest.getParameter(3);
+    if (!storage)
+        return MTP_RESPONSE_INVALID_STORAGE_ID;
+    MtpString path;
+    MtpResponseCode result;
+
+    MtpString fromPath;
+    int64_t fileLength;
+    MtpObjectFormat format;
+    MtpObjectInfo info(objectHandle);
+    result = mDatabase->getObjectInfo(objectHandle, info);
+    if (result != MTP_RESPONSE_OK)
+        return result;
+    result = mDatabase->getObjectFilePath(objectHandle, fromPath, fileLength, format);
+    if (result != MTP_RESPONSE_OK)
+        return result;
+
+    // special case the root
+    if (parent == 0) {
+        path = storage->getPath();
+    } else {
+        int64_t parentLength;
+        MtpObjectFormat parentFormat;
+        result = mDatabase->getObjectFilePath(parent, path, parentLength, parentFormat);
+        if (result != MTP_RESPONSE_OK)
+            return result;
+        if (parentFormat != MTP_FORMAT_ASSOCIATION)
+            return MTP_RESPONSE_INVALID_PARENT_OBJECT;
+    }
+
+    if (path[path.size() - 1] != '/')
+        path += "/";
+    path += info.mName;
+
+    result = mDatabase->moveObject(objectHandle, parent, path);
+    if (result != MTP_RESPONSE_OK)
+        return result;
+
+    if (info.mStorageID == storageID) {
+        ALOGV("Moving file from %s to %s", (const char*)fromPath, (const char*)path);
+        if (rename(fromPath, path)) {
+            ALOGE("rename() failed from %s to %s", (const char*)fromPath, (const char*)path);
+            result = MTP_RESPONSE_GENERAL_ERROR;
+        }
+    } else {
+        ALOGV("Moving across storages from %s to %s", (const char*)fromPath, (const char*)path);
+        if (copyFile(fromPath, path)) {
+            result = MTP_RESPONSE_GENERAL_ERROR;
+        } else {
+            deletePath(fromPath);
+        }
+    }
+
+    // If the move failed, undo the database change
+    if (result != MTP_RESPONSE_OK)
+        if (mDatabase->moveObject(objectHandle, info.mParent, fromPath) != MTP_RESPONSE_OK)
+            ALOGE("Couldn't undo failed move");
+
+    return result;
+}
+
+MtpResponseCode MtpServer::doCopyObject() {
+    if (!hasStorage())
+        return MTP_RESPONSE_GENERAL_ERROR;
+    MtpResponseCode result = MTP_RESPONSE_OK;
+    if (mRequest.getParameterCount() < 3)
+        return MTP_RESPONSE_INVALID_PARAMETER;
+    MtpObjectHandle objectHandle = mRequest.getParameter(1);
+    MtpStorageID storageID = mRequest.getParameter(2);
+    MtpStorage* storage = getStorage(storageID);
+    MtpObjectHandle parent = mRequest.getParameter(3);
+    if (!storage)
+        return MTP_RESPONSE_INVALID_STORAGE_ID;
+    MtpString path;
+
+    MtpString fromPath;
+    int64_t fileLength;
+    MtpObjectFormat format;
+    MtpObjectInfo info(objectHandle);
+    result = mDatabase->getObjectInfo(objectHandle, info);
+    if (result != MTP_RESPONSE_OK)
+        return result;
+    result = mDatabase->getObjectFilePath(objectHandle, fromPath, fileLength, format);
+    if (result != MTP_RESPONSE_OK)
+        return result;
+
+    // special case the root
+    if (parent == 0) {
+        path = storage->getPath();
+    } else {
+        int64_t parentLength;
+        MtpObjectFormat parentFormat;
+        result = mDatabase->getObjectFilePath(parent, path, parentLength, parentFormat);
+        if (result != MTP_RESPONSE_OK)
+            return result;
+        if (parentFormat != MTP_FORMAT_ASSOCIATION)
+            return MTP_RESPONSE_INVALID_PARENT_OBJECT;
+    }
+
+    // check space first
+    if ((uint64_t) fileLength > storage->getFreeSpace())
+        return MTP_RESPONSE_STORAGE_FULL;
+
+    if (path[path.size() - 1] != '/')
+        path += "/";
+    path += info.mName;
+
+    MtpObjectHandle handle = mDatabase->beginSendObject((const char*)path,
+            format, parent, storageID, fileLength, info.mDateModified);
+    if (handle == kInvalidObjectHandle) {
+        return MTP_RESPONSE_GENERAL_ERROR;
+    }
+
+    ALOGV("Copying file from %s to %s", (const char*)fromPath, (const char*)path);
+    if (copyFile(fromPath, path)) {
+        result = MTP_RESPONSE_GENERAL_ERROR;
+    }
+
+    mDatabase->endSendObject(path, handle, format, result);
+    mResponse.setParameter(1, handle);
+    return result;
+}
+
 MtpResponseCode MtpServer::doSendObject() {
     if (!hasStorage())
         return MTP_RESPONSE_GENERAL_ERROR;
@@ -1122,65 +1259,6 @@ done:
     ALOGV("Got a file over MTP. Time: %fs, Size: %" PRIu64 ", Rate: %f bytes/s",
             diff.count(), finalsize, ((double) finalsize) / diff.count());
     return result;
-}
-
-static void deleteRecursive(const char* path) {
-    char pathbuf[PATH_MAX];
-    size_t pathLength = strlen(path);
-    if (pathLength >= sizeof(pathbuf) - 1) {
-        ALOGE("path too long: %s\n", path);
-    }
-    strcpy(pathbuf, path);
-    if (pathbuf[pathLength - 1] != '/') {
-        pathbuf[pathLength++] = '/';
-    }
-    char* fileSpot = pathbuf + pathLength;
-    int pathRemaining = sizeof(pathbuf) - pathLength - 1;
-
-    DIR* dir = opendir(path);
-    if (!dir) {
-        ALOGE("opendir %s failed: %s", path, strerror(errno));
-        return;
-    }
-
-    struct dirent* entry;
-    while ((entry = readdir(dir))) {
-        const char* name = entry->d_name;
-
-        // ignore "." and ".."
-        if (name[0] == '.' && (name[1] == 0 || (name[1] == '.' && name[2] == 0))) {
-            continue;
-        }
-
-        int nameLength = strlen(name);
-        if (nameLength > pathRemaining) {
-            ALOGE("path %s/%s too long\n", path, name);
-            continue;
-        }
-        strcpy(fileSpot, name);
-
-        if (entry->d_type == DT_DIR) {
-            deleteRecursive(pathbuf);
-            rmdir(pathbuf);
-        } else {
-            unlink(pathbuf);
-        }
-    }
-    closedir(dir);
-}
-
-static void deletePath(const char* path) {
-    struct stat statbuf;
-    if (stat(path, &statbuf) == 0) {
-        if (S_ISDIR(statbuf.st_mode)) {
-            deleteRecursive(path);
-            rmdir(path);
-        } else {
-            unlink(path);
-        }
-    } else {
-        ALOGE("deletePath stat failed for %s: %s", path, strerror(errno));
-    }
 }
 
 MtpResponseCode MtpServer::doDeleteObject() {
