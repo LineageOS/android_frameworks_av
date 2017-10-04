@@ -1,0 +1,39 @@
+cc_library_shared {
+
+    srcs: ["AACExtractor.cpp"],
+
+    include_dirs: [
+        "frameworks/av/media/libstagefright/",
+    ],
+
+    shared_libs: [
+        "libstagefright",
+        "libmedia",
+        "libstagefright_foundation",
+        "libutils",
+        "liblog",
+    ],
+
+    name: "libaacextractor",
+    relative_install_path: "extractors",
+
+    compile_multilib: "first",
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+        "-fvisibility=hidden",
+    ],
+
+    sanitize: {
+        cfi: true,
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        diag: {
+            cfi: true,
+        },
+    },
+
+}

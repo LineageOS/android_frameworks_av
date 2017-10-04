@@ -33,6 +33,12 @@ getrandom: 1
 # for FileSource
 readlinkat: 1
 
+# for dynamically loading extractors
+getdents64: 1
+readlinkat: 1
+pread64: 1
+mremap: 1
+
 # for attaching to debuggerd on process crash
 tgkill: 1
 rt_sigprocmask: 1

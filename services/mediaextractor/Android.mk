@@ -14,6 +14,20 @@ include $(CLEAR_VARS)
 LOCAL_REQUIRED_MODULES_arm := mediaextractor.policy
 LOCAL_REQUIRED_MODULES_arm64 := mediaextractor.policy
 LOCAL_REQUIRED_MODULES_x86 := mediaextractor.policy
+
+# extractor libraries
+LOCAL_REQUIRED_MODULES := \
+    libaacextractor \
+    libamrextractor \
+    libflacextractor \
+    libmidiextractor \
+    libmkvextractor \
+    libmp3extractor \
+    libmp4extractor \
+    libmpeg2extractor \
+    liboggextractor \
+    libwavextractor \
+
 LOCAL_SRC_FILES := main_extractorservice.cpp
 LOCAL_SHARED_LIBRARIES := libmedia libmediaextractorservice libbinder libutils \
     liblog libbase libicuuc libavservices_minijail

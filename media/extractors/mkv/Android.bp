@@ -1,0 +1,47 @@
+cc_library_shared {
+
+    srcs: ["MatroskaExtractor.cpp"],
+
+    include_dirs: [
+        "external/flac/include",
+        "external/libvpx/libwebm",
+        "frameworks/av/media/libstagefright/include",
+        "frameworks/av/media/libstagefright/flac/dec",
+    ],
+
+    shared_libs: [
+        "libstagefright",
+        "libmedia",
+        "libstagefright_foundation",
+        "libstagefright_flacdec",
+        "libutils",
+        "liblog",
+    ],
+
+    static_libs: [
+        "libwebm",
+    ],
+
+    name: "libmkvextractor",
+    relative_install_path: "extractors",
+
+    compile_multilib: "first",
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+        "-fvisibility=hidden",
+    ],
+
+    sanitize: {
+        cfi: true,
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        diag: {
+            cfi: true,
+        },
+    },
+
+}

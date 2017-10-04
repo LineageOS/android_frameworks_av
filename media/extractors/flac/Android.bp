@@ -1,0 +1,44 @@
+cc_library_shared {
+
+    srcs: ["FLACExtractor.cpp"],
+
+    include_dirs: [
+        "frameworks/av/media/libstagefright/include",
+        "external/flac/include",
+    ],
+
+    shared_libs: [
+        "libstagefright",
+        "libmedia",
+        "libstagefright_foundation",
+        "libutils",
+        "liblog",
+    ],
+
+    static_libs: [
+        "libFLAC",
+    ],
+
+    name: "libflacextractor",
+    relative_install_path: "extractors",
+
+    compile_multilib: "first",
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+        "-fvisibility=hidden",
+    ],
+
+    sanitize: {
+        cfi: true,
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        diag: {
+            cfi: true,
+        },
+    },
+
+}

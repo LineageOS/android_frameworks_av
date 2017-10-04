@@ -39,5 +39,14 @@ cc_library_shared {
         "libstagefright",
         "libstagefright_foundation",
         "libutils",
+        "libhidlbase",
+        "android.hardware.cas@1.0",
+        "android.hardware.cas.native@1.0",
     ],
+
+    static_libs: [
+        "libstagefright_id3",
+        "libstagefright_mpeg2support",
+    ],
+
 }
