@@ -13,6 +13,8 @@ cc_library_shared {
     include_dirs: [
         "frameworks/av/include",
         "frameworks/native/include",
+        "frameworks/native/libs/arect/include",
+        "frameworks/native/libs/nativebase/include",
     ],
 
     local_include_dirs: [
@@ -30,7 +32,6 @@ cc_library_shared {
 
     export_shared_lib_headers: [
         "libbinder",
-        "libui",
     ],
 
     cflags: [
@@ -42,7 +43,6 @@ cc_library_shared {
     shared_libs: [
         "libbinder",
         "libutils",
-        "libui",
         "libcutils",
         "liblog",
         "libpowermanager",

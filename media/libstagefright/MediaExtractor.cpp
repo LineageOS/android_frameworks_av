@@ -20,19 +20,6 @@
 #include <inttypes.h>
 #include <pwd.h>
 
-#include "include/AMRExtractor.h"
-#include "include/MP3Extractor.h"
-#include "include/MPEG4Extractor.h"
-#include "include/WAVExtractor.h"
-#include "include/OggExtractor.h"
-#include "include/MPEG2PSExtractor.h"
-#include "include/MPEG2TSExtractor.h"
-#include "include/FLACExtractor.h"
-#include "include/AACExtractor.h"
-#include "include/MidiExtractor.h"
-
-#include "matroska/MatroskaExtractor.h"
-
 #include <binder/IServiceManager.h>
 #include <binder/MemoryDealer.h>
 
@@ -54,6 +41,9 @@
 // still doing some on/off toggling here.
 #define MEDIA_LOG       1
 
+#include <sys/types.h>
+#include <dirent.h>
+#include <dlfcn.h>
 
 namespace android {
 
@@ -68,7 +58,7 @@ MediaExtractor::MediaExtractor() {
     if (!LOG_NDEBUG) {
         uid_t uid = getuid();
         struct passwd *pw = getpwuid(uid);
-        ALOGI("extractor created in uid: %d (%s)", getuid(), pw->pw_name);
+        ALOGV("extractor created in uid: %d (%s)", getuid(), pw->pw_name);
     }
 
     mAnalyticsItem = NULL;
@@ -162,12 +152,13 @@ sp<MediaExtractor> MediaExtractor::CreateFromService(
 
     sp<AMessage> meta;
 
+    CreatorFunc creator = NULL;
     String8 tmp;
     if (mime == NULL) {
         float confidence;
-        if (!sniff(source, &tmp, &confidence, &meta)) {
-            ALOGW("FAILED to autodetect media content.");
-
+        creator = sniff(source, &tmp, &confidence, &meta);
+        if (!creator) {
+            ALOGV("FAILED to autodetect media content.");
             return NULL;
         }
 
@@ -176,32 +167,7 @@ sp<MediaExtractor> MediaExtractor::CreateFromService(
              mime, confidence);
     }
 
-    MediaExtractor *ret = NULL;
-    if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MPEG4)
-            || !strcasecmp(mime, "audio/mp4")) {
-        ret = new MPEG4Extractor(source);
-    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_MPEG)) {
-        ret = new MP3Extractor(source, meta);
-    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AMR_NB)
-            || !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AMR_WB)) {
-        ret = new AMRExtractor(source);
-    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_FLAC)) {
-        ret = new FLACExtractor(source);
-    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_WAV)) {
-        ret = new WAVExtractor(source);
-    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_OGG)) {
-        ret = new OggExtractor(source);
-    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MATROSKA)) {
-        ret = new MatroskaExtractor(source);
-    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MPEG2TS)) {
-        ret = new MPEG2TSExtractor(source);
-    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC_ADTS)) {
-        ret = new AACExtractor(source, meta);
-    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MPEG2PS)) {
-        ret = new MPEG2PSExtractor(source);
-    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_MIDI)) {
-        ret = new MidiExtractor(source);
-    }
+    MediaExtractor *ret = creator(source, meta);
 
     if (ret != NULL) {
         // track the container format (mpeg, aac, wvm, etc)
@@ -231,11 +197,11 @@ sp<MediaExtractor> MediaExtractor::CreateFromService(
 }
 
 Mutex MediaExtractor::gSnifferMutex;
-List<MediaExtractor::SnifferFunc> MediaExtractor::gSniffers;
+List<MediaExtractor::ExtractorDef> MediaExtractor::gSniffers;
 bool MediaExtractor::gSniffersRegistered = false;
 
 // static
-bool MediaExtractor::sniff(
+MediaExtractor::CreatorFunc MediaExtractor::sniff(
         const sp<DataSource> &source, String8 *mimeType, float *confidence, sp<AMessage> *meta) {
     *mimeType = "";
     *confidence = 0.0f;
@@ -244,37 +210,69 @@ bool MediaExtractor::sniff(
     {
         Mutex::Autolock autoLock(gSnifferMutex);
         if (!gSniffersRegistered) {
-            return false;
+            return NULL;
         }
     }
 
-    for (List<SnifferFunc>::iterator it = gSniffers.begin();
+    CreatorFunc curCreator = NULL;
+    CreatorFunc bestCreator = NULL;
+    for (List<ExtractorDef>::iterator it = gSniffers.begin();
          it != gSniffers.end(); ++it) {
         String8 newMimeType;
         float newConfidence;
         sp<AMessage> newMeta;
-        if ((*it)(source, &newMimeType, &newConfidence, &newMeta)) {
+        if ((curCreator = (*it).sniff(source, &newMimeType, &newConfidence, &newMeta))) {
             if (newConfidence > *confidence) {
                 *mimeType = newMimeType;
                 *confidence = newConfidence;
                 *meta = newMeta;
+                bestCreator = curCreator;
             }
         }
     }
 
-    return *confidence > 0.0;
+    return bestCreator;
 }
 
 // static
-void MediaExtractor::RegisterSniffer_l(SnifferFunc func) {
-    for (List<SnifferFunc>::iterator it = gSniffers.begin();
-         it != gSniffers.end(); ++it) {
-        if (*it == func) {
-            return;
-        }
+void MediaExtractor::RegisterSniffer_l(const ExtractorDef &def) {
+    // sanity check check struct version, uuid, name
+    if (def.def_version == 0 || def.def_version > EXTRACTORDEF_VERSION) {
+        ALOGE("don't understand extractor format %u, ignoring.", def.def_version);
+        return;
+    }
+    if (memcmp(&def.extractor_uuid, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", 16) == 0) {
+        ALOGE("invalid UUID, ignoring");
+        return;
+    }
+    if (def.extractor_name == NULL || strlen(def.extractor_name) == 0) {
+        ALOGE("extractors should have a name, ignoring");
+        return;
     }
 
-    gSniffers.push_back(func);
+    for (List<ExtractorDef>::iterator it = gSniffers.begin();
+            it != gSniffers.end(); ++it) {
+        if (memcmp(&((*it).extractor_uuid), &def.extractor_uuid, 16) == 0) {
+            // there's already an extractor with the same uuid
+            if ((*it).extractor_version < def.extractor_version) {
+                // this one is newer, replace the old one
+                ALOGW("replacing extractor '%s' version %u with version %u",
+                        def.extractor_name,
+                        (*it).extractor_version,
+                        def.extractor_version);
+                gSniffers.erase(it);
+                break;
+            } else {
+                ALOGW("ignoring extractor '%s' version %u in favor of version %u",
+                        def.extractor_name,
+                        def.extractor_version,
+                        (*it).extractor_version);
+                return;
+            }
+        }
+    }
+    ALOGV("registering extractor for %s", def.extractor_name);
+    gSniffers.push_back(def);
 }
 
 // static
@@ -284,17 +282,44 @@ void MediaExtractor::RegisterDefaultSniffers() {
         return;
     }
 
-    RegisterSniffer_l(SniffMPEG4);
-    RegisterSniffer_l(SniffMatroska);
-    RegisterSniffer_l(SniffOgg);
-    RegisterSniffer_l(SniffWAV);
-    RegisterSniffer_l(SniffFLAC);
-    RegisterSniffer_l(SniffAMR);
-    RegisterSniffer_l(SniffMPEG2TS);
-    RegisterSniffer_l(SniffMP3);
-    RegisterSniffer_l(SniffAAC);
-    RegisterSniffer_l(SniffMPEG2PS);
-    RegisterSniffer_l(SniffMidi);
+    auto registerExtractors = [](const char *libDirPath) -> void {
+        DIR *libDir = opendir(libDirPath);
+        if (libDir) {
+            struct dirent* libEntry;
+            while ((libEntry = readdir(libDir))) {
+                String8 libPath = String8(libDirPath) + libEntry->d_name;
+                void *libHandle = dlopen(libPath.string(), RTLD_NOW | RTLD_LOCAL);
+                if (libHandle) {
+                    GetExtractorDef getsniffer = (GetExtractorDef) dlsym(libHandle, "GETEXTRACTORDEF");
+                    if (getsniffer) {
+                        ALOGV("registering sniffer for %s", libPath.string());
+                        RegisterSniffer_l(getsniffer());
+                    } else {
+                        ALOGW("%s does not contain sniffer", libPath.string());
+                        dlclose(libHandle);
+                    }
+                } else {
+                    ALOGW("couldn't dlopen(%s)", libPath.string());
+                }
+            }
+
+            closedir(libDir);
+        } else {
+            ALOGE("couldn't opendir(%s)", libDirPath);
+        }
+    };
+
+    registerExtractors("/system/lib"
+#ifdef __LP64__
+            "64"
+#endif
+            "/extractors/");
+
+    registerExtractors("/vendor/lib"
+#ifdef __LP64__
+            "64"
+#endif
+            "/extractors/");
 
     gSniffersRegistered = true;
 }

@@ -39,6 +39,12 @@ getgroups32: 1
 nanosleep: 1
 getrandom: 1
 
+# for dynamically loading extractors
+getdents64: 1
+readlinkat: 1
+pread64: 1
+mremap: 1
+
 # for FileSource
 readlinkat: 1
 _llseek: 1

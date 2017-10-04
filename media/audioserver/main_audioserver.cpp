@@ -32,9 +32,11 @@
 #include <hwbinder/ProcessState.h>
 
 // from LOCAL_C_INCLUDES
+#include "aaudio/AAudioTesting.h"
 #include "AudioFlinger.h"
 #include "AudioPolicyService.h"
 #include "AAudioService.h"
+#include "utility/AAudioUtilities.h"
 #include "MediaLogService.h"
 #include "SoundTriggerHwService.h"
 
@@ -131,7 +133,16 @@ int main(int argc __unused, char **argv)
         ALOGI("ServiceManager: %p", sm.get());
         AudioFlinger::instantiate();
         AudioPolicyService::instantiate();
-        AAudioService::instantiate();
+
+        // AAudioService should only be used in OC-MR1 and later.
+        // And only enable the AAudioService if the system MMAP policy explicitly allows it.
+        // This prevents a client from misusing AAudioService when it is not supported.
+        aaudio_policy_t mmapPolicy = property_get_int32(AAUDIO_PROP_MMAP_POLICY,
+                                                        AAUDIO_POLICY_NEVER);
+        if (mmapPolicy == AAUDIO_POLICY_AUTO || mmapPolicy == AAUDIO_POLICY_ALWAYS) {
+            AAudioService::instantiate();
+        }
+
         SoundTriggerHwService::instantiate();
         ProcessState::self()->startThreadPool();
 

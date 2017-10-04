@@ -58,16 +58,11 @@ cc_library_shared {
         "libhidltransport",
         "libnativewindow", // TODO(b/62923479): use header library
         "libvndksupport",
-        "android.hidl.memory@1.0",
-        "android.hidl.token@1.0-utils",
-        "android.hardware.media@1.0",
         "android.hardware.media.omx@1.0",
-        "android.hardware.graphics.common@1.0",
         "android.hardware.graphics.bufferqueue@1.0",
     ],
 
     export_shared_lib_headers: [
-        "android.hidl.memory@1.0",
         "libmedia_omx",
         "libstagefright_foundation",
         "libstagefright_xmlparser",

@@ -24,6 +24,7 @@ LOCAL_SHARED_LIBRARIES := \
     libcutils \
     liblog \
     libnbaio \
+    libnblog \
     libsonic \
     libutils \
 
