@@ -231,6 +231,8 @@ aaudio_result_t AAudioServiceStreamBase::stop() {
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
+    setState(AAUDIO_STREAM_STATE_STOPPING);
+
     sendCurrentTimestamp(); // warning - this calls a virtual function
     result = stopTimestampThread();
     if (result != AAUDIO_OK) {
