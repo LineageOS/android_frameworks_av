@@ -470,41 +470,7 @@ struct ItemReference : public Box, public RefBase {
 
     uint32_t itemId() { return mItemId; }
 
-    void apply(KeyedVector<uint32_t, ImageItem> &itemIdToImageMap) const {
-        ssize_t imageIndex = itemIdToImageMap.indexOfKey(mItemId);
-
-        // ignore non-image items
-        if (imageIndex < 0) {
-            return;
-        }
-
-        ALOGV("attach reference type 0x%x to item id %d)", type(), mItemId);
-
-        if (type() == FOURCC('d', 'i', 'm', 'g')) {
-            ImageItem &image = itemIdToImageMap.editValueAt(imageIndex);
-            if (!image.dimgRefs.empty()) {
-                ALOGW("dimgRefs if not clean!");
-            }
-            image.dimgRefs.appendVector(mRefs);
-        } else if (type() == FOURCC('t', 'h', 'm', 'b')) {
-            for (size_t i = 0; i < mRefs.size(); i++) {
-                imageIndex = itemIdToImageMap.indexOfKey(mRefs[i]);
-
-                // ignore non-image items
-                if (imageIndex < 0) {
-                    continue;
-                }
-                ALOGV("Image item id %d uses thumbnail item id %d", mRefs[i], mItemId);
-                ImageItem &image = itemIdToImageMap.editValueAt(imageIndex);
-                if (!image.thumbnails.empty()) {
-                    ALOGW("already has thumbnails!");
-                }
-                image.thumbnails.push_back(mItemId);
-            }
-        } else {
-            ALOGW("ignoring unsupported ref type 0x%x", type());
-        }
-    }
+    void apply(KeyedVector<uint32_t, ImageItem> &itemIdToItemMap) const;
 
 private:
     uint32_t mItemId;
@@ -513,6 +479,42 @@ private:
 
     DISALLOW_EVIL_CONSTRUCTORS(ItemReference);
 };
+
+void ItemReference::apply(KeyedVector<uint32_t, ImageItem> &itemIdToItemMap) const {
+    ssize_t itemIndex = itemIdToItemMap.indexOfKey(mItemId);
+
+    // ignore non-image items
+    if (itemIndex < 0) {
+        return;
+    }
+
+    ALOGV("attach reference type 0x%x to item id %d)", type(), mItemId);
+
+    if (type() == FOURCC('d', 'i', 'm', 'g')) {
+        ImageItem &derivedImage = itemIdToItemMap.editValueAt(itemIndex);
+        if (!derivedImage.dimgRefs.empty()) {
+            ALOGW("dimgRefs if not clean!");
+        }
+        derivedImage.dimgRefs.appendVector(mRefs);
+    } else if (type() == FOURCC('t', 'h', 'm', 'b')) {
+        for (size_t i = 0; i < mRefs.size(); i++) {
+            itemIndex = itemIdToItemMap.indexOfKey(mRefs[i]);
+
+            // ignore non-image items
+            if (itemIndex < 0) {
+                continue;
+            }
+            ALOGV("Image item id %d uses thumbnail item id %d", mRefs[i], mItemId);
+            ImageItem &masterImage = itemIdToItemMap.editValueAt(itemIndex);
+            if (!masterImage.thumbnails.empty()) {
+                ALOGW("already has thumbnails!");
+            }
+            masterImage.thumbnails.push_back(mItemId);
+        }
+    } else {
+        ALOGW("ignoring unsupported ref type 0x%x", type());
+    }
+}
 
 status_t ItemReference::parse(off64_t offset, size_t size) {
     if (size < mRefIdSize + 2) {
@@ -985,45 +987,7 @@ status_t InfeBox::parse(off64_t offset, size_t size, ItemInfo *itemInfo) {
     }
 
     if (version() == 0 || version() == 1) {
-        if (size < 4) {
-            return ERROR_MALFORMED;
-        }
-        uint16_t item_id;
-        if (!source()->getUInt16(offset, &item_id)) {
-            return ERROR_IO;
-        }
-        ALOGV("item_id %d", item_id);
-        uint16_t item_protection_index;
-        if (!source()->getUInt16(offset + 2, &item_protection_index)) {
-            return ERROR_IO;
-        }
-        offset += 4;
-        size -= 4;
-
-        String8 item_name;
-        if (!parseNullTerminatedString(&offset, &size, &item_name)) {
-            return ERROR_MALFORMED;
-        }
-
-        String8 content_type;
-        if (!parseNullTerminatedString(&offset, &size, &content_type)) {
-            return ERROR_MALFORMED;
-        }
-
-        String8 content_encoding;
-        if (!parseNullTerminatedString(&offset, &size, &content_encoding)) {
-            return ERROR_MALFORMED;
-        }
-
-        if (version() == 1) {
-            uint32_t extension_type;
-            if (!source()->getUInt32(offset, &extension_type)) {
-                return ERROR_IO;
-            }
-            offset++;
-            size--;
-            // TODO: handle this case
-        }
+        return ERROR_UNSUPPORTED;
     } else { // version >= 2
         uint32_t item_id;
         size_t itemIdSize = (version() == 2) ? 2 : 4;
@@ -1140,11 +1104,10 @@ status_t IinfBox::onChunkData(uint32_t type, off64_t offset, size_t size) {
     InfeBox infeBox(source());
     ItemInfo itemInfo;
     status_t err = infeBox.parse(offset, size, &itemInfo);
-    if (err != OK) {
-        return err;
+    if (err == OK) {
+        mItemInfos->push_back(itemInfo);
+        mHasGrids |= (itemInfo.itemType == FOURCC('g', 'r', 'i', 'd'));
     }
-    mItemInfos->push_back(itemInfo);
-    mHasGrids |= (itemInfo.itemType == FOURCC('g', 'r', 'i', 'd'));
     return OK;
 }
 
@@ -1156,7 +1119,7 @@ ItemTable::ItemTable(const sp<DataSource> &source)
       mIdatOffset(0),
       mIdatSize(0),
       mImageItemsValid(false),
-      mCurrentImageIndex(0) {
+      mCurrentItemIndex(0) {
     mRequiredBoxes.insert('iprp');
     mRequiredBoxes.insert('iloc');
     mRequiredBoxes.insert('pitm');
@@ -1311,8 +1274,8 @@ status_t ItemTable::buildImageItemsIfPossible(uint32_t type) {
             continue;
         }
 
-        ssize_t imageIndex = mItemIdToImageMap.indexOfKey(info.itemId);
-        if (imageIndex >= 0) {
+        ssize_t itemIndex = mItemIdToItemMap.indexOfKey(info.itemId);
+        if (itemIndex >= 0) {
             ALOGW("ignoring duplicate image item id %d", info.itemId);
             continue;
         }
@@ -1351,7 +1314,7 @@ status_t ItemTable::buildImageItemsIfPossible(uint32_t type) {
             image.offset = offset;
             image.size = size;
         }
-        mItemIdToImageMap.add(info.itemId, image);
+        mItemIdToItemMap.add(info.itemId, image);
     }
 
     for (size_t i = 0; i < mAssociations.size(); i++) {
@@ -1359,7 +1322,7 @@ status_t ItemTable::buildImageItemsIfPossible(uint32_t type) {
     }
 
     for (size_t i = 0; i < mItemReferences.size(); i++) {
-        mItemReferences[i]->apply(mItemIdToImageMap);
+        mItemReferences[i]->apply(mItemIdToItemMap);
     }
 
     mImageItemsValid = true;
@@ -1367,10 +1330,10 @@ status_t ItemTable::buildImageItemsIfPossible(uint32_t type) {
 }
 
 void ItemTable::attachProperty(const AssociationEntry &association) {
-    ssize_t imageIndex = mItemIdToImageMap.indexOfKey(association.itemId);
+    ssize_t itemIndex = mItemIdToItemMap.indexOfKey(association.itemId);
 
     // ignore non-image items
-    if (imageIndex < 0) {
+    if (itemIndex < 0) {
         return;
     }
 
@@ -1384,7 +1347,7 @@ void ItemTable::attachProperty(const AssociationEntry &association) {
             propertyIndex, association.itemId);
 
     mItemProperties[propertyIndex]->attachTo(
-            mItemIdToImageMap.editValueAt(imageIndex));
+            mItemIdToItemMap.editValueAt(itemIndex));
 }
 
 sp<MetaData> ItemTable::getImageMeta() {
@@ -1392,15 +1355,15 @@ sp<MetaData> ItemTable::getImageMeta() {
         return NULL;
     }
 
-    ssize_t imageIndex = mItemIdToImageMap.indexOfKey(mPrimaryItemId);
-    if (imageIndex < 0) {
+    ssize_t itemIndex = mItemIdToItemMap.indexOfKey(mPrimaryItemId);
+    if (itemIndex < 0) {
         ALOGE("Primary item id %d not found!", mPrimaryItemId);
         return NULL;
     }
 
-    ALOGV("primary image index %zu", imageIndex);
+    ALOGV("primary item index %zu", itemIndex);
 
-    const ImageItem *image = &mItemIdToImageMap[imageIndex];
+    const ImageItem *image = &mItemIdToItemMap[itemIndex];
 
     sp<MetaData> meta = new MetaData;
     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_HEVC);
@@ -1421,24 +1384,24 @@ sp<MetaData> ItemTable::getImageMeta() {
     meta->setInt32(kKeyMaxInputSize, image->width * image->height * 1.5);
 
     if (!image->thumbnails.empty()) {
-        ssize_t thumbnailIndex = mItemIdToImageMap.indexOfKey(image->thumbnails[0]);
-        if (thumbnailIndex >= 0) {
-            const ImageItem &thumbnail = mItemIdToImageMap[thumbnailIndex];
+        ssize_t thumbItemIndex = mItemIdToItemMap.indexOfKey(image->thumbnails[0]);
+        if (thumbItemIndex >= 0) {
+            const ImageItem &thumbnail = mItemIdToItemMap[thumbItemIndex];
 
             meta->setInt32(kKeyThumbnailWidth, thumbnail.width);
             meta->setInt32(kKeyThumbnailHeight, thumbnail.height);
             meta->setData(kKeyThumbnailHVCC, kTypeHVCC,
                     thumbnail.hvcc->data(), thumbnail.hvcc->size());
-            ALOGV("thumbnail meta: %dx%d, index %zd",
-                    thumbnail.width, thumbnail.height, thumbnailIndex);
+            ALOGV("thumbnail meta: %dx%d, item index %zd",
+                    thumbnail.width, thumbnail.height, thumbItemIndex);
         } else {
-            ALOGW("Referenced thumbnail does not exist!");
+            ALOGW("%s: Referenced thumbnail does not exist!", __FUNCTION__);
         }
     }
 
     if (image->isGrid()) {
-        ssize_t tileIndex = mItemIdToImageMap.indexOfKey(image->dimgRefs[0]);
-        if (tileIndex < 0) {
+        ssize_t tileItemIndex = mItemIdToItemMap.indexOfKey(image->dimgRefs[0]);
+        if (tileItemIndex < 0) {
             return NULL;
         }
         // when there are tiles, (kKeyWidth, kKeyHeight) is the full tiled area,
@@ -1448,7 +1411,7 @@ sp<MetaData> ItemTable::getImageMeta() {
         int32_t gridRows = image->rows, gridCols = image->columns;
 
         // point image to the first tile for grid size and HVCC
-        image = &mItemIdToImageMap.editValueAt(tileIndex);
+        image = &mItemIdToItemMap.editValueAt(tileItemIndex);
         meta->setInt32(kKeyWidth, image->width * gridCols);
         meta->setInt32(kKeyHeight, image->height * gridRows);
         meta->setInt32(kKeyGridWidth, image->width);
@@ -1457,7 +1420,7 @@ sp<MetaData> ItemTable::getImageMeta() {
     }
 
     if (image->hvcc == NULL) {
-        ALOGE("hvcc is missing!");
+        ALOGE("%s: hvcc is missing for item index %zd!", __FUNCTION__, itemIndex);
         return NULL;
     }
     meta->setData(kKeyHVCC, kTypeHVCC, image->hvcc->data(), image->hvcc->size());
@@ -1469,87 +1432,88 @@ sp<MetaData> ItemTable::getImageMeta() {
 }
 
 uint32_t ItemTable::countImages() const {
-    return mImageItemsValid ? mItemIdToImageMap.size() : 0;
+    return mImageItemsValid ? mItemIdToItemMap.size() : 0;
 }
 
-status_t ItemTable::findPrimaryImage(uint32_t *imageIndex) {
+status_t ItemTable::findPrimaryImage(uint32_t *itemIndex) {
     if (!mImageItemsValid) {
         return INVALID_OPERATION;
     }
 
-    ssize_t index = mItemIdToImageMap.indexOfKey(mPrimaryItemId);
+    ssize_t index = mItemIdToItemMap.indexOfKey(mPrimaryItemId);
     if (index < 0) {
         return ERROR_MALFORMED;
     }
 
-    *imageIndex = index;
+    *itemIndex = index;
     return OK;
 }
 
-status_t ItemTable::findThumbnail(uint32_t *imageIndex) {
+status_t ItemTable::findThumbnail(uint32_t *itemIndex) {
     if (!mImageItemsValid) {
         return INVALID_OPERATION;
     }
 
-    ssize_t primaryIndex = mItemIdToImageMap.indexOfKey(mPrimaryItemId);
-    if (primaryIndex < 0) {
-        ALOGE("Primary item id %d not found!", mPrimaryItemId);
+    ssize_t primaryItemIndex = mItemIdToItemMap.indexOfKey(mPrimaryItemId);
+    if (primaryItemIndex < 0) {
+        ALOGE("%s: Primary item id %d not found!", __FUNCTION__, mPrimaryItemId);
         return ERROR_MALFORMED;
     }
 
-    const ImageItem &primaryImage = mItemIdToImageMap[primaryIndex];
+    const ImageItem &primaryImage = mItemIdToItemMap[primaryItemIndex];
     if (primaryImage.thumbnails.empty()) {
-        ALOGW("Using primary in place of thumbnail.");
-        *imageIndex = primaryIndex;
+        ALOGW("%s: Using primary in place of thumbnail.", __FUNCTION__);
+        *itemIndex = primaryItemIndex;
         return OK;
     }
 
-    ssize_t thumbnailIndex = mItemIdToImageMap.indexOfKey(
+    ssize_t thumbItemIndex = mItemIdToItemMap.indexOfKey(
             primaryImage.thumbnails[0]);
-    if (thumbnailIndex < 0) {
-        ALOGE("Thumbnail item id %d not found!", primaryImage.thumbnails[0]);
+    if (thumbItemIndex < 0) {
+        ALOGE("%s: Thumbnail item id %d not found!",
+                __FUNCTION__, primaryImage.thumbnails[0]);
         return ERROR_MALFORMED;
     }
 
-    *imageIndex = thumbnailIndex;
+    *itemIndex = thumbItemIndex;
     return OK;
 }
 
 status_t ItemTable::getImageOffsetAndSize(
-        uint32_t *imageIndex, off64_t *offset, size_t *size) {
+        uint32_t *itemIndex, off64_t *offset, size_t *size) {
     if (!mImageItemsValid) {
         return INVALID_OPERATION;
     }
 
-    if (imageIndex != NULL) {
-        if (*imageIndex >= mItemIdToImageMap.size()) {
-            ALOGE("Bad image index!");
+    if (itemIndex != NULL) {
+        if (*itemIndex >= mItemIdToItemMap.size()) {
+            ALOGE("%s: Bad item index!", __FUNCTION__);
             return BAD_VALUE;
         }
-        mCurrentImageIndex = *imageIndex;
+        mCurrentItemIndex = *itemIndex;
     }
 
-    ImageItem &image = mItemIdToImageMap.editValueAt(mCurrentImageIndex);
+    ImageItem &image = mItemIdToItemMap.editValueAt(mCurrentItemIndex);
     if (image.isGrid()) {
         uint32_t tileItemId;
-        status_t err = image.getNextTileItemId(&tileItemId, imageIndex != NULL);
+        status_t err = image.getNextTileItemId(&tileItemId, itemIndex != NULL);
         if (err != OK) {
             return err;
         }
-        ssize_t tileImageIndex = mItemIdToImageMap.indexOfKey(tileItemId);
-        if (tileImageIndex < 0) {
+        ssize_t tileItemIndex = mItemIdToItemMap.indexOfKey(tileItemId);
+        if (tileItemIndex < 0) {
             return ERROR_END_OF_STREAM;
         }
-        *offset = mItemIdToImageMap[tileImageIndex].offset;
-        *size = mItemIdToImageMap[tileImageIndex].size;
+        *offset = mItemIdToItemMap[tileItemIndex].offset;
+        *size = mItemIdToItemMap[tileItemIndex].size;
     } else {
-        if (imageIndex == NULL) {
+        if (itemIndex == NULL) {
             // For single images, we only allow it to be read once, after that
-            // it's EOS.  New image index must be requested each time.
+            // it's EOS.  New item index must be requested each time.
             return ERROR_END_OF_STREAM;
         }
-        *offset = mItemIdToImageMap[mCurrentImageIndex].offset;
-        *size = mItemIdToImageMap[mCurrentImageIndex].size;
+        *offset = mItemIdToItemMap[mCurrentItemIndex].offset;
+        *size = mItemIdToItemMap[mCurrentItemIndex].size;
     }
 
     return OK;
