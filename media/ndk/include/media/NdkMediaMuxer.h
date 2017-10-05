@@ -35,11 +35,7 @@
 #include "NdkMediaError.h"
 #include "NdkMediaFormat.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#if __ANDROID_API__ >= 21
+__BEGIN_DECLS
 
 struct AMediaMuxer;
 typedef struct AMediaMuxer AMediaMuxer;
@@ -48,6 +44,8 @@ typedef enum {
     AMEDIAMUXER_OUTPUT_FORMAT_MPEG_4 = 0,
     AMEDIAMUXER_OUTPUT_FORMAT_WEBM   = 1,
 } OutputFormat;
+
+#if __ANDROID_API__ >= 21
 
 /**
  * Create new media muxer
@@ -117,8 +115,6 @@ media_status_t AMediaMuxer_writeSampleData(AMediaMuxer *muxer,
 
 #endif /* __ANDROID_API__ >= 21 */
 
-#ifdef __cplusplus
-} // extern "C"
-#endif
+__END_DECLS
 
 #endif // _NDK_MEDIA_MUXER_H

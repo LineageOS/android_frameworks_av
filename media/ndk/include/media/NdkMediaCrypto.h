@@ -32,16 +32,14 @@
 #include <sys/types.h>
 #include <stdbool.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#if __ANDROID_API__ >= 21
+__BEGIN_DECLS
 
 struct AMediaCrypto;
 typedef struct AMediaCrypto AMediaCrypto;
 
 typedef uint8_t AMediaUUID[16];
+
+#if __ANDROID_API__ >= 21
 
 bool AMediaCrypto_isCryptoSchemeSupported(const AMediaUUID uuid);
 
@@ -53,8 +51,6 @@ void AMediaCrypto_delete(AMediaCrypto* crypto);
 
 #endif /* __ANDROID_API__ >= 21 */
 
-#ifdef __cplusplus
-} // extern "C"
-#endif
+__END_DECLS
 
 #endif // _NDK_MEDIA_CRYPTO_H

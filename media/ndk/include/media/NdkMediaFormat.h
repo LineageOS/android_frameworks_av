@@ -32,14 +32,12 @@
 
 #include "NdkMediaError.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#if __ANDROID_API__ >= 21
+__BEGIN_DECLS
 
 struct AMediaFormat;
 typedef struct AMediaFormat AMediaFormat;
+
+#if __ANDROID_API__ >= 21
 
 AMediaFormat *AMediaFormat_new();
 media_status_t AMediaFormat_delete(AMediaFormat*);
@@ -109,8 +107,6 @@ extern const char* AMEDIAFORMAT_KEY_STRIDE;
 
 #endif /* __ANDROID_API__ >= 21 */
 
-#ifdef __cplusplus
-} // extern "C"
-#endif
+__END_DECLS
 
 #endif // _NDK_MEDIA_FORMAT_H
