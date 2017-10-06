@@ -57,6 +57,7 @@ enum media_event_type {
     MEDIA_SUBTITLE_DATA     = 201,
     MEDIA_META_DATA         = 202,
     MEDIA_DRM_INFO          = 210,
+    MEDIA_AUDIO_ROUTING_CHANGED = 10000,
 };
 
 // Generic error codes for the media player framework.  Errors are fatal, the
@@ -275,6 +276,10 @@ public:
             // Modular DRM
             status_t        prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>& drmSessionId);
             status_t        releaseDrm();
+            // AudioRouting
+            status_t        setOutputDevice(audio_port_handle_t deviceId);
+            audio_port_handle_t getRoutedDeviceId();
+            status_t        enableAudioDeviceCallback(bool enabled);
 
 private:
             void            clear_l();

@@ -590,6 +590,7 @@ MediaPlayerService::Client::~Client()
         free(mAudioAttributes);
     }
     clearDeathNotifiers_l();
+    mAudioDeviceUpdatedListener.clear();
 }
 
 void MediaPlayerService::Client::disconnect()
@@ -697,6 +698,17 @@ void MediaPlayerService::Client::ServiceDeathNotifier::unlinkToDeath() {
     }
 }
 
+void MediaPlayerService::Client::AudioDeviceUpdatedNotifier::onAudioDeviceUpdate(
+        audio_io_handle_t audioIo,
+        audio_port_handle_t deviceId) {
+    sp<MediaPlayerBase> listener = mListener.promote();
+    if (listener != NULL) {
+        listener->sendEvent(MEDIA_AUDIO_ROUTING_CHANGED, audioIo, deviceId);
+    } else {
+        ALOGW("listener for process %d death is gone", MEDIA_AUDIO_ROUTING_CHANGED);
+    }
+}
+
 void MediaPlayerService::Client::clearDeathNotifiers_l() {
     if (mExtractorDeathListener != nullptr) {
         mExtractorDeathListener->unlinkToDeath();
@@ -755,10 +767,11 @@ sp<MediaPlayerBase> MediaPlayerService::Client::setDataSource_pre(
     clearDeathNotifiers_l();
     mExtractorDeathListener = extractorDeathListener;
     mCodecDeathListener = codecDeathListener;
+    mAudioDeviceUpdatedListener = new AudioDeviceUpdatedNotifier(p);
 
     if (!p->hardwareOutput()) {
         mAudioOutput = new AudioOutput(mAudioSessionId, IPCThreadState::self()->getCallingUid(),
-                mPid, mAudioAttributes);
+                mPid, mAudioAttributes, mAudioDeviceUpdatedListener);
         static_cast<MediaPlayerInterface*>(p.get())->setAudioSink(mAudioOutput);
     }
 
@@ -1528,6 +1541,42 @@ status_t MediaPlayerService::Client::releaseDrm()
     return ret;
 }
 
+status_t MediaPlayerService::Client::setOutputDevice(audio_port_handle_t deviceId)
+{
+    ALOGV("[%d] setOutputDevice", mConnId);
+    {
+        Mutex::Autolock l(mLock);
+        if (mAudioOutput.get() != nullptr) {
+            return mAudioOutput->setOutputDevice(deviceId);
+        }
+    }
+    return NO_INIT;
+}
+
+status_t MediaPlayerService::Client::getRoutedDeviceId(audio_port_handle_t* deviceId)
+{
+    ALOGV("[%d] getRoutedDeviceId", mConnId);
+    {
+        Mutex::Autolock l(mLock);
+        if (mAudioOutput.get() != nullptr) {
+            return mAudioOutput->getRoutedDeviceId(deviceId);
+        }
+    }
+    return NO_INIT;
+}
+
+status_t MediaPlayerService::Client::enableAudioDeviceCallback(bool enabled)
+{
+    ALOGV("[%d] enableAudioDeviceCallback, %d", mConnId, enabled);
+    {
+        Mutex::Autolock l(mLock);
+        if (mAudioOutput.get() != nullptr) {
+            return mAudioOutput->enableAudioDeviceCallback(enabled);
+        }
+    }
+    return NO_INIT;
+}
+
 #if CALLBACK_ANTAGONIZER
 const int Antagonizer::interval = 10000; // 10 msecs
 
@@ -1566,7 +1615,7 @@ int Antagonizer::callbackThread(void* user)
 #undef LOG_TAG
 #define LOG_TAG "AudioSink"
 MediaPlayerService::AudioOutput::AudioOutput(audio_session_t sessionId, uid_t uid, int pid,
-        const audio_attributes_t* attr)
+        const audio_attributes_t* attr, const sp<AudioSystem::AudioDeviceCallback>& deviceCallback)
     : mCallback(NULL),
       mCallbackCookie(NULL),
       mCallbackData(NULL),
@@ -1583,7 +1632,10 @@ MediaPlayerService::AudioOutput::AudioOutput(audio_session_t sessionId, uid_t ui
       mSendLevel(0.0),
       mAuxEffectId(0),
       mFlags(AUDIO_OUTPUT_FLAG_NONE),
-      mVolumeHandler(new media::VolumeHandler())
+      mVolumeHandler(new media::VolumeHandler()),
+      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
+      mDeviceCallbackEnabled(false),
+      mDeviceCallback(deviceCallback)
 {
     ALOGV("AudioOutput(%d)", sessionId);
     if (attr != NULL) {
@@ -1969,7 +2021,9 @@ status_t MediaPlayerService::AudioOutput::open(
                     mUid,
                     mPid,
                     mAttributes,
-                    doNotReconnect);
+                    doNotReconnect,
+                    1.0f,  // default value for maxRequiredSpeed
+                    mSelectedDeviceId);
         } else {
             // TODO: Due to buffer memory concerns, we use a max target playback speed
             // based on mPlaybackRate at the time of open (instead of kMaxRequiredSpeed),
@@ -1996,7 +2050,8 @@ status_t MediaPlayerService::AudioOutput::open(
                     mPid,
                     mAttributes,
                     doNotReconnect,
-                    targetSpeed);
+                    targetSpeed,
+                    mSelectedDeviceId);
         }
 
         if ((t == 0) || (t->initCheck() != NO_ERROR)) {
@@ -2089,6 +2144,10 @@ status_t MediaPlayerService::AudioOutput::updateTrack() {
             mTrack->setAuxEffectSendLevel(mSendLevel);
             res = mTrack->attachAuxEffect(mAuxEffectId);
         }
+    }
+    mTrack->setOutputDevice(mSelectedDeviceId);
+    if (mDeviceCallbackEnabled) {
+        mTrack->addAudioDeviceCallback(mDeviceCallback.promote());
     }
     ALOGV("updateTrack() DONE status %d", res);
     return res;
@@ -2301,6 +2360,45 @@ status_t MediaPlayerService::AudioOutput::attachAuxEffect(int effectId)
     mAuxEffectId = effectId;
     if (mTrack != 0) {
         return mTrack->attachAuxEffect(effectId);
+    }
+    return NO_ERROR;
+}
+
+status_t MediaPlayerService::AudioOutput::setOutputDevice(audio_port_handle_t deviceId)
+{
+    ALOGV("setOutputDevice(%d)", deviceId);
+    Mutex::Autolock lock(mLock);
+    mSelectedDeviceId = deviceId;
+    if (mTrack != 0) {
+        return mTrack->setOutputDevice(deviceId);
+    }
+    return NO_ERROR;
+}
+
+status_t MediaPlayerService::AudioOutput::getRoutedDeviceId(audio_port_handle_t* deviceId)
+{
+    ALOGV("getRoutedDeviceId");
+    Mutex::Autolock lock(mLock);
+    if (mTrack != 0) {
+        *deviceId = mTrack->getRoutedDeviceId();
+        return NO_ERROR;
+    }
+    return NO_INIT;
+}
+
+status_t MediaPlayerService::AudioOutput::enableAudioDeviceCallback(bool enabled)
+{
+    ALOGV("enableAudioDeviceCallback, %d", enabled);
+    Mutex::Autolock lock(mLock);
+    mDeviceCallbackEnabled = enabled;
+    if (mTrack != 0) {
+        status_t status;
+        if (enabled) {
+            status = mTrack->addAudioDeviceCallback(mDeviceCallback.promote());
+        } else {
+            status = mTrack->removeAudioDeviceCallback(mDeviceCallback.promote());
+        }
+        return status;
     }
     return NO_ERROR;
 }
