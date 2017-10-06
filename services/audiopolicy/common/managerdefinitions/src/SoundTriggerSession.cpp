@@ -34,7 +34,7 @@ status_t SoundTriggerSessionCollection::releaseSession(audio_session_t session)
 {
     ssize_t index = indexOfKey(session);
     if (index < 0) {
-        ALOGW("acquireSoundTriggerSession() session %d not registered", session);
+        ALOGW("releaseSession() session %d not registered", session);
         return BAD_VALUE;
     }
 
