@@ -7,11 +7,11 @@ cc_library_shared {
     ],
 
     shared_libs: [
-        "libstagefright",
+        "liblog",
         "libmedia",
+        "libstagefright",
         "libstagefright_foundation",
         "libutils",
-        "liblog",
     ],
 
     name: "libaacextractor",
