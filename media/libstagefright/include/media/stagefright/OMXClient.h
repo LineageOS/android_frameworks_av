@@ -18,9 +18,9 @@
 
 #define OMX_CLIENT_H_
 
-namespace android {
+#include <media/IOMX.h>
 
-class IOMX;
+namespace android {
 
 class OMXClient {
 public:
