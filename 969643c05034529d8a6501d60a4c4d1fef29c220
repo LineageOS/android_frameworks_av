@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "13848a14_8c435573",
+        "filename": "media/mtp/MtpServer.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 159,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2017-10-07T19:07:28Z",
+      "side": 1,
+      "message": "This should be nullptr, not NULL.",
+      "range": {
+        "startLine": 159,
+        "startChar": 35,
+        "endLine": 159,
+        "endChar": 39
+      },
+      "revId": "969643c05034529d8a6501d60a4c4d1fef29c220",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
