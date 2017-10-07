@@ -18,6 +18,7 @@
 #define CLEARKEY_AES_CTR_DECRYPTOR_H_
 
 #include <media/stagefright/foundation/ABase.h>
+#include <media/stagefright/MediaErrors.h>
 #include <Utils.h>
 #include <utils/Errors.h>
 #include <utils/Vector.h>
