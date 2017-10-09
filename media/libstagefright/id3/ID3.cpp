@@ -392,7 +392,12 @@ bool ID3::removeUnsynchronizationV2_4(bool iTunesHack) {
                     --mSize;
                     --dataSize;
                 }
-                mData[writeOffset++] = mData[readOffset++];
+                if (i + 1 < dataSize) {
+                    // Only move data if there's actually something to move.
+                    // This handles the special case of the data being only [0xff, 0x00]
+                    // which should be converted to just 0xff if unsynchronization is on.
+                    mData[writeOffset++] = mData[readOffset++];
+                }
             }
             // move the remaining data following this frame
             if (readOffset <= oldSize) {
