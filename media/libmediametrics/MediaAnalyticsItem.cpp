@@ -100,7 +100,7 @@ void MediaAnalyticsItem::clear() {
 
     // clean attributes
     // contents of the attributes
-    for (size_t i = 0 ; i < mPropSize; i++ ) {
+    for (size_t i = 0 ; i < mPropCount; i++ ) {
         clearProp(&mProps[i]);
     }
     // the attribute records themselves
@@ -300,7 +300,8 @@ bool MediaAnalyticsItem::removeProp(const char *name) {
         clearProp(prop);
         if (i != mPropCount-1) {
             // in the middle, bring last one down to fill gap
-            mProps[i] = mProps[mPropCount-1];
+            copyProp(prop, &mProps[mPropCount-1]);
+            clearProp(&mProps[mPropCount-1]);
         }
         mPropCount--;
         return true;
@@ -819,11 +820,16 @@ bool MediaAnalyticsItem::selfrecord(bool forcenew) {
     sp<IMediaAnalyticsService> svc = getInstance();
 
     if (svc != NULL) {
-        svc->submit(this, forcenew);
+        MediaAnalyticsItem::SessionID_t newid = svc->submit(this, forcenew);
+        if (newid == SessionIDInvalid) {
+            AString p = this->toString();
+            ALOGW("Failed to record: %s [forcenew=%d]", p.c_str(), forcenew);
+            return false;
+        }
         return true;
     } else {
         AString p = this->toString();
-        ALOGD("Unable to record: %s [forcenew=%d]", p.c_str(), forcenew);
+        ALOGW("Unable to record: %s [forcenew=%d]", p.c_str(), forcenew);
         return false;
     }
 }
@@ -832,6 +838,7 @@ bool MediaAnalyticsItem::selfrecord(bool forcenew) {
 // static
 sp<IMediaAnalyticsService> MediaAnalyticsItem::sAnalyticsService;
 static Mutex sInitMutex;
+static int remainingBindAttempts = SVC_TRIES;
 
 //static
 bool MediaAnalyticsItem::isEnabled() {
@@ -849,10 +856,28 @@ bool MediaAnalyticsItem::isEnabled() {
     return true;
 }
 
+
+// monitor health of our connection to the metrics service
+class MediaMetricsDeathNotifier : public IBinder::DeathRecipient {
+        virtual void binderDied(const wp<IBinder> &) {
+            ALOGW("Reacquire service connection on next request");
+            MediaAnalyticsItem::dropInstance();
+        }
+};
+
+static sp<MediaMetricsDeathNotifier> sNotifier = NULL;
+
+// static
+void MediaAnalyticsItem::dropInstance() {
+    Mutex::Autolock _l(sInitMutex);
+    remainingBindAttempts = SVC_TRIES;
+    sAnalyticsService = NULL;
+}
+
 //static
 sp<IMediaAnalyticsService> MediaAnalyticsItem::getInstance() {
+
     static const char *servicename = "media.metrics";
-    static int tries_remaining = SVC_TRIES;
     int enabled = isEnabled();
 
     if (enabled == false) {
@@ -884,15 +909,20 @@ sp<IMediaAnalyticsService> MediaAnalyticsItem::getInstance() {
         Mutex::Autolock _l(sInitMutex);
         const char *badness = "";
 
-        // think of tries_remaining as telling us whether service==NULL because
+        // think of remainingBindAttempts as telling us whether service==NULL because
         // (1) we haven't tried to initialize it yet
         // (2) we've tried to initialize it, but failed.
-        if (sAnalyticsService == NULL && tries_remaining > 0) {
+        if (sAnalyticsService == NULL && remainingBindAttempts > 0) {
             sp<IServiceManager> sm = defaultServiceManager();
             if (sm != NULL) {
                 sp<IBinder> binder = sm->getService(String16(servicename));
                 if (binder != NULL) {
                     sAnalyticsService = interface_cast<IMediaAnalyticsService>(binder);
+                    if (sNotifier != NULL) {
+                        sNotifier = NULL;
+                    }
+                    sNotifier = new MediaMetricsDeathNotifier();
+                    binder->linkToDeath(sNotifier);
                 } else {
                     badness = "did not find service";
                 }
@@ -901,8 +931,8 @@ sp<IMediaAnalyticsService> MediaAnalyticsItem::getInstance() {
             }
 
             if (sAnalyticsService == NULL) {
-                if (tries_remaining > 0) {
-                    tries_remaining--;
+                if (remainingBindAttempts > 0) {
+                    remainingBindAttempts--;
                 }
                 if (DEBUG_SERVICEACCESS) {
                     ALOGD("Unable to bind to service %s: %s", servicename, badness);
@@ -913,7 +943,6 @@ sp<IMediaAnalyticsService> MediaAnalyticsItem::getInstance() {
         return sAnalyticsService;
     }
 }
-
 
 // merge the info from 'incoming' into this record.
 // we finish with a union of this+incoming and special handling for collisions

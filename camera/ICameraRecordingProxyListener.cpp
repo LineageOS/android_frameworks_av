@@ -146,12 +146,14 @@ status_t BnCameraRecordingProxyListener::onTransact(
             timestamps.reserve(n);
             handles.reserve(n);
             for (uint32_t i = 0; i < n; i++) {
-                res = data.readInt64(&timestamps[i]);
+                nsecs_t t;
+                res = data.readInt64(&t);
                 if (res != OK) {
                     ALOGE("%s: Failed to read timestamp[%d]: %s (%d)",
                             __FUNCTION__, i, strerror(-res), res);
                     return BAD_VALUE;
                 }
+                timestamps.push_back(t);
             }
             for (uint32_t i = 0; i < n; i++) {
                 native_handle_t* handle = data.readNativeHandle();

@@ -197,7 +197,7 @@ static int sFastTrackMultiplier = kFastTrackMultiplier;
 // Initially this heap is used to allocate client buffers for "fast" AudioRecord.
 // Eventually it will be the single buffer that FastCapture writes into via HAL read(),
 // and that all "fast" AudioRecord clients read from.  In either case, the size can be small.
-static const size_t kRecordThreadReadOnlyHeapSize = 0x2000;
+static const size_t kRecordThreadReadOnlyHeapSize = 0x4000;
 
 // ----------------------------------------------------------------------------
 
@@ -8148,10 +8148,8 @@ void AudioFlinger::MmapThread::threadLoop_standby()
 
 void AudioFlinger::MmapThread::threadLoop_exit()
 {
-    sp<MmapStreamCallback> callback = mCallback.promote();
-    if (callback != 0) {
-        callback->onTearDown();
-    }
+    // Do not call callback->onTearDown() because it is redundant for thread exit
+    // and because it can cause a recursive mutex lock on stop().
 }
 
 status_t AudioFlinger::MmapThread::setSyncEvent(const sp<SyncEvent>& event __unused)

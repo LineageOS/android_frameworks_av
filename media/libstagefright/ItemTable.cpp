@@ -1409,7 +1409,14 @@ sp<MetaData> ItemTable::getImageMeta() {
     meta->setInt32(kKeyWidth, image->width);
     meta->setInt32(kKeyHeight, image->height);
     if (image->rotation != 0) {
-        meta->setInt32(kKeyRotation, image->rotation);
+        // Rotation angle in HEIF is CCW, convert to CW here to be
+        // consistent with the other media formats.
+        switch(image->rotation) {
+            case 90: meta->setInt32(kKeyRotation, 270); break;
+            case 180: meta->setInt32(kKeyRotation, 180); break;
+            case 270: meta->setInt32(kKeyRotation, 90); break;
+            default: break; // don't set if invalid
+        }
     }
     meta->setInt32(kKeyMaxInputSize, image->width * image->height * 1.5);
 
