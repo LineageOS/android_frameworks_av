@@ -45,7 +45,6 @@ cc_library_shared {
         "libutils",
         "libcutils",
         "liblog",
-        "libpowermanager",
     ],
 
     srcs: [
@@ -61,7 +60,6 @@ cc_library_shared {
         "ANetworkSession.cpp",
         "AString.cpp",
         "AStringUtils.cpp",
-        "AWakeLock.cpp",
         "ColorUtils.cpp",
         "MediaBuffer.cpp",
         "MediaBufferGroup.cpp",
@@ -70,13 +68,6 @@ cc_library_shared {
         "base64.cpp",
         "hexdump.cpp",
     ],
-
-    target: {
-        vendor: {
-            exclude_shared_libs: ["libpowermanager"],
-            exclude_srcs: ["AWakeLock.cpp"],
-        },
-    },
 
     clang: true,
 
