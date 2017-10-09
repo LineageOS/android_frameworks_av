@@ -61,7 +61,7 @@ LOCAL_MODULE:= libmediaplayerservice
 
 LOCAL_32_BIT_ONLY := true
 
-LOCAL_SANITIZE := cfi
+LOCAL_SANITIZE := cfi integer_overflow
 LOCAL_SANITIZE_DIAG := cfi
 
 include $(BUILD_SHARED_LIBRARY)
