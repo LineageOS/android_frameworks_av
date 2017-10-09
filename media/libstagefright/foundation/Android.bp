@@ -64,6 +64,7 @@ cc_library_shared {
         "ColorUtils.cpp",
         "MediaBuffer.cpp",
         "MediaBufferGroup.cpp",
+        "MediaDefs.cpp",
         "MetaData.cpp",
         "ParsedMessage.cpp",
         "base64.cpp",

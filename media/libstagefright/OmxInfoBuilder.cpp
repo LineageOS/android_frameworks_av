@@ -26,6 +26,7 @@
 
 #include <binder/IServiceManager.h>
 #include <media/IMediaCodecService.h>
+#include <media/stagefright/foundation/MediaDefs.h>
 #include <media/stagefright/OmxInfoBuilder.h>
 #include <media/stagefright/ACodec.h>
 
@@ -36,7 +37,6 @@
 
 #include <media/IOMXStore.h>
 #include <media/IOMX.h>
-#include <media/MediaDefs.h>
 #include <media/omx/1.0/WOmx.h>
 
 #include <media/openmax/OMX_Index.h>
