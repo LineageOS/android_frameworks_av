@@ -60,6 +60,7 @@ cc_library_shared {
         "ANetworkSession.cpp",
         "AString.cpp",
         "AStringUtils.cpp",
+        "ByteUtils.cpp",
         "ColorUtils.cpp",
         "MediaBuffer.cpp",
         "MediaBufferGroup.cpp",

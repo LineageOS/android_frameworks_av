@@ -18,7 +18,7 @@
 #define LOG_TAG "ESDS"
 #include <utils/Log.h>
 
-#include <media/stagefright/Utils.h>
+#include <media/stagefright/foundation/ByteUtils.h>
 
 #include "include/ESDS.h"
 

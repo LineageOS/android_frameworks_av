@@ -23,8 +23,8 @@
 #include <arpa/inet.h>
 
 #include <media/stagefright/foundation/ADebug.h>
+#include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/DataSource.h>
-#include <media/stagefright/Utils.h>
 
 #include "SampleTable.h"
 

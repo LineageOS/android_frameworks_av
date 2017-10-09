@@ -25,6 +25,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/ABuffer.h>
+#include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/foundation/ColorUtils.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/DataSource.h>
@@ -33,7 +34,6 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
-#include <media/stagefright/Utils.h>
 #include <utils/String8.h>
 
 #include <inttypes.h>
@@ -540,6 +540,31 @@ int64_t BlockIterator::blockTimeUs() const {
 
 static unsigned U24_AT(const uint8_t *ptr) {
     return ptr[0] << 16 | ptr[1] << 8 | ptr[2];
+}
+
+static AString uriDebugString(const AString &uri) {
+    // find scheme
+    AString scheme;
+    const char *chars = uri.c_str();
+    for (size_t i = 0; i < uri.size(); i++) {
+        const char c = chars[i];
+        if (!isascii(c)) {
+            break;
+        } else if (isalpha(c)) {
+            continue;
+        } else if (i == 0) {
+            // first character must be a letter
+            break;
+        } else if (isdigit(c) || c == '+' || c == '.' || c =='-') {
+            continue;
+        } else if (c != ':') {
+            break;
+        }
+        scheme = AString(uri, 0, i);
+        scheme.append("://<suppressed>");
+        return scheme;
+    }
+    return AString("<no-scheme URI suppressed>");
 }
 
 void MatroskaSource::clearPendingFrames() {
