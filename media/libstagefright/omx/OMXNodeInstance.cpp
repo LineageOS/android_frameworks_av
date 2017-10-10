@@ -488,6 +488,9 @@ status_t OMXNodeInstance::freeNode() {
             LOG_ALWAYS_FATAL("unknown state %s(%#x).", asString(state), state);
             break;
     }
+
+    Mutex::Autolock _l(mLock);
+
     status_t err = mOwner->freeNode(this);
 
     mDispatcher.clear();
