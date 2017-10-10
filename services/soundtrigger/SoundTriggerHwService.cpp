@@ -505,6 +505,8 @@ void SoundTriggerHwService::Module::detach() {
     if (!captureHotwordAllowed()) {
         return;
     }
+    Vector<audio_session_t> releasedSessions;
+
     {
         AutoMutex lock(mLock);
         for (size_t i = 0; i < mModels.size(); i++) {
@@ -514,9 +516,16 @@ void SoundTriggerHwService::Module::detach() {
                 mHwDevice->stop_recognition(mHwDevice, model->mHandle);
             }
             mHwDevice->unload_sound_model(mHwDevice, model->mHandle);
+            releasedSessions.add(model->mCaptureSession);
         }
         mModels.clear();
     }
+
+    for (size_t i = 0; i < releasedSessions.size(); i++) {
+        // do not call AudioSystem methods with mLock held
+        AudioSystem::releaseSoundTriggerSession(releasedSessions[i]);
+    }
+
     if (mClient != 0) {
         IInterface::asBinder(mClient)->unlinkToDeath(this);
     }
@@ -558,33 +567,43 @@ status_t SoundTriggerHwService::Module::loadSoundModel(const sp<IMemory>& modelM
         return BAD_VALUE;
     }
 
-    AutoMutex lock(mLock);
-
-    if (mModels.size() >= mDescriptor.properties.max_sound_models) {
-        ALOGW("loadSoundModel(): Not loading, max number of models (%d) would be exceeded",
-              mDescriptor.properties.max_sound_models);
-        return INVALID_OPERATION;
-    }
-
-    status_t status = mHwDevice->load_sound_model(mHwDevice, sound_model,
-                                                  SoundTriggerHwService::soundModelCallback,
-                                                  this, handle);
-
-    if (status != NO_ERROR) {
-        return status;
-    }
     audio_session_t session;
     audio_io_handle_t ioHandle;
     audio_devices_t device;
-
-    status = AudioSystem::acquireSoundTriggerSession(&session, &ioHandle, &device);
+    // do not call AudioSystem methods with mLock held
+    status_t status = AudioSystem::acquireSoundTriggerSession(&session, &ioHandle, &device);
     if (status != NO_ERROR) {
         return status;
     }
 
-    sp<Model> model = new Model(*handle, session, ioHandle, device, sound_model->type);
-    mModels.replaceValueFor(*handle, model);
+    {
+        AutoMutex lock(mLock);
 
+        if (mModels.size() >= mDescriptor.properties.max_sound_models) {
+            ALOGW("loadSoundModel(): Not loading, max number of models (%d) would be exceeded",
+                  mDescriptor.properties.max_sound_models);
+            status = INVALID_OPERATION;
+            goto exit;
+        }
+
+        status_t status = mHwDevice->load_sound_model(mHwDevice,
+                                                      sound_model,
+                                                      SoundTriggerHwService::soundModelCallback,
+                                                      this,
+                                                      handle);
+        if (status != NO_ERROR) {
+            goto exit;
+        }
+
+        sp<Model> model = new Model(*handle, session, ioHandle, device, sound_model->type);
+        mModels.replaceValueFor(*handle, model);
+    }
+
+exit:
+    if (status != NO_ERROR) {
+        // do not call AudioSystem methods with mLock held
+        AudioSystem::releaseSoundTriggerSession(session);
+    }
     return status;
 }
 
@@ -594,25 +613,26 @@ status_t SoundTriggerHwService::Module::unloadSoundModel(sound_model_handle_t ha
     if (!captureHotwordAllowed()) {
         return PERMISSION_DENIED;
     }
+    status_t status;
+    audio_session_t session;
 
-    AutoMutex lock(mLock);
-    return unloadSoundModel_l(handle);
-}
-
-status_t SoundTriggerHwService::Module::unloadSoundModel_l(sound_model_handle_t handle)
-{
-    ssize_t index = mModels.indexOfKey(handle);
-    if (index < 0) {
-        return BAD_VALUE;
+    {
+      AutoMutex lock(mLock);
+      ssize_t index = mModels.indexOfKey(handle);
+      if (index < 0) {
+          return BAD_VALUE;
+      }
+      sp<Model> model = mModels.valueAt(index);
+      mModels.removeItem(handle);
+      if (model->mState == Model::STATE_ACTIVE) {
+          mHwDevice->stop_recognition(mHwDevice, model->mHandle);
+          model->mState = Model::STATE_IDLE;
+      }
+      status = mHwDevice->unload_sound_model(mHwDevice, handle);
+      session = model->mCaptureSession;
     }
-    sp<Model> model = mModels.valueAt(index);
-    mModels.removeItem(handle);
-    if (model->mState == Model::STATE_ACTIVE) {
-        mHwDevice->stop_recognition(mHwDevice, model->mHandle);
-        model->mState = Model::STATE_IDLE;
-    }
-    AudioSystem::releaseSoundTriggerSession(model->mCaptureSession);
-    return mHwDevice->unload_sound_model(mHwDevice, handle);
+    AudioSystem::releaseSoundTriggerSession(session);
+    return status;
 }
 
 status_t SoundTriggerHwService::Module::startRecognition(sound_model_handle_t handle,
