@@ -1023,6 +1023,10 @@ int main(int argc, char **argv) {
                 bool haveVideo = false;
                 for (size_t i = 0; i < numTracks; ++i) {
                     sp<MediaSource> source = extractor->getTrack(i);
+                    if (source == NULL) {
+                        fprintf(stderr, "skip NULL track %zu, track count %zu.\n", i, numTracks);
+                        continue;
+                    }
 
                     const char *mime;
                     CHECK(source->getFormat()->findCString(
@@ -1082,6 +1086,10 @@ int main(int argc, char **argv) {
                 }
 
                 mediaSource = extractor->getTrack(i);
+                if (mediaSource == NULL) {
+                    fprintf(stderr, "skip NULL track %zu, total tracks %zu.\n", i, numTracks);
+                    return -1;
+                }
             }
         }
 
