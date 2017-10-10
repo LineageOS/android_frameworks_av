@@ -36,6 +36,7 @@ cc_library_shared {
         "libcrypto",
         "libcutils",
         "libmedia",
+        "libmediaextractor",
         "libstagefright",
         "libstagefright_foundation",
         "libutils",

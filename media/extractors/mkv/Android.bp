@@ -11,8 +11,7 @@ cc_library_shared {
 
     shared_libs: [
         "liblog",
-        "libmedia",
-        "libstagefright",
+        "libmediaextractor",
         "libstagefright_flacdec",
         "libstagefright_foundation",
         "libutils",

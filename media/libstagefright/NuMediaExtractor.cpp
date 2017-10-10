@@ -23,16 +23,18 @@
 #include "include/ESDS.h"
 #include "include/NuCachedSource2.h"
 
+#include <media/DataSource.h>
+#include <media/MediaExtractor.h>
+#include <media/MediaSource.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/DataSource.h>
+#include <media/stagefright/DataSourceFactory.h>
 #include <media/stagefright/FileSource.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MediaExtractor.h>
-#include <media/stagefright/MediaSource.h>
+#include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
 
@@ -70,13 +72,13 @@ status_t NuMediaExtractor::setDataSource(
     }
 
     sp<DataSource> dataSource =
-        DataSource::CreateFromURI(httpService, path, headers);
+        DataSourceFactory::CreateFromURI(httpService, path, headers);
 
     if (dataSource == NULL) {
         return -ENOENT;
     }
 
-    mImpl = MediaExtractor::Create(dataSource);
+    mImpl = MediaExtractorFactory::Create(dataSource);
 
     if (mImpl == NULL) {
         return ERROR_UNSUPPORTED;
@@ -112,7 +114,7 @@ status_t NuMediaExtractor::setDataSource(int fd, off64_t offset, off64_t size) {
         return err;
     }
 
-    mImpl = MediaExtractor::Create(fileSource);
+    mImpl = MediaExtractorFactory::Create(fileSource);
 
     if (mImpl == NULL) {
         return ERROR_UNSUPPORTED;
@@ -142,7 +144,7 @@ status_t NuMediaExtractor::setDataSource(const sp<DataSource> &source) {
         return err;
     }
 
-    mImpl = MediaExtractor::Create(source);
+    mImpl = MediaExtractorFactory::Create(source);
 
     if (mImpl == NULL) {
         return ERROR_UNSUPPORTED;

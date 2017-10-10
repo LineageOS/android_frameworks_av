@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-#include <media/stagefright/CallbackMediaSource.h>
-#include <media/stagefright/MediaSource.h>
-#include <media/stagefright/RemoteMediaSource.h>
+#include <media/MediaSource.h>
+#include <media/IMediaSource.h>
 
 namespace android {
 
@@ -24,16 +23,56 @@ MediaSource::MediaSource() {}
 
 MediaSource::~MediaSource() {}
 
-// static
-sp<MediaSource> MediaSource::CreateFromIMediaSource(const sp<IMediaSource> &source) {
-    if (source == nullptr) {
-        return nullptr;
-    }
-    return new CallbackMediaSource(source);
+////////////////////////////////////////////////////////////////////////////////
+
+MediaSource::ReadOptions::ReadOptions() {
+    reset();
 }
 
-sp<IMediaSource> MediaSource::asIMediaSource() {
-    return RemoteMediaSource::wrap(sp<MediaSource>(this));
+void MediaSource::ReadOptions::reset() {
+    mOptions = 0;
+    mSeekTimeUs = 0;
+    mLatenessUs = 0;
+    mNonBlocking = false;
+}
+
+void MediaSource::ReadOptions::setNonBlocking() {
+    mNonBlocking = true;
+}
+
+void MediaSource::ReadOptions::clearNonBlocking() {
+    mNonBlocking = false;
+}
+
+bool MediaSource::ReadOptions::getNonBlocking() const {
+    return mNonBlocking;
+}
+
+void MediaSource::ReadOptions::setSeekTo(int64_t time_us, SeekMode mode) {
+    mOptions |= kSeekTo_Option;
+    mSeekTimeUs = time_us;
+    mSeekMode = mode;
+}
+
+void MediaSource::ReadOptions::clearSeekTo() {
+    mOptions &= ~kSeekTo_Option;
+    mSeekTimeUs = 0;
+    mSeekMode = SEEK_CLOSEST_SYNC;
+}
+
+bool MediaSource::ReadOptions::getSeekTo(
+        int64_t *time_us, SeekMode *mode) const {
+    *time_us = mSeekTimeUs;
+    *mode = mSeekMode;
+    return (mOptions & kSeekTo_Option) != 0;
+}
+
+void MediaSource::ReadOptions::setLateBy(int64_t lateness_us) {
+    mLatenessUs = lateness_us;
+}
+
+int64_t MediaSource::ReadOptions::getLateBy() const {
+    return mLatenessUs;
 }
 
 }  // namespace android

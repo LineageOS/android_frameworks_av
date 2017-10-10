@@ -48,6 +48,7 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaClock.h>
 #include <media/stagefright/MediaDefs.h>
@@ -57,7 +58,6 @@
 #include <gui/IGraphicBufferProducer.h>
 #include <gui/Surface.h>
 
-#include "avc_utils.h"
 
 #include "ESDS.h"
 #include <media/stagefright/Utils.h>

@@ -20,7 +20,7 @@
 
 #include "mkvparser/mkvparser.h"
 
-#include <media/stagefright/MediaExtractor.h>
+#include <media/MediaExtractor.h>
 #include <utils/Vector.h>
 #include <utils/threads.h>
 

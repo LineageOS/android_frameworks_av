@@ -30,6 +30,7 @@
 
 #include <binder/MemoryDealer.h>
 
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -55,7 +56,6 @@
 #include <media/openmax/OMX_IndexExt.h>
 #include <media/openmax/OMX_AsString.h>
 
-#include "include/avc_utils.h"
 #include "include/ACodecBufferChannel.h"
 #include "include/DataConverter.h"
 #include "include/SecureBuffer.h"
@@ -6052,7 +6052,7 @@ bool ACodec::BaseState::onOMXFillBufferDone(
             }
 #if 0
             if (mCodec->mNativeWindow == NULL) {
-                if (IsIDR(info->mData)) {
+                if (IsIDR(info->mData->data(), info->mData->size())) {
                     ALOGI("IDR frame");
                 }
             }

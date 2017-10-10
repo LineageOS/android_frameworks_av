@@ -19,8 +19,8 @@
 
 #include <binder/IMemory.h>
 #include <binder/MemoryDealer.h>
+#include <media/DataSource.h>
 #include <media/IDataSource.h>
-#include <media/stagefright/DataSource.h>
 
 namespace android {
 

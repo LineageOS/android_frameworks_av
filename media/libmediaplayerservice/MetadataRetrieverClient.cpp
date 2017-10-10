@@ -31,10 +31,11 @@
 #include <binder/MemoryHeapBase.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
+#include <media/DataSource.h>
 #include <media/IMediaHTTPService.h>
 #include <media/MediaMetadataRetrieverInterface.h>
 #include <media/MediaPlayerInterface.h>
-#include <media/stagefright/DataSource.h>
+#include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/Utils.h>
 #include <private/media/VideoFrame.h>
 #include "MetadataRetrieverClient.h"
@@ -180,7 +181,7 @@ status_t MetadataRetrieverClient::setDataSource(
     ALOGV("setDataSource(IDataSource)");
     Mutex::Autolock lock(mLock);
 
-    sp<DataSource> dataSource = DataSource::CreateFromIDataSource(source);
+    sp<DataSource> dataSource = CreateDataSourceFromIDataSource(source);
     player_type playerType =
         MediaPlayerFactory::getPlayerType(NULL /* client */, dataSource);
     ALOGV("player type = %d", playerType);

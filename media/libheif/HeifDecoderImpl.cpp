@@ -26,7 +26,7 @@
 #include <media/IDataSource.h>
 #include <media/mediametadataretriever.h>
 #include <media/stagefright/foundation/ADebug.h>
-#include <media/stagefright/MediaSource.h>
+#include <media/MediaSource.h>
 #include <private/media/VideoFrame.h>
 #include <utils/Log.h>
 #include <utils/RefBase.h>
@@ -302,7 +302,7 @@ bool HeifDecoderImpl::init(HeifStream* stream, HeifFrameInfo* frameInfo) {
     }
 
     mFrameMemory = mRetriever->getFrameAtTime(0,
-            IMediaSource::ReadOptions::SEEK_PREVIOUS_SYNC,
+            MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC,
             mOutputColor, true /*metaOnly*/);
     if (mFrameMemory == nullptr || mFrameMemory->pointer() == nullptr) {
         ALOGE("getFrameAtTime: videoFrame is a nullptr");
@@ -369,7 +369,7 @@ bool HeifDecoderImpl::decode(HeifFrameInfo* frameInfo) {
     }
 
     mFrameMemory = mRetriever->getFrameAtTime(0,
-            IMediaSource::ReadOptions::SEEK_PREVIOUS_SYNC, mOutputColor);
+            MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC, mOutputColor);
     if (mFrameMemory == nullptr || mFrameMemory->pointer() == nullptr) {
         ALOGE("getFrameAtTime: videoFrame is a nullptr");
         return false;

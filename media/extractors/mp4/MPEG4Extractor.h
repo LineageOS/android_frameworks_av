@@ -20,8 +20,8 @@
 
 #include <arpa/inet.h>
 
-#include <media/stagefright/DataSource.h>
-#include <media/stagefright/MediaExtractor.h>
+#include <media/DataSource.h>
+#include <media/MediaExtractor.h>
 #include <utils/List.h>
 #include <utils/Vector.h>
 #include <utils/String8.h>

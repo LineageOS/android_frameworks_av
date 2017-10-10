@@ -19,13 +19,13 @@
 #include <utils/Log.h>
 #include <inttypes.h>
 
-#include "avc_utils.h"
 #include "NuPlayerCCDecoder.h"
 
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/MediaDefs.h>
 
 namespace android {

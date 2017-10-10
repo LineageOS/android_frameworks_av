@@ -176,6 +176,7 @@ cc_library_shared {
         "libexpat",
         "libcamera_client",
         "libstagefright_foundation",
+        "libmediaextractor",
         "libgui",
         "libdl",
         "libaudioutils",

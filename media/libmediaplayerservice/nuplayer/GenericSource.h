@@ -24,6 +24,7 @@
 #include "ATSParser.h"
 
 #include <media/mediaplayer.h>
+#include <media/stagefright/MediaBuffer.h>
 
 namespace android {
 

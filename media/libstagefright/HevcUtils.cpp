@@ -21,12 +21,12 @@
 #include <utility>
 
 #include "include/HevcUtils.h"
-#include "include/avc_utils.h"
 
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/Utils.h>
 

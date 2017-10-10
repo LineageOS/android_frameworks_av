@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
+#include <media/stagefright/InterfaceUtils.h>
+#include <media/MediaSource.h>
 #include <media/stagefright/RemoteMediaExtractor.h>
-#include <media/stagefright/MediaSource.h>
 
 namespace android {
 
@@ -30,7 +31,7 @@ size_t RemoteMediaExtractor::countTracks() {
 
 sp<IMediaSource> RemoteMediaExtractor::getTrack(size_t index) {
     sp<MediaSource> source = mExtractor->getTrack(index);
-    return (source.get() == nullptr) ? nullptr : source->asIMediaSource();
+    return (source.get() == nullptr) ? nullptr : CreateIMediaSourceFromMediaSource(source);
 }
 
 sp<MetaData> RemoteMediaExtractor::getTrackMetaData(size_t index, uint32_t flags) {

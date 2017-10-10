@@ -8,9 +8,9 @@ cc_library_shared {
 
     shared_libs: [
         "liblog",
-        "libmedia",
+        "libmedia",  // Needed for MidiIoWrapper
+        "libmediaextractor",
         "libsonivox",
-        "libstagefright",
         "libstagefright_foundation",
         "libutils",
     ],

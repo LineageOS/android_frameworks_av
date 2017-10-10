@@ -20,8 +20,9 @@ cc_library_shared {
         "libcutils",
         "libhidlbase",
         "liblog",
-        "libmedia",
-        "libstagefright",
+        "libmedia",  // Needed for IStreamListener
+        "libmediaextractor",
+        "libstagefright",  // Needed for AnotherPacketSource and more
         "libstagefright_foundation",
         "libutils",
     ],

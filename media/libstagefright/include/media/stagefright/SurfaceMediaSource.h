@@ -22,7 +22,7 @@
 
 #include <utils/threads.h>
 #include <utils/Vector.h>
-#include <media/stagefright/MediaSource.h>
+#include <media/MediaSource.h>
 #include <media/stagefright/MediaBuffer.h>
 
 #include <media/hardware/MetadataBufferType.h>

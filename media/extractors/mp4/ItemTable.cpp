@@ -18,7 +18,7 @@
 #define LOG_TAG "ItemTable"
 
 #include <ItemTable.h>
-#include <media/stagefright/DataSource.h>
+#include <media/DataSource.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/foundation/ABuffer.h>

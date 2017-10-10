@@ -18,7 +18,6 @@
 #define LOG_TAG "MediaCodec"
 #include <inttypes.h>
 
-#include "include/avc_utils.h"
 #include "include/SecureBuffer.h"
 #include "include/SharedMemoryBuffer.h"
 #include "include/SoftwareRenderer.h"
@@ -41,6 +40,7 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AString.h>
 #include <media/stagefright/foundation/AUtils.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/ACodec.h>
 #include <media/stagefright/BufferProducerWrapper.h>

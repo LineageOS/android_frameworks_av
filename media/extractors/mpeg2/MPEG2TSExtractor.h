@@ -19,8 +19,8 @@
 #define MPEG2_TS_EXTRACTOR_H_
 
 #include <media/stagefright/foundation/ABase.h>
-#include <media/stagefright/MediaExtractor.h>
-#include <media/stagefright/MediaSource.h>
+#include <media/MediaExtractor.h>
+#include <media/MediaSource.h>
 #include <utils/threads.h>
 #include <utils/KeyedVector.h>
 #include <utils/Vector.h>

@@ -8,6 +8,7 @@ cc_test {
         "libstagefright",
         "libbinder",
         "libmedia",
+        "libmediaextractor",
         "libutils",
         "liblog",
         "libstagefright_foundation",

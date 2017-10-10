@@ -16,27 +16,11 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "DataSource"
 
-#include "include/CallbackDataSource.h"
-#include "include/HTTPBase.h"
-#include "include/NuCachedSource2.h"
-
+#include <media/DataSource.h>
 #include <media/IDataSource.h>
-#include <media/IMediaHTTPConnection.h>
-#include <media/IMediaHTTPService.h>
-#include <media/stagefright/foundation/ADebug.h>
-#include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/ByteUtils.h>
-#include <media/stagefright/DataSource.h>
-#include <media/stagefright/DataURISource.h>
-#include <media/stagefright/FileSource.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MediaHTTP.h>
-#include <media/stagefright/RemoteDataSource.h>
 #include <utils/String8.h>
-
-#include <cutils/properties.h>
-
-#include <private/android_filesystem_config.h>
 
 namespace android {
 
@@ -144,103 +128,8 @@ sp<IDataSource> DataSource::getIDataSource() const {
     return nullptr;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
-// static
-sp<DataSource> DataSource::CreateFromURI(
-        const sp<IMediaHTTPService> &httpService,
-        const char *uri,
-        const KeyedVector<String8, String8> *headers,
-        String8 *contentType,
-        HTTPBase *httpSource) {
-    if (contentType != NULL) {
-        *contentType = "";
-    }
-
-    sp<DataSource> source;
-    if (!strncasecmp("file://", uri, 7)) {
-        source = new FileSource(uri + 7);
-    } else if (!strncasecmp("http://", uri, 7) || !strncasecmp("https://", uri, 8)) {
-        if (httpService == NULL) {
-            ALOGE("Invalid http service!");
-            return NULL;
-        }
-
-        if (httpSource == NULL) {
-            sp<IMediaHTTPConnection> conn = httpService->makeHTTPConnection();
-            if (conn == NULL) {
-                ALOGE("Failed to make http connection from http service!");
-                return NULL;
-            }
-            httpSource = new MediaHTTP(conn);
-        }
-
-        String8 cacheConfig;
-        bool disconnectAtHighwatermark = false;
-        KeyedVector<String8, String8> nonCacheSpecificHeaders;
-        if (headers != NULL) {
-            nonCacheSpecificHeaders = *headers;
-            NuCachedSource2::RemoveCacheSpecificHeaders(
-                    &nonCacheSpecificHeaders,
-                    &cacheConfig,
-                    &disconnectAtHighwatermark);
-        }
-
-        if (httpSource->connect(uri, &nonCacheSpecificHeaders) != OK) {
-            ALOGE("Failed to connect http source!");
-            return NULL;
-        }
-
-        if (contentType != NULL) {
-            *contentType = httpSource->getMIMEType();
-        }
-
-        source = NuCachedSource2::Create(
-                httpSource,
-                cacheConfig.isEmpty() ? NULL : cacheConfig.string(),
-                disconnectAtHighwatermark);
-    } else if (!strncasecmp("data:", uri, 5)) {
-        source = DataURISource::Create(uri);
-    } else {
-        // Assume it's a filename.
-        source = new FileSource(uri);
-    }
-
-    if (source == NULL || source->initCheck() != OK) {
-        return NULL;
-    }
-
-    return source;
-}
-
-sp<DataSource> DataSource::CreateFromFd(int fd, int64_t offset, int64_t length) {
-    sp<FileSource> source = new FileSource(fd, offset, length);
-    return source->initCheck() != OK ? nullptr : source;
-}
-
-sp<DataSource> DataSource::CreateMediaHTTP(const sp<IMediaHTTPService> &httpService) {
-    if (httpService == NULL) {
-        return NULL;
-    }
-
-    sp<IMediaHTTPConnection> conn = httpService->makeHTTPConnection();
-    if (conn == NULL) {
-        return NULL;
-    } else {
-        return new MediaHTTP(conn);
-    }
-}
-
-sp<DataSource> DataSource::CreateFromIDataSource(const sp<IDataSource> &source) {
-    return new TinyCacheSource(new CallbackDataSource(source));
-}
-
 String8 DataSource::getMIMEType() const {
     return String8("application/octet-stream");
-}
-
-sp<IDataSource> DataSource::asIDataSource() {
-    return RemoteDataSource::wrap(sp<DataSource>(this));
 }
 
 }  // namespace android
