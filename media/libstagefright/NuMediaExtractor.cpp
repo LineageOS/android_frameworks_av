@@ -305,7 +305,14 @@ status_t NuMediaExtractor::selectTrack(size_t index) {
 
     sp<IMediaSource> source = mImpl->getTrack(index);
 
-    CHECK_EQ((status_t)OK, source->start());
+    if (source == nullptr) {
+        return ERROR_MALFORMED;
+    }
+
+    status_t ret = source->start();
+    if (ret != OK) {
+        return ret;
+    }
 
     mSelectedTracks.push();
     TrackInfo *info = &mSelectedTracks.editItemAt(mSelectedTracks.size() - 1);

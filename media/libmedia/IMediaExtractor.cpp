@@ -209,11 +209,16 @@ String8 ExtractorInstance::toString() const {
     for (size_t i = 0; i < tracks.size(); i++) {
         const String8 desc = trackDescriptions.itemAt(i);
         str.appendFormat("    track {%s} ", desc.string());
-        const sp<IMediaSource> source = tracks.itemAt(i).promote();
-        if (source == NULL) {
-            str.append(": deleted\n");
+        wp<IMediaSource> wSource = tracks.itemAt(i);
+        if (wSource == NULL) {
+            str.append(": null\n");
         } else {
-            str.appendFormat(": active\n");
+            const sp<IMediaSource> source = wSource.promote();
+            if (source == NULL) {
+                str.append(": deleted\n");
+            } else {
+                str.appendFormat(": active\n");
+            }
         }
     }
     return str;
@@ -232,9 +237,14 @@ void registerMediaSource(
         if (extractor != NULL && extractor == ex) {
             if (instance.tracks.size() > 5) {
                 instance.tracks.resize(5);
+                instance.trackDescriptions.resize(5);
             }
             instance.tracks.push_front(source);
-            instance.trackDescriptions.add(source->getFormat()->toString());
+            if (source != NULL) {
+                instance.trackDescriptions.push_front(source->getFormat()->toString());
+            } else {
+                instance.trackDescriptions.push_front(String8::empty());
+            }
             break;
         }
     }
