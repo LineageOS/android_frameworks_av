@@ -30,6 +30,9 @@ public:
     DECLARE_META_INTERFACE(MediaExtractor);
 
     virtual size_t countTracks() = 0;
+    // This function could return NULL IMediaSource even when index is within the
+    // track count returned by countTracks, since it's possible the track is malformed
+    // and it's not detected during countTracks call.
     virtual sp<IMediaSource> getTrack(size_t index) = 0;
 
     enum GetTrackMetaDataFlags {
