@@ -1236,7 +1236,7 @@ public:
      * \retval C2_NOT_FOUND the notification was not found
      * \retval C2_CORRUPTED an unknown error prevented the registration (unexpected)
      */
-    C2Error unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify);
+    C2Error unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg = nullptr);
 
     ///@}
 

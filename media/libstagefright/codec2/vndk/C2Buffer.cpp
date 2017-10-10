@@ -1344,7 +1344,7 @@ public:
 
     const C2BufferData &data() const { return mData; }
 
-    C2Error registerOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg = nullptr) {
+    C2Error registerOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg) {
         auto it = std::find_if(
                 mNotify.begin(), mNotify.end(),
                 [onDestroyNotify, arg] (const auto &pair) {
@@ -1357,11 +1357,11 @@ public:
         return C2_OK;
     }
 
-    C2Error unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify) {
+    C2Error unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg) {
         auto it = std::find_if(
                 mNotify.begin(), mNotify.end(),
-                [onDestroyNotify] (const auto &pair) {
-                    return pair.first == onDestroyNotify;
+                [onDestroyNotify, arg] (const auto &pair) {
+                    return pair.first == onDestroyNotify && pair.second == arg;
                 });
         if (it == mNotify.end()) {
             return C2_NOT_FOUND;
@@ -1418,8 +1418,8 @@ C2Error C2Buffer::registerOnDestroyNotify(OnDestroyNotify onDestroyNotify, void 
     return mImpl->registerOnDestroyNotify(onDestroyNotify, arg);
 }
 
-C2Error C2Buffer::unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify) {
-    return mImpl->unregisterOnDestroyNotify(onDestroyNotify);
+C2Error C2Buffer::unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg) {
+    return mImpl->unregisterOnDestroyNotify(onDestroyNotify, arg);
 }
 
 const std::list<std::shared_ptr<const C2Info>> C2Buffer::infos() const {
