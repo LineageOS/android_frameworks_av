@@ -30,7 +30,6 @@ cc_library_shared {
     static_libs: ["libvpx"],
 
     shared_libs: [
-        "libmedia_omx",
         "libstagefright_omx",
         "libstagefright_foundation",
         "libutils",

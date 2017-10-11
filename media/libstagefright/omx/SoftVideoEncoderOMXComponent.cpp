@@ -26,9 +26,9 @@
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
+#include <media/stagefright/foundation/MediaDefs.h>
 #include <media/hardware/HardwareAPI.h>
 #include <media/openmax/OMX_IndexExt.h>
-#include <media/MediaDefs.h>
 
 #include <ui/Fence.h>
 #include <ui/GraphicBufferMapper.h>

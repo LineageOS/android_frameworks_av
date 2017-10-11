@@ -93,7 +93,6 @@ cc_library_shared {
     static_libs: ["libstagefright_m4vh263dec"],
 
     shared_libs: [
-        "libmedia_omx",
         "libstagefright_omx",
         "libstagefright_foundation",
         "libutils",

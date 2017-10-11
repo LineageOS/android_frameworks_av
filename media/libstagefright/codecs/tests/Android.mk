@@ -24,8 +24,8 @@ LOCAL_MODULE := c2_google_component_test
 
 LOCAL_SHARED_LIBRARIES := \
 	libcutils \
-	libmedia \
 	libstagefright_codec2 \
+	libstagefright_foundation \
 	libstagefright_soft_c2avcdec \
 	liblog \
 

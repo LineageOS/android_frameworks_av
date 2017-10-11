@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <media/MediaDefs.h>
+#include <media/stagefright/foundation/MediaDefs.h>
 
 namespace android {
 

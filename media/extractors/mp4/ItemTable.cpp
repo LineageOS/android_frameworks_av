@@ -18,13 +18,13 @@
 #define LOG_TAG "ItemTable"
 
 #include <ItemTable.h>
-#include <media/MediaDefs.h>
 #include <media/stagefright/DataSource.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/foundation/hexdump.h>
+#include <media/stagefright/foundation/MediaDefs.h>
 #include <utils/Log.h>
 
 namespace android {
