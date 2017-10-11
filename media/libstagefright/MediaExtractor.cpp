@@ -154,18 +154,16 @@ sp<MediaExtractor> MediaExtractor::CreateFromService(
 
     CreatorFunc creator = NULL;
     String8 tmp;
-    if (mime == NULL) {
-        float confidence;
-        creator = sniff(source, &tmp, &confidence, &meta);
-        if (!creator) {
-            ALOGV("FAILED to autodetect media content.");
-            return NULL;
-        }
-
-        mime = tmp.string();
-        ALOGV("Autodetected media content as '%s' with confidence %.2f",
-             mime, confidence);
+    float confidence;
+    creator = sniff(source, &tmp, &confidence, &meta);
+    if (!creator) {
+        ALOGV("FAILED to autodetect media content.");
+        return NULL;
     }
+
+    mime = tmp.string();
+    ALOGV("Autodetected media content as '%s' with confidence %.2f",
+         mime, confidence);
 
     MediaExtractor *ret = creator(source, meta);
 
