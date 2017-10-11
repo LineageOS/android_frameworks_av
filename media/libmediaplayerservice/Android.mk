@@ -28,6 +28,7 @@ LOCAL_SHARED_LIBRARIES :=       \
     libmediadrm                 \
     libmediautils               \
     libmemunreachable           \
+    libpowermanager             \
     libstagefright              \
     libstagefright_foundation   \
     libstagefright_httplive     \
