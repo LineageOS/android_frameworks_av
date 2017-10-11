@@ -28,6 +28,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AUtils.h>
+#include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/MediaClock.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>

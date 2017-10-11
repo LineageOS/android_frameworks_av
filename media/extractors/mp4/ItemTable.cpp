@@ -22,8 +22,8 @@
 #include <media/stagefright/DataSource.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/Utils.h>
 #include <media/stagefright/foundation/ABuffer.h>
+#include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <utils/Log.h>
 

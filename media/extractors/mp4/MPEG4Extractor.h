@@ -22,7 +22,6 @@
 
 #include <media/stagefright/DataSource.h>
 #include <media/stagefright/MediaExtractor.h>
-#include <media/stagefright/Utils.h>
 #include <utils/List.h>
 #include <utils/Vector.h>
 #include <utils/String8.h>
