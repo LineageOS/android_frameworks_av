@@ -18,8 +18,10 @@
 #define AAUDIO_EXAMPLE_UTILS_H
 
 #include <atomic>
+#include <errno.h>
 #include <linux/futex.h>
 #include <sched.h>
+#include <string.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 
