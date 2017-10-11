@@ -475,9 +475,10 @@ TEST_F(C2BufferTest, BufferTest) {
     destroyed = false;
     ASSERT_EQ(C2_OK, buffer->registerOnDestroyNotify(&DestroyCallback, &arg));
     EXPECT_FALSE(destroyed);
-    ASSERT_EQ(C2_OK, buffer->unregisterOnDestroyNotify(&DestroyCallback));
+    ASSERT_EQ(C2_NOT_FOUND, buffer->unregisterOnDestroyNotify(&DestroyCallback, nullptr));
+    ASSERT_EQ(C2_OK, buffer->unregisterOnDestroyNotify(&DestroyCallback, &arg));
     EXPECT_FALSE(destroyed);
-    ASSERT_EQ(C2_NOT_FOUND, buffer->unregisterOnDestroyNotify(&DestroyCallback));
+    ASSERT_EQ(C2_NOT_FOUND, buffer->unregisterOnDestroyNotify(&DestroyCallback, &arg));
     buffer.reset();
     EXPECT_FALSE(destroyed);
 
