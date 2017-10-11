@@ -18,6 +18,9 @@
 //#define LOG_NDEBUG 0
 #include <log/log.h>
 
+#include <errno.h>
+#include <string.h>
+
 #include <aaudio/AAudio.h>
 #include "SharedMemoryProxy.h"
 
