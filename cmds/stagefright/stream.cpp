@@ -182,8 +182,8 @@ MyConvertingStreamSource::MyConvertingStreamSource(const char *filename)
             continue;
         }
 
-        sp<IMediaSource> track = extractor->getTrack(i);
-        if (track == nullptr) {
+        sp<MediaSource> track = extractor->getTrack(i);
+        if (track == NULL) {
             fprintf(stderr, "skip NULL track %zu, total tracks %zu\n", i, numTracks);
             continue;
         }
