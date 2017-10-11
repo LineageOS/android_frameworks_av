@@ -72,7 +72,7 @@ enum C2ParamIndexKind : uint32_t {
     kParamIndexParamStart = 0x800,
 };
 
-C2ENUM(C2DomainKind, int32_t,
+C2ENUM(C2DomainKind, uint32_t,
     C2DomainVideo,
     C2DomainAudio,
     C2DomainOther = C2DomainAudio + 1

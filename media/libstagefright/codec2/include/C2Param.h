@@ -652,7 +652,7 @@ public:
 
     // constructors - implicit
     template<typename T>
-    C2Value(T value)  : mType(typeFor<T>()),  mValue(value) { }
+    C2Value(T value)  : mType(typeFor<T>()), mValue(value) { }
 
     C2Value() : mType(NO_INIT) { }
 
