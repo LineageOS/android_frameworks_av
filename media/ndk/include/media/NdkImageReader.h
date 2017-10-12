@@ -42,17 +42,15 @@
 #include "NdkMediaError.h"
 #include "NdkImage.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#if __ANDROID_API__ >= 24
+__BEGIN_DECLS
 
 /**
  * AImage is an opaque type that allows direct application access to image data rendered into a
  * {@link ANativeWindow}.
  */
 typedef struct AImageReader AImageReader;
+
+#if __ANDROID_API__ >= 24
 
 /**
  * Create a new reader for images of the desired size and format.
@@ -436,10 +434,7 @@ media_status_t AImageReader_setBufferRemovedListener(
 
 #endif /* __ANDROID_API__ >= 26 */
 
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
+__END_DECLS
 
 #endif //_NDK_IMAGE_READER_H
 
