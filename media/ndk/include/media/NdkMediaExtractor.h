@@ -35,15 +35,12 @@
 #include "NdkMediaFormat.h"
 #include "NdkMediaCrypto.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#if __ANDROID_API__ >= 21
+__BEGIN_DECLS
 
 struct AMediaExtractor;
 typedef struct AMediaExtractor AMediaExtractor;
 
+#if __ANDROID_API__ >= 21
 
 /**
  * Create new media extractor
@@ -163,8 +160,6 @@ enum {
 
 #endif /* __ANDROID_API__ >= 21 */
 
-#ifdef __cplusplus
-} // extern "C"
-#endif
+__END_DECLS
 
 #endif // _NDK_MEDIA_EXTRACTOR_H
