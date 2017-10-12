@@ -76,8 +76,8 @@ private:
     std::set<uint32_t> mBoxesSeen;
 
     bool mImageItemsValid;
-    uint32_t mCurrentImageIndex;
-    KeyedVector<uint32_t, ImageItem> mItemIdToImageMap;
+    uint32_t mCurrentItemIndex;
+    KeyedVector<uint32_t, ImageItem> mItemIdToItemMap;
 
     status_t parseIlocBox(off64_t offset, size_t size);
     status_t parseIinfBox(off64_t offset, size_t size);
