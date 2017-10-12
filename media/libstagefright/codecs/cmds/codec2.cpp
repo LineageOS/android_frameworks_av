@@ -154,10 +154,10 @@ SimplePlayer::SimplePlayer()
     CHECK(mControl != NULL);
     CHECK(mControl->isValid());
 
-    SurfaceComposerClient::openGlobalTransaction();
-    CHECK_EQ(mControl->setLayer(INT_MAX), (status_t)OK);
-    CHECK_EQ(mControl->show(), (status_t)OK);
-    SurfaceComposerClient::closeGlobalTransaction();
+    SurfaceComposerClient::Transaction{}
+            .setLayer(mControl, INT_MAX)
+            .show(mControl)
+            .apply();
 
     mSurface = mControl->getSurface();
     CHECK(mSurface != NULL);

@@ -764,10 +764,10 @@ int main(int argc, char **argv) {
         CHECK(control != NULL);
         CHECK(control->isValid());
 
-        SurfaceComposerClient::openGlobalTransaction();
-        CHECK_EQ((status_t)OK, control->setLayer(INT_MAX));
-        CHECK_EQ((status_t)OK, control->show());
-        SurfaceComposerClient::closeGlobalTransaction();
+        SurfaceComposerClient::Transaction{}
+                .setLayer(control, INT_MAX)
+                .show(control)
+                .apply();
 
         surface = control->getSurface();
         CHECK(surface != NULL);

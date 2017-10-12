@@ -9,7 +9,7 @@ LOCAL_SRC_FILES:=       \
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright libmedia libutils libbinder libstagefright_foundation \
-        libjpeg libgui libcutils liblog \
+        libjpeg libui libgui libcutils liblog \
         libhidlmemory \
         android.hardware.media.omx@1.0 \
 
@@ -107,7 +107,7 @@ LOCAL_SRC_FILES:=         \
         stream.cpp    \
 
 LOCAL_SHARED_LIBRARIES := \
-        libstagefright liblog libutils libbinder libgui \
+        libstagefright liblog libutils libbinder libui libgui \
         libstagefright_foundation libmedia libcutils
 
 LOCAL_C_INCLUDES:= \
@@ -132,7 +132,7 @@ LOCAL_SRC_FILES:=               \
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright liblog libutils libbinder libstagefright_foundation \
-        libmedia libaudioclient libgui libcutils
+        libmedia libaudioclient libui libgui libcutils
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \
@@ -163,6 +163,7 @@ LOCAL_SHARED_LIBRARIES := \
         libbinder \
         libstagefright_foundation \
         libmedia \
+        libui \
         libgui \
         libcutils \
         libRScpp \

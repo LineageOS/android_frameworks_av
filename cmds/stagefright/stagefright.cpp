@@ -960,10 +960,10 @@ int main(int argc, char **argv) {
             CHECK(control != NULL);
             CHECK(control->isValid());
 
-            SurfaceComposerClient::openGlobalTransaction();
-            CHECK_EQ(control->setLayer(INT_MAX), (status_t)OK);
-            CHECK_EQ(control->show(), (status_t)OK);
-            SurfaceComposerClient::closeGlobalTransaction();
+            SurfaceComposerClient::Transaction{}
+                    .setLayer(control, INT_MAX)
+                    .show(control)
+                    .apply();
 
             gSurface = control->getSurface();
             CHECK(gSurface != NULL);
