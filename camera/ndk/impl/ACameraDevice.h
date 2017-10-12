@@ -41,7 +41,7 @@
 
 namespace android {
 
-// Wrap ACameraCaptureFailure so it can be ref-counter
+// Wrap ACameraCaptureFailure so it can be ref-counted
 struct CameraCaptureFailure : public RefBase, public ACameraCaptureFailure {};
 
 class CameraDevice final : public RefBase {
