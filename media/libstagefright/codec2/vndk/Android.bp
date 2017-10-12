@@ -1,7 +1,10 @@
 cc_library_static {
     name: "libstagefright_codec2_vndk",
 
-    srcs: ["C2Buffer.cpp"],
+    srcs: [
+        "C2Buffer.cpp",
+        "C2Config.cpp",
+    ],
 
     include_dirs: [
         "frameworks/av/media/libstagefright/codec2/include",
