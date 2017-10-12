@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudioService"
+#define LOG_TAG "SharedRingBuffer"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -46,14 +46,14 @@ aaudio_result_t SharedRingBuffer::allocate(fifo_frames_t   bytesPerFrame,
     mSharedMemorySizeInBytes = mDataMemorySizeInBytes + (2 * (sizeof(fifo_counter_t)));
     mFileDescriptor.reset(ashmem_create_region("AAudioSharedRingBuffer", mSharedMemorySizeInBytes));
     if (mFileDescriptor.get() == -1) {
-        ALOGE("SharedRingBuffer::allocate() ashmem_create_region() failed %d", errno);
+        ALOGE("allocate() ashmem_create_region() failed %d", errno);
         return AAUDIO_ERROR_INTERNAL;
     }
-    ALOGV("SharedRingBuffer::allocate() mFileDescriptor = %d\n", mFileDescriptor.get());
+    ALOGV("allocate() mFileDescriptor = %d\n", mFileDescriptor.get());
 
     int err = ashmem_set_prot_region(mFileDescriptor.get(), PROT_READ|PROT_WRITE); // TODO error handling?
     if (err < 0) {
-        ALOGE("SharedRingBuffer::allocate() ashmem_set_prot_region() failed %d", errno);
+        ALOGE("allocate() ashmem_set_prot_region() failed %d", errno);
         mFileDescriptor.reset();
         return AAUDIO_ERROR_INTERNAL; // TODO convert errno to a better AAUDIO_ERROR;
     }
@@ -64,7 +64,7 @@ aaudio_result_t SharedRingBuffer::allocate(fifo_frames_t   bytesPerFrame,
                          MAP_SHARED,
                          mFileDescriptor.get(), 0);
     if (mSharedMemory == MAP_FAILED) {
-        ALOGE("SharedRingBuffer::allocate() mmap() failed %d", errno);
+        ALOGE("allocate() mmap() failed %d", errno);
         mFileDescriptor.reset();
         return AAUDIO_ERROR_INTERNAL; // TODO convert errno to a better AAUDIO_ERROR;
     }

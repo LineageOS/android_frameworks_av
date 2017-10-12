@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudioService"
+#define LOG_TAG "AAudioMixer"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 

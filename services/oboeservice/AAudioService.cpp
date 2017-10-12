@@ -92,14 +92,14 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
     if (pid != mAudioClient.clientPid) {
         int32_t count = AAudioClientTracker::getInstance().getStreamCount(pid);
         if (count >= MAX_STREAMS_PER_PROCESS) {
-            ALOGE("AAudioService::openStream(): exceeded max streams per process %d >= %d",
+            ALOGE("openStream(): exceeded max streams per process %d >= %d",
                   count,  MAX_STREAMS_PER_PROCESS);
             return AAUDIO_ERROR_UNAVAILABLE;
         }
     }
 
     if (sharingMode != AAUDIO_SHARING_MODE_EXCLUSIVE && sharingMode != AAUDIO_SHARING_MODE_SHARED) {
-        ALOGE("AAudioService::openStream(): unrecognized sharing mode = %d", sharingMode);
+        ALOGE("openStream(): unrecognized sharing mode = %d", sharingMode);
         return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
     }
 
@@ -114,7 +114,7 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
         result = serviceStream->open(request);
         if (result != AAUDIO_OK) {
             // Clear it so we can possibly fall back to using a shared stream.
-            ALOGW("AAudioService::openStream(), could not open in EXCLUSIVE mode");
+            ALOGW("openStream(), could not open in EXCLUSIVE mode");
             serviceStream.clear();
         }
     }
@@ -128,12 +128,12 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
 
     if (result != AAUDIO_OK) {
         serviceStream.clear();
-        ALOGE("AAudioService::openStream(): failed, return %d = %s",
+        ALOGE("openStream(): failed, return %d = %s",
               result, AAudio_convertResultToText(result));
         return result;
     } else {
         aaudio_handle_t handle = mStreamTracker.addStreamForHandle(serviceStream.get());
-        ALOGD("AAudioService::openStream(): handle = 0x%08X", handle);
+        ALOGD("openStream(): handle = 0x%08X", handle);
         serviceStream->setHandle(handle);
         pid_t pid = request.getProcessId();
         AAudioClientTracker::getInstance().registerClientStream(pid, serviceStream);
@@ -146,11 +146,11 @@ aaudio_result_t AAudioService::closeStream(aaudio_handle_t streamHandle) {
     // Check permission and ownership first.
     sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
-        ALOGE("AAudioService::closeStream(0x%0x), illegal stream handle", streamHandle);
+        ALOGE("closeStream(0x%0x), illegal stream handle", streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
 
-    ALOGD("AAudioService.closeStream(0x%08X)", streamHandle);
+    ALOGD("closeStream(0x%08X)", streamHandle);
     // Remove handle from tracker so that we cannot look up the raw address any more.
     // removeStreamByHandle() uses a lock so that if there are two simultaneous closes
     // then only one will get the pointer and do the close.
@@ -161,7 +161,7 @@ aaudio_result_t AAudioService::closeStream(aaudio_handle_t streamHandle) {
         AAudioClientTracker::getInstance().unregisterClientStream(pid, serviceStream);
         return AAUDIO_OK;
     } else {
-        ALOGW("AAudioService::closeStream(0x%0x) being handled by another thread", streamHandle);
+        ALOGW("closeStream(0x%0x) being handled by another thread", streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
 }
@@ -192,7 +192,7 @@ aaudio_result_t AAudioService::getStreamDescription(
                 aaudio::AudioEndpointParcelable &parcelable) {
     sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
-        ALOGE("AAudioService::getStreamDescription(), illegal stream handle = 0x%0x", streamHandle);
+        ALOGE("getStreamDescription(), illegal stream handle = 0x%0x", streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
 
@@ -204,7 +204,7 @@ aaudio_result_t AAudioService::getStreamDescription(
 aaudio_result_t AAudioService::startStream(aaudio_handle_t streamHandle) {
     sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
-        ALOGE("AAudioService::startStream(), illegal stream handle = 0x%0x", streamHandle);
+        ALOGE("startStream(), illegal stream handle = 0x%0x", streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
 
@@ -214,7 +214,7 @@ aaudio_result_t AAudioService::startStream(aaudio_handle_t streamHandle) {
 aaudio_result_t AAudioService::pauseStream(aaudio_handle_t streamHandle) {
     sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
-        ALOGE("AAudioService::pauseStream(), illegal stream handle = 0x%0x", streamHandle);
+        ALOGE("pauseStream(), illegal stream handle = 0x%0x", streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
     aaudio_result_t result = serviceStream->pause();
@@ -224,7 +224,7 @@ aaudio_result_t AAudioService::pauseStream(aaudio_handle_t streamHandle) {
 aaudio_result_t AAudioService::stopStream(aaudio_handle_t streamHandle) {
     sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
-        ALOGE("AAudioService::stopStream(), illegal stream handle = 0x%0x", streamHandle);
+        ALOGE("stopStream(), illegal stream handle = 0x%0x", streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
     aaudio_result_t result = serviceStream->stop();
@@ -234,7 +234,7 @@ aaudio_result_t AAudioService::stopStream(aaudio_handle_t streamHandle) {
 aaudio_result_t AAudioService::flushStream(aaudio_handle_t streamHandle) {
     sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
-        ALOGE("AAudioService::flushStream(), illegal stream handle = 0x%0x", streamHandle);
+        ALOGE("flushStream(), illegal stream handle = 0x%0x", streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
     return serviceStream->flush();
@@ -245,11 +245,11 @@ aaudio_result_t AAudioService::registerAudioThread(aaudio_handle_t streamHandle,
                                                    int64_t periodNanoseconds) {
     sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
-        ALOGE("AAudioService::registerAudioThread(), illegal stream handle = 0x%0x", streamHandle);
+        ALOGE("registerAudioThread(), illegal stream handle = 0x%0x", streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
     if (serviceStream->getRegisteredThread() != AAudioServiceStreamBase::ILLEGAL_THREAD_ID) {
-        ALOGE("AAudioService::registerAudioThread(), thread already registered");
+        ALOGE("registerAudioThread(), thread already registered");
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
@@ -258,7 +258,7 @@ aaudio_result_t AAudioService::registerAudioThread(aaudio_handle_t streamHandle,
     int err = android::requestPriority(ownerPid, clientThreadId,
                                        DEFAULT_AUDIO_PRIORITY, true /* isForApp */);
     if (err != 0){
-        ALOGE("AAudioService::registerAudioThread(%d) failed, errno = %d, priority = %d",
+        ALOGE("registerAudioThread(%d) failed, errno = %d, priority = %d",
               clientThreadId, errno, DEFAULT_AUDIO_PRIORITY);
         return AAUDIO_ERROR_INTERNAL;
     } else {
@@ -270,12 +270,11 @@ aaudio_result_t AAudioService::unregisterAudioThread(aaudio_handle_t streamHandl
                                                      pid_t clientThreadId) {
     sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
-        ALOGE("AAudioService::unregisterAudioThread(), illegal stream handle = 0x%0x",
-              streamHandle);
+        ALOGE("unregisterAudioThread(), illegal stream handle = 0x%0x", streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
     if (serviceStream->getRegisteredThread() != clientThreadId) {
-        ALOGE("AAudioService::unregisterAudioThread(), wrong thread");
+        ALOGE("unregisterAudioThread(), wrong thread");
         return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
     }
     serviceStream->setRegisteredThread(0);
@@ -287,8 +286,7 @@ aaudio_result_t AAudioService::startClient(aaudio_handle_t streamHandle,
                                   audio_port_handle_t *clientHandle) {
     sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
-        ALOGE("AAudioService::startClient(), illegal stream handle = 0x%0x",
-              streamHandle);
+        ALOGE("startClient(), illegal stream handle = 0x%0x", streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
     return serviceStream->startClient(client, clientHandle);
@@ -298,8 +296,7 @@ aaudio_result_t AAudioService::stopClient(aaudio_handle_t streamHandle,
                                           audio_port_handle_t clientHandle) {
     sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
-        ALOGE("AAudioService::stopClient(), illegal stream handle = 0x%0x",
-              streamHandle);
+        ALOGE("stopClient(), illegal stream handle = 0x%0x", streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
     return serviceStream->stopClient(clientHandle);

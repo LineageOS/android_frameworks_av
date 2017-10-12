@@ -91,11 +91,11 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     mErrorCallbackUserData = builder.getErrorCallbackUserData();
 
     // This is very helpful for debugging in the future. Please leave it in.
-    ALOGI("AudioStream::open() rate = %d, channels = %d, format = %d, sharing = %s, dir = %s",
+    ALOGI("open() rate = %d, channels = %d, format = %d, sharing = %s, dir = %s",
           mSampleRate, mSamplesPerFrame, mFormat,
           AudioStream_convertSharingModeToShortText(mSharingMode),
           (getDirection() == AAUDIO_DIRECTION_OUTPUT) ? "OUTPUT" : "INPUT");
-    ALOGI("AudioStream::open() device = %d, perfMode = %d, callback: %s with frames = %d",
+    ALOGI("open() device = %d, perfMode = %d, callback: %s with frames = %d",
           mDeviceId, mPerformanceMode,
           (mDataCallbackProc == nullptr ? "OFF" : "ON"),
           mFramesPerDataCallback);
@@ -163,7 +163,7 @@ aaudio_result_t AudioStream::createThread(int64_t periodNanoseconds,
                                      void* threadArg)
 {
     if (mHasThread) {
-        ALOGE("AudioStream::createThread() - mHasThread already true");
+        ALOGE("createThread() - mHasThread already true");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     if (threadProc == nullptr) {
@@ -185,7 +185,7 @@ aaudio_result_t AudioStream::createThread(int64_t periodNanoseconds,
 aaudio_result_t AudioStream::joinThread(void** returnArg, int64_t timeoutNanoseconds)
 {
     if (!mHasThread) {
-        ALOGE("AudioStream::joinThread() - but has no thread");
+        ALOGE("joinThread() - but has no thread");
         return AAUDIO_ERROR_INVALID_STATE;
     }
 #if 0

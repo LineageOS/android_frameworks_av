@@ -102,7 +102,7 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::findExclusiveEndpoint_l(
         }
     }
 
-    ALOGV("AAudioEndpointManager.findExclusiveEndpoint_l(), found %p for device = %d",
+    ALOGV("findExclusiveEndpoint_l(), found %p for device = %d",
           endpoint.get(), configuration.getDeviceId());
     return endpoint;
 }
@@ -118,7 +118,7 @@ sp<AAudioServiceEndpointShared> AAudioEndpointManager::findSharedEndpoint_l(
         }
     }
 
-    ALOGV("AAudioEndpointManager.findSharedEndpoint_l(), found %p for device = %d",
+    ALOGV("findSharedEndpoint_l(), found %p for device = %d",
           endpoint.get(), configuration.getDeviceId());
     return endpoint;
 }
@@ -146,23 +146,23 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openExclusiveEndpoint(
 
     // If we find an existing one then this one cannot be exclusive.
     if (endpoint.get() != nullptr) {
-        ALOGE("AAudioEndpointManager.openExclusiveEndpoint() already in use");
+        ALOGE("openExclusiveEndpoint() already in use");
         // Already open so do not allow a second stream.
         return nullptr;
     } else {
         sp<AAudioServiceEndpointMMAP> endpointMMap = new AAudioServiceEndpointMMAP();
-        ALOGD("AAudioEndpointManager.openEndpoint(), created MMAP %p", endpointMMap.get());
+        ALOGD("openEndpoint(),created MMAP %p", endpointMMap.get());
         endpoint = endpointMMap;
 
         aaudio_result_t result = endpoint->open(request);
         if (result != AAUDIO_OK) {
-            ALOGE("AAudioEndpointManager.openEndpoint(), open failed");
+            ALOGE("openEndpoint(), open failed");
             endpoint.clear();
         } else {
             mExclusiveStreams.push_back(endpointMMap);
         }
 
-        ALOGD("AAudioEndpointManager.openEndpoint(), created %p for device = %d",
+        ALOGD("openEndpoint(), created %p for device = %d",
               endpoint.get(), configuration.getDeviceId());
     }
 
@@ -203,13 +203,13 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openSharedEndpoint(
         if (endpoint.get() != nullptr) {
             aaudio_result_t result = endpoint->open(request);
             if (result != AAUDIO_OK) {
-                ALOGE("AAudioEndpointManager.openEndpoint(), open failed");
+                ALOGE("openSharedEndpoint(), open failed");
                 endpoint.clear();
             } else {
                 mSharedStreams.push_back(endpoint);
             }
         }
-        ALOGD("AAudioEndpointManager.openSharedEndpoint(), created %p for device = %d, dir = %d",
+        ALOGD("openSharedEndpoint(), created %p for device = %d, dir = %d",
               endpoint.get(), configuration.getDeviceId(), (int)direction);
         IPCThreadState::self()->restoreCallingIdentity(token);
     }
@@ -239,14 +239,14 @@ void AAudioEndpointManager::closeExclusiveEndpoint(sp<AAudioServiceEndpoint> ser
     int32_t newRefCount = serviceEndpoint->getOpenCount() - 1;
     serviceEndpoint->setOpenCount(newRefCount);
 
-    // If no longer in use then close and delete it.
+    // If no longer in use then actually close it.
     if (newRefCount <= 0) {
         mExclusiveStreams.erase(
                 std::remove(mExclusiveStreams.begin(), mExclusiveStreams.end(), serviceEndpoint),
                 mExclusiveStreams.end());
 
         serviceEndpoint->close();
-        ALOGD("AAudioEndpointManager::closeExclusiveEndpoint() %p for device %d",
+        ALOGD("closeExclusiveEndpoint() %p for device %d",
               serviceEndpoint.get(), serviceEndpoint->getDeviceId());
     }
 }
@@ -261,14 +261,14 @@ void AAudioEndpointManager::closeSharedEndpoint(sp<AAudioServiceEndpoint> servic
     int32_t newRefCount = serviceEndpoint->getOpenCount() - 1;
     serviceEndpoint->setOpenCount(newRefCount);
 
-    // If no longer in use then close and delete it.
+    // If no longer in use then actually close it.
     if (newRefCount <= 0) {
         mSharedStreams.erase(
                 std::remove(mSharedStreams.begin(), mSharedStreams.end(), serviceEndpoint),
                 mSharedStreams.end());
 
         serviceEndpoint->close();
-        ALOGD("AAudioEndpointManager::closeSharedEndpoint() %p for device %d",
+        ALOGD("closeSharedEndpoint() %p for device %d",
               serviceEndpoint.get(), serviceEndpoint->getDeviceId());
     }
 }

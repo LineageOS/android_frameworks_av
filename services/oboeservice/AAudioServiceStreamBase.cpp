@@ -51,7 +51,7 @@ AAudioServiceStreamBase::AAudioServiceStreamBase(AAudioService &audioService)
 }
 
 AAudioServiceStreamBase::~AAudioServiceStreamBase() {
-    ALOGD("AAudioServiceStreamBase::~AAudioServiceStreamBase() destroying %p", this);
+    ALOGD("~AAudioServiceStreamBase() destroying %p", this);
     // If the stream is deleted when OPEN or in use then audio resources will leak.
     // This would indicate an internal error. So we want to find this ASAP.
     LOG_ALWAYS_FATAL_IF(!(getState() == AAUDIO_STREAM_STATE_CLOSED
@@ -93,7 +93,7 @@ aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest 
     {
         std::lock_guard<std::mutex> lock(mUpMessageQueueLock);
         if (mUpMessageQueue != nullptr) {
-            ALOGE("AAudioServiceStreamBase::open() called twice");
+            ALOGE("open() called twice");
             return AAUDIO_ERROR_INVALID_STATE;
         }
 
@@ -108,7 +108,7 @@ aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest 
                                                          request,
                                                          sharingMode);
         if (mServiceEndpoint == nullptr) {
-            ALOGE("AAudioServiceStreamBase::open() openEndpoint() failed");
+            ALOGE("open() openEndpoint() failed");
             result = AAUDIO_ERROR_UNAVAILABLE;
             goto error;
         }
@@ -167,7 +167,7 @@ aaudio_result_t AAudioServiceStreamBase::start() {
     }
 
     if (mServiceEndpoint == nullptr) {
-        ALOGE("AAudioServiceStreamBase::start() missing endpoint");
+        ALOGE("start() missing endpoint");
         result = AAUDIO_ERROR_INVALID_STATE;
         goto error;
     }
@@ -199,12 +199,12 @@ aaudio_result_t AAudioServiceStreamBase::pause() {
         return result;
     }
     if (mServiceEndpoint == nullptr) {
-        ALOGE("AAudioServiceStreamShared::pause() missing endpoint");
+        ALOGE("pause() missing endpoint");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     result = mServiceEndpoint->stopStream(this, mClientHandle);
     if (result != AAUDIO_OK) {
-        ALOGE("AAudioServiceStreamShared::pause() mServiceEndpoint returned %d", result);
+        ALOGE("pause() mServiceEndpoint returned %d", result);
         disconnect(); // TODO should we return or pause Base first?
     }
 
@@ -227,7 +227,7 @@ aaudio_result_t AAudioServiceStreamBase::stop() {
     }
 
     if (mServiceEndpoint == nullptr) {
-        ALOGE("AAudioServiceStreamShared::stop() missing endpoint");
+        ALOGE("stop() missing endpoint");
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
@@ -243,7 +243,7 @@ aaudio_result_t AAudioServiceStreamBase::stop() {
     // TODO wait for data to be played out
     result = mServiceEndpoint->stopStream(this, mClientHandle);
     if (result != AAUDIO_OK) {
-        ALOGE("AAudioServiceStreamShared::stop() mServiceEndpoint returned %d", result);
+        ALOGE("stop() mServiceEndpoint returned %d", result);
         disconnect();
         // TODO what to do with result here?
     }
@@ -264,7 +264,7 @@ aaudio_result_t AAudioServiceStreamBase::stopTimestampThread() {
 
 aaudio_result_t AAudioServiceStreamBase::flush() {
     if (getState() != AAUDIO_STREAM_STATE_PAUSED) {
-        ALOGE("AAudioServiceStreamBase::flush() stream not paused, state = %s",
+        ALOGE("flush() stream not paused, state = %s",
               AAudio_convertStreamStateToText(mState));
         return AAUDIO_ERROR_INVALID_STATE;
     }
@@ -276,7 +276,7 @@ aaudio_result_t AAudioServiceStreamBase::flush() {
 
 // implement Runnable, periodically send timestamps to client
 void AAudioServiceStreamBase::run() {
-    ALOGD("AAudioServiceStreamBase::run() entering ----------------");
+    ALOGD("run() entering ----------------");
     TimestampScheduler timestampScheduler;
     timestampScheduler.setBurstPeriod(mFramesPerBurst, getSampleRate());
     timestampScheduler.start(AudioClock::getNanoseconds());
@@ -294,7 +294,7 @@ void AAudioServiceStreamBase::run() {
             AudioClock::sleepUntilNanoTime(nextTime);
         }
     }
-    ALOGD("AAudioServiceStreamBase::run() exiting ----------------");
+    ALOGD("run() exiting ----------------");
 }
 
 void AAudioServiceStreamBase::disconnect() {
