@@ -34,14 +34,11 @@
 #include "NdkMediaError.h"
 #include "NdkMediaFormat.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__BEGIN_DECLS
 
 struct ANativeWindow;
 typedef struct ANativeWindow ANativeWindow;
 
-#if __ANDROID_API__ >= 21
 
 struct AMediaCodec;
 typedef struct AMediaCodec AMediaCodec;
@@ -62,6 +59,8 @@ enum {
     AMEDIACODEC_INFO_OUTPUT_FORMAT_CHANGED = -2,
     AMEDIACODEC_INFO_TRY_AGAIN_LATER = -1
 };
+
+#if __ANDROID_API__ >= 21
 
 /**
  * Create codec by name. Use this if you know the exact codec you want to use.
@@ -364,8 +363,6 @@ media_status_t AMediaCodecCryptoInfo_getEncryptedBytes(AMediaCodecCryptoInfo*, s
 
 #endif /* __ANDROID_API__ >= 21 */
 
-#ifdef __cplusplus
-} // extern "C"
-#endif
+__END_DECLS
 
 #endif //_NDK_MEDIA_CODEC_H
