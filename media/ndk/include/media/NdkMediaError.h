@@ -30,11 +30,7 @@
 
 #include <sys/cdefs.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#if __ANDROID_API__ >= 21
+__BEGIN_DECLS
 
 typedef enum {
     AMEDIA_OK = 0,
@@ -67,10 +63,6 @@ typedef enum {
 
 } media_status_t;
 
-#endif /* __ANDROID_API__ >= 21 */
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
+__END_DECLS
 
 #endif // _NDK_MEDIA_ERROR_H
