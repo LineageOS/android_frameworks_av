@@ -17,6 +17,7 @@
 #ifndef UTILITY_AUDIO_CLOCK_H
 #define UTILITY_AUDIO_CLOCK_H
 
+#include <errno.h>
 #include <stdint.h>
 #include <time.h>
 

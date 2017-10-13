@@ -17,8 +17,11 @@
 #ifndef AAUDIO_EXAMPLE_UTILS_H
 #define AAUDIO_EXAMPLE_UTILS_H
 
-#include <unistd.h>
+#include <errno.h>
 #include <sched.h>
+#include <string.h>
+#include <unistd.h>
+
 #include <aaudio/AAudio.h>
 
 #define NANOS_PER_MICROSECOND ((int64_t)1000)
