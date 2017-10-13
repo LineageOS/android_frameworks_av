@@ -154,7 +154,7 @@ public:
      *
      * \retval C2_OK            the fence(s) were successfully signaled
      * \retval C2_BAD_STATE     the fence(s) have already been abandoned or merged (caller error)
-     * \retval C2_ALREADY_EXISTS the fence(s) have already been signaled (caller error)
+     * \retval C2_DUPLICATE     the fence(s) have already been signaled (caller error)
      * \retval C2_NO_PERMISSION no permission to signal the fence (unexpected - system)
      * \retval C2_CORRUPTED     some unknown error prevented signaling the fence(s) (unexpected)
      */
@@ -167,7 +167,7 @@ public:
      *
      * \retval C2_OK            the merging was successfully done
      * \retval C2_NO_MEMORY     not enough memory to perform the merging
-     * \retval C2_ALREADY_EXISTS    the fence have already been merged (caller error)
+     * \retval C2_DUPLICATE     the fence have already been merged (caller error)
      * \retval C2_BAD_STATE     the fence have already been signaled or abandoned (caller error)
      * \retval C2_NO_PERMISSION no permission to merge the fence (unexpected - system)
      * \retval C2_CORRUPTED     some unknown error prevented merging the fence(s) (unexpected)
@@ -182,7 +182,7 @@ public:
      *
      * \retval C2_OK            the fence(s) were successfully signaled
      * \retval C2_BAD_STATE     the fence(s) have already been signaled or merged (caller error)
-     * \retval C2_ALREADY_EXISTS    the fence(s) have already been abandoned (caller error)
+     * \retval C2_DUPLICATE     the fence(s) have already been abandoned (caller error)
      * \retval C2_NO_PERMISSION no permission to abandon the fence (unexpected - system)
      * \retval C2_CORRUPTED     some unknown error prevented signaling the fence(s) (unexpected)
      */
@@ -1236,7 +1236,7 @@ public:
      * \retval C2_NOT_FOUND the notification was not found
      * \retval C2_CORRUPTED an unknown error prevented the registration (unexpected)
      */
-    C2Error unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify);
+    C2Error unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg = nullptr);
 
     ///@}
 
@@ -1379,6 +1379,7 @@ public:
      * \retval C2_OK        the operation was successful
      * \retval C2_NO_PERMISSION no permission to map the portion
      * \retval C2_TIMED_OUT the operation timed out
+     * \retval C2_DUPLICATE if the allocation is already mapped.
      * \retval C2_NO_MEMORY not enough memory to complete the operation
      * \retval C2_BAD_VALUE the parameters (offset/size) are invalid or outside the allocation, or
      *                      the usage flags are invalid (caller error)
@@ -1402,6 +1403,7 @@ public:
      *
      * \retval C2_OK        the operation was successful
      * \retval C2_TIMED_OUT the operation timed out
+     * \retval C2_NOT_FOUND if the allocation was not mapped previously.
      * \retval C2_BAD_VALUE the parameters (addr/size) do not correspond to previously mapped
      *                      regions (caller error)
      * \retval C2_CORRUPTED some unknown error prevented the operation from completing (unexpected)
@@ -1462,7 +1464,7 @@ public:
      *
      * \retval C2_OK        the operation was successful
      * \retval C2_NO_PERMISSION no permission to map the section
-     * \retval C2_ALREADY_EXISTS there is already a mapped region (caller error)
+     * \retval C2_DUPLICATE there is already a mapped region (caller error)
      * \retval C2_TIMED_OUT the operation timed out
      * \retval C2_NO_MEMORY not enough memory to complete the operation
      * \retval C2_BAD_VALUE the parameters (rect) are invalid or outside the allocation, or the

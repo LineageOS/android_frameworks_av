@@ -18,11 +18,11 @@
 #define LOG_TAG "AWakeLock"
 #include <utils/Log.h>
 
-#include "ADebug.h"
 #include "AWakeLock.h"
 
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
+#include <media/stagefright/foundation/ADebug.h>
 #include <powermanager/PowerManager.h>
 
 

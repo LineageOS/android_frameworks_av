@@ -48,7 +48,6 @@ cc_defaults {
         "IOMXStore.cpp",
         "MediaCodecBuffer.cpp",
         "MediaCodecInfo.cpp",
-        "MediaDefs.cpp",
         "OMXBuffer.cpp",
         "omx/1.0/WGraphicBufferSource.cpp",
         "omx/1.0/WOmx.cpp",

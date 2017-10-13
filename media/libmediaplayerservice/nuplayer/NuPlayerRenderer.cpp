@@ -18,13 +18,13 @@
 #define LOG_TAG "NuPlayerRenderer"
 #include <utils/Log.h>
 
+#include "AWakeLock.h"
 #include "NuPlayerRenderer.h"
 #include <algorithm>
 #include <cutils/properties.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
-#include <media/stagefright/foundation/AWakeLock.h>
 #include <media/stagefright/MediaClock.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>

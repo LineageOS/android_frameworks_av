@@ -15,7 +15,7 @@
  */
 
 #include "TextDescriptions.h"
-#include <media/stagefright/Utils.h>
+#include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/MediaErrors.h>
 
 namespace android {

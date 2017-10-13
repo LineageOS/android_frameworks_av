@@ -20,7 +20,7 @@
 
 #include <gtest/gtest.h>
 
-#include <media/MediaDefs.h>
+#include <media/stagefright/foundation/MediaDefs.h>
 
 #include "C2SoftAvcDec.h"
 

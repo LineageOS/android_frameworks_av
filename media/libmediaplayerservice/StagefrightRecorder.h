@@ -25,7 +25,7 @@
 
 #include <system/audio.h>
 
-#include <MetadataBufferType.h>
+#include <media/hardware/MetadataBufferType.h>
 
 namespace android {
 

@@ -33,21 +33,10 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/foundation/hexdump.h>
 
 namespace android {
-
-static uint16_t U16_AT(const uint8_t *ptr) {
-    return ptr[0] << 8 | ptr[1];
-}
-
-static uint32_t U32_AT(const uint8_t *ptr) {
-    return ptr[0] << 24 | ptr[1] << 16 | ptr[2] << 8 | ptr[3];
-}
-
-static uint64_t U64_AT(const uint8_t *ptr) {
-    return ((uint64_t)U32_AT(ptr)) << 32 | U32_AT(ptr + 4);
-}
 
 static const size_t kMaxUDPSize = 1500;
 static const int32_t kMaxUDPRetries = 200;

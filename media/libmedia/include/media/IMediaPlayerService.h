@@ -48,7 +48,6 @@ public:
     virtual sp<IMediaMetadataRetriever> createMetadataRetriever() = 0;
     virtual sp<IMediaPlayer> create(const sp<IMediaPlayerClient>& client,
             audio_session_t audioSessionId = AUDIO_SESSION_ALLOCATE) = 0;
-    virtual sp<IOMX>            getOMX() = 0;
     virtual sp<IMediaCodecList> getCodecList() const = 0;
 
     // Connects to a remote display.

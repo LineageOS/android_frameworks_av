@@ -26,10 +26,10 @@
 #include <media/IMediaPlayerService.h>
 #include <media/IMediaCodecService.h>
 #include <media/MediaCodecInfo.h>
-#include <media/MediaDefs.h>
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/MediaDefs.h>
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/OmxInfoBuilder.h>

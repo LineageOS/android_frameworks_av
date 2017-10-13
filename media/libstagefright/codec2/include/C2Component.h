@@ -224,7 +224,7 @@ public:
      *
      * \retval C2_OK        the tunnel was successfully created
      * \retval C2_BAD_INDEX the target component does not exist
-     * \retval C2_ALREADY_EXIST the tunnel already exists
+     * \retval C2_DUPLICATE the tunnel already exists
      * \retval C2_UNSUPPORTED  the tunnel is not supported
      *
      * \retval C2_TIMED_OUT could not create the tunnel within the time limit (unexpected)

@@ -33,11 +33,7 @@
 
 #include "NdkMediaError.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#if __ANDROID_API__ >= 21
+__BEGIN_DECLS
 
 struct AMediaDrm;
 typedef struct AMediaDrm AMediaDrm;
@@ -51,7 +47,6 @@ typedef AMediaDrmByteArray AMediaDrmSessionId;
 typedef AMediaDrmByteArray AMediaDrmScope;
 typedef AMediaDrmByteArray AMediaDrmKeySetId;
 typedef AMediaDrmByteArray AMediaDrmSecureStop;
-
 
 typedef enum AMediaDrmEventType {
     /**
@@ -83,6 +78,7 @@ typedef enum AMediaDrmEventType {
 typedef void (*AMediaDrmEventListener)(AMediaDrm *, const AMediaDrmSessionId *sessionId,
         AMediaDrmEventType eventType, int extra, const uint8_t *data, size_t dataSize);
 
+#if __ANDROID_API__ >= 21
 
 /**
  * Query if the given scheme identified by its UUID is supported on this device, and
@@ -452,8 +448,6 @@ media_status_t AMediaDrm_verify(AMediaDrm *, const AMediaDrmSessionId *sessionId
 
 #endif /* __ANDROID_API__ >= 21 */
 
-#ifdef __cplusplus
-} // extern "C"
-#endif
+__END_DECLS
 
 #endif //_NDK_MEDIA_DRM_H

@@ -26,8 +26,8 @@
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
+#include <media/stagefright/foundation/MediaDefs.h>
 #include <media/hardware/HardwareAPI.h>
-#include <media/MediaDefs.h>
 
 namespace android {
 

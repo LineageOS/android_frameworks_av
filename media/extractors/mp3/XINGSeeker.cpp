@@ -20,8 +20,8 @@
 #include "XINGSeeker.h"
 #include "avc_utils.h"
 
+#include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/DataSource.h>
-#include <media/stagefright/Utils.h>
 
 namespace android {
 

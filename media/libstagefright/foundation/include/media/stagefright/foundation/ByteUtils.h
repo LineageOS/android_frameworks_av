@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,37 +14,31 @@
  * limitations under the License.
  */
 
-#ifndef OMX_CLIENT_H_
+#ifndef BYTE_UTILS_H
 
-#define OMX_CLIENT_H_
+#define BYTE_UTILS_H
 
-#include <media/IOMX.h>
+#include <arpa/inet.h>
 
 namespace android {
 
-class OMXClient {
-public:
-    OMXClient();
+#define FOURCC(c1, c2, c3, c4) \
+    ((c1) << 24 | (c2) << 16 | (c3) << 8 | (c4))
 
-    status_t connect();
-    status_t connect(bool* trebleFlag);
-    status_t connect(const char* name, bool* trebleFlag = nullptr);
+uint16_t U16_AT(const uint8_t *ptr);
+uint32_t U32_AT(const uint8_t *ptr);
+uint64_t U64_AT(const uint8_t *ptr);
 
-    status_t connectLegacy();
-    status_t connectTreble(const char* name = "default");
-    void disconnect();
+uint16_t U16LE_AT(const uint8_t *ptr);
+uint32_t U32LE_AT(const uint8_t *ptr);
+uint64_t U64LE_AT(const uint8_t *ptr);
 
-    sp<IOMX> interface() {
-        return mOMX;
-    }
+uint64_t ntoh64(uint64_t x);
+uint64_t hton64(uint64_t x);
 
-private:
-    sp<IOMX> mOMX;
-
-    OMXClient(const OMXClient &) = delete;
-    OMXClient &operator=(const OMXClient &) = delete;
-};
+void MakeFourCCString(uint32_t x, char *s);
 
 }  // namespace android
 
-#endif  // OMX_CLIENT_H_
+#endif  // BYTE_UTILS_H
+
