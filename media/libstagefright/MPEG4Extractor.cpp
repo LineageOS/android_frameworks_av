@@ -5335,7 +5335,7 @@ static bool BetterSniffMPEG4(
         off64_t chunkDataSize = chunkSize - (chunkDataOffset - offset);
         if (chunkDataSize < 0) {
             ALOGE("b/23540914");
-            return ERROR_MALFORMED;
+            return false;
         }
 
         char chunkstring[5];
