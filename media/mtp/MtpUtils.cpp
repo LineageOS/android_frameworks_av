@@ -204,29 +204,39 @@ void deleteRecursive(const char* path) {
         if (name[0] == '.' && (name[1] == 0 || (name[1] == '.' && name[2] == 0))) {
             continue;
         }
-        pathStr.append(name);
+        string childPath = pathStr + name;
+        int success;
         if (entry->d_type == DT_DIR) {
-            deleteRecursive(pathStr.c_str());
-            rmdir(pathStr.c_str());
+            deleteRecursive(childPath.c_str());
+            success = rmdir(childPath.c_str());
         } else {
-            unlink(pathStr.c_str());
+            success = unlink(childPath.c_str());
         }
+        if (success == -1)
+            PLOG(ERROR) << "Deleting path " << childPath << " failed";
     }
     closedir(dir);
 }
 
-void deletePath(const char* path) {
+bool deletePath(const char* path) {
     struct stat statbuf;
+    int success;
     if (stat(path, &statbuf) == 0) {
         if (S_ISDIR(statbuf.st_mode)) {
+            // rmdir will fail if the directory is non empty, so
+            // there is no need to keep errors from deleteRecursive
             deleteRecursive(path);
-            rmdir(path);
+            success = rmdir(path);
         } else {
-            unlink(path);
+            success = unlink(path);
         }
     } else {
-        PLOG(ERROR) << "deletePath stat failed for " << path;;
+        PLOG(ERROR) << "deletePath stat failed for " << path;
+        return false;
     }
+    if (success == -1)
+        PLOG(ERROR) << "Deleting path " << path << " failed";
+    return success == 0;
 }
 
 }  // namespace android

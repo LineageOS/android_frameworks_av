@@ -32,13 +32,13 @@
 
 namespace android {
 
-class MtpDatabase;
+class IMtpDatabase;
 class MtpStorage;
 
 class MtpServer {
 
 private:
-    MtpDatabase*        mDatabase;
+    IMtpDatabase*       mDatabase;
 
     // appear as a PTP device
     bool                mPtp;
@@ -98,7 +98,7 @@ private:
     Vector<ObjectEdit*>  mObjectEditList;
 
 public:
-                        MtpServer(MtpDatabase* database, bool ptp,
+                        MtpServer(IMtpDatabase* database, bool ptp,
                                     const MtpString& deviceInfoManufacturer,
                                     const MtpString& deviceInfoModel,
                                     const MtpString& deviceInfoDeviceVersion,

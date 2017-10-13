@@ -17,7 +17,6 @@
 #define LOG_TAG "MtpStorage"
 
 #include "MtpDebug.h"
-#include "MtpDatabase.h"
 #include "MtpStorage.h"
 
 #include <sys/types.h>
@@ -33,14 +32,12 @@
 namespace android {
 
 MtpStorage::MtpStorage(MtpStorageID id, const char* filePath,
-        const char* description, uint64_t reserveSpace,
-        bool removable, uint64_t maxFileSize)
+        const char* description, bool removable, uint64_t maxFileSize)
     :   mStorageID(id),
         mFilePath(filePath),
         mDescription(description),
         mMaxCapacity(0),
         mMaxFileSize(maxFileSize),
-        mReserveSpace(reserveSpace),
         mRemovable(removable)
 {
     ALOGV("MtpStorage id: %d path: %s\n", id, filePath);
@@ -75,8 +72,7 @@ uint64_t MtpStorage::getFreeSpace() {
     struct statfs   stat;
     if (statfs(getPath(), &stat))
         return -1;
-    uint64_t freeSpace = (uint64_t)stat.f_bavail * (uint64_t)stat.f_bsize;
-    return (freeSpace > mReserveSpace ? freeSpace - mReserveSpace : 0);
+    return (uint64_t)stat.f_bavail * (uint64_t)stat.f_bsize;
 }
 
 const char* MtpStorage::getDescription() const {
