@@ -927,13 +927,6 @@ status_t OMXNodeInstance::allocateBuffer(
         return BAD_VALUE;
     }
 
-    if (!mIsSecure) {
-        // This method is used only with secure codecs in this release.
-        ALOGE("b/63522818");
-        android_errorWriteLog(0x534e4554, "63522818");
-        return ERROR_UNSUPPORTED;
-    }
-
     BufferMeta *buffer_meta = new BufferMeta(size, portIndex);
 
     OMX_BUFFERHEADERTYPE *header;
