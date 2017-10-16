@@ -1803,6 +1803,9 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                     // ratio. Use compression ratio of 1.
                     max_size = width * height * 3 / 2;
                 }
+                // HACK: allow 10% overhead
+                // TODO: read sample size from traf atom for fragmented MPEG4.
+                max_size += max_size / 10;
                 mLastTrack->meta->setInt32(kKeyMaxInputSize, max_size);
             }
 
