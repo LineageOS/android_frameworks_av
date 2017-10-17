@@ -113,7 +113,6 @@ cc_library_shared {
     static_libs: [
         "libstagefright_color_conversion",
         "libyuv_static",
-        "libstagefright_aacenc",
         "libstagefright_matroska",
         "libstagefright_mediafilter",
         "libstagefright_webm",
