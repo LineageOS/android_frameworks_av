@@ -19,7 +19,7 @@
 #define MPEG2_PS_EXTRACTOR_H_
 
 #include <media/stagefright/foundation/ABase.h>
-#include <media/stagefright/MediaExtractor.h>
+#include <media/MediaExtractor.h>
 #include <utils/threads.h>
 #include <utils/KeyedVector.h>
 

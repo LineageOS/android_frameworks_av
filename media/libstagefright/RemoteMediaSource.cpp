@@ -15,6 +15,7 @@
  */
 
 #include <media/stagefright/RemoteMediaSource.h>
+#include <media/IMediaSource.h>
 
 namespace android {
 
@@ -35,7 +36,7 @@ sp<MetaData> RemoteMediaSource::getFormat() {
     return mSource->getFormat();
 }
 
-status_t RemoteMediaSource::read(MediaBuffer **buffer, const ReadOptions *options) {
+status_t RemoteMediaSource::read(MediaBuffer **buffer, const MediaSource::ReadOptions *options) {
     return mSource->read(buffer, reinterpret_cast<const MediaSource::ReadOptions*>(options));
 }
 

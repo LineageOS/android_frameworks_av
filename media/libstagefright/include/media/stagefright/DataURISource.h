@@ -18,7 +18,7 @@
 
 #define DATA_URI_SOURCE_H_
 
-#include <media/stagefright/DataSource.h>
+#include <media/DataSource.h>
 #include <media/stagefright/foundation/ABase.h>
 
 namespace android {

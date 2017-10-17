@@ -19,23 +19,29 @@
 #define MEDIA_EXTRACTOR_H_
 
 #include <stdio.h>
+#include <vector>
 
-#include <media/IMediaExtractor.h>
-#include <media/MediaAnalyticsItem.h>
+#include <utils/Errors.h>
+#include <utils/RefBase.h>
+
+// still doing some on/off toggling here.
+#define MEDIA_LOG       1
 
 namespace android {
 
 class DataSource;
-struct MediaSource;
+class IMediaSource;
+class MediaAnalyticsItem;
+class MediaExtractorFactory;
 class MetaData;
+class Parcel;
+class String8;
+struct AMessage;
+struct MediaSource;
+typedef std::vector<uint8_t> HInterfaceToken;
 
 class MediaExtractor : public RefBase {
 public:
-    static sp<IMediaExtractor> Create(
-            const sp<DataSource> &source, const char *mime = NULL);
-    static sp<MediaExtractor> CreateFromService(
-            const sp<DataSource> &source, const char *mime = NULL);
-
     virtual size_t countTracks() = 0;
     virtual sp<MediaSource> getTrack(size_t index) = 0;
 
@@ -61,9 +67,6 @@ public:
     // If subclasses do _not_ override this, the default is
     // CAN_SEEK_BACKWARD | CAN_SEEK_FORWARD | CAN_SEEK | CAN_PAUSE
     virtual uint32_t flags() const;
-
-    // Creates an IMediaExtractor wrapper to this MediaExtractor.
-    virtual sp<IMediaExtractor> asIMediaExtractor();
 
     // for DRM
     virtual char* getDrmTrackInfo(size_t /*trackID*/, int * /*len*/) {
@@ -125,20 +128,9 @@ protected:
     virtual void populateMetrics();
 
 private:
-
-    static Mutex gSnifferMutex;
-    static List<ExtractorDef> gSniffers;
-    static bool gSniffersRegistered;
-
-    static void RegisterSniffer_l(const ExtractorDef &def);
-
-    static CreatorFunc sniff(const sp<DataSource> &source,
-            String8 *mimeType, float *confidence, sp<AMessage> *meta);
-
-    static void RegisterDefaultSniffers();
-
     MediaExtractor(const MediaExtractor &);
     MediaExtractor &operator=(const MediaExtractor &);
+    friend class MediaExtractorFactory;
 };
 
 // purposely not defined anywhere so that this will fail to link if

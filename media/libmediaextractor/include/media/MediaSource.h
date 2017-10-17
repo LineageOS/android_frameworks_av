@@ -20,7 +20,8 @@
 
 #include <sys/types.h>
 
-#include <media/IMediaSource.h>
+#include <binder/IMemory.h>
+#include <binder/MemoryDealer.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
 #include <utils/RefBase.h>
@@ -33,15 +34,6 @@ class MetaData;
 class IMediaSource;
 
 struct MediaSource : public virtual RefBase {
-    // TODO: Move ReadOptions implementation from IMediaSource to MediaSource
-    // once this class moves to a separate extractor lib on which both libmedia
-    // and libstagefright rely. For now, alias is added to avoid circular
-    // dependency.
-    using ReadOptions = IMediaSource::ReadOptions;
-
-    // Creates a MediaSource which wraps the given IMediaSource object.
-    static sp<MediaSource> CreateFromIMediaSource(const sp<IMediaSource> &source);
-
     MediaSource();
 
     // To be called before any other methods on this object, except
@@ -58,6 +50,51 @@ struct MediaSource : public virtual RefBase {
 
     // Returns the format of the data output by this media source.
     virtual sp<MetaData> getFormat() = 0;
+
+    // Options that modify read() behaviour. The default is to
+    // a) not request a seek
+    // b) not be late, i.e. lateness_us = 0
+    struct ReadOptions {
+        enum SeekMode : int32_t {
+            SEEK_PREVIOUS_SYNC,
+            SEEK_NEXT_SYNC,
+            SEEK_CLOSEST_SYNC,
+            SEEK_CLOSEST,
+        };
+
+        ReadOptions();
+
+        // Reset everything back to defaults.
+        void reset();
+
+        void setSeekTo(int64_t time_us, SeekMode mode = SEEK_CLOSEST_SYNC);
+        void clearSeekTo();
+        bool getSeekTo(int64_t *time_us, SeekMode *mode) const;
+
+        // TODO: remove this if unused.
+        void setLateBy(int64_t lateness_us);
+        int64_t getLateBy() const;
+
+        void setNonBlocking();
+        void clearNonBlocking();
+        bool getNonBlocking() const;
+
+        // Used to clear all non-persistent options for multiple buffer reads.
+        void clearNonPersistent() {
+            clearSeekTo();
+        }
+
+    private:
+        enum Options {
+            kSeekTo_Option      = 1,
+        };
+
+        uint32_t mOptions;
+        int64_t mSeekTimeUs;
+        SeekMode mSeekMode;
+        int64_t mLatenessUs;
+        bool mNonBlocking;
+    } __attribute__((packed)); // sent through Binder
 
     // Returns a new buffer of data. Call blocks until a
     // buffer is available, an error is encountered of the end of the stream
@@ -102,9 +139,6 @@ struct MediaSource : public virtual RefBase {
     virtual status_t setStopTimeUs(int64_t /* stopTimeUs */) {
         return ERROR_UNSUPPORTED;
     }
-
-    // Creates an IMediaSource wrapper to this MediaSource.
-    virtual sp<IMediaSource> asIMediaSource();
 
 protected:
     virtual ~MediaSource();

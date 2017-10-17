@@ -18,8 +18,8 @@
 #define LOG_TAG "JPEGSource"
 #include <utils/Log.h>
 
+#include <media/DataSource.h>
 #include <media/stagefright/foundation/ADebug.h>
-#include <media/stagefright/DataSource.h>
 #include <media/stagefright/JPEGSource.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>

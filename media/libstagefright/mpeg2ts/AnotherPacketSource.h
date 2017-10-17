@@ -18,8 +18,8 @@
 
 #define ANOTHER_PACKET_SOURCE_H_
 
+#include <media/MediaSource.h>
 #include <media/stagefright/foundation/ABase.h>
-#include <media/stagefright/MediaSource.h>
 #include <utils/threads.h>
 #include <utils/List.h>
 

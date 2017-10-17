@@ -18,9 +18,9 @@
 
 #define NU_CACHED_SOURCE_2_H_
 
+#include <media/DataSource.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/foundation/AHandlerReflector.h>
-#include <media/stagefright/DataSource.h>
 
 namespace android {
 

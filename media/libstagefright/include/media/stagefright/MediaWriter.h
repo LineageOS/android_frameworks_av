@@ -19,8 +19,8 @@
 #define MEDIA_WRITER_H_
 
 #include <utils/RefBase.h>
+#include <media/MediaSource.h>
 #include <media/IMediaRecorderClient.h>
-#include <media/stagefright/MediaSource.h>
 
 namespace android {
 

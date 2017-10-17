@@ -20,20 +20,20 @@
 
 #include "MP3Extractor.h"
 
-#include "avc_utils.h"
 #include "ID3.h"
 #include "VBRISeeker.h"
 #include "XINGSeeker.h"
 
+#include <media/DataSource.h>
+#include <media/MediaSource.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/ByteUtils.h>
-#include <media/stagefright/DataSource.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
 #include <utils/String8.h>
 

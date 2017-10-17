@@ -12,19 +12,19 @@ cc_library_shared {
     ],
 
     shared_libs: [
-        "libbinder",
-        "libstagefright",
-        "libmedia",
-        "libstagefright_foundation",
-        "libcutils",
-        "libutils",
-        "liblog",
-        "libcrypto",
-        "libmedia",
-        "libhidlbase",
-        "android.hidl.token@1.0-utils",
         "android.hardware.cas@1.0",
         "android.hardware.cas.native@1.0",
+        "android.hidl.token@1.0-utils",
+        "libbinder",
+        "libcrypto",
+        "libcutils",
+        "libhidlbase",
+        "liblog",
+        "libmedia",  // Needed for IStreamListener
+        "libmediaextractor",
+        "libstagefright",  // Needed for AnotherPacketSource and more
+        "libstagefright_foundation",
+        "libutils",
     ],
 
     static_libs: [

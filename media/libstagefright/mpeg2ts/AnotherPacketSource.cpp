@@ -19,13 +19,12 @@
 
 #include "AnotherPacketSource.h"
 
-#include "include/avc_utils.h"
-
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AString.h>
 #include <media/stagefright/foundation/hexdump.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
@@ -663,7 +662,7 @@ sp<AMessage> AnotherPacketSource::trimBuffersBeforeMeta(
                         && !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC);
             }
         }
-        if (isAvc && !IsIDR(buffer)) {
+        if (isAvc && !IsIDR(buffer->data(), buffer->size())) {
             continue;
         }
 

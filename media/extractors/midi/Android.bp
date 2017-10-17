@@ -7,12 +7,12 @@ cc_library_shared {
     ],
 
     shared_libs: [
+        "liblog",
+        "libmedia",  // Needed for MidiIoWrapper
+        "libmediaextractor",
         "libsonivox",
-        "libstagefright",
-        "libmedia",
         "libstagefright_foundation",
         "libutils",
-        "liblog",
     ],
 
     name: "libmidiextractor",

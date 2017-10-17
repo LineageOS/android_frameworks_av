@@ -12,11 +12,11 @@ cc_library_shared {
     ],
 
     shared_libs: [
-        "libstagefright",
-        "libmedia",
+        "liblog",
+        "libmediaextractor",
+        "libstagefright",  // Needed for ESDS
         "libstagefright_foundation",
         "libutils",
-        "liblog",
     ],
 
     static_libs: [

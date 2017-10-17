@@ -18,8 +18,8 @@
 #define NU_MEDIA_EXTRACTOR_H_
 
 #include <media/stagefright/foundation/ABase.h>
-#include <media/stagefright/MediaSource.h>
 #include <media/IMediaExtractor.h>
+#include <media/MediaSource.h>
 #include <utils/Errors.h>
 #include <utils/KeyedVector.h>
 #include <utils/RefBase.h>

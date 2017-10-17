@@ -23,7 +23,7 @@
 #include <sys/types.h>
 #include <binder/Parcel.h>
 #include <media/IMediaExtractorService.h>
-#include <media/stagefright/MediaExtractor.h>
+#include <media/MediaExtractor.h>
 
 namespace android {
 

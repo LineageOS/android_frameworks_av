@@ -67,6 +67,7 @@ cc_library_shared {
         "MediaDefs.cpp",
         "MetaData.cpp",
         "ParsedMessage.cpp",
+        "avc_utils.cpp",
         "base64.cpp",
         "hexdump.cpp",
     ],

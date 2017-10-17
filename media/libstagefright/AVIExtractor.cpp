@@ -18,14 +18,14 @@
 #define LOG_TAG "AVIExtractor"
 #include <utils/Log.h>
 
-#include "include/avc_utils.h"
 #include "include/AVIExtractor.h"
 
 #include <binder/ProcessState.h>
+#include <media/DataSource.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
-#include <media/stagefright/DataSource.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>

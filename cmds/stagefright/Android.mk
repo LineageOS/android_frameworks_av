@@ -8,8 +8,8 @@ LOCAL_SRC_FILES:=       \
         SineSource.cpp
 
 LOCAL_SHARED_LIBRARIES := \
-        libstagefright libmedia libutils libbinder libstagefright_foundation \
-        libjpeg libui libgui libcutils liblog \
+        libstagefright libmedia libmediaextractor libutils libbinder \
+        libstagefright_foundation libjpeg libui libgui libcutils liblog \
         libhidlmemory \
         android.hardware.media.omx@1.0 \
 
@@ -36,7 +36,8 @@ LOCAL_SRC_FILES:=         \
         record.cpp
 
 LOCAL_SHARED_LIBRARIES := \
-        libstagefright libmedia liblog libutils libbinder libstagefright_foundation
+        libstagefright libmedia libmediaextractor liblog libutils libbinder \
+        libstagefright_foundation
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \
@@ -60,7 +61,8 @@ LOCAL_SRC_FILES:=         \
         recordvideo.cpp
 
 LOCAL_SHARED_LIBRARIES := \
-        libstagefright libmedia liblog libutils libbinder libstagefright_foundation
+        libstagefright libmedia libmediaextractor liblog libutils libbinder \
+        libstagefright_foundation
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \
@@ -85,7 +87,8 @@ LOCAL_SRC_FILES:=         \
         audioloop.cpp
 
 LOCAL_SHARED_LIBRARIES := \
-        libstagefright libmedia liblog libutils libbinder libstagefright_foundation
+        libstagefright libmedia libmediaextractor liblog libutils libbinder \
+        libstagefright_foundation
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \

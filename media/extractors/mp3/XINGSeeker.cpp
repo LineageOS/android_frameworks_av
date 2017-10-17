@@ -18,10 +18,10 @@
 #include <utils/Log.h>
 
 #include "XINGSeeker.h"
-#include "avc_utils.h"
+#include <media/stagefright/foundation/avc_utils.h>
 
 #include <media/stagefright/foundation/ByteUtils.h>
-#include <media/stagefright/DataSource.h>
+#include <media/DataSource.h>
 
 namespace android {
 

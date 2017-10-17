@@ -5,17 +5,16 @@ cc_library_shared {
     include_dirs: [
         "external/flac/include",
         "external/libvpx/libwebm",
-        "frameworks/av/media/libstagefright/include",
         "frameworks/av/media/libstagefright/flac/dec",
+        "frameworks/av/media/libstagefright/include",
     ],
 
     shared_libs: [
-        "libstagefright",
-        "libmedia",
-        "libstagefright_foundation",
-        "libstagefright_flacdec",
-        "libutils",
         "liblog",
+        "libmediaextractor",
+        "libstagefright_flacdec",
+        "libstagefright_foundation",
+        "libutils",
     ],
 
     static_libs: [

@@ -22,12 +22,12 @@
 
 #include <binder/IInterface.h>
 #include <binder/IMemory.h>
+#include <media/MediaSource.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaErrors.h>
 
 namespace android {
 
-struct MediaSource;
 class MetaData;
 class MediaBufferGroup;
 
@@ -55,50 +55,6 @@ public:
     // Returns the format of the data output by this media source.
     virtual sp<MetaData> getFormat() = 0;
 
-    // Options that modify read() behaviour. The default is to
-    // a) not request a seek
-    // b) not be late, i.e. lateness_us = 0
-    struct ReadOptions {
-        enum SeekMode : int32_t {
-            SEEK_PREVIOUS_SYNC,
-            SEEK_NEXT_SYNC,
-            SEEK_CLOSEST_SYNC,
-            SEEK_CLOSEST,
-        };
-
-        ReadOptions();
-
-        // Reset everything back to defaults.
-        void reset();
-
-        void setSeekTo(int64_t time_us, SeekMode mode = SEEK_CLOSEST_SYNC);
-        void clearSeekTo();
-        bool getSeekTo(int64_t *time_us, SeekMode *mode) const;
-
-        // TODO: remove this if unused.
-        void setLateBy(int64_t lateness_us);
-        int64_t getLateBy() const;
-
-        void setNonBlocking();
-        void clearNonBlocking();
-        bool getNonBlocking() const;
-
-        // Used to clear all non-persistent options for multiple buffer reads.
-        void clearNonPersistent() {
-            clearSeekTo();
-        }
-
-    private:
-        enum Options {
-            kSeekTo_Option      = 1,
-        };
-
-        uint32_t mOptions;
-        int64_t mSeekTimeUs;
-        SeekMode mSeekMode;
-        int64_t mLatenessUs;
-        bool mNonBlocking;
-    } __attribute__((packed)); // sent through Binder
 
     // Returns a new buffer of data. Call blocks until a
     // buffer is available, an error is encountered or the end of the stream
@@ -110,7 +66,8 @@ public:
     //
     // TODO: consider removing read() in favor of readMultiple().
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options = NULL) = 0;
+            MediaBuffer **buffer,
+            const MediaSource::ReadOptions *options = NULL) = 0;
 
     // Returns a vector of new buffers of data, where the new buffers are added
     // to the end of the vector.
@@ -126,7 +83,7 @@ public:
     // non-persistent options (e.g. seek) apply only to the first read.
     virtual status_t readMultiple(
             Vector<MediaBuffer *> *buffers, uint32_t maxNumBuffers = 1,
-            const ReadOptions *options = nullptr) = 0;
+            const MediaSource::ReadOptions *options = nullptr) = 0;
 
     // Returns true if |readMultiple| is supported, otherwise false.
     virtual bool supportReadMultiple() = 0;
@@ -168,7 +125,7 @@ public:
     // TODO: Implement this for local media sources.
     virtual status_t readMultiple(
             Vector<MediaBuffer *> * /* buffers */, uint32_t /* maxNumBuffers = 1 */,
-            const ReadOptions * /* options = nullptr */) {
+            const MediaSource::ReadOptions * /* options = nullptr */) {
         return ERROR_UNSUPPORTED;
     }
 

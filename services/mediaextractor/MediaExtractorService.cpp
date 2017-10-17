@@ -20,8 +20,11 @@
 
 #include <utils/Vector.h>
 
-#include <media/stagefright/DataSource.h>
-#include <media/stagefright/MediaExtractor.h>
+#include <media/DataSource.h>
+#include <media/MediaExtractor.h>
+#include <media/stagefright/DataSourceFactory.h>
+#include <media/stagefright/InterfaceUtils.h>
+#include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/RemoteDataSource.h>
 #include "MediaExtractorService.h"
 
@@ -31,16 +34,16 @@ sp<IMediaExtractor> MediaExtractorService::makeExtractor(
         const sp<IDataSource> &remoteSource, const char *mime) {
     ALOGV("@@@ MediaExtractorService::makeExtractor for %s", mime);
 
-    sp<DataSource> localSource = DataSource::CreateFromIDataSource(remoteSource);
+    sp<DataSource> localSource = CreateDataSourceFromIDataSource(remoteSource);
 
-    sp<MediaExtractor> extractor = MediaExtractor::CreateFromService(localSource, mime);
+    sp<MediaExtractor> extractor = MediaExtractorFactory::CreateFromService(localSource, mime);
 
     ALOGV("extractor service created %p (%s)",
             extractor.get(),
             extractor == nullptr ? "" : extractor->name());
 
     if (extractor != nullptr) {
-        sp<IMediaExtractor> ret = extractor->asIMediaExtractor();
+        sp<IMediaExtractor> ret = CreateIMediaExtractorFromMediaExtractor(extractor);
         registerMediaExtractor(ret, localSource, mime);
         return ret;
     }
@@ -49,8 +52,8 @@ sp<IMediaExtractor> MediaExtractorService::makeExtractor(
 
 sp<IDataSource> MediaExtractorService::makeIDataSource(int fd, int64_t offset, int64_t length)
 {
-    sp<DataSource> source = DataSource::CreateFromFd(fd, offset, length);
-    return source.get() != nullptr ? source->asIDataSource() : nullptr;
+    sp<DataSource> source = DataSourceFactory::CreateFromFd(fd, offset, length);
+    return CreateIDataSourceFromDataSource(source);
 }
 
 status_t MediaExtractorService::dump(int fd, const Vector<String16>& args) {

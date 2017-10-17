@@ -17,7 +17,7 @@
 #ifndef ANDROID_CALLBACKDATASOURCE_H
 #define ANDROID_CALLBACKDATASOURCE_H
 
-#include <media/stagefright/DataSource.h>
+#include <media/DataSource.h>
 #include <media/stagefright/foundation/ADebug.h>
 
 namespace android {

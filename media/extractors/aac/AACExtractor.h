@@ -18,7 +18,7 @@
 
 #define AAC_EXTRACTOR_H_
 
-#include <media/stagefright/MediaExtractor.h>
+#include <media/MediaExtractor.h>
 
 #include <utils/Vector.h>
 

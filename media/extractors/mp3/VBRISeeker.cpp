@@ -23,11 +23,11 @@
 
 #include "VBRISeeker.h"
 
-#include "avc_utils.h"
+#include <media/stagefright/foundation/avc_utils.h>
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ByteUtils.h>
-#include <media/stagefright/DataSource.h>
+#include <media/DataSource.h>
 
 namespace android {
 

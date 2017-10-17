@@ -23,7 +23,6 @@
 #include "HTTPDownloader.h"
 #include "LiveSession.h"
 #include "M3UParser.h"
-#include "include/avc_utils.h"
 #include "include/ID3.h"
 #include "mpeg2ts/AnotherPacketSource.h"
 #include "mpeg2ts/HlsSampleDecryptor.h"
@@ -32,6 +31,7 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ByteUtils.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
@@ -1829,7 +1829,7 @@ status_t PlaylistFetcher::extractAndQueueAccessUnitsFromTs(const sp<ABuffer> &bu
                             (long long)timeUs - mStartTimeUs,
                             mIDRFound);
                     if (isAvc) {
-                        if (IsIDR(accessUnit)) {
+                        if (IsIDR(accessUnit->data(), accessUnit->size())) {
                             mVideoBuffer->clear();
                             FSLOGV(stream, "found IDR, clear mVideoBuffer");
                             mIDRFound = true;

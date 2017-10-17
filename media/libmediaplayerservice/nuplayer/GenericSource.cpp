@@ -23,18 +23,21 @@
 #include "AnotherPacketSource.h"
 #include <binder/IServiceManager.h>
 #include <cutils/properties.h>
+#include <media/DataSource.h>
+#include <media/MediaExtractor.h>
+#include <media/MediaSource.h>
 #include <media/IMediaExtractorService.h>
 #include <media/IMediaHTTPService.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/DataSource.h>
+#include <media/stagefright/DataSourceFactory.h>
 #include <media/stagefright/FileSource.h>
+#include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaClock.h>
 #include <media/stagefright/MediaDefs.h>
-#include <media/stagefright/MediaExtractor.h>
-#include <media/stagefright/MediaSource.h>
+#include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
 #include "../../libstagefright/include/NuCachedSource2.h"
@@ -158,7 +161,7 @@ status_t NuPlayer::GenericSource::initFromDataSource() {
     sp<IMediaExtractor> extractor;
     CHECK(mDataSource != NULL);
 
-    extractor = MediaExtractor::Create(mDataSource, NULL);
+    extractor = MediaExtractorFactory::Create(mDataSource, NULL);
 
     if (extractor == NULL) {
         ALOGE("initFromDataSource, cannot create extractor!");
@@ -358,7 +361,7 @@ void NuPlayer::GenericSource::onPrepareAsync() {
             String8 contentType;
 
             if (!strncasecmp("http://", uri, 7) || !strncasecmp("https://", uri, 8)) {
-                mHttpSource = DataSource::CreateMediaHTTP(mHTTPService);
+                mHttpSource = DataSourceFactory::CreateMediaHTTP(mHTTPService);
                 if (mHttpSource == NULL) {
                     ALOGE("Failed to create http source!");
                     notifyPreparedAndCleanup(UNKNOWN_ERROR);
@@ -366,7 +369,7 @@ void NuPlayer::GenericSource::onPrepareAsync() {
                 }
             }
 
-            mDataSource = DataSource::CreateFromURI(
+            mDataSource = DataSourceFactory::CreateFromURI(
                    mHTTPService, uri, &mUriHeaders, &contentType,
                    static_cast<HTTPBase *>(mHttpSource.get()));
         } else {
@@ -383,7 +386,7 @@ void NuPlayer::GenericSource::onPrepareAsync() {
                     ALOGV("IDataSource(FileSource): %p %d %lld %lld",
                             source.get(), mFd, (long long)mOffset, (long long)mLength);
                     if (source.get() != nullptr) {
-                        mDataSource = DataSource::CreateFromIDataSource(source);
+                        mDataSource = CreateDataSourceFromIDataSource(source);
                         if (mDataSource != nullptr) {
                             // Close the local file descriptor as it is not needed anymore.
                             close(mFd);
@@ -401,7 +404,7 @@ void NuPlayer::GenericSource::onPrepareAsync() {
                 mDataSource = new FileSource(mFd, mOffset, mLength);
             }
             // TODO: close should always be done on mFd, see the lines following
-            // DataSource::CreateFromIDataSource above,
+            // CreateDataSourceFromIDataSource above,
             // and the FileSource constructor should dup the mFd argument as needed.
             mFd = -1;
         }

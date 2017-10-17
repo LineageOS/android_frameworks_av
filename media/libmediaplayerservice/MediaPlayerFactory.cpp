@@ -20,8 +20,8 @@
 #include <utils/Log.h>
 
 #include <cutils/properties.h>
+#include <media/DataSource.h>
 #include <media/IMediaPlayer.h>
-#include <media/stagefright/DataSource.h>
 #include <media/stagefright/FileSource.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <utils/Errors.h>

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,113 +17,40 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MediaExtractor"
 #include <utils/Log.h>
-#include <inttypes.h>
-#include <pwd.h>
 
 #include <binder/IServiceManager.h>
-#include <binder/MemoryDealer.h>
-
+#include <media/DataSource.h>
 #include <media/MediaAnalyticsItem.h>
-#include <media/stagefright/foundation/ADebug.h>
+#include <media/MediaExtractor.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/DataSource.h>
-#include <media/stagefright/MediaDefs.h>
-#include <media/stagefright/MediaExtractor.h>
+#include <media/stagefright/InterfaceUtils.h>
+#include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
-#include <media/stagefright/RemoteMediaExtractor.h>
 #include <media/IMediaExtractor.h>
 #include <media/IMediaExtractorService.h>
-#include <media/IMediaSource.h>
 #include <cutils/properties.h>
 #include <utils/String8.h>
-#include <private/android_filesystem_config.h>
 
-// still doing some on/off toggling here.
-#define MEDIA_LOG       1
-
-#include <sys/types.h>
 #include <dirent.h>
 #include <dlfcn.h>
 
 namespace android {
 
-// key for media statistics
-static const char *kKeyExtractor = "extractor";
 // attrs for media statistics
 static const char *kExtractorMime = "android.media.mediaextractor.mime";
 static const char *kExtractorTracks = "android.media.mediaextractor.ntrk";
 static const char *kExtractorFormat = "android.media.mediaextractor.fmt";
 
-MediaExtractor::MediaExtractor() {
-    if (!LOG_NDEBUG) {
-        uid_t uid = getuid();
-        struct passwd *pw = getpwuid(uid);
-        ALOGV("extractor created in uid: %d (%s)", getuid(), pw->pw_name);
-    }
-
-    mAnalyticsItem = NULL;
-    if (MEDIA_LOG) {
-        mAnalyticsItem = new MediaAnalyticsItem(kKeyExtractor);
-        (void) mAnalyticsItem->generateSessionID();
-    }
-}
-
-MediaExtractor::~MediaExtractor() {
-
-    // log the current record, provided it has some information worth recording
-    if (MEDIA_LOG) {
-        if (mAnalyticsItem != NULL) {
-            if (mAnalyticsItem->count() > 0) {
-                mAnalyticsItem->setFinalized(true);
-                mAnalyticsItem->selfrecord();
-            }
-        }
-    }
-    if (mAnalyticsItem != NULL) {
-        delete mAnalyticsItem;
-        mAnalyticsItem = NULL;
-    }
-}
-
-sp<IMediaExtractor> MediaExtractor::asIMediaExtractor() {
-    return RemoteMediaExtractor::wrap(sp<MediaExtractor>(this));
-}
-
-sp<MetaData> MediaExtractor::getMetaData() {
-    return new MetaData;
-}
-
-status_t MediaExtractor::getMetrics(Parcel *reply) {
-
-    if (mAnalyticsItem == NULL || reply == NULL) {
-        return UNKNOWN_ERROR;
-    }
-
-    populateMetrics();
-    mAnalyticsItem->writeToParcel(reply);
-
-    return OK;
-}
-
-void MediaExtractor::populateMetrics() {
-    ALOGV("MediaExtractor::populateMetrics");
-    // normally overridden in subclasses
-}
-
-uint32_t MediaExtractor::flags() const {
-    return CAN_SEEK_BACKWARD | CAN_SEEK_FORWARD | CAN_PAUSE | CAN_SEEK;
-}
-
 // static
-sp<IMediaExtractor> MediaExtractor::Create(
+sp<IMediaExtractor> MediaExtractorFactory::Create(
         const sp<DataSource> &source, const char *mime) {
-    ALOGV("MediaExtractor::Create %s", mime);
+    ALOGV("MediaExtractorFactory::Create %s", mime);
 
     if (!property_get_bool("media.stagefright.extractremote", true)) {
         // local extractor
         ALOGW("creating media extractor in calling process");
         sp<MediaExtractor> extractor = CreateFromService(source, mime);
-        return (extractor.get() == nullptr) ? nullptr : extractor->asIMediaExtractor();
+        return CreateIMediaExtractorFromMediaExtractor(extractor);
     } else {
         // remote extractor
         ALOGV("get service manager");
@@ -131,7 +58,8 @@ sp<IMediaExtractor> MediaExtractor::Create(
 
         if (binder != 0) {
             sp<IMediaExtractorService> mediaExService(interface_cast<IMediaExtractorService>(binder));
-            sp<IMediaExtractor> ex = mediaExService->makeExtractor(source->asIDataSource(), mime);
+            sp<IMediaExtractor> ex = mediaExService->makeExtractor(
+                    CreateIDataSourceFromDataSource(source), mime);
             return ex;
         } else {
             ALOGE("extractor service not running");
@@ -141,10 +69,10 @@ sp<IMediaExtractor> MediaExtractor::Create(
     return NULL;
 }
 
-sp<MediaExtractor> MediaExtractor::CreateFromService(
+sp<MediaExtractor> MediaExtractorFactory::CreateFromService(
         const sp<DataSource> &source, const char *mime) {
 
-    ALOGV("MediaExtractor::CreateFromService %s", mime);
+    ALOGV("MediaExtractorFactory::CreateFromService %s", mime);
     RegisterDefaultSniffers();
 
     // initialize source decryption if needed
@@ -152,7 +80,7 @@ sp<MediaExtractor> MediaExtractor::CreateFromService(
 
     sp<AMessage> meta;
 
-    CreatorFunc creator = NULL;
+    MediaExtractor::CreatorFunc creator = NULL;
     String8 tmp;
     float confidence;
     creator = sniff(source, &tmp, &confidence, &meta);
@@ -194,12 +122,12 @@ sp<MediaExtractor> MediaExtractor::CreateFromService(
     return ret;
 }
 
-Mutex MediaExtractor::gSnifferMutex;
-List<MediaExtractor::ExtractorDef> MediaExtractor::gSniffers;
-bool MediaExtractor::gSniffersRegistered = false;
+Mutex MediaExtractorFactory::gSnifferMutex;
+List<MediaExtractor::ExtractorDef> MediaExtractorFactory::gSniffers;
+bool MediaExtractorFactory::gSniffersRegistered = false;
 
 // static
-MediaExtractor::CreatorFunc MediaExtractor::sniff(
+MediaExtractor::CreatorFunc MediaExtractorFactory::sniff(
         const sp<DataSource> &source, String8 *mimeType, float *confidence, sp<AMessage> *meta) {
     *mimeType = "";
     *confidence = 0.0f;
@@ -212,9 +140,9 @@ MediaExtractor::CreatorFunc MediaExtractor::sniff(
         }
     }
 
-    CreatorFunc curCreator = NULL;
-    CreatorFunc bestCreator = NULL;
-    for (List<ExtractorDef>::iterator it = gSniffers.begin();
+    MediaExtractor::CreatorFunc curCreator = NULL;
+    MediaExtractor::CreatorFunc bestCreator = NULL;
+    for (List<MediaExtractor::ExtractorDef>::iterator it = gSniffers.begin();
          it != gSniffers.end(); ++it) {
         String8 newMimeType;
         float newConfidence;
@@ -233,9 +161,9 @@ MediaExtractor::CreatorFunc MediaExtractor::sniff(
 }
 
 // static
-void MediaExtractor::RegisterSniffer_l(const ExtractorDef &def) {
+void MediaExtractorFactory::RegisterSniffer_l(const MediaExtractor::ExtractorDef &def) {
     // sanity check check struct version, uuid, name
-    if (def.def_version == 0 || def.def_version > EXTRACTORDEF_VERSION) {
+    if (def.def_version == 0 || def.def_version > MediaExtractor::EXTRACTORDEF_VERSION) {
         ALOGE("don't understand extractor format %u, ignoring.", def.def_version);
         return;
     }
@@ -248,7 +176,7 @@ void MediaExtractor::RegisterSniffer_l(const ExtractorDef &def) {
         return;
     }
 
-    for (List<ExtractorDef>::iterator it = gSniffers.begin();
+    for (List<MediaExtractor::ExtractorDef>::iterator it = gSniffers.begin();
             it != gSniffers.end(); ++it) {
         if (memcmp(&((*it).extractor_uuid), &def.extractor_uuid, 16) == 0) {
             // there's already an extractor with the same uuid
@@ -274,7 +202,7 @@ void MediaExtractor::RegisterSniffer_l(const ExtractorDef &def) {
 }
 
 // static
-void MediaExtractor::RegisterDefaultSniffers() {
+void MediaExtractorFactory::RegisterDefaultSniffers() {
     Mutex::Autolock autoLock(gSnifferMutex);
     if (gSniffersRegistered) {
         return;
@@ -288,7 +216,8 @@ void MediaExtractor::RegisterDefaultSniffers() {
                 String8 libPath = String8(libDirPath) + libEntry->d_name;
                 void *libHandle = dlopen(libPath.string(), RTLD_NOW | RTLD_LOCAL);
                 if (libHandle) {
-                    GetExtractorDef getsniffer = (GetExtractorDef) dlsym(libHandle, "GETEXTRACTORDEF");
+                    MediaExtractor::GetExtractorDef getsniffer =
+                            (MediaExtractor::GetExtractorDef) dlsym(libHandle, "GETEXTRACTORDEF");
                     if (getsniffer) {
                         ALOGV("registering sniffer for %s", libPath.string());
                         RegisterSniffer_l(getsniffer());

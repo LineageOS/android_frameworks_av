@@ -21,7 +21,6 @@
 #include "AnotherPacketSource.h"
 #include "CasManager.h"
 #include "ESQueue.h"
-#include "include/avc_utils.h"
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
 #include <cutils/native_handle.h>
@@ -30,6 +29,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/ByteUtils.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
