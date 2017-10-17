@@ -97,6 +97,10 @@ public:
         mOpenCount = count;
     }
 
+    bool isConnected() const {
+        return mConnected;
+    }
+
 protected:
     void                     disconnectRegisteredStreams();
 
@@ -110,6 +114,8 @@ protected:
     int32_t                  mFramesPerBurst = 0;
     int32_t                  mOpenCount = 0;
     int32_t                  mRequestedDeviceId = 0;
+
+    std::atomic<bool>        mConnected{true};
 
 };
 

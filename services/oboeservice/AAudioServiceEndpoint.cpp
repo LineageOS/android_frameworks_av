@@ -60,6 +60,7 @@ std::string AAudioServiceEndpoint::dump() const {
     result << "    Reference Count:      " << mOpenCount << "\n";
     result << "    Requested Device Id:  " << mRequestedDeviceId << "\n";
     result << "    Device Id:            " << getDeviceId() << "\n";
+    result << "    Connected:            " << mConnected.load() << "\n";
     result << "    Registered Streams:" << "\n";
     result << AAudioServiceStreamShared::dumpHeader() << "\n";
     for (const auto stream : mRegisteredStreams) {
@@ -74,7 +75,9 @@ std::string AAudioServiceEndpoint::dump() const {
 
 void AAudioServiceEndpoint::disconnectRegisteredStreams() {
     std::lock_guard<std::mutex> lock(mLockStreams);
+    mConnected.store(false);
     for (const auto stream : mRegisteredStreams) {
+        ALOGD("disconnectRegisteredStreams() stop and disconnect %p", stream.get());
         stream->stop();
         stream->disconnect();
     }
@@ -96,6 +99,9 @@ aaudio_result_t AAudioServiceEndpoint::unregisterStream(sp<AAudioServiceStreamBa
 }
 
 bool AAudioServiceEndpoint::matches(const AAudioStreamConfiguration& configuration) {
+    if (!mConnected.load()) {
+        return false; // Only use an endpoint if it is connected to a device.
+    }
     if (configuration.getDirection() != getDirection()) {
         return false;
     }
