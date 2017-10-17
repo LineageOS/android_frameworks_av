@@ -110,6 +110,7 @@ NuPlayer::Renderer::Renderer(
       mAnchorTimeMediaUs(-1),
       mAnchorNumFramesWritten(-1),
       mVideoLateByUs(0ll),
+      mNextVideoTimeMediaUs(-1),
       mHasAudio(false),
       mHasVideo(false),
       mNotifyCompleteAudio(false),
@@ -301,6 +302,7 @@ void NuPlayer::Renderer::flush(bool audio, bool notifyComplete) {
 
         mMediaClock->clearAnchor();
         mVideoLateByUs = 0;
+        mNextVideoTimeMediaUs = -1;
         mSyncQueues = false;
     }
 
@@ -1277,9 +1279,10 @@ void NuPlayer::Renderer::postDrainVideoQueue() {
             mAnchorTimeMediaUs = mediaTimeUs;
         }
     }
+    mNextVideoTimeMediaUs = mediaTimeUs + 100000;
     if (!mHasAudio) {
         // smooth out videos >= 10fps
-        mMediaClock->updateMaxTimeMedia(mediaTimeUs + 100000);
+        mMediaClock->updateMaxTimeMedia(mNextVideoTimeMediaUs);
     }
 
     if (!mVideoSampleReceived || mediaTimeUs < mAudioFirstAnchorTimeMediaUs) {
@@ -1411,6 +1414,13 @@ void NuPlayer::Renderer::notifyEOS_l(bool audio, status_t finalResult, int64_t d
         // Video might outlive audio. Clear anchor to enable video only case.
         mAnchorTimeMediaUs = -1;
         mHasAudio = false;
+        if (mNextVideoTimeMediaUs >= 0) {
+            int64_t mediaUs = 0;
+            mMediaClock->getMediaTime(ALooper::GetNowUs(), &mediaUs);
+            if (mNextVideoTimeMediaUs > mediaUs) {
+                mMediaClock->updateMaxTimeMedia(mNextVideoTimeMediaUs);
+            }
+        }
     }
 }
 
