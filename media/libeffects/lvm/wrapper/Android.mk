@@ -64,4 +64,7 @@ LOCAL_C_INCLUDES += \
     $(call include-path-for, audio-effects)
 
 LOCAL_HEADER_LIBRARIES += libhardware_headers
+
+LOCAL_SANITIZE := integer_overflow
+
 include $(BUILD_SHARED_LIBRARY)
