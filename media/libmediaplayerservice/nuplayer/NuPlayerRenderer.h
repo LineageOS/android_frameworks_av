@@ -177,6 +177,7 @@ private:
     int64_t mAnchorTimeMediaUs;
     int64_t mAnchorNumFramesWritten;
     int64_t mVideoLateByUs;
+    int64_t mNextVideoTimeMediaUs;
     bool mHasAudio;
     bool mHasVideo;
 
