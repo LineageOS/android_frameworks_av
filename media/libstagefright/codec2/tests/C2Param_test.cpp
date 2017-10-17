@@ -2405,9 +2405,9 @@ typename lax_underlying_type<E>::type get(
 template<typename T>
 void dumpFSV(const C2FieldSupportedValues &sv, T*t) {
     using namespace std;
-    cout << (std::is_enum<T>::value ? (std::is_signed<typename std::underlying_type<T>::type>::value ? "i" : "u")
+    cout << (std::is_enum<T>::value ? (std::is_signed<typename lax_underlying_type<T>::type>::value ? "i" : "u")
              : std::is_integral<T>::value ? std::is_signed<T>::value ? "i" : "u" : "f")
-        << (8 * sizeof(T));
+         << (8 * sizeof(T));
     if (sv.type == sv.RANGE) {
         cout << ".range(" << get(sv.range.min, t);
         if (get(sv.range.step, t) != std::is_integral<T>::value) {
@@ -2549,6 +2549,22 @@ TEST_F(C2ParamTest, ReflectorTest) {
 
     for (const C2FieldSupportedValues &sv : values) {
         dumpFSV(sv, &domainInfo.mValue);
+    }
+}
+
+TEST_F(C2ParamTest, FieldSupportedValuesTest) {
+    typedef C2GlobalParam<C2Info, C2Uint32Value, 0> Uint32TestInfo;
+    Uint32TestInfo t;
+    std::vector<C2FieldSupportedValues> values;
+    values.push_back(C2FieldSupportedValues(0, 10, 1));  // min, max, step
+    values.push_back(C2FieldSupportedValues(1, 64, 2, 1));  // min, max, nom, den
+    values.push_back(C2FieldSupportedValues(false, {1, 2, 3}));  // flags, std::initializer_list
+    uint32_t val[] = {1, 3, 5, 7};
+    std::vector<uint32_t> v(std::begin(val), std::end(val));
+    values.push_back(C2FieldSupportedValues(false, v));  // flags, std::vector
+
+    for (const C2FieldSupportedValues &sv : values) {
+        dumpFSV(sv, &t.mValue);
     }
 }
 

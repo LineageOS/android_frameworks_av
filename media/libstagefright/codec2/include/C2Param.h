@@ -1164,6 +1164,15 @@ struct C2FieldSupportedValues {
         }
     }
 
+    template<typename T>
+    C2FieldSupportedValues(bool flags, const std::vector<T>& list)
+        : type(flags ? FLAGS : VALUES),
+          range{(T)0, (T)0, (T)0, (T)0, (T)0} {
+        for(T value : list) {
+            values.emplace_back(value);
+        }
+    }
+
     template<typename T, typename E=decltype(C2FieldDescriptor::namedValuesFor(*(T*)0))>
     C2FieldSupportedValues(bool flags, const T*)
         : type(flags ? FLAGS : VALUES),
