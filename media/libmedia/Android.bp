@@ -122,6 +122,33 @@ cc_library_shared {
     defaults: ["libmedia_omx_defaults"],
 }
 
+cc_library_static {
+    name: "libmedia_midiiowrapper",
+
+    srcs: ["MidiIoWrapper.cpp"],
+
+    static_libs: [
+        "libsonivox",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wno-error=deprecated-declarations",
+        "-Wall",
+    ],
+
+    sanitize: {
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+        diag: {
+            cfi: true,
+        },
+    },
+}
+
 cc_library_shared {
     name: "libmedia",
     defaults: ["libmedia_omx_defaults"],
@@ -151,7 +178,6 @@ cc_library_shared {
         "IMediaMetadataRetriever.cpp",
         "mediametadataretriever.cpp",
         "MidiDeviceInfo.cpp",
-        "MidiIoWrapper.cpp",
         "JetPlayer.cpp",
         "MediaScanner.cpp",
         "MediaScannerClient.cpp",
@@ -193,9 +219,9 @@ cc_library_shared {
         "libsonivox",
     ],
 
-    // for memory heap analysis
     static_libs: [
-        "libc_malloc_debug_backtrace",
+        "libc_malloc_debug_backtrace",  // for memory heap analysis
+        "libmedia_midiiowrapper",
     ],
 
     export_include_dirs: [
