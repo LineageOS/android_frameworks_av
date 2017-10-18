@@ -4,6 +4,28 @@ cc_library_headers {
     vendor_available: true,
 }
 
+cc_library_static {
+    name: "libstagefright_esds",
+
+    srcs: ["ESDS.cpp"],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+    sanitize: {
+        misc_undefined: [
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+        diag: {
+            cfi: true,
+        },
+    },
+
+    shared_libs: ["libmedia"],
+}
+
 cc_library_shared {
     name: "libstagefright",
 
@@ -23,7 +45,6 @@ cc_library_shared {
         "DataConverter.cpp",
         "DataSourceFactory.cpp",
         "DataURISource.cpp",
-        "ESDS.cpp",
         "FileSource.cpp",
         "FrameRenderTracker.cpp",
         "HTTPBase.cpp",
@@ -97,6 +118,7 @@ cc_library_shared {
         "libvpx",
         "libwebm",
         "libstagefright_mpeg2support",
+        "libstagefright_esds",
         "libstagefright_id3",
         "libFLAC",
     ],
