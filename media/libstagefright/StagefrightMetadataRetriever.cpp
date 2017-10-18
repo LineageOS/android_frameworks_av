@@ -22,25 +22,27 @@
 #include <utils/Log.h>
 #include <gui/Surface.h>
 
-#include "include/avc_utils.h"
 #include "include/StagefrightMetadataRetriever.h"
 
 #include <media/ICrypto.h>
 #include <media/IMediaHTTPService.h>
 #include <media/MediaCodecBuffer.h>
 
+#include <media/DataSource.h>
+#include <media/MediaExtractor.h>
+#include <media/MediaSource.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/ColorConverter.h>
-#include <media/stagefright/DataSource.h>
+#include <media/stagefright/DataSourceFactory.h>
 #include <media/stagefright/FileSource.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MediaExtractor.h>
-#include <media/stagefright/MediaSource.h>
+#include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
 
@@ -78,14 +80,14 @@ status_t StagefrightMetadataRetriever::setDataSource(
     ALOGV("setDataSource(%s)", uri);
 
     clearMetadata();
-    mSource = DataSource::CreateFromURI(httpService, uri, headers);
+    mSource = DataSourceFactory::CreateFromURI(httpService, uri, headers);
 
     if (mSource == NULL) {
         ALOGE("Unable to create data source for '%s'.", uri);
         return UNKNOWN_ERROR;
     }
 
-    mExtractor = MediaExtractor::Create(mSource);
+    mExtractor = MediaExtractorFactory::Create(mSource);
 
     if (mExtractor == NULL) {
         ALOGE("Unable to instantiate an extractor for '%s'.", uri);
@@ -115,7 +117,7 @@ status_t StagefrightMetadataRetriever::setDataSource(
         return err;
     }
 
-    mExtractor = MediaExtractor::Create(mSource);
+    mExtractor = MediaExtractorFactory::Create(mSource);
 
     if (mExtractor == NULL) {
         mSource.clear();
@@ -132,7 +134,7 @@ status_t StagefrightMetadataRetriever::setDataSource(
 
     clearMetadata();
     mSource = source;
-    mExtractor = MediaExtractor::Create(mSource, mime);
+    mExtractor = MediaExtractorFactory::Create(mSource, mime);
 
     if (mExtractor == NULL) {
         ALOGE("Failed to instantiate a MediaExtractor.");
@@ -454,7 +456,8 @@ static VideoFrame *extractVideoFrame(
         }
 
         if (haveMoreInputs && inputIndex < inputBuffers.size()) {
-            if (isAvcOrHevc && IsIDR(codecBuffer) && decodeSingleFrame) {
+            if (isAvcOrHevc && IsIDR(codecBuffer->data(), codecBuffer->size())
+                    && decodeSingleFrame) {
                 // Only need to decode one IDR frame, unless we're seeking with CLOSEST
                 // option, in which case we need to actually decode to targetTimeUs.
                 haveMoreInputs = false;

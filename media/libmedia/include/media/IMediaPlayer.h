@@ -23,7 +23,7 @@
 #include <utils/KeyedVector.h>
 #include <system/audio.h>
 
-#include <media/IMediaSource.h>
+#include <media/MediaSource.h>
 #include <media/VolumeShaper.h>
 
 // Fwd decl to make sure everyone agrees that the scope of struct sockaddr_in is
@@ -42,7 +42,7 @@ struct AudioPlaybackRate;
 struct AVSyncSettings;
 struct BufferingSettings;
 
-typedef IMediaSource::ReadOptions::SeekMode MediaPlayerSeekMode;
+typedef MediaSource::ReadOptions::SeekMode MediaPlayerSeekMode;
 
 class IMediaPlayer: public IInterface
 {

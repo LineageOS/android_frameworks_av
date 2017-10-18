@@ -15,6 +15,7 @@
  */
 
 #include <media/stagefright/CallbackMediaSource.h>
+#include <media/IMediaSource.h>
 
 namespace android {
 
@@ -36,7 +37,7 @@ sp<MetaData> CallbackMediaSource::getFormat() {
 }
 
 status_t CallbackMediaSource::read(MediaBuffer **buffer, const ReadOptions *options) {
-    return mSource->read(buffer, reinterpret_cast<const MediaSource::ReadOptions*>(options));
+    return mSource->read(buffer, reinterpret_cast<const ReadOptions*>(options));
 }
 
 status_t CallbackMediaSource::pause() {

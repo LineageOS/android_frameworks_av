@@ -19,7 +19,7 @@
 
 #include <libsonivox/eas_types.h>
 
-#include "media/stagefright/DataSource.h"
+#include <media/DataSource.h>
 
 namespace android {
 

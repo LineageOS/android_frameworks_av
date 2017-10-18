@@ -23,16 +23,16 @@
 #include "mpeg2ts/AnotherPacketSource.h"
 #include "mpeg2ts/ESQueue.h"
 
+#include <media/DataSource.h>
+#include <media/MediaSource.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/foundation/hexdump.h>
-#include <media/stagefright/DataSource.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
 #include <utils/String8.h>
 

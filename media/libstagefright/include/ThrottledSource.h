@@ -18,7 +18,7 @@
 
 #define THROTTLED_SOURCE_H_
 
-#include <media/stagefright/DataSource.h>
+#include <media/DataSource.h>
 #include <utils/threads.h>
 
 namespace android {

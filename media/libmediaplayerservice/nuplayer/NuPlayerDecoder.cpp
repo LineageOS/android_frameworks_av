@@ -33,6 +33,7 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaDefs.h>
@@ -40,7 +41,6 @@
 #include <media/stagefright/SurfaceUtils.h>
 #include <gui/Surface.h>
 
-#include "avc_utils.h"
 #include "ATSParser.h"
 
 namespace android {
@@ -945,7 +945,8 @@ status_t NuPlayer::Decoder::fetchInputData(sp<AMessage> &reply) {
                             mCurrentMaxVideoTemporalLayerId);
                 } else if (layerId > mCurrentMaxVideoTemporalLayerId) {
                     mCurrentMaxVideoTemporalLayerId = layerId;
-                } else if (layerId == 0 && mNumVideoTemporalLayerTotal > 1 && IsIDR(accessUnit)) {
+                } else if (layerId == 0 && mNumVideoTemporalLayerTotal > 1
+                        && IsIDR(accessUnit->data(), accessUnit->size())) {
                     mCurrentMaxVideoTemporalLayerId = mNumVideoTemporalLayerTotal - 1;
                 }
             }

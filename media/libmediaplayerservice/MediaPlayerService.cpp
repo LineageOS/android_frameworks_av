@@ -55,6 +55,7 @@
 #include <media/Metadata.h>
 #include <media/AudioTrack.h>
 #include <media/MemoryLeakTrackUtil.h>
+#include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/Utils.h>
@@ -882,7 +883,7 @@ status_t MediaPlayerService::Client::setDataSource(
 
 status_t MediaPlayerService::Client::setDataSource(
         const sp<IDataSource> &source) {
-    sp<DataSource> dataSource = DataSource::CreateFromIDataSource(source);
+    sp<DataSource> dataSource = CreateDataSourceFromIDataSource(source);
     player_type playerType = MediaPlayerFactory::getPlayerType(this, dataSource);
     sp<MediaPlayerBase> p = setDataSource_pre(playerType);
     if (p == NULL) {

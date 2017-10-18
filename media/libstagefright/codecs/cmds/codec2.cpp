@@ -30,17 +30,19 @@
 
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
+#include <media/DataSource.h>
 #include <media/ICrypto.h>
 #include <media/IMediaHTTPService.h>
+#include <media/MediaExtractor.h>
+#include <media/MediaSource.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
-#include <media/stagefright/DataSource.h>
+#include <media/stagefright/DataSourceFactory.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MediaExtractor.h>
-#include <media/stagefright/MediaSource.h>
+#include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
 
@@ -398,7 +400,7 @@ int main(int argc, char **argv) {
         const char *filename = argv[k];
 
         sp<DataSource> dataSource =
-            DataSource::CreateFromURI(NULL /* httpService */, filename);
+            DataSourceFactory::CreateFromURI(NULL /* httpService */, filename);
 
         if (strncasecmp(filename, "sine:", 5) && dataSource == NULL) {
             fprintf(stderr, "Unable to create data source.\n");
@@ -408,7 +410,7 @@ int main(int argc, char **argv) {
         Vector<sp<IMediaSource> > mediaSources;
         sp<IMediaSource> mediaSource;
 
-        sp<IMediaExtractor> extractor = MediaExtractor::Create(dataSource);
+        sp<IMediaExtractor> extractor = MediaExtractorFactory::Create(dataSource);
 
         if (extractor == NULL) {
             fprintf(stderr, "could not create extractor.\n");

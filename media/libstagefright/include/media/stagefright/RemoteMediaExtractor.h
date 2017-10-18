@@ -18,7 +18,7 @@
 #define REMOTE_MEDIA_EXTRACTOR_H_
 
 #include <media/IMediaExtractor.h>
-#include <media/stagefright/MediaExtractor.h>
+#include <media/MediaExtractor.h>
 
 namespace android {
 

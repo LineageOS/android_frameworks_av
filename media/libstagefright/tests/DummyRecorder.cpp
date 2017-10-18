@@ -17,8 +17,8 @@
 #define LOG_TAG "DummyRecorder"
 // #define LOG_NDEBUG 0
 
+#include <media/MediaSource.h>
 #include <media/stagefright/MediaBuffer.h>
-#include <media/stagefright/MediaSource.h>
 #include "DummyRecorder.h"
 
 #include <utils/Log.h>

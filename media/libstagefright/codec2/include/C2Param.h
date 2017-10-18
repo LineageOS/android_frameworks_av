@@ -933,6 +933,7 @@ public: \
     enum : uint32_t { baseIndex = kParamIndex##name | C2Param::BaseIndex::_kFlexibleFlag }; \
     DEFINE_C2STRUCT_NO_BASE(name)
 
+#ifdef __C2_GENERATE_GLOBAL_VARS__
 /// \ingroup internal
 /// Describe a structure of a templated structure.
 #define DESCRIBE_TEMPLATED_C2STRUCT(strukt, list) \
@@ -943,6 +944,12 @@ public: \
 /// Describe the fields of a structure using an initializer list.
 #define DESCRIBE_C2STRUCT(name, list) \
     const std::initializer_list<const C2FieldDescriptor> C2##name##Struct::fieldList = list;
+#else
+/// \if 0
+#define DESCRIBE_TEMPLATED_C2STRUCT(strukt, list)
+#define DESCRIBE_C2STRUCT(name, list)
+/// \endif
+#endif
 
 /**
  * Describe a field of a structure.
@@ -1022,6 +1029,7 @@ public: \
  *  ~~~~~~~~~~~~~
  *
  */
+#ifdef __C2_GENERATE_GLOBAL_VARS__
 #define C2FIELD(member, name) \
   C2FieldDescriptor(&((_type*)(nullptr))->member, name),
 
@@ -1032,7 +1040,7 @@ public: \
 /// Define a structure with matching baseIndex and start describing its fields.
 /// This must be at the end of the structure definition.
 #define DEFINE_AND_DESCRIBE_C2STRUCT(name) \
-    DEFINE_C2STRUCT(name) }  C2_PACK; \
+    DEFINE_C2STRUCT(name) } C2_PACK; \
     const std::initializer_list<const C2FieldDescriptor> C2##name##Struct::fieldList = {
 
 /// Define a flexible structure with matching baseIndex and start describing its fields.
@@ -1040,6 +1048,24 @@ public: \
 #define DEFINE_AND_DESCRIBE_FLEX_C2STRUCT(name, flexMember) \
     DEFINE_FLEX_C2STRUCT(name, flexMember) } C2_PACK; \
     const std::initializer_list<const C2FieldDescriptor> C2##name##Struct::fieldList = {
+#else
+/// \if 0
+/* Alternate declaration of field definitions in case no field list is to be generated.
+   TRICKY: use namespace declaration to handle closing bracket that is normally after
+   these macros. */
+#define C2FIELD(member, name)
+/// \deprecated
+#define C2SOLE_FIELD(member, name)
+/// Define a structure with matching baseIndex and start describing its fields.
+/// This must be at the end of the structure definition.
+#define DEFINE_AND_DESCRIBE_C2STRUCT(name) \
+    DEFINE_C2STRUCT(name) }  C2_PACK; namespace ignored {
+/// Define a flexible structure with matching baseIndex and start describing its fields.
+/// This must be at the end of the structure definition.
+#define DEFINE_AND_DESCRIBE_FLEX_C2STRUCT(name, flexMember) \
+    DEFINE_FLEX_C2STRUCT(name, flexMember) } C2_PACK; namespace ignored {
+/// \endif
+#endif
 
 /**
  * Parameter reflector class.

@@ -23,6 +23,7 @@
 
 #include <media/stagefright/MediaMuxer.h>
 
+#include <media/MediaSource.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -31,7 +32,6 @@
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MPEG4Writer.h>
 #include <media/stagefright/Utils.h>

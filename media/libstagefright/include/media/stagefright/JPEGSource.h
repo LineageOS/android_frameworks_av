@@ -18,7 +18,7 @@
 
 #define JPEG_SOURCE_H_
 
-#include <media/stagefright/MediaSource.h>
+#include <media/MediaSource.h>
 
 namespace android {
 

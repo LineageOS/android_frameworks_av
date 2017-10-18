@@ -4,6 +4,28 @@ cc_library_headers {
     vendor_available: true,
 }
 
+cc_library_static {
+    name: "libstagefright_esds",
+
+    srcs: ["ESDS.cpp"],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+    sanitize: {
+        misc_undefined: [
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+        diag: {
+            cfi: true,
+        },
+    },
+
+    shared_libs: ["libmedia"],
+}
+
 cc_library_shared {
     name: "libstagefright",
 
@@ -21,13 +43,13 @@ cc_library_shared {
         "CameraSource.cpp",
         "CameraSourceTimeLapse.cpp",
         "DataConverter.cpp",
-        "DataSource.cpp",
+        "DataSourceFactory.cpp",
         "DataURISource.cpp",
-        "ESDS.cpp",
         "FileSource.cpp",
         "FrameRenderTracker.cpp",
         "HTTPBase.cpp",
         "HevcUtils.cpp",
+        "InterfaceUtils.cpp",
         "JPEGSource.cpp",
         "MPEG2TSWriter.cpp",
         "MPEG4Writer.cpp",
@@ -37,11 +59,10 @@ cc_library_shared {
         "MediaCodecList.cpp",
         "MediaCodecListOverrides.cpp",
         "MediaCodecSource.cpp",
-        "MediaExtractor.cpp",
+        "MediaExtractorFactory.cpp",
         "MediaSync.cpp",
         "http/MediaHTTP.cpp",
         "MediaMuxer.cpp",
-        "MediaSource.cpp",
         "NuCachedSource2.cpp",
         "NuMediaExtractor.cpp",
         "OMXClient.cpp",
@@ -57,7 +78,6 @@ cc_library_shared {
         "ThrottledSource.cpp",
         "Utils.cpp",
         "VideoFrameScheduler.cpp",
-        "avc_utils.cpp",
     ],
 
     shared_libs: [
@@ -71,6 +91,7 @@ cc_library_shared {
         "liblog",
         "libmedia",
         "libaudioclient",
+        "libmediaextractor",
         "libmediametrics",
         "libmediautils",
         "libnetd_client",
@@ -97,6 +118,7 @@ cc_library_shared {
         "libvpx",
         "libwebm",
         "libstagefright_mpeg2support",
+        "libstagefright_esds",
         "libstagefright_id3",
         "libFLAC",
     ],

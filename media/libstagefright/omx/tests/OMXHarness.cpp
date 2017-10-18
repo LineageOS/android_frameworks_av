@@ -26,19 +26,23 @@
 #include <binder/ProcessState.h>
 #include <binder/IServiceManager.h>
 #include <binder/MemoryDealer.h>
+#include <cutils/properties.h>
+#include <media/DataSource.h>
 #include <media/IMediaHTTPService.h>
 #include <media/IMediaCodecService.h>
+#include <media/MediaExtractor.h>
+#include <media/MediaSource.h>
+#include <media/OMXBuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
-#include <media/stagefright/DataSource.h>
+#include <media/stagefright/DataSourceFactory.h>
+#include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MediaExtractor.h>
-#include <media/stagefright/MediaSource.h>
+#include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/SimpleDecodingSource.h>
-#include <media/OMXBuffer.h>
 #include <android/hardware/media/omx/1.0/IOmx.h>
 #include <media/omx/1.0/WOmx.h>
 #include <system/window.h>
@@ -291,13 +295,13 @@ private:
 
 static sp<IMediaExtractor> CreateExtractorFromURI(const char *uri) {
     sp<DataSource> source =
-        DataSource::CreateFromURI(NULL /* httpService */, uri);
+        DataSourceFactory::CreateFromURI(NULL /* httpService */, uri);
 
     if (source == NULL) {
         return NULL;
     }
 
-    return MediaExtractor::Create(source);
+    return MediaExtractorFactory::Create(source);
 }
 
 status_t Harness::testStateTransitions(
@@ -564,7 +568,7 @@ static sp<MediaSource> CreateSourceForMime(const char *mime) {
         CHECK(meta->findCString(kKeyMIMEType, &trackMime));
 
         if (!strcasecmp(mime, trackMime)) {
-            return MediaSource::CreateFromIMediaSource(extractor->getTrack(i));
+            return CreateMediaSourceFromIMediaSource(extractor->getTrack(i));
         }
     }
 

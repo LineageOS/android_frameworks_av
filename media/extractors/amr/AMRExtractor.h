@@ -19,7 +19,7 @@
 #define AMR_EXTRACTOR_H_
 
 #include <utils/Errors.h>
-#include <media/stagefright/MediaExtractor.h>
+#include <media/MediaExtractor.h>
 
 namespace android {
 

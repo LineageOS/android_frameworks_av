@@ -18,8 +18,8 @@
 
 #define IMEDIA_EXTRACTOR_BASE_H_
 
+#include <media/DataSource.h>
 #include <media/IMediaSource.h>
-#include <media/stagefright/DataSource.h>
 #include <vector>
 
 namespace android {

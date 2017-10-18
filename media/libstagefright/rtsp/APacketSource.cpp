@@ -23,8 +23,6 @@
 #include "ARawAudioAssembler.h"
 #include "ASessionDescription.h"
 
-#include "include/avc_utils.h"
-
 #include <ctype.h>
 
 #include <media/stagefright/foundation/ABitReader.h>
@@ -32,6 +30,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AString.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/base64.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaDefs.h>

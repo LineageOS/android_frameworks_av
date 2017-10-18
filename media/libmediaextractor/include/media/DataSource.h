@@ -47,17 +47,6 @@ public:
         kIsLocalFileSource     = 16,
     };
 
-    static sp<DataSource> CreateFromURI(
-            const sp<IMediaHTTPService> &httpService,
-            const char *uri,
-            const KeyedVector<String8, String8> *headers = NULL,
-            String8 *contentType = NULL,
-            HTTPBase *httpSource = NULL);
-
-    static sp<DataSource> CreateMediaHTTP(const sp<IMediaHTTPService> &httpService);
-    static sp<DataSource> CreateFromIDataSource(const sp<IDataSource> &source);
-    static sp<DataSource> CreateFromFd(int fd, int64_t offset, int64_t length);
-
     DataSource() {}
 
     virtual status_t initCheck() const = 0;
@@ -122,9 +111,6 @@ public:
     virtual String8 getMIMEType() const;
 
     virtual void close() {};
-
-    // creates an IDataSource wrapper to the DataSource.
-    virtual sp<IDataSource> asIDataSource();
 
     // returns a pointer to IDataSource if it is wrapped.
     virtual sp<IDataSource> getIDataSource() const;

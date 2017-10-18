@@ -31,6 +31,7 @@
 #include "ItemTable.h"
 #include "include/ESDS.h"
 
+#include <media/MediaSource.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -38,17 +39,16 @@
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/foundation/ColorUtils.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
-#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
 #include <utils/String8.h>
 
 #include <byteswap.h>
 #include "include/ID3.h"
-#include "include/avc_utils.h"
 
 #ifndef UINT32_MAX
 #define UINT32_MAX       (4294967295U)
@@ -1721,6 +1721,9 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                     // ratio. Use compression ratio of 1.
                     max_size = width * height * 3 / 2;
                 }
+                // HACK: allow 10% overhead
+                // TODO: read sample size from traf atom for fragmented MPEG4.
+                max_size += max_size / 10;
                 mLastTrack->meta->setInt32(kKeyMaxInputSize, max_size);
             }
 

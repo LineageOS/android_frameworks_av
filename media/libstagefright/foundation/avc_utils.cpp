@@ -18,10 +18,10 @@
 #define LOG_TAG "avc_utils"
 #include <utils/Log.h>
 
-#include "include/avc_utils.h"
 
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ADebug.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
@@ -468,11 +468,9 @@ sp<MetaData> MakeAVCCodecSpecificData(const sp<ABuffer> &accessUnit) {
     return meta;
 }
 
-template <typename T>
-bool IsIDRInternal(const sp<T> &buffer) {
-    const uint8_t *data = buffer->data();
-    size_t size = buffer->size();
-
+bool IsIDR(const uint8_t *data, size_t size) {
+//    const uint8_t *data = buffer->data();
+//    size_t size = buffer->size();
     bool foundIDR = false;
 
     const uint8_t *nalStart;
@@ -492,14 +490,6 @@ bool IsIDRInternal(const sp<T> &buffer) {
     }
 
     return foundIDR;
-}
-
-bool IsIDR(const sp<ABuffer> &buffer) {
-    return IsIDRInternal(buffer);
-}
-
-bool IsIDR(const sp<MediaCodecBuffer> &buffer) {
-    return IsIDRInternal(buffer);
 }
 
 bool IsAVCReferenceFrame(const sp<ABuffer> &accessUnit) {

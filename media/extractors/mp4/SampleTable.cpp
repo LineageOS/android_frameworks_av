@@ -25,9 +25,9 @@
 
 #include <arpa/inet.h>
 
+#include <media/DataSource.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ByteUtils.h>
-#include <media/stagefright/DataSource.h>
 
 /* TODO: remove after being merged into other branches */
 #ifndef UINT32_MAX

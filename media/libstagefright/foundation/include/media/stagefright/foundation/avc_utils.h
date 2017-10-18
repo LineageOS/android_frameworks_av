@@ -84,8 +84,7 @@ status_t getNextNALUnit(
 class MetaData;
 sp<MetaData> MakeAVCCodecSpecificData(const sp<ABuffer> &accessUnit);
 
-bool IsIDR(const sp<ABuffer> &accessUnit);
-bool IsIDR(const sp<MediaCodecBuffer> &accessUnit);
+bool IsIDR(const uint8_t *data, size_t size);
 bool IsAVCReferenceFrame(const sp<ABuffer> &accessUnit);
 uint32_t FindAVCLayerId(const uint8_t *data, size_t size);
 

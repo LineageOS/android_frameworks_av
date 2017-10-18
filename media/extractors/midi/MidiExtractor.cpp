@@ -25,7 +25,7 @@
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
-#include <media/stagefright/MediaSource.h>
+#include <media/MediaSource.h>
 #include <libsonivox/eas_reverb.h>
 
 namespace android {

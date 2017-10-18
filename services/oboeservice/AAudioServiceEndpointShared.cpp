@@ -91,7 +91,12 @@ aaudio_result_t AAudioServiceEndpointShared::close() {
 static void *aaudio_endpoint_thread_proc(void *context) {
     AAudioServiceEndpointShared *endpoint = (AAudioServiceEndpointShared *) context;
     if (endpoint != NULL) {
-        return endpoint->callbackLoop();
+        void *result = endpoint->callbackLoop();
+        // Close now so that the HW resource is freed and we can open a new device.
+        if (!endpoint->isConnected()) {
+            endpoint->close();
+        }
+        return result;
     } else {
         return NULL;
     }

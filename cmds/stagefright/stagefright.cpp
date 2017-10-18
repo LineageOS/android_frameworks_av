@@ -31,6 +31,9 @@
 
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
+#include <media/DataSource.h>
+#include <media/MediaExtractor.h>
+#include <media/MediaSource.h>
 #include <media/ICrypto.h>
 #include <media/IMediaHTTPService.h>
 #include <media/IMediaCodecService.h>
@@ -41,14 +44,14 @@
 #include <media/stagefright/foundation/AUtils.h>
 #include "include/NuCachedSource2.h"
 #include <media/stagefright/AudioPlayer.h>
-#include <media/stagefright/DataSource.h>
+#include <media/stagefright/DataSourceFactory.h>
 #include <media/stagefright/JPEGSource.h>
+#include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MediaExtractor.h>
-#include <media/stagefright/MediaSource.h>
+#include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/SimpleDecodingSource.h>
 #include <media/stagefright/Utils.h>
@@ -988,7 +991,7 @@ int main(int argc, char **argv) {
         const char *filename = argv[k];
 
         sp<DataSource> dataSource =
-            DataSource::CreateFromURI(NULL /* httpService */, filename);
+            DataSourceFactory::CreateFromURI(NULL /* httpService */, filename);
 
         if (strncasecmp(filename, "sine:", 5) && dataSource == NULL) {
             fprintf(stderr, "Unable to create data source.\n");
@@ -1022,7 +1025,7 @@ int main(int argc, char **argv) {
                 mediaSources.push(mediaSource);
             }
         } else {
-            sp<IMediaExtractor> extractor = MediaExtractor::Create(dataSource);
+            sp<IMediaExtractor> extractor = MediaExtractorFactory::Create(dataSource);
 
             if (extractor == NULL) {
                 fprintf(stderr, "could not create extractor.\n");
@@ -1049,7 +1052,7 @@ int main(int argc, char **argv) {
                 bool haveAudio = false;
                 bool haveVideo = false;
                 for (size_t i = 0; i < numTracks; ++i) {
-                    sp<MediaSource> source = MediaSource::CreateFromIMediaSource(
+                    sp<MediaSource> source = CreateMediaSourceFromIMediaSource(
                             extractor->getTrack(i));
                     if (source == nullptr) {
                         fprintf(stderr, "skip NULL track %zu, track count %zu.\n", i, numTracks);
@@ -1116,7 +1119,7 @@ int main(int argc, char **argv) {
                            thumbTimeUs, thumbTimeUs / 1E6);
                 }
 
-                mediaSource = MediaSource::CreateFromIMediaSource(extractor->getTrack(i));
+                mediaSource = CreateMediaSourceFromIMediaSource(extractor->getTrack(i));
                 if (mediaSource == nullptr) {
                     fprintf(stderr, "skip NULL track %zu, total tracks %zu.\n", i, numTracks);
                     return -1;

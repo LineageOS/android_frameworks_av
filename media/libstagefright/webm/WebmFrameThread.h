@@ -20,8 +20,8 @@
 #include "WebmFrame.h"
 #include "LinkedBlockingQueue.h"
 
+#include <media/MediaSource.h>
 #include <media/stagefright/FileSource.h>
-#include <media/stagefright/MediaSource.h>
 
 #include <utils/List.h>
 #include <utils/Errors.h>

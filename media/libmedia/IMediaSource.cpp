@@ -26,7 +26,7 @@
 #include <media/IMediaSource.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaBufferGroup.h>
-#include <media/stagefright/MediaSource.h>
+#include <media/MediaSource.h>
 #include <media/stagefright/MetaData.h>
 
 namespace android {
@@ -113,7 +113,8 @@ public:
         return NULL;
     }
 
-    virtual status_t read(MediaBuffer **buffer, const ReadOptions *options) {
+    virtual status_t read(MediaBuffer **buffer,
+            const MediaSource::ReadOptions *options) {
         Vector<MediaBuffer *> buffers;
         status_t ret = readMultiple(&buffers, 1 /* maxNumBuffers */, options);
         *buffer = buffers.size() == 0 ? nullptr : buffers[0];
@@ -123,7 +124,8 @@ public:
     }
 
     virtual status_t readMultiple(
-            Vector<MediaBuffer *> *buffers, uint32_t maxNumBuffers, const ReadOptions *options) {
+            Vector<MediaBuffer *> *buffers, uint32_t maxNumBuffers,
+            const MediaSource::ReadOptions *options) {
         ALOGV("readMultiple");
         if (buffers == NULL || !buffers->isEmpty()) {
             return BAD_VALUE;
@@ -330,7 +332,7 @@ status_t BnMediaSource::onTransact(
             }
 
             // Get read options, if any.
-            ReadOptions opts;
+            MediaSource::ReadOptions opts;
             uint32_t len;
             const bool useOptions =
                     data.readUint32(&len) == NO_ERROR
@@ -448,59 +450,6 @@ status_t BnMediaSource::onTransact(
             return BBinder::onTransact(code, data, reply, flags);
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////
-
-IMediaSource::ReadOptions::ReadOptions() {
-    reset();
-}
-
-void IMediaSource::ReadOptions::reset() {
-    mOptions = 0;
-    mSeekTimeUs = 0;
-    mLatenessUs = 0;
-    mNonBlocking = false;
-}
-
-void IMediaSource::ReadOptions::setNonBlocking() {
-    mNonBlocking = true;
-}
-
-void IMediaSource::ReadOptions::clearNonBlocking() {
-    mNonBlocking = false;
-}
-
-bool IMediaSource::ReadOptions::getNonBlocking() const {
-    return mNonBlocking;
-}
-
-void IMediaSource::ReadOptions::setSeekTo(int64_t time_us, SeekMode mode) {
-    mOptions |= kSeekTo_Option;
-    mSeekTimeUs = time_us;
-    mSeekMode = mode;
-}
-
-void IMediaSource::ReadOptions::clearSeekTo() {
-    mOptions &= ~kSeekTo_Option;
-    mSeekTimeUs = 0;
-    mSeekMode = SEEK_CLOSEST_SYNC;
-}
-
-bool IMediaSource::ReadOptions::getSeekTo(
-        int64_t *time_us, SeekMode *mode) const {
-    *time_us = mSeekTimeUs;
-    *mode = mSeekMode;
-    return (mOptions & kSeekTo_Option) != 0;
-}
-
-void IMediaSource::ReadOptions::setLateBy(int64_t lateness_us) {
-    mLatenessUs = lateness_us;
-}
-
-int64_t IMediaSource::ReadOptions::getLateBy() const {
-    return mLatenessUs;
-}
-
 
 }  // namespace android
 

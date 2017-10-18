@@ -18,7 +18,7 @@
 #define REMOTE_MEDIA_SOURCE_H_
 
 #include <media/IMediaSource.h>
-#include <media/stagefright/MediaSource.h>
+#include <media/MediaSource.h>
 #include <media/stagefright/foundation/ABase.h>
 
 namespace android {
@@ -32,7 +32,8 @@ public:
     virtual status_t stop();
     virtual sp<MetaData> getFormat();
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options = NULL);
+            MediaBuffer **buffer,
+            const MediaSource::ReadOptions *options = NULL);
     virtual status_t pause();
     virtual status_t setBuffers(const Vector<MediaBuffer *> &buffers);
     virtual status_t setStopTimeUs(int64_t stopTimeUs);

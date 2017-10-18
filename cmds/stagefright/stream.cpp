@@ -21,15 +21,18 @@
 #include <binder/ProcessState.h>
 #include <cutils/properties.h> // for property_get
 
+#include <media/DataSource.h>
 #include <media/IMediaHTTPService.h>
 #include <media/IStreamSource.h>
+#include <media/MediaExtractor.h>
 #include <media/mediaplayer.h>
+#include <media/MediaSource.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/DataSource.h>
+#include <media/stagefright/DataSourceFactory.h>
+#include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MPEG2TSWriter.h>
-#include <media/stagefright/MediaExtractor.h>
-#include <media/stagefright/MediaSource.h>
+#include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
 
 #include <binder/IServiceManager.h>
@@ -161,11 +164,11 @@ MyConvertingStreamSource::MyConvertingStreamSource(const char *filename)
     : mCurrentBufferIndex(-1),
       mCurrentBufferOffset(0) {
     sp<DataSource> dataSource =
-        DataSource::CreateFromURI(NULL /* httpService */, filename);
+        DataSourceFactory::CreateFromURI(NULL /* httpService */, filename);
 
     CHECK(dataSource != NULL);
 
-    sp<IMediaExtractor> extractor = MediaExtractor::Create(dataSource);
+    sp<IMediaExtractor> extractor = MediaExtractorFactory::Create(dataSource);
     CHECK(extractor != NULL);
 
     mWriter = new MPEG2TSWriter(
@@ -182,7 +185,7 @@ MyConvertingStreamSource::MyConvertingStreamSource(const char *filename)
             continue;
         }
 
-        sp<MediaSource> track = MediaSource::CreateFromIMediaSource(extractor->getTrack(i));
+        sp<MediaSource> track = CreateMediaSourceFromIMediaSource(extractor->getTrack(i));
         if (track == nullptr) {
             fprintf(stderr, "skip NULL track %zu, total tracks %zu\n", i, numTracks);
             continue;

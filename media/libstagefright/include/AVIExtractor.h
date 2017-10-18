@@ -18,9 +18,9 @@
 
 #define AVI_EXTRACTOR_H_
 
+#include <media/MediaExtractor.h>
+#include <media/MediaSource.h>
 #include <media/stagefright/foundation/ABase.h>
-#include <media/stagefright/MediaExtractor.h>
-#include <media/stagefright/MediaSource.h>
 #include <utils/Vector.h>
 
 namespace android {
