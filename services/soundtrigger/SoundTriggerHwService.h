@@ -141,7 +141,7 @@ public:
 
     private:
 
-       status_t unloadSoundModel_l(sound_model_handle_t handle);
+       status_t unloadSoundModel_l(sound_model_handle_t handle, audio_session_t *session);
 
 
         Mutex                                  mLock;
