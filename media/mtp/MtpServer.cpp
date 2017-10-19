@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <android-base/logging.h>
 #include <android-base/properties.h>
 #include <chrono>
 #include <dirent.h>
@@ -99,16 +100,12 @@ static const MtpEventCode kSupportedEventCodes[] = {
 };
 
 MtpServer::MtpServer(MtpDatabase* database, bool ptp,
-                    int fileGroup, int filePerm, int directoryPerm,
                     const MtpString& deviceInfoManufacturer,
                     const MtpString& deviceInfoModel,
                     const MtpString& deviceInfoDeviceVersion,
                     const MtpString& deviceInfoSerialNumber)
     :   mDatabase(database),
         mPtp(ptp),
-        mFileGroup(fileGroup),
-        mFilePermission(filePerm),
-        mDirectoryPermission(directoryPerm),
         mDeviceInfoManufacturer(deviceInfoManufacturer),
         mDeviceInfoModel(deviceInfoModel),
         mDeviceInfoDeviceVersion(deviceInfoDeviceVersion),
@@ -1002,12 +999,9 @@ MtpResponseCode MtpServer::doSendObjectInfo() {
     }
 
   if (format == MTP_FORMAT_ASSOCIATION) {
-        mode_t mask = umask(0);
-        int ret = mkdir((const char *)path, mDirectoryPermission);
-        umask(mask);
-        if (ret && ret != -EEXIST)
+        int ret = makeFolder((const char *)path);
+        if (ret)
             return MTP_RESPONSE_GENERAL_ERROR;
-        chown((const char *)path, getuid(), mFileGroup);
 
         // SendObject does not get sent for directories, so call endSendObject here instead
         mDatabase->endSendObject(path, handle, MTP_FORMAT_ASSOCIATION, MTP_RESPONSE_OK);
@@ -1068,28 +1062,39 @@ MtpResponseCode MtpServer::doMoveObject() {
         path += "/";
     path += info.mName;
 
-    result = mDatabase->moveObject(objectHandle, parent, path);
+    result = mDatabase->moveObject(objectHandle, parent, storageID, path);
     if (result != MTP_RESPONSE_OK)
         return result;
 
     if (info.mStorageID == storageID) {
         ALOGV("Moving file from %s to %s", (const char*)fromPath, (const char*)path);
         if (rename(fromPath, path)) {
-            ALOGE("rename() failed from %s to %s", (const char*)fromPath, (const char*)path);
+            PLOG(ERROR) << "rename() failed from " << fromPath << " to " << path;
             result = MTP_RESPONSE_GENERAL_ERROR;
         }
     } else {
         ALOGV("Moving across storages from %s to %s", (const char*)fromPath, (const char*)path);
-        if (copyFile(fromPath, path)) {
-            result = MTP_RESPONSE_GENERAL_ERROR;
+        if (format == MTP_FORMAT_ASSOCIATION) {
+            int ret = makeFolder((const char *)path);
+            ret += copyRecursive(fromPath, path);
+            if (ret) {
+                result = MTP_RESPONSE_GENERAL_ERROR;
+            } else {
+                deletePath(fromPath);
+            }
         } else {
-            deletePath(fromPath);
+            if (copyFile(fromPath, path)) {
+                result = MTP_RESPONSE_GENERAL_ERROR;
+            } else {
+                deletePath(fromPath);
+            }
         }
     }
 
     // If the move failed, undo the database change
     if (result != MTP_RESPONSE_OK)
-        if (mDatabase->moveObject(objectHandle, info.mParent, fromPath) != MTP_RESPONSE_OK)
+        if (mDatabase->moveObject(objectHandle, info.mParent, info.mStorageID,
+                    fromPath) != MTP_RESPONSE_OK)
             ALOGE("Couldn't undo failed move");
 
     return result;
@@ -1148,8 +1153,15 @@ MtpResponseCode MtpServer::doCopyObject() {
     }
 
     ALOGV("Copying file from %s to %s", (const char*)fromPath, (const char*)path);
-    if (copyFile(fromPath, path)) {
-        result = MTP_RESPONSE_GENERAL_ERROR;
+    if (format == MTP_FORMAT_ASSOCIATION) {
+        int ret = makeFolder((const char *)path);
+        if (ret) {
+            result = MTP_RESPONSE_GENERAL_ERROR;
+        }
+    } else {
+        if (copyFile(fromPath, path)) {
+            result = MTP_RESPONSE_GENERAL_ERROR;
+        }
     }
 
     mDatabase->endSendObject(path, handle, format, result);
@@ -1188,10 +1200,10 @@ MtpResponseCode MtpServer::doSendObject() {
         result = MTP_RESPONSE_GENERAL_ERROR;
         goto done;
     }
-    fchown(mfr.fd, getuid(), mFileGroup);
+    fchown(mfr.fd, getuid(), FILE_GROUP);
     // set permissions
     mask = umask(0);
-    fchmod(mfr.fd, mFilePermission);
+    fchmod(mfr.fd, FILE_PERM);
     umask(mask);
 
     if (initialData > 0) {
