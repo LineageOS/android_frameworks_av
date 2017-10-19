@@ -1434,6 +1434,14 @@ void MatroskaExtractor::addTracks() {
                 continue;
         }
 
+        const char *language = track->GetLanguage();
+        if (language != NULL) {
+           char lang[4];
+           strncpy(lang, language, 3);
+           lang[3] = '\0';
+           meta->setCString(kKeyMediaLanguage, lang);
+        }
+
         if (err != OK) {
             ALOGE("skipping track, codec specific data was malformed.");
             continue;
