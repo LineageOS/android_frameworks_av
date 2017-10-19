@@ -20,6 +20,7 @@
 #include <android-base/unique_fd.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <string>
 #include <sys/sendfile.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -28,6 +29,8 @@
 #include <unistd.h>
 
 #include "MtpUtils.h"
+
+using namespace std;
 
 namespace android {
 
@@ -88,6 +91,60 @@ void formatDateTime(time_t seconds, char* buffer, int bufferLength) {
         tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 }
 
+int makeFolder(const char *path) {
+    mode_t mask = umask(0);
+    int ret = mkdir((const char *)path, DIR_PERM);
+    umask(mask);
+    if (ret && ret != -EEXIST) {
+        PLOG(ERROR) << "Failed to create folder " << path;
+        ret = -1;
+    } else {
+        chown((const char *)path, getuid(), FILE_GROUP);
+    }
+    return ret;
+}
+
+/**
+ * Copies target path and all children to destination path.
+ *
+ * Returns 0 on success or a negative value indicating number of failures
+ */
+int copyRecursive(const char *fromPath, const char *toPath) {
+    int ret = 0;
+    string fromPathStr(fromPath);
+    string toPathStr(toPath);
+
+    DIR* dir = opendir(fromPath);
+    if (!dir) {
+        PLOG(ERROR) << "opendir " << fromPath << " failed";
+        return -1;
+    }
+    if (fromPathStr[fromPathStr.size()-1] != '/')
+        fromPathStr += '/';
+    if (toPathStr[toPathStr.size()-1] != '/')
+        toPathStr += '/';
+
+    struct dirent* entry;
+    while ((entry = readdir(dir))) {
+        const char* name = entry->d_name;
+
+        // ignore "." and ".."
+        if (name[0] == '.' && (name[1] == 0 || (name[1] == '.' && name[2] == 0))) {
+            continue;
+        }
+        string oldFile = fromPathStr + name;
+        string newFile = toPathStr + name;
+
+        if (entry->d_type == DT_DIR) {
+            ret += makeFolder(newFile.c_str());
+            ret += copyRecursive(oldFile.c_str(), newFile.c_str());
+        } else {
+            ret += copyFile(oldFile.c_str(), newFile.c_str());
+        }
+    }
+    return ret;
+}
+
 int copyFile(const char *fromPath, const char *toPath) {
     auto start = std::chrono::steady_clock::now();
 
@@ -96,7 +153,7 @@ int copyFile(const char *fromPath, const char *toPath) {
         PLOG(ERROR) << "Failed to open copy from " << fromPath;
         return -1;
     }
-    android::base::unique_fd toFd(open(toPath, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR));
+    android::base::unique_fd toFd(open(toPath, O_CREAT | O_WRONLY, FILE_PERM));
     if (toFd == -1) {
         PLOG(ERROR) << "Failed to open copy to " << toPath;
         return -1;
@@ -121,23 +178,17 @@ int copyFile(const char *fromPath, const char *toPath) {
     }
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> diff = end - start;
-    LOG(INFO) << "Copied a file with MTP. Time: " << diff.count() << " s, Size: " << length <<
+    LOG(DEBUG) << "Copied a file with MTP. Time: " << diff.count() << " s, Size: " << length <<
         ", Rate: " << ((double) length) / diff.count() << " bytes/s";
+    chown(toPath, getuid(), FILE_GROUP);
     return ret == -1 ? -1 : 0;
 }
 
 void deleteRecursive(const char* path) {
-    char pathbuf[PATH_MAX];
-    size_t pathLength = strlen(path);
-    if (pathLength >= sizeof(pathbuf) - 1) {
-        LOG(ERROR) << "path too long: " << path;
+    string pathStr(path);
+    if (pathStr[pathStr.size()-1] != '/') {
+        pathStr += '/';
     }
-    strcpy(pathbuf, path);
-    if (pathbuf[pathLength - 1] != '/') {
-        pathbuf[pathLength++] = '/';
-    }
-    char* fileSpot = pathbuf + pathLength;
-    int pathRemaining = sizeof(pathbuf) - pathLength - 1;
 
     DIR* dir = opendir(path);
     if (!dir) {
@@ -153,19 +204,12 @@ void deleteRecursive(const char* path) {
         if (name[0] == '.' && (name[1] == 0 || (name[1] == '.' && name[2] == 0))) {
             continue;
         }
-
-        int nameLength = strlen(name);
-        if (nameLength > pathRemaining) {
-            LOG(ERROR) << "path " << path << "/" << name << " too long";
-            continue;
-        }
-        strcpy(fileSpot, name);
-
+        pathStr.append(name);
         if (entry->d_type == DT_DIR) {
-            deleteRecursive(pathbuf);
-            rmdir(pathbuf);
+            deleteRecursive(pathStr.c_str());
+            rmdir(pathStr.c_str());
         } else {
-            unlink(pathbuf);
+            unlink(pathStr.c_str());
         }
     }
     closedir(dir);
