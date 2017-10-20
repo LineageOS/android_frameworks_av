@@ -4,6 +4,8 @@ cc_test {
 
     srcs: ["AMRWB_E_SAMPLE.c"],
 
+    cflags: ["-Wall", "-Werror"],
+
     arch: {
         arm: {
             instruction_set: "arm",

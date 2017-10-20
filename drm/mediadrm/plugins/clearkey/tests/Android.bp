@@ -21,6 +21,8 @@ cc_test {
     name: "ClearKeyDrmUnitTest",
     vendor: true,
 
+    cflags: ["-Wall", "-Werror"],
+
     srcs: [
         "AesCtrDecryptorUnittest.cpp",
         "InitDataParserUnittest.cpp",

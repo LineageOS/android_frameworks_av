@@ -30,5 +30,7 @@ cc_library_shared {
     cflags: [
         // Set the following flag to enable the decryption passthru flow
         //"-DENABLE_PASSTHRU_DECRYPTION",
+        "-Wall",
+        "-Werror",
     ],
 }

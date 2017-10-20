@@ -21,6 +21,9 @@ cc_library_shared {
         "-DUSE_64BIT_DRM_API",
         // The flag below turns on local debug printouts
         //"-DDRM_OMA_FL_ENGINE_DEBUG",
+        "-Wall",
+        "-Werror",
+        "-Wno-unused-variable",
     ],
 
     srcs: ["src/FwdLockEngine.cpp"],
