@@ -3781,6 +3781,8 @@ status_t ACodec::setupVideoEncoder(
     } else {
         mFps = (double)framerate;
     }
+    // propagate framerate to the output so that the muxer has it
+    outputFormat->setInt32("frame-rate", (int32_t)mFps);
 
     video_def->xFramerate = (OMX_U32)(mFps * 65536);
     video_def->eCompressionFormat = OMX_VIDEO_CodingUnused;
