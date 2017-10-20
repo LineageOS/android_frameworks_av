@@ -12,6 +12,9 @@ cc_library_shared {
         "libmediaextractor",
         "libstagefright_foundation",
         "libutils",
+    ],
+
+    static_libs: [
         "libvorbisidec",
     ],
 
