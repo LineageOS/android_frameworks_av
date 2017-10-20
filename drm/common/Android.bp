@@ -33,6 +33,8 @@ cc_library_static {
         "ReadWriteUtils.cpp",
     ],
 
+    cflags: ["-Wall", "-Werror"],
+
     static_libs: ["libbinder"],
 
     export_include_dirs: ["include"],
