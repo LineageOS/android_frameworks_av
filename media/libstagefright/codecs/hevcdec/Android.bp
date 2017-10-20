@@ -8,6 +8,12 @@ cc_library_shared {
     static_libs: ["libhevcdec"],
     srcs: ["SoftHEVC.cpp"],
 
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wno-unused-variable",
+    ],
+
     include_dirs: [
         "external/libhevc/decoder",
         "external/libhevc/common",
