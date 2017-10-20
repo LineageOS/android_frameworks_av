@@ -34,8 +34,8 @@ cc_library_shared {
         "libstagefright_foundation",
         "libutils",
         "android.hardware.drm@1.0",
+        "libhidlallocatorutils",
         "libhidlbase",
-        "libhidlmemory",
         "libhidltransport",
     ],
 
