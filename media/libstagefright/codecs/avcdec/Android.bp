@@ -4,6 +4,12 @@ cc_library_shared {
     static_libs: ["libavcdec"],
     srcs: ["SoftAVCDec.cpp"],
 
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wno-unused-variable",
+    ],
+
     include_dirs: [
         "external/libavc/decoder",
         "external/libavc/common",

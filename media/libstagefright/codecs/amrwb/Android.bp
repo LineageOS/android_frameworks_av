@@ -68,6 +68,8 @@ cc_test {
 
     srcs: ["test/amrwbdec_test.cpp"],
 
+    cflags: ["-Wall", "-Werror"],
+
     static_libs: [
         "libstagefright_amrwbdec",
         "libsndfile",
