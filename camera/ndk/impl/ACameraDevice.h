@@ -60,6 +60,7 @@ class CameraDevice final : public RefBase {
 
     camera_status_t createCaptureSession(
             const ACaptureSessionOutputContainer*       outputs,
+            const ACaptureRequest* sessionParameters,
             const ACameraCaptureSession_stateCallbacks* callbacks,
             /*out*/ACameraCaptureSession** session);
 
@@ -139,7 +140,8 @@ class CameraDevice final : public RefBase {
     // For capture session to notify its end of life
     void notifySessionEndOfLifeLocked(ACameraCaptureSession* session);
 
-    camera_status_t configureStreamsLocked(const ACaptureSessionOutputContainer* outputs);
+    camera_status_t configureStreamsLocked(const ACaptureSessionOutputContainer* outputs,
+           const ACaptureRequest* sessionParameters);
 
     // Input message will be posted and cleared after this returns
     void postSessionMsgAndCleanup(sp<AMessage>& msg);
@@ -309,9 +311,10 @@ struct ACameraDevice {
 
     camera_status_t createCaptureSession(
             const ACaptureSessionOutputContainer*       outputs,
+            const ACaptureRequest* sessionParameters,
             const ACameraCaptureSession_stateCallbacks* callbacks,
             /*out*/ACameraCaptureSession** session) {
-        return mDevice->createCaptureSession(outputs, callbacks, session);
+        return mDevice->createCaptureSession(outputs, sessionParameters, callbacks, session);
     }
 
     /***********************
