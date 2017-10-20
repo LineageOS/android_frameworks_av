@@ -1108,7 +1108,9 @@ status_t IinfBox::onChunkData(uint32_t type, off64_t offset, size_t size) {
         mItemInfos->push_back(itemInfo);
         mHasGrids |= (itemInfo.itemType == FOURCC('g', 'r', 'i', 'd'));
     }
-    return OK;
+    // InfeBox parse returns ERROR_UNSUPPORTED if the box if an unsupported
+    // version. Ignore this error as it's not fatal.
+    return (err == ERROR_UNSUPPORTED) ? OK : err;
 }
 
 //////////////////////////////////////////////////////////////////
