@@ -1,7 +1,7 @@
 LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
-LOCAL_MODULE_TAGS := examples
+LOCAL_MODULE_TAGS := samples
 LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils) \
     frameworks/av/media/libaaudio/src \
