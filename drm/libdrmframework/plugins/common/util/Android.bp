@@ -19,5 +19,7 @@ cc_library_static {
 
     srcs: ["src/MimeTypeUtil.cpp"],
 
+    cflags: ["-Wall", "-Werror"],
+
     export_include_dirs: ["include"],
 }

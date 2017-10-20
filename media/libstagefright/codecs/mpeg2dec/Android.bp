@@ -8,6 +8,12 @@ cc_library_shared {
     static_libs: ["libmpeg2dec"],
     srcs: ["SoftMPEG2.cpp"],
 
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wno-unused-variable",
+    ],
+
     include_dirs: [
         "external/libmpeg2/decoder",
         "external/libmpeg2/common",

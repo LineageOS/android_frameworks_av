@@ -112,6 +112,8 @@ cc_test {
         "-DOSCL_EXPORT_REF=",
         "-DOSCL_IMPORT_REF=",
         "-DBX_RC",
+        "-Wall",
+        "-Werror",
     ],
 
     sanitize: {
