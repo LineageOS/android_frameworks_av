@@ -127,6 +127,8 @@ cc_test {
         "test/mp3reader.cpp",
     ],
 
+    cflags: ["-Wall", "-Werror"],
+
     local_include_dirs: [
         "src",
         "include",

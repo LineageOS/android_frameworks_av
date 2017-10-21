@@ -35,6 +35,8 @@ cc_library_shared {
     vendor: true,
     relative_install_path: "mediadrm",
 
+    cflags: ["-Wall", "-Werror"],
+
     shared_libs: [
         "libcrypto",
         "liblog",

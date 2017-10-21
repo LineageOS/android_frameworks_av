@@ -151,7 +151,7 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openExclusiveEndpoint(
         return nullptr;
     } else {
         sp<AAudioServiceEndpointMMAP> endpointMMap = new AAudioServiceEndpointMMAP();
-        ALOGE("AAudioEndpointManager.openEndpoint(),created MMAP %p", endpointMMap.get());
+        ALOGD("AAudioEndpointManager.openEndpoint(), created MMAP %p", endpointMMap.get());
         endpoint = endpointMMap;
 
         aaudio_result_t result = endpoint->open(request);
