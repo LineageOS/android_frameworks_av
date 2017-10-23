@@ -44,6 +44,7 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mUseBufferManager(false),
         mTimestampOffset(timestampOffset),
         mConsumerUsage(0),
+        mDropBuffers(false),
         mDequeueBufferLatency(kDequeueLatencyBinSize) {
 
     if (mConsumer == NULL) {
@@ -70,6 +71,7 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mUseBufferManager(false),
         mTimestampOffset(timestampOffset),
         mConsumerUsage(0),
+        mDropBuffers(false),
         mDequeueBufferLatency(kDequeueLatencyBinSize) {
 
     if (format != HAL_PIXEL_FORMAT_BLOB && format != HAL_PIXEL_FORMAT_RAW_OPAQUE) {
@@ -100,6 +102,7 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mUseBufferManager(false),
         mTimestampOffset(timestampOffset),
         mConsumerUsage(consumerUsage),
+        mDropBuffers(false),
         mDequeueBufferLatency(kDequeueLatencyBinSize) {
     // Deferred consumer only support preview surface format now.
     if (format != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
@@ -139,6 +142,7 @@ Camera3OutputStream::Camera3OutputStream(int id, camera3_stream_type_t type,
         mUseBufferManager(false),
         mTimestampOffset(timestampOffset),
         mConsumerUsage(consumerUsage),
+        mDropBuffers(false),
         mDequeueBufferLatency(kDequeueLatencyBinSize) {
 
     if (setId > CAMERA3_STREAM_SET_ID_INVALID) {
@@ -227,9 +231,14 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
     /**
      * Return buffer back to ANativeWindow
      */
-    if (buffer.status == CAMERA3_BUFFER_STATUS_ERROR) {
+    if (buffer.status == CAMERA3_BUFFER_STATUS_ERROR || mDropBuffers) {
         // Cancel buffer
-        ALOGW("A frame is dropped for stream %d", mId);
+        if (mDropBuffers) {
+            ALOGV("%s: Dropping a frame for stream %d.", __FUNCTION__, mId);
+        } else {
+            ALOGW("%s: A frame is dropped for stream %d due to buffer error.", __FUNCTION__, mId);
+        }
+
         res = currentConsumer->cancelBuffer(currentConsumer.get(),
                 anwBuffer,
                 anwReleaseFence);
@@ -775,6 +784,12 @@ status_t Camera3OutputStream::detachBufferLocked(sp<GraphicBuffer>* buffer, int*
         onBuffersRemovedLocked(removedBuffers);
     }
     return res;
+}
+
+status_t Camera3OutputStream::dropBuffers(bool dropping) {
+    Mutex::Autolock l(mLock);
+    mDropBuffers = dropping;
+    return OK;
 }
 
 status_t Camera3OutputStream::notifyBufferReleased(ANativeWindowBuffer* /*anwBuffer*/) {
