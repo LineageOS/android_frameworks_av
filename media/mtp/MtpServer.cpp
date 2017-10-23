@@ -134,12 +134,11 @@ int MtpServer::configure(bool usePtp) {
             sHandle = new MtpDevHandle();
         }
     }
-    if (sHandle->configure(usePtp)) {
-        ALOGE("Failed to configure Mtp driver!");
-        return -1;
-    }
+
+    int ret = sHandle->configure(usePtp);
+    if (ret) ALOGE("Failed to configure MTP driver!");
     android::base::SetProperty("sys.usb.ffs.mtp.ready", "1");
-    return 0;
+    return ret;
 }
 
 void MtpServer::addStorage(MtpStorage* storage) {
