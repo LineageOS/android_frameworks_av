@@ -299,6 +299,8 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(MediaAnalyticsItem
 
     bool finalizing = item->getFinalized();
 
+    Mutex::Autolock _l(mLock);
+
     // if finalizing, we'll remove it
     MediaAnalyticsItem *oitem = findItem(mOpen, item, finalizing | forcenew);
     if (oitem != NULL) {
@@ -609,9 +611,8 @@ String8 MediaAnalyticsService::dumpQueue(List<MediaAnalyticsItem *> *theList, ns
 // XXX: rewrite this to manage persistence, etc.
 
 // insert appropriately into queue
+// caller should hold mLock
 void MediaAnalyticsService::saveItem(List<MediaAnalyticsItem *> *l, MediaAnalyticsItem * item, int front) {
-
-    Mutex::Autolock _l(mLock);
 
     // adding at back of queue (fifo order)
     if (front)  {
@@ -682,14 +683,13 @@ static bool compatibleItems(MediaAnalyticsItem * oitem, MediaAnalyticsItem * nit
 }
 
 // find the incomplete record that this will overlay
+// caller should hold mLock
 MediaAnalyticsItem *MediaAnalyticsService::findItem(List<MediaAnalyticsItem*> *theList, MediaAnalyticsItem *nitem, bool removeit) {
     if (nitem == NULL) {
         return NULL;
     }
 
     MediaAnalyticsItem *item = NULL;
-
-    Mutex::Autolock _l(mLock);
 
     for (List<MediaAnalyticsItem *>::iterator it = theList->begin();
         it != theList->end(); it++) {
@@ -711,9 +711,8 @@ MediaAnalyticsItem *MediaAnalyticsService::findItem(List<MediaAnalyticsItem*> *t
 
 
 // delete the indicated record
+// caller should hold mLock
 void MediaAnalyticsService::deleteItem(List<MediaAnalyticsItem *> *l, MediaAnalyticsItem *item) {
-
-    Mutex::Autolock _l(mLock);
 
     for (List<MediaAnalyticsItem *>::iterator it = l->begin();
         it != l->end(); it++) {

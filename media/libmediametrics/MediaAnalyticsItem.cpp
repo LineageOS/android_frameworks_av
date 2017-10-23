@@ -279,8 +279,10 @@ MediaAnalyticsItem::Prop *MediaAnalyticsItem::allocateProp(const char *name) {
         prop = &mProps[i];
     } else {
         if (i == mPropSize) {
-            growProps();
-            // XXX: verify success
+            if (growProps() == false) {
+                ALOGE("failed allocation for new props");
+                return NULL;
+            }
         }
         i = mPropCount++;
         prop = &mProps[i];
@@ -312,41 +314,54 @@ bool MediaAnalyticsItem::removeProp(const char *name) {
 // set the values
 void MediaAnalyticsItem::setInt32(MediaAnalyticsItem::Attr name, int32_t value) {
     Prop *prop = allocateProp(name);
-    prop->mType = kTypeInt32;
-    prop->u.int32Value = value;
+    if (prop != NULL) {
+        prop->mType = kTypeInt32;
+        prop->u.int32Value = value;
+    }
 }
 
 void MediaAnalyticsItem::setInt64(MediaAnalyticsItem::Attr name, int64_t value) {
     Prop *prop = allocateProp(name);
-    prop->mType = kTypeInt64;
-    prop->u.int64Value = value;
+    if (prop != NULL) {
+        prop->mType = kTypeInt64;
+        prop->u.int64Value = value;
+    }
 }
 
 void MediaAnalyticsItem::setDouble(MediaAnalyticsItem::Attr name, double value) {
     Prop *prop = allocateProp(name);
-    prop->mType = kTypeDouble;
-    prop->u.doubleValue = value;
+    if (prop != NULL) {
+        prop->mType = kTypeDouble;
+        prop->u.doubleValue = value;
+    }
 }
 
 void MediaAnalyticsItem::setCString(MediaAnalyticsItem::Attr name, const char *value) {
 
     Prop *prop = allocateProp(name);
     // any old value will be gone
-    prop->mType = kTypeCString;
-    prop->u.CStringValue = strdup(value);
+    if (prop != NULL) {
+        prop->mType = kTypeCString;
+        prop->u.CStringValue = strdup(value);
+    }
 }
 
 void MediaAnalyticsItem::setRate(MediaAnalyticsItem::Attr name, int64_t count, int64_t duration) {
     Prop *prop = allocateProp(name);
-    prop->mType = kTypeRate;
-    prop->u.rate.count = count;
-    prop->u.rate.duration = duration;
+    if (prop != NULL) {
+        prop->mType = kTypeRate;
+        prop->u.rate.count = count;
+        prop->u.rate.duration = duration;
+    }
 }
 
 
 // find/add/set fused into a single operation
 void MediaAnalyticsItem::addInt32(MediaAnalyticsItem::Attr name, int32_t value) {
     Prop *prop = allocateProp(name);
+    if (prop == NULL) {
+        return;
+    }
     switch (prop->mType) {
         case kTypeInt32:
             prop->u.int32Value += value;
@@ -361,6 +376,9 @@ void MediaAnalyticsItem::addInt32(MediaAnalyticsItem::Attr name, int32_t value) 
 
 void MediaAnalyticsItem::addInt64(MediaAnalyticsItem::Attr name, int64_t value) {
     Prop *prop = allocateProp(name);
+    if (prop == NULL) {
+        return;
+    }
     switch (prop->mType) {
         case kTypeInt64:
             prop->u.int64Value += value;
@@ -375,6 +393,9 @@ void MediaAnalyticsItem::addInt64(MediaAnalyticsItem::Attr name, int64_t value) 
 
 void MediaAnalyticsItem::addRate(MediaAnalyticsItem::Attr name, int64_t count, int64_t duration) {
     Prop *prop = allocateProp(name);
+    if (prop == NULL) {
+        return;
+    }
     switch (prop->mType) {
         case kTypeRate:
             prop->u.rate.count += count;
@@ -391,6 +412,9 @@ void MediaAnalyticsItem::addRate(MediaAnalyticsItem::Attr name, int64_t count, i
 
 void MediaAnalyticsItem::addDouble(MediaAnalyticsItem::Attr name, double value) {
     Prop *prop = allocateProp(name);
+    if (prop == NULL) {
+        return;
+    }
     switch (prop->mType) {
         case kTypeDouble:
             prop->u.doubleValue += value;
@@ -585,7 +609,7 @@ void MediaAnalyticsItem::copyProp(Prop *dst, const Prop *src)
     }
 }
 
-void MediaAnalyticsItem::growProps(int increment)
+bool MediaAnalyticsItem::growProps(int increment)
 {
     if (increment <= 0) {
         increment = kGrowProps;
@@ -599,6 +623,10 @@ void MediaAnalyticsItem::growProps(int increment)
         }
         mProps = ni;
         mPropSize = nsize;
+        return true;
+    } else {
+        ALOGW("MediaAnalyticsItem::growProps fails");
+        return false;
     }
 }
 
@@ -963,32 +991,26 @@ bool MediaAnalyticsItem::merge(MediaAnalyticsItem *incoming) {
     int nattr = incoming->mPropCount;
     for (int i = 0 ; i < nattr; i++ ) {
         Prop *iprop = &incoming->mProps[i];
-        Prop *oprop = findProp(iprop->mName);
         const char *p = iprop->mName;
         size_t len = strlen(p);
-        char semantic = p[len-1];
+
+        // should ignore a zero length name...
+        if (len == 0) {
+            continue;
+        }
+
+        Prop *oprop = findProp(iprop->mName);
 
         if (oprop == NULL) {
             // no oprop, so we insert the new one
             oprop = allocateProp(p);
-            copyProp(oprop, iprop);
-        } else {
-            // merge iprop into oprop
-            switch (semantic) {
-                case '<':       // first  aka keep old)
-                    /* nop */
-                    break;
-
-                default:        // default is 'last'
-                case '>':       // last (aka keep new)
-                    copyProp(oprop, iprop);
-                    break;
-
-                case '+':       /* sum */
-                    // XXX validate numeric types, sum in place
-                    break;
-
+            if (oprop != NULL) {
+                copyProp(oprop, iprop);
+            } else {
+                ALOGW("dropped property '%s'", iprop->mName);
             }
+        } else {
+            copyProp(oprop, iprop);
         }
     }
 
