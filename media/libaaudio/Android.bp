@@ -28,3 +28,10 @@ ndk_library {
     first_version: "26",
     unversioned_until: "current",
 }
+
+cc_library_headers {
+    name: "libaaudio_headers",
+    export_include_dirs: ["include"],
+}
+
+subdirs = ["*"]
