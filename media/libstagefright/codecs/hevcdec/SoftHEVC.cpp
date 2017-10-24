@@ -68,12 +68,14 @@ SoftHEVC::SoftHEVC(
             kProfileLevels, ARRAY_SIZE(kProfileLevels),
             320 /* width */, 240 /* height */, callbacks,
             appData, component),
+      mCodecCtx(NULL),
       mMemRecords(NULL),
       mFlushOutBuffer(NULL),
       mOmxColorFormat(OMX_COLOR_FormatYUV420Planar),
       mIvColorFormat(IV_YUV_420P),
       mNewWidth(mWidth),
       mNewHeight(mHeight),
+      mSignalledError(false),
       mChangingResolution(false) {
     const size_t kMinCompressionRatio = 4 /* compressionRatio (for Level 4+) */;
     const size_t kMaxOutputBufferSize = 2048 * 2048 * 3 / 2;
@@ -251,6 +253,7 @@ status_t SoftHEVC::initDecoder() {
     WORD32 i4_level;
 
     mNumCores = GetCPUCoreCount();
+    mCodecCtx = NULL;
 
     /* Initialize number of ref and reorder modes (for HEVC) */
     u4_num_reorder_frames = 16;
@@ -465,7 +468,7 @@ status_t SoftHEVC::reInitDecoder() {
 void SoftHEVC::onReset() {
     ALOGD("onReset called");
     SoftVideoDecoderOMXComponent::onReset();
-
+    mSignalledError = false;
     resetDecoder();
     resetPlugin();
 }
@@ -475,7 +478,12 @@ OMX_ERRORTYPE SoftHEVC::internalSetParameter(OMX_INDEXTYPE index, const OMX_PTR 
     const uint32_t oldHeight = mHeight;
     OMX_ERRORTYPE ret = SoftVideoDecoderOMXComponent::internalSetParameter(index, params);
     if (mWidth != oldWidth || mHeight != oldHeight) {
-        reInitDecoder();
+        status_t ret = reInitDecoder();
+        if (ret != OK) {
+            notify(OMX_EventError, OMX_ErrorUnsupportedSetting, ret, NULL);
+            mSignalledError = true;
+            return OMX_ErrorUnsupportedSetting;
+        }
     }
     return ret;
 }
@@ -530,6 +538,11 @@ bool SoftHEVC::setDecodeArgs(ivd_video_decode_ip_t *ps_dec_ip,
     return true;
 }
 void SoftHEVC::onPortFlushCompleted(OMX_U32 portIndex) {
+
+    if (NULL == mCodecCtx) {
+        return;
+    }
+
     /* Once the output buffers are flushed, ignore any buffers that are held in decoder */
     if (kOutputPortIndex == portIndex) {
         setFlushMode();
@@ -554,6 +567,11 @@ void SoftHEVC::onPortFlushCompleted(OMX_U32 portIndex) {
 
 void SoftHEVC::onQueueFilled(OMX_U32 portIndex) {
     UNUSED(portIndex);
+
+    if (mSignalledError) {
+        notify(OMX_EventError, OMX_ErrorUnsupportedSetting, UNKNOWN_ERROR, NULL);
+        return;
+    }
 
     if (mOutputPortSettingsChange != NONE) {
         return;
@@ -616,7 +634,13 @@ void SoftHEVC::onQueueFilled(OMX_U32 portIndex) {
             bool portWillReset = false;
             handlePortSettingsChange(&portWillReset, mNewWidth, mNewHeight);
 
-            CHECK_EQ(reInitDecoder(), (status_t)OK);
+            status_t ret = reInitDecoder();
+            if (ret != OK) {
+                notify(OMX_EventError, OMX_ErrorUnsupportedSetting, ret, NULL);
+                mSignalledError = true;
+                return;
+            }
+
             return;
         }
 
@@ -686,7 +710,12 @@ void SoftHEVC::onQueueFilled(OMX_U32 portIndex) {
                 bool portWillReset = false;
                 handlePortSettingsChange(&portWillReset, s_dec_op.u4_pic_wd, s_dec_op.u4_pic_ht);
 
-                CHECK_EQ(reInitDecoder(), (status_t)OK);
+                status_t ret = reInitDecoder();
+                if (ret != OK) {
+                    notify(OMX_EventError, OMX_ErrorUnsupportedSetting, ret, NULL);
+                    mSignalledError = true;
+                    return;
+                }
 
                 setDecodeArgs(&s_dec_ip, &s_dec_op, inHeader, outHeader, timeStampIx);
 
