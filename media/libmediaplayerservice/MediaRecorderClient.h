@@ -18,6 +18,7 @@
 #ifndef ANDROID_MEDIARECORDERCLIENT_H
 #define ANDROID_MEDIARECORDERCLIENT_H
 
+#include <media/AudioSystem.h>
 #include <media/IMediaRecorder.h>
 
 #include <android/hardware/media/omx/1.0/IOmx.h>
@@ -58,6 +59,18 @@ class MediaRecorderClient : public BnMediaRecorder
         wp<IMediaRecorderClient> mListener;
     };
 
+    class AudioDeviceUpdatedNotifier: public AudioSystem::AudioDeviceCallback
+    {
+    public:
+        AudioDeviceUpdatedNotifier(const sp<IMediaRecorderClient>& listener);
+        virtual ~AudioDeviceUpdatedNotifier();
+        virtual void onAudioDeviceUpdate(
+                audio_io_handle_t audioIo,
+                audio_port_handle_t deviceId);
+    private:
+        wp<IMediaRecorderClient> mListener;
+    };
+
     void clearDeathNotifiers_l();
 
 public:
@@ -91,6 +104,9 @@ public:
     virtual     status_t   dump(int fd, const Vector<String16>& args);
     virtual     status_t   setInputSurface(const sp<PersistentSurface>& surface);
     virtual     sp<IGraphicBufferProducer> querySurfaceMediaSource();
+    virtual     status_t   setInputDevice(audio_port_handle_t deviceId);
+    virtual     status_t   getRoutedDeviceId(audio_port_handle_t* deviceId);
+    virtual     status_t   enableAudioDeviceCallback(bool enabled);
 
 private:
     friend class           MediaPlayerService;  // for accessing private constructor
@@ -103,6 +119,7 @@ private:
 
     sp<ServiceDeathNotifier> mCameraDeathListener;
     sp<ServiceDeathNotifier> mCodecDeathListener;
+    sp<AudioDeviceUpdatedNotifier> mAudioDeviceUpdatedNotifier;
 
     pid_t                  mPid;
     Mutex                  mLock;

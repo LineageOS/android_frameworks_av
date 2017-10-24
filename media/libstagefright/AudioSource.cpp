@@ -52,7 +52,7 @@ static void AudioRecordCallbackFunction(int event, void *user, void *info) {
 AudioSource::AudioSource(
         audio_source_t inputSource, const String16 &opPackageName,
         uint32_t sampleRate, uint32_t channelCount, uint32_t outSampleRate,
-        uid_t uid, pid_t pid)
+        uid_t uid, pid_t pid, audio_port_handle_t selectedDeviceId)
     : mStarted(false),
       mSampleRate(sampleRate),
       mOutSampleRate(outSampleRate > 0 ? outSampleRate : sampleRate),
@@ -101,7 +101,9 @@ AudioSource::AudioSource(
                     AudioRecord::TRANSFER_DEFAULT,
                     AUDIO_INPUT_FLAG_NONE,
                     uid,
-                    pid);
+                    pid,
+                    NULL /*pAttributes*/,
+                    selectedDeviceId);
         mInitCheck = mRecord->initCheck();
         if (mInitCheck != OK) {
             mRecord.clear();
@@ -463,6 +465,37 @@ int16_t AudioSource::getMaxAmplitude() {
     mMaxAmplitude = 0;
     ALOGV("max amplitude since last call: %d", value);
     return value;
+}
+
+status_t AudioSource::setInputDevice(audio_port_handle_t deviceId) {
+    if (mRecord != 0) {
+        return mRecord->setInputDevice(deviceId);
+    }
+    return NO_INIT;
+}
+
+status_t AudioSource::getRoutedDeviceId(audio_port_handle_t* deviceId) {
+    if (mRecord != 0) {
+        *deviceId = mRecord->getRoutedDeviceId();
+        return NO_ERROR;
+    }
+    return NO_INIT;
+}
+
+status_t AudioSource::addAudioDeviceCallback(
+        const sp<AudioSystem::AudioDeviceCallback>& callback) {
+    if (mRecord != 0) {
+        return mRecord->addAudioDeviceCallback(callback);
+    }
+    return NO_INIT;
+}
+
+status_t AudioSource::removeAudioDeviceCallback(
+        const sp<AudioSystem::AudioDeviceCallback>& callback) {
+    if (mRecord != 0) {
+        return mRecord->removeAudioDeviceCallback(callback);
+    }
+    return NO_INIT;
 }
 
 }  // namespace android

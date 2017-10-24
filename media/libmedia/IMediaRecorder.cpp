@@ -61,6 +61,9 @@ enum {
     PAUSE,
     RESUME,
     GET_METRICS,
+    SET_INPUT_DEVICE,
+    GET_ROUTED_DEVICE_ID,
+    ENABLE_AUDIO_DEVICE_CALLBACK,
 
 };
 
@@ -337,6 +340,57 @@ public:
         remote()->transact(RELEASE, data, &reply);
         return reply.readInt32();
     }
+
+    status_t setInputDevice(audio_port_handle_t deviceId)
+    {
+        ALOGV("setInputDevice");
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaRecorder::getInterfaceDescriptor());
+        data.writeInt32(deviceId);
+
+        status_t status = remote()->transact(SET_INPUT_DEVICE, data, &reply);
+        if (status != OK) {
+            ALOGE("setInputDevice binder call failed: %d", status);
+            return status;
+        }
+        return reply.readInt32();;
+    }
+
+    audio_port_handle_t getRoutedDeviceId(audio_port_handle_t *deviceId)
+    {
+        ALOGV("getRoutedDeviceId");
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaRecorder::getInterfaceDescriptor());
+
+        status_t status = remote()->transact(GET_ROUTED_DEVICE_ID, data, &reply);
+        if (status != OK) {
+            ALOGE("getRoutedDeviceid binder call failed: %d", status);
+            *deviceId = AUDIO_PORT_HANDLE_NONE;
+            return status;
+        }
+
+        status = reply.readInt32();
+        if (status != NO_ERROR) {
+            *deviceId = AUDIO_PORT_HANDLE_NONE;
+        } else {
+            *deviceId = reply.readInt32();
+        }
+        return status;
+    }
+
+    status_t enableAudioDeviceCallback(bool enabled)
+    {
+        ALOGV("enableAudioDeviceCallback");
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaRecorder::getInterfaceDescriptor());
+        data.writeBool(enabled);
+        status_t status = remote()->transact(ENABLE_AUDIO_DEVICE_CALLBACK, data, &reply);
+        if (status != OK) {
+            ALOGE("enableAudioDeviceCallback binder call failed: %d, %d", enabled, status);
+            return status;
+        }
+        return reply.readInt32();
+    }
 };
 
 IMPLEMENT_META_INTERFACE(MediaRecorder, "android.media.IMediaRecorder");
@@ -543,6 +597,41 @@ status_t BnMediaRecorder::onTransact(
             }
             return NO_ERROR;
         } break;
+        case SET_INPUT_DEVICE: {
+            ALOGV("SET_INPUT_DEVICE");
+            CHECK_INTERFACE(IMediaRecorder, data, reply);
+            audio_port_handle_t deviceId;
+            status_t status = data.readInt32(&deviceId);
+            if (status == NO_ERROR) {
+                reply->writeInt32(setInputDevice(deviceId));
+            } else {
+                reply->writeInt32(BAD_VALUE);
+            }
+            return NO_ERROR;
+        } break;
+        case GET_ROUTED_DEVICE_ID: {
+            ALOGV("GET_ROUTED_DEVICE_ID");
+            CHECK_INTERFACE(IMediaRecorder, data, reply);
+            audio_port_handle_t deviceId;
+            status_t status = getRoutedDeviceId(&deviceId);
+            reply->writeInt32(status);
+            if (status == NO_ERROR) {
+                reply->writeInt32(deviceId);
+            }
+            return NO_ERROR;
+        } break;
+        case ENABLE_AUDIO_DEVICE_CALLBACK: {
+            ALOGV("ENABLE_AUDIO_DEVICE_CALLBACK");
+            CHECK_INTERFACE(IMediaRecorder, data, reply);
+            bool enabled;
+            status_t status = data.readBool(&enabled);
+            if (status == NO_ERROR) {
+                reply->writeInt32(enableAudioDeviceCallback(enabled));
+            } else {
+                reply->writeInt32(BAD_VALUE);
+            }
+            return NO_ERROR;
+        }
         default:
             return BBinder::onTransact(code, data, reply, flags);
     }
