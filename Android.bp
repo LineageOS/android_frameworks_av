@@ -3,5 +3,6 @@ subdirs = [
     "drm/*",
     "media/*",
     "radio",
+    "services/*",
     "soundtrigger",
 ]
