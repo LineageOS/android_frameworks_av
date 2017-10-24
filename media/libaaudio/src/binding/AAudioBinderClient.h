@@ -17,6 +17,7 @@
 #ifndef ANDROID_AAUDIO_AAUDIO_BINDER_CLIENT_H
 #define ANDROID_AAUDIO_AAUDIO_BINDER_CLIENT_H
 
+#include <utils/RefBase.h>
 #include <utils/Singleton.h>
 
 #include <aaudio/AAudio.h>
@@ -25,14 +26,16 @@
 #include "binding/AAudioStreamRequest.h"
 #include "binding/AAudioStreamConfiguration.h"
 #include "binding/AudioEndpointParcelable.h"
+#include "binding/IAAudioService.h"
 
 /**
- * Implements the AAudioServiceInterface by talking to the actual service through Binder.
+ * Implements the AAudioServiceInterface by talking to the service through Binder.
  */
 
 namespace aaudio {
 
-class AAudioBinderClient : public AAudioServiceInterface
+class AAudioBinderClient : public virtual android::RefBase
+        , public AAudioServiceInterface
         , public android::Singleton<AAudioBinderClient> {
 
 public:
@@ -40,6 +43,12 @@ public:
     AAudioBinderClient();
 
     virtual ~AAudioBinderClient();
+
+    const android::sp<android::IAAudioService> getAAudioService();
+
+    void dropAAudioService();
+
+    void registerClient(const android::sp<android::IAAudioClient>& client __unused) override {}
 
     /**
      * @param request info needed to create the stream
@@ -82,13 +91,61 @@ public:
      * TODO Consider passing this information as part of the startStream() call.
      */
     aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle,
-                                                pid_t clientProcessId,
                                                 pid_t clientThreadId,
                                                 int64_t periodNanoseconds) override;
 
     aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
-                                                  pid_t clientProcessId,
                                                   pid_t clientThreadId) override;
+
+    aaudio_result_t startClient(aaudio_handle_t streamHandle __unused,
+                                      const android::AudioClient& client __unused,
+                                      audio_port_handle_t *clientHandle) override {
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
+    aaudio_result_t stopClient(aaudio_handle_t streamHandle __unused,
+                               audio_port_handle_t clientHandle __unused)  override {
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
+    void onStreamChange(aaudio_handle_t handle, int32_t opcode, int32_t value) {
+        // TODO This is just a stub so we can have a client Binder to pass to the service.
+        // TODO Implemented in a later CL.
+        ALOGW("onStreamChange called!");
+    }
+
+    class AAudioClient : public android::IBinder::DeathRecipient , public android::BnAAudioClient
+    {
+    public:
+        AAudioClient(android::wp<AAudioBinderClient> aaudioBinderClient)
+            : mBinderClient(aaudioBinderClient) {
+        }
+
+        // implement DeathRecipient
+        virtual void binderDied(const android::wp<android::IBinder>& who __unused) {
+            android::sp<AAudioBinderClient> client = mBinderClient.promote();
+            if (client != 0) {
+                client->dropAAudioService();
+            }
+            ALOGW("AAudio service binderDied()!");
+        }
+
+        // implement BnAAudioClient
+        void onStreamChange(aaudio_handle_t handle, int32_t opcode, int32_t value) {
+            android::sp<AAudioBinderClient> client = mBinderClient.promote();
+            if (client != 0) {
+                client->onStreamChange(handle, opcode, value);
+            }
+        }
+    private:
+        android::wp<AAudioBinderClient> mBinderClient;
+    };
+
+
+    android::Mutex               mServiceLock;
+    android::sp<android::IAAudioService>  mAAudioService;
+    android::sp<AAudioClient>    mAAudioClient;
+
 };
 
 

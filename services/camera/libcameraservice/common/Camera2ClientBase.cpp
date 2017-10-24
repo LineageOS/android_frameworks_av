@@ -248,7 +248,8 @@ template <typename TClientBase>
 void Camera2ClientBase<TClientBase>::notifyIdle() {
     if (mDeviceActive) {
         getCameraService()->updateProxyDeviceState(
-            ICameraServiceProxy::CAMERA_STATE_IDLE, TClientBase::mCameraIdStr);
+            hardware::ICameraServiceProxy::CAMERA_STATE_IDLE, TClientBase::mCameraIdStr,
+            TClientBase::mCameraFacing, TClientBase::mClientPackageName);
     }
     mDeviceActive = false;
 
@@ -263,7 +264,8 @@ void Camera2ClientBase<TClientBase>::notifyShutter(const CaptureResultExtras& re
 
     if (!mDeviceActive) {
         getCameraService()->updateProxyDeviceState(
-            ICameraServiceProxy::CAMERA_STATE_ACTIVE, TClientBase::mCameraIdStr);
+            hardware::ICameraServiceProxy::CAMERA_STATE_ACTIVE, TClientBase::mCameraIdStr,
+            TClientBase::mCameraFacing, TClientBase::mClientPackageName);
     }
     mDeviceActive = true;
 

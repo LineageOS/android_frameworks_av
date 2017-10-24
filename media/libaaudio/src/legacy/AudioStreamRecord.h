@@ -41,8 +41,6 @@ public:
     aaudio_result_t close() override;
 
     aaudio_result_t requestStart() override;
-    aaudio_result_t requestPause() override;
-    aaudio_result_t requestFlush() override;
     aaudio_result_t requestStop() override;
 
     virtual aaudio_result_t getTimestamp(clockid_t clockId,

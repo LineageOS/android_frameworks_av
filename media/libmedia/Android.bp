@@ -13,9 +13,12 @@ cc_library {
         "-Wno-error=deprecated-declarations",
         "-Wall",
     ],
-    shared: {
-      shared_libs: ["libutils", "liblog"],
-    },
+    shared_libs: ["libutils", "liblog", "libgui"],
+    header_libs: [
+        "libmedia_headers",
+        "libaudioclient_headers",
+        "libaudio_system_headers",
+    ],
     clang: true,
 }
 

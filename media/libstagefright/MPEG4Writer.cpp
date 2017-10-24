@@ -112,6 +112,7 @@ public:
     int64_t getDurationUs() const;
     int64_t getEstimatedTrackSizeBytes() const;
     void writeTrackHeader(bool use32BitOffset = true);
+    int64_t getMinCttsOffsetTimeUs();
     void bufferChunk(int64_t timestampUs);
     bool isAvc() const { return mIsAvc; }
     bool isHevc() const { return mIsHevc; }
@@ -307,10 +308,17 @@ private:
     ListTableEntries<uint32_t, 2> *mCttsTableEntries;
 
     int64_t mMinCttsOffsetTimeUs;
-    int64_t mMaxCttsOffsetTimeUs;
+    int64_t mMinCttsOffsetTicks;
+    int64_t mMaxCttsOffsetTicks;
 
-    // Save the last 10 frames' timestamp for debug.
-    std::list<std::pair<int64_t, int64_t>> mTimestampDebugHelper;
+    // Save the last 10 frames' timestamp and frame type for debug.
+    struct TimestampDebugHelperEntry {
+        int64_t pts;
+        int64_t dts;
+        std::string frameType;
+    };
+
+    std::list<TimestampDebugHelperEntry> mTimestampDebugHelper;
 
     // Sequence parameter set or picture parameter set
     struct AVCParamSet {
@@ -343,6 +351,7 @@ private:
 
     void dumpTimeStamps();
 
+    int64_t getStartTimeOffsetTimeUs() const;
     int32_t getStartTimeOffsetScaledTime() const;
 
     static void *ThreadWrapper(void *me);
@@ -1133,9 +1142,22 @@ void MPEG4Writer::writeMoovBox(int64_t durationUs) {
         writeUdtaBox();
     }
     writeMetaBox();
-    int32_t id = 1;
+    // Loop through all the tracks to get the global time offset if there is
+    // any ctts table appears in a video track.
+    int64_t minCttsOffsetTimeUs = kMaxCttsOffsetTimeUs;
     for (List<Track *>::iterator it = mTracks.begin();
-        it != mTracks.end(); ++it, ++id) {
+        it != mTracks.end(); ++it) {
+        minCttsOffsetTimeUs =
+            std::min(minCttsOffsetTimeUs, (*it)->getMinCttsOffsetTimeUs());
+    }
+    ALOGI("Ajust the moov start time from %lld us -> %lld us",
+            (long long)mStartTimestampUs,
+            (long long)(mStartTimestampUs + minCttsOffsetTimeUs - kMaxCttsOffsetTimeUs));
+    // Adjust the global start time.
+    mStartTimestampUs += minCttsOffsetTimeUs - kMaxCttsOffsetTimeUs;
+
+    for (List<Track *>::iterator it = mTracks.begin();
+        it != mTracks.end(); ++it) {
         (*it)->writeTrackHeader(mUse32BitOffset);
     }
     endBox();  // moov
@@ -1625,10 +1647,14 @@ MPEG4Writer::Track::Track(
       mStssTableEntries(new ListTableEntries<uint32_t, 1>(1000)),
       mSttsTableEntries(new ListTableEntries<uint32_t, 2>(1000)),
       mCttsTableEntries(new ListTableEntries<uint32_t, 2>(1000)),
+      mMinCttsOffsetTimeUs(0),
+      mMinCttsOffsetTicks(0),
+      mMaxCttsOffsetTicks(0),
       mCodecSpecificData(NULL),
       mCodecSpecificDataSize(0),
       mGotAllCodecSpecificData(false),
       mReachedEOS(false),
+      mStartTimestampUs(-1),
       mRotation(0) {
     getCodecSpecificDataFromInputFormatIfPossible();
 
@@ -1834,10 +1860,12 @@ void MPEG4Writer::Track::getCodecSpecificDataFromInputFormatIfPossible() {
             || !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC)) {
         if (mMeta->findData(kKeyESDS, &type, &data, &size)) {
             ESDS esds(data, size);
-            if (esds.getCodecSpecificInfo(&data, &size) != OK) {
-                data = NULL;
-                size = 0;
+            if (esds.getCodecSpecificInfo(&data, &size) == OK &&
+                    data != NULL &&
+                    copyCodecSpecificData((uint8_t*)data, size) == OK) {
+                mGotAllCodecSpecificData = true;
             }
+            return;
         }
     }
     if (data != NULL && copyCodecSpecificData((uint8_t *)data, size) == OK) {
@@ -2133,12 +2161,16 @@ status_t MPEG4Writer::Track::stop(bool stopSource) {
     if (mDone) {
         return OK;
     }
-    mDone = true;
+
     if (stopSource) {
         ALOGD("%s track source stopping", getTrackType());
         mSource->stop();
         ALOGD("%s track source stopped", getTrackType());
     }
+
+    // Set mDone to be true after sucessfully stop mSource as mSource may be still outputting
+    // buffers to the writer.
+    mDone = true;
 
     void *dummy;
     pthread_join(mThread, &dummy);
@@ -2519,12 +2551,12 @@ void MPEG4Writer::Track::updateDriftTime(const sp<MetaData>& meta) {
 }
 
 void MPEG4Writer::Track::dumpTimeStamps() {
-    ALOGE("Dumping %s track's last 10 frames timestamp ", getTrackType());
+    ALOGE("Dumping %s track's last 10 frames timestamp and frame type ", getTrackType());
     std::string timeStampString;
-    for (std::list<std::pair<int64_t, int64_t>>::iterator num = mTimestampDebugHelper.begin();
-            num != mTimestampDebugHelper.end(); ++num) {
-        timeStampString += "(" + std::to_string(num->first)+
-                "us, " + std::to_string(num->second) + "us) ";
+    for (std::list<TimestampDebugHelperEntry>::iterator entry = mTimestampDebugHelper.begin();
+            entry != mTimestampDebugHelper.end(); ++entry) {
+        timeStampString += "(" + std::to_string(entry->pts)+
+                "us, " + std::to_string(entry->dts) + "us " + entry->frameType + ") ";
     }
     ALOGE("%s", timeStampString.c_str());
 }
@@ -2734,9 +2766,9 @@ status_t MPEG4Writer::Track::threadEntry() {
             previousPausedDurationUs += pausedDurationUs - lastDurationUs;
             mResumed = false;
         }
-        std::pair<int64_t, int64_t> timestampPair;
+        TimestampDebugHelperEntry timestampDebugEntry;
         timestampUs -= previousPausedDurationUs;
-        timestampPair.first = timestampUs;
+        timestampDebugEntry.pts = timestampUs;
         if (WARN_UNLESS(timestampUs >= 0ll, "for %s track", trackName)) {
             copy->release();
             mSource->stop();
@@ -2766,6 +2798,14 @@ status_t MPEG4Writer::Track::threadEntry() {
             }
 
             mLastDecodingTimeUs = decodingTimeUs;
+            timestampDebugEntry.dts = decodingTimeUs;
+            timestampDebugEntry.frameType = isSync ? "Key frame" : "Non-Key frame";
+            // Insert the timestamp into the mTimestampDebugHelper
+            if (mTimestampDebugHelper.size() >= kTimestampDebugCount) {
+                mTimestampDebugHelper.pop_front();
+            }
+            mTimestampDebugHelper.push_back(timestampDebugEntry);
+
             cttsOffsetTimeUs =
                     timestampUs + kMaxCttsOffsetTimeUs - decodingTimeUs;
             if (WARN_UNLESS(cttsOffsetTimeUs >= 0ll, "for %s track", trackName)) {
@@ -2808,16 +2848,16 @@ status_t MPEG4Writer::Track::threadEntry() {
 
             // Update ctts time offset range
             if (mStszTableEntries->count() == 0) {
-                mMinCttsOffsetTimeUs = currCttsOffsetTimeTicks;
-                mMaxCttsOffsetTimeUs = currCttsOffsetTimeTicks;
+                mMinCttsOffsetTicks = currCttsOffsetTimeTicks;
+                mMaxCttsOffsetTicks = currCttsOffsetTimeTicks;
             } else {
-                if (currCttsOffsetTimeTicks > mMaxCttsOffsetTimeUs) {
-                    mMaxCttsOffsetTimeUs = currCttsOffsetTimeTicks;
-                } else if (currCttsOffsetTimeTicks < mMinCttsOffsetTimeUs) {
-                    mMinCttsOffsetTimeUs = currCttsOffsetTimeTicks;
+                if (currCttsOffsetTimeTicks > mMaxCttsOffsetTicks) {
+                    mMaxCttsOffsetTicks = currCttsOffsetTimeTicks;
+                } else if (currCttsOffsetTimeTicks < mMinCttsOffsetTicks) {
+                    mMinCttsOffsetTicks = currCttsOffsetTimeTicks;
+                    mMinCttsOffsetTimeUs = cttsOffsetTimeUs;
                 }
             }
-
         }
 
         if (mOwner->isRealTimeRecording()) {
@@ -2895,12 +2935,6 @@ status_t MPEG4Writer::Track::threadEntry() {
         lastDurationUs = timestampUs - lastTimestampUs;
         lastDurationTicks = currDurationTicks;
         lastTimestampUs = timestampUs;
-        timestampPair.second = timestampUs;
-        // Insert the timestamp into the mTimestampDebugHelper
-        if (mTimestampDebugHelper.size() >= kTimestampDebugCount) {
-            mTimestampDebugHelper.pop_front();
-        }
-        mTimestampDebugHelper.push_back(timestampPair);
 
         if (isSync != 0) {
             addOneStssTableEntry(mStszTableEntries->count());
@@ -3158,7 +3192,7 @@ void MPEG4Writer::Track::bufferChunk(int64_t timestampUs) {
 }
 
 int64_t MPEG4Writer::Track::getDurationUs() const {
-    return mTrackDurationUs;
+    return mTrackDurationUs + getStartTimeOffsetTimeUs();
 }
 
 int64_t MPEG4Writer::Track::getEstimatedTrackSizeBytes() const {
@@ -3211,6 +3245,16 @@ void MPEG4Writer::Track::writeTrackHeader(bool use32BitOffset) {
             mOwner->endBox();  // minf
         mOwner->endBox();  // mdia
     mOwner->endBox();  // trak
+}
+
+int64_t MPEG4Writer::Track::getMinCttsOffsetTimeUs() {
+    // For video tracks with ctts table, this should return the minimum ctts
+    // offset in the table. For non-video tracks or video tracks without ctts
+    // table, this will return kMaxCttsOffsetTimeUs.
+    if (mMinCttsOffsetTicks == mMaxCttsOffsetTicks) {
+        return kMaxCttsOffsetTimeUs;
+    }
+    return mMinCttsOffsetTimeUs;
 }
 
 void MPEG4Writer::Track::writeStblBox(bool use32BitOffset) {
@@ -3642,30 +3686,41 @@ void MPEG4Writer::Track::writePaspBox() {
     mOwner->endBox();  // pasp
 }
 
-int32_t MPEG4Writer::Track::getStartTimeOffsetScaledTime() const {
+int64_t MPEG4Writer::Track::getStartTimeOffsetTimeUs() const {
     int64_t trackStartTimeOffsetUs = 0;
     int64_t moovStartTimeUs = mOwner->getStartTimestampUs();
-    if (mStartTimestampUs != moovStartTimeUs) {
+    if (mStartTimestampUs != -1 && mStartTimestampUs != moovStartTimeUs) {
         CHECK_GT(mStartTimestampUs, moovStartTimeUs);
         trackStartTimeOffsetUs = mStartTimestampUs - moovStartTimeUs;
     }
-    return (trackStartTimeOffsetUs *  mTimeScale + 500000LL) / 1000000LL;
+    return trackStartTimeOffsetUs;
+}
+
+int32_t MPEG4Writer::Track::getStartTimeOffsetScaledTime() const {
+    return (getStartTimeOffsetTimeUs() * mTimeScale + 500000LL) / 1000000LL;
 }
 
 void MPEG4Writer::Track::writeSttsBox() {
     mOwner->beginBox("stts");
     mOwner->writeInt32(0);  // version=0, flags=0
-    uint32_t duration;
-    CHECK(mSttsTableEntries->get(duration, 1));
-    duration = htonl(duration);  // Back to host byte order
-    mSttsTableEntries->set(htonl(duration + getStartTimeOffsetScaledTime()), 1);
+    if (mMinCttsOffsetTicks == mMaxCttsOffsetTicks) {
+        // For non-vdeio tracks or video tracks without ctts table,
+        // adjust duration of first sample for tracks to account for
+        // first sample not starting at the media start time.
+        // TODO: consider signaling this using some offset
+        // as this is not quite correct.
+        uint32_t duration;
+        CHECK(mSttsTableEntries->get(duration, 1));
+        duration = htonl(duration);  // Back to host byte order
+        mSttsTableEntries->set(htonl(duration + getStartTimeOffsetScaledTime()), 1);
+    }
     mSttsTableEntries->write(mOwner);
     mOwner->endBox();  // stts
 }
 
 void MPEG4Writer::Track::writeCttsBox() {
     // There is no B frame at all
-    if (mMinCttsOffsetTimeUs == mMaxCttsOffsetTimeUs) {
+    if (mMinCttsOffsetTicks == mMaxCttsOffsetTicks) {
         return;
     }
 
@@ -3675,11 +3730,12 @@ void MPEG4Writer::Track::writeCttsBox() {
     }
 
     ALOGV("ctts box has %d entries with range [%" PRId64 ", %" PRId64 "]",
-            mCttsTableEntries->count(), mMinCttsOffsetTimeUs, mMaxCttsOffsetTimeUs);
+            mCttsTableEntries->count(), mMinCttsOffsetTicks, mMaxCttsOffsetTicks);
 
     mOwner->beginBox("ctts");
     mOwner->writeInt32(0);  // version=0, flags=0
-    int64_t delta = mMinCttsOffsetTimeUs - getStartTimeOffsetScaledTime();
+    int64_t deltaTimeUs = kMaxCttsOffsetTimeUs - getStartTimeOffsetTimeUs();
+    int64_t delta = (deltaTimeUs * mTimeScale + 500000LL) / 1000000LL;
     mCttsTableEntries->adjustEntries([delta](size_t /* ix */, uint32_t (&value)[2]) {
         // entries are <count, ctts> pairs; adjust only ctts
         uint32_t duration = htonl(value[1]); // back to host byte order

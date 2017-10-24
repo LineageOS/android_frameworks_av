@@ -153,11 +153,11 @@ void MetricsSummarizer::handleRecord(MediaAnalyticsItem *item) {
                 ALOGE("unable to save MediaMetrics record");
             }
             sortProps(item);
-            item->setInt32("aggregated",1);
+            item->setInt32("count",1);
             mSummaries->push_back(item);
     } else {
             ALOGV("increment existing record");
-            (*it)->addInt32("aggregated",1);
+            (*it)->addInt32("count",1);
             mergeRecord(*(*it), *item);
     }
 }

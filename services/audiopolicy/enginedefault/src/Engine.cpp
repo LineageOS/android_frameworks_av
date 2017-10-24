@@ -277,8 +277,11 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
                 device &= ~AUDIO_DEVICE_OUT_SPEAKER;
             }
         } else if (outputs.isStreamActive(
-                                AUDIO_STREAM_MUSIC, SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY)) {
-            // while media is playing (or has recently played), use the same device
+                                AUDIO_STREAM_MUSIC, SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY)
+                    || outputs.isStreamActive(
+                            AUDIO_STREAM_ACCESSIBILITY, SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY))
+        {
+            // while media/a11y is playing (or has recently played), use the same device
             device = getDeviceForStrategyInt(
                     STRATEGY_MEDIA, availableOutputDevices, availableInputDevices, outputs);
         } else {
@@ -550,6 +553,15 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
         if ((strategy == STRATEGY_MEDIA) &&
             (mForceUse[AUDIO_POLICY_FORCE_FOR_HDMI_SYSTEM_AUDIO] ==
                 AUDIO_POLICY_FORCE_HDMI_SYSTEM_AUDIO_ENFORCED)) {
+            device &= ~AUDIO_DEVICE_OUT_SPEAKER;
+        }
+
+        // for STRATEGY_SONIFICATION:
+        // if SPEAKER was selected, and SPEAKER_SAFE is available, use SPEAKER_SAFE instead
+        if ((strategy == STRATEGY_SONIFICATION) &&
+                (device & AUDIO_DEVICE_OUT_SPEAKER) &&
+                (availableOutputDevicesType & AUDIO_DEVICE_OUT_SPEAKER_SAFE)) {
+            device |= AUDIO_DEVICE_OUT_SPEAKER_SAFE;
             device &= ~AUDIO_DEVICE_OUT_SPEAKER;
         }
         } break;

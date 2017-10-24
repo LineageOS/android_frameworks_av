@@ -21,6 +21,7 @@
 #include "WGraphicBufferProducer.h"
 #include "WProducerListener.h"
 #include "Conversion.h"
+#include <system/window.h>
 
 namespace android {
 namespace hardware {

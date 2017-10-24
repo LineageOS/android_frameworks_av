@@ -16,6 +16,7 @@
 
 cc_test {
     name: "mtp_ffs_handle_test",
+    test_suites: ["device-tests"],
     srcs: ["MtpFfsHandle_test.cpp"],
     shared_libs: [
         "libbase",

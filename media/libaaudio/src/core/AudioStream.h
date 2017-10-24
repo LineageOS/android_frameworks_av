@@ -48,8 +48,18 @@ public:
      * Use waitForStateChange() to wait for completion.
      */
     virtual aaudio_result_t requestStart() = 0;
-    virtual aaudio_result_t requestPause() = 0;
-    virtual aaudio_result_t requestFlush() = 0;
+
+    virtual aaudio_result_t requestPause()
+    {
+        // Only implement this for OUTPUT streams.
+        return AAUDIO_ERROR_UNIMPLEMENTED;
+    }
+
+    virtual aaudio_result_t requestFlush() {
+        // Only implement this for OUTPUT streams.
+        return AAUDIO_ERROR_UNIMPLEMENTED;
+    }
+
     virtual aaudio_result_t requestStop() = 0;
 
     virtual aaudio_result_t getTimestamp(clockid_t clockId,
@@ -84,9 +94,7 @@ public:
         return AAUDIO_OK;
     }
 
-    virtual aaudio_result_t setBufferSize(int32_t requestedFrames) {
-        return AAUDIO_ERROR_UNIMPLEMENTED;
-    }
+    virtual aaudio_result_t setBufferSize(int32_t requestedFrames) = 0;
 
     virtual aaudio_result_t createThread(int64_t periodNanoseconds,
                                        aaudio_audio_thread_proc_t threadProc,
@@ -186,13 +194,9 @@ public:
         return AAudioConvert_formatToSizeInBytes(mFormat);
     }
 
-    virtual int64_t getFramesWritten() {
-        return mFramesWritten.get();
-    }
+    virtual int64_t getFramesWritten() = 0;
 
-    virtual int64_t getFramesRead() {
-        return mFramesRead.get();
-    }
+    virtual int64_t getFramesRead() = 0;
 
     AAudioStream_dataCallback getDataCallbackProc() const {
         return mDataCallbackProc;
@@ -218,27 +222,20 @@ public:
 
     // ============== I/O ===========================
     // A Stream will only implement read() or write() depending on its direction.
-    virtual aaudio_result_t write(const void *buffer,
-                             int32_t numFrames,
-                             int64_t timeoutNanoseconds) {
+    virtual aaudio_result_t write(const void *buffer __unused,
+                             int32_t numFrames __unused,
+                             int64_t timeoutNanoseconds __unused) {
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
-    virtual aaudio_result_t read(void *buffer,
-                            int32_t numFrames,
-                            int64_t timeoutNanoseconds) {
+    virtual aaudio_result_t read(void *buffer __unused,
+                            int32_t numFrames __unused,
+                            int64_t timeoutNanoseconds __unused) {
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
 protected:
 
-    virtual int64_t incrementFramesWritten(int32_t frames) {
-        return mFramesWritten.increment(frames);
-    }
-
-    virtual int64_t incrementFramesRead(int32_t frames) {
-        return mFramesRead.increment(frames);
-    }
 
     /**
      * This should not be called after the open() call.
@@ -281,8 +278,6 @@ protected:
     std::atomic<bool>    mCallbackEnabled;
 
 protected:
-    MonotonicCounter     mFramesWritten;
-    MonotonicCounter     mFramesRead;
 
     void setPeriodNanoseconds(int64_t periodNanoseconds) {
         mPeriodNanoseconds.store(periodNanoseconds, std::memory_order_release);

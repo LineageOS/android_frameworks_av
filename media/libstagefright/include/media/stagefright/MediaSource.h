@@ -75,6 +75,23 @@ struct MediaSource : public BnMediaSource {
         return ERROR_UNSUPPORTED;
     }
 
+    // The consumer of this media source requests the source stops sending
+    // buffers with timestamp larger than or equal to stopTimeUs. stopTimeUs
+    // must be in the same time base as the startTime passed in start(). If
+    // source does not support this request, ERROR_UNSUPPORTED will be returned.
+    // If stopTimeUs is invalid, BAD_VALUE will be returned. This could be
+    // called at any time even before source starts and it could be called
+    // multiple times. Setting stopTimeUs to be -1 will effectively cancel the stopTimeUs
+    // set previously. If stopTimeUs is larger than or equal to last buffer's timestamp,
+    // source will start to drop buffer when it gets a buffer with timestamp larger
+    // than or equal to stopTimeUs. If stopTimeUs is smaller than or equal to last
+    // buffer's timestamp, source will drop all the incoming buffers immediately.
+    // After setting stopTimeUs, source may still stop sending buffers with timestamp
+    // less than stopTimeUs if it is stopped by the consumer.
+    virtual status_t setStopTimeUs(int64_t /* stopTimeUs */) {
+        return ERROR_UNSUPPORTED;
+    }
+
 protected:
     virtual ~MediaSource();
 

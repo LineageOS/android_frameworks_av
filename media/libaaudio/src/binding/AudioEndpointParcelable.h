@@ -20,6 +20,7 @@
 #include <stdint.h>
 
 //#include <sys/mman.h>
+#include <android-base/unique_fd.h>
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
 
@@ -47,7 +48,7 @@ public:
      * Add the file descriptor to the table.
      * @return index in table or negative error
      */
-    int32_t addFileDescriptor(int fd, int32_t sizeInBytes);
+    int32_t addFileDescriptor(const android::base::unique_fd& fd, int32_t sizeInBytes);
 
     virtual status_t writeToParcel(Parcel* parcel) const override;
 

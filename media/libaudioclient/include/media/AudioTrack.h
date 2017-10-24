@@ -326,7 +326,7 @@ public:
      * This includes the latency due to AudioTrack buffer size, AudioMixer (if any)
      * and audio hardware driver.
      */
-            uint32_t    latency() const     { return mLatency; }
+            uint32_t    latency();
 
     /* Returns the number of application-level buffer underruns
      * since the AudioTrack was created.
@@ -563,6 +563,12 @@ public:
      *  - INVALID_OPERATION: the AudioTrack is not stopped or paused, or is streaming mode.
      */
             status_t    reload();
+
+    /**
+     * @param transferType
+     * @return text string that matches the enum name
+     */
+            static const char * convertTransferToText(transfer_type transferType);
 
     /* Returns a handle on the audio output used by this AudioTrack.
      *
@@ -927,6 +933,8 @@ protected:
 
             // caller must hold lock on mLock for all _l methods
 
+            void updateLatency_l(); // updates mAfLatency and mLatency from AudioSystem cache
+
             status_t createTrack_l();
 
             // can only be called when mState != STATE_ACTIVE
@@ -962,7 +970,7 @@ protected:
             Modulo<uint32_t> updateAndGetPosition_l();
 
             // check sample rate and speed is compatible with AudioTrack
-            bool     isSampleRateSpeedAllowed_l(uint32_t sampleRate, float speed) const;
+            bool     isSampleRateSpeedAllowed_l(uint32_t sampleRate, float speed);
 
             void     restartIfDisabled();
 
@@ -1133,7 +1141,10 @@ protected:
 
     // For Device Selection API
     //  a value of AUDIO_PORT_HANDLE_NONE indicated default (AudioPolicyManager) routing.
-    audio_port_handle_t     mSelectedDeviceId;
+    audio_port_handle_t    mSelectedDeviceId; // Device requested by the application.
+    audio_port_handle_t    mRoutedDeviceId;   // Device actually selected by audio policy manager:
+                                              // May not match the app selection depending on other
+                                              // activity and connected devices.
 
     sp<VolumeHandler>       mVolumeHandler;
 

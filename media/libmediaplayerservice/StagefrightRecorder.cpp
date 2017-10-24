@@ -1864,7 +1864,7 @@ status_t StagefrightRecorder::setupMPEG4orWEBMRecording() {
         mStartTimeOffsetMs = mEncoderProfiles->getStartTimeOffsetMs(mCameraId);
     } else if (mVideoSource == VIDEO_SOURCE_SURFACE) {
         // surface source doesn't need large initial delay
-        mStartTimeOffsetMs = 200;
+        mStartTimeOffsetMs = 100;
     }
     if (mStartTimeOffsetMs > 0) {
         writer->setStartTimeOffsetMs(mStartTimeOffsetMs);
@@ -1982,10 +1982,12 @@ status_t StagefrightRecorder::stop() {
         mCameraSourceTimeLapse = NULL;
     }
 
-    if (mVideoEncoderSource != NULL) {
-        int64_t stopTimeUs = systemTime() / 1000;
-        sp<MetaData> meta = new MetaData;
-        err = mVideoEncoderSource->setStopStimeUs(stopTimeUs);
+    int64_t stopTimeUs = systemTime() / 1000;
+    for (const auto &source : { mAudioEncoderSource, mVideoEncoderSource }) {
+        if (source != nullptr && OK != source->setStopTimeUs(stopTimeUs)) {
+            ALOGW("Failed to set stopTime %lld us for %s",
+                    (long long)stopTimeUs, source->isVideo() ? "Video" : "Audio");
+        }
     }
 
     if (mWriter != NULL) {

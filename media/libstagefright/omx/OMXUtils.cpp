@@ -24,6 +24,7 @@
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/MediaDefs.h>
+#include <system/graphics-base.h>
 #include "OMXUtils.h"
 
 namespace android {

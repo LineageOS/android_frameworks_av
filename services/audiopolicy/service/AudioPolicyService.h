@@ -82,7 +82,7 @@ public:
                                       uid_t uid,
                                       const audio_config_t *config,
                                       audio_output_flags_t flags,
-                                      audio_port_handle_t selectedDeviceId,
+                                      audio_port_handle_t *selectedDeviceId,
                                       audio_port_handle_t *portId);
     virtual status_t startOutput(audio_io_handle_t output,
                                  audio_stream_type_t stream,
@@ -100,7 +100,7 @@ public:
                                      uid_t uid,
                                      const audio_config_base_t *config,
                                      audio_input_flags_t flags,
-                                     audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE,
+                                     audio_port_handle_t *selectedDeviceId = NULL,
                                      audio_port_handle_t *portId = NULL);
     virtual status_t startInput(audio_io_handle_t input,
                                 audio_session_t session);
@@ -201,6 +201,9 @@ public:
 
     virtual status_t setMasterMono(bool mono);
     virtual status_t getMasterMono(bool *mono);
+
+    virtual float    getStreamVolumeDB(
+                audio_stream_type_t stream, int index, audio_devices_t device);
 
             status_t doStopOutput(audio_io_handle_t output,
                                   audio_stream_type_t stream,

@@ -65,8 +65,7 @@ public:
 private:
     friend class AudioFlinger;  // for mState
 
-                        RecordTrack(const RecordTrack&);
-                        RecordTrack& operator = (const RecordTrack&);
+    DISALLOW_COPY_AND_ASSIGN(RecordTrack);
 
     // AudioBufferProvider interface
     virtual status_t getNextBuffer(AudioBufferProvider::Buffer* buffer);

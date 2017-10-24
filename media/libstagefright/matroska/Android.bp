@@ -4,8 +4,10 @@ cc_library_static {
     srcs: ["MatroskaExtractor.cpp"],
 
     include_dirs: [
+        "external/flac/include",
         "external/libvpx/libwebm",
         "frameworks/native/include/media/openmax",
+        "frameworks/av/media/libstagefright/flac/dec",
         "frameworks/av/media/libstagefright/include",
     ],
 
@@ -26,5 +28,8 @@ cc_library_static {
         },
     },
 
-    shared_libs: ["libmedia"],
+    shared_libs: [
+        "libmedia",
+        "libstagefright_flacdec"
+    ],
 }

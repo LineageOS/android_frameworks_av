@@ -98,6 +98,7 @@ public:
     virtual status_t stop() { return reset(); }
     virtual status_t read(
             MediaBuffer **buffer, const ReadOptions *options = NULL);
+    virtual status_t setStopTimeUs(int64_t stopTimeUs);
 
     /**
      * Check whether a CameraSource object is properly initialized.
@@ -253,6 +254,7 @@ private:
     List<int64_t> mFrameTimes;
 
     int64_t mFirstFrameTimeUs;
+    int64_t mStopSystemTimeUs;
     int32_t mNumFramesDropped;
     int32_t mNumGlitches;
     int64_t mGlitchDurationThresholdUs;

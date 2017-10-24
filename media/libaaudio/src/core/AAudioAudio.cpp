@@ -253,8 +253,10 @@ AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream)
 AAUDIO_API aaudio_result_t  AAudioStream_requestStart(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    ALOGD("AAudioStream_requestStart(%p)", stream);
-    return audioStream->requestStart();
+    ALOGD("AAudioStream_requestStart(%p) called --------------", stream);
+    aaudio_result_t result = audioStream->requestStart();
+    ALOGD("AAudioStream_requestStart(%p) returned ------------", stream);
+    return result;
 }
 
 AAUDIO_API aaudio_result_t  AAudioStream_requestPause(AAudioStream* stream)

@@ -60,6 +60,8 @@ struct MediaCodecSource : public MediaSource,
     virtual status_t read(
             MediaBuffer **buffer,
             const ReadOptions *options = NULL);
+    virtual status_t setStopTimeUs(int64_t stopTimeUs);
+
 
     // MediaBufferObserver
     virtual void signalBufferReturned(MediaBuffer *buffer);
@@ -67,11 +69,7 @@ struct MediaCodecSource : public MediaSource,
     // for AHandlerReflector
     void onMessageReceived(const sp<AMessage> &msg);
 
-    // Set GraphicBufferSource stop time. GraphicBufferSource will stop
-    // after receiving a buffer with timestamp larger or equal than stopTimeUs.
-    // All the buffers with timestamp larger or equal to stopTimeUs will be
-    // discarded. stopTimeUs uses SYSTEM_TIME_MONOTONIC time base.
-    status_t setStopStimeUs(int64_t stopTimeUs);
+
 
 protected:
     virtual ~MediaCodecSource();
@@ -86,7 +84,7 @@ private:
         kWhatStop,
         kWhatPause,
         kWhatSetInputBufferTimeOffset,
-        kWhatSetStopTimeOffset,
+        kWhatSetStopTimeUs,
         kWhatGetFirstSampleSystemTimeUs,
         kWhatStopStalled,
     };

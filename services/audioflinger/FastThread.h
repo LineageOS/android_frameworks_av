@@ -41,7 +41,7 @@ protected:
     // callouts to subclass in same lexical order as they were in original FastMixer.cpp
     // FIXME need comments
     virtual const FastThreadState *poll() = 0;
-    virtual void setLog(NBLog::Writer *logWriter __unused) { }
+    virtual void setNBLogWriter(NBLog::Writer *logWriter __unused) { }
     virtual void onIdle() = 0;
     virtual void onExit() = 0;
     virtual bool isSubClassCommand(FastThreadState::Command command) = 0;
@@ -81,8 +81,8 @@ protected:
     struct timespec mMeasuredWarmupTs;  // how long did it take for warmup to complete
     uint32_t        mWarmupCycles;  // counter of number of loop cycles during warmup phase
     uint32_t        mWarmupConsecutiveInRangeCycles;    // number of consecutive cycles in range
-    NBLog::Writer   mDummyLogWriter;
-    NBLog::Writer*  mLogWriter;
+    NBLog::Writer   mDummyNBLogWriter;
+    NBLog::Writer*  mNBLogWriter;   // always non-nullptr: real NBLog::Writer* or &mDummyNBLogWriter
     status_t        mTimestampStatus;
 
     FastThreadState::Command mCommand;

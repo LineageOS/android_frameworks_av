@@ -184,6 +184,7 @@ AudioTrack::AudioTrack()
       mPreviousSchedulingGroup(SP_DEFAULT),
       mPausedPosition(0),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
+      mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE),
       mPortId(AUDIO_PORT_HANDLE_NONE)
 {
     mAttributes.content_type = AUDIO_CONTENT_TYPE_UNKNOWN;
@@ -908,13 +909,13 @@ status_t AudioTrack::setPlaybackRate(const AudioPlaybackRate &playbackRate)
             effectiveRate, effectiveSpeed, effectivePitch);
 
     if (!isAudioPlaybackRateValid(playbackRateTemp)) {
-        ALOGV("setPlaybackRate(%f, %f) failed (effective rate out of bounds)",
+        ALOGW("setPlaybackRate(%f, %f) failed (effective rate out of bounds)",
                 playbackRate.mSpeed, playbackRate.mPitch);
         return BAD_VALUE;
     }
     // Check if the buffer size is compatible.
     if (!isSampleRateSpeedAllowed_l(effectiveRate, effectiveSpeed)) {
-        ALOGV("setPlaybackRate(%f, %f) failed (buffer size)",
+        ALOGW("setPlaybackRate(%f, %f) failed (buffer size)",
                 playbackRate.mSpeed, playbackRate.mPitch);
         return BAD_VALUE;
     }
@@ -922,13 +923,13 @@ status_t AudioTrack::setPlaybackRate(const AudioPlaybackRate &playbackRate)
     // Check resampler ratios are within bounds
     if ((uint64_t)effectiveRate > (uint64_t)mSampleRate *
             (uint64_t)AUDIO_RESAMPLER_DOWN_RATIO_MAX) {
-        ALOGV("setPlaybackRate(%f, %f) failed. Resample rate exceeds max accepted value",
+        ALOGW("setPlaybackRate(%f, %f) failed. Resample rate exceeds max accepted value",
                 playbackRate.mSpeed, playbackRate.mPitch);
         return BAD_VALUE;
     }
 
     if ((uint64_t)effectiveRate * (uint64_t)AUDIO_RESAMPLER_UP_RATIO_MAX < (uint64_t)mSampleRate) {
-        ALOGV("setPlaybackRate(%f, %f) failed. Resample rate below min accepted value",
+        ALOGW("setPlaybackRate(%f, %f) failed. Resample rate below min accepted value",
                         playbackRate.mSpeed, playbackRate.mPitch);
         return BAD_VALUE;
     }
@@ -1226,7 +1227,14 @@ audio_port_handle_t AudioTrack::getRoutedDeviceId() {
     if (mOutput == AUDIO_IO_HANDLE_NONE) {
         return AUDIO_PORT_HANDLE_NONE;
     }
-    return AudioSystem::getDeviceIdForIo(mOutput);
+    // if the output stream does not have an active audio patch, use either the device initially
+    // selected by audio policy manager or the last routed device
+    audio_port_handle_t deviceId = AudioSystem::getDeviceIdForIo(mOutput);
+    if (deviceId == AUDIO_PORT_HANDLE_NONE) {
+        deviceId = mRoutedDeviceId;
+    }
+    mRoutedDeviceId = deviceId;
+    return deviceId;
 }
 
 status_t AudioTrack::attachAuxEffect(int effectId)
@@ -1247,9 +1255,41 @@ audio_stream_type_t AudioTrack::streamType() const
     return mStreamType;
 }
 
+uint32_t AudioTrack::latency()
+{
+    AutoMutex lock(mLock);
+    updateLatency_l();
+    return mLatency;
+}
+
 // -------------------------------------------------------------------------
 
 // must be called with mLock held
+void AudioTrack::updateLatency_l()
+{
+    status_t status = AudioSystem::getLatency(mOutput, &mAfLatency);
+    if (status != NO_ERROR) {
+        ALOGW("getLatency(%d) failed status %d", mOutput, status);
+    } else {
+        // FIXME don't believe this lie
+        mLatency = mAfLatency + (1000 * mFrameCount) / mSampleRate;
+    }
+}
+
+// TODO Move this macro to a common header file for enum to string conversion in audio framework.
+#define MEDIA_CASE_ENUM(name) case name: return #name
+const char * AudioTrack::convertTransferToText(transfer_type transferType) {
+    switch (transferType) {
+        MEDIA_CASE_ENUM(TRANSFER_DEFAULT);
+        MEDIA_CASE_ENUM(TRANSFER_CALLBACK);
+        MEDIA_CASE_ENUM(TRANSFER_OBTAIN);
+        MEDIA_CASE_ENUM(TRANSFER_SYNC);
+        MEDIA_CASE_ENUM(TRANSFER_SHARED);
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+
 status_t AudioTrack::createTrack_l()
 {
     const sp<IAudioFlinger>& audioFlinger = AudioSystem::get_audio_flinger();
@@ -1274,10 +1314,11 @@ status_t AudioTrack::createTrack_l()
     config.channel_mask = mChannelMask;
     config.format = mFormat;
     config.offload_info = mOffloadInfoCopy;
+    mRoutedDeviceId = mSelectedDeviceId;
     status = AudioSystem::getOutputForAttr(attr, &output,
                                            mSessionId, &streamType, mClientUid,
                                            &config,
-                                           mFlags, mSelectedDeviceId, &mPortId);
+                                           mFlags, &mRoutedDeviceId, &mPortId);
 
     if (status != NO_ERROR || output == AUDIO_IO_HANDLE_NONE) {
         ALOGE("Could not get audio output for session %d, stream type %d, usage %d, sample rate %u,"
@@ -1325,22 +1366,32 @@ status_t AudioTrack::createTrack_l()
 
     // Client can only express a preference for FAST.  Server will perform additional tests.
     if (mFlags & AUDIO_OUTPUT_FLAG_FAST) {
-        bool useCaseAllowed =
-            // either of these use cases:
-            // use case 1: shared buffer
-            (mSharedBuffer != 0) ||
+        // either of these use cases:
+        // use case 1: shared buffer
+        bool sharedBuffer = mSharedBuffer != 0;
+        bool transferAllowed =
             // use case 2: callback transfer mode
             (mTransfer == TRANSFER_CALLBACK) ||
             // use case 3: obtain/release mode
             (mTransfer == TRANSFER_OBTAIN) ||
             // use case 4: synchronous write
             ((mTransfer == TRANSFER_SYNC) && mThreadCanCallJava);
+
+        bool useCaseAllowed = sharedBuffer || transferAllowed;
+        if (!useCaseAllowed) {
+            ALOGW("AUDIO_OUTPUT_FLAG_FAST denied, not shared buffer and transfer = %s",
+                  convertTransferToText(mTransfer));
+        }
+
         // sample rates must also match
-        bool fastAllowed = useCaseAllowed && (mSampleRate == mAfSampleRate);
+        bool sampleRateAllowed = mSampleRate == mAfSampleRate;
+        if (!sampleRateAllowed) {
+            ALOGW("AUDIO_OUTPUT_FLAG_FAST denied, rates do not match %u Hz, require %u Hz",
+                  mSampleRate, mAfSampleRate);
+        }
+
+        bool fastAllowed = useCaseAllowed && sampleRateAllowed;
         if (!fastAllowed) {
-            ALOGW("AUDIO_OUTPUT_FLAG_FAST denied by client; transfer %d, "
-                "track %u Hz, output %u Hz",
-                mTransfer, mSampleRate, mAfSampleRate);
             mFlags = (audio_output_flags_t) (mFlags & ~AUDIO_OUTPUT_FLAG_FAST);
         }
     }
@@ -1416,6 +1467,9 @@ status_t AudioTrack::createTrack_l()
 
     pid_t tid = -1;
     if (mFlags & AUDIO_OUTPUT_FLAG_FAST) {
+        // It is currently meaningless to request SCHED_FIFO for a Java thread.  Even if the
+        // application-level code follows all non-blocking design rules, the language runtime
+        // doesn't also follow those rules, so the thread will not benefit overall.
         if (mAudioTrackThread != 0 && !mThreadCanCallJava) {
             tid = mAudioTrackThread->getTid();
         }
@@ -1541,11 +1595,9 @@ status_t AudioTrack::createTrack_l()
     }
 
     mAudioTrack->attachAuxEffect(mAuxEffectId);
-    // FIXME doesn't take into account speed or future sample rate changes (until restoreTrack)
-    // FIXME don't believe this lie
-    mLatency = mAfLatency + (1000*frameCount) / mSampleRate;
-
     mFrameCount = frameCount;
+    updateLatency_l();  // this refetches mAfLatency and sets mLatency
+
     // If IAudioTrack is re-created, don't let the requested frameCount
     // decrease.  This can confuse clients that cache frameCount().
     if (frameCount > mReqFrameCount) {
@@ -2315,8 +2367,9 @@ Modulo<uint32_t> AudioTrack::updateAndGetPosition_l()
     return mPosition;
 }
 
-bool AudioTrack::isSampleRateSpeedAllowed_l(uint32_t sampleRate, float speed) const
+bool AudioTrack::isSampleRateSpeedAllowed_l(uint32_t sampleRate, float speed)
 {
+    updateLatency_l();
     // applicable for mixing tracks only (not offloaded or direct)
     if (mStaticProxy != 0) {
         return true; // static tracks do not have issues with buffer sizing.
@@ -2324,9 +2377,14 @@ bool AudioTrack::isSampleRateSpeedAllowed_l(uint32_t sampleRate, float speed) co
     const size_t minFrameCount =
             calculateMinFrameCount(mAfLatency, mAfFrameCount, mAfSampleRate, sampleRate, speed
                 /*, 0 mNotificationsPerBufferReq*/);
-    ALOGV("isSampleRateSpeedAllowed_l mFrameCount %zu  minFrameCount %zu",
+    const bool allowed = mFrameCount >= minFrameCount;
+    ALOGD_IF(!allowed,
+            "isSampleRateSpeedAllowed_l denied "
+            "mAfLatency:%u  mAfFrameCount:%zu  mAfSampleRate:%u  sampleRate:%u  speed:%f "
+            "mFrameCount:%zu < minFrameCount:%zu",
+            mAfLatency, mAfFrameCount, mAfSampleRate, sampleRate, speed,
             mFrameCount, minFrameCount);
-    return mFrameCount >= minFrameCount;
+    return allowed;
 }
 
 status_t AudioTrack::setParameters(const String8& keyValuePairs)
@@ -2470,6 +2528,7 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
             status = ets.getBestTimestamp(&timestamp, &location);
 
             if (status == OK) {
+                updateLatency_l();
                 // It is possible that the best location has moved from the kernel to the server.
                 // In this case we adjust the position from the previous computed latency.
                 if (location == ExtendedTimestamp::LOCATION_SERVER) {
@@ -2941,6 +3000,7 @@ bool AudioTrack::AudioTrackThread::threadLoop()
     {
         AutoMutex _l(mMyLock);
         if (mPaused) {
+            // TODO check return value and handle or log
             mMyCond.wait(mMyLock);
             // caller will check for exitPending()
             return true;
@@ -2950,9 +3010,12 @@ bool AudioTrack::AudioTrackThread::threadLoop()
             mPausedInt = false;
         }
         if (mPausedInt) {
+            // TODO use futex instead of condition, for event flag "or"
             if (mPausedNs > 0) {
+                // TODO check return value and handle or log
                 (void) mMyCond.waitRelative(mMyLock, mPausedNs);
             } else {
+                // TODO check return value and handle or log
                 mMyCond.wait(mMyLock);
             }
             mPausedInt = false;

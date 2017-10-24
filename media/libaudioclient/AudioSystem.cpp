@@ -819,7 +819,7 @@ status_t AudioSystem::getOutputForAttr(const audio_attributes_t *attr,
                                         uid_t uid,
                                         const audio_config_t *config,
                                         audio_output_flags_t flags,
-                                        audio_port_handle_t selectedDeviceId,
+                                        audio_port_handle_t *selectedDeviceId,
                                         audio_port_handle_t *portId)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
@@ -863,7 +863,7 @@ status_t AudioSystem::getInputForAttr(const audio_attributes_t *attr,
                                 uid_t uid,
                                 const audio_config_base_t *config,
                                 audio_input_flags_t flags,
-                                audio_port_handle_t selectedDeviceId,
+                                audio_port_handle_t *selectedDeviceId,
                                 audio_port_handle_t *portId)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
@@ -1223,6 +1223,13 @@ status_t AudioSystem::getMasterMono(bool *mono)
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
     return aps->getMasterMono(mono);
+}
+
+float AudioSystem::getStreamVolumeDB(audio_stream_type_t stream, int index, audio_devices_t device)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return NAN;
+    return aps->getStreamVolumeDB(stream, index, device);
 }
 
 // ---------------------------------------------------------------------------

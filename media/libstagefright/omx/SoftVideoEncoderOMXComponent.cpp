@@ -36,6 +36,8 @@
 
 #include <hardware/gralloc.h>
 
+#include <nativebase/nativebase.h>
+
 #include <OMX_IndexExt.h>
 
 namespace android {

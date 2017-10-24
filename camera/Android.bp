@@ -21,7 +21,6 @@ cc_library_shared {
         export_aidl_headers: true,
         local_include_dirs: ["aidl"],
         include_dirs: [
-            "frameworks/base/core/java",
             "frameworks/native/aidl/gui",
         ],
     },
@@ -32,8 +31,10 @@ cc_library_shared {
         // include libcamera_client, at the path "aidl/package/path/BnFoo.h"
         "aidl/android/hardware/ICameraService.aidl",
         "aidl/android/hardware/ICameraServiceListener.aidl",
+        "aidl/android/hardware/ICameraServiceProxy.aidl",
         "aidl/android/hardware/camera2/ICameraDeviceCallbacks.aidl",
         "aidl/android/hardware/camera2/ICameraDeviceUser.aidl",
+
 
         // Source for camera interface parcelables, and manually-written interfaces
         "Camera.cpp",
@@ -43,7 +44,6 @@ cc_library_shared {
         "CameraParameters2.cpp",
         "ICamera.cpp",
         "ICameraClient.cpp",
-        "ICameraServiceProxy.cpp",
         "ICameraRecordingProxy.cpp",
         "ICameraRecordingProxyListener.cpp",
         "camera2/CaptureRequest.cpp",
@@ -61,13 +61,17 @@ cc_library_shared {
         "libbinder",
         "libgui",
         "libcamera_metadata",
+        "libnativewindow",
     ],
 
     include_dirs: [
         "system/media/private/camera/include",
         "frameworks/native/include/media/openmax",
     ],
-    export_include_dirs: ["include/camera"],
+    export_include_dirs: [
+         "include",
+         "include/camera"
+    ],
     export_shared_lib_headers: ["libcamera_metadata"],
 
     cflags: [
@@ -75,4 +79,5 @@ cc_library_shared {
         "-Wall",
         "-Wextra",
     ],
+
 }

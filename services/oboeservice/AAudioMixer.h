@@ -37,7 +37,7 @@ public:
      * @param volume
      * @return true if underflowed
      */
-    bool mix(android::FifoBuffer *fifo, float volume);
+    bool mix(int trackIndex, android::FifoBuffer *fifo, float volume);
 
     void mixPart(float *destination, float *source, int32_t numFrames, float volume);
 

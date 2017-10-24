@@ -37,6 +37,19 @@ using namespace aaudio;
 #define AAUDIO_MMAP_POLICY_DEFAULT             AAUDIO_POLICY_NEVER
 #define AAUDIO_MMAP_EXCLUSIVE_POLICY_DEFAULT   AAUDIO_POLICY_NEVER
 
+// These values are for a pre-check before we ask the lower level service to open a stream.
+// So they are just outside the maximum conceivable range of value,
+// on the edge of being ridiculous.
+// TODO These defines should be moved to a central place in audio.
+#define SAMPLES_PER_FRAME_MIN        1
+// TODO Remove 8 channel limitation.
+#define SAMPLES_PER_FRAME_MAX        FCC_8
+#define SAMPLE_RATE_HZ_MIN           8000
+// HDMI supports up to 32 channels at 1536000 Hz.
+#define SAMPLE_RATE_HZ_MAX           1600000
+#define FRAMES_PER_DATA_CALLBACK_MIN 1
+#define FRAMES_PER_DATA_CALLBACK_MAX (1024 * 1024)
+
 /*
  * AudioStreamBuilder
  */
@@ -85,7 +98,16 @@ static aaudio_result_t builder_createStream(aaudio_direction_t direction,
 // Exact behavior is controlled by MMapPolicy.
 aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     AudioStream *audioStream = nullptr;
+    if (streamPtr == nullptr) {
+        ALOGE("AudioStreamBuilder::build() streamPtr is null");
+        return AAUDIO_ERROR_NULL;
+    }
     *streamPtr = nullptr;
+
+    aaudio_result_t result = validate();
+    if (result != AAUDIO_OK) {
+        return result;
+    }
 
     // The API setting is the highest priority.
     aaudio_policy_t mmapPolicy = AAudio_getMMapPolicy();
@@ -116,8 +138,13 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     bool allowMMap = mmapPolicy != AAUDIO_POLICY_NEVER;
     bool allowLegacy = mmapPolicy != AAUDIO_POLICY_ALWAYS;
 
-    aaudio_result_t result = builder_createStream(getDirection(), sharingMode,
-                                                  allowMMap, &audioStream);
+    // TODO Support other performance settings in MMAP mode.
+    // Disable MMAP if low latency not requested.
+    if (getPerformanceMode() != AAUDIO_PERFORMANCE_MODE_LOW_LATENCY) {
+        allowMMap = false;
+    }
+
+    result = builder_createStream(getDirection(), sharingMode, allowMMap, &audioStream);
     if (result == AAUDIO_OK) {
         // Open the stream using the parameters from the builder.
         result = audioStream->open(*this);
@@ -146,4 +173,46 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     }
 
     return result;
+}
+
+aaudio_result_t AudioStreamBuilder::validate() const {
+
+    // Check for values that are ridiculously out of range to prevent math overflow exploits.
+    // The service will do a better check.
+    aaudio_result_t result = AAudioStreamParameters::validate();
+    if (result != AAUDIO_OK) {
+        return result;
+    }
+
+    switch (mDirection) {
+        case AAUDIO_DIRECTION_INPUT:
+        case AAUDIO_DIRECTION_OUTPUT:
+            break; // valid
+        default:
+            ALOGE("AudioStreamBuilder: direction not valid = %d", mDirection);
+            return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
+            // break;
+    }
+
+    switch (mPerformanceMode) {
+        case AAUDIO_PERFORMANCE_MODE_NONE:
+        case AAUDIO_PERFORMANCE_MODE_POWER_SAVING:
+        case AAUDIO_PERFORMANCE_MODE_LOW_LATENCY:
+            break;
+        default:
+            ALOGE("AudioStreamBuilder: illegal performanceMode = %d", mPerformanceMode);
+            return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
+            // break;
+    }
+
+    // Prevent ridiculous values from causing problems.
+    if (mFramesPerDataCallback != AAUDIO_UNSPECIFIED
+        && (mFramesPerDataCallback < FRAMES_PER_DATA_CALLBACK_MIN
+            || mFramesPerDataCallback > FRAMES_PER_DATA_CALLBACK_MAX)) {
+        ALOGE("AudioStreamBuilder: framesPerDataCallback out of range = %d",
+              mFramesPerDataCallback);
+        return AAUDIO_ERROR_OUT_OF_RANGE;
+    }
+
+    return AAUDIO_OK;
 }

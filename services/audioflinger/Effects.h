@@ -135,15 +135,14 @@ public:
 
     void             dump(int fd, const Vector<String16>& args);
 
-protected:
+private:
     friend class AudioFlinger;      // for mHandles
     bool                mPinned;
 
     // Maximum time allocated to effect engines to complete the turn off sequence
     static const uint32_t MAX_DISABLE_TIME_MS = 10000;
 
-    EffectModule(const EffectModule&);
-    EffectModule& operator = (const EffectModule&);
+    DISALLOW_COPY_AND_ASSIGN(EffectModule);
 
     status_t start_l();
     status_t stop_l();
@@ -232,10 +231,9 @@ public:
 
     void dumpToBuffer(char* buffer, size_t size);
 
-protected:
+private:
     friend class AudioFlinger;          // for mEffect, mHasControl, mEnabled
-    EffectHandle(const EffectHandle&);
-    EffectHandle& operator =(const EffectHandle&);
+    DISALLOW_COPY_AND_ASSIGN(EffectHandle);
 
     Mutex mLock;                        // protects IEffect method calls
     wp<EffectModule> mEffect;           // pointer to controlled EffectModule
@@ -333,7 +331,8 @@ public:
     void setStrategy(uint32_t strategy)
             { mStrategy = strategy; }
 
-    // suspend effect of the given type
+    // suspend or restore effects of the specified type. The number of suspend requests is counted
+    // and restore occurs once all suspend requests are cancelled.
     void setEffectSuspended_l(const effect_uuid_t *type,
                               bool suspend);
     // suspend all eligible effects
@@ -366,16 +365,15 @@ public:
 
     void dump(int fd, const Vector<String16>& args);
 
-protected:
+private:
     friend class AudioFlinger;  // for mThread, mEffects
-    EffectChain(const EffectChain&);
-    EffectChain& operator =(const EffectChain&);
+    DISALLOW_COPY_AND_ASSIGN(EffectChain);
 
     class SuspendedEffectDesc : public RefBase {
     public:
         SuspendedEffectDesc() : mRefCount(0) {}
 
-        int mRefCount;
+        int mRefCount;   // > 0 when suspended
         effect_uuid_t mType;
         wp<EffectModule> mEffect;
     };
@@ -390,6 +388,8 @@ protected:
     // OEMs can modify the rules implemented in this method to exclude specific effect
     // types or implementations from the suspend/restore mechanism.
     bool isEffectEligibleForSuspend(const effect_descriptor_t& desc);
+
+    static bool isEffectEligibleForBtNrecSuspend(const effect_uuid_t *type);
 
     void clearInputBuffer_l(const sp<ThreadBase>& thread);
 
@@ -417,6 +417,6 @@ protected:
              // mSuspendedEffects lists all effects currently suspended in the chain.
              // Use effect type UUID timelow field as key. There is no real risk of identical
              // timeLow fields among effect type UUIDs.
-             // Updated by updateSuspendedSessions_l() only.
+             // Updated by setEffectSuspended_l() and setEffectSuspendedAll_l() only.
              KeyedVector< int, sp<SuspendedEffectDesc> > mSuspendedEffects;
 };

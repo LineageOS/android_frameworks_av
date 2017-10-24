@@ -19,6 +19,7 @@
 #include <utils/Log.h>
 
 #include <stdint.h>
+#include <math.h>
 #include <sys/types.h>
 
 #include <binder/Parcel.h>
@@ -77,6 +78,7 @@ enum {
     SET_AUDIO_PORT_CALLBACK_ENABLED,
     SET_MASTER_MONO,
     GET_MASTER_MONO,
+    GET_STREAM_VOLUME_DB
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -191,7 +193,7 @@ public:
                                         uid_t uid,
                                         const audio_config_t *config,
                                         audio_output_flags_t flags,
-                                        audio_port_handle_t selectedDeviceId,
+                                        audio_port_handle_t *selectedDeviceId,
                                         audio_port_handle_t *portId)
         {
             Parcel data, reply;
@@ -208,6 +210,10 @@ public:
             }
             if (output == NULL) {
                 ALOGE("getOutputForAttr NULL output - shouldn't happen");
+                return BAD_VALUE;
+            }
+            if (selectedDeviceId == NULL) {
+                ALOGE("getOutputForAttr NULL selectedDeviceId - shouldn't happen");
                 return BAD_VALUE;
             }
             if (portId == NULL) {
@@ -230,7 +236,7 @@ public:
             data.writeInt32(uid);
             data.write(config, sizeof(audio_config_t));
             data.writeInt32(static_cast <uint32_t>(flags));
-            data.writeInt32(selectedDeviceId);
+            data.writeInt32(*selectedDeviceId);
             data.writeInt32(*portId);
             status_t status = remote()->transact(GET_OUTPUT_FOR_ATTR, data, &reply);
             if (status != NO_ERROR) {
@@ -245,6 +251,7 @@ public:
             if (stream != NULL) {
                 *stream = lStream;
             }
+            *selectedDeviceId = (audio_port_handle_t)reply.readInt32();
             *portId = (audio_port_handle_t)reply.readInt32();
             return status;
         }
@@ -294,7 +301,7 @@ public:
                                      uid_t uid,
                                      const audio_config_base_t *config,
                                      audio_input_flags_t flags,
-                                     audio_port_handle_t selectedDeviceId,
+                                     audio_port_handle_t *selectedDeviceId,
                                      audio_port_handle_t *portId)
     {
         Parcel data, reply;
@@ -307,17 +314,22 @@ public:
             ALOGE("getInputForAttr NULL input - shouldn't happen");
             return BAD_VALUE;
         }
+        if (selectedDeviceId == NULL) {
+            ALOGE("getInputForAttr NULL selectedDeviceId - shouldn't happen");
+            return BAD_VALUE;
+        }
         if (portId == NULL) {
             ALOGE("getInputForAttr NULL portId - shouldn't happen");
             return BAD_VALUE;
         }
         data.write(attr, sizeof(audio_attributes_t));
+        data.writeInt32(*input);
         data.writeInt32(session);
         data.writeInt32(pid);
         data.writeInt32(uid);
         data.write(config, sizeof(audio_config_base_t));
         data.writeInt32(flags);
-        data.writeInt32(selectedDeviceId);
+        data.writeInt32(*selectedDeviceId);
         data.writeInt32(*portId);
         status_t status = remote()->transact(GET_INPUT_FOR_ATTR, data, &reply);
         if (status != NO_ERROR) {
@@ -328,6 +340,7 @@ public:
             return status;
         }
         *input = (audio_io_handle_t)reply.readInt32();
+        *selectedDeviceId = (audio_port_handle_t)reply.readInt32();
         *portId = (audio_port_handle_t)reply.readInt32();
         return NO_ERROR;
     }
@@ -815,6 +828,20 @@ public:
         }
         return status;
     }
+
+    virtual float getStreamVolumeDB(audio_stream_type_t stream, int index, audio_devices_t device)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeInt32(static_cast <int32_t>(stream));
+        data.writeInt32(static_cast <int32_t>(index));
+        data.writeUint32(static_cast <uint32_t>(device));
+        status_t status = remote()->transact(GET_STREAM_VOLUME_DB, data, &reply);
+        if (status != NO_ERROR) {
+            return NAN;
+        }
+        return reply.readFloat();
+    }
 };
 
 IMPLEMENT_META_INTERFACE(AudioPolicyService, "android.media.IAudioPolicyService");
@@ -952,10 +979,11 @@ status_t BnAudioPolicyService::onTransact(
             status_t status = getOutputForAttr(hasAttributes ? &attr : NULL,
                     &output, session, &stream, uid,
                     &config,
-                    flags, selectedDeviceId, &portId);
+                    flags, &selectedDeviceId, &portId);
             reply->writeInt32(status);
             reply->writeInt32(output);
             reply->writeInt32(stream);
+            reply->writeInt32(selectedDeviceId);
             reply->writeInt32(portId);
             return NO_ERROR;
         } break;
@@ -997,6 +1025,7 @@ status_t BnAudioPolicyService::onTransact(
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             audio_attributes_t attr;
             data.read(&attr, sizeof(audio_attributes_t));
+            audio_io_handle_t input = (audio_io_handle_t)data.readInt32();
             audio_session_t session = (audio_session_t)data.readInt32();
             pid_t pid = (pid_t)data.readInt32();
             uid_t uid = (uid_t)data.readInt32();
@@ -1006,13 +1035,13 @@ status_t BnAudioPolicyService::onTransact(
             audio_input_flags_t flags = (audio_input_flags_t) data.readInt32();
             audio_port_handle_t selectedDeviceId = (audio_port_handle_t) data.readInt32();
             audio_port_handle_t portId = (audio_port_handle_t)data.readInt32();
-            audio_io_handle_t input = AUDIO_IO_HANDLE_NONE;
             status_t status = getInputForAttr(&attr, &input, session, pid, uid,
                                               &config,
-                                              flags, selectedDeviceId, &portId);
+                                              flags, &selectedDeviceId, &portId);
             reply->writeInt32(status);
             if (status == NO_ERROR) {
                 reply->writeInt32(input);
+                reply->writeInt32(selectedDeviceId);
                 reply->writeInt32(portId);
             }
             return NO_ERROR;
@@ -1404,6 +1433,17 @@ status_t BnAudioPolicyService::onTransact(
             }
             return NO_ERROR;
         } break;
+
+        case GET_STREAM_VOLUME_DB: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            audio_stream_type_t stream =
+                    static_cast <audio_stream_type_t>(data.readInt32());
+            int index = static_cast <int>(data.readInt32());
+            audio_devices_t device =
+                    static_cast <audio_devices_t>(data.readUint32());
+            reply->writeFloat(getStreamVolumeDB(stream, index, device));
+            return NO_ERROR;
+        }
 
         default:
             return BBinder::onTransact(code, data, reply, flags);

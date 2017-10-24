@@ -32,12 +32,15 @@
 
 namespace aaudio {
 
+/**
+ * Contains a mixer and a stream for writing the result of the mix.
+ */
 class AAudioServiceEndpointPlay : public AAudioServiceEndpoint {
 public:
     explicit AAudioServiceEndpointPlay(android::AAudioService &audioService);
     virtual ~AAudioServiceEndpointPlay();
 
-    aaudio_result_t open(int32_t deviceId) override;
+    aaudio_result_t open(const AAudioStreamConfiguration& configuration) override;
 
     AudioStreamInternal *getStreamInternal() override {
         return &mStreamInternalPlay;

@@ -308,8 +308,10 @@ class Camera3Stream :
      * For bidirectional streams, this method applies to the input-side
      * buffers.
      *
+     * Normally this call will block until the handed out buffer count is less than the stream
+     * max buffer count; if respectHalLimit is set to false, this is ignored.
      */
-    status_t         getInputBuffer(camera3_stream_buffer *buffer);
+    status_t         getInputBuffer(camera3_stream_buffer *buffer, bool respectHalLimit = true);
 
     /**
      * Return a buffer to the stream after use by the HAL.
@@ -369,7 +371,7 @@ class Camera3Stream :
 
     // Setting listener will remove previous listener (if exists)
     virtual void     setBufferFreedListener(
-            Camera3StreamBufferFreedListener* listener) override;
+            wp<Camera3StreamBufferFreedListener> listener) override;
 
     /**
      * Return if the buffer queue of the stream is abandoned.
@@ -414,7 +416,7 @@ class Camera3Stream :
             android_dataspace dataSpace, camera3_stream_rotation_t rotation,
             int setId);
 
-    Camera3StreamBufferFreedListener* mBufferFreedListener;
+    wp<Camera3StreamBufferFreedListener> mBufferFreedListener;
 
     /**
      * Interface to be implemented by derived classes
@@ -459,6 +461,9 @@ class Camera3Stream :
     // INVALID_OPERATION if they cannot be obtained.
     virtual status_t getEndpointUsage(uint32_t *usage) const = 0;
 
+    // Return whether the buffer is in the list of outstanding buffers.
+    bool isOutstandingBuffer(const camera3_stream_buffer& buffer) const;
+
     // Tracking for idle state
     wp<StatusTracker> mStatusTracker;
     // Status tracker component ID
@@ -481,9 +486,6 @@ class Camera3Stream :
 
     status_t        cancelPrepareLocked();
 
-    // Return whether the buffer is in the list of outstanding buffers.
-    bool isOutstandingBuffer(const camera3_stream_buffer& buffer);
-
     // Remove the buffer from the list of outstanding buffers.
     void removeOutstandingBuffer(const camera3_stream_buffer& buffer);
 
@@ -500,6 +502,7 @@ class Camera3Stream :
     // Number of buffers allocated on last prepare call.
     size_t mLastMaxCount;
 
+    mutable Mutex mOutstandingBuffersLock;
     // Outstanding buffers dequeued from the stream's buffer queue.
     List<buffer_handle_t> mOutstandingBuffers;
 

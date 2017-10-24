@@ -229,8 +229,7 @@ public:
         virtual     void        binderDied(const wp<IBinder>& who);
 
     private:
-                    PMDeathRecipient(const PMDeathRecipient&);
-                    PMDeathRecipient& operator = (const PMDeathRecipient&);
+        DISALLOW_COPY_AND_ASSIGN(PMDeathRecipient);
 
         wp<ThreadBase> mThread;
     };
@@ -362,11 +361,6 @@ public:
                 virtual uint32_t getStrategyForSession_l(audio_session_t sessionId __unused)
                         { return 0; }
 
-                // suspend or restore effect according to the type of effect passed. a NULL
-                // type pointer means suspend all effects in the session
-                void setEffectSuspended(const effect_uuid_t *type,
-                                        bool suspend,
-                                        audio_session_t sessionId = AUDIO_SESSION_OUTPUT_MIX);
                 // check if some effects must be suspended/restored when an effect is enabled
                 // or disabled
                 void checkSuspendOnEffectEnabled(const sp<EffectModule>& effect,
@@ -418,10 +412,13 @@ protected:
                 void        releaseWakeLock_l();
                 void        updateWakeLockUids_l(const SortedVector<uid_t> &uids);
                 void        getPowerManager_l();
+                // suspend or restore effects of the specified type (or all if type is NULL)
+                // on a given session. The number of suspend requests is counted and restore
+                // occurs when all suspend requests are cancelled.
                 void setEffectSuspended_l(const effect_uuid_t *type,
                                           bool suspend,
                                           audio_session_t sessionId);
-                // updated mSuspendedSessions when an effect suspended or restored
+                // updated mSuspendedSessions when an effect is suspended or restored
                 void        updateSuspendedSessions_l(const effect_uuid_t *type,
                                                       bool suspend,
                                                       audio_session_t sessionId);
@@ -485,6 +482,7 @@ protected:
                 const sp<PMDeathRecipient> mDeathRecipient;
                 // list of suspended effects per session and per type. The first (outer) vector is
                 // keyed by session ID, the second (inner) by type UUID timeLow field
+                // Updated by updateSuspendedSessions_l() only.
                 KeyedVector< audio_session_t, KeyedVector< int, sp<SuspendedSessionDesc> > >
                                         mSuspendedSessions;
                 static const size_t     kLogSize = 4 * 1024;
@@ -901,7 +899,7 @@ private:
 
     friend class AudioFlinger;      // for numerous
 
-    PlaybackThread& operator = (const PlaybackThread&);
+    DISALLOW_COPY_AND_ASSIGN(PlaybackThread);
 
     status_t    addTrack_l(const sp<Track>& track);
     bool        destroyTrack_l(const sp<Track>& track);
@@ -982,7 +980,7 @@ private:
     sp<NBAIO_Source>        mTeeSource;
 #endif
     uint32_t                mScreenState;   // cached copy of gScreenState
-    static const size_t     kFastMixerLogSize = 4 * 1024;
+    static const size_t     kFastMixerLogSize = 8 * 1024;
     sp<NBLog::Writer>       mFastMixerNBLogWriter;
 
 
@@ -1388,12 +1386,16 @@ public:
                         }
     virtual bool        isOutput() const override { return false; }
 
+            void        checkBtNrec();
+
 private:
             // Enter standby if not already in standby, and set mStandby flag
             void    standbyIfNotAlreadyInStandby();
 
             // Call the HAL standby method unconditionally, and don't change mStandby flag
             void    inputStandBy();
+
+            void    checkBtNrec_l();
 
             AudioStreamIn                       *mInput;
             SortedVector < sp<RecordTrack> >    mTracks;
@@ -1454,6 +1456,8 @@ private:
             sp<NBLog::Writer>                   mFastCaptureNBLogWriter;
 
             bool                                mFastTrackAvail;    // true if fast track available
+            // common state to all record threads
+            std::atomic_bool                    mBtNrecSuspended;
 };
 
 class MmapThread : public ThreadBase
@@ -1479,7 +1483,7 @@ class MmapThread : public ThreadBase
     status_t createMmapBuffer(int32_t minSizeFrames,
                                       struct audio_mmap_buffer_info *info);
     status_t getMmapPosition(struct audio_mmap_position *position);
-    status_t start(const MmapStreamInterface::Client& client, audio_port_handle_t *handle);
+    status_t start(const AudioClient& client, audio_port_handle_t *handle);
     status_t stop(audio_port_handle_t handle);
     status_t standby();
 

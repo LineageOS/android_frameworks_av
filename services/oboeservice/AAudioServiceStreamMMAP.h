@@ -19,6 +19,7 @@
 
 #include <atomic>
 
+#include <android-base/unique_fd.h>
 #include <media/audiohal/StreamHalInterface.h>
 #include <media/MmapStreamCallback.h>
 #include <media/MmapStreamInterface.h>
@@ -33,6 +34,7 @@
 #include "TimestampScheduler.h"
 #include "utility/MonotonicCounter.h"
 
+
 namespace aaudio {
 
     /**
@@ -43,9 +45,8 @@ class AAudioServiceStreamMMAP
     , public android::MmapStreamCallback {
 
 public:
-    AAudioServiceStreamMMAP();
-    virtual ~AAudioServiceStreamMMAP();
-
+    AAudioServiceStreamMMAP(const android::AudioClient& serviceClient, bool inService);
+    virtual ~AAudioServiceStreamMMAP() = default;
 
     aaudio_result_t open(const aaudio::AAudioStreamRequest &request,
                                  aaudio::AAudioStreamConfiguration &configurationOutput) override;
@@ -77,6 +78,11 @@ public:
     aaudio_result_t flush() override;
 
     aaudio_result_t close() override;
+
+    virtual aaudio_result_t startClient(const android::AudioClient& client,
+                                        audio_port_handle_t *clientHandle);
+
+    virtual aaudio_result_t stopClient(audio_port_handle_t clientHandle);
 
     /**
      * Send a MMAP/NOIRQ buffer timestamp to the client.
@@ -127,13 +133,15 @@ private:
     MonotonicCounter                    mFramesWritten;
     MonotonicCounter                    mFramesRead;
     int32_t                             mPreviousFrameCounter = 0;   // from HAL
-    int                                 mAudioDataFileDescriptor = -1;
 
     // Interface to the AudioFlinger MMAP support.
     android::sp<android::MmapStreamInterface> mMmapStream;
     struct audio_mmap_buffer_info             mMmapBufferinfo;
-    android::MmapStreamInterface::Client      mMmapClient;
-    audio_port_handle_t                       mPortHandle = -1; // TODO review best default
+    audio_port_handle_t                       mPortHandle = AUDIO_PORT_HANDLE_NONE;
+    audio_port_handle_t                       mDeviceId = AUDIO_PORT_HANDLE_NONE;
+    android::AudioClient                      mServiceClient;
+    bool                                      mInService = false;
+    android::base::unique_fd                  mAudioDataFileDescriptor;
 };
 
 } // namespace aaudio

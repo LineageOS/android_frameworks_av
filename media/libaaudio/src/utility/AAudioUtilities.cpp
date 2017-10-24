@@ -208,8 +208,11 @@ status_t AAudioConvert_aaudioToAndroidStatus(aaudio_result_t result) {
     status_t status;
     switch (result) {
     case AAUDIO_ERROR_DISCONNECTED:
-    case AAUDIO_ERROR_INVALID_HANDLE:
+    case AAUDIO_ERROR_NO_SERVICE:
         status = DEAD_OBJECT;
+        break;
+    case AAUDIO_ERROR_INVALID_HANDLE:
+        status = BAD_TYPE;
         break;
     case AAUDIO_ERROR_INVALID_STATE:
         status = INVALID_OPERATION;
@@ -226,14 +229,16 @@ status_t AAudioConvert_aaudioToAndroidStatus(aaudio_result_t result) {
     case AAUDIO_ERROR_NULL:
         status = UNEXPECTED_NULL;
         break;
+    case AAUDIO_ERROR_UNAVAILABLE:
+        status = NOT_ENOUGH_DATA;
+        break;
+
     // TODO translate these result codes
     case AAUDIO_ERROR_INTERNAL:
     case AAUDIO_ERROR_UNIMPLEMENTED:
-    case AAUDIO_ERROR_UNAVAILABLE:
     case AAUDIO_ERROR_NO_FREE_HANDLES:
     case AAUDIO_ERROR_NO_MEMORY:
     case AAUDIO_ERROR_TIMEOUT:
-    case AAUDIO_ERROR_NO_SERVICE:
     default:
         status = UNKNOWN_ERROR;
         break;
@@ -257,14 +262,17 @@ aaudio_result_t AAudioConvert_androidToAAudioResult(status_t status) {
     case INVALID_OPERATION:
         result = AAUDIO_ERROR_INVALID_STATE;
         break;
-        case UNEXPECTED_NULL:
-            result = AAUDIO_ERROR_NULL;
-            break;
-        case BAD_VALUE:
-            result = AAUDIO_ERROR_ILLEGAL_ARGUMENT;
-            break;
+    case UNEXPECTED_NULL:
+        result = AAUDIO_ERROR_NULL;
+        break;
+    case BAD_VALUE:
+        result = AAUDIO_ERROR_ILLEGAL_ARGUMENT;
+        break;
     case WOULD_BLOCK:
         result = AAUDIO_ERROR_WOULD_BLOCK;
+        break;
+    case NOT_ENOUGH_DATA:
+        result = AAUDIO_ERROR_UNAVAILABLE;
         break;
     default:
         result = AAUDIO_ERROR_INTERNAL;
@@ -361,12 +369,43 @@ int32_t AAudioProperty_getMixerBursts() {
     return prop;
 }
 
+int32_t AAudioProperty_getWakeupDelayMicros() {
+    const int32_t minMicros = 0; // arbitrary
+    const int32_t defaultMicros = 200; // arbitrary, based on some observed jitter
+    const int32_t maxMicros = 5000; // arbitrary, probably don't want more than 500
+    int32_t prop = property_get_int32(AAUDIO_PROP_WAKEUP_DELAY_USEC, defaultMicros);
+    if (prop < minMicros) {
+        ALOGW("AAudioProperty_getWakeupDelayMicros: clipped %d to %d", prop, minMicros);
+        prop = minMicros;
+    } else if (prop > maxMicros) {
+        ALOGW("AAudioProperty_getWakeupDelayMicros: clipped %d to %d", prop, maxMicros);
+        prop = maxMicros;
+    }
+    return prop;
+}
+
+int32_t AAudioProperty_getMinimumSleepMicros() {
+    const int32_t minMicros = 20; // arbitrary
+    const int32_t defaultMicros = 200; // arbitrary
+    const int32_t maxMicros = 2000; // arbitrary
+    int32_t prop = property_get_int32(AAUDIO_PROP_MINIMUM_SLEEP_USEC, defaultMicros);
+    if (prop < minMicros) {
+        ALOGW("AAudioProperty_getMinimumSleepMicros: clipped %d to %d", prop, minMicros);
+        prop = minMicros;
+    } else if (prop > maxMicros) {
+        ALOGW("AAudioProperty_getMinimumSleepMicros: clipped %d to %d", prop, maxMicros);
+        prop = maxMicros;
+    }
+    return prop;
+}
+
 int32_t AAudioProperty_getHardwareBurstMinMicros() {
     const int32_t defaultMicros = 1000; // arbitrary
     const int32_t maxMicros = 1000 * 1000; // arbitrary
     int32_t prop = property_get_int32(AAUDIO_PROP_HW_BURST_MIN_USEC, defaultMicros);
     if (prop < 1 || prop > maxMicros) {
-        ALOGE("AAudioProperty_getHardwareBurstMinMicros: invalid = %d", prop);
+        ALOGE("AAudioProperty_getHardwareBurstMinMicros: invalid = %d, use %d",
+              prop, defaultMicros);
         prop = defaultMicros;
     }
     return prop;

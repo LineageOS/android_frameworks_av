@@ -79,7 +79,7 @@ void PlayerBase::serviceReleasePlayer() {
     }
 }
 
-//FIXME temporary method while some AudioTrack state is outside of this class
+//FIXME temporary method while some player state is outside of this class
 void PlayerBase::reportEvent(player_state_t event) {
     servicePlayerEvent(event);
 }
@@ -87,10 +87,30 @@ void PlayerBase::reportEvent(player_state_t event) {
 status_t PlayerBase::startWithStatus() {
     status_t status = playerStart();
     if (status == NO_ERROR) {
-        ALOGD("PlayerBase::start() from IPlayer");
         servicePlayerEvent(PLAYER_STATE_STARTED);
     } else {
-        ALOGD("PlayerBase::start() no AudioTrack to start from IPlayer");
+        ALOGW("PlayerBase::start() error %d", status);
+    }
+    return status;
+}
+
+status_t PlayerBase::pauseWithStatus() {
+    status_t status = playerPause();
+    if (status == NO_ERROR) {
+        servicePlayerEvent(PLAYER_STATE_PAUSED);
+    } else {
+        ALOGW("PlayerBase::pause() error %d", status);
+    }
+    return status;
+}
+
+
+status_t PlayerBase::stopWithStatus() {
+    status_t status = playerStop();
+    if (status == NO_ERROR) {
+        servicePlayerEvent(PLAYER_STATE_STOPPED);
+    } else {
+        ALOGW("PlayerBase::stop() error %d", status);
     }
     return status;
 }
@@ -98,42 +118,36 @@ status_t PlayerBase::startWithStatus() {
 //------------------------------------------------------------------------------
 // Implementation of IPlayer
 void PlayerBase::start() {
+    ALOGD("PlayerBase::start() from IPlayer");
     (void)startWithStatus();
 }
 
 void PlayerBase::pause() {
-    if (playerPause() == NO_ERROR) {
-        ALOGD("PlayerBase::pause() from IPlayer");
-        servicePlayerEvent(PLAYER_STATE_PAUSED);
-    } else {
-        ALOGD("PlayerBase::pause() no AudioTrack to pause from IPlayer");
-    }
+    ALOGD("PlayerBase::pause() from IPlayer");
+    (void)pauseWithStatus();
 }
 
 
 void PlayerBase::stop() {
-    if (playerStop() == NO_ERROR) {
-        ALOGD("PlayerBase::stop() from IPlayer");
-        servicePlayerEvent(PLAYER_STATE_STOPPED);
-    } else {
-        ALOGD("PlayerBase::stop() no AudioTrack to stop from IPlayer");
-    }
+    ALOGD("PlayerBase::stop() from IPlayer");
+    (void)stopWithStatus();
 }
 
 void PlayerBase::setVolume(float vol) {
+    ALOGD("PlayerBase::setVolume() from IPlayer");
     {
         Mutex::Autolock _l(mSettingsLock);
         mVolumeMultiplierL = vol;
         mVolumeMultiplierR = vol;
     }
-    if (playerSetVolume() == NO_ERROR) {
-        ALOGD("PlayerBase::setVolume() from IPlayer");
-    } else {
-        ALOGD("PlayerBase::setVolume() no AudioTrack for volume control from IPlayer");
+    status_t status = playerSetVolume();
+    if (status != NO_ERROR) {
+        ALOGW("PlayerBase::setVolume() error %d", status);
     }
 }
 
 void PlayerBase::setPan(float pan) {
+    ALOGD("PlayerBase::setPan() from IPlayer");
     {
         Mutex::Autolock _l(mSettingsLock);
         pan = min(max(-1.0f, pan), 1.0f);
@@ -145,10 +159,9 @@ void PlayerBase::setPan(float pan) {
             mPanMultiplierR = 1.0f + pan;
         }
     }
-    if (playerSetVolume() == NO_ERROR) {
-        ALOGD("PlayerBase::setPan() from IPlayer");
-    } else {
-        ALOGD("PlayerBase::setPan() no AudioTrack for volume control from IPlayer");
+    status_t status = playerSetVolume();
+    if (status != NO_ERROR) {
+        ALOGW("PlayerBase::setPan() error %d", status);
     }
 }
 

@@ -44,6 +44,9 @@ const int32_t kDefaultHwVideoEncoderFormat = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEF
 const int32_t kDefaultVideoEncoderDataSpace = HAL_DATASPACE_V0_BT709;
 
 const int kStopTimeoutUs = 300000; // allow 1 sec for shutting down encoder
+// allow maximum 1 sec for stop time offset. This limits the the delay in the
+// input source.
+const int kMaxStopTimeOffsetUs = 1000000;
 
 struct MediaCodecSource::Puller : public AHandler {
     explicit Puller(const sp<MediaSource> &source);
@@ -54,7 +57,7 @@ struct MediaCodecSource::Puller : public AHandler {
     void stopSource();
     void pause();
     void resume();
-
+    status_t setStopTimeUs(int64_t stopTimeUs);
     bool readBuffer(MediaBuffer **buffer);
 
 protected:
@@ -66,6 +69,7 @@ private:
         kWhatStart = 'msta',
         kWhatStop,
         kWhatPull,
+        kWhatSetStopTimeUs,
     };
 
     sp<MediaSource> mSource;
@@ -161,6 +165,12 @@ status_t MediaCodecSource::Puller::postSynchronouslyAndReturnError(
     return err;
 }
 
+status_t MediaCodecSource::Puller::setStopTimeUs(int64_t stopTimeUs) {
+    sp<AMessage> msg = new AMessage(kWhatSetStopTimeUs, this);
+    msg->setInt64("stop-time-us", stopTimeUs);
+    return postSynchronouslyAndReturnError(msg);
+}
+
 status_t MediaCodecSource::Puller::start(const sp<MetaData> &meta, const sp<AMessage> &notify) {
     ALOGV("puller (%s) start", mIsAudio ? "audio" : "video");
     mLooper->start(
@@ -246,6 +256,20 @@ void MediaCodecSource::Puller::onMessageReceived(const sp<AMessage> &msg) {
 
             sp<AReplyToken> replyID;
             CHECK(msg->senderAwaitsResponse(&replyID));
+            response->postReply(replyID);
+            break;
+        }
+
+        case kWhatSetStopTimeUs:
+        {
+            sp<AReplyToken> replyID;
+            CHECK(msg->senderAwaitsResponse(&replyID));
+            int64_t stopTimeUs;
+            CHECK(msg->findInt64("stop-time-us", &stopTimeUs));
+            status_t err = mSource->setStopTimeUs(stopTimeUs);
+
+            sp<AMessage> response = new AMessage;
+            response->setInt32("err", err);
             response->postReply(replyID);
             break;
         }
@@ -364,11 +388,8 @@ status_t MediaCodecSource::stop() {
 }
 
 
-status_t MediaCodecSource::setStopStimeUs(int64_t stopTimeUs) {
-    if (!(mFlags & FLAG_USE_SURFACE_INPUT)) {
-        return OK;
-    }
-    sp<AMessage> msg = new AMessage(kWhatSetStopTimeOffset, mReflector);
+status_t MediaCodecSource::setStopTimeUs(int64_t stopTimeUs) {
+    sp<AMessage> msg = new AMessage(kWhatSetStopTimeUs, mReflector);
     msg->setInt64("stop-time-us", stopTimeUs);
     return postSynchronouslyAndReturnError(msg);
 }
@@ -986,12 +1007,29 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
 
         mStopping = true;
 
+        int64_t timeoutUs = kStopTimeoutUs;
         // if using surface, signal source EOS and wait for EOS to come back.
         // otherwise, stop puller (which also clears the input buffer queue)
         // and wait for the EOS message. We cannot call source->stop() because
         // the encoder may still be processing input buffers.
         if (mFlags & FLAG_USE_SURFACE_INPUT) {
             mEncoder->signalEndOfInputStream();
+            // Increase the timeout if there is delay in the GraphicBufferSource
+            sp<AMessage> inputFormat;
+            int64_t stopTimeOffsetUs;
+            if (mEncoder->getInputFormat(&inputFormat) == OK &&
+                    inputFormat->findInt64("android._stop-time-offset-us", &stopTimeOffsetUs) &&
+                    stopTimeOffsetUs > 0) {
+                if (stopTimeOffsetUs > kMaxStopTimeOffsetUs) {
+                    ALOGW("Source stopTimeOffsetUs %lld too large, limit at %lld us",
+                        (long long)stopTimeOffsetUs, (long long)kMaxStopTimeOffsetUs);
+                    stopTimeOffsetUs = kMaxStopTimeOffsetUs;
+                }
+                timeoutUs += stopTimeOffsetUs;
+            } else {
+                // Use kMaxStopTimeOffsetUs if stop time offset is not provided by input source
+                timeoutUs = kMaxStopTimeOffsetUs;
+            }
         } else {
             mPuller->stop();
         }
@@ -999,7 +1037,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
         // complete stop even if encoder/puller stalled
         sp<AMessage> timeoutMsg = new AMessage(kWhatStopStalled, mReflector);
         timeoutMsg->setInt32("generation", mGeneration);
-        timeoutMsg->post(kStopTimeoutUs);
+        timeoutMsg->post(timeoutUs);
         break;
     }
 
@@ -1055,7 +1093,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
         response->postReply(replyID);
         break;
     }
-    case kWhatSetStopTimeOffset:
+    case kWhatSetStopTimeUs:
     {
         sp<AReplyToken> replyID;
         CHECK(msg->senderAwaitsResponse(&replyID));
@@ -1063,11 +1101,13 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
         int64_t stopTimeUs;
         CHECK(msg->findInt64("stop-time-us", &stopTimeUs));
 
-        // Propagate the timestamp offset to GraphicBufferSource.
+        // Propagate the stop time to GraphicBufferSource.
         if (mFlags & FLAG_USE_SURFACE_INPUT) {
             sp<AMessage> params = new AMessage;
             params->setInt64("stop-time-us", stopTimeUs);
             err = mEncoder->setParameters(params);
+        } else {
+            err = mPuller->setStopTimeUs(stopTimeUs);
         }
 
         sp<AMessage> response = new AMessage;

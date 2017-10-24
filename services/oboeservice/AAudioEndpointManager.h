@@ -34,25 +34,37 @@ public:
     ~AAudioEndpointManager() = default;
 
     /**
+     * Returns information about the state of the this class.
+     *
+     * Will attempt to get the object lock, but will proceed
+     * even if it cannot.
+     *
+     * Each line of information ends with a newline.
+     *
+     * @return a string with useful information
+     */
+    std::string dump() const;
+
+    /**
      * Find a service endpoint for the given deviceId and direction.
-     * If an endpoint does not already exist then it will try to create one.
+     * If an endpoint does not already exist then try to create one.
      *
      * @param deviceId
      * @param direction
      * @return endpoint or nullptr
      */
     AAudioServiceEndpoint *openEndpoint(android::AAudioService &audioService,
-                                        int32_t deviceId,
+                                        const AAudioStreamConfiguration& configuration,
                                         aaudio_direction_t direction);
 
     void closeEndpoint(AAudioServiceEndpoint *serviceEndpoint);
 
 private:
 
-    std::mutex    mLock;
+    mutable std::mutex mLock;
 
-    std::map<int32_t, AAudioServiceEndpointCapture *> mInputs;
-    std::map<int32_t, AAudioServiceEndpointPlay *> mOutputs;
+    std::vector<AAudioServiceEndpointCapture *> mInputs;
+    std::vector<AAudioServiceEndpointPlay *> mOutputs;
 
 };
 

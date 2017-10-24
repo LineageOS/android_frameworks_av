@@ -33,6 +33,10 @@ public:
     AudioStreamInternalPlay(AAudioServiceInterface  &serviceInterface, bool inService = false);
     virtual ~AudioStreamInternalPlay();
 
+    aaudio_result_t requestPause() override;
+
+    aaudio_result_t requestFlush() override;
+
     aaudio_result_t write(const void *buffer,
                           int32_t numFrames,
                           int64_t timeoutNanoseconds) override;
@@ -47,6 +51,11 @@ public:
     }
 
 protected:
+
+    aaudio_result_t requestPauseInternal();
+
+    void onFlushFromServer() override;
+
 /**
  * Low level write that will not block. It will just write as much as it can.
  *

@@ -29,8 +29,9 @@ using android::IBinder;
 
 namespace android {
 
-enum aaudio_commands_t {
-    OPEN_STREAM = IBinder::FIRST_CALL_TRANSACTION,
+enum aaudio_service_commands_t {
+    REGISTER_CLIENT = IBinder::FIRST_CALL_TRANSACTION,
+    OPEN_STREAM,
     CLOSE_STREAM,
     GET_STREAM_DESCRIPTION,
     START_STREAM,
@@ -39,6 +40,10 @@ enum aaudio_commands_t {
     FLUSH_STREAM,
     REGISTER_AUDIO_THREAD,
     UNREGISTER_AUDIO_THREAD
+};
+
+enum aaudio_client_commands_t {
+    ON_STREAM_CHANGE = IBinder::FIRST_CALL_TRANSACTION
 };
 
 } // namespace android

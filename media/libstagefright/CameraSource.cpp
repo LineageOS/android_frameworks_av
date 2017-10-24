@@ -220,6 +220,7 @@ CameraSource::CameraSource(
       mNumFramesEncoded(0),
       mTimeBetweenFrameCaptureUs(0),
       mFirstFrameTimeUs(0),
+      mStopSystemTimeUs(-1),
       mNumFramesDropped(0),
       mNumGlitches(0),
       mGlitchDurationThresholdUs(200000),
@@ -879,6 +880,7 @@ status_t CameraSource::reset() {
     {
         Mutex::Autolock autoLock(mLock);
         mStarted = false;
+        mStopSystemTimeUs = -1;
         mFrameAvailableCondition.signal();
 
         int64_t token;
@@ -970,6 +972,14 @@ void CameraSource::releaseRecordingFrame(const sp<IMemory>& frame) {
         }
 
         if (handle != nullptr) {
+            ssize_t offset;
+            size_t size;
+            sp<IMemoryHeap> heap = frame->getMemory(&offset, &size);
+            if (heap->getHeapID() != mMemoryHeapBase->getHeapID()) {
+                ALOGE("%s: Mismatched heap ID, ignoring release (got %x, expected %x)",
+		     __FUNCTION__, heap->getHeapID(), mMemoryHeapBase->getHeapID());
+                return;
+            }
             uint32_t batchSize = 0;
             {
                 Mutex::Autolock autoLock(mBatchLock);
@@ -1095,9 +1105,30 @@ status_t CameraSource::read(
     return OK;
 }
 
+status_t CameraSource::setStopTimeUs(int64_t stopTimeUs) {
+    Mutex::Autolock autoLock(mLock);
+    ALOGV("Set stoptime: %lld us", (long long)stopTimeUs);
+
+    if (stopTimeUs < -1) {
+        ALOGE("Invalid stop time %lld us", (long long)stopTimeUs);
+        return BAD_VALUE;
+    } else if (stopTimeUs == -1) {
+        ALOGI("reset stopTime to be -1");
+    }
+
+    mStopSystemTimeUs = stopTimeUs;
+    return OK;
+}
+
 bool CameraSource::shouldSkipFrameLocked(int64_t timestampUs) {
     if (!mStarted || (mNumFramesReceived == 0 && timestampUs < mStartTimeUs)) {
         ALOGV("Drop frame at %lld/%lld us", (long long)timestampUs, (long long)mStartTimeUs);
+        return true;
+    }
+
+    if (mStopSystemTimeUs != -1 && timestampUs >= mStopSystemTimeUs) {
+        ALOGV("Drop Camera frame at %lld  stop time: %lld us",
+                (long long)timestampUs, (long long)mStopSystemTimeUs);
         return true;
     }
 

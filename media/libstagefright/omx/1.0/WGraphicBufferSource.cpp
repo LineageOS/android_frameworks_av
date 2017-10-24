@@ -206,8 +206,10 @@ Return<Status> TWGraphicBufferSource::setStopTimeUs(int64_t stopTimeUs) {
 
 Return<void> TWGraphicBufferSource::getStopTimeOffsetUs(
         getStopTimeOffsetUs_cb _hidl_cb) {
-    // TODO: Implement this when needed.
-    _hidl_cb(Status::OK, 0);
+    status_t status;
+    int64_t stopTimeOffsetUs;
+    status = mBase->getStopTimeOffsetUs(&stopTimeOffsetUs);
+    _hidl_cb(toStatus(status), stopTimeOffsetUs);
     return Void();
 }
 

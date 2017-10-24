@@ -20,11 +20,14 @@
 #include <assert.h>
 #include <mutex>
 
+#include <utils/RefBase.h>
+
 #include "fifo/FifoBuffer.h"
 #include "binding/IAAudioService.h"
 #include "binding/AudioEndpointParcelable.h"
 #include "binding/AAudioServiceMessage.h"
 #include "utility/AAudioUtilities.h"
+#include <media/AudioClient.h>
 
 #include "SharedRingBuffer.h"
 #include "AAudioThread.h"
@@ -39,7 +42,8 @@ namespace aaudio {
  * Base class for a stream in the AAudio service.
  */
 class AAudioServiceStreamBase
-    : public Runnable  {
+    : public virtual android::RefBase
+    , public Runnable  {
 
 public:
     AAudioServiceStreamBase();
@@ -48,6 +52,8 @@ public:
     enum {
         ILLEGAL_THREAD_ID = 0
     };
+
+    std::string dump() const;
 
     // -------------------------------------------------------------------
     /**
@@ -73,10 +79,25 @@ public:
      */
     virtual aaudio_result_t stop();
 
+    aaudio_result_t stopTimestampThread();
+
     /**
      *  Discard any data held by the underlying HAL or Service.
      */
     virtual aaudio_result_t flush();
+
+    virtual aaudio_result_t startClient(const android::AudioClient& client __unused,
+                                        audio_port_handle_t *clientHandle __unused) {
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
+    virtual aaudio_result_t stopClient(audio_port_handle_t clientHandle __unused) {
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
+    bool isRunning() const {
+        return mState == AAUDIO_STREAM_STATE_STARTED;
+    }
 
     // -------------------------------------------------------------------
 
@@ -111,33 +132,67 @@ public:
 
     void run() override; // to implement Runnable
 
-    void processError();
+    void disconnect();
+
+    uid_t getOwnerUserId() const {
+        return mMmapClient.clientUid;
+    }
+
+    pid_t getOwnerProcessId() const {
+        return mMmapClient.clientPid;
+    }
+
+    aaudio_handle_t getHandle() const {
+        return mHandle;
+    }
+    void setHandle(aaudio_handle_t handle) {
+        mHandle = handle;
+    }
+
+    aaudio_stream_state_t getState() const {
+        return mState;
+    }
 
 protected:
+
+    void setState(aaudio_stream_state_t state) {
+        mState = state;
+    }
+
     aaudio_result_t writeUpMessageQueue(AAudioServiceMessage *command);
 
     aaudio_result_t sendCurrentTimestamp();
 
+    /**
+     * @param positionFrames
+     * @param timeNanos
+     * @return AAUDIO_OK or AAUDIO_ERROR_UNAVAILABLE or other negative error
+     */
     virtual aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) = 0;
 
     virtual aaudio_result_t getDownDataDescription(AudioEndpointParcelable &parcelable) = 0;
 
-    aaudio_stream_state_t               mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
+    aaudio_stream_state_t   mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
 
-    pid_t              mRegisteredClientThread = ILLEGAL_THREAD_ID;
+    pid_t                   mRegisteredClientThread = ILLEGAL_THREAD_ID;
 
-    SharedRingBuffer*  mUpMessageQueue;
-    std::mutex         mLockUpMessageQueue;
+    SharedRingBuffer*       mUpMessageQueue;
+    std::mutex              mLockUpMessageQueue;
 
-    AAudioThread        mAAudioThread;
+    AAudioThread            mAAudioThread;
     // This is used by one thread to tell another thread to exit. So it must be atomic.
-    std::atomic<bool>   mThreadEnabled;
+    std::atomic<bool>       mThreadEnabled;
 
-    aaudio_format_t    mAudioFormat = AAUDIO_FORMAT_UNSPECIFIED;
-    int32_t            mFramesPerBurst = 0;
-    int32_t            mSamplesPerFrame = AAUDIO_UNSPECIFIED;
-    int32_t            mSampleRate = AAUDIO_UNSPECIFIED;
-    int32_t            mCapacityInFrames = AAUDIO_UNSPECIFIED;
+    aaudio_format_t         mAudioFormat = AAUDIO_FORMAT_UNSPECIFIED;
+    int32_t                 mFramesPerBurst = 0;
+    int32_t                 mSamplesPerFrame = AAUDIO_UNSPECIFIED;
+    int32_t                 mSampleRate = AAUDIO_UNSPECIFIED;
+    int32_t                 mCapacityInFrames = AAUDIO_UNSPECIFIED;
+    android::AudioClient    mMmapClient;
+    audio_port_handle_t     mClientHandle = AUDIO_PORT_HANDLE_NONE;
+
+private:
+    aaudio_handle_t         mHandle = -1;
 };
 
 } /* namespace aaudio */

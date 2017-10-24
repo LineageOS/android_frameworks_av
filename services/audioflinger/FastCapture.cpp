@@ -57,7 +57,7 @@ const FastThreadState *FastCapture::poll()
     return mSQ.poll();
 }
 
-void FastCapture::setLog(NBLog::Writer *logWriter __unused)
+void FastCapture::setNBLogWriter(NBLog::Writer *logWriter __unused)
 {
 }
 

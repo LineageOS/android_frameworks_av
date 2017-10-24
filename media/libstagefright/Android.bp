@@ -95,6 +95,7 @@ cc_library_shared {
         "libmediadrm",
 
         "libmedia_helper",
+        "libstagefright_flacdec",
         "libstagefright_foundation",
         "libdl",
         "libRScpp",
@@ -155,6 +156,7 @@ subdirs = [
     "codecs/*",
     "colorconversion",
     "filters",
+    "flac/dec",
     "foundation",
     "http",
     "httplive",

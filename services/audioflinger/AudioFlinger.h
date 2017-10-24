@@ -25,6 +25,8 @@
 #include <sys/types.h>
 #include <limits.h>
 
+#include <android-base/macros.h>
+
 #include <cutils/compiler.h>
 #include <cutils/properties.h>
 
@@ -71,12 +73,11 @@
 #include <powermanager/IPowerManager.h>
 
 #include <media/nbaio/NBLog.h>
+#include <private/media/AudioEffectShared.h>
 #include <private/media/AudioTrackShared.h>
 
 namespace android {
 
-struct audio_track_cblk_t;
-struct effect_param_cblk_t;
 class AudioMixer;
 class AudioBuffer;
 class AudioResampler;
@@ -293,12 +294,14 @@ public:
     status_t openMmapStream(MmapStreamInterface::stream_direction_t direction,
                             const audio_attributes_t *attr,
                             audio_config_base_t *config,
-                            const MmapStreamInterface::Client& client,
+                            const AudioClient& client,
                             audio_port_handle_t *deviceId,
                             const sp<MmapStreamCallback>& callback,
-                            sp<MmapStreamInterface>& interface);
+                            sp<MmapStreamInterface>& interface,
+                            audio_port_handle_t *handle);
 private:
-    static const size_t kLogMemorySize = 40 * 1024;
+    // FIXME The 400 is temporarily too high until a leak of writers in media.log is fixed.
+    static const size_t kLogMemorySize = 400 * 1024;
     sp<MemoryDealer>    mLogMemoryDealer;   // == 0 when NBLog is disabled
     // When a log writer is unregistered, it is done lazily so that media.log can continue to see it
     // for as long as possible.  The memory is only freed when it is needed for another log writer.
@@ -347,11 +350,12 @@ public:
                                         sync_event_callback_t callBack,
                                         const wp<RefBase>& cookie);
 
+    bool        btNrecIsOff() const { return mBtNrecIsOff.load(); }
+
+
 private:
 
                audio_mode_t getMode() const { return mMode; }
-
-                bool        btNrecIsOff() const { return mBtNrecIsOff; }
 
                             AudioFlinger() ANDROID_API;
     virtual                 ~AudioFlinger();
@@ -445,8 +449,8 @@ private:
         sp<AudioFlinger>    audioFlinger() const { return mAudioFlinger; }
 
     private:
-                            Client(const Client&);
-                            Client& operator = (const Client&);
+        DISALLOW_COPY_AND_ASSIGN(Client);
+
         const sp<AudioFlinger> mAudioFlinger;
               sp<MemoryDealer> mMemoryDealer;
         const pid_t         mPid;
@@ -466,8 +470,7 @@ private:
                 virtual     void        binderDied(const wp<IBinder>& who);
 
     private:
-                            NotificationClient(const NotificationClient&);
-                            NotificationClient& operator = (const NotificationClient&);
+        DISALLOW_COPY_AND_ASSIGN(NotificationClient);
 
         const sp<AudioFlinger>  mAudioFlinger;
         const pid_t             mPid;
@@ -595,7 +598,7 @@ private:
         virtual status_t createMmapBuffer(int32_t minSizeFrames,
                                           struct audio_mmap_buffer_info *info);
         virtual status_t getMmapPosition(struct audio_mmap_position *position);
-        virtual status_t start(const MmapStreamInterface::Client& client,
+        virtual status_t start(const AudioClient& client,
                                          audio_port_handle_t *handle);
         virtual status_t stop(audio_port_handle_t handle);
         virtual status_t standby();
@@ -779,7 +782,7 @@ private:
                 volatile atomic_uint_fast32_t       mNextUniqueIds[AUDIO_UNIQUE_ID_USE_MAX];
 
                 audio_mode_t                        mMode;
-                bool                                mBtNrecIsOff;
+                std::atomic_bool                    mBtNrecIsOff;
 
                 // protected by mLock
                 Vector<AudioSessionRef*> mAudioSessionRefs;
@@ -824,7 +827,7 @@ public:
 
 #ifdef TEE_SINK
     // tee sink, if enabled by property, allows dumpsys to write most recent audio to .wav file
-    static void dumpTee(int fd, const sp<NBAIO_Source>& source, audio_io_handle_t id = 0);
+    static void dumpTee(int fd, const sp<NBAIO_Source>& source, audio_io_handle_t id, char suffix);
 
     // whether tee sink is enabled by property
     static bool mTeeSinkInputEnabled;

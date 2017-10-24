@@ -14,7 +14,12 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "AAudio"
+//#define LOG_NDEBUG 0
+#include <utils/Log.h>
+
 #include <aaudio/AAudio.h>
+#include <binder/IPCThreadState.h>
 
 #include "binding/AudioEndpointParcelable.h"
 #include "binding/AAudioStreamRequest.h"
@@ -40,16 +45,22 @@ public:
     {
     }
 
-    virtual aaudio_handle_t openStream(const aaudio::AAudioStreamRequest &request,
-                                     aaudio::AAudioStreamConfiguration &configurationOutput) override {
+    void registerClient(const sp<IAAudioClient>& client) override
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAAudioService::getInterfaceDescriptor());
+        data.writeStrongBinder(IInterface::asBinder(client));
+        remote()->transact(REGISTER_CLIENT, data, &reply);
+    }
+
+    aaudio_handle_t openStream(const aaudio::AAudioStreamRequest &request,
+                               aaudio::AAudioStreamConfiguration &configurationOutput) override {
         Parcel data, reply;
         // send command
         data.writeInterfaceToken(IAAudioService::getInterfaceDescriptor());
-        ALOGV("BpAAudioService::client openStream --------------------");
         // request.dump();
         request.writeToParcel(&data);
         status_t err = remote()->transact(OPEN_STREAM, data, &reply);
-        ALOGV("BpAAudioService::client openStream returned %d", err);
         if (err != NO_ERROR) {
             ALOGE("BpAAudioService::client openStream transact failed %d", err);
             return AAudioConvert_androidToAAudioResult(err);
@@ -186,15 +197,13 @@ public:
     }
 
     virtual aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle,
-                                              pid_t clientProcessId,
-                                              pid_t clientThreadId,
-                                              int64_t periodNanoseconds)
+                                                pid_t clientThreadId,
+                                                int64_t periodNanoseconds)
     override {
         Parcel data, reply;
         // send command
         data.writeInterfaceToken(IAAudioService::getInterfaceDescriptor());
         data.writeInt32(streamHandle);
-        data.writeInt32((int32_t) clientProcessId);
         data.writeInt32((int32_t) clientThreadId);
         data.writeInt64(periodNanoseconds);
         status_t err = remote()->transact(REGISTER_AUDIO_THREAD, data, &reply);
@@ -208,14 +217,12 @@ public:
     }
 
     virtual aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
-                                                  pid_t clientProcessId,
                                                   pid_t clientThreadId)
     override {
         Parcel data, reply;
         // send command
         data.writeInterfaceToken(IAAudioService::getInterfaceDescriptor());
         data.writeInt32(streamHandle);
-        data.writeInt32((int32_t) clientProcessId);
         data.writeInt32((int32_t) clientThreadId);
         status_t err = remote()->transact(UNREGISTER_AUDIO_THREAD, data, &reply);
         if (err != NO_ERROR) {
@@ -237,43 +244,59 @@ IMPLEMENT_META_INTERFACE(AAudioService, "IAAudioService");
 
 status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
                                         Parcel* reply, uint32_t flags) {
-    aaudio_handle_t stream;
+    aaudio_handle_t streamHandle;
     aaudio::AAudioStreamRequest request;
     aaudio::AAudioStreamConfiguration configuration;
-    pid_t pid;
     pid_t tid;
     int64_t nanoseconds;
     aaudio_result_t result;
     ALOGV("BnAAudioService::onTransact(%i) %i", code, flags);
-    data.checkInterface(this);
 
     switch(code) {
+        case REGISTER_CLIENT: {
+            CHECK_INTERFACE(IAAudioService, data, reply);
+            sp<IAAudioClient> client = interface_cast<IAAudioClient>(
+                    data.readStrongBinder());
+            registerClient(client);
+            return NO_ERROR;
+        } break;
+
         case OPEN_STREAM: {
+            CHECK_INTERFACE(IAAudioService, data, reply);
             request.readFromParcel(&data);
-
-            //ALOGD("BnAAudioService::client openStream request dump --------------------");
-            //request.dump();
-
-            stream = openStream(request, configuration);
-            //ALOGD("BnAAudioService::onTransact OPEN_STREAM server handle = 0x%08X", stream);
-            reply->writeInt32(stream);
+            result = request.validate();
+            if (result != AAUDIO_OK) {
+                streamHandle = result;
+            } else {
+                //ALOGD("BnAAudioService::client openStream request dump --------------------");
+                //request.dump();
+                // Override the uid and pid from the client in case they are incorrect.
+                request.setUserId(IPCThreadState::self()->getCallingUid());
+                request.setProcessId(IPCThreadState::self()->getCallingPid());
+                streamHandle = openStream(request, configuration);
+                //ALOGD("BnAAudioService::onTransact OPEN_STREAM server handle = 0x%08X",
+                //        streamHandle);
+            }
+            reply->writeInt32(streamHandle);
             configuration.writeToParcel(reply);
             return NO_ERROR;
         } break;
 
         case CLOSE_STREAM: {
-            data.readInt32(&stream);
-            result = closeStream(stream);
+            CHECK_INTERFACE(IAAudioService, data, reply);
+            data.readInt32(&streamHandle);
+            result = closeStream(streamHandle);
             //ALOGD("BnAAudioService::onTransact CLOSE_STREAM 0x%08X, result = %d",
-            //      stream, result);
+            //      streamHandle, result);
             reply->writeInt32(result);
             return NO_ERROR;
         } break;
 
         case GET_STREAM_DESCRIPTION: {
-            data.readInt32(&stream);
+            CHECK_INTERFACE(IAAudioService, data, reply);
+            data.readInt32(&streamHandle);
             aaudio::AudioEndpointParcelable parcelable;
-            result = getStreamDescription(stream, parcelable);
+            result = getStreamDescription(streamHandle, parcelable);
             if (result != AAUDIO_OK) {
                 return AAudioConvert_aaudioToAndroidStatus(result);
             }
@@ -289,60 +312,64 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
         } break;
 
         case START_STREAM: {
-            data.readInt32(&stream);
-            result = startStream(stream);
+            CHECK_INTERFACE(IAAudioService, data, reply);
+            data.readInt32(&streamHandle);
+            result = startStream(streamHandle);
             ALOGV("BnAAudioService::onTransact START_STREAM 0x%08X, result = %d",
-                    stream, result);
+                    streamHandle, result);
             reply->writeInt32(result);
             return NO_ERROR;
         } break;
 
         case PAUSE_STREAM: {
-            data.readInt32(&stream);
-            result = pauseStream(stream);
+            CHECK_INTERFACE(IAAudioService, data, reply);
+            data.readInt32(&streamHandle);
+            result = pauseStream(streamHandle);
             ALOGV("BnAAudioService::onTransact PAUSE_STREAM 0x%08X, result = %d",
-                  stream, result);
+                  streamHandle, result);
             reply->writeInt32(result);
             return NO_ERROR;
         } break;
 
         case STOP_STREAM: {
-            data.readInt32(&stream);
-            result = stopStream(stream);
+            CHECK_INTERFACE(IAAudioService, data, reply);
+            data.readInt32(&streamHandle);
+            result = stopStream(streamHandle);
             ALOGV("BnAAudioService::onTransact STOP_STREAM 0x%08X, result = %d",
-                  stream, result);
+                  streamHandle, result);
             reply->writeInt32(result);
             return NO_ERROR;
         } break;
 
         case FLUSH_STREAM: {
-            data.readInt32(&stream);
-            result = flushStream(stream);
+            CHECK_INTERFACE(IAAudioService, data, reply);
+            data.readInt32(&streamHandle);
+            result = flushStream(streamHandle);
             ALOGV("BnAAudioService::onTransact FLUSH_STREAM 0x%08X, result = %d",
-                    stream, result);
+                    streamHandle, result);
             reply->writeInt32(result);
             return NO_ERROR;
         } break;
 
         case REGISTER_AUDIO_THREAD: {
-            data.readInt32(&stream);
-            data.readInt32(&pid);
+            CHECK_INTERFACE(IAAudioService, data, reply);
+            data.readInt32(&streamHandle);
             data.readInt32(&tid);
             data.readInt64(&nanoseconds);
-            result = registerAudioThread(stream, pid, tid, nanoseconds);
+            result = registerAudioThread(streamHandle, tid, nanoseconds);
             ALOGV("BnAAudioService::onTransact REGISTER_AUDIO_THREAD 0x%08X, result = %d",
-                    stream, result);
+                    streamHandle, result);
             reply->writeInt32(result);
             return NO_ERROR;
         } break;
 
         case UNREGISTER_AUDIO_THREAD: {
-            data.readInt32(&stream);
-            data.readInt32(&pid);
+            CHECK_INTERFACE(IAAudioService, data, reply);
+            data.readInt32(&streamHandle);
             data.readInt32(&tid);
-            result = unregisterAudioThread(stream, pid, tid);
+            result = unregisterAudioThread(streamHandle, tid);
             ALOGV("BnAAudioService::onTransact UNREGISTER_AUDIO_THREAD 0x%08X, result = %d",
-                    stream, result);
+                    streamHandle, result);
             reply->writeInt32(result);
             return NO_ERROR;
         } break;

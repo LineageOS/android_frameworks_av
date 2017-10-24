@@ -22,33 +22,22 @@
 #include <stdlib.h>
 #include <math.h>
 #include <aaudio/AAudio.h>
+#include <aaudio/AAudioTesting.h>
 #include "AAudioExampleUtils.h"
 #include "AAudioSimpleRecorder.h"
 
-#define SAMPLE_RATE        48000
-
-#define NUM_SECONDS        10
-
+// TODO support FLOAT
+#define REQUIRED_FORMAT  AAUDIO_FORMAT_PCM_I16
 #define MIN_FRAMES_TO_READ 48  /* arbitrary, 1 msec at 48000 Hz */
 
-int main(int argc, char **argv)
+int main(int argc, const char **argv)
 {
-    (void)argc; // unused
-
+    AAudioArgsParser   argParser;
     aaudio_result_t result;
     AAudioSimpleRecorder recorder;
     int actualSamplesPerFrame;
     int actualSampleRate;
-    const aaudio_format_t requestedDataFormat = AAUDIO_FORMAT_PCM_I16;
-    aaudio_format_t actualDataFormat;
-
-    const int requestedInputChannelCount = 1; // Can affect whether we get a FAST path.
-
-    //aaudio_performance_mode_t requestedPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
-    const aaudio_performance_mode_t requestedPerformanceMode = AAUDIO_PERFORMANCE_MODE_LOW_LATENCY;
-    //aaudio_performance_mode_t requestedPerformanceMode = AAUDIO_PERFORMANCE_MODE_POWER_SAVING;
-    const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_SHARED;
-    //const aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_EXCLUSIVE;
+    aaudio_format_t       actualDataFormat;
     aaudio_sharing_mode_t actualSharingMode;
 
     AAudioStream *aaudioStream = nullptr;
@@ -61,6 +50,7 @@ int main(int argc, char **argv)
     int16_t *data = nullptr;
     float peakLevel = 0.0;
     int loopCounter = 0;
+    int32_t deviceId;
 
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
@@ -68,26 +58,26 @@ int main(int argc, char **argv)
 
     printf("%s - Monitor input level using AAudio\n", argv[0]);
 
-    recorder.setPerformanceMode(requestedPerformanceMode);
-    recorder.setSharingMode(requestedSharingMode);
+    argParser.setFormat(REQUIRED_FORMAT);
+    if (argParser.parseArgs(argc, argv)) {
+        return EXIT_FAILURE;
+    }
 
-    result = recorder.open(requestedInputChannelCount, 48000, requestedDataFormat,
-                           nullptr, nullptr, nullptr);
+    result = recorder.open(argParser);
     if (result != AAUDIO_OK) {
         fprintf(stderr, "ERROR -  recorder.open() returned %d\n", result);
         goto finish;
     }
     aaudioStream = recorder.getStream();
+    argParser.compareWithStream(aaudioStream);
+
+    deviceId = AAudioStream_getDeviceId(aaudioStream);
+    printf("deviceId = %d\n", deviceId);
 
     actualSamplesPerFrame = AAudioStream_getSamplesPerFrame(aaudioStream);
     printf("SamplesPerFrame = %d\n", actualSamplesPerFrame);
     actualSampleRate = AAudioStream_getSampleRate(aaudioStream);
     printf("SamplesPerFrame = %d\n", actualSampleRate);
-
-    actualSharingMode = AAudioStream_getSharingMode(aaudioStream);
-    printf("SharingMode: requested = %s, actual = %s\n",
-            getSharingModeText(requestedSharingMode),
-            getSharingModeText(actualSharingMode));
 
     // This is the number of frames that are written in one chunk by a DMA controller
     // or a DSP.
@@ -103,14 +93,12 @@ int main(int argc, char **argv)
     printf("DataFormat: framesPerRead  = %d\n",framesPerRead);
 
     actualDataFormat = AAudioStream_getFormat(aaudioStream);
-    printf("DataFormat: requested      = %d, actual = %d\n", requestedDataFormat, actualDataFormat);
+    printf("DataFormat: requested      = %d, actual = %d\n",
+           REQUIRED_FORMAT, actualDataFormat);
     // TODO handle other data formats
-    assert(actualDataFormat == AAUDIO_FORMAT_PCM_I16);
+    assert(actualDataFormat == REQUIRED_FORMAT);
 
-    printf("PerformanceMode: requested = %d, actual = %d\n", requestedPerformanceMode,
-           AAudioStream_getPerformanceMode(aaudioStream));
-
-    // Allocate a buffer for the audio data.
+    // Allocate a buffer for the PCM_16 audio data.
     data = new(std::nothrow) int16_t[framesPerRead * actualSamplesPerFrame];
     if (data == nullptr) {
         fprintf(stderr, "ERROR - could not allocate data buffer\n");
@@ -129,11 +117,11 @@ int main(int argc, char **argv)
     printf("after start, state = %s\n", AAudio_convertStreamStateToText(state));
 
     // Record for a while.
-    framesToRecord = actualSampleRate * NUM_SECONDS;
+    framesToRecord = actualSampleRate * argParser.getDurationSeconds();
     framesLeft = framesToRecord;
     while (framesLeft > 0) {
         // Read audio data from the stream.
-        const int64_t timeoutNanos = 100 * NANOS_PER_MILLISECOND;
+        const int64_t timeoutNanos = 1000 * NANOS_PER_MILLISECOND;
         int minFrames = (framesToRecord < framesPerRead) ? framesToRecord : framesPerRead;
         int actual = AAudioStream_read(aaudioStream, data, minFrames, timeoutNanos);
         if (actual < 0) {
@@ -168,6 +156,8 @@ int main(int argc, char **argv)
     if (result != AAUDIO_OK) {
         goto finish;
     }
+
+    argParser.compareWithStream(aaudioStream);
 
 finish:
     recorder.close();

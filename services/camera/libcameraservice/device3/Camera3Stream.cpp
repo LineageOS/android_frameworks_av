@@ -479,6 +479,7 @@ status_t Camera3Stream::getBuffer(camera3_stream_buffer *buffer,
     if (res == OK) {
         fireBufferListenersLocked(*buffer, /*acquired*/true, /*output*/true);
         if (buffer->buffer) {
+            Mutex::Autolock l(mOutstandingBuffersLock);
             mOutstandingBuffers.push_back(*buffer->buffer);
         }
     }
@@ -486,10 +487,12 @@ status_t Camera3Stream::getBuffer(camera3_stream_buffer *buffer,
     return res;
 }
 
-bool Camera3Stream::isOutstandingBuffer(const camera3_stream_buffer &buffer) {
+bool Camera3Stream::isOutstandingBuffer(const camera3_stream_buffer &buffer) const{
     if (buffer.buffer == nullptr) {
         return false;
     }
+
+    Mutex::Autolock l(mOutstandingBuffersLock);
 
     for (auto b : mOutstandingBuffers) {
         if (b == *buffer.buffer) {
@@ -503,6 +506,8 @@ void Camera3Stream::removeOutstandingBuffer(const camera3_stream_buffer &buffer)
     if (buffer.buffer == nullptr) {
         return;
     }
+
+    Mutex::Autolock l(mOutstandingBuffersLock);
 
     for (auto b = mOutstandingBuffers.begin(); b != mOutstandingBuffers.end(); b++) {
         if (*b == *buffer.buffer) {
@@ -523,6 +528,8 @@ status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
         return BAD_VALUE;
     }
 
+    removeOutstandingBuffer(buffer);
+
     /**
      * TODO: Check that the state is valid first.
      *
@@ -540,11 +547,10 @@ status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
     // buffer to be returned.
     mOutputBufferReturnedSignal.signal();
 
-    removeOutstandingBuffer(buffer);
     return res;
 }
 
-status_t Camera3Stream::getInputBuffer(camera3_stream_buffer *buffer) {
+status_t Camera3Stream::getInputBuffer(camera3_stream_buffer *buffer, bool respectHalLimit) {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);
     status_t res = OK;
@@ -557,7 +563,7 @@ status_t Camera3Stream::getInputBuffer(camera3_stream_buffer *buffer) {
     }
 
     // Wait for new buffer returned back if we are running into the limit.
-    if (getHandoutInputBufferCountLocked() == camera3_stream::max_buffers) {
+    if (getHandoutInputBufferCountLocked() == camera3_stream::max_buffers && respectHalLimit) {
         ALOGV("%s: Already dequeued max input buffers (%d), wait for next returned one.",
                 __FUNCTION__, camera3_stream::max_buffers);
         res = mInputBufferReturnedSignal.waitRelative(mLock, kWaitForBufferDuration);
@@ -574,6 +580,7 @@ status_t Camera3Stream::getInputBuffer(camera3_stream_buffer *buffer) {
     if (res == OK) {
         fireBufferListenersLocked(*buffer, /*acquired*/true, /*output*/false);
         if (buffer->buffer) {
+            Mutex::Autolock l(mOutstandingBuffersLock);
             mOutstandingBuffers.push_back(*buffer->buffer);
         }
     }
@@ -591,13 +598,14 @@ status_t Camera3Stream::returnInputBuffer(const camera3_stream_buffer &buffer) {
         return BAD_VALUE;
     }
 
+    removeOutstandingBuffer(buffer);
+
     status_t res = returnInputBufferLocked(buffer);
     if (res == OK) {
         fireBufferListenersLocked(buffer, /*acquired*/false, /*output*/false);
         mInputBufferReturnedSignal.signal();
     }
 
-    removeOutstandingBuffer(buffer);
     return res;
 }
 
@@ -744,7 +752,7 @@ void Camera3Stream::removeBufferListener(
 }
 
 void Camera3Stream::setBufferFreedListener(
-        Camera3StreamBufferFreedListener* listener) {
+        wp<Camera3StreamBufferFreedListener> listener) {
     Mutex::Autolock l(mLock);
     // Only allow set listener during stream configuration because stream is guaranteed to be IDLE
     // at this state, so setBufferFreedListener won't collide with onBufferFreed callbacks

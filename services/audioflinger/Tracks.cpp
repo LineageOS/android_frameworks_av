@@ -234,7 +234,7 @@ status_t AudioFlinger::ThreadBase::TrackBase::initCheck() const
 AudioFlinger::ThreadBase::TrackBase::~TrackBase()
 {
 #ifdef TEE_SINK
-    dumpTee(-1, mTeeSource, mId);
+    dumpTee(-1, mTeeSource, mId, 'T');
 #endif
     // delete the proxy before deleting the shared memory it refers to, to avoid dangling reference
     mServerProxy.clear();

@@ -17,10 +17,14 @@
 #ifndef ANDROID_AAUDIO_BINDING_AAUDIO_SERVICE_INTERFACE_H
 #define ANDROID_AAUDIO_BINDING_AAUDIO_SERVICE_INTERFACE_H
 
+#include <utils/StrongPointer.h>
+#include <media/AudioClient.h>
+
 #include "binding/AAudioServiceDefinitions.h"
 #include "binding/AAudioStreamRequest.h"
 #include "binding/AAudioStreamConfiguration.h"
 #include "binding/AudioEndpointParcelable.h"
+#include "binding/IAAudioClient.h"
 
 /**
  * This has the same methods as IAAudioService but without the Binder features.
@@ -35,6 +39,8 @@ public:
 
     AAudioServiceInterface() {};
     virtual ~AAudioServiceInterface() = default;
+
+    virtual void registerClient(const android::sp<android::IAAudioClient>& client) = 0;
 
     /**
      * @param request info needed to create the stream
@@ -76,13 +82,18 @@ public:
      * Manage the specified thread as a low latency audio thread.
      */
     virtual aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle,
-                                                pid_t clientProcessId,
                                                 pid_t clientThreadId,
                                                 int64_t periodNanoseconds) = 0;
 
     virtual aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
-                                                  pid_t clientProcessId,
                                                   pid_t clientThreadId) = 0;
+
+    virtual aaudio_result_t startClient(aaudio_handle_t streamHandle,
+                                      const android::AudioClient& client,
+                                      audio_port_handle_t *clientHandle) = 0;
+
+    virtual aaudio_result_t stopClient(aaudio_handle_t streamHandle,
+                                       audio_port_handle_t clientHandle) = 0;
 };
 
 } /* namespace aaudio */

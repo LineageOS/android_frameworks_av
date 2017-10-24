@@ -44,7 +44,7 @@ class AAudioServiceStreamShared : public AAudioServiceStreamBase {
 
 public:
     AAudioServiceStreamShared(android::AAudioService &aAudioService);
-    virtual ~AAudioServiceStreamShared();
+    virtual ~AAudioServiceStreamShared() = default;
 
     aaudio_result_t open(const aaudio::AAudioStreamRequest &request,
                          aaudio::AAudioStreamConfiguration &configurationOutput) override;
@@ -87,15 +87,19 @@ public:
      */
     void markTransferTime(int64_t nanoseconds);
 
-    void onStop();
-
-    void onDisconnect();
-
 protected:
 
     aaudio_result_t getDownDataDescription(AudioEndpointParcelable &parcelable) override;
 
     aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) override;
+
+    /**
+     * @param requestedCapacityFrames
+     * @param framesPerBurst
+     * @return capacity or negative error
+     */
+    static int32_t calculateBufferCapacity(int32_t requestedCapacityFrames,
+                                            int32_t framesPerBurst);
 
 private:
     android::AAudioService  &mAudioService;

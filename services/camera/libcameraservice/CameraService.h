@@ -19,6 +19,7 @@
 
 #include <android/hardware/BnCameraService.h>
 #include <android/hardware/ICameraServiceListener.h>
+#include <android/hardware/ICameraServiceProxy.h>
 
 #include <cutils/multiuser.h>
 #include <utils/Vector.h>
@@ -26,7 +27,6 @@
 #include <binder/AppOpsManager.h>
 #include <binder/BinderService.h>
 #include <binder/IAppOpsCallback.h>
-#include <camera/ICameraServiceProxy.h>
 #include <hardware/camera.h>
 
 #include <android/hardware/camera/common/1.0/types.h>
@@ -182,8 +182,10 @@ public:
      * the camera proxy service in the system service
      */
     static void         updateProxyDeviceState(
-            ICameraServiceProxy::CameraState newState,
-            const String8& cameraId);
+            int newState,
+            const String8& cameraId,
+            int facing,
+            const String16& clientName);
 
     /////////////////////////////////////////////////////////////////////
     // CameraDeviceFactory functionality
@@ -772,7 +774,7 @@ private:
     static StatusInternal mapToInternal(hardware::camera::common::V1_0::CameraDeviceStatus status);
     static int32_t mapToInterface(StatusInternal status);
 
-    static sp<ICameraServiceProxy> getCameraServiceProxy();
+    static sp<hardware::ICameraServiceProxy> getCameraServiceProxy();
     static void pingCameraServiceProxy();
 
 };

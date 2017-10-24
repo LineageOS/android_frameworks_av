@@ -25,6 +25,7 @@ LOCAL_SRC_FILES += \
     $(LIBAAUDIO_SRC_DIR)/utility/HandleTracker.cpp \
     SharedMemoryProxy.cpp \
     SharedRingBuffer.cpp \
+    AAudioClientTracker.cpp \
     AAudioEndpointManager.cpp \
     AAudioMixer.cpp \
     AAudioService.cpp \
@@ -46,9 +47,11 @@ LOCAL_CFLAGS += -Wall -Werror
 LOCAL_SHARED_LIBRARIES :=  \
     libaaudio \
     libaudioflinger \
+    libaudioclient \
     libbinder \
     libcutils \
     libmediautils \
+    libserviceutility \
     libutils \
     liblog
 

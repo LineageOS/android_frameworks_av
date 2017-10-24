@@ -224,7 +224,7 @@ public:
                                      uid_t uid,
                                      const audio_config_t *config,
                                      audio_output_flags_t flags,
-                                     audio_port_handle_t selectedDeviceId,
+                                     audio_port_handle_t *selectedDeviceId,
                                      audio_port_handle_t *portId);
     static status_t startOutput(audio_io_handle_t output,
                                 audio_stream_type_t stream,
@@ -245,7 +245,7 @@ public:
                                     uid_t uid,
                                     const audio_config_base_t *config,
                                     audio_input_flags_t flags,
-                                    audio_port_handle_t selectedDeviceId,
+                                    audio_port_handle_t *selectedDeviceId,
                                     audio_port_handle_t *portId);
 
     static status_t startInput(audio_io_handle_t input,
@@ -337,6 +337,9 @@ public:
 
     static status_t setMasterMono(bool mono);
     static status_t getMasterMono(bool *mono);
+
+    static float    getStreamVolumeDB(
+            audio_stream_type_t stream, int index, audio_devices_t device);
 
     // ----------------------------------------------------------------------------
 

@@ -55,7 +55,7 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
 
     // Try to create an AudioRecord
 
-    // TODO Support UNSPECIFIED in AudioTrack. For now, use stereo if unspecified.
+    // TODO Support UNSPECIFIED in AudioRecord. For now, use stereo if unspecified.
     int32_t samplesPerFrame = (getSamplesPerFrame() == AAUDIO_UNSPECIFIED)
                               ? 2 : getSamplesPerFrame();
     audio_channel_mask_t channelMask = audio_channel_in_mask_from_count(samplesPerFrame);
@@ -130,8 +130,8 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
         return AAudioConvert_androidToAAudioResult(status);
     }
 
-    // Get the actual rate.
-    setSampleRate(mAudioRecord->getSampleRate());
+    // Get the actual values from the AudioRecord.
+    setSamplesPerFrame(mAudioRecord->channelCount());
     setFormat(AAudioConvert_androidToAAudioDataFormat(mAudioRecord->format()));
 
     int32_t actualSampleRate = mAudioRecord->getSampleRate();
@@ -221,18 +221,6 @@ aaudio_result_t AudioStreamRecord::requestStart()
         setState(AAUDIO_STREAM_STATE_STARTING);
     }
     return AAUDIO_OK;
-}
-
-aaudio_result_t AudioStreamRecord::requestPause()
-{
-    // This does not make sense for an input stream.
-    // There is no real difference between pause() and stop().
-    return AAUDIO_ERROR_UNIMPLEMENTED;
-}
-
-aaudio_result_t AudioStreamRecord::requestFlush() {
-    // This does not make sense for an input stream.
-    return AAUDIO_ERROR_UNIMPLEMENTED;
 }
 
 aaudio_result_t AudioStreamRecord::requestStop() {

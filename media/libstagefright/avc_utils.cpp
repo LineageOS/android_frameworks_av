@@ -80,7 +80,16 @@ static void skipScalingList(ABitReader *br, size_t sizeOfScalingList) {
     for (size_t j = 0; j < sizeOfScalingList; ++j) {
         if (nextScale != 0) {
             signed delta_scale = parseSE(br);
-            nextScale = (lastScale + delta_scale + 256) % 256;
+            // ISO_IEC_14496-10_201402-ITU, 7.4.2.1.1.1, The value of delta_scale
+            // shall be in the range of −128 to +127, inclusive.
+            if (delta_scale < -128) {
+                ALOGW("delta_scale (%d) is below range, capped to -128", delta_scale);
+                delta_scale = -128;
+            } else if (delta_scale > 127) {
+                ALOGW("delta_scale (%d) is above range, capped to 127", delta_scale);
+                delta_scale = 127;
+            }
+            nextScale = (lastScale + (delta_scale + 256)) % 256;
         }
 
         lastScale = (nextScale == 0) ? lastScale : nextScale;

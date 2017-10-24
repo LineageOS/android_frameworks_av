@@ -24,7 +24,7 @@ namespace android {
 
 namespace camera3 {
 
-class Camera3StreamBufferFreedListener {
+class Camera3StreamBufferFreedListener : public virtual RefBase {
 public:
     // onBufferFreed is called when a buffer is no longer being managed
     // by this stream. This will not be called in events when all

@@ -64,6 +64,7 @@ enum {
     kKeyOpusHeader        = 'ohdr',  // raw data
     kKeyOpusCodecDelay    = 'ocod',  // uint64_t (codec delay in ns)
     kKeyOpusSeekPreRoll   = 'ospr',  // uint64_t (seek preroll in ns)
+    kKeyFlacMetadata      = 'flMd',  // raw data
     kKeyVp9CodecPrivate   = 'vp9p',  // raw data (vp9 csd information)
     kKeyWantsNALFragments = 'NALf',
     kKeyIsSyncFrame       = 'sync',  // int32_t (bool)

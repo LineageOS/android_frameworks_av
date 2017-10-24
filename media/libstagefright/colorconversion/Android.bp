@@ -10,7 +10,10 @@ cc_library_static {
         "frameworks/native/include/media/openmax",
     ],
 
-    shared_libs: ["libui"],
+    shared_libs: [
+        "libui",
+        "libnativewindow",
+    ],
 
     static_libs: ["libyuv_static"],
 

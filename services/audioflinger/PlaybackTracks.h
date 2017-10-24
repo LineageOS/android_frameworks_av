@@ -94,8 +94,7 @@ protected:
     friend class DirectOutputThread;
     friend class OffloadThread;
 
-                        Track(const Track&);
-                        Track& operator = (const Track&);
+    DISALLOW_COPY_AND_ASSIGN(Track);
 
     // AudioBufferProvider interface
     virtual status_t getNextBuffer(AudioBufferProvider::Buffer* buffer);

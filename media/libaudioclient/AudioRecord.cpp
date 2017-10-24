@@ -69,7 +69,8 @@ AudioRecord::AudioRecord(const String16 &opPackageName)
     : mActive(false), mStatus(NO_INIT), mOpPackageName(opPackageName),
       mSessionId(AUDIO_SESSION_ALLOCATE),
       mPreviousPriority(ANDROID_PRIORITY_NORMAL), mPreviousSchedulingGroup(SP_DEFAULT),
-      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE), mPortId(AUDIO_PORT_HANDLE_NONE)
+      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE), mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE),
+      mPortId(AUDIO_PORT_HANDLE_NONE)
 {
 }
 
@@ -503,10 +504,29 @@ audio_port_handle_t AudioRecord::getRoutedDeviceId() {
     if (mInput == AUDIO_IO_HANDLE_NONE) {
         return AUDIO_PORT_HANDLE_NONE;
     }
-    return AudioSystem::getDeviceIdForIo(mInput);
+    // if the input stream does not have an active audio patch, use either the device initially
+    // selected by audio policy manager or the last routed device
+    audio_port_handle_t deviceId = AudioSystem::getDeviceIdForIo(mInput);
+    if (deviceId == AUDIO_PORT_HANDLE_NONE) {
+        deviceId = mRoutedDeviceId;
+    }
+    mRoutedDeviceId = deviceId;
+    return deviceId;
 }
 
 // -------------------------------------------------------------------------
+// TODO Move this macro to a common header file for enum to string conversion in audio framework.
+#define MEDIA_CASE_ENUM(name) case name: return #name
+const char * AudioRecord::convertTransferToText(transfer_type transferType) {
+    switch (transferType) {
+        MEDIA_CASE_ENUM(TRANSFER_DEFAULT);
+        MEDIA_CASE_ENUM(TRANSFER_CALLBACK);
+        MEDIA_CASE_ENUM(TRANSFER_OBTAIN);
+        MEDIA_CASE_ENUM(TRANSFER_SYNC);
+        default:
+            return "UNRECOGNIZED";
+    }
+}
 
 // must be called with mLock held
 status_t AudioRecord::openRecord_l(const Modulo<uint32_t> &epoch, const String16& opPackageName)
@@ -538,13 +558,14 @@ status_t AudioRecord::openRecord_l(const Modulo<uint32_t> &epoch, const String16
             .channel_mask = mChannelMask,
             .format = mFormat
         };
+    mRoutedDeviceId = mSelectedDeviceId;
     status = AudioSystem::getInputForAttr(&mAttributes, &input,
                                         mSessionId,
                                         // FIXME compare to AudioTrack
                                         mClientPid,
                                         mClientUid,
                                         &config,
-                                        mFlags, mSelectedDeviceId, &mPortId);
+                                        mFlags, &mRoutedDeviceId, &mPortId);
 
     if (status != NO_ERROR || input == AUDIO_IO_HANDLE_NONE) {
         ALOGE("Could not get audio input for session %d, record source %d, sample rate %u, "
@@ -590,12 +611,20 @@ status_t AudioRecord::openRecord_l(const Modulo<uint32_t> &epoch, const String16
             (mTransfer == TRANSFER_SYNC) ||
             // use case 3: obtain/release mode
             (mTransfer == TRANSFER_OBTAIN);
+        if (!useCaseAllowed) {
+            ALOGW("AUDIO_INPUT_FLAG_FAST denied, incompatible transfer = %s",
+                  convertTransferToText(mTransfer));
+        }
+
         // sample rates must also match
-        bool fastAllowed = useCaseAllowed && (mSampleRate == afSampleRate);
+        bool sampleRateAllowed = mSampleRate == afSampleRate;
+        if (!sampleRateAllowed) {
+            ALOGW("AUDIO_INPUT_FLAG_FAST denied, rates do not match %u Hz, require %u Hz",
+                  mSampleRate, afSampleRate);
+        }
+
+        bool fastAllowed = useCaseAllowed && sampleRateAllowed;
         if (!fastAllowed) {
-            ALOGW("AUDIO_INPUT_FLAG_FAST denied by client; transfer %d, "
-                "track %u Hz, input %u Hz",
-                mTransfer, mSampleRate, afSampleRate);
             mFlags = (audio_input_flags_t) (mFlags & ~(AUDIO_INPUT_FLAG_FAST |
                     AUDIO_INPUT_FLAG_RAW));
             AudioSystem::releaseInput(input, mSessionId);
@@ -1272,6 +1301,7 @@ bool AudioRecord::AudioRecordThread::threadLoop()
     {
         AutoMutex _l(mMyLock);
         if (mPaused) {
+            // TODO check return value and handle or log
             mMyCond.wait(mMyLock);
             // caller will check for exitPending()
             return true;
@@ -1282,8 +1312,10 @@ bool AudioRecord::AudioRecordThread::threadLoop()
         }
         if (mPausedInt) {
             if (mPausedNs > 0) {
+                // TODO check return value and handle or log
                 (void) mMyCond.waitRelative(mMyLock, mPausedNs);
             } else {
+                // TODO check return value and handle or log
                 mMyCond.wait(mMyLock);
             }
             mPausedInt = false;

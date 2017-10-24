@@ -74,6 +74,15 @@ public:
 
     virtual int64_t incrementClientFrameCounter(int32_t frames)  = 0;
 
+
+    virtual int64_t getFramesWritten() override {
+        return mFramesWritten.get();
+    }
+
+    virtual int64_t getFramesRead() override {
+        return mFramesRead.get();
+    }
+
 protected:
 
     class StreamDeviceCallback : public android::AudioSystem::AudioDeviceCallback
@@ -102,6 +111,17 @@ protected:
 
     void onStart() { mCallbackEnabled.store(true); }
     void onStop() { mCallbackEnabled.store(false); }
+
+    int64_t incrementFramesWritten(int32_t frames) {
+        return mFramesWritten.increment(frames);
+    }
+
+    int64_t incrementFramesRead(int32_t frames) {
+        return mFramesRead.increment(frames);
+    }
+
+    MonotonicCounter           mFramesWritten;
+    MonotonicCounter           mFramesRead;
 
     FixedBlockAdapter         *mBlockAdapter = nullptr;
     aaudio_wrapping_frames_t   mPositionWhenStarting = 0;

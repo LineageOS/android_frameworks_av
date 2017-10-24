@@ -64,16 +64,18 @@ public:
      * if the data is split across the end of the FIFO then set data2 and numFrames2.
      * Other wise set them to null
      * @param wrappingBuffer
+     * @return total full frames available
      */
-    void getFullDataAvailable(WrappingBuffer *wrappingBuffer);
+    fifo_frames_t getFullDataAvailable(WrappingBuffer *wrappingBuffer);
 
     /**
      * Return pointer to available empty frames in data1 and set size in numFrames1.
      * if the room is split across the end of the FIFO then set data2 and numFrames2.
      * Other wise set them to null
      * @param wrappingBuffer
+     * @return total empty frames available
      */
-    void getEmptyRoomAvailable(WrappingBuffer *wrappingBuffer);
+    fifo_frames_t getEmptyRoomAvailable(WrappingBuffer *wrappingBuffer);
 
     /**
      * Copy data from the FIFO into the buffer.

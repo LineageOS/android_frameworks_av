@@ -18,14 +18,11 @@
 #define ANDROID_AAUDIO_SHARED_MEMORY_PARCELABLE_H
 
 #include <stdint.h>
-
 #include <sys/mman.h>
+
+#include <android-base/unique_fd.h>
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
-
-using android::status_t;
-using android::Parcel;
-using android::Parcelable;
 
 namespace aaudio {
 
@@ -37,25 +34,30 @@ namespace aaudio {
 /**
  * This is a parcelable description of a shared memory referenced by a file descriptor.
  * It may be divided into several regions.
+ * The memory can be shared using Binder or simply shared between threads.
  */
-class SharedMemoryParcelable : public Parcelable {
+class SharedMemoryParcelable : public android::Parcelable {
 public:
     SharedMemoryParcelable();
     virtual ~SharedMemoryParcelable();
 
-    void setup(int fd, int32_t sizeInBytes);
+    /**
+     * Make a dup() of the fd and store it for later use.
+     *
+     * @param fd
+     * @param sizeInBytes
+     */
+    void setup(const android::base::unique_fd& fd, int32_t sizeInBytes);
 
-    virtual status_t writeToParcel(Parcel* parcel) const override;
+    virtual android::status_t writeToParcel(android::Parcel* parcel) const override;
 
-    virtual status_t readFromParcel(const Parcel* parcel) override;
+    virtual android::status_t readFromParcel(const android::Parcel* parcel) override;
 
     // mmap() shared memory
     aaudio_result_t resolve(int32_t offsetInBytes, int32_t sizeInBytes, void **regionAddressPtr);
 
     // munmap() any mapped memory
     aaudio_result_t close();
-
-    bool isFileDescriptorSafe();
 
     int32_t getSizeInBytes();
 
@@ -67,10 +69,11 @@ protected:
 
 #define MMAP_UNRESOLVED_ADDRESS    reinterpret_cast<uint8_t*>(MAP_FAILED)
 
-    int      mFd = -1;
-    int      mOriginalFd = -1;
-    int32_t  mSizeInBytes = 0;
-    uint8_t *mResolvedAddress = MMAP_UNRESOLVED_ADDRESS;
+    aaudio_result_t resolveSharedMemory(const android::base::unique_fd& fd);
+
+    android::base::unique_fd   mFd;
+    int32_t     mSizeInBytes = 0;
+    uint8_t    *mResolvedAddress = MMAP_UNRESOLVED_ADDRESS;
 };
 
 } /* namespace aaudio */

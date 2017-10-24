@@ -31,7 +31,23 @@ interface ICameraServiceProxy
     oneway void pingForUserUpdate();
 
     /**
-     * Update the status of a camera device
+     * Values for notifyCameraState newCameraState
      */
-     oneway void notifyCameraState(String cameraId, int newCameraState);
+    const int CAMERA_STATE_OPEN = 0;
+    const int CAMERA_STATE_ACTIVE = 1;
+    const int CAMERA_STATE_IDLE = 2;
+    const int CAMERA_STATE_CLOSED = 3;
+
+    /**
+     * Values for notifyCameraState facing
+     */
+    const int CAMERA_FACING_BACK = 0;
+    const int CAMERA_FACING_FRONT = 1;
+    const int CAMERA_FACING_EXTERNAL = 2;
+
+    /**
+     * Update the status of a camera device.
+     */
+    oneway void notifyCameraState(String cameraId, int facing, int newCameraState,
+            String clientName);
 }

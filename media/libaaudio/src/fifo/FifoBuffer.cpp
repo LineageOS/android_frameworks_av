@@ -105,16 +105,18 @@ void FifoBuffer::fillWrappingBuffer(WrappingBuffer *wrappingBuffer,
 
 }
 
-void FifoBuffer::getFullDataAvailable(WrappingBuffer *wrappingBuffer) {
+fifo_frames_t FifoBuffer::getFullDataAvailable(WrappingBuffer *wrappingBuffer) {
     fifo_frames_t framesAvailable = mFifo->getFullFramesAvailable();
     fifo_frames_t startIndex = mFifo->getReadIndex();
     fillWrappingBuffer(wrappingBuffer, framesAvailable, startIndex);
+    return framesAvailable;
 }
 
-void FifoBuffer::getEmptyRoomAvailable(WrappingBuffer *wrappingBuffer) {
+fifo_frames_t FifoBuffer::getEmptyRoomAvailable(WrappingBuffer *wrappingBuffer) {
     fifo_frames_t framesAvailable = mFifo->getEmptyFramesAvailable();
     fifo_frames_t startIndex = mFifo->getWriteIndex();
     fillWrappingBuffer(wrappingBuffer, framesAvailable, startIndex);
+    return framesAvailable;
 }
 
 fifo_frames_t FifoBuffer::read(void *buffer, fifo_frames_t numFrames) {

@@ -16,46 +16,32 @@
 
 // Play sine waves using AAudio.
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
+#include <asm/fcntl.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
 #include "AAudioExampleUtils.h"
 #include "AAudioSimplePlayer.h"
+#include "AAudioArgsParser.h"
 
-#define SAMPLE_RATE           48000
-#define NUM_SECONDS           20
+#define NUM_SECONDS           4
 
-#define MMAP_POLICY              AAUDIO_UNSPECIFIED
-//#define MMAP_POLICY              AAUDIO_POLICY_NEVER
-//#define MMAP_POLICY              AAUDIO_POLICY_AUTO
-//#define MMAP_POLICY              AAUDIO_POLICY_ALWAYS
-
-#define REQUESTED_FORMAT         AAUDIO_FORMAT_PCM_I16
-
-#define REQUESTED_SHARING_MODE   AAUDIO_SHARING_MODE_SHARED
-//#define REQUESTED_SHARING_MODE   AAUDIO_SHARING_MODE_EXCLUSIVE
-
-
-int main(int argc, char **argv)
+int main(int argc, const char **argv)
 {
-    (void)argc; // unused
-
+    AAudioArgsParser   argParser;
     AAudioSimplePlayer player;
     SineThreadedData_t myData;
-    aaudio_result_t result = AAUDIO_OK;
+    aaudio_result_t    result = AAUDIO_OK;
 
-    const int requestedChannelCount = 2;
-    int actualChannelCount = 0;
-    const int requestedSampleRate = SAMPLE_RATE;
-    int actualSampleRate = 0;
-    aaudio_format_t requestedDataFormat = REQUESTED_FORMAT;
+    int32_t         actualChannelCount = 0;
+    int32_t         actualSampleRate = 0;
     aaudio_format_t actualDataFormat = AAUDIO_FORMAT_UNSPECIFIED;
-    aaudio_sharing_mode_t actualSharingMode = AAUDIO_SHARING_MODE_SHARED;
 
     AAudioStream *aaudioStream = nullptr;
-    aaudio_stream_state_t state = AAUDIO_STREAM_STATE_UNINITIALIZED;
     int32_t  framesPerBurst = 0;
     int32_t  framesPerWrite = 0;
     int32_t  bufferCapacity = 0;
@@ -65,69 +51,44 @@ int main(int argc, char **argv)
     float   *floatData = nullptr;
     int16_t *shortData = nullptr;
 
+    int      testFd = -1;
+
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
 
-    printf("%s - Play a sine wave using AAudio\n", argv[0]);
+    printf("%s - Play a sine wave using AAudio V0.1.1\n", argv[0]);
 
-    AAudio_setMMapPolicy(MMAP_POLICY);
-    printf("requested MMapPolicy = %d\n", AAudio_getMMapPolicy());
+    if (argParser.parseArgs(argc, argv)) {
+        return EXIT_FAILURE;
+    }
 
-    player.setSharingMode(REQUESTED_SHARING_MODE);
-
-    result = player.open(requestedChannelCount, requestedSampleRate, requestedDataFormat,
-                         nullptr, nullptr, &myData);
+    result = player.open(argParser);
     if (result != AAUDIO_OK) {
         fprintf(stderr, "ERROR -  player.open() returned %d\n", result);
         goto finish;
     }
 
     aaudioStream = player.getStream();
-    // Request stream properties.
 
-    state = AAudioStream_getState(aaudioStream);
-    printf("after open, state = %s\n", AAudio_convertStreamStateToText(state));
+    argParser.compareWithStream(aaudioStream);
 
-    // Check to see what kind of stream we actually got.
+    actualChannelCount = AAudioStream_getChannelCount(aaudioStream);
     actualSampleRate = AAudioStream_getSampleRate(aaudioStream);
-    printf("SampleRate: requested = %d, actual = %d\n", requestedSampleRate, actualSampleRate);
+    actualDataFormat = AAudioStream_getFormat(aaudioStream);
 
     myData.sineOsc1.setup(440.0, actualSampleRate);
     myData.sineOsc2.setup(660.0, actualSampleRate);
 
-    actualChannelCount = AAudioStream_getChannelCount(aaudioStream);
-    printf("ChannelCount: requested = %d, actual = %d\n",
-            requestedChannelCount, actualChannelCount);
-
-    actualSharingMode = AAudioStream_getSharingMode(aaudioStream);
-    printf("SharingMode: requested = %s, actual = %s\n",
-            getSharingModeText(REQUESTED_SHARING_MODE),
-            getSharingModeText(actualSharingMode));
-
-    // This is the number of frames that are read in one chunk by a DMA controller
-    // or a DSP or a mixer.
-    framesPerBurst = AAudioStream_getFramesPerBurst(aaudioStream);
-    printf("Buffer: bufferSize     = %d\n", AAudioStream_getBufferSizeInFrames(aaudioStream));
-    bufferCapacity = AAudioStream_getBufferCapacityInFrames(aaudioStream);
-    printf("Buffer: bufferCapacity = %d, remainder = %d\n",
-           bufferCapacity, bufferCapacity % framesPerBurst);
-
     // Some DMA might use very short bursts of 16 frames. We don't need to write such small
     // buffers. But it helps to use a multiple of the burst size for predictable scheduling.
+    framesPerBurst = AAudioStream_getFramesPerBurst(aaudioStream);
     framesPerWrite = framesPerBurst;
     while (framesPerWrite < 48) {
         framesPerWrite *= 2;
     }
     printf("Buffer: framesPerBurst = %d\n",framesPerBurst);
     printf("Buffer: framesPerWrite = %d\n",framesPerWrite);
-
-    printf("PerformanceMode        = %d\n", AAudioStream_getPerformanceMode(aaudioStream));
-    printf("is MMAP used?          = %s\n", AAudioStream_isMMapUsed(aaudioStream) ? "yes" : "no");
-
-    actualDataFormat = AAudioStream_getFormat(aaudioStream);
-    printf("DataFormat: requested  = %d, actual = %d\n", REQUESTED_FORMAT, actualDataFormat);
-    // TODO handle other data formats
 
     // Allocate a buffer for the audio data.
     if (actualDataFormat == AAUDIO_FORMAT_PCM_FLOAT) {
@@ -139,6 +100,9 @@ int main(int argc, char **argv)
         goto finish;
     }
 
+    testFd = open("/data/aaudio_temp.raw", O_CREAT | O_RDWR, S_IRWXU);
+    printf("testFd = %d, pid = %d\n", testFd, getpid());
+
     // Start the stream.
     printf("call player.start()\n");
     result = player.start();
@@ -147,11 +111,11 @@ int main(int argc, char **argv)
         goto finish;
     }
 
-    state = AAudioStream_getState(aaudioStream);
-    printf("after start, state = %s\n", AAudio_convertStreamStateToText(state));
+    printf("after start, state = %s\n",
+            AAudio_convertStreamStateToText(AAudioStream_getState(aaudioStream)));
 
     // Play for a while.
-    framesToPlay = actualSampleRate * NUM_SECONDS;
+    framesToPlay = actualSampleRate * argParser.getDurationSeconds();
     framesLeft = framesToPlay;
     while (framesLeft > 0) {
 
@@ -220,7 +184,17 @@ int main(int argc, char **argv)
     }
 
 finish:
+    printf("testFd = %d, fcntl before aaudio close returns 0x%08X\n",
+           testFd, fcntl(testFd, F_GETFD));
     player.close();
+    printf("testFd = %d, fcntl after aaudio close returns 0x%08X\n",
+           testFd, fcntl(testFd, F_GETFD));
+    if (::close(testFd) != 0) {
+        printf("ERROR SharedMemoryParcelable::close() of testFd = %d, errno = %s\n",
+               testFd, strerror(errno));
+    }
+    printf("testFd = %d, fcntl after close() returns 0x%08X\n", testFd, fcntl(testFd, F_GETFD));
+
     delete[] floatData;
     delete[] shortData;
     printf("exiting - AAudio result = %d = %s\n", result, AAudio_convertResultToText(result));

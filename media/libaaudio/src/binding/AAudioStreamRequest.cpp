@@ -45,16 +45,19 @@ AAudioStreamRequest::~AAudioStreamRequest() {}
 status_t AAudioStreamRequest::writeToParcel(Parcel* parcel) const {
     status_t status = parcel->writeInt32((int32_t) mUserId);
     if (status != NO_ERROR) goto error;
-    status = parcel->writeInt32((int32_t) mProcessId);
-    if (status != NO_ERROR) goto error;
+
     status = parcel->writeInt32((int32_t) mDirection);
     if (status != NO_ERROR) goto error;
 
     status = parcel->writeBool(mSharingModeMatchRequired);
     if (status != NO_ERROR) goto error;
 
+    status = parcel->writeBool(mInService);
+    if (status != NO_ERROR) goto error;
+
     status = mConfiguration.writeToParcel(parcel);
     if (status != NO_ERROR) goto error;
+
     return NO_ERROR;
 
 error:
@@ -70,17 +73,17 @@ status_t AAudioStreamRequest::readFromParcel(const Parcel* parcel) {
 
     status = parcel->readInt32(&temp);
     if (status != NO_ERROR) goto error;
-    mProcessId = (pid_t) temp;
-
-    status = parcel->readInt32(&temp);
-    if (status != NO_ERROR) goto error;
     mDirection = (aaudio_direction_t) temp;
 
     status = parcel->readBool(&mSharingModeMatchRequired);
     if (status != NO_ERROR) goto error;
 
+    status = parcel->readBool(&mInService);
+    if (status != NO_ERROR) goto error;
+
     status = mConfiguration.readFromParcel(parcel);
     if (status != NO_ERROR) goto error;
+
     return NO_ERROR;
 
 error:
@@ -96,5 +99,7 @@ void AAudioStreamRequest::dump() const {
     ALOGD("AAudioStreamRequest mUserId    = %d", mUserId);
     ALOGD("AAudioStreamRequest mProcessId = %d", mProcessId);
     ALOGD("AAudioStreamRequest mDirection = %d", mDirection);
+    ALOGD("AAudioStreamRequest mSharingModeMatchRequired = %d", mSharingModeMatchRequired);
+    ALOGD("AAudioStreamRequest mInService = %d", mInService);
     mConfiguration.dump();
 }

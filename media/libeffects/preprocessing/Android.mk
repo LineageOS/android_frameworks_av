@@ -3,6 +3,7 @@ LOCAL_PATH:= $(call my-dir)
 # audio preprocessing wrapper
 include $(CLEAR_VARS)
 
+LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE:= libaudiopreprocessing
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_RELATIVE_PATH := soundfx

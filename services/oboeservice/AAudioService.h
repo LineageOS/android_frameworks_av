@@ -21,6 +21,7 @@
 #include <pthread.h>
 
 #include <binder/BinderService.h>
+#include <media/AudioClient.h>
 
 #include <aaudio/AAudio.h>
 #include "utility/HandleTracker.h"
@@ -44,8 +45,12 @@ public:
 
     static const char* getServiceName() { return AAUDIO_SERVICE_NAME; }
 
+    virtual status_t        dump(int fd, const Vector<String16>& args) override;
+
+    virtual void            registerClient(const sp<IAAudioClient>& client);
+
     virtual aaudio_handle_t openStream(const aaudio::AAudioStreamRequest &request,
-                                     aaudio::AAudioStreamConfiguration &configuration);
+                                     aaudio::AAudioStreamConfiguration &configurationOutput);
 
     virtual aaudio_result_t closeStream(aaudio_handle_t streamHandle);
 
@@ -62,17 +67,26 @@ public:
     virtual aaudio_result_t flushStream(aaudio_handle_t streamHandle);
 
     virtual aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle,
-                                              pid_t pid, pid_t tid,
-                                              int64_t periodNanoseconds) ;
+                                                pid_t tid,
+                                                int64_t periodNanoseconds) ;
 
     virtual aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
-                                                  pid_t pid, pid_t tid);
+                                                  pid_t tid);
+
+    virtual aaudio_result_t startClient(aaudio_handle_t streamHandle,
+                                      const android::AudioClient& client,
+                                      audio_port_handle_t *clientHandle);
+
+    virtual aaudio_result_t stopClient(aaudio_handle_t streamHandle,
+                                       audio_port_handle_t clientHandle);
 
 private:
 
     aaudio::AAudioServiceStreamBase *convertHandleToServiceStream(aaudio_handle_t streamHandle) const;
 
     HandleTracker mHandleTracker;
+
+    android::AudioClient mAudioClient;
 
     enum constants {
         DEFAULT_AUDIO_PRIORITY = 2

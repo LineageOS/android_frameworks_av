@@ -68,13 +68,20 @@ public:
         mSharingModeMatchRequired = required;
     }
 
-
     const AAudioStreamConfiguration &getConstantConfiguration() const {
         return mConfiguration;
     }
 
     AAudioStreamConfiguration &getConfiguration() {
         return mConfiguration;
+    }
+
+    bool isInService() const {
+        return mInService;
+    }
+
+    void setInService(bool inService) {
+        mInService = inService;
     }
 
     virtual status_t writeToParcel(Parcel* parcel) const override;
@@ -91,6 +98,7 @@ protected:
     pid_t                      mProcessId;
     aaudio_direction_t         mDirection;
     bool                       mSharingModeMatchRequired = false;
+    bool                       mInService = false; // Stream opened by AAudioservice
 };
 
 } /* namespace aaudio */

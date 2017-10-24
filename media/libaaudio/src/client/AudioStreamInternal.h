@@ -18,6 +18,7 @@
 #define ANDROID_AAUDIO_AUDIO_STREAM_INTERNAL_H
 
 #include <stdint.h>
+#include <media/PlayerBase.h>
 #include <aaudio/AAudio.h>
 
 #include "binding/IAAudioService.h"
@@ -26,6 +27,7 @@
 #include "client/IsochronousClockModel.h"
 #include "client/AudioEndpoint.h"
 #include "core/AudioStream.h"
+#include "utility/AudioClock.h"
 #include "utility/LinearRamp.h"
 
 using android::sp;
@@ -34,18 +36,13 @@ using android::IAAudioService;
 namespace aaudio {
 
 // A stream that talks to the AAudioService or directly to a HAL.
-class AudioStreamInternal : public AudioStream {
+class AudioStreamInternal : public AudioStream, public android::PlayerBase  {
 
 public:
     AudioStreamInternal(AAudioServiceInterface  &serviceInterface, bool inService);
     virtual ~AudioStreamInternal();
 
-    // =========== Begin ABSTRACT methods ===========================
     aaudio_result_t requestStart() override;
-
-    aaudio_result_t requestPause() override;
-
-    aaudio_result_t requestFlush() override;
 
     aaudio_result_t requestStop() override;
 
@@ -54,7 +51,6 @@ public:
                                        int64_t *timeNanoseconds) override;
 
     virtual aaudio_result_t updateStateWhileWaiting() override;
-    // =========== End ABSTRACT methods ===========================
 
     aaudio_result_t open(const AudioStreamBuilder &builder) override;
 
@@ -89,6 +85,14 @@ public:
     // Calculate timeout based on framesPerBurst
     int64_t calculateReasonableTimeout();
 
+    //PlayerBase virtuals
+    virtual void destroy();
+
+    aaudio_result_t startClient(const android::AudioClient& client,
+                                audio_port_handle_t *clientHandle);
+
+    aaudio_result_t stopClient(audio_port_handle_t clientHandle);
+
 protected:
 
     aaudio_result_t processData(void *buffer,
@@ -109,20 +113,29 @@ protected:
 
     aaudio_result_t processCommands();
 
-    aaudio_result_t requestPauseInternal();
     aaudio_result_t requestStopInternal();
 
     aaudio_result_t stopCallback();
 
 
-    void onFlushFromServer();
+    virtual void onFlushFromServer() {}
 
     aaudio_result_t onEventFromServer(AAudioServiceMessage *message);
 
     aaudio_result_t onTimestampFromServer(AAudioServiceMessage *message);
 
+    void logTimestamp(AAudioServiceMessage &message);
+
     // Calculate timeout for an operation involving framesPerOperation.
     int64_t calculateReasonableTimeout(int32_t framesPerOperation);
+
+    void doSetVolume();
+
+    //PlayerBase virtuals
+    virtual status_t playerStart();
+    virtual status_t playerPause();
+    virtual status_t playerStop();
+    virtual status_t playerSetVolume();
 
     aaudio_format_t          mDeviceFormat = AAUDIO_FORMAT_UNSPECIFIED;
 
@@ -135,12 +148,18 @@ protected:
     int32_t                  mXRunCount = 0;      // how many underrun events?
 
     LinearRamp               mVolumeRamp;
+    float                    mStreamVolume;
 
     // Offset from underlying frame position.
     int64_t                  mFramesOffsetFromService = 0; // offset for timestamps
 
     uint8_t                 *mCallbackBuffer = nullptr;
     int32_t                  mCallbackFrames = 0;
+
+    // The service uses this for SHARED mode.
+    bool                     mInService = false;  // Is this running in the client or the service?
+
+    AAudioServiceInterface  &mServiceInterface;   // abstract interface to the service
 
 private:
     /*
@@ -155,12 +174,13 @@ private:
     // Adjust timing model based on timestamp from service.
     void processTimestamp(uint64_t position, int64_t time);
 
+    // Thread on other side of FIFO will have wakeup jitter.
+    // By delaying slightly we can avoid waking up before other side is ready.
+    const int32_t            mWakeupDelayNanos; // delay past typical wakeup jitter
+    const int32_t            mMinimumSleepNanos; // minimum sleep while polling
+
     AudioEndpointParcelable  mEndPointParcelable; // description of the buffers filled by service
     EndpointDescriptor       mEndpointDescriptor; // buffer description with resolved addresses
-    AAudioServiceInterface  &mServiceInterface;   // abstract interface to the service
-
-    // The service uses this for SHARED mode.
-    bool                     mInService = false;  // Is this running in the client or the service?
 };
 
 } /* namespace aaudio */

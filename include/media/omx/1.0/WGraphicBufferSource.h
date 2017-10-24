@@ -74,6 +74,7 @@ struct LWGraphicBufferSource : public BnGraphicBufferSource {
     BnStatus setTimeLapseConfig(double fps, double captureFps) override;
     BnStatus setStartTimeUs(int64_t startTimeUs) override;
     BnStatus setStopTimeUs(int64_t stopTimeUs) override;
+    BnStatus getStopTimeOffsetUs(int64_t *stopTimeOffsetUs) override;
     BnStatus setColorAspects(int32_t aspects) override;
     BnStatus setTimeOffsetUs(int64_t timeOffsetsUs) override;
     BnStatus signalEndOfInputStream() override;

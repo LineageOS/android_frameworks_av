@@ -41,6 +41,7 @@
 #include <audio_utils/format.h>
 #include <media/AudioMixer.h>
 #include "FastMixer.h"
+#include "TypedLogger.h"
 
 namespace android {
 
@@ -101,10 +102,12 @@ const FastThreadState *FastMixer::poll()
     return mSQ.poll();
 }
 
-void FastMixer::setLog(NBLog::Writer *logWriter)
+void FastMixer::setNBLogWriter(NBLog::Writer *logWriter)
 {
+    // FIXME If mMixer is set or changed prior to this, we don't inform correctly.
+    //       Should cache logWriter and re-apply it at the assignment to mMixer.
     if (mMixer != NULL) {
-        mMixer->setLog(logWriter);
+        mMixer->setNBLogWriter(logWriter);
     }
 }
 
@@ -135,6 +138,7 @@ bool FastMixer::isSubClassCommand(FastThreadState::Command command)
 
 void FastMixer::onStateChange()
 {
+    LOG_HIST_FLUSH();
     const FastMixerState * const current = (const FastMixerState *) mCurrent;
     const FastMixerState * const previous = (const FastMixerState *) mPrevious;
     FastMixerDumpState * const dumpState = (FastMixerDumpState *) mDumpState;
@@ -188,6 +192,7 @@ void FastMixer::onStateChange()
             //       implementation; it would be better to have normal mixer allocate for us
             //       to avoid blocking here and to prevent possible priority inversion
             mMixer = new AudioMixer(frameCount, mSampleRate, FastMixerState::sMaxFastTracks);
+            // FIXME See the other FIXME at FastMixer::setNBLogWriter()
             const size_t mixerFrameSize = mSinkChannelCount
                     * audio_bytes_per_sample(mMixerBufferFormat);
             mMixerBufferSize = mixerFrameSize * frameCount;
@@ -330,6 +335,7 @@ void FastMixer::onStateChange()
 
 void FastMixer::onWork()
 {
+    LOG_HIST_TS();
     const FastMixerState * const current = (const FastMixerState *) mCurrent;
     FastMixerDumpState * const dumpState = (FastMixerDumpState *) mDumpState;
     const FastMixerState::Command command = mCommand;

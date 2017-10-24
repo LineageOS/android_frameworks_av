@@ -48,6 +48,8 @@ public:
 
 
             status_t startWithStatus();
+            status_t pauseWithStatus();
+            status_t stopWithStatus();
 
             //FIXME temporary method while some player state is outside of this class
             void reportEvent(player_state_t event);
