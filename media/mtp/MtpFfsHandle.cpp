@@ -20,13 +20,10 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <linux/usb/ch9.h>
-#include <linux/usb/functionfs.h>
 #include <memory>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/endian.h>
 #include <sys/eventfd.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -36,6 +33,7 @@
 #include <unistd.h>
 
 #include "PosixAsyncIO.h"
+#include "MtpDescriptors.h"
 #include "MtpFfsHandle.h"
 #include "mtp.h"
 
@@ -44,11 +42,6 @@ namespace {
 constexpr char FFS_MTP_EP_IN[] = "/dev/usb-ffs/mtp/ep1";
 constexpr char FFS_MTP_EP_OUT[] = "/dev/usb-ffs/mtp/ep2";
 constexpr char FFS_MTP_EP_INTR[] = "/dev/usb-ffs/mtp/ep3";
-
-constexpr int MAX_PACKET_SIZE_FS = 64;
-constexpr int MAX_PACKET_SIZE_HS = 512;
-constexpr int MAX_PACKET_SIZE_SS = 1024;
-constexpr int MAX_PACKET_SIZE_EV = 28;
 
 constexpr unsigned AIO_BUFS_MAX = 128;
 constexpr unsigned AIO_BUF_LEN = 16384;
@@ -60,234 +53,6 @@ constexpr unsigned MAX_FILE_CHUNK_SIZE = AIO_BUFS_MAX * AIO_BUF_LEN;
 constexpr uint32_t MAX_MTP_FILE_SIZE = 0xFFFFFFFF;
 
 struct timespec ZERO_TIMEOUT = { 0, 0 };
-
-struct func_desc {
-    struct usb_interface_descriptor intf;
-    struct usb_endpoint_descriptor_no_audio sink;
-    struct usb_endpoint_descriptor_no_audio source;
-    struct usb_endpoint_descriptor_no_audio intr;
-} __attribute__((packed));
-
-struct ss_func_desc {
-    struct usb_interface_descriptor intf;
-    struct usb_endpoint_descriptor_no_audio sink;
-    struct usb_ss_ep_comp_descriptor sink_comp;
-    struct usb_endpoint_descriptor_no_audio source;
-    struct usb_ss_ep_comp_descriptor source_comp;
-    struct usb_endpoint_descriptor_no_audio intr;
-    struct usb_ss_ep_comp_descriptor intr_comp;
-} __attribute__((packed));
-
-struct desc_v1 {
-    struct usb_functionfs_descs_head_v1 {
-        __le32 magic;
-        __le32 length;
-        __le32 fs_count;
-        __le32 hs_count;
-    } __attribute__((packed)) header;
-    struct func_desc fs_descs, hs_descs;
-} __attribute__((packed));
-
-struct desc_v2 {
-    struct usb_functionfs_descs_head_v2 header;
-    // The rest of the structure depends on the flags in the header.
-    __le32 fs_count;
-    __le32 hs_count;
-    __le32 ss_count;
-    __le32 os_count;
-    struct func_desc fs_descs, hs_descs;
-    struct ss_func_desc ss_descs;
-    struct usb_os_desc_header os_header;
-    struct usb_ext_compat_desc os_desc;
-} __attribute__((packed));
-
-const struct usb_interface_descriptor mtp_interface_desc = {
-    .bLength = USB_DT_INTERFACE_SIZE,
-    .bDescriptorType = USB_DT_INTERFACE,
-    .bInterfaceNumber = 0,
-    .bNumEndpoints = 3,
-    .bInterfaceClass = USB_CLASS_STILL_IMAGE,
-    .bInterfaceSubClass = 1,
-    .bInterfaceProtocol = 1,
-    .iInterface = 1,
-};
-
-const struct usb_interface_descriptor ptp_interface_desc = {
-    .bLength = USB_DT_INTERFACE_SIZE,
-    .bDescriptorType = USB_DT_INTERFACE,
-    .bInterfaceNumber = 0,
-    .bNumEndpoints = 3,
-    .bInterfaceClass = USB_CLASS_STILL_IMAGE,
-    .bInterfaceSubClass = 1,
-    .bInterfaceProtocol = 1,
-};
-
-const struct usb_endpoint_descriptor_no_audio fs_sink = {
-    .bLength = USB_DT_ENDPOINT_SIZE,
-    .bDescriptorType = USB_DT_ENDPOINT,
-    .bEndpointAddress = 1 | USB_DIR_IN,
-    .bmAttributes = USB_ENDPOINT_XFER_BULK,
-    .wMaxPacketSize = MAX_PACKET_SIZE_FS,
-};
-
-const struct usb_endpoint_descriptor_no_audio fs_source = {
-    .bLength = USB_DT_ENDPOINT_SIZE,
-    .bDescriptorType = USB_DT_ENDPOINT,
-    .bEndpointAddress = 2 | USB_DIR_OUT,
-    .bmAttributes = USB_ENDPOINT_XFER_BULK,
-    .wMaxPacketSize = MAX_PACKET_SIZE_FS,
-};
-
-const struct usb_endpoint_descriptor_no_audio intr = {
-    .bLength = USB_DT_ENDPOINT_SIZE,
-    .bDescriptorType = USB_DT_ENDPOINT,
-    .bEndpointAddress = 3 | USB_DIR_IN,
-    .bmAttributes = USB_ENDPOINT_XFER_INT,
-    .wMaxPacketSize = MAX_PACKET_SIZE_EV,
-    .bInterval = 6,
-};
-
-const struct usb_endpoint_descriptor_no_audio hs_sink = {
-    .bLength = USB_DT_ENDPOINT_SIZE,
-    .bDescriptorType = USB_DT_ENDPOINT,
-    .bEndpointAddress = 1 | USB_DIR_IN,
-    .bmAttributes = USB_ENDPOINT_XFER_BULK,
-    .wMaxPacketSize = MAX_PACKET_SIZE_HS,
-};
-
-const struct usb_endpoint_descriptor_no_audio hs_source = {
-    .bLength = USB_DT_ENDPOINT_SIZE,
-    .bDescriptorType = USB_DT_ENDPOINT,
-    .bEndpointAddress = 2 | USB_DIR_OUT,
-    .bmAttributes = USB_ENDPOINT_XFER_BULK,
-    .wMaxPacketSize = MAX_PACKET_SIZE_HS,
-};
-
-const struct usb_endpoint_descriptor_no_audio ss_sink = {
-    .bLength = USB_DT_ENDPOINT_SIZE,
-    .bDescriptorType = USB_DT_ENDPOINT,
-    .bEndpointAddress = 1 | USB_DIR_IN,
-    .bmAttributes = USB_ENDPOINT_XFER_BULK,
-    .wMaxPacketSize = MAX_PACKET_SIZE_SS,
-};
-
-const struct usb_endpoint_descriptor_no_audio ss_source = {
-    .bLength = USB_DT_ENDPOINT_SIZE,
-    .bDescriptorType = USB_DT_ENDPOINT,
-    .bEndpointAddress = 2 | USB_DIR_OUT,
-    .bmAttributes = USB_ENDPOINT_XFER_BULK,
-    .wMaxPacketSize = MAX_PACKET_SIZE_SS,
-};
-
-const struct usb_ss_ep_comp_descriptor ss_sink_comp = {
-    .bLength = sizeof(ss_sink_comp),
-    .bDescriptorType = USB_DT_SS_ENDPOINT_COMP,
-    .bMaxBurst = 6,
-};
-
-const struct usb_ss_ep_comp_descriptor ss_source_comp = {
-    .bLength = sizeof(ss_source_comp),
-    .bDescriptorType = USB_DT_SS_ENDPOINT_COMP,
-    .bMaxBurst = 6,
-};
-
-const struct usb_ss_ep_comp_descriptor ss_intr_comp = {
-    .bLength = sizeof(ss_intr_comp),
-    .bDescriptorType = USB_DT_SS_ENDPOINT_COMP,
-};
-
-const struct func_desc mtp_fs_descriptors = {
-    .intf = mtp_interface_desc,
-    .sink = fs_sink,
-    .source = fs_source,
-    .intr = intr,
-};
-
-const struct func_desc mtp_hs_descriptors = {
-    .intf = mtp_interface_desc,
-    .sink = hs_sink,
-    .source = hs_source,
-    .intr = intr,
-};
-
-const struct ss_func_desc mtp_ss_descriptors = {
-    .intf = mtp_interface_desc,
-    .sink = ss_sink,
-    .sink_comp = ss_sink_comp,
-    .source = ss_source,
-    .source_comp = ss_source_comp,
-    .intr = intr,
-    .intr_comp = ss_intr_comp,
-};
-
-const struct func_desc ptp_fs_descriptors = {
-    .intf = ptp_interface_desc,
-    .sink = fs_sink,
-    .source = fs_source,
-    .intr = intr,
-};
-
-const struct func_desc ptp_hs_descriptors = {
-    .intf = ptp_interface_desc,
-    .sink = hs_sink,
-    .source = hs_source,
-    .intr = intr,
-};
-
-const struct ss_func_desc ptp_ss_descriptors = {
-    .intf = ptp_interface_desc,
-    .sink = ss_sink,
-    .sink_comp = ss_sink_comp,
-    .source = ss_source,
-    .source_comp = ss_source_comp,
-    .intr = intr,
-    .intr_comp = ss_intr_comp,
-};
-
-#define STR_INTERFACE "MTP"
-const struct {
-    struct usb_functionfs_strings_head header;
-    struct {
-        __le16 code;
-        const char str1[sizeof(STR_INTERFACE)];
-    } __attribute__((packed)) lang0;
-} __attribute__((packed)) strings = {
-    .header = {
-        .magic = htole32(FUNCTIONFS_STRINGS_MAGIC),
-        .length = htole32(sizeof(strings)),
-        .str_count = htole32(1),
-        .lang_count = htole32(1),
-    },
-    .lang0 = {
-        .code = htole16(0x0409),
-        .str1 = STR_INTERFACE,
-    },
-};
-
-struct usb_os_desc_header mtp_os_desc_header = {
-    .interface = htole32(1),
-    .dwLength = htole32(sizeof(usb_os_desc_header) + sizeof(usb_ext_compat_desc)),
-    .bcdVersion = htole16(1),
-    .wIndex = htole16(4),
-    .bCount = htole16(1),
-    .Reserved = htole16(0),
-};
-
-struct usb_ext_compat_desc mtp_os_desc_compat = {
-    .bFirstInterfaceNumber = 0,
-    .Reserved1 = htole32(1),
-    .CompatibleID = { 'M', 'T', 'P' },
-    .SubCompatibleID = {0},
-    .Reserved2 = {0},
-};
-
-struct usb_ext_compat_desc ptp_os_desc_compat = {
-    .bFirstInterfaceNumber = 0,
-    .Reserved1 = htole32(1),
-    .CompatibleID = { 'P', 'T', 'P' },
-    .SubCompatibleID = {0},
-    .Reserved2 = {0},
-};
 
 struct mtp_device_status {
     uint16_t  wLength;
@@ -357,58 +122,38 @@ void MtpFfsHandle::advise(int fd) {
 }
 
 bool MtpFfsHandle::initFunctionfs() {
-    ssize_t ret;
-    struct desc_v1 v1_descriptor;
-    struct desc_v2 v2_descriptor;
-
-    v2_descriptor.header.magic = htole32(FUNCTIONFS_DESCRIPTORS_MAGIC_V2);
-    v2_descriptor.header.length = htole32(sizeof(v2_descriptor));
-    v2_descriptor.header.flags = FUNCTIONFS_HAS_FS_DESC | FUNCTIONFS_HAS_HS_DESC |
-                                 FUNCTIONFS_HAS_SS_DESC | FUNCTIONFS_HAS_MS_OS_DESC;
-    v2_descriptor.fs_count = 4;
-    v2_descriptor.hs_count = 4;
-    v2_descriptor.ss_count = 7;
-    v2_descriptor.os_count = 1;
-    v2_descriptor.fs_descs = mPtp ? ptp_fs_descriptors : mtp_fs_descriptors;
-    v2_descriptor.hs_descs = mPtp ? ptp_hs_descriptors : mtp_hs_descriptors;
-    v2_descriptor.ss_descs = mPtp ? ptp_ss_descriptors : mtp_ss_descriptors;
-    v2_descriptor.os_header = mtp_os_desc_header;
-    v2_descriptor.os_desc = mPtp ? ptp_os_desc_compat : mtp_os_desc_compat;
-
     if (mControl < 0) { // might have already done this before
         mControl.reset(TEMP_FAILURE_RETRY(open(FFS_MTP_EP0, O_RDWR)));
         if (mControl < 0) {
             PLOG(ERROR) << FFS_MTP_EP0 << ": cannot open control endpoint";
-            goto err;
+            return false;
         }
-
-        ret = TEMP_FAILURE_RETRY(::write(mControl, &v2_descriptor, sizeof(v2_descriptor)));
-        if (ret < 0) {
-            v1_descriptor.header.magic = htole32(FUNCTIONFS_DESCRIPTORS_MAGIC);
-            v1_descriptor.header.length = htole32(sizeof(v1_descriptor));
-            v1_descriptor.header.fs_count = 4;
-            v1_descriptor.header.hs_count = 4;
-            v1_descriptor.fs_descs = mPtp ? ptp_fs_descriptors : mtp_fs_descriptors;
-            v1_descriptor.hs_descs = mPtp ? ptp_hs_descriptors : mtp_hs_descriptors;
-            PLOG(ERROR) << FFS_MTP_EP0 << "Switching to V1 descriptor format";
-            ret = TEMP_FAILURE_RETRY(::write(mControl, &v1_descriptor, sizeof(v1_descriptor)));
-            if (ret < 0) {
-                PLOG(ERROR) << FFS_MTP_EP0 << "Writing descriptors failed";
-                goto err;
-            }
-        }
-        ret = TEMP_FAILURE_RETRY(::write(mControl, &strings, sizeof(strings)));
-        if (ret < 0) {
-            PLOG(ERROR) << FFS_MTP_EP0 << "Writing strings failed";
-            goto err;
+        if (!writeDescriptors()) {
+            closeConfig();
+            return false;
         }
     }
-
     return true;
+}
 
-err:
-    closeConfig();
-    return false;
+bool MtpFfsHandle::writeDescriptors() {
+    ssize_t ret = TEMP_FAILURE_RETRY(::write(mControl,
+                &(mPtp ? ptp_desc_v2 : mtp_desc_v2), sizeof(desc_v2)));
+    if (ret < 0) {
+        PLOG(ERROR) << FFS_MTP_EP0 << "Switching to V1 descriptor format";
+        ret = TEMP_FAILURE_RETRY(::write(mControl,
+                    &(mPtp ? ptp_desc_v1 : mtp_desc_v1), sizeof(desc_v1)));
+        if (ret < 0) {
+            PLOG(ERROR) << FFS_MTP_EP0 << "Writing descriptors failed";
+            return false;
+        }
+    }
+    ret = TEMP_FAILURE_RETRY(::write(mControl, &mtp_strings, sizeof(mtp_strings)));
+    if (ret < 0) {
+        PLOG(ERROR) << FFS_MTP_EP0 << "Writing strings failed";
+        return false;
+    }
+    return true;
 }
 
 void MtpFfsHandle::closeConfig() {

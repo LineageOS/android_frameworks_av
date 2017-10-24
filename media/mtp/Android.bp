@@ -19,6 +19,7 @@ cc_library_shared {
     srcs: [
         "MtpDataPacket.cpp",
         "MtpDebug.cpp",
+        "MtpDescriptors.cpp",
         "MtpDevHandle.cpp",
         "MtpDevice.cpp",
         "MtpDeviceInfo.cpp",
