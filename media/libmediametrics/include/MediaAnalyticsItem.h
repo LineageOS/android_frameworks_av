@@ -243,7 +243,7 @@ class MediaAnalyticsItem {
         enum {
             kGrowProps = 10
         };
-        void growProps(int increment = kGrowProps);
+        bool growProps(int increment = kGrowProps);
         size_t findPropIndex(const char *name, size_t len);
         Prop *findProp(const char *name);
         Prop *allocateProp(const char *name);
