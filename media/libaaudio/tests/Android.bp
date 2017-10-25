@@ -1,0 +1,72 @@
+cc_test {
+    name: "test_handle_tracker",
+    srcs: ["test_handle_tracker.cpp"],
+    shared_libs: ["libaaudio"],
+}
+
+cc_test {
+    name: "test_aaudio_marshalling",
+    srcs: ["test_marshalling.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+cc_test {
+    name: "test_block_adapter",
+    srcs: ["test_block_adapter.cpp"],
+    shared_libs: ["libaaudio"],
+}
+
+cc_test {
+    name: "test_linear_ramp",
+    srcs: ["test_linear_ramp.cpp"],
+    shared_libs: ["libaaudio"],
+}
+
+cc_test {
+    name: "test_open_params",
+    srcs: ["test_open_params.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+cc_test {
+    name: "test_no_close",
+    srcs: ["test_no_close.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+cc_test {
+    name: "test_aaudio_recovery",
+    srcs: ["test_recovery.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+cc_test {
+    name: "test_n_streams",
+    srcs: ["test_n_streams.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
