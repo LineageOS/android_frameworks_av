@@ -22,7 +22,7 @@
 #include <utils/StrongPointer.h>
 
 #include "DrmPlugin.h"
-
+#include "ClearKeyDrmProperties.h"
 #include "Session.h"
 
 namespace {
@@ -44,7 +44,22 @@ using android::sp;
 
 DrmPlugin::DrmPlugin(SessionLibrary* sessionLibrary)
         : mSessionLibrary(sessionLibrary) {
+
     mPlayPolicy.clear();
+    initProperties();
+}
+
+void DrmPlugin::initProperties() {
+    mStringProperties.clear();
+    mStringProperties.add(kVendorKey, kVendorValue);
+    mStringProperties.add(kVersionKey, kVersionValue);
+    mStringProperties.add(kPluginDescriptionKey, kPluginDescriptionValue);
+    mStringProperties.add(kAlgorithmsKey, kAlgorithmsValue);
+    mStringProperties.add(kListenerTestSupportKey, kListenerTestSupportValue);
+
+    Vector<uint8_t> testDeviceId;
+    testDeviceId.appendArray(kTestDeviceIdData, sizeof(kTestDeviceIdData) / sizeof(uint8_t));
+    mByteArrayProperties.add(kDeviceIdKey, testDeviceId);
 }
 
 status_t DrmPlugin::openSession(Vector<uint8_t>& sessionId) {
@@ -122,21 +137,57 @@ status_t DrmPlugin::provideKeyResponse(
     return res;
 }
 
+status_t DrmPlugin::getPropertyByteArray(
+        const String8& name, Vector<uint8_t>& value) const {
+    ssize_t index = mByteArrayProperties.indexOfKey(name);
+    if (index < 0) {
+        ALOGE("App requested unknown property: %s", name.string());
+        return android::BAD_VALUE;
+    }
+    value = mByteArrayProperties.valueAt(index);
+    return android::OK;
+}
+
+status_t DrmPlugin::setPropertyByteArray(
+        const String8& name, const Vector<uint8_t>& value) {
+    if (0 == name.compare(kDeviceIdKey)) {
+        ALOGD("Cannot set immutable property: %s", name.string());
+        return android::BAD_VALUE;
+    }
+
+    ssize_t status = mByteArrayProperties.replaceValueFor(name, value);
+    if (status >= 0) {
+        return android::OK;
+    }
+    ALOGE("Failed to set property byte array, key=%s", name.string());
+    return android::BAD_VALUE;
+}
+
 status_t DrmPlugin::getPropertyString(
         const String8& name, String8& value) const {
-    if (name == "vendor") {
-        value = "Google";
-    } else if (name == "version") {
-        value = "1.0";
-    } else if (name == "description") {
-        value = "ClearKey CDM";
-    } else if (name == "algorithms") {
-        value = "";
-    } else if (name == "listenerTestSupport") {
-        value = "true";
-    } else {
-        ALOGE("App requested unknown string property %s", name.string());
-        return android::ERROR_DRM_CANNOT_HANDLE;
+    ssize_t index = mStringProperties.indexOfKey(name);
+    if (index < 0) {
+        ALOGE("App requested unknown property: %s", name.string());
+        return android::BAD_VALUE;
+    }
+    value = mStringProperties.valueAt(index);
+    return android::OK;
+}
+
+status_t DrmPlugin::setPropertyString(
+        const String8& name, const String8& value) {
+    String8 immutableKeys;
+    immutableKeys.appendFormat("%s,%s,%s,%s",
+            kAlgorithmsKey.string(), kPluginDescriptionKey.string(),
+            kVendorKey.string(), kVersionKey.string());
+    if (immutableKeys.contains(name.string())) {
+        ALOGD("Cannot set immutable property: %s", name.string());
+        return android::BAD_VALUE;
+    }
+
+    if (mStringProperties.add(name, value) < 0) {
+        ALOGE("Failed to set property string, key=%s", name.string());
+        return android::BAD_VALUE;
     }
     return android::OK;
 }
