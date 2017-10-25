@@ -17,6 +17,8 @@
 #ifndef NU_MEDIA_EXTRACTOR_H_
 #define NU_MEDIA_EXTRACTOR_H_
 
+#include <list>
+#include <media/mediaplayer.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <media/IMediaExtractor.h>
 #include <media/MediaSource.h>
@@ -67,7 +69,9 @@ struct NuMediaExtractor : public RefBase {
 
     status_t getFileFormat(sp<AMessage> *format) const;
 
-    status_t selectTrack(size_t index);
+    status_t selectTrack(size_t index, int64_t startTimeUs = -1ll,
+            MediaSource::ReadOptions::SeekMode mode =
+                MediaSource::ReadOptions::SEEK_CLOSEST_SYNC);
     status_t unselectTrack(size_t index);
 
     status_t seekTo(
@@ -75,8 +79,12 @@ struct NuMediaExtractor : public RefBase {
             MediaSource::ReadOptions::SeekMode mode =
                 MediaSource::ReadOptions::SEEK_CLOSEST_SYNC);
 
+    // Each selected track has a read pointer.
+    // advance() advances the read pointer with the lowest timestamp.
     status_t advance();
+    // readSampleData() reads the sample with the lowest timestamp.
     status_t readSampleData(const sp<ABuffer> &buffer);
+
     status_t getSampleTrackIndex(size_t *trackIndex);
     status_t getSampleTime(int64_t *sampleTimeUs);
     status_t getSampleMeta(sp<MetaData> *sampleMeta);
@@ -96,12 +104,20 @@ private:
         kMaxTrackCount = 16384,
     };
 
+    struct Sample {
+        Sample();
+        Sample(MediaBuffer *buffer, int64_t timeUs);
+        MediaBuffer *mBuffer;
+        int64_t mSampleTimeUs;
+    };
+
     struct TrackInfo {
         sp<IMediaSource> mSource;
         size_t mTrackIndex;
+        media_track_type mTrackType;
+        size_t mMaxFetchCount;
         status_t mFinalResult;
-        MediaBuffer *mSample;
-        int64_t mSampleTimeUs;
+        std::list<Sample> mSamples;
 
         uint32_t mTrackFlags;  // bitmask of "TrackFlags"
     };
@@ -117,16 +133,23 @@ private:
     int64_t mTotalBitrate;  // in bits/sec
     int64_t mDurationUs;
 
-    ssize_t fetchTrackSamples(
+    ssize_t fetchAllTrackSamples(
+            int64_t seekTimeUs = -1ll,
+            MediaSource::ReadOptions::SeekMode mode =
+                MediaSource::ReadOptions::SEEK_CLOSEST_SYNC);
+    void fetchTrackSamples(
+            TrackInfo *info,
             int64_t seekTimeUs = -1ll,
             MediaSource::ReadOptions::SeekMode mode =
                 MediaSource::ReadOptions::SEEK_CLOSEST_SYNC);
 
-    void releaseTrackSamples();
+    void releaseOneSample(TrackInfo *info);
+    void releaseTrackSamples(TrackInfo *info);
+    void releaseAllTrackSamples();
 
     bool getTotalBitrate(int64_t *bitRate) const;
     status_t updateDurationAndBitrate();
-    status_t appendVorbisNumPageSamples(TrackInfo *info, const sp<ABuffer> &buffer);
+    status_t appendVorbisNumPageSamples(MediaBuffer *mbuf, const sp<ABuffer> &buffer);
 
     DISALLOW_EVIL_CONSTRUCTORS(NuMediaExtractor);
 };
