@@ -29,6 +29,7 @@
 #include <unistd.h>
 
 #include <iostream>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -37,6 +38,8 @@
 #include <media/AudioBufferProvider.h>
 
 #include <media/AudioResampler.h>
+#include "../AudioResamplerDyn.h"
+#include "../AudioResamplerFirGen.h"
 #include "test_utils.h"
 
 template <typename T>
@@ -240,6 +243,60 @@ void testStopbandDownconversion(size_t channels,
 
     free(reference);
     delete resampler;
+}
+
+void testFilterResponse(
+        size_t channels, unsigned inputFreq, unsigned outputFreq)
+{
+    // create resampler
+    using ResamplerType = android::AudioResamplerDyn<float, float, float>;
+    std::unique_ptr<ResamplerType> rdyn(
+            static_cast<ResamplerType *>(
+                    android::AudioResampler::create(
+                            AUDIO_FORMAT_PCM_FLOAT,
+                            channels,
+                            outputFreq,
+                            android::AudioResampler::DYN_HIGH_QUALITY)));
+    rdyn->setSampleRate(inputFreq);
+
+    // get design parameters
+    const int phases = rdyn->getPhases();
+    const int halfLength = rdyn->getHalfLength();
+    const float *coefs = rdyn->getFilterCoefs();
+    const double fcr = rdyn->getNormalizedCutoffFrequency();
+    const double tbw = rdyn->getNormalizedTransitionBandwidth();
+    const double attenuation = rdyn->getFilterAttenuation();
+    const double stopbandDb = rdyn->getStopbandAttenuationDb();
+    const double passbandDb = rdyn->getPassbandRippleDb();
+    const double fp = fcr - tbw / 2;
+    const double fs = fcr + tbw / 2;
+
+    printf("inputFreq:%d outputFreq:%d design"
+            " phases:%d halfLength:%d"
+            " fcr:%lf fp:%lf fs:%lf tbw:%lf"
+            " attenuation:%lf stopRipple:%.lf passRipple:%lf"
+            "\n",
+            inputFreq, outputFreq,
+            phases, halfLength,
+            fcr, fp, fs, tbw,
+            attenuation, stopbandDb, passbandDb);
+
+    // verify design parameters
+    constexpr int32_t passSteps = 1000;
+    double passMin, passMax, passRipple, stopMax, stopRipple;
+    android::testFir(coefs, phases, halfLength, fp / phases, fs / phases,
+            passSteps, phases * passSteps /* stopSteps */,
+            passMin, passMax, passRipple,
+            stopMax, stopRipple);
+    printf("inputFreq:%d outputFreq:%d verify"
+            " passMin:%lf passMax:%lf passRipple:%lf stopMax:%lf stopRipple:%lf"
+            "\n",
+            inputFreq, outputFreq,
+            passMin, passMax, passRipple, stopMax, stopRipple);
+
+    ASSERT_GT(stopRipple, 60.);  // enough stopband attenuation
+    ASSERT_LT(passRipple, 0.2);  // small passband ripple
+    ASSERT_GT(passMin, 0.99);    // we do not attenuate the signal (ideally 1.)
 }
 
 /* Buffer increment test
@@ -484,3 +541,30 @@ TEST(audioflinger_resampler, stopbandresponse_float_multichannel) {
     }
 }
 
+TEST(audioflinger_resampler, filterresponse) {
+    std::vector<int> inSampleRates{
+        8000,
+        11025,
+        12000,
+        16000,
+        22050,
+        24000,
+        32000,
+        44100,
+        48000,
+        88200,
+        96000,
+        176400,
+        192000,
+    };
+    std::vector<int> outSampleRates{
+        48000,
+        96000,
+    };
+
+    for (int outSampleRate : outSampleRates) {
+        for (int inSampleRate : inSampleRates) {
+            testFilterResponse(2 /* channels */, inSampleRate, outSampleRate);
+        }
+    }
+}
