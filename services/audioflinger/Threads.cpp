@@ -3307,9 +3307,13 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                         // 2. threadLoop_mix (significant for heavy mixing, especially
                         //                    on low tier processors)
 
-                        // it's OK if deltaMs is an overestimate.
-                        const int32_t deltaMs =
-                                (lastWriteFinished - previousLastWriteFinished) / 1000000;
+                        // it's OK if deltaMs (and deltaNs) is an overestimate.
+                        nsecs_t deltaNs;
+                        // deltaNs = lastWriteFinished - previousLastWriteFinished;
+                        __builtin_sub_overflow(
+                            lastWriteFinished,previousLastWriteFinished, &deltaNs);
+                        const int32_t deltaMs = deltaNs / 1000000;
+
                         const int32_t throttleMs = mHalfBufferMs - deltaMs;
                         if ((signed)mHalfBufferMs >= throttleMs && throttleMs > 0) {
                             usleep(throttleMs * 1000);
