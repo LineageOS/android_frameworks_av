@@ -49,10 +49,9 @@ void AAudioMixer::clear() {
     memset(mOutputBuffer, 0, mBufferSizeInBytes);
 }
 
-bool AAudioMixer::mix(int trackIndex, FifoBuffer *fifo, float volume) {
+bool AAudioMixer::mix(int streamIndex, FifoBuffer *fifo, bool allowUnderflow) {
     WrappingBuffer wrappingBuffer;
     float *destination = mOutputBuffer;
-    fifo_frames_t framesLeft = mFramesPerBurst;
 
 #if AAUDIO_MIXER_ATRACE_ENABLED
     ATRACE_BEGIN("aaMix");
@@ -63,35 +62,44 @@ bool AAudioMixer::mix(int trackIndex, FifoBuffer *fifo, float volume) {
 #if AAUDIO_MIXER_ATRACE_ENABLED
     if (ATRACE_ENABLED()) {
         char rdyText[] = "aaMixRdy#";
-        char letter = 'A' + (trackIndex % 26);
+        char letter = 'A' + (streamIndex % 26);
         rdyText[sizeof(rdyText) - 2] = letter;
         ATRACE_INT(rdyText, fullFrames);
     }
 #else /* MIXER_ATRACE_ENABLED */
     (void) trackIndex;
-    (void) fullFrames;
 #endif /* AAUDIO_MIXER_ATRACE_ENABLED */
+
+    // If allowUnderflow then always advance by one burst even if we do not have the data.
+    // Otherwise the stream timing will drift whenever there is an underflow.
+    // This actual underflow can then be detected by the client for XRun counting.
+    //
+    // Generally, allowUnderflow will be false when stopping a stream and we want to
+    // use up whatever data is in the queue.
+    fifo_frames_t framesDesired = mFramesPerBurst;
+    if (!allowUnderflow && fullFrames < framesDesired) {
+        framesDesired = fullFrames; // just use what is available then stop
+    }
 
     // Mix data in one or two parts.
     int partIndex = 0;
+    int32_t framesLeft = framesDesired;
     while (framesLeft > 0 && partIndex < WrappingBuffer::SIZE) {
-        fifo_frames_t framesToMix = framesLeft;
-        fifo_frames_t framesAvailable = wrappingBuffer.numFrames[partIndex];
-        if (framesAvailable > 0) {
-            if (framesToMix > framesAvailable) {
-                framesToMix = framesAvailable;
+        fifo_frames_t framesToMixFromPart = framesLeft;
+        fifo_frames_t framesAvailableFromPart = wrappingBuffer.numFrames[partIndex];
+        if (framesAvailableFromPart > 0) {
+            if (framesToMixFromPart > framesAvailableFromPart) {
+                framesToMixFromPart = framesAvailableFromPart;
             }
-            mixPart(destination, (float *)wrappingBuffer.data[partIndex], framesToMix, volume);
+            mixPart(destination, (float *)wrappingBuffer.data[partIndex],
+                    framesToMixFromPart);
 
-            destination += framesToMix * mSamplesPerFrame;
-            framesLeft -= framesToMix;
+            destination += framesToMixFromPart * mSamplesPerFrame;
+            framesLeft -= framesToMixFromPart;
         }
         partIndex++;
     }
-    // Always advance by one burst even if we do not have the data.
-    // Otherwise the stream timing will drift whenever there is an underflow.
-    // This actual underflow can then be detected by the client for XRun counting.
-    fifo->getFifoControllerBase()->advanceReadIndex(mFramesPerBurst);
+    fifo->getFifoControllerBase()->advanceReadIndex(framesDesired);
 
 #if AAUDIO_MIXER_ATRACE_ENABLED
     ATRACE_END();
@@ -100,11 +108,11 @@ bool AAudioMixer::mix(int trackIndex, FifoBuffer *fifo, float volume) {
     return (framesLeft > 0); // did not get all the frames we needed, ie. "underflow"
 }
 
-void AAudioMixer::mixPart(float *destination, float *source, int32_t numFrames, float volume) {
+void AAudioMixer::mixPart(float *destination, float *source, int32_t numFrames) {
     int32_t numSamples = numFrames * mSamplesPerFrame;
     // TODO maybe optimize using SIMD
     for (int sampleIndex = 0; sampleIndex < numSamples; sampleIndex++) {
-        *destination++ += *source++ * volume;
+        *destination++ += *source++;
     }
 }
 

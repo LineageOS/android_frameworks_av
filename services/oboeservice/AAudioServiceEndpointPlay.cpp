@@ -82,9 +82,13 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
             std::lock_guard <std::mutex> lock(mLockStreams);
             for (const auto clientStream : mRegisteredStreams) {
                 int64_t clientFramesRead = 0;
+                bool allowUnderflow = true;
 
-                if (!clientStream->isRunning()) {
-                    continue;
+                aaudio_stream_state_t state = clientStream->getState();
+                if (state == AAUDIO_STREAM_STATE_STOPPING) {
+                    allowUnderflow = false; // just read what is already in the FIFO
+                } else if (state != AAUDIO_STREAM_STATE_STARTED) {
+                    continue; // this stream is not running so skip it.
                 }
 
                 sp<AAudioServiceStreamShared> streamShared =
@@ -104,8 +108,7 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
                         int64_t positionOffset = mmapFramesWritten - clientFramesRead;
                         streamShared->setTimestampPositionOffset(positionOffset);
 
-                        float volume = 1.0; // to match legacy volume
-                        bool underflowed = mMixer.mix(index, fifo, volume);
+                        bool underflowed = mMixer.mix(index, fifo, allowUnderflow);
                         if (underflowed) {
                             streamShared->incrementXRunCount();
                         }
