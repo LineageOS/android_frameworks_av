@@ -729,25 +729,13 @@ sp<MediaPlayerBase> MediaPlayerService::Client::setDataSource_pre(
     mExtractorDeathListener = new ServiceDeathNotifier(binder, p, MEDIAEXTRACTOR_PROCESS_DEATH);
     binder->linkToDeath(mExtractorDeathListener);
 
-    if (property_get_bool("persist.media.treble_omx", true)) {
-        // Treble IOmx
-        sp<IOmx> omx = IOmx::getService();
-        if (omx == nullptr) {
-            ALOGE("Treble IOmx not available");
-            return NULL;
-        }
-        mCodecDeathListener = new ServiceDeathNotifier(omx, p, MEDIACODEC_PROCESS_DEATH);
-        omx->linkToDeath(mCodecDeathListener, 0);
-    } else {
-        // Legacy IOMX
-        binder = sm->getService(String16("media.codec"));
-        if (binder == NULL) {
-            ALOGE("codec service not available");
-            return NULL;
-        }
-        mCodecDeathListener = new ServiceDeathNotifier(binder, p, MEDIACODEC_PROCESS_DEATH);
-        binder->linkToDeath(mCodecDeathListener);
+    sp<IOmx> omx = IOmx::getService();
+    if (omx == nullptr) {
+        ALOGE("IOmx service is not available");
+        return NULL;
     }
+    mCodecDeathListener = new ServiceDeathNotifier(omx, p, MEDIACODEC_PROCESS_DEATH);
+    omx->linkToDeath(mCodecDeathListener, 0);
 
     if (!p->hardwareOutput()) {
         Mutex::Autolock l(mLock);

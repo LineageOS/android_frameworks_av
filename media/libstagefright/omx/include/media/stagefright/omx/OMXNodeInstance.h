@@ -25,9 +25,9 @@
 #include <utils/threads.h>
 #include <utils/KeyedVector.h>
 #include <utils/SortedVector.h>
-#include "OmxNodeOwner.h"
 
 #include <android/hidl/memory/1.0/IMemory.h>
+#include <media/stagefright/omx/1.0/Omx.h>
 
 namespace android {
 class GraphicBuffer;
@@ -35,11 +35,12 @@ class IOMXBufferSource;
 class IOMXObserver;
 struct OMXMaster;
 class OMXBuffer;
-typedef hidl::memory::V1_0::IMemory IHidlMemory;
+using IHidlMemory = hidl::memory::V1_0::IMemory;
+using hardware::media::omx::V1_0::implementation::Omx;
 
 struct OMXNodeInstance : public BnOMXNode {
     OMXNodeInstance(
-            OmxNodeOwner *owner, const sp<IOMXObserver> &observer, const char *name);
+            Omx *owner, const sp<IOMXObserver> &observer, const char *name);
 
     void setHandle(OMX_HANDLETYPE handle);
 
@@ -122,7 +123,7 @@ private:
 
     Mutex mLock;
 
-    OmxNodeOwner *mOwner;
+    Omx *mOwner;
     OMX_HANDLETYPE mHandle;
     sp<IOMXObserver> mObserver;
     sp<CallbackDispatcher> mDispatcher;
