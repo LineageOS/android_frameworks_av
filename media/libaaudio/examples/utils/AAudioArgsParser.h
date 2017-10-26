@@ -17,6 +17,8 @@
 #ifndef AAUDIO_EXAMPLE_ARGS_PARSER_H
 #define AAUDIO_EXAMPLE_ARGS_PARSER_H
 
+#define MAX_CHANNELS                     8
+
 #include <cctype>
 #include <unistd.h>
 #include <stdio.h>
@@ -39,6 +41,10 @@ public:
     }
 
     void setChannelCount(int32_t channelCount) {
+        if (channelCount > MAX_CHANNELS) {
+            printf("Sorry, MAX of %d channels!\n", MAX_CHANNELS);
+            channelCount = MAX_CHANNELS;
+        }
         mChannelCount = channelCount;
     }
 
