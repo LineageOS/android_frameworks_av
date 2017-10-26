@@ -258,6 +258,13 @@ aaudio_result_t AAudioServiceEndpointMMAP::startStream(sp<AAudioServiceStreamBas
 aaudio_result_t AAudioServiceEndpointMMAP::stopStream(sp<AAudioServiceStreamBase> stream,
                                                   audio_port_handle_t clientHandle) {
     mFramesTransferred.reset32();
+
+    // Round 64-bit counter up to a multiple of the buffer capacity.
+    // This is required because the 64-bit counter is used as an index
+    // into a circular buffer and the actual HW position is reset to zero
+    // when the stream is stopped.
+    mFramesTransferred.roundUp64(getBufferCapacity());
+
     return stopClient(mPortHandle);
 }
 
