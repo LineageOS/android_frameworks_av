@@ -36,12 +36,13 @@
 #include <media/MediaSource.h>
 #include <media/ICrypto.h>
 #include <media/IMediaHTTPService.h>
+#include <media/IMediaCodecService.h>
 #include <media/IMediaPlayerService.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
-#include <NuCachedSource2.h>
+#include "include/NuCachedSource2.h"
 #include <media/stagefright/AudioPlayer.h>
 #include <media/stagefright/DataSourceFactory.h>
 #include <media/stagefright/JPEGSource.h>
@@ -67,6 +68,7 @@
 #include <gui/SurfaceComposerClient.h>
 
 #include <android/hardware/media/omx/1.0/IOmx.h>
+#include <media/omx/1.0/WOmx.h>
 
 using namespace android;
 
@@ -910,24 +912,37 @@ int main(int argc, char **argv) {
     }
 
     if (listComponents) {
-        using ::android::hardware::hidl_vec;
-        using ::android::hardware::hidl_string;
-        using namespace ::android::hardware::media::omx::V1_0;
-        sp<IOmx> omx = IOmx::getService();
-        CHECK(omx.get() != nullptr);
+        sp<IOMX> omx;
+        if (property_get_bool("persist.media.treble_omx", true)) {
+            using namespace ::android::hardware::media::omx::V1_0;
+            sp<IOmx> tOmx = IOmx::getService();
 
-        hidl_vec<IOmx::ComponentInfo> nodeList;
-        auto transStatus = omx->listNodes([](
-                const auto& status, const auto& nodeList) {
-                    CHECK(status == Status::OK);
-                    for (const auto& info : nodeList) {
-                        printf("%s\t Roles: ", info.mName.c_str());
-                        for (const auto& role : info.mRoles) {
-                            printf("%s\t", role.c_str());
-                        }
-                    }
-                });
-        CHECK(transStatus.isOk());
+            CHECK(tOmx.get() != NULL);
+
+            omx = new utils::LWOmx(tOmx);
+        } else {
+            sp<IServiceManager> sm = defaultServiceManager();
+            sp<IBinder> binder = sm->getService(String16("media.codec"));
+            sp<IMediaCodecService> service = interface_cast<IMediaCodecService>(binder);
+
+            CHECK(service.get() != NULL);
+
+            omx = service->getOMX();
+        }
+        CHECK(omx.get() != NULL);
+
+        List<IOMX::ComponentInfo> list;
+        omx->listNodes(&list);
+
+        for (List<IOMX::ComponentInfo>::iterator it = list.begin();
+             it != list.end(); ++it) {
+            printf("%s\t Roles: ", (*it).mName.string());
+            for (List<String8>::iterator itRoles = (*it).mRoles.begin() ;
+                    itRoles != (*it).mRoles.end() ; ++itRoles) {
+                printf("%s\t", (*itRoles).string());
+            }
+            printf("\n");
+        }
     }
 
     sp<SurfaceComposerClient> composerClient;

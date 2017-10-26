@@ -7,16 +7,16 @@ LOCAL_SRC_FILES:=       \
         jpeg.cpp        \
         SineSource.cpp
 
-LOCAL_HEADER_LIBRARIES := \
-        media_plugin_headers \
-
 LOCAL_SHARED_LIBRARIES := \
         libstagefright libmedia libmediaextractor libutils libbinder \
         libstagefright_foundation libjpeg libui libgui libcutils liblog \
-        libhidlbase \
+        libhidlmemory \
         android.hardware.media.omx@1.0 \
 
 LOCAL_C_INCLUDES:= \
+        frameworks/av/media/libstagefright \
+        frameworks/av/media/libstagefright/include \
+        frameworks/native/include/media/openmax \
         external/jpeg \
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
@@ -35,12 +35,14 @@ LOCAL_SRC_FILES:=         \
         SineSource.cpp    \
         record.cpp
 
-LOCAL_HEADER_LIBRARIES := \
-        media_plugin_headers \
-
 LOCAL_SHARED_LIBRARIES := \
         libstagefright libmedia libmediaextractor liblog libutils libbinder \
         libstagefright_foundation
+
+LOCAL_C_INCLUDES:= \
+        frameworks/av/media/libstagefright \
+        frameworks/native/include/media/openmax \
+        frameworks/native/include/media/hardware
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
 
@@ -58,12 +60,14 @@ LOCAL_SRC_FILES:=         \
         SineSource.cpp    \
         recordvideo.cpp
 
-LOCAL_HEADER_LIBRARIES := \
-        media_plugin_headers \
-
 LOCAL_SHARED_LIBRARIES := \
         libstagefright libmedia libmediaextractor liblog libutils libbinder \
         libstagefright_foundation
+
+LOCAL_C_INCLUDES:= \
+        frameworks/av/media/libstagefright \
+        frameworks/native/include/media/openmax \
+        frameworks/native/include/media/hardware
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
 
@@ -82,12 +86,13 @@ LOCAL_SRC_FILES:=         \
         SineSource.cpp    \
         audioloop.cpp
 
-LOCAL_HEADER_LIBRARIES := \
-        media_plugin_headers \
-
 LOCAL_SHARED_LIBRARIES := \
         libstagefright libmedia libmediaextractor liblog libutils libbinder \
         libstagefright_foundation
+
+LOCAL_C_INCLUDES:= \
+        frameworks/av/media/libstagefright \
+        frameworks/native/include/media/openmax
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
 
@@ -104,12 +109,13 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES:=         \
         stream.cpp    \
 
-LOCAL_HEADER_LIBRARIES := \
-        media_plugin_headers \
-
 LOCAL_SHARED_LIBRARIES := \
         libstagefright liblog libutils libbinder libui libgui \
         libstagefright_foundation libmedia libcutils
+
+LOCAL_C_INCLUDES:= \
+        frameworks/av/media/libstagefright \
+        frameworks/native/include/media/openmax
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
 
@@ -127,12 +133,13 @@ LOCAL_SRC_FILES:=               \
         codec.cpp               \
         SimplePlayer.cpp        \
 
-LOCAL_HEADER_LIBRARIES := \
-        media_plugin_headers \
-
 LOCAL_SHARED_LIBRARIES := \
         libstagefright liblog libutils libbinder libstagefright_foundation \
         libmedia libaudioclient libui libgui libcutils
+
+LOCAL_C_INCLUDES:= \
+        frameworks/av/media/libstagefright \
+        frameworks/native/include/media/openmax
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
 
@@ -152,9 +159,6 @@ LOCAL_SRC_FILES:= \
         filters/saturation.rs \
         mediafilter.cpp \
 
-LOCAL_HEADER_LIBRARIES := \
-        media_plugin_headers \
-
 LOCAL_SHARED_LIBRARIES := \
         libstagefright \
         liblog \
@@ -166,6 +170,12 @@ LOCAL_SHARED_LIBRARIES := \
         libgui \
         libcutils \
         libRScpp \
+
+LOCAL_C_INCLUDES:= \
+        frameworks/av/media/libstagefright \
+        frameworks/native/include/media/openmax \
+        frameworks/rs/cpp \
+        frameworks/rs \
 
 intermediates := $(call intermediates-dir-for,STATIC_LIBRARIES,libRS,TARGET,)
 LOCAL_C_INCLUDES += $(intermediates)
@@ -191,12 +201,13 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES:=               \
         muxer.cpp            \
 
-LOCAL_HEADER_LIBRARIES := \
-        media_plugin_headers \
-
 LOCAL_SHARED_LIBRARIES := \
         libstagefright liblog libutils libbinder libstagefright_foundation \
         libcutils libc
+
+LOCAL_C_INCLUDES:= \
+        frameworks/av/media/libstagefright \
+        frameworks/native/include/media/openmax
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
 
