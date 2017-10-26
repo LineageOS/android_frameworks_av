@@ -17,23 +17,6 @@ LOCAL_SRC_FILES := \
 
 LOCAL_CFLAGS := -Wall -Werror
 
-ifeq ($(USE_LEGACY_LOCAL_AUDIO_HAL), true)
-
-# Use audiohal directly w/o hwbinder middleware.
-# This is for performance comparison and debugging only.
-
-LOCAL_SRC_FILES += \
-    EffectBufferHalLocal.cpp    \
-    EffectsFactoryHalLocal.cpp  \
-    EffectHalLocal.cpp
-
-LOCAL_SHARED_LIBRARIES += \
-    libeffects
-
-LOCAL_CFLAGS += -DUSE_LEGACY_LOCAL_AUDIO_HAL
-
-else  # if !USE_LEGACY_LOCAL_AUDIO_HAL
-
 LOCAL_SRC_FILES += \
     ConversionHelperHidl.cpp   \
     HalDeathHandlerHidl.cpp    \
@@ -59,8 +42,6 @@ LOCAL_SHARED_LIBRARIES += \
     android.hidl.memory@1.0                \
     libmedia_helper  \
     libmediautils
-
-endif  # USE_LEGACY_LOCAL_AUDIO_HAL
 
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/include
 
