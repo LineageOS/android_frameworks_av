@@ -28,6 +28,8 @@
 
 #include <media/stagefright/ACodec.h>
 
+#include <binder/MemoryDealer.h>
+
 #include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -573,6 +575,8 @@ ACodec::ACodec()
     memset(&mLastNativeWindowCrop, 0, sizeof(mLastNativeWindowCrop));
 
     changeState(mUninitializedState);
+
+    mTrebleFlag = false;
 }
 
 ACodec::~ACodec() {
@@ -824,7 +828,11 @@ status_t ACodec::setPortMode(int32_t portIndex, IOMX::PortMode mode) {
 status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
     CHECK(portIndex == kPortIndexInput || portIndex == kPortIndexOutput);
 
-    CHECK(mAllocator[portIndex] == NULL);
+    if (getTrebleFlag()) {
+        CHECK(mAllocator[portIndex] == NULL);
+    } else {
+        CHECK(mDealer[portIndex] == NULL);
+    }
     CHECK(mBuffers[portIndex].isEmpty());
 
     status_t err;
@@ -866,10 +874,7 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
                 }
             }
 
-            size_t alignment = 32; // This is the value currently returned by
-                                   // MemoryDealer::getAllocationAlignment().
-                                   // TODO: Fix this when Treble has
-                                   // MemoryHeap/MemoryDealer.
+            size_t alignment = MemoryDealer::getAllocationAlignment();
 
             ALOGV("[%s] Allocating %u buffers of size %zu (from %u using %s) on %s port",
                     mComponentName.c_str(),
@@ -891,15 +896,18 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
             }
 
             if (mode != IOMX::kPortModePresetSecureBuffer) {
-                mAllocator[portIndex] = TAllocator::getService("ashmem");
-                if (mAllocator[portIndex] == nullptr) {
-                    ALOGE("hidl allocator on port %d is null",
-                            (int)portIndex);
-                    return NO_MEMORY;
+                if (getTrebleFlag()) {
+                    mAllocator[portIndex] = TAllocator::getService("ashmem");
+                    if (mAllocator[portIndex] == nullptr) {
+                        ALOGE("hidl allocator on port %d is null",
+                                (int)portIndex);
+                        return NO_MEMORY;
+                    }
+                } else {
+                    size_t totalSize = def.nBufferCountActual *
+                            (alignedSize + alignedConvSize);
+                    mDealer[portIndex] = new MemoryDealer(totalSize, "ACodec");
                 }
-                // TODO: When Treble has MemoryHeap/MemoryDealer, we should
-                // specify the heap size to be
-                // def.nBufferCountActual * (alignedSize + alignedConvSize).
             }
 
             const sp<AMessage> &format =
@@ -928,55 +936,23 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
                             : new SecureBuffer(format, native_handle, bufSize);
                     info.mCodecData = info.mData;
                 } else {
-                    bool success;
-                    auto transStatus = mAllocator[portIndex]->allocate(
-                            bufSize,
-                            [&success, &hidlMemToken](
-                                    bool s,
-                                    hidl_memory const& m) {
-                                success = s;
-                                hidlMemToken = m;
-                            });
-
-                    if (!transStatus.isOk()) {
-                        ALOGE("hidl's AshmemAllocator failed at the "
-                                "transport: %s",
-                                transStatus.description().c_str());
-                        return NO_MEMORY;
-                    }
-                    if (!success) {
-                        return NO_MEMORY;
-                    }
-                    hidlMem = mapMemory(hidlMemToken);
-                    if (hidlMem == nullptr) {
-                        return NO_MEMORY;
-                    }
-                    err = mOMXNode->useBuffer(
-                            portIndex, hidlMemToken, &info.mBufferID);
-
-                    if (mode == IOMX::kPortModeDynamicANWBuffer) {
-                        VideoNativeMetadata* metaData = (VideoNativeMetadata*)(
-                                (void*)hidlMem->getPointer());
-                        metaData->nFenceFd = -1;
-                    }
-
-                    info.mCodecData = new SharedMemoryBuffer(
-                            format, hidlMem);
-                    info.mCodecRef = hidlMem;
-
-                    // if we require conversion, allocate conversion buffer for client use;
-                    // otherwise, reuse codec buffer
-                    if (mConverter[portIndex] != NULL) {
-                        CHECK_GT(conversionBufferSize, (size_t)0);
+                    if (getTrebleFlag()) {
                         bool success;
-                        mAllocator[portIndex]->allocate(
-                                conversionBufferSize,
+                        auto transStatus = mAllocator[portIndex]->allocate(
+                                bufSize,
                                 [&success, &hidlMemToken](
                                         bool s,
                                         hidl_memory const& m) {
                                     success = s;
                                     hidlMemToken = m;
                                 });
+
+                        if (!transStatus.isOk()) {
+                            ALOGE("hidl's AshmemAllocator failed at the "
+                                    "transport: %s",
+                                    transStatus.description().c_str());
+                            return NO_MEMORY;
+                        }
                         if (!success) {
                             return NO_MEMORY;
                         }
@@ -984,8 +960,67 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
                         if (hidlMem == nullptr) {
                             return NO_MEMORY;
                         }
-                        info.mData = new SharedMemoryBuffer(format, hidlMem);
-                        info.mMemRef = hidlMem;
+                        err = mOMXNode->useBuffer(
+                                portIndex, hidlMemToken, &info.mBufferID);
+                    } else {
+                        mem = mDealer[portIndex]->allocate(bufSize);
+                        if (mem == NULL || mem->pointer() == NULL) {
+                            return NO_MEMORY;
+                        }
+
+                        err = mOMXNode->useBuffer(
+                                portIndex, mem, &info.mBufferID);
+                    }
+
+                    if (mode == IOMX::kPortModeDynamicANWBuffer) {
+                        VideoNativeMetadata* metaData = (VideoNativeMetadata*)(
+                                getTrebleFlag() ?
+                                (void*)hidlMem->getPointer() : mem->pointer());
+                        metaData->nFenceFd = -1;
+                    }
+
+                    if (getTrebleFlag()) {
+                        info.mCodecData = new SharedMemoryBuffer(
+                                format, hidlMem);
+                        info.mCodecRef = hidlMem;
+                    } else {
+                        info.mCodecData = new SharedMemoryBuffer(
+                                format, mem);
+                        info.mCodecRef = mem;
+                    }
+
+                    // if we require conversion, allocate conversion buffer for client use;
+                    // otherwise, reuse codec buffer
+                    if (mConverter[portIndex] != NULL) {
+                        CHECK_GT(conversionBufferSize, (size_t)0);
+                        if (getTrebleFlag()) {
+                            bool success;
+                            mAllocator[portIndex]->allocate(
+                                    conversionBufferSize,
+                                    [&success, &hidlMemToken](
+                                            bool s,
+                                            hidl_memory const& m) {
+                                        success = s;
+                                        hidlMemToken = m;
+                                    });
+                            if (!success) {
+                                return NO_MEMORY;
+                            }
+                            hidlMem = mapMemory(hidlMemToken);
+                            if (hidlMem == nullptr) {
+                                return NO_MEMORY;
+                            }
+                            info.mData = new SharedMemoryBuffer(format, hidlMem);
+                            info.mMemRef = hidlMem;
+                        } else {
+                            mem = mDealer[portIndex]->allocate(
+                                    conversionBufferSize);
+                            if (mem == NULL|| mem->pointer() == NULL) {
+                                return NO_MEMORY;
+                            }
+                            info.mData = new SharedMemoryBuffer(format, mem);
+                            info.mMemRef = mem;
+                        }
                     } else {
                         info.mData = info.mCodecData;
                         info.mMemRef = info.mCodecRef;
@@ -1546,7 +1581,11 @@ status_t ACodec::freeBuffersOnPort(OMX_U32 portIndex) {
         }
     }
 
-    mAllocator[portIndex].clear();
+    if (getTrebleFlag()) {
+        mAllocator[portIndex].clear();
+    } else {
+        mDealer[portIndex].clear();
+    }
     return err;
 }
 
@@ -6212,8 +6251,13 @@ void ACodec::UninitializedState::stateEntered() {
 
     if (mDeathNotifier != NULL) {
         if (mCodec->mOMXNode != NULL) {
-            auto tOmxNode = mCodec->mOMXNode->getHalInterface();
-            tOmxNode->unlinkToDeath(mDeathNotifier);
+            if (mCodec->getTrebleFlag()) {
+                auto tOmxNode = mCodec->mOMXNode->getHalInterface();
+                tOmxNode->unlinkToDeath(mDeathNotifier);
+            } else {
+                sp<IBinder> binder = IInterface::asBinder(mCodec->mOMXNode);
+                binder->unlinkToDeath(mDeathNotifier);
+            }
         }
         mDeathNotifier.clear();
     }
@@ -6361,7 +6405,8 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
         componentName = matchingCodecs[matchIndex];
 
         OMXClient client;
-        if (client.connect(owners[matchIndex].c_str()) != OK) {
+        bool trebleFlag;
+        if (client.connect(owners[matchIndex].c_str(), &trebleFlag) != OK) {
             mCodec->signalError(OMX_ErrorUndefined, NO_INIT);
             return false;
         }
@@ -6374,6 +6419,7 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
         androidSetThreadPriority(tid, prevPriority);
 
         if (err == OK) {
+            mCodec->setTrebleFlag(trebleFlag);
             break;
         } else {
             ALOGW("Allocating component '%s' failed, try next one.", componentName.c_str());
@@ -6395,9 +6441,17 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
     }
 
     mDeathNotifier = new DeathNotifier(notify);
-    auto tOmxNode = omxNode->getHalInterface();
-    if (!tOmxNode->linkToDeath(mDeathNotifier, 0)) {
-        mDeathNotifier.clear();
+    if (mCodec->getTrebleFlag()) {
+        auto tOmxNode = omxNode->getHalInterface();
+        if (!tOmxNode->linkToDeath(mDeathNotifier, 0)) {
+            mDeathNotifier.clear();
+        }
+    } else {
+        if (IInterface::asBinder(omxNode)->linkToDeath(mDeathNotifier) != OK) {
+            // This was a local binder, if it dies so do we, we won't care
+            // about any notifications in the afterlife.
+            mDeathNotifier.clear();
+        }
     }
 
     notify = new AMessage(kWhatOMXMessageList, mCodec);
@@ -7804,7 +7858,11 @@ bool ACodec::OutputPortSettingsChangedState::onOMXEvent(
                             mCodec->mBuffers[kPortIndexOutput].size());
                     err = FAILED_TRANSACTION;
                 } else {
-                    mCodec->mAllocator[kPortIndexOutput].clear();
+                    if (mCodec->getTrebleFlag()) {
+                        mCodec->mAllocator[kPortIndexOutput].clear();
+                    } else {
+                        mCodec->mDealer[kPortIndexOutput].clear();
+                    }
                 }
 
                 if (err == OK) {
@@ -8404,6 +8462,14 @@ status_t ACodec::getOMXChannelMapping(size_t numChannels, OMX_AUDIO_CHANNELTYPE 
     }
 
     return OK;
+}
+
+void ACodec::setTrebleFlag(bool trebleFlag) {
+    mTrebleFlag = trebleFlag;
+}
+
+bool ACodec::getTrebleFlag() const {
+    return mTrebleFlag;
 }
 
 }  // namespace android
