@@ -48,6 +48,7 @@ int main(int argc, const char **argv)
     int32_t  framesToPlay = 0;
     int32_t  framesLeft = 0;
     int32_t  xRunCount = 0;
+    int      numActiveOscilators = 0;
     float   *floatData = nullptr;
     int16_t *shortData = nullptr;
 
@@ -77,8 +78,8 @@ int main(int argc, const char **argv)
     actualSampleRate = AAudioStream_getSampleRate(aaudioStream);
     actualDataFormat = AAudioStream_getFormat(aaudioStream);
 
-    myData.sineOsc1.setup(440.0, actualSampleRate);
-    myData.sineOsc2.setup(660.0, actualSampleRate);
+    myData.sampleRate = actualSampleRate;
+    myData.setupSineSweeps();
 
     // Some DMA might use very short bursts of 16 frames. We don't need to write such small
     // buffers. But it helps to use a multiple of the burst size for predictable scheduling.
@@ -117,19 +118,18 @@ int main(int argc, const char **argv)
     // Play for a while.
     framesToPlay = actualSampleRate * argParser.getDurationSeconds();
     framesLeft = framesToPlay;
+    numActiveOscilators = (actualChannelCount > MAX_CHANNELS) ? MAX_CHANNELS : actualChannelCount;
     while (framesLeft > 0) {
-
+        // Render as FLOAT or PCM
         if (actualDataFormat == AAUDIO_FORMAT_PCM_FLOAT) {
-            // Render sine waves to left and right channels.
-            myData.sineOsc1.render(&floatData[0], actualChannelCount, framesPerWrite);
-            if (actualChannelCount > 1) {
-                myData.sineOsc2.render(&floatData[1], actualChannelCount, framesPerWrite);
+            for (int i = 0; i < numActiveOscilators; ++i) {
+                myData.sineOscillators[i].render(&floatData[i], actualChannelCount,
+                                                  framesPerWrite);
             }
         } else if (actualDataFormat == AAUDIO_FORMAT_PCM_I16) {
-            // Render sine waves to left and right channels.
-            myData.sineOsc1.render(&shortData[0], actualChannelCount, framesPerWrite);
-            if (actualChannelCount > 1) {
-                myData.sineOsc2.render(&shortData[1], actualChannelCount, framesPerWrite);
+            for (int i = 0; i < numActiveOscilators; ++i) {
+                myData.sineOscillators[i].render(&shortData[i], actualChannelCount,
+                                                  framesPerWrite);
             }
         }
 

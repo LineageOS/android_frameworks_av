@@ -20,7 +20,7 @@
 #include <inttypes.h>
 
 #include <binder/ProcessState.h>
-#include <filters/ColorConvert.h>
+#include <ColorConvert.h>
 #include <gui/ISurfaceComposer.h>
 #include <gui/SurfaceComposerClient.h>
 #include <gui/Surface.h>
