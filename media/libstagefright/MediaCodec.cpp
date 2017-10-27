@@ -1832,6 +1832,12 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                                         mSurface.get(), (android_dataspace)dataSpace);
                                 ALOGW_IF(err != 0, "failed to set dataspace on surface (%d)", err);
                             }
+                            if (mOutputFormat->contains("hdr-static-info")) {
+                                HDRStaticInfo info;
+                                if (ColorUtils::getHDRStaticInfoFromFormat(mOutputFormat, &info)) {
+                                    setNativeWindowHdrMetadata(mSurface.get(), &info);
+                                }
+                            }
 
                             if (mime.startsWithIgnoreCase("video/")) {
                                 mSoftRenderer = new SoftwareRenderer(mSurface, mRotationDegrees);

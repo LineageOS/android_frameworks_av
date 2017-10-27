@@ -551,6 +551,8 @@ ACodec::ACodec()
       mDescribeHDRStaticInfoIndex((OMX_INDEXTYPE)0),
       mStateGeneration(0),
       mVendorExtensionsStatus(kExtensionsUnchecked) {
+    memset(&mLastHDRStaticInfo, 0, sizeof(mLastHDRStaticInfo));
+
     mUninitializedState = new UninitializedState(this);
     mLoadedState = new LoadedState(this);
     mLoadedToIdleState = new LoadedToIdleState(this);
@@ -6102,6 +6104,14 @@ void ACodec::BaseState::onOutputBufferDrained(const sp<AMessage> &msg) {
                     mCodec->mNativeWindow.get(), (android_dataspace)dataSpace);
             mCodec->mLastNativeWindowDataSpace = dataSpace;
             ALOGW_IF(err != NO_ERROR, "failed to set dataspace: %d", err);
+        }
+        if (buffer->format()->contains("hdr-static-info")) {
+            HDRStaticInfo info;
+            if (ColorUtils::getHDRStaticInfoFromFormat(buffer->format(), &info)
+                && memcmp(&mCodec->mLastHDRStaticInfo, &info, sizeof(info))) {
+                setNativeWindowHdrMetadata(mCodec->mNativeWindow.get(), &info);
+                mCodec->mLastHDRStaticInfo = info;
+            }
         }
 
         // save buffers sent to the surface so we can get render time when they return

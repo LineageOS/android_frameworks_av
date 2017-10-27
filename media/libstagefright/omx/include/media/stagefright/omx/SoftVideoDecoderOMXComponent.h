@@ -23,6 +23,7 @@
 #include <media/stagefright/foundation/AHandlerReflector.h>
 #include <media/stagefright/foundation/ColorUtils.h>
 #include <media/IOMX.h>
+#include <media/hardware/HardwareAPI.h>
 
 #include <utils/RefBase.h>
 #include <utils/threads.h>
@@ -46,6 +47,7 @@ struct SoftVideoDecoderOMXComponent : public SimpleSoftOMXComponent {
 protected:
     enum {
         kDescribeColorAspectsIndex = kPrepareForAdaptivePlaybackIndex + 1,
+        kDescribeHdrStaticInfoIndex = kPrepareForAdaptivePlaybackIndex + 2,
     };
 
     enum {
@@ -75,6 +77,8 @@ protected:
     virtual bool supportsDescribeColorAspects();
 
     virtual int getColorAspectPreference();
+
+    virtual bool supportDescribeHdrStaticInfo();
 
     // This function sets both minimum buffer count and actual buffer count of
     // input port to be |numInputBuffers|. It will also set both minimum buffer
@@ -113,7 +117,9 @@ protected:
     // It will trigger OMX_EventPortSettingsChanged event if necessary.
     void handlePortSettingsChange(
             bool *portWillReset, uint32_t width, uint32_t height,
-            CropSettingsMode cropSettingsMode = kCropUnSet, bool fakeStride = false);
+            OMX_COLOR_FORMATTYPE outputFormat = OMX_COLOR_FormatYUV420Planar,
+            CropSettingsMode cropSettingsMode = kCropUnSet,
+            bool fakeStride = false);
 
     void copyYV12FrameToOutputBuffer(
             uint8_t *dst, const uint8_t *srcY, const uint8_t *srcU, const uint8_t *srcV,
@@ -129,7 +135,8 @@ protected:
     uint32_t mAdaptiveMaxWidth, mAdaptiveMaxHeight;
     uint32_t mWidth, mHeight;
     uint32_t mCropLeft, mCropTop, mCropWidth, mCropHeight;
-
+    OMX_COLOR_FORMATTYPE mOutputFormat;
+    HDRStaticInfo mHdrStaticInfo;
     enum {
         NONE,
         AWAITING_DISABLED,

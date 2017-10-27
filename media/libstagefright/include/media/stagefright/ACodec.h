@@ -235,6 +235,7 @@ private:
     int mNativeWindowUsageBits;
     android_native_rect_t mLastNativeWindowCrop;
     int32_t mLastNativeWindowDataSpace;
+    HDRStaticInfo mLastHDRStaticInfo;
     sp<AMessage> mConfigFormat;
     sp<AMessage> mInputFormat;
     sp<AMessage> mOutputFormat;
