@@ -43,9 +43,7 @@ cc_defaults {
         "aidl/android/IOMXBufferSource.aidl",
 
         "IMediaCodecList.cpp",
-        "IMediaCodecService.cpp",
         "IOMX.cpp",
-        "IOMXStore.cpp",
         "MediaCodecBuffer.cpp",
         "MediaCodecInfo.cpp",
         "OMXBuffer.cpp",

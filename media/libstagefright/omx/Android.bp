@@ -9,8 +9,6 @@ cc_library_shared {
         "FrameDropper.cpp",
         "GraphicBufferSource.cpp",
         "BWGraphicBufferSource.cpp",
-        "OMX.cpp",
-        "OMXStore.cpp",
         "OMXMaster.cpp",
         "OMXNodeInstance.cpp",
         "OMXUtils.cpp",

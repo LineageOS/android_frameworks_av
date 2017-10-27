@@ -24,7 +24,6 @@
 
 #include <media/IMediaCodecList.h>
 #include <media/IMediaPlayerService.h>
-#include <media/IMediaCodecService.h>
 #include <media/MediaCodecInfo.h>
 
 #include <media/stagefright/foundation/ADebug.h>

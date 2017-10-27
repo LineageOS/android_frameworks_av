@@ -13,8 +13,12 @@ cc_library_static {
         "ZeroFilter.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/native/include/media/openmax",
+    header_libs: [
+        "media_plugin_headers",
+    ],
+
+    export_header_lib_headers: [
+        "media_plugin_headers",
     ],
 
     cflags: [
