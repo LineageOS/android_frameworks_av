@@ -21,7 +21,6 @@
 #include <utils/Log.h>
 
 #include "DeviceHalLocal.h"
-#include "EffectHalLocal.h"
 #include "StreamHalLocal.h"
 
 namespace android {
@@ -86,16 +85,14 @@ status_t StreamHalLocal::getParameters(const String8& keys, String8 *values) {
     return OK;
 }
 
-status_t StreamHalLocal::addEffect(sp<EffectHalInterface> effect) {
-    LOG_ALWAYS_FATAL_IF(!effect->isLocal(), "Only local effects can be added for a local stream");
-    return mStream->add_audio_effect(mStream,
-            static_cast<EffectHalLocal*>(effect.get())->handle());
+status_t StreamHalLocal::addEffect(sp<EffectHalInterface>) {
+    LOG_ALWAYS_FATAL("Local streams can not have effects");
+    return INVALID_OPERATION;
 }
 
-status_t StreamHalLocal::removeEffect(sp<EffectHalInterface> effect) {
-    LOG_ALWAYS_FATAL_IF(!effect->isLocal(), "Only local effects can be removed for a local stream");
-    return mStream->remove_audio_effect(mStream,
-            static_cast<EffectHalLocal*>(effect.get())->handle());
+status_t StreamHalLocal::removeEffect(sp<EffectHalInterface>) {
+    LOG_ALWAYS_FATAL("Local streams can not have effects");
+    return INVALID_OPERATION;
 }
 
 status_t StreamHalLocal::standby() {

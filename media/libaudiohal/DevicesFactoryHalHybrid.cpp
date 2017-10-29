@@ -19,9 +19,7 @@
 
 #include "DevicesFactoryHalHybrid.h"
 #include "DevicesFactoryHalLocal.h"
-#ifndef USE_LEGACY_LOCAL_AUDIO_HAL
 #include "DevicesFactoryHalHidl.h"
-#endif
 
 namespace android {
 
@@ -32,13 +30,7 @@ sp<DevicesFactoryHalInterface> DevicesFactoryHalInterface::create() {
 
 DevicesFactoryHalHybrid::DevicesFactoryHalHybrid()
         : mLocalFactory(new DevicesFactoryHalLocal()),
-          mHidlFactory(
-#ifdef USE_LEGACY_LOCAL_AUDIO_HAL
-                  nullptr
-#else
-                  new DevicesFactoryHalHidl()
-#endif
-                       ) {
+          mHidlFactory(new DevicesFactoryHalHidl()) {
 }
 
 DevicesFactoryHalHybrid::~DevicesFactoryHalHybrid() {

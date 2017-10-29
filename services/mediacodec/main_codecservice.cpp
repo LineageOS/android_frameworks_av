@@ -28,6 +28,7 @@
 #include <android-base/logging.h>
 
 // from LOCAL_C_INCLUDES
+#include "MediaCodecService.h"
 #include "minijail.h"
 
 #include <hidl/HidlTransportSupport.h>
@@ -45,7 +46,10 @@ static const char kVendorSeccompPolicyPath[] =
 int main(int argc __unused, char** argv)
 {
     LOG(INFO) << "mediacodecservice starting";
-    android::ProcessState::initWithDriver("/dev/vndbinder");
+    bool treble = property_get_bool("persist.media.treble_omx", true);
+    if (treble) {
+      android::ProcessState::initWithDriver("/dev/vndbinder");
+    }
 
     signal(SIGPIPE, SIG_IGN);
     SetUpMinijail(kSystemSeccompPolicyPath, kVendorSeccompPolicyPath);
@@ -55,20 +59,25 @@ int main(int argc __unused, char** argv)
     ::android::hardware::configureRpcThreadpool(64, false);
     sp<ProcessState> proc(ProcessState::self());
 
-    using namespace ::android::hardware::media::omx::V1_0;
-    sp<IOmxStore> omxStore = new implementation::OmxStore();
-    if (omxStore == nullptr) {
-        LOG(ERROR) << "Cannot create IOmxStore HAL service.";
-    } else if (omxStore->registerAsService() != OK) {
-        LOG(ERROR) << "Cannot register IOmxStore HAL service.";
-    }
-    sp<IOmx> omx = new implementation::Omx();
-    if (omx == nullptr) {
-        LOG(ERROR) << "Cannot create IOmx HAL service.";
-    } else if (omx->registerAsService() != OK) {
-        LOG(ERROR) << "Cannot register IOmx HAL service.";
+    if (treble) {
+        using namespace ::android::hardware::media::omx::V1_0;
+        sp<IOmxStore> omxStore = new implementation::OmxStore();
+        if (omxStore == nullptr) {
+            LOG(ERROR) << "Cannot create IOmxStore HAL service.";
+        } else if (omxStore->registerAsService() != OK) {
+            LOG(ERROR) << "Cannot register IOmxStore HAL service.";
+        }
+        sp<IOmx> omx = new implementation::Omx();
+        if (omx == nullptr) {
+            LOG(ERROR) << "Cannot create IOmx HAL service.";
+        } else if (omx->registerAsService() != OK) {
+            LOG(ERROR) << "Cannot register IOmx HAL service.";
+        } else {
+            LOG(INFO) << "Treble OMX service created.";
+        }
     } else {
-        LOG(INFO) << "IOmx HAL service created.";
+        MediaCodecService::instantiate();
+        LOG(INFO) << "Non-Treble OMX service created.";
     }
 
     ProcessState::self()->startThreadPool();

@@ -450,14 +450,27 @@ status_t MediaRecorderClient::setListener(const sp<IMediaRecorderClient>& listen
     }
     sCameraChecked = true;
 
-    sp<IOmx> omx = IOmx::getService();
-    if (omx == nullptr) {
-        ALOGE("IOmx service is not available");
-        return NO_INIT;
+    if (property_get_bool("persist.media.treble_omx", true)) {
+        // Treble IOmx
+        sp<IOmx> omx = IOmx::getService();
+        if (omx == nullptr) {
+            ALOGE("Treble IOmx not available");
+            return NO_INIT;
+        }
+        mCodecDeathListener = new ServiceDeathNotifier(omx, listener,
+                MediaPlayerService::MEDIACODEC_PROCESS_DEATH);
+        omx->linkToDeath(mCodecDeathListener, 0);
+    } else {
+        // Legacy IOMX
+        binder = sm->getService(String16("media.codec"));
+        if (binder == NULL) {
+           ALOGE("Unable to connect to media codec service");
+           return NO_INIT;
+        }
+        mCodecDeathListener = new ServiceDeathNotifier(binder, listener,
+                MediaPlayerService::MEDIACODEC_PROCESS_DEATH);
+        binder->linkToDeath(mCodecDeathListener);
     }
-    mCodecDeathListener = new ServiceDeathNotifier(omx, listener,
-            MediaPlayerService::MEDIACODEC_PROCESS_DEATH);
-    omx->linkToDeath(mCodecDeathListener, 0);
 
     return OK;
 }
