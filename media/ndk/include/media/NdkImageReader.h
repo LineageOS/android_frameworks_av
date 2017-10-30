@@ -305,9 +305,9 @@ media_status_t AImageReader_setImageListener(
 /**
  * AImageReader constructor similar to {@link AImageReader_new} that takes an additional parameter
  * for the consumer usage. All other parameters and the return values are identical to those passed
- * to {@line AImageReader_new}.
+ * to {@link AImageReader_new}.
  *
- * <p>If the {@code format} is {@link AIMAGE_FORMAT_PRIVATE}, the created {@link AImageReader}
+ * <p>If the \c format is {@link AIMAGE_FORMAT_PRIVATE}, the created {@link AImageReader}
  * will produce images whose contents are not directly accessible by the application. The application can
  * still acquire images from this {@link AImageReader} and access {@link AHardwareBuffer} via
  * {@link AImage_getHardwareBuffer()}. The {@link AHardwareBuffer} gained this way can then
@@ -322,7 +322,7 @@ media_status_t AImageReader_setImageListener(
  * AImageReader}s using other format such as {@link AIMAGE_FORMAT_YUV_420_888}.</p>
  *
  * <p>Note that not all format and usage flag combination is supported by the {@link AImageReader},
- * especially if {@code format} is {@link AIMAGE_FORMAT_PRIVATE}, {@code usage} must not include either
+ * especially if \c format is {@link AIMAGE_FORMAT_PRIVATE}, \c usage must not include either
  * {@link AHARDWAREBUFFER_USAGE_READ_RARELY} or {@link AHARDWAREBUFFER_USAGE_READ_OFTEN}</p>
  *
  * @param width The default width in pixels of the Images that this reader will produce.
@@ -367,7 +367,7 @@ media_status_t AImageReader_newWithUsage(
         int32_t width, int32_t height, int32_t format, uint64_t usage, int32_t maxImages,
         /*out*/ AImageReader** reader);
 
-/*
+/**
  * Acquire the next {@link AImage} from the image reader's queue asynchronously.
  *
  * <p>AImageReader acquire method similar to {@link AImageReader_acquireNextImage} that takes an
@@ -377,7 +377,7 @@ media_status_t AImageReader_newWithUsage(
  * @param acquireFenceFd A sync fence fd defined in {@link sync.h}, which is used to signal when the
  *         buffer is ready to consume. When synchronization fence is not needed, fence will be set
  *         to -1 and the {@link AImage} returned is ready for use immediately. Otherwise, user shall
- *         use syscalls such as {@code poll()}, {@code epoll()}, {@code select()} to wait for the
+ *         use syscalls such as \c poll(), \c epoll(), \c select() to wait for the
  *         fence fd to change status before attempting to access the {@link AImage} returned.
  *
  * @see sync.h
@@ -386,7 +386,7 @@ media_status_t AImageReader_newWithUsage(
 media_status_t AImageReader_acquireNextImageAsync(
         AImageReader* reader, /*out*/AImage** image, /*out*/int* acquireFenceFd);
 
-/*
+/**
  * Acquire the latest {@link AImage} from the image reader's queue asynchronously, dropping older
  * images.
  *
@@ -397,7 +397,7 @@ media_status_t AImageReader_acquireNextImageAsync(
  * @param acquireFenceFd A sync fence fd defined in {@link sync.h}, which is used to signal when the
  *         buffer is ready to consume. When synchronization fence is not needed, fence will be set
  *         to -1 and the {@link AImage} returned is ready for use immediately. Otherwise, user shall
- *         use syscalls such as {@code poll()}, {@code epoll()}, {@code select()} to wait for the
+ *         use syscalls such as \c poll(), \c epoll(), \c select() to wait for the
  *         fence fd to change status before attempting to access the {@link AImage} returned.
  *
  * @see sync.h
