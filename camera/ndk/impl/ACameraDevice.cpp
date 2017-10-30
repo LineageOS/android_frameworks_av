@@ -59,7 +59,8 @@ CameraDevice::CameraDevice(
         mWrapper(wrapper),
         mInError(false),
         mError(ACAMERA_OK),
-        mIdle(true) {
+        mIdle(true),
+        mCurrentSession(nullptr) {
     mClosing = false;
     // Setup looper thread to perfrom device callbacks to app
     mCbLooper = new ALooper;
@@ -98,16 +99,28 @@ CameraDevice::CameraDevice(
 
 // Device close implementaiton
 CameraDevice::~CameraDevice() {
-    Mutex::Autolock _l(mDeviceLock);
-    if (!isClosed()) {
-        disconnectLocked();
-    }
-    if (mCbLooper != nullptr) {
-        mCbLooper->unregisterHandler(mHandler->id());
-        mCbLooper->stop();
+    sp<ACameraCaptureSession> session = mCurrentSession.promote();
+    {
+        Mutex::Autolock _l(mDeviceLock);
+        if (!isClosed()) {
+            disconnectLocked(session);
+        }
+        mCurrentSession = nullptr;
+        if (mCbLooper != nullptr) {
+            mCbLooper->unregisterHandler(mHandler->id());
+            mCbLooper->stop();
+        }
     }
     mCbLooper.clear();
     mHandler.clear();
+}
+
+void
+CameraDevice::postSessionMsgAndCleanup(sp<AMessage>& msg) {
+    msg->post();
+    msg.clear();
+    sp<AMessage> cleanupMsg = new AMessage(kWhatCleanUpSessions, mHandler);
+    cleanupMsg->post();
 }
 
 // TODO: cached created request?
@@ -146,14 +159,15 @@ CameraDevice::createCaptureSession(
         const ACaptureSessionOutputContainer*       outputs,
         const ACameraCaptureSession_stateCallbacks* callbacks,
         /*out*/ACameraCaptureSession** session) {
+    sp<ACameraCaptureSession> currentSession = mCurrentSession.promote();
     Mutex::Autolock _l(mDeviceLock);
     camera_status_t ret = checkCameraClosedOrErrorLocked();
     if (ret != ACAMERA_OK) {
         return ret;
     }
 
-    if (mCurrentSession != nullptr) {
-        mCurrentSession->closeByDevice();
+    if (currentSession != nullptr) {
+        currentSession->closeByDevice();
         stopRepeatingLocked();
     }
 
@@ -264,7 +278,7 @@ CameraDevice::submitRequestsLocked(
         msg->setPointer(kContextKey, session->mUserSessionCallback.context);
         msg->setObject(kSessionSpKey, session);
         msg->setPointer(kCallbackFpKey, (void*) session->mUserSessionCallback.onActive);
-        msg->post();
+        postSessionMsgAndCleanup(msg);
     }
     mIdle = false;
     mBusySession = session;
@@ -328,7 +342,7 @@ CameraDevice::notifySessionEndOfLifeLocked(ACameraCaptureSession* session) {
         return;
     }
 
-    if (session != mCurrentSession) {
+    if (mCurrentSession != session) {
         // Session has been replaced by other seesion or device is closed
         return;
     }
@@ -349,7 +363,7 @@ CameraDevice::notifySessionEndOfLifeLocked(ACameraCaptureSession* session) {
 }
 
 void
-CameraDevice::disconnectLocked() {
+CameraDevice::disconnectLocked(sp<ACameraCaptureSession>& session) {
     if (mClosing.exchange(true)) {
         // Already closing, just return
         ALOGW("Camera device %s is already closing.", getId());
@@ -361,9 +375,8 @@ CameraDevice::disconnectLocked() {
     }
     mRemote = nullptr;
 
-    if (mCurrentSession != nullptr) {
-        mCurrentSession->closeByDevice();
-        mCurrentSession = nullptr;
+    if (session != nullptr) {
+        session->closeByDevice();
     }
 }
 
@@ -404,7 +417,7 @@ CameraDevice::flushLocked(ACameraCaptureSession* session) {
     // This should never happen because creating a new session will close
     // previous one and thus reject any API call from previous session.
     // But still good to check here in case something unexpected happen.
-    if (session != mCurrentSession) {
+    if (mCurrentSession != session) {
         ALOGE("Camera %s session %p is not current active session!", getId(), session);
         return ACAMERA_ERROR_INVALID_OPERATION;
     }
@@ -415,12 +428,13 @@ CameraDevice::flushLocked(ACameraCaptureSession* session) {
     }
 
     mFlushing = true;
+
     // Send onActive callback to guarantee there is always active->ready transition
     sp<AMessage> msg = new AMessage(kWhatSessionStateCb, mHandler);
     msg->setPointer(kContextKey, session->mUserSessionCallback.context);
     msg->setObject(kSessionSpKey, session);
     msg->setPointer(kCallbackFpKey, (void*) session->mUserSessionCallback.onActive);
-    msg->post();
+    postSessionMsgAndCleanup(msg);
 
     // If device is already idling, send callback and exit early
     if (mIdle) {
@@ -428,7 +442,7 @@ CameraDevice::flushLocked(ACameraCaptureSession* session) {
         msg->setPointer(kContextKey, session->mUserSessionCallback.context);
         msg->setObject(kSessionSpKey, session);
         msg->setPointer(kCallbackFpKey, (void*) session->mUserSessionCallback.onReady);
-        msg->post();
+        postSessionMsgAndCleanup(msg);
         mFlushing = false;
         return ACAMERA_OK;
     }
@@ -568,7 +582,7 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
         msg->setObject(kSessionSpKey, mBusySession);
         msg->setPointer(kCallbackFpKey, (void*) mBusySession->mUserSessionCallback.onReady);
         mBusySession.clear();
-        msg->post();
+        postSessionMsgAndCleanup(msg);
     }
     mIdle = true;
 
@@ -728,7 +742,7 @@ CameraDevice::onCaptureErrorLocked(
         msg->setObject(kCaptureRequestKey, request);
         msg->setPointer(kAnwKey, (void*) anw);
         msg->setInt64(kFrameNumberKey, frameNumber);
-        msg->post();
+        postSessionMsgAndCleanup(msg);
     } else { // Handle other capture failures
         // Fire capture failure callback if there is one registered
         ACameraCaptureSession_captureCallback_failed onError = cbh.mCallbacks.onCaptureFailed;
@@ -746,7 +760,7 @@ CameraDevice::onCaptureErrorLocked(
         msg->setPointer(kCallbackFpKey, (void*) onError);
         msg->setObject(kCaptureRequestKey, request);
         msg->setObject(kCaptureFailureKey, failure);
-        msg->post();
+        postSessionMsgAndCleanup(msg);
 
         // Update tracker
         mFrameNumberTracker.updateTracker(frameNumber, /*isError*/true);
@@ -769,6 +783,9 @@ void CameraDevice::CallbackHandler::onMessageReceived(
         case kWhatCaptureBufferLost:
             ALOGV("%s: Received msg %d", __FUNCTION__, msg->what());
             break;
+        case kWhatCleanUpSessions:
+            mCachedSessions.clear();
+            return;
         default:
             ALOGE("%s:Error: unknown device callback %d", __FUNCTION__, msg->what());
             return;
@@ -842,6 +859,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                 return;
             }
             sp<ACameraCaptureSession> session(static_cast<ACameraCaptureSession*>(obj.get()));
+            mCachedSessions.push(session);
             sp<CaptureRequest> requestSp = nullptr;
             switch (msg->what()) {
                 case kWhatCaptureStart:
@@ -1053,7 +1071,7 @@ CameraDevice::checkRepeatingSequenceCompleteLocked(
         msg->setObject(kSessionSpKey, cbh.mSession);
         msg->setPointer(kCallbackFpKey, (void*) cbh.mCallbacks.onCaptureSequenceAborted);
         msg->setInt32(kSequenceIdKey, sequenceId);
-        msg->post();
+        postSessionMsgAndCleanup(msg);
     } else {
         // Use mSequenceLastFrameNumberMap to track
         mSequenceLastFrameNumberMap.insert(std::make_pair(sequenceId, lastFrameNumber));
@@ -1110,7 +1128,7 @@ CameraDevice::checkAndFireSequenceCompleteLocked() {
             // before cbh goes out of scope and causing we call the session
             // destructor while holding device lock
             cbh.mSession.clear();
-            msg->post();
+            postSessionMsgAndCleanup(msg);
         }
 
         // No need to track sequence complete if there is no callback registered
@@ -1137,6 +1155,7 @@ CameraDevice::ServiceCallback::onDeviceError(
         return ret; // device has been closed
     }
 
+    sp<ACameraCaptureSession> session = dev->mCurrentSession.promote();
     Mutex::Autolock _l(dev->mDeviceLock);
     if (dev->mRemote == nullptr) {
         return ret; // device has been closed
@@ -1145,10 +1164,10 @@ CameraDevice::ServiceCallback::onDeviceError(
         case ERROR_CAMERA_DISCONNECTED:
         {
             // Camera is disconnected, close the session and expect no more callbacks
-            if (dev->mCurrentSession != nullptr) {
-                dev->mCurrentSession->closeByDevice();
-                dev->mCurrentSession = nullptr;
+            if (session != nullptr) {
+                session->closeByDevice();
             }
+            dev->mCurrentSession = nullptr;
             sp<AMessage> msg = new AMessage(kWhatOnDisconnected, dev->mHandler);
             msg->setPointer(kContextKey, dev->mAppCallbacks.context);
             msg->setPointer(kDeviceKey, (void*) dev->getWrapper());
@@ -1216,6 +1235,7 @@ CameraDevice::ServiceCallback::onDeviceIdle() {
             dev->setCameraDeviceErrorLocked(ACAMERA_ERROR_CAMERA_DEVICE);
             return ret;
         }
+
         sp<AMessage> msg = new AMessage(kWhatSessionStateCb, dev->mHandler);
         msg->setPointer(kContextKey, dev->mBusySession->mUserSessionCallback.context);
         msg->setObject(kSessionSpKey, dev->mBusySession);
@@ -1223,7 +1243,7 @@ CameraDevice::ServiceCallback::onDeviceIdle() {
         // Make sure we clear the sp first so the session destructor can
         // only happen on handler thread (where we don't hold device/session lock)
         dev->mBusySession.clear();
-        msg->post();
+        dev->postSessionMsgAndCleanup(msg);
     }
     dev->mIdle = true;
     dev->mFlushing = false;
@@ -1265,7 +1285,7 @@ CameraDevice::ServiceCallback::onCaptureStarted(
         msg->setPointer(kCallbackFpKey, (void*) onStart);
         msg->setObject(kCaptureRequestKey, request);
         msg->setInt64(kTimeStampKey, timestamp);
-        msg->post();
+        dev->postSessionMsgAndCleanup(msg);
     }
     return ret;
 }
@@ -1328,7 +1348,7 @@ CameraDevice::ServiceCallback::onResultReceived(
         msg->setPointer(kCallbackFpKey, (void*) onResult);
         msg->setObject(kCaptureRequestKey, request);
         msg->setObject(kCaptureResultKey, result);
-        msg->post();
+        dev->postSessionMsgAndCleanup(msg);
     }
 
     if (!isPartialResult) {
