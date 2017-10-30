@@ -859,7 +859,7 @@ void AudioPolicyService::AudioCommandThread::insertCommand_l(sp<AudioCommand>& c
     }
 
     // check same pending commands with later time stamps and eliminate them
-    for (i = mAudioCommands.size()-1; i >= 0; i--) {
+    for (i = (ssize_t)mAudioCommands.size()-1; i >= 0; i--) {
         sp<AudioCommand> command2 = mAudioCommands[i];
         // commands are sorted by increasing time stamp: no need to scan the rest of mAudioCommands
         if (command2->mTime <= command->mTime) break;
