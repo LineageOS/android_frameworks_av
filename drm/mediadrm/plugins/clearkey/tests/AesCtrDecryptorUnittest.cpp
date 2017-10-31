@@ -34,7 +34,7 @@ class AesCtrDecryptorTest : public ::testing::Test {
                             uint8_t* destination, const SubSample* subSamples,
                             size_t numSubSamples, size_t* bytesDecryptedOut) {
         Vector<uint8_t> keyVector;
-        keyVector.appendArray(key, kBlockSize);
+        keyVector.appendArray(key, sizeof(key) / sizeof(uint8_t));
 
         AesCtrDecryptor decryptor;
         return decryptor.decrypt(keyVector, iv, source, destination, subSamples,
@@ -56,6 +56,67 @@ class AesCtrDecryptorTest : public ::testing::Test {
         EXPECT_EQ(0, memcmp(outputBuffer, decrypted, totalSize));
     }
 };
+
+TEST_F(AesCtrDecryptorTest, DecryptsWithEmptyKey) {
+    const size_t kTotalSize = 64;
+    const size_t kNumSubsamples = 1;
+
+    // Test vectors from NIST-800-38A
+    Iv iv = {
+        0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7,
+        0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff
+    };
+
+    uint8_t source[kTotalSize] = { 0 };
+    uint8_t destination[kTotalSize] = { 0 };
+    SubSample subSamples[kNumSubsamples] = {
+        {0, 64}
+    };
+
+    size_t bytesDecrypted = 0;
+    Vector<uint8_t> keyVector;
+    keyVector.clear();
+
+    AesCtrDecryptor decryptor;
+    ASSERT_EQ(android::ERROR_DRM_DECRYPT, decryptor.decrypt(keyVector, iv,
+              &source[0], &destination[0],
+              &subSamples[0], kNumSubsamples, &bytesDecrypted));
+    ASSERT_EQ(0u, bytesDecrypted);
+}
+
+TEST_F(AesCtrDecryptorTest, DecryptsWithKeyTooLong) {
+    const size_t kTotalSize = 64;
+    const size_t kNumSubsamples = 1;
+
+    // Test vectors from NIST-800-38A
+    uint8_t key[kBlockSize * 2] = {
+        0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6,
+        0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c,
+        0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6,
+        0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c
+    };
+
+    Iv iv = {
+        0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7,
+        0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff
+    };
+
+    uint8_t source[kTotalSize] = { 0 };
+    uint8_t destination[kTotalSize] = { 0 };
+    SubSample subSamples[kNumSubsamples] = {
+        {0, 64}
+    };
+
+    size_t bytesDecrypted = 0;
+    Vector<uint8_t> keyVector;
+    keyVector.appendArray(key, sizeof(key) / sizeof(uint8_t));
+
+    AesCtrDecryptor decryptor;
+    ASSERT_EQ(android::ERROR_DRM_DECRYPT, decryptor.decrypt(keyVector, iv,
+              &source[0], &destination[0],
+              &subSamples[0], kNumSubsamples, &bytesDecrypted));
+    ASSERT_EQ(0u, bytesDecrypted);
+}
 
 TEST_F(AesCtrDecryptorTest, DecryptsContiguousEncryptedBlock) {
     const size_t kTotalSize = 64;
