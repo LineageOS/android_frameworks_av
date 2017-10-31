@@ -20,8 +20,9 @@
 #include <media/cas/DescramblerAPI.h>
 #include <media/DescramblerImpl.h>
 #include <media/SharedLibrary.h>
-#include <utils/Log.h>
+#include <media/stagefright/foundation/AUtils.h>
 #include <binder/IMemory.h>
+#include <utils/Log.h>
 
 namespace android {
 
@@ -74,9 +75,56 @@ Status DescramblerImpl::requiresSecureDecoderComponent(
     return getBinderStatus(OK);
 }
 
+static inline bool validateRangeForSize(
+        uint64_t offset, uint64_t length, uint64_t size) {
+    return isInRange<uint64_t, uint64_t>(0, size, offset, length);
+}
+
 Status DescramblerImpl::descramble(
         const DescrambleInfo& info, int32_t *result) {
     ALOGV("descramble");
+
+    if (info.srcMem == NULL || info.srcMem->pointer() == NULL) {
+        ALOGE("srcMem is invalid");
+        return getBinderStatus(BAD_VALUE);
+    }
+
+    // use 64-bit here to catch bad subsample size that might be overflowing.
+    uint64_t totalBytesInSubSamples = 0;
+    for (size_t i = 0; i < info.numSubSamples; i++) {
+        totalBytesInSubSamples += (uint64_t)info.subSamples[i].mNumBytesOfClearData +
+                info.subSamples[i].mNumBytesOfEncryptedData;
+    }
+    // validate if the specified srcOffset and requested total subsample size
+    // is consistent with the source shared buffer size.
+    if (!validateRangeForSize(info.srcOffset, totalBytesInSubSamples, info.srcMem->size())) {
+        ALOGE("Invalid srcOffset and subsample size: "
+                "srcOffset %llu, totalBytesInSubSamples %llu, srcMem size %llu",
+                (unsigned long long) info.srcOffset,
+                (unsigned long long) totalBytesInSubSamples,
+                (unsigned long long) info.srcMem->size());
+        android_errorWriteLog(0x534e4554, "67962232");
+        return getBinderStatus(BAD_VALUE);
+    }
+    void *dstPtr = NULL;
+    if (info.dstType == DescrambleInfo::kDestinationTypeVmPointer) {
+        // When using shared memory, src buffer is also used as dst
+        dstPtr = info.srcMem->pointer();
+
+        // In this case the dst and src would be the same buffer, need to validate
+        // dstOffset against the buffer size too.
+        if (!validateRangeForSize(info.dstOffset, totalBytesInSubSamples, info.srcMem->size())) {
+            ALOGE("Invalid dstOffset and subsample size: "
+                    "dstOffset %llu, totalBytesInSubSamples %llu, srcBuffer size %llu",
+                    (unsigned long long) info.dstOffset,
+                    (unsigned long long) totalBytesInSubSamples,
+                    (unsigned long long) info.srcMem->size());
+            android_errorWriteLog(0x534e4554, "67962232");
+            return getBinderStatus(BAD_VALUE);
+        }
+    } else {
+        dstPtr = info.dstPtr;
+    }
 
     *result = mPlugin->descramble(
             info.dstType != DescrambleInfo::kDestinationTypeVmPointer,
@@ -85,8 +133,7 @@ Status DescramblerImpl::descramble(
             info.subSamples,
             info.srcMem->pointer(),
             info.srcOffset,
-            info.dstType == DescrambleInfo::kDestinationTypeVmPointer ?
-                    info.srcMem->pointer() : info.dstPtr,
+            dstPtr,
             info.dstOffset,
             NULL);
 
