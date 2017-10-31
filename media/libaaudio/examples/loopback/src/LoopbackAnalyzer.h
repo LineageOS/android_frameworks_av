@@ -432,9 +432,7 @@ public:
             int needleSize = (int) (sizeof(s_Impulse) / sizeof(float));
             float *haystack = audioRecorder.getData();
             int haystackSize = audioRecorder.size();
-            int result = measureLatencyFromEchos(haystack, haystackSize,
-                                                 needle, needleSize,
-                                                 &latencyReport);
+            measureLatencyFromEchos(haystack, haystackSize, needle, needleSize, &latencyReport);
             if (latencyReport.confidence < 0.01) {
                 printf("   ERROR - confidence too low = %f\n", latencyReport.confidence);
             } else {
@@ -580,7 +578,6 @@ private:
 
     int           mDownCounter = 500;
     int           mLoopCounter = 0;
-    int           mLoopStart = 1000;
     float         mPulseThreshold = 0.02f;
     float         mSilenceThreshold = 0.002f;
     float         mMeasuredLoopGain = 0.0f;
@@ -651,7 +648,6 @@ public:
     void process(float *inputData, int inputChannelCount,
                  float *outputData, int outputChannelCount,
                  int numFrames) override {
-        float sample;
         float peak = measurePeakAmplitude(inputData, inputChannelCount, numFrames);
         if (peak > mPeakAmplitude) {
             mPeakAmplitude = peak;
@@ -778,8 +774,6 @@ private:
     int     mDownCounter = 4000;
     int32_t mFrameCounter = 0;
     float   mOutputAmplitude = 0.75;
-
-    int32_t mZeroCrossings = 0;
 
     PseudoRandom  mWhiteNoise;
     float   mNoiseAmplitude = 0.00; // Used to experiment with warbling caused by DRC.

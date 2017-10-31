@@ -80,13 +80,15 @@ const char *getDirectionText(aaudio_direction_t direction) {
     return text;
 }
 
-static void convertNanosecondsToTimespec(int64_t nanoseconds, struct timespec *time) {
+template <class T = int64_t>
+void convertNanosecondsToTimespec(int64_t nanoseconds, struct timespec *time) {
     time->tv_sec = nanoseconds / NANOS_PER_SECOND;
     // Calculate the fractional nanoseconds. Avoids expensive % operation.
     time->tv_nsec = nanoseconds - (time->tv_sec * NANOS_PER_SECOND);
 }
 
-static int64_t getNanoseconds(clockid_t clockId = CLOCK_MONOTONIC) {
+template <class T = clockid_t>
+int64_t getNanoseconds(clockid_t clockId = CLOCK_MONOTONIC) {
     struct timespec time;
     int result = clock_gettime(clockId, &time);
     if (result < 0) {
@@ -95,7 +97,8 @@ static int64_t getNanoseconds(clockid_t clockId = CLOCK_MONOTONIC) {
     return (time.tv_sec * NANOS_PER_SECOND) + time.tv_nsec;
 }
 
-static void displayPeakLevel(float peakLevel) {
+template <class T = float>
+void displayPeakLevel(float peakLevel) {
     printf("%5.3f ", peakLevel);
     const int maxStars = 50; // arbitrary, fits on one line
     int numStars = (int) (peakLevel * maxStars);
@@ -113,7 +116,8 @@ static void displayPeakLevel(float peakLevel) {
  * @param sampleRate
  * @return latency in milliseconds
  */
-static double calculateLatencyMillis(int64_t position1, int64_t nanoseconds1,
+template <class T = int64_t>
+double calculateLatencyMillis(int64_t position1, int64_t nanoseconds1,
                               int64_t position2, int64_t nanoseconds2,
                               int64_t sampleRate) {
     int64_t deltaFrames = position2 - position1;
@@ -127,7 +131,8 @@ static double calculateLatencyMillis(int64_t position1, int64_t nanoseconds1,
 
 // ================================================================================
 // These Futex calls are common online examples.
-static android::status_t sys_futex(void *addr1, int op, int val1,
+template <class T = int>
+android::status_t sys_futex(void *addr1, int op, int val1,
                       struct timespec *timeout, void *addr2, int val3) {
     android::status_t result = (android::status_t) syscall(SYS_futex, addr1,
                                                            op, val1, timeout,
@@ -135,12 +140,14 @@ static android::status_t sys_futex(void *addr1, int op, int val1,
     return (result == 0) ? 0 : -errno;
 }
 
-static android::status_t futex_wake(void *addr, int numWake) {
+template <class T = int>
+android::status_t futex_wake(void *addr, int numWake) {
     // Use _PRIVATE because we are just using the futex in one process.
     return sys_futex(addr, FUTEX_WAKE_PRIVATE, numWake, NULL, NULL, 0);
 }
 
-static android::status_t futex_wait(void *addr, int current, struct timespec *time) {
+template <class T = int>
+android::status_t futex_wait(void *addr, int current, struct timespec *time) {
     // Use _PRIVATE because we are just using the futex in one process.
     return sys_futex(addr, FUTEX_WAIT_PRIVATE, current, time, NULL, 0);
 }

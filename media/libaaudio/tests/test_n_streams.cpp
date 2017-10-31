@@ -71,7 +71,6 @@ aaudio_result_t testMaxStreams(aaudio_direction_t direction) {
 
     AAudioStreamBuilder_delete(aaudioBuilder);
 
-finish:
     return result;
 }
 
