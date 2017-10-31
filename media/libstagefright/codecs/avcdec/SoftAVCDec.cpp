@@ -578,7 +578,7 @@ void SoftAVC::onQueueFilled(OMX_U32 portIndex) {
                 notifyEmptyBufferDone(inHeader);
 
                 if (!(inHeader->nFlags & OMX_BUFFERFLAG_EOS)) {
-                    continue;
+                    return;
                 }
 
                 mReceivedEOS = true;
