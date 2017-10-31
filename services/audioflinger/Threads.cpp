@@ -197,7 +197,7 @@ static int sFastTrackMultiplier = kFastTrackMultiplier;
 // Initially this heap is used to allocate client buffers for "fast" AudioRecord.
 // Eventually it will be the single buffer that FastCapture writes into via HAL read(),
 // and that all "fast" AudioRecord clients read from.  In either case, the size can be small.
-static const size_t kRecordThreadReadOnlyHeapSize = 0x2000;
+static const size_t kRecordThreadReadOnlyHeapSize = 0x4000;
 
 // ----------------------------------------------------------------------------
 
