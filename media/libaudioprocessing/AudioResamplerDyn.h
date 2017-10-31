@@ -55,6 +55,39 @@ public:
     virtual size_t resample(int32_t* out, size_t outFrameCount,
             AudioBufferProvider* provider);
 
+    // Make available key design criteria for testing
+    int getHalfLength() const {
+        return mConstants.mHalfNumCoefs;
+    }
+
+    const TC *getFilterCoefs() const {
+        return mConstants.mFirCoefs;
+    }
+
+    int getPhases() const {
+        return mConstants.mL;
+    }
+
+    double getStopbandAttenuationDb() const {
+        return mStopbandAttenuationDb;
+    }
+
+    double getPassbandRippleDb() const {
+        return mPassbandRippleDb;
+    }
+
+    double getNormalizedTransitionBandwidth() const {
+        return mNormalizedTransitionBandwidth;
+    }
+
+    double getFilterAttenuation() const {
+        return mFilterAttenuation;
+    }
+
+    double getNormalizedCutoffFrequency() const {
+        return mNormalizedCutoffFrequency;
+    }
+
 private:
 
     class Constants { // stores the filter constants.
@@ -112,6 +145,8 @@ private:
     void createKaiserFir(Constants &c, double stopBandAtten,
             int inSampleRate, int outSampleRate, double tbwCheat);
 
+    void createKaiserFir(Constants &c, double stopBandAtten, double fcr);
+
     template<int CHANNELS, bool LOCKED, int STRIDE>
     size_t resample(TO* out, size_t outFrameCount, AudioBufferProvider* provider);
 
@@ -127,6 +162,38 @@ private:
             int32_t mFilterSampleRate; // designed filter sample rate.
         src_quality mFilterQuality;    // designed filter quality.
               void* mCoefBuffer;       // if a filter is created, this is not null
+
+    // Property selected design parameters.
+              // This will enable fixed high quality resampling.
+
+              // 32 char PROP_NAME_MAX limit enforced before Android O
+
+              // Use for sample rates greater than or equal to this value.
+              // Set to non-negative to enable, negative to disable.
+              int32_t mPropertyEnableAtSampleRate = 48000;
+                      // "ro.audio.resampler.psd.enable_at_samplerate"
+
+              // Specify HALF the resampling filter length.
+              // Set to a value which is a multiple of 4.
+              int32_t mPropertyHalfFilterLength = 32;
+                      // "ro.audio.resampler.psd.halflength"
+
+              // Specify the stopband attenuation in positive dB.
+              // Set to a value greater or equal to 20.
+              int32_t mPropertyStopbandAttenuation = 90;
+                      // "ro.audio.resampler.psd.stopband"
+
+              // Specify the cutoff frequency as a percentage of Nyquist.
+              // Set to a value between 50 and 100.
+              int32_t mPropertyCutoffPercent = 100;
+                      // "ro.audio.resampler.psd.cutoff_percent"
+
+    // Filter creation design parameters, see setSampleRate()
+             double mStopbandAttenuationDb = 0.;
+             double mPassbandRippleDb = 0.;
+             double mNormalizedTransitionBandwidth = 0.;
+             double mFilterAttenuation = 0.;
+             double mNormalizedCutoffFrequency = 0.;
 };
 
 } // namespace android
