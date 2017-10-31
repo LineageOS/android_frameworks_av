@@ -1391,14 +1391,14 @@ status_t AudioTrack::createTrack_l()
 
         bool useCaseAllowed = sharedBuffer || transferAllowed;
         if (!useCaseAllowed) {
-            ALOGW("AUDIO_OUTPUT_FLAG_FAST denied, not shared buffer and transfer = %s",
+            ALOGW("AUDIO_OUTPUT_FLAG_FAST denied by client, not shared buffer and transfer = %s",
                   convertTransferToText(mTransfer));
         }
 
         // sample rates must also match
         bool sampleRateAllowed = mSampleRate == mAfSampleRate;
         if (!sampleRateAllowed) {
-            ALOGW("AUDIO_OUTPUT_FLAG_FAST denied, rates do not match %u Hz, require %u Hz",
+            ALOGW("AUDIO_OUTPUT_FLAG_FAST denied by client, sample rate %u Hz but HAL needs %u Hz",
                   mSampleRate, mAfSampleRate);
         }
 
@@ -1576,6 +1576,15 @@ status_t AudioTrack::createTrack_l()
             // or at least triple-buffering if there is sample rate conversion
             const int nBuffering = mOriginalSampleRate == mAfSampleRate ? 2 : 3;
             maxNotificationFrames = frameCount / nBuffering;
+            // If client requested a fast track but this was denied, then use the smaller maximum.
+            // FMS_20 is the minimum task wakeup period in ms for which CFS operates reliably.
+#define FMS_20 20   // FIXME share a common declaration with the same symbol in Threads.cpp
+            if (mOrigFlags & AUDIO_OUTPUT_FLAG_FAST) {
+                size_t maxNotificationFramesFastDenied = FMS_20 * mSampleRate / 1000;
+                if (maxNotificationFrames > maxNotificationFramesFastDenied) {
+                    maxNotificationFrames = maxNotificationFramesFastDenied;
+                }
+            }
         }
         if (mNotificationFramesAct == 0 || mNotificationFramesAct > maxNotificationFrames) {
             if (mNotificationFramesAct == 0) {
