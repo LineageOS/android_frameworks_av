@@ -96,7 +96,7 @@ class CameraDevice final : public RefBase {
     // device goes into fatal error state after this
     void setCameraDeviceErrorLocked(camera_status_t error);
 
-    void disconnectLocked(); // disconnect from camera service
+    void disconnectLocked(sp<ACameraCaptureSession>& session); // disconnect from camera service
 
     camera_status_t stopRepeatingLocked();
 
@@ -137,6 +137,9 @@ class CameraDevice final : public RefBase {
     void notifySessionEndOfLifeLocked(ACameraCaptureSession* session);
 
     camera_status_t configureStreamsLocked(const ACaptureSessionOutputContainer* outputs);
+
+    // Input message will be posted and cleared after this returns
+    void postSessionMsgAndCleanup(sp<AMessage>& msg);
 
     static camera_status_t getIGBPfromAnw(
             ANativeWindow* anw, sp<IGraphicBufferProducer>& out);
@@ -185,7 +188,9 @@ class CameraDevice final : public RefBase {
         kWhatCaptureFail,      // onCaptureFailed
         kWhatCaptureSeqEnd,    // onCaptureSequenceCompleted
         kWhatCaptureSeqAbort,  // onCaptureSequenceAborted
-        kWhatCaptureBufferLost // onCaptureBufferLost
+        kWhatCaptureBufferLost,// onCaptureBufferLost
+        // Internal cleanup
+        kWhatCleanUpSessions   // Cleanup cached sp<ACameraCaptureSession>
     };
     static const char* kContextKey;
     static const char* kDeviceKey;
@@ -199,10 +204,16 @@ class CameraDevice final : public RefBase {
     static const char* kSequenceIdKey;
     static const char* kFrameNumberKey;
     static const char* kAnwKey;
+
     class CallbackHandler : public AHandler {
       public:
-        CallbackHandler() {}
         void onMessageReceived(const sp<AMessage> &msg) override;
+
+      private:
+        // This handler will cache all capture session sp until kWhatCleanUpSessions
+        // is processed. This is used to guarantee the last session reference is always
+        // being removed in callback thread without holding camera device lock
+        Vector<sp<ACameraCaptureSession>> mCachedSessions;
     };
     sp<CallbackHandler> mHandler;
 
@@ -210,7 +221,7 @@ class CameraDevice final : public RefBase {
      * Capture session related members *
      ***********************************/
     // The current active session
-    ACameraCaptureSession* mCurrentSession = nullptr;
+    wp<ACameraCaptureSession> mCurrentSession;
     bool mFlushing = false;
 
     int mNextSessionId = 0;
