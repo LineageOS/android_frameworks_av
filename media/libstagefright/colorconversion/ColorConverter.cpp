@@ -129,6 +129,12 @@ status_t ColorConverter::convert(
             dstWidth, dstHeight,
             dstCropLeft, dstCropTop, dstCropRight, dstCropBottom, mDstFormat);
 
+    if (!((src.mCropLeft & 1) == 0
+        && src.cropWidth() == dst.cropWidth()
+        && src.cropHeight() == dst.cropHeight())) {
+        return ERROR_UNSUPPORTED;
+    }
+
     status_t err;
 
     switch (mSrcFormat) {
@@ -171,12 +177,6 @@ status_t ColorConverter::convertCbYCrY(
     // XXX Untested
 
     uint8_t *kAdjustedClip = initClip();
-
-    if (!((src.mCropLeft & 1) == 0
-        && src.cropWidth() == dst.cropWidth()
-        && src.cropHeight() == dst.cropHeight())) {
-        return ERROR_UNSUPPORTED;
-    }
 
     uint16_t *dst_ptr = (uint16_t *)dst.mBits
         + dst.mCropTop * dst.mWidth + dst.mCropLeft;
@@ -232,12 +232,6 @@ status_t ColorConverter::convertCbYCrY(
 
 status_t ColorConverter::convertYUV420PlanarUseLibYUV(
         const BitmapParams &src, const BitmapParams &dst) {
-    if (!((src.mCropLeft & 1) == 0
-            && src.cropWidth() == dst.cropWidth()
-            && src.cropHeight() == dst.cropHeight())) {
-        return ERROR_UNSUPPORTED;
-    }
-
     uint8_t *dst_ptr = (uint8_t *)dst.mBits
         + dst.mCropTop * dst.mStride + dst.mCropLeft * dst.mBpp;
 
@@ -338,12 +332,6 @@ void ColorConverter::writeToDst(
 }
 status_t ColorConverter::convertYUV420Planar(
         const BitmapParams &src, const BitmapParams &dst) {
-    if (!((src.mCropLeft & 1) == 0
-            && src.cropWidth() == dst.cropWidth()
-            && src.cropHeight() == dst.cropHeight())) {
-        return ERROR_UNSUPPORTED;
-    }
-
     uint8_t *kAdjustedClip = initClip();
 
     uint8_t *dst_ptr = (uint8_t *)dst.mBits
@@ -422,12 +410,6 @@ status_t ColorConverter::convertQCOMYUV420SemiPlanar(
         const BitmapParams &src, const BitmapParams &dst) {
     uint8_t *kAdjustedClip = initClip();
 
-    if (!((src.mCropLeft & 1) == 0
-            && src.cropWidth() == dst.cropWidth()
-            && src.cropHeight() == dst.cropHeight())) {
-        return ERROR_UNSUPPORTED;
-    }
-
     uint16_t *dst_ptr = (uint16_t *)dst.mBits
         + dst.mCropTop * dst.mWidth + dst.mCropLeft;
 
@@ -496,12 +478,6 @@ status_t ColorConverter::convertYUV420SemiPlanar(
 
     uint8_t *kAdjustedClip = initClip();
 
-    if (!((src.mCropLeft & 1) == 0
-            && src.cropWidth() == dst.cropWidth()
-            && src.cropHeight() == dst.cropHeight())) {
-        return ERROR_UNSUPPORTED;
-    }
-
     uint16_t *dst_ptr = (uint16_t *)dst.mBits
         + dst.mCropTop * dst.mWidth + dst.mCropLeft;
 
@@ -567,12 +543,6 @@ status_t ColorConverter::convertYUV420SemiPlanar(
 status_t ColorConverter::convertTIYUV420PackedSemiPlanar(
         const BitmapParams &src, const BitmapParams &dst) {
     uint8_t *kAdjustedClip = initClip();
-
-    if (!((src.mCropLeft & 1) == 0
-            && src.cropWidth() == dst.cropWidth()
-            && src.cropHeight() == dst.cropHeight())) {
-        return ERROR_UNSUPPORTED;
-    }
 
     uint16_t *dst_ptr = (uint16_t *)dst.mBits
         + dst.mCropTop * dst.mWidth + dst.mCropLeft;

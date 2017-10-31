@@ -25,8 +25,8 @@
 #include <drm/drm_framework_common.h>
 #include <media/IDataSource.h>
 #include <media/mediametadataretriever.h>
-#include <media/stagefright/foundation/ADebug.h>
 #include <media/MediaSource.h>
+#include <media/stagefright/foundation/ADebug.h>
 #include <private/media/VideoFrame.h>
 #include <utils/Log.h>
 #include <utils/RefBase.h>
@@ -270,7 +270,9 @@ HeifDecoderImpl::HeifDecoderImpl() :
     // it's not, default to HAL_PIXEL_FORMAT_RGB_565.
     mOutputColor(HAL_PIXEL_FORMAT_RGB_565),
     mCurScanline(0),
-    mFrameDecoded(false) {
+    mFrameDecoded(false),
+    mHasImage(false),
+    mHasVideo(false) {
 }
 
 HeifDecoderImpl::~HeifDecoderImpl() {
@@ -278,6 +280,8 @@ HeifDecoderImpl::~HeifDecoderImpl() {
 
 bool HeifDecoderImpl::init(HeifStream* stream, HeifFrameInfo* frameInfo) {
     mFrameDecoded = false;
+    mFrameMemory.clear();
+
     sp<HeifDataSource> dataSource = new HeifDataSource(stream);
     if (!dataSource->init()) {
         return false;
@@ -285,7 +289,7 @@ bool HeifDecoderImpl::init(HeifStream* stream, HeifFrameInfo* frameInfo) {
     mDataSource = dataSource;
 
     mRetriever = new MediaMetadataRetriever();
-    status_t err = mRetriever->setDataSource(mDataSource, "video/mp4");
+    status_t err = mRetriever->setDataSource(mDataSource, "image/heif");
     if (err != OK) {
         ALOGE("failed to set data source!");
 
@@ -295,15 +299,21 @@ bool HeifDecoderImpl::init(HeifStream* stream, HeifFrameInfo* frameInfo) {
     }
     ALOGV("successfully set data source.");
 
+    const char* hasImage = mRetriever->extractMetadata(METADATA_KEY_HAS_IMAGE);
     const char* hasVideo = mRetriever->extractMetadata(METADATA_KEY_HAS_VIDEO);
-    if (!hasVideo || strcasecmp(hasVideo, "yes")) {
-        ALOGE("no video: %s", hasVideo ? hasVideo : "null");
-        return false;
+
+    mHasImage = hasImage && !strcasecmp(hasImage, "yes");
+    mHasVideo = hasVideo && !strcasecmp(hasVideo, "yes");
+    if (mHasImage) {
+        // image index < 0 to retrieve primary image
+        mFrameMemory = mRetriever->getImageAtIndex(
+                -1, mOutputColor, true /*metaOnly*/);
+    } else if (mHasVideo) {
+        mFrameMemory = mRetriever->getFrameAtTime(0,
+                MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC,
+                mOutputColor, true /*metaOnly*/);
     }
 
-    mFrameMemory = mRetriever->getFrameAtTime(0,
-            MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC,
-            mOutputColor, true /*metaOnly*/);
     if (mFrameMemory == nullptr || mFrameMemory->pointer() == nullptr) {
         ALOGE("getFrameAtTime: videoFrame is a nullptr");
         return false;
@@ -368,8 +378,14 @@ bool HeifDecoderImpl::decode(HeifFrameInfo* frameInfo) {
         return true;
     }
 
-    mFrameMemory = mRetriever->getFrameAtTime(0,
-            MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC, mOutputColor);
+    if (mHasImage) {
+        // image index < 0 to retrieve primary image
+        mFrameMemory = mRetriever->getImageAtIndex(-1, mOutputColor);
+    } else if (mHasVideo) {
+        mFrameMemory = mRetriever->getFrameAtTime(0,
+                MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC, mOutputColor);
+    }
+
     if (mFrameMemory == nullptr || mFrameMemory->pointer() == nullptr) {
         ALOGE("getFrameAtTime: videoFrame is a nullptr");
         return false;

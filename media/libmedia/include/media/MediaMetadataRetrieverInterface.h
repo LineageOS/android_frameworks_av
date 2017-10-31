@@ -22,6 +22,7 @@
 #include <media/mediametadataretriever.h>
 #include <media/mediascanner.h>
 #include <private/media/VideoFrame.h>
+#include <media/stagefright/MediaErrors.h>
 
 namespace android {
 
@@ -41,9 +42,14 @@ public:
             const KeyedVector<String8, String8> *headers = NULL) = 0;
 
     virtual status_t    setDataSource(int fd, int64_t offset, int64_t length) = 0;
-    virtual status_t setDataSource(const sp<DataSource>& source, const char *mime) = 0;
+    virtual status_t    setDataSource(const sp<DataSource>& source, const char *mime) = 0;
     virtual VideoFrame* getFrameAtTime(
             int64_t timeUs, int option, int colorFormat, bool metaOnly) = 0;
+    virtual VideoFrame* getImageAtIndex(
+            int index, int colorFormat, bool metaOnly) = 0;
+    virtual status_t getFrameAtIndex(
+            std::vector<VideoFrame*>* frames,
+            int frameIndex, int numFrames, int colorFormat, bool metaOnly);
     virtual MediaAlbumArt* extractAlbumArt() = 0;
     virtual const char* extractMetadata(int keyCode) = 0;
 };
@@ -58,6 +64,13 @@ public:
     virtual VideoFrame* getFrameAtTime(
             int64_t /*timeUs*/, int /*option*/, int /*colorFormat*/, bool /*metaOnly*/)
     { return NULL; }
+    virtual VideoFrame* getImageAtIndex(
+            int /*index*/, int /*colorFormat*/, bool /*metaOnly*/)
+    { return NULL; }
+    virtual status_t getFrameAtIndex(
+            std::vector<VideoFrame*>* /*frames*/,
+            int /*frameIndex*/, int /*numFrames*/, int /*colorFormat*/, bool /*metaOnly*/)
+    { return ERROR_UNSUPPORTED; }
     virtual MediaAlbumArt* extractAlbumArt() { return NULL; }
     virtual const char* extractMetadata(int /*keyCode*/) { return NULL; }
 };

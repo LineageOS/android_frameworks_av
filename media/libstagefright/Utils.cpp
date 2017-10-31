@@ -639,7 +639,8 @@ status_t convertMetaDataToMessage(
         msg->setString("language", lang);
     }
 
-    if (!strncasecmp("video/", mime, 6)) {
+    if (!strncasecmp("video/", mime, 6) ||
+            !strncasecmp("image/", mime, 6)) {
         int32_t width, height;
         if (!meta->findInt32(kKeyWidth, &width)
                 || !meta->findInt32(kKeyHeight, &height)) {
@@ -661,6 +662,19 @@ status_t convertMetaDataToMessage(
                 && meta->findInt32(kKeySARHeight, &sarHeight)) {
             msg->setInt32("sar-width", sarWidth);
             msg->setInt32("sar-height", sarHeight);
+        }
+
+        if (!strncasecmp("image/", mime, 6)) {
+            int32_t gridWidth, gridHeight, gridRows, gridCols;
+            if (meta->findInt32(kKeyGridWidth, &gridWidth)
+                    && meta->findInt32(kKeyHeight, &gridHeight)
+                    && meta->findInt32(kKeyGridRows, &gridRows)
+                    && meta->findInt32(kKeyGridCols, &gridCols)) {
+                msg->setInt32("grid-width", gridWidth);
+                msg->setInt32("grid-height", gridHeight);
+                msg->setInt32("grid-rows", gridRows);
+                msg->setInt32("grid-cols", gridCols);
+            }
         }
 
         int32_t colorFormat;

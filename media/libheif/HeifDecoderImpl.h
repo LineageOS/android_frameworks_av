@@ -55,6 +55,8 @@ private:
     android_pixel_format_t mOutputColor;
     size_t mCurScanline;
     bool mFrameDecoded;
+    bool mHasImage;
+    bool mHasVideo;
 };
 
 } // namespace android

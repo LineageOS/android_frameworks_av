@@ -72,7 +72,8 @@ public:
     enum {
         kFlagBefore,
         kFlagAfter,
-        kFlagClosest
+        kFlagClosest,
+        kFlagFrameIndex,
     };
     status_t findSampleAtTime(
             uint64_t req_time, uint64_t scale_num, uint64_t scale_den,

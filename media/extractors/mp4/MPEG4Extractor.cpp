@@ -138,7 +138,7 @@ private:
 
     uint8_t *mSrcBuffer;
 
-    bool mIsHEIF;
+    bool mIsHeif;
     sp<ItemTable> mItemTable;
 
     size_t parseNALSize(const uint8_t *data) const;
@@ -338,7 +338,7 @@ static bool AdjustChannelsAndRate(uint32_t fourcc, uint32_t *channels, uint32_t 
     return false;
 }
 
-MPEG4Extractor::MPEG4Extractor(const sp<DataSource> &source)
+MPEG4Extractor::MPEG4Extractor(const sp<DataSource> &source, const char *mime)
     : mMoofOffset(0),
       mMoofFound(false),
       mMdatFound(false),
@@ -346,12 +346,15 @@ MPEG4Extractor::MPEG4Extractor(const sp<DataSource> &source)
       mInitCheck(NO_INIT),
       mHeaderTimescale(0),
       mIsQT(false),
-      mIsHEIF(false),
+      mIsHeif(false),
+      mIsHeifSequence(false),
+      mPreferHeif(mime != NULL && !strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_HEIF)),
       mFirstTrack(NULL),
       mLastTrack(NULL),
       mFileMetaData(new MetaData),
       mFirstSINF(NULL),
       mIsDrm(false) {
+    ALOGV("mime=%s, mPreferHeif=%d", mime, mPreferHeif);
 }
 
 MPEG4Extractor::~MPEG4Extractor() {
@@ -560,8 +563,9 @@ status_t MPEG4Extractor::readMetaData() {
     status_t err;
     bool sawMoovOrSidx = false;
 
-    while (!((sawMoovOrSidx && (mMdatFound || mMoofFound)) ||
-            (mIsHEIF && (mItemTable != NULL) && mItemTable->isValid()))) {
+    while (!((!mIsHeif && sawMoovOrSidx && (mMdatFound || mMoofFound)) ||
+             (mIsHeif && (mPreferHeif || !mIsHeifSequence)
+                     && (mItemTable != NULL) && mItemTable->isValid()))) {
         off64_t orig_offset = offset;
         err = parseChunk(&offset, 0);
 
@@ -578,12 +582,47 @@ status_t MPEG4Extractor::readMetaData() {
         }
     }
 
+    if (mIsHeif) {
+        uint32_t imageCount = mItemTable->countImages();
+        if (imageCount == 0) {
+            ALOGE("found no image in heif!");
+        } else {
+            for (uint32_t imageIndex = 0; imageIndex < imageCount; imageIndex++) {
+                sp<MetaData> meta = mItemTable->getImageMeta(imageIndex);
+                if (meta == NULL) {
+                    ALOGE("heif image %u has no meta!", imageIndex);
+                    continue;
+                }
+
+                ALOGV("adding HEIF image track %u", imageIndex);
+                Track *track = new Track;
+                track->next = NULL;
+                if (mLastTrack != NULL) {
+                    mLastTrack->next = track;
+                } else {
+                    mFirstTrack = track;
+                }
+                mLastTrack = track;
+
+                track->meta = meta;
+                track->meta->setInt32(kKeyTrackID, imageIndex);
+                track->includes_expensive_metadata = false;
+                track->skipTrack = false;
+                track->timescale = 0;
+            }
+        }
+    }
+
     if (mInitCheck == OK) {
         if (findTrackByMimePrefix("video/") != NULL) {
             mFileMetaData->setCString(
                     kKeyMIMEType, MEDIA_MIMETYPE_CONTAINER_MPEG4);
         } else if (findTrackByMimePrefix("audio/") != NULL) {
             mFileMetaData->setCString(kKeyMIMEType, "audio/mp4");
+        } else if (findTrackByMimePrefix(
+                MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC) != NULL) {
+            mFileMetaData->setCString(
+                    kKeyMIMEType, MEDIA_MIMETYPE_CONTAINER_HEIF);
         } else {
             mFileMetaData->setCString(kKeyMIMEType, "application/octet-stream");
         }
@@ -612,28 +651,6 @@ status_t MPEG4Extractor::readMetaData() {
         }
         mFileMetaData->setData(kKeyPssh, 'pssh', buf, psshsize);
         free(buf);
-    }
-
-    if (mIsHEIF) {
-        sp<MetaData> meta = mItemTable->getImageMeta();
-        if (meta == NULL) {
-            return ERROR_MALFORMED;
-        }
-
-        Track *track = mLastTrack;
-        if (track != NULL) {
-            ALOGW("track is set before metadata is fully processed");
-        } else {
-            track = new Track;
-            track->next = NULL;
-            mFirstTrack = mLastTrack = track;
-        }
-
-        track->meta = meta;
-        track->meta->setInt32(kKeyTrackID, 0);
-        track->includes_expensive_metadata = false;
-        track->skipTrack = false;
-        track->timescale = 0;
     }
 
     return mInitCheck;
@@ -1037,6 +1054,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 }
                 isTrack = true;
 
+                ALOGV("adding new track");
                 Track *track = new Track;
                 track->next = NULL;
                 if (mLastTrack) {
@@ -1084,6 +1102,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 }
 
                 if (mLastTrack->skipTrack) {
+                    ALOGV("skipping this track...");
                     Track *cur = mFirstTrack;
 
                     if (cur == mLastTrack) {
@@ -1256,6 +1275,25 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             if ((err = parseTrackHeader(data_offset, chunk_data_size)) != OK) {
                 return err;
             }
+
+            break;
+        }
+
+        case FOURCC('t', 'r', 'e', 'f'):
+        {
+            *offset += chunk_size;
+
+            if (mLastTrack == NULL) {
+                return ERROR_MALFORMED;
+            }
+
+            // Skip thumbnail track for now since we don't have an
+            // API to retrieve it yet.
+            // The thumbnail track can't be accessed by negative index or time,
+            // because each timed sample has its own corresponding thumbnail
+            // in the thumbnail track. We'll need a dedicated API to retrieve
+            // thumbnail at time instead.
+            mLastTrack->skipTrack = true;
 
             break;
         }
@@ -1758,6 +1796,8 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                             mLastTrack->meta->setInt32(kKeyFrameRate, frameRate);
                         }
                     }
+                    ALOGV("setting frame count %zu", nSamples);
+                    mLastTrack->meta->setInt32(kKeyFrameCount, nSamples);
                 }
             }
 
@@ -2089,7 +2129,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case FOURCC('i', 'r', 'e', 'f'):
         case FOURCC('i', 'p', 'r', 'o'):
         {
-            if (mIsHEIF) {
+            if (mIsHeif) {
                 if (mItemTable == NULL) {
                     mItemTable = new ItemTable(mDataSource);
                 }
@@ -2469,10 +2509,17 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 
             if (brandSet.count(FOURCC('q', 't', ' ', ' ')) > 0) {
                 mIsQT = true;
-            } else if (brandSet.count(FOURCC('m', 'i', 'f', '1')) > 0
-                    && brandSet.count(FOURCC('h', 'e', 'i', 'c')) > 0) {
-                mIsHEIF = true;
-                ALOGV("identified HEIF image");
+            } else {
+                if (brandSet.count(FOURCC('m', 'i', 'f', '1')) > 0
+                 && brandSet.count(FOURCC('h', 'e', 'i', 'c')) > 0) {
+                    mIsHeif = true;
+                    ALOGV("identified HEIF image");
+                }
+                if (brandSet.count(FOURCC('m', 's', 'f', '1')) > 0
+                 && brandSet.count(FOURCC('h', 'e', 'v', 'c')) > 0) {
+                    mIsHeifSequence = true;
+                    ALOGV("identified HEIF image sequence");
+                }
             }
 
             *offset = stop_offset;
@@ -3391,6 +3438,7 @@ sp<MediaSource> MPEG4Extractor::getTrack(size_t index) {
         return NULL;
     }
 
+    sp<ItemTable> itemTable;
     if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)) {
         uint32_t type;
         const void *data;
@@ -3404,7 +3452,8 @@ sp<MediaSource> MPEG4Extractor::getTrack(size_t index) {
         if (size < 7 || ptr[0] != 1) {  // configurationVersion == 1
             return NULL;
         }
-    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC)) {
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC)
+            || !strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC)) {
         uint32_t type;
         const void *data;
         size_t size;
@@ -3417,11 +3466,14 @@ sp<MediaSource> MPEG4Extractor::getTrack(size_t index) {
         if (size < 22 || ptr[0] != 1) {  // configurationVersion == 1
             return NULL;
         }
+        if (!strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC)) {
+            itemTable = mItemTable;
+        }
     }
 
     sp<MPEG4Source> source =  new MPEG4Source(this,
             track->meta, mDataSource, track->timescale, track->sampleTable,
-            mSidxEntries, trex, mMoofOffset, mItemTable);
+            mSidxEntries, trex, mMoofOffset, itemTable);
     if (source->init() != OK) {
         return NULL;
     }
@@ -3849,7 +3901,7 @@ MPEG4Source::MPEG4Source(
       mBuffer(NULL),
       mWantsNALFragments(false),
       mSrcBuffer(NULL),
-      mIsHEIF(itemTable != NULL),
+      mIsHeif(itemTable != NULL),
       mItemTable(itemTable) {
 
     memset(&mTrackFragmentHeaderInfo, 0, sizeof(mTrackFragmentHeaderInfo));
@@ -3871,7 +3923,8 @@ MPEG4Source::MPEG4Source(
     CHECK(success);
 
     mIsAVC = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC);
-    mIsHEVC = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC);
+    mIsHEVC = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC) ||
+              !strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC);
 
     if (mIsAVC) {
         uint32_t type;
@@ -4625,15 +4678,19 @@ status_t MPEG4Source::read(
     int64_t seekTimeUs;
     ReadOptions::SeekMode mode;
     if (options && options->getSeekTo(&seekTimeUs, &mode)) {
-        if (mIsHEIF) {
+        if (mIsHeif) {
             CHECK(mSampleTable == NULL);
             CHECK(mItemTable != NULL);
+            int32_t imageIndex;
+            if (!mFormat->findInt32(kKeyTrackID, &imageIndex)) {
+                return ERROR_MALFORMED;
+            }
 
             status_t err;
             if (seekTimeUs >= 0) {
-                err = mItemTable->findPrimaryImage(&mCurrentSampleIndex);
+                err = mItemTable->findImageItem(imageIndex, &mCurrentSampleIndex);
             } else {
-                err = mItemTable->findThumbnail(&mCurrentSampleIndex);
+                err = mItemTable->findThumbnailItem(imageIndex, &mCurrentSampleIndex);
             }
             if (err != OK) {
                 return err;
@@ -4651,6 +4708,9 @@ status_t MPEG4Source::read(
                 case ReadOptions::SEEK_CLOSEST:
                     findFlags = SampleTable::kFlagClosest;
                     break;
+                case ReadOptions::SEEK_FRAME_INDEX:
+                    findFlags = SampleTable::kFlagFrameIndex;
+                    break;
                 default:
                     CHECK(!"Should not be here.");
                     break;
@@ -4661,7 +4721,8 @@ status_t MPEG4Source::read(
                     seekTimeUs, 1000000, mTimescale,
                     &sampleIndex, findFlags);
 
-            if (mode == ReadOptions::SEEK_CLOSEST) {
+            if (mode == ReadOptions::SEEK_CLOSEST
+                    || mode == ReadOptions::SEEK_FRAME_INDEX) {
                 // We found the closest sample already, now we want the sync
                 // sample preceding it (or the sample itself of course), even
                 // if the subsequent sync sample is closer.
@@ -4693,7 +4754,8 @@ status_t MPEG4Source::read(
                 return err;
             }
 
-            if (mode == ReadOptions::SEEK_CLOSEST) {
+            if (mode == ReadOptions::SEEK_CLOSEST
+                || mode == ReadOptions::SEEK_FRAME_INDEX) {
                 targetSampleTimeUs = (sampleTime * 1000000ll) / mTimescale;
             }
 
@@ -4729,7 +4791,7 @@ status_t MPEG4Source::read(
         newBuffer = true;
 
         status_t err;
-        if (!mIsHEIF) {
+        if (!mIsHeif) {
             err = mSampleTable->getMetaDataForSample(
                     mCurrentSampleIndex, &offset, &size, &cts, &isSyncSample, &stts);
         } else {
@@ -5316,7 +5378,8 @@ static bool LegacySniffMPEG4(
         || !memcmp(header, "ftypisom", 8) || !memcmp(header, "ftypM4V ", 8)
         || !memcmp(header, "ftypM4A ", 8) || !memcmp(header, "ftypf4v ", 8)
         || !memcmp(header, "ftypkddi", 8) || !memcmp(header, "ftypM4VP", 8)
-        || !memcmp(header, "ftypmif1", 8) || !memcmp(header, "ftypheic", 8)) {
+        || !memcmp(header, "ftypmif1", 8) || !memcmp(header, "ftypheic", 8)
+        || !memcmp(header, "ftypmsf1", 8) || !memcmp(header, "ftyphevc", 8)) {
         *mimeType = MEDIA_MIMETYPE_CONTAINER_MPEG4;
         *confidence = 0.4;
 
@@ -5347,6 +5410,8 @@ static bool isCompatibleBrand(uint32_t fourcc) {
         FOURCC('3', 'g', '2', 'b'),
         FOURCC('m', 'i', 'f', '1'),  // HEIF image
         FOURCC('h', 'e', 'i', 'c'),  // HEIF image
+        FOURCC('m', 's', 'f', '1'),  // HEIF image sequence
+        FOURCC('h', 'e', 'v', 'c'),  // HEIF image sequence
     };
 
     for (size_t i = 0;
