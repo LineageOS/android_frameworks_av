@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudioService"
+#define LOG_TAG "AAudioServiceEndpointCapture"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -57,7 +57,7 @@ aaudio_result_t AAudioServiceEndpointCapture::open(const aaudio::AAudioStreamReq
 
 // Read data from the shared MMAP stream and then distribute it to the client streams.
 void *AAudioServiceEndpointCapture::callbackLoop() {
-    ALOGD("AAudioServiceEndpointCapture(): callbackLoop() entering");
+    ALOGD("callbackLoop() entering");
     int32_t underflowCount = 0;
     aaudio_result_t result = AAUDIO_OK;
     int64_t timeoutNanos = getStreamInternal()->calculateReasonableTimeout();
@@ -73,7 +73,7 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
             disconnectRegisteredStreams();
             break;
         } else if (result != getFramesPerBurst()) {
-            ALOGW("AAudioServiceEndpointCapture(): callbackLoop() read %d / %d",
+            ALOGW("callbackLoop() read %d / %d",
                   result, getFramesPerBurst());
             break;
         }
@@ -125,6 +125,6 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
         }
     }
 
-    ALOGD("AAudioServiceEndpointCapture(): callbackLoop() exiting, %d underflows", underflowCount);
+    ALOGD("callbackLoop() exiting, %d underflows", underflowCount);
     return NULL; // TODO review
 }

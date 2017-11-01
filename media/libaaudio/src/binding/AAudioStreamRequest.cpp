@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudio"
+#define LOG_TAG "AAudioStreamRequest"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -58,7 +58,7 @@ status_t AAudioStreamRequest::writeToParcel(Parcel* parcel) const {
     return NO_ERROR;
 
 error:
-    ALOGE("AAudioStreamRequest.writeToParcel(): write failed = %d", status);
+    ALOGE("writeToParcel(): write failed = %d", status);
     return status;
 }
 
@@ -80,7 +80,7 @@ status_t AAudioStreamRequest::readFromParcel(const Parcel* parcel) {
     return NO_ERROR;
 
 error:
-    ALOGE("AAudioStreamRequest.readFromParcel(): read failed = %d", status);
+    ALOGE("readFromParcel(): read failed = %d", status);
     return status;
 }
 
@@ -89,9 +89,9 @@ aaudio_result_t AAudioStreamRequest::validate() const {
 }
 
 void AAudioStreamRequest::dump() const {
-    ALOGD("AAudioStreamRequest mUserId    = %d", mUserId);
-    ALOGD("AAudioStreamRequest mProcessId = %d", mProcessId);
-    ALOGD("AAudioStreamRequest mSharingModeMatchRequired = %d", mSharingModeMatchRequired);
-    ALOGD("AAudioStreamRequest mInService = %d", mInService);
+    ALOGD("mUserId    = %d", mUserId);
+    ALOGD("mProcessId = %d", mProcessId);
+    ALOGD("mSharingModeMatchRequired = %d", mSharingModeMatchRequired);
+    ALOGD("mInService = %d", mInService);
     mConfiguration.dump();
 }

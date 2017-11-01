@@ -74,7 +74,7 @@ int32_t AAudioServiceStreamShared::calculateBufferCapacity(int32_t requestedCapa
                                                            int32_t framesPerBurst) {
 
     if (requestedCapacityFrames > MAX_FRAMES_PER_BUFFER) {
-        ALOGE("AAudioServiceStreamShared::calculateBufferCapacity() requested capacity %d > max %d",
+        ALOGE("calculateBufferCapacity() requested capacity %d > max %d",
               requestedCapacityFrames, MAX_FRAMES_PER_BUFFER);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
@@ -99,7 +99,7 @@ int32_t AAudioServiceStreamShared::calculateBufferCapacity(int32_t requestedCapa
     }
     // Check for numeric overflow.
     if (numBursts > 0x8000 || framesPerBurst > 0x8000) {
-        ALOGE("AAudioServiceStreamShared::calculateBufferCapacity() overflow, capacity = %d * %d",
+        ALOGE("calculateBufferCapacity() overflow, capacity = %d * %d",
               numBursts, framesPerBurst);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
@@ -107,11 +107,11 @@ int32_t AAudioServiceStreamShared::calculateBufferCapacity(int32_t requestedCapa
 
     // Final sanity check.
     if (capacityInFrames > MAX_FRAMES_PER_BUFFER) {
-        ALOGE("AAudioServiceStreamShared::calculateBufferCapacity() calc capacity %d > max %d",
+        ALOGE("calculateBufferCapacity() calc capacity %d > max %d",
               capacityInFrames, MAX_FRAMES_PER_BUFFER);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
-    ALOGD("AAudioServiceStreamShared::calculateBufferCapacity() requested %d frames, actual = %d",
+    ALOGD("calculateBufferCapacity() requested %d frames, actual = %d",
           requestedCapacityFrames, capacityInFrames);
     return capacityInFrames;
 }
@@ -122,7 +122,7 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
 
     aaudio_result_t result = AAudioServiceStreamBase::open(request, AAUDIO_SHARING_MODE_SHARED);
     if (result != AAUDIO_OK) {
-        ALOGE("AAudioServiceStreamBase open() returned %d", result);
+        ALOGE("open() returned %d", result);
         return result;
     }
 
@@ -134,7 +134,7 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
     if (getFormat() == AAUDIO_FORMAT_UNSPECIFIED) {
         setFormat(AAUDIO_FORMAT_PCM_FLOAT);
     } else if (getFormat() != AAUDIO_FORMAT_PCM_FLOAT) {
-        ALOGE("AAudioServiceStreamShared::open() mAudioFormat = %d, need FLOAT", getFormat());
+        ALOGE("open() mAudioFormat = %d, need FLOAT", getFormat());
         result = AAUDIO_ERROR_INVALID_FORMAT;
         goto error;
     }
@@ -143,7 +143,7 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
     if (getSampleRate() == AAUDIO_UNSPECIFIED) {
         setSampleRate(mServiceEndpoint->getSampleRate());
     } else if (getSampleRate() != mServiceEndpoint->getSampleRate()) {
-        ALOGE("AAudioServiceStreamShared::open() mSampleRate = %d, need %d",
+        ALOGE("open() mSampleRate = %d, need %d",
               getSampleRate(), mServiceEndpoint->getSampleRate());
         result = AAUDIO_ERROR_INVALID_RATE;
         goto error;
@@ -153,7 +153,7 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
     if (getSamplesPerFrame() == AAUDIO_UNSPECIFIED) {
         setSamplesPerFrame(mServiceEndpoint->getSamplesPerFrame());
     } else if (getSamplesPerFrame() != mServiceEndpoint->getSamplesPerFrame()) {
-        ALOGE("AAudioServiceStreamShared::open() mSamplesPerFrame = %d, need %d",
+        ALOGE("open() mSamplesPerFrame = %d, need %d",
               getSamplesPerFrame(), mServiceEndpoint->getSamplesPerFrame());
         result = AAUDIO_ERROR_OUT_OF_RANGE;
         goto error;
@@ -173,14 +173,14 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
         mAudioDataQueue = new SharedRingBuffer();
         result = mAudioDataQueue->allocate(calculateBytesPerFrame(), getBufferCapacity());
         if (result != AAUDIO_OK) {
-            ALOGE("AAudioServiceStreamShared::open() could not allocate FIFO with %d frames",
+            ALOGE("open() could not allocate FIFO with %d frames",
                   getBufferCapacity());
             result = AAUDIO_ERROR_NO_MEMORY;
             goto error;
         }
     }
 
-    ALOGD("AAudioServiceStreamShared::open() actual rate = %d, channels = %d, deviceId = %d",
+    ALOGD("open() actual rate = %d, channels = %d, deviceId = %d",
           getSampleRate(), getSamplesPerFrame(), mServiceEndpoint->getDeviceId());
 
     result = mServiceEndpoint->registerStream(keep);

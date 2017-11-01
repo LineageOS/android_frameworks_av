@@ -140,7 +140,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
                                                           this, // callback
                                                           mMmapStream,
                                                           &mPortHandle);
-    ALOGD("AAudioServiceEndpointMMAP::open() mMapClient.uid = %d, pid = %d => portHandle = %d\n",
+    ALOGD("open() mMapClient.uid = %d, pid = %d => portHandle = %d\n",
           mMmapClient.clientUid,  mMmapClient.clientPid, mPortHandle);
     if (status != OK) {
         ALOGE("openMmapStream returned status %d", status);
@@ -148,7 +148,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
     }
 
     if (deviceId == AAUDIO_UNSPECIFIED) {
-        ALOGW("AAudioServiceEndpointMMAP::open() - openMmapStream() failed to set deviceId");
+        ALOGW("open() - openMmapStream() failed to set deviceId");
     }
     setDeviceId(deviceId);
 
@@ -159,7 +159,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
     }
     status = mMmapStream->createMmapBuffer(minSizeFrames, &mMmapBufferinfo);
     if (status != OK) {
-        ALOGE("AAudioServiceEndpointMMAP::open() - createMmapBuffer() failed with status %d %s",
+        ALOGE("open() - createMmapBuffer() failed with status %d %s",
               status, strerror(-status));
         result = AAUDIO_ERROR_UNAVAILABLE;
         goto error;
@@ -186,7 +186,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
             // Fallback is handled by caller but indicate what is possible in case
             // this is used in the future
             setSharingMode(AAUDIO_SHARING_MODE_SHARED);
-            ALOGW("AAudioServiceEndpointMMAP::open() - exclusive FD cannot be used by client");
+            ALOGW("open() - exclusive FD cannot be used by client");
             result = AAUDIO_ERROR_UNAVAILABLE;
             goto error;
         }
@@ -201,7 +201,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
     // Assume that AudioFlinger will close the original shared_memory_fd.
     mAudioDataFileDescriptor.reset(dup(mMmapBufferinfo.shared_memory_fd));
     if (mAudioDataFileDescriptor.get() == -1) {
-        ALOGE("AAudioServiceEndpointMMAP::open() - could not dup shared_memory_fd");
+        ALOGE("open() - could not dup shared_memory_fd");
         result = AAUDIO_ERROR_INTERNAL;
         goto error;
     }
@@ -219,10 +219,10 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
         burstMicros = mFramesPerBurst * static_cast<int64_t>(1000000) / getSampleRate();
     } while (burstMicros < burstMinMicros);
 
-    ALOGD("AAudioServiceEndpointMMAP::open() original burst = %d, minMicros = %d, to burst = %d\n",
+    ALOGD("open() original burst = %d, minMicros = %d, to burst = %d\n",
           mMmapBufferinfo.burst_size_frames, burstMinMicros, mFramesPerBurst);
 
-    ALOGD("AAudioServiceEndpointMMAP::open() actual rate = %d, channels = %d"
+    ALOGD("open() actual rate = %d, channels = %d"
           ", deviceId = %d, capacity = %d\n",
           getSampleRate(), getSamplesPerFrame(), deviceId, getBufferCapacity());
 
@@ -236,7 +236,7 @@ error:
 aaudio_result_t AAudioServiceEndpointMMAP::close() {
 
     if (mMmapStream != 0) {
-        ALOGD("AAudioServiceEndpointMMAP::close() clear() endpoint");
+        ALOGD("close() clear() endpoint");
         // Needs to be explicitly cleared or CTS will fail but it is not clear why.
         mMmapStream.clear();
         // Apparently the above close is asynchronous. An attempt to open a new device
@@ -271,12 +271,12 @@ aaudio_result_t AAudioServiceEndpointMMAP::stopStream(sp<AAudioServiceStreamBase
 aaudio_result_t AAudioServiceEndpointMMAP::startClient(const android::AudioClient& client,
                                                        audio_port_handle_t *clientHandle) {
     if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
-    ALOGD("AAudioServiceEndpointMMAP::startClient(%p(uid=%d, pid=%d))",
+    ALOGD("startClient(%p(uid=%d, pid=%d))",
           &client, client.clientUid, client.clientPid);
     audio_port_handle_t originalHandle =  *clientHandle;
     status_t status = mMmapStream->start(client, clientHandle);
     aaudio_result_t result = AAudioConvert_androidToAAudioResult(status);
-    ALOGD("AAudioServiceEndpointMMAP::startClient() , %d => %d returns %d",
+    ALOGD("startClient() , %d => %d returns %d",
           originalHandle, *clientHandle, result);
     return result;
 }
@@ -284,7 +284,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::startClient(const android::AudioClien
 aaudio_result_t AAudioServiceEndpointMMAP::stopClient(audio_port_handle_t clientHandle) {
     if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
     aaudio_result_t result = AAudioConvert_androidToAAudioResult(mMmapStream->stop(clientHandle));
-    ALOGD("AAudioServiceEndpointMMAP::stopClient(%d) returns %d", clientHandle, result);
+    ALOGD("stopClient(%d) returns %d", clientHandle, result);
     return result;
 }
 
@@ -296,7 +296,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::getFreeRunningPosition(int64_t *posit
         return AAUDIO_ERROR_NULL;
     }
     status_t status = mMmapStream->getMmapPosition(&position);
-    ALOGV("AAudioServiceEndpointMMAP::getFreeRunningPosition() status= %d, pos = %d, nanos = %lld\n",
+    ALOGV("getFreeRunningPosition() status= %d, pos = %d, nanos = %lld\n",
           status, position.position_frames, (long long) position.time_nanoseconds);
     aaudio_result_t result = AAudioConvert_androidToAAudioResult(status);
     if (result == AAUDIO_ERROR_UNAVAILABLE) {
@@ -319,7 +319,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::getTimestamp(int64_t *positionFrames,
 
 
 void AAudioServiceEndpointMMAP::onTearDown() {
-    ALOGD("AAudioServiceEndpointMMAP::onTearDown() called");
+    ALOGD("onTearDown() called");
     disconnectRegisteredStreams();
 };
 
@@ -327,7 +327,7 @@ void AAudioServiceEndpointMMAP::onVolumeChanged(audio_channel_mask_t channels,
                                               android::Vector<float> values) {
     // TODO do we really need a different volume for each channel?
     float volume = values[0];
-    ALOGD("AAudioServiceEndpointMMAP::onVolumeChanged() volume[0] = %f", volume);
+    ALOGD("onVolumeChanged() volume[0] = %f", volume);
     std::lock_guard<std::mutex> lock(mLockStreams);
     for(const auto stream : mRegisteredStreams) {
         stream->onVolumeChanged(volume);
@@ -335,7 +335,7 @@ void AAudioServiceEndpointMMAP::onVolumeChanged(audio_channel_mask_t channels,
 };
 
 void AAudioServiceEndpointMMAP::onRoutingChanged(audio_port_handle_t deviceId) {
-    ALOGD("AAudioServiceEndpointMMAP::onRoutingChanged() called with %d, old = %d",
+    ALOGD("onRoutingChanged() called with dev %d, old = %d",
           deviceId, getDeviceId());
     if (getDeviceId() != AUDIO_PORT_HANDLE_NONE  && getDeviceId() != deviceId) {
         disconnectRegisteredStreams();

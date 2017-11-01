@@ -1889,6 +1889,10 @@ int Reverb_setParameter (ReverbContext *pContext, void *pParam, void *pValue, in
         if (param != REVERB_PARAM_PRESET) {
             return -EINVAL;
         }
+        if (vsize < (int)sizeof(uint16_t)) {
+            android_errorWriteLog(0x534e4554, "67647856");
+            return -EINVAL;
+        }
 
         uint16_t preset = *(uint16_t *)pValue;
         ALOGV("set REVERB_PARAM_PRESET, preset %d", preset);

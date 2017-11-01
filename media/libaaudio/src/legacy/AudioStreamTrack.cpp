@@ -113,7 +113,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     }
     mCallbackBufferSize = builder.getFramesPerDataCallback();
 
-    ALOGD("AudioStreamTrack::open(), request notificationFrames = %d, frameCount = %u",
+    ALOGD("open(), request notificationFrames = %d, frameCount = %u",
           notificationFrames, (uint)frameCount);
     mAudioTrack = new AudioTrack(); // TODO review
     if (getDeviceId() != AAUDIO_UNSPECIFIED) {
@@ -139,7 +139,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     status_t status = mAudioTrack->initCheck();
     if (status != NO_ERROR) {
         close();
-        ALOGE("AudioStreamTrack::open(), initCheck() returned %d", status);
+        ALOGE("open(), initCheck() returned %d", status);
         return AAudioConvert_androidToAAudioResult(status);
     }
 
@@ -153,7 +153,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
     int32_t actualSampleRate = mAudioTrack->getSampleRate();
     ALOGW_IF(actualSampleRate != getSampleRate(),
-             "AudioStreamTrack::open() sampleRate changed from %d to %d",
+             "open() sampleRate changed from %d to %d",
              getSampleRate(), actualSampleRate);
     setSampleRate(actualSampleRate);
 
@@ -186,10 +186,10 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
     // Log warning if we did not get what we asked for.
     ALOGW_IF(actualFlags != flags,
-             "AudioStreamTrack::open() flags changed from 0x%08X to 0x%08X",
+             "open() flags changed from 0x%08X to 0x%08X",
              flags, actualFlags);
     ALOGW_IF(actualPerformanceMode != perfMode,
-             "AudioStreamTrack::open() perfMode changed from %d to %d",
+             "open() perfMode changed from %d to %d",
              perfMode, actualPerformanceMode);
 
     return AAUDIO_OK;
@@ -227,7 +227,7 @@ aaudio_result_t AudioStreamTrack::requestStart() {
     std::lock_guard<std::mutex> lock(mStreamMutex);
 
     if (mAudioTrack.get() == nullptr) {
-        ALOGE("AudioStreamTrack::requestStart() no AudioTrack");
+        ALOGE("requestStart() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     // Get current position so we can detect when the track is playing.
@@ -273,10 +273,10 @@ aaudio_result_t AudioStreamTrack::requestFlush() {
     std::lock_guard<std::mutex> lock(mStreamMutex);
 
     if (mAudioTrack.get() == nullptr) {
-        ALOGE("AudioStreamTrack::requestFlush() no AudioTrack");
+        ALOGE("requestFlush() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
     } else if (getState() != AAUDIO_STREAM_STATE_PAUSED) {
-        ALOGE("AudioStreamTrack::requestFlush() not paused");
+        ALOGE("requestFlush() not paused");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     setState(AAUDIO_STREAM_STATE_FLUSHING);
@@ -291,7 +291,7 @@ aaudio_result_t AudioStreamTrack::requestStop() {
     std::lock_guard<std::mutex> lock(mStreamMutex);
 
     if (mAudioTrack.get() == nullptr) {
-        ALOGE("AudioStreamTrack::requestStop() no AudioTrack");
+        ALOGE("requestStop() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     onStop();

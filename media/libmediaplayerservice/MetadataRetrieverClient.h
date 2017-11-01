@@ -52,6 +52,11 @@ public:
     virtual status_t                setDataSource(const sp<IDataSource>& source, const char *mime);
     virtual sp<IMemory>             getFrameAtTime(
             int64_t timeUs, int option, int colorFormat, bool metaOnly);
+    virtual sp<IMemory>             getImageAtIndex(
+            int index, int colorFormat, bool metaOnly);
+    virtual status_t getFrameAtIndex(
+                std::vector<sp<IMemory> > *frames,
+                int frameIndex, int numFrames, int colorFormat, bool metaOnly);
     virtual sp<IMemory>             extractAlbumArt();
     virtual const char*             extractMetadata(int keyCode);
 

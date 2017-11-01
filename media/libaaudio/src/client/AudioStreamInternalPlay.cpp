@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#define LOG_TAG (mInService ? "AAudioService" : "AAudio")
+#define LOG_TAG (mInService ? "AudioStreamInternalPlay_Service" \
+                          : "AudioStreamInternalPlay_Client")
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 

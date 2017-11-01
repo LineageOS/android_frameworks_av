@@ -724,6 +724,14 @@ status_t SampleTable::findSampleAtTime(
         return ERROR_OUT_OF_RANGE;
     }
 
+    if (flags == kFlagFrameIndex) {
+        if (req_time >= mNumSampleSizes) {
+            return ERROR_OUT_OF_RANGE;
+        }
+        *sample_index = mSampleTimeEntries[req_time].mSampleIndex;
+        return OK;
+    }
+
     uint32_t left = 0;
     uint32_t right_plus_one = mNumSampleSizes;
     while (left < right_plus_one) {

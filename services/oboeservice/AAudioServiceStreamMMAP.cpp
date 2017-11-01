@@ -81,9 +81,7 @@ error:
     return AAUDIO_OK;
 }
 
-/**
- * Start the flow of data.
- */
+// Start the flow of data.
 aaudio_result_t AAudioServiceStreamMMAP::startDevice() {
     aaudio_result_t result = AAudioServiceStreamBase::startDevice();
     if (!mInService && result == AAUDIO_OK) {
@@ -93,9 +91,7 @@ aaudio_result_t AAudioServiceStreamMMAP::startDevice() {
     return result;
 }
 
-/**
- * Stop the flow of data such that start() can resume with loss of data.
- */
+// Stop the flow of data such that start() can resume with loss of data.
 aaudio_result_t AAudioServiceStreamMMAP::pause() {
     if (!isRunning()) {
         return AAUDIO_OK;
@@ -165,9 +161,7 @@ aaudio_result_t AAudioServiceStreamMMAP::getHardwareTimestamp(int64_t *positionF
     }
 }
 
-/**
- * Get an immutable description of the data queue from the HAL.
- */
+// Get an immutable description of the data queue from the HAL.
 aaudio_result_t AAudioServiceStreamMMAP::getAudioDataDescription(
         AudioEndpointParcelable &parcelable)
 {

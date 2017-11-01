@@ -55,7 +55,6 @@ public:
     // Returns the format of the data output by this media source.
     virtual sp<MetaData> getFormat() = 0;
 
-
     // Returns a new buffer of data. Call blocks until a
     // buffer is available, an error is encountered or the end of the stream
     // is reached.

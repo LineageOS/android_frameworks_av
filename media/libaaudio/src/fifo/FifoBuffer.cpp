@@ -43,7 +43,7 @@ FifoBuffer::FifoBuffer(int32_t bytesPerFrame, fifo_frames_t capacityInFrames)
     int32_t bytesPerBuffer = bytesPerFrame * capacityInFrames;
     mStorage = new uint8_t[bytesPerBuffer];
     mStorageOwned = true;
-    ALOGD("FifoBuffer: capacityInFrames = %d, bytesPerFrame = %d",
+    ALOGD("capacityInFrames = %d, bytesPerFrame = %d",
           capacityInFrames, bytesPerFrame);
 }
 

@@ -40,8 +40,9 @@ struct ImageItem {
     friend struct ItemReference;
     friend struct ItemProperty;
 
-    ImageItem() : ImageItem(0) {}
-    ImageItem(uint32_t _type) : type(_type),
+    ImageItem() : ImageItem(0, 0, false) {}
+    ImageItem(uint32_t _type, uint32_t _id, bool _hidden) :
+            type(_type), itemId(_id), hidden(_hidden),
             rows(0), columns(0), width(0), height(0), rotation(0),
             offset(0), size(0), nextTileIndex(0) {}
 
@@ -61,6 +62,8 @@ struct ImageItem {
     }
 
     uint32_t type;
+    uint32_t itemId;
+    bool hidden;
     int32_t rows;
     int32_t columns;
     int32_t width;
@@ -496,7 +499,25 @@ void ItemReference::apply(KeyedVector<uint32_t, ImageItem> &itemIdToItemMap) con
             ALOGW("dimgRefs if not clean!");
         }
         derivedImage.dimgRefs.appendVector(mRefs);
+
+        for (size_t i = 0; i < mRefs.size(); i++) {
+            itemIndex = itemIdToItemMap.indexOfKey(mRefs[i]);
+
+            // ignore non-image items
+            if (itemIndex < 0) {
+                continue;
+            }
+            ImageItem &sourceImage = itemIdToItemMap.editValueAt(itemIndex);
+
+            // mark the source image of the derivation as hidden
+            sourceImage.hidden = true;
+        }
     } else if (type() == FOURCC('t', 'h', 'm', 'b')) {
+        // mark thumbnail image as hidden, these can be retrieved if the client
+        // request thumbnail explicitly, but won't be exposed as displayables.
+        ImageItem &thumbImage = itemIdToItemMap.editValueAt(itemIndex);
+        thumbImage.hidden = true;
+
         for (size_t i = 0; i < mRefs.size(); i++) {
             itemIndex = itemIdToItemMap.indexOfKey(mRefs[i]);
 
@@ -511,6 +532,10 @@ void ItemReference::apply(KeyedVector<uint32_t, ImageItem> &itemIdToItemMap) con
             }
             masterImage.thumbnails.push_back(mItemId);
         }
+    } else if (type() == FOURCC('a', 'u', 'x', 'l')) {
+        // mark auxiliary image as hidden
+        ImageItem &auxImage = itemIdToItemMap.editValueAt(itemIndex);
+        auxImage.hidden = true;
     } else {
         ALOGW("ignoring unsupported ref type 0x%x", type());
     }
@@ -942,6 +967,7 @@ status_t IprpBox::onChunkData(uint32_t type, off64_t offset, size_t size) {
 struct ItemInfo {
     uint32_t itemId;
     uint32_t itemType;
+    bool hidden;
 };
 
 struct InfeBox : public FullBox {
@@ -1012,6 +1038,9 @@ status_t InfeBox::parse(off64_t offset, size_t size, ItemInfo *itemInfo) {
 
         itemInfo->itemId = item_id;
         itemInfo->itemType = item_type;
+        // According to HEIF spec, (flags & 1) indicates the image is hidden
+        // and not supposed to be displayed.
+        itemInfo->hidden = (flags() & 1);
 
         char itemTypeString[5];
         MakeFourCCString(item_type, itemTypeString);
@@ -1295,7 +1324,7 @@ status_t ItemTable::buildImageItemsIfPossible(uint32_t type) {
             return ERROR_MALFORMED;
         }
 
-        ImageItem image(info.itemType);
+        ImageItem image(info.itemType, info.itemId, info.hidden);
 
         ALOGV("adding %s: itemId %d", image.isGrid() ? "grid" : "image", info.itemId);
 
@@ -1327,6 +1356,29 @@ status_t ItemTable::buildImageItemsIfPossible(uint32_t type) {
         mItemReferences[i]->apply(mItemIdToItemMap);
     }
 
+    bool foundPrimary = false;
+    for (size_t i = 0; i < mItemIdToItemMap.size(); i++) {
+        // add all non-hidden images, also add the primary even if it's marked
+        // hidden, in case the primary is set to a thumbnail
+        bool isPrimary = (mItemIdToItemMap[i].itemId == mPrimaryItemId);
+        if (!mItemIdToItemMap[i].hidden || isPrimary) {
+            mDisplayables.push_back(i);
+        }
+        foundPrimary |= isPrimary;
+    }
+
+    ALOGV("found %zu displayables", mDisplayables.size());
+
+    // fail if no displayables are found
+    if (mDisplayables.empty()) {
+        return ERROR_MALFORMED;
+    }
+
+    // if the primary item id is invalid, set primary to the first displayable
+    if (!foundPrimary) {
+        mPrimaryItemId = mItemIdToItemMap[mDisplayables[0]].itemId;
+    }
+
     mImageItemsValid = true;
     return OK;
 }
@@ -1348,29 +1400,36 @@ void ItemTable::attachProperty(const AssociationEntry &association) {
     ALOGV("attach property %d to item id %d)",
             propertyIndex, association.itemId);
 
-    mItemProperties[propertyIndex]->attachTo(
-            mItemIdToItemMap.editValueAt(itemIndex));
+    mItemProperties[propertyIndex]->attachTo(mItemIdToItemMap.editValueAt(itemIndex));
 }
 
-sp<MetaData> ItemTable::getImageMeta() {
+uint32_t ItemTable::countImages() const {
+    return mImageItemsValid ? mDisplayables.size() : 0;
+}
+
+sp<MetaData> ItemTable::getImageMeta(const uint32_t imageIndex) {
     if (!mImageItemsValid) {
         return NULL;
     }
 
-    ssize_t itemIndex = mItemIdToItemMap.indexOfKey(mPrimaryItemId);
-    if (itemIndex < 0) {
-        ALOGE("Primary item id %d not found!", mPrimaryItemId);
+    if (imageIndex >= mDisplayables.size()) {
+        ALOGE("%s: invalid image index %u", __FUNCTION__, imageIndex);
         return NULL;
     }
-
-    ALOGV("primary item index %zu", itemIndex);
+    const uint32_t itemIndex = mDisplayables[imageIndex];
+    ALOGV("image[%u]: item index %u", imageIndex, itemIndex);
 
     const ImageItem *image = &mItemIdToItemMap[itemIndex];
 
     sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_HEVC);
+    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC);
 
-    ALOGV("setting image size %dx%d", image->width, image->height);
+    if (image->itemId == mPrimaryItemId) {
+        meta->setInt32(kKeyIsPrimaryImage, 1);
+    }
+
+    ALOGV("image[%u]: size %dx%d", imageIndex, image->width, image->height);
+
     meta->setInt32(kKeyWidth, image->width);
     meta->setInt32(kKeyHeight, image->height);
     if (image->rotation != 0) {
@@ -1394,8 +1453,8 @@ sp<MetaData> ItemTable::getImageMeta() {
             meta->setInt32(kKeyThumbnailHeight, thumbnail.height);
             meta->setData(kKeyThumbnailHVCC, kTypeHVCC,
                     thumbnail.hvcc->data(), thumbnail.hvcc->size());
-            ALOGV("thumbnail meta: %dx%d, item index %zd",
-                    thumbnail.width, thumbnail.height, thumbItemIndex);
+            ALOGV("image[%u]: thumbnail: size %dx%d, item index %zd",
+                    imageIndex, thumbnail.width, thumbnail.height, thumbItemIndex);
         } else {
             ALOGW("%s: Referenced thumbnail does not exist!", __FUNCTION__);
         }
@@ -1406,23 +1465,18 @@ sp<MetaData> ItemTable::getImageMeta() {
         if (tileItemIndex < 0) {
             return NULL;
         }
-        // when there are tiles, (kKeyWidth, kKeyHeight) is the full tiled area,
-        // and (kKeyDisplayWidth, kKeyDisplayHeight) may be smaller than that.
-        meta->setInt32(kKeyDisplayWidth, image->width);
-        meta->setInt32(kKeyDisplayHeight, image->height);
-        int32_t gridRows = image->rows, gridCols = image->columns;
+        meta->setInt32(kKeyGridRows, image->rows);
+        meta->setInt32(kKeyGridCols, image->columns);
 
         // point image to the first tile for grid size and HVCC
         image = &mItemIdToItemMap.editValueAt(tileItemIndex);
-        meta->setInt32(kKeyWidth, image->width * gridCols);
-        meta->setInt32(kKeyHeight, image->height * gridRows);
         meta->setInt32(kKeyGridWidth, image->width);
         meta->setInt32(kKeyGridHeight, image->height);
         meta->setInt32(kKeyMaxInputSize, image->width * image->height * 1.5);
     }
 
     if (image->hvcc == NULL) {
-        ALOGE("%s: hvcc is missing for item index %zd!", __FUNCTION__, itemIndex);
+        ALOGE("%s: hvcc is missing for image[%u]!", __FUNCTION__, imageIndex);
         return NULL;
     }
     meta->setData(kKeyHVCC, kTypeHVCC, image->hvcc->data(), image->hvcc->size());
@@ -1433,48 +1487,46 @@ sp<MetaData> ItemTable::getImageMeta() {
     return meta;
 }
 
-uint32_t ItemTable::countImages() const {
-    return mImageItemsValid ? mItemIdToItemMap.size() : 0;
-}
-
-status_t ItemTable::findPrimaryImage(uint32_t *itemIndex) {
+status_t ItemTable::findImageItem(const uint32_t imageIndex, uint32_t *itemIndex) {
     if (!mImageItemsValid) {
         return INVALID_OPERATION;
     }
 
-    ssize_t index = mItemIdToItemMap.indexOfKey(mPrimaryItemId);
-    if (index < 0) {
-        return ERROR_MALFORMED;
+    if (imageIndex >= mDisplayables.size()) {
+        ALOGE("%s: invalid image index %d", __FUNCTION__, imageIndex);
+        return BAD_VALUE;
     }
 
-    *itemIndex = index;
+    *itemIndex = mDisplayables[imageIndex];
+
+    ALOGV("image[%u]: item index %u", imageIndex, *itemIndex);
     return OK;
 }
 
-status_t ItemTable::findThumbnail(uint32_t *itemIndex) {
+status_t ItemTable::findThumbnailItem(const uint32_t imageIndex, uint32_t *itemIndex) {
     if (!mImageItemsValid) {
         return INVALID_OPERATION;
     }
 
-    ssize_t primaryItemIndex = mItemIdToItemMap.indexOfKey(mPrimaryItemId);
-    if (primaryItemIndex < 0) {
-        ALOGE("%s: Primary item id %d not found!", __FUNCTION__, mPrimaryItemId);
-        return ERROR_MALFORMED;
+    if (imageIndex >= mDisplayables.size()) {
+        ALOGE("%s: invalid image index %d", __FUNCTION__, imageIndex);
+        return BAD_VALUE;
     }
 
-    const ImageItem &primaryImage = mItemIdToItemMap[primaryItemIndex];
-    if (primaryImage.thumbnails.empty()) {
-        ALOGW("%s: Using primary in place of thumbnail.", __FUNCTION__);
-        *itemIndex = primaryItemIndex;
+    uint32_t masterItemIndex = mDisplayables[imageIndex];
+
+    const ImageItem &masterImage = mItemIdToItemMap[masterItemIndex];
+    if (masterImage.thumbnails.empty()) {
+        *itemIndex = masterItemIndex;
         return OK;
     }
 
-    ssize_t thumbItemIndex = mItemIdToItemMap.indexOfKey(
-            primaryImage.thumbnails[0]);
+    ssize_t thumbItemIndex = mItemIdToItemMap.indexOfKey(masterImage.thumbnails[0]);
     if (thumbItemIndex < 0) {
-        ALOGE("%s: Thumbnail item id %d not found!",
-                __FUNCTION__, primaryImage.thumbnails[0]);
-        return ERROR_MALFORMED;
+        ALOGW("%s: Thumbnail item id %d not found, use master instead",
+                __FUNCTION__, masterImage.thumbnails[0]);
+        *itemIndex = masterItemIndex;
+        return OK;
     }
 
     *itemIndex = thumbItemIndex;

@@ -38,6 +38,9 @@
 
 //#define DEBUG_RESAMPLER
 
+// use this for our buffer alignment.  Should be at least 32 bytes.
+constexpr size_t CACHE_LINE_SIZE = 64;
+
 namespace android {
 
 /*
@@ -94,7 +97,10 @@ void AudioResamplerDyn<TC, TI, TO>::InBuffer::resize(int CHANNELS, int halfNumCo
 
     // create new buffer
     TI* state = NULL;
-    (void)posix_memalign(reinterpret_cast<void**>(&state), 32, stateCount*sizeof(*state));
+    (void)posix_memalign(
+            reinterpret_cast<void **>(&state),
+            CACHE_LINE_SIZE /* alignment */,
+            stateCount * sizeof(*state));
     memset(state, 0, stateCount*sizeof(*state));
 
     // attempt to preserve state
@@ -185,6 +191,16 @@ AudioResamplerDyn<TC, TI, TO>::AudioResamplerDyn(
     // setSampleRate() for 1:1. (May be removed if precalculated filters are used.)
     mInSampleRate = 0;
     mConstants.set(128, 8, mSampleRate, mSampleRate); // TODO: set better
+
+    // fetch property based resampling parameters
+    mPropertyEnableAtSampleRate = property_get_int32(
+            "ro.audio.resampler.psd.enable_at_samplerate", mPropertyEnableAtSampleRate);
+    mPropertyHalfFilterLength = property_get_int32(
+            "ro.audio.resampler.psd.halflength", mPropertyHalfFilterLength);
+    mPropertyStopbandAttenuation = property_get_int32(
+            "ro.audio.resampler.psd.stopband", mPropertyStopbandAttenuation);
+    mPropertyCutoffPercent = property_get_int32(
+            "ro.audio.resampler.psd.cutoff_percent", mPropertyCutoffPercent);
 }
 
 template<typename TC, typename TI, typename TO>
@@ -215,6 +231,8 @@ void AudioResamplerDyn<TC, TI, TO>::setVolume(float left, float right)
     }
 }
 
+// TODO: update to C++11
+
 template<typename T> T max(T a, T b) {return a > b ? a : b;}
 
 template<typename T> T absdiff(T a, T b) {return a > b ? a - b : b - a;}
@@ -223,37 +241,74 @@ template<typename TC, typename TI, typename TO>
 void AudioResamplerDyn<TC, TI, TO>::createKaiserFir(Constants &c,
         double stopBandAtten, int inSampleRate, int outSampleRate, double tbwCheat)
 {
-    TC* buf = NULL;
-    static const double atten = 0.9998;   // to avoid ripple overflow
-    double fcr;
-    double tbw = firKaiserTbw(c.mHalfNumCoefs, stopBandAtten);
+    // compute the normalized transition bandwidth
+    const double tbw = firKaiserTbw(c.mHalfNumCoefs, stopBandAtten);
+    const double halfbw = tbw / 2.;
 
-    (void)posix_memalign(reinterpret_cast<void**>(&buf), 32, (c.mL+1)*c.mHalfNumCoefs*sizeof(TC));
+    double fcr; // compute fcr, the 3 dB amplitude cut-off.
     if (inSampleRate < outSampleRate) { // upsample
-        fcr = max(0.5*tbwCheat - tbw/2, tbw/2);
+        fcr = max(0.5 * tbwCheat - halfbw, halfbw);
     } else { // downsample
-        fcr = max(0.5*tbwCheat*outSampleRate/inSampleRate - tbw/2, tbw/2);
+        fcr = max(0.5 * tbwCheat * outSampleRate / inSampleRate - halfbw, halfbw);
     }
-    // create and set filter
-    firKaiserGen(buf, c.mL, c.mHalfNumCoefs, stopBandAtten, fcr, atten);
-    c.mFirCoefs = buf;
-    if (mCoefBuffer) {
-        free(mCoefBuffer);
-    }
-    mCoefBuffer = buf;
-#ifdef DEBUG_RESAMPLER
+    createKaiserFir(c, stopBandAtten, fcr);
+}
+
+template<typename TC, typename TI, typename TO>
+void AudioResamplerDyn<TC, TI, TO>::createKaiserFir(Constants &c,
+        double stopBandAtten, double fcr) {
+    // compute the normalized transition bandwidth
+    const double tbw = firKaiserTbw(c.mHalfNumCoefs, stopBandAtten);
+    const int phases = c.mL;
+    const int halfLength = c.mHalfNumCoefs;
+
+    // create buffer
+    TC *coefs = nullptr;
+    int ret = posix_memalign(
+            reinterpret_cast<void **>(&coefs),
+            CACHE_LINE_SIZE /* alignment */,
+            (phases + 1) * halfLength * sizeof(TC));
+    LOG_ALWAYS_FATAL_IF(ret != 0, "Cannot allocate buffer memory, ret %d", ret);
+    c.mFirCoefs = coefs;
+    free(mCoefBuffer);
+    mCoefBuffer = coefs;
+
+    // square the computed minimum passband value (extra safety).
+    double attenuation =
+            computeWindowedSincMinimumPassbandValue(stopBandAtten);
+    attenuation *= attenuation;
+
+    // design filter
+    firKaiserGen(coefs, phases, halfLength, stopBandAtten, fcr, attenuation);
+
+    // update the design criteria
+    mNormalizedCutoffFrequency = fcr;
+    mNormalizedTransitionBandwidth = tbw;
+    mFilterAttenuation = attenuation;
+    mStopbandAttenuationDb = stopBandAtten;
+    mPassbandRippleDb = computeWindowedSincPassbandRippleDb(stopBandAtten);
+
+#if 0
+    // Keep this debug code in case an app causes resampler design issues.
+    const double halfbw = tbw / 2.;
     // print basic filter stats
-    printf("L:%d  hnc:%d  stopBandAtten:%lf  fcr:%lf  atten:%lf  tbw:%lf\n",
-            c.mL, c.mHalfNumCoefs, stopBandAtten, fcr, atten, tbw);
-    // test the filter and report results
-    double fp = (fcr - tbw/2)/c.mL;
-    double fs = (fcr + tbw/2)/c.mL;
+    ALOGD("L:%d  hnc:%d  stopBandAtten:%lf  fcr:%lf  atten:%lf  tbw:%lf\n",
+            c.mL, c.mHalfNumCoefs, stopBandAtten, fcr, attenuation, tbw);
+
+    // test the filter and report results.
+    // Since this is a polyphase filter, normalized fp and fs must be scaled.
+    const double fp = (fcr - halfbw) / phases;
+    const double fs = (fcr + halfbw) / phases;
+
     double passMin, passMax, passRipple;
     double stopMax, stopRipple;
-    testFir(buf, c.mL, c.mHalfNumCoefs, fp, fs, /*passSteps*/ 1000, /*stopSteps*/ 100000,
+
+    const int32_t passSteps = 1000;
+
+    testFir(coefs, c.mL, c.mHalfNumCoefs, fp, fs, passSteps, passSteps * c.ML /*stopSteps*/,
             passMin, passMax, passRipple, stopMax, stopRipple);
-    printf("passband(%lf, %lf): %.8lf %.8lf %.8lf\n", 0., fp, passMin, passMax, passRipple);
-    printf("stopband(%lf, %lf): %.8lf %.3lf\n", fs, 0.5, stopMax, stopRipple);
+    ALOGD("passband(%lf, %lf): %.8lf %.8lf %.8lf\n", 0., fp, passMin, passMax, passRipple);
+    ALOGD("stopband(%lf, %lf): %.8lf %.3lf\n", fs, 0.5, stopMax, stopRipple);
 #endif
 }
 
@@ -304,6 +359,11 @@ void AudioResamplerDyn<TC, TI, TO>::setSampleRate(int32_t inSampleRate)
         mFilterSampleRate = inSampleRate;
         mFilterQuality = getQuality();
 
+        double stopBandAtten;
+        double tbwCheat = 1.; // how much we "cheat" into aliasing
+        int halfLength;
+        double fcr = 0.;
+
         // Begin Kaiser Filter computation
         //
         // The quantization floor for S16 is about 96db - 10*log_10(#length) + 3dB.
@@ -313,52 +373,60 @@ void AudioResamplerDyn<TC, TI, TO>::setSampleRate(int32_t inSampleRate)
         // 96-98dB
         //
 
-        double stopBandAtten;
-        double tbwCheat = 1.; // how much we "cheat" into aliasing
-        int halfLength;
-        if (mFilterQuality == DYN_HIGH_QUALITY) {
-            // 32b coefficients, 64 length
+        if (mPropertyEnableAtSampleRate >= 0 && mSampleRate >= mPropertyEnableAtSampleRate) {
+            // An alternative method which allows allows a greater fcr
+            // at the expense of potential aliasing.
+            halfLength = mPropertyHalfFilterLength;
+            stopBandAtten = mPropertyStopbandAttenuation;
             useS32 = true;
-            stopBandAtten = 98.;
-            if (inSampleRate >= mSampleRate * 4) {
-                halfLength = 48;
-            } else if (inSampleRate >= mSampleRate * 2) {
-                halfLength = 40;
-            } else {
-                halfLength = 32;
-            }
-        } else if (mFilterQuality == DYN_LOW_QUALITY) {
-            // 16b coefficients, 16-32 length
-            useS32 = false;
-            stopBandAtten = 80.;
-            if (inSampleRate >= mSampleRate * 4) {
-                halfLength = 24;
-            } else if (inSampleRate >= mSampleRate * 2) {
-                halfLength = 16;
-            } else {
-                halfLength = 8;
-            }
-            if (inSampleRate <= mSampleRate) {
-                tbwCheat = 1.05;
-            } else {
-                tbwCheat = 1.03;
-            }
-        } else { // DYN_MED_QUALITY
-            // 16b coefficients, 32-64 length
-            // note: > 64 length filters with 16b coefs can have quantization noise problems
-            useS32 = false;
-            stopBandAtten = 84.;
-            if (inSampleRate >= mSampleRate * 4) {
-                halfLength = 32;
-            } else if (inSampleRate >= mSampleRate * 2) {
-                halfLength = 24;
-            } else {
-                halfLength = 16;
-            }
-            if (inSampleRate <= mSampleRate) {
-                tbwCheat = 1.03;
-            } else {
-                tbwCheat = 1.01;
+            fcr = mInSampleRate <= mSampleRate
+                    ? 0.5 : 0.5 * mSampleRate / mInSampleRate;
+            fcr *= mPropertyCutoffPercent / 100.;
+        } else {
+            if (mFilterQuality == DYN_HIGH_QUALITY) {
+                // 32b coefficients, 64 length
+                useS32 = true;
+                stopBandAtten = 98.;
+                if (inSampleRate >= mSampleRate * 4) {
+                    halfLength = 48;
+                } else if (inSampleRate >= mSampleRate * 2) {
+                    halfLength = 40;
+                } else {
+                    halfLength = 32;
+                }
+            } else if (mFilterQuality == DYN_LOW_QUALITY) {
+                // 16b coefficients, 16-32 length
+                useS32 = false;
+                stopBandAtten = 80.;
+                if (inSampleRate >= mSampleRate * 4) {
+                    halfLength = 24;
+                } else if (inSampleRate >= mSampleRate * 2) {
+                    halfLength = 16;
+                } else {
+                    halfLength = 8;
+                }
+                if (inSampleRate <= mSampleRate) {
+                    tbwCheat = 1.05;
+                } else {
+                    tbwCheat = 1.03;
+                }
+            } else { // DYN_MED_QUALITY
+                // 16b coefficients, 32-64 length
+                // note: > 64 length filters with 16b coefs can have quantization noise problems
+                useS32 = false;
+                stopBandAtten = 84.;
+                if (inSampleRate >= mSampleRate * 4) {
+                    halfLength = 32;
+                } else if (inSampleRate >= mSampleRate * 2) {
+                    halfLength = 24;
+                } else {
+                    halfLength = 16;
+                }
+                if (inSampleRate <= mSampleRate) {
+                    tbwCheat = 1.03;
+                } else {
+                    tbwCheat = 1.01;
+                }
             }
         }
 
@@ -390,8 +458,12 @@ void AudioResamplerDyn<TC, TI, TO>::setSampleRate(int32_t inSampleRate)
 
         // create the filter
         mConstants.set(phases, halfLength, inSampleRate, mSampleRate);
-        createKaiserFir(mConstants, stopBandAtten,
-                inSampleRate, mSampleRate, tbwCheat);
+        if (fcr > 0.) {
+            createKaiserFir(mConstants, stopBandAtten, fcr);
+        } else {
+            createKaiserFir(mConstants, stopBandAtten,
+                    inSampleRate, mSampleRate, tbwCheat);
+        }
     } // End Kaiser filter
 
     // update phase and state based on the new filter.

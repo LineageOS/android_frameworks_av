@@ -49,12 +49,12 @@ public:
     status_t parse(uint32_t type, off64_t offset, size_t size);
 
     bool isValid() { return mImageItemsValid; }
-    sp<MetaData> getImageMeta();
     uint32_t countImages() const;
-    status_t findPrimaryImage(uint32_t *imageIndex);
-    status_t findThumbnail(uint32_t *thumbnailIndex);
+    sp<MetaData> getImageMeta(const uint32_t imageIndex);
+    status_t findImageItem(const uint32_t imageIndex, uint32_t *itemIndex);
+    status_t findThumbnailItem(const uint32_t imageIndex, uint32_t *itemIndex);
     status_t getImageOffsetAndSize(
-            uint32_t *imageIndex, off64_t *offset, size_t *size);
+            uint32_t *itemIndex, off64_t *offset, size_t *size);
 
 protected:
     ~ItemTable();
@@ -78,6 +78,7 @@ private:
     bool mImageItemsValid;
     uint32_t mCurrentItemIndex;
     KeyedVector<uint32_t, ImageItem> mItemIdToItemMap;
+    Vector<uint32_t> mDisplayables;
 
     status_t parseIlocBox(off64_t offset, size_t size);
     status_t parseIinfBox(off64_t offset, size_t size);

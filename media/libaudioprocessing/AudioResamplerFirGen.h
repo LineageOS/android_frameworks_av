@@ -546,8 +546,9 @@ static void testFir(const T* coef, int L, int halfNumCoef,
         }
         wstart += wstep;
     }
-    // renormalize - this is only needed for integer filter types
-    double norm = 1./((1ULL<<(sizeof(T)*8-1))*L);
+    // renormalize - this is needed for integer filter types, use 1 for float or double.
+    constexpr int64_t integralShift = std::is_integral<T>::value ? (sizeof(T) * 8 - 1) : 0;
+    const double norm = 1. / (L << integralShift);
 
     firMin = fmin * norm;
     firMax = fmax * norm;
@@ -557,9 +558,12 @@ static void testFir(const T* coef, int L, int halfNumCoef,
  * evaluates the |H(f)| lowpass band characteristics.
  *
  * This function tests the lowpass characteristics for the overall polyphase filter,
- * and is used to verify the design.  For this case, fp should be set to the
+ * and is used to verify the design.
+ *
+ * For a polyphase filter (L > 1), typically fp should be set to the
  * passband normalized frequency from 0 to 0.5 for the overall filter (thus it
  * is the designed polyphase bank value / L).  Likewise for fs.
+ * Similarly the stopSteps should be L * passSteps for equivalent accuracy.
  *
  * @param coef is the designed polyphase filter banks
  *
@@ -610,6 +614,74 @@ static void testFir(const T* coef, int L, int halfNumCoef,
 }
 
 /*
+ * Estimate the windowed sinc minimum passband value.
+ *
+ * This is the minimum value for a windowed sinc filter in its passband,
+ * which is identical to the scaling required not to cause overflow of a 0dBFS signal.
+ * The actual value used to attenuate the filter amplitude should be slightly
+ * smaller than this (suggest squaring) as this is just an estimate.
+ *
+ * As a windowed sinc has a passband ripple commensurate to the stopband attenuation
+ * due to Gibb's phenomenon from truncating the sinc, we derive this value from
+ * the design stopbandAttenuationDb (a positive value).
+ */
+static inline double computeWindowedSincMinimumPassbandValue(
+        double stopBandAttenuationDb) {
+    return 1. - pow(10. /* base */, stopBandAttenuationDb * (-1. / 20.));
+}
+
+/*
+ * Compute the windowed sinc passband ripple from stopband attenuation.
+ *
+ * As a windowed sinc has an passband ripple commensurate to the stopband attenuation
+ * due to Gibb's phenomenon from truncating the sinc, we derive this value from
+ * the design stopbandAttenuationDb (a positive value).
+ */
+static inline double computeWindowedSincPassbandRippleDb(
+        double stopBandAttenuationDb) {
+    return -20. * log10(computeWindowedSincMinimumPassbandValue(stopBandAttenuationDb));
+}
+
+/*
+ * Kaiser window Beta value
+ *
+ * Formula 3.2.5, 3.2.7, Vaidyanathan, _Multirate Systems and Filter Banks_, p. 48
+ * Formula 7.75, Oppenheim and Schafer, _Discrete-time Signal Processing, 3e_, p. 542
+ *
+ * See also: http://melodi.ee.washington.edu/courses/ee518/notes/lec17.pdf
+ *
+ * Kaiser window and beta parameter
+ *
+ *         | 0.1102*(A - 8.7)                         A > 50
+ *  Beta = | 0.5842*(A - 21)^0.4 + 0.07886*(A - 21)   21 < A <= 50
+ *         | 0.                                       A <= 21
+ *
+ * with A is the desired stop-band attenuation in positive dBFS
+ *
+ *    30 dB    2.210
+ *    40 dB    3.384
+ *    50 dB    4.538
+ *    60 dB    5.658
+ *    70 dB    6.764
+ *    80 dB    7.865
+ *    90 dB    8.960
+ *   100 dB   10.056
+ *
+ * For some values of stopBandAttenuationDb the function may be computed
+ * at compile time.
+ */
+static inline constexpr double computeBeta(double stopBandAttenuationDb) {
+    if (stopBandAttenuationDb > 50.) {
+        return 0.1102 * (stopBandAttenuationDb - 8.7);
+    }
+    const double offset = stopBandAttenuationDb - 21.;
+    if (offset > 0.) {
+        return 0.5842 * pow(offset, 0.4) + 0.07886 * offset;
+    }
+    return 0.;
+}
+
+/*
  * Calculates the overall polyphase filter based on a windowed sinc function.
  *
  * The windowed sinc is an odd length symmetric filter of exactly L*halfNumCoef*2+1
@@ -642,31 +714,8 @@ static void testFir(const T* coef, int L, int halfNumCoef,
 template <typename T>
 static inline void firKaiserGen(T* coef, int L, int halfNumCoef,
         double stopBandAtten, double fcr, double atten) {
-    //
-    // Formula 3.2.5, 3.2.7, Vaidyanathan, _Multirate Systems and Filter Banks_, p. 48
-    // Formula 7.75, Oppenheim and Schafer, _Discrete-time Signal Processing, 3e_, p. 542
-    //
-    // See also: http://melodi.ee.washington.edu/courses/ee518/notes/lec17.pdf
-    //
-    // Kaiser window and beta parameter
-    //
-    //         | 0.1102*(A - 8.7)                         A > 50
-    //  beta = | 0.5842*(A - 21)^0.4 + 0.07886*(A - 21)   21 <= A <= 50
-    //         | 0.                                       A < 21
-    //
-    // with A is the desired stop-band attenuation in dBFS
-    //
-    //    30 dB    2.210
-    //    40 dB    3.384
-    //    50 dB    4.538
-    //    60 dB    5.658
-    //    70 dB    6.764
-    //    80 dB    7.865
-    //    90 dB    8.960
-    //   100 dB   10.056
-
     const int N = L * halfNumCoef; // non-negative half
-    const double beta = 0.1102 * (stopBandAtten - 8.7); // >= 50dB always
+    const double beta = computeBeta(stopBandAtten);
     const double xstep = (2. * M_PI) * fcr / L;
     const double xfrac = 1. / N;
     const double yscale = atten * L / (I0(beta) * M_PI);
@@ -696,9 +745,9 @@ static inline void firKaiserGen(T* coef, int L, int halfNumCoef,
                 sg.advance();
             }
 
-            if (is_same<T, int16_t>::value) { // int16_t needs noise shaping
+            if (std::is_same<T, int16_t>::value) { // int16_t needs noise shaping
                 *coef++ = static_cast<T>(toint(y, 1ULL<<(sizeof(T)*8-1), err));
-            } else if (is_same<T, int32_t>::value) {
+            } else if (std::is_same<T, int32_t>::value) {
                 *coef++ = static_cast<T>(toint(y, 1ULL<<(sizeof(T)*8-1)));
             } else { // assumed float or double
                 *coef++ = static_cast<T>(y);

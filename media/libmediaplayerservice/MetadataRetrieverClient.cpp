@@ -194,6 +194,25 @@ status_t MetadataRetrieverClient::setDataSource(
 
 Mutex MetadataRetrieverClient::sLock;
 
+static sp<IMemory> getThumbnail(VideoFrame* frame) {
+    std::unique_ptr<VideoFrame> frameDeleter(frame);
+
+    size_t size = frame->getFlattenedSize();
+    sp<MemoryHeapBase> heap = new MemoryHeapBase(size, 0, "MetadataRetrieverClient");
+    if (heap == NULL) {
+        ALOGE("failed to create MemoryDealer");
+        return NULL;
+    }
+    sp<IMemory> thrumbnail = new MemoryBase(heap, 0, size);
+    if (thrumbnail == NULL) {
+        ALOGE("not enough memory for VideoFrame size=%zu", size);
+        return NULL;
+    }
+    VideoFrame *frameCopy = static_cast<VideoFrame *>(thrumbnail->pointer());
+    frameCopy->copyFlattened(*frame);
+    return thrumbnail;
+}
+
 sp<IMemory> MetadataRetrieverClient::getFrameAtTime(
         int64_t timeUs, int option, int colorFormat, bool metaOnly)
 {
@@ -206,29 +225,55 @@ sp<IMemory> MetadataRetrieverClient::getFrameAtTime(
         ALOGE("retriever is not initialized");
         return NULL;
     }
-    VideoFrame *frame = mRetriever->getFrameAtTime(
-            timeUs, option, colorFormat, metaOnly);
+    VideoFrame *frame = mRetriever->getFrameAtTime(timeUs, option, colorFormat, metaOnly);
     if (frame == NULL) {
         ALOGE("failed to capture a video frame");
         return NULL;
     }
-    size_t size = frame->getFlattenedSize();
-    sp<MemoryHeapBase> heap = new MemoryHeapBase(size, 0, "MetadataRetrieverClient");
-    if (heap == NULL) {
-        ALOGE("failed to create MemoryDealer");
-        delete frame;
+    return getThumbnail(frame);
+}
+
+sp<IMemory> MetadataRetrieverClient::getImageAtIndex(
+        int index, int colorFormat, bool metaOnly) {
+    ALOGV("getFrameAtTime: index(%d) colorFormat(%d), metaOnly(%d)",
+            index, colorFormat, metaOnly);
+    Mutex::Autolock lock(mLock);
+    Mutex::Autolock glock(sLock);
+    mThumbnail.clear();
+    if (mRetriever == NULL) {
+        ALOGE("retriever is not initialized");
         return NULL;
     }
-    mThumbnail = new MemoryBase(heap, 0, size);
-    if (mThumbnail == NULL) {
-        ALOGE("not enough memory for VideoFrame size=%zu", size);
-        delete frame;
+    VideoFrame *frame = mRetriever->getImageAtIndex(index, colorFormat, metaOnly);
+    if (frame == NULL) {
+        ALOGE("failed to extract image");
         return NULL;
     }
-    VideoFrame *frameCopy = static_cast<VideoFrame *>(mThumbnail->pointer());
-    frameCopy->copyFlattened(*frame);
-    delete frame;  // Fix memory leakage
-    return mThumbnail;
+    return getThumbnail(frame);
+}
+
+status_t MetadataRetrieverClient::getFrameAtIndex(
+            std::vector<sp<IMemory> > *frames,
+            int frameIndex, int numFrames, int colorFormat, bool metaOnly) {
+    ALOGV("getFrameAtIndex: frameIndex(%d), numFrames(%d), colorFormat(%d), metaOnly(%d)",
+            frameIndex, numFrames, colorFormat, metaOnly);
+    Mutex::Autolock lock(mLock);
+    Mutex::Autolock glock(sLock);
+    if (mRetriever == NULL) {
+        ALOGE("retriever is not initialized");
+        return INVALID_OPERATION;
+    }
+
+    std::vector<VideoFrame*> videoFrames;
+    status_t err = mRetriever->getFrameAtIndex(
+            &videoFrames, frameIndex, numFrames, colorFormat, metaOnly);
+    if (err != OK) {
+        return err;
+    }
+    for (size_t i = 0; i < videoFrames.size(); i++) {
+        frames->push_back(getThumbnail(videoFrames[i]));
+    }
+    return OK;
 }
 
 sp<IMemory> MetadataRetrieverClient::extractAlbumArt()

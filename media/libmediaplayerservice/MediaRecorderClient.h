@@ -58,7 +58,7 @@ class MediaRecorderClient : public BnMediaRecorder
         wp<IMediaRecorderClient> mListener;
     };
 
-    void clearDeathNotifiers();
+    void clearDeathNotifiers_l();
 
 public:
     virtual     status_t   setCamera(const sp<hardware::ICamera>& camera,

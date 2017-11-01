@@ -30,8 +30,7 @@
 namespace aaudio {
 
 /**
- * This Service class corresponds to a Client stream that shares an MMAP device through a mixer
- * or an input distributor.
+ * This manages an internal stream that is shared by multiple Client streams.
  */
 class AAudioServiceEndpointShared : public AAudioServiceEndpoint {
 
