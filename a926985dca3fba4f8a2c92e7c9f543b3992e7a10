@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "05b89c00_d8a2db0a",
+        "filename": "camera/Android.bp",
+        "patchSetId": 1
+      },
+      "lineNbr": 78,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2017-11-01T10:01:55Z",
+      "side": 1,
+      "message": "Isn\u0027t this case sensitive?",
+      "range": {
+        "startLine": 78,
+        "startChar": 12,
+        "endLine": 78,
+        "endChar": 49
+      },
+      "revId": "a926985dca3fba4f8a2c92e7c9f543b3992e7a10",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
