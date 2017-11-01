@@ -15,7 +15,7 @@
  */
 
 
-#define LOG_TAG "AAudioService"
+#define LOG_TAG "AAudioClientTracker"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -64,8 +64,7 @@ std::string AAudioClientTracker::dump() const {
 // Create a tracker for the client.
 aaudio_result_t AAudioClientTracker::registerClient(pid_t pid,
                                          const sp<IAAudioClient>& client) {
-    ALOGV("AAudioClientTracker::registerClient(), calling pid = %d, getpid() = %d\n",
-          pid, getpid());
+    ALOGV("registerClient(), calling pid = %d, getpid() = %d\n", pid, getpid());
 
     std::lock_guard<std::mutex> lock(mLock);
     if (mNotificationClients.count(pid) == 0) {
@@ -74,18 +73,16 @@ aaudio_result_t AAudioClientTracker::registerClient(pid_t pid,
 
         sp<IBinder> binder = IInterface::asBinder(client);
         status_t status = binder->linkToDeath(notificationClient);
-        ALOGW_IF(status != NO_ERROR,
-                 "AAudioClientTracker::registerClient() linkToDeath = %d\n", status);
+        ALOGW_IF(status != NO_ERROR, "registerClient() linkToDeath = %d\n", status);
         return AAudioConvert_androidToAAudioResult(status);
     } else {
-        ALOGW("AAudioClientTracker::registerClient(%d) already registered!", pid);
+        ALOGW("registerClient(%d) already registered!", pid);
         return AAUDIO_OK; // TODO should this be considered an error
     }
 }
 
 void AAudioClientTracker::unregisterClient(pid_t pid) {
-    ALOGV("AAudioClientTracker::unregisterClient(), calling pid = %d, getpid() = %d\n",
-          pid, getpid());
+    ALOGV("unregisterClient(), calling pid = %d, getpid() = %d\n", pid, getpid());
     std::lock_guard<std::mutex> lock(mLock);
     mNotificationClients.erase(pid);
 }
@@ -103,12 +100,12 @@ int32_t AAudioClientTracker::getStreamCount(pid_t pid) {
 aaudio_result_t
 AAudioClientTracker::registerClientStream(pid_t pid, sp<AAudioServiceStreamBase> serviceStream) {
     aaudio_result_t result = AAUDIO_OK;
-    ALOGV("AAudioClientTracker::registerClientStream(%d, %p)\n", pid, serviceStream.get());
+    ALOGV("registerClientStream(%d, %p)\n", pid, serviceStream.get());
     std::lock_guard<std::mutex> lock(mLock);
     sp<NotificationClient> notificationClient = mNotificationClients[pid];
     if (notificationClient == 0) {
         // This will get called the first time the audio server registers an internal stream.
-        ALOGV("AAudioClientTracker::registerClientStream(%d,) unrecognized pid\n", pid);
+        ALOGV("registerClientStream(%d,) unrecognized pid\n", pid);
         notificationClient = new NotificationClient(pid);
         mNotificationClients[pid] = notificationClient;
     }
@@ -120,15 +117,15 @@ AAudioClientTracker::registerClientStream(pid_t pid, sp<AAudioServiceStreamBase>
 aaudio_result_t
 AAudioClientTracker::unregisterClientStream(pid_t pid,
                                             sp<AAudioServiceStreamBase> serviceStream) {
-    ALOGV("AAudioClientTracker::unregisterClientStream(%d, %p)\n", pid, serviceStream.get());
+    ALOGV("unregisterClientStream(%d, %p)\n", pid, serviceStream.get());
     std::lock_guard<std::mutex> lock(mLock);
     auto it = mNotificationClients.find(pid);
     if (it != mNotificationClients.end()) {
-        ALOGV("AAudioClientTracker::unregisterClientStream(%d, %p) found NotificationClient\n",
+        ALOGV("unregisterClientStream(%d, %p) found NotificationClient\n",
               pid, serviceStream.get());
         it->second->unregisterClientStream(serviceStream);
     } else {
-        ALOGE("AAudioClientTracker::unregisterClientStream(%d, %p) missing NotificationClient\n",
+        ALOGE("unregisterClientStream(%d, %p) missing NotificationClient\n",
               pid, serviceStream.get());
     }
     return AAUDIO_OK;
@@ -136,11 +133,11 @@ AAudioClientTracker::unregisterClientStream(pid_t pid,
 
 AAudioClientTracker::NotificationClient::NotificationClient(pid_t pid)
         : mProcessId(pid) {
-    //ALOGD("AAudioClientTracker::NotificationClient(%d) created %p\n", pid, this);
+    //ALOGD("NotificationClient(%d) created %p\n", pid, this);
 }
 
 AAudioClientTracker::NotificationClient::~NotificationClient() {
-    //ALOGD("AAudioClientTracker::~NotificationClient() destroyed %p\n", this);
+    //ALOGD("~NotificationClient() destroyed %p\n", this);
 }
 
 int32_t AAudioClientTracker::NotificationClient::getStreamCount() {
@@ -179,7 +176,7 @@ void AAudioClientTracker::NotificationClient::binderDied(const wp<IBinder>& who 
 
         for (const auto& serviceStream : streamsToClose) {
             aaudio_handle_t handle = serviceStream->getHandle();
-            ALOGW("AAudioClientTracker::binderDied() close abandoned stream 0x%08X\n", handle);
+            ALOGW("binderDied() close abandoned stream 0x%08X\n", handle);
             aaudioService->closeStream(handle);
         }
         // mStreams should be empty now

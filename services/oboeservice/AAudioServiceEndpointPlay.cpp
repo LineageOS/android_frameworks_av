@@ -135,7 +135,7 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
             AAudioServiceEndpointShared::disconnectRegisteredStreams();
             break;
         } else if (result != getFramesPerBurst()) {
-            ALOGW("AAudioServiceEndpoint(): callbackLoop() wrote %d / %d",
+            ALOGW("callbackLoop() wrote %d / %d",
                   result, getFramesPerBurst());
             break;
         }

@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#define LOG_TAG (mInService ? "AAudioService" : "AAudio")
+#define LOG_TAG (mInService ? "AudioStreamInternalCapture_Service" \
+                          : "AudioStreamInternalCapture_Client")
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -152,7 +153,7 @@ aaudio_result_t AudioStreamInternalCapture::processDataNow(void *buffer, int32_t
 
 aaudio_result_t AudioStreamInternalCapture::readNowWithConversion(void *buffer,
                                                                 int32_t numFrames) {
-    // ALOGD("AudioStreamInternalCapture::readNowWithConversion(%p, %d)",
+    // ALOGD("readNowWithConversion(%p, %d)",
     //              buffer, numFrames);
     WrappingBuffer wrappingBuffer;
     uint8_t *destination = (uint8_t *) buffer;
@@ -201,7 +202,7 @@ aaudio_result_t AudioStreamInternalCapture::readNowWithConversion(void *buffer,
     int32_t framesProcessed = numFrames - framesLeft;
     mAudioEndpoint.advanceReadIndex(framesProcessed);
 
-    //ALOGD("AudioStreamInternalCapture::readNowWithConversion() returns %d", framesProcessed);
+    //ALOGD("readNowWithConversion() returns %d", framesProcessed);
     return framesProcessed;
 }
 
@@ -215,14 +216,14 @@ int64_t AudioStreamInternalCapture::getFramesWritten() {
     // Prevent retrograde motion.
     mLastFramesWritten = std::max(mLastFramesWritten,
                                   framesWrittenHardware + mFramesOffsetFromService);
-    //ALOGD("AudioStreamInternalCapture::getFramesWritten() returns %lld",
+    //ALOGD("getFramesWritten() returns %lld",
     //      (long long)mLastFramesWritten);
     return mLastFramesWritten;
 }
 
 int64_t AudioStreamInternalCapture::getFramesRead() {
     int64_t frames = mAudioEndpoint.getDataReadCounter() + mFramesOffsetFromService;
-    //ALOGD("AudioStreamInternalCapture::getFramesRead() returns %lld", (long long)frames);
+    //ALOGD("getFramesRead() returns %lld", (long long)frames);
     return frames;
 }
 
@@ -242,7 +243,7 @@ void *AudioStreamInternalCapture::callbackLoop() {
         // This is a BLOCKING READ!
         result = read(mCallbackBuffer, mCallbackFrames, timeoutNanos);
         if ((result != mCallbackFrames)) {
-            ALOGE("AudioStreamInternalCapture(): callbackLoop: read() returned %d", result);
+            ALOGE("callbackLoop: read() returned %d", result);
             if (result >= 0) {
                 // Only read some of the frames requested. Must have timed out.
                 result = AAUDIO_ERROR_TIMEOUT;
@@ -265,12 +266,12 @@ void *AudioStreamInternalCapture::callbackLoop() {
                 mCallbackFrames);
 
         if (callbackResult == AAUDIO_CALLBACK_RESULT_STOP) {
-            ALOGD("AudioStreamInternalCapture(): callback returned AAUDIO_CALLBACK_RESULT_STOP");
+            ALOGD("callback returned AAUDIO_CALLBACK_RESULT_STOP");
             break;
         }
     }
 
-    ALOGD("AudioStreamInternalCapture(): callbackLoop() exiting, result = %d, isActive() = %d",
+    ALOGD("callbackLoop() exiting, result = %d, isActive() = %d",
           result, (int) isActive());
     return NULL;
 }

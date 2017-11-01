@@ -15,7 +15,7 @@
  */
 
 
-#define LOG_TAG "AAudio"
+#define LOG_TAG "AAudioStreamParameters"
 #include <utils/Log.h>
 #include <hardware/audio.h>
 
@@ -47,12 +47,12 @@ void AAudioStreamParameters::copyFrom(const AAudioStreamParameters &other) {
 aaudio_result_t AAudioStreamParameters::validate() const {
     if (mSamplesPerFrame != AAUDIO_UNSPECIFIED
         && (mSamplesPerFrame < SAMPLES_PER_FRAME_MIN || mSamplesPerFrame > SAMPLES_PER_FRAME_MAX)) {
-        ALOGE("AAudioStreamParameters: channelCount out of range = %d", mSamplesPerFrame);
+        ALOGE("channelCount out of range = %d", mSamplesPerFrame);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
 
     if (mDeviceId < 0) {
-        ALOGE("AAudioStreamParameters: deviceId out of range = %d", mDeviceId);
+        ALOGE("deviceId out of range = %d", mDeviceId);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
 
@@ -61,7 +61,7 @@ aaudio_result_t AAudioStreamParameters::validate() const {
         case AAUDIO_SHARING_MODE_SHARED:
             break;
         default:
-            ALOGE("AAudioStreamParameters: illegal sharingMode = %d", mSharingMode);
+            ALOGE("illegal sharingMode = %d", mSharingMode);
             return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
             // break;
     }
@@ -72,19 +72,19 @@ aaudio_result_t AAudioStreamParameters::validate() const {
         case AAUDIO_FORMAT_PCM_FLOAT:
             break; // valid
         default:
-            ALOGE("AAudioStreamParameters: audioFormat not valid = %d", mAudioFormat);
+            ALOGE("audioFormat not valid = %d", mAudioFormat);
             return AAUDIO_ERROR_INVALID_FORMAT;
             // break;
     }
 
     if (mSampleRate != AAUDIO_UNSPECIFIED
         && (mSampleRate < SAMPLE_RATE_HZ_MIN || mSampleRate > SAMPLE_RATE_HZ_MAX)) {
-        ALOGE("AAudioStreamParameters: sampleRate out of range = %d", mSampleRate);
+        ALOGE("sampleRate out of range = %d", mSampleRate);
         return AAUDIO_ERROR_INVALID_RATE;
     }
 
     if (mBufferCapacity < 0) {
-        ALOGE("AAudioStreamParameters: bufferCapacity out of range = %d", mBufferCapacity);
+        ALOGE("bufferCapacity out of range = %d", mBufferCapacity);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
 
@@ -93,7 +93,7 @@ aaudio_result_t AAudioStreamParameters::validate() const {
         case AAUDIO_DIRECTION_OUTPUT:
             break; // valid
         default:
-            ALOGE("AAudioStreamParameters: direction not valid = %d", mDirection);
+            ALOGE("direction not valid = %d", mDirection);
             return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
             // break;
     }
@@ -102,12 +102,12 @@ aaudio_result_t AAudioStreamParameters::validate() const {
 }
 
 void AAudioStreamParameters::dump() const {
-    ALOGD("AAudioStreamParameters mDeviceId        = %d", mDeviceId);
-    ALOGD("AAudioStreamParameters mSampleRate      = %d", mSampleRate);
-    ALOGD("AAudioStreamParameters mSamplesPerFrame = %d", mSamplesPerFrame);
-    ALOGD("AAudioStreamParameters mSharingMode     = %d", (int)mSharingMode);
-    ALOGD("AAudioStreamParameters mAudioFormat     = %d", (int)mAudioFormat);
-    ALOGD("AAudioStreamParameters mDirection       = %d", mDirection);
-    ALOGD("AAudioStreamParameters mBufferCapacity  = %d", mBufferCapacity);
+    ALOGD("mDeviceId        = %6d", mDeviceId);
+    ALOGD("mSampleRate      = %6d", mSampleRate);
+    ALOGD("mSamplesPerFrame = %6d", mSamplesPerFrame);
+    ALOGD("mSharingMode     = %6d", (int)mSharingMode);
+    ALOGD("mAudioFormat     = %6d", (int)mAudioFormat);
+    ALOGD("mDirection       = %6d", mDirection);
+    ALOGD("mBufferCapacity  = %6d", mBufferCapacity);
 }
 

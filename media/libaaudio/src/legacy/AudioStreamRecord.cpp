@@ -96,7 +96,7 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     }
     mCallbackBufferSize = builder.getFramesPerDataCallback();
 
-    ALOGD("AudioStreamRecord::open(), request notificationFrames = %u, frameCount = %u",
+    ALOGD("open(), request notificationFrames = %u, frameCount = %u",
           notificationFrames, (uint)frameCount);
     mAudioRecord = new AudioRecord(
             mOpPackageName // const String16& opPackageName TODO does not compile
@@ -126,7 +126,7 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     status_t status = mAudioRecord->initCheck();
     if (status != OK) {
         close();
-        ALOGE("AudioStreamRecord::open(), initCheck() returned %d", status);
+        ALOGE("open(), initCheck() returned %d", status);
         return AAudioConvert_androidToAAudioResult(status);
     }
 
@@ -136,7 +136,7 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
 
     int32_t actualSampleRate = mAudioRecord->getSampleRate();
     ALOGW_IF(actualSampleRate != getSampleRate(),
-             "AudioStreamRecord::open() sampleRate changed from %d to %d",
+             "open() sampleRate changed from %d to %d",
              getSampleRate(), actualSampleRate);
     setSampleRate(actualSampleRate);
 
@@ -164,10 +164,10 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
 
     // Log warning if we did not get what we asked for.
     ALOGW_IF(actualFlags != flags,
-             "AudioStreamRecord::open() flags changed from 0x%08X to 0x%08X",
+             "open() flags changed from 0x%08X to 0x%08X",
              flags, actualFlags);
     ALOGW_IF(actualPerformanceMode != perfMode,
-             "AudioStreamRecord::open() perfMode changed from %d to %d",
+             "open() perfMode changed from %d to %d",
              perfMode, actualPerformanceMode);
 
     setState(AAUDIO_STREAM_STATE_OPEN);

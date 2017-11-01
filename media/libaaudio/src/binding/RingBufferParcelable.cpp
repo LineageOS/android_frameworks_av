@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudio"
+#define LOG_TAG "RingBufferParcelable"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -97,7 +97,7 @@ status_t RingBufferParcelable::writeToParcel(Parcel* parcel) const {
     }
     return NO_ERROR;
 error:
-    ALOGE("RingBufferParcelable::writeToParcel() error = %d", status);
+    ALOGE("writeToParcel() error = %d", status);
     return status;
 }
 
@@ -120,7 +120,7 @@ status_t RingBufferParcelable::readFromParcel(const Parcel* parcel) {
     }
     return NO_ERROR;
 error:
-    ALOGE("RingBufferParcelable::readFromParcel() error = %d", status);
+    ALOGE("readFromParcel() error = %d", status);
     return status;
 }
 
@@ -154,27 +154,27 @@ aaudio_result_t RingBufferParcelable::resolve(SharedMemoryParcelable *memoryParc
 aaudio_result_t RingBufferParcelable::validate() {
     aaudio_result_t result;
     if (mCapacityInFrames < 0 || mCapacityInFrames >= 32 * 1024) {
-        ALOGE("RingBufferParcelable invalid mCapacityInFrames = %d", mCapacityInFrames);
+        ALOGE("invalid mCapacityInFrames = %d", mCapacityInFrames);
         return AAUDIO_ERROR_INTERNAL;
     }
     if (mBytesPerFrame < 0 || mBytesPerFrame >= 256) {
-        ALOGE("RingBufferParcelable invalid mBytesPerFrame = %d", mBytesPerFrame);
+        ALOGE("invalid mBytesPerFrame = %d", mBytesPerFrame);
         return AAUDIO_ERROR_INTERNAL;
     }
     if (mFramesPerBurst < 0 || mFramesPerBurst >= 16 * 1024) {
-        ALOGE("RingBufferParcelable invalid mFramesPerBurst = %d", mFramesPerBurst);
+        ALOGE("invalid mFramesPerBurst = %d", mFramesPerBurst);
         return AAUDIO_ERROR_INTERNAL;
     }
     if ((result = mReadCounterParcelable.validate()) != AAUDIO_OK) {
-        ALOGE("RingBufferParcelable invalid mReadCounterParcelable = %d", result);
+        ALOGE("invalid mReadCounterParcelable = %d", result);
         return result;
     }
     if ((result = mWriteCounterParcelable.validate()) != AAUDIO_OK) {
-        ALOGE("RingBufferParcelable invalid mWriteCounterParcelable = %d", result);
+        ALOGE("invalid mWriteCounterParcelable = %d", result);
         return result;
     }
     if ((result = mDataParcelable.validate()) != AAUDIO_OK) {
-        ALOGE("RingBufferParcelable invalid mDataParcelable = %d", result);
+        ALOGE("invalid mDataParcelable = %d", result);
         return result;
     }
     return AAUDIO_OK;
@@ -182,11 +182,11 @@ aaudio_result_t RingBufferParcelable::validate() {
 
 
 void RingBufferParcelable::dump() {
-    ALOGD("RingBufferParcelable mCapacityInFrames = %d ---------", mCapacityInFrames);
+    ALOGD("mCapacityInFrames = %d ---------", mCapacityInFrames);
     if (mCapacityInFrames > 0) {
-        ALOGD("RingBufferParcelable mBytesPerFrame = %d", mBytesPerFrame);
-        ALOGD("RingBufferParcelable mFramesPerBurst = %d", mFramesPerBurst);
-        ALOGD("RingBufferParcelable mFlags = %u", mFlags);
+        ALOGD("mBytesPerFrame = %d", mBytesPerFrame);
+        ALOGD("mFramesPerBurst = %d", mFramesPerBurst);
+        ALOGD("mFlags = %u", mFlags);
         mReadCounterParcelable.dump();
         mWriteCounterParcelable.dump();
         mDataParcelable.dump();
