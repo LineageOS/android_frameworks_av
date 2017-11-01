@@ -22,6 +22,24 @@
       "revId": "a926985dca3fba4f8a2c92e7c9f543b3992e7a10",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5ed5b645_4b2400fb",
+        "filename": "camera/Android.bp",
+        "patchSetId": 1
+      },
+      "lineNbr": 78,
+      "author": {
+        "id": 3962
+      },
+      "writtenOn": "2017-11-01T12:23:09Z",
+      "side": 1,
+      "message": "No. It\u0027s supposed to be lowercase here and uppercase in the .go and .mk files",
+      "parentUuid": "",
+      "revId": "a926985dca3fba4f8a2c92e7c9f543b3992e7a10",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
