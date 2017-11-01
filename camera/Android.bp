@@ -14,6 +14,26 @@
 
 subdirs = ["ndk"]
 
+bootstrap_go_package {
+    name: "soong-camera-parameters",
+    pkgPath: "android/soong/camera_parameters",
+    deps: [
+        "blueprint",
+        "blueprint-pathtools",
+        "soong",
+        "soong-android",
+        "soong-cc",
+    ],
+    srcs: [
+        "parameters.go",
+    ],
+    pluginFor: ["soong_build"],
+}
+
+camera_parameters_defaults {
+    name: "camera_parameters_defaults",
+}
+
 cc_library_shared {
     name: "libcamera_client",
 
@@ -34,7 +54,6 @@ cc_library_shared {
         // Source for camera interface parcelables, and manually-written interfaces
         "Camera.cpp",
         "CameraMetadata.cpp",
-        "CameraParameters.cpp",
         "CaptureResult.cpp",
         "CameraParameters2.cpp",
         "ICamera.cpp",
@@ -48,6 +67,17 @@ cc_library_shared {
         "CameraUtils.cpp",
         "VendorTagDescriptor.cpp",
     ],
+
+    product_variables: {
+        lineage: {
+            uses_generic_camera_parameter_library: {
+                srcs: [
+                    "CameraParameters.cpp",
+                ],
+            },
+        },
+    },
+    defaults: ["camera_parameters_defaults"],
 
     shared_libs: [
         "libcutils",
