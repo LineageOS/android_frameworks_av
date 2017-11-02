@@ -202,19 +202,23 @@ aaudio_result_t AAudioServiceStreamBase::pause() {
         ALOGE("AAudioServiceStreamShared::pause() missing endpoint");
         return AAUDIO_ERROR_INVALID_STATE;
     }
+
+    // Send it now because the timestamp gets rounded up when stopStream() is called below.
+    // Also we don't need the timestamps while we are shutting down.
+    sendCurrentTimestamp();
+
+    result = stopTimestampThread();
+    if (result != AAUDIO_OK) {
+        disconnect();
+        return result;
+    }
+
     result = mServiceEndpoint->stopStream(this, mClientHandle);
     if (result != AAUDIO_OK) {
         ALOGE("AAudioServiceStreamShared::pause() mServiceEndpoint returned %d", result);
         disconnect(); // TODO should we return or pause Base first?
     }
 
-    sendCurrentTimestamp();
-    mThreadEnabled.store(false);
-    result = mTimestampThread.stop();
-    if (result != AAUDIO_OK) {
-        disconnect();
-        return result;
-    }
     sendServiceEvent(AAUDIO_SERVICE_EVENT_PAUSED);
     setState(AAUDIO_STREAM_STATE_PAUSED);
     return result;
@@ -231,6 +235,8 @@ aaudio_result_t AAudioServiceStreamBase::stop() {
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
+    // Send it now because the timestamp gets rounded up when stopStream() is called below.
+    // Also we don't need the timestamps while we are shutting down.
     sendCurrentTimestamp(); // warning - this calls a virtual function
     result = stopTimestampThread();
     if (result != AAUDIO_OK) {
