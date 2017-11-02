@@ -1062,10 +1062,6 @@ MtpResponseCode MtpServer::doMoveObject() {
         path += "/";
     path += info.mName;
 
-    result = mDatabase->moveObject(objectHandle, parent, storageID, path);
-    if (result != MTP_RESPONSE_OK)
-        return result;
-
     if (info.mStorageID == storageID) {
         ALOGV("Moving file from %s to %s", (const char*)fromPath, (const char*)path);
         if (rename(fromPath, path)) {
@@ -1092,10 +1088,8 @@ MtpResponseCode MtpServer::doMoveObject() {
     }
 
     // If the move failed, undo the database change
-    if (result != MTP_RESPONSE_OK)
-        if (mDatabase->moveObject(objectHandle, info.mParent, info.mStorageID,
-                    fromPath) != MTP_RESPONSE_OK)
-            ALOGE("Couldn't undo failed move");
+    if (result == MTP_RESPONSE_OK)
+        result = mDatabase->moveObject(objectHandle, parent, storageID, path);
 
     return result;
 }
