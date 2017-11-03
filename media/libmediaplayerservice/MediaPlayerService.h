@@ -78,8 +78,12 @@ class MediaPlayerService : public BnMediaPlayerService
         class CallbackData;
 
      public:
-                                AudioOutput(audio_session_t sessionId, uid_t uid, int pid,
-                                        const audio_attributes_t * attr);
+                                AudioOutput(
+                                        audio_session_t sessionId,
+                                        uid_t uid,
+                                        int pid,
+                                        const audio_attributes_t * attr,
+                                        const sp<AudioSystem::AudioDeviceCallback>& deviceCallback);
         virtual                 ~AudioOutput();
 
         virtual bool            ready() const { return mTrack != 0; }
@@ -137,6 +141,11 @@ class MediaPlayerService : public BnMediaPlayerService
                                         const sp<media::VolumeShaper::Operation>& operation) override;
         virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id) override;
 
+        // AudioRouting
+        virtual status_t        setOutputDevice(audio_port_handle_t deviceId);
+        virtual status_t        getRoutedDeviceId(audio_port_handle_t* deviceId);
+        virtual status_t        enableAudioDeviceCallback(bool enabled);
+
     private:
         static void             setMinBufferCount();
         static void             CallbackWrapper(
@@ -166,6 +175,9 @@ class MediaPlayerService : public BnMediaPlayerService
         int                     mAuxEffectId;
         audio_output_flags_t    mFlags;
         sp<media::VolumeHandler>       mVolumeHandler;
+        audio_port_handle_t     mSelectedDeviceId;
+        bool                    mDeviceCallbackEnabled;
+        wp<AudioSystem::AudioDeviceCallback>        mDeviceCallback;
         mutable Mutex           mLock;
 
         // static variables below not protected by mutex
@@ -374,6 +386,10 @@ private:
         // Modular DRM
         virtual status_t prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>& drmSessionId);
         virtual status_t releaseDrm();
+        // AudioRouting
+        virtual status_t setOutputDevice(audio_port_handle_t deviceId);
+        virtual status_t getRoutedDeviceId(audio_port_handle_t* deviceId);
+        virtual status_t enableAudioDeviceCallback(bool enabled);
 
     private:
         class ServiceDeathNotifier:
@@ -400,6 +416,21 @@ private:
             int mWhich;
             sp<IBinder> mService;
             sp<IOmx> mOmx;
+            wp<MediaPlayerBase> mListener;
+        };
+
+        class AudioDeviceUpdatedNotifier: public AudioSystem::AudioDeviceCallback
+        {
+        public:
+            AudioDeviceUpdatedNotifier(const sp<MediaPlayerBase>& listener) {
+                mListener = listener;
+            }
+            ~AudioDeviceUpdatedNotifier() {}
+
+            virtual void onAudioDeviceUpdate(audio_io_handle_t audioIo,
+                                             audio_port_handle_t deviceId);
+
+        private:
             wp<MediaPlayerBase> mListener;
         };
 
@@ -466,6 +497,7 @@ private:
 
         sp<ServiceDeathNotifier> mExtractorDeathListener;
         sp<ServiceDeathNotifier> mCodecDeathListener;
+        sp<AudioDeviceUpdatedNotifier> mAudioDeviceUpdatedListener;
 #if CALLBACK_ANTAGONIZER
                     Antagonizer*                mAntagonizer;
 #endif

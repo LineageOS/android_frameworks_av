@@ -216,19 +216,19 @@ AudioTrack::AudioTrack(
         pid_t pid,
         const audio_attributes_t* pAttributes,
         bool doNotReconnect,
-        float maxRequiredSpeed)
+        float maxRequiredSpeed,
+        audio_port_handle_t selectedDeviceId)
     : mStatus(NO_INIT),
       mState(STATE_STOPPED),
       mPreviousPriority(ANDROID_PRIORITY_NORMAL),
       mPreviousSchedulingGroup(SP_DEFAULT),
       mPausedPosition(0),
-      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
       mPortId(AUDIO_PORT_HANDLE_NONE)
 {
     mStatus = set(streamType, sampleRate, format, channelMask,
             frameCount, flags, cbf, user, notificationFrames,
             0 /*sharedBuffer*/, false /*threadCanCallJava*/, sessionId, transferType,
-            offloadInfo, uid, pid, pAttributes, doNotReconnect, maxRequiredSpeed);
+            offloadInfo, uid, pid, pAttributes, doNotReconnect, maxRequiredSpeed, selectedDeviceId);
 }
 
 AudioTrack::AudioTrack(
@@ -310,7 +310,8 @@ status_t AudioTrack::set(
         pid_t pid,
         const audio_attributes_t* pAttributes,
         bool doNotReconnect,
-        float maxRequiredSpeed)
+        float maxRequiredSpeed,
+        audio_port_handle_t selectedDeviceId)
 {
     ALOGV("set(): streamType %d, sampleRate %u, format %#x, channelMask %#x, frameCount %zu, "
           "flags #%x, notificationFrames %d, sessionId %d, transferType %d, uid %d, pid %d",
@@ -318,6 +319,7 @@ status_t AudioTrack::set(
           sessionId, transferType, uid, pid);
 
     mThreadCanCallJava = threadCanCallJava;
+    mSelectedDeviceId = selectedDeviceId;
 
     switch (transferType) {
     case TRANSFER_DEFAULT:
@@ -1221,6 +1223,7 @@ status_t AudioTrack::setOutputDevice(audio_port_handle_t deviceId) {
         mSelectedDeviceId = deviceId;
         if (mStatus == NO_ERROR) {
             android_atomic_or(CBLK_INVALID, &mCblk->mFlags);
+            mProxy->interrupt();
         }
     }
     return NO_ERROR;

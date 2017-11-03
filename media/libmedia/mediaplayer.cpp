@@ -1094,4 +1094,39 @@ status_t MediaPlayer::releaseDrm()
     return status;
 }
 
+status_t MediaPlayer::setOutputDevice(audio_port_handle_t deviceId)
+{
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == NULL) {
+        ALOGV("setOutputDevice: player not init");
+        return NO_INIT;
+    }
+    return mPlayer->setOutputDevice(deviceId);
+}
+
+audio_port_handle_t MediaPlayer::getRoutedDeviceId()
+{
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == NULL) {
+        ALOGV("getRoutedDeviceId: player not init");
+        return AUDIO_PORT_HANDLE_NONE;
+    }
+    audio_port_handle_t deviceId;
+    status_t status = mPlayer->getRoutedDeviceId(&deviceId);
+    if (status != NO_ERROR) {
+        return AUDIO_PORT_HANDLE_NONE;
+    }
+    return deviceId;
+}
+
+status_t MediaPlayer::enableAudioDeviceCallback(bool enabled)
+{
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == NULL) {
+        ALOGV("addAudioDeviceCallback: player not init");
+        return NO_INIT;
+    }
+    return mPlayer->enableAudioDeviceCallback(enabled);
+}
+
 } // namespace android

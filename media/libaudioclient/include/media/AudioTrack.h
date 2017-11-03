@@ -218,6 +218,8 @@ public:
      *                     maxRequiredSpeed playback. Values less than 1.0f and greater than
      *                     AUDIO_TIMESTRETCH_SPEED_MAX will be clamped.  For non-PCM tracks
      *                     and direct or offloaded tracks, this parameter is ignored.
+     * selectedDeviceId:   Selected device id of the app which initially requested the AudioTrack
+     *                     to open with a specific device.
      * threadCanCallJava:  Not present in parameter list, and so is fixed at false.
      */
 
@@ -237,7 +239,8 @@ public:
                                     pid_t pid = -1,
                                     const audio_attributes_t* pAttributes = NULL,
                                     bool doNotReconnect = false,
-                                    float maxRequiredSpeed = 1.0f);
+                                    float maxRequiredSpeed = 1.0f,
+                                    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
 
     /* Creates an audio track and registers it with AudioFlinger.
      * With this constructor, the track is configured for static buffer mode.
@@ -313,7 +316,8 @@ public:
                             pid_t pid = -1,
                             const audio_attributes_t* pAttributes = NULL,
                             bool doNotReconnect = false,
-                            float maxRequiredSpeed = 1.0f);
+                            float maxRequiredSpeed = 1.0f,
+                            audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
 
     /* Result of constructing the AudioTrack. This must be checked for successful initialization
      * before using any AudioTrack API (except for set()), because using
