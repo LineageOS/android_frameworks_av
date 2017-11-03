@@ -109,12 +109,7 @@ public:
     //
 
     // request an output appropriate for playback of the supplied stream type and parameters
-    virtual audio_io_handle_t getOutput(audio_stream_type_t stream,
-                                        uint32_t samplingRate,
-                                        audio_format_t format,
-                                        audio_channel_mask_t channelMask,
-                                        audio_output_flags_t flags,
-                                        const audio_offload_info_t *offloadInfo) = 0;
+    virtual audio_io_handle_t getOutput(audio_stream_type_t stream) = 0;
     virtual status_t getOutputForAttr(const audio_attributes_t *attr,
                                         audio_io_handle_t *output,
                                         audio_session_t session,

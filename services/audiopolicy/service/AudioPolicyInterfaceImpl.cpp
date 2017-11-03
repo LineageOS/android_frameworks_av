@@ -141,12 +141,7 @@ audio_policy_forced_cfg_t AudioPolicyService::getForceUse(audio_policy_force_use
     return mAudioPolicyManager->getForceUse(usage);
 }
 
-audio_io_handle_t AudioPolicyService::getOutput(audio_stream_type_t stream,
-                                    uint32_t samplingRate,
-                                    audio_format_t format,
-                                    audio_channel_mask_t channelMask,
-                                    audio_output_flags_t flags,
-                                    const audio_offload_info_t *offloadInfo)
+audio_io_handle_t AudioPolicyService::getOutput(audio_stream_type_t stream)
 {
     if (uint32_t(stream) >= AUDIO_STREAM_PUBLIC_CNT) {
         return AUDIO_IO_HANDLE_NONE;
@@ -156,8 +151,7 @@ audio_io_handle_t AudioPolicyService::getOutput(audio_stream_type_t stream,
     }
     ALOGV("getOutput()");
     Mutex::Autolock _l(mLock);
-    return mAudioPolicyManager->getOutput(stream, samplingRate,
-                                    format, channelMask, flags, offloadInfo);
+    return mAudioPolicyManager->getOutput(stream);
 }
 
 status_t AudioPolicyService::getOutputForAttr(const audio_attributes_t *attr,
@@ -173,7 +167,7 @@ status_t AudioPolicyService::getOutputForAttr(const audio_attributes_t *attr,
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
-    ALOGV("getOutput()");
+    ALOGV("getOutputForAttr()");
     Mutex::Autolock _l(mLock);
 
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
