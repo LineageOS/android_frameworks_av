@@ -68,7 +68,13 @@ public:
     virtual status_t setPhoneState(audio_mode_t state);
     virtual status_t setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config);
     virtual audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage);
-    virtual audio_io_handle_t getOutput(audio_stream_type_t stream);
+    virtual audio_io_handle_t getOutput(audio_stream_type_t stream,
+                                        uint32_t samplingRate = 0,
+                                        audio_format_t format = AUDIO_FORMAT_DEFAULT,
+                                        audio_channel_mask_t channelMask = 0,
+                                        audio_output_flags_t flags =
+                                                AUDIO_OUTPUT_FLAG_NONE,
+                                        const audio_offload_info_t *offloadInfo = NULL);
     virtual status_t getOutputForAttr(const audio_attributes_t *attr,
                                       audio_io_handle_t *output,
                                       audio_session_t session,

@@ -751,15 +751,20 @@ sp<IOProfile> AudioPolicyManager::getProfileForDirectOutput(
     return profile;
 }
 
-audio_io_handle_t AudioPolicyManager::getOutput(audio_stream_type_t stream)
+audio_io_handle_t AudioPolicyManager::getOutput(audio_stream_type_t stream,
+                                                uint32_t samplingRate,
+                                                audio_format_t format,
+                                                audio_channel_mask_t channelMask,
+                                                audio_output_flags_t flags,
+                                                const audio_offload_info_t *offloadInfo)
 {
     routing_strategy strategy = getStrategy(stream);
     audio_devices_t device = getDeviceForStrategy(strategy, false /*fromCache*/);
-    SortedVector<audio_io_handle_t> outputs = getOutputsForDevice(device, mOutputs);
-    audio_io_handle_t output = selectOutput(outputs, AUDIO_OUTPUT_FLAG_NONE, AUDIO_FORMAT_INVALID);
+    ALOGV("getOutput() device %d, stream %d, samplingRate %d, format %x, channelMask %x, flags %x",
+          device, stream, samplingRate, format, channelMask, flags);
 
-    ALOGV("getOutput() stream %d selected device %08x, output %d", stream, device, output);
-    return output;
+    return getOutputForDevice(device, AUDIO_SESSION_ALLOCATE, stream, samplingRate, format,
+                              channelMask, flags, offloadInfo);
 }
 
 status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
@@ -937,12 +942,12 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
                     (channelMask == outputDesc->mChannelMask)) {
                   if (session == outputDesc->mDirectClientSession) {
                       outputDesc->mDirectOpenCount++;
-                      ALOGV("getOutputForDevice() reusing direct output %d for session %d",
+                      ALOGV("getOutput() reusing direct output %d for session %d",
                             mOutputs.keyAt(i), session);
                       return mOutputs.keyAt(i);
                   } else {
-                      ALOGV("getOutputForDevice() do not reuse direct output because"
-                              "current client (%d) is not the same as requesting client (%d)",
+                      ALOGV("getOutput() do not reuse direct output because current client (%d) "
+                            "is not the same as requesting client (%d)",
                             outputDesc->mDirectClientSession, session);
                       goto non_direct_output;
                   }
@@ -997,7 +1002,7 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
             (samplingRate != 0 && samplingRate != config.sample_rate) ||
             (format != AUDIO_FORMAT_DEFAULT && !audio_formats_match(format, config.format)) ||
             (channelMask != 0 && channelMask != config.channel_mask)) {
-            ALOGV("getOutputForDevice() failed opening direct output: output %d samplingRate %d %d,"
+            ALOGV("getOutput() failed opening direct output: output %d samplingRate %d %d,"
                     "format %d %d, channelMask %04x %04x", output, samplingRate,
                     outputDesc->mSamplingRate, format, outputDesc->mFormat, channelMask,
                     outputDesc->mChannelMask);
@@ -1020,7 +1025,7 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
 
         addOutput(output, outputDesc);
         mPreviousOutputs = mOutputs;
-        ALOGV("getOutputForDevice() returns new direct output %d", output);
+        ALOGV("getOutput() returns new direct output %d", output);
         mpClientInterface->onAudioPortListUpdate();
         return output;
     }
@@ -1047,9 +1052,8 @@ non_direct_output:
         flags = (audio_output_flags_t)(flags & ~AUDIO_OUTPUT_FLAG_DIRECT);
         output = selectOutput(outputs, flags, format);
     }
-    ALOGW_IF((output == 0), "getOutputForDevice() could not find output for stream %d, "
-            "samplingRate %d, format %d, channels %x, flags %x",
-            stream, samplingRate, format, channelMask, flags);
+    ALOGW_IF((output == 0), "getOutput() could not find output for stream %d, samplingRate %d, "
+            "format %d, channels %x, flags %x", stream, samplingRate, format, channelMask, flags);
 
     return output;
 }
