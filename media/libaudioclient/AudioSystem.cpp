@@ -822,11 +822,16 @@ audio_policy_forced_cfg_t AudioSystem::getForceUse(audio_policy_force_use_t usag
 }
 
 
-audio_io_handle_t AudioSystem::getOutput(audio_stream_type_t stream)
+audio_io_handle_t AudioSystem::getOutput(audio_stream_type_t stream,
+                                    uint32_t samplingRate,
+                                    audio_format_t format,
+                                    audio_channel_mask_t channelMask,
+                                    audio_output_flags_t flags,
+                                    const audio_offload_info_t *offloadInfo)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return 0;
-    return aps->getOutput(stream);
+    return aps->getOutput(stream, samplingRate, format, channelMask, flags, offloadInfo);
 }
 
 status_t AudioSystem::getOutputForAttr(const audio_attributes_t *attr,
