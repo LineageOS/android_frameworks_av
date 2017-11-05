@@ -41,6 +41,9 @@ getgroups32: 1
 nanosleep: 1
 getrandom: 1
 
+# for dynamically loading extractors
+pread64: 1
+
 # for FileSource
 readlinkat: 1
 _llseek: 1

@@ -159,21 +159,20 @@ static void MyErrorCallbackProc(
 }
 
 static void usage() {
-    printf("loopback: -n{numBursts} -p{outPerf} -P{inPerf} -t{test} -g{gain} -f{freq}\n");
-    printf("          -c{inputChannels}\n");
-    printf("          -f{freq}  sine frequency\n");
-    printf("          -g{gain}  recirculating loopback gain\n");
-    printf("          -m enable MMAP mode\n");
-    printf("          -n{numBursts} buffer size, for example 2 for double buffered\n");
-    printf("          -p{outPerf}  set output AAUDIO_PERFORMANCE_MODE*\n");
-    printf("          -P{inPerf}   set input AAUDIO_PERFORMANCE_MODE*\n");
+    printf("Usage: aaudio_loopback [OPTION]...\n\n");
+    printf("          -c{inputChannels} number of input channels\n");
+    printf("          -g{gain}          recirculating loopback gain\n");
+    printf("          -m                enable MMAP mode\n");
+    printf("          -n{numBursts}     buffer size, for example 2 for double buffered\n");
+    printf("          -p{outPerf}       set output AAUDIO_PERFORMANCE_MODE*\n");
+    printf("          -P{inPerf}        set input AAUDIO_PERFORMANCE_MODE*\n");
     printf("              n for _NONE\n");
     printf("              l for _LATENCY\n");
-    printf("              p for _POWER_SAVING;\n");
-    printf("          -t{test}   select test mode\n");
+    printf("              p for _POWER_SAVING\n");
+    printf("          -t{test}          select test mode\n");
     printf("              m for sine magnitude\n");
-    printf("              e for echo latency (default)\n");
-    printf("For example:  loopback -b2 -pl -Pn\n");
+    printf("              e for echo latency (default)\n\n");
+    printf("Example:  aaudio_loopback -n2 -pl -Pn\n");
 }
 
 static aaudio_performance_mode_t parsePerformanceMode(char c) {

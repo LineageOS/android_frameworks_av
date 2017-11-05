@@ -78,6 +78,10 @@ enum {
     // Modular DRM
     PREPARE_DRM,
     RELEASE_DRM,
+    // AudioRouting
+    SET_OUTPUT_DEVICE,
+    GET_ROUTED_DEVICE_ID,
+    ENABLE_AUDIO_DEVICE_CALLBACK,
 };
 
 // ModDrm helpers
@@ -559,6 +563,59 @@ public:
 
         return reply.readInt32();
     }
+
+    status_t setOutputDevice(audio_port_handle_t deviceId)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
+
+        data.writeInt32(deviceId);
+
+        status_t status = remote()->transact(SET_OUTPUT_DEVICE, data, &reply);
+        if (status != OK) {
+            ALOGE("setOutputDevice: binder call failed: %d", status);
+            return status;
+        }
+
+        return reply.readInt32();
+    }
+
+    status_t getRoutedDeviceId(audio_port_handle_t* deviceId)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
+
+        status_t status = remote()->transact(GET_ROUTED_DEVICE_ID, data, &reply);
+        if (status != OK) {
+            ALOGE("getRoutedDeviceid: binder call failed: %d", status);
+            *deviceId = AUDIO_PORT_HANDLE_NONE;
+            return status;
+        }
+
+        status = reply.readInt32();
+        if (status != NO_ERROR) {
+            *deviceId = AUDIO_PORT_HANDLE_NONE;
+        } else {
+            *deviceId = reply.readInt32();
+        }
+        return status;
+    }
+
+    status_t enableAudioDeviceCallback(bool enabled)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
+
+        data.writeBool(enabled);
+
+        status_t status = remote()->transact(ENABLE_AUDIO_DEVICE_CALLBACK, data, &reply);
+        if (status != OK) {
+            ALOGE("enableAudioDeviceCallback: binder call failed: %d, %d", enabled, status);
+            return status;
+        }
+
+        return reply.readInt32();
+    }
 };
 
 IMPLEMENT_META_INTERFACE(MediaPlayer, "android.media.IMediaPlayer");
@@ -916,6 +973,41 @@ status_t BnMediaPlayer::onTransact(
             reply->writeInt32(result);
             return OK;
         }
+
+        // AudioRouting
+        case SET_OUTPUT_DEVICE: {
+            CHECK_INTERFACE(IMediaPlayer, data, reply);
+            int deviceId;
+            status_t status = data.readInt32(&deviceId);
+            if (status == NO_ERROR) {
+                reply->writeInt32(setOutputDevice(deviceId));
+            } else {
+                reply->writeInt32(BAD_VALUE);
+            }
+            return NO_ERROR;
+        }
+        case GET_ROUTED_DEVICE_ID: {
+            CHECK_INTERFACE(IMediaPlayer, data, reply);
+            audio_port_handle_t deviceId;
+            status_t ret = getRoutedDeviceId(&deviceId);
+            reply->writeInt32(ret);
+            if (ret == NO_ERROR) {
+                reply->writeInt32(deviceId);
+            }
+            return NO_ERROR;
+        } break;
+        case ENABLE_AUDIO_DEVICE_CALLBACK: {
+            CHECK_INTERFACE(IMediaPlayer, data, reply);
+            bool enabled;
+            status_t status = data.readBool(&enabled);
+            if (status == NO_ERROR) {
+                reply->writeInt32(enableAudioDeviceCallback(enabled));
+            } else {
+                reply->writeInt32(BAD_VALUE);
+            }
+            return NO_ERROR;
+        } break;
+
         default:
             return BBinder::onTransact(code, data, reply, flags);
     }

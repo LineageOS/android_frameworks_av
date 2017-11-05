@@ -131,6 +131,11 @@ public:
     virtual status_t        getMetadata(bool update_only,
                                         bool apply_filter,
                                         Parcel *metadata) = 0;
+
+    // AudioRouting
+    virtual status_t        setOutputDevice(audio_port_handle_t deviceId) = 0;
+    virtual status_t        getRoutedDeviceId(audio_port_handle_t *deviceId) = 0;
+    virtual status_t        enableAudioDeviceCallback(bool enabled) = 0;
 };
 
 // ----------------------------------------------------------------------------
