@@ -990,7 +990,7 @@ protected:
     sp<IAudioTrack>         mAudioTrack;
     sp<IMemory>             mCblkMemory;
     audio_track_cblk_t*     mCblk;                  // re-load after mLock.unlock()
-    audio_io_handle_t       mOutput;                // returned by AudioSystem::getOutput()
+    audio_io_handle_t       mOutput;                // returned by AudioSystem::getOutputForAttr()
 
     sp<AudioTrackThread>    mAudioTrackThread;
     bool                    mThreadCanCallJava;
