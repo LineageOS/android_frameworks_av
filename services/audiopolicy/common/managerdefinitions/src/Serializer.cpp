@@ -140,19 +140,19 @@ status_t AudioGainTraits::deserialize(_xmlDoc */*doc*/, const _xmlNode *root, Pt
     }
 
     string minValueMBLiteral = getXmlAttribute(root, Attributes::minValueMB);
-    uint32_t minValueMB;
+    int32_t minValueMB;
     if (!minValueMBLiteral.empty() && convertTo(minValueMBLiteral, minValueMB)) {
         gain->setMinValueInMb(minValueMB);
     }
 
     string maxValueMBLiteral = getXmlAttribute(root, Attributes::maxValueMB);
-    uint32_t maxValueMB;
+    int32_t maxValueMB;
     if (!maxValueMBLiteral.empty() && convertTo(maxValueMBLiteral, maxValueMB)) {
         gain->setMaxValueInMb(maxValueMB);
     }
 
     string defaultValueMBLiteral = getXmlAttribute(root, Attributes::defaultValueMB);
-    uint32_t defaultValueMB;
+    int32_t defaultValueMB;
     if (!defaultValueMBLiteral.empty() && convertTo(defaultValueMBLiteral, defaultValueMB)) {
         gain->setDefaultValueInMb(defaultValueMB);
     }
