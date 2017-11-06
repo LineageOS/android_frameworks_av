@@ -49,7 +49,6 @@ static aaudio_data_callback_result_t s_myDataCallbackProc(
         void *audioData,
         int32_t numFrames
 ) {
-    stream;
     (void) userData;
     (void) audioData;
     (void) numFrames;
@@ -138,7 +137,7 @@ static void s_myErrorCallbackProc(
 
 int main(int argc, char **argv) {
     (void) argc;
-    (void *)argv;
+    (void) argv;
 
     aaudio_result_t result = AAUDIO_OK;
 

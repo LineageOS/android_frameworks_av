@@ -10,6 +10,7 @@ LOCAL_C_INCLUDES := \
 
 # NDK recommends using this kind of relative path instead of an absolute path.
 LOCAL_SRC_FILES:= ../src/write_sine.cpp
+LOCAL_CFLAGS := -Wall -Werror
 LOCAL_SHARED_LIBRARIES := libaaudio
 LOCAL_MODULE := write_sine
 include $(BUILD_EXECUTABLE)
@@ -22,6 +23,7 @@ LOCAL_C_INCLUDES := \
     frameworks/av/media/libaaudio/examples/utils
 
 LOCAL_SRC_FILES:= ../src/write_sine_callback.cpp
+LOCAL_CFLAGS := -Wall -Werror
 LOCAL_SHARED_LIBRARIES := libaaudio
 LOCAL_MODULE := write_sine_callback
 include $(BUILD_EXECUTABLE)
