@@ -23,32 +23,6 @@
 
 namespace android {
 
-class C2AllocatorIon : public C2Allocator {
-public:
-    // (usage, capacity) => (align, heapMask, flags)
-    typedef std::function<int (C2MemoryUsage, size_t,
-                      /* => */ size_t*, unsigned*, unsigned*)> usage_mapper_fn;
-
-    virtual C2Error allocateLinearBuffer(
-            uint32_t capacity, C2MemoryUsage usage,
-            std::shared_ptr<C2LinearAllocation> *allocation) override;
-
-    virtual C2Error recreateLinearBuffer(
-            const C2Handle *handle,
-            std::shared_ptr<C2LinearAllocation> *allocation) override;
-
-    C2AllocatorIon();
-
-    C2Error status() const { return mInit; }
-
-    virtual ~C2AllocatorIon();
-
-private:
-    C2Error mInit;
-    int mIonFd;
-    usage_mapper_fn mUsageMapper;
-};
-
 class C2DefaultBlockAllocator : public C2BlockAllocator {
 public:
     explicit C2DefaultBlockAllocator(const std::shared_ptr<C2Allocator> &allocator);
@@ -63,31 +37,6 @@ public:
     // TODO:
 private:
     const std::shared_ptr<C2Allocator> mAllocator;
-};
-
-class C2AllocatorGralloc : public C2Allocator {
-public:
-    // (usage, capacity) => (align, heapMask, flags)
-    typedef std::function<int (C2MemoryUsage, size_t,
-                      /* => */ size_t*, unsigned*, unsigned*)> usage_mapper_fn;
-
-    virtual C2Error allocateGraphicBuffer(
-            uint32_t width, uint32_t height, uint32_t format, C2MemoryUsage usage,
-            std::shared_ptr<C2GraphicAllocation> *allocation) override;
-
-    virtual C2Error recreateGraphicBuffer(
-            const C2Handle *handle,
-            std::shared_ptr<C2GraphicAllocation> *allocation) override;
-
-    C2AllocatorGralloc();
-
-    C2Error status() const;
-
-    virtual ~C2AllocatorGralloc();
-
-private:
-    class Impl;
-    Impl *mImpl;
 };
 
 class C2DefaultGraphicBlockAllocator : public C2BlockAllocator {

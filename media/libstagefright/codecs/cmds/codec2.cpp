@@ -52,6 +52,8 @@
 #include <gui/SurfaceComposerClient.h>
 
 #include <util/C2ParamUtils.h>
+#include <C2AllocatorGralloc.h>
+#include <C2AllocatorIon.h>
 #include <C2Buffer.h>
 #include <C2BufferPriv.h>
 #include <C2Component.h>
