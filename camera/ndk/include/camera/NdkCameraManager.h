@@ -232,18 +232,18 @@ camera_status_t ACameraManager_getCameraCharacteristics(
  * priority when accessing the camera, and this method will succeed even if the camera device is
  * in use by another camera API client. Any lower-priority application that loses control of the
  * camera in this way will receive an
- * {@link ACameraDevice_stateCallbacks#onDisconnected} callback.</p>
+ * {@link ACameraDevice_StateCallbacks#onDisconnected} callback.</p>
  *
  * <p>Once the camera is successfully opened,the ACameraDevice can then be set up
  * for operation by calling {@link ACameraDevice_createCaptureSession} and
  * {@link ACameraDevice_createCaptureRequest}.</p>
  *
  * <p>If the camera becomes disconnected after this function call returns,
- * {@link ACameraDevice_stateCallbacks#onDisconnected} with a
+ * {@link ACameraDevice_StateCallbacks#onDisconnected} with a
  * ACameraDevice in the disconnected state will be called.</p>
  *
  * <p>If the camera runs into error after this function call returns,
- * {@link ACameraDevice_stateCallbacks#onError} with a
+ * {@link ACameraDevice_StateCallbacks#onError} with a
  * ACameraDevice in the error state will be called.</p>
  *
  * @param manager the {@link ACameraManager} of interest.
