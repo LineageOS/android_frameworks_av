@@ -90,18 +90,18 @@ enum {
 };
 
 /**
- * Camera device state callbacks to be used in {@link ACameraDevice_stateCallbacks}.
+ * Camera device state callbacks to be used in {@link ACameraDevice_StateCallbacks}.
  *
- * @param context The optional context in {@link ACameraDevice_stateCallbacks} will be
+ * @param context The optional context in {@link ACameraDevice_StateCallbacks} will be
  *                passed to this callback.
  * @param device The {@link ACameraDevice} that is being disconnected.
  */
 typedef void (*ACameraDevice_StateCallback)(void* context, ACameraDevice* device);
 
 /**
- * Camera device error state callbacks to be used in {@link ACameraDevice_stateCallbacks}.
+ * Camera device error state callbacks to be used in {@link ACameraDevice_StateCallbacks}.
  *
- * @param context The optional context in {@link ACameraDevice_stateCallbacks} will be
+ * @param context The optional context in {@link ACameraDevice_StateCallbacks} will be
  *                passed to this callback.
  * @param device The {@link ACameraDevice} that is being disconnected.
  * @param error The error code describes the cause of this error callback. See the folowing
@@ -150,7 +150,7 @@ typedef struct ACameraDevice_StateCallbacks {
      *
      */
     ACameraDevice_ErrorStateCallback  onError;
-} ACameraDevice_stateCallbacks;
+} ACameraDevice_StateCallbacks;
 
 /**
  * Close the connection and free this ACameraDevice synchronously. Access to the ACameraDevice
