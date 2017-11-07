@@ -85,7 +85,7 @@ struct AImageReader : public RefBase {
     // Called by AImageReader_acquireXXX to acquire a Buffer and setup AImage.
     media_status_t acquireImageLocked(/*out*/AImage** image, /*out*/int* fenceFd);
 
-    // Called by AImage to close image
+    // Called by AImage/~AImageReader to close image. Caller is responsible to grab AImage::mLock
     void releaseImageLocked(AImage* image, int releaseFenceFd);
 
     static int getBufferWidth(BufferItem* buffer);
