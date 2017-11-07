@@ -52,11 +52,10 @@
 #include <gui/SurfaceComposerClient.h>
 
 #include <util/C2ParamUtils.h>
-#include <C2AllocatorGralloc.h>
-#include <C2AllocatorIon.h>
 #include <C2Buffer.h>
 #include <C2BufferPriv.h>
 #include <C2Component.h>
+#include <C2PlatformSupport.h>
 #include <C2Work.h>
 
 #include "../avcdec/C2SoftAvcDec.h"
@@ -141,12 +140,15 @@ private:
 SimplePlayer::SimplePlayer()
     : mListener(new Listener(this)),
       mProducerListener(new DummyProducerListener),
-      mAllocIon(new C2AllocatorIon),
-      mAllocGralloc(new C2AllocatorGralloc),
-      mLinearAlloc(new C2DefaultBlockAllocator(mAllocIon)),
-      mGraphicAlloc(new C2DefaultGraphicBlockAllocator(mAllocGralloc)),
       mComposerClient(new SurfaceComposerClient) {
     CHECK_EQ(mComposerClient->initCheck(), (status_t)OK);
+
+    std::shared_ptr<C2AllocatorStore> store = GetCodec2PlatformAllocatorStore();
+    CHECK_EQ(store->createAllocator(C2AllocatorStore::DEFAULT_LINEAR, &mAllocIon), C2_OK);
+    CHECK_EQ(store->createAllocator(C2AllocatorStore::DEFAULT_GRAPHIC, &mAllocGralloc), C2_OK);
+
+    mLinearAlloc = std::make_shared<C2DefaultBlockAllocator>(mAllocIon);
+    mGraphicAlloc = std::make_shared<C2DefaultGraphicBlockAllocator>(mAllocGralloc);
 
     mControl = mComposerClient->createSurface(
             String8("A Surface"),

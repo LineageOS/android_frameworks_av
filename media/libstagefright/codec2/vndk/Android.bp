@@ -6,6 +6,7 @@ cc_library_static {
         "C2AllocatorGralloc.cpp",
         "C2Buffer.cpp",
         "C2Config.cpp",
+        "C2Store.cpp",
     ],
 
     include_dirs: [
