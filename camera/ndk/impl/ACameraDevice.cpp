@@ -941,7 +941,6 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                     ACaptureRequest* request = allocateACaptureRequest(requestSp);
                     (*onFail)(context, session.get(), request, failure);
                     freeACaptureRequest(request);
-                    delete failure;
                     break;
                 }
                 case kWhatCaptureSeqEnd:
