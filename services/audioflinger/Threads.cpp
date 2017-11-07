@@ -3314,7 +3314,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                             lastWriteFinished,previousLastWriteFinished, &deltaNs);
                         const int32_t deltaMs = deltaNs / 1000000;
 
-                        const int32_t throttleMs = mHalfBufferMs - deltaMs;
+                        const int32_t throttleMs = (int32_t)mHalfBufferMs - deltaMs;
                         if ((signed)mHalfBufferMs >= throttleMs && throttleMs > 0) {
                             usleep(throttleMs * 1000);
                             // notify of throttle start on verbose log
