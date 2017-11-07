@@ -16,6 +16,8 @@
 
 #include <gtest/gtest.h>
 
+#include <C2AllocatorIon.h>
+#include <C2AllocatorGralloc.h>
 #include <C2Buffer.h>
 #include <C2BufferPriv.h>
 #include <C2ParamDef.h>

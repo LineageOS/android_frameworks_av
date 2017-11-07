@@ -2,6 +2,8 @@ cc_library_static {
     name: "libstagefright_codec2_vndk",
 
     srcs: [
+        "C2AllocatorIon.cpp",
+        "C2AllocatorGralloc.cpp",
         "C2Buffer.cpp",
         "C2Config.cpp",
     ],

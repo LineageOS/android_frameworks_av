@@ -750,11 +750,12 @@ void SoundTriggerHwService::Module::onCallbackEvent(const sp<CallbackEvent>& eve
         return;
     }
 
+    Vector< sp<ModuleClient> > clients;
+
     switch (event->mType) {
     case CallbackEvent::TYPE_RECOGNITION: {
         struct sound_trigger_recognition_event *recognitionEvent =
                 (struct sound_trigger_recognition_event *)eventMemory->pointer();
-        sp<ISoundTriggerClient> client;
         {
             AutoMutex lock(mLock);
             sp<Model> model = getModel(recognitionEvent->model);
@@ -769,16 +770,12 @@ void SoundTriggerHwService::Module::onCallbackEvent(const sp<CallbackEvent>& eve
 
             recognitionEvent->capture_session = model->mCaptureSession;
             model->mState = Model::STATE_IDLE;
-            client = model->mModuleClient->client();
-        }
-        if (client != 0) {
-            client->onRecognitionEvent(eventMemory);
+            clients.add(model->mModuleClient);
         }
     } break;
     case CallbackEvent::TYPE_SOUNDMODEL: {
         struct sound_trigger_model_event *soundmodelEvent =
                 (struct sound_trigger_model_event *)eventMemory->pointer();
-        sp<ISoundTriggerClient> client;
         {
             AutoMutex lock(mLock);
             sp<Model> model = getModel(soundmodelEvent->model);
@@ -786,28 +783,25 @@ void SoundTriggerHwService::Module::onCallbackEvent(const sp<CallbackEvent>& eve
                 ALOGW("%s model == 0", __func__);
                 return;
             }
-            client = model->mModuleClient->client();
-        }
-        if (client != 0) {
-            client->onSoundModelEvent(eventMemory);
+            clients.add(model->mModuleClient);
         }
     } break;
     case CallbackEvent::TYPE_SERVICE_STATE: {
-        Vector< sp<ISoundTriggerClient> > clients;
         {
             AutoMutex lock(mLock);
             for (size_t i = 0; i < mModuleClients.size(); i++) {
                 if (mModuleClients[i] != 0) {
-                    clients.add(mModuleClients[i]->client());
+                    clients.add(mModuleClients[i]);
                 }
             }
-        }
-        for (size_t i = 0; i < clients.size(); i++) {
-            clients[i]->onServiceStateChange(eventMemory);
         }
     } break;
     default:
         LOG_ALWAYS_FATAL("onCallbackEvent unknown event type %d", event->mType);
+    }
+
+    for (size_t i = 0; i < clients.size(); i++) {
+        clients[i]->onCallbackEvent(event);
     }
 }
 
@@ -1070,19 +1064,26 @@ void SoundTriggerHwService::ModuleClient::onCallbackEvent(const sp<CallbackEvent
         return;
     }
 
-    switch (event->mType) {
-    case CallbackEvent::TYPE_SERVICE_STATE: {
-        sp<ISoundTriggerClient> client;
-        {
-            AutoMutex lock(mLock);
-            client = mClient;
-        }
-        if (client !=0 ) {
+    sp<ISoundTriggerClient> client;
+    {
+        AutoMutex lock(mLock);
+        client = mClient;
+    }
+
+    if (client != 0) {
+        switch (event->mType) {
+        case CallbackEvent::TYPE_RECOGNITION: {
+            client->onRecognitionEvent(eventMemory);
+        } break;
+        case CallbackEvent::TYPE_SOUNDMODEL: {
+            client->onSoundModelEvent(eventMemory);
+        } break;
+        case CallbackEvent::TYPE_SERVICE_STATE: {
             client->onServiceStateChange(eventMemory);
+        } break;
+        default:
+            LOG_ALWAYS_FATAL("onCallbackEvent unknown event type %d", event->mType);
         }
-    } break;
-    default:
-        LOG_ALWAYS_FATAL("onCallbackEvent unknown event type %d", event->mType);
     }
 }
 

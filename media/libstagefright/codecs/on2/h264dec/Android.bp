@@ -117,6 +117,7 @@ cc_library_shared {
 
     shared_libs: [
         "libmedia",
+        "libmedia_omx",
         "libstagefright_omx",
         "libstagefright_foundation",
         "libutils",
