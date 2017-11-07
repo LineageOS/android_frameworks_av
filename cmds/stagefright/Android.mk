@@ -8,7 +8,7 @@ LOCAL_SRC_FILES:=       \
         SineSource.cpp
 
 LOCAL_SHARED_LIBRARIES := \
-        libstagefright libmedia libmediaextractor libutils libbinder \
+        libstagefright libmedia libmedia_omx libmediaextractor libutils libbinder \
         libstagefright_foundation libjpeg libui libgui libcutils liblog \
         libhidlmemory \
         android.hardware.media.omx@1.0 \
@@ -135,7 +135,7 @@ LOCAL_SRC_FILES:=               \
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright liblog libutils libbinder libstagefright_foundation \
-        libmedia libaudioclient libui libgui libcutils
+        libmedia libmedia_omx libaudioclient libui libgui libcutils
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \
@@ -166,6 +166,7 @@ LOCAL_SHARED_LIBRARIES := \
         libbinder \
         libstagefright_foundation \
         libmedia \
+        libmedia_omx \
         libui \
         libgui \
         libcutils \

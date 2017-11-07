@@ -91,6 +91,7 @@ cc_library_shared {
         "libgui",
         "liblog",
         "libmedia",
+        "libmedia_omx",
         "libaudioclient",
         "libmediaextractor",
         "libmediametrics",
