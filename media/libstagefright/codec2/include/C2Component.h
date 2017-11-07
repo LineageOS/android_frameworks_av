@@ -612,16 +612,16 @@ public:
      *
      * \note Parameter values do not depend on the order of query.
      *
-     * This method MUST be "non-blocking" and return within 1ms.
+     * This method may be momentarily blocking, but MUST return within 5ms.
      *
-     * \param stackParams     a list of params queried. These are initialized specific to each
+     * \param stackParams   a list of params queried. These are initialized specific to each
      *                      setting; e.g. size and index are set and rest of the members are
      *                      cleared.
      *                      NOTE: Flexible settings that are of incorrect size will be invalidated.
      * \param heapParamIndices a vector of param indices for params to be queried and returned on the
      *                      heap. These parameters will be returned in heapParams. Unsupported param
      *                      indices will be ignored.
-     * \param heapParams      a list of params where to which the supported heap parameters will be
+     * \param heapParams    a list of params where to which the supported heap parameters will be
      *                      appended in the order they appear in heapParamIndices.
      *
      * \retval C2_OK        all parameters could be queried
@@ -631,10 +631,10 @@ public:
      * \retval C2_CORRUPTED some unknown error prevented the querying of the parameters
      *                      (unexpected)
      */
-    virtual status_t query_nb(
+    virtual status_t query_sm(
         const std::vector<C2Param* const> &stackParams,
         const std::vector<C2Param::Index> &heapParamIndices,
-        std::vector<std::unique_ptr<C2Param>>* const heapParams) = 0;
+        std::vector<std::unique_ptr<C2Param>>* const heapParams) const = 0;
 
     /**
      * Sets a set of system-wide parameters.
