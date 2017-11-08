@@ -31,6 +31,7 @@
 #include <utils/SortedVector.h>
 #include <media/AudioParameter.h>
 #include <media/AudioPolicy.h>
+#include <media/PatchBuilder.h>
 #include "AudioPolicyInterface.h"
 
 #include <AudioPolicyManagerInterface.h>
@@ -407,8 +408,7 @@ protected:
         // if 'onOutputsChecked' callback is provided, it is executed after the outputs
         // check via 'checkOutputForAllStrategies'. If the callback returns 'true',
         // A2DP suspend status is rechecked.
-        void checkForDeviceAndOutputChanges();
-        void checkForDeviceAndOutputChanges(std::function<bool()> onOutputsChecked);
+        void checkForDeviceAndOutputChanges(std::function<bool()> onOutputsChecked = nullptr);
 
         // checks and if necessary changes outputs used for all strategies.
         // must be called every time a condition that affects the output choice for a given strategy
@@ -506,7 +506,7 @@ protected:
         uint32_t updateCallRouting(audio_devices_t rxDevice, uint32_t delayMs = 0);
         sp<AudioPatch> createTelephonyPatch(bool isRx, audio_devices_t device, uint32_t delayMs);
         sp<DeviceDescriptor> findDevice(
-                const DeviceVector& devices, audio_devices_t device);
+                const DeviceVector& devices, audio_devices_t device) const;
 
         // if argument "device" is different from AUDIO_DEVICE_NONE,  startSource() will force
         // the re-evaluation of the output device.
@@ -619,6 +619,17 @@ private:
         void filterSurroundChannelMasks(ChannelsVector *channelMasksPtr);
 
         status_t getSupportedFormats(audio_io_handle_t ioHandle, FormatVector& formats);
+
+        // Support for Multi-Stream Decoder (MSD) module
+        sp<DeviceDescriptor> getMsdAudioInDevice() const;
+        audio_devices_t getMsdAudioOutDeviceTypes() const;
+        const AudioPatchCollection getMsdPatches() const;
+        status_t getBestMsdAudioProfileFor(audio_devices_t outputDevice,
+                                           bool hwAvSync,
+                                           audio_port_config *sourceConfig,
+                                           audio_port_config *sinkConfig) const;
+        PatchBuilder buildMsdPatch(audio_devices_t outputDevice) const;
+        status_t setMsdPatch(audio_devices_t outputDevice = AUDIO_DEVICE_NONE);
 
         // If any, resolve any "dynamic" fields of an Audio Profiles collection
         void updateAudioProfiles(audio_devices_t device, audio_io_handle_t ioHandle,
