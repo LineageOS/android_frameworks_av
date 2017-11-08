@@ -171,7 +171,7 @@ status_t SoftAVC::setParams(size_t stride) {
 status_t SoftAVC::resetPlugin() {
     mIsInFlush = false;
     mReceivedEOS = false;
-    mInputOffset = 0;
+
     memset(mTimeStamps, 0, sizeof(mTimeStamps));
     memset(mTimeStampsValid, 0, sizeof(mTimeStampsValid));
 
@@ -334,6 +334,7 @@ void SoftAVC::onReset() {
     SoftVideoDecoderOMXComponent::onReset();
 
     mSignalledError = false;
+    mInputOffset = 0;
     resetDecoder();
     resetPlugin();
 }
@@ -465,7 +466,8 @@ void SoftAVC::onPortFlushCompleted(OMX_U32 portIndex) {
             free(mFlushOutBuffer);
             mFlushOutBuffer = NULL;
         }
-
+    } else {
+        mInputOffset = 0;
     }
 }
 
