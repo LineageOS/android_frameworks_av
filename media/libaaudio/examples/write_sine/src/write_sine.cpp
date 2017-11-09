@@ -44,7 +44,6 @@ int main(int argc, const char **argv)
     AAudioStream *aaudioStream = nullptr;
     int32_t  framesPerBurst = 0;
     int32_t  framesPerWrite = 0;
-    int32_t  bufferCapacity = 0;
     int32_t  framesToPlay = 0;
     int32_t  framesLeft = 0;
     int32_t  xRunCount = 0;

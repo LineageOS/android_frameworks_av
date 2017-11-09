@@ -257,24 +257,17 @@ int main(int argc, const char **argv)
     aaudio_result_t      result = AAUDIO_OK;
     aaudio_sharing_mode_t requestedInputSharingMode     = AAUDIO_SHARING_MODE_SHARED;
     int                   requestedInputChannelCount = NUM_INPUT_CHANNELS;
-    const int             requestedOutputChannelCount = AAUDIO_UNSPECIFIED;
-    int                   actualSampleRate = 0;
     const aaudio_format_t requestedInputFormat = AAUDIO_FORMAT_PCM_I16;
     const aaudio_format_t requestedOutputFormat = AAUDIO_FORMAT_PCM_FLOAT;
     aaudio_format_t       actualInputFormat;
     aaudio_format_t       actualOutputFormat;
-    aaudio_performance_mode_t outputPerformanceLevel = AAUDIO_PERFORMANCE_MODE_LOW_LATENCY;
     aaudio_performance_mode_t inputPerformanceLevel = AAUDIO_PERFORMANCE_MODE_LOW_LATENCY;
 
     int testMode = TEST_ECHO_LATENCY;
     double gain = 1.0;
 
-    aaudio_stream_state_t state = AAUDIO_STREAM_STATE_UNINITIALIZED;
     int32_t framesPerBurst = 0;
     float *outputData = NULL;
-    double deviation;
-    double latency;
-    int32_t burstsPerBuffer = 1; // single buffered
 
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
