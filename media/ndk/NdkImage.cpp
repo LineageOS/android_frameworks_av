@@ -53,7 +53,6 @@ AImage::isClosed() const {
 
 void
 AImage::close(int releaseFenceFd) {
-    lockReader();
     Mutex::Autolock _l(mLock);
     if (mIsClosed) {
         return;
@@ -71,7 +70,6 @@ AImage::close(int releaseFenceFd) {
     mBuffer = nullptr;
     mLockedBuffer = nullptr;
     mIsClosed = true;
-    unlockReader();
 }
 
 void
@@ -622,7 +620,9 @@ EXPORT
 void AImage_deleteAsync(AImage* image, int releaseFenceFd) {
     ALOGV("%s", __FUNCTION__);
     if (image != nullptr) {
+        image->lockReader();
         image->close(releaseFenceFd);
+        image->unlockReader();
         if (!image->isClosed()) {
             LOG_ALWAYS_FATAL("Image close failed!");
         }
