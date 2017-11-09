@@ -9,6 +9,7 @@ LOCAL_C_INCLUDES := \
 
 # NDK recommends using this kind of relative path instead of an absolute path.
 LOCAL_SRC_FILES:= ../src/loopback.cpp
+LOCAL_CFLAGS := -Wall -Werror
 LOCAL_SHARED_LIBRARIES := libaaudio
 LOCAL_MODULE := aaudio_loopback
 include $(BUILD_EXECUTABLE)

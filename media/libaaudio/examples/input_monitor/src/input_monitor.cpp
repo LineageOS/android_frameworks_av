@@ -38,7 +38,6 @@ int main(int argc, const char **argv)
     int actualSamplesPerFrame;
     int actualSampleRate;
     aaudio_format_t       actualDataFormat;
-    aaudio_sharing_mode_t actualSharingMode;
 
     AAudioStream *aaudioStream = nullptr;
     aaudio_stream_state_t state;
