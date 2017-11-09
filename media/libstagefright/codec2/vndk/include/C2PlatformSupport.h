@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,24 +14,20 @@
  * limitations under the License.
  */
 
-#ifndef OMX_NODE_OWNER_H_
+#ifndef STAGEFRIGHT_CODEC2_PLATFORM_SUPPORT_H_
+#define STAGEFRIGHT_CODEC2_PLATFORM_SUPPORT_H_
 
-#define OMX_NODE_OWNER_H_
+#include <C2Component.h>
+
+#include <memory>
 
 namespace android {
 
-struct OMXNodeInstance;
-
 /**
- * This struct is needed to separate OMX from OMXNodeInstance.
- *
- * TODO: This might not be needed after Treble transition is complete.
+ * Returns the platform allocator store.
  */
-struct OmxNodeOwner {
-    virtual status_t freeNode(const sp<OMXNodeInstance> &instance) = 0;
-    virtual ~OmxNodeOwner() {}
-};
+std::shared_ptr<C2AllocatorStore> GetCodec2PlatformAllocatorStore();
 
-}
+} // namespace android
 
-#endif  // OMX_NODE_OWNER_H_
+#endif // STAGEFRIGHT_CODEC2_PLATFORM_SUPPORT_H_

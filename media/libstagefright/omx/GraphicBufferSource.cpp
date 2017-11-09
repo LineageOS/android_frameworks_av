@@ -1199,7 +1199,8 @@ status_t GraphicBufferSource::setStartTimeUs(int64_t skipFramesBeforeUs) {
     Mutex::Autolock autoLock(mMutex);
 
     mSkipFramesBeforeNs =
-            (skipFramesBeforeUs > 0) ? (skipFramesBeforeUs * 1000) : -1ll;
+            (skipFramesBeforeUs > 0 && skipFramesBeforeUs <= INT64_MAX / 1000) ?
+            (skipFramesBeforeUs * 1000) : -1ll;
 
     return OK;
 }

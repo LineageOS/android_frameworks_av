@@ -160,9 +160,14 @@ static void MyErrorCallbackProc(
 
 static void usage() {
     printf("Usage: aaudio_loopback [OPTION]...\n\n");
-    printf("          -c{inputChannels} number of input channels\n");
+    printf("          -c{channels}      number of output channels\n");
+    printf("          -C{channels}      number of input channels\n");
     printf("          -g{gain}          recirculating loopback gain\n");
-    printf("          -m                enable MMAP mode\n");
+    printf("          -m{0|1|2|3}       set MMAP policy\n");
+    printf("              0 = _UNSPECIFIED\n");
+    printf("              1 = _NEVER\n");
+    printf("              2 = _AUTO, also if -m is used with no number\n");
+    printf("              3 = _ALWAYS\n");
     printf("          -n{numBursts}     buffer size, for example 2 for double buffered\n");
     printf("          -p{outPerf}       set output AAUDIO_PERFORMANCE_MODE*\n");
     printf("          -P{inPerf}        set input AAUDIO_PERFORMANCE_MODE*\n");
@@ -172,7 +177,9 @@ static void usage() {
     printf("          -t{test}          select test mode\n");
     printf("              m for sine magnitude\n");
     printf("              e for echo latency (default)\n\n");
-    printf("Example:  aaudio_loopback -n2 -pl -Pn\n");
+    printf("          -x                use EXCLUSIVE mode for output\n");
+    printf("          -X                use EXCLUSIVE mode for input\n");
+    printf("Example:  aaudio_loopback -n2 -pl -Pl -x\n");
 }
 
 static aaudio_performance_mode_t parsePerformanceMode(char c) {

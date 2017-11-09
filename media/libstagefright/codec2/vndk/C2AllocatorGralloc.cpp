@@ -15,7 +15,7 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "C2AllocatorIon"
+#define LOG_TAG "C2AllocatorGralloc"
 #include <utils/Log.h>
 
 #include <android/hardware/graphics/allocator/2.0/IAllocator.h>

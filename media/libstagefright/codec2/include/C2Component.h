@@ -518,15 +518,20 @@ class C2AllocatorStore {
 public:
     // TBD
 
-    enum Type {
-        LINEAR,     ///< basic linear allocator type
-        GRALLOC,    ///< basic gralloc allocator type
+    typedef uint32_t ID;
+
+    enum ID_ : uint32_t {
+        DEFAULT_LINEAR,     ///< basic linear allocator type
+        DEFAULT_GRAPHIC,    ///< basic graphic allocator type
+        PLATFORM_START = 0x10,
+        VENDOR_START   = 0x100,
     };
 
     /**
      * Creates an allocator.
      *
-     * \param type      the type of allocator to create
+     * \param id      the ID of the allocator to create. This is defined by the store, but
+     *                the ID of the default linear and graphic allocators is formalized.
      * \param allocator shared pointer where the created allocator is stored. Cleared on failure
      *                  and updated on success.
      *
@@ -537,7 +542,7 @@ public:
      * \retval C2_NOT_FOUND no such allocator
      * \retval C2_NO_MEMORY not enough memory to create the allocator
      */
-    virtual status_t createAllocator(Type type, std::shared_ptr<C2Allocator>* const allocator) = 0;
+    virtual status_t createAllocator(ID id, std::shared_ptr<C2Allocator>* const allocator) = 0;
 
     virtual ~C2AllocatorStore() = default;
 };
