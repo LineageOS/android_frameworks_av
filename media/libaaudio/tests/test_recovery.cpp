@@ -23,24 +23,9 @@
 
 #define DEFAULT_TIMEOUT_NANOS  ((int64_t)1000000000)
 
-static const char *getSharingModeText(aaudio_sharing_mode_t mode) {
-    const char *modeText = "unknown";
-    switch (mode) {
-        case AAUDIO_SHARING_MODE_EXCLUSIVE:
-            modeText = "EXCLUSIVE";
-            break;
-        case AAUDIO_SHARING_MODE_SHARED:
-            modeText = "SHARED";
-            break;
-        default:
-            break;
-    }
-    return modeText;
-}
-
 int main(int argc, char **argv) {
     (void) argc;
-    (void *)argv;
+    (void) argv;
 
     aaudio_result_t result = AAUDIO_OK;
 
@@ -52,7 +37,6 @@ int main(int argc, char **argv) {
     int32_t actualChannelCount = 0;
     int32_t actualSampleRate = 0;
     aaudio_format_t actualDataFormat = AAUDIO_FORMAT_PCM_FLOAT;
-    aaudio_sharing_mode_t actualSharingMode = AAUDIO_SHARING_MODE_SHARED;
 
     AAudioStreamBuilder *aaudioBuilder = nullptr;
     AAudioStream *aaudioStream = nullptr;

@@ -28,7 +28,8 @@
 #define NANOS_PER_MILLISECOND (NANOS_PER_MICROSECOND * 1000)
 #define NANOS_PER_SECOND      (NANOS_PER_MILLISECOND * 1000)
 
-static const char *getSharingModeText(aaudio_sharing_mode_t mode) {
+template <class T = aaudio_sharing_mode_t>
+const char *getSharingModeText(aaudio_sharing_mode_t mode) {
     const char *modeText = "unknown";
     switch (mode) {
     case AAUDIO_SHARING_MODE_EXCLUSIVE:
@@ -43,7 +44,8 @@ static const char *getSharingModeText(aaudio_sharing_mode_t mode) {
     return modeText;
 }
 
-static int64_t getNanoseconds(clockid_t clockId = CLOCK_MONOTONIC) {
+template <class T = clockid_t>
+int64_t getNanoseconds(clockid_t clockId = CLOCK_MONOTONIC) {
     struct timespec time;
     int result = clock_gettime(clockId, &time);
     if (result < 0) {
