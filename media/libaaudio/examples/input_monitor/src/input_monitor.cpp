@@ -40,7 +40,6 @@ int main(int argc, const char **argv)
     int actualSamplesPerFrame;
     int actualSampleRate;
     aaudio_format_t       actualDataFormat;
-    aaudio_sharing_mode_t actualSharingMode;
 
     AAudioStream *aaudioStream = nullptr;
     aaudio_stream_state_t state;
@@ -54,7 +53,6 @@ int main(int argc, const char **argv)
     int64_t previousFramePosition = -1;
     int16_t *data = nullptr;
     float peakLevel = 0.0;
-    int loopCounter = 0;
     int32_t deviceId;
 
     // Make printf print immediately so that debug info is not stuck

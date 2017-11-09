@@ -25,21 +25,6 @@
 
 #include <gtest/gtest.h>
 
-static const char *getSharingModeText(aaudio_sharing_mode_t mode) {
-    const char *modeText = "unknown";
-    switch (mode) {
-    case AAUDIO_SHARING_MODE_EXCLUSIVE:
-        modeText = "EXCLUSIVE";
-        break;
-    case AAUDIO_SHARING_MODE_SHARED:
-        modeText = "SHARED";
-        break;
-    default:
-        break;
-    }
-    return modeText;
-}
-
 // Callback function that fills the audio output buffer.
 aaudio_data_callback_result_t MyDataCallbackProc(
         AAudioStream *stream,
@@ -67,7 +52,6 @@ static void testOpenOptions(aaudio_direction_t direction,
     int32_t actualChannelCount = 0;
     int32_t actualSampleRate = 0;
     aaudio_format_t actualDataFormat = AAUDIO_FORMAT_UNSPECIFIED;
-    aaudio_sharing_mode_t actualSharingMode = AAUDIO_SHARING_MODE_SHARED;
     aaudio_direction_t actualDirection;
 
     AAudioStreamBuilder *aaudioBuilder = nullptr;
