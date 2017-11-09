@@ -178,7 +178,10 @@ private:
     int32_t mVideoDecoderGeneration;
     int32_t mRendererGeneration;
 
+    Mutex mPlayingTimeLock;
     int64_t mLastStartedPlayingTimeNs;
+    void stopPlaybackTimer(const char *where);
+    void startPlaybackTimer(const char *where);
 
     int64_t mPreviousSeekTimeUs;
 
