@@ -81,9 +81,6 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := \
 
 LOCAL_CFLAGS += -Wall -Wextra -Werror
 
-# Workaround for invalid unused-lambda-capture warning http://b/38349491
-LOCAL_CLANG_CFLAGS += -Wno-error=unused-lambda-capture
-
 LOCAL_MODULE:= libcameraservice
 
 include $(BUILD_SHARED_LIBRARY)
