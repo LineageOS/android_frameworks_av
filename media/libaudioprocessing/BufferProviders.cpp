@@ -376,6 +376,23 @@ void ReformatBufferProvider::copyFrames(void *dst, const void *src, size_t frame
     memcpy_by_audio_format(dst, mOutputFormat, src, mInputFormat, frames * mChannelCount);
 }
 
+ClampFloatBufferProvider::ClampFloatBufferProvider(int32_t channelCount, size_t bufferFrameCount) :
+        CopyBufferProvider(
+                channelCount * audio_bytes_per_sample(AUDIO_FORMAT_PCM_FLOAT),
+                channelCount * audio_bytes_per_sample(AUDIO_FORMAT_PCM_FLOAT),
+                bufferFrameCount),
+        mChannelCount(channelCount)
+{
+    ALOGV("ClampFloatBufferProvider(%p)(%u)", this, channelCount);
+}
+
+void ClampFloatBufferProvider::copyFrames(void *dst, const void *src, size_t frames)
+{
+    memcpy_to_float_from_float_with_clamping((float*)dst, (const float*)src,
+                                             frames * mChannelCount,
+                                             FLOAT_NOMINAL_RANGE_HEADROOM);
+}
+
 TimestretchBufferProvider::TimestretchBufferProvider(int32_t channelCount,
         audio_format_t format, uint32_t sampleRate, const AudioPlaybackRate &playbackRate) :
         mChannelCount(channelCount),
