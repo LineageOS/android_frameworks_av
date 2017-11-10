@@ -18,8 +18,8 @@
 #define LOG_TAG "SoftOMXPlugin"
 #include <utils/Log.h>
 
-#include "SoftOMXPlugin.h"
-#include "include/SoftOMXComponent.h"
+#include <media/stagefright/omx/SoftOMXPlugin.h>
+#include <media/stagefright/omx/SoftOMXComponent.h>
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AString.h>
@@ -85,7 +85,21 @@ OMX_ERRORTYPE SoftOMXPlugin::makeComponentInstance(
         libName.append(kComponents[i].mLibNameSuffix);
         libName.append(".so");
 
-        void *libHandle = dlopen(libName.c_str(), RTLD_NOW);
+        // RTLD_NODELETE means we keep the shared library around forever.
+        // this eliminates thrashing during sequences like loading soundpools.
+        // It also leaves the rest of the logic around the dlopen()/dlclose()
+        // calls in this file unchanged.
+        //
+        // Implications of the change:
+        // -- the codec process (where this happens) will have a slightly larger
+        //    long-term memory footprint as it accumulates the loaded shared libraries.
+        //    This is expected to be a small amount of memory.
+        // -- plugin codecs can no longer (and never should have) depend on a
+        //    free reset of any static data as the library would have crossed
+        //    a dlclose/dlopen cycle.
+        //
+
+        void *libHandle = dlopen(libName.c_str(), RTLD_NOW|RTLD_NODELETE);
 
         if (libHandle == NULL) {
             ALOGE("unable to dlopen %s: %s", libName.c_str(), dlerror());

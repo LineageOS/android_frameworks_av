@@ -25,6 +25,7 @@
 #include <system/audio_effects/effect_ns.h>
 #include <system/audio_effects/effect_visualizer.h>
 #include <audio_utils/primitives.h>
+#include <media/AudioEffect.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 
@@ -109,7 +110,10 @@ AudioFlinger::EffectModule::~EffectModule()
 {
     ALOGV("Destructor %p", this);
     if (mEffectInterface != 0) {
-        ALOGW("EffectModule %p destructor called with unreleased interface", this);
+        char uuidStr[64];
+        AudioEffect::guidToString(&mDescriptor.uuid, uuidStr, sizeof(uuidStr));
+        ALOGW("EffectModule %p destructor called with unreleased interface, effect %s",
+                this, uuidStr);
         release_l();
     }
 
@@ -1081,18 +1085,12 @@ void AudioFlinger::EffectModule::dump(int fd, const Vector<String16>& args __unu
     result.append(buffer);
 
     result.append("\t\tDescriptor:\n");
-    snprintf(buffer, SIZE, "\t\t- UUID: %08X-%04X-%04X-%04X-%02X%02X%02X%02X%02X%02X\n",
-            mDescriptor.uuid.timeLow, mDescriptor.uuid.timeMid, mDescriptor.uuid.timeHiAndVersion,
-            mDescriptor.uuid.clockSeq, mDescriptor.uuid.node[0], mDescriptor.uuid.node[1],
-                    mDescriptor.uuid.node[2],
-            mDescriptor.uuid.node[3],mDescriptor.uuid.node[4],mDescriptor.uuid.node[5]);
+    char uuidStr[64];
+    AudioEffect::guidToString(&mDescriptor.uuid, uuidStr, sizeof(uuidStr));
+    snprintf(buffer, SIZE, "\t\t- UUID: %s\n", uuidStr);
     result.append(buffer);
-    snprintf(buffer, SIZE, "\t\t- TYPE: %08X-%04X-%04X-%04X-%02X%02X%02X%02X%02X%02X\n",
-                mDescriptor.type.timeLow, mDescriptor.type.timeMid,
-                    mDescriptor.type.timeHiAndVersion,
-                mDescriptor.type.clockSeq, mDescriptor.type.node[0], mDescriptor.type.node[1],
-                    mDescriptor.type.node[2],
-                mDescriptor.type.node[3],mDescriptor.type.node[4],mDescriptor.type.node[5]);
+    AudioEffect::guidToString(&mDescriptor.type, uuidStr, sizeof(uuidStr));
+    snprintf(buffer, SIZE, "\t\t- TYPE: %s\n", uuidStr);
     result.append(buffer);
     snprintf(buffer, SIZE, "\t\t- apiVersion: %08X\n\t\t- flags: %08X (%s)\n",
             mDescriptor.apiVersion,
@@ -1306,11 +1304,10 @@ void AudioFlinger::EffectHandle::disconnect(bool unpinIfLast)
     if (thread != 0) {
         thread->disconnectEffectHandle(this, unpinIfLast);
     } else {
-        ALOGW("%s Effect handle %p disconnected after thread destruction", __FUNCTION__, this);
         // try to cleanup as much as we can
         sp<EffectModule> effect = mEffect.promote();
-        if (effect != 0) {
-            effect->disconnectHandle(this, unpinIfLast);
+        if (effect != 0 && effect->disconnectHandle(this, unpinIfLast) > 0) {
+            ALOGW("%s Effect handle %p disconnected after thread destruction", __FUNCTION__, this);
         }
     }
 

@@ -26,7 +26,86 @@
 /**********************************************************************************
    FUNCTION LVCore_MIXSOFT_1ST_D16C31_WRA
 ***********************************************************************************/
+#ifdef BUILD_FLOAT
+void LVC_Core_MixSoft_1St_D16C31_WRA( LVMixer3_FLOAT_st *ptrInstance,
+                                    const LVM_FLOAT     *src,
+                                          LVM_FLOAT     *dst,
+                                          LVM_INT16     n)
+{
+    LVM_INT16   OutLoop;
+    LVM_INT16   InLoop;
+    LVM_INT32   ii;
+    Mix_Private_FLOAT_st  *pInstance=(Mix_Private_FLOAT_st *)(ptrInstance->PrivateParams);
+    LVM_FLOAT   Delta= (LVM_FLOAT)pInstance->Delta;
+    LVM_FLOAT   Current = (LVM_FLOAT)pInstance->Current;
+    LVM_FLOAT   Target= (LVM_FLOAT)pInstance->Target;
+    LVM_FLOAT   Temp;
 
+    InLoop = (LVM_INT16)(n >> 2); /* Process per 4 samples */
+    OutLoop = (LVM_INT16)(n - (InLoop << 2));
+
+    if(Current<Target){
+        if (OutLoop){
+
+            Temp = Current + Delta;
+            if (Temp > 1.0f)
+                Temp = 1.0f;
+            else if (Temp < -1.0f)
+                Temp = -1.0f;
+
+            Current=Temp;
+            if (Current > Target)
+                Current = Target;
+
+            for (ii = OutLoop; ii != 0; ii--){
+                *(dst++) = (((LVM_FLOAT)*(src++) * (LVM_FLOAT)Current));
+            }
+        }
+
+        for (ii = InLoop; ii != 0; ii--){
+
+            Temp = Current + Delta;
+
+            if (Temp > 1.0f)
+                Temp = 1.0f;
+            else if (Temp < -1.0f)
+                Temp = -1.0f;
+
+            Current=Temp;
+            if (Current > Target)
+                Current = Target;
+
+            *(dst++) = (((LVM_FLOAT)*(src++) * Current) );
+            *(dst++) = (((LVM_FLOAT)*(src++) * Current) );
+            *(dst++) = (((LVM_FLOAT)*(src++) * Current) );
+            *(dst++) = (((LVM_FLOAT)*(src++) * Current) );
+        }
+    }
+    else{
+        if (OutLoop){
+            Current -= Delta;
+            if (Current < Target)
+                Current = Target;
+
+            for (ii = OutLoop; ii != 0; ii--){
+                *(dst++) = (((LVM_FLOAT)*(src++) * Current));
+            }
+        }
+
+        for (ii = InLoop; ii != 0; ii--){
+            Current -= Delta;
+            if (Current < Target)
+                Current = Target;
+
+            *(dst++) = (((LVM_FLOAT)*(src++) * Current));
+            *(dst++) = (((LVM_FLOAT)*(src++) * Current));
+            *(dst++) = (((LVM_FLOAT)*(src++) * Current));
+            *(dst++) = (((LVM_FLOAT)*(src++) * Current));
+        }
+    }
+    pInstance->Current=Current;
+}
+#else
 void LVC_Core_MixSoft_1St_D16C31_WRA( LVMixer3_st *ptrInstance,
                                     const LVM_INT16     *src,
                                           LVM_INT16     *dst,
@@ -101,6 +180,5 @@ void LVC_Core_MixSoft_1St_D16C31_WRA( LVMixer3_st *ptrInstance,
     }
     pInstance->Current=Current;
 }
-
-
+#endif
 /**********************************************************************************/

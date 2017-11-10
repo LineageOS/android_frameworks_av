@@ -126,6 +126,29 @@ OMX_ERRORTYPE SoftFlacDecoder::internalGetParameter(
         OMX_INDEXTYPE index, OMX_PTR params) {
     ALOGV("internalGetParameter: index(%x)", index);
     switch ((OMX_U32)index) {
+        case OMX_IndexParamAudioPortFormat:
+        {
+            OMX_AUDIO_PARAM_PORTFORMATTYPE *formatParams =
+                (OMX_AUDIO_PARAM_PORTFORMATTYPE *)params;
+
+            if (!isValidOMXParam(formatParams)) {
+                return OMX_ErrorBadParameter;
+            }
+
+            if (formatParams->nPortIndex > 1) {
+                return OMX_ErrorUndefined;
+            }
+
+            if (formatParams->nIndex > 0) {
+                return OMX_ErrorNoMore;
+            }
+
+            formatParams->eEncoding =
+                (formatParams->nPortIndex == 0)
+                    ? OMX_AUDIO_CodingFLAC : OMX_AUDIO_CodingPCM;
+
+            return OMX_ErrorNone;
+        }
         case OMX_IndexParamAudioFlac:
         {
             OMX_AUDIO_PARAM_FLACTYPE *flacParams =
@@ -219,6 +242,29 @@ OMX_ERRORTYPE SoftFlacDecoder::internalSetParameter(
             return OMX_ErrorNone;
         }
 
+        case OMX_IndexParamAudioPortFormat:
+        {
+            const OMX_AUDIO_PARAM_PORTFORMATTYPE *formatParams =
+                (const OMX_AUDIO_PARAM_PORTFORMATTYPE *)params;
+
+            if (!isValidOMXParam(formatParams)) {
+                return OMX_ErrorBadParameter;
+            }
+
+            if (formatParams->nPortIndex > 1) {
+                return OMX_ErrorUndefined;
+            }
+
+            if ((formatParams->nPortIndex == 0
+                        && formatParams->eEncoding != OMX_AUDIO_CodingFLAC)
+                || (formatParams->nPortIndex == 1
+                        && formatParams->eEncoding != OMX_AUDIO_CodingPCM)) {
+                return OMX_ErrorUndefined;
+            }
+
+            return OMX_ErrorNone;
+        }
+
         case OMX_IndexParamAudioPcm:
         {
             const OMX_AUDIO_PARAM_PCMMODETYPE *pcmParams =
@@ -256,10 +302,27 @@ void SoftFlacDecoder::onQueueFilled(OMX_U32 /* portIndex */) {
     while (!inQueue.empty() && !outQueue.empty()) {
         BufferInfo *inInfo = *inQueue.begin();
         OMX_BUFFERHEADERTYPE *inHeader = inInfo->mHeader;
+        BufferInfo *outInfo = *outQueue.begin();
+        OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
         uint8_t* inBuffer = inHeader->pBuffer + inHeader->nOffset;
         uint32_t inBufferLength = inHeader->nFilledLen;
         bool endOfInput = (inHeader->nFlags & OMX_BUFFERFLAG_EOS) != 0;
 
+        if (inHeader->nFilledLen == 0) {
+            if (endOfInput) {
+                outHeader->nFilledLen = 0;
+                outHeader->nFlags = OMX_BUFFERFLAG_EOS;
+                outInfo->mOwnedByUs = false;
+                outQueue.erase(outQueue.begin());
+                notifyFillBufferDone(outHeader);
+            } else {
+                ALOGE("onQueueFilled: emptyInputBuffer received");
+            }
+            inInfo->mOwnedByUs = false;
+            inQueue.erase(inQueue.begin());
+            notifyEmptyBufferDone(inHeader);
+            return;
+        }
         if (mInputBufferCount == 0 && !(inHeader->nFlags & OMX_BUFFERFLAG_CODECCONFIG)) {
             ALOGE("onQueueFilled: first buffer should have OMX_BUFFERFLAG_CODECCONFIG set");
             inHeader->nFlags |= OMX_BUFFERFLAG_CODECCONFIG;
@@ -297,8 +360,6 @@ void SoftFlacDecoder::onQueueFilled(OMX_U32 /* portIndex */) {
             return;
         }
 
-        BufferInfo *outInfo = *outQueue.begin();
-        OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
         short *outBuffer =
                 reinterpret_cast<short *>(outHeader->pBuffer + outHeader->nOffset);
         size_t outBufferSize = outHeader->nAllocLen - outHeader->nOffset;

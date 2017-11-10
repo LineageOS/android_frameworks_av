@@ -27,7 +27,39 @@
 /**********************************************************************************
    FUNCTION LVC_Core_MixHard_1St_2i_D16C31_SAT
 ***********************************************************************************/
+#ifdef BUILD_FLOAT
+void LVC_Core_MixHard_1St_2i_D16C31_SAT( LVMixer3_FLOAT_st        *ptrInstance1,
+                                         LVMixer3_FLOAT_st        *ptrInstance2,
+                                         const LVM_FLOAT    *src,
+                                         LVM_FLOAT          *dst,
+                                         LVM_INT16          n)
+{
+    LVM_FLOAT  Temp;
+    LVM_INT16 ii;
+    Mix_Private_FLOAT_st  *pInstance1 = (Mix_Private_FLOAT_st *)(ptrInstance1->PrivateParams);
+    Mix_Private_FLOAT_st  *pInstance2 = (Mix_Private_FLOAT_st *)(ptrInstance2->PrivateParams);
+    for (ii = n; ii != 0; ii--)
+    {
+        Temp = ((LVM_FLOAT)*(src++) * (LVM_FLOAT)pInstance1->Current);
+        if (Temp > 1.0f)
+            *dst++ = 1.0f;
+        else if (Temp < -1.0f)
+            *dst++ = -1.0f;
+        else
+            *dst++ = (LVM_FLOAT)Temp;
 
+        Temp = ((LVM_FLOAT)*(src++) * (LVM_FLOAT)pInstance2->Current);
+        if (Temp > 1.0f)
+            *dst++ = 1.0f;
+        else if (Temp < -1.0f)
+            *dst++ = -1.0f;
+        else
+            *dst++ = (LVM_FLOAT)Temp;
+    }
+
+
+}
+#else
 void LVC_Core_MixHard_1St_2i_D16C31_SAT( LVMixer3_st        *ptrInstance1,
                                          LVMixer3_st        *ptrInstance2,
                                          const LVM_INT16    *src,
@@ -66,4 +98,5 @@ void LVC_Core_MixHard_1St_2i_D16C31_SAT( LVMixer3_st        *ptrInstance1,
 
 
 }
+#endif
 /**********************************************************************************/

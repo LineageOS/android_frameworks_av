@@ -1,5 +1,9 @@
 cc_library_shared {
     name: "libstagefright_soft_avcdec",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     static_libs: ["libavcdec"],
     srcs: ["SoftAVCDec.cpp"],
@@ -18,7 +22,7 @@ cc_library_shared {
     ],
 
     shared_libs: [
-        "libmedia",
+        "libmedia_omx",
         "libstagefright_omx",
         "libstagefright_foundation",
         "libutils",
@@ -36,4 +40,5 @@ cc_library_shared {
     },
 
     ldflags: ["-Wl,-Bsymbolic"],
+    compile_multilib: "32",
 }

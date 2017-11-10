@@ -103,6 +103,10 @@ struct BundledEffectContext{
     FILE                            *PcmInPtr;
     FILE                            *PcmOutPtr;
     #endif
+    #ifdef BUILD_FLOAT
+    LVM_FLOAT                       *pInputBuffer;
+    LVM_FLOAT                       *pOutputBuffer;
+    #endif
 };
 
 /* SessionContext : One session */
@@ -209,7 +213,7 @@ static const float LimitLevel_bandEnergyCrossCoefficient[FIVEBAND_NUMBANDS-1] = 
 static const float LimitLevel_bassBoostEnergyCrossCoefficient[FIVEBAND_NUMBANDS] = {
         221.21, 208.10, 28.16, 0.0, 0.0 };
 
-static const float LimitLevel_bassBoostEnergyCoefficient = 7.12;
+static const float LimitLevel_bassBoostEnergyCoefficient = 9.00;
 
 static const float LimitLevel_virtualizerContribution = 1.9;
 

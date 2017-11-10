@@ -349,8 +349,8 @@ public:
 
     virtual void onDynamicPolicyMixStateUpdate(String8 regId, int32_t state) = 0;
 
-    virtual void onRecordingConfigurationUpdate(int event, audio_session_t session,
-                    audio_source_t source,
+    virtual void onRecordingConfigurationUpdate(int event,
+                    const record_client_info_t *clientInfo,
                     const struct audio_config_base *clientConfig,
                     const struct audio_config_base *deviceConfig,
                     audio_patch_handle_t patchHandle) = 0;

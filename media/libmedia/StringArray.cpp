@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "StringArray.h"
+#include <media/StringArray.h>
 
 namespace android {
 

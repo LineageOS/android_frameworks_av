@@ -275,6 +275,7 @@ private:
     void onChangeAudioFormat(const sp<AMessage> &meta, const sp<AMessage> &notify);
 
     void notifyEOS(bool audio, status_t finalResult, int64_t delayUs = 0);
+    void notifyEOS_l(bool audio, status_t finalResult, int64_t delayUs = 0);
     void notifyFlushComplete(bool audio);
     void notifyPosition();
     void notifyVideoLateBy(int64_t lateByUs);

@@ -20,18 +20,18 @@
 #include "client/AudioStreamInternal.h"
 #include "client/AudioStreamInternalCapture.h"
 
+#include "AAudioServiceEndpointShared.h"
+#include "AAudioServiceStreamShared.h"
+
 namespace aaudio {
 
-class AAudioServiceEndpointCapture : public AAudioServiceEndpoint {
+class AAudioServiceEndpointCapture : public AAudioServiceEndpointShared {
 public:
     explicit AAudioServiceEndpointCapture(android::AAudioService &audioService);
     virtual ~AAudioServiceEndpointCapture();
 
-    aaudio_result_t open(const AAudioStreamConfiguration& configuration) override;
+    aaudio_result_t open(const aaudio::AAudioStreamRequest &request) override;
 
-    AudioStreamInternal *getStreamInternal() override {
-        return &mStreamInternalCapture;
-    }
 
     void *callbackLoop() override;
 

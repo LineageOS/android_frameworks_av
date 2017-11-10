@@ -432,7 +432,7 @@ private:
 };
 
 MPEG4Writer::MPEG4Writer(int fd) {
-    initInternal(fd);
+    initInternal(fd, true /*isFirstSession*/);
 }
 
 MPEG4Writer::~MPEG4Writer() {
@@ -451,19 +451,26 @@ MPEG4Writer::~MPEG4Writer() {
     }
 }
 
-void MPEG4Writer::initInternal(int fd) {
+void MPEG4Writer::initInternal(int fd, bool isFirstSession) {
     ALOGV("initInternal");
     mFd = dup(fd);
     mNextFd = -1;
     mInitCheck = mFd < 0? NO_INIT: OK;
-    mIsRealTimeRecording = true;
-    mUse4ByteNalLength = true;
-    mUse32BitOffset = true;
-    mIsFileSizeLimitExplicitlyRequested = false;
+
+    mInterleaveDurationUs = 1000000;
+
+    mStartTimestampUs = -1ll;
+    mStartTimeOffsetMs = -1;
     mPaused = false;
     mStarted = false;
     mWriterThreadStarted = false;
     mSendNotify = false;
+
+    // Reset following variables for all the sessions and they will be
+    // initialized in start(MetaData *param).
+    mIsRealTimeRecording = true;
+    mUse4ByteNalLength = true;
+    mUse32BitOffset = true;
     mOffset = 0;
     mMdatOffset = 0;
     mMoovBoxBuffer = NULL;
@@ -472,17 +479,21 @@ void MPEG4Writer::initInternal(int fd) {
     mFreeBoxOffset = 0;
     mStreamableFile = false;
     mEstimatedMoovBoxSize = 0;
-    mMoovExtraSize = 0;
-    mInterleaveDurationUs = 1000000;
     mTimeScale = -1;
-    mStartTimestampUs = -1ll;
-    mLatitudex10000 = 0;
-    mLongitudex10000 = 0;
-    mAreGeoTagsAvailable = false;
-    mStartTimeOffsetMs = -1;
-    mSwitchPending = false;
-    mMetaKeys = new AMessage();
-    addDeviceMeta();
+
+    // Following variables only need to be set for the first recording session.
+    // And they will stay the same for all the recording sessions.
+    if (isFirstSession) {
+        mMoovExtraSize = 0;
+        mMetaKeys = new AMessage();
+        addDeviceMeta();
+        mLatitudex10000 = 0;
+        mLongitudex10000 = 0;
+        mAreGeoTagsAvailable = false;
+        mSwitchPending = false;
+        mIsFileSizeLimitExplicitlyRequested = false;
+    }
+
     // Verify mFd is seekable
     off64_t off = lseek64(mFd, 0, SEEK_SET);
     if (off < 0) {
@@ -873,19 +884,8 @@ bool MPEG4Writer::use32BitFileOffset() const {
 }
 
 status_t MPEG4Writer::pause() {
-    if (mInitCheck != OK) {
-        return OK;
-    }
-    mPaused = true;
-    status_t err = OK;
-    for (List<Track *>::iterator it = mTracks.begin();
-         it != mTracks.end(); ++it) {
-        status_t status = (*it)->pause();
-        if (status != OK) {
-            err = status;
-        }
-    }
-    return err;
+    ALOGW("MPEG4Writer: pause is not supported");
+    return ERROR_UNSUPPORTED;
 }
 
 void MPEG4Writer::stopWriterThread() {
@@ -1833,7 +1833,7 @@ void MPEG4Writer::onMessageReceived(const sp<AMessage> &msg) {
             int fd = mNextFd;
             mNextFd = -1;
             mLock.unlock();
-            initInternal(fd);
+            initInternal(fd, false /*isFirstSession*/);
             start(mStartMeta.get());
             mSwitchPending = false;
             notify(MEDIA_RECORDER_EVENT_INFO, MEDIA_RECORDER_INFO_NEXT_OUTPUT_FILE_STARTED, 0);

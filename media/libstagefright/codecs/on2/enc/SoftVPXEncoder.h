@@ -18,7 +18,7 @@
 
 #define SOFT_VPX_ENCODER_H_
 
-#include "SoftVideoEncoderOMXComponent.h"
+#include <media/stagefright/omx/SoftVideoEncoderOMXComponent.h>
 
 #include <OMX_VideoExt.h>
 #include <OMX_IndexExt.h>

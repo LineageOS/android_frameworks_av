@@ -59,9 +59,11 @@ public:
 
     int32_t getXRunCount() const override;
 
+    int64_t getFramesWritten() override;
+
     int32_t getFramesPerBurst() const override;
 
-    aaudio_result_t updateStateWhileWaiting() override;
+    aaudio_result_t updateStateMachine() override;
 
     aaudio_direction_t getDirection() const override {
         return AAUDIO_DIRECTION_INPUT;

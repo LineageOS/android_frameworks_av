@@ -19,7 +19,7 @@
 
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/foundation/ABase.h>
-#include "SoftVideoEncoderOMXComponent.h"
+#include <media/stagefright/omx/SoftVideoEncoderOMXComponent.h>
 #include "mp4enc_api.h"
 
 

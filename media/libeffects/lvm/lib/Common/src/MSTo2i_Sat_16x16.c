@@ -77,4 +77,58 @@ void MSTo2i_Sat_16x16(const LVM_INT16  *srcM,
 
     return;
 }
+#ifdef BUILD_FLOAT
+void MSTo2i_Sat_Float(const LVM_FLOAT  *srcM,
+                      const LVM_FLOAT  *srcS,
+                      LVM_FLOAT  *dst,
+                      LVM_INT16  n )
+{
+    LVM_FLOAT temp,mVal,sVal;
+    LVM_INT16 ii;
+
+
+    for (ii = n; ii != 0; ii--)
+    {
+        mVal = (LVM_FLOAT)*srcM;
+        srcM++;
+
+        sVal = (LVM_FLOAT)*srcS;
+        srcS++;
+
+        temp = mVal + sVal;
+
+        if (temp > 1.0f)
+        {
+            *dst = 1.0f;
+        }
+        else if (temp < -1.0f)
+        {
+            *dst = -1.0f;
+        }
+        else
+        {
+            *dst = (LVM_FLOAT)temp;
+        }
+        dst++;
+
+        temp = mVal - sVal;
+
+        if (temp > 1.0f)
+        {
+            *dst = 1.0f;
+        }
+        else if (temp < -1.0f)
+        {
+            *dst = - 1.0f;
+        }
+        else
+        {
+            *dst = (LVM_FLOAT)temp;
+        }
+        dst++;
+    }
+
+    return;
+}
+#endif
 /**********************************************************************************/

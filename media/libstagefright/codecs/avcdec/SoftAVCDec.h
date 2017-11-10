@@ -18,7 +18,7 @@
 
 #define SOFT_H264_DEC_H_
 
-#include "SoftVideoDecoderOMXComponent.h"
+#include <media/stagefright/omx/SoftVideoDecoderOMXComponent.h>
 #include <sys/time.h>
 
 namespace android {

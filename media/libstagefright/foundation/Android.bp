@@ -1,3 +1,9 @@
+cc_library_headers {
+    name: "libstagefright_foundation_headers",
+    export_include_dirs: ["include"],
+    vendor_available: true,
+}
+
 cc_library_shared {
     name: "libstagefright_foundation",
     vendor_available: true,
@@ -13,12 +19,13 @@ cc_library_shared {
         "include/media/stagefright/foundation",
     ],
 
-    export_include_dirs: [
-        "include",
-    ],
-
     header_libs: [
         "libhardware_headers",
+        "libstagefright_foundation_headers",
+    ],
+
+    export_header_lib_headers: [
+        "libstagefright_foundation_headers",
     ],
 
     export_shared_lib_headers: [

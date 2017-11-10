@@ -28,9 +28,10 @@ public:
 
     status_t connect();
     status_t connect(bool* trebleFlag);
+    status_t connect(const char* name, bool* trebleFlag = nullptr);
 
     status_t connectLegacy();
-    status_t connectTreble();
+    status_t connectTreble(const char* name = "default");
     void disconnect();
 
     sp<IOMX> interface() {
@@ -40,8 +41,8 @@ public:
 private:
     sp<IOMX> mOMX;
 
-    OMXClient(const OMXClient &);
-    OMXClient &operator=(const OMXClient &);
+    OMXClient(const OMXClient &) = delete;
+    OMXClient &operator=(const OMXClient &) = delete;
 };
 
 }  // namespace android

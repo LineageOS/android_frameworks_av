@@ -18,7 +18,7 @@
 
 #define SOFT_VPX_H_
 
-#include "SoftVideoDecoderOMXComponent.h"
+#include <media/stagefright/omx/SoftVideoDecoderOMXComponent.h>
 
 #include "vpx/vpx_decoder.h"
 #include "vpx/vpx_codec.h"

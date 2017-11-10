@@ -28,6 +28,8 @@ struct AString;
 sp<ABuffer> decodeBase64(const AString &s);
 void encodeBase64(const void *data, size_t size, AString *out);
 
+void encodeBase64Url(const void *data, size_t size, AString *out);
+
 }  // namespace android
 
 #endif  // BASE_64_H_

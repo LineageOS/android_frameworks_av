@@ -18,7 +18,7 @@
 
 #define SOFT_AAC_ENCODER_H_
 
-#include "SimpleSoftOMXComponent.h"
+#include <media/stagefright/omx/SimpleSoftOMXComponent.h>
 
 struct VO_AUDIO_CODECAPI;
 struct VO_MEM_OPERATOR;

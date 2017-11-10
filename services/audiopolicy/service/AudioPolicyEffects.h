@@ -155,7 +155,8 @@ private:
     audio_stream_type_t streamNameToEnum(const char *name);
 
     // Parse audio_effects.conf
-    status_t loadAudioEffectConfig(const char *path);
+    status_t loadAudioEffectConfig(const char *path); // TODO: add legacy in the name
+    status_t loadAudioEffectXmlConfig(); // TODO: remove "Xml" in the name
 
     // Load all effects descriptors in configuration file
     status_t loadEffects(cnode *root, Vector <EffectDesc *>& effects);

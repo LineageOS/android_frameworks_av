@@ -17,15 +17,14 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "TWGraphicBufferSource"
 
+#include <media/stagefright/omx/1.0/WGraphicBufferSource.h>
+#include <media/stagefright/omx/1.0/WOmxNode.h>
+#include <media/stagefright/omx/1.0/Conversion.h>
+#include <media/stagefright/omx/OMXUtils.h>
 #include <android/hardware/media/omx/1.0/IOmxBufferSource.h>
 #include <android/hardware/media/omx/1.0/IOmxNode.h>
-#include <OMX_Component.h>
-#include <OMX_IndexExt.h>
-
-#include "omx/OMXUtils.h"
-#include "WGraphicBufferSource.h"
-#include "WOmxNode.h"
-#include "Conversion.h"
+#include <media/openmax/OMX_Component.h>
+#include <media/openmax/OMX_IndexExt.h>
 
 namespace android {
 namespace hardware {
@@ -68,7 +67,14 @@ struct TWGraphicBufferSource::TWOmxNodeWrapper : public IOmxNodeWrapper {
         tMsg.data.eventData.data1 = dataSpace;
         tMsg.data.eventData.data2 = aspects;
         tMsg.data.eventData.data3 = pixelFormat;
-        mOmxNode->dispatchMessage(tMsg);
+        if (!mOmxNode->dispatchMessage(tMsg).isOk()) {
+            ALOGE("TWOmxNodeWrapper failed to dispatch message "
+                    "OMX_EventDataSpaceChanged: "
+                    "dataSpace = %ld, aspects = %ld, pixelFormat = %ld",
+                    static_cast<long>(dataSpace),
+                    static_cast<long>(aspects),
+                    static_cast<long>(pixelFormat));
+        }
     }
 };
 
@@ -144,10 +150,13 @@ Return<Status> TWGraphicBufferSource::configure(
                         outParams.data() + outParams.size(),
                         params);
             });
-    omxNode->getParameter(
+    auto transStatus = omxNode->getParameter(
             static_cast<uint32_t>(OMX_IndexParamConsumerUsageBits),
             inHidlBytes(&consumerUsage, sizeof(consumerUsage)),
             _hidl_cb);
+    if (!transStatus.isOk()) {
+        return toStatus(FAILED_TRANSACTION);
+    }
     if (fnStatus != OK) {
         consumerUsage = 0;
     }
@@ -158,10 +167,13 @@ Return<Status> TWGraphicBufferSource::configure(
 
     _params = &def;
     params = static_cast<uint8_t*>(_params);
-    omxNode->getParameter(
+    transStatus = omxNode->getParameter(
             static_cast<uint32_t>(OMX_IndexParamPortDefinition),
             inHidlBytes(&def, sizeof(def)),
             _hidl_cb);
+    if (!transStatus.isOk()) {
+        return toStatus(FAILED_TRANSACTION);
+    }
     if (fnStatus != NO_ERROR) {
         ALOGE("Failed to get port definition: %d", fnStatus);
         return toStatus(fnStatus);

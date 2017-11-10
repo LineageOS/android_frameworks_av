@@ -568,6 +568,9 @@ public:
     // which may include non-contiguous frames
     virtual size_t      framesReady();
 
+    // Safe frames ready query used by dump() - this has no side effects.
+    virtual size_t      framesReadySafe() const;
+
     // Currently AudioFlinger will call framesReady() for a fast track from two threads:
     // FastMixer thread, and normal mixer thread.  This is dangerous, as the proxy is intended
     // to be called from at most one thread of server, and one thread of client.
@@ -620,6 +623,7 @@ protected:
 
 public:
     virtual size_t      framesReady();
+    virtual size_t      framesReadySafe() const override;
     virtual void        framesReadyIsCalledByMultipleThreads();
     virtual status_t    obtainBuffer(Buffer* buffer, bool ackFlush);
     virtual void        releaseBuffer(Buffer* buffer);

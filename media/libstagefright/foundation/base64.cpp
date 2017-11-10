@@ -23,6 +23,7 @@ namespace android {
 
 sp<ABuffer> decodeBase64(const AString &s) {
     size_t n = s.size();
+
     if ((n % 4) != 0) {
         return NULL;
     }
@@ -45,7 +46,6 @@ sp<ABuffer> decodeBase64(const AString &s) {
     size_t outLen = (n / 4) * 3 - padding;
 
     sp<ABuffer> buffer = new ABuffer(outLen);
-
     uint8_t *out = buffer->data();
     if (out == NULL || buffer->size() < outLen) {
         return NULL;
@@ -61,9 +61,9 @@ sp<ABuffer> decodeBase64(const AString &s) {
             value = 26 + c - 'a';
         } else if (c >= '0' && c <= '9') {
             value = 52 + c - '0';
-        } else if (c == '+') {
+        } else if (c == '+' || c == '-') {
             value = 62;
-        } else if (c == '/') {
+        } else if (c == '/' || c == '_') {
             value = 63;
         } else if (c != '=') {
             return NULL;
@@ -143,5 +143,27 @@ void encodeBase64(
         }
     }
 }
+
+void encodeBase64Url(
+        const void *_data, size_t size, AString *out) {
+    encodeBase64(_data, size, out);
+
+    if ((-1 != out->find("+")) || (-1 != out->find("/"))) {
+        size_t outLen = out->size();
+        char *base64url = new char[outLen];
+        for (size_t i = 0; i < outLen; ++i) {
+            if (out->c_str()[i] == '+')
+                base64url[i] = '-';
+            else if (out->c_str()[i] == '/')
+                base64url[i] = '_';
+            else
+                base64url[i] = out->c_str()[i];
+        }
+
+        out->setTo(base64url, outLen);
+        delete[] base64url;
+    }
+}
+
 
 }  // namespace android

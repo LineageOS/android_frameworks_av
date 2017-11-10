@@ -21,7 +21,6 @@ cc_library {
         "legacy/AudioStreamLegacy.cpp",
         "legacy/AudioStreamRecord.cpp",
         "legacy/AudioStreamTrack.cpp",
-        "utility/HandleTracker.cpp",
         "utility/AAudioUtilities.cpp",
         "utility/FixedBlockAdapter.cpp",
         "utility/FixedBlockReader.cpp",

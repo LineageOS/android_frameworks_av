@@ -69,6 +69,7 @@ NuPlayerDriver::NuPlayerDriver(pid_t pid)
       mPlayer(new NuPlayer(pid)),
       mPlayerFlags(0),
       mAnalyticsItem(NULL),
+      mClientUid(-1),
       mAtEOS(false),
       mLooping(false),
       mAutoLoop(false) {
@@ -109,6 +110,10 @@ status_t NuPlayerDriver::initCheck() {
 
 status_t NuPlayerDriver::setUID(uid_t uid) {
     mPlayer->setUID(uid);
+    mClientUid = uid;
+    if (mAnalyticsItem) {
+        mAnalyticsItem->setUid(mClientUid);
+    }
 
     return OK;
 }
@@ -601,6 +606,7 @@ void NuPlayerDriver::logMetrics(const char *where) {
         mAnalyticsItem = new MediaAnalyticsItem("nuplayer");
         if (mAnalyticsItem) {
             mAnalyticsItem->generateSessionID();
+            mAnalyticsItem->setUid(mClientUid);
         }
     } else {
         ALOGV("did not have anything to record");
@@ -637,11 +643,6 @@ status_t NuPlayerDriver::reset() {
 
     if (mState != STATE_STOPPED) {
         notifyListener_l(MEDIA_STOPPED);
-    }
-
-    if (property_get_bool("persist.debug.sf.stats", false)) {
-        Vector<String16> args;
-        dump(-1, args);
     }
 
     mState = STATE_RESET_IN_PROGRESS;
@@ -935,7 +936,10 @@ void NuPlayerDriver::notifyListener_l(
                     // don't send completion event when looping
                     return;
                 }
-
+                if (property_get_bool("persist.debug.sf.stats", false)) {
+                    Vector<String16> args;
+                    dump(-1, args);
+                }
                 mPlayer->pause();
                 mState = STATE_PAUSED;
             }

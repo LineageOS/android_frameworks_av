@@ -258,4 +258,112 @@ static inline bool AAudio_tryUntilTrue(
     }
 }
 
+
+/**
+ * Simple double buffer for a structure that can be written occasionally and read occasionally.
+ * This allows a SINGLE writer with multiple readers.
+ *
+ * It is OK if the FIFO overflows and we lose old values.
+ * It is also OK if we read an old value.
+ * Thread may return a non-atomic result if the other thread is rapidly writing
+ * new values on another core.
+ */
+template <class T>
+class SimpleDoubleBuffer {
+public:
+    SimpleDoubleBuffer()
+            : mValues() {}
+
+    __attribute__((no_sanitize("integer")))
+    void write(T value) {
+        int index = mCounter.load() & 1;
+        mValues[index] = value;
+        mCounter++; // Increment AFTER updating storage, OK if it wraps.
+    }
+
+    /**
+     * This should only be called by the same thread that calls write() or when
+     * no other thread is calling write.
+     */
+    void clear() {
+        mCounter.store(0);
+    }
+
+    T read() const {
+        T result;
+        int before;
+        int after;
+        int timeout = 3;
+        do {
+            // Check to see if a write occurred while were reading.
+            before = mCounter.load();
+            int index = (before & 1) ^ 1;
+            result = mValues[index];
+            after = mCounter.load();
+        } while ((after != before) && (after > 0) && (--timeout > 0));
+        return result;
+    }
+
+    /**
+     * @return true if at least one value has been written
+     */
+    bool isValid() const {
+        return mCounter.load() > 0;
+    }
+
+private:
+    T                    mValues[2];
+    std::atomic<int>     mCounter{0};
+};
+
+class Timestamp {
+public:
+    Timestamp()
+            : mPosition(0)
+            , mNanoseconds(0) {}
+    Timestamp(int64_t position, int64_t nanoseconds)
+            : mPosition(position)
+            , mNanoseconds(nanoseconds) {}
+
+    int64_t getPosition() const { return mPosition; }
+
+    int64_t getNanoseconds() const { return mNanoseconds; }
+
+private:
+    // These cannot be const because we need to implement the copy assignment operator.
+    int64_t mPosition;
+    int64_t mNanoseconds;
+};
+
+
+/**
+ * Pass a request to another thread.
+ * This is used when one thread, A, wants another thread, B, to do something.
+ * A naive approach would be for A to set a flag and for B to clear it when done.
+ * But that creates a race condition. This technique avoids the race condition.
+ *
+ * Assumes only one requester and one acknowledger.
+ */
+class AtomicRequestor {
+public:
+
+    __attribute__((no_sanitize("integer")))
+    void request() {
+        mRequested++;
+    }
+
+    __attribute__((no_sanitize("integer")))
+    bool isRequested() {
+        return (mRequested.load() - mAcknowledged.load()) > 0;
+    }
+
+    __attribute__((no_sanitize("integer")))
+    void acknowledge() {
+        mAcknowledged++;
+    }
+
+private:
+    std::atomic<int> mRequested{0};
+    std::atomic<int> mAcknowledged{0};
+};
 #endif //UTILITY_AAUDIO_UTILITIES_H

@@ -474,6 +474,7 @@ status_t AudioFlinger::PatchPanel::createPatchConnections(Patch *patch,
                                              format,
                                              frameCount,
                                              NULL,
+                                             (size_t)0 /* bufferSize */,
                                              AUDIO_INPUT_FLAG_NONE);
     if (patch->mPatchRecord == 0) {
         return NO_MEMORY;
@@ -494,6 +495,7 @@ status_t AudioFlinger::PatchPanel::createPatchConnections(Patch *patch,
                                            format,
                                            frameCount,
                                            patch->mPatchRecord->buffer(),
+                                           patch->mPatchRecord->bufferSize(),
                                            AUDIO_OUTPUT_FLAG_NONE);
     if (patch->mPatchTrack == 0) {
         return NO_MEMORY;

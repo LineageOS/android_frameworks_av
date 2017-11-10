@@ -21,24 +21,21 @@
 #include <utils/Log.h>
 #include <utils/misc.h>
 
-#include "include/SoftVideoEncoderOMXComponent.h"
-
-#include <media/hardware/HardwareAPI.h>
+#include <media/stagefright/omx/SoftVideoEncoderOMXComponent.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
-#include <media/stagefright/MediaDefs.h>
+#include <media/hardware/HardwareAPI.h>
+#include <media/openmax/OMX_IndexExt.h>
+#include <media/MediaDefs.h>
 
 #include <ui/Fence.h>
 #include <ui/GraphicBufferMapper.h>
 #include <ui/Rect.h>
 
 #include <hardware/gralloc.h>
-
 #include <nativebase/nativebase.h>
-
-#include <OMX_IndexExt.h>
 
 namespace android {
 

@@ -52,14 +52,6 @@ public:
         mProcessId = processId;
     }
 
-    aaudio_direction_t getDirection() const {
-        return mDirection;
-    }
-
-    void setDirection(aaudio_direction_t direction) {
-        mDirection = direction;
-    }
-
     bool isSharingModeMatchRequired() const {
         return mSharingModeMatchRequired;
     }
@@ -94,9 +86,8 @@ public:
 
 protected:
     AAudioStreamConfiguration  mConfiguration;
-    uid_t                      mUserId;
-    pid_t                      mProcessId;
-    aaudio_direction_t         mDirection;
+    uid_t                      mUserId = (uid_t) -1;
+    pid_t                      mProcessId = (pid_t) -1;
     bool                       mSharingModeMatchRequired = false;
     bool                       mInService = false; // Stream opened by AAudioservice
 };

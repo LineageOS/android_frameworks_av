@@ -18,14 +18,14 @@
 * Documentation: Workflow summary for histogram data processing:
 * For more details on FIFO, please see system/media/audio_utils; doxygen
 * TODO: add this documentation to doxygen once it is further developed
-* 1) writing the data to a buffer
-* onWork
+* 1) Writing buffer period timestamp to the circular buffer
+* onWork()
 *     Called every period length (e.g., 4ms)
 *     Calls LOG_HIST_TS
 * LOG_HIST_TS
-*     Hashes file name and line number
-*     calls NBLOG::Writer::logHistTS once
-* NBLOG::Writer::logHistTS
+*     Hashes file name and line number, and writes single timestamp to buffer
+*     calls NBLOG::Writer::logEventHistTS once
+* NBLOG::Writer::logEventHistTS
 *     calls NBLOG::Writer::log on hash and current timestamp
 *     time is in CLOCK_MONOTONIC converted to ns
 * NBLOG::Writer::log(Event, const void*, size_t)
@@ -44,6 +44,8 @@
 * ssize_t audio_utils_fifo_reader::obtain
 *     Determines readable buffer section via pointer arithmetic on reader
 *     and writer pointers
+* Similarly, LOG_AUDIO_STATE() is called by onStateChange whenever audio is
+* turned on or off, and writes this notification to the FIFO.
 *
 * 2) reading the data from shared memory
 * Thread::threadloop()
@@ -51,6 +53,7 @@
 * NBLog::MergeThread::threadLoop()
 *     calls NBLog::Merger::merge
 * NBLog::Merger::merge
+*     Merges snapshots sorted by timestamp
 *     for each reader in vector of class NamedReader,
 *     callsNamedReader::reader()->getSnapshot
 *     TODO: check whether the rest of this function is relevant
@@ -59,11 +62,12 @@
 *     calls mFifoReader->obtain to find readable data
 *     sets snapshot.begin() and .end() iterators to boundaries of valid entries
 *     moves the fifo reader index to after the last entry read
-*     in this case, the buffer is in shared memory. in (3), the buffer is private
+*     in this case, the buffer is in shared memory. in (4), the buffer is private
 *
 * 3) reading the data from private buffer
 * MediaLogService::dump
-*     calls NBLog::Reader::dump(int) on instance of subclass mergeReader
+*     calls NBLog::Reader::dump(CONSOLE)
+*     The private buffer contains all logs for all readers in shared memory
 * NBLog::Reader::dump(int)
 *     calls getSnapshot on the current reader
 *     calls dump(int, size_t, Snapshot)
@@ -72,9 +76,10 @@
 *     (string, timestamp, etc...)
 *     In the case of EVENT_HISTOGRAM_ENTRY_TS, adds a list of timestamp sequences
 *     (histogram entry) to NBLog::mHists
-*     In the case of EVENT_HISTOGRAM_FLUSH, calls drawHistogram on each element in
-*     the list and erases it
-*     TODO: when do these events occur?
+*     TODO: add every HISTOGRAM_ENTRY_TS to two
+*     circular buffers: one short-term and one long-term (can add even longer-term
+*     structures in the future). When dump is called, print everything currently
+*     in the buffer.
 * NBLog::drawHistogram
 *     input: timestamp array
 *     buckets this to a histogram and prints
@@ -82,7 +87,7 @@
 */
 
 #define LOG_TAG "NBLog"
-//#define LOG_NDEBUG 0
+// #define LOG_NDEBUG 0
 
 #include <algorithm>
 #include <climits>
@@ -102,6 +107,8 @@
 #include <new>
 #include <audio_utils/roundup.h>
 #include <media/nbaio/NBLog.h>
+#include <media/nbaio/PerformanceAnalysis.h>
+#include <media/nbaio/ReportPerformance.h>
 // #include <utils/CallStack.h> // used to print callstack
 #include <utils/Log.h>
 #include <utils/String8.h>
@@ -134,7 +141,7 @@ std::unique_ptr<NBLog::AbstractEntry> NBLog::AbstractEntry::buildEntry(const uin
     switch (type) {
     case EVENT_START_FMT:
         return std::make_unique<FormatEntry>(FormatEntry(ptr));
-    case EVENT_HISTOGRAM_FLUSH:
+    case EVENT_AUDIO_STATE:
     case EVENT_HISTOGRAM_ENTRY_TS:
         return std::make_unique<HistogramEntry>(HistogramEntry(ptr));
     default:
@@ -513,7 +520,7 @@ void NBLog::Writer::logHash(log_hash_t hash)
     log(EVENT_HASH, &hash, sizeof(hash));
 }
 
-void NBLog::Writer::logHistTS(log_hash_t hash)
+void NBLog::Writer::logEventHistTs(Event event, log_hash_t hash)
 {
     if (!mEnabled) {
         return;
@@ -522,22 +529,7 @@ void NBLog::Writer::logHistTS(log_hash_t hash)
     data.hash = hash;
     data.ts = get_monotonic_ns();
     if (data.ts > 0) {
-        log(EVENT_HISTOGRAM_ENTRY_TS, &data, sizeof(data));
-    } else {
-        ALOGE("Failed to get timestamp");
-    }
-}
-
-void NBLog::Writer::logHistFlush(log_hash_t hash)
-{
-    if (!mEnabled) {
-        return;
-    }
-    HistTsEntry data;
-    data.hash = hash;
-    data.ts = get_monotonic_ns();
-    if (data.ts > 0) {
-        log(EVENT_HISTOGRAM_FLUSH, &data, sizeof(data));
+        log(event, &data, sizeof(data));
     } else {
         ALOGE("Failed to get timestamp");
     }
@@ -771,15 +763,15 @@ const std::set<NBLog::Event> NBLog::Reader::startingTypes {NBLog::Event::EVENT_S
                                                            NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS};
 const std::set<NBLog::Event> NBLog::Reader::endingTypes   {NBLog::Event::EVENT_END_FMT,
                                                            NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS,
-                                                           NBLog::Event::EVENT_HISTOGRAM_FLUSH};
+                                                           NBLog::Event::EVENT_AUDIO_STATE};
+
 NBLog::Reader::Reader(const void *shared, size_t size)
     : mShared((/*const*/ Shared *) shared), /*mIMemory*/
       mFd(-1), mIndent(0),
       mFifo(mShared != NULL ?
         new audio_utils_fifo(size, sizeof(uint8_t),
             mShared->mBuffer, mShared->mRear, NULL /*throttlesFront*/) : NULL),
-      mFifoReader(mFifo != NULL ? new audio_utils_fifo_reader(*mFifo) : NULL),
-      findGlitch(false)
+      mFifoReader(mFifo != NULL ? new audio_utils_fifo_reader(*mFifo) : NULL)
 {
 }
 
@@ -793,39 +785,6 @@ NBLog::Reader::~Reader()
 {
     delete mFifoReader;
     delete mFifo;
-}
-
-inline static int deltaMs(int64_t ns1, int64_t ns2) {
-    return (ns2 - ns1) / (1000 * 1000);
-}
-
-// Produces a log warning if the timing of recent buffer periods caused a glitch
-// Computes sum of running window of three buffer periods
-// Checks whether the buffer periods leave enough CPU time for the next one
-// e.g. if a buffer period is expected to be 4 ms and a buffer requires 3 ms of CPU time,
-// here are some glitch cases:
-// 4 + 4 + 6 ; 5 + 4 + 5; 2 + 2 + 10
-// TODO: develop this code to track changes in histogram distribution in addition
-// to / instead of glitches
-void NBLog::Reader::alertIfGlitch(const std::vector<int64_t> &samples) {
-    //TODO: measure kPeriodLen and kRatio from the data as they may change.
-    static const int kPeriodLen = 4; // current period length is ideally 4 ms
-    static const double kRatio = 0.75; // estimate of CPU time as ratio of period length
-    // DAC processing time for 4 ms buffer
-    static const int kPeriodTime = static_cast<int>(round(kPeriodLen * kRatio));
-    static const int kNumBuff = 3; // number of buffers considered in local history
-    std::deque<int> periods(kNumBuff, kPeriodLen);
-    for (size_t i = 2; i < samples.size(); ++i) { // skip first time entry
-        periods.push_front(deltaMs(samples[i - 1], samples[i]));
-        periods.pop_back();
-        // TODO: check that all glitch cases are covered
-        if (std::accumulate(periods.begin(), periods.end(), 0) > kNumBuff * kPeriodLen +
-            kPeriodLen - kPeriodTime) {
-                ALOGW("A glitch occurred");
-                periods.assign(kNumBuff, kPeriodLen);
-        }
-    }
-    return;
 }
 
 const uint8_t *NBLog::Reader::findLastEntryOfTypes(const uint8_t *front, const uint8_t *back,
@@ -911,61 +870,17 @@ std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
 
 }
 
-// writes sample deltas to file, either truncating or appending
-inline void writeHistToFile(const std::vector<int64_t> &samples, bool append) {
-    // name of file on audioserver
-    static const char* const kName = (char *)"/data/misc/audioserver/sample_results.txt";
-    // stores deltas between the samples
-    std::vector<int64_t> intervals;
-    for (size_t i = 1; i < samples.size(); ++i) {
-        intervals.push_back(deltaMs(samples[i - 1], samples[i]));
-    }
-    if (intervals.empty()) return;
-    // Deletes maximum value in a histogram. Temp quick fix.
-    // FIXME: need to find root cause of approx. 35th element from the end
-    // consistently being an outlier in the first histogram of a flush
-    // ALOGW("%" PRId64 "before", (int64_t) *(std::max_element(intervals.begin(), intervals.end())));
-    intervals.erase(std::max_element(intervals.begin(), intervals.end()));
-    // ALOGW("%" PRId64 "after", (int64_t) *(std::max_element(intervals.begin(), intervals.end())));
-    std::ofstream ofs;
-    ofs.open(kName, append ? std::ios::app : std::ios::trunc);
-    if (!ofs) {
-        ALOGW("couldn't open file %s", kName);
-        return;
-    }
-    for (size_t i = 0; i < intervals.size(); ++i) {
-        ofs << intervals[i] << "\n";
-    }
-    ofs.close();
-}
-
+// TODO: move this to PerformanceAnalysis
+// TODO: make call to dump periodic so that data in shared FIFO does not get overwritten
 void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapshot)
 {
-  //  CallStack cs(LOG_TAG);
-#if 0
-    struct timespec ts;
-    time_t maxSec = -1;
-    while (entry - start >= (int) Entry::kOverhead) {
-        if (prevEntry - start < 0 || !prevEntry.hasConsistentLength()) {
-            break;
-        }
-        if (prevEntry->type == EVENT_TIMESTAMP) {
-            if (prevEntry->length != sizeof(struct timespec)) {
-                // corrupt
-                break;
-            }
-            prevEntry.copyData((uint8_t*) &ts);
-            if (ts.tv_sec > maxSec) {
-                maxSec = ts.tv_sec;
-            }
-        }
-        --entry;
-        --prevEntry;
-    }
-#endif
     mFd = fd;
     mIndent = indent;
     String8 timestamp, body;
+    // FIXME: this is not thread safe
+    // TODO: need a separate instance of performanceAnalysis for each thread
+    // used to store data and to call analysis functions
+    static ReportPerformance::PerformanceAnalysis performanceAnalysis;
     size_t lost = snapshot.lost() + (snapshot.begin() - EntryIterator(snapshot.data()));
     if (lost > 0) {
         body.appendFormat("warning: lost %zu bytes worth of events", lost);
@@ -973,85 +888,9 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
         //      log to push it out.  Consider keeping the timestamp/body between calls to copyEntryDataAt().
         dumpLine(timestamp, body);
     }
-#if 0
-    size_t width = 1;
-    while (maxSec >= 10) {
-        ++width;
-        maxSec /= 10;
-    }
-    if (maxSec >= 0) {
-        timestamp.appendFormat("[%*s]", (int) width + 4, "");
-    }
-    bool deferredTimestamp = false;
-#endif
 
     for (auto entry = snapshot.begin(); entry != snapshot.end();) {
         switch (entry->type) {
-#if 0
-        case EVENT_STRING:
-            body.appendFormat("%.*s", (int) entry.length(), entry.data());
-            break;
-        case EVENT_TIMESTAMP: {
-            // already checked that length == sizeof(struct timespec);
-            entry.copyData((const uint8_t*) &ts);
-            long prevNsec = ts.tv_nsec;
-            long deltaMin = LONG_MAX;
-            long deltaMax = -1;
-            long deltaTotal = 0;
-            auto aux(entry);
-            for (;;) {
-                ++aux;
-                if (end - aux >= 0 || aux.type() != EVENT_TIMESTAMP) {
-                    break;
-                }
-                struct timespec tsNext;
-                aux.copyData((const uint8_t*) &tsNext);
-                if (tsNext.tv_sec != ts.tv_sec) {
-                    break;
-                }
-                long delta = tsNext.tv_nsec - prevNsec;
-                if (delta < 0) {
-                    break;
-                }
-                if (delta < deltaMin) {
-                    deltaMin = delta;
-                }
-                if (delta > deltaMax) {
-                    deltaMax = delta;
-                }
-                deltaTotal += delta;
-                prevNsec = tsNext.tv_nsec;
-            }
-            size_t n = (aux - entry) / (sizeof(struct timespec) + 3 /*Entry::kOverhead?*/);
-            if (deferredTimestamp) {
-                dumpLine(timestamp, body);
-                deferredTimestamp = false;
-            }
-            timestamp.clear();
-            if (n >= kSquashTimestamp) {
-                timestamp.appendFormat("[%d.%03d to .%.03d by .%.03d to .%.03d]",
-                        (int) ts.tv_sec, (int) (ts.tv_nsec / 1000000),
-                        (int) ((ts.tv_nsec + deltaTotal) / 1000000),
-                        (int) (deltaMin / 1000000), (int) (deltaMax / 1000000));
-                entry = aux;
-                // advance = 0;
-                break;
-            }
-            timestamp.appendFormat("[%d.%03d]", (int) ts.tv_sec,
-                    (int) (ts.tv_nsec / 1000000));
-            deferredTimestamp = true;
-            }
-            break;
-        case EVENT_INTEGER:
-            appendInt(&body, entry.data());
-            break;
-        case EVENT_FLOAT:
-            appendFloat(&body, entry.data());
-            break;
-        case EVENT_PID:
-            appendPID(&body, entry.data(), entry.length());
-            break;
-#endif
         case EVENT_START_FMT:
             entry = handleFormat(FormatEntry(entry), &timestamp, &body);
             break;
@@ -1063,40 +902,12 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             memcpy(&hash, &(data->hash), sizeof(hash));
             int64_t ts;
             memcpy(&ts, &data->ts, sizeof(ts));
-            const std::pair<log_hash_t, int> key(hash, data->author);
-            // TODO might want to filter excessively high outliers, which are usually caused
-            // by the thread being inactive.
-            mHists[key].push_back(ts);
+            performanceAnalysis.logTsEntry(ts);
             ++entry;
             break;
         }
-        // draws histograms stored in global Reader::mHists and erases them
-        case EVENT_HISTOGRAM_FLUSH: {
-            HistogramEntry histEntry(entry);
-            // Log timestamp
-            // Timestamp of call to drawHistogram, not when audio was generated
-            const int64_t ts = histEntry.timestamp();
-            timestamp.clear();
-            timestamp.appendFormat("[%d.%03d]", (int) (ts / (1000 * 1000 * 1000)),
-                            (int) ((ts / (1000 * 1000)) % 1000));
-            // Log histograms
-            setFindGlitch(true);
-            body.appendFormat("Histogram flush - ");
-            handleAuthor(histEntry, &body);
-            for (auto hist = mHists.begin(); hist != mHists.end();) {
-                if (hist->first.second == histEntry.author()) {
-                    body.appendFormat("%X", (int)hist->first.first);
-                    if (findGlitch) {
-                        alertIfGlitch(hist->second);
-                    }
-                    // set file to empty and write data for all histograms in this set
-                    writeHistToFile(hist->second, hist != mHists.begin());
-                    drawHistogram(&body, hist->second, true, indent);
-                    hist = mHists.erase(hist);
-                } else {
-                    ++hist;
-                }
-            }
+        case EVENT_AUDIO_STATE: {
+            performanceAnalysis.handleStateChange();
             ++entry;
             break;
         }
@@ -1110,10 +921,10 @@ void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapsho
             ++entry;
             break;
         }
-
-        if (!body.isEmpty()) {
-            dumpLine(timestamp, body);
-        }
+    }
+    performanceAnalysis.reportPerformance(&body);
+    if (!body.isEmpty()) {
+        dumpLine(timestamp, body);
     }
 }
 
@@ -1137,16 +948,6 @@ void NBLog::Reader::dumpLine(const String8 &timestamp, String8 &body)
 bool NBLog::Reader::isIMemory(const sp<IMemory>& iMemory) const
 {
     return iMemory != 0 && mIMemory != 0 && iMemory->pointer() == mIMemory->pointer();
-}
-
-void NBLog::Reader::setFindGlitch(bool s)
-{
-    findGlitch = s;
-}
-
-bool NBLog::Reader::isFindGlitch() const
-{
-    return findGlitch;
 }
 
 // ---------------------------------------------------------------------------
@@ -1281,126 +1082,6 @@ NBLog::EntryIterator NBLog::Reader::handleFormat(const FormatEntry &fmtEntry,
     ALOGW_IF(arg->type != EVENT_END_FMT, "Expected end of format, got %d", arg->type);
     ++arg;
     return arg;
-}
-
-static int widthOf(int x) {
-    int width = 0;
-    while (x > 0) {
-        ++width;
-        x /= 10;
-    }
-    return width;
-}
-
-static std::map<int, int> buildBuckets(const std::vector<int64_t> &samples) {
-    // TODO allow buckets of variable resolution
-    std::map<int, int> buckets;
-    for (size_t i = 1; i < samples.size(); ++i) {
-        ++buckets[deltaMs(samples[i - 1], samples[i])];
-    }
-    return buckets;
-}
-
-static inline uint32_t log2(uint32_t x) {
-    // This works for x > 0
-    return 31 - __builtin_clz(x);
-}
-
-// TODO put this function in separate file. Make it return a std::string instead of modifying body
-/*
-Example output:
-[54.234] Histogram flush - AudioOut_D:
-Histogram 33640BF1
-            [ 1][ 1][ 1][ 3][54][69][ 1][ 2][ 1]
-        64|                      []
-        32|                  []  []
-        16|                  []  []
-         8|                  []  []
-         4|                  []  []
-         2|______________[]__[]__[]______[]____
-              4   5   6   8   9  10  11  13  15
-Notice that all values that fall in the same row have the same height (65 and 127 are displayed
-identically). That's why exact counts are added at the top.
-*/
-void NBLog::Reader::drawHistogram(String8 *body,
-                                  const std::vector<int64_t> &samples,
-                                  bool logScale,
-                                  int indent,
-                                  int maxHeight) {
-    // this avoids some corner cases
-    if (samples.size() <= 1) {
-        return;
-    }
-    // temp code for debugging the outlier timestamp
-    const int kMaxMs = 100;
-    for (size_t i = 1; i < samples.size()-1; ++i) {
-        const int currDelta = deltaMs(samples[i - 1], samples[i]);
-        if (currDelta > kMaxMs) {
-            body->appendFormat("\nlocation: %zu, size: %zu, pos from end: %zu, %d\t", i,
-                           samples.size(), samples.size() - i, currDelta);
-        }
-    }
-    // FIXME: as can be seen when printing the values, the outlier timestamps typically occur
-    // in the first histogram 35 to 38 indices from the end (most often 35).
-    // TODO: build histogram buckets earlier and discard timestamps to save memory
-    std::map<int, int> buckets = buildBuckets(samples);
-    // TODO consider changing all ints to uint32_t or uint64_t
-
-    // underscores and spaces length corresponds to maximum width of histogram
-    static const int kLen = 40;
-    std::string underscores(kLen, '-');
-    std::string spaces(kLen, ' ');
-
-    auto it = buckets.begin();
-    int maxDelta = it->first;
-    int maxCount = it->second;
-    // Compute maximum values
-    while (++it != buckets.end()) {
-        if (it->first > maxDelta) {
-            maxDelta = it->first;
-        }
-        if (it->second > maxCount) {
-            maxCount = it->second;
-        }
-    }
-    int height = logScale ? log2(maxCount) + 1 : maxCount; // maxCount > 0, safe to call log2
-    const int leftPadding = widthOf(logScale ? pow(2, height) : maxCount);
-    const int colWidth = std::max(std::max(widthOf(maxDelta) + 1, 3), leftPadding + 2);
-    int scalingFactor = 1;
-    // scale data if it exceeds maximum height
-    if (height > maxHeight) {
-        scalingFactor = (height + maxHeight) / maxHeight;
-        height /= scalingFactor;
-    }
-    body->appendFormat("\n%*s", leftPadding + 11, "Occurrences");
-    // write histogram label line with bucket values
-    body->appendFormat("\n%*s", indent, " ");
-    body->appendFormat("%*s", leftPadding, " ");
-    for (auto const &x : buckets) {
-        body->appendFormat("%*d", colWidth, x.second);
-    }
-    // write histogram ascii art
-    body->appendFormat("\n%*s", indent, " ");
-    for (int row = height * scalingFactor; row >= 0; row -= scalingFactor) {
-        const int value = logScale ? (1 << row) : row;
-        body->appendFormat("%.*s", leftPadding, spaces.c_str());
-        for (auto const &x : buckets) {
-          body->appendFormat("%.*s%s", colWidth - 1, spaces.c_str(), x.second < value ? " " : "|");
-        }
-        body->appendFormat("\n%*s", indent, " ");
-    }
-    // print x-axis
-    const int columns = static_cast<int>(buckets.size());
-    body->appendFormat("%*c", leftPadding, ' ');
-    body->appendFormat("%.*s", (columns + 1) * colWidth, underscores.c_str());
-    body->appendFormat("\n%*s", indent, " ");
-
-    // write footer with bucket labels
-    body->appendFormat("%*s", leftPadding, " ");
-    for (auto const &x : buckets) {
-        body->appendFormat("%*d", colWidth, x.first);
-    }
-    body->appendFormat("%.*s%s", colWidth, spaces.c_str(), "ms\n");
 }
 
 NBLog::Merger::Merger(const void *shared, size_t size):

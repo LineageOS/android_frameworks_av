@@ -25,7 +25,39 @@
 /* Gain table for (10^(Gain/20) - 1)                                                */
 /*                                                                                  */
 /************************************************************************************/
-
+#ifdef BUILD_FLOAT
+#define LVEQNB_Gain_Neg15_dB                             -0.822172f
+#define LVEQNB_Gain_Neg14_dB                             -0.800474f
+#define LVEQNB_Gain_Neg13_dB                             -0.776128f
+#define LVEQNB_Gain_Neg12_dB                             -0.748811f
+#define LVEQNB_Gain_Neg11_dB                             -0.718162f
+#define LVEQNB_Gain_Neg10_dB                             -0.683772f
+#define LVEQNB_Gain_Neg9_dB                              -0.645187f
+#define LVEQNB_Gain_Neg8_dB                              -0.601893f
+#define LVEQNB_Gain_Neg7_dB                              -0.553316f
+#define LVEQNB_Gain_Neg6_dB                              -0.498813f
+#define LVEQNB_Gain_Neg5_dB                              -0.437659f
+#define LVEQNB_Gain_Neg4_dB                              -0.369043f
+#define LVEQNB_Gain_Neg3_dB                              -0.292054f
+#define LVEQNB_Gain_Neg2_dB                              -0.205672f
+#define LVEQNB_Gain_Neg1_dB                              -0.108749f
+#define LVEQNB_Gain_0_dB                                  0.000000f
+#define LVEQNB_Gain_1_dB                                  0.122018f
+#define LVEQNB_Gain_2_dB                                  0.258925f
+#define LVEQNB_Gain_3_dB                                  0.412538f
+#define LVEQNB_Gain_4_dB                                  0.584893f
+#define LVEQNB_Gain_5_dB                                  0.778279f
+#define LVEQNB_Gain_6_dB                                  0.995262f
+#define LVEQNB_Gain_7_dB                                  1.238721f
+#define LVEQNB_Gain_8_dB                                  1.511886f
+#define LVEQNB_Gain_9_dB                                  1.818383f
+#define LVEQNB_Gain_10_dB                                 2.162278f
+#define LVEQNB_Gain_11_dB                                 2.548134f
+#define LVEQNB_Gain_12_dB                                 2.981072f
+#define LVEQNB_Gain_13_dB                                 3.466836f
+#define LVEQNB_Gain_14_dB                                 4.011872f
+#define LVEQNB_Gain_15_dB                                 4.623413f
+#else
 #define LVEQNB_GAINSHIFT                                   11         /* As a power of 2 */
 #define LVEQNB_Gain_Neg15_dB                           (-1684)        /* Floating point value -0.822172 */
 #define LVEQNB_Gain_Neg14_dB                           (-1639)        /* Floating point value -0.800474 */
@@ -58,14 +90,30 @@
 #define LVEQNB_Gain_13_dB                                7100         /* Floating point value 3.466836 */
 #define LVEQNB_Gain_14_dB                                8216         /* Floating point value 4.011872 */
 #define LVEQNB_Gain_15_dB                                9469         /* Floating point value 4.623413 */
-
+#endif
 
 /************************************************************************************/
 /*                                                                                  */
 /* Frequency table for 2*Pi/Fs                                                      */
 /*                                                                                  */
 /************************************************************************************/
+#ifdef BUILD_FLOAT
+#define LVEQNB_2PiOn_8000                                0.000785f
+#define LVEQNB_2PiOn_11025                               0.000570f
+#define LVEQNB_2PiOn_12000                               0.000524f
+#define LVEQNB_2PiOn_16000                               0.000393f
+#define LVEQNB_2PiOn_22050                               0.000285f
+#define LVEQNB_2PiOn_24000                               0.000262f
+#define LVEQNB_2PiOn_32000                               0.000196f
+#define LVEQNB_2PiOn_44100                               0.000142f
+#define LVEQNB_2PiOn_48000                               0.000131f
 
+#ifdef HIGHER_FS
+#define LVEQNB_2PiOn_96000                               0.000065f
+#define LVEQNB_2PiOn_192000                              0.000033f
+#endif
+
+#else
 #define LVEQNB_FREQSHIFT                                   25         /* As a power of 2 */
 #define LVEQNB_2PiOn_8000                               26354         /* Floating point value 0.000785 */
 #define LVEQNB_2PiOn_11025                              19123         /* Floating point value 0.000570 */
@@ -76,14 +124,31 @@
 #define LVEQNB_2PiOn_32000                               6588         /* Floating point value 0.000196 */
 #define LVEQNB_2PiOn_44100                               4781         /* Floating point value 0.000142 */
 #define LVEQNB_2PiOn_48000                               4392         /* Floating point value 0.000131 */
-
+#endif
 
 /************************************************************************************/
 /*                                                                                  */
 /* 50D table for 50 / ( 1 + Gain )                                                  */
 /*                                                                                  */
 /************************************************************************************/
-
+#ifdef BUILD_FLOAT
+#define LVEQNB_100D_Neg15_dB                             5.623413f
+#define LVEQNB_100D_Neg14_dB                             5.011872f
+#define LVEQNB_100D_Neg13_dB                             4.466836f
+#define LVEQNB_100D_Neg12_dB                             3.981072f
+#define LVEQNB_100D_Neg11_dB                             3.548134f
+#define LVEQNB_100D_Neg10_dB                             3.162278f
+#define LVEQNB_100D_Neg9_dB                              2.818383f
+#define LVEQNB_100D_Neg8_dB                              2.511886f
+#define LVEQNB_100D_Neg7_dB                              2.238721f
+#define LVEQNB_100D_Neg6_dB                              1.995262f
+#define LVEQNB_100D_Neg5_dB                              1.778279f
+#define LVEQNB_100D_Neg4_dB                              1.584893f
+#define LVEQNB_100D_Neg3_dB                              1.412538f
+#define LVEQNB_100D_Neg2_dB                              1.258925f
+#define LVEQNB_100D_Neg1_dB                              1.122018f
+#define LVEQNB_100D_0_dB                                 1.000000f
+#else
 #define LVEQNB_100DSHIFT                                    5         /* As a power of 2 */
 #define LVEQNB_100D_Neg15_dB                            17995         /* Floating point value 5.623413 */
 #define LVEQNB_100D_Neg14_dB                            16038         /* Floating point value 5.011872 */
@@ -101,6 +166,6 @@
 #define LVEQNB_100D_Neg2_dB                              4029         /* Floating point value 1.258925 */
 #define LVEQNB_100D_Neg1_dB                              3590         /* Floating point value 1.122018 */
 #define LVEQNB_100D_0_dB                                 3200         /* Floating point value 1.000000 */
-
+#endif
 
 #endif

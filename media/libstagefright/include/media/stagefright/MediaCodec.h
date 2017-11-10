@@ -47,10 +47,13 @@ class IResourceManagerService;
 struct PersistentSurface;
 class SoftwareRenderer;
 class Surface;
-namespace media {
-class IDescrambler;
-};
-using namespace media;
+namespace hardware {
+namespace cas {
+namespace native {
+namespace V1_0 {
+struct IDescrambler;
+}}}}
+using hardware::cas::native::V1_0::IDescrambler;
 
 struct MediaCodec : public AHandler {
     enum ConfigureFlags {
@@ -83,11 +86,6 @@ struct MediaCodec : public AHandler {
             pid_t pid = kNoPid, uid_t uid = kNoUid);
 
     static sp<PersistentSurface> CreatePersistentInputSurface();
-
-    // utility method to query capabilities
-    static status_t QueryCapabilities(
-            const AString &name, const AString &mime, bool isEncoder,
-            sp<MediaCodecInfo::Capabilities> *caps /* nonnull */);
 
     status_t configure(
             const sp<AMessage> &format,
@@ -316,6 +314,8 @@ private:
     SoftwareRenderer *mSoftRenderer;
 
     MediaAnalyticsItem *mAnalyticsItem;
+    void initAnalyticsItem();
+    void flushAnalyticsItem();
 
     sp<AMessage> mOutputFormat;
     sp<AMessage> mInputFormat;

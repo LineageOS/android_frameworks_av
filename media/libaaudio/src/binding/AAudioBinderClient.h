@@ -118,13 +118,13 @@ public:
     {
     public:
         AAudioClient(android::wp<AAudioBinderClient> aaudioBinderClient)
-            : mBinderClient(aaudioBinderClient) {
+                : mBinderClient(aaudioBinderClient) {
         }
 
         // implement DeathRecipient
         virtual void binderDied(const android::wp<android::IBinder>& who __unused) {
             android::sp<AAudioBinderClient> client = mBinderClient.promote();
-            if (client != 0) {
+            if (client.get() != nullptr) {
                 client->dropAAudioService();
             }
             ALOGW("AAudio service binderDied()!");
@@ -133,7 +133,7 @@ public:
         // implement BnAAudioClient
         void onStreamChange(aaudio_handle_t handle, int32_t opcode, int32_t value) {
             android::sp<AAudioBinderClient> client = mBinderClient.promote();
-            if (client != 0) {
+            if (client.get() != nullptr) {
                 client->onStreamChange(handle, opcode, value);
             }
         }
@@ -141,10 +141,11 @@ public:
         android::wp<AAudioBinderClient> mBinderClient;
     };
 
+private:
 
-    android::Mutex               mServiceLock;
+    android::Mutex                  mServiceLock;
     android::sp<android::IAAudioService>  mAAudioService;
-    android::sp<AAudioClient>    mAAudioClient;
+    android::sp<AAudioClient>       mAAudioClient;
 
 };
 

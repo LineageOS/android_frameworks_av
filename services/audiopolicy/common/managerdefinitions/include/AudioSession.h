@@ -22,6 +22,7 @@
 #include <utils/Errors.h>
 #include <utils/KeyedVector.h>
 #include <media/AudioPolicy.h>
+#include <media/IAudioPolicyServiceClient.h>
 #include "AudioSessionInfoProvider.h"
 
 namespace android {
@@ -44,14 +45,14 @@ public:
 
     status_t dump(int fd, int spaces, int index) const;
 
-    audio_session_t session() const { return mSession; }
-    audio_source_t inputSource()const { return mInputSource; }
+    audio_session_t session() const { return mRecordClientInfo.session; }
+    audio_source_t inputSource()const { return mRecordClientInfo.source; }
     audio_format_t format() const { return mConfig.format; }
     uint32_t sampleRate() const { return mConfig.sample_rate; }
     audio_channel_mask_t channelMask() const { return mConfig.channel_mask; }
     audio_input_flags_t flags() const { return mFlags; }
-    uid_t uid() const { return mUid; }
-    void setUid(uid_t uid) { mUid = uid; }
+    uid_t uid() const { return mRecordClientInfo.uid; }
+    void setUid(uid_t uid) { mRecordClientInfo.uid = uid; }
     bool matches(const sp<AudioSession> &other) const;
     bool isSoundTrigger() const { return mIsSoundTrigger; }
     uint32_t openCount() const { return mOpenCount; } ;
@@ -65,11 +66,9 @@ public:
     virtual void onSessionInfoUpdate() const;
 
 private:
-    const audio_session_t mSession;
-    const audio_source_t mInputSource;
+    record_client_info_t mRecordClientInfo;
     const struct audio_config_base mConfig;
     const audio_input_flags_t mFlags;
-    uid_t mUid;
     bool  mIsSoundTrigger;
     uint32_t  mOpenCount;
     uint32_t  mActiveCount;

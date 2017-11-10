@@ -27,7 +27,15 @@
 namespace android {
 
 StreamHalLocal::StreamHalLocal(audio_stream_t *stream, sp<DeviceHalLocal> device)
-        : mDevice(device), mStream(stream) {
+        : mDevice(device),
+          mStream(stream) {
+    // Instrument audio signal power logging.
+    // Note: This assumes channel mask, format, and sample rate do not change after creation.
+    if (mStream != nullptr && mStreamPowerLog.isUserDebugOrEngBuild()) {
+        mStreamPowerLog.init(mStream->get_sample_rate(mStream),
+                mStream->get_channels(mStream),
+                mStream->get_format(mStream));
+    }
 }
 
 StreamHalLocal::~StreamHalLocal() {
@@ -95,7 +103,9 @@ status_t StreamHalLocal::standby() {
 }
 
 status_t StreamHalLocal::dump(int fd) {
-    return mStream->dump(mStream, fd);
+    status_t status = mStream->dump(mStream, fd);
+    mStreamPowerLog.dump(fd);
+    return status;
 }
 
 status_t StreamHalLocal::setHalThreadPriority(int) {
@@ -133,6 +143,7 @@ status_t StreamOutHalLocal::write(const void *buffer, size_t bytes, size_t *writ
     ssize_t writeResult = mStream->write(mStream, buffer, bytes);
     if (writeResult > 0) {
         *written = writeResult;
+        mStreamPowerLog.log(buffer, *written);
         return OK;
     } else {
         *written = 0;
@@ -266,6 +277,7 @@ status_t StreamInHalLocal::read(void *buffer, size_t bytes, size_t *read) {
     ssize_t readResult = mStream->read(mStream, buffer, bytes);
     if (readResult > 0) {
         *read = readResult;
+        mStreamPowerLog.log( buffer, *read);
         return OK;
     } else {
         *read = 0;

@@ -28,8 +28,7 @@ LOCAL_SRC_FILES:= \
 
 LOCAL_MODULE := libclearkeycasplugin
 
-#TODO: move this back to /vendor/lib after conversion to treble
-#LOCAL_PROPRIETARY_MODULE := true
+LOCAL_PROPRIETARY_MODULE := true
 LOCAL_MODULE_RELATIVE_PATH := mediacas
 
 LOCAL_SHARED_LIBRARIES := \
@@ -38,6 +37,9 @@ LOCAL_SHARED_LIBRARIES := \
     libcrypto \
     libstagefright_foundation \
     libprotobuf-cpp-lite \
+
+LOCAL_HEADER_LIBRARIES := \
+    media_plugin_headers
 
 LOCAL_STATIC_LIBRARIES := \
     libjsmn \

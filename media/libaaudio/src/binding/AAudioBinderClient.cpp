@@ -45,6 +45,7 @@ using android::interface_cast;
 using android::IInterface;
 using android::IAAudioService;
 using android::Mutex;
+using android::ProcessState;
 using android::sp;
 using android::wp;
 
@@ -52,15 +53,19 @@ using namespace aaudio;
 
 ANDROID_SINGLETON_STATIC_INSTANCE(AAudioBinderClient);
 
+// If we don't keep a strong pointer here then this singleton can get deleted!
+android::sp<AAudioBinderClient> gKeepBinderClient;
+
 AAudioBinderClient::AAudioBinderClient()
         : AAudioServiceInterface()
         , Singleton<AAudioBinderClient>() {
-
+    gKeepBinderClient = this; // so this singleton won't get deleted
     mAAudioClient = new AAudioClient(this);
-    ALOGV("AAudioBinderClient() created mAAudioClient = %p", mAAudioClient.get());
+    ALOGV("AAudioBinderClient() this = %p, created mAAudioClient = %p", this, mAAudioClient.get());
 }
 
 AAudioBinderClient::~AAudioBinderClient() {
+    ALOGV("AAudioBinderClient()::~AAudioBinderClient() destroying %p", this);
     Mutex::Autolock _l(mServiceLock);
     if (mAAudioService != 0) {
         IInterface::asBinder(mAAudioService)->unlinkToDeath(mAAudioClient);
@@ -75,19 +80,19 @@ const sp<IAAudioService> AAudioBinderClient::getAAudioService() {
     bool needToRegister = false;
     {
         Mutex::Autolock _l(mServiceLock);
-        if (mAAudioService == 0) {
+        if (mAAudioService.get() == nullptr) {
             sp<IBinder> binder;
             sp<IServiceManager> sm = defaultServiceManager();
             // Try several times to get the service.
             int retries = 4;
             do {
                 binder = sm->getService(String16(AAUDIO_SERVICE_NAME)); // This will wait a while.
-                if (binder != 0) {
+                if (binder.get() != nullptr) {
                     break;
                 }
             } while (retries-- > 0);
 
-            if (binder != 0) {
+            if (binder.get() != nullptr) {
                 // Ask for notification if the service dies.
                 status_t status = binder->linkToDeath(mAAudioClient);
                 // TODO review what we should do if this fails
@@ -98,7 +103,7 @@ const sp<IAAudioService> AAudioBinderClient::getAAudioService() {
                 mAAudioService = interface_cast<IAAudioService>(binder);
                 needToRegister = true;
                 // Make sure callbacks can be received by mAAudioClient
-                android::ProcessState::self()->startThreadPool();
+                ProcessState::self()->startThreadPool();
             } else {
                 ALOGE("AAudioBinderClient could not connect to %s", AAUDIO_SERVICE_NAME);
             }
@@ -106,7 +111,7 @@ const sp<IAAudioService> AAudioBinderClient::getAAudioService() {
         aaudioService = mAAudioService;
     }
     // Do this outside the mutex lock.
-    if (needToRegister && aaudioService != 0) { // new client?
+    if (needToRegister && aaudioService.get() != nullptr) { // new client?
         aaudioService->registerClient(mAAudioClient);
     }
     return aaudioService;
@@ -116,7 +121,6 @@ void AAudioBinderClient::dropAAudioService() {
     Mutex::Autolock _l(mServiceLock);
     mAAudioService.clear(); // force a reconnect
 }
-
 
 /**
 * @param request info needed to create the stream
@@ -128,14 +132,12 @@ aaudio_handle_t AAudioBinderClient::openStream(const AAudioStreamRequest &reques
     aaudio_handle_t stream;
     for (int i = 0; i < 2; i++) {
         const sp<IAAudioService> &service = getAAudioService();
-        if (service == 0) {
-            return AAUDIO_ERROR_NO_SERVICE;
-        }
+        if (service.get() == nullptr) return AAUDIO_ERROR_NO_SERVICE;
 
         stream = service->openStream(request, configurationOutput);
 
         if (stream == AAUDIO_ERROR_NO_SERVICE) {
-            ALOGE("AAudioBinderClient: lost connection to AAudioService.");
+            ALOGE("AAudioBinderClient::openStream lost connection to AAudioService.");
             dropAAudioService(); // force a reconnect
         } else {
             break;
@@ -145,8 +147,8 @@ aaudio_handle_t AAudioBinderClient::openStream(const AAudioStreamRequest &reques
 }
 
 aaudio_result_t AAudioBinderClient::closeStream(aaudio_handle_t streamHandle) {
-    const sp<IAAudioService> &service = getAAudioService();
-    if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
+    const sp<IAAudioService> service = getAAudioService();
+    if (service.get() == nullptr) return AAUDIO_ERROR_NO_SERVICE;
     return service->closeStream(streamHandle);
 }
 
@@ -155,32 +157,32 @@ aaudio_result_t AAudioBinderClient::closeStream(aaudio_handle_t streamHandle) {
 */
 aaudio_result_t AAudioBinderClient::getStreamDescription(aaudio_handle_t streamHandle,
                                                          AudioEndpointParcelable &parcelable) {
-    const sp<IAAudioService> &service = getAAudioService();
-    if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
+    const sp<IAAudioService> service = getAAudioService();
+    if (service.get() == nullptr) return AAUDIO_ERROR_NO_SERVICE;
     return service->getStreamDescription(streamHandle, parcelable);
 }
 
 aaudio_result_t AAudioBinderClient::startStream(aaudio_handle_t streamHandle) {
-    const sp<IAAudioService> &service = getAAudioService();
-    if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
+    const sp<IAAudioService> service = getAAudioService();
+    if (service.get() == nullptr) return AAUDIO_ERROR_NO_SERVICE;
     return service->startStream(streamHandle);
 }
 
 aaudio_result_t AAudioBinderClient::pauseStream(aaudio_handle_t streamHandle) {
-    const sp<IAAudioService> &service = getAAudioService();
-    if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
+    const sp<IAAudioService> service = getAAudioService();
+    if (service.get() == nullptr) return AAUDIO_ERROR_NO_SERVICE;
     return service->pauseStream(streamHandle);
 }
 
 aaudio_result_t AAudioBinderClient::stopStream(aaudio_handle_t streamHandle) {
-    const sp<IAAudioService> &service = getAAudioService();
-    if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
+    const sp<IAAudioService> service = getAAudioService();
+    if (service.get() == nullptr) return AAUDIO_ERROR_NO_SERVICE;
     return service->stopStream(streamHandle);
 }
 
 aaudio_result_t AAudioBinderClient::flushStream(aaudio_handle_t streamHandle) {
-    const sp<IAAudioService> &service = getAAudioService();
-    if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
+    const sp<IAAudioService> service = getAAudioService();
+    if (service.get() == nullptr) return AAUDIO_ERROR_NO_SERVICE;
     return service->flushStream(streamHandle);
 }
 
@@ -190,8 +192,8 @@ aaudio_result_t AAudioBinderClient::flushStream(aaudio_handle_t streamHandle) {
 aaudio_result_t AAudioBinderClient::registerAudioThread(aaudio_handle_t streamHandle,
                                                         pid_t clientThreadId,
                                                         int64_t periodNanoseconds) {
-    const sp<IAAudioService> &service = getAAudioService();
-    if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
+    const sp<IAAudioService> service = getAAudioService();
+    if (service.get() == nullptr) return AAUDIO_ERROR_NO_SERVICE;
     return service->registerAudioThread(streamHandle,
                                         clientThreadId,
                                         periodNanoseconds);
@@ -199,8 +201,8 @@ aaudio_result_t AAudioBinderClient::registerAudioThread(aaudio_handle_t streamHa
 
 aaudio_result_t AAudioBinderClient::unregisterAudioThread(aaudio_handle_t streamHandle,
                                                           pid_t clientThreadId) {
-    const sp<IAAudioService> &service = getAAudioService();
-    if (service == 0) return AAUDIO_ERROR_NO_SERVICE;
+    const sp<IAAudioService> service = getAAudioService();
+    if (service.get() == nullptr) return AAUDIO_ERROR_NO_SERVICE;
     return service->unregisterAudioThread(streamHandle,
                                           clientThreadId);
 }

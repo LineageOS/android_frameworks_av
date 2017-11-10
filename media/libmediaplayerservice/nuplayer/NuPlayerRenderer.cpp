@@ -840,7 +840,7 @@ void NuPlayer::Renderer::notifyEOSCallback() {
         return;
     }
 
-    notifyEOS(true /* audio */, ERROR_END_OF_STREAM);
+    notifyEOS_l(true /* audio */, ERROR_END_OF_STREAM);
 }
 
 size_t NuPlayer::Renderer::fillAudioBuffer(void *buffer, size_t size) {
@@ -917,10 +917,10 @@ size_t NuPlayer::Renderer::fillAudioBuffer(void *buffer, size_t size) {
             if (mAudioSink->needsTrailingPadding()) {
                 postEOSDelayUs = getPendingAudioPlayoutDurationUs(ALooper::GetNowUs());
             }
-            ALOGV("fillAudioBuffer: notifyEOS "
+            ALOGV("fillAudioBuffer: notifyEOS_l "
                     "mNumFramesWritten:%u  finalResult:%d  postEOSDelay:%lld",
                     mNumFramesWritten, entry->mFinalResult, (long long)postEOSDelayUs);
-            notifyEOS(true /* audio */, entry->mFinalResult, postEOSDelayUs);
+            notifyEOS_l(true /* audio */, entry->mFinalResult, postEOSDelayUs);
         }
     }
     return sizeCopied;
@@ -1152,7 +1152,18 @@ int64_t NuPlayer::Renderer::getPendingAudioPlayoutDurationUs(int64_t nowUs) {
             return writtenAudioDurationUs - (mediaUs - mAudioFirstAnchorTimeMediaUs);
         }
     }
-    return writtenAudioDurationUs - mAudioSink->getPlayedOutDurationUs(nowUs);
+
+    const int64_t audioSinkPlayedUs = mAudioSink->getPlayedOutDurationUs(nowUs);
+    int64_t pendingUs = writtenAudioDurationUs - audioSinkPlayedUs;
+    if (pendingUs < 0) {
+        // This shouldn't happen unless the timestamp is stale.
+        ALOGW("%s: pendingUs %lld < 0, clamping to zero, potential resume after pause "
+                "writtenAudioDurationUs: %lld, audioSinkPlayedUs: %lld",
+                __func__, (long long)pendingUs,
+                (long long)writtenAudioDurationUs, (long long)audioSinkPlayedUs);
+        pendingUs = 0;
+    }
+    return pendingUs;
 }
 
 int64_t NuPlayer::Renderer::getRealTimeUs(int64_t mediaTimeUs, int64_t nowUs) {
@@ -1408,6 +1419,11 @@ void NuPlayer::Renderer::notifyVideoRenderingStart() {
 }
 
 void NuPlayer::Renderer::notifyEOS(bool audio, status_t finalResult, int64_t delayUs) {
+    Mutex::Autolock autoLock(mLock);
+    notifyEOS_l(audio, finalResult, delayUs);
+}
+
+void NuPlayer::Renderer::notifyEOS_l(bool audio, status_t finalResult, int64_t delayUs) {
     if (audio && delayUs > 0) {
         sp<AMessage> msg = new AMessage(kWhatEOS, this);
         msg->setInt32("audioEOSGeneration", mAudioEOSGeneration);
@@ -1420,6 +1436,11 @@ void NuPlayer::Renderer::notifyEOS(bool audio, status_t finalResult, int64_t del
     notify->setInt32("audio", static_cast<int32_t>(audio));
     notify->setInt32("finalResult", finalResult);
     notify->post(delayUs);
+
+    if (audio) {
+        // Video might outlive audio. Clear anchor to enable video only case.
+        mAnchorTimeMediaUs = -1;
+    }
 }
 
 void NuPlayer::Renderer::notifyAudioTearDown(AudioTearDownReason reason) {

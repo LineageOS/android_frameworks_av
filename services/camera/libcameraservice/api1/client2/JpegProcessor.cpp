@@ -136,17 +136,16 @@ status_t JpegProcessor::updateStream(const Parameters &params) {
 
     if (mCaptureStreamId != NO_STREAM) {
         // Check if stream parameters have to change
-        uint32_t currentWidth, currentHeight;
-        res = device->getStreamInfo(mCaptureStreamId,
-                &currentWidth, &currentHeight, 0, 0);
+        CameraDeviceBase::StreamInfo streamInfo;
+        res = device->getStreamInfo(mCaptureStreamId, &streamInfo);
         if (res != OK) {
             ALOGE("%s: Camera %d: Error querying capture output stream info: "
                     "%s (%d)", __FUNCTION__,
                     mId, strerror(-res), res);
             return res;
         }
-        if (currentWidth != (uint32_t)params.pictureWidth ||
-                currentHeight != (uint32_t)params.pictureHeight) {
+        if (streamInfo.width != (uint32_t)params.pictureWidth ||
+                streamInfo.height != (uint32_t)params.pictureHeight) {
             ALOGV("%s: Camera %d: Deleting stream %d since the buffer dimensions changed",
                 __FUNCTION__, mId, mCaptureStreamId);
             res = device->deleteStream(mCaptureStreamId);

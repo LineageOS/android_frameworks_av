@@ -217,8 +217,10 @@ public:
         return binder::Status::ok();
     }
 
-    virtual binder::Status onRepeatingRequestError(int64_t lastFrameNumber) {
+    virtual binder::Status onRepeatingRequestError(
+            int64_t lastFrameNumber, int32_t stoppedSequenceId) {
         (void) lastFrameNumber;
+        (void) stoppedSequenceId;
         Mutex::Autolock l(mLock);
         mLastStatus = REPEATING_REQUEST_ERROR;
         mStatusesHit.push_back(mLastStatus);

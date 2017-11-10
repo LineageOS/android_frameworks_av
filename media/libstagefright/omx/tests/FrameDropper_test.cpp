@@ -20,7 +20,7 @@
 
 #include <gtest/gtest.h>
 
-#include "FrameDropper.h"
+#include <media/stagefright/omx/FrameDropper.h>
 #include <media/stagefright/foundation/ADebug.h>
 
 namespace android {

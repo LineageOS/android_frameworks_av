@@ -25,7 +25,7 @@
 /*                                                                         */
 /* DESCRIPTION:                                                            */
 /*   This function performs polynomial expansion                           */
-/*  Y = (A0 + A1*X + A2*X2 + A3*X3 + ….. + AN*xN) << AN+1                  */
+/*  Y = (A0 + A1*X + A2*X2 + A3*X3 + ï¿½.. + AN*xN) << AN+1                  */
 /*                                                                         */
 /*  LVM_INT32 LVM_Polynomial(LVM_UINT16    N,                              */
 /*                           LVM_INT32    *pCoefficients,                  */
@@ -40,7 +40,48 @@
 /* RETURNS:                                                                */
 /*   The result of the polynomial expansion in Q1.31 format                */
 /*-------------------------------------------------------------------------*/
+#ifdef BUILD_FLOAT
+LVM_FLOAT LVM_Polynomial(LVM_UINT16    N,
+                         LVM_FLOAT    *pCoefficients,
+                         LVM_FLOAT    X)
+{
+    LVM_INT32 i;
+    LVM_FLOAT Y,A,XTemp,Temp,sign;
 
+    Y = *pCoefficients; /* Y=A0*/
+    pCoefficients++;
+
+    if(X == -1.0f)
+    {
+        Temp = -1;
+        sign = Temp;
+        for(i = 1; i <= N; i++)
+        {
+            Y += ((*pCoefficients) * sign);
+            pCoefficients++;
+            sign *= Temp;
+        }
+
+
+    }
+    else
+    {
+        XTemp = X;
+        for(i = N-1; i >= 0; i--)
+        {
+            A = *pCoefficients;
+            pCoefficients++;
+
+            Temp = A * XTemp;
+            Y += Temp;
+
+            Temp = XTemp * X;
+            XTemp = Temp;
+        }
+    }
+    return Y;
+}
+#else
 LVM_INT32 LVM_Polynomial(LVM_UINT16    N,
                          LVM_INT32    *pCoefficients,
                          LVM_INT32    X)
@@ -93,4 +134,4 @@ LVM_INT32 LVM_Polynomial(LVM_UINT16    N,
     }
     return Y;
 }
-
+#endif

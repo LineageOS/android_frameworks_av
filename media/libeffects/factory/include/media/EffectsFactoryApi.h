@@ -17,6 +17,7 @@
 #ifndef ANDROID_EFFECTSFACTORYAPI_H_
 #define ANDROID_EFFECTSFACTORYAPI_H_
 
+#include <cutils/compiler.h>
 #include <errno.h>
 #include <stdint.h>
 #include <sys/types.h>
@@ -52,6 +53,7 @@ extern "C" {
 //        *pNumEffects:     updated with number of effects in factory
 //
 ////////////////////////////////////////////////////////////////////////////////
+ANDROID_API
 int EffectQueryNumberEffects(uint32_t *pNumEffects);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -79,6 +81,7 @@ int EffectQueryNumberEffects(uint32_t *pNumEffects);
 //        *pDescriptor:     updated with the effect descriptor.
 //
 ////////////////////////////////////////////////////////////////////////////////
+ANDROID_API
 int EffectQueryEffect(uint32_t index, effect_descriptor_t *pDescriptor);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -110,6 +113,7 @@ int EffectQueryEffect(uint32_t index, effect_descriptor_t *pDescriptor);
 //        *pHandle:         updated with the effect handle.
 //
 ////////////////////////////////////////////////////////////////////////////////
+ANDROID_API
 int EffectCreate(const effect_uuid_t *pEffectUuid, int32_t sessionId, int32_t ioId,
         effect_handle_t *pHandle);
 
@@ -130,6 +134,7 @@ int EffectCreate(const effect_uuid_t *pEffectUuid, int32_t sessionId, int32_t io
 //                          -EINVAL     invalid interface handle
 //
 ////////////////////////////////////////////////////////////////////////////////
+ANDROID_API
 int EffectRelease(effect_handle_t handle);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -153,6 +158,7 @@ int EffectRelease(effect_handle_t handle);
 //        *pDescriptor:     updated with the effect descriptor.
 //
 ////////////////////////////////////////////////////////////////////////////////
+ANDROID_API
 int EffectGetDescriptor(const effect_uuid_t *pEffectUuid, effect_descriptor_t *pDescriptor);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -169,8 +175,10 @@ int EffectGetDescriptor(const effect_uuid_t *pEffectUuid, effect_descriptor_t *p
 //                           1 if uuid is equal to EFFECT_UUID_NULL.
 //
 ////////////////////////////////////////////////////////////////////////////////
+ANDROID_API
 int EffectIsNullUuid(const effect_uuid_t *pEffectUuid);
 
+ANDROID_API
 int EffectDumpEffects(int fd);
 
 #if __cplusplus

@@ -18,7 +18,7 @@
 
 #define SOFT_AAC_ENCODER_2_H_
 
-#include "SimpleSoftOMXComponent.h"
+#include <media/stagefright/omx/SimpleSoftOMXComponent.h>
 
 #include "aacenc_lib.h"
 

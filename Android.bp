@@ -2,7 +2,6 @@ subdirs = [
     "camera",
     "drm/*",
     "media/*",
-    "radio",
     "services/*",
     "soundtrigger",
 ]

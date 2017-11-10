@@ -29,11 +29,6 @@ using hardware::hidl_handle;
 CameraHardwareInterface::~CameraHardwareInterface()
 {
     ALOGI("Destroying camera %s", mName.string());
-    if (mDevice) {
-        int rc = mDevice->common.close(&mDevice->common);
-        if (rc != OK)
-            ALOGE("Could not close camera %s: %d", mName.string(), rc);
-    }
     if (mHidlDevice != nullptr) {
         mHidlDevice->close();
         mHidlDevice.clear();
@@ -42,12 +37,6 @@ CameraHardwareInterface::~CameraHardwareInterface()
 }
 
 status_t CameraHardwareInterface::initialize(sp<CameraProviderManager> manager) {
-    if (mDevice) {
-        ALOGE("%s: camera hardware interface has been initialized to libhardware path!",
-                __FUNCTION__);
-        return INVALID_OPERATION;
-    }
-
     ALOGI("Opening camera %s", mName.string());
 
     status_t ret = manager->openSession(mName.string(), this, &mHidlDevice);
@@ -393,7 +382,7 @@ CameraHardwareInterface::setUsage(hardware::graphics::common::V1_0::BufferUsage 
         ALOGE("%s: preview window is null", __FUNCTION__);
         return s;
     }
-    mPreviewUsage = (int) usage;
+    mPreviewUsage = static_cast<uint64_t> (usage);
     int rc = native_window_set_usage(a, mPreviewUsage);
     if (rc == OK) {
         cleanupCirculatingBuffers();
@@ -465,23 +454,6 @@ status_t CameraHardwareInterface::setPreviewWindow(const sp<ANativeWindow>& buf)
         }
         return CameraProviderManager::mapToStatusT(
                 mHidlDevice->setPreviewWindow(buf.get() ? this : nullptr));
-    } else if (mDevice) {
-        if (mDevice->ops->set_preview_window) {
-            mPreviewWindow = buf;
-            if (buf != nullptr) {
-                if (mPreviewScalingMode != NOT_SET) {
-                    setPreviewScalingMode(mPreviewScalingMode);
-                }
-                if (mPreviewTransform != NOT_SET) {
-                    setPreviewTransform(mPreviewTransform);
-                }
-            }
-            mHalPreviewWindow.user = this;
-            ALOGV("%s &mHalPreviewWindow %p mHalPreviewWindow.user %p",__FUNCTION__,
-                    &mHalPreviewWindow, mHalPreviewWindow.user);
-            return mDevice->ops->set_preview_window(mDevice,
-                    buf.get() ? &mHalPreviewWindow.nw : 0);
-        }
     }
     return INVALID_OPERATION;
 }
@@ -499,15 +471,6 @@ void CameraHardwareInterface::setCallbacks(notify_callback notify_cb,
     mCbUser = user;
 
     ALOGV("%s(%s)", __FUNCTION__, mName.string());
-
-    if (mDevice && mDevice->ops->set_callbacks) {
-        mDevice->ops->set_callbacks(mDevice,
-                               sNotifyCb,
-                               sDataCb,
-                               sDataCbTimestamp,
-                               sGetMemory,
-                               this);
-    }
 }
 
 void CameraHardwareInterface::enableMsgType(int32_t msgType)
@@ -515,8 +478,6 @@ void CameraHardwareInterface::enableMsgType(int32_t msgType)
     ALOGV("%s(%s)", __FUNCTION__, mName.string());
     if (CC_LIKELY(mHidlDevice != nullptr)) {
         mHidlDevice->enableMsgType(msgType);
-    } else if (mDevice && mDevice->ops->enable_msg_type) {
-        mDevice->ops->enable_msg_type(mDevice, msgType);
     }
 }
 
@@ -525,8 +486,6 @@ void CameraHardwareInterface::disableMsgType(int32_t msgType)
     ALOGV("%s(%s)", __FUNCTION__, mName.string());
     if (CC_LIKELY(mHidlDevice != nullptr)) {
         mHidlDevice->disableMsgType(msgType);
-    } else if (mDevice && mDevice->ops->disable_msg_type) {
-        mDevice->ops->disable_msg_type(mDevice, msgType);
     }
 }
 
@@ -535,8 +494,6 @@ int CameraHardwareInterface::msgTypeEnabled(int32_t msgType)
     ALOGV("%s(%s)", __FUNCTION__, mName.string());
     if (CC_LIKELY(mHidlDevice != nullptr)) {
         return mHidlDevice->msgTypeEnabled(msgType);
-    } else if (mDevice && mDevice->ops->msg_type_enabled) {
-        return mDevice->ops->msg_type_enabled(mDevice, msgType);
     }
     return false;
 }
@@ -547,8 +504,6 @@ status_t CameraHardwareInterface::startPreview()
     if (CC_LIKELY(mHidlDevice != nullptr)) {
         return CameraProviderManager::mapToStatusT(
                 mHidlDevice->startPreview());
-    } else if (mDevice && mDevice->ops->start_preview) {
-        return mDevice->ops->start_preview(mDevice);
     }
     return INVALID_OPERATION;
 }
@@ -558,8 +513,6 @@ void CameraHardwareInterface::stopPreview()
     ALOGV("%s(%s)", __FUNCTION__, mName.string());
     if (CC_LIKELY(mHidlDevice != nullptr)) {
         mHidlDevice->stopPreview();
-    } else if (mDevice && mDevice->ops->stop_preview) {
-        mDevice->ops->stop_preview(mDevice);
     }
 }
 
@@ -568,8 +521,6 @@ int CameraHardwareInterface::previewEnabled()
     ALOGV("%s(%s)", __FUNCTION__, mName.string());
     if (CC_LIKELY(mHidlDevice != nullptr)) {
         return mHidlDevice->previewEnabled();
-    } else if (mDevice && mDevice->ops->preview_enabled) {
-        return mDevice->ops->preview_enabled(mDevice);
     }
     return false;
 }
@@ -580,8 +531,6 @@ status_t CameraHardwareInterface::storeMetaDataInBuffers(int enable)
     if (CC_LIKELY(mHidlDevice != nullptr)) {
         return CameraProviderManager::mapToStatusT(
                 mHidlDevice->storeMetaDataInBuffers(enable));
-    } else if (mDevice && mDevice->ops->store_meta_data_in_buffers) {
-        return mDevice->ops->store_meta_data_in_buffers(mDevice, enable);
     }
     return enable ? INVALID_OPERATION: OK;
 }
@@ -592,8 +541,6 @@ status_t CameraHardwareInterface::startRecording()
     if (CC_LIKELY(mHidlDevice != nullptr)) {
         return CameraProviderManager::mapToStatusT(
                 mHidlDevice->startRecording());
-    } else if (mDevice && mDevice->ops->start_recording) {
-        return mDevice->ops->start_recording(mDevice);
     }
     return INVALID_OPERATION;
 }
@@ -606,8 +553,6 @@ void CameraHardwareInterface::stopRecording()
     ALOGV("%s(%s)", __FUNCTION__, mName.string());
     if (CC_LIKELY(mHidlDevice != nullptr)) {
         mHidlDevice->stopRecording();
-    } else if (mDevice && mDevice->ops->stop_recording) {
-        mDevice->ops->stop_recording(mDevice);
     }
 }
 
@@ -619,8 +564,6 @@ int CameraHardwareInterface::recordingEnabled()
     ALOGV("%s(%s)", __FUNCTION__, mName.string());
     if (CC_LIKELY(mHidlDevice != nullptr)) {
         return mHidlDevice->recordingEnabled();
-    } else if (mDevice && mDevice->ops->recording_enabled) {
-        return mDevice->ops->recording_enabled(mDevice);
     }
     return false;
 }
@@ -645,9 +588,6 @@ void CameraHardwareInterface::releaseRecordingFrame(const sp<IMemory>& mem)
         } else {
             mHidlDevice->releaseRecordingFrame(heapId, bufferIndex);
         }
-    } else if (mDevice && mDevice->ops->release_recording_frame) {
-        void *data = ((uint8_t *)heap->base()) + offset;
-        return mDevice->ops->release_recording_frame(mDevice, data);
     }
 }
 
@@ -674,9 +614,6 @@ void CameraHardwareInterface::releaseRecordingFrameBatch(const std::vector<sp<IM
                 ALOGE("%s only supports VideoNativeHandleMetadata mode", __FUNCTION__);
                 return;
             }
-        } else {
-            ALOGE("Non HIDL mode do not support %s", __FUNCTION__);
-            return;
         }
     }
 
@@ -695,8 +632,6 @@ status_t CameraHardwareInterface::autoFocus()
     if (CC_LIKELY(mHidlDevice != nullptr)) {
         return CameraProviderManager::mapToStatusT(
                 mHidlDevice->autoFocus());
-    } else if (mDevice && mDevice->ops->auto_focus) {
-        return mDevice->ops->auto_focus(mDevice);
     }
     return INVALID_OPERATION;
 }
@@ -707,8 +642,6 @@ status_t CameraHardwareInterface::cancelAutoFocus()
     if (CC_LIKELY(mHidlDevice != nullptr)) {
         return CameraProviderManager::mapToStatusT(
                 mHidlDevice->cancelAutoFocus());
-    } else if (mDevice && mDevice->ops->cancel_auto_focus) {
-        return mDevice->ops->cancel_auto_focus(mDevice);
     }
     return INVALID_OPERATION;
 }
@@ -719,8 +652,6 @@ status_t CameraHardwareInterface::takePicture()
     if (CC_LIKELY(mHidlDevice != nullptr)) {
         return CameraProviderManager::mapToStatusT(
                 mHidlDevice->takePicture());
-    } else if (mDevice && mDevice->ops->take_picture) {
-        return mDevice->ops->take_picture(mDevice);
     }
     return INVALID_OPERATION;
 }
@@ -731,8 +662,6 @@ status_t CameraHardwareInterface::cancelPicture()
     if (CC_LIKELY(mHidlDevice != nullptr)) {
         return CameraProviderManager::mapToStatusT(
                 mHidlDevice->cancelPicture());
-    } else if (mDevice && mDevice->ops->cancel_picture) {
-        return mDevice->ops->cancel_picture(mDevice);
     }
     return INVALID_OPERATION;
 }
@@ -743,8 +672,6 @@ status_t CameraHardwareInterface::setParameters(const CameraParameters &params)
     if (CC_LIKELY(mHidlDevice != nullptr)) {
         return CameraProviderManager::mapToStatusT(
                 mHidlDevice->setParameters(params.flatten().string()));
-    } else if (mDevice && mDevice->ops->set_parameters) {
-        return mDevice->ops->set_parameters(mDevice, params.flatten().string());
     }
     return INVALID_OPERATION;
 }
@@ -761,14 +688,6 @@ CameraParameters CameraHardwareInterface::getParameters() const
                 });
         String8 tmp(outParam.c_str());
         parms.unflatten(tmp);
-    } else if (mDevice && mDevice->ops->get_parameters) {
-        char *temp = mDevice->ops->get_parameters(mDevice);
-        String8 str_parms(temp);
-        if (mDevice->ops->put_parameters)
-            mDevice->ops->put_parameters(mDevice, temp);
-        else
-            free(temp);
-        parms.unflatten(str_parms);
     }
     return parms;
 }
@@ -779,8 +698,6 @@ status_t CameraHardwareInterface::sendCommand(int32_t cmd, int32_t arg1, int32_t
     if (CC_LIKELY(mHidlDevice != nullptr)) {
         return CameraProviderManager::mapToStatusT(
                 mHidlDevice->sendCommand((CommandType) cmd, arg1, arg2));
-    } else if (mDevice && mDevice->ops->send_command) {
-        return mDevice->ops->send_command(mDevice, cmd, arg1, arg2);
     }
     return INVALID_OPERATION;
 }
@@ -794,8 +711,6 @@ void CameraHardwareInterface::release() {
     if (CC_LIKELY(mHidlDevice != nullptr)) {
         mHidlDevice->close();
         mHidlDevice.clear();
-    } else if (mDevice && mDevice->ops->release) {
-        mDevice->ops->release(mDevice);
     }
 }
 
@@ -811,15 +726,10 @@ status_t CameraHardwareInterface::dump(int fd, const Vector<String16>& /*args*/)
         Status s = mHidlDevice->dumpState(handle);
         native_handle_delete(handle);
         return CameraProviderManager::mapToStatusT(s);
-    } else if (mDevice && mDevice->ops->dump) {
-        return mDevice->ops->dump(mDevice, fd);
     }
     return OK; // It's fine if the HAL doesn't implement dump()
 }
 
-/**
- * Methods for legacy (non-HIDL) path follows
- */
 void CameraHardwareInterface::sNotifyCb(int32_t msg_type, int32_t ext1,
                         int32_t ext2, void *user)
 {
@@ -887,179 +797,6 @@ void CameraHardwareInterface::sPutMemory(camera_memory_t *data)
 
     CameraHeapMemory *mem = static_cast<CameraHeapMemory *>(data->handle);
     mem->decStrong(mem);
-}
-
-ANativeWindow* CameraHardwareInterface::sToAnw(void *user)
-{
-    CameraHardwareInterface *object =
-            reinterpret_cast<CameraHardwareInterface *>(user);
-    return object->mPreviewWindow.get();
-}
-#define anw(n) sToAnw(((struct camera_preview_window *)(n))->user)
-#define hwi(n) reinterpret_cast<CameraHardwareInterface *>(\
-    ((struct camera_preview_window *)(n))->user)
-
-int CameraHardwareInterface::sDequeueBuffer(struct preview_stream_ops* w,
-                            buffer_handle_t** buffer, int *stride)
-{
-    int rc;
-    ANativeWindow *a = anw(w);
-    ANativeWindowBuffer* anb;
-    rc = native_window_dequeue_buffer_and_wait(a, &anb);
-    if (rc == OK) {
-        *buffer = &anb->handle;
-        *stride = anb->stride;
-    }
-    return rc;
-}
-
-#ifndef container_of
-#define container_of(ptr, type, member) ({                      \
-    const __typeof__(((type *) 0)->member) *__mptr = (ptr);     \
-    (type *) ((char *) __mptr - (char *)(&((type *)0)->member)); })
-#endif
-
-int CameraHardwareInterface::sLockBuffer(struct preview_stream_ops* w,
-                  buffer_handle_t* /*buffer*/)
-{
-    ANativeWindow *a = anw(w);
-    (void)a;
-    return 0;
-}
-
-int CameraHardwareInterface::sEnqueueBuffer(struct preview_stream_ops* w,
-                  buffer_handle_t* buffer)
-{
-    ANativeWindow *a = anw(w);
-    return a->queueBuffer(a,
-              container_of(buffer, ANativeWindowBuffer, handle), -1);
-}
-
-int CameraHardwareInterface::sCancelBuffer(struct preview_stream_ops* w,
-                  buffer_handle_t* buffer)
-{
-    ANativeWindow *a = anw(w);
-    return a->cancelBuffer(a,
-              container_of(buffer, ANativeWindowBuffer, handle), -1);
-}
-
-int CameraHardwareInterface::sSetBufferCount(struct preview_stream_ops* w, int count)
-{
-    ANativeWindow *a = anw(w);
-
-    if (a != nullptr) {
-        // Workaround for b/27039775
-        // Previously, setting the buffer count would reset the buffer
-        // queue's flag that allows for all buffers to be dequeued on the
-        // producer side, instead of just the producer's declared max count,
-        // if no filled buffers have yet been queued by the producer.  This
-        // reset no longer happens, but some HALs depend on this behavior,
-        // so it needs to be maintained for HAL backwards compatibility.
-        // Simulate the prior behavior by disconnecting/reconnecting to the
-        // window and setting the values again.  This has the drawback of
-        // actually causing memory reallocation, which may not have happened
-        // in the past.
-        CameraHardwareInterface *hw = hwi(w);
-        native_window_api_disconnect(a, NATIVE_WINDOW_API_CAMERA);
-        native_window_api_connect(a, NATIVE_WINDOW_API_CAMERA);
-        if (hw->mPreviewScalingMode != NOT_SET) {
-            native_window_set_scaling_mode(a, hw->mPreviewScalingMode);
-        }
-        if (hw->mPreviewTransform != NOT_SET) {
-            native_window_set_buffers_transform(a, hw->mPreviewTransform);
-        }
-        if (hw->mPreviewWidth != NOT_SET) {
-            native_window_set_buffers_dimensions(a,
-                    hw->mPreviewWidth, hw->mPreviewHeight);
-            native_window_set_buffers_format(a, hw->mPreviewFormat);
-        }
-        if (hw->mPreviewUsage != 0) {
-            native_window_set_usage(a, hw->mPreviewUsage);
-        }
-        if (hw->mPreviewSwapInterval != NOT_SET) {
-            a->setSwapInterval(a, hw->mPreviewSwapInterval);
-        }
-        if (hw->mPreviewCrop.left != NOT_SET) {
-            native_window_set_crop(a, &(hw->mPreviewCrop));
-        }
-    }
-
-    return native_window_set_buffer_count(a, count);
-}
-
-int CameraHardwareInterface::sSetBuffersGeometry(struct preview_stream_ops* w,
-                  int width, int height, int format)
-{
-    int rc;
-    ANativeWindow *a = anw(w);
-    CameraHardwareInterface *hw = hwi(w);
-    hw->mPreviewWidth = width;
-    hw->mPreviewHeight = height;
-    hw->mPreviewFormat = format;
-    rc = native_window_set_buffers_dimensions(a, width, height);
-    if (rc == OK) {
-        rc = native_window_set_buffers_format(a, format);
-    }
-    return rc;
-}
-
-int CameraHardwareInterface::sSetCrop(struct preview_stream_ops *w,
-                  int left, int top, int right, int bottom)
-{
-    ANativeWindow *a = anw(w);
-    CameraHardwareInterface *hw = hwi(w);
-    hw->mPreviewCrop.left = left;
-    hw->mPreviewCrop.top = top;
-    hw->mPreviewCrop.right = right;
-    hw->mPreviewCrop.bottom = bottom;
-    return native_window_set_crop(a, &(hw->mPreviewCrop));
-}
-
-int CameraHardwareInterface::sSetTimestamp(struct preview_stream_ops *w,
-                           int64_t timestamp) {
-    ANativeWindow *a = anw(w);
-    return native_window_set_buffers_timestamp(a, timestamp);
-}
-
-int CameraHardwareInterface::sSetUsage(struct preview_stream_ops* w, int usage)
-{
-    ANativeWindow *a = anw(w);
-    CameraHardwareInterface *hw = hwi(w);
-    hw->mPreviewUsage = usage;
-    return native_window_set_usage(a, usage);
-}
-
-int CameraHardwareInterface::sSetSwapInterval(struct preview_stream_ops *w, int interval)
-{
-    ANativeWindow *a = anw(w);
-    CameraHardwareInterface *hw = hwi(w);
-    hw->mPreviewSwapInterval = interval;
-    return a->setSwapInterval(a, interval);
-}
-
-int CameraHardwareInterface::sGetMinUndequeuedBufferCount(
-                  const struct preview_stream_ops *w,
-                  int *count)
-{
-    ANativeWindow *a = anw(w);
-    return a->query(a, NATIVE_WINDOW_MIN_UNDEQUEUED_BUFFERS, count);
-}
-
-void CameraHardwareInterface::initHalPreviewWindow()
-{
-    mHalPreviewWindow.nw.cancel_buffer = sCancelBuffer;
-    mHalPreviewWindow.nw.lock_buffer = sLockBuffer;
-    mHalPreviewWindow.nw.dequeue_buffer = sDequeueBuffer;
-    mHalPreviewWindow.nw.enqueue_buffer = sEnqueueBuffer;
-    mHalPreviewWindow.nw.set_buffer_count = sSetBufferCount;
-    mHalPreviewWindow.nw.set_buffers_geometry = sSetBuffersGeometry;
-    mHalPreviewWindow.nw.set_crop = sSetCrop;
-    mHalPreviewWindow.nw.set_timestamp = sSetTimestamp;
-    mHalPreviewWindow.nw.set_usage = sSetUsage;
-    mHalPreviewWindow.nw.set_swap_interval = sSetSwapInterval;
-
-    mHalPreviewWindow.nw.get_min_undequeued_buffer_count =
-            sGetMinUndequeuedBufferCount;
 }
 
 }; // namespace android

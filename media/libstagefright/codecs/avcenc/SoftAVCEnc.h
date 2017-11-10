@@ -21,7 +21,7 @@
 #include <media/stagefright/foundation/ABase.h>
 #include <utils/Vector.h>
 
-#include "SoftVideoEncoderOMXComponent.h"
+#include <media/stagefright/omx/SoftVideoEncoderOMXComponent.h>
 
 namespace android {
 

@@ -28,11 +28,14 @@
 #include <utils/String8.h>
 
 namespace android {
-
 struct AMessage;
 class DataSource;
 class SampleTable;
 class String8;
+namespace heif {
+class ItemTable;
+}
+using heif::ItemTable;
 
 struct SidxEntry {
     size_t mSize;
@@ -59,6 +62,7 @@ public:
     virtual sp<MetaData> getMetaData();
     virtual uint32_t flags() const;
     virtual const char * name() { return "MPEG4Extractor"; }
+    virtual void release();
 
     // for DRM
     virtual char* getDrmTrackInfo(size_t trackID, int *len);
@@ -100,6 +104,7 @@ private:
     status_t mInitCheck;
     uint32_t mHeaderTimescale;
     bool mIsQT;
+    bool mIsHEIF;
 
     Track *mFirstTrack, *mLastTrack;
 
@@ -137,6 +142,8 @@ private:
     SINF *mFirstSINF;
 
     bool mIsDrm;
+    sp<ItemTable> mItemTable;
+
     status_t parseDrmSINF(off64_t *offset, off64_t data_offset);
 
     status_t parseTrackHeader(off64_t data_offset, off64_t data_size);

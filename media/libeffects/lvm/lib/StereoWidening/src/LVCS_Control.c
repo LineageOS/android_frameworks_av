@@ -120,11 +120,13 @@ LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t      hInstance,
         pInstance->VolCorrect = pLVCS_VolCorrectTable[Offset];
 
         pInstance->CompressGain = pInstance->VolCorrect.CompMin;
-
+#ifdef BUILD_FLOAT
+        LVC_Mixer_Init(&pInstance->BypassMix.Mixer_Instance.MixerStream[0], 0, 0);
+#else
         LVC_Mixer_Init(&pInstance->BypassMix.Mixer_Instance.MixerStream[0],0,0);
-
-
+#endif
         {
+#ifndef BUILD_FLOAT
             LVM_UINT32          Gain;
             const Gain_t        *pOutputGainTable = (Gain_t*)&LVCS_OutputGainTable[0];
             Gain = (LVM_UINT32)(pOutputGainTable[Offset].Loss * LVM_MAXINT_16);
@@ -140,7 +142,23 @@ LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t      hInstance,
                     LVCS_BYPASS_MIXER_TC,pParams->SampleRate,2);
             LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->BypassMix.Mixer_Instance.MixerStream[1],
                     LVCS_BYPASS_MIXER_TC,pParams->SampleRate,2);
+#else
+            LVM_FLOAT          Gain;
+            const Gain_t        *pOutputGainTable = (Gain_t*)&LVCS_OutputGainTable[0];
+            Gain = (LVM_FLOAT)(pOutputGainTable[Offset].Loss);
+            Gain = (LVM_FLOAT)pOutputGainTable[Offset].UnprocLoss * (Gain);
 
+            /*
+             * Apply the gain correction
+             */
+            Gain = (Gain * pInstance->VolCorrect.GainMin);
+
+            LVC_Mixer_Init(&pInstance->BypassMix.Mixer_Instance.MixerStream[1], 0, Gain);
+            LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->BypassMix.Mixer_Instance.MixerStream[0],
+                    LVCS_BYPASS_MIXER_TC, pParams->SampleRate, 2);
+            LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->BypassMix.Mixer_Instance.MixerStream[1],
+                    LVCS_BYPASS_MIXER_TC, pParams->SampleRate, 2);
+#endif
         }
 
 

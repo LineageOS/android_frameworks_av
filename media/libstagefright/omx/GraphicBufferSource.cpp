@@ -22,7 +22,9 @@
 
 #define STRINGIFY_ENUMS // for asString in HardwareAPI.h/VideoAPI.h
 
-#include "GraphicBufferSource.h"
+#include <media/stagefright/omx/GraphicBufferSource.h>
+#include <media/stagefright/omx/FrameDropper.h>
+#include <media/stagefright/omx/OMXUtils.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/ColorUtils.h>
@@ -31,14 +33,12 @@
 #include <media/hardware/MetadataBufferType.h>
 #include <ui/GraphicBuffer.h>
 #include <gui/BufferItem.h>
-#include <HardwareAPI.h>
-#include "omx/OMXUtils.h"
-#include <OMX_Component.h>
-#include <OMX_IndexExt.h>
-#include "media/OMXBuffer.h"
+#include <media/hardware/HardwareAPI.h>
+#include <media/openmax/OMX_Component.h>
+#include <media/openmax/OMX_IndexExt.h>
+#include <media/OMXBuffer.h>
 
 #include <inttypes.h>
-#include "FrameDropper.h"
 
 #include <functional>
 #include <memory>
@@ -733,7 +733,7 @@ bool GraphicBufferSource::calculateCodecTimestamp_l(
         } else {
             // snap to nearest capture point
             int64_t nFrames = std::llround(
-                    (timeUs - mPrevCaptureUs) * mCaptureFps);
+                    (timeUs - mPrevCaptureUs) * mCaptureFps / 1000000);
             if (nFrames <= 0) {
                 // skip this frame as it's too close to previous capture
                 ALOGV("skipping frame, timeUs %lld", static_cast<long long>(timeUs));
@@ -741,9 +741,9 @@ bool GraphicBufferSource::calculateCodecTimestamp_l(
             }
             mFrameCount += nFrames;
             mPrevCaptureUs = mBaseCaptureUs + std::llround(
-                    mFrameCount / mCaptureFps);
+                    mFrameCount * 1000000 / mCaptureFps);
             mPrevFrameUs = mBaseFrameUs + std::llround(
-                    mFrameCount / mFps);
+                    mFrameCount * 1000000 / mFps);
         }
 
         ALOGV("timeUs %lld, captureUs %lld, frameUs %lld",

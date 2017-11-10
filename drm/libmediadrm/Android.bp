@@ -5,36 +5,31 @@
 cc_library_shared {
     name: "libmediadrm",
 
-    aidl: {
-        local_include_dirs: ["aidl"],
-        export_aidl_headers: true,
-    },
 
     srcs: [
-        "aidl/android/media/ICas.aidl",
-        "aidl/android/media/ICasListener.aidl",
-        "aidl/android/media/IDescrambler.aidl",
-        "aidl/android/media/IMediaCasService.aidl",
-
-        "CasImpl.cpp",
-        "DescramblerImpl.cpp",
         "DrmPluginPath.cpp",
         "DrmSessionManager.cpp",
         "ICrypto.cpp",
         "IDrm.cpp",
         "IDrmClient.cpp",
         "IMediaDrmService.cpp",
-        "MediaCasDefs.cpp",
+        "PluginMetricsReporting.cpp",
         "SharedLibrary.cpp",
         "DrmHal.cpp",
         "CryptoHal.cpp",
+        "protos/plugin_metrics.proto",
     ],
+
+    proto: {
+        type: "lite",
+    },
 
     shared_libs: [
         "libbinder",
         "libcutils",
         "libdl",
         "liblog",
+        "libmediametrics",
         "libmediautils",
         "libstagefright_foundation",
         "libutils",

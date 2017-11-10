@@ -1,5 +1,6 @@
 cc_library_static {
     name: "libstagefright_amrwbdec",
+    vendor_available: true,
 
     srcs: [
         "src/agc2_amr_wb.cpp",

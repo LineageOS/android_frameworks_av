@@ -20,20 +20,20 @@
 
 #include <inttypes.h>
 
-#include "../include/OMXNodeInstance.h"
-#include "OMXMaster.h"
-#include "OMXUtils.h"
+#include <media/stagefright/omx/OMXNodeInstance.h>
+#include <media/stagefright/omx/OMXMaster.h>
+#include <media/stagefright/omx/OMXUtils.h>
 #include <android/IOMXBufferSource.h>
 
-#include <OMX_Component.h>
-#include <OMX_IndexExt.h>
-#include <OMX_VideoExt.h>
-#include <OMX_AsString.h>
+#include <media/openmax/OMX_Component.h>
+#include <media/openmax/OMX_IndexExt.h>
+#include <media/openmax/OMX_VideoExt.h>
+#include <media/openmax/OMX_AsString.h>
 
 #include <binder/IMemory.h>
 #include <cutils/properties.h>
 #include <gui/BufferQueue.h>
-#include <HardwareAPI.h>
+#include <media/hardware/HardwareAPI.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ColorUtils.h>
@@ -41,7 +41,7 @@
 #include <utils/misc.h>
 #include <utils/NativeHandle.h>
 #include <media/OMXBuffer.h>
-#include <media/vndk/xmlparser/1.0/MediaCodecsXmlParser.h>
+#include <media/stagefright/xmlparser/MediaCodecsXmlParser.h>
 
 #include <hidlmemory/mapping.h>
 
@@ -246,6 +246,15 @@ protected:
     virtual ~CallbackDispatcher();
 
 private:
+    enum {
+        // This is used for frame_rendered message batching, which will eventually end up in a
+        // single AMessage in MediaCodec when it is signaled to the app. AMessage can contain
+        // up-to 64 key-value pairs, and each frame_rendered message uses 2 keys, so the max
+        // value for this would be 32. Nonetheless, limit this to 12 to which gives at least 10
+        // mseconds of batching at 120Hz.
+        kMaxQueueSize = 12,
+    };
+
     Mutex mLock;
 
     sp<OMXNodeInstance> const mOwner;
@@ -290,7 +299,7 @@ void OMXNodeInstance::CallbackDispatcher::post(const omx_message &msg, bool real
     Mutex::Autolock autoLock(mLock);
 
     mQueue.push_back(msg);
-    if (realTime) {
+    if (realTime || mQueue.size() >= kMaxQueueSize) {
         mQueueChanged.signal();
     }
 }
@@ -363,6 +372,8 @@ OMXNodeInstance::OMXNodeInstance(
     mPortMode[1] = IOMX::kPortModePresetByteBuffer;
     mSecureBufferType[0] = kSecureBufferTypeUnknown;
     mSecureBufferType[1] = kSecureBufferTypeUnknown;
+    mGraphicBufferEnabled[0] = false;
+    mGraphicBufferEnabled[1] = false;
     mIsSecure = AString(name).endsWith(".secure");
     mLegacyAdaptiveExperiment = ADebug::isExperimentEnabled("legacy-adaptive");
 }
@@ -486,6 +497,9 @@ status_t OMXNodeInstance::freeNode() {
             LOG_ALWAYS_FATAL("unknown state %s(%#x).", asString(state), state);
             break;
     }
+
+    Mutex::Autolock _l(mLock);
+
     status_t err = mOwner->freeNode(this);
 
     mDispatcher.clear();
@@ -665,6 +679,11 @@ status_t OMXNodeInstance::setPortMode(OMX_U32 portIndex, IOMX::PortMode mode) {
         return BAD_VALUE;
     }
 
+    if (mSailed || mNumPortBuffers[portIndex] > 0) {
+        android_errorWriteLog(0x534e4554, "29422020");
+        return INVALID_OPERATION;
+    }
+
     CLOG_CONFIG(setPortMode, "%s(%d), port %d", asString(mode), mode, portIndex);
 
     switch (mode) {
@@ -795,6 +814,12 @@ status_t OMXNodeInstance::enableNativeBuffers_l(
                     enable ? kSecureBufferTypeNativeHandle : kSecureBufferTypeOpaque;
             } else if (mSecureBufferType[portIndex] == kSecureBufferTypeUnknown) {
                 mSecureBufferType[portIndex] = kSecureBufferTypeOpaque;
+            }
+        } else {
+            if (err == OMX_ErrorNone) {
+                mGraphicBufferEnabled[portIndex] = enable;
+            } else if (enable) {
+                mGraphicBufferEnabled[portIndex] = false;
             }
         }
     } else {
@@ -1064,6 +1089,12 @@ status_t OMXNodeInstance::useBuffer_l(
     OMX_ERRORTYPE err = OMX_ErrorNone;
     bool isMetadata = mMetadataType[portIndex] != kMetadataBufferTypeInvalid;
 
+    if (!isMetadata && mGraphicBufferEnabled[portIndex]) {
+        ALOGE("b/62948670");
+        android_errorWriteLog(0x534e4554, "62948670");
+        return INVALID_OPERATION;
+    }
+
     size_t paramsSize;
     void* paramsPointer;
     if (params != NULL && hParams != NULL) {
@@ -1247,6 +1278,13 @@ status_t OMXNodeInstance::useGraphicBuffer_l(
     if (mMetadataType[portIndex] != kMetadataBufferTypeInvalid) {
         return useGraphicBufferWithMetadata_l(
                 portIndex, graphicBuffer, buffer);
+    }
+
+    if (!mGraphicBufferEnabled[portIndex]) {
+        // Report error if this is not in graphic buffer mode.
+        ALOGE("b/62948670");
+        android_errorWriteLog(0x534e4554, "62948670");
+        return INVALID_OPERATION;
     }
 
     // See if the newer version of the extension is present.
@@ -2168,8 +2206,8 @@ OMX_ERRORTYPE OMXNodeInstance::OnEvent(
             msg.fenceFd = -1;
             msg.u.render_data.timestamp = renderData[i].nMediaTimeUs;
             msg.u.render_data.nanoTime = renderData[i].nSystemTimeNs;
-
-            instance->mDispatcher->post(msg, false /* realTime */);
+            bool realTime = msg.u.render_data.timestamp == INT64_MAX;
+            instance->mDispatcher->post(msg, realTime);
         }
         return OMX_ErrorNone;
     }

@@ -111,6 +111,11 @@ public:
         mFifo->setWriteCounter(n);
     }
 
+    /*
+     * This is generally only called before or after the buffer is used.
+     */
+    void eraseMemory();
+
 private:
 
     void fillWrappingBuffer(WrappingBuffer *wrappingBuffer,

@@ -48,7 +48,8 @@ aaudio_result_t AudioStreamInternalPlay::requestPauseInternal()
 
     mClockModel.stop(AudioClock::getNanoseconds());
     setState(AAUDIO_STREAM_STATE_PAUSING);
-    return AAudioConvert_androidToAAudioResult(pauseWithStatus());
+    mAtomicTimestamp.clear();
+    return mServiceInterface.pauseStream(mServiceStreamHandle);
 }
 
 aaudio_result_t AudioStreamInternalPlay::requestPause()
@@ -72,19 +73,23 @@ aaudio_result_t AudioStreamInternalPlay::requestFlush() {
     return mServiceInterface.flushStream(mServiceStreamHandle);
 }
 
-void AudioStreamInternalPlay::onFlushFromServer() {
+void AudioStreamInternalPlay::advanceClientToMatchServerPosition() {
     int64_t readCounter = mAudioEndpoint.getDataReadCounter();
     int64_t writeCounter = mAudioEndpoint.getDataWriteCounter();
 
     // Bump offset so caller does not see the retrograde motion in getFramesRead().
-    int64_t framesFlushed = writeCounter - readCounter;
-    mFramesOffsetFromService += framesFlushed;
-    ALOGD("AudioStreamInternal::onFlushFromServer() readN = %lld, writeN = %lld, offset = %lld",
+    int64_t offset = writeCounter - readCounter;
+    mFramesOffsetFromService += offset;
+    ALOGD("advanceClientToMatchServerPosition() readN = %lld, writeN = %lld, offset = %lld",
           (long long)readCounter, (long long)writeCounter, (long long)mFramesOffsetFromService);
 
-    // Flush written frames by forcing writeCounter to readCounter.
-    // This is because we cannot move the read counter in the hardware.
+    // Force writeCounter to match readCounter.
+    // This is because we cannot change the read counter in the hardware.
     mAudioEndpoint.setDataWriteCounter(readCounter);
+}
+
+void AudioStreamInternalPlay::onFlushFromServer() {
+    advanceClientToMatchServerPosition();
 }
 
 // Write the data, block if needed and timeoutMillis > 0
@@ -106,12 +111,31 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
     const char *traceName = "aaWrNow";
     ATRACE_BEGIN(traceName);
 
+    if (mClockModel.isStarting()) {
+        // Still haven't got any timestamps from server.
+        // Keep waiting until we get some valid timestamps then start writing to the
+        // current buffer position.
+        ALOGD("processDataNow() wait for valid timestamps");
+        // Sleep very briefly and hope we get a timestamp soon.
+        *wakeTimePtr = currentNanoTime + (2000 * AAUDIO_NANOS_PER_MICROSECOND);
+        ATRACE_END();
+        return 0;
+    }
+    // If we have gotten this far then we have at least one timestamp from server.
+
     // If a DMA channel or DSP is reading the other end then we have to update the readCounter.
     if (mAudioEndpoint.isFreeRunning()) {
         // Update data queue based on the timing model.
         int64_t estimatedReadCounter = mClockModel.convertTimeToPosition(currentNanoTime);
         // ALOGD("AudioStreamInternal::processDataNow() - estimatedReadCounter = %d", (int)estimatedReadCounter);
         mAudioEndpoint.setDataReadCounter(estimatedReadCounter);
+    }
+
+    if (mNeedCatchUp.isRequested()) {
+        // Catch an MMAP pointer that is already advancing.
+        // This will avoid initial underruns caused by a slow cold start.
+        advanceClientToMatchServerPosition();
+        mNeedCatchUp.acknowledge();
     }
 
     // If the read index passed the write index then consider it an underrun.
@@ -153,9 +177,9 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
                 // Calculate frame position based off of the writeCounter because
                 // the readCounter might have just advanced in the background,
                 // causing us to sleep until a later burst.
-                int64_t nextReadPosition = mAudioEndpoint.getDataWriteCounter() + mFramesPerBurst
+                int64_t nextPosition = mAudioEndpoint.getDataWriteCounter() + mFramesPerBurst
                         - mAudioEndpoint.getBufferSizeInFrames();
-                wakeTime = mClockModel.convertPositionToTime(nextReadPosition);
+                wakeTime = mClockModel.convertPositionToTime(nextPosition);
             }
                 break;
             default:
@@ -266,7 +290,6 @@ aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(const void *buff
     return framesWritten;
 }
 
-
 int64_t AudioStreamInternalPlay::getFramesRead()
 {
     int64_t framesReadHardware;
@@ -339,4 +362,11 @@ void *AudioStreamInternalPlay::callbackLoop() {
     ALOGD("AudioStreamInternalPlay(): callbackLoop() exiting, result = %d, isActive() = %d",
           result, (int) isActive());
     return NULL;
+}
+
+//------------------------------------------------------------------------------
+// Implementation of PlayerBase
+status_t AudioStreamInternalPlay::doSetVolume() {
+    mVolumeRamp.setTarget(mStreamVolume * getDuckAndMuteVolume());
+    return android::NO_ERROR;
 }

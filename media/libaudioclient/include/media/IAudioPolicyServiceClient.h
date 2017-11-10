@@ -26,6 +26,16 @@ namespace android {
 
 // ----------------------------------------------------------------------------
 
+struct record_client_info {
+    uid_t uid;
+    audio_session_t session;
+    audio_source_t source;
+};
+
+typedef struct record_client_info record_client_info_t;
+
+// ----------------------------------------------------------------------------
+
 class IAudioPolicyServiceClient : public IInterface
 {
 public:
@@ -38,8 +48,8 @@ public:
     // Notifies a change in the mixing state of a specific mix in a dynamic audio policy
     virtual void onDynamicPolicyMixStateUpdate(String8 regId, int32_t state) = 0;
     // Notifies a change of audio recording configuration
-    virtual void onRecordingConfigurationUpdate(int event, audio_session_t session,
-            audio_source_t source,
+    virtual void onRecordingConfigurationUpdate(int event,
+            const record_client_info_t *clientInfo,
             const audio_config_base_t *clientConfig,
             const audio_config_base_t *deviceConfig,
             audio_patch_handle_t patchHandle) = 0;

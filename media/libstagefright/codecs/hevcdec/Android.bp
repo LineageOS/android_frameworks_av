@@ -1,5 +1,9 @@
 cc_library_shared {
     name: "libstagefright_soft_hevcdec",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     static_libs: ["libhevcdec"],
     srcs: ["SoftHEVC.cpp"],
@@ -28,7 +32,7 @@ cc_library_shared {
     },
 
     shared_libs: [
-        "libmedia",
+        "libmedia_omx",
         "libstagefright_omx",
         "libstagefright_foundation",
         "libutils",
@@ -39,4 +43,5 @@ cc_library_shared {
     // requires unsupported dynamic reloc R_ARM_REL32; recompile with -fPIC
     // Bug: 16853291
     ldflags: ["-Wl,-Bsymbolic"],
+    compile_multilib: "32",
 }
