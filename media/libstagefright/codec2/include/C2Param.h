@@ -1100,48 +1100,6 @@ protected:
 };
 
 /**
- * A useable supported values for a field.
- *
- * This can be either a range or a set of values. The range can be linear or geometric with a
- * clear minimum and maximum value, and can have an optional step size or geometric ratio. Values
- * can optionally represent flags.
- *
- * \note Do not use flags to represent bitfields. Use individual values or separate fields instead.
- */
-template<typename T>
-struct C2TypedFieldSupportedValues {
-//public:
-    enum Type {
-        RANGE,      ///< a numeric range that can be continuous or discrete
-        VALUES,     ///< a list of values
-        FLAGS       ///< a list of flags that can be OR-ed
-    };
-
-    Type type;
-
-    struct {
-        T min;
-        T max;
-        T step;
-        T nom;
-        T denom;
-    } range;
-    std::vector<T> values;
-
-    C2TypedFieldSupportedValues(T min, T max, T step = T(std::is_floating_point<T>::value ? 0 : 1))
-        : type(RANGE),
-          range{min, max, step, (T)1, (T)1} { }
-
-    C2TypedFieldSupportedValues(T min, T max, T nom, T den) :
-        type(RANGE),
-        range{min, max, (T)0, nom, den} { }
-
-    C2TypedFieldSupportedValues(bool flags, std::initializer_list<T> list) :
-        type(flags ? FLAGS : VALUES),
-        values(list) {}
-};
-
-/**
  * Generic supported values for a field.
  *
  * This can be either a range or a set of values. The range can be linear or geometric with a

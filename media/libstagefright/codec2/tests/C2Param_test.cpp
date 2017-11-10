@@ -2197,36 +2197,6 @@ struct C2VideoConfigStruct {
 
 typedef C2PortParam<C2Tuning, C2VideoConfigStruct> C2VideoConfigPortTuning;
 
-class MyReflector : public C2ParamReflector {
-private:
-    std::unique_ptr<C2VideoConfigPortTuning::input> inputVideoConfigTuning;
-    std::unique_ptr<C2VideoConfigPortTuning::output> outputVideoConfigTuning;
-
-public:
-    void describeSupportedValues() {
-        C2TypedFieldSupportedValues<int32_t> supportedWidths(16, 1920, 8);
-        C2FieldSupportedValues supportedWidths2(16, 1920, 8);
-
-
-        std::list<C2FieldSupportedValues> supported;
-        //supported.emplace_push(inputVideoConfigTuning->mNumber, range(16, 1920, 8));
-        //supported.emplace_push(inputVideoConfigTuning->mHeight, range(16, 1088, 8));
-        //supported.emplace_push(inputVideoConfigTuning->mMetadataType, all_enums);
-        //supported.emplace_push(inputVideoConfigTuning->mSupportedFormats, { 0, 1, 5, 7 });
-    }
-
-    virtual std::unique_ptr<android::C2StructDescriptor> describe(C2Param::BaseIndex paramType) {
-        switch (paramType.baseIndex()) {
-        case C2VideoConfigPortTuning::baseIndex:
-            return std::unique_ptr<C2StructDescriptor>(new C2StructDescriptor{
-                paramType.baseIndex(),
-                C2VideoConfigPortTuning::fieldList,
-            });
-        }
-        return nullptr;
-    }
-};
-
 class MyComponentInstance : public C2ComponentInterface {
 public:
     virtual C2String getName() const {
