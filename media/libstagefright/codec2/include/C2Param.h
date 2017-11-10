@@ -71,7 +71,7 @@ namespace android {
  *     an error for the specific setting, but should continue to apply other settings.
  *     TODO: this currently may result in unintended results.
  *
- * **NOTE:** unlike OMX, params are not versioned. Instead, a new struct with new base index
+ * **NOTE:** unlike OMX, params are not versioned. Instead, a new struct with new param index
  * SHALL be added as new versions are required.
  *
  * The proper subtype (Setting, Info or Param) is incorporated into the class type. Define structs
@@ -104,7 +104,7 @@ struct C2Param {
     // layout:
     //
     //      +------+-----+---+------+--------+----|------+--------------+
-    //      | kind | dir | - |stream|streamID|flex|vendor|  base index  |
+    //      | kind | dir | - |stream|streamID|flex|vendor|  core index  |
     //      +------+-----+---+------+--------+----+------+--------------+
     //  bit: 31..30 29.28       25   24 .. 17  16    15   14    ..     0
     //
@@ -119,6 +119,19 @@ public:
         SETTING = (1 << 2),
         TUNING  = (1 << 3) | SETTING, // tunings are settings
     };
+
+    /**
+     * Parameter index is associated with each parameter. It is used to identify and distinguish
+     * global parameters, and also parameters on a given port or stream. They must be unique for the
+     * set of global parameters, as well as for the set of parameters on each port or each stream,
+     * but the same parameter index can be used for parameters on different streams or ports, as
+     * well as for global parameters and port/stream parameters.
+     *
+     * Parameter index is also used to describe the layout of the parameter structures. Multiple
+     * parameter types can share the same layout, but the layout for all parameters with the same
+     * parameter index across all components must be identical.
+     */
+    typedef uint32_t ParamIndex;
 
     /**
      * base index (including the vendor extension bit) is a global index for
@@ -149,7 +162,7 @@ public:
             kFlexibleFlag  = 0x00010000,
             kVendorFlag    = 0x00008000,
             kParamMask     = 0x0000FFFF,
-            kBaseMask      = kParamMask | kFlexibleFlag,
+            kCoreMask      = kParamMask | kFlexibleFlag,
         };
 
     public:
@@ -170,11 +183,12 @@ public:
         /// returns true iff this is a flexible parameter (with variable size)
         inline bool isFlexible() const { return mIndex & kFlexibleFlag; }
 
-        /// returns the base type: the index for the underlying struct
-        inline unsigned int baseIndex() const { return mIndex & kBaseMask; }
+        /// returns the core parameter type (index) for the underlying struct.
+        /// This is the combination of the parameter index and the flexible flag.
+        inline unsigned int coreIndex() const { return mIndex & kCoreMask; }
 
-        /// returns the param index for the underlying struct
-        inline unsigned int paramIndex() const { return mIndex & kParamMask; }
+        /// returns the parameter index for the underlying struct
+        inline ParamIndex paramIndex() const { return mIndex & kParamMask; }
 
         DEFINE_FIELD_BASED_COMPARISON_OPERATORS(BaseIndex, mIndex)
 
@@ -450,8 +464,8 @@ private:
     friend struct _C2ParamInspector; // for testing
 
     /// returns the base type: the index for the underlying struct (for testing
-    /// as this can be gotten by the baseIndex enum)
-    inline uint32_t _baseIndex() const { return _mIndex.baseIndex(); }
+    /// as this can be gotten by the coreIndex enum)
+    inline uint32_t _coreIndex() const { return _mIndex.coreIndex(); }
 
     /// returns true iff |o| has the same size and index as this. This performs the
     /// basic check for equality.
@@ -711,7 +725,7 @@ struct C2FieldDescriptor {
                         ///< however, bytes cannot be individually addressed by clients.
 
         // complex types
-        STRUCT_FLAG = 0x10000, ///< structs. Marked with this flag in addition to their baseIndex.
+        STRUCT_FLAG = 0x10000, ///< structs. Marked with this flag in addition to their coreIndex.
     };
 
     typedef std::pair<C2String, C2Value::Primitive> named_value_type;
@@ -802,12 +816,12 @@ private:
         return getType(&underlying);
     }
 
-    // verify C2Struct by having a fieldList and a baseIndex.
+    // verify C2Struct by having a fieldList and a coreIndex.
     template<typename T,
-             class=decltype(T::baseIndex + 1), class=decltype(T::fieldList)>
+             class=decltype(T::coreIndex + 1), class=decltype(T::fieldList)>
     inline static Type getType(T*) {
         static_assert(!std::is_base_of<C2Param, T>::value, "cannot use C2Params as fields");
-        return (Type)(T::baseIndex | STRUCT_FLAG);
+        return (Type)(T::coreIndex | STRUCT_FLAG);
     }
 };
 
@@ -832,7 +846,7 @@ DEFINE_NO_NAMED_VALUES_FOR(float)
 struct C2StructDescriptor {
 public:
     /// Returns the parameter type
-    inline C2Param::BaseIndex baseIndex() const { return _mType.baseIndex(); }
+    inline C2Param::BaseIndex coreIndex() const { return _mType.coreIndex(); }
 
     // Returns the number of fields in this param (not counting any recursive fields).
     // Must be at least 1 for valid params.
@@ -849,7 +863,7 @@ public:
 
     template<typename T>
     inline C2StructDescriptor(T*)
-        : C2StructDescriptor(T::baseIndex, T::fieldList) { }
+        : C2StructDescriptor(T::coreIndex, T::fieldList) { }
 
     inline C2StructDescriptor(
             C2Param::BaseIndex type,
@@ -914,24 +928,30 @@ private:
 };
 
 /// \ingroup internal
-/// Define a structure without baseIndex.
-#define DEFINE_C2STRUCT_NO_BASE(name) \
+/// Define a structure without coreIndex.
+#define DEFINE_BASE_C2STRUCT(name) \
 public: \
     typedef C2##name##Struct _type; /**< type name shorthand */ \
     const static std::initializer_list<const C2FieldDescriptor> fieldList; /**< structure fields */
 
-/// Define a structure with matching baseIndex.
+/// Define a structure with matching coreIndex.
 #define DEFINE_C2STRUCT(name) \
 public: \
-    enum : uint32_t { baseIndex = kParamIndex##name }; \
-    DEFINE_C2STRUCT_NO_BASE(name)
+    enum : uint32_t { coreIndex = kParamIndex##name }; \
+    DEFINE_BASE_C2STRUCT(name)
 
-/// Define a flexible structure with matching baseIndex.
+/// Define a flexible structure without coreIndex.
+#define DEFINE_BASE_FLEX_C2STRUCT(name, flexMember) \
+public: \
+    FLEX(C2##name##Struct, flexMember) \
+    DEFINE_BASE_C2STRUCT(name)
+
+/// Define a flexible structure with matching coreIndex.
 #define DEFINE_FLEX_C2STRUCT(name, flexMember) \
 public: \
     FLEX(C2##name##Struct, flexMember) \
-    enum : uint32_t { baseIndex = kParamIndex##name | C2Param::BaseIndex::_kFlexibleFlag }; \
-    DEFINE_C2STRUCT_NO_BASE(name)
+    enum : uint32_t { coreIndex = kParamIndex##name | C2Param::BaseIndex::_kFlexibleFlag }; \
+    DEFINE_BASE_C2STRUCT(name)
 
 #ifdef __C2_GENERATE_GLOBAL_VARS__
 /// \ingroup internal
@@ -1037,17 +1057,30 @@ public: \
 #define C2SOLE_FIELD(member, name) \
   C2FieldDescriptor(&_type::member, name, 0)
 
-/// Define a structure with matching baseIndex and start describing its fields.
+/// Define a structure with matching coreIndex and start describing its fields.
 /// This must be at the end of the structure definition.
 #define DEFINE_AND_DESCRIBE_C2STRUCT(name) \
     DEFINE_C2STRUCT(name) } C2_PACK; \
     const std::initializer_list<const C2FieldDescriptor> C2##name##Struct::fieldList = {
 
-/// Define a flexible structure with matching baseIndex and start describing its fields.
+/// Define a flexible structure with matching coreIndex and start describing its fields.
 /// This must be at the end of the structure definition.
 #define DEFINE_AND_DESCRIBE_FLEX_C2STRUCT(name, flexMember) \
     DEFINE_FLEX_C2STRUCT(name, flexMember) } C2_PACK; \
     const std::initializer_list<const C2FieldDescriptor> C2##name##Struct::fieldList = {
+
+/// Define a base structure (with no coreIndex) and start describing its fields.
+/// This must be at the end of the structure definition.
+#define DEFINE_AND_DESCRIBE_BASE_C2STRUCT(name) \
+    DEFINE_BASE_C2STRUCT(name) } C2_PACK; \
+    const std::initializer_list<const C2FieldDescriptor> C2##name##Struct::fieldList = {
+
+/// Define a flexible base structure (with no coreIndex) and start describing its fields.
+/// This must be at the end of the structure definition.
+#define DEFINE_AND_DESCRIBE_BASE_FLEX_C2STRUCT(name, flexMember) \
+    DEFINE_BASE_FLEX_C2STRUCT(name, flexMember) } C2_PACK; \
+    const std::initializer_list<const C2FieldDescriptor> C2##name##Struct::fieldList = {
+
 #else
 /// \if 0
 /* Alternate declaration of field definitions in case no field list is to be generated.
@@ -1056,14 +1089,22 @@ public: \
 #define C2FIELD(member, name)
 /// \deprecated
 #define C2SOLE_FIELD(member, name)
-/// Define a structure with matching baseIndex and start describing its fields.
+/// Define a structure with matching coreIndex and start describing its fields.
 /// This must be at the end of the structure definition.
 #define DEFINE_AND_DESCRIBE_C2STRUCT(name) \
     DEFINE_C2STRUCT(name) }  C2_PACK; namespace ignored {
-/// Define a flexible structure with matching baseIndex and start describing its fields.
+/// Define a flexible structure with matching coreIndex and start describing its fields.
 /// This must be at the end of the structure definition.
 #define DEFINE_AND_DESCRIBE_FLEX_C2STRUCT(name, flexMember) \
     DEFINE_FLEX_C2STRUCT(name, flexMember) } C2_PACK; namespace ignored {
+/// Define a base structure (with no coreIndex) and start describing its fields.
+/// This must be at the end of the structure definition.
+#define DEFINE_AND_DESCRIBE_BASE_C2STRUCT(name) \
+    DEFINE_BASE_C2STRUCT(name) } C2_PACK; namespace ignored {
+/// Define a flexible base structure (with no coreIndex) and start describing its fields.
+/// This must be at the end of the structure definition.
+#define DEFINE_AND_DESCRIBE_BASE_FLEX_C2STRUCT(name, flexMember) \
+    DEFINE_BASE_FLEX_C2STRUCT(name, flexMember) } C2_PACK; namespace ignored {
 /// \endif
 #endif
 
@@ -1080,7 +1121,8 @@ public:
     /**
      *  Describes a parameter structure.
      *
-     *  \param[in] paramIndex the base index of the parameter structure
+     *  \param[in] coreIndex the base index of the parameter structure containing at least the
+     *  core index
      *
      *  \return the description of the parameter structure
      *  \retval nullptr if the parameter is not supported by this reflector
@@ -1093,7 +1135,7 @@ public:
      *  descriptions, but we want to conserve memory if client only wants the description
      *  of a few indices.
      */
-    virtual std::unique_ptr<C2StructDescriptor> describe(C2Param::BaseIndex paramIndex) = 0;
+    virtual std::unique_ptr<C2StructDescriptor> describe(C2Param::BaseIndex coreIndex) = 0;
 
 protected:
     virtual ~C2ParamReflector() = default;
