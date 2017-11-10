@@ -156,13 +156,14 @@ status_t Camera2ClientBase<TClientBase>::dumpDevice(
     result = "  Device dump:\n";
     write(fd, result.string(), result.size());
 
-    if (!mDevice.get()) {
+    sp<CameraDeviceBase> device = mDevice;
+    if (!device.get()) {
         result = "  *** Device is detached\n";
         write(fd, result.string(), result.size());
         return NO_ERROR;
     }
 
-    status_t res = mDevice->dump(fd, args);
+    status_t res = device->dump(fd, args);
     if (res != OK) {
         result = String8::format("   Error dumping device: %s (%d)",
                 strerror(-res), res);
