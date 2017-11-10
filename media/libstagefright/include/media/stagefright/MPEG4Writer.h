@@ -31,6 +31,7 @@ namespace android {
 struct AMessage;
 class MediaBuffer;
 class MetaData;
+struct ABuffer;
 
 class MPEG4Writer : public MediaWriter {
 public:
@@ -132,6 +133,8 @@ private:
     status_t startTracks(MetaData *params);
     size_t numTracks();
     int64_t estimateMoovBoxSize(int32_t bitRate);
+    int64_t estimateFileLevelMetaSize();
+    void writeCachedBoxToFile(const char *type);
 
     struct Chunk {
         Track               *mTrack;        // Owner
@@ -163,6 +166,46 @@ private:
     pthread_t       mThread;                // Thread id for the writer
     List<ChunkInfo> mChunkInfos;            // Chunk infos
     Condition       mChunkReadyCondition;   // Signal that chunks are available
+
+    // HEIF writing
+    typedef struct _ItemInfo {
+        bool isGrid() const { return !strcmp("grid", itemType); }
+        const char *itemType;
+        uint16_t itemId;
+        bool isPrimary;
+        bool isHidden;
+        union {
+            // image item
+            struct {
+                uint32_t offset;
+                uint32_t size;
+            };
+            // grid item
+            struct {
+                uint32_t rows;
+                uint32_t cols;
+                uint32_t width;
+                uint32_t height;
+            };
+        };
+        Vector<uint16_t> properties;
+        Vector<uint16_t> dimgRefs;
+    } ItemInfo;
+
+    typedef struct _ItemProperty {
+        uint32_t type;
+        int32_t width;
+        int32_t height;
+        sp<ABuffer> hvcc;
+    } ItemProperty;
+
+    bool mHasFileLevelMeta;
+    bool mHasMoovBox;
+    uint32_t mPrimaryItemId;
+    uint32_t mAssociationEntryCount;
+    uint32_t mNumGrids;
+    Vector<ItemInfo> mItems;
+    Vector<ItemProperty> mProperties;
 
     // Writer thread handling
     status_t startWriterThread();
@@ -209,9 +252,11 @@ private:
     void initInternal(int fd, bool isFirstSession);
 
     // Acquire lock before calling these methods
-    off64_t addSample_l(MediaBuffer *buffer);
-    off64_t addLengthPrefixedSample_l(MediaBuffer *buffer);
-    off64_t addMultipleLengthPrefixedSamples_l(MediaBuffer *buffer);
+    off64_t addSample_l(MediaBuffer *buffer, bool usePrefix, size_t *bytesWritten);
+    void addLengthPrefixedSample_l(MediaBuffer *buffer);
+    void addMultipleLengthPrefixedSamples_l(MediaBuffer *buffer);
+    uint16_t addProperty_l(const ItemProperty &);
+    uint16_t addItem_l(const ItemInfo &);
 
     bool exceedsFileSizeLimit();
     bool use32BitFileOffset() const;
@@ -230,10 +275,23 @@ private:
     void finishCurrentSession();
 
     void addDeviceMeta();
-    void writeHdlr();
+    void writeHdlr(const char *handlerType);
     void writeKeys();
     void writeIlst();
-    void writeMetaBox();
+    void writeMoovLevelMetaBox();
+
+    // HEIF writing
+    void writeIlocBox();
+    void writeInfeBox(uint16_t itemId, const char *type, uint32_t flags);
+    void writeIinfBox();
+    void writeIpcoBox();
+    void writeIpmaBox();
+    void writeIprpBox();
+    void writeIdatBox();
+    void writeIrefBox();
+    void writePitmBox();
+    void writeFileLevelMetaBox();
+
     void sendSessionSummary();
     void release();
     status_t switchFd();

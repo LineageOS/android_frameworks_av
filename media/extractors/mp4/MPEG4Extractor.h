@@ -104,7 +104,7 @@ private:
     uint32_t mHeaderTimescale;
     bool mIsQT;
     bool mIsHeif;
-    bool mIsHeifSequence;
+    bool mHasMoovBox;
     bool mPreferHeif;
 
     Track *mFirstTrack, *mLastTrack;

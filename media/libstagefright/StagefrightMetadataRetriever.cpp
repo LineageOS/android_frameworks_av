@@ -154,7 +154,8 @@ VideoFrame* StagefrightMetadataRetriever::getImageAtIndex(
 
         if (!strncasecmp(mime, "image/", 6)) {
             int32_t isPrimary;
-            if ((index < 0 && meta->findInt32(kKeyIsPrimaryImage, &isPrimary) && isPrimary)
+            if ((index < 0 && meta->findInt32(
+                    kKeyTrackIsDefault, &isPrimary) && isPrimary)
                     || (index == imageCount++)) {
                 break;
             }
@@ -490,7 +491,8 @@ void StagefrightMetadataRetriever::parseMetaData() {
                 }
             } else if (!strncasecmp("image/", mime, 6)) {
                 int32_t isPrimary;
-                if (trackMeta->findInt32(kKeyIsPrimaryImage, &isPrimary) && isPrimary) {
+                if (trackMeta->findInt32(
+                        kKeyTrackIsDefault, &isPrimary) && isPrimary) {
                     imagePrimary = imageCount;
                     CHECK(trackMeta->findInt32(kKeyWidth, &imageWidth));
                     CHECK(trackMeta->findInt32(kKeyHeight, &imageHeight));
