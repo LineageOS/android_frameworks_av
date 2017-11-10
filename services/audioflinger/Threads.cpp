@@ -1837,10 +1837,13 @@ void AudioFlinger::PlaybackThread::preExit()
 sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrack_l(
         const sp<AudioFlinger::Client>& client,
         audio_stream_type_t streamType,
-        uint32_t sampleRate,
+        uint32_t *pSampleRate,
         audio_format_t format,
         audio_channel_mask_t channelMask,
         size_t *pFrameCount,
+        size_t *pNotificationFrameCount,
+        uint32_t notificationsPerBuffer,
+        float speed,
         const sp<IMemory>& sharedBuffer,
         audio_session_t sessionId,
         audio_output_flags_t *flags,
@@ -1850,9 +1853,16 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
         audio_port_handle_t portId)
 {
     size_t frameCount = *pFrameCount;
+    size_t notificationFrameCount = *pNotificationFrameCount;
     sp<Track> track;
     status_t lStatus;
     audio_output_flags_t outputFlags = mOutput->flags;
+    audio_output_flags_t requestedFlags = *flags;
+
+    if (*pSampleRate == 0) {
+        *pSampleRate = mSampleRate;
+    }
+    uint32_t sampleRate = *pSampleRate;
 
     // special case for FAST flag considered OK if fast mixer is present
     if (hasFastMixer()) {
@@ -1929,36 +1939,114 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
         *flags = (audio_output_flags_t)(*flags & ~AUDIO_OUTPUT_FLAG_FAST);
       }
     }
-    // For normal PCM streaming tracks, update minimum frame count.
-    // For compatibility with AudioTrack calculation, buffer depth is forced
-    // to be at least 2 x the normal mixer frame count and cover audio hardware latency.
-    // This is probably too conservative, but legacy application code may depend on it.
-    // If you change this calculation, also review the start threshold which is related.
-    if (!(*flags & AUDIO_OUTPUT_FLAG_FAST)
-            && audio_has_proportional_frames(format) && sharedBuffer == 0) {
-        // this must match AudioTrack.cpp calculateMinFrameCount().
-        // TODO: Move to a common library
-        uint32_t latencyMs = 0;
-        lStatus = mOutput->stream->getLatency(&latencyMs);
-        if (lStatus != OK) {
-            ALOGE("Error when retrieving output stream latency: %d", lStatus);
+
+    if (!audio_has_proportional_frames(format)) {
+        if (sharedBuffer != 0) {
+            // Same comment as below about ignoring frameCount parameter for set()
+            frameCount = sharedBuffer->size();
+        } else if (frameCount == 0) {
+            frameCount = mNormalFrameCount;
+        }
+        if (notificationFrameCount != frameCount) {
+            notificationFrameCount = frameCount;
+        }
+    } else if (sharedBuffer != 0) {
+        // FIXME: Ensure client side memory buffers need
+        // not have additional alignment beyond sample
+        // (e.g. 16 bit stereo accessed as 32 bit frame).
+        size_t alignment = audio_bytes_per_sample(format);
+        if (alignment & 1) {
+            // for AUDIO_FORMAT_PCM_24_BIT_PACKED (not exposed through Java).
+            alignment = 1;
+        }
+        uint32_t channelCount = audio_channel_count_from_out_mask(channelMask);
+        size_t frameSize = channelCount * audio_bytes_per_sample(format);
+        if (channelCount > 1) {
+            // More than 2 channels does not require stronger alignment than stereo
+            alignment <<= 1;
+        }
+        if (((uintptr_t)sharedBuffer->pointer() & (alignment - 1)) != 0) {
+            ALOGE("Invalid buffer alignment: address %p, channel count %u",
+                  sharedBuffer->pointer(), channelCount);
+            lStatus = BAD_VALUE;
             goto Exit;
         }
-        uint32_t minBufCount = latencyMs / ((1000 * mNormalFrameCount) / mSampleRate);
-        if (minBufCount < 2) {
-            minBufCount = 2;
+
+        // When initializing a shared buffer AudioTrack via constructors,
+        // there's no frameCount parameter.
+        // But when initializing a shared buffer AudioTrack via set(),
+        // there _is_ a frameCount parameter.  We silently ignore it.
+        frameCount = sharedBuffer->size() / frameSize;
+    } else {
+        size_t minFrameCount = 0;
+        // For fast tracks we try to respect the application's request for notifications per buffer.
+        if (*flags & AUDIO_OUTPUT_FLAG_FAST) {
+            if (notificationsPerBuffer > 0) {
+                // Avoid possible arithmetic overflow during multiplication.
+                if (notificationsPerBuffer > SIZE_MAX / mFrameCount) {
+                    ALOGE("Requested notificationPerBuffer=%u ignored for HAL frameCount=%zu",
+                          notificationsPerBuffer, mFrameCount);
+                } else {
+                    minFrameCount = mFrameCount * notificationsPerBuffer;
+                }
+            }
+        } else {
+            // For normal PCM streaming tracks, update minimum frame count.
+            // Buffer depth is forced to be at least 2 x the normal mixer frame count and
+            // cover audio hardware latency.
+            // This is probably too conservative, but legacy application code may depend on it.
+            // If you change this calculation, also review the start threshold which is related.
+            uint32_t latencyMs = latency_l();
+            if (latencyMs == 0) {
+                ALOGE("Error when retrieving output stream latency");
+                lStatus = UNKNOWN_ERROR;
+                goto Exit;
+            }
+
+            minFrameCount = AudioSystem::calculateMinFrameCount(latencyMs, mNormalFrameCount,
+                                mSampleRate, sampleRate, speed /*, 0 mNotificationsPerBufferReq*/);
+
         }
-        // For normal mixing tracks, if speed is > 1.0f (normal), AudioTrack
-        // or the client should compute and pass in a larger buffer request.
-        size_t minFrameCount =
-                minBufCount * sourceFramesNeededWithTimestretch(
-                        sampleRate, mNormalFrameCount,
-                        mSampleRate, AUDIO_TIMESTRETCH_SPEED_NORMAL /*speed*/);
-        if (frameCount < minFrameCount) { // including frameCount == 0
+        if (frameCount < minFrameCount) {
             frameCount = minFrameCount;
         }
     }
+
+    // Make sure that application is notified with sufficient margin before underrun.
+    // The client can divide the AudioTrack buffer into sub-buffers,
+    // and expresses its desire to server as the notification frame count.
+    if (sharedBuffer == 0 && audio_is_linear_pcm(format)) {
+        size_t maxNotificationFrames;
+        if (*flags & AUDIO_OUTPUT_FLAG_FAST) {
+            // notify every HAL buffer, regardless of the size of the track buffer
+            maxNotificationFrames = mFrameCount;
+        } else {
+            // For normal tracks, use at least double-buffering if no sample rate conversion,
+            // or at least triple-buffering if there is sample rate conversion
+            const int nBuffering = sampleRate == mSampleRate ? 2 : 3;
+            maxNotificationFrames = frameCount / nBuffering;
+            // If client requested a fast track but this was denied, then use the smaller maximum.
+            if (requestedFlags & AUDIO_OUTPUT_FLAG_FAST) {
+                size_t maxNotificationFramesFastDenied = FMS_20 * sampleRate / 1000;
+                if (maxNotificationFrames > maxNotificationFramesFastDenied) {
+                    maxNotificationFrames = maxNotificationFramesFastDenied;
+                }
+            }
+        }
+        if (notificationFrameCount == 0 || notificationFrameCount > maxNotificationFrames) {
+            if (notificationFrameCount == 0) {
+                ALOGD("Client defaulted notificationFrames to %zu for frameCount %zu",
+                    maxNotificationFrames, frameCount);
+            } else {
+                ALOGW("Client adjusted notificationFrames from %zu to %zu for frameCount %zu",
+                      notificationFrameCount, maxNotificationFrames, frameCount);
+            }
+            notificationFrameCount = maxNotificationFrames;
+        }
+    }
+
     *pFrameCount = frameCount;
+    *pNotificationFrameCount = notificationFrameCount;
 
     switch (mType) {
 
