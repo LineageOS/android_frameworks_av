@@ -93,9 +93,9 @@ enum {
 struct C2SizeStruct {
     int32_t mNumber;
     int32_t mHeight;
-    enum : uint32_t { baseIndex = kParamIndexSize };                        // <= needed for C2FieldDescriptor
+    enum : uint32_t { coreIndex = kParamIndexSize };                        // <= needed for C2FieldDescriptor
     const static std::initializer_list<const C2FieldDescriptor> fieldList;  // <= needed for C2FieldDescriptor
-    const static FD::Type TYPE = (FD::Type)(baseIndex | FD::STRUCT_FLAG);
+    const static FD::Type TYPE = (FD::Type)(coreIndex | FD::STRUCT_FLAG);
 };
 
 DEFINE_NO_NAMED_VALUES_FOR(C2SizeStruct)
@@ -121,7 +121,7 @@ struct C2TestStruct_A {
     bool mYesNo[100];
 
     const static std::initializer_list<const C2FieldDescriptor> fieldList;
-    // enum : uint32_t { baseIndex = kParamIndexTest };
+    // enum : uint32_t { coreIndex = kParamIndexTest };
     // typedef C2TestStruct_A _type;
 } __attribute__((packed));
 
@@ -296,7 +296,7 @@ struct C2TestStruct_FlexS32 {
     int32_t mFlex[];
 
     const static std::initializer_list<const C2FieldDescriptor> fieldList;
-    // enum : uint32_t { baseIndex = kParamIndexTestFlex, flexSize = 4 };
+    // enum : uint32_t { coreIndex = kParamIndexTestFlex, flexSize = 4 };
     // typedef C2TestStruct_FlexS32 _type;
     // typedef int32_t flexType;
 };
@@ -310,7 +310,7 @@ struct C2TestStruct_FlexEndS32 {
     int32_t mFlex[];
 
     const static std::initializer_list<const C2FieldDescriptor> fieldList;
-    // enum : uint32_t { baseIndex = kParamIndexTestFlexEnd, flexSize = 4 };
+    // enum : uint32_t { coreIndex = kParamIndexTestFlexEnd, flexSize = 4 };
     // typedef C2TestStruct_FlexEnd _type;
     // typedef int32_t flexType;
 };
@@ -365,7 +365,7 @@ struct C2TestStruct_FlexS64 {
     int64_t mFlexSigned64[];
 
     const static std::initializer_list<const C2FieldDescriptor> fieldList;
-    // enum : uint32_t { baseIndex = kParamIndexTestFlexS64, flexSize = 8 };
+    // enum : uint32_t { coreIndex = kParamIndexTestFlexS64, flexSize = 8 };
     // typedef C2TestStruct_FlexS64 _type;
     // typedef int64_t flexType;
 };
@@ -379,7 +379,7 @@ struct C2TestStruct_FlexEndS64 {
     int64_t mSigned64Flex[];
 
     const static std::initializer_list<const C2FieldDescriptor> fieldList;
-    // enum : uint32_t { baseIndex = C2TestStruct_FlexEndS64, flexSize = 8 };
+    // enum : uint32_t { coreIndex = C2TestStruct_FlexEndS64, flexSize = 8 };
     // typedef C2TestStruct_FlexEndS64 _type;
     // typedef int64_t flexType;
 };
@@ -426,7 +426,7 @@ struct C2TestStruct_FlexSize {
     C2SizeStruct mFlexSize[];
 
     const static std::initializer_list<const C2FieldDescriptor> fieldList;
-    // enum : uint32_t { baseIndex = kParamIndexTestFlexSize, flexSize = 8 };
+    // enum : uint32_t { coreIndex = kParamIndexTestFlexSize, flexSize = 8 };
     // typedef C2TestStruct_FlexSize _type;
     // typedef C2SizeStruct flexType;
 };
@@ -440,7 +440,7 @@ struct C2TestStruct_FlexEndSize {
     C2SizeStruct mSizeFlex[];
 
     const static std::initializer_list<const C2FieldDescriptor> fieldList;
-    // enum : uint32_t { baseIndex = C2TestStruct_FlexEndSize, flexSize = 8 };
+    // enum : uint32_t { coreIndex = C2TestStruct_FlexEndSize, flexSize = 8 };
     // typedef C2TestStruct_FlexEndSize _type;
     // typedef C2SizeStruct flexType;
 };
@@ -471,6 +471,29 @@ DESCRIBE_C2STRUCT(TestFlexEndSize, {
     C2FIELD(mFlexSize, "flex")
 }) // ; optional
 
+struct C2TestBaseFlexEndSizeStruct {
+    int32_t mSigned32;
+    C2SizeStruct mFlexSize[];
+    C2TestBaseFlexEndSizeStruct() {}
+
+    DEFINE_BASE_FLEX_C2STRUCT(TestBaseFlexEndSize, mFlexSize)
+} C2_PACK;
+
+DESCRIBE_C2STRUCT(TestBaseFlexEndSize, {
+    C2FIELD(mSigned32, "s32")
+    C2FIELD(mFlexSize, "flex")
+}) // ; optional
+
+struct C2TestBaseFlexEndSize2Struct {
+    int32_t mSigned32;
+    C2SizeStruct mFlexSize[];
+    C2TestBaseFlexEndSize2Struct() {}
+
+    DEFINE_AND_DESCRIBE_BASE_FLEX_C2STRUCT(TestBaseFlexEndSize2, mFlexSize)
+    C2FIELD(mSigned32, "s32")
+    C2FIELD(mFlexSize, "flex")
+};
+
 template<>
 std::vector<std::vector<const C2FieldDescriptor>>
 //std::initializer_list<std::initializer_list<const C2FieldDescriptor>>
@@ -480,6 +503,8 @@ C2ParamTest_FlexParamFieldList<C2SizeStruct>::GetLists() {
         C2TestStruct_FlexEndSize::fieldList,
         C2TestFlexSizeStruct::fieldList,
         C2TestFlexEndSizeStruct::fieldList,
+        C2TestBaseFlexEndSizeStruct::fieldList,
+        C2TestBaseFlexEndSize2Struct::fieldList,
     };
 }
 
@@ -498,6 +523,9 @@ TEST_F(C2ParamTest, FieldId) {
     EXPECT_EQ(_C2FieldId(0, 4), _C2FieldId(&((C2TestFlexEndSizeStruct*)0)->mSigned32));
     EXPECT_EQ(_C2FieldId(4, 8), _C2FieldId(&((C2TestFlexEndSizeStruct*)0)->mFlexSize));
 
+    EXPECT_EQ(_C2FieldId(0, 4), _C2FieldId(&((C2TestBaseFlexEndSizeStruct*)0)->mSigned32));
+    EXPECT_EQ(_C2FieldId(4, 8), _C2FieldId(&((C2TestBaseFlexEndSizeStruct*)0)->mFlexSize));
+
     // member pointer constructor
     EXPECT_EQ(_C2FieldId(0, 4), _C2FieldId((C2TestStruct_A*)0, &C2TestStruct_A::mSigned32));
     EXPECT_EQ(_C2FieldId(4, 8), _C2FieldId((C2TestStruct_A*)0, &C2TestStruct_A::mSigned64));
@@ -511,6 +539,9 @@ TEST_F(C2ParamTest, FieldId) {
 
     EXPECT_EQ(_C2FieldId(0, 4), _C2FieldId((C2TestFlexEndSizeStruct*)0, &C2TestFlexEndSizeStruct::mSigned32));
     EXPECT_EQ(_C2FieldId(4, 8), _C2FieldId((C2TestFlexEndSizeStruct*)0, &C2TestFlexEndSizeStruct::mFlexSize));
+
+    EXPECT_EQ(_C2FieldId(0, 4), _C2FieldId((C2TestBaseFlexEndSizeStruct*)0, &C2TestBaseFlexEndSizeStruct::mSigned32));
+    EXPECT_EQ(_C2FieldId(4, 8), _C2FieldId((C2TestBaseFlexEndSizeStruct*)0, &C2TestBaseFlexEndSizeStruct::mFlexSize));
 
     // member pointer sans type pointer
     EXPECT_EQ(_C2FieldId(0, 4), _C2FieldId(&C2TestStruct_A::mSigned32));
@@ -526,8 +557,12 @@ TEST_F(C2ParamTest, FieldId) {
     EXPECT_EQ(_C2FieldId(0, 4), _C2FieldId(&C2TestFlexEndSizeStruct::mSigned32));
     EXPECT_EQ(_C2FieldId(4, 8), _C2FieldId(&C2TestFlexEndSizeStruct::mFlexSize));
 
+    EXPECT_EQ(_C2FieldId(0, 4), _C2FieldId(&C2TestBaseFlexEndSizeStruct::mSigned32));
+    EXPECT_EQ(_C2FieldId(4, 8), _C2FieldId(&C2TestBaseFlexEndSizeStruct::mFlexSize));
+
     typedef C2GlobalParam<C2Info, C2TestAStruct> C2TestAInfo;
     typedef C2GlobalParam<C2Info, C2TestFlexEndSizeStruct> C2TestFlexEndSizeInfo;
+    typedef C2GlobalParam<C2Info, C2TestBaseFlexEndSizeStruct, kParamIndexTestFlexEndSize> C2TestFlexEndSizeInfoFromBase;
 
     // pointer constructor in C2Param
     EXPECT_EQ(_C2FieldId(8, 4), _C2FieldId(&((C2TestAInfo*)0)->mSigned32));
@@ -542,6 +577,9 @@ TEST_F(C2ParamTest, FieldId) {
 
     EXPECT_EQ(_C2FieldId(8, 4), _C2FieldId(&((C2TestFlexEndSizeInfo*)0)->m.mSigned32));
     EXPECT_EQ(_C2FieldId(12, 8), _C2FieldId(&((C2TestFlexEndSizeInfo*)0)->m.mFlexSize));
+
+    EXPECT_EQ(_C2FieldId(8, 4), _C2FieldId(&((C2TestFlexEndSizeInfoFromBase*)0)->m.mSigned32));
+    EXPECT_EQ(_C2FieldId(12, 8), _C2FieldId(&((C2TestFlexEndSizeInfoFromBase*)0)->m.mFlexSize));
 
     // member pointer in C2Param
     EXPECT_EQ(_C2FieldId(8, 4), _C2FieldId((C2TestAInfo*)0, &C2TestAInfo::mSigned32));
@@ -558,6 +596,8 @@ TEST_F(C2ParamTest, FieldId) {
     // EXPECT_EQ(_C2FieldId(8, 4), _C2FieldId(&C2TestFlexEndSizeInfo::m.mSigned32));
     // EXPECT_EQ(_C2FieldId(12, 8), _C2FieldId(&C2TestFlexEndSizeInfo::m.mFlexSize));
 
+    // EXPECT_EQ(_C2FieldId(8, 4), _C2FieldId(&C2TestFlexEndSizeInfoFromBase::m.mSigned32));
+    // EXPECT_EQ(_C2FieldId(12, 8), _C2FieldId(&C2TestFlexEndSizeInfoFromBase::m.mFlexSize));
 
 
 }
@@ -636,6 +676,10 @@ TEST_F(C2ParamTest, MemberPointerCast) {
     typedef C2GlobalParam<C2Info, C2TestFlexEndSizeStruct> C2TestFlexEndSizeInfo;
     static_assert(offsetof(C2TestFlexEndSizeInfo, m.mSigned32) == 8, "offset should be 8");
     static_assert(offsetof(C2TestFlexEndSizeInfo, m.mFlexSize) == 12, "offset should be 12");
+
+    typedef C2GlobalParam<C2Info, C2TestBaseFlexEndSizeStruct, kParamIndexTestFlexEndSize> C2TestFlexEndSizeInfoFromBase;
+    static_assert(offsetof(C2TestFlexEndSizeInfoFromBase, m.mSigned32) == 8, "offset should be 8");
+    static_assert(offsetof(C2TestFlexEndSizeInfoFromBase, m.mFlexSize) == 12, "offset should be 12");
 }
 
 /* ===================================== PARAM USAGE TESTS ===================================== */
@@ -646,6 +690,15 @@ struct C2NumberStruct {
     C2NumberStruct(int32_t _number) : mNumber(_number) {}
 
     DEFINE_AND_DESCRIBE_C2STRUCT(Number)
+    C2FIELD(mNumber, "number")
+};
+
+struct C2NumberBaseStruct {
+    int32_t mNumber;
+    C2NumberBaseStruct() {}
+    C2NumberBaseStruct(int32_t _number) : mNumber(_number) {}
+
+    DEFINE_AND_DESCRIBE_BASE_C2STRUCT(NumberBase)
     C2FIELD(mNumber, "number")
 };
 
@@ -691,7 +744,7 @@ void test3() {
 
 struct C2NumbersStruct {
     int32_t mNumbers[];
-    enum { baseIndex = kParamIndexNumber };
+    enum { coreIndex = kParamIndexNumber };
     const static std::initializer_list<const C2FieldDescriptor> fieldList;
     C2NumbersStruct() {}
 
@@ -725,7 +778,7 @@ std::list<const C2FieldDescriptor> myList = C2NumberConfig::fieldList;
 
         C2Param::Index index(paramType);
         switch (paramType) {
-        case C2NumberConfig::baseIndex:
+        case C2NumberConfig::coreIndex:
             return std::unique_ptr<C2ParamDescriptor>(new C2ParamDescriptor{
                 true /* isRequired */,
                 "number",
@@ -774,19 +827,21 @@ static_assert(_C2Comparable<_test2>::value, "class with != is not comparable");
 
 struct _C2ParamInspector {
     static void StaticTest();
+    static void StaticFromBaseTest();
     static void StaticFlexTest();
+    static void StaticFlexFromBaseTest();
 };
 
 // TEST_F(_C2ParamInspector, StaticTest) {
 void _C2ParamInspector::StaticTest() {
     typedef C2Param::Index I;
 
-    // C2NumberStruct: baseIndex = kIndex                          (args)
-    static_assert(C2NumberStruct::baseIndex == kParamIndexNumber, "bad index");
+    // C2NumberStruct: coreIndex = kIndex                          (args)
+    static_assert(C2NumberStruct::coreIndex == kParamIndexNumber, "bad index");
     static_assert(sizeof(C2NumberStruct) == 4, "bad size");
 
     // C2NumberTuning:             kIndex | tun | global           (args)
-    static_assert(C2NumberTuning::baseIndex == kParamIndexNumber, "bad index");
+    static_assert(C2NumberTuning::coreIndex == kParamIndexNumber, "bad index");
     static_assert(C2NumberTuning::typeIndex == (kParamIndexNumber | I::kTypeTuning | I::kDirGlobal), "bad index");
     static_assert(sizeof(C2NumberTuning) == 12, "bad size");
 
@@ -798,11 +853,11 @@ void _C2ParamInspector::StaticTest() {
     static_assert(sizeof(C2NumberPortTuning) == 12, "bad size");
     // C2NumberPortTuning::input:  kIndex | tun | port | input     (args)
     // C2NumberPortTuning::output: kIndex | tun | port | output    (args)
-    static_assert(C2NumberPortTuning::input::baseIndex ==
+    static_assert(C2NumberPortTuning::input::coreIndex ==
                   kParamIndexNumber, "bad index");
     static_assert(C2NumberPortTuning::input::typeIndex ==
                   (kParamIndexNumber | I::kTypeTuning | I::kDirInput), "bad index");
-    static_assert(C2NumberPortTuning::output::baseIndex ==
+    static_assert(C2NumberPortTuning::output::coreIndex ==
                   kParamIndexNumber, "bad index");
     static_assert(C2NumberPortTuning::output::typeIndex ==
                   (kParamIndexNumber | I::kTypeTuning | I::kDirOutput), "bad index");
@@ -819,11 +874,11 @@ void _C2ParamInspector::StaticTest() {
     static_assert(sizeof(C2NumberStreamTuning) == 12u, "bad size");
     // C2NumberStreamTuning::input kIndex | tun | str | input      (int, args)
     // C2NumberStreamTuning::output kIx   | tun | str | output     (int, args)
-    static_assert(C2NumberStreamTuning::input::baseIndex ==
+    static_assert(C2NumberStreamTuning::input::coreIndex ==
                   kParamIndexNumber, "bad index");
     static_assert(C2NumberStreamTuning::input::typeIndex ==
                   (kParamIndexNumber | I::kTypeTuning | I::kDirInput | I::kStreamFlag), "bad index");
-    static_assert(C2NumberStreamTuning::output::baseIndex ==
+    static_assert(C2NumberStreamTuning::output::coreIndex ==
                   kParamIndexNumber, "bad index");
     static_assert(C2NumberStreamTuning::output::typeIndex ==
                   (kParamIndexNumber | I::kTypeTuning | I::kDirOutput | I::kStreamFlag), "bad index");
@@ -837,15 +892,80 @@ void _C2ParamInspector::StaticTest() {
     static_assert(offsetof(C2NumberStreamTuning::output, mNumber) == 8, "bad offset");
 }
 
+void _C2ParamInspector::StaticFromBaseTest() {
+    enum { kParamIndexMy = 3102 };
+    typedef C2NumberBaseStruct C2MyStruct;
+    typedef C2GlobalParam<C2Setting, C2MyStruct, kParamIndexMy> C2MySetting;
+    typedef   C2PortParam<C2Setting, C2MyStruct, kParamIndexMy> C2MyPortSetting;
+    typedef C2StreamParam<C2Setting, C2MyStruct, kParamIndexMy> C2MyStreamSetting;
+
+    typedef C2Param::Index I;
+
+    // C2MyStruct has no coreIndex
+    //static_assert(C2MyStruct::coreIndex == kParamIndexMy, "bad index");
+    static_assert(sizeof(C2MyStruct) == 4, "bad size");
+
+    // C2MySetting:             kIndex | tun | global           (args)
+    static_assert(C2MySetting::coreIndex == kParamIndexMy, "bad index");
+    static_assert(C2MySetting::typeIndex == (kParamIndexMy | I::kTypeSetting | I::kDirGlobal), "bad index");
+    static_assert(sizeof(C2MySetting) == 12, "bad size");
+
+    static_assert(offsetof(C2MySetting, _mSize) == 0, "bad size");
+    static_assert(offsetof(C2MySetting, _mIndex) == 4, "bad offset");
+    static_assert(offsetof(C2MySetting, mNumber) == 8, "bad offset");
+
+    // C2MyPortSetting:         kIndex | tun | port             (bool, args)
+    static_assert(sizeof(C2MyPortSetting) == 12, "bad size");
+    // C2MyPortSetting::input:  kIndex | tun | port | input     (args)
+    // C2MyPortSetting::output: kIndex | tun | port | output    (args)
+    static_assert(C2MyPortSetting::input::coreIndex ==
+                  kParamIndexMy, "bad index");
+    static_assert(C2MyPortSetting::input::typeIndex ==
+                  (kParamIndexMy | I::kTypeSetting | I::kDirInput), "bad index");
+    static_assert(C2MyPortSetting::output::coreIndex ==
+                  kParamIndexMy, "bad index");
+    static_assert(C2MyPortSetting::output::typeIndex ==
+                  (kParamIndexMy | I::kTypeSetting | I::kDirOutput), "bad index");
+    static_assert(sizeof(C2MyPortSetting::input) == 12, "bad size");
+    static_assert(sizeof(C2MyPortSetting::output) == 12, "bad size");
+    static_assert(offsetof(C2MyPortSetting::input, _mSize) == 0, "bad size");
+    static_assert(offsetof(C2MyPortSetting::input, _mIndex) == 4, "bad offset");
+    static_assert(offsetof(C2MyPortSetting::input, mNumber) == 8, "bad offset");
+    static_assert(offsetof(C2MyPortSetting::output, _mSize) == 0, "bad size");
+    static_assert(offsetof(C2MyPortSetting::output, _mIndex) == 4, "bad offset");
+    static_assert(offsetof(C2MyPortSetting::output, mNumber) == 8, "bad offset");
+
+    // C2MyStreamSetting:       kIndex | tun | str              (bool, uint, args)
+    static_assert(sizeof(C2MyStreamSetting) == 12u, "bad size");
+    // C2MyStreamSetting::input kIndex | tun | str | input      (int, args)
+    // C2MyStreamSetting::output kIx   | tun | str | output     (int, args)
+    static_assert(C2MyStreamSetting::input::coreIndex ==
+                  kParamIndexMy, "bad index");
+    static_assert(C2MyStreamSetting::input::typeIndex ==
+                  (kParamIndexMy | I::kTypeSetting | I::kDirInput | I::kStreamFlag), "bad index");
+    static_assert(C2MyStreamSetting::output::coreIndex ==
+                  kParamIndexMy, "bad index");
+    static_assert(C2MyStreamSetting::output::typeIndex ==
+                  (kParamIndexMy | I::kTypeSetting | I::kDirOutput | I::kStreamFlag), "bad index");
+    static_assert(sizeof(C2MyStreamSetting::input) == 12u, "bad size");
+    static_assert(sizeof(C2MyStreamSetting::output) == 12u, "bad size");
+    static_assert(offsetof(C2MyStreamSetting::input, _mSize) == 0, "bad size");
+    static_assert(offsetof(C2MyStreamSetting::input, _mIndex) == 4, "bad offset");
+    static_assert(offsetof(C2MyStreamSetting::input, mNumber) == 8, "bad offset");
+    static_assert(offsetof(C2MyStreamSetting::output, _mSize) == 0, "bad size");
+    static_assert(offsetof(C2MyStreamSetting::output, _mIndex) == 4, "bad offset");
+    static_assert(offsetof(C2MyStreamSetting::output, mNumber) == 8, "bad offset");
+}
+
 void _C2ParamInspector::StaticFlexTest() {
     typedef C2Param::Index I;
 
-    // C2NumbersStruct: baseIndex = kIndex                          (args)
-    static_assert(C2NumbersStruct::baseIndex == (I::kFlexibleFlag | kParamIndexNumbers), "bad index");
+    // C2NumbersStruct: coreIndex = kIndex                          (args)
+    static_assert(C2NumbersStruct::coreIndex == (I::kFlexibleFlag | kParamIndexNumbers), "bad index");
     static_assert(sizeof(C2NumbersStruct) == 0, "bad size");
 
     // C2NumbersTuning:             kIndex | tun | global           (args)
-    static_assert(C2NumbersTuning::baseIndex == (I::kFlexibleFlag | kParamIndexNumbers), "bad index");
+    static_assert(C2NumbersTuning::coreIndex == (I::kFlexibleFlag | kParamIndexNumbers), "bad index");
     static_assert(C2NumbersTuning::typeIndex == (I::kFlexibleFlag | kParamIndexNumbers | I::kTypeTuning | I::kDirGlobal), "bad index");
     static_assert(sizeof(C2NumbersTuning) == 8, "bad size");
 
@@ -857,11 +977,11 @@ void _C2ParamInspector::StaticFlexTest() {
     static_assert(sizeof(C2NumbersPortTuning) == 8, "bad size");
     // C2NumbersPortTuning::input:  kIndex | tun | port | input     (args)
     // C2NumbersPortTuning::output: kIndex | tun | port | output    (args)
-    static_assert(C2NumbersPortTuning::input::baseIndex ==
+    static_assert(C2NumbersPortTuning::input::coreIndex ==
                   (I::kFlexibleFlag | kParamIndexNumbers), "bad index");
     static_assert(C2NumbersPortTuning::input::typeIndex ==
                   (I::kFlexibleFlag | kParamIndexNumbers | I::kTypeTuning | I::kDirInput), "bad index");
-    static_assert(C2NumbersPortTuning::output::baseIndex ==
+    static_assert(C2NumbersPortTuning::output::coreIndex ==
                   (I::kFlexibleFlag | kParamIndexNumbers), "bad index");
     static_assert(C2NumbersPortTuning::output::typeIndex ==
                   (I::kFlexibleFlag | kParamIndexNumbers | I::kTypeTuning | I::kDirOutput), "bad index");
@@ -878,11 +998,11 @@ void _C2ParamInspector::StaticFlexTest() {
     static_assert(sizeof(C2NumbersStreamTuning) == 8, "bad size");
     // C2NumbersStreamTuning::input kIndex | tun | str | input      (int, args)
     // C2NumbersStreamTuning::output kIx   | tun | str | output     (int, args)
-    static_assert(C2NumbersStreamTuning::input::baseIndex ==
+    static_assert(C2NumbersStreamTuning::input::coreIndex ==
                   (I::kFlexibleFlag | kParamIndexNumbers), "bad index");
     static_assert(C2NumbersStreamTuning::input::typeIndex ==
                   (I::kFlexibleFlag | kParamIndexNumbers | I::kTypeTuning | I::kDirInput | I::kStreamFlag), "bad index");
-    static_assert(C2NumbersStreamTuning::output::baseIndex ==
+    static_assert(C2NumbersStreamTuning::output::coreIndex ==
                   (I::kFlexibleFlag | kParamIndexNumbers), "bad index");
     static_assert(C2NumbersStreamTuning::output::typeIndex ==
                   (I::kFlexibleFlag | kParamIndexNumbers | I::kTypeTuning | I::kDirOutput | I::kStreamFlag), "bad index");
@@ -896,6 +1016,80 @@ void _C2ParamInspector::StaticFlexTest() {
     static_assert(offsetof(C2NumbersStreamTuning::output, m.mNumbers) == 8, "bad offset");
 }
 
+template<bool, unsigned ...N>
+struct _print_as_warning { };
+
+template<unsigned ...N>
+struct _print_as_warning<true, N...> : std::true_type { };
+
+#define static_assert_equals(a, b, msg) \
+static_assert(_print_as_warning<(a) == (b), a, b>::value, msg)
+
+void _C2ParamInspector::StaticFlexFromBaseTest() {
+    enum { kParamIndexMy = 1203 };
+    typedef C2TestBaseFlexEndSizeStruct C2MyStruct;
+    typedef C2GlobalParam<C2Info, C2MyStruct, kParamIndexMy> C2MyInfo;
+    typedef   C2PortParam<C2Info, C2MyStruct, kParamIndexMy> C2MyPortInfo;
+    typedef C2StreamParam<C2Info, C2MyStruct, kParamIndexMy> C2MyStreamInfo;
+
+    typedef C2Param::Index I;
+
+    // C2MyStruct has no coreIndex
+    //static_assert(C2MyStruct::coreIndex == (I::kFlexibleFlag | kParamIndexMy), "bad index");
+    static_assert(sizeof(C2MyStruct) == 4, "bad size");
+
+    // C2MyInfo:             kIndex | tun | global           (args)
+    static_assert_equals(C2MyInfo::coreIndex, (I::kFlexibleFlag | kParamIndexMy), "bad index");
+    static_assert_equals(C2MyInfo::typeIndex, (I::kFlexibleFlag | kParamIndexMy | I::kTypeInfo | I::kDirGlobal), "bad index");
+    static_assert(sizeof(C2MyInfo) == 12, "bad size");
+
+    static_assert(offsetof(C2MyInfo, _mSize) == 0, "bad size");
+    static_assert(offsetof(C2MyInfo, _mIndex) == 4, "bad offset");
+    static_assert(offsetof(C2MyInfo, m.mSigned32) == 8, "bad offset");
+
+    // C2MyPortInfo:         kIndex | tun | port             (bool, args)
+    static_assert(sizeof(C2MyPortInfo) == 12, "bad size");
+    // C2MyPortInfo::input:  kIndex | tun | port | input     (args)
+    // C2MyPortInfo::output: kIndex | tun | port | output    (args)
+    static_assert(C2MyPortInfo::input::coreIndex ==
+                  (I::kFlexibleFlag | kParamIndexMy), "bad index");
+    static_assert(C2MyPortInfo::input::typeIndex ==
+                  (I::kFlexibleFlag | kParamIndexMy | I::kTypeInfo | I::kDirInput), "bad index");
+    static_assert(C2MyPortInfo::output::coreIndex ==
+                  (I::kFlexibleFlag | kParamIndexMy), "bad index");
+    static_assert(C2MyPortInfo::output::typeIndex ==
+                  (I::kFlexibleFlag | kParamIndexMy | I::kTypeInfo | I::kDirOutput), "bad index");
+    static_assert(sizeof(C2MyPortInfo::input) == 12, "bad size");
+    static_assert(sizeof(C2MyPortInfo::output) == 12, "bad size");
+    static_assert(offsetof(C2MyPortInfo::input, _mSize) == 0, "bad size");
+    static_assert(offsetof(C2MyPortInfo::input, _mIndex) == 4, "bad offset");
+    static_assert(offsetof(C2MyPortInfo::input, m.mSigned32) == 8, "bad offset");
+    static_assert(offsetof(C2MyPortInfo::output, _mSize) == 0, "bad size");
+    static_assert(offsetof(C2MyPortInfo::output, _mIndex) == 4, "bad offset");
+    static_assert(offsetof(C2MyPortInfo::output, m.mSigned32) == 8, "bad offset");
+
+    // C2MyStreamInfo:       kIndex | tun | str              (bool, uint, args)
+    static_assert(sizeof(C2MyStreamInfo) == 12, "bad size");
+    // C2MyStreamInfo::input kIndex | tun | str | input      (int, args)
+    // C2MyStreamInfo::output kIx   | tun | str | output     (int, args)
+    static_assert(C2MyStreamInfo::input::coreIndex ==
+                  (I::kFlexibleFlag | kParamIndexMy), "bad index");
+    static_assert(C2MyStreamInfo::input::typeIndex ==
+                  (I::kFlexibleFlag | kParamIndexMy | I::kTypeInfo | I::kDirInput | I::kStreamFlag), "bad index");
+    static_assert(C2MyStreamInfo::output::coreIndex ==
+                  (I::kFlexibleFlag | kParamIndexMy), "bad index");
+    static_assert(C2MyStreamInfo::output::typeIndex ==
+                  (I::kFlexibleFlag | kParamIndexMy | I::kTypeInfo | I::kDirOutput | I::kStreamFlag), "bad index");
+    static_assert(sizeof(C2MyStreamInfo::input) == 12, "bad size");
+    static_assert(sizeof(C2MyStreamInfo::output) == 12, "bad size");
+    static_assert(offsetof(C2MyStreamInfo::input, _mSize) == 0, "bad size");
+    static_assert(offsetof(C2MyStreamInfo::input, _mIndex) == 4, "bad offset");
+    static_assert(offsetof(C2MyStreamInfo::input, m.mSigned32) == 8, "bad offset");
+    static_assert(offsetof(C2MyStreamInfo::output, _mSize) == 0, "bad size");
+    static_assert(offsetof(C2MyStreamInfo::output, _mIndex) == 4, "bad offset");
+    static_assert(offsetof(C2MyStreamInfo::output, m.mSigned32) == 8, "bad offset");
+}
+
 TEST_F(C2ParamTest, ParamOpsTest) {
     const C2NumberStruct str(100);
     C2NumberStruct bstr;
@@ -904,10 +1098,10 @@ TEST_F(C2ParamTest, ParamOpsTest) {
         EXPECT_EQ(100, str.mNumber);
         bstr.mNumber = 100;
 
-        C2Param::BaseIndex index = C2NumberStruct::baseIndex;
+        C2Param::BaseIndex index = C2NumberStruct::coreIndex;
         EXPECT_FALSE(index.isVendor());
         EXPECT_FALSE(index.isFlexible());
-        EXPECT_EQ(index.baseIndex(), kParamIndexNumber);
+        EXPECT_EQ(index.coreIndex(), kParamIndexNumber);
         EXPECT_EQ(index.paramIndex(), kParamIndexNumber);
     }
 
@@ -941,15 +1135,15 @@ TEST_F(C2ParamTest, ParamOpsTest) {
         EXPECT_EQ(tun, btun);
 
         // index
-        EXPECT_EQ(C2Param::Type(tun.type()).baseIndex(), C2NumberStruct::baseIndex);
+        EXPECT_EQ(C2Param::Type(tun.type()).coreIndex(), C2NumberStruct::coreIndex);
         EXPECT_EQ(C2Param::Type(tun.type()).paramIndex(), kParamIndexNumber);
         EXPECT_EQ(tun.type(), C2NumberTuning::typeIndex);
         EXPECT_EQ(tun.stream(), ~0u);
 
-        C2Param::BaseIndex index = C2NumberTuning::baseIndex;
+        C2Param::BaseIndex index = C2NumberTuning::coreIndex;
         EXPECT_FALSE(index.isVendor());
         EXPECT_FALSE(index.isFlexible());
-        EXPECT_EQ(index.baseIndex(), kParamIndexNumber);
+        EXPECT_EQ(index.coreIndex(), kParamIndexNumber);
         EXPECT_EQ(index.paramIndex(), kParamIndexNumber);
 
         C2Param::Type type = C2NumberTuning::typeIndex;
@@ -1095,22 +1289,22 @@ TEST_F(C2ParamTest, ParamOpsTest) {
         EXPECT_TRUE(inp1 == boutp1);
 
         // index
-        EXPECT_EQ(C2Param::Type(inp1.type()).baseIndex(), C2NumberStruct::baseIndex);
+        EXPECT_EQ(C2Param::Type(inp1.type()).coreIndex(), C2NumberStruct::coreIndex);
         EXPECT_EQ(C2Param::Type(inp1.type()).paramIndex(), kParamIndexNumber);
         EXPECT_EQ(inp1.type(), C2NumberPortTuning::input::typeIndex);
         EXPECT_EQ(inp1.stream(), ~0u);
 
-        EXPECT_EQ(C2Param::Type(inp2.type()).baseIndex(), C2NumberStruct::baseIndex);
+        EXPECT_EQ(C2Param::Type(inp2.type()).coreIndex(), C2NumberStruct::coreIndex);
         EXPECT_EQ(C2Param::Type(inp2.type()).paramIndex(), kParamIndexNumber);
         EXPECT_EQ(inp2.type(), C2NumberPortTuning::input::typeIndex);
         EXPECT_EQ(inp2.stream(), ~0u);
 
-        EXPECT_EQ(C2Param::Type(outp1.type()).baseIndex(), C2NumberStruct::baseIndex);
+        EXPECT_EQ(C2Param::Type(outp1.type()).coreIndex(), C2NumberStruct::coreIndex);
         EXPECT_EQ(C2Param::Type(outp1.type()).paramIndex(), kParamIndexNumber);
         EXPECT_EQ(outp1.type(), C2NumberPortTuning::output::typeIndex);
         EXPECT_EQ(outp1.stream(), ~0u);
 
-        EXPECT_EQ(C2Param::Type(outp2.type()).baseIndex(), C2NumberStruct::baseIndex);
+        EXPECT_EQ(C2Param::Type(outp2.type()).coreIndex(), C2NumberStruct::coreIndex);
         EXPECT_EQ(C2Param::Type(outp2.type()).paramIndex(), kParamIndexNumber);
         EXPECT_EQ(outp2.type(), C2NumberPortTuning::output::typeIndex);
         EXPECT_EQ(outp2.stream(), ~0u);
@@ -1118,13 +1312,13 @@ TEST_F(C2ParamTest, ParamOpsTest) {
         C2Param::BaseIndex index = C2NumberPortTuning::input::typeIndex;
         EXPECT_FALSE(index.isVendor());
         EXPECT_FALSE(index.isFlexible());
-        EXPECT_EQ(index.baseIndex(), kParamIndexNumber);
+        EXPECT_EQ(index.coreIndex(), kParamIndexNumber);
         EXPECT_EQ(index.paramIndex(), kParamIndexNumber);
 
         index = C2NumberPortTuning::output::typeIndex;
         EXPECT_FALSE(index.isVendor());
         EXPECT_FALSE(index.isFlexible());
-        EXPECT_EQ(index.baseIndex(), kParamIndexNumber);
+        EXPECT_EQ(index.coreIndex(), kParamIndexNumber);
         EXPECT_EQ(index.paramIndex(), kParamIndexNumber);
 
         C2Param::Type type = C2NumberPortTuning::input::typeIndex;
@@ -1315,32 +1509,32 @@ TEST_F(C2ParamTest, ParamOpsTest) {
         EXPECT_TRUE(ins1 == bouts1);
 
         // index
-        EXPECT_EQ(C2Param::Type(ins1.type()).baseIndex(), C2NumberStruct::baseIndex);
+        EXPECT_EQ(C2Param::Type(ins1.type()).coreIndex(), C2NumberStruct::coreIndex);
         EXPECT_EQ(C2Param::Type(ins1.type()).paramIndex(), kParamIndexNumber);
         EXPECT_EQ(ins1.type(), C2NumberStreamTuning::input::typeIndex);
 
-        EXPECT_EQ(C2Param::Type(ins2.type()).baseIndex(), C2NumberStruct::baseIndex);
+        EXPECT_EQ(C2Param::Type(ins2.type()).coreIndex(), C2NumberStruct::coreIndex);
         EXPECT_EQ(C2Param::Type(ins2.type()).paramIndex(), kParamIndexNumber);
         EXPECT_EQ(ins2.type(), C2NumberStreamTuning::input::typeIndex);
 
-        EXPECT_EQ(C2Param::Type(outs1.type()).baseIndex(), C2NumberStruct::baseIndex);
+        EXPECT_EQ(C2Param::Type(outs1.type()).coreIndex(), C2NumberStruct::coreIndex);
         EXPECT_EQ(C2Param::Type(outs1.type()).paramIndex(), kParamIndexNumber);
         EXPECT_EQ(outs1.type(), C2NumberStreamTuning::output::typeIndex);
 
-        EXPECT_EQ(C2Param::Type(outs2.type()).baseIndex(), C2NumberStruct::baseIndex);
+        EXPECT_EQ(C2Param::Type(outs2.type()).coreIndex(), C2NumberStruct::coreIndex);
         EXPECT_EQ(C2Param::Type(outs2.type()).paramIndex(), kParamIndexNumber);
         EXPECT_EQ(outs2.type(), C2NumberStreamTuning::output::typeIndex);
 
         C2Param::BaseIndex index = C2NumberStreamTuning::input::typeIndex;
         EXPECT_FALSE(index.isVendor());
         EXPECT_FALSE(index.isFlexible());
-        EXPECT_EQ(index.baseIndex(), kParamIndexNumber);
+        EXPECT_EQ(index.coreIndex(), kParamIndexNumber);
         EXPECT_EQ(index.paramIndex(), kParamIndexNumber);
 
         index = C2NumberStreamTuning::output::typeIndex;
         EXPECT_FALSE(index.isVendor());
         EXPECT_FALSE(index.isFlexible());
-        EXPECT_EQ(index.baseIndex(), kParamIndexNumber);
+        EXPECT_EQ(index.coreIndex(), kParamIndexNumber);
         EXPECT_EQ(index.paramIndex(), kParamIndexNumber);
 
         C2Param::Type type = C2NumberStreamTuning::input::typeIndex;
@@ -1420,11 +1614,11 @@ TEST_F(C2ParamTest, ParamOpsTest) {
     }
 }
 
-void StaticTestAddBaseIndex() {
+void StaticTestAddCoreIndex() {
     struct nobase {};
-    struct base { enum : uint32_t { baseIndex = 1 }; };
-    static_assert(C2AddBaseIndex<nobase, 2>::baseIndex == 2, "should be 2");
-    static_assert(C2AddBaseIndex<base, 1>::baseIndex == 1, "should be 1");
+    struct base { enum : uint32_t { coreIndex = 1 }; };
+    static_assert(C2AddCoreIndex<nobase, 2>::coreIndex == 2, "should be 2");
+    static_assert(C2AddCoreIndex<base, 1>::coreIndex == 1, "should be 1");
 }
 
 class TestFlexHelper {
@@ -1464,10 +1658,10 @@ TEST_F(C2ParamTest, FlexParamOpsTest) {
 //        EXPECT_EQ(100, str->m.mNumbers[0]);
         (void)&bstr.mNumbers[0];
 
-        C2Param::BaseIndex index = C2NumbersStruct::baseIndex;
+        C2Param::BaseIndex index = C2NumbersStruct::coreIndex;
         EXPECT_FALSE(index.isVendor());
         EXPECT_TRUE(index.isFlexible());
-        EXPECT_EQ(index.baseIndex(), kParamIndexNumbers | C2Param::BaseIndex::_kFlexibleFlag);
+        EXPECT_EQ(index.coreIndex(), kParamIndexNumbers | C2Param::BaseIndex::_kFlexibleFlag);
         EXPECT_EQ(index.paramIndex(), kParamIndexNumbers);
     }
 
@@ -1504,15 +1698,15 @@ TEST_F(C2ParamTest, FlexParamOpsTest) {
         EXPECT_EQ(*tun, *btun);
 
         // index
-        EXPECT_EQ(C2Param::Type(tun->type()).baseIndex(), C2NumbersStruct::baseIndex);
+        EXPECT_EQ(C2Param::Type(tun->type()).coreIndex(), C2NumbersStruct::coreIndex);
         EXPECT_EQ(C2Param::Type(tun->type()).paramIndex(), kParamIndexNumbers);
         EXPECT_EQ(tun->type(), C2NumbersTuning::typeIndex);
         EXPECT_EQ(tun->stream(), ~0u);
 
-        C2Param::BaseIndex index = C2NumbersTuning::baseIndex;
+        C2Param::BaseIndex index = C2NumbersTuning::coreIndex;
         EXPECT_FALSE(index.isVendor());
         EXPECT_TRUE(index.isFlexible());
-        EXPECT_EQ(index.baseIndex(), kParamIndexNumbers | C2Param::BaseIndex::_kFlexibleFlag);
+        EXPECT_EQ(index.coreIndex(), kParamIndexNumbers | C2Param::BaseIndex::_kFlexibleFlag);
         EXPECT_EQ(index.paramIndex(), kParamIndexNumbers);
 
         C2Param::Type type = C2NumbersTuning::typeIndex;
@@ -1673,22 +1867,22 @@ TEST_F(C2ParamTest, FlexParamOpsTest) {
         EXPECT_TRUE(*inp1 == *boutp1);
 
         // index
-        EXPECT_EQ(C2Param::Type(inp1->type()).baseIndex(), C2NumbersStruct::baseIndex);
+        EXPECT_EQ(C2Param::Type(inp1->type()).coreIndex(), C2NumbersStruct::coreIndex);
         EXPECT_EQ(C2Param::Type(inp1->type()).paramIndex(), kParamIndexNumbers);
         EXPECT_EQ(inp1->type(), C2NumbersPortTuning::input::typeIndex);
         EXPECT_EQ(inp1->stream(), ~0u);
 
-        EXPECT_EQ(C2Param::Type(inp2->type()).baseIndex(), C2NumbersStruct::baseIndex);
+        EXPECT_EQ(C2Param::Type(inp2->type()).coreIndex(), C2NumbersStruct::coreIndex);
         EXPECT_EQ(C2Param::Type(inp2->type()).paramIndex(), kParamIndexNumbers);
         EXPECT_EQ(inp2->type(), C2NumbersPortTuning::input::typeIndex);
         EXPECT_EQ(inp2->stream(), ~0u);
 
-        EXPECT_EQ(C2Param::Type(outp1->type()).baseIndex(), C2NumbersStruct::baseIndex);
+        EXPECT_EQ(C2Param::Type(outp1->type()).coreIndex(), C2NumbersStruct::coreIndex);
         EXPECT_EQ(C2Param::Type(outp1->type()).paramIndex(), kParamIndexNumbers);
         EXPECT_EQ(outp1->type(), C2NumbersPortTuning::output::typeIndex);
         EXPECT_EQ(outp1->stream(), ~0u);
 
-        EXPECT_EQ(C2Param::Type(outp2->type()).baseIndex(), C2NumbersStruct::baseIndex);
+        EXPECT_EQ(C2Param::Type(outp2->type()).coreIndex(), C2NumbersStruct::coreIndex);
         EXPECT_EQ(C2Param::Type(outp2->type()).paramIndex(), kParamIndexNumbers);
         EXPECT_EQ(outp2->type(), C2NumbersPortTuning::output::typeIndex);
         EXPECT_EQ(outp2->stream(), ~0u);
@@ -1696,13 +1890,13 @@ TEST_F(C2ParamTest, FlexParamOpsTest) {
         C2Param::BaseIndex index = C2NumbersPortTuning::input::typeIndex;
         EXPECT_FALSE(index.isVendor());
         EXPECT_TRUE(index.isFlexible());
-        EXPECT_EQ(index.baseIndex(), kParamIndexNumbers | C2Param::BaseIndex::_kFlexibleFlag);
+        EXPECT_EQ(index.coreIndex(), kParamIndexNumbers | C2Param::BaseIndex::_kFlexibleFlag);
         EXPECT_EQ(index.paramIndex(), kParamIndexNumbers);
 
         index = C2NumbersPortTuning::output::typeIndex;
         EXPECT_FALSE(index.isVendor());
         EXPECT_TRUE(index.isFlexible());
-        EXPECT_EQ(index.baseIndex(), kParamIndexNumbers | C2Param::BaseIndex::_kFlexibleFlag);
+        EXPECT_EQ(index.coreIndex(), kParamIndexNumbers | C2Param::BaseIndex::_kFlexibleFlag);
         EXPECT_EQ(index.paramIndex(), kParamIndexNumbers);
 
         C2Param::Type type = C2NumbersPortTuning::input::typeIndex;
@@ -1910,32 +2104,32 @@ TEST_F(C2ParamTest, FlexParamOpsTest) {
         EXPECT_TRUE(*ins1 == *bouts1);
 
         // index
-        EXPECT_EQ(C2Param::Type(ins1->type()).baseIndex(), C2NumbersStruct::baseIndex);
+        EXPECT_EQ(C2Param::Type(ins1->type()).coreIndex(), C2NumbersStruct::coreIndex);
         EXPECT_EQ(C2Param::Type(ins1->type()).paramIndex(), kParamIndexNumbers);
         EXPECT_EQ(ins1->type(), C2NumbersStreamTuning::input::typeIndex);
 
-        EXPECT_EQ(C2Param::Type(ins2->type()).baseIndex(), C2NumbersStruct::baseIndex);
+        EXPECT_EQ(C2Param::Type(ins2->type()).coreIndex(), C2NumbersStruct::coreIndex);
         EXPECT_EQ(C2Param::Type(ins2->type()).paramIndex(), kParamIndexNumbers);
         EXPECT_EQ(ins2->type(), C2NumbersStreamTuning::input::typeIndex);
 
-        EXPECT_EQ(C2Param::Type(outs1->type()).baseIndex(), C2NumbersStruct::baseIndex);
+        EXPECT_EQ(C2Param::Type(outs1->type()).coreIndex(), C2NumbersStruct::coreIndex);
         EXPECT_EQ(C2Param::Type(outs1->type()).paramIndex(), kParamIndexNumbers);
         EXPECT_EQ(outs1->type(), C2NumbersStreamTuning::output::typeIndex);
 
-        EXPECT_EQ(C2Param::Type(outs2->type()).baseIndex(), C2NumbersStruct::baseIndex);
+        EXPECT_EQ(C2Param::Type(outs2->type()).coreIndex(), C2NumbersStruct::coreIndex);
         EXPECT_EQ(C2Param::Type(outs2->type()).paramIndex(), kParamIndexNumbers);
         EXPECT_EQ(outs2->type(), C2NumbersStreamTuning::output::typeIndex);
 
         C2Param::BaseIndex index = C2NumbersStreamTuning::input::typeIndex;
         EXPECT_FALSE(index.isVendor());
         EXPECT_TRUE(index.isFlexible());
-        EXPECT_EQ(index.baseIndex(), kParamIndexNumbers | C2Param::BaseIndex::_kFlexibleFlag);
+        EXPECT_EQ(index.coreIndex(), kParamIndexNumbers | C2Param::BaseIndex::_kFlexibleFlag);
         EXPECT_EQ(index.paramIndex(), kParamIndexNumbers);
 
         index = C2NumbersStreamTuning::output::typeIndex;
         EXPECT_FALSE(index.isVendor());
         EXPECT_TRUE(index.isFlexible());
-        EXPECT_EQ(index.baseIndex(), kParamIndexNumbers | C2Param::BaseIndex::_kFlexibleFlag);
+        EXPECT_EQ(index.coreIndex(), kParamIndexNumbers | C2Param::BaseIndex::_kFlexibleFlag);
         EXPECT_EQ(index.paramIndex(), kParamIndexNumbers);
 
         C2Param::Type type = C2NumbersStreamTuning::input::typeIndex;
@@ -2284,8 +2478,8 @@ public:
         MyParamReflector(const MyComponentInstance *i) : instance(i) { }
 
         virtual std::unique_ptr<C2StructDescriptor> describe(C2Param::BaseIndex paramIndex) {
-            switch (paramIndex.baseIndex()) {
-            case decltype(instance->mDomainInfo)::baseIndex:
+            switch (paramIndex.coreIndex()) {
+            case decltype(instance->mDomainInfo)::coreIndex:
             default:
                 return std::unique_ptr<C2StructDescriptor>(new C2StructDescriptor{
                     instance->mDomainInfo.type(),
@@ -2460,7 +2654,7 @@ void dumpType(FD::Type type) {
 void dumpStruct(const C2StructDescriptor &sd) {
     using namespace std;
     cout << "struct ";
-    dumpType(sd.baseIndex());
+    dumpType(sd.coreIndex());
     cout << " {" << endl;
     //C2FieldDescriptor &f;
     for (const C2FieldDescriptor &f : sd) {

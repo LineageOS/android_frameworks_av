@@ -59,35 +59,35 @@ struct C2_HIDE _C2Comparable
                         || decltype(_C2Comparable_impl::__testNE<S>(0))::value> {
 };
 
-///  Helper class that checks if a type has a baseIndex constant.
-struct C2_HIDE _C2BaseIndexHelper_impl
+///  Helper class that checks if a type has a coreIndex constant.
+struct C2_HIDE _C2CoreIndexHelper_impl
 {
-    template<typename S, int=S::baseIndex>
-    static std::true_type __testBaseIndex(int);
+    template<typename S, int=S::coreIndex>
+    static std::true_type __testCoreIndex(int);
     template<typename>
-    static std::false_type __testBaseIndex(...);
+    static std::false_type __testCoreIndex(...);
 };
 
-/// Helper template that verifies a type's baseIndex and creates it if the type does not have one.
-template<typename S, int BaseIndex,
-        bool HasBase=decltype(_C2BaseIndexHelper_impl::__testBaseIndex<S>(0))::value>
-struct C2_HIDE C2BaseIndexOverride {
-    // TODO: what if we allow structs without baseIndex?
-    static_assert(BaseIndex == S::baseIndex, "baseIndex differs from structure");
+/// Helper template that verifies a type's coreIndex and creates it if the type does not have one.
+template<typename S, int CoreIndex,
+        bool HasBase=decltype(_C2CoreIndexHelper_impl::__testCoreIndex<S>(0))::value>
+struct C2_HIDE C2CoreIndexOverride {
+    // TODO: what if we allow structs without coreIndex?
+    static_assert(CoreIndex == S::coreIndex, "coreIndex differs from structure");
 };
 
-/// Specialization for types without a baseIndex.
-template<typename S, int BaseIndex>
-struct C2_HIDE C2BaseIndexOverride<S, BaseIndex, false> {
+/// Specialization for types without a coreIndex.
+template<typename S, int CoreIndex>
+struct C2_HIDE C2CoreIndexOverride<S, CoreIndex, false> {
 public:
     enum : uint32_t {
-        baseIndex = BaseIndex, ///< baseIndex override.
+        coreIndex = CoreIndex, ///< coreIndex override.
     };
 };
 
-/// Helper template that adds a baseIndex to a type if it does not have one.
-template<typename S, int BaseIndex>
-struct C2_HIDE C2AddBaseIndex : public S, public C2BaseIndexOverride<S, BaseIndex> {};
+/// Helper template that adds a coreIndex to a type if it does not have one.
+template<typename S, int CoreIndex>
+struct C2_HIDE C2AddCoreIndex : public S, public C2CoreIndexOverride<S, CoreIndex> {};
 
 /**
  * \brief Helper class to check struct requirements for parameters.
@@ -96,7 +96,7 @@ struct C2_HIDE C2AddBaseIndex : public S, public C2BaseIndexOverride<S, BaseInde
  *  - verify default constructor, no virtual methods, and no equality operators.
  *  - expose typeIndex, and non-flex flexSize.
  */
-template<typename S, int BaseIndex, unsigned TypeIndex>
+template<typename S, int CoreIndex, unsigned TypeIndex>
 struct C2_HIDE C2StructCheck {
     static_assert(
             std::is_default_constructible<S>::value, "C2 structure must have default constructor");
@@ -105,7 +105,7 @@ struct C2_HIDE C2StructCheck {
 
 public:
     enum : uint32_t {
-        typeIndex = BaseIndex | TypeIndex
+        typeIndex = CoreIndex | TypeIndex
     };
 
 protected:
@@ -161,17 +161,19 @@ struct C2_HIDE _C2FlexHelper<S[],
  * \brief Helper class to check flexible struct requirements and add common operations.
  *
  * Features:
- *  - expose baseIndex and fieldList (this is normally inherited from the struct, but flexible
+ *  - expose coreIndex and fieldList (this is normally inherited from the struct, but flexible
  *    structs cannot be base classes and thus inherited from)
  *  - disable copy assignment and construction (TODO: this is already done in the FLEX macro for the
  *    flexible struct, so may not be needed here)
  */
-template<typename S, int BaseIndex, unsigned TypeIndex>
-struct C2_HIDE C2FlexStructCheck : public C2StructCheck<S, BaseIndex, TypeIndex> {
+template<typename S, int ParamIndex, unsigned TypeIndex>
+struct C2_HIDE C2FlexStructCheck :
+// add flexible flag as C2StructCheck defines typeIndex
+        public C2StructCheck<S, ParamIndex | C2Param::BaseIndex::_kFlexibleFlag, TypeIndex> {
 public:
     enum : uint32_t {
         /// \hideinitializer
-        baseIndex = BaseIndex | C2Param::BaseIndex::_kFlexibleFlag, ///< flexible struct base-index
+        coreIndex = ParamIndex | C2Param::BaseIndex::_kFlexibleFlag, ///< flexible struct core-index
     };
 
     const static std::initializer_list<const C2FieldDescriptor> fieldList; // TODO assign here
@@ -181,8 +183,8 @@ public:
 
 protected:
     // cannot copy flexible params
-    C2FlexStructCheck(const C2FlexStructCheck<S, BaseIndex, TypeIndex> &) = delete;
-    C2FlexStructCheck& operator= (const C2FlexStructCheck<S, BaseIndex, TypeIndex> &) = delete;
+    C2FlexStructCheck(const C2FlexStructCheck<S, ParamIndex, TypeIndex> &) = delete;
+    C2FlexStructCheck& operator= (const C2FlexStructCheck<S, ParamIndex, TypeIndex> &) = delete;
 
     // constants used for helper methods
     enum : uint32_t {
@@ -215,8 +217,9 @@ protected:
 
 // TODO: this probably does not work.
 /// Expose fieldList from subClass;
-template<typename S, int BaseIndex, unsigned TypeIndex>
-const std::initializer_list<const C2FieldDescriptor> C2FlexStructCheck<S, BaseIndex, TypeIndex>::fieldList = S::fieldList;
+template<typename S, int ParamIndex, unsigned TypeIndex>
+const std::initializer_list<const C2FieldDescriptor>
+C2FlexStructCheck<S, ParamIndex, TypeIndex>::fieldList = S::fieldList;
 
 /// Define From() cast operators for params.
 #define DEFINE_CAST_OPERATORS(_type) \
@@ -299,7 +302,7 @@ public: \
  * Global-parameter template.
  *
  * Base template to define a global setting/tuning or info based on a structure and
- * an optional BaseIndex. Global parameters are not tied to a port (input or output).
+ * an optional ParamIndex. Global parameters are not tied to a port (input or output).
  *
  * Parameters wrap structures by prepending a (parameter) header. The fields of the wrapped
  * structure can be accessed directly, and constructors and potential public methods are also
@@ -307,13 +310,14 @@ public: \
  *
  * \tparam T param type C2Setting, C2Tuning or C2Info
  * \tparam S wrapped structure
- * \tparam BaseIndex optional base-index override. Must be specified for common/reused structures.
+ * \tparam ParamIndex optional parameter index override. Must be specified for base/reused
+ * structures.
  */
-template<typename T, typename S, int BaseIndex=S::baseIndex, class Flex=void>
-struct C2_HIDE C2GlobalParam : public T, public S, public C2BaseIndexOverride<S, BaseIndex>,
-        public C2StructCheck<S, BaseIndex, T::indexFlags | T::Type::kDirGlobal> {
+template<typename T, typename S, int ParamIndex=S::coreIndex, class Flex=void>
+struct C2_HIDE C2GlobalParam : public T, public S, public C2CoreIndexOverride<S, ParamIndex>,
+        public C2StructCheck<S, ParamIndex, T::indexFlags | T::Type::kDirGlobal> {
 private:
-    typedef C2GlobalParam<T, S, BaseIndex> _type;
+    typedef C2GlobalParam<T, S, ParamIndex> _type;
 
 public:
     /// Wrapper around base structure's constructor.
@@ -327,21 +331,22 @@ public:
  * Global-parameter template for flexible structures.
  *
  * Base template to define a global setting/tuning or info based on a flexible structure and
- * an optional BaseIndex. Global parameters are not tied to a port (input or output).
+ * an optional ParamIndex. Global parameters are not tied to a port (input or output).
  *
  * \tparam T param type C2Setting, C2Tuning or C2Info
  * \tparam S wrapped flexible structure
- * \tparam BaseIndex optional base-index override. Must be specified for common/reused structures.
+ * \tparam ParamIndex optional parameter index override. Must be specified for base/reused
+ *         structures.
  *
  * Parameters wrap structures by prepending a (parameter) header. The fields and methods of flexible
  * structures can be accessed via the m member variable; however, the constructors of the structure
  * are wrapped directly. (This is because flexible types cannot be subclassed.)
  */
-template<typename T, typename S, int BaseIndex>
-struct C2_HIDE C2GlobalParam<T, S, BaseIndex, IF_FLEXIBLE(S)>
-    : public T, public C2FlexStructCheck<S, BaseIndex, T::indexFlags | T::Type::kDirGlobal> {
+template<typename T, typename S, int ParamIndex>
+struct C2_HIDE C2GlobalParam<T, S, ParamIndex, IF_FLEXIBLE(S)>
+    : public T, public C2FlexStructCheck<S, ParamIndex, T::indexFlags | T::Type::kDirGlobal> {
 private:
-    typedef C2GlobalParam<T, S, BaseIndex> _type;
+    typedef C2GlobalParam<T, S, ParamIndex> _type;
 
     /// Wrapper around base structure's constructor.
     template<typename ...Args>
@@ -359,12 +364,13 @@ public:
  * Port-parameter template.
  *
  * Base template to define a port setting/tuning or info based on a structure and
- * an optional BaseIndex. Port parameters are tied to a port (input or output), but not to a
+ * an optional ParamIndex. Port parameters are tied to a port (input or output), but not to a
  * specific stream.
  *
  * \tparam T param type C2Setting, C2Tuning or C2Info
  * \tparam S wrapped structure
- * \tparam BaseIndex optional base-index override. Must be specified for common/reused structures.
+ * \tparam ParamIndex optional parameter index override. Must be specified for base/reused
+ *         structures.
  *
  * Parameters wrap structures by prepending a (parameter) header. The fields of the wrapped
  * structure can be accessed directly, and constructors and potential public methods are also
@@ -373,11 +379,11 @@ public:
  * There are 3 flavors of port parameters: unspecified, input and output. Parameters with
  * unspecified port expose a setPort method, and add an initial port parameter to the constructor.
  */
-template<typename T, typename S, int BaseIndex=S::baseIndex, class Flex=void>
-struct C2_HIDE C2PortParam : public T, public S, public C2BaseIndexOverride<S, BaseIndex>,
-        private C2StructCheck<S, BaseIndex, T::indexFlags | T::Index::kDirUndefined> {
+template<typename T, typename S, int ParamIndex=S::coreIndex, class Flex=void>
+struct C2_HIDE C2PortParam : public T, public S, public C2CoreIndexOverride<S, ParamIndex>,
+        private C2StructCheck<S, ParamIndex, T::indexFlags | T::Index::kDirUndefined> {
 private:
-    typedef C2PortParam<T, S, BaseIndex> _type;
+    typedef C2PortParam<T, S, ParamIndex> _type;
 
 public:
     /// Default constructor.
@@ -392,8 +398,8 @@ public:
     DEFINE_CAST_OPERATORS(_type)
 
     /// Specialization for an input port parameter.
-    struct input : public T, public S, public C2BaseIndexOverride<S, BaseIndex>,
-            public C2StructCheck<S, BaseIndex, T::indexFlags | T::Index::kDirInput> {
+    struct input : public T, public S, public C2CoreIndexOverride<S, ParamIndex>,
+            public C2StructCheck<S, ParamIndex, T::indexFlags | T::Index::kDirInput> {
         /// Wrapper around base structure's constructor.
         template<typename ...Args>
         inline input(const Args(&... args)) : T(sizeof(_type), input::typeIndex), S(args...) { }
@@ -403,8 +409,8 @@ public:
     };
 
     /// Specialization for an output port parameter.
-    struct output : public T, public S, public C2BaseIndexOverride<S, BaseIndex>,
-            public C2StructCheck<S, BaseIndex, T::indexFlags | T::Index::kDirOutput> {
+    struct output : public T, public S, public C2CoreIndexOverride<S, ParamIndex>,
+            public C2StructCheck<S, ParamIndex, T::indexFlags | T::Index::kDirOutput> {
         /// Wrapper around base structure's constructor.
         template<typename ...Args>
         inline output(const Args(&... args)) : T(sizeof(_type), output::typeIndex), S(args...) { }
@@ -417,12 +423,13 @@ public:
  * Port-parameter template for flexible structures.
  *
  * Base template to define a port setting/tuning or info based on a flexible structure and
- * an optional BaseIndex. Port parameters are tied to a port (input or output), but not to a
+ * an optional ParamIndex. Port parameters are tied to a port (input or output), but not to a
  * specific stream.
  *
  * \tparam T param type C2Setting, C2Tuning or C2Info
  * \tparam S wrapped flexible structure
- * \tparam BaseIndex optional base-index override. Must be specified for common/reused structures.
+ * \tparam ParamIndex optional parameter index override. Must be specified for base/reused
+ *         structures.
  *
  * Parameters wrap structures by prepending a (parameter) header. The fields and methods of flexible
  * structures can be accessed via the m member variable; however, the constructors of the structure
@@ -431,11 +438,11 @@ public:
  * There are 3 flavors of port parameters: unspecified, input and output. Parameters with
  * unspecified port expose a setPort method, and add an initial port parameter to the constructor.
  */
-template<typename T, typename S, int BaseIndex>
-struct C2_HIDE C2PortParam<T, S, BaseIndex, IF_FLEXIBLE(S)>
-    : public T, public C2FlexStructCheck<S, BaseIndex, T::indexFlags | T::Type::kDirUndefined> {
+template<typename T, typename S, int ParamIndex>
+struct C2_HIDE C2PortParam<T, S, ParamIndex, IF_FLEXIBLE(S)>
+    : public T, public C2FlexStructCheck<S, ParamIndex, T::indexFlags | T::Type::kDirUndefined> {
 private:
-    typedef C2PortParam<T, S, BaseIndex> _type;
+    typedef C2PortParam<T, S, ParamIndex> _type;
 
     /// Default constructor for basic allocation: new(flexCount) P.
     inline C2PortParam(size_t flexCount) : T(_type::calcSize(flexCount), _type::typeIndex) { }
@@ -455,8 +462,8 @@ public:
     DEFINE_CAST_OPERATORS(_type)
 
     /// Specialization for an input port parameter.
-    struct input : public T, public C2BaseIndexOverride<S, BaseIndex>,
-            public C2FlexStructCheck<S, BaseIndex, T::indexFlags | T::Index::kDirInput> {
+    struct input : public T,
+            public C2FlexStructCheck<S, ParamIndex, T::indexFlags | T::Index::kDirInput> {
     private:
         /// Wrapper around base structure's constructor while also specifying port/direction.
         template<typename ...Args>
@@ -471,8 +478,8 @@ public:
     };
 
     /// Specialization for an output port parameter.
-    struct output : public T, public C2BaseIndexOverride<S, BaseIndex>,
-            public C2FlexStructCheck<S, BaseIndex, T::indexFlags | T::Index::kDirOutput> {
+    struct output : public T,
+            public C2FlexStructCheck<S, ParamIndex, T::indexFlags | T::Index::kDirOutput> {
     private:
         /// Wrapper around base structure's constructor while also specifying port/direction.
         template<typename ...Args>
@@ -491,12 +498,13 @@ public:
  * Stream-parameter template.
  *
  * Base template to define a stream setting/tuning or info based on a structure and
- * an optional BaseIndex. Stream parameters are tied to a specific stream on a port (input or
+ * an optional ParamIndex. Stream parameters are tied to a specific stream on a port (input or
  * output).
  *
  * \tparam T param type C2Setting, C2Tuning or C2Info
  * \tparam S wrapped structure
- * \tparam BaseIndex optional base-index override. Must be specified for common/reused structures.
+ * \tparam ParamIndex optional paramter index override. Must be specified for base/reused
+ *         structures.
  *
  * Parameters wrap structures by prepending a (parameter) header. The fields of the wrapped
  * structure can be accessed directly, and constructors and potential public methods are also
@@ -507,12 +515,12 @@ public:
  * parameters with unspecified port expose a setPort method, and add an additional initial port
  * parameter to the constructor.
  */
-template<typename T, typename S, int BaseIndex=S::baseIndex, class Flex=void>
-struct C2_HIDE C2StreamParam : public T, public S, public C2BaseIndexOverride<S, BaseIndex>,
-        private C2StructCheck<S, BaseIndex,
+template<typename T, typename S, int ParamIndex=S::coreIndex, class Flex=void>
+struct C2_HIDE C2StreamParam : public T, public S, public C2CoreIndexOverride<S, ParamIndex>,
+        private C2StructCheck<S, ParamIndex,
                 T::indexFlags | T::Index::kStreamFlag | T::Index::kDirUndefined> {
 private:
-    typedef C2StreamParam<T, S, BaseIndex> _type;
+    typedef C2StreamParam<T, S, ParamIndex> _type;
 
 public:
     /// Default constructor. Port/direction and stream-ID is undefined.
@@ -531,8 +539,8 @@ public:
     DEFINE_CAST_OPERATORS(_type)
 
     /// Specialization for an input stream parameter.
-    struct input : public T, public S, public C2BaseIndexOverride<S, BaseIndex>,
-            public C2StructCheck<S, BaseIndex,
+    struct input : public T, public S, public C2CoreIndexOverride<S, ParamIndex>,
+            public C2StructCheck<S, ParamIndex,
                     T::indexFlags | T::Index::kStreamFlag | T::Type::kDirInput> {
         /// Default constructor. Stream-ID is undefined.
         inline input() : T(sizeof(_type), input::typeIndex) { }
@@ -547,8 +555,8 @@ public:
     };
 
     /// Specialization for an output stream parameter.
-    struct output : public T, public S, public C2BaseIndexOverride<S, BaseIndex>,
-            public C2StructCheck<S, BaseIndex,
+    struct output : public T, public S, public C2CoreIndexOverride<S, ParamIndex>,
+            public C2StructCheck<S, ParamIndex,
                     T::indexFlags | T::Index::kStreamFlag | T::Type::kDirOutput> {
         /// Default constructor. Stream-ID is undefined.
         inline output() : T(sizeof(_type), output::typeIndex) { }
@@ -567,12 +575,13 @@ public:
  * Stream-parameter template for flexible structures.
  *
  * Base template to define a stream setting/tuning or info based on a flexible structure and
- * an optional BaseIndex. Stream parameters are tied to a specific stream on a port (input or
+ * an optional ParamIndex. Stream parameters are tied to a specific stream on a port (input or
  * output).
  *
  * \tparam T param type C2Setting, C2Tuning or C2Info
  * \tparam S wrapped flexible structure
- * \tparam BaseIndex optional base-index override. Must be specified for common/reused structures.
+ * \tparam ParamIndex optional parameter index override. Must be specified for base/reused
+ *         structures.
  *
  * Parameters wrap structures by prepending a (parameter) header. The fields and methods of flexible
  * structures can be accessed via the m member variable; however, the constructors of the structure
@@ -583,13 +592,13 @@ public:
  * parameters with unspecified port expose a setPort method, and add an additional initial port
  * parameter to the constructor.
  */
-template<typename T, typename S, int BaseIndex>
-struct C2_HIDE C2StreamParam<T, S, BaseIndex, IF_FLEXIBLE(S)>
-    : public T, public C2BaseIndexOverride<S, BaseIndex>,
-      private C2FlexStructCheck<S, BaseIndex,
+template<typename T, typename S, int ParamIndex>
+struct C2_HIDE C2StreamParam<T, S, ParamIndex, IF_FLEXIBLE(S)>
+    : public T,
+      public C2FlexStructCheck<S, ParamIndex,
               T::indexFlags | T::Index::kStreamFlag | T::Index::kDirUndefined> {
 private:
-    typedef C2StreamParam<T, S> _type;
+    typedef C2StreamParam<T, S, ParamIndex> _type;
     /// Default constructor. Port/direction and stream-ID is undefined.
     inline C2StreamParam(size_t flexCount) : T(_type::calcSize(flexCount), _type::typeIndex, 0u) { }
     /// Wrapper around base structure's constructor while also specifying port/direction and
@@ -611,8 +620,8 @@ public:
     DEFINE_CAST_OPERATORS(_type)
 
     /// Specialization for an input stream parameter.
-    struct input : public T, public C2BaseIndexOverride<S, BaseIndex>,
-            public C2FlexStructCheck<S, BaseIndex,
+    struct input : public T,
+            public C2FlexStructCheck<S, ParamIndex,
                     T::indexFlags | T::Index::kStreamFlag | T::Type::kDirInput> {
     private:
         /// Default constructor. Stream-ID is undefined.
@@ -633,8 +642,8 @@ public:
     };
 
     /// Specialization for an output stream parameter.
-    struct output : public T, public C2BaseIndexOverride<S, BaseIndex>,
-            public C2FlexStructCheck<S, BaseIndex,
+    struct output : public T,
+            public C2FlexStructCheck<S, ParamIndex,
                     T::indexFlags | T::Index::kStreamFlag | T::Type::kDirOutput> {
     private:
         /// Default constructor. Stream-ID is undefined.
@@ -659,7 +668,7 @@ public:
 
 /**
  * \ingroup internal
- * A structure template encapsulating a single element with default constructors and no base-index.
+ * A structure template encapsulating a single element with default constructors and no core-index.
  */
 template<typename T>
 struct C2SimpleValueStruct {
@@ -668,7 +677,7 @@ struct C2SimpleValueStruct {
     inline C2SimpleValueStruct() = default;
     // Constructor with an initial value.
     inline C2SimpleValueStruct(T value) : mValue(value) {}
-    DEFINE_C2STRUCT_NO_BASE(SimpleValue)
+    DEFINE_BASE_C2STRUCT(SimpleValue)
 };
 
 // TODO: move this and next to some generic place
@@ -757,7 +766,7 @@ struct _C2ValueArrayHelper {
 
 /**
  * Specialization for a flexible blob and string arrays. A structure template encapsulating a single
- * flexible array member with default flexible constructors and no base-index. This type cannot be
+ * flexible array member with default flexible constructors and no core-index. This type cannot be
  * constructed on its own as it's size is 0.
  *
  * \internal This is different from C2SimpleArrayStruct<T[]> simply because its member has the name
@@ -770,7 +779,7 @@ struct C2SimpleValueStruct<T[]> {
     T mValue[];
 
     inline C2SimpleValueStruct() = default;
-    DEFINE_C2STRUCT_NO_BASE(SimpleValue)
+    DEFINE_BASE_C2STRUCT(SimpleValue)
     FLEX(C2SimpleValueStruct, mValue)
 
 private:
@@ -792,7 +801,7 @@ private:
 
 /**
  * A structure template encapsulating a single flexible array element of a specific type (T) with
- * default constructors and no base-index. This type cannot be constructed on its own as it's size
+ * default constructors and no core-index. This type cannot be constructed on its own as it's size
  * is 0. Instead, it is meant to be used as a parameter, e.g.
  *
  *   typedef C2StreamParam<C2Info, C2SimpleArrayStruct<C2MyFancyStruct>,
@@ -806,8 +815,8 @@ struct C2SimpleArrayStruct {
     T mValues[]; ///< array member
     /// Default constructor
     inline C2SimpleArrayStruct() = default;
-    DEFINE_C2STRUCT_NO_BASE(SimpleArray)
-    FLEX(C2SimpleArrayStruct, mValues)
+    DEFINE_BASE_FLEX_C2STRUCT(SimpleArray, mValues)
+    //FLEX(C2SimpleArrayStruct, mValues)
 
 private:
     /// Construct from a C2MemoryBlock.
