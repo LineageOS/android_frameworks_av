@@ -289,7 +289,7 @@ CameraDevice::submitRequestsLocked(
     return ACAMERA_OK;
 }
 
-camera_status_t CameraDevice::updateOutputConfiguration(ACaptureSessionOutput *output) {
+camera_status_t CameraDevice::updateOutputConfigurationLocked(ACaptureSessionOutput *output) {
     camera_status_t ret = checkCameraClosedOrErrorLocked();
     if (ret != ACAMERA_OK) {
         return ret;
@@ -361,6 +361,7 @@ camera_status_t CameraDevice::updateOutputConfiguration(ACaptureSessionOutput *o
                 return ACAMERA_ERROR_UNKNOWN;
         }
     }
+    mConfiguredOutputs[streamId] = std::make_pair(output->mWindow, outConfig);
 
     return ACAMERA_OK;
 }
@@ -373,6 +374,7 @@ CameraDevice::allocateCaptureRequest(
     req->mMetadata = request->settings->getInternalData();
     req->mIsReprocess = false; // NDK does not support reprocessing yet
     req->mContext = request->context;
+    req->mSurfaceConverted = true; // set to true, and fill in stream/surface idx to speed up IPC
 
     for (auto outputTarget : request->targets->mOutputs) {
         ANativeWindow* anw = outputTarget.mWindow;
@@ -383,7 +385,31 @@ CameraDevice::allocateCaptureRequest(
             return ret;
         }
         req->mSurfaceList.push_back(surface);
+
+        bool found = false;
+        // lookup stream/surface ID
+        for (const auto& kvPair : mConfiguredOutputs) {
+            int streamId = kvPair.first;
+            const OutputConfiguration& outConfig = kvPair.second.second;
+            const auto& gbps = outConfig.getGraphicBufferProducers();
+            for (int surfaceId = 0; surfaceId < (int) gbps.size(); surfaceId++) {
+                if (gbps[surfaceId] == surface->getIGraphicBufferProducer()) {
+                    found = true;
+                    req->mStreamIdxList.push_back(streamId);
+                    req->mSurfaceIdxList.push_back(surfaceId);
+                    break;
+                }
+            }
+            if (found) {
+                break;
+            }
+        }
+        if (!found) {
+            ALOGE("Unconfigured output target %p in capture request!", anw);
+            return ret;
+        }
     }
+
     outReq = req;
     return ACAMERA_OK;
 }
@@ -564,17 +590,11 @@ camera_status_t
 CameraDevice::getIGBPfromAnw(
         ANativeWindow* anw,
         sp<IGraphicBufferProducer>& out) {
-    if (anw == nullptr) {
-        ALOGE("Error: output ANativeWindow is null");
-        return ACAMERA_ERROR_INVALID_PARAMETER;
+    sp<Surface> surface;
+    camera_status_t ret = getSurfaceFromANativeWindow(anw, surface);
+    if (ret != ACAMERA_OK) {
+        return ret;
     }
-    int value;
-    int err = (*anw->query)(anw, NATIVE_WINDOW_CONCRETE_TYPE, &value);
-    if (err != OK || value != NATIVE_WINDOW_SURFACE) {
-        ALOGE("Error: ANativeWindow is not backed by Surface!");
-        return ACAMERA_ERROR_INVALID_PARAMETER;
-    }
-    const sp<Surface> surface(static_cast<Surface*>(anw));
     out = surface->getIGraphicBufferProducer();
     return ACAMERA_OK;
 }
@@ -809,19 +829,26 @@ CameraDevice::onCaptureErrorLocked(
             setCameraDeviceErrorLocked(ACAMERA_ERROR_CAMERA_SERVICE);
             return;
         }
-        ANativeWindow* anw = outputPairIt->second.first;
 
-        ALOGV("Camera %s Lost output buffer for ANW %p frame %" PRId64,
-                getId(), anw, frameNumber);
+        const auto& gbps = outputPairIt->second.second.getGraphicBufferProducers();
+        for (const auto& outGbp : gbps) {
+            for (auto surface : request->mSurfaceList) {
+                if (surface->getIGraphicBufferProducer() == outGbp) {
+                    ANativeWindow* anw = static_cast<ANativeWindow*>(surface.get());
+                    ALOGV("Camera %s Lost output buffer for ANW %p frame %" PRId64,
+                            getId(), anw, frameNumber);
 
-        sp<AMessage> msg = new AMessage(kWhatCaptureBufferLost, mHandler);
-        msg->setPointer(kContextKey, cbh.mCallbacks.context);
-        msg->setObject(kSessionSpKey, session);
-        msg->setPointer(kCallbackFpKey, (void*) onBufferLost);
-        msg->setObject(kCaptureRequestKey, request);
-        msg->setPointer(kAnwKey, (void*) anw);
-        msg->setInt64(kFrameNumberKey, frameNumber);
-        postSessionMsgAndCleanup(msg);
+                    sp<AMessage> msg = new AMessage(kWhatCaptureBufferLost, mHandler);
+                    msg->setPointer(kContextKey, cbh.mCallbacks.context);
+                    msg->setObject(kSessionSpKey, session);
+                    msg->setPointer(kCallbackFpKey, (void*) onBufferLost);
+                    msg->setObject(kCaptureRequestKey, request);
+                    msg->setPointer(kAnwKey, (void*) anw);
+                    msg->setInt64(kFrameNumberKey, frameNumber);
+                    postSessionMsgAndCleanup(msg);
+                }
+            }
+        }
     } else { // Handle other capture failures
         // Fire capture failure callback if there is one registered
         ACameraCaptureSession_captureCallback_failed onError = cbh.mCallbacks.onCaptureFailed;
