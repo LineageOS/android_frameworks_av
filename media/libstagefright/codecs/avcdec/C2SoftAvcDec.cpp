@@ -209,15 +209,15 @@ public:
 }  // namespace
 
 #define CASE(member) \
-    case decltype(component->member)::baseIndex: \
+    case decltype(component->member)::coreIndex: \
         return std::unique_ptr<C2StructDescriptor>(new C2StructDescriptor( \
                 static_cast<decltype(component->member) *>(nullptr)))
 
 class C2SoftAvcDecIntf::ParamReflector : public C2ParamReflector {
 public:
-    virtual std::unique_ptr<C2StructDescriptor> describe(C2Param::BaseIndex paramIndex) override {
+    virtual std::unique_ptr<C2StructDescriptor> describe(C2Param::BaseIndex coreIndex) override {
         constexpr C2SoftAvcDecIntf *component = nullptr;
-        switch (paramIndex.baseIndex()) {
+        switch (coreIndex.coreIndex()) {
         CASE(mDomainInfo);
         CASE(mInputStreamCount);
         CASE(mInputStreamFormat);
@@ -226,7 +226,7 @@ public:
         CASE(mMaxVideoSizeHint);
 
         // port mime configs are stored as unique_ptr.
-        case C2PortMimeConfig::baseIndex:
+        case C2PortMimeConfig::coreIndex:
             return std::unique_ptr<C2StructDescriptor>(new C2StructDescriptor(
                     static_cast<C2PortMimeConfig *>(nullptr)));
         }

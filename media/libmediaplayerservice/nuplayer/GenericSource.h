@@ -158,6 +158,7 @@ private:
     int64_t mOffset;
     int64_t mLength;
 
+    bool mDisconnected;
     sp<DataSource> mDataSource;
     sp<NuCachedSource2> mCachedSource;
     sp<DataSource> mHttpSource;

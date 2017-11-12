@@ -88,6 +88,7 @@ void NuPlayer::GenericSource::resetDataSource() {
 
     mHTTPService.clear();
     mHttpSource.clear();
+    mDisconnected = false;
     mUri.clear();
     mUriHeaders.clear();
     if (mFd >= 0) {
@@ -159,15 +160,27 @@ sp<MetaData> NuPlayer::GenericSource::getFileFormatMeta() const {
 status_t NuPlayer::GenericSource::initFromDataSource() {
     sp<IMediaExtractor> extractor;
     CHECK(mDataSource != NULL);
+    sp<DataSource> dataSource = mDataSource;
 
-    extractor = MediaExtractorFactory::Create(mDataSource, NULL);
+    mLock.unlock();
+    // This might take long time if data source is not reliable.
+    extractor = MediaExtractorFactory::Create(dataSource, NULL);
 
     if (extractor == NULL) {
         ALOGE("initFromDataSource, cannot create extractor!");
         return UNKNOWN_ERROR;
     }
 
-    mFileMeta = extractor->getMetaData();
+    sp<MetaData> fileMeta = extractor->getMetaData();
+
+    size_t numtracks = extractor->countTracks();
+    if (numtracks == 0) {
+        ALOGE("initFromDataSource, source has no track!");
+        return UNKNOWN_ERROR;
+    }
+
+    mLock.lock();
+    mFileMeta = fileMeta;
     if (mFileMeta != NULL) {
         int64_t duration;
         if (mFileMeta->findInt64(kKeyDuration, &duration)) {
@@ -176,12 +189,6 @@ status_t NuPlayer::GenericSource::initFromDataSource() {
     }
 
     int32_t totalBitrate = 0;
-
-    size_t numtracks = extractor->countTracks();
-    if (numtracks == 0) {
-        ALOGE("initFromDataSource, source has no track!");
-        return UNKNOWN_ERROR;
-    }
 
     mMimes.clear();
 
@@ -391,9 +398,15 @@ void NuPlayer::GenericSource::onPrepareAsync() {
                 }
             }
 
-            mDataSource = DataSourceFactory::CreateFromURI(
+            mLock.unlock();
+            // This might take long time if connection has some issue.
+            sp<DataSource> dataSource = DataSourceFactory::CreateFromURI(
                    mHTTPService, uri, &mUriHeaders, &contentType,
                    static_cast<HTTPBase *>(mHttpSource.get()));
+            mLock.lock();
+            if (!mDisconnected) {
+                mDataSource = dataSource;
+            }
         } else {
             if (property_get_bool("media.stagefright.extractremote", true) &&
                     !FileSource::requiresDrm(mFd, mOffset, mLength, nullptr /* mime */)) {
@@ -555,6 +568,7 @@ void NuPlayer::GenericSource::disconnect() {
         Mutex::Autolock _l(mLock);
         dataSource = mDataSource;
         httpSource = mHttpSource;
+        mDisconnected = true;
     }
 
     if (dataSource != NULL) {
