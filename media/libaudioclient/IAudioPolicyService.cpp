@@ -960,6 +960,7 @@ status_t BnAudioPolicyService::onTransact(
             bool hasAttributes = data.readInt32() != 0;
             if (hasAttributes) {
                 data.read(&attr, sizeof(audio_attributes_t));
+                sanetizeAudioAttributes(&attr);
             }
             audio_session_t session = (audio_session_t)data.readInt32();
             audio_stream_type_t stream = AUDIO_STREAM_DEFAULT;
@@ -1025,6 +1026,7 @@ status_t BnAudioPolicyService::onTransact(
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             audio_attributes_t attr;
             data.read(&attr, sizeof(audio_attributes_t));
+            sanetizeAudioAttributes(&attr);
             audio_io_handle_t input = (audio_io_handle_t)data.readInt32();
             audio_session_t session = (audio_session_t)data.readInt32();
             pid_t pid = (pid_t)data.readInt32();
@@ -1400,6 +1402,7 @@ status_t BnAudioPolicyService::onTransact(
             data.read(&source, sizeof(struct audio_port_config));
             audio_attributes_t attributes;
             data.read(&attributes, sizeof(audio_attributes_t));
+            sanetizeAudioAttributes(&attributes);
             audio_patch_handle_t handle = AUDIO_PATCH_HANDLE_NONE;
             status_t status = startAudioSource(&source, &attributes, &handle);
             reply->writeInt32(status);
@@ -1448,6 +1451,15 @@ status_t BnAudioPolicyService::onTransact(
         default:
             return BBinder::onTransact(code, data, reply, flags);
     }
+}
+
+void BnAudioPolicyService::sanetizeAudioAttributes(audio_attributes_t* attr)
+{
+    const size_t tagsMaxSize = AUDIO_ATTRIBUTES_TAGS_MAX_SIZE;
+    if (strnlen(attr->tags, tagsMaxSize) >= tagsMaxSize) {
+        android_errorWriteLog(0x534e4554, "68953950"); // SafetyNet logging
+    }
+    attr->tags[tagsMaxSize - 1] = '\0';
 }
 
 // ----------------------------------------------------------------------------
