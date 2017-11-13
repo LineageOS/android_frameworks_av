@@ -799,6 +799,7 @@ status_t BnAudioPolicyService::onTransact(
             bool hasAttributes = data.readInt32() != 0;
             if (hasAttributes) {
                 data.read(&attr, sizeof(audio_attributes_t));
+                sanetizeAudioAttributes(&attr);
             }
             audio_session_t session = (audio_session_t)data.readInt32();
             audio_stream_type_t stream = AUDIO_STREAM_DEFAULT;
@@ -864,6 +865,7 @@ status_t BnAudioPolicyService::onTransact(
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             audio_attributes_t attr;
             data.read(&attr, sizeof(audio_attributes_t));
+            sanetizeAudioAttributes(&attr);
             audio_session_t session = (audio_session_t)data.readInt32();
             uint32_t samplingRate = data.readInt32();
             audio_format_t format = (audio_format_t) data.readInt32();
@@ -1224,6 +1226,15 @@ status_t BnAudioPolicyService::onTransact(
         default:
             return BBinder::onTransact(code, data, reply, flags);
     }
+}
+
+void BnAudioPolicyService::sanetizeAudioAttributes(audio_attributes_t* attr)
+{
+    const size_t tagsMaxSize = AUDIO_ATTRIBUTES_TAGS_MAX_SIZE;
+    if (strnlen(attr->tags, tagsMaxSize) >= tagsMaxSize) {
+        android_errorWriteLog(0x534e4554, "68953950"); // SafetyNet logging
+    }
+    attr->tags[tagsMaxSize - 1] = '\0';
 }
 
 // ----------------------------------------------------------------------------
