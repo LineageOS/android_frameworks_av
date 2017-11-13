@@ -183,6 +183,8 @@ public:
                                     const Parcel& data,
                                     Parcel* reply,
                                     uint32_t flags = 0);
+private:
+    void sanetizeAudioAttributes(audio_attributes_t* attr);
 };
 
 // ----------------------------------------------------------------------------
