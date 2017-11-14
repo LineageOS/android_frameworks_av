@@ -11,10 +11,7 @@ cc_library_shared {
     },
 
     srcs: [
-        "aidl/android/media/ICas.aidl",
-        "aidl/android/media/ICasListener.aidl",
-        "aidl/android/media/IDescrambler.aidl",
-        "aidl/android/media/IMediaCasService.aidl",
+        ":libmediadrm_aidl",
 
         "CasImpl.cpp",
         "DescramblerImpl.cpp",
@@ -47,5 +44,16 @@ cc_library_shared {
     cflags: [
         "-Werror",
         "-Wall",
+    ],
+}
+
+// AIDL interface between libmediadrm and framework.jar
+filegroup {
+    name: "libmediadrm_aidl",
+    srcs: [
+        "aidl/android/media/ICas.aidl",
+        "aidl/android/media/ICasListener.aidl",
+        "aidl/android/media/IDescrambler.aidl",
+        "aidl/android/media/IMediaCasService.aidl",
     ],
 }
