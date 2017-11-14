@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "c0a2eddc_d2478e28",
+        "filename": "media/libstagefright/OggExtractor.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 1126,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2017-11-14T03:59:24Z",
+      "side": 1,
+      "message": "Do the max/min bit rate need setting too?",
+      "revId": "9b00225d5296c5f73381d82c978ca2b7bb3e3146",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
