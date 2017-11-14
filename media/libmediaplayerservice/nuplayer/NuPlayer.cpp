@@ -338,9 +338,9 @@ void NuPlayer::setDataSourceAsync(const sp<DataSource> &dataSource) {
     mDataSourceType = DATA_SOURCE_TYPE_MEDIA;
 }
 
-status_t NuPlayer::getDefaultBufferingSettings(
+status_t NuPlayer::getBufferingSettings(
         BufferingSettings *buffering /* nonnull */) {
-    sp<AMessage> msg = new AMessage(kWhatGetDefaultBufferingSettings, this);
+    sp<AMessage> msg = new AMessage(kWhatGetBufferingSettings, this);
     sp<AMessage> response;
     status_t err = msg->postAndAwaitResponse(&response);
     if (err == OK && response != NULL) {
@@ -566,16 +566,16 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
             break;
         }
 
-        case kWhatGetDefaultBufferingSettings:
+        case kWhatGetBufferingSettings:
         {
             sp<AReplyToken> replyID;
             CHECK(msg->senderAwaitsResponse(&replyID));
 
-            ALOGV("kWhatGetDefaultBufferingSettings");
+            ALOGV("kWhatGetBufferingSettings");
             BufferingSettings buffering;
             status_t err = OK;
             if (mSource != NULL) {
-                err = mSource->getDefaultBufferingSettings(&buffering);
+                err = mSource->getBufferingSettings(&buffering);
             } else {
                 err = INVALID_OPERATION;
             }

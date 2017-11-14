@@ -54,7 +54,7 @@ struct NuPlayer::GenericSource : public NuPlayer::Source,
 
     status_t setDataSource(const sp<DataSource>& dataSource);
 
-    virtual status_t getDefaultBufferingSettings(
+    virtual status_t getBufferingSettings(
             BufferingSettings* buffering /* nonnull */) override;
     virtual status_t setBufferingSettings(const BufferingSettings& buffering) override;
 

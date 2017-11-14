@@ -66,7 +66,7 @@ struct NuPlayer::Source : public AHandler {
         : mNotify(notify) {
     }
 
-    virtual status_t getDefaultBufferingSettings(
+    virtual status_t getBufferingSettings(
             BufferingSettings* buffering /* nonnull */) = 0;
     virtual status_t setBufferingSettings(const BufferingSettings& buffering) = 0;
 

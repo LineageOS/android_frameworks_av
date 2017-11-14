@@ -185,7 +185,7 @@ public:
     virtual status_t    setVideoSurfaceTexture(
                                 const sp<IGraphicBufferProducer>& bufferProducer) = 0;
 
-    virtual status_t    getDefaultBufferingSettings(
+    virtual status_t    getBufferingSettings(
                                 BufferingSettings* buffering /* nonnull */) {
         *buffering = BufferingSettings();
         return OK;

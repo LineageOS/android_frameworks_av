@@ -46,7 +46,7 @@ struct NuPlayerDriver : public MediaPlayerInterface {
     virtual status_t setVideoSurfaceTexture(
             const sp<IGraphicBufferProducer> &bufferProducer);
 
-    virtual status_t getDefaultBufferingSettings(
+    virtual status_t getBufferingSettings(
             BufferingSettings* buffering /* nonnull */) override;
     virtual status_t setBufferingSettings(const BufferingSettings& buffering) override;
 

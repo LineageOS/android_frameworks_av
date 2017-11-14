@@ -32,7 +32,7 @@ struct NuPlayer::StreamingSource : public NuPlayer::Source {
             const sp<AMessage> &notify,
             const sp<IStreamSource> &source);
 
-    virtual status_t getDefaultBufferingSettings(
+    virtual status_t getBufferingSettings(
             BufferingSettings* buffering /* nonnull */) override;
     virtual status_t setBufferingSettings(const BufferingSettings& buffering) override;
 

@@ -45,9 +45,10 @@
 
 namespace android {
 
-static const int kLowWaterMarkMs          = 2000;  // 2secs
-static const int kHighWaterMarkMs         = 5000;  // 5secs
-static const int kHighWaterMarkRebufferMs = 15000;  // 15secs
+static const int kInitialMarkMs        = 5000;  // 5secs
+
+//static const int kPausePlaybackMarkMs  = 2000;  // 2secs
+static const int kResumePlaybackMarkMs = 15000;  // 15secs
 
 NuPlayer::GenericSource::GenericSource(
         const sp<AMessage> &notify,
@@ -79,7 +80,8 @@ NuPlayer::GenericSource::GenericSource(
     ALOGV("GenericSource");
     CHECK(mediaClock != NULL);
 
-    getDefaultBufferingSettings(&mBufferingSettings);
+    mBufferingSettings.mInitialMarkMs = kInitialMarkMs;
+    mBufferingSettings.mResumePlaybackMarkMs = kResumePlaybackMarkMs;
     resetDataSource();
 }
 
@@ -272,37 +274,22 @@ status_t NuPlayer::GenericSource::initFromDataSource() {
     return OK;
 }
 
-status_t NuPlayer::GenericSource::getDefaultBufferingSettings(
+status_t NuPlayer::GenericSource::getBufferingSettings(
         BufferingSettings* buffering /* nonnull */) {
-    buffering->mInitialBufferingMode = BUFFERING_MODE_TIME_ONLY;
-    buffering->mRebufferingMode = BUFFERING_MODE_TIME_ONLY;
-    buffering->mInitialWatermarkMs = kHighWaterMarkMs;
-    buffering->mRebufferingWatermarkLowMs = kLowWaterMarkMs;
-    buffering->mRebufferingWatermarkHighMs = kHighWaterMarkRebufferMs;
+    {
+        Mutex::Autolock _l(mLock);
+        *buffering = mBufferingSettings;
+    }
 
-    ALOGV("getDefaultBufferingSettings{%s}", buffering->toString().string());
+    ALOGV("getBufferingSettings{%s}", buffering->toString().string());
     return OK;
 }
 
 status_t NuPlayer::GenericSource::setBufferingSettings(const BufferingSettings& buffering) {
     ALOGV("setBufferingSettings{%s}", buffering.toString().string());
 
-    if (buffering.IsSizeBasedBufferingMode(buffering.mInitialBufferingMode)
-            || buffering.IsSizeBasedBufferingMode(buffering.mRebufferingMode)
-            || (buffering.IsTimeBasedBufferingMode(buffering.mRebufferingMode)
-                && buffering.mRebufferingWatermarkLowMs > buffering.mRebufferingWatermarkHighMs)) {
-        return BAD_VALUE;
-    }
-
     Mutex::Autolock _l(mLock);
     mBufferingSettings = buffering;
-    if (mBufferingSettings.mInitialBufferingMode == BUFFERING_MODE_NONE) {
-        mBufferingSettings.mInitialWatermarkMs = BufferingSettings::kNoWatermark;
-    }
-    if (mBufferingSettings.mRebufferingMode == BUFFERING_MODE_NONE) {
-        mBufferingSettings.mRebufferingWatermarkLowMs = BufferingSettings::kNoWatermark;
-        mBufferingSettings.mRebufferingWatermarkHighMs = INT32_MAX;
-    }
     return OK;
 }
 
@@ -867,8 +854,10 @@ status_t NuPlayer::GenericSource::dequeueAccessUnit(
         }
     } else {
         int64_t durationUs = track->mPackets->getBufferedDurationUs(&finalResult);
+        // TODO: maxRebufferingMarkMs could be larger than
+        // mBufferingSettings.mResumePlaybackMarkMs
         int64_t restartBufferingMarkUs =
-             mBufferingSettings.mRebufferingWatermarkHighMs * 1000ll / 2;
+             mBufferingSettings.mResumePlaybackMarkMs * 1000ll / 2;
         if (finalResult == OK) {
             if (durationUs < restartBufferingMarkUs) {
                 postReadBuffer(audio? MEDIA_TRACK_TYPE_AUDIO : MEDIA_TRACK_TYPE_VIDEO);
@@ -1422,8 +1411,10 @@ void NuPlayer::GenericSource::readBuffer(
         status_t finalResult;
         int64_t durationUs = track->mPackets->getBufferedDurationUs(&finalResult);
 
-        int64_t markUs = (mPreparing ? mBufferingSettings.mInitialWatermarkMs
-            : mBufferingSettings.mRebufferingWatermarkHighMs) * 1000ll;
+        // TODO: maxRebufferingMarkMs could be larger than
+        // mBufferingSettings.mResumePlaybackMarkMs
+        int64_t markUs = (mPreparing ? mBufferingSettings.mInitialMarkMs
+            : mBufferingSettings.mResumePlaybackMarkMs) * 1000ll;
         if (finalResult == ERROR_END_OF_STREAM || durationUs >= markUs) {
             if (mPreparing || mSentPauseOnBuffering) {
                 Track *counterTrack =

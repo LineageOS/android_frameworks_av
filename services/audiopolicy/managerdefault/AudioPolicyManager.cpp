@@ -755,6 +755,13 @@ audio_io_handle_t AudioPolicyManager::getOutput(audio_stream_type_t stream)
 {
     routing_strategy strategy = getStrategy(stream);
     audio_devices_t device = getDeviceForStrategy(strategy, false /*fromCache*/);
+
+    // Note that related method getOutputForAttr() uses getOutputForDevice() not selectOutput().
+    // We use selectOutput() here since we don't have the desired AudioTrack sample rate,
+    // format, flags, etc. This may result in some discrepancy for functions that utilize
+    // getOutput() solely on audio_stream_type such as AudioSystem::getOutputFrameCount()
+    // and AudioSystem::getOutputSamplingRate().
+
     SortedVector<audio_io_handle_t> outputs = getOutputsForDevice(device, mOutputs);
     audio_io_handle_t output = selectOutput(outputs, AUDIO_OUTPUT_FLAG_NONE, AUDIO_FORMAT_INVALID);
 
@@ -1102,8 +1109,9 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
             int commonFlags = popcount(outputDesc->mProfile->getFlags() & flags);
             if (commonFlags >= maxCommonFlags) {
                 if (commonFlags == maxCommonFlags) {
-                    if (AudioPort::isBetterFormatMatch(
-                            outputDesc->mFormat, bestFormatForFlags, format)) {
+                    if (format != AUDIO_FORMAT_INVALID
+                            && AudioPort::isBetterFormatMatch(
+                                    outputDesc->mFormat, bestFormatForFlags, format)) {
                         outputForFlags = outputs[i];
                         bestFormatForFlags = outputDesc->mFormat;
                     }
