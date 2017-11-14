@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "a74ab48e_553d650b",
+        "filename": "media/libstagefright/MPEG4Extractor.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 3465,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2017-11-14T03:58:51Z",
+      "side": 1,
+      "message": "This if check looks wrong for a uint32_t. The only case this check will fail is if maxBitrate \u003d\u003d 0, and assigning a uint32_t into an int32_t is probably not great either.",
+      "range": {
+        "startLine": 3465,
+        "startChar": 12,
+        "endLine": 3465,
+        "endChar": 52
+      },
+      "revId": "2dcc4fcd61197eae410b3bbd34261f28fc41a77f",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
