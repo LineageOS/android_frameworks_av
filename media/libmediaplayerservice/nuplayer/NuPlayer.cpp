@@ -182,6 +182,7 @@ NuPlayer::NuPlayer(pid_t pid, const sp<MediaClock> &mediaClock)
       mAudioDecoderGeneration(0),
       mVideoDecoderGeneration(0),
       mRendererGeneration(0),
+      mLastStartedPlayingTimeNs(0),
       mPreviousSeekTimeUs(0),
       mAudioEOS(false),
       mVideoEOS(false),
@@ -1309,6 +1310,7 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
             ALOGV("kWhatReset");
 
             mResetting = true;
+            stopPlaybackTimer("kWhatReset");
 
             mDeferredActions.push_back(
                     new FlushDecoderAction(
@@ -1449,7 +1451,7 @@ void NuPlayer::onResume() {
         ALOGW("resume called when renderer is gone or not set");
     }
 
-    mLastStartedPlayingTimeNs = systemTime();
+    startPlaybackTimer("onresume");
 }
 
 status_t NuPlayer::onInstantiateSecureDecoders() {
@@ -1569,12 +1571,43 @@ void NuPlayer::onStart(int64_t startPositionUs, MediaPlayerSeekMode mode) {
         mAudioDecoder->setRenderer(mRenderer);
     }
 
-    mLastStartedPlayingTimeNs = systemTime();
+    startPlaybackTimer("onstart");
 
     postScanSources();
 }
 
+void NuPlayer::startPlaybackTimer(const char *where) {
+    Mutex::Autolock autoLock(mPlayingTimeLock);
+    if (mLastStartedPlayingTimeNs == 0) {
+        mLastStartedPlayingTimeNs = systemTime();
+        ALOGV("startPlaybackTimer() time %20" PRId64 " (%s)",  mLastStartedPlayingTimeNs, where);
+    }
+}
+
+void NuPlayer::stopPlaybackTimer(const char *where) {
+    Mutex::Autolock autoLock(mPlayingTimeLock);
+
+    ALOGV("stopPlaybackTimer()  time %20" PRId64 " (%s)", mLastStartedPlayingTimeNs, where);
+
+    if (mLastStartedPlayingTimeNs != 0) {
+        sp<NuPlayerDriver> driver = mDriver.promote();
+        if (driver != NULL) {
+            int64_t now = systemTime();
+            int64_t played = now - mLastStartedPlayingTimeNs;
+            ALOGV("stopPlaybackTimer()  log  %20" PRId64 "", played);
+
+            if (played > 0) {
+                driver->notifyMorePlayingTimeUs((played+500)/1000);
+            }
+        }
+        mLastStartedPlayingTimeNs = 0;
+    }
+}
+
 void NuPlayer::onPause() {
+
+    stopPlaybackTimer("onPause");
+
     if (mPaused) {
         return;
     }
@@ -1590,13 +1623,6 @@ void NuPlayer::onPause() {
         ALOGW("pause called when renderer is gone or not set");
     }
 
-    sp<NuPlayerDriver> driver = mDriver.promote();
-    if (driver != NULL) {
-        int64_t now = systemTime();
-        int64_t played = now - mLastStartedPlayingTimeNs;
-
-        driver->notifyMorePlayingTimeUs((played+500)/1000);
-    }
 }
 
 bool NuPlayer::audioDecoderStillNeeded() {
@@ -2222,6 +2248,8 @@ void NuPlayer::performReset() {
 
     CHECK(mAudioDecoder == NULL);
     CHECK(mVideoDecoder == NULL);
+
+    stopPlaybackTimer("performReset");
 
     cancelPollDuration();
 
