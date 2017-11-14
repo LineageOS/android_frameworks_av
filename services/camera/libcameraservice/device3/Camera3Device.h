@@ -44,6 +44,8 @@
 #include "utils/LatencyHistogram.h"
 #include <camera_metadata_hidden.h>
 
+using android::camera3::OutputStreamInfo;
+
 /**
  * Function pointer types with C calling convention to
  * use for HAL callback functions.
@@ -117,11 +119,13 @@ class Camera3Device :
     status_t createStream(sp<Surface> consumer,
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
+            std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
             bool isShared = false, uint64_t consumerUsage = 0) override;
     status_t createStream(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
+            std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
             bool isShared = false, uint64_t consumerUsage = 0) override;
 
@@ -176,7 +180,17 @@ class Camera3Device :
      * Set the deferred consumer surfaces to the output stream and finish the deferred
      * consumer configuration.
      */
-    status_t setConsumerSurfaces(int streamId, const std::vector<sp<Surface>>& consumers) override;
+    status_t setConsumerSurfaces(
+            int streamId, const std::vector<sp<Surface>>& consumers,
+            std::vector<int> *surfaceIds /*out*/) override;
+
+    /**
+     * Update a given stream.
+     */
+    status_t updateStream(int streamId, const std::vector<sp<Surface>> &newSurfaces,
+            const std::vector<OutputStreamInfo> &outputInfo,
+            const std::vector<size_t> &removedSurfaceIds,
+            KeyedVector<sp<Surface>, size_t> *outputMap/*out*/);
 
   private:
 
@@ -704,6 +718,12 @@ class Camera3Device :
          * capture request
          */
         bool isStreamPending(sp<camera3::Camera3StreamInterface>& stream);
+
+        /**
+         * Returns true if the surface is a target of any queued or repeating
+         * capture request
+         */
+        bool isOutputSurfacePending(int streamId, size_t surfaceId);
 
         // dump processCaptureRequest latency
         void dumpCaptureRequestLatency(int fd, const char* name) {
