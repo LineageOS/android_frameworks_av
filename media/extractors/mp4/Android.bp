@@ -2,6 +2,7 @@ cc_defaults {
     name: "libmp4extractor_defaults",
 
     srcs: [
+        "AC4Parser.cpp",
         "ItemTable.cpp",
         "MPEG4Extractor.cpp",
         "SampleIterator.cpp",

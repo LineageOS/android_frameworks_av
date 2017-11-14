@@ -86,6 +86,21 @@ void ElementaryStreamQueue::setCasInfo(
     mCasSessionId = sessionId;
 }
 
+static int32_t readVariableBits(ABitReader &bits, int32_t nbits) {
+    int32_t value = 0;
+    int32_t more_bits = 1;
+
+    while (more_bits) {
+        value += bits.getBits(nbits);
+        more_bits = bits.getBits(1);
+        if (!more_bits)
+            break;
+        value++;
+        value <<= nbits;
+    }
+    return value;
+}
+
 // Parse AC3 header assuming the current ptr is start position of syncframe,
 // update metadata only applicable, and return the payload size
 static unsigned parseAC3SyncFrame(
@@ -197,6 +212,78 @@ static unsigned parseAC3SyncFrame(
 
 static bool IsSeeminglyValidAC3Header(const uint8_t *ptr, size_t size) {
     return parseAC3SyncFrame(ptr, size, NULL) > 0;
+}
+
+// Parse AC4 header assuming the current ptr is start position of syncframe
+// and update frameSize and metadata.
+static status_t parseAC4SyncFrame(
+        const uint8_t *ptr, size_t size, unsigned &frameSize, sp<MetaData> *metaData) {
+    // ETSI TS 103 190-2 V1.1.1 (2015-09), Annex C
+    // The sync_word can be either 0xAC40 or 0xAC41.
+    static const int kSyncWordAC40 = 0xAC40;
+    static const int kSyncWordAC41 = 0xAC41;
+
+    size_t headerSize = 0;
+    ABitReader bits(ptr, size);
+    int32_t syncWord = bits.getBits(16);
+    if ((syncWord != kSyncWordAC40) && (syncWord != kSyncWordAC41)) {
+        ALOGE("Invalid syncword in AC4 header");
+        return ERROR_MALFORMED;
+    }
+    headerSize += 2;
+
+    frameSize = bits.getBits(16);
+    headerSize += 2;
+    if (frameSize == 0xFFFF) {
+        frameSize = bits.getBits(24);
+        headerSize += 3;
+    }
+
+    if (frameSize == 0) {
+        ALOGE("Invalid frame size in AC4 header");
+        return ERROR_MALFORMED;
+    }
+    frameSize += headerSize;
+    // If the sync_word is 0xAC41, a crc_word is also transmitted.
+    if (syncWord == kSyncWordAC41) {
+        frameSize += 2; // crc_word
+    }
+    ALOGV("AC4 frameSize = %u", frameSize);
+
+    // ETSI TS 103 190-2 V1.1.1 6.2.1.1
+    uint32_t bitstreamVersion = bits.getBits(2);
+    if (bitstreamVersion == 3) {
+        bitstreamVersion += readVariableBits(bits, 2);
+    }
+
+    bits.skipBits(10); // Sequence Counter
+
+    uint32_t bWaitFrames = bits.getBits(1);
+    if (bWaitFrames) {
+        uint32_t waitFrames = bits.getBits(3);
+        if (waitFrames > 0) {
+            bits.skipBits(2); // br_code;
+        }
+    }
+
+    // ETSI TS 103 190 V1.1.1 Table 82
+    bool fsIndex = bits.getBits(1);
+    uint32_t samplingRate = fsIndex ? 48000 : 44100;
+
+    if (metaData != NULL) {
+        ALOGV("dequeueAccessUnitAC4 Setting mFormat");
+        (*metaData)->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AC4);
+        (*metaData)->setInt32(kKeyIsSyncFrame, 1);
+        // [FIXME] AC4 channel count is defined per presentation. Provide a default channel count
+        // as stereo for the entire stream.
+        (*metaData)->setInt32(kKeyChannelCount, 2);
+        (*metaData)->setInt32(kKeySampleRate, samplingRate);
+    }
+    return OK;
+}
+
+static status_t IsSeeminglyValidAC4Header(const uint8_t *ptr, size_t size, unsigned &frameSize) {
+    return parseAC4SyncFrame(ptr, size, frameSize, NULL);
 }
 
 static bool IsSeeminglyValidADTSHeader(
@@ -409,6 +496,42 @@ status_t ElementaryStreamQueue::appendData(
                     ALOGI("found something resembling an AC3 syncword at "
                           "offset %zd",
                           startOffset);
+                }
+
+                data = &ptr[startOffset];
+                size -= startOffset;
+                break;
+            }
+
+            case AC4:
+            {
+                uint8_t *ptr = (uint8_t *)data;
+                unsigned frameSize = 0;
+                ssize_t startOffset = -1;
+
+                // A valid AC4 stream should have minimum of 7 bytes in its buffer.
+                // (Sync header 4 bytes + AC4 toc 3 bytes)
+                if (size < 7) {
+                    return ERROR_MALFORMED;
+                }
+                for (size_t i = 0; i < size; ++i) {
+                    if (IsSeeminglyValidAC4Header(&ptr[i], size - i, frameSize) == OK) {
+                        startOffset = i;
+                        break;
+                    }
+                }
+
+                if (startOffset < 0) {
+                    return ERROR_MALFORMED;
+                }
+
+                if (startOffset > 0) {
+                    ALOGI("found something resembling an AC4 syncword at offset %zd",
+                         startOffset);
+                }
+                if (frameSize != size - startOffset) {
+                    ALOGV("AC4 frame size is %u bytes, while the buffer size is %zd bytes.",
+                          frameSize, size - startOffset);
                 }
 
                 data = &ptr[startOffset];
@@ -649,6 +772,8 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnit() {
             return dequeueAccessUnitAAC();
         case AC3:
             return dequeueAccessUnitAC3();
+        case AC4:
+            return dequeueAccessUnitAC4();
         case MPEG_VIDEO:
             return dequeueAccessUnitMPEGVideo();
         case MPEG4_VIDEO:
@@ -727,6 +852,69 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitAC3() {
 
     mBuffer->setRange(0, mBuffer->size() - syncStartPos - payloadSize);
 
+    return accessUnit;
+}
+
+sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitAC4() {
+    unsigned syncStartPos = 0;
+    unsigned payloadSize = 0;
+    sp<MetaData> format = new MetaData;
+    ALOGV("dequeueAccessUnit_AC4[%d]: mBuffer %p(%zu)", mAUIndex, mBuffer->data(), mBuffer->size());
+
+    // A valid AC4 stream should have minimum of 7 bytes in its buffer.
+    // (Sync header 4 bytes + AC4 toc 3 bytes)
+    if (mBuffer->size() < 7) {
+        return NULL;
+    }
+
+    while (true) {
+        if (syncStartPos + 2 >= mBuffer->size()) {
+            return NULL;
+        }
+
+        status_t status = parseAC4SyncFrame(
+                    mBuffer->data() + syncStartPos,
+                    mBuffer->size() - syncStartPos,
+                    payloadSize,
+                    &format);
+        if (status == OK) {
+            break;
+        }
+
+        ALOGV("dequeueAccessUnit_AC4[%d]: syncStartPos %u payloadSize %u",
+                mAUIndex, syncStartPos, payloadSize);
+
+        ++syncStartPos;
+    }
+
+    if (mBuffer->size() < syncStartPos + payloadSize) {
+        ALOGV("Not enough buffer size for AC4");
+        return NULL;
+    }
+
+    if (mFormat == NULL) {
+        mFormat = format;
+    }
+
+    int64_t timeUs = fetchTimestamp(syncStartPos + payloadSize);
+    if (timeUs < 0ll) {
+        ALOGE("negative timeUs");
+        return NULL;
+    }
+    mAUIndex++;
+
+    sp<ABuffer> accessUnit = new ABuffer(syncStartPos + payloadSize);
+    memcpy(accessUnit->data(), mBuffer->data(), syncStartPos + payloadSize);
+
+    accessUnit->meta()->setInt64("timeUs", timeUs);
+    accessUnit->meta()->setInt32("isSync", 1);
+
+    memmove(
+            mBuffer->data(),
+            mBuffer->data() + syncStartPos + payloadSize,
+            mBuffer->size() - syncStartPos - payloadSize);
+
+    mBuffer->setRange(0, mBuffer->size() - syncStartPos - payloadSize);
     return accessUnit;
 }
 

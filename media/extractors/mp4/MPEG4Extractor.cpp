@@ -26,6 +26,7 @@
 
 #include <utils/Log.h>
 
+#include "AC4Parser.h"
 #include "MPEG4Extractor.h"
 #include "SampleTable.h"
 #include "ItemTable.h"
@@ -123,6 +124,8 @@ private:
 
     bool mIsAVC;
     bool mIsHEVC;
+    bool mIsAC4;
+
     size_t mNALLengthSize;
 
     bool mStarted;
@@ -320,6 +323,8 @@ static const char *FourCC2MIME(uint32_t fourcc) {
         case FOURCC('h', 'v', 'c', '1'):
         case FOURCC('h', 'e', 'v', '1'):
             return MEDIA_MIMETYPE_VIDEO_HEVC;
+        case FOURCC('a', 'c', '-', '4'):
+            return MEDIA_MIMETYPE_AUDIO_AC4;
         default:
             CHECK(!"should not be here.");
             return NULL;
@@ -2326,6 +2331,12 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             return parseAC3SampleEntry(data_offset);
         }
 
+        case FOURCC('a', 'c', '-', '4'):
+        {
+            *offset += chunk_size;
+            return parseAC4SampleEntry(data_offset);
+        }
+
         case FOURCC('f', 't', 'y', 'p'):
         {
             if (chunk_data_size < 8 || depth != 0) {
@@ -2392,6 +2403,84 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             *offset += chunk_size;
             break;
         }
+    }
+
+    return OK;
+}
+
+status_t MPEG4Extractor::parseAC4SampleEntry(off64_t offset) {
+    // skip 16 bytes:
+    //  + 6-byte reserved,
+    //  + 2-byte data reference index,
+    //  + 8-byte reserved
+    offset += 16;
+    uint16_t channelCount;
+    if (!mDataSource->getUInt16(offset, &channelCount)) {
+        ALOGE("MPEG4Extractor: error while reading ac-4 block: cannot read channel count");
+        return ERROR_MALFORMED;
+    }
+    // skip 8 bytes:
+    //  + 2-byte channelCount,
+    //  + 2-byte sample size,
+    //  + 4-byte reserved
+    offset += 8;
+    uint16_t sampleRate;
+    if (!mDataSource->getUInt16(offset, &sampleRate)) {
+        ALOGE("MPEG4Extractor: error while reading ac-4 block: cannot read sample rate");
+        return ERROR_MALFORMED;
+    }
+
+    // skip 4 bytes:
+    //  + 2-byte sampleRate,
+    //  + 2-byte reserved
+    offset += 4;
+
+    if (mLastTrack == NULL) {
+        return ERROR_MALFORMED;
+    }
+    mLastTrack->meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AC4);
+    mLastTrack->meta.setInt32(kKeyChannelCount, channelCount);
+    mLastTrack->meta.setInt32(kKeySampleRate, sampleRate);
+    return parseAC4SpecificBox(offset);
+}
+
+status_t MPEG4Extractor::parseAC4SpecificBox(off64_t offset) {
+    uint32_t size;
+    // + 4-byte size
+    // + 4-byte type
+    // + 3-byte payload
+    const uint32_t kAC4MinimumBoxSize = 4 + 4 + 3;
+    if (!mDataSource->getUInt32(offset, &size) || size < kAC4MinimumBoxSize) {
+        ALOGE("MPEG4Extractor: error while reading ac-4 block: cannot read specific box size");
+        return ERROR_MALFORMED;
+    }
+
+    // + 4-byte size
+    offset += 4;
+    uint32_t type;
+    if (!mDataSource->getUInt32(offset, &type) || type != FOURCC('d', 'a', 'c', '4')) {
+        ALOGE("MPEG4Extractor: error while reading ac-4 specific block: header not dac4");
+        return ERROR_MALFORMED;
+    }
+
+    // + 4-byte type
+    offset += 4;
+    // at least for AC4 DSI v1 this is big enough
+    const uint32_t kAC4SpecificBoxPayloadSize = 256;
+    uint8_t chunk[kAC4SpecificBoxPayloadSize];
+    ssize_t dsiSize = size - 8; // size of box - size and type fields
+    if (dsiSize >= (ssize_t)kAC4SpecificBoxPayloadSize ||
+        mDataSource->readAt(offset, chunk, dsiSize) != dsiSize) {
+        ALOGE("MPEG4Extractor: error while reading ac-4 specific block: bitstream fields");
+        return ERROR_MALFORMED;
+    }
+    // + size-byte payload
+    offset += dsiSize;
+    ABitReader br(chunk, dsiSize);
+    AC4DSIParser parser(br);
+    if (!parser.parse()){
+        ALOGE("MPEG4Extractor: error while parsing ac-4 specific block");
+        return ERROR_MALFORMED;
     }
 
     return OK;
@@ -3745,6 +3834,7 @@ MPEG4Source::MPEG4Source(
       mCurrentSampleInfoOffsets(NULL),
       mIsAVC(false),
       mIsHEVC(false),
+      mIsAC4(false),
       mNALLengthSize(0),
       mStarted(false),
       mGroup(NULL),
@@ -3775,6 +3865,7 @@ MPEG4Source::MPEG4Source(
     mIsAVC = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC);
     mIsHEVC = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC) ||
               !strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC);
+    mIsAC4 = !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AC4);
 
     if (mIsAVC) {
         uint32_t type;
@@ -4672,7 +4763,7 @@ status_t MPEG4Source::read(
         }
     }
 
-    if ((!mIsAVC && !mIsHEVC) || mWantsNALFragments) {
+    if ((!mIsAVC && !mIsHEVC && !mIsAC4) || mWantsNALFragments) {
         if (newBuffer) {
             ssize_t num_bytes_read =
                 mDataSource->readAt(offset, (uint8_t *)mBuffer->data(), size);
@@ -4704,11 +4795,18 @@ status_t MPEG4Source::read(
             ++mCurrentSampleIndex;
         }
 
-        if (!mIsAVC && !mIsHEVC) {
+        if (!mIsAVC && !mIsHEVC && !mIsAC4) {
             *out = mBuffer;
             mBuffer = NULL;
 
             return OK;
+        }
+
+        if (mIsAC4) {
+            mBuffer->release();
+            mBuffer = NULL;
+
+            return ERROR_IO;
         }
 
         // Each NAL unit is split up into its constituent fragments and
@@ -4747,6 +4845,58 @@ status_t MPEG4Source::read(
         }
 
         *out = clone;
+
+        return OK;
+    } else if (mIsAC4) {
+        CHECK(mBuffer != NULL);
+        // Make sure there is enough space to write the sync header and the raw frame
+        if (mBuffer->range_length() < (7 + size)) {
+            mBuffer->release();
+            mBuffer = NULL;
+
+            return ERROR_IO;
+        }
+
+        uint8_t *dstData = (uint8_t *)mBuffer->data();
+        size_t dstOffset = 0;
+        // Add AC-4 sync header to MPEG4 encapsulated AC-4 raw frame
+        // AC40 sync word, meaning no CRC at the end of the frame
+        dstData[dstOffset++] = 0xAC;
+        dstData[dstOffset++] = 0x40;
+        dstData[dstOffset++] = 0xFF;
+        dstData[dstOffset++] = 0xFF;
+        dstData[dstOffset++] = (uint8_t)((size >> 16) & 0xFF);
+        dstData[dstOffset++] = (uint8_t)((size >> 8) & 0xFF);
+        dstData[dstOffset++] = (uint8_t)((size >> 0) & 0xFF);
+
+        ssize_t numBytesRead = mDataSource->readAt(offset, dstData + dstOffset, size);
+        if (numBytesRead != (ssize_t)size) {
+            mBuffer->release();
+            mBuffer = NULL;
+
+            return ERROR_IO;
+        }
+
+        mBuffer->set_range(0, dstOffset + size);
+        mBuffer->meta_data().clear();
+        mBuffer->meta_data().setInt64(
+                kKeyTime, ((int64_t)cts * 1000000) / mTimescale);
+        mBuffer->meta_data().setInt64(
+                kKeyDuration, ((int64_t)stts * 1000000) / mTimescale);
+
+        if (targetSampleTimeUs >= 0) {
+            mBuffer->meta_data().setInt64(
+                    kKeyTargetTime, targetSampleTimeUs);
+        }
+
+        if (isSyncSample) {
+            mBuffer->meta_data().setInt32(kKeyIsSyncFrame, 1);
+        }
+
+        ++mCurrentSampleIndex;
+
+        *out = mBuffer;
+        mBuffer = NULL;
 
         return OK;
     } else {
@@ -5191,6 +5341,8 @@ status_t MPEG4Source::fragmentedRead(
 
         return OK;
     }
+
+    return OK;
 }
 
 MPEG4Extractor::Track *MPEG4Extractor::findTrackByMimePrefix(

@@ -119,6 +119,7 @@ struct ATSParser::Program : public RefBase {
 private:
     struct StreamInfo {
         unsigned mType;
+        unsigned mTypeExt;
         unsigned mPID;
         int32_t mCASystemId;
     };
@@ -145,10 +146,12 @@ struct ATSParser::Stream : public RefBase {
     Stream(Program *program,
            unsigned elementaryPID,
            unsigned streamType,
+           unsigned streamTypeExt,
            unsigned PCR_PID,
            int32_t CA_system_ID);
 
     unsigned type() const { return mStreamType; }
+    unsigned typeExt() const { return mStreamTypeExt; }
     unsigned pid() const { return mElementaryPID; }
     void setPID(unsigned pid) { mElementaryPID = pid; }
 
@@ -194,6 +197,7 @@ private:
     Program *mProgram;
     unsigned mElementaryPID;
     unsigned mStreamType;
+    unsigned mStreamTypeExt;
     unsigned mPCR_PID;
     int32_t mExpectedContinuityCounter;
 
@@ -447,7 +451,7 @@ bool ATSParser::Program::findCADescriptor(
         if (descriptor_length > infoLength) {
             break;
         }
-        if (descriptor_tag == 9 && descriptor_length >= 4) {
+        if (descriptor_tag == DESCRIPTOR_CA && descriptor_length >= 4) {
             found = true;
             caDescriptor->mSystemID = br->getBits(16);
             caDescriptor->mPID = br->getBits(16) & 0x1fff;
@@ -513,37 +517,65 @@ status_t ATSParser::Program::parseProgramMap(ABitReader *br) {
     // infoBytesRemaining is the number of bytes that make up the
     // variable length section of ES_infos. It does not include the
     // final CRC.
-    size_t infoBytesRemaining = section_length - 9 - program_info_length - 4;
+    int32_t infoBytesRemaining = section_length - 9 - program_info_length - 4;
 
     while (infoBytesRemaining >= 5) {
-
-        unsigned streamType = br->getBits(8);
-        ALOGV("    stream_type = 0x%02x", streamType);
-
+        StreamInfo info;
+        info.mType = br->getBits(8);
+        ALOGV("    stream_type = 0x%02x", info.mType);
         MY_LOGV("    reserved = %u", br->getBits(3));
 
-        unsigned elementaryPID = br->getBits(13);
-        ALOGV("    elementary_PID = 0x%04x", elementaryPID);
+        info.mPID = br->getBits(13);
+        ALOGV("    elementary_PID = 0x%04x", info.mPID);
 
         MY_LOGV("    reserved = %u", br->getBits(4));
 
         unsigned ES_info_length = br->getBits(12);
         ALOGV("    ES_info_length = %u", ES_info_length);
+        infoBytesRemaining -= 5 + ES_info_length;
 
         CADescriptor streamCA;
-        bool hasStreamCA = findCADescriptor(br, ES_info_length, &streamCA);
+        info.mTypeExt = EXT_DESCRIPTOR_DVB_RESERVED_MAX;
+        bool hasStreamCA = false;
+        while (ES_info_length > 2 && infoBytesRemaining >= 0) {
+            unsigned descriptor_tag = br->getBits(8);
+            ALOGV("      tag = 0x%02x", descriptor_tag);
+
+            unsigned descriptor_length = br->getBits(8);
+            ALOGV("      len = %u", descriptor_length);
+
+            ES_info_length -= 2;
+            if (descriptor_length > ES_info_length) {
+                return ERROR_MALFORMED;
+            }
+            if (descriptor_tag == DESCRIPTOR_CA && descriptor_length >= 4) {
+                hasStreamCA = true;
+                streamCA.mSystemID = br->getBits(16);
+                streamCA.mPID = br->getBits(16) & 0x1fff;
+                ES_info_length -= 4;
+                streamCA.mPrivateData.assign(br->data(), br->data() + descriptor_length - 4);
+            } else if (info.mType == STREAMTYPE_PES_PRIVATE_DATA &&
+                       descriptor_tag == DESCRIPTOR_DVB_EXTENSION && descriptor_length >= 1) {
+                unsigned descTagExt = br->getBits(8);
+                ALOGV("      tag_ext = 0x%02x", descTagExt);
+                if (descTagExt == EXT_DESCRIPTOR_DVB_AC4) {
+                    info.mTypeExt = EXT_DESCRIPTOR_DVB_AC4;
+                }
+                ES_info_length -= descriptor_length;
+                descriptor_length--;
+                br->skipBits(descriptor_length * 8);
+            } else {
+                ES_info_length -= descriptor_length;
+                br->skipBits(descriptor_length * 8);
+            }
+        }
         if (hasStreamCA && !mParser->mCasManager->addStream(
-                mProgramNumber, elementaryPID, streamCA)) {
+                mProgramNumber, info.mPID, streamCA)) {
             return ERROR_MALFORMED;
         }
-        StreamInfo info;
-        info.mType = streamType;
-        info.mPID = elementaryPID;
         info.mCASystemId = hasProgramCA ? programCA.mSystemID :
                            hasStreamCA ? streamCA.mSystemID  : -1;
         infos.push(info);
-
-        infoBytesRemaining -= 5 + ES_info_length;
     }
 
     if (infoBytesRemaining != 0) {
@@ -602,7 +634,7 @@ status_t ATSParser::Program::parseProgramMap(ABitReader *br) {
 
         if (index < 0) {
             sp<Stream> stream = new Stream(
-                    this, info.mPID, info.mType, PCR_PID, info.mCASystemId);
+                    this, info.mPID, info.mType, info.mTypeExt, PCR_PID, info.mCASystemId);
 
             if (mSampleAesKeyItem != NULL) {
                 stream->signalNewSampleAesKey(mSampleAesKeyItem);
@@ -720,11 +752,13 @@ ATSParser::Stream::Stream(
         Program *program,
         unsigned elementaryPID,
         unsigned streamType,
+        unsigned streamTypeExt,
         unsigned PCR_PID,
         int32_t CA_system_ID)
     : mProgram(program),
       mElementaryPID(elementaryPID),
       mStreamType(streamType),
+      mStreamTypeExt(streamTypeExt),
       mPCR_PID(PCR_PID),
       mExpectedContinuityCounter(-1),
       mPayloadStarted(false),
@@ -779,6 +813,12 @@ ATSParser::Stream::Stream(
         case STREAMTYPE_AC3:
         case STREAMTYPE_AC3_ENCRYPTED:
             mode = ElementaryStreamQueue::AC3;
+            break;
+
+        case STREAMTYPE_PES_PRIVATE_DATA:
+            if (mStreamTypeExt == EXT_DESCRIPTOR_DVB_AC4) {
+                mode = ElementaryStreamQueue::AC4;
+            }
             break;
 
         case STREAMTYPE_METADATA:
@@ -989,6 +1029,8 @@ bool ATSParser::Stream::isAudio() const {
         case STREAMTYPE_AAC_ENCRYPTED:
         case STREAMTYPE_AC3_ENCRYPTED:
             return true;
+        case STREAMTYPE_PES_PRIVATE_DATA:
+            return mStreamTypeExt == EXT_DESCRIPTOR_DVB_AC4;
 
         default:
             return false;
