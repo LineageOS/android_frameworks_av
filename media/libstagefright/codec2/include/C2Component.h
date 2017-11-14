@@ -55,6 +55,31 @@ protected:
     virtual ~C2ComponentListener() = default;
 };
 
+struct C2FieldSupportedValuesQuery {
+    enum Type : uint32_t {
+        POSSIBLE, ///< query all possible values regardless of other settings
+        CURRENT,  ///< query currently possible values given dependent settings
+    };
+
+    const C2ParamField field;
+    const Type type;
+    status_t status;
+    C2FieldSupportedValues values;
+
+    C2FieldSupportedValuesQuery(const C2ParamField &field_, Type type_)
+        : field(field_), type(type_), status(C2_NO_INIT) { }
+
+    static C2FieldSupportedValuesQuery&&
+    Current(const C2ParamField &field_) {
+        return std::move(C2FieldSupportedValuesQuery(field_, CURRENT));
+    }
+
+    static C2FieldSupportedValuesQuery&&
+    Possible(const C2ParamField &field_) {
+        return std::move(C2FieldSupportedValuesQuery(field_, POSSIBLE));
+    }
+};
+
 /**
  * Component interface object. This object contains all of the configuration of a potential or
  * actual component. It can be created and used independently of an actual C2Component instance to
@@ -282,8 +307,7 @@ public:
      * fields in the same list?
      */
     virtual status_t getSupportedValues(
-            const std::vector<const C2ParamField> &fields,
-            std::vector<C2FieldSupportedValues>* const values) const = 0;
+            std::vector<C2FieldSupportedValuesQuery> &fields) const = 0;
 
     virtual ~C2ComponentInterface() = default;
 };

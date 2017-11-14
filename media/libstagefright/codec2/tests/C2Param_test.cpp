@@ -2491,16 +2491,18 @@ public:
     };
 
     virtual status_t getSupportedValues(
-            const std::vector<const C2ParamField> &fields,
-            std::vector<C2FieldSupportedValues>* const values) const {
-        for (const C2ParamField &field : fields) {
-            if (field == C2ParamField(&mDomainInfo, &C2ComponentDomainInfo::mValue)) {
-                values->push_back(C2FieldSupportedValues(
+            std::vector<C2FieldSupportedValuesQuery> &fields) const {
+        for (C2FieldSupportedValuesQuery &query : fields) {
+            if (query.field == C2ParamField(&mDomainInfo, &C2ComponentDomainInfo::mValue)) {
+                query.values = C2FieldSupportedValues(
                     false /* flag */,
                     &mDomainInfo.mValue
                     //,
                     //{(int32_t)C2DomainVideo}
-                ));
+                );
+                query.status = C2_OK;
+            } else {
+                query.status = C2_BAD_INDEX;
             }
         }
         return C2_OK;
@@ -2699,21 +2701,23 @@ void dumpDesc(const C2ParamDescriptor &pd) {
 TEST_F(C2ParamTest, ReflectorTest) {
     C2ComponentDomainInfo domainInfo;
     std::shared_ptr<C2ComponentInterface> comp(new MyComponentInstance);
-    std::vector<C2FieldSupportedValues> values;
 
     std::unique_ptr<C2StructDescriptor> desc{
         comp->getParamReflector()->describe(C2ComponentDomainInfo::indexFlags)};
     dumpStruct(*desc);
 
-    EXPECT_EQ(
-        C2_OK,
-        comp->getSupportedValues(
-            { C2ParamField(&domainInfo, &C2ComponentDomainInfo::mValue) },
-            &values)
-    );
+    std::vector<C2FieldSupportedValuesQuery> query = {
+        { C2ParamField(&domainInfo, &C2ComponentDomainInfo::mValue),
+          C2FieldSupportedValuesQuery::CURRENT },
+        C2FieldSupportedValuesQuery(C2ParamField(&domainInfo, &C2ComponentDomainInfo::mValue),
+          C2FieldSupportedValuesQuery::CURRENT),
+        C2FieldSupportedValuesQuery::Current(C2ParamField(&domainInfo, &C2ComponentDomainInfo::mValue)),
+    };
 
-    for (const C2FieldSupportedValues &sv : values) {
-        dumpFSV(sv, &domainInfo.mValue);
+    EXPECT_EQ(C2_OK, comp->getSupportedValues(query));
+
+    for (const C2FieldSupportedValuesQuery &q : query) {
+        dumpFSV(q.values, &domainInfo.mValue);
     }
 }
 

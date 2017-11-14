@@ -141,6 +141,7 @@ enum {
 
     // unknown fatal
     C2_CORRUPTED        = UNKNOWN_ERROR,        ///< some unexpected error prevented the operation
+    C2_NO_INIT          = NO_INIT,              ///< status has not been initialized
 };
 
 /// @}
