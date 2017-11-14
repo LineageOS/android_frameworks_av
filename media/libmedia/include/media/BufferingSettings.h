@@ -21,45 +21,14 @@
 
 namespace android {
 
-enum BufferingMode : int {
-    // Do not support buffering.
-    BUFFERING_MODE_NONE             = 0,
-    // Support only time based buffering.
-    BUFFERING_MODE_TIME_ONLY        = 1,
-    // Support only size based buffering.
-    BUFFERING_MODE_SIZE_ONLY        = 2,
-    // Support both time and size based buffering, time based calculation precedes size based.
-    // Size based calculation will be used only when time information is not available for
-    // the stream.
-    BUFFERING_MODE_TIME_THEN_SIZE   = 3,
-    // Number of modes.
-    BUFFERING_MODE_COUNT            = 4,
-};
-
 struct BufferingSettings : public Parcelable {
-    static const int kNoWatermark = -1;
+    static const int kNoMark = -1;
 
-    static bool IsValidBufferingMode(int mode);
-    static bool IsTimeBasedBufferingMode(int mode);
-    static bool IsSizeBasedBufferingMode(int mode);
+    int mInitialMarkMs;
 
-    BufferingMode mInitialBufferingMode;  // for prepare
-    BufferingMode mRebufferingMode;  // for playback
-
-    int mInitialWatermarkMs;  // time based
-    int mInitialWatermarkKB;  // size based
-
-    // When cached data is below this mark, playback will be paused for buffering
-    // till data reach |mRebufferingWatermarkHighMs| or end of stream.
-    int mRebufferingWatermarkLowMs;
-    // When cached data is above this mark, buffering will be paused.
-    int mRebufferingWatermarkHighMs;
-
-    // When cached data is below this mark, playback will be paused for buffering
-    // till data reach |mRebufferingWatermarkHighKB| or end of stream.
-    int mRebufferingWatermarkLowKB;
-    // When cached data is above this mark, buffering will be paused.
-    int mRebufferingWatermarkHighKB;
+    // When cached data is above this mark, playback will be resumed if it has been paused
+    // due to low cached data.
+    int mResumePlaybackMarkMs;
 
     BufferingSettings();
 

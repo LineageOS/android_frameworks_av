@@ -1046,18 +1046,18 @@ status_t MediaPlayerService::Client::setBufferingSettings(
     return p->setBufferingSettings(buffering);
 }
 
-status_t MediaPlayerService::Client::getDefaultBufferingSettings(
+status_t MediaPlayerService::Client::getBufferingSettings(
         BufferingSettings* buffering /* nonnull */)
 {
     sp<MediaPlayerBase> p = getPlayer();
     // TODO: create mPlayer on demand.
     if (p == 0) return UNKNOWN_ERROR;
-    status_t ret = p->getDefaultBufferingSettings(buffering);
+    status_t ret = p->getBufferingSettings(buffering);
     if (ret == NO_ERROR) {
-        ALOGV("[%d] getDefaultBufferingSettings{%s}",
+        ALOGV("[%d] getBufferingSettings{%s}",
                 mConnId, buffering->toString().string());
     } else {
-        ALOGV("[%d] getDefaultBufferingSettings returned %d", mConnId, ret);
+        ALOGE("[%d] getBufferingSettings returned %d", mConnId, ret);
     }
     return ret;
 }

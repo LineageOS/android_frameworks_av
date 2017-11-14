@@ -52,7 +52,7 @@ struct NuPlayer : public AHandler {
 
     void setDataSourceAsync(const sp<DataSource> &source);
 
-    status_t getDefaultBufferingSettings(BufferingSettings* buffering /* nonnull */);
+    status_t getBufferingSettings(BufferingSettings* buffering /* nonnull */);
     status_t setBufferingSettings(const BufferingSettings& buffering);
 
     void prepareAsync();
@@ -152,7 +152,7 @@ private:
         kWhatGetTrackInfo               = 'gTrI',
         kWhatGetSelectedTrack           = 'gSel',
         kWhatSelectTrack                = 'selT',
-        kWhatGetDefaultBufferingSettings = 'gDBS',
+        kWhatGetBufferingSettings       = 'gBus',
         kWhatSetBufferingSettings       = 'sBuS',
         kWhatPrepareDrm                 = 'pDrm',
         kWhatReleaseDrm                 = 'rDrm',

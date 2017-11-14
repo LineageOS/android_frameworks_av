@@ -139,10 +139,8 @@ status_t MediaPlayer::attachNewPlayer(const sp<IMediaPlayer>& player)
         mPlayer = player;
         if (player != 0) {
             mCurrentState = MEDIA_PLAYER_INITIALIZED;
-            player->getDefaultBufferingSettings(&mCurrentBufferingSettings);
             err = NO_ERROR;
         } else {
-            mCurrentBufferingSettings = BufferingSettings();
             ALOGE("Unable to create media player");
         }
     }
@@ -249,17 +247,6 @@ status_t MediaPlayer::setVideoSurfaceTexture(
     return mPlayer->setVideoSurfaceTexture(bufferProducer);
 }
 
-status_t MediaPlayer::getDefaultBufferingSettings(BufferingSettings* buffering /* nonnull */)
-{
-    ALOGV("getDefaultBufferingSettings");
-
-    Mutex::Autolock _l(mLock);
-    if (mPlayer == 0) {
-        return NO_INIT;
-    }
-    return mPlayer->getDefaultBufferingSettings(buffering);
-}
-
 status_t MediaPlayer::getBufferingSettings(BufferingSettings* buffering /* nonnull */)
 {
     ALOGV("getBufferingSettings");
@@ -268,8 +255,7 @@ status_t MediaPlayer::getBufferingSettings(BufferingSettings* buffering /* nonnu
     if (mPlayer == 0) {
         return NO_INIT;
     }
-    *buffering = mCurrentBufferingSettings;
-    return NO_ERROR;
+    return mPlayer->getBufferingSettings(buffering);
 }
 
 status_t MediaPlayer::setBufferingSettings(const BufferingSettings& buffering)
@@ -280,11 +266,7 @@ status_t MediaPlayer::setBufferingSettings(const BufferingSettings& buffering)
     if (mPlayer == 0) {
         return NO_INIT;
     }
-    status_t err =  mPlayer->setBufferingSettings(buffering);
-    if (err == NO_ERROR) {
-        mCurrentBufferingSettings = buffering;
-    }
-    return err;
+    return mPlayer->setBufferingSettings(buffering);
 }
 
 // must call with lock held
@@ -636,7 +618,6 @@ status_t MediaPlayer::reset_l()
         // setDataSource has to be called again to create a
         // new mediaplayer.
         mPlayer = 0;
-        mCurrentBufferingSettings = BufferingSettings();
         return ret;
     }
     clear_l();

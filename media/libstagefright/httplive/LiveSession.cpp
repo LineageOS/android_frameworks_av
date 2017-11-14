@@ -49,6 +49,10 @@ const int64_t LiveSession::kDownSwitchMarkUs = 20000000ll;
 const int64_t LiveSession::kUpSwitchMarginUs = 5000000ll;
 const int64_t LiveSession::kResumeThresholdUs = 100000ll;
 
+//TODO: redefine this mark to a fair value
+// default buffer underflow mark
+static const int kUnderflowMarkMs = 1000;  // 1 second
+
 struct LiveSession::BandwidthEstimator : public RefBase {
     BandwidthEstimator();
 
@@ -840,7 +844,7 @@ void LiveSession::onMessageReceived(const sp<AMessage> &msg) {
                     // (If we don't have that cushion we'd rather cancel and try again.)
                     int64_t delayUs =
                         switchUp ?
-                            (mBufferingSettings.mRebufferingWatermarkLowMs * 1000ll + 1000000ll)
+                            (kUnderflowMarkMs * 1000ll + 1000000ll)
                             : 0;
                     bool needResumeUntil = false;
                     sp<AMessage> stopParams = msg;
@@ -2202,14 +2206,14 @@ bool LiveSession::checkBuffering(
         ++activeCount;
         int64_t readyMarkUs =
             (mInPreparationPhase ?
-                mBufferingSettings.mInitialWatermarkMs :
-                mBufferingSettings.mRebufferingWatermarkHighMs) * 1000ll;
+                mBufferingSettings.mInitialMarkMs :
+                mBufferingSettings.mResumePlaybackMarkMs) * 1000ll;
         if (bufferedDurationUs > readyMarkUs
                 || mPacketSources[i]->isFinished(0)) {
             ++readyCount;
         }
         if (!mPacketSources[i]->isFinished(0)) {
-            if (bufferedDurationUs < mBufferingSettings.mRebufferingWatermarkLowMs * 1000ll) {
+            if (bufferedDurationUs < kUnderflowMarkMs * 1000ll) {
                 ++underflowCount;
             }
             if (bufferedDurationUs > mUpSwitchMark) {
