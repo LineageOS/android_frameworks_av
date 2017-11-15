@@ -91,7 +91,7 @@ public:
      * \retval C2_NO_PERMISSION no permission to wait for the fence (unexpected - system)
      * \retval C2_CORRUPTED     some unknown error prevented waiting for the fence (unexpected)
      */
-    C2Error wait(nsecs_t timeoutNs);
+    C2Status wait(nsecs_t timeoutNs);
 
     /**
      * Used to check if this fence is valid (if there is a chance for it to be signaled.)
@@ -158,7 +158,7 @@ public:
      * \retval C2_NO_PERMISSION no permission to signal the fence (unexpected - system)
      * \retval C2_CORRUPTED     some unknown error prevented signaling the fence(s) (unexpected)
      */
-    C2Error fire();
+    C2Status fire();
 
     /**
      * Trigger this event from the merging of the supplied fences. This means that it will be
@@ -172,7 +172,7 @@ public:
      * \retval C2_NO_PERMISSION no permission to merge the fence (unexpected - system)
      * \retval C2_CORRUPTED     some unknown error prevented merging the fence(s) (unexpected)
      */
-    C2Error merge(std::vector<C2Fence> fences);
+    C2Status merge(std::vector<C2Fence> fences);
 
     /**
      * Abandons the event and any associated fence(s).
@@ -186,7 +186,7 @@ public:
      * \retval C2_NO_PERMISSION no permission to abandon the fence (unexpected - system)
      * \retval C2_CORRUPTED     some unknown error prevented signaling the fence(s) (unexpected)
      */
-    C2Error abandon();
+    C2Status abandon();
 
 private:
     class Impl;
@@ -197,15 +197,15 @@ private:
 /// @{
 
 /**
- * Interface for objects that encapsulate an updatable error value.
+ * Interface for objects that encapsulate an updatable status value.
  */
-struct _C2InnateError {
-    inline C2Error error() const { return mError; }
+struct _C2InnateStatus {
+    inline C2Status status() const { return mStatus; }
 
 protected:
-    _C2InnateError(C2Error error) : mError(error) { }
+    _C2InnateStatus(C2Status status) : mStatus(status) { }
 
-    C2Error mError; // this error is updatable by the object
+    C2Status mStatus; // this status is updatable by the object
 };
 
 /// @}
@@ -230,10 +230,10 @@ public:
     }
 
 protected:
-    C2Acquirable(C2Error error, C2Fence fence, T t) : C2Fence(fence), mInitialError(error), mT(t) { }
+    C2Acquirable(C2Status error, C2Fence fence, T t) : C2Fence(fence), mInitialError(error), mT(t) { }
 
 private:
-    C2Error mInitialError;
+    C2Status mInitialError;
     T mT; // TODO: move instead of copy
 };
 
@@ -449,11 +449,11 @@ public:
     /**
      * \return error during the creation/mapping of this view.
      */
-    C2Error error();
+    C2Status error() const;
 
 protected:
     C2ReadView(const _C2LinearCapacityAspect *parent, const uint8_t *data);
-    explicit C2ReadView(C2Error error);
+    explicit C2ReadView(C2Status error);
 
 private:
     class Impl;
@@ -482,11 +482,11 @@ public:
     /**
      * \return error during the creation/mapping of this view.
      */
-    C2Error error();
+    C2Status error() const;
 
 protected:
     C2WriteView(const _C2LinearRangeAspect *parent, uint8_t *base);
-    explicit C2WriteView(C2Error error);
+    explicit C2WriteView(C2Status error);
 
 private:
     class Impl;
@@ -631,7 +631,7 @@ public:
      * \retval C2_TIMED_OUT     the reservation timed out \todo when?
      * \retval C2_CORRUPTED     some unknown error prevented reserving space. (unexpected)
      */
-    C2Error reserve(size_t size, C2Fence *fence /* nullable */);
+    C2Status reserve(size_t size, C2Fence *fence /* nullable */);
 
     /**
      * Abandons a portion of this segment. This will move to the beginning of this segment.
@@ -644,7 +644,7 @@ public:
      * \retval C2_TIMED_OUT     the operation timed out (unexpected)
      * \retval C2_CORRUPTED     some unknown error prevented abandoning the data (unexpected)
      */
-    C2Error abandon(size_t size);
+    C2Status abandon(size_t size);
 
     /**
      * Share a portion as block(s) with consumers (these are moved to the used section).
@@ -661,7 +661,7 @@ public:
      * \retval C2_TIMED_OUT     the operation timed out (unexpected)
      * \retval C2_CORRUPTED     some unknown error prevented sharing the data (unexpected)
      */
-    C2Error share(size_t size, C2Fence fence, std::list<C2ConstLinearBlock> &blocks);
+    C2Status share(size_t size, C2Fence fence, std::list<C2ConstLinearBlock> &blocks);
 
     /**
      * Returns the beginning offset of this segment from the start of this circular block.
@@ -695,7 +695,7 @@ public:
     /**
      * \return error during the creation/mapping of this view.
      */
-    C2Error error();
+    C2Status error() const;
 };
 
 /**
@@ -716,7 +716,7 @@ public:
      * \param size    number of bytes to commit to the next segment
      * \param fence   fence used for the commit (the fence must signal before the data is committed)
      */
-    C2Error commit(size_t size, C2Fence fence);
+    C2Status commit(size_t size, C2Fence fence);
 
     /**
      * Maps this block into memory and returns a write view for it.
@@ -1016,14 +1016,14 @@ public:
     /**
      * \return error during the creation/mapping of this view.
      */
-    C2Error error() const;
+    C2Status error() const;
 
 protected:
     C2GraphicView(
             const _C2PlanarCapacityAspect *parent,
             uint8_t *const *data,
             const C2PlaneLayout& layout);
-    explicit C2GraphicView(C2Error error);
+    explicit C2GraphicView(C2Status error);
 
 private:
     class Impl;
@@ -1224,7 +1224,7 @@ public:
      * \retval C2_NO_MEMORY not enough memory to register for this callback
      * \retval C2_CORRUPTED an unknown error prevented the registration (unexpected)
      */
-    C2Error registerOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg = nullptr);
+    C2Status registerOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg = nullptr);
 
     /**
      * Unregisters a previously registered pre-destroy notification.
@@ -1236,7 +1236,7 @@ public:
      * \retval C2_NOT_FOUND the notification was not found
      * \retval C2_CORRUPTED an unknown error prevented the registration (unexpected)
      */
-    C2Error unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg = nullptr);
+    C2Status unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg = nullptr);
 
     ///@}
 
@@ -1262,7 +1262,7 @@ public:
      * \retval C2_NO_MEMORY not enough memory to attach the metadata (this return value is not
      *                      used if the same kind of metadata is already attached to the buffer).
      */
-    C2Error setInfo(const std::shared_ptr<C2Info> &info);
+    C2Status setInfo(const std::shared_ptr<C2Info> &info);
 
     /**
      * Checks if there is a certain type of metadata attached to this buffer.
@@ -1385,7 +1385,7 @@ public:
      *                      the usage flags are invalid (caller error)
      * \retval C2_CORRUPTED some unknown error prevented the operation from completing (unexpected)
      */
-    virtual C2Error map(
+    virtual C2Status map(
             size_t offset, size_t size, C2MemoryUsage usage, int *fenceFd /* nullable */,
             void **addr /* nonnull */) = 0;
 
@@ -1409,7 +1409,7 @@ public:
      * \retval C2_CORRUPTED some unknown error prevented the operation from completing (unexpected)
      * \retval C2_NO_PERMISSION no permission to unmap the portion (unexpected - system)
      */
-    virtual C2Error unmap(void *addr, size_t size, int *fenceFd /* nullable */) = 0;
+    virtual C2Status unmap(void *addr, size_t size, int *fenceFd /* nullable */) = 0;
 
     /**
      * Returns true if this is a valid allocation.
@@ -1472,7 +1472,7 @@ public:
      * \retval C2_CORRUPTED some unknown error prevented the operation from completing (unexpected)
 
      */
-    virtual C2Error map(
+    virtual C2Status map(
             C2Rect rect, C2MemoryUsage usage, int *fenceFd,
             // TODO: return <addr, size> buffers with plane sizes
             C2PlaneLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) = 0;
@@ -1492,7 +1492,7 @@ public:
      * \retval C2_CORRUPTED some unknown error prevented the operation from completing (unexpected)
      * \retval C2_NO_PERMISSION no permission to unmap the section (unexpected - system)
      */
-    virtual C2Error unmap(C2Fence *fenceFd /* nullable */) = 0;
+    virtual C2Status unmap(C2Fence *fenceFd /* nullable */) = 0;
 
     /**
      * Returns true if this is a valid allocation.
@@ -1550,7 +1550,7 @@ public:
      * \retval C2_UNSUPPORTED       this allocator does not support 1D allocations
      * \retval C2_CORRUPTED some unknown, unrecoverable error occured during allocation (unexpected)
      */
-    virtual C2Error allocateLinearBuffer(
+    virtual C2Status allocateLinearBuffer(
             uint32_t capacity __unused, C2MemoryUsage usage __unused,
             std::shared_ptr<C2LinearAllocation> *allocation /* nonnull */) {
         *allocation = nullptr;
@@ -1573,7 +1573,7 @@ public:
      * \retval C2_UNSUPPORTED       this allocator does not support 1D allocations
      * \retval C2_CORRUPTED some unknown, unrecoverable error occured during allocation (unexpected)
      */
-    virtual C2Error recreateLinearBuffer(
+    virtual C2Status recreateLinearBuffer(
             const C2Handle *handle __unused,
             std::shared_ptr<C2LinearAllocation> *allocation /* nonnull */) {
         *allocation = nullptr;
@@ -1606,7 +1606,7 @@ public:
      * \retval C2_UNSUPPORTED       this allocator does not support 2D allocations
      * \retval C2_CORRUPTED some unknown, unrecoverable error occured during allocation (unexpected)
      */
-    virtual C2Error allocateGraphicBuffer(
+    virtual C2Status allocateGraphicBuffer(
             uint32_t width __unused, uint32_t height __unused, uint32_t format __unused,
             C2MemoryUsage usage __unused,
             std::shared_ptr<C2GraphicAllocation> *allocation /* nonnull */) {
@@ -1630,7 +1630,7 @@ public:
      * \retval C2_UNSUPPORTED       this allocator does not support 2D allocations
      * \retval C2_CORRUPTED some unknown, unrecoverable error occured during recreation (unexpected)
      */
-    virtual C2Error recreateGraphicBuffer(
+    virtual C2Status recreateGraphicBuffer(
             const C2Handle *handle __unused,
             std::shared_ptr<C2GraphicAllocation> *allocation /* nonnull */) {
         *allocation = nullptr;
@@ -1674,7 +1674,7 @@ public:
      * \retval C2_UNSUPPORTED       this allocator does not support linear allocations
      * \retval C2_CORRUPTED some unknown, unrecoverable error occured during allocation (unexpected)
      */
-    virtual C2Error allocateLinearBlock(
+    virtual C2Status allocateLinearBlock(
             uint32_t capacity __unused, C2MemoryUsage usage __unused,
             std::shared_ptr<C2LinearBlock> *block /* nonnull */) {
         *block = nullptr;
@@ -1703,7 +1703,7 @@ public:
      * \retval C2_UNSUPPORTED   this allocator does not support circular allocations
      * \retval C2_CORRUPTED     some unknown, unrecoverable error occured during allocation (unexpected)
      */
-    virtual C2Error allocateCircularBlock(
+    virtual C2Status allocateCircularBlock(
             uint32_t capacity __unused, C2MemoryUsage usage __unused,
             std::shared_ptr<C2CircularBlock> *block /* nonnull */) {
         *block = nullptr;
@@ -1736,7 +1736,7 @@ public:
      * \retval C2_UNSUPPORTED   this allocator does not support 2D allocations
      * \retval C2_CORRUPTED     some unknown, unrecoverable error occured during allocation (unexpected)
      */
-    virtual C2Error allocateGraphicBlock(
+    virtual C2Status allocateGraphicBlock(
             uint32_t width __unused, uint32_t height __unused, uint32_t format __unused,
             C2MemoryUsage usage __unused,
             std::shared_ptr<C2GraphicBlock> *block /* nonnull */) {

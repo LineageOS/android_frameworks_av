@@ -28,8 +28,6 @@
 #include <list>
 #include <vector>
 
-typedef int status_t;
-
 namespace android {
 
 /// \defgroup work Work and data processing
@@ -167,7 +165,7 @@ struct C2Work {
     std::list<std::unique_ptr<C2Worklet>> worklets;
 
     uint32_t worklets_processed;
-    status_t result;
+    C2Status result;
 };
 
 struct C2WorkOutline {
