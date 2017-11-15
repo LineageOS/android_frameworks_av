@@ -432,7 +432,7 @@ node_id C2SoftAvcDecIntf::getId() const {
     return mId;
 }
 
-status_t C2SoftAvcDecIntf::query_nb(
+C2Status C2SoftAvcDecIntf::query_nb(
         const std::vector<C2Param* const> & stackParams,
         const std::vector<C2Param::Index> & heapParamIndices,
         std::vector<std::unique_ptr<C2Param>>* const heapParams) const {
@@ -465,10 +465,10 @@ status_t C2SoftAvcDecIntf::query_nb(
     return C2_OK;
 }
 
-status_t C2SoftAvcDecIntf::config_nb(
+C2Status C2SoftAvcDecIntf::config_nb(
         const std::vector<C2Param* const> &params,
         std::vector<std::unique_ptr<C2SettingResult>>* const failures) {
-    status_t err = C2_OK;
+    C2Status err = C2_OK;
     for (C2Param *param : params) {
         uint32_t index = restoreIndex(param);
         if (mParams.count(index) == 0) {
@@ -489,20 +489,20 @@ status_t C2SoftAvcDecIntf::config_nb(
     return err;
 }
 
-status_t C2SoftAvcDecIntf::commit_sm(
+C2Status C2SoftAvcDecIntf::commit_sm(
         const std::vector<C2Param* const> &params,
         std::vector<std::unique_ptr<C2SettingResult>>* const failures) {
     // TODO
     return config_nb(params, failures);
 }
 
-status_t C2SoftAvcDecIntf::createTunnel_sm(node_id targetComponent) {
+C2Status C2SoftAvcDecIntf::createTunnel_sm(node_id targetComponent) {
     // Tunneling is not supported
     (void) targetComponent;
     return C2_UNSUPPORTED;
 }
 
-status_t C2SoftAvcDecIntf::releaseTunnel_sm(node_id targetComponent) {
+C2Status C2SoftAvcDecIntf::releaseTunnel_sm(node_id targetComponent) {
     // Tunneling is not supported
     (void) targetComponent;
     return C2_UNSUPPORTED;
@@ -512,15 +512,15 @@ std::shared_ptr<C2ParamReflector> C2SoftAvcDecIntf::getParamReflector() const {
     return mParamReflector;
 }
 
-status_t C2SoftAvcDecIntf::getSupportedParams(
+C2Status C2SoftAvcDecIntf::getSupportedParams(
         std::vector<std::shared_ptr<C2ParamDescriptor>> * const params) const {
     params->insert(params->begin(), mParamDescs.begin(), mParamDescs.end());
     return C2_OK;
 }
 
-status_t C2SoftAvcDecIntf::getSupportedValues(
+C2Status C2SoftAvcDecIntf::getSupportedValues(
         std::vector<C2FieldSupportedValuesQuery> &fields) const {
-    status_t res = C2_OK;
+    C2Status res = C2_OK;
     for (C2FieldSupportedValuesQuery &query : fields) {
         if (mSupportedValues.count(query.field) == 0) {
             query.status = C2_BAD_INDEX;
@@ -651,7 +651,7 @@ C2SoftAvcDec::~C2SoftAvcDec() {
     CHECK_EQ(deInitDecoder(), (status_t)OK);
 }
 
-status_t C2SoftAvcDec::queue_nb(
+C2Status C2SoftAvcDec::queue_nb(
         std::list<std::unique_ptr<C2Work>>* const items) {
     if (!mThread->isRunning()) {
         return C2_CORRUPTED;
@@ -666,13 +666,13 @@ status_t C2SoftAvcDec::queue_nb(
     return C2_OK;
 }
 
-status_t C2SoftAvcDec::announce_nb(const std::vector<C2WorkOutline> &items) {
+C2Status C2SoftAvcDec::announce_nb(const std::vector<C2WorkOutline> &items) {
     // Tunneling is not supported
     (void) items;
     return C2_UNSUPPORTED;
 }
 
-status_t C2SoftAvcDec::flush_sm(
+C2Status C2SoftAvcDec::flush_sm(
         bool flushThrough, std::list<std::unique_ptr<C2Work>>* const flushedWork) {
     // Tunneling is not supported
     (void) flushThrough;
@@ -698,7 +698,7 @@ status_t C2SoftAvcDec::flush_sm(
     return C2_OK;
 }
 
-status_t C2SoftAvcDec::drain_nb(bool drainThrough) {
+C2Status C2SoftAvcDec::drain_nb(bool drainThrough) {
     // Tunneling is not supported
     (void) drainThrough;
 
@@ -714,14 +714,14 @@ status_t C2SoftAvcDec::drain_nb(bool drainThrough) {
     return C2_OK;
 }
 
-status_t C2SoftAvcDec::start() {
+C2Status C2SoftAvcDec::start() {
     if (!mThread->isRunning()) {
         mThread->start(shared_from_this());
     }
     return C2_OK;
 }
 
-status_t C2SoftAvcDec::stop() {
+C2Status C2SoftAvcDec::stop() {
     ALOGV("stop");
     std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
     std::chrono::system_clock::time_point deadline = now + std::chrono::milliseconds(500);
