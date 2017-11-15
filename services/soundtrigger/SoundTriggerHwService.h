@@ -221,10 +221,10 @@ public:
            sp<IMemory> prepareSoundModelEvent(struct sound_trigger_model_event *event);
            void sendSoundModelEvent(struct sound_trigger_model_event *event, Module *module);
 
-           sp<IMemory> prepareServiceStateEvent_l(sound_trigger_service_state_t state);
-           void sendServiceStateEvent_l(sound_trigger_service_state_t state, Module *module);
-           void sendServiceStateEvent_l(sound_trigger_service_state_t state,
-                                        ModuleClient *moduleClient);
+           sp<IMemory> prepareServiceStateEvent(sound_trigger_service_state_t state);
+           void sendServiceStateEvent(sound_trigger_service_state_t state, Module *module);
+           void sendServiceStateEvent(sound_trigger_service_state_t state,
+                                      ModuleClient *moduleClient);
 
            void sendCallbackEvent(const sp<CallbackEvent>& event);
            void onCallbackEvent(const sp<CallbackEvent>& event);
