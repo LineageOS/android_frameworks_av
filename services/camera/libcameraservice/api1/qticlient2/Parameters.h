@@ -178,6 +178,8 @@ struct Parameters {
     bool slowJpegMode;
     // Whether ZSL reprocess is supported by the device.
     bool isZslReprocessPresent;
+    // Whether the device supports enableZsl.
+    bool isDeviceZslSupported;
 
     // Overall camera state
     enum State {
