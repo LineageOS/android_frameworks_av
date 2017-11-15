@@ -318,6 +318,7 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(MediaAnalyticsItem
                 saveItem(mFinalized, oitem, 0);
             }
             // new record could itself be marked finalized...
+            id = item->getSessionID();
             if (finalizing) {
                 summarize(item);
                 saveItem(mFinalized, item, 0);
@@ -325,16 +326,15 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(MediaAnalyticsItem
             } else {
                 saveItem(mOpen, item, 1);
             }
-            id = item->getSessionID();
         } else {
             // combine the records, send it to finalized if appropriate
             oitem->merge(item);
+            id = oitem->getSessionID();
             if (finalizing) {
                 summarize(oitem);
                 saveItem(mFinalized, oitem, 0);
                 mItemsFinalized++;
             }
-            id = oitem->getSessionID();
 
             // we're responsible for disposing of the dead record
             delete item;
@@ -614,17 +614,28 @@ String8 MediaAnalyticsService::dumpQueue(List<MediaAnalyticsItem *> *theList, ns
 // caller should hold mLock
 void MediaAnalyticsService::saveItem(List<MediaAnalyticsItem *> *l, MediaAnalyticsItem * item, int front) {
 
-    // adding at back of queue (fifo order)
     if (front)  {
+        // for non-finalized stuff, since we expect to reference it again soon,
+        // make it quicker to find (nearer the front of our list)
         l->push_front(item);
     } else {
+        // for finalized records, which we want to dump 'in sequence order'
         l->push_back(item);
     }
+
+    // our reclaim process is for oldest-first queues
+    if (front) {
+        return;
+    }
+
 
     // keep removing old records the front until we're in-bounds (count)
     if (mMaxRecords > 0) {
         while (l->size() > (size_t) mMaxRecords) {
             MediaAnalyticsItem * oitem = *(l->begin());
+            if (oitem == item) {
+                break;
+            }
             l->erase(l->begin());
             delete oitem;
             mItemsDiscarded++;
@@ -638,6 +649,9 @@ void MediaAnalyticsService::saveItem(List<MediaAnalyticsItem *> *l, MediaAnalyti
         while (l->size() > 0) {
             MediaAnalyticsItem * oitem = *(l->begin());
             nsecs_t when = oitem->getTimestamp();
+            if (oitem == item) {
+                break;
+            }
             // careful about timejumps too
             if ((now > when) && (now-when) <= mMaxRecordAgeNs) {
                 // this (and the rest) are recent enough to keep
