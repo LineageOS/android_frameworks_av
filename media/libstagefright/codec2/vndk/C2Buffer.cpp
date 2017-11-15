@@ -129,26 +129,26 @@ public:
     explicit Impl(const uint8_t *data)
         : mData(data), mError(C2_OK) {}
 
-    explicit Impl(C2Error error)
+    explicit Impl(C2Status error)
         : mData(nullptr), mError(error) {}
 
     const uint8_t *data() const {
         return mData;
     }
 
-    C2Error error() const {
+    C2Status error() const {
         return mError;
     }
 
 private:
     const uint8_t *mData;
-    C2Error mError;
+    C2Status mError;
 };
 
 C2ReadView::C2ReadView(const _C2LinearCapacityAspect *parent, const uint8_t *data)
     : _C2LinearCapacityAspect(parent), mImpl(std::make_shared<Impl>(data)) {}
 
-C2ReadView::C2ReadView(C2Error error)
+C2ReadView::C2ReadView(C2Status error)
     : _C2LinearCapacityAspect(0u), mImpl(std::make_shared<Impl>(error)) {}
 
 const uint8_t *C2ReadView::data() const {
@@ -167,7 +167,7 @@ C2ReadView C2ReadView::subView(size_t offset, size_t size) const {
     return C2ReadView(&newCapacity, data() + offset);
 }
 
-C2Error C2ReadView::error() {
+C2Status C2ReadView::error() const {
     return mImpl->error();
 }
 
@@ -176,33 +176,33 @@ public:
     explicit Impl(uint8_t *base)
         : mBase(base), mError(C2_OK) {}
 
-    explicit Impl(C2Error error)
+    explicit Impl(C2Status error)
         : mBase(nullptr), mError(error) {}
 
     uint8_t *base() const {
         return mBase;
     }
 
-    C2Error error() const {
+    C2Status error() const {
         return mError;
     }
 
 private:
     uint8_t *mBase;
-    C2Error mError;
+    C2Status mError;
 };
 
 C2WriteView::C2WriteView(const _C2LinearRangeAspect *parent, uint8_t *base)
     : _C2EditableLinearRange(parent), mImpl(std::make_shared<Impl>(base)) {}
 
-C2WriteView::C2WriteView(C2Error error)
+C2WriteView::C2WriteView(C2Status error)
     : _C2EditableLinearRange(nullptr), mImpl(std::make_shared<Impl>(error)) {}
 
 uint8_t *C2WriteView::base() { return mImpl->base(); }
 
 uint8_t *C2WriteView::data() { return mImpl->base() + offset(); }
 
-C2Error C2WriteView::error() { return mImpl->error(); }
+C2Status C2WriteView::error() const { return mImpl->error(); }
 
 class C2ConstLinearBlock::Impl {
 public:
@@ -212,7 +212,7 @@ public:
     ~Impl() {
         if (mBase != nullptr) {
             // TODO: fence
-            C2Error err = mAllocation->unmap(mBase, mSize, nullptr);
+            C2Status err = mAllocation->unmap(mBase, mSize, nullptr);
             if (err != C2_OK) {
                 // TODO: Log?
             }
@@ -238,13 +238,13 @@ public:
 
     const uint8_t *base() const { return mBase; }
 
-    C2Error error() const { return mError; }
+    C2Status error() const { return mError; }
 
 private:
     std::shared_ptr<C2LinearAllocation> mAllocation;
     uint8_t *mBase;
     size_t mSize;
-    C2Error mError;
+    C2Status mError;
 };
 
 C2ConstLinearBlock::C2ConstLinearBlock(std::shared_ptr<C2LinearAllocation> alloc)
@@ -277,7 +277,7 @@ public:
     ~Impl() {
         if (mBase != nullptr) {
             // TODO: fence
-            C2Error err = mAllocation->unmap(mBase, mSize, nullptr);
+            C2Status err = mAllocation->unmap(mBase, mSize, nullptr);
             if (err != C2_OK) {
                 // TODO: Log?
             }
@@ -309,7 +309,7 @@ public:
 
     uint8_t *base() const { return mBase; }
 
-    C2Error error() const { return mError; }
+    C2Status error() const { return mError; }
 
     C2Fence fence() const { return mFence; }
 
@@ -317,7 +317,7 @@ private:
     std::shared_ptr<C2LinearAllocation> mAllocation;
     uint8_t *mBase;
     size_t mSize;
-    C2Error mError;
+    C2Status mError;
     C2Fence mFence;
 };
 
@@ -349,14 +349,14 @@ C2DefaultBlockAllocator::C2DefaultBlockAllocator(
         const std::shared_ptr<C2Allocator> &allocator)
   : mAllocator(allocator) {}
 
-C2Error C2DefaultBlockAllocator::allocateLinearBlock(
+C2Status C2DefaultBlockAllocator::allocateLinearBlock(
         uint32_t capacity,
         C2MemoryUsage usage,
         std::shared_ptr<C2LinearBlock> *block /* nonnull */) {
     block->reset();
 
     std::shared_ptr<C2LinearAllocation> alloc;
-    C2Error err = mAllocator->allocateLinearBuffer(capacity, usage, &alloc);
+    C2Status err = mAllocator->allocateLinearBuffer(capacity, usage, &alloc);
     if (err != C2_OK) {
         return err;
     }
@@ -392,16 +392,16 @@ class C2GraphicView::Impl {
 public:
     Impl(uint8_t *const *data, const C2PlaneLayout &layout)
         : mData(data), mLayout(layout), mError(C2_OK) {}
-    explicit Impl(C2Error error) : mData(nullptr), mError(error) {}
+    explicit Impl(C2Status error) : mData(nullptr), mError(error) {}
 
     uint8_t *const *data() const { return mData; }
     const C2PlaneLayout &layout() const { return mLayout; }
-    C2Error error() const { return mError; }
+    C2Status error() const { return mError; }
 
 private:
     uint8_t *const *mData;
     C2PlaneLayout mLayout;
-    C2Error mError;
+    C2Status mError;
 };
 
 C2GraphicView::C2GraphicView(
@@ -410,7 +410,7 @@ C2GraphicView::C2GraphicView(
         const C2PlaneLayout& layout)
     : _C2PlanarSection(parent), mImpl(new Impl(data, layout)) {}
 
-C2GraphicView::C2GraphicView(C2Error error)
+C2GraphicView::C2GraphicView(C2Status error)
     : _C2PlanarSection(nullptr), mImpl(new Impl(error)) {}
 
 const uint8_t *const *C2GraphicView::data() const {
@@ -437,7 +437,7 @@ C2GraphicView C2GraphicView::subView(const C2Rect &rect) {
     return view;
 }
 
-C2Error C2GraphicView::error() const {
+C2Status C2GraphicView::error() const {
     return mImpl->error();
 }
 
@@ -453,12 +453,12 @@ public:
         }
     }
 
-    C2Error map(C2Rect rect) {
+    C2Status map(C2Rect rect) {
         if (mData[0] != nullptr) {
             // Already mapped.
             return C2_OK;
         }
-        C2Error err = mAllocation->map(
+        C2Status err = mAllocation->map(
                 rect,
                 { C2MemoryUsage::kSoftwareRead, 0 },
                 nullptr,
@@ -493,7 +493,7 @@ C2ConstGraphicBlock::C2ConstGraphicBlock(
     : C2Block2D(alloc), mImpl(new Impl(alloc)), mFence(fence) {}
 
 C2Acquirable<const C2GraphicView> C2ConstGraphicBlock::map() const {
-    C2Error err = mImpl->map(crop());
+    C2Status err = mImpl->map(crop());
     if (err != C2_OK) {
         C2DefaultGraphicView view(err);
         return C2AcquirableConstGraphicView(err, mFence, view);
@@ -518,13 +518,13 @@ public:
         }
     }
 
-    C2Error map(C2Rect rect) {
+    C2Status map(C2Rect rect) {
         if (mData[0] != nullptr) {
             // Already mapped.
             return C2_OK;
         }
         uint8_t *data[C2PlaneLayout::MAX_NUM_PLANES];
-        C2Error err = mAllocation->map(
+        C2Status err = mAllocation->map(
                 rect,
                 { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
                 nullptr,
@@ -560,7 +560,7 @@ C2GraphicBlock::C2GraphicBlock(const std::shared_ptr<C2GraphicAllocation> &alloc
     : C2Block2D(alloc), mImpl(new Impl(alloc)) {}
 
 C2Acquirable<C2GraphicView> C2GraphicBlock::map() {
-    C2Error err = mImpl->map(crop());
+    C2Status err = mImpl->map(crop());
     if (err != C2_OK) {
         C2DefaultGraphicView view(err);
         // TODO: fence
@@ -579,7 +579,7 @@ C2DefaultGraphicBlockAllocator::C2DefaultGraphicBlockAllocator(
         const std::shared_ptr<C2Allocator> &allocator)
   : mAllocator(allocator) {}
 
-C2Error C2DefaultGraphicBlockAllocator::allocateGraphicBlock(
+C2Status C2DefaultGraphicBlockAllocator::allocateGraphicBlock(
         uint32_t width,
         uint32_t height,
         uint32_t format,
@@ -588,7 +588,7 @@ C2Error C2DefaultGraphicBlockAllocator::allocateGraphicBlock(
     block->reset();
 
     std::shared_ptr<C2GraphicAllocation> alloc;
-    C2Error err = mAllocator->allocateGraphicBuffer(width, height, format, usage, &alloc);
+    C2Status err = mAllocator->allocateGraphicBuffer(width, height, format, usage, &alloc);
     if (err != C2_OK) {
         return err;
     }
@@ -650,7 +650,7 @@ public:
 
     const C2BufferData &data() const { return mData; }
 
-    C2Error registerOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg) {
+    C2Status registerOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg) {
         auto it = std::find_if(
                 mNotify.begin(), mNotify.end(),
                 [onDestroyNotify, arg] (const auto &pair) {
@@ -663,7 +663,7 @@ public:
         return C2_OK;
     }
 
-    C2Error unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg) {
+    C2Status unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg) {
         auto it = std::find_if(
                 mNotify.begin(), mNotify.end(),
                 [onDestroyNotify, arg] (const auto &pair) {
@@ -684,7 +684,7 @@ public:
         return result;
     }
 
-    C2Error setInfo(const std::shared_ptr<C2Info> &info) {
+    C2Status setInfo(const std::shared_ptr<C2Info> &info) {
         // To "update" you need to erase the existing one if any, and then insert.
         (void) mInfos.erase(info->type());
         (void) mInfos.insert({ info->type(), info });
@@ -720,11 +720,11 @@ C2Buffer::C2Buffer(const std::list<C2ConstGraphicBlock> &blocks)
 
 const C2BufferData C2Buffer::data() const { return mImpl->data(); }
 
-C2Error C2Buffer::registerOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg) {
+C2Status C2Buffer::registerOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg) {
     return mImpl->registerOnDestroyNotify(onDestroyNotify, arg);
 }
 
-C2Error C2Buffer::unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg) {
+C2Status C2Buffer::unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify, void *arg) {
     return mImpl->unregisterOnDestroyNotify(onDestroyNotify, arg);
 }
 
@@ -732,7 +732,7 @@ const std::list<std::shared_ptr<const C2Info>> C2Buffer::infos() const {
     return mImpl->infos();
 }
 
-C2Error C2Buffer::setInfo(const std::shared_ptr<C2Info> &info) {
+C2Status C2Buffer::setInfo(const std::shared_ptr<C2Info> &info) {
     return mImpl->setInfo(info);
 }
 

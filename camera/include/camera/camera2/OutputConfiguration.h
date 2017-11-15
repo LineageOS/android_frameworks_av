@@ -64,7 +64,7 @@ public:
     OutputConfiguration(const android::Parcel& parcel);
 
     OutputConfiguration(sp<IGraphicBufferProducer>& gbp, int rotation,
-            int surfaceSetID = INVALID_SET_ID);
+            int surfaceSetID = INVALID_SET_ID, bool isShared = false);
 
     bool operator == (const OutputConfiguration& other) const {
         return ( mRotation == other.mRotation &&
@@ -110,6 +110,7 @@ public:
 
     bool gbpsEqual(const OutputConfiguration& other) const;
     bool gbpsLessThan(const OutputConfiguration& other) const;
+    void addGraphicProducer(sp<IGraphicBufferProducer> gbp) {mGbps.push_back(gbp);}
 private:
     std::vector<sp<IGraphicBufferProducer>> mGbps;
     int                        mRotation;

@@ -23,6 +23,7 @@
 #include <utils/String8.h>
 #include <utils/String16.h>
 #include <utils/Vector.h>
+#include <utils/KeyedVector.h>
 #include <utils/Timers.h>
 #include <utils/List.h>
 
@@ -118,6 +119,7 @@ class CameraDeviceBase : public virtual RefBase {
     virtual status_t createStream(sp<Surface> consumer,
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
+            std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
             bool isShared = false, uint64_t consumerUsage = 0) = 0;
 
@@ -131,6 +133,7 @@ class CameraDeviceBase : public virtual RefBase {
     virtual status_t createStream(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
+            std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
             bool isShared = false, uint64_t consumerUsage = 0) = 0;
 
@@ -347,8 +350,15 @@ class CameraDeviceBase : public virtual RefBase {
      * Set the deferred consumer surface and finish the rest of the stream configuration.
      */
     virtual status_t setConsumerSurfaces(int streamId,
-            const std::vector<sp<Surface>>& consumers) = 0;
+            const std::vector<sp<Surface>>& consumers, std::vector<int> *surfaceIds /*out*/) = 0;
 
+    /**
+     * Update a given stream.
+     */
+    virtual status_t updateStream(int streamId, const std::vector<sp<Surface>> &newSurfaces,
+            const std::vector<android::camera3::OutputStreamInfo> &outputInfo,
+            const std::vector<size_t> &removedSurfaceIds,
+            KeyedVector<sp<Surface>, size_t> *outputMap/*out*/) = 0;
 };
 
 }; // namespace android

@@ -172,6 +172,19 @@ class Camera3OutputStream :
      */
     status_t setBufferManager(sp<Camera3BufferManager> bufferManager);
 
+    /**
+     * Query the ouput surface id.
+     */
+    virtual ssize_t getSurfaceId(const sp<Surface> &/*surface*/) { return 0; }
+
+    /**
+     * Update the stream output surfaces.
+     */
+    virtual status_t updateStream(const std::vector<sp<Surface>> &outputSurfaces,
+            const std::vector<OutputStreamInfo> &outputInfo,
+            const std::vector<size_t> &removedSurfaceIds,
+            KeyedVector<sp<Surface>, size_t> *outputMap/*out*/);
+
   protected:
     Camera3OutputStream(int id, camera3_stream_type_t type,
             uint32_t width, uint32_t height, int format,

@@ -160,12 +160,12 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
 }
 
 OutputConfiguration::OutputConfiguration(sp<IGraphicBufferProducer>& gbp, int rotation,
-        int surfaceSetID) {
+        int surfaceSetID, bool isShared) {
     mGbps.push_back(gbp);
     mRotation = rotation;
     mSurfaceSetID = surfaceSetID;
     mIsDeferred = false;
-    mIsShared = false;
+    mIsShared = isShared;
 }
 
 status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {

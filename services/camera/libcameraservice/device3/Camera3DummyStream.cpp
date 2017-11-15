@@ -113,6 +113,15 @@ status_t Camera3DummyStream::setConsumers(const std::vector<sp<Surface>>& /*cons
             __FUNCTION__, mId);
     return INVALID_OPERATION;
 }
+
+status_t Camera3DummyStream::updateStream(const std::vector<sp<Surface>> &/*outputSurfaces*/,
+            const std::vector<OutputStreamInfo> &/*outputInfo*/,
+            const std::vector<size_t> &/*removedSurfaceIds*/,
+            KeyedVector<sp<Surface>, size_t> * /*outputMap*/) {
+    ALOGE("%s: this method is not supported!", __FUNCTION__);
+    return INVALID_OPERATION;
+}
+
 }; // namespace camera3
 
 }; // namespace android

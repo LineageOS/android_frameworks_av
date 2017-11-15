@@ -29,7 +29,7 @@ public:
 
     virtual ~C2DefaultBlockAllocator() = default;
 
-    virtual C2Error allocateLinearBlock(
+    virtual C2Status allocateLinearBlock(
             uint32_t capacity,
             C2MemoryUsage usage,
             std::shared_ptr<C2LinearBlock> *block /* nonnull */) override;
@@ -45,7 +45,7 @@ public:
 
     virtual ~C2DefaultGraphicBlockAllocator() = default;
 
-    virtual C2Error allocateGraphicBlock(
+    virtual C2Status allocateGraphicBlock(
             uint32_t width,
             uint32_t height,
             uint32_t format,

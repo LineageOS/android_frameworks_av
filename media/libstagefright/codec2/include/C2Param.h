@@ -344,6 +344,10 @@ public:
     /// returns the parameter type: the parameter index without the stream ID
     inline uint32_t type() const { return _mIndex.type(); }
 
+    /// returns the index of this parameter
+    /// \todo: should we restrict this to C2ParamField?
+    inline uint32_t index() const { return (uint32_t)_mIndex; }
+
     /// returns the kind of this parameter
     inline Kind kind() const { return _mIndex.kind(); }
 
@@ -562,7 +566,6 @@ struct _C2FieldId {
     /**
      * Constructor used to identify a field in an object.
      *
-     * \param U[type] pointer to the object that contains this field
      * \param pm[im] member pointer to the field
      */
     template<typename R, typename T, typename B=typename std::remove_extent<R>::type>
@@ -597,23 +600,93 @@ private:
 };
 
 /**
- * Structure uniquely specifying a field in a configuration
+ * Structure uniquely specifying a 'field' in a configuration. The field
+ * can be a field of a configuration, a subfield of a field of a configuration,
+ * and even the whole configuration. Moreover, if the field can point to an
+ * element in a array field, or to the entire array field.
+ *
+ * This structure is used for querying supported values for a field, as well
+ * as communicating configuration failures and conflicts when trying to change
+ * a configuration for a component/interface or a store.
  */
 struct C2ParamField {
 //public:
-    // TODO: fix what this is for T[] (for now size becomes T[1])
+    /**
+     * Create a field identifier using a configuration parameter (variable),
+     * and a pointer to member.
+     *
+     * ~~~~~~~~~~~~~ (.cpp)
+     *
+     * struct C2SomeParam {
+     *   uint32_t mField;
+     *   uint32_t mArray[2];
+     *   C2OtherStruct mStruct;
+     *   uint32_t mFlexArray[];
+     * } *mParam;
+     *
+     * C2ParamField(mParam, &mParam->mField);
+     * C2ParamField(mParam, &mParam->mArray);
+     * C2ParamField(mParam, &mParam->mArray[0]);
+     * C2ParamField(mParam, &mParam->mStruct.mSubField);
+     * C2ParamField(mParam, &mParam->mFlexArray);
+     * C2ParamField(mParam, &mParam->mFlexArray[2]);
+     *
+     * ~~~~~~~~~~~~~
+     *
+     * \todo fix what this is for T[] (for now size becomes T[1])
+     *
+     * \param param pointer to parameter
+     * \param offset member pointer
+     */
     template<typename S, typename T>
     inline C2ParamField(S* param, T* offset)
         : _mIndex(param->index()),
           _mFieldId(offset) {}
 
+    /**
+     * Create a field identifier using a configuration parameter (variable),
+     * and a member pointer. This method cannot be used to refer to an
+     * array element or a subfield.
+     *
+     * ~~~~~~~~~~~~~ (.cpp)
+     *
+     * C2SomeParam mParam;
+     * C2ParamField(&mParam, &C2SomeParam::mMemberField);
+     *
+     * ~~~~~~~~~~~~~
+     *
+     * \param p pointer to parameter
+     * \param T member pointer to the field member
+     */
     template<typename R, typename T, typename U>
-    inline C2ParamField(U *p, R T::* pm) : _mIndex(p->type()), _mFieldId(p, pm) { }
+    inline C2ParamField(U *p, R T::* pm) : _mIndex(p->index()), _mFieldId(p, pm) { }
 
+    /**
+     * Create a field identifier to a configuration parameter (variable).
+     *
+     * ~~~~~~~~~~~~~ (.cpp)
+     *
+     * C2SomeParam mParam;
+     * C2ParamField(&mParam);
+     *
+     * ~~~~~~~~~~~~~
+     *
+     * \param param pointer to parameter
+     */
+    template<typename S>
+    inline C2ParamField(S* param)
+        : _mIndex(param->index()), _mFieldId(0u, param->size()) {}
+
+    /**
+     * Equality operator.
+     */
     inline bool operator==(const C2ParamField &other) const {
         return _mIndex == other._mIndex && _mFieldId == other._mFieldId;
     }
 
+    /**
+     * Ordering operator.
+     */
     inline bool operator<(const C2ParamField &other) const {
         return _mIndex < other._mIndex ||
             (_mIndex == other._mIndex && _mFieldId < other._mFieldId);
@@ -622,8 +695,8 @@ struct C2ParamField {
     DEFINE_OTHER_COMPARISON_OPERATORS(C2ParamField)
 
 private:
-    C2Param::Index _mIndex;
-    _C2FieldId _mFieldId;
+    C2Param::Index _mIndex; ///< parameter index
+    _C2FieldId _mFieldId;   ///< field identifier
 };
 
 /**
@@ -1153,6 +1226,7 @@ protected:
 struct C2FieldSupportedValues {
 //public:
     enum Type {
+        EMPTY,      ///< no supported values
         RANGE,      ///< a numeric range that can be continuous or discrete
         VALUES,     ///< a list of values
         FLAGS       ///< a list of flags that can be OR-ed
@@ -1170,6 +1244,10 @@ struct C2FieldSupportedValues {
         Primitive denom;
     } range;
     std::vector<Primitive> values;
+
+    C2FieldSupportedValues()
+        : type(EMPTY) {
+    }
 
     template<typename T>
     C2FieldSupportedValues(T min, T max, T step = T(std::is_floating_point<T>::value ? 0 : 1))
@@ -1199,6 +1277,9 @@ struct C2FieldSupportedValues {
         }
     }
 
+    /// \internal
+    /// \todo: create separate values vs. flags initializer as for flags we want
+    /// to list both allowed and disallowed flags
     template<typename T, typename E=decltype(C2FieldDescriptor::namedValuesFor(*(T*)0))>
     C2FieldSupportedValues(bool flags, const T*)
         : type(flags ? FLAGS : VALUES),
@@ -1208,6 +1289,21 @@ struct C2FieldSupportedValues {
             values.emplace_back(item.second);
         }
     }
+};
+
+/**
+ * Spported values for a specific field.
+ *
+ * This is a pair of the field specifier together with an optional supported values object.
+ * This structure is used when reporting parameter configuration failures and conflicts.
+ */
+struct C2ParamFieldValues {
+    C2ParamField paramOrField; ///< the field or parameter
+    /// optional supported values for the field if paramOrField specifies an actual field that is
+    /// numeric (non struct, blob or string). Supported values for arrays (including string and
+    /// blobs) describe the supported values for each element (character for string, and bytes for
+    /// blobs). It is optional for read-only strings and blobs.
+    std::unique_ptr<C2FieldSupportedValues> values;
 };
 
 /// @}

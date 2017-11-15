@@ -35,7 +35,7 @@ public:
     C2PlatformAllocatorStore(
         /* ionmapper */
     );
-    virtual status_t createAllocator(ID id, std::shared_ptr<C2Allocator> *const allocator);
+    virtual C2Status createAllocator(ID id, std::shared_ptr<C2Allocator> *const allocator);
 
 private:
     // returns a shared-singleton ion allocator
@@ -48,7 +48,7 @@ private:
 C2PlatformAllocatorStore::C2PlatformAllocatorStore() {
 }
 
-status_t C2PlatformAllocatorStore::createAllocator(
+C2Status C2PlatformAllocatorStore::createAllocator(
         ID id, std::shared_ptr<C2Allocator> *const allocator) {
     allocator->reset();
     switch (id) {

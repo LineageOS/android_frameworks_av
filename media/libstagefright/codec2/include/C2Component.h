@@ -55,6 +55,31 @@ protected:
     virtual ~C2ComponentListener() = default;
 };
 
+struct C2FieldSupportedValuesQuery {
+    enum Type : uint32_t {
+        POSSIBLE, ///< query all possible values regardless of other settings
+        CURRENT,  ///< query currently possible values given dependent settings
+    };
+
+    const C2ParamField field;
+    const Type type;
+    C2Status status;
+    C2FieldSupportedValues values;
+
+    C2FieldSupportedValuesQuery(const C2ParamField &field_, Type type_)
+        : field(field_), type(type_), status(C2_NO_INIT) { }
+
+    static C2FieldSupportedValuesQuery&&
+    Current(const C2ParamField &field_) {
+        return std::move(C2FieldSupportedValuesQuery(field_, CURRENT));
+    }
+
+    static C2FieldSupportedValuesQuery&&
+    Possible(const C2ParamField &field_) {
+        return std::move(C2FieldSupportedValuesQuery(field_, POSSIBLE));
+    }
+};
+
 /**
  * Component interface object. This object contains all of the configuration of a potential or
  * actual component. It can be created and used independently of an actual C2Component instance to
@@ -129,7 +154,7 @@ public:
      * \retval C2_CORRUPTED some unknown error prevented the querying of the parameters
      *                      (unexpected)
      */
-    virtual status_t query_nb(
+    virtual C2Status query_nb(
         const std::vector<C2Param* const> &stackParams,
         const std::vector<C2Param::Index> &heapParamIndices,
         std::vector<std::unique_ptr<C2Param>>* const heapParams) const = 0;
@@ -166,7 +191,7 @@ public:
      * \retval C2_CORRUPTED some unknown error prevented the update of the parameters
      *                      (unexpected)
      */
-    virtual status_t config_nb(
+    virtual C2Status config_nb(
             const std::vector<C2Param* const> &params,
             std::vector<std::unique_ptr<C2SettingResult>>* const failures) = 0;
 
@@ -205,7 +230,7 @@ public:
      * \retval C2_CORRUPTED some unknown error prevented the update of the parameters
      *                      (unexpected)
      */
-    virtual status_t commit_sm(
+    virtual C2Status commit_sm(
             const std::vector<C2Param* const> &params,
             std::vector<std::unique_ptr<C2SettingResult>>* const failures) = 0;
 
@@ -230,7 +255,7 @@ public:
      * \retval C2_TIMED_OUT could not create the tunnel within the time limit (unexpected)
      * \retval C2_CORRUPTED some unknown error prevented the creation of the tunnel (unexpected)
      */
-    virtual status_t createTunnel_sm(node_id targetComponent) = 0;
+    virtual C2Status createTunnel_sm(node_id targetComponent) = 0;
 
     /**
      * Releases a tunnel from this component to the target component.
@@ -250,7 +275,7 @@ public:
      * \retval C2_TIMED_OUT could not mark the tunnel for release within the time limit (unexpected)
      * \retval C2_CORRUPTED some unknown error prevented the release of the tunnel (unexpected)
      */
-    virtual status_t releaseTunnel_sm(node_id targetComponent) = 0;
+    virtual C2Status releaseTunnel_sm(node_id targetComponent) = 0;
 
 
     // REFLECTION MECHANISM (USED FOR EXTENSION)
@@ -273,7 +298,7 @@ public:
      * \retval C2_OK        the operation completed successfully.
      * \retval C2_NO_MEMORY not enough memory to complete this method.
      */
-    virtual status_t getSupportedParams(
+    virtual C2Status getSupportedParams(
             std::vector<std::shared_ptr<C2ParamDescriptor>> * const params) const = 0;
 
     /**
@@ -281,9 +306,8 @@ public:
      * \todo should this take a list considering that setting some fields may further limit other
      * fields in the same list?
      */
-    virtual status_t getSupportedValues(
-            const std::vector<const C2ParamField> &fields,
-            std::vector<C2FieldSupportedValues>* const values) const = 0;
+    virtual C2Status getSupportedValues(
+            std::vector<C2FieldSupportedValuesQuery> &fields) const = 0;
 
     virtual ~C2ComponentInterface() = default;
 };
@@ -310,7 +334,7 @@ public:
      * \retval C2_NO_MEMORY not enough memory to queue the work
      * \retval C2_CORRUPTED some unknown error prevented queuing the work (unexpected)
      */
-    virtual status_t queue_nb(std::list<std::unique_ptr<C2Work>>* const items) = 0;
+    virtual C2Status queue_nb(std::list<std::unique_ptr<C2Work>>* const items) = 0;
 
     /**
      * Announces a work to be queued later for the component. This reserves a slot for the queue
@@ -329,7 +353,7 @@ public:
      *
      * \todo Can this be rolled into queue_nb?
      */
-    virtual status_t announce_nb(const std::vector<C2WorkOutline> &items) = 0;
+    virtual C2Status announce_nb(const std::vector<C2WorkOutline> &items) = 0;
 
     /**
      * Discards and abandons any pending work for the component, and optionally any component
@@ -361,7 +385,7 @@ public:
      * \retval C2_TIMED_OUT the flush could not be completed within the time limit (unexpected)
      * \retval C2_CORRUPTED some unknown error prevented flushing from completion (unexpected)
      */
-    virtual status_t flush_sm(bool flushThrough, std::list<std::unique_ptr<C2Work>>* const flushedWork) = 0;
+    virtual C2Status flush_sm(bool flushThrough, std::list<std::unique_ptr<C2Work>>* const flushedWork) = 0;
 
     /**
      * Drains the component, and optionally downstream components
@@ -390,7 +414,7 @@ public:
      * \retval C2_TIMED_OUT the flush could not be completed within the time limit (unexpected)
      * \retval C2_CORRUPTED some unknown error prevented flushing from completion (unexpected)
      */
-    virtual status_t drain_nb(bool drainThrough) = 0;
+    virtual C2Status drain_nb(bool drainThrough) = 0;
 
     // STATE CHANGE METHODS
     // =============================================================================================
@@ -411,7 +435,7 @@ public:
      * \retval C2_TIMED_OUT the component could not be started within the time limit (unexpected)
      * \retval C2_CORRUPTED some unknown error prevented starting the component (unexpected)
      */
-    virtual status_t start() = 0;
+    virtual C2Status start() = 0;
 
     /**
      * Stops the component.
@@ -428,7 +452,7 @@ public:
      * This does not alter any settings and tunings that may have resulted in a tripped state.
      * (Is this material given the definition? Perhaps in case we want to start again.)
      */
-    virtual status_t stop() = 0;
+    virtual C2Status stop() = 0;
 
     /**
      * Resets the component.
@@ -502,9 +526,9 @@ public:
      * \retval C2_TIMED_OUT could not reset the parser within the time limit (unexpected)
      * \retval C2_CORRUPTED some unknown error prevented the resetting of the parser (unexpected)
      */
-    virtual status_t reset() { return C2_OK; }
+    virtual C2Status reset() { return C2_OK; }
 
-    virtual status_t parseFrame(C2BufferPack &frame);
+    virtual C2Status parseFrame(C2BufferPack &frame);
 
     virtual ~C2FrameInfoParser() = default;
 };
@@ -542,7 +566,7 @@ public:
      * \retval C2_NOT_FOUND no such allocator
      * \retval C2_NO_MEMORY not enough memory to create the allocator
      */
-    virtual status_t createAllocator(ID id, std::shared_ptr<C2Allocator>* const allocator) = 0;
+    virtual C2Status createAllocator(ID id, std::shared_ptr<C2Allocator>* const allocator) = 0;
 
     virtual ~C2AllocatorStore() = default;
 };
@@ -565,7 +589,7 @@ public:
      * \retval C2_NOT_FOUND no such component
      * \retval C2_NO_MEMORY not enough memory to create the component
      */
-    virtual status_t createComponent(C2String name, std::shared_ptr<C2Component>* const component);
+    virtual C2Status createComponent(C2String name, std::shared_ptr<C2Component>* const component);
 
     /**
      * Creates a component interface.
@@ -586,7 +610,7 @@ public:
      *
      * \todo Do we need an interface, or could this just be a component that is never started?
      */
-    virtual status_t createInterface(C2String name, std::shared_ptr<C2ComponentInterface>* const interface);
+    virtual C2Status createInterface(C2String name, std::shared_ptr<C2ComponentInterface>* const interface);
 
     /**
      * Returns the list of components supported by this component store.
@@ -600,9 +624,9 @@ public:
     // -------------------------------------- UTILITY METHODS --------------------------------------
 
     // on-demand buffer layout conversion (swizzling)
-    virtual status_t copyBuffer(std::shared_ptr<C2GraphicBuffer> src, std::shared_ptr<C2GraphicBuffer> dst);
+    virtual C2Status copyBuffer(std::shared_ptr<C2GraphicBuffer> src, std::shared_ptr<C2GraphicBuffer> dst);
 
-    // status_t selectPreferredColor(formats<A>, formats<B>);
+    // C2Status selectPreferredColor(formats<A>, formats<B>);
 
     // GLOBAL SETTINGS
     // system-wide stride & slice-height (???)
@@ -636,7 +660,7 @@ public:
      * \retval C2_CORRUPTED some unknown error prevented the querying of the parameters
      *                      (unexpected)
      */
-    virtual status_t query_sm(
+    virtual C2Status query_sm(
         const std::vector<C2Param* const> &stackParams,
         const std::vector<C2Param::Index> &heapParamIndices,
         std::vector<std::unique_ptr<C2Param>>* const heapParams) const = 0;
@@ -675,7 +699,7 @@ public:
      * \retval C2_CORRUPTED some unknown error prevented the update of the parameters
      *                      (unexpected)
      */
-    virtual status_t config_nb(
+    virtual C2Status config_nb(
             const std::vector<C2Param* const> &params,
             std::list<std::unique_ptr<C2SettingResult>>* const failures) = 0;
 

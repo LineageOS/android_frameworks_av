@@ -28,28 +28,47 @@
 #include <list>
 #include <vector>
 
-typedef int status_t;
-
 namespace android {
 
 /// \defgroup work Work and data processing
 /// @{
 
+/**
+ * Information describing the reason a parameter settings may fail, or
+ * may be overriden.
+ */
 struct C2SettingResult {
-    enum Failure {
+    enum Failure : uint32_t {
         READ_ONLY,  ///< parameter is read-only and cannot be set
         MISMATCH,   ///< parameter mismatches input data
         BAD_VALUE,  ///< parameter does not accept value
         BAD_TYPE,   ///< parameter is not supported
         BAD_PORT,   ///< parameter is not supported on the specific port
         BAD_INDEX,  ///< parameter is not supported on the specific stream
-        CONFLICT,   ///< parameter is in conflict with another setting
+        CONFLICT,   ///< parameter is in conflict with an/other setting(s)
+        /// parameter is out of range due to other settings (this failure mode
+        /// can only be used for strict parameters)
+        UNSUPPORTED,
+
+
+        /// requested parameter value is in conflict with an/other setting(s)
+        /// and has been corrected to the closest supported value. This failure
+        /// mode is given to provide suggestion to the client as to how to
+        /// enable the requested parameter value.
+        INFO_CONFLICT,
     };
 
-    C2ParamField field;
-    Failure failure;
-    std::unique_ptr<C2FieldSupportedValues> supportedValues; //< if different from normal (e.g. in conflict w/another param or input data)
-    std::list<C2ParamField> conflictingFields;
+    Failure failure;    ///< failure code
+
+    /// Failing (or corrected) field. Currently supported values for the field. This is set if
+    /// different from the globally supported values (e.g. due to restrictions by another param or
+    /// input data)
+    /// \todo need to define suggestions for masks to be set and unset.
+    C2ParamFieldValues field;
+
+    /// Conflicting parameters or fields with optional suggestions with (optional) suggested values
+    /// for any conflicting fields to avoid the conflict.
+    std::list<C2ParamFieldValues> conflicts;
 };
 
 // ================================================================================================
@@ -146,7 +165,7 @@ struct C2Work {
     std::list<std::unique_ptr<C2Worklet>> worklets;
 
     uint32_t worklets_processed;
-    status_t result;
+    C2Status result;
 };
 
 struct C2WorkOutline {

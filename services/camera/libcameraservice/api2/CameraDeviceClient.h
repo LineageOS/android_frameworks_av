@@ -26,6 +26,8 @@
 #include "common/FrameProcessorBase.h"
 #include "common/Camera2ClientBase.h"
 
+using android::camera3::OutputStreamInfo;
+
 namespace android {
 
 struct CameraDeviceClientBase :
@@ -131,6 +133,10 @@ public:
     // Prepare stream by preallocating up to maxCount of its buffers
     virtual binder::Status prepare2(int32_t maxCount, int32_t streamId) override;
 
+    // Update an output configuration
+    virtual binder::Status updateOutputConfiguration(int streamId,
+            const hardware::camera2::params::OutputConfiguration &outputConfiguration) override;
+
     // Finalize the output configurations with surfaces not added before.
     virtual binder::Status finalizeOutputConfigurations(int32_t streamId,
             const hardware::camera2::params::OutputConfiguration &outputConfiguration) override;
@@ -205,24 +211,6 @@ private:
         int32_t mSurfaceId;
 
     }; // class StreamSurfaceId
-
-    // OutputStreamInfo describes the property of a camera stream.
-    class OutputStreamInfo {
-    public:
-        int width;
-        int height;
-        int format;
-        android_dataspace dataSpace;
-        uint64_t consumerUsage;
-        bool finalized = false;
-        OutputStreamInfo() :
-                width(-1), height(-1), format(-1), dataSpace(HAL_DATASPACE_UNKNOWN),
-                consumerUsage(0) {}
-        OutputStreamInfo(int _width, int _height, int _format, android_dataspace _dataSpace,
-                uint64_t _consumerUsage) :
-                    width(_width), height(_height), format(_format),
-                    dataSpace(_dataSpace), consumerUsage(_consumerUsage) {}
-    };
 
 private:
     /** ICameraDeviceUser interface-related private members */

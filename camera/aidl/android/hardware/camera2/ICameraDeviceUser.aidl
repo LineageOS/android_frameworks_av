@@ -140,5 +140,7 @@ interface ICameraDeviceUser
 
     void prepare2(int maxCount, int streamId);
 
+    void updateOutputConfiguration(int streamId, in OutputConfiguration outputConfiguration);
+
     void finalizeOutputConfigurations(int streamId, in OutputConfiguration outputConfiguration);
 }

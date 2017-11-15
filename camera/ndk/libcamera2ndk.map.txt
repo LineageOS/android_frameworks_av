@@ -6,6 +6,7 @@ LIBCAMERA2NDK {
     ACameraCaptureSession_getDevice;
     ACameraCaptureSession_setRepeatingRequest;
     ACameraCaptureSession_stopRepeating;
+    ACameraCaptureSession_updateSharedOutput;
     ACameraDevice_close;
     ACameraDevice_createCaptureRequest;
     ACameraDevice_createCaptureSession;
@@ -40,6 +41,9 @@ LIBCAMERA2NDK {
     ACaptureSessionOutputContainer_free;
     ACaptureSessionOutputContainer_remove;
     ACaptureSessionOutput_create;
+    ACaptureSessionSharedOutput_create;
+    ACaptureSessionSharedOutput_add;
+    ACaptureSessionSharedOutput_remove;
     ACaptureSessionOutput_free;
   local:
     *;

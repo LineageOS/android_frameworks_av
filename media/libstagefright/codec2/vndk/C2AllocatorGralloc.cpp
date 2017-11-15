@@ -38,7 +38,7 @@ using ::android::hardware::hidl_handle;
 using ::android::hardware::hidl_vec;
 
 /* ===================================== GRALLOC ALLOCATION ==================================== */
-static C2Error maperr2error(Error maperr) {
+static C2Status maperr2error(Error maperr) {
     switch (maperr) {
         case Error::NONE:           return C2_OK;
         case Error::BAD_DESCRIPTOR: return C2_BAD_VALUE;
@@ -54,10 +54,10 @@ class C2AllocationGralloc : public C2GraphicAllocation {
 public:
     virtual ~C2AllocationGralloc();
 
-    virtual C2Error map(
+    virtual C2Status map(
             C2Rect rect, C2MemoryUsage usage, int *fenceFd,
             C2PlaneLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) override;
-    virtual C2Error unmap(C2Fence *fenceFd /* nullable */) override;
+    virtual C2Status unmap(C2Fence *fenceFd /* nullable */) override;
     virtual bool isValid() const override { return true; }
     virtual const C2Handle *handle() const override { return mHandle; }
     virtual bool equals(const std::shared_ptr<const C2GraphicAllocation> &other) const override;
@@ -69,7 +69,7 @@ public:
               const sp<IMapper> &mapper,
               hidl_handle &handle);
     int dup() const;
-    C2Error status() const;
+    C2Status status() const;
 
 private:
     const IMapper::BufferDescriptorInfo mInfo;
@@ -100,7 +100,7 @@ C2AllocationGralloc::~C2AllocationGralloc() {
     mMapper->freeBuffer(const_cast<native_handle_t *>(mBuffer));
 }
 
-C2Error C2AllocationGralloc::map(
+C2Status C2AllocationGralloc::map(
         C2Rect rect, C2MemoryUsage usage, int *fenceFd,
         C2PlaneLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) {
     // TODO
@@ -114,7 +114,7 @@ C2Error C2AllocationGralloc::map(
         return C2_BAD_VALUE;
     }
 
-    C2Error err = C2_OK;
+    C2Status err = C2_OK;
     if (!mBuffer) {
         mMapper->importBuffer(
                 mHandle, [&err, this](const auto &maperr, const auto &buffer) {
@@ -202,9 +202,9 @@ C2Error C2AllocationGralloc::map(
     return C2_OK;
 }
 
-C2Error C2AllocationGralloc::unmap(C2Fence *fenceFd /* nullable */) {
+C2Status C2AllocationGralloc::unmap(C2Fence *fenceFd /* nullable */) {
     // TODO: fence
-    C2Error err = C2_OK;
+    C2Status err = C2_OK;
     mMapper->unlock(
             const_cast<native_handle_t *>(mBuffer),
             [&err, &fenceFd](const auto &maperr, const auto &releaseFence) {
@@ -231,18 +231,18 @@ class C2AllocatorGralloc::Impl {
 public:
     Impl();
 
-    C2Error allocateGraphicBuffer(
+    C2Status allocateGraphicBuffer(
             uint32_t width, uint32_t height, uint32_t format, const C2MemoryUsage &usage,
             std::shared_ptr<C2GraphicAllocation> *allocation);
 
-    C2Error recreateGraphicBuffer(
+    C2Status recreateGraphicBuffer(
             const C2Handle *handle,
             std::shared_ptr<C2GraphicAllocation> *allocation);
 
-    C2Error status() const { return mInit; }
+    C2Status status() const { return mInit; }
 
 private:
-    C2Error mInit;
+    C2Status mInit;
     sp<IAllocator> mAllocator;
     sp<IMapper> mMapper;
 };
@@ -256,7 +256,7 @@ C2AllocatorGralloc::Impl::Impl() : mInit(C2_OK) {
     }
 }
 
-C2Error C2AllocatorGralloc::Impl::allocateGraphicBuffer(
+C2Status C2AllocatorGralloc::Impl::allocateGraphicBuffer(
         uint32_t width, uint32_t height, uint32_t format, const C2MemoryUsage &usage,
         std::shared_ptr<C2GraphicAllocation> *allocation) {
     // TODO: buffer usage should be determined according to |usage|
@@ -269,7 +269,7 @@ C2Error C2AllocatorGralloc::Impl::allocateGraphicBuffer(
         (PixelFormat)format,
         BufferUsage::CPU_READ_OFTEN | BufferUsage::CPU_WRITE_OFTEN,
     };
-    C2Error err = C2_OK;
+    C2Status err = C2_OK;
     BufferDescriptor desc;
     mMapper->createDescriptor(
             info, [&err, &desc](const auto &maperr, const auto &descriptor) {
@@ -307,7 +307,7 @@ C2Error C2AllocatorGralloc::Impl::allocateGraphicBuffer(
     return C2_OK;
 }
 
-C2Error C2AllocatorGralloc::Impl::recreateGraphicBuffer(
+C2Status C2AllocatorGralloc::Impl::recreateGraphicBuffer(
         const C2Handle *handle,
         std::shared_ptr<C2GraphicAllocation> *allocation) {
     (void) handle;
@@ -321,19 +321,19 @@ C2AllocatorGralloc::C2AllocatorGralloc() : mImpl(new Impl) {}
 
 C2AllocatorGralloc::~C2AllocatorGralloc() { delete mImpl; }
 
-C2Error C2AllocatorGralloc::allocateGraphicBuffer(
+C2Status C2AllocatorGralloc::allocateGraphicBuffer(
         uint32_t width, uint32_t height, uint32_t format, C2MemoryUsage usage,
         std::shared_ptr<C2GraphicAllocation> *allocation) {
     return mImpl->allocateGraphicBuffer(width, height, format, usage, allocation);
 }
 
-C2Error C2AllocatorGralloc::recreateGraphicBuffer(
+C2Status C2AllocatorGralloc::recreateGraphicBuffer(
         const C2Handle *handle,
         std::shared_ptr<C2GraphicAllocation> *allocation) {
     return mImpl->recreateGraphicBuffer(handle, allocation);
 }
 
-C2Error C2AllocatorGralloc::status() const {
+C2Status C2AllocatorGralloc::status() const {
     return mImpl->status();
 }
 

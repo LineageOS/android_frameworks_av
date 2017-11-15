@@ -2403,7 +2403,7 @@ public:
         return 0;
     }
 
-    virtual status_t commit_sm(
+    virtual C2Status commit_sm(
             const std::vector<C2Param* const> &params,
             std::vector<std::unique_ptr<C2SettingResult>>* const failures) {
         (void)params;
@@ -2411,7 +2411,7 @@ public:
         return C2_UNSUPPORTED;
     }
 
-    virtual status_t config_nb(
+    virtual C2Status config_nb(
             const std::vector<C2Param* const> &params,
             std::vector<std::unique_ptr<C2SettingResult>>* const failures) {
         (void)params;
@@ -2419,12 +2419,12 @@ public:
         return C2_UNSUPPORTED;
     }
 
-    virtual status_t createTunnel_sm(node_id targetComponent) {
+    virtual C2Status createTunnel_sm(node_id targetComponent) {
         (void)targetComponent;
         return C2_UNSUPPORTED;
     }
 
-    virtual status_t query_nb(
+    virtual C2Status query_nb(
             const std::vector<C2Param* const> &stackParams,
             const std::vector<C2Param::Index> &heapParamIndices,
             std::vector<std::unique_ptr<C2Param>>* const heapParams) const {
@@ -2466,7 +2466,7 @@ public:
         mMyParams.insert({mDomainInfo.type(), mDomainInfo});
     }
 
-    virtual status_t releaseTunnel_sm(node_id targetComponent) {
+    virtual C2Status releaseTunnel_sm(node_id targetComponent) {
         (void)targetComponent;
         return C2_UNSUPPORTED;
     }
@@ -2490,17 +2490,19 @@ public:
         }
     };
 
-    virtual status_t getSupportedValues(
-            const std::vector<const C2ParamField> &fields,
-            std::vector<C2FieldSupportedValues>* const values) const {
-        for (const C2ParamField &field : fields) {
-            if (field == C2ParamField(&mDomainInfo, &C2ComponentDomainInfo::mValue)) {
-                values->push_back(C2FieldSupportedValues(
+    virtual C2Status getSupportedValues(
+            std::vector<C2FieldSupportedValuesQuery> &fields) const {
+        for (C2FieldSupportedValuesQuery &query : fields) {
+            if (query.field == C2ParamField(&mDomainInfo, &C2ComponentDomainInfo::mValue)) {
+                query.values = C2FieldSupportedValues(
                     false /* flag */,
                     &mDomainInfo.mValue
                     //,
                     //{(int32_t)C2DomainVideo}
-                ));
+                );
+                query.status = C2_OK;
+            } else {
+                query.status = C2_BAD_INDEX;
             }
         }
         return C2_OK;
@@ -2510,13 +2512,13 @@ public:
         return std::shared_ptr<C2ParamReflector>(new MyParamReflector(this));
     }
 
-    virtual status_t getSupportedParams(std::vector<std::shared_ptr<C2ParamDescriptor>> * const params) const {
+    virtual C2Status getSupportedParams(std::vector<std::shared_ptr<C2ParamDescriptor>> * const params) const {
         params->push_back(std::make_shared<C2ParamDescriptor>(
                 true /* required */, "_domain", &mDomainInfo));
         return C2_OK;
     }
 
-    status_t getSupportedParams2(std::vector<std::shared_ptr<C2ParamDescriptor>> * const params) {
+    C2Status getSupportedParams2(std::vector<std::shared_ptr<C2ParamDescriptor>> * const params) {
         params->push_back(std::shared_ptr<C2ParamDescriptor>(
                 new C2ParamDescriptor(true /* required */, "_domain", &mDomainInfo)));
         return C2_OK;
@@ -2699,21 +2701,23 @@ void dumpDesc(const C2ParamDescriptor &pd) {
 TEST_F(C2ParamTest, ReflectorTest) {
     C2ComponentDomainInfo domainInfo;
     std::shared_ptr<C2ComponentInterface> comp(new MyComponentInstance);
-    std::vector<C2FieldSupportedValues> values;
 
     std::unique_ptr<C2StructDescriptor> desc{
         comp->getParamReflector()->describe(C2ComponentDomainInfo::indexFlags)};
     dumpStruct(*desc);
 
-    EXPECT_EQ(
-        C2_OK,
-        comp->getSupportedValues(
-            { C2ParamField(&domainInfo, &C2ComponentDomainInfo::mValue) },
-            &values)
-    );
+    std::vector<C2FieldSupportedValuesQuery> query = {
+        { C2ParamField(&domainInfo, &C2ComponentDomainInfo::mValue),
+          C2FieldSupportedValuesQuery::CURRENT },
+        C2FieldSupportedValuesQuery(C2ParamField(&domainInfo, &C2ComponentDomainInfo::mValue),
+          C2FieldSupportedValuesQuery::CURRENT),
+        C2FieldSupportedValuesQuery::Current(C2ParamField(&domainInfo, &C2ComponentDomainInfo::mValue)),
+    };
 
-    for (const C2FieldSupportedValues &sv : values) {
-        dumpFSV(sv, &domainInfo.mValue);
+    EXPECT_EQ(C2_OK, comp->getSupportedValues(query));
+
+    for (const C2FieldSupportedValuesQuery &q : query) {
+        dumpFSV(q.values, &domainInfo.mValue);
     }
 }
 

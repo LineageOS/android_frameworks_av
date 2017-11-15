@@ -101,10 +101,10 @@ typedef std::string C2String;
 typedef const char *C2StringLiteral;
 
 /**
- * C2Error: status codes used.
+ * C2Status: status codes used.
  */
-typedef int32_t C2Error;
-enum {
+//typedef int32_t C2Status;
+enum C2Status : int32_t {
 #ifndef __ANDROID__
     OK                  = 0,
     BAD_VALUE           = -EINVAL,
@@ -141,6 +141,7 @@ enum {
 
     // unknown fatal
     C2_CORRUPTED        = UNKNOWN_ERROR,        ///< some unexpected error prevented the operation
+    C2_NO_INIT          = NO_INIT,              ///< status has not been initialized
 };
 
 /// @}
