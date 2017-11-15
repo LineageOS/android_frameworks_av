@@ -813,7 +813,7 @@ bool AudioMixer::track_t::setPlaybackRate(const AudioPlaybackRate &playbackRate)
                 mMixerInFormat, sampleRate, playbackRate);
         reconfigureBufferProviders();
     } else {
-        reinterpret_cast<TimestretchBufferProvider*>(mTimestretchBufferProvider)
+        static_cast<TimestretchBufferProvider*>(mTimestretchBufferProvider)
                 ->setPlaybackRate(playbackRate);
     }
     return true;
