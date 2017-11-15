@@ -101,8 +101,7 @@ public:
     virtual status_t getSupportedParams(
             std::vector<std::shared_ptr<C2ParamDescriptor>> * const params) const override;
     virtual status_t getSupportedValues(
-            const std::vector<const C2ParamField> &fields,
-            std::vector<C2FieldSupportedValues>* const values) const override;
+            std::vector<C2FieldSupportedValuesQuery> &fields) const override;
 
 private:
     class ParamReflector;
@@ -228,9 +227,9 @@ private:
     bool mChangingResolution;
     bool mFlushNeeded;
     bool mSignalledError;
-    int32_t mWidth;
-    int32_t mHeight;
-    int32_t mStride;
+    uint32_t mWidth;
+    uint32_t mHeight;
+    uint32_t mStride;
     size_t mInputOffset;
 
     void processQueue();

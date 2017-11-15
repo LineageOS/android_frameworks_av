@@ -162,7 +162,7 @@ private:
     //                   config() should be failed if these values are used as new values.
     // This function should be called only for writable and supported parameters.
     template <typename TField>
-    void getTestValues(const std::vector<C2FieldSupportedValues> &validValueInfos,
+    void getTestValues(const C2FieldSupportedValues &validValueInfos,
                        std::vector<TField> *const validValues,
                        std::vector<TField> *const invalidValues);
 
@@ -325,7 +325,7 @@ void C2CompIntfTest::configWritableParamInvalidValue(const T &newParam) {
 // If another field type is added, it is necessary to add function for that.
 template <>
 void C2CompIntfTest::getTestValues(
-        const std::vector<C2FieldSupportedValues> &validValueInfos,
+        const C2FieldSupportedValues &validValueInfos,
         std::vector<C2DomainKind> *const validValues,
         std::vector<C2DomainKind> *const invalidValues) {
     UNUSED(validValueInfos);
@@ -339,7 +339,7 @@ void C2CompIntfTest::getTestValues(
 
 template <typename TField>
 void C2CompIntfTest::getTestValues(
-        const std::vector<C2FieldSupportedValues> &validValueInfos,
+        const C2FieldSupportedValues &validValueInfos,
         std::vector<TField> *const validValues,
         std::vector<TField> *const invalidValues) {
 
@@ -366,9 +366,14 @@ void C2CompIntfTest::getTestValues(
     };
 
     // The size of validValueInfos is one.
-    const auto &c2FSV = validValueInfos[0];
+    const auto &c2FSV = validValueInfos;
 
     switch (c2FSV.type) {
+    case C2FieldSupportedValues::Type::EMPTY: {
+        invalidValues->emplace_back(TField(0));
+        // TODO(hiroh) : Should other invalid values be tested?
+        break;
+    }
     case C2FieldSupportedValues::Type::RANGE: {
         const auto &range = c2FSV.range;
         auto rmin = prim2Value(range.min);
@@ -584,15 +589,16 @@ void C2CompIntfTest::outputResults(const std::string &name) {
 #define TEST_GENERAL_WRITABLE_FIELD(TParam_, field_type_name_, field_name_) \
     do {                                                                \
         std::unique_ptr<TParam_> param = makeParam<TParam_>();          \
-        std::vector<C2FieldSupportedValues> validValueInfos;            \
+        std::vector<C2FieldSupportedValuesQuery> validValueInfos = {    \
+            C2FieldSupportedValuesQuery::Current(                       \
+                    C2ParamField(param.get(), &field_type_name_::field_name_)) \
+        };                                                              \
         ASSERT_EQ(C2_OK,                                                \
-                  mIntf->getSupportedValues(                            \
-                          {C2ParamField(param.get(), &field_type_name_::field_name_)}, \
-                          &validValueInfos));                           \
+                  mIntf->getSupportedValues(validValueInfos));          \
         ASSERT_EQ(1u, validValueInfos.size());                          \
         std::vector<decltype(param->field_name_)> validValues;          \
         std::vector<decltype(param->field_name_)> invalidValues;        \
-        getTestValues(validValueInfos, &validValues, &invalidValues);   \
+        getTestValues(validValueInfos[0].values, &validValues, &invalidValues);   \
         testWritableParam(param.get(), &param->field_name_, validValues,\
                           invalidValues);                               \
     } while (0)

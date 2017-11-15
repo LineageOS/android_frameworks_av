@@ -94,11 +94,15 @@ struct ValidateParam {
     bool validateField(
             const C2FieldSupportedValues &supportedValues, const T &value) {
         switch (supportedValues.type) {
+        case C2FieldSupportedValues::EMPTY:
+            {
+                return false;
+            }
         case C2FieldSupportedValues::RANGE:
             {
                 // TODO: handle step, nom, denom
-                return Getter<T>::get(supportedValues.range.min) < value
-                        && value < Getter<T>::get(supportedValues.range.max);
+                return Getter<T>::get(supportedValues.range.min) <= value
+                        && value <= Getter<T>::get(supportedValues.range.max);
             }
         case C2FieldSupportedValues::VALUES:
             {
@@ -153,7 +157,7 @@ struct ValidateSimpleParam : public ValidateParam {
         const C2FieldSupportedValues &supportedValues = mSupportedValues.at(field).supported;
         if (!validateField(supportedValues, param->mValue)) {
             return std::unique_ptr<C2SettingResult>(
-                    new C2SettingResult {field, C2SettingResult::BAD_VALUE, nullptr, {}});
+                    new C2SettingResult {C2SettingResult::BAD_VALUE, {field, nullptr}, {}});
         }
         return nullptr;
     }
@@ -171,13 +175,13 @@ struct ValidateVideoSize : public ValidateParam {
         const C2FieldSupportedValues &supportedWidth = mSupportedValues.at(field).supported;
         if (!validateField(supportedWidth, param->mWidth)) {
             return std::unique_ptr<C2SettingResult>(
-                    new C2SettingResult {field, C2SettingResult::BAD_VALUE, nullptr, {}});
+                    new C2SettingResult {C2SettingResult::BAD_VALUE, {field, nullptr}, {}});
         }
         field = C2ParamField(param, &T::mHeight);
         const C2FieldSupportedValues &supportedHeight = mSupportedValues.at(field).supported;
         if (!validateField(supportedHeight, param->mHeight)) {
             return std::unique_ptr<C2SettingResult>(
-                    new C2SettingResult {field, C2SettingResult::BAD_VALUE, nullptr, {}});
+                    new C2SettingResult {C2SettingResult::BAD_VALUE, {field, nullptr}, {}});
         }
         return nullptr;
     }
@@ -191,7 +195,7 @@ struct ValidateCString {
         T* param = (T*)c2param;
         if (strncmp(param->m.mValue, mExpected, param->flexCount()) != 0) {
             return std::unique_ptr<C2SettingResult>(
-                    new C2SettingResult {C2ParamField(param, &T::m), C2SettingResult::BAD_VALUE, nullptr, {}});
+                    new C2SettingResult {C2SettingResult::BAD_VALUE, {C2ParamField(param, &T::m), nullptr}, {}});
         }
         return nullptr;
     }
@@ -515,15 +519,18 @@ status_t C2SoftAvcDecIntf::getSupportedParams(
 }
 
 status_t C2SoftAvcDecIntf::getSupportedValues(
-        const std::vector<const C2ParamField> &fields,
-        std::vector<C2FieldSupportedValues>* const values) const {
-    for (const auto &field : fields) {
-        if (mSupportedValues.count(field) == 0) {
-            return BAD_VALUE;
+        std::vector<C2FieldSupportedValuesQuery> &fields) const {
+    status_t res = C2_OK;
+    for (C2FieldSupportedValuesQuery &query : fields) {
+        if (mSupportedValues.count(query.field) == 0) {
+            query.status = C2_BAD_INDEX;
+            res = C2_BAD_INDEX;
+        } else {
+            query.status = C2_OK;
+            query.values = mSupportedValues.at(query.field).supported;
         }
-        values->push_back(mSupportedValues.at(field).supported);
     }
-    return C2_OK;
+    return res;
 }
 
 void C2SoftAvcDecIntf::updateSupportedValues() {
