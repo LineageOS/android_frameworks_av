@@ -209,6 +209,9 @@ private:
         // HONG KONG Supervisory tones
         TONE_HK_BUSY,               // Busy tone: 480 Hz + 620 Hz, 500ms ON, 500ms OFF...
         TONE_HK_RINGTONE,           // Ring Tone: 440 Hz + 480 Hz repeated with pattern 0,4s on, 0,2s off, 0,4s on and 3s off.
+        // IRELAND Supervisory tones
+        TONE_IE_RINGTONE,           // Ring Tone: A 400Hz + 450Hz tone repeated in a 0.4s on, 0.2s off, 0.4s on, 2.0s off pattern.
+        TONE_IE_CALL_WAITING,       // Call waiting tone: 425Hz tone repeated in a 0.18s on, 0.2s off, 0.2s on, 4.5s off pattern.
         NUM_ALTERNATE_TONES
     };
 
@@ -219,6 +222,7 @@ private:
         AUSTRALIA,
         SINGAPORE,
         HONGKONG,
+        IRELAND,
         CEPT,
         NUM_REGIONS
     };
