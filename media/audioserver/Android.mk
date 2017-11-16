@@ -13,6 +13,8 @@ LOCAL_SHARED_LIBRARIES := \
 	libbinder \
 	libcutils \
 	liblog \
+	libhidltransport \
+	libhwbinder \
 	libmedialogservice \
 	libnbaio \
 	libsoundtriggerservice \
