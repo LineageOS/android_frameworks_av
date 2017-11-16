@@ -677,6 +677,12 @@ void NuPlayer::GenericSource::onMessageReceived(const sp<AMessage> &msg) {
           break;
       }
 
+      case kWhatSeek:
+      {
+          onSeek(msg);
+          break;
+      }
+
       case kWhatReadBuffer:
       {
           onReadBuffer(msg);
@@ -1097,8 +1103,39 @@ status_t NuPlayer::GenericSource::selectTrack(size_t trackIndex, bool select, in
 }
 
 status_t NuPlayer::GenericSource::seekTo(int64_t seekTimeUs, MediaPlayerSeekMode mode) {
-    Mutex::Autolock _l(mLock);
     ALOGV("seekTo: %lld, %d", (long long)seekTimeUs, mode);
+    sp<AMessage> msg = new AMessage(kWhatSeek, this);
+    msg->setInt64("seekTimeUs", seekTimeUs);
+    msg->setInt32("mode", mode);
+
+    // Need to call readBuffer on |mLooper| to ensure the calls to
+    // IMediaSource::read* are serialized. Note that IMediaSource::read*
+    // is called without |mLock| acquired and MediaSource is not thread safe.
+    sp<AMessage> response;
+    status_t err = msg->postAndAwaitResponse(&response);
+    if (err == OK && response != NULL) {
+        CHECK(response->findInt32("err", &err));
+    }
+
+    return err;
+}
+
+void NuPlayer::GenericSource::onSeek(const sp<AMessage>& msg) {
+    int64_t seekTimeUs;
+    int32_t mode;
+    CHECK(msg->findInt64("seekTimeUs", &seekTimeUs));
+    CHECK(msg->findInt32("mode", &mode));
+
+    sp<AMessage> response = new AMessage;
+    status_t err = doSeek(seekTimeUs, (MediaPlayerSeekMode)mode);
+    response->setInt32("err", err);
+
+    sp<AReplyToken> replyID;
+    CHECK(msg->senderAwaitsResponse(&replyID));
+    response->postReply(replyID);
+}
+
+status_t NuPlayer::GenericSource::doSeek(int64_t seekTimeUs, MediaPlayerSeekMode mode) {
     if (mVideoTrack.mSource != NULL) {
         ++mVideoDataGeneration;
 
@@ -1321,13 +1358,14 @@ void NuPlayer::GenericSource::readBuffer(
         Vector<MediaBuffer *> mediaBuffers;
         status_t err = NO_ERROR;
 
+        sp<IMediaSource> source = track->mSource;
         mLock.unlock();
         if (couldReadMultiple) {
-            err = track->mSource->readMultiple(
+            err = source->readMultiple(
                     &mediaBuffers, maxBuffers - numBuffers, &options);
         } else {
             MediaBuffer *mbuf = NULL;
-            err = track->mSource->read(&mbuf, &options);
+            err = source->read(&mbuf, &options);
             if (err == OK && mbuf != NULL) {
                 mediaBuffers.push_back(mbuf);
             }
