@@ -25,9 +25,11 @@
 
 #include <binder/ProcessState.h>
 #include <binder/IServiceManager.h>
+#include <binder/MemoryDealer.h>
 #include <cutils/properties.h>
 #include <media/DataSource.h>
 #include <media/IMediaHTTPService.h>
+#include <media/IMediaCodecService.h>
 #include <media/MediaExtractor.h>
 #include <media/MediaSource.h>
 #include <media/OMXBuffer.h>
@@ -69,7 +71,7 @@ void Harness::CodecObserver::onMessages(const std::list<omx_message> &messages) 
 /////////////////////////////////////////////////////////////////////
 
 Harness::Harness()
-    : mInitCheck(NO_INIT) {
+    : mInitCheck(NO_INIT), mUseTreble(false) {
     mInitCheck = initOMX();
 }
 
@@ -81,12 +83,21 @@ status_t Harness::initCheck() const {
 }
 
 status_t Harness::initOMX() {
-    using namespace ::android::hardware::media::omx::V1_0;
-    sp<IOmx> tOmx = IOmx::getService();
-    if (tOmx == nullptr) {
-        return NO_INIT;
+    if (property_get_bool("persist.media.treble_omx", true)) {
+        using namespace ::android::hardware::media::omx::V1_0;
+        sp<IOmx> tOmx = IOmx::getService();
+        if (tOmx == nullptr) {
+            return NO_INIT;
+        }
+        mOMX = new utils::LWOmx(tOmx);
+        mUseTreble = true;
+    } else {
+        sp<IServiceManager> sm = defaultServiceManager();
+        sp<IBinder> binder = sm->getService(String16("media.codec"));
+        sp<IMediaCodecService> service = interface_cast<IMediaCodecService>(binder);
+        mOMX = service->getOMX();
+        mUseTreble = false;
     }
-    mOMX = new utils::LWOmx(tOmx);
 
     return mOMX != 0 ? OK : NO_INIT;
 }
@@ -214,19 +225,25 @@ status_t Harness::allocatePortBuffers(
     for (OMX_U32 i = 0; i < def.nBufferCountActual; ++i) {
         Buffer buffer;
         buffer.mFlags = 0;
-        bool success;
-        auto transStatus = mAllocator->allocate(def.nBufferSize,
-                [&success, &buffer](
-                        bool s,
-                        hidl_memory const& m) {
-                    success = s;
-                    buffer.mHidlMemory = m;
-                });
-        EXPECT(transStatus.isOk(),
-                "Cannot call allocator");
-        EXPECT(success,
-                "Cannot allocate memory");
-        err = mOMXNode->useBuffer(portIndex, buffer.mHidlMemory, &buffer.mID);
+        if (mUseTreble) {
+            bool success;
+            auto transStatus = mAllocator->allocate(def.nBufferSize,
+                    [&success, &buffer](
+                            bool s,
+                            hidl_memory const& m) {
+                        success = s;
+                        buffer.mHidlMemory = m;
+                    });
+            EXPECT(transStatus.isOk(),
+                    "Cannot call allocator");
+            EXPECT(success,
+                    "Cannot allocate memory");
+            err = mOMXNode->useBuffer(portIndex, buffer.mHidlMemory, &buffer.mID);
+        } else {
+            buffer.mMemory = mDealer->allocate(def.nBufferSize);
+            CHECK(buffer.mMemory != NULL);
+            err = mOMXNode->useBuffer(portIndex, buffer.mMemory, &buffer.mID);
+        }
 
         EXPECT_SUCCESS(err, "useBuffer");
 
@@ -295,11 +312,13 @@ status_t Harness::testStateTransitions(
         return OK;
     }
 
-    mAllocator = IAllocator::getService("ashmem");
-    EXPECT(mAllocator != nullptr,
-            "Cannot obtain hidl AshmemAllocator");
-    // TODO: When Treble has MemoryHeap/MemoryDealer, we should specify the heap
-    // size to be 16 * 1024 * 1024.
+    if (mUseTreble) {
+        mAllocator = IAllocator::getService("ashmem");
+        EXPECT(mAllocator != nullptr,
+                "Cannot obtain hidl AshmemAllocator");
+    } else {
+        mDealer = new MemoryDealer(16 * 1024 * 1024, "OMXHarness");
+    }
 
     sp<CodecObserver> observer = new CodecObserver(this, ++mCurGeneration);
 
