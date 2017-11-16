@@ -43,6 +43,9 @@ DevicesFactoryHalHidl::DevicesFactoryHalHidl() {
         ALOGE("Failed to obtain IDevicesFactory service, terminating process.");
         exit(1);
     }
+    // The MSD factory is optional
+    mDevicesFactoryMsd = IDevicesFactory::getService(AUDIO_HAL_SERVICE_NAME_MSD);
+    // TODO: Register death handler, and add 'restart' directive to audioserver.rc
 }
 
 DevicesFactoryHalHidl::~DevicesFactoryHalHidl() {
