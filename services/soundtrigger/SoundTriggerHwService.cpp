@@ -313,7 +313,7 @@ void SoundTriggerHwService::sendSoundModelEvent(struct sound_trigger_model_event
 }
 
 
-sp<IMemory> SoundTriggerHwService::prepareServiceStateEvent_l(sound_trigger_service_state_t state)
+sp<IMemory> SoundTriggerHwService::prepareServiceStateEvent(sound_trigger_service_state_t state)
 {
     AutoMutex lock(mMemoryDealerLock);
     sp<IMemory> eventMemory;
@@ -328,34 +328,23 @@ sp<IMemory> SoundTriggerHwService::prepareServiceStateEvent_l(sound_trigger_serv
     return eventMemory;
 }
 
-// call with mServiceLock held
-void SoundTriggerHwService::sendServiceStateEvent_l(sound_trigger_service_state_t state,
+void SoundTriggerHwService::sendServiceStateEvent(sound_trigger_service_state_t state,
                                                   Module *module)
 {
-    sp<IMemory> eventMemory = prepareServiceStateEvent_l(state);
+    sp<IMemory> eventMemory = prepareServiceStateEvent(state);
     if (eventMemory == 0) {
-        return;
-    }
-    sp<Module> strongModule;
-    for (size_t i = 0; i < mModules.size(); i++) {
-        if (mModules.valueAt(i).get() == module) {
-            strongModule = mModules.valueAt(i);
-            break;
-        }
-    }
-    if (strongModule == 0) {
         return;
     }
     sp<CallbackEvent> callbackEvent = new CallbackEvent(CallbackEvent::TYPE_SERVICE_STATE,
                                                         eventMemory);
-    callbackEvent->setModule(strongModule);
+    callbackEvent->setModule(module);
     sendCallbackEvent(callbackEvent);
 }
 
-void SoundTriggerHwService::sendServiceStateEvent_l(sound_trigger_service_state_t state,
-                                                    ModuleClient *moduleClient)
+void SoundTriggerHwService::sendServiceStateEvent(sound_trigger_service_state_t state,
+                                                  ModuleClient *moduleClient)
 {
-    sp<IMemory> eventMemory = prepareServiceStateEvent_l(state);
+    sp<IMemory> eventMemory = prepareServiceStateEvent(state);
     if (eventMemory == 0) {
         return;
     }
@@ -906,7 +895,7 @@ void SoundTriggerHwService::Module::setCaptureState_l(bool active)
     }
 
 exit:
-    service->sendServiceStateEvent_l(state, this);
+    service->sendServiceStateEvent(state, this);
 }
 
 
@@ -1051,7 +1040,7 @@ void SoundTriggerHwService::ModuleClient::setCaptureState_l(bool active)
             return;
         }
     }
-    service->sendServiceStateEvent_l(state, this);
+    service->sendServiceStateEvent(state, this);
 }
 
 void SoundTriggerHwService::ModuleClient::onCallbackEvent(const sp<CallbackEvent>& event)
