@@ -37,8 +37,8 @@ AImage::AImage(AImageReader* reader, int32_t format, uint64_t usage, BufferItem*
         mTimestamp(timestamp), mWidth(width), mHeight(height), mNumPlanes(numPlanes) {
 }
 
-// Can only be called by free() with mLock hold
 AImage::~AImage() {
+    Mutex::Autolock _l(mLock);
     if (!mIsClosed) {
         LOG_ALWAYS_FATAL(
                 "Error: AImage %p is deleted before returning buffer to AImageReader!", this);
@@ -78,7 +78,6 @@ AImage::free() {
         ALOGE("Cannot free AImage before close!");
         return;
     }
-    Mutex::Autolock _l(mLock);
     delete this;
 }
 
