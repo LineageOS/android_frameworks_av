@@ -294,7 +294,15 @@ C2AllocatorIon::~C2AllocatorIon() {
     }
 }
 
-C2Status C2AllocatorIon::allocateLinearBuffer(
+C2Allocator::id_t C2AllocatorIon::getId() const {
+    return 0; /// \todo implement ID
+}
+
+C2String C2AllocatorIon::getName() const {
+    return "android.allocator.ion";
+}
+
+C2Status C2AllocatorIon::newLinearAllocation(
         uint32_t capacity, C2MemoryUsage usage, std::shared_ptr<C2LinearAllocation> *allocation) {
     if (allocation == nullptr) {
         return C2_BAD_VALUE;
@@ -328,7 +336,7 @@ C2Status C2AllocatorIon::allocateLinearBuffer(
     return ret;
 }
 
-C2Status C2AllocatorIon::recreateLinearBuffer(
+C2Status C2AllocatorIon::priorLinearAllocation(
         const C2Handle *handle, std::shared_ptr<C2LinearAllocation> *allocation) {
     *allocation = nullptr;
     if (mInit != C2_OK) {

@@ -542,11 +542,9 @@ struct C2ComponentInfo {
 
 class C2AllocatorStore {
 public:
-    // TBD
+    typedef C2Allocator::id_t id_t;
 
-    typedef uint32_t ID;
-
-    enum ID_ : uint32_t {
+    enum : C2Allocator::id_t {
         DEFAULT_LINEAR,     ///< basic linear allocator type
         DEFAULT_GRAPHIC,    ///< basic graphic allocator type
         PLATFORM_START = 0x10,
@@ -554,7 +552,30 @@ public:
     };
 
     /**
-     * Creates an allocator.
+     * Returns the unique name of this allocator store.
+     *
+     * This method MUST be "non-blocking" and return within 1ms.
+     *
+     * \return the name of this allocator store.
+     * \retval an empty string if there was not enough memory to allocate the actual name.
+     */
+    virtual C2String getName() const = 0;
+
+    /**
+     * Returns the set of allocators supported by this allocator store.
+     *
+     * This method SHALL return within 1ms.
+     *
+     * \retval vector of allocator information (as shared pointers)
+     * \retval an empty vector if there was not enough memory to allocate the whole vector.
+     */
+    virtual std::vector<std::shared_ptr<const C2Allocator::Info>> listAllocators() const = 0;
+
+    /**
+     * Retrieves/creates a shared allocator object.
+     *
+     * The allocator is created on first use, and the same allocator is returned on subsequent
+     * concurrent uses in the same process. The allocator is freed when it is no longer referenced.
      *
      * \param id      the ID of the allocator to create. This is defined by the store, but
      *                the ID of the default linear and graphic allocators is formalized.
@@ -568,7 +589,7 @@ public:
      * \retval C2_NOT_FOUND no such allocator
      * \retval C2_NO_MEMORY not enough memory to create the allocator
      */
-    virtual C2Status createAllocator(ID id, std::shared_ptr<C2Allocator>* const allocator) = 0;
+    virtual C2Status getAllocator(id_t id, std::shared_ptr<C2Allocator>* const allocator) = 0;
 
     virtual ~C2AllocatorStore() = default;
 };

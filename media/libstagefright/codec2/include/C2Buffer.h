@@ -1529,17 +1529,71 @@ protected:
 class C2Allocator {
 public:
     /**
+     * Allocator ID type.
+     */
+    typedef uint32_t id_t;
+
+    /**
+     * Allocation types. This is a bitmask and is used in C2Allocator::Info
+     * to list the supported allocation types of an allocator.
+     */
+    enum type_t : uint32_t {
+        LINEAR  = 1 << 0, //
+        GRAPHIC = 1 << 1,
+    };
+
+    /**
+     * Information about an allocator.
+     */
+    struct Info {
+        C2String name;              ///< allocator name
+        id_t id;                    ///< allocator ID
+        type_t supportedTypes;      ///< supported allocation types
+        C2MemoryUsage minimumUsage; ///< usage that is minimally required for allocations
+        C2MemoryUsage maximumUsage; ///< usage that is maximally allowed for allocations
+    };
+
+    /**
+     * Returns the unique name of this allocator.
+     *
+     * This method MUST be "non-blocking" and return within 1ms.
+     *
+     * \return the name of this allocator.
+     * \retval an empty string if there was not enough memory to allocate the actual name.
+     */
+    virtual C2String getName() const = 0;
+
+    /**
+     * Returns a unique ID for this allocator. This ID is used to get this allocator from the
+     * allocator store, and to identify this allocator across all processes.
+     *
+     * This method MUST be "non-blocking" and return within 1ms.
+     *
+     * \return a unique ID for this allocator.
+     */
+    virtual id_t getId() const = 0;
+
+    /**
+     * Returns the allocator information.
+     *
+     * This method MUST be "non-blocking" and return within 1ms.
+     *
+     * \return allocator information
+     */
+    virtual std::shared_ptr<const Info> getInfo() const = 0;
+
+    /**
      * Allocates a 1D allocation of given |capacity| and |usage|. If successful, the allocation is
      * stored in |allocation|. Otherwise, |allocation| is set to 'nullptr'.
      *
-     * \param capacity        the size of requested allocation (the allocation could be slightly
+     * \param capacity      the size of requested allocation (the allocation could be slightly
      *                      larger, e.g. to account for any system-required alignment)
-     * \param usage           the memory usage info for the requested allocation. \note that the
+     * \param usage         the memory usage info for the requested allocation. \note that the
      *                      returned allocation may be later used/mapped with different usage.
      *                      The allocator should layout the buffer to be optimized for this usage,
      *                      but must support any usage. One exception: protected buffers can
      *                      only be used in a protected scenario.
-     * \param allocation      pointer to where the allocation shall be stored on success. nullptr
+     * \param allocation    pointer to where the allocation shall be stored on success. nullptr
      *                      will be stored here on failure
      *
      * \retval C2_OK        the allocation was successful
@@ -1550,7 +1604,7 @@ public:
      * \retval C2_OMITTED   this allocator does not support 1D allocations
      * \retval C2_CORRUPTED some unknown, unrecoverable error occured during allocation (unexpected)
      */
-    virtual C2Status allocateLinearBuffer(
+    virtual C2Status newLinearAllocation(
             uint32_t capacity __unused, C2MemoryUsage usage __unused,
             std::shared_ptr<C2LinearAllocation> *allocation /* nonnull */) {
         *allocation = nullptr;
@@ -1563,7 +1617,7 @@ public:
      *
      * \param handle      the handle for the existing allocation
      * \param allocation  pointer to where the allocation shall be stored on success. nullptr
-     *                  will be stored here on failure
+     *                    will be stored here on failure
      *
      * \retval C2_OK        the allocation was recreated successfully
      * \retval C2_NO_MEMORY not enough memory to recreate the allocation
@@ -1573,7 +1627,7 @@ public:
      * \retval C2_OMITTED   this allocator does not support 1D allocations
      * \retval C2_CORRUPTED some unknown, unrecoverable error occured during allocation (unexpected)
      */
-    virtual C2Status recreateLinearBuffer(
+    virtual C2Status priorLinearAllocation(
             const C2Handle *handle __unused,
             std::shared_ptr<C2LinearAllocation> *allocation /* nonnull */) {
         *allocation = nullptr;
@@ -1584,18 +1638,18 @@ public:
      * Allocates a 2D allocation of given |width|, |height|, |format| and |usage|. If successful,
      * the allocation is stored in |allocation|. Otherwise, |allocation| is set to 'nullptr'.
      *
-     * \param width           the width of requested allocation (the allocation could be slightly
+     * \param width         the width of requested allocation (the allocation could be slightly
      *                      larger, e.g. to account for any system-required alignment)
-     * \param height          the height of requested allocation (the allocation could be slightly
+     * \param height        the height of requested allocation (the allocation could be slightly
      *                      larger, e.g. to account for any system-required alignment)
-     * \param format          the pixel format of requested allocation. This could be a vendor
+     * \param format        the pixel format of requested allocation. This could be a vendor
      *                      specific format.
-     * \param usage           the memory usage info for the requested allocation. \note that the
+     * \param usage         the memory usage info for the requested allocation. \note that the
      *                      returned allocation may be later used/mapped with different usage.
      *                      The allocator should layout the buffer to be optimized for this usage,
      *                      but must support any usage. One exception: protected buffers can
      *                      only be used in a protected scenario.
-     * \param allocation      pointer to where the allocation shall be stored on success. nullptr
+     * \param allocation    pointer to where the allocation shall be stored on success. nullptr
      *                      will be stored here on failure
      *
      * \retval C2_OK        the allocation was successful
@@ -1606,7 +1660,7 @@ public:
      * \retval C2_OMITTED   this allocator does not support 2D allocations
      * \retval C2_CORRUPTED some unknown, unrecoverable error occured during allocation (unexpected)
      */
-    virtual C2Status allocateGraphicBuffer(
+    virtual C2Status newGraphicAllocation(
             uint32_t width __unused, uint32_t height __unused, uint32_t format __unused,
             C2MemoryUsage usage __unused,
             std::shared_ptr<C2GraphicAllocation> *allocation /* nonnull */) {
@@ -1620,7 +1674,7 @@ public:
      *
      * \param handle      the handle for the existing allocation
      * \param allocation  pointer to where the allocation shall be stored on success. nullptr
-     *                  will be stored here on failure
+     *                    will be stored here on failure
      *
      * \retval C2_OK        the allocation was recreated successfully
      * \retval C2_NO_MEMORY not enough memory to recreate the allocation
@@ -1630,7 +1684,7 @@ public:
      * \retval C2_OMITTED   this allocator does not support 2D allocations
      * \retval C2_CORRUPTED some unknown, unrecoverable error occured during recreation (unexpected)
      */
-    virtual C2Status recreateGraphicBuffer(
+    virtual C2Status priorGraphicAllocation(
             const C2Handle *handle __unused,
             std::shared_ptr<C2GraphicAllocation> *allocation /* nonnull */) {
         *allocation = nullptr;
@@ -1644,37 +1698,73 @@ protected:
 };
 
 /**
- *  Block allocators are used by components to allocate memory for output buffers. They can
- *  support either linear (1D), circular (1D) or graphic (2D) allocations.
+ *  Block pools are used by components to obtain output buffers in an efficient way. They can
+ *  support either linear (1D), circular (1D) or graphic (2D) blocks.
+ *
+ *  Block pools decouple the recycling of memory/allocations from the components. They are meant to
+ *  be an opaque service (there are no public APIs other than obtaining blocks) provided by the
+ *  platform. Block pools are also meant to decouple allocations from memory used by buffers. This
+ *  is accomplished by allowing pools to allot multiple memory 'blocks' on a single allocation. As
+ *  their name suggest, block pools maintain a pool of memory blocks. When a component asks for
+ *  a memory block, pools will try to return a free memory block already in the pool. If no such
+ *  block exists, they will allocate memory using the backing allocator and allot a block on that
+ *  allocation. When blocks are no longer used in the system, they are recycled back to the block
+ *  pool and are available as free blocks.
  *
  *  Never constructed on stack.
- *
- *  Block allocators are provided by the framework.
  */
-class C2BlockAllocator {
+class C2BlockPool {
 public:
     /**
-     * Allocates a linear writeable block of given |capacity| and |usage|. If successful, the
+     * Block pool ID type.
+     */
+    typedef uint64_t local_id_t;
+
+    enum : local_id_t {
+        BASIC_LINEAR = 0,  ///< ID of basic (unoptimized) block pool for fetching 1D blocks
+        BASIC_GRAPHIC = 1, ///< ID of basic (unoptimized) block pool for fetching 2D blocks
+        PLATFORM_START = 0x10,
+    };
+
+    /**
+     * Returns the ID for this block pool. This ID is used to get this block pool from the platform.
+     * It is only valid in the current process.
+     *
+     * This method MUST be "non-blocking" and return within 1ms.
+     *
+     * \return a local ID for this block pool.
+     */
+    virtual local_id_t getLocalId() const = 0;
+
+    /**
+     * Returns the ID of the backing allocator of this block pool.
+     *
+     * This method MUST be "non-blocking" and return within 1ms.
+     *
+     * \return the ID of the backing allocator of this block pool.
+     */
+    virtual C2Allocator::id_t getAllocatorId() const = 0;
+
+    /**
+     * Obtains a linear writeable block of given |capacity| and |usage|. If successful, the
      * block is stored in |block|. Otherwise, |block| is set to 'nullptr'.
      *
-     * \param capacity        the size of requested block.
-     * \param usage           the memory usage info for the requested allocation. \note that the
-     *                      returned allocation may be later used/mapped with different usage.
-     *                      The allocator shall lay out the buffer to be optimized for this usage,
-     *                      but must support any usage. One exception: protected buffers can
-     *                      only be used in a protected scenario.
-     * \param block      pointer to where the allocated block shall be stored on success. nullptr
-     *                      will be stored here on failure
+     * \param capacity the size of requested block.
+     * \param usage    the memory usage info for the requested block. Returned blocks will be
+     *                 optimized for this usage, but may be used with any usage. One exception:
+     *                 protected blocks/buffers can only be used in a protected scenario.
+     * \param block    pointer to where the obtained block shall be stored on success. nullptr will
+     *                 be stored here on failure
      *
-     * \retval C2_OK        the allocation was successful
-     * \retval C2_NO_MEMORY not enough memory to complete the allocation
-     * \retval C2_TIMED_OUT the allocation timed out
-     * \retval C2_REFUSED   no permission to complete the allocation
+     * \retval C2_OK        the operation was successful
+     * \retval C2_NO_MEMORY not enough memory to complete any required allocation
+     * \retval C2_TIMED_OUT the operation timed out
+     * \retval C2_REFUSED   no permission to complete any required allocation
      * \retval C2_BAD_VALUE capacity or usage are not supported (invalid) (caller error)
-     * \retval C2_OMITTED   this allocator does not support linear allocations
-     * \retval C2_CORRUPTED some unknown, unrecoverable error occured during allocation (unexpected)
+     * \retval C2_OMITTED   this pool does not support linear blocks
+     * \retval C2_CORRUPTED some unknown, unrecoverable error occured during operation (unexpected)
      */
-    virtual C2Status allocateLinearBlock(
+    virtual C2Status fetchLinearBlock(
             uint32_t capacity __unused, C2MemoryUsage usage __unused,
             std::shared_ptr<C2LinearBlock> *block /* nonnull */) {
         *block = nullptr;
@@ -1682,28 +1772,27 @@ public:
     }
 
     /**
-     * Allocates a circular writeable block of given |capacity| and |usage|. If successful, the
+     * Obtains a circular writeable block of given |capacity| and |usage|. If successful, the
      * block is stored in |block|. Otherwise, |block| is set to 'nullptr'.
      *
-     * \param capacity        the size of requested circular block. (the allocation could be slightly
-     *                      larger, e.g. to account for any system-required alignment)
-     * \param usage           the memory usage info for the requested allocation. \note that the
-     *                      returned allocation may be later used/mapped with different usage.
-     *                      The allocator shall lay out the buffer to be optimized for this usage,
-     *                      but must support any usage. One exception: protected buffers can
-     *                      only be used in a protected scenario.
-     * \param block      pointer to where the allocated block shall be stored on success. nullptr
-     *                      will be stored here on failure
+     * \param capacity the size of requested circular block. (note: the size of the obtained
+     *                 block could be slightly larger, e.g. to accommodate any system-required
+     *                 alignment)
+     * \param usage    the memory usage info for the requested block. Returned blocks will be
+     *                 optimized for this usage, but may be used with any usage. One exception:
+     *                 protected blocks/buffers can only be used in a protected scenario.
+     * \param block    pointer to where the obtained block shall be stored on success. nullptr
+     *                 will be stored here on failure
      *
-     * \retval C2_OK            the allocation was successful
-     * \retval C2_NO_MEMORY     not enough memory to complete the allocation
-     * \retval C2_TIMED_OUT     the allocation timed out
-     * \retval C2_REFUSED       no permission to complete the allocation
-     * \retval C2_BAD_VALUE     capacity or usage are not supported (invalid) (caller error)
-     * \retval C2_OMITTED       this allocator does not support circular allocations
-     * \retval C2_CORRUPTED     some unknown, unrecoverable error occured during allocation (unexpected)
+     * \retval C2_OK        the operation was successful
+     * \retval C2_NO_MEMORY not enough memory to complete any required allocation
+     * \retval C2_TIMED_OUT the operation timed out
+     * \retval C2_REFUSED   no permission to complete any required allocation
+     * \retval C2_BAD_VALUE capacity or usage are not supported (invalid) (caller error)
+     * \retval C2_OMITTED   this pool does not support circular blocks
+     * \retval C2_CORRUPTED some unknown, unrecoverable error occured during operation (unexpected)
      */
-    virtual C2Status allocateCircularBlock(
+    virtual C2Status fetchCircularBlock(
             uint32_t capacity __unused, C2MemoryUsage usage __unused,
             std::shared_ptr<C2CircularBlock> *block /* nonnull */) {
         *block = nullptr;
@@ -1711,32 +1800,30 @@ public:
     }
 
     /**
-     * Allocates a 2D graphic block of given |width|, |height|, |format| and |usage|. If successful,
-     * the allocation is stored in |block|. Otherwise, |block| is set to 'nullptr'.
+     * Obtains a 2D graphic block of given |width|, |height|, |format| and |usage|. If successful,
+     * the block is stored in |block|. Otherwise, |block| is set to 'nullptr'.
      *
-     * \param width           the width of requested allocation (the allocation could be slightly
-     *                      larger, e.g. to account for any system-required alignment)
-     * \param height          the height of requested allocation (the allocation could be slightly
-     *                      larger, e.g. to account for any system-required alignment)
-     * \param format          the pixel format of requested allocation. This could be a vendor
-     *                      specific format.
-     * \param usage           the memory usage info for the requested allocation. \note that the
-     *                      returned allocation may be later used/mapped with different usage.
-     *                      The allocator should layout the buffer to be optimized for this usage,
-     *                      but must support any usage. One exception: protected buffers can
-     *                      only be used in a protected scenario.
-     * \param block      pointer to where the allocation shall be stored on success. nullptr
-     *                      will be stored here on failure
+     * \param width  the width of requested block (the obtained block could be slightly larger, e.g.
+     *               to accommodate any system-required alignment)
+     * \param height the height of requested block (the obtained block could be slightly larger,
+     *               e.g. to accommodate any system-required alignment)
+     * \param format the pixel format of requested block. This could be a vendor specific format.
+     * \param usage  the memory usage info for the requested block. Returned blocks will be
+     *               optimized for this usage, but may be used with any usage. One exception:
+     *               protected blocks/buffers can only be used in a protected scenario.
+     * \param block  pointer to where the obtained block shall be stored on success. nullptr
+     *               will be stored here on failure
      *
-     * \retval C2_OK            the allocation was successful
-     * \retval C2_NO_MEMORY     not enough memory to complete the allocation
-     * \retval C2_TIMED_OUT     the allocation timed out
-     * \retval C2_REFUSED       no permission to complete the allocation
-     * \retval C2_BAD_VALUE     width, height, format or usage are not supported (invalid) (caller error)
-     * \retval C2_OMITTED       this allocator does not support 2D allocations
-     * \retval C2_CORRUPTED     some unknown, unrecoverable error occured during allocation (unexpected)
+     * \retval C2_OK        the operation was successful
+     * \retval C2_NO_MEMORY not enough memory to complete any required allocation
+     * \retval C2_TIMED_OUT the operation timed out
+     * \retval C2_REFUSED   no permission to complete any required allocation
+     * \retval C2_BAD_VALUE width, height, format or usage are not supported (invalid) (caller
+     *                      error)
+     * \retval C2_OMITTED   this pool does not support 2D blocks
+     * \retval C2_CORRUPTED some unknown, unrecoverable error occured during operation (unexpected)
      */
-    virtual C2Status allocateGraphicBlock(
+    virtual C2Status fetchGraphicBlock(
             uint32_t width __unused, uint32_t height __unused, uint32_t format __unused,
             C2MemoryUsage usage __unused,
             std::shared_ptr<C2GraphicBlock> *block /* nonnull */) {
@@ -1745,9 +1832,9 @@ public:
     }
 
 protected:
-    C2BlockAllocator() = default;
+    C2BlockPool() = default;
 
-    virtual ~C2BlockAllocator() = default;
+    virtual ~C2BlockPool() = default;
 };
 
 /// @}

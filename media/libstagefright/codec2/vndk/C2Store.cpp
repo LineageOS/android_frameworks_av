@@ -27,7 +27,7 @@ namespace android {
 
 class C2PlatformAllocatorStore : public C2AllocatorStore {
 public:
-    enum ID_ : uint32_t {
+    enum : id_t {
         ION = PLATFORM_START,
         GRALLOC,
     };
@@ -35,7 +35,16 @@ public:
     C2PlatformAllocatorStore(
         /* ionmapper */
     );
-    virtual C2Status createAllocator(ID id, std::shared_ptr<C2Allocator> *const allocator);
+
+    virtual C2Status getAllocator(id_t id, std::shared_ptr<C2Allocator> *const allocator);
+
+    virtual std::vector<std::shared_ptr<const C2Allocator::Info>> listAllocators() const {
+        return std::vector<std::shared_ptr<const C2Allocator::Info>>(); /// \todo
+    }
+
+    virtual C2String getName() const {
+        return "android.allocator-store";
+    }
 
 private:
     // returns a shared-singleton ion allocator
@@ -48,8 +57,8 @@ private:
 C2PlatformAllocatorStore::C2PlatformAllocatorStore() {
 }
 
-C2Status C2PlatformAllocatorStore::createAllocator(
-        ID id, std::shared_ptr<C2Allocator> *const allocator) {
+C2Status C2PlatformAllocatorStore::getAllocator(
+        id_t id, std::shared_ptr<C2Allocator> *const allocator) {
     allocator->reset();
     switch (id) {
     // TODO: should we implement a generic registry for all, and use that?

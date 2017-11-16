@@ -1211,7 +1211,7 @@ void C2SoftAvcDec::process(std::unique_ptr<C2Work> &work) {
         // TODO: format & usage
         uint32_t format = HAL_PIXEL_FORMAT_YV12;
         C2MemoryUsage usage = { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite };
-        (void) work->worklets.front()->allocators[0]->allocateGraphicBlock(
+        (void) work->worklets.front()->allocators[0]->fetchGraphicBlock(
                 mWidth, mHeight, format, usage, &mAllocatedBlock);
         ALOGE("provided (%dx%d) required (%dx%d)", mAllocatedBlock->width(), mAllocatedBlock->height(), mWidth, mHeight);
     }
