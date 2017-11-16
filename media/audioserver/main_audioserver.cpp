@@ -27,10 +27,6 @@
 #include <binder/IServiceManager.h>
 #include <utils/Log.h>
 
-// FIXME: remove when BUG 31748996 is fixed
-#include <hwbinder/IPCThreadState.h>
-#include <hwbinder/ProcessState.h>
-
 // from LOCAL_C_INCLUDES
 #include "aaudio/AAudioTesting.h"
 #include "AudioFlinger.h"
@@ -145,10 +141,6 @@ int main(int argc __unused, char **argv)
 
         SoundTriggerHwService::instantiate();
         ProcessState::self()->startThreadPool();
-
-// FIXME: remove when BUG 31748996 is fixed
-        android::hardware::ProcessState::self()->startThreadPool();
-
         IPCThreadState::self()->joinThreadPool();
     }
 }
