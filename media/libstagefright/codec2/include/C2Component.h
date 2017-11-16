@@ -250,7 +250,8 @@ public:
      * \retval C2_OK        the tunnel was successfully created
      * \retval C2_BAD_INDEX the target component does not exist
      * \retval C2_DUPLICATE the tunnel already exists
-     * \retval C2_UNSUPPORTED  the tunnel is not supported
+     * \retval C2_OMITTED   tunneling is not supported by this component
+     * \retval C2_CANNOT_DO the specific tunnel is not supported
      *
      * \retval C2_TIMED_OUT could not create the tunnel within the time limit (unexpected)
      * \retval C2_CORRUPTED some unknown error prevented the creation of the tunnel (unexpected)
@@ -271,6 +272,7 @@ public:
      * \retval C2_OK        the tunnel was marked for release successfully
      * \retval C2_BAD_INDEX the target component does not exist
      * \retval C2_NOT_FOUND the tunnel does not exist
+     * \retval C2_OMITTED   tunneling is not supported by this component
      *
      * \retval C2_TIMED_OUT could not mark the tunnel for release within the time limit (unexpected)
      * \retval C2_CORRUPTED some unknown error prevented the release of the tunnel (unexpected)
@@ -329,7 +331,7 @@ public:
      *
      * \retval C2_OK        the work was successfully queued
      * \retval C2_BAD_INDEX some component(s) in the work do(es) not exist
-     * \retval C2_UNSUPPORTED  the components are not tunneled
+     * \retval C2_CANNOT_DO the components are not tunneled
      *
      * \retval C2_NO_MEMORY not enough memory to queue the work
      * \retval C2_CORRUPTED some unknown error prevented queuing the work (unexpected)
@@ -346,7 +348,7 @@ public:
      *
      * \retval C2_OK        the work announcement has been successfully recorded
      * \retval C2_BAD_INDEX some component(s) in the work outline do(es) not exist
-     * \retval C2_UNSUPPORTED  the componentes are not tunneled
+     * \retval C2_CANNOT_DO the componentes are not tunneled
      *
      * \retval C2_NO_MEMORY not enough memory to record the work announcement
      * \retval C2_CORRUPTED some unknown error prevented recording the announcement (unexpected)

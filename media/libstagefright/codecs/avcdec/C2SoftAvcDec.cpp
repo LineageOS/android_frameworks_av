@@ -499,13 +499,13 @@ C2Status C2SoftAvcDecIntf::commit_sm(
 C2Status C2SoftAvcDecIntf::createTunnel_sm(node_id targetComponent) {
     // Tunneling is not supported
     (void) targetComponent;
-    return C2_UNSUPPORTED;
+    return C2_OMITTED;
 }
 
 C2Status C2SoftAvcDecIntf::releaseTunnel_sm(node_id targetComponent) {
     // Tunneling is not supported
     (void) targetComponent;
-    return C2_UNSUPPORTED;
+    return C2_OMITTED;
 }
 
 std::shared_ptr<C2ParamReflector> C2SoftAvcDecIntf::getParamReflector() const {
@@ -669,7 +669,7 @@ C2Status C2SoftAvcDec::queue_nb(
 C2Status C2SoftAvcDec::announce_nb(const std::vector<C2WorkOutline> &items) {
     // Tunneling is not supported
     (void) items;
-    return C2_UNSUPPORTED;
+    return C2_OMITTED;
 }
 
 C2Status C2SoftAvcDec::flush_sm(

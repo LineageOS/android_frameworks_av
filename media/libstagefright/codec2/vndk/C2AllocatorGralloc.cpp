@@ -45,7 +45,7 @@ static C2Status maperr2error(Error maperr) {
         case Error::BAD_BUFFER:     return C2_BAD_VALUE;
         case Error::BAD_VALUE:      return C2_BAD_VALUE;
         case Error::NO_RESOURCES:   return C2_NO_MEMORY;
-        case Error::UNSUPPORTED:    return C2_UNSUPPORTED;
+        case Error::UNSUPPORTED:    return C2_CANNOT_DO;
     }
     return C2_CORRUPTED;
 }
@@ -195,7 +195,7 @@ C2Status C2AllocationGralloc::map(
             return err;
         }
         // TODO
-        return C2_UNSUPPORTED;
+        return C2_OMITTED;
     }
     mLocked = true;
 
@@ -314,7 +314,7 @@ C2Status C2AllocatorGralloc::Impl::recreateGraphicBuffer(
 
     // TODO: need to figure out BufferDescriptorInfo from the handle.
     allocation->reset();
-    return C2_UNSUPPORTED;
+    return C2_OMITTED;
 }
 
 C2AllocatorGralloc::C2AllocatorGralloc() : mImpl(new Impl) {}

@@ -88,7 +88,7 @@ public:
      * \retval C2_TIMED_OUT     the fence has not been signaled within the timeout
      * \retval C2_BAD_STATE     the fence has been abandoned without being signaled (it will never
      *                          be signaled)
-     * \retval C2_NO_PERMISSION no permission to wait for the fence (unexpected - system)
+     * \retval C2_REFUSED       no permission to wait for the fence (unexpected - system)
      * \retval C2_CORRUPTED     some unknown error prevented waiting for the fence (unexpected)
      */
     C2Status wait(nsecs_t timeoutNs);
@@ -155,7 +155,7 @@ public:
      * \retval C2_OK            the fence(s) were successfully signaled
      * \retval C2_BAD_STATE     the fence(s) have already been abandoned or merged (caller error)
      * \retval C2_DUPLICATE     the fence(s) have already been signaled (caller error)
-     * \retval C2_NO_PERMISSION no permission to signal the fence (unexpected - system)
+     * \retval C2_REFUSED       no permission to signal the fence (unexpected - system)
      * \retval C2_CORRUPTED     some unknown error prevented signaling the fence(s) (unexpected)
      */
     C2Status fire();
@@ -169,7 +169,7 @@ public:
      * \retval C2_NO_MEMORY     not enough memory to perform the merging
      * \retval C2_DUPLICATE     the fence have already been merged (caller error)
      * \retval C2_BAD_STATE     the fence have already been signaled or abandoned (caller error)
-     * \retval C2_NO_PERMISSION no permission to merge the fence (unexpected - system)
+     * \retval C2_REFUSED       no permission to merge the fence (unexpected - system)
      * \retval C2_CORRUPTED     some unknown error prevented merging the fence(s) (unexpected)
      */
     C2Status merge(std::vector<C2Fence> fences);
@@ -183,7 +183,7 @@ public:
      * \retval C2_OK            the fence(s) were successfully signaled
      * \retval C2_BAD_STATE     the fence(s) have already been signaled or merged (caller error)
      * \retval C2_DUPLICATE     the fence(s) have already been abandoned (caller error)
-     * \retval C2_NO_PERMISSION no permission to abandon the fence (unexpected - system)
+     * \retval C2_REFUSED       no permission to abandon the fence (unexpected - system)
      * \retval C2_CORRUPTED     some unknown error prevented signaling the fence(s) (unexpected)
      */
     C2Status abandon();
@@ -1377,7 +1377,7 @@ public:
      * \todo Do we need to support sync operation as we could just wait for the fence?
      *
      * \retval C2_OK        the operation was successful
-     * \retval C2_NO_PERMISSION no permission to map the portion
+     * \retval C2_REFUSED   no permission to map the portion
      * \retval C2_TIMED_OUT the operation timed out
      * \retval C2_DUPLICATE if the allocation is already mapped.
      * \retval C2_NO_MEMORY not enough memory to complete the operation
@@ -1407,7 +1407,7 @@ public:
      * \retval C2_BAD_VALUE the parameters (addr/size) do not correspond to previously mapped
      *                      regions (caller error)
      * \retval C2_CORRUPTED some unknown error prevented the operation from completing (unexpected)
-     * \retval C2_NO_PERMISSION no permission to unmap the portion (unexpected - system)
+     * \retval C2_REFUSED   no permission to unmap the portion (unexpected - system)
      */
     virtual C2Status unmap(void *addr, size_t size, int *fenceFd /* nullable */) = 0;
 
@@ -1463,7 +1463,7 @@ public:
      * \todo Do we need to support sync operation as we could just wait for the fence?
      *
      * \retval C2_OK        the operation was successful
-     * \retval C2_NO_PERMISSION no permission to map the section
+     * \retval C2_REFUSED   no permission to map the section
      * \retval C2_DUPLICATE there is already a mapped region (caller error)
      * \retval C2_TIMED_OUT the operation timed out
      * \retval C2_NO_MEMORY not enough memory to complete the operation
@@ -1490,7 +1490,7 @@ public:
      * \retval C2_TIMED_OUT the operation timed out
      * \retval C2_NOT_FOUND there is no mapped region (caller error)
      * \retval C2_CORRUPTED some unknown error prevented the operation from completing (unexpected)
-     * \retval C2_NO_PERMISSION no permission to unmap the section (unexpected - system)
+     * \retval C2_REFUSED   no permission to unmap the section (unexpected - system)
      */
     virtual C2Status unmap(C2Fence *fenceFd /* nullable */) = 0;
 
@@ -1545,16 +1545,16 @@ public:
      * \retval C2_OK        the allocation was successful
      * \retval C2_NO_MEMORY not enough memory to complete the allocation
      * \retval C2_TIMED_OUT the allocation timed out
-     * \retval C2_NO_PERMISSION     no permission to complete the allocation
+     * \retval C2_REFUSED   no permission to complete the allocation
      * \retval C2_BAD_VALUE capacity or usage are not supported (invalid) (caller error)
-     * \retval C2_UNSUPPORTED       this allocator does not support 1D allocations
+     * \retval C2_OMITTED   this allocator does not support 1D allocations
      * \retval C2_CORRUPTED some unknown, unrecoverable error occured during allocation (unexpected)
      */
     virtual C2Status allocateLinearBuffer(
             uint32_t capacity __unused, C2MemoryUsage usage __unused,
             std::shared_ptr<C2LinearAllocation> *allocation /* nonnull */) {
         *allocation = nullptr;
-        return C2_UNSUPPORTED;
+        return C2_OMITTED;
     }
 
     /**
@@ -1568,16 +1568,16 @@ public:
      * \retval C2_OK        the allocation was recreated successfully
      * \retval C2_NO_MEMORY not enough memory to recreate the allocation
      * \retval C2_TIMED_OUT the recreation timed out (unexpected)
-     * \retval C2_NO_PERMISSION     no permission to recreate the allocation
+     * \retval C2_REFUSED   no permission to recreate the allocation
      * \retval C2_BAD_VALUE invalid handle (caller error)
-     * \retval C2_UNSUPPORTED       this allocator does not support 1D allocations
+     * \retval C2_OMITTED   this allocator does not support 1D allocations
      * \retval C2_CORRUPTED some unknown, unrecoverable error occured during allocation (unexpected)
      */
     virtual C2Status recreateLinearBuffer(
             const C2Handle *handle __unused,
             std::shared_ptr<C2LinearAllocation> *allocation /* nonnull */) {
         *allocation = nullptr;
-        return C2_UNSUPPORTED;
+        return C2_OMITTED;
     }
 
     /**
@@ -1601,9 +1601,9 @@ public:
      * \retval C2_OK        the allocation was successful
      * \retval C2_NO_MEMORY not enough memory to complete the allocation
      * \retval C2_TIMED_OUT the allocation timed out
-     * \retval C2_NO_PERMISSION     no permission to complete the allocation
+     * \retval C2_REFUSED   no permission to complete the allocation
      * \retval C2_BAD_VALUE width, height, format or usage are not supported (invalid) (caller error)
-     * \retval C2_UNSUPPORTED       this allocator does not support 2D allocations
+     * \retval C2_OMITTED   this allocator does not support 2D allocations
      * \retval C2_CORRUPTED some unknown, unrecoverable error occured during allocation (unexpected)
      */
     virtual C2Status allocateGraphicBuffer(
@@ -1611,7 +1611,7 @@ public:
             C2MemoryUsage usage __unused,
             std::shared_ptr<C2GraphicAllocation> *allocation /* nonnull */) {
         *allocation = nullptr;
-        return C2_UNSUPPORTED;
+        return C2_OMITTED;
     }
 
     /**
@@ -1625,16 +1625,16 @@ public:
      * \retval C2_OK        the allocation was recreated successfully
      * \retval C2_NO_MEMORY not enough memory to recreate the allocation
      * \retval C2_TIMED_OUT the recreation timed out (unexpected)
-     * \retval C2_NO_PERMISSION     no permission to recreate the allocation
+     * \retval C2_REFUSED   no permission to recreate the allocation
      * \retval C2_BAD_VALUE invalid handle (caller error)
-     * \retval C2_UNSUPPORTED       this allocator does not support 2D allocations
+     * \retval C2_OMITTED   this allocator does not support 2D allocations
      * \retval C2_CORRUPTED some unknown, unrecoverable error occured during recreation (unexpected)
      */
     virtual C2Status recreateGraphicBuffer(
             const C2Handle *handle __unused,
             std::shared_ptr<C2GraphicAllocation> *allocation /* nonnull */) {
         *allocation = nullptr;
-        return C2_UNSUPPORTED;
+        return C2_OMITTED;
     }
 
 protected:
@@ -1669,16 +1669,16 @@ public:
      * \retval C2_OK        the allocation was successful
      * \retval C2_NO_MEMORY not enough memory to complete the allocation
      * \retval C2_TIMED_OUT the allocation timed out
-     * \retval C2_NO_PERMISSION     no permission to complete the allocation
+     * \retval C2_REFUSED   no permission to complete the allocation
      * \retval C2_BAD_VALUE capacity or usage are not supported (invalid) (caller error)
-     * \retval C2_UNSUPPORTED       this allocator does not support linear allocations
+     * \retval C2_OMITTED   this allocator does not support linear allocations
      * \retval C2_CORRUPTED some unknown, unrecoverable error occured during allocation (unexpected)
      */
     virtual C2Status allocateLinearBlock(
             uint32_t capacity __unused, C2MemoryUsage usage __unused,
             std::shared_ptr<C2LinearBlock> *block /* nonnull */) {
         *block = nullptr;
-        return C2_UNSUPPORTED;
+        return C2_OMITTED;
     }
 
     /**
@@ -1698,16 +1698,16 @@ public:
      * \retval C2_OK            the allocation was successful
      * \retval C2_NO_MEMORY     not enough memory to complete the allocation
      * \retval C2_TIMED_OUT     the allocation timed out
-     * \retval C2_NO_PERMISSION     no permission to complete the allocation
+     * \retval C2_REFUSED       no permission to complete the allocation
      * \retval C2_BAD_VALUE     capacity or usage are not supported (invalid) (caller error)
-     * \retval C2_UNSUPPORTED   this allocator does not support circular allocations
+     * \retval C2_OMITTED       this allocator does not support circular allocations
      * \retval C2_CORRUPTED     some unknown, unrecoverable error occured during allocation (unexpected)
      */
     virtual C2Status allocateCircularBlock(
             uint32_t capacity __unused, C2MemoryUsage usage __unused,
             std::shared_ptr<C2CircularBlock> *block /* nonnull */) {
         *block = nullptr;
-        return C2_UNSUPPORTED;
+        return C2_OMITTED;
     }
 
     /**
@@ -1731,9 +1731,9 @@ public:
      * \retval C2_OK            the allocation was successful
      * \retval C2_NO_MEMORY     not enough memory to complete the allocation
      * \retval C2_TIMED_OUT     the allocation timed out
-     * \retval C2_NO_PERMISSION     no permission to complete the allocation
+     * \retval C2_REFUSED       no permission to complete the allocation
      * \retval C2_BAD_VALUE     width, height, format or usage are not supported (invalid) (caller error)
-     * \retval C2_UNSUPPORTED   this allocator does not support 2D allocations
+     * \retval C2_OMITTED       this allocator does not support 2D allocations
      * \retval C2_CORRUPTED     some unknown, unrecoverable error occured during allocation (unexpected)
      */
     virtual C2Status allocateGraphicBlock(
@@ -1741,7 +1741,7 @@ public:
             C2MemoryUsage usage __unused,
             std::shared_ptr<C2GraphicBlock> *block /* nonnull */) {
         *block = nullptr;
-        return C2_UNSUPPORTED;
+        return C2_OMITTED;
     }
 
 protected:
