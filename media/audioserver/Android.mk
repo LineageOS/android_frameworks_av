@@ -13,11 +13,12 @@ LOCAL_SHARED_LIBRARIES := \
 	libbinder \
 	libcutils \
 	liblog \
+	libhidltransport \
+	libhwbinder \
 	libmedialogservice \
 	libnbaio \
 	libsoundtriggerservice \
-	libutils \
-	libhwbinder
+	libutils
 
 # TODO oboeservice is the old folder name for aaudioservice. It will be changed.
 LOCAL_C_INCLUDES := \

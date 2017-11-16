@@ -25,11 +25,8 @@
 #include <binder/IPCThreadState.h>
 #include <binder/ProcessState.h>
 #include <binder/IServiceManager.h>
+#include <hidl/HidlTransportSupport.h>
 #include <utils/Log.h>
-
-// FIXME: remove when BUG 31748996 is fixed
-#include <hwbinder/IPCThreadState.h>
-#include <hwbinder/ProcessState.h>
 
 // from LOCAL_C_INCLUDES
 #include "aaudio/AAudioTesting.h"
@@ -128,6 +125,7 @@ int main(int argc __unused, char **argv)
             prctl(PR_SET_PDEATHSIG, SIGKILL);   // if parent media.log dies before me, kill me also
             setpgid(0, 0);                      // but if I die first, don't kill my parent
         }
+        android::hardware::configureRpcThreadpool(4, false /*callerWillJoin*/);
         sp<ProcessState> proc(ProcessState::self());
         sp<IServiceManager> sm = defaultServiceManager();
         ALOGI("ServiceManager: %p", sm.get());
@@ -145,10 +143,6 @@ int main(int argc __unused, char **argv)
 
         SoundTriggerHwService::instantiate();
         ProcessState::self()->startThreadPool();
-
-// FIXME: remove when BUG 31748996 is fixed
-        android::hardware::ProcessState::self()->startThreadPool();
-
         IPCThreadState::self()->joinThreadPool();
     }
 }
