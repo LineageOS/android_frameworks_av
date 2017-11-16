@@ -112,6 +112,7 @@ private:
         kWhatSendTimedTextData,
         kWhatChangeAVSource,
         kWhatPollBuffering,
+        kWhatSeek,
         kWhatReadBuffer,
         kWhatStart,
         kWhatResume,
@@ -182,6 +183,9 @@ private:
     void onSecureDecodersInstantiated(status_t err);
     void finishPrepareAsync();
     status_t startSources();
+
+    void onSeek(const sp<AMessage>& msg);
+    status_t doSeek(int64_t seekTimeUs, MediaPlayerSeekMode mode);
 
     void onPrepareAsync();
 
