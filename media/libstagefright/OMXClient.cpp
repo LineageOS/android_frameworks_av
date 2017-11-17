@@ -25,7 +25,6 @@
 #include <cutils/properties.h>
 
 #include <binder/IServiceManager.h>
-#include <media/IMediaCodecService.h>
 #include <media/stagefright/OMXClient.h>
 
 #include <media/IOMX.h>
@@ -38,75 +37,34 @@ OMXClient::OMXClient() {
 }
 
 status_t OMXClient::connect() {
-    return connect("default", nullptr);
+    return connect("default");
 }
 
-status_t OMXClient::connect(bool* trebleFlag) {
-    if (property_get_bool("persist.media.treble_omx", true)) {
-        if (trebleFlag != nullptr) {
-            *trebleFlag = true;
-        }
-        return connectTreble();
-    }
-    if (trebleFlag != nullptr) {
-        *trebleFlag = false;
-    }
-    return connectLegacy();
-}
-
-status_t OMXClient::connect(const char* name, bool* trebleFlag) {
-    if (property_get_bool("persist.media.treble_omx", true)) {
-        if (trebleFlag != nullptr) {
-            *trebleFlag = true;
-        }
-        return connectTreble(name);
-    }
-    if (trebleFlag != nullptr) {
-        *trebleFlag = false;
-    }
-    return connectLegacy();
-}
-
-status_t OMXClient::connectLegacy() {
-    sp<IServiceManager> sm = defaultServiceManager();
-    sp<IBinder> codecbinder = sm->getService(String16("media.codec"));
-    sp<IMediaCodecService> codecservice = interface_cast<IMediaCodecService>(codecbinder);
-
-    if (codecservice.get() == NULL) {
-        ALOGE("Cannot obtain IMediaCodecService");
-        return NO_INIT;
-    }
-
-    mOMX = codecservice->getOMX();
-    if (mOMX.get() == NULL) {
-        ALOGE("Cannot obtain mediacodec IOMX");
-        return NO_INIT;
-    }
-
-    return OK;
-}
-
-status_t OMXClient::connectTreble(const char* name) {
+status_t OMXClient::connect(const char* name) {
     using namespace ::android::hardware::media::omx::V1_0;
     if (name == nullptr) {
         name = "default";
     }
     sp<IOmx> tOmx = IOmx::getService(name);
     if (tOmx.get() == nullptr) {
-        ALOGE("Cannot obtain Treble IOmx.");
+        ALOGE("Cannot obtain IOmx service.");
         return NO_INIT;
     }
     if (!tOmx->isRemote()) {
-        ALOGE("Treble IOmx is in passthrough mode.");
+        ALOGE("IOmx service running in passthrough mode.");
         return NO_INIT;
     }
     mOMX = new utils::LWOmx(tOmx);
-    ALOGI("Treble IOmx obtained");
+    ALOGI("IOmx service obtained");
     return OK;
 }
 
 void OMXClient::disconnect() {
     mOMX.clear();
+}
+
+sp<IOMX> OMXClient::interface() {
+    return mOMX;
 }
 
 }  // namespace android

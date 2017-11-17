@@ -344,7 +344,7 @@ bool OMXNodeInstance::CallbackDispatcherThread::threadLoop() {
 ////////////////////////////////////////////////////////////////////////////////
 
 OMXNodeInstance::OMXNodeInstance(
-        OmxNodeOwner *owner, const sp<IOMXObserver> &observer, const char *name)
+        Omx *owner, const sp<IOMXObserver> &observer, const char *name)
     : mOwner(owner),
       mHandle(NULL),
       mObserver(observer),
