@@ -176,6 +176,7 @@ class MediaPlayerService : public BnMediaPlayerService
         audio_output_flags_t    mFlags;
         sp<media::VolumeHandler>       mVolumeHandler;
         audio_port_handle_t     mSelectedDeviceId;
+        audio_port_handle_t     mRoutedDeviceId;
         bool                    mDeviceCallbackEnabled;
         wp<AudioSystem::AudioDeviceCallback>        mDeviceCallback;
         mutable Mutex           mLock;

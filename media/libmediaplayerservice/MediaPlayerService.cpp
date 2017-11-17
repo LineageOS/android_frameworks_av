@@ -1622,6 +1622,7 @@ MediaPlayerService::AudioOutput::AudioOutput(audio_session_t sessionId, uid_t ui
       mFlags(AUDIO_OUTPUT_FLAG_NONE),
       mVolumeHandler(new media::VolumeHandler()),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
+      mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE),
       mDeviceCallbackEnabled(false),
       mDeviceCallback(deviceCallback)
 {
@@ -2368,10 +2369,10 @@ status_t MediaPlayerService::AudioOutput::getRoutedDeviceId(audio_port_handle_t*
     ALOGV("getRoutedDeviceId");
     Mutex::Autolock lock(mLock);
     if (mTrack != 0) {
-        *deviceId = mTrack->getRoutedDeviceId();
-        return NO_ERROR;
+        mRoutedDeviceId = mTrack->getRoutedDeviceId();
     }
-    return NO_INIT;
+    *deviceId = mRoutedDeviceId;
+    return NO_ERROR;
 }
 
 status_t MediaPlayerService::AudioOutput::enableAudioDeviceCallback(bool enabled)
