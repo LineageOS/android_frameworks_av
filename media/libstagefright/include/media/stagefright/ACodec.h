@@ -95,6 +95,11 @@ struct ACodec : public AHierarchicalStateMachine, public CodecBase {
 
     static status_t getOMXChannelMapping(size_t numChannels, OMX_AUDIO_CHANNELTYPE map[]);
 
+    // Save the flag.
+    void setTrebleFlag(bool trebleFlag);
+    // Return the saved flag.
+    bool getTrebleFlag() const;
+
 protected:
     virtual ~ACodec();
 
@@ -228,7 +233,9 @@ private:
     sp<IOMX> mOMX;
     sp<IOMXNode> mOMXNode;
     int32_t mNodeGeneration;
+    bool mTrebleFlag;
     sp<TAllocator> mAllocator[2];
+    sp<MemoryDealer> mDealer[2];
 
     bool mUsingNativeWindow;
     sp<ANativeWindow> mNativeWindow;
