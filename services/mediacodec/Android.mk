@@ -30,7 +30,6 @@ LOCAL_SHARED_LIBRARIES := \
     libmediacodecservice \
     libbinder \
     libutils \
-    libgui \
     liblog \
     libbase \
     libavservices_minijail_vendor \
