@@ -35,6 +35,7 @@
 
 #include <media/IOMX.h>
 #include <media/omx/1.0/WOmx.h>
+#include <media/stagefright/omx/1.0/OmxStore.h>
 
 #include <media/openmax/OMX_Index.h>
 #include <media/openmax/OMX_IndexExt.h>
@@ -89,8 +90,6 @@ OmxInfoBuilder::OmxInfoBuilder() {
 }
 
 status_t OmxInfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
-    hidl_vec<IOmxStore::RoleInfo> roles;
-
     // Obtain IOmxStore
     sp<IOmxStore> omxStore = IOmxStore::getService();
     if (omxStore == nullptr) {
@@ -100,8 +99,37 @@ status_t OmxInfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
 
     // List service attributes (global settings)
     Status status;
+    hidl_vec<IOmxStore::RoleInfo> roles;
+    auto transStatus = omxStore->listRoles(
+            [&roles] (
+            const hidl_vec<IOmxStore::RoleInfo>& inRoleList) {
+                roles = inRoleList;
+            });
+    if (!transStatus.isOk()) {
+        ALOGE("Fail to obtain codec roles from IOmxStore.");
+        return NO_INIT;
+    } else if (roles.size() == 0) {
+        ALOGW("IOmxStore has empty implementation. "
+                "Creating a local default instance...");
+        omxStore = new implementation::OmxStore();
+        if (omxStore == nullptr) {
+            ALOGE("Cannot create a local default instance.");
+            return NO_INIT;
+        }
+        ALOGI("IOmxStore local default instance created.");
+        transStatus = omxStore->listRoles(
+                [&roles] (
+                const hidl_vec<IOmxStore::RoleInfo>& inRoleList) {
+                    roles = inRoleList;
+                });
+        if (!transStatus.isOk()) {
+            ALOGE("Fail to obtain codec roles from local IOmxStore.");
+            return NO_INIT;
+        }
+    }
+
     hidl_vec<IOmxStore::ServiceAttribute> serviceAttributes;
-    auto transStatus = omxStore->listServiceAttributes(
+    transStatus = omxStore->listServiceAttributes(
             [&status, &serviceAttributes] (
             Status inStatus,
             const hidl_vec<IOmxStore::ServiceAttribute>& inAttributes) {
@@ -119,16 +147,6 @@ status_t OmxInfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
     for (const auto& p : serviceAttributes) {
         writer->addGlobalSetting(
                 p.key.c_str(), p.value.c_str());
-    }
-
-    transStatus = omxStore->listRoles(
-            [&roles] (
-            const hidl_vec<IOmxStore::RoleInfo>& inRoleList) {
-                roles = inRoleList;
-            });
-    if (!transStatus.isOk()) {
-        ALOGE("Fail to obtain codec roles from IOmxStore.");
-        return NO_INIT;
     }
 
     // Convert roles to lists of codecs
