@@ -93,8 +93,6 @@ private:
     Condition mMessageAddedCondition;
     int32_t mLastMsgGeneration;
     int32_t mCurGeneration;
-    bool mUseTreble;
-    sp<MemoryDealer> mDealer;
     sp<IAllocator> mAllocator;
 
     status_t initOMX();
