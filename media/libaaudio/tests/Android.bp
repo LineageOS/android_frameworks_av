@@ -99,3 +99,15 @@ cc_test {
         "libutils",
     ],
 }
+
+cc_test {
+    name: "test_various",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_various.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
