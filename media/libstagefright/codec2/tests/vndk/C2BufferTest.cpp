@@ -38,13 +38,13 @@ public:
     ~C2BufferTest() = default;
 
     void allocateLinear(size_t capacity) {
-        C2Status err = mLinearAllocator->allocateLinearBuffer(
+        C2Status err = mLinearAllocator->newLinearAllocation(
                 capacity,
                 { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
                 &mLinearAllocation);
         if (err != C2_OK) {
             mLinearAllocation.reset();
-            FAIL() << "C2Allocator::allocateLinearBuffer() failed: " << err;
+            FAIL() << "C2Allocator::newLinearAllocation() failed: " << err;
         }
     }
 
@@ -77,12 +77,12 @@ public:
         mAddr = nullptr;
     }
 
-    std::shared_ptr<C2BlockAllocator> makeLinearBlockAllocator() {
-        return std::make_shared<C2DefaultBlockAllocator>(mLinearAllocator);
+    std::shared_ptr<C2BlockPool> makeLinearBlockPool() {
+        return std::make_shared<C2BasicLinearBlockPool>(mLinearAllocator);
     }
 
     void allocateGraphic(uint32_t width, uint32_t height) {
-        C2Status err = mGraphicAllocator->allocateGraphicBuffer(
+        C2Status err = mGraphicAllocator->newGraphicAllocation(
                 width,
                 height,
                 HAL_PIXEL_FORMAT_YCBCR_420_888,
@@ -90,7 +90,7 @@ public:
                 &mGraphicAllocation);
         if (err != C2_OK) {
             mGraphicAllocation.reset();
-            FAIL() << "C2Allocator::allocateLinearBuffer() failed: " << err;
+            FAIL() << "C2Allocator::newGraphicAllocation() failed: " << err;
         }
     }
 
@@ -118,8 +118,8 @@ public:
         ASSERT_EQ(C2_OK, mGraphicAllocation->unmap(nullptr));
     }
 
-    std::shared_ptr<C2BlockAllocator> makeGraphicBlockAllocator() {
-        return std::make_shared<C2DefaultGraphicBlockAllocator>(mGraphicAllocator);
+    std::shared_ptr<C2BlockPool> makeGraphicBlockPool() {
+        return std::make_shared<C2BasicGraphicBlockPool>(mGraphicAllocator);
     }
 
 private:
@@ -155,13 +155,13 @@ TEST_F(C2BufferTest, LinearAllocationTest) {
     }
 }
 
-TEST_F(C2BufferTest, BlockAllocatorTest) {
+TEST_F(C2BufferTest, BlockPoolTest) {
     constexpr size_t kCapacity = 1024u * 1024u;
 
-    std::shared_ptr<C2BlockAllocator> blockAllocator(makeLinearBlockAllocator());
+    std::shared_ptr<C2BlockPool> blockPool(makeLinearBlockPool());
 
     std::shared_ptr<C2LinearBlock> block;
-    ASSERT_EQ(C2_OK, blockAllocator->allocateLinearBlock(
+    ASSERT_EQ(C2_OK, blockPool->fetchLinearBlock(
             kCapacity,
             { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
             &block));
@@ -285,14 +285,14 @@ TEST_F(C2BufferTest, GraphicAllocationTest) {
     ASSERT_TRUE(verifyPlane({ 0, 0, kWidth / 4, kHeight }, vInfo, v, 0));
 }
 
-TEST_F(C2BufferTest, GraphicBlockAllocatorTest) {
+TEST_F(C2BufferTest, GraphicBlockPoolTest) {
     constexpr uint32_t kWidth = 320;
     constexpr uint32_t kHeight = 240;
 
-    std::shared_ptr<C2BlockAllocator> blockAllocator(makeGraphicBlockAllocator());
+    std::shared_ptr<C2BlockPool> blockPool(makeGraphicBlockPool());
 
     std::shared_ptr<C2GraphicBlock> block;
-    ASSERT_EQ(C2_OK, blockAllocator->allocateGraphicBlock(
+    ASSERT_EQ(C2_OK, blockPool->fetchGraphicBlock(
             kWidth,
             kHeight,
             HAL_PIXEL_FORMAT_YCBCR_420_888,
@@ -370,8 +370,8 @@ public:
 };
 
 TEST_F(C2BufferTest, BufferDataTest) {
-    std::shared_ptr<C2BlockAllocator> linearBlockAllocator(makeLinearBlockAllocator());
-    std::shared_ptr<C2BlockAllocator> graphicBlockAllocator(makeGraphicBlockAllocator());
+    std::shared_ptr<C2BlockPool> linearBlockPool(makeLinearBlockPool());
+    std::shared_ptr<C2BlockPool> graphicBlockPool(makeGraphicBlockPool());
 
     constexpr uint32_t kWidth1 = 320;
     constexpr uint32_t kHeight1 = 240;
@@ -384,23 +384,23 @@ TEST_F(C2BufferTest, BufferDataTest) {
 
     std::shared_ptr<C2LinearBlock> linearBlock1;
     std::shared_ptr<C2LinearBlock> linearBlock2;
-    ASSERT_EQ(C2_OK, linearBlockAllocator->allocateLinearBlock(
+    ASSERT_EQ(C2_OK, linearBlockPool->fetchLinearBlock(
             kCapacity1,
             { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
             &linearBlock1));
-    ASSERT_EQ(C2_OK, linearBlockAllocator->allocateLinearBlock(
+    ASSERT_EQ(C2_OK, linearBlockPool->fetchLinearBlock(
             kCapacity2,
             { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
             &linearBlock2));
     std::shared_ptr<C2GraphicBlock> graphicBlock1;
     std::shared_ptr<C2GraphicBlock> graphicBlock2;
-    ASSERT_EQ(C2_OK, graphicBlockAllocator->allocateGraphicBlock(
+    ASSERT_EQ(C2_OK, graphicBlockPool->fetchGraphicBlock(
             kWidth1,
             kHeight1,
             HAL_PIXEL_FORMAT_YCBCR_420_888,
             { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
             &graphicBlock1));
-    ASSERT_EQ(C2_OK, graphicBlockAllocator->allocateGraphicBlock(
+    ASSERT_EQ(C2_OK, graphicBlockPool->fetchGraphicBlock(
             kWidth2,
             kHeight2,
             HAL_PIXEL_FORMAT_YCBCR_420_888,
@@ -454,11 +454,11 @@ typedef C2GlobalParam<C2Info, C2Int32Value, kParamIndexNumber1> C2Number1Info;
 typedef C2GlobalParam<C2Info, C2Int32Value, kParamIndexNumber2> C2Number2Info;
 
 TEST_F(C2BufferTest, BufferTest) {
-    std::shared_ptr<C2BlockAllocator> alloc(makeLinearBlockAllocator());
+    std::shared_ptr<C2BlockPool> alloc(makeLinearBlockPool());
     constexpr size_t kCapacity = 1024u;
     std::shared_ptr<C2LinearBlock> block;
 
-    ASSERT_EQ(C2_OK, alloc->allocateLinearBlock(
+    ASSERT_EQ(C2_OK, alloc->fetchLinearBlock(
             kCapacity,
             { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
             &block));

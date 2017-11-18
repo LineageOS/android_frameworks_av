@@ -61,7 +61,7 @@ class C2DefaultConstLinearBlock : public C2ConstLinearBlock {
 
 class C2DefaultLinearBlock : public C2LinearBlock {
     using C2LinearBlock::C2LinearBlock;
-    friend class ::android::C2DefaultBlockAllocator;
+    friend class ::android::C2BasicLinearBlockPool;
 };
 
 class C2DefaultGraphicView : public C2GraphicView {
@@ -87,7 +87,7 @@ class C2DefaultConstGraphicBlock : public C2ConstGraphicBlock {
 
 class C2DefaultGraphicBlock : public C2GraphicBlock {
     using C2GraphicBlock::C2GraphicBlock;
-    friend class ::android::C2DefaultGraphicBlockAllocator;
+    friend class ::android::C2BasicGraphicBlockPool;
 };
 
 class C2DefaultBufferData : public C2BufferData {
@@ -345,18 +345,18 @@ C2ConstLinearBlock C2LinearBlock::share(size_t offset, size_t size, C2Fence fenc
     return mImpl->share(offset, size, fence);
 }
 
-C2DefaultBlockAllocator::C2DefaultBlockAllocator(
+C2BasicLinearBlockPool::C2BasicLinearBlockPool(
         const std::shared_ptr<C2Allocator> &allocator)
   : mAllocator(allocator) {}
 
-C2Status C2DefaultBlockAllocator::allocateLinearBlock(
+C2Status C2BasicLinearBlockPool::fetchLinearBlock(
         uint32_t capacity,
         C2MemoryUsage usage,
         std::shared_ptr<C2LinearBlock> *block /* nonnull */) {
     block->reset();
 
     std::shared_ptr<C2LinearAllocation> alloc;
-    C2Status err = mAllocator->allocateLinearBuffer(capacity, usage, &alloc);
+    C2Status err = mAllocator->newLinearAllocation(capacity, usage, &alloc);
     if (err != C2_OK) {
         return err;
     }
@@ -575,11 +575,11 @@ C2ConstGraphicBlock C2GraphicBlock::share(const C2Rect &crop, C2Fence fence) {
     return mImpl->share(crop, fence);
 }
 
-C2DefaultGraphicBlockAllocator::C2DefaultGraphicBlockAllocator(
+C2BasicGraphicBlockPool::C2BasicGraphicBlockPool(
         const std::shared_ptr<C2Allocator> &allocator)
   : mAllocator(allocator) {}
 
-C2Status C2DefaultGraphicBlockAllocator::allocateGraphicBlock(
+C2Status C2BasicGraphicBlockPool::fetchGraphicBlock(
         uint32_t width,
         uint32_t height,
         uint32_t format,
@@ -588,7 +588,7 @@ C2Status C2DefaultGraphicBlockAllocator::allocateGraphicBlock(
     block->reset();
 
     std::shared_ptr<C2GraphicAllocation> alloc;
-    C2Status err = mAllocator->allocateGraphicBuffer(width, height, format, usage, &alloc);
+    C2Status err = mAllocator->newGraphicAllocation(width, height, format, usage, &alloc);
     if (err != C2_OK) {
         return err;
     }

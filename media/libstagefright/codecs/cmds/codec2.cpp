@@ -96,8 +96,8 @@ private:
 
     std::shared_ptr<C2Allocator> mAllocIon;
     std::shared_ptr<C2Allocator> mAllocGralloc;
-    std::shared_ptr<C2BlockAllocator> mLinearAlloc;
-    std::shared_ptr<C2BlockAllocator> mGraphicAlloc;
+    std::shared_ptr<C2BlockPool> mLinearPool;
+    std::shared_ptr<C2BlockPool> mGraphicPool;
 
     std::mutex mQueueLock;
     std::condition_variable mQueueCondition;
@@ -144,11 +144,11 @@ SimplePlayer::SimplePlayer()
     CHECK_EQ(mComposerClient->initCheck(), (status_t)OK);
 
     std::shared_ptr<C2AllocatorStore> store = GetCodec2PlatformAllocatorStore();
-    CHECK_EQ(store->createAllocator(C2AllocatorStore::DEFAULT_LINEAR, &mAllocIon), C2_OK);
-    CHECK_EQ(store->createAllocator(C2AllocatorStore::DEFAULT_GRAPHIC, &mAllocGralloc), C2_OK);
+    CHECK_EQ(store->getAllocator(C2AllocatorStore::DEFAULT_LINEAR, &mAllocIon), C2_OK);
+    CHECK_EQ(store->getAllocator(C2AllocatorStore::DEFAULT_GRAPHIC, &mAllocGralloc), C2_OK);
 
-    mLinearAlloc = std::make_shared<C2DefaultBlockAllocator>(mAllocIon);
-    mGraphicAlloc = std::make_shared<C2DefaultGraphicBlockAllocator>(mAllocGralloc);
+    mLinearPool = std::make_shared<C2BasicLinearBlockPool>(mAllocIon);
+    mGraphicPool = std::make_shared<C2BasicGraphicBlockPool>(mAllocGralloc);
 
     mControl = mComposerClient->createSurface(
             String8("A Surface"),
@@ -274,7 +274,7 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
     });
 
     long numFrames = 0;
-    mLinearAlloc.reset(new C2DefaultBlockAllocator(mAllocIon));
+    mLinearPool.reset(new C2BasicLinearBlockPool(mAllocIon));
 
     for (;;) {
         size_t size = 0u;
@@ -328,7 +328,7 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
         work->input.ordinal.frame_index = numFrames;
 
         std::shared_ptr<C2LinearBlock> block;
-        mLinearAlloc->allocateLinearBlock(
+        mLinearPool->fetchLinearBlock(
                 size,
                 { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
                 &block);
@@ -343,7 +343,7 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
         work->input.buffers.emplace_back(new LinearBuffer(block));
         work->worklets.clear();
         work->worklets.emplace_back(new C2Worklet);
-        work->worklets.front()->allocators.emplace_back(mGraphicAlloc);
+        work->worklets.front()->allocators.emplace_back(mGraphicPool);
 
         std::list<std::unique_ptr<C2Work>> items;
         items.push_back(std::move(work));

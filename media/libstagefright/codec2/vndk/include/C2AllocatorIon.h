@@ -29,11 +29,19 @@ public:
     typedef std::function<int (C2MemoryUsage, size_t,
                       /* => */ size_t*, unsigned*, unsigned*)> usage_mapper_fn;
 
-    virtual C2Status allocateLinearBuffer(
+    virtual id_t getId() const override;
+
+    virtual C2String getName() const override;
+
+    virtual std::shared_ptr<const Info> getInfo() const override {
+        return nullptr; // \todo
+    }
+
+    virtual C2Status newLinearAllocation(
             uint32_t capacity, C2MemoryUsage usage,
             std::shared_ptr<C2LinearAllocation> *allocation) override;
 
-    virtual C2Status recreateLinearBuffer(
+    virtual C2Status priorLinearAllocation(
             const C2Handle *handle,
             std::shared_ptr<C2LinearAllocation> *allocation) override;
 
