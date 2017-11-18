@@ -27,6 +27,8 @@
 #include "ih264d.h"
 #include "C2SoftAvcDec.h"
 
+#include <C2PlatformSupport.h>
+
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaDefs.h>
 #include <utils/misc.h>
@@ -275,6 +277,8 @@ C2SoftAvcDecIntf::C2SoftAvcDecIntf(const char *name, node_id id)
     mMaxVideoSizeHint.mWidth = H264_MAX_FRAME_WIDTH;
     mMaxVideoSizeHint.mHeight = H264_MAX_FRAME_HEIGHT;
 
+    mOutputBlockPools = C2PortBlockPoolsTuning::output::alloc_unique({});
+
     auto insertParam = [&params = mParams] (C2Param *param) {
         params[restoreIndex(param)] = param;
     };
@@ -422,6 +426,8 @@ C2SoftAvcDecIntf::C2SoftAvcDecIntf(const char *name, node_id id)
             false, "_video_size", &mVideoSize));
     mParamDescs.push_back(std::make_shared<C2ParamDescriptor>(
             false, "_max_video_size_hint", &mMaxVideoSizeHint));
+    mParamDescs.push_back(std::make_shared<C2ParamDescriptor>(
+            false, "_output_block_pools", mOutputBlockPools.get()));
 }
 
 C2String C2SoftAvcDecIntf::getName() const {
@@ -443,6 +449,8 @@ C2Status C2SoftAvcDecIntf::query_nb(
 
         uint32_t index = restoreIndex(param);
         if (!mParams.count(index)) {
+            // TODO: add support for output-block-pools (this will be done when we move all
+            // config to shared ptr)
             continue;
         }
 
@@ -471,6 +479,13 @@ C2Status C2SoftAvcDecIntf::config_nb(
     C2Status err = C2_OK;
     for (C2Param *param : params) {
         uint32_t index = restoreIndex(param);
+        if (param->index() == mOutputBlockPools.get()->index()) {
+            // setting output block pools
+            mOutputBlockPools.reset(
+                    (C2PortBlockPoolsTuning::output *)C2Param::Copy(*param).release());
+            continue;
+        }
+
         if (mParams.count(index) == 0) {
             // We can't create C2SettingResult with no field, so just skipping in this case.
             err = C2_BAD_INDEX;
@@ -1211,7 +1226,19 @@ void C2SoftAvcDec::process(std::unique_ptr<C2Work> &work) {
         // TODO: format & usage
         uint32_t format = HAL_PIXEL_FORMAT_YV12;
         C2MemoryUsage usage = { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite };
-        (void) work->worklets.front()->allocators[0]->fetchGraphicBlock(
+        // TODO: lock access to interface
+        C2BlockPool::local_id_t poolId =
+            mIntf->mOutputBlockPools->flexCount() ?
+                    mIntf->mOutputBlockPools->m.mValues[0] : C2BlockPool::BASIC_GRAPHIC;
+        if (!mOutputBlockPool || mOutputBlockPool->getLocalId() != poolId) {
+            C2Status err = GetCodec2BlockPool(poolId, shared_from_this(), &mOutputBlockPool);
+            if (err != C2_OK) {
+                // TODO: trip
+            }
+        }
+        ALOGE("using allocator %u", mOutputBlockPool->getAllocatorId());
+
+        (void)mOutputBlockPool->fetchGraphicBlock(
                 mWidth, mHeight, format, usage, &mAllocatedBlock);
         ALOGE("provided (%dx%d) required (%dx%d)", mAllocatedBlock->width(), mAllocatedBlock->height(), mWidth, mHeight);
     }
