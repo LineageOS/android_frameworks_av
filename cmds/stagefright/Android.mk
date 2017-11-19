@@ -10,7 +10,7 @@ LOCAL_SRC_FILES:=       \
 LOCAL_SHARED_LIBRARIES := \
         libstagefright libmedia libmedia_omx libmediaextractor libutils libbinder \
         libstagefright_foundation libjpeg libui libgui libcutils liblog \
-        libhidlmemory \
+        libhidlbase \
         android.hardware.media.omx@1.0 \
 
 LOCAL_C_INCLUDES:= \

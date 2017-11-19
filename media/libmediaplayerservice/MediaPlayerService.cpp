@@ -741,26 +741,14 @@ sp<MediaPlayerBase> MediaPlayerService::Client::setDataSource_pre(
             new ServiceDeathNotifier(binder, p, MEDIAEXTRACTOR_PROCESS_DEATH);
     binder->linkToDeath(extractorDeathListener);
 
-    sp<ServiceDeathNotifier> codecDeathListener;
-    if (property_get_bool("persist.media.treble_omx", true)) {
-        // Treble IOmx
-        sp<IOmx> omx = IOmx::getService();
-        if (omx == nullptr) {
-            ALOGE("Treble IOmx not available");
-            return NULL;
-        }
-        codecDeathListener = new ServiceDeathNotifier(omx, p, MEDIACODEC_PROCESS_DEATH);
-        omx->linkToDeath(codecDeathListener, 0);
-    } else {
-        // Legacy IOMX
-        binder = sm->getService(String16("media.codec"));
-        if (binder == NULL) {
-            ALOGE("codec service not available");
-            return NULL;
-        }
-        codecDeathListener = new ServiceDeathNotifier(binder, p, MEDIACODEC_PROCESS_DEATH);
-        binder->linkToDeath(codecDeathListener);
+    sp<IOmx> omx = IOmx::getService();
+    if (omx == nullptr) {
+        ALOGE("IOmx service is not available");
+        return NULL;
     }
+    sp<ServiceDeathNotifier> codecDeathListener =
+            new ServiceDeathNotifier(omx, p, MEDIACODEC_PROCESS_DEATH);
+    omx->linkToDeath(codecDeathListener, 0);
 
     Mutex::Autolock lock(mLock);
 
@@ -1634,6 +1622,7 @@ MediaPlayerService::AudioOutput::AudioOutput(audio_session_t sessionId, uid_t ui
       mFlags(AUDIO_OUTPUT_FLAG_NONE),
       mVolumeHandler(new media::VolumeHandler()),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
+      mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE),
       mDeviceCallbackEnabled(false),
       mDeviceCallback(deviceCallback)
 {
@@ -2380,10 +2369,10 @@ status_t MediaPlayerService::AudioOutput::getRoutedDeviceId(audio_port_handle_t*
     ALOGV("getRoutedDeviceId");
     Mutex::Autolock lock(mLock);
     if (mTrack != 0) {
-        *deviceId = mTrack->getRoutedDeviceId();
-        return NO_ERROR;
+        mRoutedDeviceId = mTrack->getRoutedDeviceId();
     }
-    return NO_INIT;
+    *deviceId = mRoutedDeviceId;
+    return NO_ERROR;
 }
 
 status_t MediaPlayerService::AudioOutput::enableAudioDeviceCallback(bool enabled)

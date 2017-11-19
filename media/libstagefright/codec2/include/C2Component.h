@@ -250,7 +250,8 @@ public:
      * \retval C2_OK        the tunnel was successfully created
      * \retval C2_BAD_INDEX the target component does not exist
      * \retval C2_DUPLICATE the tunnel already exists
-     * \retval C2_UNSUPPORTED  the tunnel is not supported
+     * \retval C2_OMITTED   tunneling is not supported by this component
+     * \retval C2_CANNOT_DO the specific tunnel is not supported
      *
      * \retval C2_TIMED_OUT could not create the tunnel within the time limit (unexpected)
      * \retval C2_CORRUPTED some unknown error prevented the creation of the tunnel (unexpected)
@@ -271,6 +272,7 @@ public:
      * \retval C2_OK        the tunnel was marked for release successfully
      * \retval C2_BAD_INDEX the target component does not exist
      * \retval C2_NOT_FOUND the tunnel does not exist
+     * \retval C2_OMITTED   tunneling is not supported by this component
      *
      * \retval C2_TIMED_OUT could not mark the tunnel for release within the time limit (unexpected)
      * \retval C2_CORRUPTED some unknown error prevented the release of the tunnel (unexpected)
@@ -329,7 +331,7 @@ public:
      *
      * \retval C2_OK        the work was successfully queued
      * \retval C2_BAD_INDEX some component(s) in the work do(es) not exist
-     * \retval C2_UNSUPPORTED  the components are not tunneled
+     * \retval C2_CANNOT_DO the components are not tunneled
      *
      * \retval C2_NO_MEMORY not enough memory to queue the work
      * \retval C2_CORRUPTED some unknown error prevented queuing the work (unexpected)
@@ -346,7 +348,7 @@ public:
      *
      * \retval C2_OK        the work announcement has been successfully recorded
      * \retval C2_BAD_INDEX some component(s) in the work outline do(es) not exist
-     * \retval C2_UNSUPPORTED  the componentes are not tunneled
+     * \retval C2_CANNOT_DO the componentes are not tunneled
      *
      * \retval C2_NO_MEMORY not enough memory to record the work announcement
      * \retval C2_CORRUPTED some unknown error prevented recording the announcement (unexpected)
@@ -540,11 +542,9 @@ struct C2ComponentInfo {
 
 class C2AllocatorStore {
 public:
-    // TBD
+    typedef C2Allocator::id_t id_t;
 
-    typedef uint32_t ID;
-
-    enum ID_ : uint32_t {
+    enum : C2Allocator::id_t {
         DEFAULT_LINEAR,     ///< basic linear allocator type
         DEFAULT_GRAPHIC,    ///< basic graphic allocator type
         PLATFORM_START = 0x10,
@@ -552,7 +552,30 @@ public:
     };
 
     /**
-     * Creates an allocator.
+     * Returns the unique name of this allocator store.
+     *
+     * This method MUST be "non-blocking" and return within 1ms.
+     *
+     * \return the name of this allocator store.
+     * \retval an empty string if there was not enough memory to allocate the actual name.
+     */
+    virtual C2String getName() const = 0;
+
+    /**
+     * Returns the set of allocators supported by this allocator store.
+     *
+     * This method SHALL return within 1ms.
+     *
+     * \retval vector of allocator information (as shared pointers)
+     * \retval an empty vector if there was not enough memory to allocate the whole vector.
+     */
+    virtual std::vector<std::shared_ptr<const C2Allocator::Info>> listAllocators() const = 0;
+
+    /**
+     * Retrieves/creates a shared allocator object.
+     *
+     * The allocator is created on first use, and the same allocator is returned on subsequent
+     * concurrent uses in the same process. The allocator is freed when it is no longer referenced.
      *
      * \param id      the ID of the allocator to create. This is defined by the store, but
      *                the ID of the default linear and graphic allocators is formalized.
@@ -566,7 +589,7 @@ public:
      * \retval C2_NOT_FOUND no such allocator
      * \retval C2_NO_MEMORY not enough memory to create the allocator
      */
-    virtual C2Status createAllocator(ID id, std::shared_ptr<C2Allocator>* const allocator) = 0;
+    virtual C2Status getAllocator(id_t id, std::shared_ptr<C2Allocator>* const allocator) = 0;
 
     virtual ~C2AllocatorStore() = default;
 };

@@ -2408,7 +2408,7 @@ public:
             std::vector<std::unique_ptr<C2SettingResult>>* const failures) {
         (void)params;
         (void)failures;
-        return C2_UNSUPPORTED;
+        return C2_OMITTED;
     }
 
     virtual C2Status config_nb(
@@ -2416,12 +2416,12 @@ public:
             std::vector<std::unique_ptr<C2SettingResult>>* const failures) {
         (void)params;
         (void)failures;
-        return C2_UNSUPPORTED;
+        return C2_OMITTED;
     }
 
     virtual C2Status createTunnel_sm(node_id targetComponent) {
         (void)targetComponent;
-        return C2_UNSUPPORTED;
+        return C2_OMITTED;
     }
 
     virtual C2Status query_nb(
@@ -2468,7 +2468,7 @@ public:
 
     virtual C2Status releaseTunnel_sm(node_id targetComponent) {
         (void)targetComponent;
-        return C2_UNSUPPORTED;
+        return C2_OMITTED;
     }
 
     class MyParamReflector : public C2ParamReflector {

@@ -282,7 +282,7 @@ int C2AllocationIon::dup() const {
 C2AllocatorIon::C2AllocatorIon() : mInit(C2_OK), mIonFd(ion_open()) {
     if (mIonFd < 0) {
         switch (errno) {
-        case ENOENT:    mInit = C2_UNSUPPORTED; break;
+        case ENOENT:    mInit = C2_OMITTED; break;
         default:        mInit = c2_map_errno<EACCES>(errno); break;
         }
     }
@@ -294,7 +294,15 @@ C2AllocatorIon::~C2AllocatorIon() {
     }
 }
 
-C2Status C2AllocatorIon::allocateLinearBuffer(
+C2Allocator::id_t C2AllocatorIon::getId() const {
+    return 0; /// \todo implement ID
+}
+
+C2String C2AllocatorIon::getName() const {
+    return "android.allocator.ion";
+}
+
+C2Status C2AllocatorIon::newLinearAllocation(
         uint32_t capacity, C2MemoryUsage usage, std::shared_ptr<C2LinearAllocation> *allocation) {
     if (allocation == nullptr) {
         return C2_BAD_VALUE;
@@ -302,7 +310,7 @@ C2Status C2AllocatorIon::allocateLinearBuffer(
 
     allocation->reset();
     if (mInit != C2_OK) {
-        return C2_UNSUPPORTED;
+        return mInit;
     }
 
     // get align, heapMask and flags
@@ -328,11 +336,11 @@ C2Status C2AllocatorIon::allocateLinearBuffer(
     return ret;
 }
 
-C2Status C2AllocatorIon::recreateLinearBuffer(
+C2Status C2AllocatorIon::priorLinearAllocation(
         const C2Handle *handle, std::shared_ptr<C2LinearAllocation> *allocation) {
     *allocation = nullptr;
     if (mInit != C2_OK) {
-        return C2_UNSUPPORTED;
+        return mInit;
     }
 
     if (!C2HandleIon::isValid(handle)) {

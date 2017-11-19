@@ -26,8 +26,8 @@ namespace android {
 template<int N> constexpr C2Status _c2_errno2status_impl();
 template<> constexpr C2Status _c2_errno2status_impl<0>()       { return C2_OK; }
 template<> constexpr C2Status _c2_errno2status_impl<EINVAL>()  { return C2_BAD_VALUE; }
-template<> constexpr C2Status _c2_errno2status_impl<EACCES>()  { return C2_NO_PERMISSION; }
-template<> constexpr C2Status _c2_errno2status_impl<EPERM>()   { return C2_NO_PERMISSION; }
+template<> constexpr C2Status _c2_errno2status_impl<EACCES>()  { return C2_REFUSED; }
+template<> constexpr C2Status _c2_errno2status_impl<EPERM>()   { return C2_REFUSED; }
 template<> constexpr C2Status _c2_errno2status_impl<ENOMEM>()  { return C2_NO_MEMORY; }
 
 // map standard errno-s to the equivalent C2Status
