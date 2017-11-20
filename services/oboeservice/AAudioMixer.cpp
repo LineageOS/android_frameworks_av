@@ -49,7 +49,7 @@ void AAudioMixer::clear() {
     memset(mOutputBuffer, 0, mBufferSizeInBytes);
 }
 
-bool AAudioMixer::mix(int streamIndex, FifoBuffer *fifo, bool allowUnderflow) {
+int32_t AAudioMixer::mix(int streamIndex, FifoBuffer *fifo, bool allowUnderflow) {
     WrappingBuffer wrappingBuffer;
     float *destination = mOutputBuffer;
 
@@ -105,7 +105,7 @@ bool AAudioMixer::mix(int streamIndex, FifoBuffer *fifo, bool allowUnderflow) {
     ATRACE_END();
 #endif /* AAUDIO_MIXER_ATRACE_ENABLED */
 
-    return (framesLeft > 0); // did not get all the frames we needed, ie. "underflow"
+    return (framesDesired - framesLeft); // framesRead
 }
 
 void AAudioMixer::mixPart(float *destination, float *source, int32_t numFrames) {

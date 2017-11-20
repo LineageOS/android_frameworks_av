@@ -1,4 +1,4 @@
-/*
+ /*
  * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -80,7 +80,7 @@ public:
     }
 
     void incrementXRunCount() {
-        mXRunCount++;
+        sendXRunCount(++mXRunCount);
     }
 
     int32_t getXRunCount() const {

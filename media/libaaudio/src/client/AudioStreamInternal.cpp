@@ -490,6 +490,9 @@ aaudio_result_t AudioStreamInternal::onEventFromServer(AAudioServiceMessage *mes
             doSetVolume();
             ALOGD("%s - AAUDIO_SERVICE_EVENT_VOLUME %lf", __func__, message->event.dataDouble);
             break;
+        case AAUDIO_SERVICE_EVENT_XRUN:
+            mXRunCount = static_cast<int32_t>(message->event.dataLong);
+            break;
         default:
             ALOGE("%s - Unrecognized event = %d", __func__, (int) message->event.event);
             break;
