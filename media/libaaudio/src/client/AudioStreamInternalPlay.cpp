@@ -219,8 +219,7 @@ aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(const void *buff
             // Data conversion.
             float levelFrom;
             float levelTo;
-            bool ramping = mVolumeRamp.nextSegment(framesToWrite * getSamplesPerFrame(),
-                                                   &levelFrom, &levelTo);
+            bool ramping = mVolumeRamp.nextSegment(framesToWrite, &levelFrom, &levelTo);
             // The formats are validated when the stream is opened so we do not have to
             // check for illegal combinations here.
             // TODO factor this out into a utility function
