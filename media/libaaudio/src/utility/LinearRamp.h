@@ -87,7 +87,7 @@ private:
 
     std::atomic<float>   mTarget;
 
-    int32_t mLengthInFrames  = 48000 / 50; // 20 msec at 48000 Hz
+    int32_t mLengthInFrames  = 48000 / 100; // 10 msec at 48000 Hz
     int32_t mRemaining       = 0;
     float   mLevelFrom       = 0.0f;
     float   mLevelTo         = 0.0f;
