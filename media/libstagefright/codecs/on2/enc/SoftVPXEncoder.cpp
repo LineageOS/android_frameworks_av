@@ -821,6 +821,13 @@ void SoftVPXEncoder::onQueueFilled(OMX_U32 portIndex) {
             return;
         }
 
+        OMX_ERRORTYPE error = validateInputBuffer(inputBufferHeader, mWidth, mHeight);
+        if (error != OMX_ErrorNone) {
+            ALOGE("b/27569635");
+            android_errorWriteLog(0x534e4554, "27569635");
+            notify(OMX_EventError, error, 0, 0);
+            return;
+        }
         uint8_t *source =
             inputBufferHeader->pBuffer + inputBufferHeader->nOffset;
 
@@ -857,14 +864,6 @@ void SoftVPXEncoder::onQueueFilled(OMX_U32 portIndex) {
 
             CHECK_EQ(0, grmodule->unlock(grmodule, handle));
         } else {
-            if (inputBufferHeader->nFilledLen < frameSize) {
-                android_errorWriteLog(0x534e4554, "27569635");
-                notify(OMX_EventError, OMX_ErrorUndefined, 0, 0);
-                return;
-            } else if (inputBufferHeader->nFilledLen > frameSize) {
-                ALOGW("Input buffer contains too many pixels");
-            }
-
             if (mColorFormat == OMX_COLOR_FormatYUV420SemiPlanar) {
                 ConvertSemiPlanarToPlanar(
                         source, mConversionBuffer, mWidth, mHeight);

@@ -75,6 +75,10 @@ protected:
 
     PortInfo *editPortInfo(OMX_U32 portIndex);
 
+    OMX_ERRORTYPE validateInputBuffer(
+                  const OMX_BUFFERHEADERTYPE *inputBufferHeader,
+                  int32_t frameWidth, int32_t frameHeight);
+
 private:
     enum {
         kWhatSendCommand,
