@@ -16,17 +16,19 @@
 
 // Test various AAudio features including AAudioStream_setBufferSizeInFrames().
 
+#include <condition_variable>
+#include <mutex>
 #include <stdio.h>
-//#include <stdlib.h>
-//#include <math.h>
 
 #include <android-base/macros.h>
 #include <aaudio/AAudio.h>
 
 #include <gtest/gtest.h>
+#include <unistd.h>
+
 
 // Callback function that does nothing.
-aaudio_data_callback_result_t MyDataCallbackProc(
+aaudio_data_callback_result_t NoopDataCallbackProc(
         AAudioStream *stream,
         void *userData,
         void *audioData,
@@ -52,7 +54,7 @@ TEST(test_various, aaudio_stop_when_open) {
     ASSERT_EQ(AAUDIO_OK, AAudio_createStreamBuilder(&aaudioBuilder));
 
 // Request stream properties.
-    AAudioStreamBuilder_setDataCallback(aaudioBuilder, MyDataCallbackProc, nullptr);
+    AAudioStreamBuilder_setDataCallback(aaudioBuilder, NoopDataCallbackProc, nullptr);
     AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
 
 // Create an AAudioStream using the Builder.
@@ -85,7 +87,7 @@ TEST(test_various, aaudio_flush_when_started) {
     ASSERT_EQ(AAUDIO_OK, AAudio_createStreamBuilder(&aaudioBuilder));
 
 // Request stream properties.
-    AAudioStreamBuilder_setDataCallback(aaudioBuilder, MyDataCallbackProc, nullptr);
+    AAudioStreamBuilder_setDataCallback(aaudioBuilder, NoopDataCallbackProc, nullptr);
     AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
 
 // Create an AAudioStream using the Builder.
@@ -111,6 +113,7 @@ TEST(test_various, aaudio_flush_when_started) {
 
 //int main() { // To fix Android Studio formatting when editing.
 TEST(test_various, aaudio_set_buffer_size) {
+
     int32_t bufferCapacity;
     int32_t framesPerBurst = 0;
     int32_t actualSize = 0;
@@ -122,7 +125,7 @@ TEST(test_various, aaudio_set_buffer_size) {
     ASSERT_EQ(AAUDIO_OK, AAudio_createStreamBuilder(&aaudioBuilder));
 
     // Request stream properties.
-    AAudioStreamBuilder_setDataCallback(aaudioBuilder, MyDataCallbackProc, nullptr);
+    AAudioStreamBuilder_setDataCallback(aaudioBuilder, NoopDataCallbackProc, nullptr);
     AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
 
     // Create an AAudioStream using the Builder.
@@ -169,4 +172,156 @@ TEST(test_various, aaudio_set_buffer_size) {
 
     AAudioStream_close(aaudioStream);
     AAudioStreamBuilder_delete(aaudioBuilder);
+}
+
+
+// ************************************************************
+// Test to make sure that AAUDIO_CALLBACK_RESULT_STOP works.
+
+// Callback function that counts calls.
+aaudio_data_callback_result_t CallbackOnceProc(
+        AAudioStream *stream,
+        void *userData,
+        void *audioData,
+        int32_t numFrames
+) {
+    (void) stream;
+    (void) audioData;
+    (void) numFrames;
+
+    std::atomic<int32_t> *callbackCountPtr = (std::atomic<int32_t> *)userData;
+    (*callbackCountPtr)++;
+
+    return AAUDIO_CALLBACK_RESULT_STOP;
+}
+
+void checkCallbackOnce(aaudio_performance_mode_t perfMode) {
+
+    std::atomic<int32_t>   callbackCount{0};
+
+    AAudioStreamBuilder *aaudioBuilder = nullptr;
+    AAudioStream *aaudioStream = nullptr;
+
+    // Use an AAudioStreamBuilder to contain requested parameters.
+    ASSERT_EQ(AAUDIO_OK, AAudio_createStreamBuilder(&aaudioBuilder));
+
+    // Request stream properties.
+    AAudioStreamBuilder_setDataCallback(aaudioBuilder, CallbackOnceProc, &callbackCount);
+    AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, perfMode);
+
+    // Create an AAudioStream using the Builder.
+    ASSERT_EQ(AAUDIO_OK, AAudioStreamBuilder_openStream(aaudioBuilder, &aaudioStream));
+    AAudioStreamBuilder_delete(aaudioBuilder);
+
+    ASSERT_EQ(AAUDIO_OK, AAudioStream_requestStart(aaudioStream));
+
+    sleep(1); // Give callback a chance to run many times.
+
+    EXPECT_EQ(AAUDIO_OK, AAudioStream_requestStop(aaudioStream));
+
+    EXPECT_EQ(1, callbackCount.load()); // should stop after first call
+
+    EXPECT_EQ(AAUDIO_OK, AAudioStream_close(aaudioStream));
+}
+
+TEST(test_various, aaudio_callback_once_none) {
+    checkCallbackOnce(AAUDIO_PERFORMANCE_MODE_NONE);
+}
+
+TEST(test_various, aaudio_callback_once_lowlat) {
+    checkCallbackOnce(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+}
+
+// ************************************************************
+struct WakeUpCallbackData {
+    void wakeOther() {
+        // signal waiting test to wake up
+        {
+            std::lock_guard <std::mutex> lock(mutex);
+            finished = true;
+        }
+        conditionVariable.notify_one();
+    }
+
+    void waitForFinished() {
+        std::unique_lock <std::mutex> aLock(mutex);
+        conditionVariable.wait(aLock, [=] { return finished; });
+    }
+
+    // For signalling foreground test when callback finished
+    std::mutex              mutex;
+    std::condition_variable conditionVariable;
+    bool                    finished = false;
+};
+
+// Test to make sure we cannot call recursively into the system from a callback.
+struct DangerousData : public WakeUpCallbackData {
+    aaudio_result_t resultStart = AAUDIO_OK;
+    aaudio_result_t resultStop = AAUDIO_OK;
+    aaudio_result_t resultPause = AAUDIO_OK;
+    aaudio_result_t resultFlush = AAUDIO_OK;
+    aaudio_result_t resultClose = AAUDIO_OK;
+};
+
+// Callback function that tries to call back into the stream.
+aaudio_data_callback_result_t DangerousDataCallbackProc(
+        AAudioStream *stream,
+        void *userData,
+        void *audioData,
+        int32_t numFrames) {
+    (void) audioData;
+    (void) numFrames;
+
+    DangerousData *data = (DangerousData *)userData;
+    data->resultStart = AAudioStream_requestStart(stream);
+    data->resultStop = AAudioStream_requestStop(stream);
+    data->resultPause = AAudioStream_requestPause(stream);
+    data->resultFlush = AAudioStream_requestFlush(stream);
+    data->resultClose = AAudioStream_close(stream);
+
+    data->wakeOther();
+
+    return AAUDIO_CALLBACK_RESULT_STOP;
+}
+
+//int main() { // To fix Android Studio formatting when editing.
+void checkDangerousCallback(aaudio_performance_mode_t perfMode) {
+    DangerousData        dangerousData;
+    AAudioStreamBuilder *aaudioBuilder = nullptr;
+    AAudioStream        *aaudioStream = nullptr;
+
+    // Use an AAudioStreamBuilder to contain requested parameters.
+    ASSERT_EQ(AAUDIO_OK, AAudio_createStreamBuilder(&aaudioBuilder));
+
+    // Request stream properties.
+    AAudioStreamBuilder_setDataCallback(aaudioBuilder, DangerousDataCallbackProc, &dangerousData);
+    AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, perfMode);
+
+    // Create an AAudioStream using the Builder.
+    ASSERT_EQ(AAUDIO_OK, AAudioStreamBuilder_openStream(aaudioBuilder, &aaudioStream));
+    AAudioStreamBuilder_delete(aaudioBuilder);
+
+    ASSERT_EQ(AAUDIO_OK, AAudioStream_requestStart(aaudioStream));
+
+    dangerousData.waitForFinished();
+
+    EXPECT_EQ(AAUDIO_OK, AAudioStream_requestStop(aaudioStream));
+
+    EXPECT_EQ(AAUDIO_ERROR_INVALID_STATE, dangerousData.resultStart);
+    EXPECT_EQ(AAUDIO_ERROR_INVALID_STATE, dangerousData.resultStop);
+    EXPECT_EQ(AAUDIO_ERROR_INVALID_STATE, dangerousData.resultPause);
+    EXPECT_EQ(AAUDIO_ERROR_INVALID_STATE, dangerousData.resultFlush);
+    EXPECT_EQ(AAUDIO_ERROR_INVALID_STATE, dangerousData.resultClose);
+
+    EXPECT_EQ(AAUDIO_OK, AAudioStream_close(aaudioStream));
+}
+
+//int main() { // To fix Android Studio formatting when editing.
+
+TEST(test_various, aaudio_callback_blockers_none) {
+    checkDangerousCallback(AAUDIO_PERFORMANCE_MODE_NONE);
+}
+
+TEST(test_various, aaudio_callback_blockers_lowlat) {
+    checkDangerousCallback(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
 }
