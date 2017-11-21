@@ -670,4 +670,16 @@ SimpleSoftOMXComponent::PortInfo *SimpleSoftOMXComponent::editPortInfo(
     return &mPorts.editItemAt(portIndex);
 }
 
+OMX_ERRORTYPE SimpleSoftOMXComponent::validateInputBuffer(
+        const OMX_BUFFERHEADERTYPE *inputBufferHeader,
+        int32_t frameWidth, int32_t frameHeight) {
+    size_t frameSize = frameWidth * frameHeight * 3 / 2;
+    if (inputBufferHeader->nFilledLen < frameSize) {
+        return OMX_ErrorUndefined;
+    } else if (inputBufferHeader->nFilledLen > frameSize) {
+        ALOGW("Input buffer contains more data than expected.");
+    }
+    return OMX_ErrorNone;
+}
+
 }  // namespace android
