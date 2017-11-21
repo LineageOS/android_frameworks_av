@@ -2393,41 +2393,41 @@ typedef C2PortParam<C2Tuning, C2VideoConfigStruct> C2VideoConfigPortTuning;
 
 class MyComponentInstance : public C2ComponentInterface {
 public:
-    virtual C2String getName() const {
+    virtual C2String getName() const override {
         /// \todo this seems too specific
         return "sample.interface";
     };
 
-    virtual node_id getId() const {
+    virtual c2_node_id_t getId() const override {
         /// \todo how are these shared?
         return 0;
     }
 
-    virtual C2Status commit_sm(
+    virtual c2_status_t commit_sm(
             const std::vector<C2Param* const> &params,
-            std::vector<std::unique_ptr<C2SettingResult>>* const failures) {
+            std::vector<std::unique_ptr<C2SettingResult>>* const failures) override {
         (void)params;
         (void)failures;
         return C2_OMITTED;
     }
 
-    virtual C2Status config_nb(
+    virtual c2_status_t config_nb(
             const std::vector<C2Param* const> &params,
-            std::vector<std::unique_ptr<C2SettingResult>>* const failures) {
+            std::vector<std::unique_ptr<C2SettingResult>>* const failures) override {
         (void)params;
         (void)failures;
         return C2_OMITTED;
     }
 
-    virtual C2Status createTunnel_sm(node_id targetComponent) {
+    virtual c2_status_t createTunnel_sm(c2_node_id_t targetComponent) override {
         (void)targetComponent;
         return C2_OMITTED;
     }
 
-    virtual C2Status query_nb(
+    virtual c2_status_t query_nb(
             const std::vector<C2Param* const> &stackParams,
             const std::vector<C2Param::Index> &heapParamIndices,
-            std::vector<std::unique_ptr<C2Param>>* const heapParams) const {
+            std::vector<std::unique_ptr<C2Param>>* const heapParams) const override {
         for (C2Param* const param : stackParams) {
             if (!*param) { // param is already invalid - remember it
                 continue;
@@ -2466,7 +2466,7 @@ public:
         mMyParams.insert({mDomainInfo.type(), mDomainInfo});
     }
 
-    virtual C2Status releaseTunnel_sm(node_id targetComponent) {
+    virtual c2_status_t releaseTunnel_sm(c2_node_id_t targetComponent) override {
         (void)targetComponent;
         return C2_OMITTED;
     }
@@ -2477,7 +2477,7 @@ public:
     public:
         MyParamReflector(const MyComponentInstance *i) : instance(i) { }
 
-        virtual std::unique_ptr<C2StructDescriptor> describe(C2Param::BaseIndex paramIndex) {
+        virtual std::unique_ptr<C2StructDescriptor> describe(C2Param::BaseIndex paramIndex) override {
             switch (paramIndex.coreIndex()) {
             case decltype(instance->mDomainInfo)::coreIndex:
             default:
@@ -2490,8 +2490,8 @@ public:
         }
     };
 
-    virtual C2Status getSupportedValues(
-            std::vector<C2FieldSupportedValuesQuery> &fields) const {
+    virtual c2_status_t querySupportedValues_nb(
+            std::vector<C2FieldSupportedValuesQuery> &fields) const override {
         for (C2FieldSupportedValuesQuery &query : fields) {
             if (query.field == C2ParamField(&mDomainInfo, &C2ComponentDomainInfo::mValue)) {
                 query.values = C2FieldSupportedValues(
@@ -2508,22 +2508,20 @@ public:
         return C2_OK;
     }
 
-    virtual std::shared_ptr<C2ParamReflector> getParamReflector() const {
+    std::shared_ptr<C2ParamReflector> getParamReflector() const {
         return std::shared_ptr<C2ParamReflector>(new MyParamReflector(this));
     }
 
-    virtual C2Status getSupportedParams(std::vector<std::shared_ptr<C2ParamDescriptor>> * const params) const {
+    virtual c2_status_t querySupportedParams_nb(
+            std::vector<std::shared_ptr<C2ParamDescriptor>> * const params) const override {
         params->push_back(std::make_shared<C2ParamDescriptor>(
                 true /* required */, "_domain", &mDomainInfo));
-        return C2_OK;
-    }
-
-    C2Status getSupportedParams2(std::vector<std::shared_ptr<C2ParamDescriptor>> * const params) {
         params->push_back(std::shared_ptr<C2ParamDescriptor>(
                 new C2ParamDescriptor(true /* required */, "_domain", &mDomainInfo)));
         return C2_OK;
     }
 
+    virtual ~MyComponentInstance() override = default;
 };
 
 template<typename E, bool S=std::is_enum<E>::value>
@@ -2700,10 +2698,11 @@ void dumpDesc(const C2ParamDescriptor &pd) {
 
 TEST_F(C2ParamTest, ReflectorTest) {
     C2ComponentDomainInfo domainInfo;
-    std::shared_ptr<C2ComponentInterface> comp(new MyComponentInstance);
+    std::shared_ptr<MyComponentInstance> myComp(new MyComponentInstance);
+    std::shared_ptr<C2ComponentInterface> comp = myComp;
 
     std::unique_ptr<C2StructDescriptor> desc{
-        comp->getParamReflector()->describe(C2ComponentDomainInfo::indexFlags)};
+        myComp->getParamReflector()->describe(C2ComponentDomainInfo::indexFlags)};
     dumpStruct(*desc);
 
     std::vector<C2FieldSupportedValuesQuery> query = {
@@ -2714,7 +2713,7 @@ TEST_F(C2ParamTest, ReflectorTest) {
         C2FieldSupportedValuesQuery::Current(C2ParamField(&domainInfo, &C2ComponentDomainInfo::mValue)),
     };
 
-    EXPECT_EQ(C2_OK, comp->getSupportedValues(query));
+    EXPECT_EQ(C2_OK, comp->querySupportedValues_nb(query));
 
     for (const C2FieldSupportedValuesQuery &q : query) {
         dumpFSV(q.values, &domainInfo.mValue);

@@ -222,7 +222,7 @@ private:
     friend class C2ParamTest_ParamUtilsTest_Test;
 
 public:
-    static std::vector<C2String> getEnumValuesFromString(C2StringLiteral value) {
+    static std::vector<C2String> parseEnumValuesFromString(C2StringLiteral value) {
         std::vector<C2String> foundNames;
         size_t pos = 0, len = strlen(value);
         do {

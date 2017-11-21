@@ -23,17 +23,17 @@
 namespace android {
 
 // standard ERRNO mappings
-template<int N> constexpr C2Status _c2_errno2status_impl();
-template<> constexpr C2Status _c2_errno2status_impl<0>()       { return C2_OK; }
-template<> constexpr C2Status _c2_errno2status_impl<EINVAL>()  { return C2_BAD_VALUE; }
-template<> constexpr C2Status _c2_errno2status_impl<EACCES>()  { return C2_REFUSED; }
-template<> constexpr C2Status _c2_errno2status_impl<EPERM>()   { return C2_REFUSED; }
-template<> constexpr C2Status _c2_errno2status_impl<ENOMEM>()  { return C2_NO_MEMORY; }
+template<int N> constexpr c2_status_t _c2_errno2status_impl();
+template<> constexpr c2_status_t _c2_errno2status_impl<0>()       { return C2_OK; }
+template<> constexpr c2_status_t _c2_errno2status_impl<EINVAL>()  { return C2_BAD_VALUE; }
+template<> constexpr c2_status_t _c2_errno2status_impl<EACCES>()  { return C2_REFUSED; }
+template<> constexpr c2_status_t _c2_errno2status_impl<EPERM>()   { return C2_REFUSED; }
+template<> constexpr c2_status_t _c2_errno2status_impl<ENOMEM>()  { return C2_NO_MEMORY; }
 
-// map standard errno-s to the equivalent C2Status
+// map standard errno-s to the equivalent c2_status_t
 template<int... N> struct _c2_map_errno_impl;
 template<int E, int ... N> struct _c2_map_errno_impl<E, N...> {
-    static C2Status map(int result) {
+    static c2_status_t map(int result) {
         if (result == E) {
             return _c2_errno2status_impl <E>();
         } else {
@@ -42,13 +42,13 @@ template<int E, int ... N> struct _c2_map_errno_impl<E, N...> {
     }
 };
 template<> struct _c2_map_errno_impl<> {
-    static C2Status map(int result) {
+    static c2_status_t map(int result) {
         return result == 0 ? C2_OK : C2_CORRUPTED;
     }
 };
 
 template<int... N>
-C2Status c2_map_errno(int result) {
+c2_status_t c2_map_errno(int result) {
     return _c2_map_errno_impl<N...>::map(result);
 }
 

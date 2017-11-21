@@ -75,14 +75,9 @@ struct C2SettingResult {
 //  WORK
 // ================================================================================================
 
-// node_id-s
-typedef uint32_t node_id;
-
-enum flags_t : uint32_t {
-    BUFFERFLAG_CODEC_CONFIG  = (1 << 0),
-    BUFFERFLAG_DROP_FRAME    = (1 << 1),
-    BUFFERFLAG_END_OF_STREAM = (1 << 2),
-};
+// c2_node_id_t-s
+typedef uint32_t c2_node_id_t;
+typedef c2_node_id_t c2_node_id_t;
 
 enum {
     kParamIndexWorkOrdinal,
@@ -101,6 +96,12 @@ struct C2WorkOrdinalStruct {
 
 struct C2BufferPack {
 //public:
+    enum flags_t : uint32_t {
+        FLAG_CODEC_CONFIG  = (1 << 0),
+        FLAG_DROP_FRAME    = (1 << 1),
+        FLAG_END_OF_STREAM = (1 << 2),
+    };
+
     flags_t  flags;
     C2WorkOrdinalStruct ordinal;
     std::vector<std::shared_ptr<C2Buffer>> buffers;
@@ -113,7 +114,7 @@ struct C2BufferPack {
 struct C2Worklet {
 //public:
     // IN
-    node_id component;
+    c2_node_id_t component;
 
     std::list<std::unique_ptr<C2Param>> tunings; //< tunings to be applied before processing this
                                                  // worklet
@@ -165,13 +166,13 @@ struct C2Work {
     std::list<std::unique_ptr<C2Worklet>> worklets;
 
     uint32_t worklets_processed;
-    C2Status result;
+    c2_status_t result;
 };
 
 struct C2WorkOutline {
 //public:
     C2WorkOrdinalStruct ordinal;
-    std::list<node_id> chain;
+    std::list<c2_node_id_t> chain;
 };
 
 /// @}

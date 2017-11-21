@@ -66,7 +66,7 @@ enum {
  * mitigate binary breaks by adhering to the following conventions:
  *
  * - at most one vtable with placeholder virtual methods
- * - all optional/placeholder virtual methods returning a C2Status, with C2_OMITTED not requiring
+ * - all optional/placeholder virtual methods returning a c2_status_t, with C2_OMITTED not requiring
  *   any update to input/output arguments.
  * - limiting symbol export of inline methods
  * - use of pimpl (or shared-pimpl)
@@ -106,9 +106,9 @@ typedef std::string C2String;
 typedef const char *C2StringLiteral;
 
 /**
- * C2Status: status codes used.
+ * c2_status_t: status codes used.
  */
-enum C2Status : int32_t {
+enum c2_status_t : int32_t {
 
 /*
  * Use android status constants if available. Otherwise, define the android status constants as
