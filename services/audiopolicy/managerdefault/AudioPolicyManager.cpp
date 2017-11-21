@@ -926,37 +926,29 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
     }
 
     if (profile != 0) {
-        sp<SwAudioOutputDescriptor> outputDesc = NULL;
-
         for (size_t i = 0; i < mOutputs.size(); i++) {
             sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
             if (!desc->isDuplicated() && (profile == desc->mProfile)) {
-                outputDesc = desc;
                 // reuse direct output if currently open by the same client
                 // and configured with same parameters
-                if ((config->sample_rate == outputDesc->mSamplingRate) &&
-                    audio_formats_match(config->format, outputDesc->mFormat) &&
-                    (config->channel_mask == outputDesc->mChannelMask)) {
-                  if (session == outputDesc->mDirectClientSession) {
-                      outputDesc->mDirectOpenCount++;
-                      ALOGV("getOutputForDevice() reusing direct output %d for session %d",
-                            mOutputs.keyAt(i), session);
-                      return mOutputs.keyAt(i);
-                  } else {
-                      ALOGV("getOutputForDevice() do not reuse direct output because"
-                              "current client (%d) is not the same as requesting client (%d)",
-                            outputDesc->mDirectClientSession, session);
-                      goto non_direct_output;
-                  }
+                if ((config->sample_rate == desc->mSamplingRate) &&
+                    audio_formats_match(config->format, desc->mFormat) &&
+                    (config->channel_mask == desc->mChannelMask) &&
+                    (session == desc->mDirectClientSession)) {
+                    desc->mDirectOpenCount++;
+                    ALOGV("getOutputForDevice() reusing direct output %d for session %d",
+                        mOutputs.keyAt(i), session);
+                    return mOutputs.keyAt(i);
                 }
             }
         }
-        // close direct output if currently open and configured with different parameters
-        if (outputDesc != NULL) {
-            closeOutput(outputDesc->mIoHandle);
+
+        if (!profile->canOpenNewIo()) {
+            goto non_direct_output;
         }
 
-        outputDesc = new SwAudioOutputDescriptor(profile, mpClientInterface);
+        sp<SwAudioOutputDescriptor> outputDesc =
+                new SwAudioOutputDescriptor(profile, mpClientInterface);
         status = outputDesc->open(config, device, String8(""), stream, flags, &output);
 
         // only accept an output with the requested parameters
@@ -1114,6 +1106,13 @@ status_t AudioPolicyManager::startOutput(audio_io_handle_t output,
 
     sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueAt(index);
 
+    if (!outputDesc->isActive()) {
+        if (!outputDesc->mProfile->canStartNewIo()) {
+            return INVALID_OPERATION;
+        }
+        outputDesc->mProfile->curActiveCount++;
+    }
+
     // Routing?
     mOutputRoutes.incRouteActivity(session);
 
@@ -1141,6 +1140,12 @@ status_t AudioPolicyManager::startOutput(audio_io_handle_t output,
 
     if (status != NO_ERROR) {
         mOutputRoutes.decRouteActivity(session);
+        if (!outputDesc->isActive()) {
+            LOG_ALWAYS_FATAL_IF(outputDesc->mProfile->curActiveCount < 1,
+                                "%s invalid profile active count %u",
+                                __FUNCTION__, outputDesc->mProfile->curActiveCount);
+            outputDesc->mProfile->curActiveCount--;
+        }
         return status;
     }
     // Automatically enable the remote submix input when output is started on a re routing mix
@@ -1329,7 +1334,15 @@ status_t AudioPolicyManager::stopOutput(audio_io_handle_t output,
         }
     }
 
-    return stopSource(outputDesc, stream, forceDeviceUpdate);
+    status_t status = stopSource(outputDesc, stream, forceDeviceUpdate);
+
+    if (status == NO_ERROR && !outputDesc->isActive()) {
+        LOG_ALWAYS_FATAL_IF(outputDesc->mProfile->curActiveCount < 1,
+                            "%s invalid profile active count %u",
+                            __FUNCTION__, outputDesc->mProfile->curActiveCount);
+        outputDesc->mProfile->curActiveCount--;
+    }
+    return status;
 }
 
 status_t AudioPolicyManager::stopSource(const sp<AudioOutputDescriptor>& outputDesc,
@@ -1715,6 +1728,10 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
     }
 #endif
 
+    if (!profile->canOpenNewIo()) {
+        return AUDIO_IO_HANDLE_NONE;
+    }
+
     sp<AudioInputDescriptor> inputDesc = new AudioInputDescriptor(profile, mpClientInterface);
 
     audio_config_t lConfig = AUDIO_CONFIG_INITIALIZER;
@@ -1952,6 +1969,13 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
         setInputDevice(input, device, true /* force */);
 
         if (inputDesc->getAudioSessionCount(true/*activeOnly*/) == 1) {
+            if (!inputDesc->mProfile->canStartNewIo()) {
+                mInputRoutes.decRouteActivity(session);
+                audioSession->changeActiveCount(-1);
+                return INVALID_OPERATION;
+            }
+            inputDesc->mProfile->curActiveCount++;
+
             // if input maps to a dynamic policy with an activity listener, notify of state change
             if ((inputDesc->mPolicyMix != NULL)
                     && ((inputDesc->mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
@@ -2021,6 +2045,11 @@ status_t AudioPolicyManager::stopInput(audio_io_handle_t input,
         if (inputDesc->isActive()) {
             setInputDevice(input, getNewInputDevice(inputDesc), false /* force */);
         } else {
+            LOG_ALWAYS_FATAL_IF(inputDesc->mProfile->curActiveCount < 1,
+                                "%s invalid profile active count %u",
+                                __FUNCTION__, inputDesc->mProfile->curActiveCount);
+            inputDesc->mProfile->curActiveCount--;
+
             // if input maps to a dynamic policy with an activity listener, notify of state change
             if ((inputDesc->mPolicyMix != NULL)
                     && ((inputDesc->mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
@@ -3578,6 +3607,12 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
         {
             const sp<IOProfile> outProfile = mHwModules[i]->mOutputProfiles[j];
 
+            if (!outProfile->canOpenNewIo()) {
+                ALOGE("Invalid Output profile max open count %u for profile %s",
+                      outProfile->maxOpenCount, outProfile->getTagName().c_str());
+                continue;
+            }
+
             if (!outProfile->hasSupportedDevices()) {
                 ALOGW("Output profile contains no device on module %s", mHwModules[i]->getName());
                 continue;
@@ -3640,6 +3675,12 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
         for (size_t j = 0; j < mHwModules[i]->mInputProfiles.size(); j++)
         {
             const sp<IOProfile> inProfile = mHwModules[i]->mInputProfiles[j];
+
+            if (!inProfile->canOpenNewIo()) {
+                ALOGE("Invalid Input profile max open count %u for profile %s",
+                      inProfile->maxOpenCount, inProfile->getTagName().c_str());
+                continue;
+            }
 
             if (!inProfile->hasSupportedDevices()) {
                 ALOGW("Input profile contains no device on module %s", mHwModules[i]->getName());
@@ -3848,6 +3889,12 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                 continue;
             }
 
+            if (!profile->canOpenNewIo()) {
+                ALOGW("Max Output number %u already opened for this profile %s",
+                      profile->maxOpenCount, profile->getTagName().c_str());
+                continue;
+            }
+
             ALOGV("opening output for device %08x with params %s profile %p name %s",
                   device, address.string(), profile.get(), profile->getName().string());
             desc = new SwAudioOutputDescriptor(profile, mpClientInterface);
@@ -4053,6 +4100,7 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
         for (ssize_t profile_index = 0; profile_index < (ssize_t)profiles.size(); profile_index++) {
 
             sp<IOProfile> profile = profiles[profile_index];
+
             // nothing to do if one input is already opened for this profile
             size_t input_index;
             for (input_index = 0; input_index < mInputs.size(); input_index++) {
@@ -4065,6 +4113,12 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
                 }
             }
             if (input_index != mInputs.size()) {
+                continue;
+            }
+
+            if (!profile->canOpenNewIo()) {
+                ALOGW("Max Input number %u already opened for this profile %s",
+                      profile->maxOpenCount, profile->getTagName().c_str());
                 continue;
             }
 

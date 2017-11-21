@@ -236,6 +236,7 @@ status_t AudioInputDescriptor::open(const audio_config_t *config,
         mFormat = lConfig.format;
         mId = AudioPort::getNextUniqueId();
         mIoHandle = *input;
+        mProfile->curOpenCount++;
     }
 
     return status;
@@ -246,6 +247,10 @@ void AudioInputDescriptor::close()
 {
     if (mIoHandle != AUDIO_IO_HANDLE_NONE) {
         mClientInterface->closeInput(mIoHandle);
+        LOG_ALWAYS_FATAL_IF(mProfile->curOpenCount < 1, "%s profile open count %u",
+                            __FUNCTION__, mProfile->curOpenCount);
+        mProfile->curOpenCount--;
+        mIoHandle = AUDIO_IO_HANDLE_NONE;
     }
 }
 
