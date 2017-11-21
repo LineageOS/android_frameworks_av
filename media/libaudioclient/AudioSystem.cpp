@@ -20,6 +20,7 @@
 #include <utils/Log.h>
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
+#include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
 #include <media/IAudioFlinger.h>
 #include <media/IAudioPolicyService.h>
@@ -252,6 +253,31 @@ int AudioSystem::logToLinear(float volume)
     // return v;
     return volume ? 100 - int(dBConvertInverse * log(volume) + 0.5) : 0;
 }
+
+/* static */ size_t AudioSystem::calculateMinFrameCount(
+        uint32_t afLatencyMs, uint32_t afFrameCount, uint32_t afSampleRate,
+        uint32_t sampleRate, float speed /*, uint32_t notificationsPerBufferReq*/)
+{
+    // Ensure that buffer depth covers at least audio hardware latency
+    uint32_t minBufCount = afLatencyMs / ((1000 * afFrameCount) / afSampleRate);
+    if (minBufCount < 2) {
+        minBufCount = 2;
+    }
+#if 0
+    // The notificationsPerBufferReq parameter is not yet used for non-fast tracks,
+    // but keeping the code here to make it easier to add later.
+    if (minBufCount < notificationsPerBufferReq) {
+        minBufCount = notificationsPerBufferReq;
+    }
+#endif
+    ALOGV("calculateMinFrameCount afLatency %u  afFrameCount %u  afSampleRate %u  "
+            "sampleRate %u  speed %f  minBufCount: %u" /*"  notificationsPerBufferReq %u"*/,
+            afLatencyMs, afFrameCount, afSampleRate, sampleRate, speed, minBufCount
+            /*, notificationsPerBufferReq*/);
+    return minBufCount * sourceFramesNeededWithTimestretch(
+            sampleRate, afFrameCount, afSampleRate, speed);
+}
+
 
 status_t AudioSystem::getOutputSamplingRate(uint32_t* samplingRate, audio_stream_type_t streamType)
 {

@@ -24,6 +24,8 @@
 #include <utils/RefBase.h>
 #include <utils/Errors.h>
 #include <binder/IInterface.h>
+#include <binder/Parcel.h>
+#include <media/AudioClient.h>
 #include <media/IAudioTrack.h>
 #include <media/IAudioFlingerClient.h>
 #include <system/audio.h>
@@ -44,6 +46,135 @@ class IAudioFlinger : public IInterface
 public:
     DECLARE_META_INTERFACE(AudioFlinger);
 
+    /* CreateTrackInput contains all input arguments sent by AudioTrack to AudioFlinger
+     * when calling createTrack() including arguments that will be updated by AudioFlinger
+     * and returned in CreateTrackOutput object
+     */
+    class CreateTrackInput {
+    public:
+        status_t readFromParcel(Parcel *parcel) {
+            /* input arguments*/
+            memset(&attr, 0, sizeof(audio_attributes_t));
+            if (parcel->read(&attr, sizeof(audio_attributes_t)) != NO_ERROR) {
+                return DEAD_OBJECT;
+            }
+            attr.tags[AUDIO_ATTRIBUTES_TAGS_MAX_SIZE -1] = '\0';
+            memset(&config, 0, sizeof(audio_config_t));
+            if (parcel->read(&config, sizeof(audio_config_t)) != NO_ERROR) {
+                return DEAD_OBJECT;
+            }
+            (void)clientInfo.readFromParcel(parcel);
+            if (parcel->readInt32() != 0) {
+                sharedBuffer = interface_cast<IMemory>(parcel->readStrongBinder());
+                if (sharedBuffer == 0 || sharedBuffer->pointer() == NULL) {
+                    return BAD_VALUE;
+                }
+            }
+            notificationsPerBuffer = parcel->readInt32();
+            speed = parcel->readFloat();
+
+            /* input/output arguments*/
+            (void)parcel->read(&flags, sizeof(audio_output_flags_t));
+            frameCount = parcel->readInt64();
+            notificationFrameCount = parcel->readInt64();
+            (void)parcel->read(&selectedDeviceId, sizeof(audio_port_handle_t));
+            (void)parcel->read(&sessionId, sizeof(audio_session_t));
+            return NO_ERROR;
+        }
+
+        status_t writeToParcel(Parcel *parcel) const {
+            /* input arguments*/
+            (void)parcel->write(&attr, sizeof(audio_attributes_t));
+            (void)parcel->write(&config, sizeof(audio_config_t));
+            (void)clientInfo.writeToParcel(parcel);
+            if (sharedBuffer != 0) {
+                (void)parcel->writeInt32(1);
+                (void)parcel->writeStrongBinder(IInterface::asBinder(sharedBuffer));
+            } else {
+                (void)parcel->writeInt32(0);
+            }
+            (void)parcel->writeInt32(notificationsPerBuffer);
+            (void)parcel->writeFloat(speed);
+
+            /* input/output arguments*/
+            (void)parcel->write(&flags, sizeof(audio_output_flags_t));
+            (void)parcel->writeInt64(frameCount);
+            (void)parcel->writeInt64(notificationFrameCount);
+            (void)parcel->write(&selectedDeviceId, sizeof(audio_port_handle_t));
+            (void)parcel->write(&sessionId, sizeof(audio_session_t));
+            return NO_ERROR;
+        }
+
+        /* input */
+        audio_attributes_t attr;
+        audio_config_t config;
+        AudioClient clientInfo;
+        sp<IMemory> sharedBuffer;
+        uint32_t notificationsPerBuffer;
+        float speed;
+
+        /* input/output */
+        audio_output_flags_t flags;
+        size_t frameCount;
+        size_t notificationFrameCount;
+        audio_port_handle_t selectedDeviceId;
+        audio_session_t sessionId;
+    };
+
+    /* CreateTrackOutput contains all output arguments returned by AudioFlinger to AudioTrack
+     * when calling createTrack() including arguments that were passed as I/O for update by
+     * CreateTrackInput.
+     */
+    class CreateTrackOutput {
+    public:
+        status_t readFromParcel(Parcel *parcel) {
+            /* input/output arguments*/
+            (void)parcel->read(&flags, sizeof(audio_output_flags_t));
+            frameCount = parcel->readInt64();
+            notificationFrameCount = parcel->readInt64();
+            (void)parcel->read(&selectedDeviceId, sizeof(audio_port_handle_t));
+            (void)parcel->read(&sessionId, sizeof(audio_session_t));
+
+            /* output arguments*/
+            sampleRate = parcel->readUint32();
+            afFrameCount = parcel->readInt64();
+            afSampleRate = parcel->readInt64();
+            afLatencyMs = parcel->readInt32();
+            (void)parcel->read(&outputId, sizeof(audio_io_handle_t));
+            return NO_ERROR;
+        }
+
+        status_t writeToParcel(Parcel *parcel) const {
+            /* input/output arguments*/
+            (void)parcel->write(&flags, sizeof(audio_output_flags_t));
+            (void)parcel->writeInt64(frameCount);
+            (void)parcel->writeInt64(notificationFrameCount);
+            (void)parcel->write(&selectedDeviceId, sizeof(audio_port_handle_t));
+            (void)parcel->write(&sessionId, sizeof(audio_session_t));
+
+            /* output arguments*/
+            (void)parcel->writeUint32(sampleRate);
+            (void)parcel->writeInt64(afFrameCount);
+            (void)parcel->writeInt64(afSampleRate);
+            (void)parcel->writeInt32(afLatencyMs);
+            (void)parcel->write(&outputId, sizeof(audio_io_handle_t));
+            return NO_ERROR;
+        }
+
+        /* input/output */
+        audio_output_flags_t flags;
+        size_t frameCount;
+        size_t notificationFrameCount;
+        audio_port_handle_t selectedDeviceId;
+        audio_session_t sessionId;
+
+        /* output */
+        uint32_t sampleRate;
+        size_t   afFrameCount;
+        uint32_t afSampleRate;
+        uint32_t afLatencyMs;
+        audio_io_handle_t outputId;
+    };
 
     // invariant on exit for all APIs that return an sp<>:
     //   (return value != 0) == (*status == NO_ERROR)
@@ -51,24 +182,9 @@ public:
     /* create an audio track and registers it with AudioFlinger.
      * return null if the track cannot be created.
      */
-    virtual sp<IAudioTrack> createTrack(
-                                audio_stream_type_t streamType,
-                                uint32_t sampleRate,
-                                audio_format_t format,
-                                audio_channel_mask_t channelMask,
-                                size_t *pFrameCount,
-                                audio_output_flags_t *flags,
-                                const sp<IMemory>& sharedBuffer,
-                                // On successful return, AudioFlinger takes over the handle
-                                // reference and will release it when the track is destroyed.
-                                // However on failure, the client is responsible for release.
-                                audio_io_handle_t output,
-                                pid_t pid,
-                                pid_t tid,  // -1 means unused, otherwise must be valid non-0
-                                audio_session_t *sessionId,
-                                int clientUid,
-                                status_t *status,
-                                audio_port_handle_t portId) = 0;
+    virtual sp<IAudioTrack> createTrack(const CreateTrackInput& input,
+                                        CreateTrackOutput& output,
+                                        status_t *status) = 0;
 
     virtual sp<media::IAudioRecord> openRecord(
                                 // On successful return, AudioFlinger takes over the handle
