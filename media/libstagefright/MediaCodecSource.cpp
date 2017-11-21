@@ -643,7 +643,9 @@ void MediaCodecSource::signalEOS(status_t err) {
 
     if (mStopping && reachedEOS) {
         ALOGI("encoder (%s) stopped", mIsVideo ? "video" : "audio");
-        mPuller->stopSource();
+        if (mPuller != NULL) {
+            mPuller->stopSource();
+        }
         ALOGV("source (%s) stopped", mIsVideo ? "video" : "audio");
         // posting reply to everyone that's waiting
         List<sp<AReplyToken>>::iterator it;
