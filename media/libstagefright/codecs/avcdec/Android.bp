@@ -74,9 +74,9 @@ cc_library_shared {
         misc_undefined: [
             "signed-integer-overflow",
         ],
-        cfi: true,
+        cfi: false, // true,
         diag: {
-            cfi: true,
+            cfi: false, // true,
         },
     },
 

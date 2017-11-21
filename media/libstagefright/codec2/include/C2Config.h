@@ -61,13 +61,15 @@ enum C2ParamIndexKind : C2Param::ParamIndex {
     kParamIndexMime,
     kParamIndexStreamCount,
     kParamIndexFormat,
+    kParamIndexBlockPools,
+
+    kParamIndexMaxVideoSizeHint,
+    kParamIndexVideoSizeTuning,
 
     // video info
 
     kParamIndexStructStart = 0x1,
     kParamIndexVideoSize,
-    kParamIndexMaxVideoSizeHint,
-    kParamIndexVideoSizeTuning,
 
     kParamIndexParamStart = 0x800,
 };
@@ -124,6 +126,8 @@ C2ENUM(C2FormatKind, uint32_t,
 )
 
 typedef C2StreamParam<C2Tuning, C2Uint32Value, kParamIndexFormat> C2StreamFormatConfig;
+
+typedef C2PortParam<C2Tuning, C2Uint64Array, kParamIndexBlockPools> C2PortBlockPoolsTuning;
 
 /*
    Component description fields:

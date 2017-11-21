@@ -118,6 +118,7 @@ private:
     // TODO: C2StreamMimeConfig mInputStreamMime;
     // TODO: C2StreamMimeConfig mOutputStreamMime;
     C2StreamFormatConfig::input mInputStreamFormat;
+    std::unique_ptr<C2PortBlockPoolsTuning::output> mOutputBlockPools;
     C2StreamFormatConfig::output mOutputStreamFormat;
     C2VideoSizeStreamInfo::output mVideoSize;
     C2MaxVideoSizeHintPortSetting::input mMaxVideoSizeHint;
@@ -138,6 +139,7 @@ private:
     std::vector<std::shared_ptr<C2ParamDescriptor>> mParamDescs;
 
     void updateSupportedValues();
+    friend class C2SoftAvcDec;
 };
 
 class C2SoftAvcDec
@@ -191,6 +193,7 @@ private:
 
     const std::shared_ptr<C2SoftAvcDecIntf> mIntf;
     const std::shared_ptr<C2ComponentListener> mListener;
+    std::shared_ptr<C2BlockPool> mOutputBlockPool;
 
     std::mutex mQueueLock;
     std::condition_variable mQueueCond;

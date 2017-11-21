@@ -18,6 +18,7 @@
 #ifndef ANDROID_AUDIO_CLIENT_H
 #define ANDROID_AUDIO_CLIENT_H
 
+#include <binder/Parcel.h>
 #include <system/audio.h>
 #include <utils/String16.h>
 
@@ -26,11 +27,28 @@ namespace android {
 class AudioClient {
  public:
     AudioClient() :
-        clientUid(-1), clientPid(-1), packageName("") {}
+        clientUid(-1), clientPid(-1), clientTid(-1), packageName("") {}
 
     uid_t clientUid;
     pid_t clientPid;
+    pid_t clientTid;
     String16 packageName;
+
+    status_t readFromParcel(Parcel *parcel) {
+        clientUid = parcel->readInt32();
+        clientPid = parcel->readInt32();
+        clientTid = parcel->readInt32();
+        packageName = parcel->readString16();
+        return NO_ERROR;
+    }
+
+    status_t writeToParcel(Parcel *parcel) const {
+        parcel->writeInt32(clientUid);
+        parcel->writeInt32(clientPid);
+        parcel->writeInt32(clientTid);
+        parcel->writeString16(packageName);
+        return NO_ERROR;
+    }
 };
 
 }; // namespace android

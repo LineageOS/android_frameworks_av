@@ -106,6 +106,9 @@ public:
 
     static float linearToLog(int volume);
     static int logToLinear(float volume);
+    static size_t calculateMinFrameCount(
+            uint32_t afLatencyMs, uint32_t afFrameCount, uint32_t afSampleRate,
+            uint32_t sampleRate, float speed /*, uint32_t notificationsPerBufferReq*/);
 
     // Returned samplingRate and frameCount output values are guaranteed
     // to be non-zero if status == NO_ERROR
@@ -209,8 +212,6 @@ public:
     static status_t setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config);
     static audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage);
 
-    // Client must successfully hand off the handle reference to AudioFlinger via createTrack(),
-    // or release it with releaseOutput().
     static status_t getOutputForAttr(const audio_attributes_t *attr,
                                      audio_io_handle_t *output,
                                      audio_session_t session,

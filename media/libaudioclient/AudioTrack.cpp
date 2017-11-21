@@ -99,32 +99,6 @@ static inline float adjustPitch(float pitch)
     return kFixPitch ? AUDIO_TIMESTRETCH_PITCH_NORMAL : pitch;
 }
 
-// Must match similar computation in createTrack_l in Threads.cpp.
-// TODO: Move to a common library
-static size_t calculateMinFrameCount(
-        uint32_t afLatencyMs, uint32_t afFrameCount, uint32_t afSampleRate,
-        uint32_t sampleRate, float speed /*, uint32_t notificationsPerBufferReq*/)
-{
-    // Ensure that buffer depth covers at least audio hardware latency
-    uint32_t minBufCount = afLatencyMs / ((1000 * afFrameCount) / afSampleRate);
-    if (minBufCount < 2) {
-        minBufCount = 2;
-    }
-#if 0
-    // The notificationsPerBufferReq parameter is not yet used for non-fast tracks,
-    // but keeping the code here to make it easier to add later.
-    if (minBufCount < notificationsPerBufferReq) {
-        minBufCount = notificationsPerBufferReq;
-    }
-#endif
-    ALOGV("calculateMinFrameCount afLatency %u  afFrameCount %u  afSampleRate %u  "
-            "sampleRate %u  speed %f  minBufCount: %u" /*"  notificationsPerBufferReq %u"*/,
-            afLatencyMs, afFrameCount, afSampleRate, sampleRate, speed, minBufCount
-            /*, notificationsPerBufferReq*/);
-    return minBufCount * sourceFramesNeededWithTimestretch(
-            sampleRate, afFrameCount, afSampleRate, speed);
-}
-
 // static
 status_t AudioTrack::getMinFrameCount(
         size_t* frameCount,
@@ -165,8 +139,8 @@ status_t AudioTrack::getMinFrameCount(
 
     // When called from createTrack, speed is 1.0f (normal speed).
     // This is rechecked again on setting playback rate (TODO: on setting sample rate, too).
-    *frameCount = calculateMinFrameCount(afLatency, afFrameCount, afSampleRate, sampleRate, 1.0f
-            /*, 0 notificationsPerBufferReq*/);
+    *frameCount = AudioSystem::calculateMinFrameCount(afLatency, afFrameCount, afSampleRate,
+                                              sampleRate, 1.0f /*, 0 notificationsPerBufferReq*/);
 
     // The formula above should always produce a non-zero value under normal circumstances:
     // AudioTrack.SAMPLE_RATE_HZ_MIN <= sampleRate <= AudioTrack.SAMPLE_RATE_HZ_MAX.
@@ -190,8 +164,7 @@ AudioTrack::AudioTrack()
       mPreviousSchedulingGroup(SP_DEFAULT),
       mPausedPosition(0),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
-      mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE),
-      mPortId(AUDIO_PORT_HANDLE_NONE)
+      mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE)
 {
     mAttributes.content_type = AUDIO_CONTENT_TYPE_UNKNOWN;
     mAttributes.usage = AUDIO_USAGE_UNKNOWN;
@@ -222,8 +195,7 @@ AudioTrack::AudioTrack(
       mState(STATE_STOPPED),
       mPreviousPriority(ANDROID_PRIORITY_NORMAL),
       mPreviousSchedulingGroup(SP_DEFAULT),
-      mPausedPosition(0),
-      mPortId(AUDIO_PORT_HANDLE_NONE)
+      mPausedPosition(0)
 {
     mStatus = set(streamType, sampleRate, format, channelMask,
             frameCount, flags, cbf, user, notificationFrames,
@@ -254,8 +226,7 @@ AudioTrack::AudioTrack(
       mPreviousPriority(ANDROID_PRIORITY_NORMAL),
       mPreviousSchedulingGroup(SP_DEFAULT),
       mPausedPosition(0),
-      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
-      mPortId(AUDIO_PORT_HANDLE_NONE)
+      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE)
 {
     mStatus = set(streamType, sampleRate, format, channelMask,
             0 /*frameCount*/, flags, cbf, user, notificationFrames,
@@ -320,6 +291,7 @@ status_t AudioTrack::set(
 
     mThreadCanCallJava = threadCanCallJava;
     mSelectedDeviceId = selectedDeviceId;
+    mSessionId = sessionId;
 
     switch (transferType) {
     case TRANSFER_DEFAULT:
@@ -500,11 +472,6 @@ status_t AudioTrack::set(
                 notificationFrames, minNotificationsPerBuffer, maxNotificationsPerBuffer);
     }
     mNotificationFramesAct = 0;
-    if (sessionId == AUDIO_SESSION_ALLOCATE) {
-        mSessionId = (audio_session_t) AudioSystem::newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
-    } else {
-        mSessionId = sessionId;
-    }
     int callingpid = IPCThreadState::self()->getCallingPid();
     int mypid = getpid();
     if (uid == AUDIO_UID_INVALID || (callingpid != mypid)) {
@@ -1317,70 +1284,12 @@ status_t AudioTrack::createTrack_l()
         return NO_INIT;
     }
 
-    audio_io_handle_t output;
-    audio_stream_type_t streamType = mStreamType;
-    audio_attributes_t *attr = (mStreamType == AUDIO_STREAM_DEFAULT) ? &mAttributes : NULL;
+    status_t status;
     bool callbackAdded = false;
 
+    {
     // mFlags (not mOrigFlags) is modified depending on whether fast request is accepted.
     // After fast request is denied, we will request again if IAudioTrack is re-created.
-
-    status_t status;
-    audio_config_t config = AUDIO_CONFIG_INITIALIZER;
-    config.sample_rate = mSampleRate;
-    config.channel_mask = mChannelMask;
-    config.format = mFormat;
-    config.offload_info = mOffloadInfoCopy;
-    mRoutedDeviceId = mSelectedDeviceId;
-    status = AudioSystem::getOutputForAttr(attr, &output,
-                                           mSessionId, &streamType, mClientUid,
-                                           &config,
-                                           mFlags, &mRoutedDeviceId, &mPortId);
-
-    if (status != NO_ERROR || output == AUDIO_IO_HANDLE_NONE) {
-        ALOGE("Could not get audio output for session %d, stream type %d, usage %d, sample rate %u,"
-              " format %#x, channel mask %#x, flags %#x",
-              mSessionId, streamType, mAttributes.usage, mSampleRate, mFormat, mChannelMask,
-              mFlags);
-        return BAD_VALUE;
-    }
-    {
-    // Now that we have a reference to an I/O handle and have not yet handed it off to AudioFlinger,
-    // we must release it ourselves if anything goes wrong.
-
-    // Not all of these values are needed under all conditions, but it is easier to get them all
-    status = AudioSystem::getLatency(output, &mAfLatency);
-    if (status != NO_ERROR) {
-        ALOGE("getLatency(%d) failed status %d", output, status);
-        goto release;
-    }
-    ALOGV("createTrack_l() output %d afLatency %u", output, mAfLatency);
-
-    status = AudioSystem::getFrameCount(output, &mAfFrameCount);
-    if (status != NO_ERROR) {
-        ALOGE("getFrameCount(output=%d) status %d", output, status);
-        goto release;
-    }
-
-    // TODO consider making this a member variable if there are other uses for it later
-    size_t afFrameCountHAL;
-    status = AudioSystem::getFrameCountHAL(output, &afFrameCountHAL);
-    if (status != NO_ERROR) {
-        ALOGE("getFrameCountHAL(output=%d) status %d", output, status);
-        goto release;
-    }
-    ALOG_ASSERT(afFrameCountHAL > 0);
-
-    status = AudioSystem::getSamplingRate(output, &mAfSampleRate);
-    if (status != NO_ERROR) {
-        ALOGE("getSamplingRate(output=%d) status %d", output, status);
-        goto release;
-    }
-    if (mSampleRate == 0) {
-        mSampleRate = mAfSampleRate;
-        mOriginalSampleRate = mAfSampleRate;
-    }
-
     // Client can only express a preference for FAST.  Server will perform additional tests.
     if (mFlags & AUDIO_OUTPUT_FLAG_FAST) {
         // either of these use cases:
@@ -1394,129 +1303,77 @@ status_t AudioTrack::createTrack_l()
             // use case 4: synchronous write
             ((mTransfer == TRANSFER_SYNC) && mThreadCanCallJava);
 
-        bool useCaseAllowed = sharedBuffer || transferAllowed;
-        if (!useCaseAllowed) {
+        bool fastAllowed = sharedBuffer || transferAllowed;
+        if (!fastAllowed) {
             ALOGW("AUDIO_OUTPUT_FLAG_FAST denied by client, not shared buffer and transfer = %s",
                   convertTransferToText(mTransfer));
-        }
-
-        // sample rates must also match
-        bool sampleRateAllowed = mSampleRate == mAfSampleRate;
-        if (!sampleRateAllowed) {
-            ALOGW("AUDIO_OUTPUT_FLAG_FAST denied by client, sample rate %u Hz but HAL needs %u Hz",
-                  mSampleRate, mAfSampleRate);
-        }
-
-        bool fastAllowed = useCaseAllowed && sampleRateAllowed;
-        if (!fastAllowed) {
             mFlags = (audio_output_flags_t) (mFlags & ~AUDIO_OUTPUT_FLAG_FAST);
         }
     }
 
-    mNotificationFramesAct = mNotificationFramesReq;
-
-    size_t frameCount = mReqFrameCount;
-    if (!audio_has_proportional_frames(mFormat)) {
-
-        if (mSharedBuffer != 0) {
-            // Same comment as below about ignoring frameCount parameter for set()
-            frameCount = mSharedBuffer->size();
-        } else if (frameCount == 0) {
-            frameCount = mAfFrameCount;
-        }
-        if (mNotificationFramesAct != frameCount) {
-            mNotificationFramesAct = frameCount;
-        }
-    } else if (mSharedBuffer != 0) {
-        // FIXME: Ensure client side memory buffers need
-        // not have additional alignment beyond sample
-        // (e.g. 16 bit stereo accessed as 32 bit frame).
-        size_t alignment = audio_bytes_per_sample(mFormat);
-        if (alignment & 1) {
-            // for AUDIO_FORMAT_PCM_24_BIT_PACKED (not exposed through Java).
-            alignment = 1;
-        }
-        if (mChannelCount > 1) {
-            // More than 2 channels does not require stronger alignment than stereo
-            alignment <<= 1;
-        }
-        if (((uintptr_t)mSharedBuffer->pointer() & (alignment - 1)) != 0) {
-            ALOGE("Invalid buffer alignment: address %p, channel count %u",
-                    mSharedBuffer->pointer(), mChannelCount);
-            status = BAD_VALUE;
-            goto release;
-        }
-
-        // When initializing a shared buffer AudioTrack via constructors,
-        // there's no frameCount parameter.
-        // But when initializing a shared buffer AudioTrack via set(),
-        // there _is_ a frameCount parameter.  We silently ignore it.
-        frameCount = mSharedBuffer->size() / mFrameSize;
+    IAudioFlinger::CreateTrackInput input;
+    if (mStreamType != AUDIO_STREAM_DEFAULT) {
+        stream_type_to_audio_attributes(mStreamType, &input.attr);
     } else {
-        size_t minFrameCount = 0;
-        // For fast tracks the frame count calculations and checks are mostly done by server,
-        // but we try to respect the application's request for notifications per buffer.
-        if (mFlags & AUDIO_OUTPUT_FLAG_FAST) {
-            if (mNotificationsPerBufferReq > 0) {
-                // Avoid possible arithmetic overflow during multiplication.
-                // mNotificationsPerBuffer is clamped to a small integer earlier, so it is unlikely.
-                if (mNotificationsPerBufferReq > SIZE_MAX / afFrameCountHAL) {
-                    ALOGE("Requested notificationPerBuffer=%u ignored for HAL frameCount=%zu",
-                            mNotificationsPerBufferReq, afFrameCountHAL);
-                } else {
-                    minFrameCount = afFrameCountHAL * mNotificationsPerBufferReq;
-                }
-            }
-        } else {
-            // for normal tracks precompute the frame count based on speed.
-            const float speed = !isPurePcmData_l() || isOffloadedOrDirect_l() ? 1.0f :
-                            max(mMaxRequiredSpeed, mPlaybackRate.mSpeed);
-            minFrameCount = calculateMinFrameCount(
-                    mAfLatency, mAfFrameCount, mAfSampleRate, mSampleRate,
-                    speed /*, 0 mNotificationsPerBufferReq*/);
-        }
-        if (frameCount < minFrameCount) {
-            frameCount = minFrameCount;
-        }
+        input.attr = mAttributes;
     }
-
-    audio_output_flags_t flags = mFlags;
-
-    pid_t tid = -1;
+    input.config = AUDIO_CONFIG_INITIALIZER;
+    input.config.sample_rate = mSampleRate;
+    input.config.channel_mask = mChannelMask;
+    input.config.format = mFormat;
+    input.config.offload_info = mOffloadInfoCopy;
+    input.clientInfo.clientUid = mClientUid;
+    input.clientInfo.clientPid = mClientPid;
+    input.clientInfo.clientTid = -1;
     if (mFlags & AUDIO_OUTPUT_FLAG_FAST) {
         // It is currently meaningless to request SCHED_FIFO for a Java thread.  Even if the
         // application-level code follows all non-blocking design rules, the language runtime
         // doesn't also follow those rules, so the thread will not benefit overall.
         if (mAudioTrackThread != 0 && !mThreadCanCallJava) {
-            tid = mAudioTrackThread->getTid();
+            input.clientInfo.clientTid = mAudioTrackThread->getTid();
         }
     }
+    input.sharedBuffer = mSharedBuffer;
+    input.notificationsPerBuffer = mNotificationsPerBufferReq;
+    input.speed = 1.0;
+    if (audio_has_proportional_frames(mFormat) && mSharedBuffer == 0 &&
+            (mFlags & AUDIO_OUTPUT_FLAG_FAST) == 0) {
+        input.speed  = !isPurePcmData_l() || isOffloadedOrDirect_l() ? 1.0f :
+                        max(mMaxRequiredSpeed, mPlaybackRate.mSpeed);
+    }
+    input.flags = mFlags;
+    input.frameCount = mReqFrameCount;
+    input.notificationFrameCount = mNotificationFramesReq;
+    input.selectedDeviceId = mSelectedDeviceId;
+    input.sessionId = mSessionId;
 
-    size_t temp = frameCount;   // temp may be replaced by a revised value of frameCount,
-                                // but we will still need the original value also
-    audio_session_t originalSessionId = mSessionId;
-    sp<IAudioTrack> track = audioFlinger->createTrack(streamType,
-                                                      mSampleRate,
-                                                      mFormat,
-                                                      mChannelMask,
-                                                      &temp,
-                                                      &flags,
-                                                      mSharedBuffer,
+    IAudioFlinger::CreateTrackOutput output;
+
+    sp<IAudioTrack> track = audioFlinger->createTrack(input,
                                                       output,
-                                                      mClientPid,
-                                                      tid,
-                                                      &mSessionId,
-                                                      mClientUid,
-                                                      &status,
-                                                      mPortId);
-    ALOGE_IF(originalSessionId != AUDIO_SESSION_ALLOCATE && mSessionId != originalSessionId,
-            "session ID changed from %d to %d", originalSessionId, mSessionId);
+                                                      &status);
 
-    if (status != NO_ERROR) {
-        ALOGE("AudioFlinger could not create track, status: %d", status);
-        goto release;
+    if (status != NO_ERROR || output.outputId == AUDIO_IO_HANDLE_NONE) {
+        ALOGE("AudioFlinger could not create track, status: %d output %d", status, output.outputId);
+        goto error;
     }
     ALOG_ASSERT(track != 0);
+
+    mFrameCount = output.frameCount;
+    mNotificationFramesAct = (uint32_t)output.notificationFrameCount;
+    mRoutedDeviceId = output.selectedDeviceId;
+    mSessionId = output.sessionId;
+
+    mSampleRate = output.sampleRate;
+    if (mOriginalSampleRate == 0) {
+        mOriginalSampleRate = mSampleRate;
+    }
+
+    mAfFrameCount = output.afFrameCount;
+    mAfSampleRate = output.afSampleRate;
+    mAfLatency = output.afLatencyMs;
+
+    mLatency = mAfLatency + (1000LL * mFrameCount) / mSampleRate;
 
     // AudioFlinger now owns the reference to the I/O handle,
     // so we are no longer responsible for releasing it.
@@ -1526,13 +1383,13 @@ status_t AudioTrack::createTrack_l()
     if (iMem == 0) {
         ALOGE("Could not get control block");
         status = NO_INIT;
-        goto release;
+        goto error;
     }
     void *iMemPointer = iMem->pointer();
     if (iMemPointer == NULL) {
         ALOGE("Could not get control block pointer");
         status = NO_INIT;
-        goto release;
+        goto error;
     }
     // invariant that mAudioTrack != 0 is true only after set() returns successfully
     if (mAudioTrack != 0) {
@@ -1545,75 +1402,33 @@ status_t AudioTrack::createTrack_l()
 
     audio_track_cblk_t* cblk = static_cast<audio_track_cblk_t*>(iMemPointer);
     mCblk = cblk;
-    // note that temp is the (possibly revised) value of frameCount
-    if (temp < frameCount || (frameCount == 0 && temp == 0)) {
-        // In current design, AudioTrack client checks and ensures frame count validity before
-        // passing it to AudioFlinger so AudioFlinger should not return a different value except
-        // for fast track as it uses a special method of assigning frame count.
-        ALOGW("Requested frameCount %zu but received frameCount %zu", frameCount, temp);
-    }
-    frameCount = temp;
 
     mAwaitBoost = false;
     if (mFlags & AUDIO_OUTPUT_FLAG_FAST) {
-        if (flags & AUDIO_OUTPUT_FLAG_FAST) {
-            ALOGI("AUDIO_OUTPUT_FLAG_FAST successful; frameCount %zu -> %zu", frameCount, temp);
+        if (output.flags & AUDIO_OUTPUT_FLAG_FAST) {
+            ALOGI("AUDIO_OUTPUT_FLAG_FAST successful; frameCount %zu -> %zu",
+                  mReqFrameCount, mFrameCount);
             if (!mThreadCanCallJava) {
                 mAwaitBoost = true;
             }
         } else {
-            ALOGW("AUDIO_OUTPUT_FLAG_FAST denied by server; frameCount %zu -> %zu", frameCount,
-                    temp);
+            ALOGW("AUDIO_OUTPUT_FLAG_FAST denied by server; frameCount %zu -> %zu", mReqFrameCount,
+                  mFrameCount);
         }
     }
-    mFlags = flags;
-
-    // Make sure that application is notified with sufficient margin before underrun.
-    // The client can divide the AudioTrack buffer into sub-buffers,
-    // and expresses its desire to server as the notification frame count.
-    if (mSharedBuffer == 0 && audio_is_linear_pcm(mFormat)) {
-        size_t maxNotificationFrames;
-        if (mFlags & AUDIO_OUTPUT_FLAG_FAST) {
-            // notify every HAL buffer, regardless of the size of the track buffer
-            maxNotificationFrames = afFrameCountHAL;
-        } else {
-            // For normal tracks, use at least double-buffering if no sample rate conversion,
-            // or at least triple-buffering if there is sample rate conversion
-            const int nBuffering = mOriginalSampleRate == mAfSampleRate ? 2 : 3;
-            maxNotificationFrames = frameCount / nBuffering;
-            // If client requested a fast track but this was denied, then use the smaller maximum.
-            // FMS_20 is the minimum task wakeup period in ms for which CFS operates reliably.
-#define FMS_20 20   // FIXME share a common declaration with the same symbol in Threads.cpp
-            if (mOrigFlags & AUDIO_OUTPUT_FLAG_FAST) {
-                size_t maxNotificationFramesFastDenied = FMS_20 * mSampleRate / 1000;
-                if (maxNotificationFrames > maxNotificationFramesFastDenied) {
-                    maxNotificationFrames = maxNotificationFramesFastDenied;
-                }
-            }
-        }
-        if (mNotificationFramesAct == 0 || mNotificationFramesAct > maxNotificationFrames) {
-            if (mNotificationFramesAct == 0) {
-                ALOGD("Client defaulted notificationFrames to %zu for frameCount %zu",
-                    maxNotificationFrames, frameCount);
-            } else {
-                ALOGW("Client adjusted notificationFrames from %u to %zu for frameCount %zu",
-                    mNotificationFramesAct, maxNotificationFrames, frameCount);
-            }
-            mNotificationFramesAct = (uint32_t) maxNotificationFrames;
-        }
-    }
+    mFlags = output.flags;
 
     //mOutput != output includes the case where mOutput == AUDIO_IO_HANDLE_NONE for first creation
-    if (mDeviceCallback != 0 && mOutput != output) {
+    if (mDeviceCallback != 0 && mOutput != output.outputId) {
         if (mOutput != AUDIO_IO_HANDLE_NONE) {
             AudioSystem::removeAudioDeviceCallback(this, mOutput);
         }
-        AudioSystem::addAudioDeviceCallback(this, output);
+        AudioSystem::addAudioDeviceCallback(this, output.outputId);
         callbackAdded = true;
     }
 
     // We retain a copy of the I/O handle, but don't own the reference
-    mOutput = output;
+    mOutput = output.outputId;
     mRefreshRemaining = true;
 
     // Starting address of buffers in shared memory.  If there is a shared buffer, buffers
@@ -1628,18 +1443,16 @@ status_t AudioTrack::createTrack_l()
         if (buffers == NULL) {
             ALOGE("Could not get buffer pointer");
             status = NO_INIT;
-            goto release;
+            goto error;
         }
     }
 
     mAudioTrack->attachAuxEffect(mAuxEffectId);
-    mFrameCount = frameCount;
-    updateLatency_l();  // this refetches mAfLatency and sets mLatency
 
     // If IAudioTrack is re-created, don't let the requested frameCount
     // decrease.  This can confuse clients that cache frameCount().
-    if (frameCount > mReqFrameCount) {
-        mReqFrameCount = frameCount;
+    if (mFrameCount > mReqFrameCount) {
+        mReqFrameCount = mFrameCount;
     }
 
     // reset server position to 0 as we have new cblk.
@@ -1648,9 +1461,9 @@ status_t AudioTrack::createTrack_l()
     // update proxy
     if (mSharedBuffer == 0) {
         mStaticProxy.clear();
-        mProxy = new AudioTrackClientProxy(cblk, buffers, frameCount, mFrameSize);
+        mProxy = new AudioTrackClientProxy(cblk, buffers, mFrameCount, mFrameSize);
     } else {
-        mStaticProxy = new StaticAudioTrackClientProxy(cblk, buffers, frameCount, mFrameSize);
+        mStaticProxy = new StaticAudioTrackClientProxy(cblk, buffers, mFrameCount, mFrameSize);
         mProxy = mStaticProxy;
     }
 
@@ -1676,8 +1489,7 @@ status_t AudioTrack::createTrack_l()
     return NO_ERROR;
     }
 
-release:
-    AudioSystem::releaseOutput(output, streamType, mSessionId);
+error:
     if (callbackAdded) {
         // note: mOutput is always valid is callbackAdded is true
         AudioSystem::removeAudioDeviceCallback(this, mOutput);
@@ -1685,6 +1497,8 @@ release:
     if (status == NO_ERROR) {
         status = NO_INIT;
     }
+
+    // sp<IAudioTrack> track destructor will cause releaseOutput() to be called by AudioFlinger
     return status;
 }
 
@@ -2420,8 +2234,8 @@ bool AudioTrack::isSampleRateSpeedAllowed_l(uint32_t sampleRate, float speed)
         return true; // static tracks do not have issues with buffer sizing.
     }
     const size_t minFrameCount =
-            calculateMinFrameCount(mAfLatency, mAfFrameCount, mAfSampleRate, sampleRate, speed
-                /*, 0 mNotificationsPerBufferReq*/);
+            AudioSystem::calculateMinFrameCount(mAfLatency, mAfFrameCount, mAfSampleRate,
+                                            sampleRate, speed /*, 0 mNotificationsPerBufferReq*/);
     const bool allowed = mFrameCount >= minFrameCount;
     ALOGD_IF(!allowed,
             "isSampleRateSpeedAllowed_l denied "

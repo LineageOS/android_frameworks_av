@@ -95,9 +95,7 @@ private:
     sp<IProducerListener> mProducerListener;
 
     std::shared_ptr<C2Allocator> mAllocIon;
-    std::shared_ptr<C2Allocator> mAllocGralloc;
     std::shared_ptr<C2BlockPool> mLinearPool;
-    std::shared_ptr<C2BlockPool> mGraphicPool;
 
     std::mutex mQueueLock;
     std::condition_variable mQueueCondition;
@@ -145,10 +143,7 @@ SimplePlayer::SimplePlayer()
 
     std::shared_ptr<C2AllocatorStore> store = GetCodec2PlatformAllocatorStore();
     CHECK_EQ(store->getAllocator(C2AllocatorStore::DEFAULT_LINEAR, &mAllocIon), C2_OK);
-    CHECK_EQ(store->getAllocator(C2AllocatorStore::DEFAULT_GRAPHIC, &mAllocGralloc), C2_OK);
-
     mLinearPool = std::make_shared<C2BasicLinearBlockPool>(mAllocIon);
-    mGraphicPool = std::make_shared<C2BasicGraphicBlockPool>(mAllocGralloc);
 
     mControl = mComposerClient->createSurface(
             String8("A Surface"),
@@ -214,6 +209,10 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
     }
 
     std::shared_ptr<C2Component> component(std::make_shared<C2SoftAvcDec>("avc", 0, mListener));
+    std::unique_ptr<C2PortBlockPoolsTuning::output> pools =
+        C2PortBlockPoolsTuning::output::alloc_unique({ (uint64_t)C2BlockPool::BASIC_GRAPHIC });
+    std::vector<std::unique_ptr<C2SettingResult>> result;
+    (void)component->intf()->config_nb({pools.get()}, &result);
     component->start();
 
     for (int i = 0; i < 8; ++i) {
@@ -343,7 +342,6 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
         work->input.buffers.emplace_back(new LinearBuffer(block));
         work->worklets.clear();
         work->worklets.emplace_back(new C2Worklet);
-        work->worklets.front()->allocators.emplace_back(mGraphicPool);
 
         std::list<std::unique_ptr<C2Work>> items;
         items.push_back(std::move(work));

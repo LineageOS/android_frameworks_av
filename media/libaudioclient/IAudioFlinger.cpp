@@ -95,83 +95,38 @@ public:
     {
     }
 
-    virtual sp<IAudioTrack> createTrack(
-                                audio_stream_type_t streamType,
-                                uint32_t sampleRate,
-                                audio_format_t format,
-                                audio_channel_mask_t channelMask,
-                                size_t *pFrameCount,
-                                audio_output_flags_t *flags,
-                                const sp<IMemory>& sharedBuffer,
-                                audio_io_handle_t output,
-                                pid_t pid,
-                                pid_t tid,
-                                audio_session_t *sessionId,
-                                int clientUid,
-                                status_t *status,
-                                audio_port_handle_t portId)
+    virtual sp<IAudioTrack> createTrack(const CreateTrackInput& input,
+                                        CreateTrackOutput& output,
+                                        status_t *status)
     {
         Parcel data, reply;
         sp<IAudioTrack> track;
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
-        data.writeInt32((int32_t) streamType);
-        data.writeInt32(sampleRate);
-        data.writeInt32(format);
-        data.writeInt32(channelMask);
-        size_t frameCount = pFrameCount != NULL ? *pFrameCount : 0;
-        data.writeInt64(frameCount);
-        audio_output_flags_t lFlags = flags != NULL ? *flags : AUDIO_OUTPUT_FLAG_NONE;
-        data.writeInt32(lFlags);
-        // haveSharedBuffer
-        if (sharedBuffer != 0) {
-            data.writeInt32(true);
-            data.writeStrongBinder(IInterface::asBinder(sharedBuffer));
-        } else {
-            data.writeInt32(false);
+
+        if (status == nullptr) {
+            return track;
         }
-        data.writeInt32((int32_t) output);
-        data.writeInt32((int32_t) pid);
-        data.writeInt32((int32_t) tid);
-        audio_session_t lSessionId = AUDIO_SESSION_ALLOCATE;
-        if (sessionId != NULL) {
-            lSessionId = *sessionId;
-        }
-        data.writeInt32(lSessionId);
-        data.writeInt32(clientUid);
-        data.writeInt32(portId);
+
+        input.writeToParcel(&data);
+
         status_t lStatus = remote()->transact(CREATE_TRACK, data, &reply);
         if (lStatus != NO_ERROR) {
-            ALOGE("createTrack error: %s", strerror(-lStatus));
-        } else {
-            frameCount = reply.readInt64();
-            if (pFrameCount != NULL) {
-                *pFrameCount = frameCount;
-            }
-            lFlags = (audio_output_flags_t)reply.readInt32();
-            if (flags != NULL) {
-                *flags = lFlags;
-            }
-            lSessionId = (audio_session_t) reply.readInt32();
-            if (sessionId != NULL) {
-                *sessionId = lSessionId;
-            }
-            lStatus = reply.readInt32();
-            track = interface_cast<IAudioTrack>(reply.readStrongBinder());
-            if (lStatus == NO_ERROR) {
-                if (track == 0) {
-                    ALOGE("createTrack should have returned an IAudioTrack");
-                    lStatus = UNKNOWN_ERROR;
-                }
-            } else {
-                if (track != 0) {
-                    ALOGE("createTrack returned an IAudioTrack but with status %d", lStatus);
-                    track.clear();
-                }
-            }
+            ALOGE("createTrack transaction error %d", lStatus);
+            *status = DEAD_OBJECT;
+            return track;
         }
-        if (status != NULL) {
-            *status = lStatus;
+        *status = reply.readInt32();
+        if (*status != NO_ERROR) {
+            ALOGE("createTrack returned error %d", *status);
+            return track;
         }
+        track = interface_cast<IAudioTrack>(reply.readStrongBinder());
+        if (track == 0) {
+            ALOGE("createTrack returned an NULL IAudioTrack with status OK");
+            *status = DEAD_OBJECT;
+            return track;
+        }
+        output.readFromParcel(&reply);
         return track;
     }
 
@@ -970,41 +925,27 @@ status_t BnAudioFlinger::onTransact(
     switch (code) {
         case CREATE_TRACK: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
-            int streamType = data.readInt32();
-            uint32_t sampleRate = data.readInt32();
-            audio_format_t format = (audio_format_t) data.readInt32();
-            audio_channel_mask_t channelMask = data.readInt32();
-            size_t frameCount = data.readInt64();
-            audio_output_flags_t flags = (audio_output_flags_t) data.readInt32();
-            bool haveSharedBuffer = data.readInt32() != 0;
-            sp<IMemory> buffer;
-            if (haveSharedBuffer) {
-                buffer = interface_cast<IMemory>(data.readStrongBinder());
+
+            CreateTrackInput input;
+            if (input.readFromParcel((Parcel*)&data) != NO_ERROR) {
+                reply->writeInt32(DEAD_OBJECT);
+                return NO_ERROR;
             }
-            audio_io_handle_t output = (audio_io_handle_t) data.readInt32();
-            pid_t pid = (pid_t) data.readInt32();
-            pid_t tid = (pid_t) data.readInt32();
-            audio_session_t sessionId = (audio_session_t) data.readInt32();
-            int clientUid = data.readInt32();
-            audio_port_handle_t portId = (audio_port_handle_t) data.readInt32();
-            status_t status = NO_ERROR;
-            sp<IAudioTrack> track;
-            if ((haveSharedBuffer && (buffer == 0)) ||
-                    ((buffer != 0) && (buffer->pointer() == NULL))) {
-                ALOGW("CREATE_TRACK: cannot retrieve shared memory");
-                status = DEAD_OBJECT;
-            } else {
-                track = createTrack(
-                        (audio_stream_type_t) streamType, sampleRate, format,
-                        channelMask, &frameCount, &flags, buffer, output, pid, tid,
-                        &sessionId, clientUid, &status, portId);
-                LOG_ALWAYS_FATAL_IF((track != 0) != (status == NO_ERROR));
-            }
-            reply->writeInt64(frameCount);
-            reply->writeInt32(flags);
-            reply->writeInt32(sessionId);
+
+            status_t status;
+            CreateTrackOutput output;
+
+            sp<IAudioTrack> track= createTrack(input,
+                                               output,
+                                               &status);
+
+            LOG_ALWAYS_FATAL_IF((track != 0) != (status == NO_ERROR));
             reply->writeInt32(status);
+            if (status != NO_ERROR) {
+                return NO_ERROR;
+            }
             reply->writeStrongBinder(IInterface::asBinder(track));
+            output.writeToParcel(reply);
             return NO_ERROR;
         } break;
         case OPEN_RECORD: {

@@ -34,6 +34,12 @@ using android::IAAudioService;
 
 namespace aaudio {
 
+    // These are intended to be outside the range of what is normally encountered.
+    // TODO MAXes should probably be much bigger.
+    constexpr int32_t MIN_FRAMES_PER_BURST = 16; // arbitrary
+    constexpr int32_t MAX_FRAMES_PER_BURST = 16 * 1024;  // arbitrary
+    constexpr int32_t MAX_BUFFER_CAPACITY_IN_FRAMES = 32 * 1024;  // arbitrary
+
 // A stream that talks to the AAudioService or directly to a HAL.
 class AudioStreamInternal : public AudioStream {
 
@@ -141,7 +147,7 @@ protected:
     AudioEndpoint            mAudioEndpoint;   // source for reads or sink for writes
     aaudio_handle_t          mServiceStreamHandle; // opaque handle returned from service
 
-    int32_t                  mFramesPerBurst;     // frames per HAL transfer
+    int32_t                  mFramesPerBurst = MIN_FRAMES_PER_BURST; // frames per HAL transfer
     int32_t                  mXRunCount = 0;      // how many underrun events?
 
     // Offset from underlying frame position.

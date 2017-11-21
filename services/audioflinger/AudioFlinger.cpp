@@ -641,38 +641,52 @@ void AudioFlinger::unregisterWriter(const sp<NBLog::Writer>& writer)
 
 // IAudioFlinger interface
 
-
-sp<IAudioTrack> AudioFlinger::createTrack(
-        audio_stream_type_t streamType,
-        uint32_t sampleRate,
-        audio_format_t format,
-        audio_channel_mask_t channelMask,
-        size_t *frameCount,
-        audio_output_flags_t *flags,
-        const sp<IMemory>& sharedBuffer,
-        audio_io_handle_t output,
-        pid_t pid,
-        pid_t tid,
-        audio_session_t *sessionId,
-        int clientUid,
-        status_t *status,
-        audio_port_handle_t portId)
+sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
+                                          CreateTrackOutput& output,
+                                          status_t *status)
 {
     sp<PlaybackThread::Track> track;
     sp<TrackHandle> trackHandle;
     sp<Client> client;
     status_t lStatus;
-    audio_session_t lSessionId;
+    audio_stream_type_t streamType;
+    audio_port_handle_t portId;
 
+    bool updatePid = (input.clientInfo.clientPid == -1);
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
-    if (pid == -1 || !isTrustedCallingUid(callingUid)) {
+    uid_t clientUid = input.clientInfo.clientUid;
+    if (!isTrustedCallingUid(callingUid)) {
+        ALOGW_IF(clientUid != callingUid,
+                "%s uid %d tried to pass itself off as %d",
+                __FUNCTION__, callingUid, clientUid);
+        clientUid = callingUid;
+        updatePid = true;
+    }
+    pid_t clientPid = input.clientInfo.clientPid;
+    if (updatePid) {
         const pid_t callingPid = IPCThreadState::self()->getCallingPid();
-        ALOGW_IF(pid != -1 && pid != callingPid,
+        ALOGW_IF(clientPid != -1 && clientPid != callingPid,
                  "%s uid %d pid %d tried to pass itself off as pid %d",
-                 __func__, callingUid, callingPid, pid);
-        pid = callingPid;
+                 __func__, callingUid, callingPid, clientPid);
+        clientPid = callingPid;
     }
 
+    audio_session_t sessionId = input.sessionId;
+    if (sessionId == AUDIO_SESSION_ALLOCATE) {
+        sessionId = (audio_session_t) newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
+    }
+    output.sessionId = sessionId;
+    output.outputId = AUDIO_IO_HANDLE_NONE;
+    output.selectedDeviceId = input.selectedDeviceId;
+
+    lStatus = AudioSystem::getOutputForAttr(&input.attr, &output.outputId, sessionId, &streamType,
+                                            clientUid, &input.config, input.flags,
+                                            &output.selectedDeviceId, &portId);
+
+    if (lStatus != NO_ERROR || output.outputId == AUDIO_IO_HANDLE_NONE) {
+        ALOGE("createTrack() getOutputForAttr() return error %d or invalid output handle", lStatus);
+        goto Exit;
+    }
     // client AudioTrack::set already implements AUDIO_STREAM_DEFAULT => AUDIO_STREAM_MUSIC,
     // but if someone uses binder directly they could bypass that and cause us to crash
     if (uint32_t(streamType) >= AUDIO_STREAM_CNT) {
@@ -681,78 +695,63 @@ sp<IAudioTrack> AudioFlinger::createTrack(
         goto Exit;
     }
 
-    // further sample rate checks are performed by createTrack_l() depending on the thread type
-    if (sampleRate == 0) {
-        ALOGE("createTrack() invalid sample rate %u", sampleRate);
-        lStatus = BAD_VALUE;
-        goto Exit;
-    }
-
     // further channel mask checks are performed by createTrack_l() depending on the thread type
-    if (!audio_is_output_channel(channelMask)) {
-        ALOGE("createTrack() invalid channel mask %#x", channelMask);
+    if (!audio_is_output_channel(input.config.channel_mask)) {
+        ALOGE("createTrack() invalid channel mask %#x", input.config.channel_mask);
         lStatus = BAD_VALUE;
         goto Exit;
     }
 
     // further format checks are performed by createTrack_l() depending on the thread type
-    if (!audio_is_valid_format(format)) {
-        ALOGE("createTrack() invalid format %#x", format);
-        lStatus = BAD_VALUE;
-        goto Exit;
-    }
-
-    if (sharedBuffer != 0 && sharedBuffer->pointer() == NULL) {
-        ALOGE("createTrack() sharedBuffer is non-0 but has NULL pointer()");
+    if (!audio_is_valid_format(input.config.format)) {
+        ALOGE("createTrack() invalid format %#x", input.config.format);
         lStatus = BAD_VALUE;
         goto Exit;
     }
 
     {
         Mutex::Autolock _l(mLock);
-        PlaybackThread *thread = checkPlaybackThread_l(output);
+        PlaybackThread *thread = checkPlaybackThread_l(output.outputId);
         if (thread == NULL) {
-            ALOGE("no playback thread found for output handle %d", output);
+            ALOGE("no playback thread found for output handle %d", output.outputId);
             lStatus = BAD_VALUE;
             goto Exit;
         }
 
-        client = registerPid(pid);
+        client = registerPid(clientPid);
 
         PlaybackThread *effectThread = NULL;
-        if (sessionId != NULL && *sessionId != AUDIO_SESSION_ALLOCATE) {
-            if (audio_unique_id_get_use(*sessionId) != AUDIO_UNIQUE_ID_USE_SESSION) {
-                ALOGE("createTrack() invalid session ID %d", *sessionId);
-                lStatus = BAD_VALUE;
-                goto Exit;
-            }
-            lSessionId = *sessionId;
-            // check if an effect chain with the same session ID is present on another
-            // output thread and move it here.
-            for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
-                sp<PlaybackThread> t = mPlaybackThreads.valueAt(i);
-                if (mPlaybackThreads.keyAt(i) != output) {
-                    uint32_t sessions = t->hasAudioSession(lSessionId);
-                    if (sessions & ThreadBase::EFFECT_SESSION) {
-                        effectThread = t.get();
-                        break;
-                    }
+        // check if an effect chain with the same session ID is present on another
+        // output thread and move it here.
+        for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
+            sp<PlaybackThread> t = mPlaybackThreads.valueAt(i);
+            if (mPlaybackThreads.keyAt(i) != output.outputId) {
+                uint32_t sessions = t->hasAudioSession(sessionId);
+                if (sessions & ThreadBase::EFFECT_SESSION) {
+                    effectThread = t.get();
+                    break;
                 }
             }
-        } else {
-            // if no audio session id is provided, create one here
-            lSessionId = (audio_session_t) nextUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
-            if (sessionId != NULL) {
-                *sessionId = lSessionId;
-            }
         }
-        ALOGV("createTrack() lSessionId: %d", lSessionId);
+        ALOGV("createTrack() sessionId: %d", sessionId);
 
-        track = thread->createTrack_l(client, streamType, sampleRate, format,
-                channelMask, frameCount, sharedBuffer, lSessionId, flags, tid,
-                clientUid, &lStatus, portId);
+        output.sampleRate = input.config.sample_rate;
+        output.frameCount = input.frameCount;
+        output.notificationFrameCount = input.notificationFrameCount;
+        output.flags = input.flags;
+
+        track = thread->createTrack_l(client, streamType, &output.sampleRate, input.config.format,
+                                      input.config.channel_mask,
+                                      &output.frameCount, &output.notificationFrameCount,
+                                      input.notificationsPerBuffer, input.speed,
+                                      input.sharedBuffer, sessionId, &output.flags,
+                                      input.clientInfo.clientTid, clientUid, &lStatus, portId);
         LOG_ALWAYS_FATAL_IF((lStatus == NO_ERROR) && (track == 0));
         // we don't abort yet if lStatus != NO_ERROR; there is still work to be done regardless
+
+        output.afFrameCount = thread->frameCount();
+        output.afSampleRate = thread->sampleRate();
+        output.afLatencyMs = thread->latency();
 
         // move effect chain to this output thread if an effect on same session was waiting
         // for a track to be created
@@ -760,12 +759,12 @@ sp<IAudioTrack> AudioFlinger::createTrack(
             // no risk of deadlock because AudioFlinger::mLock is held
             Mutex::Autolock _dl(thread->mLock);
             Mutex::Autolock _sl(effectThread->mLock);
-            moveEffectChain_l(lSessionId, effectThread, thread, true);
+            moveEffectChain_l(sessionId, effectThread, thread, true);
         }
 
         // Look for sync events awaiting for a session to be used.
         for (size_t i = 0; i < mPendingSyncEvents.size(); i++) {
-            if (mPendingSyncEvents[i]->triggerSession() == lSessionId) {
+            if (mPendingSyncEvents[i]->triggerSession() == sessionId) {
                 if (thread->isValidSyncEvent(mPendingSyncEvents[i])) {
                     if (lStatus == NO_ERROR) {
                         (void) track->setSyncEvent(mPendingSyncEvents[i]);
@@ -778,7 +777,7 @@ sp<IAudioTrack> AudioFlinger::createTrack(
             }
         }
 
-        setAudioHwSyncForSession_l(thread, lSessionId);
+        setAudioHwSyncForSession_l(thread, sessionId);
     }
 
     if (lStatus != NO_ERROR) {
@@ -798,6 +797,9 @@ sp<IAudioTrack> AudioFlinger::createTrack(
     trackHandle = new TrackHandle(track);
 
 Exit:
+    if (lStatus != NO_ERROR && output.outputId != AUDIO_IO_HANDLE_NONE) {
+        AudioSystem::releaseOutput(output.outputId, streamType, sessionId);
+    }
     *status = lStatus;
     return trackHandle;
 }

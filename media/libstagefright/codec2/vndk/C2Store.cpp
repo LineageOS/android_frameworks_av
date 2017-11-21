@@ -16,6 +16,7 @@
 
 #include <C2AllocatorGralloc.h>
 #include <C2AllocatorIon.h>
+#include <C2BufferPriv.h>
 #include <C2Component.h>
 #include <C2PlatformSupport.h>
 
@@ -107,6 +108,37 @@ std::shared_ptr<C2Allocator> C2PlatformAllocatorStore::getGrallocAllocator() {
 
 std::shared_ptr<C2AllocatorStore> GetCodec2PlatformAllocatorStore() {
     return std::make_shared<C2PlatformAllocatorStore>();
+}
+
+C2Status GetCodec2BlockPool(
+        C2BlockPool::local_id_t id, std::shared_ptr<const C2Component> component,
+        std::shared_ptr<C2BlockPool> *pool) {
+    pool->reset();
+    if (!component) {
+        return C2_BAD_VALUE;
+    }
+    // TODO support pre-registered block pools
+    std::shared_ptr<C2AllocatorStore> allocatorStore = GetCodec2PlatformAllocatorStore();
+    std::shared_ptr<C2Allocator> allocator;
+    C2Status res = C2_NOT_FOUND;
+
+    switch (id) {
+    case C2BlockPool::BASIC_LINEAR:
+        res = allocatorStore->getAllocator(C2AllocatorStore::DEFAULT_LINEAR, &allocator);
+        if (res == OK) {
+            *pool = std::make_shared<C2BasicLinearBlockPool>(allocator);
+        }
+        break;
+    case C2BlockPool::BASIC_GRAPHIC:
+        res = allocatorStore->getAllocator(C2AllocatorStore::DEFAULT_GRAPHIC, &allocator);
+        if (res == OK) {
+            *pool = std::make_shared<C2BasicGraphicBlockPool>(allocator);
+        }
+        break;
+    default:
+        break;
+    }
+    return res;
 }
 
 } // namespace android
