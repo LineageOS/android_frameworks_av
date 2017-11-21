@@ -28,6 +28,7 @@
 #include <aaudio/AAudio.h>
 #include "AAudioExampleUtils.h"
 #include "AAudioSimplePlayer.h"
+#include "AAudioArgsParser.h"
 
 /**
  * Open stream, play some sine waves, then close the stream.
@@ -37,7 +38,8 @@
  */
 static aaudio_result_t testOpenPlayClose(AAudioArgsParser &argParser,
                                          int32_t loopCount,
-                                         int32_t prefixToneMsec)
+                                         int32_t prefixToneMsec,
+                                         bool forceUnderruns)
 {
     SineThreadedData_t myData;
     AAudioSimplePlayer &player = myData.simplePlayer;
@@ -49,8 +51,7 @@ static aaudio_result_t testOpenPlayClose(AAudioArgsParser &argParser,
     printf("----------------------- run complete test --------------------------\n");
     myData.schedulerChecked = false;
     myData.callbackCount = 0;
-    // TODO add a command line option for the forceUnderruns
-    myData.forceUnderruns = false; // set true to test AAudioStream_getXRunCount()
+    myData.forceUnderruns = forceUnderruns; // test AAudioStream_getXRunCount()
 
     result = player.open(argParser,
                          SimplePlayerDataCallbackProc, SimplePlayerErrorCallbackProc, &myData);
@@ -202,7 +203,8 @@ error:
 static void usage() {
     AAudioArgsParser::usage();
     printf("      -l{count} loopCount start/stop, every other one is silent\n");
-    printf("      -t{msec} play a high pitched tone at the beginning\n");
+    printf("      -t{msec}  play a high pitched tone at the beginning\n");
+    printf("      -u        force periodic Underruns by sleeping in callback\n");
 }
 
 int main(int argc, const char **argv)
@@ -211,6 +213,7 @@ int main(int argc, const char **argv)
     aaudio_result_t    result;
     int32_t            loopCount = 1;
     int32_t            prefixToneMsec = 0;
+    bool               forceUnderruns = false;
 
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
@@ -231,6 +234,9 @@ int main(int argc, const char **argv)
                     case 't':
                         prefixToneMsec = atoi(&arg[2]);
                         break;
+                    case 'u':
+                        forceUnderruns = true;
+                        break;
                     default:
                         usage();
                         exit(EXIT_FAILURE);
@@ -245,7 +251,7 @@ int main(int argc, const char **argv)
     }
 
     // Keep looping until we can complete the test without disconnecting.
-    while((result = testOpenPlayClose(argParser, loopCount, prefixToneMsec))
+    while((result = testOpenPlayClose(argParser, loopCount, prefixToneMsec, forceUnderruns))
             == AAUDIO_ERROR_DISCONNECTED);
 
     return (result) ? EXIT_FAILURE : EXIT_SUCCESS;

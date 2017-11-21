@@ -30,8 +30,8 @@
 #define SHARING_MODE  AAUDIO_SHARING_MODE_SHARED
 #define PERFORMANCE_MODE AAUDIO_PERFORMANCE_MODE_NONE
 
-// Arbitrary period for glitches, once per second at 48000 Hz.
-#define FORCED_UNDERRUN_PERIOD_FRAMES    48000
+// Arbitrary period for glitches
+#define FORCED_UNDERRUN_PERIOD_FRAMES    (2 * 48000)
 // How long to sleep in a callback to cause an intentional glitch. For testing.
 #define FORCED_UNDERRUN_SLEEP_MICROS     (10 * 1000)
 
