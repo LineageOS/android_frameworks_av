@@ -56,6 +56,10 @@ static const char *kPlayerPlaying = "android.media.mediaplayer.playingMs";
 static const char *kPlayerError = "android.media.mediaplayer.err";
 static const char *kPlayerErrorCode = "android.media.mediaplayer.errcode";
 static const char *kPlayerDataSourceType = "android.media.mediaplayer.dataSource";
+//
+static const char *kPlayerRebuffering = "android.media.mediaplayer.rebufferingMs";
+static const char *kPlayerRebufferingCount = "android.media.mediaplayer.rebuffers";
+static const char *kPlayerRebufferingAtExit = "android.media.mediaplayer.rebufferExit";
 
 
 NuPlayerDriver::NuPlayerDriver(pid_t pid)
@@ -67,6 +71,9 @@ NuPlayerDriver::NuPlayerDriver(pid_t pid)
       mPositionUs(-1),
       mSeekInProgress(false),
       mPlayingTimeUs(0),
+      mRebufferingTimeUs(0),
+      mRebufferingEvents(0),
+      mRebufferingAtExit(false),
       mLooper(new ALooper),
       mMediaClock(new MediaClock),
       mPlayer(new NuPlayer(pid, mMediaClock)),
@@ -582,6 +589,12 @@ void NuPlayerDriver::updateMetrics(const char *where) {
 
     mAnalyticsItem->setInt64(kPlayerPlaying, (mPlayingTimeUs+500)/1000 );
 
+    if (mRebufferingEvents != 0) {
+        mAnalyticsItem->setInt64(kPlayerRebuffering, (mRebufferingTimeUs+500)/1000 );
+        mAnalyticsItem->setInt32(kPlayerRebufferingCount, mRebufferingEvents);
+        mAnalyticsItem->setInt32(kPlayerRebufferingAtExit, mRebufferingAtExit);
+    }
+
     mAnalyticsItem->setCString(kPlayerDataSourceType, mPlayer->getDataSourceType());
 }
 
@@ -661,6 +674,9 @@ status_t NuPlayerDriver::reset() {
     mPositionUs = -1;
     mLooping = false;
     mPlayingTimeUs = 0;
+    mRebufferingTimeUs = 0;
+    mRebufferingEvents = 0;
+    mRebufferingAtExit = false;
 
     return OK;
 }
@@ -809,6 +825,17 @@ void NuPlayerDriver::notifyDuration(int64_t durationUs) {
 void NuPlayerDriver::notifyMorePlayingTimeUs(int64_t playingUs) {
     Mutex::Autolock autoLock(mLock);
     mPlayingTimeUs += playingUs;
+}
+
+void NuPlayerDriver::notifyMoreRebufferingTimeUs(int64_t rebufferingUs) {
+    Mutex::Autolock autoLock(mLock);
+    mRebufferingTimeUs += rebufferingUs;
+    mRebufferingEvents++;
+}
+
+void NuPlayerDriver::notifyRebufferingWhenExit(bool status) {
+    Mutex::Autolock autoLock(mLock);
+    mRebufferingAtExit = status;
 }
 
 void NuPlayerDriver::notifySeekComplete() {
