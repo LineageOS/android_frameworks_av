@@ -78,6 +78,10 @@ private:
         {
             return mPolicyEngine->getPhoneState();
         }
+        virtual void setDpConnAndAllowedForVoice(bool connAndAllowed)
+        {
+            return mPolicyEngine->setDpConnAndAllowedForVoice(connAndAllowed);
+        }
         virtual status_t setForceUse(audio_policy_force_use_t usage,
                                      audio_policy_forced_cfg_t config)
         {
@@ -110,6 +114,12 @@ private:
         return is_state_in_call(mPhoneState);
     }
 
+    inline bool getDpConnAndAllowedForVoice() const
+    {
+        return mDpConnAndAllowedForVoice;
+    }
+
+    void setDpConnAndAllowedForVoice(bool connAndAllowed);
     status_t setPhoneState(audio_mode_t mode);
     audio_mode_t getPhoneState() const
     {
@@ -132,6 +142,8 @@ private:
             uint32_t outputDeviceTypesToIgnore) const;
     audio_devices_t getDeviceForInputSource(audio_source_t inputSource) const;
     audio_mode_t mPhoneState;  /**< current phone state. */
+    /* if display-port is connected and can be used for voip/voice */
+    bool mDpConnAndAllowedForVoice;
 
     /** current forced use configuration. */
     audio_policy_forced_cfg_t mForceUse[AUDIO_POLICY_FORCE_USE_CNT];
