@@ -1425,7 +1425,7 @@ sp<MetaData> ItemTable::getImageMeta(const uint32_t imageIndex) {
     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC);
 
     if (image->itemId == mPrimaryItemId) {
-        meta->setInt32(kKeyIsPrimaryImage, 1);
+        meta->setInt32(kKeyTrackIsDefault, 1);
     }
 
     ALOGV("image[%u]: size %dx%d", imageIndex, image->width, image->height);

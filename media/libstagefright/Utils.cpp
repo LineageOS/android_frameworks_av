@@ -675,6 +675,10 @@ status_t convertMetaDataToMessage(
                 msg->setInt32("grid-rows", gridRows);
                 msg->setInt32("grid-cols", gridCols);
             }
+            int32_t isPrimary;
+            if (meta->findInt32(kKeyTrackIsDefault, &isPrimary) && isPrimary) {
+                msg->setInt32("is-default", 1);
+            }
         }
 
         int32_t colorFormat;
@@ -1308,7 +1312,7 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
         meta->setCString(kKeyMediaLanguage, lang.c_str());
     }
 
-    if (mime.startsWith("video/")) {
+    if (mime.startsWith("video/") || mime.startsWith("image/")) {
         int32_t width;
         int32_t height;
         if (msg->findInt32("width", &width) && msg->findInt32("height", &height)) {
@@ -1330,6 +1334,26 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
                 && msg->findInt32("display-height", &displayHeight)) {
             meta->setInt32(kKeyDisplayWidth, displayWidth);
             meta->setInt32(kKeyDisplayHeight, displayHeight);
+        }
+
+        if (mime.startsWith("image/")){
+            int32_t isPrimary;
+            if (msg->findInt32("is-default", &isPrimary) && isPrimary) {
+                meta->setInt32(kKeyTrackIsDefault, 1);
+            }
+            int32_t gridWidth, gridHeight, gridRows, gridCols;
+            if (msg->findInt32("grid-width", &gridWidth)) {
+                meta->setInt32(kKeyGridWidth, gridWidth);
+            }
+            if (msg->findInt32("grid-height", &gridHeight)) {
+                meta->setInt32(kKeyGridHeight, gridHeight);
+            }
+            if (msg->findInt32("grid-rows", &gridRows)) {
+                meta->setInt32(kKeyGridRows, gridRows);
+            }
+            if (msg->findInt32("grid-cols", &gridCols)) {
+                meta->setInt32(kKeyGridCols, gridCols);
+            }
         }
 
         int32_t colorFormat;
@@ -1448,7 +1472,8 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             // for transporting the CSD to muxers.
             reassembleESDS(csd0, esds.data());
             meta->setData(kKeyESDS, kKeyESDS, esds.data(), esds.size());
-        } else if (mime == MEDIA_MIMETYPE_VIDEO_HEVC) {
+        } else if (mime == MEDIA_MIMETYPE_VIDEO_HEVC ||
+                   mime == MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC) {
             std::vector<uint8_t> hvcc(csd0size + 1024);
             size_t outsize = reassembleHVCC(csd0, hvcc.data(), hvcc.size(), 4);
             meta->setData(kKeyHVCC, kKeyHVCC, hvcc.data(), outsize);
