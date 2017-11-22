@@ -526,6 +526,13 @@ private:
     };
 
     // --- PlaybackThread ---
+#ifdef FLOAT_EFFECT_CHAIN
+#define EFFECT_BUFFER_FORMAT AUDIO_FORMAT_PCM_FLOAT
+using effect_buffer_t = float;
+#else
+#define EFFECT_BUFFER_FORMAT AUDIO_FORMAT_PCM_16_BIT
+using effect_buffer_t = int16_t;
+#endif
 
 #include "Threads.h"
 

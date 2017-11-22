@@ -2537,7 +2537,7 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
     free(mEffectBuffer);
     mEffectBuffer = NULL;
     if (mEffectBufferEnabled) {
-        mEffectBufferFormat = AUDIO_FORMAT_PCM_16_BIT; // Note: Effects support 16b only
+        mEffectBufferFormat = EFFECT_BUFFER_FORMAT;
         mEffectBufferSize = mNormalFrameCount * mChannelCount
                 * audio_bytes_per_sample(mEffectBufferFormat);
         (void)posix_memalign(&mEffectBuffer, 32, mEffectBufferSize);
@@ -2884,8 +2884,7 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
             &halInBuffer);
     if (result != OK) return result;
     halOutBuffer = halInBuffer;
-    int16_t *buffer = reinterpret_cast<int16_t*>(halInBuffer->externalData());
-
+    effect_buffer_t *buffer = reinterpret_cast<effect_buffer_t*>(halInBuffer->externalData());
     ALOGV("addEffectChain_l() %p on thread %p for session %d", chain.get(), this, session);
     if (session > AUDIO_SESSION_OUTPUT_MIX) {
         // Only one effect chain can be present in direct output thread and it uses
@@ -2893,10 +2892,14 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
         if (mType != DIRECT) {
             size_t numSamples = mNormalFrameCount * mChannelCount;
             status_t result = EffectBufferHalInterface::allocate(
-                    numSamples * sizeof(int16_t),
+                    numSamples * sizeof(effect_buffer_t),
                     &halInBuffer);
             if (result != OK) return result;
+#ifdef FLOAT_EFFECT_CHAIN
+            buffer = halInBuffer->audioBuffer()->f32;
+#else
             buffer = halInBuffer->audioBuffer()->s16;
+#endif
             ALOGV("addEffectChain_l() creating new input buffer %p session %d",
                     buffer, session);
         }
@@ -2971,7 +2974,7 @@ size_t AudioFlinger::PlaybackThread::removeEffectChain_l(const sp<EffectChain>& 
             for (size_t i = 0; i < mTracks.size(); ++i) {
                 sp<Track> track = mTracks[i];
                 if (session == track->sessionId()) {
-                    track->setMainBuffer(reinterpret_cast<int16_t*>(mSinkBuffer));
+                    track->setMainBuffer(reinterpret_cast<effect_buffer_t*>(mSinkBuffer));
                     chain->decTrackCnt();
                 }
             }
@@ -4554,7 +4557,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 mAudioMixer->setParameter(
                         name,
                         AudioMixer::TRACK,
-                        AudioMixer::MIXER_FORMAT, (void *)AUDIO_FORMAT_PCM_16_BIT);
+                        AudioMixer::MIXER_FORMAT, (void *)EFFECT_BUFFER_FORMAT);
                 mAudioMixer->setParameter(
                         name,
                         AudioMixer::TRACK,

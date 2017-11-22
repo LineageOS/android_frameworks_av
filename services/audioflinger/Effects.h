@@ -168,6 +168,12 @@ mutable Mutex               mLock;      // mutex for process, commands and handl
     bool     mSuspended;            // effect is suspended: temporarily disabled by framework
     bool     mOffloaded;            // effect is currently offloaded to the audio DSP
     wp<AudioFlinger>    mAudioFlinger;
+
+#ifdef FLOAT_EFFECT_CHAIN
+    bool    mSupportsFloat;         // effect supports float processing
+    sp<EffectBufferHalInterface> mInBuffer16;  // Buffers for interacting with HAL at 16 bits
+    sp<EffectBufferHalInterface> mOutBuffer16;
+#endif
 };
 
 // The EffectHandle class implements the IEffect interface. It provides resources
@@ -308,14 +314,14 @@ public:
     void setInBuffer(const sp<EffectBufferHalInterface>& buffer) {
         mInBuffer = buffer;
     }
-    int16_t *inBuffer() const {
-        return mInBuffer != 0 ? reinterpret_cast<int16_t*>(mInBuffer->ptr()) : NULL;
+    effect_buffer_t *inBuffer() const {
+        return mInBuffer != 0 ? reinterpret_cast<effect_buffer_t*>(mInBuffer->ptr()) : NULL;
     }
     void setOutBuffer(const sp<EffectBufferHalInterface>& buffer) {
         mOutBuffer = buffer;
     }
-    int16_t *outBuffer() const {
-        return mOutBuffer != 0 ? reinterpret_cast<int16_t*>(mOutBuffer->ptr()) : NULL;
+    effect_buffer_t *outBuffer() const {
+        return mOutBuffer != 0 ? reinterpret_cast<effect_buffer_t*>(mOutBuffer->ptr()) : NULL;
     }
 
     void incTrackCnt() { android_atomic_inc(&mTrackCnt); }
