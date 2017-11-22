@@ -111,8 +111,6 @@ static aaudio_result_t testTimeStamps(aaudio_policy_t mmapPolicy,
     aaudio_result_t result = AAUDIO_OK;
 
     int32_t framesPerBurst = 0;
-    float *buffer = nullptr;
-
     int32_t actualChannelCount = 0;
     int32_t actualSampleRate = 0;
     int32_t originalBufferSize = 0;
@@ -287,7 +285,7 @@ finish:
 
 int main(int argc, char **argv) {
     (void) argc;
-    (void *) argv;
+    (void) argv;
 
     aaudio_result_t result = AAUDIO_OK;
 
