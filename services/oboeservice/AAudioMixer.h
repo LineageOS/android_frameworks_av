@@ -36,15 +36,17 @@ public:
      * @param streamIndex for marking stream variables in systrace
      * @param fifo to read from
      * @param allowUnderflow if true then allow mixer to advance read index past the write index
-     * @return true if actually underflowed
+     * @return frames read from this stream
      */
-    bool mix(int streamIndex, android::FifoBuffer *fifo, bool allowUnderflow);
-
-    void mixPart(float *destination, float *source, int32_t numFrames);
+    int32_t mix(int streamIndex, android::FifoBuffer *fifo, bool allowUnderflow);
 
     float *getOutputBuffer();
 
+    int32_t getFramesPerBurst() const { return mFramesPerBurst; }
+
 private:
+    void mixPart(float *destination, float *source, int32_t numFrames);
+
     float   *mOutputBuffer = nullptr;
     int32_t  mSamplesPerFrame = 0;
     int32_t  mFramesPerBurst = 0;

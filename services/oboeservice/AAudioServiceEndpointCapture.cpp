@@ -58,7 +58,6 @@ aaudio_result_t AAudioServiceEndpointCapture::open(const aaudio::AAudioStreamReq
 // Read data from the shared MMAP stream and then distribute it to the client streams.
 void *AAudioServiceEndpointCapture::callbackLoop() {
     ALOGD("callbackLoop() entering");
-    int32_t underflowCount = 0;
     aaudio_result_t result = AAUDIO_OK;
     int64_t timeoutNanos = getStreamInternal()->calculateReasonableTimeout();
 
@@ -102,9 +101,10 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
                             int64_t positionOffset = mmapFramesRead - clientFramesWritten;
                             streamShared->setTimestampPositionOffset(positionOffset);
 
+                            // Is the buffer too full to write a burst?
                             if (fifo->getFifoControllerBase()->getEmptyFramesAvailable() <
-                                getFramesPerBurst()) {
-                                underflowCount++;
+                                    getFramesPerBurst()) {
+                                streamShared->incrementXRunCount();
                             } else {
                                 fifo->write(mDistributionBuffer, getFramesPerBurst());
                             }
@@ -125,6 +125,6 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
         }
     }
 
-    ALOGD("callbackLoop() exiting, %d underflows", underflowCount);
+    ALOGD("callbackLoop() exiting");
     return NULL; // TODO review
 }

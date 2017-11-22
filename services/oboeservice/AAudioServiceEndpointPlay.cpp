@@ -34,6 +34,7 @@
 #include "AAudioServiceStreamShared.h"
 #include "AAudioServiceEndpointPlay.h"
 #include "AAudioServiceEndpointShared.h"
+#include "AAudioServiceStreamBase.h"
 
 using namespace android;  // TODO just import names needed
 using namespace aaudio;   // TODO just import names needed
@@ -108,9 +109,19 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
                         int64_t positionOffset = mmapFramesWritten - clientFramesRead;
                         streamShared->setTimestampPositionOffset(positionOffset);
 
-                        bool underflowed = mMixer.mix(index, fifo, allowUnderflow);
-                        if (underflowed) {
-                            streamShared->incrementXRunCount();
+                        int32_t framesMixed = mMixer.mix(index, fifo, allowUnderflow);
+
+                        if (streamShared->isFlowing()) {
+                            // Consider it an underflow if we got less than a burst
+                            // after the data started flowing.
+                            bool underflowed = allowUnderflow
+                                               && framesMixed < mMixer.getFramesPerBurst();
+                            if (underflowed) {
+                                streamShared->incrementXRunCount();
+                            }
+                        } else if (framesMixed > 0) {
+                            // Mark beginning of data flow after a start.
+                            streamShared->setFlowing(true);
                         }
                         clientFramesRead = fifo->getReadCounter();
                     }

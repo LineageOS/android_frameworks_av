@@ -172,6 +172,8 @@ aaudio_result_t AAudioServiceStreamBase::start() {
         goto error;
     }
 
+    setFlowing(false);
+
     // Start with fresh presentation timestamps.
     mAtomicTimestamp.clear();
 
@@ -311,12 +313,19 @@ void AAudioServiceStreamBase::disconnect() {
 }
 
 aaudio_result_t AAudioServiceStreamBase::sendServiceEvent(aaudio_service_event_t event,
-                                               double  dataDouble,
-                                               int64_t dataLong) {
+                                                          double  dataDouble) {
     AAudioServiceMessage command;
     command.what = AAudioServiceMessage::code::EVENT;
     command.event.event = event;
     command.event.dataDouble = dataDouble;
+    return writeUpMessageQueue(&command);
+}
+
+aaudio_result_t AAudioServiceStreamBase::sendServiceEvent(aaudio_service_event_t event,
+                                                          int64_t dataLong) {
+    AAudioServiceMessage command;
+    command.what = AAudioServiceMessage::code::EVENT;
+    command.event.event = event;
     command.event.dataLong = dataLong;
     return writeUpMessageQueue(&command);
 }
@@ -334,6 +343,10 @@ aaudio_result_t AAudioServiceStreamBase::writeUpMessageQueue(AAudioServiceMessag
     } else {
         return AAUDIO_OK;
     }
+}
+
+aaudio_result_t AAudioServiceStreamBase::sendXRunCount(int32_t xRunCount) {
+    return sendServiceEvent(AAUDIO_SERVICE_EVENT_XRUN, (int64_t) xRunCount);
 }
 
 aaudio_result_t AAudioServiceStreamBase::sendCurrentTimestamp() {
