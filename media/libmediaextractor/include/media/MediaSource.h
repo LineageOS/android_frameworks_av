@@ -110,15 +110,6 @@ struct MediaSource : public virtual RefBase {
         return ERROR_UNSUPPORTED;
     }
 
-    // The consumer of this media source requests that the given buffers
-    // are to be returned exclusively in response to read calls.
-    // This will be called after a successful start() and before the
-    // first read() call.
-    // Callee assumes ownership of the buffers if no error is returned.
-    virtual status_t setBuffers(const Vector<MediaBuffer *> & /* buffers */) {
-        return ERROR_UNSUPPORTED;
-    }
-
     // The consumer of this media source requests the source stops sending
     // buffers with timestamp larger than or equal to stopTimeUs. stopTimeUs
     // must be in the same time base as the startTime passed in start(). If

@@ -35,7 +35,6 @@ public:
             MediaBuffer **buffer,
             const MediaSource::ReadOptions *options = NULL);
     virtual status_t pause();
-    virtual status_t setBuffers(const Vector<MediaBuffer *> &buffers);
     virtual status_t setStopTimeUs(int64_t stopTimeUs);
 
 private:

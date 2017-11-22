@@ -121,10 +121,6 @@ struct NuPlayer2::Source : public AHandler {
         return INVALID_OPERATION;
     }
 
-    virtual status_t setBuffers(bool /* audio */, Vector<MediaBuffer *> &/* buffers */) {
-        return INVALID_OPERATION;
-    }
-
     virtual bool isRealTime() const {
         return false;
     }

@@ -69,7 +69,6 @@ public:
 
     // unsupported methods
     virtual status_t pause() { return INVALID_OPERATION; }
-    virtual status_t setBuffers(const Vector<MediaBuffer *> &) { return INVALID_OPERATION; }
 
 private:
     // Construct this using a codec, source and looper.

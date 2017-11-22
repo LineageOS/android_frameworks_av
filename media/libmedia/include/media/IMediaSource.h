@@ -95,14 +95,6 @@ public:
     // until a subsequent read-with-seek. Currently only supported by
     // OMXCodec.
     virtual status_t pause()  = 0;
-
-    // The consumer of this media source requests that the given buffers
-    // are to be returned exclusively in response to read calls.
-    // This will be called after a successful start() and before the
-    // first read() call.
-    // Callee assumes ownership of the buffers if no error is returned.
-    virtual status_t setBuffers(const Vector<MediaBuffer *> & /* buffers */) = 0;
-
 };
 
 class BnMediaSource: public BnInterface<IMediaSource>
@@ -114,10 +106,6 @@ public:
                                 uint32_t flags = 0);
 
     virtual status_t pause() {
-        return ERROR_UNSUPPORTED;
-    }
-
-    virtual status_t setBuffers(const Vector<MediaBuffer *> & /* buffers */) {
         return ERROR_UNSUPPORTED;
     }
 

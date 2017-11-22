@@ -33,7 +33,6 @@ public:
     virtual status_t read(
             MediaBuffer **buffer, const ReadOptions *options = NULL);
     virtual status_t pause();
-    virtual status_t setBuffers(const Vector<MediaBuffer *> &buffers);
 
 private:
     sp<IMediaSource> mSource;
