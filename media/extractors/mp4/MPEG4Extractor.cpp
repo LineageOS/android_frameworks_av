@@ -347,7 +347,7 @@ MPEG4Extractor::MPEG4Extractor(const sp<DataSource> &source, const char *mime)
       mHeaderTimescale(0),
       mIsQT(false),
       mIsHeif(false),
-      mIsHeifSequence(false),
+      mHasMoovBox(false),
       mPreferHeif(mime != NULL && !strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_HEIF)),
       mFirstTrack(NULL),
       mLastTrack(NULL),
@@ -563,9 +563,9 @@ status_t MPEG4Extractor::readMetaData() {
     status_t err;
     bool sawMoovOrSidx = false;
 
-    while (!((!mIsHeif && sawMoovOrSidx && (mMdatFound || mMoofFound)) ||
-             (mIsHeif && (mPreferHeif || !mIsHeifSequence)
-                     && (mItemTable != NULL) && mItemTable->isValid()))) {
+    while (!((mHasMoovBox && sawMoovOrSidx && (mMdatFound || mMoofFound)) ||
+             (mIsHeif && (mPreferHeif || !mHasMoovBox) &&
+                     (mItemTable != NULL) && mItemTable->isValid()))) {
         off64_t orig_offset = offset;
         err = parseChunk(&offset, 0);
 
@@ -582,34 +582,30 @@ status_t MPEG4Extractor::readMetaData() {
         }
     }
 
-    if (mIsHeif) {
-        uint32_t imageCount = mItemTable->countImages();
-        if (imageCount == 0) {
-            ALOGE("found no image in heif!");
-        } else {
-            for (uint32_t imageIndex = 0; imageIndex < imageCount; imageIndex++) {
-                sp<MetaData> meta = mItemTable->getImageMeta(imageIndex);
-                if (meta == NULL) {
-                    ALOGE("heif image %u has no meta!", imageIndex);
-                    continue;
-                }
-
-                ALOGV("adding HEIF image track %u", imageIndex);
-                Track *track = new Track;
-                track->next = NULL;
-                if (mLastTrack != NULL) {
-                    mLastTrack->next = track;
-                } else {
-                    mFirstTrack = track;
-                }
-                mLastTrack = track;
-
-                track->meta = meta;
-                track->meta->setInt32(kKeyTrackID, imageIndex);
-                track->includes_expensive_metadata = false;
-                track->skipTrack = false;
-                track->timescale = 0;
+    if (mIsHeif && (mItemTable != NULL) && (mItemTable->countImages() > 0)) {
+        for (uint32_t imageIndex = 0;
+                imageIndex < mItemTable->countImages(); imageIndex++) {
+            sp<MetaData> meta = mItemTable->getImageMeta(imageIndex);
+            if (meta == NULL) {
+                ALOGE("heif image %u has no meta!", imageIndex);
+                continue;
             }
+
+            ALOGV("adding HEIF image track %u", imageIndex);
+            Track *track = new Track;
+            track->next = NULL;
+            if (mLastTrack != NULL) {
+                mLastTrack->next = track;
+            } else {
+                mFirstTrack = track;
+            }
+            mLastTrack = track;
+
+            track->meta = meta;
+            track->meta->setInt32(kKeyTrackID, imageIndex);
+            track->includes_expensive_metadata = false;
+            track->skipTrack = false;
+            track->timescale = 0;
         }
     }
 
@@ -2512,13 +2508,18 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             } else {
                 if (brandSet.count(FOURCC('m', 'i', 'f', '1')) > 0
                  && brandSet.count(FOURCC('h', 'e', 'i', 'c')) > 0) {
-                    mIsHeif = true;
                     ALOGV("identified HEIF image");
+
+                    mIsHeif = true;
+                    brandSet.erase(FOURCC('m', 'i', 'f', '1'));
+                    brandSet.erase(FOURCC('h', 'e', 'i', 'c'));
                 }
-                if (brandSet.count(FOURCC('m', 's', 'f', '1')) > 0
-                 && brandSet.count(FOURCC('h', 'e', 'v', 'c')) > 0) {
-                    mIsHeifSequence = true;
-                    ALOGV("identified HEIF image sequence");
+
+                if (!brandSet.empty()) {
+                    // This means that the file should have moov box.
+                    // It could be any iso files (mp4, heifs, etc.)
+                    mHasMoovBox = true;
+                    ALOGV("identified HEIF image with other tracks");
                 }
             }
 
