@@ -58,8 +58,6 @@ public:
 
     explicit MediaBuffer(size_t size);
 
-    explicit MediaBuffer(const sp<GraphicBuffer>& graphicBuffer);
-
     explicit MediaBuffer(const sp<ABuffer> &buffer);
 
     MediaBuffer(const sp<IMemory> &mem) :
@@ -87,8 +85,6 @@ public:
     size_t range_length() const;
 
     void set_range(size_t offset, size_t length);
-
-    sp<GraphicBuffer> graphicBuffer() const;
 
     sp<MetaData> meta_data();
 
@@ -167,7 +163,6 @@ private:
 
     void *mData;
     size_t mSize, mRangeOffset, mRangeLength;
-    sp<GraphicBuffer> mGraphicBuffer;
     sp<ABuffer> mBuffer;
 
     bool mOwnsData;
