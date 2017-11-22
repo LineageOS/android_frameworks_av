@@ -15,7 +15,6 @@ cc_library_static {
 
     include_dirs: [
         "frameworks/av/media/libstagefright/codec2/include",
-        "frameworks/av/media/libstagefright/codec2/vndk/include",
         "frameworks/native/include/media/hardware",
     ],
 
