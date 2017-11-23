@@ -95,7 +95,7 @@ struct BundledEffectContext{
     int                             SamplesToExitCountEq;
     int                             SamplesToExitCountBb;
     int                             SamplesToExitCountVirt;
-    LVM_INT16                       *workBuffer;
+    effect_buffer_t                 *workBuffer;
     int                             frameCount;
     int32_t                         bandGaindB[FIVEBAND_NUMBANDS];
     int                             volume;
@@ -103,10 +103,10 @@ struct BundledEffectContext{
     FILE                            *PcmInPtr;
     FILE                            *PcmOutPtr;
     #endif
-    #ifdef BUILD_FLOAT
+#if defined(BUILD_FLOAT) && !defined(NATIVE_FLOAT_BUFFER)
     LVM_FLOAT                       *pInputBuffer;
     LVM_FLOAT                       *pOutputBuffer;
-    #endif
+#endif
 };
 
 /* SessionContext : One session */

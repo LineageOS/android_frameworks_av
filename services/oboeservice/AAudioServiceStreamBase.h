@@ -129,11 +129,15 @@ public:
     // -------------------------------------------------------------------
 
     /**
-     * Send a message to the client.
+     * Send a message to the client with an int64_t data value.
      */
     aaudio_result_t sendServiceEvent(aaudio_service_event_t event,
-                                     double  dataDouble = 0.0,
                                      int64_t dataLong = 0);
+    /**
+     * Send a message to the client with an double data value.
+     */
+    aaudio_result_t sendServiceEvent(aaudio_service_event_t event,
+                                     double  dataDouble);
 
     /**
      * Fill in a parcelable description of stream.
@@ -182,6 +186,19 @@ public:
 
     void onVolumeChanged(float volume);
 
+    /**
+     * Set false when the stream is started.
+     * Set true when data is first read from the stream.
+     * @param b
+     */
+    void setFlowing(bool b) {
+        mFlowing = b;
+    }
+
+    bool isFlowing() const {
+        return mFlowing;
+    }
+
 protected:
 
     /**
@@ -203,6 +220,8 @@ protected:
     aaudio_result_t writeUpMessageQueue(AAudioServiceMessage *command);
 
     aaudio_result_t sendCurrentTimestamp();
+
+    aaudio_result_t sendXRunCount(int32_t xRunCount);
 
     /**
      * @param positionFrames
@@ -237,6 +256,8 @@ protected:
 
 private:
     aaudio_handle_t         mHandle = -1;
+
+    bool                    mFlowing = false;
 };
 
 } /* namespace aaudio */

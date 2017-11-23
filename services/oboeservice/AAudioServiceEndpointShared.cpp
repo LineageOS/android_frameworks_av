@@ -47,6 +47,7 @@ std::string AAudioServiceEndpointShared::dump() const {
            << std::setfill('0') << std::setw(8)
            << std::hex << mStreamInternal->getServiceHandle()
            << std::dec << std::setfill(' ');
+    result << ", XRuns = " << mStreamInternal->getXRunCount();
     result << "\n";
     result << "    Running Stream Count: " << mRunningStreamCount << "\n";
 

@@ -101,12 +101,12 @@ private:
     bool mSendNotify;
     off64_t mOffset;
     off_t mMdatOffset;
-    uint8_t *mMoovBoxBuffer;
-    off64_t mMoovBoxBufferOffset;
-    bool  mWriteMoovBoxToMemory;
+    uint8_t *mInMemoryCache;
+    off64_t mInMemoryCacheOffset;
+    off64_t mInMemoryCacheSize;
+    bool  mWriteBoxToMemory;
     off64_t mFreeBoxOffset;
     bool mStreamableFile;
-    off64_t mEstimatedMoovBoxSize;
     off64_t mMoovExtraSize;
     uint32_t mInterleaveDurationUs;
     int32_t mTimeScale;

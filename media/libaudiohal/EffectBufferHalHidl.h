@@ -35,6 +35,8 @@ class EffectBufferHalHidl : public EffectBufferHalInterface
     virtual audio_buffer_t* audioBuffer();
     virtual void* externalData() const;
 
+    virtual size_t getSize() const override { return mBufferSize; }
+
     virtual void setExternalData(void* external);
     virtual void setFrameCount(size_t frameCount);
     virtual bool checkFrameCountChange();

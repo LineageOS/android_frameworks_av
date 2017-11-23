@@ -140,7 +140,8 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
     }
 
     // If the read index passed the write index then consider it an underrun.
-    if (mAudioEndpoint.getFullFramesAvailable() < 0) {
+    // For shared streams, the xRunCount is passed up from the service.
+    if (mAudioEndpoint.isFreeRunning() && mAudioEndpoint.getFullFramesAvailable() < 0) {
         mXRunCount++;
         if (ATRACE_ENABLED()) {
             ATRACE_INT("aaUnderRuns", mXRunCount);

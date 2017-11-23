@@ -395,7 +395,7 @@ AudioFlinger::PlaybackThread::Track::Track(
     mSharedBuffer(sharedBuffer),
     mStreamType(streamType),
     mName(-1),  // see note below
-    mMainBuffer(thread->mixBuffer()),
+    mMainBuffer(thread->sinkBuffer()),
     mAuxBuffer(NULL),
     mAuxEffectId(0), mHasVolumeController(false),
     mPresentationCompleteFrames(0),

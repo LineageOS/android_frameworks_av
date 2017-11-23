@@ -102,7 +102,8 @@ aaudio_result_t AudioStreamInternalCapture::processDataNow(void *buffer, int32_t
     }
 
     // If the write index passed the read index then consider it an overrun.
-    if (mAudioEndpoint.getEmptyFramesAvailable() < 0) {
+    // For shared streams, the xRunCount is passed up from the service.
+    if (mAudioEndpoint.isFreeRunning() && mAudioEndpoint.getEmptyFramesAvailable() < 0) {
         mXRunCount++;
         if (ATRACE_ENABLED()) {
             ATRACE_INT("aaOverRuns", mXRunCount);
