@@ -125,6 +125,7 @@ class MediaAnalyticsService : public BnMediaAnalyticsService
 
     // support for generating output
     int mDumpProto;
+    int mDumpProtoDefault;
     String8 dumpQueue(List<MediaAnalyticsItem*> *);
     String8 dumpQueue(List<MediaAnalyticsItem*> *, nsecs_t, const char *only);
 
