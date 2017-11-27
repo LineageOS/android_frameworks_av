@@ -173,8 +173,8 @@ class MediaAnalyticsItem {
         MediaAnalyticsItem &setPkgName(AString);
         AString getPkgName() const;
 
-        MediaAnalyticsItem &setPkgVersionCode(int32_t);
-        int32_t getPkgVersionCode() const;
+        MediaAnalyticsItem &setPkgVersionCode(int64_t);
+        int64_t getPkgVersionCode() const;
 
         // our serialization code for binder calls
         int32_t writeToParcel(Parcel *);
@@ -205,7 +205,7 @@ class MediaAnalyticsItem {
         pid_t     mPid;
         uid_t     mUid;
         AString   mPkgName;
-        int32_t   mPkgVersionCode;
+        int64_t   mPkgVersionCode;
 
         // let's reuse a binder connection
         static sp<IMediaAnalyticsService> sAnalyticsService;
