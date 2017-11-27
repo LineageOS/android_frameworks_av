@@ -39,26 +39,30 @@ struct ColorUtils {
      * vendor-extension section so they won't collide with future platform values.
      */
 
-#define GET_HAL_ENUM(class, name) HAL_DATASPACE_##class##name
-#define GET_HAL_BITFIELD(class, name) (GET_HAL_ENUM(class, _##name) >> GET_HAL_ENUM(class, _SHIFT))
-
+    /**
+     * graphic.h constants changed in Android 8.0 after ColorStandard values were already public
+     * in Android 7.0. We will not deal with the break in graphic.h here, but list the public
+     * Android SDK MediaFormat values here.
+     */
     enum ColorStandard : uint32_t {
-        kColorStandardUnspecified =          GET_HAL_BITFIELD(STANDARD, UNSPECIFIED),
-        kColorStandardBT709 =                GET_HAL_BITFIELD(STANDARD, BT709),
-        kColorStandardBT601_625 =            GET_HAL_BITFIELD(STANDARD, BT601_625),
-        kColorStandardBT601_625_Unadjusted = GET_HAL_BITFIELD(STANDARD, BT601_625_UNADJUSTED),
-        kColorStandardBT601_525 =            GET_HAL_BITFIELD(STANDARD, BT601_525),
-        kColorStandardBT601_525_Unadjusted = GET_HAL_BITFIELD(STANDARD, BT601_525_UNADJUSTED),
-        kColorStandardBT2020 =               GET_HAL_BITFIELD(STANDARD, BT2020),
-        kColorStandardBT2020Constant =       GET_HAL_BITFIELD(STANDARD, BT2020_CONSTANT_LUMINANCE),
-        kColorStandardBT470M =               GET_HAL_BITFIELD(STANDARD, BT470M),
-        kColorStandardFilm =                 GET_HAL_BITFIELD(STANDARD, FILM),
-        kColorStandardMax =                  GET_HAL_BITFIELD(STANDARD, MASK),
+        kColorStandardUnspecified =          0,
+        kColorStandardBT709 =                1,
+        kColorStandardBT601_625 =            2,
+        kColorStandardBT601_625_Unadjusted = 3, // not in SDK
+        kColorStandardBT601_525 =            4,
+        kColorStandardBT601_525_Unadjusted = 5, // not in SDK
+        kColorStandardBT2020 =               6,
+        kColorStandardBT2020Constant =       7, // not in SDK
+        kColorStandardBT470M =               8, // not in SDK
+        kColorStandardFilm =                 9, // not in SDK
+        kColorStandardDCI_P3 =               10, // not in SDK, new in Android 8.0
+
+        kColorStandardMax = 63, // TODO: remove post O
 
         /* This marks a section of color-standard values that are not supported by graphics HAL,
            but track defined color primaries-matrix coefficient combinations in media.
            These are stable for a given release. */
-        kColorStandardExtendedStart = kColorStandardMax + 1,
+        kColorStandardExtendedStart = 64,
 
         /* This marks a section of color-standard values that are not supported by graphics HAL
            nor using media defined color primaries or matrix coefficients. These may differ per
@@ -66,16 +70,20 @@ struct ColorUtils {
         kColorStandardVendorStart = 0x10000,
     };
 
+    /**
+     * These values shipped in Android O, but they do not correspond to the SDK values also in O.
+     * DO NOT USE THIS ENUM.
+     */
     enum ColorTransfer : uint32_t  {
-        kColorTransferUnspecified = GET_HAL_BITFIELD(TRANSFER, UNSPECIFIED),
-        kColorTransferLinear =      GET_HAL_BITFIELD(TRANSFER, LINEAR),
-        kColorTransferSRGB =        GET_HAL_BITFIELD(TRANSFER, SRGB),
-        kColorTransferSMPTE_170M =  GET_HAL_BITFIELD(TRANSFER, SMPTE_170M),
-        kColorTransferGamma22 =     GET_HAL_BITFIELD(TRANSFER, GAMMA2_2),
-        kColorTransferGamma28 =     GET_HAL_BITFIELD(TRANSFER, GAMMA2_8),
-        kColorTransferST2084 =      GET_HAL_BITFIELD(TRANSFER, ST2084),
-        kColorTransferHLG =         GET_HAL_BITFIELD(TRANSFER, HLG),
-        kColorTransferMax =         GET_HAL_BITFIELD(TRANSFER, MASK),
+        kColorTransferUnspecified = 0,
+        kColorTransferLinear =      1,
+        kColorTransferSRGB =        2,
+        kColorTransferSMPTE_170M =  3,
+        kColorTransferGamma22 =     4,
+        kColorTransferGamma28 =     6,
+        kColorTransferST2084 =      7,
+        kColorTransferHLG =         8,
+        kColorTransferMax =         31,
 
         /* This marks a section of color-transfer values that are not supported by graphics HAL,
            but track media-defined color-transfer. These are stable for a given release. */
@@ -86,23 +94,44 @@ struct ColorUtils {
         kColorTransferVendorStart = 0x10000,
     };
 
-    enum ColorRange : uint32_t  {
-        kColorRangeUnspecified = GET_HAL_BITFIELD(RANGE, UNSPECIFIED),
-        kColorRangeFull =        GET_HAL_BITFIELD(RANGE, FULL),
-        kColorRangeLimited =     GET_HAL_BITFIELD(RANGE, LIMITED),
-        kColorRangeMax =         GET_HAL_BITFIELD(RANGE, MASK),
+    /**
+     * TODO: rename this into ColorTransfer post Android O.
+     */
+    enum ColorTransferSdk : uint32_t  {
+        kColorTransferSdkUnspecified = 0,
+        kColorTransferSdkLinear =      1,
+        kColorTransferSdkSRGB =        2,
+        kColorTransferSdkSMPTE_170M =  3, // not in SDK
+        kColorTransferSdkGamma22 =     4, // not in SDK
+        kColorTransferSdkGamma28 =     5, // not in SDK
+        kColorTransferSdkST2084 =      6,
+        kColorTransferSdkHLG =         7,
+        kColorTransferSdkGamma26 =     8, // not in SDK, new in Android 8.0
 
         /* This marks a section of color-transfer values that are not supported by graphics HAL,
            but track media-defined color-transfer. These are stable for a given release. */
-        kColorRangeExtendedStart = kColorRangeMax + 1,
+        kColorTransferSdkExtendedStart = 32,
+
+        /* This marks a section of color-transfer values that are not supported by graphics HAL
+           nor defined by media. These may differ per device. */
+        kColorTransferSdkVendorStart = 0x10000,
+    };
+
+    enum ColorRange : uint32_t  {
+        kColorRangeUnspecified = 0,
+        kColorRangeFull =        1,
+        kColorRangeLimited =     2,
+
+        kColorRangeMax = 7, // TODO: remove post O
+
+        /* This marks a section of color-transfer values that are not supported by graphics HAL,
+           but track media-defined color-transfer. These are stable for a given release. */
+        kColorRangeExtendedStart = 8,
 
         /* This marks a section of color-transfer values that are not supported by graphics HAL
            nor defined by media. These may differ per device. */
         kColorRangeVendorStart = 0x10000,
     };
-
-#undef GET_HAL_BITFIELD
-#undef GET_HAL_ENUM
 
     /*
      * Static utilities for codec support
@@ -197,10 +226,12 @@ inline static const char *asString(android::ColorUtils::ColorStandard i, const c
         case ColorUtils::kColorStandardBT2020Constant:       return "BT2020Constant";
         case ColorUtils::kColorStandardBT470M:               return "BT470M";
         case ColorUtils::kColorStandardFilm:                 return "Film";
-        default:                                            return def;
+        case ColorUtils::kColorStandardDCI_P3:               return "DCI_P3";
+        default:                                             return def;
     }
 }
 
+// TODO: remove post O
 inline static const char *asString(android::ColorUtils::ColorTransfer i, const char *def = "??") {
     using namespace android;
     switch (i) {
@@ -212,7 +243,23 @@ inline static const char *asString(android::ColorUtils::ColorTransfer i, const c
         case ColorUtils::kColorTransferGamma28:     return "Gamma28";
         case ColorUtils::kColorTransferST2084:      return "ST2084";
         case ColorUtils::kColorTransferHLG:         return "HLG";
-        default:                                   return def;
+        default:                                    return def;
+    }
+}
+
+inline static const char *asString(android::ColorUtils::ColorTransferSdk i, const char *def = "??") {
+    using namespace android;
+    switch (i) {
+        case ColorUtils::kColorTransferSdkUnspecified: return "Unspecified";
+        case ColorUtils::kColorTransferSdkLinear:      return "Linear";
+        case ColorUtils::kColorTransferSdkSRGB:        return "SRGB";
+        case ColorUtils::kColorTransferSdkSMPTE_170M:  return "SMPTE_170M";
+        case ColorUtils::kColorTransferSdkGamma22:     return "Gamma22";
+        case ColorUtils::kColorTransferSdkGamma28:     return "Gamma28";
+        case ColorUtils::kColorTransferSdkST2084:      return "ST2084";
+        case ColorUtils::kColorTransferSdkHLG:         return "HLG";
+        case ColorUtils::kColorTransferSdkGamma26:     return "Gamma26";
+        default:                                       return def;
     }
 }
 
@@ -222,7 +269,7 @@ inline static const char *asString(android::ColorUtils::ColorRange i, const char
         case ColorUtils::kColorRangeUnspecified: return "Unspecified";
         case ColorUtils::kColorRangeFull:        return "Full";
         case ColorUtils::kColorRangeLimited:     return "Limited";
-        default:                                return def;
+        default:                                 return def;
     }
 }
 
