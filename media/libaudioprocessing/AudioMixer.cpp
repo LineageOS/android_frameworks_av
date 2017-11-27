@@ -1947,11 +1947,10 @@ void AudioMixer::convertMixerFormat(void *out, audio_format_t mixerOutFormat,
     case AUDIO_FORMAT_PCM_16_BIT:
         switch (mixerOutFormat) {
         case AUDIO_FORMAT_PCM_FLOAT:
-            memcpy_to_float_from_q4_27((float*)out, (int32_t*)in, sampleCount);
+            memcpy_to_float_from_q4_27((float*)out, (const int32_t*)in, sampleCount);
             break;
         case AUDIO_FORMAT_PCM_16_BIT:
-            // two int16_t are produced per iteration
-            ditherAndClamp((int32_t*)out, (int32_t*)in, sampleCount >> 1);
+            memcpy_to_i16_from_q4_27((int16_t*)out, (const int32_t*)in, sampleCount);
             break;
         default:
             LOG_ALWAYS_FATAL("bad mixerOutFormat: %#x", mixerOutFormat);
