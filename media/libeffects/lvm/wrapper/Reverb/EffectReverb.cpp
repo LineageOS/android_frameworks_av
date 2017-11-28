@@ -480,9 +480,7 @@ int process( effect_buffer_t   *pIn,
                 (size_t)frameCount * FCC_2);
 #endif
 #else
-        for (int i = 0; i < frameCount * FCC_2; i++) { //always stereo here
-            OutFrames16[i] = clamp16(pContext->OutFrames[i]>>8);
-        }
+        memcpy_to_i16_from_q4_27(OutFrames16, pContext->OutFrames, (size_t)frameCount * FCC_2);
 #endif
     } else {
 #ifdef BUILD_FLOAT

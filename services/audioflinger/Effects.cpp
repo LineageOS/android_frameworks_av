@@ -312,16 +312,14 @@ void AudioFlinger::EffectModule::process()
                     float * const pFloat = mConfig.inputCfg.buffer.f32;
                     memcpy_to_float_from_q4_27(pFloat, p32, mConfig.inputCfg.buffer.frameCount);
                 } else {
-                    const size_t pairs = mConfig.inputCfg.buffer.frameCount / 2;
-                    ditherAndClamp(mConfig.inputCfg.buffer.s32,
+                    memcpy_to_i16_from_q4_27(mConfig.inputCfg.buffer.s16,
                             mConfig.inputCfg.buffer.s32,
-                            pairs);
+                            mConfig.inputCfg.buffer.frameCount);
                 }
 #else
-                const size_t pairs = mConfig.inputCfg.buffer.frameCount / 2;
-                ditherAndClamp(mConfig.inputCfg.buffer.s32,
+                memcpy_to_i16_from_q4_27(mConfig.inputCfg.buffer.s16,
                                             mConfig.inputCfg.buffer.s32,
-                                            pairs);
+                                            mConfig.inputCfg.buffer.frameCount);
 #endif
             }
 #ifdef FLOAT_EFFECT_CHAIN

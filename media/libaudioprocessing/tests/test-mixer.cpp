@@ -316,8 +316,7 @@ int main(int argc, char* argv[]) {
             outputSampleRate, outputChannels, outputFrames, useMixerFloat);
     if (auxFilename) {
         // Aux buffer is always in q4_27 format for now.
-        // memcpy_to_i16_from_q4_27(), but with stereo frame count (not sample count)
-        ditherAndClamp((int32_t*)auxAddr, (int32_t*)auxAddr, outputFrames >> 1);
+        memcpy_to_i16_from_q4_27((int16_t*)auxAddr, (const int32_t*)auxAddr, outputFrames);
         writeFile(auxFilename, auxAddr, outputSampleRate, 1, outputFrames, false);
     }
 
