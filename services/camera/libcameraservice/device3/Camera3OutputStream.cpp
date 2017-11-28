@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 The Android Open Source Project
+ * Copyright (C) 2013-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,9 +35,11 @@ Camera3OutputStream::Camera3OutputStream(int id,
         sp<Surface> consumer,
         uint32_t width, uint32_t height, int format,
         android_dataspace dataSpace, camera3_stream_rotation_t rotation,
-        nsecs_t timestampOffset, int setId) :
+        nsecs_t timestampOffset, const String8& physicalCameraId,
+        int setId) :
         Camera3IOStreamBase(id, CAMERA3_STREAM_OUTPUT, width, height,
-                            /*maxSize*/0, format, dataSpace, rotation, setId),
+                            /*maxSize*/0, format, dataSpace, rotation,
+                            physicalCameraId, setId),
         mConsumer(consumer),
         mTransform(0),
         mTraceFirstBuffer(true),
@@ -61,9 +63,9 @@ Camera3OutputStream::Camera3OutputStream(int id,
         sp<Surface> consumer,
         uint32_t width, uint32_t height, size_t maxSize, int format,
         android_dataspace dataSpace, camera3_stream_rotation_t rotation,
-        nsecs_t timestampOffset, int setId) :
+        nsecs_t timestampOffset, const String8& physicalCameraId, int setId) :
         Camera3IOStreamBase(id, CAMERA3_STREAM_OUTPUT, width, height, maxSize,
-                            format, dataSpace, rotation, setId),
+                            format, dataSpace, rotation, physicalCameraId, setId),
         mConsumer(consumer),
         mTransform(0),
         mTraceFirstBuffer(true),
@@ -93,9 +95,11 @@ Camera3OutputStream::Camera3OutputStream(int id,
 Camera3OutputStream::Camera3OutputStream(int id,
         uint32_t width, uint32_t height, int format,
         uint64_t consumerUsage, android_dataspace dataSpace,
-        camera3_stream_rotation_t rotation, nsecs_t timestampOffset, int setId) :
+        camera3_stream_rotation_t rotation, nsecs_t timestampOffset,
+        const String8& physicalCameraId, int setId) :
         Camera3IOStreamBase(id, CAMERA3_STREAM_OUTPUT, width, height,
-                            /*maxSize*/0, format, dataSpace, rotation, setId),
+                            /*maxSize*/0, format, dataSpace, rotation,
+                            physicalCameraId, setId),
         mConsumer(nullptr),
         mTransform(0),
         mTraceFirstBuffer(true),
@@ -131,11 +135,13 @@ Camera3OutputStream::Camera3OutputStream(int id, camera3_stream_type_t type,
                                          int format,
                                          android_dataspace dataSpace,
                                          camera3_stream_rotation_t rotation,
+                                         const String8& physicalCameraId,
                                          uint64_t consumerUsage, nsecs_t timestampOffset,
                                          int setId) :
         Camera3IOStreamBase(id, type, width, height,
                             /*maxSize*/0,
-                            format, dataSpace, rotation, setId),
+                            format, dataSpace, rotation,
+                            physicalCameraId, setId),
         mTransform(0),
         mTraceFirstBuffer(true),
         mUseMonoTimestamp(false),

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 The Android Open Source Project
+ * Copyright (C) 2013-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,7 +47,8 @@ const Camera3Stream* Camera3Stream::cast(const camera3_stream *stream) {
 Camera3Stream::Camera3Stream(int id,
         camera3_stream_type type,
         uint32_t width, uint32_t height, size_t maxSize, int format,
-        android_dataspace dataSpace, camera3_stream_rotation_t rotation, int setId) :
+        android_dataspace dataSpace, camera3_stream_rotation_t rotation,
+        const String8& physicalCameraId, int setId) :
     camera3_stream(),
     mId(id),
     mSetId(setId),
@@ -64,7 +65,8 @@ Camera3Stream::Camera3Stream(int id,
     mLastMaxCount(Camera3StreamInterface::ALLOCATE_PIPELINE_MAX),
     mBufferLimitLatency(kBufferLimitLatencyBinSize),
     mFormatOverridden(false),
-    mOriginalFormat(-1) {
+    mOriginalFormat(-1),
+    mPhysicalCameraId(physicalCameraId) {
 
     camera3_stream::stream_type = type;
     camera3_stream::width = width;
@@ -74,6 +76,7 @@ Camera3Stream::Camera3Stream(int id,
     camera3_stream::rotation = rotation;
     camera3_stream::max_buffers = 0;
     camera3_stream::priv = NULL;
+    camera3_stream::physical_camera_id = mPhysicalCameraId.string();
 
     if ((format == HAL_PIXEL_FORMAT_BLOB || format == HAL_PIXEL_FORMAT_RAW_OPAQUE) &&
             maxSize == 0) {

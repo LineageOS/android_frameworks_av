@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 The Android Open Source Project
+ * Copyright (C) 2013-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -449,7 +449,7 @@ class Camera3Stream :
     Camera3Stream(int id, camera3_stream_type type,
             uint32_t width, uint32_t height, size_t maxSize, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation,
-            int setId);
+            const String8& physicalCameraId, int setId);
 
     wp<Camera3StreamBufferFreedListener> mBufferFreedListener;
 
@@ -556,6 +556,7 @@ class Camera3Stream :
     bool mDataSpaceOverridden;
     android_dataspace mOriginalDataSpace;
 
+    String8 mPhysicalCameraId;
 }; // class Camera3Stream
 
 }; // namespace camera3

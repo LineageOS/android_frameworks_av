@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 The Android Open Source Project
+ * Copyright (C) 2013-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,9 +31,11 @@ namespace camera3 {
 
 Camera3IOStreamBase::Camera3IOStreamBase(int id, camera3_stream_type_t type,
         uint32_t width, uint32_t height, size_t maxSize, int format,
-        android_dataspace dataSpace, camera3_stream_rotation_t rotation, int setId) :
+        android_dataspace dataSpace, camera3_stream_rotation_t rotation,
+        const String8& physicalCameraId, int setId) :
         Camera3Stream(id, type,
-                width, height, maxSize, format, dataSpace, rotation, setId),
+                width, height, maxSize, format, dataSpace, rotation,
+                physicalCameraId, setId),
         mTotalBufferCount(0),
         mHandoutTotalBufferCount(0),
         mHandoutOutputBufferCount(0),
