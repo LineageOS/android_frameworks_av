@@ -35,6 +35,7 @@ cc_library_shared {
         "AACWriter.cpp",
         "AMRWriter.cpp",
         "AudioPlayer.cpp",
+        "AudioPresentationInfo.cpp",
         "AudioSource.cpp",
         "BufferImpl.cpp",
         "CCodec.cpp",
