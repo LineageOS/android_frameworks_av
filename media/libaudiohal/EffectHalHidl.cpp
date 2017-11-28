@@ -121,16 +121,24 @@ status_t EffectHalHidl::analyzeResult(const Result& result) {
 }
 
 status_t EffectHalHidl::setInBuffer(const sp<EffectBufferHalInterface>& buffer) {
-    if (mInBuffer == 0 || buffer->audioBuffer() != mInBuffer->audioBuffer()) {
-        mBuffersChanged = true;
+    if (!mBuffersChanged) {
+        if (buffer.get() == nullptr || mInBuffer.get() == nullptr) {
+            mBuffersChanged = buffer.get() != mInBuffer.get();
+        } else {
+            mBuffersChanged = buffer->audioBuffer() != mInBuffer->audioBuffer();
+        }
     }
     mInBuffer = buffer;
     return OK;
 }
 
 status_t EffectHalHidl::setOutBuffer(const sp<EffectBufferHalInterface>& buffer) {
-    if (mOutBuffer == 0 || buffer->audioBuffer() != mOutBuffer->audioBuffer()) {
-        mBuffersChanged = true;
+    if (!mBuffersChanged) {
+        if (buffer.get() == nullptr || mOutBuffer.get() == nullptr) {
+            mBuffersChanged = buffer.get() != mOutBuffer.get();
+        } else {
+            mBuffersChanged = buffer->audioBuffer() != mOutBuffer->audioBuffer();
+        }
     }
     mOutBuffer = buffer;
     return OK;

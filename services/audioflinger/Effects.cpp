@@ -903,9 +903,7 @@ void AudioFlinger::EffectModule::setInBuffer(const sp<EffectBufferHalInterface>&
         mConfig.inputCfg.buffer.raw = NULL;
     }
     mInBuffer = buffer;
-    if (buffer != nullptr) { // FIXME: EffectHalHidl::setInBuffer should accept null input.
-        mEffectInterface->setInBuffer(buffer);
-    }
+    mEffectInterface->setInBuffer(buffer);
 
 #ifdef FLOAT_EFFECT_CHAIN
     // aux effects do in place conversion to float - we don't allocate mInBuffer16 for them.
@@ -947,9 +945,7 @@ void AudioFlinger::EffectModule::setOutBuffer(const sp<EffectBufferHalInterface>
         mConfig.outputCfg.buffer.raw = NULL;
     }
     mOutBuffer = buffer;
-    if (buffer != nullptr) {
-        mEffectInterface->setOutBuffer(buffer);
-    }
+    mEffectInterface->setOutBuffer(buffer);
 
 #ifdef FLOAT_EFFECT_CHAIN
     // Note: Any effect that does not accumulate does not need mOutBuffer16 and
