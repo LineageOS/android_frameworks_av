@@ -48,6 +48,16 @@ public:
     aaudio_result_t requestFlush() override;
     aaudio_result_t requestStop() override;
 
+    bool isFlushSupported() const override {
+        // Only implement FLUSH for OUTPUT streams.
+        return true;
+    }
+
+    bool isPauseSupported() const override {
+        // Only implement PAUSE for OUTPUT streams.
+        return true;
+    }
+
     aaudio_result_t getTimestamp(clockid_t clockId,
                                        int64_t *framePosition,
                                        int64_t *timeNanoseconds) override;

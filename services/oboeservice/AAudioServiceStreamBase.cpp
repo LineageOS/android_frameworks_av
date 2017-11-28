@@ -271,11 +271,11 @@ aaudio_result_t AAudioServiceStreamBase::stopTimestampThread() {
 }
 
 aaudio_result_t AAudioServiceStreamBase::flush() {
-    if (getState() != AAUDIO_STREAM_STATE_PAUSED) {
-        ALOGE("flush() stream not paused, state = %s",
-              AAudio_convertStreamStateToText(mState));
-        return AAUDIO_ERROR_INVALID_STATE;
+    aaudio_result_t result = AAudio_isFlushAllowed(getState());
+    if (result != AAUDIO_OK) {
+        return result;
     }
+
     // Data will get flushed when the client receives the FLUSHED event.
     sendServiceEvent(AAUDIO_SERVICE_EVENT_FLUSHED);
     setState(AAUDIO_STREAM_STATE_FLUSHED);

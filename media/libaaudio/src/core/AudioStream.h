@@ -73,6 +73,24 @@ protected:
      */
     virtual aaudio_result_t requestStart() = 0;
 
+    /**
+     * Check the state to see if Pause if currently legal.
+     *
+     * @param result pointer to return code
+     * @return true if OK to continue, if false then return result
+     */
+    bool checkPauseStateTransition(aaudio_result_t *result);
+
+    virtual bool isFlushSupported() const {
+        // Only implement FLUSH for OUTPUT streams.
+        return false;
+    }
+
+    virtual bool isPauseSupported() const {
+        // Only implement PAUSE for OUTPUT streams.
+        return false;
+    }
+
     virtual aaudio_result_t requestPause()
     {
         // Only implement this for OUTPUT streams.
@@ -341,11 +359,13 @@ public:
         return mPlayerBase->getResult();
     }
 
+    // Pass pause request through PlayerBase for tracking.
     aaudio_result_t systemPause() {
         mPlayerBase->pause();
         return mPlayerBase->getResult();
     }
 
+    // Pass stop request through PlayerBase for tracking.
     aaudio_result_t systemStop() {
         mPlayerBase->stop();
         return mPlayerBase->getResult();
@@ -452,7 +472,14 @@ protected:
     }
 
     void setState(aaudio_stream_state_t state) {
-        mState = state;
+        if (mState == AAUDIO_STREAM_STATE_CLOSED) {
+            ; // CLOSED is a final state
+        } else if (mState == AAUDIO_STREAM_STATE_DISCONNECTED
+                && state != AAUDIO_STREAM_STATE_CLOSED) {
+            ; // Once DISCONNECTED, we can only move to CLOSED state.
+        } else {
+            mState = state;
+        }
     }
 
     void setDeviceId(int32_t deviceId) {
