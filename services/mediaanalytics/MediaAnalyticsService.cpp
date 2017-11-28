@@ -159,7 +159,8 @@ MediaAnalyticsService::MediaAnalyticsService()
           mMaxRecordAgeNs(kMaxRecordAgeNs),
           mMaxRecordSets(kMaxRecordSets),
           mNewSetInterval(kNewSetIntervalNs),
-          mDumpProto(MediaAnalyticsItem::PROTO_V0) {
+          mDumpProto(MediaAnalyticsItem::PROTO_V1),
+          mDumpProtoDefault(MediaAnalyticsItem::PROTO_V1) {
 
     ALOGD("MediaAnalyticsService created");
     // clear our queues
@@ -381,6 +382,7 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
     String16 summaryOption("-summary");
     bool summary = false;
     String16 protoOption("-proto");
+    int chosenProto = mDumpProtoDefault;
     String16 clearOption("-clear");
     bool clear = false;
     String16 sinceOption("-since");
@@ -400,7 +402,7 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
             i++;
             if (i < n) {
                 String8 value(args[i]);
-                int proto = MediaAnalyticsItem::PROTO_V0;       // default to original
+                int proto = MediaAnalyticsItem::PROTO_V0;
                 char *endp;
                 const char *p = value.string();
                 proto = strtol(p, &endp, 10);
@@ -410,8 +412,12 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
                     } else if (proto > MediaAnalyticsItem::PROTO_LAST) {
                         proto = MediaAnalyticsItem::PROTO_LAST;
                     }
-                    mDumpProto = proto;
+                    chosenProto = proto;
+                } else {
+                    result.append("unable to parse value for -proto\n\n");
                 }
+            } else {
+                result.append("missing value for -proto\n\n");
             }
         } else if (args[i] == sinceOption) {
             i++;
@@ -437,7 +443,7 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
         } else if (args[i] == helpOption) {
             result.append("Recognized parameters:\n");
             result.append("-help        this help message\n");
-            result.append("-proto X     dump using protocol X (defaults to 1)");
+            result.append("-proto #     dump using protocol #");
             result.append("-summary     show summary info\n");
             result.append("-clear       clears out saved records\n");
             result.append("-only X      process records for component X\n");
@@ -449,6 +455,8 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
     }
 
     Mutex::Autolock _l(mLock);
+
+    mDumpProto = chosenProto;
 
     // we ALWAYS dump this piece
     snprintf(buffer, SIZE, "Dump of the %s process:\n", kServiceName);
