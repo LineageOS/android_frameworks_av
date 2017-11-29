@@ -251,6 +251,36 @@ typedef enum {
      * @see ACameraDevice_createCaptureRequest
      */
     TEMPLATE_MANUAL = 6,
+
+    /**
+     * A template for selecting camera parameters that match TEMPLATE_PREVIEW as closely as
+     * possible while improving the camera output for motion tracking use cases.
+     *
+     * <p>This template is best used by applications that are frequently switching between motion
+     * tracking use cases and regular still capture use cases, to minimize the IQ changes
+     * when swapping use cases.</p>
+     *
+     * <p>This template is guaranteed to be supported on camera devices that support the
+     * {@link ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_MOTION_TRACKING} capability.</p>
+     *
+     * @see ACameraDevice_createCaptureRequest
+     */
+    TEMPLATE_MOTION_TRACKING_PREVIEW = 7,
+
+    /**
+     * A template for selecting camera parameters that maximize the quality of camera output for
+     * motion tracking use cases.
+     *
+     * <p>This template is best used by applications dedicated to motion tracking applications,
+     * which aren't concerned about fast switches between motion tracking and other use cases.</p>
+     *
+     * <p>This template is guaranteed to be supported on camera devices that support the
+     * {@link ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_MOTION_TRACKING} capability.</p>
+     *
+     * @see ACameraDevice_createCaptureRequest
+     */
+    TEMPLATE_MOTION_TRACKING_BEST = 8,
+
 } ACameraDevice_request_template;
 
 /**
@@ -760,4 +790,3 @@ __END_DECLS
 #endif /* _NDK_CAMERA_DEVICE_H */
 
 /** @} */
-
