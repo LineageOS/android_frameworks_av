@@ -47,6 +47,9 @@
 #ifdef FLOAT_EFFECT_CHAIN
 // define FLOAT_AUX to process aux effect buffers in float (FLOAT_EFFECT_CHAIN must be defined)
 #define FLOAT_AUX
+
+// define MULTICHANNEL_EFFECT_CHAIN to allow multichannel effects (FLOAT_EFFECT_CHAIN defined)
+#define MULTICHANNEL_EFFECT_CHAIN
 #endif
 
 #endif // ANDROID_AUDIOFLINGER_CONFIGURATION_H
