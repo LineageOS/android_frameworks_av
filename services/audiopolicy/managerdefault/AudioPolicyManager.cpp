@@ -5595,6 +5595,11 @@ void AudioPolicyManager::filterSurroundFormats(FormatVector *formatsPtr) {
             case AUDIO_FORMAT_E_AC3:
             case AUDIO_FORMAT_DTS:
             case AUDIO_FORMAT_DTS_HD:
+                // If ALWAYS, remove all other surround formats here since we will add them later.
+                if (forceUse == AUDIO_POLICY_FORCE_ENCODED_SURROUND_ALWAYS) {
+                    formats.removeAt(formatIndex);
+                    formatIndex--;
+                }
                 supportsOtherSurround = true;
                 break;
             case AUDIO_FORMAT_IEC61937:
@@ -5640,8 +5645,7 @@ void AudioPolicyManager::filterSurroundFormats(FormatVector *formatsPtr) {
         // If ALWAYS, add support for raw surround formats if all are missing.
         // This assumes that if any of these formats are reported by the HAL
         // then the report is valid and should not be modified.
-        if ((forceUse == AUDIO_POLICY_FORCE_ENCODED_SURROUND_ALWAYS)
-                && !supportsOtherSurround) {
+        if (forceUse == AUDIO_POLICY_FORCE_ENCODED_SURROUND_ALWAYS) {
             formats.add(AUDIO_FORMAT_E_AC3);
             formats.add(AUDIO_FORMAT_DTS);
             formats.add(AUDIO_FORMAT_DTS_HD);
