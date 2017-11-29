@@ -43,6 +43,7 @@ struct CaptureRequest : public Parcelable {
     CameraMetadata          mMetadata;
     Vector<sp<Surface> >    mSurfaceList;
     bool                    mIsReprocess;
+    void*                   mContext; // arbitrary user context from NDK apps, null for java apps
 
     /**
      * Keep impl up-to-date with CaptureRequest.java in frameworks/base

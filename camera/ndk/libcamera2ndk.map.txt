@@ -26,9 +26,11 @@ LIBCAMERA2NDK {
     ACameraOutputTarget_create;
     ACameraOutputTarget_free;
     ACaptureRequest_addTarget;
+    ACaptureRequest_copy;
     ACaptureRequest_free;
     ACaptureRequest_getAllTags;
     ACaptureRequest_getConstEntry;
+    ACaptureRequest_getUserContext;
     ACaptureRequest_removeTarget;
     ACaptureRequest_setEntry_double;
     ACaptureRequest_setEntry_float;
@@ -36,6 +38,7 @@ LIBCAMERA2NDK {
     ACaptureRequest_setEntry_i64;
     ACaptureRequest_setEntry_rational;
     ACaptureRequest_setEntry_u8;
+    ACaptureRequest_setUserContext;
     ACaptureSessionOutputContainer_add;
     ACaptureSessionOutputContainer_create;
     ACaptureSessionOutputContainer_free;

@@ -305,6 +305,58 @@ void ACaptureRequest_free(ACaptureRequest* request);
 
 #endif /* __ANDROID_API__ >= 24 */
 
+#if __ANDROID_API__ >= 28
+
+/**
+ * Associate an arbitrary user context pointer to the {@link ACaptureRequest}
+ *
+ * This method is useful for user to identify the capture request in capture session callbacks.
+ * The context is NULL for newly created request.
+ * {@link ACameraOutputTarget_free} will not free the context. Also calling this method twice
+ * will not cause the previous context be freed.
+ * Also note that calling this method after the request has been sent to capture session will not
+ * change the context pointer in the capture callbacks.
+ *
+ * @param request the {@link ACaptureRequest} of interest.
+ * @param context the user context pointer to be associated with this capture request.
+ *
+ * @return <ul>
+ *         <li>{@link ACAMERA_OK} if the method call succeeds.</li>
+ *         <li>{@link ACAMERA_ERROR_INVALID_PARAMETER} if request is NULL.</li></ul>
+ */
+camera_status_t ACaptureRequest_setUserContext(
+        ACaptureRequest* request, void* context);
+
+/**
+ * Get the user context pointer of the {@link ACaptureRequest}
+ *
+ * This method is useful for user to identify the capture request in capture session callbacks.
+ * The context is NULL for newly created request.
+ *
+ * @param request the {@link ACaptureRequest} of interest.
+ * @param context the user context pointer of this capture request.
+ *
+ * @return <ul>
+ *         <li>{@link ACAMERA_OK} if the method call succeeds.</li>
+ *         <li>{@link ACAMERA_ERROR_INVALID_PARAMETER} if request is NULL.</li></ul>
+ */
+camera_status_t ACaptureRequest_getUserContext(
+        const ACaptureRequest* request, /*out*/void** context);
+
+/**
+ * Create a copy of input {@link ACaptureRequest}.
+ *
+ * <p>The returned ACaptureRequest must be freed by the application by {@link ACaptureRequest_free}
+ * after application is done using it.</p>
+ *
+ * @param src the input {@link ACaptureRequest} to be copied.
+ *
+ * @return a valid ACaptureRequest pointer or NULL if the input request cannot be copied.
+ */
+ACaptureRequest* ACaptureRequest_copy(const ACaptureRequest* src);
+
+#endif /* __ANDROID_API__ >= 28 */
+
 __END_DECLS
 
 #endif /* _NDK_CAPTURE_REQUEST_H */
