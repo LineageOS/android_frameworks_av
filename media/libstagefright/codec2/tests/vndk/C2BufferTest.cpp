@@ -38,7 +38,7 @@ public:
     ~C2BufferTest() = default;
 
     void allocateLinear(size_t capacity) {
-        C2Status err = mLinearAllocator->newLinearAllocation(
+        c2_status_t err = mLinearAllocator->newLinearAllocation(
                 capacity,
                 { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
                 &mLinearAllocation);
@@ -50,7 +50,7 @@ public:
 
     void mapLinear(size_t offset, size_t size, uint8_t **addr) {
         ASSERT_TRUE(mLinearAllocation);
-        C2Status err = mLinearAllocation->map(
+        c2_status_t err = mLinearAllocation->map(
                 offset,
                 size,
                 { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
@@ -82,7 +82,7 @@ public:
     }
 
     void allocateGraphic(uint32_t width, uint32_t height) {
-        C2Status err = mGraphicAllocator->newGraphicAllocation(
+        c2_status_t err = mGraphicAllocator->newGraphicAllocation(
                 width,
                 height,
                 HAL_PIXEL_FORMAT_YCBCR_420_888,
@@ -96,7 +96,7 @@ public:
 
     void mapGraphic(C2Rect rect, C2PlaneLayout *layout, uint8_t **addr) {
         ASSERT_TRUE(mGraphicAllocation);
-        C2Status err = mGraphicAllocation->map(
+        c2_status_t err = mGraphicAllocation->map(
                 rect,
                 { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
                 // TODO: fence

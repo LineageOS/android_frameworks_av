@@ -27,7 +27,7 @@ class C2BasicLinearBlockPool : public C2BlockPool {
 public:
     explicit C2BasicLinearBlockPool(const std::shared_ptr<C2Allocator> &allocator);
 
-    virtual ~C2BasicLinearBlockPool() = default;
+    virtual ~C2BasicLinearBlockPool() override = default;
 
     virtual C2Allocator::id_t getAllocatorId() const override {
         return mAllocator->getId();
@@ -37,7 +37,7 @@ public:
         return BASIC_LINEAR;
     }
 
-    virtual C2Status fetchLinearBlock(
+    virtual c2_status_t fetchLinearBlock(
             uint32_t capacity,
             C2MemoryUsage usage,
             std::shared_ptr<C2LinearBlock> *block /* nonnull */) override;
@@ -52,7 +52,7 @@ class C2BasicGraphicBlockPool : public C2BlockPool {
 public:
     explicit C2BasicGraphicBlockPool(const std::shared_ptr<C2Allocator> &allocator);
 
-    virtual ~C2BasicGraphicBlockPool() = default;
+    virtual ~C2BasicGraphicBlockPool() override = default;
 
     virtual C2Allocator::id_t getAllocatorId() const override {
         return mAllocator->getId();
@@ -62,7 +62,7 @@ public:
         return BASIC_GRAPHIC;
     }
 
-    virtual C2Status fetchGraphicBlock(
+    virtual c2_status_t fetchGraphicBlock(
             uint32_t width,
             uint32_t height,
             uint32_t format,

@@ -246,7 +246,7 @@ public:
 //     { OMX_VIDEO_AVCProfileMain,     OMX_VIDEO_AVCLevel52 },
 //     { OMX_VIDEO_AVCProfileHigh,     OMX_VIDEO_AVCLevel52 },
 // };
-C2SoftAvcDecIntf::C2SoftAvcDecIntf(const char *name, node_id id)
+C2SoftAvcDecIntf::C2SoftAvcDecIntf(const char *name, c2_node_id_t id)
     : mName(name),
       mId(id),
       mDomainInfo(C2DomainVideo),
@@ -434,11 +434,11 @@ C2String C2SoftAvcDecIntf::getName() const {
     return mName;
 }
 
-node_id C2SoftAvcDecIntf::getId() const {
+c2_node_id_t C2SoftAvcDecIntf::getId() const {
     return mId;
 }
 
-C2Status C2SoftAvcDecIntf::query_nb(
+c2_status_t C2SoftAvcDecIntf::query_nb(
         const std::vector<C2Param* const> & stackParams,
         const std::vector<C2Param::Index> & heapParamIndices,
         std::vector<std::unique_ptr<C2Param>>* const heapParams) const {
@@ -473,10 +473,10 @@ C2Status C2SoftAvcDecIntf::query_nb(
     return C2_OK;
 }
 
-C2Status C2SoftAvcDecIntf::config_nb(
+c2_status_t C2SoftAvcDecIntf::config_nb(
         const std::vector<C2Param* const> &params,
         std::vector<std::unique_ptr<C2SettingResult>>* const failures) {
-    C2Status err = C2_OK;
+    c2_status_t err = C2_OK;
     for (C2Param *param : params) {
         uint32_t index = restoreIndex(param);
         if (param->index() == mOutputBlockPools.get()->index()) {
@@ -504,20 +504,20 @@ C2Status C2SoftAvcDecIntf::config_nb(
     return err;
 }
 
-C2Status C2SoftAvcDecIntf::commit_sm(
+c2_status_t C2SoftAvcDecIntf::commit_sm(
         const std::vector<C2Param* const> &params,
         std::vector<std::unique_ptr<C2SettingResult>>* const failures) {
     // TODO
     return config_nb(params, failures);
 }
 
-C2Status C2SoftAvcDecIntf::createTunnel_sm(node_id targetComponent) {
+c2_status_t C2SoftAvcDecIntf::createTunnel_sm(c2_node_id_t targetComponent) {
     // Tunneling is not supported
     (void) targetComponent;
     return C2_OMITTED;
 }
 
-C2Status C2SoftAvcDecIntf::releaseTunnel_sm(node_id targetComponent) {
+c2_status_t C2SoftAvcDecIntf::releaseTunnel_sm(c2_node_id_t targetComponent) {
     // Tunneling is not supported
     (void) targetComponent;
     return C2_OMITTED;
@@ -527,15 +527,15 @@ std::shared_ptr<C2ParamReflector> C2SoftAvcDecIntf::getParamReflector() const {
     return mParamReflector;
 }
 
-C2Status C2SoftAvcDecIntf::getSupportedParams(
+c2_status_t C2SoftAvcDecIntf::querySupportedParams_nb(
         std::vector<std::shared_ptr<C2ParamDescriptor>> * const params) const {
     params->insert(params->begin(), mParamDescs.begin(), mParamDescs.end());
     return C2_OK;
 }
 
-C2Status C2SoftAvcDecIntf::getSupportedValues(
+c2_status_t C2SoftAvcDecIntf::querySupportedValues_nb(
         std::vector<C2FieldSupportedValuesQuery> &fields) const {
-    C2Status res = C2_OK;
+    c2_status_t res = C2_OK;
     for (C2FieldSupportedValuesQuery &query : fields) {
         if (mSupportedValues.count(query.field) == 0) {
             query.status = C2_BAD_INDEX;
@@ -642,10 +642,8 @@ private:
 
 C2SoftAvcDec::C2SoftAvcDec(
         const char *name,
-        node_id id,
-        const std::shared_ptr<C2ComponentListener> &listener)
+        c2_node_id_t id)
     : mIntf(std::make_shared<C2SoftAvcDecIntf>(name, id)),
-      mListener(listener),
       mThread(new QueueProcessThread),
       mCodecCtx(NULL),
       mFlushOutBuffer(NULL),
@@ -666,7 +664,22 @@ C2SoftAvcDec::~C2SoftAvcDec() {
     CHECK_EQ(deInitDecoder(), (status_t)OK);
 }
 
-C2Status C2SoftAvcDec::queue_nb(
+c2_status_t C2SoftAvcDec::setListener_sm(
+        const std::shared_ptr<C2Component::Listener> &listener) {
+    std::unique_lock<std::mutex> lock(mListenerLock);
+    // TODO: we really need to lock the running check as well
+    if (listener && mThread->isRunning()) {
+        return C2_BAD_STATE;
+    }
+    mListener = listener;
+    if (mActiveListener && !listener) {
+        // wait until no active listeners are in use
+        mActiveListenerChanged.wait(lock, [this]{ return !mActiveListener; });
+    }
+    return C2_OK;
+}
+
+c2_status_t C2SoftAvcDec::queue_nb(
         std::list<std::unique_ptr<C2Work>>* const items) {
     if (!mThread->isRunning()) {
         return C2_CORRUPTED;
@@ -681,16 +694,16 @@ C2Status C2SoftAvcDec::queue_nb(
     return C2_OK;
 }
 
-C2Status C2SoftAvcDec::announce_nb(const std::vector<C2WorkOutline> &items) {
+c2_status_t C2SoftAvcDec::announce_nb(const std::vector<C2WorkOutline> &items) {
     // Tunneling is not supported
     (void) items;
     return C2_OMITTED;
 }
 
-C2Status C2SoftAvcDec::flush_sm(
-        bool flushThrough, std::list<std::unique_ptr<C2Work>>* const flushedWork) {
+c2_status_t C2SoftAvcDec::flush_sm(
+        flush_mode_t mode, std::list<std::unique_ptr<C2Work>>* const flushedWork) {
     // Tunneling is not supported
-    (void) flushThrough;
+    (void) mode;
 
     if (!mThread->isRunning()) {
         return C2_CORRUPTED;
@@ -713,9 +726,9 @@ C2Status C2SoftAvcDec::flush_sm(
     return C2_OK;
 }
 
-C2Status C2SoftAvcDec::drain_nb(bool drainThrough) {
+c2_status_t C2SoftAvcDec::drain_nb(drain_mode_t mode) {
     // Tunneling is not supported
-    (void) drainThrough;
+    (void) mode;
 
     if (!mThread->isRunning()) {
         return C2_CORRUPTED;
@@ -723,20 +736,20 @@ C2Status C2SoftAvcDec::drain_nb(bool drainThrough) {
     std::unique_lock<std::mutex> lock(mQueueLock);
     if (!mQueue.empty()) {
         C2BufferPack &lastInput = mQueue.back()->input;
-        lastInput.flags = (flags_t)(lastInput.flags | BUFFERFLAG_END_OF_STREAM);
+        lastInput.flags = (C2BufferPack::flags_t)(lastInput.flags | C2BufferPack::FLAG_END_OF_STREAM);
         mQueueCond.notify_all();
     }
     return C2_OK;
 }
 
-C2Status C2SoftAvcDec::start() {
+c2_status_t C2SoftAvcDec::start() {
     if (!mThread->isRunning()) {
         mThread->start(shared_from_this());
     }
     return C2_OK;
 }
 
-C2Status C2SoftAvcDec::stop() {
+c2_status_t C2SoftAvcDec::stop() {
     ALOGV("stop");
     std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
     std::chrono::system_clock::time_point deadline = now + std::chrono::milliseconds(500);
@@ -843,7 +856,16 @@ void C2SoftAvcDec::processQueue() {
     }
 
     if (!done.empty()) {
-        mListener->onWorkDone(shared_from_this(), std::move(done));
+        std::unique_lock<std::mutex> lock(mListenerLock);
+        mActiveListener = mListener;
+
+        if (mActiveListener) {
+            lock.unlock();
+            mActiveListener->onWorkDone_nb(shared_from_this(), std::move(done));
+            lock.lock();
+            mActiveListener.reset();
+            mActiveListenerChanged.notify_all();
+        }
     }
 }
 
@@ -1206,14 +1228,14 @@ void C2SoftAvcDec::process(std::unique_ptr<C2Work> &work) {
 
         std::vector<std::unique_ptr<C2Work>> done;
         done.emplace_back(std::move(work));
-        mListener->onWorkDone(shared_from_this(), std::move(done));
-        if (!(work->input.flags & BUFFERFLAG_END_OF_STREAM)) {
+        mListener->onWorkDone_nb(shared_from_this(), std::move(done));
+        if (!(work->input.flags & C2BufferPack::FLAG_END_OF_STREAM)) {
             return;
         }
 
         mReceivedEOS = true;
         // TODO: flush
-    } else if (work->input.flags & BUFFERFLAG_END_OF_STREAM) {
+    } else if (work->input.flags & C2BufferPack::FLAG_END_OF_STREAM) {
         mReceivedEOS = true;
     }
 
@@ -1231,7 +1253,7 @@ void C2SoftAvcDec::process(std::unique_ptr<C2Work> &work) {
             mIntf->mOutputBlockPools->flexCount() ?
                     mIntf->mOutputBlockPools->m.mValues[0] : C2BlockPool::BASIC_GRAPHIC;
         if (!mOutputBlockPool || mOutputBlockPool->getLocalId() != poolId) {
-            C2Status err = GetCodec2BlockPool(poolId, shared_from_this(), &mOutputBlockPool);
+            c2_status_t err = GetCodec2BlockPool(poolId, shared_from_this(), &mOutputBlockPool);
             if (err != C2_OK) {
                 // TODO: trip
             }
@@ -1359,7 +1381,7 @@ void C2SoftAvcDec::process(std::unique_ptr<C2Work> &work) {
             done[0]->worklets.front()->output.buffers.emplace_back(
                     std::make_shared<GraphicBuffer>(std::move(mAllocatedBlock)));
             done[0]->worklets.front()->output.ordinal = done[0]->input.ordinal;
-            mListener->onWorkDone(shared_from_this(), std::move(done));
+            mListener->onWorkDone_nb(shared_from_this(), std::move(done));
         } else if (mIsInFlush) {
             ALOGV("flush");
             /* If in flush mode and no output is returned by the codec,
@@ -1440,4 +1462,29 @@ status_t C2SoftAvcDec::handleColorAspectsChange() {
     return C2_OK;
 }
 
+class C2SoftAvcDecFactory : public C2ComponentFactory {
+public:
+    virtual c2_status_t createComponent(
+            std::shared_ptr<C2Component>* const component, c2_node_id_t id) override {
+        *component = std::make_shared<C2SoftAvcDec>("avc", id);
+        return C2_OK;
+    }
+
+    virtual c2_status_t createInterface(
+            std::shared_ptr<C2ComponentInterface>* const interface, c2_node_id_t id) override {
+        *interface = std::make_shared<C2SoftAvcDecIntf>("avc", id);
+        return C2_OK;
+    }
+
+    virtual ~C2SoftAvcDecFactory() override = default;
+};
+
 }  // namespace android
+
+extern "C" ::android::C2ComponentFactory* CreateCodec2Factory() {
+    return new ::android::C2SoftAvcDecFactory();
+}
+
+extern "C" void DestroyCodec2Factory(::android::C2ComponentFactory* factory) {
+    delete factory;
+}

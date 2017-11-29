@@ -48,9 +48,62 @@ std::shared_ptr<C2AllocatorStore> GetCodec2PlatformAllocatorStore();
  * \retval C2_CORRUPTED some unknown, unrecoverable error occured during operation (unexpected,
  *                      this return value is only possible for basic pools)
  */
-C2Status GetCodec2BlockPool(
+c2_status_t GetCodec2BlockPool(
         C2BlockPool::local_id_t id, std::shared_ptr<const C2Component> component,
         std::shared_ptr<C2BlockPool> *pool);
+
+/**
+ * Component factory object that enables to create a component and/or interface from a dynamically
+ * linked library. This is needed because the component/interfaces are managed objects, but we
+ * cannot safely create a managed object and pass it in C.
+ *
+ * Components/interfaces typically inherit from std::enable_shared_from_this, but C requires
+ * passing simple pointer, and shared_ptr constructor needs to know the class to be constructed
+ * derives from enable_shared_from_this.
+ *
+ */
+class C2ComponentFactory {
+public:
+    /**
+     * Creates a component.
+     *
+     * This method SHALL return within 100ms.
+     *
+     * \param component shared pointer where the created component is stored. Cleared on
+     *                  failure and updated on success.
+     * \param id        component ID for the created component
+     *
+     * \retval C2_OK        the component was created successfully
+     * \retval C2_TIMED_OUT could not create the component within the time limit (unexpected)
+     * \retval C2_CORRUPTED some unknown error prevented the creation of the component (unexpected)
+     *
+     * \retval C2_NO_MEMORY not enough memory to create the component
+     */
+    virtual c2_status_t createComponent(
+            std::shared_ptr<C2Component>* const component, c2_node_id_t id) = 0;
+
+    /**
+     * Creates a component interface.
+     *
+     * This method SHALL return within 100ms.
+     *
+     * \param interface shared pointer where the created interface is stored. Cleared on
+     *                  failure and updated on success.
+     * \param id        component interface ID for the created interface
+     *
+     * \retval C2_OK        the component interface was created successfully
+     * \retval C2_TIMED_OUT could not create the component interface within the time limit
+     *                      (unexpected)
+     * \retval C2_CORRUPTED some unknown error prevented the creation of the component interface
+     *                      (unexpected)
+     *
+     * \retval C2_NO_MEMORY not enough memory to create the component interface
+     */
+    virtual c2_status_t createInterface(
+            std::shared_ptr<C2ComponentInterface>* const interface, c2_node_id_t id) = 0;
+
+    virtual ~C2ComponentFactory() = default;
+};
 
 } // namespace android
 
