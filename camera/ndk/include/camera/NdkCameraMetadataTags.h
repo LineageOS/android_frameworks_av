@@ -1635,6 +1635,28 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_CONTROL_ENABLE_ZSL =                                // byte (acamera_metadata_enum_android_control_enable_zsl_t)
             ACAMERA_CONTROL_START + 41,
+    /**
+     * <p>Whether a significant scene change is detected within the currently-set AF
+     * region(s).</p>
+     *
+     * <p>Type: int32 (acamera_metadata_enum_android_control_af_scene_change_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     * </ul></p>
+     *
+     * <p>When the camera focus routine detects a change in the scene it is looking at,
+     * such as a large shift in camera viewpoint, significant motion in the scene, or a
+     * significant illumination change, this value will be set to DETECTED for a single capture
+     * result. Otherwise the value will be NOT_DETECTED. The threshold for detection is similar
+     * to what would trigger a new passive focus scan to begin in CONTINUOUS autofocus modes.</p>
+     * <p>afSceneChange may be DETECTED only if afMode is AF_MODE_CONTINUOUS_VIDEO or
+     * AF_MODE_CONTINUOUS_PICTURE. In other AF modes, afSceneChange must be NOT_DETECTED.</p>
+     * <p>This key will be available if the camera device advertises this key via {@link ACAMERA_REQUEST_AVAILABLE_RESULT_KEYS }.</p>
+     */
+    ACAMERA_CONTROL_AF_SCENE_CHANGE =                           // int32 (acamera_metadata_enum_android_control_af_scene_change_t)
+            ACAMERA_CONTROL_START + 42,
     ACAMERA_CONTROL_END,
 
     /**
@@ -6114,6 +6136,20 @@ typedef enum acamera_metadata_enum_acamera_control_enable_zsl {
     ACAMERA_CONTROL_ENABLE_ZSL_TRUE                                  = 1,
 
 } acamera_metadata_enum_android_control_enable_zsl_t;
+
+// ACAMERA_CONTROL_AF_SCENE_CHANGE
+typedef enum acamera_metadata_enum_acamera_control_af_scene_change {
+    /**
+     * <p>Scene change is not detected within the AF region(s).</p>
+     */
+    ACAMERA_CONTROL_AF_SCENE_CHANGE_NOT_DETECTED                     = 0,
+
+    /**
+     * <p>Scene change is detected within the AF region(s).</p>
+     */
+    ACAMERA_CONTROL_AF_SCENE_CHANGE_DETECTED                         = 1,
+
+} acamera_metadata_enum_android_control_af_scene_change_t;
 
 
 
