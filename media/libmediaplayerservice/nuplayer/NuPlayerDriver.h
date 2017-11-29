@@ -84,6 +84,8 @@ struct NuPlayerDriver : public MediaPlayerInterface {
     void notifySetSurfaceComplete();
     void notifyDuration(int64_t durationUs);
     void notifyMorePlayingTimeUs(int64_t timeUs);
+    void notifyMoreRebufferingTimeUs(int64_t timeUs);
+    void notifyRebufferingWhenExit(bool status);
     void notifySeekComplete();
     void notifySeekComplete_l();
     void notifyListener(int msg, int ext1 = 0, int ext2 = 0, const Parcel *in = NULL);
@@ -126,6 +128,9 @@ private:
     int64_t mPositionUs;
     bool mSeekInProgress;
     int64_t mPlayingTimeUs;
+    int64_t mRebufferingTimeUs;
+    int32_t mRebufferingEvents;
+    bool mRebufferingAtExit;
     // <<<
 
     sp<ALooper> mLooper;

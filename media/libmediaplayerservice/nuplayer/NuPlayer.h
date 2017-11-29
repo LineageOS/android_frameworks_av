@@ -183,6 +183,10 @@ private:
     void stopPlaybackTimer(const char *where);
     void startPlaybackTimer(const char *where);
 
+    int64_t mLastStartedRebufferingTimeNs;
+    void startRebufferingTimer();
+    void stopRebufferingTimer(bool exitingPlayback);
+
     int64_t mPreviousSeekTimeUs;
 
     List<sp<Action> > mDeferredActions;

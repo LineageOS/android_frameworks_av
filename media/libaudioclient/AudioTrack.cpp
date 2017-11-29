@@ -2651,23 +2651,28 @@ bool AudioTrack::isOffloadedOrDirect() const
 
 status_t AudioTrack::dump(int fd, const Vector<String16>& args __unused) const
 {
-
-    const size_t SIZE = 256;
-    char buffer[SIZE];
     String8 result;
 
     result.append(" AudioTrack::dump\n");
-    snprintf(buffer, 255, "  stream type(%d), left - right volume(%f, %f)\n", mStreamType,
-            mVolume[AUDIO_INTERLEAVE_LEFT], mVolume[AUDIO_INTERLEAVE_RIGHT]);
-    result.append(buffer);
-    snprintf(buffer, 255, "  format(%d), channel count(%d), frame count(%zu)\n", mFormat,
-            mChannelCount, mFrameCount);
-    result.append(buffer);
-    snprintf(buffer, 255, "  sample rate(%u), speed(%f), status(%d)\n",
-            mSampleRate, mPlaybackRate.mSpeed, mStatus);
-    result.append(buffer);
-    snprintf(buffer, 255, "  state(%d), latency (%d)\n", mState, mLatency);
-    result.append(buffer);
+    result.appendFormat("  status(%d), state(%d), session Id(%d), flags(%x)\n",
+                        mStatus, mState, mSessionId, mFlags);
+    result.appendFormat("  stream type(%d), left - right volume(%f, %f)\n",
+                        (mStreamType == AUDIO_STREAM_DEFAULT) ?
+                                audio_attributes_to_stream_type(&mAttributes) : mStreamType,
+                        mVolume[AUDIO_INTERLEAVE_LEFT], mVolume[AUDIO_INTERLEAVE_RIGHT]);
+    result.appendFormat("  format(%x), channel mask(%x), channel count(%u)\n",
+                  mFormat, mChannelMask, mChannelCount);
+    result.appendFormat("  sample rate(%u), original sample rate(%u), speed(%f)\n",
+                  mSampleRate, mOriginalSampleRate, mPlaybackRate.mSpeed);
+    result.appendFormat("  frame count(%zu), req. frame count(%zu)\n",
+                  mFrameCount, mReqFrameCount);
+    result.appendFormat("  notif. frame count(%u), req. notif. frame count(%u),"
+            " req. notif. per buff(%u)\n",
+             mNotificationFramesAct, mNotificationFramesReq, mNotificationsPerBufferReq);
+    result.appendFormat("  latency (%d), selected device Id(%d), routed device Id(%d)\n",
+                        mLatency, mSelectedDeviceId, mRoutedDeviceId);
+    result.appendFormat("  output(%d) AF latency (%u) AF frame count(%zu) AF SampleRate(%u)\n",
+                        mOutput, mAfLatency, mAfFrameCount, mAfSampleRate);
     ::write(fd, result.string(), result.size());
     return NO_ERROR;
 }

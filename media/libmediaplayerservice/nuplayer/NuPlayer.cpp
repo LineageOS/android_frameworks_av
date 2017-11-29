@@ -1311,6 +1311,7 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
 
             mResetting = true;
             stopPlaybackTimer("kWhatReset");
+            stopRebufferingTimer(true);
 
             mDeferredActions.push_back(
                     new FlushDecoderAction(
@@ -1601,6 +1602,37 @@ void NuPlayer::stopPlaybackTimer(const char *where) {
             }
         }
         mLastStartedPlayingTimeNs = 0;
+    }
+}
+
+void NuPlayer::startRebufferingTimer() {
+    Mutex::Autolock autoLock(mPlayingTimeLock);
+    if (mLastStartedRebufferingTimeNs == 0) {
+        mLastStartedRebufferingTimeNs = systemTime();
+        ALOGV("startRebufferingTimer() time %20" PRId64 "",  mLastStartedRebufferingTimeNs);
+    }
+}
+
+void NuPlayer::stopRebufferingTimer(bool exitingPlayback) {
+    Mutex::Autolock autoLock(mPlayingTimeLock);
+
+    ALOGV("stopRebufferTimer()  time %20" PRId64 " (exiting %d)", mLastStartedRebufferingTimeNs, exitingPlayback);
+
+    if (mLastStartedRebufferingTimeNs != 0) {
+        sp<NuPlayerDriver> driver = mDriver.promote();
+        if (driver != NULL) {
+            int64_t now = systemTime();
+            int64_t rebuffered = now - mLastStartedRebufferingTimeNs;
+            ALOGV("stopRebufferingTimer()  log  %20" PRId64 "", rebuffered);
+
+            if (rebuffered > 0) {
+                driver->notifyMoreRebufferingTimeUs((rebuffered+500)/1000);
+                if (exitingPlayback) {
+                    driver->notifyRebufferingWhenExit(true);
+                }
+            }
+        }
+        mLastStartedRebufferingTimeNs = 0;
     }
 }
 
@@ -2250,6 +2282,7 @@ void NuPlayer::performReset() {
     CHECK(mVideoDecoder == NULL);
 
     stopPlaybackTimer("performReset");
+    stopRebufferingTimer(true);
 
     cancelPollDuration();
 
@@ -2503,6 +2536,7 @@ void NuPlayer::onSourceNotify(const sp<AMessage> &msg) {
             if (mStarted) {
                 ALOGI("buffer low, pausing...");
 
+                startRebufferingTimer();
                 mPausedForBuffering = true;
                 onPause();
             }
@@ -2516,6 +2550,7 @@ void NuPlayer::onSourceNotify(const sp<AMessage> &msg) {
             if (mStarted) {
                 ALOGI("buffer ready, resuming...");
 
+                stopRebufferingTimer(false);
                 mPausedForBuffering = false;
 
                 // do not resume yet if client didn't unpause
