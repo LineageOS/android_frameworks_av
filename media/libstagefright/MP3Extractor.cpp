@@ -672,6 +672,15 @@ bool SniffMP3(
     off64_t pos = 0;
     off64_t post_id3_pos;
     uint32_t header;
+    uint8_t mpeg_header[5];
+    if (source->readAt(0, mpeg_header, sizeof(mpeg_header)) < (ssize_t)sizeof(mpeg_header)) {
+        return false;
+    }
+
+    if (!memcmp("\x00\x00\x01\xba", mpeg_header, 4) && (mpeg_header[4] >> 4) == 2) {
+        ALOGV("MPEG1PS container is not supported!");
+        return false;
+    }
     if (!Resync(source, 0, &pos, &post_id3_pos, &header)) {
         return false;
     }
