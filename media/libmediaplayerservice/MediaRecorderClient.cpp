@@ -411,6 +411,25 @@ void MediaRecorderClient::ServiceDeathNotifier::unlinkToDeath() {
     }
 }
 
+MediaRecorderClient::AudioDeviceUpdatedNotifier::AudioDeviceUpdatedNotifier(
+        const sp<IMediaRecorderClient>& listener) {
+    mListener = listener;
+}
+
+MediaRecorderClient::AudioDeviceUpdatedNotifier::~AudioDeviceUpdatedNotifier() {
+}
+
+void MediaRecorderClient::AudioDeviceUpdatedNotifier::onAudioDeviceUpdate(
+        audio_io_handle_t audioIo,
+        audio_port_handle_t deviceId) {
+    sp<IMediaRecorderClient> listener = mListener.promote();
+    if (listener != NULL) {
+        listener->notify(MEDIA_RECORDER_AUDIO_ROUTING_CHANGED, audioIo, deviceId);
+    } else {
+        ALOGW("listener for process %d death is gone", MEDIA_RECORDER_AUDIO_ROUTING_CHANGED);
+    }
+}
+
 void MediaRecorderClient::clearDeathNotifiers_l() {
     if (mCameraDeathListener != nullptr) {
         mCameraDeathListener->unlinkToDeath();
@@ -459,6 +478,9 @@ status_t MediaRecorderClient::setListener(const sp<IMediaRecorderClient>& listen
             MediaPlayerService::MEDIACODEC_PROCESS_DEATH);
     omx->linkToDeath(mCodecDeathListener, 0);
 
+    mAudioDeviceUpdatedNotifier = new AudioDeviceUpdatedNotifier(listener);
+    mRecorder->setAudioDeviceCallback(mAudioDeviceUpdatedNotifier);
+
     return OK;
 }
 
@@ -479,4 +501,30 @@ status_t MediaRecorderClient::dump(int fd, const Vector<String16>& args) {
     return OK;
 }
 
+status_t MediaRecorderClient::setInputDevice(audio_port_handle_t deviceId) {
+    ALOGV("setInputDevice(%d)", deviceId);
+    Mutex::Autolock lock(mLock);
+    if (mRecorder != NULL) {
+        return mRecorder->setInputDevice(deviceId);
+    }
+    return NO_INIT;
+}
+
+status_t MediaRecorderClient::getRoutedDeviceId(audio_port_handle_t* deviceId) {
+    ALOGV("getRoutedDeviceId");
+    Mutex::Autolock lock(mLock);
+    if (mRecorder != NULL) {
+        return mRecorder->getRoutedDeviceId(deviceId);
+    }
+    return NO_INIT;
+}
+
+status_t MediaRecorderClient::enableAudioDeviceCallback(bool enabled) {
+    ALOGV("enableDeviceCallback: %d", enabled);
+    Mutex::Autolock lock(mLock);
+    if (mRecorder != NULL) {
+        return mRecorder->enableAudioDeviceCallback(enabled);
+    }
+    return NO_INIT;
+}
 }; // namespace android

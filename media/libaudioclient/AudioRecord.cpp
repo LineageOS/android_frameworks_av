@@ -89,7 +89,8 @@ AudioRecord::AudioRecord(
         audio_input_flags_t flags,
         uid_t uid,
         pid_t pid,
-        const audio_attributes_t* pAttributes)
+        const audio_attributes_t* pAttributes,
+        audio_port_handle_t selectedDeviceId)
     : mActive(false),
       mStatus(NO_INIT),
       mOpPackageName(opPackageName),
@@ -97,12 +98,11 @@ AudioRecord::AudioRecord(
       mPreviousPriority(ANDROID_PRIORITY_NORMAL),
       mPreviousSchedulingGroup(SP_DEFAULT),
       mProxy(NULL),
-      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
       mPortId(AUDIO_PORT_HANDLE_NONE)
 {
     mStatus = set(inputSource, sampleRate, format, channelMask, frameCount, cbf, user,
             notificationFrames, false /*threadCanCallJava*/, sessionId, transferType, flags,
-            uid, pid, pAttributes);
+            uid, pid, pAttributes, selectedDeviceId);
 }
 
 AudioRecord::~AudioRecord()
@@ -148,13 +148,16 @@ status_t AudioRecord::set(
         audio_input_flags_t flags,
         uid_t uid,
         pid_t pid,
-        const audio_attributes_t* pAttributes)
+        const audio_attributes_t* pAttributes,
+        audio_port_handle_t selectedDeviceId)
 {
     ALOGV("set(): inputSource %d, sampleRate %u, format %#x, channelMask %#x, frameCount %zu, "
           "notificationFrames %u, sessionId %d, transferType %d, flags %#x, opPackageName %s "
           "uid %d, pid %d",
           inputSource, sampleRate, format, channelMask, frameCount, notificationFrames,
           sessionId, transferType, flags, String8(mOpPackageName).string(), uid, pid);
+
+    mSelectedDeviceId = selectedDeviceId;
 
     switch (transferType) {
     case TRANSFER_DEFAULT:
@@ -489,6 +492,7 @@ status_t AudioRecord::setInputDevice(audio_port_handle_t deviceId) {
                 mAudioRecord->stop();
             }
             android_atomic_or(CBLK_INVALID, &mCblk->mFlags);
+            mProxy->interrupt();
         }
     }
     return NO_ERROR;

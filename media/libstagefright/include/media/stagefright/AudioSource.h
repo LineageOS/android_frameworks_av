@@ -40,7 +40,8 @@ struct AudioSource : public MediaSource, public MediaBufferObserver {
             uint32_t channels,
             uint32_t outSampleRate = 0,
             uid_t uid = -1,
-            pid_t pid = -1);
+            pid_t pid = -1,
+            audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
 
     status_t initCheck() const;
 
@@ -57,6 +58,11 @@ struct AudioSource : public MediaSource, public MediaBufferObserver {
 
     status_t dataCallback(const AudioRecord::Buffer& buffer);
     virtual void signalBufferReturned(MediaBuffer *buffer);
+
+    status_t setInputDevice(audio_port_handle_t deviceId);
+    status_t getRoutedDeviceId(audio_port_handle_t* deviceId);
+    status_t addAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCallback>& callback);
+    status_t removeAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCallback>& callback);
 
 protected:
     virtual ~AudioSource();

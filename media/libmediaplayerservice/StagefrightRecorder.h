@@ -72,6 +72,10 @@ struct StagefrightRecorder : public MediaRecorderBase {
     virtual status_t dump(int fd, const Vector<String16> &args) const;
     // Querying a SurfaceMediaSourcer
     virtual sp<IGraphicBufferProducer> querySurfaceMediaSource() const;
+    virtual status_t setInputDevice(audio_port_handle_t deviceId);
+    virtual status_t getRoutedDeviceId(audio_port_handle_t* deviceId);
+    virtual void setAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCallback>& callback);
+    virtual status_t enableAudioDeviceCallback(bool enabled);
 
 private:
     mutable Mutex mLock;
@@ -143,6 +147,10 @@ private:
     // frame buffers will be queued and dequeued
     sp<IGraphicBufferProducer> mGraphicBufferProducer;
     sp<ALooper> mLooper;
+
+    audio_port_handle_t mSelectedDeviceId;
+    bool mDeviceCallbackEnabled;
+    wp<AudioSystem::AudioDeviceCallback> mAudioDeviceCallback;
 
     static const int kMaxHighSpeedFps = 1000;
 
