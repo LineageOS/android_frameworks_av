@@ -33,6 +33,9 @@
 // FIXME This is actually unity gain, which might not be max in future, expressed in U.12
 #define MAX_GAIN_INT AudioMixer::UNITY_GAIN_INT
 
+// This must match frameworks/av/services/audioflinger/Configuration.h
+#define FLOAT_AUX
+
 namespace android {
 
 // ----------------------------------------------------------------------------
