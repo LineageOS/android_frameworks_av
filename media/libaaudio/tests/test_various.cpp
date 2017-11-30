@@ -41,10 +41,76 @@ aaudio_data_callback_result_t MyDataCallbackProc(
 
 // Test AAudioStream_setBufferSizeInFrames()
 
+constexpr int64_t NANOS_PER_MILLISECOND = 1000 * 1000;
+
+//int foo() { // To fix Android Studio formatting when editing.
+TEST(test_various, aaudio_stop_when_open) {
+    AAudioStreamBuilder *aaudioBuilder = nullptr;
+    AAudioStream *aaudioStream = nullptr;
+
+// Use an AAudioStreamBuilder to contain requested parameters.
+    ASSERT_EQ(AAUDIO_OK, AAudio_createStreamBuilder(&aaudioBuilder));
+
+// Request stream properties.
+    AAudioStreamBuilder_setDataCallback(aaudioBuilder, MyDataCallbackProc, nullptr);
+    AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+
+// Create an AAudioStream using the Builder.
+    EXPECT_EQ(AAUDIO_OK, AAudioStreamBuilder_openStream(aaudioBuilder, &aaudioStream));
+
+
+    aaudio_stream_state_t state = AAUDIO_STREAM_STATE_UNKNOWN;
+    EXPECT_EQ(AAUDIO_OK, AAudioStream_waitForStateChange(aaudioStream,
+                                                         AAUDIO_STREAM_STATE_UNKNOWN, &state,
+                                                         1000 * NANOS_PER_MILLISECOND));
+    EXPECT_EQ(AAUDIO_STREAM_STATE_OPEN, state);
+
+    EXPECT_EQ(AAUDIO_OK, AAudioStream_requestStop(aaudioStream));
+
+    state = AAUDIO_STREAM_STATE_UNKNOWN;
+    EXPECT_EQ(AAUDIO_OK, AAudioStream_waitForStateChange(aaudioStream,
+                                                         AAUDIO_STREAM_STATE_UNKNOWN, &state, 0));
+    EXPECT_EQ(AAUDIO_STREAM_STATE_OPEN, state);
+
+    AAudioStream_close(aaudioStream);
+    AAudioStreamBuilder_delete(aaudioBuilder);
+}
+
+//int boo() { // To fix Android Studio formatting when editing.
+TEST(test_various, aaudio_flush_when_started) {
+    AAudioStreamBuilder *aaudioBuilder = nullptr;
+    AAudioStream *aaudioStream = nullptr;
+
+// Use an AAudioStreamBuilder to contain requested parameters.
+    ASSERT_EQ(AAUDIO_OK, AAudio_createStreamBuilder(&aaudioBuilder));
+
+// Request stream properties.
+    AAudioStreamBuilder_setDataCallback(aaudioBuilder, MyDataCallbackProc, nullptr);
+    AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+
+// Create an AAudioStream using the Builder.
+    EXPECT_EQ(AAUDIO_OK, AAudioStreamBuilder_openStream(aaudioBuilder, &aaudioStream));
+    EXPECT_EQ(AAUDIO_OK, AAudioStream_requestStart(aaudioStream));
+
+    aaudio_stream_state_t state = AAUDIO_STREAM_STATE_UNKNOWN;
+    EXPECT_EQ(AAUDIO_OK, AAudioStream_waitForStateChange(aaudioStream,
+                                                         AAUDIO_STREAM_STATE_STARTING, &state,
+                                                         1000 * NANOS_PER_MILLISECOND));
+    EXPECT_EQ(AAUDIO_STREAM_STATE_STARTED, state);
+
+    EXPECT_EQ(AAUDIO_ERROR_INVALID_STATE, AAudioStream_requestFlush(aaudioStream));
+
+    state = AAUDIO_STREAM_STATE_UNKNOWN;
+    EXPECT_EQ(AAUDIO_OK, AAudioStream_waitForStateChange(aaudioStream,
+                                                         AAUDIO_STREAM_STATE_UNKNOWN, &state, 0));
+    EXPECT_EQ(AAUDIO_STREAM_STATE_STARTED, state);
+
+    AAudioStream_close(aaudioStream);
+    AAudioStreamBuilder_delete(aaudioBuilder);
+}
+
 //int main() { // To fix Android Studio formatting when editing.
 TEST(test_various, aaudio_set_buffer_size) {
-
-    aaudio_result_t result = AAUDIO_OK;
     int32_t bufferCapacity;
     int32_t framesPerBurst = 0;
     int32_t actualSize = 0;
@@ -103,5 +169,4 @@ TEST(test_various, aaudio_set_buffer_size) {
 
     AAudioStream_close(aaudioStream);
     AAudioStreamBuilder_delete(aaudioBuilder);
-    printf("          result = %d = %s\n", result, AAudio_convertResultToText(result));
 }

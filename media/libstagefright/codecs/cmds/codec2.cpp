@@ -58,6 +58,9 @@
 #include <C2PlatformSupport.h>
 #include <C2Work.h>
 
+extern "C" ::android::C2ComponentFactory *CreateCodec2Factory();
+extern "C" void DestroyCodec2Factory(::android::C2ComponentFactory *);
+
 #include "../avcdec/C2SoftAvcDec.h"
 
 using namespace android;
@@ -110,22 +113,22 @@ private:
     sp<SurfaceControl> mControl;
 };
 
-class Listener : public C2ComponentListener {
+class Listener : public C2Component::Listener {
 public:
     explicit Listener(SimplePlayer *thiz) : mThis(thiz) {}
     virtual ~Listener() = default;
 
-    virtual void onWorkDone(std::weak_ptr<C2Component> component,
+    virtual void onWorkDone_nb(std::weak_ptr<C2Component> component,
                             std::vector<std::unique_ptr<C2Work>> workItems) override {
         mThis->onWorkDone(component, std::move(workItems));
     }
 
-    virtual void onTripped(std::weak_ptr<C2Component> component,
+    virtual void onTripped_nb(std::weak_ptr<C2Component> component,
                            std::vector<std::shared_ptr<C2SettingResult>> settingResult) override {
         mThis->onTripped(component, settingResult);
     }
 
-    virtual void onError(std::weak_ptr<C2Component> component,
+    virtual void onError_nb(std::weak_ptr<C2Component> component,
                          uint32_t errorCode) override {
         mThis->onError(component, errorCode);
     }
@@ -142,7 +145,7 @@ SimplePlayer::SimplePlayer()
     CHECK_EQ(mComposerClient->initCheck(), (status_t)OK);
 
     std::shared_ptr<C2AllocatorStore> store = GetCodec2PlatformAllocatorStore();
-    CHECK_EQ(store->getAllocator(C2AllocatorStore::DEFAULT_LINEAR, &mAllocIon), C2_OK);
+    CHECK_EQ(store->fetchAllocator(C2AllocatorStore::DEFAULT_LINEAR, &mAllocIon), C2_OK);
     mLinearPool = std::make_shared<C2BasicLinearBlockPool>(mAllocIon);
 
     mControl = mComposerClient->createSurface(
@@ -208,7 +211,12 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
         return;
     }
 
-    std::shared_ptr<C2Component> component(std::make_shared<C2SoftAvcDec>("avc", 0, mListener));
+    std::unique_ptr<C2ComponentFactory> factory(CreateCodec2Factory());
+    std::shared_ptr<C2Component> component;
+    (void)factory->createComponent(&component, 0);
+    DestroyCodec2Factory(factory.release());
+
+    (void)component->setListener_sm(mListener);
     std::unique_ptr<C2PortBlockPoolsTuning::output> pools =
         C2PortBlockPoolsTuning::output::alloc_unique({ (uint64_t)C2BlockPool::BASIC_GRAPHIC });
     std::vector<std::unique_ptr<C2SettingResult>> result;
@@ -322,7 +330,7 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
                 mQueueCondition.wait_for(l, 100ms);
             }
         }
-        work->input.flags = (flags_t)0;
+        work->input.flags = (C2BufferPack::flags_t)0;
         work->input.ordinal.timestamp = timestamp;
         work->input.ordinal.frame_index = numFrames;
 

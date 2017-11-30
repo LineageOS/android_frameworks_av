@@ -103,7 +103,9 @@ StagefrightRecorder::StagefrightRecorder(const String16 &opPackageName)
       mOutputFd(-1),
       mAudioSource(AUDIO_SOURCE_CNT),
       mVideoSource(VIDEO_SOURCE_LIST_END),
-      mStarted(false) {
+      mStarted(false),
+      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
+      mDeviceCallbackEnabled(false) {
 
     ALOGV("Constructor");
 
@@ -204,7 +206,7 @@ status_t StagefrightRecorder::init() {
     return OK;
 }
 
-// The client side of mediaserver asks it to creat a SurfaceMediaSource
+// The client side of mediaserver asks it to create a SurfaceMediaSource
 // and return a interface reference. The client side will use that
 // while encoding GL Frames
 sp<IGraphicBufferProducer> StagefrightRecorder::querySurfaceMediaSource() const {
@@ -1069,7 +1071,8 @@ sp<MediaCodecSource> StagefrightRecorder::createAudioSource() {
                 mAudioChannels,
                 mSampleRate,
                 mClientUid,
-                mClientPid);
+                mClientPid,
+                mSelectedDeviceId);
 
     status_t err = audioSource->initCheck();
 
@@ -1120,6 +1123,10 @@ sp<MediaCodecSource> StagefrightRecorder::createAudioSource() {
 
     sp<MediaCodecSource> audioEncoder =
             MediaCodecSource::Create(mLooper, format, audioSource);
+    sp<AudioSystem::AudioDeviceCallback> callback = mAudioDeviceCallback.promote();
+    if (mDeviceCallbackEnabled && callback != 0) {
+        audioSource->addAudioDeviceCallback(callback);
+    }
     mAudioSourceNode = audioSource;
 
     if (audioEncoder == NULL) {
@@ -2114,6 +2121,46 @@ status_t StagefrightRecorder::getMetrics(Parcel *reply) {
     updateMetrics();
     mAnalyticsItem->writeToParcel(reply);
     return OK;
+}
+
+status_t StagefrightRecorder::setInputDevice(audio_port_handle_t deviceId) {
+    ALOGV("setInputDevice");
+
+    if (mSelectedDeviceId != deviceId) {
+        mSelectedDeviceId = deviceId;
+        if (mAudioSourceNode != 0) {
+            return mAudioSourceNode->setInputDevice(deviceId);
+        }
+    }
+    return NO_ERROR;
+}
+
+status_t StagefrightRecorder::getRoutedDeviceId(audio_port_handle_t* deviceId) {
+    ALOGV("getRoutedDeviceId");
+
+    if (mAudioSourceNode != 0) {
+        status_t status = mAudioSourceNode->getRoutedDeviceId(deviceId);
+        return status;
+    }
+    return NO_INIT;
+}
+
+void StagefrightRecorder::setAudioDeviceCallback(
+        const sp<AudioSystem::AudioDeviceCallback>& callback) {
+    mAudioDeviceCallback = callback;
+}
+
+status_t StagefrightRecorder::enableAudioDeviceCallback(bool enabled) {
+    mDeviceCallbackEnabled = enabled;
+    sp<AudioSystem::AudioDeviceCallback> callback = mAudioDeviceCallback.promote();
+    if (mAudioSourceNode != 0 && callback != 0) {
+        if (enabled) {
+            return mAudioSourceNode->addAudioDeviceCallback(callback);
+        } else {
+            return mAudioSourceNode->removeAudioDeviceCallback(callback);
+        }
+    }
+    return NO_ERROR;
 }
 
 status_t StagefrightRecorder::dump(

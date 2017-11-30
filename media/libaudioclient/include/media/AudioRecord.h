@@ -185,7 +185,8 @@ public:
                                     audio_input_flags_t flags = AUDIO_INPUT_FLAG_NONE,
                                     uid_t uid = AUDIO_UID_INVALID,
                                     pid_t pid = -1,
-                                    const audio_attributes_t* pAttributes = NULL);
+                                    const audio_attributes_t* pAttributes = NULL,
+                                    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
 
     /* Terminates the AudioRecord and unregisters it from AudioFlinger.
      * Also destroys all resources associated with the AudioRecord.
@@ -223,7 +224,8 @@ public:
                             audio_input_flags_t flags = AUDIO_INPUT_FLAG_NONE,
                             uid_t uid = AUDIO_UID_INVALID,
                             pid_t pid = -1,
-                            const audio_attributes_t* pAttributes = NULL);
+                            const audio_attributes_t* pAttributes = NULL,
+                            audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
 
     /* Result of constructing the AudioRecord. This must be checked for successful initialization
      * before using any AudioRecord API (except for set()), because using

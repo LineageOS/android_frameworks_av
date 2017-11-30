@@ -79,35 +79,36 @@ public:
         SupportedValuesWithFields(const C2FieldSupportedValues &supported) : supported(supported) {}
     };
 
-    C2SoftAvcDecIntf(const char *name, node_id id);
+    C2SoftAvcDecIntf(const char *name, c2_node_id_t id);
     virtual ~C2SoftAvcDecIntf() = default;
 
     // From C2ComponentInterface
     virtual C2String getName() const override;
-    virtual node_id getId() const override;
-    virtual C2Status query_nb(
+    virtual c2_node_id_t getId() const override;
+    virtual c2_status_t query_nb(
             const std::vector<C2Param* const> &stackParams,
             const std::vector<C2Param::Index> &heapParamIndices,
             std::vector<std::unique_ptr<C2Param>>* const heapParams) const override;
-    virtual C2Status config_nb(
+    virtual c2_status_t config_nb(
             const std::vector<C2Param* const> &params,
             std::vector<std::unique_ptr<C2SettingResult>>* const failures) override;
-    virtual C2Status commit_sm(
+    virtual c2_status_t commit_sm(
             const std::vector<C2Param* const> &params,
             std::vector<std::unique_ptr<C2SettingResult>>* const failures) override;
-    virtual C2Status createTunnel_sm(node_id targetComponent) override;
-    virtual C2Status releaseTunnel_sm(node_id targetComponent) override;
-    virtual std::shared_ptr<C2ParamReflector> getParamReflector() const override;
-    virtual C2Status getSupportedParams(
+    virtual c2_status_t createTunnel_sm(c2_node_id_t targetComponent) override;
+    virtual c2_status_t releaseTunnel_sm(c2_node_id_t targetComponent) override;
+    // TODO: move this into some common store class
+    std::shared_ptr<C2ParamReflector> getParamReflector() const;
+    virtual c2_status_t querySupportedParams_nb(
             std::vector<std::shared_ptr<C2ParamDescriptor>> * const params) const override;
-    virtual C2Status getSupportedValues(
+    virtual c2_status_t querySupportedValues_nb(
             std::vector<C2FieldSupportedValuesQuery> &fields) const override;
 
 private:
     class ParamReflector;
 
     const C2String mName;
-    const node_id mId;
+    const c2_node_id_t mId;
 
     C2ComponentDomainInfo mDomainInfo;
     // TODO: config desc
@@ -146,18 +147,18 @@ class C2SoftAvcDec
     : public C2Component,
       public std::enable_shared_from_this<C2SoftAvcDec> {
 public:
-    C2SoftAvcDec(
-            const char *name, node_id id, const std::shared_ptr<C2ComponentListener> &listener);
+    C2SoftAvcDec(const char *name, c2_node_id_t id);
     virtual ~C2SoftAvcDec();
 
     // From C2Component
-    virtual C2Status queue_nb(std::list<std::unique_ptr<C2Work>>* const items) override;
-    virtual C2Status announce_nb(const std::vector<C2WorkOutline> &items) override;
-    virtual C2Status flush_sm(
-            bool flushThrough, std::list<std::unique_ptr<C2Work>>* const flushedWork) override;
-    virtual C2Status drain_nb(bool drainThrough) override;
-    virtual C2Status start() override;
-    virtual C2Status stop() override;
+    virtual c2_status_t setListener_sm(const std::shared_ptr<Listener> &listener) override;
+    virtual c2_status_t queue_nb(std::list<std::unique_ptr<C2Work>>* const items) override;
+    virtual c2_status_t announce_nb(const std::vector<C2WorkOutline> &items) override;
+    virtual c2_status_t flush_sm(
+            flush_mode_t mode, std::list<std::unique_ptr<C2Work>>* const flushedWork) override;
+    virtual c2_status_t drain_nb(drain_mode_t mode) override;
+    virtual c2_status_t start() override;
+    virtual c2_status_t stop() override;
     virtual void reset() override;
     virtual void release() override;
     virtual std::shared_ptr<C2ComponentInterface> intf() override;
@@ -192,7 +193,11 @@ private:
     using IndexType = decltype(C2WorkOrdinalStruct().frame_index);
 
     const std::shared_ptr<C2SoftAvcDecIntf> mIntf;
-    const std::shared_ptr<C2ComponentListener> mListener;
+    std::shared_ptr<Listener> mListener;
+    std::shared_ptr<Listener> mActiveListener;
+    std::mutex mListenerLock;
+    std::condition_variable mActiveListenerChanged;
+
     std::shared_ptr<C2BlockPool> mOutputBlockPool;
 
     std::mutex mQueueLock;

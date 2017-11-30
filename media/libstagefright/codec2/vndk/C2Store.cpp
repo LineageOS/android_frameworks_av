@@ -37,40 +37,40 @@ public:
         /* ionmapper */
     );
 
-    virtual C2Status getAllocator(id_t id, std::shared_ptr<C2Allocator> *const allocator);
+    virtual c2_status_t fetchAllocator(id_t id, std::shared_ptr<C2Allocator> *const allocator) override;
 
-    virtual std::vector<std::shared_ptr<const C2Allocator::Info>> listAllocators() const {
-        return std::vector<std::shared_ptr<const C2Allocator::Info>>(); /// \todo
+    virtual std::vector<std::shared_ptr<const C2Allocator::Traits>> listAllocators_nb() const override {
+        return std::vector<std::shared_ptr<const C2Allocator::Traits>>(); /// \todo
     }
 
-    virtual C2String getName() const {
+    virtual C2String getName() const override {
         return "android.allocator-store";
     }
 
 private:
     // returns a shared-singleton ion allocator
-    std::shared_ptr<C2Allocator> getIonAllocator();
+    std::shared_ptr<C2Allocator> fetchIonAllocator();
 
     // returns a shared-singleton gralloc allocator
-    std::shared_ptr<C2Allocator> getGrallocAllocator();
+    std::shared_ptr<C2Allocator> fetchGrallocAllocator();
 };
 
 C2PlatformAllocatorStore::C2PlatformAllocatorStore() {
 }
 
-C2Status C2PlatformAllocatorStore::getAllocator(
+c2_status_t C2PlatformAllocatorStore::fetchAllocator(
         id_t id, std::shared_ptr<C2Allocator> *const allocator) {
     allocator->reset();
     switch (id) {
     // TODO: should we implement a generic registry for all, and use that?
     case C2PlatformAllocatorStore::ION:
     case C2AllocatorStore::DEFAULT_LINEAR:
-        *allocator = getIonAllocator();
+        *allocator = fetchIonAllocator();
         break;
 
     case C2PlatformAllocatorStore::GRALLOC:
     case C2AllocatorStore::DEFAULT_GRAPHIC:
-        *allocator = getGrallocAllocator();
+        *allocator = fetchGrallocAllocator();
         break;
 
     default:
@@ -82,7 +82,7 @@ C2Status C2PlatformAllocatorStore::getAllocator(
     return C2_OK;
 }
 
-std::shared_ptr<C2Allocator> C2PlatformAllocatorStore::getIonAllocator() {
+std::shared_ptr<C2Allocator> C2PlatformAllocatorStore::fetchIonAllocator() {
     static std::mutex mutex;
     static std::weak_ptr<C2Allocator> ionAllocator;
     std::lock_guard<std::mutex> lock(mutex);
@@ -94,7 +94,7 @@ std::shared_ptr<C2Allocator> C2PlatformAllocatorStore::getIonAllocator() {
     return allocator;
 }
 
-std::shared_ptr<C2Allocator> C2PlatformAllocatorStore::getGrallocAllocator() {
+std::shared_ptr<C2Allocator> C2PlatformAllocatorStore::fetchGrallocAllocator() {
     static std::mutex mutex;
     static std::weak_ptr<C2Allocator> grallocAllocator;
     std::lock_guard<std::mutex> lock(mutex);
@@ -110,7 +110,7 @@ std::shared_ptr<C2AllocatorStore> GetCodec2PlatformAllocatorStore() {
     return std::make_shared<C2PlatformAllocatorStore>();
 }
 
-C2Status GetCodec2BlockPool(
+c2_status_t GetCodec2BlockPool(
         C2BlockPool::local_id_t id, std::shared_ptr<const C2Component> component,
         std::shared_ptr<C2BlockPool> *pool) {
     pool->reset();
@@ -120,17 +120,17 @@ C2Status GetCodec2BlockPool(
     // TODO support pre-registered block pools
     std::shared_ptr<C2AllocatorStore> allocatorStore = GetCodec2PlatformAllocatorStore();
     std::shared_ptr<C2Allocator> allocator;
-    C2Status res = C2_NOT_FOUND;
+    c2_status_t res = C2_NOT_FOUND;
 
     switch (id) {
     case C2BlockPool::BASIC_LINEAR:
-        res = allocatorStore->getAllocator(C2AllocatorStore::DEFAULT_LINEAR, &allocator);
+        res = allocatorStore->fetchAllocator(C2AllocatorStore::DEFAULT_LINEAR, &allocator);
         if (res == OK) {
             *pool = std::make_shared<C2BasicLinearBlockPool>(allocator);
         }
         break;
     case C2BlockPool::BASIC_GRAPHIC:
-        res = allocatorStore->getAllocator(C2AllocatorStore::DEFAULT_GRAPHIC, &allocator);
+        res = allocatorStore->fetchAllocator(C2AllocatorStore::DEFAULT_GRAPHIC, &allocator);
         if (res == OK) {
             *pool = std::make_shared<C2BasicGraphicBlockPool>(allocator);
         }
