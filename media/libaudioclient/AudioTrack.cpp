@@ -197,7 +197,7 @@ AudioTrack::AudioTrack(
       mPreviousSchedulingGroup(SP_DEFAULT),
       mPausedPosition(0)
 {
-    mStatus = set(streamType, sampleRate, format, channelMask,
+    (void)set(streamType, sampleRate, format, channelMask,
             frameCount, flags, cbf, user, notificationFrames,
             0 /*sharedBuffer*/, false /*threadCanCallJava*/, sessionId, transferType,
             offloadInfo, uid, pid, pAttributes, doNotReconnect, maxRequiredSpeed, selectedDeviceId);
@@ -228,7 +228,7 @@ AudioTrack::AudioTrack(
       mPausedPosition(0),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE)
 {
-    mStatus = set(streamType, sampleRate, format, channelMask,
+    (void)set(streamType, sampleRate, format, channelMask,
             0 /*frameCount*/, flags, cbf, user, notificationFrames,
             sharedBuffer, false /*threadCanCallJava*/, sessionId, transferType, offloadInfo,
             uid, pid, pAttributes, doNotReconnect, maxRequiredSpeed);
@@ -284,6 +284,11 @@ status_t AudioTrack::set(
         float maxRequiredSpeed,
         audio_port_handle_t selectedDeviceId)
 {
+    status_t status;
+    uint32_t channelCount;
+    pid_t callingPid;
+    pid_t myPid;
+
     ALOGV("set(): streamType %d, sampleRate %u, format %#x, channelMask %#x, frameCount %zu, "
           "flags #%x, notificationFrames %d, sessionId %d, transferType %d, uid %d, pid %d",
           streamType, sampleRate, format, channelMask, frameCount, flags, notificationFrames,
@@ -306,25 +311,29 @@ status_t AudioTrack::set(
     case TRANSFER_CALLBACK:
         if (cbf == NULL || sharedBuffer != 0) {
             ALOGE("Transfer type TRANSFER_CALLBACK but cbf == NULL || sharedBuffer != 0");
-            return BAD_VALUE;
+            status = BAD_VALUE;
+            goto exit;
         }
         break;
     case TRANSFER_OBTAIN:
     case TRANSFER_SYNC:
         if (sharedBuffer != 0) {
             ALOGE("Transfer type TRANSFER_OBTAIN but sharedBuffer != 0");
-            return BAD_VALUE;
+            status = BAD_VALUE;
+            goto exit;
         }
         break;
     case TRANSFER_SHARED:
         if (sharedBuffer == 0) {
             ALOGE("Transfer type TRANSFER_SHARED but sharedBuffer == 0");
-            return BAD_VALUE;
+            status = BAD_VALUE;
+            goto exit;
         }
         break;
     default:
         ALOGE("Invalid transfer type %d", transferType);
-        return BAD_VALUE;
+        status = BAD_VALUE;
+        goto exit;
     }
     mSharedBuffer = sharedBuffer;
     mTransfer = transferType;
@@ -338,7 +347,8 @@ status_t AudioTrack::set(
     // invariant that mAudioTrack != 0 is true only after set() returns successfully
     if (mAudioTrack != 0) {
         ALOGE("Track already in use");
-        return INVALID_OPERATION;
+        status = INVALID_OPERATION;
+        goto exit;
     }
 
     // handle default values first.
@@ -348,7 +358,8 @@ status_t AudioTrack::set(
     if (pAttributes == NULL) {
         if (uint32_t(streamType) >= AUDIO_STREAM_PUBLIC_CNT) {
             ALOGE("Invalid stream type %d", streamType);
-            return BAD_VALUE;
+            status = BAD_VALUE;
+            goto exit;
         }
         mStreamType = streamType;
 
@@ -380,16 +391,18 @@ status_t AudioTrack::set(
     // validate parameters
     if (!audio_is_valid_format(format)) {
         ALOGE("Invalid format %#x", format);
-        return BAD_VALUE;
+        status = BAD_VALUE;
+        goto exit;
     }
     mFormat = format;
 
     if (!audio_is_output_channel(channelMask)) {
         ALOGE("Invalid channel mask %#x", channelMask);
-        return BAD_VALUE;
+        status = BAD_VALUE;
+        goto exit;
     }
     mChannelMask = channelMask;
-    uint32_t channelCount = audio_channel_count_from_out_mask(channelMask);
+    channelCount = audio_channel_count_from_out_mask(channelMask);
     mChannelCount = channelCount;
 
     // force direct flag if format is not linear PCM
@@ -424,7 +437,8 @@ status_t AudioTrack::set(
 
     // sampling rate must be specified for direct outputs
     if (sampleRate == 0 && (flags & AUDIO_OUTPUT_FLAG_DIRECT) != 0) {
-        return BAD_VALUE;
+        status = BAD_VALUE;
+        goto exit;
     }
     mSampleRate = sampleRate;
     mOriginalSampleRate = sampleRate;
@@ -455,12 +469,14 @@ status_t AudioTrack::set(
         if (!(flags & AUDIO_OUTPUT_FLAG_FAST)) {
             ALOGE("notificationFrames=%d not permitted for non-fast track",
                     notificationFrames);
-            return BAD_VALUE;
+            status = BAD_VALUE;
+            goto exit;
         }
         if (frameCount > 0) {
             ALOGE("notificationFrames=%d not permitted with non-zero frameCount=%zu",
                     notificationFrames, frameCount);
-            return BAD_VALUE;
+            status = BAD_VALUE;
+            goto exit;
         }
         mNotificationFramesReq = 0;
         const uint32_t minNotificationsPerBuffer = 1;
@@ -472,15 +488,15 @@ status_t AudioTrack::set(
                 notificationFrames, minNotificationsPerBuffer, maxNotificationsPerBuffer);
     }
     mNotificationFramesAct = 0;
-    int callingpid = IPCThreadState::self()->getCallingPid();
-    int mypid = getpid();
-    if (uid == AUDIO_UID_INVALID || (callingpid != mypid)) {
+    callingPid = IPCThreadState::self()->getCallingPid();
+    myPid = getpid();
+    if (uid == AUDIO_UID_INVALID || (callingPid != myPid)) {
         mClientUid = IPCThreadState::self()->getCallingUid();
     } else {
         mClientUid = uid;
     }
-    if (pid == -1 || (callingpid != mypid)) {
-        mClientPid = callingpid;
+    if (pid == -1 || (callingPid != myPid)) {
+        mClientPid = callingPid;
     } else {
         mClientPid = pid;
     }
@@ -495,7 +511,7 @@ status_t AudioTrack::set(
     }
 
     // create the IAudioTrack
-    status_t status = createTrack_l();
+    status = createTrack_l();
 
     if (status != NO_ERROR) {
         if (mAudioTrackThread != 0) {
@@ -503,10 +519,9 @@ status_t AudioTrack::set(
             mAudioTrackThread->requestExitAndWait();
             mAudioTrackThread.clear();
         }
-        return status;
+        goto exit;
     }
 
-    mStatus = NO_ERROR;
     mUserData = user;
     mLoopCount = 0;
     mLoopStart = 0;
@@ -534,7 +549,10 @@ status_t AudioTrack::set(
     mFramesWrittenServerOffset = 0;
     mFramesWrittenAtRestore = -1; // -1 is a unique initializer.
     mVolumeHandler = new media::VolumeHandler();
-    return NO_ERROR;
+
+exit:
+    mStatus = status;
+    return status;
 }
 
 // -------------------------------------------------------------------------
@@ -1278,14 +1296,15 @@ const char * AudioTrack::convertTransferToText(transfer_type transferType) {
 
 status_t AudioTrack::createTrack_l()
 {
+    status_t status;
+    bool callbackAdded = false;
+
     const sp<IAudioFlinger>& audioFlinger = AudioSystem::get_audio_flinger();
     if (audioFlinger == 0) {
         ALOGE("Could not get audioflinger");
-        return NO_INIT;
+        status = NO_INIT;
+        goto exit;
     }
-
-    status_t status;
-    bool callbackAdded = false;
 
     {
     // mFlags (not mOrigFlags) is modified depending on whether fast request is accepted.
@@ -1355,7 +1374,10 @@ status_t AudioTrack::createTrack_l()
 
     if (status != NO_ERROR || output.outputId == AUDIO_IO_HANDLE_NONE) {
         ALOGE("AudioFlinger could not create track, status: %d output %d", status, output.outputId);
-        goto error;
+        if (status == NO_ERROR) {
+            status = NO_INIT;
+        }
+        goto exit;
     }
     ALOG_ASSERT(track != 0);
 
@@ -1383,13 +1405,13 @@ status_t AudioTrack::createTrack_l()
     if (iMem == 0) {
         ALOGE("Could not get control block");
         status = NO_INIT;
-        goto error;
+        goto exit;
     }
     void *iMemPointer = iMem->pointer();
     if (iMemPointer == NULL) {
         ALOGE("Could not get control block pointer");
         status = NO_INIT;
-        goto error;
+        goto exit;
     }
     // invariant that mAudioTrack != 0 is true only after set() returns successfully
     if (mAudioTrack != 0) {
@@ -1443,7 +1465,7 @@ status_t AudioTrack::createTrack_l()
         if (buffers == NULL) {
             ALOGE("Could not get buffer pointer");
             status = NO_INIT;
-            goto error;
+            goto exit;
         }
     }
 
@@ -1486,17 +1508,15 @@ status_t AudioTrack::createTrack_l()
     mDeathNotifier = new DeathNotifier(this);
     IInterface::asBinder(mAudioTrack)->linkToDeath(mDeathNotifier, this);
 
-    return NO_ERROR;
     }
 
-error:
-    if (callbackAdded) {
+exit:
+    if (status != NO_ERROR && callbackAdded) {
         // note: mOutput is always valid is callbackAdded is true
         AudioSystem::removeAudioDeviceCallback(this, mOutput);
     }
-    if (status == NO_ERROR) {
-        status = NO_INIT;
-    }
+
+    mStatus = status;
 
     // sp<IAudioTrack> track destructor will cause releaseOutput() to be called by AudioFlinger
     return status;
