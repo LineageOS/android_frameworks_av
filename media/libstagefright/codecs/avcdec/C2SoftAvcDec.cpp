@@ -790,6 +790,7 @@ std::shared_ptr<C2ComponentInterface> C2SoftAvcDec::intf() {
 }
 
 void C2SoftAvcDec::processQueue() {
+#if 0
     if (mIsInFlush) {
         setFlushMode();
 
@@ -825,9 +826,10 @@ void C2SoftAvcDec::processQueue() {
         }
         mIsInFlush = false;
     }
+#endif
 
     std::unique_ptr<C2Work> work;
-    {
+    if (!mIsInFlush) {
         std::unique_lock<std::mutex> lock(mQueueLock);
         if (mQueue.empty()) {
             mQueueCond.wait(lock);
@@ -844,7 +846,7 @@ void C2SoftAvcDec::processQueue() {
     process(work);
 
     std::vector<std::unique_ptr<C2Work>> done;
-    {
+    if (work) {
         std::unique_lock<std::mutex> lock(mPendingLock);
         uint32_t index = work->input.ordinal.frame_index;
         mPendingWork[index].swap(work);
@@ -871,12 +873,12 @@ void C2SoftAvcDec::processQueue() {
 
 
 static void *ivd_aligned_malloc(void *ctxt, WORD32 alignment, WORD32 size) {
-    UNUSED(ctxt);
+    (void) ctxt;
     return memalign(alignment, size);
 }
 
 static void ivd_aligned_free(void *ctxt, void *buf) {
-    UNUSED(ctxt);
+    (void) ctxt;
     free(buf);
     return;
 }
@@ -1001,6 +1003,7 @@ status_t C2SoftAvcDec::setNumCores() {
 }
 
 status_t C2SoftAvcDec::setFlushMode() {
+    ALOGV("setFlushMode");
     IV_API_CALL_STATUS_T status;
     ivd_ctl_flush_ip_t s_video_flush_ip;
     ivd_ctl_flush_op_t s_video_flush_op;
@@ -1019,7 +1022,7 @@ status_t C2SoftAvcDec::setFlushMode() {
                 s_video_flush_op.u4_error_code);
         return UNKNOWN_ERROR;
     }
-
+    mIsInFlush = true;
     return OK;
 }
 
@@ -1079,7 +1082,6 @@ status_t C2SoftAvcDec::initDecoder() {
 }
 
 status_t C2SoftAvcDec::deInitDecoder() {
-    size_t i;
     IV_API_CALL_STATUS_T status;
 
     if (mCodecCtx) {
@@ -1206,7 +1208,6 @@ void C2SoftAvcDec::process(std::unique_ptr<C2Work> &work) {
     if (mSignalledError) {
         return;
     }
-
     if (NULL == mCodecCtx) {
         if (OK != initDecoder()) {
             ALOGE("Failed to initialize decoder");
@@ -1221,66 +1222,78 @@ void C2SoftAvcDec::process(std::unique_ptr<C2Work> &work) {
         setParams(mStride);
     }
 
-    const C2ConstLinearBlock &buffer =
-            work->input.buffers[0]->data().linearBlocks().front();
-    if (buffer.capacity() == 0) {
-        // TODO: result?
+    uint32_t workIndex = 0;
+    std::unique_ptr<C2ReadView> input;
+    if (work) {
+        work->result = C2_OK;
 
-        std::vector<std::unique_ptr<C2Work>> done;
-        done.emplace_back(std::move(work));
-        mListener->onWorkDone_nb(shared_from_this(), std::move(done));
-        if (!(work->input.flags & C2BufferPack::FLAG_END_OF_STREAM)) {
-            return;
-        }
+        const C2ConstLinearBlock &buffer =
+                work->input.buffers[0]->data().linearBlocks().front();
+        if (buffer.capacity() == 0) {
+            // TODO: result?
 
-        mReceivedEOS = true;
-        // TODO: flush
-    } else if (work->input.flags & C2BufferPack::FLAG_END_OF_STREAM) {
-        mReceivedEOS = true;
-    }
-
-    C2ReadView input = work->input.buffers[0]->data().linearBlocks().front().map().get();
-    uint32_t workIndex = work->input.ordinal.frame_index & 0xFFFFFFFF;
-
-    // TODO: populate --- assume display order?
-    if (!mAllocatedBlock) {
-        // TODO: error handling
-        // TODO: format & usage
-        uint32_t format = HAL_PIXEL_FORMAT_YV12;
-        C2MemoryUsage usage = { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite };
-        // TODO: lock access to interface
-        C2BlockPool::local_id_t poolId =
-            mIntf->mOutputBlockPools->flexCount() ?
-                    mIntf->mOutputBlockPools->m.mValues[0] : C2BlockPool::BASIC_GRAPHIC;
-        if (!mOutputBlockPool || mOutputBlockPool->getLocalId() != poolId) {
-            c2_status_t err = GetCodec2BlockPool(poolId, shared_from_this(), &mOutputBlockPool);
-            if (err != C2_OK) {
-                // TODO: trip
+            std::vector<std::unique_ptr<C2Work>> done;
+            done.emplace_back(std::move(work));
+            mListener->onWorkDone_nb(shared_from_this(), std::move(done));
+            if (!(work->input.flags & C2BufferPack::FLAG_END_OF_STREAM)) {
+                return;
             }
-        }
-        ALOGE("using allocator %u", mOutputBlockPool->getAllocatorId());
 
-        (void)mOutputBlockPool->fetchGraphicBlock(
-                mWidth, mHeight, format, usage, &mAllocatedBlock);
-        ALOGE("provided (%dx%d) required (%dx%d)", mAllocatedBlock->width(), mAllocatedBlock->height(), mWidth, mHeight);
+            mReceivedEOS = true;
+            // TODO: flush
+        } else if (work->input.flags & C2BufferPack::FLAG_END_OF_STREAM) {
+            ALOGV("input EOS: %llu", work->input.ordinal.frame_index);
+            mReceivedEOS = true;
+        }
+
+        input.reset(new C2ReadView(work->input.buffers[0]->data().linearBlocks().front().map().get()));
+        workIndex = work->input.ordinal.frame_index & 0xFFFFFFFF;
     }
-    C2GraphicView output = mAllocatedBlock->map().get();
-    ALOGE("mapped err = %d", output.error());
 
     size_t inOffset = 0u;
-    while (inOffset < input.capacity()) {
+    while (!input || inOffset < input->capacity()) {
+        if (!input) {
+            ALOGV("flushing");
+        }
+        // TODO: populate --- assume display order?
+        if (!mAllocatedBlock) {
+            // TODO: error handling
+            // TODO: format & usage
+            uint32_t format = HAL_PIXEL_FORMAT_YV12;
+            C2MemoryUsage usage = { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite };
+            // TODO: lock access to interface
+            C2BlockPool::local_id_t poolId =
+                mIntf->mOutputBlockPools->flexCount() ?
+                        mIntf->mOutputBlockPools->m.mValues[0] : C2BlockPool::BASIC_GRAPHIC;
+            if (!mOutputBlockPool || mOutputBlockPool->getLocalId() != poolId) {
+                c2_status_t err = GetCodec2BlockPool(poolId, shared_from_this(), &mOutputBlockPool);
+                if (err != C2_OK) {
+                    // TODO: trip
+                }
+            }
+            ALOGE("using allocator %u", mOutputBlockPool->getAllocatorId());
+
+            (void)mOutputBlockPool->fetchGraphicBlock(
+                    mWidth, mHeight, format, usage, &mAllocatedBlock);
+            ALOGE("provided (%dx%d) required (%dx%d)", mAllocatedBlock->width(), mAllocatedBlock->height(), mWidth, mHeight);
+        }
+        C2GraphicView output = mAllocatedBlock->map().get();
+        if (output.error() != OK) {
+            ALOGE("mapped err = %d", output.error());
+        }
+
         ivd_video_decode_ip_t s_dec_ip;
         ivd_video_decode_op_t s_dec_op;
         WORD32 timeDelay, timeTaken;
         size_t sizeY, sizeUV;
 
-        if (!setDecodeArgs(&s_dec_ip, &s_dec_op, &input, &output, workIndex, inOffset)) {
+        if (!setDecodeArgs(&s_dec_ip, &s_dec_op, input.get(), &output, workIndex, inOffset)) {
             ALOGE("Decoder arg setup failed");
             // TODO: notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
             mSignalledError = true;
             return;
         }
-        ALOGE("Decoder arg setup succeeded");
+        ALOGV("Decoder arg setup succeeded");
         // If input dump is enabled, then write to file
         DUMP_TO_FILE(mInFile, s_dec_ip.pv_stream_buffer, s_dec_ip.u4_num_Bytes, mInputOffset);
 
@@ -1321,15 +1334,24 @@ void C2SoftAvcDec::process(std::unique_ptr<C2Work> &work) {
 
         PRINT_TIME("timeTaken=%6d delay=%6d numBytes=%6d", timeTaken, timeDelay,
                s_dec_op.u4_num_bytes_consumed);
-        ALOGI("bytes total=%u", input.capacity());
+        if (input) {
+            ALOGI("bytes total=%u", input->capacity());
+        }
         if (s_dec_op.u4_frame_decoded_flag && !mFlushNeeded) {
             mFlushNeeded = true;
         }
 
-        if (1 != s_dec_op.u4_frame_decoded_flag) {
-            /* If the input did not contain picture data, then ignore
-             * the associated timestamp */
-            //mTimeStampsValid[workIndex] = false;
+        if (1 != s_dec_op.u4_frame_decoded_flag && work) {
+            /* If the input did not contain picture data, return work without
+             * buffer */
+            ALOGV("no picture data");
+            std::vector<std::unique_ptr<C2Work>> done;
+            done.push_back(std::move(work));
+            done[0]->worklets.front()->output.flags = (C2BufferPack::flags_t)0;
+            done[0]->worklets.front()->output.buffers.clear();
+            done[0]->worklets.front()->output.buffers.emplace_back(nullptr);
+            done[0]->worklets.front()->output.ordinal = done[0]->input.ordinal;
+            mListener->onWorkDone_nb(shared_from_this(), std::move(done));
         }
 
         // If the decoder is in the changing resolution mode and there is no output present,
@@ -1373,10 +1395,19 @@ void C2SoftAvcDec::process(std::unique_ptr<C2Work> &work) {
         }
 
         if (s_dec_op.u4_output_present) {
-            ALOGV("output_present");
-            // TODO: outHeader->nFilledLen = (mWidth * mHeight * 3) / 2;
+            ALOGV("output_present: %d", s_dec_op.u4_ts);
             std::vector<std::unique_ptr<C2Work>> done;
-            done.push_back(std::move(mPendingWork[s_dec_op.u4_ts]));
+            {
+                std::unique_lock<std::mutex> lock(mPendingLock);
+                done.push_back(std::move(mPendingWork[s_dec_op.u4_ts]));
+                mPendingWork.erase(s_dec_op.u4_ts);
+            }
+            uint32_t flags = 0;
+            if (done[0]->input.flags & C2BufferPack::FLAG_END_OF_STREAM) {
+                flags |= C2BufferPack::FLAG_END_OF_STREAM;
+                ALOGV("EOS");
+            }
+            done[0]->worklets.front()->output.flags = (C2BufferPack::flags_t)flags;
             done[0]->worklets.front()->output.buffers.clear();
             done[0]->worklets.front()->output.buffers.emplace_back(
                     std::make_shared<GraphicBuffer>(std::move(mAllocatedBlock)));
@@ -1391,16 +1422,25 @@ void C2SoftAvcDec::process(std::unique_ptr<C2Work> &work) {
             /* If EOS was recieved on input port and there is no output
              * from the codec, then signal EOS on output port */
             if (mReceivedEOS) {
-                // TODO
-                // outHeader->nFilledLen = 0;
-                // outHeader->nFlags |= OMX_BUFFERFLAG_EOS;
+                std::vector<std::unique_ptr<C2Work>> done;
+                {
+                    std::unique_lock<std::mutex> lock(mPendingLock);
+                    if (!mPendingWork.empty()) {
+                        done.push_back(std::move(mPendingWork.begin()->second));
+                        mPendingWork.erase(mPendingWork.begin());
+                    }
+                }
+                if (!done.empty()) {
+                    ALOGV("sending empty EOS buffer");
+                    done[0]->worklets.front()->output.flags = C2BufferPack::FLAG_END_OF_STREAM;
+                    done[0]->worklets.front()->output.buffers.clear();
+                    done[0]->worklets.front()->output.buffers.emplace_back(nullptr);
+                    done[0]->worklets.front()->output.ordinal = done[0]->input.ordinal;
+                    mListener->onWorkDone_nb(shared_from_this(), std::move(done));
+                }
 
-                // outInfo->mOwnedByUs = false;
-                // outQueue.erase(outQueue.begin());
-                // outInfo = NULL;
-                // notifyFillBufferDone(outHeader);
-                // outHeader = NULL;
                 resetPlugin();
+                return;
             }
         }
         inOffset += s_dec_op.u4_num_bytes_consumed;

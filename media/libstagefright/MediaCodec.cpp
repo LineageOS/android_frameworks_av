@@ -28,6 +28,7 @@
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 #include <binder/MemoryDealer.h>
+#include <cutils/properties.h>
 #include <gui/BufferQueue.h>
 #include <gui/Surface.h>
 #include <media/ICrypto.h>
@@ -44,6 +45,7 @@
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/ACodec.h>
 #include <media/stagefright/BufferProducerWrapper.h>
+#include <media/stagefright/CCodec.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaDefs.h>
@@ -549,8 +551,11 @@ void MediaCodec::PostReplyWithError(const sp<AReplyToken> &replyID, int32_t err)
 
 //static
 sp<CodecBase> MediaCodec::GetCodecBase(const AString &name, bool nameIsType) {
-    // at this time only ACodec specifies a mime type.
-    if (nameIsType || name.startsWithIgnoreCase("omx.")) {
+    static bool ccodecEnabled = property_get_bool("debug.stagefright.ccodec", false);
+    if (ccodecEnabled && !nameIsType && name.startsWithIgnoreCase("codec2.")) {
+        return new CCodec;
+    } else if (nameIsType || name.startsWithIgnoreCase("omx.")) {
+        // at this time only ACodec specifies a mime type.
         return new ACodec;
     } else if (name.startsWithIgnoreCase("android.filter.")) {
         return new MediaFilter;
@@ -1849,7 +1854,6 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                                 }
                             }
                         }
-
                         if (mFlags & kFlagIsAsync) {
                             onOutputFormatChanged();
                         } else {
