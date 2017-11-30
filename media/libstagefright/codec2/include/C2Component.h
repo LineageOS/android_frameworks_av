@@ -360,6 +360,7 @@ public:
         C2DomainKind domain;       ///< component domain (e.g. audio or video)
         C2ComponentKind type;      ///< component type (e.g. encoder, decoder or filter)
         C2StringLiteral mediaType; ///< media type supported by the component
+        C2ComponentPriority priority; ///< priority used to determine component ordering
 
         /**
          * name alias(es) for backward compatibility.
@@ -569,7 +570,6 @@ public:
      */
     virtual std::shared_ptr<C2ComponentInterface> intf() = 0;
 
-protected:
     virtual ~C2Component() = default;
 };
 
@@ -724,11 +724,11 @@ public:
     /**
      * Returns the list of components supported by this component store.
      *
-     * This method may be momentarily blocking, but MUST return within 5ms.
+     * This method MUST return within 500ms.
      *
      * \retval vector of component information.
      */
-    virtual std::vector<std::shared_ptr<const C2Component::Traits>> listComponents_sm() const = 0;
+    virtual std::vector<std::shared_ptr<const C2Component::Traits>> listComponents() = 0;
 
     // -------------------------------------- UTILITY METHODS --------------------------------------
 

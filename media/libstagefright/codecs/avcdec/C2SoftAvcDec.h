@@ -77,7 +77,7 @@ public:
     };
 
     C2SoftAvcDecIntf(const char *name, c2_node_id_t id);
-    virtual ~C2SoftAvcDecIntf() = default;
+    virtual ~C2SoftAvcDecIntf() override;
 
     // From C2ComponentInterface
     virtual C2String getName() const override;
