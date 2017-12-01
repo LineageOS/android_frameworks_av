@@ -359,6 +359,12 @@ class CameraDeviceBase : public virtual RefBase {
             const std::vector<android::camera3::OutputStreamInfo> &outputInfo,
             const std::vector<size_t> &removedSurfaceIds,
             KeyedVector<sp<Surface>, size_t> *outputMap/*out*/) = 0;
+
+    /**
+     * Drop buffers for stream of streamId if dropping is true. If dropping is false, do not
+     * drop buffers for stream of streamId.
+     */
+    virtual status_t dropStreamBuffers(bool /*dropping*/, int /*streamId*/) = 0;
 };
 
 }; // namespace android

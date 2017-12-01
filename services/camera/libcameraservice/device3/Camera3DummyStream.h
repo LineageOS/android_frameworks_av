@@ -57,6 +57,12 @@ class Camera3DummyStream :
     virtual status_t detachBuffer(sp<GraphicBuffer>* buffer, int* fenceFd);
 
     /**
+     * Drop buffers for stream of streamId if dropping is true. If dropping is false, do not
+     * drop buffers for stream of streamId.
+     */
+    virtual status_t dropBuffers(bool /*dropping*/) override;
+
+    /**
      * Return if this output stream is for video encoding.
      */
     bool isVideoStream() const;

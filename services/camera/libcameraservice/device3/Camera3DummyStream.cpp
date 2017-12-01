@@ -108,6 +108,10 @@ bool Camera3DummyStream::isConsumerConfigurationDeferred(size_t /*surface_id*/) 
     return false;
 }
 
+status_t Camera3DummyStream::dropBuffers(bool /*dropping*/) {
+    return OK;
+}
+
 status_t Camera3DummyStream::setConsumers(const std::vector<sp<Surface>>& /*consumers*/) {
     ALOGE("%s: Stream %d: Dummy stream doesn't support set consumer surface!",
             __FUNCTION__, mId);

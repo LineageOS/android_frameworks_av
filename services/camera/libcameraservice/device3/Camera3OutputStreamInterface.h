@@ -73,6 +73,11 @@ class Camera3OutputStreamInterface : public virtual Camera3StreamInterface {
             const std::vector<OutputStreamInfo> &outputInfo,
             const std::vector<size_t> &removedSurfaceIds,
             KeyedVector<sp<Surface>, size_t> *outputMap/*out*/) = 0;
+
+    /**
+     * Drop buffers if dropping is true. If dropping is false, do not drop buffers.
+     */
+    virtual status_t dropBuffers(bool /*dropping*/) = 0;
 };
 
 } // namespace camera3

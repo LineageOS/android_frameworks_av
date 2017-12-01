@@ -192,6 +192,12 @@ class Camera3Device :
             const std::vector<size_t> &removedSurfaceIds,
             KeyedVector<sp<Surface>, size_t> *outputMap/*out*/);
 
+    /**
+     * Drop buffers for stream of streamId if dropping is true. If dropping is false, do not
+     * drop buffers for stream of streamId.
+     */
+    status_t dropStreamBuffers(bool dropping, int streamId) override;
+
   private:
 
     // internal typedefs
