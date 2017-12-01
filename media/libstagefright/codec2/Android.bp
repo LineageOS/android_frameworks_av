@@ -7,6 +7,11 @@ cc_library_shared {
 
     srcs: ["C2.cpp"],
 
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+
     include_dirs: [
         "frameworks/av/media/libstagefright/codec2/include",
         "frameworks/native/include/media/hardware",

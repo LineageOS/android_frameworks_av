@@ -5,6 +5,11 @@ cc_library_shared {
 
     srcs: ["src/EffectsConfig.cpp"],
 
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+
     shared_libs: [
         "liblog",
         "libtinyxml2",
