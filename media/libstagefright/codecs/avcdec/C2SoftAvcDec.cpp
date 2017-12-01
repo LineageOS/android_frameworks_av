@@ -261,7 +261,7 @@ C2SoftAvcDecIntf::C2SoftAvcDecIntf(const char *name, c2_node_id_t id)
       mFrameRate(0u, 0),
       mBlocksPerSecond(0u, 0),
       mParamReflector(new ParamReflector) {
-
+    ALOGV("in %s", __func__);
     mInputPortMime = C2PortMimeConfig::input::alloc_unique(strlen(CODEC_MIME_TYPE) + 1);
     strcpy(mInputPortMime->m.mValue, CODEC_MIME_TYPE);
     mOutputPortMime = C2PortMimeConfig::output::alloc_unique(strlen(MEDIA_MIMETYPE_VIDEO_RAW) + 1);
@@ -428,6 +428,10 @@ C2SoftAvcDecIntf::C2SoftAvcDecIntf(const char *name, c2_node_id_t id)
             false, "_max_video_size_hint", &mMaxVideoSizeHint));
     mParamDescs.push_back(std::make_shared<C2ParamDescriptor>(
             false, "_output_block_pools", mOutputBlockPools.get()));
+}
+
+C2SoftAvcDecIntf::~C2SoftAvcDecIntf() {
+    ALOGV("in %s", __func__);
 }
 
 C2String C2SoftAvcDecIntf::getName() const {
@@ -653,6 +657,7 @@ C2SoftAvcDec::C2SoftAvcDec(
       mWidth(320),
       mHeight(240),
       mInputOffset(0) {
+    ALOGV("in %s", __func__);
     GETTIME(&mTimeStart, NULL);
 
     // If input dump is enabled, then open create an empty file
@@ -661,6 +666,7 @@ C2SoftAvcDec::C2SoftAvcDec(
 }
 
 C2SoftAvcDec::~C2SoftAvcDec() {
+    ALOGV("in %s", __func__);
     CHECK_EQ(deInitDecoder(), (status_t)OK);
 }
 
@@ -1505,14 +1511,17 @@ status_t C2SoftAvcDec::handleColorAspectsChange() {
 class C2SoftAvcDecFactory : public C2ComponentFactory {
 public:
     virtual c2_status_t createComponent(
-            std::shared_ptr<C2Component>* const component, c2_node_id_t id) override {
-        *component = std::make_shared<C2SoftAvcDec>("avc", id);
+            c2_node_id_t id, std::shared_ptr<C2Component>* const component,
+            std::function<void(::android::C2Component*)> deleter) override {
+        *component = std::shared_ptr<C2Component>(new C2SoftAvcDec("avc", id), deleter);
         return C2_OK;
     }
 
     virtual c2_status_t createInterface(
-            std::shared_ptr<C2ComponentInterface>* const interface, c2_node_id_t id) override {
-        *interface = std::make_shared<C2SoftAvcDecIntf>("avc", id);
+            c2_node_id_t id, std::shared_ptr<C2ComponentInterface>* const interface,
+            std::function<void(::android::C2ComponentInterface*)> deleter) override {
+        *interface =
+            std::shared_ptr<C2ComponentInterface>(new C2SoftAvcDecIntf("avc", id), deleter);
         return C2_OK;
     }
 
@@ -1522,9 +1531,11 @@ public:
 }  // namespace android
 
 extern "C" ::android::C2ComponentFactory* CreateCodec2Factory() {
+    ALOGV("in %s", __func__);
     return new ::android::C2SoftAvcDecFactory();
 }
 
 extern "C" void DestroyCodec2Factory(::android::C2ComponentFactory* factory) {
+    ALOGV("in %s", __func__);
     delete factory;
 }

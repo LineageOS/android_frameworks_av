@@ -22,7 +22,6 @@ cc_binary {
         "libstagefright",
         "libstagefright_codec2",
         "libstagefright_foundation",
-        "libstagefright_soft_c2avcdec",
         "libui",
         "libutils",
     ],
