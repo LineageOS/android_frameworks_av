@@ -25,6 +25,7 @@
 #include <utils/Errors.h>
 #include <binder/IInterface.h>
 #include <binder/Parcel.h>
+#include <binder/Parcelable.h>
 #include <media/AudioClient.h>
 #include <media/IAudioTrack.h>
 #include <media/IAudioFlingerClient.h>
@@ -50,9 +51,9 @@ public:
      * when calling createTrack() including arguments that will be updated by AudioFlinger
      * and returned in CreateTrackOutput object
      */
-    class CreateTrackInput {
+    class CreateTrackInput : public Parcelable {
     public:
-        status_t readFromParcel(Parcel *parcel) {
+        status_t readFromParcel(const Parcel *parcel) override {
             /* input arguments*/
             memset(&attr, 0, sizeof(audio_attributes_t));
             if (parcel->read(&attr, sizeof(audio_attributes_t)) != NO_ERROR) {
@@ -63,7 +64,9 @@ public:
             if (parcel->read(&config, sizeof(audio_config_t)) != NO_ERROR) {
                 return DEAD_OBJECT;
             }
-            (void)clientInfo.readFromParcel(parcel);
+            if (clientInfo.readFromParcel(parcel) != NO_ERROR) {
+                return DEAD_OBJECT;
+            }
             if (parcel->readInt32() != 0) {
                 sharedBuffer = interface_cast<IMemory>(parcel->readStrongBinder());
                 if (sharedBuffer == 0 || sharedBuffer->pointer() == NULL) {
@@ -82,7 +85,7 @@ public:
             return NO_ERROR;
         }
 
-        status_t writeToParcel(Parcel *parcel) const {
+        status_t writeToParcel(Parcel *parcel) const override {
             /* input arguments*/
             (void)parcel->write(&attr, sizeof(audio_attributes_t));
             (void)parcel->write(&config, sizeof(audio_config_t));
@@ -125,9 +128,9 @@ public:
      * when calling createTrack() including arguments that were passed as I/O for update by
      * CreateTrackInput.
      */
-    class CreateTrackOutput {
+    class CreateTrackOutput : public Parcelable {
     public:
-        status_t readFromParcel(Parcel *parcel) {
+        status_t readFromParcel(const Parcel *parcel) override {
             /* input/output arguments*/
             (void)parcel->read(&flags, sizeof(audio_output_flags_t));
             frameCount = parcel->readInt64();
@@ -144,7 +147,7 @@ public:
             return NO_ERROR;
         }
 
-        status_t writeToParcel(Parcel *parcel) const {
+        status_t writeToParcel(Parcel *parcel) const override {
             /* input/output arguments*/
             (void)parcel->write(&flags, sizeof(audio_output_flags_t));
             (void)parcel->writeInt64(frameCount);
@@ -176,6 +179,140 @@ public:
         audio_io_handle_t outputId;
     };
 
+    /* CreateRecordInput contains all input arguments sent by AudioRecord to AudioFlinger
+     * when calling createRecord() including arguments that will be updated by AudioFlinger
+     * and returned in CreateRecordOutput object
+     */
+    class CreateRecordInput : public Parcelable {
+    public:
+        status_t readFromParcel(const Parcel *parcel) override {
+            /* input arguments*/
+            memset(&attr, 0, sizeof(audio_attributes_t));
+            if (parcel->read(&attr, sizeof(audio_attributes_t)) != NO_ERROR) {
+                return DEAD_OBJECT;
+            }
+            attr.tags[AUDIO_ATTRIBUTES_TAGS_MAX_SIZE -1] = '\0';
+            memset(&config, 0, sizeof(audio_config_base_t));
+            if (parcel->read(&config, sizeof(audio_config_base_t)) != NO_ERROR) {
+                return DEAD_OBJECT;
+            }
+            if (clientInfo.readFromParcel(parcel) != NO_ERROR) {
+                return DEAD_OBJECT;
+            }
+            opPackageName = parcel->readString16();
+
+            /* input/output arguments*/
+            (void)parcel->read(&flags, sizeof(audio_input_flags_t));
+            frameCount = parcel->readInt64();
+            notificationFrameCount = parcel->readInt64();
+            (void)parcel->read(&selectedDeviceId, sizeof(audio_port_handle_t));
+            (void)parcel->read(&sessionId, sizeof(audio_session_t));
+            return NO_ERROR;
+        }
+
+        status_t writeToParcel(Parcel *parcel) const override {
+            /* input arguments*/
+            (void)parcel->write(&attr, sizeof(audio_attributes_t));
+            (void)parcel->write(&config, sizeof(audio_config_base_t));
+            (void)clientInfo.writeToParcel(parcel);
+            (void)parcel->writeString16(opPackageName);
+
+            /* input/output arguments*/
+            (void)parcel->write(&flags, sizeof(audio_input_flags_t));
+            (void)parcel->writeInt64(frameCount);
+            (void)parcel->writeInt64(notificationFrameCount);
+            (void)parcel->write(&selectedDeviceId, sizeof(audio_port_handle_t));
+            (void)parcel->write(&sessionId, sizeof(audio_session_t));
+            return NO_ERROR;
+        }
+
+        /* input */
+        audio_attributes_t attr;
+        audio_config_base_t config;
+        AudioClient clientInfo;
+        String16 opPackageName;
+
+        /* input/output */
+        audio_input_flags_t flags;
+        size_t frameCount;
+        size_t notificationFrameCount;
+        audio_port_handle_t selectedDeviceId;
+        audio_session_t sessionId;
+    };
+
+    /* CreateRecordOutput contains all output arguments returned by AudioFlinger to AudioRecord
+     * when calling createRecord() including arguments that were passed as I/O for update by
+     * CreateRecordInput.
+     */
+    class CreateRecordOutput : public Parcelable {
+    public:
+        status_t readFromParcel(const Parcel *parcel) override {
+            /* input/output arguments*/
+            (void)parcel->read(&flags, sizeof(audio_input_flags_t));
+            frameCount = parcel->readInt64();
+            notificationFrameCount = parcel->readInt64();
+            (void)parcel->read(&selectedDeviceId, sizeof(audio_port_handle_t));
+            (void)parcel->read(&sessionId, sizeof(audio_session_t));
+
+            /* output arguments*/
+            sampleRate = parcel->readUint32();
+            (void)parcel->read(&inputId, sizeof(audio_io_handle_t));
+            if (parcel->readInt32() != 0) {
+                cblk = interface_cast<IMemory>(parcel->readStrongBinder());
+                if (cblk == 0 || cblk->pointer() == NULL) {
+                    return BAD_VALUE;
+                }
+            }
+            if (parcel->readInt32() != 0) {
+                buffers = interface_cast<IMemory>(parcel->readStrongBinder());
+                if (buffers == 0 || buffers->pointer() == NULL) {
+                    return BAD_VALUE;
+                }
+            }
+            return NO_ERROR;
+        }
+
+        status_t writeToParcel(Parcel *parcel) const override {
+            /* input/output arguments*/
+            (void)parcel->write(&flags, sizeof(audio_input_flags_t));
+            (void)parcel->writeInt64(frameCount);
+            (void)parcel->writeInt64(notificationFrameCount);
+            (void)parcel->write(&selectedDeviceId, sizeof(audio_port_handle_t));
+            (void)parcel->write(&sessionId, sizeof(audio_session_t));
+
+            /* output arguments*/
+            (void)parcel->writeUint32(sampleRate);
+            (void)parcel->write(&inputId, sizeof(audio_io_handle_t));
+            if (cblk != 0) {
+                (void)parcel->writeInt32(1);
+                (void)parcel->writeStrongBinder(IInterface::asBinder(cblk));
+            } else {
+                (void)parcel->writeInt32(0);
+            }
+            if (buffers != 0) {
+                (void)parcel->writeInt32(1);
+                (void)parcel->writeStrongBinder(IInterface::asBinder(buffers));
+            } else {
+                (void)parcel->writeInt32(0);
+            }
+
+            return NO_ERROR;
+        }
+
+        /* input/output */
+        audio_input_flags_t flags;
+        size_t frameCount;
+        size_t notificationFrameCount;
+        audio_port_handle_t selectedDeviceId;
+        audio_session_t sessionId;
+
+        /* output */
+        uint32_t sampleRate;
+        audio_io_handle_t inputId;
+        sp<IMemory> cblk;
+        sp<IMemory> buffers;
+    };
+
     // invariant on exit for all APIs that return an sp<>:
     //   (return value != 0) == (*status == NO_ERROR)
 
@@ -186,26 +323,9 @@ public:
                                         CreateTrackOutput& output,
                                         status_t *status) = 0;
 
-    virtual sp<media::IAudioRecord> openRecord(
-                                // On successful return, AudioFlinger takes over the handle
-                                // reference and will release it when the track is destroyed.
-                                // However on failure, the client is responsible for release.
-                                audio_io_handle_t input,
-                                uint32_t sampleRate,
-                                audio_format_t format,
-                                audio_channel_mask_t channelMask,
-                                const String16& callingPackage,
-                                size_t *pFrameCount,
-                                audio_input_flags_t *flags,
-                                pid_t pid,
-                                pid_t tid,  // -1 means unused, otherwise must be valid non-0
-                                int clientUid,
-                                audio_session_t *sessionId,
-                                size_t *notificationFrames,
-                                sp<IMemory>& cblk,
-                                sp<IMemory>& buffers,   // return value 0 means it follows cblk
-                                status_t *status,
-                                audio_port_handle_t portId) = 0;
+    virtual sp<media::IAudioRecord> createRecord(const CreateRecordInput& input,
+                                        CreateRecordOutput& output,
+                                        status_t *status) = 0;
 
     // FIXME Surprisingly, format/latency don't work for input handles
 
