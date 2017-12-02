@@ -29,12 +29,7 @@ cc_library_shared {
         // AIDL files for camera interfaces
         // The headers for these interfaces will be available to any modules that
         // include libcamera_client, at the path "aidl/package/path/BnFoo.h"
-        "aidl/android/hardware/ICameraService.aidl",
-        "aidl/android/hardware/ICameraServiceListener.aidl",
-        "aidl/android/hardware/ICameraServiceProxy.aidl",
-        "aidl/android/hardware/camera2/ICameraDeviceCallbacks.aidl",
-        "aidl/android/hardware/camera2/ICameraDeviceUser.aidl",
-
+        ":libcamera_client_aidl",
 
         // Source for camera interface parcelables, and manually-written interfaces
         "Camera.cpp",
@@ -80,4 +75,26 @@ cc_library_shared {
         "-Wextra",
     ],
 
+}
+
+// AIDL interface between camera clients and the camera service.
+filegroup {
+    name: "libcamera_client_aidl",
+    srcs: [
+        "aidl/android/hardware/ICameraService.aidl",
+        "aidl/android/hardware/ICameraServiceListener.aidl",
+        "aidl/android/hardware/ICameraServiceProxy.aidl",
+        "aidl/android/hardware/camera2/ICameraDeviceCallbacks.aidl",
+        "aidl/android/hardware/camera2/ICameraDeviceUser.aidl",
+    ],
+}
+
+// Extra AIDL files that are used by framework.jar but not libcamera_client
+// because they have hand-written native implementations.
+filegroup {
+    name: "libcamera_client_framework_aidl",
+    srcs: [
+        "aidl/android/hardware/ICamera.aidl",
+        "aidl/android/hardware/ICameraClient.aidl",
+    ],
 }
