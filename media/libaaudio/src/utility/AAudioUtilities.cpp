@@ -25,6 +25,7 @@
 
 #include "aaudio/AAudio.h"
 #include <aaudio/AAudioTesting.h>
+#include <math.h>
 
 #include "utility/AAudioUtilities.h"
 
@@ -50,44 +51,10 @@ int32_t AAudioConvert_formatToSizeInBytes(aaudio_format_t format) {
     return size;
 }
 
-
 // TODO expose and call clamp16_from_float function in primitives.h
 static inline int16_t clamp16_from_float(float f) {
-    /* Offset is used to expand the valid range of [-1.0, 1.0) into the 16 lsbs of the
-     * floating point significand. The normal shift is 3<<22, but the -15 offset
-     * is used to multiply by 32768.
-     */
-    static const float offset = (float)(3 << (22 - 15));
-    /* zero = (0x10f << 22) =  0x43c00000 (not directly used) */
-    static const int32_t limneg = (0x10f << 22) /*zero*/ - 32768; /* 0x43bf8000 */
-    static const int32_t limpos = (0x10f << 22) /*zero*/ + 32767; /* 0x43c07fff */
-
-    union {
-        float f;
-        int32_t i;
-    } u;
-
-    u.f = f + offset; /* recenter valid range */
-    /* Now the valid range is represented as integers between [limneg, limpos].
-     * Clamp using the fact that float representation (as an integer) is an ordered set.
-     */
-    if (u.i < limneg)
-        u.i = -32768;
-    else if (u.i > limpos)
-        u.i = 32767;
-    return u.i; /* Return lower 16 bits, the part of interest in the significand. */
-}
-
-// Same but without clipping.
-// Convert -1.0f to +1.0f to -32768 to +32767
-static inline int16_t floatToInt16(float f) {
-    static const float offset = (float)(3 << (22 - 15));
-    union {
-        float f;
-        int32_t i;
-    } u;
-    u.f = f + offset; /* recenter valid range */
-    return u.i; /* Return lower 16 bits, the part of interest in the significand. */
+    static const float scale = 1 << 15;
+    return (int16_t) roundf(fmaxf(fminf(f * scale, scale - 1.f), -scale));
 }
 
 static float clipAndClampFloatToPcm16(float sample, float scaler) {
@@ -188,13 +155,14 @@ void AAudio_linearRamp(const int16_t *source,
                        int32_t samplesPerFrame,
                        float amplitude1,
                        float amplitude2) {
-    float scaler = amplitude1 / SHORT_SCALE;
-    float delta = (amplitude2 - amplitude1) / (SHORT_SCALE * (float) numFrames);
+    // Because we are converting from int16 to 1nt16, we do not have to scale by 1/32768.
+    float scaler = amplitude1;
+    float delta = (amplitude2 - amplitude1) / numFrames;
     for (int frameIndex = 0; frameIndex < numFrames; frameIndex++) {
         for (int sampleIndex = 0; sampleIndex < samplesPerFrame; sampleIndex++) {
             // No need to clip because int16_t range is inherently limited.
             float sample =  *source++ * scaler;
-            *destination++ =  floatToInt16(sample);
+            *destination++ = (int16_t) roundf(sample);
         }
         scaler += delta;
     }

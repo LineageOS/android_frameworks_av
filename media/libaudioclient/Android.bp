@@ -20,7 +20,7 @@ cc_library_shared {
         // The headers for these interfaces will be available to any modules that
         // include libaudioclient, at the path "aidl/package/path/BnFoo.h"
         "aidl/android/media/IAudioRecord.aidl",
-        "aidl/android/media/IPlayer.aidl",
+        ":libaudioclient_aidl",
 
         "AudioEffect.cpp",
         "AudioPolicy.cpp",
@@ -69,4 +69,12 @@ cc_library_shared {
             "signed-integer-overflow",
         ],
     },
+}
+
+// AIDL interface between libaudioclient and framework.jar
+filegroup {
+    name: "libaudioclient_aidl",
+    srcs: [
+        "aidl/android/media/IPlayer.aidl",
+    ],
 }

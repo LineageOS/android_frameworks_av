@@ -2039,6 +2039,20 @@ status_t Camera3Device::updateStream(int streamId, const std::vector<sp<Surface>
     return res;
 }
 
+status_t Camera3Device::dropStreamBuffers(bool dropping, int streamId) {
+    Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock l(mLock);
+
+    int idx = mOutputStreams.indexOfKey(streamId);
+    if (idx == NAME_NOT_FOUND) {
+        ALOGE("%s: Stream %d is not found.", __FUNCTION__, streamId);
+        return BAD_VALUE;
+    }
+
+    sp<Camera3OutputStreamInterface> stream = mOutputStreams.editValueAt(idx);
+    return stream->dropBuffers(dropping);
+}
+
 /**
  * Camera3Device private methods
  */

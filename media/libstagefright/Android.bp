@@ -37,6 +37,8 @@ cc_library_shared {
         "AudioPlayer.cpp",
         "AudioSource.cpp",
         "BufferImpl.cpp",
+        "CCodec.cpp",
+        "CCodecBufferChannel.cpp",
         "CodecBase.cpp",
         "CallbackDataSource.cpp",
         "CallbackMediaSource.cpp",
@@ -89,6 +91,7 @@ cc_library_shared {
         "libdl",
         "libdrmframework",
         "libgui",
+        "libion",
         "liblog",
         "libmedia",
         "libmedia_omx",
@@ -100,6 +103,7 @@ cc_library_shared {
         "libui",
         "libutils",
         "libmedia_helper",
+        "libstagefright_codec2",
         "libstagefright_foundation",
         "libstagefright_omx",
         "libstagefright_omx_utils",
@@ -111,6 +115,11 @@ cc_library_shared {
         "android.hidl.allocator@1.0",
         "android.hardware.cas.native@1.0",
         "android.hardware.media.omx@1.0",
+        "android.hardware.graphics.allocator@2.0",
+        "android.hardware.graphics.mapper@2.0",
+
+        // XXX: hack
+        "libstagefright_soft_c2avcdec",
     ],
 
     static_libs: [
@@ -125,6 +134,9 @@ cc_library_shared {
         "libstagefright_esds",
         "libstagefright_id3",
         "libFLAC",
+
+        // XXX: hack
+        "libstagefright_codec2_vndk",
     ],
 
     export_shared_lib_headers: [

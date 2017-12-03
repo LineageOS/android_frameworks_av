@@ -57,7 +57,7 @@ private:
             OWNED_BY_UPSTREAM,
         };
 
-        IOMX::buffer_id mBufferID;
+        uint32_t mBufferID;
         int32_t mGeneration;
         int32_t mOutputFlags;
         Status mStatus;
@@ -121,7 +121,7 @@ private:
 
     status_t allocateBuffersOnPort(OMX_U32 portIndex);
     BufferInfo *findBufferByID(
-            uint32_t portIndex, IOMX::buffer_id bufferID,
+            uint32_t portIndex, uint32_t bufferID,
             ssize_t *index = NULL);
     void postFillThisBuffer(BufferInfo *info);
     void postDrainThisBuffer(BufferInfo *info);

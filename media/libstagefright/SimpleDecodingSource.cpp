@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+//#define LOG_NDEBUG 0
+#define LOG_TAG "SimpleDecodingSource"
+#include <utils/Log.h>
+
 #include <gui/Surface.h>
 
 #include <media/ICrypto.h>
@@ -43,7 +47,7 @@ sp<SimpleDecodingSource> SimpleDecodingSource::Create(
 //static
 sp<SimpleDecodingSource> SimpleDecodingSource::Create(
         const sp<MediaSource> &source, uint32_t flags, const sp<ANativeWindow> &nativeWindow,
-        const char *desiredCodec) {
+        const char *desiredCodec, bool skipMediaCodecList) {
     sp<Surface> surface = static_cast<Surface*>(nativeWindow.get());
     const char *mime = NULL;
     sp<MetaData> meta = source->getFormat();
@@ -63,6 +67,33 @@ sp<SimpleDecodingSource> SimpleDecodingSource::Create(
     looper->start();
 
     sp<MediaCodec> codec;
+    auto configure = [=](const sp<MediaCodec> &codec, const AString &componentName)
+            -> sp<SimpleDecodingSource> {
+        if (codec != NULL) {
+            ALOGI("Successfully allocated codec '%s'", componentName.c_str());
+
+            status_t err = codec->configure(format, surface, NULL /* crypto */, 0 /* flags */);
+            sp<AMessage> outFormat;
+            if (err == OK) {
+                err = codec->getOutputFormat(&outFormat);
+            }
+            if (err == OK) {
+                return new SimpleDecodingSource(codec, source, looper,
+                        surface != NULL,
+                        strcmp(mime, MEDIA_MIMETYPE_AUDIO_VORBIS) == 0,
+                        outFormat);
+            }
+
+            ALOGD("Failed to configure codec '%s'", componentName.c_str());
+            codec->release();
+        }
+        return NULL;
+    };
+
+    if (skipMediaCodecList) {
+        codec = MediaCodec::CreateByComponentName(looper, desiredCodec);
+        return configure(codec, desiredCodec);
+    }
 
     for (size_t i = 0; i < matchingCodecs.size(); ++i) {
         const AString &componentName = matchingCodecs[i];
@@ -73,22 +104,10 @@ sp<SimpleDecodingSource> SimpleDecodingSource::Create(
         ALOGV("Attempting to allocate codec '%s'", componentName.c_str());
 
         codec = MediaCodec::CreateByComponentName(looper, componentName);
-        if (codec != NULL) {
-            ALOGI("Successfully allocated codec '%s'", componentName.c_str());
-
-            status_t err = codec->configure(format, surface, NULL /* crypto */, 0 /* flags */);
-            if (err == OK) {
-                err = codec->getOutputFormat(&format);
-            }
-            if (err == OK) {
-                return new SimpleDecodingSource(codec, source, looper,
-                        surface != NULL,
-                        strcmp(mime, MEDIA_MIMETYPE_AUDIO_VORBIS) == 0,
-                        format);
-            }
-
-            ALOGD("Failed to configure codec '%s'", componentName.c_str());
-            codec->release();
+        sp<SimpleDecodingSource> res = configure(codec, componentName);
+        if (res != NULL) {
+            return res;
+        } else {
             codec = NULL;
         }
     }

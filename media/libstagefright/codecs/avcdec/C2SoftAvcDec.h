@@ -58,9 +58,6 @@ struct ivd_video_decode_op_t;
 
 #define MIN(a, b) ((a) < (b)) ? (a) : (b)
 
-/** Used to remove warnings about unused parameters */
-#define UNUSED(x) ((void)(x))
-
 /** Get time */
 #define GETTIME(a, b) gettimeofday(a, b);
 
@@ -80,7 +77,7 @@ public:
     };
 
     C2SoftAvcDecIntf(const char *name, c2_node_id_t id);
-    virtual ~C2SoftAvcDecIntf() = default;
+    virtual ~C2SoftAvcDecIntf() override;
 
     // From C2ComponentInterface
     virtual C2String getName() const override;
