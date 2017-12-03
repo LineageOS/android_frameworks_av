@@ -16,6 +16,24 @@
       "revId": "d51fad5f9c08a2e72f6f3d76b262e2e8d8af8f9c",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1fa5d7c3_12ae8834",
+        "filename": "media/libstagefright/OMXCodec.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 2482,
+      "author": {
+        "id": 17656
+      },
+      "writtenOn": "2017-12-03T13:16:04Z",
+      "side": 1,
+      "message": "or we need a 2nd #endif after line 2484",
+      "parentUuid": "2043db6b_4d95f7cb",
+      "revId": "d51fad5f9c08a2e72f6f3d76b262e2e8d8af8f9c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
