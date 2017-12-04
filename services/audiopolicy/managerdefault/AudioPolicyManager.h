@@ -601,20 +601,15 @@ private:
                 audio_devices_t device,
                 audio_session_t session,
                 audio_stream_type_t stream,
-                uint32_t samplingRate,
-                audio_format_t format,
-                audio_channel_mask_t channelMask,
-                audio_output_flags_t flags,
-                const audio_offload_info_t *offloadInfo);
+                const audio_config_t *config,
+                audio_output_flags_t flags);
         // internal method to return the input handle for the given device and format
         audio_io_handle_t getInputForDevice(audio_devices_t device,
                 String8 address,
                 audio_session_t session,
                 uid_t uid,
                 audio_source_t inputSource,
-                uint32_t samplingRate,
-                audio_format_t format,
-                audio_channel_mask_t channelMask,
+                const audio_config_base_t *config,
                 audio_input_flags_t flags,
                 AudioMix *policyMix);
 
