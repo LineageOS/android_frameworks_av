@@ -136,7 +136,12 @@ status_t CameraClient::dumpClient(int fd, const Vector<String16>& args) {
     const char *enddump = "\n\n";
     write(fd, enddump, strlen(enddump));
 
-    return mHardware->dump(fd, args);
+    sp<CameraHardwareInterface> hardware = mHardware;
+    if (hardware != nullptr) {
+        return hardware->dump(fd, args);
+    }
+    ALOGI("%s: camera device closed already, skip dumping", __FUNCTION__);
+    return OK;
 }
 
 // ----------------------------------------------------------------------------
