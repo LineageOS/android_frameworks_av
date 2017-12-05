@@ -3330,14 +3330,19 @@ int Effect_process(effect_handle_t     self,
         //ALOGV("\tEffect_process Not Calling process with %d effects enabled, %d called: Effect %d",
         //pContext->pBundledContext->NumberEffectsEnabled,
         //pContext->pBundledContext->NumberEffectsCalled, pContext->EffectType);
-        // 2 is for stereo input
+
         if (pContext->config.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
-            for (size_t i=0; i < outBuffer->frameCount*2; i++){
-                outBuffer->s16[i] =
-                        clamp16((LVM_INT32)outBuffer->s16[i] + (LVM_INT32)inBuffer->s16[i]);
+            for (size_t i = 0; i < outBuffer->frameCount * FCC_2; ++i){
+#ifdef NATIVE_FLOAT_BUFFER
+                outBuffer->f32[i] += inBuffer->f32[i];
+#else
+                outBuffer->s16[i] = clamp16((LVM_INT32)outBuffer->s16[i] + inBuffer->s16[i]);
+#endif
             }
         } else if (outBuffer->raw != inBuffer->raw) {
-            memcpy(outBuffer->raw, inBuffer->raw, outBuffer->frameCount*sizeof(LVM_INT16)*2);
+            memcpy(outBuffer->raw,
+                    inBuffer->raw,
+                    outBuffer->frameCount * sizeof(effect_buffer_t) * FCC_2);
         }
     }
 
