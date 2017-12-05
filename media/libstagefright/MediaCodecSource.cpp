@@ -166,9 +166,7 @@ status_t MediaCodecSource::Puller::postSynchronouslyAndReturnError(
 }
 
 status_t MediaCodecSource::Puller::setStopTimeUs(int64_t stopTimeUs) {
-    sp<AMessage> msg = new AMessage(kWhatSetStopTimeUs, this);
-    msg->setInt64("stop-time-us", stopTimeUs);
-    return postSynchronouslyAndReturnError(msg);
+    return mSource->setStopTimeUs(stopTimeUs);
 }
 
 status_t MediaCodecSource::Puller::start(const sp<MetaData> &meta, const sp<AMessage> &notify) {
