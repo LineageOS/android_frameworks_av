@@ -272,7 +272,7 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(MediaAnalyticsItem
     }
 
     ALOGV("given uid %d; sanitized uid: %d sanitized pkg: %s "
-          "sanitized pkg version: %d",
+          "sanitized pkg version: %"  PRId64,
           uid_given, item->getUid(),
           item->getPkgName().c_str(),
           item->getPkgVersionCode());
@@ -856,7 +856,7 @@ void MediaAnalyticsService::setPkgInfo(MediaAnalyticsItem *item, uid_t uid, bool
     } else {
         AString pkg;
         std::string installer = "";
-        int32_t versionCode = 0;
+        int64_t versionCode = 0;
 
         struct passwd *pw = getpwuid(uid);
         if (pw) {
@@ -926,7 +926,7 @@ void MediaAnalyticsService::setPkgInfo(MediaAnalyticsItem *item, uid_t uid, bool
                 }
 
 
-                ALOGV("package '%s' installed by '%s' versioncode %d / %08x",
+                ALOGV("package '%s' installed by '%s' versioncode %"  PRId64 " / %" PRIx64,
                       pkg.c_str(), installer.c_str(), versionCode, versionCode);
 
                 if (strncmp(installer.c_str(), "com.android.", 12) == 0) {

@@ -214,12 +214,12 @@ AString MediaAnalyticsItem::getPkgName() const {
     return mPkgName;
 }
 
-MediaAnalyticsItem &MediaAnalyticsItem::setPkgVersionCode(int32_t pkgVersionCode) {
+MediaAnalyticsItem &MediaAnalyticsItem::setPkgVersionCode(int64_t pkgVersionCode) {
     mPkgVersionCode = pkgVersionCode;
     return *this;
 }
 
-int32_t MediaAnalyticsItem::getPkgVersionCode() const {
+int64_t MediaAnalyticsItem::getPkgVersionCode() const {
     return mPkgVersionCode;
 }
 
@@ -640,7 +640,7 @@ int32_t MediaAnalyticsItem::readFromParcel(const Parcel& data) {
     mPid = data.readInt32();
     mUid = data.readInt32();
     mPkgName = data.readCString();
-    mPkgVersionCode = data.readInt32();
+    mPkgVersionCode = data.readInt64();
     mSessionID = data.readInt64();
     mFinalized = data.readInt32();
     mTimestamp = data.readInt64();
@@ -687,7 +687,7 @@ int32_t MediaAnalyticsItem::writeToParcel(Parcel *data) {
     data->writeInt32(mPid);
     data->writeInt32(mUid);
     data->writeCString(mPkgName.c_str());
-    data->writeInt32(mPkgVersionCode);
+    data->writeInt64(mPkgVersionCode);
     data->writeInt64(mSessionID);
     data->writeInt32(mFinalized);
     data->writeInt64(mTimestamp);
@@ -766,7 +766,7 @@ AString MediaAnalyticsItem::toString(int version) {
 
     if (version >= PROTO_V1) {
         result.append(mPkgName);
-        snprintf(buffer, sizeof(buffer), ":%d:", mPkgVersionCode);
+        snprintf(buffer, sizeof(buffer), ":%"  PRId64 ":", mPkgVersionCode);
         result.append(buffer);
     }
 

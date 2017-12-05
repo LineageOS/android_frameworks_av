@@ -138,7 +138,7 @@ class MediaAnalyticsService : public BnMediaAnalyticsService
         uid_t uid;
         AString pkg;
         AString installer;
-        int32_t versionCode;
+        int64_t versionCode;
         nsecs_t expiration;
     };
 
