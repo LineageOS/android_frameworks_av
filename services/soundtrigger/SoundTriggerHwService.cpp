@@ -586,11 +586,11 @@ status_t SoundTriggerHwService::Module::loadSoundModel(const sp<IMemory>& modelM
             goto exit;
         }
 
-        status_t status = mHwDevice->load_sound_model(mHwDevice,
-                                                      sound_model,
-                                                      SoundTriggerHwService::soundModelCallback,
-                                                      this,
-                                                      handle);
+        status = mHwDevice->load_sound_model(mHwDevice,
+                                             sound_model,
+                                             SoundTriggerHwService::soundModelCallback,
+                                             this,
+                                             handle);
         if (status != NO_ERROR) {
             goto exit;
         }
