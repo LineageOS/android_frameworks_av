@@ -843,12 +843,10 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
         flags = (audio_output_flags_t)(flags | AUDIO_OUTPUT_FLAG_HW_AV_SYNC);
     }
 
-    ALOGV("getOutputForAttr() device 0x%x, samplingRate %d, format %x, channelMask %x, flags %x",
+    ALOGV("getOutputForAttr() device 0x%x, sampling rate %d, format %x, channel mask %x, flags %x",
           device, config->sample_rate, config->format, config->channel_mask, flags);
 
-    *output = getOutputForDevice(device, session, *stream,
-                                 config->sample_rate, config->format, config->channel_mask,
-                                 flags, &config->offload_info);
+    *output = getOutputForDevice(device, session, *stream, config, flags);
     if (*output == AUDIO_IO_HANDLE_NONE) {
         mOutputRoutes.removeRoute(session);
         return INVALID_OPERATION;
@@ -867,11 +865,8 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
         audio_devices_t device,
         audio_session_t session,
         audio_stream_type_t stream,
-        uint32_t samplingRate,
-        audio_format_t format,
-        audio_channel_mask_t channelMask,
-        audio_output_flags_t flags,
-        const audio_offload_info_t *offloadInfo)
+        const audio_config_t *config,
+        audio_output_flags_t flags)
 {
     audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
     status_t status;
@@ -898,7 +893,7 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
     if (stream == AUDIO_STREAM_TTS) {
         flags = AUDIO_OUTPUT_FLAG_TTS;
     } else if (stream == AUDIO_STREAM_VOICE_CALL &&
-               audio_is_linear_pcm(format)) {
+               audio_is_linear_pcm(config->format)) {
         flags = (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_VOIP_RX |
                                        AUDIO_OUTPUT_FLAG_DIRECT);
         ALOGV("Set VoIP and Direct output flags for PCM format");
@@ -909,8 +904,8 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
     // skip direct output selection if the request can obviously be attached to a mixed output
     // and not explicitly requested
     if (((flags & AUDIO_OUTPUT_FLAG_DIRECT) == 0) &&
-            audio_is_linear_pcm(format) && samplingRate <= SAMPLE_RATE_HZ_MAX &&
-            audio_channel_count_from_out_mask(channelMask) <= 2) {
+            audio_is_linear_pcm(config->format) && config->sample_rate <= SAMPLE_RATE_HZ_MAX &&
+            audio_channel_count_from_out_mask(config->channel_mask) <= 2) {
         goto non_direct_output;
     }
 
@@ -924,102 +919,58 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
     if (((flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) == 0) ||
             !(mEffects.isNonOffloadableEffectEnabled() || mMasterMono)) {
         profile = getProfileForDirectOutput(device,
-                                           samplingRate,
-                                           format,
-                                           channelMask,
+                                           config->sample_rate,
+                                           config->format,
+                                           config->channel_mask,
                                            (audio_output_flags_t)flags);
     }
 
     if (profile != 0) {
-        sp<SwAudioOutputDescriptor> outputDesc = NULL;
-
         for (size_t i = 0; i < mOutputs.size(); i++) {
             sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
             if (!desc->isDuplicated() && (profile == desc->mProfile)) {
-                outputDesc = desc;
                 // reuse direct output if currently open by the same client
                 // and configured with same parameters
-                if ((samplingRate == outputDesc->mSamplingRate) &&
-                    audio_formats_match(format, outputDesc->mFormat) &&
-                    (channelMask == outputDesc->mChannelMask)) {
-                  if (session == outputDesc->mDirectClientSession) {
-                      outputDesc->mDirectOpenCount++;
-                      ALOGV("getOutputForDevice() reusing direct output %d for session %d",
-                            mOutputs.keyAt(i), session);
-                      return mOutputs.keyAt(i);
-                  } else {
-                      ALOGV("getOutputForDevice() do not reuse direct output because"
-                              "current client (%d) is not the same as requesting client (%d)",
-                            outputDesc->mDirectClientSession, session);
-                      goto non_direct_output;
-                  }
+                if ((config->sample_rate == desc->mSamplingRate) &&
+                    audio_formats_match(config->format, desc->mFormat) &&
+                    (config->channel_mask == desc->mChannelMask) &&
+                    (session == desc->mDirectClientSession)) {
+                    desc->mDirectOpenCount++;
+                    ALOGV("getOutputForDevice() reusing direct output %d for session %d",
+                        mOutputs.keyAt(i), session);
+                    return mOutputs.keyAt(i);
                 }
             }
         }
-        // close direct output if currently open and configured with different parameters
-        if (outputDesc != NULL) {
-            closeOutput(outputDesc->mIoHandle);
+
+        if (!profile->canOpenNewIo()) {
+            goto non_direct_output;
         }
 
-        // if the selected profile is offloaded and no offload info was specified,
-        // create a default one
-        audio_offload_info_t defaultOffloadInfo = AUDIO_INFO_INITIALIZER;
-        if ((profile->getFlags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) && !offloadInfo) {
-            flags = (audio_output_flags_t)(flags | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD);
-            defaultOffloadInfo.sample_rate = samplingRate;
-            defaultOffloadInfo.channel_mask = channelMask;
-            defaultOffloadInfo.format = format;
-            defaultOffloadInfo.stream_type = stream;
-            defaultOffloadInfo.bit_rate = 0;
-            defaultOffloadInfo.duration_us = -1;
-            defaultOffloadInfo.has_video = true; // conservative
-            defaultOffloadInfo.is_streaming = true; // likely
-            offloadInfo = &defaultOffloadInfo;
-        }
-
-        outputDesc = new SwAudioOutputDescriptor(profile, mpClientInterface);
-        outputDesc->mDevice = device;
-        outputDesc->mLatency = 0;
-        outputDesc->mFlags = (audio_output_flags_t)(outputDesc->mFlags | flags);
-        audio_config_t config = AUDIO_CONFIG_INITIALIZER;
-        config.sample_rate = samplingRate;
-        config.channel_mask = channelMask;
-        config.format = format;
-        if (offloadInfo != NULL) {
-            config.offload_info = *offloadInfo;
-        }
-        DeviceVector outputDevices = mAvailableOutputDevices.getDevicesFromType(device);
-        String8 address = outputDevices.size() > 0 ? outputDevices.itemAt(0)->mAddress
-                : String8("");
-        status = mpClientInterface->openOutput(profile->getModuleHandle(),
-                                               &output,
-                                               &config,
-                                               &outputDesc->mDevice,
-                                               address,
-                                               &outputDesc->mLatency,
-                                               outputDesc->mFlags);
+        sp<SwAudioOutputDescriptor> outputDesc =
+                new SwAudioOutputDescriptor(profile, mpClientInterface);
+        status = outputDesc->open(config, device, String8(""), stream, flags, &output);
 
         // only accept an output with the requested parameters
         if (status != NO_ERROR ||
-            (samplingRate != 0 && samplingRate != config.sample_rate) ||
-            (format != AUDIO_FORMAT_DEFAULT && !audio_formats_match(format, config.format)) ||
-            (channelMask != 0 && channelMask != config.channel_mask)) {
-            ALOGV("getOutputForDevice() failed opening direct output: output %d samplingRate %d %d,"
-                    "format %d %d, channelMask %04x %04x", output, samplingRate,
-                    outputDesc->mSamplingRate, format, outputDesc->mFormat, channelMask,
-                    outputDesc->mChannelMask);
+            (config->sample_rate != 0 && config->sample_rate != outputDesc->mSamplingRate) ||
+            (config->format != AUDIO_FORMAT_DEFAULT &&
+                    !audio_formats_match(config->format, outputDesc->mFormat)) ||
+            (config->channel_mask != 0 && config->channel_mask != outputDesc->mChannelMask)) {
+            ALOGV("getOutputForDevice() failed opening direct output: output %d sample rate %d %d,"
+                    "format %d %d, channel mask %04x %04x", output, config->sample_rate,
+                    outputDesc->mSamplingRate, config->format, outputDesc->mFormat,
+                    config->channel_mask, outputDesc->mChannelMask);
             if (output != AUDIO_IO_HANDLE_NONE) {
-                mpClientInterface->closeOutput(output);
+                outputDesc->close();
             }
             // fall back to mixer output if possible when the direct output could not be open
-            if (audio_is_linear_pcm(format) && samplingRate <= SAMPLE_RATE_HZ_MAX) {
+            if (audio_is_linear_pcm(config->format) &&
+                    config->sample_rate  <= SAMPLE_RATE_HZ_MAX) {
                 goto non_direct_output;
             }
             return AUDIO_IO_HANDLE_NONE;
         }
-        outputDesc->mSamplingRate = config.sample_rate;
-        outputDesc->mChannelMask = config.channel_mask;
-        outputDesc->mFormat = config.format;
         outputDesc->mRefCount[stream] = 0;
         outputDesc->mStopTime[stream] = 0;
         outputDesc->mDirectOpenCount = 1;
@@ -1045,18 +996,18 @@ non_direct_output:
     // open a non direct output
 
     // for non direct outputs, only PCM is supported
-    if (audio_is_linear_pcm(format)) {
+    if (audio_is_linear_pcm(config->format)) {
         // get which output is suitable for the specified stream. The actual
         // routing change will happen when startOutput() will be called
         SortedVector<audio_io_handle_t> outputs = getOutputsForDevice(device, mOutputs);
 
         // at this stage we should ignore the DIRECT flag as no direct output could be found earlier
         flags = (audio_output_flags_t)(flags & ~AUDIO_OUTPUT_FLAG_DIRECT);
-        output = selectOutput(outputs, flags, format);
+        output = selectOutput(outputs, flags, config->format);
     }
     ALOGW_IF((output == 0), "getOutputForDevice() could not find output for stream %d, "
-            "samplingRate %d, format %d, channels %x, flags %x",
-            stream, samplingRate, format, channelMask, flags);
+            "sampling rate %d, format %d, channels %x, flags %x",
+            stream, config->sample_rate, config->format, config->channel_mask, flags);
 
     return output;
 }
@@ -1155,6 +1106,13 @@ status_t AudioPolicyManager::startOutput(audio_io_handle_t output,
 
     sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueAt(index);
 
+    if (!outputDesc->isActive()) {
+        if (!outputDesc->mProfile->canStartNewIo()) {
+            return INVALID_OPERATION;
+        }
+        outputDesc->mProfile->curActiveCount++;
+    }
+
     // Routing?
     mOutputRoutes.incRouteActivity(session);
 
@@ -1182,6 +1140,12 @@ status_t AudioPolicyManager::startOutput(audio_io_handle_t output,
 
     if (status != NO_ERROR) {
         mOutputRoutes.decRouteActivity(session);
+        if (!outputDesc->isActive()) {
+            LOG_ALWAYS_FATAL_IF(outputDesc->mProfile->curActiveCount < 1,
+                                "%s invalid profile active count %u",
+                                __FUNCTION__, outputDesc->mProfile->curActiveCount);
+            outputDesc->mProfile->curActiveCount--;
+        }
         return status;
     }
     // Automatically enable the remote submix input when output is started on a re routing mix
@@ -1370,7 +1334,15 @@ status_t AudioPolicyManager::stopOutput(audio_io_handle_t output,
         }
     }
 
-    return stopSource(outputDesc, stream, forceDeviceUpdate);
+    status_t status = stopSource(outputDesc, stream, forceDeviceUpdate);
+
+    if (status == NO_ERROR && !outputDesc->isActive()) {
+        LOG_ALWAYS_FATAL_IF(outputDesc->mProfile->curActiveCount < 1,
+                            "%s invalid profile active count %u",
+                            __FUNCTION__, outputDesc->mProfile->curActiveCount);
+        outputDesc->mProfile->curActiveCount--;
+    }
+    return status;
 }
 
 status_t AudioPolicyManager::stopSource(const sp<AudioOutputDescriptor>& outputDesc,
@@ -1473,7 +1445,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
                                              input_type_t *inputType,
                                              audio_port_handle_t *portId)
 {
-    ALOGV("getInputForAttr() source %d, samplingRate %d, format %d, channelMask %x,"
+    ALOGV("getInputForAttr() source %d, sampling rate %d, format %d, channel mask %x,"
             "session %d, flags %#x",
           attr->source, config->sample_rate, config->format, config->channel_mask, session, flags);
 
@@ -1484,6 +1456,10 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
     audio_source_t inputSource = attr->source;
     AudioMix *policyMix = NULL;
     DeviceVector inputDevices;
+
+    if (inputSource == AUDIO_SOURCE_DEFAULT) {
+        inputSource = AUDIO_SOURCE_MIC;
+    }
 
     // Explicit routing?
     sp<DeviceDescriptor> deviceDesc;
@@ -1541,9 +1517,6 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
     *input = AUDIO_IO_HANDLE_NONE;
     *inputType = API_INPUT_INVALID;
 
-    if (inputSource == AUDIO_SOURCE_DEFAULT) {
-        inputSource = AUDIO_SOURCE_MIC;
-    }
     halInputSource = inputSource;
 
     // TODO: check for existing client for this port ID
@@ -1593,7 +1566,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
     }
 
     *input = getInputForDevice(device, address, session, uid, inputSource,
-                               config->sample_rate, config->format, config->channel_mask, flags,
+                               config, flags,
                                policyMix);
     if (*input == AUDIO_IO_HANDLE_NONE) {
         status = INVALID_OPERATION;
@@ -1620,9 +1593,7 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
                                                         audio_session_t session,
                                                         uid_t uid,
                                                         audio_source_t inputSource,
-                                                        uint32_t samplingRate,
-                                                        audio_format_t format,
-                                                        audio_channel_mask_t channelMask,
+                                                        const audio_config_base_t *config,
                                                         audio_input_flags_t flags,
                                                         AudioMix *policyMix)
 {
@@ -1641,16 +1612,17 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
             halInputSource = AUDIO_SOURCE_VOICE_RECOGNITION;
         }
     } else if (inputSource == AUDIO_SOURCE_VOICE_COMMUNICATION &&
-               audio_is_linear_pcm(format)) {
+               audio_is_linear_pcm(config->format)) {
         flags = (audio_input_flags_t)(flags | AUDIO_INPUT_FLAG_VOIP_TX);
     }
 
     // find a compatible input profile (not necessarily identical in parameters)
     sp<IOProfile> profile;
-    // samplingRate and flags may be updated by getInputProfile
-    uint32_t profileSamplingRate = (samplingRate == 0) ? SAMPLE_RATE_HZ_DEFAULT : samplingRate;
-    audio_format_t profileFormat = format;
-    audio_channel_mask_t profileChannelMask = channelMask;
+    // sampling rate and flags may be updated by getInputProfile
+    uint32_t profileSamplingRate = (config->sample_rate == 0) ?
+            SAMPLE_RATE_HZ_DEFAULT : config->sample_rate;
+    audio_format_t profileFormat = config->format;
+    audio_channel_mask_t profileChannelMask = config->channel_mask;
     audio_input_flags_t profileFlags = flags;
     for (;;) {
         profile = getInputProfile(device, address,
@@ -1664,12 +1636,13 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
             profileFlags = AUDIO_INPUT_FLAG_NONE; // retry
         } else { // fail
             ALOGW("getInputForDevice() could not find profile for device 0x%X, "
-                  "samplingRate %u, format %#x, channelMask 0x%X, flags %#x",
-                    device, samplingRate, format, channelMask, flags);
+                  "sampling rate %u, format %#x, channel mask 0x%X, flags %#x",
+                    device, config->sample_rate, config->format, config->channel_mask, flags);
             return input;
         }
     }
     // Pick input sampling rate if not specified by client
+    uint32_t samplingRate = config->sample_rate;
     if (samplingRate == 0) {
         samplingRate = profileSamplingRate;
     }
@@ -1680,14 +1653,14 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
     }
 
     sp<AudioSession> audioSession = new AudioSession(session,
-                                                              inputSource,
-                                                              format,
-                                                              samplingRate,
-                                                              channelMask,
-                                                              flags,
-                                                              uid,
-                                                              isSoundTrigger,
-                                                              policyMix, mpClientInterface);
+                                                     inputSource,
+                                                     config->format,
+                                                     samplingRate,
+                                                     config->channel_mask,
+                                                     flags,
+                                                     uid,
+                                                     isSoundTrigger,
+                                                     policyMix, mpClientInterface);
 
 // FIXME: disable concurrent capture until UI is ready
 #if 0
@@ -1731,8 +1704,8 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
             // can be selected.
             if (!isConcurrentSource(inputSource) &&
                     ((desc->mSamplingRate != samplingRate ||
-                    desc->mChannelMask != channelMask ||
-                    !audio_formats_match(desc->mFormat, format)) &&
+                    desc->mChannelMask != config->channel_mask ||
+                    !audio_formats_match(desc->mFormat, config->format)) &&
                     (source_priority(desc->getHighestPrioritySource(false /*activeOnly*/)) <
                      source_priority(inputSource)))) {
                 reusedInputDesc = desc;
@@ -1755,44 +1728,34 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
     }
 #endif
 
-    audio_config_t config = AUDIO_CONFIG_INITIALIZER;
-    config.sample_rate = profileSamplingRate;
-    config.channel_mask = profileChannelMask;
-    config.format = profileFormat;
-
-    if (address == "") {
-        DeviceVector inputDevices = mAvailableInputDevices.getDevicesFromType(device);
-        //   the inputs vector must be of size 1, but we don't want to crash here
-        address = inputDevices.size() > 0 ? inputDevices.itemAt(0)->mAddress : String8("");
+    if (!profile->canOpenNewIo()) {
+        return AUDIO_IO_HANDLE_NONE;
     }
 
-    status_t status = mpClientInterface->openInput(profile->getModuleHandle(),
-                                                   &input,
-                                                   &config,
-                                                   &device,
-                                                   address,
-                                                   halInputSource,
-                                                   profileFlags);
+    sp<AudioInputDescriptor> inputDesc = new AudioInputDescriptor(profile, mpClientInterface);
+
+    audio_config_t lConfig = AUDIO_CONFIG_INITIALIZER;
+    lConfig.sample_rate = profileSamplingRate;
+    lConfig.channel_mask = profileChannelMask;
+    lConfig.format = profileFormat;
+
+    status_t status = inputDesc->open(&lConfig, device, address,
+            halInputSource, profileFlags, &input);
 
     // only accept input with the exact requested set of parameters
     if (status != NO_ERROR || input == AUDIO_IO_HANDLE_NONE ||
-        (profileSamplingRate != config.sample_rate) ||
-        !audio_formats_match(profileFormat, config.format) ||
-        (profileChannelMask != config.channel_mask)) {
-        ALOGW("getInputForAttr() failed opening input: samplingRate %d"
-              ", format %d, channelMask %x",
-                samplingRate, format, channelMask);
+        (profileSamplingRate != lConfig.sample_rate) ||
+        !audio_formats_match(profileFormat, lConfig.format) ||
+        (profileChannelMask != lConfig.channel_mask)) {
+        ALOGW("getInputForAttr() failed opening input: sampling rate %d"
+              ", format %d, channel mask %x",
+              profileSamplingRate, profileFormat, profileChannelMask);
         if (input != AUDIO_IO_HANDLE_NONE) {
-            mpClientInterface->closeInput(input);
+            inputDesc->close();
         }
         return AUDIO_IO_HANDLE_NONE;
     }
 
-    sp<AudioInputDescriptor> inputDesc = new AudioInputDescriptor(profile);
-    inputDesc->mSamplingRate = profileSamplingRate;
-    inputDesc->mFormat = profileFormat;
-    inputDesc->mChannelMask = profileChannelMask;
-    inputDesc->mDevice = device;
     inputDesc->mPolicyMix = policyMix;
     inputDesc->addAudioSession(session, audioSession);
 
@@ -2006,6 +1969,13 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
         setInputDevice(input, device, true /* force */);
 
         if (inputDesc->getAudioSessionCount(true/*activeOnly*/) == 1) {
+            if (!inputDesc->mProfile->canStartNewIo()) {
+                mInputRoutes.decRouteActivity(session);
+                audioSession->changeActiveCount(-1);
+                return INVALID_OPERATION;
+            }
+            inputDesc->mProfile->curActiveCount++;
+
             // if input maps to a dynamic policy with an activity listener, notify of state change
             if ((inputDesc->mPolicyMix != NULL)
                     && ((inputDesc->mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
@@ -2075,6 +2045,11 @@ status_t AudioPolicyManager::stopInput(audio_io_handle_t input,
         if (inputDesc->isActive()) {
             setInputDevice(input, getNewInputDevice(inputDesc), false /* force */);
         } else {
+            LOG_ALWAYS_FATAL_IF(inputDesc->mProfile->curActiveCount < 1,
+                                "%s invalid profile active count %u",
+                                __FUNCTION__, inputDesc->mProfile->curActiveCount);
+            inputDesc->mProfile->curActiveCount--;
+
             // if input maps to a dynamic policy with an activity listener, notify of state change
             if ((inputDesc->mPolicyMix != NULL)
                     && ((inputDesc->mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
@@ -2169,7 +2144,7 @@ void AudioPolicyManager::closeAllInputs() {
             mAudioPatches.removeItemsAt(patch_index);
             patchRemoved = true;
         }
-        mpClientInterface->closeInput(mInputs.keyAt(input_index));
+        inputDesc->close();
     }
     mInputs.clear();
     SoundTrigger::setCaptureState(false);
@@ -3632,6 +3607,12 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
         {
             const sp<IOProfile> outProfile = mHwModules[i]->mOutputProfiles[j];
 
+            if (!outProfile->canOpenNewIo()) {
+                ALOGE("Invalid Output profile max open count %u for profile %s",
+                      outProfile->maxOpenCount, outProfile->getTagName().c_str());
+                continue;
+            }
+
             if (!outProfile->hasSupportedDevices()) {
                 ALOGW("Output profile contains no device on module %s", mHwModules[i]->getName());
                 continue;
@@ -3660,30 +3641,15 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
             const DeviceVector &devicesForType = supportedDevices.getDevicesFromType(profileType);
             String8 address = devicesForType.size() > 0 ? devicesForType.itemAt(0)->mAddress
                     : String8("");
-
-            outputDesc->mDevice = profileType;
-            audio_config_t config = AUDIO_CONFIG_INITIALIZER;
-            config.sample_rate = outputDesc->mSamplingRate;
-            config.channel_mask = outputDesc->mChannelMask;
-            config.format = outputDesc->mFormat;
             audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-            status_t status = mpClientInterface->openOutput(outProfile->getModuleHandle(),
-                                                            &output,
-                                                            &config,
-                                                            &outputDesc->mDevice,
-                                                            address,
-                                                            &outputDesc->mLatency,
-                                                            outputDesc->mFlags);
+            status_t status = outputDesc->open(nullptr, profileType, address,
+                                           AUDIO_STREAM_DEFAULT, AUDIO_OUTPUT_FLAG_NONE, &output);
 
             if (status != NO_ERROR) {
                 ALOGW("Cannot open output stream for device %08x on hw module %s",
                       outputDesc->mDevice,
                       mHwModules[i]->getName());
             } else {
-                outputDesc->mSamplingRate = config.sample_rate;
-                outputDesc->mChannelMask = config.channel_mask;
-                outputDesc->mFormat = config.format;
-
                 for (size_t k = 0; k  < supportedDevices.size(); k++) {
                     ssize_t index = mAvailableOutputDevices.indexOf(supportedDevices[k]);
                     // give a valid ID to an attached device once confirmed it is reachable
@@ -3697,11 +3663,11 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
                 }
                 addOutput(output, outputDesc);
                 setOutputDevice(outputDesc,
-                                outputDesc->mDevice,
+                                profileType,
                                 true,
                                 0,
                                 NULL,
-                                address.string());
+                                address);
             }
         }
         // open input streams needed to access attached devices to validate
@@ -3709,6 +3675,12 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
         for (size_t j = 0; j < mHwModules[i]->mInputProfiles.size(); j++)
         {
             const sp<IOProfile> inProfile = mHwModules[i]->mInputProfiles[j];
+
+            if (!inProfile->canOpenNewIo()) {
+                ALOGE("Invalid Input profile max open count %u for profile %s",
+                      inProfile->maxOpenCount, inProfile->getTagName().c_str());
+                continue;
+            }
 
             if (!inProfile->hasSupportedDevices()) {
                 ALOGW("Input profile contains no device on module %s", mHwModules[i]->getName());
@@ -3722,30 +3694,15 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
                 continue;
             }
             sp<AudioInputDescriptor> inputDesc =
-                    new AudioInputDescriptor(inProfile);
+                    new AudioInputDescriptor(inProfile, mpClientInterface);
 
-            inputDesc->mDevice = profileType;
-
-            // find the address
-            DeviceVector inputDevices = mAvailableInputDevices.getDevicesFromType(profileType);
-            //   the inputs vector must be of size 1, but we don't want to crash here
-            String8 address = inputDevices.size() > 0 ? inputDevices.itemAt(0)->mAddress
-                    : String8("");
-            ALOGV("  for input device 0x%x using address %s", profileType, address.string());
-            ALOGE_IF(inputDevices.size() == 0, "Input device list is empty!");
-
-            audio_config_t config = AUDIO_CONFIG_INITIALIZER;
-            config.sample_rate = inputDesc->mSamplingRate;
-            config.channel_mask = inputDesc->mChannelMask;
-            config.format = inputDesc->mFormat;
             audio_io_handle_t input = AUDIO_IO_HANDLE_NONE;
-            status_t status = mpClientInterface->openInput(inProfile->getModuleHandle(),
-                                                           &input,
-                                                           &config,
-                                                           &inputDesc->mDevice,
-                                                           address,
-                                                           AUDIO_SOURCE_MIC,
-                                                           AUDIO_INPUT_FLAG_NONE);
+            status_t status = inputDesc->open(nullptr,
+                                              profileType,
+                                              String8(""),
+                                              AUDIO_SOURCE_MIC,
+                                              AUDIO_INPUT_FLAG_NONE,
+                                              &input);
 
             if (status == NO_ERROR) {
                 const DeviceVector &supportedDevices = inProfile->getSupportedDevices();
@@ -3760,10 +3717,10 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
                         }
                     }
                 }
-                mpClientInterface->closeInput(input);
+                inputDesc->close();
             } else {
                 ALOGW("Cannot open input stream for device %08x on hw module %s",
-                      inputDesc->mDevice,
+                      profileType,
                       mHwModules[i]->getName());
             }
         }
@@ -3804,10 +3761,10 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
 AudioPolicyManager::~AudioPolicyManager()
 {
    for (size_t i = 0; i < mOutputs.size(); i++) {
-        mpClientInterface->closeOutput(mOutputs.keyAt(i));
+        mOutputs.valueAt(i)->close();
    }
    for (size_t i = 0; i < mInputs.size(); i++) {
-        mpClientInterface->closeInput(mInputs.keyAt(i));
+        mInputs.valueAt(i)->close();
    }
    mAvailableOutputDevices.clear();
    mAvailableInputDevices.clear();
@@ -3825,7 +3782,6 @@ status_t AudioPolicyManager::initCheck()
 
 void AudioPolicyManager::addOutput(audio_io_handle_t output, const sp<SwAudioOutputDescriptor>& outputDesc)
 {
-    outputDesc->setIoHandle(output);
     mOutputs.add(output, outputDesc);
     updateMono(output); // update mono status when adding to output list
     selectOutputForMusicEffects();
@@ -3840,7 +3796,6 @@ void AudioPolicyManager::removeOutput(audio_io_handle_t output)
 
 void AudioPolicyManager::addInput(audio_io_handle_t input, const sp<AudioInputDescriptor>& inputDesc)
 {
-    inputDesc->setIoHandle(input);
     mInputs.add(input, inputDesc);
     nextAudioPortGeneration();
 }
@@ -3934,30 +3889,20 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                 continue;
             }
 
+            if (!profile->canOpenNewIo()) {
+                ALOGW("Max Output number %u already opened for this profile %s",
+                      profile->maxOpenCount, profile->getTagName().c_str());
+                continue;
+            }
+
             ALOGV("opening output for device %08x with params %s profile %p name %s",
                   device, address.string(), profile.get(), profile->getName().string());
             desc = new SwAudioOutputDescriptor(profile, mpClientInterface);
-            desc->mDevice = device;
-            audio_config_t config = AUDIO_CONFIG_INITIALIZER;
-            config.sample_rate = desc->mSamplingRate;
-            config.channel_mask = desc->mChannelMask;
-            config.format = desc->mFormat;
-            config.offload_info.sample_rate = desc->mSamplingRate;
-            config.offload_info.channel_mask = desc->mChannelMask;
-            config.offload_info.format = desc->mFormat;
             audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-            status_t status = mpClientInterface->openOutput(profile->getModuleHandle(),
-                                                            &output,
-                                                            &config,
-                                                            &desc->mDevice,
-                                                            address,
-                                                            &desc->mLatency,
-                                                            desc->mFlags);
-            if (status == NO_ERROR) {
-                desc->mSamplingRate = config.sample_rate;
-                desc->mChannelMask = config.channel_mask;
-                desc->mFormat = config.format;
+            status_t status = desc->open(nullptr, device, address,
+                                         AUDIO_STREAM_DEFAULT, AUDIO_OUTPUT_FLAG_NONE, &output);
 
+            if (status == NO_ERROR) {
                 // Here is where the out_set_parameters() for card & device gets called
                 if (!address.isEmpty()) {
                     char *param = audio_device_address_to_parameter(device, address);
@@ -3967,27 +3912,21 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                 updateAudioProfiles(device, output, profile->getAudioProfiles());
                 if (!profile->hasValidAudioProfile()) {
                     ALOGW("checkOutputsForDevice() missing param");
-                    mpClientInterface->closeOutput(output);
+                    desc->close();
                     output = AUDIO_IO_HANDLE_NONE;
                 } else if (profile->hasDynamicAudioProfile()) {
-                    mpClientInterface->closeOutput(output);
+                    desc->close();
                     output = AUDIO_IO_HANDLE_NONE;
-                    profile->pickAudioProfile(config.sample_rate, config.channel_mask, config.format);
+                    audio_config_t config = AUDIO_CONFIG_INITIALIZER;
+                    profile->pickAudioProfile(
+                            config.sample_rate, config.channel_mask, config.format);
                     config.offload_info.sample_rate = config.sample_rate;
                     config.offload_info.channel_mask = config.channel_mask;
                     config.offload_info.format = config.format;
-                    status = mpClientInterface->openOutput(profile->getModuleHandle(),
-                                                           &output,
-                                                           &config,
-                                                           &desc->mDevice,
-                                                           address,
-                                                           &desc->mLatency,
-                                                           desc->mFlags);
-                    if (status == NO_ERROR) {
-                        desc->mSamplingRate = config.sample_rate;
-                        desc->mChannelMask = config.channel_mask;
-                        desc->mFormat = config.format;
-                    } else {
+
+                    status_t status = desc->open(&config, device, address, AUDIO_STREAM_DEFAULT,
+                                                 AUDIO_OUTPUT_FLAG_NONE, &output);
+                    if (status != NO_ERROR) {
                         output = AUDIO_IO_HANDLE_NONE;
                     }
                 }
@@ -4033,7 +3972,7 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                         } else {
                             ALOGW("checkOutputsForDevice() could not open dup output for %d and %d",
                                     mPrimaryOutput->mIoHandle, output);
-                            mpClientInterface->closeOutput(output);
+                            desc->close();
                             removeOutput(output);
                             nextAudioPortGeneration();
                             output = AUDIO_IO_HANDLE_NONE;
@@ -4161,6 +4100,7 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
         for (ssize_t profile_index = 0; profile_index < (ssize_t)profiles.size(); profile_index++) {
 
             sp<IOProfile> profile = profiles[profile_index];
+
             // nothing to do if one input is already opened for this profile
             size_t input_index;
             for (input_index = 0; input_index < mInputs.size(); input_index++) {
@@ -4176,31 +4116,22 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
                 continue;
             }
 
-            ALOGV("opening input for device 0x%X with params %s", device, address.string());
-            desc = new AudioInputDescriptor(profile);
-            desc->mDevice = device;
-            audio_config_t config = AUDIO_CONFIG_INITIALIZER;
-            config.sample_rate = desc->mSamplingRate;
-            config.channel_mask = desc->mChannelMask;
-            config.format = desc->mFormat;
+            if (!profile->canOpenNewIo()) {
+                ALOGW("Max Input number %u already opened for this profile %s",
+                      profile->maxOpenCount, profile->getTagName().c_str());
+                continue;
+            }
+
+            desc = new AudioInputDescriptor(profile, mpClientInterface);
             audio_io_handle_t input = AUDIO_IO_HANDLE_NONE;
-
-            ALOGV("opening inputput for device %08x with params %s profile %p name %s",
-                  desc->mDevice, address.string(), profile.get(), profile->getName().string());
-
-            status_t status = mpClientInterface->openInput(profile->getModuleHandle(),
-                                                           &input,
-                                                           &config,
-                                                           &desc->mDevice,
-                                                           address,
-                                                           AUDIO_SOURCE_MIC,
-                                                           AUDIO_INPUT_FLAG_NONE /*FIXME*/);
+            status_t status = desc->open(nullptr,
+                                         device,
+                                         address,
+                                         AUDIO_SOURCE_MIC,
+                                         AUDIO_INPUT_FLAG_NONE,
+                                         &input);
 
             if (status == NO_ERROR) {
-                desc->mSamplingRate = config.sample_rate;
-                desc->mChannelMask = config.channel_mask;
-                desc->mFormat = config.format;
-
                 if (!address.isEmpty()) {
                     char *param = audio_device_address_to_parameter(device, address);
                     mpClientInterface->setParameters(input, String8(param));
@@ -4209,7 +4140,7 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
                 updateAudioProfiles(device, input, profile->getAudioProfiles());
                 if (!profile->hasValidAudioProfile()) {
                     ALOGW("checkInputsForDevice() direct input missing param");
-                    mpClientInterface->closeInput(input);
+                    desc->close();
                     input = AUDIO_IO_HANDLE_NONE;
                 }
 
@@ -4317,11 +4248,8 @@ void AudioPolicyManager::closeOutput(audio_io_handle_t output)
         mpClientInterface->onAudioPatchListUpdate();
     }
 
-    AudioParameter param;
-    param.add(String8("closing"), String8("true"));
-    mpClientInterface->setParameters(output, param.toString());
+    outputDesc->close();
 
-    mpClientInterface->closeOutput(output);
     removeOutput(output);
     mPreviousOutputs = mOutputs;
 }
@@ -4346,7 +4274,7 @@ void AudioPolicyManager::closeInput(audio_io_handle_t input)
         mpClientInterface->onAudioPatchListUpdate();
     }
 
-    mpClientInterface->closeInput(input);
+    inputDesc->close();
     mInputs.removeItem(input);
 }
 

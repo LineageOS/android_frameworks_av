@@ -23,6 +23,7 @@
 #include "AudioGain.h"
 #include "Volume.h"
 #include "HwModule.h"
+#include <media/AudioParameter.h>
 #include <media/AudioPolicy.h>
 
 // A device mask for all audio output devices that are considered "remote" when evaluating
@@ -231,13 +232,6 @@ SwAudioOutputDescriptor::SwAudioOutputDescriptor(const sp<IOProfile>& profile,
     }
 }
 
-void SwAudioOutputDescriptor::setIoHandle(audio_io_handle_t ioHandle)
-{
-    mId = AudioPort::getNextUniqueId();
-    mIoHandle = ioHandle;
-}
-
-
 status_t SwAudioOutputDescriptor::dump(int fd)
 {
     const size_t SIZE = 256;
@@ -386,6 +380,93 @@ bool SwAudioOutputDescriptor::setVolume(float volume,
     }
     return changed;
 }
+
+status_t SwAudioOutputDescriptor::open(const audio_config_t *config,
+                                       audio_devices_t device,
+                                       const String8& address,
+                                       audio_stream_type_t stream,
+                                       audio_output_flags_t flags,
+                                       audio_io_handle_t *output)
+{
+    audio_config_t lConfig;
+    if (config == nullptr) {
+        lConfig = AUDIO_CONFIG_INITIALIZER;
+        lConfig.sample_rate = mSamplingRate;
+        lConfig.channel_mask = mChannelMask;
+        lConfig.format = mFormat;
+    } else {
+        lConfig = *config;
+    }
+
+    String8 lAddress = address;
+    if (lAddress == "") {
+        const DeviceVector& supportedDevices = mProfile->getSupportedDevices();
+        const DeviceVector& devicesForType = supportedDevices.getDevicesFromType(device);
+        lAddress = devicesForType.size() > 0 ? devicesForType.itemAt(0)->mAddress
+                  : String8("");
+    }
+
+    mDevice = device;
+    // if the selected profile is offloaded and no offload info was specified,
+    // create a default one
+    if ((mProfile->getFlags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) &&
+            lConfig.offload_info.format == AUDIO_FORMAT_DEFAULT) {
+        flags = (audio_output_flags_t)(flags | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD);
+        lConfig.offload_info = AUDIO_INFO_INITIALIZER;
+        lConfig.offload_info.sample_rate = lConfig.sample_rate;
+        lConfig.offload_info.channel_mask = lConfig.channel_mask;
+        lConfig.offload_info.format = lConfig.format;
+        lConfig.offload_info.stream_type = stream;
+        lConfig.offload_info.duration_us = -1;
+        lConfig.offload_info.has_video = true; // conservative
+        lConfig.offload_info.is_streaming = true; // likely
+    }
+
+    mFlags = (audio_output_flags_t)(mFlags | flags);
+
+    ALOGV("opening output for device %08x address %s profile %p name %s",
+          mDevice, lAddress.string(), mProfile.get(), mProfile->getName().string());
+
+    status_t status = mClientInterface->openOutput(mProfile->getModuleHandle(),
+                                                   output,
+                                                   &lConfig,
+                                                   &mDevice,
+                                                   lAddress,
+                                                   &mLatency,
+                                                   mFlags);
+    LOG_ALWAYS_FATAL_IF(mDevice != device,
+                        "%s openOutput returned device %08x when given device %08x",
+                        __FUNCTION__, mDevice, device);
+
+    if (status == NO_ERROR) {
+        mSamplingRate = lConfig.sample_rate;
+        mChannelMask = lConfig.channel_mask;
+        mFormat = lConfig.format;
+        mId = AudioPort::getNextUniqueId();
+        mIoHandle = *output;
+        mProfile->curOpenCount++;
+    }
+
+    return status;
+}
+
+
+void SwAudioOutputDescriptor::close()
+{
+    if (mIoHandle != AUDIO_IO_HANDLE_NONE) {
+        AudioParameter param;
+        param.add(String8("closing"), String8("true"));
+        mClientInterface->setParameters(mIoHandle, param.toString());
+
+        mClientInterface->closeOutput(mIoHandle);
+
+        LOG_ALWAYS_FATAL_IF(mProfile->curOpenCount < 1, "%s profile open count %u",
+                            __FUNCTION__, mProfile->curOpenCount);
+        mProfile->curOpenCount--;
+        mIoHandle = AUDIO_IO_HANDLE_NONE;
+    }
+}
+
 
 // HwAudioOutputDescriptor implementation
 HwAudioOutputDescriptor::HwAudioOutputDescriptor(const sp<AudioSourceDescriptor>& source,
