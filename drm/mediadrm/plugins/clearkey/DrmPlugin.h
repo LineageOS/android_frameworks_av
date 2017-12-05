@@ -137,25 +137,13 @@ public:
             const String8& name, String8& value) const;
 
     virtual status_t getPropertyByteArray(
-            const String8& name, Vector<uint8_t>& value) const {
-        UNUSED(name);
-        UNUSED(value);
-        return android::ERROR_DRM_CANNOT_HANDLE;
-    }
+            const String8& name, Vector<uint8_t>& value) const;
 
     virtual status_t setPropertyString(
-            const String8& name, const String8& value) {
-        UNUSED(name);
-        UNUSED(value);
-        return android::ERROR_DRM_CANNOT_HANDLE;
-    }
+            const String8& name, const String8& value);
 
     virtual status_t setPropertyByteArray(
-            const String8& name, const Vector<uint8_t>& value) {
-        UNUSED(name);
-        UNUSED(value);
-        return android::ERROR_DRM_CANNOT_HANDLE;
-    }
+            const String8& name, const Vector<uint8_t>& value);
 
     virtual status_t setCipherAlgorithm(
             const Vector<uint8_t>& sessionId, const String8& algorithm) {
@@ -242,9 +230,13 @@ public:
     }
 
 private:
+    void initProperties();
     void setPlayPolicy();
 
-    android::KeyedVector<android::String8, android::String8> mPlayPolicy;
+    android::KeyedVector<String8, String8> mPlayPolicy;
+    android::KeyedVector<String8, String8> mStringProperties;
+    android::KeyedVector<String8, Vector<uint8_t>> mByteArrayProperties;
+
     SessionLibrary* mSessionLibrary;
 
     DISALLOW_EVIL_CONSTRUCTORS(DrmPlugin);
