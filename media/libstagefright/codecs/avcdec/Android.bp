@@ -11,7 +11,6 @@ cc_library_shared {
     cflags: [
         "-Wall",
         "-Werror",
-        "-Wno-unused-variable",
     ],
 
     include_dirs: [
@@ -50,6 +49,11 @@ cc_library_shared {
         "libstagefright_codec2_vndk",
     ],
     srcs: ["C2SoftAvcDec.cpp"],
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
 
     include_dirs: [
         "external/libavc/decoder",
