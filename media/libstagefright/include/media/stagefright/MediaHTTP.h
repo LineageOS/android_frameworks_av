@@ -24,10 +24,10 @@
 
 namespace android {
 
-struct IMediaHTTPConnection;
+struct MediaHTTPConnection;
 
 struct MediaHTTP : public HTTPBase {
-    MediaHTTP(const sp<IMediaHTTPConnection> &conn);
+    MediaHTTP(const sp<MediaHTTPConnection> &conn);
 
     virtual status_t connect(
             const char *uri,
@@ -56,7 +56,7 @@ protected:
 
 private:
     status_t mInitCheck;
-    sp<IMediaHTTPConnection> mHTTPConnection;
+    sp<MediaHTTPConnection> mHTTPConnection;
 
     KeyedVector<String8, String8> mLastHeaders;
     AString mLastURI;

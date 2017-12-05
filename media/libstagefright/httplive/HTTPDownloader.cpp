@@ -22,8 +22,8 @@
 #include "M3UParser.h"
 
 #include <media/DataSource.h>
-#include <media/IMediaHTTPConnection.h>
-#include <media/IMediaHTTPService.h>
+#include <media/MediaHTTPConnection.h>
+#include <media/MediaHTTPService.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaHTTP.h>
@@ -36,7 +36,7 @@
 namespace android {
 
 HTTPDownloader::HTTPDownloader(
-        const sp<IMediaHTTPService> &httpService,
+        const sp<MediaHTTPService> &httpService,
         const KeyedVector<String8, String8> &headers) :
     mHTTPDataSource(new MediaHTTP(httpService->makeHTTPConnection())),
     mExtraHeaders(headers),
