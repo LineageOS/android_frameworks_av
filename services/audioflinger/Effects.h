@@ -171,8 +171,8 @@ mutable Mutex               mLock;      // mutex for process, commands and handl
 
 #ifdef FLOAT_EFFECT_CHAIN
     bool    mSupportsFloat;         // effect supports float processing
-    sp<EffectBufferHalInterface> mInBuffer16;  // Buffers for interacting with HAL at 16 bits
-    sp<EffectBufferHalInterface> mOutBuffer16;
+    sp<EffectBufferHalInterface> mInConversionBuffer;  // Buffers for HAL conversion if needed.
+    sp<EffectBufferHalInterface> mOutConversionBuffer;
 #endif
 };
 
