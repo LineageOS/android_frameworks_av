@@ -25,11 +25,11 @@
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/Utils.h>
 
-#include <media/IMediaHTTPConnection.h>
+#include <media/MediaHTTPConnection.h>
 
 namespace android {
 
-MediaHTTP::MediaHTTP(const sp<IMediaHTTPConnection> &conn)
+MediaHTTP::MediaHTTP(const sp<MediaHTTPConnection> &conn)
     : mInitCheck((conn != NULL) ? OK : NO_INIT),
       mHTTPConnection(conn),
       mCachedSizeValid(false),

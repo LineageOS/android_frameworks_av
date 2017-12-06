@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 The Android Open Source Project
+ * Copyright 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,21 +14,17 @@
  * limitations under the License.
  */
 
-#ifndef I_MEDIA_HTTP_CONNECTION_H_
+#ifndef MEDIA_HTTP_CONNECTION_H_
 
-#define I_MEDIA_HTTP_CONNECTION_H_
+#define MEDIA_HTTP_CONNECTION_H_
 
-#include <binder/IInterface.h>
-#include <media/MediaHTTPConnection.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <utils/KeyedVector.h>
 
 namespace android {
 
-/** MUST stay in sync with IMediaHTTPConnection.aidl */
-
-struct IMediaHTTPConnection : public MediaHTTPConnection, public IInterface {
-    DECLARE_META_INTERFACE(MediaHTTPConnection);
+struct MediaHTTPConnection : public virtual RefBase {
+    MediaHTTPConnection() {}
 
     virtual bool connect(
             const char *uri, const KeyedVector<String8, String8> *headers) = 0;
@@ -40,9 +36,9 @@ struct IMediaHTTPConnection : public MediaHTTPConnection, public IInterface {
     virtual status_t getUri(String8 *uri) = 0;
 
 private:
-    DISALLOW_EVIL_CONSTRUCTORS(IMediaHTTPConnection);
+    DISALLOW_EVIL_CONSTRUCTORS(MediaHTTPConnection);
 };
 
 }  // namespace android
 
-#endif  // I_MEDIA_HTTP_CONNECTION_H_
+#endif  // MEDIA_HTTP_CONNECTION_H_

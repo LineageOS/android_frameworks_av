@@ -23,20 +23,20 @@
 
 namespace android {
 
-struct IMediaHTTPService;
+struct MediaHTTPService;
 class String8;
 struct HTTPBase;
 
 class DataSourceFactory {
 public:
     static sp<DataSource> CreateFromURI(
-            const sp<IMediaHTTPService> &httpService,
+            const sp<MediaHTTPService> &httpService,
             const char *uri,
             const KeyedVector<String8, String8> *headers = NULL,
             String8 *contentType = NULL,
             HTTPBase *httpSource = NULL);
 
-    static sp<DataSource> CreateMediaHTTP(const sp<IMediaHTTPService> &httpService);
+    static sp<DataSource> CreateMediaHTTP(const sp<MediaHTTPService> &httpService);
     static sp<DataSource> CreateFromFd(int fd, int64_t offset, int64_t length);
 };
 

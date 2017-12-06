@@ -25,7 +25,7 @@
 namespace android {
 
 struct HTTPBase;
-struct IMediaHTTPService;
+struct MediaHTTPService;
 
 struct SDPLoader : public AHandler {
     enum Flags {
@@ -38,7 +38,7 @@ struct SDPLoader : public AHandler {
     SDPLoader(
             const sp<AMessage> &notify,
             uint32_t flags,
-            const sp<IMediaHTTPService> &httpService);
+            const sp<MediaHTTPService> &httpService);
 
     void load(const char* url, const KeyedVector<String8, String8> *headers);
 

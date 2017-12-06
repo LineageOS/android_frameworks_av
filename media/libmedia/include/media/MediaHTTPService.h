@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 The Android Open Source Project
+ * Copyright 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,29 +14,25 @@
  * limitations under the License.
  */
 
-#ifndef I_MEDIA_HTTP_SERVICE_H_
+#ifndef MEDIA_HTTP_SERVICE_H_
 
-#define I_MEDIA_HTTP_SERVICE_H_
+#define MEDIA_HTTP_SERVICE_H_
 
-#include <binder/IInterface.h>
-#include <media/MediaHTTPService.h>
 #include <media/stagefright/foundation/ABase.h>
 
 namespace android {
 
 struct MediaHTTPConnection;
 
-/** MUST stay in sync with IMediaHTTPService.aidl */
-
-struct IMediaHTTPService : public MediaHTTPService, public IInterface {
-    DECLARE_META_INTERFACE(MediaHTTPService);
+struct MediaHTTPService : public virtual RefBase {
+    MediaHTTPService() {}
 
     virtual sp<MediaHTTPConnection> makeHTTPConnection() = 0;
 
 private:
-    DISALLOW_EVIL_CONSTRUCTORS(IMediaHTTPService);
+    DISALLOW_EVIL_CONSTRUCTORS(MediaHTTPService);
 };
 
 }  // namespace android
 
-#endif  // I_MEDIA_HTTP_SERVICE_H_
+#endif  // MEDIA_HTTP_SERVICE_H_
