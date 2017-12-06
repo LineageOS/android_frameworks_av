@@ -3,6 +3,7 @@ LOCAL_PATH := $(call my-dir)
 # service library
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES := MediaExtractorService.cpp
+LOCAL_CFLAGS := -Wall -Werror
 LOCAL_SHARED_LIBRARIES := libmedia libstagefright libbinder libutils liblog
 LOCAL_MODULE:= libmediaextractorservice
 include $(BUILD_SHARED_LIBRARY)
@@ -21,6 +22,7 @@ LOCAL_STATIC_LIBRARIES := libicuandroid_utils
 LOCAL_MODULE:= mediaextractor
 LOCAL_INIT_RC := mediaextractor.rc
 LOCAL_C_INCLUDES := frameworks/av/media/libmedia
+LOCAL_CFLAGS := -Wall -Werror
 include $(BUILD_EXECUTABLE)
 
 # service seccomp filter
