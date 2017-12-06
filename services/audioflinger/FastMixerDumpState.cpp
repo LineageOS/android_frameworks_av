@@ -78,7 +78,12 @@ void FastMixerDumpState::dump(int fd) const
     uint32_t bounds = mBounds;
     uint32_t newestOpen = bounds & 0xFFFF;
     uint32_t oldestClosed = bounds >> 16;
-    uint32_t n = (newestOpen - oldestClosed) & 0xFFFF;
+
+    //uint32_t n = (newestOpen - oldestClosed) & 0xFFFF;
+    uint32_t n;
+    __builtin_sub_overflow(newestOpen, oldestClosed, &n);
+    n = n & 0xFFFF;
+
     if (n > mSamplingN) {
         ALOGE("too many samples %u", n);
         n = mSamplingN;
