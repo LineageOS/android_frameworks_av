@@ -442,15 +442,16 @@ void SoftMPEG4Encoder::onQueueFilled(OMX_U32 /* portIndex */) {
         }
 
         if (inHeader->nFilledLen > 0) {
+            OMX_ERRORTYPE error = validateInputBuffer(inHeader);
+            if (error != OMX_ErrorNone) {
+                ALOGE("b/69065651");
+                android_errorWriteLog(0x534e4554, "69065651");
+                mSignalledError = true;
+                notify(OMX_EventError, error, 0, 0);
+                return;
+            }
             const uint8_t *inputData = NULL;
             if (mInputDataIsMeta) {
-                if (inHeader->nFilledLen != 8) {
-                    ALOGE("MetaData buffer is wrong size! "
-                            "(got %u bytes, expected 8)", inHeader->nFilledLen);
-                    mSignalledError = true;
-                    notify(OMX_EventError, OMX_ErrorUndefined, 0, 0);
-                    return;
-                }
                 inputData =
                     extractGraphicBuffer(
                             mInputFrameData, (mWidth * mHeight * 3) >> 1,
