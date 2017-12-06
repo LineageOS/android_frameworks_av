@@ -71,7 +71,13 @@ bool IOProfile::isCompatibleProfile(audio_devices_t device,
             return false;
         }
     } else {
-        if (checkExactAudioProfile(samplingRate, channelMask, format) != NO_ERROR) {
+        const struct audio_port_config config = {
+            .config_mask = AUDIO_PORT_CONFIG_ALL & ~AUDIO_PORT_CONFIG_GAIN,
+            .sample_rate = samplingRate,
+            .channel_mask = channelMask,
+            .format = format,
+        };
+        if (checkExactAudioProfile(&config) != NO_ERROR) {
             return false;
         }
     }
