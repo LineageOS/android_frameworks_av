@@ -65,7 +65,7 @@ private:
 
     MtpStorageList      mStorages;
 
-    static IMtpHandle*  sHandle;
+    IMtpHandle*         mHandle;
 
     // handle for new object, set by SendObjectInfo and used by SendObject
     MtpObjectHandle     mSendObjectHandle;
@@ -98,7 +98,7 @@ private:
     Vector<ObjectEdit*>  mObjectEditList;
 
 public:
-                        MtpServer(IMtpDatabase* database, bool ptp,
+                        MtpServer(IMtpDatabase* database, int controlFd, bool ptp,
                                     const MtpString& deviceInfoManufacturer,
                                     const MtpString& deviceInfoModel,
                                     const MtpString& deviceInfoDeviceVersion,
@@ -111,7 +111,6 @@ public:
     void                addStorage(MtpStorage* storage);
     void                removeStorage(MtpStorage* storage);
 
-    static int          configure(bool usePtp);
     void                run();
 
     void                sendObjectAdded(MtpObjectHandle handle);
