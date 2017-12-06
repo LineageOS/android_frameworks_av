@@ -1148,6 +1148,7 @@ MtpResponseCode MtpServer::doCopyObject() {
     ALOGV("Copying file from %s to %s", (const char*)fromPath, (const char*)path);
     if (format == MTP_FORMAT_ASSOCIATION) {
         int ret = makeFolder((const char *)path);
+        ret += copyRecursive(fromPath, path);
         if (ret) {
             result = MTP_RESPONSE_GENERAL_ERROR;
         }
@@ -1158,6 +1159,8 @@ MtpResponseCode MtpServer::doCopyObject() {
     }
 
     mDatabase->endSendObject(path, handle, format, result);
+    if (format == MTP_FORMAT_ASSOCIATION)
+        mDatabase->doScanDirectory(path);
     mResponse.setParameter(1, handle);
     return result;
 }
