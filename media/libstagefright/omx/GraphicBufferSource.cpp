@@ -46,6 +46,36 @@
 
 namespace android {
 
+namespace {
+// kTimestampFluctuation is an upper bound of timestamp fluctuation from the
+// source that GraphicBufferSource allows. The unit of kTimestampFluctuation is
+// frames. More specifically, GraphicBufferSource will drop a frame if
+//
+// expectedNewFrametimestamp - actualNewFrameTimestamp <
+//     (0.5 - kTimestampFluctuation) * expectedtimePeriodBetweenFrames
+//
+// where
+// - expectedNewFrameTimestamp is the calculated ideal timestamp of the new
+//   incoming frame
+// - actualNewFrameTimestamp is the timestamp received from the source
+// - expectedTimePeriodBetweenFrames is the ideal difference of the timestamps
+//   of two adjacent frames
+//
+// See GraphicBufferSource::calculateCodecTimestamp_l() for more detail about
+// how kTimestampFluctuation is used.
+//
+// kTimestampFluctuation should be non-negative. A higher value causes a smaller
+// chance of dropping frames, but at the same time a higher bound on the
+// difference between the source timestamp and the interpreted (snapped)
+// timestamp.
+//
+// The value of 0.05 means that GraphicBufferSource expects the input timestamps
+// to fluctuate no more than 5% from the regular time period.
+//
+// TODO: Justify the choice of this value, or make it configurable.
+constexpr double kTimestampFluctuation = 0.05;
+}
+
 /**
  * A copiable object managing a buffer in the buffer cache managed by the producer. This object
  * holds a reference to the buffer, and maintains which buffer slot it belongs to (if any), and
@@ -732,14 +762,16 @@ bool GraphicBufferSource::calculateCodecTimestamp_l(
             mFrameCount = 0;
         } else {
             // snap to nearest capture point
-            int64_t nFrames = std::llround(
-                    (timeUs - mPrevCaptureUs) * mCaptureFps / 1000000);
-            if (nFrames <= 0) {
+            double nFrames = (timeUs - mPrevCaptureUs) * mCaptureFps / 1000000;
+            if (nFrames < 0.5 - kTimestampFluctuation) {
                 // skip this frame as it's too close to previous capture
                 ALOGV("skipping frame, timeUs %lld", static_cast<long long>(timeUs));
                 return false;
             }
-            mFrameCount += nFrames;
+            if (nFrames <= 1.0) {
+                nFrames = 1.0;
+            }
+            mFrameCount += std::llround(nFrames);
             mPrevCaptureUs = mBaseCaptureUs + std::llround(
                     mFrameCount * 1000000 / mCaptureFps);
             mPrevFrameUs = mBaseFrameUs + std::llround(

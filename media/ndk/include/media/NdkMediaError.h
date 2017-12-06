@@ -35,6 +35,17 @@ __BEGIN_DECLS
 typedef enum {
     AMEDIA_OK = 0,
 
+    /**
+     * This indicates required resource was not able to be allocated.
+     */
+    AMEDIACODEC_ERROR_INSUFFICIENT_RESOURCE = 1100,
+
+    /**
+     * This indicates the resource manager reclaimed the media resource used by the codec.
+     * With this error, the codec must be released, as it has moved to terminal state.
+     */
+    AMEDIACODEC_ERROR_RECLAIMED             = 1101,
+
     AMEDIA_ERROR_BASE                  = -10000,
     AMEDIA_ERROR_UNKNOWN               = AMEDIA_ERROR_BASE,
     AMEDIA_ERROR_MALFORMED             = AMEDIA_ERROR_BASE - 1,

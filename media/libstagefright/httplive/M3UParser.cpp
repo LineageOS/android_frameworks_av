@@ -898,6 +898,9 @@ status_t M3UParser::parseStreamInf(
         }
     }
 
+    if (meta->get() == NULL) {
+        return ERROR_MALFORMED;
+    }
     return OK;
 }
 

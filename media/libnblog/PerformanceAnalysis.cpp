@@ -230,6 +230,7 @@ inline int numberWidth(double number, int leftPadding) {
 }
 
 // rounds value to precision based on log-distance from mean
+__attribute__((no_sanitize("signed-integer-overflow")))
 inline double logRound(double x, double mean) {
     // Larger values decrease range of high resolution and prevent overflow
     // of a histogram on the console.

@@ -402,3 +402,13 @@ aaudio_result_t AAudioServiceStreamBase::getDescription(AudioEndpointParcelable 
 void AAudioServiceStreamBase::onVolumeChanged(float volume) {
     sendServiceEvent(AAUDIO_SERVICE_EVENT_VOLUME, volume);
 }
+
+int32_t AAudioServiceStreamBase::incrementServiceReferenceCount() {
+    std::lock_guard<std::mutex> lock(mCallingCountLock);
+    return ++mCallingCount;
+}
+
+int32_t AAudioServiceStreamBase::decrementServiceReferenceCount() {
+    std::lock_guard<std::mutex> lock(mCallingCountLock);
+    return --mCallingCount;
+}

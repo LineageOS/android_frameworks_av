@@ -199,6 +199,26 @@ public:
         return mFlowing;
     }
 
+    /**
+     * Atomically increment the number of active references to the stream by AAudioService.
+     * @return value after the increment
+     */
+    int32_t incrementServiceReferenceCount();
+
+    /**
+     * Atomically decrement the number of active references to the stream by AAudioService.
+     * @return value after the decrement
+     */
+    int32_t decrementServiceReferenceCount();
+
+    bool isCloseNeeded() const {
+        return mCloseNeeded.load();
+    }
+
+    void setCloseNeeded(bool needed) {
+        mCloseNeeded.store(needed);
+    }
+
 protected:
 
     /**
@@ -256,8 +276,11 @@ protected:
 
 private:
     aaudio_handle_t         mHandle = -1;
-
     bool                    mFlowing = false;
+
+    std::mutex              mCallingCountLock;
+    std::atomic<int32_t>    mCallingCount{0};
+    std::atomic<bool>       mCloseNeeded{false};
 };
 
 } /* namespace aaudio */

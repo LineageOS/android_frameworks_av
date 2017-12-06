@@ -419,8 +419,11 @@ status_t VideoFrameDecoder::onOutputReceived(
 
     *done = (++mNumFramesDecoded >= mNumFrames);
 
+    if (outputFormat == NULL) {
+        return ERROR_MALFORMED;
+    }
+
     int32_t width, height;
-    CHECK(outputFormat != NULL);
     CHECK(outputFormat->findInt32("width", &width));
     CHECK(outputFormat->findInt32("height", &height));
 
@@ -540,8 +543,11 @@ sp<AMessage> ImageDecoder::onGetFormatAndSeekOptions(
 status_t ImageDecoder::onOutputReceived(
         const sp<MediaCodecBuffer> &videoFrameBuffer,
         const sp<AMessage> &outputFormat, int64_t /*timeUs*/, bool *done) {
+    if (outputFormat == NULL) {
+        return ERROR_MALFORMED;
+    }
+
     int32_t width, height;
-    CHECK(outputFormat != NULL);
     CHECK(outputFormat->findInt32("width", &width));
     CHECK(outputFormat->findInt32("height", &height));
 
