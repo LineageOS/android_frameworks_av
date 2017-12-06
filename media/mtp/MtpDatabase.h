@@ -45,6 +45,8 @@ public:
                                             MtpObjectFormat format,
                                             bool succeeded) = 0;
 
+    virtual void                    doScanDirectory(const char* path) = 0;
+
     virtual MtpObjectHandleList*    getObjectList(MtpStorageID storageID,
                                             MtpObjectFormat format,
                                             MtpObjectHandle parent) = 0;
