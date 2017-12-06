@@ -2951,212 +2951,215 @@ status_t MPEG4Writer::Track::threadEntry() {
             mGotStartKeyFrame = true;
         }
 ////////////////////////////////////////////////////////////////////////////////
-        if (mStszTableEntries->count() == 0) {
-            mFirstSampleTimeRealUs = systemTime() / 1000;
-            mStartTimestampUs = timestampUs;
-            mOwner->setStartTimestampUs(mStartTimestampUs);
-            previousPausedDurationUs = mStartTimestampUs;
-        }
 
-        if (mResumed) {
-            int64_t durExcludingEarlierPausesUs = timestampUs - previousPausedDurationUs;
-            if (WARN_UNLESS(durExcludingEarlierPausesUs >= 0ll, "for %s track", trackName)) {
-                copy->release();
-                mSource->stop();
-                mIsMalformed = true;
-                break;
-            }
-
-            int64_t pausedDurationUs = durExcludingEarlierPausesUs - mTrackDurationUs;
-            if (WARN_UNLESS(pausedDurationUs >= lastDurationUs, "for %s track", trackName)) {
-                copy->release();
-                mSource->stop();
-                mIsMalformed = true;
-                break;
-            }
-
-            previousPausedDurationUs += pausedDurationUs - lastDurationUs;
-            mResumed = false;
-        }
-        TimestampDebugHelperEntry timestampDebugEntry;
-        timestampUs -= previousPausedDurationUs;
-        timestampDebugEntry.pts = timestampUs;
-        if (WARN_UNLESS(timestampUs >= 0ll, "for %s track", trackName)) {
-            copy->release();
-            mSource->stop();
-            mIsMalformed = true;
-            break;
-        }
-
-        if (mIsVideo) {
-            /*
-             * Composition time: timestampUs
-             * Decoding time: decodingTimeUs
-             * Composition time offset = composition time - decoding time
-             */
-            int64_t decodingTimeUs;
-            CHECK(meta_data->findInt64(kKeyDecodingTime, &decodingTimeUs));
-            decodingTimeUs -= previousPausedDurationUs;
-
-            // ensure non-negative, monotonic decoding time
-            if (mLastDecodingTimeUs < 0) {
-                decodingTimeUs = std::max((int64_t)0, decodingTimeUs);
-            } else {
-                // increase decoding time by at least the larger vaule of 1 tick and
-                // 0.1 milliseconds. This needs to take into account the possible
-                // delta adjustment in DurationTicks in below.
-                decodingTimeUs = std::max(mLastDecodingTimeUs +
-                        std::max(100, divUp(1000000, mTimeScale)), decodingTimeUs);
-            }
-
-            mLastDecodingTimeUs = decodingTimeUs;
-            timestampDebugEntry.dts = decodingTimeUs;
-            timestampDebugEntry.frameType = isSync ? "Key frame" : "Non-Key frame";
-            // Insert the timestamp into the mTimestampDebugHelper
-            if (mTimestampDebugHelper.size() >= kTimestampDebugCount) {
-                mTimestampDebugHelper.pop_front();
-            }
-            mTimestampDebugHelper.push_back(timestampDebugEntry);
-
-            cttsOffsetTimeUs =
-                    timestampUs + kMaxCttsOffsetTimeUs - decodingTimeUs;
-            if (WARN_UNLESS(cttsOffsetTimeUs >= 0ll, "for %s track", trackName)) {
-                copy->release();
-                mSource->stop();
-                mIsMalformed = true;
-                break;
-            }
-
-            timestampUs = decodingTimeUs;
-            ALOGV("decoding time: %" PRId64 " and ctts offset time: %" PRId64,
-                timestampUs, cttsOffsetTimeUs);
-
-            // Update ctts box table if necessary
-            currCttsOffsetTimeTicks =
-                    (cttsOffsetTimeUs * mTimeScale + 500000LL) / 1000000LL;
-            if (WARN_UNLESS(currCttsOffsetTimeTicks <= 0x0FFFFFFFFLL, "for %s track", trackName)) {
-                copy->release();
-                mSource->stop();
-                mIsMalformed = true;
-                break;
-            }
-
+        if (!mIsHeic) {
             if (mStszTableEntries->count() == 0) {
-                // Force the first ctts table entry to have one single entry
-                // so that we can do adjustment for the initial track start
-                // time offset easily in writeCttsBox().
-                lastCttsOffsetTimeTicks = currCttsOffsetTimeTicks;
-                addOneCttsTableEntry(1, currCttsOffsetTimeTicks);
-                cttsSampleCount = 0;      // No sample in ctts box is pending
-            } else {
-                if (currCttsOffsetTimeTicks != lastCttsOffsetTimeTicks) {
-                    addOneCttsTableEntry(cttsSampleCount, lastCttsOffsetTimeTicks);
-                    lastCttsOffsetTimeTicks = currCttsOffsetTimeTicks;
-                    cttsSampleCount = 1;  // One sample in ctts box is pending
+                mFirstSampleTimeRealUs = systemTime() / 1000;
+                mStartTimestampUs = timestampUs;
+                mOwner->setStartTimestampUs(mStartTimestampUs);
+                previousPausedDurationUs = mStartTimestampUs;
+            }
+
+            if (mResumed) {
+                int64_t durExcludingEarlierPausesUs = timestampUs - previousPausedDurationUs;
+                if (WARN_UNLESS(durExcludingEarlierPausesUs >= 0ll, "for %s track", trackName)) {
+                    copy->release();
+                    mSource->stop();
+                    mIsMalformed = true;
+                    break;
+                }
+
+                int64_t pausedDurationUs = durExcludingEarlierPausesUs - mTrackDurationUs;
+                if (WARN_UNLESS(pausedDurationUs >= lastDurationUs, "for %s track", trackName)) {
+                    copy->release();
+                    mSource->stop();
+                    mIsMalformed = true;
+                    break;
+                }
+
+                previousPausedDurationUs += pausedDurationUs - lastDurationUs;
+                mResumed = false;
+            }
+            TimestampDebugHelperEntry timestampDebugEntry;
+            timestampUs -= previousPausedDurationUs;
+            timestampDebugEntry.pts = timestampUs;
+            if (WARN_UNLESS(timestampUs >= 0ll, "for %s track", trackName)) {
+                copy->release();
+                mSource->stop();
+                mIsMalformed = true;
+                break;
+            }
+
+            if (mIsVideo) {
+                /*
+                 * Composition time: timestampUs
+                 * Decoding time: decodingTimeUs
+                 * Composition time offset = composition time - decoding time
+                 */
+                int64_t decodingTimeUs;
+                CHECK(meta_data->findInt64(kKeyDecodingTime, &decodingTimeUs));
+                decodingTimeUs -= previousPausedDurationUs;
+
+                // ensure non-negative, monotonic decoding time
+                if (mLastDecodingTimeUs < 0) {
+                    decodingTimeUs = std::max((int64_t)0, decodingTimeUs);
                 } else {
-                    ++cttsSampleCount;
+                    // increase decoding time by at least the larger vaule of 1 tick and
+                    // 0.1 milliseconds. This needs to take into account the possible
+                    // delta adjustment in DurationTicks in below.
+                    decodingTimeUs = std::max(mLastDecodingTimeUs +
+                            std::max(100, divUp(1000000, mTimeScale)), decodingTimeUs);
                 }
-            }
 
-            // Update ctts time offset range
-            if (mStszTableEntries->count() == 0) {
-                mMinCttsOffsetTicks = currCttsOffsetTimeTicks;
-                mMaxCttsOffsetTicks = currCttsOffsetTimeTicks;
-            } else {
-                if (currCttsOffsetTimeTicks > mMaxCttsOffsetTicks) {
-                    mMaxCttsOffsetTicks = currCttsOffsetTimeTicks;
-                } else if (currCttsOffsetTimeTicks < mMinCttsOffsetTicks) {
+                mLastDecodingTimeUs = decodingTimeUs;
+                timestampDebugEntry.dts = decodingTimeUs;
+                timestampDebugEntry.frameType = isSync ? "Key frame" : "Non-Key frame";
+                // Insert the timestamp into the mTimestampDebugHelper
+                if (mTimestampDebugHelper.size() >= kTimestampDebugCount) {
+                    mTimestampDebugHelper.pop_front();
+                }
+                mTimestampDebugHelper.push_back(timestampDebugEntry);
+
+                cttsOffsetTimeUs =
+                        timestampUs + kMaxCttsOffsetTimeUs - decodingTimeUs;
+                if (WARN_UNLESS(cttsOffsetTimeUs >= 0ll, "for %s track", trackName)) {
+                    copy->release();
+                    mSource->stop();
+                    mIsMalformed = true;
+                    break;
+                }
+
+                timestampUs = decodingTimeUs;
+                ALOGV("decoding time: %" PRId64 " and ctts offset time: %" PRId64,
+                    timestampUs, cttsOffsetTimeUs);
+
+                // Update ctts box table if necessary
+                currCttsOffsetTimeTicks =
+                        (cttsOffsetTimeUs * mTimeScale + 500000LL) / 1000000LL;
+                if (WARN_UNLESS(currCttsOffsetTimeTicks <= 0x0FFFFFFFFLL, "for %s track", trackName)) {
+                    copy->release();
+                    mSource->stop();
+                    mIsMalformed = true;
+                    break;
+                }
+
+                if (mStszTableEntries->count() == 0) {
+                    // Force the first ctts table entry to have one single entry
+                    // so that we can do adjustment for the initial track start
+                    // time offset easily in writeCttsBox().
+                    lastCttsOffsetTimeTicks = currCttsOffsetTimeTicks;
+                    addOneCttsTableEntry(1, currCttsOffsetTimeTicks);
+                    cttsSampleCount = 0;      // No sample in ctts box is pending
+                } else {
+                    if (currCttsOffsetTimeTicks != lastCttsOffsetTimeTicks) {
+                        addOneCttsTableEntry(cttsSampleCount, lastCttsOffsetTimeTicks);
+                        lastCttsOffsetTimeTicks = currCttsOffsetTimeTicks;
+                        cttsSampleCount = 1;  // One sample in ctts box is pending
+                    } else {
+                        ++cttsSampleCount;
+                    }
+                }
+
+                // Update ctts time offset range
+                if (mStszTableEntries->count() == 0) {
                     mMinCttsOffsetTicks = currCttsOffsetTimeTicks;
-                    mMinCttsOffsetTimeUs = cttsOffsetTimeUs;
+                    mMaxCttsOffsetTicks = currCttsOffsetTimeTicks;
+                } else {
+                    if (currCttsOffsetTimeTicks > mMaxCttsOffsetTicks) {
+                        mMaxCttsOffsetTicks = currCttsOffsetTimeTicks;
+                    } else if (currCttsOffsetTimeTicks < mMinCttsOffsetTicks) {
+                        mMinCttsOffsetTicks = currCttsOffsetTimeTicks;
+                        mMinCttsOffsetTimeUs = cttsOffsetTimeUs;
+                    }
                 }
             }
-        }
 
-        if (mOwner->isRealTimeRecording()) {
-            if (mIsAudio) {
-                updateDriftTime(meta_data);
-            }
-        }
-
-        if (WARN_UNLESS(timestampUs >= 0ll, "for %s track", trackName)) {
-            copy->release();
-            mSource->stop();
-            mIsMalformed = true;
-            break;
-        }
-
-        ALOGV("%s media time stamp: %" PRId64 " and previous paused duration %" PRId64,
-                trackName, timestampUs, previousPausedDurationUs);
-        if (timestampUs > mTrackDurationUs) {
-            mTrackDurationUs = timestampUs;
-        }
-
-        // We need to use the time scale based ticks, rather than the
-        // timestamp itself to determine whether we have to use a new
-        // stts entry, since we may have rounding errors.
-        // The calculation is intended to reduce the accumulated
-        // rounding errors.
-        currDurationTicks =
-            ((timestampUs * mTimeScale + 500000LL) / 1000000LL -
-                (lastTimestampUs * mTimeScale + 500000LL) / 1000000LL);
-        if (currDurationTicks < 0ll) {
-            ALOGE("do not support out of order frames (timestamp: %lld < last: %lld for %s track",
-                    (long long)timestampUs, (long long)lastTimestampUs, trackName);
-            copy->release();
-            mSource->stop();
-            mIsMalformed = true;
-            break;
-        }
-
-        // if the duration is different for this sample, see if it is close enough to the previous
-        // duration that we can fudge it and use the same value, to avoid filling the stts table
-        // with lots of near-identical entries.
-        // "close enough" here means that the current duration needs to be adjusted by less
-        // than 0.1 milliseconds
-        if (lastDurationTicks && (currDurationTicks != lastDurationTicks)) {
-            int64_t deltaUs = ((lastDurationTicks - currDurationTicks) * 1000000LL
-                    + (mTimeScale / 2)) / mTimeScale;
-            if (deltaUs > -100 && deltaUs < 100) {
-                // use previous ticks, and adjust timestamp as if it was actually that number
-                // of ticks
-                currDurationTicks = lastDurationTicks;
-                timestampUs += deltaUs;
-            }
-        }
-        mStszTableEntries->add(htonl(sampleSize));
-        if (mStszTableEntries->count() > 2) {
-
-            // Force the first sample to have its own stts entry so that
-            // we can adjust its value later to maintain the A/V sync.
-            if (mStszTableEntries->count() == 3 || currDurationTicks != lastDurationTicks) {
-                addOneSttsTableEntry(sampleCount, lastDurationTicks);
-                sampleCount = 1;
-            } else {
-                ++sampleCount;
+            if (mOwner->isRealTimeRecording()) {
+                if (mIsAudio) {
+                    updateDriftTime(meta_data);
+                }
             }
 
-        }
-        if (mSamplesHaveSameSize) {
-            if (mStszTableEntries->count() >= 2 && previousSampleSize != sampleSize) {
-                mSamplesHaveSameSize = false;
+            if (WARN_UNLESS(timestampUs >= 0ll, "for %s track", trackName)) {
+                copy->release();
+                mSource->stop();
+                mIsMalformed = true;
+                break;
             }
-            previousSampleSize = sampleSize;
-        }
-        ALOGV("%s timestampUs/lastTimestampUs: %" PRId64 "/%" PRId64,
-                trackName, timestampUs, lastTimestampUs);
-        lastDurationUs = timestampUs - lastTimestampUs;
-        lastDurationTicks = currDurationTicks;
-        lastTimestampUs = timestampUs;
 
-        if (isSync != 0) {
-            addOneStssTableEntry(mStszTableEntries->count());
-        }
-
-        if (mTrackingProgressStatus) {
-            if (mPreviousTrackTimeUs <= 0) {
-                mPreviousTrackTimeUs = mStartTimestampUs;
+            ALOGV("%s media time stamp: %" PRId64 " and previous paused duration %" PRId64,
+                    trackName, timestampUs, previousPausedDurationUs);
+            if (timestampUs > mTrackDurationUs) {
+                mTrackDurationUs = timestampUs;
             }
-            trackProgressStatus(timestampUs);
+
+            // We need to use the time scale based ticks, rather than the
+            // timestamp itself to determine whether we have to use a new
+            // stts entry, since we may have rounding errors.
+            // The calculation is intended to reduce the accumulated
+            // rounding errors.
+            currDurationTicks =
+                ((timestampUs * mTimeScale + 500000LL) / 1000000LL -
+                    (lastTimestampUs * mTimeScale + 500000LL) / 1000000LL);
+            if (currDurationTicks < 0ll) {
+                ALOGE("do not support out of order frames (timestamp: %lld < last: %lld for %s track",
+                        (long long)timestampUs, (long long)lastTimestampUs, trackName);
+                copy->release();
+                mSource->stop();
+                mIsMalformed = true;
+                break;
+            }
+
+            // if the duration is different for this sample, see if it is close enough to the previous
+            // duration that we can fudge it and use the same value, to avoid filling the stts table
+            // with lots of near-identical entries.
+            // "close enough" here means that the current duration needs to be adjusted by less
+            // than 0.1 milliseconds
+            if (lastDurationTicks && (currDurationTicks != lastDurationTicks)) {
+                int64_t deltaUs = ((lastDurationTicks - currDurationTicks) * 1000000LL
+                        + (mTimeScale / 2)) / mTimeScale;
+                if (deltaUs > -100 && deltaUs < 100) {
+                    // use previous ticks, and adjust timestamp as if it was actually that number
+                    // of ticks
+                    currDurationTicks = lastDurationTicks;
+                    timestampUs += deltaUs;
+                }
+            }
+            mStszTableEntries->add(htonl(sampleSize));
+            if (mStszTableEntries->count() > 2) {
+
+                // Force the first sample to have its own stts entry so that
+                // we can adjust its value later to maintain the A/V sync.
+                if (mStszTableEntries->count() == 3 || currDurationTicks != lastDurationTicks) {
+                    addOneSttsTableEntry(sampleCount, lastDurationTicks);
+                    sampleCount = 1;
+                } else {
+                    ++sampleCount;
+                }
+
+            }
+            if (mSamplesHaveSameSize) {
+                if (mStszTableEntries->count() >= 2 && previousSampleSize != sampleSize) {
+                    mSamplesHaveSameSize = false;
+                }
+                previousSampleSize = sampleSize;
+            }
+            ALOGV("%s timestampUs/lastTimestampUs: %" PRId64 "/%" PRId64,
+                    trackName, timestampUs, lastTimestampUs);
+            lastDurationUs = timestampUs - lastTimestampUs;
+            lastDurationTicks = currDurationTicks;
+            lastTimestampUs = timestampUs;
+
+            if (isSync != 0) {
+                addOneStssTableEntry(mStszTableEntries->count());
+            }
+
+            if (mTrackingProgressStatus) {
+                if (mPreviousTrackTimeUs <= 0) {
+                    mPreviousTrackTimeUs = mStartTimestampUs;
+                }
+                trackProgressStatus(timestampUs);
+            }
         }
         if (!hasMultipleTracks) {
             size_t bytesWritten;
@@ -4331,9 +4334,12 @@ void MPEG4Writer::writeFileLevelMetaBox() {
     }
 
     // patch up the mPrimaryItemId and count items with prop associations
+    uint16_t firstVisibleItemId = 0;
     for (size_t index = 0; index < mItems.size(); index++) {
         if (mItems[index].isPrimary) {
             mPrimaryItemId = mItems[index].itemId;
+        } else if (!firstVisibleItemId && !mItems[index].isHidden) {
+            firstVisibleItemId = mItems[index].itemId;
         }
 
         if (!mItems[index].properties.empty()) {
@@ -4342,8 +4348,13 @@ void MPEG4Writer::writeFileLevelMetaBox() {
     }
 
     if (mPrimaryItemId == 0) {
-        ALOGW("didn't find primary, using first item");
-        mPrimaryItemId = mItems[0].itemId;
+        if (firstVisibleItemId > 0) {
+            ALOGW("didn't find primary, using first visible item");
+            mPrimaryItemId = firstVisibleItemId;
+        } else {
+            ALOGW("no primary and no visible item, using first item");
+            mPrimaryItemId = mItems[0].itemId;
+        }
     }
 
     beginBox("meta");
