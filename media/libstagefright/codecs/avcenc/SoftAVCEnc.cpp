@@ -27,7 +27,6 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
-#include <media/stagefright/Utils.h>
 #include <OMX_IndexExt.h>
 #include <OMX_VideoExt.h>
 
@@ -75,33 +74,11 @@ static LevelConversion ConversionTable[] = {
 };
 
 static const CodecProfileLevel kProfileLevels[] = {
-    { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel1  },
-    { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel1b },
-    { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel11 },
-    { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel12 },
-    { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel13 },
-    { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel2  },
-    { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel21 },
-    { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel22 },
-    { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel3  },
-    { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel31 },
-    { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel32 },
-    { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel4  },
-    { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel41 },
-    { OMX_VIDEO_AVCProfileMain, OMX_VIDEO_AVCLevel1  },
-    { OMX_VIDEO_AVCProfileMain, OMX_VIDEO_AVCLevel1b },
-    { OMX_VIDEO_AVCProfileMain, OMX_VIDEO_AVCLevel11 },
-    { OMX_VIDEO_AVCProfileMain, OMX_VIDEO_AVCLevel12 },
-    { OMX_VIDEO_AVCProfileMain, OMX_VIDEO_AVCLevel13 },
-    { OMX_VIDEO_AVCProfileMain, OMX_VIDEO_AVCLevel2  },
-    { OMX_VIDEO_AVCProfileMain, OMX_VIDEO_AVCLevel21 },
-    { OMX_VIDEO_AVCProfileMain, OMX_VIDEO_AVCLevel22 },
-    { OMX_VIDEO_AVCProfileMain, OMX_VIDEO_AVCLevel3  },
-    { OMX_VIDEO_AVCProfileMain, OMX_VIDEO_AVCLevel31 },
-    { OMX_VIDEO_AVCProfileMain, OMX_VIDEO_AVCLevel32 },
-    { OMX_VIDEO_AVCProfileMain, OMX_VIDEO_AVCLevel4  },
-    { OMX_VIDEO_AVCProfileMain, OMX_VIDEO_AVCLevel41 },
+    { OMX_VIDEO_AVCProfileConstrainedBaseline, OMX_VIDEO_AVCLevel41 },
 
+    { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel41 },
+
+    { OMX_VIDEO_AVCProfileMain, OMX_VIDEO_AVCLevel41 },
 };
 
 static size_t GetCPUCoreCount() {
@@ -629,8 +606,10 @@ OMX_ERRORTYPE SoftAVC::initEncoder() {
         level = 30;
     } else if (displaySizeY > (352 * 288)) {
         level = 21;
-    } else {
+    } else if (displaySizeY > (176 * 144)) {
         level = 20;
+    } else {
+        level = 10;
     }
     mAVCEncLevel = MAX(level, mAVCEncLevel);
 
@@ -963,7 +942,8 @@ OMX_ERRORTYPE SoftAVC::internalGetParameter(OMX_INDEXTYPE index, OMX_PTR params)
                 return OMX_ErrorUndefined;
             }
 
-            avcParams->eProfile = OMX_VIDEO_AVCProfileBaseline;
+            // TODO: maintain profile
+            avcParams->eProfile = (OMX_VIDEO_AVCPROFILETYPE)OMX_VIDEO_AVCProfileConstrainedBaseline;
             avcParams->eLevel = omxLevel;
             avcParams->nRefFrames = 1;
             avcParams->bUseHadamard = OMX_TRUE;

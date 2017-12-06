@@ -18,8 +18,7 @@
 #define LOG_TAG "SimpleSoftOMXComponent"
 #include <utils/Log.h>
 
-#include "include/SimpleSoftOMXComponent.h"
-
+#include <media/stagefright/omx/SimpleSoftOMXComponent.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>

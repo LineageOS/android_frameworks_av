@@ -132,10 +132,12 @@ private:
     uint32_t mPlayerFlags;
 
     MediaAnalyticsItem *mAnalyticsItem;
+    uid_t mClientUid;
 
     bool mAtEOS;
     bool mLooping;
     bool mAutoLoop;
+
 
     void updateMetrics(const char *where);
     void logMetrics(const char *where);

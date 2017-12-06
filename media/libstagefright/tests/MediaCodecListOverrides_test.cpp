@@ -26,6 +26,8 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/MediaCodecList.h>
 
+#include <vector>
+
 namespace android {
 
 static const char kTestOverridesStr[] =
@@ -117,7 +119,7 @@ TEST_F(MediaCodecListOverridesTest, splitString) {
 // TODO: the codec component never returns OMX_EventCmdComplete in unit test.
 TEST_F(MediaCodecListOverridesTest, DISABLED_profileCodecs) {
     sp<IMediaCodecList> list = MediaCodecList::getInstance();
-    Vector<sp<MediaCodecInfo>> infos;
+    std::vector<sp<MediaCodecInfo>> infos;
     for (size_t i = 0; i < list->countCodecs(); ++i) {
         infos.push_back(list->getCodecInfo(i));
     }

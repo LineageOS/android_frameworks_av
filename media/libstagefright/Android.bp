@@ -17,6 +17,7 @@ cc_library_shared {
         "AudioPlayer.cpp",
         "AudioSource.cpp",
         "BufferImpl.cpp",
+        "CodecBase.cpp",
         "CallbackDataSource.cpp",
         "CameraSource.cpp",
         "CameraSourceTimeLapse.cpp",
@@ -29,6 +30,7 @@ cc_library_shared {
         "FrameRenderTracker.cpp",
         "HTTPBase.cpp",
         "HevcUtils.cpp",
+        "ItemTable.cpp",
         "JPEGSource.cpp",
         "MP3Extractor.cpp",
         "MPEG2TSWriter.cpp",
@@ -49,6 +51,7 @@ cc_library_shared {
         "NuCachedSource2.cpp",
         "NuMediaExtractor.cpp",
         "OMXClient.cpp",
+        "OmxInfoBuilder.cpp",
         "OggExtractor.cpp",
         "SampleIterator.cpp",
         "SampleTable.cpp",
@@ -65,11 +68,6 @@ cc_library_shared {
         "WAVExtractor.cpp",
         "XINGSeeker.cpp",
         "avc_utils.cpp",
-    ],
-
-    include_dirs: [
-        "frameworks/native/include/media/openmax",
-        "frameworks/native/include/media/hardware",
     ],
 
     shared_libs: [
@@ -93,15 +91,22 @@ cc_library_shared {
         "libutils",
         "libvorbisidec",
         "libmediadrm",
+        "libnativewindow",
 
         "libmedia_helper",
+        "libstagefright_omx_utils",
         "libstagefright_flacdec",
         "libstagefright_foundation",
+        "libstagefright_xmlparser",
         "libdl",
         "libRScpp",
         "libhidlbase",
         "libhidlmemory",
         "android.hidl.allocator@1.0",
+        "android.hidl.memory@1.0",
+        "android.hidl.token@1.0-utils",
+        "android.hardware.cas@1.0",
+        "android.hardware.cas.native@1.0",
         "android.hardware.media.omx@1.0",
     ],
 
@@ -110,7 +115,6 @@ cc_library_shared {
         "libyuv_static",
         "libstagefright_matroska",
         "libstagefright_mediafilter",
-        "libstagefright_omx_utils",
         "libstagefright_webm",
         "libstagefright_timedtext",
         "libvpx",
@@ -120,9 +124,12 @@ cc_library_shared {
         "libFLAC",
     ],
 
-    export_shared_lib_headers: ["libmedia"],
+    export_shared_lib_headers: [
+        "libmedia",
+        "android.hidl.allocator@1.0",
+    ],
+
     export_include_dirs: [
-        ".",
         "include",
     ],
 
@@ -169,4 +176,5 @@ subdirs = [
     "timedtext",
     "webm",
     "wifi-display",
+    "xmlparser",
 ]

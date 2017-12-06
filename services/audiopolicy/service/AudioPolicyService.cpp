@@ -185,21 +185,21 @@ void AudioPolicyService::doOnDynamicPolicyMixStateUpdate(const String8& regId, i
     }
 }
 
-void AudioPolicyService::onRecordingConfigurationUpdate(int event, audio_session_t session,
-        audio_source_t source, const audio_config_base_t *clientConfig,
+void AudioPolicyService::onRecordingConfigurationUpdate(int event,
+        const record_client_info_t *clientInfo, const audio_config_base_t *clientConfig,
         const audio_config_base_t *deviceConfig, audio_patch_handle_t patchHandle)
 {
-    mOutputCommandThread->recordingConfigurationUpdateCommand(event, session, source,
+    mOutputCommandThread->recordingConfigurationUpdateCommand(event, clientInfo,
             clientConfig, deviceConfig, patchHandle);
 }
 
-void AudioPolicyService::doOnRecordingConfigurationUpdate(int event, audio_session_t session,
-        audio_source_t source, const audio_config_base_t *clientConfig,
+void AudioPolicyService::doOnRecordingConfigurationUpdate(int event,
+        const record_client_info_t *clientInfo, const audio_config_base_t *clientConfig,
         const audio_config_base_t *deviceConfig, audio_patch_handle_t patchHandle)
 {
     Mutex::Autolock _l(mNotificationClientsLock);
     for (size_t i = 0; i < mNotificationClients.size(); i++) {
-        mNotificationClients.valueAt(i)->onRecordingConfigurationUpdate(event, session, source,
+        mNotificationClients.valueAt(i)->onRecordingConfigurationUpdate(event, clientInfo,
                 clientConfig, deviceConfig, patchHandle);
     }
 }
@@ -267,12 +267,12 @@ void AudioPolicyService::NotificationClient::onDynamicPolicyMixStateUpdate(
 }
 
 void AudioPolicyService::NotificationClient::onRecordingConfigurationUpdate(
-        int event, audio_session_t session, audio_source_t source,
+        int event, const record_client_info_t *clientInfo,
         const audio_config_base_t *clientConfig, const audio_config_base_t *deviceConfig,
         audio_patch_handle_t patchHandle)
 {
     if (mAudioPolicyServiceClient != 0) {
-        mAudioPolicyServiceClient->onRecordingConfigurationUpdate(event, session, source,
+        mAudioPolicyServiceClient->onRecordingConfigurationUpdate(event, clientInfo,
                 clientConfig, deviceConfig, patchHandle);
     }
 }
@@ -544,8 +544,8 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
                         break;
                     }
                     mLock.unlock();
-                    svc->doOnRecordingConfigurationUpdate(data->mEvent, data->mSession,
-                            data->mSource, &data->mClientConfig, &data->mDeviceConfig,
+                    svc->doOnRecordingConfigurationUpdate(data->mEvent, &data->mClientInfo,
+                            &data->mClientConfig, &data->mDeviceConfig,
                             data->mPatchHandle);
                     mLock.lock();
                     } break;
@@ -810,7 +810,7 @@ void AudioPolicyService::AudioCommandThread::dynamicPolicyMixStateUpdateCommand(
 }
 
 void AudioPolicyService::AudioCommandThread::recordingConfigurationUpdateCommand(
-        int event, audio_session_t session, audio_source_t source,
+        int event, const record_client_info_t *clientInfo,
         const audio_config_base_t *clientConfig, const audio_config_base_t *deviceConfig,
         audio_patch_handle_t patchHandle)
 {
@@ -818,14 +818,13 @@ void AudioPolicyService::AudioCommandThread::recordingConfigurationUpdateCommand
     command->mCommand = RECORDING_CONFIGURATION_UPDATE;
     RecordingConfigurationUpdateData *data = new RecordingConfigurationUpdateData();
     data->mEvent = event;
-    data->mSession = session;
-    data->mSource = source;
+    data->mClientInfo = *clientInfo;
     data->mClientConfig = *clientConfig;
     data->mDeviceConfig = *deviceConfig;
     data->mPatchHandle = patchHandle;
     command->mParam = data;
-    ALOGV("AudioCommandThread() adding recording configuration update event %d, source %d",
-            event, source);
+    ALOGV("AudioCommandThread() adding recording configuration update event %d, source %d uid %u",
+            event, clientInfo->source, clientInfo->uid);
     sendCommand(command);
 }
 

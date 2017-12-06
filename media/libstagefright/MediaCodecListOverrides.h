@@ -23,11 +23,9 @@
 
 #include <utils/StrongPointer.h>
 #include <utils/KeyedVector.h>
+#include <vector>
 
 namespace android {
-
-extern const char *kProfilingVersionString;
-extern const char *kProfilingResults;
 
 struct MediaCodecInfo;
 
@@ -36,11 +34,12 @@ AString getProfilingVersionString();
 bool splitString(const AString &s, const AString &delimiter, AString *s1, AString *s2);
 
 // profile codecs and save the result to xml file named kProfilingResults.
-void profileCodecs(const Vector<sp<MediaCodecInfo>> &infos);
+void profileCodecs(const std::vector<sp<MediaCodecInfo>> &infos,
+        const char* profilingResults);
 
 // profile codecs and save the result to global_results, encoder_results and decoder_results.
 void profileCodecs(
-        const Vector<sp<MediaCodecInfo>> &infos,
+        const std::vector<sp<MediaCodecInfo>> &infos,
         CodecSettings *global_results,
         KeyedVector<AString, CodecSettings> *encoder_results,
         KeyedVector<AString, CodecSettings> *decoder_results,

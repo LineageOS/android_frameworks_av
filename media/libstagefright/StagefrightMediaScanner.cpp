@@ -85,7 +85,8 @@ MediaScanResult StagefrightMediaScanner::processFileInternal(
     status_t status;
     if (fd < 0) {
         // couldn't open it locally, maybe the media server can?
-        status = mRetriever->setDataSource(NULL /* httpService */, path);
+        sp<IMediaHTTPService> nullService;
+        status = mRetriever->setDataSource(nullService, path);
     } else {
         status = mRetriever->setDataSource(fd, 0, 0x7ffffffffffffffL);
         close(fd);

@@ -1544,6 +1544,7 @@ ssize_t AudioFlinger::ThreadBase::ActiveTracks<T>::add(const sp<T> &track) {
         ALOGW("ActiveTracks<T>::add track %p already there", track.get());
         return index;
     }
+    logTrack("add", track);
     mActiveTracksGeneration++;
     mLatestActiveTrack = track;
     ++mBatteryCounter[track->uid()].second;
@@ -1557,6 +1558,7 @@ ssize_t AudioFlinger::ThreadBase::ActiveTracks<T>::remove(const sp<T> &track) {
         ALOGW("ActiveTracks<T>::remove nonexistent track %p", track.get());
         return index;
     }
+    logTrack("remove", track);
     mActiveTracksGeneration++;
     --mBatteryCounter[track->uid()].second;
     // mLatestActiveTrack is not cleared even if is the same as track.
@@ -1567,6 +1569,7 @@ template <typename T>
 void AudioFlinger::ThreadBase::ActiveTracks<T>::clear() {
     for (const sp<T> &track : mActiveTracks) {
         BatteryNotifier::getInstance().noteStopAudio(track->uid());
+        logTrack("clear", track);
     }
     mLastActiveTracksGeneration = mActiveTracksGeneration;
     mActiveTracks.clear();
@@ -1605,6 +1608,16 @@ void AudioFlinger::ThreadBase::ActiveTracks<T>::updatePowerState(
     }
 }
 
+template <typename T>
+void AudioFlinger::ThreadBase::ActiveTracks<T>::logTrack(
+        const char *funcName, const sp<T> &track) const {
+    if (mLocalLog != nullptr) {
+        String8 result;
+        track->appendDump(result, false /* active */);
+        mLocalLog->log("AT::%-10s(%p) %s", funcName, track.get(), result.string());
+    }
+}
+
 void AudioFlinger::ThreadBase::broadcast_l()
 {
     // Thread could be blocked waiting for async
@@ -1640,6 +1653,7 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
         mSuspended(0), mBytesWritten(0),
         mFramesWritten(0),
         mSuspendedFrames(0),
+        mActiveTracks(&this->mLocalLog),
         // mStreamTypes[] initialized in constructor body
         mOutput(output),
         mLastWriteTime(-1), mNumWrites(0), mNumDelayedWrites(0), mInWrite(false),
@@ -1654,7 +1668,8 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
         mScreenState(AudioFlinger::mScreenState),
         // index 0 is reserved for normal mixer's submix
         mFastTrackAvailMask(((1 << FastMixerState::sMaxFastTracks) - 1) & ~1),
-        mHwSupportsPause(false), mHwPaused(false), mFlushPending(false)
+        mHwSupportsPause(false), mHwPaused(false), mFlushPending(false),
+        mLeftVolFloat(-1.0), mRightVolFloat(-1.0)
 {
     snprintf(mThreadName, kThreadNameLength, "AudioOut_%X", id);
     mNBLogWriter = audioFlinger->newWriter_l(kLogSize, mThreadName);
@@ -1707,8 +1722,6 @@ void AudioFlinger::PlaybackThread::dump(int fd, const Vector<String16>& args)
 
 void AudioFlinger::PlaybackThread::dumpTracks(int fd, const Vector<String16>& args __unused)
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
     String8 result;
 
     result.appendFormat("  Stream volumes in dB: ");
@@ -1735,8 +1748,10 @@ void AudioFlinger::PlaybackThread::dumpTracks(int fd, const Vector<String16>& ar
     size_t numactive = mActiveTracks.size();
     dprintf(fd, "  %zu Tracks", numtracks);
     size_t numactiveseen = 0;
+    const char *prefix = "    ";
     if (numtracks) {
         dprintf(fd, " of which %zu are active\n", numactive);
+        result.append(prefix);
         Track::appendDumpHeader(result);
         for (size_t i = 0; i < numtracks; ++i) {
             sp<Track> track = mTracks[i];
@@ -1745,8 +1760,8 @@ void AudioFlinger::PlaybackThread::dumpTracks(int fd, const Vector<String16>& ar
                 if (active) {
                     numactiveseen++;
                 }
-                track->dump(buffer, SIZE, active);
-                result.append(buffer);
+                result.append(prefix);
+                track->appendDump(result, active);
             }
         }
     } else {
@@ -1754,15 +1769,15 @@ void AudioFlinger::PlaybackThread::dumpTracks(int fd, const Vector<String16>& ar
     }
     if (numactiveseen != numactive) {
         // some tracks in the active list were not in the tracks list
-        snprintf(buffer, SIZE, "  The following tracks are in the active list but"
+        result.append("  The following tracks are in the active list but"
                 " not in the track list\n");
-        result.append(buffer);
+        result.append(prefix);
         Track::appendDumpHeader(result);
         for (size_t i = 0; i < numactive; ++i) {
             sp<Track> track = mActiveTracks[i];
             if (mTracks.indexOf(track) < 0) {
-                track->dump(buffer, SIZE, true);
-                result.append(buffer);
+                result.append(prefix);
+                track->appendDump(result, true /* active */);
             }
         }
     }
@@ -2013,7 +2028,8 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
         }
 
         track = new Track(this, client, streamType, sampleRate, format,
-                          channelMask, frameCount, NULL, sharedBuffer,
+                          channelMask, frameCount,
+                          nullptr /* buffer */, (size_t)0 /* bufferSize */, sharedBuffer,
                           sessionId, uid, *flags, TrackBase::TYPE_DEFAULT, portId);
 
         lStatus = track != 0 ? track->initCheck() : (status_t) NO_MEMORY;
@@ -2172,10 +2188,6 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
             chain->incActiveTrackCnt();
         }
 
-        char buffer[256];
-        track->dump(buffer, arraysize(buffer), false /* active */);
-        mLocalLog.log("addTrack_l    (%p) %s", track.get(), buffer + 4); // log for analysis
-
         status = NO_ERROR;
     }
 
@@ -2202,9 +2214,9 @@ void AudioFlinger::PlaybackThread::removeTrack_l(const sp<Track>& track)
 {
     track->triggerEvents(AudioSystem::SYNC_EVENT_PRESENTATION_COMPLETE);
 
-    char buffer[256];
-    track->dump(buffer, arraysize(buffer), false /* active */);
-    mLocalLog.log("removeTrack_l (%p) %s", track.get(), buffer + 4); // log for analysis
+    String8 result;
+    track->appendDump(result, false /* active */);
+    mLocalLog.log("removeTrack_l (%p) %s", track.get(), result.string());
 
     mTracks.remove(track);
     deleteTrackName_l(track->name());
@@ -2242,6 +2254,7 @@ void AudioFlinger::PlaybackThread::ioConfigChanged(audio_io_config_event event, 
 
     switch (event) {
     case AUDIO_OUTPUT_OPENED:
+    case AUDIO_OUTPUT_REGISTERED:
     case AUDIO_OUTPUT_CONFIG_CHANGED:
         desc->mPatch = mPatch;
         desc->mChannelMask = mChannelMask;
@@ -3404,10 +3417,6 @@ void AudioFlinger::PlaybackThread::removeTracks_l(const Vector< sp<Track> >& tra
             }
             if (track->isTerminated()) {
                 removeTrack_l(track);
-            } else { // inactive but not terminated
-                char buffer[256];
-                track->dump(buffer, arraysize(buffer), false /* active */);
-                mLocalLog.log("removeTracks_l(%p) %s", track.get(), buffer + 4);
             }
         }
     }
@@ -4287,6 +4296,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                     param = AudioMixer::RAMP_VOLUME;
                 }
                 mAudioMixer->setParameter(name, AudioMixer::RESAMPLE, AudioMixer::RESET, NULL);
+                mLeftVolFloat = -1.0;
             // FIXME should not make a decision based on mServer
             } else if (cblk->mServer != 0) {
                 // If the track is stopped before the first frame was mixed,
@@ -4297,6 +4307,10 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
             // compute volume for this track
             uint32_t vl, vr;       // in U8.24 integer format
             float vlf, vrf, vaf;   // in [0.0, 1.0] float format
+            // read original volumes with volume control
+            float typeVolume = mStreamTypes[track->streamType()].volume;
+            float v = masterVolume * typeVolume;
+
             if (track->isPausing() || mStreamTypes[track->streamType()].mute) {
                 vl = vr = 0;
                 vlf = vrf = vaf = 0.;
@@ -4304,10 +4318,6 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                     track->setPaused();
                 }
             } else {
-
-                // read original volumes with volume control
-                float typeVolume = mStreamTypes[track->streamType()].volume;
-                float v = masterVolume * typeVolume;
                 sp<AudioTrackServerProxy> proxy = track->mAudioTrackServerProxy;
                 gain_minifloat_packed_t vlr = proxy->getVolumeLR();
                 vlf = float_from_gain(gain_minifloat_unpack_left(vlr));
@@ -4359,6 +4369,25 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 track->mHasVolumeController = false;
             }
 
+            // For dedicated VoIP outputs, let the HAL apply the stream volume. Track volume is
+            // still applied by the mixer.
+            if ((mOutput->flags & AUDIO_OUTPUT_FLAG_VOIP_RX) != 0) {
+                v = mStreamTypes[track->streamType()].mute ? 0.0f : v;
+                if (v != mLeftVolFloat) {
+                    status_t result = mOutput->stream->setVolume(v, v);
+                    ALOGE_IF(result != OK, "Error when setting output stream volume: %d", result);
+                    if (result == OK) {
+                        mLeftVolFloat = v;
+                    }
+                }
+                // if stream volume was successfully sent to the HAL, mLeftVolFloat == v here and we
+                // remove stream volume contribution from software volume.
+                if (v != 0.0f && mLeftVolFloat == v) {
+                   vlf = min(1.0f, vlf / v);
+                   vrf = min(1.0f, vrf / v);
+                   vaf = min(1.0f, vaf / v);
+               }
+            }
             // XXX: these things DON'T need to be done each time
             mAudioMixer->setBufferProvider(name, track);
             mAudioMixer->enable(name);
@@ -4800,7 +4829,6 @@ void AudioFlinger::MixerThread::cacheParameters_l()
 AudioFlinger::DirectOutputThread::DirectOutputThread(const sp<AudioFlinger>& audioFlinger,
         AudioStreamOut* output, audio_io_handle_t id, audio_devices_t device, bool systemReady)
     :   PlaybackThread(audioFlinger, output, id, device, DIRECT, systemReady)
-        // mLeftVolFloat, mRightVolFloat
 {
 }
 
@@ -4808,7 +4836,6 @@ AudioFlinger::DirectOutputThread::DirectOutputThread(const sp<AudioFlinger>& aud
         AudioStreamOut* output, audio_io_handle_t id, uint32_t device,
         ThreadBase::type_t type, bool systemReady)
     :   PlaybackThread(audioFlinger, output, id, device, type, systemReady)
-        // mLeftVolFloat, mRightVolFloat
         , mVolumeShaperActive(false)
 {
 }
@@ -5925,7 +5952,9 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
 #endif
                                          ) :
     ThreadBase(audioFlinger, id, outDevice, inDevice, RECORD, systemReady),
-    mInput(input), mRsmpInBuffer(NULL),
+    mInput(input),
+    mActiveTracks(&this->mLocalLog),
+    mRsmpInBuffer(NULL),
     // mRsmpInFrames, mRsmpInFramesP2, and mRsmpInFramesOA are set by readInputParameters_l()
     mRsmpInRear(0)
 #ifdef TEE_SINK
@@ -6696,7 +6725,8 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
         Mutex::Autolock _l(mLock);
 
         track = new RecordTrack(this, client, sampleRate,
-                      format, channelMask, frameCount, NULL, sessionId, uid,
+                      format, channelMask, frameCount,
+                      nullptr /* buffer */, (size_t)0 /* bufferSize */, sessionId, uid,
                       *flags, TrackBase::TYPE_DEFAULT, portId);
 
         lStatus = track->initCheck();
@@ -6888,6 +6918,10 @@ void AudioFlinger::RecordThread::destroyTrack_l(const sp<RecordTrack>& track)
 
 void AudioFlinger::RecordThread::removeTrack_l(const sp<RecordTrack>& track)
 {
+    String8 result;
+    track->appendDump(result, false /* active */);
+    mLocalLog.log("removeTrack_l (%p) %s", track.get(), result.string());
+
     mTracks.remove(track);
     // need anything related to effects here?
     if (track->isFastTrack()) {
@@ -6901,6 +6935,8 @@ void AudioFlinger::RecordThread::dump(int fd, const Vector<String16>& args)
     dumpInternals(fd, args);
     dumpTracks(fd, args);
     dumpEffectChains(fd, args);
+    dprintf(fd, "  Local log:\n");
+    mLocalLog.dump(fd, "   " /* prefix */, 40 /* lines */);
 }
 
 void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& args)
@@ -6914,6 +6950,12 @@ void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& a
     if (mActiveTracks.size() == 0) {
         dprintf(fd, "  No active record clients\n");
     }
+
+    if (input != nullptr) {
+        dprintf(fd, "  Hal stream dump:\n");
+        (void)input->stream->dump(fd);
+    }
+
     dprintf(fd, "  Fast capture thread: %s\n", hasFastCapture() ? "yes" : "no");
     dprintf(fd, "  Fast track available: %s\n", mFastTrackAvail ? "yes" : "no");
 
@@ -6928,16 +6970,15 @@ void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& a
 
 void AudioFlinger::RecordThread::dumpTracks(int fd, const Vector<String16>& args __unused)
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
     String8 result;
-
     size_t numtracks = mTracks.size();
     size_t numactive = mActiveTracks.size();
     size_t numactiveseen = 0;
     dprintf(fd, "  %zu Tracks", numtracks);
+    const char *prefix = "    ";
     if (numtracks) {
         dprintf(fd, " of which %zu are active\n", numactive);
+        result.append(prefix);
         RecordTrack::appendDumpHeader(result);
         for (size_t i = 0; i < numtracks ; ++i) {
             sp<RecordTrack> track = mTracks[i];
@@ -6946,8 +6987,8 @@ void AudioFlinger::RecordThread::dumpTracks(int fd, const Vector<String16>& args
                 if (active) {
                     numactiveseen++;
                 }
-                track->dump(buffer, SIZE, active);
-                result.append(buffer);
+                result.append(prefix);
+                track->appendDump(result, active);
             }
         }
     } else {
@@ -6955,15 +6996,15 @@ void AudioFlinger::RecordThread::dumpTracks(int fd, const Vector<String16>& args
     }
 
     if (numactiveseen != numactive) {
-        snprintf(buffer, SIZE, "  The following tracks are in the active list but"
+        result.append("  The following tracks are in the active list but"
                 " not in the track list\n");
-        result.append(buffer);
+        result.append(prefix);
         RecordTrack::appendDumpHeader(result);
         for (size_t i = 0; i < numactive; ++i) {
             sp<RecordTrack> track = mActiveTracks[i];
             if (mTracks.indexOf(track) < 0) {
-                track->dump(buffer, SIZE, true);
-                result.append(buffer);
+                result.append(prefix);
+                track->appendDump(result, true /* active */);
             }
         }
 
@@ -7221,6 +7262,7 @@ void AudioFlinger::RecordThread::ioConfigChanged(audio_io_config_event event, pi
 
     switch (event) {
     case AUDIO_INPUT_OPENED:
+    case AUDIO_INPUT_REGISTERED:
     case AUDIO_INPUT_CONFIG_CHANGED:
         desc->mPatch = mPatch;
         desc->mChannelMask = mChannelMask;
@@ -7482,34 +7524,22 @@ void AudioFlinger::RecordThread::getAudioPortConfig(struct audio_port_config *co
 AudioFlinger::MmapThreadHandle::MmapThreadHandle(const sp<MmapThread>& thread)
     : mThread(thread)
 {
+    assert(thread != 0); // thread must start non-null and stay non-null
 }
 
 AudioFlinger::MmapThreadHandle::~MmapThreadHandle()
 {
-    MmapThread *thread = mThread.get();
-    // clear our strong reference before disconnecting the thread: the last strong reference
-    // will be removed when closeInput/closeOutput is executed upon call from audio policy manager
-    // and the thread removed from mMMapThreads list causing the thread destruction.
-    mThread.clear();
-    if (thread != nullptr) {
-        thread->disconnect();
-    }
+    mThread->disconnect();
 }
 
 status_t AudioFlinger::MmapThreadHandle::createMmapBuffer(int32_t minSizeFrames,
                                   struct audio_mmap_buffer_info *info)
 {
-    if (mThread == 0) {
-        return NO_INIT;
-    }
     return mThread->createMmapBuffer(minSizeFrames, info);
 }
 
 status_t AudioFlinger::MmapThreadHandle::getMmapPosition(struct audio_mmap_position *position)
 {
-    if (mThread == 0) {
-        return NO_INIT;
-    }
     return mThread->getMmapPosition(position);
 }
 
@@ -7517,25 +7547,16 @@ status_t AudioFlinger::MmapThreadHandle::start(const AudioClient& client,
         audio_port_handle_t *handle)
 
 {
-    if (mThread == 0) {
-        return NO_INIT;
-    }
     return mThread->start(client, handle);
 }
 
 status_t AudioFlinger::MmapThreadHandle::stop(audio_port_handle_t handle)
 {
-    if (mThread == 0) {
-        return NO_INIT;
-    }
     return mThread->stop(handle);
 }
 
 status_t AudioFlinger::MmapThreadHandle::standby()
 {
-    if (mThread == 0) {
-        return NO_INIT;
-    }
     return mThread->standby();
 }
 
@@ -7545,7 +7566,10 @@ AudioFlinger::MmapThread::MmapThread(
         AudioHwDevice *hwDev, sp<StreamHalInterface> stream,
         audio_devices_t outDevice, audio_devices_t inDevice, bool systemReady)
     : ThreadBase(audioFlinger, id, outDevice, inDevice, MMAP, systemReady),
-      mHalStream(stream), mHalDevice(hwDev->hwDevice()), mAudioHwDev(hwDev)
+      mSessionId(AUDIO_SESSION_NONE),
+      mDeviceId(AUDIO_PORT_HANDLE_NONE), mPortId(AUDIO_PORT_HANDLE_NONE),
+      mHalStream(stream), mHalDevice(hwDev->hwDevice()), mAudioHwDev(hwDev),
+      mActiveTracks(&this->mLocalLog)
 {
     mStandby = true;
     readHalParameters_l();
@@ -7566,7 +7590,7 @@ void AudioFlinger::MmapThread::disconnect()
     for (const sp<MmapTrack> &t : mActiveTracks) {
         stop(t->portId());
     }
-    // this will cause the destruction of this thread.
+    // This will decrement references and may cause the destruction of this thread.
     if (isOutput()) {
         AudioSystem::releaseOutput(mId, streamType(), mSessionId);
     } else {
@@ -7579,11 +7603,13 @@ void AudioFlinger::MmapThread::configure(const audio_attributes_t *attr,
                                                 audio_stream_type_t streamType __unused,
                                                 audio_session_t sessionId,
                                                 const sp<MmapStreamCallback>& callback,
+                                                audio_port_handle_t deviceId,
                                                 audio_port_handle_t portId)
 {
     mAttr = *attr;
     mSessionId = sessionId;
     mCallback = callback;
+    mDeviceId = deviceId;
     mPortId = portId;
 }
 
@@ -7628,6 +7654,10 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         return NO_ERROR;
     }
 
+    if (!isOutput() && !recordingAllowed(client.packageName, client.clientPid, client.clientUid)) {
+        return PERMISSION_DENIED;
+    }
+
     audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
 
     audio_io_handle_t io = mId;
@@ -7639,7 +7669,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         audio_stream_type_t stream = streamType();
         audio_output_flags_t flags =
                 (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ | AUDIO_OUTPUT_FLAG_DIRECT);
-        audio_port_handle_t deviceId = AUDIO_PORT_HANDLE_NONE;
+        audio_port_handle_t deviceId = mDeviceId;
         ret = AudioSystem::getOutputForAttr(&mAttr, &io,
                                             mSessionId,
                                             &stream,
@@ -7653,7 +7683,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         config.sample_rate = mSampleRate;
         config.channel_mask = mChannelMask;
         config.format = mFormat;
-        audio_port_handle_t deviceId = AUDIO_PORT_HANDLE_NONE;
+        audio_port_handle_t deviceId = mDeviceId;
         ret = AudioSystem::getInputForAttr(&mAttr, &io,
                                               mSessionId,
                                               client.clientPid,
@@ -7693,7 +7723,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
     }
 
     sp<MmapTrack> track = new MmapTrack(this, mSampleRate, mFormat, mChannelMask, mSessionId,
-                                        client.clientUid, portId);
+                                        client.clientUid, client.clientPid, portId);
 
     mActiveTracks.add(track);
     sp<EffectChain> chain = getEffectChain_l(mSessionId);
@@ -7904,8 +7934,10 @@ void AudioFlinger::MmapThread::ioConfigChanged(audio_io_config_event event, pid_
 
     switch (event) {
     case AUDIO_INPUT_OPENED:
+    case AUDIO_INPUT_REGISTERED:
     case AUDIO_INPUT_CONFIG_CHANGED:
     case AUDIO_OUTPUT_OPENED:
+    case AUDIO_OUTPUT_REGISTERED:
     case AUDIO_OUTPUT_CONFIG_CHANGED:
         desc->mPatch = mPatch;
         desc->mChannelMask = mChannelMask;
@@ -7990,17 +8022,19 @@ status_t AudioFlinger::MmapThread::createAudioPatch_l(const struct audio_patch *
         mPrevOutDevice = type;
         sendIoConfigEvent_l(AUDIO_OUTPUT_CONFIG_CHANGED);
         sp<MmapStreamCallback> callback = mCallback.promote();
-        if (callback != 0) {
+        if (mDeviceId != deviceId && callback != 0) {
             callback->onRoutingChanged(deviceId);
         }
+        mDeviceId = deviceId;
     }
     if (!isOutput() && mPrevInDevice != mInDevice) {
         mPrevInDevice = type;
         sendIoConfigEvent_l(AUDIO_INPUT_CONFIG_CHANGED);
         sp<MmapStreamCallback> callback = mCallback.promote();
-        if (callback != 0) {
+        if (mDeviceId != deviceId && callback != 0) {
             callback->onRoutingChanged(deviceId);
         }
+        mDeviceId = deviceId;
     }
     return status;
 }
@@ -8114,10 +8148,8 @@ void AudioFlinger::MmapThread::threadLoop_standby()
 
 void AudioFlinger::MmapThread::threadLoop_exit()
 {
-    sp<MmapStreamCallback> callback = mCallback.promote();
-    if (callback != 0) {
-        callback->onTearDown();
-    }
+    // Do not call callback->onTearDown() because it is redundant for thread exit
+    // and because it can cause a recursive mutex lock on stop().
 }
 
 status_t AudioFlinger::MmapThread::setSyncEvent(const sp<SyncEvent>& event __unused)
@@ -8178,6 +8210,8 @@ void AudioFlinger::MmapThread::dump(int fd, const Vector<String16>& args)
     dumpInternals(fd, args);
     dumpTracks(fd, args);
     dumpEffectChains(fd, args);
+    dprintf(fd, "  Local log:\n");
+    mLocalLog.dump(fd, "   " /* prefix */, 40 /* lines */);
 }
 
 void AudioFlinger::MmapThread::dumpInternals(int fd, const Vector<String16>& args)
@@ -8194,18 +8228,17 @@ void AudioFlinger::MmapThread::dumpInternals(int fd, const Vector<String16>& arg
 
 void AudioFlinger::MmapThread::dumpTracks(int fd, const Vector<String16>& args __unused)
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
     String8 result;
-
     size_t numtracks = mActiveTracks.size();
-    dprintf(fd, "  %zu Tracks", numtracks);
+    dprintf(fd, "  %zu Tracks\n", numtracks);
+    const char *prefix = "    ";
     if (numtracks) {
+        result.append(prefix);
         MmapTrack::appendDumpHeader(result);
         for (size_t i = 0; i < numtracks ; ++i) {
             sp<MmapTrack> track = mActiveTracks[i];
-            track->dump(buffer, SIZE);
-            result.append(buffer);
+            result.append(prefix);
+            track->appendDump(result, true /* active */);
         }
     } else {
         dprintf(fd, "\n");
@@ -8240,9 +8273,10 @@ void AudioFlinger::MmapPlaybackThread::configure(const audio_attributes_t *attr,
                                                 audio_stream_type_t streamType,
                                                 audio_session_t sessionId,
                                                 const sp<MmapStreamCallback>& callback,
+                                                audio_port_handle_t deviceId,
                                                 audio_port_handle_t portId)
 {
-    MmapThread::configure(attr, streamType, sessionId, callback, portId);
+    MmapThread::configure(attr, streamType, sessionId, callback, deviceId, portId);
     mStreamType = streamType;
 }
 

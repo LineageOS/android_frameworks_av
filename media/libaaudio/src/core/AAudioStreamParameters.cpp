@@ -34,6 +34,16 @@ using namespace aaudio;
 AAudioStreamParameters::AAudioStreamParameters() {}
 AAudioStreamParameters::~AAudioStreamParameters() {}
 
+void AAudioStreamParameters::copyFrom(const AAudioStreamParameters &other) {
+    mSamplesPerFrame = other.mSamplesPerFrame;
+    mSampleRate      = other.mSampleRate;
+    mDeviceId        = other.mDeviceId;
+    mSharingMode     = other.mSharingMode;
+    mAudioFormat     = other.mAudioFormat;
+    mDirection       = other.mDirection;
+    mBufferCapacity  = other.mBufferCapacity;
+}
+
 aaudio_result_t AAudioStreamParameters::validate() const {
     if (mSamplesPerFrame != AAUDIO_UNSPECIFIED
         && (mSamplesPerFrame < SAMPLES_PER_FRAME_MIN || mSamplesPerFrame > SAMPLES_PER_FRAME_MAX)) {
@@ -78,6 +88,16 @@ aaudio_result_t AAudioStreamParameters::validate() const {
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
 
+    switch (mDirection) {
+        case AAUDIO_DIRECTION_INPUT:
+        case AAUDIO_DIRECTION_OUTPUT:
+            break; // valid
+        default:
+            ALOGE("AAudioStreamParameters: direction not valid = %d", mDirection);
+            return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
+            // break;
+    }
+
     return AAUDIO_OK;
 }
 
@@ -87,5 +107,7 @@ void AAudioStreamParameters::dump() const {
     ALOGD("AAudioStreamParameters mSamplesPerFrame = %d", mSamplesPerFrame);
     ALOGD("AAudioStreamParameters mSharingMode     = %d", (int)mSharingMode);
     ALOGD("AAudioStreamParameters mAudioFormat     = %d", (int)mAudioFormat);
+    ALOGD("AAudioStreamParameters mDirection       = %d", mDirection);
     ALOGD("AAudioStreamParameters mBufferCapacity  = %d", mBufferCapacity);
 }
+

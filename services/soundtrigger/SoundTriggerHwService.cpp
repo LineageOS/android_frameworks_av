@@ -89,7 +89,8 @@ status_t SoundTriggerHwService::listModules(struct sound_trigger_module_descript
                              uint32_t *numModules)
 {
     ALOGV("listModules");
-    if (!captureHotwordAllowed()) {
+    if (!captureHotwordAllowed(IPCThreadState::self()->getCallingPid(),
+                               IPCThreadState::self()->getCallingUid())) {
         return PERMISSION_DENIED;
     }
 
@@ -110,7 +111,8 @@ status_t SoundTriggerHwService::attach(const sound_trigger_module_handle_t handl
                         sp<ISoundTrigger>& moduleInterface)
 {
     ALOGV("attach module %d", handle);
-    if (!captureHotwordAllowed()) {
+    if (!captureHotwordAllowed(IPCThreadState::self()->getCallingPid(),
+                               IPCThreadState::self()->getCallingUid())) {
         return PERMISSION_DENIED;
     }
 
@@ -528,37 +530,45 @@ SoundTriggerHwService::Module::addClient(const sp<ISoundTriggerClient>& client)
 void SoundTriggerHwService::Module::detach(const sp<ModuleClient>& moduleClient)
 {
     ALOGV("Module::detach()");
-    AutoMutex lock(mLock);
-    ssize_t index = -1;
+    Vector<audio_session_t> releasedSessions;
 
-    for (size_t i = 0; i < mModuleClients.size(); i++) {
-        if (mModuleClients[i] == moduleClient) {
-            index = i;
-            break;
-        }
-    }
-    if (index == -1) {
-        return;
-    }
+    {
+        AutoMutex lock(mLock);
+        ssize_t index = -1;
 
-    ALOGV("remove client %p", moduleClient.get());
-    mModuleClients.removeAt(index);
-
-    // Iterate in reverse order as models are removed from list inside the loop.
-    for (size_t i = mModels.size(); i > 0; i--) {
-        sp<Model> model = mModels.valueAt(i - 1);
-        if (moduleClient == model->mModuleClient) {
-            mModels.removeItemsAt(i - 1);
-            ALOGV("detach() unloading model %d", model->mHandle);
-            if (mHalInterface != 0) {
-                if (model->mState == Model::STATE_ACTIVE) {
-                    mHalInterface->stopRecognition(model->mHandle);
-                }
-                mHalInterface->unloadSoundModel(model->mHandle);
+        for (size_t i = 0; i < mModuleClients.size(); i++) {
+            if (mModuleClients[i] == moduleClient) {
+                index = i;
+                break;
             }
-            AudioSystem::releaseSoundTriggerSession(model->mCaptureSession);
-            mHalInterface->unloadSoundModel(model->mHandle);
         }
+        if (index == -1) {
+            return;
+        }
+
+        ALOGV("remove client %p", moduleClient.get());
+        mModuleClients.removeAt(index);
+
+        // Iterate in reverse order as models are removed from list inside the loop.
+        for (size_t i = mModels.size(); i > 0; i--) {
+            sp<Model> model = mModels.valueAt(i - 1);
+            if (moduleClient == model->mModuleClient) {
+                mModels.removeItemsAt(i - 1);
+                ALOGV("detach() unloading model %d", model->mHandle);
+                if (mHalInterface != 0) {
+                    if (model->mState == Model::STATE_ACTIVE) {
+                        mHalInterface->stopRecognition(model->mHandle);
+                    }
+                    mHalInterface->unloadSoundModel(model->mHandle);
+                }
+                releasedSessions.add(model->mCaptureSession);
+            }
+        }
+    }
+
+    for (size_t i = 0; i < releasedSessions.size(); i++) {
+        // do not call AudioSystem methods with mLock held
+        AudioSystem::releaseSoundTriggerSession(releasedSessions[i]);
     }
 }
 
@@ -593,61 +603,71 @@ status_t SoundTriggerHwService::Module::loadSoundModel(const sp<IMemory>& modelM
         return BAD_VALUE;
     }
 
-    AutoMutex lock(mLock);
-
-    if (mModels.size() >= mDescriptor.properties.max_sound_models) {
-        ALOGW("loadSoundModel(): Not loading, max number of models (%d) would be exceeded",
-              mDescriptor.properties.max_sound_models);
-        return INVALID_OPERATION;
-    }
-
-    status_t status = mHalInterface->loadSoundModel(sound_model,
-                                                  SoundTriggerHwService::soundModelCallback,
-                                                  this, handle);
-
-    if (status != NO_ERROR) {
-        return status;
-    }
     audio_session_t session;
     audio_io_handle_t ioHandle;
     audio_devices_t device;
-
-    status = AudioSystem::acquireSoundTriggerSession(&session, &ioHandle, &device);
+    // do not call AudioSystem methods with mLock held
+    status_t status = AudioSystem::acquireSoundTriggerSession(&session, &ioHandle, &device);
     if (status != NO_ERROR) {
         return status;
     }
 
-    sp<Model> model = new Model(*handle, session, ioHandle, device, sound_model->type,
-                                moduleClient);
-    mModels.replaceValueFor(*handle, model);
+    {
+        AutoMutex lock(mLock);
 
+        if (mModels.size() >= mDescriptor.properties.max_sound_models) {
+            ALOGW("loadSoundModel(): Not loading, max number of models (%d) would be exceeded",
+                  mDescriptor.properties.max_sound_models);
+            status = INVALID_OPERATION;
+            goto exit;
+        }
+
+        status = mHalInterface->loadSoundModel(sound_model,
+                                                      SoundTriggerHwService::soundModelCallback,
+                                                      this, handle);
+        if (status != NO_ERROR) {
+            goto exit;
+        }
+
+        sp<Model> model = new Model(*handle, session, ioHandle, device, sound_model->type,
+                                    moduleClient);
+        mModels.replaceValueFor(*handle, model);
+    }
+exit:
+    if (status != NO_ERROR) {
+        // do not call AudioSystem methods with mLock held
+        AudioSystem::releaseSoundTriggerSession(session);
+    }
     return status;
 }
 
 status_t SoundTriggerHwService::Module::unloadSoundModel(sound_model_handle_t handle)
 {
     ALOGV("unloadSoundModel() model handle %d", handle);
-    AutoMutex lock(mLock);
-    return unloadSoundModel_l(handle);
-}
+    status_t status;
+    audio_session_t session;
 
-status_t SoundTriggerHwService::Module::unloadSoundModel_l(sound_model_handle_t handle)
-{
-    if (mHalInterface == 0) {
-        return NO_INIT;
+    {
+        AutoMutex lock(mLock);
+        if (mHalInterface == 0) {
+            return NO_INIT;
+        }
+        ssize_t index = mModels.indexOfKey(handle);
+        if (index < 0) {
+            return BAD_VALUE;
+        }
+        sp<Model> model = mModels.valueAt(index);
+        mModels.removeItem(handle);
+        if (model->mState == Model::STATE_ACTIVE) {
+            mHalInterface->stopRecognition(model->mHandle);
+            model->mState = Model::STATE_IDLE;
+        }
+        status = mHalInterface->unloadSoundModel(handle);
+        session = model->mCaptureSession;
     }
-    ssize_t index = mModels.indexOfKey(handle);
-    if (index < 0) {
-        return BAD_VALUE;
-    }
-    sp<Model> model = mModels.valueAt(index);
-    mModels.removeItem(handle);
-    if (model->mState == Model::STATE_ACTIVE) {
-        mHalInterface->stopRecognition(model->mHandle);
-        model->mState = Model::STATE_IDLE;
-    }
-    AudioSystem::releaseSoundTriggerSession(model->mCaptureSession);
-    return mHalInterface->unloadSoundModel(handle);
+    // do not call AudioSystem methods with mLock held
+    AudioSystem::releaseSoundTriggerSession(session);
+    return status;
 }
 
 status_t SoundTriggerHwService::Module::startRecognition(sound_model_handle_t handle,
@@ -838,7 +858,7 @@ void SoundTriggerHwService::Module::setCaptureState_l(bool active)
         }
 
         const bool supports_stop_all =
-                (mHalInterface != 0) && (mHalInterface->stopAllRecognitions() == ENOSYS);
+                (mHalInterface != 0) && (mHalInterface->stopAllRecognitions() != -ENOSYS);
 
         for (size_t i = 0; i < mModels.size(); i++) {
             sp<Model> model = mModels.valueAt(i);
@@ -942,7 +962,8 @@ status_t SoundTriggerHwService::ModuleClient::dump(int fd __unused,
 
 void SoundTriggerHwService::ModuleClient::detach() {
     ALOGV("detach()");
-    if (!captureHotwordAllowed()) {
+    if (!captureHotwordAllowed(IPCThreadState::self()->getCallingPid(),
+                               IPCThreadState::self()->getCallingUid())) {
         return;
     }
 
@@ -965,7 +986,8 @@ status_t SoundTriggerHwService::ModuleClient::loadSoundModel(const sp<IMemory>& 
                                 sound_model_handle_t *handle)
 {
     ALOGV("loadSoundModel() handle");
-    if (!captureHotwordAllowed()) {
+    if (!captureHotwordAllowed(IPCThreadState::self()->getCallingPid(),
+                               IPCThreadState::self()->getCallingUid())) {
         return PERMISSION_DENIED;
     }
 
@@ -979,7 +1001,8 @@ status_t SoundTriggerHwService::ModuleClient::loadSoundModel(const sp<IMemory>& 
 status_t SoundTriggerHwService::ModuleClient::unloadSoundModel(sound_model_handle_t handle)
 {
     ALOGV("unloadSoundModel() model handle %d", handle);
-    if (!captureHotwordAllowed()) {
+    if (!captureHotwordAllowed(IPCThreadState::self()->getCallingPid(),
+                               IPCThreadState::self()->getCallingUid())) {
         return PERMISSION_DENIED;
     }
 
@@ -994,7 +1017,8 @@ status_t SoundTriggerHwService::ModuleClient::startRecognition(sound_model_handl
                                  const sp<IMemory>& dataMemory)
 {
     ALOGV("startRecognition() model handle %d", handle);
-    if (!captureHotwordAllowed()) {
+    if (!captureHotwordAllowed(IPCThreadState::self()->getCallingPid(),
+                               IPCThreadState::self()->getCallingUid())) {
         return PERMISSION_DENIED;
     }
 
@@ -1008,7 +1032,8 @@ status_t SoundTriggerHwService::ModuleClient::startRecognition(sound_model_handl
 status_t SoundTriggerHwService::ModuleClient::stopRecognition(sound_model_handle_t handle)
 {
     ALOGV("stopRecognition() model handle %d", handle);
-    if (!captureHotwordAllowed()) {
+    if (!captureHotwordAllowed(IPCThreadState::self()->getCallingPid(),
+                               IPCThreadState::self()->getCallingUid())) {
         return PERMISSION_DENIED;
     }
 

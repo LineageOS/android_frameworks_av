@@ -1,4 +1,0 @@
-subdirs = [
-    "xmlparser/1.0",
-]
-

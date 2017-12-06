@@ -508,9 +508,10 @@ protected:
                 template <typename T>
                 class ActiveTracks {
                 public:
-                    ActiveTracks()
+                    explicit ActiveTracks(SimpleLog *localLog = nullptr)
                         : mActiveTracksGeneration(0)
                         , mLastActiveTracksGeneration(0)
+                        , mLocalLog(localLog)
                     { }
 
                     ~ActiveTracks() {
@@ -562,6 +563,8 @@ protected:
                     void            updatePowerState(sp<ThreadBase> thread, bool force = false);
 
                 private:
+                    void            logTrack(const char *funcName, const sp<T> &track) const;
+
                     SortedVector<uid_t> getWakeLockUids() {
                         SortedVector<uid_t> wakeLockUids;
                         for (const sp<T> &track : mActiveTracks) {
@@ -576,6 +579,7 @@ protected:
                     int                 mActiveTracksGeneration;
                     int                 mLastActiveTracksGeneration;
                     wp<T>               mLatestActiveTrack; // latest track added to ActiveTracks
+                    SimpleLog * const   mLocalLog;
                 };
 
                 SimpleLog mLocalLog;
@@ -995,6 +999,9 @@ protected:
                 bool        mHwSupportsPause;
                 bool        mHwPaused;
                 bool        mFlushPending;
+                // volumes last sent to audio HAL with stream->setVolume()
+                float mLeftVolFloat;
+                float mRightVolFloat;
 };
 
 class MixerThread : public PlaybackThread {
@@ -1112,9 +1119,6 @@ protected:
 
     virtual     void        onAddNewTrack_l();
 
-    // volumes last sent to audio HAL with stream->set_volume()
-    float mLeftVolFloat;
-    float mRightVolFloat;
     bool mVolumeShaperActive;
 
     DirectOutputThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
@@ -1475,6 +1479,7 @@ class MmapThread : public ThreadBase
                                       audio_stream_type_t streamType,
                                       audio_session_t sessionId,
                                       const sp<MmapStreamCallback>& callback,
+                                      audio_port_handle_t deviceId,
                                       audio_port_handle_t portId);
 
                 void        disconnect();
@@ -1536,6 +1541,7 @@ class MmapThread : public ThreadBase
 
                 audio_attributes_t      mAttr;
                 audio_session_t         mSessionId;
+                audio_port_handle_t     mDeviceId;
                 audio_port_handle_t     mPortId;
 
                 wp<MmapStreamCallback>  mCallback;
@@ -1558,6 +1564,7 @@ public:
                                       audio_stream_type_t streamType,
                                       audio_session_t sessionId,
                                       const sp<MmapStreamCallback>& callback,
+                                      audio_port_handle_t deviceId,
                                       audio_port_handle_t portId);
 
                 AudioStreamOut* clearOutput();

@@ -18,15 +18,19 @@
 #define LOG_TAG "CasManager"
 #include "CasManager.h"
 
-#include <android/media/ICas.h>
-#include <android/media/IDescrambler.h>
-#include <android/media/IMediaCasService.h>
-#include <binder/IServiceManager.h>
+#include <android/hardware/cas/1.0/ICas.h>
+#include <android/hardware/cas/1.0/IMediaCasService.h>
+#include <android/hardware/cas/native/1.0/IDescrambler.h>
+#include <hidl/HidlSupport.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <utils/Log.h>
 
 namespace android {
-using binder::Status;
+
+using hardware::hidl_vec;
+using hardware::Return;
+using namespace hardware::cas::V1_0;
+using namespace hardware::cas::native::V1_0;
 
 struct ATSParser::CasManager::ProgramCasManager : public RefBase {
     ProgramCasManager(unsigned programNumber, const CADescriptor &descriptor);
@@ -125,45 +129,60 @@ status_t ATSParser::CasManager::ProgramCasManager::initSession(
          const sp<ICas>& cas,
          PidToSessionMap &sessionMap,
          CasSession *session) {
-    sp<IServiceManager> sm = defaultServiceManager();
-    sp<IBinder> casServiceBinder = sm->getService(String16("media.cas"));
-    sp<IMediaCasService> casService =
-            interface_cast<IMediaCasService>(casServiceBinder);
-
+    sp<IMediaCasService> casService = IMediaCasService::getService("default");
     if (casService == NULL) {
         ALOGE("Cannot obtain IMediaCasService");
         return NO_INIT;
     }
 
+    Status status;
     sp<IDescrambler> descrambler;
+    sp<IDescramblerBase> descramblerBase;
+    Return<Status> returnStatus(Status::OK);
+    Return<sp<IDescramblerBase> > returnDescrambler(NULL);
     std::vector<uint8_t> sessionId;
     const CADescriptor &descriptor = session->mCADescriptor;
 
-    Status status = cas->openSession(&sessionId);
-    if (!status.isOk()) {
-        ALOGE("Failed to open session: exception=%d, error=%d",
-                status.exceptionCode(), status.serviceSpecificErrorCode());
+    auto returnVoid = cas->openSession(
+            [&status, &sessionId] (Status _status, const hidl_vec<uint8_t>& _sessionId) {
+                status = _status;
+                sessionId = _sessionId;
+            });
+    if (!returnVoid.isOk() || status != Status::OK) {
+        ALOGE("Failed to open session: trans=%s, status=%d",
+                returnVoid.description().c_str(), status);
         goto l_fail;
     }
 
-    cas->setSessionPrivateData(sessionId, descriptor.mPrivateData);
-    if (!status.isOk()) {
-        ALOGE("Failed to set private data: exception=%d, error=%d",
-                status.exceptionCode(), status.serviceSpecificErrorCode());
+    returnStatus = cas->setSessionPrivateData(sessionId, descriptor.mPrivateData);
+    if (!returnStatus.isOk() || returnStatus != Status::OK) {
+        ALOGE("Failed to set private data: trans=%s, status=%d",
+                returnStatus.description().c_str(), (Status)returnStatus);
         goto l_fail;
     }
 
-    status = casService->createDescrambler(descriptor.mSystemID, &descrambler);
-    if (!status.isOk() || descrambler == NULL) {
-        ALOGE("Failed to create descrambler: : exception=%d, error=%d",
-                status.exceptionCode(), status.serviceSpecificErrorCode());
+    returnDescrambler = casService->createDescrambler(descriptor.mSystemID);
+    if (!returnDescrambler.isOk()) {
+        ALOGE("Failed to create descrambler: trans=%s",
+                returnDescrambler.description().c_str());
+        goto l_fail;
+    }
+    descramblerBase = (sp<IDescramblerBase>) returnDescrambler;
+    if (descramblerBase == NULL) {
+        ALOGE("Failed to create descrambler: null ptr");
         goto l_fail;
     }
 
-    status = descrambler->setMediaCasSession(sessionId);
-    if (!status.isOk()) {
-        ALOGE("Failed to init descrambler: : exception=%d, error=%d",
-                status.exceptionCode(), status.serviceSpecificErrorCode());
+    returnStatus = descramblerBase->setMediaCasSession(sessionId);
+    if (!returnStatus.isOk() || (Status) returnStatus != Status::OK) {
+        ALOGE("Failed to init descrambler: : trans=%s, status=%d",
+                returnStatus.description().c_str(), (Status) returnStatus);
+        goto l_fail;
+    }
+
+    descrambler = IDescrambler::castFrom(descramblerBase);
+    if (descrambler == NULL) {
+        ALOGE("Failed to cast from IDescramblerBase to IDescrambler");
         goto l_fail;
     }
 
@@ -177,8 +196,8 @@ l_fail:
     if (!sessionId.empty()) {
         cas->closeSession(sessionId);
     }
-    if (descrambler != NULL) {
-        descrambler->release();
+    if (descramblerBase != NULL) {
+        descramblerBase->release();
     }
     return NO_INIT;
 }
@@ -316,11 +335,12 @@ bool ATSParser::CasManager::parsePID(ABitReader *br, unsigned pid) {
     if (index < 0) {
         return false;
     }
-    MediaCas::ParcelableCasData ecm(br->data(), br->numBitsLeft() / 8);
-    Status status = mICas->processEcm(mCAPidToSessionIdMap[index], ecm);
-    if (!status.isOk()) {
-        ALOGE("Failed to process ECM: exception=%d, error=%d",
-                status.exceptionCode(), status.serviceSpecificErrorCode());
+    hidl_vec<uint8_t> ecm;
+    ecm.setToExternal((uint8_t*)br->data(), br->numBitsLeft() / 8);
+    auto returnStatus = mICas->processEcm(mCAPidToSessionIdMap[index], ecm);
+    if (!returnStatus.isOk() || (Status) returnStatus != Status::OK) {
+        ALOGE("Failed to process ECM: trans=%s, status=%d",
+                returnStatus.description().c_str(), (Status) returnStatus);
     }
     return true; // handled
 }

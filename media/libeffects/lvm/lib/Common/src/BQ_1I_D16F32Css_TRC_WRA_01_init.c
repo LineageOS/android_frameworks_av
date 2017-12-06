@@ -38,6 +38,27 @@
 /* RETURNS:                                                                */
 /*   void return code                                                      */
 /*-------------------------------------------------------------------------*/
+#ifdef BUILD_FLOAT
+void BQ_1I_D16F32Css_TRC_WRA_01_Init (   Biquad_FLOAT_Instance_t         *pInstance,
+                                         Biquad_1I_Order2_FLOAT_Taps_t   *pTaps,
+                                         BQ_FLOAT_Coefs_t            *pCoef)
+{
+    LVM_FLOAT temp;
+    PFilter_State_FLOAT pBiquadState = (PFilter_State_FLOAT) pInstance;
+    pBiquadState->pDelays      = (LVM_FLOAT *)pTaps;
+
+    temp = pCoef->A2;
+    pBiquadState->coefs[0] = temp;
+    temp = pCoef->A1;
+    pBiquadState->coefs[1] = temp;
+    temp = pCoef->A0;
+    pBiquadState->coefs[2] = temp;
+    temp = pCoef->B2;
+    pBiquadState->coefs[3] = temp;
+    temp = pCoef->B1;
+    pBiquadState->coefs[4] = temp;
+}
+#else
 void BQ_1I_D16F32Css_TRC_WRA_01_Init (   Biquad_Instance_t         *pInstance,
                                          Biquad_1I_Order2_Taps_t   *pTaps,
                                          BQ_C16_Coefs_t            *pCoef)
@@ -57,6 +78,7 @@ void BQ_1I_D16F32Css_TRC_WRA_01_Init (   Biquad_Instance_t         *pInstance,
   temp=pCoef->B1;
   pBiquadState->coefs[4]=temp;
 }
+#endif
 /*-------------------------------------------------------------------------*/
 /* End Of File: BQ_1I_D16F32Css_TRC_WRA_01_Init                              */
 

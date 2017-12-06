@@ -87,5 +87,58 @@
 #define ALPHA_49                                0      /* Floating point Alpha = 0.000000 */
 #define ALPHA_50                                0      /* Floating point Alpha = 0.000000 */
 
+#ifdef BUILD_FLOAT /* BUILD_FLOAT */
+#define ALPHA_Float_0                        0.999999f
+#define ALPHA_Float_1                        0.999998f
+#define ALPHA_Float_2                        0.999997f
+#define ALPHA_Float_3                        0.999996f
+#define ALPHA_Float_4                        0.999995f
+#define ALPHA_Float_5                        0.999992f
+#define ALPHA_Float_6                        0.999989f
+#define ALPHA_Float_7                        0.999985f
+#define ALPHA_Float_8                        0.999979f
+#define ALPHA_Float_9                        0.999970f
+#define ALPHA_Float_10                       0.999957f
+#define ALPHA_Float_11                       0.999939f
+#define ALPHA_Float_12                       0.999914f
+#define ALPHA_Float_13                       0.999879f
+#define ALPHA_Float_14                       0.999829f
+#define ALPHA_Float_15                       0.999758f
+#define ALPHA_Float_16                       0.999658f
+#define ALPHA_Float_17                       0.999516f
+#define ALPHA_Float_18                       0.999316f
+#define ALPHA_Float_19                       0.999033f
+#define ALPHA_Float_20                       0.998633f
+#define ALPHA_Float_21                       0.998067f
+#define ALPHA_Float_22                       0.997268f
+#define ALPHA_Float_23                       0.996139f
+#define ALPHA_Float_24                       0.994545f
+#define ALPHA_Float_25                       0.992295f
+#define ALPHA_Float_26                       0.989123f
+#define ALPHA_Float_27                       0.984654f
+#define ALPHA_Float_28                       0.978370f
+#define ALPHA_Float_29                       0.969553f
+#define ALPHA_Float_30                       0.957221f
+#define ALPHA_Float_31                       0.940051f
+#define ALPHA_Float_32                       0.916297f
+#define ALPHA_Float_33                       0.883729f
+#define ALPHA_Float_34                       0.839645f
+#define ALPHA_Float_35                       0.781036f
+#define ALPHA_Float_36                       0.705078f
+#define ALPHA_Float_37                       0.610108f
+#define ALPHA_Float_38                       0.497239f
+#define ALPHA_Float_39                       0.372343f
+#define ALPHA_Float_40                       0.247351f
+#define ALPHA_Float_41                       0.138722f
+#define ALPHA_Float_42                       0.061234f
+#define ALPHA_Float_43                       0.019267f
+#define ALPHA_Float_44                       0.003756f
+#define ALPHA_Float_45                       0.000372f
+#define ALPHA_Float_46                       0.000014f
+#define ALPHA_Float_47                       0.000000f
+#define ALPHA_Float_48                       0.000000f
+#define ALPHA_Float_49                       0.000000f
+#define ALPHA_Float_50                       0.000000f
+#endif
 
 #endif

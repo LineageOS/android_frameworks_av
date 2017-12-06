@@ -17,6 +17,8 @@
 #define LOG_TAG "MetricsSummarizerCodec"
 #include <utils/Log.h>
 
+#include <stdint.h>
+#include <inttypes.h>
 
 #include <utils/threads.h>
 #include <utils/Errors.h>
@@ -39,6 +41,5 @@ MetricsSummarizerCodec::MetricsSummarizerCodec(const char *key)
 {
     ALOGV("MetricsSummarizerCodec::MetricsSummarizerCodec");
 }
-
 
 } // namespace android

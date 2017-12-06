@@ -36,7 +36,7 @@ size_t clampToSize(T x) {
 // a value between "other" + 1 and "other" + INT32_MAX, the choice of
 // which needs to be the "least recently used" sequence value for "self".
 // In general, this means (new_self) returned is max(self, other) + 1.
-
+__attribute__((no_sanitize("integer")))
 static uint32_t incrementSequence(uint32_t self, uint32_t other) {
     int32_t diff = (int32_t) self - (int32_t) other;
     if (diff >= 0 && diff < INT32_MAX) {
@@ -393,6 +393,7 @@ size_t ClientProxy::getMisalignment()
 
 // ---------------------------------------------------------------------------
 
+__attribute__((no_sanitize("integer")))
 void AudioTrackClientProxy::flush()
 {
     // This works for mFrameCountP2 <= 2^30
@@ -840,6 +841,25 @@ size_t AudioTrackServerProxy::framesReady()
     return filled;
 }
 
+__attribute__((no_sanitize("integer")))
+size_t AudioTrackServerProxy::framesReadySafe() const
+{
+    if (mIsShutdown) {
+        return 0;
+    }
+    const audio_track_cblk_t* cblk = mCblk;
+    const int32_t flush = android_atomic_acquire_load(&cblk->u.mStreaming.mFlush);
+    if (flush != mFlush) {
+        return mFrameCount;
+    }
+    const int32_t rear = android_atomic_acquire_load(&cblk->u.mStreaming.mRear);
+    const ssize_t filled = rear - cblk->u.mStreaming.mFront;
+    if (!(0 <= filled && (size_t) filled <= mFrameCount)) {
+        return 0; // error condition, silently return 0.
+    }
+    return filled;
+}
+
 bool  AudioTrackServerProxy::setStreamEndDone() {
     audio_track_cblk_t* cblk = mCblk;
     bool old =
@@ -851,6 +871,7 @@ bool  AudioTrackServerProxy::setStreamEndDone() {
     return old;
 }
 
+__attribute__((no_sanitize("integer")))
 void AudioTrackServerProxy::tallyUnderrunFrames(uint32_t frameCount)
 {
     audio_track_cblk_t* cblk = mCblk;
@@ -905,6 +926,11 @@ size_t StaticAudioTrackServerProxy::framesReady()
     if (!mFramesReadyIsCalledByMultipleThreads) {
         (void) pollPosition();
     }
+    return mFramesReadySafe;
+}
+
+size_t StaticAudioTrackServerProxy::framesReadySafe() const
+{
     return mFramesReadySafe;
 }
 
@@ -1001,6 +1027,7 @@ ssize_t StaticAudioTrackServerProxy::pollPosition()
     return (ssize_t) mState.mPosition;
 }
 
+__attribute__((no_sanitize("integer")))
 status_t StaticAudioTrackServerProxy::obtainBuffer(Buffer* buffer, bool ackFlush)
 {
     if (mIsShutdown) {
@@ -1047,6 +1074,7 @@ status_t StaticAudioTrackServerProxy::obtainBuffer(Buffer* buffer, bool ackFlush
     return NO_ERROR;
 }
 
+__attribute__((no_sanitize("integer")))
 void StaticAudioTrackServerProxy::releaseBuffer(Buffer* buffer)
 {
     size_t stepCount = buffer->mFrameCount;

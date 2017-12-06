@@ -20,14 +20,14 @@
 #define LOG_TAG "SoftVideoDecoderOMXComponent"
 #include <utils/Log.h>
 
-#include "include/SoftVideoDecoderOMXComponent.h"
+#include <media/stagefright/omx/SoftVideoDecoderOMXComponent.h>
 
-#include <media/hardware/HardwareAPI.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
-#include <media/stagefright/MediaDefs.h>
+#include <media/hardware/HardwareAPI.h>
+#include <media/MediaDefs.h>
 
 namespace android {
 
@@ -182,11 +182,11 @@ void SoftVideoDecoderOMXComponent::updatePortDefinitions(bool updateCrop, bool u
 
 
 uint32_t SoftVideoDecoderOMXComponent::outputBufferWidth() {
-    return mIsAdaptive ? mAdaptiveMaxWidth : mWidth;
+    return max(mIsAdaptive ? mAdaptiveMaxWidth : 0, mWidth);
 }
 
 uint32_t SoftVideoDecoderOMXComponent::outputBufferHeight() {
-    return mIsAdaptive ? mAdaptiveMaxHeight : mHeight;
+    return max(mIsAdaptive ? mAdaptiveMaxHeight : 0, mHeight);
 }
 
 void SoftVideoDecoderOMXComponent::handlePortSettingsChange(

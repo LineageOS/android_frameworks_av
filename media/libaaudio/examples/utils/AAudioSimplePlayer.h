@@ -23,6 +23,7 @@
 #include <sched.h>
 
 #include <aaudio/AAudio.h>
+#include <atomic>
 #include "AAudioArgsParser.h"
 #include "SineGenerator.h"
 
@@ -34,6 +35,13 @@
 #define FORCED_UNDERRUN_PERIOD_FRAMES    48000
 // How long to sleep in a callback to cause an intentional glitch. For testing.
 #define FORCED_UNDERRUN_SLEEP_MICROS     (10 * 1000)
+
+#define MAX_TIMESTAMPS   16
+
+typedef struct Timestamp {
+    int64_t position;
+    int64_t nanoseconds;
+} Timestamp;
 
 /**
  * Simple wrapper for AAudio that opens an output stream either in callback or blocking write mode.
@@ -219,18 +227,28 @@ private:
     AAudioStream             *mStream = nullptr;
     aaudio_sharing_mode_t     mRequestedSharingMode = SHARING_MODE;
     aaudio_performance_mode_t mRequestedPerformanceMode = PERFORMANCE_MODE;
+
 };
 
 typedef struct SineThreadedData_s {
+
     SineGenerator  sineOsc1;
     SineGenerator  sineOsc2;
+    Timestamp      timestamps[MAX_TIMESTAMPS];
     int64_t        framesTotal = 0;
     int64_t        nextFrameToGlitch = FORCED_UNDERRUN_PERIOD_FRAMES;
     int32_t        minNumFrames = INT32_MAX;
     int32_t        maxNumFrames = 0;
-    int            scheduler;
+    int32_t        timestampCount = 0; // in timestamps
+
+    int            scheduler = 0;
     bool           schedulerChecked = false;
     bool           forceUnderruns = false;
+
+    AAudioSimplePlayer simplePlayer;
+    int32_t            callbackCount = 0;
+    WakeUp             waker{AAUDIO_OK};
+
 } SineThreadedData_t;
 
 // Callback function that fills the audio output buffer.
@@ -247,6 +265,7 @@ aaudio_data_callback_result_t SimplePlayerDataCallbackProc(
         return AAUDIO_CALLBACK_RESULT_STOP;
     }
     SineThreadedData_t *sineData = (SineThreadedData_t *) userData;
+    sineData->callbackCount++;
 
     sineData->framesTotal += numFrames;
 
@@ -261,6 +280,17 @@ aaudio_data_callback_result_t SimplePlayerDataCallbackProc(
     if (!sineData->schedulerChecked) {
         sineData->scheduler = sched_getscheduler(gettid());
         sineData->schedulerChecked = true;
+    }
+
+    if (sineData->timestampCount < MAX_TIMESTAMPS) {
+        Timestamp *timestamp = &sineData->timestamps[sineData->timestampCount];
+        aaudio_result_t result = AAudioStream_getTimestamp(stream,
+            CLOCK_MONOTONIC, &timestamp->position, &timestamp->nanoseconds);
+        if (result == AAUDIO_OK && // valid?
+                (sineData->timestampCount == 0 || // first one?
+                (timestamp->position != (timestamp - 1)->position))) { // advanced position?
+            sineData->timestampCount++; // keep this one
+        }
     }
 
     if (numFrames > sineData->maxNumFrames) {
@@ -304,9 +334,16 @@ aaudio_data_callback_result_t SimplePlayerDataCallbackProc(
 void SimplePlayerErrorCallbackProc(
         AAudioStream *stream __unused,
         void *userData __unused,
-        aaudio_result_t error)
-{
-    printf("Error Callback, error: %d\n",(int)error);
+        aaudio_result_t error) {
+    // should not happen but just in case...
+    if (userData == nullptr) {
+        printf("ERROR - MyPlayerErrorCallbackProc needs userData\n");
+        return;
+    }
+    SineThreadedData_t *sineData = (SineThreadedData_t *) userData;
+    android::status_t ret = sineData->waker.wake(error);
+    printf("Error Callback, error: %d, futex wake returns %d\n", error, ret);
 }
+
 
 #endif //AAUDIO_SIMPLE_PLAYER_H

@@ -56,12 +56,15 @@ Camera3Stream::Camera3Stream(int id,
     mState(STATE_CONSTRUCTED),
     mStatusId(StatusTracker::NO_STATUS_ID),
     mStreamUnpreparable(true),
+    mUsage(0),
     mOldUsage(0),
     mOldMaxBuffers(0),
     mPrepared(false),
     mPreparedBufferIdx(0),
     mLastMaxCount(Camera3StreamInterface::ALLOCATE_PIPELINE_MAX),
-    mBufferLimitLatency(kBufferLimitLatencyBinSize) {
+    mBufferLimitLatency(kBufferLimitLatencyBinSize),
+    mFormatOverridden(false),
+    mOriginalFormat(-1) {
 
     camera3_stream::stream_type = type;
     camera3_stream::width = width;
@@ -69,7 +72,6 @@ Camera3Stream::Camera3Stream(int id,
     camera3_stream::format = format;
     camera3_stream::data_space = dataSpace;
     camera3_stream::rotation = rotation;
-    camera3_stream::usage = 0;
     camera3_stream::max_buffers = 0;
     camera3_stream::priv = NULL;
 
@@ -104,6 +106,40 @@ android_dataspace Camera3Stream::getDataSpace() const {
     return camera3_stream::data_space;
 }
 
+uint64_t Camera3Stream::getUsage() const {
+    return mUsage;
+}
+
+void Camera3Stream::setUsage(uint64_t usage) {
+    mUsage = usage;
+}
+
+void Camera3Stream::setFormatOverride(bool formatOverridden) {
+    mFormatOverridden = formatOverridden;
+    if (formatOverridden) mOriginalFormat = camera3_stream::format;
+}
+
+bool Camera3Stream::isFormatOverridden() const {
+    return mFormatOverridden;
+}
+
+int Camera3Stream::getOriginalFormat() const {
+    return mOriginalFormat;
+}
+
+void Camera3Stream::setDataSpaceOverride(bool dataSpaceOverridden) {
+    mDataSpaceOverridden = dataSpaceOverridden;
+    if (dataSpaceOverridden) mOriginalDataSpace = camera3_stream::data_space;
+}
+
+bool Camera3Stream::isDataSpaceOverridden() const {
+    return mDataSpaceOverridden;
+}
+
+android_dataspace Camera3Stream::getOriginalDataSpace() const {
+    return mOriginalDataSpace;
+}
+
 camera3_stream* Camera3Stream::startConfiguration() {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);
@@ -133,10 +169,10 @@ camera3_stream* Camera3Stream::startConfiguration() {
             return NULL;
     }
 
-    mOldUsage = camera3_stream::usage;
+    mOldUsage = mUsage;
     mOldMaxBuffers = camera3_stream::max_buffers;
 
-    res = getEndpointUsage(&(camera3_stream::usage));
+    res = getEndpointUsage(&mUsage);
     if (res != OK) {
         ALOGE("%s: Cannot query consumer endpoint usage!",
                 __FUNCTION__);
@@ -197,7 +233,7 @@ status_t Camera3Stream::finishConfiguration() {
     // Check if the stream configuration is unchanged, and skip reallocation if
     // so. As documented in hardware/camera3.h:configure_streams().
     if (mState == STATE_IN_RECONFIG &&
-            mOldUsage == camera3_stream::usage &&
+            mOldUsage == mUsage &&
             mOldMaxBuffers == camera3_stream::max_buffers) {
         mState = STATE_CONFIGURED;
         return OK;
@@ -243,7 +279,7 @@ status_t Camera3Stream::cancelConfiguration() {
             return INVALID_OPERATION;
     }
 
-    camera3_stream::usage = mOldUsage;
+    mUsage = mOldUsage;
     camera3_stream::max_buffers = mOldMaxBuffers;
 
     mState = (mState == STATE_IN_RECONFIG) ? STATE_CONFIGURED : STATE_CONSTRUCTED;

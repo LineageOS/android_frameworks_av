@@ -232,7 +232,11 @@ LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
         /*
          * Set the capabilities
          */
+#if defined(BUILD_FLOAT) && defined(HIGHER_FS)
+        DBE_Capabilities.SampleRate      = LVDBE_CAP_FS_8000 | LVDBE_CAP_FS_11025 | LVDBE_CAP_FS_12000 | LVDBE_CAP_FS_16000 | LVDBE_CAP_FS_22050 | LVDBE_CAP_FS_24000 | LVDBE_CAP_FS_32000 | LVDBE_CAP_FS_44100 | LVDBE_CAP_FS_48000 | LVDBE_CAP_FS_96000 | LVDBE_CAP_FS_192000;
+#else
         DBE_Capabilities.SampleRate      = LVDBE_CAP_FS_8000 | LVDBE_CAP_FS_11025 | LVDBE_CAP_FS_12000 | LVDBE_CAP_FS_16000 | LVDBE_CAP_FS_22050 | LVDBE_CAP_FS_24000 | LVDBE_CAP_FS_32000 | LVDBE_CAP_FS_44100 | LVDBE_CAP_FS_48000;
+#endif
         DBE_Capabilities.CentreFrequency = LVDBE_CAP_CENTRE_55Hz | LVDBE_CAP_CENTRE_55Hz | LVDBE_CAP_CENTRE_66Hz | LVDBE_CAP_CENTRE_78Hz | LVDBE_CAP_CENTRE_90Hz;
         DBE_Capabilities.MaxBlockSize    = InternalBlockSize;
 
@@ -265,7 +269,11 @@ LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
         /*
          * Set the capabilities
          */
+#if defined(BUILD_FLOAT) && defined(HIGHER_FS)
+        EQNB_Capabilities.SampleRate   = LVEQNB_CAP_FS_8000 | LVEQNB_CAP_FS_11025 | LVEQNB_CAP_FS_12000 | LVEQNB_CAP_FS_16000 | LVEQNB_CAP_FS_22050 | LVEQNB_CAP_FS_24000 | LVEQNB_CAP_FS_32000 | LVEQNB_CAP_FS_44100 | LVEQNB_CAP_FS_48000 | LVEQNB_CAP_FS_96000 | LVEQNB_CAP_FS_192000;
+#else
         EQNB_Capabilities.SampleRate   = LVEQNB_CAP_FS_8000 | LVEQNB_CAP_FS_11025 | LVEQNB_CAP_FS_12000 | LVEQNB_CAP_FS_16000 | LVEQNB_CAP_FS_22050 | LVEQNB_CAP_FS_24000 | LVEQNB_CAP_FS_32000 | LVEQNB_CAP_FS_44100 | LVEQNB_CAP_FS_48000;
+#endif
         EQNB_Capabilities.SourceFormat = LVEQNB_CAP_STEREO | LVEQNB_CAP_MONOINSTEREO;
         EQNB_Capabilities.MaxBlockSize = InternalBlockSize;
         EQNB_Capabilities.MaxBands     = pInstParams->EQNB_NumBands;
@@ -542,10 +550,15 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
         BundleScratchSize = (LVM_INT32)(6 * (MIN_INTERNAL_BLOCKSIZE + InternalBlockSize) * sizeof(LVM_INT16));
         pInstance->pBufferManagement->pScratch = InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_TEMPORARY_FAST],   /* Scratch 1 buffer */
                                                                      (LVM_UINT32)BundleScratchSize);
-
+#ifdef BUILD_FLOAT
+        LoadConst_Float(0,                                   /* Clear the input delay buffer */
+                        (LVM_FLOAT *)&pInstance->pBufferManagement->InDelayBuffer,
+                        (LVM_INT16)(2 * MIN_INTERNAL_BLOCKSIZE));
+#else
         LoadConst_16(0,                                                        /* Clear the input delay buffer */
                      (LVM_INT16 *)&pInstance->pBufferManagement->InDelayBuffer,
                      (LVM_INT16)(2 * MIN_INTERNAL_BLOCKSIZE));
+#endif
         pInstance->pBufferManagement->InDelaySamples = MIN_INTERNAL_BLOCKSIZE; /* Set the number of delay samples */
         pInstance->pBufferManagement->OutDelaySamples = 0;                     /* No samples in the output buffer */
         pInstance->pBufferManagement->BufferState = LVM_FIRSTCALL;             /* Set the state ready for the first call */
@@ -598,14 +611,26 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
     /* In managed buffering, start with low signal level as delay in buffer management causes a click*/
     if (pInstParams->BufferMode == LVM_MANAGED_BUFFERS)
     {
+#ifdef BUILD_FLOAT
+        LVC_Mixer_Init(&pInstance->VC_Volume.MixerStream[0], 0, 0);
+#else
         LVC_Mixer_Init(&pInstance->VC_Volume.MixerStream[0],0,0);
+#endif
     }
     else
     {
+#ifdef BUILD_FLOAT
+        LVC_Mixer_Init(&pInstance->VC_Volume.MixerStream[0], LVM_MAXFLOAT, LVM_MAXFLOAT);
+#else
         LVC_Mixer_Init(&pInstance->VC_Volume.MixerStream[0],LVM_MAXINT_16,LVM_MAXINT_16);
+#endif
     }
 
+#ifdef BUILD_FLOAT
     LVC_Mixer_SetTimeConstant(&pInstance->VC_Volume.MixerStream[0],0,LVM_FS_8000,2);
+#else
+    LVC_Mixer_SetTimeConstant(&pInstance->VC_Volume.MixerStream[0], 0, LVM_FS_8000, 2);
+#endif
 
     pInstance->VC_VolumedB                  = 0;
     pInstance->VC_AVLFixedVolume            = 0;
@@ -615,15 +640,24 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
     pInstance->VC_BalanceMix.MixerStream[0].CallbackSet        = 0;
     pInstance->VC_BalanceMix.MixerStream[0].pCallbackHandle    = pInstance;
     pInstance->VC_BalanceMix.MixerStream[0].pCallBack          = LVM_VCCallBack;
+#ifdef BUILD_FLOAT
+    LVC_Mixer_Init(&pInstance->VC_BalanceMix.MixerStream[0], LVM_MAXFLOAT, LVM_MAXFLOAT);
+#else
     LVC_Mixer_Init(&pInstance->VC_BalanceMix.MixerStream[0],LVM_MAXINT_16,LVM_MAXINT_16);
+#endif
     LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->VC_BalanceMix.MixerStream[0],LVM_VC_MIXER_TIME,LVM_FS_8000,2);
 
     pInstance->VC_BalanceMix.MixerStream[1].CallbackParam      = 0;
     pInstance->VC_BalanceMix.MixerStream[1].CallbackSet        = 0;
     pInstance->VC_BalanceMix.MixerStream[1].pCallbackHandle    = pInstance;
     pInstance->VC_BalanceMix.MixerStream[1].pCallBack          = LVM_VCCallBack;
+#ifdef BUILD_FLOAT
+    LVC_Mixer_Init(&pInstance->VC_BalanceMix.MixerStream[1], LVM_MAXFLOAT, LVM_MAXFLOAT);
+#else
     LVC_Mixer_Init(&pInstance->VC_BalanceMix.MixerStream[1],LVM_MAXINT_16,LVM_MAXINT_16);
+#endif
     LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->VC_BalanceMix.MixerStream[1],LVM_VC_MIXER_TIME,LVM_FS_8000,2);
+
     /*
      * Set the default EQNB pre-gain and pointer to the band definitions
      */
@@ -709,7 +743,11 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
         /*
          * Set the initialisation capabilities
          */
+#if defined(BUILD_FLOAT) && defined(HIGHER_FS)
+        DBE_Capabilities.SampleRate      = LVDBE_CAP_FS_8000 | LVDBE_CAP_FS_11025 | LVDBE_CAP_FS_12000 | LVDBE_CAP_FS_16000 | LVDBE_CAP_FS_22050 | LVDBE_CAP_FS_24000 | LVDBE_CAP_FS_32000 | LVDBE_CAP_FS_44100 | LVDBE_CAP_FS_48000 | LVDBE_CAP_FS_96000 | LVDBE_CAP_FS_192000;
+#else
         DBE_Capabilities.SampleRate      = LVDBE_CAP_FS_8000 | LVDBE_CAP_FS_11025 | LVDBE_CAP_FS_12000 | LVDBE_CAP_FS_16000 | LVDBE_CAP_FS_22050 | LVDBE_CAP_FS_24000 | LVDBE_CAP_FS_32000 | LVDBE_CAP_FS_44100 | LVDBE_CAP_FS_48000;
+#endif
         DBE_Capabilities.CentreFrequency = LVDBE_CAP_CENTRE_55Hz | LVDBE_CAP_CENTRE_55Hz | LVDBE_CAP_CENTRE_66Hz | LVDBE_CAP_CENTRE_78Hz | LVDBE_CAP_CENTRE_90Hz;
         DBE_Capabilities.MaxBlockSize    = (LVM_UINT16)InternalBlockSize;
 
@@ -763,7 +801,11 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
         /*
          * Set the initialisation capabilities
          */
+#if defined(BUILD_FLOAT) && defined(HIGHER_FS)
+        EQNB_Capabilities.SampleRate      = LVEQNB_CAP_FS_8000 | LVEQNB_CAP_FS_11025 | LVEQNB_CAP_FS_12000 | LVEQNB_CAP_FS_16000 | LVEQNB_CAP_FS_22050 | LVEQNB_CAP_FS_24000 | LVEQNB_CAP_FS_32000 | LVEQNB_CAP_FS_44100 | LVEQNB_CAP_FS_48000 | LVEQNB_CAP_FS_96000 | LVEQNB_CAP_FS_192000;
+#else
         EQNB_Capabilities.SampleRate      = LVEQNB_CAP_FS_8000 | LVEQNB_CAP_FS_11025 | LVEQNB_CAP_FS_12000 | LVEQNB_CAP_FS_16000 | LVEQNB_CAP_FS_22050 | LVEQNB_CAP_FS_24000 | LVEQNB_CAP_FS_32000 | LVEQNB_CAP_FS_44100 | LVEQNB_CAP_FS_48000;
+#endif
         EQNB_Capabilities.MaxBlockSize    = (LVM_UINT16)InternalBlockSize;
         EQNB_Capabilities.MaxBands        = pInstParams->EQNB_NumBands;
         EQNB_Capabilities.SourceFormat    = LVEQNB_CAP_STEREO | LVEQNB_CAP_MONOINSTEREO;
@@ -868,9 +910,14 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
                 PSA_MemTab.Region[LVM_PERSISTENT_FAST_COEF].Size);
 
             /* Fast Temporary */
+#ifdef BUILD_FLOAT
             pInstance->pPSAInput = InstAlloc_AddMember(&AllocMem[LVM_TEMPORARY_FAST],
-                                                                     (LVM_UINT32) MAX_INTERNAL_BLOCKSIZE * sizeof(LVM_INT16));
-
+                                                       (LVM_UINT32) MAX_INTERNAL_BLOCKSIZE * \
+                                                       sizeof(LVM_FLOAT));
+#else
+            pInstance->pPSAInput = InstAlloc_AddMember(&AllocMem[LVM_TEMPORARY_FAST],
+                                                       (LVM_UINT32) MAX_INTERNAL_BLOCKSIZE * sizeof(LVM_INT16));
+#endif
             PSA_MemTab.Region[LVM_TEMPORARY_FAST].pBaseAddress       = (void *)InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_TEMPORARY_FAST],0);
 
 
@@ -993,7 +1040,6 @@ LVM_ReturnStatus_en LVM_ClearAudioBuffers(LVM_Handle_t  hInstance)
 
     /* DC removal filter */
     DC_2I_D16_TRC_WRA_01_Init(&pInstance->DC_RemovalInstance);
-
 
     return LVM_SUCCESS;
 }

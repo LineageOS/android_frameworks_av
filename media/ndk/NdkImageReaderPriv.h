@@ -49,7 +49,7 @@ namespace {
 
 struct AImageReader : public RefBase {
   public:
-    static bool isSupportedFormat(int32_t format);
+    static bool isSupportedFormatAndUsage(int32_t format, uint64_t usage0);
     static int getNumPlanesForFormat(int32_t format);
 
     AImageReader(int32_t width,

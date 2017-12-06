@@ -24,11 +24,12 @@
 #include "binding/AAudioServiceMessage.h"
 #include "AAudioServiceEndpoint.h"
 #include "AAudioServiceEndpointCapture.h"
+#include "AAudioServiceEndpointMMAP.h"
 #include "AAudioServiceEndpointPlay.h"
 
 namespace aaudio {
 
-class AAudioEndpointManager : public android::Singleton<AAudioEndpointManager>{
+class AAudioEndpointManager : public android::Singleton<AAudioEndpointManager> {
 public:
     AAudioEndpointManager();
     ~AAudioEndpointManager() = default;
@@ -49,22 +50,42 @@ public:
      * Find a service endpoint for the given deviceId and direction.
      * If an endpoint does not already exist then try to create one.
      *
-     * @param deviceId
-     * @param direction
-     * @return endpoint or nullptr
+     * @param audioService
+     * @param request
+     * @param sharingMode
+     * @return endpoint or null
      */
-    AAudioServiceEndpoint *openEndpoint(android::AAudioService &audioService,
-                                        const AAudioStreamConfiguration& configuration,
-                                        aaudio_direction_t direction);
+    android::sp<AAudioServiceEndpoint> openEndpoint(android::AAudioService &audioService,
+                                        const aaudio::AAudioStreamRequest &request,
+                                        aaudio_sharing_mode_t sharingMode);
 
-    void closeEndpoint(AAudioServiceEndpoint *serviceEndpoint);
+    void closeEndpoint(android::sp<AAudioServiceEndpoint> serviceEndpoint);
 
 private:
+    android::sp<AAudioServiceEndpoint> openExclusiveEndpoint(android::AAudioService &aaudioService,
+                                                 const aaudio::AAudioStreamRequest &request);
 
-    mutable std::mutex mLock;
+    android::sp<AAudioServiceEndpoint> openSharedEndpoint(android::AAudioService &aaudioService,
+                                              const aaudio::AAudioStreamRequest &request);
 
-    std::vector<AAudioServiceEndpointCapture *> mInputs;
-    std::vector<AAudioServiceEndpointPlay *> mOutputs;
+    android::sp<AAudioServiceEndpoint> findExclusiveEndpoint_l(
+            const AAudioStreamConfiguration& configuration);
+
+    android::sp<AAudioServiceEndpointShared> findSharedEndpoint_l(
+            const AAudioStreamConfiguration& configuration);
+
+    void closeExclusiveEndpoint(android::sp<AAudioServiceEndpoint> serviceEndpoint);
+    void closeSharedEndpoint(android::sp<AAudioServiceEndpoint> serviceEndpoint);
+
+    // Use separate locks because opening a Shared endpoint requires opening an Exclusive one.
+    // That could cause a recursive lock.
+    // Lock mSharedLock before mExclusiveLock.
+    // it is OK to only lock mExclusiveLock.
+    mutable std::mutex                                     mSharedLock;
+    std::vector<android::sp<AAudioServiceEndpointShared>>  mSharedStreams;
+
+    mutable std::mutex                                     mExclusiveLock;
+    std::vector<android::sp<AAudioServiceEndpointMMAP>>    mExclusiveStreams;
 
 };
 

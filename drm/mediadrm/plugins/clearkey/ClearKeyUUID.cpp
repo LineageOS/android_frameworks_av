@@ -21,12 +21,19 @@
 namespace clearkeydrm {
 
 bool isClearKeyUUID(const uint8_t uuid[16]) {
-    static const uint8_t kClearKeyUUID[16] = {
+    static const uint8_t kCommonPsshBoxUUID[16] = {
         0x10,0x77,0xEF,0xEC,0xC0,0xB2,0x4D,0x02,
         0xAC,0xE3,0x3C,0x1E,0x52,0xE2,0xFB,0x4B
     };
 
-    return !memcmp(uuid, kClearKeyUUID, sizeof(kClearKeyUUID));
+    // To be used in mpd to specify drm scheme for players
+    static const uint8_t kClearKeyUUID[16] = {
+        0xE2,0x71,0x9D,0x58,0xA9,0x85,0xB3,0xC9,
+        0x78,0x1A,0xB0,0x30,0xAF,0x78,0xD3,0x0E
+    };
+
+    return !memcmp(uuid, kCommonPsshBoxUUID, sizeof(kCommonPsshBoxUUID)) ||
+           !memcmp(uuid, kClearKeyUUID, sizeof(kClearKeyUUID));
 }
 
 } // namespace clearkeydrm

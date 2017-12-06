@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudio"
+#define LOG_TAG "AudioStreamRecord"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -159,6 +159,9 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
         actualPerformanceMode = AAUDIO_PERFORMANCE_MODE_LOW_LATENCY;
     }
     setPerformanceMode(actualPerformanceMode);
+
+    setSharingMode(AAUDIO_SHARING_MODE_SHARED); // EXCLUSIVE mode not supported in legacy
+
     // Log warning if we did not get what we asked for.
     ALOGW_IF(actualFlags != flags,
              "AudioStreamRecord::open() flags changed from 0x%08X to 0x%08X",
@@ -178,11 +181,12 @@ aaudio_result_t AudioStreamRecord::close()
 {
     // TODO add close() or release() to AudioRecord API then call it from here
     if (getState() != AAUDIO_STREAM_STATE_CLOSED) {
+        mAudioRecord->removeAudioDeviceCallback(mDeviceCallback);
         mAudioRecord.clear();
         setState(AAUDIO_STREAM_STATE_CLOSED);
     }
     mFixedBlockWriter.close();
-    return AAUDIO_OK;
+    return AudioStream::close();
 }
 
 void AudioStreamRecord::processCallback(int event, void *info) {
@@ -207,7 +211,7 @@ aaudio_result_t AudioStreamRecord::requestStart()
     if (mAudioRecord.get() == nullptr) {
         return AAUDIO_ERROR_INVALID_STATE;
     }
-    // Get current position so we can detect when the track is playing.
+    // Get current position so we can detect when the track is recording.
     status_t err = mAudioRecord->getPosition(&mPositionWhenStarting);
     if (err != OK) {
         return AAudioConvert_androidToAAudioResult(err);
@@ -230,12 +234,15 @@ aaudio_result_t AudioStreamRecord::requestStop() {
     onStop();
     setState(AAUDIO_STREAM_STATE_STOPPING);
     incrementFramesWritten(getFramesRead() - getFramesWritten()); // TODO review
+    mTimestampPosition.set(getFramesRead());
     mAudioRecord->stop();
     mFramesRead.reset32();
+    mTimestampPosition.reset32();
+    checkForDisconnectRequest();
     return AAUDIO_OK;
 }
 
-aaudio_result_t AudioStreamRecord::updateStateWhileWaiting()
+aaudio_result_t AudioStreamRecord::updateStateMachine()
 {
     aaudio_result_t result = AAUDIO_OK;
     aaudio_wrapping_frames_t position;
@@ -292,6 +299,12 @@ aaudio_result_t AudioStreamRecord::read(void *buffer,
     }
     int32_t framesRead = (int32_t)(bytesRead / bytesPerFrame);
     incrementFramesRead(framesRead);
+
+    result = updateStateMachine();
+    if (result != AAUDIO_OK) {
+        return result;
+    }
+
     return (aaudio_result_t) framesRead;
 }
 
@@ -325,8 +338,28 @@ aaudio_result_t AudioStreamRecord::getTimestamp(clockid_t clockId,
                                                int64_t *timeNanoseconds) {
     ExtendedTimestamp extendedTimestamp;
     status_t status = mAudioRecord->getTimestamp(&extendedTimestamp);
-    if (status != NO_ERROR) {
+    if (status == WOULD_BLOCK) {
+        return AAUDIO_ERROR_INVALID_STATE;
+    } else if (status != NO_ERROR) {
         return AAudioConvert_androidToAAudioResult(status);
     }
     return getBestTimestamp(clockId, framePosition, timeNanoseconds, &extendedTimestamp);
+}
+
+int64_t AudioStreamRecord::getFramesWritten() {
+    aaudio_wrapping_frames_t position;
+    status_t result;
+    switch (getState()) {
+        case AAUDIO_STREAM_STATE_STARTING:
+        case AAUDIO_STREAM_STATE_STARTED:
+        case AAUDIO_STREAM_STATE_STOPPING:
+            result = mAudioRecord->getPosition(&position);
+            if (result == OK) {
+                mFramesWritten.update32(position);
+            }
+            break;
+        default:
+            break;
+    }
+    return AudioStreamLegacy::getFramesWritten();
 }

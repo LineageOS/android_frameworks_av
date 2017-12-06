@@ -1,5 +1,9 @@
 cc_library_shared {
     name: "libstagefright_soft_rawdec",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     srcs: ["SoftRaw.cpp"],
 
@@ -27,4 +31,5 @@ cc_library_shared {
         "libutils",
         "liblog",
     ],
+    compile_multilib: "32",
 }

@@ -16,14 +16,14 @@
 
 #define LOG_TAG "WOmxObserver-impl"
 
-#include <vector>
-
 #include <android-base/logging.h>
 #include <cutils/native_handle.h>
 #include <binder/Binder.h>
 
-#include "WOmxObserver.h"
-#include "Conversion.h"
+#include <media/stagefright/omx/1.0/WOmxObserver.h>
+#include <media/stagefright/omx/1.0/Conversion.h>
+
+#include <vector>
 
 namespace android {
 namespace hardware {

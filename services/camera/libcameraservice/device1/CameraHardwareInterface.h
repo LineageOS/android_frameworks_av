@@ -90,7 +90,6 @@ class CameraHardwareInterface :
 
 public:
     explicit CameraHardwareInterface(const char *name):
-            mDevice(nullptr),
             mHidlDevice(nullptr),
             mName(name),
             mPreviewScalingMode(NOT_SET),
@@ -299,7 +298,6 @@ public:
     status_t dump(int fd, const Vector<String16>& /*args*/) const;
 
 private:
-    camera_device_t *mDevice;
     sp<hardware::camera::device::V1_0::ICameraDevice> mHidlDevice;
     String8 mName;
 
@@ -369,41 +367,6 @@ private:
 
     static void sPutMemory(camera_memory_t *data);
 
-    static ANativeWindow *sToAnw(void *user);
-
-    static int sDequeueBuffer(struct preview_stream_ops* w,
-                                buffer_handle_t** buffer, int *stride);
-
-    static int sLockBuffer(struct preview_stream_ops* w,
-                      buffer_handle_t* /*buffer*/);
-
-    static int sEnqueueBuffer(struct preview_stream_ops* w,
-                      buffer_handle_t* buffer);
-
-    static int sCancelBuffer(struct preview_stream_ops* w,
-                      buffer_handle_t* buffer);
-
-    static int sSetBufferCount(struct preview_stream_ops* w, int count);
-
-    static int sSetBuffersGeometry(struct preview_stream_ops* w,
-                      int width, int height, int format);
-
-    static int sSetCrop(struct preview_stream_ops *w,
-                      int left, int top, int right, int bottom);
-
-    static int sSetTimestamp(struct preview_stream_ops *w,
-                               int64_t timestamp);
-
-    static int sSetUsage(struct preview_stream_ops* w, int usage);
-
-    static int sSetSwapInterval(struct preview_stream_ops *w, int interval);
-
-    static int sGetMinUndequeuedBufferCount(
-                      const struct preview_stream_ops *w,
-                      int *count);
-
-    void initHalPreviewWindow();
-
     std::pair<bool, uint64_t> getBufferId(ANativeWindowBuffer* anb);
     void cleanupCirculatingBuffers();
 
@@ -459,13 +422,6 @@ private:
 
     sp<ANativeWindow>        mPreviewWindow;
 
-    struct camera_preview_window {
-        struct preview_stream_ops nw;
-        void *user;
-    };
-
-    struct camera_preview_window mHalPreviewWindow;
-
     notify_callback               mNotifyCb;
     data_callback                 mDataCb;
     data_callback_timestamp       mDataCbTimestamp;
@@ -479,7 +435,7 @@ private:
     int mPreviewWidth;
     int mPreviewHeight;
     int mPreviewFormat;
-    int mPreviewUsage;
+    uint64_t mPreviewUsage;
     int mPreviewSwapInterval;
     android_native_rect_t mPreviewCrop;
 

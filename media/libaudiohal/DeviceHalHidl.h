@@ -18,11 +18,13 @@
 #define ANDROID_HARDWARE_DEVICE_HAL_HIDL_H
 
 #include <android/hardware/audio/2.0/IDevice.h>
+#include <android/hardware/audio/2.0/IPrimaryDevice.h>
 #include <media/audiohal/DeviceHalInterface.h>
 
 #include "ConversionHelperHidl.h"
 
 using ::android::hardware::audio::V2_0::IDevice;
+using ::android::hardware::audio::V2_0::IPrimaryDevice;
 using ::android::hardware::Return;
 
 namespace android {
@@ -110,6 +112,7 @@ class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
   private:
     friend class DevicesFactoryHalHidl;
     sp<IDevice> mDevice;
+    sp<IPrimaryDevice> mPrimaryDevice;  // Null if it's not a primary device.
 
     // Can not be constructed directly by clients.
     explicit DeviceHalHidl(const sp<IDevice>& device);

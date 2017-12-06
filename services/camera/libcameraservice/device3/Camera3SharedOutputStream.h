@@ -34,7 +34,7 @@ public:
      */
     Camera3SharedOutputStream(int id, const std::vector<sp<Surface>>& surfaces,
             uint32_t width, uint32_t height, int format,
-            uint32_t consumerUsage, android_dataspace dataSpace,
+            uint64_t consumerUsage, android_dataspace dataSpace,
             camera3_stream_rotation_t rotation, nsecs_t timestampOffset,
             int setId = CAMERA3_STREAM_SET_ID_INVALID);
 
@@ -74,7 +74,7 @@ private:
 
     virtual status_t disconnectLocked();
 
-    virtual status_t getEndpointUsage(uint32_t *usage) const;
+    virtual status_t getEndpointUsage(uint64_t *usage) const;
 
 }; // class Camera3SharedOutputStream
 

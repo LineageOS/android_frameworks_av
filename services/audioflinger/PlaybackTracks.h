@@ -30,6 +30,7 @@ public:
                                 audio_channel_mask_t channelMask,
                                 size_t frameCount,
                                 void *buffer,
+                                size_t bufferSize,
                                 const sp<IMemory>& sharedBuffer,
                                 audio_session_t sessionId,
                                 uid_t uid,
@@ -40,7 +41,7 @@ public:
     virtual status_t    initCheck() const;
 
     static  void        appendDumpHeader(String8& result);
-            void        dump(char* buffer, size_t size, bool active);
+            void        appendDump(String8& result, bool active);
     virtual status_t    start(AudioSystem::sync_event_t event =
                                     AudioSystem::SYNC_EVENT_NONE,
                              audio_session_t triggerSession = AUDIO_SESSION_NONE);
@@ -240,6 +241,7 @@ public:
                                    audio_format_t format,
                                    size_t frameCount,
                                    void *buffer,
+                                   size_t bufferSize,
                                    audio_output_flags_t flags);
     virtual             ~PatchTrack();
 

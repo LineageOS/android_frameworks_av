@@ -18,7 +18,7 @@
 
 #define SOFT_AMRNB_ENCODER_H_
 
-#include "SimpleSoftOMXComponent.h"
+#include <media/stagefright/omx/SimpleSoftOMXComponent.h>
 
 namespace android {
 

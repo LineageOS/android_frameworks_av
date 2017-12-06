@@ -108,11 +108,29 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t            *phInsta
     /*
      * Zero all memory regions
      */
-     LoadConst_16(0, (LVM_INT16 *)pMemoryTable->Region[LVM_PERSISTENT_SLOW_DATA].pBaseAddress, (LVM_INT16)((pMemoryTable->Region[LVM_PERSISTENT_SLOW_DATA].Size)/sizeof(LVM_INT16)));
-     LoadConst_16(0, (LVM_INT16 *)pMemoryTable->Region[LVM_PERSISTENT_FAST_DATA].pBaseAddress, (LVM_INT16)((pMemoryTable->Region[LVM_PERSISTENT_FAST_DATA].Size)/sizeof(LVM_INT16)));
-     LoadConst_16(0, (LVM_INT16 *)pMemoryTable->Region[LVM_PERSISTENT_FAST_COEF].pBaseAddress, (LVM_INT16)((pMemoryTable->Region[LVM_PERSISTENT_FAST_COEF].Size)/sizeof(LVM_INT16)));
-     LoadConst_16(0, (LVM_INT16 *)pMemoryTable->Region[LVM_TEMPORARY_FAST].pBaseAddress, (LVM_INT16)((pMemoryTable->Region[LVM_TEMPORARY_FAST].Size)/sizeof(LVM_INT16)));
-
+#ifdef BUILD_FLOAT
+    LoadConst_Float(0,
+                    (LVM_FLOAT *)pMemoryTable->Region[LVM_PERSISTENT_SLOW_DATA].pBaseAddress,
+                    (LVM_INT16)((pMemoryTable->Region[LVM_PERSISTENT_SLOW_DATA].Size) / \
+                                                    sizeof(LVM_FLOAT)));
+    LoadConst_Float(0,
+                    (LVM_FLOAT *)pMemoryTable->Region[LVM_PERSISTENT_FAST_DATA].pBaseAddress,
+                    (LVM_INT16)((pMemoryTable->Region[LVM_PERSISTENT_FAST_DATA].Size) / \
+                                                    sizeof(LVM_FLOAT)));
+    LoadConst_Float(0,
+                    (LVM_FLOAT *)pMemoryTable->Region[LVM_PERSISTENT_FAST_COEF].pBaseAddress,
+                    (LVM_INT16)((pMemoryTable->Region[LVM_PERSISTENT_FAST_COEF].Size) / \
+                                                    sizeof(LVM_FLOAT)));
+    LoadConst_Float(0,
+                    (LVM_FLOAT *)pMemoryTable->Region[LVM_TEMPORARY_FAST].pBaseAddress,
+                    (LVM_INT16)((pMemoryTable->Region[LVM_TEMPORARY_FAST].Size) / \
+                                                    sizeof(LVM_FLOAT)));
+#else
+    LoadConst_16(0, (LVM_INT16 *)pMemoryTable->Region[LVM_PERSISTENT_SLOW_DATA].pBaseAddress, (LVM_INT16)((pMemoryTable->Region[LVM_PERSISTENT_SLOW_DATA].Size)/sizeof(LVM_INT16)));
+    LoadConst_16(0, (LVM_INT16 *)pMemoryTable->Region[LVM_PERSISTENT_FAST_DATA].pBaseAddress, (LVM_INT16)((pMemoryTable->Region[LVM_PERSISTENT_FAST_DATA].Size)/sizeof(LVM_INT16)));
+    LoadConst_16(0, (LVM_INT16 *)pMemoryTable->Region[LVM_PERSISTENT_FAST_COEF].pBaseAddress, (LVM_INT16)((pMemoryTable->Region[LVM_PERSISTENT_FAST_COEF].Size)/sizeof(LVM_INT16)));
+    LoadConst_16(0, (LVM_INT16 *)pMemoryTable->Region[LVM_TEMPORARY_FAST].pBaseAddress, (LVM_INT16)((pMemoryTable->Region[LVM_TEMPORARY_FAST].Size)/sizeof(LVM_INT16)));
+#endif
     /*
      * Set the instance handle if not already initialised
      */
@@ -146,7 +164,7 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t            *phInsta
      * Set the data, coefficient and temporary memory pointers
      */
     pLVREV_Private->pFastData = InstAlloc_AddMember(&FastData, sizeof(LVREV_FastData_st));                              /* Fast data memory base address */
-
+#ifndef BUILD_FLOAT
     if(pInstanceParams->NumDelays == LVREV_DELAYLINES_4)
     {
         pLVREV_Private->pDelay_T[3]     = InstAlloc_AddMember(&FastData, LVREV_MAX_T3_DELAY  * sizeof(LVM_INT32));
@@ -190,7 +208,67 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t            *phInsta
 
         LoadConst_32(0,pLVREV_Private->pDelay_T[0]  , (LVM_INT16)LVREV_MAX_T0_DELAY);
     }
+#else
+    if(pInstanceParams->NumDelays == LVREV_DELAYLINES_4)
+    {
+        pLVREV_Private->pDelay_T[3]     = InstAlloc_AddMember(&FastData, LVREV_MAX_T3_DELAY * \
+                                                              sizeof(LVM_FLOAT));
+        pLVREV_Private->pDelay_T[2]     = InstAlloc_AddMember(&FastData, LVREV_MAX_T2_DELAY * \
+                                                              sizeof(LVM_FLOAT));
+        pLVREV_Private->pDelay_T[1]     = InstAlloc_AddMember(&FastData, LVREV_MAX_T1_DELAY * \
+                                                              sizeof(LVM_FLOAT));
+        pLVREV_Private->pDelay_T[0]     = InstAlloc_AddMember(&FastData, LVREV_MAX_T0_DELAY * \
+                                                              sizeof(LVM_FLOAT));
 
+        for(i = 0; i < 4; i++)
+        {
+            /* Scratch for each delay line output */
+            pLVREV_Private->pScratchDelayLine[i] = InstAlloc_AddMember(&Temporary,
+                                                                       sizeof(LVM_FLOAT) * \
+                                                                       MaxBlockSize);
+        }
+
+        LoadConst_Float(0, pLVREV_Private->pDelay_T[3], LVREV_MAX_T3_DELAY);
+        LoadConst_Float(0, pLVREV_Private->pDelay_T[2], LVREV_MAX_T2_DELAY);
+        LoadConst_Float(0, pLVREV_Private->pDelay_T[1], LVREV_MAX_T1_DELAY);
+        LoadConst_Float(0, pLVREV_Private->pDelay_T[0], LVREV_MAX_T0_DELAY);
+    }
+
+    if(pInstanceParams->NumDelays == LVREV_DELAYLINES_2)
+    {
+        pLVREV_Private->pDelay_T[1]  = InstAlloc_AddMember(&FastData, LVREV_MAX_T1_DELAY * \
+                                                           sizeof(LVM_FLOAT));
+        pLVREV_Private->pDelay_T[0]  = InstAlloc_AddMember(&FastData, LVREV_MAX_T0_DELAY * \
+                                                           sizeof(LVM_FLOAT));
+
+        for(i = 0; i < 2; i++)
+        {
+            /* Scratch for each delay line output */
+            pLVREV_Private->pScratchDelayLine[i] = InstAlloc_AddMember(&Temporary,
+                                                                       sizeof(LVM_FLOAT) * \
+                                                                       MaxBlockSize);
+        }
+
+        LoadConst_Float(0, pLVREV_Private->pDelay_T[1], (LVM_INT16)LVREV_MAX_T1_DELAY);
+        LoadConst_Float(0, pLVREV_Private->pDelay_T[0], (LVM_INT16)LVREV_MAX_T0_DELAY);
+    }
+
+    if(pInstanceParams->NumDelays == LVREV_DELAYLINES_1)
+    {
+        pLVREV_Private->pDelay_T[0]  = InstAlloc_AddMember(&FastData,
+                                                           LVREV_MAX_T0_DELAY * sizeof(LVM_FLOAT));
+
+        for(i = 0; i < 1; i++)
+        {
+            /* Scratch for each delay line output */
+            pLVREV_Private->pScratchDelayLine[i] = InstAlloc_AddMember(&Temporary,
+                                                                       sizeof(LVM_FLOAT) * \
+                                                                       MaxBlockSize);
+        }
+
+        LoadConst_Float(0, pLVREV_Private->pDelay_T[0], (LVM_INT16)LVREV_MAX_T0_DELAY);
+    }
+#endif
     /* All-pass delay buffer addresses and sizes */
     pLVREV_Private->T[0]         = LVREV_MAX_T0_DELAY;
     pLVREV_Private->T[1]         = LVREV_MAX_T1_DELAY;
@@ -200,10 +278,19 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t            *phInsta
 
 
     pLVREV_Private->pFastCoef       = InstAlloc_AddMember(&FastCoef, sizeof(LVREV_FastCoef_st));                        /* Fast coefficient memory base address */
+#ifndef BUILD_FLOAT
     pLVREV_Private->pScratch        = InstAlloc_AddMember(&Temporary, sizeof(LVM_INT32) * MaxBlockSize);                /* General purpose scratch */
     pLVREV_Private->pInputSave      = InstAlloc_AddMember(&Temporary, 2 * sizeof(LVM_INT32) * MaxBlockSize);            /* Mono->stereo input save for end mix */
     LoadConst_32(0, pLVREV_Private->pInputSave, (LVM_INT16)(MaxBlockSize*2));
-
+#else
+    /* General purpose scratch */
+    pLVREV_Private->pScratch        = InstAlloc_AddMember(&Temporary, sizeof(LVM_FLOAT) * \
+                                                          MaxBlockSize);
+    /* Mono->stereo input save for end mix */
+    pLVREV_Private->pInputSave      = InstAlloc_AddMember(&Temporary, 2 * sizeof(LVM_FLOAT) * \
+                                                          MaxBlockSize);
+    LoadConst_Float(0, pLVREV_Private->pInputSave, (LVM_INT16)(MaxBlockSize * 2));
+#endif
 
     /*
      * Save the instance parameters in the instance structure
@@ -252,9 +339,13 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t            *phInsta
     pLVREV_Private->GainMixer.pGeneralPurpose    = LVM_NULL;
     pLVREV_Private->GainMixer.pCallBack          = LVM_NULL;
     pLVREV_Private->GainMixer.CallbackSet        = LVM_FALSE;
+#ifndef BUILD_FLOAT
     pLVREV_Private->GainMixer.Current            = 0x03ffffff;
     pLVREV_Private->GainMixer.Target             = 0x03ffffff;
-
+#else
+    pLVREV_Private->GainMixer.Current            = 0.03125f;//0x03ffffff;
+    pLVREV_Private->GainMixer.Target             = 0.03125f;//0x03ffffff;
+#endif
 
     /*
      * Set the All-Pass Filter mixers
@@ -277,7 +368,11 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t            *phInsta
         pLVREV_Private->Mixer_APTaps[i].pCallBack1       = LVM_NULL;
         pLVREV_Private->Mixer_APTaps[i].CallbackSet1     = LVM_FALSE;
         pLVREV_Private->Mixer_APTaps[i].Current1         = 0;
+#ifndef BUILD_FLOAT
         pLVREV_Private->Mixer_APTaps[i].Target1          = 0x7fffffff;
+#else
+        pLVREV_Private->Mixer_APTaps[i].Target1          = 1;
+#endif
         /* Feedforward mixer */
         pLVREV_Private->Mixer_SGFeedforward[i].CallbackParam   = 0;
         pLVREV_Private->Mixer_SGFeedforward[i].pCallbackHandle = LVM_NULL;

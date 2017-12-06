@@ -77,7 +77,7 @@ cc_library_shared {
 
 }
 
-// AIDL interface between libcamera_client and framework.jar.
+// AIDL interface between camera clients and the camera service.
 filegroup {
     name: "libcamera_client_aidl",
     srcs: [

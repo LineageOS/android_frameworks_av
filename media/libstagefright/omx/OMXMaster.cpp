@@ -18,14 +18,12 @@
 #define LOG_TAG "OMXMaster"
 #include <utils/Log.h>
 
-#include "OMXMaster.h"
-
-#include "SoftOMXPlugin.h"
+#include <media/stagefright/omx/OMXMaster.h>
+#include <media/stagefright/omx/SoftOMXPlugin.h>
+#include <media/stagefright/foundation/ADebug.h>
 
 #include <dlfcn.h>
 #include <fcntl.h>
-
-#include <media/stagefright/foundation/ADebug.h>
 
 namespace android {
 

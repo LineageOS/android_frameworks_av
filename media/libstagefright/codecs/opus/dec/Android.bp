@@ -1,5 +1,9 @@
 cc_library_shared {
     name: "libstagefright_soft_opusdec",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     srcs: ["SoftOpus.cpp"],
 
@@ -10,7 +14,7 @@ cc_library_shared {
 
     shared_libs: [
         "libopus",
-        "libmedia",
+        "libmedia_omx",
         "libstagefright_omx",
         "libstagefright_foundation",
         "libutils",
@@ -29,4 +33,5 @@ cc_library_shared {
             cfi: true,
         },
     },
+    compile_multilib: "32",
 }

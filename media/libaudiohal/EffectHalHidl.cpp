@@ -40,7 +40,7 @@ using ::android::hardware::Return;
 namespace android {
 
 EffectHalHidl::EffectHalHidl(const sp<IEffect>& effect, uint64_t effectId)
-        : mEffect(effect), mEffectId(effectId), mBuffersChanged(true) {
+        : mEffect(effect), mEffectId(effectId), mBuffersChanged(true), mEfGroup(nullptr) {
 }
 
 EffectHalHidl::~EffectHalHidl() {
@@ -48,6 +48,9 @@ EffectHalHidl::~EffectHalHidl() {
         close();
         mEffect.clear();
         hardware::IPCThreadState::self()->flushCommands();
+    }
+    if (mEfGroup) {
+        EventFlag::deleteEventFlag(&mEfGroup);
     }
 }
 

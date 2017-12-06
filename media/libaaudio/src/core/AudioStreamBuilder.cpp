@@ -184,16 +184,6 @@ aaudio_result_t AudioStreamBuilder::validate() const {
         return result;
     }
 
-    switch (mDirection) {
-        case AAUDIO_DIRECTION_INPUT:
-        case AAUDIO_DIRECTION_OUTPUT:
-            break; // valid
-        default:
-            ALOGE("AudioStreamBuilder: direction not valid = %d", mDirection);
-            return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
-            // break;
-    }
-
     switch (mPerformanceMode) {
         case AAUDIO_PERFORMANCE_MODE_NONE:
         case AAUDIO_PERFORMANCE_MODE_POWER_SAVING:

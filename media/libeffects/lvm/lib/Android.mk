@@ -72,19 +72,25 @@ LOCAL_SRC_FILES:= \
     Common/src/From2iToMono_16.c \
     Common/src/Copy_16.c \
     Common/src/MonoTo2I_16.c \
+    Common/src/MonoTo2I_32.c \
     Common/src/LoadConst_16.c \
+    Common/src/LoadConst_32.c \
     Common/src/dB_to_Lin32.c \
     Common/src/Shift_Sat_v16xv16.c \
+    Common/src/Shift_Sat_v32xv32.c \
     Common/src/Abs_32.c \
     Common/src/Int32RShiftToInt16_Sat_32x16.c \
     Common/src/From2iToMono_32.c \
     Common/src/mult3s_16x16.c \
+    Common/src/Mult3s_32x16.c \
     Common/src/NonLinComp_D16.c \
     Common/src/DelayMix_16x16.c \
     Common/src/MSTo2i_Sat_16x16.c \
     Common/src/From2iToMS_16x16.c \
     Common/src/Mac3s_Sat_16x16.c \
+    Common/src/Mac3s_Sat_32x16.c \
     Common/src/Add2_Sat_16x16.c \
+    Common/src/Add2_Sat_32x32.c \
     Common/src/LVC_MixSoft_1St_2i_D16C31_SAT.c \
     Common/src/LVC_MixSoft_1St_D16C31_SAT.c \
     Common/src/LVC_Mixer_VarSlope_SetTimeConstant.c \
@@ -120,7 +126,7 @@ LOCAL_C_INCLUDES += \
     $(LOCAL_PATH)/StereoWidening/src \
     $(LOCAL_PATH)/StereoWidening/lib
 
-LOCAL_CFLAGS += -fvisibility=hidden
+LOCAL_CFLAGS += -fvisibility=hidden -DBUILD_FLOAT -DHIGHER_FS
 LOCAL_CFLAGS += -Wall -Werror
 
 include $(BUILD_STATIC_LIBRARY)
@@ -179,6 +185,7 @@ LOCAL_C_INCLUDES += \
     $(LOCAL_PATH)/Common/lib \
     $(LOCAL_PATH)/Common/src
 
-LOCAL_CFLAGS += -fvisibility=hidden
+LOCAL_CFLAGS += -fvisibility=hidden -DBUILD_FLOAT -DHIGHER_FS
 LOCAL_CFLAGS += -Wall -Werror
+
 include $(BUILD_STATIC_LIBRARY)

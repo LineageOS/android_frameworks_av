@@ -19,20 +19,19 @@
 
 #include <android-base/logging.h>
 #include <gui/IGraphicBufferProducer.h>
-#include <OMX_Core.h>
-#include <OMX_AsString.h>
+#include <media/openmax/OMX_Core.h>
+#include <media/openmax/OMX_AsString.h>
 
-#include "../OMXUtils.h"
-#include "../OMXMaster.h"
-#include "../GraphicBufferSource.h"
+#include <media/stagefright/omx/OMXUtils.h>
+#include <media/stagefright/omx/OMXMaster.h>
+#include <media/stagefright/omx/GraphicBufferSource.h>
 
-#include "WOmxNode.h"
-#include "WOmxObserver.h"
-#include "WGraphicBufferProducer.h"
-#include "WGraphicBufferSource.h"
-#include "Conversion.h"
-
-#include "Omx.h"
+#include <media/stagefright/omx/1.0/WOmxNode.h>
+#include <media/stagefright/omx/1.0/WOmxObserver.h>
+#include <media/stagefright/omx/1.0/WGraphicBufferProducer.h>
+#include <media/stagefright/omx/1.0/WGraphicBufferSource.h>
+#include <media/stagefright/omx/1.0/Conversion.h>
+#include <media/stagefright/omx/1.0/Omx.h>
 
 namespace android {
 namespace hardware {
@@ -115,15 +114,23 @@ Return<void> Omx::allocateNode(
             return Void();
         }
         instance->setHandle(handle);
-        std::vector<AString> quirkVector;
-        if (mParser.getQuirks(name.c_str(), &quirkVector) == OK) {
+
+        // Find quirks from mParser
+        const auto& codec = mParser.getCodecMap().find(name.c_str());
+        if (codec == mParser.getCodecMap().cend()) {
+            LOG(WARNING) << "Failed to obtain quirks for omx component "
+                    "'" << name.c_str() << "' "
+                    "from XML files";
+        } else {
             uint32_t quirks = 0;
-            for (const AString quirk : quirkVector) {
+            for (const auto& quirk : codec->second.quirkSet) {
                 if (quirk == "requires-allocate-on-input-ports") {
-                    quirks |= kRequiresAllocateBufferOnInputPorts;
+                    quirks |= OMXNodeInstance::
+                            kRequiresAllocateBufferOnInputPorts;
                 }
                 if (quirk == "requires-allocate-on-output-ports") {
-                    quirks |= kRequiresAllocateBufferOnOutputPorts;
+                    quirks |= OMXNodeInstance::
+                            kRequiresAllocateBufferOnOutputPorts;
                 }
             }
             instance->setQuirks(quirks);

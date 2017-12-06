@@ -98,7 +98,13 @@ LVCS_ReturnStatus_en LVCS_Memory(LVCS_Handle_t          hInstance,
         /*
          * Scratch memory
          */
+#ifdef BUILD_FLOAT
+        /* Inplace processing */
+        ScratchSize = (LVM_UINT32) \
+                        (LVCS_SCRATCHBUFFERS * sizeof(LVM_FLOAT) * pCapabilities->MaxBlockSize);
+#else
         ScratchSize = (LVM_UINT32)(LVCS_SCRATCHBUFFERS*sizeof(LVM_INT16)*pCapabilities->MaxBlockSize);     /* Inplace processing */
+#endif
         pMemoryTable->Region[LVCS_MEMREGION_TEMPORARY_FAST].Size         = ScratchSize;
         pMemoryTable->Region[LVCS_MEMREGION_TEMPORARY_FAST].Type         = LVCS_SCRATCH;
         pMemoryTable->Region[LVCS_MEMREGION_TEMPORARY_FAST].pBaseAddress = LVM_NULL;
@@ -190,6 +196,7 @@ LVCS_ReturnStatus_en LVCS_Init(LVCS_Handle_t         *phInstance,
     pLVCS_VolCorrectTable            = (LVCS_VolCorrect_t*)&LVCS_VolCorrectTable[0];
     pInstance->VolCorrect            = pLVCS_VolCorrectTable[0];
     pInstance->TransitionGain        = 0;
+
     /* These current and target values are intialized again in LVCS_Control.c */
     LVC_Mixer_Init(&pInstance->BypassMix.Mixer_Instance.MixerStream[0],0,0);
     /* These current and target values are intialized again in LVCS_Control.c */

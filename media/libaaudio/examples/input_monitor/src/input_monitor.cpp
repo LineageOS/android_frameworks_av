@@ -27,8 +27,10 @@
 #include "AAudioSimpleRecorder.h"
 
 // TODO support FLOAT
-#define REQUIRED_FORMAT  AAUDIO_FORMAT_PCM_I16
+#define REQUIRED_FORMAT    AAUDIO_FORMAT_PCM_I16
 #define MIN_FRAMES_TO_READ 48  /* arbitrary, 1 msec at 48000 Hz */
+
+static const int FRAMES_PER_LINE = 20000;
 
 int main(int argc, const char **argv)
 {
@@ -45,17 +47,19 @@ int main(int argc, const char **argv)
     int32_t framesPerRead = 0;
     int32_t framesToRecord = 0;
     int32_t framesLeft = 0;
+    int32_t nextFrameCount = 0;
+    int32_t frameCount = 0;
     int32_t xRunCount = 0;
+    int64_t previousFramePosition = -1;
     int16_t *data = nullptr;
     float peakLevel = 0.0;
-    int loopCounter = 0;
     int32_t deviceId;
 
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
 
-    printf("%s - Monitor input level using AAudio\n", argv[0]);
+    printf("%s - Monitor input level using AAudio read, V0.1.2\n", argv[0]);
 
     argParser.setFormat(REQUIRED_FORMAT);
     if (argParser.parseArgs(argc, argv)) {
@@ -73,7 +77,7 @@ int main(int argc, const char **argv)
     deviceId = AAudioStream_getDeviceId(aaudioStream);
     printf("deviceId = %d\n", deviceId);
 
-    actualSamplesPerFrame = AAudioStream_getSamplesPerFrame(aaudioStream);
+    actualSamplesPerFrame = AAudioStream_getChannelCount(aaudioStream);
     printf("SamplesPerFrame = %d\n", actualSamplesPerFrame);
     actualSampleRate = AAudioStream_getSampleRate(aaudioStream);
     printf("SamplesPerFrame = %d\n", actualSampleRate);
@@ -132,6 +136,7 @@ int main(int argc, const char **argv)
             goto finish;
         }
         framesLeft -= actual;
+        frameCount += actual;
 
         // Peak finder.
         for (int frameIndex = 0; frameIndex < actual; frameIndex++) {
@@ -142,9 +147,36 @@ int main(int argc, const char **argv)
         }
 
         // Display level as stars, eg. "******".
-        if ((loopCounter++ % 10) == 0) {
+        if (frameCount > nextFrameCount) {
             displayPeakLevel(peakLevel);
             peakLevel = 0.0;
+            nextFrameCount += FRAMES_PER_LINE;
+        }
+
+        // Print timestamps.
+        int64_t framePosition = 0;
+        int64_t frameTime = 0;
+        aaudio_result_t timeResult;
+        timeResult = AAudioStream_getTimestamp(aaudioStream, CLOCK_MONOTONIC,
+                                               &framePosition, &frameTime);
+
+        if (timeResult == AAUDIO_OK) {
+            if (framePosition > (previousFramePosition + FRAMES_PER_LINE)) {
+                int64_t realTime = getNanoseconds();
+                int64_t framesRead = AAudioStream_getFramesRead(aaudioStream);
+
+                double latencyMillis = calculateLatencyMillis(framesRead, realTime,
+                                                              framePosition, frameTime,
+                                                              actualSampleRate);
+
+                printf("--- timestamp: result = %4d, position = %lld, at %lld nanos"
+                               ", latency = %7.2f msec\n",
+                       timeResult,
+                       (long long) framePosition,
+                       (long long) frameTime,
+                       latencyMillis);
+                previousFramePosition = framePosition;
+            }
         }
     }
 

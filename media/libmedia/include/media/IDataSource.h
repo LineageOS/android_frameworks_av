@@ -35,7 +35,9 @@ public:
     // Get the memory that readAt writes into.
     virtual sp<IMemory> getIMemory() = 0;
     // Read up to |size| bytes into the memory returned by getIMemory(). Returns
-    // the number of bytes read, or -1 on error. |size| must not be larger than
+    // the number of bytes read, or negative value on error (eg.
+    // ERROR_END_OF_STREAM indicating EOS. This is needed by CallbackDataSource
+    // to properly handle reading of last chunk). |size| must not be larger than
     // the buffer.
     virtual ssize_t readAt(off64_t offset, size_t size) = 0;
     // Get the size, or -1 if the size is unknown.

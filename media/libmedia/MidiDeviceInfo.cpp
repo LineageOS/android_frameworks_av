@@ -16,7 +16,7 @@
 
 #define LOG_TAG "MidiDeviceInfo"
 
-#include "MidiDeviceInfo.h"
+#include <media/MidiDeviceInfo.h>
 
 #include <binder/Parcel.h>
 #include <log/log.h>

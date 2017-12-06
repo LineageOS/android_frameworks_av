@@ -24,14 +24,13 @@
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
 
+#include "AudioClock.h"
 #include "AudioStreamBuilder.h"
 #include "AudioStream.h"
-#include "AudioClock.h"
+#include "binding/AAudioCommon.h"
 #include "client/AudioStreamInternal.h"
-#include "HandleTracker.h"
 
 using namespace aaudio;
-
 
 // Macros for common code that includes a return.
 // TODO Consider using do{}while(0) construct. I tried but it hung AndroidStudio
@@ -101,7 +100,6 @@ AAUDIO_API const char * AAudio_convertStreamStateToText(aaudio_stream_state_t st
  */
 static aaudio_policy_t s_MMapPolicy = AAUDIO_UNSPECIFIED;
 
-
 static AudioStream *convertAAudioStreamToAudioStream(AAudioStream* stream)
 {
     return (AudioStream*) stream;
@@ -144,17 +142,16 @@ AAUDIO_API void AAudioStreamBuilder_setSampleRate(AAudioStreamBuilder* builder,
 }
 
 AAUDIO_API void AAudioStreamBuilder_setChannelCount(AAudioStreamBuilder* builder,
-                                                       int32_t channelCount)
+                                                    int32_t channelCount)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
     streamBuilder->setSamplesPerFrame(channelCount);
 }
 
 AAUDIO_API void AAudioStreamBuilder_setSamplesPerFrame(AAudioStreamBuilder* builder,
-                                                       int32_t samplesPerFrame)
+                                                       int32_t channelCount)
 {
-    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
-    streamBuilder->setSamplesPerFrame(samplesPerFrame);
+    AAudioStreamBuilder_setChannelCount(builder, channelCount);
 }
 
 AAUDIO_API void AAudioStreamBuilder_setDirection(AAudioStreamBuilder* builder,
@@ -221,6 +218,7 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_openStream(AAudioStreamBuilder* 
     ALOGD("AAudioStreamBuilder_openStream() returns %d = %s for (%p) ----------------",
           result, AAudio_convertResultToText(result), audioStream);
     if (result == AAUDIO_OK) {
+        audioStream->registerPlayerBase();
         *streamPtr = (AAudioStream*) audioStream;
     } else {
         *streamPtr = nullptr;
@@ -244,6 +242,7 @@ AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream)
     ALOGD("AAudioStream_close(%p)", stream);
     if (audioStream != nullptr) {
         audioStream->close();
+        audioStream->unregisterPlayerBase();
         delete audioStream;
         return AAUDIO_OK;
     }
@@ -254,8 +253,8 @@ AAUDIO_API aaudio_result_t  AAudioStream_requestStart(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     ALOGD("AAudioStream_requestStart(%p) called --------------", stream);
-    aaudio_result_t result = audioStream->requestStart();
-    ALOGD("AAudioStream_requestStart(%p) returned ------------", stream);
+    aaudio_result_t result = audioStream->systemStart();
+    ALOGD("AAudioStream_requestStart(%p) returned %d ---------", stream, result);
     return result;
 }
 
@@ -263,7 +262,7 @@ AAUDIO_API aaudio_result_t  AAudioStream_requestPause(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     ALOGD("AAudioStream_requestPause(%p)", stream);
-    return audioStream->requestPause();
+    return audioStream->systemPause();
 }
 
 AAUDIO_API aaudio_result_t  AAudioStream_requestFlush(AAudioStream* stream)
@@ -277,7 +276,7 @@ AAUDIO_API aaudio_result_t  AAudioStream_requestStop(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     ALOGD("AAudioStream_requestStop(%p)", stream);
-    return audioStream->requestStop();
+    return audioStream->systemStop();
 }
 
 AAUDIO_API aaudio_result_t AAudioStream_waitForStateChange(AAudioStream* stream,
@@ -359,8 +358,7 @@ AAUDIO_API int32_t AAudioStream_getChannelCount(AAudioStream* stream)
 
 AAUDIO_API int32_t AAudioStream_getSamplesPerFrame(AAudioStream* stream)
 {
-    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    return audioStream->getSamplesPerFrame();
+    return AAudioStream_getChannelCount(stream);
 }
 
 AAUDIO_API aaudio_stream_state_t AAudioStream_getState(AAudioStream* stream)

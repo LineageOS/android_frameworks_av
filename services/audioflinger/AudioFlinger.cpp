@@ -326,9 +326,14 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
     sp<MmapThread> thread = mMmapThreads.valueFor(io);
     if (thread != 0) {
         interface = new MmapThreadHandle(thread);
-        thread->configure(attr, streamType, sessionId, callback, portId);
+        thread->configure(attr, streamType, sessionId, callback, *deviceId, portId);
         *handle = portId;
     } else {
+        if (direction == MmapStreamInterface::DIRECTION_OUTPUT) {
+            AudioSystem::releaseOutput(io, streamType, sessionId);
+        } else {
+            AudioSystem::releaseInput(io, sessionId);
+        }
         ret = NO_INIT;
     }
 
@@ -1397,11 +1402,11 @@ void AudioFlinger::registerClient(const sp<IAudioFlingerClient>& client)
     // the config change is always sent from playback or record threads to avoid deadlock
     // with AudioSystem::gLock
     for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
-        mPlaybackThreads.valueAt(i)->sendIoConfigEvent(AUDIO_OUTPUT_OPENED, pid);
+        mPlaybackThreads.valueAt(i)->sendIoConfigEvent(AUDIO_OUTPUT_REGISTERED, pid);
     }
 
     for (size_t i = 0; i < mRecordThreads.size(); i++) {
-        mRecordThreads.valueAt(i)->sendIoConfigEvent(AUDIO_INPUT_OPENED, pid);
+        mRecordThreads.valueAt(i)->sendIoConfigEvent(AUDIO_INPUT_REGISTERED, pid);
     }
 }
 
@@ -2603,7 +2608,7 @@ void AudioFlinger::purgeStaleEffects_l() {
             while (ec->mEffects.size()) {
                 sp<EffectModule> effect = ec->mEffects[0];
                 effect->unPin();
-                t->removeEffect_l(effect);
+                t->removeEffect_l(effect, /*release*/ true);
                 if (effect->purgeHandles()) {
                     t->checkSuspendOnEffectEnabled_l(effect, false, effect->sessionId());
                 }

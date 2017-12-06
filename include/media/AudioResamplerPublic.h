@@ -1,1 +1,1 @@
-../../media/libaudioprocessing/include/AudioResamplerPublic.h
+../../media/libaudioprocessing/include/media/AudioResamplerPublic.h

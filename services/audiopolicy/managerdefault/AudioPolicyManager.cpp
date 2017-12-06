@@ -1320,9 +1320,9 @@ status_t AudioPolicyManager::startSource(const sp<AudioOutputDescriptor>& output
 
         // apply volume rules for current stream and device if necessary
         checkAndSetVolume(stream,
-                          mVolumeCurves->getVolumeIndex(stream, device),
+                          mVolumeCurves->getVolumeIndex(stream, outputDesc->device()),
                           outputDesc,
-                          device);
+                          outputDesc->device());
 
         // update the outputs if starting an output with a stream that can affect notification
         // routing
@@ -1499,62 +1499,13 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
             "session %d, flags %#x",
           attr->source, config->sample_rate, config->format, config->channel_mask, session, flags);
 
-    // special case for mmap capture: if an input IO handle is specified, we reuse this input if
-    // possible
-    if ((flags & AUDIO_INPUT_FLAG_MMAP_NOIRQ) == AUDIO_INPUT_FLAG_MMAP_NOIRQ &&
-            *input != AUDIO_IO_HANDLE_NONE) {
-        ssize_t index = mInputs.indexOfKey(*input);
-        if (index < 0) {
-            ALOGW("getInputForAttr() unknown MMAP input %d", *input);
-            return BAD_VALUE;
-        }
-        sp<AudioInputDescriptor> inputDesc = mInputs.valueAt(index);
-        sp<AudioSession> audioSession = inputDesc->getAudioSession(session);
-        if (audioSession == 0) {
-            ALOGW("getInputForAttr() unknown session %d on input %d", session, *input);
-            return BAD_VALUE;
-        }
-        // For MMAP mode, the first call to getInputForAttr() is made on behalf of audioflinger.
-        // The second call is for the first active client and sets the UID. Any further call
-        // corresponds to a new client and is only permitted from the same UId.
-        if (audioSession->openCount() == 1) {
-            audioSession->setUid(uid);
-        } else if (audioSession->uid() != uid) {
-            ALOGW("getInputForAttr() bad uid %d for session %d uid %d",
-                  uid, session, audioSession->uid());
-            return INVALID_OPERATION;
-        }
-        audioSession->changeOpenCount(1);
-        *inputType = API_INPUT_LEGACY;
-        if (*portId == AUDIO_PORT_HANDLE_NONE) {
-            *portId = AudioPort::getNextUniqueId();
-        }
-        DeviceVector inputDevices = mAvailableInputDevices.getDevicesFromType(inputDesc->mDevice);
-        *selectedDeviceId = inputDevices.size() > 0 ? inputDevices.itemAt(0)->getId()
-                : AUDIO_PORT_HANDLE_NONE;
-        ALOGI("%s reusing MMAP input %d for session %d", __FUNCTION__, *input, session);
-        return NO_ERROR;
-    }
-
-    *input = AUDIO_IO_HANDLE_NONE;
-    *inputType = API_INPUT_INVALID;
-
-    audio_devices_t device;
+    status_t status = NO_ERROR;
     // handle legacy remote submix case where the address was not always specified
     String8 address = String8("");
-    audio_source_t inputSource = attr->source;
     audio_source_t halInputSource;
+    audio_source_t inputSource = attr->source;
     AudioMix *policyMix = NULL;
-
-    if (inputSource == AUDIO_SOURCE_DEFAULT) {
-        inputSource = AUDIO_SOURCE_MIC;
-    }
-    halInputSource = inputSource;
-
-    // TODO: check for existing client for this port ID
-    if (*portId == AUDIO_PORT_HANDLE_NONE) {
-        *portId = AudioPort::getNextUniqueId();
-    }
+    DeviceVector inputDevices;
 
     // Explicit routing?
     sp<DeviceDescriptor> deviceDesc;
@@ -1568,11 +1519,67 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
     }
     mInputRoutes.addRoute(session, SessionRoute::STREAM_TYPE_NA, inputSource, deviceDesc, uid);
 
+    // special case for mmap capture: if an input IO handle is specified, we reuse this input if
+    // possible
+    if ((flags & AUDIO_INPUT_FLAG_MMAP_NOIRQ) == AUDIO_INPUT_FLAG_MMAP_NOIRQ &&
+            *input != AUDIO_IO_HANDLE_NONE) {
+        ssize_t index = mInputs.indexOfKey(*input);
+        if (index < 0) {
+            ALOGW("getInputForAttr() unknown MMAP input %d", *input);
+            status = BAD_VALUE;
+            goto error;
+        }
+        sp<AudioInputDescriptor> inputDesc = mInputs.valueAt(index);
+        sp<AudioSession> audioSession = inputDesc->getAudioSession(session);
+        if (audioSession == 0) {
+            ALOGW("getInputForAttr() unknown session %d on input %d", session, *input);
+            status = BAD_VALUE;
+            goto error;
+        }
+        // For MMAP mode, the first call to getInputForAttr() is made on behalf of audioflinger.
+        // The second call is for the first active client and sets the UID. Any further call
+        // corresponds to a new client and is only permitted from the same UId.
+        if (audioSession->openCount() == 1) {
+            audioSession->setUid(uid);
+        } else if (audioSession->uid() != uid) {
+            ALOGW("getInputForAttr() bad uid %d for session %d uid %d",
+                  uid, session, audioSession->uid());
+            status = INVALID_OPERATION;
+            goto error;
+        }
+        audioSession->changeOpenCount(1);
+        *inputType = API_INPUT_LEGACY;
+        if (*portId == AUDIO_PORT_HANDLE_NONE) {
+            *portId = AudioPort::getNextUniqueId();
+        }
+        inputDevices = mAvailableInputDevices.getDevicesFromType(inputDesc->mDevice);
+        *selectedDeviceId = inputDevices.size() > 0 ? inputDevices.itemAt(0)->getId()
+                : AUDIO_PORT_HANDLE_NONE;
+        ALOGI("%s reusing MMAP input %d for session %d", __FUNCTION__, *input, session);
+
+        return NO_ERROR;
+    }
+
+    *input = AUDIO_IO_HANDLE_NONE;
+    *inputType = API_INPUT_INVALID;
+
+    if (inputSource == AUDIO_SOURCE_DEFAULT) {
+        inputSource = AUDIO_SOURCE_MIC;
+    }
+    halInputSource = inputSource;
+
+    // TODO: check for existing client for this port ID
+    if (*portId == AUDIO_PORT_HANDLE_NONE) {
+        *portId = AudioPort::getNextUniqueId();
+    }
+
+    audio_devices_t device;
+
     if (inputSource == AUDIO_SOURCE_REMOTE_SUBMIX &&
             strncmp(attr->tags, "addr=", strlen("addr=")) == 0) {
-        status_t ret = mPolicyMixes.getInputMixForAttr(*attr, &policyMix);
-        if (ret != NO_ERROR) {
-            return ret;
+        status = mPolicyMixes.getInputMixForAttr(*attr, &policyMix);
+        if (status != NO_ERROR) {
+            goto error;
         }
         *inputType = API_INPUT_MIX_EXT_POLICY_REROUTE;
         device = AUDIO_DEVICE_IN_REMOTE_SUBMIX;
@@ -1581,7 +1588,8 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
         device = getDeviceAndMixForInputSource(inputSource, &policyMix);
         if (device == AUDIO_DEVICE_NONE) {
             ALOGW("getInputForAttr() could not find device for source %d", inputSource);
-            return BAD_VALUE;
+            status = BAD_VALUE;
+            goto error;
         }
         if (policyMix != NULL) {
             address = policyMix->mDeviceAddress;
@@ -1610,11 +1618,11 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
                                config->sample_rate, config->format, config->channel_mask, flags,
                                policyMix);
     if (*input == AUDIO_IO_HANDLE_NONE) {
-        mInputRoutes.removeRoute(session);
-        return INVALID_OPERATION;
+        status = INVALID_OPERATION;
+        goto error;
     }
 
-    DeviceVector inputDevices = mAvailableInputDevices.getDevicesFromType(device);
+    inputDevices = mAvailableInputDevices.getDevicesFromType(device);
     *selectedDeviceId = inputDevices.size() > 0 ? inputDevices.itemAt(0)->getId()
             : AUDIO_PORT_HANDLE_NONE;
 
@@ -1622,6 +1630,10 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
             *input, *inputType, *selectedDeviceId);
 
     return NO_ERROR;
+
+error:
+    mInputRoutes.removeRoute(session);
+    return status;
 }
 
 
@@ -4721,10 +4733,10 @@ audio_devices_t AudioPolicyManager::getNewOutputDevice(const sp<AudioOutputDescr
     //      use device for strategy enforced audible
     // 2: we are in call or the strategy phone is active on the output:
     //      use device for strategy phone
-    // 3: the strategy for enforced audible is active but not enforced on the output:
-    //      use the device for strategy enforced audible
-    // 4: the strategy sonification is active on the output:
+    // 3: the strategy sonification is active on the output:
     //      use device for strategy sonification
+    // 4: the strategy for enforced audible is active but not enforced on the output:
+    //      use the device for strategy enforced audible
     // 5: the strategy accessibility is active on the output:
     //      use device for strategy accessibility
     // 6: the strategy "respectful" sonification is active on the output:
@@ -4741,10 +4753,10 @@ audio_devices_t AudioPolicyManager::getNewOutputDevice(const sp<AudioOutputDescr
     } else if (isInCall() ||
                     isStrategyActive(outputDesc, STRATEGY_PHONE)) {
         device = getDeviceForStrategy(STRATEGY_PHONE, fromCache);
-    } else if (isStrategyActive(outputDesc, STRATEGY_ENFORCED_AUDIBLE)) {
-        device = getDeviceForStrategy(STRATEGY_ENFORCED_AUDIBLE, fromCache);
     } else if (isStrategyActive(outputDesc, STRATEGY_SONIFICATION)) {
         device = getDeviceForStrategy(STRATEGY_SONIFICATION, fromCache);
+    } else if (isStrategyActive(outputDesc, STRATEGY_ENFORCED_AUDIBLE)) {
+        device = getDeviceForStrategy(STRATEGY_ENFORCED_AUDIBLE, fromCache);
     } else if (isStrategyActive(outputDesc, STRATEGY_ACCESSIBILITY)) {
         device = getDeviceForStrategy(STRATEGY_ACCESSIBILITY, fromCache);
     } else if (isStrategyActive(outputDesc, STRATEGY_SONIFICATION_RESPECTFUL)) {
@@ -4926,12 +4938,13 @@ audio_devices_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strate
     // scan the whole RouteMap, for each entry, convert the stream type to a strategy
     // (getStrategy(stream)).
     // if the strategy from the stream type in the RouteMap is the same as the argument above,
-    // and activity count is non-zero
-    // the device = the device from the descriptor in the RouteMap, and exit.
+    // and activity count is non-zero and the device in the route descriptor is available
+    // then select this device.
     for (size_t routeIndex = 0; routeIndex < mOutputRoutes.size(); routeIndex++) {
         sp<SessionRoute> route = mOutputRoutes.valueAt(routeIndex);
         routing_strategy routeStrategy = getStrategy(route->mStreamType);
-        if ((routeStrategy == strategy) && route->isActive()) {
+        if ((routeStrategy == strategy) && route->isActive() &&
+                (mAvailableOutputDevices.indexOf(route->mDeviceDescriptor) >= 0)) {
             return route->mDeviceDescriptor->type();
         }
     }
@@ -5326,9 +5339,15 @@ audio_devices_t AudioPolicyManager::getDeviceAndMixForInputSource(audio_source_t
 
 audio_devices_t AudioPolicyManager::getDeviceForInputSource(audio_source_t inputSource)
 {
+    // Routing
+    // Scan the whole RouteMap to see if we have an explicit route:
+    // if the input source in the RouteMap is the same as the argument above,
+    // and activity count is non-zero and the device in the route descriptor is available
+    // then select this device.
     for (size_t routeIndex = 0; routeIndex < mInputRoutes.size(); routeIndex++) {
          sp<SessionRoute> route = mInputRoutes.valueAt(routeIndex);
-         if (inputSource == route->mSource && route->isActive()) {
+         if ((inputSource == route->mSource) && route->isActive() &&
+                 (mAvailableInputDevices.indexOf(route->mDeviceDescriptor) >= 0)) {
              return route->mDeviceDescriptor->type();
          }
      }

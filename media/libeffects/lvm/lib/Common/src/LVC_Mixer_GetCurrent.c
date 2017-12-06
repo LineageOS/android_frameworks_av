@@ -31,7 +31,15 @@
 /*  CurrentGain      - CurrentGain value in Q 16.15 format              */
 /*                                                                      */
 /************************************************************************/
-
+#ifdef BUILD_FLOAT
+LVM_FLOAT LVC_Mixer_GetCurrent( LVMixer3_FLOAT_st *pStream)
+{
+    LVM_FLOAT       CurrentGain;
+    Mix_Private_FLOAT_st  *pInstance = (Mix_Private_FLOAT_st *)pStream->PrivateParams;
+    CurrentGain = pInstance->Current;  // CurrentGain
+    return CurrentGain;
+}
+#else
 LVM_INT32 LVC_Mixer_GetCurrent( LVMixer3_st *pStream)
 {
     LVM_INT32       CurrentGain;
@@ -39,3 +47,4 @@ LVM_INT32 LVC_Mixer_GetCurrent( LVMixer3_st *pStream)
     CurrentGain=pInstance->Current>>(16-pInstance->Shift);  // CurrentGain in Q16.15 format
     return CurrentGain;
 }
+#endif

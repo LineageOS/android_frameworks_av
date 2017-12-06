@@ -27,7 +27,6 @@
 #include <cutils/properties.h>
 #include <utils/Log.h>
 #include "MediaDrmService.h"
-#include "MediaCasService.h"
 
 using namespace android;
 
@@ -39,7 +38,6 @@ int main()
     sp<IServiceManager> sm = defaultServiceManager();
     ALOGI("ServiceManager: %p", sm.get());
     MediaDrmService::instantiate();
-    MediaCasService::instantiate();
     ProcessState::self()->startThreadPool();
     IPCThreadState::self()->joinThreadPool();
 }
