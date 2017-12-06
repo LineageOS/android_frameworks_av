@@ -228,11 +228,11 @@ public:
 
             void onDynamicPolicyMixStateUpdate(const String8& regId, int32_t state);
             void doOnDynamicPolicyMixStateUpdate(const String8& regId, int32_t state);
-            void onRecordingConfigurationUpdate(int event, audio_session_t session,
-                    audio_source_t source, const audio_config_base_t *clientConfig,
+            void onRecordingConfigurationUpdate(int event, const record_client_info_t *clientInfo,
+                    const audio_config_base_t *clientConfig,
                     const audio_config_base_t *deviceConfig, audio_patch_handle_t patchHandle);
-            void doOnRecordingConfigurationUpdate(int event, audio_session_t session,
-                    audio_source_t source, const audio_config_base_t *clientConfig,
+            void doOnRecordingConfigurationUpdate(int event, const record_client_info_t *clientInfo,
+                    const audio_config_base_t *clientConfig,
                     const audio_config_base_t *deviceConfig, audio_patch_handle_t patchHandle);
 
 private:
@@ -306,8 +306,8 @@ private:
                                                           int delayMs);
                     void        dynamicPolicyMixStateUpdateCommand(const String8& regId, int32_t state);
                     void        recordingConfigurationUpdateCommand(
-                                                        int event, audio_session_t session,
-                                                        audio_source_t source,
+                                                        int event,
+                                                        const record_client_info_t *clientInfo,
                                                         const audio_config_base_t *clientConfig,
                                                         const audio_config_base_t *deviceConfig,
                                                         audio_patch_handle_t patchHandle);
@@ -404,8 +404,7 @@ private:
         class RecordingConfigurationUpdateData : public AudioCommandData {
         public:
             int mEvent;
-            audio_session_t mSession;
-            audio_source_t mSource;
+            record_client_info_t mClientInfo;
             struct audio_config_base mClientConfig;
             struct audio_config_base mDeviceConfig;
             audio_patch_handle_t mPatchHandle;
@@ -518,7 +517,7 @@ private:
         virtual void onAudioPatchListUpdate();
         virtual void onDynamicPolicyMixStateUpdate(String8 regId, int32_t state);
         virtual void onRecordingConfigurationUpdate(int event,
-                        audio_session_t session, audio_source_t source,
+                        const record_client_info_t *clientInfo,
                         const audio_config_base_t *clientConfig,
                         const audio_config_base_t *deviceConfig, audio_patch_handle_t patchHandle);
 
@@ -540,8 +539,7 @@ private:
                             void      onAudioPatchListUpdate();
                             void      onDynamicPolicyMixStateUpdate(const String8& regId, int32_t state);
                             void      onRecordingConfigurationUpdate(
-                                        int event, audio_session_t session,
-                                        audio_source_t source,
+                                        int event, const record_client_info_t *clientInfo,
                                         const audio_config_base_t *clientConfig,
                                         const audio_config_base_t *deviceConfig,
                                         audio_patch_handle_t patchHandle);

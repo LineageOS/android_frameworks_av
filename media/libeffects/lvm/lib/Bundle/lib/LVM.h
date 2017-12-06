@@ -514,11 +514,19 @@ LVM_ReturnStatus_en LVM_SetControlParameters(LVM_Handle_t           hInstance,
 /*      STEREO              the number of sample pairs in the block                     */
 /*                                                                                      */
 /****************************************************************************************/
+#ifdef BUILD_FLOAT
+LVM_ReturnStatus_en LVM_Process(LVM_Handle_t                hInstance,
+                                const LVM_FLOAT             *pInData,
+                                LVM_FLOAT                      *pOutData,
+                                LVM_UINT16                  NumSamples,
+                                LVM_UINT32                  AudioTime);
+#else
 LVM_ReturnStatus_en LVM_Process(LVM_Handle_t                hInstance,
                                 const LVM_INT16             *pInData,
                                 LVM_INT16                   *pOutData,
                                 LVM_UINT16                  NumSamples,
                                 LVM_UINT32                  AudioTime);
+#endif
 
 
 /****************************************************************************************/

@@ -59,7 +59,7 @@ class InitDataParserTest : public ::testing::Test {
                   (size_t)requestString.find(kRequestSuffix));
         for (size_t i = 0; i < expectedKeys.size(); ++i) {
             AString encodedIdAString;
-            android::encodeBase64(expectedKeys[i], kKeyIdSize,
+            android::encodeBase64Url(expectedKeys[i], kKeyIdSize,
                                   &encodedIdAString);
             String8 encodedId(encodedIdAString.c_str());
             encodedId.removeAll(kBase64Padding);
@@ -231,5 +231,4 @@ TEST_F(InitDataParserTest, FailsForPsshBadKeyCount) {
 
     attemptParseExpectingFailure(initData, kCencMimeType);
 }
-
 }  // namespace clearkeydrm

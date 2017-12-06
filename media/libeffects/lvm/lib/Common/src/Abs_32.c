@@ -47,4 +47,14 @@ LVM_INT32    Abs_32(LVM_INT32    input)
     }
     return input;
 }
-
+#ifdef BUILD_FLOAT
+LVM_FLOAT    Abs_Float(LVM_FLOAT    input)
+{
+    if(input <  0)
+    {
+        /* Negative input, so invert */
+        input = (LVM_FLOAT)(-input);
+    }
+    return input;
+}
+#endif

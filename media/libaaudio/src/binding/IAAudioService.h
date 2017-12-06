@@ -24,12 +24,12 @@
 
 #include <aaudio/AAudio.h>
 
+#include "binding/AAudioCommon.h"
 #include "binding/AAudioServiceDefinitions.h"
-#include "binding/AudioEndpointParcelable.h"
-#include "binding/AAudioStreamRequest.h"
 #include "binding/AAudioStreamConfiguration.h"
+#include "binding/AAudioStreamRequest.h"
+#include "binding/AudioEndpointParcelable.h"
 #include "binding/IAAudioClient.h"
-#include "utility/HandleTracker.h"
 
 namespace android {
 
@@ -51,7 +51,7 @@ public:
      * @param configuration contains information about the created stream
      * @return handle to the stream or a negative error
      */
-    virtual aaudio_handle_t openStream(const aaudio::AAudioStreamRequest &request,
+    virtual aaudio::aaudio_handle_t openStream(const aaudio::AAudioStreamRequest &request,
                                      aaudio::AAudioStreamConfiguration &configurationOutput) = 0;
 
     virtual aaudio_result_t closeStream(aaudio::aaudio_handle_t streamHandle) = 0;
@@ -89,11 +89,11 @@ public:
     /**
      * Manage the specified thread as a low latency audio thread.
      */
-    virtual aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle,
+    virtual aaudio_result_t registerAudioThread(aaudio::aaudio_handle_t streamHandle,
                                               pid_t clientThreadId,
                                               int64_t periodNanoseconds) = 0;
 
-    virtual aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
+    virtual aaudio_result_t unregisterAudioThread(aaudio::aaudio_handle_t streamHandle,
                                                 pid_t clientThreadId) = 0;
 };
 

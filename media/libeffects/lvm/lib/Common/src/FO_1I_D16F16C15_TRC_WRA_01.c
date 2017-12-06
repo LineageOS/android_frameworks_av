@@ -31,6 +31,46 @@
  pBiquadState->pDelays[1] is y(n-1)L in Q0 format
 ***************************************************************************/
 
+#ifdef BUILD_FLOAT
+void FO_1I_D16F16C15_TRC_WRA_01( Biquad_FLOAT_Instance_t       *pInstance,
+                                 LVM_FLOAT               *pDataIn,
+                                 LVM_FLOAT               *pDataOut,
+                                 LVM_INT16               NrSamples)
+    {
+        LVM_FLOAT  ynL;
+        LVM_INT16 ii;
+        PFilter_State_FLOAT pBiquadState = (PFilter_State_FLOAT) pInstance;
+
+         for (ii = NrSamples; ii != 0; ii--)
+         {
+
+            /**************************************************************************
+                            PROCESSING OF THE LEFT CHANNEL
+            ***************************************************************************/
+            // ynL=A1  * x(n-1)L
+            ynL = (LVM_FLOAT)pBiquadState->coefs[0] * pBiquadState->pDelays[0];
+
+            // ynL+=A0  * x(n)L
+            ynL += (LVM_FLOAT)pBiquadState->coefs[1] * (*pDataIn);
+
+            // ynL+=  (-B1  * y(n-1)L
+            ynL += (LVM_FLOAT)pBiquadState->coefs[2] * pBiquadState->pDelays[1];
+
+            /**************************************************************************
+                            UPDATING THE DELAYS
+            ***************************************************************************/
+            pBiquadState->pDelays[1] = ynL; // Update y(n-1)L
+            pBiquadState->pDelays[0] = (*pDataIn++); // Update x(n-1)L
+
+            /**************************************************************************
+                            WRITING THE OUTPUT
+            ***************************************************************************/
+            *pDataOut++ = (LVM_FLOAT)ynL; // Write Left output
+
+        }
+
+    }
+#else
 void FO_1I_D16F16C15_TRC_WRA_01( Biquad_Instance_t       *pInstance,
                                  LVM_INT16               *pDataIn,
                                  LVM_INT16               *pDataOut,
@@ -71,4 +111,4 @@ void FO_1I_D16F16C15_TRC_WRA_01( Biquad_Instance_t       *pInstance,
         }
 
     }
-
+#endif

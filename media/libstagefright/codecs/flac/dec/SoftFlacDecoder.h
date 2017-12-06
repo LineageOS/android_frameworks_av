@@ -18,7 +18,7 @@
 #define SOFT_FLAC_DECODER_H
 
 #include "FLACDecoder.h"
-#include "SimpleSoftOMXComponent.h"
+#include <media/stagefright/omx/SimpleSoftOMXComponent.h>
 
 namespace android {
 

@@ -22,6 +22,8 @@ cc_library_shared {
     vendor: true,
     relative_install_path: "mediadrm",
 
+    header_libs: ["media_plugin_headers"],
+
     shared_libs: [
         "libutils",
         "liblog",

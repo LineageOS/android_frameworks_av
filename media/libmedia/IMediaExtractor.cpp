@@ -21,7 +21,6 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-#include <android/media/ICas.h>
 #include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
 #include <binder/PermissionCache.h>
@@ -40,7 +39,8 @@ enum {
     SETMEDIACAS,
     SETUID,
     NAME,
-    GETMETRICS
+    GETMETRICS,
+    RELEASE,
 };
 
 class BpMediaExtractor : public BpInterface<IMediaExtractor> {
@@ -118,12 +118,12 @@ public:
         return NULL;
     }
 
-    virtual status_t setMediaCas(const sp<ICas> & cas) {
+    virtual status_t setMediaCas(const HInterfaceToken &casToken) {
         ALOGV("setMediaCas");
 
         Parcel data, reply;
         data.writeInterfaceToken(BpMediaExtractor::getInterfaceDescriptor());
-        data.writeStrongBinder(IInterface::asBinder(cas));
+        data.writeByteVector(casToken);
 
         status_t err = remote()->transact(SETMEDIACAS, data, &reply);
         if (err != NO_ERROR) {
@@ -139,6 +139,13 @@ public:
     virtual const char * name() {
         ALOGV("name NOT IMPLEMENTED");
         return NULL;
+    }
+
+    virtual void release() {
+        ALOGV("release");
+        Parcel data, reply;
+        data.writeInterfaceToken(BpMediaExtractor::getInterfaceDescriptor());
+        remote()->transact(RELEASE, data, &reply);
     }
 };
 
@@ -207,15 +214,20 @@ status_t BnMediaExtractor::onTransact(
             ALOGV("setMediaCas");
             CHECK_INTERFACE(IMediaExtractor, data, reply);
 
-            sp<IBinder> casBinder;
-            status_t err = data.readNullableStrongBinder(&casBinder);
+            HInterfaceToken casToken;
+            status_t err = data.readByteVector(&casToken);
             if (err != NO_ERROR) {
-                ALOGE("Error reading cas from parcel");
+                ALOGE("Error reading casToken from parcel");
                 return err;
             }
-            sp<ICas> cas = interface_cast<ICas>(casBinder);
 
-            reply->writeInt32(setMediaCas(cas));
+            reply->writeInt32(setMediaCas(casToken));
+            return OK;
+        }
+        case RELEASE: {
+            ALOGV("release");
+            CHECK_INTERFACE(IMediaExtractor, data, reply);
+            release();
             return OK;
         }
         default:

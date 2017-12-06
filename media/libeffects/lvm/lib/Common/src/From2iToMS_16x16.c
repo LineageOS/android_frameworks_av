@@ -53,5 +53,34 @@ void From2iToMS_16x16( const LVM_INT16  *src,
 
     return;
 }
+#ifdef BUILD_FLOAT
+void From2iToMS_Float( const LVM_FLOAT  *src,
+                             LVM_FLOAT  *dstM,
+                             LVM_FLOAT  *dstS,
+                             LVM_INT16  n )
+{
+    LVM_FLOAT temp1,left,right;
+    LVM_INT16 ii;
+    for (ii = n; ii != 0; ii--)
+    {
+        left = (LVM_FLOAT)*src;
+        src++;
 
+        right = (LVM_FLOAT)*src;
+        src++;
+
+        /* Compute M signal*/
+        temp1 =  (left + right) / 2.0f;
+        *dstM = (LVM_FLOAT)temp1;
+        dstM++;
+
+        /* Compute S signal*/
+        temp1 =  (left - right) / 2.0f;
+        *dstS = (LVM_FLOAT)temp1;
+        dstS++;
+    }
+
+    return;
+}
+#endif
 /**********************************************************************************/

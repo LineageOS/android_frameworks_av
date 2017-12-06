@@ -375,7 +375,7 @@ audio_format_t formatFromString(const std::string &literalFormat, audio_format_t
 audio_channel_mask_t channelMaskFromString(const std::string &literalChannels)
 {
     audio_channel_mask_t channels;
-    if (!OutputChannelConverter::fromString(literalChannels, channels) ||
+    if (!OutputChannelConverter::fromString(literalChannels, channels) &&
             !InputChannelConverter::fromString(literalChannels, channels)) {
         return AUDIO_CHANNEL_INVALID;
     }

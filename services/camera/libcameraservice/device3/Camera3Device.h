@@ -30,6 +30,7 @@
 
 #include <android/hardware/camera/device/3.2/ICameraDevice.h>
 #include <android/hardware/camera/device/3.2/ICameraDeviceSession.h>
+#include <android/hardware/camera/device/3.3/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.2/ICameraDeviceCallback.h>
 #include <fmq/MessageQueue.h>
 #include <hardware/camera3.h>
@@ -117,20 +118,18 @@ class Camera3Device :
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
-            bool isShared = false, uint32_t consumerUsage = 0) override;
+            bool isShared = false, uint64_t consumerUsage = 0) override;
     status_t createStream(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
-            bool isShared = false, uint32_t consumerUsage = 0) override;
+            bool isShared = false, uint64_t consumerUsage = 0) override;
 
     status_t createInputStream(
             uint32_t width, uint32_t height, int format,
             int *id) override;
 
-    status_t getStreamInfo(int id,
-            uint32_t *width, uint32_t *height,
-            uint32_t *format, android_dataspace *dataSpace) override;
+    status_t getStreamInfo(int id, StreamInfo *streamInfo) override;
     status_t setStreamTransform(int id, int transform) override;
 
     status_t deleteStream(int id) override;
@@ -271,7 +270,6 @@ class Camera3Device :
         void getInflightBufferKeys(std::vector<std::pair<int32_t, int32_t>>* out);
 
       private:
-        camera3_device_t *mHal3Device;
         sp<hardware::camera::device::V3_2::ICameraDeviceSession> mHidlSession;
         std::shared_ptr<RequestMetadataQueue> mRequestMetadataQueue;
 
@@ -590,7 +588,7 @@ class Camera3Device :
     static hardware::graphics::common::V1_0::PixelFormat mapToPixelFormat(int frameworkFormat);
     static hardware::camera::device::V3_2::DataspaceFlags mapToHidlDataspace(
             android_dataspace dataSpace);
-    static hardware::camera::device::V3_2::BufferUsageFlags mapToConsumerUsage(uint32_t usage);
+    static hardware::camera::device::V3_2::BufferUsageFlags mapToConsumerUsage(uint64_t usage);
     static hardware::camera::device::V3_2::StreamRotation mapToStreamRotation(
             camera3_stream_rotation_t rotation);
     // Returns a negative error code if the passed-in operation mode is not valid.
@@ -598,9 +596,11 @@ class Camera3Device :
             /*out*/ hardware::camera::device::V3_2::StreamConfigurationMode *mode);
     static camera3_buffer_status_t mapHidlBufferStatus(hardware::camera::device::V3_2::BufferStatus status);
     static int mapToFrameworkFormat(hardware::graphics::common::V1_0::PixelFormat pixelFormat);
-    static uint32_t mapConsumerToFrameworkUsage(
+    static android_dataspace mapToFrameworkDataspace(
+            hardware::camera::device::V3_2::DataspaceFlags);
+    static uint64_t mapConsumerToFrameworkUsage(
             hardware::camera::device::V3_2::BufferUsageFlags usage);
-    static uint32_t mapProducerToFrameworkUsage(
+    static uint64_t mapProducerToFrameworkUsage(
             hardware::camera::device::V3_2::BufferUsageFlags usage);
 
     struct RequestTrigger {
@@ -886,6 +886,11 @@ class Camera3Device :
         // For auto-exposure modes, equal to 1/(lower end of target FPS range)
         nsecs_t maxExpectedDuration;
 
+        // Whether the result metadata for this request is to be skipped. The
+        // result metadata should be skipped in the case of
+        // REQUEST/RESULT error.
+        bool skipResultMetadata;
+
         // Default constructor needed by KeyedVector
         InFlightRequest() :
                 shutterTimestamp(0),
@@ -895,7 +900,8 @@ class Camera3Device :
                 numBuffersLeft(0),
                 hasInputBuffer(false),
                 hasCallback(true),
-                maxExpectedDuration(kDefaultExpectedDuration) {
+                maxExpectedDuration(kDefaultExpectedDuration),
+                skipResultMetadata(false) {
         }
 
         InFlightRequest(int numBuffers, CaptureResultExtras extras, bool hasInput,
@@ -908,7 +914,8 @@ class Camera3Device :
                 resultExtras(extras),
                 hasInputBuffer(hasInput),
                 hasCallback(hasAppCallback),
-                maxExpectedDuration(maxDuration) {
+                maxExpectedDuration(maxDuration),
+                skipResultMetadata(false) {
         }
     };
 

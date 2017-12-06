@@ -141,23 +141,23 @@ void MetricsSummarizer::handleRecord(MediaAnalyticsItem *item) {
     List<MediaAnalyticsItem *>::iterator it = mSummaries->begin();
     for (; it != mSummaries->end(); it++) {
         bool good = sameAttributes((*it), item, getIgnorables());
-        ALOGV("Match against %s says %d",
-              (*it)->toString().c_str(), good);
+        ALOGV("Match against %s says %d", (*it)->toString().c_str(), good);
         if (good)
             break;
     }
     if (it == mSummaries->end()) {
             ALOGV("save new record");
-            item = item->dup();
-            if (item == NULL) {
+            MediaAnalyticsItem *nitem = item->dup();
+            if (nitem == NULL) {
                 ALOGE("unable to save MediaMetrics record");
             }
-            sortProps(item);
-            item->setInt32("count",1);
-            mSummaries->push_back(item);
+            sortProps(nitem);
+            nitem->setInt32("aggregated",1);
+            mergeRecord(*nitem, *item);
+            mSummaries->push_back(nitem);
     } else {
             ALOGV("increment existing record");
-            (*it)->addInt32("count",1);
+            (*it)->addInt32("aggregated",1);
             mergeRecord(*(*it), *item);
     }
 }
@@ -166,6 +166,71 @@ void MetricsSummarizer::mergeRecord(MediaAnalyticsItem &/*have*/, MediaAnalytics
     // default is no further massaging.
     ALOGV("MetricsSummarizer::mergeRecord() [default]");
     return;
+}
+
+// keep some stats for things: sums, counts, standard deviation
+// the integer version -- all of these pieces are in 64 bits
+void MetricsSummarizer::minMaxVar64(MediaAnalyticsItem &summation, const char *key, int64_t value) {
+    if (key == NULL)
+        return;
+    int len = strlen(key) + 32;
+    char *tmpKey = (char *)malloc(len);
+
+    if (tmpKey == NULL) {
+        return;
+    }
+
+    // N - count of samples
+    snprintf(tmpKey, len, "%s.n", key);
+    summation.addInt64(tmpKey, 1);
+
+    // zero - count of samples that are zero
+    if (value == 0) {
+        snprintf(tmpKey, len, "%s.zero", key);
+        int64_t zero = 0;
+        (void) summation.getInt64(tmpKey,&zero);
+        zero++;
+        summation.setInt64(tmpKey, zero);
+    }
+
+    // min
+    snprintf(tmpKey, len, "%s.min", key);
+    int64_t min = value;
+    if (summation.getInt64(tmpKey,&min)) {
+        if (min > value) {
+            summation.setInt64(tmpKey, value);
+        }
+    } else {
+        summation.setInt64(tmpKey, value);
+    }
+
+    // max
+    snprintf(tmpKey, len, "%s.max", key);
+    int64_t max = value;
+    if (summation.getInt64(tmpKey,&max)) {
+        if (max < value) {
+            summation.setInt64(tmpKey, value);
+        }
+    } else {
+        summation.setInt64(tmpKey, value);
+    }
+
+    // components for mean, stddev;
+    // stddev = sqrt(1/4*(sumx2 - (2*sumx*sumx/n) + ((sumx/n)^2)))
+    // sum x
+    snprintf(tmpKey, len, "%s.sumX", key);
+    summation.addInt64(tmpKey, value);
+    // sum x^2
+    snprintf(tmpKey, len, "%s.sumX2", key);
+    summation.addInt64(tmpKey, value*value);
+
+
+    // last thing we do -- remove the base key from the summation
+    // record so we won't get confused about it having both individual
+    // and summary information in there.
+    summation.removeProp(key);
+
+    free(tmpKey);
 }
 
 
@@ -186,20 +251,23 @@ bool MetricsSummarizer::sameAttributes(MediaAnalyticsItem *summ, MediaAnalyticsI
     ALOGV("MetricsSummarizer::sameAttributes(): summ %s", summ->toString().c_str());
     ALOGV("MetricsSummarizer::sameAttributes(): single %s", single->toString().c_str());
 
+    // keep different sources/users separate
+    if (single->mUid != summ->mUid) {
+        return false;
+    }
+
     // this can be made better.
     for(size_t i=0;i<single->mPropCount;i++) {
         MediaAnalyticsItem::Prop *prop1 = &(single->mProps[i]);
         const char *attrName = prop1->mName;
-        ALOGV("compare on attr '%s'", attrName);
 
         // is it something we should ignore
         if (ignorable != NULL) {
             const char **ig = ignorable;
-            while (*ig) {
+            for (;*ig; ig++) {
                 if (strcmp(*ig, attrName) == 0) {
                     break;
                 }
-                ig++;
             }
             if (*ig) {
                 ALOGV("we don't mind that it has attr '%s'", attrName);
@@ -218,29 +286,42 @@ bool MetricsSummarizer::sameAttributes(MediaAnalyticsItem *summ, MediaAnalyticsI
         }
         switch (prop1->mType) {
             case MediaAnalyticsItem::kTypeInt32:
-                if (prop1->u.int32Value != prop2->u.int32Value)
+                if (prop1->u.int32Value != prop2->u.int32Value) {
+                    ALOGV("mismatch values");
                     return false;
+                }
                 break;
             case MediaAnalyticsItem::kTypeInt64:
-                if (prop1->u.int64Value != prop2->u.int64Value)
+                if (prop1->u.int64Value != prop2->u.int64Value) {
+                    ALOGV("mismatch values");
                     return false;
+                }
                 break;
             case MediaAnalyticsItem::kTypeDouble:
                 // XXX: watch out for floating point comparisons!
-                if (prop1->u.doubleValue != prop2->u.doubleValue)
+                if (prop1->u.doubleValue != prop2->u.doubleValue) {
+                    ALOGV("mismatch values");
                     return false;
+                }
                 break;
             case MediaAnalyticsItem::kTypeCString:
-                if (strcmp(prop1->u.CStringValue, prop2->u.CStringValue) != 0)
+                if (strcmp(prop1->u.CStringValue, prop2->u.CStringValue) != 0) {
+                    ALOGV("mismatch values");
                     return false;
+                }
                 break;
             case MediaAnalyticsItem::kTypeRate:
-                if (prop1->u.rate.count != prop2->u.rate.count)
+                if (prop1->u.rate.count != prop2->u.rate.count) {
+                    ALOGV("mismatch values");
                     return false;
-                if (prop1->u.rate.duration != prop2->u.rate.duration)
+                }
+                if (prop1->u.rate.duration != prop2->u.rate.duration) {
+                    ALOGV("mismatch values");
                     return false;
+                }
                 break;
             default:
+                ALOGV("mismatch values in default type");
                 return false;
         }
     }
@@ -248,15 +329,6 @@ bool MetricsSummarizer::sameAttributes(MediaAnalyticsItem *summ, MediaAnalyticsI
     return true;
 }
 
-bool MetricsSummarizer::sameAttributesId(MediaAnalyticsItem *summ, MediaAnalyticsItem *single, const char **ignorable) {
-
-    // verify same user
-    if (summ->mPid != single->mPid)
-        return false;
-
-    // and finally do the more expensive validation of the attributes
-    return sameAttributes(summ, single, ignorable);
-}
 
 int MetricsSummarizer::PropSorter(const void *a, const void *b) {
     MediaAnalyticsItem::Prop *ai = (MediaAnalyticsItem::Prop *)a;
@@ -267,14 +339,8 @@ int MetricsSummarizer::PropSorter(const void *a, const void *b) {
 // we sort in the summaries so that it looks pretty in the dumpsys
 void MetricsSummarizer::sortProps(MediaAnalyticsItem *item) {
     if (item->mPropCount != 0) {
-        if (DEBUG_SORT) {
-            ALOGD("sortProps(pre): %s", item->toString().c_str());
-        }
         qsort(item->mProps, item->mPropCount,
               sizeof(MediaAnalyticsItem::Prop), MetricsSummarizer::PropSorter);
-        if (DEBUG_SORT) {
-            ALOGD("sortProps(pst): %s", item->toString().c_str());
-        }
     }
 }
 

@@ -284,14 +284,14 @@ TEST_F(JsonWebKeyTest, ExtractKeys) {
                 "\"keys\":"
                     "[{"
                         "\"kid\":\"Y2xlYXJrZXlrZXlpZDAx\""
-                        "\"k\":\"SGVsbG8gRnJpZW5kISE\""
+                        "\"k\":\"SGVsbG8gRnJpZW5kICE-Pw\""
                         "\"kty\":\"oct\""
                         "\"alg\":\"A128KW1\""
                     "}"
                     "{"
                         "\"kty\":\"oct\""
                         "\"alg\":\"A128KW2\""
-                        "\"k\":\"SGVsbG8gRnJpZW5kIQ\""
+                        "\"k\":\"SGVsbG8gRnJpZW5kICE_\""
                         "\"kid\":\"Y2xlYXJrZXlrZXlpZDAy\""
                     "}"
                     "{"
@@ -303,7 +303,7 @@ TEST_F(JsonWebKeyTest, ExtractKeys) {
                     "{"
                         "\"alg\":\"A128KW3\""
                         "\"kid\":\"Y2xlYXJrZXlrZXlpZDAz\""
-                        "\"k\":\"R29vZCBkYXkh\""
+                        "\"k\":\"SGVsbG8gPz4-IEZyaWVuZCA_Pg\""
                         "\"kty\":\"oct\""
                     "}]"
             "}");
@@ -313,8 +313,8 @@ TEST_F(JsonWebKeyTest, ExtractKeys) {
     EXPECT_TRUE(keys.size() == 3);
 
     const String8 clearKeys[] =
-            { String8("Hello Friend!!"), String8("Hello Friend!"),
-              String8("Good day!") };
+            { String8("Hello Friend !>?"), String8("Hello Friend !?"),
+              String8("Hello ?>> Friend ?>") };
     verifyKeys(keys, clearKeys);
 }
 

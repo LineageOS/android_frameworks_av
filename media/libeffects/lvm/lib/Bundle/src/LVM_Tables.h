@@ -37,16 +37,23 @@ extern "C" {
 /*                                                                                  */
 /************************************************************************************/
 
+#ifdef BUILD_FLOAT
+extern FO_FLOAT_LShx_Coefs_t     LVM_TrebleBoostCoefs[];
+#else
 extern FO_C16_LShx_Coefs_t     LVM_TrebleBoostCoefs[];
-
+#endif
 
 /************************************************************************************/
 /*                                                                                  */
 /*    Volume control gain and time constant tables                                  */
 /*                                                                                  */
 /************************************************************************************/
-
+#ifdef BUILD_FLOAT
+extern const LVM_FLOAT LVM_VolumeTable[];
+#else
 extern const LVM_INT16 LVM_VolumeTable[];
+#endif
+
 extern const LVM_INT16 LVM_MixerTCTable[];
 
 

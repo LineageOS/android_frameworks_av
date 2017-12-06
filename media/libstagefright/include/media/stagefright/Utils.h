@@ -95,7 +95,7 @@ void writeToAMessage(const sp<AMessage> &msg, const BufferingSettings &buffering
 void readFromAMessage(const sp<AMessage> &msg, BufferingSettings *buffering /* nonnull */);
 
 AString nameForFd(int fd);
-
+void MakeFourCCString(uint32_t x, char *s);
 }  // namespace android
 
 #endif  // UTILS_H_

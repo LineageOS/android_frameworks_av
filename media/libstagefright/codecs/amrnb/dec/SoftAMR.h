@@ -18,7 +18,7 @@
 
 #define SOFT_AMR_H_
 
-#include "SimpleSoftOMXComponent.h"
+#include <media/stagefright/omx/SimpleSoftOMXComponent.h>
 
 namespace android {
 

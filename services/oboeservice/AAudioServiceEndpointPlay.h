@@ -25,6 +25,7 @@
 #include "client/AudioStreamInternal.h"
 #include "client/AudioStreamInternalPlay.h"
 #include "binding/AAudioServiceMessage.h"
+#include "AAudioServiceEndpointShared.h"
 #include "AAudioServiceStreamShared.h"
 #include "AAudioServiceStreamMMAP.h"
 #include "AAudioMixer.h"
@@ -35,16 +36,12 @@ namespace aaudio {
 /**
  * Contains a mixer and a stream for writing the result of the mix.
  */
-class AAudioServiceEndpointPlay : public AAudioServiceEndpoint {
+class AAudioServiceEndpointPlay : public AAudioServiceEndpointShared {
 public:
     explicit AAudioServiceEndpointPlay(android::AAudioService &audioService);
     virtual ~AAudioServiceEndpointPlay();
 
-    aaudio_result_t open(const AAudioStreamConfiguration& configuration) override;
-
-    AudioStreamInternal *getStreamInternal() override {
-        return &mStreamInternalPlay;
-    }
+    aaudio_result_t open(const aaudio::AAudioStreamRequest &request) override;
 
     void *callbackLoop() override;
 

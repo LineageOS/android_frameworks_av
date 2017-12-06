@@ -23,7 +23,7 @@ namespace camera3 {
 Camera3SharedOutputStream::Camera3SharedOutputStream(int id,
         const std::vector<sp<Surface>>& surfaces,
         uint32_t width, uint32_t height, int format,
-        uint32_t consumerUsage, android_dataspace dataSpace,
+        uint64_t consumerUsage, android_dataspace dataSpace,
         camera3_stream_rotation_t rotation,
         nsecs_t timestampOffset, int setId) :
         Camera3OutputStream(id, CAMERA3_STREAM_OUTPUT, width, height,
@@ -41,7 +41,7 @@ status_t Camera3SharedOutputStream::connectStreamSplitterLocked() {
 
     mStreamSplitter = new Camera3StreamSplitter();
 
-    uint32_t usage;
+    uint64_t usage;
     getEndpointUsage(&usage);
 
     res = mStreamSplitter->connect(mSurfaces, usage, camera3_stream::max_buffers, &mConsumer);
@@ -191,10 +191,10 @@ status_t Camera3SharedOutputStream::disconnectLocked() {
     return res;
 }
 
-status_t Camera3SharedOutputStream::getEndpointUsage(uint32_t *usage) const {
+status_t Camera3SharedOutputStream::getEndpointUsage(uint64_t *usage) const {
 
     status_t res = OK;
-    uint32_t u = 0;
+    uint64_t u = 0;
 
     if (mConsumer == nullptr) {
         // Called before shared buffer queue is constructed.

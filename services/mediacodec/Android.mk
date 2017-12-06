@@ -9,13 +9,8 @@ LOCAL_SHARED_LIBRARIES := \
     libgui \
     libutils \
     liblog \
-    libstagefright_omx
-LOCAL_C_INCLUDES := \
-    frameworks/av/include \
-    frameworks/av/media/libstagefright \
-    frameworks/av/media/libstagefright/include \
-    frameworks/native/include \
-    frameworks/native/include/media/openmax
+    libstagefright_omx \
+    libstagefright_xmlparser
 LOCAL_MODULE:= libmediacodecservice
 LOCAL_VENDOR_MODULE := true
 LOCAL_32_BIT_ONLY := true
@@ -38,15 +33,10 @@ LOCAL_SHARED_LIBRARIES := \
     libhwbinder \
     libhidltransport \
     libstagefright_omx \
+    libstagefright_xmlparser \
     android.hardware.media.omx@1.0 \
     android.hidl.memory@1.0
 
-LOCAL_C_INCLUDES := \
-    frameworks/av/include \
-    frameworks/av/media/libstagefright \
-    frameworks/av/media/libstagefright/include \
-    frameworks/native/include \
-    frameworks/native/include/media/openmax
 LOCAL_MODULE := android.hardware.media.omx@1.0-service
 LOCAL_MODULE_RELATIVE_PATH := hw
 LOCAL_VENDOR_MODULE := true

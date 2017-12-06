@@ -220,11 +220,11 @@ void AudioPolicyService::AudioPolicyClient::onDynamicPolicyMixStateUpdate(
 }
 
 void AudioPolicyService::AudioPolicyClient::onRecordingConfigurationUpdate(
-        int event, audio_session_t session, audio_source_t source,
+        int event, const record_client_info_t *clientInfo,
         const audio_config_base_t *clientConfig, const audio_config_base_t *deviceConfig,
         audio_patch_handle_t patchHandle)
 {
-    mAudioPolicyService->onRecordingConfigurationUpdate(event, session, source,
+    mAudioPolicyService->onRecordingConfigurationUpdate(event, clientInfo,
             clientConfig, deviceConfig, patchHandle);
 }
 

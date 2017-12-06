@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudio"
+#define LOG_TAG "AAudioStream"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -29,11 +29,24 @@
 using namespace aaudio;
 
 AudioStream::AudioStream()
-        : mCallbackEnabled(false)
+        : mPlayerBase(new MyPlayerBase(this))
 {
     // mThread is a pthread_t of unknown size so we need memset.
     memset(&mThread, 0, sizeof(mThread));
     setPeriodNanoseconds(0);
+}
+
+AudioStream::~AudioStream() {
+    ALOGD("destroying %p, state = %s", this, AAudio_convertStreamStateToText(getState()));
+    // If the stream is deleted when OPEN or in use then audio resources will leak.
+    // This would indicate an internal error. So we want to find this ASAP.
+    LOG_ALWAYS_FATAL_IF(!(getState() == AAUDIO_STREAM_STATE_CLOSED
+                          || getState() == AAUDIO_STREAM_STATE_UNINITIALIZED
+                          || getState() == AAUDIO_STREAM_STATE_DISCONNECTED),
+                        "aaudio stream still in use, state = %s",
+                        AAudio_convertStreamStateToText(getState()));
+
+    mPlayerBase->clearParentReference(); // remove reference to this AudioStream
 }
 
 static const char *AudioStream_convertSharingModeToShortText(aaudio_sharing_mode_t sharingMode) {
@@ -90,15 +103,12 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     return AAUDIO_OK;
 }
 
-AudioStream::~AudioStream() {
-    close();
-}
 
 aaudio_result_t AudioStream::waitForStateChange(aaudio_stream_state_t currentState,
                                                 aaudio_stream_state_t *nextState,
                                                 int64_t timeoutNanoseconds)
 {
-    aaudio_result_t result = updateStateWhileWaiting();
+    aaudio_result_t result = updateStateMachine();
     if (result != AAUDIO_OK) {
         return result;
     }
@@ -112,7 +122,7 @@ aaudio_result_t AudioStream::waitForStateChange(aaudio_stream_state_t currentSta
         AudioClock::sleepForNanos(durationNanos);
         timeoutNanoseconds -= durationNanos;
 
-        aaudio_result_t result = updateStateWhileWaiting();
+        aaudio_result_t result = updateStateMachine();
         if (result != AAUDIO_OK) {
             return result;
         }
@@ -153,6 +163,7 @@ aaudio_result_t AudioStream::createThread(int64_t periodNanoseconds,
                                      void* threadArg)
 {
     if (mHasThread) {
+        ALOGE("AudioStream::createThread() - mHasThread already true");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     if (threadProc == nullptr) {
@@ -174,6 +185,7 @@ aaudio_result_t AudioStream::createThread(int64_t periodNanoseconds,
 aaudio_result_t AudioStream::joinThread(void** returnArg, int64_t timeoutNanoseconds)
 {
     if (!mHasThread) {
+        ALOGE("AudioStream::joinThread() - but has no thread");
         return AAUDIO_ERROR_INVALID_STATE;
     }
 #if 0
@@ -187,3 +199,38 @@ aaudio_result_t AudioStream::joinThread(void** returnArg, int64_t timeoutNanosec
     return err ? AAudioConvert_androidToAAudioResult(-errno) : mThreadRegistrationResult;
 }
 
+
+#if AAUDIO_USE_VOLUME_SHAPER
+android::media::VolumeShaper::Status AudioStream::applyVolumeShaper(
+        const android::media::VolumeShaper::Configuration& configuration __unused,
+        const android::media::VolumeShaper::Operation& operation __unused) {
+    ALOGW("applyVolumeShaper() is not supported");
+    return android::media::VolumeShaper::Status::ok();
+}
+#endif
+
+AudioStream::MyPlayerBase::MyPlayerBase(AudioStream *parent) : mParent(parent) {
+}
+
+AudioStream::MyPlayerBase::~MyPlayerBase() {
+    ALOGV("MyPlayerBase::~MyPlayerBase(%p) deleted", this);
+}
+
+void AudioStream::MyPlayerBase::registerWithAudioManager() {
+    if (!mRegistered) {
+        init(android::PLAYER_TYPE_AAUDIO, AUDIO_USAGE_MEDIA);
+        mRegistered = true;
+    }
+}
+
+void AudioStream::MyPlayerBase::unregisterWithAudioManager() {
+    if (mRegistered) {
+        baseDestroy();
+        mRegistered = false;
+    }
+}
+
+
+void AudioStream::MyPlayerBase::destroy() {
+    unregisterWithAudioManager();
+}

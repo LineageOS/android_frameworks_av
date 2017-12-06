@@ -48,9 +48,13 @@ namespace android {
         (IVD_CONTROL_API_COMMAND_TYPE_T)IH264D_CMD_CTL_SET_NUM_CORES
 
 static const CodecProfileLevel kProfileLevels[] = {
+    { OMX_VIDEO_AVCProfileConstrainedBaseline, OMX_VIDEO_AVCLevel52 },
+
     { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel52 },
 
     { OMX_VIDEO_AVCProfileMain,     OMX_VIDEO_AVCLevel52 },
+
+    { OMX_VIDEO_AVCProfileConstrainedHigh,     OMX_VIDEO_AVCLevel52 },
 
     { OMX_VIDEO_AVCProfileHigh,     OMX_VIDEO_AVCLevel52 },
 };

@@ -98,7 +98,8 @@ status_t deviceAddressFromHal(
 }  // namespace
 
 DeviceHalHidl::DeviceHalHidl(const sp<IDevice>& device)
-        : ConversionHelperHidl("Device"), mDevice(device) {
+        : ConversionHelperHidl("Device"), mDevice(device),
+          mPrimaryDevice(IPrimaryDevice::castFrom(device)) {
 }
 
 DeviceHalHidl::~DeviceHalHidl() {
@@ -120,24 +121,21 @@ status_t DeviceHalHidl::initCheck() {
 
 status_t DeviceHalHidl::setVoiceVolume(float volume) {
     if (mDevice == 0) return NO_INIT;
-    sp<IPrimaryDevice> primaryDev = IPrimaryDevice::castFrom(mDevice);
-    if (primaryDev == 0) return INVALID_OPERATION;
-    return processReturn("setVoiceVolume", primaryDev->setVoiceVolume(volume));
+    if (mPrimaryDevice == 0) return INVALID_OPERATION;
+    return processReturn("setVoiceVolume", mPrimaryDevice->setVoiceVolume(volume));
 }
 
 status_t DeviceHalHidl::setMasterVolume(float volume) {
     if (mDevice == 0) return NO_INIT;
-    sp<IPrimaryDevice> primaryDev = IPrimaryDevice::castFrom(mDevice);
-    if (primaryDev == 0) return INVALID_OPERATION;
-    return processReturn("setMasterVolume", primaryDev->setMasterVolume(volume));
+    if (mPrimaryDevice == 0) return INVALID_OPERATION;
+    return processReturn("setMasterVolume", mPrimaryDevice->setMasterVolume(volume));
 }
 
 status_t DeviceHalHidl::getMasterVolume(float *volume) {
     if (mDevice == 0) return NO_INIT;
-    sp<IPrimaryDevice> primaryDev = IPrimaryDevice::castFrom(mDevice);
-    if (primaryDev == 0) return INVALID_OPERATION;
+    if (mPrimaryDevice == 0) return INVALID_OPERATION;
     Result retval;
-    Return<void> ret = primaryDev->getMasterVolume(
+    Return<void> ret = mPrimaryDevice->getMasterVolume(
             [&](Result r, float v) {
                 retval = r;
                 if (retval == Result::OK) {
@@ -149,9 +147,8 @@ status_t DeviceHalHidl::getMasterVolume(float *volume) {
 
 status_t DeviceHalHidl::setMode(audio_mode_t mode) {
     if (mDevice == 0) return NO_INIT;
-    sp<IPrimaryDevice> primaryDev = IPrimaryDevice::castFrom(mDevice);
-    if (primaryDev == 0) return INVALID_OPERATION;
-    return processReturn("setMode", primaryDev->setMode(AudioMode(mode)));
+    if (mPrimaryDevice == 0) return INVALID_OPERATION;
+    return processReturn("setMode", mPrimaryDevice->setMode(AudioMode(mode)));
 }
 
 status_t DeviceHalHidl::setMicMute(bool state) {

@@ -47,7 +47,20 @@ namespace android {
 StreamHalHidl::StreamHalHidl(IStream *stream)
         : ConversionHelperHidl("Stream"),
           mStream(stream),
-          mHalThreadPriority(HAL_THREAD_PRIORITY_DEFAULT) {
+          mHalThreadPriority(HAL_THREAD_PRIORITY_DEFAULT),
+          mCachedBufferSize(0){
+
+    // Instrument audio signal power logging.
+    // Note: This assumes channel mask, format, and sample rate do not change after creation.
+    if (mStream != nullptr && mStreamPowerLog.isUserDebugOrEngBuild()) {
+        // Obtain audio properties (see StreamHalHidl::getAudioProperties() below).
+        Return<void> ret = mStream->getAudioProperties(
+                [&](uint32_t sr, AudioChannelMask m, AudioFormat f) {
+                mStreamPowerLog.init(sr,
+                        static_cast<audio_channel_mask_t>(m),
+                        static_cast<audio_format_t>(f));
+            });
+    }
 }
 
 StreamHalHidl::~StreamHalHidl() {
@@ -61,7 +74,11 @@ status_t StreamHalHidl::getSampleRate(uint32_t *rate) {
 
 status_t StreamHalHidl::getBufferSize(size_t *size) {
     if (!mStream) return NO_INIT;
-    return processReturn("getBufferSize", mStream->getBufferSize(), size);
+    status_t status = processReturn("getBufferSize", mStream->getBufferSize(), size);
+    if (status == OK) {
+        mCachedBufferSize = *size;
+    }
+    return status;
 }
 
 status_t StreamHalHidl::getChannelMask(audio_channel_mask_t *mask) {
@@ -135,6 +152,7 @@ status_t StreamHalHidl::dump(int fd) {
     hidlHandle->data[0] = fd;
     Return<void> ret = mStream->debugDump(hidlHandle);
     native_handle_delete(hidlHandle);
+    mStreamPowerLog.dump(fd);
     return processReturn("dump", ret);
 }
 
@@ -187,6 +205,14 @@ status_t StreamHalHidl::getMmapPosition(struct audio_mmap_position *position) {
 status_t StreamHalHidl::setHalThreadPriority(int priority) {
     mHalThreadPriority = priority;
     return OK;
+}
+
+status_t StreamHalHidl::getCachedBufferSize(size_t *size) {
+    if (mCachedBufferSize != 0) {
+        *size = mCachedBufferSize;
+        return OK;
+    }
+    return getBufferSize(size);
 }
 
 bool StreamHalHidl::requestHalThreadPriority(pid_t threadPid, pid_t threadId) {
@@ -307,11 +333,22 @@ status_t StreamOutHalHidl::write(const void *buffer, size_t bytes, size_t *writt
     }
 
     status_t status;
-    if (!mDataMQ && (status = prepareForWriting(bytes)) != OK) {
-        return status;
+    if (!mDataMQ) {
+        // In case if playback starts close to the end of a compressed track, the bytes
+        // that need to be written is less than the actual buffer size. Need to use
+        // full buffer size for the MQ since otherwise after seeking back to the middle
+        // data will be truncated.
+        size_t bufferSize;
+        if ((status = getCachedBufferSize(&bufferSize)) != OK) {
+            return status;
+        }
+        if (bytes > bufferSize) bufferSize = bytes;
+        if ((status = prepareForWriting(bufferSize)) != OK) {
+            return status;
+        }
     }
 
-    return callWriterThread(
+    status = callWriterThread(
             WriteCommand::WRITE, "write", static_cast<const uint8_t*>(buffer), bytes,
             [&] (const WriteStatus& writeStatus) {
                 *written = writeStatus.reply.written;
@@ -320,6 +357,8 @@ status_t StreamOutHalHidl::write(const void *buffer, size_t bytes, size_t *writt
                         "hal reports more bytes written than asked for: %lld > %lld",
                         (long long)*written, (long long)bytes);
             });
+    mStreamPowerLog.log(buffer, *written);
+    return status;
 }
 
 status_t StreamOutHalHidl::callWriterThread(
@@ -580,7 +619,7 @@ status_t StreamInHalHidl::read(void *buffer, size_t bytes, size_t *read) {
     ReadParameters params;
     params.command = ReadCommand::READ;
     params.params.read = bytes;
-    return callReaderThread(params, "read",
+    status = callReaderThread(params, "read",
             [&](const ReadStatus& readStatus) {
                 const size_t availToRead = mDataMQ->availableToRead();
                 if (!mDataMQ->read(static_cast<uint8_t*>(buffer), std::min(bytes, availToRead))) {
@@ -591,6 +630,8 @@ status_t StreamInHalHidl::read(void *buffer, size_t bytes, size_t *read) {
                         (int32_t)availToRead, (int32_t)readStatus.reply.read);
                 *read = readStatus.reply.read;
             });
+    mStreamPowerLog.log(buffer, *read);
+    return status;
 }
 
 status_t StreamInHalHidl::callReaderThread(

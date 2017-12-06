@@ -23,8 +23,8 @@
 #include "ESQueue.h"
 #include "include/avc_utils.h"
 
-#include <android/media/IDescrambler.h>
-#include <binder/MemoryDealer.h>
+#include <android/hardware/cas/native/1.0/IDescrambler.h>
+#include <cutils/native_handle.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -41,8 +41,12 @@
 #include <inttypes.h>
 
 namespace android {
-using binder::Status;
-using MediaDescrambler::DescrambleInfo;
+using hardware::hidl_handle;
+using hardware::hidl_memory;
+using hardware::hidl_string;
+using hardware::hidl_vec;
+using namespace hardware::cas::V1_0;
+using namespace hardware::cas::native::V1_0;
 
 // I want the expression "y" evaluated even if verbose logging is off.
 #define MY_LOGV(x, y) \
@@ -203,6 +207,7 @@ private:
     sp<AMessage> mSampleAesKeyItem;
     sp<IMemory> mMem;
     sp<MemoryDealer> mDealer;
+    hardware::cas::native::V1_0::SharedBuffer mDescramblerSrcBuffer;
     sp<ABuffer> mDescrambledBuffer;
     List<SubSampleInfo> mSubSamples;
     sp<IDescrambler> mDescrambler;
@@ -235,7 +240,7 @@ private:
 
     // Ensure internal buffers can hold specified size, and will re-allocate
     // as needed.
-    void ensureBufferCapacity(size_t size);
+    bool ensureBufferCapacity(size_t size);
 
     DISALLOW_EVIL_CONSTRUCTORS(Stream);
 };
@@ -807,9 +812,9 @@ ATSParser::Stream::~Stream() {
     mQueue = NULL;
 }
 
-void ATSParser::Stream::ensureBufferCapacity(size_t neededSize) {
+bool ATSParser::Stream::ensureBufferCapacity(size_t neededSize) {
     if (mBuffer != NULL && mBuffer->capacity() >= neededSize) {
-        return;
+        return true;
     }
 
     ALOGV("ensureBufferCapacity: current size %zu, new size %zu, scrambled %d",
@@ -837,6 +842,26 @@ void ATSParser::Stream::ensureBufferCapacity(size_t neededSize) {
         mMem = newMem;
         mDealer = newDealer;
         mDescrambledBuffer = newScrambledBuffer;
+
+        ssize_t offset;
+        size_t size;
+        sp<IMemoryHeap> heap = newMem->getMemory(&offset, &size);
+        if (heap == NULL) {
+            return false;
+        }
+        native_handle_t* nativeHandle = native_handle_create(1, 0);
+        if (!nativeHandle) {
+            ALOGE("[stream %d] failed to create native handle", mElementaryPID);
+            return false;
+        }
+        nativeHandle->data[0] = heap->getHeapID();
+        mDescramblerSrcBuffer.heapBase = hidl_memory("ashmem",
+                hidl_handle(nativeHandle), heap->getSize());
+        mDescramblerSrcBuffer.offset = (uint64_t) offset;
+        mDescramblerSrcBuffer.size = (uint64_t) size;
+
+        ALOGD("[stream %d] created shared buffer for descrambling, offset %zd, size %zu",
+                mElementaryPID, offset, size);
     } else {
         // Align to multiples of 64K.
         neededSize = (neededSize + 65535) & ~65535;
@@ -850,6 +875,7 @@ void ATSParser::Stream::ensureBufferCapacity(size_t neededSize) {
         newBuffer->setRange(0, 0);
     }
     mBuffer = newBuffer;
+    return true;
 }
 
 status_t ATSParser::Stream::parse(
@@ -923,7 +949,9 @@ status_t ATSParser::Stream::parse(
     }
 
     size_t neededSize = mBuffer->size() + payloadSizeBits / 8;
-    ensureBufferCapacity(neededSize);
+    if (!ensureBufferCapacity(neededSize)) {
+        return NO_MEMORY;
+    }
 
     memcpy(mBuffer->data() + mBuffer->size(), br->data(), payloadSizeBits / 8);
     mBuffer->setRange(0, mBuffer->size() + payloadSizeBits / 8);
@@ -1365,47 +1393,59 @@ status_t ATSParser::Stream::flushScrambled(SyncEvent *event) {
         memcpy(mDescrambledBuffer->data(), mBuffer->data(), descrambleBytes);
         mDescrambledBuffer->setRange(0, descrambleBytes);
 
-        sp<ABuffer> subSamples = new ABuffer(
-                sizeof(DescramblerPlugin::SubSample) * descrambleSubSamples);
-
-        DescrambleInfo info;
-        info.dstType = DescrambleInfo::kDestinationTypeVmPointer;
-        info.scramblingControl = (DescramblerPlugin::ScramblingControl)sctrl;
-        info.numSubSamples = descrambleSubSamples;
-        info.subSamples = (DescramblerPlugin::SubSample *)subSamples->data();
-        info.srcMem = mMem;
-        info.srcOffset = 0;
-        info.dstPtr = NULL; // in-place descrambling into srcMem
-        info.dstOffset = 0;
+        hidl_vec<SubSample> subSamples;
+        subSamples.resize(descrambleSubSamples);
 
         int32_t i = 0;
         for (auto it = mSubSamples.begin();
                 it != mSubSamples.end() && i < descrambleSubSamples; it++, i++) {
             if (it->transport_scrambling_mode != 0 || pesScramblingControl != 0) {
-                info.subSamples[i].mNumBytesOfClearData = 0;
-                info.subSamples[i].mNumBytesOfEncryptedData = it->subSampleSize;
+                subSamples[i].numBytesOfClearData = 0;
+                subSamples[i].numBytesOfEncryptedData = it->subSampleSize;
             } else {
-                info.subSamples[i].mNumBytesOfClearData = it->subSampleSize;
-                info.subSamples[i].mNumBytesOfEncryptedData = 0;
+                subSamples[i].numBytesOfClearData = it->subSampleSize;
+                subSamples[i].numBytesOfEncryptedData = 0;
             }
         }
+
+        uint64_t srcOffset = 0, dstOffset = 0;
         // If scrambled at PES-level, PES header should be skipped
         if (pesScramblingControl != 0) {
-            info.srcOffset = info.dstOffset = pesOffset;
-            info.subSamples[0].mNumBytesOfEncryptedData -= pesOffset;
+            srcOffset = dstOffset = pesOffset;
+            subSamples[0].numBytesOfEncryptedData -= pesOffset;
         }
 
-        int32_t result;
-        Status status = mDescrambler->descramble(info, &result);
+        Status status = Status::OK;
+        uint32_t bytesWritten = 0;
+        hidl_string detailedError;
 
-        if (!status.isOk()) {
-            ALOGE("[stream %d] descramble failed, exceptionCode=%d",
-                    mElementaryPID, status.exceptionCode());
+        DestinationBuffer dstBuffer;
+        dstBuffer.type = BufferType::SHARED_MEMORY;
+        dstBuffer.nonsecureMemory = mDescramblerSrcBuffer;
+
+        auto returnVoid = mDescrambler->descramble(
+                (ScramblingControl) sctrl,
+                subSamples,
+                mDescramblerSrcBuffer,
+                srcOffset,
+                dstBuffer,
+                dstOffset,
+                [&status, &bytesWritten, &detailedError] (
+                        Status _status, uint32_t _bytesWritten,
+                        const hidl_string& _detailedError) {
+                    status = _status;
+                    bytesWritten = _bytesWritten;
+                    detailedError = _detailedError;
+                });
+
+        if (!returnVoid.isOk()) {
+            ALOGE("[stream %d] descramble failed, trans=%s",
+                    mElementaryPID, returnVoid.description().c_str());
             return UNKNOWN_ERROR;
         }
 
         ALOGV("[stream %d] descramble succeeded, %d bytes",
-                mElementaryPID, result);
+                mElementaryPID, bytesWritten);
         memcpy(mBuffer->data(), mDescrambledBuffer->data(), descrambleBytes);
     }
 

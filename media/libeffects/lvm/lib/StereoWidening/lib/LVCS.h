@@ -374,12 +374,17 @@ LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t     hInstance,
 /* NOTES:                                                                               */
 /*                                                                                      */
 /****************************************************************************************/
-
+#ifdef BUILD_FLOAT
+LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
+                                  const LVM_FLOAT           *pInData,
+                                  LVM_FLOAT                 *pOutData,
+                                  LVM_UINT16                NumSamples);
+#else
 LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
                                   const LVM_INT16           *pInData,
                                   LVM_INT16                 *pOutData,
                                   LVM_UINT16                NumSamples);
-
+#endif
 
 #ifdef __cplusplus
 }

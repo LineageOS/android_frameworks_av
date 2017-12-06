@@ -36,7 +36,84 @@
  pBiquadState->pDelays[6] is y(n-2)L in Q16 format
  pBiquadState->pDelays[7] is y(n-2)R in Q16 format
 ***************************************************************************/
+#ifdef BUILD_FLOAT
+void BQ_2I_D16F32C15_TRC_WRA_01 (           Biquad_FLOAT_Instance_t       *pInstance,
+                                            LVM_FLOAT                    *pDataIn,
+                                            LVM_FLOAT                    *pDataOut,
+                                            LVM_INT16                    NrSamples)
+    {
+        LVM_FLOAT  ynL,ynR;
+        LVM_INT16 ii;
+        PFilter_State_FLOAT pBiquadState = (PFilter_State_FLOAT) pInstance;
 
+         for (ii = NrSamples; ii != 0; ii--)
+         {
+
+
+            /**************************************************************************
+                            PROCESSING OF THE LEFT CHANNEL
+            ***************************************************************************/
+            /* ynL=A2  * x(n-2)L */
+            ynL = (LVM_FLOAT)pBiquadState->coefs[0] * pBiquadState->pDelays[2];
+
+            /* ynL+=A1  * x(n-1)L */
+            ynL += (LVM_FLOAT)pBiquadState->coefs[1] * pBiquadState->pDelays[0];
+
+            /* ynL+=A0  * x(n)L */
+            ynL += (LVM_FLOAT)pBiquadState->coefs[2] * (*pDataIn);
+
+            /* ynL+= ( (-B2  * y(n-2)L )  */
+            ynL += pBiquadState->pDelays[6] * pBiquadState->coefs[3];
+
+
+            /* ynL+=( (-B1  * y(n-1)L  ))  */
+            ynL += pBiquadState->pDelays[4] * pBiquadState->coefs[4];
+
+
+            /**************************************************************************
+                            PROCESSING OF THE RIGHT CHANNEL
+            ***************************************************************************/
+            /* ynR=A2  * x(n-2)R */
+            ynR = (LVM_FLOAT)pBiquadState->coefs[0] * pBiquadState->pDelays[3];
+
+            /* ynR+=A1  * x(n-1)R */
+            ynR += (LVM_FLOAT)pBiquadState->coefs[1] * pBiquadState->pDelays[1];
+
+            /* ynR+=A0  * x(n)R */
+            ynR += (LVM_FLOAT)pBiquadState->coefs[2] * (*(pDataIn+1));
+
+            /* ynR+= ( (-B2  * y(n-2)R ) */
+            ynR += pBiquadState->pDelays[7] * pBiquadState->coefs[3];
+
+
+            /* ynR+=( (-B1  * y(n-1)R  )) in Q15 */
+            ynR += pBiquadState->pDelays[5] * pBiquadState->coefs[4];
+
+            /**************************************************************************
+                            UPDATING THE DELAYS
+            ***************************************************************************/
+            pBiquadState->pDelays[7] = pBiquadState->pDelays[5]; /* y(n-2)R=y(n-1)R*/
+            pBiquadState->pDelays[6] = pBiquadState->pDelays[4]; /* y(n-2)L=y(n-1)L*/
+            pBiquadState->pDelays[3] = pBiquadState->pDelays[1]; /* x(n-2)R=x(n-1)R*/
+            pBiquadState->pDelays[2] = pBiquadState->pDelays[0]; /* x(n-2)L=x(n-1)L*/
+            pBiquadState->pDelays[5] = ynR; /* Update y(n-1)R*/
+            pBiquadState->pDelays[4] = ynL; /* Update y(n-1)L*/
+            pBiquadState->pDelays[0] = (*pDataIn); /* Update x(n-1)L*/
+            pDataIn++;
+            pBiquadState->pDelays[1] = (*pDataIn); /* Update x(n-1)R*/
+            pDataIn++;
+
+            /**************************************************************************
+                            WRITING THE OUTPUT
+            ***************************************************************************/
+            *pDataOut = (LVM_FLOAT)(ynL); /* Write Left output*/
+            pDataOut++;
+            *pDataOut = (LVM_FLOAT)(ynR); /* Write Right ouput*/
+            pDataOut++;
+        }
+
+    }
+#else
 void BQ_2I_D16F32C15_TRC_WRA_01 (           Biquad_Instance_t       *pInstance,
                                             LVM_INT16                    *pDataIn,
                                             LVM_INT16                    *pDataOut,
@@ -114,4 +191,4 @@ void BQ_2I_D16F32C15_TRC_WRA_01 (           Biquad_Instance_t       *pInstance,
         }
 
     }
-
+#endif

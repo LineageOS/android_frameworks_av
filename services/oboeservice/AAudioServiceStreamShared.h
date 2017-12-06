@@ -46,52 +46,54 @@ public:
     AAudioServiceStreamShared(android::AAudioService &aAudioService);
     virtual ~AAudioServiceStreamShared() = default;
 
-    aaudio_result_t open(const aaudio::AAudioStreamRequest &request,
-                         aaudio::AAudioStreamConfiguration &configurationOutput) override;
+    static std::string dumpHeader();
 
-    /**
-     * Start the flow of audio data.
-     *
-     * This is not guaranteed to be synchronous but it currently is.
-     * An AAUDIO_SERVICE_EVENT_STARTED will be sent to the client when complete.
-     */
-    aaudio_result_t start() override;
+    std::string dump() const override;
 
-    /**
-     * Stop the flow of data so that start() can resume without loss of data.
-     *
-     * This is not guaranteed to be synchronous but it currently is.
-     * An AAUDIO_SERVICE_EVENT_PAUSED will be sent to the client when complete.
-    */
-    aaudio_result_t pause() override;
-
-    /**
-     * Stop the flow of data after data in buffer has played.
-     */
-    aaudio_result_t stop() override;
-
-    /**
-     *  Discard any data held by the underlying HAL or Service.
-     *
-     * This is not guaranteed to be synchronous but it currently is.
-     * An AAUDIO_SERVICE_EVENT_FLUSHED will be sent to the client when complete.
-     */
-    aaudio_result_t flush() override;
+    aaudio_result_t open(const aaudio::AAudioStreamRequest &request) override;
 
     aaudio_result_t close() override;
 
-    android::FifoBuffer *getDataFifoBuffer() { return mAudioDataQueue->getFifoBuffer(); }
+    /**
+     * This must be locked when calling getAudioDataFifoBuffer_l() and while
+     * using the FifoBuffer it returns.
+     */
+    std::mutex &getAudioDataQueueLock() {
+        return mAudioDataQueueLock;
+    }
+
+    /**
+     * This must only be call under getAudioDataQueueLock().
+     * @return
+     */
+    android::FifoBuffer *getAudioDataFifoBuffer_l() { return (mAudioDataQueue == nullptr)
+                                                      ? nullptr
+                                                      : mAudioDataQueue->getFifoBuffer(); }
 
     /* Keep a record of when a buffer transfer completed.
      * This allows for a more accurate timing model.
      */
-    void markTransferTime(int64_t nanoseconds);
+    void markTransferTime(Timestamp &timestamp);
+
+    void setTimestampPositionOffset(int64_t deltaFrames) {
+        mTimestampPositionOffset.store(deltaFrames);
+    }
+
+    void incrementXRunCount() {
+        mXRunCount++;
+    }
+
+    int32_t getXRunCount() const {
+        return mXRunCount.load();
+    }
 
 protected:
 
-    aaudio_result_t getDownDataDescription(AudioEndpointParcelable &parcelable) override;
+    aaudio_result_t getAudioDataDescription(AudioEndpointParcelable &parcelable) override;
 
     aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) override;
+
+    aaudio_result_t getHardwareTimestamp(int64_t *positionFrames, int64_t *timeNanos) override;
 
     /**
      * @param requestedCapacityFrames
@@ -102,12 +104,12 @@ protected:
                                             int32_t framesPerBurst);
 
 private:
-    android::AAudioService  &mAudioService;
-    AAudioServiceEndpoint   *mServiceEndpoint = nullptr;
-    SharedRingBuffer        *mAudioDataQueue = nullptr;
+    SharedRingBuffer        *mAudioDataQueue = nullptr; // protected by mAudioDataQueueLock
+    std::mutex               mAudioDataQueueLock;
 
-    int64_t                  mMarkedPosition = 0;
-    int64_t                  mMarkedTime = 0;
+    std::atomic<int64_t>     mTimestampPositionOffset;
+    std::atomic<int32_t>     mXRunCount;
+
 };
 
 } /* namespace aaudio */

@@ -1,5 +1,9 @@
 cc_library_shared {
     name: "libstagefright_flacdec",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     srcs: [
         "FLACDecoder.cpp",
@@ -31,4 +35,5 @@ cc_library_shared {
         "libstagefright_foundation",
         "libutils",
     ],
+    header_libs: ["libmedia_headers"],
 }

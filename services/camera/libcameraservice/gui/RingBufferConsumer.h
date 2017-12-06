@@ -60,7 +60,7 @@ class RingBufferConsumer : public ConsumerBase,
     // the consumer usage flags passed to the graphics allocator. The
     // bufferCount parameter specifies how many buffers can be pinned for user
     // access at the same time.
-    RingBufferConsumer(const sp<IGraphicBufferConsumer>& consumer, uint32_t consumerUsage,
+    RingBufferConsumer(const sp<IGraphicBufferConsumer>& consumer, uint64_t consumerUsage,
             int bufferCount);
 
     virtual ~RingBufferConsumer();
@@ -80,7 +80,7 @@ class RingBufferConsumer : public ConsumerBase,
 
     // setConsumerUsage allows the BufferQueue consumer usage to be
     // set at a later time after construction.
-    status_t setConsumerUsage(uint32_t usage);
+    status_t setConsumerUsage(uint64_t usage);
 
     // Buffer info, minus the graphics buffer/slot itself.
     struct BufferInfo {

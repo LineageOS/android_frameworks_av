@@ -140,8 +140,6 @@ public:
 
     private:
 
-        status_t unloadSoundModel_l(sound_model_handle_t handle);
-
         Mutex                                  mLock;
         wp<SoundTriggerHwService>              mService;
         sp<SoundTriggerHalInterface>           mHalInterface;

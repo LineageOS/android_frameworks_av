@@ -27,7 +27,9 @@
 */
 
 #define DOWNMIX_OUTPUT_CHANNELS AUDIO_CHANNEL_OUT_STEREO
-
+#ifdef BUILD_FLOAT
+#define LVM_FLOAT float
+#endif
 typedef enum {
     DOWNMIX_STATE_UNINITIALIZED,
     DOWNMIX_STATE_INITIALIZED,
@@ -95,11 +97,18 @@ int Downmix_Configure(downmix_module_t *pDwmModule, effect_config_t *pConfig, bo
 int Downmix_Reset(downmix_object_t *pDownmixer, bool init);
 int Downmix_setParameter(downmix_object_t *pDownmixer, int32_t param, uint32_t size, void *pValue);
 int Downmix_getParameter(downmix_object_t *pDownmixer, int32_t param, uint32_t *pSize, void *pValue);
-
+#ifdef BUILD_FLOAT
+void Downmix_foldFromQuad(LVM_FLOAT *pSrc, LVM_FLOAT *pDst, size_t numFrames, bool accumulate);
+void Downmix_foldFrom5Point1(LVM_FLOAT *pSrc, LVM_FLOAT *pDst, size_t numFrames, bool accumulate);
+void Downmix_foldFrom7Point1(LVM_FLOAT *pSrc, LVM_FLOAT *pDst, size_t numFrames, bool accumulate);
+bool Downmix_foldGeneric(
+        uint32_t mask, LVM_FLOAT *pSrc, LVM_FLOAT *pDst, size_t numFrames, bool accumulate);
+#else
 void Downmix_foldFromQuad(int16_t *pSrc, int16_t*pDst, size_t numFrames, bool accumulate);
 void Downmix_foldFrom5Point1(int16_t *pSrc, int16_t*pDst, size_t numFrames, bool accumulate);
 void Downmix_foldFrom7Point1(int16_t *pSrc, int16_t*pDst, size_t numFrames, bool accumulate);
 bool Downmix_foldGeneric(
         uint32_t mask, int16_t *pSrc, int16_t*pDst, size_t numFrames, bool accumulate);
+#endif
 
 #endif /*ANDROID_EFFECTDOWNMIX_H_*/

@@ -24,7 +24,8 @@
 
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
-#include <AAudioExampleUtils.h>
+
+#include "AAudioExampleUtils.h"
 
 // TODO use this as a base class within AAudio
 class AAudioParameters {
@@ -149,6 +150,9 @@ public:
                     setChannelCount(atoi(&arg[2]));
                     break;
                 case 'd':
+                    setDeviceId(atoi(&arg[2]));
+                    break;
+                case 's':
                     mDurationSeconds = atoi(&arg[2]);
                     break;
                 case 'm': {
@@ -201,7 +205,8 @@ public:
         printf("      Default values are UNSPECIFIED unless otherwise stated.\n");
         printf("      -b{bufferCapacity} frames\n");
         printf("      -c{channels} for example 2 for stereo\n");
-        printf("      -d{duration} in seconds, default is %d\n", DEFAULT_DURATION_SECONDS);
+        printf("      -d{deviceId} default is %d\n", AAUDIO_UNSPECIFIED);
+        printf("      -s{duration} in seconds, default is %d\n", DEFAULT_DURATION_SECONDS);
         printf("      -m{0|1|2|3} set MMAP policy\n");
         printf("          0 = _UNSPECIFIED, default\n");
         printf("          1 = _NEVER\n");
@@ -239,7 +244,7 @@ public:
      * Print stream parameters in comparison with requested values.
      * @param stream
      */
-    void compareWithStream(AAudioStream *stream) {
+    void compareWithStream(AAudioStream *stream) const {
 
         printf("  DeviceId:     requested = %d, actual = %d\n",
                getDeviceId(), AAudioStream_getDeviceId(stream));

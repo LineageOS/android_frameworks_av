@@ -22,7 +22,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "media/MidiIoWrapper.h"
+#include <media/MidiIoWrapper.h>
 
 static int readAt(void *handle, void *buffer, int pos, int size) {
     return ((android::MidiIoWrapper*)handle)->readAt(buffer, pos, size);

@@ -38,7 +38,12 @@
 #include "AnotherPacketSource.h"
 #include "ATSParser.h"
 
+#include <hidl/HybridInterface.h>
+#include <android/hardware/cas/1.0/ICas.h>
+
 namespace android {
+
+using hardware::cas::V1_0::ICas;
 
 static const size_t kTSPacketSize = 188;
 static const int kMaxDurationReadSize = 250000LL;
@@ -156,7 +161,10 @@ bool MPEG2TSExtractor::isScrambledFormat(const sp<MetaData> &format) {
                     || !strcasecmp(MEDIA_MIMETYPE_AUDIO_SCRAMBLED, mime));
 }
 
-status_t MPEG2TSExtractor::setMediaCas(const sp<ICas> &cas) {
+status_t MPEG2TSExtractor::setMediaCas(const HInterfaceToken &casToken) {
+    HalToken halToken;
+    halToken.setToExternal((uint8_t*)casToken.data(), casToken.size());
+    sp<ICas> cas = ICas::castFrom(retrieveHalInterface(halToken));
     ALOGD("setMediaCas: %p", cas.get());
 
     status_t err = mParser->setMediaCas(cas);

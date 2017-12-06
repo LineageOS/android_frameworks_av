@@ -33,7 +33,7 @@ namespace android {
 
 typedef void (*audio_error_callback)(status_t err);
 typedef void (*dynamic_policy_callback)(int event, String8 regId, int val);
-typedef void (*record_config_callback)(int event, audio_session_t session, int source,
+typedef void (*record_config_callback)(int event, const record_client_info_t *clientInfo,
                 const audio_config_base_t *clientConfig, const audio_config_base_t *deviceConfig,
                 audio_patch_handle_t patchHandle);
 
@@ -370,9 +370,9 @@ public:
                                          audio_port_handle_t deviceId) = 0;
     };
 
-    static status_t addAudioDeviceCallback(const sp<AudioDeviceCallback>& callback,
+    static status_t addAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
                                            audio_io_handle_t audioIo);
-    static status_t removeAudioDeviceCallback(const sp<AudioDeviceCallback>& callback,
+    static status_t removeAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
                                               audio_io_handle_t audioIo);
 
     static audio_port_handle_t getDeviceIdForIo(audio_io_handle_t audioIo);
@@ -403,9 +403,9 @@ private:
                                      const sp<AudioIoDescriptor>& ioDesc);
 
 
-        status_t addAudioDeviceCallback(const sp<AudioDeviceCallback>& callback,
+        status_t addAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
                                                audio_io_handle_t audioIo);
-        status_t removeAudioDeviceCallback(const sp<AudioDeviceCallback>& callback,
+        status_t removeAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
                                            audio_io_handle_t audioIo);
 
         audio_port_handle_t getDeviceIdForIo(audio_io_handle_t audioIo);
@@ -413,7 +413,7 @@ private:
     private:
         Mutex                               mLock;
         DefaultKeyedVector<audio_io_handle_t, sp<AudioIoDescriptor> >   mIoDescriptors;
-        DefaultKeyedVector<audio_io_handle_t, Vector < sp<AudioDeviceCallback> > >
+        DefaultKeyedVector<audio_io_handle_t, Vector < wp<AudioDeviceCallback> > >
                                                                         mAudioDeviceCallbacks;
         // cached values for recording getInputBufferSize() queries
         size_t                              mInBuffSize;    // zero indicates cache is invalid
@@ -440,8 +440,9 @@ private:
         virtual void onAudioPortListUpdate();
         virtual void onAudioPatchListUpdate();
         virtual void onDynamicPolicyMixStateUpdate(String8 regId, int32_t state);
-        virtual void onRecordingConfigurationUpdate(int event, audio_session_t session,
-                        audio_source_t source, const audio_config_base_t *clientConfig,
+        virtual void onRecordingConfigurationUpdate(int event,
+                        const record_client_info_t *clientInfo,
+                        const audio_config_base_t *clientConfig,
                         const audio_config_base_t *deviceConfig, audio_patch_handle_t patchHandle);
 
     private:

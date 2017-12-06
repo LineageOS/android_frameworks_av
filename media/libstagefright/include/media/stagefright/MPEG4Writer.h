@@ -204,7 +204,10 @@ private:
     void lock();
     void unlock();
 
-    void initInternal(int fd);
+    // Init all the internal variables for each recording session. Some variables
+    // will only need to be set for the first recording session and they will stay
+    // the same across all the recording sessions.
+    void initInternal(int fd, bool isFirstSession);
 
     // Acquire lock before calling these methods
     off64_t addSample_l(MediaBuffer *buffer);

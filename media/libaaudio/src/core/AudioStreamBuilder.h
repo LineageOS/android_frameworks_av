@@ -35,15 +35,6 @@ public:
 
     ~AudioStreamBuilder();
 
-    aaudio_direction_t getDirection() const {
-        return mDirection;
-    }
-
-    AudioStreamBuilder* setDirection(aaudio_direction_t direction) {
-        mDirection = direction;
-        return this;
-    }
-
     bool isSharingModeMatchRequired() const {
         return mSharingModeMatchRequired;
     }
@@ -113,7 +104,6 @@ public:
 
 private:
     bool                       mSharingModeMatchRequired = false; // must match sharing mode requested
-    aaudio_direction_t         mDirection = AAUDIO_DIRECTION_OUTPUT;
     aaudio_performance_mode_t  mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
 
     AAudioStream_dataCallback  mDataCallbackProc = nullptr;  // external callback functions

@@ -18,7 +18,7 @@
 
 #define SOFT_VORBIS_H_
 
-#include "SimpleSoftOMXComponent.h"
+#include <media/stagefright/omx/SimpleSoftOMXComponent.h>
 
 struct vorbis_dsp_state;
 struct vorbis_info;
@@ -72,6 +72,7 @@ private:
     void initPorts();
     status_t initDecoder();
     bool isConfigured() const;
+    void handleEOS();
 
     DISALLOW_EVIL_CONSTRUCTORS(SoftVorbis);
 };

@@ -48,24 +48,24 @@ JsonAssetLoader::~JsonAssetLoader() {
  * Extract a clear key asset from a JSON string.
  *
  * Returns OK if a clear key asset is extracted successfully,
- * or ERROR_DRM_NO_LICENSE if the string doesn't contain a valid
+ * or ERROR_CAS_NO_LICENSE if the string doesn't contain a valid
  * clear key asset.
  */
 status_t JsonAssetLoader::extractAssetFromString(
         const String8& jsonAssetString, Asset *asset) {
     if (!parseJsonAssetString(jsonAssetString, &mJsonObjects)) {
-        return ERROR_DRM_NO_LICENSE;
+        return ERROR_CAS_NO_LICENSE;
     }
 
     if (mJsonObjects.size() < 1) {
-        return ERROR_DRM_NO_LICENSE;
+        return ERROR_CAS_NO_LICENSE;
     }
 
     if (!parseJsonObject(mJsonObjects[0], &mTokens))
-        return ERROR_DRM_NO_LICENSE;
+        return ERROR_CAS_NO_LICENSE;
 
     if (!findKey(mJsonObjects[0], asset)) {
-        return ERROR_DRM_NO_LICENSE;
+        return ERROR_CAS_NO_LICENSE;
     }
     return OK;
 }

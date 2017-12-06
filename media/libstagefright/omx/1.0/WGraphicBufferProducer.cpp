@@ -18,9 +18,9 @@
 
 #include <android-base/logging.h>
 
-#include "WGraphicBufferProducer.h"
-#include "WProducerListener.h"
-#include "Conversion.h"
+#include <media/stagefright/omx/1.0/WGraphicBufferProducer.h>
+#include <media/stagefright/omx/1.0/WProducerListener.h>
+#include <media/stagefright/omx/1.0/Conversion.h>
 #include <system/window.h>
 
 namespace android {
@@ -41,7 +41,9 @@ Return<void> TWGraphicBufferProducer::requestBuffer(
     sp<GraphicBuffer> buf;
     status_t status = mBase->requestBuffer(slot, &buf);
     AnwBuffer anwBuffer;
-    wrapAs(&anwBuffer, *buf);
+    if (buf != nullptr) {
+        wrapAs(&anwBuffer, *buf);
+    }
     _hidl_cb(static_cast<int32_t>(status), anwBuffer);
     return Void();
 }
@@ -64,10 +66,9 @@ Return<void> TWGraphicBufferProducer::dequeueBuffer(
     sp<Fence> fence;
     ::android::FrameEventHistoryDelta outTimestamps;
     status_t status = mBase->dequeueBuffer(
-            &slot, &fence,
-            width, height,
-            static_cast<::android::PixelFormat>(format), usage,
-            getFrameTimestamps ? &outTimestamps : nullptr);
+        &slot, &fence, width, height,
+        static_cast<::android::PixelFormat>(format), usage, nullptr,
+        getFrameTimestamps ? &outTimestamps : nullptr);
     hidl_handle tFence;
     FrameEventHistoryDelta tOutTimestamps;
 

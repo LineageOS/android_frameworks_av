@@ -210,3 +210,9 @@ fifo_frames_t FifoBuffer::getBufferCapacityInFrames() {
     return mFifo->getCapacity();
 }
 
+void FifoBuffer::eraseMemory() {
+    int32_t numBytes = convertFramesToBytes(getBufferCapacityInFrames());
+    if (numBytes > 0) {
+        memset(mStorage, 0, (size_t) numBytes);
+    }
+}

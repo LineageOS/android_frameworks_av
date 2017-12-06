@@ -51,37 +51,43 @@ MetricsSummarizerPlayer::MetricsSummarizerPlayer(const char *key)
     setIgnorables(player_ignorable);
 }
 
+// NB: this is also called for the first time -- so summation == item
+// Not sure if we need a flag for that or not.
+// In this particular mergeRecord() code -- we're' ok for this.
 void MetricsSummarizerPlayer::mergeRecord(MediaAnalyticsItem &summation, MediaAnalyticsItem &item) {
 
     ALOGV("MetricsSummarizerPlayer::mergeRecord()");
 
-    //
-    // we sum time & frames.
-    // be careful about our special "-1" values that indicate 'unknown'
-    // treat those as 0 [basically, not summing them into the totals].
+
     int64_t duration = 0;
     if (item.getInt64("android.media.mediaplayer.durationMs", &duration)) {
         ALOGV("found durationMs of %" PRId64, duration);
-        summation.addInt64("android.media.mediaplayer.durationMs",duration);
+        minMaxVar64(summation, "android.media.mediaplayer.durationMs", duration);
     }
+
     int64_t playing = 0;
-    if (item.getInt64("android.media.mediaplayer.playingMs", &playing))
+    if (item.getInt64("android.media.mediaplayer.playingMs", &playing)) {
         ALOGV("found playingMs of %" PRId64, playing);
-        if (playing >= 0) {
-            summation.addInt64("android.media.mediaplayer.playingMs",playing);
-        }
+    }
+    if (playing >= 0) {
+        minMaxVar64(summation,"android.media.mediaplayer.playingMs",playing);
+    }
+
     int64_t frames = 0;
-    if (item.getInt64("android.media.mediaplayer.frames", &frames))
+    if (item.getInt64("android.media.mediaplayer.frames", &frames)) {
         ALOGV("found framess of %" PRId64, frames);
-        if (frames >= 0) {
-            summation.addInt64("android.media.mediaplayer.frames",frames);
-        }
+    }
+    if (frames >= 0) {
+        minMaxVar64(summation,"android.media.mediaplayer.frames",frames);
+    }
+
     int64_t dropped = 0;
-    if (item.getInt64("android.media.mediaplayer.dropped", &dropped))
+    if (item.getInt64("android.media.mediaplayer.dropped", &dropped)) {
         ALOGV("found dropped of %" PRId64, dropped);
-        if (dropped >= 0) {
-            summation.addInt64("android.media.mediaplayer.dropped",dropped);
-        }
+    }
+    if (dropped >= 0) {
+        minMaxVar64(summation,"android.media.mediaplayer.dropped",dropped);
+    }
 }
 
 } // namespace android

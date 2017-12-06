@@ -30,7 +30,16 @@
 /*  TargetGain      - TargetGain value in Q 16.15 format                */
 /*                                                                      */
 /************************************************************************/
-
+#ifdef BUILD_FLOAT
+LVM_FLOAT LVC_Mixer_GetTarget( LVMixer3_FLOAT_st *pStream)
+{
+    LVM_FLOAT       TargetGain;
+    Mix_Private_FLOAT_st  *pInstance = (Mix_Private_FLOAT_st *)pStream->PrivateParams;
+    
+    TargetGain = pInstance->Target;  // TargetGain
+    return TargetGain;
+}
+#else
 LVM_INT32 LVC_Mixer_GetTarget( LVMixer3_st *pStream)
 {
     LVM_INT32       TargetGain;
@@ -40,3 +49,4 @@ LVM_INT32 LVC_Mixer_GetTarget( LVMixer3_st *pStream)
 
     return TargetGain;
 }
+#endif

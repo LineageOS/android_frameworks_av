@@ -119,7 +119,7 @@ class CameraDeviceBase : public virtual RefBase {
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
-            bool isShared = false, uint32_t consumerUsage = 0) = 0;
+            bool isShared = false, uint64_t consumerUsage = 0) = 0;
 
     /**
      * Create an output stream of the requested size, format, rotation and
@@ -132,7 +132,7 @@ class CameraDeviceBase : public virtual RefBase {
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
-            bool isShared = false, uint32_t consumerUsage = 0) = 0;
+            bool isShared = false, uint64_t consumerUsage = 0) = 0;
 
     /**
      * Create an input stream of width, height, and format.
@@ -142,12 +142,51 @@ class CameraDeviceBase : public virtual RefBase {
     virtual status_t createInputStream(uint32_t width, uint32_t height,
             int32_t format, /*out*/ int32_t *id) = 0;
 
+    struct StreamInfo {
+        uint32_t width;
+        uint32_t height;
+
+        uint32_t format;
+        bool formatOverridden;
+        uint32_t originalFormat;
+
+        android_dataspace dataSpace;
+        bool dataSpaceOverridden;
+        android_dataspace originalDataSpace;
+
+        StreamInfo() : width(0), height(0), format(0), formatOverridden(false), originalFormat(0),
+                dataSpace(HAL_DATASPACE_UNKNOWN), dataSpaceOverridden(false),
+                originalDataSpace(HAL_DATASPACE_UNKNOWN) {}
+        /**
+         * Check whether the format matches the current or the original one in case
+         * it got overridden.
+         */
+        bool matchFormat(uint32_t clientFormat) const {
+            if ((formatOverridden && (originalFormat == clientFormat)) ||
+                    (format == clientFormat)) {
+                return true;
+            }
+            return false;
+        }
+
+        /**
+         * Check whether the dataspace matches the current or the original one in case
+         * it got overridden.
+         */
+        bool matchDataSpace(android_dataspace clientDataSpace) const {
+            if ((dataSpaceOverridden && (originalDataSpace == clientDataSpace)) ||
+                    (dataSpace == clientDataSpace)) {
+                return true;
+            }
+            return false;
+        }
+
+    };
+
     /**
      * Get information about a given stream.
      */
-    virtual status_t getStreamInfo(int id,
-            uint32_t *width, uint32_t *height,
-            uint32_t *format, android_dataspace *dataSpace) = 0;
+    virtual status_t getStreamInfo(int id, StreamInfo *streamInfo) = 0;
 
     /**
      * Set stream gralloc buffer transform

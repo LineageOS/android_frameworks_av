@@ -313,11 +313,13 @@ binder::Status CameraDeviceClient::cancelRequest(
 
 binder::Status CameraDeviceClient::beginConfigure() {
     // TODO: Implement this.
+    ATRACE_CALL();
     ALOGV("%s: Not implemented yet.", __FUNCTION__);
     return binder::Status::ok();
 }
 
 binder::Status CameraDeviceClient::endConfigure(int operatingMode) {
+    ATRACE_CALL();
     ALOGV("%s: ending configure (%d input stream, %zu output surfaces)",
             __FUNCTION__, mInputStream.configured ? 1 : 0,
             mStreamMap.size());
@@ -568,7 +570,7 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
         /*out*/
         int* newStreamId) {
     int width, height, format, surfaceType;
-    int32_t consumerUsage;
+    uint64_t consumerUsage;
     android_dataspace dataSpace;
     status_t err;
     binder::Status res;
@@ -764,24 +766,23 @@ binder::Status CameraDeviceClient::createSurfaceFromGbp(
     // Query consumer usage bits to set async operation mode for
     // GLConsumer using controlledByApp parameter.
     bool useAsync = false;
-    int32_t consumerUsage;
+    uint64_t consumerUsage = 0;
     status_t err;
-    if ((err = gbp->query(NATIVE_WINDOW_CONSUMER_USAGE_BITS,
-            &consumerUsage)) != OK) {
+    if ((err = gbp->getConsumerUsage(&consumerUsage)) != OK) {
         String8 msg = String8::format("Camera %s: Failed to query Surface consumer usage: %s (%d)",
                 mCameraIdStr.string(), strerror(-err), err);
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.string());
     }
     if (consumerUsage & GraphicBuffer::USAGE_HW_TEXTURE) {
-        ALOGW("%s: Camera %s with consumer usage flag: 0x%x: Forcing asynchronous mode for stream",
+        ALOGW("%s: Camera %s with consumer usage flag: %" PRIu64 ": Forcing asynchronous mode for stream",
                 __FUNCTION__, mCameraIdStr.string(), consumerUsage);
         useAsync = true;
     }
 
-    int32_t disallowedFlags = GraphicBuffer::USAGE_HW_VIDEO_ENCODER |
+    uint64_t disallowedFlags = GraphicBuffer::USAGE_HW_VIDEO_ENCODER |
                               GRALLOC_USAGE_RENDERSCRIPT;
-    int32_t allowedFlags = GraphicBuffer::USAGE_SW_READ_MASK |
+    uint64_t allowedFlags = GraphicBuffer::USAGE_SW_READ_MASK |
                            GraphicBuffer::USAGE_HW_TEXTURE |
                            GraphicBuffer::USAGE_HW_COMPOSER;
     bool flexibleConsumer = (consumerUsage & disallowedFlags) == 0 &&
@@ -874,7 +875,7 @@ binder::Status CameraDeviceClient::createSurfaceFromGbp(
         //surface class type. Use usage flag to approximate the comparison.
         if (consumerUsage != streamInfo.consumerUsage) {
             String8 msg = String8::format(
-                    "Camera %s:Surface usage flag doesn't match 0x%x vs 0x%x",
+                    "Camera %s:Surface usage flag doesn't match %" PRIu64 " vs %" PRIu64 "",
                     mCameraIdStr.string(), consumerUsage, streamInfo.consumerUsage);
             ALOGE("%s: %s", __FUNCTION__, msg.string());
             return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
@@ -1353,7 +1354,7 @@ void CameraDeviceClient::notifyRepeatingRequestError(long lastFrameNumber) {
     sp<hardware::camera2::ICameraDeviceCallbacks> remoteCb = getRemoteCallback();
 
     if (remoteCb != 0) {
-        remoteCb->onRepeatingRequestError(lastFrameNumber);
+        remoteCb->onRepeatingRequestError(lastFrameNumber, mStreamingRequestId);
     }
 
     Mutex::Autolock idLock(mStreamingRequestIdLock);

@@ -28,6 +28,7 @@ public:
                             audio_channel_mask_t channelMask,
                             audio_session_t sessionId,
                             uid_t uid,
+                            pid_t pid,
                             audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE);
     virtual             ~MmapTrack();
 
@@ -39,7 +40,7 @@ public:
     virtual bool        isFastTrack() const { return false; }
 
      static void        appendDumpHeader(String8& result);
-            void        dump(char* buffer, size_t size);
+            void        appendDump(String8& result, bool active);
 
 private:
     friend class MmapThread;
@@ -55,5 +56,6 @@ private:
     virtual int64_t framesReleased() const;
     virtual void onTimestamp(const ExtendedTimestamp &timestamp);
 
+    pid_t mPid;
 };  // end of Track
 

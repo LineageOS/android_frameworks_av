@@ -59,6 +59,7 @@ const int MediaAnalyticsItem::EnabledProperty_default  = 1;
 MediaAnalyticsItem::MediaAnalyticsItem()
     : mPid(-1),
       mUid(-1),
+      mPkgVersionCode(0),
       mSessionID(MediaAnalyticsItem::SessionIDNone),
       mTimestamp(0),
       mFinalized(0),
@@ -70,6 +71,7 @@ MediaAnalyticsItem::MediaAnalyticsItem()
 MediaAnalyticsItem::MediaAnalyticsItem(MediaAnalyticsItem::Key key)
     : mPid(-1),
       mUid(-1),
+      mPkgVersionCode(0),
       mSessionID(MediaAnalyticsItem::SessionIDNone),
       mTimestamp(0),
       mFinalized(0),
@@ -98,7 +100,7 @@ void MediaAnalyticsItem::clear() {
 
     // clean attributes
     // contents of the attributes
-    for (size_t i = 0 ; i < mPropSize; i++ ) {
+    for (size_t i = 0 ; i < mPropCount; i++ ) {
         clearProp(&mProps[i]);
     }
     // the attribute records themselves
@@ -120,6 +122,8 @@ MediaAnalyticsItem *MediaAnalyticsItem::dup() {
         // key as part of constructor
         dst->mPid = this->mPid;
         dst->mUid = this->mUid;
+        dst->mPkgName = this->mPkgName;
+        dst->mPkgVersionCode = this->mPkgVersionCode;
         dst->mSessionID = this->mSessionID;
         dst->mTimestamp = this->mTimestamp;
         dst->mFinalized = this->mFinalized;
@@ -201,6 +205,24 @@ uid_t MediaAnalyticsItem::getUid() const {
     return mUid;
 }
 
+MediaAnalyticsItem &MediaAnalyticsItem::setPkgName(AString pkgName) {
+    mPkgName = pkgName;
+    return *this;
+}
+
+AString MediaAnalyticsItem::getPkgName() const {
+    return mPkgName;
+}
+
+MediaAnalyticsItem &MediaAnalyticsItem::setPkgVersionCode(int32_t pkgVersionCode) {
+    mPkgVersionCode = pkgVersionCode;
+    return *this;
+}
+
+int32_t MediaAnalyticsItem::getPkgVersionCode() const {
+    return mPkgVersionCode;
+}
+
 // this key is for the overall record -- "codec", "player", "drm", etc
 MediaAnalyticsItem &MediaAnalyticsItem::setKey(MediaAnalyticsItem::Key key) {
     mKey = key;
@@ -263,9 +285,28 @@ MediaAnalyticsItem::Prop *MediaAnalyticsItem::allocateProp(const char *name) {
         i = mPropCount++;
         prop = &mProps[i];
         prop->setName(name, len);
+        prop->mType = kTypeNone;        // make caller set type info
     }
 
     return prop;
+}
+
+// used within the summarizers; return whether property existed
+bool MediaAnalyticsItem::removeProp(const char *name) {
+    size_t len = strlen(name);
+    size_t i = findPropIndex(name, len);
+    if (i < mPropCount) {
+        Prop *prop = &mProps[i];
+        clearProp(prop);
+        if (i != mPropCount-1) {
+            // in the middle, bring last one down to fill gap
+            copyProp(prop, &mProps[mPropCount-1]);
+            clearProp(&mProps[mPropCount-1]);
+        }
+        mPropCount--;
+        return true;
+    }
+    return false;
 }
 
 // set the values
@@ -568,6 +609,10 @@ int32_t MediaAnalyticsItem::readFromParcel(const Parcel& data) {
     // into 'this' object
     // .. we make a copy of the string to put away.
     mKey = data.readCString();
+    mPid = data.readInt32();
+    mUid = data.readInt32();
+    mPkgName = data.readCString();
+    mPkgVersionCode = data.readInt32();
     mSessionID = data.readInt64();
     mFinalized = data.readInt32();
     mTimestamp = data.readInt64();
@@ -611,6 +656,10 @@ int32_t MediaAnalyticsItem::writeToParcel(Parcel *data) {
 
 
     data->writeCString(mKey.c_str());
+    data->writeInt32(mPid);
+    data->writeInt32(mUid);
+    data->writeCString(mPkgName.c_str());
+    data->writeInt32(mPkgVersionCode);
     data->writeInt64(mSessionID);
     data->writeInt32(mFinalized);
     data->writeInt64(mTimestamp);
@@ -651,21 +700,54 @@ int32_t MediaAnalyticsItem::writeToParcel(Parcel *data) {
 
 
 AString MediaAnalyticsItem::toString() {
+   return toString(-1);
+}
 
-    AString result = "(";
+AString MediaAnalyticsItem::toString(int version) {
+
+    // v0 : released with 'o'
+    // v1 : bug fix (missing pid/finalized separator),
+    //      adds apk name, apk version code
+
+    if (version <= PROTO_FIRST) {
+        // default to original v0 format, until proper parsers are in place
+        version = PROTO_V0;
+    } else if (version > PROTO_LAST) {
+        version = PROTO_LAST;
+    }
+
+    AString result;
     char buffer[512];
+
+    if (version == PROTO_V0) {
+        result = "(";
+    } else {
+        snprintf(buffer, sizeof(buffer), "[%d:", version);
+        result.append(buffer);
+    }
 
     // same order as we spill into the parcel, although not required
     // key+session are our primary matching criteria
-    //RBE ALOGD("mKey.c_str");
     result.append(mKey.c_str());
-    //RBE ALOGD("post-mKey.c_str");
     result.append(":");
     snprintf(buffer, sizeof(buffer), "%" PRId64 ":", mSessionID);
     result.append(buffer);
 
-    // we need these internally, but don't want to upload them
-    snprintf(buffer, sizeof(buffer), "%d:%d", mUid, mPid);
+    snprintf(buffer, sizeof(buffer), "%d:", mUid);
+    result.append(buffer);
+
+    if (version >= PROTO_V1) {
+        result.append(mPkgName);
+        snprintf(buffer, sizeof(buffer), ":%d:", mPkgVersionCode);
+        result.append(buffer);
+    }
+
+    // in 'o' (v1) , the separator between pid and finalized was omitted
+    if (version <= PROTO_V0) {
+        snprintf(buffer, sizeof(buffer), "%d", mPid);
+    } else {
+        snprintf(buffer, sizeof(buffer), "%d:", mPid);
+    }
     result.append(buffer);
 
     snprintf(buffer, sizeof(buffer), "%d:", mFinalized);
@@ -713,7 +795,11 @@ AString MediaAnalyticsItem::toString() {
             result.append(buffer);
     }
 
-    result.append(")");
+    if (version == PROTO_V0) {
+        result.append(")");
+    } else {
+        result.append("]");
+    }
 
     return result;
 }
@@ -734,11 +820,16 @@ bool MediaAnalyticsItem::selfrecord(bool forcenew) {
     sp<IMediaAnalyticsService> svc = getInstance();
 
     if (svc != NULL) {
-        svc->submit(this, forcenew);
+        MediaAnalyticsItem::SessionID_t newid = svc->submit(this, forcenew);
+        if (newid == SessionIDInvalid) {
+            AString p = this->toString();
+            ALOGW("Failed to record: %s [forcenew=%d]", p.c_str(), forcenew);
+            return false;
+        }
         return true;
     } else {
         AString p = this->toString();
-        ALOGD("Unable to record: %s [forcenew=%d]", p.c_str(), forcenew);
+        ALOGW("Unable to record: %s [forcenew=%d]", p.c_str(), forcenew);
         return false;
     }
 }
@@ -747,6 +838,7 @@ bool MediaAnalyticsItem::selfrecord(bool forcenew) {
 // static
 sp<IMediaAnalyticsService> MediaAnalyticsItem::sAnalyticsService;
 static Mutex sInitMutex;
+static int remainingBindAttempts = SVC_TRIES;
 
 //static
 bool MediaAnalyticsItem::isEnabled() {
@@ -764,10 +856,28 @@ bool MediaAnalyticsItem::isEnabled() {
     return true;
 }
 
+
+// monitor health of our connection to the metrics service
+class MediaMetricsDeathNotifier : public IBinder::DeathRecipient {
+        virtual void binderDied(const wp<IBinder> &) {
+            ALOGW("Reacquire service connection on next request");
+            MediaAnalyticsItem::dropInstance();
+        }
+};
+
+static sp<MediaMetricsDeathNotifier> sNotifier = NULL;
+
+// static
+void MediaAnalyticsItem::dropInstance() {
+    Mutex::Autolock _l(sInitMutex);
+    remainingBindAttempts = SVC_TRIES;
+    sAnalyticsService = NULL;
+}
+
 //static
 sp<IMediaAnalyticsService> MediaAnalyticsItem::getInstance() {
+
     static const char *servicename = "media.metrics";
-    static int tries_remaining = SVC_TRIES;
     int enabled = isEnabled();
 
     if (enabled == false) {
@@ -799,15 +909,20 @@ sp<IMediaAnalyticsService> MediaAnalyticsItem::getInstance() {
         Mutex::Autolock _l(sInitMutex);
         const char *badness = "";
 
-        // think of tries_remaining as telling us whether service==NULL because
+        // think of remainingBindAttempts as telling us whether service==NULL because
         // (1) we haven't tried to initialize it yet
         // (2) we've tried to initialize it, but failed.
-        if (sAnalyticsService == NULL && tries_remaining > 0) {
+        if (sAnalyticsService == NULL && remainingBindAttempts > 0) {
             sp<IServiceManager> sm = defaultServiceManager();
             if (sm != NULL) {
                 sp<IBinder> binder = sm->getService(String16(servicename));
                 if (binder != NULL) {
                     sAnalyticsService = interface_cast<IMediaAnalyticsService>(binder);
+                    if (sNotifier != NULL) {
+                        sNotifier = NULL;
+                    }
+                    sNotifier = new MediaMetricsDeathNotifier();
+                    binder->linkToDeath(sNotifier);
                 } else {
                     badness = "did not find service";
                 }
@@ -816,8 +931,8 @@ sp<IMediaAnalyticsService> MediaAnalyticsItem::getInstance() {
             }
 
             if (sAnalyticsService == NULL) {
-                if (tries_remaining > 0) {
-                    tries_remaining--;
+                if (remainingBindAttempts > 0) {
+                    remainingBindAttempts--;
                 }
                 if (DEBUG_SERVICEACCESS) {
                     ALOGD("Unable to bind to service %s: %s", servicename, badness);
@@ -828,7 +943,6 @@ sp<IMediaAnalyticsService> MediaAnalyticsItem::getInstance() {
         return sAnalyticsService;
     }
 }
-
 
 // merge the info from 'incoming' into this record.
 // we finish with a union of this+incoming and special handling for collisions

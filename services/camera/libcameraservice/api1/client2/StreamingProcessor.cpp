@@ -161,18 +161,17 @@ status_t StreamingProcessor::updatePreviewStream(const Parameters &params) {
 
     if (mPreviewStreamId != NO_STREAM) {
         // Check if stream parameters have to change
-        uint32_t currentWidth, currentHeight;
-        res = device->getStreamInfo(mPreviewStreamId,
-                &currentWidth, &currentHeight, 0, 0);
+        CameraDeviceBase::StreamInfo streamInfo;
+        res = device->getStreamInfo(mPreviewStreamId, &streamInfo);
         if (res != OK) {
             ALOGE("%s: Camera %d: Error querying preview stream info: "
                     "%s (%d)", __FUNCTION__, mId, strerror(-res), res);
             return res;
         }
-        if (currentWidth != (uint32_t)params.previewWidth ||
-                currentHeight != (uint32_t)params.previewHeight) {
+        if (streamInfo.width != (uint32_t)params.previewWidth ||
+                streamInfo.height != (uint32_t)params.previewHeight) {
             ALOGV("%s: Camera %d: Preview size switch: %d x %d -> %d x %d",
-                    __FUNCTION__, mId, currentWidth, currentHeight,
+                    __FUNCTION__, mId, streamInfo.width, streamInfo.height,
                     params.previewWidth, params.previewHeight);
             res = device->waitUntilDrained();
             if (res != OK) {
@@ -312,10 +311,8 @@ status_t StreamingProcessor::recordingStreamNeedsUpdate(
         return INVALID_OPERATION;
     }
 
-    uint32_t currentWidth, currentHeight, currentFormat;
-    android_dataspace currentDataSpace;
-    res = device->getStreamInfo(mRecordingStreamId,
-            &currentWidth, &currentHeight, &currentFormat, &currentDataSpace);
+    CameraDeviceBase::StreamInfo streamInfo;
+    res = device->getStreamInfo(mRecordingStreamId, &streamInfo);
     if (res != OK) {
         ALOGE("%s: Camera %d: Error querying recording output stream info: "
                 "%s (%d)", __FUNCTION__, mId,
@@ -324,10 +321,10 @@ status_t StreamingProcessor::recordingStreamNeedsUpdate(
     }
 
     if (mRecordingWindow == nullptr ||
-            currentWidth != (uint32_t)params.videoWidth ||
-            currentHeight != (uint32_t)params.videoHeight ||
-            currentFormat != (uint32_t)params.videoFormat ||
-            currentDataSpace != params.videoDataSpace) {
+            streamInfo.width != (uint32_t)params.videoWidth ||
+            streamInfo.height != (uint32_t)params.videoHeight ||
+            !streamInfo.matchFormat((uint32_t)params.videoFormat) ||
+            !streamInfo.matchDataSpace(params.videoDataSpace)) {
         *needsUpdate = true;
         return res;
     }
@@ -348,22 +345,18 @@ status_t StreamingProcessor::updateRecordingStream(const Parameters &params) {
 
     if (mRecordingStreamId != NO_STREAM) {
         // Check if stream parameters have to change
-        uint32_t currentWidth, currentHeight;
-        uint32_t currentFormat;
-        android_dataspace currentDataSpace;
-        res = device->getStreamInfo(mRecordingStreamId,
-                &currentWidth, &currentHeight,
-                &currentFormat, &currentDataSpace);
+        CameraDeviceBase::StreamInfo streamInfo;
+        res = device->getStreamInfo(mRecordingStreamId, &streamInfo);
         if (res != OK) {
             ALOGE("%s: Camera %d: Error querying recording output stream info: "
                     "%s (%d)", __FUNCTION__, mId,
                     strerror(-res), res);
             return res;
         }
-        if (currentWidth != (uint32_t)params.videoWidth ||
-                currentHeight != (uint32_t)params.videoHeight ||
-                currentFormat != (uint32_t)params.videoFormat ||
-                currentDataSpace != params.videoDataSpace) {
+        if (streamInfo.width != (uint32_t)params.videoWidth ||
+                streamInfo.height != (uint32_t)params.videoHeight ||
+                !streamInfo.matchFormat((uint32_t)params.videoFormat) ||
+                !streamInfo.matchDataSpace(params.videoDataSpace)) {
             // TODO: Should wait to be sure previous recording has finished
             res = device->deleteStream(mRecordingStreamId);
 

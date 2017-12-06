@@ -18,7 +18,7 @@
 
 #define SOFT_AVC_H_
 
-#include "SoftVideoDecoderOMXComponent.h"
+#include <media/stagefright/omx/SoftVideoDecoderOMXComponent.h>
 #include <utils/KeyedVector.h>
 
 #include "H264SwDecApi.h"

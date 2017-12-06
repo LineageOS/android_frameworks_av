@@ -789,7 +789,7 @@ void SoftMPEG2::onQueueFilled(OMX_U32 portIndex) {
 
             if (s_dec_op.u4_output_present) {
                 ssize_t timeStampIdx;
-                outHeader->nFilledLen = (mWidth * mHeight * 3) / 2;
+                outHeader->nFilledLen = (outputBufferWidth() * outputBufferHeight() * 3) / 2;
 
                 timeStampIdx = getMinTimestampIdx(mTimeStamps, mTimeStampsValid);
                 if (timeStampIdx < 0) {

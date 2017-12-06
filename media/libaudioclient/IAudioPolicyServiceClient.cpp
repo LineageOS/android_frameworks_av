@@ -48,6 +48,18 @@ inline void writeAudioConfigBaseToParcel(Parcel& data, const audio_config_base_t
     data.writeInt32((int32_t) config->format);
 }
 
+inline void readRecordClientInfoFromParcel(const Parcel& data, record_client_info_t *clientInfo) {
+    clientInfo->uid = (uid_t) data.readUint32();
+    clientInfo->session = (audio_session_t) data.readInt32();
+    clientInfo->source = (audio_source_t) data.readInt32();
+}
+
+inline void writeRecordClientInfoFromParcel(Parcel& data, const record_client_info_t *clientInfo) {
+    data.writeUint32((uint32_t) clientInfo->uid);
+    data.writeInt32((int32_t) clientInfo->session);
+    data.writeInt32((int32_t) clientInfo->source);
+}
+
 // ----------------------------------------------------------------------
 class BpAudioPolicyServiceClient : public BpInterface<IAudioPolicyServiceClient>
 {
@@ -80,14 +92,13 @@ public:
         remote()->transact(MIX_STATE_UPDATE, data, &reply, IBinder::FLAG_ONEWAY);
     }
 
-    void onRecordingConfigurationUpdate(int event, audio_session_t session,
-            audio_source_t source, const audio_config_base_t *clientConfig,
+    void onRecordingConfigurationUpdate(int event, const record_client_info_t *clientInfo,
+            const audio_config_base_t *clientConfig,
             const audio_config_base_t *deviceConfig, audio_patch_handle_t patchHandle) {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyServiceClient::getInterfaceDescriptor());
         data.writeInt32(event);
-        data.writeInt32(session);
-        data.writeInt32(source);
+        writeRecordClientInfoFromParcel(data, clientInfo);
         writeAudioConfigBaseToParcel(data, clientConfig);
         writeAudioConfigBaseToParcel(data, deviceConfig);
         data.writeInt32(patchHandle);
@@ -123,14 +134,14 @@ status_t BnAudioPolicyServiceClient::onTransact(
     case RECORDING_CONFIGURATION_UPDATE: {
             CHECK_INTERFACE(IAudioPolicyServiceClient, data, reply);
             int event = (int) data.readInt32();
-            audio_session_t session = (audio_session_t) data.readInt32();
-            audio_source_t source = (audio_source_t) data.readInt32();
+            record_client_info_t clientInfo;
             audio_config_base_t clientConfig;
             audio_config_base_t deviceConfig;
+            readRecordClientInfoFromParcel(data, &clientInfo);
             readAudioConfigBaseFromParcel(data, &clientConfig);
             readAudioConfigBaseFromParcel(data, &deviceConfig);
             audio_patch_handle_t patchHandle = (audio_patch_handle_t) data.readInt32();
-            onRecordingConfigurationUpdate(event, session, source, &clientConfig, &deviceConfig,
+            onRecordingConfigurationUpdate(event, &clientInfo, &clientConfig, &deviceConfig,
                     patchHandle);
             return NO_ERROR;
         } break;

@@ -29,8 +29,9 @@
 #include <media/hardware/MetadataBufferType.h>
 #include <android/hardware/media/omx/1.0/IOmxNode.h>
 
-#include <OMX_Core.h>
-#include <OMX_Video.h>
+#include <media/openmax/OMX_Core.h>
+#include <media/openmax/OMX_Video.h>
+#include <media/openmax/OMX_VideoExt.h>
 
 namespace android {
 
