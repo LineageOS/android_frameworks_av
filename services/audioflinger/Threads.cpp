@@ -1412,7 +1412,7 @@ status_t AudioFlinger::ThreadBase::addEffect_l(const sp<EffectModule>& effect)
     bool chainCreated = false;
 
     ALOGD_IF((mType == OFFLOAD) && !effect->isOffloadable(),
-             "addEffect_l() on offloaded thread %p: effect %s does not support offload flags %x",
+             "addEffect_l() on offloaded thread %p: effect %s does not support offload flags %#x",
                     this, effect->desc().name, effect->desc().flags);
 
     if (chain == 0) {
@@ -3697,7 +3697,7 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
         // mNormalSink below
 {
     ALOGV("MixerThread() id=%d device=%#x type=%d", id, device, type);
-    ALOGV("mSampleRate=%u, mChannelMask=%#x, mChannelCount=%u, mFormat=%d, mFrameSize=%zu, "
+    ALOGV("mSampleRate=%u, mChannelMask=%#x, mChannelCount=%u, mFormat=%#x, mFrameSize=%zu, "
             "mFrameCount=%zu, mNormalFrameCount=%zu",
             mSampleRate, mChannelMask, mChannelCount, mFormat, mFrameSize, mFrameCount,
             mNormalFrameCount);
@@ -3765,7 +3765,7 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
         NBAIO_Format origformat = format;
 #endif
         // adjust format to match that of the Fast Mixer
-        ALOGV("format changed from %d to %d", format.mFormat, fastMixerFormat);
+        ALOGV("format changed from %#x to %#x", format.mFormat, fastMixerFormat);
         format.mFormat = fastMixerFormat;
         format.mFrameSize = audio_bytes_per_sample(format.mFormat) * format.mChannelCount;
 

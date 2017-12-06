@@ -2674,13 +2674,13 @@ status_t AudioTrack::dump(int fd, const Vector<String16>& args __unused) const
     String8 result;
 
     result.append(" AudioTrack::dump\n");
-    result.appendFormat("  status(%d), state(%d), session Id(%d), flags(%x)\n",
+    result.appendFormat("  status(%d), state(%d), session Id(%d), flags(%#x)\n",
                         mStatus, mState, mSessionId, mFlags);
     result.appendFormat("  stream type(%d), left - right volume(%f, %f)\n",
                         (mStreamType == AUDIO_STREAM_DEFAULT) ?
                                 audio_attributes_to_stream_type(&mAttributes) : mStreamType,
                         mVolume[AUDIO_INTERLEAVE_LEFT], mVolume[AUDIO_INTERLEAVE_RIGHT]);
-    result.appendFormat("  format(%x), channel mask(%x), channel count(%u)\n",
+    result.appendFormat("  format(%#x), channel mask(%#x), channel count(%u)\n",
                   mFormat, mChannelMask, mChannelCount);
     result.appendFormat("  sample rate(%u), original sample rate(%u), speed(%f)\n",
                   mSampleRate, mOriginalSampleRate, mPlaybackRate.mSpeed);
