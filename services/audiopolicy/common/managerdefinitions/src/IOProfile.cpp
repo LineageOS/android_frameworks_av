@@ -122,16 +122,6 @@ void IOProfile::dump(int fd)
     result.append("\n");
     write(fd, result.string(), result.size());
     mSupportedDevices.dump(fd, String8("Supported"), 4, false);
-
-    result.clear();
-    snprintf(buffer, SIZE, "\n    - maxOpenCount: %u - curOpenCount: %u\n",
-             maxOpenCount, curOpenCount);
-    result.append(buffer);
-    snprintf(buffer, SIZE, "    - maxActiveCount: %u - curActiveCount: %u\n",
-             maxActiveCount, curActiveCount);
-    result.append(buffer);
-
-    write(fd, result.string(), result.size());
 }
 
 void IOProfile::log()
