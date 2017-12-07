@@ -444,7 +444,6 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *config,
         mFormat = lConfig.format;
         mId = AudioPort::getNextUniqueId();
         mIoHandle = *output;
-        mProfile->curOpenCount++;
     }
 
     return status;
@@ -459,11 +458,6 @@ void SwAudioOutputDescriptor::close()
         mClientInterface->setParameters(mIoHandle, param.toString());
 
         mClientInterface->closeOutput(mIoHandle);
-
-        LOG_ALWAYS_FATAL_IF(mProfile->curOpenCount < 1, "%s profile open count %u",
-                            __FUNCTION__, mProfile->curOpenCount);
-        mProfile->curOpenCount--;
-        mIoHandle = AUDIO_IO_HANDLE_NONE;
     }
 }
 
