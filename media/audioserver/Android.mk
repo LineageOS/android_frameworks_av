@@ -15,6 +15,7 @@ LOCAL_SHARED_LIBRARIES := \
 	liblog \
 	libhidltransport \
 	libhwbinder \
+	libmedia \
 	libmedialogservice \
 	libnbaio \
 	libsoundtriggerservice \
@@ -35,6 +36,7 @@ LOCAL_C_INCLUDES := \
 	frameworks/av/media/libaaudio/include \
 	frameworks/av/media/libaaudio/src \
 	frameworks/av/media/libaaudio/src/binding \
+	frameworks/av/media/libmedia \
 	$(call include-path-for, audio-utils) \
 	external/sonic \
 
