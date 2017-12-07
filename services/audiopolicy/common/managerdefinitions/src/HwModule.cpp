@@ -154,10 +154,9 @@ sp<DeviceDescriptor> HwModule::getRouteSinkDevice(const sp<AudioRoute> &route) c
 DeviceVector HwModule::getRouteSourceDevices(const sp<AudioRoute> &route) const
 {
     DeviceVector sourceDevices;
-    Vector <sp<AudioPort> > sources = route->getSources();
-    for (size_t i = 0; i < sources.size(); i++) {
-        if (sources[i]->getType() == AUDIO_PORT_TYPE_DEVICE) {
-            sourceDevices.add(mDeclaredDevices.getDeviceFromTagName(sources[i]->getTagName()));
+    for (const auto& source : route->getSources()) {
+        if (source->getType() == AUDIO_PORT_TYPE_DEVICE) {
+            sourceDevices.add(mDeclaredDevices.getDeviceFromTagName(source->getTagName()));
         }
     }
     return sourceDevices;
@@ -173,17 +172,15 @@ void HwModule::setRoutes(const AudioRouteVector &routes)
 void HwModule::refreshSupportedDevices()
 {
     // Now updating the streams (aka IOProfile until now) supported devices
-    for (size_t i = 0; i < mInputProfiles.size(); i++) {
-        sp<IOProfile> stream = mInputProfiles[i];
+    for (const auto& stream : mInputProfiles) {
         DeviceVector sourceDevices;
-        const AudioRouteVector &routes = stream->getRoutes();
-        for (size_t j = 0; j < routes.size(); j++) {
-            sp<AudioPort> sink = routes[j]->getSink();
+        for (const auto& route : stream->getRoutes()) {
+            sp<AudioPort> sink = route->getSink();
             if (sink == 0 || stream != sink) {
                 ALOGE("%s: Invalid route attached to input stream", __FUNCTION__);
                 continue;
             }
-            DeviceVector sourceDevicesForRoute = getRouteSourceDevices(routes[j]);
+            DeviceVector sourceDevicesForRoute = getRouteSourceDevices(route);
             if (sourceDevicesForRoute.isEmpty()) {
                 ALOGE("%s: invalid source devices for %s", __FUNCTION__, stream->getName().string());
                 continue;
@@ -196,17 +193,15 @@ void HwModule::refreshSupportedDevices()
         }
         stream->setSupportedDevices(sourceDevices);
     }
-    for (size_t i = 0; i < mOutputProfiles.size(); i++) {
-        sp<IOProfile> stream = mOutputProfiles[i];
+    for (const auto& stream : mOutputProfiles) {
         DeviceVector sinkDevices;
-        const AudioRouteVector &routes = stream->getRoutes();
-        for (size_t j = 0; j < routes.size(); j++) {
-            sp<AudioPort> source = routes[j]->getSources().findByTagName(stream->getTagName());
+        for (const auto& route : stream->getRoutes()) {
+            sp<AudioPort> source = route->getSources().findByTagName(stream->getTagName());
             if (source == 0 || stream != source) {
                 ALOGE("%s: Invalid route attached to output stream", __FUNCTION__);
                 continue;
             }
-            sp<DeviceDescriptor> sinkDevice = getRouteSinkDevice(routes[j]);
+            sp<DeviceDescriptor> sinkDevice = getRouteSinkDevice(route);
             if (sinkDevice == 0) {
                 ALOGE("%s: invalid sink device for %s", __FUNCTION__, stream->getName().string());
                 continue;

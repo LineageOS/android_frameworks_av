@@ -74,11 +74,11 @@ void AudioPort::toAudioPort(struct audio_port *port) const
     SortedVector<audio_format_t> flatenedFormats;
     SampleRateVector flatenedRates;
     ChannelsVector flatenedChannels;
-    for (size_t profileIndex = 0; profileIndex < mProfiles.size(); profileIndex++) {
-        if (mProfiles[profileIndex]->isValid()) {
-            audio_format_t formatToExport = mProfiles[profileIndex]->getFormat();
-            const SampleRateVector &ratesToExport = mProfiles[profileIndex]->getSampleRates();
-            const ChannelsVector &channelsToExport = mProfiles[profileIndex]->getChannels();
+    for (const auto& profile : mProfiles) {
+        if (profile->isValid()) {
+            audio_format_t formatToExport = profile->getFormat();
+            const SampleRateVector &ratesToExport = profile->getSampleRates();
+            const ChannelsVector &channelsToExport = profile->getChannels();
 
             if (flatenedFormats.indexOf(formatToExport) < 0) {
                 flatenedFormats.add(formatToExport);
@@ -130,14 +130,12 @@ void AudioPort::toAudioPort(struct audio_port *port) const
 
 void AudioPort::importAudioPort(const sp<AudioPort>& port, bool force __unused)
 {
-    size_t indexToImport;
-    for (indexToImport = 0; indexToImport < port->mProfiles.size(); indexToImport++) {
-        const sp<AudioProfile> &profileToImport = port->mProfiles[indexToImport];
+    for (const auto& profileToImport : port->mProfiles) {
         if (profileToImport->isValid()) {
             // Import only valid port, i.e. valid format, non empty rates and channels masks
             bool hasSameProfile = false;
-            for (size_t profileIndex = 0; profileIndex < mProfiles.size(); profileIndex++) {
-                if (*mProfiles[profileIndex] == *profileToImport) {
+            for (const auto& profile : mProfiles) {
+                if (*profile == *profileToImport) {
                     // never import a profile twice
                     hasSameProfile = true;
                     break;

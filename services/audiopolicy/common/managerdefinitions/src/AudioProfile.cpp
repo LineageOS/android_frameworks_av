@@ -233,8 +233,7 @@ status_t AudioProfileVector::checkExactProfile(uint32_t samplingRate,
         return NO_ERROR;
     }
 
-    for (size_t i = 0; i < size(); i++) {
-        const sp<AudioProfile> profile = itemAt(i);
+    for (const auto& profile : *this) {
         if (profile->checkExact(samplingRate, channelMask, format) == NO_ERROR) {
             return NO_ERROR;
         }
