@@ -664,4 +664,17 @@ OMX_ERRORTYPE SoftVideoEncoderOMXComponent::getExtensionIndex(
     return SimpleSoftOMXComponent::getExtensionIndex(name, index);
 }
 
+OMX_ERRORTYPE SoftVideoEncoderOMXComponent::validateInputBuffer(
+        const OMX_BUFFERHEADERTYPE *inputBufferHeader) {
+    size_t frameSize = mInputDataIsMeta ?
+            max(sizeof(VideoNativeMetadata), sizeof(VideoGrallocMetadata))
+            : mWidth * mHeight * 3 / 2;
+    if (inputBufferHeader->nFilledLen < frameSize) {
+        return OMX_ErrorUndefined;
+    } else if (inputBufferHeader->nFilledLen > frameSize) {
+        ALOGW("Input buffer contains more data than expected.");
+    }
+    return OMX_ErrorNone;
+}
+
 }  // namespace android
