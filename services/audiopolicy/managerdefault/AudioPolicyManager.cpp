@@ -1072,11 +1072,9 @@ status_t AudioPolicyManager::startOutput(audio_io_handle_t output,
 
     sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueAt(index);
 
-    if (!outputDesc->isActive()) {
-        if (!outputDesc->mProfile->canStartNewIo()) {
-            return INVALID_OPERATION;
-        }
-        outputDesc->mProfile->curActiveCount++;
+    status_t status = outputDesc->start();
+    if (status != NO_ERROR) {
+        return status;
     }
 
     // Routing?
@@ -1102,16 +1100,11 @@ status_t AudioPolicyManager::startOutput(audio_io_handle_t output,
 
     uint32_t delayMs = 0;
 
-    status_t status = startSource(outputDesc, stream, newDevice, address, &delayMs);
+    status = startSource(outputDesc, stream, newDevice, address, &delayMs);
 
     if (status != NO_ERROR) {
         mOutputRoutes.decRouteActivity(session);
-        if (!outputDesc->isActive()) {
-            LOG_ALWAYS_FATAL_IF(outputDesc->mProfile->curActiveCount < 1,
-                                "%s invalid profile active count %u",
-                                __FUNCTION__, outputDesc->mProfile->curActiveCount);
-            outputDesc->mProfile->curActiveCount--;
-        }
+        outputDesc->stop();
         return status;
     }
     // Automatically enable the remote submix input when output is started on a re routing mix
@@ -1302,11 +1295,8 @@ status_t AudioPolicyManager::stopOutput(audio_io_handle_t output,
 
     status_t status = stopSource(outputDesc, stream, forceDeviceUpdate);
 
-    if (status == NO_ERROR && !outputDesc->isActive()) {
-        LOG_ALWAYS_FATAL_IF(outputDesc->mProfile->curActiveCount < 1,
-                            "%s invalid profile active count %u",
-                            __FUNCTION__, outputDesc->mProfile->curActiveCount);
-        outputDesc->mProfile->curActiveCount--;
+    if (status == NO_ERROR ) {
+        outputDesc->stop();
     }
     return status;
 }
@@ -1929,14 +1919,14 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
         audio_devices_t device = getNewInputDevice(inputDesc);
         setInputDevice(input, device, true /* force */);
 
-        if (inputDesc->getAudioSessionCount(true/*activeOnly*/) == 1) {
-            if (!inputDesc->mProfile->canStartNewIo()) {
-                mInputRoutes.decRouteActivity(session);
-                audioSession->changeActiveCount(-1);
-                return INVALID_OPERATION;
-            }
-            inputDesc->mProfile->curActiveCount++;
+        status_t status = inputDesc->start();
+        if (status != NO_ERROR) {
+            mInputRoutes.decRouteActivity(session);
+            audioSession->changeActiveCount(-1);
+            return status;
+        }
 
+        if (inputDesc->getAudioSessionCount(true/*activeOnly*/) == 1) {
             // if input maps to a dynamic policy with an activity listener, notify of state change
             if ((inputDesc->mPolicyMix != NULL)
                     && ((inputDesc->mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
@@ -2002,15 +1992,10 @@ status_t AudioPolicyManager::stopInput(audio_io_handle_t input,
     mInputRoutes.decRouteActivity(session);
 
     if (audioSession->activeCount() == 0) {
-
+        inputDesc->stop();
         if (inputDesc->isActive()) {
             setInputDevice(input, getNewInputDevice(inputDesc), false /* force */);
         } else {
-            LOG_ALWAYS_FATAL_IF(inputDesc->mProfile->curActiveCount < 1,
-                                "%s invalid profile active count %u",
-                                __FUNCTION__, inputDesc->mProfile->curActiveCount);
-            inputDesc->mProfile->curActiveCount--;
-
             // if input maps to a dynamic policy with an activity listener, notify of state change
             if ((inputDesc->mPolicyMix != NULL)
                     && ((inputDesc->mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
@@ -3303,6 +3288,11 @@ status_t AudioPolicyManager::connectAudioSource(const sp<AudioSourceDescriptor>&
             ALOGV("%s output for device %08x is duplicated", __FUNCTION__, sinkDevice);
             return INVALID_OPERATION;
         }
+        status_t status = outputDesc->start();
+        if (status != NO_ERROR) {
+            return status;
+        }
+
         // create a special patch with no sink and two sources:
         // - the second source indicates to PatchPanel through which output mix this patch should
         // be connected as well as the stream type for volume control
@@ -3313,7 +3303,7 @@ status_t AudioPolicyManager::connectAudioSource(const sp<AudioSourceDescriptor>&
         srcDeviceDesc->toAudioPortConfig(&patch->sources[0], NULL);
         outputDesc->toAudioPortConfig(&patch->sources[1], NULL);
         patch->sources[1].ext.mix.usecase.stream = stream;
-        status_t status = mpClientInterface->createAudioPatch(patch,
+        status = mpClientInterface->createAudioPatch(patch,
                                                               &afPatchHandle,
                                                               0);
         ALOGV("%s patch panel returned %d patchHandle %d", __FUNCTION__,
@@ -3415,7 +3405,10 @@ status_t AudioPolicyManager::disconnectAudioSource(const sp<AudioSourceDescripto
     audio_stream_type_t stream = streamTypefromAttributesInt(&sourceDesc->mAttributes);
     sp<SwAudioOutputDescriptor> swOutputDesc = sourceDesc->mSwOutput.promote();
     if (swOutputDesc != 0) {
-        stopSource(swOutputDesc, stream, false);
+        status_t status = stopSource(swOutputDesc, stream, false);
+        if (status == NO_ERROR) {
+            swOutputDesc->stop();
+        }
         mpClientInterface->releaseAudioPatch(patchDesc->mAfPatchHandle, 0);
     } else {
         sp<HwAudioOutputDescriptor> hwOutputDesc = sourceDesc->mHwOutput.promote();
@@ -4149,7 +4142,7 @@ void AudioPolicyManager::closeOutput(audio_io_handle_t output)
         if (dupOutputDesc->isDuplicated() &&
                 (dupOutputDesc->mOutput1 == outputDesc ||
                 dupOutputDesc->mOutput2 == outputDesc)) {
-            sp<AudioOutputDescriptor> outputDesc2;
+            sp<SwAudioOutputDescriptor> outputDesc2;
             if (dupOutputDesc->mOutput1 == outputDesc) {
                 outputDesc2 = dupOutputDesc->mOutput2;
             } else {
@@ -4159,9 +4152,15 @@ void AudioPolicyManager::closeOutput(audio_io_handle_t output)
             // and as they were also referenced on the other output, the reference
             // count for their stream type must be adjusted accordingly on
             // the other output.
+            bool wasActive = outputDesc2->isActive();
             for (int j = 0; j < AUDIO_STREAM_CNT; j++) {
                 int refCount = dupOutputDesc->mRefCount[j];
                 outputDesc2->changeRefCount((audio_stream_type_t)j,-refCount);
+            }
+            // stop() will be a no op if the output is still active but is needed in case all
+            // active streams refcounts where cleared above
+            if (wasActive) {
+                outputDesc2->stop();
             }
             audio_io_handle_t duplicatedOutput = mOutputs.keyAt(i);
             ALOGV("closeOutput() closing also duplicated output %d", duplicatedOutput);

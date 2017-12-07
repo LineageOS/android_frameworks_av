@@ -126,6 +126,12 @@ public:
                           audio_stream_type_t stream,
                           audio_output_flags_t flags,
                           audio_io_handle_t *output);
+            // Called when a stream is about to be started
+            // Note: called before changeRefCount(1);
+            status_t start();
+            // Called after a stream is stopped.
+            // Note: called after changeRefCount(-1);
+            void stop();
             void close();
 
     const sp<IOProfile> mProfile;          // I/O profile this output derives from
