@@ -72,7 +72,7 @@ NuMediaExtractor::~NuMediaExtractor() {
 }
 
 status_t NuMediaExtractor::setDataSource(
-        const sp<IMediaHTTPService> &httpService,
+        const sp<MediaHTTPService> &httpService,
         const char *path,
         const KeyedVector<String8, String8> *headers) {
     Mutex::Autolock autoLock(mLock);

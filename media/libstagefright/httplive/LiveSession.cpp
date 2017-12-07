@@ -26,7 +26,7 @@
 #include "mpeg2ts/AnotherPacketSource.h"
 
 #include <cutils/properties.h>
-#include <media/IMediaHTTPService.h>
+#include <media/MediaHTTPService.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -274,7 +274,7 @@ ATSParser::SourceType LiveSession::getSourceTypeForStream(StreamType type) {
 
 LiveSession::LiveSession(
         const sp<AMessage> &notify, uint32_t flags,
-        const sp<IMediaHTTPService> &httpService)
+        const sp<MediaHTTPService> &httpService)
     : mNotify(notify),
       mFlags(flags),
       mHTTPService(httpService),

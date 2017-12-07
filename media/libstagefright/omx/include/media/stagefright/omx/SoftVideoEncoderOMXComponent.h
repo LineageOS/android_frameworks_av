@@ -67,6 +67,8 @@ protected:
 
     virtual OMX_ERRORTYPE getExtensionIndex(const char *name, OMX_INDEXTYPE *index);
 
+    OMX_ERRORTYPE validateInputBuffer(const OMX_BUFFERHEADERTYPE *inputBufferHeader);
+
     enum {
         kInputPortIndex = 0,
         kOutputPortIndex = 1,

@@ -594,7 +594,7 @@ int Visualizer_command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdSize,
                     deltaSmpl = CAPTURE_BUF_SIZE;
                 }
 
-                int32_t capturePoint = pContext->mCaptureIdx - deltaSmpl;
+                int32_t capturePoint = (int32_t)pContext->mCaptureIdx - deltaSmpl;
                 // a negative capturePoint means we wrap the buffer.
                 if (capturePoint < 0) {
                     uint32_t size = -capturePoint;

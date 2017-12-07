@@ -19,8 +19,8 @@
 #include "include/HTTPBase.h"
 #include "include/NuCachedSource2.h"
 
-#include <media/IMediaHTTPConnection.h>
-#include <media/IMediaHTTPService.h>
+#include <media/MediaHTTPConnection.h>
+#include <media/MediaHTTPService.h>
 #include <media/stagefright/DataSourceFactory.h>
 #include <media/stagefright/DataURISource.h>
 #include <media/stagefright/FileSource.h>
@@ -31,7 +31,7 @@ namespace android {
 
 // static
 sp<DataSource> DataSourceFactory::CreateFromURI(
-        const sp<IMediaHTTPService> &httpService,
+        const sp<MediaHTTPService> &httpService,
         const char *uri,
         const KeyedVector<String8, String8> *headers,
         String8 *contentType,
@@ -50,7 +50,7 @@ sp<DataSource> DataSourceFactory::CreateFromURI(
         }
 
         if (httpSource == NULL) {
-            sp<IMediaHTTPConnection> conn = httpService->makeHTTPConnection();
+            sp<MediaHTTPConnection> conn = httpService->makeHTTPConnection();
             if (conn == NULL) {
                 ALOGE("Failed to make http connection from http service!");
                 return NULL;
@@ -101,12 +101,12 @@ sp<DataSource> DataSourceFactory::CreateFromFd(int fd, int64_t offset, int64_t l
     return source->initCheck() != OK ? nullptr : source;
 }
 
-sp<DataSource> DataSourceFactory::CreateMediaHTTP(const sp<IMediaHTTPService> &httpService) {
+sp<DataSource> DataSourceFactory::CreateMediaHTTP(const sp<MediaHTTPService> &httpService) {
     if (httpService == NULL) {
         return NULL;
     }
 
-    sp<IMediaHTTPConnection> conn = httpService->makeHTTPConnection();
+    sp<MediaHTTPConnection> conn = httpService->makeHTTPConnection();
     if (conn == NULL) {
         return NULL;
     } else {
