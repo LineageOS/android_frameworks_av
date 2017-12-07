@@ -521,6 +521,11 @@ public:
     /* Get the flags */
             audio_input_flags_t getFlags() const { AutoMutex _l(mLock); return mFlags; }
 
+    /*
+     * Dumps the state of an audio record.
+     */
+            status_t    dump(int fd, const Vector<String16>& args) const;
+
 private:
     /* copying audio record objects is not allowed */
                         AudioRecord(const AudioRecord& other);

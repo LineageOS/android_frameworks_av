@@ -530,6 +530,27 @@ audio_port_handle_t AudioRecord::getRoutedDeviceId() {
     return mRoutedDeviceId;
 }
 
+status_t AudioRecord::dump(int fd, const Vector<String16>& args __unused) const
+{
+    String8 result;
+
+    result.append(" AudioRecord::dump\n");
+    result.appendFormat("  status(%d), active(%d), session Id(%d)\n",
+                        mStatus, mActive, mSessionId);
+    result.appendFormat("  flags(%#x), req. flags(%#x), audio source(%d)\n",
+                        mFlags, mOrigFlags, mAttributes.source);
+    result.appendFormat("  format(%#x), channel mask(%#x), channel count(%u), sample rate(%u)\n",
+                  mFormat, mChannelMask, mChannelCount, mSampleRate);
+    result.appendFormat("  frame count(%zu), req. frame count(%zu)\n",
+                  mFrameCount, mReqFrameCount);
+    result.appendFormat("  notif. frame count(%u), req. notif. frame count(%u)\n",
+             mNotificationFramesAct, mNotificationFramesReq);
+    result.appendFormat("  input(%d), latency(%u), selected device Id(%d), routed device Id(%d)\n",
+                        mInput, mLatency, mSelectedDeviceId, mRoutedDeviceId);
+    ::write(fd, result.string(), result.size());
+    return NO_ERROR;
+}
+
 // -------------------------------------------------------------------------
 // TODO Move this macro to a common header file for enum to string conversion in audio framework.
 #define MEDIA_CASE_ENUM(name) case name: return #name
