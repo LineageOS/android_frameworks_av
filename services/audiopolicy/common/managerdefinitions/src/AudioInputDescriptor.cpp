@@ -249,9 +249,6 @@ void AudioInputDescriptor::close()
         mClientInterface->closeInput(mIoHandle);
         LOG_ALWAYS_FATAL_IF(mProfile->curOpenCount < 1, "%s profile open count %u",
                             __FUNCTION__, mProfile->curOpenCount);
-        if (isActive()) {
-            mProfile->curActiveCount--;
-        }
         mProfile->curOpenCount--;
         mIoHandle = AUDIO_IO_HANDLE_NONE;
     }
