@@ -252,60 +252,40 @@ void HwModule::dump(int fd)
 
 sp <HwModule> HwModuleCollection::getModuleFromName(const char *name) const
 {
-    sp <HwModule> module;
-
-    for (size_t i = 0; i < size(); i++)
-    {
-        if (strcmp(itemAt(i)->getName(), name) == 0) {
-            return itemAt(i);
+    for (const auto& module : *this) {
+        if (strcmp(module->getName(), name) == 0) {
+            return module;
         }
     }
-    return module;
+    return nullptr;
 }
-
 
 sp <HwModule> HwModuleCollection::getModuleForDevice(audio_devices_t device) const
 {
-    sp <HwModule> module;
-
-    for (size_t i = 0; i < size(); i++) {
-        if (itemAt(i)->getHandle() == 0) {
-            continue;
-        }
-        if (audio_is_output_device(device)) {
-            for (size_t j = 0; j < itemAt(i)->mOutputProfiles.size(); j++)
-            {
-                if (itemAt(i)->mOutputProfiles[j]->supportDevice(device)) {
-                    return itemAt(i);
-                }
-            }
-        } else {
-            for (size_t j = 0; j < itemAt(i)->mInputProfiles.size(); j++) {
-                if (itemAt(i)->mInputProfiles[j]->supportDevice(device)) {
-                    return itemAt(i);
-                }
+    for (const auto& module : *this) {
+        IOProfileCollection& profiles = audio_is_output_device(device) ?
+                module->mOutputProfiles : module->mInputProfiles;
+        for (const auto& profile : profiles) {
+            if (profile->supportDevice(device)) {
+                return module;
             }
         }
     }
-    return module;
+    return nullptr;
 }
 
-sp<DeviceDescriptor>  HwModuleCollection::getDeviceDescriptor(const audio_devices_t device,
-                                                              const char *device_address,
-                                                              const char *device_name,
-                                                              bool matchAdress) const
+sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices_t device,
+                                                             const char *device_address,
+                                                             const char *device_name,
+                                                             bool matchAdress) const
 {
-    String8 address = (device_address == NULL) ? String8("") : String8(device_address);
+    String8 address = (device_address == nullptr) ? String8("") : String8(device_address);
     // handle legacy remote submix case where the address was not always specified
     if (device_distinguishes_on_address(device) && (address.length() == 0)) {
         address = String8("0");
     }
 
-    for (size_t i = 0; i < size(); i++) {
-        const sp<HwModule> hwModule = itemAt(i);
-        if (hwModule->mHandle == 0) {
-            continue;
-        }
+    for (const auto& hwModule : *this) {
         DeviceVector declaredDevices = hwModule->getDeclaredDevices();
         DeviceVector deviceList = declaredDevices.getDevicesFromTypeAddr(device, address);
         if (!deviceList.isEmpty()) {
@@ -339,5 +319,6 @@ status_t HwModuleCollection::dump(int fd) const
     }
     return NO_ERROR;
 }
+
 
 } //namespace android
