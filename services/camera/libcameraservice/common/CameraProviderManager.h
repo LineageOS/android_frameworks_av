@@ -384,6 +384,8 @@ private:
 
         // Generate vendor tag id
         static metadata_vendor_id_t generateVendorTagId(const std::string &name);
+
+        void removeDevice(std::string id);
     };
 
     // Utility to find a DeviceInfo by ID; pointer is only valid while mInterfaceMutex is held

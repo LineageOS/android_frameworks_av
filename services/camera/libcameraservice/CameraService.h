@@ -512,8 +512,9 @@ private:
     // Eumerate all camera providers in the system
     status_t enumerateProviders();
 
-    // Add a new camera to camera and torch state lists
+    // Add a new camera to camera and torch state lists or remove an unplugged one
     void addStates(const String8 id);
+    void removeStates(const String8 id);
 
     // Check if we can connect, before we acquire the service lock.
     // The returned originalClientPid is the PID of the original process that wants to connect to
