@@ -296,6 +296,43 @@ void AudioFlinger::EffectModule::process()
     const bool auxType =
             (mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY;
 
+    // safeInputOutputSampleCount is 0 if the channel count between input and output
+    // buffers do not match. This prevents automatic accumulation or copying between the
+    // input and output effect buffers without an intermediary effect process.
+    // TODO: consider implementing channel conversion.
+    const size_t safeInputOutputSampleCount =
+            inChannelCount != outChannelCount ? 0
+                    : outChannelCount * std::min(
+                            mConfig.inputCfg.buffer.frameCount,
+                            mConfig.outputCfg.buffer.frameCount);
+    const auto accumulateInputToOutput = [this, safeInputOutputSampleCount]() {
+#ifdef FLOAT_EFFECT_CHAIN
+        accumulate_float(
+                mConfig.outputCfg.buffer.f32,
+                mConfig.inputCfg.buffer.f32,
+                safeInputOutputSampleCount);
+#else
+        accumulate_i16(
+                mConfig.outputCfg.buffer.s16,
+                mConfig.inputCfg.buffer.s16,
+                safeInputOutputSampleCount);
+#endif
+    };
+    const auto copyInputToOutput = [this, safeInputOutputSampleCount]() {
+#ifdef FLOAT_EFFECT_CHAIN
+        memcpy(
+                mConfig.outputCfg.buffer.f32,
+                mConfig.inputCfg.buffer.f32,
+                safeInputOutputSampleCount * sizeof(*mConfig.outputCfg.buffer.f32));
+
+#else
+        memcpy(
+                mConfig.outputCfg.buffer.s16,
+                mConfig.inputCfg.buffer.s16,
+                safeInputOutputSampleCount * sizeof(*mConfig.outputCfg.buffer.s16));
+#endif
+    };
+
     if (isProcessEnabled()) {
         int ret;
         if (isProcessImplemented()) {
@@ -308,97 +345,69 @@ void AudioFlinger::EffectModule::process()
                     static_assert(sizeof(float) <= sizeof(int32_t),
                             "in-place conversion requires sizeof(float) <= sizeof(int32_t)");
 
-                    const int32_t * const p32 = mConfig.inputCfg.buffer.s32;
-                    float * const pFloat = mConfig.inputCfg.buffer.f32;
-                    memcpy_to_float_from_q4_27(pFloat, p32, mConfig.inputCfg.buffer.frameCount);
-                } else {
-                    memcpy_to_i16_from_q4_27(mConfig.inputCfg.buffer.s16,
+                    memcpy_to_float_from_q4_27(
+                            mConfig.inputCfg.buffer.f32,
+                            mConfig.inputCfg.buffer.s32,
+                            mConfig.inputCfg.buffer.frameCount);
+                } else
+#endif
+                {
+                    memcpy_to_i16_from_q4_27(
+                            mConfig.inputCfg.buffer.s16,
                             mConfig.inputCfg.buffer.s32,
                             mConfig.inputCfg.buffer.frameCount);
                 }
-#else
-                memcpy_to_i16_from_q4_27(mConfig.inputCfg.buffer.s16,
-                                            mConfig.inputCfg.buffer.s32,
-                                            mConfig.inputCfg.buffer.frameCount);
-#endif
             }
 #ifdef FLOAT_EFFECT_CHAIN
-            if (mSupportsFloat) {
-                ret = mEffectInterface->process();
-            } else {
-                {   // convert input to int16_t as effect doesn't support float.
-                    if (!auxType) {
-                        if (mInConversionBuffer.get() == nullptr) {
-                            ALOGW("%s: mInConversionBuffer is null, bypassing", __func__);
-                            goto data_bypass;
-                        }
-                        const float * const pIn = mInBuffer->audioBuffer()->f32;
-                        int16_t * const pIn16 = mInConversionBuffer->audioBuffer()->s16;
-                        memcpy_to_i16_from_float(
-                                pIn16, pIn, inChannelCount * mConfig.inputCfg.buffer.frameCount);
+            if (!mSupportsFloat) { // convert input to int16_t as effect doesn't support float.
+                if (!auxType) {
+                    if (mInConversionBuffer.get() == nullptr) {
+                        ALOGW("%s: mInConversionBuffer is null, bypassing", __func__);
+                        goto data_bypass;
                     }
-                    if (mConfig.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
-                        if (mOutConversionBuffer.get() == nullptr) {
-                            ALOGW("%s: mOutConversionBuffer is null, bypassing", __func__);
-                            goto data_bypass;
-                        }
-                        int16_t * const pOut16 = mOutConversionBuffer->audioBuffer()->s16;
-                        const float * const pOut = mOutBuffer->audioBuffer()->f32;
-                        memcpy_to_i16_from_float(
-                                pOut16,
-                                pOut,
-                                outChannelCount * mConfig.outputCfg.buffer.frameCount);
-                    }
+                    memcpy_to_i16_from_float(
+                            mInConversionBuffer->audioBuffer()->s16,
+                            mInBuffer->audioBuffer()->f32,
+                            inChannelCount * mConfig.inputCfg.buffer.frameCount);
                 }
-
-                ret = mEffectInterface->process();
-
-                {   // convert output back to float.
-                    const int16_t * const pOut16 = mOutConversionBuffer->audioBuffer()->s16;
-                    float * const pOut = mOutBuffer->audioBuffer()->f32;
-                    memcpy_to_float_from_i16(
-                            pOut, pOut16, outChannelCount * mConfig.outputCfg.buffer.frameCount);
+                if (mConfig.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
+                    if (mOutConversionBuffer.get() == nullptr) {
+                        ALOGW("%s: mOutConversionBuffer is null, bypassing", __func__);
+                        goto data_bypass;
+                    }
+                    memcpy_to_i16_from_float(
+                            mOutConversionBuffer->audioBuffer()->s16,
+                            mOutBuffer->audioBuffer()->f32,
+                            outChannelCount * mConfig.outputCfg.buffer.frameCount);
                 }
             }
-#else
+#endif
+
             ret = mEffectInterface->process();
+
+#ifdef FLOAT_EFFECT_CHAIN
+            if (!mSupportsFloat) { // convert output int16_t back to float.
+                memcpy_to_float_from_i16(
+                        mOutBuffer->audioBuffer()->f32,
+                        mOutConversionBuffer->audioBuffer()->s16,
+                        outChannelCount * mConfig.outputCfg.buffer.frameCount);
+            }
 #endif
         } else {
 #ifdef FLOAT_EFFECT_CHAIN
             data_bypass:
 #endif
             if (!auxType  /* aux effects do not require data bypass */
-                    && mConfig.inputCfg.buffer.raw != mConfig.outputCfg.buffer.raw
-                    && inChannelCount == outChannelCount) {
-                const size_t sampleCount = std::min(
-                        mConfig.inputCfg.buffer.frameCount,
-                        mConfig.outputCfg.buffer.frameCount) * outChannelCount;
-
-#ifdef FLOAT_EFFECT_CHAIN
-                const float * const in = mConfig.inputCfg.buffer.f32;
-                float * const out = mConfig.outputCfg.buffer.f32;
-
+                    && mConfig.inputCfg.buffer.raw != mConfig.outputCfg.buffer.raw) {
                 if (mConfig.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
-                    accumulate_float(out, in, sampleCount);
+                    accumulateInputToOutput();
                 } else {
-                    memcpy(mConfig.outputCfg.buffer.f32, mConfig.inputCfg.buffer.f32,
-                            sampleCount * sizeof(*mConfig.outputCfg.buffer.f32));
+                    copyInputToOutput();
                 }
-
-#else
-                const int16_t * const in = mConfig.inputCfg.buffer.s16;
-                int16_t * const out = mConfig.outputCfg.buffer.s16;
-
-                if (mConfig.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
-                    accumulate_i16(out, in, sampleCount);
-                } else {
-                    memcpy(mConfig.outputCfg.buffer.s16, mConfig.inputCfg.buffer.s16,
-                            sampleCount * sizeof(*mConfig.outputCfg.buffer.s16));
-                }
-#endif
             }
             ret = -ENODATA;
         }
+
         // force transition to IDLE state when engine is ready
         if (mState == STOPPED && ret == -ENODATA) {
             mDisableWaitCnt = 1;
@@ -417,21 +426,8 @@ void AudioFlinger::EffectModule::process()
         // If an insert effect is idle and input buffer is different from output buffer,
         // accumulate input onto output
         sp<EffectChain> chain = mChain.promote();
-        if (chain != 0
-                && chain->activeTrackCnt() != 0
-                && inChannelCount == outChannelCount) {
-            const size_t sampleCount = std::min(
-                    mConfig.inputCfg.buffer.frameCount,
-                    mConfig.outputCfg.buffer.frameCount) * outChannelCount;
-#ifdef FLOAT_EFFECT_CHAIN
-            const float * const in = mConfig.inputCfg.buffer.f32;
-            float * const out = mConfig.outputCfg.buffer.f32;
-            accumulate_float(out, in, sampleCount);
-#else
-            const int16_t * const in = mConfig.inputCfg.buffer.s16;
-            int16_t * const out = mConfig.outputCfg.buffer.s16;
-            accumulate_i16(out, in, sampleCount);
-#endif
+        if (chain.get() != nullptr && chain->activeTrackCnt() != 0) {
+            accumulateInputToOutput();
         }
     }
 }
@@ -927,7 +923,6 @@ void AudioFlinger::EffectModule::setInBuffer(const sp<EffectBufferHalInterface>&
             (void)EffectBufferHalInterface::allocate(size, &mInConversionBuffer);
         }
         if (mInConversionBuffer.get() != nullptr) {
-            // FIXME: confirm buffer has enough size.
             mInConversionBuffer->setFrameCount(inFrameCount);
             mEffectInterface->setInBuffer(mInConversionBuffer);
         } else if (size > 0) {
