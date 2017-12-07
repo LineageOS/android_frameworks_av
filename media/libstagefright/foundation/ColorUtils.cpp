@@ -62,23 +62,17 @@ ALookup<CU::ColorStandard, std::pair<CA::Primaries, CA::MatrixCoeffs>> sStandard
     }
 };
 
-// TODO: remove this. This is needed ABI compat as we used to instantiate this templated type.
 const static
-ALookup<CU::ColorTransfer, CA::Transfer> __sTransfersForAbiCompat {
-    {}
-};
-
-const static
-ALookup<CU::ColorTransferSdk, CA::Transfer> sTransfers{
+ALookup<CU::ColorTransfer, CA::Transfer> sTransfers{
     {
-        { CU::kColorTransferSdkUnspecified,    CA::TransferUnspecified },
-        { CU::kColorTransferSdkLinear,         CA::TransferLinear },
-        { CU::kColorTransferSdkSRGB,           CA::TransferSRGB },
-        { CU::kColorTransferSdkSMPTE_170M,     CA::TransferSMPTE170M },
-        { CU::kColorTransferSdkGamma22,        CA::TransferGamma22 },
-        { CU::kColorTransferSdkGamma28,        CA::TransferGamma28 },
-        { CU::kColorTransferSdkST2084,         CA::TransferST2084 },
-        { CU::kColorTransferSdkHLG,            CA::TransferHLG },
+        { CU::kColorTransferUnspecified,    CA::TransferUnspecified },
+        { CU::kColorTransferLinear,         CA::TransferLinear },
+        { CU::kColorTransferSRGB,           CA::TransferSRGB },
+        { CU::kColorTransferSMPTE_170M,     CA::TransferSMPTE170M },
+        { CU::kColorTransferGamma22,        CA::TransferGamma22 },
+        { CU::kColorTransferGamma28,        CA::TransferGamma28 },
+        { CU::kColorTransferST2084,         CA::TransferST2084 },
+        { CU::kColorTransferHLG,            CA::TransferHLG },
     }
 };
 
@@ -198,7 +192,7 @@ static bool isDefined(ColorAspects::Transfer t) {
 //  static
 int32_t ColorUtils::wrapColorAspectsIntoColorTransfer(
         ColorAspects::Transfer transfer) {
-    ColorTransferSdk res;
+    ColorTransfer res;
     if (sTransfers.map(transfer, &res)) {
         return res;
     } else if (!isValid(transfer)) {
@@ -214,7 +208,7 @@ int32_t ColorUtils::wrapColorAspectsIntoColorTransfer(
 //static
 status_t ColorUtils::unwrapColorAspectsFromColorTransfer(
         int32_t transfer, ColorAspects::Transfer *aspect) {
-    if (sTransfers.map((ColorTransferSdk)transfer, aspect)) {
+    if (sTransfers.map((ColorTransfer)transfer, aspect)) {
         return OK;
     }
 
@@ -404,7 +398,7 @@ void ColorUtils::setDefaultCodecColorAspectsIfNeeded(
 }
 
 // TODO: move this into a Video HAL
-// TODO: make this const static
+const static
 ALookup<CU::ColorStandard, std::pair<CA::Primaries, CA::MatrixCoeffs>> sStandardFallbacks {
     {
         { CU::kColorStandardBT601_625, { CA::PrimariesBT709_5, CA::MatrixBT470_6M } },
@@ -427,7 +421,7 @@ ALookup<CU::ColorStandard, std::pair<CA::Primaries, CA::MatrixCoeffs>> sStandard
     }
 };
 
-// TODO: make this const static
+const static
 ALookup<CU::ColorStandard, CA::Primaries> sStandardPrimariesFallbacks {
     {
         { CU::kColorStandardFilm,                 CA::PrimariesGenericFilm },
@@ -438,8 +432,7 @@ ALookup<CU::ColorStandard, CA::Primaries> sStandardPrimariesFallbacks {
     }
 };
 
-// TODO: make this const static
-static
+const static
 ALookup<android_dataspace, android_dataspace> sLegacyDataSpaceToV0 {
     {
         { HAL_DATASPACE_SRGB, HAL_DATASPACE_V0_SRGB },
@@ -479,26 +472,26 @@ static_assert(CU::kColorStandardBT601_525 == 4, "SDK mismatch"); // N
 static_assert(CU::kColorStandardBT2020 == 6, "SDK mismatch"); // N
 
 const static
-ALookup<CU::ColorTransferSdk, uint32_t> sGfxTransfers {
+ALookup<CU::ColorTransfer, uint32_t> sGfxTransfers {
     {
-        { CU::kColorTransferSdkUnspecified, GET_HAL_BITFIELD(TRANSFER, UNSPECIFIED) },
-        { CU::kColorTransferSdkLinear,      GET_HAL_BITFIELD(TRANSFER, LINEAR) },
-        { CU::kColorTransferSdkSRGB,        GET_HAL_BITFIELD(TRANSFER, SRGB) },
-        { CU::kColorTransferSdkSMPTE_170M,  GET_HAL_BITFIELD(TRANSFER, SMPTE_170M) },
-        { CU::kColorTransferSdkGamma22,     GET_HAL_BITFIELD(TRANSFER, GAMMA2_2) },
-        { CU::kColorTransferSdkGamma28,     GET_HAL_BITFIELD(TRANSFER, GAMMA2_8) },
-        { CU::kColorTransferSdkST2084,      GET_HAL_BITFIELD(TRANSFER, ST2084) },
-        { CU::kColorTransferSdkHLG,         GET_HAL_BITFIELD(TRANSFER, HLG) },
+        { CU::kColorTransferUnspecified, GET_HAL_BITFIELD(TRANSFER, UNSPECIFIED) },
+        { CU::kColorTransferLinear,      GET_HAL_BITFIELD(TRANSFER, LINEAR) },
+        { CU::kColorTransferSRGB,        GET_HAL_BITFIELD(TRANSFER, SRGB) },
+        { CU::kColorTransferSMPTE_170M,  GET_HAL_BITFIELD(TRANSFER, SMPTE_170M) },
+        { CU::kColorTransferGamma22,     GET_HAL_BITFIELD(TRANSFER, GAMMA2_2) },
+        { CU::kColorTransferGamma28,     GET_HAL_BITFIELD(TRANSFER, GAMMA2_8) },
+        { CU::kColorTransferST2084,      GET_HAL_BITFIELD(TRANSFER, ST2084) },
+        { CU::kColorTransferHLG,         GET_HAL_BITFIELD(TRANSFER, HLG) },
     }
 };
 
 // verify public values are stable
-static_assert(CU::kColorTransferSdkUnspecified == 0, "SDK mismatch"); // N
-static_assert(CU::kColorTransferSdkLinear == 1, "SDK mismatch"); // N
-static_assert(CU::kColorTransferSdkSRGB == 2, "SDK mismatch"); // N
-static_assert(CU::kColorTransferSdkSMPTE_170M == 3, "SDK mismatch"); // N
-static_assert(CU::kColorTransferSdkST2084 == 6, "SDK mismatch"); // N
-static_assert(CU::kColorTransferSdkHLG == 7, "SDK mismatch"); // N
+static_assert(CU::kColorTransferUnspecified == 0, "SDK mismatch"); // N
+static_assert(CU::kColorTransferLinear == 1, "SDK mismatch"); // N
+static_assert(CU::kColorTransferSRGB == 2, "SDK mismatch"); // N
+static_assert(CU::kColorTransferSMPTE_170M == 3, "SDK mismatch"); // N
+static_assert(CU::kColorTransferST2084 == 6, "SDK mismatch"); // N
+static_assert(CU::kColorTransferHLG == 7, "SDK mismatch"); // N
 
 const static
 ALookup<CU::ColorRange, uint32_t> sGfxRanges {
@@ -516,6 +509,7 @@ static_assert(CU::kColorRangeLimited == 2, "SDK mismatch"); // N
 
 #undef GET_HAL_BITFIELD
 #undef GET_HAL_ENUM
+
 
 bool ColorUtils::convertDataSpaceToV0(android_dataspace &dataSpace) {
     (void)sLegacyDataSpaceToV0.lookup(dataSpace, &dataSpace);
@@ -567,7 +561,7 @@ android_dataspace ColorUtils::getDataSpaceForColorAspects(ColorAspects &aspects,
 
     // default to video range and transfer
     ColorRange range = kColorRangeLimited;
-    ColorTransferSdk transfer = kColorTransferSdkSMPTE_170M;
+    ColorTransfer transfer = kColorTransferSMPTE_170M;
     (void)sRanges.map(aspects.mRange, &range);
     (void)sTransfers.map(aspects.mTransfer, &transfer);
 
@@ -648,7 +642,7 @@ void ColorUtils::getColorAspectsFromFormat(const sp<AMessage> &format, ColorAspe
         ALOGW("Ignoring illegal color aspects(R:%d(%s), S:%d(%s), T:%d(%s))",
                 range, asString((ColorRange)range),
                 standard, asString((ColorStandard)standard),
-                transfer, asString((ColorTransferSdk)transfer));
+                transfer, asString((ColorTransfer)transfer));
         // Invalid values were converted to unspecified !params!, but otherwise were not changed
         // For encoders, we leave these as is. For decoders, we will use default values.
     }
@@ -660,7 +654,7 @@ void ColorUtils::getColorAspectsFromFormat(const sp<AMessage> &format, ColorAspe
             aspects.mTransfer, asString(aspects.mTransfer),
             range, asString((ColorRange)range),
             standard, asString((ColorStandard)standard),
-            transfer, asString((ColorTransferSdk)transfer));
+            transfer, asString((ColorTransfer)transfer));
 }
 
 // static
@@ -687,7 +681,7 @@ void ColorUtils::setColorAspectsIntoFormat(
             aspects.mTransfer, asString(aspects.mTransfer),
             range, asString((ColorRange)range),
             standard, asString((ColorStandard)standard),
-            transfer, asString((ColorTransferSdk)transfer));
+            transfer, asString((ColorTransfer)transfer));
 }
 
 // static

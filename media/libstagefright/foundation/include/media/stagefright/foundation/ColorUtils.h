@@ -57,8 +57,6 @@ struct ColorUtils {
         kColorStandardFilm =                 9, // not in SDK
         kColorStandardDCI_P3 =               10, // not in SDK, new in Android 8.0
 
-        kColorStandardMax = 63, // TODO: remove post O
-
         /* This marks a section of color-standard values that are not supported by graphics HAL,
            but track defined color primaries-matrix coefficient combinations in media.
            These are stable for a given release. */
@@ -70,59 +68,30 @@ struct ColorUtils {
         kColorStandardVendorStart = 0x10000,
     };
 
-    /**
-     * These values shipped in Android O, but they do not correspond to the SDK values also in O.
-     * DO NOT USE THIS ENUM.
-     */
     enum ColorTransfer : uint32_t  {
         kColorTransferUnspecified = 0,
         kColorTransferLinear =      1,
         kColorTransferSRGB =        2,
-        kColorTransferSMPTE_170M =  3,
-        kColorTransferGamma22 =     4,
-        kColorTransferGamma28 =     6,
-        kColorTransferST2084 =      7,
-        kColorTransferHLG =         8,
-        kColorTransferMax =         31,
+        kColorTransferSMPTE_170M =  3, // not in SDK
+        kColorTransferGamma22 =     4, // not in SDK
+        kColorTransferGamma28 =     5, // not in SDK
+        kColorTransferST2084 =      6,
+        kColorTransferHLG =         7,
+        kColorTransferGamma26 =     8, // not in SDK, new in Android 8.0
 
         /* This marks a section of color-transfer values that are not supported by graphics HAL,
            but track media-defined color-transfer. These are stable for a given release. */
-        kColorTransferExtendedStart = kColorTransferMax + 1,
+        kColorTransferExtendedStart = 32,
 
         /* This marks a section of color-transfer values that are not supported by graphics HAL
            nor defined by media. These may differ per device. */
         kColorTransferVendorStart = 0x10000,
     };
 
-    /**
-     * TODO: rename this into ColorTransfer post Android O.
-     */
-    enum ColorTransferSdk : uint32_t  {
-        kColorTransferSdkUnspecified = 0,
-        kColorTransferSdkLinear =      1,
-        kColorTransferSdkSRGB =        2,
-        kColorTransferSdkSMPTE_170M =  3, // not in SDK
-        kColorTransferSdkGamma22 =     4, // not in SDK
-        kColorTransferSdkGamma28 =     5, // not in SDK
-        kColorTransferSdkST2084 =      6,
-        kColorTransferSdkHLG =         7,
-        kColorTransferSdkGamma26 =     8, // not in SDK, new in Android 8.0
-
-        /* This marks a section of color-transfer values that are not supported by graphics HAL,
-           but track media-defined color-transfer. These are stable for a given release. */
-        kColorTransferSdkExtendedStart = 32,
-
-        /* This marks a section of color-transfer values that are not supported by graphics HAL
-           nor defined by media. These may differ per device. */
-        kColorTransferSdkVendorStart = 0x10000,
-    };
-
     enum ColorRange : uint32_t  {
         kColorRangeUnspecified = 0,
         kColorRangeFull =        1,
         kColorRangeLimited =     2,
-
-        kColorRangeMax = 7, // TODO: remove post O
 
         /* This marks a section of color-transfer values that are not supported by graphics HAL,
            but track media-defined color-transfer. These are stable for a given release. */
@@ -231,7 +200,6 @@ inline static const char *asString(android::ColorUtils::ColorStandard i, const c
     }
 }
 
-// TODO: remove post O
 inline static const char *asString(android::ColorUtils::ColorTransfer i, const char *def = "??") {
     using namespace android;
     switch (i) {
@@ -243,23 +211,8 @@ inline static const char *asString(android::ColorUtils::ColorTransfer i, const c
         case ColorUtils::kColorTransferGamma28:     return "Gamma28";
         case ColorUtils::kColorTransferST2084:      return "ST2084";
         case ColorUtils::kColorTransferHLG:         return "HLG";
+        case ColorUtils::kColorTransferGamma26:     return "Gamma26";
         default:                                    return def;
-    }
-}
-
-inline static const char *asString(android::ColorUtils::ColorTransferSdk i, const char *def = "??") {
-    using namespace android;
-    switch (i) {
-        case ColorUtils::kColorTransferSdkUnspecified: return "Unspecified";
-        case ColorUtils::kColorTransferSdkLinear:      return "Linear";
-        case ColorUtils::kColorTransferSdkSRGB:        return "SRGB";
-        case ColorUtils::kColorTransferSdkSMPTE_170M:  return "SMPTE_170M";
-        case ColorUtils::kColorTransferSdkGamma22:     return "Gamma22";
-        case ColorUtils::kColorTransferSdkGamma28:     return "Gamma28";
-        case ColorUtils::kColorTransferSdkST2084:      return "ST2084";
-        case ColorUtils::kColorTransferSdkHLG:         return "HLG";
-        case ColorUtils::kColorTransferSdkGamma26:     return "Gamma26";
-        default:                                       return def;
     }
 }
 
