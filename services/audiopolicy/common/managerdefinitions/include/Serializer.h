@@ -92,8 +92,6 @@ struct MixPortTraits
         static const char name[];
         static const char role[];
         static const char flags[];
-        static const char maxOpenCount[];
-        static const char maxActiveCount[];
     };
 
     typedef IOProfile Element;
