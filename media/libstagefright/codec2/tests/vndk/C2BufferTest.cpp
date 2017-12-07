@@ -40,7 +40,7 @@ public:
     void allocateLinear(size_t capacity) {
         c2_status_t err = mLinearAllocator->newLinearAllocation(
                 capacity,
-                { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+                { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE },
                 &mLinearAllocation);
         if (err != C2_OK) {
             mLinearAllocation.reset();
@@ -53,7 +53,7 @@ public:
         c2_status_t err = mLinearAllocation->map(
                 offset,
                 size,
-                { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+                { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE },
                 // TODO: fence
                 nullptr,
                 &mAddr);
@@ -86,7 +86,7 @@ public:
                 width,
                 height,
                 HAL_PIXEL_FORMAT_YCBCR_420_888,
-                { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+                { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE },
                 &mGraphicAllocation);
         if (err != C2_OK) {
             mGraphicAllocation.reset();
@@ -94,19 +94,19 @@ public:
         }
     }
 
-    void mapGraphic(C2Rect rect, C2PlaneLayout *layout, uint8_t **addr) {
+    void mapGraphic(C2Rect rect, C2PlanarLayout *layout, uint8_t **addr) {
         ASSERT_TRUE(mGraphicAllocation);
         c2_status_t err = mGraphicAllocation->map(
                 rect,
-                { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+                { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE },
                 // TODO: fence
                 nullptr,
                 layout,
                 addr);
         if (err != C2_OK) {
-            addr[C2PlaneLayout::Y] = nullptr;
-            addr[C2PlaneLayout::U] = nullptr;
-            addr[C2PlaneLayout::V] = nullptr;
+            addr[C2PlanarLayout::PLANE_Y] = nullptr;
+            addr[C2PlanarLayout::PLANE_U] = nullptr;
+            addr[C2PlanarLayout::PLANE_V] = nullptr;
             FAIL() << "C2GraphicAllocation::map() failed: " << err;
         }
     }
@@ -163,7 +163,7 @@ TEST_F(C2BufferTest, BlockPoolTest) {
     std::shared_ptr<C2LinearBlock> block;
     ASSERT_EQ(C2_OK, blockPool->fetchLinearBlock(
             kCapacity,
-            { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+            { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE },
             &block));
     ASSERT_TRUE(block);
 
@@ -210,20 +210,20 @@ TEST_F(C2BufferTest, BlockPoolTest) {
 }
 
 void fillPlane(const C2Rect rect, const C2PlaneInfo info, uint8_t *addr, uint8_t value) {
-    for (uint32_t row = 0; row < rect.mHeight / info.mVertSubsampling; ++row) {
-        int32_t rowOffset = (row + rect.mTop / info.mVertSubsampling) * info.mRowInc;
-        for (uint32_t col = 0; col < rect.mWidth / info.mHorizSubsampling; ++col) {
-            int32_t colOffset = (col + rect.mLeft / info.mHorizSubsampling) * info.mColInc;
+    for (uint32_t row = 0; row < rect.height / info.rowSampling; ++row) {
+        int32_t rowOffset = (row + rect.top / info.rowSampling) * info.rowInc;
+        for (uint32_t col = 0; col < rect.width / info.colSampling; ++col) {
+            int32_t colOffset = (col + rect.left / info.colSampling) * info.colInc;
             addr[rowOffset + colOffset] = value;
         }
     }
 }
 
 bool verifyPlane(const C2Rect rect, const C2PlaneInfo info, const uint8_t *addr, uint8_t value) {
-    for (uint32_t row = 0; row < rect.mHeight / info.mVertSubsampling; ++row) {
-        int32_t rowOffset = (row + rect.mTop / info.mVertSubsampling) * info.mRowInc;
-        for (uint32_t col = 0; col < rect.mWidth / info.mHorizSubsampling; ++col) {
-            int32_t colOffset = (col + rect.mLeft / info.mHorizSubsampling) * info.mColInc;
+    for (uint32_t row = 0; row < rect.height / info.rowSampling; ++row) {
+        int32_t rowOffset = (row + rect.top / info.rowSampling) * info.rowInc;
+        for (uint32_t col = 0; col < rect.width / info.colSampling; ++col) {
+            int32_t colOffset = (col + rect.left / info.colSampling) * info.colInc;
             if (addr[rowOffset + colOffset] != value) {
                 return false;
             }
@@ -238,20 +238,20 @@ TEST_F(C2BufferTest, GraphicAllocationTest) {
 
     allocateGraphic(kWidth, kHeight);
 
-    uint8_t *addr[C2PlaneLayout::MAX_NUM_PLANES];
+    uint8_t *addr[C2PlanarLayout::MAX_NUM_PLANES];
     C2Rect rect{ 0, 0, kWidth, kHeight };
-    C2PlaneLayout layout;
+    C2PlanarLayout layout;
     mapGraphic(rect, &layout, addr);
-    ASSERT_NE(nullptr, addr[C2PlaneLayout::Y]);
-    ASSERT_NE(nullptr, addr[C2PlaneLayout::U]);
-    ASSERT_NE(nullptr, addr[C2PlaneLayout::V]);
+    ASSERT_NE(nullptr, addr[C2PlanarLayout::PLANE_Y]);
+    ASSERT_NE(nullptr, addr[C2PlanarLayout::PLANE_U]);
+    ASSERT_NE(nullptr, addr[C2PlanarLayout::PLANE_V]);
 
-    uint8_t *y = addr[C2PlaneLayout::Y];
-    C2PlaneInfo yInfo = layout.mPlanes[C2PlaneLayout::Y];
-    uint8_t *u = addr[C2PlaneLayout::U];
-    C2PlaneInfo uInfo = layout.mPlanes[C2PlaneLayout::U];
-    uint8_t *v = addr[C2PlaneLayout::V];
-    C2PlaneInfo vInfo = layout.mPlanes[C2PlaneLayout::V];
+    uint8_t *y = addr[C2PlanarLayout::PLANE_Y];
+    C2PlaneInfo yInfo = layout.planes[C2PlanarLayout::PLANE_Y];
+    uint8_t *u = addr[C2PlanarLayout::PLANE_U];
+    C2PlaneInfo uInfo = layout.planes[C2PlanarLayout::PLANE_U];
+    uint8_t *v = addr[C2PlanarLayout::PLANE_V];
+    C2PlaneInfo vInfo = layout.planes[C2PlanarLayout::PLANE_V];
 
     fillPlane(rect, yInfo, y, 0);
     fillPlane(rect, uInfo, u, 0);
@@ -263,16 +263,16 @@ TEST_F(C2BufferTest, GraphicAllocationTest) {
     unmapGraphic();
 
     mapGraphic(rect, &layout, addr);
-    ASSERT_NE(nullptr, addr[C2PlaneLayout::Y]);
-    ASSERT_NE(nullptr, addr[C2PlaneLayout::U]);
-    ASSERT_NE(nullptr, addr[C2PlaneLayout::V]);
+    ASSERT_NE(nullptr, addr[C2PlanarLayout::PLANE_Y]);
+    ASSERT_NE(nullptr, addr[C2PlanarLayout::PLANE_U]);
+    ASSERT_NE(nullptr, addr[C2PlanarLayout::PLANE_V]);
 
-    y = addr[C2PlaneLayout::Y];
-    yInfo = layout.mPlanes[C2PlaneLayout::Y];
-    u = addr[C2PlaneLayout::U];
-    uInfo = layout.mPlanes[C2PlaneLayout::U];
-    v = addr[C2PlaneLayout::V];
-    vInfo = layout.mPlanes[C2PlaneLayout::V];
+    y = addr[C2PlanarLayout::PLANE_Y];
+    yInfo = layout.planes[C2PlanarLayout::PLANE_Y];
+    u = addr[C2PlanarLayout::PLANE_U];
+    uInfo = layout.planes[C2PlanarLayout::PLANE_U];
+    v = addr[C2PlanarLayout::PLANE_V];
+    vInfo = layout.planes[C2PlanarLayout::PLANE_V];
 
     ASSERT_TRUE(verifyPlane({ kWidth / 4, kHeight / 4, kWidth / 2, kHeight / 2 }, yInfo, y, 0x12));
     ASSERT_TRUE(verifyPlane({ kWidth / 4, kHeight / 4, kWidth / 2, kHeight / 2 }, uInfo, u, 0x34));
@@ -296,7 +296,7 @@ TEST_F(C2BufferTest, GraphicBlockPoolTest) {
             kWidth,
             kHeight,
             HAL_PIXEL_FORMAT_YCBCR_420_888,
-            { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+            { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE },
             &block));
     ASSERT_TRUE(block);
 
@@ -307,15 +307,15 @@ TEST_F(C2BufferTest, GraphicBlockPoolTest) {
     ASSERT_EQ(kHeight, graphicView.height());
 
     uint8_t *const *data = graphicView.data();
-    C2PlaneLayout layout = graphicView.layout();
+    C2PlanarLayout layout = graphicView.layout();
     ASSERT_NE(nullptr, data);
 
-    uint8_t *y = data[C2PlaneLayout::Y];
-    C2PlaneInfo yInfo = layout.mPlanes[C2PlaneLayout::Y];
-    uint8_t *u = data[C2PlaneLayout::U];
-    C2PlaneInfo uInfo = layout.mPlanes[C2PlaneLayout::U];
-    uint8_t *v = data[C2PlaneLayout::V];
-    C2PlaneInfo vInfo = layout.mPlanes[C2PlaneLayout::V];
+    uint8_t *y = data[C2PlanarLayout::PLANE_Y];
+    C2PlaneInfo yInfo = layout.planes[C2PlanarLayout::PLANE_Y];
+    uint8_t *u = data[C2PlanarLayout::PLANE_U];
+    C2PlaneInfo uInfo = layout.planes[C2PlanarLayout::PLANE_U];
+    uint8_t *v = data[C2PlanarLayout::PLANE_V];
+    C2PlaneInfo vInfo = layout.planes[C2PlanarLayout::PLANE_V];
 
     fillPlane({ 0, 0, kWidth, kHeight }, yInfo, y, 0);
     fillPlane({ 0, 0, kWidth, kHeight }, uInfo, u, 0);
@@ -339,12 +339,12 @@ TEST_F(C2BufferTest, GraphicBlockPoolTest) {
     layout = graphicView.layout();
     ASSERT_NE(nullptr, constData);
 
-    const uint8_t *cy = constData[C2PlaneLayout::Y];
-    yInfo = layout.mPlanes[C2PlaneLayout::Y];
-    const uint8_t *cu = constData[C2PlaneLayout::U];
-    uInfo = layout.mPlanes[C2PlaneLayout::U];
-    const uint8_t *cv = constData[C2PlaneLayout::V];
-    vInfo = layout.mPlanes[C2PlaneLayout::V];
+    const uint8_t *cy = constData[C2PlanarLayout::PLANE_Y];
+    yInfo = layout.planes[C2PlanarLayout::PLANE_Y];
+    const uint8_t *cu = constData[C2PlanarLayout::PLANE_U];
+    uInfo = layout.planes[C2PlanarLayout::PLANE_U];
+    const uint8_t *cv = constData[C2PlanarLayout::PLANE_V];
+    vInfo = layout.planes[C2PlanarLayout::PLANE_V];
 
     ASSERT_TRUE(verifyPlane({ kWidth / 4, kHeight / 4, kWidth / 2, kHeight / 2 }, yInfo, cy, 0x12));
     ASSERT_TRUE(verifyPlane({ kWidth / 4, kHeight / 4, kWidth / 2, kHeight / 2 }, uInfo, cu, 0x34));
@@ -386,11 +386,11 @@ TEST_F(C2BufferTest, BufferDataTest) {
     std::shared_ptr<C2LinearBlock> linearBlock2;
     ASSERT_EQ(C2_OK, linearBlockPool->fetchLinearBlock(
             kCapacity1,
-            { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+            { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE },
             &linearBlock1));
     ASSERT_EQ(C2_OK, linearBlockPool->fetchLinearBlock(
             kCapacity2,
-            { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+            { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE },
             &linearBlock2));
     std::shared_ptr<C2GraphicBlock> graphicBlock1;
     std::shared_ptr<C2GraphicBlock> graphicBlock2;
@@ -398,13 +398,13 @@ TEST_F(C2BufferTest, BufferDataTest) {
             kWidth1,
             kHeight1,
             HAL_PIXEL_FORMAT_YCBCR_420_888,
-            { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+            { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE },
             &graphicBlock1));
     ASSERT_EQ(C2_OK, graphicBlockPool->fetchGraphicBlock(
             kWidth2,
             kHeight2,
             HAL_PIXEL_FORMAT_YCBCR_420_888,
-            { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+            { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE },
             &graphicBlock2));
 
     std::shared_ptr<C2BufferData> data(new BufferData({ linearBlock1->share(0, kCapacity1, C2Fence()) }));
@@ -460,7 +460,7 @@ TEST_F(C2BufferTest, BufferTest) {
 
     ASSERT_EQ(C2_OK, alloc->fetchLinearBlock(
             kCapacity,
-            { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+            { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE },
             &block));
 
     std::atomic_bool destroyed(false);

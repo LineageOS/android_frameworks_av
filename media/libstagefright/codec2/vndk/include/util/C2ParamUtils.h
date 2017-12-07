@@ -278,9 +278,9 @@ template<typename T, typename... Params>
 C2_HIDE
 void addC2Params(std::list<const C2FieldDescriptor> &fields, _C2Tuple<T, Params...> *)
 {
-    //C2Param::index_t index = T::coreIndex;
+    //C2Param::CodeIndex index = T::CORE_INDEX;
     //(void)index;
-    fields.insert(fields.end(), T::fieldList);
+    fields.insert(fields.end(), T::FIELD_LIST);
     addC2Params(fields, (_C2Tuple<Params...> *)nullptr);
 }
 

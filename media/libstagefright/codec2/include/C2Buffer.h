@@ -23,8 +23,6 @@
 #include <list>
 #include <memory>
 
-typedef int C2Fence;
-
 #ifdef __ANDROID__
 
 // #include <system/window.h>
@@ -738,20 +736,20 @@ class _C2PlanarCapacityAspect {
 /// \name Planar capacity interface
 /// @{
 public:
-    inline uint32_t width() const { return mWidth; }
-    inline uint32_t height() const { return mHeight; }
+    inline uint32_t width() const { return _mWidth; }
+    inline uint32_t height() const { return _mHeight; }
 
 protected:
     inline _C2PlanarCapacityAspect(uint32_t width, uint32_t height)
-      : mWidth(width), mHeight(height) { }
+      : _mWidth(width), _mHeight(height) { }
 
     inline _C2PlanarCapacityAspect(const _C2PlanarCapacityAspect *parent)
-        : mWidth(parent == nullptr ? 0 : parent->width()),
-          mHeight(parent == nullptr ? 0 : parent->height()) { }
+        : _mWidth(parent == nullptr ? 0 : parent->width()),
+          _mHeight(parent == nullptr ? 0 : parent->height()) { }
 
 private:
-    const uint32_t mWidth;
-    const uint32_t mHeight;
+    const uint32_t _mWidth;
+    const uint32_t _mHeight;
 /// @}
 };
 
@@ -762,25 +760,25 @@ private:
  */
 struct C2Rect {
 // public:
-    uint32_t mLeft;
-    uint32_t mTop;
-    uint32_t mWidth;
-    uint32_t mHeight;
+    uint32_t left;
+    uint32_t top;
+    uint32_t width;
+    uint32_t height;
 
-    constexpr inline C2Rect(uint32_t width, uint32_t height)
-        : C2Rect(width, height, 0, 0) { }
+    constexpr inline C2Rect(uint32_t width_, uint32_t height_)
+        : C2Rect(width_, height_, 0, 0) { }
 
-    constexpr inline C2Rect(uint32_t width, uint32_t height, uint32_t left, uint32_t top)
-        : mLeft(left), mTop(top), mWidth(width), mHeight(height) { }
+    constexpr inline C2Rect(uint32_t width_, uint32_t height_, uint32_t left_, uint32_t top_)
+        : left(left_), top(top_), width(width_), height(height_) { }
 
     // utility methods
 
     inline bool isEmpty() const {
-        return mWidth == 0 || mHeight == 0;
+        return width == 0 || height == 0;
     }
 
     inline bool isValid() const {
-        return mLeft <= ~mWidth && mTop <= ~mHeight;
+        return left <= ~width && top <= ~height;
     }
 
     inline operator bool() const {
@@ -797,9 +795,9 @@ struct C2Rect {
         } else if (other.isEmpty()) {
             return true;
         } else {
-            return mLeft <= other.mLeft && mTop <= other.mTop
-                    && mLeft + mWidth >= other.mLeft + other.mWidth
-                    && mTop + mHeight >= other.mTop + other.mHeight;
+            return left <= other.left && top <= other.top
+                    && left + width >= other.left + other.width
+                    && top + height >= other.top + other.height;
         }
     }
 
@@ -809,8 +807,8 @@ struct C2Rect {
         } else if (isEmpty()) {
             return other.isEmpty();
         } else {
-            return mLeft == other.mLeft && mTop == other.mTop
-                    && mWidth == other.mWidth && mHeight == other.mHeight;
+            return left == other.left && top == other.top
+                    && width == other.width && height == other.height;
         }
     }
 
@@ -836,78 +834,104 @@ struct C2Rect {
 };
 
 /**
- * C2PlaneInfo: information on the layout of flexible planes.
+ * C2PlaneInfo: information on the layout of a singe flexible plane.
  *
  * Public fields without getters/setters.
  */
 struct C2PlaneInfo {
-// public:
-    enum Channel : uint32_t {
-        Y,
-        R,
-        G,
-        B,
-        A,
-        Cr,
-        Cb,
-    } mChannel;
+//public:
+    enum channel_t : uint32_t {
+        CHANNEL_Y,  ///< luma
+        CHANNEL_R,  ///< red
+        CHANNEL_G,  ///< green
+        CHANNEL_B,  ///< blue
+        CHANNEL_A,  ///< alpha
+        CHANNEL_CR, ///< Cr
+        CHANNEL_CB, ///< Cb
+    } channel;
 
-    int32_t mColInc;               // column increment in bytes. may be negative
-    int32_t mRowInc;               // row increment in bytes. may be negative
-    uint32_t mHorizSubsampling;    // subsampling compared to width
-    uint32_t mVertSubsampling;     // subsampling compared to height
+    int32_t colInc;       ///< column increment in bytes. may be negative
+    int32_t rowInc;       ///< row increment in bytes. may be negative
+    uint32_t colSampling; ///< subsampling compared to width (must be a power of 2)
+    uint32_t rowSampling; ///< subsampling compared to height (must be a power of 2)
 
-    uint32_t mBitDepth;
-    uint32_t mAllocatedDepth;
+    uint32_t allocatedDepth; ///< size of each sample (must be a multiple of 8)
+    uint32_t bitDepth;       ///< significant bits per sample
+    /**
+     * the right shift of the significant bits in the sample. E.g. if a 10-bit significant
+     * value is laid out in a 16-bit allocation aligned to LSB (values 0-1023), rightShift
+     * would be 0 as the 16-bit value read from the sample does not need to be right shifted
+     * and can be used as is (after applying a 10-bit mask of 0x3FF).
+     *
+     * +--------+--------+
+     * |      VV|VVVVVVVV|
+     * +--------+--------+
+     *  15     8 7      0
+     *
+     * If the value is laid out aligned to MSB, rightShift would be 6, as the value read
+     * from the allocated sample must be right-shifted by 6 to get the actual sample value.
+     *
+     * +--------+--------+
+     * |VVVVVVVV|VV      |
+     * +--------+--------+
+     *  15     8 7      0
+     */
+    uint32_t rightShift;
+
+    enum endianness_t : uint32_t {
+        NATIVE,
+        LITTLE_END, // LITTLE_ENDIAN is reserved macro
+        BIG_END,    // BIG_ENDIAN is a reserved macro
+    } endianness; ///< endianness of the samples
 
     inline ssize_t minOffset(uint32_t width, uint32_t height) {
         ssize_t offs = 0;
-        if (width > 0 && mColInc < 0) {
-            offs += mColInc * (ssize_t)(width - 1);
+        if (width > 0 && colInc < 0) {
+            offs += colInc * (ssize_t)(width - 1);
         }
-        if (height > 0 && mRowInc < 0) {
-            offs += mRowInc * (ssize_t)(height - 1);
+        if (height > 0 && rowInc < 0) {
+            offs += rowInc * (ssize_t)(height - 1);
         }
         return offs;
     }
 
     inline ssize_t maxOffset(uint32_t width, uint32_t height, uint32_t allocatedDepth) {
         ssize_t offs = (allocatedDepth + 7) >> 3;
-        if (width > 0 && mColInc > 0) {
-            offs += mColInc * (ssize_t)(width - 1);
+        if (width > 0 && colInc > 0) {
+            offs += colInc * (ssize_t)(width - 1);
         }
-        if (height > 0 && mRowInc > 0) {
-            offs += mRowInc * (ssize_t)(height - 1);
+        if (height > 0 && rowInc > 0) {
+            offs += rowInc * (ssize_t)(height - 1);
         }
         return offs;
     }
 };
 
-struct C2PlaneLayout {
-public:
-    enum Type : uint32_t {
-        MEDIA_IMAGE_TYPE_UNKNOWN = 0,
-        MEDIA_IMAGE_TYPE_YUV = 0x100,
-        MEDIA_IMAGE_TYPE_YUVA,
-        MEDIA_IMAGE_TYPE_RGB,
-        MEDIA_IMAGE_TYPE_RGBA,
+struct C2PlanarLayout {
+//public:
+    enum type_t : uint32_t {
+        TYPE_UNKNOWN = 0,
+        TYPE_YUV = 0x100,
+        TYPE_YUVA,
+        TYPE_RGB,
+        TYPE_RGBA,
     };
 
-    Type mType;
-    uint32_t mNumPlanes;               // number of planes
+    type_t type;
+    uint32_t numPlanes;               // number of planes
 
-    enum PlaneIndex : uint32_t {
-        Y = 0,
-        U = 1,
-        V = 2,
-        R = 0,
-        G = 1,
-        B = 2,
-        A = 3,
+    enum plane_index_t : uint32_t {
+        PLANE_Y = 0,
+        PLANE_U = 1,
+        PLANE_V = 2,
+        PLANE_R = 0,
+        PLANE_G = 1,
+        PLANE_B = 2,
+        PLANE_A = 3,
         MAX_NUM_PLANES = 4,
     };
 
-    C2PlaneInfo mPlanes[MAX_NUM_PLANES];
+    C2PlaneInfo planes[MAX_NUM_PLANES];
 };
 
 /**
@@ -927,11 +951,11 @@ public:
      *  Sets crop to crop intersected with [(0,0) .. (width, height)]
      */
     inline void setCrop_be(const C2Rect &crop) {
-        mCrop.mLeft = std::min(width(), crop.mLeft);
-        mCrop.mTop = std::min(height(), crop.mTop);
-        // It's guaranteed that mCrop.mLeft <= width() && mCrop.mTop <= height()
-        mCrop.mWidth = std::min(width() - mCrop.mLeft, crop.mWidth);
-        mCrop.mHeight = std::min(height() - mCrop.mTop, crop.mHeight);
+        mCrop.left = std::min(width(), crop.left);
+        mCrop.top = std::min(height(), crop.top);
+        // It's guaranteed that mCrop.left <= width() && mCrop.top <= height()
+        mCrop.width = std::min(width() - mCrop.left, crop.width);
+        mCrop.height = std::min(height() - mCrop.top, crop.height);
     }
 
     /**
@@ -940,8 +964,8 @@ public:
      * \return true iff crop is within the dimensions of this object
      */
     inline bool setCrop(const C2Rect &crop) {
-        if (width() < crop.mWidth || height() < crop.mHeight
-                || width() - crop.mWidth < crop.mLeft || height() - crop.mHeight < crop.mTop) {
+        if (width() < crop.width || height() < crop.height
+                || width() - crop.width < crop.left || height() - crop.height < crop.top) {
             return false;
         }
         mCrop = crop;
@@ -1001,7 +1025,7 @@ public:
     /**
      * \return layout of the graphic block to interpret the returned data.
      */
-    const C2PlaneLayout layout() const;
+    const C2PlanarLayout layout() const;
 
     /**
      * Returns a section of this view.
@@ -1022,7 +1046,7 @@ protected:
     C2GraphicView(
             const _C2PlanarCapacityAspect *parent,
             uint8_t *const *data,
-            const C2PlaneLayout& layout);
+            const C2PlanarLayout& layout);
     explicit C2GraphicView(c2_status_t error);
 
 private:
@@ -1327,25 +1351,26 @@ struct C2MemoryUsage {
 // public:
     // TODO: match these to gralloc1.h
     enum Consumer : uint64_t {
-        kSoftwareRead        = GRALLOC_USAGE_SW_READ_OFTEN,
-        kRenderScriptRead    = GRALLOC_USAGE_RENDERSCRIPT,
-        kTextureRead         = GRALLOC_USAGE_HW_TEXTURE,
-        kHardwareComposer    = GRALLOC_USAGE_HW_COMPOSER,
-        kHardwareEncoder     = GRALLOC_USAGE_HW_VIDEO_ENCODER,
-        kProtectedRead       = GRALLOC_USAGE_PROTECTED,
+        // \todo do we need to distinguish often from rarely?
+        CPU_READ          = GRALLOC_USAGE_SW_READ_OFTEN,
+        RENDERSCRIPT_READ = GRALLOC_USAGE_RENDERSCRIPT,
+        HW_TEXTURE_READ   = GRALLOC_USAGE_HW_TEXTURE,
+        HW_COMPOSER_READ  = GRALLOC_USAGE_HW_COMPOSER,
+        HW_CODEC_READ     = GRALLOC_USAGE_HW_VIDEO_ENCODER,
+        READ_PROTECTED    = GRALLOC_USAGE_PROTECTED,
     };
 
     enum Producer : uint64_t {
-        kSoftwareWrite       = GRALLOC_USAGE_SW_WRITE_OFTEN,
-        kRenderScriptWrite   = GRALLOC_USAGE_RENDERSCRIPT,
-        kTextureWrite        = GRALLOC_USAGE_HW_RENDER,
-        kCompositionTarget   = GRALLOC_USAGE_HW_COMPOSER | GRALLOC_USAGE_HW_RENDER,
-        kHardwareDecoder     = GRALLOC_USAGE_HW_VIDEO_ENCODER,
-        kProtectedWrite      = GRALLOC_USAGE_PROTECTED,
+        CPU_WRITE          = GRALLOC_USAGE_SW_WRITE_OFTEN,
+        RENDERSCRIPT_WRITE = GRALLOC_USAGE_RENDERSCRIPT,
+        HW_TEXTURE_WRITE   = GRALLOC_USAGE_HW_RENDER,
+        HW_COMPOSER_WRITE  = GRALLOC_USAGE_HW_COMPOSER | GRALLOC_USAGE_HW_RENDER,
+        HW_CODEC_WRITE     = GRALLOC_USAGE_HW_VIDEO_ENCODER,
+        WRITE_PROTECTED    = GRALLOC_USAGE_PROTECTED,
     };
 
-    uint64_t mConsumer; // e.g. input
-    uint64_t mProducer; // e.g. output
+    uint64_t consumer; // e.g. input
+    uint64_t producer; // e.g. output
 };
 
 /**
@@ -1475,7 +1500,7 @@ public:
     virtual c2_status_t map(
             C2Rect rect, C2MemoryUsage usage, int *fenceFd,
             // TODO: return <addr, size> buffers with plane sizes
-            C2PlaneLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) = 0;
+            C2PlanarLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) = 0;
 
     /**
      * Unmaps the last mapped rectangular section.

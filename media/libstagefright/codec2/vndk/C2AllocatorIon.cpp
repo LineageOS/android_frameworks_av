@@ -147,10 +147,10 @@ public:
         *addr = nullptr;
         int prot = PROT_NONE;
         int flags = MAP_PRIVATE;
-        if (usage.mConsumer & GRALLOC_USAGE_SW_READ_MASK) {
+        if (usage.consumer & C2MemoryUsage::CPU_READ) {
             prot |= PROT_READ;
         }
-        if (usage.mProducer & GRALLOC_USAGE_SW_WRITE_MASK) {
+        if (usage.producer & C2MemoryUsage::CPU_WRITE) {
             prot |= PROT_WRITE;
             flags = MAP_SHARED;
         }

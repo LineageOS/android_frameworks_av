@@ -56,7 +56,7 @@ public:
 
     virtual c2_status_t map(
             C2Rect rect, C2MemoryUsage usage, int *fenceFd,
-            C2PlaneLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) override;
+            C2PlanarLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) override;
     virtual c2_status_t unmap(C2Fence *fenceFd /* nullable */) override;
     virtual bool isValid() const override { return true; }
     virtual const C2Handle *handle() const override { return mHandle; }
@@ -102,7 +102,7 @@ C2AllocationGralloc::~C2AllocationGralloc() {
 
 c2_status_t C2AllocationGralloc::map(
         C2Rect rect, C2MemoryUsage usage, int *fenceFd,
-        C2PlaneLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) {
+        C2PlanarLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) {
     // TODO
     (void) fenceFd;
     (void) usage;
@@ -133,7 +133,7 @@ c2_status_t C2AllocationGralloc::map(
         mMapper->lockYCbCr(
                 const_cast<native_handle_t *>(mBuffer),
                 BufferUsage::CPU_READ_OFTEN | BufferUsage::CPU_WRITE_OFTEN,
-                { (int32_t)rect.mLeft, (int32_t)rect.mTop, (int32_t)rect.mWidth, (int32_t)rect.mHeight },
+                { (int32_t)rect.left, (int32_t)rect.top, (int32_t)rect.width, (int32_t)rect.height },
                 // TODO: fence
                 hidl_handle(),
                 [&err, &ycbcrLayout](const auto &maperr, const auto &mapLayout) {
@@ -145,44 +145,50 @@ c2_status_t C2AllocationGralloc::map(
         if (err != C2_OK) {
             return err;
         }
-        addr[C2PlaneLayout::Y] = (uint8_t *)ycbcrLayout.y;
-        addr[C2PlaneLayout::U] = (uint8_t *)ycbcrLayout.cb;
-        addr[C2PlaneLayout::V] = (uint8_t *)ycbcrLayout.cr;
-        layout->mType = C2PlaneLayout::MEDIA_IMAGE_TYPE_YUV;
-        layout->mNumPlanes = 3;
-        layout->mPlanes[C2PlaneLayout::Y] = {
-            C2PlaneInfo::Y,                 // mChannel
-            1,                              // mColInc
-            (int32_t)ycbcrLayout.yStride,   // mRowInc
-            1,                              // mHorizSubsampling
-            1,                              // mVertSubsampling
-            8,                              // mBitDepth
-            8,                              // mAllocatedDepth
+        addr[C2PlanarLayout::PLANE_Y] = (uint8_t *)ycbcrLayout.y;
+        addr[C2PlanarLayout::PLANE_U] = (uint8_t *)ycbcrLayout.cb;
+        addr[C2PlanarLayout::PLANE_V] = (uint8_t *)ycbcrLayout.cr;
+        layout->type = C2PlanarLayout::TYPE_YUV;
+        layout->numPlanes = 3;
+        layout->planes[C2PlanarLayout::PLANE_Y] = {
+            C2PlaneInfo::CHANNEL_Y,         // channel
+            1,                              // colInc
+            (int32_t)ycbcrLayout.yStride,   // rowInc
+            1,                              // mColSampling
+            1,                              // mRowSampling
+            8,                              // allocatedDepth
+            8,                              // bitDepth
+            0,                              // rightShift
+            C2PlaneInfo::NATIVE,            // endianness
         };
-        layout->mPlanes[C2PlaneLayout::U] = {
-            C2PlaneInfo::Cb,                  // mChannel
-            (int32_t)ycbcrLayout.chromaStep,  // mColInc
-            (int32_t)ycbcrLayout.cStride,     // mRowInc
-            2,                                // mHorizSubsampling
-            2,                                // mVertSubsampling
-            8,                                // mBitDepth
-            8,                                // mAllocatedDepth
+        layout->planes[C2PlanarLayout::PLANE_U] = {
+            C2PlaneInfo::CHANNEL_CB,          // channel
+            (int32_t)ycbcrLayout.chromaStep,  // colInc
+            (int32_t)ycbcrLayout.cStride,     // rowInc
+            2,                                // mColSampling
+            2,                                // mRowSampling
+            8,                                // allocatedDepth
+            8,                                // bitDepth
+            0,                                // rightShift
+            C2PlaneInfo::NATIVE,              // endianness
         };
-        layout->mPlanes[C2PlaneLayout::V] = {
-            C2PlaneInfo::Cr,                  // mChannel
-            (int32_t)ycbcrLayout.chromaStep,  // mColInc
-            (int32_t)ycbcrLayout.cStride,     // mRowInc
-            2,                                // mHorizSubsampling
-            2,                                // mVertSubsampling
-            8,                                // mBitDepth
-            8,                                // mAllocatedDepth
+        layout->planes[C2PlanarLayout::PLANE_V] = {
+            C2PlaneInfo::CHANNEL_CR,          // channel
+            (int32_t)ycbcrLayout.chromaStep,  // colInc
+            (int32_t)ycbcrLayout.cStride,     // rowInc
+            2,                                // mColSampling
+            2,                                // mRowSampling
+            8,                                // allocatedDepth
+            8,                                // bitDepth
+            0,                                // rightShift
+            C2PlaneInfo::NATIVE,              // endianness
         };
     } else {
         void *pointer = nullptr;
         mMapper->lock(
                 const_cast<native_handle_t *>(mBuffer),
                 BufferUsage::CPU_READ_OFTEN | BufferUsage::CPU_WRITE_OFTEN,
-                { (int32_t)rect.mLeft, (int32_t)rect.mTop, (int32_t)rect.mWidth, (int32_t)rect.mHeight },
+                { (int32_t)rect.left, (int32_t)rect.top, (int32_t)rect.width, (int32_t)rect.height },
                 // TODO: fence
                 hidl_handle(),
                 [&err, &pointer](const auto &maperr, const auto &mapPointer) {

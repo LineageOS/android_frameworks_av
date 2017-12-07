@@ -227,7 +227,7 @@ public:
         if (mBase == nullptr) {
             void *base = nullptr;
             mError = mAllocation->map(
-                    offset, size, { C2MemoryUsage::kSoftwareRead, 0 }, nullptr, &base);
+                    offset, size, { C2MemoryUsage::CPU_READ, 0 }, nullptr, &base);
             // TODO: fence
             if (mError == C2_OK) {
                 mBase = (uint8_t *)base;
@@ -291,7 +291,7 @@ public:
             mError = mAllocation->map(
                     0u,
                     capacity,
-                    { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+                    { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE },
                     nullptr,
                     &base);
             if (mError == C2_OK) {
@@ -390,24 +390,24 @@ const C2Handle *C2Block2D::handle() const {
 
 class C2GraphicView::Impl {
 public:
-    Impl(uint8_t *const *data, const C2PlaneLayout &layout)
+    Impl(uint8_t *const *data, const C2PlanarLayout &layout)
         : mData(data), mLayout(layout), mError(C2_OK) {}
     explicit Impl(c2_status_t error) : mData(nullptr), mError(error) {}
 
     uint8_t *const *data() const { return mData; }
-    const C2PlaneLayout &layout() const { return mLayout; }
+    const C2PlanarLayout &layout() const { return mLayout; }
     c2_status_t error() const { return mError; }
 
 private:
     uint8_t *const *mData;
-    C2PlaneLayout mLayout;
+    C2PlanarLayout mLayout;
     c2_status_t mError;
 };
 
 C2GraphicView::C2GraphicView(
         const _C2PlanarCapacityAspect *parent,
         uint8_t *const *data,
-        const C2PlaneLayout& layout)
+        const C2PlanarLayout& layout)
     : _C2PlanarSection(parent), mImpl(new Impl(data, layout)) {}
 
 C2GraphicView::C2GraphicView(c2_status_t error)
@@ -421,7 +421,7 @@ uint8_t *const *C2GraphicView::data() {
     return mImpl->data();
 }
 
-const C2PlaneLayout C2GraphicView::layout() const {
+const C2PlanarLayout C2GraphicView::layout() const {
     return mImpl->layout();
 }
 
@@ -460,7 +460,7 @@ public:
         }
         c2_status_t err = mAllocation->map(
                 rect,
-                { C2MemoryUsage::kSoftwareRead, 0 },
+                { C2MemoryUsage::CPU_READ, 0 },
                 nullptr,
                 &mLayout,
                 mData);
@@ -480,12 +480,12 @@ public:
         return mData[0] == nullptr ? nullptr : &mData[0];
     }
 
-    const C2PlaneLayout &layout() const { return mLayout; }
+    const C2PlanarLayout &layout() const { return mLayout; }
 
 private:
     std::shared_ptr<C2GraphicAllocation> mAllocation;
-    C2PlaneLayout mLayout;
-    uint8_t *mData[C2PlaneLayout::MAX_NUM_PLANES];
+    C2PlanarLayout mLayout;
+    uint8_t *mData[C2PlanarLayout::MAX_NUM_PLANES];
 };
 
 C2ConstGraphicBlock::C2ConstGraphicBlock(
@@ -523,10 +523,10 @@ public:
             // Already mapped.
             return C2_OK;
         }
-        uint8_t *data[C2PlaneLayout::MAX_NUM_PLANES];
+        uint8_t *data[C2PlanarLayout::MAX_NUM_PLANES];
         c2_status_t err = mAllocation->map(
                 rect,
-                { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+                { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE },
                 nullptr,
                 &mLayout,
                 data);
@@ -548,12 +548,12 @@ public:
         return mData[0] == nullptr ? nullptr : mData;
     }
 
-    const C2PlaneLayout &layout() const { return mLayout; }
+    const C2PlanarLayout &layout() const { return mLayout; }
 
 private:
     std::shared_ptr<C2GraphicAllocation> mAllocation;
-    C2PlaneLayout mLayout;
-    uint8_t *mData[C2PlaneLayout::MAX_NUM_PLANES];
+    C2PlanarLayout mLayout;
+    uint8_t *mData[C2PlanarLayout::MAX_NUM_PLANES];
 };
 
 C2GraphicBlock::C2GraphicBlock(const std::shared_ptr<C2GraphicAllocation> &alloc)
@@ -708,7 +708,7 @@ public:
 private:
     C2Buffer * const mThis;
     C2DefaultBufferData mData;
-    std::map<uint32_t, std::shared_ptr<C2Info>> mInfos;
+    std::map<C2Param::Type, std::shared_ptr<C2Info>> mInfos;
     std::list<std::pair<OnDestroyNotify, void *>> mNotify;
 };
 

@@ -98,7 +98,7 @@ public:
         status_t err = mAlloc->fetchLinearBlock(
                 // TODO: proper max input size
                 65536,
-                { 0, C2MemoryUsage::kSoftwareWrite },
+                { 0, C2MemoryUsage::CPU_WRITE },
                 &block);
         if (err != OK) {
             return false;
