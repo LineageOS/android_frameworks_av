@@ -95,7 +95,7 @@ void ClearKeySessionLibrary::destroySession(const CasSessionId& sessionId) {
 void ClearKeySessionLibrary::destroyPlugin(CasPlugin *plugin) {
     Mutex::Autolock lock(mSessionsLock);
 
-    for (ssize_t index = mIDToSessionMap.size() - 1; index >= 0; index--) {
+    for (ssize_t index = (ssize_t)mIDToSessionMap.size() - 1; index >= 0; index--) {
         sp<ClearKeyCasSession> session = mIDToSessionMap.valueAt(index);
         if (session->getPlugin() == plugin) {
             mIDToSessionMap.removeItemsAt(index);
