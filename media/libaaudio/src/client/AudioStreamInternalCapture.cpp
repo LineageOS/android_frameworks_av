@@ -232,8 +232,7 @@ int64_t AudioStreamInternalCapture::getFramesRead() {
 void *AudioStreamInternalCapture::callbackLoop() {
     aaudio_result_t result = AAUDIO_OK;
     aaudio_data_callback_result_t callbackResult = AAUDIO_CALLBACK_RESULT_CONTINUE;
-    AAudioStream_dataCallback appCallback = getDataCallbackProc();
-    if (appCallback == nullptr) return NULL;
+    if (!isDataCallbackSet()) return NULL;
 
     // result might be a frame count
     while (mCallbackEnabled.load() && isActive() && (result >= 0)) {
@@ -249,22 +248,12 @@ void *AudioStreamInternalCapture::callbackLoop() {
                 // Only read some of the frames requested. Must have timed out.
                 result = AAUDIO_ERROR_TIMEOUT;
             }
-            AAudioStream_errorCallback errorCallback = getErrorCallbackProc();
-            if (errorCallback != nullptr) {
-                (*errorCallback)(
-                        (AAudioStream *) this,
-                        getErrorCallbackUserData(),
-                        result);
-            }
+            maybeCallErrorCallback(result);
             break;
         }
 
         // Call application using the AAudio callback interface.
-        callbackResult = (*appCallback)(
-                (AAudioStream *) this,
-                getDataCallbackUserData(),
-                mCallbackBuffer,
-                mCallbackFrames);
+        callbackResult = maybeCallDataCallback(mCallbackBuffer, mCallbackFrames);
 
         if (callbackResult == AAUDIO_CALLBACK_RESULT_STOP) {
             ALOGD("callback returned AAUDIO_CALLBACK_RESULT_STOP");

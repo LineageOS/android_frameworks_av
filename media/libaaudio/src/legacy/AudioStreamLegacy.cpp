@@ -48,19 +48,14 @@ aaudio_legacy_callback_t AudioStreamLegacy::getLegacyCallback() {
     return AudioStreamLegacy_callback;
 }
 
-int32_t AudioStreamLegacy::callDataCallbackFrames(uint8_t *buffer, int32_t numFrames) {
+aaudio_data_callback_result_t AudioStreamLegacy::callDataCallbackFrames(uint8_t *buffer, int32_t numFrames) {
     if (getDirection() == AAUDIO_DIRECTION_INPUT) {
         // Increment before because we already got the data from the device.
         incrementFramesRead(numFrames);
     }
 
     // Call using the AAudio callback interface.
-    AAudioStream_dataCallback appCallback = getDataCallbackProc();
-    aaudio_data_callback_result_t callbackResult = (*appCallback)(
-            (AAudioStream *) this,
-            getDataCallbackUserData(),
-            buffer,
-            numFrames);
+    aaudio_data_callback_result_t callbackResult = maybeCallDataCallback(buffer, numFrames);
 
     if (callbackResult == AAUDIO_CALLBACK_RESULT_CONTINUE
             && getDirection() == AAUDIO_DIRECTION_OUTPUT) {
@@ -73,22 +68,26 @@ int32_t AudioStreamLegacy::callDataCallbackFrames(uint8_t *buffer, int32_t numFr
 // Implement FixedBlockProcessor
 int32_t AudioStreamLegacy::onProcessFixedBlock(uint8_t *buffer, int32_t numBytes) {
     int32_t numFrames = numBytes / getBytesPerFrame();
-    return callDataCallbackFrames(buffer, numFrames);
+    return (int32_t) callDataCallbackFrames(buffer, numFrames);
 }
 
 void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode, void *info) {
     aaudio_data_callback_result_t callbackResult;
+    // This illegal size can be used to AudioFlinger to stop calling us.
+    // This takes advantage of AudioFlinger killing the stream.
+    // TODO need API change in AudioRecord and AudioTrack
+    const size_t SIZE_STOP_CALLBACKS = SIZE_MAX;
 
     switch (opcode) {
         case AAUDIO_CALLBACK_OPERATION_PROCESS_DATA: {
-            checkForDisconnectRequest();
+            (void) checkForDisconnectRequest(true);
 
             // Note that this code assumes an AudioTrack::Buffer is the same as
             // AudioRecord::Buffer
             // TODO define our own AudioBuffer and pass it from the subclasses.
             AudioTrack::Buffer *audioBuffer = static_cast<AudioTrack::Buffer *>(info);
             if (getState() == AAUDIO_STREAM_STATE_DISCONNECTED || !mCallbackEnabled.load()) {
-                audioBuffer->size = 0; // silence the buffer
+                audioBuffer->size = SIZE_STOP_CALLBACKS;
             } else {
                 if (audioBuffer->frameCount == 0) {
                     return;
@@ -106,8 +105,11 @@ void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode
                 }
                 if (callbackResult == AAUDIO_CALLBACK_RESULT_CONTINUE) {
                     audioBuffer->size = audioBuffer->frameCount * getBytesPerFrame();
-                } else {
-                    audioBuffer->size = 0;
+                } else { // STOP or invalid result
+                    ALOGW("%s() stop stream by faking an error", __func__);
+                    audioBuffer->size = SIZE_STOP_CALLBACKS;
+                    // Disable the callback just in case AudioFlinger keeps trying to call us.
+                    mCallbackEnabled.store(false);
                 }
 
                 if (updateStateMachine() != AAUDIO_OK) {
@@ -130,26 +132,23 @@ void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode
     }
 }
 
-
-
-void AudioStreamLegacy::checkForDisconnectRequest() {
+aaudio_result_t AudioStreamLegacy::checkForDisconnectRequest(bool errorCallbackEnabled) {
     if (mRequestDisconnect.isRequested()) {
         ALOGD("checkForDisconnectRequest() mRequestDisconnect acknowledged");
-        forceDisconnect();
+        forceDisconnect(errorCallbackEnabled);
         mRequestDisconnect.acknowledge();
         mCallbackEnabled.store(false);
+        return AAUDIO_ERROR_DISCONNECTED;
+    } else {
+        return AAUDIO_OK;
     }
 }
 
-void AudioStreamLegacy::forceDisconnect() {
+void AudioStreamLegacy::forceDisconnect(bool errorCallbackEnabled) {
     if (getState() != AAUDIO_STREAM_STATE_DISCONNECTED) {
         setState(AAUDIO_STREAM_STATE_DISCONNECTED);
-        if (getErrorCallbackProc() != nullptr) {
-            (*getErrorCallbackProc())(
-                    (AAudioStream *) this,
-                    getErrorCallbackUserData(),
-                    AAUDIO_ERROR_DISCONNECTED
-            );
+        if (errorCallbackEnabled) {
+            maybeCallErrorCallback(AAUDIO_ERROR_DISCONNECTED);
         }
     }
 }

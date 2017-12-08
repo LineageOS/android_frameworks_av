@@ -224,8 +224,6 @@ void AudioStreamTrack::processCallback(int event, void *info) {
 }
 
 aaudio_result_t AudioStreamTrack::requestStart() {
-    std::lock_guard<std::mutex> lock(mStreamMutex);
-
     if (mAudioTrack.get() == nullptr) {
         ALOGE("requestStart() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
@@ -247,13 +245,12 @@ aaudio_result_t AudioStreamTrack::requestStart() {
 }
 
 aaudio_result_t AudioStreamTrack::requestPause() {
-    std::lock_guard<std::mutex> lock(mStreamMutex);
-
     if (mAudioTrack.get() == nullptr) {
         ALOGE("requestPause() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
     } else if (getState() != AAUDIO_STREAM_STATE_STARTING
             && getState() != AAUDIO_STREAM_STATE_STARTED) {
+            // TODO What about DISCONNECTED?
         ALOGE("requestPause(), called when state is %s",
               AAudio_convertStreamStateToText(getState()));
         return AAUDIO_ERROR_INVALID_STATE;
@@ -261,17 +258,14 @@ aaudio_result_t AudioStreamTrack::requestPause() {
     onStop();
     setState(AAUDIO_STREAM_STATE_PAUSING);
     mAudioTrack->pause();
-    checkForDisconnectRequest();
     status_t err = mAudioTrack->getPosition(&mPositionWhenPausing);
     if (err != OK) {
         return AAudioConvert_androidToAAudioResult(err);
     }
-    return AAUDIO_OK;
+    return checkForDisconnectRequest(false);
 }
 
 aaudio_result_t AudioStreamTrack::requestFlush() {
-    std::lock_guard<std::mutex> lock(mStreamMutex);
-
     if (mAudioTrack.get() == nullptr) {
         ALOGE("requestFlush() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
@@ -288,8 +282,6 @@ aaudio_result_t AudioStreamTrack::requestFlush() {
 }
 
 aaudio_result_t AudioStreamTrack::requestStop() {
-    std::lock_guard<std::mutex> lock(mStreamMutex);
-
     if (mAudioTrack.get() == nullptr) {
         ALOGE("requestStop() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
@@ -301,8 +293,7 @@ aaudio_result_t AudioStreamTrack::requestStop() {
     mFramesWritten.reset32();
     mTimestampPosition.reset32();
     mAudioTrack->stop();
-    checkForDisconnectRequest();
-    return AAUDIO_OK;
+    return checkForDisconnectRequest(false);;
 }
 
 aaudio_result_t AudioStreamTrack::updateStateMachine()
