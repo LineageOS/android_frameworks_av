@@ -19,13 +19,12 @@
 #define ANDROID_AUDIO_CLIENT_H
 
 #include <binder/Parcel.h>
-#include <binder/Parcelable.h>
 #include <system/audio.h>
 #include <utils/String16.h>
 
 namespace android {
 
-class AudioClient : public Parcelable {
+class AudioClient {
  public:
     AudioClient() :
         clientUid(-1), clientPid(-1), clientTid(-1), packageName("") {}
@@ -35,7 +34,7 @@ class AudioClient : public Parcelable {
     pid_t clientTid;
     String16 packageName;
 
-    status_t readFromParcel(const Parcel *parcel) override {
+    status_t readFromParcel(Parcel *parcel) {
         clientUid = parcel->readInt32();
         clientPid = parcel->readInt32();
         clientTid = parcel->readInt32();
@@ -43,7 +42,7 @@ class AudioClient : public Parcelable {
         return NO_ERROR;
     }
 
-    status_t writeToParcel(Parcel *parcel) const override {
+    status_t writeToParcel(Parcel *parcel) const {
         parcel->writeInt32(clientUid);
         parcel->writeInt32(clientPid);
         parcel->writeInt32(clientTid);
