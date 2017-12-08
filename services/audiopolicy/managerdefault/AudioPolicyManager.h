@@ -470,6 +470,9 @@ protected:
         }
 
         uint32_t updateCallRouting(audio_devices_t rxDevice, uint32_t delayMs = 0);
+        sp<AudioPatch> createTelephonyPatch(bool isRx, audio_devices_t device, uint32_t delayMs);
+        sp<DeviceDescriptor> fillAudioPortConfigForDevice(
+                const DeviceVector& devices, audio_devices_t device, audio_port_config *config);
 
         // if argument "device" is different from AUDIO_DEVICE_NONE,  startSource() will force
         // the re-evaluation of the output device.

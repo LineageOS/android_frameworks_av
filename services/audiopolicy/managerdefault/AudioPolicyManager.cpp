@@ -386,9 +386,6 @@ status_t AudioPolicyManager::handleDeviceConfigChange(audio_devices_t device,
 uint32_t AudioPolicyManager::updateCallRouting(audio_devices_t rxDevice, uint32_t delayMs)
 {
     bool createTxPatch = false;
-    status_t status;
-    audio_patch_handle_t afPatchHandle;
-    DeviceVector deviceList;
     uint32_t muteWaitMs = 0;
 
     if(!hasPrimaryOutput() || mPrimaryOutput->device() == AUDIO_DEVICE_OUT_STUB) {
@@ -420,80 +417,48 @@ uint32_t AudioPolicyManager::updateCallRouting(audio_devices_t rxDevice, uint32_
             createTxPatch = true;
         }
     } else { // create RX path audio patch
-        struct audio_patch patch;
-
-        patch.num_sources = 1;
-        patch.num_sinks = 1;
-        deviceList = mAvailableOutputDevices.getDevicesFromType(rxDevice);
-        ALOG_ASSERT(!deviceList.isEmpty(),
-                    "updateCallRouting() selected device not in output device list");
-        sp<DeviceDescriptor> rxSinkDeviceDesc = deviceList.itemAt(0);
-        deviceList = mAvailableInputDevices.getDevicesFromType(AUDIO_DEVICE_IN_TELEPHONY_RX);
-        ALOG_ASSERT(!deviceList.isEmpty(),
-                    "updateCallRouting() no telephony RX device");
-        sp<DeviceDescriptor> rxSourceDeviceDesc = deviceList.itemAt(0);
-
-        rxSourceDeviceDesc->toAudioPortConfig(&patch.sources[0]);
-        rxSinkDeviceDesc->toAudioPortConfig(&patch.sinks[0]);
-
-        // request to reuse existing output stream if one is already opened to reach the RX device
-        SortedVector<audio_io_handle_t> outputs =
-                                getOutputsForDevice(rxDevice, mOutputs);
-        audio_io_handle_t output = selectOutput(outputs,
-                                                AUDIO_OUTPUT_FLAG_NONE,
-                                                AUDIO_FORMAT_INVALID);
-        if (output != AUDIO_IO_HANDLE_NONE) {
-            sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueFor(output);
-            ALOG_ASSERT(!outputDesc->isDuplicated(),
-                        "updateCallRouting() RX device output is duplicated");
-            outputDesc->toAudioPortConfig(&patch.sources[1]);
-            patch.sources[1].ext.mix.usecase.stream = AUDIO_STREAM_PATCH;
-            patch.num_sources = 2;
-        }
-
-        afPatchHandle = AUDIO_PATCH_HANDLE_NONE;
-        status = mpClientInterface->createAudioPatch(&patch, &afPatchHandle, delayMs);
-        ALOGW_IF(status != NO_ERROR, "updateCallRouting() error %d creating RX audio patch",
-                                               status);
-        if (status == NO_ERROR) {
-            mCallRxPatch = new AudioPatch(&patch, mUidCached);
-            mCallRxPatch->mAfPatchHandle = afPatchHandle;
-            mCallRxPatch->mUid = mUidCached;
-        }
+        mCallRxPatch = createTelephonyPatch(true /*isRx*/, rxDevice, delayMs);
         createTxPatch = true;
     }
     if (createTxPatch) { // create TX path audio patch
-        struct audio_patch patch;
+        mCallTxPatch = createTelephonyPatch(false /*isRx*/, txDevice, delayMs);
+    }
 
-        patch.num_sources = 1;
-        patch.num_sinks = 1;
-        deviceList = mAvailableInputDevices.getDevicesFromType(txDevice);
-        ALOG_ASSERT(!deviceList.isEmpty(),
-                    "updateCallRouting() selected device not in input device list");
-        sp<DeviceDescriptor> txSourceDeviceDesc = deviceList.itemAt(0);
-        txSourceDeviceDesc->toAudioPortConfig(&patch.sources[0]);
-        deviceList = mAvailableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_TELEPHONY_TX);
-        ALOG_ASSERT(!deviceList.isEmpty(),
-                    "updateCallRouting() no telephony TX device");
-        sp<DeviceDescriptor> txSinkDeviceDesc = deviceList.itemAt(0);
-        txSinkDeviceDesc->toAudioPortConfig(&patch.sinks[0]);
+    return muteWaitMs;
+}
 
-        SortedVector<audio_io_handle_t> outputs =
-                                getOutputsForDevice(AUDIO_DEVICE_OUT_TELEPHONY_TX, mOutputs);
-        audio_io_handle_t output = selectOutput(outputs,
-                                                AUDIO_OUTPUT_FLAG_NONE,
-                                                AUDIO_FORMAT_INVALID);
-        // request to reuse existing output stream if one is already opened to reach the TX
-        // path output device
-        if (output != AUDIO_IO_HANDLE_NONE) {
-            sp<AudioOutputDescriptor> outputDesc = mOutputs.valueFor(output);
-            ALOG_ASSERT(!outputDesc->isDuplicated(),
-                        "updateCallRouting() RX device output is duplicated");
-            outputDesc->toAudioPortConfig(&patch.sources[1]);
-            patch.sources[1].ext.mix.usecase.stream = AUDIO_STREAM_PATCH;
-            patch.num_sources = 2;
-        }
+sp<AudioPatch> AudioPolicyManager::createTelephonyPatch(
+        bool isRx, audio_devices_t device, uint32_t delayMs) {
+    struct audio_patch patch;
+    patch.num_sources = 1;
+    patch.num_sinks = 1;
 
+    sp<DeviceDescriptor> txSourceDeviceDesc;
+    if (isRx) {
+        fillAudioPortConfigForDevice(mAvailableOutputDevices, device, &patch.sinks[0]);
+        fillAudioPortConfigForDevice(
+                mAvailableInputDevices, AUDIO_DEVICE_IN_TELEPHONY_RX, &patch.sources[0]);
+    } else {
+        txSourceDeviceDesc = fillAudioPortConfigForDevice(
+                mAvailableInputDevices, device, &patch.sources[0]);
+        fillAudioPortConfigForDevice(
+                mAvailableOutputDevices, AUDIO_DEVICE_OUT_TELEPHONY_TX, &patch.sinks[0]);
+    }
+
+    audio_devices_t outputDevice = isRx ? device : AUDIO_DEVICE_OUT_TELEPHONY_TX;
+    SortedVector<audio_io_handle_t> outputs = getOutputsForDevice(outputDevice, mOutputs);
+    audio_io_handle_t output = selectOutput(outputs, AUDIO_OUTPUT_FLAG_NONE, AUDIO_FORMAT_INVALID);
+    // request to reuse existing output stream if one is already opened to reach the target device
+    if (output != AUDIO_IO_HANDLE_NONE) {
+        sp<AudioOutputDescriptor> outputDesc = mOutputs.valueFor(output);
+        ALOG_ASSERT(!outputDesc->isDuplicated(),
+                "%s() %#x device output %d is duplicated", __func__, outputDevice, output);
+        outputDesc->toAudioPortConfig(&patch.sources[1]);
+        patch.sources[1].ext.mix.usecase.stream = AUDIO_STREAM_PATCH;
+        patch.num_sources = 2;
+    }
+
+    if (!isRx) {
         // terminate active capture if on the same HW module as the call TX source device
         // FIXME: would be better to refine to only inputs whose profile connects to the
         // call TX device but this information is not in the audio patch and logic here must be
@@ -509,19 +474,29 @@ uint32_t AudioPolicyManager::updateCallRouting(audio_devices_t rxDevice, uint32_
                 }
             }
         }
-
-        afPatchHandle = AUDIO_PATCH_HANDLE_NONE;
-        status = mpClientInterface->createAudioPatch(&patch, &afPatchHandle, delayMs);
-        ALOGW_IF(status != NO_ERROR, "setPhoneState() error %d creating TX audio patch",
-                                               status);
-        if (status == NO_ERROR) {
-            mCallTxPatch = new AudioPatch(&patch, mUidCached);
-            mCallTxPatch->mAfPatchHandle = afPatchHandle;
-            mCallTxPatch->mUid = mUidCached;
-        }
     }
 
-    return muteWaitMs;
+    audio_patch_handle_t afPatchHandle = AUDIO_PATCH_HANDLE_NONE;
+    status_t status = mpClientInterface->createAudioPatch(&patch, &afPatchHandle, delayMs);
+    ALOGW_IF(status != NO_ERROR,
+            "%s() error %d creating %s audio patch", __func__, status, isRx ? "RX" : "TX");
+    sp<AudioPatch> audioPatch;
+    if (status == NO_ERROR) {
+        audioPatch = new AudioPatch(&patch, mUidCached);
+        audioPatch->mAfPatchHandle = afPatchHandle;
+        audioPatch->mUid = mUidCached;
+    }
+    return audioPatch;
+}
+
+sp<DeviceDescriptor> AudioPolicyManager::fillAudioPortConfigForDevice(
+        const DeviceVector& devices, audio_devices_t device, audio_port_config *config) {
+    DeviceVector deviceList = devices.getDevicesFromType(device);
+    ALOG_ASSERT(!deviceList.isEmpty(),
+            "%s() selected device type %#x is not in devices list", __func__, device);
+    sp<DeviceDescriptor> deviceDesc = deviceList.itemAt(0);
+    deviceDesc->toAudioPortConfig(config);
+    return deviceDesc;
 }
 
 void AudioPolicyManager::setPhoneState(audio_mode_t state)
