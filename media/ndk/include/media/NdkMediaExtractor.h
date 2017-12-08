@@ -32,6 +32,7 @@
 #include <sys/types.h>
 
 #include "NdkMediaCodec.h"
+#include "NdkMediaDataSource.h"
 #include "NdkMediaFormat.h"
 #include "NdkMediaCrypto.h"
 
@@ -63,6 +64,15 @@ media_status_t AMediaExtractor_setDataSourceFd(AMediaExtractor*, int fd, off64_t
  */
 media_status_t AMediaExtractor_setDataSource(AMediaExtractor*, const char *location);
         // TODO support headers
+
+#if __ANDROID_API__ >= 28
+
+/**
+ * Set the custom data source implementation from which the extractor will read.
+ */
+media_status_t AMediaExtractor_setDataSourceCustom(AMediaExtractor*, AMediaDataSource *src);
+
+#endif /* __ANDROID_API__ >= 28 */
 
 /**
  * Return the number of tracks in the previously specified media file

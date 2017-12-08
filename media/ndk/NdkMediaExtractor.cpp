@@ -20,6 +20,7 @@
 
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaExtractor.h>
+#include "NdkMediaDataSourcePriv.h"
 #include "NdkMediaFormatPriv.h"
 
 
@@ -118,6 +119,11 @@ media_status_t AMediaExtractor_setDataSource(AMediaExtractor *mData, const char 
     status_t err = mData->mImpl->setDataSource(httpService, location, NULL);
     env->ExceptionClear();
     return translate_error(err);
+}
+
+EXPORT
+media_status_t AMediaExtractor_setDataSourceCustom(AMediaExtractor* mData, AMediaDataSource *src) {
+    return translate_error(mData->mImpl->setDataSource(new NdkDataSource(src)));
 }
 
 EXPORT
