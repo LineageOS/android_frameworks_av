@@ -49,7 +49,7 @@ public:
             int index, int colorFormat, bool metaOnly) = 0;
     virtual status_t getFrameAtIndex(
             std::vector<VideoFrame*>* frames,
-            int frameIndex, int numFrames, int colorFormat, bool metaOnly);
+            int frameIndex, int numFrames, int colorFormat, bool metaOnly) = 0;
     virtual MediaAlbumArt* extractAlbumArt() = 0;
     virtual const char* extractMetadata(int keyCode) = 0;
 };
