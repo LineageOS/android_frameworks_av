@@ -45,26 +45,17 @@ audio_port_handle_t AudioPort::getNextUniqueId()
 
 audio_module_handle_t AudioPort::getModuleHandle() const
 {
-    if (mModule == 0) {
-        return AUDIO_MODULE_HANDLE_NONE;
-    }
-    return mModule->mHandle;
+    return mModule != 0 ? mModule->getHandle() : AUDIO_MODULE_HANDLE_NONE;
 }
 
 uint32_t AudioPort::getModuleVersionMajor() const
 {
-    if (mModule == 0) {
-        return 0;
-    }
-    return mModule->getHalVersionMajor();
+    return mModule != 0 ? mModule->getHalVersionMajor() : 0;
 }
 
 const char *AudioPort::getModuleName() const
 {
-    if (mModule == 0) {
-        return "invalid module";
-    }
-    return mModule->getName();
+    return mModule != 0 ? mModule->getName() : "invalid module";
 }
 
 void AudioPort::toAudioPort(struct audio_port *port) const

@@ -212,6 +212,12 @@ void HwModule::refreshSupportedDevices()
     }
 }
 
+void HwModule::setHandle(audio_module_handle_t handle) {
+    ALOGW_IF(mHandle != AUDIO_MODULE_HANDLE_NONE,
+            "HwModule handle is changing from %d to %d", mHandle, handle);
+    mHandle = handle;
+}
+
 void HwModule::dump(int fd)
 {
     const size_t SIZE = 256;
@@ -258,8 +264,8 @@ sp <HwModule> HwModuleCollection::getModuleFromName(const char *name) const
 sp <HwModule> HwModuleCollection::getModuleForDevice(audio_devices_t device) const
 {
     for (const auto& module : *this) {
-        IOProfileCollection& profiles = audio_is_output_device(device) ?
-                module->mOutputProfiles : module->mInputProfiles;
+        const auto& profiles = audio_is_output_device(device) ?
+                module->getOutputProfiles() : module->getInputProfiles();
         for (const auto& profile : profiles) {
             if (profile->supportDevice(device)) {
                 return module;

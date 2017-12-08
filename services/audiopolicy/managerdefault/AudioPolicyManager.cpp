@@ -718,7 +718,7 @@ sp<IOProfile> AudioPolicyManager::getProfileForDirectOutput(
     sp<IOProfile> profile;
 
     for (const auto& hwModule : mHwModules) {
-        for (const auto& curProfile : hwModule->mOutputProfiles) {
+        for (const auto& curProfile : hwModule->getOutputProfiles()) {
             if (!curProfile->isCompatibleProfile(device, String8(""),
                     samplingRate, NULL /*updatedSamplingRate*/,
                     format, NULL /*updatedFormat*/,
@@ -3529,7 +3529,7 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
     audio_devices_t outputDeviceTypes = mAvailableOutputDevices.types();
     audio_devices_t inputDeviceTypes = mAvailableInputDevices.types() & ~AUDIO_DEVICE_BIT_IN;
     for (const auto& hwModule : mHwModulesAll) {
-        hwModule->mHandle = mpClientInterface->loadHwModule(hwModule->getName());
+        hwModule->setHandle(mpClientInterface->loadHwModule(hwModule->getName()));
         if (hwModule->getHandle() == AUDIO_MODULE_HANDLE_NONE) {
             ALOGW("could not open HW module %s", hwModule->getName());
             continue;
@@ -3539,7 +3539,7 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
         // except for direct output streams that are only opened when they are actually
         // required by an app.
         // This also validates mAvailableOutputDevices list
-        for (const auto& outProfile : hwModule->mOutputProfiles) {
+        for (const auto& outProfile : hwModule->getOutputProfiles()) {
             if (!outProfile->hasSupportedDevices()) {
                 ALOGW("Output profile contains no device on module %s", hwModule->getName());
                 continue;
@@ -3599,7 +3599,7 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
         }
         // open input streams needed to access attached devices to validate
         // mAvailableInputDevices list
-        for (const auto& inProfile : hwModule->mInputProfiles) {
+        for (const auto& inProfile : hwModule->getInputProfiles()) {
             if (!inProfile->hasSupportedDevices()) {
                 ALOGW("Input profile contains no device on module %s", hwModule->getName());
                 continue;
@@ -3761,8 +3761,8 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
         // then look for output profiles that can be routed to this device
         SortedVector< sp<IOProfile> > profiles;
         for (const auto& hwModule : mHwModules) {
-            for (size_t j = 0; j < hwModule->mOutputProfiles.size(); j++) {
-                sp<IOProfile> profile = hwModule->mOutputProfiles[j];
+            for (size_t j = 0; j < hwModule->getOutputProfiles().size(); j++) {
+                sp<IOProfile> profile = hwModule->getOutputProfiles()[j];
                 if (profile->supportDevice(device)) {
                     if (!device_distinguishes_on_address(device) ||
                             profile->supportDeviceAddress(address)) {
@@ -3933,8 +3933,8 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
         }
         // Clear any profiles associated with the disconnected device.
         for (const auto& hwModule : mHwModules) {
-            for (size_t j = 0; j < hwModule->mOutputProfiles.size(); j++) {
-                sp<IOProfile> profile = hwModule->mOutputProfiles[j];
+            for (size_t j = 0; j < hwModule->getOutputProfiles().size(); j++) {
+                sp<IOProfile> profile = hwModule->getOutputProfiles()[j];
                 if (profile->supportDevice(device)) {
                     ALOGV("checkOutputsForDevice(): "
                             "clearing direct output profile %zu on module %s",
@@ -3974,9 +3974,9 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
         SortedVector< sp<IOProfile> > profiles;
         for (const auto& hwModule : mHwModules) {
             for (size_t profile_index = 0;
-                 profile_index < hwModule->mInputProfiles.size();
+                 profile_index < hwModule->getInputProfiles().size();
                  profile_index++) {
-                sp<IOProfile> profile = hwModule->mInputProfiles[profile_index];
+                sp<IOProfile> profile = hwModule->getInputProfiles()[profile_index];
 
                 if (profile->supportDevice(device)) {
                     if (!device_distinguishes_on_address(device) ||
@@ -4072,9 +4072,9 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
         // Clear any profiles associated with the disconnected device.
         for (const auto& hwModule : mHwModules) {
             for (size_t profile_index = 0;
-                 profile_index < hwModule->mInputProfiles.size();
+                 profile_index < hwModule->getInputProfiles().size();
                  profile_index++) {
-                sp<IOProfile> profile = hwModule->mInputProfiles[profile_index];
+                sp<IOProfile> profile = hwModule->getInputProfiles()[profile_index];
                 if (profile->supportDevice(device)) {
                     ALOGV("checkInputsForDevice(): clearing direct input profile %zu on module %s",
                             profile_index, hwModule->getName());
@@ -4916,7 +4916,7 @@ sp<IOProfile> AudioPolicyManager::getInputProfile(audio_devices_t device,
     // the best matching profile, not the first one.
 
     for (const auto& hwModule : mHwModules) {
-        for (const auto& profile : hwModule->mInputProfiles) {
+        for (const auto& profile : hwModule->getInputProfiles()) {
             // profile->log();
             if (profile->isCompatibleProfile(device, address, samplingRate,
                                              &samplingRate /*updatedSamplingRate*/,
