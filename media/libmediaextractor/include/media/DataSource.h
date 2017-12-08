@@ -112,9 +112,6 @@ public:
 
     virtual void close() {};
 
-    // returns a pointer to IDataSource if it is wrapped.
-    virtual sp<IDataSource> getIDataSource() const;
-
 protected:
     virtual ~DataSource() {}
 

@@ -17,7 +17,6 @@
 #define LOG_TAG "DataSource"
 
 #include <media/DataSource.h>
-#include <media/IDataSource.h>
 #include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/MediaErrors.h>
 #include <utils/String8.h>
@@ -122,10 +121,6 @@ status_t DataSource::getSize(off64_t *size) {
     *size = 0;
 
     return ERROR_UNSUPPORTED;
-}
-
-sp<IDataSource> DataSource::getIDataSource() const {
-    return nullptr;
 }
 
 String8 DataSource::getMIMEType() const {
