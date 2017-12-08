@@ -1327,12 +1327,12 @@ public:
 
             sp<AudioFlinger::RecordThread::RecordTrack>  createRecordTrack_l(
                     const sp<AudioFlinger::Client>& client,
-                    uint32_t sampleRate,
+                    uint32_t *pSampleRate,
                     audio_format_t format,
                     audio_channel_mask_t channelMask,
                     size_t *pFrameCount,
                     audio_session_t sessionId,
-                    size_t *notificationFrames,
+                    size_t *pNotificationFrameCount,
                     uid_t uid,
                     audio_input_flags_t *flags,
                     pid_t tid,
