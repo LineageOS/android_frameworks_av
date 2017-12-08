@@ -63,6 +63,8 @@ cc_library_shared {
         "android.hardware.media.omx@1.0",
         "android.hardware.graphics.common@1.0",
         "android.hardware.graphics.bufferqueue@1.0",
+        "vendor.lineage.configstore@1.0",
+        "android.hardware.configstore-utils",
     ],
 
     export_shared_lib_headers: [

@@ -44,6 +44,9 @@
 #include <memory>
 #include <cmath>
 
+#include <vendor/lineage/configstore/1.0/IOmxConfigs.h>
+#include <configstore/Utils.h>
+
 namespace android {
 
 /**
@@ -765,6 +768,9 @@ bool GraphicBufferSource::calculateCodecTimestamp_l(
     return true;
 }
 
+using namespace android::hardware::configstore;
+using namespace vendor::lineage::configstore::V1_0;
+
 status_t GraphicBufferSource::submitBuffer_l(const VideoBuffer &item) {
     CHECK(!mFreeCodecBuffers.empty());
     IOMX::buffer_id codecBufferId = *mFreeCodecBuffers.begin();
@@ -776,7 +782,10 @@ status_t GraphicBufferSource::submitBuffer_l(const VideoBuffer &item) {
         return UNKNOWN_ERROR;
     }
 
-    if ((android_dataspace)item.mDataspace != mLastDataspace) {
+    bool qcomLegacyOmx = getBool<IOmxConfigs,
+            &IOmxConfigs::hasLegacyQCOMOmx>(false);
+
+    if (((android_dataspace)item.mDataspace != mLastDataspace) && !qcomLegacyOmx) {
         onDataspaceChanged_l(
                 item.mDataspace,
                 (android_pixel_format)item.mBuffer->getGraphicBuffer()->format);
