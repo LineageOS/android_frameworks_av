@@ -40,8 +40,10 @@ int main(int argc __unused, char** argv)
     signal(SIGPIPE, SIG_IGN);
     SetUpMinijail(kSystemSeccompPolicyPath, kVendorSeccompPolicyPath);
 
+#ifdef USE_VNDBINDER
     android::ProcessState::initWithDriver("/dev/vndbinder");
     android::ProcessState::self()->startThreadPool();
+#endif // USE_VNDBINDER
 
     ::android::hardware::configureRpcThreadpool(64, false);
 
