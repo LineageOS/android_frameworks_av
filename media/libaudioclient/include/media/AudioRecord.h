@@ -570,7 +570,7 @@ private:
 
             // caller must hold lock on mLock for all _l methods
 
-            status_t createRecord_l(const Modulo<uint32_t> &epoch, const String16& opPackageName);
+            status_t openRecord_l(const Modulo<uint32_t> &epoch, const String16& opPackageName);
 
             // FIXME enum is faster than strcmp() for parameter 'from'
             status_t restoreRecord_l(const char *from);
@@ -682,6 +682,7 @@ private:
                                               // May not match the app selection depending on other
                                               // activity and connected devices
     wp<AudioSystem::AudioDeviceCallback> mDeviceCallback;
+    audio_port_handle_t    mPortId;  // unique ID allocated by audio policy
 
 };
 

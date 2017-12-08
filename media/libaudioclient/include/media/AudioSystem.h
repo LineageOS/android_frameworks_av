@@ -231,7 +231,7 @@ public:
                               audio_stream_type_t stream,
                               audio_session_t session);
 
-    // Client must successfully hand off the handle reference to AudioFlinger via createRecord(),
+    // Client must successfully hand off the handle reference to AudioFlinger via openRecord(),
     // or release it with releaseInput().
     static status_t getInputForAttr(const audio_attributes_t *attr,
                                     audio_io_handle_t *input,
