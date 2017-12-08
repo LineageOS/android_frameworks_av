@@ -1585,6 +1585,7 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
 
     output.cblk.clear();
     output.buffers.clear();
+    output.inputId = AUDIO_IO_HANDLE_NONE;
 
     bool updatePid = (input.clientInfo.clientPid == -1);
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
@@ -1633,7 +1634,6 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
     }
 
     output.sessionId = sessionId;
-    output.inputId = AUDIO_IO_HANDLE_NONE;
     output.selectedDeviceId = input.selectedDeviceId;
     output.flags = input.flags;
 
@@ -1645,6 +1645,12 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
     // The sp<> references will be dropped when re-entering scope.
     // The lack of indentation is deliberate, to reduce code churn and ease merges.
     for (;;) {
+    // release previously opened input if retrying.
+    if (output.inputId != AUDIO_IO_HANDLE_NONE) {
+        recordTrack.clear();
+        AudioSystem::releaseInput(output.inputId, sessionId);
+        output.inputId = AUDIO_IO_HANDLE_NONE;
+    }
     lStatus = AudioSystem::getInputForAttr(&input.attr, &output.inputId,
                                       sessionId,
                                     // FIXME compare to AudioTrack
@@ -1680,13 +1686,10 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
         // lStatus == BAD_TYPE means FAST flag was rejected: request a new input from
         // audio policy manager without FAST constraint
         if (lStatus == BAD_TYPE) {
-            AudioSystem::releaseInput(output.inputId, sessionId);
-            recordTrack.clear();
             continue;
         }
 
         if (lStatus != NO_ERROR) {
-            recordTrack.clear();
             goto Exit;
         }
 
@@ -1718,6 +1721,10 @@ Exit:
         {
             Mutex::Autolock _cl(mClientLock);
             client.clear();
+        }
+        recordTrack.clear();
+        if (output.inputId != AUDIO_IO_HANDLE_NONE) {
+            AudioSystem::releaseInput(output.inputId, sessionId);
         }
     }
 
