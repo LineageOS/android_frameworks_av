@@ -118,9 +118,23 @@ public:
                                         CreateTrackOutput& output,
                                         status_t *status);
 
-    virtual sp<media::IAudioRecord> createRecord(const CreateRecordInput& input,
-                                                 CreateRecordOutput& output,
-                                                 status_t *status);
+    virtual sp<media::IAudioRecord> openRecord(
+                                audio_io_handle_t input,
+                                uint32_t sampleRate,
+                                audio_format_t format,
+                                audio_channel_mask_t channelMask,
+                                const String16& opPackageName,
+                                size_t *pFrameCount,
+                                audio_input_flags_t *flags,
+                                pid_t pid,
+                                pid_t tid,
+                                int clientUid,
+                                audio_session_t *sessionId,
+                                size_t *notificationFrames,
+                                sp<IMemory>& cblk,
+                                sp<IMemory>& buffers,
+                                status_t *status /*non-NULL*/,
+                                audio_port_handle_t portId);
 
     virtual     uint32_t    sampleRate(audio_io_handle_t ioHandle) const;
     virtual     audio_format_t format(audio_io_handle_t output) const;
