@@ -60,7 +60,7 @@ bool DeviceDescriptor::equals(const sp<DeviceDescriptor>& other) const
 void DeviceVector::refreshTypes()
 {
     mDeviceTypes = AUDIO_DEVICE_NONE;
-    for(size_t i = 0; i < size(); i++) {
+    for (size_t i = 0; i < size(); i++) {
         mDeviceTypes |= itemAt(i)->type();
     }
     ALOGV("DeviceVector::refreshTypes() mDeviceTypes %08x", mDeviceTypes);
@@ -68,7 +68,7 @@ void DeviceVector::refreshTypes()
 
 ssize_t DeviceVector::indexOf(const sp<DeviceDescriptor>& item) const
 {
-    for(size_t i = 0; i < size(); i++) {
+    for (size_t i = 0; i < size(); i++) {
         if (item->equals(itemAt(i))) {
             return i;
         }
@@ -78,11 +78,14 @@ ssize_t DeviceVector::indexOf(const sp<DeviceDescriptor>& item) const
 
 void DeviceVector::add(const DeviceVector &devices)
 {
-    for (size_t i = 0; i < devices.size(); i++) {
-        sp<DeviceDescriptor> device = devices.itemAt(i);
+    bool added = false;
+    for (const auto& device : devices) {
         if (indexOf(device) < 0 && SortedVector::add(device) >= 0) {
-            refreshTypes();
+            added = true;
         }
+    }
+    if (added) {
+        refreshTypes();
     }
 }
 
@@ -148,14 +151,12 @@ sp<DeviceDescriptor> DeviceVector::getDevice(audio_devices_t type, const String8
 
 sp<DeviceDescriptor> DeviceVector::getDeviceFromId(audio_port_handle_t id) const
 {
-    sp<DeviceDescriptor> device;
-    for (size_t i = 0; i < size(); i++) {
-        if (itemAt(i)->getId() == id) {
-            device = itemAt(i);
-            break;
+    for (const auto& device : *this) {
+        if (device->getId() == id) {
+            return device;
         }
     }
-    return device;
+    return nullptr;
 }
 
 DeviceVector DeviceVector::getDevicesFromType(audio_devices_t type) const
@@ -180,11 +181,9 @@ DeviceVector DeviceVector::getDevicesFromTypeAddr(
         audio_devices_t type, const String8& address) const
 {
     DeviceVector devices;
-    for (size_t i = 0; i < size(); i++) {
-        if (itemAt(i)->type() == type) {
-            if (itemAt(i)->mAddress == address) {
-                devices.add(itemAt(i));
-            }
+    for (const auto& device : *this) {
+        if (device->type() == type && device->mAddress == address) {
+            devices.add(device);
         }
     }
     return devices;
@@ -192,14 +191,12 @@ DeviceVector DeviceVector::getDevicesFromTypeAddr(
 
 sp<DeviceDescriptor> DeviceVector::getDeviceFromTagName(const String8 &tagName) const
 {
-    sp<DeviceDescriptor> device;
-    for (size_t i = 0; i < size(); i++) {
-        if (itemAt(i)->getTagName() == tagName) {
-            device = itemAt(i);
-            break;
+    for (const auto& device : *this) {
+        if (device->getTagName() == tagName) {
+            return device;
         }
     }
-    return device;
+    return nullptr;
 }
 
 status_t DeviceVector::dump(int fd, const String8 &tag, int spaces, bool verbose) const
