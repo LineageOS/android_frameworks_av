@@ -16,7 +16,6 @@
 
 package android.media;
 
-/* Native code must specify namespace media (media::IAudioRecord) when referring to this class */
 interface IAudioRecord {
 
   /* After it's created the track is not active. Call start() to
