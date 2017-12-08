@@ -18,6 +18,7 @@
 
 #include "AudioCollections.h"
 #include "AudioProfile.h"
+#include "HandleGenerator.h"
 #include <utils/String8.h>
 #include <utils/Vector.h>
 #include <utils/RefBase.h>
@@ -32,7 +33,7 @@ class AudioGain;
 class AudioRoute;
 typedef Vector<sp<AudioGain> > AudioGainCollection;
 
-class AudioPort : public virtual RefBase
+class AudioPort : public virtual RefBase, private HandleGenerator<audio_port_handle_t>
 {
 public:
     AudioPort(const String8& name, audio_port_type_t type,  audio_port_role_t role) :
@@ -152,7 +153,6 @@ private:
     uint32_t mFlags; // attribute flags mask (e.g primary output, direct output...).
     AudioProfileVector mProfiles; // AudioProfiles supported by this port (format, Rates, Channels)
     AudioRouteVector mRoutes; // Routes involving this port
-    static volatile int32_t mNextUniqueId;
 };
 
 class AudioPortConfig : public virtual RefBase

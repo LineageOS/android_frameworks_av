@@ -32,7 +32,6 @@
 
 #include <AudioPolicyManagerInterface.h>
 #include <AudioPolicyEngineInstance.h>
-#include <cutils/atomic.h>
 #include <cutils/properties.h>
 #include <utils/Log.h>
 #include <media/AudioParameter.h>
@@ -3437,7 +3436,7 @@ sp<AudioSourceDescriptor> AudioPolicyManager::getSourceForStrategyOnOutput(
 // ----------------------------------------------------------------------------
 uint32_t AudioPolicyManager::nextAudioPortGeneration()
 {
-    return android_atomic_inc(&mAudioPortGeneration);
+    return mAudioPortGeneration++;
 }
 
 #ifdef USE_XML_AUDIO_POLICY_CONF

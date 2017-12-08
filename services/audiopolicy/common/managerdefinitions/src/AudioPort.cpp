@@ -21,15 +21,12 @@
 #include "HwModule.h"
 #include "AudioGain.h"
 #include <policy.h>
-#include <cutils/atomic.h>
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #endif
 
 namespace android {
-
-int32_t volatile AudioPort::mNextUniqueId = 1;
 
 // --- AudioPort class implementation
 void AudioPort::attach(const sp<HwModule>& module)
@@ -40,7 +37,7 @@ void AudioPort::attach(const sp<HwModule>& module)
 // Note that is a different namespace than AudioFlinger unique IDs
 audio_port_handle_t AudioPort::getNextUniqueId()
 {
-    return static_cast<audio_port_handle_t>(android_atomic_inc(&mNextUniqueId));
+    return getNextHandle();
 }
 
 audio_module_handle_t AudioPort::getModuleHandle() const

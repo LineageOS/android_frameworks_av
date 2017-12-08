@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <atomic>
+
 #include <stdint.h>
 #include <sys/types.h>
 #include <cutils/config_utils.h>
@@ -534,7 +536,7 @@ protected:
         HwModuleCollection mHwModulesAll; // normally not needed, used during construction and for
                                           // dumps
 
-        volatile int32_t mAudioPortGeneration;
+        std::atomic<uint32_t> mAudioPortGeneration;
 
         AudioPatchCollection mAudioPatches;
 
