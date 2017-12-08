@@ -143,4 +143,4 @@ private:
     bool &mIsSpeakerDrcEnabled;
 };
 
-}; // namespace android
+} // namespace android

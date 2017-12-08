@@ -69,4 +69,4 @@ private:
     static const uint32_t MAX_EFFECTS_MEMORY = 512;
 };
 
-}; // namespace android
+} // namespace android

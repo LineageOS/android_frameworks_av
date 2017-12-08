@@ -638,4 +638,4 @@ status_t PolicySerializer::deserialize(const char *configFile, AudioPolicyConfig
     return android::OK;
 }
 
-}; // namespace android
+} // namespace android

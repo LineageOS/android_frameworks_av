@@ -53,4 +53,4 @@ status_t AudioRouteVector::dump(int fd, int spaces) const
     return NO_ERROR;
 }
 
-}; // namespace android
+} // namespace android

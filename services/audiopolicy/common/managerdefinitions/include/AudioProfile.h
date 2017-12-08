@@ -349,4 +349,4 @@ private:
 
 bool operator == (const AudioProfile &left, const AudioProfile &right);
 
-}; // namespace android
+} // namespace android

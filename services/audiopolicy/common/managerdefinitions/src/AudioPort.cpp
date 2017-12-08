@@ -465,4 +465,4 @@ void AudioPortConfig::toAudioPortConfig(struct audio_port_config *dstConfig,
     }
 }
 
-}; // namespace android
+} // namespace android

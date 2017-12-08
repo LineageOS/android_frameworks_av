@@ -577,6 +577,6 @@ private:
     audio_mode_t mPhoneState;
 };
 
-}; // namespace android
+} // namespace android
 
 #endif // ANDROID_AUDIOPOLICYSERVICE_H

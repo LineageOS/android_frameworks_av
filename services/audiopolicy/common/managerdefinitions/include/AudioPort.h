@@ -176,4 +176,4 @@ public:
     struct audio_gain_config mGain;
 };
 
-}; // namespace android
+} // namespace android

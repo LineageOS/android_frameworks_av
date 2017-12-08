@@ -310,4 +310,4 @@ void DeviceDescriptor::log() const
     AudioPort::log("  ");
 }
 
-}; // namespace android
+} // namespace android

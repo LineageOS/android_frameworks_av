@@ -5565,4 +5565,4 @@ void AudioPolicyManager::updateAudioProfiles(audio_devices_t device,
     }
 }
 
-}; // namespace android
+} // namespace android

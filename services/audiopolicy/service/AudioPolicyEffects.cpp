@@ -744,4 +744,4 @@ status_t AudioPolicyEffects::loadAudioEffectConfig(const char *path)
 }
 
 
-}; // namespace android
+} // namespace android

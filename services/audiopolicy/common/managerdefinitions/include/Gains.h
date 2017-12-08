@@ -56,4 +56,4 @@ public :
     static const VolumeCurvePoint *sVolumeProfiles[AUDIO_STREAM_CNT][DEVICE_CATEGORY_CNT];
 };
 
-}; // namespace android
+} // namespace android

@@ -287,4 +287,4 @@ int AudioProfileVector::compareFormats(const sp<AudioProfile> *profile1,
     return AudioPort::compareFormats((*profile1)->getFormat(), (*profile2)->getFormat());
 }
 
-}; // namespace android
+} // namespace android

@@ -56,4 +56,4 @@ public:
     status_t dump(int fd) const;
 };
 
-}; // namespace android
+} // namespace android

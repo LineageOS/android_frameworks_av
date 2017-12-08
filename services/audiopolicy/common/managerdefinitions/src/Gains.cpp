@@ -235,4 +235,4 @@ float Gains::volIndexToDb(const VolumeCurvePoint *curve, int indexMin, int index
     return decibels;
 }
 
-}; // namespace android
+} // namespace android

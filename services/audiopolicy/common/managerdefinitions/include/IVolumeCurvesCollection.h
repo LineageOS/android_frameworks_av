@@ -51,4 +51,4 @@ protected:
     virtual ~IVolumeCurvesCollection() {}
 };
 
-}; // namespace android
+} // namespace android

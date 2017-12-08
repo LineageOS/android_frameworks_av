@@ -115,4 +115,4 @@ private:
     const session_route_map_type_t mMapType;
 };
 
-}; // namespace android
+} // namespace android
