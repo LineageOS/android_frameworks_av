@@ -22,7 +22,6 @@
 #include <math.h>
 #include <sys/types.h>
 
-#include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
 
 #include <media/AudioEffect.h>
@@ -832,33 +831,10 @@ IMPLEMENT_META_INTERFACE(AudioPolicyService, "android.media.IAudioPolicyService"
 
 // ----------------------------------------------------------------------
 
+
 status_t BnAudioPolicyService::onTransact(
     uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
-    // make sure transactions reserved to AudioFlinger do not come from other processes
-    switch (code) {
-        case START_OUTPUT:
-        case STOP_OUTPUT:
-        case RELEASE_OUTPUT:
-        case GET_INPUT_FOR_ATTR:
-        case START_INPUT:
-        case STOP_INPUT:
-        case RELEASE_INPUT:
-        case GET_STRATEGY_FOR_STREAM:
-        case GET_OUTPUT_FOR_EFFECT:
-        case REGISTER_EFFECT:
-        case UNREGISTER_EFFECT:
-        case SET_EFFECT_ENABLED:
-        case GET_OUTPUT_FOR_ATTR:
-        case ACQUIRE_SOUNDTRIGGER_SESSION:
-        case RELEASE_SOUNDTRIGGER_SESSION:
-            ALOGW("%s: transaction %d received from PID %d",
-                  __func__, code, IPCThreadState::self()->getCallingPid());
-            return INVALID_OPERATION;
-        default:
-            break;
-    }
-
     switch (code) {
         case SET_DEVICE_CONNECTION_STATE: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
