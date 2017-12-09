@@ -22,7 +22,6 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-#include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
 
 #include "IAudioFlinger.h"
@@ -900,35 +899,6 @@ IMPLEMENT_META_INTERFACE(AudioFlinger, "android.media.IAudioFlinger");
 status_t BnAudioFlinger::onTransact(
     uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
-    // make sure transactions reserved to AudioPolicyManager do not come from other processes
-    switch (code) {
-        case SET_STREAM_VOLUME:
-        case SET_STREAM_MUTE:
-        case SET_MODE:
-        case OPEN_OUTPUT:
-        case OPEN_DUPLICATE_OUTPUT:
-        case CLOSE_OUTPUT:
-        case SUSPEND_OUTPUT:
-        case RESTORE_OUTPUT:
-        case OPEN_INPUT:
-        case CLOSE_INPUT:
-        case INVALIDATE_STREAM:
-        case SET_VOICE_VOLUME:
-        case MOVE_EFFECTS:
-        case LOAD_HW_MODULE:
-        case LIST_AUDIO_PORTS:
-        case GET_AUDIO_PORT:
-        case CREATE_AUDIO_PATCH:
-        case RELEASE_AUDIO_PATCH:
-        case LIST_AUDIO_PATCHES:
-        case SET_AUDIO_PORT_CONFIG:
-            ALOGW("%s: transaction %d received from PID %d",
-                  __func__, code, IPCThreadState::self()->getCallingPid());
-            return INVALID_OPERATION;
-        default:
-            break;
-    }
-
     // Whitelist of relevant events to trigger log merging.
     // Log merging should activate during audio activity of any kind. This are considered the
     // most relevant events.
@@ -938,8 +908,12 @@ status_t BnAudioFlinger::onTransact(
         case OPEN_RECORD:
         case SET_MASTER_VOLUME:
         case SET_MASTER_MUTE:
+        case SET_STREAM_VOLUME:
+        case SET_STREAM_MUTE:
         case SET_MIC_MUTE:
         case SET_PARAMETERS:
+        case OPEN_INPUT:
+        case SET_VOICE_VOLUME:
         case CREATE_EFFECT:
         case SYSTEM_READY: {
             requestLogMerge();
@@ -948,7 +922,6 @@ status_t BnAudioFlinger::onTransact(
         default:
             break;
     }
-
     switch (code) {
         case CREATE_TRACK: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
