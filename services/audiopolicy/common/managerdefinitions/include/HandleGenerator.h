@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,19 +14,27 @@
  * limitations under the License.
  */
 
-#include "managerdefault/AudioPolicyManager.h"
+#pragma once
+
+#include <atomic>
+#include <limits>
 
 namespace android {
 
-extern "C" AudioPolicyInterface* createAudioPolicyManager(
-        AudioPolicyClientInterface *clientInterface)
-{
-    return new AudioPolicyManager(clientInterface);
+template<typename T>
+class HandleGenerator {
+  protected:
+    static T getNextHandle();
+};
+
+template<typename T>
+T HandleGenerator<T>::getNextHandle() {
+    static std::atomic<uint32_t> mNextUniqueId(1);
+    uint32_t id = mNextUniqueId++;
+    while (id > std::numeric_limits<T>::max()) {
+        id -= std::numeric_limits<T>::max();
+    }
+    return static_cast<T>(id);
 }
 
-extern "C" void destroyAudioPolicyManager(AudioPolicyInterface *interface)
-{
-    delete interface;
-}
-
-} // namespace android
+}  // namespace android

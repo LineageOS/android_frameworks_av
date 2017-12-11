@@ -138,4 +138,4 @@ status_t VolumeCurvesCollection::dump(int fd) const
     return NO_ERROR;
 }
 
-}; // namespace android
+} // namespace android

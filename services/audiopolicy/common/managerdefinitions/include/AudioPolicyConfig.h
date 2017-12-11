@@ -112,7 +112,7 @@ public:
         mAvailableOutputDevices.add(mDefaultOutputDevices);
         mAvailableInputDevices.add(defaultInputDevice);
 
-        module = new HwModule("primary");
+        module = new HwModule(AUDIO_HARDWARE_MODULE_ID_PRIMARY);
 
         sp<OutputProfile> outProfile;
         outProfile = new OutputProfile(String8("primary"));
@@ -121,7 +121,7 @@ public:
                 new AudioProfile(AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, 44100));
         outProfile->addSupportedDevice(mDefaultOutputDevices);
         outProfile->setFlags(AUDIO_OUTPUT_FLAG_PRIMARY);
-        module->mOutputProfiles.add(outProfile);
+        module->addOutputProfile(outProfile);
 
         sp<InputProfile> inProfile;
         inProfile = new InputProfile(String8("primary"));
@@ -129,7 +129,7 @@ public:
         inProfile->addAudioProfile(
                 new AudioProfile(AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_MONO, 8000));
         inProfile->addSupportedDevice(defaultInputDevice);
-        module->mInputProfiles.add(inProfile);
+        module->addInputProfile(inProfile);
 
         mHwModules.add(module);
     }
@@ -143,4 +143,4 @@ private:
     bool &mIsSpeakerDrcEnabled;
 };
 
-}; // namespace android
+} // namespace android

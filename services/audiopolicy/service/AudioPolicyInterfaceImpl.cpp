@@ -778,4 +778,4 @@ float AudioPolicyService::getStreamVolumeDB(
 }
 
 
-}; // namespace android
+} // namespace android

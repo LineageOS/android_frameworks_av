@@ -65,4 +65,4 @@ template class TypeConverter<MixTypeTraits>;
 template class TypeConverter<RouteFlagTraits>;
 template class TypeConverter<RuleTraits>;
 
-}; // namespace android
+} // namespace android

@@ -355,6 +355,6 @@ extern "C" AudioPolicyInterface* createAudioPolicyManager(AudioPolicyClientInter
 extern "C" void destroyAudioPolicyManager(AudioPolicyInterface *interface);
 
 
-}; // namespace android
+} // namespace android
 
 #endif // ANDROID_AUDIOPOLICY_INTERFACE_H

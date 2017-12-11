@@ -22,15 +22,12 @@
 #include "TypeConverter.h"
 
 #include <log/log.h>
-#include <cutils/atomic.h>
 #include <utils/String8.h>
 
 namespace android {
 
-int32_t volatile AudioPatch::mNextUniqueId = 1;
-
 AudioPatch::AudioPatch(const struct audio_patch *patch, uid_t uid) :
-    mHandle(static_cast<audio_patch_handle_t>(android_atomic_inc(&mNextUniqueId))),
+    mHandle(HandleGenerator<audio_patch_handle_t>::getNextHandle()),
     mPatch(*patch),
     mUid(uid),
     mAfPatchHandle(AUDIO_PATCH_HANDLE_NONE)
@@ -176,4 +173,4 @@ status_t AudioPatchCollection::dump(int fd) const
     return NO_ERROR;
 }
 
-}; // namespace android
+} // namespace android

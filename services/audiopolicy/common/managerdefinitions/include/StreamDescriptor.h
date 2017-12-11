@@ -107,4 +107,4 @@ private:
     void setVolumeIndexMax(audio_stream_type_t stream,int volIndexMax);
 };
 
-}; // namespace android
+} // namespace android

@@ -32,7 +32,6 @@
 
 #include <AudioPolicyManagerInterface.h>
 #include <AudioPolicyEngineInstance.h>
-#include <cutils/atomic.h>
 #include <cutils/properties.h>
 #include <utils/Log.h>
 #include <media/AudioParameter.h>
@@ -387,9 +386,6 @@ status_t AudioPolicyManager::handleDeviceConfigChange(audio_devices_t device,
 uint32_t AudioPolicyManager::updateCallRouting(audio_devices_t rxDevice, uint32_t delayMs)
 {
     bool createTxPatch = false;
-    status_t status;
-    audio_patch_handle_t afPatchHandle;
-    DeviceVector deviceList;
     uint32_t muteWaitMs = 0;
 
     if(!hasPrimaryOutput() || mPrimaryOutput->device() == AUDIO_DEVICE_OUT_STUB) {
@@ -421,80 +417,48 @@ uint32_t AudioPolicyManager::updateCallRouting(audio_devices_t rxDevice, uint32_
             createTxPatch = true;
         }
     } else { // create RX path audio patch
-        struct audio_patch patch;
-
-        patch.num_sources = 1;
-        patch.num_sinks = 1;
-        deviceList = mAvailableOutputDevices.getDevicesFromType(rxDevice);
-        ALOG_ASSERT(!deviceList.isEmpty(),
-                    "updateCallRouting() selected device not in output device list");
-        sp<DeviceDescriptor> rxSinkDeviceDesc = deviceList.itemAt(0);
-        deviceList = mAvailableInputDevices.getDevicesFromType(AUDIO_DEVICE_IN_TELEPHONY_RX);
-        ALOG_ASSERT(!deviceList.isEmpty(),
-                    "updateCallRouting() no telephony RX device");
-        sp<DeviceDescriptor> rxSourceDeviceDesc = deviceList.itemAt(0);
-
-        rxSourceDeviceDesc->toAudioPortConfig(&patch.sources[0]);
-        rxSinkDeviceDesc->toAudioPortConfig(&patch.sinks[0]);
-
-        // request to reuse existing output stream if one is already opened to reach the RX device
-        SortedVector<audio_io_handle_t> outputs =
-                                getOutputsForDevice(rxDevice, mOutputs);
-        audio_io_handle_t output = selectOutput(outputs,
-                                                AUDIO_OUTPUT_FLAG_NONE,
-                                                AUDIO_FORMAT_INVALID);
-        if (output != AUDIO_IO_HANDLE_NONE) {
-            sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueFor(output);
-            ALOG_ASSERT(!outputDesc->isDuplicated(),
-                        "updateCallRouting() RX device output is duplicated");
-            outputDesc->toAudioPortConfig(&patch.sources[1]);
-            patch.sources[1].ext.mix.usecase.stream = AUDIO_STREAM_PATCH;
-            patch.num_sources = 2;
-        }
-
-        afPatchHandle = AUDIO_PATCH_HANDLE_NONE;
-        status = mpClientInterface->createAudioPatch(&patch, &afPatchHandle, delayMs);
-        ALOGW_IF(status != NO_ERROR, "updateCallRouting() error %d creating RX audio patch",
-                                               status);
-        if (status == NO_ERROR) {
-            mCallRxPatch = new AudioPatch(&patch, mUidCached);
-            mCallRxPatch->mAfPatchHandle = afPatchHandle;
-            mCallRxPatch->mUid = mUidCached;
-        }
+        mCallRxPatch = createTelephonyPatch(true /*isRx*/, rxDevice, delayMs);
         createTxPatch = true;
     }
     if (createTxPatch) { // create TX path audio patch
-        struct audio_patch patch;
+        mCallTxPatch = createTelephonyPatch(false /*isRx*/, txDevice, delayMs);
+    }
 
-        patch.num_sources = 1;
-        patch.num_sinks = 1;
-        deviceList = mAvailableInputDevices.getDevicesFromType(txDevice);
-        ALOG_ASSERT(!deviceList.isEmpty(),
-                    "updateCallRouting() selected device not in input device list");
-        sp<DeviceDescriptor> txSourceDeviceDesc = deviceList.itemAt(0);
-        txSourceDeviceDesc->toAudioPortConfig(&patch.sources[0]);
-        deviceList = mAvailableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_TELEPHONY_TX);
-        ALOG_ASSERT(!deviceList.isEmpty(),
-                    "updateCallRouting() no telephony TX device");
-        sp<DeviceDescriptor> txSinkDeviceDesc = deviceList.itemAt(0);
-        txSinkDeviceDesc->toAudioPortConfig(&patch.sinks[0]);
+    return muteWaitMs;
+}
 
-        SortedVector<audio_io_handle_t> outputs =
-                                getOutputsForDevice(AUDIO_DEVICE_OUT_TELEPHONY_TX, mOutputs);
-        audio_io_handle_t output = selectOutput(outputs,
-                                                AUDIO_OUTPUT_FLAG_NONE,
-                                                AUDIO_FORMAT_INVALID);
-        // request to reuse existing output stream if one is already opened to reach the TX
-        // path output device
-        if (output != AUDIO_IO_HANDLE_NONE) {
-            sp<AudioOutputDescriptor> outputDesc = mOutputs.valueFor(output);
-            ALOG_ASSERT(!outputDesc->isDuplicated(),
-                        "updateCallRouting() RX device output is duplicated");
-            outputDesc->toAudioPortConfig(&patch.sources[1]);
-            patch.sources[1].ext.mix.usecase.stream = AUDIO_STREAM_PATCH;
-            patch.num_sources = 2;
-        }
+sp<AudioPatch> AudioPolicyManager::createTelephonyPatch(
+        bool isRx, audio_devices_t device, uint32_t delayMs) {
+    struct audio_patch patch;
+    patch.num_sources = 1;
+    patch.num_sinks = 1;
 
+    sp<DeviceDescriptor> txSourceDeviceDesc;
+    if (isRx) {
+        fillAudioPortConfigForDevice(mAvailableOutputDevices, device, &patch.sinks[0]);
+        fillAudioPortConfigForDevice(
+                mAvailableInputDevices, AUDIO_DEVICE_IN_TELEPHONY_RX, &patch.sources[0]);
+    } else {
+        txSourceDeviceDesc = fillAudioPortConfigForDevice(
+                mAvailableInputDevices, device, &patch.sources[0]);
+        fillAudioPortConfigForDevice(
+                mAvailableOutputDevices, AUDIO_DEVICE_OUT_TELEPHONY_TX, &patch.sinks[0]);
+    }
+
+    audio_devices_t outputDevice = isRx ? device : AUDIO_DEVICE_OUT_TELEPHONY_TX;
+    SortedVector<audio_io_handle_t> outputs = getOutputsForDevice(outputDevice, mOutputs);
+    audio_io_handle_t output = selectOutput(outputs, AUDIO_OUTPUT_FLAG_NONE, AUDIO_FORMAT_INVALID);
+    // request to reuse existing output stream if one is already opened to reach the target device
+    if (output != AUDIO_IO_HANDLE_NONE) {
+        sp<AudioOutputDescriptor> outputDesc = mOutputs.valueFor(output);
+        ALOG_ASSERT(!outputDesc->isDuplicated(),
+                "%s() %#x device output %d is duplicated", __func__, outputDevice, output);
+        outputDesc->toAudioPortConfig(&patch.sources[1]);
+        patch.sources[1].ext.mix.usecase.stream = AUDIO_STREAM_PATCH;
+        patch.num_sources = 2;
+    }
+
+    if (!isRx) {
         // terminate active capture if on the same HW module as the call TX source device
         // FIXME: would be better to refine to only inputs whose profile connects to the
         // call TX device but this information is not in the audio patch and logic here must be
@@ -510,19 +474,29 @@ uint32_t AudioPolicyManager::updateCallRouting(audio_devices_t rxDevice, uint32_
                 }
             }
         }
-
-        afPatchHandle = AUDIO_PATCH_HANDLE_NONE;
-        status = mpClientInterface->createAudioPatch(&patch, &afPatchHandle, delayMs);
-        ALOGW_IF(status != NO_ERROR, "setPhoneState() error %d creating TX audio patch",
-                                               status);
-        if (status == NO_ERROR) {
-            mCallTxPatch = new AudioPatch(&patch, mUidCached);
-            mCallTxPatch->mAfPatchHandle = afPatchHandle;
-            mCallTxPatch->mUid = mUidCached;
-        }
     }
 
-    return muteWaitMs;
+    audio_patch_handle_t afPatchHandle = AUDIO_PATCH_HANDLE_NONE;
+    status_t status = mpClientInterface->createAudioPatch(&patch, &afPatchHandle, delayMs);
+    ALOGW_IF(status != NO_ERROR,
+            "%s() error %d creating %s audio patch", __func__, status, isRx ? "RX" : "TX");
+    sp<AudioPatch> audioPatch;
+    if (status == NO_ERROR) {
+        audioPatch = new AudioPatch(&patch, mUidCached);
+        audioPatch->mAfPatchHandle = afPatchHandle;
+        audioPatch->mUid = mUidCached;
+    }
+    return audioPatch;
+}
+
+sp<DeviceDescriptor> AudioPolicyManager::fillAudioPortConfigForDevice(
+        const DeviceVector& devices, audio_devices_t device, audio_port_config *config) {
+    DeviceVector deviceList = devices.getDevicesFromType(device);
+    ALOG_ASSERT(!deviceList.isEmpty(),
+            "%s() selected device type %#x is not in devices list", __func__, device);
+    sp<DeviceDescriptor> deviceDesc = deviceList.itemAt(0);
+    deviceDesc->toAudioPortConfig(config);
+    return deviceDesc;
 }
 
 void AudioPolicyManager::setPhoneState(audio_mode_t state)
@@ -718,7 +692,7 @@ sp<IOProfile> AudioPolicyManager::getProfileForDirectOutput(
     sp<IOProfile> profile;
 
     for (const auto& hwModule : mHwModules) {
-        for (const auto& curProfile : hwModule->mOutputProfiles) {
+        for (const auto& curProfile : hwModule->getOutputProfiles()) {
             if (!curProfile->isCompatibleProfile(device, String8(""),
                     samplingRate, NULL /*updatedSamplingRate*/,
                     format, NULL /*updatedFormat*/,
@@ -3437,7 +3411,7 @@ sp<AudioSourceDescriptor> AudioPolicyManager::getSourceForStrategyOnOutput(
 // ----------------------------------------------------------------------------
 uint32_t AudioPolicyManager::nextAudioPortGeneration()
 {
-    return android_atomic_inc(&mAudioPortGeneration);
+    return mAudioPortGeneration++;
 }
 
 #ifdef USE_XML_AUDIO_POLICY_CONF
@@ -3529,7 +3503,7 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
     audio_devices_t outputDeviceTypes = mAvailableOutputDevices.types();
     audio_devices_t inputDeviceTypes = mAvailableInputDevices.types() & ~AUDIO_DEVICE_BIT_IN;
     for (const auto& hwModule : mHwModulesAll) {
-        hwModule->mHandle = mpClientInterface->loadHwModule(hwModule->getName());
+        hwModule->setHandle(mpClientInterface->loadHwModule(hwModule->getName()));
         if (hwModule->getHandle() == AUDIO_MODULE_HANDLE_NONE) {
             ALOGW("could not open HW module %s", hwModule->getName());
             continue;
@@ -3539,7 +3513,7 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
         // except for direct output streams that are only opened when they are actually
         // required by an app.
         // This also validates mAvailableOutputDevices list
-        for (const auto& outProfile : hwModule->mOutputProfiles) {
+        for (const auto& outProfile : hwModule->getOutputProfiles()) {
             if (!outProfile->hasSupportedDevices()) {
                 ALOGW("Output profile contains no device on module %s", hwModule->getName());
                 continue;
@@ -3599,7 +3573,7 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
         }
         // open input streams needed to access attached devices to validate
         // mAvailableInputDevices list
-        for (const auto& inProfile : hwModule->mInputProfiles) {
+        for (const auto& inProfile : hwModule->getInputProfiles()) {
             if (!inProfile->hasSupportedDevices()) {
                 ALOGW("Input profile contains no device on module %s", hwModule->getName());
                 continue;
@@ -3761,8 +3735,8 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
         // then look for output profiles that can be routed to this device
         SortedVector< sp<IOProfile> > profiles;
         for (const auto& hwModule : mHwModules) {
-            for (size_t j = 0; j < hwModule->mOutputProfiles.size(); j++) {
-                sp<IOProfile> profile = hwModule->mOutputProfiles[j];
+            for (size_t j = 0; j < hwModule->getOutputProfiles().size(); j++) {
+                sp<IOProfile> profile = hwModule->getOutputProfiles()[j];
                 if (profile->supportDevice(device)) {
                     if (!device_distinguishes_on_address(device) ||
                             profile->supportDeviceAddress(address)) {
@@ -3933,8 +3907,8 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
         }
         // Clear any profiles associated with the disconnected device.
         for (const auto& hwModule : mHwModules) {
-            for (size_t j = 0; j < hwModule->mOutputProfiles.size(); j++) {
-                sp<IOProfile> profile = hwModule->mOutputProfiles[j];
+            for (size_t j = 0; j < hwModule->getOutputProfiles().size(); j++) {
+                sp<IOProfile> profile = hwModule->getOutputProfiles()[j];
                 if (profile->supportDevice(device)) {
                     ALOGV("checkOutputsForDevice(): "
                             "clearing direct output profile %zu on module %s",
@@ -3974,9 +3948,9 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
         SortedVector< sp<IOProfile> > profiles;
         for (const auto& hwModule : mHwModules) {
             for (size_t profile_index = 0;
-                 profile_index < hwModule->mInputProfiles.size();
+                 profile_index < hwModule->getInputProfiles().size();
                  profile_index++) {
-                sp<IOProfile> profile = hwModule->mInputProfiles[profile_index];
+                sp<IOProfile> profile = hwModule->getInputProfiles()[profile_index];
 
                 if (profile->supportDevice(device)) {
                     if (!device_distinguishes_on_address(device) ||
@@ -4072,9 +4046,9 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
         // Clear any profiles associated with the disconnected device.
         for (const auto& hwModule : mHwModules) {
             for (size_t profile_index = 0;
-                 profile_index < hwModule->mInputProfiles.size();
+                 profile_index < hwModule->getInputProfiles().size();
                  profile_index++) {
-                sp<IOProfile> profile = hwModule->mInputProfiles[profile_index];
+                sp<IOProfile> profile = hwModule->getInputProfiles()[profile_index];
                 if (profile->supportDevice(device)) {
                     ALOGV("checkInputsForDevice(): clearing direct input profile %zu on module %s",
                             profile_index, hwModule->getName());
@@ -4916,7 +4890,7 @@ sp<IOProfile> AudioPolicyManager::getInputProfile(audio_devices_t device,
     // the best matching profile, not the first one.
 
     for (const auto& hwModule : mHwModules) {
-        for (const auto& profile : hwModule->mInputProfiles) {
+        for (const auto& profile : hwModule->getInputProfiles()) {
             // profile->log();
             if (profile->isCompatibleProfile(device, address, samplingRate,
                                              &samplingRate /*updatedSamplingRate*/,
@@ -5566,4 +5540,4 @@ void AudioPolicyManager::updateAudioProfiles(audio_devices_t device,
     }
 }
 
-}; // namespace android
+} // namespace android
