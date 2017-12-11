@@ -266,7 +266,7 @@ protected:
         {
             return mDefaultOutputDevice;
         }
-protected:
+
         void addOutput(audio_io_handle_t output, const sp<SwAudioOutputDescriptor>& outputDesc);
         void removeOutput(audio_io_handle_t output);
         void addInput(audio_io_handle_t input, const sp<AudioInputDescriptor>& inputDesc);
@@ -530,7 +530,9 @@ protected:
         EffectDescriptorCollection mEffects;  // list of registered audio effects
         bool    mA2dpSuspended;  // true if A2DP output is suspended
         sp<DeviceDescriptor> mDefaultOutputDevice; // output device selected by default at boot time
-        HwModuleCollection mHwModules;
+        HwModuleCollection mHwModules; // contains only modules that have been loaded successfully
+        HwModuleCollection mHwModulesAll; // normally not needed, used during construction and for
+                                          // dumps
 
         volatile int32_t mAudioPortGeneration;
 

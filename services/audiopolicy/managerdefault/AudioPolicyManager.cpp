@@ -88,7 +88,7 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t device,
                                                          const char *device_name)
 {
     ALOGV("setDeviceConnectionStateInt() device: 0x%X, state %d, address %s name %s",
--            device, state, device_address, device_name);
+            device, state, device_address, device_name);
 
     // connect/disconnect only 1 device at a time
     if (!audio_is_output_device(device) && !audio_is_input_device(device)) return BAD_VALUE;
@@ -183,14 +183,14 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t device,
         checkOutputForAllStrategies();
         // outputs must be closed after checkOutputForAllStrategies() is executed
         if (!outputs.isEmpty()) {
-            for (size_t i = 0; i < outputs.size(); i++) {
-                sp<SwAudioOutputDescriptor> desc = mOutputs.valueFor(outputs[i]);
+            for (audio_io_handle_t output : outputs) {
+                sp<SwAudioOutputDescriptor> desc = mOutputs.valueFor(output);
                 // close unused outputs after device disconnection or direct outputs that have been
                 // opened by checkOutputsForDevice() to query dynamic parameters
                 if ((state == AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE) ||
                         (((desc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) != 0) &&
                          (desc->mDirectOpenCount == 0))) {
-                    closeOutput(outputs[i]);
+                    closeOutput(output);
                 }
             }
             // check again after closing A2DP output to reset mA2dpSuspended if needed
@@ -499,9 +499,7 @@ uint32_t AudioPolicyManager::updateCallRouting(audio_devices_t rxDevice, uint32_
         // FIXME: would be better to refine to only inputs whose profile connects to the
         // call TX device but this information is not in the audio patch and logic here must be
         // symmetric to the one in startInput()
-        Vector<sp <AudioInputDescriptor> > activeInputs = mInputs.getActiveInputs();
-        for (size_t i = 0; i < activeInputs.size(); i++) {
-            sp<AudioInputDescriptor> activeDesc = activeInputs[i];
+        for (const auto& activeDesc : mInputs.getActiveInputs()) {
             if (activeDesc->hasSameHwModuleAs(txSourceDeviceDesc)) {
                 AudioSessionCollection activeSessions =
                         activeDesc->getAudioSessions(true /*activeOnly*/);
@@ -683,9 +681,7 @@ void AudioPolicyManager::setForceUse(audio_policy_force_use_t usage,
         }
     }
 
-    Vector<sp <AudioInputDescriptor> > activeInputs = mInputs.getActiveInputs();
-    for (size_t i = 0; i < activeInputs.size(); i++) {
-        sp<AudioInputDescriptor> activeDesc = activeInputs[i];
+    for (const auto& activeDesc : mInputs.getActiveInputs()) {
         audio_devices_t newDevice = getNewInputDevice(activeDesc);
         // Force new input selection if the new device can not be reached via current input
         if (activeDesc->mProfile->getSupportedDevices().types() &
@@ -721,12 +717,8 @@ sp<IOProfile> AudioPolicyManager::getProfileForDirectOutput(
 
     sp<IOProfile> profile;
 
-    for (size_t i = 0; i < mHwModules.size(); i++) {
-        if (mHwModules[i]->mHandle == 0) {
-            continue;
-        }
-        for (size_t j = 0; j < mHwModules[i]->mOutputProfiles.size(); j++) {
-            sp<IOProfile> curProfile = mHwModules[i]->mOutputProfiles[j];
+    for (const auto& hwModule : mHwModules) {
+        for (const auto& curProfile : hwModule->mOutputProfiles) {
             if (!curProfile->isCompatibleProfile(device, String8(""),
                     samplingRate, NULL /*updatedSamplingRate*/,
                     format, NULL /*updatedFormat*/,
@@ -827,12 +819,7 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
     // Explicit routing?
     sp<DeviceDescriptor> deviceDesc;
     if (*selectedDeviceId != AUDIO_PORT_HANDLE_NONE) {
-        for (size_t i = 0; i < mAvailableOutputDevices.size(); i++) {
-            if (mAvailableOutputDevices[i]->getId() == *selectedDeviceId) {
-                deviceDesc = mAvailableOutputDevices[i];
-                break;
-            }
-        }
+        deviceDesc = mAvailableOutputDevices.getDeviceFromId(*selectedDeviceId);
     }
     mOutputRoutes.addRoute(session, *stream, SessionRoute::SOURCE_TYPE_NA, deviceDesc, uid);
 
@@ -1033,21 +1020,21 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
     // 4: the first output in the list
 
     if (outputs.size() == 0) {
-        return 0;
+        return AUDIO_IO_HANDLE_NONE;
     }
     if (outputs.size() == 1) {
         return outputs[0];
     }
 
     int maxCommonFlags = 0;
-    audio_io_handle_t outputForFlags = 0;
-    audio_io_handle_t outputForPrimary = 0;
-    audio_io_handle_t outputForFormat = 0;
+    audio_io_handle_t outputForFlags = AUDIO_IO_HANDLE_NONE;
+    audio_io_handle_t outputForPrimary = AUDIO_IO_HANDLE_NONE;
+    audio_io_handle_t outputForFormat = AUDIO_IO_HANDLE_NONE;
     audio_format_t bestFormat = AUDIO_FORMAT_INVALID;
     audio_format_t bestFormatForFlags = AUDIO_FORMAT_INVALID;
 
-    for (size_t i = 0; i < outputs.size(); i++) {
-        sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueFor(outputs[i]);
+    for (audio_io_handle_t output : outputs) {
+        sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueFor(output);
         if (!outputDesc->isDuplicated()) {
             // if a valid format is specified, skip output if not compatible
             if (format != AUDIO_FORMAT_INVALID) {
@@ -1060,7 +1047,7 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
                 }
                 if (AudioPort::isBetterFormatMatch(
                         outputDesc->mFormat, bestFormat, format)) {
-                    outputForFormat = outputs[i];
+                    outputForFormat = output;
                     bestFormat = outputDesc->mFormat;
                 }
             }
@@ -1071,29 +1058,29 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
                     if (format != AUDIO_FORMAT_INVALID
                             && AudioPort::isBetterFormatMatch(
                                     outputDesc->mFormat, bestFormatForFlags, format)) {
-                        outputForFlags = outputs[i];
+                        outputForFlags = output;
                         bestFormatForFlags = outputDesc->mFormat;
                     }
                 } else {
-                    outputForFlags = outputs[i];
+                    outputForFlags = output;
                     maxCommonFlags = commonFlags;
                     bestFormatForFlags = outputDesc->mFormat;
                 }
-                ALOGV("selectOutput() commonFlags for output %d, %04x", outputs[i], commonFlags);
+                ALOGV("selectOutput() commonFlags for output %d, %04x", output, commonFlags);
             }
             if (outputDesc->mProfile->getFlags() & AUDIO_OUTPUT_FLAG_PRIMARY) {
-                outputForPrimary = outputs[i];
+                outputForPrimary = output;
             }
         }
     }
 
-    if (outputForFlags != 0) {
+    if (outputForFlags != AUDIO_IO_HANDLE_NONE) {
         return outputForFlags;
     }
-    if (outputForFormat != 0) {
+    if (outputForFormat != AUDIO_IO_HANDLE_NONE) {
         return outputForFormat;
     }
-    if (outputForPrimary != 0) {
+    if (outputForPrimary != AUDIO_IO_HANDLE_NONE) {
         return outputForPrimary;
     }
 
@@ -1451,12 +1438,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
     // Explicit routing?
     sp<DeviceDescriptor> deviceDesc;
     if (*selectedDeviceId != AUDIO_PORT_HANDLE_NONE) {
-        for (size_t i = 0; i < mAvailableInputDevices.size(); i++) {
-            if (mAvailableInputDevices[i]->getId() == *selectedDeviceId) {
-                deviceDesc = mAvailableInputDevices[i];
-                break;
-            }
-        }
+        deviceDesc = mAvailableOutputDevices.getDeviceFromId(*selectedDeviceId);
     }
     mInputRoutes.addRoute(session, SessionRoute::STREAM_TYPE_NA, inputSource, deviceDesc, uid);
 
@@ -1779,9 +1761,7 @@ bool AudioPolicyManager::isConcurentCaptureAllowed(const sp<AudioInputDescriptor
         return true;
     }
 
-    Vector< sp<AudioInputDescriptor> > activeInputs = mInputs.getActiveInputs();
-    for (size_t i = 0; i <  activeInputs.size(); i++) {
-        sp<AudioInputDescriptor> activeInput = activeInputs[i];
+    for (const auto& activeInput : mInputs.getActiveInputs()) {
         if (!isConcurrentSource(activeInput->inputSource(true)) &&
                 !is_virtual_input_device(activeInput->mDevice)) {
             return false;
@@ -1867,9 +1847,7 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
         }
 
         Vector< sp<AudioInputDescriptor> > activeInputs = mInputs.getActiveInputs();
-        for (size_t i = 0; i < activeInputs.size(); i++) {
-            sp<AudioInputDescriptor> activeDesc = activeInputs[i];
-
+        for (const auto& activeDesc : activeInputs) {
             if (is_virtual_input_device(activeDesc->mDevice)) {
                 continue;
             }
@@ -1909,9 +1887,7 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
             inputDesc->isSoundTrigger() ? soundTriggerSupportsConcurrentCapture() : false;
 
         // if capture is allowed, preempt currently active HOTWORD captures
-        for (size_t i = 0; i < activeInputs.size(); i++) {
-            sp<AudioInputDescriptor> activeDesc = activeInputs[i];
-
+        for (const auto& activeDesc : activeInputs) {
             if (is_virtual_input_device(activeDesc->mDevice)) {
                 continue;
             }
@@ -2106,7 +2082,7 @@ void AudioPolicyManager::releaseInput(audio_io_handle_t input,
 void AudioPolicyManager::closeAllInputs() {
     bool patchRemoved = false;
 
-    for(size_t input_index = 0; input_index < mInputs.size(); input_index++) {
+    for (size_t input_index = 0; input_index < mInputs.size(); input_index++) {
         sp<AudioInputDescriptor> inputDesc = mInputs.valueAt(input_index);
         ssize_t patch_index = mAudioPatches.indexOfKey(inputDesc->getPatchHandle());
         if (patch_index >= 0) {
@@ -2270,21 +2246,21 @@ audio_io_handle_t AudioPolicyManager::selectOutputForMusicEffects()
         audio_io_handle_t outputDeepBuffer = AUDIO_IO_HANDLE_NONE;
         audio_io_handle_t outputPrimary = AUDIO_IO_HANDLE_NONE;
 
-        for (size_t i = 0; i < outputs.size(); i++) {
-            sp<SwAudioOutputDescriptor> desc = mOutputs.valueFor(outputs[i]);
+        for (audio_io_handle_t output : outputs) {
+            sp<SwAudioOutputDescriptor> desc = mOutputs.valueFor(output);
             if (activeOnly && !desc->isStreamActive(AUDIO_STREAM_MUSIC)) {
                 continue;
             }
-            ALOGV("selectOutputForMusicEffects activeOnly %d outputs[%zu] flags 0x%08x",
-                  activeOnly, i, desc->mFlags);
+            ALOGV("selectOutputForMusicEffects activeOnly %d output %d flags 0x%08x",
+                  activeOnly, output, desc->mFlags);
             if ((desc->mFlags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) != 0) {
-                outputOffloaded = outputs[i];
+                outputOffloaded = output;
             }
             if ((desc->mFlags & AUDIO_OUTPUT_FLAG_DEEP_BUFFER) != 0) {
-                outputDeepBuffer = outputs[i];
+                outputDeepBuffer = output;
             }
             if ((desc->mFlags & AUDIO_OUTPUT_FLAG_PRIMARY) != 0) {
-                outputPrimary = outputs[i];
+                outputPrimary = output;
             }
         }
         if (outputOffloaded != AUDIO_IO_HANDLE_NONE) {
@@ -2395,23 +2371,16 @@ status_t AudioPolicyManager::registerPolicyMixes(const Vector<AudioMix>& mixes)
             break;
         }
         if ((mixes[i].mRouteFlags & MIX_ROUTE_FLAG_LOOP_BACK) == MIX_ROUTE_FLAG_LOOP_BACK) {
-            // Loop back through "remote submix"
-            if (rSubmixModule == 0) {
-                for (size_t j = 0; i < mHwModules.size(); j++) {
-                    if (strcmp(AUDIO_HARDWARE_MODULE_ID_REMOTE_SUBMIX, mHwModules[j]->mName) == 0
-                            && mHwModules[j]->mHandle != 0) {
-                        rSubmixModule = mHwModules[j];
-                        break;
-                    }
-                }
-            }
-
             ALOGV("registerPolicyMixes() mix %zu of %zu is LOOP_BACK", i, mixes.size());
-
             if (rSubmixModule == 0) {
-                ALOGE(" Unable to find audio module for submix, aborting mix %zu registration", i);
-                res = INVALID_OPERATION;
-                break;
+                rSubmixModule = mHwModules.getModuleFromName(
+                        AUDIO_HARDWARE_MODULE_ID_REMOTE_SUBMIX);
+                if (rSubmixModule == 0) {
+                    ALOGE(" Unable to find audio module for submix, aborting mix %zu registration",
+                            i);
+                    res = INVALID_OPERATION;
+                    break;
+                }
             }
 
             String8 address = mixes[i].mDeviceAddress;
@@ -2490,24 +2459,19 @@ status_t AudioPolicyManager::unregisterPolicyMixes(Vector<AudioMix> mixes)
     status_t res = NO_ERROR;
     sp<HwModule> rSubmixModule;
     // examine each mix's route type
-    for (size_t i = 0; i < mixes.size(); i++) {
-        if ((mixes[i].mRouteFlags & MIX_ROUTE_FLAG_LOOP_BACK) == MIX_ROUTE_FLAG_LOOP_BACK) {
+    for (const auto& mix : mixes) {
+        if ((mix.mRouteFlags & MIX_ROUTE_FLAG_LOOP_BACK) == MIX_ROUTE_FLAG_LOOP_BACK) {
 
             if (rSubmixModule == 0) {
-                for (size_t j = 0; i < mHwModules.size(); j++) {
-                    if (strcmp(AUDIO_HARDWARE_MODULE_ID_REMOTE_SUBMIX, mHwModules[j]->mName) == 0
-                            && mHwModules[j]->mHandle != 0) {
-                        rSubmixModule = mHwModules[j];
-                        break;
-                    }
+                rSubmixModule = mHwModules.getModuleFromName(
+                        AUDIO_HARDWARE_MODULE_ID_REMOTE_SUBMIX);
+                if (rSubmixModule == 0) {
+                    res = INVALID_OPERATION;
+                    continue;
                 }
             }
-            if (rSubmixModule == 0) {
-                res = INVALID_OPERATION;
-                continue;
-            }
 
-            String8 address = mixes[i].mDeviceAddress;
+            String8 address = mix.mDeviceAddress;
 
             if (mPolicyMixes.unregisterMix(address) != NO_ERROR) {
                 res = INVALID_OPERATION;
@@ -2529,8 +2493,8 @@ status_t AudioPolicyManager::unregisterPolicyMixes(Vector<AudioMix> mixes)
             rSubmixModule->removeOutputProfile(address);
             rSubmixModule->removeInputProfile(address);
 
-        } if ((mixes[i].mRouteFlags & MIX_ROUTE_FLAG_RENDER) == MIX_ROUTE_FLAG_RENDER) {
-            if (mPolicyMixes.unregisterMix(mixes[i].mDeviceAddress) != NO_ERROR) {
+        } if ((mix.mRouteFlags & MIX_ROUTE_FLAG_RENDER) == MIX_ROUTE_FLAG_RENDER) {
+            if (mPolicyMixes.unregisterMix(mix.mDeviceAddress) != NO_ERROR) {
                 res = INVALID_OPERATION;
                 continue;
             }
@@ -2582,7 +2546,7 @@ status_t AudioPolicyManager::dump(int fd)
 
     mAvailableOutputDevices.dump(fd, String8("Available output"));
     mAvailableInputDevices.dump(fd, String8("Available input"));
-    mHwModules.dump(fd);
+    mHwModulesAll.dump(fd);
     mOutputs.dump(fd);
     mInputs.dump(fd);
     mVolumeCurves->dump(fd);
@@ -2687,23 +2651,23 @@ status_t AudioPolicyManager::listAudioPorts(audio_port_role_t role,
         // do not report devices with type AUDIO_DEVICE_IN_STUB or AUDIO_DEVICE_OUT_STUB
         // as they are used by stub HALs by convention
         if (role == AUDIO_PORT_ROLE_SINK || role == AUDIO_PORT_ROLE_NONE) {
-            for (size_t i = 0; i < mAvailableOutputDevices.size(); i++) {
-                if (mAvailableOutputDevices[i]->type() == AUDIO_DEVICE_OUT_STUB) {
+            for (const auto& dev : mAvailableOutputDevices) {
+                if (dev->type() == AUDIO_DEVICE_OUT_STUB) {
                     continue;
                 }
                 if (portsWritten < portsMax) {
-                    mAvailableOutputDevices[i]->toAudioPort(&ports[portsWritten++]);
+                    dev->toAudioPort(&ports[portsWritten++]);
                 }
                 (*num_ports)++;
             }
         }
         if (role == AUDIO_PORT_ROLE_SOURCE || role == AUDIO_PORT_ROLE_NONE) {
-            for (size_t i = 0; i < mAvailableInputDevices.size(); i++) {
-                if (mAvailableInputDevices[i]->type() == AUDIO_DEVICE_IN_STUB) {
+            for (const auto& dev : mAvailableInputDevices) {
+                if (dev->type() == AUDIO_DEVICE_IN_STUB) {
                     continue;
                 }
                 if (portsWritten < portsMax) {
-                    mAvailableInputDevices[i]->toAudioPort(&ports[portsWritten++]);
+                    dev->toAudioPort(&ports[portsWritten++]);
                 }
                 (*num_ports)++;
             }
@@ -3198,8 +3162,8 @@ void AudioPolicyManager::clearSessionRoutes(uid_t uid)
         }
     }
     // reroute outputs if necessary
-    for (size_t i = 0; i < affectedStrategies.size(); i++) {
-        checkStrategyRoute(affectedStrategies[i], AUDIO_IO_HANDLE_NONE);
+    for (const auto& strategy : affectedStrategies) {
+        checkStrategyRoute(strategy, AUDIO_IO_HANDLE_NONE);
     }
 
     // remove input routes associated with this uid
@@ -3221,8 +3185,8 @@ void AudioPolicyManager::clearSessionRoutes(uid_t uid)
             inputsToClose.add(inputDesc->mIoHandle);
         }
     }
-    for (size_t i = 0; i < inputsToClose.size(); i++) {
-        closeInput(inputsToClose[i]);
+    for (const auto& input : inputsToClose) {
+        closeInput(input);
     }
 }
 
@@ -3399,8 +3363,8 @@ status_t AudioPolicyManager::setMasterMono(bool mono)
                 offloaded.push(desc->mIoHandle);
             }
         }
-        for (size_t i = 0; i < offloaded.size(); ++i) {
-            closeOutput(offloaded[i]);
+        for (const auto& handle : offloaded) {
+            closeOutput(handle);
         }
     }
     // update master mono for all remaining outputs
@@ -3526,13 +3490,13 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
 
 #ifdef USE_XML_AUDIO_POLICY_CONF
     mVolumeCurves = new VolumeCurvesCollection();
-    AudioPolicyConfig config(mHwModules, mAvailableOutputDevices, mAvailableInputDevices,
+    AudioPolicyConfig config(mHwModulesAll, mAvailableOutputDevices, mAvailableInputDevices,
                              mDefaultOutputDevice, speakerDrcEnabled,
                              static_cast<VolumeCurvesCollection *>(mVolumeCurves));
     if (deserializeAudioPolicyXmlConfig(config) != NO_ERROR) {
 #else
     mVolumeCurves = new StreamDescriptorCollection();
-    AudioPolicyConfig config(mHwModules, mAvailableOutputDevices, mAvailableInputDevices,
+    AudioPolicyConfig config(mHwModulesAll, mAvailableOutputDevices, mAvailableInputDevices,
                              mDefaultOutputDevice, speakerDrcEnabled);
     if ((ConfigParsingUtils::loadConfig(AUDIO_POLICY_VENDOR_CONFIG_FILE, config) != NO_ERROR) &&
             (ConfigParsingUtils::loadConfig(AUDIO_POLICY_CONFIG_FILE, config) != NO_ERROR)) {
@@ -3564,22 +3528,20 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
     // open all output streams needed to access attached devices
     audio_devices_t outputDeviceTypes = mAvailableOutputDevices.types();
     audio_devices_t inputDeviceTypes = mAvailableInputDevices.types() & ~AUDIO_DEVICE_BIT_IN;
-    for (size_t i = 0; i < mHwModules.size(); i++) {
-        mHwModules[i]->mHandle = mpClientInterface->loadHwModule(mHwModules[i]->getName());
-        if (mHwModules[i]->mHandle == 0) {
-            ALOGW("could not open HW module %s", mHwModules[i]->getName());
+    for (const auto& hwModule : mHwModulesAll) {
+        hwModule->mHandle = mpClientInterface->loadHwModule(hwModule->getName());
+        if (hwModule->getHandle() == AUDIO_MODULE_HANDLE_NONE) {
+            ALOGW("could not open HW module %s", hwModule->getName());
             continue;
         }
+        mHwModules.push_back(hwModule);
         // open all output streams needed to access attached devices
         // except for direct output streams that are only opened when they are actually
         // required by an app.
         // This also validates mAvailableOutputDevices list
-        for (size_t j = 0; j < mHwModules[i]->mOutputProfiles.size(); j++)
-        {
-            const sp<IOProfile> outProfile = mHwModules[i]->mOutputProfiles[j];
-
+        for (const auto& outProfile : hwModule->mOutputProfiles) {
             if (!outProfile->hasSupportedDevices()) {
-                ALOGW("Output profile contains no device on module %s", mHwModules[i]->getName());
+                ALOGW("Output profile contains no device on module %s", hwModule->getName());
                 continue;
             }
             if ((outProfile->getFlags() & AUDIO_OUTPUT_FLAG_TTS) != 0) {
@@ -3613,13 +3575,13 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
             if (status != NO_ERROR) {
                 ALOGW("Cannot open output stream for device %08x on hw module %s",
                       outputDesc->mDevice,
-                      mHwModules[i]->getName());
+                      hwModule->getName());
             } else {
-                for (size_t k = 0; k  < supportedDevices.size(); k++) {
-                    ssize_t index = mAvailableOutputDevices.indexOf(supportedDevices[k]);
+                for (const auto& dev : supportedDevices) {
+                    ssize_t index = mAvailableOutputDevices.indexOf(dev);
                     // give a valid ID to an attached device once confirmed it is reachable
                     if (index >= 0 && !mAvailableOutputDevices[index]->isAttached()) {
-                        mAvailableOutputDevices[index]->attach(mHwModules[i]);
+                        mAvailableOutputDevices[index]->attach(hwModule);
                     }
                 }
                 if (mPrimaryOutput == 0 &&
@@ -3637,12 +3599,9 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
         }
         // open input streams needed to access attached devices to validate
         // mAvailableInputDevices list
-        for (size_t j = 0; j < mHwModules[i]->mInputProfiles.size(); j++)
-        {
-            const sp<IOProfile> inProfile = mHwModules[i]->mInputProfiles[j];
-
+        for (const auto& inProfile : hwModule->mInputProfiles) {
             if (!inProfile->hasSupportedDevices()) {
-                ALOGW("Input profile contains no device on module %s", mHwModules[i]->getName());
+                ALOGW("Input profile contains no device on module %s", hwModule->getName());
                 continue;
             }
             // chose first device present in profile's SupportedDevices also part of
@@ -3664,14 +3623,13 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
                                               &input);
 
             if (status == NO_ERROR) {
-                const DeviceVector &supportedDevices = inProfile->getSupportedDevices();
-                for (size_t k = 0; k  < supportedDevices.size(); k++) {
-                    ssize_t index =  mAvailableInputDevices.indexOf(supportedDevices[k]);
+                for (const auto& dev : inProfile->getSupportedDevices()) {
+                    ssize_t index = mAvailableInputDevices.indexOf(dev);
                     // give a valid ID to an attached device once confirmed it is reachable
                     if (index >= 0) {
                         sp<DeviceDescriptor> devDesc = mAvailableInputDevices[index];
                         if (!devDesc->isAttached()) {
-                            devDesc->attach(mHwModules[i]);
+                            devDesc->attach(hwModule);
                             devDesc->importAudioPort(inProfile, true);
                         }
                     }
@@ -3680,7 +3638,7 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
             } else {
                 ALOGW("Cannot open input stream for device %08x on hw module %s",
                       profileType,
-                      mHwModules[i]->getName());
+                      hwModule->getName());
             }
         }
     }
@@ -3730,6 +3688,7 @@ AudioPolicyManager::~AudioPolicyManager()
    mOutputs.clear();
    mInputs.clear();
    mHwModules.clear();
+   mHwModulesAll.clear();
 }
 
 status_t AudioPolicyManager::initCheck()
@@ -3801,19 +3760,15 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
         }
         // then look for output profiles that can be routed to this device
         SortedVector< sp<IOProfile> > profiles;
-        for (size_t i = 0; i < mHwModules.size(); i++)
-        {
-            if (mHwModules[i]->mHandle == 0) {
-                continue;
-            }
-            for (size_t j = 0; j < mHwModules[i]->mOutputProfiles.size(); j++)
-            {
-                sp<IOProfile> profile = mHwModules[i]->mOutputProfiles[j];
+        for (const auto& hwModule : mHwModules) {
+            for (size_t j = 0; j < hwModule->mOutputProfiles.size(); j++) {
+                sp<IOProfile> profile = hwModule->mOutputProfiles[j];
                 if (profile->supportDevice(device)) {
                     if (!device_distinguishes_on_address(device) ||
                             profile->supportDeviceAddress(address)) {
                         profiles.add(profile);
-                        ALOGV("checkOutputsForDevice(): adding profile %zu from module %zu", j, i);
+                        ALOGV("checkOutputsForDevice(): adding profile %zu from module %s",
+                                j, hwModule->getName());
                     }
                 }
             }
@@ -3977,17 +3932,13 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
             }
         }
         // Clear any profiles associated with the disconnected device.
-        for (size_t i = 0; i < mHwModules.size(); i++)
-        {
-            if (mHwModules[i]->mHandle == 0) {
-                continue;
-            }
-            for (size_t j = 0; j < mHwModules[i]->mOutputProfiles.size(); j++)
-            {
-                sp<IOProfile> profile = mHwModules[i]->mOutputProfiles[j];
+        for (const auto& hwModule : mHwModules) {
+            for (size_t j = 0; j < hwModule->mOutputProfiles.size(); j++) {
+                sp<IOProfile> profile = hwModule->mOutputProfiles[j];
                 if (profile->supportDevice(device)) {
                     ALOGV("checkOutputsForDevice(): "
-                            "clearing direct output profile %zu on module %zu", j, i);
+                            "clearing direct output profile %zu on module %s",
+                            j, hwModule->getName());
                     profile->clearAudioProfiles();
                 }
             }
@@ -4021,23 +3972,18 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
 
         // then look for input profiles that can be routed to this device
         SortedVector< sp<IOProfile> > profiles;
-        for (size_t module_idx = 0; module_idx < mHwModules.size(); module_idx++)
-        {
-            if (mHwModules[module_idx]->mHandle == 0) {
-                continue;
-            }
+        for (const auto& hwModule : mHwModules) {
             for (size_t profile_index = 0;
-                 profile_index < mHwModules[module_idx]->mInputProfiles.size();
-                 profile_index++)
-            {
-                sp<IOProfile> profile = mHwModules[module_idx]->mInputProfiles[profile_index];
+                 profile_index < hwModule->mInputProfiles.size();
+                 profile_index++) {
+                sp<IOProfile> profile = hwModule->mInputProfiles[profile_index];
 
                 if (profile->supportDevice(device)) {
                     if (!device_distinguishes_on_address(device) ||
                             profile->supportDeviceAddress(address)) {
                         profiles.add(profile);
-                        ALOGV("checkInputsForDevice(): adding profile %zu from module %zu",
-                              profile_index, module_idx);
+                        ALOGV("checkInputsForDevice(): adding profile %zu from module %s",
+                                profile_index, hwModule->getName());
                     }
                 }
             }
@@ -4124,17 +4070,14 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
             }
         }
         // Clear any profiles associated with the disconnected device.
-        for (size_t module_index = 0; module_index < mHwModules.size(); module_index++) {
-            if (mHwModules[module_index]->mHandle == 0) {
-                continue;
-            }
+        for (const auto& hwModule : mHwModules) {
             for (size_t profile_index = 0;
-                 profile_index < mHwModules[module_index]->mInputProfiles.size();
+                 profile_index < hwModule->mInputProfiles.size();
                  profile_index++) {
-                sp<IOProfile> profile = mHwModules[module_index]->mInputProfiles[profile_index];
+                sp<IOProfile> profile = hwModule->mInputProfiles[profile_index];
                 if (profile->supportDevice(device)) {
-                    ALOGV("checkInputsForDevice(): clearing direct input profile %zu on module %zu",
-                          profile_index, module_index);
+                    ALOGV("checkInputsForDevice(): clearing direct input profile %zu on module %s",
+                            profile_index, hwModule->getName());
                     profile->clearAudioProfiles();
                 }
             }
@@ -4286,14 +4229,14 @@ void AudioPolicyManager::checkOutputForStrategy(routing_strategy strategy)
         ALOGV("checkOutputForStrategy() strategy %d, moving from output %d to output %d",
               strategy, srcOutputs[0], dstOutputs[0]);
         // mute strategy while moving tracks from one output to another
-        for (size_t i = 0; i < srcOutputs.size(); i++) {
-            sp<SwAudioOutputDescriptor> desc = mOutputs.valueFor(srcOutputs[i]);
+        for (audio_io_handle_t srcOut : srcOutputs) {
+            sp<SwAudioOutputDescriptor> desc = mOutputs.valueFor(srcOut);
             if (isStrategyActive(desc, strategy)) {
                 setStrategyMute(strategy, true, desc);
                 setStrategyMute(strategy, false, desc, MUTE_TIME_MS, newDevice);
             }
             sp<AudioSourceDescriptor> source =
-                    getSourceForStrategyOnOutput(srcOutputs[i], strategy);
+                    getSourceForStrategyOnOutput(srcOut, strategy);
             if (source != 0){
                 connectAudioSource(source);
             }
@@ -4487,9 +4430,8 @@ audio_devices_t AudioPolicyManager::getDevicesForStream(audio_stream_type_t stre
         routing_strategy curStrategy = getStrategy((audio_stream_type_t)curStream);
         audio_devices_t curDevices =
                 getDeviceForStrategy((routing_strategy)curStrategy, false /*fromCache*/);
-        SortedVector<audio_io_handle_t> outputs = getOutputsForDevice(curDevices, mOutputs);
-        for (size_t i = 0; i < outputs.size(); i++) {
-            sp<AudioOutputDescriptor> outputDesc = mOutputs.valueFor(outputs[i]);
+        for (audio_io_handle_t output : getOutputsForDevice(curDevices, mOutputs)) {
+            sp<AudioOutputDescriptor> outputDesc = mOutputs.valueFor(output);
             if (outputDesc->isStreamActive((audio_stream_type_t)curStream)) {
                 curDevices |= outputDesc->device();
             }
@@ -4973,14 +4915,8 @@ sp<IOProfile> AudioPolicyManager::getInputProfile(audio_devices_t device,
     // TODO: perhaps isCompatibleProfile should return a "matching" score so we can return
     // the best matching profile, not the first one.
 
-    for (size_t i = 0; i < mHwModules.size(); i++)
-    {
-        if (mHwModules[i]->mHandle == 0) {
-            continue;
-        }
-        for (size_t j = 0; j < mHwModules[i]->mInputProfiles.size(); j++)
-        {
-            sp<IOProfile> profile = mHwModules[i]->mInputProfiles[j];
+    for (const auto& hwModule : mHwModules) {
+        for (const auto& profile : hwModule->mInputProfiles) {
             // profile->log();
             if (profile->isCompatibleProfile(device, address, samplingRate,
                                              &samplingRate /*updatedSamplingRate*/,
@@ -5460,7 +5396,7 @@ void AudioPolicyManager::filterSurroundFormats(FormatVector *formatsPtr) {
     bool supportsAC3 = false;
     bool supportsOtherSurround = false;
     bool supportsIEC61937 = false;
-    for (size_t formatIndex = 0; formatIndex < formats.size(); formatIndex++) {
+    for (ssize_t formatIndex = 0; formatIndex < (ssize_t)formats.size(); formatIndex++) {
         audio_format_t format = formats[formatIndex];
         switch (format) {
             case AUDIO_FORMAT_AC3:
@@ -5556,8 +5492,7 @@ void AudioPolicyManager::filterSurroundChannelMasks(ChannelsVector *channelMasks
     } else if (forceUse == AUDIO_POLICY_FORCE_ENCODED_SURROUND_ALWAYS) {
         bool supports5dot1 = false;
         // Are there any channel masks that can be considered "surround"?
-        for (size_t maskIndex = 0; maskIndex < channelMasks.size(); maskIndex++) {
-            audio_channel_mask_t channelMask = channelMasks[maskIndex];
+        for (audio_channel_mask_t channelMask : channelMasks) {
             if ((channelMask & AUDIO_CHANNEL_OUT_5POINT1) == AUDIO_CHANNEL_OUT_5POINT1) {
                 supports5dot1 = true;
                 break;
@@ -5594,10 +5529,8 @@ void AudioPolicyManager::updateAudioProfiles(audio_devices_t device,
         }
         profiles.setFormats(formats);
     }
-    const FormatVector &supportedFormats = profiles.getSupportedFormats();
 
-    for (size_t formatIndex = 0; formatIndex < supportedFormats.size(); formatIndex++) {
-        audio_format_t format = supportedFormats[formatIndex];
+    for (audio_format_t format : profiles.getSupportedFormats()) {
         ChannelsVector channelMasks;
         SampleRateVector samplingRates;
         AudioParameter requestedParameters;
