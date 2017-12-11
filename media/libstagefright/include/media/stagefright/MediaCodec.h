@@ -217,6 +217,7 @@ private:
         STOPPING,
         RELEASING,
     };
+    std::string stateString(State state);
 
     enum {
         kPortIndexInput         = 0,
