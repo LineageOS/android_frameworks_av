@@ -614,7 +614,7 @@ int MtpFfsHandle::start() {
 
 int MtpFfsHandle::configure(bool usePtp) {
     // Wait till previous server invocation has closed
-    if (!mLock.try_lock_for(std::chrono::milliseconds(1000))) {
+    if (!mLock.try_lock_for(std::chrono::milliseconds(300))) {
         LOG(ERROR) << "MtpServer was unable to get configure lock";
         return -1;
     }
