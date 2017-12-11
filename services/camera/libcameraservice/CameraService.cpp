@@ -243,29 +243,10 @@ status_t CameraService::enumerateProviders() {
         }
 
         if (!cameraFound) {
-            hardware::camera::common::V1_0::CameraResourceCost cost;
-            res = mCameraProviderManager->getResourceCost(cameraId, &cost);
-            if (res != OK) {
-                ALOGE("Failed to query device resource cost: %s (%d)", strerror(-res), res);
-                continue;
-            }
-            std::set<String8> conflicting;
-            for (size_t i = 0; i < cost.conflictingDevices.size(); i++) {
-                conflicting.emplace(String8(cost.conflictingDevices[i].c_str()));
-            }
-
-            {
-                Mutex::Autolock lock(mCameraStatesLock);
-                mCameraStates.emplace(id8,
-                    std::make_shared<CameraState>(id8, cost.resourceCost, conflicting));
-            }
+            addStates(id8);
         }
 
         onDeviceStatusChanged(id8, CameraDeviceStatus::PRESENT);
-
-        if (mFlashlight->hasFlashUnit(id8)) {
-            mTorchStatusMap.add(id8, TorchModeStatus::AVAILABLE_OFF);
-        }
     }
 
     return OK;
@@ -300,6 +281,31 @@ void CameraService::onNewProviderRegistered() {
     enumerateProviders();
 }
 
+void CameraService::addStates(const String8 id) {
+    std::string cameraId(id.c_str());
+    hardware::camera::common::V1_0::CameraResourceCost cost;
+    status_t res = mCameraProviderManager->getResourceCost(cameraId, &cost);
+    if (res != OK) {
+        ALOGE("Failed to query device resource cost: %s (%d)", strerror(-res), res);
+        return;
+    }
+    std::set<String8> conflicting;
+    for (size_t i = 0; i < cost.conflictingDevices.size(); i++) {
+        conflicting.emplace(String8(cost.conflictingDevices[i].c_str()));
+    }
+
+    {
+        Mutex::Autolock lock(mCameraStatesLock);
+        mCameraStates.emplace(id, std::make_shared<CameraState>(id, cost.resourceCost,
+                                                                conflicting));
+    }
+
+    if (mFlashlight->hasFlashUnit(id)) {
+        mTorchStatusMap.add(id, TorchModeStatus::AVAILABLE_OFF);
+    }
+    logDeviceAdded(id, "Device added");
+}
+
 void CameraService::onDeviceStatusChanged(const String8& id,
         CameraDeviceStatus newHalStatus) {
     ALOGI("%s: Status changed for cameraId=%s, newStatus=%d", __FUNCTION__,
@@ -311,8 +317,13 @@ void CameraService::onDeviceStatusChanged(const String8& id,
 
     if (state == nullptr) {
         if (newStatus == StatusInternal::PRESENT) {
-            ALOGW("%s: Unknown camera ID %s, probably newly registered?",
+            ALOGI("%s: Unknown camera ID %s, a new camera is added",
                     __FUNCTION__, id.string());
+
+            // First add as absent to make sure clients are notified below
+            addStates(id);
+
+            updateStatus(newStatus, id);
         } else {
             ALOGE("%s: Bad camera ID %s", __FUNCTION__, id.string());
         }
@@ -2229,8 +2240,11 @@ status_t CameraService::BasicClient::finishCameraOps() {
                 mClientPackageName);
         mOpsActive = false;
 
+        // This function is called when a client disconnects. This should
+        // release the camera, but actually only if it was in a proper
+        // functional state, i.e. with status NOT_AVAILABLE
         std::initializer_list<StatusInternal> rejected = {StatusInternal::PRESENT,
-                StatusInternal::ENUMERATING};
+                StatusInternal::ENUMERATING, StatusInternal::NOT_PRESENT};
 
         // Transition to PRESENT if the camera is not in either of the rejected states
         sCameraService->updateStatus(StatusInternal::PRESENT,
@@ -2322,7 +2336,7 @@ void CameraService::Client::OpsCallback::opChanged(int32_t op,
 
 CameraService::CameraState::CameraState(const String8& id, int cost,
         const std::set<String8>& conflicting) : mId(id),
-        mStatus(StatusInternal::PRESENT), mCost(cost), mConflicting(conflicting) {}
+        mStatus(StatusInternal::NOT_PRESENT), mCost(cost), mConflicting(conflicting) {}
 
 CameraService::CameraState::~CameraState() {}
 
