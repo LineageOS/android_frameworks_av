@@ -18,7 +18,6 @@
 
 #define AVC_UTILS_H_
 
-#include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <utils/Errors.h>
 
