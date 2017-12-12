@@ -1258,12 +1258,13 @@ status_t MediaPlayer2Manager::Client::getRetransmitEndpoint(
 }
 
 void MediaPlayer2Manager::Client::notify(
-        void* cookie, int msg, int ext1, int ext2, const Parcel *obj)
+        const wp<MediaPlayer2Engine> &listener, int msg, int ext1, int ext2, const Parcel *obj)
 {
-    Client* client = static_cast<Client*>(cookie);
-    if (client == NULL) {
+    sp<MediaPlayer2Engine> spListener = listener.promote();
+    if (spListener == NULL) {
         return;
     }
+    Client* client = static_cast<Client*>(spListener.get());
 
     sp<MediaPlayer2EngineClient> c;
     sp<Client> nextClient;
@@ -1311,7 +1312,7 @@ void MediaPlayer2Manager::Client::notify(
     }
 
     if (c != NULL) {
-        ALOGV("[%d] notify (%p, %d, %d, %d)", client->mConnId, cookie, msg, ext1, ext2);
+        ALOGV("[%d] notify (%p, %d, %d, %d)", client->mConnId, spListener.get(), msg, ext1, ext2);
         c->notify(msg, ext1, ext2, obj);
     }
 }
@@ -1405,7 +1406,9 @@ status_t MediaPlayer2Manager::Client::enableAudioDeviceCallback(bool enabled)
 #if CALLBACK_ANTAGONIZER
 const int Antagonizer::interval = 10000; // 10 msecs
 
-Antagonizer::Antagonizer(notify_callback_f cb, void* client) :
+Antagonizer::Antagonizer(
+        MediaPlayer2Manager::NotifyCallback cb,
+        const wp<MediaPlayer2Engine> &client) :
     mExit(false), mActive(false), mClient(client), mCb(cb)
 {
     createThread(callbackThread, this);
