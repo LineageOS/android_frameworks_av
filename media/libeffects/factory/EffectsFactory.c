@@ -261,7 +261,6 @@ int EffectCreate(const effect_uuid_t *uuid, int32_t sessionId, int32_t ioId, eff
     effect_descriptor_t *d = NULL;
     effect_handle_t itfe;
     effect_entry_t *fx;
-    int found = 0;
     int ret;
 
     if (uuid == NULL || pHandle == NULL) {
@@ -428,8 +427,6 @@ int EffectGetSubEffects(const effect_uuid_t *uuid, sub_effect_entry_t **pSube,
 /////////////////////////////////////////////////
 
 int init() {
-    int hdl;
-
     if (gInitDone) {
         return 0;
     }
@@ -552,7 +549,6 @@ int EffectDumpEffects(int fd) {
     list_elem_t *e = gLibraryList;
     lib_entry_t *l = NULL;
     effect_descriptor_t *d = NULL;
-    int found = 0;
     int ret = 0;
 
     dprintf(fd, "Libraries loaded:\n");
