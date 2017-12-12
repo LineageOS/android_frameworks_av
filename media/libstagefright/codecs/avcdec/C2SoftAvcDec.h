@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 The Android Open Source Project
+ * Copyright 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@
 
 #include <C2Component.h>
 #include <C2Param.h>
+#include <SimpleC2Component.h>
 
 #include "C2AvcConfig.h"
 
@@ -140,29 +141,23 @@ private:
     friend class C2SoftAvcDec;
 };
 
-class C2SoftAvcDec
-    : public C2Component,
-      public std::enable_shared_from_this<C2SoftAvcDec> {
+class C2SoftAvcDec : public SimpleC2Component {
 public:
     C2SoftAvcDec(const char *name, c2_node_id_t id);
     virtual ~C2SoftAvcDec();
 
-    // From C2Component
-    virtual c2_status_t setListener_sm(const std::shared_ptr<Listener> &listener) override;
-    virtual c2_status_t queue_nb(std::list<std::unique_ptr<C2Work>>* const items) override;
-    virtual c2_status_t announce_nb(const std::vector<C2WorkOutline> &items) override;
-    virtual c2_status_t flush_sm(
-            flush_mode_t mode, std::list<std::unique_ptr<C2Work>>* const flushedWork) override;
-    virtual c2_status_t drain_nb(drain_mode_t mode) override;
-    virtual c2_status_t start() override;
-    virtual c2_status_t stop() override;
-    virtual void reset() override;
-    virtual void release() override;
-    virtual std::shared_ptr<C2ComponentInterface> intf() override;
+    // From SimpleC2Component
+    virtual c2_status_t onInit() override;
+    virtual c2_status_t onStop() override;
+    virtual void onReset() override;
+    virtual void onRelease() override;
+    virtual c2_status_t onFlush_sm() override;
+    virtual c2_status_t onDrain_nb() override;
+    virtual bool process(
+            const std::unique_ptr<C2Work> &work,
+            std::shared_ptr<C2BlockPool> pool) override;
 
 private:
-    class QueueProcessThread;
-
     Mutex mColorAspectsLock;
     // color aspects passed from the framework.
     ColorAspects mDefaultColorAspects;
@@ -181,30 +176,6 @@ private:
 
     // This function will update the mFinalColorAspects based on codec preference.
     status_t handleColorAspectsChange();
-
-    // Number of input and output buffers
-    enum {
-        kNumBuffers = 8
-    };
-
-    using IndexType = decltype(C2WorkOrdinalStruct().frame_index);
-
-    const std::shared_ptr<C2SoftAvcDecIntf> mIntf;
-    std::shared_ptr<Listener> mListener;
-    std::shared_ptr<Listener> mActiveListener;
-    std::mutex mListenerLock;
-    std::condition_variable mActiveListenerChanged;
-
-    std::shared_ptr<C2BlockPool> mOutputBlockPool;
-
-    std::mutex mQueueLock;
-    std::condition_variable mQueueCond;
-    std::list<std::unique_ptr<C2Work>> mQueue;
-
-    std::mutex mPendingLock;
-    std::unordered_map<IndexType, std::unique_ptr<C2Work>> mPendingWork;
-
-    std::unique_ptr<QueueProcessThread> mThread;
 
     std::shared_ptr<C2GraphicBlock> mAllocatedBlock;
 
@@ -236,9 +207,6 @@ private:
     uint32_t mHeight;
     uint32_t mStride;
     size_t mInputOffset;
-
-    void processQueue();
-    void process(std::unique_ptr<C2Work> &work);
 
     status_t initDecoder();
     status_t deInitDecoder();

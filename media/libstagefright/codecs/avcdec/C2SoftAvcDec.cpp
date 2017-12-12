@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 The Android Open Source Project
+ * Copyright 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 #define LOG_TAG "C2SoftAvcDec"
 #include <utils/Log.h>
 
@@ -608,47 +608,10 @@ void C2SoftAvcDecIntf::updateSupportedValues() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-class C2SoftAvcDec::QueueProcessThread {
-public:
-    QueueProcessThread() : mExitRequested(false), mRunning(false) {}
-
-    ~QueueProcessThread() {
-        if (mThread && mThread->joinable()) {
-            mExitRequested = true;
-            mThread->join();
-        }
-    }
-
-    void start(std::weak_ptr<C2SoftAvcDec> component) {
-        mThread.reset(new std::thread([this, component] () {
-            mRunning = true;
-            while (auto comp = component.lock()) {
-                if (mExitRequested) break;
-                comp->processQueue();
-            }
-            mRunning = false;
-        }));
-    }
-
-    void requestExit() {
-        mExitRequested = true;
-    }
-
-    bool isRunning() {
-        return mRunning;
-    }
-
-private:
-    std::atomic_bool mExitRequested;
-    std::atomic_bool mRunning;
-    std::unique_ptr<std::thread> mThread;
-};
-
 C2SoftAvcDec::C2SoftAvcDec(
         const char *name,
         c2_node_id_t id)
-    : mIntf(std::make_shared<C2SoftAvcDecIntf>(name, id)),
-      mThread(new QueueProcessThread),
+    : SimpleC2Component(std::make_shared<C2SoftAvcDecIntf>(name, id)),
       mCodecCtx(NULL),
       mFlushOutBuffer(NULL),
       mIvColorFormat(IV_YUV_420P),
@@ -670,106 +633,12 @@ C2SoftAvcDec::~C2SoftAvcDec() {
     CHECK_EQ(deInitDecoder(), (status_t)OK);
 }
 
-c2_status_t C2SoftAvcDec::setListener_sm(
-        const std::shared_ptr<C2Component::Listener> &listener) {
-    std::unique_lock<std::mutex> lock(mListenerLock);
-    // TODO: we really need to lock the running check as well
-    if (listener && mThread->isRunning()) {
-        return C2_BAD_STATE;
-    }
-    mListener = listener;
-    if (mActiveListener && !listener) {
-        // wait until no active listeners are in use
-        mActiveListenerChanged.wait(lock, [this]{ return !mActiveListener; });
-    }
+c2_status_t C2SoftAvcDec::onInit() {
+    // TODO: initialize using intf
     return C2_OK;
 }
 
-c2_status_t C2SoftAvcDec::queue_nb(
-        std::list<std::unique_ptr<C2Work>>* const items) {
-    if (!mThread->isRunning()) {
-        return C2_CORRUPTED;
-    }
-    std::unique_lock<std::mutex> lock(mQueueLock);
-    while (!items->empty()) {
-        // TODO: examine item and update width/height?
-        mQueue.emplace_back(std::move(items->front()));
-        items->pop_front();
-    }
-    mQueueCond.notify_all();
-    return C2_OK;
-}
-
-c2_status_t C2SoftAvcDec::announce_nb(const std::vector<C2WorkOutline> &items) {
-    // Tunneling is not supported
-    (void) items;
-    return C2_OMITTED;
-}
-
-c2_status_t C2SoftAvcDec::flush_sm(
-        flush_mode_t mode, std::list<std::unique_ptr<C2Work>>* const flushedWork) {
-    // Tunneling is not supported
-    (void) mode;
-
-    if (!mThread->isRunning()) {
-        return C2_CORRUPTED;
-    }
-    {
-        std::unique_lock<std::mutex> lock(mQueueLock);
-        while (!mQueue.empty()) {
-            flushedWork->emplace_back(std::move(mQueue.front()));
-            mQueue.pop_front();
-        }
-        mQueueCond.notify_all();
-    }
-    {
-        std::unique_lock<std::mutex> lock(mPendingLock);
-        for (auto &elem : mPendingWork) {
-            flushedWork->emplace_back(std::move(elem.second));
-        }
-        mPendingWork.clear();
-    }
-    return C2_OK;
-}
-
-c2_status_t C2SoftAvcDec::drain_nb(drain_mode_t mode) {
-    // Tunneling is not supported
-    (void) mode;
-
-    if (!mThread->isRunning()) {
-        return C2_CORRUPTED;
-    }
-    std::unique_lock<std::mutex> lock(mQueueLock);
-    if (!mQueue.empty()) {
-        C2BufferPack &lastInput = mQueue.back()->input;
-        lastInput.flags = (C2BufferPack::flags_t)(lastInput.flags | C2BufferPack::FLAG_END_OF_STREAM);
-        mQueueCond.notify_all();
-    }
-    return C2_OK;
-}
-
-c2_status_t C2SoftAvcDec::start() {
-    if (!mThread->isRunning()) {
-        mThread->start(shared_from_this());
-    }
-    return C2_OK;
-}
-
-c2_status_t C2SoftAvcDec::stop() {
-    ALOGV("stop");
-    std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
-    std::chrono::system_clock::time_point deadline = now + std::chrono::milliseconds(500);
-
-    mThread->requestExit();
-    while (mThread->isRunning() && (now = std::chrono::system_clock::now()) < deadline) {
-        std::this_thread::yield();
-        std::unique_lock<std::mutex> lock(mQueueLock);
-        mQueueCond.notify_all();
-    }
-    if (mThread->isRunning()) {
-        return C2_TIMED_OUT;
-    }
-
+c2_status_t C2SoftAvcDec::onStop() {
     mSignalledError = false;
     resetDecoder();
     resetPlugin();
@@ -777,106 +646,54 @@ c2_status_t C2SoftAvcDec::stop() {
     return C2_OK;
 }
 
-void C2SoftAvcDec::reset() {
-    if (mThread->isRunning()) {
-        stop();
+void C2SoftAvcDec::onReset() {
+    (void)onStop();
+}
+
+void C2SoftAvcDec::onRelease() {
+    (void)deInitDecoder();
+}
+
+c2_status_t C2SoftAvcDec::onFlush_sm() {
+    setFlushMode();
+
+    /* Allocate a picture buffer to flushed data */
+    uint32_t displayStride = mWidth;
+    uint32_t displayHeight = mHeight;
+
+    uint32_t bufferSize = displayStride * displayHeight * 3 / 2;
+    mFlushOutBuffer = (uint8_t *)memalign(128, bufferSize);
+    if (NULL == mFlushOutBuffer) {
+        ALOGE("Could not allocate flushOutputBuffer of size %u", bufferSize);
+        return C2_NO_MEMORY;
     }
+
+    while (true) {
+        ivd_video_decode_ip_t s_dec_ip;
+        ivd_video_decode_op_t s_dec_op;
+        IV_API_CALL_STATUS_T status;
+        // size_t sizeY, sizeUV;
+
+        setDecodeArgs(&s_dec_ip, &s_dec_op, NULL, NULL, 0, 0u);
+
+        status = ivdec_api_function(mCodecCtx, (void *)&s_dec_ip, (void *)&s_dec_op);
+        if (0 == s_dec_op.u4_output_present) {
+            resetPlugin();
+            break;
+        }
+    }
+
+    if (mFlushOutBuffer) {
+        free(mFlushOutBuffer);
+        mFlushOutBuffer = NULL;
+    }
+    return C2_OK;
+}
+
+c2_status_t C2SoftAvcDec::onDrain_nb() {
     // TODO
+    return C2_OK;
 }
-
-void C2SoftAvcDec::release() {
-    if (mThread->isRunning()) {
-        stop();
-    }
-    // TODO
-}
-
-std::shared_ptr<C2ComponentInterface> C2SoftAvcDec::intf() {
-    return mIntf;
-}
-
-void C2SoftAvcDec::processQueue() {
-#if 0
-    if (mIsInFlush) {
-        setFlushMode();
-
-        /* Allocate a picture buffer to flushed data */
-        uint32_t displayStride = mWidth;
-        uint32_t displayHeight = mHeight;
-
-        uint32_t bufferSize = displayStride * displayHeight * 3 / 2;
-        mFlushOutBuffer = (uint8_t *)memalign(128, bufferSize);
-        if (NULL == mFlushOutBuffer) {
-            ALOGE("Could not allocate flushOutputBuffer of size %u", bufferSize);
-            return;
-        }
-
-        while (true) {
-            ivd_video_decode_ip_t s_dec_ip;
-            ivd_video_decode_op_t s_dec_op;
-            IV_API_CALL_STATUS_T status;
-            size_t sizeY, sizeUV;
-
-            setDecodeArgs(&s_dec_ip, &s_dec_op, NULL, NULL, 0, 0u);
-
-            status = ivdec_api_function(mCodecCtx, (void *)&s_dec_ip, (void *)&s_dec_op);
-            if (0 == s_dec_op.u4_output_present) {
-                resetPlugin();
-                break;
-            }
-        }
-
-        if (mFlushOutBuffer) {
-            free(mFlushOutBuffer);
-            mFlushOutBuffer = NULL;
-        }
-        mIsInFlush = false;
-    }
-#endif
-
-    std::unique_ptr<C2Work> work;
-    if (!mIsInFlush) {
-        std::unique_lock<std::mutex> lock(mQueueLock);
-        if (mQueue.empty()) {
-            mQueueCond.wait(lock);
-        }
-        if (mQueue.empty()) {
-            ALOGV("empty queue");
-            return;
-        }
-        work.swap(mQueue.front());
-        mQueue.pop_front();
-    }
-
-    // Process the work
-    process(work);
-
-    std::vector<std::unique_ptr<C2Work>> done;
-    if (work) {
-        std::unique_lock<std::mutex> lock(mPendingLock);
-        uint32_t index = work->input.ordinal.frame_index;
-        mPendingWork[index].swap(work);
-
-        if (work) {
-            work->result = C2_CORRUPTED;
-            done.emplace_back(std::move(work));
-        }
-    }
-
-    if (!done.empty()) {
-        std::unique_lock<std::mutex> lock(mListenerLock);
-        mActiveListener = mListener;
-
-        if (mActiveListener) {
-            lock.unlock();
-            mActiveListener->onWorkDone_nb(shared_from_this(), std::move(done));
-            lock.lock();
-            mActiveListener.reset();
-            mActiveListenerChanged.notify_all();
-        }
-    }
-}
-
 
 static void *ivd_aligned_malloc(void *ctxt, WORD32 alignment, WORD32 size) {
     (void) ctxt;
@@ -955,7 +772,6 @@ status_t C2SoftAvcDec::setParams(size_t stride) {
 }
 
 status_t C2SoftAvcDec::resetPlugin() {
-    mReceivedEOS = false;
     mInputOffset = 0;
 
     /* Initialize both start and end times */
@@ -1028,7 +844,6 @@ status_t C2SoftAvcDec::setFlushMode() {
                 s_video_flush_op.u4_error_code);
         return UNKNOWN_ERROR;
     }
-    mIsInFlush = true;
     return OK;
 }
 
@@ -1106,7 +921,6 @@ status_t C2SoftAvcDec::deInitDecoder() {
             return UNKNOWN_ERROR;
         }
     }
-
 
     mChangingResolution = false;
 
@@ -1210,78 +1024,76 @@ bool C2SoftAvcDec::setDecodeArgs(
     return true;
 }
 
-void C2SoftAvcDec::process(std::unique_ptr<C2Work> &work) {
-    if (mSignalledError) {
-        return;
-    }
-    if (NULL == mCodecCtx) {
-        if (OK != initDecoder()) {
-            ALOGE("Failed to initialize decoder");
-            // TODO: notify(OMX_EventError, OMX_ErrorUnsupportedSetting, 0, NULL);
-            mSignalledError = true;
-            return;
+bool C2SoftAvcDec::process(const std::unique_ptr<C2Work> &work, std::shared_ptr<C2BlockPool> pool) {
+    bool isInFlush = false;
+    bool eos = false;
+
+    bool done = false;
+    work->result = C2_OK;
+
+    const C2ConstLinearBlock &buffer =
+            work->input.buffers[0]->data().linearBlocks().front();
+    auto fillEmptyWork = [](const std::unique_ptr<C2Work> &work) {
+        uint32_t flags = 0;
+        if ((work->input.flags & C2BufferPack::FLAG_END_OF_STREAM)) {
+            flags |= C2BufferPack::FLAG_END_OF_STREAM;
         }
-    }
-    if (mWidth != mStride) {
-        /* Set the run-time (dynamic) parameters */
-        mStride = mWidth;
-        setParams(mStride);
-    }
-
-    uint32_t workIndex = 0;
-    std::unique_ptr<C2ReadView> input;
-    if (work) {
-        work->result = C2_OK;
-
-        const C2ConstLinearBlock &buffer =
-                work->input.buffers[0]->data().linearBlocks().front();
-        if (buffer.capacity() == 0) {
-            // TODO: result?
-
-            std::vector<std::unique_ptr<C2Work>> done;
-            done.emplace_back(std::move(work));
-            mListener->onWorkDone_nb(shared_from_this(), std::move(done));
-            if (!(work->input.flags & C2BufferPack::FLAG_END_OF_STREAM)) {
-                return;
-            }
-
-            mReceivedEOS = true;
-            // TODO: flush
-        } else if (work->input.flags & C2BufferPack::FLAG_END_OF_STREAM) {
-            ALOGV("input EOS: %llu", work->input.ordinal.frame_index);
-            mReceivedEOS = true;
+        work->worklets.front()->output.flags = (C2BufferPack::flags_t)flags;
+        work->worklets.front()->output.buffers.clear();
+        work->worklets.front()->output.buffers.emplace_back(nullptr);
+        work->worklets.front()->output.ordinal = work->input.ordinal;
+    };
+    if (buffer.capacity() == 0) {
+        ALOGV("empty input: %llu", work->input.ordinal.frame_index);
+        // TODO: result?
+        fillEmptyWork(work);
+        if ((work->input.flags & C2BufferPack::FLAG_END_OF_STREAM)) {
+            eos = true;
         }
-
-        input.reset(new C2ReadView(work->input.buffers[0]->data().linearBlocks().front().map().get()));
-        workIndex = work->input.ordinal.frame_index & 0xFFFFFFFF;
+        done = true;
+    } else if (work->input.flags & C2BufferPack::FLAG_END_OF_STREAM) {
+        ALOGV("input EOS: %llu", work->input.ordinal.frame_index);
+        eos = true;
     }
 
+    std::unique_ptr<C2ReadView> deferred;
+    std::unique_ptr<C2ReadView> input(new C2ReadView(
+            work->input.buffers[0]->data().linearBlocks().front().map().get()));
+    uint32_t workIndex = work->input.ordinal.frame_index & 0xFFFFFFFF;
     size_t inOffset = 0u;
-    while (!input || inOffset < input->capacity()) {
-        if (!input) {
+
+    while (input || isInFlush) {
+        if (mSignalledError) {
+            return done;
+        }
+        if (NULL == mCodecCtx) {
+            if (OK != initDecoder()) {
+                ALOGE("Failed to initialize decoder");
+                // TODO: notify(OMX_EventError, OMX_ErrorUnsupportedSetting, 0, NULL);
+                mSignalledError = true;
+                return done;
+            }
+        }
+        if (mWidth != mStride) {
+            /* Set the run-time (dynamic) parameters */
+            mStride = mWidth;
+            setParams(mStride);
+        }
+
+        if (isInFlush) {
             ALOGV("flushing");
         }
-        // TODO: populate --- assume display order?
+
         if (!mAllocatedBlock) {
             // TODO: error handling
             // TODO: format & usage
             uint32_t format = HAL_PIXEL_FORMAT_YV12;
             C2MemoryUsage usage = { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite };
-            // TODO: lock access to interface
-            C2BlockPool::local_id_t poolId =
-                mIntf->mOutputBlockPools->flexCount() ?
-                        mIntf->mOutputBlockPools->m.mValues[0] : C2BlockPool::BASIC_GRAPHIC;
-            if (!mOutputBlockPool || mOutputBlockPool->getLocalId() != poolId) {
-                c2_status_t err = GetCodec2BlockPool(poolId, shared_from_this(), &mOutputBlockPool);
-                if (err != C2_OK) {
-                    // TODO: trip
-                }
-            }
-            ALOGE("using allocator %u", mOutputBlockPool->getAllocatorId());
+            ALOGV("using allocator %u", pool->getAllocatorId());
 
-            (void)mOutputBlockPool->fetchGraphicBlock(
+            (void)pool->fetchGraphicBlock(
                     mWidth, mHeight, format, usage, &mAllocatedBlock);
-            ALOGE("provided (%dx%d) required (%dx%d)", mAllocatedBlock->width(), mAllocatedBlock->height(), mWidth, mHeight);
+            ALOGV("provided (%dx%d) required (%dx%d)", mAllocatedBlock->width(), mAllocatedBlock->height(), mWidth, mHeight);
         }
         C2GraphicView output = mAllocatedBlock->map().get();
         if (output.error() != OK) {
@@ -1291,13 +1103,13 @@ void C2SoftAvcDec::process(std::unique_ptr<C2Work> &work) {
         ivd_video_decode_ip_t s_dec_ip;
         ivd_video_decode_op_t s_dec_op;
         WORD32 timeDelay, timeTaken;
-        size_t sizeY, sizeUV;
+        //size_t sizeY, sizeUV;
 
         if (!setDecodeArgs(&s_dec_ip, &s_dec_op, input.get(), &output, workIndex, inOffset)) {
             ALOGE("Decoder arg setup failed");
             // TODO: notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
             mSignalledError = true;
-            return;
+            return done;
         }
         ALOGV("Decoder arg setup succeeded");
         // If input dump is enabled, then write to file
@@ -1319,7 +1131,7 @@ void C2SoftAvcDec::process(std::unique_ptr<C2Work> &work) {
             ALOGE("Unsupported resolution : %dx%d", mWidth, mHeight);
             // TODO: notify(OMX_EventError, OMX_ErrorUnsupportedSetting, 0, NULL);
             mSignalledError = true;
-            return;
+            return done;
         }
 
         bool allocationFailed = (IVD_MEM_ALLOC_FAILED == (s_dec_op.u4_error_code & 0xFF));
@@ -1327,7 +1139,7 @@ void C2SoftAvcDec::process(std::unique_ptr<C2Work> &work) {
             ALOGE("Allocation failure in decoder");
             // TODO: notify(OMX_EventError, OMX_ErrorUnsupportedSetting, 0, NULL);
             mSignalledError = true;
-            return;
+            return done;
         }
 
         bool resChanged = (IVD_RES_CHANGED == (s_dec_op.u4_error_code & 0xFF));
@@ -1341,23 +1153,18 @@ void C2SoftAvcDec::process(std::unique_ptr<C2Work> &work) {
         PRINT_TIME("timeTaken=%6d delay=%6d numBytes=%6d", timeTaken, timeDelay,
                s_dec_op.u4_num_bytes_consumed);
         if (input) {
-            ALOGI("bytes total=%u", input->capacity());
+            ALOGV("bytes total=%u", input->capacity());
         }
         if (s_dec_op.u4_frame_decoded_flag && !mFlushNeeded) {
             mFlushNeeded = true;
         }
 
-        if (1 != s_dec_op.u4_frame_decoded_flag && work) {
+        if (1 != s_dec_op.u4_frame_decoded_flag && input) {
             /* If the input did not contain picture data, return work without
              * buffer */
-            ALOGV("no picture data");
-            std::vector<std::unique_ptr<C2Work>> done;
-            done.push_back(std::move(work));
-            done[0]->worklets.front()->output.flags = (C2BufferPack::flags_t)0;
-            done[0]->worklets.front()->output.buffers.clear();
-            done[0]->worklets.front()->output.buffers.emplace_back(nullptr);
-            done[0]->worklets.front()->output.ordinal = done[0]->input.ordinal;
-            mListener->onWorkDone_nb(shared_from_this(), std::move(done));
+            ALOGV("no picture data: %u", workIndex);
+            fillEmptyWork(work);
+            done = true;
         }
 
         // If the decoder is in the changing resolution mode and there is no output present,
@@ -1369,7 +1176,7 @@ void C2SoftAvcDec::process(std::unique_ptr<C2Work> &work) {
             resetPlugin();
             mStride = mWidth;
             setParams(mStride);
-            return;
+            continue;
         }
 
         if (resChanged) {
@@ -1377,8 +1184,10 @@ void C2SoftAvcDec::process(std::unique_ptr<C2Work> &work) {
             mChangingResolution = true;
             if (mFlushNeeded) {
                 setFlushMode();
+                isInFlush = true;
+                deferred = std::move(input);
             }
-            return;
+            continue;
         }
 
         // Combine the resolution change and coloraspects change in one PortSettingChange event
@@ -1397,69 +1206,68 @@ void C2SoftAvcDec::process(std::unique_ptr<C2Work> &work) {
             //    kDescribeColorAspectsIndex, NULL);
             ALOGV("update color aspect");
             mUpdateColorAspects = false;
-            return;
+            continue;
         }
 
         if (s_dec_op.u4_output_present) {
             ALOGV("output_present: %d", s_dec_op.u4_ts);
-            std::vector<std::unique_ptr<C2Work>> done;
-            {
-                std::unique_lock<std::mutex> lock(mPendingLock);
-                done.push_back(std::move(mPendingWork[s_dec_op.u4_ts]));
-                mPendingWork.erase(s_dec_op.u4_ts);
+            auto fillWork = [this](const std::unique_ptr<C2Work> &work) {
+                uint32_t flags = 0;
+                if (work->input.flags & C2BufferPack::FLAG_END_OF_STREAM) {
+                    flags |= C2BufferPack::FLAG_END_OF_STREAM;
+                    ALOGV("EOS");
+                }
+                work->worklets.front()->output.flags = (C2BufferPack::flags_t)flags;
+                work->worklets.front()->output.buffers.clear();
+                work->worklets.front()->output.buffers.emplace_back(
+                        std::make_shared<GraphicBuffer>(std::move(mAllocatedBlock)));
+                work->worklets.front()->output.ordinal = work->input.ordinal;
+            };
+            if (s_dec_op.u4_ts != workIndex) {
+                finish(s_dec_op.u4_ts, fillWork);
+            } else {
+                fillWork(work);
+                done = true;
             }
-            uint32_t flags = 0;
-            if (done[0]->input.flags & C2BufferPack::FLAG_END_OF_STREAM) {
-                flags |= C2BufferPack::FLAG_END_OF_STREAM;
-                ALOGV("EOS");
-            }
-            done[0]->worklets.front()->output.flags = (C2BufferPack::flags_t)flags;
-            done[0]->worklets.front()->output.buffers.clear();
-            done[0]->worklets.front()->output.buffers.emplace_back(
-                    std::make_shared<GraphicBuffer>(std::move(mAllocatedBlock)));
-            done[0]->worklets.front()->output.ordinal = done[0]->input.ordinal;
-            mListener->onWorkDone_nb(shared_from_this(), std::move(done));
-        } else if (mIsInFlush) {
-            ALOGV("flush");
+        } else if (isInFlush) {
+            ALOGV("flush complete");
             /* If in flush mode and no output is returned by the codec,
              * then come out of flush mode */
-            mIsInFlush = false;
+            isInFlush = false;
 
             /* If EOS was recieved on input port and there is no output
              * from the codec, then signal EOS on output port */
-            if (mReceivedEOS) {
-                std::vector<std::unique_ptr<C2Work>> done;
-                {
-                    std::unique_lock<std::mutex> lock(mPendingLock);
-                    if (!mPendingWork.empty()) {
-                        done.push_back(std::move(mPendingWork.begin()->second));
-                        mPendingWork.erase(mPendingWork.begin());
-                    }
-                }
-                if (!done.empty()) {
-                    ALOGV("sending empty EOS buffer");
-                    done[0]->worklets.front()->output.flags = C2BufferPack::FLAG_END_OF_STREAM;
-                    done[0]->worklets.front()->output.buffers.clear();
-                    done[0]->worklets.front()->output.buffers.emplace_back(nullptr);
-                    done[0]->worklets.front()->output.ordinal = done[0]->input.ordinal;
-                    mListener->onWorkDone_nb(shared_from_this(), std::move(done));
-                }
+            if (eos) {
+                // TODO: It's an error if not done.
 
                 resetPlugin();
-                return;
+                return done;
+            }
+
+            input = std::move(deferred);
+        }
+
+        if (input) {
+            inOffset += s_dec_op.u4_num_bytes_consumed;
+            if (inOffset >= input->capacity()) {
+                /* If input EOS is seen and decoder is not in flush mode,
+                 * set the decoder in flush mode.
+                 * There can be a case where EOS is sent along with last picture data
+                 * In that case, only after decoding that input data, decoder has to be
+                 * put in flush. This case is handled here  */
+                if (eos && !isInFlush) {
+                    setFlushMode();
+                    isInFlush = true;
+                }
+                if (isInFlush) {
+                    input.reset();
+                } else {
+                    break;
+                }
             }
         }
-        inOffset += s_dec_op.u4_num_bytes_consumed;
     }
-    /* If input EOS is seen and decoder is not in flush mode,
-     * set the decoder in flush mode.
-     * There can be a case where EOS is sent along with last picture data
-     * In that case, only after decoding that input data, decoder has to be
-     * put in flush. This case is handled here  */
-
-    if (mReceivedEOS && !mIsInFlush) {
-        setFlushMode();
-    }
+    return done;
 }
 
 bool C2SoftAvcDec::colorAspectsDiffer(

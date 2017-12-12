@@ -67,6 +67,7 @@ cc_library_shared {
         "libmedia",
         "libstagefright_codec2",
         "libstagefright_foundation",
+        "libstagefright_simple_c2component",
         "libutils",
     ],
 
