@@ -206,24 +206,16 @@ status_t AudioInputDescriptor::open(const audio_config_t *config,
         lConfig = *config;
     }
 
-    String8 lAddress = address;
-    if (lAddress == "") {
-        const DeviceVector& supportedDevices = mProfile->getSupportedDevices();
-        const DeviceVector& devicesForType = supportedDevices.getDevicesFromType(device);
-        lAddress = devicesForType.size() > 0 ? devicesForType.itemAt(0)->mAddress
-                  : String8("");
-    }
-
     mDevice = device;
 
     ALOGV("opening input for device %08x address %s profile %p name %s",
-          mDevice, lAddress.string(), mProfile.get(), mProfile->getName().string());
+          mDevice, address.string(), mProfile.get(), mProfile->getName().string());
 
     status_t status = mClientInterface->openInput(mProfile->getModuleHandle(),
                                                   input,
                                                   &lConfig,
                                                   &mDevice,
-                                                  lAddress,
+                                                  address,
                                                   source,
                                                   flags);
     LOG_ALWAYS_FATAL_IF(mDevice != device,

@@ -918,7 +918,12 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
         }
 
         outputDesc = new SwAudioOutputDescriptor(profile, mpClientInterface);
-        status = outputDesc->open(config, device, String8(""), stream, flags, &output);
+
+        DeviceVector outputDevices = mAvailableOutputDevices.getDevicesFromType(device);
+        String8 address = outputDevices.size() > 0 ? outputDevices.itemAt(0)->mAddress
+                : String8("");
+
+        status = outputDesc->open(config, device, address, stream, flags, &output);
 
         // only accept an output with the requested parameters
         if (status != NO_ERROR ||
@@ -1677,6 +1682,12 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
     lConfig.sample_rate = profileSamplingRate;
     lConfig.channel_mask = profileChannelMask;
     lConfig.format = profileFormat;
+
+    if (address == "") {
+        DeviceVector inputDevices = mAvailableInputDevices.getDevicesFromType(device);
+        // the inputs vector must be of size >= 1, but we don't want to crash here
+        address = inputDevices.size() > 0 ? inputDevices.itemAt(0)->mAddress : String8("");
+    }
 
     status_t status = inputDesc->open(&lConfig, device, address,
             halInputSource, profileFlags, &input);
@@ -3588,10 +3599,17 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
             sp<AudioInputDescriptor> inputDesc =
                     new AudioInputDescriptor(inProfile, mpClientInterface);
 
+            DeviceVector inputDevices = mAvailableInputDevices.getDevicesFromType(profileType);
+            //   the inputs vector must be of size >= 1, but we don't want to crash here
+            String8 address = inputDevices.size() > 0 ? inputDevices.itemAt(0)->mAddress
+                    : String8("");
+            ALOGV("  for input device 0x%x using address %s", profileType, address.string());
+            ALOGE_IF(inputDevices.size() == 0, "Input device list is empty!");
+
             audio_io_handle_t input = AUDIO_IO_HANDLE_NONE;
             status_t status = inputDesc->open(nullptr,
                                               profileType,
-                                              String8(""),
+                                              address,
                                               AUDIO_SOURCE_MIC,
                                               AUDIO_INPUT_FLAG_NONE,
                                               &input);
