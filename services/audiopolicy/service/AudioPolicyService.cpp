@@ -1146,4 +1146,4 @@ int aps_stop_tone(void *service);
 int aps_set_voice_volume(void *service, float volume, int delay_ms);
 };
 
-}; // namespace android
+} // namespace android

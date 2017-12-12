@@ -58,4 +58,4 @@ const RouteFlagTypeConverter::Table RouteFlagTypeConverter::mTable[];
 template <>
 const RuleTypeConverter::Table RuleTypeConverter::mTable[];
 
-}; // namespace android
+} // namespace android

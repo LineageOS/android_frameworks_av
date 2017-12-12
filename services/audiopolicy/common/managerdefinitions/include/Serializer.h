@@ -234,4 +234,4 @@ private:
     // Children are: ModulesTraits, VolumeTraits
 };
 
-}; // namespace android
+} // namespace android

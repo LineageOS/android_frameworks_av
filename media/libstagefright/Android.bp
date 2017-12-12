@@ -174,6 +174,90 @@ cc_library_shared {
     },
 }
 
+cc_library_shared {
+    name: "libstagefright_player2",
+
+    srcs: [
+        "CallbackDataSource.cpp",
+        "CallbackMediaSource.cpp",
+        "DataSourceFactory.cpp",
+        "DataURISource.cpp",
+        "FileSource.cpp",
+        "HTTPBase.cpp",
+        "HevcUtils.cpp",
+        "InterfaceUtils.cpp",
+        "MediaClock.cpp",
+        "MediaExtractorFactory.cpp",
+        "NuCachedSource2.cpp",
+        "RemoteMediaExtractor.cpp",
+        "RemoteMediaSource.cpp",
+        "SurfaceUtils.cpp",
+        "Utils.cpp",
+        "VideoFrameScheduler.cpp",
+        "http/MediaHTTP.cpp",
+    ],
+
+    shared_libs: [
+        "libbinder",
+        "libcutils",
+        "libdrmframework",
+        "libgui",
+        "liblog",
+        "libmedia_omx",
+        "libmedia_player2_util",
+        "libaudioclient",
+        "libmediaextractor",
+        "libmediametrics",
+        "libmediautils",
+        "libnetd_client",
+        "libui",
+        "libutils",
+        "libmedia_helper",
+        "libstagefright_foundation",
+        "libdl",
+    ],
+
+    static_libs: [
+        "libstagefright_esds",
+        "libstagefright_id3",
+        "libstagefright_mpeg2support",
+        "libstagefright_timedtext",
+    ],
+
+    export_shared_lib_headers: [
+        "libmedia_player2_util",
+    ],
+
+    export_include_dirs: [
+        "include",
+    ],
+
+    cflags: [
+        "-Wno-multichar",
+        "-Werror",
+        "-Wno-error=deprecated-declarations",
+        "-Wall",
+    ],
+
+    product_variables: {
+        debuggable: {
+            // enable experiments only in userdebug and eng builds
+            cflags: ["-DENABLE_STAGEFRIGHT_EXPERIMENTS"],
+        },
+    },
+
+    sanitize: {
+        cfi: true,
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        diag: {
+            cfi: true,
+        },
+    },
+}
+
 subdirs = [
     "codec2",
     "codecs/*",

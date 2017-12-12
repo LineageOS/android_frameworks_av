@@ -21,15 +21,12 @@
 #include "HwModule.h"
 #include "AudioGain.h"
 #include <policy.h>
-#include <cutils/atomic.h>
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #endif
 
 namespace android {
-
-int32_t volatile AudioPort::mNextUniqueId = 1;
 
 // --- AudioPort class implementation
 void AudioPort::attach(const sp<HwModule>& module)
@@ -40,31 +37,22 @@ void AudioPort::attach(const sp<HwModule>& module)
 // Note that is a different namespace than AudioFlinger unique IDs
 audio_port_handle_t AudioPort::getNextUniqueId()
 {
-    return static_cast<audio_port_handle_t>(android_atomic_inc(&mNextUniqueId));
+    return getNextHandle();
 }
 
 audio_module_handle_t AudioPort::getModuleHandle() const
 {
-    if (mModule == 0) {
-        return AUDIO_MODULE_HANDLE_NONE;
-    }
-    return mModule->mHandle;
+    return mModule != 0 ? mModule->getHandle() : AUDIO_MODULE_HANDLE_NONE;
 }
 
 uint32_t AudioPort::getModuleVersionMajor() const
 {
-    if (mModule == 0) {
-        return 0;
-    }
-    return mModule->getHalVersionMajor();
+    return mModule != 0 ? mModule->getHalVersionMajor() : 0;
 }
 
 const char *AudioPort::getModuleName() const
 {
-    if (mModule == 0) {
-        return "invalid module";
-    }
-    return mModule->getName();
+    return mModule != 0 ? mModule->getName() : "invalid module";
 }
 
 void AudioPort::toAudioPort(struct audio_port *port) const
@@ -477,4 +465,4 @@ void AudioPortConfig::toAudioPortConfig(struct audio_port_config *dstConfig,
     }
 }
 
-}; // namespace android
+} // namespace android

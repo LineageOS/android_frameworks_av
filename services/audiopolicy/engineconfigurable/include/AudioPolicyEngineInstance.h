@@ -76,6 +76,6 @@ AudioPolicyManagerInterface *EngineInstance::queryInterface() const;
 template <>
 AudioPolicyPluginInterface *EngineInstance::queryInterface() const;
 
-}; // namespace audio_policy
+} // namespace audio_policy
 
-}; // namespace android
+} // namespace android

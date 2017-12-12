@@ -197,6 +197,7 @@ void SimplePlayer::onError(std::weak_ptr<C2Component> component, uint32_t errorC
 }
 
 void SimplePlayer::play(const sp<IMediaSource> &source) {
+    ALOGV("SimplePlayer::play");
     sp<AMessage> format;
     (void) convertMetaDataToMessage(source->getFormat(), &format);
 
@@ -353,6 +354,7 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
         std::list<std::unique_ptr<C2Work>> items;
         items.push_back(std::move(work));
 
+        ALOGV("Frame #%ld size = %zu", numFrames, size);
         // DO THE DECODING
         component->queue_nb(&items);
 

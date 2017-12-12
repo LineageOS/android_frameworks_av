@@ -137,4 +137,4 @@ protected:
     virtual ~AudioPolicyManagerInterface() {}
 };
 
-}; // namespace android
+} // namespace android

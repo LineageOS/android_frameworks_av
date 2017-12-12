@@ -119,4 +119,4 @@ public:
     explicit OutputProfile(const String8 &name) : IOProfile(name, AUDIO_PORT_ROLE_SOURCE) {}
 };
 
-}; // namespace android
+} // namespace android

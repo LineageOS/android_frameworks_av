@@ -56,4 +56,4 @@ private:
     static status_t loadHwModule(cnode *root, sp<HwModule> &module, AudioPolicyConfig &config);
 };
 
-}; // namespace android
+} // namespace android

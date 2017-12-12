@@ -416,4 +416,4 @@ status_t ConfigParsingUtils::loadConfig(const char *path, AudioPolicyConfig &con
     return NO_ERROR;
 }
 
-}; // namespace android
+} // namespace android

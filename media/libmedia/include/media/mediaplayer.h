@@ -17,6 +17,8 @@
 #ifndef ANDROID_MEDIAPLAYER_H
 #define ANDROID_MEDIAPLAYER_H
 
+#include <media/mediaplayer_common.h>
+
 #include <arpa/inet.h>
 
 #include <binder/IMemory.h>
@@ -186,16 +188,6 @@ enum media_player_invoke_ids {
     INVOKE_ID_UNSELECT_TRACK = 5,
     INVOKE_ID_SET_VIDEO_SCALING_MODE = 6,
     INVOKE_ID_GET_SELECTED_TRACK = 7
-};
-
-// Keep MEDIA_TRACK_TYPE_* in sync with MediaPlayer.java.
-enum media_track_type {
-    MEDIA_TRACK_TYPE_UNKNOWN = 0,
-    MEDIA_TRACK_TYPE_VIDEO = 1,
-    MEDIA_TRACK_TYPE_AUDIO = 2,
-    MEDIA_TRACK_TYPE_TIMEDTEXT = 3,
-    MEDIA_TRACK_TYPE_SUBTITLE = 4,
-    MEDIA_TRACK_TYPE_METADATA = 5,
 };
 
 // ----------------------------------------------------------------------------

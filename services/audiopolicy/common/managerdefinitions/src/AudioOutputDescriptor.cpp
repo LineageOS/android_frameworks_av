@@ -398,14 +398,6 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *config,
         lConfig = *config;
     }
 
-    String8 lAddress = address;
-    if (lAddress == "") {
-        const DeviceVector& supportedDevices = mProfile->getSupportedDevices();
-        const DeviceVector& devicesForType = supportedDevices.getDevicesFromType(device);
-        lAddress = devicesForType.size() > 0 ? devicesForType.itemAt(0)->mAddress
-                  : String8("");
-    }
-
     mDevice = device;
     // if the selected profile is offloaded and no offload info was specified,
     // create a default one
@@ -425,13 +417,13 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *config,
     mFlags = (audio_output_flags_t)(mFlags | flags);
 
     ALOGV("opening output for device %08x address %s profile %p name %s",
-          mDevice, lAddress.string(), mProfile.get(), mProfile->getName().string());
+          mDevice, address.string(), mProfile.get(), mProfile->getName().string());
 
     status_t status = mClientInterface->openOutput(mProfile->getModuleHandle(),
                                                    output,
                                                    &lConfig,
                                                    &mDevice,
-                                                   lAddress,
+                                                   address,
                                                    &mLatency,
                                                    mFlags);
     LOG_ALWAYS_FATAL_IF(mDevice != device,

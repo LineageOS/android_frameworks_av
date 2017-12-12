@@ -44,12 +44,10 @@ public:
 
     const char *getName() const { return mName.string(); }
 
-
     const DeviceVector &getDeclaredDevices() const { return mDeclaredDevices; }
     void setDeclaredDevices(const DeviceVector &devices);
 
     const InputProfileCollection &getInputProfiles() const { return mInputProfiles; }
-
     const OutputProfileCollection &getOutputProfiles() const { return mOutputProfiles; }
 
     void setProfiles(const IOProfileCollection &profiles);
@@ -76,6 +74,7 @@ public:
     status_t removeInputProfile(const String8& name);
 
     audio_module_handle_t getHandle() const { return mHandle; }
+    void setHandle(audio_module_handle_t handle);
 
     sp<AudioPort> findPortByTagName(const String8 &tagName) const
     {
@@ -85,14 +84,13 @@ public:
     // TODO remove from here (split serialization)
     void dump(int fd);
 
+private:
+    void refreshSupportedDevices();
+
     const String8 mName; // base name of the audio HW module (primary, a2dp ...)
     audio_module_handle_t mHandle;
     OutputProfileCollection mOutputProfiles; // output profiles exposed by this module
     InputProfileCollection mInputProfiles;  // input profiles exposed by this module
-
-private:
-    void refreshSupportedDevices();
-
     uint32_t mHalVersion; // audio HAL API version
     DeviceVector mDeclaredDevices; // devices declared in audio_policy configuration file.
     AudioRouteVector mRoutes;
@@ -114,4 +112,4 @@ public:
     status_t dump(int fd) const;
 };
 
-}; // namespace android
+} // namespace android

@@ -129,4 +129,4 @@ void IOProfile::log()
     // @TODO: forward log to AudioPort
 }
 
-}; // namespace android
+} // namespace android
