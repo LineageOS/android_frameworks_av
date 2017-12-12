@@ -115,10 +115,13 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
     ALOGD("open(), request notificationFrames = %d, frameCount = %u",
           notificationFrames, (uint)frameCount);
-    mAudioTrack = new AudioTrack(); // TODO review
-    if (getDeviceId() != AAUDIO_UNSPECIFIED) {
-        mAudioTrack->setOutputDevice(getDeviceId());
-    }
+
+    // Don't call mAudioTrack->setDeviceId() because it will be overwritten by set()!
+    audio_port_handle_t selectedDeviceId = (getDeviceId() == AAUDIO_UNSPECIFIED)
+                                           ? AUDIO_PORT_HANDLE_NONE
+                                           : getDeviceId();
+
+    mAudioTrack = new AudioTrack();
     mAudioTrack->set(
             (audio_stream_type_t) AUDIO_STREAM_MUSIC,
             getSampleRate(),
@@ -129,11 +132,20 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             callback,
             callbackData,
             notificationFrames,
-            0 /*sharedBuffer*/,
-            false /*threadCanCallJava*/,
+            0,       // DEFAULT sharedBuffer*/,
+            false,   // DEFAULT threadCanCallJava
             AUDIO_SESSION_ALLOCATE,
-            streamTransferType
-            );
+            streamTransferType,
+            NULL,    // DEFAULT audio_offload_info_t
+            AUDIO_UID_INVALID, // DEFAULT uid
+            -1,      // DEFAULT pid
+            NULL,    // DEFAULT audio_attributes_t
+            // WARNING - If doNotReconnect set true then audio stops after plugging and unplugging
+            // headphones a few times.
+            false,   // DEFAULT doNotReconnect,
+            1.0f,    // DEFAULT maxRequiredSpeed
+            selectedDeviceId
+    );
 
     // Did we get a valid track?
     status_t status = mAudioTrack->initCheck();

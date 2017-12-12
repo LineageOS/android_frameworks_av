@@ -98,12 +98,15 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
 
     ALOGD("open(), request notificationFrames = %u, frameCount = %u",
           notificationFrames, (uint)frameCount);
+
+    // Don't call mAudioRecord->setInputDevice() because it will be overwritten by set()!
+    audio_port_handle_t selectedDeviceId = (getDeviceId() == AAUDIO_UNSPECIFIED)
+                                           ? AUDIO_PORT_HANDLE_NONE
+                                           : getDeviceId();
+
     mAudioRecord = new AudioRecord(
             mOpPackageName // const String16& opPackageName TODO does not compile
             );
-    if (getDeviceId() != AAUDIO_UNSPECIFIED) {
-        mAudioRecord->setInputDevice(getDeviceId());
-    }
     mAudioRecord->set(
             AUDIO_SOURCE_VOICE_RECOGNITION,
             getSampleRate(),
@@ -116,10 +119,11 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
             false /*threadCanCallJava*/,
             AUDIO_SESSION_ALLOCATE,
             streamTransferType,
-            flags
-            //   int uid = -1,
-            //   pid_t pid = -1,
-            //   const audio_attributes_t* pAttributes = nullptr
+            flags,
+            AUDIO_UID_INVALID, // DEFAULT uid
+            -1,                // DEFAULT pid
+            NULL,              // DEFAULT audio_attributes_t
+            selectedDeviceId
             );
 
     // Did we get a valid track?
