@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
 
 #include "IAudioFlinger.h"
@@ -30,7 +31,7 @@ namespace android {
 
 enum {
     CREATE_TRACK = IBinder::FIRST_CALL_TRANSACTION,
-    OPEN_RECORD,
+    CREATE_RECORD,
     SAMPLE_RATE,
     RESERVED,   // obsolete, was CHANNEL_COUNT
     FORMAT,
@@ -130,102 +131,39 @@ public:
         return track;
     }
 
-    virtual sp<media::IAudioRecord> openRecord(
-                                audio_io_handle_t input,
-                                uint32_t sampleRate,
-                                audio_format_t format,
-                                audio_channel_mask_t channelMask,
-                                const String16& opPackageName,
-                                size_t *pFrameCount,
-                                audio_input_flags_t *flags,
-                                pid_t pid,
-                                pid_t tid,
-                                int clientUid,
-                                audio_session_t *sessionId,
-                                size_t *notificationFrames,
-                                sp<IMemory>& cblk,
-                                sp<IMemory>& buffers,
-                                status_t *status,
-                                audio_port_handle_t portId)
+    virtual sp<media::IAudioRecord> createRecord(const CreateRecordInput& input,
+                                                 CreateRecordOutput& output,
+                                                 status_t *status)
     {
         Parcel data, reply;
         sp<media::IAudioRecord> record;
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
-        data.writeInt32((int32_t) input);
-        data.writeInt32(sampleRate);
-        data.writeInt32(format);
-        data.writeInt32(channelMask);
-        data.writeString16(opPackageName);
-        size_t frameCount = pFrameCount != NULL ? *pFrameCount : 0;
-        data.writeInt64(frameCount);
-        audio_input_flags_t lFlags = flags != NULL ? *flags : AUDIO_INPUT_FLAG_NONE;
-        data.writeInt32(lFlags);
-        data.writeInt32((int32_t) pid);
-        data.writeInt32((int32_t) tid);
-        data.writeInt32((int32_t) clientUid);
-        audio_session_t lSessionId = AUDIO_SESSION_ALLOCATE;
-        if (sessionId != NULL) {
-            lSessionId = *sessionId;
+
+        if (status == nullptr) {
+            return record;
         }
-        data.writeInt32(lSessionId);
-        data.writeInt64(notificationFrames != NULL ? *notificationFrames : 0);
-        data.writeInt32(portId);
-        cblk.clear();
-        buffers.clear();
-        status_t lStatus = remote()->transact(OPEN_RECORD, data, &reply);
+
+        input.writeToParcel(&data);
+
+        status_t lStatus = remote()->transact(CREATE_RECORD, data, &reply);
         if (lStatus != NO_ERROR) {
-            ALOGE("openRecord error: %s", strerror(-lStatus));
-        } else {
-            frameCount = reply.readInt64();
-            if (pFrameCount != NULL) {
-                *pFrameCount = frameCount;
-            }
-            lFlags = (audio_input_flags_t)reply.readInt32();
-            if (flags != NULL) {
-                *flags = lFlags;
-            }
-            lSessionId = (audio_session_t) reply.readInt32();
-            if (sessionId != NULL) {
-                *sessionId = lSessionId;
-            }
-            size_t lNotificationFrames = (size_t) reply.readInt64();
-            if (notificationFrames != NULL) {
-                *notificationFrames = lNotificationFrames;
-            }
-            lStatus = reply.readInt32();
-            record = interface_cast<media::IAudioRecord>(reply.readStrongBinder());
-            cblk = interface_cast<IMemory>(reply.readStrongBinder());
-            if (cblk != 0 && cblk->pointer() == NULL) {
-                cblk.clear();
-            }
-            buffers = interface_cast<IMemory>(reply.readStrongBinder());
-            if (buffers != 0 && buffers->pointer() == NULL) {
-                buffers.clear();
-            }
-            if (lStatus == NO_ERROR) {
-                if (record == 0) {
-                    ALOGE("openRecord should have returned an IAudioRecord");
-                    lStatus = UNKNOWN_ERROR;
-                } else if (cblk == 0) {
-                    ALOGE("openRecord should have returned a cblk");
-                    lStatus = NO_MEMORY;
-                }
-                // buffers is permitted to be 0
-            } else {
-                if (record != 0 || cblk != 0 || buffers != 0) {
-                    ALOGE("openRecord returned an IAudioRecord, cblk, "
-                          "or buffers but with status %d", lStatus);
-                }
-            }
-            if (lStatus != NO_ERROR) {
-                record.clear();
-                cblk.clear();
-                buffers.clear();
-            }
+            ALOGE("createRecord transaction error %d", lStatus);
+            *status = DEAD_OBJECT;
+            return record;
         }
-        if (status != NULL) {
-            *status = lStatus;
+        *status = reply.readInt32();
+        if (*status != NO_ERROR) {
+            ALOGE("createRecord returned error %d", *status);
+            return record;
         }
+
+        record = interface_cast<media::IAudioRecord>(reply.readStrongBinder());
+        if (record == 0) {
+            ALOGE("createRecord returned a NULL IAudioRecord with status OK");
+            *status = DEAD_OBJECT;
+            return record;
+        }
+        output.readFromParcel(&reply);
         return record;
     }
 
@@ -899,21 +837,46 @@ IMPLEMENT_META_INTERFACE(AudioFlinger, "android.media.IAudioFlinger");
 status_t BnAudioFlinger::onTransact(
     uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
+    // make sure transactions reserved to AudioPolicyManager do not come from other processes
+    switch (code) {
+        case SET_STREAM_VOLUME:
+        case SET_STREAM_MUTE:
+        case SET_MODE:
+        case OPEN_OUTPUT:
+        case OPEN_DUPLICATE_OUTPUT:
+        case CLOSE_OUTPUT:
+        case SUSPEND_OUTPUT:
+        case RESTORE_OUTPUT:
+        case OPEN_INPUT:
+        case CLOSE_INPUT:
+        case INVALIDATE_STREAM:
+        case SET_VOICE_VOLUME:
+        case MOVE_EFFECTS:
+        case LOAD_HW_MODULE:
+        case LIST_AUDIO_PORTS:
+        case GET_AUDIO_PORT:
+        case CREATE_AUDIO_PATCH:
+        case RELEASE_AUDIO_PATCH:
+        case LIST_AUDIO_PATCHES:
+        case SET_AUDIO_PORT_CONFIG:
+            ALOGW("%s: transaction %d received from PID %d",
+                  __func__, code, IPCThreadState::self()->getCallingPid());
+            return INVALID_OPERATION;
+        default:
+            break;
+    }
+
     // Whitelist of relevant events to trigger log merging.
     // Log merging should activate during audio activity of any kind. This are considered the
     // most relevant events.
     // TODO should select more wisely the items from the list
     switch (code) {
         case CREATE_TRACK:
-        case OPEN_RECORD:
+        case CREATE_RECORD:
         case SET_MASTER_VOLUME:
         case SET_MASTER_MUTE:
-        case SET_STREAM_VOLUME:
-        case SET_STREAM_MUTE:
         case SET_MIC_MUTE:
         case SET_PARAMETERS:
-        case OPEN_INPUT:
-        case SET_VOICE_VOLUME:
         case CREATE_EFFECT:
         case SYSTEM_READY: {
             requestLogMerge();
@@ -922,6 +885,7 @@ status_t BnAudioFlinger::onTransact(
         default:
             break;
     }
+
     switch (code) {
         case CREATE_TRACK: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
@@ -948,37 +912,29 @@ status_t BnAudioFlinger::onTransact(
             output.writeToParcel(reply);
             return NO_ERROR;
         } break;
-        case OPEN_RECORD: {
+        case CREATE_RECORD: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
-            audio_io_handle_t input = (audio_io_handle_t) data.readInt32();
-            uint32_t sampleRate = data.readInt32();
-            audio_format_t format = (audio_format_t) data.readInt32();
-            audio_channel_mask_t channelMask = data.readInt32();
-            const String16& opPackageName = data.readString16();
-            size_t frameCount = data.readInt64();
-            audio_input_flags_t flags = (audio_input_flags_t) data.readInt32();
-            pid_t pid = (pid_t) data.readInt32();
-            pid_t tid = (pid_t) data.readInt32();
-            int clientUid = data.readInt32();
-            audio_session_t sessionId = (audio_session_t) data.readInt32();
-            size_t notificationFrames = data.readInt64();
-            audio_port_handle_t portId = (audio_port_handle_t) data.readInt32();
-            sp<IMemory> cblk;
-            sp<IMemory> buffers;
-            status_t status = NO_ERROR;
-            sp<media::IAudioRecord> record = openRecord(input,
-                    sampleRate, format, channelMask, opPackageName, &frameCount, &flags,
-                    pid, tid, clientUid, &sessionId, &notificationFrames, cblk, buffers,
-                    &status, portId);
+
+            CreateRecordInput input;
+            if (input.readFromParcel((Parcel*)&data) != NO_ERROR) {
+                reply->writeInt32(DEAD_OBJECT);
+                return NO_ERROR;
+            }
+
+            status_t status;
+            CreateRecordOutput output;
+
+            sp<media::IAudioRecord> record = createRecord(input,
+                                                          output,
+                                                          &status);
+
             LOG_ALWAYS_FATAL_IF((record != 0) != (status == NO_ERROR));
-            reply->writeInt64(frameCount);
-            reply->writeInt32(flags);
-            reply->writeInt32(sessionId);
-            reply->writeInt64(notificationFrames);
             reply->writeInt32(status);
+            if (status != NO_ERROR) {
+                return NO_ERROR;
+            }
             reply->writeStrongBinder(IInterface::asBinder(record));
-            reply->writeStrongBinder(IInterface::asBinder(cblk));
-            reply->writeStrongBinder(IInterface::asBinder(buffers));
+            output.writeToParcel(reply);
             return NO_ERROR;
         } break;
         case SAMPLE_RATE: {
