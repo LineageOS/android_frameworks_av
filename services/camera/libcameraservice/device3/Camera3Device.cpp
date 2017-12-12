@@ -194,8 +194,14 @@ status_t Camera3Device::initializeCommonLocked() {
 
     mTagMonitor.initialize(mVendorTagId);
 
+    Vector<int32_t> sessionParamKeys;
+    camera_metadata_entry_t sessionKeysEntry = mDeviceInfo.find(
+            ANDROID_REQUEST_AVAILABLE_SESSION_KEYS);
+    if (sessionKeysEntry.count > 0) {
+        sessionParamKeys.insertArrayAt(sessionKeysEntry.data.i32, 0, sessionKeysEntry.count);
+    }
     /** Start up request queue thread */
-    mRequestThread = new RequestThread(this, mStatusTracker, mInterface);
+    mRequestThread = new RequestThread(this, mStatusTracker, mInterface, sessionParamKeys);
     res = mRequestThread->run(String8::format("C3Dev-%s-ReqQueue", mId.string()).string());
     if (res != OK) {
         SET_ERR_L("Unable to start request queue thread: %s (%d)",
@@ -1104,7 +1110,7 @@ sp<Camera3Device::CaptureRequest> Camera3Device::setUpRequestLocked(
     if (mStatus == STATUS_UNCONFIGURED || mNeedConfig) {
         // This point should only be reached via API1 (API2 must explicitly call configureStreams)
         // so unilaterally select normal operating mode.
-        res = configureStreamsLocked(CAMERA3_STREAM_CONFIGURATION_NORMAL_MODE, mSessionParams);
+        res = filterParamsAndConfigureLocked(request, CAMERA3_STREAM_CONFIGURATION_NORMAL_MODE);
         // Stream configuration failed. Client might try other configuraitons.
         if (res != OK) {
             CLOGE("Can't set up streams: %s (%d)", strerror(-res), res);
@@ -1508,11 +1514,20 @@ status_t Camera3Device::configureStreams(const CameraMetadata& sessionParams, in
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
 
+    return filterParamsAndConfigureLocked(sessionParams, operatingMode);
+}
+
+status_t Camera3Device::filterParamsAndConfigureLocked(const CameraMetadata& sessionParams,
+        int operatingMode) {
     //Filter out any incoming session parameters
     const CameraMetadata params(sessionParams);
-    CameraMetadata filteredParams;
     camera_metadata_entry_t availableSessionKeys = mDeviceInfo.find(
             ANDROID_REQUEST_AVAILABLE_SESSION_KEYS);
+    CameraMetadata filteredParams(availableSessionKeys.count);
+    camera_metadata_t *meta = const_cast<camera_metadata_t *>(
+            filteredParams.getAndLock());
+    set_camera_metadata_vendor_id(meta, mVendorTagId);
+    filteredParams.unlock(meta);
     if (availableSessionKeys.count > 0) {
         for (size_t i = 0; i < availableSessionKeys.count; i++) {
             camera_metadata_ro_entry entry = params.find(
@@ -2203,10 +2218,47 @@ void Camera3Device::cancelStreamsConfigurationLocked() {
     // properly clean things up
     internalUpdateStatusLocked(STATUS_UNCONFIGURED);
     mNeedConfig = true;
+
+    res = mPreparerThread->resume();
+    if (res != OK) {
+        ALOGE("%s: Camera %s: Preparer thread failed to resume!", __FUNCTION__, mId.string());
+    }
+}
+
+bool Camera3Device::reconfigureCamera(const CameraMetadata& sessionParams) {
+    ATRACE_CALL();
+    bool ret = false;
+
+    Mutex::Autolock il(mInterfaceLock);
+    nsecs_t maxExpectedDuration = getExpectedInFlightDuration();
+
+    Mutex::Autolock l(mLock);
+    auto rc = internalPauseAndWaitLocked(maxExpectedDuration);
+    if (rc == NO_ERROR) {
+        mNeedConfig = true;
+        rc = configureStreamsLocked(mOperatingMode, sessionParams, /*notifyRequestThread*/ false);
+        if (rc == NO_ERROR) {
+            ret = true;
+            mPauseStateNotify = false;
+            //Moving to active state while holding 'mLock' is important.
+            //There could be pending calls to 'create-/deleteStream' which
+            //will trigger another stream configuration while the already
+            //present streams end up with outstanding buffers that will
+            //not get drained.
+            internalUpdateStatusLocked(STATUS_ACTIVE);
+        } else {
+            setErrorStateLocked("%s: Failed to re-configure camera: %d",
+                    __FUNCTION__, rc);
+        }
+    } else {
+        ALOGE("%s: Failed to pause streaming: %d", __FUNCTION__, rc);
+    }
+
+    return ret;
 }
 
 status_t Camera3Device::configureStreamsLocked(int operatingMode,
-        const CameraMetadata& sessionParams) {
+        const CameraMetadata& sessionParams, bool notifyRequestThread) {
     ATRACE_CALL();
     status_t res;
 
@@ -2246,6 +2298,8 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
 
     // Start configuring the streams
     ALOGV("%s: Camera %s: Starting stream configuration", __FUNCTION__, mId.string());
+
+    mPreparerThread->pause();
 
     camera3_stream_configuration config;
     config.operation_mode = mOperatingMode;
@@ -2338,7 +2392,9 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
 
     // Request thread needs to know to avoid using repeat-last-settings protocol
     // across configure_streams() calls
-    mRequestThread->configurationComplete(mIsConstrainedHighSpeedConfiguration);
+    if (notifyRequestThread) {
+        mRequestThread->configurationComplete(mIsConstrainedHighSpeedConfiguration, sessionParams);
+    }
 
     char value[PROPERTY_VALUE_MAX];
     property_get("camera.fifo.disable", value, "0");
@@ -2375,6 +2431,12 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
 
     // tear down the deleted streams after configure streams.
     mDeletedStreams.clear();
+
+    auto rc = mPreparerThread->resume();
+    if (rc != OK) {
+        SET_ERR_L("%s: Camera %s: Preparer thread failed to resume!", __FUNCTION__, mId.string());
+        return rc;
+    }
 
     return OK;
 }
@@ -3747,7 +3809,7 @@ void Camera3Device::HalInterface::onBufferFreed(
 
 Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         sp<StatusTracker> statusTracker,
-        sp<HalInterface> interface) :
+        sp<HalInterface> interface, const Vector<int32_t>& sessionParamKeys) :
         Thread(/*canCallJava*/false),
         mParent(parent),
         mStatusTracker(statusTracker),
@@ -3764,7 +3826,9 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mRepeatingLastFrameNumber(
             hardware::camera2::ICameraDeviceUser::NO_IN_FLIGHT_REPEATING_FRAMES),
         mPrepareVideoStream(false),
-        mRequestLatency(kRequestLatencyBinSize) {
+        mRequestLatency(kRequestLatencyBinSize),
+        mSessionParamKeys(sessionParamKeys),
+        mLatestSessionParams(sessionParamKeys.size()) {
     mStatusId = statusTracker->addComponent();
 }
 
@@ -3777,10 +3841,12 @@ void Camera3Device::RequestThread::setNotificationListener(
     mListener = listener;
 }
 
-void Camera3Device::RequestThread::configurationComplete(bool isConstrainedHighSpeed) {
+void Camera3Device::RequestThread::configurationComplete(bool isConstrainedHighSpeed,
+        const CameraMetadata& sessionParams) {
     ATRACE_CALL();
     Mutex::Autolock l(mRequestLock);
     mReconfigured = true;
+    mLatestSessionParams = sessionParams;
     // Prepare video stream for high speed recording.
     mPrepareVideoStream = isConstrainedHighSpeed;
 }
@@ -4191,6 +4257,52 @@ nsecs_t Camera3Device::RequestThread::calculateMaxExpectedDuration(const camera_
     return maxExpectedDuration;
 }
 
+bool Camera3Device::RequestThread::updateSessionParameters(const CameraMetadata& settings) {
+    ATRACE_CALL();
+    bool updatesDetected = false;
+
+    for (auto tag : mSessionParamKeys) {
+        camera_metadata_ro_entry entry = settings.find(tag);
+        camera_metadata_entry lastEntry = mLatestSessionParams.find(tag);
+
+        if (entry.count > 0) {
+            bool isDifferent = false;
+            if (lastEntry.count > 0) {
+                // Have a last value, compare to see if changed
+                if (lastEntry.type == entry.type &&
+                        lastEntry.count == entry.count) {
+                    // Same type and count, compare values
+                    size_t bytesPerValue = camera_metadata_type_size[lastEntry.type];
+                    size_t entryBytes = bytesPerValue * lastEntry.count;
+                    int cmp = memcmp(entry.data.u8, lastEntry.data.u8, entryBytes);
+                    if (cmp != 0) {
+                        isDifferent = true;
+                    }
+                } else {
+                    // Count or type has changed
+                    isDifferent = true;
+                }
+            } else {
+                // No last entry, so always consider to be different
+                isDifferent = true;
+            }
+
+            if (isDifferent) {
+                ALOGV("%s: Session parameter tag id %d changed", __FUNCTION__, tag);
+                mLatestSessionParams.update(entry);
+                updatesDetected = true;
+            }
+        } else if (lastEntry.count > 0) {
+            // Value has been removed
+            ALOGV("%s: Session parameter tag id %d removed", __FUNCTION__, tag);
+            mLatestSessionParams.erase(tag);
+            updatesDetected = true;
+        }
+    }
+
+    return updatesDetected;
+}
+
 bool Camera3Device::RequestThread::threadLoop() {
     ATRACE_CALL();
     status_t res;
@@ -4215,6 +4327,49 @@ bool Camera3Device::RequestThread::threadLoop() {
     } else {
         ALOGW("%s: Did not have android.request.id set in the request.", __FUNCTION__);
         latestRequestId = NAME_NOT_FOUND;
+    }
+
+    // 'mNextRequests' will at this point contain either a set of HFR batched requests
+    //  or a single request from streaming or burst. In either case the first element
+    //  should contain the latest camera settings that we need to check for any session
+    //  parameter updates.
+    if (updateSessionParameters(mNextRequests[0].captureRequest->mSettings)) {
+        res = OK;
+
+        //Input stream buffers are already acquired at this point so an input stream
+        //will not be able to move to idle state unless we force it.
+        if (mNextRequests[0].captureRequest->mInputStream != nullptr) {
+            res = mNextRequests[0].captureRequest->mInputStream->forceToIdle();
+            if (res != OK) {
+                ALOGE("%s: Failed to force idle input stream: %d", __FUNCTION__, res);
+                cleanUpFailedRequests(/*sendRequestError*/ false);
+                return false;
+            }
+        }
+
+        if (res == OK) {
+            sp<StatusTracker> statusTracker = mStatusTracker.promote();
+            if (statusTracker != 0) {
+                statusTracker->markComponentIdle(mStatusId, Fence::NO_FENCE);
+
+                sp<Camera3Device> parent = mParent.promote();
+                if (parent != nullptr) {
+                    mReconfigured |= parent->reconfigureCamera(mLatestSessionParams);
+                }
+
+                statusTracker->markComponentActive(mStatusId);
+                setPaused(false);
+            }
+
+            if (mNextRequests[0].captureRequest->mInputStream != nullptr) {
+                mNextRequests[0].captureRequest->mInputStream->restoreConfiguredState();
+                if (res != OK) {
+                    ALOGE("%s: Failed to restore configured input stream: %d", __FUNCTION__, res);
+                    cleanUpFailedRequests(/*sendRequestError*/ false);
+                    return false;
+                }
+            }
+        }
     }
 
     // Prepare a batch of HAL requests and output buffers.
@@ -4980,7 +5135,7 @@ status_t Camera3Device::RequestThread::addDummyTriggerIds(
 
 Camera3Device::PreparerThread::PreparerThread() :
         Thread(/*canCallJava*/false), mListener(nullptr),
-        mActive(false), mCancelNow(false) {
+        mActive(false), mCancelNow(false), mCurrentMaxCount(0), mCurrentPrepareComplete(false) {
 }
 
 Camera3Device::PreparerThread::~PreparerThread() {
@@ -5031,8 +5186,91 @@ status_t Camera3Device::PreparerThread::prepare(int maxCount, sp<Camera3StreamIn
     }
 
     // queue up the work
-    mPendingStreams.push_back(stream);
+    mPendingStreams.emplace(maxCount, stream);
     ALOGV("%s: Stream %d queued for preparing", __FUNCTION__, stream->getId());
+
+    return OK;
+}
+
+void Camera3Device::PreparerThread::pause() {
+    ATRACE_CALL();
+
+    Mutex::Autolock l(mLock);
+
+    std::unordered_map<int, sp<camera3::Camera3StreamInterface> > pendingStreams;
+    pendingStreams.insert(mPendingStreams.begin(), mPendingStreams.end());
+    sp<camera3::Camera3StreamInterface> currentStream = mCurrentStream;
+    int currentMaxCount = mCurrentMaxCount;
+    mPendingStreams.clear();
+    mCancelNow = true;
+    while (mActive) {
+        auto res = mThreadActiveSignal.waitRelative(mLock, kActiveTimeout);
+        if (res == TIMED_OUT) {
+            ALOGE("%s: Timed out waiting on prepare thread!", __FUNCTION__);
+            return;
+        } else if (res != OK) {
+            ALOGE("%s: Encountered an error: %d waiting on prepare thread!", __FUNCTION__, res);
+            return;
+        }
+    }
+
+    //Check whether the prepare thread was able to complete the current
+    //stream. In case work is still pending emplace it along with the rest
+    //of the streams in the pending list.
+    if (currentStream != nullptr) {
+        if (!mCurrentPrepareComplete) {
+            pendingStreams.emplace(currentMaxCount, currentStream);
+        }
+    }
+
+    mPendingStreams.insert(pendingStreams.begin(), pendingStreams.end());
+    for (const auto& it : mPendingStreams) {
+        it.second->cancelPrepare();
+    }
+}
+
+status_t Camera3Device::PreparerThread::resume() {
+    ATRACE_CALL();
+    status_t res;
+
+    Mutex::Autolock l(mLock);
+    sp<NotificationListener> listener = mListener.promote();
+
+    if (mActive) {
+        ALOGE("%s: Trying to resume an already active prepare thread!", __FUNCTION__);
+        return NO_INIT;
+    }
+
+    auto it = mPendingStreams.begin();
+    for (; it != mPendingStreams.end();) {
+        res = it->second->startPrepare(it->first);
+        if (res == OK) {
+            if (listener != NULL) {
+                listener->notifyPrepared(it->second->getId());
+            }
+            it = mPendingStreams.erase(it);
+        } else if (res != NOT_ENOUGH_DATA) {
+            ALOGE("%s: Unable to start preparer stream: %d (%s)", __FUNCTION__,
+                    res, strerror(-res));
+            it = mPendingStreams.erase(it);
+        } else {
+            it++;
+        }
+    }
+
+    if (mPendingStreams.empty()) {
+        return OK;
+    }
+
+    res = Thread::run("C3PrepThread", PRIORITY_BACKGROUND);
+    if (res != OK) {
+        ALOGE("%s: Unable to start preparer stream: %d (%s)",
+                __FUNCTION__, res, strerror(-res));
+        return res;
+    }
+    mCancelNow = false;
+    mActive = true;
+    ALOGV("%s: Preparer stream started", __FUNCTION__);
 
     return OK;
 }
@@ -5041,8 +5279,8 @@ status_t Camera3Device::PreparerThread::clear() {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);
 
-    for (const auto& stream : mPendingStreams) {
-        stream->cancelPrepare();
+    for (const auto& it : mPendingStreams) {
+        it.second->cancelPrepare();
     }
     mPendingStreams.clear();
     mCancelNow = true;
@@ -5067,12 +5305,15 @@ bool Camera3Device::PreparerThread::threadLoop() {
                 // threadLoop _must not_ re-acquire mLock after it sets mActive to false; would
                 // cause deadlock with prepare()'s requestExitAndWait triggered by !mActive.
                 mActive = false;
+                mThreadActiveSignal.signal();
                 return false;
             }
 
             // Get next stream to prepare
             auto it = mPendingStreams.begin();
-            mCurrentStream = *it;
+            mCurrentStream = it->second;
+            mCurrentMaxCount = it->first;
+            mCurrentPrepareComplete = false;
             mPendingStreams.erase(it);
             ATRACE_ASYNC_BEGIN("stream prepare", mCurrentStream->getId());
             ALOGV("%s: Preparing stream %d", __FUNCTION__, mCurrentStream->getId());
@@ -5107,6 +5348,7 @@ bool Camera3Device::PreparerThread::threadLoop() {
 
     ATRACE_ASYNC_END("stream prepare", mCurrentStream->getId());
     mCurrentStream.clear();
+    mCurrentPrepareComplete = true;
 
     return true;
 }

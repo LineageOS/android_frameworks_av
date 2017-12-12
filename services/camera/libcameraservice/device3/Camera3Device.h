@@ -552,11 +552,23 @@ class Camera3Device :
                                             const SurfaceMap &surfaceMap);
 
     /**
+     * Internally re-configure camera device using new session parameters.
+     * This will get triggered by the request thread.
+     */
+    bool reconfigureCamera(const CameraMetadata& sessionParams);
+
+    /**
+     * Filter stream session parameters and configure camera HAL.
+     */
+    status_t filterParamsAndConfigureLocked(const CameraMetadata& sessionParams,
+            int operatingMode);
+
+    /**
      * Take the currently-defined set of streams and configure the HAL to use
      * them. This is a long-running operation (may be several hundered ms).
      */
     status_t           configureStreamsLocked(int operatingMode,
-            const CameraMetadata& sessionParams);
+            const CameraMetadata& sessionParams, bool notifyRequestThread = true);
 
     /**
      * Cancel stream configuration that did not finish successfully.
@@ -655,7 +667,7 @@ class Camera3Device :
 
         RequestThread(wp<Camera3Device> parent,
                 sp<camera3::StatusTracker> statusTracker,
-                sp<HalInterface> interface);
+                sp<HalInterface> interface, const Vector<int32_t>& sessionParamKeys);
         ~RequestThread();
 
         void     setNotificationListener(wp<NotificationListener> listener);
@@ -663,7 +675,8 @@ class Camera3Device :
         /**
          * Call after stream (re)-configuration is completed.
          */
-        void     configurationComplete(bool isConstrainedHighSpeed);
+        void     configurationComplete(bool isConstrainedHighSpeed,
+                const CameraMetadata& sessionParams);
 
         /**
          * Set or clear the list of repeating requests. Does not block
@@ -812,6 +825,12 @@ class Camera3Device :
         // Calculate the expected maximum duration for a request
         nsecs_t calculateMaxExpectedDuration(const camera_metadata_t *request);
 
+        // Check and update latest session parameters based on the current request settings.
+        bool updateSessionParameters(const CameraMetadata& settings);
+
+        // Re-configure camera using the latest session parameters.
+        bool reconfigureCamera();
+
         wp<Camera3Device>  mParent;
         wp<camera3::StatusTracker>  mStatusTracker;
         sp<HalInterface>   mInterface;
@@ -869,6 +888,9 @@ class Camera3Device :
 
         static const int32_t kRequestLatencyBinSize = 40; // in ms
         CameraLatencyHistogram mRequestLatency;
+
+        Vector<int32_t>    mSessionParamKeys;
+        CameraMetadata     mLatestSessionParams;
     };
     sp<RequestThread> mRequestThread;
 
@@ -1006,21 +1028,34 @@ class Camera3Device :
          */
         status_t clear();
 
+        /**
+         * Pause all preparation activities
+         */
+        void pause();
+
+        /**
+         * Resume preparation activities
+         */
+        status_t resume();
+
       private:
         Mutex mLock;
+        Condition mThreadActiveSignal;
 
         virtual bool threadLoop();
 
         // Guarded by mLock
 
         wp<NotificationListener> mListener;
-        List<sp<camera3::Camera3StreamInterface> > mPendingStreams;
+        std::unordered_map<int, sp<camera3::Camera3StreamInterface> > mPendingStreams;
         bool mActive;
         bool mCancelNow;
 
         // Only accessed by threadLoop and the destructor
 
         sp<camera3::Camera3StreamInterface> mCurrentStream;
+        int mCurrentMaxCount;
+        bool mCurrentPrepareComplete;
     };
     sp<PreparerThread> mPreparerThread;
 
