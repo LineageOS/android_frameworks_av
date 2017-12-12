@@ -39,14 +39,13 @@ public:
                       DeviceVector &availableOutputDevices,
                       DeviceVector &availableInputDevices,
                       sp<DeviceDescriptor> &defaultOutputDevices,
-                      bool &isSpeakerDrcEnabled,
                       VolumeCurvesCollection *volumes = nullptr)
         : mHwModules(hwModules),
           mAvailableOutputDevices(availableOutputDevices),
           mAvailableInputDevices(availableInputDevices),
           mDefaultOutputDevices(defaultOutputDevices),
           mVolumeCurves(volumes),
-          mIsSpeakerDrcEnabled(isSpeakerDrcEnabled)
+          mIsSpeakerDrcEnabled(false)
     {}
 
     void setVolumes(const VolumeCurvesCollection &volumes)
@@ -79,6 +78,8 @@ public:
     {
         mAvailableOutputDevices.add(availableOutputDevices);
     }
+
+    bool isSpeakerDrcEnabled() const { return mIsSpeakerDrcEnabled; }
 
     void setSpeakerDrcEnabled(bool isSpeakerDrcEnabled)
     {
@@ -140,7 +141,10 @@ private:
     DeviceVector &mAvailableInputDevices;
     sp<DeviceDescriptor> &mDefaultOutputDevices;
     VolumeCurvesCollection *mVolumeCurves;
-    bool &mIsSpeakerDrcEnabled;
+    // TODO: remove when legacy conf file is removed. true on devices that use DRC on the
+    // DEVICE_CATEGORY_SPEAKER path to boost soft sounds, used to adjust volume curves accordingly.
+    // Note: remove also speaker_drc_enabled from global configuration of XML config file.
+    bool mIsSpeakerDrcEnabled;
 };
 
 } // namespace android
