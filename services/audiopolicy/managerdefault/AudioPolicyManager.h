@@ -17,6 +17,7 @@
 #pragma once
 
 #include <atomic>
+#include <memory>
 
 #include <stdint.h>
 #include <sys/types.h>
@@ -547,7 +548,7 @@ protected:
         float   mLastVoiceVolume;            // last voice volume value sent to audio HAL
         bool    mA2dpSuspended;  // true if A2DP output is suspended
 
-        IVolumeCurvesCollection *mVolumeCurves; // Volume Curves per use case and device category
+        std::unique_ptr<IVolumeCurvesCollection> mVolumeCurves; // Volume Curves per use case and device category
         EffectDescriptorCollection mEffects;  // list of registered audio effects
         sp<DeviceDescriptor> mDefaultOutputDevice; // output device selected by default at boot time
         HwModuleCollection mHwModules; // contains only modules that have been loaded successfully
