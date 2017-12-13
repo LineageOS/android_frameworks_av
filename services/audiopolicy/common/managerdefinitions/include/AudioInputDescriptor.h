@@ -79,6 +79,12 @@ public:
                   audio_source_t source,
                   audio_input_flags_t flags,
                   audio_io_handle_t *input);
+    // Called when a stream is about to be started.
+    // Note: called after AudioSession::changeActiveCount(1)
+    status_t start();
+    // Called after a stream is stopped
+    // Note: called after AudioSession::changeActiveCount(-1)
+    void stop();
     void close();
 
 private:
