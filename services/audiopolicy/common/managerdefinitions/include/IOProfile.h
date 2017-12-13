@@ -34,7 +34,11 @@ class IOProfile : public AudioPort
 {
 public:
     IOProfile(const String8 &name, audio_port_role_t role)
-        : AudioPort(name, AUDIO_PORT_TYPE_MIX, role) {}
+        : AudioPort(name, AUDIO_PORT_TYPE_MIX, role),
+          maxOpenCount((role == AUDIO_PORT_ROLE_SOURCE) ? 1 : 0),
+          curOpenCount(0),
+          maxActiveCount(1),
+          curActiveCount(0) {}
 
     // For a Profile aka MixPort, tag name and name are equivalent.
     virtual const String8 getTagName() const { return getName(); }
@@ -102,6 +106,34 @@ public:
     }
 
     const DeviceVector &getSupportedDevices() const { return mSupportedDevices; }
+
+    bool canOpenNewIo() {
+        if (maxOpenCount == 0 || curOpenCount < maxOpenCount) {
+            return true;
+        }
+        return false;
+    }
+
+    bool canStartNewIo() {
+        if (maxActiveCount == 0 || curActiveCount < maxActiveCount) {
+            return true;
+        }
+        return false;
+    }
+
+    // Maximum number of input or output streams that can be simultaneously opened for this profile.
+    // By convention 0 means no limit. To respect legacy behavior, initialized to 1 for output
+    // profiles and 0 for input profiles
+    uint32_t     maxOpenCount;
+    // Number of streams currently opened for this profile.
+    uint32_t     curOpenCount;
+    // Maximum number of input or output streams that can be simultaneously active for this profile.
+    // By convention 0 means no limit. To respect legacy behavior, initialized to 0 for output
+    // profiles and 1 for input profiles
+    uint32_t     maxActiveCount;
+    // Number of streams currently active for this profile. This is not the number of active clients
+    // (AudioTrack or AudioRecord) but the number of active HAL streams.
+    uint32_t     curActiveCount;
 
 private:
     DeviceVector mSupportedDevices; // supported devices: this input/output can be routed from/to

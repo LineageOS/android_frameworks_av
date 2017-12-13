@@ -6708,12 +6708,12 @@ void AudioFlinger::RecordThread::inputStandBy()
 // RecordThread::createRecordTrack_l() must be called with AudioFlinger::mLock held
 sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRecordTrack_l(
         const sp<AudioFlinger::Client>& client,
-        uint32_t sampleRate,
+        uint32_t *pSampleRate,
         audio_format_t format,
         audio_channel_mask_t channelMask,
         size_t *pFrameCount,
         audio_session_t sessionId,
-        size_t *notificationFrames,
+        size_t *pNotificationFrameCount,
         uid_t uid,
         audio_input_flags_t *flags,
         pid_t tid,
@@ -6721,16 +6721,30 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
         audio_port_handle_t portId)
 {
     size_t frameCount = *pFrameCount;
+    size_t notificationFrameCount = *pNotificationFrameCount;
     sp<RecordTrack> track;
     status_t lStatus;
     audio_input_flags_t inputFlags = mInput->flags;
+    audio_input_flags_t requestedFlags = *flags;
+    uint32_t sampleRate;
+
+    lStatus = initCheck();
+    if (lStatus != NO_ERROR) {
+        ALOGE("createRecordTrack_l() audio driver not initialized");
+        goto Exit;
+    }
+
+    if (*pSampleRate == 0) {
+        *pSampleRate = mSampleRate;
+    }
+    sampleRate = *pSampleRate;
 
     // special case for FAST flag considered OK if fast capture is present
     if (hasFastCapture()) {
         inputFlags = (audio_input_flags_t)(inputFlags | AUDIO_INPUT_FLAG_FAST);
     }
 
-    // Check if requested flags are compatible with output stream flags
+    // Check if requested flags are compatible with input stream flags
     if ((*flags & inputFlags) != *flags) {
         ALOGW("createRecordTrack_l(): mismatch between requested flags (%08x) and"
                 " input flags (%08x)",
@@ -6785,12 +6799,20 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
       }
     }
 
+    // If FAST or RAW flags were corrected, ask caller to request new input from audio policy
+    if ((*flags & AUDIO_INPUT_FLAG_FAST) !=
+            (requestedFlags & AUDIO_INPUT_FLAG_FAST)) {
+        *flags = (audio_input_flags_t) (*flags & ~(AUDIO_INPUT_FLAG_FAST | AUDIO_INPUT_FLAG_RAW));
+        lStatus = BAD_TYPE;
+        goto Exit;
+    }
+
     // compute track buffer size in frames, and suggest the notification frame count
     if (*flags & AUDIO_INPUT_FLAG_FAST) {
         // fast track: frame count is exactly the pipe depth
         frameCount = mPipeFramesP2;
         // ignore requested notificationFrames, and always notify exactly once every HAL buffer
-        *notificationFrames = mFrameCount;
+        notificationFrameCount = mFrameCount;
     } else {
         // not fast track: max notification period is resampled equivalent of one HAL buffer time
         //                 or 20 ms if there is a fast capture
@@ -6809,17 +6831,12 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
         const size_t minFrameCount = maxNotificationFrames *
                 max(kMinNotifications, minNotificationsByMs);
         frameCount = max(frameCount, minFrameCount);
-        if (*notificationFrames == 0 || *notificationFrames > maxNotificationFrames) {
-            *notificationFrames = maxNotificationFrames;
+        if (notificationFrameCount == 0 || notificationFrameCount > maxNotificationFrames) {
+            notificationFrameCount = maxNotificationFrames;
         }
     }
     *pFrameCount = frameCount;
-
-    lStatus = initCheck();
-    if (lStatus != NO_ERROR) {
-        ALOGE("createRecordTrack_l() audio driver not initialized");
-        goto Exit;
-    }
+    *pNotificationFrameCount = notificationFrameCount;
 
     { // scope for mLock
         Mutex::Autolock _l(mLock);
@@ -6874,7 +6891,7 @@ status_t AudioFlinger::RecordThread::start(RecordThread::RecordTrack* recordTrac
             recordTrack->clearSyncStartEvent();
         } else {
             // do not wait for the event for more than AudioSystem::kSyncRecordStartTimeOutMs
-            recordTrack->mFramesToDrop = -
+            recordTrack->mFramesToDrop = -(ssize_t)
                     ((AudioSystem::kSyncRecordStartTimeOutMs * recordTrack->mSampleRate) / 1000);
         }
     }

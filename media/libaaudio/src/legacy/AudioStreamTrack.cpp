@@ -115,10 +115,13 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
     ALOGD("open(), request notificationFrames = %d, frameCount = %u",
           notificationFrames, (uint)frameCount);
-    mAudioTrack = new AudioTrack(); // TODO review
-    if (getDeviceId() != AAUDIO_UNSPECIFIED) {
-        mAudioTrack->setOutputDevice(getDeviceId());
-    }
+
+    // Don't call mAudioTrack->setDeviceId() because it will be overwritten by set()!
+    audio_port_handle_t selectedDeviceId = (getDeviceId() == AAUDIO_UNSPECIFIED)
+                                           ? AUDIO_PORT_HANDLE_NONE
+                                           : getDeviceId();
+
+    mAudioTrack = new AudioTrack();
     mAudioTrack->set(
             (audio_stream_type_t) AUDIO_STREAM_MUSIC,
             getSampleRate(),
@@ -129,11 +132,20 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             callback,
             callbackData,
             notificationFrames,
-            0 /*sharedBuffer*/,
-            false /*threadCanCallJava*/,
+            0,       // DEFAULT sharedBuffer*/,
+            false,   // DEFAULT threadCanCallJava
             AUDIO_SESSION_ALLOCATE,
-            streamTransferType
-            );
+            streamTransferType,
+            NULL,    // DEFAULT audio_offload_info_t
+            AUDIO_UID_INVALID, // DEFAULT uid
+            -1,      // DEFAULT pid
+            NULL,    // DEFAULT audio_attributes_t
+            // WARNING - If doNotReconnect set true then audio stops after plugging and unplugging
+            // headphones a few times.
+            false,   // DEFAULT doNotReconnect,
+            1.0f,    // DEFAULT maxRequiredSpeed
+            selectedDeviceId
+    );
 
     // Did we get a valid track?
     status_t status = mAudioTrack->initCheck();
@@ -224,8 +236,6 @@ void AudioStreamTrack::processCallback(int event, void *info) {
 }
 
 aaudio_result_t AudioStreamTrack::requestStart() {
-    std::lock_guard<std::mutex> lock(mStreamMutex);
-
     if (mAudioTrack.get() == nullptr) {
         ALOGE("requestStart() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
@@ -247,13 +257,12 @@ aaudio_result_t AudioStreamTrack::requestStart() {
 }
 
 aaudio_result_t AudioStreamTrack::requestPause() {
-    std::lock_guard<std::mutex> lock(mStreamMutex);
-
     if (mAudioTrack.get() == nullptr) {
         ALOGE("requestPause() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
     } else if (getState() != AAUDIO_STREAM_STATE_STARTING
             && getState() != AAUDIO_STREAM_STATE_STARTED) {
+            // TODO What about DISCONNECTED?
         ALOGE("requestPause(), called when state is %s",
               AAudio_convertStreamStateToText(getState()));
         return AAUDIO_ERROR_INVALID_STATE;
@@ -261,17 +270,14 @@ aaudio_result_t AudioStreamTrack::requestPause() {
     onStop();
     setState(AAUDIO_STREAM_STATE_PAUSING);
     mAudioTrack->pause();
-    checkForDisconnectRequest();
     status_t err = mAudioTrack->getPosition(&mPositionWhenPausing);
     if (err != OK) {
         return AAudioConvert_androidToAAudioResult(err);
     }
-    return AAUDIO_OK;
+    return checkForDisconnectRequest(false);
 }
 
 aaudio_result_t AudioStreamTrack::requestFlush() {
-    std::lock_guard<std::mutex> lock(mStreamMutex);
-
     if (mAudioTrack.get() == nullptr) {
         ALOGE("requestFlush() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
@@ -288,8 +294,6 @@ aaudio_result_t AudioStreamTrack::requestFlush() {
 }
 
 aaudio_result_t AudioStreamTrack::requestStop() {
-    std::lock_guard<std::mutex> lock(mStreamMutex);
-
     if (mAudioTrack.get() == nullptr) {
         ALOGE("requestStop() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
@@ -301,8 +305,7 @@ aaudio_result_t AudioStreamTrack::requestStop() {
     mFramesWritten.reset32();
     mTimestampPosition.reset32();
     mAudioTrack->stop();
-    checkForDisconnectRequest();
-    return AAUDIO_OK;
+    return checkForDisconnectRequest(false);;
 }
 
 aaudio_result_t AudioStreamTrack::updateStateMachine()

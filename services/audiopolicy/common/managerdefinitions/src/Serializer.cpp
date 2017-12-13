@@ -217,6 +217,8 @@ const char *const MixPortTraits::tag = "mixPort";
 const char MixPortTraits::Attributes::name[] = "name";
 const char MixPortTraits::Attributes::role[] = "role";
 const char MixPortTraits::Attributes::flags[] = "flags";
+const char MixPortTraits::Attributes::maxOpenCount[] = "maxOpenCount";
+const char MixPortTraits::Attributes::maxActiveCount[] = "maxActiveCount";
 
 status_t MixPortTraits::deserialize(_xmlDoc *doc, const _xmlNode *child, PtrElement &mixPort,
                                     PtrSerializingCtx /*serializingContext*/)
@@ -258,6 +260,14 @@ status_t MixPortTraits::deserialize(_xmlDoc *doc, const _xmlNode *child, PtrElem
             // Sink role
             mixPort->setFlags(InputFlagConverter::maskFromString(flags));
         }
+    }
+    string maxOpenCount = getXmlAttribute(child, Attributes::maxOpenCount);
+    if (!maxOpenCount.empty()) {
+        convertTo(maxOpenCount, mixPort->maxOpenCount);
+    }
+    string maxActiveCount = getXmlAttribute(child, Attributes::maxActiveCount);
+    if (!maxActiveCount.empty()) {
+        convertTo(maxActiveCount, mixPort->maxActiveCount);
     }
     // Deserialize children
     AudioGainTraits::Collection gains;

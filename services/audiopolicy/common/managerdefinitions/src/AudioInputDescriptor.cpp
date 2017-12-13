@@ -228,16 +228,48 @@ status_t AudioInputDescriptor::open(const audio_config_t *config,
         mFormat = lConfig.format;
         mId = AudioPort::getNextUniqueId();
         mIoHandle = *input;
+        mProfile->curOpenCount++;
     }
 
     return status;
 }
 
+status_t AudioInputDescriptor::start()
+{
+    if (getAudioSessionCount(true/*activeOnly*/) == 1) {
+        if (!mProfile->canStartNewIo()) {
+            ALOGI("%s mProfile->curActiveCount %d", __func__, mProfile->curActiveCount);
+            return INVALID_OPERATION;
+        }
+        mProfile->curActiveCount++;
+    }
+    return NO_ERROR;
+}
+
+void AudioInputDescriptor::stop()
+{
+    if (!isActive()) {
+        LOG_ALWAYS_FATAL_IF(mProfile->curActiveCount < 1,
+                            "%s invalid profile active count %u",
+                            __func__, mProfile->curActiveCount);
+        mProfile->curActiveCount--;
+    }
+}
 
 void AudioInputDescriptor::close()
 {
     if (mIoHandle != AUDIO_IO_HANDLE_NONE) {
         mClientInterface->closeInput(mIoHandle);
+        LOG_ALWAYS_FATAL_IF(mProfile->curOpenCount < 1, "%s profile open count %u",
+                            __FUNCTION__, mProfile->curOpenCount);
+        // do not call stop() here as stop() is supposed to be called after
+        // AudioSession::changeActiveCount(-1) and we don't know how many sessions
+        // are still active at this time
+        if (isActive()) {
+            mProfile->curActiveCount--;
+        }
+        mProfile->curOpenCount--;
+        mIoHandle = AUDIO_IO_HANDLE_NONE;
     }
 }
 

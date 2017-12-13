@@ -674,7 +674,11 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
     audio_session_t sessionId = input.sessionId;
     if (sessionId == AUDIO_SESSION_ALLOCATE) {
         sessionId = (audio_session_t) newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
+    } else if (audio_unique_id_get_use(sessionId) != AUDIO_UNIQUE_ID_USE_SESSION) {
+        lStatus = BAD_VALUE;
+        goto Exit;
     }
+
     output.sessionId = sessionId;
     output.outputId = AUDIO_IO_HANDLE_NONE;
     output.selectedDeviceId = input.selectedDeviceId;
@@ -1568,120 +1572,147 @@ void AudioFlinger::requestLogMerge() {
 
 // ----------------------------------------------------------------------------
 
-sp<media::IAudioRecord> AudioFlinger::openRecord(
-        audio_io_handle_t input,
-        uint32_t sampleRate,
-        audio_format_t format,
-        audio_channel_mask_t channelMask,
-        const String16& opPackageName,
-        size_t *frameCount,
-        audio_input_flags_t *flags,
-        pid_t pid,
-        pid_t tid,
-        int clientUid,
-        audio_session_t *sessionId,
-        size_t *notificationFrames,
-        sp<IMemory>& cblk,
-        sp<IMemory>& buffers,
-        status_t *status,
-        audio_port_handle_t portId)
+sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& input,
+                                                   CreateRecordOutput& output,
+                                                   status_t *status)
 {
     sp<RecordThread::RecordTrack> recordTrack;
     sp<RecordHandle> recordHandle;
     sp<Client> client;
     status_t lStatus;
-    audio_session_t lSessionId;
+    audio_session_t sessionId = input.sessionId;
+    audio_port_handle_t portId;
 
-    cblk.clear();
-    buffers.clear();
+    output.cblk.clear();
+    output.buffers.clear();
+    output.inputId = AUDIO_IO_HANDLE_NONE;
 
-    bool updatePid = (pid == -1);
+    bool updatePid = (input.clientInfo.clientPid == -1);
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
+    uid_t clientUid = input.clientInfo.clientUid;
     if (!isTrustedCallingUid(callingUid)) {
-        ALOGW_IF((uid_t)clientUid != callingUid,
-                "%s uid %d tried to pass itself off as %d", __FUNCTION__, callingUid, clientUid);
+        ALOGW_IF(clientUid != callingUid,
+                "%s uid %d tried to pass itself off as %d",
+                __FUNCTION__, callingUid, clientUid);
         clientUid = callingUid;
         updatePid = true;
     }
-
+    pid_t clientPid = input.clientInfo.clientPid;
     if (updatePid) {
         const pid_t callingPid = IPCThreadState::self()->getCallingPid();
-        ALOGW_IF(pid != -1 && pid != callingPid,
+        ALOGW_IF(clientPid != -1 && clientPid != callingPid,
                  "%s uid %d pid %d tried to pass itself off as pid %d",
-                 __func__, callingUid, callingPid, pid);
-        pid = callingPid;
+                 __func__, callingUid, callingPid, clientPid);
+        clientPid = callingPid;
     }
 
     // check calling permissions
-    if (!recordingAllowed(opPackageName, tid, clientUid)) {
-        ALOGE("openRecord() permission denied: recording not allowed");
+    if (!recordingAllowed(input.opPackageName, input.clientInfo.clientTid, clientUid)) {
+        ALOGE("createRecord() permission denied: recording not allowed");
         lStatus = PERMISSION_DENIED;
         goto Exit;
     }
-
-    // further sample rate checks are performed by createRecordTrack_l()
-    if (sampleRate == 0) {
-        ALOGE("openRecord() invalid sample rate %u", sampleRate);
-        lStatus = BAD_VALUE;
-        goto Exit;
-    }
-
     // we don't yet support anything other than linear PCM
-    if (!audio_is_valid_format(format) || !audio_is_linear_pcm(format)) {
-        ALOGE("openRecord() invalid format %#x", format);
+    if (!audio_is_valid_format(input.config.format) || !audio_is_linear_pcm(input.config.format)) {
+        ALOGE("createRecord() invalid format %#x", input.config.format);
         lStatus = BAD_VALUE;
         goto Exit;
     }
 
     // further channel mask checks are performed by createRecordTrack_l()
-    if (!audio_is_input_channel(channelMask)) {
-        ALOGE("openRecord() invalid channel mask %#x", channelMask);
+    if (!audio_is_input_channel(input.config.channel_mask)) {
+        ALOGE("createRecord() invalid channel mask %#x", input.config.channel_mask);
         lStatus = BAD_VALUE;
         goto Exit;
     }
 
+    if (sessionId == AUDIO_SESSION_ALLOCATE) {
+        sessionId = (audio_session_t) newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
+    } else if (audio_unique_id_get_use(sessionId) != AUDIO_UNIQUE_ID_USE_SESSION) {
+        lStatus = BAD_VALUE;
+        goto Exit;
+    }
+
+    output.sessionId = sessionId;
+    output.selectedDeviceId = input.selectedDeviceId;
+    output.flags = input.flags;
+
+    client = registerPid(clientPid);
+
+    // Not a conventional loop, but a retry loop for at most two iterations total.
+    // Try first maybe with FAST flag then try again without FAST flag if that fails.
+    // Exits loop via break on no error of got exit on error
+    // The sp<> references will be dropped when re-entering scope.
+    // The lack of indentation is deliberate, to reduce code churn and ease merges.
+    for (;;) {
+    // release previously opened input if retrying.
+    if (output.inputId != AUDIO_IO_HANDLE_NONE) {
+        recordTrack.clear();
+        AudioSystem::releaseInput(output.inputId, sessionId);
+        output.inputId = AUDIO_IO_HANDLE_NONE;
+    }
+    lStatus = AudioSystem::getInputForAttr(&input.attr, &output.inputId,
+                                      sessionId,
+                                    // FIXME compare to AudioTrack
+                                      clientPid,
+                                      clientUid,
+                                      &input.config,
+                                      output.flags, &output.selectedDeviceId, &portId);
+
     {
         Mutex::Autolock _l(mLock);
-        RecordThread *thread = checkRecordThread_l(input);
+        RecordThread *thread = checkRecordThread_l(output.inputId);
         if (thread == NULL) {
-            ALOGE("openRecord() checkRecordThread_l failed");
+            ALOGE("createRecord() checkRecordThread_l failed");
             lStatus = BAD_VALUE;
             goto Exit;
         }
 
-        client = registerPid(pid);
+        ALOGV("createRecord() lSessionId: %d input %d", sessionId, output.inputId);
 
-        if (sessionId != NULL && *sessionId != AUDIO_SESSION_ALLOCATE) {
-            if (audio_unique_id_get_use(*sessionId) != AUDIO_UNIQUE_ID_USE_SESSION) {
-                lStatus = BAD_VALUE;
-                goto Exit;
-            }
-            lSessionId = *sessionId;
-        } else {
-            // if no audio session id is provided, create one here
-            lSessionId = (audio_session_t) nextUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
-            if (sessionId != NULL) {
-                *sessionId = lSessionId;
-            }
-        }
-        ALOGV("openRecord() lSessionId: %d input %d", lSessionId, input);
+        output.sampleRate = input.config.sample_rate;
+        output.frameCount = input.frameCount;
+        output.notificationFrameCount = input.notificationFrameCount;
 
-        recordTrack = thread->createRecordTrack_l(client, sampleRate, format, channelMask,
-                                                  frameCount, lSessionId, notificationFrames,
-                                                  clientUid, flags, tid, &lStatus, portId);
+        recordTrack = thread->createRecordTrack_l(client, &output.sampleRate,
+                                                  input.config.format, input.config.channel_mask,
+                                                  &output.frameCount, sessionId,
+                                                  &output.notificationFrameCount,
+                                                  clientUid, &output.flags,
+                                                  input.clientInfo.clientTid,
+                                                  &lStatus, portId);
         LOG_ALWAYS_FATAL_IF((lStatus == NO_ERROR) && (recordTrack == 0));
 
-        if (lStatus == NO_ERROR) {
-            // Check if one effect chain was awaiting for an AudioRecord to be created on this
-            // session and move it to this thread.
-            sp<EffectChain> chain = getOrphanEffectChain_l(lSessionId);
-            if (chain != 0) {
-                Mutex::Autolock _l(thread->mLock);
-                thread->addEffectChain_l(chain);
-            }
+        // lStatus == BAD_TYPE means FAST flag was rejected: request a new input from
+        // audio policy manager without FAST constraint
+        if (lStatus == BAD_TYPE) {
+            continue;
         }
+
+        if (lStatus != NO_ERROR) {
+            goto Exit;
+        }
+
+        // Check if one effect chain was awaiting for an AudioRecord to be created on this
+        // session and move it to this thread.
+        sp<EffectChain> chain = getOrphanEffectChain_l(sessionId);
+        if (chain != 0) {
+            Mutex::Autolock _l(thread->mLock);
+            thread->addEffectChain_l(chain);
+        }
+        break;
+    }
+    // End of retry loop.
+    // The lack of indentation is deliberate, to reduce code churn and ease merges.
     }
 
+    output.cblk = recordTrack->getCblk();
+    output.buffers = recordTrack->getBuffers();
+
+    // return handle to client
+    recordHandle = new RecordHandle(recordTrack);
+
+Exit:
     if (lStatus != NO_ERROR) {
         // remove local strong reference to Client before deleting the RecordTrack so that the
         // Client destructor is called by the TrackBase destructor with mClientLock held
@@ -1692,16 +1723,11 @@ sp<media::IAudioRecord> AudioFlinger::openRecord(
             client.clear();
         }
         recordTrack.clear();
-        goto Exit;
+        if (output.inputId != AUDIO_IO_HANDLE_NONE) {
+            AudioSystem::releaseInput(output.inputId, sessionId);
+        }
     }
 
-    cblk = recordTrack->getCblk();
-    buffers = recordTrack->getBuffers();
-
-    // return handle to client
-    recordHandle = new RecordHandle(recordTrack);
-
-Exit:
     *status = lStatus;
     return recordHandle;
 }

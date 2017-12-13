@@ -43,7 +43,7 @@ AudioStream::~AudioStream() {
     LOG_ALWAYS_FATAL_IF(!(getState() == AAUDIO_STREAM_STATE_CLOSED
                           || getState() == AAUDIO_STREAM_STATE_UNINITIALIZED
                           || getState() == AAUDIO_STREAM_STATE_DISCONNECTED),
-                        "aaudio stream still in use, state = %s",
+                        "~AudioStream() - still in use, state = %s",
                         AAudio_convertStreamStateToText(getState()));
 
     mPlayerBase->clearParentReference(); // remove reference to this AudioStream
@@ -97,12 +97,56 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
           (getDirection() == AAUDIO_DIRECTION_OUTPUT) ? "OUTPUT" : "INPUT");
     ALOGI("open() device = %d, perfMode = %d, callback: %s with frames = %d",
           mDeviceId, mPerformanceMode,
-          (mDataCallbackProc == nullptr ? "OFF" : "ON"),
+          (isDataCallbackSet() ? "ON" : "OFF"),
           mFramesPerDataCallback);
 
     return AAUDIO_OK;
 }
 
+aaudio_result_t AudioStream::safeStart() {
+    std::lock_guard<std::mutex> lock(mStreamLock);
+    if (collidesWithCallback()) {
+        ALOGE("%s cannot be called from a callback!", __func__);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    return requestStart();
+}
+
+aaudio_result_t AudioStream::safePause() {
+    std::lock_guard<std::mutex> lock(mStreamLock);
+    if (collidesWithCallback()) {
+        ALOGE("%s cannot be called from a callback!", __func__);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    return requestPause();
+}
+
+aaudio_result_t AudioStream::safeFlush() {
+    std::lock_guard<std::mutex> lock(mStreamLock);
+    if (collidesWithCallback()) {
+        ALOGE("%s cannot be called from a callback!", __func__);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    return requestFlush();
+}
+
+aaudio_result_t AudioStream::safeStop() {
+    std::lock_guard<std::mutex> lock(mStreamLock);
+    if (collidesWithCallback()) {
+        ALOGE("%s cannot be called from a callback!", __func__);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    return requestStop();
+}
+
+aaudio_result_t AudioStream::safeClose() {
+    std::lock_guard<std::mutex> lock(mStreamLock);
+    if (collidesWithCallback()) {
+        ALOGE("%s cannot be called from a callback!", __func__);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    return close();
+}
 
 aaudio_result_t AudioStream::waitForStateChange(aaudio_stream_state_t currentState,
                                                 aaudio_stream_state_t *nextState,
@@ -199,6 +243,58 @@ aaudio_result_t AudioStream::joinThread(void** returnArg, int64_t timeoutNanosec
     return err ? AAudioConvert_androidToAAudioResult(-errno) : mThreadRegistrationResult;
 }
 
+
+aaudio_data_callback_result_t AudioStream::maybeCallDataCallback(void *audioData,
+                                                                 int32_t numFrames) {
+    aaudio_data_callback_result_t result = AAUDIO_CALLBACK_RESULT_STOP;
+    AAudioStream_dataCallback dataCallback = getDataCallbackProc();
+    if (dataCallback != nullptr) {
+        // Store thread ID of caller to detect stop() and close() calls from callback.
+        pid_t expected = CALLBACK_THREAD_NONE;
+        if (mDataCallbackThread.compare_exchange_strong(expected, gettid())) {
+            result = (*dataCallback)(
+                    (AAudioStream *) this,
+                    getDataCallbackUserData(),
+                    audioData,
+                    numFrames);
+            mDataCallbackThread.store(CALLBACK_THREAD_NONE);
+        } else {
+            ALOGW("%s() data callback already running!", __func__);
+        }
+    }
+    return result;
+}
+
+void AudioStream::maybeCallErrorCallback(aaudio_result_t result) {
+    AAudioStream_errorCallback errorCallback = getErrorCallbackProc();
+    if (errorCallback != nullptr) {
+        // Store thread ID of caller to detect stop() and close() calls from callback.
+        pid_t expected = CALLBACK_THREAD_NONE;
+        if (mErrorCallbackThread.compare_exchange_strong(expected, gettid())) {
+            (*errorCallback)(
+                    (AAudioStream *) this,
+                    getErrorCallbackUserData(),
+                    result);
+            mErrorCallbackThread.store(CALLBACK_THREAD_NONE);
+        } else {
+            ALOGW("%s() error callback already running!", __func__);
+        }
+    }
+}
+
+// Is this running on the same thread as a callback?
+// Note: This cannot be implemented using a thread_local because that would
+// require using a thread_local variable that is shared between streams.
+// So a thread_local variable would prevent stopping or closing stream A from
+// a callback on stream B, which is currently legal and not so terrible.
+bool AudioStream::collidesWithCallback() const {
+    pid_t thisThread = gettid();
+    // Compare the current thread ID with the thread ID of the callback
+    // threads to see it they match. If so then this code is being
+    // called from one of the stream callback functions.
+    return ((mErrorCallbackThread.load() == thisThread)
+            || (mDataCallbackThread.load() == thisThread));
+}
 
 #if AAUDIO_USE_VOLUME_SHAPER
 android::media::VolumeShaper::Status AudioStream::applyVolumeShaper(

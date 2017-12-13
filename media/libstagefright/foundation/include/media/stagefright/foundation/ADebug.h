@@ -82,6 +82,10 @@ MAKE_COMPARATOR(GE,>=)
 MAKE_COMPARATOR(LT,<)
 MAKE_COMPARATOR(GT,>)
 
+#ifdef CHECK_OP
+#undef CHECK_OP
+#endif
+
 #define CHECK_OP(x,y,suffix,op)                                         \
     do {                                                                \
         AString ___res = Compare_##suffix(x, y);                        \

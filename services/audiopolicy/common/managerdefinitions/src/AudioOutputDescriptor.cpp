@@ -436,11 +436,50 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *config,
         mFormat = lConfig.format;
         mId = AudioPort::getNextUniqueId();
         mIoHandle = *output;
+        mProfile->curOpenCount++;
     }
 
     return status;
 }
 
+status_t SwAudioOutputDescriptor::start()
+{
+    if (isDuplicated()) {
+        status_t status = mOutput1->start();
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = mOutput2->start();
+        if (status != NO_ERROR) {
+            mOutput1->stop();
+            return status;
+        }
+        return NO_ERROR;
+    }
+    if (!isActive()) {
+        if (!mProfile->canStartNewIo()) {
+            return INVALID_OPERATION;
+        }
+        mProfile->curActiveCount++;
+    }
+    return NO_ERROR;
+}
+
+void SwAudioOutputDescriptor::stop()
+{
+    if (isDuplicated()) {
+        mOutput1->stop();
+        mOutput2->stop();
+        return;
+    }
+
+    if (!isActive()) {
+        LOG_ALWAYS_FATAL_IF(mProfile->curActiveCount < 1,
+                            "%s invalid profile active count %u",
+                            __func__, mProfile->curActiveCount);
+        mProfile->curActiveCount--;
+    }
+}
 
 void SwAudioOutputDescriptor::close()
 {
@@ -450,9 +489,18 @@ void SwAudioOutputDescriptor::close()
         mClientInterface->setParameters(mIoHandle, param.toString());
 
         mClientInterface->closeOutput(mIoHandle);
+
+        LOG_ALWAYS_FATAL_IF(mProfile->curOpenCount < 1, "%s profile open count %u",
+                            __FUNCTION__, mProfile->curOpenCount);
+        // do not call stop() here as stop() is supposed to be called after changeRefCount(-1)
+        // and we don't know how many streams are still active at this time
+        if (isActive()) {
+            mProfile->curActiveCount--;
+        }
+        mProfile->curOpenCount--;
+        mIoHandle = AUDIO_IO_HANDLE_NONE;
     }
 }
-
 
 // HwAudioOutputDescriptor implementation
 HwAudioOutputDescriptor::HwAudioOutputDescriptor(const sp<AudioSourceDescriptor>& source,
