@@ -39,6 +39,8 @@ typedef void *(*aaudio_audio_thread_proc_t)(void *);
 
 class AudioStreamBuilder;
 
+constexpr pid_t        CALLBACK_THREAD_NONE = 0;
+
 /**
  * AAudio audio stream.
  */
@@ -49,8 +51,22 @@ public:
 
     virtual ~AudioStream();
 
+    /**
+     * Lock a mutex and make sure we are not calling from a callback function.
+     * @return result of requestStart();
+     */
+    aaudio_result_t safeStart();
+
+    aaudio_result_t safePause();
+
+    aaudio_result_t safeFlush();
+
+    aaudio_result_t safeStop();
+
+    aaudio_result_t safeClose();
 
     // =========== Begin ABSTRACT methods ===========================
+protected:
 
     /* Asynchronous requests.
      * Use waitForStateChange() to wait for completion.
@@ -70,6 +86,7 @@ public:
 
     virtual aaudio_result_t requestStop() = 0;
 
+public:
     virtual aaudio_result_t getTimestamp(clockid_t clockId,
                                        int64_t *framePosition,
                                        int64_t *timeNanoseconds) = 0;
@@ -80,7 +97,6 @@ public:
      * @return
      */
     virtual aaudio_result_t updateStateMachine() = 0;
-
 
     // =========== End ABSTRACT methods ===========================
 
@@ -209,13 +225,19 @@ public:
     AAudioStream_dataCallback getDataCallbackProc() const {
         return mDataCallbackProc;
     }
+
     AAudioStream_errorCallback getErrorCallbackProc() const {
         return mErrorCallbackProc;
     }
 
+    aaudio_data_callback_result_t maybeCallDataCallback(void *audioData, int32_t numFrames);
+
+    void maybeCallErrorCallback(aaudio_result_t result);
+
     void *getDataCallbackUserData() const {
         return mDataCallbackUserData;
     }
+
     void *getErrorCallbackUserData() const {
         return mErrorCallbackUserData;
     }
@@ -224,9 +246,24 @@ public:
         return mFramesPerDataCallback;
     }
 
-    bool isDataCallbackActive() {
-        return (mDataCallbackProc != nullptr) && isActive();
+    /**
+     * @return true if data callback has been specified
+     */
+    bool isDataCallbackSet() const {
+        return mDataCallbackProc != nullptr;
     }
+
+    /**
+     * @return true if data callback has been specified and stream is running
+     */
+    bool isDataCallbackActive() const {
+        return isDataCallbackSet() && isActive();
+    }
+
+    /**
+     * @return true if called from the same thread as the callback
+     */
+    bool collidesWithCallback() const;
 
     // ============== I/O ===========================
     // A Stream will only implement read() or write() depending on its direction.
@@ -248,7 +285,7 @@ public:
         doSetVolume(); // apply this change
     }
 
-    float getDuckAndMuteVolume() {
+    float getDuckAndMuteVolume() const {
         return mDuckAndMuteVolume;
     }
 
@@ -331,17 +368,17 @@ protected:
 
         android::status_t playerStart() override {
             // mParent should NOT be null. So go ahead and crash if it is.
-            mResult = mParent->requestStart();
+            mResult = mParent->safeStart();
             return AAudioConvert_aaudioToAndroidStatus(mResult);
         }
 
         android::status_t playerPause() override {
-            mResult = mParent->requestPause();
+            mResult = mParent->safePause();
             return AAudioConvert_aaudioToAndroidStatus(mResult);
         }
 
         android::status_t playerStop() override {
-            mResult = mParent->requestStop();
+            mResult = mParent->safeStop();
             return AAudioConvert_aaudioToAndroidStatus(mResult);
         }
 
@@ -405,8 +442,6 @@ protected:
         mDeviceId = deviceId;
     }
 
-    std::mutex           mStreamMutex;
-
     std::atomic<bool>    mCallbackEnabled{false};
 
     float                mDuckAndMuteVolume = 1.0f;
@@ -422,39 +457,42 @@ protected:
     }
 
 private:
+
+    std::mutex                 mStreamLock;
+
     const android::sp<MyPlayerBase>   mPlayerBase;
 
     // These do not change after open().
-    int32_t                mSamplesPerFrame = AAUDIO_UNSPECIFIED;
-    int32_t                mSampleRate = AAUDIO_UNSPECIFIED;
-    int32_t                mDeviceId = AAUDIO_UNSPECIFIED;
-    aaudio_sharing_mode_t  mSharingMode = AAUDIO_SHARING_MODE_SHARED;
-    bool                   mSharingModeMatchRequired = false; // must match sharing mode requested
-    aaudio_format_t        mFormat = AAUDIO_FORMAT_UNSPECIFIED;
-    aaudio_stream_state_t  mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
-
-    aaudio_performance_mode_t mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
+    int32_t                     mSamplesPerFrame = AAUDIO_UNSPECIFIED;
+    int32_t                     mSampleRate = AAUDIO_UNSPECIFIED;
+    int32_t                     mDeviceId = AAUDIO_UNSPECIFIED;
+    aaudio_sharing_mode_t       mSharingMode = AAUDIO_SHARING_MODE_SHARED;
+    bool                        mSharingModeMatchRequired = false; // must match sharing mode requested
+    aaudio_format_t             mFormat = AAUDIO_FORMAT_UNSPECIFIED;
+    aaudio_stream_state_t       mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
+    aaudio_performance_mode_t   mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
 
     // callback ----------------------------------
 
     AAudioStream_dataCallback   mDataCallbackProc = nullptr;  // external callback functions
     void                       *mDataCallbackUserData = nullptr;
     int32_t                     mFramesPerDataCallback = AAUDIO_UNSPECIFIED; // frames
+    std::atomic<pid_t>          mDataCallbackThread{CALLBACK_THREAD_NONE};
 
     AAudioStream_errorCallback  mErrorCallbackProc = nullptr;
     void                       *mErrorCallbackUserData = nullptr;
+    std::atomic<pid_t>          mErrorCallbackThread{CALLBACK_THREAD_NONE};
 
     // background thread ----------------------------------
-    bool                   mHasThread = false;
-    pthread_t              mThread; // initialized in constructor
+    bool                        mHasThread = false;
+    pthread_t                   mThread; // initialized in constructor
 
     // These are set by the application thread and then read by the audio pthread.
-    std::atomic<int64_t>   mPeriodNanoseconds; // for tuning SCHED_FIFO threads
+    std::atomic<int64_t>        mPeriodNanoseconds; // for tuning SCHED_FIFO threads
     // TODO make atomic?
-    aaudio_audio_thread_proc_t mThreadProc = nullptr;
-    void*                  mThreadArg = nullptr;
-    aaudio_result_t        mThreadRegistrationResult = AAUDIO_OK;
-
+    aaudio_audio_thread_proc_t  mThreadProc = nullptr;
+    void                       *mThreadArg = nullptr;
+    aaudio_result_t             mThreadRegistrationResult = AAUDIO_OK;
 
 };
 

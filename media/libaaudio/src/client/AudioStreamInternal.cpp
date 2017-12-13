@@ -171,7 +171,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     mClockModel.setSampleRate(getSampleRate());
     mClockModel.setFramesPerBurst(mFramesPerBurst);
 
-    if (getDataCallbackProc()) {
+    if (isDataCallbackSet()) {
         mCallbackFrames = builder.getFramesPerDataCallback();
         if (mCallbackFrames > getBufferCapacity() / 2) {
             ALOGE("%s - framesPerCallback too big = %d, capacity = %d",
@@ -290,7 +290,7 @@ aaudio_result_t AudioStreamInternal::requestStart()
     mNeedCatchUp.request();  // Ask data processing code to catch up when first timestamp received.
 
     // Start data callback thread.
-    if (result == AAUDIO_OK && getDataCallbackProc() != nullptr) {
+    if (result == AAUDIO_OK && isDataCallbackSet()) {
         // Launch the callback loop thread.
         int64_t periodNanos = mCallbackFrames
                               * AAUDIO_NANOS_PER_SECOND
