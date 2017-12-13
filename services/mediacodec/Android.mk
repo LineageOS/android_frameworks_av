@@ -8,7 +8,6 @@ LOCAL_SHARED_LIBRARIES := \
     libmedia_omx \
     libbinder \
     libutils \
-    libgui \
     liblog \
     libbase \
     libavservices_minijail_vendor \
