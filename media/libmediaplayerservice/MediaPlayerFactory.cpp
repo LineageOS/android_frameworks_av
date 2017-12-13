@@ -126,7 +126,7 @@ player_type MediaPlayerFactory::getPlayerType(const sp<IMediaPlayer>& client,
 
 sp<MediaPlayerBase> MediaPlayerFactory::createPlayer(
         player_type playerType,
-        void* cookie,
+        const wp<IMediaPlayer> &client,
         notify_callback_f notifyFunc,
         pid_t pid) {
     sp<MediaPlayerBase> p;
@@ -152,7 +152,7 @@ sp<MediaPlayerBase> MediaPlayerFactory::createPlayer(
 
     init_result = p->initCheck();
     if (init_result == NO_ERROR) {
-        p->setNotifyCallback(cookie, notifyFunc);
+        p->setNotifyCallback(client, notifyFunc);
     } else {
         ALOGE("Failed to create player object of type %d, initCheck failed"
               " (res = %d)", playerType, init_result);

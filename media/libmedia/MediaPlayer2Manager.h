@@ -46,20 +46,22 @@ class MediaPlayer2EngineClient;
 #if CALLBACK_ANTAGONIZER
 class Antagonizer {
 public:
-    Antagonizer(notify_callback_f cb, void* client);
+    Antagonizer(
+            MediaPlayer2Base::NotifyCallback cb,
+            const wp<MediaPlayer2Engine> &client);
     void start() { mActive = true; }
     void stop() { mActive = false; }
     void kill();
 private:
     static const int interval;
     Antagonizer();
-    static int callbackThread(void* cookie);
-    Mutex               mLock;
-    Condition           mCondition;
-    bool                mExit;
-    bool                mActive;
-    void*               mClient;
-    notify_callback_f   mCb;
+    static int callbackThread(void *cookie);
+    Mutex                            mLock;
+    Condition                        mCondition;
+    bool                             mExit;
+    bool                             mActive;
+    wp<MediaPlayer2Engine>           mClient;
+    MediaPlayer2Base::NotifyCallback mCb;
 };
 #endif
 
@@ -301,7 +303,7 @@ private:
         status_t                setDataSource_post(const sp<MediaPlayer2Base>& p,
                                                    status_t status);
 
-        static  void            notify(void* cookie, int msg,
+        static  void            notify(const wp<MediaPlayer2Engine> &listener, int msg,
                                        int ext1, int ext2, const Parcel *obj);
 
                 pid_t           pid() const { return mPid; }
