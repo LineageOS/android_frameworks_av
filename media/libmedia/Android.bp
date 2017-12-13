@@ -180,7 +180,6 @@ cc_library_shared {
     ],
 
     shared_libs: [
-        "libui",
         "liblog",
         "libcutils",
         "libutils",
@@ -196,8 +195,6 @@ cc_library_shared {
         "libdl",
         "libaudioutils",
         "libaudioclient",
-        "libhidlbase",
-        "libhidltransport",
         "libmedia_omx",
     ],
 
