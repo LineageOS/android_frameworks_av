@@ -182,7 +182,7 @@ void CCodec::allocate(const AString &componentName) {
     mListener.reset(new CCodecListener(mChannel));
 
     std::shared_ptr<C2Component> comp(new C2SoftAvcDec(componentName.c_str(), 0));
-    comp->setListener_sm(mListener);
+    comp->setListener_vb(mListener, C2_DONT_BLOCK);
     {
         Mutexed<State>::Locked state(mState);
         if (state->mState != ALLOCATING) {

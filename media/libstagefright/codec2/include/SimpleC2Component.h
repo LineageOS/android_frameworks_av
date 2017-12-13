@@ -35,17 +35,19 @@ public:
     virtual ~SimpleC2Component() = default;
 
     // C2Component
-    virtual c2_status_t setListener_sm(const std::shared_ptr<C2Component::Listener> &listener) final;
-    virtual c2_status_t queue_nb(std::list<std::unique_ptr<C2Work>> * const items) final;
-    virtual c2_status_t announce_nb(const std::vector<C2WorkOutline> &items) final;
+    // From C2Component
+    virtual c2_status_t setListener_vb(
+            const std::shared_ptr<Listener> &listener, c2_blocking_t mayBlock) override;
+    virtual c2_status_t queue_nb(std::list<std::unique_ptr<C2Work>>* const items) override;
+    virtual c2_status_t announce_nb(const std::vector<C2WorkOutline> &items) override;
     virtual c2_status_t flush_sm(
-            flush_mode_t flushThrough, std::list<std::unique_ptr<C2Work>>* const flushedWork) final;
-    virtual c2_status_t drain_nb(drain_mode_t drainThrough) final;
-    virtual c2_status_t start() final;
-    virtual c2_status_t stop() final;
-    virtual void reset() final;
-    virtual void release() final;
-    virtual std::shared_ptr<C2ComponentInterface> intf() final;
+            flush_mode_t mode, std::list<std::unique_ptr<C2Work>>* const flushedWork) override;
+    virtual c2_status_t drain_nb(drain_mode_t mode) override;
+    virtual c2_status_t start() override;
+    virtual c2_status_t stop() override;
+    virtual c2_status_t reset() override;
+    virtual c2_status_t release() override;
+    virtual std::shared_ptr<C2ComponentInterface> intf() override;
 
     // for thread
     inline bool exitRequested() { return mExitRequested; }
