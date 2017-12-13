@@ -78,6 +78,8 @@ struct NuPlayer2Driver : public MediaPlayer2Interface {
 
     virtual status_t dump(int fd, const Vector<String16> &args) const;
 
+    virtual void onMessageReceived(const sp<AMessage> &msg) override;
+
     void notifySetDataSourceCompleted(status_t err);
     void notifyPrepareCompleted(status_t err);
     void notifyResetComplete();
@@ -113,6 +115,10 @@ private:
         STATE_STOPPED_AND_PREPARED,     // equivalent to PAUSED, but seek complete
     };
 
+    enum {
+        kWhatNotifyListener,
+    };
+
     mutable Mutex mLock;
     Condition mCondition;
 
@@ -134,6 +140,7 @@ private:
     // <<<
 
     sp<ALooper> mLooper;
+    sp<ALooper> mNuPlayer2Looper;
     const sp<MediaClock> mMediaClock;
     const sp<NuPlayer2> mPlayer;
     sp<AudioSink> mAudioSink;
@@ -146,13 +153,13 @@ private:
     bool mLooping;
     bool mAutoLoop;
 
-
     void updateMetrics(const char *where);
     void logMetrics(const char *where);
 
     status_t prepare_l();
     status_t start_l();
     void notifyListener_l(int msg, int ext1 = 0, int ext2 = 0, const Parcel *in = NULL);
+    void sendNotifyOnLooper(int msgId);
 
     DISALLOW_EVIL_CONSTRUCTORS(NuPlayer2Driver);
 };
