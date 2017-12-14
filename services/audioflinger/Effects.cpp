@@ -67,7 +67,10 @@ AudioFlinger::EffectModule::EffectModule(ThreadBase *thread,
     : mPinned(pinned),
       mThread(thread), mChain(chain), mId(id), mSessionId(sessionId),
       mDescriptor(*desc),
-      // mConfig cleared in constructor body, set by configure()
+      // clear mConfig to ensure consistent initial value of buffer framecount
+      // in case buffers are associated by setInBuffer() or setOutBuffer()
+      // prior to configure().
+      mConfig{{}, {}},
       mStatus(NO_INIT), mState(IDLE),
       // mMaxDisableWaitCnt is set by configure() and not used before then
       // mDisableWaitCnt is set by process() and updateState() and not used before then
@@ -79,11 +82,6 @@ AudioFlinger::EffectModule::EffectModule(ThreadBase *thread,
 {
     ALOGV("Constructor %p pinned %d", this, pinned);
     int lStatus;
-
-    // clear configuration to ensure consistent initial value of buffer framecount
-    // in case buffers are associated by setInBuffer() or setOutBuffer()
-    // prior to configure().
-    memset(&mConfig, 0, sizeof(mConfig));
 
     // create effect engine from effect factory
     mStatus = -ENODEV;
