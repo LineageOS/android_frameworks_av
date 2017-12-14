@@ -33,6 +33,7 @@
 #include <AudioPolicyManagerInterface.h>
 #include <AudioPolicyManagerObserver.h>
 #include <AudioGain.h>
+#include <AudioPolicyConfig.h>
 #include <AudioPort.h>
 #include <AudioPatch.h>
 #include <DeviceDescriptor.h>
@@ -234,6 +235,21 @@ public:
         routing_strategy getStrategy(audio_stream_type_t stream) const;
 
 protected:
+        // A constructor that allows more fine-grained control over initialization process,
+        // used in automatic tests.
+        AudioPolicyManager(AudioPolicyClientInterface *clientInterface, bool forTesting);
+
+        // These methods should be used when finer control over APM initialization
+        // is needed, e.g. in tests. Must be used in conjunction with the constructor
+        // that only performs fields initialization. The public constructor comprises
+        // these steps in the following sequence:
+        //   - field initializing constructor;
+        //   - loadConfig;
+        //   - initialize.
+        AudioPolicyConfig& getConfig() { return mConfig; }
+        void loadConfig();
+        status_t initialize();
+
         // From AudioPolicyManagerObserver
         virtual const AudioPatchCollection &getAudioPatches() const
         {
@@ -526,18 +542,18 @@ protected:
         SessionRouteMap mOutputRoutes = SessionRouteMap(SessionRouteMap::MAPTYPE_OUTPUT);
         SessionRouteMap mInputRoutes = SessionRouteMap(SessionRouteMap::MAPTYPE_INPUT);
 
-        IVolumeCurvesCollection *mVolumeCurves; // Volume Curves per use case and device category
-
         bool    mLimitRingtoneVolume;        // limit ringtone volume to music volume if headset connected
         audio_devices_t mDeviceForStrategy[NUM_STRATEGIES];
         float   mLastVoiceVolume;            // last voice volume value sent to audio HAL
-
-        EffectDescriptorCollection mEffects;  // list of registered audio effects
         bool    mA2dpSuspended;  // true if A2DP output is suspended
+
+        IVolumeCurvesCollection *mVolumeCurves; // Volume Curves per use case and device category
+        EffectDescriptorCollection mEffects;  // list of registered audio effects
         sp<DeviceDescriptor> mDefaultOutputDevice; // output device selected by default at boot time
         HwModuleCollection mHwModules; // contains only modules that have been loaded successfully
         HwModuleCollection mHwModulesAll; // normally not needed, used during construction and for
                                           // dumps
+        AudioPolicyConfig mConfig;
 
         std::atomic<uint32_t> mAudioPortGeneration;
 
