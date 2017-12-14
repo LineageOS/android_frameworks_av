@@ -42,7 +42,6 @@ public:
         return mName;
     }
     virtual sp<DecryptHandle> DrmInitialization(const char *mime = NULL);
-    virtual sp<IDataSource> getIDataSource() const;
 
 private:
     sp<IDataSource> mIDataSource;
@@ -71,7 +70,6 @@ public:
         return mName;
     }
     virtual sp<DecryptHandle> DrmInitialization(const char *mime = NULL);
-    virtual sp<IDataSource> getIDataSource() const;
 
 private:
     // 2kb comes from experimenting with the time-to-first-frame from a MediaPlayer
