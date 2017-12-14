@@ -65,7 +65,7 @@ class MediaPlayerFactory {
                                      const sp<DataSource> &source);
 
     static sp<MediaPlayerBase> createPlayer(player_type playerType,
-                                            void* cookie,
+                                            const wp<IMediaPlayer> &client,
                                             notify_callback_f notifyFunc,
                                             pid_t pid);
 
