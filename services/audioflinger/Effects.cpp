@@ -67,7 +67,7 @@ AudioFlinger::EffectModule::EffectModule(ThreadBase *thread,
     : mPinned(pinned),
       mThread(thread), mChain(chain), mId(id), mSessionId(sessionId),
       mDescriptor(*desc),
-      // mConfig is set by configure() and not used before then
+      // mConfig cleared in constructor body, set by configure()
       mStatus(NO_INIT), mState(IDLE),
       // mMaxDisableWaitCnt is set by configure() and not used before then
       // mDisableWaitCnt is set by process() and updateState() and not used before then
@@ -79,6 +79,11 @@ AudioFlinger::EffectModule::EffectModule(ThreadBase *thread,
 {
     ALOGV("Constructor %p pinned %d", this, pinned);
     int lStatus;
+
+    // clear configuration to ensure consistent initial value of buffer framecount
+    // in case buffers are associated by setInBuffer() or setOutBuffer()
+    // prior to configure().
+    memset(&mConfig, 0, sizeof(mConfig));
 
     // create effect engine from effect factory
     mStatus = -ENODEV;
@@ -578,6 +583,7 @@ status_t AudioFlinger::EffectModule::configure()
             (1000 * mConfig.outputCfg.buffer.frameCount);
 
 exit:
+    // TODO: consider clearing mConfig on error.
     mStatus = status;
     ALOGVV("configure ended");
     return status;
@@ -892,6 +898,8 @@ bool AudioFlinger::EffectModule::isProcessEnabled() const
 
 void AudioFlinger::EffectModule::setInBuffer(const sp<EffectBufferHalInterface>& buffer) {
     ALOGVV("setInBuffer %p",(&buffer));
+
+    // mConfig.inputCfg.buffer.frameCount may be zero if configure() is not called yet.
     if (buffer != 0) {
         mConfig.inputCfg.buffer.raw = buffer->audioBuffer()->raw;
         buffer->setFrameCount(mConfig.inputCfg.buffer.frameCount);
@@ -934,6 +942,8 @@ void AudioFlinger::EffectModule::setInBuffer(const sp<EffectBufferHalInterface>&
 
 void AudioFlinger::EffectModule::setOutBuffer(const sp<EffectBufferHalInterface>& buffer) {
     ALOGVV("setOutBuffer %p",(&buffer));
+
+    // mConfig.outputCfg.buffer.frameCount may be zero if configure() is not called yet.
     if (buffer != 0) {
         mConfig.outputCfg.buffer.raw = buffer->audioBuffer()->raw;
         buffer->setFrameCount(mConfig.outputCfg.buffer.frameCount);
