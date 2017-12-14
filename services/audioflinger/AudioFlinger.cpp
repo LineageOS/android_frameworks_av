@@ -3204,6 +3204,42 @@ void AudioFlinger::dumpTee(int fd, const sp<NBAIO_Source>& source, audio_io_hand
 
 // ----------------------------------------------------------------------------
 
+status_t AudioFlinger::getAudioData(int par, unsigned long size, char * buffer)
+{
+    status_t result = BAD_VALUE;
+    ALOGV("getAudioData: par=%d, size=%d, buffer=%p", par, size, buffer);
+    Mutex::Autolock _l(mLock);
+    if (mPrimaryHardwareDev != NULL) {
+        audio_hw_device_t *dev = mPrimaryHardwareDev->hwDevice();
+        if (dev != NULL && dev->get_audio_data != NULL) {
+            result = dev->get_audio_data(dev, par, size, buffer);
+        } else {
+            ALOGE("getAudioData: dev or get_audio_data is NULL");
+        }
+    } else {
+        ALOGE("getAudioData: mPrimaryHardwareDev is NULL");
+    }
+    return result;
+}
+
+status_t AudioFlinger::setAudioData(int par, unsigned long size, char * buffer)
+{
+    status_t result = BAD_VALUE;
+    ALOGV("setAudioData: par=%d, size=%d, buffer=%p", par, size, buffer);
+    Mutex::Autolock _l(mLock);
+    if (mPrimaryHardwareDev != NULL) {
+        audio_hw_device_t *dev = mPrimaryHardwareDev->hwDevice();
+        if (dev != NULL && dev->set_audio_data != NULL) {
+            result = dev->set_audio_data(dev, par, size, buffer);
+        } else {
+            ALOGE("setAudioData: dev or get_audio_data is NULL");
+        }
+    } else {
+        ALOGE("setAudioData: mPrimaryHardwareDev is NULL");
+    }
+    return result;
+}
+
 status_t AudioFlinger::onTransact(
         uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
