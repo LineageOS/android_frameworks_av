@@ -26,7 +26,6 @@
 #include <gtest/gtest.h>
 #include <unistd.h>
 
-
 // Callback function that does nothing.
 aaudio_data_callback_result_t NoopDataCallbackProc(
         AAudioStream *stream,
@@ -45,73 +44,376 @@ aaudio_data_callback_result_t NoopDataCallbackProc(
 
 constexpr int64_t NANOS_PER_MILLISECOND = 1000 * 1000;
 
-//int foo() { // To fix Android Studio formatting when editing.
-TEST(test_various, aaudio_stop_when_open) {
+enum FunctionToCall {
+    CALL_START, CALL_STOP, CALL_PAUSE, CALL_FLUSH
+};
+
+void checkStateTransition(aaudio_performance_mode_t perfMode,
+                          aaudio_stream_state_t originalState,
+                          FunctionToCall functionToCall,
+                          aaudio_result_t expectedResult,
+                          aaudio_stream_state_t expectedState) {
     AAudioStreamBuilder *aaudioBuilder = nullptr;
     AAudioStream *aaudioStream = nullptr;
 
-// Use an AAudioStreamBuilder to contain requested parameters.
+    // Use an AAudioStreamBuilder to contain requested parameters.
     ASSERT_EQ(AAUDIO_OK, AAudio_createStreamBuilder(&aaudioBuilder));
 
-// Request stream properties.
+    // Request stream properties.
     AAudioStreamBuilder_setDataCallback(aaudioBuilder, NoopDataCallbackProc, nullptr);
-    AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+    AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, perfMode);
 
-// Create an AAudioStream using the Builder.
-    EXPECT_EQ(AAUDIO_OK, AAudioStreamBuilder_openStream(aaudioBuilder, &aaudioStream));
+    // Create an AAudioStream using the Builder.
+    ASSERT_EQ(AAUDIO_OK, AAudioStreamBuilder_openStream(aaudioBuilder, &aaudioStream));
 
-
+    // Verify Open State
     aaudio_stream_state_t state = AAUDIO_STREAM_STATE_UNKNOWN;
     EXPECT_EQ(AAUDIO_OK, AAudioStream_waitForStateChange(aaudioStream,
                                                          AAUDIO_STREAM_STATE_UNKNOWN, &state,
                                                          1000 * NANOS_PER_MILLISECOND));
     EXPECT_EQ(AAUDIO_STREAM_STATE_OPEN, state);
 
-    EXPECT_EQ(AAUDIO_OK, AAudioStream_requestStop(aaudioStream));
+    // Put stream into desired state.
+    aaudio_stream_state_t inputState = AAUDIO_STREAM_STATE_UNINITIALIZED;
+    if (originalState != AAUDIO_STREAM_STATE_OPEN) {
 
-    state = AAUDIO_STREAM_STATE_UNKNOWN;
+        ASSERT_EQ(AAUDIO_OK, AAudioStream_requestStart(aaudioStream));
+
+        if (originalState != AAUDIO_STREAM_STATE_STARTING) {
+
+            ASSERT_EQ(AAUDIO_OK, AAudioStream_waitForStateChange(aaudioStream,
+                                                                 AAUDIO_STREAM_STATE_STARTING,
+                                                                 &state,
+                                                                 1000 * NANOS_PER_MILLISECOND));
+            ASSERT_EQ(AAUDIO_STREAM_STATE_STARTED, state);
+
+            if (originalState == AAUDIO_STREAM_STATE_STOPPING) {
+                ASSERT_EQ(AAUDIO_OK, AAudioStream_requestStop(aaudioStream));
+            } else if (originalState == AAUDIO_STREAM_STATE_STOPPED) {
+                ASSERT_EQ(AAUDIO_OK, AAudioStream_requestStop(aaudioStream));
+                inputState = AAUDIO_STREAM_STATE_STOPPING;
+            } else if (originalState == AAUDIO_STREAM_STATE_PAUSING) {
+                ASSERT_EQ(AAUDIO_OK, AAudioStream_requestPause(aaudioStream));
+            } else if (originalState == AAUDIO_STREAM_STATE_PAUSED) {
+                ASSERT_EQ(AAUDIO_OK, AAudioStream_requestPause(aaudioStream));
+                inputState = AAUDIO_STREAM_STATE_PAUSING;
+            }
+        }
+    }
+
+    // Wait until past transitional state.
+    if (inputState != AAUDIO_STREAM_STATE_UNINITIALIZED) {
+        ASSERT_EQ(AAUDIO_OK, AAudioStream_waitForStateChange(aaudioStream,
+                                                             inputState,
+                                                             &state,
+                                                             1000 * NANOS_PER_MILLISECOND));
+        ASSERT_EQ(originalState, state);
+    }
+
+    aaudio_stream_state_t transitionalState = originalState;
+    switch(functionToCall) {
+        case FunctionToCall::CALL_START:
+            EXPECT_EQ(expectedResult, AAudioStream_requestStart(aaudioStream));
+            transitionalState = AAUDIO_STREAM_STATE_STARTING;
+            break;
+        case FunctionToCall::CALL_STOP:
+            EXPECT_EQ(expectedResult, AAudioStream_requestStop(aaudioStream));
+            transitionalState = AAUDIO_STREAM_STATE_STOPPING;
+            break;
+        case FunctionToCall::CALL_PAUSE:
+            EXPECT_EQ(expectedResult, AAudioStream_requestPause(aaudioStream));
+            transitionalState = AAUDIO_STREAM_STATE_PAUSING;
+            break;
+        case FunctionToCall::CALL_FLUSH:
+            EXPECT_EQ(expectedResult, AAudioStream_requestFlush(aaudioStream));
+            transitionalState = AAUDIO_STREAM_STATE_FLUSHING;
+            break;
+    }
+
     EXPECT_EQ(AAUDIO_OK, AAudioStream_waitForStateChange(aaudioStream,
-                                                         AAUDIO_STREAM_STATE_UNKNOWN, &state, 0));
-    EXPECT_EQ(AAUDIO_STREAM_STATE_OPEN, state);
-
-    AAudioStream_close(aaudioStream);
-    AAudioStreamBuilder_delete(aaudioBuilder);
-}
-
-//int boo() { // To fix Android Studio formatting when editing.
-TEST(test_various, aaudio_flush_when_started) {
-    AAudioStreamBuilder *aaudioBuilder = nullptr;
-    AAudioStream *aaudioStream = nullptr;
-
-// Use an AAudioStreamBuilder to contain requested parameters.
-    ASSERT_EQ(AAUDIO_OK, AAudio_createStreamBuilder(&aaudioBuilder));
-
-// Request stream properties.
-    AAudioStreamBuilder_setDataCallback(aaudioBuilder, NoopDataCallbackProc, nullptr);
-    AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
-
-// Create an AAudioStream using the Builder.
-    EXPECT_EQ(AAUDIO_OK, AAudioStreamBuilder_openStream(aaudioBuilder, &aaudioStream));
-    EXPECT_EQ(AAUDIO_OK, AAudioStream_requestStart(aaudioStream));
-
-    aaudio_stream_state_t state = AAUDIO_STREAM_STATE_UNKNOWN;
-    EXPECT_EQ(AAUDIO_OK, AAudioStream_waitForStateChange(aaudioStream,
-                                                         AAUDIO_STREAM_STATE_STARTING, &state,
+                                                         transitionalState,
+                                                         &state,
                                                          1000 * NANOS_PER_MILLISECOND));
-    EXPECT_EQ(AAUDIO_STREAM_STATE_STARTED, state);
-
-    EXPECT_EQ(AAUDIO_ERROR_INVALID_STATE, AAudioStream_requestFlush(aaudioStream));
-
-    state = AAUDIO_STREAM_STATE_UNKNOWN;
-    EXPECT_EQ(AAUDIO_OK, AAudioStream_waitForStateChange(aaudioStream,
-                                                         AAUDIO_STREAM_STATE_UNKNOWN, &state, 0));
-    EXPECT_EQ(AAUDIO_STREAM_STATE_STARTED, state);
+    // We should not change state when a function fails.
+    if (expectedResult != AAUDIO_OK) {
+        ASSERT_EQ(originalState, expectedState);
+    }
+    EXPECT_EQ(expectedState, state);
+    if (state != expectedState) {
+        printf("ERROR - expected %s, actual = %s\n",
+                AAudio_convertStreamStateToText(expectedState),
+                AAudio_convertStreamStateToText(state));
+        fflush(stdout);
+    }
 
     AAudioStream_close(aaudioStream);
     AAudioStreamBuilder_delete(aaudioBuilder);
 }
 
-//int main() { // To fix Android Studio formatting when editing.
+// TODO Use parameterized tests instead of these individual specific tests.
+
+// OPEN =================================================================
+TEST(test_various, aaudio_state_lowlat_open_start) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+            AAUDIO_STREAM_STATE_OPEN,
+            FunctionToCall::CALL_START,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_STARTED);
+}
+
+TEST(test_various, aaudio_state_none_open_start) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+            AAUDIO_STREAM_STATE_OPEN,
+            FunctionToCall::CALL_START,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_STARTED);
+}
+
+TEST(test_various, aaudio_state_lowlat_open_stop) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+            AAUDIO_STREAM_STATE_OPEN,
+            FunctionToCall::CALL_STOP,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_STOPPED);
+}
+
+TEST(test_various, aaudio_state_none_open_stop) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+            AAUDIO_STREAM_STATE_OPEN,
+            FunctionToCall::CALL_STOP,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_STOPPED);
+}
+
+TEST(test_various, aaudio_state_lowlat_open_pause) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+            AAUDIO_STREAM_STATE_OPEN,
+            FunctionToCall::CALL_PAUSE,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_PAUSED);
+}
+
+TEST(test_various, aaudio_state_none_open_pause) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+            AAUDIO_STREAM_STATE_OPEN,
+            FunctionToCall::CALL_PAUSE,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_PAUSED);
+}
+
+TEST(test_various, aaudio_state_lowlat_open_flush) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+            AAUDIO_STREAM_STATE_OPEN,
+            FunctionToCall::CALL_FLUSH,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_FLUSHED);
+}
+
+TEST(test_various, aaudio_state_none_open_flush) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+            AAUDIO_STREAM_STATE_OPEN,
+            FunctionToCall::CALL_FLUSH,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_FLUSHED);
+}
+
+
+// STARTED =================================================================
+TEST(test_various, aaudio_state_lowlat_started_start) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+            AAUDIO_STREAM_STATE_STARTED,
+            FunctionToCall::CALL_START,
+            AAUDIO_ERROR_INVALID_STATE,
+            AAUDIO_STREAM_STATE_STARTED);
+}
+
+TEST(test_various, aaudio_state_none_started_start) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+            AAUDIO_STREAM_STATE_STARTED,
+            FunctionToCall::CALL_START,
+            AAUDIO_ERROR_INVALID_STATE,
+            AAUDIO_STREAM_STATE_STARTED);
+}
+
+TEST(test_various, aaudio_state_lowlat_started_stop) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+            AAUDIO_STREAM_STATE_STARTED,
+            FunctionToCall::CALL_STOP,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_STOPPED);
+}
+
+TEST(test_various, aaudio_state_none_started_stop) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+            AAUDIO_STREAM_STATE_STARTED,
+            FunctionToCall::CALL_STOP,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_STOPPED);
+}
+
+TEST(test_various, aaudio_state_lowlat_started_pause) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+            AAUDIO_STREAM_STATE_STARTED,
+            FunctionToCall::CALL_PAUSE,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_PAUSED);
+}
+
+TEST(test_various, aaudio_state_none_started_pause) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+            AAUDIO_STREAM_STATE_STARTED,
+            FunctionToCall::CALL_PAUSE,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_PAUSED);
+}
+
+TEST(test_various, aaudio_state_lowlat_started_flush) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+            AAUDIO_STREAM_STATE_STARTED,
+            FunctionToCall::CALL_FLUSH,
+            AAUDIO_ERROR_INVALID_STATE,
+            AAUDIO_STREAM_STATE_STARTED);
+}
+
+TEST(test_various, aaudio_state_none_started_flush) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+            AAUDIO_STREAM_STATE_STARTED,
+            FunctionToCall::CALL_FLUSH,
+            AAUDIO_ERROR_INVALID_STATE,
+            AAUDIO_STREAM_STATE_STARTED);
+}
+
+// STOPPED =================================================================
+TEST(test_various, aaudio_state_lowlat_stopped_start) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+            AAUDIO_STREAM_STATE_STOPPED,
+            FunctionToCall::CALL_START,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_STARTED);
+}
+
+TEST(test_various, aaudio_state_none_stopped_start) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+            AAUDIO_STREAM_STATE_STOPPED,
+            FunctionToCall::CALL_START,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_STARTED);
+}
+
+TEST(test_various, aaudio_state_lowlat_stopped_stop) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+            AAUDIO_STREAM_STATE_STOPPED,
+            FunctionToCall::CALL_STOP,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_STOPPED);
+}
+
+TEST(test_various, aaudio_state_none_stopped_stop) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+            AAUDIO_STREAM_STATE_STOPPED,
+            FunctionToCall::CALL_STOP,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_STOPPED);
+}
+
+TEST(test_various, aaudio_state_lowlat_stopped_pause) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+            AAUDIO_STREAM_STATE_STOPPED,
+            FunctionToCall::CALL_PAUSE,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_PAUSED);
+}
+
+TEST(test_various, aaudio_state_none_stopped_pause) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+            AAUDIO_STREAM_STATE_STOPPED,
+            FunctionToCall::CALL_PAUSE,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_PAUSED);
+}
+
+TEST(test_various, aaudio_state_lowlat_stopped_flush) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+            AAUDIO_STREAM_STATE_STOPPED,
+            FunctionToCall::CALL_FLUSH,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_FLUSHED);
+}
+
+TEST(test_various, aaudio_state_none_stopped_flush) {
+    checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+            AAUDIO_STREAM_STATE_STOPPED,
+            FunctionToCall::CALL_FLUSH,
+            AAUDIO_OK,
+            AAUDIO_STREAM_STATE_FLUSHED);
+}
+
+// PAUSED =================================================================
+TEST(test_various, aaudio_state_lowlat_paused_start) {
+checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+        AAUDIO_STREAM_STATE_PAUSED,
+        FunctionToCall::CALL_START,
+        AAUDIO_OK,
+        AAUDIO_STREAM_STATE_STARTED);
+}
+
+TEST(test_various, aaudio_state_none_paused_start) {
+checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+        AAUDIO_STREAM_STATE_PAUSED,
+        FunctionToCall::CALL_START,
+        AAUDIO_OK,
+        AAUDIO_STREAM_STATE_STARTED);
+}
+
+TEST(test_various, aaudio_state_lowlat_paused_stop) {
+checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+        AAUDIO_STREAM_STATE_PAUSED,
+        FunctionToCall::CALL_STOP,
+        AAUDIO_OK,
+        AAUDIO_STREAM_STATE_STOPPED);
+}
+
+TEST(test_various, aaudio_state_none_paused_stop) {
+checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+        AAUDIO_STREAM_STATE_PAUSED,
+        FunctionToCall::CALL_STOP,
+        AAUDIO_OK,
+        AAUDIO_STREAM_STATE_STOPPED);
+}
+
+TEST(test_various, aaudio_state_lowlat_paused_pause) {
+checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+        AAUDIO_STREAM_STATE_PAUSED,
+        FunctionToCall::CALL_PAUSE,
+        AAUDIO_OK,
+        AAUDIO_STREAM_STATE_PAUSED);
+}
+
+TEST(test_various, aaudio_state_none_paused_pause) {
+checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+        AAUDIO_STREAM_STATE_PAUSED,
+        FunctionToCall::CALL_PAUSE,
+        AAUDIO_OK,
+        AAUDIO_STREAM_STATE_PAUSED);
+}
+
+TEST(test_various, aaudio_state_lowlat_paused_flush) {
+checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+        AAUDIO_STREAM_STATE_PAUSED,
+        FunctionToCall::CALL_FLUSH,
+        AAUDIO_OK,
+        AAUDIO_STREAM_STATE_FLUSHED);
+}
+
+TEST(test_various, aaudio_state_none_paused_flush) {
+checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+        AAUDIO_STREAM_STATE_PAUSED,
+        FunctionToCall::CALL_FLUSH,
+        AAUDIO_OK,
+        AAUDIO_STREAM_STATE_FLUSHED);
+}
+
+// ==========================================================================
 TEST(test_various, aaudio_set_buffer_size) {
 
     int32_t bufferCapacity;
@@ -173,7 +475,6 @@ TEST(test_various, aaudio_set_buffer_size) {
     AAudioStream_close(aaudioStream);
     AAudioStreamBuilder_delete(aaudioBuilder);
 }
-
 
 // ************************************************************
 // Test to make sure that AAUDIO_CALLBACK_RESULT_STOP works.
