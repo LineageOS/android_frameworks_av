@@ -24,7 +24,6 @@ cc_library_shared {
     ],
     shared_libs: [
         "libbinder",
-        "libcutils",
         "liblog",
         "libutils",
         "libmemunreachable",
