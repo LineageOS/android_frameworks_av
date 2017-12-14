@@ -1349,7 +1349,6 @@ status_t AudioSystem::setAudioData(int par, unsigned long size, char * buffer)
     return af->setAudioData(par, size, buffer);
 }
 
- #ifdef MTK_MT6582
  extern "C" void _ZN7android11AudioSystem24getVoiceUnlockDLInstanceEv()
  { return; }
  extern "C" int _ZN7android11AudioSystem23GetVoiceUnlockDLLatencyEv()
@@ -1370,6 +1369,5 @@ status_t AudioSystem::setAudioData(int par, unsigned long size, char * buffer)
  { return 0; }
  extern "C" void _ZN7android15IATVCtrlService11asInterfaceERKNS_2spINS_7IBinderEEE()
  { return; }
- #endif
 
 } // namespace android
