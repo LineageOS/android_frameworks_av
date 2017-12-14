@@ -20,11 +20,13 @@
 #include "media/JAudioFormat.h"
 #include "media/JAudioTrack.h"
 
+#include <android_media_AudioErrors.h>
 #include <android_runtime/AndroidRuntime.h>
 #include <media/AudioResamplerPublic.h>
 
 namespace android {
 
+// TODO: Store Java class/methodID as a member variable in the class.
 // TODO: Add NULL && Exception checks after every JNI call.
 JAudioTrack::JAudioTrack(                             // < Usages of the arguments are below >
         audio_stream_type_t streamType,               // AudioAudioAttributes
@@ -38,6 +40,7 @@ JAudioTrack::JAudioTrack(                             // < Usages of the argumen
 
     JNIEnv *env = AndroidRuntime::getJNIEnv();
     jclass jAudioTrackCls = env->FindClass("android/media/AudioTrack");
+    mAudioTrackCls = (jclass) env->NewGlobalRef(jAudioTrackCls);
 
     maxRequiredSpeed = std::min(std::max(maxRequiredSpeed, 1.0f), AUDIO_TIMESTRETCH_SPEED_MAX);
 
@@ -49,8 +52,8 @@ JAudioTrack::JAudioTrack(                             // < Usages of the argumen
     } else if (sampleRate > 0) {
         // Call Java AudioTrack::getMinBufferSize().
         jmethodID jGetMinBufferSize =
-                env->GetStaticMethodID(jAudioTrackCls, "getMinBufferSize", "(III)I");
-        bufferSizeInBytes = env->CallStaticIntMethod(jAudioTrackCls, jGetMinBufferSize,
+                env->GetStaticMethodID(mAudioTrackCls, "getMinBufferSize", "(III)I");
+        bufferSizeInBytes = env->CallStaticIntMethod(mAudioTrackCls, jGetMinBufferSize,
                 sampleRate, outChannelMaskFromNative(channelMask), audioFormatFromNative(format));
     }
     bufferSizeInBytes = (int) (bufferSizeInBytes * maxRequiredSpeed);
@@ -75,8 +78,8 @@ JAudioTrack::JAudioTrack(                             // < Usages of the argumen
     jBuilderObj = env->CallObjectMethod(jBuilderObj, jSetBufferSizeInBytes, bufferSizeInBytes);
 
     // We only use streaming mode of Java AudioTrack.
-    jfieldID jModeStream = env->GetStaticFieldID(jAudioTrackCls, "MODE_STREAM", "I");
-    jint transferMode = env->GetStaticIntField(jAudioTrackCls, jModeStream);
+    jfieldID jModeStream = env->GetStaticFieldID(mAudioTrackCls, "MODE_STREAM", "I");
+    jint transferMode = env->GetStaticIntField(mAudioTrackCls, jModeStream);
     jmethodID jSetTransferMode = env->GetMethodID(jBuilderCls, "setTransferMode",
             "(I)Landroid/media/AudioTrack$Builder;");
     jBuilderObj = env->CallObjectMethod(jBuilderObj, jSetTransferMode,
@@ -92,11 +95,147 @@ JAudioTrack::JAudioTrack(                             // < Usages of the argumen
     mAudioTrackObj = env->CallObjectMethod(jBuilderObj, jBuild);
 }
 
+JAudioTrack::~JAudioTrack() {
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    env->DeleteGlobalRef(mAudioTrackCls);
+}
+
+size_t JAudioTrack::frameCount() {
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    jmethodID jGetBufferSizeInFrames = env->GetMethodID(
+            mAudioTrackCls, "getBufferSizeInFrames", "()I");
+    return env->CallIntMethod(mAudioTrackObj, jGetBufferSizeInFrames);
+}
+
+size_t JAudioTrack::channelCount() {
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    jmethodID jGetChannelCount = env->GetMethodID(mAudioTrackCls, "getChannelCount", "()I");
+    return env->CallIntMethod(mAudioTrackObj, jGetChannelCount);
+}
+
+status_t JAudioTrack::getPosition(uint32_t *position) {
+    if (position == NULL) {
+        return BAD_VALUE;
+    }
+
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    jmethodID jGetPlaybackHeadPosition = env->GetMethodID(
+            mAudioTrackCls, "getPlaybackHeadPosition", "()I");
+    *position = env->CallIntMethod(mAudioTrackObj, jGetPlaybackHeadPosition);
+
+    return NO_ERROR;
+}
+
+status_t JAudioTrack::setAuxEffectSendLevel(float level) {
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    jmethodID jSetAuxEffectSendLevel = env->GetMethodID(
+            mAudioTrackCls, "setAuxEffectSendLevel", "(F)I");
+    int result = env->CallIntMethod(mAudioTrackObj, jSetAuxEffectSendLevel, level);
+    return javaToNativeStatus(result);
+}
+
+status_t JAudioTrack::attachAuxEffect(int effectId) {
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    jmethodID jAttachAuxEffect = env->GetMethodID(mAudioTrackCls, "attachAuxEffect", "(I)I");
+    int result = env->CallIntMethod(mAudioTrackObj, jAttachAuxEffect, effectId);
+    return javaToNativeStatus(result);
+}
+
+status_t JAudioTrack::setVolume(float left, float right) {
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    // TODO: Java setStereoVolume is deprecated. Do we really need this method?
+    jmethodID jSetStereoVolume = env->GetMethodID(mAudioTrackCls, "setStereoVolume", "(FF)I");
+    int result = env->CallIntMethod(mAudioTrackObj, jSetStereoVolume, left, right);
+    return javaToNativeStatus(result);
+}
+
+status_t JAudioTrack::setVolume(float volume) {
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    jmethodID jSetVolume = env->GetMethodID(mAudioTrackCls, "setVolume", "(F)I");
+    int result = env->CallIntMethod(mAudioTrackObj, jSetVolume, volume);
+    return javaToNativeStatus(result);
+}
+
+status_t JAudioTrack::start() {
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    jmethodID jPlay = env->GetMethodID(mAudioTrackCls, "play", "()V");
+    // TODO: Should we catch the Java IllegalStateException from play()?
+    env->CallVoidMethod(mAudioTrackObj, jPlay);
+    return NO_ERROR;
+}
+
 void JAudioTrack::stop() {
     JNIEnv *env = AndroidRuntime::getJNIEnv();
-    jclass jAudioTrackCls = env->FindClass("android/media/AudioTrack");
-    jmethodID jStop = env->GetMethodID(jAudioTrackCls, "stop", "()V");
+    jmethodID jStop = env->GetMethodID(mAudioTrackCls, "stop", "()V");
     env->CallVoidMethod(mAudioTrackObj, jStop);
+    // TODO: Should we catch IllegalStateException?
+}
+
+// TODO: Is the right implementation?
+bool JAudioTrack::stopped() const {
+    return !isPlaying();
+}
+
+void JAudioTrack::flush() {
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    jmethodID jFlush = env->GetMethodID(mAudioTrackCls, "flush", "()V");
+    env->CallVoidMethod(mAudioTrackObj, jFlush);
+}
+
+void JAudioTrack::pause() {
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    jmethodID jPause = env->GetMethodID(mAudioTrackCls, "pause", "()V");
+    env->CallVoidMethod(mAudioTrackObj, jPause);
+    // TODO: Should we catch IllegalStateException?
+}
+
+bool JAudioTrack::isPlaying() const {
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    jmethodID jGetPlayState = env->GetMethodID(mAudioTrackCls, "getPlayState", "()I");
+    int currentPlayState = env->CallIntMethod(mAudioTrackObj, jGetPlayState);
+
+    // TODO: In Java AudioTrack, there is no STOPPING state.
+    // This means while stopping, isPlaying() will return different value in two class.
+    //  - in existing native AudioTrack: true
+    //  - in JAudioTrack: false
+    // If not okay, also modify the implementation of stopped().
+    jfieldID jPlayStatePlaying = env->GetStaticFieldID(mAudioTrackCls, "PLAYSTATE_PLAYING", "I");
+    int statePlaying = env->GetStaticIntField(mAudioTrackCls, jPlayStatePlaying);
+    return currentPlayState == statePlaying;
+}
+
+uint32_t JAudioTrack::getSampleRate() {
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    jmethodID jGetSampleRate = env->GetMethodID(mAudioTrackCls, "getSampleRate", "()I");
+    return env->CallIntMethod(mAudioTrackObj, jGetSampleRate);
+}
+
+audio_format_t JAudioTrack::format() {
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    jmethodID jGetAudioFormat = env->GetMethodID(mAudioTrackCls, "getAudioFormat", "()I");
+    int javaFormat = env->CallIntMethod(mAudioTrackObj, jGetAudioFormat);
+    return audioFormatToNative(javaFormat);
+}
+
+status_t JAudioTrack::javaToNativeStatus(int javaStatus) {
+    switch (javaStatus) {
+    case AUDIO_JAVA_SUCCESS:
+        return NO_ERROR;
+    case AUDIO_JAVA_BAD_VALUE:
+        return BAD_VALUE;
+    case AUDIO_JAVA_INVALID_OPERATION:
+        return INVALID_OPERATION;
+    case AUDIO_JAVA_PERMISSION_DENIED:
+        return PERMISSION_DENIED;
+    case AUDIO_JAVA_NO_INIT:
+        return NO_INIT;
+    case AUDIO_JAVA_WOULD_BLOCK:
+        return WOULD_BLOCK;
+    case AUDIO_JAVA_DEAD_OBJECT:
+        return DEAD_OBJECT;
+    default:
+        return UNKNOWN_ERROR;
+    }
 }
 
 } // namespace android

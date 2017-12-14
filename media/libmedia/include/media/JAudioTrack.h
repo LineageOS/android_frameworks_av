@@ -93,11 +93,105 @@ public:
        threadCanCallJava
     */
 
+    virtual ~JAudioTrack();
+
+    size_t frameCount();
+    size_t channelCount();
+
+    /* Return the total number of frames played since playback start.
+     * The counter will wrap (overflow) periodically, e.g. every ~27 hours at 44.1 kHz.
+     * It is reset to zero by flush(), reload(), and stop().
+     *
+     * Parameters:
+     *
+     * position: Address where to return play head position.
+     *
+     * Returned status (from utils/Errors.h) can be:
+     *  - NO_ERROR: successful operation
+     *  - BAD_VALUE: position is NULL
+     */
+    status_t getPosition(uint32_t *position);
+
+    /* Set the send level for this track. An auxiliary effect should be attached
+     * to the track with attachAuxEffect(). Level must be >= 0.0 and <= 1.0.
+     */
+    status_t setAuxEffectSendLevel(float level);
+
+    /* Attach track auxiliary output to specified effect. Use effectId = 0
+     * to detach track from effect.
+     *
+     * Parameters:
+     *
+     * effectId: effectId obtained from AudioEffect::id().
+     *
+     * Returned status (from utils/Errors.h) can be:
+     *  - NO_ERROR: successful operation
+     *  - INVALID_OPERATION: the effect is not an auxiliary effect.
+     *  - BAD_VALUE: The specified effect ID is invalid
+     */
+    status_t attachAuxEffect(int effectId);
+
+    /* Set volume for this track, mostly used for games' sound effects
+     * left and right volumes. Levels must be >= 0.0 and <= 1.0.
+     * This is the older API.  New applications should use setVolume(float) when possible.
+     */
+    status_t setVolume(float left, float right);
+
+    /* Set volume for all channels. This is the preferred API for new applications,
+     * especially for multi-channel content.
+     */
+    status_t setVolume(float volume);
+
+    // TODO: Does this comment equally apply to the Java AudioTrack::play()?
+    /* After it's created the track is not active. Call start() to
+     * make it active. If set, the callback will start being called.
+     * If the track was previously paused, volume is ramped up over the first mix buffer.
+     */
+    status_t start();
+
+    // TODO: Does this comment equally apply to the Java AudioTrack::stop()?
+    /* Stop a track.
+     * In static buffer mode, the track is stopped immediately.
+     * In streaming mode, the callback will cease being called.  Note that obtainBuffer() still
+     * works and will fill up buffers until the pool is exhausted, and then will return WOULD_BLOCK.
+     * In streaming mode the stop does not occur immediately: any data remaining in the buffer
+     * is first drained, mixed, and output, and only then is the track marked as stopped.
+     */
     void stop();
+    bool stopped() const;
 
-protected:
-    jobject mAudioTrackObj;         // Java AudioTrack object
+    // TODO: Does this comment equally apply to the Java AudioTrack::flush()?
+    /* Flush a stopped or paused track. All previously buffered data is discarded immediately.
+     * This has the effect of draining the buffers without mixing or output.
+     * Flush is intended for streaming mode, for example before switching to non-contiguous content.
+     * This function is a no-op if the track is not stopped or paused, or uses a static buffer.
+     */
+    void flush();
 
+    // TODO: Does this comment equally apply to the Java AudioTrack::pause()?
+    // At least we are not using obtainBuffer.
+    /* Pause a track. After pause, the callback will cease being called and
+     * obtainBuffer returns WOULD_BLOCK. Note that obtainBuffer() still works
+     * and will fill up buffers until the pool is exhausted.
+     * Volume is ramped down over the next mix buffer following the pause request,
+     * and then the track is marked as paused. It can be resumed with ramp up by start().
+     */
+    void pause();
+
+    bool isPlaying() const;
+
+    /* Return current source sample rate in Hz.
+     * If specified as zero in constructor, this will be the sink sample rate.
+     */
+    uint32_t getSampleRate();
+
+    audio_format_t format();
+
+private:
+    jclass mAudioTrackCls;
+    jobject mAudioTrackObj;
+
+    status_t javaToNativeStatus(int javaStatus);
 };
 
 }; // namespace android
